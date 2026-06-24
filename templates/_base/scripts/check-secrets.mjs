@@ -35,7 +35,11 @@ async function walk(d) {
       await walk(p);
       continue;
     }
-    if (e.name === '.env.example') continue;
+    // Skip env files: .env / .env.* are gitignored by contract (never committed)
+    // and .env.example holds placeholders. gitleaks (CI) is the authoritative
+    // commit-time scanner; skipping these avoids false positives on a developer's
+    // real local .env, which would otherwise break `just security` / `just ci`.
+    if (e.name === '.env' || e.name.startsWith('.env.')) continue;
     const s = await stat(p);
     if (s.size > 1_000_000) continue;
     let txt;

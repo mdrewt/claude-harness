@@ -57,6 +57,10 @@ test('check-secrets flags a planted secret and passes a clean tree', async () =>
   const dir = await mkdtemp(path.join(tmpdir(), 'sec-'));
   await writeFile(path.join(dir, 'clean.txt'), 'nothing to see');
   assert.equal(run(SECRETS, [dir], dir).code, 0, 'clean tree should pass');
+  // A gitignored .env holds real local secrets and is never committed; the
+  // scanner must skip it (gitleaks scans the committed tree in CI).
+  await writeFile(path.join(dir, '.env'), 'API_KEY="super-secret-value-123"');
+  assert.equal(run(SECRETS, [dir], dir).code, 0, 'gitignored .env must not trip the scanner');
   await writeFile(path.join(dir, 'leak.txt'), 'aws AKIA1234567890ABCD12 key');
   assert.equal(run(SECRETS, [dir], dir).code, 1, 'planted AWS key should fail');
   await rm(dir, { recursive: true, force: true });
