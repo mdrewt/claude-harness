@@ -317,7 +317,11 @@ test('every *.eval.mjs default-exports a function', async () => {
     if (!existsSync(evalDir)) continue;
     for (const f of readdirSync(evalDir).filter((n) => n.endsWith('.eval.mjs'))) {
       const mod = await import(pathToFileURL(path.join(evalDir, f)).href);
-      assert.equal(typeof mod.default, 'function', `${s}/evals/${f}: must default-export a function`);
+      assert.equal(
+        typeof mod.default,
+        'function',
+        `${s}/evals/${f}: must default-export a function`,
+      );
     }
   }
 });

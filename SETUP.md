@@ -49,6 +49,15 @@ pipx install specify-cli                      # or: uv tool install specify-cli
 3. `node scripts/new-project.mjs hello node-ts-app` then `cd projects/hello` and
    `just ci` (or `npm run ci`).
 
+## Sandbox sessions (Linux build sandbox)
+The ephemeral Linux sandbox is recreated each session, so `just` (installed via
+winget on the Windows host) is missing until restored. Run once per session
+before any `just` recipe:
+```bash
+source scripts/bootstrap-sandbox.sh   # installs `just`, adds it to PATH
+```
+No-op on the Windows host, where `just` is already installed.
+
 ## Notes
 - `just ci` = lint, typecheck, test, eval, security. CI adds gitleaks + Semgrep
   + SBOM via GitHub Actions (each project's `.github/workflows/ci.yml`).
