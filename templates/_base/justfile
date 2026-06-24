@@ -1,0 +1,31 @@
+set windows-shell := ["cmd.exe", "/c"]
+# Standard command vocabulary (same across every stack = least surprise).
+# Stack templates MUST override setup/lint/typecheck/test/mutate. These bodies
+# FAIL LOUD on purpose: if one runs, a stack template is missing its justfile or
+# a recipe — that's a bug to fix in the template, never a silent no-op gate.
+
+setup:
+    @echo "ERROR: 'setup' was not overridden by the stack template" && exit 1
+
+test:
+    @echo "ERROR: 'test' was not overridden by the stack template" && exit 1
+
+lint:
+    @echo "ERROR: 'lint' was not overridden by the stack template" && exit 1
+
+typecheck:
+    @echo "ERROR: 'typecheck' was not overridden by the stack template" && exit 1
+
+mutate:
+    @echo "ERROR: 'mutate' was not overridden by the stack template" && exit 1
+
+eval:
+    node evals/run.mjs
+
+security:
+    node scripts/check-secrets.mjs .
+
+changelog:
+    git cliff -o CHANGELOG.md
+
+ci: lint typecheck test eval security

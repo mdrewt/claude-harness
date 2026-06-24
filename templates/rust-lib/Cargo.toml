@@ -1,0 +1,11 @@
+[package]
+name = "{{NAME}}"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "{{DESCRIPTION}}"
+
+[dependencies]
+
+[dev-dependencies]
+proptest = "1"

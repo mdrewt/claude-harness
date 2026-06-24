@@ -1,0 +1,32 @@
+# --- Projects are independent repos; never tracked by the harness ---
+/projects/
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Build / deps / caches ---
+node_modules/
+target/
+dist/
+build/
+__pycache__/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# --- Local Claude state (keep shared config, ignore local overrides) ---
+.claude/settings.local.json

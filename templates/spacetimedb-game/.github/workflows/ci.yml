@@ -1,0 +1,19 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gitleaks/gitleaks-action@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with: { components: clippy }
+      - uses: extractions/setup-just@v2
+      - run: just lint
+      - run: just typecheck
+      - run: just test
+      # build/publish/integration require a running SpacetimeDB instance (see README)

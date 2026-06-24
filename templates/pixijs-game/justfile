@@ -1,0 +1,27 @@
+set windows-shell := ["cmd.exe", "/c"]
+setup:
+    npm run setup
+
+lint:
+    npm run lint
+
+typecheck:
+    npm run typecheck
+
+test:
+    npm run test
+
+eval:
+    npm run eval
+
+security:
+    npm run security
+
+build:
+    npm run build
+
+changelog:
+    git cliff -o CHANGELOG.md
+
+ci:
+    npm run ci

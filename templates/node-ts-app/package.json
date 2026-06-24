@@ -1,0 +1,22 @@
+{
+  "name": "{{NAME}}",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "{{DESCRIPTION}}",
+  "license": "MIT",
+  "scripts": {
+    "setup": "npm install",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "eval": "node evals/run.mjs",
+    "security": "node scripts/check-secrets.mjs .",
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run eval && npm run security"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$comment": "Per-project guardrails shipped by the harness. Claude Code enforces these even when the project is opened standalone. Never autonomously move money / execute trades in finance projects (see standards/domain/finance.md).",
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)", "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Read(**/.env)", "Read(**/.env.*)", "Read(**/*.pem)", "Read(**/*.key)"
+    ]
+  }
+}

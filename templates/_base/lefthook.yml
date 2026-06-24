@@ -1,0 +1,11 @@
+pre-commit:
+  parallel: true
+  commands:
+    secrets:
+      run: node scripts/check-secrets.mjs .
+    lint:
+      run: just lint
+commit-msg:
+  commands:
+    conventional:
+      run: 'grep -Eq "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(\(.+\))?!?: " {1} || (echo "Use Conventional Commits"; exit 1)'

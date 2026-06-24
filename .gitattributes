@@ -1,0 +1,14 @@
+# Normalize line endings to LF in the repo (keeps shell scripts/justfiles working
+# on Linux CI and avoids noisy CRLF diffs on Windows).
+* text=auto eol=lf
+
+# Binary assets git should never touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff2 binary
+*.pdf binary
+*.wasm binary

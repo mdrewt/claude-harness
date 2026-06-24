@@ -1,0 +1,3 @@
+{ "compilerOptions": { "target":"ES2022","module":"CommonJS","moduleResolution":"node",
+  "strict":true,"outDir":"dist","skipLibCheck":true },
+  "include":["src","evals"] }

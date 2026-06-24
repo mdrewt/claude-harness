@@ -1,0 +1,28 @@
+{
+  "$comment": "Shared harness config. Local overrides go in settings.local.json (git-ignored).",
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)",
+      "Bash(git commit:*)", "Bash(git switch:*)", "Bash(git worktree:*)",
+      "Bash(just:*)", "Bash(node:*)", "Bash(npx:*)", "Bash(pnpm:*)", "Bash(npm:*)",
+      "Bash(cargo:*)", "Bash(uv:*)", "Bash(pytest:*)", "Bash(ruff:*)", "Bash(biome:*)",
+      "Bash(docker compose:*)", "Bash(gh pr:*)", "Bash(semgrep:*)", "Bash(gitleaks:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)", "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Read(**/.env)", "Read(**/.env.*)", "Read(**/*.pem)", "Read(**/*.key)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-bash.mjs\"" }
+        ]
+      }
+    ]
+  }
+}

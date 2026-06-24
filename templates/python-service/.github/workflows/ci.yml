@@ -1,0 +1,23 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gitleaks/gitleaks-action@v2
+      - uses: astral-sh/setup-uv@v3
+      - uses: extractions/setup-just@v2
+      - run: just setup
+      - run: just lint
+      - run: just typecheck
+      - run: just test
+      - run: just eval
+      - name: SAST (Semgrep)
+        run: pipx run semgrep scan --config auto --error
+      - name: SBOM
+        uses: anchore/sbom-action@v0

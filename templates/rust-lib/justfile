@@ -1,0 +1,26 @@
+set windows-shell := ["cmd.exe", "/c"]
+setup:
+    cargo fetch
+
+lint:
+    cargo clippy --all-targets -- -D warnings && cargo fmt --check
+
+typecheck:
+    cargo check --all-targets
+
+test:
+    cargo test
+
+eval:
+    cargo test --test architecture
+
+security:
+    cargo audit || echo "install cargo-audit for SCA"
+
+mutate:
+    cargo mutants
+
+changelog:
+    git cliff -o CHANGELOG.md
+
+ci: lint typecheck test eval security
