@@ -11,10 +11,10 @@ doctor:
     node scripts/doctor.mjs
 
 lint:
-    npx --yes @biomejs/biome check --config-path templates/_base scripts
+    npx --yes @biomejs/biome@2 check --config-path templates/_base scripts
 
 format:
-    npx --yes @biomejs/biome format --write --config-path templates/_base scripts
+    npx --yes @biomejs/biome@2 format --write --config-path templates/_base scripts
 
 review:
     node scripts/workspace-review.mjs
