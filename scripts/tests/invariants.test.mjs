@@ -99,6 +99,26 @@ test('sync-templates MANAGED files all exist in _base', async () => {
   }
 });
 
+// Security parity guard: `just security` must run the portable check-secrets
+// scanner in EVERY stack (defense-in-depth alongside the lefthook hook + CI
+// gitleaks). rust-lib once ran only `cargo audit` and silently skipped it; this
+// catches that regression and forces any new stack to wire the scanner in too.
+test('every stack runs the portable secret scanner in `just security`', async () => {
+  for (const s of STACKS) {
+    const jf = await readFile(tpl(s, 'justfile'), 'utf8');
+    const m = jf.match(/(^|\n)security:\n((?:[ \t].*\n?)*)/);
+    assert.ok(m, `${s}: justfile missing 'security' recipe`);
+    const body = m[2];
+    let runsScanner = /check-secrets/.test(body);
+    // Node stacks delegate to `npm run security`; follow that to package.json.
+    if (!runsScanner && /npm run security/.test(body)) {
+      const pkg = JSON.parse(await readFile(tpl(s, 'package.json'), 'utf8'));
+      runsScanner = /check-secrets/.test(pkg.scripts?.security ?? '');
+    }
+    assert.ok(runsScanner, `${s}: 'just security' must run the portable check-secrets scanner`);
+  }
+});
+
 // Docs-drift guard: the README must name every real stack (the just stacks bug
 // slipped through because nothing exercised it; this catches silent doc drift).
 test('README documents every stack', async () => {

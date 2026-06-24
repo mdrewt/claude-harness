@@ -15,6 +15,7 @@ eval:
     cargo test --test architecture
 
 security:
+    node scripts/check-secrets.mjs .
     cargo audit || echo "install cargo-audit for SCA"
 
 mutate:
