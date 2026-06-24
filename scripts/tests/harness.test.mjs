@@ -1,20 +1,24 @@
 // Tests for the harness's own tooling. Pure Node test runner (no deps):
 //   node --test scripts/tests/
-import { test } from 'node:test';
+
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
-import { mkdtemp, cp, writeFile, mkdir, readFile, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const HARNESS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SECRETS = path.join(HARNESS, 'templates', '_base', 'scripts', 'check-secrets.mjs');
 
 function run(file, args, cwd) {
-  try { return { code: 0, out: execFileSync('node', [file, ...args], { cwd, encoding: 'utf8' }) }; }
-  catch (e) { return { code: e.status ?? 1, out: (e.stdout || '') + (e.stderr || '') }; }
+  try {
+    return { code: 0, out: execFileSync('node', [file, ...args], { cwd, encoding: 'utf8' }) };
+  } catch (e) {
+    return { code: e.status ?? 1, out: (e.stdout || '') + (e.stderr || '') };
+  }
 }
 // true if any file still contains one of OUR placeholders (not 3rd-party {{ }} template syntax).
 // Scans in-process (no `grep`) so a missing tool can never make this pass falsely.
@@ -23,16 +27,24 @@ function hasTokens(dir) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (e.name === '.git' || e.name === 'node_modules') continue;
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) { if (hasTokens(p)) return true; continue; }
+    if (e.isDirectory()) {
+      if (hasTokens(p)) return true;
+      continue;
+    }
     let t;
-    try { t = readFileSync(p, 'utf8'); } catch { continue; }
+    try {
+      t = readFileSync(p, 'utf8');
+    } catch {
+      continue;
+    }
     if (OUR_TOKEN.test(t)) return true;
   }
   return false;
 }
 function stacksIn(harnessDir) {
   return readdirSync(path.join(harnessDir, 'templates'), { withFileTypes: true })
-    .filter((e) => e.isDirectory() && e.name !== '_base').map((e) => e.name);
+    .filter((e) => e.isDirectory() && e.name !== '_base')
+    .map((e) => e.name);
 }
 async function tempHarness() {
   const dir = await mkdtemp(path.join(tmpdir(), 'harness-'));
@@ -58,7 +70,10 @@ test('new-project scaffolds a stack, substitutes tokens, and commits', async () 
   const pkg = await readFile(path.join(dir, 'projects', 'demo-proj', 'package.json'), 'utf8');
   assert.match(pkg, /"name":\s*"demo-proj"/, 'NAME token substituted');
   assert.doesNotMatch(pkg, /\{\{/, 'no leftover tokens');
-  const log = execFileSync('git', ['log', '--oneline'], { cwd: path.join(dir, 'projects', 'demo-proj'), encoding: 'utf8' });
+  const log = execFileSync('git', ['log', '--oneline'], {
+    cwd: path.join(dir, 'projects', 'demo-proj'),
+    encoding: 'utf8',
+  });
   assert.match(log, /scaffold from template/, 'initial commit exists');
   await rm(dir, { recursive: true, force: true });
 });
@@ -79,7 +94,11 @@ test('every stack template generates cleanly with no leftover tokens', async () 
   for (const s of stacks) {
     const r = run(gen, [`p-${s}`, s], dir);
     assert.equal(r.code, 0, `${s}: ${r.out}`);
-    assert.equal(hasTokens(path.join(dir, 'projects', `p-${s}`)), false, `${s} has leftover {{tokens}}`);
+    assert.equal(
+      hasTokens(path.join(dir, 'projects', `p-${s}`)),
+      false,
+      `${s} has leftover {{tokens}}`,
+    );
   }
   await rm(dir, { recursive: true, force: true });
 });
@@ -103,10 +122,15 @@ test('all justfiles use valid recipe syntax (no header-level ";", no tabs, bodie
   }
   for (const f of roots) {
     let text;
-    try { text = await readFile(f, 'utf8'); } catch { continue; }
+    try {
+      text = await readFile(f, 'utf8');
+    } catch {
+      continue;
+    }
     const lines = text.split('\n');
     lines.forEach((ln, i) => {
-      const isHeader = ln && !/^\s/.test(ln) && !ln.startsWith('#') && !ln.startsWith('set ') && ln.includes(':');
+      const isHeader =
+        ln && !/^\s/.test(ln) && !ln.startsWith('#') && !ln.startsWith('set ') && ln.includes(':');
       if (isHeader) {
         const header = ln.split('#')[0];
         assert.ok(!header.includes(';'), `${f}:${i + 1} header-level ';' -> ${ln}`);

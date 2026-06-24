@@ -1,0 +1,11 @@
+# Pre-commit hooks for the HARNESS repo itself (dogfoods what generated
+# projects do). Enable once with:  lefthook install
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: just lint
+    test:
+      run: just test
+    secrets:
+      run: node templates/_base/scripts/check-secrets.mjs .

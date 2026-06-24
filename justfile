@@ -4,6 +4,9 @@ set windows-shell := ["cmd.exe", "/c"]
 test:
     node --test scripts/tests/harness.test.mjs scripts/tests/invariants.test.mjs
 
+# Full harness gate (dogfoods what projects do): lint its own scripts, then test.
+ci: lint test
+
 doctor:
     node scripts/doctor.mjs
 
@@ -23,4 +26,4 @@ new name stack:
     node scripts/new-project.mjs {{name}} {{stack}}
 
 stacks:
-    @node -e "for(const d of require('node:fs').readdirSync('templates',{withFileTypes:true}))if(d.isDirectory()&&d.name!=='_base')console.log(d.name)"
+    @node scripts/stacks.mjs
