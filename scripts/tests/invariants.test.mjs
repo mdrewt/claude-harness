@@ -143,3 +143,21 @@ test('generated projects ship the PostToolUse auto-format hook', async () => {
     '_base/.claude/settings.json must wire PostToolUse -> format-edited.mjs',
   );
 });
+
+// Destructive-command guard: generated projects must ship the PreToolUse guard-bash
+// hook (defense-in-depth behind the permission deny-list — it also blocks ops the
+// deny-list doesn't, e.g. `drop database` / `truncate table` / `reset --hard origin`).
+// README promises every project "carries a minimal copy of those guardrails", so this
+// guards that claim and stops the hook being silently dropped.
+test('generated projects ship the PreToolUse destructive-command guard hook', async () => {
+  assert.ok(
+    existsSync(tpl('_base', '.claude', 'hooks', 'guard-bash.mjs')),
+    '_base must ship .claude/hooks/guard-bash.mjs',
+  );
+  const settings = JSON.parse(await readFile(tpl('_base', '.claude', 'settings.json'), 'utf8'));
+  const pre = JSON.stringify(settings.hooks?.PreToolUse ?? []);
+  assert.ok(
+    pre.includes('guard-bash.mjs'),
+    '_base/.claude/settings.json must wire PreToolUse -> guard-bash.mjs',
+  );
+});
