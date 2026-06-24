@@ -26,9 +26,9 @@ const MANAGED = [
   'renovate.json',
   'lefthook.yml',
   'cliff.toml',
-  'commitlint.config.cjs',
   'CODE_OF_CONDUCT.md',
   'scripts/check-secrets.mjs',
+  'scripts/check-commit-msg.mjs',
   'evals/run.mjs',
 ];
 

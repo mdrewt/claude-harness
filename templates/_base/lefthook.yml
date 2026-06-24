@@ -8,4 +8,4 @@ pre-commit:
 commit-msg:
   commands:
     conventional:
-      run: 'grep -Eq "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(\(.+\))?!?: " {1} || (echo "Use Conventional Commits"; exit 1)'
+      run: node scripts/check-commit-msg.mjs {1}

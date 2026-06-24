@@ -161,3 +161,21 @@ test('generated projects ship the PreToolUse destructive-command guard hook', as
     '_base/.claude/settings.json must wire PreToolUse -> guard-bash.mjs',
   );
 });
+
+// Cross-platform guard: the commit-msg hook must be portable. A `grep` one-liner
+// silently fails to run on Windows (no POSIX grep on PATH) — the same trap that
+// turned guard-bash.sh into guard-bash.mjs. The hook must call the portable
+// no-dep Node validator, which must ship in _base.
+test('lefthook commit-msg validation is portable (Node, not grep)', async () => {
+  const yml = await readFile(tpl('_base', 'lefthook.yml'), 'utf8');
+  assert.doesNotMatch(yml, /\bgrep\b/, '_base/lefthook.yml must not use grep (not on Windows)');
+  assert.match(
+    yml,
+    /check-commit-msg\.mjs/,
+    'commit-msg hook must run scripts/check-commit-msg.mjs',
+  );
+  assert.ok(
+    existsSync(tpl('_base', 'scripts', 'check-commit-msg.mjs')),
+    '_base must ship scripts/check-commit-msg.mjs',
+  );
+});
