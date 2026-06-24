@@ -7,5 +7,15 @@
       "Bash(git reset --hard:*)",
       "Read(**/.env)", "Read(**/.env.*)", "Read(**/*.pem)", "Read(**/*.key)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/format-edited.mjs\"" }
+        ]
+      }
+    ]
   }
 }

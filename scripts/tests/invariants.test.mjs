@@ -127,3 +127,19 @@ test('README documents every stack', async () => {
     assert.ok(readme.includes(s), `README.md must mention the '${s}' stack`);
   }
 });
+
+// Auto-format hook guard: generated projects must ship the PostToolUse formatter so
+// the agent's edits are auto-formatted/linted immediately (Biome/Ruff/rustfmt) instead
+// of failing late at `just ci` — and so it can't be silently dropped.
+test('generated projects ship the PostToolUse auto-format hook', async () => {
+  assert.ok(
+    existsSync(tpl('_base', '.claude', 'hooks', 'format-edited.mjs')),
+    '_base must ship .claude/hooks/format-edited.mjs',
+  );
+  const settings = JSON.parse(await readFile(tpl('_base', '.claude', 'settings.json'), 'utf8'));
+  const post = JSON.stringify(settings.hooks?.PostToolUse ?? []);
+  assert.ok(
+    post.includes('format-edited.mjs'),
+    '_base/.claude/settings.json must wire PostToolUse -> format-edited.mjs',
+  );
+});
