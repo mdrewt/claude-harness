@@ -1,12 +1,38 @@
 {
-  "$comment": "Shared harness config. Local overrides go in settings.local.json (git-ignored).",
+  "$comment": "Shared harness config. Local overrides go in settings.local.json (git-ignored). Doc/library MCP servers are intentionally NOT declared here — a connected server costs context every session just by existing (see docs/routing.md). Load them lazily via Tool Search, or declare project-specific servers in that project's .mcp.json (e.g. gitmcp-pixijs in templates/pixijs-game; gitmcp-spacetimedb / gitmcp-wasm-bindgen in the relevant game project; context7 where version-sensitive docs are needed).",
   "permissions": {
     "allow": [
-      "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)",
-      "Bash(git commit:*)", "Bash(git switch:*)", "Bash(git worktree:*)",
-      "Bash(just:*)", "Bash(node:*)", "Bash(npx:*)", "Bash(pnpm:*)", "Bash(npm:*)",
-      "Bash(cargo:*)", "Bash(uv:*)", "Bash(pytest:*)", "Bash(ruff:*)", "Bash(biome:*)",
-      "Bash(docker compose:*)", "Bash(gh pr:*)", "Bash(semgrep:*)", "Bash(gitleaks:*)"
+      "WebSearch",
+      "WebFetch",
+      "Read",
+      "Edit",
+      "Write",
+      "Bash",
+      "Glob",
+      "Skill",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git switch:*)",
+      "Bash(git worktree:*)",
+      "Bash(just:*)",
+      "Bash(node:*)",
+      "Bash(npx:*)",
+      "Bash(pnpm:*)",
+      "Bash(npm:*)",
+      "Bash(cargo:*)",
+      "Bash(uv:*)",
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(biome:*)",
+      "Bash(docker compose:*)",
+      "Bash(gh pr:*)",
+      "Bash(semgrep:*)",
+      "Bash(gitleaks:*)",
+      "mcp__codebase-memory-mcp__*",
+      "mcp__playwright__*"
     ],
     "deny": [
       "Bash(rm -rf:*)", "Bash(rm -fr:*)",
@@ -29,6 +55,13 @@
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/format-edited.mjs\"" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-docs-updated.mjs\"" }
         ]
       }
     ]
