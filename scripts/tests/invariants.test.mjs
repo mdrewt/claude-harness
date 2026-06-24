@@ -179,3 +179,19 @@ test('lefthook commit-msg validation is portable (Node, not grep)', async () => 
     '_base must ship scripts/check-commit-msg.mjs',
   );
 });
+
+// CI-side secret-scan parity: every CI workflow shipped in templates/ must run the
+// gitleaks secret scan. Node stacks inherit _base's workflow; stacks that override
+// it (python/rust/spacetimedb) must keep the scan. Secret scanning is the highest-
+// stakes gate, so any new stack's CI must not silently drop it.
+test('every template CI workflow runs the gitleaks secret scan', async () => {
+  const ymls = [tpl('_base', '.github', 'workflows', 'ci.yml')];
+  for (const s of STACKS) {
+    const p = tpl(s, '.github', 'workflows', 'ci.yml');
+    if (existsSync(p)) ymls.push(p);
+  }
+  for (const p of ymls) {
+    const yml = await readFile(p, 'utf8');
+    assert.match(yml, /gitleaks/, `${p} must run the gitleaks secret scan in CI`);
+  }
+});
