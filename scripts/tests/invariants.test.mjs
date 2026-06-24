@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -11,17 +11,17 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const HARNESS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const STACKS = [
-  'rust-lib',
-  'python-service',
-  'node-ts-app',
-  'react-web',
-  'electron-desktop',
-  'pixijs-game',
-  'spacetimedb-game',
-];
-const NODE_STACKS = ['node-ts-app', 'react-web', 'electron-desktop', 'pixijs-game'];
 const tpl = (...p) => path.join(HARNESS, 'templates', ...p);
+// Stacks are DERIVED from templates/ (single source of truth) so a newly added
+// stack is automatically covered by these invariants — no hand-maintained list
+// to drift out of sync (the exact "hand-maintained list" failure mode these
+// guards exist to prevent elsewhere).
+const STACKS = readdirSync(tpl(), { withFileTypes: true })
+  .filter((e) => e.isDirectory() && e.name !== '_base')
+  .map((e) => e.name);
+// Node stacks = those whose template ships a package.json; the Biome-lint and
+// package.json invariants below only apply to these.
+const NODE_STACKS = STACKS.filter((s) => existsSync(tpl(s, 'package.json')));
 
 async function tempHarness() {
   const dir = await mkdtemp(path.join(tmpdir(), 'inv-'));
