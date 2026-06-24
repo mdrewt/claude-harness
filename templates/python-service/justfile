@@ -9,14 +9,16 @@ typecheck:
     uv run mypy src
 
 test:
-    uv run pytest -q
+    uv run pytest -q --cov=src/app --cov-report=term-missing --cov-fail-under=80
 
 eval:
     uv run python evals/run.py
 
+# check-secrets is the local gate; SCA (pip-audit) is advisory locally and the
+# authoritative gate in CI (see .github/workflows/ci.yml).
 security:
     node scripts/check-secrets.mjs .
-    uv run pip-audit || echo "install pip-audit for SCA"
+    uv run pip-audit || echo "pip-audit: advisory locally; CI gates SCA"
 
 mutate:
     uv run mutmut run

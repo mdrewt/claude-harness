@@ -14,9 +14,11 @@ test:
 eval:
     cargo test --test architecture
 
+# check-secrets is the local gate; SCA (cargo audit) is advisory locally and the
+# authoritative gate in CI (see .github/workflows/ci.yml).
 security:
     node scripts/check-secrets.mjs .
-    cargo audit || echo "install cargo-audit for SCA"
+    cargo audit || echo "cargo audit: advisory locally; CI gates SCA"
 
 mutate:
     cargo mutants

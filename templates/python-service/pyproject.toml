@@ -7,12 +7,15 @@ license = { text = "MIT" }
 dependencies = ["pydantic>=2"]
 
 [dependency-groups]
-dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.5", "mypy>=1.10", "mutmut>=2"]
+dev = ["pytest>=8", "pytest-cov>=5", "hypothesis>=6", "ruff>=0.5", "mypy>=1.10", "mutmut>=2", "pip-audit>=2"]
 
 [tool.ruff]
 line-length = 100
 [tool.mypy]
 strict = true
+[tool.mutmut]
+paths_to_mutate = "src/app/"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -20,7 +20,10 @@ security:
     npm run security
 
 mutate:
-    npx stryker run
+    npm run mutate
+
+build:
+    npm run build
 
 changelog:
     git cliff -o CHANGELOG.md

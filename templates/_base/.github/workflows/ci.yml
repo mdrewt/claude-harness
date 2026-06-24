@@ -15,14 +15,22 @@ jobs:
       - uses: actions/checkout@v4
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
+      - name: Dependency review (SCA on PRs)
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - uses: extractions/setup-just@v2
       - run: just setup
       - run: just lint
       - run: just typecheck
-      - run: just test
+      - run: just test            # vitest with coverage thresholds (standards/testing-tdd.md)
       - run: just eval
+      - name: Mutation tests (meaningful-test gate)
+        run: just mutate
+      - run: just build
+      - name: SCA (npm audit)
+        run: npm audit --audit-level=high
       - name: SAST (Semgrep)
         run: pipx run semgrep scan --config auto --error
       - name: SBOM

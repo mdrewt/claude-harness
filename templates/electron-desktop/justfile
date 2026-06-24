@@ -23,6 +23,11 @@ build:
 start:
     npm run start
 
+# No pure-logic modules to mutate yet (Electron runtime glue; security posture is
+# gated by the eval + security.test). Add logic + tests, then wire StrykerJS here.
+mutate:
+    @echo "mutate: no pure-logic modules to mutate yet (see justfile comment)"
+
 changelog:
     git cliff -o CHANGELOG.md
 

@@ -14,13 +14,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: gitleaks/gitleaks-action@v2
+      - name: Dependency review (SCA on PRs)
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
       - uses: astral-sh/setup-uv@v3
       - uses: extractions/setup-just@v2
       - run: just setup
       - run: just lint
       - run: just typecheck
-      - run: just test
+      - run: just test            # pytest with --cov-fail-under (standards/testing-tdd.md)
       - run: just eval
+      - name: SCA (pip-audit)
+        run: uv run pip-audit
       - name: SAST (Semgrep)
         run: pipx run semgrep scan --config auto --error
       - name: SBOM

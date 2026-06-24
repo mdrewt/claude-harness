@@ -19,6 +19,9 @@ eval:
 security:
     node scripts/check-secrets.mjs .
 
+mutate:
+    cargo mutants --manifest-path server/Cargo.toml
+
 build:
     spacetime build --module-path server
 

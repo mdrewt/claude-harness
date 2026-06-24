@@ -20,6 +20,9 @@ security:
 build:
     npm run build
 
+mutate:
+    npm run mutate
+
 changelog:
     git cliff -o CHANGELOG.md
 
