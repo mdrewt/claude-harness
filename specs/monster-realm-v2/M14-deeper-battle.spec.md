@@ -1,0 +1,100 @@
+# Spec: M14 — Deeper battle systems (status, abilities, weather)
+
+**Status:** draft · **Owner:** Drew · **Date:** 2026-06-24
+**Stack:** spacetimedb-game · **Project:** monster-realm · **Depends on:** M0–M13. **Closes Phase B.**
+**Decisions:** ADR-0006 (content), 0010 (proof-of-teeth), 0011 (server-resolved battles), 0017 (battle
+model — extend additively), 0023 (additive battle-depth). **No v1 chapter** (explicitly deferred in v1) —
+designed from standards + game-design practice with extra ADR care. **Workflow:** design → review (§7).
+
+## 1. Problem / intent
+
+Add tactical depth to battles **without breaking the tested M7 core**: **status effects**, **abilities**
+(passive per-species), and **weather/field** — all as **additive layers on `resolve_turn`** (which stays
+symmetric and server-resolved, so M16 PvP gets the depth for free). The depth must be data-driven, behind
+**exhaustive enums** (a new variant flags every site), deterministic, and must extend `resolve_turn`'s event
+pipeline rather than rewrite it. Success = battles gain status/abilities/weather as content-driven additive
+rules, M7's existing battle tests still pass unchanged, and PvP (M16) inherits the depth symmetrically.
+
+> **Scope is the fork** (appendix flags it). This spec proposes a **default set** (status + abilities +
+> weather; multi-active deferred). The Phase B checkpoint decides the final set.
+
+## 2. Scope
+
+**In scope (default set — confirm at the checkpoint)**
+- **Status effects** (`game-core`): a `StatusEffect` enum (e.g. Poison, Burn, Paralysis, Sleep, Freeze) on
+  `BattleMonster`; applied by skills/abilities; resolved each turn (damage-over-time, action-skip chance,
+  etc.) via injected variance — **exhaustive `match`** (a new status flags every site). Cured by items
+  (extend M9) / switching / time.
+- **Abilities** (`game-core` + content): passive per-species effects (e.g. status immunity, weather synergy,
+  on-entry effects), read from `species` ability data; resolved in the turn pipeline.
+- **Weather / field** (`game-core`): a battle-wide field state (e.g. Rain/Sun/Sand) affecting damage/
+  effectiveness/status, set by skills/abilities, ticking down each turn.
+- **Content:** `skill`/`species` gain status/weather/ability fields; new status/weather/ability data; all
+  `sync_content` + `validate_content` (no dangling refs; append-only ids).
+- **Resolution:** all of the above extend `resolve_turn`'s ordered `BattleEvent` pipeline **additively** —
+  `resolve_turn`'s signature/semantics for a plain attack are **unchanged** (M7 tests pass).
+
+**Out of scope (named deferrals)**
+- **Multi-active (2v2/3v3)** → deferred (it changes `BattleSide` structure — a bigger, separate additive
+  step; decide at the checkpoint). **Mega/temporary forms** → optional later (additive on M10 transforms).
+- **PvP-specific depth tuning** → M16 (the depth is symmetric, so PvP inherits it; balance is content).
+
+## 3. Acceptance criteria (EARS)
+
+**Additive depth (ADR-0023) — must not regress M7**
+- WHEN a plain attack turn is resolved THE SYSTEM SHALL behave **identically to M7** (the M7 battle tests
+  pass unchanged) — depth is additive, `resolve_turn` is not rewritten.
+- WHEN a status/ability/weather effect applies THE SYSTEM SHALL resolve it deterministically (variance
+  injected) and emit ordered `BattleEvent`s for the client to animate.
+- WHEN a new `StatusEffect`/weather/ability variant is added THE SYSTEM SHALL force an exhaustive-`match`
+  update at every resolution site (compiler-enforced — OCP inverted, per principles).
+
+**Status / abilities / weather**
+- WHILE a monster has a status THE SYSTEM SHALL apply its per-turn effect (DoT, action-skip chance, …) and
+  expire/cure it per the rules; abilities modify these per their data (e.g. immunity).
+- WHILE weather is active THE SYSTEM SHALL apply its damage/effectiveness/status modifiers and tick it down.
+
+**Content integrity + proof-of-teeth**
+- IF content references a non-existent status/ability/weather THEN `validate_content` SHALL fail (fixture).
+- THE SYSTEM SHALL ship proof-of-teeth fixtures: a depth change that altered plain-attack resolution fails
+  the M7 regression; a non-exhaustive match fails to compile.
+
+## 4. Plan (high level)
+- **`game-core/combat` extensions** are pure rules layered into `resolve_turn`'s existing event pipeline
+  (apply pre-turn effects → speed-ordered actions → post-turn effects → weather/status tick), each emitting
+  `BattleEvent`s. The plain-attack path is untouched; new effects are new branches behind exhaustive enums.
+- **Data-driven:** statuses/abilities/weather are content on skills/species; the resolver reads data, never
+  hardcodes a special case.
+- **Symmetric → PvP-ready:** because `resolve_turn` stays symmetric (ADR-0017), M16 PvP inherits the depth
+  with no extra work; raids (M18) too.
+
+**Boundary preview — Phase C (M15–M19):** the now-deeper, still-symmetric `resolve_turn` is what M16 PvP and
+M18 raids resolve; the battle table (M7) is already PvP-ready. M15 trade is independent of battle depth.
+
+## 5. Tasks
+- [ ] `game-core`: `StatusEffect` enum + per-turn resolution (additive on `resolve_turn`); unit/property + determinism + **M7-regression** tests.
+- [ ] Abilities (data-driven passives) + weather/field; content fields + `validate_content` + fixtures.
+- [ ] Items that cure status (extend M9); battle view animates the new `BattleEvent`s.
+- [ ] Proof-of-teeth: plain-attack-unchanged regression; exhaustive-match enforcement.
+- [ ] doc-keeper changelog + memory; mark **Phase B complete** in `ARCHITECTURE.md`.
+
+## 6. Risks / decisions
+- **Default set chosen for autonomy (status + abilities + weather; multi-active deferred) — the Phase B
+  checkpoint confirms it.** Multi-active is the larger structural change (separate additive step).
+- **Must not rewrite `resolve_turn`** (ADR-0017/0023) — depth extends the event pipeline additively; the M7
+  tests are the guardrail (a regression fixture proves it).
+- **Exhaustive enums** (OCP inverted) — a new status/weather/ability flags every site; intended.
+- **Open:** the exact status/ability/weather set + their numbers → data, tunable; balance is a content pass.
+
+## 7. Review / red-team notes
+### Design notes (no v1 chapter — v1 deferred this; designed from standards + practice, extra ADR care)
+The key constraint is **additivity**: M7's `resolve_turn` is tested and symmetric; depth must layer on its
+event pipeline, never rewrite it — so PvP/raids inherit depth for free and the existing tests stay green.
+Everything is data behind exhaustive enums (the difference between a scalable battle system and hardcoded
+special cases).
+### Red-team
+- Depth silently changing plain-attack resolution → M7-regression fixture (must stay green). · Hardcoded
+  effects → data + `validate_content`. · A new variant missed at a site → exhaustive `match` (won't compile).
+- Asymmetric depth breaking PvP → keep `resolve_turn` symmetric; depth applies to both sides equally.
+### Simplify
+Default set only; multi-active + mega-forms deferred; no `resolve_turn` rewrite; all additive + data-driven.
