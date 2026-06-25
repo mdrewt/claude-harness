@@ -6,7 +6,7 @@ perf, test, build, ci, chore. Breaking changes: `!` + `BREAKING CHANGE:` footer.
 These drive SemVer and the generated changelog.
 
 ## Branches & worktrees
-- `main` is protected. Work on `feat/...`, `fix/...` branches.
+- `master` is protected. Work on `feat/...`, `fix/...` branches.
 - Parallel agent work uses **git worktrees** (one isolated worktree per
   specialist agent) so agents never collide. Merges are sequential, gated by
   the verifier.

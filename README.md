@@ -213,7 +213,7 @@ A **daily scheduled review** also runs each morning (only when session usage is
 low) and reports drift and suggestions — it never edits project code.
 
 To back up the harness: add a private remote and push (`git remote add origin …`
-then `git push -u origin main`). Projects are separate repos with their own
+then `git push -u origin master`). Projects are separate repos with their own
 remotes.
 
 ---

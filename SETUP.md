@@ -15,7 +15,7 @@ git init
 git add -A
 git commit -m "chore: scaffold agentic coding harness (v0.1) per WORKSPACE-PLAN.md"
 git remote add origin <your private repo>   # backup of standards/decisions
-git push -u origin main
+git push -u origin master
 ```
 (`projects/` is git-ignored, so each project stays its own independent repo.)
 

@@ -96,7 +96,15 @@ async function fill(dir) {
 await fill(dest);
 
 try {
-  execFileSync('git', ['init', '-q'], { cwd: dest });
+  // `-b master` so scaffolded repos match standards/git.md (master is the protected
+  // branch), regardless of the host git init.defaultBranch (git < 2.28 lacks `-b`).
+  // Fall back to symbolic-ref when `-b` is unavailable.
+  try {
+    execFileSync('git', ['init', '-q', '-b', 'master'], { cwd: dest });
+  } catch {
+    execFileSync('git', ['init', '-q'], { cwd: dest });
+    execFileSync('git', ['symbolic-ref', 'HEAD', 'refs/heads/master'], { cwd: dest });
+  }
   let hasIdentity = true;
   try {
     execFileSync('git', ['config', 'user.email'], { cwd: dest, stdio: 'ignore' });

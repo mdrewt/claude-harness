@@ -13,7 +13,7 @@ GitHub Actions, one pipeline per project repo.
 8. **Build** — artifacts / container.
 
 ## Branch protection
-- PRs required; no direct pushes to `main`.
+- PRs required; no direct pushes to `master`.
 - All required checks must pass; at least one approving review (the `verifier`
   / human).
 - Linear history; squash-merge with a Conventional Commit title.

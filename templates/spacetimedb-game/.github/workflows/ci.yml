@@ -1,6 +1,6 @@
 name: CI
 on:
-  push: { branches: [main] }
+  push: { branches: [master] }
   pull_request:
 # Cancel superseded runs on the same ref (PR push / branch update) to save CI minutes.
 concurrency:

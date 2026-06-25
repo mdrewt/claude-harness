@@ -27,7 +27,7 @@ hallucinated/typosquatted deps).
 ## Destructive-action guardrails
 - Permission allow/deny lists in `.claude/settings.json`.
 - No auto-approval of force-push, history rewrite, DB drops, or bulk deletes.
-- Branch protection on `main`. `/rewind` to recover from a bad path.
+- Branch protection on `master`. `/rewind` to recover from a bad path.
 
 ## Finance rule (hard stop)
 Never execute trades, place orders, or move money autonomously. Surface the
