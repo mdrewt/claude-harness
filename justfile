@@ -27,3 +27,9 @@ new name stack:
 
 stacks:
     @node scripts/stacks.mjs
+
+# Heavy: scaffold every stack template and run its REAL gates (npm/cargo/uv
+# install + `just ci`). Catches templates that generate but don't pass their own
+# gates. For a scheduled/manual CI job, not the fast `just test` suite.
+validate-templates *STACKS:
+    node scripts/validate-templates.mjs {{STACKS}}
