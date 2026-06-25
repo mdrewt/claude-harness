@@ -14,3 +14,7 @@ full ADR in the project repo.
 | 2026-06-24 | (harness) | Pin GitHub Actions to digests via Renovate preset | `docs/adr/0004-pin-github-actions-digests-via-renovate.md` |
 | 2026-06-24 | (harness) | Cancel superseded CI runs via workflow concurrency group | `docs/adr/0005-cancel-superseded-ci-runs.md` |
 | 2026-06-24 | (harness) | Mechanically enforce mutation/coverage/SCA gates (CI + invariants tests) | `docs/adr/0006-mechanical-enforcement-of-test-and-supply-chain-gates.md` |
+
+> The four 2026-06-23 entries marked `—` predate the ADR practice, which began
+> 2026-06-24 (`docs/adr/0001-record-architecture-decisions.md`). They are kept as a
+> pre-ADR baseline and are intentionally not back-dated into ADRs.
