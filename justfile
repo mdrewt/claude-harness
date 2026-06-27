@@ -5,7 +5,7 @@ test:
     node --test scripts/tests/harness.test.mjs scripts/tests/invariants.test.mjs
 
 # Full harness gate (dogfoods what projects do): lint its own scripts, then test.
-ci: lint test
+ci: lint test research-gate
 
 doctor:
     node scripts/doctor.mjs
@@ -56,3 +56,16 @@ research-index DIR:
 # Verify a research index is in sync (exits 1 if stale) — CI backstop.
 research-index-check DIR:
     node scripts/research-index.mjs {{DIR}} --check
+
+# Lint research docs against the research-protocol authoring contract: frontmatter
+# completeness + one-line abstract; with --shared, project-agnostic purity (no
+# project/milestone/ADR leakage). WARNs are advisory; exits 1 only on FAIL.
+#   just research-lint docs/research --shared
+research-lint *ARGS:
+    node scripts/research-lint.mjs {{ARGS}}
+
+# Gate the harness shared research library: index in sync (+ no dup slugs) and the
+# doc lint with project-agnostic purity. Part of `just ci`.
+research-gate:
+    node scripts/research-index.mjs docs/research --check
+    node scripts/research-lint.mjs docs/research --shared
