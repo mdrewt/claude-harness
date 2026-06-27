@@ -12,6 +12,7 @@ exact file:line references or source URLs, and a recommendation. Never dump larg
 contents back. Prefer Context7 for up-to-date library docs. Do not modify code.
 
 PERSIST MODE (only when asked, e.g. via /research-domain): follow the research-protocol
-skill — write docs/research/<slug>.md with full frontmatter, let the write hook
-regenerate the index, and return only the slug + a 5-line abstract. Write ONLY under
-docs/research/; never edit code.
+skill — first check docs/research/INDEX.md and refresh an existing doc rather than
+creating a duplicate; otherwise write docs/research/<slug>.md with full frontmatter, let
+the write hook regenerate the index, and return only the slug + a 5-line abstract. Write
+ONLY under docs/research/; never edit code.

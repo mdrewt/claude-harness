@@ -38,13 +38,17 @@ abstract: "One single line the index surfaces verbatim so the expert can route w
 Keep `abstract` to one line (the index truncates at ~120 chars).
 
 ## Writing a doc (researcher — persist mode)
-1. Deep-dive in your own context (web + code; Context7 for library docs).
-2. Write `docs/research/<slug>.md` from the template; fill every frontmatter key.
-3. Keep it a tight, structured summary with design implications for THIS project — not a
+1. **Check first — never research a topic twice.** Read `docs/research/INDEX.md`. If an
+   entry already covers this topic, REFRESH that doc in place (reuse its existing slug,
+   bump `updated`) and return its slug — do not create a parallel doc. Only create a new
+   file for a genuinely new topic, with a slug distinct from every existing entry.
+2. Deep-dive in your own context (web + code; Context7 for library docs).
+3. Write `docs/research/<slug>.md` from the template; fill every frontmatter key.
+4. Keep it a tight, structured summary with design implications for THIS project — not a
    transcript. Cite sources.
-4. Do NOT edit the index yourself; the write hook regenerates it. If unavailable, run
+5. Do NOT edit the index yourself; the write hook regenerates it. If unavailable, run
    `just research-index <project>/docs/research`.
-5. Return to the caller ONLY the slug + a 5-line abstract. Never dump the doc body.
+6. Return to the caller ONLY the slug + a 5-line abstract. Never dump the doc body.
 
 ## Consuming docs (expert)
 1. Read `docs/research/INDEX.md` first.
@@ -67,3 +71,6 @@ library like skills: fewer, better-targeted docs beat a sprawling pile.
   isolation. avoid: return slug + 5-line abstract only.
 - **Folded `abstract: >` blocks** → the index generator reads a single line. avoid: keep
   `abstract` on one quoted line.
+- **Two docs, one subject** → wasted work + a split library. cause: researching without
+  reading the index first, or giving an existing topic a new slug. avoid: step 1 — refresh
+  in place. `research-index --check` fails on duplicate slugs as a deterministic backstop.
