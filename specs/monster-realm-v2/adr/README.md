@@ -40,6 +40,9 @@ roadmap and `../spec-corpus-review.md` for the holistic review.
 | 0032 | Accessibility strategy | M23 | WCAG-aligned; accessible DOM menus + `pixijs-accessibility`; reduced-motion switches the visual layer |
 | 0033 | Internationalization strategy | M24 | Externalized catalogs + locale-keyed RON; a new language is a data drop; chat untranslated |
 | 0034 | Security audit & threat-model gate | M25 | Maintained threat model + tooled/manual audit + blocking launch sign-off + re-audit cadence |
+| 0055 | Server-module internal module boundary | M8.9 | Split `server-module/src/lib.rs` into domain modules → narrow `touches:` for parallel fan-out (proposed) |
+
+> **Numbering note:** 0035–0054 are *implementation* ADRs that live in the project repo (`projects/monster-realm/docs/adr/`), per `../../../projects/monster-realm/AGENTS.md` (design ADRs 0002–0034 here; impl ADRs 0035+ there). **0055** is recorded here because it is driven by the harness-spec'd M8.9 milestone; its project-side implementation ADR is filed at the confirmed next-free number when M8.9 builds.
 
 **Companion SSOT docs:** `../netcode-quality-review.md` (feel) · `../observability-performance-plan.md`
 (robustness/perf) · `../security-threat-model.md` (attack surface) · `../spec-corpus-review.md` (holistic).

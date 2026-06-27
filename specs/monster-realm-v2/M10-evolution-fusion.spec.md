@@ -67,26 +67,43 @@ derived form.
   an `encounter` table OR a dangling species ref THEN `validate_content` SHALL fail — each with a fixture on
   a synthetic violation. Species ids remain append-only.
 
-## 4. Plan (high level)
-- **`game-core/evolution`** holds the pure transforms + eligibility (property-tested; individuality carried,
-  not re-rolled). The reducers are thin (validate → transform → write); `fuse` is one atomic transaction
-  (delete two, insert one) — SpacetimeDB's transactional reducer gives this for free.
-- **Content integrity** lives in `validate_content` (the same place dangling-ref checks already live), gated
-  with proof-of-teeth — the rules ("no dup recipe", "derived forms not wild") are real integrity, not author
-  discipline.
-- **Reuse `reject_if_in_battle`/`reject_if_in_trade`** guards (M7/M15) so an escrowed/in-battle monster
-  can't be fused away.
+## 4. Plan (slices + `touches:` for collision-safe fan-out)
+
+Design anchors: `game-core/evolution` holds the pure transforms + eligibility (property-tested;
+individuality carried, not re-rolled). Reducers stay thin (validate → transform → write); `fuse` is one
+atomic transaction (delete two, insert one — SpacetimeDB gives this for free). Content integrity ("no dup
+recipe", "derived forms not wild", dangling refs, append-only ids) lives in `validate_content` with
+proof-of-teeth. `evolve`/`fuse` reuse the `reject_if_in_battle`/`reject_if_in_trade` guards (M7/M15).
+
+**`touches:` targets assume the post-M8.9 server-module map** — evolve/fuse reducers land in
+`server-module/src/evolution.rs`, the additive `fusion` table + `evolves_to` column in
+`server-module/src/schema.rs`, and escrow guards in `server-module/src/guards.rs`. **Pre-M8.9 fallback:**
+collapse 10b's server `touches:` to `server-module/src/lib.rs`. `schema.rs` serializes the table/column add
+(rare, wants one reviewable diff).
+
+There are **two fan-out points**: an optional split inside the game-core work, and the client ‖ evals tail.
+
+- **M10a-rules — `game-core/evolution` transforms** · `touches: game-core/src/evolution/ (new), game-core/src/lib.rs (mod decl)` — eligibility + evolve (carry individuality, re-derive) + fusion (per-stat max IV, higher-bond nature, fresh L1, lower slot); unit/property + determinism tests.
+- **M10a-content — content + integrity** · `touches: game-core/src/content.rs (validate_content extensions), game-core/content/ (fusion recipes + species.evolutions RON)` — no-dup-pair (order-independent), derived-forms-not-wild, dangling-ref, append-only; proof-of-teeth fixtures on synthetic violations.
+  - **M10a-rules ‖ M10a-content fan out (N≤2) iff the shared content *types* (`FusionRecipe`/`EvolutionCondition`) are defined first** (a tiny `10a-types` pre-slice in `content.rs`/`types.rs`, or co-located so neither imports the other's new defs). If the rules import new content-struct definitions, run **M10a-content → M10a-rules serial** instead. The supervisor picks based on the actual type layout.
+- **M10b — Server: fusion table + reducers** · `touches: server-module/src/{schema,evolution,guards}.rs` *(pre-M8.9: `server-module/src/lib.rs`)* — `fusion` table + `evolves_to` column on `monster`; `evolve`/`fuse` reducers (ownership, eligibility/recipe, atomic fuse, reuse escrow guards); server-compute `evolves_to` on the row. **Serial after M10a** (delegates to its rules; needs the content types).
+- **M10c — Client: evolve/fuse UI** ‖ **M10d — Evals + doc-keeper** — **disjoint, fan out (N≤2)**:
+  - **M10c** · `touches: client/src/...` — a pure subscription view showing `evolves_to` + evolve/fuse actions via ownership-checked reducers (no eligibility/recipe logic in TS).
+  - **M10d** · `touches: evals/...` (+ `ARCHITECTURE.md`/changelog/memory) — content-integrity proof-of-teeth wired into `just eval`; mark **Phase A complete** in `ARCHITECTURE.md`; changelog + memory.
+  - Both depend only on M10b → run concurrently (`client/` vs `evals/`).
+
+Recommended order: **{ M10a-rules ‖ M10a-content } → M10b → { M10c ‖ M10d }.**
 
 **Boundary preview — Phase B (M11, the authored world):** the now-complete single-player loop (move → find
 → tame → raise → evolve/fuse) runs in one hand-authored zone; M11 makes the world **data** (Tiled→RON,
 multi-zone, warps) and accepts ADR-0008.
 
 ## 5. Tasks
-- [ ] `game-core/evolution`: eligibility + evolve transform + fusion rule (individuality-preserving); unit/property + determinism tests.
-- [ ] `fusion` table + `species.evolutions` content; `validate_content` extensions + proof-of-teeth fixtures.
-- [ ] `evolve`/`fuse` reducers (ownership, eligibility/recipe, atomic fuse, escrow guards) + security-auditor.
-- [ ] Server-computed `evolves_to` on the row; evolve/fuse UI (pure view + actions).
-- [ ] doc-keeper changelog + memory; mark **Phase A complete** in `ARCHITECTURE.md`.
+- [ ] **10a-rules** (‖ 10a-content) `game-core/evolution`: eligibility + evolve transform + fusion rule (individuality-preserving); unit/property + determinism tests.
+- [ ] **10a-content** (‖ 10a-rules) `fusion` table content + `species.evolutions`; `validate_content` extensions (no-dup-pair, derived-forms-not-wild, dangling-ref, append-only) + proof-of-teeth fixtures. *(Define shared content types first if rules import them — see §4.)*
+- [ ] **10b** `evolve`/`fuse` reducers (ownership, eligibility/recipe, atomic fuse, escrow guards) + `fusion` table + `evolves_to` column + server-computed `evolves_to` on the row + security-auditor.
+- [ ] **10c** (‖ 10d) evolve/fuse UI (pure subscription view + ownership-checked actions).
+- [ ] **10d** (‖ 10c) content-integrity proof-of-teeth wired into `just eval`; doc-keeper changelog + memory; mark **Phase A complete** in `ARCHITECTURE.md`.
 
 ## 6. Risks / decisions
 - **Preserve, don't re-roll, individuality** (ADR-0019) — re-rolling on evolution/fusion would erase the

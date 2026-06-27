@@ -72,24 +72,43 @@ stats server-side; care raises bond; item quantities are owner-private and overf
 - WHEN training changes a monster THE SYSTEM SHALL re-store its `derived` stats so the client reads the
   updated value (no client-side recompute).
 
-## 4. Plan (high level)
-- **`game-core/raising`** holds the pure rules; the reducers stay thin (validate → consume → re-derive →
-  write). Training/bond fields were reserved on the `monster` row at M6 (additive).
-- **Item economy primitive (ADR-0018):** `player_item` + `grant_item`/`consume_one` are the single mutation
-  surface; every grant path (recruit bait M8, training food, future shop M13, quest reward M12) routes
-  through them, so the one-stack/saturating invariant can't be bypassed.
-- **`heal_party`** remains the placeholder until town healing (M12).
+## 4. Plan (slices + `touches:` for collision-safe fan-out)
+
+Design anchors: `game-core/raising` holds the pure rules (reducers stay thin: validate → consume →
+re-derive → write; training/bond fields were reserved on `monster` at M6, additive). The **item economy
+primitive (ADR-0018)** — `player_item` + `grant_item`/`consume_one` — is the *single* mutation surface;
+every grant path (recruit bait M8, training food, shop M13, quest reward M12) routes through it. `heal_party`
+stays a placeholder until town healing (M12).
+
+**`touches:` targets assume the post-M8.9 server-module map.** Train/care reducers land in a
+`server-module/src/raising.rs` domain module and the item backbone in `server-module/src/inventory.rs`
+(the M8.9 vocabulary), so M9's server work is scoped to those files instead of the monolithic `lib.rs`.
+**If M8.9 has NOT landed when M9 builds**, collapse 9b's server `touches:` to `server-module/src/lib.rs`
+and accept that 9b serializes against any other `lib.rs` slice (the pre-M8.9 bottleneck). `player_item` is
+additive → it also touches `server-module/src/schema.rs`, the one file that serializes table-adds
+(acceptable: additive schema changes are rare and want a single reviewable diff).
+
+Dependency chain: the pure rules gate the reducers, which gate the client + evals — the fan-out is the
+**client ‖ evals tail**.
+
+- **M9a — `game-core/raising` rules (pure)** · `touches: game-core/src/raising/ (new), game-core/src/lib.rs (mod decl), game-core/src/monster/types.rs (EV/bond fields if M6 didn't reserve them)` — focus-training (EV top-off to per-stat + total caps → `derive_stats`) + care (capped bond); deterministic; unit/property + determinism tests. **Critical-path start (nothing precedes it).**
+- **M9b — Server: item backbone + raising reducers** · `touches: server-module/src/{schema,inventory,raising,taming}.rs` *(pre-M8.9: `server-module/src/lib.rs`)* — `player_item` table (RLS owner-scoped); `grant_item`/`consume_one` (saturating, delete-at-zero) as the sole item-mutation surface; `train`/`care` reducers (ownership + owned-item validation; care cooldown from `ctx.timestamp`; reject-not-clamp); retrofit M8 bait grants through `grant_item`. **Serial after M9a** (delegates to its rules).
+- **M9c — Client: inventory + raising UI** ‖ **M9d — Evals + doc-keeper** — **disjoint, fan out (N≤2)**:
+  - **M9c** · `touches: client/src/...` — an inventory/raising view + `train`/`care` actions via ownership-checked reducers; pure subscription view, no rule logic in TS.
+  - **M9d** · `touches: evals/...` — `player_item` privacy proof-of-teeth (non-owner sees none) + `train`/`care` reducer-security-auditor fixtures (rejecting-comparison + a no-rejection bad fixture); changelog + memory.
+  - Both depend only on M9b (tables/reducers/bindings exist) and touch disjoint trees (`client/` vs `evals/`) → run concurrently.
+
+Recommended order: **M9a → M9b → { M9c ‖ M9d }.**
 
 **Boundary preview — what M10 (evolution/fusion) will consume:** the monster's `training`/`bond`/`level`
 (evolution conditions may read them); the `derive_stats` re-store path (evolution re-derives); the box.
 What M13/M15 consume: the `player_item` + `grant_item`/`consume_one` backbone (additive).
 
 ## 5. Tasks
-- [ ] `game-core/raising`: focus-training + care rules; unit/property + determinism tests.
-- [ ] `player_item` table (RLS owner-scoped) + `grant_item`/`consume_one` helpers (saturating, delete-at-zero) + privacy proof-of-teeth.
-- [ ] `train`/`care` reducers (ownership + owned-item validation, re-derive) + security-auditor + fixtures.
-- [ ] Inventory + raising UI (pure subscription view + ownership-checked reducers).
-- [ ] Retrofit M8 bait grants through `grant_item` (single mutation surface); doc-keeper changelog + memory.
+- [ ] **9a** `game-core/raising`: focus-training + care rules; unit/property + determinism tests.
+- [ ] **9b** `player_item` table (RLS owner-scoped) + `grant_item`/`consume_one` (saturating, delete-at-zero, sole mutation surface); `train`/`care` reducers (ownership + owned-item validation, care cooldown via `ctx.timestamp`, re-derive); retrofit M8 bait grants through `grant_item`.
+- [ ] **9c** (‖ 9d) Inventory + raising UI (pure subscription view + ownership-checked reducers).
+- [ ] **9d** (‖ 9c) `player_item` privacy proof-of-teeth + `train`/`care` reducer-security-auditor fixtures (rejecting-comparison + no-rejection bad fixture); doc-keeper changelog + memory.
 
 ## 6. Risks / decisions
 - **Item overflow / multi-stack** (v1 recurring pitfall) → one stack per `(owner,item)`, `saturating_add`
