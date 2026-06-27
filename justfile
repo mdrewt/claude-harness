@@ -33,3 +33,26 @@ stacks:
 # gates. For a scheduled/manual CI job, not the fast `just test` suite.
 validate-templates *STACKS:
     node scripts/validate-templates.mjs {{STACKS}}
+
+# Skill & sub-agent usage audit (read-only; parses ~/.claude transcripts and
+# folds in the PostToolUse hook log). Defaults to last 7 days.
+#   just audit            # last 7 days
+#   just audit --all      # all retained history
+#   just audit --days 30
+audit *ARGS:
+    node scripts/audit-usage.mjs {{ARGS}}
+
+# Validate that every skill & sub-agent is correctly wired (harness + projects).
+# Skills must be <name>/SKILL.md dirs; agents .claude/agents/<name>.md. Exits 1 on FAIL.
+validate-wiring *ARGS:
+    node scripts/validate-wiring.mjs {{ARGS}}
+
+# Regenerate a project's docs/research/INDEX.md from doc frontmatter (SSOT). The
+# format-edited write hook calls this automatically; use it for a manual refresh.
+#   just research-index projects/monster-realm/docs/research
+research-index DIR:
+    node scripts/research-index.mjs {{DIR}}
+
+# Verify a research index is in sync (exits 1 if stale) — CI backstop.
+research-index-check DIR:
+    node scripts/research-index.mjs {{DIR}} --check

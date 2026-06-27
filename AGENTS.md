@@ -53,7 +53,9 @@ the full rationale and `standards/` for the engineering rules.
 - `/spec` — author/refine a spec (Spec Kit: Spec → Plan → Tasks).
 - `/loop <task>` — the PRERRR build loop from a spec task.
 - `/review` · `/simplify` · `/adr` · `/audit` — review, de-complexify, record a decision, audit.
-- `/deep-research <q>` — isolated research; returns a summary only.
+- `/deep-research <q>` — isolated research; returns a summary only (throwaway).
+- `/research-domain <topic>` — isolated deep dive PERSISTED to `<project>/docs/research/`.
+- `/consult <q>` — advice from the `expert` subagent over that research library.
 - `/brainstorm` · `/debate` · `/compete` · `/redteam` — multi-agent patterns
   (cost-governed; see `standards/` and `WORKSPACE-PLAN.md` §7).
 
@@ -70,6 +72,9 @@ the full rationale and `standards/` for the engineering rules.
 - Scope work to the files named; don't explore the whole workspace unprompted —
   use the `researcher` subagent / `/deep-research` so exploration doesn't fill the
   main session.
+- Persist reusable domain knowledge with `/research-domain` (it lands in
+  `<project>/docs/research/` with a generated `INDEX.md`); consult it via `/consult`
+  or `@expert` before domain-heavy gameplay/art/netcode work.
 - Doc lookups follow the cost-aware rules in `docs/routing.md` (narrow, lazy,
   route by ownership, prefer no-quota sources; reserve metered services).
 - Before changing a signature/type used across a boundary or by several modules,
@@ -78,4 +83,11 @@ the full rationale and `standards/` for the engineering rules.
 ## Authoring these instruction files
 Keep `AGENTS.md` a lean lookup table, not a brain dump. If an agent already does
 something correctly without being told, delete that line. Stable rules live here;
-transient task context does not.
+transient task context does not. To decide what to trim, run `just audit` —
+it ranks skill/agent usage and flags defined-but-never-invoked items
+(see `docs/usage-auditing.md`).
+
+Skills (`.claude/skills/`) end with a `## Gotchas` section — a running log of
+edge cases, bugs, and quirks (format: **symptom/quirk** → cause → **avoid:**
+action). Append to it whenever a bug or quirky behavior costs you time, so the
+next run avoids it.
