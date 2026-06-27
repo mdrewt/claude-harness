@@ -18,6 +18,16 @@
   *shapes* across a Rust↔TS or service boundary are often correct; coupling them is worse.
 - **YAGNI with named exceptions** — state the exceptions explicitly so they aren't
   "simplified" away later.
+- **The Boy Scout Rule — leave every file you touch better than you found it.** Make
+  the opportunistic improvement *within the change's blast radius*: a clearer name, a
+  deleted dead branch, a missing test for the behavior you changed, a small decoupling.
+  **Bounded, not unbounded** — improve what you are already editing; do *not* reformat
+  untouched code or widen the diff with drive-by rewrites (that fights minimal-diff
+  review and inflates blast radius). Cleanups larger than the current change get
+  **flagged separately** (a follow-up slice / issue / ADR), never smuggled inline. For
+  long-lived code this is the compounding default that keeps the codebase cheap to
+  change — the build-loop's "every milestone leaves the code easier to change" is this
+  rule applied per slice.
 
 ## Tier 2 — apply with judgment
 - **SOLID where it fits** (evolving services/libraries); skip for thin scripts. Note
@@ -51,6 +61,7 @@ Wire each rule to a tool so it never depends on someone remembering:
 | Determinism | seedable RNG / injected clocks + determinism evals |
 | Secrets / SAST / deps | gitleaks + Semgrep + SCA in CI (`security.md`) |
 | Over-engineering / DRY / YAGNI | `/simplify` + the `reviewer` |
+| Incremental code health (Boy Scout) | the `reviewer` + the per-task `/review` pass, scoped to the diff's blast radius |
 | Correctness / smells | `/review` + tests + mutation testing |
 | Blast radius of shared changes | impact analysis before edit (below) |
 
@@ -70,3 +81,7 @@ silently desync.
 - Duplicated *sources of truth* (≠ duplicated shapes across a boundary, which is fine).
 - Public surface larger than the spec requires.
 - Comments that restate code instead of explaining *why*.
+- A touched file left *worse* than found — a new smell, dead code, or changed
+  behavior without a test — when a bounded in-blast-radius fix was available (Boy
+  Scout violation). Note the inverse is also a red flag: an unbounded drive-by
+  cleanup that balloons the diff beyond the change at hand.

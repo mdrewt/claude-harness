@@ -215,6 +215,19 @@ breaks the spine. Numbering restarts for the new project.
 > decision (ADR) + scope + boundary, with full EARS criteria + tasks drafted by the loop at build time;
 > **Phase A/B (M0–M14) carry full detail** (the near-term path). See `spec-corpus-review.md` §7.
 
+> **Build parallelism & slice independence (for the autonomous runner).** The build is gate-driven
+> and the **spine (M0–M10) is largely a serial dependency chain** — each milestone consumes the prior
+> one's delivered code. The runner's throughput comes from (1) **chaining** slices back-to-back with no
+> idle gap and (2) **bounded fan-out (N ≤ 2)** onto *genuinely independent* slices. When a milestone is
+> decomposed into slices, **each slice declares a `touches:` path-set** (the crates/files it may modify);
+> the supervisor runs two slices concurrently **only when their `touches:` sets are disjoint**, and merges
+> them **serially (verifier-gated, the second rebased on the first)**. Natural independence lives at the
+> **leaves, not the spine**: client/render vs server/reducer slices within a milestone, pure **content-data**
+> additions, and the cross-cutting **M20 (observability) · M23 (accessibility) · M24 (i18n)** retrofits. A
+> slice with **no** `touches:` declaration is treated as colliding → run serially. This is the §7
+> worktree-isolation pattern (`WORKSPACE-PLAN.md` §7; `docs/routing.md`: N = 2–3, depth = 1, serial gated
+> merges) applied to the build — quality is unchanged; only the idle between slices is removed.
+
 **Phase A — Spine (re-engineered v1, better):**
 - **M0** Contracts, generator scaffold, determinism gate, **schema-evolution + content-sync from day
   one**, full CI incl. sim-harness skeleton. Split into **M0a** (substrate + gates + proof-of-teeth, no
