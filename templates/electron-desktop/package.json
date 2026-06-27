@@ -1,6 +1,7 @@
 {
   "name": "{{NAME}}", "version": "0.1.0", "license": "MIT", "main": "dist/main.js",
   "description": "{{DESCRIPTION}}",
+  "engines": { "node": ">=24.13.1 <25" },
   "scripts": {
     "setup": "npm install", "lint": "biome check .", "format": "biome format --write .",
     "typecheck": "tsc --noEmit", "test": "vitest run", "eval": "node evals/run.mjs",

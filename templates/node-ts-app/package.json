@@ -4,6 +4,7 @@
   "type": "module",
   "description": "{{DESCRIPTION}}",
   "license": "MIT",
+  "engines": { "node": ">=24.13.1 <25" },
   "scripts": {
     "setup": "npm install",
     "lint": "biome check .",

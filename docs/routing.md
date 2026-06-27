@@ -27,6 +27,15 @@ one tier; hard latency forces Haiku. Switch mid-session with `/model`.
 - **`/deep-research`** — custom command delegating to the `researcher` subagent
   in isolation; returns a summary only.
 
+### Intra-task parallelism (within one slice)
+Fan out the **independent, read-only** analyses concurrently (up to N = 2–3,
+depth = 1): the plan/test/impl **review lenses** (`reviewer` + `red-team`), the
+**domain auditors**, and `researcher` lookups. Keep the **ordered gates serial** —
+tests precede implementation, merges are sequential and verifier-gated, and no two
+specialists touch the same files. Triage complexity first, then route (an
+autonomous loop bumps one tier): solo/light for a simple slice, full multi-agent
++ `ultracode` for a gnarly/security one.
+
 ## Token-efficiency
 Escalation buys quality by spending more tokens — be selective. Efficiency comes
 from: effort routing, subagent isolation, model routing, cloud offload, and

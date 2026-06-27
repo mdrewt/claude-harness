@@ -1,6 +1,7 @@
 {
   "name": "{{NAME}}", "version": "0.1.0", "type": "module", "license": "MIT",
   "description": "{{DESCRIPTION}}",
+  "engines": { "node": ">=24.13.1 <25" },
   "scripts": {
     "setup": "npm install", "dev": "vite",
     "lint": "biome check .", "format": "biome format --write .", "typecheck": "tsc --noEmit",

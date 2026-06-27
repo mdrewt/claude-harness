@@ -1,0 +1,63 @@
+{
+  "_README": "Hand-rated importance for skills/agents, joined onto the usage audit by scripts/audit-usage.mjs. EDIT FREELY \u2014 these are seed guesses, not gospel. 'value' is IMPORTANCE / cost-if-missing, independent of how often it is used (frequency is the separate 'count' column). Scale: critical | high | medium | low. Leave an item out to keep it unrated (shows as '\u2014', verdict REVIEW). 'note' is optional free text shown beneath the row. type/scope/verdict are derived automatically; you only set value + note here.",
+  "agents": {
+    "reviewer": {
+      "value": "high",
+      "note": "core code-review gate"
+    },
+    "verifier": {
+      "value": "high",
+      "note": "verification is central to the harness loop"
+    },
+    "red-team": {
+      "value": "high",
+      "note": "adversarial / security pass"
+    },
+    "planner": {
+      "value": "high",
+      "note": "decomposes multi-step work"
+    },
+    "tester": {
+      "value": "high",
+      "note": "writes and runs tests"
+    },
+    "reducer-security-auditor": {
+      "value": "critical",
+      "note": "SpacetimeDB reducer security \u2014 high blast radius"
+    },
+    "desync-guard": {
+      "value": "critical",
+      "note": "multiplayer desync = data-corruption-class bugs"
+    },
+    "researcher": {
+      "value": "medium",
+      "note": "isolated research to protect main-session context"
+    },
+    "doc-keeper": {
+      "value": "medium",
+      "note": "keeps docs in sync with code"
+    },
+    "judge": {
+      "value": "medium",
+      "note": "adjudicates /compete and /debate patterns"
+    }
+  },
+  "skills": {
+    "code-review": {
+      "value": "high",
+      "note": "primary review skill"
+    },
+    "simplify": {
+      "value": "medium",
+      "note": "code-simplification pass"
+    },
+    "schedule": {
+      "value": "low",
+      "note": "occasional scheduling utility"
+    },
+    "pixijs": {
+      "value": "high",
+      "note": "central to the game clients; 26-skill pack auto-wired from node_modules"
+    }
+  }
+}
