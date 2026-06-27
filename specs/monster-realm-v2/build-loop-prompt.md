@@ -2,7 +2,7 @@ ultracode ultraplan ultrathink
 
 # Build-loop prompt — implement the Monster Realm (v2) milestones
 
-The build-phase companion to `milestone-loop-prompt.md` (which *specs*); this one *builds* the specs into a real project under `projects/`. Run it in the harness at `~/projects/ai-apps/claude-harness`, working in the **real Ubuntu/WSL** (login shell — native tools for the rooted run; via Desktop Commander, whose default shell is already WSL login bash, if driven from the desktop app), per the project's `AGENTS.md` — never run project commands in the sandbox (Rust 1.96.0 · spacetime 2.6.x · wasm-pack 0.15.0 · node 24.13.1 · `just`).
+The build-phase companion to `milestone-loop-prompt.md` (which *specs*); this one *builds* the specs into a real project under `projects/`. Run it in the harness at `~/projects/ai-apps/claude-harness`, working in the **real Ubuntu/WSL** (a login shell with the toolchain on PATH — native tools for the rooted run; Desktop Commander runs inside WSL if driven from the desktop app), per the project's `AGENTS.md` — never run project commands in the sandbox (Rust 1.96.0 · spacetime 2.6.x · wasm-pack 0.15.0 · node 24.13.1 · `just`).
 
 ## Mission
 

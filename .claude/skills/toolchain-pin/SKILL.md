@@ -18,7 +18,7 @@ Each tool pins **differently** — there is no single mechanism. Reproducibility
 
 ## Audit workflow
 
-1. **Detect installed** — run `<tool> --version` directly — DC's default shell is already a Ubuntu **login** shell, so asdf shims are on PATH; a non-login sub-shell drops the shims and reports the *system* version (see `[[wsl-harness-exec]]`).
+1. **Detect installed** — run `<tool> --version` directly; Desktop Commander runs inside WSL with the asdf toolchain inherited on `PATH`, so you get the pinned version (a non-login sub-shell you spawn yourself can drop the shims → *system* version). See `[[wsl-harness-exec]]`.
 2. **Identify the canonical mechanism** for that tool (table above).
 3. **Check for drift** — grep the version across `standards/`, project `AGENTS.md`, and `templates/`; confirm CI pins match local.
 4. **Record** in the project `AGENTS.md` `Toolchain (pinned)` line.
