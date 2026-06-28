@@ -68,3 +68,21 @@ No-op on the Windows host, where `just` is already installed.
   `just sync --apply` updates managed files without touching your source).
 - Verify the harness itself anytime with `just test`.
 - `projects/smoke-test/` is a throwaway example from verification — safe to delete.
+
+## Step 3 — wire shared skills & agents into ~/.claude (per machine)
+
+Make the harness's cross-cutting skills (`context-hygiene`, `security`,
+`toolchain-pin`, `wsl-harness-exec`, …) and global consultant agents (`expert`,
+`review-lens`) discoverable in **every** project and worktree — not just the
+harness root — by linking them into `~/.claude`. The harness repo stays the single
+source of truth (the links point back into it), so editing a skill here updates it
+everywhere.
+
+```bash
+just setup-claude          # create the ~/.claude symlinks (idempotent)
+just setup-claude --check  # verify later — exits 1 if a link is missing or drifted
+```
+
+Re-run `just setup-claude` after adding a new harness-level skill. Project-scoped
+agents (planner, reviewer, tester, …) stay committed in each project's
+`.claude/agents/` and are intentionally not promoted.

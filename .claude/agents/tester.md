@@ -40,5 +40,5 @@ specialist implements, the verifier runs).
   (`(x) => { expect(a).toEqual(b); }`), never expression-body (`(x) => expect(...)`)
   — fast-check misreads the matcher's return as a `false` and fails spuriously.
   See `[[vitest-fast-check]]`.
-- Use the project's framework + `standards/testing-tdd.md`; scope the runner away
+- Use the project's framework + `~/.claude/harness/standards/testing-tdd.md`; scope the runner away
   from other test types (e.g. Playwright e2e specs the unit runner would grab).

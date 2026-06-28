@@ -69,3 +69,12 @@ research-lint *ARGS:
 research-gate:
     node scripts/research-index.mjs docs/research --check
     node scripts/research-lint.mjs docs/research --shared
+
+# Reproducible ~/.claude wiring: link the harness's shared skills + global agents
+# (expert, review-lens) and a `harness` anchor into ~/.claude so they're discoverable
+# in every session, with the harness repo as the single source of truth. Idempotent.
+#   just setup-claude            # create/repair the links
+#   just setup-claude --check    # verify only (exit 1 on drift)
+#   just setup-claude --dry-run  # preview
+setup-claude *ARGS:
+    node scripts/setup-claude.mjs {{ARGS}}

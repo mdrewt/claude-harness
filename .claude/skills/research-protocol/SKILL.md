@@ -91,7 +91,7 @@ Keep `abstract` to one line (the index truncates at ~120 chars).
   goes through `/research-library` (fan-out -> verify each file landed -> regen index -> lint).
 
 ## Consuming docs (expert)
-1. Read the **shared library** `docs/research/INDEX.md` in the harness repo first (your default
+1. Read the **shared library** `~/.claude/harness/docs/research/INDEX.md` first (your default
    knowledge base — the harness ships these agents/standards; from a sibling project it is
    `../claude-harness/docs/research/`, or locate it by the repo with `AGENTS.md` + `standards/`).
    Also read the current project's `docs/research/INDEX.md` if one exists.

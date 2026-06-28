@@ -1,8 +1,8 @@
 ---
 name: security
-description: Security review checklist and gates for code changes. Use before merging anything touching auth, input handling, dependencies, secrets, SQL, or money. Pulls from standards/security.md.
+description: Security review checklist and gates for code changes. Use before merging anything touching auth, input handling, dependencies, secrets, SQL, or money. Pulls from ~/.claude/harness/standards/security.md.
 ---
-Run the security checklist from `standards/security.md`:
+Run the security checklist from `~/.claude/harness/standards/security.md`:
 - Secrets: no committed secrets; gitleaks clean.
 - Input: all external IO validated at the boundary (zod/pydantic); no unsafe SQL.
 - AuthZ: every protected path checks permissions.

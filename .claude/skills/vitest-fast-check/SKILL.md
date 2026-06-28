@@ -5,7 +5,7 @@ description: Writing reliable vitest + fast-check tests in the harness node/TS s
 
 # vitest + fast-check — reliable property tests
 
-The node stacks test with **vitest** + **fast-check** (property tests for logic-heavy code, per `standards/testing-tdd.md`). A few footguns cost real debugging time — front-load them.
+The node stacks test with **vitest** + **fast-check** (property tests for logic-heavy code, per `~/.claude/harness/standards/testing-tdd.md`). A few footguns cost real debugging time — front-load them.
 
 ## The expression-body footgun (the big one)
 

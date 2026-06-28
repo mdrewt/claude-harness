@@ -42,6 +42,38 @@ const AS_JSON = flag('--json');
 const SHOW_ALL = flag('--full');
 const CSV = opt('--csv', join(CONFIG, 'usage-log.csv'));
 
+// Minimal RFC4180 line parser: handles quoted fields with embedded commas/quotes, so a
+// quoted name written by the usage-logger hook is not truncated at the first comma.
+const parseCsvLine = (line) => {
+  const out = [];
+  let cur = '';
+  let q = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (q) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          q = false;
+        }
+      } else {
+        cur += ch;
+      }
+    } else if (ch === '"') {
+      q = true;
+    } else if (ch === ',') {
+      out.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+};
+
 const now = Date.now();
 let since = null;
 let until = null;
@@ -198,7 +230,7 @@ for (const file of transcripts) {
 if (existsSync(CSV)) {
   for (const row of readFileSync(CSV, 'utf8').split('\n')) {
     if (!row || row.startsWith('timestamp,')) continue;
-    const [iso, kind, name] = row.split(',');
+    const [iso, kind, name] = parseCsvLine(row);
     const ts = Date.parse(iso);
     if (Number.isNaN(ts) || ts < since || ts > until) continue;
     if (ts >= transcriptFloor) continue; // covered by transcripts; no double count

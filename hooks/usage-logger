@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""PostToolUse hook: append every Skill / Agent invocation to ~/.claude/usage-log.csv.
+
+Canonical source lives in the harness repo (hooks/usage-logger); `just setup-claude`
+symlinks ~/.claude/hooks/usage-logger to it. Wired in ~/.claude/settings.json under
+PostToolUse with matcher "Skill|Agent|Task". Never blocks and never errors out the
+tool call: always exits 0. Read back by scripts/audit-usage.mjs.
+
+Security: the skill/agent name and project come from model-controlled tool input, so
+each field is sanitized before it lands in the CSV — control chars are flattened (so a
+field can't break the row) and a leading =,+,-,@ is escaped so the value can never be
+interpreted as a formula if the log is opened in a spreadsheet (CSV-injection guard).
+"""
+
+import csv
+import datetime
+import json
+import os
+import sys
+
+LOG = os.path.join(os.path.expanduser("~"), ".claude", "usage-log.csv")
+HEADER = ["timestamp", "kind", "name", "session", "project"]
+
+
+def safe(value):
+    """Neutralize CSV/formula injection from untrusted (model/path-derived) fields."""
+    s = str(value)
+    # Flatten control chars so a value can never break the CSV row structure.
+    for ch in ("\r", "\n", "\t"):
+        s = s.replace(ch, " ")
+    # Escape spreadsheet formula triggers (=, +, -, @) with a leading apostrophe.
+    if s[:1] in ("=", "+", "-", "@"):
+        s = "'" + s
+    return s
+
+
+def main():
+    try:
+        data = json.load(sys.stdin)
+    except Exception:
+        return
+    tool = data.get("tool_name")
+    inp = data.get("tool_input") or {}
+    if tool == "Skill":
+        kind, name = "skill", inp.get("skill", "(unknown)")
+    elif tool in ("Agent", "Task"):
+        kind, name = "agent", inp.get("subagent_type", "(unknown)")
+    else:
+        return
+    cwd = (data.get("cwd") or "").rstrip("/")
+    row = [
+        datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        kind,
+        safe(name),
+        data.get("session_id", ""),
+        safe(os.path.basename(cwd)) if cwd else "",
+    ]
+    new = not os.path.exists(LOG)
+    with open(LOG, "a", newline="") as f:
+        w = csv.writer(f)
+        if new:
+            w.writerow(HEADER)
+        w.writerow(row)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        pass
+    sys.exit(0)

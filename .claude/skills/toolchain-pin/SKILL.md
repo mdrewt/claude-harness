@@ -20,7 +20,7 @@ Each tool pins **differently** — there is no single mechanism. Reproducibility
 
 1. **Detect installed** — run `<tool> --version` directly; Desktop Commander runs inside WSL with the asdf toolchain inherited on `PATH`, so you get the pinned version (a non-login sub-shell you spawn yourself can drop the shims → *system* version). See `[[wsl-harness-exec]]`.
 2. **Identify the canonical mechanism** for that tool (table above).
-3. **Check for drift** — grep the version across `standards/`, project `AGENTS.md`, and `templates/`; confirm CI pins match local.
+3. **Check for drift** — grep the version across `~/.claude/harness/standards/`, project `AGENTS.md`, and `templates/`; confirm CI pins match local.
 4. **Record** in the project `AGENTS.md` `Toolchain (pinned)` line.
 5. **Verify (proof-of-teeth)** — prove the guard *bites*: e.g. an impossible `engines` range under the current Node must fail `npm install` with `EBADENGINE`; `rustup show` must name the `rust-toolchain.toml`.
 
