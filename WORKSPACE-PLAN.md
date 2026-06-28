@@ -121,6 +121,7 @@ Context rot is the progressive degradation of output quality as the window fills
 - **Memory index is small and authoritative.** Agents read `memory/index.md` (a map) and pull only the relevant project card — never the whole memory store.
 - **Compaction discipline.** Compact at task boundaries; start a fresh context per task rather than letting one session sprawl (long-horizon drift is a known failure mode).
 - **Upgrade path:** if the markdown memory store outgrows itself, swap in a graph/managed memory backend (Mem0 / Cognee / Supermemory MCP) without changing the index contract. Deferred until justified.
+- **Knowledge contract.** Durable agent-readable knowledge (research libraries, generated schema bundles) follows `standards/knowledge-format.md` (ADR-0008) — an OKF-aligned, generated-from-source, drift-gated markdown convention. It is the portable *index contract* a future memory backend (above) would consume unchanged.
 
 ---
 
