@@ -28,7 +28,11 @@ specialist implements, the verifier runs).
    on the wrong tile — this assertion catches it").
 5. **Report** the test list, the criterion each covers, and the red state. You do
    NOT later edit a gating test to fit a buggy implementation — a wrong test is
-   revised *from the spec*, never to match the code.
+   revised *from the spec*, never to match the code. When a gating test's expected
+   value was wrong **against the spec**, **you** (not the implementer) correct it;
+   the correction must **strengthen or preserve the bite** (still fail a wrong
+   impl), and you **log a one-line rationale** tying the new expected value to the
+   spec — the verifier checks correction-vs-weakening and rejects a silent retarget.
 
 ## Framework gotchas
 
