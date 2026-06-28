@@ -155,7 +155,8 @@ A spec is finalized only when **all** hold:
   smoothness criteria, included as applicable.
 - Plan with data/API sketches, **version-sensitive flags** (confirm SpacetimeDB APIs vs the pinned
   version), and a **"what M{N+1} will consume" boundary preview**.
-- Tasks as small vertical slices (split `M{N}a/M{N}b` if large).
+- Tasks as small vertical slices (split `M{N}a/M{N}b` if large), **each with an explicit `touches:` path-set** declared along the natural boundaries (a `game-core` rule module; a **server-module domain module** per the M8.9 map — `schema/guards/marshal/content/movement/monster_mgmt/battle/taming`; `client/`; content + `validate_content`; `evals/`) so independent slices are `touches:`-disjoint and the supervisor can fan out (per `PLAN.md` §9). Slice **order** must reflect the real dependency chain (rule → reducer → client/evals), not only file-disjointness; disjoint files are necessary but not sufficient.
+- A **post-integration verification plan**: after the slices merge (serial, verifier-gated, each later slice rebased on the merged earlier ones), the *integrated whole* is verified — full `just ci` green-and-meaningful, `bindings-drift = 0`, schema-snapshot intact, e2e/integration green, and the **combined** behavior satisfies the milestone's EARS end-to-end (not merely each slice individually green). Every cross-slice contract (shared types, table columns, reducer signatures, generated bindings) is named with the test that proves it holds after integration.
 - Risks/decisions documented; **§7 review/red-team** note + a **tutorial-harvest** note (or an explicit
   "no v1 precedent — designed from standards").
 - ADR(s) created, accepted, synced; `PLAN.md` updated (ADR table + resolution-status line + roadmap line
