@@ -242,3 +242,37 @@ Detached rooted run for m8.95b (conformance+drift eval; touches: evals/knowledge
 **m8.95b MERGED.** PR #103 (feat/m8.95b-conformance-eval) squash-merged → master 4e3634a; CI+e2e green pre- and post-merge. Diff = exactly `evals/knowledge-bundle-conformance.eval.mjs` (⊆ touches; `evals/run.mjs` untouched; no baselines, no ADR — 0080 still next-free, reserved for 8.95d). Audits CLEAN: Sonnet model asserted; tester/reviewer/red-team/verifier lenses all ran; no skip/only in diff. Cost $7.65, 1 attempt. Worktree `.claude/worktrees/m8.95b` + branch removed; master ff'd. Stray untracked `.claire/` left untouched.
 **Next: launching m8.95c** (research-library conformance; touches docs/research/*.md + vendored type-aware research-index/lint + INDEX.md; run authors/vendors the type-aware scripts itself — harness canonical copies are NOT yet type-aware). 8.95d (doc-keeper, ADR 0080) remains the closer; fan-out c‖d declined (d closes/verifies the milestone — serial safer). M10.5 still owed after 8.95.
 **09:14Z IN-PROGRESS:** launching m8.95c (research-library conformance) detached via mr-launch.sh. Brief /tmp/mr_pass_m8.95c.md. No ADR reserved (8.95d owns 0080).
+
+## 2026-07-04T10:16Z — mr-sup-cowork-20260704T100628Z-2060749-15290 (Cowork supervisor tick)
+
+**m8.95c MERGED.** PR #104 (feat/m8.95c-research-conformance) squash-merged at 10:09Z → master 1fb7d70. Post-merge CI GREEN. Run finished cleanly (EXIT=0, ATTEMPTS=1, $6.92, sonnet-4-6). Audits: orchestration CLEAN (4 subagents: tester/reviewer/red-team/verifier), gating-test CLEAN (no test files in diff), diff ⊆ declared touches. No ADR consumed (0080 still reserved for M8.95d). Worktree .claude/worktrees/m8.95c removed, branch deleted. Note: untracked stray `.claire/` dir in project root — left untouched. Supervisor DC shell died during CI poll; reconciled in a fresh shell, no impact.
+
+Next: M8.95d (doc-keeper+verifier closes M8.95 milestone, files project ADR at 0080), then M10.5.
+
+## 2026-07-04T10:26Z — mr-sup-cowork-20260704T100628Z-2060749-15290 — IN-PROGRESS: launching M8.95d
+
+Composite launch after m8.95c merge. M8.95d = doc-keeper+verifier, closes M8.95 milestone. ADR 0080 pre-allocated. Brief: /tmp/mr_pass_m8.95d.md. Doc-only slice.
+
+---
+
+## 2026-07-04T~11:30Z — M8.95d TERMINAL STATE: PR #105 OPEN, local just ci GREEN (EXIT=0), remote CI running
+
+**M8.95d (doc-keeper + verifier — closes M8.95 knowledge-bundle milestone)**
+
+Monster-realm repo changes (branch `feat/m8.95d-doc-keeper`, PR #105, 2 commits, tip `e58fa92`):
+
+- **`docs/adr/0080-generated-knowledge-bundle.md`** (NEW): project-side ADR, mirror of corpus ADR-0057. Records A+F1+G1 decisions, all 4 M8.95 slices with PR refs. ADR-0080 consumed; ADR next-free = **0081**.
+- **`ARCHITECTURE.md`**: (1) knowledge-bundle drift gate in §Mechanical gates; (2) new §Agent knowledge bundle (M8.95 — ADR-0080) section with concept-type table + producer/lint/privacy/recipe notes; (3) §Decisions range 0035–0079→0080 + ADR-0080 highlight.
+- **`CHANGELOG.md`**: regenerated via `just changelog`; picks up M8.95a/b/c feat entries (PRs #102–#104).
+
+Harness changes (committed to harness main `ea46c97`):
+- `specs/monster-realm-v2/M8.95-knowledge-bundle.spec.md`: §5 boxes ticked — 8.95a (PR #102), 8.95b (PR #103), 8.95d (PR #105); 8.95c was already ticked
+- `memory/projects/monster-realm-m8.95d.md` (NEW): doc-keeper memo
+
+**Verifier:** just ci EXIT=0 — 47 evals (schema-snapshot PASS, bindings-drift PASS, knowledge-bundle-conformance PASS: 48 concepts lint-clean + drift gate passed), 777 Rust tests, 571 client tests.
+
+**M8.95 milestone: ALL SLICES MERGED** — 8.95a (PR #102) + 8.95b (PR #103) + 8.95c (PR #104) + 8.95d (PR #105 pending merge).
+
+**Supervisor:** squash-merge PR #105 → master. ADR next-free = 0081. Worktree `.claude/worktrees/m8.95d` + branch removable after merge.
+
+**Next slice:** M10.5 (five residual slices — 10.5a content validation, 10.5b doc accuracy, 10.5c ADR-README, 10.5d gates+config).
