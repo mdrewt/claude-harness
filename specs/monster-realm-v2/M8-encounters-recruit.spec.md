@@ -3,7 +3,7 @@
 **Status:** draft · **Owner:** Drew · **Date:** 2026-06-24
 **Stack:** spacetimedb-game · **Project:** monster-realm · **Depends on:** M0–M7.
 **Decisions:** ADR-0006 (content), 0007 (zoned), 0010 (proof-of-teeth), 0011 (server-paced tick), 0015
-(private/RLS visibility), 0017 (battle model). **No new ADR** (applies existing patterns). **Workflow:**
+(private/RLS visibility), 0017 (battle model), **0045** (wild individuality private side-table — M8c resolution). **Workflow:**
 harvest v1 M8 chapter → draft → review (§7).
 
 ## 1. Problem / intent
@@ -28,8 +28,10 @@ monster to your box at full HP; failure forfeits the turn.
   (`#[index(btree)] zone_id`); seeded from RON via `sync_content`; the client never receives it.
 - **Grass trigger in the per-zone `movement_tick`:** when a character *steps into* a grass tile, roll
   `encounter_triggers`; if triggered, roll the wild (species from the zone's `encounter` rows +
-  `roll_individuality`) and `start_battle` storing the rolled `wild_ivs`/`wild_nature` on the
-  `battle` row (M7-reserved).
+  `roll_individuality`) and start a wild battle storing the rolled `individuality_seed` in a
+  **private `battle_wild` side-table** keyed by `battle_id` (NOT as columns on the public `battle`
+  row — ADR-0045; `battle` is public per ADR-0042, and raw IV/seed data must never reach a client
+  per ADR-0015).
 - **Recruit action** (in-battle reducer): `attempt_recruit` — validate it's the player's wild battle and
   not over; consume one bait if used (`consume_one`); roll `recruit_chance` from the wild's `current_hp`;
   **on success** rebuild *that exact* wild from the battle-row individuality → grant a `monster` (owned by
@@ -62,9 +64,9 @@ monster to your box at full HP; failure forfeits the turn.
   receives nothing (privacy proof-of-teeth — spawn weights/odds stay hidden).
 
 **Recruit (server-authoritative)**
-- WHEN `attempt_recruit` succeeds THE SYSTEM SHALL rebuild the wild from the battle-row individuality (so
-  it is *that exact* monster), grant it to `ctx.sender` at full HP, and end the battle; IF bait was used it
-  SHALL be `consume_one`'d first.
+- WHEN `attempt_recruit` succeeds THE SYSTEM SHALL rebuild the wild from the `individuality_seed` stored in
+  the private `battle_wild` side-table (keyed by `battle_id`) — so it is *that exact* monster — grant it to
+  `ctx.sender` at full HP, and end the battle; IF bait was used it SHALL be `consume_one`'d first.
 - IF `attempt_recruit` is called on a non-owned/over/non-wild battle, or without owned bait when bait is
   specified, THEN THE SYSTEM SHALL reject with `Err`; on a failed roll the wild SHALL strike back (turn
   forfeited).
@@ -92,9 +94,12 @@ fields to grow; `current_hp` persistence.
 
 ## 6. Risks / decisions
 - **`encounter` must be private** — a public spawn table is a cheat surface; enforce + proof-of-teeth.
-- **Rebuild the *exact* wild** from the battle-row individuality (not a fresh roll) — otherwise recruit
-  returns a different monster than the one you fought (a feel/trust bug). The wild fields were reserved on
-  the `battle` row at M7 (additive).
+- **Rebuild the *exact* wild** from the stored `individuality_seed` (not a fresh roll) — otherwise recruit
+  returns a different monster than the one you fought (a feel/trust bug). **M8c resolution (ADR-0045):**
+  the seed is stored in a private `battle_wild` side-table (1:1 keyed by `battle_id`), NOT on the public
+  `battle` row — `battle` is client-subscribable (ADR-0042) and raw RNG-derived genes are must-never-leak
+  (ADR-0015). `roll_individuality(seed)` is pure/deterministic so the seed is the SSOT; M8d reads it to
+  rebuild the exact wild. Storing only the seed (not expanded IV columns) also keeps the table SSOT-clean.
 - **Classify bait by data** (`recruit_bonus > 0`) on both client and server — a hard-coded item id drifts.
 - **Probabilistic e2e** (recruit/encounter) must be **bounded + robust** (cap the loop, field a tanky
   monster to survive), never an unbounded retry.

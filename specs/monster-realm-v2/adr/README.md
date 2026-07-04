@@ -1,6 +1,6 @@
 # ADR registry — Monster Realm (v2)
 
-All architecture decisions, MADR format. **All 29 accepted.** Decisions 0002/0003/0004 were settled by
+All architecture decisions, MADR format. **0001-0034 accepted; 0055-0057 proposed** (driven by harness-spec'd milestones M8.9/M8.95). Decisions 0002/0003/0004 were settled by
 `/debate` and ratified; the rest accepted as load-bearing for their milestone. See `../PLAN.md` for the
 roadmap and `../spec-corpus-review.md` for the holistic review.
 
@@ -42,8 +42,9 @@ roadmap and `../spec-corpus-review.md` for the holistic review.
 | 0034 | Security audit & threat-model gate | M25 | Maintained threat model + tooled/manual audit + blocking launch sign-off + re-audit cadence |
 | 0055 | Server-module internal module boundary | M8.9 (A) | Split `server-module/src/lib.rs` into domain modules → narrow `touches:` for parallel fan-out (proposed) |
 | 0056 | Content as glob-loaded directories (build.rs) | M8.9 (B) | Per-registry content dirs embedded via `build.rs` → content additions become disjoint files (proposed) |
+| 0057 | Generated knowledge bundle (OKF-conformant schema projection) | M8.95 | Generate an OKF-aligned schema/reducer bundle from source, drift-gated; an SSOT projection, **not** a source of truth (proposed) |
 
-> **Numbering note:** 0035–0054 are *implementation* ADRs that live in the project repo (`projects/monster-realm/docs/adr/`), per `../../../projects/monster-realm/AGENTS.md` (design ADRs 0002–0034 here; impl ADRs 0035+ there). **0055/0056** are recorded here because they are driven by the harness-spec'd M8.9 milestone; their project-side implementation ADRs are filed at the confirmed next-free numbers when M8.9 builds.
+> **Numbering note:** 0035–0054 are *implementation* ADRs that live in the project repo (`projects/monster-realm/docs/adr/`), per `../../../projects/monster-realm/AGENTS.md` (design ADRs 0002–0034 here; impl ADRs 0035+ there). **0055/0056/0057** are recorded here because they are driven by harness-spec'd milestones (M8.9, M8.95); their project-side implementation ADRs are filed at the confirmed next-free numbers when those milestones build.
 
 **Companion SSOT docs:** `../netcode-quality-review.md` (feel) · `../observability-performance-plan.md`
 (robustness/perf) · `../security-threat-model.md` (attack surface) · `../spec-corpus-review.md` (holistic).

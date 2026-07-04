@@ -99,11 +99,11 @@ Recommended order: **{ M10a-rules ‖ M10a-content } → M10b → { M10c ‖ M10
 multi-zone, warps) and accepts ADR-0008.
 
 ## 5. Tasks
-- [ ] **10a-rules** (‖ 10a-content) `game-core/evolution`: eligibility + evolve transform + fusion rule (individuality-preserving); unit/property + determinism tests.
-- [ ] **10a-content** (‖ 10a-rules) `fusion` table content + `species.evolutions`; `validate_content` extensions (no-dup-pair, derived-forms-not-wild, dangling-ref, append-only) + proof-of-teeth fixtures. *(Define shared content types first if rules import them — see §4.)*
-- [ ] **10b** `evolve`/`fuse` reducers (ownership, eligibility/recipe, atomic fuse, escrow guards) + `fusion` table + `evolves_to` column + server-computed `evolves_to` on the row + security-auditor.
-- [ ] **10c** (‖ 10d) evolve/fuse UI (pure subscription view + ownership-checked actions).
-- [ ] **10d** (‖ 10c) content-integrity proof-of-teeth wired into `just eval`; doc-keeper changelog + memory; mark **Phase A complete** in `ARCHITECTURE.md`.
+- [x] **10a-rules** DONE (PR #64) — `game-core/evolution`: eligibility (`evolves_to`/`resolve_evolution`) + evolve/fuse transforms; 46 unit/property tests; ADR-0061.
+- [x] **10a-content** DONE (PR #62) — `fusion` content + `species.evolutions`; `validate_evolution_fusion` integrity validator (7-rule cross-registry, proof-of-teeth); ADR-0060.
+- [x] **10b** DONE (PR #67) — `evolve`/`fuse` reducers (battle/escrow guards, atomic fuse delete-two-insert-one); `fusion` table + `evolves_to` column; `compute_evolves_to`; ADR-0062. *Residual: fuse offspring dual-write ordering fixed later in M12.5a (PR #84, ADR-0072).*
+- [x] **10c** DONE (PR #70) — evolve/fuse UI (KeyE `EvolutionView`, `FusionRecipeViewModel`, `evolvesTo` decode, coverage exclusion); ADR-0063.
+- [x] **10d** DONE (PR #69) — content-integrity + reducer-security evals (29 proof-of-teeth); Phase A declared complete in `ARCHITECTURE.md`; ADR-0064.
 
 ## 6. Risks / decisions
 - **Preserve, don't re-roll, individuality** (ADR-0019) — re-rolling on evolution/fusion would erase the

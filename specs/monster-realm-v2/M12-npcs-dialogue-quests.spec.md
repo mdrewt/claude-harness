@@ -74,12 +74,12 @@ cost/cooldown.
 rewards in currency; the item/inventory backbone (M9) extended with currency (M13).
 
 ## 5. Tasks
-- [ ] `game-core`: `npc_decide` + dialogue model + quest/flag rules; unit/property + determinism tests.
-- [ ] `npc` entity + per-zone-tick wander (additive); content (dialogue/quests RON) + `validate_content` + fixtures.
-- [ ] `player_quest` (RLS) + `talk`/`advance_dialogue`/quest-advance reducers (server-evaluated, reward via helpers) + security/privacy fixtures.
-- [ ] Town healing location → `heal_party` with cost/cooldown (replaces the placeholder).
-- [ ] Frontend dialogue screen + quest log; doc-keeper changelog + memory; update M7 (`heal_party` resolved).
-- [ ] Reconcile M1/M2 note: `npc_decide` now exists (the deferral from M1 is closed here).
+- [x] `game-core`: `npc_decide` + dialogue model + quest/flag rules; unit/property + determinism tests. DONE (PR #78, M12a, ADR-0068).
+- [x] `npc` entity + per-zone-tick wander (additive); content (dialogue/quests RON) + `validate_content` + fixtures. DONE (PR #79 M12b ADR-0069, PR #81 M12c ADR-0070 — NPC zone policy + RT-ADV-01 fix).
+- [x] `player_quest` (RLS) + `talk`/`advance_dialogue`/quest-advance reducers (server-evaluated, reward via helpers) + security/privacy fixtures. DONE (PR #79 M12b, PR #81 M12c — npc-dialogue-quest-security eval 10 checks).
+- [x] Town healing location → `heal_party` with cost/cooldown (replaces the placeholder). DONE (PR #79, M12b).
+- [x] Frontend dialogue screen + quest log; doc-keeper changelog + memory; update M7 (`heal_party` resolved). DONE (PR #83, M12d, ADR-0071).
+- [x] Reconcile M1/M2 note: `npc_decide` now exists (the deferral from M1 is closed here). DONE (PR #78, M12a — non-commutative hash closes M1/M2 deferral; ARCHITECTURE.md updated).
 
 ## 6. Risks / decisions
 - **Quest system depth = flag-based (default, flagged for the M14 checkpoint)** — flags + progress over
