@@ -1,0 +1,29 @@
+{
+ "schema_version": 1,
+ "updated_utc": "2026-07-04T20:12:28Z",
+ "updated_by": "mr-sup-cowork-20260704T200432Z-2563911-31400 (m13b launched)",
+ "master": {
+  "sha": "7c7e568",
+  "ci": "GREEN on 7c7e568 (chore #112) and 969e1be (m13a)",
+  "nightly": "not checked this tick"
+ },
+ "adr_next_free": 83,
+ "inflight": [
+  {
+   "slice": "m13b",
+   "session_leader": 2566468,
+   "claude_pid": 2566471,
+   "started_utc": "2026-07-04T20:12:28Z"
+  }
+ ],
+ "awaiting_merge": [],
+ "queue": [
+  "m13c (sinks/sources wiring; serial after m13b)",
+  "m13d (client shop UI + wallet; pure client - fan-out candidate vs m13c)",
+  "M13.5 (seventh-review residuals; Drew resolved all 3 DECISIONS in spec s3 - implement DECIDED options not defaults)"
+ ],
+ "park_counters": {},
+ "consecutive_standdowns": 0,
+ "rate_limit_resets_at": null,
+ "notes": "20:02-20:12Z tick: reconciled m13a fully merged (PR #111 -> 969e1be, chore #112 -> 7c7e568, both CI green). Launched m13b detached, model sonnet asserted, detachment asserted (PID==SESS 2566468 != supervisor shell). ADR 0082 reserved (next free 83). Fan-out declined: m13c serial after m13b; m13d likely needs m13b bindings."
+}

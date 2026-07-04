@@ -259,6 +259,7 @@ breaks the spine. Numbering restarts for the new project.
 - **M13 Economy & inventory** (`M13-economy.spec.md`; ADR-0022) — shops, a single owner-private currency,
   and content-priced server-mediated buy/sell on the M9 inventory backbone (ADR-0018); M15 player-trade adds
   only a dual-consent escrow on top.
+- **M13.5 Seventh-review residuals** (`M13.5-seventh-review-residuals.spec.md`; inserted between M13 and M14 while m13a was in flight — resolves the verified 2026-07-04 seventh-review findings @ `15bd08b`: gate-of-gates CI/nightly wiring guards + coverage-ratchet re-tighten, the silent phantom-intent desync + reducer-rejection UX surfacing + reconnect confirmation, content-lifecycle completion (NPC upsert, zone removal, write-back clamp), hot-path content-parse caching, battle-overlay/zone-failure/render UX fixes, GrantItem/quest-wildcard/coded-decode/party-slot type-rigor hardening, a docs/ledger reconciliation pass (incl. the harness↔project ADR 0055–0057 numbering-collision rule fix), and the named recruit-e2e revival slice 12.5f-5 demanded; no new game-design surface).
 - **M14 Deeper battle systems** (`M14-deeper-battle.spec.md`; ADR-0023) — status effects, abilities, weather
   as **additive** layers on the symmetric `resolve_turn` (M7 untouched; PvP/raids inherit it); multi-active
   deferred to the Phase B checkpoint. **Phase B complete.**
