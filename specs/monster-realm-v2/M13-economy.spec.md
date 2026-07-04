@@ -67,8 +67,8 @@ pattern; M15 adds a **dual-consent escrow** for player↔player trades on top (n
 ## 5. Tasks
 - [x] Currency balance (RLS owner-scoped) + `grant_currency`/`spend_currency` (saturating, reject-on-insufficient) + privacy/overflow fixtures.
 - [x] Shop content (RON) + `validate_content` + `buy`/`sell` reducers (atomic, server-priced) + security-auditor.
-- [ ] Wire sinks/sources (healing cost, quest/battle rewards) through the currency helpers.
-- [ ] Frontend shop screen + wallet display; doc-keeper changelog + memory.
+- [x] Wire sinks/sources (healing cost, quest/battle rewards) through the currency helpers.
+- [x] M13d — client shop screen + wallet display (PR #115)
 
 ## 6. Risks / decisions
 - **Single currency (default, flagged for the M14/Phase-B checkpoint)** — sufficient and simplest; multiple/

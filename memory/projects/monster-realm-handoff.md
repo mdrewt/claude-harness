@@ -114,3 +114,20 @@ All findings fixed, `just ci` EXIT=0 (801 Rust + 574 client + 48 evals), pushed 
 - **ADR next-free: 0083**
 - **Worktree:** `.claude/worktrees/m13b` (retained until merge)
 - **Next:** Supervisor owns merge. After merge → M13c (economy sinks) or M13.5 slices per PLAN §9.
+
+## 2026-07-04T21:26:17Z — m13b MERGED; m13c ‖ m13d LAUNCHING (supervisor tick mr-sup-cowork-20260704T210533Z-2625451-13404)
+
+- m13b: PR #113 squash-merged → e60374d; master CI GREEN. ADR-0082 registered via chore PR #114 → 3c284e5 (--auto rejected by branch protection again → merged manually on green). Worktree/branches removed. Audits: orchestration CLEAN (sonnet; tester+review-lens+red-team present), gating-test CLEAN (18 tests added, none weakened). Cost $11.10, 1 attempt. Note: diff contained game-core/build.rs + docs/knowledge/** marginally outside declared touches — no siblings in flight, accepted, noted.
+- FAN-OUT: launching m13c (sinks/sources wiring; server-side; ADR 0083) ‖ m13d (client shop UI + wallet; pure client; ADR 0084). Touches disjoint (server/game-core/evals vs client-minus-bindings); approved server ‖ client pair shape; 39G free, load 0.04; final re-probe clean. Briefs: /tmp/mr_pass_m13c.md, /tmp/mr_pass_m13d.md.
+- ADR next free after reservations: 0085.
+
+## 2026-07-04T21:3xZ — m13d TERMINAL STATE (PR #115 open, `just ci` green)
+
+- Branch: `feat/m13d-shop-client-ui`, tip: `c5d6b39`
+- PR #115 open: https://github.com/mdrewt/monster-realm/pull/115
+- `just ci` EXIT=0: 626 tests (Rust + client combined) + 52 evals all PASS
+- **What landed:** `shop_row`/`shop_item_row` store subscriptions via `MicrotaskBatcher`; `buildShopViewModel` pure function (ADR-0016, lowest-shopId-wins sort, itemId inventory aggregate); `shopView.ts` DOM shell (KeyG trigger, mutual-exclusivity with all overlays per ADR-0014, `#pending` bool + `btn.disabled` in-flight lock); `SHOP_QTY = 1` const (ADR-0082 D5 single-unit MVP); `player_wallet` **NOT subscribed** (private table, ADR-0081/0040); transaction feedback via async/await Promise rejection (spec gap "wallet display" documented in ADR-0084); ARCHITECTURE.md M13d section added.
+- **ADR-0084:** shop client view; spec gap (wallet privacy) documented with follow-up recommendation; next-free = 0085.
+- **Spec tick:** M13 §5 task 4 marked DONE (PR #115).
+- **Worktree:** `.claude/worktrees/m13d` (retained until merge)
+- **Next:** Remote CI + merge. M13 spec §5 all 4 tasks done (M13a/b/d shipped, M13c concurrent sibling status TBD).
