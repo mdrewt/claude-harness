@@ -1,5 +1,59 @@
 ---
 
+## 2026-07-04T~11:30Z — M8.95c TERMINAL STATE: PR #104 OPEN, local just ci GREEN (EXIT=0), remote CI running
+
+**M8.95c (research-library conformance — type field + type-aware vendored scripts)**
+
+Monster-realm repo changes (branch `feat/m8.95c-research-conformance`, PR #104, 2 commits, tip `c8a3162`):
+
+- **`docs/research/monster-taming-mechanics.md`**: added `type: Research Note` frontmatter
+- **`docs/research/top-down-2d-art.md`**: added `type: Research Note`; fixed `[[wikilink]]` → proper markdown link
+- **`.claude/hooks/research-lint.mjs`** (NEW): type-aware research lib lint — requires type/title/slug/domain/tags/status/updated/confidence/sources/abstract; validates `type: Research Note` only; `confidence` enum (low/medium/high); YAML block-scalar abstract guard; no new RegExp(); exit 0/1/2
+- **`.claude/hooks/research-index.mjs`**: added `| type |` column; strict `--check` equality (no trim); ellipsis on truncated abstract cells
+- **`docs/research/INDEX.md`**: regenerated with `type` column + ellipsis
+
+**Review:** tester (15/15 EARS assertions PASS) + reviewer (CHANGES_NEEDED → applied) + red-team (FINDING 1 MEDIUM fixed, FINDING 2 LOW deferred, FINDING 3 LOW expected canary) + verifier (PASS).
+
+**Local just ci:** EXIT=0 — 46 evals, 777 Rust tests, 571 client tests.
+
+**Supervisor:** squash-merge PR #104 → master. No ADR for this slice (0080 is M8.95d's). Worktree `.claude/worktrees/m8.95c` + branch removable after merge.
+
+**Next slice:** M8.95d (doc-keeper + verifier closes milestone — ARCHITECTURE.md, CHANGELOG, ADR-0080, memory, spec §5 ticks for 8.95a/b/c).
+
+**Known open items for M8.95d:**
+- `research-lint.mjs` not wired into `just ci` — M8.95d may add justfile verb or wire into eval
+- Parser divergence on indented frontmatter keys (FINDING 2 LOW) — theoretical edge case, well-formed docs unaffected
+- ADR-0080 filing (milestone implementation ADR)
+- Spec §5 checkboxes for 8.95a (PR #102), 8.95b (PR #103), 8.95c (PR #104)
+
+---
+
+## 2026-07-04T~10:45Z — M8.95b TERMINAL STATE: PR #103 OPEN, local just ci GREEN (EXIT=0), remote CI running
+
+**M8.95b (OKF knowledge-bundle conformance + drift eval)**
+
+Monster-realm repo changes (branch `feat/m8.95b-conformance-eval`, PR #103, 2 commits, tip `b9471d6`):
+
+- **`evals/knowledge-bundle-conformance.eval.mjs`** (NEW): lint + drift gate for `docs/knowledge/`
+  - TOOTH A: exact-match `.includes('missing required frontmatter key: type')` (not gameable via dangling link)
+  - TOOTH A-good: well-formed concept accepted (false-positive guard)
+  - TOOTH C: dangling bundle-relative link rejected (Rule 5 independently tested)
+  - TOOTH B: stale bundle detected (generate→modify→check round-trip, exit 1 confirmed)
+  - Real lint: all 48 concepts in `docs/knowledge/` lint-clean
+  - Real drift: `scripts/okf-export.mjs docs/knowledge --check` exits 0
+  - `rmSync` cleanup wrapped in try/catch (run.mjs crash-safe)
+  - `BUNDLE_DIR` absolute constant in drift check
+
+**Review:** tester (ADEQUATE) + reviewer (BLOCKER B-1 deferred to 8.95d, all others applied) + red-team (CLEAN after fixes) + verifier (APPROVE). 3 subagent lenses run.
+
+**Local just ci:** EXIT=0 — 46 evals (new: knowledge-bundle-conformance), 777 Rust tests, 571 client tests.
+
+**Supervisor:** squash-merge PR #103 → master. ADR 0080 NOT consumed (ADR is 8.95d's). Worktree `.claude/worktrees/m8.95b` + branch removable after merge.
+
+**Next slice:** M8.95c (research-library conformance — disjoint, fans out) or M8.95d (doc-keeper closes milestone). M8.95d should tick spec §5 checkbox for 8.95b (PR #103).
+
+---
+
 ## 2026-07-04T~09:30Z — M8.95a TERMINAL STATE: PR #102 OPEN, local just ci GREEN (EXIT=0), remote CI running
 
 **M8.95a (OKF knowledge bundle producer + generated docs/knowledge/)**
@@ -175,3 +229,16 @@ Reviewed last 6 ticks; fixes applied: (1) mr-launch.sh now auto-resumes transien
 **Composite launch: m8.95a** (M8.95 Producer + bundle, critical-path start). **Prereq gap found & scoped into the brief:** harness-canonical `scripts/okf-lint.mjs` and type-aware research scripts NEVER LANDED (spec assumed "landed alongside"; only `standards/knowledge-format.md` exists). Brief instructs the run to author harness-canonical okf-lint.mjs first (contract SSOT = standards/knowledge-format.md), commit to harness main, then vendor into the project per the research-index precedent. NO fan-out with m8.95c this tick — c depends on the same missing harness prereqs and concurrent harness-repo writers aren't covered by fan-out rules; c is fan-out-eligible next tick once prereqs exist. ADR 0080 reserved (optional — project ADR is 8.95d's job).
 
 ## 2026-07-04T07:32:17Z IN-PROGRESS: m8.95a LAUNCHED by mr-sup-cowork-20260704T071800Z-1897312-14713 — M8.95 producer+bundle (incl. authoring the missing harness-canonical okf-lint.mjs first). Brief /tmp/mr_pass_m8.95a.md, ADR 0080 reserved (optional; project ADR is 8.95d's). Fresh slice, no resume.
+
+## 2026-07-04T08:17Z — supervisor tick mr-sup-cowork-20260704T080545Z-1949320-22949 (Cowork)
+**m8.95a MERGED.** PR #102 (feat/m8.95a-knowledge-bundle) squash-merged → master 370d1e7; ci+e2e green pre-merge, master CI GREEN post-merge. Diff exactly ⊆ declared touches (scripts/okf-export.mjs, docs/knowledge/** ~54 generated files, justfile, .claude/hooks/okf-lint.mjs); no evals/run.mjs or structural files. Audits: orchestration CLEAN (Sonnet-class model, tester+reviewer roles in log), gating-test CLEAN (no test files touched), no rate-limit events tripped (4 events, all allowed). Wrapper: EXIT=0 ATTEMPTS=1, cost $8.19. No ADR filed — 0080 remains next-free (project ADR is 8.95d's job). Harness-side canonical okf-lint.mjs landed on harness main (1512f55).
+Ops note: DC shell died mid-`gh pr merge`; merge completed server-side; new shell reconciled from live PR state and finished cleanup (ff-only to 370d1e7, worktree+branch removed).
+**Next: composite-launching m8.95b** (conformance+drift eval, serial after a). Fan-out with 8.95c declined again — harness-prereq gap (type-aware research scripts) unresolved.
+
+## 2026-07-04T08:21Z — IN-PROGRESS: m8.95b launched (mr-sup-cowork-20260704T080545Z-1949320-22949)
+Detached rooted run for m8.95b (conformance+drift eval; touches: evals/knowledge-bundle-conformance.eval.mjs new, evals/baselines/ only-if-fixture; evals/run.mjs off-limits). Brief /tmp/mr_pass_m8.95b.md; ADR 0080 reserved (optional). Supervisor will merge on green.
+
+## 2026-07-04T09:11Z — supervisor tick mr-sup-cowork-20260704T090612Z-2008418-654 (cowork)
+**m8.95b MERGED.** PR #103 (feat/m8.95b-conformance-eval) squash-merged → master 4e3634a; CI+e2e green pre- and post-merge. Diff = exactly `evals/knowledge-bundle-conformance.eval.mjs` (⊆ touches; `evals/run.mjs` untouched; no baselines, no ADR — 0080 still next-free, reserved for 8.95d). Audits CLEAN: Sonnet model asserted; tester/reviewer/red-team/verifier lenses all ran; no skip/only in diff. Cost $7.65, 1 attempt. Worktree `.claude/worktrees/m8.95b` + branch removed; master ff'd. Stray untracked `.claire/` left untouched.
+**Next: launching m8.95c** (research-library conformance; touches docs/research/*.md + vendored type-aware research-index/lint + INDEX.md; run authors/vendors the type-aware scripts itself — harness canonical copies are NOT yet type-aware). 8.95d (doc-keeper, ADR 0080) remains the closer; fan-out c‖d declined (d closes/verifies the milestone — serial safer). M10.5 still owed after 8.95.
+**09:14Z IN-PROGRESS:** launching m8.95c (research-library conformance) detached via mr-launch.sh. Brief /tmp/mr_pass_m8.95c.md. No ADR reserved (8.95d owns 0080).
