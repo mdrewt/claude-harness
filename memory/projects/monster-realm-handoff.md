@@ -1,5 +1,53 @@
 ---
 
+## 2026-07-04T~13:30Z — M10.5b TERMINAL STATE: PR #108 open (feat/m10.5b-architecture-reconcile, tip b03d980), local just ci GREEN (EXIT=0), awaiting supervisor merge
+
+**M10.5b (ARCHITECTURE.md reconcile with M9/M10a — doc-only)**
+
+Monster-realm repo changes (branch `feat/m10.5b-architecture-reconcile`, PR #108, 1 commit, tip `b03d980`):
+
+- **`ARCHITECTURE.md`** (1 file, doc-only):
+  - Module-map table (10.5b-1): added `inventory.rs` row (`grant_item`/`consume_one`, ADR-0059); added `raising.rs` row (`care`/`train`/`evaluate_heal`/`heal_party`, ADR-0058/0059); removed `grant_item`/`consume_one` from `taming.rs` row; removed `heal_party` from `battle.rs` row (lives in `raising.rs` since M12b)
+  - Content-registry table (10.5b-2): updated species row to note `000-core.ron` + `010-derived.ron`; added `evolutions.ron` + `fusion.ron` single-file rows (ADR-0060); added `npcs`/`dialogue_trees`/`quests`/`heal_locations` directory rows for M12 registries
+  - Added `## Raising subsystem` (M9 — ADR-0058/0059) and `## Evolution/Fusion content` (M10a — ADR-0060/0061) sections (10.5b-4)
+  - Status block already reflects M9/M10a complete; 10.5b-3 (ADR prose) + 10.5b-5 (README) already done by m12.5g — verified only
+
+**Verification:** all spec §4 greps pass; `just ci` EXIT=0 (47 evals, 777 Rust tests, 571 client tests).
+
+**Supervisor:** squash-merge PR #108 → master. No ADR consumed (doc-only). Worktree `.claude/worktrees/m10.5b` + branch removable after merge.
+
+**Next slice:** 10.5c (docs/adr/ index + numbering residuals) and 10.5d (gate hardening — allowOnly/forbidOnly, per-eval isolation in run.mjs, flushBatch per-listener isolation).
+
+---
+
+## 2026-07-04T~11:35Z — M10.5a TERMINAL STATE: PR open (feat/m10.5a-empty-moveset-invariant, tip feba332), local just ci GREEN (EXIT=0), awaiting supervisor merge
+
+**M10.5a (empty-moveset content invariant + marshal defense-in-depth)**
+
+Monster-realm repo changes (branch `feat/m10.5a-empty-moveset-invariant`, PR open, tip `feba332`):
+
+- **`game-core/src/content.rs` — `validate_content`**: added `if sp.learnable_skill_ids.is_empty() { return Err(...) }` inside cross-check loop — rejects any species with no learnable skills at content-load time; docstring updated (non-empty moveset bullet).
+- **`server-module/src/marshal.rs` — `wild_battle_monster`**: extracted `known_skill_ids` local (collect from loaded skills); added `if known_skill_ids.is_empty() { return Err(...) }` after collect — rejects wild monsters whose skill intersection is empty.
+- **`server-module/src/marshal.rs` — `battle_monster_from_row`**: same pattern — rejects owned monsters whose skill intersection is empty (defense-in-depth gap identified in review).
+
+**Gating tests (6 total, all BITE when guard removed):**
+- `content::tests::m10_5a_validate_content_rejects_empty_learnable_skill_ids` (guard 1 fires)
+- `content::tests::m10_5a_validate_content_accepts_nonempty_learnable_skill_ids` (guard 1 false-negative gate)
+- `marshal_tests::m10_5a_wild_battle_monster_rejects_empty_known_skills` (guard 2 fires)
+- `marshal_tests::m10_5a_wild_battle_monster_accepts_nonempty_known_skills` (guard 2 false-negative gate)
+- `marshal_tests::m10_5a_battle_monster_from_row_rejects_empty_known_skills` (guard 3 fires)
+- `marshal_tests::m10_5a_battle_monster_from_row_accepts_nonempty_known_skills` (guard 3 false-negative gate)
+
+**Review fixes:** `validate_content` docstring + ADR-0049 §5 amendment (one-line guard record) + 4 pre-existing fixtures hardened to use non-empty skill ids.
+
+**Local just ci:** EXIT=0 — 783 Rust tests (1 skipped), 46 evals PASS, 571 client tests.
+
+**Supervisor:** squash-merge PR → master. No ADR new number (spec: fold into ADR-0049 amendment). ADR next-free = **0081** (unchanged). Worktree + branch removable after merge.
+
+**Next slice:** 10.5b, 10.5c, 10.5d remain (doc accuracy, ADR-README, gates+config).
+
+---
+
 ## 2026-07-04T~11:30Z — M8.95c TERMINAL STATE: PR #104 OPEN, local just ci GREEN (EXIT=0), remote CI running
 
 **M8.95c (research-library conformance — type field + type-aware vendored scripts)**
@@ -276,3 +324,21 @@ Harness changes (committed to harness main `ea46c97`):
 **Supervisor:** squash-merge PR #105 → master. ADR next-free = 0081. Worktree `.claude/worktrees/m8.95d` + branch removable after merge.
 
 **Next slice:** M10.5 (five residual slices — 10.5a content validation, 10.5b doc accuracy, 10.5c ADR-README, 10.5d gates+config).
+
+## 2026-07-04T11:20Z — supervisor tick mr-sup-cowork-20260704T110726Z-2102793-12730 (Cowork)
+**M8.95d MERGED — M8.95 MILESTONE CLOSED.** PR #105 (feat/m8.95d-doc-keeper) squash-merged 11:08:56Z → master 34250d5; CI+e2e green pre-merge, master CI GREEN post-merge. Diff = ARCHITECTURE.md + CHANGELOG.md + docs/adr/0080-generated-knowledge-bundle.md, exactly ⊆ declared touches. Audits: orchestration EXEMPT-doc-only (0 subagents, sonnet-4-6 asserted, $2.77, ATTEMPTS=1); gating-test CLEAN (no test files). ADR-0080 consumed; next_free = 0081.
+**ADR-index chore PR #106** (chore/m8.95d-adr-index: add 0080 row, range →0080, next-free →0081) merged → master 2d70f00, CI GREEN. NOTE: `gh pr merge --auto` was rejected ("Protected branch rules not configured for enablePullRequestAutoMerge") despite the 06:25Z maintenance re-enable of repo allow_auto_merge — auto-merge needs the branch-protection-rule flag too, not just the repo flag; merged manually on green. Flag for Drew/maintenance.
+Cleanup: worktree .claude/worktrees/m8.95d + both branches removed, master ff'd to 2d70f00, per-run lock removed. Stray untracked `.claire/` left untouched. DC shells died twice mid-tick (during merge + CI watch); reconciled from live PR state each time, no impact.
+**Next: composite-launching M10.5a** (empty-moveset content invariant + marshal defense-in-depth, test-first). Spec §6's serialize-against-M10-content.rs constraint is moot (M10 fully landed). Spec written @ d873a93 — brief instructs re-locating evidence on current master. No ADR reserved (spec: no new number; fold into ADR-0049 amendment if reviewer wants it recorded). 10.5b/c/d remain; fan-out declined this tick (conservative; 10.5d touches structural evals/run.mjs = always-serial anyway).
+
+## 2026-07-04T11:28Z — IN-PROGRESS: launching m10.5a (mr-sup-cowork-20260704T110726Z-2102793-12730)
+Detached rooted run for M10.5a (empty-moveset content invariant + marshal boundary guard, test-first). Brief /tmp/mr_pass_m10.5a.md. No ADR reserved (spec: fold into ADR-0049 amendment if recorded). Fresh slice, no resume. Supervisor merges on green.
+
+## 2026-07-04T12:15Z — supervisor tick mr-sup-cowork-20260704T120704Z-2200539-24543 (Cowork)
+**m10.5a MERGED.** PR #107 (feat/m10.5a-empty-moveset-invariant) squash-merged 12:09:50Z → master 329978f; CI+e2e green pre-merge, master CI GREEN post-merge. Diff = game-core/src/content.rs + server-module/src/marshal.rs + marshal_tests.rs + docs/adr/0049 amendment — ⊆ declared touches. Audits: orchestration CLEAN (6 subagent invocations: tester/reviewer/red-team/verifier/doc-keeper; sonnet-4-6 asserted; ~$19.02 across ATTEMPTS=2); gating-test CLEAN (RED→GREEN commit pattern, no removed/skipped tests). No new ADR consumed (ADR-0049 amended in-branch) → no index chore PR; adr_next_free stays 0081.
+Cleanup: worktree .claude/worktrees/m10.5a + branch removed, master ff'd 2d70f00→329978f, per-run lock + stale .done files (m10.5a, m8.95d) removed. Stray `.claire/` left untouched. DC shell died once mid-CI-poll; reconciled from live state.
+**Remaining M10.5:** 10.5b (docs ARCHITECTURE+README reconcile — verify overlap with M12.5g first), 10.5c (ADR-README residuals), 10.5d (gate hardening — structural evals/run.mjs, always-serial). No composite launch this tick: 10.5b/c need an overlap/residual verification pass best done at launch-brief time with fresh eyes; next tick picks up 10.5b.
+
+---
+## 2026-07-04T13:13:14Z — supervisor tick (mr-sup-cowork-20260704T130555Z-2215799-17910) — IN PROGRESS
+Launching m10.5b (docs-only residual: ARCHITECTURE.md module-map/content-registry/subsystem sections; 10.5b-3/-5 verified already done by later slices). master GREEN @ 329978f, no open PRs, no in-flight runs. ADR 0081 reserved (not expected). Touches: ARCHITECTURE.md, README.md.
