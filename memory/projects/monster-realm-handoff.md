@@ -1,5 +1,31 @@
 ---
 
+## 2026-07-04T~09:30Z — M8.95a TERMINAL STATE: PR #102 OPEN, local just ci GREEN (EXIT=0), remote CI running
+
+**M8.95a (OKF knowledge bundle producer + generated docs/knowledge/)**
+
+Monster-realm repo changes (branch `feat/m8.95a-knowledge-bundle`, PR #102, 2 commits):
+
+- **`scripts/okf-export.mjs`** (NEW): OKF bundle producer — imports `parseTableSchemas()` from `evals/battle-schema-snapshot.eval.mjs` (SSOT); `parseTableMetadata`/`parseReducerMetadata` detect visibility+lifecycle variants; `gitDate()` sentinel fallback `'1970-01-01'`; fail-secure `visibility: 'private'` default; drift-check via `--check` flag with `p()` path normalizer
+- **`docs/knowledge/`** (NEW, 51 files): 22 table concepts + index, 25 reducer concepts + index, schema-overview.md, root index.md; 6 private tables correctly tagged; init+on_disconnect present
+- **`.claude/hooks/okf-lint.mjs`** (NEW): verbatim copy of harness `scripts/okf-lint.mjs` (1512f55); vendor pattern (no cross-repo imports)
+- **`justfile`**: added `knowledge` + `knowledge-check` verbs
+
+Harness changes (committed to harness main at 1512f55):
+- **`scripts/okf-lint.mjs`** (NEW): canonical OKF conformance linter; zero-dep, all literal regex; exports `VOCAB`, `parseFrontmatter`, `extractBundleLinks`, `collectConcepts`, `lintFile`, `lint`; CLI exit 0/1/2
+
+**Local just ci:** EXIT=0 — 45 evals, 777 Rust tests, 571 client tests.
+
+**Branch:** `feat/m8.95a-knowledge-bundle`, tip `9b7ffcc`. PR #102 open. Worktree: `.claude/worktrees/m8.95a`.
+
+**Reviewer findings resolved:** B-1 (lifecycle reducer detection), M-1 (Windows path sep in drift check), M-2 (fail-secure private default), M-3 (blank line before `## Privacy`), M-4 (existsSync import guard). Deferred to M8.95b: m-1 (non-bundle URIs in lint), m-5 (fenced-code-block termination), unit tests for linter, proof-of-teeth eval.
+
+**Supervisor:** squash-merge PR #102 → master. ADR 0080 NOT consumed (ADR is M8.95d's). Worktree + branch removable after merge.
+
+**Next slice:** M8.95b (knowledge-bundle-conformance eval with proof-of-teeth — drift gate + OKF conformance checks). Branch off updated master after #102 merges.
+
+---
+
 ## 2026-07-04T~07:00Z — m12.5g TERMINAL STATE: PR #101 OPEN, local just ci GREEN (EXIT=0), remote CI running
 
 **m12.5g (docs/spec reconciliation — DOCS-ONLY pass)**
@@ -137,3 +163,15 @@ MERGED m12.5c1-deflake (PR #100 → 1298137, squash). Master CI GREEN on merge c
 
 ## 2026-07-04T05:22:50Z — supervisor tick mr-sup-cowork-20260704T050621Z-1826942-20379 (launch)
 IN-PROGRESS: launched m12.5g (docs-only reconciliation; g-1 doc set, g-2 M11/ADR-0067 annotations, g-3 → reference M8.95 as scheduled). Brief /tmp/mr_pass_m12.5g.md, ADR 0080 reserved (optional). Fresh slice, no resume.
+
+## 2026-07-04T06:25Z — MAINTENANCE (interactive Cowork session, Drew present) — not a supervisor tick
+Reviewed last 6 ticks; fixes applied: (1) mr-launch.sh now auto-resumes transient API crashes (Overloaded/5xx/network) with backoff — previously only RC==0 resumed, so the 00:06Z M12.5e2 Overloaded death sat dead until the next tick; (2) ledger repaired — two empty-ts lines stamped from handoff anchors, June-26 unquoted ~N JSON corruption fixed, all 119 lines now parse; canonical field names + pre-append validation added to the task prompt; (3) repo allow_auto_merge re-ENABLED (chore-PR --auto works again); (4) brief template: tester lens now explicitly mandatory for test-artifact slices; task prompt gained a matching CLEAN-test-artifact audit carve-out (no more forced review passes when adversarial execution evidence exists); (5) prompt env notes: jq absent, use /usr/bin/python3. NOTE: task cron changed from hourly to daily 05:00 local sometime after the 05:03Z tick — flagged to Drew, not reverted. PR #101 (m12.5g) open at terminal state, awaiting next tick's merge.
+
+## 2026-07-04T07:30Z — supervisor tick mr-sup-cowork-20260704T071800Z-1897312-14713
+**M12.5g MERGED.** PR #101 squash-merged → master `8612a20`; CI GREEN on merge commit. Audits: touches CLEAN (7 files ⊆ declared; raising.rs verified doc-comment-only); gating-test CLEAN (no test files); orchestration EXEMPT-doc-only (0 subagents, sonnet confirmed, $5.33, ATTEMPTS=1). ADR-0067 accepted; ADR index range fixed 0035–0079; ADR 0080 NOT consumed (next_free stays 80). Harness spec-corpus commit `eba5c7e` (g-2) landed on harness main. Cleanup: worktree/branch removed, main checkout ff'd to 8612a20; stray CHANGELOG.md stashed (`supervisor-stray-20260704T072151Z`, likely run doc-leak). Cosmetic: squash title inherited "wip(m12.5g)…" from branch head commit. M12.5 milestone: ALL SLICES MERGED.
+
+**Probe note:** gate-top probe saw the 06:25Z maintenance handoff write at ~5 min age; 2nd probe clean (7.7 min, no other writes, no claude pids) + the entry explicitly delegated this merge → proceeded.
+
+**Composite launch: m8.95a** (M8.95 Producer + bundle, critical-path start). **Prereq gap found & scoped into the brief:** harness-canonical `scripts/okf-lint.mjs` and type-aware research scripts NEVER LANDED (spec assumed "landed alongside"; only `standards/knowledge-format.md` exists). Brief instructs the run to author harness-canonical okf-lint.mjs first (contract SSOT = standards/knowledge-format.md), commit to harness main, then vendor into the project per the research-index precedent. NO fan-out with m8.95c this tick — c depends on the same missing harness prereqs and concurrent harness-repo writers aren't covered by fan-out rules; c is fan-out-eligible next tick once prereqs exist. ADR 0080 reserved (optional — project ADR is 8.95d's job).
+
+## 2026-07-04T07:32:17Z IN-PROGRESS: m8.95a LAUNCHED by mr-sup-cowork-20260704T071800Z-1897312-14713 — M8.95 producer+bundle (incl. authoring the missing harness-canonical okf-lint.mjs first). Brief /tmp/mr_pass_m8.95a.md, ADR 0080 reserved (optional; project ADR is 8.95d's). Fresh slice, no resume.
