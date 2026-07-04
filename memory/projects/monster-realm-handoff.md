@@ -1,344 +1,47 @@
 ---
 
-## 2026-07-04T~13:30Z — M10.5b TERMINAL STATE: PR #108 open (feat/m10.5b-architecture-reconcile, tip b03d980), local just ci GREEN (EXIT=0), awaiting supervisor merge
+## 2026-07-04T15:21:43Z — IN-PROGRESS: m10.5d launched (mr-sup-cowork-20260704T150628Z-2280652-17492)
 
-**M10.5b (ARCHITECTURE.md reconcile with M9/M10a — doc-only)**
+- Composite tick: after m10.5c merge, launching M10.5d (mechanical gate hardening per M10.5 spec §3/10.5d). ADR 0081 reserved (likely unused). Structural touch (evals/run.mjs) -> serial, no fan-out.
 
-Monster-realm repo changes (branch `feat/m10.5b-architecture-reconcile`, PR #108, 1 commit, tip `b03d980`):
+## 2026-07-04T17:00:00Z — CLOSED: m10.5d terminal state (PR #110)
 
-- **`ARCHITECTURE.md`** (1 file, doc-only):
-  - Module-map table (10.5b-1): added `inventory.rs` row (`grant_item`/`consume_one`, ADR-0059); added `raising.rs` row (`care`/`train`/`evaluate_heal`/`heal_party`, ADR-0058/0059); removed `grant_item`/`consume_one` from `taming.rs` row; removed `heal_party` from `battle.rs` row (lives in `raising.rs` since M12b)
-  - Content-registry table (10.5b-2): updated species row to note `000-core.ron` + `010-derived.ron`; added `evolutions.ron` + `fusion.ron` single-file rows (ADR-0060); added `npcs`/`dialogue_trees`/`quests`/`heal_locations` directory rows for M12 registries
-  - Added `## Raising subsystem` (M9 — ADR-0058/0059) and `## Evolution/Fusion content` (M10a — ADR-0060/0061) sections (10.5b-4)
-  - Status block already reflects M9/M10a complete; 10.5b-3 (ADR prose) + 10.5b-5 (README) already done by m12.5g — verified only
+- Branch: `feat/m10.5d-gate-hardening`, tip: `92d3d45`
+- PR #110 open: https://github.com/mdrewt/monster-realm/pull/110
+- All 3 EARS criteria met: vite.config.ts allowOnly:false (10.5d-1), playwright.config.ts forbidOnly:!!process.env.CI (10.5d-2), store.ts flushBatch per-listener try/catch closes M8.8e residual (10.5d-3)
+- New eval: evals/gate-hardening-config.eval.mjs (4 criteria, 11 bad fixtures, brace-depth matching for Criterion D)
+- run.mjs: per-eval try/catch + synthetic pass:false; zero-eval guard count updated to 40+
+- Gate: just ci EXIT=0; 574 client tests pass; 41 evals all PASS
+- No new ADR (spec says mechanical hardening needs none); ADR next-free=0081 unchanged
+- Worktree: .claude/worktrees/m10.5d (symlinks: client/node_modules→main, client-wasm/pkg→main)
+- **Next:** M10.5 milestone CLOSED. Supervisor to determine next milestone.
 
-**Verification:** all spec §4 greps pass; `just ci` EXIT=0 (47 evals, 777 Rust tests, 571 client tests).
 
-**Supervisor:** squash-merge PR #108 → master. No ADR consumed (doc-only). Worktree `.claude/worktrees/m10.5b` + branch removable after merge.
+## 2026-07-04T16:22:06Z — supervisor tick mr-sup-cowork-20260704T160624Z-2337718-28130 (cowork)
 
-**Next slice:** 10.5c (docs/adr/ index + numbering residuals) and 10.5d (gate hardening — allowOnly/forbidOnly, per-eval isolation in run.mjs, flushBatch per-listener isolation).
+- **m10.5d MERGED**: PR #110 (gate hardening — allowOnly:false in vite, forbidOnly in playwright, per-eval isolation in run.mjs, flushBatch per-listener isolation) squash-merged at ~16:08Z -> master 15bd08b. PR CI+e2e green pre-merge; master CI GREEN post-merge on 15bd08b.
+- Audits: orchestration CLEAN (sonnet-4-6 asserted, 5 subagent invocations incl. tester+reviewer+red-team; 1 attempt, $9.11); gating-test clean (no removed tests, +3 tests; .only hits = the hardening target). Diff note: evals/gate-hardening-config.eval.mjs (new) was outside declared touches — adjacent to declared evals/run.mjs, no siblings in flight, accepted with note.
+- ADR 0081 released unused (mechanical slice; next-free stays 0081). Cleanup: worktree .claude/worktrees/m10.5d removed, local+remote branch deleted, main checkout ff'd to 15bd08b. Strays untouched (.claire/, 3 labeled stashes).
+- **M10.5 milestone CLOSED (a/b/c/d all merged).** Queue re-derived: M12.5 (a-g) and M8.95 (a-d) fully merged; next per PLAN §9 Phase B = **M13 Economy & inventory** (M13-economy.spec.md, corpus ADR-0022). Composite-launching M13a (currency primitive) this tick.
 
----
+## 2026-07-04T16:26:54Z — IN-PROGRESS: m13a launched (mr-sup-cowork-20260704T160624Z-2337718-28130)
 
-## 2026-07-04T~11:35Z — M10.5a TERMINAL STATE: PR open (feat/m10.5a-empty-moveset-invariant, tip feba332), local just ci GREEN (EXIT=0), awaiting supervisor merge
+- Composite tick: after m10.5d merge (master 15bd08b GREEN), launched **M13a** (currency primitive — owner-private balance + grant/spend helpers, saturating/reject-on-insufficient, RLS + overflow fixtures; M13-economy.spec.md section 3+5 task 1). First slice of M13 Economy & inventory (Phase B).
+- STRUCTURAL touches (schema.rs + bindings) -> ALWAYS SERIAL, no fan-out. ADR **0081** reserved for m13a; adr_next_free -> 82.
+- Leader 2343886 (own session, detachment asserted), claude 2343889, model claude-sonnet-4-6 asserted, codebase-memory-mcp up.
+- Next tick: fast-path liveness on 2343886; on .done -> audits (orchestration: tester+reviewer roles required; gating-test integrity; touches-subset) then merge; then M13b (shops) / M13c (sinks) / M13d (client) — b/c serial after a; d (pure client) may fan out with c per pair rules.
 
-**M10.5a (empty-moveset content invariant + marshal defense-in-depth)**
+## 2026-07-04T18:0xZ — supervisor tick mr-sup-cowork-20260704T180521Z-2441824-21863 — IN PROGRESS
+m13a run finished (EXIT=0, ATTEMPTS=1) with PR #111 open, but remote CI RED on both jobs: shared root cause `wasm-pack build` -> "File exists (os error 17)" in `just wasm` (justfile:34); 3 wasm-parity evals fail in ci job, all else green. master@15bd08b remote-green at 16:08Z -> suspect runner toolchain drift (unpinned jetli/wasm-pack-action) or slice interaction. Action: RESUME-launch m13a with fix-remote-red brief (touches extended for this resume: justfile, .github/workflows/**, client-wasm/**). remote_red_fix_cycles=1. Never merging red.
 
-Monster-realm repo changes (branch `feat/m10.5a-empty-moveset-invariant`, PR open, tip `feba332`):
+## 2026-07-04T18:17Z — m13a CI-fix resume (this session)
 
-- **`game-core/src/content.rs` — `validate_content`**: added `if sp.learnable_skill_ids.is_empty() { return Err(...) }` inside cross-check loop — rejects any species with no learnable skills at content-load time; docstring updated (non-empty moveset bullet).
-- **`server-module/src/marshal.rs` — `wild_battle_monster`**: extracted `known_skill_ids` local (collect from loaded skills); added `if known_skill_ids.is_empty() { return Err(...) }` after collect — rejects wild monsters whose skill intersection is empty.
-- **`server-module/src/marshal.rs` — `battle_monster_from_row`**: same pattern — rejects owned monsters whose skill intersection is empty (defense-in-depth gap identified in review).
+Root cause diagnosed: the worktree setup had created a symlink `client-wasm/pkg -> .../monster-realm/client-wasm/pkg` which was accidentally committed in the m13a branch. In CI (fresh checkout) the symlink exists but its target doesn't; wasm-pack tries to `create_dir("client-wasm/pkg")` → EEXIST (os error 17).
 
-**Gating tests (6 total, all BITE when guard removed):**
-- `content::tests::m10_5a_validate_content_rejects_empty_learnable_skill_ids` (guard 1 fires)
-- `content::tests::m10_5a_validate_content_accepts_nonempty_learnable_skill_ids` (guard 1 false-negative gate)
-- `marshal_tests::m10_5a_wild_battle_monster_rejects_empty_known_skills` (guard 2 fires)
-- `marshal_tests::m10_5a_wild_battle_monster_accepts_nonempty_known_skills` (guard 2 false-negative gate)
-- `marshal_tests::m10_5a_battle_monster_from_row_rejects_empty_known_skills` (guard 3 fires)
-- `marshal_tests::m10_5a_battle_monster_from_row_accepts_nonempty_known_skills` (guard 3 false-negative gate)
+Fix: `git rm --cached client-wasm/pkg` + `rm client-wasm/pkg` + added `client-wasm/pkg` (no trailing slash) to `.gitignore` (the existing `client-wasm/pkg/` with slash only matches directories, not symlinks).
 
-**Review fixes:** `validate_content` docstring + ADR-0049 §5 amendment (one-line guard record) + 4 pre-existing fixtures hardened to use non-empty skill ids.
-
-**Local just ci:** EXIT=0 — 783 Rust tests (1 skipped), 46 evals PASS, 571 client tests.
-
-**Supervisor:** squash-merge PR → master. No ADR new number (spec: fold into ADR-0049 amendment). ADR next-free = **0081** (unchanged). Worktree + branch removable after merge.
-
-**Next slice:** 10.5b, 10.5c, 10.5d remain (doc accuracy, ADR-README, gates+config).
-
----
-
-## 2026-07-04T~11:30Z — M8.95c TERMINAL STATE: PR #104 OPEN, local just ci GREEN (EXIT=0), remote CI running
-
-**M8.95c (research-library conformance — type field + type-aware vendored scripts)**
-
-Monster-realm repo changes (branch `feat/m8.95c-research-conformance`, PR #104, 2 commits, tip `c8a3162`):
-
-- **`docs/research/monster-taming-mechanics.md`**: added `type: Research Note` frontmatter
-- **`docs/research/top-down-2d-art.md`**: added `type: Research Note`; fixed `[[wikilink]]` → proper markdown link
-- **`.claude/hooks/research-lint.mjs`** (NEW): type-aware research lib lint — requires type/title/slug/domain/tags/status/updated/confidence/sources/abstract; validates `type: Research Note` only; `confidence` enum (low/medium/high); YAML block-scalar abstract guard; no new RegExp(); exit 0/1/2
-- **`.claude/hooks/research-index.mjs`**: added `| type |` column; strict `--check` equality (no trim); ellipsis on truncated abstract cells
-- **`docs/research/INDEX.md`**: regenerated with `type` column + ellipsis
-
-**Review:** tester (15/15 EARS assertions PASS) + reviewer (CHANGES_NEEDED → applied) + red-team (FINDING 1 MEDIUM fixed, FINDING 2 LOW deferred, FINDING 3 LOW expected canary) + verifier (PASS).
-
-**Local just ci:** EXIT=0 — 46 evals, 777 Rust tests, 571 client tests.
-
-**Supervisor:** squash-merge PR #104 → master. No ADR for this slice (0080 is M8.95d's). Worktree `.claude/worktrees/m8.95c` + branch removable after merge.
-
-**Next slice:** M8.95d (doc-keeper + verifier closes milestone — ARCHITECTURE.md, CHANGELOG, ADR-0080, memory, spec §5 ticks for 8.95a/b/c).
-
-**Known open items for M8.95d:**
-- `research-lint.mjs` not wired into `just ci` — M8.95d may add justfile verb or wire into eval
-- Parser divergence on indented frontmatter keys (FINDING 2 LOW) — theoretical edge case, well-formed docs unaffected
-- ADR-0080 filing (milestone implementation ADR)
-- Spec §5 checkboxes for 8.95a (PR #102), 8.95b (PR #103), 8.95c (PR #104)
-
----
-
-## 2026-07-04T~10:45Z — M8.95b TERMINAL STATE: PR #103 OPEN, local just ci GREEN (EXIT=0), remote CI running
-
-**M8.95b (OKF knowledge-bundle conformance + drift eval)**
-
-Monster-realm repo changes (branch `feat/m8.95b-conformance-eval`, PR #103, 2 commits, tip `b9471d6`):
-
-- **`evals/knowledge-bundle-conformance.eval.mjs`** (NEW): lint + drift gate for `docs/knowledge/`
-  - TOOTH A: exact-match `.includes('missing required frontmatter key: type')` (not gameable via dangling link)
-  - TOOTH A-good: well-formed concept accepted (false-positive guard)
-  - TOOTH C: dangling bundle-relative link rejected (Rule 5 independently tested)
-  - TOOTH B: stale bundle detected (generate→modify→check round-trip, exit 1 confirmed)
-  - Real lint: all 48 concepts in `docs/knowledge/` lint-clean
-  - Real drift: `scripts/okf-export.mjs docs/knowledge --check` exits 0
-  - `rmSync` cleanup wrapped in try/catch (run.mjs crash-safe)
-  - `BUNDLE_DIR` absolute constant in drift check
-
-**Review:** tester (ADEQUATE) + reviewer (BLOCKER B-1 deferred to 8.95d, all others applied) + red-team (CLEAN after fixes) + verifier (APPROVE). 3 subagent lenses run.
-
-**Local just ci:** EXIT=0 — 46 evals (new: knowledge-bundle-conformance), 777 Rust tests, 571 client tests.
-
-**Supervisor:** squash-merge PR #103 → master. ADR 0080 NOT consumed (ADR is 8.95d's). Worktree `.claude/worktrees/m8.95b` + branch removable after merge.
-
-**Next slice:** M8.95c (research-library conformance — disjoint, fans out) or M8.95d (doc-keeper closes milestone). M8.95d should tick spec §5 checkbox for 8.95b (PR #103).
-
----
-
-## 2026-07-04T~09:30Z — M8.95a TERMINAL STATE: PR #102 OPEN, local just ci GREEN (EXIT=0), remote CI running
-
-**M8.95a (OKF knowledge bundle producer + generated docs/knowledge/)**
-
-Monster-realm repo changes (branch `feat/m8.95a-knowledge-bundle`, PR #102, 2 commits):
-
-- **`scripts/okf-export.mjs`** (NEW): OKF bundle producer — imports `parseTableSchemas()` from `evals/battle-schema-snapshot.eval.mjs` (SSOT); `parseTableMetadata`/`parseReducerMetadata` detect visibility+lifecycle variants; `gitDate()` sentinel fallback `'1970-01-01'`; fail-secure `visibility: 'private'` default; drift-check via `--check` flag with `p()` path normalizer
-- **`docs/knowledge/`** (NEW, 51 files): 22 table concepts + index, 25 reducer concepts + index, schema-overview.md, root index.md; 6 private tables correctly tagged; init+on_disconnect present
-- **`.claude/hooks/okf-lint.mjs`** (NEW): verbatim copy of harness `scripts/okf-lint.mjs` (1512f55); vendor pattern (no cross-repo imports)
-- **`justfile`**: added `knowledge` + `knowledge-check` verbs
-
-Harness changes (committed to harness main at 1512f55):
-- **`scripts/okf-lint.mjs`** (NEW): canonical OKF conformance linter; zero-dep, all literal regex; exports `VOCAB`, `parseFrontmatter`, `extractBundleLinks`, `collectConcepts`, `lintFile`, `lint`; CLI exit 0/1/2
-
-**Local just ci:** EXIT=0 — 45 evals, 777 Rust tests, 571 client tests.
-
-**Branch:** `feat/m8.95a-knowledge-bundle`, tip `9b7ffcc`. PR #102 open. Worktree: `.claude/worktrees/m8.95a`.
-
-**Reviewer findings resolved:** B-1 (lifecycle reducer detection), M-1 (Windows path sep in drift check), M-2 (fail-secure private default), M-3 (blank line before `## Privacy`), M-4 (existsSync import guard). Deferred to M8.95b: m-1 (non-bundle URIs in lint), m-5 (fenced-code-block termination), unit tests for linter, proof-of-teeth eval.
-
-**Supervisor:** squash-merge PR #102 → master. ADR 0080 NOT consumed (ADR is M8.95d's). Worktree + branch removable after merge.
-
-**Next slice:** M8.95b (knowledge-bundle-conformance eval with proof-of-teeth — drift gate + OKF conformance checks). Branch off updated master after #102 merges.
-
----
-
-## 2026-07-04T~07:00Z — m12.5g TERMINAL STATE: PR #101 OPEN, local just ci GREEN (EXIT=0), remote CI running
-
-**m12.5g (docs/spec reconciliation — DOCS-ONLY pass)**
-
-Monster-realm repo changes (7 files, PR #101, branch `feat/m12.5g-doc-reconciliation`):
-- **ARCHITECTURE.md**: `guards.rs` module table adds `reject_if_in_battle`; Decisions ADR range `0035–0057 → 0035–0079` with M11–M12.5 highlights
-- **docs/adr/README.md**: implementation ADR range summary `0035–0054 → 0035–0079`
-- **docs/adr/0067-follow-camera-and-warp-resubscribe.md**: status `proposed → accepted`
-- **README.md**: `server/` → `server-module/`; CI note corrected (e2e IS in default merge gate); standards paths fixed
-- **AGENTS.md**: spec range `M0–M9` → `M0–M25` (incl. all M8.x, M10.5, M12.5)
-- **server-module/src/raising.rs**: module doc — remove stale "train is parked" claim (train shipped in M9b-tail)
-- **CHANGELOG.md**: regenerated via `just changelog`
-
-Harness changes (committed to harness main, same commit):
-- M9/M10/M11/M12 spec §5 task checkboxes ticked with PR refs
-- M11 spec §3: reconciliation note — ADR-0067 global subscription Option C + culling DEFERRED to M20/size-trigger
-- M10.5 spec: D-M8.95 DECIDED (Drew) — scheduled as slice M8.95
-- M12.5 spec §5: "Delivered slices" section listing all shipped PRs
-- build-loop-prompt.md step 10: "tick spec §5 boxes with PR refs" added to doc-keeper checklist
-- All previously-untracked spec files committed (M8.5/M8.6/M8.7/M8.95 specs, ADR-0057, M10.5/M12.5)
-
-**Local just ci:** EXIT=0 — 45 evals, 777 Rust tests, 571 client tests.
-
-**Branch:** `feat/m12.5g-doc-reconciliation`, tip `fa45028`. PR #101 open. Worktree: `.claude/worktrees/m12.5g`.
-
-**Supervisor:** squash-merge PR #101 → master. ADR 0080 NOT consumed (no ADR needed — docs-only). Worktree + branch removable after merge.
-
-**Next slice:** M10.5 (five residual slices still owed — 10.5a content validation, 10.5b doc accuracy, 10.5c ADR-README, 10.5d gates+config), then M8.95 (knowledge bundle), then M13+. Fan-out eligible: M10.5 doc slices ‖ M8.95.
-
----
-
-## 2026-07-04T~01:00Z — m12.5c1-deflake TERMINAL STATE: PR #100 OPEN, local just ci GREEN, remote CI running
-
-**m12.5c1-deflake (zoneSync e2e deflake — fix-red-master action)** — 1 file, 1 commit:
-
-- **`client/e2e/zoneSync.spec.ts`**: two race fixes, no product code changes:
-  1. **Test 1 (`:158` race)**: `setRawMapZoneForTest(1)` + `snap()` combined into a single `page.evaluate()` (atomic: no WebSocket task can fire between set and read in a single synchronous evaluate).
-  2. **Test 4 (`:367` timeout)**: replaced passive `waitForFunction(sawFractionalOwnMotion, 15s)` with explicit `step('South')` + state-based `waitForFunction(10s)` — guarantees a new target-tile change and a fresh slide clock animation regardless of prior state.
-
-**Root causes:** (1) inter-evaluate task delivery allowed the reconcile listener to call `switchZone(0)` between the set and the read; (2) when `drain()` immediately applied the queued move (old `move_started_at`), the slide clock initialised at the destination tile with no slide → no fractional motion → flag never re-latched.
-
-**Local just ci:** EXIT=0 — 45 evals, 777 Rust tests, 571 client tests. TypeScript clean.
-
-**Review fixes (commit `5e79950`):** HIGH finding addressed — test 4 setup step now uses direction-aware walkability check instead of hardcoded 'South' (wall-bump risk eliminated); MEDIUM comment clarification added. BITES assertion intact.
-
-**Branch:** `feat/m12.5c1-deflake`, tip `5e79950`. PR #100 open. Worktree: `.claude/worktrees/m12.5c1-deflake`.
-
-**Supervisor:** squash-merge PR #100 → master once remote CI (e2e job) is green. ADR 0080 NOT consumed (no ADR needed — test-only fix). Worktree + branch can be removed after merge.
-
-**Next slice:** `m12.5g-1` (doc reconciliation) or per queue — queue is unblocked once master is green.
-
----
-
-## 2026-07-04T~03:10Z — M12.5b6 TERMINAL STATE: PR #98 OPEN, local just ci GREEN, remote CI running
-
-**M12.5b6 (nightly republish-without-delete smoke test, ADR-0079)** — 6 files, 2 commits:
-
-- **`.github/workflows/nightly.yml`**: new `smoke-republish:` job (timeout-minutes: 20, after coverage); SHA-pinned actions; installs SpacetimeDB 2.6.0; starts in-memory STDB; runs `just smoke-republish`; dumps logs on failure.
-- **`scripts/smoke-republish.sh`**: 6-phase smoke: build + publish (`--delete-data`) → `join_game` → assert starter monster → bump `CONTENT_VERSION` via anchored `sed` + verify patch → rebuild + republish (no `--delete-data`) → `sync_content` + output check → assert monster survived + config version updated. `trap EXIT` restores `lib.rs`.
-- **`evals/nightly-smoke-wiring.eval.mjs`**: 5 TEETH A–E wiring gate (statically checks that job is in nightly not ci, `run:` prefix on smoke step, justfile recipe, script shebang+size, ADR failure policy).
-- **`evals/smoke-republish-on-disconnect-compat.eval.mjs`**: RT-SR-01 gate (red-team; prevents regression to `FROM player` assertions which `on_disconnect` vacates).
-- **`justfile`**: `smoke-republish` recipe with quoted env vars.
-- **`docs/adr/0079-nightly-republish-smoke.md`**: decision, smoke sequence, isolation strategy, failure policy.
-
-**Key decisions made during slice:**
-- RT-SR-01 (CRITICAL): `on_disconnect` clears `player`+`character` rows; script now asserts `FROM monster` (starter is session-independent, persists).
-- `join_game '["SmokePlayer"]'` — JSON-array arg format per SpacetimeDB 2.x CLI.
-- `CONTENT_VERSION` bumped by +1 (not +100); `sed` anchored to declaration line start; `trap EXIT` restores lib.rs.
-- Retry loops (10 × 1s) replace fixed `sleep 1` for SQL assertions.
-- `sync_content` output captured and grepped for error markers (fire-and-forget exit-code gap).
-
-**Local just ci:** EXIT=0 — 45 evals (2 new: nightly-smoke-wiring + smoke-republish-on-disconnect-compat), 777 Rust tests, 571 client tests.
-
-**Branch:** `feat/m12.5b6-nightly-smoke-republish`, tip `9ac5357` (2 commits on top of master). PR #98 open.
-
-**Supervisor:** squash-merge PR #98 → master. ADR next-free = **0080** (0079 used). Worktree: `.claude/worktrees/m12.5b6`.
-
-## 2026-07-04T03:13:22Z — mr-sup-cowork-20260704T030635Z-1749207-13162 (supervisor tick)
-IN-PROGRESS: M12.5b6 build run finished (EXIT=0, ATTEMPTS=1, PR #98 open, CI+e2e green, cost $9.11). Orchestration audit FLAGGED (zero tester-role invocations on a code slice) -> per policy, NOT merging yet; launched mandated review pass (tester+reviewer+red-team+domain-auditors+verifier on PR #98 diff) as run m12.5b6-nightly. Merge next tick iff APPROVE-FOR-MERGE memo present.
-
----
-
-## 2026-07-04T~04:00Z — M12.5b6 REVIEW COMPLETE: APPROVE-FOR-MERGE — tip a92d73e
-
-**Multi-lens review of PR #98 diff (`origin/master...HEAD`) complete. Fixes applied in commit `a92d73e`.**
-
-### Lens verdicts:
-
-- **tester**: CLEAN (adequate) — RED checkpoint `ec1cd6f` genuine (missing impl files, not broken eval). TEETH A–E biting (TEETH E bad-fixture is vacuous in direction that predicate correctly returns false — structurally sound; real-file check at line 300 is the production gate). Eval suite covers A1–A5 EARS criteria. One noted weakness: TEETH E bad-fixture direction never fires for correct impl (by design — expected). Overall: ADEQUATE.
-- **reviewer + red-team** (fresh pass): FIXED — 2 HIGH, 4 MEDIUM, 4 LOW found; all fixable items applied in `a92d73e` (see below). M-1 (installer checksum) and M-3 (ADR README row) noted; M-3 blocked by instructions (NEVER touch docs/adr/README.md — pre-existing 12.5g-1 debt).
-- **reducer-security-auditor**: NOT_APPLICABLE — no new reducers; `sync_content` owner guard (ADR-0073) confirmed correct in committed code.
-- **desync-guard**: NOT_APPLICABLE — no client/sim-harness/wasm changes.
-- **verifier**: APPROVE — `just ci` EXIT=0 (45 evals / 777 Rust / 571 client tests), no tests weakened RED→green, all TEETH present and biting, ADR-0079 file complete.
-
-### Fixes in `a92d73e`:
-- **H-1** `scripts/smoke-republish.sh:42,82`: pre-initialize `MONSTER_ROWS=""` / `MONSTER_ROWS_AFTER=""` before poll loops (set -u safety)
-- **H-2** `scripts/smoke-republish.sh:94`: anchor BUMP_VERSION grep with `[^0-9]` word-boundary to prevent substring false-positives
-- **M-2** `scripts/smoke-republish.sh:24`: EXIT trap warns instead of `|| true` silent swallow
-- **M-4** `scripts/smoke-republish.sh:73`: `if ! SYNC_OUT=$(cmd)` form — `VAR=$(cmd)` alone suppresses set -e on non-zero exit
-- **L-1** `docs/adr/0079-nightly-republish-smoke.md:55`: fix "V+100" → "V+1" copy-paste error
-- **L-2** `justfile:109`: document macOS GNU sed requirement
-- **L-4** `evals/nightly-smoke-wiring.eval.mjs:276`: add `set -euo pipefail` content check
-
-### Known open items (not blocking):
-- **M-1**: Installer script at `https://install.spacetimedb.com` has no SHA checksum verification — supply-chain gap per standards/security.md. SpacetimeDB project does not publish a detached checksum for their installer. Flagged for future hardening.
-- **M-3**: ADR README row for 0079 missing, next-free not bumped to 0080 — pre-existing documentation debt scoped to 12.5g-1 doc-keeper pass. Instructions prohibit touching docs/adr/README.md in this slice.
-- **TEETH E**: vacuous bad-fixture direction (minor structural observation; real file check is the production gate; no action needed).
-
-**Branch:** `feat/m12.5b6-nightly-smoke-republish`, tip `a92d73e`. All evals green. PR #98 CLEARED FOR MERGE.
-
-**Supervisor:** squash-merge PR #98 → master. ADR next-free = **0080**. Worktree: `.claude/worktrees/m12.5b6`.
-
----
-
-## 2026-07-04T04:25Z — supervisor tick mr-sup-cowork-20260704T040628Z-1780370-4742
-
-**M12.5b6 MERGED.** Review pass (m12.5b6-nightly, $4.02, sonnet, EXIT=0 ATTEMPTS=1) returned APPROVE-FOR-MERGE with fixes `a92d73e`. Supervisor audits: touches-assert CLEAN (6 files, all within declared set, run.mjs untouched); gating-test CLEAN (ec1cd6f→a92d73e additions only; the single flagged removed line was a redundant-regex simplification with the predicate strengthened). PR #98 squash-merged → master `fa85970`. Worktree `.claude/worktrees/m12.5b6` + branch removed; main checkout ff'd to fa85970.
-
-**master CI: RED (known flake, escalating).** e2e failed on zoneSync 12.5c-1/5 state-based (:136, expect at :158) on fa85970 attempts 1 AND 2 — first time a rerun did not clear it. Same flake also hit doc-only chore PR #99. Recurrences #6 and #7. `ci` job green both times; M12.5b6 touched no client/e2e files. Rerun attempt 3 in flight.
-
-**ADR-0079 index chore PR #99 OPEN** (`chore/m12.5b6-adr-index`, doc-only: README row + next-free→0080). Repo has auto-merge disabled (known since #97) → must be merged manually when checks green; its e2e flaked once, rerun triggered. If still open next tick: rerun/merge it (doc-only, no review needed).
-
-**Composite launch this tick: `M12.5c-1-deflake`** — per queue policy (mandatory on master-red), see IN-PROGRESS entry below. ADR 0080 reserved (use only if ADR-worthy; next-free stays 80 in state until consumed).
-
-**DC note:** supervisor shell died mid-`gh pr merge` (session churn); merge confirmed completed from live PR state on a fresh shell — no divergence.
-
----
-
-## 2026-07-04T04:30:33Z IN-PROGRESS: m12.5c1-deflake LAUNCHED by mr-sup-cowork-20260704T040628Z-1780370-4742 — zoneSync 12.5c-1 e2e deflake (master RED on this flake, recurrences #6/#7). Brief /tmp/mr_pass_m12.5c1-deflake.md, ADR 0080 reserved (optional). Chore PR #99 (ADR-0079 index) still open pending green e2e — merge it when green.
-
-**2026-07-04T04:35:11Z addendum:** chore PR #99 merged -> master `192e739` (ADR-0079 indexed, next-free 0080). Master e2e attempt 3 on fa85970 FAILED (3rd consecutive) — but PR #99 e2e passed on the same base, confirming flake not hard break; no further reruns, the in-flight m12.5c1-deflake run is the fix.
-
-## 2026-07-04T05:20Z — supervisor tick mr-sup-cowork-20260704T050621Z-1826942-20379
-MERGED m12.5c1-deflake (PR #100 → 1298137, squash). Master CI GREEN on merge commit — zoneSync 12.5c-1 flake fix confirmed (was RED 3x on fa85970). Audits: gating-test CLEAN (assertion refactored atomically, nothing weakened); orchestration FLAGGED-mitigated (no tester subagent, but test-only slice with 3 local playwright passes + reviewer/red-team in-build — merged without separate review pass, deviating from b6 precedent; rationale in ledger). Cleanup done (worktree/branch/lock/.done removed; master ff'd to 1298137). No ADR added (next_free stays 80). Composite-launching m12.5g (docs-only reconciliation, g-1+g-2, g-3 referenced as scheduled M8.95) this tick.
-
-## 2026-07-04T05:22:50Z — supervisor tick mr-sup-cowork-20260704T050621Z-1826942-20379 (launch)
-IN-PROGRESS: launched m12.5g (docs-only reconciliation; g-1 doc set, g-2 M11/ADR-0067 annotations, g-3 → reference M8.95 as scheduled). Brief /tmp/mr_pass_m12.5g.md, ADR 0080 reserved (optional). Fresh slice, no resume.
-
-## 2026-07-04T06:25Z — MAINTENANCE (interactive Cowork session, Drew present) — not a supervisor tick
-Reviewed last 6 ticks; fixes applied: (1) mr-launch.sh now auto-resumes transient API crashes (Overloaded/5xx/network) with backoff — previously only RC==0 resumed, so the 00:06Z M12.5e2 Overloaded death sat dead until the next tick; (2) ledger repaired — two empty-ts lines stamped from handoff anchors, June-26 unquoted ~N JSON corruption fixed, all 119 lines now parse; canonical field names + pre-append validation added to the task prompt; (3) repo allow_auto_merge re-ENABLED (chore-PR --auto works again); (4) brief template: tester lens now explicitly mandatory for test-artifact slices; task prompt gained a matching CLEAN-test-artifact audit carve-out (no more forced review passes when adversarial execution evidence exists); (5) prompt env notes: jq absent, use /usr/bin/python3. NOTE: task cron changed from hourly to daily 05:00 local sometime after the 05:03Z tick — flagged to Drew, not reverted. PR #101 (m12.5g) open at terminal state, awaiting next tick's merge.
-
-## 2026-07-04T07:30Z — supervisor tick mr-sup-cowork-20260704T071800Z-1897312-14713
-**M12.5g MERGED.** PR #101 squash-merged → master `8612a20`; CI GREEN on merge commit. Audits: touches CLEAN (7 files ⊆ declared; raising.rs verified doc-comment-only); gating-test CLEAN (no test files); orchestration EXEMPT-doc-only (0 subagents, sonnet confirmed, $5.33, ATTEMPTS=1). ADR-0067 accepted; ADR index range fixed 0035–0079; ADR 0080 NOT consumed (next_free stays 80). Harness spec-corpus commit `eba5c7e` (g-2) landed on harness main. Cleanup: worktree/branch removed, main checkout ff'd to 8612a20; stray CHANGELOG.md stashed (`supervisor-stray-20260704T072151Z`, likely run doc-leak). Cosmetic: squash title inherited "wip(m12.5g)…" from branch head commit. M12.5 milestone: ALL SLICES MERGED.
-
-**Probe note:** gate-top probe saw the 06:25Z maintenance handoff write at ~5 min age; 2nd probe clean (7.7 min, no other writes, no claude pids) + the entry explicitly delegated this merge → proceeded.
-
-**Composite launch: m8.95a** (M8.95 Producer + bundle, critical-path start). **Prereq gap found & scoped into the brief:** harness-canonical `scripts/okf-lint.mjs` and type-aware research scripts NEVER LANDED (spec assumed "landed alongside"; only `standards/knowledge-format.md` exists). Brief instructs the run to author harness-canonical okf-lint.mjs first (contract SSOT = standards/knowledge-format.md), commit to harness main, then vendor into the project per the research-index precedent. NO fan-out with m8.95c this tick — c depends on the same missing harness prereqs and concurrent harness-repo writers aren't covered by fan-out rules; c is fan-out-eligible next tick once prereqs exist. ADR 0080 reserved (optional — project ADR is 8.95d's job).
-
-## 2026-07-04T07:32:17Z IN-PROGRESS: m8.95a LAUNCHED by mr-sup-cowork-20260704T071800Z-1897312-14713 — M8.95 producer+bundle (incl. authoring the missing harness-canonical okf-lint.mjs first). Brief /tmp/mr_pass_m8.95a.md, ADR 0080 reserved (optional; project ADR is 8.95d's). Fresh slice, no resume.
-
-## 2026-07-04T08:17Z — supervisor tick mr-sup-cowork-20260704T080545Z-1949320-22949 (Cowork)
-**m8.95a MERGED.** PR #102 (feat/m8.95a-knowledge-bundle) squash-merged → master 370d1e7; ci+e2e green pre-merge, master CI GREEN post-merge. Diff exactly ⊆ declared touches (scripts/okf-export.mjs, docs/knowledge/** ~54 generated files, justfile, .claude/hooks/okf-lint.mjs); no evals/run.mjs or structural files. Audits: orchestration CLEAN (Sonnet-class model, tester+reviewer roles in log), gating-test CLEAN (no test files touched), no rate-limit events tripped (4 events, all allowed). Wrapper: EXIT=0 ATTEMPTS=1, cost $8.19. No ADR filed — 0080 remains next-free (project ADR is 8.95d's job). Harness-side canonical okf-lint.mjs landed on harness main (1512f55).
-Ops note: DC shell died mid-`gh pr merge`; merge completed server-side; new shell reconciled from live PR state and finished cleanup (ff-only to 370d1e7, worktree+branch removed).
-**Next: composite-launching m8.95b** (conformance+drift eval, serial after a). Fan-out with 8.95c declined again — harness-prereq gap (type-aware research scripts) unresolved.
-
-## 2026-07-04T08:21Z — IN-PROGRESS: m8.95b launched (mr-sup-cowork-20260704T080545Z-1949320-22949)
-Detached rooted run for m8.95b (conformance+drift eval; touches: evals/knowledge-bundle-conformance.eval.mjs new, evals/baselines/ only-if-fixture; evals/run.mjs off-limits). Brief /tmp/mr_pass_m8.95b.md; ADR 0080 reserved (optional). Supervisor will merge on green.
-
-## 2026-07-04T09:11Z — supervisor tick mr-sup-cowork-20260704T090612Z-2008418-654 (cowork)
-**m8.95b MERGED.** PR #103 (feat/m8.95b-conformance-eval) squash-merged → master 4e3634a; CI+e2e green pre- and post-merge. Diff = exactly `evals/knowledge-bundle-conformance.eval.mjs` (⊆ touches; `evals/run.mjs` untouched; no baselines, no ADR — 0080 still next-free, reserved for 8.95d). Audits CLEAN: Sonnet model asserted; tester/reviewer/red-team/verifier lenses all ran; no skip/only in diff. Cost $7.65, 1 attempt. Worktree `.claude/worktrees/m8.95b` + branch removed; master ff'd. Stray untracked `.claire/` left untouched.
-**Next: launching m8.95c** (research-library conformance; touches docs/research/*.md + vendored type-aware research-index/lint + INDEX.md; run authors/vendors the type-aware scripts itself — harness canonical copies are NOT yet type-aware). 8.95d (doc-keeper, ADR 0080) remains the closer; fan-out c‖d declined (d closes/verifies the milestone — serial safer). M10.5 still owed after 8.95.
-**09:14Z IN-PROGRESS:** launching m8.95c (research-library conformance) detached via mr-launch.sh. Brief /tmp/mr_pass_m8.95c.md. No ADR reserved (8.95d owns 0080).
-
-## 2026-07-04T10:16Z — mr-sup-cowork-20260704T100628Z-2060749-15290 (Cowork supervisor tick)
-
-**m8.95c MERGED.** PR #104 (feat/m8.95c-research-conformance) squash-merged at 10:09Z → master 1fb7d70. Post-merge CI GREEN. Run finished cleanly (EXIT=0, ATTEMPTS=1, $6.92, sonnet-4-6). Audits: orchestration CLEAN (4 subagents: tester/reviewer/red-team/verifier), gating-test CLEAN (no test files in diff), diff ⊆ declared touches. No ADR consumed (0080 still reserved for M8.95d). Worktree .claude/worktrees/m8.95c removed, branch deleted. Note: untracked stray `.claire/` dir in project root — left untouched. Supervisor DC shell died during CI poll; reconciled in a fresh shell, no impact.
-
-Next: M8.95d (doc-keeper+verifier closes M8.95 milestone, files project ADR at 0080), then M10.5.
-
-## 2026-07-04T10:26Z — mr-sup-cowork-20260704T100628Z-2060749-15290 — IN-PROGRESS: launching M8.95d
-
-Composite launch after m8.95c merge. M8.95d = doc-keeper+verifier, closes M8.95 milestone. ADR 0080 pre-allocated. Brief: /tmp/mr_pass_m8.95d.md. Doc-only slice.
-
----
-
-## 2026-07-04T~11:30Z — M8.95d TERMINAL STATE: PR #105 OPEN, local just ci GREEN (EXIT=0), remote CI running
-
-**M8.95d (doc-keeper + verifier — closes M8.95 knowledge-bundle milestone)**
-
-Monster-realm repo changes (branch `feat/m8.95d-doc-keeper`, PR #105, 2 commits, tip `e58fa92`):
-
-- **`docs/adr/0080-generated-knowledge-bundle.md`** (NEW): project-side ADR, mirror of corpus ADR-0057. Records A+F1+G1 decisions, all 4 M8.95 slices with PR refs. ADR-0080 consumed; ADR next-free = **0081**.
-- **`ARCHITECTURE.md`**: (1) knowledge-bundle drift gate in §Mechanical gates; (2) new §Agent knowledge bundle (M8.95 — ADR-0080) section with concept-type table + producer/lint/privacy/recipe notes; (3) §Decisions range 0035–0079→0080 + ADR-0080 highlight.
-- **`CHANGELOG.md`**: regenerated via `just changelog`; picks up M8.95a/b/c feat entries (PRs #102–#104).
-
-Harness changes (committed to harness main `ea46c97`):
-- `specs/monster-realm-v2/M8.95-knowledge-bundle.spec.md`: §5 boxes ticked — 8.95a (PR #102), 8.95b (PR #103), 8.95d (PR #105); 8.95c was already ticked
-- `memory/projects/monster-realm-m8.95d.md` (NEW): doc-keeper memo
-
-**Verifier:** just ci EXIT=0 — 47 evals (schema-snapshot PASS, bindings-drift PASS, knowledge-bundle-conformance PASS: 48 concepts lint-clean + drift gate passed), 777 Rust tests, 571 client tests.
-
-**M8.95 milestone: ALL SLICES MERGED** — 8.95a (PR #102) + 8.95b (PR #103) + 8.95c (PR #104) + 8.95d (PR #105 pending merge).
-
-**Supervisor:** squash-merge PR #105 → master. ADR next-free = 0081. Worktree `.claude/worktrees/m8.95d` + branch removable after merge.
-
-**Next slice:** M10.5 (five residual slices — 10.5a content validation, 10.5b doc accuracy, 10.5c ADR-README, 10.5d gates+config).
-
-## 2026-07-04T11:20Z — supervisor tick mr-sup-cowork-20260704T110726Z-2102793-12730 (Cowork)
-**M8.95d MERGED — M8.95 MILESTONE CLOSED.** PR #105 (feat/m8.95d-doc-keeper) squash-merged 11:08:56Z → master 34250d5; CI+e2e green pre-merge, master CI GREEN post-merge. Diff = ARCHITECTURE.md + CHANGELOG.md + docs/adr/0080-generated-knowledge-bundle.md, exactly ⊆ declared touches. Audits: orchestration EXEMPT-doc-only (0 subagents, sonnet-4-6 asserted, $2.77, ATTEMPTS=1); gating-test CLEAN (no test files). ADR-0080 consumed; next_free = 0081.
-**ADR-index chore PR #106** (chore/m8.95d-adr-index: add 0080 row, range →0080, next-free →0081) merged → master 2d70f00, CI GREEN. NOTE: `gh pr merge --auto` was rejected ("Protected branch rules not configured for enablePullRequestAutoMerge") despite the 06:25Z maintenance re-enable of repo allow_auto_merge — auto-merge needs the branch-protection-rule flag too, not just the repo flag; merged manually on green. Flag for Drew/maintenance.
-Cleanup: worktree .claude/worktrees/m8.95d + both branches removed, master ff'd to 2d70f00, per-run lock removed. Stray untracked `.claire/` left untouched. DC shells died twice mid-tick (during merge + CI watch); reconciled from live PR state each time, no impact.
-**Next: composite-launching M10.5a** (empty-moveset content invariant + marshal defense-in-depth, test-first). Spec §6's serialize-against-M10-content.rs constraint is moot (M10 fully landed). Spec written @ d873a93 — brief instructs re-locating evidence on current master. No ADR reserved (spec: no new number; fold into ADR-0049 amendment if reviewer wants it recorded). 10.5b/c/d remain; fan-out declined this tick (conservative; 10.5d touches structural evals/run.mjs = always-serial anyway).
-
-## 2026-07-04T11:28Z — IN-PROGRESS: launching m10.5a (mr-sup-cowork-20260704T110726Z-2102793-12730)
-Detached rooted run for M10.5a (empty-moveset content invariant + marshal boundary guard, test-first). Brief /tmp/mr_pass_m10.5a.md. No ADR reserved (spec: fold into ADR-0049 amendment if recorded). Fresh slice, no resume. Supervisor merges on green.
-
-## 2026-07-04T12:15Z — supervisor tick mr-sup-cowork-20260704T120704Z-2200539-24543 (Cowork)
-**m10.5a MERGED.** PR #107 (feat/m10.5a-empty-moveset-invariant) squash-merged 12:09:50Z → master 329978f; CI+e2e green pre-merge, master CI GREEN post-merge. Diff = game-core/src/content.rs + server-module/src/marshal.rs + marshal_tests.rs + docs/adr/0049 amendment — ⊆ declared touches. Audits: orchestration CLEAN (6 subagent invocations: tester/reviewer/red-team/verifier/doc-keeper; sonnet-4-6 asserted; ~$19.02 across ATTEMPTS=2); gating-test CLEAN (RED→GREEN commit pattern, no removed/skipped tests). No new ADR consumed (ADR-0049 amended in-branch) → no index chore PR; adr_next_free stays 0081.
-Cleanup: worktree .claude/worktrees/m10.5a + branch removed, master ff'd 2d70f00→329978f, per-run lock + stale .done files (m10.5a, m8.95d) removed. Stray `.claire/` left untouched. DC shell died once mid-CI-poll; reconciled from live state.
-**Remaining M10.5:** 10.5b (docs ARCHITECTURE+README reconcile — verify overlap with M12.5g first), 10.5c (ADR-README residuals), 10.5d (gate hardening — structural evals/run.mjs, always-serial). No composite launch this tick: 10.5b/c need an overlap/residual verification pass best done at launch-brief time with fresh eyes; next tick picks up 10.5b.
-
----
-## 2026-07-04T13:13:14Z — supervisor tick (mr-sup-cowork-20260704T130555Z-2215799-17910) — IN PROGRESS
-Launching m10.5b (docs-only residual: ARCHITECTURE.md module-map/content-registry/subsystem sections; 10.5b-3/-5 verified already done by later slices). master GREEN @ 329978f, no open PRs, no in-flight runs. ADR 0081 reserved (not expected). Touches: ARCHITECTURE.md, README.md.
+- Commit: 9906439 `fix(m13a): remove accidentally-committed client-wasm/pkg symlink`
+- local `just ci` EXIT=0 (801 Rust + 574 client + 41 evals all green)
+- Pushed to `feat/m13a-currency-primitive`; remote CI run #28715339830 in_progress
+- **Terminal state: PR #111 open, remote CI running. Supervisor owns merge.**
+- No new ADR needed (not a behavior/design change, just a gitignore/worktree artifact fix).
