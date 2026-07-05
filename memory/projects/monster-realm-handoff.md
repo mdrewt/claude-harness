@@ -121,6 +121,18 @@ All findings fixed, `just ci` EXIT=0 (801 Rust + 574 client + 48 evals), pushed 
 - FAN-OUT: launching m13c (sinks/sources wiring; server-side; ADR 0083) ‖ m13d (client shop UI + wallet; pure client; ADR 0084). Touches disjoint (server/game-core/evals vs client-minus-bindings); approved server ‖ client pair shape; 39G free, load 0.04; final re-probe clean. Briefs: /tmp/mr_pass_m13c.md, /tmp/mr_pass_m13d.md.
 - ADR next free after reservations: 0085.
 
+## 2026-07-04T~22:30Z — m13c TERMINAL STATE (PR #116 open, `just ci` green)
+
+- Branch: `feat/m13c-economy-sinks-sources`, tip: `1fd2ac7`
+- PR #116 open: https://github.com/mdrewt/monster-realm/pull/116
+- `just ci` EXIT=0: 799 Rust tests + 53 evals all PASS (0 client tests — pure server slice)
+- **What landed:** `HealLocationDef.cost_currency` (#[serde(default)]); `QuestReward.currency` (#[serde(default)]); `battle_currency_reward(loser_bst: u16) -> u64` in game-core (bst/10, re-exported at crate root); CONTENT_VERSION 6→7 (quest_001 currency=50, content-hash baseline updated); heal_party spends via spend_currency (require_owner before spend, ADR-0081); apply_quest_trigger grants reward.currency on QuestComplete; write_back_battle_results grants battle_currency_reward(bst) on SideAWins; `evals/economy-sinks-sources.eval.mjs` (5 teeth); ADR-0083; ARCHITECTURE.md updated.
+- **Review findings fixed:** RT-WB-CURRENCY-01: grant_currency moved before loser_lvl parse so corrupt level never drops reward; RT-M13C-01 regression test documents require_owner tautology (ADR-0083 §A convention).
+- **Known limitation (documented):** cost_currency not in HealLocationRow DB schema (schema change forbidden in m13c due to concurrent m13d). Deferred to future slice.
+- **Review pass:** 4 lenses (reviewer + red-team + reducer-security-auditor + desync-guard) + verifier. APPROVE-FOR-MERGE.
+- **ADR-0083 registered; next-free: 0084** (0084 already used by m13d; supervisor should note m13c went to 0083 which was pre-reserved)
+- **Next:** Supervisor owns merge. M13 §5 all 4 tasks: 1(m13a)✓ 2(m13b)✓ 3(m13c=PR#116) 4(m13d=PR#115).
+
 ## 2026-07-04T21:3xZ — m13d TERMINAL STATE (PR #115 open, `just ci` green)
 
 - Branch: `feat/m13d-shop-client-ui`, tip: `c5d6b39`
@@ -131,3 +143,32 @@ All findings fixed, `just ci` EXIT=0 (801 Rust + 574 client + 48 evals), pushed 
 - **Spec tick:** M13 §5 task 4 marked DONE (PR #115).
 - **Worktree:** `.claude/worktrees/m13d` (retained until merge)
 - **Next:** Remote CI + merge. M13 spec §5 all 4 tasks done (M13a/b/d shipped, M13c concurrent sibling status TBD).
+
+## 2026-07-04T22:15Z — supervisor tick (mr-sup-cowork-20260704T220559Z-2725809-15911)
+- **m13d MERGED**: PR #115 (feat/m13d-shop-client-ui) squash-merged → master 10f6a8b; master CI GREEN. Cost $11.54, 1 attempt, Sonnet. Audits: orchestration CLEAN (tester/reviewer/red-team/verifier all present), gating-test CLEAN (no removed/skipped tests). ADR-0084 + its index row landed in-branch — no chore PR needed for 0084.
+- Touches variance (both slices, non-colliding): m13d also touched client/index.html + client/vite.config.ts (outside declared client/src/**); m13c touches docs/knowledge/reducers/*.md (outside declared). Actual sets disjoint; treated as degraded-to-serial, merges serial anyway.
+- **m13c (PR #116) finished clean (EXIT=0, 1 attempt), audits pre-checked CLEAN, awaits merge NEXT TICK.** mergeStateStatus UNKNOWN right after master moved — expect BEHIND (update-branch) or doc-set conflict on ARCHITECTURE.md (resolve deterministically, union both sides). After merge: chore PR for ADR 0083 index row.
+- Stray: main-checkout ARCHITECTURE.md modification stashed labeled "supervisor-stray-20260704T221148Z". .claire/ dir still untouched (human stray).
+- Ops note: DC shell died mid CI-poll; new shell resumed under same run_id/mutex. m13d worktree+branch removed; m13c worktree/branch/lock KEPT.
+
+
+## 2026-07-04T23:27:00Z — mr-sup-cowork-20260704T230449Z-2741381-1047 (supervisor tick)
+
+**m13c MERGED.** PR #116 squash-merged -> eab6d7b (master CI GREEN). Conflict after m13d was ARCHITECTURE.md-only (doc set): union-resolved both economy sections, fixed next-free-ADR pointer to 0085. ADR-0083 index chore PR #117 merged -> e875af0 (CI GREEN); auto-merge still rejected by branch protection, merged manually on green. m13c worktree/branches removed. **M13 (a/b/c/d) fully merged.** Next: M13.5 residuals (3 decisions DECIDED by Drew: 13.5e-5 adaptive interp delay, 13.5a-6 nightly mutants gating, 13.5c-5 player_conversation private). adr_next_free=85. Note: untracked .claire/ dir in main checkout — human's, untouched.
+
+---
+## 2026-07-05T00:15:24Z — IN-PROGRESS: m13.5a launched (supervisor mr-sup-cowork-20260705T000447Z-2757453-15189)
+Slice 13.5a (gate-of-gates: CI/nightly wiring guards + coverage ratchet, incl. DECIDED 13.5a-6 nightly cargo-mutants gating). Fresh worktree from origin/master@e875af0. Brief /tmp/mr_pass_m13.5a.md; ADR 0085 reserved (primary deliverable is an ADR-0050 amendment). Model: fable (per updated task directive; probe-validated claude-fable-5). M13 complete; first M13.5 slice, serial (touches evals/ = structural set).
+
+## 2026-07-05T~02:30Z — m13.5a TERMINAL STATE (PR #118 open, local `just ci` green, remote CI running)
+
+- Branch: `feat/m13.5a-gate-of-gates`, tip: `15ab616` (worktree `.claude/worktrees/m13.5a`, base `e875af0`)
+- PR #118 open: https://github.com/mdrewt/monster-realm/pull/118
+- `just ci` EXIT=0 (verifier-run): 833 Rust tests + 626 client tests + **51/51 evals**
+- **What landed (all 6 EARS):** NEW `evals/ci-gate-wiring.eval.mjs` (13.5a-1+5: hardcoded 7-verb oracle, per-step neuter scoping, dup-job-key detection, comment-aware security-substitution markers, recipe-body guards for test/eval/client-test, run.mjs integrity check, anchorIsWired, `import.meta.url` main-guard self-runner); dual anchor = lefthook pre-commit `ci-gate` + bare `- run: node evals/ci-gate-wiring.eval.mjs` step in ci.yml e2e job (**deliberate touches deviation** — spec 13.5a-1 names the e2e job; lefthook binary not installed anywhere → lefthook-only would be theater; reviewer-ratified, ADR A3); nightly-smoke-wiring extended (nightlyHas{Mutation,Coverage,ServerMutation}Job exact-step, jobIsNotNeutered ×3, trigger liveness, coverageRecipeThresholdIntact last-flag-wins ≥96, mutateServerRecipeIntact); nightly.yml `mutation-server:` gating job (no continue-on-error, v1-nightly-server cache, split cargo-mutants/cargo-nextest installs); justfile `mutate-server cap="180"` fail-loud shebang recipe + coverage 25→96; dom-shell eval: findUnsanctionedExclusions + coverageIncludeIsFull + shopView.ts allowlist + **quote-aware stripComments rewrite** (old regex mangled globs: `'src/**/*.ts'` contains `/**/`).
+- **ADR-0050 amendment** (A1 ratchet 29.65→99.35→96; A2 mutation baseline 253/180/56/17 @ 2min local, cap 180, `-p monster-realm-module` package-name trap; A3 topology + **7 accepted gaps** incl. double-anchor-deletion residual). **ADR-0085 NOT used — number returned to the pool (next-free still 0085).**
+- **Proof matrix executed:** anchor detached-fixture (pristine 0 / doctored 1); `just mutate-server` exit 0 at cap; `just mutate-server 179` exit 1 ratchet-violation; malformed cap exit 64; coverage green at 96; 6 verifier spot-checks all bite.
+- **Review trail:** planner → plan lenses (reviewer+red-team; lefthook-not-installed finding changed the anchor design) → tester RED (3 fix iterations: exclude-array scoping, stripComments glob bug, main-guard self-import deadlock) → impl → reviewer (2 blockers fixed: missing mutation-server neuter check, wc -l trailing-newline bug) + red-team round-2 (7 bypasses closed: dup-job-key, comment-stuffed markers/anchor, last-flag-wins threshold, inline-comment flag, suffixed nightly steps, -o redirect, bracket-in-glob) → verifier **APPROVE-FOR-MERGE** (teeth-weakening audit clean). Domain auditors N/A (no reducer/netcode surface) — recorded. Ops note: a duplicate fresh tester was spawned when the original appeared context-compacted, then TaskStop'd on discovering the original HAD completed the batch; no file conflict (verified, suite green).
+- **Worktree note:** untracked `mutants.out/` + `mutants.out.old/` in the worktree from proofs — never `git add -A` there; supervisor cleanup removes them with the worktree.
+- **First scheduled `mutation-server` nightly run** is the real-world runtime validation (~15–30 min extrapolated from 2-min/32-core local).
+- **Next:** Supervisor owns merge (remote CI was starting at handoff). Then per spec §6: 13.5g + 13.5h fan out freely; 13.5b ‖ 13.5c next code pair.
