@@ -74,7 +74,8 @@ M18 raids resolve; the battle table (M7) is already PvP-ready. M15 trade is inde
 ## 5. Tasks
 - [x] `game-core`: `StatusEffect` enum + per-turn resolution (additive on `resolve_turn`); unit/property + determinism + **M7-regression** tests. *(m14a — PR #134, ADR-0092)*
 - [x] Server schema + persistence: `BattleMonster.status`, `StatusCured.slot` (RT-S14-01), `submit_attack→resolve_full_turn`, bindings regen. *(m14b — PR #135, ADR-0093)*
-- [ ] Abilities (data-driven passives) + weather/field; content fields + `validate_content` + fixtures.
+- [x] Abilities (data-driven passives); StatusKind payload-free, AbilityEffect exhaustive, per-species content, `validate_abilities` additive sibling, apply_entry_ability hooks. *(m14c — PR #137, ADR-0094)*
+- [ ] Weather/field state; content fields + `validate_content` + fixtures.
 - [ ] Items that cure status (extend M9); battle view animates the new `BattleEvent`s.
 - [ ] Proof-of-teeth: plain-attack-unchanged regression; exhaustive-match enforcement.
 - [ ] doc-keeper changelog + memory; mark **Phase B complete** in `ARCHITECTURE.md`.

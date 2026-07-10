@@ -201,3 +201,42 @@ Launch confirmed 2026-07-10T20:23:06Z: m14b detached (leader 523131, claude 5231
 - **Review trail:** reviewer (F1 serde test strengthened → fixed; F2 attempt_recruit gap → deferred; F3 dead sleep_wake fields → documented; F4 Sleep baseline → deferred) + reducer-security-auditor (M1 write-back gate → fixed; rest CLEAN) + red-team lens (in flight at terminal)
 - **ADR-0093 CONSUMED** (next-free → 0094)
 - **Supervisor owns merge. Next per M14 plan: m14c (abilities) ‖ m14d (weather) — parallel-eligible (disjoint files)**
+
+---
+
+## 2026-07-10T22:20Z — supervisor mr-sup-cowork-20260710T220620Z-583420-24654 — m14b MERGED
+
+- **PR #135 squash-merged** → master `8270ef5`; master CI GREEN.
+- e2e was red once on the PR: known `recruit.spec.ts` R2 MAX_HEALS flake (identical to m14a-PR failure, rerun-green with zero code changes). Deflake candidate remains in queue.
+- Audits: orchestration CLEAN (planner/tester/red-team/review-lens subagents present; model sonnet-class); gating-test CLEAN (no deleted tests, no skips added).
+- Touches-drift note: actual diff wider than declared touches (combat ai/damage/resolve/status + marshal + several test files). No in-flight siblings → no collision; recorded for future fan-out planning.
+- ADR index reconciled via doc-only chore PR #136 (`chore/m14b-adr-index`, adds 0093 row, next-free → 0094), `--squash --auto` armed.
+- Worktree `.claude/worktrees/m14b` + branch removed; main checkout ff'd to `8270ef5`.
+- **Composite launch: m14c (passive abilities) launched SERIAL.** m14c ‖ m14d fan-out DECLINED: m14d touches `server-module/src/schema.rs` (structural always-serial set) and both slices touch content RON. m14d next after m14c.
+- ADR **0094 reserved for m14c** (next-free → 0095).
+
+---
+
+## 2026-07-10T~23:00Z — m14c TERMINAL STATE (PR #137 open, local `just ci` EXIT=0)
+
+- Branch: `feat/m14c-passive-abilities`, tip TBD (worktree `.claude/worktrees/m14c`), base `8270ef5` (master after m14b squash)
+- PR #137: https://github.com/mdrewt/monster-realm/pull/137
+- `just ci` EXIT=0: **949 Rust tests, 778 client tests (32 files), 53/53 evals PASS**
+- **What landed (ADR-0094):**
+  - `game-core/src/combat/ability.rs` (NEW): `StatusKind` enum (payload-free discriminant — Burn/Sleep/Poison/Paralysis/Freeze without `Sleep { turns }` payload), `AbilityEffect` exhaustive enum (`StatusImmunity { immune_to: StatusKind }` / `EntryHeal { denom: u16 }`), `AbilityStore { side_a: Vec<Option<AbilityEffect>>, side_b: Vec<Option<AbilityEffect>> }`, `apply_entry_ability`, `apply_ability_modifiers`
+  - `game-core/src/combat/m14c_tests.rs` (NEW): 20 EARS gating tests
+  - `game-core/src/combat/redteam_m14c_tests.rs` (NEW): 4 red-team tests (RT-A14-01 HIGH, RT-A14-02 MEDIUM, RT-A14-03 MEDIUM, RT-A14-05 LOW)
+  - `game-core/content/abilities/000-core.ron` (NEW): 3 starter abilities (Flame Body StatusImmunity Burn, Vital Spirit StatusImmunity Sleep, Regeneration EntryHeal denom:4)
+  - `game-core/src/content.rs`: Species gains `#[serde(default)] ability: Option<u32>`, AbilityDef struct, load_abilities/parse_abilities/validate_abilities functions (additive sibling, does NOT change validate_content 4-param signature)
+  - `game-core/build.rs`: "abilities" added as 12th registry entry
+  - `game-core/src/combat/mod.rs` + `game-core/src/lib.rs`: re-exports of ability types/functions
+  - `server-module/src/lib.rs`: CONTENT_VERSION 7→8
+  - `server-module/src/content.rs`: load_abilities + validate_abilities wired into sync_content_inner
+  - Server-module test files: `ability: None` added to Species literals in marshal/movement/taming
+  - `evals/baselines/content-hash.json`: version=8, hash updated
+  - `docs/knowledge/reducers/` regenerated (8 files via `just knowledge`)
+  - `docs/adr/0094-m14c-passive-ability-system.md` (NEW)
+- **Key design decisions (ADR-0094):** StatusKind payload-free discriminant (avoids Sleep clause in RON); AbilityEffect exhaustive (OCP gate, ADR-0010); validate_abilities additive sibling (preserves validate_content signature per ADR-0006); apply_entry_ability returns () not Vec<BattleEvent> (no speculative event API); debug_assert!(denom >= 2) on EntryHeal (ADR-0055 precondition policy); server wiring hooks into resolve_full_turn deferred to M14d
+- **Named residuals (deferred):** wiring apply_entry_ability/apply_ability_modifiers into resolve_full_turn (M14d); attempt_recruit ability population (M14d); DoT interaction with entry abilities (M14e+); RT-A14-01 HIGH fix wired
+- **ADR-0094 CONSUMED** (next-free → 0095)
+- **Supervisor owns merge. Next per M14 plan: m14d (weather) serial.**

@@ -1,28 +1,29 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-10T20:30:00Z",
- "updated_by": "m14a TERMINAL (PR #134 open, just ci EXIT=0 \u2014 949 Rust + 778 client); ADR-0092 consumed; supervisor owns merge",
+ "updated_utc": "2026-07-10T22:32:32Z",
+ "updated_by": "supervisor mr-sup-cowork-20260710T220620Z-583420-24654 (merged m14b, launched m14c)",
  "master": {
-  "sha": "f0d0e79",
-  "ci": "GREEN on f0d0e79 (m13.5g ADR chore); m14a PR #134 open \u2014 pending supervisor merge",
+  "sha": "8270ef5",
+  "ci": "GREEN on 8270ef5 (m14b merge)",
   "nightly": "ratchet fix merged (6d7ce61); VERIFY next scheduled nightly"
  },
- "adr_next_free": 93,
- "inflight": [],
- "awaiting_merge": [
+ "adr_next_free": 95,
+ "inflight": [
   {
-   "slice": "m14a",
-   "pr": 134,
-   "branch": "feat/m14a-status-effect-core",
-   "tip": "2889bfa",
-   "ci": "local just ci EXIT=0 (949 Rust + 778 client); remote CI running"
+   "slice": "m14c",
+   "session_leader": 589805,
+   "claude_pid": 589809,
+   "started_utc": "2026-07-10T22:35:34Z"
   }
  ],
+ "awaiting_merge": [],
  "queue": [
-  "FOLLOW-UP: okf-export updated-stamp drift trap -- fold into a doc/infra slice"
+  "FOLLOW-UP: okf-export updated-stamp drift trap -- fold into a doc/infra slice",
+  "FOLLOW-UP: e2e recruit.spec.ts R2 MAX_HEALS flake (failed on m14a PR, rerun-green) -- deflake candidate",
+  "VERIFY: chore PR #136 (ADR index 0093) auto-merged"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "M13.5 (a-h) COMPLETE. M14a TERMINAL: StatusEffect+BattleStatusStore+resolve_full_turn pure game-core (no schema change). m14b needs: SpacetimeType on StatusEffect, additive BattleMonster.status column, submit_turn→resolve_full_turn, StatusVariance::from_ctx_random, StatusCured slot-index fix (RT-S14-01). ADR-0092 consumed, adr_next_free=93."
+ "notes": "m14b MERGED (PR #135, master 8270ef5, ADR-0093; index via chore PR #136 auto-merge). m14c LAUNCHING serial (ADR 0094 reserved): passive abilities - AbilityDef registry, ability.rs, content.rs Species.ability, entry/modifier hooks, validate_content cross-check. m14d NEXT (serial after m14c: schema.rs structural + content RON overlap blocked fan-out). Then m14e -> m14f."
 }
