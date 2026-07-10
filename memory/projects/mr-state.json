@@ -1,28 +1,28 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-10T14:27:30Z",
- "updated_by": "supervisor tick mr-sup-cowork-20260710T140706Z-291188-21483: m13.5r merged (PR#130 -> 6d7ce61), composite-launched m13.5g (docs/ledger reconciliation, serial)",
+ "updated_utc": "2026-07-10T20:30:00Z",
+ "updated_by": "m14a TERMINAL (PR #134 open, just ci EXIT=0 \u2014 949 Rust + 778 client); ADR-0092 consumed; supervisor owns merge",
  "master": {
-  "sha": "6d7ce61",
-  "ci": "GREEN on 6d7ce61 (m13.5r)",
-  "nightly": "ratchet fix merged (6d7ce61, projected ~153 survivors < cap 180); VERIFY next scheduled nightly"
+  "sha": "f0d0e79",
+  "ci": "GREEN on f0d0e79 (m13.5g ADR chore); m14a PR #134 open \u2014 pending supervisor merge",
+  "nightly": "ratchet fix merged (6d7ce61); VERIFY next scheduled nightly"
  },
- "adr_next_free": 92,
- "inflight": [
+ "adr_next_free": 93,
+ "inflight": [],
+ "awaiting_merge": [
   {
-   "slice": "m13.5g",
-   "session_leader": 295229,
-   "claude_pid": 295235,
-   "started_utc": "2026-07-10T14:27:30Z"
+   "slice": "m14a",
+   "pr": 134,
+   "branch": "feat/m14a-status-effect-core",
+   "tip": "2889bfa",
+   "ci": "local just ci EXIT=0 (949 Rust + 778 client); remote CI running"
   }
  ],
- "awaiting_merge": [],
  "queue": [
-  "13.5f last (game-core collisions)",
   "FOLLOW-UP: okf-export updated-stamp drift trap -- fold into a doc/infra slice"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m13.5r merged 14:09Z (nightly ratchet fix; VERIFY next nightly). m13.5g in flight: doc/ledger reconciliation + warpDetect wire-or-delete + root package-lock deletion + @types/node bump; ADR 0091 re-reserved, likely unused. After g: only 13.5f remains in M13.5."
+ "notes": "M13.5 (a-h) COMPLETE. M14a TERMINAL: StatusEffect+BattleStatusStore+resolve_full_turn pure game-core (no schema change). m14b needs: SpacetimeType on StatusEffect, additive BattleMonster.status column, submit_turn→resolve_full_turn, StatusVariance::from_ctx_random, StatusCured slot-index fix (RT-S14-01). ADR-0092 consumed, adr_next_free=93."
 }

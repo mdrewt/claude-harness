@@ -95,3 +95,70 @@ Fresh launch (composite after m13.5r merge): docs/spec ledger reconciliation (13
 
 ## 2026-07-10 — DONE: m13.5g (PR #131)
 Docs/spec ledger reconciliation complete. PR #131 open on feat/m13.5g-docs-ledger-reconciliation, tip 89822f4, just ci GREEN (778 tests, 0 eval FAILs). ADR 0091 unused. Trap: lib.rs CONTENT_VERSION doc change → knowledge-bundle drift → `just knowledge` required. Supervisor owns merge. **Next per queue: 13.5f** (last remaining M13.5 slice).
+
+## 2026-07-10T16:25:56Z — supervisor tick mr-sup-cowork-20260710T160616Z-363894-28401 (Cowork)
+
+**m13.5g MERGED** — PR #131 squash-merged to `a3fe09a`; master CI GREEN. Worktree/branch cleaned; main checkout ff'd.
+
+- Run finished clean (EXIT=0, ATTEMPTS=1, $8.27, sonnet-4-6) but log showed ZERO subagent invocations on a slice with production code (warpDetect wire-in in connection.ts) -> orchestration_audit FLAGGED. Supervisor performed the required review pass on the PR diff (reviewer/red-team/domain/verifier lenses): wire-in is behavior-preserving (isOwnZoneChange predicate identical to the removed inline check, unit-tested on master); @types/node ^22->^24 dev-only, CI green; root package-lock.json stub deleted; everything else docs/comments. APPROVED.
+- PR e2e was red: recruit.spec.ts R2 (an M13.5h test, untouched by this slice) — judged flake, rerun -> green. Counted as remote_red_fix_cycles=1.
+- Touches drift: server-module/src/lib.rs (CONTENT_VERSION doc-history, comment-only) was in the diff but not the declared touches. Non-blocking; briefs should declare comment-only files too.
+- Squash landed with the run's `wip(m13.5g): ...` title (PR title was proper). The no-wip-titles workflow note merged IN this slice; future merges should override the squash title.
+- ADR 0091 unused by g; re-reserved for m13.5f. Only **13.5f** remains in M13.5.
+- Next: composite-launch m13.5f (serial — game-core touches) if final re-probe is clean.
+
+## 2026-07-10T16:27:55Z — supervisor: m13.5f IN-PROGRESS (launched, serial; ADR 0091 reserved; last slice of M13.5)
+
+## 2026-07-10T~18:30Z — m13.5f TERMINAL STATE (PR pending verifier)
+
+- Branch: `feat/m13.5f-type-rigor-hardening`, tip: `8d0b979` (worktree `.claude/worktrees/m13.5f`)
+- `just ci` EXIT=0: **667 game-core + 192 server-module Rust tests, 53/53 evals PASS**
+- **What landed (ADR-0091):**
+  - f-1: `validate_npc_content` 6b (GrantItem item-id cross-ref) + 6c (once-only BTreeSet intersection, same flag name); `talk` security comment; 6 proof-of-teeth tests
+  - f-2: `trigger_matches` exhaustive nested match — no tuple wildcard
+  - f-3: `dir_from_code`/`action_from_code` → `Option<T>`; `apply_move_coded` → `Result<[i32;4], String>`; `predict_move` → `Result<Vec<i32>, JsValue>`; `#[must_use]` added
+  - f-4: `check_party_slot` + `SlotError` in `game-core/src/world.rs`; `set_party_slot` delegates; occupied excludes PARTY_SLOT_NONE (M-1 fix); RT-PS-01 documenting test
+  - f-5: `skill_defs_from_rows`/`type_chart_from_rows` → `Result`; `?` in battle.rs + taming.rs; 8 proof-of-teeth tests
+- **Side effects:** sim-harness/movement_vectors.rs `.expect()` on Result; docs/knowledge/ regen (4 files)
+- **Key traps (for doc-keeper):**
+  - PARTY_SLOT_NONE filter required in occupied vec
+  - `apply_move_coded` error is `String` (not `&'static str`)
+  - `doc_lazy_continuation` clippy lint fires on unnested `6b.`/`6c.` items in doc lists
+  - choice-level GrantItem gate must be in choice's own conditions (not node entry_conditions)
+  - knowledge bundle drifts whenever world.rs/monster_mgmt.rs line numbers shift
+- **ADR-0091 CONSUMED** (next-free → 0092)
+- **Named residuals:** RT-PS-01 race (DB unique constraint), RT-PS-DIALOGUE TOCTOU, pp>0 gap, asymmetric marshal API
+- **Review:** reviewer (8 findings, M-1/M-4/m-3/m-1 fixed) + red-team (RT-PS-01 + compile error fixed; TOCTOU named/deferred)
+- **Supervisor owns merge. All remaining M13.5 slices (f, g, h) are DONE.**
+
+## 2026-07-10T18:19Z — supervisor: m13.5f MERGED — **M13.5 MILESTONE COMPLETE**
+
+- PR #132 squash-merged 18:10:03Z → `67b5a42` (explicit subject; no-wip-titles honored). Remote CI + e2e green pre-merge; master CI green on 67b5a42 post-merge.
+- Audits: orchestration **FLAGGED** (zero tester-role; 4 subagents: planner/reviewer/red-team/verifier) → supervisor review pass on the PR diff (reviewer/red-team/domain/verifier lenses): marshal re-checks reject-not-clamp with correct domains (power>0, accuracy 1..=100, effectiveness {0,5,10,20}); set_party_slot delegation behavior-preserving w/ M-1 boxed-monster fix; residuals (RT-PS-01 race, TOCTOU, pp>0 gap, asymmetric marshal API) named/deferred → APPROVED. Gating-test audit CLEAN (no removed/weakened tests; 14 proof-of-teeth added).
+- Touches drift (non-blocking, no siblings): battle.rs, taming.rs, game-core/lib.rs, sim-harness — mechanical Result-propagation fallout of declared f-5 work. Briefs should declare propagation fallout.
+- ADR-0091 consumed; index reconciled via doc-only chore PR #133 (auto-merge) → master `f0d0e79`, next-free **0092**.
+- Worktree `.claude/worktrees/m13.5f` + local/remote branches removed. Stray untracked `.claire/` left untouched (not ours).
+- Supervisor DC shell died twice mid-tick; reconciled from live PR state each time (fast-path worked as designed).
+- **All M13.5 slices (a–h) merged. Next tick: pick first unfinished slice of the next milestone in PLAN §9.**
+
+## 2026-07-10T18:27:32Z — supervisor: m14a IN-PROGRESS (launched; first M14 slice + M14 slicing pass in planning; ADR 0092 reserved; serial)
+
+## 2026-07-10T~20:30Z — m14a TERMINAL STATE (PR #134 open, local `just ci` EXIT=0)
+
+- Branch: `feat/m14a-status-effect-core`, tip: `2889bfa` (worktree `.claude/worktrees/m14a`), base `f0d0e79`
+- PR #134: https://github.com/mdrewt/monster-realm/pull/134
+- `just ci` EXIT=0: **949 Rust tests (949 passed, 1 skipped), 778 client tests (32 files)**; evals all passed
+- **What landed (ADR-0092):**
+  - `game-core/src/combat/status.rs` (NEW): `StatusEffect` enum (Poison/Burn/Paralysis/Sleep{turns_remaining}/Freeze), `BattleStatusStore` (pure, no SpacetimeType), `StatusVariance` (6 rolls, sleep_wake reserved for m14b), `apply_pre_turn_effects`, `apply_post_turn_effects` (DoT + faint cascade), `tick_status`
+  - `types.rs`: `TurnChoice::Pass` variant + 3 new `BattleEvent` variants (StatusDamage, ActionBlocked, StatusCured)
+  - `resolve.rs`: `resolve_full_turn` (pre-turn block → Pass substitution → resolve_turn → post-DoT → tick_status); `skill_id_from` gets `Pass => unreachable!()` exhaustiveness arm
+  - `mod.rs` + `lib.rs`: re-exports of all new types/functions
+  - 22 EARS tests (m14a_tests.rs) + 4 permanent red-team gating tests (redteam_m14a_tests.rs)
+  - `docs/adr/0092-m14a-status-effect-rules.md` (NEW); README next-free → 0093
+  - M14-deeper-battle.spec.md §5 task 1 ticked
+- **Planning deliverable also in this run:** M14 slice breakdown (m14a–m14f with touches sets, dependency order, fan-out pairs) committed to harness `specs/monster-realm-v2/M14-deeper-battle.spec.md` as `8cd003b`
+- **Key design decisions (ADR-0092):** separate StatusVariance (preserve resolve_turn signature per ADR-0017/0023); BattleStatusStore pure game-core (no schema change — persistence m14b); TurnChoice::Pass for blocked sides; faint-cascade duplication avoids circular status.rs→resolve.rs import; SideA-first DoT ordering (simultaneous KO = SideB wins); StatusCured lacks slot index (RT-S14-01 → m14b); sleep_wake_roll reserved
+- **Named residuals:** RT-S14-01 (StatusCured slot-index gap → m14b), RT-S14-03 (undersized store drops DoT — documented caller contract), RT-PS-01 + RT-PS-DIALOGUE (carried from m13.5f)
+- **Review trail:** reviewer + red-team + desync-guard lenses (parallel); all HIGH/MED findings closed; 4 red-team tests added; mutation gaps (SideB DoT, Burn floor) pinned by tests 19+20
+- **ADR-0092 CONSUMED** (next-free → 0093)
+- **Supervisor owns merge.** Next per M14 plan: m14b (server persistence — SpacetimeType on BattleMonster.status, submit_turn → resolve_full_turn, bindings regen; depends on m14a types stable)
