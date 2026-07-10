@@ -1,33 +1,28 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-10T03:55Z",
- "updated_by": "fix-nightly DONE — PR #125 opened",
+ "updated_utc": "2026-07-10T14:27:30Z",
+ "updated_by": "supervisor tick mr-sup-cowork-20260710T140706Z-291188-21483: m13.5r merged (PR#130 -> 6d7ce61), composite-launched m13.5g (docs/ledger reconciliation, serial)",
  "master": {
-  "sha": "e104d13",
-  "ci": "GREEN on e104d13",
-  "nightly": "RED x5 since 2026-07-05 — PR #125 fix-nightly AWAITING MERGE"
+  "sha": "6d7ce61",
+  "ci": "GREEN on 6d7ce61 (m13.5r)",
+  "nightly": "ratchet fix merged (6d7ce61, projected ~153 survivors < cap 180); VERIFY next scheduled nightly"
  },
- "adr_next_free": 89,
- "inflight": [],
- "awaiting_merge": [
+ "adr_next_free": 92,
+ "inflight": [
   {
-   "slice": "fix-nightly",
-   "pr": 125,
-   "branch": "fix/nightly-mutation-smoke",
-   "tip": "7d6ee55",
-   "opened_utc": "2026-07-10T03:55Z",
-   "note": "ADR-0088. smoke-republish + 38 missed mutants killed (37 tests + 1 toml exclusion). just ci EXIT=0. Nightly should go GREEN on merge."
+   "slice": "m13.5g",
+   "session_leader": 295229,
+   "claude_pid": 295235,
+   "started_utc": "2026-07-10T14:27:30Z"
   }
  ],
+ "awaiting_merge": [],
  "queue": [
-  "13.5d after fix-nightly (same server files — now free)",
-  "13.5e (unblocked) — pairable with 13.5d? check touches",
-  "13.5g serial (structural: package-lock deletion)",
   "13.5f last (game-core collisions)",
-  "FOLLOW-UP: okf-export updated-stamp drift trap (squash on later day re-trips knowledge-bundle gate) — durable exporter fix; fold into a doc/infra slice"
+  "FOLLOW-UP: okf-export updated-stamp drift trap -- fold into a doc/infra slice"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "fix-nightly took 3 resume attempts. Repeated failure was wait-behavior (background subagents + SIGTERM). Final attempt succeeded by waiting synchronously. GOTCHA: bash comment with backtick formatting inside JS template literal broke the CANONICAL constant — use unquoted form in embedded bash comments."
+ "notes": "m13.5r merged 14:09Z (nightly ratchet fix; VERIFY next nightly). m13.5g in flight: doc/ledger reconciliation + warpDetect wire-or-delete + root package-lock deletion + @types/node bump; ADR 0091 re-reserved, likely unused. After g: only 13.5f remains in M13.5."
 }
