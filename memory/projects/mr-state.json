@@ -1,29 +1,33 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-04T20:12:28Z",
- "updated_by": "mr-sup-cowork-20260704T200432Z-2563911-31400 (m13b launched)",
+ "updated_utc": "2026-07-10T03:55Z",
+ "updated_by": "fix-nightly DONE — PR #125 opened",
  "master": {
-  "sha": "7c7e568",
-  "ci": "GREEN on 7c7e568 (chore #112) and 969e1be (m13a)",
-  "nightly": "not checked this tick"
+  "sha": "e104d13",
+  "ci": "GREEN on e104d13",
+  "nightly": "RED x5 since 2026-07-05 — PR #125 fix-nightly AWAITING MERGE"
  },
- "adr_next_free": 83,
- "inflight": [
+ "adr_next_free": 89,
+ "inflight": [],
+ "awaiting_merge": [
   {
-   "slice": "m13b",
-   "session_leader": 2566468,
-   "claude_pid": 2566471,
-   "started_utc": "2026-07-04T20:12:28Z"
+   "slice": "fix-nightly",
+   "pr": 125,
+   "branch": "fix/nightly-mutation-smoke",
+   "tip": "7d6ee55",
+   "opened_utc": "2026-07-10T03:55Z",
+   "note": "ADR-0088. smoke-republish + 38 missed mutants killed (37 tests + 1 toml exclusion). just ci EXIT=0. Nightly should go GREEN on merge."
   }
  ],
- "awaiting_merge": [],
  "queue": [
-  "m13c (sinks/sources wiring; serial after m13b)",
-  "m13d (client shop UI + wallet; pure client - fan-out candidate vs m13c)",
-  "M13.5 (seventh-review residuals; Drew resolved all 3 DECISIONS in spec s3 - implement DECIDED options not defaults)"
+  "13.5d after fix-nightly (same server files — now free)",
+  "13.5e (unblocked) — pairable with 13.5d? check touches",
+  "13.5g serial (structural: package-lock deletion)",
+  "13.5f last (game-core collisions)",
+  "FOLLOW-UP: okf-export updated-stamp drift trap (squash on later day re-trips knowledge-bundle gate) — durable exporter fix; fold into a doc/infra slice"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "20:02-20:12Z tick: reconciled m13a fully merged (PR #111 -> 969e1be, chore #112 -> 7c7e568, both CI green). Launched m13b detached, model sonnet asserted, detachment asserted (PID==SESS 2566468 != supervisor shell). ADR 0082 reserved (next free 83). Fan-out declined: m13c serial after m13b; m13d likely needs m13b bindings."
+ "notes": "fix-nightly took 3 resume attempts. Repeated failure was wait-behavior (background subagents + SIGTERM). Final attempt succeeded by waiting synchronously. GOTCHA: bash comment with backtick formatting inside JS template literal broke the CANONICAL constant — use unquoted form in embedded bash comments."
 }
