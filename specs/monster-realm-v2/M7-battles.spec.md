@@ -97,11 +97,11 @@ trigger); the battle's reserved `wild_ivs`/`wild_nature` (so recruit rebuilds *t
 the `opponent_identity`-keyed shared row (additive).
 
 ## 5. Tasks (M7a rules, M7b server, M7c view)
-- [ ] `game-core/combat`: `BattleState` types + integer damage + `TypeChart` + `resolve_turn`/`resolve_enemy_turn`/`resolve_player_swap` + AI + XP reward; unit/property tests + determinism.
-- [ ] `battle` table (RLS, `battle_id` pk + `opponent_identity` index, PvP-ready) + schema-snapshot/append-only evals.
-- [ ] reducers: `start_battle` (dev trigger), `submit_attack`/`swap_active`/`flee`, HP write-back, XP grant; security-auditor + proof-of-teeth (illegal action rejected; non-participant sees nothing).
-- [ ] battle view (M4 `battle` screen) — server-driven, no prediction, exit-before-gate.
-- [ ] `heal_party` placeholder; doc-keeper changelog + memory; link combat in `ARCHITECTURE.md`.
+- [x] `game-core/combat`: `BattleState` types + integer damage + `TypeChart` + `resolve_turn`/`resolve_enemy_turn`/`resolve_player_swap` + AI + XP reward; unit/property tests + determinism. — DONE (M7a, commit aae9c56)
+- [x] `battle` table (RLS, `battle_id` pk + `opponent_identity` index, PvP-ready) + schema-snapshot/append-only evals. — DONE PR #8 (M7b)
+- [x] reducers: `start_battle` (dev trigger), `submit_attack`/`swap_active`/`flee`, HP write-back, XP grant; security-auditor + proof-of-teeth (illegal action rejected; non-participant sees nothing). — DONE PR #8 (M7b)
+- [x] battle view (M4 `battle` screen) — server-driven, no prediction, exit-before-gate. — DONE PR #9 (M7c)
+- [x] `heal_party` placeholder; doc-keeper changelog + memory; link combat in `ARCHITECTURE.md`. — DONE PR #9 (M7c)
 
 ## 6. Risks / decisions
 - **PvP-ready keying now (decided — design-for-endpoint)** — synthetic `battle_id` + `opponent_identity`

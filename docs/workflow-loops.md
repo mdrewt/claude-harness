@@ -33,3 +33,9 @@ when (high value OR high risk OR hard to reverse) AND a cheap evaluator exists.
 Beyond green+meaningful CI, each task closes with a **`/simplify`** pass (strip
 over-engineering) and a **`/review`** pass (correctness/security/smells). These
 are part of the mechanical-enforcement map in `standards/principles.md`.
+
+## Merge title discipline
+Squash-merge titles drive `git cliff` CHANGELOG generation. **Do not use `wip(…):`
+as a squash-merge title** — `wip(...)` commits produce a spurious `### Wip` section
+in the generated changelog. Use a conventional commit type (`feat`, `fix`, `docs`,
+`chore`, `test`, `refactor`) with the slice scope, e.g. `feat(m13.5g): …`.
