@@ -162,3 +162,42 @@ Docs/spec ledger reconciliation complete. PR #131 open on feat/m13.5g-docs-ledge
 - **Review trail:** reviewer + red-team + desync-guard lenses (parallel); all HIGH/MED findings closed; 4 red-team tests added; mutation gaps (SideB DoT, Burn floor) pinned by tests 19+20
 - **ADR-0092 CONSUMED** (next-free → 0093)
 - **Supervisor owns merge.** Next per M14 plan: m14b (server persistence — SpacetimeType on BattleMonster.status, submit_turn → resolve_full_turn, bindings regen; depends on m14a types stable)
+
+---
+
+## 2026-07-10T20:20:28Z — supervisor mr-sup-cowork-20260710T200618Z-519840-5239
+
+Merged m14a PR #134 (squash → master 5955047; e2e red was recruit.spec flake — rerun green; audits: orchestration CLEAN, gating-test CLEAN). master CI GREEN. IN-PROGRESS: launching m14b (server schema + persistence for status, ADR reserved 0093) via mr-launch.sh, brief /tmp/mr_pass_m14b.md.
+
+Launch confirmed 2026-07-10T20:23:06Z: m14b detached (leader 523131, claude 523136, model claude-sonnet-4-6 asserted). Ledger + mr-state.json written; mutex released.
+
+## 2026-07-10T~22:30Z — m14b TERMINAL STATE (PR #135 open, local `just ci` EXIT=0, remote CI running)
+
+- Branch: `feat/m14b-server-status-persistence`, tip: `a44ad07` (worktree `.claude/worktrees/m14b`), base `5955047` (master after m14a squash)
+- PR #135: https://github.com/mdrewt/monster-realm/pull/135
+- `just ci` EXIT=0: **739 game-core + 192 server-module Rust tests (931 total), 778 client tests (32 files), 54/54 evals PASS**
+- **What landed (ADR-0093):**
+  - `StatusEffect` moved `status.rs` → `types.rs` to avoid circular import (`BattleMonster.status: Option<StatusEffect>` would create a cycle); `status.rs` re-exports via `pub use super::types::StatusEffect`
+  - `BattleMonster.status: Option<StatusEffect>` added as LAST field with `#[serde(default)]` (ADR-0006 additive; old rows deserialise to None)
+  - `StatusEffect` gains `#[cfg_attr(feature="spacetimedb", derive(spacetimedb::SpacetimeType))]`
+  - `BattleEvent::StatusCured` gains `slot: u32` — fixes RT-S14-01 (bench-slot cures previously ambiguous)
+  - `StatusVariance::from_ctx_random(seed: u32)` — same splitmix64 pattern as `TurnVariance::from_ctx_random`; 6 deterministic u8 rolls
+  - `submit_attack` reducer: constructs `BattleStatusStore` from `BattleMonster.status` fields → calls `resolve_full_turn` → writes store back (gated on `Ongoing` — terminal rows GC'd immediately)
+  - 19 new M14b tests (`m14b_tests.rs`) including `m14b_serde_default_allows_missing_status_field` (properly tests `#[serde(default)]` by deserialising pre-M14b row without `status` field)
+  - `module_bindings/types.ts` regenerated: `StatusEffect` enum + `BattleMonster.status: option(StatusEffect)`
+  - `evals/baselines/spacetime-types.json` baseline updated 14 → 15 types
+  - `docs/knowledge/` regenerated (5 reducer docs: flee/start_battle/start_wild_battle/submit_attack/swap_active)
+  - `docs/adr/0093-m14b-server-status-persistence.md` written
+- **Key design decisions (ADR-0093):**
+  - `StatusEffect` in `types.rs` (not `status.rs`) — circular import avoidance; `status.rs` re-exports for backward compat
+  - `#[serde(default)]` + last-field position = additive schema (ADR-0006)
+  - Two `ctx.random()` calls per turn (one for TurnVariance, one for StatusVariance) — independent seeds
+  - `swap_active` NOT touched (no status tick needed for a switch — not a numbered turn)
+  - Status write-back gated on `Ongoing` (terminal rows immediately GC'd by write_back_battle_results — reducer-security-audit finding)
+- **Named residuals (deferred):**
+  - `attempt_recruit` DoT gap — wild's counter-attack on failed recruit skips status tick (reviewer finding; inherited from m14a's `resolve_recruit_failure` not calling `resolve_full_turn`; deferred to M14c)
+  - `Sleep` payload not in spacetime-types baseline — eval parser snapshots variant names only, not struct-variant payloads; `Sleep { turns_remaining: u8 }` appears as bare `"Sleep"` (pre-existing eval limitation)
+  - RT-PS-01 race + RT-PS-DIALOGUE TOCTOU carried from m13.5f
+- **Review trail:** reviewer (F1 serde test strengthened → fixed; F2 attempt_recruit gap → deferred; F3 dead sleep_wake fields → documented; F4 Sleep baseline → deferred) + reducer-security-auditor (M1 write-back gate → fixed; rest CLEAN) + red-team lens (in flight at terminal)
+- **ADR-0093 CONSUMED** (next-free → 0094)
+- **Supervisor owns merge. Next per M14 plan: m14c (abilities) ‖ m14d (weather) — parallel-eligible (disjoint files)**
