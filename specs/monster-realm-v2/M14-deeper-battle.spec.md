@@ -99,6 +99,81 @@ special cases).
 ### Simplify
 Default set only; multi-active + mega-forms deferred; no `resolve_turn` rewrite; all additive + data-driven.
 
+## 8. Slice breakdown (finalized 2026-07-10)
+
+Dependency order: m14a → m14b → (m14c ‖ m14d) → m14e → m14f.
+
+### m14a — game-core status rules (THIS SLICE)
+Pure-rule layer only. No schema changes, no bindings regen. Serial-safe with everything.
+
+**Touches:** `game-core/src/combat/status.rs` (NEW), `game-core/src/combat/types.rs` (new `BattleEvent` variants + `TurnChoice::Pass`), `game-core/src/combat/resolve.rs` (additive `resolve_full_turn` wrapper + `skill_id_from` Pass arm), `game-core/src/combat/mod.rs` (re-exports), `game-core/src/lib.rs` (re-exports), `game-core` test files.
+
+**Delivered:**
+- `StatusEffect` enum: `Poison | Burn | Paralysis | Sleep { turns_remaining: u8 } | Freeze`
+- `BattleStatusStore { side_a: Vec<Option<StatusEffect>>, side_b: Vec<Option<StatusEffect>> }` (pure game-core, not `SpacetimeType` — persistence wired in m14b)
+- `StatusVariance { action_skip_roll_a/b, freeze_thaw_roll_a/b, sleep_wake_roll_a/b }` (separate from `TurnVariance` so existing signature is unchanged)
+- `TurnChoice::Pass` variant — falls through silently in `resolve_turn` (no existing arm touched); `skill_id_from` gains a `Pass => unreachable!` arm
+- `resolve_full_turn(state, choice_a, choice_b, skills, type_chart, turn_variance, status, status_variance)` — new wrapper: pre-turn action-blocking → `resolve_turn` (unchanged) → post-turn DoT → status tick
+- New `BattleEvent` variants (all under `#[non_exhaustive]`, no `SpacetimeType`): `StatusApplied { side, status }`, `StatusDamage { side, amount }`, `ActionBlocked { side }`, `StatusCured { side }` (for completeness — curing wired in m14e)
+- Unit + property + determinism tests; **proof-of-teeth**: (1) M7-regression — `resolve_full_turn` with empty `BattleStatusStore` and a plain-attack produces byte-identical events to `resolve_turn`; (2) exhaustive-match — adding a future `StatusEffect` variant must fail to compile at every `match` site
+
+**Cross-slice contract:** `StatusEffect`, `BattleStatusStore`, `StatusVariance` types exported from `game-core::combat`. m14b depends on these being stable.
+
+**Fan-out-eligible:** NO (adds new `BattleEvent` variants — cross-boundary contract; touches shared `types.rs`). Must run serially.
+
+---
+
+### m14b — server schema + persistence for status
+Serial after m14a. Depends on m14a types being merged.
+
+**Touches:** `game-core/src/combat/types.rs` (`StatusEffect` gains `SpacetimeType` cfg-attr), `server-module/src/battle.rs` (new server domain module if needed, or extension of existing), `server-module/src/schema.rs` (additive column on `BattleMonster`), `client/src/module_bindings/` (regen), `evals/battle-schema-snapshot.eval.mjs` (snapshot update).
+
+**Delivered:** `BattleMonster` gains `pub status: Option<StatusEffect>` with `#[serde(default)]`; server `submit_turn` reducer calls `resolve_full_turn` instead of `resolve_turn`; status store constructed from/persisted to `BattleMonster.status` fields; bindings drift = 0 after regen.
+
+**Cross-slice contract:** `BattleMonster.status` column added additively (ADR-0006); `module_bindings` updated.
+
+---
+
+### m14c — passive abilities (per-species)
+Serial after m14b. Parallel-eligible with m14d (disjoint files).
+
+**Touches:** `game-core/src/combat/ability.rs` (NEW), `game-core/src/content.rs` (`Species` gains `ability: Option<u32>` id field; new `AbilityDef` registry), content RON files.
+
+**Delivered:** `AbilityDef { id, name, effect: AbilityEffect }` where `AbilityEffect` is exhaustive enum; `apply_entry_ability` + `apply_ability_modifiers` hooks in the full-turn pipeline; `validate_content` cross-checks ability ids; content integrity fixtures.
+
+---
+
+### m14d — weather / field state
+Serial after m14b. Parallel-eligible with m14c.
+
+**Touches:** `game-core/src/combat/weather.rs` (NEW), `game-core/src/combat/types.rs` (`BattleState` gains `weather: Option<WeatherEffect>`), `server-module/src/schema.rs` (additive column), content RON (`SkillDef` gains optional `sets_weather` field).
+
+**Delivered:** `WeatherEffect { Rain | Sun | Sandstorm | Hail, turns_remaining: u8 }` enum; per-turn weather damage and effectiveness modifiers; weather tick in `resolve_full_turn`; validate_content cross-checks.
+
+---
+
+### m14e — status-curing items + client event display
+Serial after m14b + m14c merged. Parallel-eligible: server item-cure reducer ‖ client animation.
+
+**Touches (server):** `server-module/src/battle.rs` (new `use_battle_item` reducer or `ItemEffect::CureStatus` branch in existing item reducer).
+
+**Touches (client):** `client/src/battle*.ts` — render new `BattleEvent` variants (StatusApplied, StatusDamage, ActionBlocked animations).
+
+**Fan-out-eligible:** YES (server ‖ client if files are disjoint).
+
+---
+
+### m14f — doc-keeper close + Phase B complete
+Serial last. Doc-only, no production code.
+
+**Touches:** `docs/adr/0092-*.md` (ADR), `ARCHITECTURE.md` (Phase B section), harness memory, spec §5 tick-boxes.
+
+---
+
+**Post-integration verification:** After m14a–m14e merge in order, run full `just ci` on the integrated whole: `bindings-drift = 0`, `battle-schema-snapshot` green with status column, `resolve_full_turn` M7-regression test still passes, e2e recruits and battles green, mutation rate within ratchet.
+
+---
+
 ## Fan-out & integration note (for the slicing agent)
 
 When finalizing this milestone's slices and `touches:` sets — drafted at build time per `PLAN.md` §9 for the M15–M25 sketches; refined from the existing task breakdown for the fuller M11–M14 specs — design for **`touches:`-disjoint parallel fan-out** and plan for **post-integration correctness**:
