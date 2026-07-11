@@ -240,3 +240,110 @@ Launch confirmed 2026-07-10T20:23:06Z: m14b detached (leader 523131, claude 5231
 - **Named residuals (deferred):** wiring apply_entry_ability/apply_ability_modifiers into resolve_full_turn (M14d); attempt_recruit ability population (M14d); DoT interaction with entry abilities (M14e+); RT-A14-01 HIGH fix wired
 - **ADR-0094 CONSUMED** (next-free → 0095)
 - **Supervisor owns merge. Next per M14 plan: m14d (weather) serial.**
+
+---
+
+## 2026-07-11T00:30Z — supervisor mr-sup-cowork-20260711T000602Z-657543-17248 — m14c MERGED
+
+- **m14c (passive per-species ability system, ADR-0094): PR #137 squash-merged** → master `b6363dc`. Wrapper EXIT=0 ATTEMPTS=1, cost $16.49, model claude-sonnet-4-6. Orchestration audit CLEAN (8 subagents: planner/tester/reviewer/red-team/review-lens/verifier/doc-keeper). Gating-test audit CLEAN (no removed asserts/tests, no added skips; m10a/m8d/m8a gating files touched additively only).
+- **Touches-overrun noted (not parked):** actual diff included server-module/{content,lib,marshal,marshal_tests,movement,taming}.rs, game-core/build.rs+lib.rs, evolution/monster/taming test files, evals/baselines/content-hash.json — well beyond declared touches. Serial with no siblings → no fan-out hazard; future fan-out decisions must treat ability-registry-style slices as broad. Brief-writing lesson: content-registry slices ripple through server marshal + content plumbing.
+- **Doc reconcile: chore PR #138 auto-merged** (ADR index 0094 row, next-free 0095, plus ARCHITECTURE.md doc-aggregation for 0091–0094 which the run wrote as an uncommitted stray into the MAIN checkout at 23:16Z — machine-generated, folded into the chore PR rather than stashed).
+- **master CI:** b6363dc master run hit the KNOWN e2e recruit.spec.ts R2 MAX_HEALS flake (queue item; ci job green). Rerun was auto-cancelled by the #138 push; tip run 29132420280 (contains all m14c code) **GREEN**. Master verified green on tip.
+- Worktree + branch cleaned. Chore PR #136 auto-merge VERIFIED (queue item resolved).
+- **Ops note:** DC shell sessions died 4× mid-tick (incl. mid-`gh pr merge`); reconciled from live PR/CI state each time per runbook.
+- **Next:** m14d (weather/field state; serial — touches schema.rs structural; ADR 0095 reserved). Then m14e → m14f.
+
+- 2026-07-11T00:36Z IN-PROGRESS: supervisor launching m14d (weather/field state, ADR 0095 reserved, serial/structural) via mr-launch.sh.
+
+## 2026-07-11T02:13:56Z — supervisor mr-sup-cowork-20260711T020614Z-733303-27927 — m14d review pass IN PROGRESS
+m14d run finished (EXIT=0, ATTEMPTS=1, $14.36, sonnet-4-6). PR #139 open, remote CI+e2e GREEN, mergeStateStatus CLEAN. Gating-test scan: 0 deleted/skipped tests. BUT orchestration audit FLAGGED: only planner+tester subagents invoked — zero reviewer/red-team/auditor/verifier lenses on a production-code slice → mandatory review pass before merge. Launched detached review run 'm14d-weather' (brief /tmp/mr_pass_m14d-weather.md) against the existing worktree .claude/worktrees/m14d. Supervisor merges next tick after review evidence lands. Touches-overrun also noted: diff far exceeds declared touches (module_bindings/types.ts structural, resolve/damage/ai/content, server-module ripple) — serial launch so no fan-out hazard; follow-up already queued.
+
+---
+
+## 2026-07-11T~03:00Z — m14d REVIEW PASS COMPLETE (supervisor-mandated independent review)
+
+**Scope:** PR #139 (feat/m14d-weather-field-state) — weather/field-state system (ADR-0095).  
+**Worktree:** `.claude/worktrees/m14d` on branch `feat/m14d-weather-field-state`.
+
+### Lenses Run
+1. **reviewer** (inline + background agent): Correctness, invariants, code smells
+2. **red-team** (background agent): Adversarial attack on weather mechanics
+3. **Domain checks inline**: desync paths, OCP gate validity, overflow analysis, event ordering
+
+### Findings by lens
+
+**reviewer — BLOCKER B-1 (FIXED):**
+- `game-core/src/content.rs:815-820`: `validate_content` weather guard was dead code — `let _valid = matches!(...)` computed a boolean but discarded it, never asserted. The comment claimed compile-time OCP gate but `matches!` has implicit `_` wildcard so a new WeatherKind would NOT be a compile error at this site.
+- **Fix applied**: replaced with exhaustive `match` with no wildcard arm — now a true compile-time OCP gate (ADR-0010).
+
+**reviewer — MINOR (FIXED):**
+- `game-core/src/combat/weather.rs:122-123`: Doc comment stated `(u16::MAX * 3) > u64::MAX` which is numerically false. Fixed to correctly describe overflow safety.
+- `server-module/src/marshal.rs:387-389`: Comment "DB path used only for boundary validation" was factually wrong — `taming.rs` uses this path for battle resolution. Fixed to reference ADR-0095 residuals.
+
+**reviewer — DOCUMENTED DEFERRALS (not bugs):**
+- `taming.rs:162` uses `skill_defs_from_rows` for recruit-fail strike-back → explicit residual in ADR-0095 §Residuals, deferred m14e/m14f.
+- WeatherSet fires after BattleEnd on KO turns → intentional per ADR-0095 D4; documented and gating test added.
+- swap_active/recruit turns skip weather chip/tick → consistent with "not full turn" design.
+
+**red-team — all findings:**
+- HIGH: taming.rs desync (= reviewer M-1, documented ADR-0095 residual)
+- MEDIUM: validate_content vacuous guard (= reviewer B-1, FIXED)
+- LOW: WeatherSet after BattleEnd (intentional, gating test added)
+- LOW: chip-faint auto-switch not re-chipped same turn (correct behavior)
+- LOW: no power cap on weather skills (content-author risk, not player-exploitable)
+- LOW: turns_remaining=0 via DB safe (tick_weather handles correctly)
+
+**False positives:**
+- Reviewer flagged ADR-0095 file missing — file EXISTS at `docs/adr/0095-m14d-weather-field-state.md`
+- Reviewer flagged phase 3.5 doc ordering — documented correctly in both resolve.rs and ADR-0095 D4
+
+### Code changes on feat/m14d-weather-field-state
+Commit `bf39cf2` pushed:
+1. `game-core/src/content.rs` — exhaustive `match` replaces vacuous `matches!` guard (B-1 fix)
+2. `game-core/src/combat/weather.rs` — doc comment overflow claim corrected
+3. `server-module/src/marshal.rs` — misleading comment corrected (references ADR-0095 residuals)
+4. `game-core/src/combat/redteam_m14d_weather_desync.rs` (NEW) — 3 gating tests:
+   - RT-W14-DESYNC-01: proves skill_defs_from_rows strips sets_weather (documents residual)
+   - RT-W14-VALID-01: gates valid weather skills still accepted after B-1 fix
+   - RT-W14-ORDERING-01: gates WeatherSet fires AFTER BattleEnd on KO turns (ADR-0095 D4)
+5. `game-core/src/combat/mod.rs` — registers new test module
+
+### Local CI result
+`just ci` EXIT=0 — 1022 Rust tests + 778 client tests, all green. Biome `useLiteralKeys` warnings are pre-existing (exit 0 from before this PR).
+
+### Verdict
+**FIXED** — 1 BLOCKER fixed, 2 minor doc/comment fixes, 3 new gating tests added. No test weakening (all existing tests untouched; new tests are additive). Documented deferrals in ADR-0095 residuals acknowledged and gated.
+
+**PR #139 stays OPEN — supervisor owns merge.**
+
+## 2026-07-11T04:18:56Z — supervisor mr-sup-cowork-20260711T040623Z-780249-32433 — m14d MERGED, m14e IN-PROGRESS
+- PR #139 (m14d weather/field-state, ADR-0095) squash-merged -> master 0a788a7; master CI GREEN. Review-pass verdict FIXED (B-1 vacuous guard fixed, 3 red-team gating tests added, bf39cf2). Gating-test scan clean; review lenses (reviewer+red-team) satisfied the FLAGGED orchestration audit.
+- Chore PR #140 (ADR index 0095, next-free 0096) merged -> master 6af6e23.
+- LAUNCHING m14e (status-curing items + client event display), ADR reserved 0096, detached via mr-launch.sh.
+
+## 2026-07-11T06:24Z — supervisor mr-sup-cowork-20260711T060620Z-937678-3331 — m14e MERGED
+- PR #141 (feat/m14e-status-cure-items, ADR-0096) squash-merged as 523668f; master CI GREEN (run 29142495607).
+- e2e failed once on the known recruit.spec.ts R2 MAX_HEALS flake (4th sighting; untouched M13 test) — rerun-failed → green. Deflake priority now HIGH.
+- Audits: orchestration CLEAN (sonnet, all 6 roles incl. tester/reviewer/red-team/verifier); gating-test CLEAN (no removed/skipped tests in diff).
+- Touches overrun vs declared (module_bindings regen + combat ripple + evals baseline) — no in-flight siblings, recorded as follow-up pattern (same as m14c).
+- ADR index self-reconciled on the slice branch (0096 row, next free 0097) — no chore PR.
+- Worktree + branch cleaned; main checkout ff'd to 523668f.
+- Composite launch: m14f (doc-keeper close, doc-only, ADR 0097 reserved) — see IN-PROGRESS below if launched.
+
+## 2026-07-11T06:29Z — supervisor (same tick) — m14f IN-PROGRESS
+- Launched m14f (doc-keeper close for M14; doc-only; ADR 0097 reserved) detached via mr-launch.sh. M14 complete when it merges.
+
+## 2026-07-11T~08:00Z — m14f TERMINAL STATE (PR TBD open, local `just ci` EXIT=0)
+
+- Branch: `feat/m14f-doc-keeper-close`, worktree `.claude/worktrees/m14f` (in monster-realm), base `523668f` (master after m14e)
+- `just ci` EXIT=0 on master `523668f` (integration verification run before docs committed)
+- **What landed (ADR-0097, doc-only):**
+  - `docs/adr/0097-m14-close-phase-b-complete.md` (NEW): post-integration verification evidence, M14 slice summary table, R1/R2/R3 advance to Phase C (not m14f), ADR next-free=0098
+  - `ARCHITECTURE.md` — M14a–M14e narrative summaries + "Phase B (M11–M14) complete" statement
+  - `specs/monster-realm-v2/M14-deeper-battle.spec.md` §5 — m14d/m14e/proof-of-teeth/doc-keeper ticked
+  - Harness memory: `memory/projects/monster-realm-m14f.md` (new)
+  - Auto memory: `monster-realm-m14f.md` + MEMORY.md index row
+- **ADR-0097 CONSUMED** (next-free → 0098)
+- **Phase B (M11–M14) COMPLETE**
+- **Named residuals advancing to Phase C:** R1 (swap_active status-drop), R2 (bench-cure gap), R3 (attempt_recruit gap), RT-PS-01, RT-PS-DIALOGUE
+- **Supervisor owns merge.** Next: Phase C — M15 trade. First queue item: deflake recruit.spec.ts R2 (4 sightings, HIGH priority).

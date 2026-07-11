@@ -75,10 +75,10 @@ M18 raids resolve; the battle table (M7) is already PvP-ready. M15 trade is inde
 - [x] `game-core`: `StatusEffect` enum + per-turn resolution (additive on `resolve_turn`); unit/property + determinism + **M7-regression** tests. *(m14a — PR #134, ADR-0092)*
 - [x] Server schema + persistence: `BattleMonster.status`, `StatusCured.slot` (RT-S14-01), `submit_attack→resolve_full_turn`, bindings regen. *(m14b — PR #135, ADR-0093)*
 - [x] Abilities (data-driven passives); StatusKind payload-free, AbilityEffect exhaustive, per-species content, `validate_abilities` additive sibling, apply_entry_ability hooks. *(m14c — PR #137, ADR-0094)*
-- [ ] Weather/field state; content fields + `validate_content` + fixtures.
-- [ ] Items that cure status (extend M9); battle view animates the new `BattleEvent`s.
-- [ ] Proof-of-teeth: plain-attack-unchanged regression; exhaustive-match enforcement.
-- [ ] doc-keeper changelog + memory; mark **Phase B complete** in `ARCHITECTURE.md`.
+- [x] Weather/field state; content fields + `validate_content` + fixtures. *(m14d — PR #139, ADR-0095)*
+- [x] Items that cure status (extend M9); battle view animates the new `BattleEvent`s. *(m14e — PR #141, ADR-0096)*
+- [x] Proof-of-teeth: plain-attack-unchanged regression; exhaustive-match enforcement. *(distributed: m14a M7-regression + exhaustive-match; m14b RT-S14-01; m14c OCP gate; m14d validate_content exhaustive match; m14e 6-guard test)*
+- [x] doc-keeper changelog + memory; mark **Phase B complete** in `ARCHITECTURE.md`. *(m14f — ADR-0097)*
 
 ## 6. Risks / decisions
 - **Default set chosen for autonomy (status + abilities + weather; multi-active deferred) — the Phase B
