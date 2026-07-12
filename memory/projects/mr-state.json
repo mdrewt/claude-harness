@@ -1,24 +1,26 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-11T08:00:00Z",
- "updated_by": "m14f doc-keeper (phase-b-close, ADR-0097)",
+ "updated_utc": "2026-07-12T10:29:00Z",
+ "updated_by": "deflake-e2e-r2-dialogue run (PR #146 open, local just ci EXIT=0)",
  "master": {
-  "sha": "523668f (m14e)",
-  "ci": "GREEN (run 29142495607 on 523668f)",
-  "nightly": "VERIFY next scheduled nightly (ratchet fix 6d7ce61)"
+  "sha": "d318064 (fix-nightly-mutants #145)",
+  "ci": "GREEN on d318064 (e2e flaked once: R2 MAX_ENCOUNTERS=30, green on rerun)",
+  "nightly": "in_progress run on 35945f8 at tick time; d318064 carries the mutant-killing tests - expect next nightly green"
  },
  "adr_next_free": 98,
  "inflight": [],
  "awaiting_merge": [
   {
-   "slice": "m14f",
-   "branch": "feat/m14f-doc-keeper-close",
-   "pr": "TBD",
-   "status": "PR open, local just ci EXIT=0"
+   "slice": "deflake-e2e-r2-dialogue",
+   "pr": 146,
+   "branch": "feat/deflake-e2e-r2-dialogue",
+   "tip": "a5c59c3",
+   "local_ci": "EXIT=0",
+   "adr": "none (ADR-0098 unused — test-only timing+guard fix)"
   }
  ],
  "queue": [
-  "FOLLOW-UP: e2e recruit.spec.ts R2 MAX_HEALS flake -- 4th sighting on m14e PR#141 e2e 2026-07-11 -- deflake priority HIGH, FIRST Phase C queue item",
+  "NOTE: R2 recruit flake mode 2 (MAX_ENCOUNTERS=30 exhaustion) recurred on master 29188660053 post-#144 - covered by in-flight deflake-e2e-r2-dialogue with dialogue 13.5c-5",
   "FOLLOW-UP: R1 swap_active status-drop (ADR-0096) -- Phase C carry-forward",
   "FOLLOW-UP: R2 bench-cure gap (ADR-0096) -- Phase C carry-forward",
   "FOLLOW-UP: R3 attempt_recruit status-drop (ADR-0096) -- Phase C carry-forward",
@@ -28,5 +30,5 @@
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m14f TERMINAL STATE: PR open (TBD), local just ci EXIT=0 (1041 Rust/778 client/all evals). Phase B (M11-M14) COMPLETE. ADR-0097 consumed, next-free=0098. Supervisor owns merge. Next: Phase C M15 trade + deflake recruit R2."
+ "notes": "fix-nightly-mutants MERGED (PR #145 -> d318064). deflake-e2e-r2-dialogue PR #146 open (tip a5c59c3): dialogue 13.5c-5 toBeHidden 10→20s + recruit R2 HEAL_COOLDOWN_MS outer guard removed + test.setTimeout 900→1500s. ADR-0098 unused. After merge: M14.5 eighth-review-residuals slices per PLAN 9 Phase C."
 }
