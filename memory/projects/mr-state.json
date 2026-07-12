@@ -1,26 +1,27 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-12T10:29:00Z",
- "updated_by": "deflake-e2e-r2-dialogue run (PR #146 open, local just ci EXIT=0)",
+ "updated_utc": "2026-07-12T20:16:12Z",
+ "updated_by": "mr-sup-cowork-20260712T200619Z-42882-22633",
  "master": {
-  "sha": "d318064 (fix-nightly-mutants #145)",
-  "ci": "GREEN on d318064 (e2e flaked once: R2 MAX_ENCOUNTERS=30, green on rerun)",
-  "nightly": "in_progress run on 35945f8 at tick time; d318064 carries the mutant-killing tests - expect next nightly green"
+  "sha": "1f21ab1 (deflake-e2e-r2-dialogue #146)",
+  "ci": "GREEN on 1f21ab1",
+  "nightly": "last nightly FAILURE on 35945f8 (pre-#145, expected); #145 mutant-killers on master - expect next nightly green"
  },
  "adr_next_free": 98,
- "inflight": [],
- "awaiting_merge": [
+ "inflight": [
   {
-   "slice": "deflake-e2e-r2-dialogue",
-   "pr": 146,
-   "branch": "feat/deflake-e2e-r2-dialogue",
-   "tip": "a5c59c3",
-   "local_ci": "EXIT=0",
-   "adr": "none (ADR-0098 unused — test-only timing+guard fix)"
+   "slice": "m14.5a",
+   "session_leader": 43451,
+   "claude_pid": 43455,
+   "started_utc": "2026-07-12T20:16:12Z",
+   "phase": "review-pass (orchestration audit FLAGGED on build pass)"
   }
  ],
+ "awaiting_merge": [],
  "queue": [
-  "NOTE: R2 recruit flake mode 2 (MAX_ENCOUNTERS=30 exhaustion) recurred on master 29188660053 post-#144 - covered by in-flight deflake-e2e-r2-dialogue with dialogue 13.5c-5",
+  "m14.5b (after m14.5a - shares resolve.rs)",
+  "m14.5c (STRUCTURAL, serial)",
+  "m14.5d/e/f/g (mutually disjoint, fan-out eligible after c)",
   "FOLLOW-UP: R1 swap_active status-drop (ADR-0096) -- Phase C carry-forward",
   "FOLLOW-UP: R2 bench-cure gap (ADR-0096) -- Phase C carry-forward",
   "FOLLOW-UP: R3 attempt_recruit status-drop (ADR-0096) -- Phase C carry-forward",
@@ -30,5 +31,5 @@
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "fix-nightly-mutants MERGED (PR #145 -> d318064). deflake-e2e-r2-dialogue PR #146 open (tip a5c59c3): dialogue 13.5c-5 toBeHidden 10→20s + recruit R2 HEAL_COOLDOWN_MS outer guard removed + test.setTimeout 900→1500s. ADR-0098 unused. After merge: M14.5 eighth-review-residuals slices per PLAN 9 Phase C."
+ "notes": "m14.5a build pass done (PR#147, CI green, EXIT=0 ATTEMPTS=1, cost .52) but orchestration audit FLAGGED (tester-only, zero review/verifier lenses) -> review pass launched 20:14Z on existing branch feat/m14.5a-swap-recruit-full-pipeline. Merge deferred until review pass lands + gating-test audit at merge. Touches-overrun (docs/knowledge/reducers/*.md, doc-only) accepted+recorded. Build-pass artifacts: /tmp/mr_pass_m14.5a.buildpass1.*"
 }

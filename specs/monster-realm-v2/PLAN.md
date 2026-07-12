@@ -265,6 +265,7 @@ breaks the spine. Numbering restarts for the new project.
   deferred to the Phase B checkpoint. **Phase B complete.**
 
 **Phase C — Social & multiplayer depth (re-engineered + extended):**
+- **M14.5 Eighth-review residuals** (`M14.5-eighth-review-residuals.spec.md`; inserted between M14 and M15 while the Phase C deflake-recruit-r2 slice was in flight — resolves the verified 2026-07-11 eighth-review findings @ `3eeb484`: the swap/recruit paths that bypass the entire post-turn status/weather tick pipeline (closes R1/R3/RT-W14-DESYNC-01 + the recruit turn-freeze), the Phase-4.5 status-misdirection-onto-switched-in-monster bug, end-to-end wiring of the structurally-inert M14c passive-ability system, client battle-UX completion (use_battle_item is player-unreachable; weather is dropped before the store), ADR-0089 cache completion for skills/items, a BSATN-level additive-schema proof + randomized/warp-under-loss convergence coverage, and a ledger-reconciliation pass (ADR 0055–0057 collision-note correction, CHANGELOG M14 backfill); no new game-design surface).
 - **M15 Trading** (escrowed dual-consent; `M15-trading.spec.md`; ADR-0024) · **M16 PvP** (`M16-pvp.spec.md`; ADR-0025;
   shared battle row, both-submit secret picks, **turn-deadline + forfeit-on-disconnect** up front) ·
   **M17 Ranked ladder** (persistent Elo profile; `M17-ranked-ladder.spec.md`; ADR-0026) ·

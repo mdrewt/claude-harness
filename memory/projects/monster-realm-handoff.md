@@ -162,3 +162,72 @@ red-team PASS (no new flake modes), verifier in-progress.
 **Touches:** `client/e2e/dialogue.spec.ts` + `client/e2e/recruit.spec.ts` ONLY
 
 **Supervisor owns squash-merge.** Next: M14.5 Phase C per PLAN §9.
+
+## 2026-07-12T17:49Z — supervisor tick (mr-sup-cowork-20260712T174319Z-954-32399)
+Took over stale chain-owner lock (prior tick died mid-"merging-pr-146" at 12:09Z; pid dead, /tmp run artifacts lost — reboot suspected). Reconciled from live GH: **PR #146 (deflake-e2e-r2-dialogue) WAS merged** 12:09:28Z → master 1f21ab1, CI GREEN. Completed the orphaned post-merge steps: gating-test audit clean (timeout bumps + test-helper guard removal only, no tests deleted/skipped); orchestration audit unverifiable (log lost) but diff is test-only. Pruned merged remote branches (#144, #146). ADR-0098 still unused; next-free 98. Next: M14.5 eighth-review-residuals slices (Phase C).
+
+## 2026-07-12T17:53Z — IN-PROGRESS: m14.5a launched (mr-sup-cowork-20260712T174319Z-954-32399)
+Launching slice 14.5a (swap/recruit full status/weather pipeline; ADR reserved 0098; D-14.5-1 default (b)). Brief /tmp/mr_pass_m14.5a.md.
+
+## 2026-07-12 — m14.5a TERMINAL STATE — PR #147 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m14.5a-swap-recruit-full-pipeline`, tip `fd85b35`, **PR:** https://github.com/mdrewt/monster-realm/pull/147
+**ADR:** `docs/adr/0098-m14.5a-swap-recruit-full-pipeline.md` (ADR-0098 CONSUMED)
+
+**What landed (closes R1, R3, RT-W14-DESYNC-01):**
+
+- **14.5a-1:** `run_post_turn_phases` helper in resolve.rs; `resolve_player_swap` and `resolve_recruit_failure` accept `&mut BattleStatusStore` + `&StatusVariance` and run phases 3–5 (DoT, weather chip, status/weather tick, StatusApplied write-back). `swap_active` and `attempt_recruit` build/persist the store identically to `submit_attack`.
+- **14.5a-2:** Status/weather clocks now tick on every failed-recruit turn and every player-swap turn.
+- **14.5a-3:** `attempt_recruit` uses `load_skills()` (content cache) for retaliation; `skill_defs_from_rows` removed from all battle paths; gated to `#[cfg(test)]` for marshal boundary validation tests only. RT-W14-DESYNC-01 flipped to fix-pin (asserts `turns_remaining = WEATHER_DEFAULT_TURNS - 1` after Rain Dance + phase-5 tick).
+- **14.5a-4 (D-14.5-1(b)):** Swap always permitted regardless of status. ADR-0092 §D3 amended.
+
+**Gating tests (5 new, all GREEN):**
+- `sandstorm_ticks_during_resolve_recruit_failure` (EARS 14.5a-2a)
+- `poison_dot_fires_during_resolve_player_swap` (EARS 14.5a-2b)
+- `swap_allowed_when_player_active_has_sleep` / `_freeze` / `_paralysis` (EARS 14.5a-4)
+
+**`just ci`:** EXIT=0 — 1058 Rust tests / 778 JS tests / all evals / knowledge-bundle regenerated.
+**ADR-0098 CONSUMED. ADR next-free → 0099.**
+
+**Supervisor owns squash-merge.** Next: 14.5b (Phase-4.5 slot capture) or parallel fan-out per 14.5 sequencing in spec §6.
+
+## 2026-07-12T20:13:41Z — supervisor tick mr-sup-cowork-20260712T200619Z-42882-22633 — IN PROGRESS
+m14.5a build pass finished (EXIT=0, ATTEMPTS=1), PR #147 open, remote CI green, mergeStateStatus CLEAN. Pre-merge orchestration audit FLAGGED: log shows 1 Agent invocation (tester only), zero reviewer/red-team/domain-auditor/verifier lenses — orchestrator edited directly. Per policy, launching a mandated REVIEW PASS on the PR diff before merge (brief: /tmp/mr_pass_m14.5a.md; build-pass artifacts archived as /tmp/mr_pass_m14.5a.buildpass1.*). Touches-overrun noted: docs/knowledge/reducers/*.md not in declared touches (doc-only, no in-flight siblings — accepted, recorded). Merge deferred until review pass lands.
+
+## 2026-07-12T20:16:12Z — supervisor tick mr-sup-cowork-20260712T200619Z-42882-22633 — LAUNCHED
+Review pass for m14.5a launched detached (leader 43451, claude 43455, model claude-sonnet-4-6 asserted). PR #147 stays open; supervisor merges after the review pass + gating-test audit. Ledger recorded (build-pass cost $7.52).
+
+## 2026-07-12 — m14.5a REVIEW-PASS TERMINAL STATE — PR #147 OPEN (pushed), local `just ci` EXIT=0
+
+**Branch:** `feat/m14.5a-swap-recruit-full-pipeline`, tip `0bf68b7`, **PR:** https://github.com/mdrewt/monster-realm/pull/147
+
+**Full review gate run (parallel):** reviewer + red-team + /simplify + reducer-security-auditor + desync-guard lenses; then verifier (gating-test integrity).
+
+**Verifier verdict: PASS** — 7 checks green; confirmed RT-M14.5A-01/02/03 were RED before fix (slot-capture fix required), GREEN after; no RED→green weakening on pre-existing tests.
+
+**Bugs found and fixed:**
+
+1. **RT-M14.5A-01/02 (CRITICAL) — Phase-4.5 writes status to wrong slot after weather-chip KO + auto-switch:** `run_post_turn_phases` captured `state.side_*.active` AFTER phases 3/3.5 could trigger an auto-switch. Fixed: capture `active_slot_a/b` immediately on entry, before any phase runs. Three new red-team tests in `redteam_m14_5a_tests.rs` (declared in `mod.rs`); were genuinely RED before the slot-capture fix.
+2. **B-1 (SSOT) — resolve_full_turn duplicated phases 3–5:** resolve_full_turn now calls `run_post_turn_phases` instead of duplicating the logic. Single implementation.
+3. **M-2 — sync_status_to_monsters duplication:** Extracted private `sync_status_to_monsters` helper; the 3x-duplicated 10-line Phase-1.5 sync block reduced to 3 single-line calls.
+4. **M-1 — events.clone() in resolve_recruit_failure:** Replaced `events.clone()` with separate `strike_events` Vec (same pattern as resolve_player_swap). No semantic change; removes unnecessary clone.
+5. **Misleading cache comment in battle.rs:** `// load_skills() is cached (M13.5d LazyLock); no DB round-trip` → `// load_skills() re-parses compile-time-embedded RON; no DB round-trip`. The LazyLock lives in `content_cache.rs` at a different call path.
+6. **Knowledge bundle drift:** Regenerated `docs/knowledge/reducers/grant_bait.md` via `just knowledge` after taming.rs edits.
+7. **Test inline StatusVariance:** Replaced 3 inline `StatusVariance { .. }` blocks with `no_block_sv()` helper call (excludes the intentional `action_skip_roll_a: 0` paralysis test).
+
+**Parked findings (documented in ADR-0098 / taming.rs comment):**
+- **M-3:** resolve_recruit_failure not in game_core lib.rs re-exports — requires lib.rs edit outside touches.
+- **M-4:** too_many_arguments (8-arg functions) — BattleContext struct refactor outside touches.
+- **M-5:** BattleStatusStore::from_state constructor — requires status.rs edit outside touches.
+- **MEDIUM-1 (security):** attempt_recruit require_owner pattern — blocked by `recruit-reducer-security` eval which pattern-matches `player_identity != me`; PARK comment added to taming.rs.
+- **LOW-4:** bait/load_skills() ordering — practically safe (load_skills() never fails in production).
+
+**Ownership guard issue (REVERTED):** Reviewer suggested `require_owner(ctx, &battle)`. Implemented, then reverted after two evals (`gate-teeth` Tooth 12 + `recruit-reducer-security`) failed — the evals pattern-match the raw `player_identity != me` form and don't recognise the helper. PARK comment added; unify when evals are updated.
+
+**Commits added during review pass:**
+- `97f03fb` — slot-capture fix, SSOT, require_owner revert start, comment fix
+- `0bf68b7` — require_owner revert finalised + knowledge regen
+
+**`just ci`:** EXIT=0 — 1061 Rust tests / 778 JS tests / all 47 evals green.
+
+**Supervisor owns squash-merge.** Next: 14.5b (Phase-4.5 slot capture already resolved; next slice per spec §6 sequencing) — likely 14.5b ability wiring or 14.5c weather client store.
