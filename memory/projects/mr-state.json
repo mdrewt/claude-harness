@@ -1,9 +1,9 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-13T19:05:00Z",
- "updated_by": "claude-sonnet-4-6 m14.5d-1a build-loop",
+ "updated_utc": "2026-07-13T21:00:00Z",
+ "updated_by": "m14.5d-1b terminal handoff",
  "master": {
-  "sha": "ec19b1d (m-infra-d2 #161)",
+  "sha": "eca22bb (m14.5d-1a #162)",
   "ci": "GREEN",
   "nightly": "expected GREEN"
  },
@@ -11,24 +11,21 @@
  "inflight": [],
  "awaiting_merge": [
   {
-   "slice": "m14.5d-1a",
-   "branch": "feat/m14.5d-1a-item-row-cure-status",
-   "pr": 162,
-   "pr_url": "https://github.com/mdrewt/monster-realm/pull/162",
-   "tip_sha": "85fcdd5",
-   "ci_local": "EXIT=0 (55 eval PASS)",
-   "verifier": "PASS",
-   "adr": "ADR-0105"
+   "slice": "m14.5d-1b",
+   "pr": 164,
+   "branch": "feat/m14.5d-1b-cure-item-ui",
+   "tip": "f44502c",
+   "ci": "local EXIT=0 (853 tests, 55 evals)",
+   "adr": "none (0106 reservation released)"
   }
  ],
  "queue": [
-  "m14.5d-1a AWAITING MERGE (PR #162 open; supervisor owns squash-merge)",
-  "m14.5d-1b QUEUED after 1a merge: client Use-Item UI mirroring bait-selector (spec 14.5d-1)",
-  "FOLLOW-UP: recurring touches-overrun (m14c/m14.5c/m14.5e/m14.5g/m-infra-d2) — tighten brief touches declarations",
-  "M15 Trading (Phase C) next milestone"
+  "chore PR #163 (ADR index next-free 0106) — verify merged (auto-merge armed)",
+  "FOLLOW-UP: recurring touches-overrun (m14c/m14.5c/m14.5e/m14.5g/m-infra-d2/m14.5d-1a) — tighten brief touches declarations",
+  "M15 Trading (Phase C) next milestone after M14.5 closes"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m14.5d-1a DONE (PR #162, ADR-0105, tip 85fcdd5). CONTENT_VERSION 11→12. next-free=0106. Stray main-checkout edits stashed stash@{0}."
+ "notes": "m14.5d-1b PR #164 open; 853 tests + 55 evals green locally. ADR-0106 reservation released (no new ADR needed — extends existing patterns). adr_next_free=106. Supervisor owns squash-merge. After merge, EARS 14.5d-1 complete and all 14.5d criteria done."
 }

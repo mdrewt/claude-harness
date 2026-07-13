@@ -1,13 +1,13 @@
 ---
 name: monster-realm-m-infra-d
-description: ADR digest slice (ADR-0104, PR #159) — generator+gate+fixtures; header backfill parked; key traps for future slices
+description: ADR digest (ADR-0104, PR #159) + full backfill (m-infra-d2, PR #161) — LEGACY_TOLERANCE now empty; all 70 ADRs canonical
 metadata:
   type: project
 ---
 
-ADR-0104 consumed by M-infra-d (PR #159). Next-free → **0105**.
+ADR-0104 consumed by M-infra-d (PR #159). M-infra-d2 (PR #161) completed the backfill. Next-free → **0105**.
 
-**Why:** Agent-facing compaction of 100+ ADR corpus into a single scannable DIGEST.md; canonical header block standard for new ADRs going forward.
+**Why:** Agent-facing compaction of 100+ ADR corpus into a single scannable DIGEST.md; canonical header block standard for all ADRs (including legacy) going forward.
 
 **How to apply:** New ADRs must have all 7 canonical fields (Status/Date/Slice/Supersedes/Amends/Subsystems/Decision). Run `just adr-digest` before committing any ADR. Read `docs/adr/DIGEST.md` first for "is there a decision about X?" — open full ADR only on a hit.
 
@@ -18,10 +18,11 @@ ADR-0104 consumed by M-infra-d (PR #159). Next-free → **0105**.
 - **`docs/adr/design-corpus.json`**: frozen harness design ADRs H-0002–H-0034 + H-0055/H-0056/H-0057
 - **`evals/adr-digest.eval.mjs`**: 10 teeth; TOOTH 7 = real-corpus `--check` (drift gate in CI)
 - **`evals/fixtures/adr-digest/`**: 8 fixtures (0900-0907)
+- **`scripts/backfill-adr-headers.mjs`**: one-shot utility (audit trail); used in m-infra-d2
 
 ## LEGACY_TOLERANCE
 
-All 69 pre-infra-d project ADRs (0001, 0035–0103 excluding 0102) are in the set. Missing canonical fields are **warnings, not errors** for these. Header backfill (EARS infra-d-1..3) is a **parked follow-up slice** — remove entries from the set until empty.
+**EMPTY** as of m-infra-d2 (PR #161). All 69 pre-infra-d project ADRs (0001, 0035–0103 excluding 0102) have been backfilled with canonical headers. The validator is now zero-tolerance for all project ADRs.
 
 ## Design decisions / traps
 

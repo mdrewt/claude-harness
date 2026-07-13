@@ -284,3 +284,44 @@ Launching M-infra-d (ADR digest: header backfill + DIGEST.md + design-corpus.jso
 **Composite launch: m14.5d-1a** — server half of the re-serialized 14.5d-1 pair (spec §14.5d-1 hidden dependency, ADR-0101 unblocking path): additive `cure_status` column on public `item_row` + seeding from ItemDef content + bindings regen. Structural set (schema/bindings) → SERIAL, N=1. ADR 0105 pre-allocated (conditional). Client half m14.5d-1b follows after merge.
 
 **IN-PROGRESS breadcrumb:** m14.5d-1a launched detached 2026-07-13T18:19Z (run mr-sup-cowork-20260713T180637Z-657427-25296). Brief /tmp/mr_pass_m14.5d-1a.md; ADR 0105 reserved (conditional).
+
+---
+
+## 2026-07-13 — m14.5d-1b TERMINAL STATE — PR #164 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m14.5d-1b-cure-item-ui`, tip `f44502c`, **PR:** https://github.com/mdrewt/monster-realm/pull/164
+**ADR:** None — extends ADR-0047 (classify-by-data) + ADR-0101 (battle UX) without new decisions; **ADR 0106 reservation released; next-free stays 0106**
+**Worktree:** `.claude/worktrees/m14.5d-1b` (supervisor cleans up post-merge). Client-only; no server/schema/evals changes.
+
+**What landed (EARS 14.5d-1, client half — builds on merged m14.5d-1a / PR #162 / ADR-0105):**
+- `client/src/net/store.ts`: `StoreItemRow` gains `cureStatus: string | null`
+- `client/src/net/rowConvert.ts`: `SdkItemRowRow` gains `cureStatus: { readonly tag: string } | undefined`; `itemRowToStore` maps `?.tag ?? null`
+- `client/src/ui/battleModel.ts`: `CureItem` interface; `cureItems: readonly CureItem[]` in `BattleViewModel`; 5th arg to `buildBattleViewModel`; classify-by-data filter `c.cureStatus !== null && c.count > 0` (defense-in-depth, two layers); `battleVMsEqual` extended (length + per-element incl. count)
+- `client/src/ui/battleView.ts`: `onUseItem` callback; `#cureSelectEl` private field; `#renderCureItems` method (selector + `data-cure-status` attr + Use Item button; `parseInt`/`isNaN` guard, no bare use); save/restore selection with TS narrowing cast (mirrors bait pattern)
+- `client/src/main.ts`: `cureItems` construction from inventory, 5th arg to `buildBattleViewModel`, `onUseItem` → `sendGuarded`
+
+**Key design decisions:**
+- Available in ANY ongoing battle (not gated on `canRecruit`/wild — deliberate divergence from bait, documented)
+- No bare use: empty select → NaN → isNaN guard → no-op
+- `data-cure-status` attribute is the ADR-0047 DOM contract surface
+
+**Gates:** local full `just ci` EXIT=0 (853 client tests, 55 evals green). Reviewer BLOCKER addressed (stale @ts-expect-error × 6). Red-team findings addressed (NaN guard, data-cure-status test, last stale @ts-expect-error). RT-CI-01 gating tests locked runtime null-filter invariant.
+
+**Commit structure (3 commits):**
+- `8c6f972 feat(m14.5d-1b)`: main implementation
+- `6510a33 fix(m14.5d-1b)`: reviewer findings (NaN guard, @ts-expect-error cleanup, data-cure-status test, store.ts comment)
+- `f44502c fix(m14.5d-1b)`: red-team findings (last @ts-expect-error, RT-CI-01 gating tests)
+
+**Supervisor owns squash-merge.** ADR-0106 reservation released (unused). After merge, EARS 14.5d-1 is COMPLETE. No further 14.5d criteria remain.
+
+---
+
+## 2026-07-13T20:19:51Z — supervisor tick mr-sup-cowork-20260713T200639Z-737398-10660 (Cowork)
+
+**MERGED m14.5d-1a** — PR #162 squash-merged to master (eca22bb); master CI GREEN. Audits: orchestration CLEAN (6 Agent invocations: planner/tester/reviewer/red-team/verifier/doc-keeper; model claude-sonnet-4-6), gating-test CLEAN (RED 6178948 -> tip: tests 4->5, asserts 5->6, zero removals/skips). Cost $16.07, 1 wrapper attempt. Touches overrun again (game-core/, evals/baselines, docs/knowledge/ beyond declared set) — serial so harmless; the tighten-touches follow-up stands. ADR-0105 landed; index rows pre-existed from chore #160; doc-only chore PR #163 bumps next-free 0105->0106, auto-merge armed. Worktree + branch removed. Stray untracked dirs (.claire/, docs/memory-cards/) left untouched.
+
+**Next:** composite launch of m14.5d-1b (client-only: cure-item Use-Item UI + weather banner + statusBadge/outcome rigor; touches client/src/** only) this tick if final re-probe stays clean.
+
+**IN-PROGRESS 20:21:57Z:** launching m14.5d-1b (client-only, ADR reserved 0106-conditional) detached via mr-launch.sh — brief /tmp/mr_pass_m14.5d-1b.md.
+
+**LAUNCHED 20:23:58Z:** m14.5d-1b detached OK — session leader 738455, claude_pid 738459, model claude-sonnet-4-6 asserted, per-run lock written, ADR 0106 reserved. Supervisor tick complete; mutex released.
