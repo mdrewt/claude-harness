@@ -1,5 +1,28 @@
 ---
 
+## 2026-07-13 — m14.5h TERMINAL STATE — PR #158 OPEN, local `just ci` EXIT=0, verifier PASS, reviewer PASS
+
+**Branch:** `feat/m14.5h-nightly-mutant-kill`, tip `84d4efd`, **PR:** https://github.com/mdrewt/monster-realm/pull/158
+**ADR:** ADR-0100 D6 amended in-place — no new ADR needed; **ADR next-free stays 0104**
+**Worktree:** `.claude/worktrees/m14.5h` (supervisor cleans up post-merge). LOW complexity test-artifact slice.
+
+**What landed (2 goals: nightly gate + ADR-0100 D6):**
+- `.cargo/mutants.toml`: second blessed exclusion `ability.rs:169:60 replace < with <=` — equivalent mutant (`.min(max_hp)` clamp makes both branches produce `max_hp` at full HP)
+- `game-core/src/combat/resolve.rs`: `apply_ko_switch_entry_abilities` private fn + 3 call sites (Phase 2.5 in resolve_full_turn/resolve_player_swap/resolve_recruit_failure) + Faint→Switch adjacency debug_assert (pins contract for windows(2) scan)
+- `game-core/src/combat/m14_5h_tests.rs`: 4 tests — EARS-h-1a (boundary full-HP no-heal), EARS-h-1b (below-full heals), EARS-h-2a (KO auto-switch EntryHeal, RED→GREEN), EARS-h-2b (KO auto-switch StatusImmunity, RED→GREEN)
+- `evals/mutate-core-recipe-integrity.eval.mjs`: updated from 1→2 blessed entries; TEETH 8 retargeted (3 entries); TEETH 14 added (single entry fails); name updated; CANONICAL_MUTANTS_TOML updated
+- `docs/adr/0100-m14.5c-ability-system-wiring.md`: D6 section amended to "closed in M14.5h"
+
+**Gates:** local full `just ci` EXIT=0 (4 new tests, all evals PASS). Verifier PASS. Reviewer: no BLOCKERs; M-2 debug_assert + m-1 doc label + m-3 eval name addressed.
+
+**Equivalent mutant proof:** at `current_hp == max_hp`, `< → <=` means the branch IS taken, but `max_hp.saturating_add(heal).min(max_hp) == max_hp` (clamp). Observationally identical. Proved by EARS-h-1a.
+
+**Reviewer M-1 (not fixed — unreachable):** The multi-KO-per-turn scenario would cause `apply_ko_switch_entry_abilities` to miss intermediate slot entry abilities. BUT: `resolve_turn`'s `second_had_faint` guard prevents a second attack after the first KOs the second side. At most ONE Faint+Switch pair per `turn_events`. M-1 is unreachable with current game rules. The debug_assert (M-2) mechanically pins the adjacency invariant that makes this safe.
+
+**Supervisor owns squash-merge.** After merge, nightly gate should restore to GREEN. ADR-0104 remains free.
+
+---
+
 ## 2026-07-13 — m14.5g TERMINAL STATE — PR #157 OPEN, local `just ci` EXIT=0, remote CI running
 
 **Branch:** `feat/m14.5g-ledger-type-rigor`, tip `51cddf3`, **PR:** https://github.com/mdrewt/monster-realm/pull/157
@@ -128,3 +151,16 @@ Launching m14.5f (republish proof + randomized convergence) serial, ADR reserved
 ## 2026-07-13T10:27Z — mr-sup-cowork-20260713T100648Z-407585-2527 (supervisor tick, cont.)
 - IN-PROGRESS: launching m14.5g (LOW ledger/docs/type-rigor reconciliation + okf-export stamp-drift fix folded in) serial, ADR 0104 reserved (may go unused). Brief /tmp/mr_pass_m14.5g.md.
 - m14.5g LAUNCHED: leader 409483, detached (PID==SESS), model claude-sonnet-4-6 asserted, rate-limit events flowing status=allowed. Supervisor releasing mutex.
+
+## 2026-07-13T12:23:05Z — supervisor tick mr-sup-cowork-20260713T120645Z-485462-481 — m14.5g MERGED
+- PR #157 (feat/m14.5g-ledger-type-rigor) squash-merged -> master 3667bc4; ci+e2e green pre-merge, master CI GREEN post-merge.
+- Audits: orchestration FLAGGED (only 2 Agent invocations: reviewer+red-team, zero tester-role on a code slice; model claude-sonnet-4-6, cost $11.13, 1 attempt). Per protocol, supervisor ran the required review pass on the PR diff: PASS — compute_evolves_to (level,bond) refactor behavior-preserving across 8 call sites, classify unreachable! guarded by ADR-0049 trust boundary in marshal.rs with should_panic proof-of-teeth, okf-export %cI UTC normalization sound. Gating-test audit CLEAN (deletions = temp-Monster refactor; no tests/assertions dropped, no skips).
+- Touches overrun: server-module/src/*.rs + docs/knowledge/reducers/*.md undeclared in lock. Serial run, no siblings -> merged; recurring brief-tightening follow-up stands in queue.
+- ADR-0104 reserved-unused; adr_next_free stays 104. Index edited in-branch (serial) — no chore PR needed.
+- Cleanup: worktree .claude/worktrees/m14.5g + local/remote branch removed; main checkout ff'd fae0479->3667bc4. Strays (.claire/, docs/memory-cards/) untouched.
+- MILESTONE: M14.5 COMPLETE — all slices a-g merged (PRs 147-157). The mr-state note "Remaining: a/b/c" was stale (a/b/c merged 2026-07-12).
+- NIGHTLY RED on fae0479: mutate-core zero-tolerance gate, 4 missed mutants — 3x StatusKind::matches delete-true-arm (killed by #157's truth-table test ears_21) + 1x apply_entry_ability:158 <-to-<= (SURVIVES; overlaps queued ADR-0100 D6 KO-auto-switch coverage gap).
+- NEXT: launching m14.5h (test-artifact slice): kill surviving nightly mutant(s) at ability.rs:158 boundary + close/cover ADR-0100 D6 gap; restores nightly green before Phase C (M15). Precedent: PR #145.
+
+## 2026-07-13T12:25:38Z — supervisor tick mr-sup-cowork-20260713T120645Z-485462-481 — m14.5h IN-PROGRESS
+Launching m14.5h (nightly mutant kill apply_entry_ability:158 + ADR-0100 D6 KO-auto-switch coverage) serial, ADR 0104 reserved (expected unused). Brief /tmp/mr_pass_m14.5h.md. Detached via mr-launch.sh.

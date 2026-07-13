@@ -1,32 +1,31 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-13T12:00:00Z",
- "updated_by": "m14.5g-session",
+ "updated_utc": "2026-07-13T14:35:00Z",
+ "updated_by": "m14.5h-session",
  "master": {
-  "sha": "fae0479 (m14.5f #156)",
-  "ci": "GREEN on fae0479",
-  "nightly": "expect green"
+  "sha": "3667bc4 (m14.5g #157)",
+  "ci": "GREEN on 3667bc4",
+  "nightly": "RED on fae0479 (mutate-core 4 missed; PR #158 targets restoration)"
  },
  "adr_next_free": 104,
  "inflight": [],
  "awaiting_merge": [
   {
-   "slice": "m14.5g",
-   "pr": 157,
-   "branch": "feat/m14.5g-ledger-type-rigor",
-   "tip": "51cddf3",
-   "pr_url": "https://github.com/mdrewt/monster-realm/pull/157",
-   "local_ci": "EXIT=0",
-   "notes": "ADR-0104 reserved but unused. Supervisor owns merge."
+   "slice": "m14.5h",
+   "pr": 158,
+   "branch": "feat/m14.5h-nightly-mutant-kill",
+   "ci": "GREEN",
+   "verifier": "PASS",
+   "reviewer": "PASS (no BLOCKERs, all items addressed)"
   }
  ],
  "queue": [
-  "D6 gap: apply_entry_ability on KO-auto-switch (ADR-0100 D6, Phase C)",
-  "FOLLOW-UP: m14c/m14.5c touches-overrun — tighten brief touches declarations",
-  "14.5d-1 PARKED: cure_status item UI requires cure_status column on item_row (server+client slice pair)"
+  "14.5d-1 PARKED: cure_status item UI requires cure_status column on item_row (server+client slice pair)",
+  "FOLLOW-UP: recurring touches-overrun (m14c/m14.5c/m14.5e/m14.5g) — tighten brief touches declarations",
+  "M15 Trading (Phase C) next milestone after nightly green"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m14.5g PR #157 OPEN, just ci EXIT=0. ADR-0104 allocated but unused (all changes in-contract hardening); next-free stays 0104 for reclaim. All M14.5 disjoint slices (e/f/g) complete. Remaining M14.5: a/b/c (resolve.rs coupling). compute_evolves_to now takes (level: u8, bond: u8) — 8 call sites updated."
+ "notes": "m14.5h (PR #158) awaiting merge: restores nightly mutate-core gate (4 missed → 0), closes ADR-0100 D6. Equivalent mutant (ability.rs:169:60) exempted with second mutants.toml entry. After merge, nightly should be GREEN. ADR-0104 still free."
 }
