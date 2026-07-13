@@ -213,3 +213,74 @@ Launching M-infra-d (ADR digest: header backfill + DIGEST.md + design-corpus.jso
 **Gates:** local full `just ci` EXIT=0; eval PASS 10/10 teeth.
 
 **Supervisor owns squash-merge.** ADR-0104 CONSUMED; next-free → 0105. After merge, agents should use DIGEST.md as entry point for "is there a decision about X?" queries.
+
+---
+## 2026-07-13T16:20Z — supervisor tick mr-sup-cowork-20260713T160650Z-617098-14943 (cowork)
+**M-infra-d MERGED.** PR #159 (feat/m-infra-d) squash-merged at 16:09:36Z → master 3cfadf5; master CI GREEN. Audits: orchestration CLEAN (Sonnet, tester/reviewer/red-team roles present), gating-test integrity clean (additive only, no skips). Chore PR #160 (supervisor-owned index reconciliation) merged: added the MISSING 0103 row (never reconciled after m14.5f) + 0104 row; next-free → 0105; master CI GREEN on that too. Cleaned worktree + local/remote feat/m-infra-d and chore branches. Note: no 0102 ADR file exists — number gap left as-is. Next queued: M-infra-d backfill (EARS infra-d-1..3, 69 legacy ADRs in LEGACY_TOLERANCE) — attempting composite launch this tick as slice m-infra-d2.
+
+**IN-PROGRESS 2026-07-13T16:24Z:** m-infra-d2 (legacy ADR header backfill, LEGACY_TOLERANCE -> empty) launched detached via mr-launch.sh; ADR 0105 reserved conditionally.
+
+---
+
+## 2026-07-13 — m-infra-d2 TERMINAL STATE — PR #161 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m-infra-d2`, tip `942ea9f`, **PR:** https://github.com/mdrewt/monster-realm/pull/161
+**ADR:** None — this completes ADR-0104's deferred backfill work; ADR-0105 reserved but not consumed; **ADR next-free stays 0105**
+**Worktree:** `.claude/worktrees/m-infra-d2` (supervisor cleans up post-merge). Pure doc/tooling slice; no schema or behavior change.
+
+**What landed (EARS infra-d-1..3 — the backfill deferred from M-infra-d):**
+- `scripts/backfill-adr-headers.mjs`: one-shot utility (kept for audit trail) that inserted the canonical block after the title line in 66 pre-existing ADRs.
+- `scripts/adr-digest.mjs`: LEGACY_TOLERANCE shrunk from 69 entries to empty `Set` — zero-tolerance gate now active.
+- `docs/adr/0001–0103` (69 files): canonical header block (`**Status:**`, `**Date:**`, `**Slice:**`, `**Supersedes:**`, `**Amends:**`, `**Subsystems:**`, `**Decision:**`, plus conditional `**Amended-by:**`/`**Superseded-by:**`) inserted after title line. 66 via script; 0091/0092/0097 patched manually (had Status/Date but lacked Subsystems/Decision/Amended-by).
+- `docs/adr/DIGEST.md`: regenerated via `just adr-digest`; all 70 project ADRs now show real Subsystems and Decision (no PENDING entries).
+
+**Key cross-refs wired:** ADR-0037↔0073, ADR-0041↔0092, ADR-0049↔0091, ADR-0053↔0091, ADR-0068↔0091, ADR-0069↔0087, ADR-0075↔0090, ADR-0087↔0069, ADR-0090 supersedes 0075 §12.5d-1, ADR-0092↔0098, ADR-0098 amends 0092.
+
+**Gates:** local full `just ci` EXIT=0 (all Rust/client/eval gates green); `node scripts/adr-digest.mjs --check` → no drift; `node evals/adr-digest.eval.mjs` → EXIT=0.
+
+**Supervisor owns squash-merge.** ADR-0105 remains free — next real decision should claim it.
+
+## 2026-07-13 — m14.5d-1a TERMINAL STATE — PR #162 OPEN, local `just ci` EXIT=0, verifier PASS
+
+**Branch:** `feat/m14.5d-1a-item-row-cure-status`, tip `85fcdd5`, **PR:** https://github.com/mdrewt/monster-realm/pull/162
+**ADR:** `docs/adr/0105-m14.5d-1a-item-row-cure-status.md` (**ADR-0105 CONSUMED**; next-free → 0106)
+**Worktree:** `.claude/worktrees/m14.5d-1a` (supervisor cleans up post-merge). Server-only schema slice; disjoint from all other branches.
+
+**What landed (EARS d1a-1..6):**
+- `game-core/src/combat/ability.rs`: `StatusKind` gains `#[cfg_attr(feature = "spacetimedb", derive(spacetimedb::SpacetimeType))]` (cfg-gated, ADR-0003)
+- `server-module/src/schema.rs`: `ItemRow` gains `pub cure_status: Option<StatusKind>` as last field (additive, ADR-0006)
+- `server-module/src/content.rs`: `sync_content_inner` seeds `cure_status: item.cure_status` in `ItemRow` construction
+- `server-module/src/lib.rs`: `CONTENT_VERSION` bumped 11→12 with v12 doc comment (ADR-0054 — BLOCKER fix)
+- `evals/baselines/spacetime-types.json`: `StatusKind` enum entry added
+- `evals/baselines/table-schemas.json`: `item_row` gains `"cure_status": "Option<StatusKind>"`
+- `evals/baselines/content-hash.json`: version 11→12 (same hash — only schema changed, not content RON)
+- `server-module/src/m14_5d_1a_tests.rs`: EA-1 (cfg_attr), EA-2 (ItemRow field), EA-3 (seeding), EA-5 (baseline), EA-6 (CONTENT_VERSION≥12) source-guard tests
+- `game-core/src/content.rs` (mod tests): EA-4 Antidote→Poison assertion
+- `client/src/module_bindings/`: bindings regenerated — `item_row_table.ts` gains `cureStatus` getter; `types.ts` gains `StatusKind` export
+- `docs/adr/0105-m14.5d-1a-item-row-cure-status.md`: ADR authored (subsystems: schema-persistence, content, battle)
+- `evals/spacetime-type-snapshot.eval.mjs`: MINOR-1 inline-variant constraint comment added
+- `docs/adr/DIGEST.md` + `docs/knowledge/`: regenerated
+
+**Key trap (CONTENT_VERSION):** Reviewer caught that `sync_content_inner` returns early if DB version==CONTENT_VERSION (line 36-40). Without bumping to 12, all deployed DBs at v11 would skip the item_row upsert loop, leaving `cure_status=None` for all items including Antidote. EA-6 gates this invariant permanently.
+
+**Red-team findings:** No BLOCKER/MAJOR. MINOR-1 (eval regex + inline-only constraint comment) fixed. NOTE-1 (serde(default) asymmetry explanation) added to ADR-0105 §D2. NOTE-2 (two-source-of-truth) accepted as design (D3). NOTE-3/4 latent, no action needed now.
+
+**Commit structure (4 commits):**
+- `6178948 wip(m14.5d-1a): RED gating tests`
+- `a374346 wip(m14.5d-1a): implement cure_status column — RED→GREEN`
+- `71e284d fix(m14.5d-1a): CONTENT_VERSION 11→12 + EA-6 gate + ADR-0105 subsystem fix`
+- `85fcdd5 fix(m14.5d-1a): red-team MINOR-1 + NOTE-1 — eval comment + ADR-0105 D2 clarification`
+
+**Gates:** local full `just ci` EXIT=0 (1104 Rust tests, 833 TS tests, 55 evals PASS). Reviewer BLOCKER addressed. Red-team: no BLOCKER/MAJOR. Verifier PASS.
+
+**Supervisor owns squash-merge.** ADR-0105 CONSUMED; next-free → 0106. After merge, clients can subscribe to `item_row` and classify cure items by `cureStatus !== null`. Unblocks m14.5d-1b (client Use-Item battle UI).
+
+---
+
+## 2026-07-13T18:15Z — supervisor tick mr-sup-cowork-20260713T180637Z-657427-25296 (cowork)
+
+**m-infra-d2 MERGED** — PR #161 squash-merged to `master` @ `ec19b1d` (69 legacy ADR canonical-header backfills + DIGEST.md + LEGACY_TOLERANCE→empty + backfill script). Remote ci+e2e green pre-merge; master CI GREEN post-merge. Audits: gating-test CLEAN (no test files); orchestration CLEAN-doc-artifact (review-lens in-build, digest exercised by the ADR-0104 CI drift gate; no tester-role — doc/tooling slice). ADR 0105 conditional reservation UNUSED → `adr_next_free` stays 105; no index chore needed (README untouched). Touches-overrun noted: `scripts/backfill-adr-headers.mjs` undeclared (no siblings — recorded to the recurring-overrun follow-up). Stray local edits found in main checkout (docs/adr 0091/0092/0097 + scripts/adr-digest.mjs, +untracked `.claire/`, `docs/memory-cards/`) — stashed labeled (stash@{0}), untracked left alone. Worktree + local/remote `feat/m-infra-d2` removed.
+
+**Composite launch: m14.5d-1a** — server half of the re-serialized 14.5d-1 pair (spec §14.5d-1 hidden dependency, ADR-0101 unblocking path): additive `cure_status` column on public `item_row` + seeding from ItemDef content + bindings regen. Structural set (schema/bindings) → SERIAL, N=1. ADR 0105 pre-allocated (conditional). Client half m14.5d-1b follows after merge.
+
+**IN-PROGRESS breadcrumb:** m14.5d-1a launched detached 2026-07-13T18:19Z (run mr-sup-cowork-20260713T180637Z-657427-25296). Brief /tmp/mr_pass_m14.5d-1a.md; ADR 0105 reserved (conditional).
