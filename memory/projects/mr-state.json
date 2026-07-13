@@ -1,33 +1,32 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-12T21:30:00Z",
- "updated_by": "m14.5c-build-pass-terminal",
+ "updated_utc": "2026-07-13T12:00:00Z",
+ "updated_by": "m14.5g-session",
  "master": {
-  "sha": "f8c63a9 (chore adr-index #150; code tip 1e3207b m14.5b #149)",
-  "ci": "GREEN on 1e3207b (f8c63a9 doc-only)",
-  "nightly": "last nightly FAILURE on 35945f8 (pre-#145, expected); #145 mutant-killers on master - expect next nightly green"
+  "sha": "fae0479 (m14.5f #156)",
+  "ci": "GREEN on fae0479",
+  "nightly": "expect green"
  },
- "adr_next_free": 101,
+ "adr_next_free": 104,
  "inflight": [],
  "awaiting_merge": [
   {
-   "slice": "m14.5c",
-   "pr": 151,
-   "branch": "feat/m14.5c-ability-wiring",
-   "tip": "607fbc9",
-   "adr": "ADR-0100 (CONSUMED)",
-   "ci": "local just ci EXIT=0; remote CI in-progress",
-   "note": "STRUCTURAL serial (schema+wiring+content). Reviewer P1s fixed. RT-D6 gap tests added. D6 auto-switch gap documented, Phase C carry-forward."
+   "slice": "m14.5g",
+   "pr": 157,
+   "branch": "feat/m14.5g-ledger-type-rigor",
+   "tip": "51cddf3",
+   "pr_url": "https://github.com/mdrewt/monster-realm/pull/157",
+   "local_ci": "EXIT=0",
+   "notes": "ADR-0104 reserved but unused. Supervisor owns merge."
   }
  ],
  "queue": [
-  "m14.5d/e/f/g (mutually disjoint, fan-out eligible after m14.5c merges)",
   "D6 gap: apply_entry_ability on KO-auto-switch (ADR-0100 D6, Phase C)",
-  "FOLLOW-UP: okf-export updated-stamp drift trap -- fold into a doc/infra slice",
-  "FOLLOW-UP: m14c touches-overrun (server-module ripple) -- tighten brief touches declarations for content-registry slices"
+  "FOLLOW-UP: m14c/m14.5c touches-overrun — tighten brief touches declarations",
+  "14.5d-1 PARKED: cure_status item UI requires cure_status column on item_row (server+client slice pair)"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m14.5c build pass TERMINAL. PR #151 open. ADR-0100 consumed, next-free=0101. R1/R2/R3 from ADR-0096 all addressed by m14.5a (R1/R3) and m14.5b (slot-capture); R2 bench-cure still Phase C. Reviewer P1s: stale ability.rs comment removed, taming.rs species_from_row SSOT restored."
+ "notes": "m14.5g PR #157 OPEN, just ci EXIT=0. ADR-0104 allocated but unused (all changes in-contract hardening); next-free stays 0104 for reclaim. All M14.5 disjoint slices (e/f/g) complete. Remaining M14.5: a/b/c (resolve.rs coupling). compute_evolves_to now takes (level: u8, bond: u8) — 8 call sites updated."
 }
