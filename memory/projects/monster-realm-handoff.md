@@ -169,3 +169,47 @@ Launching m14.5h (nightly mutant kill apply_entry_ability:158 + ADR-0100 D6 KO-a
 - New infra slice spec: specs/monster-realm-v2/M-infra-d-adr-digest.spec.md — agent-facing ADR compaction: canonical header block backfill (Status/Supersedes/Amends/Subsystems/Decision), generated drift-gated docs/adr/DIGEST.md, frozen design-corpus.json (harness 0002-0034, H- namespace, 0055-0057 collision as data), just adr-digest + ci gate, fixture proof-of-teeth eval. README.md stays supervisor-owned (allocator seed untouched). PLAN §9 bullet inserted before M15; mr-state queue updated.
 - Sequencing: SERIAL — launch only with no in-flight slice (backfill touches every docs/adr file). m14.5h currently in flight; 14.5d-1 pair also queued. Supervisor picks order next tick.
 - Distinct from M-infra-b (Plan A doc-aggregation fragments) — no CHANGELOG/ARCHITECTURE/fragment scope here; if M-infra-b lands later its docs-reconcile should also run just adr-digest.
+
+## 2026-07-13T14:19Z — supervisor tick mr-sup-cowork-20260713T140749Z-561491-8485 — m14.5h MERGED
+- PR #158 (feat/m14.5h-nightly-mutant-kill) squash-merged -> master 81ac54a; ci+e2e green pre-merge, master CI GREEN post-merge (14:16Z).
+- Audits: orchestration CLEAN (3 Agent invocations: tester+reviewer+verifier; model claude-sonnet-4-6, cost $9.52, 1 attempt). Gating-test CLEAN (RED 5318d8a -> tip 84d4efd: 4 tests both ends, zero removed assertions, no skip/only/ignore). mutants.toml change = narrow line-pinned equivalent-mutant exemption (ability.rs:169:60) with EARS-h-1a boundary proof + recipe-integrity eval guard — legitimate, not gate-weakening.
+- Touches overrun (recurring): .cargo/mutants.toml + evals/mutate-core-recipe-integrity.eval.mjs undeclared. Serial, no siblings -> merged. Brief-tightening follow-up stands.
+- ADR-0100 amended in-branch (D6 closed); ADR-0104 reserved-unused; allocator stays 104. No index chore PR needed (amend only).
+- Nightly: was RED on fae0479 (4 missed mutants); #157+#158 kill 3 + exempt 1 equivalent — next nightly expected GREEN.
+- Cleanup: m14.5h worktree + local branch removed, remote branch deleted; main checkout ff'd 3667bc4->81ac54a. Strays (.claire/, docs/memory-cards/) untouched. Stale merged remotes chore/m14.5d-adr-index + feat/m14.5d-client-battle-ux noted for cleanup.
+- Supervisor DC shell died mid CI-poll; recovered in new shell, same run_id, mutex held throughout.
+- NEXT: composite launch M-infra-d (ADR digest, doc-only, SERIAL — requires empty in-flight, satisfied now; human-requested 2026-07-13). 14.5d-1 server+client pair queued after.
+
+## 2026-07-13T14:23:13Z — supervisor tick mr-sup-cowork-20260713T140749Z-561491-8485 — M-infra-d IN-PROGRESS
+Launching M-infra-d (ADR digest: header backfill + DIGEST.md + design-corpus.json + drift gate) serial, ADR 0104 reserved. Brief /tmp/mr_pass_m-infra-d.md. Detached via mr-launch.sh.
+
+---
+
+## 2026-07-13 — M-infra-d TERMINAL STATE — PR #159 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m-infra-d`, tip `b05e5e3`, **PR:** https://github.com/mdrewt/monster-realm/pull/159
+**ADR:** `docs/adr/0104-m-infra-d-adr-digest.md` (**ADR-0104 CONSUMED**; next-free → 0105)
+**Worktree:** `.claude/worktrees/m-infra-d` (supervisor cleans up post-merge). Pure docs/tooling; no schema or behavior change.
+
+**What landed (EARS infra-d-4..8, right-sized):**
+- `docs/adr/0104-m-infra-d-adr-digest.md`: canonical header block ADR with all 7 required fields; first ADR with canonical headers; NOT in LEGACY_TOLERANCE
+- `docs/adr/design-corpus.json`: frozen snapshot of harness design ADRs H-0002–H-0034 + H-0055/H-0056/H-0057 (collision map encoded as data)
+- `docs/adr/DIGEST.md`: generated corpus index — DO-NOT-EDIT; 70 project ADRs + 36 H- entries; numeric master list + H- namespace table + by-subsystem grouped list
+- `scripts/adr-digest.mjs`: generator with `--check` drift-gate mode; LEGACY_TOLERANCE for 69 pre-infra-d ADRs; preamble-scoped field extraction (before first `\n## `); H- ID scanning in `extractAllAdrIds`; Superseded+em-dash pointer check; NO new RegExp()
+- `evals/adr-digest.eval.mjs`: 10 proof-of-teeth (false-positive, missing-Status, unknown-subsystem, decision>240, dangling-Superseded-by, stale-drift, real-corpus-check, body-embed bypass, H- dangling ref, Superseded+em-dash bypass)
+- `evals/fixtures/adr-digest/`: 8 fixtures (0900-0907); design-corpus-minimal.json deleted as dead artifact
+- `just adr-digest` / `just adr-digest-check` recipes
+- `AGENTS.md`: canonical header block note + DIGEST.md first-entry instruction + subsystem vocabulary
+
+**Review + red-team findings closed (6 fixes):**
+- CRITICAL: `extractBoldField` preamble boundary guard (body code blocks now excluded)
+- HIGH: H- prefix support in `extractAllAdrIds` + `allIds` populated from corpus entries
+- MEDIUM: `Status=Superseded` + `Superseded-by=—` bypass fixed
+- MAJOR: dead artifact `design-corpus-minimal.json` deleted
+- Minor: `path.basename` in `filenameBase`; `entry` DRY in by-subsystem renderer
+
+**Right-sizing:** EARS infra-d-1..3 (header backfill across 69 legacy ADRs) PARKED as follow-up slice. LEGACY_TOLERANCE set tracks which ADRs remain; backfill = remove entries until set is empty.
+
+**Gates:** local full `just ci` EXIT=0; eval PASS 10/10 teeth.
+
+**Supervisor owns squash-merge.** ADR-0104 CONSUMED; next-free → 0105. After merge, agents should use DIGEST.md as entry point for "is there a decision about X?" queries.
