@@ -318,3 +318,65 @@ m14.5c (STRUCTURAL — species_row ability column + AbilityStore end-to-end wiri
 **ADR-0100 CONSUMED. ADR next-free → 0101.**
 
 **Supervisor owns squash-merge.** Next M14.5 slice per spec §6 sequencing.
+
+## 2026-07-13T02:1xZ — supervisor mr-sup-cowork-20260713T020609Z-238393-1798 — IN-PROGRESS
+m14.5c build pass ended EXIT=0 ATTEMPTS=1 but PR #151 remote `ci` is RED: `just lint` / clippy `-D mixed-script-confusables` — Cyrillic 'о' (U+043E) homoglyph in test fn name at game-core/src/combat/m14_5c_tests.rs:352 (e2e GREEN, local ci was green — clippy unicode lint only trips in the lint recipe). Action: relaunched m14.5c as a narrow RESUME fix pass (rename identifier to ASCII, full `just ci`, push; no new PR/ADR). remote_red_fix_cycles=1. Merge deferred to next tick on green.
+
+## 2026-07-12 — m14.5c RESUME fix pass DONE — PR #151 tip `5d65324`, local `just ci` EXIT=0, remote CI IN_PROGRESS
+Fix pass complete, back at terminal state. Two commits pushed to `feat/m14.5c-ability-wiring`:
+- `7f6f29f fix(m14.5c): replace Cyrillic homoglyph in test fn name` — BOTH rt_d6a and rt_d6b had the Cyrillic 'о' (two occurrences, not one); full branch-diff scanned for Cyrillic/Greek confusables → clean; no test logic changed.
+- `5d65324 fix(m14.5c): regenerate knowledge bundle (taming.rs anchors + commit dates)` — SECOND latent red found by full local ci that remote never reached (lint failed first): knowledge-bundle-conformance drift gate; the reviewer-fix commit 6829ee9 shifted taming.rs reducer line anchors after d6b2f13 generated the bundle. `just knowledge` regen (54 files, frontmatter-only).
+
+Full `just ci` EXIT=0 locally at tip (53 evals, 778 JS tests). Remote `ci`+`e2e` IN_PROGRESS on 5d65324. **Supervisor: poll remote CI → squash-merge.** remote_red_fix_cycles=1 (resolved).
+
+## 2026-07-13T04:40Z — supervisor tick mr-sup-cowork-20260713T040554Z-253197-23646 (Cowork)
+**m14.5c MERGED.** PR #151 squash-merged → `95d3c30`. **INCIDENT — master RED post-merge:** knowledge-bundle-conformance drift gate tripped: `updated:` frontmatter stamps are day-granularity; bundle regenerated 2026-07-12 on-branch, squash landed 2026-07-13 UTC → 54 files stale. (This is the queued "okf-export updated-stamp drift trap" biting for real — ANY squash-merge that crosses midnight UTC after `just knowledge` ran will red master.) Fix: folded a frontmatter-only `just knowledge` regen into the doc-only ADR-index chore PR #152 (ADR-0100 indexed, next-free → 0101), gate verified green locally, merged manually on green (auto-merge rejected with clean-status error again, third time). Master CI **GREEN on `89f5f80`**. Audits: gating-test CLEAN (mechanical); orchestration CLEAN-by-handoff-evidence (build log truncated by resume launch — counts unavailable; reviewer P1s + RT-D6 red-team tests documented). Worktree/branches cleaned. remote_red_fix_cycles=1 (resolved).
+**PRIORITY BUMP for the drift trap:** now demonstrated to red master; the fix (drop day-stamps or stamp from source-commit date) should ride the next doc/infra slice.
+
+## 2026-07-13T04:42:40Z — IN-PROGRESS: m14.5d + m14.5e fan-out launched (composite tick, run mr-sup-cowork-20260713T040554Z-253197-23646)
+m14.5d (client battle UX, ADR 0101, leader 257559) || m14.5e (ADR-0089 caching completion, ADR 0102 if needed, leader 257648). Disjoint touches (client/** vs server-module/**), model claude-fable-5 asserted both, detached both, rate-limit schema asserted (allowed). Supervisor merges serially on green.
+
+## 2026-07-13 — m14.5e TERMINAL STATE — PR #153 OPEN, local `just ci` EXIT=0, remote CI running
+
+**Branch:** `feat/m14.5e-content-cache-skills-items`, tip `561836d`, **PR:** https://github.com/mdrewt/monster-realm/pull/153
+**ADR:** `docs/adr/0089-content-parse-caching.md` AMENDED IN PLACE (no new number; next-free stays 0101; reserved 0102 unused)
+**Worktree:** `.claude/worktrees/m14.5e` (supervisor cleans up post-merge). Sibling m14.5d worktree observed in flight (client-only, disjoint) — no collisions.
+
+**What landed (EARS 14.5e-1..2):**
+- content_cache.rs: SKILLS/ITEMS LazyLock statics + cached_skills()/cached_items() (six registries total)
+- 4 call-site switches (qualified `crate::content_cache::cached_*` form): submit_attack, swap_active, use_battle_item (keeps `.map_err("content error: {e}")` byte-identical), attempt_recruit
+- Lying/stale comments corrected: battle.rs submit_attack header (the spec's false-"content cache" comment), swap_active, taming.rs, marshal.rs ×2
+- Gating tests (5, red-first): 2× transparency assert_eq!, 2× ptr-identity, 1× source-guard proof-of-teeth (module-qualified needles; two-part use_battle_item pin `cached_items().map_err` + `content error`). RED evidence pinned in commit 0f984b9; verifier live-revert confirmed the bite.
+
+**Gates:** local full `just ci` EXIT=0 (1080 Rust tests, module 195→200; 53/53 evals; 778 client tests). Lenses: planner + plan-review (reviewer+red-team) + test-review (reviewer+red-team empirical probe) + impl-review (reviewer, red-team, desync-guard CLEAN×5, reducer-security CLEAN×4) + /simplify + verifier PASS (integrity: no weakening dc02624..HEAD, needles byte-identical).
+
+**Touches-overrun (mechanical, precedented):** docs/knowledge/** regen (`just knowledge`; battle/taming anchor shifts; knowledge-check green 25 tables/28 reducers). Day-stamp trap noted in PR: bundle stamped 2026-07-13 — merge after next midnight UTC may red master (known, fix queued).
+
+**In-branch incident (fixed):** orphan `/*` in a content_cache_tests.rs doc comment blinded stripRustComments in evals/battle-schema-snapshot.eval.mjs (shared SSOT parser used by okf-export) → 0 tables parsed. Reworded to same-line pairs. **QUEUED FOLLOW-UP:** harden that eval's comment-stripper (string-literal/pairing awareness) — evals/** was outside 14.5e touches.
+
+**Named residuals:** load_abilities() uncached at 5 sites (3 per-turn sites carry PARK comments; ADR-0089 amendment names all 5) — natural next slice `cached_abilities()` + source-guard extension. Test-helper triplication (strip_rust_comments/extract_fn_body ×3 test files) — rule-of-three consolidation follow-up. Spec §5 note: 14.5a/b/c checkboxes still untick despite merges — reconcile at 14.5g doc-keeper close (14.5e ticked with PR #153).
+
+**Supervisor owns squash-merge** (remote ci+e2e running on 561836d at handoff time). Next M14.5 slices per spec §6: 14.5f, 14.5g (14.5d in flight).
+
+## 2026-07-13 — m14.5d TERMINAL STATE — PR #154 OPEN, local `just ci` EXIT=0, remote CI running
+
+**Branch:** `feat/m14.5d-client-battle-ux`, tip `dc0a4f6`, **PR:** https://github.com/mdrewt/monster-realm/pull/154
+**ADR:** `docs/adr/0101-m14.5d-client-battle-ux.md` (**ADR-0101 CONSUMED** — supersedes sibling m14.5e's "next-free stays 0101" note; **ADR next-free → 0102**)
+**Worktree:** `.claude/worktrees/m14.5d` (supervisor cleans up post-merge). Pure-client diff — disjoint from sibling m14.5e (PR #153, server-module), no collisions.
+
+**What landed (EARS 14.5d-2/3/4):**
+- **14.5d-2 weather pipeline:** `SdkBattleRow.state.weather` (structural, optional) → `battleRowToStore` explicit `value→turnsRemaining` rename (`!= null` object-truthiness; `turnsRemaining: 0` survives) → `StoreBattle.weather: StoreWeather | null` → `BattleViewModel.weather {label, turnsRemaining}` via pure `weatherBanner()` → `data-testid="weather-banner"` field banner (textContent-only), cleared on null/hide path.
+- **14.5d-3 parity rigor:** `BattleViewModel.outcome` = `BattleOutcomeTag` literal union; narrowing ONLY in `buildBattleViewModel` (unknown → warn + null VM); `#renderOutcome` exhaustive `never`-check (interpolation fallback replaced; never-arm proven unreachable). Parity tests derive variant lists from generated bindings at runtime (`X.algebraicType.value.variants[].name`), anchored length 5/4/4 + known member (no vacuous pass).
+- **14.5d-4 VM-compare refresh guard (NEW — the "cheap 90% fix"):** pure `battleVMsEqual` (field-by-field incl. card status + weather; bigint `===`; arrays length-first; JSON.stringify rejected) + `shouldSkipBattleRefresh(visible, lastVm, vm)` in `refreshBattle`; visible-check is primary defense on all hide paths; `lastBattleVM` resets (hide branch/Escape/resetPredictionState) are invariant hygiene; overlay lifecycle state updates before the guard.
+
+**14.5d-1 PARKED (hidden dependency = SPEC GAP):** cure-item Use-Item UI requires classify-by-data on `cure_status`, which lives ONLY on game-core `ItemDef` content — deliberately absent from the public `item_row` table (battle.rs use_battle_item guard-3 doc). Client has no data path; spec's `Touches: client/src/** only` is wrong for this criterion. **Unblocking path (ADR-0101):** small server slice adds additive `cure_status` column to item_row + seeding + bindings regen, then a client slice mirrors the bait-selector verbatim. Supervisor: re-serialize as follow-up slice pair; correct spec §14.5d-1 touches.
+
+**Gates:** local full `just ci` EXIT=0 (log /tmp/m14.5d_justci2.log): 1075/1075 Rust nextest + doc tests, 833/833 client tests (was 778; +56 gating +2 corrections −3 rewritten), 53/53 evals, biome exit 0, tsc clean. Remote CI running on `dc0a4f6` at handoff.
+
+**Orchestration record (audit):** planner → plan-review (reviewer approve-with-changes ×10 findings + red-team ×8, all folded) → tester (56 RED tests, red run 43F/131P @ 80eb39d) → specialist red→green (no gating-test edits) → 4 parallel impl lenses (reviewer approve-with-changes, red-team 1 MEDIUM fixed, simplify 1 MEDIUM folded, desync-guard 1 MEDIUM fixed + field-mapping table CLEAN) → consolidated fix pass (specialist prod-files ∥ tester test-files, disjoint) → **verifier PASS** (RED provenance proven, no weakening, teeth bite). reducer-security-auditor deliberately skipped: zero reducer/server code in diff. Deviation noted: impl red-team applied its own `== null` fix + 2 tests directly (report-only instruction breached; audited by orchestrator + covered by verifier integrity pass — no weakening).
+
+**Gaps documented (ADR-0101 Consequences):** Sleep `turnsRemaining` not in card VM (future countdown display must extend VM + compare); two unknown weather tags compare equal via `''` labels (zero visual impact); unknown-variant console.warn per-batch until bindings regen (intentional).
+
+**Doc-aggregation compliance:** CHANGELOG/adr-README/ARCHITECTURE untouched (supervisor reconciles; ADR-0101 needs indexing). Codebase-memory graph: main checkout unchanged (pure-branch work) — supervisor runs `detect_changes`/`index_repository` post-merge.
+
+**Supervisor owns squash-merge.** Next per spec §6: 14.5f, 14.5g (+ the re-serialized 14.5d-1 follow-up pair).
