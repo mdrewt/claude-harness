@@ -164,3 +164,8 @@ Launching m14.5f (republish proof + randomized convergence) serial, ADR reserved
 
 ## 2026-07-13T12:25:38Z — supervisor tick mr-sup-cowork-20260713T120645Z-485462-481 — m14.5h IN-PROGRESS
 Launching m14.5h (nightly mutant kill apply_entry_ability:158 + ADR-0100 D6 KO-auto-switch coverage) serial, ADR 0104 reserved (expected unused). Brief /tmp/mr_pass_m14.5h.md. Detached via mr-launch.sh.
+
+## 2026-07-13T13:54:16Z — human session (Drew, via cowork supervisor chat) — M-infra-d spec authored
+- New infra slice spec: specs/monster-realm-v2/M-infra-d-adr-digest.spec.md — agent-facing ADR compaction: canonical header block backfill (Status/Supersedes/Amends/Subsystems/Decision), generated drift-gated docs/adr/DIGEST.md, frozen design-corpus.json (harness 0002-0034, H- namespace, 0055-0057 collision as data), just adr-digest + ci gate, fixture proof-of-teeth eval. README.md stays supervisor-owned (allocator seed untouched). PLAN §9 bullet inserted before M15; mr-state queue updated.
+- Sequencing: SERIAL — launch only with no in-flight slice (backfill touches every docs/adr file). m14.5h currently in flight; 14.5d-1 pair also queued. Supervisor picks order next tick.
+- Distinct from M-infra-b (Plan A doc-aggregation fragments) — no CHANGELOG/ARCHITECTURE/fragment scope here; if M-infra-b lands later its docs-reconcile should also run just adr-digest.

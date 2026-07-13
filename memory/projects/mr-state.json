@@ -1,6 +1,6 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-13T14:35:00Z",
+ "updated_utc": "2026-07-13T13:54:16Z",
  "updated_by": "m14.5h-session",
  "master": {
   "sha": "3667bc4 (m14.5g #157)",
@@ -21,11 +21,12 @@
  ],
  "queue": [
   "14.5d-1 PARKED: cure_status item UI requires cure_status column on item_row (server+client slice pair)",
-  "FOLLOW-UP: recurring touches-overrun (m14c/m14.5c/m14.5e/m14.5g) — tighten brief touches declarations",
-  "M15 Trading (Phase C) next milestone after nightly green"
+  "FOLLOW-UP: recurring touches-overrun (m14c/m14.5c/m14.5e/m14.5g) \u2014 tighten brief touches declarations",
+  "M-infra-d ADR digest (specs/monster-realm-v2/M-infra-d-adr-digest.spec.md) \u2014 SERIAL, launch only with no in-flight slice (70-file docs/adr backfill conflicts with any concurrent ADR edit); reserve next free ADR number at launch",
+  "M15 Trading (Phase C) next milestone"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m14.5h (PR #158) awaiting merge: restores nightly mutate-core gate (4 missed → 0), closes ADR-0100 D6. Equivalent mutant (ability.rs:169:60) exempted with second mutants.toml entry. After merge, nightly should be GREEN. ADR-0104 still free."
+ "notes": "m14.5h (PR #158) awaiting merge: restores nightly mutate-core gate (4 missed \u2192 0), closes ADR-0100 D6. Equivalent mutant (ability.rs:169:60) exempted with second mutants.toml entry. After merge, nightly should be GREEN. ADR-0104 still free. | M-infra-d spec authored+registered 2026-07-13 (human-session: Drew requested ADR compaction)."
 }
