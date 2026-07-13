@@ -231,3 +231,90 @@ Review pass for m14.5a launched detached (leader 43451, claude 43455, model clau
 **`just ci`:** EXIT=0 — 1061 Rust tests / 778 JS tests / all 47 evals green.
 
 **Supervisor owns squash-merge.** Next: 14.5b (Phase-4.5 slot capture already resolved; next slice per spec §6 sequencing) — likely 14.5b ability wiring or 14.5c weather client store.
+
+---
+## 2026-07-12T22:29Z — supervisor tick (mr-sup-cowork-20260712T220607Z-88479-15126)
+
+**m14.5a MERGED.** Review pass (launched 20:14Z after FLAGGED build-pass orchestration audit) finished EXIT=0 ATTEMPTS=1, cost $9.82. Audits at merge: orchestration CLEAN (reviewer/red-team/verifier lenses all present in review pass), gating-test CLEAN (no removed tests/asserts, no skips; combat/mod.rs diff = test-module wiring only). PR #147 squash-merged → master dc26107; CI green on dc26107. ADR-0098 indexed via doc-only chore PR #148 (auto-merge rejected by GH again — merged manually on green) → master 59b7f51. Worktrees/branches cleaned (m14.5a worktree removed, both branches deleted). Untracked strays `.claire/` and `docs/memory-cards/` left untouched.
+
+Next: composite launch of **m14.5b** (Phase 4.5 status write targets slot-at-emission; touches game-core/src/combat/{resolve,types,weather,status}.rs + tests; ADR reserved 0099) this tick if final re-probe stays clear.
+
+**2026-07-12T22:31:39Z IN-PROGRESS:** m14.5b launched (fresh; ADR reserved 0099; touches game-core/src/combat/{resolve,types,weather,status}.rs + tests).
+
+## 2026-07-12 — m14.5b TERMINAL STATE — PR #149 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m14.5b-status-slot-capture`, tip `7f704b7`, **PR:** https://github.com/mdrewt/monster-realm/pull/149
+**ADR:** `docs/adr/0099-m14.5b-status-applied-slot-capture.md` (ADR-0099 CONSUMED)
+
+**What landed (ADR-0099):**
+
+- **D1:** `BattleEvent::StatusApplied` now carries `slot: u32` — team-slot of the targeted monster, captured at emission time (Phase 2). Phase 4.5 reads slot from event rather than from `state.side_X.active`.
+- **D2:** Phase 4.5 drops the write if `state.side_X.team[slot].is_fainted()`. Sandstorm/Hail chip KO between emission and Phase 4.5 → write is silently dropped (no status on fainted monster).
+- **D3:** Removed stale `active_slot_a/b` early-capture variables in `run_post_turn_phases` (superseded by D1).
+- **D4:** Corrected misleading `types.rs` doc comment (was "No slot field: active is stable"; now explains event-carried slot + drop-if-fainted per ADR-0099).
+- `debug_assert!` added to Phase 4.5 loop: slot-out-of-bounds fails loud in debug/test builds.
+
+**Proof-of-teeth:** `m14_5b_2_proof_of_teeth_near_lethal_status_hit_sandstorm_chip_faint` — near-lethal Burn hit on 3-HP/Fire target with Sandstorm active; chip kills target; asserts `status.side_b[0] == None` (fainted, write dropped) AND `status.side_b[1] == None` (bench backup, never targeted).
+
+**Review gates all passed:**
+- Simplify: 1 fix (stale module doc in RT-M14.5A-01)
+- Reviewer: 4 findings fixed (stale inline comment blocker, self-contradicting comment major, debug_assert major, stale "RED" note minor)
+- Red-team: 3 new gating tests added (RT-M14.5B-01/02/03):
+  - `m14_5b_3`: both sides apply status in same turn → both writes committed
+  - `m14_5b_4`: slot is defender-side slot, not attacker-side slot
+  - `m14_5b_5`: zero StatusApplied events when KO and status in same hit
+- Verifier: PASS — 1066 Rust tests, 778 JS tests, all 53 evals green; no gating tests weakened
+
+**`just ci`:** EXIT=0 (805 combat tests + 1066 Rust total + 778 JS + all evals)
+**ADR-0099 CONSUMED. ADR next-free → 0100.**
+
+**Supervisor owns squash-merge.** Next M14.5 slice per spec §6 sequencing (14.5c weather client store or 14.5d ability wiring).
+
+## 2026-07-13T00:25Z — supervisor tick mr-sup-cowork-20260713T000618Z-168782-15059 (Cowork)
+
+**m14.5b MERGED.** PR #149 (feat/m14.5b-status-slot-capture) squash-merged → `1e3207b`; master CI GREEN. ADR-0099 indexed via doc-only chore PR #150 → `f8c63a9` (auto-merge rejected again — "Protected branch rules not configured"; merged manually on green). adr_next_free now 100.
+
+Audits: orchestration CLEAN (5 Agent invocations; tester/reviewer/red-team/verifier all present; model sonnet-4-6). Gating-test CLEAN (no removed tests/assertions, no skip/ignore; m14_5b_tests 5, redteam_m14_5a_tests 3 added, m14e_tests unchanged at 11). Wrapper: EXIT=0 ATTEMPTS=1, cost $11.67. Minor touches-overrun: `combat/mod.rs` (test-module registration only — benign; touches-declaration follow-up already queued).
+
+Cleanup: worktree m14.5b removed, local+remote branches deleted, main checkout ff-advanced to f8c63a9. Strays `.claire/` and `docs/memory-cards/` (untracked, pre-existing) left untouched.
+
+Next: m14.5c (STRUCTURAL → serial). Composite launch attempted this tick if final re-probe clean.
+
+## 2026-07-13T00:35Z — IN-PROGRESS: m14.5c launched (composite tick, same run_id as m14.5b merge)
+
+m14.5c (STRUCTURAL — species_row ability column + AbilityStore end-to-end wiring per §14.5c, ADR reserved 0100) launched detached via mr-launch.sh. Serial (no siblings). Brief /tmp/mr_pass_m14.5c.md.
+
+## 2026-07-12 — m14.5c TERMINAL STATE — PR #151 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m14.5c-ability-wiring`, tip `607fbc9`, **PR:** https://github.com/mdrewt/monster-realm/pull/151
+**ADR:** `docs/adr/0100-m14.5c-ability-system-wiring.md` (ADR-0100 CONSUMED)
+
+**What landed (ADR-0100):**
+
+- **D1:** `species_row.ability: Option<u32>` additive last field on `SpeciesRow` (ADR-0006). Client bindings regenerated (`just gen`); `species_row_table.ts` gains `ability: __t.option(__t.u32())`.
+- **D2:** Species content assignments — Flameling → ability_id 1 (Flame Body: StatusImmunity Burn), Sproutlet → ability_id 3 (Regeneration: EntryHeal denom=4), Tidalin → none. `SPECIES_GOLDEN` snapshot updated.
+- **D3:** `build_ability_store(side_a_ids, side_b_ids, ability_defs) -> AbilityStore` pure helper in `marshal.rs`; unknown IDs → `None` (graceful).
+- **D4:** `AbilityStore` threaded as last parameter through `resolve_full_turn` (Phase 0: `apply_ability_modifiers`), `resolve_player_swap` (entry: `apply_entry_ability`), `resolve_recruit_failure` (`apply_ability_modifiers`). All test-file call sites updated (8 files).
+- **D5:** Five reducer paths build and pass `AbilityStore`; `start_battle` + `begin_encounter` call `apply_entry_ability` for both sides' initial active before `Battle` row insert.
+- **D6 (gap, documented):** Auto-switch-on-KO does NOT call `apply_entry_ability`. `TODO(ADR-0100 D6)` marker added in `resolve.rs`; Phase C carry-forward. Two RT-D6a/b gap-documentation tests added.
+- **D7:** Stale "NOT wired" comment in `ability.rs` removed; accurate pipeline description substituted.
+- **Reviewer P1s fixed:** `species_from_row` now used in taming.rs recruit-success path (was inline `ability: None`); `StatBlock` import cleaned up.
+- `CONTENT_VERSION 10 → 11`; `evals/baselines/content-hash.json` updated; `evals/baselines/table-schemas.json` updated; `docs/knowledge/` regenerated (`just knowledge`).
+- 8 server-module test-file `SpeciesRow` literal initializers updated with `ability: None`.
+- ARCHITECTURE.md M14.5 section added (m14.5a + m14.5b + m14.5c narratives); ADR-0097–0100 added to ADR cross-reference list.
+
+**Gating tests (7 EARS + 2 RT-D6 = 9 new, all GREEN):**
+- `content_flameling_has_flame_body_ability` (EARS 14.5c-1a)
+- `content_sproutlet_has_regeneration_ability` (EARS 14.5c-1b)
+- `content_tidalin_has_no_ability` (EARS 14.5c-1c)
+- `content_driven_ability_store_resolves_flame_body` (EARS 14.5c-2a)
+- `content_driven_ability_store_resolves_regeneration` (EARS 14.5c-2b)
+- `flameling_flame_body_clears_burn_via_modifiers` (EARS 14.5c-3a)
+- `sproutlet_regeneration_heals_on_entry` (EARS 14.5c-3b)
+- `rt_d6a_ko_auto_switch_does_not_call_entry_ability_status_immunity` (RT-D6a, gap doc)
+- `rt_d6b_ko_auto_switch_does_not_call_entry_ability_entry_heal` (RT-D6b, gap doc)
+
+**`just ci`:** EXIT=0 — 1073 Rust tests / 778 JS tests / all evals green
+**ADR-0100 CONSUMED. ADR next-free → 0101.**
+
+**Supervisor owns squash-merge.** Next M14.5 slice per spec §6 sequencing.

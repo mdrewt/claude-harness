@@ -1,35 +1,33 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-12T20:16:12Z",
- "updated_by": "mr-sup-cowork-20260712T200619Z-42882-22633",
+ "updated_utc": "2026-07-12T21:30:00Z",
+ "updated_by": "m14.5c-build-pass-terminal",
  "master": {
-  "sha": "1f21ab1 (deflake-e2e-r2-dialogue #146)",
-  "ci": "GREEN on 1f21ab1",
+  "sha": "f8c63a9 (chore adr-index #150; code tip 1e3207b m14.5b #149)",
+  "ci": "GREEN on 1e3207b (f8c63a9 doc-only)",
   "nightly": "last nightly FAILURE on 35945f8 (pre-#145, expected); #145 mutant-killers on master - expect next nightly green"
  },
- "adr_next_free": 98,
- "inflight": [
+ "adr_next_free": 101,
+ "inflight": [],
+ "awaiting_merge": [
   {
-   "slice": "m14.5a",
-   "session_leader": 43451,
-   "claude_pid": 43455,
-   "started_utc": "2026-07-12T20:16:12Z",
-   "phase": "review-pass (orchestration audit FLAGGED on build pass)"
+   "slice": "m14.5c",
+   "pr": 151,
+   "branch": "feat/m14.5c-ability-wiring",
+   "tip": "607fbc9",
+   "adr": "ADR-0100 (CONSUMED)",
+   "ci": "local just ci EXIT=0; remote CI in-progress",
+   "note": "STRUCTURAL serial (schema+wiring+content). Reviewer P1s fixed. RT-D6 gap tests added. D6 auto-switch gap documented, Phase C carry-forward."
   }
  ],
- "awaiting_merge": [],
  "queue": [
-  "m14.5b (after m14.5a - shares resolve.rs)",
-  "m14.5c (STRUCTURAL, serial)",
-  "m14.5d/e/f/g (mutually disjoint, fan-out eligible after c)",
-  "FOLLOW-UP: R1 swap_active status-drop (ADR-0096) -- Phase C carry-forward",
-  "FOLLOW-UP: R2 bench-cure gap (ADR-0096) -- Phase C carry-forward",
-  "FOLLOW-UP: R3 attempt_recruit status-drop (ADR-0096) -- Phase C carry-forward",
+  "m14.5d/e/f/g (mutually disjoint, fan-out eligible after m14.5c merges)",
+  "D6 gap: apply_entry_ability on KO-auto-switch (ADR-0100 D6, Phase C)",
   "FOLLOW-UP: okf-export updated-stamp drift trap -- fold into a doc/infra slice",
   "FOLLOW-UP: m14c touches-overrun (server-module ripple) -- tighten brief touches declarations for content-registry slices"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m14.5a build pass done (PR#147, CI green, EXIT=0 ATTEMPTS=1, cost .52) but orchestration audit FLAGGED (tester-only, zero review/verifier lenses) -> review pass launched 20:14Z on existing branch feat/m14.5a-swap-recruit-full-pipeline. Merge deferred until review pass lands + gating-test audit at merge. Touches-overrun (docs/knowledge/reducers/*.md, doc-only) accepted+recorded. Build-pass artifacts: /tmp/mr_pass_m14.5a.buildpass1.*"
+ "notes": "m14.5c build pass TERMINAL. PR #151 open. ADR-0100 consumed, next-free=0101. R1/R2/R3 from ADR-0096 all addressed by m14.5a (R1/R3) and m14.5b (slot-capture); R2 bench-cure still Phase C. Reviewer P1s: stale ability.rs comment removed, taming.rs species_from_row SSOT restored."
 }
