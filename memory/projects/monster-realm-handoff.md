@@ -155,3 +155,118 @@ structural set; no fan-out). Brief /tmp/mr_pass_m16a.md.
 
 ## 2026-07-14T10:12:17Z — mr-sup-cowork-20260714T100626Z-1158375-18603
 REVIEW PASS m16a-pvp COMPLETE — **APPROVE-MERGE**. PR #172 tip `3957a69`. All 5 lenses run (tester/reviewer/red-team/reducer-security-auditor/desync-guard/verifier). Three runs of PvP tests green; two teeth checks confirmed (RT-M16-06 mutation → red; EA-PVP-01 mutation → red; both reverted). `just ci` EXIT=0 (1169 Rust tests, 912 JS tests, 32 evals). Two code fixes pushed (3957a69): RT-M16-08 GC ordering violation (write_back_battle_results called after terminal update → deletes current battle row) + H-3 silent Ok on mismatch. Side-B XP gap documented as deferred (ADR-0109 D10, M17). Verdict memo at memory/projects/monster-realm-m16a-review.md. **Supervisor owns squash-merge.** m16b/m16c PARKED. ADR next-free: 0110.
+
+## 2026-07-14T11:55Z — weekly ninth-review (generate-improvement-plan task) — NEW MILESTONE M16.5 INSERTED
+
+Read-only multi-lens review of master @ `3424c5c` (isolated clone, no worktrees/branches touched; clone
+torn down). 7 lenses → blind verification (20/20 verified, 0 dropped). Severity: 0 Critical, 1 High,
+7 Medium, 12 Low.
+
+**New milestone: `specs/monster-realm-v2/M16.5-ninth-review-residuals.spec.md`** — inserted between M16
+and M17 (PLAN.md Phase C updated). Include it with your git commits. Chain it per your own judgement;
+suggested: evals/docs slices (16.5e/16.5g) any time, 16.5a (HIGH — battle↔trade interlock; trade-away-
+mid-battle permanently bricks the battler via the write_back_party_hp abort rollback) must rebase onto
+merged m16a because the guard must also cover PvP battle rows. Note: docs-chore PR #171 (ADR README
+0107/0108 rows + next-free 0109) was still unmerged on master at review time — 16.5g-1 asks to verify
+or land it. Full ranked findings in the review tasks
+ chat output (severity x ROI ranked, with verified evidence and repro for the High).
+
+---
+
+## 2026-07-14T12:18:38Z — mr-sup-cowork-20260714T120554Z-1223997-28122 (Cowork supervisor tick)
+
+- **m16a MERGED**: review pass m16a-pvp returned APPROVE-MERGE (memo monster-realm-m16a-review.md). PR #172 squash-merged 12:09:23Z -> master 115daab; CI+e2e GREEN. Review pass fixed HIGH RT-M16-08 (GC write-back ordering), H-3, H-1 (3957a69).
+- Audits: orchestration FLAGGED->cleared by review pass; gating-test audit CLEAN.
+- ADR index reconciled via chore PR #173 (e433dc2): 0109 row added, next free 0110. --auto rejected (clean status); merged manually, doc-only.
+- Worktree + feat/m16a-pvp-spine (local+remote) and chore branch cleaned.
+- **Nightly RED** (run 29320384291, 09:04Z): mutate-core missed=10 — game-core/src/trading/rules.rs (39,40,42,69,84,220), trading/types.rs (56,89), combat/ability.rs (170). 5 timeouts in tiled_import.rs tolerated iff missed=0 (ADR-0088). Next target: fix-nightly-mutants (test-only slice to kill the 10 missed mutants).
+
+## 2026-07-14 — fix-nightly-mutants TERMINAL STATE — PR #174 OPEN, local `just ci` EXIT=0
+
+**Branch:** `fix/fix-nightly-mutants`, **PR:** https://github.com/mdrewt/monster-realm/pull/174  
+**ADR:** None needed — test-only, no new patterns; **ADR next-free stays 0110**  
+**Worktree:** `.claude/worktrees/fix-nightly-mutants`
+
+**Summary:** 6 new tests in trading/rules.rs + trading/types.rs; re-pinned ability.rs line drift (169→170); added is_active equivalent-mutant exemption. Kills 6 mutants in declared scope (trading/); nightly mutate-core 10→5 missed. Discovered 3 traps: line-drift brittleness, is_active terminal-state equivalent, eval-guards-count coupling.
+
+**Remaining 5 mutants:** ability.rs (54, 56, 58, 158) + resolve.rs (462) — outside declared scope; next follow-up requires supervisor re-brief.
+
+**Gates:** local full `just ci` EXIT=0. Remote CI running. Supervisor owns merge; build loop stops at PR open pending CI verification.
+
+## 2026-07-14T14:21Z — mr-sup-cowork-20260714T140528Z-1322725-1604 (Cowork supervisor tick)
+
+- **fix-nightly-mutants MERGED**: PR #174 squash-merged 14:10:09Z -> master 35ebe3f; master CI GREEN (CI + e2e). Worktree + local/remote branch cleaned. `.done` EXIT=0 ATTEMPTS=2.
+- Audits: orchestration CLEAN (Sonnet-class model; tester/reviewer/red-team/verifier all present). Gating-test audit CLEAN — no removed/skipped tests; 2 equivalent-mutant exclusions documented + line-pinned, integrity eval updated to 3 blessed exclusions.
+- Touches overrun (again): `.cargo/mutants.toml` + `evals/mutate-core-recipe-integrity.eval.mjs` undeclared. No in-flight siblings so no collision; merged anyway. Follow-up "tighten brief touches declarations" stays in queue.
+- No ADR added; adr_next_free stays 0110. No adr-index chore needed.
+- **Nightly still expected RED**: 5 mutants remain outside merged scope — ability.rs (54, 56, 58, 158) + resolve.rs (462). Composite launch: **fix-nightly-mutants-r2** (test-only, game-core combat) targeting those 5.
+
+## 2026-07-14T14:24Z — mr-sup-cowork-20260714T140528Z-1322725-1604 — IN-PROGRESS: launching fix-nightly-mutants-r2
+- Composite launch after #174 merge. Test-only: kill remaining 5 mutants (ability.rs 54/56/58/158, resolve.rs 462). ADR 0110 reserved if needed.
+
+## 2026-07-14 — fix-nightly-mutants-r2 TERMINAL STATE — PR #175 OPEN, local `just ci` EXIT=0
+
+**Branch:** `fix/fix-nightly-mutants-r2`, tip `f8e94af`, **PR:** https://github.com/mdrewt/monster-realm/pull/175
+**ADR:** None (test-only); **ADR next-free stays 0110**
+**Worktree:** `.claude/worktrees/fix-nightly-mutants-r2`
+
+**Key finding:** All 5 mutants the supervisor expected to survive were already caught by existing tests (EARS-21 for ability.rs:56; indirect path via resolve_recruit_failure for resolve.rs:467). Targeted cargo-mutants run showed 0 missed BEFORE any changes. Lines 54, 58, 158 in ability.rs and 462 in resolve.rs do not generate separate cargo-mutants 27.1.0 mutations.
+
+**Gap found:** `resolve_enemy_turn_only_enemy_acts` does NOT assert `!events.is_empty()` — a `vec![]` stub passes vacuously. Added `resolve_enemy_turn_returns_events_for_skilled_enemy` to make the kill direct.
+
+**Reviewer:** No blockers. m-1 (over-long assertion message) applied — shortened to essential claim, rationale stays in doc-comment. m-2 (blank line after `#[test]`) no action required (pre-existing quirk). Verifier PASS (all 5 checks confirmed).
+
+**Evidence:** 60 mutants tested, 54 caught, 6 unviable, 0 missed. `.cargo/mutants.toml` unchanged (3 exclusions). Eval unchanged.
+
+**Supervisor owns squash-merge. Next: M16b (PvP client UI) or M16.5 residuals per PLAN.md.**
+
+## 2026-07-14T16:15Z — supervisor tick mr-sup-cowork-20260714T160530Z-1633022-7030
+- **fix-nightly-mutants-r2 MERGED** — PR #175 squash-merged → master 57168cd, CI GREEN.
+- Key finding (from run): all 5 brief mutants (ability.rs 54/56/58/158, resolve.rs 462) were already caught by existing tests; run added one direct liveness test for `resolve_enemy_turn` (empty-vec stub previously passed vacuous assertions). Targeted cargo-mutants: 60 mutants, 54 caught, 6 unviable, **0 missed**.
+- Audits: orchestration CLEAN (sonnet; tester/reviewer/verifier roles present), gating-test integrity clean (1 test added, 0 removed/skipped). Cost $4.62, 1 attempt.
+- Cleanup: worktree + local/remote branch removed; main checkout ff'd to 57168cd. ADR 0110 reserved but unused → adr_next_free stays 110.
+- NEXT: verify next nightly shows missed=0; then next unfinished PLAN §9 slice.
+
+## 2026-07-14T16:25:29Z — mr-sup-cowork-20260714T160530Z-1633022-7030 — IN-PROGRESS: launching m16b
+- Composite launch after #175 merge. m16b = M16 PvP client UI (deferred tail of merged m16a spine). ADR 0110 reserved if needed. Touches: client/src/** (excl module_bindings) + client/e2e/**. Serial (no siblings).
+
+---
+
+## 2026-07-14 — m16b TERMINAL STATE — PR #176 OPEN, local gates GREEN
+
+**Branch:** `feat/m16b-pvp-client-ui`, tip `ce89707`, **PR:** https://github.com/mdrewt/monster-realm/pull/176
+**ADR:** 0110 at `docs/adr/0110-m16b-pvp-client-ui.md`
+**Worktree:** `.claude/worktrees/m16b`
+
+**Built (m16b — PvP client UI):**
+- `client/src/ui/pvpModel.ts` — pure `buildPvpChallengeViewModel`; incoming/outgoing/challengeablePlayers
+- `client/src/ui/pvpView.ts` — DOM shell; `refresh(vm, forceVisible)` auto-show/hide; show/hide/showFeedback
+- `client/src/ui/pvpModel.test.ts` — 6 Vitest tests (incoming/outgoing/challengeable/fallback-name)
+- `client/src/net/store.ts` — `StoreBattleChallenge` + `#challenges` map + `upsertChallenge`/`removeChallenge`/`allChallenges`/`allPlayers`
+- `client/src/net/rowConvert.ts` — `SdkBattleChallengeRow` + `battleChallengeRowToStore`
+- `client/src/net/connection.ts` — `battle_challenge` table insert/update/delete + `SELECT * FROM battle_challenge` subscription; comment: `battle_action` MUST NEVER be subscribed
+- `client/src/ui/battleModel.ts` — `isPvP` detection, `pvpPendingSubmit`, `pvpOpponentName`, `canFlee: false` in PvP, `battleVMsEqual` extended; `makeBattle()` test fixture updated to `opponentIdentity: 'alice'`
+- `client/src/ui/battleView.ts` — `onPvpAttack`/`onPvpSwap` callbacks, pvpStatusEl banner, locked UI when pending, PvP-labeled skill/swap buttons
+- `client/src/main.ts` — full wiring: `pvpPendingTurnNumber` tracking, `PvpView` construction, `KeyP` handler (9-way guard), pvpView batch listener (anyOverlayVisible guard), `onReconnect` `pvpView?.hide()`, `new Identity(hex)` for challengePvp target
+- `client/index.html` — `#pvp-challenge-overlay` DOM shell
+- `client/vite.config.ts` — `pvpView.ts` in coverage.exclude
+- `evals/dom-shell-coverage-exclusion.eval.mjs` — `pvpView.ts` in `DOM_SHELLS`
+- `docs/adr/0110-m16b-pvp-client-ui.md` — ADR filed; DIGEST regenerated
+- `client/e2e/pvp.spec.ts` — 7 DOM/key/mutual-exclusivity tests
+
+**Key design invariants (ADR-0110):**
+- `battle_action` PRIVATE — never subscribed (ADR-0015 must-never-leak). Only comments reference it.
+- `pvpPendingTurnNumber` set INSIDE `sendGuarded` lambda (frozen-link no permanent lock); `.catch` clears on rejection
+- pvpView auto-show gated by `anyOverlayVisible` (no pop-over-battle)
+- `isPvP = !isWild && playerIdentity !== opponentIdentity`; canFlee=false in PvP
+- Pre-existing m15b KeyQ/KeyH/KeyT `!tradeView?.visible` gaps closed in this slice
+
+**Review-pass fixes:** 1 BLOCKER + 1 WARNING + 2 pre-existing gaps (all closed)
+- BLOCKER RT-M16B-01: pvpPendingTurnNumber moved inside lambda + .catch clears on rejection
+- WARNING RT-M16B-02: anyOverlayVisible guard on pvpView auto-show
+- KeyQ/KeyH/KeyT !tradeView?.visible + KeyT !pvpView?.visible (pre-existing m15b gap)
+
+**Gates:** TypeScript clean, 934/934 tests (34 files), 58 evals PASS. Remote CI pending.
+
+**Supervisor owns squash-merge.** m16c (PvP evals) PARKED.
+**ADR next-free:** 0111

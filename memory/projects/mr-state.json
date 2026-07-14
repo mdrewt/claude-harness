@@ -1,28 +1,32 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-14T08:36:00Z",
- "updated_by": "mr-sup-cowork-20260714T080541Z-1080981-28883",
+ "updated_utc": "2026-07-14T13:05:00Z",
+ "updated_by": "m16b-build-loop",
  "master": {
-  "sha": "3424c5c (m15c #170)",
-  "ci": "GREEN (3424c5c full run success)",
-  "nightly": "unknown"
+  "sha": "57168cd (#175 fix-nightly-mutants-r2)",
+  "ci": "GREEN",
+  "nightly": "expected GREEN next run (targeted mutants 0 missed; verify nightly missed=0)"
  },
- "adr_next_free": 110,
- "inflight": [
+ "adr_next_free": 111,
+ "inflight": [],
+ "awaiting_merge": [
   {
-   "slice": "m16a",
-   "session_leader": 1082789,
-   "claude_pid": 1082797,
-   "started_utc": "2026-07-14T08:34:30Z"
+   "slice": "m16b",
+   "pr": 176,
+   "branch": "feat/m16b-pvp-client-ui",
+   "tip": "ce89707",
+   "adr": "0110",
+   "ci": "PENDING"
   }
  ],
- "awaiting_merge": [],
  "queue": [
-  "VERIFY next tick: chore PR #171 (ADR index 0107/0108, next-free 0109) auto-merged on green",
-  "FOLLOW-UP: recurring touches-overrun \u2014 tighten brief touches declarations (recurred on m15b)"
+  "m16c (PvP evals tail) — PARKED, after m16b merge",
+  "M16.5 residuals (16.5a HIGH battle-trade interlock first)",
+  "FOLLOW-UP: recurring touches-overrun - tighten brief touches declarations",
+  "FOLLOW-UP: briefs must make tester-role explicit"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m15c MERGED (PR #170 -> 3424c5c, CI green; audits CLEAN-test-artifact/CLEAN; cost $11.89). M15 Trading CLOSED. Index chore #171 auto-merge armed (CI pending at tick end). Composite launch m16a (M16 PvP spine, ADR-0109 reserved, serial \u2014 schema is structural). Next tick: poll m16a; verify #171 merged."
+ "notes": "m16b DONE (PR #176, ce89707, ADR-0110). PvP client UI: pvpModel/pvpView/main.ts wired; battle_action never subscribed; pvpPendingTurnNumber inside-lambda fix; anyOverlayVisible auto-show guard; isPvP detection; 934/934 tests, 58 evals. Supervisor owns merge. Next: m16c (PvP evals) or M16.5 residuals."
 }
