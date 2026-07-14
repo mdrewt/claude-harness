@@ -134,9 +134,21 @@ structural set; no fan-out). Brief /tmp/mr_pass_m16a.md.
 - Side-B HP write-back in both forfeit and natural-resolution terminal paths
 - `pvp_deadline_reaper` scheduler-only: `ctx.sender != ctx.identity()` guard
 
-**Gates:** local full `just ci` EXIT=0 (238 Rust tests, 912 client tests, all evals PASS including spacetime-type-snapshot, schema-snapshot, bindings-drift, knowledge-bundle-conformance, battle-reducer-security, no-idle-accrual). Remote CI running.
+**Gates (initial):** local full `just ci` EXIT=0 (238 Rust tests, 912 client tests, all evals PASS). Remote CI green.
 
-**Reviewer + red-team agents running in background** (fixes to be applied if CRITICAL/HIGH findings).
+**Review-pass (b25a73e + 83087e4):**
+- RT-M16-02 CRITICAL FIXED: `is_practice = opponent_identity != WILD_IDENTITY` → `player_identity == opponent_identity`
+- RT-M16-05 HIGH FIXED: `apply_pvp_forfeit` + `resolve_pvp_turn_if_ready` now update battle row BEFORE write-backs (log-and-continue ADR-0077); `Battle` gains `#[derive(Clone)]`
+- RT-M16-01 HIGH FIXED: `challenge_pvp` guard 5a: `is_in_ongoing_battle(ctx, target)`
+- H-2 FIXED: `challenge_pvp` guard 5b: `has_active_incoming_challenge(ctx, me)`
+- RT-M16-06 MEDIUM FIXED: `pvp_deadline_forfeit_side` reads `b_submitted`; test inverted to `assert_ne!`
+- M-1 FIXED: `debug_assert!(actions.len() == 2)` in `resolve_pvp_turn_if_ready`
+- RT-M16-03 MEDIUM FIXED: `write_back_battle_results` GCs by `opponent_identity` for PvP side-B terminal rows
+- 5 new red-team gating tests (RT-M16-01..03, RT-M16-05..06) GREEN
+- `just ci` EXIT=0 after fixes (242 Rust tests, 912 client tests)
+- ADR-0109 Consequences section updated; knowledge bundle regenerated
+
+**Gates post-review:** local `just ci` EXIT=0 (242 Rust, 912 JS, 48 evals PASS). tip `83087e4`.
 
 **Supervisor owns squash-merge.** m16b (client UI) + m16c (PvP evals) PARKED.
 **ADR next-free:** 0110
