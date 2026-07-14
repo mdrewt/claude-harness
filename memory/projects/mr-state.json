@@ -1,28 +1,30 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-14T04:31:24Z",
- "updated_by": "mr-sup-cowork-20260714T040641Z-1000312-12965",
+ "updated_utc": "2026-07-14T05:00:00Z",
+ "updated_by": "m15b terminal handoff",
  "master": {
   "sha": "9754b03 (chore #167)",
   "ci": "GREEN (15279c9 full run; 9754b03 doc-only)",
   "nightly": "unknown"
  },
  "adr_next_free": 108,
- "inflight": [
+ "inflight": [],
+ "awaiting_merge": [
   {
    "slice": "m15b",
-   "session_leader": 1001909,
-   "claude_pid": 1001909,
-   "started_utc": "2026-07-14T04:31:24Z"
+   "pr": 168,
+   "branch": "feat/m15b-trade-client-ui",
+   "verdict": "MERGE-OK",
+   "ci": "GREEN (just ci exit 0: 1142 Rust + 912 JS tests, all evals)",
+   "notes": "reviewer B-1/B-2/M-1/M-2 fixed; red-team clean (no criticals); RT-TO-01+RT-TO-02 tests committed; ADR-0107 accepted"
   }
  ],
- "awaiting_merge": [],
  "queue": [
-  "m15c trade evals tail (serial after m15b \u2014 its touches incl. vague integration/e2e)",
-  "FOLLOW-UP: recurring touches-overrun \u2014 tighten brief touches declarations"
+  "m15c trade evals tail (serial after m15b — its touches incl. vague integration/e2e)",
+  "FOLLOW-UP: recurring touches-overrun — tighten brief touches declarations"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Tick 20260714T0406Z: merged #166 fix-red-master (master GREEN), merged #167 ADR-index chore, launched m15b (trade client UI, ADR 0107). claude_pid==leader pid recorded (pgrep matched launcher); liveness judged from leader per rule 2."
+ "notes": "m15b MERGE-OK (PR #168). Master still at 9754b03 pending merge. Next: supervisor merges #168, then queues m15c."
 }
