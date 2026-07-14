@@ -1,7 +1,7 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-14T13:05:00Z",
- "updated_by": "m16b-build-loop",
+ "updated_utc": "2026-07-14T18:35:00Z",
+ "updated_by": "m16b-review-pass",
  "master": {
   "sha": "57168cd (#175 fix-nightly-mutants-r2)",
   "ci": "GREEN",
@@ -14,13 +14,25 @@
    "slice": "m16b",
    "pr": 176,
    "branch": "feat/m16b-pvp-client-ui",
-   "tip": "ce89707",
-   "adr": "0110",
-   "ci": "PENDING"
+   "tip": "6e016bb",
+   "worktree": null,
+   "gates": [
+    "orchestration_audit:FLAGGED->review-pass:FIXED",
+    "gating_test_audit:CLEAN",
+    "remote_ci:GREEN (ce89707; re-running at 6e016bb)",
+    "mergeStateStatus:CLEAN",
+    "review_pass:FIXED(51e6f5d+6e016bb) \u2014 5 WARNINGs fixed, 938/938, 58/58 evals"
+   ],
+   "adr_reserved": 110,
+   "touches": [
+    "client/src/**",
+    "client/e2e/**",
+    "+overrun: client/index.html, client/vite.config.ts, evals/dom-shell-coverage-exclusion.eval.mjs"
+   ]
   }
  ],
  "queue": [
-  "m16c (PvP evals tail) — PARKED, after m16b merge",
+  "m16c (PvP evals tail) \u2014 PARKED, after m16b merge",
   "M16.5 residuals (16.5a HIGH battle-trade interlock first)",
   "FOLLOW-UP: recurring touches-overrun - tighten brief touches declarations",
   "FOLLOW-UP: briefs must make tester-role explicit"
@@ -28,5 +40,5 @@
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m16b DONE (PR #176, ce89707, ADR-0110). PvP client UI: pvpModel/pvpView/main.ts wired; battle_action never subscribed; pvpPendingTurnNumber inside-lambda fix; anyOverlayVisible auto-show guard; isPvP detection; 934/934 tests, 58 evals. Supervisor owns merge. Next: m16c (PvP evals) or M16.5 residuals."
+ "notes": "m16b review pass COMPLETE \u2014 VERDICT: FIXED. 5 WARNINGs fixed in 51e6f5d+6e016bb on feat/m16b-pvp-client-ui. 938/938 unit tests (4 new RT-PVP-01 gating tests), 58 evals. Verdict memo: memory/projects/monster-realm-m16b-review.md. Next tick: verify CI green at 6e016bb, merge #176 (squash), ADR-0110 index chore-PR, then m16c/M16.5 per queue."
 }

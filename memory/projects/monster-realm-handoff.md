@@ -270,3 +270,29 @@ or land it. Full ranked findings in the review tasks
 
 **Supervisor owns squash-merge.** m16c (PvP evals) PARKED.
 **ADR next-free:** 0111
+
+## 2026-07-14T18:12:21Z — supervisor tick mr-sup-cowork-20260714T180656Z-1670398-693 — IN PROGRESS
+m16b build run finished clean (EXIT=0 ATTEMPTS=1, PR #176 open, remote CI green, mergeStateStatus CLEAN). Pre-merge orchestration audit FLAGGED: zero tester-role invocations (planner/red-team/review-lens only, model sonnet OK). Gating-test audit clean (no removed/skipped tests in diff). Touches-overrun noted again: client/index.html, client/vite.config.ts, evals/dom-shell-coverage-exclusion.eval.mjs outside declared set (no siblings, no collision). Per protocol, launching mandated review pass (slice id m16b-review) on the PR diff with tester+verifier+auditor lenses before merge. Merge deferred to next tick pending VERDICT in memory/projects/monster-realm-m16b-review.md.
+
+## 2026-07-14 — m16b review pass COMPLETE — VERDICT: FIXED (pushed 51e6f5d)
+
+2 defects found and fixed. Branch `feat/m16b-pvp-client-ui` tip advanced `ce89707`→`51e6f5d`.
+
+**Fixes:**
+1. **WARNING RT-M16B-R1**: KeyG (shop) guard missing `!tradeView?.visible` — shop could open over active trade overlay. Pre-existing m15b gap; ADR-0110 fixed KeyQ/KeyH/KeyT but missed KeyG. Fixed: added at line 477 in main.ts.
+2. **WARNING RT-M16B-R2**: pvpView `forceVisible` preservation bug — `|| (pvpView?.visible ?? false)` branch didn't check `anyOverlayVisible`, so pvpView stayed open over a newly-started battle when player accepted a challenge while pvpView was open. Fixed: `!anyOverlayVisible && (incoming || pvpView.visible)`.
+
+**Lens results:**
+- Tester: 934/934, 3× stable; Mutations A+B RED (teeth confirmed); Mutation C GREEN (main.ts orchestration not unit-testable — known gap, e2e only)
+- Verifier: 934/934, just ci passes, no skip/only/removed assertions; fixture change `opponentIdentity: 'npc'→'alice'` is a CORRECTION; RT-PVP-DS-01 tests have real bite; pvpModel.test.ts lacks `// Kills:` comments (style gap only)
+- Reviewer/red-team: still running at report time — direct pre-agent checks confirmed ADR-0015 clean, pvpPendingTurnNumber-inside-lambda pattern, 9-way KeyP guard complete, anyOverlayVisible covers all overlays
+
+**Gates post-fix (51e6f5d):** 934/934 unit tests, 58/58 evals PASS.
+
+**Second round (6e016bb) — 3 more defects from reviewer/red-team:**
+- RT-PVP-01: pvpModel.ts was returning non-Pending outgoing challenges; pvpView.refresh's `hasActive` would auto-show overlay even when anyOverlayVisible=true. Fixed: `&& c.status === 'Pending'` filter + `if (!forceVisible)` in pvpView.refresh. 4 new gating tests.
+- Forfeit clear: pvpPendingTurnNumber not cleared when opponent forfeits (apply_pvp_forfeit skips advance_turn). Fixed: `|| outcome !== 'Ongoing'` fallback.
+
+**Final gates (6e016bb):** 938/938 unit tests (934 + 4 new RT-PVP-01), 58/58 evals PASS. Remote CI re-running.
+
+**Supervisor owns merge.** ADR next-free: 0111. m16c (PvP evals) still PARKED.
