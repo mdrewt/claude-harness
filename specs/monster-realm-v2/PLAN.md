@@ -272,6 +272,7 @@ breaks the spine. Numbering restarts for the new project.
   **M17 Ranked ladder** (persistent Elo profile; `M17-ranked-ladder.spec.md`; ADR-0026) ·
   **M18 Co-op raids** (`M18-coop-raids.spec.md`; ADR-0027) · **M19 Guilds/chat/social** (`M19-social.spec.md`;
   ADR-0028).
+- **M16.5 Ninth-review residuals** (`M16.5-ninth-review-residuals.spec.md`; inserted between M16 and M17 while m16a was in flight — resolves the verified 2026-07-14 ninth-review findings @ `3424c5c`: the one-directional battle↔trade interlock (trade-away-mid-battle → permanent zombie Ongoing battle + bricked battler, incl. PvP-row coverage) plus real teeth for the write_back_party_hp owner-change abort (the revived anchor test is a zero-assertion body), reject-not-destroy conservation at receiver item/currency caps, trade runtime-coverage completion (full-flow e2e hook or honest spec amendment; attempt_recruit added to the escrow-guards eval), symmetric trade-overlay mutual exclusivity (KeyQ/KeyH/KeyG) + exhaustive client status typing, eval-infra hardening (spacetime-type append-only gate, extraction robustness, additive-column smoke coupling), trade SSOT/privacy-doc polish + stale-offer TTL decision, and a ledger reconciliation pass (ADR README/ARCHITECTURE/CHANGELOG/PLAN + spec checkboxes); no new game-design surface).
 
 **Phase D — Production readiness:**
 - **M20 Observability, performance & load hardening** (`M20-observability-performance.spec.md`; ADR-0029) —

@@ -1,44 +1,42 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-14T18:35:00Z",
- "updated_by": "m16b-review-pass",
+ "updated_utc": "2026-07-14T23:59:00Z",
+ "updated_by": "m16c-review (sonnet)",
  "master": {
-  "sha": "57168cd (#175 fix-nightly-mutants-r2)",
-  "ci": "GREEN",
-  "nightly": "expected GREEN next run (targeted mutants 0 missed; verify nightly missed=0)"
+  "sha": "5a679da (#177 adr-index; #176 m16b at 44e5505)",
+  "ci": "GREEN (44e5505 success; 5a679da doc-only run pending)",
+  "nightly": "expected GREEN (verify missed=0)"
  },
- "adr_next_free": 111,
+ "adr_next_free": 112,
  "inflight": [],
  "awaiting_merge": [
   {
-   "slice": "m16b",
-   "pr": 176,
-   "branch": "feat/m16b-pvp-client-ui",
-   "tip": "6e016bb",
-   "worktree": null,
+   "slice": "m16c",
+   "pr": 178,
+   "branch": "feat/m16c-pvp-evals",
+   "branch_tip": "df60c76",
+   "worktree": ".claude/worktrees/m16c",
    "gates": [
-    "orchestration_audit:FLAGGED->review-pass:FIXED",
-    "gating_test_audit:CLEAN",
-    "remote_ci:GREEN (ce89707; re-running at 6e016bb)",
-    "mergeStateStatus:CLEAN",
-    "review_pass:FIXED(51e6f5d+6e016bb) \u2014 5 WARNINGs fixed, 938/938, 58/58 evals"
+    "remote CI green (fb10db0)",
+    "61/61 evals (df60c76 local, 5 clean runs)",
+    "just ci EXIT=0 (df60c76)",
+    "review VERDICT: FIXED (df60c76)"
    ],
-   "adr_reserved": 110,
+   "adr_reserved": 111,
    "touches": [
-    "client/src/**",
-    "client/e2e/**",
-    "+overrun: client/index.html, client/vite.config.ts, evals/dom-shell-coverage-exclusion.eval.mjs"
-   ]
+    "evals/**",
+    "client/e2e/**"
+   ],
+   "blocked_on": null
   }
  ],
  "queue": [
-  "m16c (PvP evals tail) \u2014 PARKED, after m16b merge",
-  "M16.5 residuals (16.5a HIGH battle-trade interlock first)",
+  "M16.5 residuals (16.5a HIGH battle-trade interlock first) — after m16c closes M16",
   "FOLLOW-UP: recurring touches-overrun - tighten brief touches declarations",
-  "FOLLOW-UP: briefs must make tester-role explicit"
+  "FOLLOW-UP: briefs must make tester-role explicit (m16c brief includes explicit tester mandate)"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m16b review pass COMPLETE \u2014 VERDICT: FIXED. 5 WARNINGs fixed in 51e6f5d+6e016bb on feat/m16b-pvp-client-ui. 938/938 unit tests (4 new RT-PVP-01 gating tests), 58 evals. Verdict memo: memory/projects/monster-realm-m16b-review.md. Next tick: verify CI green at 6e016bb, merge #176 (squash), ADR-0110 index chore-PR, then m16c/M16.5 per queue."
+ "notes": "m16c-review COMPLETE. VERDICT: FIXED (pushed df60c76). Two defects fixed: (1) ARCHITECTURE.md criterion count 10→11 for pvp-handshake-guards (c78a2fb); (2) cancelFiltersByTarget missing good-fixture teeth in pvp-deadline-disconnect.eval.mjs (df60c76). Theoretical future-risk findings (battleActionIsPublic single-line, hasStaleTurnCheck alias coupling, stripRustComments nested) not fixed — no current defect. just ci EXIT=0 on df60c76 (1176 Rust, 938 client, 61 evals). PR #178 ready to merge. Next: gating-test audit + squash-merge #178 -> ADR-0111 index chore -> M16 CLOSED -> M16.5 residuals (16.5a first)."
 }

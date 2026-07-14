@@ -1,62 +1,99 @@
-# fix-nightly-mutants slice — progress memo
+---
+name: fix-nightly-mutants
+description: fix-nightly-mutants DONE — PR #174, 6 tests + 2 re-pinned equivalent exclusions; line-drift + is_active traps
+metadata:
+  type: project
+---
 
-**Branch:** `feat/fix-nightly-mutants`  
-**PR:** https://github.com/mdrewt/monster-realm/pull/145  
-**Status:** PR open, local `just ci` EXIT=0. Supervisor owns merge.
+# fix-nightly-mutants slice — DONE
+
+**Branch:** `fix/fix-nightly-mutants`  
+**PR:** #174  
+**Status:** PR open, local `just ci` EXIT=0, remote CI running  
+**ADR:** None (test-only slice, no architectural decisions)  
+**ADR next-free:** 0110 (unchanged)
 
 ---
 
-## DONE
+## Summary
 
-- **Scoped mutants before:** 11 missed in status.rs + weather.rs (9 XOR/shift in from_ctx_random + 2 constant-replacement in turns_remaining)
-- **Scoped mutants after:** 0 missed in those two files
-- **Tests written:**
-  - `game-core/src/combat/status.rs` — `mod status_variance_exact_tests` (lines 337+):
-    - 6 named-seed exact-value tests (`from_ctx_random_exact_seed_0/1/42/0x12345678/deadbeef/max`)
-    - 1 proptest comparing production vs independent `splitmix64_derive_expected` reference
-  - `game-core/src/combat/weather.rs` — `mod weather_turns_remaining_tests` (lines 290+):
-    - 4 per-variant tests (`rain/sun/sandstorm/hail_turns_remaining_is_stored_value`)
-    - 1 proptest `turns_remaining_identity` over all u8 × 4 variants
-- **AC-M7 compliance:** `// kills:` comments with exact `file:line:col mutant` identifiers added
-- **Reference scope disclaimer:** `splitmix64_derive_expected` documented as detecting single-operator mutations only
-- **Review gates:** tester ✓, reviewer ✓ (2 MAJOR fixed), red-team ✓ (1 MEDIUM fixed), verifier in-progress
-- **`just ci`:** EXIT=0 (lint/typecheck/test/eval/security/wasm/client)
-- **Full `cargo mutants -p game-core --jobs 8`:** 5 missed (down from 16)
-- No ADR authored (ADR-0098 reserved but not consumed; test-only slice, no new pattern)
+Killed 6 mutants in `trading/` test coverage to drive nightly mutate-core from missed=10 down to missed=5 (game-core files only; ability.rs + resolve.rs remain outside declared scope). Test-only changes; no schema, server, or client code touched. Discovered and documented three traps: line-drift in exemptions, is_active terminal-state equivalent, and eval-guard count coupling.
 
 ---
 
-## REMAINING
+## Changes
 
-**5 pre-existing missed mutants in files OUTSIDE declared touches path:**
+### 1. `game-core/src/trading/rules.rs` — 5 new tests
 
-| File | Location | Mutant description |
-|------|----------|--------------------|
-| `ability.rs` | 54:13 | delete match arm `(StatusKind::Poison, StatusEffect::Poison)` in `StatusKind::matches` |
-| `ability.rs` | 56:13 | delete match arm `(StatusKind::Paralysis, StatusEffect::Paralysis)` in `StatusKind::matches` |
-| `ability.rs` | 58:13 | delete match arm `(StatusKind::Freeze, StatusEffect::Freeze)` in `StatusKind::matches` |
-| `ability.rs` | 158:60 | replace `<` with `<=` in `apply_entry_ability` |
-| `resolve.rs` | 462:22 | replace `==` with `!=` in `resolve_full_turn` |
+Added `mod tests {}` block with five named tests:
 
-These were in the nightly's "16 missed" but NOT in the brief's stated scope (status.rs + weather.rs). `just mutate-core` will still exit 1 until they're fixed.
+- **`validate_accepts_counterparty_monster_only`** — kills mutant `39:9 +->*`
+- **`validate_accepts_initiator_monster_counterparty_item`** — kills `40:9 +->-`, `69:12 delete!`, `84:21 ==->!=`
+- **`validate_accepts_counterparty_items_only`** — kills `40:9 +->*` (alt path)
+- **`validate_accepts_counterparty_currency_only`** — kills `42:36 >-><`
+- **`swap_plan_includes_counterparty_currency_transfer`** — kills `220:30 >-><`
+
+Each test uses fixture data to drive acceptance logic paths and verify the constraint guard operates correctly.
+
+### 2. `game-core/src/trading/types.rs` — new test module
+
+Added `mod tests {}` with:
+
+- **`trade_error_display_is_meaningful`** — kills `89:9 ->Ok(Default)` in `Display` impl
+
+Ensures error Display fallback does not replace actual error variant.
+
+### 3. `.cargo/mutants.toml` — re-pinned + new entry
+
+- Re-pinned `ability.rs` exemption: `169:60` → `170:60` (line drift from prior slices)
+- Added entry 3 for `trading/types.rs:56:9 is_active` (equivalent mutant, see trap below)
+
+### 4. `evals/mutate-core-recipe-integrity.eval.mjs` — updated fixture
+
+- Updated blessed exclusions from 2 to 3 entries
+- Re-pinned ability.rs needle to `:170:60`
+- Added `is_active` entry-3 check (TS narrowing + row-deletion witness)
+- Added TEETH 15 (new guard for entry-3 existence check)
+- Updated CANONICAL_MUTANTS_TOML quoting to match mutants.toml count
 
 ---
 
-## BLOCKERS
+## Three Key Traps Discovered
 
-1. **Full nightly gate not yet green:** `just mutate-core` exits 1 (5 missed in ability.rs + resolve.rs). This slice reduces from 16→5, but the gate requires 0.
-2. **Touches constraint:** ability.rs and resolve.rs are outside declared `touches:`. Expanding requires supervisor re-serialization.
-3. **Verifier:** running in background (may need to confirm result before merge)
+### 1. Line Drift in Exemptions
+
+`ability.rs` exemption was originally at `169:60`. Between M14.5h and this slice, code shifted to `170:60` due to insertions or refactoring in prior slices. The nightly runner's line-based detection re-surfaced this as a "missed" mutant. **Lesson:** exemptions must be re-checked and re-pinned consciously after each slice; line numbers are brittle.
+
+### 2. is_active Equivalent Mutant
+
+`TradeStatus` enum has only 2 variants, both returning `true` from `is_active()`. Terminal state is represented by row deletion, not an enum variant. Therefore, replacing `is_active -> bool` with `true` (constant folding) is genuinely equivalent — the mutant cannot be killed without adding a third enum state. Documented in mutants.toml entry-3 as an exception.
+
+### 3. Eval Guards the Count
+
+The mutants.toml count (2→3) is guarded by multiple points in the eval:
+
+- CANONICAL_MUTANTS_TOML quote-count check
+- TEETH 15 fixture witness for entry-3 existence
+- eval's loop-count assertion
+
+All three must be updated together. A mismatch (e.g., adding an entry without updating CANONICAL_MUTANTS_TOML) causes eval to FAIL with a counting mismatch error.
 
 ---
 
-## EXACT NEXT STEP (to resume or follow up)
+## Gates
 
-Create a follow-up slice `fix-nightly-mutants-2` with:
-- `touches:` game-core/src/combat/ability.rs (test additions only), game-core/src/combat/resolve.rs (test additions only)
-- Kill the 5 remaining mutants:
-  - `ability.rs` StatusKind::matches — need tests for Poison, Paralysis, Freeze arm coverage
-  - `ability.rs` apply_entry_ability line 158 — boundary condition `<` vs `<=`
-  - `resolve.rs` resolve_full_turn line 462 — the `==` check (likely a flag or outcome comparison)
+- **Local `just ci`:** EXIT=0 (all Rust + JS + eval tests pass)
+- **Remote CI:** running at time of PR open
+- **Full mutate-core:** 10 → 5 missed (game-core only; ability.rs/resolve.rs remain out of scope)
 
-Once those 5 are killed, `just mutate-core` achieves missed=0 and the nightly gate goes fully green.
+---
+
+## No ADR
+
+This slice is test-only (no new patterns, no schema, no server/client logic). No ADR was authored. ADR next-free stays 0110.
+
+---
+
+## Next Step
+
+Remaining 5 missed mutants are in `ability.rs` (lines 54, 56, 58, 158) and `resolve.rs` (line 462). They fall outside the declared scope of this slice and require supervisor re-serialization + separate `fix-nightly-mutants-2` slice to address.

@@ -296,3 +296,51 @@ m16b build run finished clean (EXIT=0 ATTEMPTS=1, PR #176 open, remote CI green,
 **Final gates (6e016bb):** 938/938 unit tests (934 + 4 new RT-PVP-01), 58/58 evals PASS. Remote CI re-running.
 
 **Supervisor owns merge.** ADR next-free: 0111. m16c (PvP evals) still PARKED.
+
+## 2026-07-14T20:12Z — supervisor tick (mr-sup-cowork-20260714T200608Z-1759558-10938)
+- **m16b MERGED**: PR #176 squash-merged → master `44e5505`; post-merge CI GREEN. Review pass verdict FIXED had cleared the orchestration FLAG.
+- Cleanup: worktrees `.claude/worktrees/m16b` and `/tmp/mr-m16b-review` removed; local+remote slice branches deleted.
+- ADR-0110 index reconciliation: chore PR #177 (`chore/m16b-adr-index`) opened; `--auto` rejected again (branch-protection auto-merge not enabled) → merging manually on green this tick.
+- Next: m16c (PvP evals tail, PARKED) is the queue head — resume after #177 lands.
+
+---
+
+## 2026-07-14 — m16c TERMINAL STATE — PR #178 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m16c-pvp-evals`, tip `fb10db0`, **PR:** https://github.com/mdrewt/monster-realm/pull/178
+**ADR:** 0111 at `docs/adr/0111-m16c-pvp-evals.md`
+**Worktree:** `.claude/worktrees/m16c`
+
+**Scope:** Evals-only — no server/client/schema changes. 3 new `evals/pvp-*.eval.mjs` files:
+- `pvp-action-privacy`: 4 cross-language criteria (schema.rs + connection.ts; battle_action must-never-leak)
+- `pvp-handshake-guards`: 11 lifecycle guard criteria (role+status+GC across 4 challenge reducers; CANCEL_DELETE added after tester review)
+- `pvp-deadline-disconnect`: 5 liveness criteria (scheduler guard, stale-turn, both-sides disconnect, cancel-outgoing-only)
+
+**Gates:** 61/61 evals PASS, full `just ci` EXIT=0 (Rust 1176/1176, client 938/938). Tester adversarial review clean (all teeth verified).
+
+**M16 PvP CLOSED** (m16a spine + m16b client UI + m16c evals). **ADR next-free: 0112.**
+
+**Supervisor owns squash-merge.** After merge, no open structural slices remain in M16.
+
+**Composite launch: m16c** (M16 PvP evals tail — pvp-*.eval.mjs + e2e + milestone post-integration verification per M16-pvp.spec.md; final M16 slice). ADR-0111 reserved. Serial/SOLO (evals/run.mjs is structural). Brief /tmp/mr_pass_m16c.md.
+
+## 2026-07-14T22:14:39Z — supervisor tick mr-sup-cowork-20260714T220608Z-1803526-25899 — IN PROGRESS
+m16c build run finished clean (EXIT=0 ATTEMPTS=1, PR #178 open, remote CI green, mergeStateStatus CLEAN, 61/61 evals). Pre-merge orchestration audit FLAGGED: tester-role ran in-build (adversarial eval review, clean) but zero reviewer/verifier-role invocations; test-artifact carve-out not fully met (reviewer lens missing). Per protocol (m16b precedent), launching mandated review pass (slice id m16c-review) on the PR diff with reviewer+red-team+verifier lenses before merge. Merge deferred to next tick pending VERDICT in memory/projects/monster-realm-m16c-review.md.
+
+## 2026-07-14 — m16c review pass COMPLETE — VERDICT: FIXED (pushed c78a2fb)
+
+**Lenses run:** reviewer + red-team (parallel) + verifier + manual primary analysis.
+
+**Two defects found and fixed:**
+1. ARCHITECTURE.md M16c entry said "10 criteria" for `pvp-handshake-guards.eval.mjs` but the eval has 11 (CANCEL_DELETE added post-tester-review per ADR-0111). Fixed: "10"→"11" and "cancel initiator+status"→"cancel initiator+status+GC". ADR-0111 and DIGEST.md were already correct. Pushed `c78a2fb`.
+2. `cancelFiltersByTarget` in pvp-deadline-disconnect.eval.mjs had only the bad-fixture teeth direction (detects `.target()` in bad input). Missing good-fixture assertion: `cancelFiltersByTarget(goodCancelChallenger) === false`. Added per project proof-of-teeth standard. Pushed `df60c76`.
+
+**All other red-team/reviewer findings are theoretical future risks:** `battleActionIsPublic` single-line window (not current pattern), `hasStaleTurnCheck` variable name alias (matches production exactly), `stripRustComments` nested block comments (none in production), `extractFunctionBody` string literal braces (production uses balanced `{{/}}`).
+
+**Eval runs:** 61/61 PASS × 5 clean runs post-fix (one transient run had wasm-pack failures on pre-existing evals unrelated to PR #178). No TEETH FAILED. No skip/xit/.only in pvp eval files.
+
+**just ci on fixed tip df60c76:** EXIT=0 — 1176/1176 Rust, 938/938 client, 61/61 evals. No removed/skipped tests.
+
+**Proof-of-teeth verified:** all 4 pvp-action-privacy, all 11 pvp-handshake-guards, all 5 pvp-deadline-disconnect confirmed against pvp.rs, schema.rs, connection.ts.
+
+**Supervisor owns squash-merge.** Branch tip: `df60c76`. M16 PvP CLOSED. ADR next-free: 0112.
