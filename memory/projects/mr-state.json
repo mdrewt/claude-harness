@@ -1,30 +1,28 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-14T05:00:00Z",
- "updated_by": "m15b terminal handoff",
+ "updated_utc": "2026-07-14T08:36:00Z",
+ "updated_by": "mr-sup-cowork-20260714T080541Z-1080981-28883",
  "master": {
-  "sha": "9754b03 (chore #167)",
-  "ci": "GREEN (15279c9 full run; 9754b03 doc-only)",
+  "sha": "3424c5c (m15c #170)",
+  "ci": "GREEN (3424c5c full run success)",
   "nightly": "unknown"
  },
- "adr_next_free": 108,
- "inflight": [],
- "awaiting_merge": [
+ "adr_next_free": 110,
+ "inflight": [
   {
-   "slice": "m15b",
-   "pr": 168,
-   "branch": "feat/m15b-trade-client-ui",
-   "verdict": "MERGE-OK",
-   "ci": "GREEN (just ci exit 0: 1142 Rust + 912 JS tests, all evals)",
-   "notes": "reviewer B-1/B-2/M-1/M-2 fixed; red-team clean (no criticals); RT-TO-01+RT-TO-02 tests committed; ADR-0107 accepted"
+   "slice": "m16a",
+   "session_leader": 1082789,
+   "claude_pid": 1082797,
+   "started_utc": "2026-07-14T08:34:30Z"
   }
  ],
+ "awaiting_merge": [],
  "queue": [
-  "m15c trade evals tail (serial after m15b — its touches incl. vague integration/e2e)",
-  "FOLLOW-UP: recurring touches-overrun — tighten brief touches declarations"
+  "VERIFY next tick: chore PR #171 (ADR index 0107/0108, next-free 0109) auto-merged on green",
+  "FOLLOW-UP: recurring touches-overrun \u2014 tighten brief touches declarations (recurred on m15b)"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m15b MERGE-OK (PR #168). Master still at 9754b03 pending merge. Next: supervisor merges #168, then queues m15c."
+ "notes": "m15c MERGED (PR #170 -> 3424c5c, CI green; audits CLEAN-test-artifact/CLEAN; cost $11.89). M15 Trading CLOSED. Index chore #171 auto-merge armed (CI pending at tick end). Composite launch m16a (M16 PvP spine, ADR-0109 reserved, serial \u2014 schema is structural). Next tick: poll m16a; verify #171 merged."
 }

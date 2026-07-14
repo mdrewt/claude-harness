@@ -88,3 +88,55 @@ M15-trading.spec.md §5; final M15 slice). ADR-0108 reserved. Serial (no fan-out
 
 **Supervisor owns squash-merge.** ADR-0108 complete; M15 Trading CLOSED (m15a + m15b + m15c).
 **ADR next-free:** 0109
+
+## 2026-07-14T08:29Z — supervisor tick mr-sup-cowork-20260714T080541Z-1080981-28883
+
+**m15c MERGED.** PR #170 squash-merged at 08:12:32Z → master 3424c5c; full CI (ci + e2e) green.
+**M15 Trading CLOSED** (m15a #165 + m15b #168 + m15c #170). ADR-0108 landed. ADR index reconciled via
+doc-only chore PR #171 (adds missing 0107 AND 0108 rows, next-free → 0109, range line → 0035–0108;
+`--auto` squash armed successfully, CI was pending at tick end — verify merged next tick).
+Audits: orchestration CLEAN-test-artifact (Sonnet; planner/reviewer/red-team; no tester-role but
+test-artifact carve-out satisfied — adversarial proof-of-teeth eval runs in-log, e2e tests/expects
+unchanged RED→tip at 6/20, remote CI green). Gating-test audit CLEAN (no skips/only/ignore; RED→tip
+deletions were e2e helper refactor only). m15c worktree + branch removed; old merged chore branches
+(m12b/m14b/m14c-adr-index) deleted. Cost $11.89, attempts 1. Strays left untouched: .claire/, docs/memory-cards/.
+
+**Composite launch: m16a** (M16 PvP spine per M16-pvp.spec.md — shared battle row, both-submit secret
+picks, turn-deadline + forfeit-on-disconnect; game-core rules + server-module reducers; client ‖ evals
+tail deferred to m16b/m16c per the spec's serial-spine note). ADR-0109 reserved. Serial (schema =
+structural set; no fan-out). Brief /tmp/mr_pass_m16a.md.
+
+---
+
+## 2026-07-14 — m16a TERMINAL STATE — PR #172 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m16a-pvp-spine`, tip `a514775`, **PR:** https://github.com/mdrewt/monster-realm/pull/172
+**ADR:** 0109 at `docs/adr/0109-m16a-pvp-spine.md`
+**Worktree:** `.claude/worktrees/m16a`
+
+**Built (m16a — PvP battle spine):**
+- `game-core/src/combat/pvp.rs` — `PvpAction` enum (Attack/Swap), `pvp_forfeit_outcome`, `pvp_deadline_forfeit_side` (pure, deterministic, with inline tests)
+- `server-module/src/pvp.rs` — Full PvP domain module (~570 LOC): `challenge_pvp`, `accept_challenge`, `decline_challenge`, `cancel_challenge`, `submit_pvp_action` (inline resolve), `pvp_deadline_reaper` (scheduler-only guard), `forfeit_on_disconnect`, `cancel_challenges_on_disconnect`, `start_pvp_battle` (internal, bypasses ADR-0048 guard), `resolve_pvp_turn_if_ready`, `write_back_party_hp_pvp_side_b`
+- `server-module/src/pvp_tests.rs` — 10 source-guard tests (EA-PVP-01..10): battle_action not public, scheduler guard, baseline completeness, on_disconnect hooks, constant value, inline-resolve wire-up
+- `server-module/src/schema.rs` — `ChallengeStatus` SpacetimeType enum + `BattleChallenge` (public) + `BattleAction` (private) tables; `Battle.opponent_identity` btree index added
+- `server-module/src/guards.rs` — `require_pvp_participant(ctx, reducer, &battle) -> Result<SideId, String>`
+- `server-module/src/lib.rs` — `mod pvp` declared + two `on_disconnect` hooks
+- `evals/baselines/table-schemas.json` — 3 new tables (battle_challenge, battle_action, pvp_deadline_schedule)
+- `evals/baselines/spacetime-types.json` — 2 new types (ChallengeStatus, PvpAction)
+- TypeScript bindings regenerated (5 new files), knowledge bundle refreshed (71 files), ADR-0109 + DIGEST
+
+**Key design invariants (ADR-0109):**
+- `battle_action` PRIVATE — must-never-leak (ADR-0015). Clients detect turn resolution via `battle.state.turn_number` increment.
+- `start_battle` ADR-0048 guard preserved; PvP via internal `start_pvp_battle`
+- Forfeit → existing `SideAWins`/`SideBWins` (no new BattleOutcome variants — BSATN stability)
+- Both-submitted resolution inline in same SpacetimeDB transaction
+- Challenger-first tie-break at deadline (D5)
+- Side-B HP write-back in both forfeit and natural-resolution terminal paths
+- `pvp_deadline_reaper` scheduler-only: `ctx.sender != ctx.identity()` guard
+
+**Gates:** local full `just ci` EXIT=0 (238 Rust tests, 912 client tests, all evals PASS including spacetime-type-snapshot, schema-snapshot, bindings-drift, knowledge-bundle-conformance, battle-reducer-security, no-idle-accrual). Remote CI running.
+
+**Reviewer + red-team agents running in background** (fixes to be applied if CRITICAL/HIGH findings).
+
+**Supervisor owns squash-merge.** m16b (client UI) + m16c (PvP evals) PARKED.
+**ADR next-free:** 0110
