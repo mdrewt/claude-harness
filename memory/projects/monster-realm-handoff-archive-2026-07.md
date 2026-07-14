@@ -2956,3 +2956,356 @@ Full `just ci` EXIT=0 locally at tip (53 evals, 778 JS tests). Remote `ci`+`e2e`
 ## 2026-07-13T04:42:40Z — IN-PROGRESS: m14.5d + m14.5e fan-out launched (composite tick, run mr-sup-cowork-20260713T040554Z-253197-23646)
 m14.5d (client battle UX, ADR 0101, leader 257559) || m14.5e (ADR-0089 caching completion, ADR 0102 if needed, leader 257648). Disjoint touches (client/** vs server-module/**), model claude-fable-5 asserted both, detached both, rate-limit schema asserted (allowed). Supervisor merges serially on green.
 
+
+## 2026-07-13 — m15a REVIEW-PASS TERMINAL STATE — PR #165 review-pass complete, fixes pushed, MERGE-OK
+
+**Branch:** `feat/m15a-trading-spine`, tip `289879d`, **PR:** https://github.com/mdrewt/monster-realm/pull/165
+**ADR:** ADR-0106 (trading spine) · **ADR next-free: 0107**
+**Worktree:** `.claude/worktrees/m15a`
+
+**Review pass complete (post-hoc, supervisor-required):**
+- 6 parallel lenses ran: tester, reviewer, red-team, simplify, security-auditor+desync-guard, verifier
+- 7 findings fixed in commit 289879d:
+  - F1: `DuplicateItem` variant + item dedup in `validate_proposal`
+  - F2: counterparty joined-player guard in `propose_trade`
+  - F3: currency + item balance checks at propose time
+  - F4: `heal_party` raw `.saturating_sub()` → `saturating_sub_u64()`
+  - F5: TEETH label TR-22 → TR-1 fix
+  - F6/F7: counterparty `build_swap_plan` + `escrowed_item_qty` TEETH tests
+- 6 findings waived (see memory/projects/monster-realm-m15a.md for full rationale)
+- PR review comment posted: MERGE-OK
+- Full `just ci` green on 289879d (1142 Rust + 853 TS + 60/60 evals)
+
+**Supervisor owns squash-merge.** M15b (client UI) and M15c (evals) remain PARKED.
+
+---
+
+## 2026-07-13 — m14.5h TERMINAL STATE — PR #158 OPEN, local `just ci` EXIT=0, verifier PASS, reviewer PASS
+
+**Branch:** `feat/m14.5h-nightly-mutant-kill`, tip `84d4efd`, **PR:** https://github.com/mdrewt/monster-realm/pull/158
+**ADR:** ADR-0100 D6 amended in-place — no new ADR needed; **ADR next-free stays 0104**
+**Worktree:** `.claude/worktrees/m14.5h` (supervisor cleans up post-merge). LOW complexity test-artifact slice.
+
+**What landed (2 goals: nightly gate + ADR-0100 D6):**
+- `.cargo/mutants.toml`: second blessed exclusion `ability.rs:169:60 replace < with <=` — equivalent mutant (`.min(max_hp)` clamp makes both branches produce `max_hp` at full HP)
+- `game-core/src/combat/resolve.rs`: `apply_ko_switch_entry_abilities` private fn + 3 call sites (Phase 2.5 in resolve_full_turn/resolve_player_swap/resolve_recruit_failure) + Faint→Switch adjacency debug_assert (pins contract for windows(2) scan)
+- `game-core/src/combat/m14_5h_tests.rs`: 4 tests — EARS-h-1a (boundary full-HP no-heal), EARS-h-1b (below-full heals), EARS-h-2a (KO auto-switch EntryHeal, RED→GREEN), EARS-h-2b (KO auto-switch StatusImmunity, RED→GREEN)
+- `evals/mutate-core-recipe-integrity.eval.mjs`: updated from 1→2 blessed entries; TEETH 8 retargeted (3 entries); TEETH 14 added (single entry fails); name updated; CANONICAL_MUTANTS_TOML updated
+- `docs/adr/0100-m14.5c-ability-system-wiring.md`: D6 section amended to "closed in M14.5h"
+
+**Gates:** local full `just ci` EXIT=0 (4 new tests, all evals PASS). Verifier PASS. Reviewer: no BLOCKERs; M-2 debug_assert + m-1 doc label + m-3 eval name addressed.
+
+**Equivalent mutant proof:** at `current_hp == max_hp`, `< → <=` means the branch IS taken, but `max_hp.saturating_add(heal).min(max_hp) == max_hp` (clamp). Observationally identical. Proved by EARS-h-1a.
+
+**Reviewer M-1 (not fixed — unreachable):** The multi-KO-per-turn scenario would cause `apply_ko_switch_entry_abilities` to miss intermediate slot entry abilities. BUT: `resolve_turn`'s `second_had_faint` guard prevents a second attack after the first KOs the second side. At most ONE Faint+Switch pair per `turn_events`. M-1 is unreachable with current game rules. The debug_assert (M-2) mechanically pins the adjacency invariant that makes this safe.
+
+**Supervisor owns squash-merge.** After merge, nightly gate should restore to GREEN. ADR-0104 remains free.
+
+---
+
+## 2026-07-13 — m14.5g TERMINAL STATE — PR #157 OPEN, local `just ci` EXIT=0, remote CI running
+
+**Branch:** `feat/m14.5g-ledger-type-rigor`, tip `51cddf3`, **PR:** https://github.com/mdrewt/monster-realm/pull/157
+**ADR:** ADR-0104 reserved — **UNUSED** (all changes are in-contract hardening; no new pattern; next-free stays 0104)
+**Worktree:** `.claude/worktrees/m14.5g` (supervisor cleans up post-merge). LOW complexity slice.
+
+**What landed (8 ledger + 4 type-rigor + 1 OKF stamp + simplify/review followup):**
+- ADR collision note corrected in `docs/adr/README.md` and `AGENTS.md`: harness 0055↔project 0056, 0056↔0057, 0057↔0080
+- Dead link `0090-client-ux-correctness.md` → `0090-adaptive-interp-delay.md` in README
+- Node pin reference corrected: `AGENTS.md:6` now says `client/package.json engines ≥24.13.1 <25`
+- ADR-0091 SpacetimeDB version cite `1.12.0` → `2.6.0` (2 occurrences)
+- CHANGELOG regenerated via `just changelog` (M14 ADRs 0092-0097 now present)
+- `specs/monster-realm-v2/PLAN.md:3` status updated: Phase A+B complete, M14.5 residuals building
+- `M13.5-seventh-review-residuals.spec.md:102` 13.5f checkbox ticked — DONE (PR #132, ADR-0091)
+- `M14.5-eighth-review-residuals.spec.md` 14.5g checkbox ticked
+- `evals/battle-lifecycle-gc.eval.mjs` stale "RED today" header removed
+- `StatusKind::matches` wildcard `_` → exhaustive false OR-pattern (compile-error gate, ADR-0010)
+- `TypeChart::classify` silent `_ => Neutral` → `unreachable!()` + proof-of-teeth tests
+- `f1_damage_chain_order_matters` wired to real `calc_damage` call
+- `compute_evolves_to` drops fake MonsterInstance; takes `(level: u8, bond: u8)` directly (8 call sites updated across evolution.rs/fuse, battle.rs, content.rs, raising.rs, content_tests.rs, content_cache_tests.rs, evolution_tests.rs)
+- OKF `gitDate()` UTC-normalizes via `%cI` + `new Date(iso).toISOString()` (post-midnight drift fix)
+- EARS-21 truth-table test in `m14c_tests.rs` (pins all 5 StatusKind true arms)
+- `marshal.rs` stale "silently maps to Neutral" comment updated to reflect unreachable! panic
+
+**Gates:** local full `just ci` EXIT=0 (846 game-core, 200 server-module, 833 client tests, 54 evals PASS). Reviewer MAJOR (fuse temp Monster) fixed; red-team all CLEARED or addressed.
+
+**Harness changes committed separately:** PLAN.md, M13.5 spec, M14.5 spec (committed to claude-harness main, not part of PR #157).
+
+**Supervisor owns squash-merge** (remote CI running on `51cddf3` at handoff time). ADR-0104 goes unused — can be reclaimed for the next slice requiring a new ADR.
+
+---
+
+## 2026-07-13 — m14.5e TERMINAL STATE — PR #153 OPEN, local `just ci` EXIT=0, remote CI running
+
+**Branch:** `feat/m14.5e-content-cache-skills-items`, tip `561836d`, **PR:** https://github.com/mdrewt/monster-realm/pull/153
+**ADR:** `docs/adr/0089-content-parse-caching.md` AMENDED IN PLACE (no new number; next-free stays 0101; reserved 0102 unused)
+**Worktree:** `.claude/worktrees/m14.5e` (supervisor cleans up post-merge). Sibling m14.5d worktree observed in flight (client-only, disjoint) — no collisions.
+
+**What landed (EARS 14.5e-1..2):**
+- content_cache.rs: SKILLS/ITEMS LazyLock statics + cached_skills()/cached_items() (six registries total)
+- 4 call-site switches (qualified `crate::content_cache::cached_*` form): submit_attack, swap_active, use_battle_item (keeps `.map_err("content error: {e}")` byte-identical), attempt_recruit
+- Lying/stale comments corrected: battle.rs submit_attack header (the spec's false-"content cache" comment), swap_active, taming.rs, marshal.rs ×2
+- Gating tests (5, red-first): 2× transparency assert_eq!, 2× ptr-identity, 1× source-guard proof-of-teeth (module-qualified needles; two-part use_battle_item pin `cached_items().map_err` + `content error`). RED evidence pinned in commit 0f984b9; verifier live-revert confirmed the bite.
+
+**Gates:** local full `just ci` EXIT=0 (1080 Rust tests, module 195→200; 53/53 evals; 778 client tests). Lenses: planner + plan-review (reviewer+red-team) + test-review (reviewer+red-team empirical probe) + impl-review (reviewer, red-team, desync-guard CLEAN×5, reducer-security CLEAN×4) + /simplify + verifier PASS (integrity: no weakening dc02624..HEAD, needles byte-identical).
+
+**Touches-overrun (mechanical, precedented):** docs/knowledge/** regen (`just knowledge`; battle/taming anchor shifts; knowledge-check green 25 tables/28 reducers). Day-stamp trap noted in PR: bundle stamped 2026-07-13 — merge after next midnight UTC may red master (known, fix queued).
+
+**In-branch incident (fixed):** orphan `/*` in a content_cache_tests.rs doc comment blinded stripRustComments in evals/battle-schema-snapshot.eval.mjs (shared SSOT parser used by okf-export) → 0 tables parsed. Reworded to same-line pairs. **QUEUED FOLLOW-UP:** harden that eval's comment-stripper (string-literal/pairing awareness) — evals/** was outside 14.5e touches.
+
+**Named residuals:** load_abilities() uncached at 5 sites (3 per-turn sites carry PARK comments; ADR-0089 amendment names all 5) — natural next slice `cached_abilities()` + source-guard extension. Test-helper triplication (strip_rust_comments/extract_fn_body ×3 test files) — rule-of-three consolidation follow-up. Spec §5 note: 14.5a/b/c checkboxes still untick despite merges — reconcile at 14.5g doc-keeper close (14.5e ticked with PR #153).
+
+**Supervisor owns squash-merge** (remote ci+e2e running on 561836d at handoff time). Next M14.5 slices per spec §6: 14.5f, 14.5g (14.5d in flight).
+
+## 2026-07-13 — m14.5d TERMINAL STATE — PR #154 OPEN, local `just ci` EXIT=0, remote CI running
+
+**Branch:** `feat/m14.5d-client-battle-ux`, tip `dc0a4f6`, **PR:** https://github.com/mdrewt/monster-realm/pull/154
+**ADR:** `docs/adr/0101-m14.5d-client-battle-ux.md` (**ADR-0101 CONSUMED** — supersedes sibling m14.5e's "next-free stays 0101" note; **ADR next-free → 0102**)
+**Worktree:** `.claude/worktrees/m14.5d` (supervisor cleans up post-merge). Pure-client diff — disjoint from sibling m14.5e (PR #153, server-module), no collisions.
+
+**What landed (EARS 14.5d-2/3/4):**
+- **14.5d-2 weather pipeline:** `SdkBattleRow.state.weather` (structural, optional) → `battleRowToStore` explicit `value→turnsRemaining` rename (`!= null` object-truthiness; `turnsRemaining: 0` survives) → `StoreBattle.weather: StoreWeather | null` → `BattleViewModel.weather {label, turnsRemaining}` via pure `weatherBanner()` → `data-testid="weather-banner"` field banner (textContent-only), cleared on null/hide path.
+- **14.5d-3 parity rigor:** `BattleViewModel.outcome` = `BattleOutcomeTag` literal union; narrowing ONLY in `buildBattleViewModel` (unknown → warn + null VM); `#renderOutcome` exhaustive `never`-check (interpolation fallback replaced; never-arm proven unreachable). Parity tests derive variant lists from generated bindings at runtime (`X.algebraicType.value.variants[].name`), anchored length 5/4/4 + known member (no vacuous pass).
+- **14.5d-4 VM-compare refresh guard (NEW — the "cheap 90% fix"):** pure `battleVMsEqual` (field-by-field incl. card status + weather; bigint `===`; arrays length-first; JSON.stringify rejected) + `shouldSkipBattleRefresh(visible, lastVm, vm)` in `refreshBattle`; visible-check is primary defense on all hide paths; `lastBattleVM` resets (hide branch/Escape/resetPredictionState) are invariant hygiene; overlay lifecycle state updates before the guard.
+
+**14.5d-1 PARKED (hidden dependency = SPEC GAP):** cure-item Use-Item UI requires classify-by-data on `cure_status`, which lives ONLY on game-core `ItemDef` content — deliberately absent from the public `item_row` table (battle.rs use_battle_item guard-3 doc). Client has no data path; spec's `Touches: client/src/** only` is wrong for this criterion. **Unblocking path (ADR-0101):** small server slice adds additive `cure_status` column to item_row + seeding + bindings regen, then a client slice mirrors the bait-selector verbatim. Supervisor: re-serialize as follow-up slice pair; correct spec §14.5d-1 touches.
+
+**Gates:** local full `just ci` EXIT=0 (log /tmp/m14.5d_justci2.log): 1075/1075 Rust nextest + doc tests, 833/833 client tests (was 778; +56 gating +2 corrections −3 rewritten), 53/53 evals, biome exit 0, tsc clean. Remote CI running on `dc0a4f6` at handoff.
+
+**Orchestration record (audit):** planner → plan-review (reviewer approve-with-changes ×10 findings + red-team ×8, all folded) → tester (56 RED tests, red run 43F/131P @ 80eb39d) → specialist red→green (no gating-test edits) → 4 parallel impl lenses (reviewer approve-with-changes, red-team 1 MEDIUM fixed, simplify 1 MEDIUM folded, desync-guard 1 MEDIUM fixed + field-mapping table CLEAN) → consolidated fix pass (specialist prod-files ∥ tester test-files, disjoint) → **verifier PASS** (RED provenance proven, no weakening, teeth bite). reducer-security-auditor deliberately skipped: zero reducer/server code in diff. Deviation noted: impl red-team applied its own `== null` fix + 2 tests directly (report-only instruction breached; audited by orchestrator + covered by verifier integrity pass — no weakening).
+
+**Gaps documented (ADR-0101 Consequences):** Sleep `turnsRemaining` not in card VM (future countdown display must extend VM + compare); two unknown weather tags compare equal via `''` labels (zero visual impact); unknown-variant console.warn per-batch until bindings regen (intentional).
+
+**Doc-aggregation compliance:** CHANGELOG/adr-README/ARCHITECTURE untouched (supervisor reconciles; ADR-0101 needs indexing). Codebase-memory graph: main checkout unchanged (pure-branch work) — supervisor runs `detect_changes`/`index_repository` post-merge.
+
+**Supervisor owns squash-merge.** Next per spec §6: 14.5f, 14.5g (+ the re-serialized 14.5d-1 follow-up pair).
+
+
+## 2026-07-13T06:16:05Z — supervisor tick mr-sup-cowork-20260713T060632Z-374696-15801
+- Fan-out pair finished: m14.5d (.done EXIT=0 ATTEMPTS=3) and m14.5e (.done EXIT=0 ATTEMPTS=1); no live pids.
+- MERGED m14.5e: PR #153 squash -> master d090fcb, CI GREEN post-merge. Audits: orchestration CLEAN (13 Agent invocations incl. tester/reviewer/red-team/verifier; model claude-fable-5), gating-test CLEAN (no removed/skipped tests). Cost $41.53.
+- Touches overrun on m14.5e: docs/knowledge/reducers/*.md regen undeclared but disjoint from sibling — merged; brief-tightening follow-up already queued.
+- ADR-0089 amended in-slice; no new ADR, 0102 reserved-unused, next_free stays 103. No index chore PR needed for e.
+- m14.5e worktree+branch removed. m14.5d worktree/branch/lock kept (open PR #154, CLEAN).
+- NEXT TICK: merge m14.5d #154 (update-branch if behind after d090fcb), audits pre-merge, then chore ADR-index PR for 0101.
+- Note: supervisor DC shell died mid-CI-poll (session churn); new shell reconciled from live state under same run_id. Merges serial: one merge this tick by design.
+
+## 2026-07-13T08:20:09Z — supervisor tick mr-sup-cowork-20260713T080612Z-375835-29916 — m14.5d MERGED
+- PR #154 (feat/m14.5d-client-battle-ux) squash-merged -> dfc0e1f; checks green pre-merge (ci+e2e).
+- Audits: orchestration CLEAN (13 Agent invocations; tester/reviewer/red-team/verifier/planner/doc-keeper all present; model claude-fable-5). Gating-test CLEAN: 6 tests rewritten stronger between RED and tip (data-testid selectors; unknown-outcome variants now assert null-VM per new spec), zero dropped, no skip/only/ignore.
+- ADR-index chore PR #155 merged -> 3101508 (adds 0101 row, next-free -> 0103; 0102 reserved by m14.5e but unused — burned to match allocator).
+- Master CI: dfc0e1f run cancelled by concurrency-group; tip 3101508 GREEN.
+- Cleanup: m14.5d worktree + local branch removed; main checkout ff-only to origin/master.
+- Note: touches-overrun docs/m14.5d-plan.md (doc-only). Cost ~$43.95 across 3 wrapper attempts.
+- Next: m14.5f (republish proof + randomized convergence) — structural/serial (evals/run.mjs); composite launch this tick if final re-probe clean.
+
+## 2026-07-13T08:24:41Z — supervisor tick mr-sup-cowork-20260713T080612Z-375835-29916 — m14.5f IN-PROGRESS
+Launching m14.5f (republish proof + randomized convergence) serial, ADR reserved 0103, brief /tmp/mr_pass_m14.5f.md. Detached via mr-launch.sh.
+
+## 2026-07-13 — m14.5f TERMINAL STATE — PR #156 OPEN, local `just ci` EXIT=0, remote CI running
+
+**Branch:** `feat/m14.5f-gates-convergence`, tip `c998d22`, **PR:** https://github.com/mdrewt/monster-realm/pull/156
+**ADR:** `docs/adr/0103-m14.5f-gates-convergence.md` (ADR-0103 CONSUMED; **ADR next-free → 0104**)
+**Worktree:** `.claude/worktrees/m14.5f` (supervisor cleans up post-merge). Disjoint from all sibling slices (evals/sim-harness only).
+
+**What landed (EARS 14.5f-1..2):**
+- **14.5f-1 (BSATN compat — option b):** `evals/bsatn-compat-smoke.eval.mjs` — 4 exported pure predicates, 9 proof-of-teeth. Documents FINDING: `#[serde(default)]` covers serde/RON path only; `BattleMonster`/`BattleState` persist via `SpacetimeType`/BSATN (position-based codec, no missing-field defaults); SpacetimeDB engine handles additive schema on publish. Option (a) — live pre-M14b smoke — infeasible: spacetime 2.6.0 CLI `spacetime build` has no `--features` flag; `dev_reducers` not passable. `hasSerdeDefaultOnField` extracts struct body (opening `{` to first `\n}`), checks exact 2-line co-location pattern. No `new RegExp()` (detect-non-literal-regexp Semgrep rule).
+- **14.5f-2 (convergence net):** `ServerWorld.SimChar` gains `battle_locked: bool`; `lock_battle`/`unlock_battle`; `tick_zone` battle-guard (drain skipped, queue intact, ActionState→Idle); mirrors `movement.rs:207-220`. 4 new public lib.rs functions: `random_scenario` (tick_seed only, all 5 variants, `is_multiple_of(11)` burst, both-clients guarantee), `warp_scenario_under_link` (SeqCanonical forward vs reversed, non-vacuity guard), `apply_stream_with_battle_lock`, `battle_lock_scenario`. Binary emits 9 JSON fields. `convergencePasses` checks 7 criteria; teeth E/F/G added.
+
+**Clippy traps hit:** `r % 11 == 0` → `r.is_multiple_of(11)` (Rust 1.96+); `for (&k, _) in &map` → `for &k in map.keys()`; `0x14_5F_0000_CAFE` → `0x145F_0000_CAFE` (unusual byte groupings); `//! last-line` after a list needs blank `//!` line (doc_lazy_continuation). Worktree needs `npm install` in `client/` (node_modules not shared across worktrees).
+
+**Gates:** local full `just ci` EXIT=0: 37/37 sim-harness tests (28 existing + 9 new: RS-1/RS-2/RS-2b/RS-3/WL-1/WL-2/BL-A/BL-B + battle-lock world tests), 833 client tests, 0 eval failures; `eval PASS: bsatn-compat-smoke` + `eval PASS: netcode-convergence` (both carry extended detail). Remote CI running at handoff.
+
+**Orchestration record:** planner → reviewer (inline) → RED tests (tester commit 9203564) → GREEN impl (specialist) → clippy fix pass → doc-keeper (ADR-0103, README →0104, memory card, spec §5 14.5f ticked). Multi-lens impl review agent (reviewer) was dispatched in parallel with `just ci` second run — result pending at handoff.
+
+**Supervisor owns squash-merge.** Next per spec §6: 14.5g (ledger reconciliation + type-rigor micro-fixes).
+
+## 2026-07-13T10:16Z — mr-sup-cowork-20260713T100648Z-407585-2527 (supervisor tick)
+- **m14.5f MERGED**: PR #156 (feat/m14.5f-gates-convergence) squash-merged → master `fae0479`. CI+e2e green pre-merge, master CI green post-merge.
+- Audits: orchestration CLEAN (tester + review-lens + planner subagents; model claude-sonnet-4-6, cost $12.39, 1 attempt); gating-test CLEAN (RED checkpoint 9203564 intact, no test deletions/skips).
+- ADR-0103 + index updated in-branch by the slice (serial run → no chore PR needed). Allocator remains 104.
+- Worktree `.claude/worktrees/m14.5f` and local branch removed; remote branch deleted by gh. Main checkout ff'd to fae0479. Pre-existing stashes and untracked strays (`.claire/`, `docs/memory-cards/`) untouched.
+- Note: supervisor DC shell died mid CI-poll; recovered in a new shell under same run_id, lock held throughout.
+- Next: m14.5g (LOW ledger/docs/type-rigor, serial doc-heavy) — fold in okf-export updated-stamp drift-trap FIX per queue.
+
+## 2026-07-13T10:27Z — mr-sup-cowork-20260713T100648Z-407585-2527 (supervisor tick, cont.)
+- IN-PROGRESS: launching m14.5g (LOW ledger/docs/type-rigor reconciliation + okf-export stamp-drift fix folded in) serial, ADR 0104 reserved (may go unused). Brief /tmp/mr_pass_m14.5g.md.
+- m14.5g LAUNCHED: leader 409483, detached (PID==SESS), model claude-sonnet-4-6 asserted, rate-limit events flowing status=allowed. Supervisor releasing mutex.
+
+## 2026-07-13T12:23:05Z — supervisor tick mr-sup-cowork-20260713T120645Z-485462-481 — m14.5g MERGED
+- PR #157 (feat/m14.5g-ledger-type-rigor) squash-merged -> master 3667bc4; ci+e2e green pre-merge, master CI GREEN post-merge.
+- Audits: orchestration FLAGGED (only 2 Agent invocations: reviewer+red-team, zero tester-role on a code slice; model claude-sonnet-4-6, cost $11.13, 1 attempt). Per protocol, supervisor ran the required review pass on the PR diff: PASS — compute_evolves_to (level,bond) refactor behavior-preserving across 8 call sites, classify unreachable! guarded by ADR-0049 trust boundary in marshal.rs with should_panic proof-of-teeth, okf-export %cI UTC normalization sound. Gating-test audit CLEAN (deletions = temp-Monster refactor; no tests/assertions dropped, no skips).
+- Touches overrun: server-module/src/*.rs + docs/knowledge/reducers/*.md undeclared in lock. Serial run, no siblings -> merged; recurring brief-tightening follow-up stands in queue.
+- ADR-0104 reserved-unused; adr_next_free stays 104. Index edited in-branch (serial) — no chore PR needed.
+- Cleanup: worktree .claude/worktrees/m14.5g + local/remote branch removed; main checkout ff'd fae0479->3667bc4. Strays (.claire/, docs/memory-cards/) untouched.
+- MILESTONE: M14.5 COMPLETE — all slices a-g merged (PRs 147-157). The mr-state note "Remaining: a/b/c" was stale (a/b/c merged 2026-07-12).
+- NIGHTLY RED on fae0479: mutate-core zero-tolerance gate, 4 missed mutants — 3x StatusKind::matches delete-true-arm (killed by #157's truth-table test ears_21) + 1x apply_entry_ability:158 <-to-<= (SURVIVES; overlaps queued ADR-0100 D6 KO-auto-switch coverage gap).
+- NEXT: launching m14.5h (test-artifact slice): kill surviving nightly mutant(s) at ability.rs:158 boundary + close/cover ADR-0100 D6 gap; restores nightly green before Phase C (M15). Precedent: PR #145.
+
+## 2026-07-13T12:25:38Z — supervisor tick mr-sup-cowork-20260713T120645Z-485462-481 — m14.5h IN-PROGRESS
+Launching m14.5h (nightly mutant kill apply_entry_ability:158 + ADR-0100 D6 KO-auto-switch coverage) serial, ADR 0104 reserved (expected unused). Brief /tmp/mr_pass_m14.5h.md. Detached via mr-launch.sh.
+
+## 2026-07-13T13:54:16Z — human session (Drew, via cowork supervisor chat) — M-infra-d spec authored
+- New infra slice spec: specs/monster-realm-v2/M-infra-d-adr-digest.spec.md — agent-facing ADR compaction: canonical header block backfill (Status/Supersedes/Amends/Subsystems/Decision), generated drift-gated docs/adr/DIGEST.md, frozen design-corpus.json (harness 0002-0034, H- namespace, 0055-0057 collision as data), just adr-digest + ci gate, fixture proof-of-teeth eval. README.md stays supervisor-owned (allocator seed untouched). PLAN §9 bullet inserted before M15; mr-state queue updated.
+- Sequencing: SERIAL — launch only with no in-flight slice (backfill touches every docs/adr file). m14.5h currently in flight; 14.5d-1 pair also queued. Supervisor picks order next tick.
+- Distinct from M-infra-b (Plan A doc-aggregation fragments) — no CHANGELOG/ARCHITECTURE/fragment scope here; if M-infra-b lands later its docs-reconcile should also run just adr-digest.
+
+## 2026-07-13T14:19Z — supervisor tick mr-sup-cowork-20260713T140749Z-561491-8485 — m14.5h MERGED
+- PR #158 (feat/m14.5h-nightly-mutant-kill) squash-merged -> master 81ac54a; ci+e2e green pre-merge, master CI GREEN post-merge (14:16Z).
+- Audits: orchestration CLEAN (3 Agent invocations: tester+reviewer+verifier; model claude-sonnet-4-6, cost $9.52, 1 attempt). Gating-test CLEAN (RED 5318d8a -> tip 84d4efd: 4 tests both ends, zero removed assertions, no skip/only/ignore). mutants.toml change = narrow line-pinned equivalent-mutant exemption (ability.rs:169:60) with EARS-h-1a boundary proof + recipe-integrity eval guard — legitimate, not gate-weakening.
+- Touches overrun (recurring): .cargo/mutants.toml + evals/mutate-core-recipe-integrity.eval.mjs undeclared. Serial, no siblings -> merged. Brief-tightening follow-up stands.
+- ADR-0100 amended in-branch (D6 closed); ADR-0104 reserved-unused; allocator stays 104. No index chore PR needed (amend only).
+- Nightly: was RED on fae0479 (4 missed mutants); #157+#158 kill 3 + exempt 1 equivalent — next nightly expected GREEN.
+- Cleanup: m14.5h worktree + local branch removed, remote branch deleted; main checkout ff'd 3667bc4->81ac54a. Strays (.claire/, docs/memory-cards/) untouched. Stale merged remotes chore/m14.5d-adr-index + feat/m14.5d-client-battle-ux noted for cleanup.
+- Supervisor DC shell died mid CI-poll; recovered in new shell, same run_id, mutex held throughout.
+- NEXT: composite launch M-infra-d (ADR digest, doc-only, SERIAL — requires empty in-flight, satisfied now; human-requested 2026-07-13). 14.5d-1 server+client pair queued after.
+
+## 2026-07-13T14:23:13Z — supervisor tick mr-sup-cowork-20260713T140749Z-561491-8485 — M-infra-d IN-PROGRESS
+Launching M-infra-d (ADR digest: header backfill + DIGEST.md + design-corpus.json + drift gate) serial, ADR 0104 reserved. Brief /tmp/mr_pass_m-infra-d.md. Detached via mr-launch.sh.
+
+---
+
+## 2026-07-13 — M-infra-d TERMINAL STATE — PR #159 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m-infra-d`, tip `b05e5e3`, **PR:** https://github.com/mdrewt/monster-realm/pull/159
+**ADR:** `docs/adr/0104-m-infra-d-adr-digest.md` (**ADR-0104 CONSUMED**; next-free → 0105)
+**Worktree:** `.claude/worktrees/m-infra-d` (supervisor cleans up post-merge). Pure docs/tooling; no schema or behavior change.
+
+**What landed (EARS infra-d-4..8, right-sized):**
+- `docs/adr/0104-m-infra-d-adr-digest.md`: canonical header block ADR with all 7 required fields; first ADR with canonical headers; NOT in LEGACY_TOLERANCE
+- `docs/adr/design-corpus.json`: frozen snapshot of harness design ADRs H-0002–H-0034 + H-0055/H-0056/H-0057 (collision map encoded as data)
+- `docs/adr/DIGEST.md`: generated corpus index — DO-NOT-EDIT; 70 project ADRs + 36 H- entries; numeric master list + H- namespace table + by-subsystem grouped list
+- `scripts/adr-digest.mjs`: generator with `--check` drift-gate mode; LEGACY_TOLERANCE for 69 pre-infra-d ADRs; preamble-scoped field extraction (before first `\n## `); H- ID scanning in `extractAllAdrIds`; Superseded+em-dash pointer check; NO new RegExp()
+- `evals/adr-digest.eval.mjs`: 10 proof-of-teeth (false-positive, missing-Status, unknown-subsystem, decision>240, dangling-Superseded-by, stale-drift, real-corpus-check, body-embed bypass, H- dangling ref, Superseded+em-dash bypass)
+- `evals/fixtures/adr-digest/`: 8 fixtures (0900-0907); design-corpus-minimal.json deleted as dead artifact
+- `just adr-digest` / `just adr-digest-check` recipes
+- `AGENTS.md`: canonical header block note + DIGEST.md first-entry instruction + subsystem vocabulary
+
+**Review + red-team findings closed (6 fixes):**
+- CRITICAL: `extractBoldField` preamble boundary guard (body code blocks now excluded)
+- HIGH: H- prefix support in `extractAllAdrIds` + `allIds` populated from corpus entries
+- MEDIUM: `Status=Superseded` + `Superseded-by=—` bypass fixed
+- MAJOR: dead artifact `design-corpus-minimal.json` deleted
+- Minor: `path.basename` in `filenameBase`; `entry` DRY in by-subsystem renderer
+
+**Right-sizing:** EARS infra-d-1..3 (header backfill across 69 legacy ADRs) PARKED as follow-up slice. LEGACY_TOLERANCE set tracks which ADRs remain; backfill = remove entries until set is empty.
+
+**Gates:** local full `just ci` EXIT=0; eval PASS 10/10 teeth.
+
+**Supervisor owns squash-merge.** ADR-0104 CONSUMED; next-free → 0105. After merge, agents should use DIGEST.md as entry point for "is there a decision about X?" queries.
+
+---
+## 2026-07-13T16:20Z — supervisor tick mr-sup-cowork-20260713T160650Z-617098-14943 (cowork)
+**M-infra-d MERGED.** PR #159 (feat/m-infra-d) squash-merged at 16:09:36Z → master 3cfadf5; master CI GREEN. Audits: orchestration CLEAN (Sonnet, tester/reviewer/red-team roles present), gating-test integrity clean (additive only, no skips). Chore PR #160 (supervisor-owned index reconciliation) merged: added the MISSING 0103 row (never reconciled after m14.5f) + 0104 row; next-free → 0105; master CI GREEN on that too. Cleaned worktree + local/remote feat/m-infra-d and chore branches. Note: no 0102 ADR file exists — number gap left as-is. Next queued: M-infra-d backfill (EARS infra-d-1..3, 69 legacy ADRs in LEGACY_TOLERANCE) — attempting composite launch this tick as slice m-infra-d2.
+
+**IN-PROGRESS 2026-07-13T16:24Z:** m-infra-d2 (legacy ADR header backfill, LEGACY_TOLERANCE -> empty) launched detached via mr-launch.sh; ADR 0105 reserved conditionally.
+
+---
+
+## 2026-07-13 — m-infra-d2 TERMINAL STATE — PR #161 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m-infra-d2`, tip `942ea9f`, **PR:** https://github.com/mdrewt/monster-realm/pull/161
+**ADR:** None — this completes ADR-0104's deferred backfill work; ADR-0105 reserved but not consumed; **ADR next-free stays 0105**
+**Worktree:** `.claude/worktrees/m-infra-d2` (supervisor cleans up post-merge). Pure doc/tooling slice; no schema or behavior change.
+
+**What landed (EARS infra-d-1..3 — the backfill deferred from M-infra-d):**
+- `scripts/backfill-adr-headers.mjs`: one-shot utility (kept for audit trail) that inserted the canonical block after the title line in 66 pre-existing ADRs.
+- `scripts/adr-digest.mjs`: LEGACY_TOLERANCE shrunk from 69 entries to empty `Set` — zero-tolerance gate now active.
+- `docs/adr/0001–0103` (69 files): canonical header block (`**Status:**`, `**Date:**`, `**Slice:**`, `**Supersedes:**`, `**Amends:**`, `**Subsystems:**`, `**Decision:**`, plus conditional `**Amended-by:**`/`**Superseded-by:**`) inserted after title line. 66 via script; 0091/0092/0097 patched manually (had Status/Date but lacked Subsystems/Decision/Amended-by).
+- `docs/adr/DIGEST.md`: regenerated via `just adr-digest`; all 70 project ADRs now show real Subsystems and Decision (no PENDING entries).
+
+**Key cross-refs wired:** ADR-0037↔0073, ADR-0041↔0092, ADR-0049↔0091, ADR-0053↔0091, ADR-0068↔0091, ADR-0069↔0087, ADR-0075↔0090, ADR-0087↔0069, ADR-0090 supersedes 0075 §12.5d-1, ADR-0092↔0098, ADR-0098 amends 0092.
+
+**Gates:** local full `just ci` EXIT=0 (all Rust/client/eval gates green); `node scripts/adr-digest.mjs --check` → no drift; `node evals/adr-digest.eval.mjs` → EXIT=0.
+
+**Supervisor owns squash-merge.** ADR-0105 remains free — next real decision should claim it.
+
+## 2026-07-13 — m14.5d-1a TERMINAL STATE — PR #162 OPEN, local `just ci` EXIT=0, verifier PASS
+
+**Branch:** `feat/m14.5d-1a-item-row-cure-status`, tip `85fcdd5`, **PR:** https://github.com/mdrewt/monster-realm/pull/162
+**ADR:** `docs/adr/0105-m14.5d-1a-item-row-cure-status.md` (**ADR-0105 CONSUMED**; next-free → 0106)
+**Worktree:** `.claude/worktrees/m14.5d-1a` (supervisor cleans up post-merge). Server-only schema slice; disjoint from all other branches.
+
+**What landed (EARS d1a-1..6):**
+- `game-core/src/combat/ability.rs`: `StatusKind` gains `#[cfg_attr(feature = "spacetimedb", derive(spacetimedb::SpacetimeType))]` (cfg-gated, ADR-0003)
+- `server-module/src/schema.rs`: `ItemRow` gains `pub cure_status: Option<StatusKind>` as last field (additive, ADR-0006)
+- `server-module/src/content.rs`: `sync_content_inner` seeds `cure_status: item.cure_status` in `ItemRow` construction
+- `server-module/src/lib.rs`: `CONTENT_VERSION` bumped 11→12 with v12 doc comment (ADR-0054 — BLOCKER fix)
+- `evals/baselines/spacetime-types.json`: `StatusKind` enum entry added
+- `evals/baselines/table-schemas.json`: `item_row` gains `"cure_status": "Option<StatusKind>"`
+- `evals/baselines/content-hash.json`: version 11→12 (same hash — only schema changed, not content RON)
+- `server-module/src/m14_5d_1a_tests.rs`: EA-1 (cfg_attr), EA-2 (ItemRow field), EA-3 (seeding), EA-5 (baseline), EA-6 (CONTENT_VERSION≥12) source-guard tests
+- `game-core/src/content.rs` (mod tests): EA-4 Antidote→Poison assertion
+- `client/src/module_bindings/`: bindings regenerated — `item_row_table.ts` gains `cureStatus` getter; `types.ts` gains `StatusKind` export
+- `docs/adr/0105-m14.5d-1a-item-row-cure-status.md`: ADR authored (subsystems: schema-persistence, content, battle)
+- `evals/spacetime-type-snapshot.eval.mjs`: MINOR-1 inline-variant constraint comment added
+- `docs/adr/DIGEST.md` + `docs/knowledge/`: regenerated
+
+**Key trap (CONTENT_VERSION):** Reviewer caught that `sync_content_inner` returns early if DB version==CONTENT_VERSION (line 36-40). Without bumping to 12, all deployed DBs at v11 would skip the item_row upsert loop, leaving `cure_status=None` for all items including Antidote. EA-6 gates this invariant permanently.
+
+**Red-team findings:** No BLOCKER/MAJOR. MINOR-1 (eval regex + inline-only constraint comment) fixed. NOTE-1 (serde(default) asymmetry explanation) added to ADR-0105 §D2. NOTE-2 (two-source-of-truth) accepted as design (D3). NOTE-3/4 latent, no action needed now.
+
+**Commit structure (4 commits):**
+- `6178948 wip(m14.5d-1a): RED gating tests`
+- `a374346 wip(m14.5d-1a): implement cure_status column — RED→GREEN`
+- `71e284d fix(m14.5d-1a): CONTENT_VERSION 11→12 + EA-6 gate + ADR-0105 subsystem fix`
+- `85fcdd5 fix(m14.5d-1a): red-team MINOR-1 + NOTE-1 — eval comment + ADR-0105 D2 clarification`
+
+**Gates:** local full `just ci` EXIT=0 (1104 Rust tests, 833 TS tests, 55 evals PASS). Reviewer BLOCKER addressed. Red-team: no BLOCKER/MAJOR. Verifier PASS.
+
+**Supervisor owns squash-merge.** ADR-0105 CONSUMED; next-free → 0106. After merge, clients can subscribe to `item_row` and classify cure items by `cureStatus !== null`. Unblocks m14.5d-1b (client Use-Item battle UI).
+
+---
+
+## 2026-07-13T18:15Z — supervisor tick mr-sup-cowork-20260713T180637Z-657427-25296 (cowork)
+
+**m-infra-d2 MERGED** — PR #161 squash-merged to `master` @ `ec19b1d` (69 legacy ADR canonical-header backfills + DIGEST.md + LEGACY_TOLERANCE→empty + backfill script). Remote ci+e2e green pre-merge; master CI GREEN post-merge. Audits: gating-test CLEAN (no test files); orchestration CLEAN-doc-artifact (review-lens in-build, digest exercised by the ADR-0104 CI drift gate; no tester-role — doc/tooling slice). ADR 0105 conditional reservation UNUSED → `adr_next_free` stays 105; no index chore needed (README untouched). Touches-overrun noted: `scripts/backfill-adr-headers.mjs` undeclared (no siblings — recorded to the recurring-overrun follow-up). Stray local edits found in main checkout (docs/adr 0091/0092/0097 + scripts/adr-digest.mjs, +untracked `.claire/`, `docs/memory-cards/`) — stashed labeled (stash@{0}), untracked left alone. Worktree + local/remote `feat/m-infra-d2` removed.
+
+**Composite launch: m14.5d-1a** — server half of the re-serialized 14.5d-1 pair (spec §14.5d-1 hidden dependency, ADR-0101 unblocking path): additive `cure_status` column on public `item_row` + seeding from ItemDef content + bindings regen. Structural set (schema/bindings) → SERIAL, N=1. ADR 0105 pre-allocated (conditional). Client half m14.5d-1b follows after merge.
+
+**IN-PROGRESS breadcrumb:** m14.5d-1a launched detached 2026-07-13T18:19Z (run mr-sup-cowork-20260713T180637Z-657427-25296). Brief /tmp/mr_pass_m14.5d-1a.md; ADR 0105 reserved (conditional).
+
+---
+
+## 2026-07-13 — m14.5d-1b TERMINAL STATE — PR #164 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m14.5d-1b-cure-item-ui`, tip `f44502c`, **PR:** https://github.com/mdrewt/monster-realm/pull/164
+**ADR:** None — extends ADR-0047 (classify-by-data) + ADR-0101 (battle UX) without new decisions; **ADR 0106 reservation released; next-free stays 0106**
+**Worktree:** `.claude/worktrees/m14.5d-1b` (supervisor cleans up post-merge). Client-only; no server/schema/evals changes.
+
+**What landed (EARS 14.5d-1, client half — builds on merged m14.5d-1a / PR #162 / ADR-0105):**
+- `client/src/net/store.ts`: `StoreItemRow` gains `cureStatus: string | null`
+- `client/src/net/rowConvert.ts`: `SdkItemRowRow` gains `cureStatus: { readonly tag: string } | undefined`; `itemRowToStore` maps `?.tag ?? null`
+- `client/src/ui/battleModel.ts`: `CureItem` interface; `cureItems: readonly CureItem[]` in `BattleViewModel`; 5th arg to `buildBattleViewModel`; classify-by-data filter `c.cureStatus !== null && c.count > 0` (defense-in-depth, two layers); `battleVMsEqual` extended (length + per-element incl. count)
+- `client/src/ui/battleView.ts`: `onUseItem` callback; `#cureSelectEl` private field; `#renderCureItems` method (selector + `data-cure-status` attr + Use Item button; `parseInt`/`isNaN` guard, no bare use); save/restore selection with TS narrowing cast (mirrors bait pattern)
+- `client/src/main.ts`: `cureItems` construction from inventory, 5th arg to `buildBattleViewModel`, `onUseItem` → `sendGuarded`
+
+**Key design decisions:**
+- Available in ANY ongoing battle (not gated on `canRecruit`/wild — deliberate divergence from bait, documented)
+- No bare use: empty select → NaN → isNaN guard → no-op
+- `data-cure-status` attribute is the ADR-0047 DOM contract surface
+
+**Gates:** local full `just ci` EXIT=0 (853 client tests, 55 evals green). Reviewer BLOCKER addressed (stale @ts-expect-error × 6). Red-team findings addressed (NaN guard, data-cure-status test, last stale @ts-expect-error). RT-CI-01 gating tests locked runtime null-filter invariant.
+
+**Commit structure (3 commits):**
+- `8c6f972 feat(m14.5d-1b)`: main implementation
+- `6510a33 fix(m14.5d-1b)`: reviewer findings (NaN guard, @ts-expect-error cleanup, data-cure-status test, store.ts comment)
+- `f44502c fix(m14.5d-1b)`: red-team findings (last @ts-expect-error, RT-CI-01 gating tests)
+
+**Supervisor owns squash-merge.** ADR-0106 reservation released (unused). After merge, EARS 14.5d-1 is COMPLETE. No further 14.5d criteria remain.
+
+---
+
+## 2026-07-13T20:19:51Z — supervisor tick mr-sup-cowork-20260713T200639Z-737398-10660 (Cowork)
+
+**MERGED m14.5d-1a** — PR #162 squash-merged to master (eca22bb); master CI GREEN. Audits: orchestration CLEAN (6 Agent invocations: planner/tester/reviewer/red-team/verifier/doc-keeper; model claude-sonnet-4-6), gating-test CLEAN (RED 6178948 -> tip: tests 4->5, asserts 5->6, zero removals/skips). Cost $16.07, 1 wrapper attempt. Touches overrun again (game-core/, evals/baselines, docs/knowledge/ beyond declared set) — serial so harmless; the tighten-touches follow-up stands. ADR-0105 landed; index rows pre-existed from chore #160; doc-only chore PR #163 bumps next-free 0105->0106, auto-merge armed. Worktree + branch removed. Stray untracked dirs (.claire/, docs/memory-cards/) left untouched.
+
+**Next:** composite launch of m14.5d-1b (client-only: cure-item Use-Item UI + weather banner + statusBadge/outcome rigor; touches client/src/** only) this tick if final re-probe stays clean.
+
+**IN-PROGRESS 20:21:57Z:** launching m14.5d-1b (client-only, ADR reserved 0106-conditional) detached via mr-launch.sh — brief /tmp/mr_pass_m14.5d-1b.md.
+
+**LAUNCHED 20:23:58Z:** m14.5d-1b detached OK — session leader 738455, claude_pid 738459, model claude-sonnet-4-6 asserted, per-run lock written, ADR 0106 reserved. Supervisor tick complete; mutex released.
+
+## 2026-07-13T22:20Z — supervisor tick (mr-sup-cowork-20260713T220618Z-809144-19744)
+
+**MERGED m14.5d-1b** — PR #164 squash-merged as `6f32178` (battle overlay Use-Item action for cure items, ADR-0047, closes EARS 14.5d-1). Master CI green (run 29288967880). Audits: orchestration CLEAN (planner/tester/reviewer/red-team all present, Sonnet confirmed), gating-test CLEAN (+572 test lines across 3 test files, zero removed/skipped), touches assert clean (8 files ⊆ client/src/**). No ADR consumed — 0106 reservation released, adr_next_free stays 106. Chore PR #163 (ADR index) confirmed merged earlier at 20:15Z. Worktree m14.5d-1b removed, local+remote branch deleted, main checkout ff'd to 6f32178. Wrapper attempts=2 (one clean auto-resume), cost $1.38. Note: supervisor DC shell died mid-CI-watch; reconciled cleanly in a fresh shell under the same run_id/mutex. All 14.5d criteria now done — next eligible work per PLAN §9 (M15 Trading expected).

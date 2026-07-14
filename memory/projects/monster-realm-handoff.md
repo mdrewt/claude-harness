@@ -25,3 +25,30 @@ m15a build run finished (PR #165 open, remote CI+e2e green, EXIT=0 ATTEMPTS=1) b
 
 ## 2026-07-14T02:20:55Z — supervisor tick mr-sup-cowork-20260714T020706Z-966302-25545
 IN-PROGRESS: merged m15a PR #165 (c5fddc4, audits clean after review pass MERGE-OK). Master CI went RED post-merge (just eval knowledge DRIFT). Launched fix-red-master run to regenerate bundles and restore green. ADR-0106 index chore-PR deferred until master green.
+
+## 2026-07-14T04:28:00Z — supervisor mr-sup-cowork-20260714T040641Z-1000312-12965 (cowork tick)
+IN-PROGRESS: launched m15b (trade client UI) detached via mr-launch.sh, ADR reserved 0107.
+Earlier this tick: merged PR #166 fix-red-master (knowledge-bundle date rollover; doc-only, orch-audit exempt) → master 15279c9 CI GREEN; merged chore PR #167 ADR index (0105/0106 rows, next-free 0107) → master 9754b03.
+
+---
+
+## 2026-07-14 — m15b TERMINAL STATE — PR #168 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m15b-trade-client-ui`, **PR:** https://github.com/mdrewt/monster-realm/pull/168
+**ADR:** 0107 at `docs/adr/0107-m15b-trade-client-ui.md` — reserved from m15a
+**Worktree:** `.claude/worktrees/m15b`
+
+**Built (m15b — trade client UI spine):**
+- `client/src/ui/tradeModel.ts` — pure `buildTradeViewModel` function; 4-state action table; mySide/theirSide orientation
+- `client/src/ui/tradeView.ts` — DOM shell (`TradeView` class, KeyU toggle, double-spend `#pending` lock, `TradeCallbacks → Promise<void>`)
+- `client/src/ui/tradeModel.test.ts` — 44 Vitest tests (all 4 action states, bigint, fast-check, identity filtering)
+- `client/src/net/store.ts` — `StoreMonsterCard`, `StoreTradeItem`, `StoreTradeOffer` types + 4 methods + `reset()` clear
+- `client/src/net/rowConvert.ts` — `SdkTradeOfferRow` + `tradeOfferRowToStore`
+- `client/src/net/connection.ts` — `trade_offer` table insert/update/delete wiring + `SELECT * FROM trade_offer` subscription
+- `client/src/main.ts` — KeyU handler, 4 reducer callbacks, batch listener, reconnect reset, frame-loop guard, mutual exclusivity (KeyB/KeyI/KeyE)
+- `client/index.html` — `#trade-overlay` DOM block
+
+**Gates:** local full `just ci` EXIT=0 (1142 Rust + 897 JS tests, all evals pass).
+
+**Supervisor notes:** ADR-0107 design decisions in place; m15c (integrate evals/e2e tail) PARKED.
+**ADR next-free:** 0108

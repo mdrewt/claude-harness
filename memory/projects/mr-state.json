@@ -1,31 +1,28 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-13T21:00:00Z",
- "updated_by": "m14.5d-1b terminal handoff",
+ "updated_utc": "2026-07-14T04:31:24Z",
+ "updated_by": "mr-sup-cowork-20260714T040641Z-1000312-12965",
  "master": {
-  "sha": "eca22bb (m14.5d-1a #162)",
-  "ci": "GREEN",
-  "nightly": "expected GREEN"
+  "sha": "9754b03 (chore #167)",
+  "ci": "GREEN (15279c9 full run; 9754b03 doc-only)",
+  "nightly": "unknown"
  },
- "adr_next_free": 106,
- "inflight": [],
- "awaiting_merge": [
+ "adr_next_free": 108,
+ "inflight": [
   {
-   "slice": "m14.5d-1b",
-   "pr": 164,
-   "branch": "feat/m14.5d-1b-cure-item-ui",
-   "tip": "f44502c",
-   "ci": "local EXIT=0 (853 tests, 55 evals)",
-   "adr": "none (0106 reservation released)"
+   "slice": "m15b",
+   "session_leader": 1001909,
+   "claude_pid": 1001909,
+   "started_utc": "2026-07-14T04:31:24Z"
   }
  ],
+ "awaiting_merge": [],
  "queue": [
-  "chore PR #163 (ADR index next-free 0106) — verify merged (auto-merge armed)",
-  "FOLLOW-UP: recurring touches-overrun (m14c/m14.5c/m14.5e/m14.5g/m-infra-d2/m14.5d-1a) — tighten brief touches declarations",
-  "M15 Trading (Phase C) next milestone after M14.5 closes"
+  "m15c trade evals tail (serial after m15b \u2014 its touches incl. vague integration/e2e)",
+  "FOLLOW-UP: recurring touches-overrun \u2014 tighten brief touches declarations"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m14.5d-1b PR #164 open; 853 tests + 55 evals green locally. ADR-0106 reservation released (no new ADR needed — extends existing patterns). adr_next_free=106. Supervisor owns squash-merge. After merge, EARS 14.5d-1 complete and all 14.5d criteria done."
+ "notes": "Tick 20260714T0406Z: merged #166 fix-red-master (master GREEN), merged #167 ADR-index chore, launched m15b (trade client UI, ADR 0107). claude_pid==leader pid recorded (pgrep matched launcher); liveness judged from leader per rule 2."
 }
