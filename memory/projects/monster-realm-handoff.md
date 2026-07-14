@@ -152,3 +152,6 @@ structural set; no fan-out). Brief /tmp/mr_pass_m16a.md.
 
 **Supervisor owns squash-merge.** m16b (client UI) + m16c (PvP evals) PARKED.
 **ADR next-free:** 0110
+
+## 2026-07-14T10:12:17Z — mr-sup-cowork-20260714T100626Z-1158375-18603
+REVIEW PASS m16a-pvp COMPLETE — **APPROVE-MERGE**. PR #172 tip `3957a69`. All 5 lenses run (tester/reviewer/red-team/reducer-security-auditor/desync-guard/verifier). Three runs of PvP tests green; two teeth checks confirmed (RT-M16-06 mutation → red; EA-PVP-01 mutation → red; both reverted). `just ci` EXIT=0 (1169 Rust tests, 912 JS tests, 32 evals). Two code fixes pushed (3957a69): RT-M16-08 GC ordering violation (write_back_battle_results called after terminal update → deletes current battle row) + H-3 silent Ok on mismatch. Side-B XP gap documented as deferred (ADR-0109 D10, M17). Verdict memo at memory/projects/monster-realm-m16a-review.md. **Supervisor owns squash-merge.** m16b/m16c PARKED. ADR next-free: 0110.
