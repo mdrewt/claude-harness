@@ -52,3 +52,39 @@ Earlier this tick: merged PR #166 fix-red-master (knowledge-bundle date rollover
 
 **Supervisor notes:** ADR-0107 design decisions in place; m15c (integrate evals/e2e tail) PARKED.
 **ADR next-free:** 0108
+
+## 2026-07-14T06:18Z — supervisor tick mr-sup-cowork-20260714T060532Z-1044076-8218
+
+**m15b MERGED.** PR #168 squash-merged at 06:07:55Z → master a20507a; full CI green. ADR-0107 landed;
+index reconciled via doc-only chore PR #169 (next-free → 0108; `--auto` rejected on clean status, merged
+manually per 2026-07-04 fallback; its doc-only CI was in_progress at tick end). Audits clean: orchestration
+(Sonnet, planner/tester/reviewer/red-team/doc-keeper subagents) + gating-test (no skips/deletions/removed
+assertions in diff). Known touches-overrun recurred (diff included connection.ts, rowConvert.*, index.html,
+vite.config.ts beyond declared set) — harmless serial, follow-up stays queued. m15b worktree + branches removed.
+
+**Composite launch: m15c** (trade evals tail — `evals/trade-*.eval.mjs` + integration/e2e per
+M15-trading.spec.md §5; final M15 slice). ADR-0108 reserved. Serial (no fan-out). Brief /tmp/mr_pass_m15c.md.
+
+---
+
+## 2026-07-14 — m15c TERMINAL STATE — PR #170 OPEN, local `just ci` EXIT=0
+
+**Branch:** `feat/m15c-trade-evals-e2e`, tip `4768305`, **PR:** https://github.com/mdrewt/monster-realm/pull/170
+**ADR:** 0108 at `docs/adr/0108-m15c-trade-evals.md`
+**Worktree:** `.claude/worktrees/m15c`
+
+**Built (m15c — trade evals tail):**
+- `evals/trade-reducer-security.eval.mjs` — 12 criteria (TR-19 no-genes, TR-18 disconnect, TR-13..17 role+status+reread+delete, cancel party-check, trade_offer public)
+- `evals/trade-escrow-guards.eval.mjs` — 11 guard sites (TR-2..TR-12, fuse≥2, start_battle≥2)
+- `evals/trade-conservation.eval.mjs` — TR-16 dual-write + item consume+grant + currency spend+grant + row deletion
+- `client/e2e/trade.spec.ts` — DOM wiring, KeyU/Escape, "No active trade", mutual exclusivity (waitForFunction on box DOM state)
+
+**Hardening delivered (reviewer + red-team):**
+- RT-SEC-01: `hasCancelPartyCheck` requires `if`-gated expression (rejects log-macro bypass)
+- RT-SEC-02: `bodyHasGuard` counts `guard + '('` call sites only (rejects string-literal bypass)
+- `start_battle` minCount raised 1→2 (party + opponent loop coverage)
+
+**Gates:** local full `just ci` EXIT=0 (all 48 evals PASS). Remote CI running.
+
+**Supervisor owns squash-merge.** ADR-0108 complete; M15 Trading CLOSED (m15a + m15b + m15c).
+**ADR next-free:** 0109
