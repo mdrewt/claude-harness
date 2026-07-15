@@ -29,6 +29,40 @@ m16.5c (trade client completion, ADR-0114, PR #185) squash-merged to master. Com
 
 **2026-07-15T11:14:22Z — model pin change (Drew-directed):** mr-launch.sh default model sonnet -> fable (CLI verified: `claude --model fable` works on this host). Backup kept at mr-launch.sh.bak-sonnet-20260715. All future rooted runs (m16.5e onward) plan+code on Fable 5; supervisors must assert the log's model string is Fable-class (claude-fable-5) post-launch — Sonnet now indicates a silent downgrade. m16.5d (already green, awaiting merge) is unaffected. ~/.claude/settings.json untouched per standing rule.
 
+## 2026-07-15 — m16.5e runner OPS NOTE: harness commit 37c2249 is mis-scoped (benign, do not revert)
+
+A Claude Code process restart mid-run reset the shell cwd from the m16.5e worktree back to the harness root; the runner's checkpoint `git add -A && git commit && git push` therefore landed on **harness `main` as 37c2249** with a misleading `wip(m16.5e)` message. Contents: ONLY pre-existing uncommitted harness state (handoff, mr-state.json, m16.5b/c/d memory cards, mr-launch.sh + backup, strays-m16.5a dir, OKF/future-prompts strays) — no monster-realm content, nothing lost or altered. Reverting would regress live supervisor state — leave it. The intended slice checkpoint was re-done correctly on `feat/m16.5e-eval-infra-hardening` (49b2e23). Lesson recorded: after any process restart, mutating commands must re-assert the worktree via `git -C <abs-path>`/`cd` in the same command line.
+
 ## 2026-07-15T12:27:33Z — supervisor tick mr-sup-cowork-20260715T121019Z-2189394-1148 (IN PROGRESS)
 Merged m16.5d PR #187 (squash 267513b, ci+e2e green, touches-assert PASS, gating-test audit PASS, orchestration CLEAN from prior tick). ADR-0115 index chore PR #188 merged (679b58e; --auto rejected again, merged manually on green). master CI GREEN on 267513b. NOTE: Nightly RED 5 consecutive days (Jul 11-15) — mutate-core + mutate-server jobs failing; needs triage (queued). Composite launch: m16.5e (evals-only, ADR 0116 reserved) via mr-launch.sh on fable.
 2026-07-15T12:30:32Z — tick complete: m16.5d MERGED (#187+#188), m16.5e LAUNCHED (fable, leader 2190883, ADR 0116). Nightly RED 5 days (mutation jobs) queued for triage.
+
+## 2026-07-15T14:15Z — IN-PROGRESS: m16.5e RESUMED (attempt 4) by mr-sup-cowork-20260715T141117Z-2216033-32348
+- Attempts 1-3 all died at the 600s background-task wait ceiling: orchestrator ended turns while subagents still ran (headless -p kills session on end_turn). Real progress made: 3 wip commits pushed (plan/ADR-0116 draft, red-team amendments, tester RED teeth — 3 evals red by design) + uncommitted implementer work on spacetime-type-snapshot.eval.mjs. No PR yet.
+- Resume brief prepends a foreground-only/no-background-end_turn directive + verified state facts. Old logs archived /tmp/mr_pass_m16.5e.{log,err}.attempts1-3-*.
+
+## 2026-07-15T15:0xZ — m16.5e TERMINAL: PR #189 OPEN, local `just ci` green — supervisor to merge
+- Attempt 4 (fable) completed the slice foreground-only: implementer red→green on tester teeth 610a7d0 (kept byte-intact — verifier PASS w/ mutation spot-checks), review fan = reviewer + red-team + reducer-security review-lens + /simplify + verifier (all findings triaged: 3 code fixes applied — bounded struct search, function-local dbWriteRe, checkAppendOnly null guard; rest = documented ADR residuals or stale).
+- Branch feat/m16.5e-eval-infra-hardening @ b3135ad (pushed). PR https://github.com/mdrewt/monster-realm/pull/189. Local `just ci` EXIT=0 on PR head; 61/61 evals ×5 + keepalives; 1193 Rust + 943 client tests.
+- ADR-0116 written at reserved number (Subsystems: ci-gates, digest row present); ARCHITECTURE.md M16.5e entry; adr README/CHANGELOG untouched per doc-aggregation rule. touches-delta in PR body.
+- Implementation discoveries recorded in ADR-0116 + memory card monster-realm-m16.5e: backslash-newline string-strip trap; content.rs updates monster/monster_pub (in-place-mutation exemption in coupling gate); ADR next-free = 0117.
+- NEXT: supervisor merges #189 (squash). Worktree .claude/worktrees/m16.5e removable after merge.
+
+## 2026-07-15T16:31Z — supervisor tick mr-sup-cowork-20260715T160957Z-2271340-20239 (Cowork)
+- **m16.5e MERGED**: PR #189 squash-merged as `9f8f8ad` (eval-infra hardening, ADR-0116). Wrapper resume attempt 4 finished clean (EXIT=0). Master CI **GREEN** on 9f8f8ad.
+- Audits: orchestration CLEAN-test-artifact (eval-only diff; 15+ full eval-suite runs; reviewer/red-team/review-lens/verifier all invoked; model claude-fable-5). Gating-test audit CLEAN (no removed assertions/skips; +1621/-8).
+- ADR index reconciled via chore PR #190 (merged manually on green; `--auto` rejected on clean status). Next free ADR: **0117**.
+- Worktree `.claude/worktrees/m16.5e` + branch removed; main checkout ff'd to master. Untracked strays (`.claire/`, `docs/memory-cards/`) left untouched.
+- Ops note: DC shell churn killed 5 supervisor sessions mid-tick; all steps reconciled from live PR/git state, no damage.
+- Next: m16.5f (then 16.5g); nightly mutation-job triage still queued (RED 5 days).
+
+## 2026-07-15T16:39:14Z — supervisor: m16.5f IN-PROGRESS (launching)
+- Brief /tmp/mr_pass_m16.5f.md, ADR reserved 0117, model fable, fresh slice (no resume). Touches: game-core/src/trading/**, server-module/{trading,schema}.rs, ADR-0106 amendment, tests. Serial (schema.rs = structural).
+
+## 2026-07-15 ~19:0xZ — m16.5f TERMINAL: PR #191 OPEN, local `just ci` green — supervisor to merge
+
+- Branch `feat/m16.5f-trade-ssot-polish` @ fa246db (pushed). PR https://github.com/mdrewt/monster-realm/pull/191. Local full `just ci` EXIT=0 (61/61 evals, 881+253 Rust, 943 client, clippy clean); remote CI running.
+- Slice delivered all four 16.5f items (ADR-0117, amends 0106/0108): authorize_respond/confirm delegation (role-first, `&TradeStatus`); MonsterNotOwned + InsufficientCurrency variants DELETED (privacy trap documented); symmetric propose escrow (both indexes chained, provably-0-under-D4 comments); trade_offer privacy doc + ADR-0106 M-2 corrected (player_wallet false precedent dropped; probe-vector recorded as accepted exposure); TTL reaper (trade_offer_reaper_schedule one-shot per offer, 1h const in game-core, disarm at 4 deletion sites — deliberate extension of pvp precedent; no self-disarm, runtime auto-delete cited from SpacetimeDB docs §Row Lifecycle).
+- Orchestration: planner → reviewer+red-team plan fan → tester (RED: 13 rules tests compile-red, 4 ea_ scans, eval 12→16 criteria) → implementer (separate agent, did not touch gating tests) → reviewer+red-team+reducer-security review-lens+/simplify fan → gate hardening via tester (stmt-terminator ?-scan, arg-span field check, string-literal strip — closes dropped-Result/wrong-field/literal-bypass gate holes) → verifier (gating-test integrity PASS: strengthenings only cff9983..HEAD; 6/6 mutation spot-checks bite; caught knowledge-bundle line-drift → regenerated) → doc-keeper (ARCHITECTURE M16.5f entry, memory card both locations).
+- touches-delta audited in PR body: game-core/src/lib.rs (mechanical re-export — flagged), bindings types.ts (just gen), table-schemas.json baseline append, DIGEST regen, knowledge regen (73 files, 2 new), ADR-0117. CHANGELOG/adr-README untouched. ADR next-free = 0118.
+- Worktree `.claude/worktrees/m16.5f` removable after merge. NEXT: supervisor merges #191 (squash), then 16.5g (ledger/docs reconciliation — last M16.5 slice) per queue; nightly mutation-job triage still queued (RED 5+ days, pre-existing).
