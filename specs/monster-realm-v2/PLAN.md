@@ -1,6 +1,6 @@
 # Monster Realm (v2) — Greenfield Plan
 
-> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals a–f merged (ADR-0112–0117, PRs #180–#191), 16.5g docs reconciliation in flight. Next: M17.
+> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#158 + #162–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals a–f merged (ADR-0112–0117, PRs #180–#191), 16.5g docs reconciliation in flight. Next: M17.
 > **Relationship to v1:** This is a *new, from-scratch* project — the spiritual sequel to
 > `projects/pokemon-mmo` (published db `monster-tamer-mmo`). It is **not** that project and does
 > **not** modify it. Working repo name: **`monster-realm`** (rename freely; must stay kebab-case for
