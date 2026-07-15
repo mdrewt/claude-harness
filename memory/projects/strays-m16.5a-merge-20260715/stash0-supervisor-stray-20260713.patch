@@ -1,0 +1,127 @@
+diff --git a/docs/adr/0091-type-rigor-hardening.md b/docs/adr/0091-type-rigor-hardening.md
+index 0a751eb..8fa850f 100644
+--- a/docs/adr/0091-type-rigor-hardening.md
++++ b/docs/adr/0091-type-rigor-hardening.md
+@@ -5,6 +5,8 @@
+ **Slice:** M13.5f
+ **Supersedes:** none
+ **Amends:** ADR-0068 (once-only gate enforcement), ADR-0049 (marshal trust boundary), ADR-0053 (typed-error pattern)
++**Subsystems:** security-authz, ci-gates
++**Decision:** Harden five latent gaps: GrantItem once-only gate, quest-flag exhaustive match, dir/action fail-loud decode, pure check_party_slot, and marshal double-validate.
+ 
+ ---
+ 
+diff --git a/docs/adr/0092-m14a-status-effect-rules.md b/docs/adr/0092-m14a-status-effect-rules.md
+index 590aba2..835dfa3 100644
+--- a/docs/adr/0092-m14a-status-effect-rules.md
++++ b/docs/adr/0092-m14a-status-effect-rules.md
+@@ -5,6 +5,9 @@
+ **Slice:** M14a
+ **Supersedes:** none
+ **Amends:** ADR-0017 (resolve_turn signature), ADR-0023 (turn model), ADR-0041 (damage formula)
++**Subsystems:** battle
++**Decision:** StatusEffect enum, separate StatusVariance struct, resolve_full_turn wrapping resolve_turn + apply_post_turn_effects, SideA-first DoT KO tiebreak; pure game-core.
++**Amended-by:** ADR-0098
+ 
+ ---
+ 
+diff --git a/docs/adr/0097-m14-close-phase-b-complete.md b/docs/adr/0097-m14-close-phase-b-complete.md
+index 7075e2c..8ac3635 100644
+--- a/docs/adr/0097-m14-close-phase-b-complete.md
++++ b/docs/adr/0097-m14-close-phase-b-complete.md
+@@ -3,6 +3,10 @@
+ **Status:** Accepted
+ **Date:** 2026-07-11
+ **Slice:** m14f (doc-keeper close; doc-only, no production code)
++**Supersedes:** —
++**Amends:** —
++**Subsystems:** battle, tooling-docs
++**Decision:** Milestone closure record for Phase B (M14 status effects, abilities, weather); verifies integrated correctness and queues residuals for M14.5 Phase C.
+ 
+ ---
+ 
+diff --git a/scripts/adr-digest.mjs b/scripts/adr-digest.mjs
+index c31d9fa..e64fe04 100644
+--- a/scripts/adr-digest.mjs
++++ b/scripts/adr-digest.mjs
+@@ -37,77 +37,9 @@ const SUBSYSTEM_VOCAB = new Set([
+ // standard (M-infra-d). Missing canonical fields are warnings, not errors.
+ // The backfill slice removes entries here until the set is empty.
+ // ---------------------------------------------------------------------------
+-const LEGACY_TOLERANCE = new Set([
+-  '0001',
+-  '0035',
+-  '0036',
+-  '0037',
+-  '0038',
+-  '0039',
+-  '0040',
+-  '0041',
+-  '0042',
+-  '0043',
+-  '0044',
+-  '0045',
+-  '0046',
+-  '0047',
+-  '0048',
+-  '0049',
+-  '0050',
+-  '0051',
+-  '0052',
+-  '0053',
+-  '0054',
+-  '0055',
+-  '0056',
+-  '0057',
+-  '0058',
+-  '0059',
+-  '0060',
+-  '0061',
+-  '0062',
+-  '0063',
+-  '0064',
+-  '0065',
+-  '0066',
+-  '0067',
+-  '0068',
+-  '0069',
+-  '0070',
+-  '0071',
+-  '0072',
+-  '0073',
+-  '0074',
+-  '0075',
+-  '0076',
+-  '0077',
+-  '0078',
+-  '0079',
+-  '0080',
+-  '0081',
+-  '0082',
+-  '0083',
+-  '0084',
+-  '0085',
+-  '0086',
+-  '0087',
+-  '0088',
+-  '0089',
+-  '0090',
+-  '0091',
+-  '0092',
+-  '0093',
+-  '0094',
+-  '0095',
+-  '0096',
+-  '0097',
+-  '0098',
+-  '0099',
+-  '0100',
+-  '0101',
+-  '0103',
+-]);
++// All legacy ADRs have been backfilled with canonical headers in the
++// m-infra-d2 slice. LEGACY_TOLERANCE is now empty — the gate is zero-tolerance.
++const LEGACY_TOLERANCE = new Set([]);
+ 
+ // ---------------------------------------------------------------------------
+ // CLI argument parsing

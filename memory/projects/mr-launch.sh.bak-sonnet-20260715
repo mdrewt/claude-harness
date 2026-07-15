@@ -4,7 +4,7 @@
 # Contract (relied on by the monster-realm-v2-milestone-runner supervisor):
 #   - reads brief from /tmp/mr_pass_<slice>.md
 #   - writes stream-json to /tmp/mr_pass_<slice>.log, stderr to .err (appends on retries)
-#   - pins --model (default fable — per Drew 2026-07-15: plan+code on Fable 5; a global ~/.claude/settings.json haiku override
+#   - pins --model (default sonnet; a global ~/.claude/settings.json haiku override
 #     otherwise silently downgrades the orchestrator — see supervisor gotchas)
 #   - auto-resumes the run (<= MAX_ATTEMPTS total) via `claude --resume <last session_id>`:
 #       * RC==0 (premature end_turn)              -> resume with "continue" nudge
@@ -22,7 +22,7 @@
 # Caller MUST launch detached and assert it:  setsid bash mr-launch.sh <slice> & disown
 set -u
 S="${1:?usage: mr-launch.sh <slice> [model]}"
-MODEL="${2:-fable}"
+MODEL="${2:-sonnet}"
 MAX_ATTEMPTS=3
 HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
 B="/tmp/mr_pass_$S.md"; L="/tmp/mr_pass_$S.log"; E="/tmp/mr_pass_$S.err"; D="/tmp/mr_pass_$S.done"

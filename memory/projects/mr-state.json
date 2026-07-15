@@ -1,42 +1,31 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-14T23:59:00Z",
- "updated_by": "m16c-review (sonnet)",
+ "updated_utc": "2026-07-15T12:30:32Z",
+ "updated_by": "mr-sup-cowork-20260715T121019Z-2189394-1148",
  "master": {
-  "sha": "5a679da (#177 adr-index; #176 m16b at 44e5505)",
-  "ci": "GREEN (44e5505 success; 5a679da doc-only run pending)",
-  "nightly": "expected GREEN (verify missed=0)"
+  "sha": "679b58e (#188 m16.5d adr-index chore; m16.5d #187 267513b beneath)",
+  "ci": "GREEN verified on 267513b (CI success); 679b58e doc-only",
+  "nightly": "RED 5 consecutive days Jul11-15 (mutate-core + mutate-server job failures) \u2014 NEEDS TRIAGE"
  },
- "adr_next_free": 112,
- "inflight": [],
- "awaiting_merge": [
+ "adr_next_free": 117,
+ "inflight": [
   {
-   "slice": "m16c",
-   "pr": 178,
-   "branch": "feat/m16c-pvp-evals",
-   "branch_tip": "df60c76",
-   "worktree": ".claude/worktrees/m16c",
-   "gates": [
-    "remote CI green (fb10db0)",
-    "61/61 evals (df60c76 local, 5 clean runs)",
-    "just ci EXIT=0 (df60c76)",
-    "review VERDICT: FIXED (df60c76)"
-   ],
-   "adr_reserved": 111,
-   "touches": [
-    "evals/**",
-    "client/e2e/**"
-   ],
-   "blocked_on": null
+   "slice": "m16.5e",
+   "session_leader": 2190883,
+   "claude_pid": 2190890,
+   "started_utc": "2026-07-15T12:27:33Z"
   }
  ],
+ "awaiting_merge": [],
  "queue": [
-  "M16.5 residuals (16.5a HIGH battle-trade interlock first) — after m16c closes M16",
-  "FOLLOW-UP: recurring touches-overrun - tighten brief touches declarations",
-  "FOLLOW-UP: briefs must make tester-role explicit (m16c brief includes explicit tester mandate)"
+  "TRIAGE: Nightly mutation jobs (mutate-core, mutate-server) red 5 straight days \u2014 determine surviving-mutants vs infra; candidate next target after m16.5e if not a PLAN slice",
+  "MODEL DIRECTIVE (Drew, 2026-07-15): rooted runs launch on FABLE (mr-launch.sh default fable). Post-launch model assert = Fable-class (claude-fable-5). Verified on m16.5e launch.",
+  "M16.5 residuals after 16.5e: 16.5f -> 16.5g (16.5g docs-only fan-out friendly; 16.5f touches game-core/server-module trading)",
+  "NOTE for brief-writing: declare test-file siblings + docs/knowledge/** in touches:",
+  "FOLLOW-UP: briefs must make tester-role explicit"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m16c-review COMPLETE. VERDICT: FIXED (pushed df60c76). Two defects fixed: (1) ARCHITECTURE.md criterion count 10→11 for pvp-handshake-guards (c78a2fb); (2) cancelFiltersByTarget missing good-fixture teeth in pvp-deadline-disconnect.eval.mjs (df60c76). Theoretical future-risk findings (battleActionIsPublic single-line, hasStaleTurnCheck alias coupling, stripRustComments nested) not fixed — no current defect. just ci EXIT=0 on df60c76 (1176 Rust, 938 client, 61 evals). PR #178 ready to merge. Next: gating-test audit + squash-merge #178 -> ADR-0111 index chore -> M16 CLOSED -> M16.5 residuals (16.5a first)."
+ "notes": "2026-07-15T12:30:32Z: m16.5d merged #187 (squash 267513b) after touches-assert PASS + gating-test audit PASS; chore #188 (ADR-0115 index, next-free->0116) merged manually on green (--auto rejected: 'Protected branch rules not configured'). master GREEN. Composite launch m16.5e (evals-only, ADR 0116 reserved, adr_next_free->117), fable confirmed in log, detached leader 2190883. seven_day rate-limit allowed_warning util 0.80 on watch (resetsAt 1784246400)."
 }
