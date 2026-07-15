@@ -111,7 +111,7 @@ if reviewable.
 
 ## Definition of Done
 
-- [ ] All eight EARS criteria demonstrably met (or right-sized park recorded per the note above)
-- [ ] `just ci` green locally and remote; digest gate proven to bite via the fixture eval
-- [ ] ADR authored at the supervisor-assigned number documenting the digest convention + vocabulary
-- [ ] No edit to `docs/adr/README.md`; no renumbering; CHANGELOG via commit messages only
+- [x] All eight EARS criteria demonstrably met (or right-sized park recorded per the note above) — DONE (PR #159; the parked header backfill landed via PR #161)
+- [x] `just ci` green locally and remote; digest gate proven to bite via the fixture eval — DONE (PR #159, `adr-digest` eval)
+- [x] ADR authored at the supervisor-assigned number documenting the digest convention + vocabulary — DONE (ADR-0104)
+- [x] No edit to `docs/adr/README.md`; no renumbering; CHANGELOG via commit messages only — DONE

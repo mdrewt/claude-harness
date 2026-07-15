@@ -92,26 +92,26 @@ and rejects only if the requested spend exceeds the available amount. This is di
 
 ## §4 Task checkboxes (m15a)
 
-- [ ] Elaborate spec + write ADR-0106 (PR #TBD)
-- [ ] `MonsterCard`, `TradeStatus`, `TradeError` types in `game-core/src/trading/`
-- [ ] `game_core::trading` pure rule module (propose/respond/confirm/atomic_swap/cancel)
-- [ ] `trade_offer` table in `server-module/src/schema.rs`
-- [ ] `reject_if_monster_in_trade`, `escrowed_item_qty`, `escrowed_currency_amount` in `guards.rs`
-- [ ] Wire guard into 12 reducers: evolve, fuse×2, set_nickname, set_party_slot, care, train, sell, buy,
-  heal_party, use_battle_item, attempt_recruit, start_battle
-- [ ] `server-module/src/trading.rs` (4 reducers: propose_trade, respond_trade, confirm_trade, cancel_trade)
-- [ ] Extend `on_disconnect` in `lib.rs` (TR-18)
-- [ ] Regen client bindings (`just gen-bindings`)
-- [ ] Tests: proof-of-teeth for each guard site, TR-15 atomic-swap re-read, TR-16 conservation,
-  TR-18 disconnect, TR-19 structural, TR-20/21/22
+- [x] Elaborate spec + write ADR-0106 — DONE (PR #165)
+- [x] `MonsterCard`, `TradeStatus`, `TradeError` types in `game-core/src/trading/` — DONE (PR #165)
+- [x] `game_core::trading` pure rule module (propose/respond/confirm/atomic_swap/cancel) — DONE (PR #165)
+- [x] `trade_offer` table in `server-module/src/schema.rs` — DONE (PR #165)
+- [x] `reject_if_monster_in_trade`, `escrowed_item_qty`, `escrowed_currency_amount` in `guards.rs` — DONE (PR #165)
+- [x] Wire guard into 12 reducers: evolve, fuse×2, set_nickname, set_party_slot, care, train, sell, buy,
+  heal_party, use_battle_item, attempt_recruit, start_battle — DONE (PR #165)
+- [x] `server-module/src/trading.rs` (4 reducers: propose_trade, respond_trade, confirm_trade, cancel_trade) — DONE (PR #165)
+- [x] Extend `on_disconnect` in `lib.rs` (TR-18) — DONE (PR #165)
+- [x] Regen client bindings (`just gen-bindings`) — DONE (PR #165)
+- [x] Tests: proof-of-teeth for each guard site, TR-15 atomic-swap re-read, TR-16 conservation,
+  TR-18 disconnect, TR-19 structural, TR-20/21/22 — DONE (PR #165; evals tail completed in m15c, PR #170)
 
 ## §5 Slice decomposition (m15a / m15b / m15c)
 
 | Slice | Touches | Notes |
 |-------|---------|-------|
 | **m15a (MERGED)** | `game-core/src/trading/**`, `game-core/src/lib.rs`, `server-module/src/trading.rs`, `server-module/src/schema.rs`, `server-module/src/guards.rs`, `server-module/src/lib.rs`, `server-module/src/evolution.rs`, `server-module/src/monster_mgmt.rs`, `server-module/src/raising.rs`, `server-module/src/economy.rs`, `server-module/src/taming.rs`, `server-module/src/battle.rs`, `client/src/module_bindings/**`, spec file | Structural schema + shared guards → SERIAL (no sibling) |
-| **m15b (PR #168)** | `client/src/ui/trade*.ts`, `client/src/net/store.ts`, `client/src/main.ts` | Trade overlay UI; depends on m15a bindings |
-| **m15c** (PARKED) | `evals/trade-*.eval.mjs`, integration/e2e | Evals tail; parallels m15b after m15a merges |
+| **m15b (MERGED PR #168)** | `client/src/ui/trade*.ts`, `client/src/net/store.ts`, `client/src/main.ts` | Trade overlay UI; depends on m15a bindings |
+| **m15c (MERGED PR #170)** | `evals/trade-*.eval.mjs`, integration/e2e | Evals tail; parallels m15b after m15a merges |
 
 **Post-integration verification** (after m15b + m15c merge): full `just ci` green, bindings-drift = 0,
 schema-snapshot updated to include `trade_offer`, e2e `propose → respond → confirm` flow passes end-to-end.
