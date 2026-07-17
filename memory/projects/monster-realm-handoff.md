@@ -129,3 +129,39 @@ Merged m16.5d PR #187 (squash 267513b, ci+e2e green, touches-assert PASS, gating
 - touches-delta in PR body (battle.rs+tests, guards.rs+tests, server lib.rs, justfile cap, battle-reducer-security eval, DIGEST, ARCHITECTURE). CHANGELOG/adr-README untouched. ADR next-free = **0120**.
 - Memory card: memory/projects/monster-realm-m17a.md (repo) + auto-memory copy + MEMORY.md index line. Codebase-memory graph: main checkout unchanged (worktree slice) — reindex after merge as usual. Worktree `.claude/worktrees/m17a` removable after merge.
 - NEXT: supervisor merges #196 (squash); then m17b ‖ m17c (after considering m17-fix-sideb-guards scheduling).
+
+---
+
+## 2026-07-17T06:35Z — supervisor tick mr-sup-cowork-20260717T061346Z-1408254-16043 (Cowork)
+
+**m17a MERGED.** PR #196 squash-merged → master `729106a` (CI green). ADR-0119 ranked-ladder spine.
+ADR-index chore PR #197 merged → `79d26b0` (`--auto` rejected on already-clean PR; merged manually on
+green per fallback). Next free ADR: **0120**.
+
+Audits: orchestration CLEAN (12 subagent invocations — tester/reviewer/red-team/verifier/planner/doc-keeper;
+model `claude-fable-5`; cost $103.48, 1 attempt). Gating-test CLEAN (0 deleted tests, 0 ignores; RL-10
+asserts replaced by strictly broader all-non-pvp-files scan; net +18 asserts).
+
+Touches-drift noted: actual diff also hit `justfile`, `battle.rs(+tests)`, `guards.rs(+tests)`,
+`evals/battle-reducer-security.eval.mjs` beyond the launch-time declared set. Harmless (no siblings);
+spec §5 table is now the canonical touches source for m17b/m17c briefs.
+
+Next: m17b ‖ m17c fan-out per spec §5 (approved pair, disjoint client/src vs evals+e2e). Candidate
+follow-up slice `m17-fix-sideb-guards` (ADR-0119 residuals) remains unscheduled — decide after m17b/c.
+Stray worktree `fix/review-residuals-i26-i27-i28` still untouched.
+
+**2026-07-17T06:42:22Z IN-PROGRESS:** composite launch m17b (ADR 0120 reserved) ‖ m17c (ADR 0121 reserved) — spec §5 fan-out pair, disjoint touches, N=2.
+
+**2026-07-17T06:47:14Z LAUNCHED:** m17b leader=1418718 claude=1418721 · m17c leader=1418820 claude=1418823 — both detached, model claude-fable-5 asserted. Supervisor tick complete; next tick merges whichever finishes first (merges stay serial).
+
+## 2026-07-17T~05:1xZ — m17c TERMINAL: PR #198 OPEN, local full `just ci` green — supervisor to merge
+
+- Branch `feat/m17c-ranked-evals-tail` @ 99f7160 (pushed). PR https://github.com/mdrewt/monster-realm/pull/198. Local full `just ci` EXIT=0 on PR head (1255 Rust + 943 client tests, 63/63 evals — 2 new); `just e2e` 34 passed + 1 pre-existing fixme skip (new ranked-forfeit spec green); remote ci+e2e running.
+- Delivered (test-only, RL-16/17/18): `evals/ranking-security.eval.mjs` (module-write-only A1/A2, once-only B1/B2 two-needle per ADR-0119 D3, never-deleted C1a/C1b/C2); `evals/ranking-pve-exclusion.eval.mjs` (re-verifies 4 battle.rs guards via frozen-eval imports w/ guarded mod[k] presence loop + `hasPvpRejectWithNonEmptyBody` killing the documented no-op-body residual); `client/e2e/ranked-forfeit.spec.ts` (two-context challenge→accept→disconnect-forfeit, zero-sum `spacetime sql` server-truth assertion — zero client/src dependence, decoupled from concurrent m17b). ADR-0121 at the reserved number; DIGEST regen; ARCHITECTURE M17c entry.
+- Orchestration: planner → plan fan (reviewer+red-team, APPROVE-WITH-AMENDMENTS ×2, 9 binding amendments incl. two blockers: side-B has no ongoingBattle → assert A only; R17-B sub-block algorithm pinned) → tester authored 3 files (first-run green) → impl fan (reviewer APPROVE-WITH-FIXES + red-team CLEAN: 9/9 real-source mutations bite, e2e flake-free ×5, no silent-pass path) → fixes routed BACK to authoring tester (author/grader separation held) → verifier PASS 7/7 (full ci, full e2e, gating-test integrity = correction-not-weakening, touches audit 6 files, teeth re-bite on final HEAD, ADR coherence, clean tree) → dead-code polish via tester → final full ci EXIT=0. Model claude-fable-5.
+- **Review-fan catch worth auditing:** C1b split-binding scan originally reused B's domainFiles which excluded pvp.rs → pvp.rs escaped the never-deleted scan (real gap, fixed + bite-verified via scratch-tree mutation).
+- **Ops trap recorded:** `just eval` rebuilds client-wasm/pkg dev-server-incompatibly (and a concurrent `just wasm` during evals corrupts pkg with mixed timestamps) — `just ci`/`just e2e` recipe ordering already handles it; never raw `npx playwright` after `just eval`. Cost ~2 red→green cycles of diagnosis.
+- touches-delta in PR body (ADR-0121, DIGEST.md, ARCHITECTURE.md beyond the declared eval/e2e set). CHANGELOG/adr-README untouched per doc-aggregation rule. ADR 0121 used; 0120 still reserved by m17b.
+- **Cross-slice contract for m17b (also in ADR-0121 + eval inline comment):** all `ctx.db.profile()` access must stay in ranking.rs (ADR-0119 D6) or the m17b PR must widen the ranking-security A2 allowlist explicitly — if m17b lands set_profile_name elsewhere, remote CI on the merged pair goes red on A2.
+- Memory card: memory/projects/monster-realm-m17c.md (repo) + auto-memory copy + MEMORY.md index line. Local spacetime server left running on :3000 (started by this run for e2e). Worktree `.claude/worktrees/m17c` removable after merge.
+- NEXT: supervisor merges #198 (squash) — post-integration verification block in spec §5 after BOTH m17b and m17c are in; m17-fix-sideb-guards candidate slice still unscheduled.

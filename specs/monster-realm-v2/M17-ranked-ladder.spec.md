@@ -102,7 +102,7 @@ unlike the ephemeral `player` presence row — is **never deleted**.
 |-------|---------|-------|
 | **m17a (spine — PR #196, terminal: awaiting supervisor merge)** | `game-core/src/ranking.rs` (new single-file pure module, inline tests — currency.rs precedent, plan-review N-1), `game-core/src/lib.rs` (re-export), `server-module/src/schema.rs` (`profile` table), `server-module/src/ranking.rs` (NEW domain module — extends the M8.9 `touches:` vocabulary: `get_or_init_profile`, `apply_pvp_rating`), `server-module/src/ranking_tests.rs`, `server-module/src/guards.rs` (`is_ranked_pvp` — guard-family home, plan-review M-4) + `guards_tests.rs`, `server-module/src/pvp.rs` (+`pvp_tests.rs`) settle-funnel unification, `server-module/src/battle.rs` (+`battle_tests.rs`) PvE-path PvP guards (RL-8/9), `evals/battle-reducer-security.eval.mjs` (PvP-reject criterion, RL-17 in-slice), `client/src/module_bindings/**` (generated), table-schemas baseline + `docs/knowledge/**` (generated), `docs/adr/0119-*.md` | Schema + shared battle-path guards = structural → **SERIAL** (no sibling). ADR-0119. |
 | **m17b (client UI)** | `client/src/ui/leaderboard*.ts`, `client/src/main.ts`, `client/src/net/store.ts`, sibling `*.test.ts` | Depends on m17a bindings. Parallelizable with m17c after m17a merges. |
-| **m17c (evals tail)** | `evals/ranking-*.eval.mjs`, `client/e2e/**` (ranked two-context spec) | Depends on m17a. **Fan-out pair: m17b ‖ m17c** (disjoint `client/src` vs `evals`+`e2e`). |
+| **m17c (evals tail — PR #198, terminal: awaiting supervisor merge)** | `evals/ranking-*.eval.mjs`, `client/e2e/**` (ranked two-context spec) | Depends on m17a. **Fan-out pair: m17b ‖ m17c** (disjoint `client/src` vs `evals`+`e2e`). ADR-0121. |
 
 **Dependency order:** m17a → (m17b ‖ m17c). m17a is fan-out-ineligible (schema change + ADR + new module
 vocabulary). m17b/m17c may run concurrently per `docs/routing.md` N≤2 after m17a merges.
@@ -114,6 +114,13 @@ ADR-0119 for a **candidate slice `m17-fix-sideb-guards`** (pre-existing M16: sid
 `movement_tick`/`heal_party` — not a rating-dodge; touches battle.rs/movement.rs/raising.rs) —
 schedule before or alongside m17b/m17c. m17b note: `set_profile_name` requires the RL-7 tooth
 amendment pre-staged in ADR-0119 D6.
+
+**m17c delivery note (2026-07-17):** RL-16/17/18 delivered in PR #198 (ADR-0121; local full
+`just ci` green, 63 evals, e2e 34+1; terminal: awaiting supervisor merge). RL-17 hardened beyond
+re-verify: `hasPvpRejectWithNonEmptyBody` kills the no-op-body residual documented in the frozen
+m17a eval. RL-18 asserts server truth via `spacetime sql` (no client hook — zero m17b coupling).
+Contract for m17b: profile access stays in ranking.rs or the m17b PR widens the ranking-security
+A2 allowlist explicitly (ADR-0119 D6 / ADR-0121 D4).
 
 **Post-integration verification (after m17b + m17c merge):** full `just ci` green-and-meaningful ·
 bindings-drift = 0 · schema-snapshot includes `profile` (append-only direction, M16.5e) · e2e ranked flow
