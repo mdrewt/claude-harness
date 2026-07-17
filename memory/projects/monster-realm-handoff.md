@@ -175,3 +175,42 @@ Stray worktree `fix/review-residuals-i26-i27-i28` still untouched.
 - Orchestration: planner → plan fan (reviewer+red-team parallel; red-team added site #22; reviewer B-1 REFUTED with pvpView.refresh(vm,false)-hides evidence) → tester RED (54) → test fan (reviewer+red-team; 4 required strengthenings incl. scan-throws-on-missing-file vacuous-pass fix + non-rating-order view fixture + conn-sub tooth) → tester hardening (56) → implementer (separate agent; refused to edit a defective gating test, routed back to tester — one-line path fix, verifier-classified CORRECTION) → impl fan (reviewer fix-then-approve comparator return-0 + red-team 0 blockers 9/9 mutants killed + desync-guard review-lens 6/6 invariants PASS; reducer-security N/A justified: no server code) → verifier APPROVE-PR (5/5 checks; 3 independent bite-checks; gating-test integrity CLEAN). Model claude-fable-5 throughout.
 - ADR next-free = **0121** (0120 used at the reserved number). Worktree `.claude/worktrees/m17b` removable after merge. Project main checkout untouched (79d26b0); codebase-memory graph was reindexed at 79d26b0 pre-slice (was stale, pre-m17a) — reindex after merge as usual.
 - NOTE for m17c/supervisor: `leaderboardView.ts` is deliberately in neither vite.config coverage-excludes nor the eval's DOM_SHELLS (eval green both ways); m17c MAY sanction the exclusion later. index.html now has `#leaderboard-overlay`; KeyL is bound; harness M17 spec §5 row + delivery note updated on harness main (concurrent m17c spec edits observed on disk — merged cleanly).
+
+
+## 2026-07-17T10:25:39Z — supervisor tick (cowork) — m17b MERGED
+- run_id: mr-sup-cowork-20260717T101048Z-1670446-18871
+- Fan-out pair m17b/m17c both finished clean (EXIT=0 ATTEMPTS=1, leaders dead). Serial merge: m17b first.
+- **m17b MERGED**: PR #199 squash -> 5b841aa; master CI GREEN verified. ADR-index chore #201 -> 9a74e2a (0120 row, next-free 0122; --auto rejected, merged manually on green). Worktree/branch cleaned.
+- Audits: orchestration CLEAN (11 Agent calls; tester/reviewer/red-team/verifier; fable-5). Gating-test CLEAN (RED checkpoint fb0c1fa; 0 tests removed; no skip/only).
+- Touches drift: m17b diff exceeded declaration (index.html, net/connection.ts, net/rowConvert.ts+test) — disjoint from m17c so degraded to serial merge (no park). Spec section-5 table remains canonical for briefs.
+- External change: PR #200 (fix/review: rule-core contracts, name/party hardening, placeholder-texture teardown) hit master between ticks — non-supervisor merge, CI green. Possibly the stray review-residuals worktree owner.
+- **NEXT TICK: merge m17c** (#198, checks were green; recheck mergeStateStatus after master moved; expect possible doc-set conflict in ARCHITECTURE.md/DIGEST.md — resolve by union/append; then 0121 index chore). ADR 0121 reserved; m17c lock kept.
+- No rate-limit events tripped. No launch this tick (merge-before-launch).
+
+## 2026-07-17T10:5xZ — NEW MILESTONE INSERTED by generate-improvement-plan (weekly review @ 9a74e2a)
+
+**M17.5 — Tenth-review residuals** created at `specs/monster-realm-v2/M17.5-tenth-review-residuals.spec.md`, **inserted between M17 and M18**. Read-only multi-lens review of the pinned snapshot `9a74e2a` (M17 m17a #196 + m17b #199 merged; m17c #198 awaiting your merge). No new game-design surface — pure hardening/coverage/docs, M8.5/M16.5 tradition. Severity: 0 Critical, 2 High, 8 Medium, ~14 Low; top findings re-verified directly against code at the SHA.
+
+**Runner action requested:** include M17.5 in your milestone chaining after M17 closes (m17c merge + post-integration verification); pick up its slices per your own best judgement on sequencing/fan-out, and reference it in your git commits. It does NOT need to block M18 planning. Slices 17.5g (docs-only) and much of 17.5f (evals/e2e) are disjoint and runnable opportunistically; 17.5a is structural on the battle path (SERIAL).
+
+**Two High findings (verified @ 9a74e2a):**
+- **17.5a** — the "one ongoing battle per player" guard checks only the `player_identity` role in `start_battle` (battle.rs:110), `begin_encounter` (battle.rs:332), `heal_party` (raising.rs:283), and `evolve`/`fuse` (evolution.rs:66/216) — while `pvp::is_in_ongoing_battle` (pvp.rs:96) checks both indexes. A PvP **side-B** player (indexed under `opponent_identity`) can open a 2nd concurrent battle (prod-reachable via grass→begin_encounter, or practice start_battle) with the same party monsters → **PvP-damage-laundering exploit** + mid-PvP heal/evolve/fuse. This **subsumes and widens the unscheduled ADR-0119 `m17-fix-sideb-guards` residual** (which omitted evolve/fuse and the exploit dimension). Fix: hoist `is_in_ongoing_battle` into guards.rs, call at all sites; both-role `reject_if_in_battle` for evolve/fuse; laundering-path regression test.
+- **17.5b** — `confirm_trade` applies same-item swap credits before the offsetting debit while `grant_item` clamps monotonically at `MAX_ITEM_STACK` (9999), so the net-of-send headroom check passes but items are **silently destroyed** (receiver-at-cap, same item both directions). Same silent-clamp class un-guarded in `buy`/`sell` (17.5c). Fix: debits-before-credits ordering (+ net the currency headroom) or fallible `grant_item_exact`.
+
+**Four decisions for Drew are in §3 of the spec** (BattleKind column vs sentinel; transport-RLS re-booking vs accepted-risk ADR; `set_profile_name`/RL-14 scheduling; DEV-gating the `__game`/`__mrTrade`/`__mrPvp` hooks + `propose_trade` client UI). Do not silently resolve these — they route to Drew.
+
+Note: I did NOT touch PLAN.md/master git state (you own those + m17c is in flight). The spec file is the only harness write; this handoff entry is the notification.
+
+
+## 2026-07-17T11:28:19Z — PLAYTEST-FIRST REPLAN (Drew-directed cowork session, not a tick)
+- Canonical: `specs/monster-realm-v2/playtest-replan-2026-07.md` + PLAN §9. Summary: after M17 closes →
+  **M17.5** (Drew's tenth-review draft, now scheduled; HIGH 17.5a/b are playtest-blocking) → **M-playtest-a**
+  (hosted deploy: Maincloud + static client + release hygiene) → **M-playtest-b** (M20 pull-forward: error
+  overlay, event ring, F9 bundle, playtest_event + H1/H2/H3 proxy report) → **M-playtest-c** (trade propose
+  UI, set_profile_name, help overlay, PLAYTEST.md) → **M-playtest-d** (roster 6→~16 + sprites + tuning) →
+  **⛩ PLAYTEST GATE** (runner stops, raises PLAYTEST READY blocker). M18+ demoted `blocked:playtest-gate`.
+- M17.5 §3 decisions resolved (replan doc §3): BattleKind ADOPT; RLS re-book→M22; set_profile_name +
+  propose-UI scheduled→M-playtest-c; DEV-gate hooks→M-playtest-a. `m17-fix-sideb-guards` candidate is
+  SUBSUMED by 17.5a. m17b-2 park subsumed by M-playtest-c.
+- New M-playtest specs are sketches: each needs the standard build-time slicing pass before first launch.
+- Next tick is UNCHANGED: merge m17c #198 first.

@@ -1,31 +1,45 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-15T12:30:32Z",
- "updated_by": "mr-sup-cowork-20260715T121019Z-2189394-1148",
+ "updated_utc": "2026-07-17T11:28:19Z",
+ "updated_by": "drew-cowork-replan-20260717",
  "master": {
-  "sha": "679b58e (#188 m16.5d adr-index chore; m16.5d #187 267513b beneath)",
-  "ci": "GREEN verified on 267513b (CI success); 679b58e doc-only",
-  "nightly": "RED 5 consecutive days Jul11-15 (mutate-core + mutate-server job failures) \u2014 NEEDS TRIAGE"
+  "sha": "9a74e2a",
+  "ci": "GREEN (5b841aa CI success verified; 9a74e2a doc-only chore)",
+  "nightly": "in_progress on 79d26b0 at tick time (validating #194 fix)"
  },
- "adr_next_free": 117,
- "inflight": [
+ "adr_next_free": 122,
+ "inflight": [],
+ "awaiting_merge": [
   {
-   "slice": "m16.5e",
-   "session_leader": 2190883,
-   "claude_pid": 2190890,
-   "started_utc": "2026-07-15T12:27:33Z"
+   "slice": "m17c",
+   "pr": 198,
+   "branch": "feat/m17c-ranked-evals-tail",
+   "worktree": ".claude/worktrees/m17c",
+   "gates": [
+    "done EXIT=0 ATTEMPTS=1",
+    "orchestration_audit CLEAN (7 agents: planner/red-team/reviewer/tester/verifier, fable-5)",
+    "PR checks were CLEAN pre-m17b-merge; mergeStateStatus UNKNOWN after master moved - recheck at merge",
+    "gating-test audit PENDING (do at merge)",
+    "test-artifact carve-out likely applies (deliverable IS tests)"
+   ],
+   "adr_reserved": "0121",
+   "touches": "evals/ranking-*.eval.mjs; client/e2e/**"
   }
  ],
- "awaiting_merge": [],
  "queue": [
-  "TRIAGE: Nightly mutation jobs (mutate-core, mutate-server) red 5 straight days \u2014 determine surviving-mutants vs infra; candidate next target after m16.5e if not a PLAN slice",
-  "MODEL DIRECTIVE (Drew, 2026-07-15): rooted runs launch on FABLE (mr-launch.sh default fable). Post-launch model assert = Fable-class (claude-fable-5). Verified on m16.5e launch.",
-  "M16.5 residuals after 16.5e: 16.5f -> 16.5g (16.5g docs-only fan-out friendly; 16.5f touches game-core/server-module trading)",
-  "NOTE for brief-writing: declare test-file siblings + docs/knowledge/** in touches:",
-  "FOLLOW-UP: briefs must make tester-role explicit"
+  "NEXT TICK: merge m17c #198 (recheck mergeStateStatus; doc-set conflict w/ ARCHITECTURE.md+DIGEST.md possible after m17b - resolve deterministically union/append; then chore ADR-index 0121 row)",
+  "After m17c merges: M17 post-integration verification per spec section-5 tail -> M17 CLOSED",
+  "=== 2026-07-17 PLAYTEST-FIRST REPLAN (Drew-directed; canonical = specs/monster-realm-v2/playtest-replan-2026-07.md + PLAN section-9) ===",
+  "THEN: M17.5 tenth-review residuals (spec committed, Drew's draft, scheduled; 17.5a SERIAL structural first or per its section-5 note; section-3 decisions RESOLVED per replan doc section-3 incl. BattleKind adopt + m17-fix-sideb-guards SUBSUMED by 17.5a - drop the old candidate)",
+  "THEN pre-gate block in order: M-playtest-a (deployment; needs build-time slicing pass like M17's a356558) -> M-playtest-b (observability/feedback; pt-b2 SERIAL schema) -> M-playtest-c (UX; subsumes m17b-2 set_profile_name park) -> M-playtest-d (content; fan-out friendly vs a1/b1/c1)",
+  "AT GATE: when all pre-gate milestones CLOSED -> raise BLOCKER-style handoff 'PLAYTEST READY', do NOT start M18+ (blocked:playtest-gate). Drew runs the closed playtest; gate decision doc re-opens the post-gate queue.",
+  "POST-GATE (blocked:playtest-gate): M18, M19, M20(slimmed), M21, M22(+RLS re-book D-17.5-B), M23, M24, M25.",
+  "MODEL DIRECTIVE (Drew, 2026-07-15): rooted runs on FABLE; assert claude-fable-5 post-launch.",
+  "NOTE: gh pr merge --auto still rejected (branch protection) - merge chore PRs manually on green",
+  "NOTE: external PR #200 merged by non-supervisor 2026-07-17; stray worktree fix/review-residuals-i26-i27-i28 - re-check ownership"
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-07-15T12:30:32Z: m16.5d merged #187 (squash 267513b) after touches-assert PASS + gating-test audit PASS; chore #188 (ADR-0115 index, next-free->0116) merged manually on green (--auto rejected: 'Protected branch rules not configured'). master GREEN. Composite launch m16.5e (evals-only, ADR 0116 reserved, adr_next_free->117), fable confirmed in log, detached leader 2190883. seven_day rate-limit allowed_warning util 0.80 on watch (resetsAt 1784246400)."
+ "notes": "2026-07-17T11:28:19Z Drew-directed playtest-first replan committed to specs/: M17.5 scheduled + M-playtest-a/b/c/d created + PLAN section-9 gate block + M18/M19/M20 demotion notes. No repo/project mutation; m17c merge unaffected. adr_next_free stays 122."
 }
