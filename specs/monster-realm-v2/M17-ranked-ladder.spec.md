@@ -1,8 +1,9 @@
-# Sketch: M17 — Ranked ladder (persistent Elo)
+# M17 — Ranked ladder (persistent Elo)
 
-**Status:** design sketch (provisional) · **Phase C** · **Decision:** ADR-0026 · **Mirrors:** v1 M11.3.
+**Status:** design sketch → **elaborated at build time** (m17a, 2026-07-16) · **Phase C** · **Decision:** ADR-0026 + ADR-0119 · **Mirrors:** v1 M11.3.
 
-> Provisional sketch — EARS criteria + tasks deferred to build time.
+> Provisional sketch promoted to build-ready spec. The granular EARS criteria + slice breakdown
+> were drafted during m17a per `PLAN.md §9` (same convention as the M14/M15 slicing passes).
 
 ## Problem / intent
 Make PvP matter over time with a **persistent** ranked rating + a leaderboard. The key point is
@@ -17,21 +18,103 @@ unlike the ephemeral `player` presence row — is **never deleted**.
   swappable.
 - Ranked outcomes call `apply_pvp_rating` **exactly once** per decisive result (structurally guarded;
   friendly battles don't count).
-- **Out of scope:** seasons/decay/rating-based matchmaking (additive later).
+- **Ranked-integrity closure of the PvE reducer paths** (build-time discovery, ADR-0119): `submit_attack`,
+  `swap_active`, `flee`, and `use_battle_item` in `battle.rs` carry owner-only guards but **no PvP
+  exclusion** — side A could drive a PvP battle to a decisive outcome with the server AI playing the human
+  opponent's side, or `flee` to dodge a rating loss. Exactly-once is unsatisfiable without excluding PvP
+  battles from these paths, so the guards ship **in m17a** (`attempt_recruit` is already structurally safe:
+  it requires the wild-only `battle_wild` row).
+- **Out of scope:** seasons/decay/rating-based matchmaking (additive later); an unranked/friendly PvP
+  challenge flag (additive later — today "friendly" = practice self-battles, which never rate).
 
-## Key design + boundary
-Presence (ephemeral `player`) vs progression (persistent `profile`) are separate tables — the whole point.
-**→ M18/M19** may surface leaderboards/guild rankings from the world-readable `profile`.
+## Key design + boundary (ADR-0119)
+- Presence (ephemeral `player`) vs progression (persistent `profile`) are separate tables — the whole point.
+  **→ M18/M19** may surface leaderboards/guild rankings from the world-readable `profile`.
+- **Battle-kind taxonomy is structural, no new flag (YAGNI):** wild = `opponent_identity == WILD_IDENTITY`;
+  practice/friendly = `player_identity == opponent_identity` (self-battle, M12.5e2); **ranked PvP** =
+  distinct players, non-wild. `is_ranked_pvp(&Battle)` is the single classifying predicate.
+- **Once-only is a structural funnel, not a flag:** the two terminal-commit sites in `pvp.rs`
+  (`resolve_pvp_turn_if_ready` terminal branch; `apply_pvp_forfeit`) share identical commit ordering
+  (RT-M16-08/-05) and are unified into ONE settle function — the only caller of `apply_pvp_rating`.
+- **Module-write-only:** `apply_pvp_rating` / `get_or_init_profile` are `pub(crate)` functions, NOT
+  reducers. No client-callable reducer writes `profile` in m17a (name edit / profile creation-on-join are
+  m17b concerns at most).
+- **No CONTENT_VERSION bump:** `profile` is a runtime table (not seeded content) — mirrors `trade_offer`
+  (ADR-0106 D7).
+
+## EARS acceptance criteria
+
+### m17a — spine (server + rules)
+- **RL-1** — WHEN `apply_pvp_rating` runs for a winner/loser identity with no `profile` row THE SYSTEM
+  SHALL create the row via `get_or_init_profile` (rating = 1000, wins = losses = 0, name seeded from the
+  `player` row if present, else empty) — the rating path is total.
+- **RL-2** — The `profile` table SHALL be public (world-readable), identity-keyed (PK = identity), and
+  never deleted: no code path deletes `profile` rows (structural proof-of-teeth; `on_disconnect` does not
+  touch it).
+- **RL-3** — `apply_elo(winner_rating, loser_rating)` SHALL be pure integer math (no floats, no RNG, no
+  clock): zero-sum (winner gains exactly what loser loses), delta ≥ 1 always, equal ratings → K/2, an
+  upset (winner rated below loser) swings strictly more than the mirror non-upset, delta bounded ≤ K−1.
+- **RL-4** — Everyone starts at 1000 (`INITIAL_RATING` const in `game-core`, the SSOT used by
+  `get_or_init_profile`).
+- **RL-5** — WHEN a ranked PvP battle reaches a decisive outcome (`SideAWins`/`SideBWins`) via ANY path
+  (both-submit resolution, deadline-reaper forfeit, disconnect forfeit) THE SYSTEM SHALL apply the rating
+  exactly once: winner rating += Δ, wins += 1; loser rating −= Δ, losses += 1.
+- **RL-6** — Friendly battles SHALL never rate: practice self-battles (`player == opponent`) and wild
+  battles (`opponent == WILD_IDENTITY`) produce no profile change even when routed through the forfeit
+  paths (disconnect mid-practice-battle → no rating change).
+- **RL-7** — Module-write-only: no client-callable reducer writes `profile` (structural proof-of-teeth:
+  `ranking.rs` declares no `#[spacetimedb::reducer]`; no reducer body writes the table).
+- **RL-8** — `Fled` SHALL apply no rating change, AND the server SHALL reject `flee` on a PvP battle
+  (reject-not-clamp) so a rating loss cannot be dodged (client `canFlee=false` is not authoritative).
+- **RL-9** — `submit_attack`, `swap_active`, and `use_battle_item` SHALL reject PvP battles (distinct-
+  player battles) — closes the AI-plays-side-B hole; every decisive PvP outcome flows through the
+  `pvp.rs` funnel.
+- **RL-10** — Exactly ONE function commits terminal PvP outcomes, and it is the ONLY caller of
+  `apply_pvp_rating` (call-site-count proof-of-teeth, RT-SEC-02 style).
+- **RL-11** — Rating conservation: the sum of the two profiles' ratings is invariant across any
+  `apply_pvp_rating` application (zero-sum at the persistence layer, not just in `apply_elo`).
+- **RL-12** — Determinism: `apply_elo` yields identical output for identical input across repeated calls
+  (property test; no ambient entropy — ADR-0055 gates still apply to the new module).
+
+### m17b — client leaderboard UI (deferred slice)
+- **RL-13** — Leaderboard overlay subscribes to `profile`, sorts by rating desc (stable tie-break: name,
+  then identity), shows rating/W/L; own row highlighted. Mutual-exclusion with other overlays per the
+  KeyB/KeyI/KeyE guard pattern (M15b).
+- **RL-14** — Post-battle rating delta surfaced in the PvP end-of-battle UI (reads own profile row change).
+- **RL-15** — No client write path to `profile` (UI is pure subscription view — ADR-0014 discipline).
+
+### m17c — evals tail (deferred slice)
+- **RL-16** — `ranking-security` eval: module-write-only (RL-7) + once-only call-site count (RL-10) +
+  never-deleted scan (RL-2) enforced as evals with proof-of-teeth fixtures that bite.
+- **RL-17** — PvE-path PvP-exclusion eval: the four battle.rs guards (RL-8/9) pinned by source-scan
+  criteria so a refactor cannot silently drop them.
+- **RL-18** — e2e: two-context ranked flow (challenge → accept → forfeit) asserts both profiles moved
+  zero-sum (mirrors the M16.5d two-context trade e2e harness).
+
+## §5 Slice decomposition (m17a / m17b / m17c)
+
+| Slice | Touches | Notes |
+|-------|---------|-------|
+| **m17a (spine)** | `game-core/src/ranking/**` (new: `mod.rs`, `elo.rs`, sibling tests), `game-core/src/lib.rs` (re-export), `server-module/src/schema.rs` (`profile` table), `server-module/src/ranking.rs` (NEW domain module — extends the M8.9 `touches:` vocabulary: `get_or_init_profile`, `apply_pvp_rating`), `server-module/src/ranking_tests.rs`, `server-module/src/pvp.rs` (+`pvp_tests.rs`) settle-funnel unification, `server-module/src/battle.rs` (+`battle_tests.rs`) PvE-path PvP guards (RL-8/9), `client/src/module_bindings/**` (generated), table-schemas baseline + `docs/knowledge/**` (generated), `docs/adr/0119-*.md` | Schema + shared battle-path guards = structural → **SERIAL** (no sibling). ADR-0119. |
+| **m17b (client UI)** | `client/src/ui/leaderboard*.ts`, `client/src/main.ts`, `client/src/net/store.ts`, sibling `*.test.ts` | Depends on m17a bindings. Parallelizable with m17c after m17a merges. |
+| **m17c (evals tail)** | `evals/ranking-*.eval.mjs`, `client/e2e/**` (ranked two-context spec) | Depends on m17a. **Fan-out pair: m17b ‖ m17c** (disjoint `client/src` vs `evals`+`e2e`). |
+
+**Dependency order:** m17a → (m17b ‖ m17c). m17a is fan-out-ineligible (schema change + ADR + new module
+vocabulary). m17b/m17c may run concurrently per `docs/routing.md` N≤2 after m17a merges.
+
+**Post-integration verification (after m17b + m17c merge):** full `just ci` green-and-meaningful ·
+bindings-drift = 0 · schema-snapshot includes `profile` (append-only direction, M16.5e) · e2e ranked flow
+(RL-18) green against the integrated whole · cross-slice contracts held: `Profile` generated binding shape
+(m17a → m17b), `profile` public visibility (m17a → m17b subscription), the four battle.rs guard strings
+(m17a → m17c source-scan evals), `apply_pvp_rating` single call site (m17a → m17c call-site count).
 
 ## Risks / decisions
-Rating lost on disconnect → persistent never-deleted profile. Double-count → once-only structural guard +
-proof-of-teeth. Client writing its own rating → module-write-only.
-
-## Fan-out & integration note (for the slicing agent)
-
-When finalizing this milestone's slices and `touches:` sets — drafted at build time per `PLAN.md` §9 for the M15–M25 sketches; refined from the existing task breakdown for the fuller M11–M14 specs — design for **`touches:`-disjoint parallel fan-out** and plan for **post-integration correctness**:
-
-- **Size and organize files so independent work declares narrow, disjoint `touches:` sets** and can run concurrently (bounded N≤2, `docs/routing.md`). Slice along the natural boundaries: a `game-core` rule module; a **server-module domain module** (the M8.9 map — `schema/guards/marshal/content/movement/monster_mgmt/battle/taming` plus any new domain file this milestone adds); `client/`; content data (`game-core/content/` + `validate_content`); and `evals/`. Two slices are parallelizable only when their `touches:` sets do not overlap (e.g. a server-reducer slice ‖ a client slice, or two different server-domain modules).
-- **Don't grow a new monolith.** If this milestone would push a file toward the size that made `server-module/src/lib.rs` a serialization bottleneck (the reason for M8.9), introduce the module split **as part of this milestone** — add a new domain module and extend the M8.9 `touches:` vocabulary — rather than appending to one large file. Keep new tables additive in `schema.rs`; keep module/file names stable so downstream `touches:` declarations remain valid.
-- **Disjoint files are necessary but not sufficient — respect the dependency chain.** A pure `game-core` rule gates its reducer, which gates the client/evals; the client needs regenerated bindings. The realistic shape is usually a **serial rule→reducer spine with a parallel client ‖ evals tail**; declare slice *order* accordingly, not just `touches:`.
-- **Include an explicit post-integration verification plan in the definition-of-done.** Parallel slices passing in isolation does **not** prove they work together. After the slices merge (serial, verifier-gated, each later slice rebased on the merged earlier ones), the milestone MUST verify the *integrated whole*: full `just ci` green-and-meaningful, `bindings-drift = 0`, schema-snapshot intact, the e2e/integration gate green, and a check that the **combined** behavior satisfies this milestone's EARS acceptance criteria end-to-end (not merely that each slice was individually green). Name every cross-slice contract (shared types, table columns, reducer signatures, generated bindings) and the test that proves it holds after integration.
+- Rating lost on disconnect → persistent never-deleted profile (RL-2).
+- Double-count → once-only structural funnel + proof-of-teeth (RL-5/10).
+- Client writing its own rating → module-write-only, no reducer surface (RL-7).
+- **Rating-loss dodge via PvE paths** (build-time discovery) → RL-8/9 server-side rejects; client-only
+  `canFlee=false` was never authoritative.
+- Integer-division asymmetry around negative diffs → `div_euclid` (or equivalent) + property tests pin
+  exact behavior; zero-sum proven at both the rule layer (RL-3) and persistence layer (RL-11).
+- Mutual KO has no `Draw` outcome (combat engine yields a deterministic winner) — Elo consumes the recorded
+  outcome as-is; no draw handling (documented in ADR-0119).
