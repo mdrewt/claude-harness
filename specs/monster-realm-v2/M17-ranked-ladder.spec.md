@@ -101,7 +101,7 @@ unlike the ephemeral `player` presence row — is **never deleted**.
 | Slice | Touches | Notes |
 |-------|---------|-------|
 | **m17a (spine — PR #196, terminal: awaiting supervisor merge)** | `game-core/src/ranking.rs` (new single-file pure module, inline tests — currency.rs precedent, plan-review N-1), `game-core/src/lib.rs` (re-export), `server-module/src/schema.rs` (`profile` table), `server-module/src/ranking.rs` (NEW domain module — extends the M8.9 `touches:` vocabulary: `get_or_init_profile`, `apply_pvp_rating`), `server-module/src/ranking_tests.rs`, `server-module/src/guards.rs` (`is_ranked_pvp` — guard-family home, plan-review M-4) + `guards_tests.rs`, `server-module/src/pvp.rs` (+`pvp_tests.rs`) settle-funnel unification, `server-module/src/battle.rs` (+`battle_tests.rs`) PvE-path PvP guards (RL-8/9), `evals/battle-reducer-security.eval.mjs` (PvP-reject criterion, RL-17 in-slice), `client/src/module_bindings/**` (generated), table-schemas baseline + `docs/knowledge/**` (generated), `docs/adr/0119-*.md` | Schema + shared battle-path guards = structural → **SERIAL** (no sibling). ADR-0119. |
-| **m17b (client UI)** | `client/src/ui/leaderboard*.ts`, `client/src/main.ts`, `client/src/net/store.ts`, sibling `*.test.ts` | Depends on m17a bindings. Parallelizable with m17c after m17a merges. |
+| **m17b (client UI — PR #199, terminal: awaiting supervisor merge)** | `client/src/ui/leaderboard*.ts`, `client/src/main.ts`, `client/src/net/store.ts`, sibling `*.test.ts` + companions `client/src/net/{connection,rowConvert}.ts`, `client/index.html` (build-time: the subscription/ingest seam lives in the adapter, not store.ts) | Depends on m17a bindings. Parallelizable with m17c after m17a merges. ADR-0120. |
 | **m17c (evals tail — PR #198, terminal: awaiting supervisor merge)** | `evals/ranking-*.eval.mjs`, `client/e2e/**` (ranked two-context spec) | Depends on m17a. **Fan-out pair: m17b ‖ m17c** (disjoint `client/src` vs `evals`+`e2e`). ADR-0121. |
 
 **Dependency order:** m17a → (m17b ‖ m17c). m17a is fan-out-ineligible (schema change + ADR + new module
@@ -121,6 +121,16 @@ re-verify: `hasPvpRejectWithNonEmptyBody` kills the no-op-body residual document
 m17a eval. RL-18 asserts server truth via `spacetime sql` (no client hook — zero m17b coupling).
 Contract for m17b: profile access stays in ranking.rs or the m17b PR widens the ranking-security
 A2 allowlist explicitly (ADR-0119 D6 / ADR-0121 D4).
+
+**m17b delivery note (2026-07-17):** RL-13 + RL-15 delivered in PR #199 (ADR-0120; local full
+`just ci` green; 56 new gating tests). Build-time discoveries: (a) `set_profile_name` does NOT
+exist server-side — m17a shipped none — so the name-edit flow (incl. the RL-7 tooth amendment
+pre-staged in ADR-0119 D6 and `validate_name` at the profile-write layer) is **parked** with
+**RL-14** (rating delta — needs battleModel/battleView outside the m17b touch set) as one
+follow-up slice after m17c merges. (b) `leaderboardView.ts` ships fully unit-covered INSTEAD of
+coverage-excluded (the dom-shell exclusion list is exact-set-guarded by the m17c-owned eval —
+ADR-0120 D3); m17c may sanction the exclusion later. RL-13 mutual-exclusion is unit+review
+pinned; the ranked e2e remains m17c (RL-18).
 
 **Post-integration verification (after m17b + m17c merge):** full `just ci` green-and-meaningful ·
 bindings-drift = 0 · schema-snapshot includes `profile` (append-only direction, M16.5e) · e2e ranked flow
