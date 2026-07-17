@@ -71,8 +71,11 @@ unlike the ephemeral `player` presence row — is **never deleted**.
   `pvp.rs` funnel.
 - **RL-10** — Exactly ONE function commits terminal PvP outcomes, and it is the ONLY caller of
   `apply_pvp_rating` (call-site-count proof-of-teeth, RT-SEC-02 style).
-- **RL-11** — Rating conservation: the sum of the two profiles' ratings is invariant across any
-  `apply_pvp_rating` application (zero-sum at the persistence layer, not just in `apply_elo`).
+- **RL-11** — Rating conservation: the sum of the two ratings is invariant across any rating
+  application on the practical domain (|rating| ≤ ~10^6), proven on the pure
+  `compute_rating_update` (zero-sum at the application layer, not just in `apply_elo`); the
+  saturating behavior at the unreachable i32 extremes is pinned by a boundary spot test and
+  documented as tolerated (ADR-0119 D2).
 - **RL-12** — Determinism: `apply_elo` yields identical output for identical input across repeated calls
   (property test; no ambient entropy — ADR-0055 gates still apply to the new module).
 
@@ -86,8 +89,10 @@ unlike the ephemeral `player` presence row — is **never deleted**.
 ### m17c — evals tail (deferred slice)
 - **RL-16** — `ranking-security` eval: module-write-only (RL-7) + once-only call-site count (RL-10) +
   never-deleted scan (RL-2) enforced as evals with proof-of-teeth fixtures that bite.
-- **RL-17** — PvE-path PvP-exclusion eval: the four battle.rs guards (RL-8/9) pinned by source-scan
-  criteria so a refactor cannot silently drop them.
+- **RL-17** — PvE-path PvP-exclusion eval: the four battle.rs guards (RL-8/9) are pinned by an
+  extension of `battle-reducer-security.eval.mjs` **in m17a itself** (review finding B-1: deferring
+  the teeth would leave a window where a battle.rs refactor silently drops a security control);
+  m17c re-verifies and may harden the needles.
 - **RL-18** — e2e: two-context ranked flow (challenge → accept → forfeit) asserts both profiles moved
   zero-sum (mirrors the M16.5d two-context trade e2e harness).
 
@@ -95,7 +100,7 @@ unlike the ephemeral `player` presence row — is **never deleted**.
 
 | Slice | Touches | Notes |
 |-------|---------|-------|
-| **m17a (spine)** | `game-core/src/ranking/**` (new: `mod.rs`, `elo.rs`, sibling tests), `game-core/src/lib.rs` (re-export), `server-module/src/schema.rs` (`profile` table), `server-module/src/ranking.rs` (NEW domain module — extends the M8.9 `touches:` vocabulary: `get_or_init_profile`, `apply_pvp_rating`), `server-module/src/ranking_tests.rs`, `server-module/src/pvp.rs` (+`pvp_tests.rs`) settle-funnel unification, `server-module/src/battle.rs` (+`battle_tests.rs`) PvE-path PvP guards (RL-8/9), `client/src/module_bindings/**` (generated), table-schemas baseline + `docs/knowledge/**` (generated), `docs/adr/0119-*.md` | Schema + shared battle-path guards = structural → **SERIAL** (no sibling). ADR-0119. |
+| **m17a (spine)** | `game-core/src/ranking.rs` (new single-file pure module, inline tests — currency.rs precedent, plan-review N-1), `game-core/src/lib.rs` (re-export), `server-module/src/schema.rs` (`profile` table), `server-module/src/ranking.rs` (NEW domain module — extends the M8.9 `touches:` vocabulary: `get_or_init_profile`, `apply_pvp_rating`), `server-module/src/ranking_tests.rs`, `server-module/src/guards.rs` (`is_ranked_pvp` — guard-family home, plan-review M-4) + `guards_tests.rs`, `server-module/src/pvp.rs` (+`pvp_tests.rs`) settle-funnel unification, `server-module/src/battle.rs` (+`battle_tests.rs`) PvE-path PvP guards (RL-8/9), `evals/battle-reducer-security.eval.mjs` (PvP-reject criterion, RL-17 in-slice), `client/src/module_bindings/**` (generated), table-schemas baseline + `docs/knowledge/**` (generated), `docs/adr/0119-*.md` | Schema + shared battle-path guards = structural → **SERIAL** (no sibling). ADR-0119. |
 | **m17b (client UI)** | `client/src/ui/leaderboard*.ts`, `client/src/main.ts`, `client/src/net/store.ts`, sibling `*.test.ts` | Depends on m17a bindings. Parallelizable with m17c after m17a merges. |
 | **m17c (evals tail)** | `evals/ranking-*.eval.mjs`, `client/e2e/**` (ranked two-context spec) | Depends on m17a. **Fan-out pair: m17b ‖ m17c** (disjoint `client/src` vs `evals`+`e2e`). |
 
