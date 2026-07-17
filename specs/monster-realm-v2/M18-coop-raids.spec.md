@@ -1,6 +1,6 @@
 # Sketch: M18 — Co-op raids
 
-**Status:** design sketch (provisional) · **Phase C** · **Decision:** ADR-0027 · **Mirrors:** v1 M11.4.
+**Status:** design sketch (provisional; **post-gate** — demoted by `playtest-replan-2026-07.md`, do not build before the playtest gate) · **Phase C** · **Decision:** ADR-0027 · **Mirrors:** v1 M11.4.
 
 > Provisional sketch — EARS criteria + tasks deferred to build time.
 

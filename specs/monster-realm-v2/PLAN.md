@@ -1,6 +1,6 @@
 # Monster Realm (v2) — Greenfield Plan
 
-> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#158 + #162–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals CLOSED (a–g, ADR-0112–0117, PRs #180–#193). Next: nightly mutation-red triage, then M17.
+> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#158 + #162–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals CLOSED (a–g, ADR-0112–0117, PRs #180–#193). M17 ranked ladder: m17a (#196) + m17b (#199) merged, m17c (#198) awaiting supervisor merge. Next: close M17, then the **2026-07-17 playtest-first replan** (`playtest-replan-2026-07.md`): M17.5 → M-playtest-a→b→c→d → **PLAYTEST GATE** (game-design.md §4); M18+ demoted to post-gate provisional.
 > **Relationship to v1:** This is a *new, from-scratch* project — the spiritual sequel to
 > `projects/pokemon-mmo` (published db `monster-tamer-mmo`). It is **not** that project and does
 > **not** modify it. Working repo name: **`monster-realm`** (rename freely; must stay kebab-case for
@@ -271,16 +271,44 @@ breaks the spine. Numbering restarts for the new project.
   shared battle row, both-submit secret picks, **turn-deadline + forfeit-on-disconnect** up front) ·
   **M17 Ranked ladder** (persistent Elo profile; `M17-ranked-ladder.spec.md`; ADR-0026) ·
   **M18 Co-op raids** (`M18-coop-raids.spec.md`; ADR-0027) · **M19 Guilds/chat/social** (`M19-social.spec.md`;
-  ADR-0028).
+  ADR-0028). **M18/M19 are demoted to post-gate provisional** by the 2026-07-17 playtest replan — GDD §9:
+  social depth follows demand; do not build them before the gate (`blocked:playtest-gate`).
 - **M16.5 Ninth-review residuals** (`M16.5-ninth-review-residuals.spec.md`; inserted between M16 and M17 while m16a was in flight — resolves the verified 2026-07-14 ninth-review findings @ `3424c5c`: the one-directional battle↔trade interlock (trade-away-mid-battle → permanent zombie Ongoing battle + bricked battler, incl. PvP-row coverage) plus real teeth for the write_back_party_hp owner-change abort (the revived anchor test is a zero-assertion body), reject-not-destroy conservation at receiver item/currency caps, trade runtime-coverage completion (full-flow e2e hook or honest spec amendment; attempt_recruit added to the escrow-guards eval), symmetric trade-overlay mutual exclusivity (KeyQ/KeyH/KeyG) + exhaustive client status typing, eval-infra hardening (spacetime-type append-only gate, extraction robustness, additive-column smoke coupling), trade SSOT/privacy-doc polish + stale-offer TTL decision, and a ledger reconciliation pass (ADR README/ARCHITECTURE/CHANGELOG/PLAN + spec checkboxes); no new game-design surface).
 
-**Phase D — Production readiness:**
+- **M17.5 Tenth-review residuals** (`M17.5-tenth-review-residuals.spec.md`; scheduled by the 2026-07-17
+  playtest replan; slices 17.5a–g — the HIGH side-B ongoing-battle guard unification (closes the PvP
+  damage-laundering exploit) + trade same-item near-cap conservation, shop reject-not-destroy, leaderboard
+  name drift, challenge TTL/anti-spam, PvP runtime coverage + SDK-boundary enum safety, ledger
+  reconciliation; §3 decisions resolved per `playtest-replan-2026-07.md` §3; no new game-design surface).
+
+**Pre-gate playtest block (2026-07-17 replan — `playtest-replan-2026-07.md`; build in order a→b→c→d,
+fan-out per each spec's pairing notes):**
+- **M-playtest-a Hosted deployment & playtest ops** (`M-playtest-a-deployment.spec.md`) — Maincloud module
+  publish + env-driven hosted client + release hygiene (DEV-gated hooks, `dev_reducers`-absent proof) +
+  version stamp + wipe/republish ops runbook. The #1 playtest blocker; lands only after 17.5a/b.
+- **M-playtest-b Playtest observability & feedback loop** (`M-playtest-b-observability-feedback.spec.md`) —
+  the **M20 pull-forward**: client error overlay + event ring + F9 bug-report bundle; additive
+  `playtest_event` table + `just playtest-report` producing the H1/H2/H3 proxy report (GDD §4). M20 keeps
+  the production capstone.
+- **M-playtest-c Playtest UX completion & tester onboarding** (`M-playtest-c-ux-completion.spec.md`) —
+  trade **propose UI** (H3 is untestable without it; resolves D-17.5-D), `set_profile_name` (D-17.5-C,
+  subsumes m17b-2), in-client help overlay, `docs/PLAYTEST.md`.
+- **M-playtest-d Playtest content pack** (`M-playtest-d-content-pack.spec.md`) — roster 6→~16 forms +
+  distinct-silhouette sprites + encounter/recruit/economy tuning to GDD §5 MVP scope; pure content/data
+  on ADR-0057, fan-out friendly.
+- **⛩ PLAYTEST GATE** (GDD §4/§9) — **not a runner slice**: when all pre-gate milestones are CLOSED the
+  runner surfaces a BLOCKER-style handoff ("playtest ready") and stops advancing milestones; Drew runs the
+  closed playtest; the gate decision doc re-opens (and may reshape) the post-gate queue below.
+
+**Phase D — Production readiness (post-gate provisional, `blocked:playtest-gate` — order unchanged, contingent on the gate):**
 - **M20 Observability, performance & load hardening** (`M20-observability-performance.spec.md`; ADR-0029) —
   the capstone: production monitoring (OTel→Datadog dashboards/alerts), full-system load testing (scaled
   sim-harness), profiling the named hot paths, and the **measured** performance-tuning pass + SLO baselines.
   The always-on substrate (structured logging, OTel seams, a benchmark + perf-budget CI gate, health/
   readiness) is built in **M0**; every milestone instruments + benchmarks + load-tests what it adds (a
   cross-cutting invariant). See `observability-performance-plan.md`; backup/DR runbook folded in.
+  **Slimmed 2026-07:** the playtest-scale error-surface/event-capture layer moved to **M-playtest-b**;
+  M20 remains the production capstone (export/dashboards/load/SLOs) and consumes `playtest_event` learnings.
 - **M21 Accounts & authentication** (`M21-accounts-auth.spec.md`; ADR-0030) — OIDC-backed stable identity
   (cross-device, recovery) replacing anonymous identities; guest→account claim. No game-data schema churn
   (the identity keying pays off).

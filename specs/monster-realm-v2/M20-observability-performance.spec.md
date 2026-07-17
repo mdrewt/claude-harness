@@ -1,6 +1,6 @@
 # Sketch: M20 — Observability, performance & load hardening
 
-**Status:** design sketch (provisional) · **Phase D — production readiness** · **Decision:** ADR-0029 ·
+**Status:** design sketch (provisional; **post-gate**; **slimmed 2026-07** — the playtest-scale error-surface/event-capture layer moved to `M-playtest-b-observability-feedback.spec.md`; M20 remains the production capstone) · **Phase D — production readiness** · **Decision:** ADR-0029 ·
 See `observability-performance-plan.md`.
 
 > Provisional sketch — EARS criteria + tasks deferred to build time. The strategy + decisions are the durable
