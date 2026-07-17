@@ -1,6 +1,6 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-17T11:28:19Z",
+ "updated_utc": "2026-07-17T11:44:51Z",
  "updated_by": "drew-cowork-replan-20260717",
  "master": {
   "sha": "9a74e2a",
@@ -31,7 +31,7 @@
   "After m17c merges: M17 post-integration verification per spec section-5 tail -> M17 CLOSED",
   "=== 2026-07-17 PLAYTEST-FIRST REPLAN (Drew-directed; canonical = specs/monster-realm-v2/playtest-replan-2026-07.md + PLAN section-9) ===",
   "THEN: M17.5 tenth-review residuals (spec committed, Drew's draft, scheduled; 17.5a SERIAL structural first or per its section-5 note; section-3 decisions RESOLVED per replan doc section-3 incl. BattleKind adopt + m17-fix-sideb-guards SUBSUMED by 17.5a - drop the old candidate)",
-  "THEN pre-gate block in order: M-playtest-a (deployment; needs build-time slicing pass like M17's a356558) -> M-playtest-b (observability/feedback; pt-b2 SERIAL schema) -> M-playtest-c (UX; subsumes m17b-2 set_profile_name park) -> M-playtest-d (content; fan-out friendly vs a1/b1/c1)",
+  "THEN pre-gate block in order: M-playtest-a (LOCAL playtest build & ops \u2014 rescoped 2026-07-17 per Drew, local-only solo tester, NO Maincloud/hosting; needs build-time slicing pass like M17's a356558) -> M-playtest-b (observability/feedback; pt-b2 SERIAL schema) -> M-playtest-c (UX; subsumes m17b-2 set_profile_name park) -> M-playtest-d (content; fan-out friendly vs a1/b1/c1)",
   "AT GATE: when all pre-gate milestones CLOSED -> raise BLOCKER-style handoff 'PLAYTEST READY', do NOT start M18+ (blocked:playtest-gate). Drew runs the closed playtest; gate decision doc re-opens the post-gate queue.",
   "POST-GATE (blocked:playtest-gate): M18, M19, M20(slimmed), M21, M22(+RLS re-book D-17.5-B), M23, M24, M25.",
   "MODEL DIRECTIVE (Drew, 2026-07-15): rooted runs on FABLE; assert claude-fable-5 post-launch.",
@@ -41,5 +41,5 @@
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-07-17T11:28:19Z Drew-directed playtest-first replan committed to specs/: M17.5 scheduled + M-playtest-a/b/c/d created + PLAN section-9 gate block + M18/M19/M20 demotion notes. No repo/project mutation; m17c merge unaffected. adr_next_free stays 122."
+ "notes": "2026-07-17T11:28:19Z Drew-directed playtest-first replan committed to specs/: M17.5 scheduled + M-playtest-a/b/c/d created + PLAN section-9 gate block + M18/M19/M20 demotion notes. No repo/project mutation; m17c merge unaffected. adr_next_free stays 122. AMENDED 2026-07-17T11:44:51Z: M-playtest-a rescoped local-only per Drew (no Maincloud); hosting deferred as M-playtest-a2."
 }

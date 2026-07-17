@@ -214,3 +214,11 @@ Note: I did NOT touch PLAN.md/master git state (you own those + m17c is in fligh
   SUBSUMED by 17.5a. m17b-2 park subsumed by M-playtest-c.
 - New M-playtest specs are sketches: each needs the standard build-time slicing pass before first launch.
 - Next tick is UNCHANGED: merge m17c #198 first.
+
+
+## 2026-07-17T11:44:51Z — replan amendment (Drew): M-playtest-a rescoped LOCAL-ONLY
+- Drew is the sole tester for this gate → no Maincloud, no hosted client, no deploy CI. M-playtest-a is now
+  "Local playtest build & ops": `just playtest-up/down` (release module, `dev_reducers`-absent proof, DB
+  `monster-realm-playtest`, prod client build), DEV-gated hooks (D-17.5-E unchanged, still in a), version
+  stamp, wipe/republish runbook. Hosting = explicit DEFERRED exception → M-playtest-a2 when external
+  testers join (Maincloud research banked in replan doc §4). Spec/PLAN/replan-doc updated; order unchanged.

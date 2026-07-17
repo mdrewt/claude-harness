@@ -20,7 +20,7 @@ with zero in-client guidance and no tester-facing doc. Close the loop-completene
   leaderboard overlay; 17.5d's mirror keeps the leaderboard honest.
 - **In-client help overlay:** one keypress (pick a free key — KeyQ/KeyH/KeyG/KeyL/KeyU taken; audit the
   full map first) listing controls + session goals; shown once on first join (store-flagged).
-- **Tester onboarding doc:** `docs/PLAYTEST.md` — join URL placeholder, controls, "your first 15
+- **Tester onboarding doc:** `docs/PLAYTEST.md` — how to launch locally (`just playtest-up`, M-playtest-a), controls, "your first 15
   minutes", known issues, the F9 bug-bundle ritual (M-playtest-b), feedback channel, the
   anonymous-identity caveat (progress is per-browser until M21).
 - **Out of scope:** trade browse/discovery UX (post-gate if H3 passes), chat (M19), any new battle UX.
@@ -36,4 +36,4 @@ and possibly pt-b1 → SERIAL vs those two; fine vs content.
 ## Risks / decisions
 Key-map collision audit before picking the help key (record in the slice ADR). Rename abuse: reuse the
 join_game validation + consider a rename cooldown (in-milestone decision; default = validation only for
-a closed test). `PLAYTEST.md` join URL stays a placeholder until M-playtest-a publishes.
+a closed test). `PLAYTEST.md` launch section lands after M-playtest-a's `just playtest-up` exists.

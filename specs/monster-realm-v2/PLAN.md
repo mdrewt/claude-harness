@@ -283,9 +283,11 @@ breaks the spine. Numbering restarts for the new project.
 
 **Pre-gate playtest block (2026-07-17 replan — `playtest-replan-2026-07.md`; build in order a→b→c→d,
 fan-out per each spec's pairing notes):**
-- **M-playtest-a Hosted deployment & playtest ops** (`M-playtest-a-deployment.spec.md`) — Maincloud module
-  publish + env-driven hosted client + release hygiene (DEV-gated hooks, `dev_reducers`-absent proof) +
-  version stamp + wipe/republish ops runbook. The #1 playtest blocker; lands only after 17.5a/b.
+- **M-playtest-a Local playtest build & ops** (`M-playtest-a-deployment.spec.md`; **rescoped 2026-07-17
+  per Drew: local-only, solo tester**) — `just playtest-up`: release module (`dev_reducers`-absent proof)
+  on the local instance as `monster-realm-playtest` + production client build + DEV-gated hooks + version
+  stamp + wipe/republish ops runbook. Hosted deployment = explicit DEFERRED exception (M-playtest-a2 when
+  external testers join). Lands only after 17.5a/b.
 - **M-playtest-b Playtest observability & feedback loop** (`M-playtest-b-observability-feedback.spec.md`) —
   the **M20 pull-forward**: client error overlay + event ring + F9 bug-report bundle; additive
   `playtest_event` table + `just playtest-report` producing the H1/H2/H3 proxy report (GDD §4). M20 keeps

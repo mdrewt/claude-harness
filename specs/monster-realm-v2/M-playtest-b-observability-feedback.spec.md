@@ -38,5 +38,5 @@ Pairing: pt-b1 ‖ M-playtest-d content OK. pt-b2 is structural → never fanned
 ## Risks / decisions
 Event taxonomy = in-milestone ADR (name the H1/H2/H3 proxies explicitly so the gate report is
 pre-committed, not post-hoc). `playtest_event` growth bounded by reaper + cap; measure write volume on
-the hosted smoke. Instrumentation must not perturb determinism (events written outside `game-core`;
+the local playtest smoke (`just playtest-up`, M-playtest-a). Instrumentation must not perturb determinism (events written outside `game-core`;
 rule-core stays pure per ADR-0003).

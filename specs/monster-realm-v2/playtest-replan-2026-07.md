@@ -15,8 +15,10 @@ after M17 are re-ordered **playtest-enabling work first**; everything below the 
    (17.5a side-B guard laundering exploit, 17.5b trade conservation) are **playtest-blocking**: testing
    on a build with a known HP-laundering exploit and silent item destruction corrupts the very feedback
    the playtest exists to gather.
-2. **M-playtest-a** — hosted deployment & playtest ops (the #1 gap: nothing today runs off
-   `ws://127.0.0.1:3000`; no hosted module, no hosted client, no reset/versioning story).
+2. **M-playtest-a** — local playtest build & ops (**rescoped 2026-07-17 per Drew: local-only, solo
+   tester — no hosted deployment**): one-command honest playtest build (release module, `dev_reducers`
+   absent, DEV hooks gated, version stamp, wipe/reset runbook). Hosting is an explicit DEFERRED
+   YAGNI exception (re-book as M-playtest-a2 when external testers join).
 3. **M-playtest-b** — playtest observability & feedback loop (the M20 pull-forward: error surfacing,
    event capture for the §4 fun-hypothesis proxies H1/H2/H3, in-client bug-report bundle).
 4. **M-playtest-c** — playtest UX completion (trade propose-UI — M15's headline feature is currently
@@ -31,10 +33,11 @@ after M17 are re-ordered **playtest-enabling work first**; everything below the 
 
 ## 2. Rationale (why this order)
 
-- **M17.5 before any hosted URL exists:** the side-B exploit is production-reachable; the deployment
-  milestone must not ship it. 17.5's own §5 sequencing note permits opportunistic disjoint slices.
-- **Deployment (a) before observability (b):** b's feedback loop is proven against the hosted target;
-  a hosted-but-uninstrumented build is still locally playtestable, the reverse is not remotely testable.
+- **M17.5 before the playtest build exists:** the side-B exploit is production-reachable; the honest
+  playtest build must not ship it. 17.5's own §5 sequencing note permits opportunistic disjoint slices.
+- **Playtest build (a) before observability (b):** b's error/event/bundle layer is proven against the
+  honest build it will run on (release module, no dev reducers/hooks) — instrumenting the dev build
+  would measure a build the playtest never uses.
 - **Observability pulled forward (Drew's explicit call):** playtesters need track/trace/debug — error
   overlay + reducer-rejection surfacing + a bug-report bundle turns every tester into a usable bug
   reporter, and the H1/H2/H3 proxy events make the gate *measurable* instead of vibes.
@@ -68,11 +71,10 @@ after M17 are re-ordered **playtest-enabling work first**; everything below the 
 
 ## 4. Research note (2026-07-17)
 
-SpacetimeDB **Maincloud** verified current: managed serverless, scales-to-zero, free tier (2,500 TeV/mo)
-+ Pro $25/mo; SpacetimeDB 2.0 (Feb 2026) matches the project's 2.x pin (ADR-0002). Primary deployment
-target for M-playtest-a, with self-host docker fallback; final call is an in-milestone decision recorded
-in that milestone's ADR (verify pricing/limits at build time). Client is a static Vite build → GitHub
-Pages / Cloudflare Pages (in-milestone decision).
+SpacetimeDB **Maincloud** verified current (managed serverless, scales-to-zero, free tier 2,500 TeV/mo +
+Pro $25/mo; SpacetimeDB 2.0 Feb 2026 matches the ADR-0002 2.x pin). **Superseded for this gate
+(2026-07-17): Drew is the sole tester → M-playtest-a is local-only**; the Maincloud finding is banked for
+the deferred **M-playtest-a2 (hosted)** when external testers join.
 
 ## 5. Supervisor mechanics
 
