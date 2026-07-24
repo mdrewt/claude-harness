@@ -1,0 +1,26 @@
+# Native supervisor — Monster Realm v2 (cutover 2026-07-21, Drew-directed)
+
+**PRIMARY:** WSL-native cron loop. **FALLBACK:** the Cowork/DC scheduled task (daily 09:00, stands down while the native heartbeat is <2h old).
+
+## Components
+- `mr-native-tick.sh` (this dir) — cron entry point. Mechanical gates in pure bash (kill-switch → flock → live-chain fast-path → rate-limit reset → human-activity probe → chain-mutex TTL); spawns `claude -p` ONLY when an action may be needed. Gate log: `mr-native-tick.log` (rotates at ~1MB).
+- `mr-supervisor-prompt-native.md` (this dir) — the decision run's full supervisor prompt (native-adapted; incl. resource locations + gotchas). Decision model: **sonnet** (`SUP_MODEL` env to override); rooted runs stay **opus** via `mr-launch.sh` (unchanged).
+- Cron: `*/30 * * * *` + `@reboot sleep 60` (user crontab, mdrewt).
+- WSL keepalive: `C:\Users\mdrewt\.wslconfig` (`instanceIdleTimeout=-1`, `vmIdleTimeout=-1`; effective on next WSL restart — do NOT `wsl --shutdown` while runs are live) + Startup-folder `wsl-ubuntu-boot.cmd` (boots the VM at Windows logon; schtasks needed admin, Startup folder does not).
+- Heartbeat: `.native-supervisor-heartbeat` (epoch secs; touched every tick incl. standdowns).
+
+## Controls
+- **Pause native loop:** `touch $MEM/.native-supervisor-disabled` (ticks log SKIP and exit). Resume: remove the flag.
+- **Full rollback to DC:** remove the two crontab lines (`crontab -e`), delete the heartbeat file, re-raise the Cowork task cadence via Cowork.
+- **Test a tick without spending:** `MR_TICK_DRYRUN=1 bash mr-native-tick.sh` (prints DECISION-NEEDED instead of spawning).
+- Decision-run transcripts: `/tmp/mr_native_tick_native-<ts>-<pid>.log`.
+
+## Test evidence (2026-07-21)
+bash -n PASS · kill-switch PASS · flock-overlap PASS · live-chain fast-path PASS (fixture faketest lock) · rate-limit/human-probe exercised live (stood down on ptc5b's dying writes — correct conservative behavior) · cron-env headless claude PASS (`NATIVE_OK`, RC=0) · crontab + cron daemon PASS · .wslconfig + startup cmd PASS · state directive + heartbeat PASS. End-to-end: first real spawn expected at the 16:30Z tick (merge of ptc5b PR #236).
+
+## End-to-end PROVEN (2026-07-21T16:30–17:00Z, first production cycle)
+16:30 cron tick: gates cleared -> SPAWNED sonnet decision run. Decision run: verified PR #236 from live state -> both audits CLEAN (orchestration: 6 Agent calls incl. tester/reviewer/red-team/verifier, opus confirmed; gating-test: 4 proof-of-teeth added, none weakened) -> squash-MERGED ptc5b (a80912c, master CI GREEN) -> composite-LAUNCHED ptc5c (leader 902320 detached, opus asserted, ADR-0139) -> ledger/handoff/state recorded -> mutex released -> rc=0. 17:00 tick: fast-path STANDDOWN live-chain ptc5c — zero-cost, no claude spawn. Full lifecycle verified in production.
+
+## Maintenance log
+- 2026-07-21T19:23Z: gate-2 hardened to accept rate_limit_resets_at as epoch OR ISO-8601 (decision runs write ISO; the original float-only parse would have leaked one sonnet spawn per tick during parked windows). Live-verified against the active seven_day park (resets 2026-07-24T00:00Z).
+- 2026-07-21 corpus tidy: handoff archived (48.8KB -> newest entries only); mr-state queue consolidated (stale c.5 progress refreshed, DC notes collapsed to one FALLBACK-ONLY entry); fallback task prompt rewritten to a 3.5KB delegating stub — supervisor logic SSOT is mr-supervisor-prompt-native.md (header marks it).

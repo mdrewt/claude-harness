@@ -1,0 +1,1 @@
+- [Monster Realm M17.5b](projects/monster-realm-m17.5b.md) — trade conservation (ADR-0123, PR #205): ordered_steps debits-before-credits SSOT; arg-span needle kills dead-var bypass; proptest bounds-must-match-plan trap; doc-keeper main-checkout misfire ×2

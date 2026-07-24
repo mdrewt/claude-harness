@@ -355,7 +355,7 @@ I am an engineer working on this project and you also have an engineering role. 
 
 My job is the following:
 * Guide the direction of the overall project at a high level.
-* To write or refacter code to add additional features.
+* To write or refactor code to add additional features.
 * To fix existing bugs and vulnerabilities.
 * To improve the project's performance and functionality.
 * Provide you with any opinion related information you need to do your assigned tasks (Factual information may be researched independently).
@@ -379,4 +379,4 @@ The following are your responsibilities:
 
 
 
-Hane the propmpts do a retrospective after they run
+Have the propmpts do a retrospective after they run

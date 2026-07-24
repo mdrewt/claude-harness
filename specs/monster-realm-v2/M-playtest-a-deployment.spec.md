@@ -41,6 +41,9 @@ deploy, minus the hosting.
 Pairing: pt-a1 ‖ M-playtest-d content slices OK (disjoint). pt-a2 is justfile/scripts-only (no CI
 workflow anymore) — still SERIAL vs other justfile-touching slices.
 
+- **Delivered — pt-a1** (PR #216, 2026-07-19): ADR-0128. Prod-safe `resolveConnectionConfig` (fail-loud on unset/empty/whitespace/case-fold dev-default DB, guard DB not URI, module-scope wiring) replacing the inline main.ts URI/DB consts; `BUILD_INFO` git-SHA/build-time stamp via vite `define`, rendered in `#build-stamp` + ungated `window.__mrBuild` for the M-playtest-b F9 bundle; DEV-hooks-absent reconciliation of ADR-0127 (empirically verified, `--minify false` caveat refined) + `main.wiring.test.ts` source-scan regression guard. **Parked to pt-a2:** `just playtest-up/down`, published-module `dev_reducers`-absent proof, automated build-output DEV-hooks grep, `docs/playtest-ops.md`; hosted deploy = M-playtest-a2.
+- **Delivered — pt-a2** (PR #218, 2026-07-19): ADR-0129. `just playtest-up/down/wipe` recipes publish default release module to isolated DB `monster-realm-playtest`; `scripts/verify-release-reducers.mjs` fails loud on dev_reducers in published `describe --json` (forbidden = `start_wild_battle`, `grant_bait`); `scripts/verify-build-hooks.mjs` scans dist for DEV-hook bindings; `evals/playtest-verify.eval.mjs` gates pure checkers (not live in CI). **pt-a2 completes M-playtest-a's core** (pt-a1 + pt-a2). **Deferred:** a live nightly `playtest-smoke` recipe → **pt-a3** (optional; the smoke-republish analogue); hosted deploy → **M-playtest-a2** (external testers / Maincloud).
+
 ## Risks / decisions
 The dev_reducers-absent check must inspect the *published module* (reducer list via CLI/introspection),
 because a wrong feature flag in the publish path is exactly the failure it guards. Local-only means the

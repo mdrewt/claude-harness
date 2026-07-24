@@ -1,0 +1,2 @@
+*/30 * * * * /bin/bash /home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh
+@reboot sleep 60 && /bin/bash /home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh

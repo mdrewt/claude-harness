@@ -1,6 +1,6 @@
 # Monster Realm (v2) — Greenfield Plan
 
-> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#158 + #162–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals CLOSED (a–g, ADR-0112–0117, PRs #180–#193). M17 ranked ladder: m17a (#196) + m17b (#199) merged, m17c (#198) awaiting supervisor merge. Next: close M17, then the **2026-07-17 playtest-first replan** (`playtest-replan-2026-07.md`): M17.5 → M-playtest-a→b→c→d → **PLAYTEST GATE** (game-design.md §4); M18+ demoted to post-gate provisional.
+> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#158 + #162–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals CLOSED (a–g, ADR-0112–0117, PRs #180–#193). M17 ranked ladder CLOSED (m17a #196 / m17b #199 / m17c #198, ADR-0119–0121); M17.5 tenth-review residuals CLOSED (ADR-0124–0127). **2026-07-17 playtest-first replan underway** (`playtest-replan-2026-07.md`): M-playtest-a (client build hygiene + local ops, ADR-0128/0129) & M-playtest-b (observability, ADR-0130/0131) CLOSED; M-playtest-c UX completion CLOSED (rename/trade-propose/help, ADR-0132–0135, PR #230); **M-playtest-c.5 pre-gate residuals 6/7 merged** — ptc5a #232 (0136) · ptc5d #234 (0137) · ptc5b #236 (0138) · ptc5c #237 (0139) · ptc5e #238 (0140) · ptc5g #239 (0141) — with **ptc5f (this slice, ADR-0142, ledger reconciliation) closing it out**. Next: **M-playtest-d** (content pack) → **⛩ PLAYTEST GATE** (game-design.md §4); M18+ demoted to post-gate provisional (see the Phase D post-gate block).
 > **Relationship to v1:** This is a *new, from-scratch* project — the spiritual sequel to
 > `projects/pokemon-mmo` (published db `monster-tamer-mmo`). It is **not** that project and does
 > **not** modify it. Working repo name: **`monster-realm`** (rename freely; must stay kebab-case for
@@ -295,6 +295,16 @@ fan-out per each spec's pairing notes):**
 - **M-playtest-c Playtest UX completion & tester onboarding** (`M-playtest-c-ux-completion.spec.md`) —
   trade **propose UI** (H3 is untestable without it; resolves D-17.5-D), `set_profile_name` (D-17.5-C,
   subsumes m17b-2), in-client help overlay, `docs/PLAYTEST.md`.
+- **M-playtest-c.5 Pre-gate review residuals** (`M-playtest-c.5-pregate-review-residuals.spec.md`;
+  inserted between M-playtest-c and M-playtest-d by the 2026-07-20 weekly review @ `0421f2c` while pt-c2
+  was in flight — resolves the verified eleventh-review findings, no new game-design surface): ptc5a
+  care/train both-role ongoing-battle guard (closes the mid-battle HP-laundering path ADR-0122 §D7
+  wrongly claims impossible) · ptc5b wild-battle disconnect resolution + `battle_wild` GC (fixes the
+  returning-player soft-lock + row leak) · ptc5c overlay mutual-exclusion symmetry (KeyB/I/E) + registry ·
+  ptc5d OKF knowledge-bundle `*_tests.rs` exclusion + two degraded test teeth (RT-M14.5A-02, mutate-server
+  cap) · ptc5e SSOT/content/dedup polish · ptc5f ledger reconciliation. §3 lists five decisions for Drew
+  (ADR-0090 burst-spread, overlay registry, care-cooldown-as-content, coverage exclusions, warp predictor
+  epoch). Land after M-playtest-c closes or opportunistically for disjoint slices. **All five §3 decisions RESOLVED 2026-07-20 (Drew-delegated): A/B/C in-slice; D→post-gate `M-postgate-client-coverage`; E→defer + ADR-0085 amend/pin (fix→post-gate `M-postgate-netcode-hardening`). Plus the M10.5 render-snap fix scheduled pre-gate as new slice ptc5g.**
 - **M-playtest-d Playtest content pack** (`M-playtest-d-content-pack.spec.md`) — roster 6→~16 forms +
   distinct-silhouette sprites + encounter/recruit/economy tuning to GDD §5 MVP scope; pure content/data
   on ADR-0057, fan-out friendly.
@@ -303,6 +313,9 @@ fan-out per each spec's pairing notes):**
   closed playtest; the gate decision doc re-opens (and may reshape) the post-gate queue below.
 
 **Phase D — Production readiness (post-gate provisional, `blocked:playtest-gate` — order unchanged, contingent on the gate):**
+
+- **M-postgate-client-coverage** (client-hardening; M-playtest-c.5 Decision D, Drew-delegated 2026-07-20) — extract the inline decision logic in `main.ts`/`battleView.ts`/`boxView.ts` into tested pure `*Model.ts` cores and drop the coverage-denominator exclusions; a mechanical fence lands pre-gate (fail if the `vite.config.ts` excluded set grows). Pairs with the ptc5c-2 overlay-registry client-hardening work.
+- **M-postgate-netcode-hardening** (netcode; M-playtest-c.5 Decision E, Drew-delegated 2026-07-20) — the warp-path `Predictor` epoch/generation guard so a stale cross-warp rejection's `.catch` no-ops on a rebuilt predictor. ADR-0085 was amended pre-gate (in ptc5f, ADR-0142) to accept the risk for the closed playtest + pin the reachability bound (predictor.test.ts). **⚠ ptc5f's red-team pass sharpened the reachability: the gap is NOT contention-gated — it is reachable in _solo_ play by warping while holding a movement key (per-character `MOVE_QUEUE_CAP` / seq-reuse `"stale seq"` rejection), causing a swallowed first-post-warp move / brief rubber-band. Recommend Drew weigh pulling this fix forward of / into the playtest rather than treating it as negligible.** The guard itself lands here.
 - **M20 Observability, performance & load hardening** (`M20-observability-performance.spec.md`; ADR-0029) —
   the capstone: production monitoring (OTel→Datadog dashboards/alerts), full-system load testing (scaled
   sim-harness), profiling the named hot paths, and the **measured** performance-tuning pass + SLO baselines.

@@ -1,0 +1,123 @@
+#!/bin/bash
+# Monster Realm supervisor status + live log tail.
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+now=$(date +%s)
+
+# most recent task log: newest slice build log or decision-tick transcript, else gate log.
+pick_log(){
+  local best="" bestm=0 f m
+  for f in /tmp/mr_pass_*.log /tmp/mr_native_tick_native-*.log; do
+    [ -f "$f" ] || continue
+    m=$(stat -c %Y "$f" 2>/dev/null || echo 0)
+    if [ "$m" -gt "$bestm" ]; then bestm=$m; best=$f; fi
+  done
+  [ -z "$best" ] && best="$MEM/mr-native-tick.log"
+  printf '%s\n' "$best"
+}
+
+case "${1:-}" in
+  -f|--follow|-t|--tail|tail|follow)
+    LOG=$(pick_log)
+    echo "==> live-tailing (raw): $LOG"
+    echo "    (Ctrl-C to stop; follows the most recently active log)"
+    echo
+    exec tail -n 40 -f "$LOG"
+    ;;
+  --pretty|pretty|-p)
+    LOG=$(pick_log)
+    echo "==> live-tailing (pretty): $LOG"
+    echo "    (Ctrl-C to stop; assistant text, tool calls, and brief results only)"
+    echo
+    PRETTY_PY=$(cat <<'PYEOF'
+import sys, json
+def summ(inp):
+    if not isinstance(inp, dict): return ""
+    for k in ("command","file_path","path","pattern","url","description","subject","prompt","query","content"):
+        v=inp.get(k)
+        if isinstance(v,str):
+            v=" ".join(v.split())
+            return v[:120]+("..." if len(v)>120 else "")
+    try: return json.dumps(inp)[:120]
+    except Exception: return ""
+def rtext(block):
+    c=block.get("content")
+    if isinstance(c,str): return c
+    if isinstance(c,list):
+        out=[]
+        for x in c:
+            if isinstance(x,dict) and x.get("type")=="text": out.append(x.get("text",""))
+            elif isinstance(x,str): out.append(x)
+        return " ".join(out)
+    return ""
+while True:
+    line=sys.stdin.readline()
+    if not line: break
+    line=line.strip()
+    if not line: continue
+    try: o=json.loads(line)
+    except Exception: continue
+    t=o.get("type")
+    if t=="assistant":
+        for b in o.get("message",{}).get("content",[]):
+            bt=b.get("type")
+            if bt=="text":
+                tx=b.get("text","").rstrip()
+                if tx: print(tx)
+            elif bt=="tool_use":
+                print("  -> %s: %s" % (b.get("name","?"), summ(b.get("input",{}))))
+    elif t=="user":
+        for b in o.get("message",{}).get("content",[]):
+            if isinstance(b,dict) and b.get("type")=="tool_result":
+                txt=" ".join(rtext(b).split())
+                if txt:
+                    tag="<- ERROR: " if b.get("is_error") else "<- "
+                    print("     %s%s" % (tag, txt[:160]+("..." if len(txt)>160 else "")))
+    elif t=="result":
+        st=o.get("subtype") or o.get("result") or "done"
+        print("=== result: %s ===" % str(st)[:120])
+    sys.stdout.flush()
+PYEOF
+)
+    tail -n 200 -f "$LOG" | /usr/bin/python3 -u -c "$PRETTY_PY"
+    ;;
+  --log|--path)
+    pick_log
+    exit 0
+    ;;
+  -h|--help)
+    echo "usage: mr-supervisor-status [option]"
+    echo "  (no args)     summary: state, live runs, health markers, recent ticks"
+    echo "  -f | tail     live-tail the most recent task's log (raw stream-json)"
+    echo "  --pretty      live-tail, readable: assistant text, tool calls, brief results"
+    echo "  --log         print the path of the most recent task's log"
+    echo "  -h | --help   show this help"
+    exit 0
+    ;;
+esac
+
+age(){ local f="$1" v; if [ -f "$f" ]; then v=$(cat "$f" 2>/dev/null); if [[ "$v" =~ ^[0-9]+$ ]]; then echo "$(( (now - v) / 60 )) min ago"; else echo "$v"; fi; else echo "(none)"; fi; }
+if [ -f "$MEM/.native-supervisor-disabled" ]; then STATE="DISABLED (paused)"; else STATE="ENABLED"; fi
+SCHED=$(crontab -l 2>/dev/null | grep -E 'mr-native-tick\.sh' | grep -v '@reboot' | awk '{print $1,$2,$3,$4,$5}')
+echo "Monster Realm supervisor"
+echo "  state        : $STATE"
+echo "  schedule     : ${SCHED:-<not in crontab>}  (+ @reboot)"
+echo "  live now     :"
+found=0
+for t in $(pgrep -f "mr-native-tick.sh" 2>/dev/null); do c=$(cat /proc/$t/comm 2>/dev/null); [ "$c" = bash ] || [ "$c" = sh ] || continue; echo "    - supervisor decision tick running (pid $t)"; found=1; done
+for L in "$MEM"/.harness-runner.*.lock; do
+  [ -e "$L" ] || continue
+  sl=$(basename "$L"); sl=${sl#.harness-runner.}; sl=${sl%.lock}
+  pid=$(/usr/bin/python3 -c "import json;print(json.load(open('$L')).get('session_leader') or '')" 2>/dev/null)
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    lg="/tmp/mr_pass_${sl}.log"; sz="?"; [ -f "$lg" ] && sz=$(du -h "$lg" 2>/dev/null | cut -f1)
+    echo "    - slice $sl BUILDING (leader $pid, log $sz)"; found=1
+  fi
+done
+[ "$found" = 0 ] && echo "    (nothing running right now)"
+echo "  tick-alive   : $(age "$MEM/.native-supervisor-tick-alive")   (cron is firing)"
+echo "  heartbeat    : $(age "$MEM/.native-supervisor-heartbeat")   (healthy = fresh)"
+echo "  last success : $(age "$MEM/.native-supervisor-last-success")"
+echo "  last failure : $(cat "$MEM/.native-supervisor-last-failure" 2>/dev/null || echo '(none)')"
+echo "  recent ticks :"
+tail -3 "$MEM/mr-native-tick.log" 2>/dev/null | sed 's/^/    /'
+echo "  watch live   : mr-supervisor-status --pretty   (readable)  |  -f (raw)"

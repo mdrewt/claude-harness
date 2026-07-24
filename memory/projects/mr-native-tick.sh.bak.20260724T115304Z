@@ -1,0 +1,91 @@
+#!/bin/bash
+# mr-native-tick.sh — NATIVE supervisor tick for Monster Realm v2 (cron-driven, no DC bridge).
+# Mechanical gates in bash; spawns `claude -p` (decision layer) ONLY when an action may be needed.
+# Env overrides: SUP_MODEL (default sonnet) · MR_TICK_DRYRUN=1 (stop before spawning claude).
+set -u
+HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
+PROJ=$HARNESS/projects/monster-realm
+MEM=$HARNESS/memory/projects
+export HOME=/home/mdrewt
+export PATH=/home/mdrewt/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+LOG=$MEM/mr-native-tick.log
+SUP_MODEL=${SUP_MODEL:-sonnet}
+TS(){ date -u +%Y-%m-%dT%H:%M:%SZ; }
+log(){ echo "$(TS) pid=$$ $*" >> "$LOG"; }
+
+# log rotation (~1MB)
+if [ -f "$LOG" ] && [ "$(stat -c %s "$LOG")" -gt 1000000 ]; then mv "$LOG" "$LOG.1"; fi
+
+# heartbeat — fallback Cowork/DC ticks stand down while this is fresh (<2h)
+date -u +%s > "$MEM/.native-supervisor-heartbeat"
+
+# gate -1: kill-switch
+[ -f "$MEM/.native-supervisor-disabled" ] && { log "SKIP disabled-flag"; exit 0; }
+
+# gate 0: tick-overlap lock (belt; the claude run's mkdir-mutex is suspenders)
+exec 9>/tmp/mr_native_tick.flock
+flock -n 9 || { log "SKIP flock-held (previous tick still running)"; exit 0; }
+
+# gate 1: fast-path — live rooted run and no .done awaiting merge -> standdown
+LIVE=0; DONE_WAIT=0; LIVE_SLICES=""
+for L in "$MEM"/.harness-runner.*.lock; do
+  [ -e "$L" ] || continue
+  SLICE=$(basename "$L"); SLICE=${SLICE#.harness-runner.}; SLICE=${SLICE%.lock}
+  PID=$(/usr/bin/python3 -c "import json,sys
+try: print(json.load(open('$L')).get('session_leader') or '')
+except Exception: print('')" 2>/dev/null)
+  if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then LIVE=1; LIVE_SLICES="$LIVE_SLICES $SLICE($PID)"; fi
+  [ -f "/tmp/mr_pass_${SLICE}.done" ] && DONE_WAIT=1
+done
+if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
+
+# gate 2: rate-limit reset-time from mr-state.json
+RLGATE=$(/usr/bin/python3 - <<'PY'
+import json, time
+try:
+    d = json.load(open("/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-state.json"))
+    r = d.get("rate_limit_resets_at")
+    def to_epoch(v):
+        try: return float(v)
+        except (TypeError, ValueError): pass
+        import datetime
+        try: return datetime.datetime.strptime(str(v).replace("Z","+0000"), "%Y-%m-%dT%H:%M:%S%z").timestamp()
+        except Exception: return None
+    e = to_epoch(r) if r else None
+    if e and e > time.time():
+        print("BLOCKED_UNTIL_%s" % r)
+    else:
+        print("CLEAR")
+except Exception as e:
+    print("CLEAR")  # state unreadable -> let the LLM tick reconcile
+PY
+)
+case "$RLGATE" in BLOCKED_UNTIL_*) log "STANDDOWN rate-limit $RLGATE"; exit 0;; esac
+
+# gate 3: human-activity probe (conservative; LLM re-probes with full policy)
+IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
+WRITES=$(find "$HARNESS" "$PROJ" -type f \
+  -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' \
+  -not -path "$HARNESS/memory/*" -mmin -6 2>/dev/null | head -1)
+if [ -n "$IDE" ]; then log "STANDDOWN human-ide-session"; exit 0; fi
+if [ -n "$WRITES" ]; then log "STANDDOWN recent-writes: $WRITES"; exit 0; fi
+
+# gate 4: chain-owner mutex freshness (TTL 600s)
+if [ -d "$MEM/.harness-runner.lock.d" ]; then
+  HB=$(stat -c %Y "$MEM/.harness-runner.lock.d/owner.json" 2>/dev/null || echo 0)
+  AGE=$(( $(date +%s) - HB ))
+  if [ "$AGE" -lt 600 ]; then log "STANDDOWN chain-mutex-fresh age=${AGE}s"; exit 0; fi
+  log "NOTE stale chain-mutex age=${AGE}s — LLM tick will evaluate takeover"
+fi
+
+# action may be needed -> spawn the decision run
+RID="native-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+TLOG="/tmp/mr_native_tick_${RID}.log"
+if [ "${MR_TICK_DRYRUN:-0}" = "1" ]; then log "DRYRUN would-spawn model=$SUP_MODEL rid=$RID"; echo "DECISION-NEEDED"; exit 0; fi
+log "SPAWN model=$SUP_MODEL rid=$RID tlog=$TLOG"
+cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
+timeout 5400 claude --model "$SUP_MODEL" --dangerously-skip-permissions \
+  -p "$(cat "$MEM/mr-supervisor-prompt-native.md")" >> "$TLOG" 2>&1
+RC=$?
+log "SPAWN-DONE rc=$RC rid=$RID"
+exit 0

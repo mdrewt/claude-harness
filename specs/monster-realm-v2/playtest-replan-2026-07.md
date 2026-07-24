@@ -56,8 +56,15 @@ after M17 are re-ordered **playtest-enabling work first**; everything below the 
 
 ## 3. Resolutions of M17.5 §3 decisions (per Drew's replan mandate; veto welcome)
 
-- **D-17.5-A (BattleKind column): ADOPT in 17.5.** Additive, cheap now; playtest adds battle volume and
-  any post-gate battle source (raids/friendlies/NPC trainers) would silently rate under the sentinel.
+- **D-17.5-A (BattleKind column): AMENDED 2026-07-17 (review agent, veto welcome) — DEFER the column; keep
+  sentinel + guarding eval (17.5a-5) in 17.5.** Reversal rationale: the column is additive, so it is exactly
+  as cheap to add at the moment a third battle kind first lands; its only consumers (raids/friendlies/NPC
+  trainers) are M18+ sources this very replan demotes below the playtest gate and may cut, so building the
+  schema + exhaustive-match rewrites + eval now is speculative generality inside a hardening milestone. The
+  new 17.5a-5 fail-loud eval pins the `is_ranked_pvp` negative-space classification (opponent must be
+  self/WILD/real-player), giving the same silent-rating protection the column would, at a fraction of the
+  cost. Adopt the column in the milestone that actually introduces the third battle kind. (Prior resolution
+  was ADOPT-in-17.5; superseded here.)
 - **D-17.5-B (transport RLS): RE-BOOK to M22** (privacy milestone, its natural home) with a fresh
   accepted-risk note in the 17.5 ADR covering the closed-playtest period (invited testers, low stakes).
   17.5g-3 fixes the stale pointer to say "→ M22".
