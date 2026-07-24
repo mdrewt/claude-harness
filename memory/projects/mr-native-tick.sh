@@ -176,6 +176,9 @@ if [ "$GSTATE" = "HARD-STOP" ]; then log "STANDDOWN budget-hard-stop (>97% of we
 RID="native-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 PROMPTF="/tmp/mr_tick_prompt_$RID.md"
 cat "$MEM/mr-supervisor-prompt-native.md" > "$PROMPTF"
+if [ "${MR_FORCE:-0}" = "1" ] && [ -f "$MEM/.native-supervisor-disabled" ]; then
+  { echo; echo "## OPERATOR-FORCED RUN"; echo "The operator (Drew) invoked this tick manually with MR_FORCE=1 while the automation pause flag (.native-supervisor-disabled) is set. The flag pauses SCHEDULED automation only — for THIS run treat it as absent: proceed with the full SSOT procedure INCLUDING launching new work if eligible. Do not stand down merely because the bundle shows disabled:true."; } >> "$PROMPTF"
+fi
 { echo; echo "## LIVE SITUATION (HINTS-ONLY — mechanically generated; re-verify anything you are about to mutate; governor state: $GSTATE$([ "$GSTATE" = UNKNOWN ] && echo ' — BUDGET UNCOMPUTABLE, flag this as a BLOCKER in your records'))"; echo '```json'; echo "$SIT"; echo '```'; } >> "$PROMPTF"
 CONSUMED=""
 for EV in "$MEM"/pending-events/*.md; do

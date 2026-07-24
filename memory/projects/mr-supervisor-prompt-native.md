@@ -26,6 +26,7 @@ The LIVE SITUATION bundle computes `budget.state` from the ledger (weekly calibr
 - **SOFT-PAUSE** (>90% of weekly incl. unreconciled estimates) → NO new launches; merges, parks, records, and watchers still allowed. Note SOFT-PAUSE in the handoff.
 - **HARD-STOP** (>97%) → the wrapper stands down before spawning you; if you see this state mid-run, finish records and exit.
 - **UNKNOWN** (budget uncomputable) → proceed but record a BLOCKER: the governor is blind and needs repair.
+- **Pause-flag semantics:** `disabled:true` in the bundle means scheduled automation is paused. On an OPERATOR-FORCED RUN (the prompt says so explicitly) treat the flag as absent and proceed fully, including launches. On event/cron ticks the wrapper already gates this — you will simply never see those.
 
 ## Offload tools (mechanical work stays out of your token budget — all in `$MEM`)
 
