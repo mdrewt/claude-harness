@@ -33,10 +33,11 @@ if [ "${MR_NO_OLLAMA:-0}" != "1" ] && command -v ollama >/dev/null 2>&1; then
     for i in 1 2 3 4 5; do sleep 2; curl -s -m 2 http://localhost:11434/api/version >/dev/null 2>&1 && break; done
   fi
   if curl -s -m 2 http://localhost:11434/api/version >/dev/null 2>&1; then
-    if ollama list 2>/dev/null | grep -q "^${MR_OLLAMA_MODEL:-ornith:35b}"; then
+    OLM=$("$MEM/mr-ollama" model 2>/dev/null); OLM=${OLM:-hrbrmstr/ornith-35b-fixed}
+    if ollama list 2>/dev/null | grep -q "^${OLM%%:latest}"; then
       # detached warm-up + 30m keep_alive; tick does NOT wait for the 21GB load
-      setsid curl -s -m 300 http://localhost:11434/api/generate -d "{\"model\":\"${MR_OLLAMA_MODEL:-ornith:35b}\",\"prompt\":\"ok\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":1},\"keep_alive\":\"30m\"}" </dev/null >/dev/null 2>&1 &
-      log "OLLAMA preflight: server up, ${MR_OLLAMA_MODEL:-ornith:35b} present, warm-up dispatched"
+      setsid curl -s -m 300 http://localhost:11434/api/generate -d "{\"model\":\"$OLM\",\"prompt\":\"ok\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":1},\"keep_alive\":\"30m\"}" </dev/null >/dev/null 2>&1 &
+      log "OLLAMA preflight: server up, $OLM present, warm-up dispatched"
     else
       printf '%s preflight MODEL-MISSING\n' "$(TS)" > "$MEM/.ollama-last"; log "OLLAMA preflight: model missing — advisory features degrade"
     fi

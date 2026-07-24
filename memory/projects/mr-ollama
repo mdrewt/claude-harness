@@ -2,13 +2,31 @@
 # mr-ollama — local-model (ollama/ornith:35b) offload for NON-CRITICAL advisory jobs. $0 marginal cost.
 # ALWAYS rc=0. On any failure prints "OLLAMA-UNAVAILABLE: <reason>" so callers degrade gracefully.
 # Output is ADVISORY ONLY — never a gate; consumers must treat it as untrusted hints.
-# usage: mr-ollama ping | summarize-run <slice> | triage <slice>
-# env: MR_NO_OLLAMA=1 · MR_OLLAMA_MODEL (default ornith:35b) · MR_OLLAMA_TIMEOUT (default 240s)
+# usage: mr-ollama ping | model | summarize-run <slice> | triage <slice>
+# Engine = raw ollama API (not the hermes CLI): faster, deterministic params, zero tool surface, and no
+# dependency on hermes gateway health (the triage role must work during outages). Tag resolution keeps the instance SHARED.
+# env: MR_NO_OLLAMA=1 · MR_OLLAMA_MODEL (overrides tag resolution; see pick_model) · MR_OLLAMA_TIMEOUT (default 240s)
 set -u
 exec 9>&- 2>/dev/null || true
-MODEL="${MR_OLLAMA_MODEL:-ornith:35b}"
+# model tag resolution: share ONE instance with the hermes agent (two 21GB variants swapping on a 16GB GPU = thrash).
+# Priority: env override -> currently-LOADED ornith-family instance -> hermes agent config -> known-good default.
+pick_model(){
+  [ -n "${MR_OLLAMA_MODEL:-}" ] && { printf '%s' "$MR_OLLAMA_MODEL"; return; }
+  L=$(curl -s -m 3 http://localhost:11434/api/ps 2>/dev/null | /usr/bin/python3 -c "import json,sys
+try:
+    for m in json.load(sys.stdin).get('models',[]):
+        n=m.get('name','')
+        if 'ornith' in n.lower(): print(n); break
+except Exception: pass" 2>/dev/null)
+  [ -n "$L" ] && { printf '%s' "$L"; return; }
+  H=$(grep -m1 -oE '(HERMES_)?MODEL[= ]+"?[^"[:space:]]*ornith[^"[:space:]]*' /home/mdrewt/.hermes/hermes-agent/.env 2>/dev/null | sed 's/.*[= ]"\?//')
+  [ -n "$H" ] && { printf '%s' "$H"; return; }
+  printf '%s' "hrbrmstr/ornith-35b-fixed"
+}
+MODEL="$(pick_model)"
 TMO="${MR_OLLAMA_TIMEOUT:-240}"
 SUB="${1:-ping}"; S="${2:-}"
+[ "$SUB" = "model" ] && { printf '%s\n' "$MODEL"; exit 0; }
 [ "${MR_NO_OLLAMA:-0}" = "1" ] && { echo "OLLAMA-UNAVAILABLE: disabled (MR_NO_OLLAMA=1)"; exit 0; }
 command -v ollama >/dev/null 2>&1 || { echo "OLLAMA-UNAVAILABLE: ollama not installed"; exit 0; }
 PF=$(mktemp /tmp/mr_ollama_prompt.XXXXXX)
