@@ -61,6 +61,10 @@ try:
             g["verdict"]="FLAGGED"; g["reason"]="mechanical tripwire (see counters); LLM must read the diff"
         else:
             g["verdict"]="CLEAN"
+        # pre-filtered evidence: embed the TEST-FILE diff hunks when flagged (no new git calls; str-sliced = utf-8 safe).
+        # NOTE: scoped to test paths only — on hard-tier flags of non-test changes this may be empty; the full diff read is still on the LLM.
+        if g["verdict"]!="CLEAN" and r2.stdout.strip():
+            g["test_diff_hunks"]="\n".join(r2.stdout.splitlines()[:200])[:12000]
     else:
         g["verdict"]="AUDIT-ERROR"; g["reason"]="repo/base/head missing or repo not a dir"
     out["gating"]=g

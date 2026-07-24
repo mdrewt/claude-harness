@@ -9,7 +9,9 @@ HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
 PROJ=$HARNESS/projects/monster-realm
 S="${1:?usage: mr-spawn <slice> [--dry]}"; DRY="${2:-}"
 V="/tmp/mr_pass_$S.vars.json"; B="/tmp/mr_pass_$S.md"
-status(){ echo "{\"slice\":\"$S\",\"status\":\"$1\",\"detail\":\"$2\"}"; exit "${3:-0}"; }
+emit(){ SLICE="$S" ST="$1" DET="$2" /usr/bin/python3 -c "import json,os;print(json.dumps({'slice':os.environ['SLICE'],'status':os.environ['ST'],'detail':' '.join(os.environ['DET'].split())[:600]}))"; }
+status(){ emit "$1" "$2"; exit "${3:-0}"; }
+fail_evidence(){ printf 'kind=%s seen=%s log_tail=%s err_tail=%s' "${LAST_FAIL_KIND:-?}" "${LAST_SEEN_MODEL:-none}" "$(tail -n 5 "/tmp/mr_pass_$S.log" 2>/dev/null | tr '\n' ' ' | head -c 200)" "$(tail -n 5 "/tmp/mr_pass_$S.err" 2>/dev/null | tr '\n' ' ' | head -c 200)"; }
 [ -r "$V" ] || status FAIL "vars.json missing: $V" 1
 # mechanical active-session probe (mirror of tick gate 3)
 IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
@@ -40,21 +42,23 @@ if [ "$DRY" = "--dry" ]; then status DRY "brief built; model=$MODEL effort=$EFFO
 RID="mr-spawn-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 attempt_launch(){
   setsid bash "$MEM/mr-launch.sh" "$S" "$MODEL" "$EFFORT" >/dev/null 2>&1 & LEADER=$!
+  LAST_SEEN_MODEL=""
   disown 2>/dev/null || true
   sleep 4
   # detachment assert: leader must be its own session
   SESS=$(ps -o sess= -p "$LEADER" 2>/dev/null | tr -d ' ')
-  [ -n "$SESS" ] && [ "$SESS" = "$LEADER" ] || return 1
+  if [ -z "$SESS" ] || [ "$SESS" != "$LEADER" ]; then LAST_FAIL_KIND="detach"; return 1; fi
   # model-class assert: poll log <=90s for first model id; must match requested class
   local want="$MODEL" seen=""
   for i in $(seq 1 30); do
     seen=$(grep -m1 -o '"model":"claude-[a-z0-9.-]*"' "/tmp/mr_pass_$S.log" 2>/dev/null | head -1)
     [ -n "$seen" ] && break; sleep 3
   done
+  LAST_SEEN_MODEL="$seen"
   case "$want" in
-    opus)  echo "$seen" | grep -q "claude-opus"  || return 2;;
-    fable) echo "$seen" | grep -q "claude-fable" || return 2;;
-    sonnet) echo "$seen" | grep -q "claude-sonnet" || return 2;;
+    opus)  echo "$seen" | grep -q "claude-opus"  || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
+    fable) echo "$seen" | grep -q "claude-fable" || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
+    sonnet) echo "$seen" | grep -q "claude-sonnet" || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
   esac
   return 0
 }
@@ -66,8 +70,8 @@ kill_attempt(){
 }
 if ! attempt_launch; then
   kill_attempt
-  echo "{\"slice\":\"$S\",\"status\":\"RETRY\",\"detail\":\"first launch failed assert; retrying once\"}"
-  if ! attempt_launch; then kill_attempt; status FAIL "launch asserts failed twice (detach/model)" 1; fi
+  emit RETRY "first launch failed assert; retrying once — $(fail_evidence)"
+  if ! attempt_launch; then kill_attempt; status FAIL "launch asserts failed twice — $(fail_evidence)" 1; fi
 fi
 CPID=$(pgrep -P "$LEADER" 2>/dev/null | head -1)
 export S V MEM RID LEADER CPID MODEL EFFORT B
@@ -85,4 +89,5 @@ lock={"run_id":os.environ["RID"],"slice":os.environ["S"],
 open(os.environ["MEM"]+"/.harness-runner."+os.environ["S"]+".lock","w").write(json.dumps(lock,indent=1))
 PYLOCK
 then kill_attempt; status FAIL "lock write failed after launch (attempt killed)" 1; fi
-status LAUNCHED "leader=$LEADER claude_pid=${CPID:-?} model=$MODEL effort=$EFFORT rid=$RID"
+TIER=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('tier','routine'))" 2>/dev/null)
+status LAUNCHED "leader=$LEADER claude_pid=${CPID:-?} model=$MODEL effort=$EFFORT tier=${TIER:-?} brief_bytes=$(stat -c %s "$B" 2>/dev/null || echo ?) rid=$RID"

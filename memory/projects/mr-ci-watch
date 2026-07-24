@@ -11,10 +11,27 @@ LOCKD="/tmp/mr_ciwatch_$S.lock.d"
 mkdir "$LOCKD" 2>/dev/null || { OP=$(cat "$LOCKD/pid" 2>/dev/null); [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null && grep -q mr-ci-watch "/proc/$OP/cmdline" 2>/dev/null && exit 0; rm -rf "$LOCKD"; mkdir "$LOCKD" || exit 0; }
 echo $$ > "$LOCKD/pid"
 trap 'rm -rf "$LOCKD"' EXIT
-fire(){ # $1=state $2=detail
+fire(){ # $1=state $2=detail (may be multi-line)
   EV="$MEM/pending-events/$S.ci.md"
-  { echo "EVENT src=ci slice=$S pr=$PR state=$1 at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; echo "$2"; } > "$EV"
+  { echo "EVENT src=ci slice=$S pr=$PR state=$1 at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; printf '%s\n' "$2"; } > "$EV"
   MR_EVENT_SRC=ci setsid /bin/bash "$MEM/mr-native-tick.sh" "$EV" >/dev/null 2>&1 &
+}
+red_details(){ # pre-filtered failure evidence for the event; best-effort, bounded, never fails
+  local TBL LINK RID OUT=""
+  TBL=$(timeout 30 gh pr checks "$PR" -R mdrewt/monster-realm 2>/dev/null | head -20)
+  OUT="--- checks table ---
+${TBL:-(checks table unavailable)}"
+  LINK=$(timeout 30 gh pr checks "$PR" -R mdrewt/monster-realm --json name,state,link -q 'first(.[]|select(.state=="FAILURE" or .state=="fail")).link' 2>/dev/null)
+  RID=$(printf '%s' "$LINK" | grep -oE '/runs/[0-9]+' | grep -oE '[0-9]+' | head -1)
+  if [ -n "$RID" ]; then
+    OUT="$OUT
+--- failed step log tail (run $RID) ---
+$(timeout 45 gh run view "$RID" -R mdrewt/monster-realm --log-failed 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | tail -n 60 | head -c 4000)"
+  else
+    OUT="$OUT
+(failed-run log unavailable: no run id resolved)"
+  fi
+  printf '%s' "$OUT"
 }
 for TRY in 1 2 3; do
   # merged/closed? then no watch needed
@@ -27,7 +44,8 @@ for TRY in 1 2 3; do
     # rc=8 means checks pending timeout w/ gh<2.x variants; non-zero can also mean failed checks (concluded)
     CONC=$(timeout 30 gh pr checks "$PR" -R mdrewt/monster-realm 2>/dev/null | grep -cE "fail|pass" || true)
     PEND=$(timeout 30 gh pr checks "$PR" -R mdrewt/monster-realm 2>/dev/null | grep -c "pending" || true)
-    if [ "${PEND:-0}" = "0" ] && [ "${CONC:-0}" != "0" ]; then fire red "checks concluded with failures (watch rc=$RC)"; exit 0; fi
+    if [ "${PEND:-0}" = "0" ] && [ "${CONC:-0}" != "0" ]; then fire red "checks concluded with failures (watch rc=$RC)
+$(red_details)"; exit 0; fi
     sleep $((30*TRY))
   fi
 done
