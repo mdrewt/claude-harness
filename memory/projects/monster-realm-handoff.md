@@ -160,3 +160,6 @@ WHAT CHANGED (full detail: mr-native-supervisor-README.md maintenance log + mr-o
 STATE: cron crontab intact; .native-supervisor-disabled SET by Drew during the work — he will run mr-supervisor-run to exercise v3, then mr-supervisor-enable.
 NEXT TICK MUST: verify ptc5f merge state live (its squash commit is on master, CI green), clean its stale lock + worktree, then proceed per SSOT (playtest-d is next unfinished work; PLAYTEST GATE approaches).
 KNOWN QUIRKS: resident IDE claude sessions trip gate-3 standdown (by design); first fable launch should confirm claude-fable-5 appears in the run log (mr-spawn asserts this).
+
+## 2026-07-24T17:37:46Z — mr-ollama local-model offload wired (advisory-only)
+ornith:35b via ollama now enriches done/crash event bundles with grounded summaries (14s, $0) and provides failure-triage when the claude CLI is down. NEVER a gate: OLLAMA-UNAVAILABLE degrade, 2400ch cap, no-inference rule, SSOT doctrine line. Disable: MR_NO_OLLAMA=1. Ungrounded summaries were shown to confabulate — grounding on the brief scope fixed it; supervisors must still verify against mechanical tails.

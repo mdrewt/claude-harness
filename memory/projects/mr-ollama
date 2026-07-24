@@ -1,0 +1,62 @@
+#!/bin/bash
+# mr-ollama — local-model (ollama/ornith:35b) offload for NON-CRITICAL advisory jobs. $0 marginal cost.
+# ALWAYS rc=0. On any failure prints "OLLAMA-UNAVAILABLE: <reason>" so callers degrade gracefully.
+# Output is ADVISORY ONLY — never a gate; consumers must treat it as untrusted hints.
+# usage: mr-ollama ping | summarize-run <slice> | triage <slice>
+# env: MR_NO_OLLAMA=1 · MR_OLLAMA_MODEL (default ornith:35b) · MR_OLLAMA_TIMEOUT (default 240s)
+set -u
+exec 9>&- 2>/dev/null || true
+MODEL="${MR_OLLAMA_MODEL:-ornith:35b}"
+TMO="${MR_OLLAMA_TIMEOUT:-240}"
+SUB="${1:-ping}"; S="${2:-}"
+[ "${MR_NO_OLLAMA:-0}" = "1" ] && { echo "OLLAMA-UNAVAILABLE: disabled (MR_NO_OLLAMA=1)"; exit 0; }
+command -v ollama >/dev/null 2>&1 || { echo "OLLAMA-UNAVAILABLE: ollama not installed"; exit 0; }
+PF=$(mktemp /tmp/mr_ollama_prompt.XXXXXX)
+trap 'rm -f "$PF"' EXIT
+gen(){ # $1=max output tokens ; prompt already in $PF
+  PF="$PF" MODEL="$MODEL" NP="${1:-350}" T="$((TMO-10))" timeout "$TMO" /usr/bin/python3 - <<'PY' 2>/dev/null || echo "OLLAMA-UNAVAILABLE: generate failed/timeout"
+import json, os, sys, urllib.request
+prompt=open(os.environ["PF"],errors="replace").read()
+if not prompt.strip(): print("OLLAMA-UNAVAILABLE: empty prompt"); sys.exit(0)
+req=urllib.request.Request("http://localhost:11434/api/generate",
+  data=json.dumps({"model":os.environ["MODEL"],"prompt":prompt,"stream":False,"think":False,
+    "options":{"num_predict":int(os.environ["NP"]),"num_ctx":8192,"temperature":0.2}}).encode(),
+  headers={"Content-Type":"application/json"})
+try:
+    r=json.load(urllib.request.urlopen(req, timeout=float(os.environ.get("T","230"))))
+    out=(r.get("response") or "").strip()
+    if not out: print("OLLAMA-UNAVAILABLE: empty response"); sys.exit(0)
+    out="".join(c for c in out if c=="\n" or 32<=ord(c)<127 or ord(c)>160)[:2400]
+    print(out)
+except Exception as e:
+    print("OLLAMA-UNAVAILABLE:", str(e)[:100])
+PY
+}
+case "$SUB" in
+  ping)
+    echo "Reply with exactly: PONG" > "$PF"; TMO=60 gen 10;;
+  summarize-run)
+    [ -n "$S" ] || { echo "OLLAMA-UNAVAILABLE: no slice given"; exit 0; }
+    L="/tmp/mr_pass_$S.log"; E="/tmp/mr_pass_$S.err"; D="/tmp/mr_pass_$S.done"
+    [ -f "$L" ] || { echo "OLLAMA-UNAVAILABLE: no log for $S"; exit 0; }
+    { echo "You are summarizing evidence from an autonomous coding run (slice: $S) for a supervisor."
+      echo "Output <=14 terse bullet lines: goal, what was built/changed, final state (PR opened? merged? parked? crashed?), attempts/escalations, errors hit, and anything the supervisor MUST verify before acting. No preamble."
+      echo "STRICT RULE: state ONLY what the evidence below literally shows. If the evidence does not show something, write (not in evidence) — NEVER infer or invent details."
+      echo "=== slice brief scope (ground truth for the goal) ==="; head -c 1500 "/tmp/mr_pass_$S.md" 2>/dev/null
+      echo "=== .done ==="; cat "$D" 2>/dev/null
+      echo "=== attempt markers ==="; grep -E "^ATTEMPT=|^ESCALAT" "$L" 2>/dev/null | head -6
+      echo "=== result events ==="; grep '"type":"result"' "$L" 2>/dev/null | tail -3 | cut -c1-500
+      echo "=== last assistant messages ==="; grep '"type":"assistant"' "$L" 2>/dev/null | tail -18 | cut -c1-350
+      echo "=== stderr tail ==="; tail -n 12 "$E" 2>/dev/null | cut -c1-300
+    } | head -c 26000 > "$PF"
+    gen 420;;
+  triage)
+    [ -n "$S" ] || { echo "OLLAMA-UNAVAILABLE: no slice given"; exit 0; }
+    { echo "A headless coding session exited non-zero. Classify the cause as exactly one word on the first line: transient (API/network/infra blip worth auto-resume) or real (code/logic/config failure needing triage). Then one short reason line."
+      echo "=== stderr tail ==="; tail -c 2000 "/tmp/mr_pass_$S.err" 2>/dev/null
+      echo "=== log tail ==="; tail -n 5 "/tmp/mr_pass_$S.log" 2>/dev/null | cut -c1-300
+    } > "$PF"
+    TMO=90 gen 60;;
+  *) echo "OLLAMA-UNAVAILABLE: unknown subcommand $SUB";;
+esac
+exit 0

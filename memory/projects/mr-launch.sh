@@ -29,6 +29,14 @@ fire_event(){ # $1=src(done|crash) $2=headline
       [ -n "$WT" ] && { echo "--- worktree status ($WT) ---"; git -C "$WT" status --short 2>/dev/null | head -20; }
     fi
   } > "$EV" 2>/dev/null
+  # advisory local-model summary (free, async-safe: we are already detached). Never gates anything.
+  if [ "${MR_NO_OLLAMA:-0}" != "1" ] && [ -x "$MEM/mr-ollama" ]; then
+    SUMM=$("$MEM/mr-ollama" summarize-run "$S" 2>/dev/null | head -c 2400)
+    case "$SUMM" in
+      OLLAMA-UNAVAILABLE*|"") : ;;
+      *) { echo "--- LOCAL-MODEL SUMMARY (ornith, ADVISORY ONLY — verify against ground truth) ---"; echo "$SUMM"; } >> "$EV" 2>/dev/null ;;
+    esac
+  fi
   MR_EVENT_SRC=$1 setsid /bin/bash "$MEM/mr-native-tick.sh" "$EV" >/dev/null 2>&1 &
 }
 fail() { echo "EXIT=$1 ATTEMPTS=${A:-0}" >"$D"; fire_event crash "wrapper-fail rc=$1"; exit "$1"; }
@@ -80,7 +88,13 @@ $(tail -c 2000 "$E" 2>/dev/null)
 --- log tail ---
 $(tail -n 5 "$L" 2>/dev/null | cut -c1-300)
 Respond with exactly one word." 2>/dev/null)
-  echo "$OUT" | grep -qi '^ *transient' && echo transient || echo real
+  if echo "$OUT" | grep -qi '^ *transient'; then echo transient; return; fi
+  if [ -z "$OUT" ] || ! echo "$OUT" | grep -qiE 'transient|real'; then
+    # claude CLI unavailable (e.g. auth outage) -> local-model fallback triage
+    LOUT=$("$MEM/mr-ollama" triage "$S" 2>/dev/null | head -1)
+    case "$LOUT" in [Tt]ransient*) echo transient; return;; esac
+  fi
+  echo real
 }
 
 A=1

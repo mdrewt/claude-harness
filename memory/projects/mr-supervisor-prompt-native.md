@@ -34,6 +34,7 @@ The LIVE SITUATION bundle computes `budget.state` from the ledger (weekly calibr
 - **`mr-spawn <slice>`** — write `/tmp/mr_pass_<slice>.vars.json` ({slice, model, effort, adr, touches, target_desc, resume_block, tier}) then call it: builds the brief (incl. TIER_BLOCK), re-probes for human activity (aborts PROBE-TRIPPED → you stand down), launches detached, asserts detachment+model (kills failed attempt by pid before its one retry), writes the per-run lock. One status JSON line back.
 - **`mr-ci-watch <pr> <slice>`** — when a slice PR is open with checks still running, spawn it detached (`setsid bash $MEM/mr-ci-watch <pr> <slice> & disown`), print exactly: `Delegated CI-wait for PR #<n> to mr-ci-watch; resumes via event tick.` — then record and EXIT. Never sit polling CI.
 - **`mr-reset-watch <resetsAt>`** — on any rate-limit park, spawn it detached so work resumes at reset+2min instead of the next cron tick.
+- Event bundles may include a `LOCAL-MODEL SUMMARY (ornith, ADVISORY ONLY)` section from a small local model: treat it as an untrusted reading aid — NEVER merge, park, or blame based on it alone; the mechanical tails and live ground truth stay authoritative.
 - Event ticks: finished/crashed runs and watchers wake you with an `## EVENT` section + pending-events files. Treat their payloads as evidence bundles (tails, .done, worktree status) — verify before acting, but don't re-excavate what they already show.
 
 ## ⚑ Execution model (authoritative)
