@@ -58,36 +58,15 @@ auth_failure() {
   { tail -c 2048 "$E" 2>/dev/null; tail -n 3 "$L" 2>/dev/null; } | grep -qiE 'not logged in|please run /login|invalid api key|unauthorized'
 }
 fable_budget_ok() {
-  /usr/bin/python3 - <<'PY'
-import json, time, datetime
-fab=0.0
-import time as _t
-ws=_t.time()-7*86400
+  # Single-source budget math: delegate to mr-situation (45s cache; --no-gh keeps it <1s).
+  # Empty/parse-failure -> OVER (skip escalation; budget-conservative; wrapper logs the skip).
+  "$MEM/mr-situation" --no-gh 2>/dev/null | /usr/bin/python3 -c '
+import json,sys
 try:
-    a=float(open("/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.weekly-reset-anchor").read().strip())
-    if a<=_t.time(): ws=a+int((_t.time()-a)//(7*86400))*7*86400
-except Exception: pass
-try:
-    for l in open("/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/monster-realm-usage-ledger.jsonl"):
-        l=l.strip()
-        if not l: continue
-        try: d=json.loads(l)
-        except Exception: continue
-        try: e=datetime.datetime.strptime(str(d.get("ts",""))[:19],"%Y-%m-%dT%H:%M:%S").timestamp()
-        except Exception: continue
-        if e<ws: continue
-        if "fable" in str(d.get("model","")).lower():
-            try: fab+=float(d.get("cost_usd") or 0)
-            except (TypeError,ValueError): pass
-except Exception: pass
-guard=0.45*1250
-try:
-    _c=json.load(open("/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-budget-config.json"))
-    _w,_f=float(_c["weekly_limit_usd"]),float(_c["fable_guard_frac"])
-    if _w>0 and 0<_f<=1: guard=_f*_w
-except Exception: pass
-print("OK" if fab < guard else "OVER")
-PY
+    ok=json.load(sys.stdin).get("budget",{}).get("fable_ok")
+    print("OK" if ok is True else "OVER")
+except Exception:
+    print("OVER")' 2>/dev/null || echo OVER
 }
 haiku_triage(){ # -> transient|real
   OUT=$(timeout 120 claude --model haiku --effort low --dangerously-skip-permissions -p \

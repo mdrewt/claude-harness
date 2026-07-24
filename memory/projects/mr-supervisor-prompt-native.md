@@ -69,8 +69,10 @@ You are an **ephemeral single-step tick**. Never run a resident loop.
 
 ## Gates (in order; stop at the first stop)
 
+*(Native ticks arrive with the wrapper's mechanical gates already passed — for you these are RE-VERIFICATION from live ground truth, not duplicate policy. For the DC-bridge FALLBACK, which has no wrapper, they are the full procedure.)*
+
 1. **Reset-time:** recorded rate-limit `resetsAt` still future → exit.
-2. **Sync + probe + lock:** `git fetch --all --prune` both repos. **Active-session probe — at gate top AND immediately before lock-acquire/launch:** stand down if (a) a resident IDE `claude` pid (`--input-format stream-json … --replay-user-messages`) new this tick or growing `etimes`; (b) harness/project non-`.git`/`node_modules`/`target` file writes in last ~6 min you didn't make; (c) handoff/ledger mtime newer than its last recorded content ts. Resident pid with zero writes ≥ 45 min = idle-open, not active. Then take the chain-owner mutex. If a slice is open or parked (incl. `wip:` branches) → resume it before starting anything new.
+2. **Sync + probe + lock:** `git fetch --all --prune` both repos. **Active-session probe — at gate top** (the pre-launch re-probe is mr-spawn's job — mechanical, single implementation): stand down if (a) a resident IDE `claude` pid (`--input-format stream-json … --replay-user-messages`) new this tick or growing `etimes`; (b) harness/project non-`.git`/`node_modules`/`target` file writes in last ~6 min you didn't make; (c) handoff/ledger mtime newer than its last recorded content ts. Resident pid with zero writes ≥ 45 min = idle-open, not active. Then take the chain-owner mutex. If a slice is open or parked (incl. `wip:` branches) → resume it before starting anything new.
 3. **Pick work / finish:** verify `git remote -v` (mismatch → park, never push). Priority: `master` CI red → fix/revert-to-green; else resume open/parked; else first unfinished non-`blocked:` slice per PLAN §9 order + its `M*.spec.md`. Only `blocked:` remain → surface BLOCKER. Nothing remains → write DONE + disable (create `$MEM/.native-supervisor-disabled` and note it), exit. **Fan-out:** while live runs < 2 and another slice passes ALL Fan-out safety rules, select it too.
 
 ## Fan-out safety (N ≤ 4; conservative)

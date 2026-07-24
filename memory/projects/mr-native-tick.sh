@@ -127,6 +127,8 @@ PENDING=$(ls -A "$MEM/pending-events" 2>/dev/null | head -1)
 if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ] && [ -z "$PENDING" ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
 
 # gate 2: rate-limit reset-time from mr-state.json
+# (ACCEPTED DUPLICATION: mr-situation also surfaces rate_limit_resets_at as data; THIS gate is the sole
+#  mechanical enforcement. If the epoch-or-ISO parse below changes, it is the only parser that matters.)
 RLGATE=$(/usr/bin/python3 - <<'PY'
 import json, time
 try:
