@@ -1,3 +1,5 @@
+> **STATUS: IMPLEMENTED 2026-07-24 (with post-spec additions: ollama advisory layer, handback enrichments, reset-anchored governor, budget-config file). This document is the historical design record — CURRENT behavior is authoritative in mr-native-supervisor-README.md + the scripts themselves.**
+
 # MR Supervisor Optimization — Implementation Spec (2026-07-24, Drew-approved plan)
 
 Priorities: 1) final project quality · 2) total cost · 3) wall-clock. Cron currently DISABLED by Drew; ptc5f rooted run LIVE (all shared-script edits must be tmp+mv, never in-place).

@@ -80,7 +80,13 @@ try:
             try: fab+=float(d.get("cost_usd") or 0)
             except (TypeError,ValueError): pass
 except Exception: pass
-print("OK" if fab < 0.45*1250 else "OVER")
+guard=0.45*1250
+try:
+    _c=json.load(open("/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-budget-config.json"))
+    _w,_f=float(_c["weekly_limit_usd"]),float(_c["fable_guard_frac"])
+    if _w>0 and 0<_f<=1: guard=_f*_w
+except Exception: pass
+print("OK" if fab < guard else "OVER")
 PY
 }
 haiku_triage(){ # -> transient|real

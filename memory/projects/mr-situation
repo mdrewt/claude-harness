@@ -52,7 +52,12 @@ out["master_ci_latest"]=safe(masterci,"error")
 rc,so,_=run(f"git -C /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm rev-parse --short HEAD", 10)
 out["master_sha_local"]=so if rc==0 else "error:git"
 # budget
-WEEKLY=1250.0; SOFT=0.90; HARD=0.97; FGUARD=0.45
+WEEKLY,SOFT,HARD,FGUARD=1250.0,0.90,0.97,0.45
+try:
+    _c=json.load(open(MEM+"/mr-budget-config.json"))
+    _w,_s,_h,_f=float(_c["weekly_limit_usd"]),float(_c["soft_pause_frac"]),float(_c["hard_stop_frac"]),float(_c["fable_guard_frac"])
+    if _w>0 and 0<_s<=_h<=1 and 0<_f<=1: WEEKLY,SOFT,HARD,FGUARD=_w,_s,_h,_f
+except Exception: pass  # fall back to defaults above
 def budget():
     now=time.time()
     ws=now-7*86400

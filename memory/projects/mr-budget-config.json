@@ -1,0 +1,7 @@
+{
+ "weekly_limit_usd": 1250,
+ "soft_pause_frac": 0.90,
+ "hard_stop_frac": 0.97,
+ "fable_guard_frac": 0.45,
+ "_comment": "Single source of truth for governor knobs. Read by mr-situation and mr-launch.sh (bounds-validated; both fall back to these same defaults on missing/invalid file). Recalibrate weekly_limit_usd + .weekly-reset-anchor at the next real rate-limit park."
+}
