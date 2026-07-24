@@ -9,6 +9,7 @@
 # Caller MUST launch detached: setsid bash mr-launch.sh <slice> [model] [effort] & disown
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
+unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # operator-forced-ness must NOT propagate to event ticks (pause semantics)
 S="${1:?usage: mr-launch.sh <slice> [model] [effort]}"
 MODEL="${2:-opus}"
 EFFORT="${3:-high}"
@@ -47,8 +48,10 @@ cd "$HARNESS" || fail 127
 [ -r "$B" ] || fail 66
 
 terminal_pr_open() {
-  gh pr list -R mdrewt/monster-realm --state open --json headRefName \
-    -q '.[].headRefName' 2>/dev/null | grep -qi "$S"
+  # Terminal = a PR for this slice is OPEN **or already MERGED** (a merged PR previously looked
+  # non-terminal and triggered ghost resume attempts + pointless escalations — 2026-07-24 retro).
+  gh pr list -R mdrewt/monster-realm --state all -L 40 --json headRefName,state \
+    -q '.[] | select(.state=="OPEN" or .state=="MERGED") | .headRefName' 2>/dev/null | grep -qi "$S"
 }
 transient_failure() {
   { tail -c 4096 "$E" 2>/dev/null; tail -n 3 "$L" 2>/dev/null; } | grep -qiE \
@@ -97,7 +100,7 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
   if [ "$RC" -ne 0 ] && auth_failure; then break; fi   # auth: dead now; supervisor/toast handles
   CUR_SIG=$(tail -c 1024 "$E" 2>/dev/null | md5sum | cut -d' ' -f1)
   if [ "$RC" -eq 0 ]; then
-    P="You stopped before a valid stopping point (no open PR for this slice, no stop-flag; if you parked you must have pushed the branch + documented the blocker — verify you did). Do not summarize and stop. Push the branch if unpushed, then continue the brief from where you left off."
+    P="You stopped before a valid stopping point (no open PR for this slice, no stop-flag; if you parked you must have pushed the branch + documented the blocker — verify you did). Do not summarize and stop. Push the branch if unpushed, then continue the brief from where you left off. If you reach the point where the PR is OPEN with local ci green: STOP — that IS your terminal state; NEVER run gh pr merge (supervisor-only)."
   elif [ "$RC" -ne 0 ] && [ -n "$PREV_SIG" ] && [ "$CUR_SIG" = "$PREV_SIG" ]; then
     break  # identical failure signature twice: deterministic bug — real failure, stop
   elif transient_failure; then
@@ -112,7 +115,8 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
   PREV_SIG="$CUR_SIG"
   A=$((A+1))
   # escalate-on-final-attempt: opus -> fable@xhigh (quality-first; budget-guarded)
-  if [ "$A" -eq "$MAX_ATTEMPTS" ] && [ "$MODEL" = "opus" ] && [ "${MR_NO_ESCALATE:-0}" != "1" ]; then
+  if [ "$A" -eq "$MAX_ATTEMPTS" ] && [ "$RC" -ne 0 ] && [ "$MODEL" = "opus" ] && [ "${MR_NO_ESCALATE:-0}" != "1" ]; then
+    # escalate only on REAL failure — an rc=0 premature stop is finishing, not failing (retro 2026-07-24: two $12 fable confirm-exits)
     if [ "$(fable_budget_ok)" = "OK" ]; then
       MODEL=fable; EFFORT=xhigh
       echo "ESCALATED final attempt to fable@xhigh TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"

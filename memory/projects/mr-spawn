@@ -4,6 +4,7 @@
 # Kills a failed first attempt BY RECORDED PID before its single retry. Prints one status JSON line.
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
+unset MR_TICK_DRYRUN 2>/dev/null || true
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
 PROJ=$HARNESS/projects/monster-realm
@@ -15,7 +16,7 @@ fail_evidence(){ printf 'kind=%s seen=%s log_tail=%s err_tail=%s' "${LAST_FAIL_K
 [ -r "$V" ] || status FAIL "vars.json missing: $V" 1
 # mechanical active-session probe (mirror of tick gate 3)
 IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
-WRITES=$(find "$HARNESS" "$PROJ" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path "$MEM/*" -mmin -6 2>/dev/null | head -1)
+WRITES=$(find "$HARNESS" "$PROJ" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/.claude/worktrees/*' -not -path "$MEM/*" -mmin -6 2>/dev/null | head -1)
 [ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
 [ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
 # build brief
@@ -27,7 +28,8 @@ tpl=open(os.environ["MEM"]+"/mr-brief-template.md").read()
 _t=v.get("touches","")
 touches_str=", ".join(_t) if isinstance(_t,list) else str(_t)
 tier=v.get("tier","routine")
-tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard" else "")
+tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard"
+ else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models (sonnet-class) — do not bump lens models upward on a content slice.\n" if tier=="content" else "")
 rb=v.get("resume_block","") or ""
 for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCHES>",touches_str),
               ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block)]:

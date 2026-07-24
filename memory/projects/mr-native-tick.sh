@@ -74,6 +74,7 @@ PYCHK
   [ "$ALREADY" = "YES" ] && { touch "$DF.recorded"; continue; }
   RLOG="/tmp/mr_pass_$SL.log"
   MDL=$(/usr/bin/python3 -c "import json;print(json.load(open('$MEM/.harness-runner.$SL.lock')).get('model','n/a'))" 2>/dev/null || echo "n/a")
+  grep -q "^ESCALATED" "$RLOG" 2>/dev/null && MDL="escalated:${MDL}-to-fable"
   "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
     --model "$MDL" --from-log "$RLOG" --notes "mechanical backfill by tick v3 reconcile" >> "$LOG" 2>&1 && touch "$DF.recorded"
 done
@@ -155,7 +156,9 @@ case "$RLGATE" in BLOCKED_UNTIL_*) log "STANDDOWN rate-limit $RLGATE"; exit 0;; 
 IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
 WRITES=$(find "$HARNESS" "$PROJ" -type f \
   -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' \
+  -not -path '*/.claude/worktrees/*' \
   -not -path "$HARNESS/memory/*" -mmin -6 2>/dev/null | head -1)
+# (worktrees are AGENT-owned by design — sibling fan-out writes are not human activity; retro 2026-07-24)
 if [ -n "$IDE" ]; then log "STANDDOWN human-ide-session"; exit 0; fi
 if [ -n "$WRITES" ]; then log "STANDDOWN recent-writes: $WRITES"; exit 0; fi
 
