@@ -3,6 +3,7 @@
 # Distinguishes checks-concluded vs gh-error (retry<=3 backoff -> INCONCLUSIVE). Fires a tick via pending-event.
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
+unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # forced-ness must not propagate to the ticks we spawn
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 PR="${1:?pr}"; S="${2:?slice}"
 [ -f "$MEM/.native-supervisor-disabled" ] && exit 0

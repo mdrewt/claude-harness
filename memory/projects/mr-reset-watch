@@ -2,6 +2,7 @@
 # mr-reset-watch <resets_at: epoch-or-ISO8601> — sleep until rate-limit reset +120s, then fire a tick. Launch detached.
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
+unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # forced-ness must not propagate to the ticks we spawn
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 R="${1:?resets_at}"
 [ "${MR_NO_EVENT_BRIDGE:-0}" = "1" ] && exit 0
