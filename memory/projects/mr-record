@@ -1,0 +1,84 @@
+#!/bin/bash
+# mr-record — validated writes to ledger/handoff. Subcommands:
+#   ledger  --run_id X --slice S --outcome O [--cost N|--from-log LOG] [--model M] [--attempts N]
+#           [--orch A] [--gating G] [--notes "..."]   (ts auto-UTC; refuses empty slice/outcome; validates JSON)
+#   handoff --title T (--body "..." | --body-file F)
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+SUB="${1:?usage: mr-record ledger|handoff ...}"; shift
+export MEM SUB
+ARGS_JSON=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
+export ARGS_JSON
+/usr/bin/python3 <<'PY'
+import json, os, sys, re, datetime
+MEM=os.environ["MEM"]; SUB=os.environ["SUB"]; argv=json.loads(os.environ["ARGS_JSON"])
+LEDGER=os.environ.get("MR_RECORD_LEDGER") or (MEM+"/monster-realm-usage-ledger.jsonl")
+HANDOFF=os.environ.get("MR_RECORD_HANDOFF") or (MEM+"/monster-realm-handoff.md")
+def die(m): print("ERROR: "+m); sys.exit(1)
+a={}; i=0
+while i<len(argv):
+    k=argv[i]
+    if not k.startswith("--"): die("bad arg "+k)
+    if i+1>=len(argv) or argv[i+1].startswith("--"): die("flag "+k+" requires a value")
+    v=argv[i+1]
+    key=k[2:]
+    if key not in ("run_id","slice","outcome","cost","model","attempts","orch","gating","cycles","standdowns","ci","notes","from-log","title","body","body-file"): die("unknown flag --"+key+" (allowed: run_id slice outcome cost model attempts orch gating cycles standdowns ci notes from-log title body body-file)")
+    a[key]=v; i+=2
+ts=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+if SUB=="handoff":
+    title=a.get("title") or die("--title required")
+    body=a.get("body") or (open(a["body-file"]).read() if a.get("body-file") else "")
+    with open(HANDOFF,"a") as f:
+        f.write(f"\n## {ts} — {title}\n{body.rstrip()}\n")
+    print("handoff-appended: "+title); sys.exit(0)
+if SUB!="ledger": die("unknown subcommand "+SUB)
+slice_=a.get("slice") or die("--slice required")
+outcome=a.get("outcome") or die("--outcome required")
+model=a.get("model","")
+if model and not re.match(r"^(claude-(opus|sonnet|haiku|fable)[-a-z0-9.]*|opus|sonnet|haiku|fable|escalated:.*|n/a)$", model):
+    die("model fails validation: "+model)
+cost=a.get("cost")
+notes=a.get("notes","")
+# C1 guard: if a wrapper-reconcile row already captured this slice's cost (<48h), refuse to double-count
+def wrapper_cost_exists(sl):
+    import time as _t
+    try:
+        rows=open(LEDGER).readlines()[-300:]
+        for l in rows:
+            try: d=json.loads(l)
+            except Exception: continue
+            if d.get("slice")==sl and d.get("run_id")=="wrapper-reconcile" and d.get("cost_usd"):
+                e=datetime.datetime.strptime(str(d.get("ts",""))[:19],"%Y-%m-%dT%H:%M:%S").timestamp()
+                if _t.time()-e < 48*3600: return True
+    except Exception: pass
+    return False
+if a.get("from-log") and a.get("run_id")!="wrapper-reconcile" and wrapper_cost_exists(slice_):
+    a.pop("from-log",None)
+    if cost not in (None,"","null"):
+        notes=(notes+" | " if notes else "")+"cost omitted: already captured by wrapper-reconcile row"
+        cost=None
+if (cost in (None,"","null")) and a.get("from-log") and os.path.exists(a["from-log"]):
+    tot=0.0; found=False
+    for line in open(a["from-log"], errors="replace"):
+        if '"type":"result"' in line:
+            try:
+                o=json.loads(line); c=o.get("total_cost_usd")
+                if c is not None: tot+=float(c); found=True
+            except Exception: pass
+    if found: cost=round(tot,4)
+if cost in (None,"","null"):
+    cost=None
+    notes=(notes+" | " if notes else "")+"COST-UNKNOWN (no result event; true spend unrecorded)"
+else:
+    try: cost=float(cost)
+    except ValueError: die("cost not a number")
+row={"ts":ts,"run_id":a.get("run_id","n/a"),"slice":slice_,"outcome":outcome,"cost_usd":cost,
+     "model":model or "n/a","attempts":int(a.get("attempts") or 0),
+     "orchestration_audit":a.get("orch",""),"gating_test_audit":a.get("gating",""),
+     "remote_red_fix_cycles":int(a.get("cycles") or 0),"consecutive_standdowns":int(a.get("standdowns") or 0),
+     "master_ci_after":a.get("ci",""),"notes":notes}
+line=json.dumps(row)
+json.loads(line)  # verify parse
+if not row["ts"]: die("empty ts")
+with open(LEDGER,"a") as f: f.write(line+"\n")
+print("ledger-appended: "+line[:160])
+PY

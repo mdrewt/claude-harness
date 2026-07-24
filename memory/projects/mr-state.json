@@ -1,45 +1,75 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-07-17T11:44:51Z",
- "updated_by": "drew-cowork-replan-20260717",
+ "updated_utc": "2026-07-24T14:18:00Z",
+ "updated_by": "tick 2026-07-24T14:18:00Z \u2014 ptc5g reconciled MERGED (aee493a); composite-launched ptc5f (fresh, ADR-0142, opus, detached confirmed)",
  "master": {
-  "sha": "9a74e2a",
-  "ci": "GREEN (5b841aa CI success verified; 9a74e2a doc-only chore)",
-  "nightly": "in_progress on 79d26b0 at tick time (validating #194 fix)"
+  "sha": "aee493a",
+  "ci": "success (ci 3m3s + e2e 4m19s pass @ aee493a, confirmed via gh run list; checked 2026-07-24T14:05Z)",
+  "nightly": "RED \u2014 mutation-server known non-gating flake, still recurring 2026-07-23 and 2026-07-24 nightly runs @ same master tip; unchanged from prior tick's note; still needs a flake-vs-real-mutant triage pass when convenient (not blocking)."
  },
- "adr_next_free": 122,
- "inflight": [],
- "awaiting_merge": [
+ "adr_next_free": 142,
+ "inflight": [
   {
-   "slice": "m17c",
-   "pr": 198,
-   "branch": "feat/m17c-ranked-evals-tail",
-   "worktree": ".claude/worktrees/m17c",
-   "gates": [
-    "done EXIT=0 ATTEMPTS=1",
-    "orchestration_audit CLEAN (7 agents: planner/red-team/reviewer/tester/verifier, fable-5)",
-    "PR checks were CLEAN pre-m17b-merge; mergeStateStatus UNKNOWN after master moved - recheck at merge",
-    "gating-test audit PENDING (do at merge)",
-    "test-artifact carve-out likely applies (deliverable IS tests)"
+   "slice": "ptc5f",
+   "run_id": "mr-sup-native-20260724T140330Z-1717009-14316",
+   "started_utc": "2026-07-24T14:15:00Z",
+   "adr_reserved": "0142",
+   "touches": [
+    "CHANGELOG.md",
+    "PLAN.md",
+    "docs/adr/0090-*.md (amend)",
+    "docs/adr/0085-*.md (amend)",
+    "docs/adr/0142-*.md (new)",
+    "client/src/net/store.ts (comment-only)",
+    "client/src/net/predictor.ts (comment-only, conditional)"
    ],
-   "adr_reserved": "0121",
-   "touches": "evals/ranking-*.eval.mjs; client/e2e/**"
+   "lock": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.harness-runner.ptc5f.lock",
+   "brief": "/tmp/mr_pass_ptc5f.md"
   }
  ],
+ "awaiting_merge": [],
  "queue": [
-  "NEXT TICK: merge m17c #198 (recheck mergeStateStatus; doc-set conflict w/ ARCHITECTURE.md+DIGEST.md possible after m17b - resolve deterministically union/append; then chore ADR-index 0121 row)",
-  "After m17c merges: M17 post-integration verification per spec section-5 tail -> M17 CLOSED",
+  "DIRECTIVE \u2014 NATIVE SUPERVISOR v3 (Drew-approved 2026-07-24): event-driven loop. Cron hourly is WATCHDOG only; done/ci/crash/reset events fire ticks via $MEM/pending-events. Decision runs: sonnet@medium with LIVE SITUATION bundle (HINTS-ONLY) prepended. Routing: routine=opus@high, HARD=fable@xhigh (fable<=45% of window), content=opus@medium. Governor: SOFT-PAUSE>90%/$1250 window (no new launches), HARD-STOP>97%; window anchored .weekly-reset-anchor (2026-07-24T00:00Z). Use mr-record/mr-audit/mr-spawn/mr-ci-watch/mr-reset-watch per SSOT. Cowork/DC ticks remain FALLBACK-ONLY (failure-latch escalation; native-tick-first).",
   "=== 2026-07-17 PLAYTEST-FIRST REPLAN (Drew-directed; canonical = specs/monster-realm-v2/playtest-replan-2026-07.md + PLAN section-9) ===",
-  "THEN: M17.5 tenth-review residuals (spec committed, Drew's draft, scheduled; 17.5a SERIAL structural first or per its section-5 note; section-3 decisions RESOLVED per replan doc section-3 incl. BattleKind adopt + m17-fix-sideb-guards SUBSUMED by 17.5a - drop the old candidate)",
-  "THEN pre-gate block in order: M-playtest-a (LOCAL playtest build & ops \u2014 rescoped 2026-07-17 per Drew, local-only solo tester, NO Maincloud/hosting; needs build-time slicing pass like M17's a356558) -> M-playtest-b (observability/feedback; pt-b2 SERIAL schema) -> M-playtest-c (UX; subsumes m17b-2 set_profile_name park) -> M-playtest-d (content; fan-out friendly vs a1/b1/c1)",
-  "AT GATE: when all pre-gate milestones CLOSED -> raise BLOCKER-style handoff 'PLAYTEST READY', do NOT start M18+ (blocked:playtest-gate). Drew runs the closed playtest; gate decision doc re-opens the post-gate queue.",
-  "POST-GATE (blocked:playtest-gate): M18, M19, M20(slimmed), M21, M22(+RLS re-book D-17.5-B), M23, M24, M25.",
-  "MODEL DIRECTIVE (Drew, 2026-07-15): rooted runs on FABLE; assert claude-fable-5 post-launch.",
-  "NOTE: gh pr merge --auto still rejected (branch protection) - merge chore PRs manually on green",
-  "NOTE: external PR #200 merged by non-supervisor 2026-07-17; stray worktree fix/review-residuals-i26-i27-i28 - re-check ownership"
+  "MERGED pre-gate: pt-a1, pt-a2, pt-b1, pt-b2, pt-c1, pt-c1b, pt-c2, pt-c2b (all merged).",
+  "M-playtest-c CLOSED 2026-07-20 (pt-c2b merged PR#230).",
+  "M-playtest-c.5 IN PROGRESS: ptc5a MERGED PR#232 (ADR-0136) \u00b7 ptc5d MERGED PR#234 (ADR-0137) \u00b7 ptc5b MERGED PR#236 (ADR-0138, a80912c) \u00b7 ptc5c MERGED PR#237 (ADR-0139, 05ca7b1) \u00b7 ptc5e MERGED PR#238 (ADR-0140, 348326ba). REMAINING: ptc5g (renderResolver position-divergence snap, pure-client, ADR-0141) \u00b7 ptc5f (docs-only, land LAST \u2014 carries ADR-0090 Decision-A amend + reachability test + ADR-0085 Decision-E amend + CHANGELOG regen + PLAN.md status update). All section-3 decisions RESOLVED 2026-07-20.",
+  "THEN M-playtest-d (content pack, roster 6->~16, ADR-0057, fan-out-friendly).",
+  "AT GATE: when M-playtest-c + c.5 + d CLOSED -> raise BLOCKER-style 'PLAYTEST READY'; do NOT start M18+ (blocked:playtest-gate).",
+  "MODEL DIRECTIVE (Drew 2026-07-19): OPUS (fable usage limit reached; mr-launch.sh default flipped fable->opus).",
+  "NOTE: gh pr merge --squash --auto REJECTED for chore PRs (GraphQL enablePullRequestAutoMerge / 'Protected branch rules not configured') as of PR#235 2026-07-21 \u2014 merge chore PRs MANUALLY on green (detached merge-on-green job pattern). Was working for PR#229/#231/#233; branch-protection auto-merge config may have regressed \u2014 investigate/repair when convenient.",
+  "NOTE: SYSTEMIC still-open: local 'just ci' security recipe lacks Semgrep (remote-only SAST). Infra slice (touches justfile) still unbooked.",
+  "WATCH: Nightly mutation-server RED @1756f2c-lineage (non-gating) \u2014 confirm flake vs real surviving-mutant.",
+  "NOTE resource locations: see mr-state.resource_locations + the RESOURCE LOCATIONS section of mr-supervisor-prompt-native.md (SSOT). Key fact: specs are HARNESS-level (/specs/monster-realm-v2/); per-slice touches:/EARS live in M*.spec.md, not PLAN section-9.",
+  "FALLBACK-ONLY (DC bridge; irrelevant to native ticks): DC/WSL shells die on ANY long-blocking interact call (~80s sleep sufficed), not just network. Mitigations: short (<30s) repeated polls; setsid artifact jobs (log+.done); persist run_id/vars to /tmp; one heredoc per call, timestamps computed inside python. Liveness is never the supervisor shell pid."
  ],
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-07-17T11:28:19Z Drew-directed playtest-first replan committed to specs/: M17.5 scheduled + M-playtest-a/b/c/d created + PLAN section-9 gate block + M18/M19/M20 demotion notes. No repo/project mutation; m17c merge unaffected. adr_next_free stays 122. AMENDED 2026-07-17T11:44:51Z: M-playtest-a rescoped local-only per Drew (no Maincloud); hosting deferred as M-playtest-a2."
+ "notes": "ptc5g MERGED PR#239 squash aee493a ADR-0141 (2026-07-24T13:33:49Z), reconciled by supervisor tick 2026-07-24T14:12Z (verified live via gh/git, orchestration+gating-test audits CLEAN, main checkout ff-only'd to aee493a, worktree+branch cleaned, codebase-memory-mcp reindexed). Composite-launched ptc5f 2026-07-24T14:15Z (fresh from aee493a, ADR-0142 reserved, opus, detachment+model confirmed: session | 2026-07-24 v3 optimization deployed (see README maintenance log + mr-optimization-impl-spec.md); ptc5f FINISHED (cost backfilled $41.10) \u2014 next tick verifies its merge state + cleans lock/worktree.",
+ "model_directive": "OPUS (Drew 2026-07-19: fable usage limit reached; mr-launch.sh default flipped fable->opus).",
+ "parked": [],
+ "open_chore_prs": [],
+ "resource_locations": {
+  "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
+  "spec_corpus_authoritative": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/  (HARNESS level, NOT /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm). Contains PLAN.md, playtest-replan-2026-07.md, and per-milestone M*.spec.md files.",
+  "per_slice_touches_and_EARS": "In the milestone spec file (e.g. M-playtest-c.5-pregate-review-residuals.spec.md), NOT in PLAN.md. PLAN section-9 is only a one-line-per-slice SUMMARY + the resolved-decisions status line. To get a slice's declared touches:/EARS/decision-hooks, open its M*.spec.md.",
+  "milestone_c5_spec": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-c.5-pregate-review-residuals.spec.md (ptc5a..ptc5g; its section-3 holds Decisions A-E, all RESOLVED 2026-07-20 per PLAN section-9 ~L307).",
+  "replan_vs_c5_decisions": "BEWARE two different 'section-3's: playtest-replan-2026-07.md section-3 = M17.5 D-17.5-A..E decisions; the M-playtest-c.5 spec has its OWN section-3 (Decisions A-E). State/queue references to 'replan section-3 open decisions' meant the c.5 spec's section-3 (now all resolved).",
+  "project_repo": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm  (literal path; never find-discover it). Primary branch master.",
+  "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
+  "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said.",
+  "found_easily": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects template + launch script + AGENTS.md two-location note were all accurate; only the harness-vs-project spec path lacked an absolute anchor in the task."
+ },
+ "native_supervisor": {
+  "active_since": "2026-07-21T16:10:57Z",
+  "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh",
+  "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
+  "cron": "*/30 * * * * + @reboot",
+  "decision_model": "sonnet",
+  "heartbeat": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.native-supervisor-heartbeat",
+  "kill_switch": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.native-supervisor-disabled",
+  "gate_log": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.log",
+  "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old"
+ }
 }

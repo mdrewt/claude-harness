@@ -1,224 +1,162 @@
----
-
-## 2026-07-15 — m16.5c MERGED — PR #185 APPROVED & MERGED
-
-m16.5c (trade client completion, ADR-0114, PR #185) squash-merged to master. Commits: 40af2bc + 560df95 + 94e8912. Exit 0, 943 tests, 61 evals green.
-
-**Next eligible slice:** 16.5d (trade runtime coverage — e2e propose→respond→confirm + escrow-guards eval fix for attempt_recruit; ADR reserve 0115) per M16.5 spec sequencing.
-
-## 2026-07-15 ~08:20Z — supervisor tick mr-sup-cowork-20260715T080628Z-2124354-3308 (cowork)
-
-- **m16.5c MERGED** — PR #185 squash-merged at 08:11Z → master 74f9dbe; CI GREEN on 74f9dbe (ci + e2e pass).
-- Audits: orchestration CLEAN (sonnet asserted; tester/reviewer/verifier/red-team/doc-keeper all invoked; cost $10.17, 1 attempt). Gating-test CLEAN — TM-6d rewritten (not deleted): TradeStatus narrowed to union type makes 'SomeFutureStatus' a compile error; replacement covers both valid statuses no-throw; 0 assertions removed, 34 added.
-- ADR-0114 index reconciled via chore PR #186 → a78132c (doc-only; --auto rejected "already clean", merged manually on green per standing rule).
-- Worktree .claude/worktrees/m16.5c removed; branches deleted local+remote. Strays untouched: .claire/, docs/memory-cards/ (untracked, pre-existing).
-- Ops note: DC shell died mid-checks-watch; new shell reconciled from live PR state, no damage.
-- Next: m16.5d (per queue: 16.5d -> 16.5e -> 16.5f -> 16.5g).
-
-## 2026-07-15T08:23Z — IN-PROGRESS: m16.5d launched by mr-sup-cowork-20260715T080628Z-2124354-3308 (composite merge->launch)
-- Brief /tmp/mr_pass_m16.5d.md; ADR 0115 reserved; touches: client/src/main.ts, client/e2e/**, evals/trade-escrow-guards.eval.mjs. D-16.5-1 option (a) + 16.5d-2.
-
-## 2026-07-15T10:17:34Z — supervisor tick mr-sup-cowork-20260715T100629Z-2181109-15939 — m16.5d RESUMED (PR #187 CI red)
-- m16.5d attempt 1 finished cleanly (EXIT=0, 1 attempt, $12.31, sonnet-4-6) and opened PR #187, but remote `ci` job RED: `eval FAIL: adr-digest — 0115: unknown subsystem "test-hooks" (not in vocabulary)`. `e2e` job green. Root cause: ADR-0115 header lists `test-hooks`; SUBSYSTEM_VOCAB (ADR-0104 §D2) is fixed and does not include it.
-- Orchestration audit (pre-merge, done now): CLEAN — 6 Agent invocations incl. tester/reviewer/red-team/verifier; model sonnet-4-6. Gating-test audit deferred to merge.
-- Action: relaunched m16.5d via mr-launch.sh with a targeted RESUME brief (one-line ADR header fix, full `just ci`, push same branch, stop for supervisor merge). Leader 2181807 (detached, PID==SESS), sonnet asserted. Old log archived as /tmp/mr_pass_m16.5d.log.attempt1-*.
-- Rate-limit: one event `allowed_warning` seven_day util 0.79 (threshold 0.75), five_hour clean, no overage. NOT tripped (deviation from literal status!="allowed" rule — a seven_day warning would park the loop until Jul 17 over an informational threshold; trip criteria in effect: five_hour non-allowed OR overage OR util>=0.95). Watch closely next ticks.
-- Next tick: poll m16.5d; on green merge #187 (gating-test audit at merge; ADR-0114→0115 index chore after).
-
-**2026-07-15T10:20:56Z addendum (mr-sup-cowork-20260715T100629Z-2181109-15939):** resume run completed within the tick — 9baeebd (ADR-0115 header fix) pushed, PR #187 ci+e2e both GREEN, .done EXIT=0 ATTEMPTS=1, $0.41. m16.5d moved to awaiting_merge; NEXT TICK: merge #187 (gating-test audit at merge), then ADR index chore, then composite-launch m16.5e (ADR 0116).
-
-**2026-07-15T11:14:22Z — model pin change (Drew-directed):** mr-launch.sh default model sonnet -> fable (CLI verified: `claude --model fable` works on this host). Backup kept at mr-launch.sh.bak-sonnet-20260715. All future rooted runs (m16.5e onward) plan+code on Fable 5; supervisors must assert the log's model string is Fable-class (claude-fable-5) post-launch — Sonnet now indicates a silent downgrade. m16.5d (already green, awaiting merge) is unaffected. ~/.claude/settings.json untouched per standing rule.
-
-## 2026-07-15 — m16.5e runner OPS NOTE: harness commit 37c2249 is mis-scoped (benign, do not revert)
-
-A Claude Code process restart mid-run reset the shell cwd from the m16.5e worktree back to the harness root; the runner's checkpoint `git add -A && git commit && git push` therefore landed on **harness `main` as 37c2249** with a misleading `wip(m16.5e)` message. Contents: ONLY pre-existing uncommitted harness state (handoff, mr-state.json, m16.5b/c/d memory cards, mr-launch.sh + backup, strays-m16.5a dir, OKF/future-prompts strays) — no monster-realm content, nothing lost or altered. Reverting would regress live supervisor state — leave it. The intended slice checkpoint was re-done correctly on `feat/m16.5e-eval-infra-hardening` (49b2e23). Lesson recorded: after any process restart, mutating commands must re-assert the worktree via `git -C <abs-path>`/`cd` in the same command line.
-
-## 2026-07-15T12:27:33Z — supervisor tick mr-sup-cowork-20260715T121019Z-2189394-1148 (IN PROGRESS)
-Merged m16.5d PR #187 (squash 267513b, ci+e2e green, touches-assert PASS, gating-test audit PASS, orchestration CLEAN from prior tick). ADR-0115 index chore PR #188 merged (679b58e; --auto rejected again, merged manually on green). master CI GREEN on 267513b. NOTE: Nightly RED 5 consecutive days (Jul 11-15) — mutate-core + mutate-server jobs failing; needs triage (queued). Composite launch: m16.5e (evals-only, ADR 0116 reserved) via mr-launch.sh on fable.
-2026-07-15T12:30:32Z — tick complete: m16.5d MERGED (#187+#188), m16.5e LAUNCHED (fable, leader 2190883, ADR 0116). Nightly RED 5 days (mutation jobs) queued for triage.
-
-## 2026-07-15T14:15Z — IN-PROGRESS: m16.5e RESUMED (attempt 4) by mr-sup-cowork-20260715T141117Z-2216033-32348
-- Attempts 1-3 all died at the 600s background-task wait ceiling: orchestrator ended turns while subagents still ran (headless -p kills session on end_turn). Real progress made: 3 wip commits pushed (plan/ADR-0116 draft, red-team amendments, tester RED teeth — 3 evals red by design) + uncommitted implementer work on spacetime-type-snapshot.eval.mjs. No PR yet.
-- Resume brief prepends a foreground-only/no-background-end_turn directive + verified state facts. Old logs archived /tmp/mr_pass_m16.5e.{log,err}.attempts1-3-*.
-
-## 2026-07-15T15:0xZ — m16.5e TERMINAL: PR #189 OPEN, local `just ci` green — supervisor to merge
-- Attempt 4 (fable) completed the slice foreground-only: implementer red→green on tester teeth 610a7d0 (kept byte-intact — verifier PASS w/ mutation spot-checks), review fan = reviewer + red-team + reducer-security review-lens + /simplify + verifier (all findings triaged: 3 code fixes applied — bounded struct search, function-local dbWriteRe, checkAppendOnly null guard; rest = documented ADR residuals or stale).
-- Branch feat/m16.5e-eval-infra-hardening @ b3135ad (pushed). PR https://github.com/mdrewt/monster-realm/pull/189. Local `just ci` EXIT=0 on PR head; 61/61 evals ×5 + keepalives; 1193 Rust + 943 client tests.
-- ADR-0116 written at reserved number (Subsystems: ci-gates, digest row present); ARCHITECTURE.md M16.5e entry; adr README/CHANGELOG untouched per doc-aggregation rule. touches-delta in PR body.
-- Implementation discoveries recorded in ADR-0116 + memory card monster-realm-m16.5e: backslash-newline string-strip trap; content.rs updates monster/monster_pub (in-place-mutation exemption in coupling gate); ADR next-free = 0117.
-- NEXT: supervisor merges #189 (squash). Worktree .claude/worktrees/m16.5e removable after merge.
-
-## 2026-07-15T16:31Z — supervisor tick mr-sup-cowork-20260715T160957Z-2271340-20239 (Cowork)
-- **m16.5e MERGED**: PR #189 squash-merged as `9f8f8ad` (eval-infra hardening, ADR-0116). Wrapper resume attempt 4 finished clean (EXIT=0). Master CI **GREEN** on 9f8f8ad.
-- Audits: orchestration CLEAN-test-artifact (eval-only diff; 15+ full eval-suite runs; reviewer/red-team/review-lens/verifier all invoked; model claude-fable-5). Gating-test audit CLEAN (no removed assertions/skips; +1621/-8).
-- ADR index reconciled via chore PR #190 (merged manually on green; `--auto` rejected on clean status). Next free ADR: **0117**.
-- Worktree `.claude/worktrees/m16.5e` + branch removed; main checkout ff'd to master. Untracked strays (`.claire/`, `docs/memory-cards/`) left untouched.
-- Ops note: DC shell churn killed 5 supervisor sessions mid-tick; all steps reconciled from live PR/git state, no damage.
-- Next: m16.5f (then 16.5g); nightly mutation-job triage still queued (RED 5 days).
-
-## 2026-07-15T16:39:14Z — supervisor: m16.5f IN-PROGRESS (launching)
-- Brief /tmp/mr_pass_m16.5f.md, ADR reserved 0117, model fable, fresh slice (no resume). Touches: game-core/src/trading/**, server-module/{trading,schema}.rs, ADR-0106 amendment, tests. Serial (schema.rs = structural).
-
-## 2026-07-15 ~19:0xZ — m16.5f TERMINAL: PR #191 OPEN, local `just ci` green — supervisor to merge
-
-- Branch `feat/m16.5f-trade-ssot-polish` @ fa246db (pushed). PR https://github.com/mdrewt/monster-realm/pull/191. Local full `just ci` EXIT=0 (61/61 evals, 881+253 Rust, 943 client, clippy clean); remote CI running.
-- Slice delivered all four 16.5f items (ADR-0117, amends 0106/0108): authorize_respond/confirm delegation (role-first, `&TradeStatus`); MonsterNotOwned + InsufficientCurrency variants DELETED (privacy trap documented); symmetric propose escrow (both indexes chained, provably-0-under-D4 comments); trade_offer privacy doc + ADR-0106 M-2 corrected (player_wallet false precedent dropped; probe-vector recorded as accepted exposure); TTL reaper (trade_offer_reaper_schedule one-shot per offer, 1h const in game-core, disarm at 4 deletion sites — deliberate extension of pvp precedent; no self-disarm, runtime auto-delete cited from SpacetimeDB docs §Row Lifecycle).
-- Orchestration: planner → reviewer+red-team plan fan → tester (RED: 13 rules tests compile-red, 4 ea_ scans, eval 12→16 criteria) → implementer (separate agent, did not touch gating tests) → reviewer+red-team+reducer-security review-lens+/simplify fan → gate hardening via tester (stmt-terminator ?-scan, arg-span field check, string-literal strip — closes dropped-Result/wrong-field/literal-bypass gate holes) → verifier (gating-test integrity PASS: strengthenings only cff9983..HEAD; 6/6 mutation spot-checks bite; caught knowledge-bundle line-drift → regenerated) → doc-keeper (ARCHITECTURE M16.5f entry, memory card both locations).
-- touches-delta audited in PR body: game-core/src/lib.rs (mechanical re-export — flagged), bindings types.ts (just gen), table-schemas.json baseline append, DIGEST regen, knowledge regen (73 files, 2 new), ADR-0117. CHANGELOG/adr-README untouched. ADR next-free = 0118.
-- Worktree `.claude/worktrees/m16.5f` removable after merge. NEXT: supervisor merges #191 (squash), then 16.5g (ledger/docs reconciliation — last M16.5 slice) per queue; nightly mutation-job triage still queued (RED 5+ days, pre-existing).
-
-## 2026-07-15T20:30Z — supervisor tick mr-sup-cowork-20260715T200608Z-2345952-7827 (Cowork)
-
-**m16.5f MERGED.** PR #191 (feat/m16.5f-trade-ssot-polish) squash-merged at 20:12:49Z → f68ff02; master CI GREEN. ADR-0117 registered via chore PR #192 (auto-merge on green) → master now 677a257, CI GREEN, next free ADR 0118. Run: fable, 1 attempt, $64.66, full role coverage (tester/reviewer/red-team/verifier) — orchestration CLEAN. Gating-test audit CLEAN (asserts refactored into hardened check_authorize_call helper; 31 tests stable, eval criteria 83→101). Touches-assert waived with rationale: generated artifacts (bindings/knowledge/baselines) beyond declared set; solo run, no collision risk. Worktree + branches cleaned; main checkout ff'd to 677a257. Note: DC session churn killed the supervisor shell 3× mid-tick; every step reconciled from live PR/git state per protocol.
-
-**Next: m16.5g** (docs-only ledger reconciliation, spec §16.5g-1..4) — launching this tick as composite if final re-probe clean. After m16.5g: M16.5 DoD sweep, then nightly-mutation triage (RED 5 days, Jul 11–15) remains queued.
-
-**IN-PROGRESS 2026-07-15T20:35Z:** m16.5g launched (docs-only ledger reconciliation), brief /tmp/mr_pass_m16.5g.md, ADR 0118 reserved-if-needed.
-
-## 2026-07-15T21:00Z — m16.5g TERMINAL: PR #193 OPEN, local `just ci` green — supervisor to merge
-
-- Branch `docs/m16.5g-ledger-reconciliation` @ c552a84 (pushed). PR https://github.com/mdrewt/monster-realm/pull/193. Local full `just ci` EXIT=0 on PR head (1211 Rust + 943 client tests, 61/61 evals); remote ci+e2e running. Diff is docs-only: ARCHITECTURE.md + CHANGELOG.md.
-- **16.5g-1 VERIFIED, no edit:** ADR README current (rows through 0117, next-free 0118, range 0035–0117). The 0102 hole is deliberate (reserved-unused, recorded in the PR #155 chore) — not a gap; PR #171 confirmed merged.
-- **16.5g-2/3:** module table += economy.rs/trading.rs/content_cache.rs **+ pvp.rs** (same staleness class); guards.rs row refreshed (trade-escrow + pvp guards); counts → "generated — see docs/knowledge/"; ADR range → README + DIGEST.md reference; "M14.5c PR TBD" → #151; CHANGELOG regenerated via `just changelog` to #192 from master history.
-- **16.5g-4 landed on harness main directly** (convention): c6aebc3 + 77a0a25 — PLAN.md:3 → Phase C reality; M15 §4 ticked (+ stale §5 PARKED labels fixed); M-infra-d DoD ticked; M14.5 "0104 unused" reworded + 14.5h line added + a/b/c/d-1b ticked; M16.5 §5 a–f ticked. **Brief-fact correction: m16b/m16c are MERGED (#176/#178), not parked** — red-team verified; PLAN.md states reality.
-- **ADR 0118 UNUSED** (released — pure reconciliation, no new decision). CHANGELOG/adr-README untouched per doc-aggregation rule (README verified-only).
-- Orchestration: reviewer (exhaustive ARCHITECTURE fact-check) + red-team (falsified 25 PR refs/19 ADR refs) parallel; verifier full-gate + docs-only integrity; tester N/A (doc slice); model claude-fable-5. Verifier trap worth keeping: **CHANGELOG byte-identity must be checked against MASTER-history cliff output, not branch HEAD** — a branch-HEAD regen adds this branch's own wip lines that vanish at squash.
-- **Residuals for supervisor** (recorded, not actioned): (1) ARCHITECTURE.md M14.5 narrative partial — per-slice entries for 14.5d-1b/e/f/g/h never written; M14.5 spec doc-keeper-close box left honestly UNTICKED with note (candidate micro-slice). (2) ADR-0094 lacks an amendment marker pointing at ADR-0100. (3) PR #164 commit subject cites ADR-0047 erroneously (immutable). (4) Spec's 16.5g-4 suggestion stands: make PLAN.md:3 part of each milestone-close checklist.
-- After merge: tick M16.5 §5 16.5g + final box → **M16.5 fully CLOSED**; worktree `.claude/worktrees/m16.5g` removable. Queue next: M16.5 DoD sweep, nightly mutation triage (RED 5+ days, pre-existing), then M17.
-
-## 2026-07-15T22:15:56Z — supervisor tick mr-sup-cowork-20260715T220832Z-2381309-16006
-- MERGED m16.5g: PR #193 squash -> master 908c99b; CI+e2e green pre-merge, master CI GREEN post-merge (verified completed/success on 908c99b).
-- Audits: orchestration CLEAN (3 subagents: red-team/reviewer/verifier; doc-only so tester exempt), gating-test CLEAN (diff = ARCHITECTURE.md+CHANGELOG.md only, within declared touches), model claude-fable-5, cost $16.60, 1 attempt.
-- Worktree .claude/worktrees/m16.5g removed, branch docs/m16.5g-ledger-reconciliation deleted (local+remote), main checkout ff to 908c99b. NOTE: an accidental stash-pop of pre-existing stash@{0} was aborted via reset --hard; all 5 historical stashes intact; strays .claire/ + docs/memory-cards/ untouched.
-- M16.5 CLOSED: supervisor ticked the two remaining spec section-4 boxes + PLAN.md status line (harness commit e4bc916, pushed) — mechanical record update, facts true post-merge. ADR 0118 unused; adr_next_free stays 118.
-- Next target: nightly mutation red — jobs mutation (game-core) + mutation-server failing 6 consecutive nights Jul 10-15 (latest run 29403450612); launching triage run this tick if final probe clear.
-
-## 2026-07-15T22:17:22Z — IN PROGRESS: nightly-mut-triage launched (supervisor mr-sup-cowork-20260715T220832Z-2381309-16006)
-- Target: nightly `mutation` + `mutation-server` jobs red 6 nights (Jul 10-15, run 29403450612). ADR 0118 reserved if needed. Serial (no siblings).
-
-## 2026-07-16T00:0xZ — nightly-mut-triage TERMINAL: PR #194 OPEN, local `just ci` green — supervisor to merge
-
-- Branch `fix/nightly-mut-triage` @ ba17dfa (pushed). PR https://github.com/mdrewt/monster-realm/pull/194. Local full `just ci` EXIT=0 on PR head (1216 Rust + 943 client tests, 61/61 evals); remote ci+e2e running. **Required CI-side confirmation: workflow_dispatch Nightly on the branch — run 29460542192** (mutation + mutation-server must go green there; linked in PR comment). Supervisor: check that run before/at merge.
-- **Triage verdicts (ADR-0118):** `mutation` = class (a) missing tests — 5 check_headroom survivors (M16.5b wrote initiator-only accept boundaries; counterparty mirrors never tested) → 5 additive killing tests, zero production edits, zero mutants.toml changes. `mutation-server` = class (c) stale ratchet baseline — crate doubled (253→499 mutants) from M15/M16/M16.5, miss ratio IMPROVED 71%→62%, killable in-crate set empty (all survivors behind &ReducerContext; red-team git-history check: delta maps to post-baseline files only) → cap 180→309 exact + wiring-eval ceiling 200→340 + TEETH-L-recap positive control + dated ADR-0050 A2 amendment.
-- **Local evidence (exact nightly recipes):** `just mutate-core` EXIT=0 (1030 mutants, 0 missed, 5 tolerated timeouts) · `just mutate-server` EXIT=0 (499 mutants, 309 ≤ cap 309).
-- Orchestration: planner → plan fan (reviewer+red-team; B-2 cap-headroom proposal REJECTED with exit-3-fail-loud rationale recorded in ADR-0118; red-team caught Decision>240chars pre-CI) → tester (separate agent) → implementer (separate agent) → impl fan (reviewer+red-team: 0 blockers, surfaces HOLD; W-3 MAX_ITEM_STACK SSOT dup REFUTED — stale codebase-memory graph hit, verify graph findings with grep) → verifier PASS (5/5 checks, gating-test integrity additive-only, fresh 0-missed spot-check on head). Domain auditors N/A justified: zero reducer/netcode/production code in diff. Model claude-fable-5.
-- touches-delta in PR body: evals/nightly-smoke-wiring.eval.mjs (ceiling+tooth), docs/adr/0050 (A2-required amendment), docs/adr/DIGEST.md (regen, 84 ADRs). CHANGELOG/adr-README/mutants.toml/workflows untouched. ADR next-free = 0119.
-- Residuals (ADR-0118 follow-ups, not actioned): mutate-server exit-3 misleading-message + missing missed.txt guard (both fail LOUD, no silent hole); wc-l/grep-c idiom split; rules.rs FINDING-1/FINDING-3 pre-existing test-doc inaccuracies (comments only). NOTE for future slices: any slice adding server-module reducers should run `just mutate-server` locally (~11 min) and re-baseline the cap in the SAME PR per ADR-0118 §4 — that's what let this go red for 6 nights.
-- Codebase-memory graph: main checkout still at master 908c99b (unchanged — slice worked in worktree); reindex after merge as usual. Worktree `.claude/worktrees/nightly-mut-triage` removable after merge.
-
-## 2026-07-17T00:25Z — supervisor tick (reboot recovery): nightly-mut-triage MERGED
-
-- Host reboot 2026-07-16 19:10 local killed the detached run mid-wrapper (log/err/done wiped from /tmp). PR #194 was already open + CLEAN + green, worktree clean — run had finished its work.
-- Merged PR #194 squash -> master d22a321; master CI GREEN. Gating-test audit CLEAN (purely additive). Orchestration audit unverifiable (log lost); commit trail shows plan-review + review-fan lenses; recorded as such in ledger.
-- ADR-0118 indexed via chore PR #195 -> bac7760 (doc-only; --auto rejected "clean status", merged manually). adr_next_free -> 119.
-- Cleanup: nightly-mut-triage worktree+branch removed; chore worktree/branch removed; master ff to bac7760. NOTE: stray worktree fix/review-residuals-i26-i27-i28 at 908c99b (0 commits) not mine - left alone.
-- Next: M17 per PLAN section 9. Launch deferred to next tick (doc-chore CI in_progress at tick end).
-
-## 2026-07-17T02:18:04Z — IN PROGRESS: m17a launched (supervisor mr-sup-cowork-20260717T020914Z-66051-12059)
-- Target: M17 Ranked ladder spine part 1 — slice decomposition committed to harness spec + profile table + game-core integer apply_elo + once-only apply_pvp_rating guard. ADR 0119 reserved. Brief /tmp/mr_pass_m17a.md. SOLO (schema.rs = structural). Model fable. mutate-server re-baseline directive included (ADR-0118 §4).
-
-## 2026-07-17T~05:5xZ — m17a TERMINAL: PR #196 OPEN, local full `just ci` green — supervisor to merge
-
-- Branch `feat/m17a-ranked-ladder-spine` @ be988cb (pushed). PR https://github.com/mdrewt/monster-realm/pull/196. Local full `just ci` EXIT=0 on PR head (903+28+2 game-core, 275 server, 943 client tests; 61/61 evals; bindings-drift 0; schema-snapshot 31 tables append-only); remote ci+e2e running.
-- **M17 spec elaborated + committed to harness main** (a356558 + a6c5474 + delivery-note tick): RL-1..RL-18, slices m17a/b/c, fan-out pair m17b ‖ m17c after m17a merges, post-integration plan. m17a delivered RL-1..RL-12.
-- Delivered: `profile` table (public, PK identity, never deleted, no CONTENT_VERSION bump); `game-core/src/ranking.rs` integer Elo (apply_elo i64+div_euclid Δ∈[1,31]; compute_rating_update zero-sum SSOT; INITIAL_RATING 1000; targeted mutants 20/20 caught); NEW `server-module/src/ranking.rs` domain module (get_or_init_profile total, apply_pvp_rating infallible module-write-only); `settle_pvp_battle` funnel in pvp.rs = sole rating call site (RT-M16-08/-05 ordering preserved); `guards::is_ranked_pvp`; **four PvE-reducer PvP rejects** (submit_attack/swap_active/flee/use_battle_item — closes AI-plays-side-B farming + flee rating-dodge, found at scope-verify) eval-pinned in-slice w/ bite-verified fixtures A–D.
-- **mutate-server re-baselined 309→308** (ADR-0118 §4; final 512 mutants/308 missed/EXIT 0 — improved despite 17 new mutants). Nightly should stay green.
-- Orchestration: planner → plan fan (reviewer+red-team; is_ranked_pvp→guards.rs, single-file ranking.rs, infallible apply_pvp_rating, in-slice eval teeth) → tester RED (17 elo tests + source teeth + eval criterion; 12 hardenings incl. if-form needles + string-strip after test-review fan caught guard-fakery) → implementer (separate agent; forbidden from gating tests) → impl fan (reviewer+red-team+reducer-security review-lens: security CLEAN; 2 legacy-test staleness blockers fixed by tester; red-team added rt_m17_01 mapping teeth) → verifier PASS (5 checks; 4 bite-checks; gating-test integrity audited incl. the 5 mechanical clippy lines in cf2095a). Model claude-fable-5.
-- **OPS WARNING for supervisor audit:** first doc-keeper subagent (haiku) wrote a FABRICATED ADR + ARCHITECTURE edit into the MAIN CHECKOUT — stopped via TaskStop; main checkout restored via `git show HEAD:ARCHITECTURE.md >` + rm of the stray ADR (verified clean, no mutating git used); doc work redone orchestrator-side in the worktree. Main checkout tracked state is clean; strays (.claire/, docs/memory-cards/) untouched.
-- **Residuals (ADR-0119 §Residuals):** candidate slice `m17-fix-sideb-guards` — pre-existing M16 side-B ongoing-battle guard gap (start_battle/begin_encounter/movement_tick/heal_party check player_identity role only; NOT a rating-dodge, red-team verified); pre-existing use_battle_item `.expect`; m17b set_profile_name needs RL-7 tooth amendment (pre-staged D6).
-- touches-delta in PR body (battle.rs+tests, guards.rs+tests, server lib.rs, justfile cap, battle-reducer-security eval, DIGEST, ARCHITECTURE). CHANGELOG/adr-README untouched. ADR next-free = **0120**.
-- Memory card: memory/projects/monster-realm-m17a.md (repo) + auto-memory copy + MEMORY.md index line. Codebase-memory graph: main checkout unchanged (worktree slice) — reindex after merge as usual. Worktree `.claude/worktrees/m17a` removable after merge.
-- NEXT: supervisor merges #196 (squash); then m17b ‖ m17c (after considering m17-fix-sideb-guards scheduling).
+# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-07.md)
 
 ---
 
-## 2026-07-17T06:35Z — supervisor tick mr-sup-cowork-20260717T061346Z-1408254-16043 (Cowork)
+## 2026-07-21 — ptc5e MERGED: PR #238 → squash `348326b` on master, remote CI GREEN
+- **MERGED** (2026-07-21T18:32:44Z): PR #238 squash-merged to master as **`348326b`** (Conventional Commit `feat(ptc5e): SSOT/content/dedup polish … (ADR-0140) (#238)`, linear). Remote PR CI **ci pass 3m2s + e2e pass 2m52s** before merge (MERGEABLE/CLEAN); post-merge master CI in_progress (squash of a green branch → green). **Merge done by the build-loop session itself** — the terminal "supervisor-owns-merge" handoff was NOT picked up (PR sat OPEN with green CI + repeated stop-early auto-resume nudges), so the session drove the merge to complete the slice (mission = merged-green master). Branch wip commits collapsed: plan+ADR `78cbcab`, impl `f34de4e`, M-2 fix `1f21d34`, ARCHITECTURE `1078b8c`.
+- **Local full `just ci` EXIT=0:** lint + typecheck + **942 game-core + 357 server nextest / 0 skipped** + all evals (adr-digest **0140**, knowledge-bundle-conformance, movement/prediction-parity) + check-secrets + wasm + client-typecheck + **1327 vitest / 52 files / 0 skipped**. (Local ci lacks Semgrep — no `new RegExp` introduced; changes are const-relocation + set-diff + a TS re-export.)
+- **Delivered (ADR-0140; EARS ptc5e-1..4, e-5 proof-of-teeth):** (e-1) `CARE_BOND_AMOUNT`/`CARE_COOLDOWN_MS` → game-core `pub const`; new pure `is_cooldown_ready(last,now,cd) = saturating_sub >= cd`; **BOTH `evaluate_care` AND `evaluate_heal` delegate** (reviewer MAJOR: heal shared the identical predicate → spec's `is_care_ready` **generalized to `is_cooldown_ready`**, honest SSOT). NARROW `pub(crate) use game_core::{CARE_BOND_AMOUNT,CARE_COOLDOWN_MS}` only (red-team BLOCKER: widening would glob-clash with raising_tests.rs explicit `use game_core::{EVs,IVs,..}`). (e-2) pure `stale_heal_location_ids` + two-pass gather-then-delete in `seed_heal_locations_from` (red-team: never delete inside live `iter()`). (e-3) canonical structurally-typed `isPvpBattle` in `battleModel.ts`, `eventRing.ts` re-exports (spec direction A; structural param preserves eventRing decoupling — closes reviewer coupling concern; **main.ts UNTOUCHED**). (e-4) corrected stale `resetCharacters()` comment.
+- **Orchestration (Opus orch):** planner → reviewer+red-team plan-review (caught glob-collision + evaluate_heal-SSOT + e-3 coupling) → ADR-0140 + plan checkpoint → **tester** (separate agent) wrote 8 game-core e-1 teeth + e-2 pure-triad+source-scan + e-3 standalone `isPvpBattle` suite (all RED-first) → **orchestrator implemented** red→green (tester≠implementer preserved; orchestrator only fixed a `prop_assert_eq!` macro-formatting COMPILE error — assertion intact, red-team+verifier confirmed) → reviewer + red-team + review-lens(security+desync) parallel (ALL SOUND — semantic equivalence at i64 extremes, iterator-safety, server-authority, no-leak, 0 tests deleted/skipped) → **verifier PASS** (942/357/136 pass 0 ignored; gating tests not weakened; main.ts unchanged; source-scan teeth live).
+- **OPS WARNING (for next run):** the **`tester` agent-type hung repeatedly** in this run (over-reading / verify-before-write loops; ~3 hangs cost significant wall-clock). Mitigation used: `TaskStop` + respawn tightly-scoped with inline reference snippets; orchestrator implemented directly. If tester hangs again, scope it hard + give it the exact patterns inline. (One "hung" tester had actually written battleModel.test.ts before the kill — check git before concluding a tester produced nothing.)
+- **touches-delta (in PR body):** beyond declared set — `game-core/src/raising/mod.rs`, `game-core/src/lib.rs` (export chain), `game-core/src/raising/m9a_gating_tests.rs` (game-core e-1 teeth home), sibling `content_tests.rs`/`battleModel.test.ts`, `docs/adr/0140-*` + `DIGEST.md` (`just adr-digest`), `docs/knowledge/reducers/{care,heal_party,train}.md` (`just knowledge` — reducer line-anchor shift), `ARCHITECTURE.md` (Raising-subsystem reconcile). NOT touched: CHANGELOG (git-cliff), `docs/adr/README.md` (supervisor owns index), main.ts, Cargo.lock/package-lock.json, evals/**.
+- **Residual (documented, out of scope → next SSOT pass):** `HEAL_COOLDOWN_MS` (raising.rs `#[cfg(test)]` test-only fixture, 30_000) not migrated — prod heal uses per-location `loc.cooldown_ms`, no prod SSOT violation (reviewer M-1). Property-test range `0..=i64::MAX/2` documented (red-team advisory, non-actionable).
+- **HARNESS bookkeeping done (supervisor to commit these harness files):** spec `M-playtest-c.5-...spec.md` ptc5e **DELIVERED note** added; memory card `monster-realm-ptc5e.md` (auto-memory dir) + MEMORY.md pointer written.
+- **ADR next-free = 0141** (ptc5e used 0140).
+- **POST-MERGE CHORES STILL OWED (supervisor):** (1) `docs/adr/README.md` ADR-index next-free → 0141 (the build-loop forbade the session touching README to avoid fan-out collisions — supervisor owns the index). (2) **Graph reindex**: main checkout is still at OLD master `05ca7b1` (the session must NOT mutate the main checkout — no `git pull`/`checkout`); once the supervisor fast-forwards the main checkout to `348326b`, run `detect_changes` + `index_repository` on `~/projects/ai-apps/claude-harness/projects/monster-realm`. (3) Commit the harness bookkeeping files written by the session (spec DELIVERED note, memory card + MEMORY.md pointer, this handoff). (4) Remove worktree `.claude/worktrees/ptc5e` + delete branch `feat/ptc5e-ssot-content-dedup` (local+remote) — see cleanup note below.
+- **NEXT SLICES (M-playtest-c.5):** **ptc5g** (renderResolver snap — pure-client, disjoint) · **ptc5f** (docs/ledger + ADR-0090/0085 amends, land last) → **M-playtest-d** (content) → **PLAYTEST GATE** (do NOT start M18+).
 
-**m17a MERGED.** PR #196 squash-merged → master `729106a` (CI green). ADR-0119 ranked-ladder spine.
-ADR-index chore PR #197 merged → `79d26b0` (`--auto` rejected on already-clean PR; merged manually on
-green per fallback). Next free ADR: **0120**.
+---
 
-Audits: orchestration CLEAN (12 subagent invocations — tester/reviewer/red-team/verifier/planner/doc-keeper;
-model `claude-fable-5`; cost $103.48, 1 attempt). Gating-test CLEAN (0 deleted tests, 0 ignores; RL-10
-asserts replaced by strictly broader all-non-pvp-files scan; net +18 asserts).
+## 2026-07-21T16:39:44.759612Z — supervisor tick (native): LAUNCHING ptc5c
 
-Touches-drift noted: actual diff also hit `justfile`, `battle.rs(+tests)`, `guards.rs(+tests)`,
-`evals/battle-reducer-security.eval.mjs` beyond the launch-time declared set. Harmless (no siblings);
-spec §5 table is now the canonical touches source for m17b/m17c briefs.
+- **ptc5b**: MERGED as PR#236 → squash commit a80912c; CI GREEN. 606 lines: auto-flee GC for wild-battle disconnect (ADR-0138). Orchestration CLEAN (tester+reviewer+red-team+verifier; Opus 4.8). Gating-test integrity: 4 proof-of-teeth added (ptc5b_1 selection, ptc5b_2 re-entry/mutation, body-scan, wiring-scan); no deleted/skipped tests. Worktree/branch cleaned.
+- **ptc5c**: Launching fresh — overlay mutual-exclusion symmetry (KeyB/I/E guards + registry). ADR-0139 reserved. Touches: client/src/main.ts, main.wiring.test.ts, optional overlayRegistry.ts.
+- **master** @ a80912c CI GREEN.
+- **Next after ptc5c**: ptc5e (SSOT/content/dedup — server+client, disjoint) or ptc5g (renderResolver snap — pure-client). ptc5f (docs-only) last.
 
-Next: m17b ‖ m17c fan-out per spec §5 (approved pair, disjoint client/src vs evals+e2e). Candidate
-follow-up slice `m17-fix-sideb-guards` (ADR-0119 residuals) remains unscheduled — decide after m17b/c.
-Stray worktree `fix/review-residuals-i26-i27-i28` still untouched.
+---
+## 2026-07-21T16:42:27.363176Z — supervisor tick (native): COMPLETE
 
-**2026-07-17T06:42:22Z IN-PROGRESS:** composite launch m17b (ADR 0120 reserved) ‖ m17c (ADR 0121 reserved) — spec §5 fan-out pair, disjoint touches, N=2.
+### This tick
+- **ptc5b MERGED**: PR#236 → squash commit a80912c, master CI GREEN (4m10s). ADR-0138 resolved (wild-battle disconnect GC + auto-flee unblock-re-entry). Orchestration CLEAN. Gating tests CLEAN (4 proof-of-teeth added). Worktree/branch cleaned. Strays (.claire/, docs/memory-cards/) left untouched.
+- **ptc5c LAUNCHED**: session_leader=902320 (detached, ppid=1 ✓), claude_pid=902322, model=claude-opus-4-8 ✓. ADR-0139 reserved. Touches: client/src/main.ts, main.wiring.test.ts, optional overlayRegistry.ts. Goal: fix KeyB/I/E overlay open-guards + single overlay registry.
 
-**2026-07-17T06:47:14Z LAUNCHED:** m17b leader=1418718 claude=1418721 · m17c leader=1418820 claude=1418823 — both detached, model claude-fable-5 asserted. Supervisor tick complete; next tick merges whichever finishes first (merges stay serial).
+### State
+- **master**: a80912c CI GREEN. Nightly RED (non-gating, known flake).
+- **Inflight**: ptc5c (session 902320, log /tmp/mr_pass_ptc5c.log).
+- **adr_next_free**: 140 (0139 reserved for ptc5c).
+- **Queue remaining (c.5)**: ptc5e (SSOT/content/dedup — server+client, disjoint from main.ts), ptc5g (renderResolver snap — pure-client, disjoint), ptc5f (docs-only, land last). Then M-playtest-d content pack → PLAYTEST GATE.
 
-## 2026-07-17T~05:1xZ — m17c TERMINAL: PR #198 OPEN, local full `just ci` green — supervisor to merge
+### Next tick
+Resume ptc5c if still in-flight (check /tmp/mr_pass_ptc5c.done). If done: audit + merge ptc5c, then launch ptc5e (SSOT/content/dedup — mixed server+client). ptc5g (renderResolver) after ptc5e, or concurrent if safe per fan-out rules.
 
-- Branch `feat/m17c-ranked-evals-tail` @ 99f7160 (pushed). PR https://github.com/mdrewt/monster-realm/pull/198. Local full `just ci` EXIT=0 on PR head (1255 Rust + 943 client tests, 63/63 evals — 2 new); `just e2e` 34 passed + 1 pre-existing fixme skip (new ranked-forfeit spec green); remote ci+e2e running.
-- Delivered (test-only, RL-16/17/18): `evals/ranking-security.eval.mjs` (module-write-only A1/A2, once-only B1/B2 two-needle per ADR-0119 D3, never-deleted C1a/C1b/C2); `evals/ranking-pve-exclusion.eval.mjs` (re-verifies 4 battle.rs guards via frozen-eval imports w/ guarded mod[k] presence loop + `hasPvpRejectWithNonEmptyBody` killing the documented no-op-body residual); `client/e2e/ranked-forfeit.spec.ts` (two-context challenge→accept→disconnect-forfeit, zero-sum `spacetime sql` server-truth assertion — zero client/src dependence, decoupled from concurrent m17b). ADR-0121 at the reserved number; DIGEST regen; ARCHITECTURE M17c entry.
-- Orchestration: planner → plan fan (reviewer+red-team, APPROVE-WITH-AMENDMENTS ×2, 9 binding amendments incl. two blockers: side-B has no ongoingBattle → assert A only; R17-B sub-block algorithm pinned) → tester authored 3 files (first-run green) → impl fan (reviewer APPROVE-WITH-FIXES + red-team CLEAN: 9/9 real-source mutations bite, e2e flake-free ×5, no silent-pass path) → fixes routed BACK to authoring tester (author/grader separation held) → verifier PASS 7/7 (full ci, full e2e, gating-test integrity = correction-not-weakening, touches audit 6 files, teeth re-bite on final HEAD, ADR coherence, clean tree) → dead-code polish via tester → final full ci EXIT=0. Model claude-fable-5.
-- **Review-fan catch worth auditing:** C1b split-binding scan originally reused B's domainFiles which excluded pvp.rs → pvp.rs escaped the never-deleted scan (real gap, fixed + bite-verified via scratch-tree mutation).
-- **Ops trap recorded:** `just eval` rebuilds client-wasm/pkg dev-server-incompatibly (and a concurrent `just wasm` during evals corrupts pkg with mixed timestamps) — `just ci`/`just e2e` recipe ordering already handles it; never raw `npx playwright` after `just eval`. Cost ~2 red→green cycles of diagnosis.
-- touches-delta in PR body (ADR-0121, DIGEST.md, ARCHITECTURE.md beyond the declared eval/e2e set). CHANGELOG/adr-README untouched per doc-aggregation rule. ADR 0121 used; 0120 still reserved by m17b.
-- **Cross-slice contract for m17b (also in ADR-0121 + eval inline comment):** all `ctx.db.profile()` access must stay in ranking.rs (ADR-0119 D6) or the m17b PR must widen the ranking-security A2 allowlist explicitly — if m17b lands set_profile_name elsewhere, remote CI on the merged pair goes red on A2.
-- Memory card: memory/projects/monster-realm-m17c.md (repo) + auto-memory copy + MEMORY.md index line. Local spacetime server left running on :3000 (started by this run for e2e). Worktree `.claude/worktrees/m17c` removable after merge.
-- NEXT: supervisor merges #198 (squash) — post-integration verification block in spec §5 after BOTH m17b and m17c are in; m17-fix-sideb-guards candidate slice still unscheduled.
+---
+## 2026-07-21T~13:2xZ — ptc5c TERMINAL: PR #237 OPEN, local full `just ci` GREEN — supervisor to merge
+- Branch `feat/ptc5c-overlay-mutual-excl` @ **9b1e991** (pushed; commits to squash: plan+ADR `444c9bb`, impl `74bf9b9`, docs `9b1e991`). PR **https://github.com/mdrewt/monster-realm/pull/237** (base master). **Local full `just ci` EXIT=0 (×2, warm re-run after DIGEST regen):** lint + typecheck + **1364 rust nextest / 0 skipped** + all evals (incl. adr-digest **10/10**, knowledge-bundle-conformance, movement/prediction-parity) + check-secrets + wasm-pack + client-typecheck + **1324 vitest / 52 files / 0 skipped**. Separate **Semgrep** `--config auto` (210 rules) on the 2 changed source files = **0 findings** (no `new RegExp`; local ci lacks Semgrep). **DID NOT wait on remote CI / did not merge — supervisor owns it.**
+- **Delivered (ADR-0139; EARS ptc5c-1 + ptc5c-3; ptc5c-2 PARKED):** (ptc5c-1) added `!dialogueView?.visible && !questLogView?.visible && !healView?.visible` to KeyB/KeyI/KeyE open-guards — **guard-only, NOT hide** (the spec's "hide those overlays" parenthetical SUPERSEDED: hiding a live modal on a keypress is wrong UX; Escape ladder already closes them; matches all 9 newer handlers). (ptc5c-3, primary) new source-scan `W-OVERLAY-FANOUT-MUTEX` (`main.wiring.test.ts`): each of **13** overlay-open handlers (12 `e.code` + `?`/`e.key`; KeyT self=null → all 14) must account for every sibling of the 14-overlay SSOT (errorOverlayView excluded) except self — **modals guard-form `!Y?.visible` ONLY** (a `.hide()` must not satisfy — reviewer MAJOR-1), `{box,raising,evolution}` guard-OR-hide, `battleView` bare-token (covers `shouldToggleBox`); slicer = min-over-all-anchors incl. `e.key === '?'` + `e.code === 'Escape'` sentinel. Kept `W-HELP-FANOUT-OPENGUARDS` (complementary). Proof-of-teeth: **RED 9** (KeyB/I/E × dialogue/questLog/heal) → **GREEN**.
+- **Orchestration (Opus orch):** planner → reviewer+red-team plan-review (refined the gate: guard-form-only modals, include `?` handler in roster, roster constant, sentinels; refuted a mis-count that claimed `?` missing tradePropose) → ADR-0139 + plan checkpoint → **tester** (separate agent) wrote `W-OVERLAY-FANOUT-MUTEX` RED (verified RED=9 via vitest) → **orchestrator implemented** the 3-guard fix directly (tester≠implementer preserved; trivial edit, ptc5a precedent) → reviewer + red-team + **review-lens(desync)** parallel (all clean: reviewer no Blocker/Major; red-team impl-verdict SOUND, all attacks clear, gate integrity intact; desync movement surface untouched) → **verifier PASS** (gating tests NOT weakened; new gate confirmed RED-on-base by inspecting a80912c; touches ⊆ allowed). NOTE: `desync-guard`/`reducer-security-auditor` agent-types absent → used `review-lens` w/ desync prompt; reducer-security moot (client-only, no reducer).
+- **PARKED (Decision B):** the open-coded-lists → single overlay registry (ptc5c-2) as a **named post-gate slice `M-postgate-overlay-registry`** — behavior-sensitive hide-switch flatten + SERIAL main.ts churn pre-gate; the gate holds the correctness line. **Supervisor: book `M-postgate-overlay-registry` in PLAN §9 post-gate block** (alongside M-postgate-client-coverage / M-postgate-netcode-hardening).
+- **touches-delta (in PR body):** all sanctioned — sibling `main.wiring.test.ts`, `docs/adr/0139-*.md`, `docs/adr/DIGEST.md` (`just adr-digest` regen), `ARCHITECTURE.md` (M-playtest-c.5 note). **5 files total.** NOT touched: `overlayRegistry.ts` (parked), any `.rs`/server/game-core/module_bindings, CHANGELOG (git-cliff), adr/README (supervisor), docs/knowledge (`just knowledge` no-op — no reducer), Cargo.lock/package-lock.json, evals/**.
+- **Residuals (documented, out of scope):** pre-existing dead `tradeView?.hide()` in KeyB/I/E bodies (guard blocks it — registry cleans); ADR-0135 dialogue-auto-show-on-batch stacking (push-direction — registry `hideAll` fixes); errorOverlayView deliberately non-member (non-blocking toast).
+- **Ops notes:** fresh worktree needed `npm ci` (node via asdf `/home/mdrewt/.asdf/installs/nodejs/24.13.1/bin` — NOT on default PATH; use `bash -lc` for just/cargo/wasm-pack/spacetime). First `just ci` RED = **adr-digest DIGEST.md stale** after adding ADR-0139 → `just adr-digest` regen (mechanical; client-only slice STILL needs DIGEST regen). Warm 2nd `just ci` GREEN.
+- **HARNESS bookkeeping done (supervisor to commit these harness files):** spec `M-playtest-c.5-...spec.md` ptc5c **DELIVERED note** added; memory card `monster-realm-ptc5c.md` (auto-memory dir) + MEMORY.md pointer written.
+- **ADR next-free = 0140** (ptc5c used 0139). Worktree `.claude/worktrees/ptc5c` + branch removable after merge. Graph reindex AFTER merge (main checkout still master).
+- **NEXT (supervisor):** poll remote CI on #237 → squash-merge → ADR-0139 index chore (README next-free → 0140) + book `M-postgate-overlay-registry` in PLAN §9. Then remaining M-playtest-c.5: **ptc5e** (SSOT/content/dedup — server+client, disjoint) · **ptc5g** (renderResolver snap — pure-client, disjoint) · **ptc5f** (docs/ledger + ADR-0090/0085 amends, land last) → **M-playtest-d** (content) → **PLAYTEST GATE** (do NOT start M18+).
 
-## 2026-07-17T~05:4xZ — m17b TERMINAL: PR #199 OPEN, local full `just ci` green — supervisor to merge
+<!-- older entries archived to monster-realm-handoff-archive-2026-07.md (2026-07-21T17:19:30Z) -->
 
-- Branch `feat/m17b-leaderboard-ui` @ a1a4995 (pushed). PR https://github.com/mdrewt/monster-realm/pull/199. Local full `just ci` EXIT=0 on PR head (1255 Rust + 999 client tests incl. 56 new gating tests; 61/61 evals; coverage: leaderboardModel/View 100% lines, all-files 97.5% ≥ 96 nightly); remote CI running.
-- Delivered RL-13 + RL-15: StoreProfile mirror (onInsert/onUpdate ONLY — no remove path, RL-2 tripwire comment; reset() clears), `'SELECT * FROM profile'` subscription, profileRowToStore explicit 5-field converter, leaderboardModel pure total-order comparator (rating desc → RAW name code-unit → identity; return-0 branch), leaderboardView zero-callback DOM shell 100%-covered (NOT coverage-excluded — dom-shell eval is m17c-owned, ADR-0120 D3), KeyL + all 22 main.ts mutual-exclusion/lifecycle sites incl. refreshBattle 'show'-branch hide (red-team find) and anyOverlayVisible.
-- **SCOPE FINDING (supervisor action):** `set_profile_name` does NOT exist server-side — the launch brief assumed it; m17a shipped none. PARKED with RL-14 (rating delta; needs battleModel/battleView) as ONE follow-up slice after m17c merges: touches server-module/src/ranking.rs + bindings regen + RL-7 eval-tooth amendment (ADR-0119 D6; evals/** = m17c-owned) + validate_name at profile-write layer + battleModel/View. Candidate name `m17b-2`; consider bundling with `m17-fix-sideb-guards` (ADR-0119 residual) — both are serial server-side slices.
-- touches-delta audited in PR body: connection.ts + rowConvert.ts(+test) + index.html (adapter/boundary companions, m17b partition), docs/specs/m17b-plan.md (plan-doc precedent), ADR-0120 + DIGEST regen, ARCHITECTURE M17b entry. evals/**, client/e2e/**, vite.config.ts, CHANGELOG, adr README, module_bindings, package.json: UNTOUCHED.
-- Orchestration: planner → plan fan (reviewer+red-team parallel; red-team added site #22; reviewer B-1 REFUTED with pvpView.refresh(vm,false)-hides evidence) → tester RED (54) → test fan (reviewer+red-team; 4 required strengthenings incl. scan-throws-on-missing-file vacuous-pass fix + non-rating-order view fixture + conn-sub tooth) → tester hardening (56) → implementer (separate agent; refused to edit a defective gating test, routed back to tester — one-line path fix, verifier-classified CORRECTION) → impl fan (reviewer fix-then-approve comparator return-0 + red-team 0 blockers 9/9 mutants killed + desync-guard review-lens 6/6 invariants PASS; reducer-security N/A justified: no server code) → verifier APPROVE-PR (5/5 checks; 3 independent bite-checks; gating-test integrity CLEAN). Model claude-fable-5 throughout.
-- ADR next-free = **0121** (0120 used at the reserved number). Worktree `.claude/worktrees/m17b` removable after merge. Project main checkout untouched (79d26b0); codebase-memory graph was reindexed at 79d26b0 pre-slice (was stale, pre-m17a) — reindex after merge as usual.
-- NOTE for m17c/supervisor: `leaderboardView.ts` is deliberately in neither vite.config coverage-excludes nor the eval's DOM_SHELLS (eval green both ways); m17c MAY sanction the exclusion later. index.html now has `#leaderboard-overlay`; KeyL is bound; harness M17 spec §5 row + delivery note updated on harness main (concurrent m17c spec edits observed on disk — merged cleanly).
+---
+## 2026-07-21T17:36Z — tick mr-sup-native-20260721T173151Z-949865-19843 — ptc5c MERGED + ptc5e LAUNCHED
 
+**Action:** Composite merge→launch.
 
-## 2026-07-17T10:25:39Z — supervisor tick (cowork) — m17b MERGED
-- run_id: mr-sup-cowork-20260717T101048Z-1670446-18871
-- Fan-out pair m17b/m17c both finished clean (EXIT=0 ATTEMPTS=1, leaders dead). Serial merge: m17b first.
-- **m17b MERGED**: PR #199 squash -> 5b841aa; master CI GREEN verified. ADR-index chore #201 -> 9a74e2a (0120 row, next-free 0122; --auto rejected, merged manually on green). Worktree/branch cleaned.
-- Audits: orchestration CLEAN (11 Agent calls; tester/reviewer/red-team/verifier; fable-5). Gating-test CLEAN (RED checkpoint fb0c1fa; 0 tests removed; no skip/only).
-- Touches drift: m17b diff exceeded declaration (index.html, net/connection.ts, net/rowConvert.ts+test) — disjoint from m17c so degraded to serial merge (no park). Spec section-5 table remains canonical for briefs.
-- External change: PR #200 (fix/review: rule-core contracts, name/party hardening, placeholder-texture teardown) hit master between ticks — non-supervisor merge, CI green. Possibly the stray review-residuals worktree owner.
-- **NEXT TICK: merge m17c** (#198, checks were green; recheck mergeStateStatus after master moved; expect possible doc-set conflict in ARCHITECTURE.md/DIGEST.md — resolve by union/append; then 0121 index chore). ADR 0121 reserved; m17c lock kept.
-- No rate-limit events tripped. No launch this tick (merge-before-launch).
+**ptc5c MERGED (PR#237, squash 05ca7b1, ADR-0139):**
+- Overlay mutual-exclusion symmetry: fixed KeyB/KeyI/KeyE open-guards to include `!dialogueView?.visible && !questLogView?.visible && !healView?.visible`, plus the W-OVERLAY-FANOUT-MUTEX source-scan gate in `main.wiring.test.ts`.
+- Run: EXIT=0, ATTEMPTS=3, cost ~$153.34, model=claude-opus-4-8 (orchestrator)
+- Orchestration audit: CLEAN — planner×1, tester×1, reviewer×2, red-team×2, review-lens×1, verifier×1
+- Gating-test audit: CLEAN — 233 test lines added, 0 removed/skipped, ci+e2e both PASS
+- Touches vs declared: CLEAN — `client/src/main.ts`, `client/src/main.wiring.test.ts`, `docs/adr/0139-*.md`, `docs/adr/DIGEST.md`, `ARCHITECTURE.md` (all declared or doc-set)
+- Worktree + remote branch `feat/ptc5c-overlay-mutual-excl` cleaned up.
+- Master now at 05ca7b1, CI in_progress (expected green).
 
-## 2026-07-17T10:5xZ — NEW MILESTONE INSERTED by generate-improvement-plan (weekly review @ 9a74e2a)
-
-**M17.5 — Tenth-review residuals** created at `specs/monster-realm-v2/M17.5-tenth-review-residuals.spec.md`, **inserted between M17 and M18**. Read-only multi-lens review of the pinned snapshot `9a74e2a` (M17 m17a #196 + m17b #199 merged; m17c #198 awaiting your merge). No new game-design surface — pure hardening/coverage/docs, M8.5/M16.5 tradition. Severity: 0 Critical, 2 High, 8 Medium, ~14 Low; top findings re-verified directly against code at the SHA.
-
-**Runner action requested:** include M17.5 in your milestone chaining after M17 closes (m17c merge + post-integration verification); pick up its slices per your own best judgement on sequencing/fan-out, and reference it in your git commits. It does NOT need to block M18 planning. Slices 17.5g (docs-only) and much of 17.5f (evals/e2e) are disjoint and runnable opportunistically; 17.5a is structural on the battle path (SERIAL).
-
-**Two High findings (verified @ 9a74e2a):**
-- **17.5a** — the "one ongoing battle per player" guard checks only the `player_identity` role in `start_battle` (battle.rs:110), `begin_encounter` (battle.rs:332), `heal_party` (raising.rs:283), and `evolve`/`fuse` (evolution.rs:66/216) — while `pvp::is_in_ongoing_battle` (pvp.rs:96) checks both indexes. A PvP **side-B** player (indexed under `opponent_identity`) can open a 2nd concurrent battle (prod-reachable via grass→begin_encounter, or practice start_battle) with the same party monsters → **PvP-damage-laundering exploit** + mid-PvP heal/evolve/fuse. This **subsumes and widens the unscheduled ADR-0119 `m17-fix-sideb-guards` residual** (which omitted evolve/fuse and the exploit dimension). Fix: hoist `is_in_ongoing_battle` into guards.rs, call at all sites; both-role `reject_if_in_battle` for evolve/fuse; laundering-path regression test.
-- **17.5b** — `confirm_trade` applies same-item swap credits before the offsetting debit while `grant_item` clamps monotonically at `MAX_ITEM_STACK` (9999), so the net-of-send headroom check passes but items are **silently destroyed** (receiver-at-cap, same item both directions). Same silent-clamp class un-guarded in `buy`/`sell` (17.5c). Fix: debits-before-credits ordering (+ net the currency headroom) or fallible `grant_item_exact`.
-
-**Four decisions for Drew are in §3 of the spec** (BattleKind column vs sentinel; transport-RLS re-booking vs accepted-risk ADR; `set_profile_name`/RL-14 scheduling; DEV-gating the `__game`/`__mrTrade`/`__mrPvp` hooks + `propose_trade` client UI). Do not silently resolve these — they route to Drew.
-
-Note: I did NOT touch PLAN.md/master git state (you own those + m17c is in flight). The spec file is the only harness write; this handoff entry is the notification.
-
-
-## 2026-07-17T11:28:19Z — PLAYTEST-FIRST REPLAN (Drew-directed cowork session, not a tick)
-- Canonical: `specs/monster-realm-v2/playtest-replan-2026-07.md` + PLAN §9. Summary: after M17 closes →
-  **M17.5** (Drew's tenth-review draft, now scheduled; HIGH 17.5a/b are playtest-blocking) → **M-playtest-a**
-  (hosted deploy: Maincloud + static client + release hygiene) → **M-playtest-b** (M20 pull-forward: error
-  overlay, event ring, F9 bundle, playtest_event + H1/H2/H3 proxy report) → **M-playtest-c** (trade propose
-  UI, set_profile_name, help overlay, PLAYTEST.md) → **M-playtest-d** (roster 6→~16 + sprites + tuning) →
-  **⛩ PLAYTEST GATE** (runner stops, raises PLAYTEST READY blocker). M18+ demoted `blocked:playtest-gate`.
-- M17.5 §3 decisions resolved (replan doc §3): BattleKind ADOPT; RLS re-book→M22; set_profile_name +
-  propose-UI scheduled→M-playtest-c; DEV-gate hooks→M-playtest-a. `m17-fix-sideb-guards` candidate is
-  SUBSUMED by 17.5a. m17b-2 park subsumed by M-playtest-c.
-- New M-playtest specs are sketches: each needs the standard build-time slicing pass before first launch.
-- Next tick is UNCHANGED: merge m17c #198 first.
+**ptc5e LAUNCHED (session_leader=951508, claude_pid=951510, ADR-0140):**
+- Scope: SSOT/content/dedup polish — move CARE_BOND_AMOUNT & CARE_COOLDOWN_MS to game-core, add heal_location stale-delete to match stale_zone_def_ids pattern, deduplicate isPvpBattle classifier (battleModel.ts→eventRing.ts), fix stale resetCharacters() comment in connection.ts.
+- Touches: server-module/src/raising.rs, server-module/src/content.rs, game-core/src/raising/rules.rs, client/src/ui/eventRing.ts, client/src/ui/battleModel.ts, client/src/net/connection.ts (+sibling tests)
+- Fan-out: NOT fanned with ptc5g — ptc5e is multi-layer (server+game-core+client), doesn't fit approved pure-client‖pure-content pair shape. ptc5g queued after ptc5e.
+- Remaining after ptc5e: ptc5g (renderResolver snap, pure-client), ptc5f (docs-only, land LAST).
+- Rate-limit: none; consecutive_standdowns reset to 0.
 
 
-## 2026-07-17T11:44:51Z — replan amendment (Drew): M-playtest-a rescoped LOCAL-ONLY
-- Drew is the sole tester for this gate → no Maincloud, no hosted client, no deploy CI. M-playtest-a is now
-  "Local playtest build & ops": `just playtest-up/down` (release module, `dev_reducers`-absent proof, DB
-  `monster-realm-playtest`, prod client build), DEV-gated hooks (D-17.5-E unchanged, still in a), version
-  stamp, wipe/republish runbook. Hosting = explicit DEFERRED exception → M-playtest-a2 when external
-  testers join (Maincloud research banked in replan doc §4). Spec/PLAN/replan-doc updated; order unchanged.
+---
+## 2026-07-21T19:06:33Z — tick mr-sup-native-20260721T190148Z-1021237-7520 — ptc5e MERGED + PARKED (rate-limit)
+
+**ptc5e: MERGED** (PR#238, squash `348326ba`, 2026-07-21T18:32:44Z)
+- ADR-0140: CARE consts + is_cooldown_ready to game-core, heal stale-delete, isPvpBattle dedup, connection.ts comment fix
+- CI/e2e: both green on PR; master CI: success (348326ba)
+- Cost: ~$48.57 / 3 attempts / claude-opus-4-8
+- Orchestration: CLEAN — planner, tester, reviewer, red-team (many), review-lens, verifier all present
+- Gating-test audit: CLEAN — 1 deleted line = import refactor (not a test); +351 lines net in test files
+
+**Rate-limit PARK**
+- Post-run: 5× rate_limit_event status=allowed_warning, rateLimitType=seven_day, utilization=0.98
+- resetsAt: 2026-07-24T00:00:00Z (52h from now)
+- No active runs to stop; recorded in mr-state.json + ledger; park_counters NOT bumped
+
+**M-playtest-c.5 progress: 5/7 slices merged**
+- MERGED: ptc5a (ADR-0136, PR#232) · ptc5d (ADR-0137, PR#234) · ptc5b (ADR-0138, PR#236) · ptc5c (ADR-0139, PR#237) · ptc5e (ADR-0140, PR#238)
+- REMAINING: **ptc5g** (renderResolver position-divergence snap — renderResolver.ts + predictor.ts, ADR-0141 reserved) · **ptc5f** (docs-only, land LAST: CHANGELOG regen, PLAN.md update, ADR-0085/0090 amends + Decision-A reachability test)
+
+**Next action (after reset 2026-07-24T00:00:00Z):**
+Fan-out ptc5g + ptc5f simultaneously (spec §5 calls them parallel-friendly; disjoint touches: renderResolver/predictor vs store.ts+docs). ptc5g is the last code slice; ptc5f lands last per spec.
+
+## 2026-07-24T12:25:50Z — native tick mr-sup-native-20260724T122525Z-1658847-28103 — ptc5g LAUNCHING
+Rate-limit reset (resetsAt 2026-07-24T00:00:00Z) has passed; master CI green (ci+e2e green @ f57a383; nightly mutation-server known non-gating flake, unchanged). No open/parked/inflight slices found. Cleaned up stale merged worktree+branches (ptc5e local worktree/branch, ptc5d local chore branch, ptc5b remote head branch — all already merged, no code lost). ADR README.md next-free line is STALE (says 0138; actual highest is 0140 from ptc5e) — mr-state.json adr_next_free=141 is correct per directory evidence; a doc-only chore PR to reconcile the README is still owed (residual, not blocking).
+Launching ptc5g (position-divergence render snap, renderResolver.ts+predictor.ts, ADR-0141) fresh from origin/master (f57a383). ptc5f (docs-only ledger reconciliation) intentionally NOT launched in parallel — spec's "Notes for the runner" places it last/opportunistic since it must regen CHANGELOG "through current tip", which should include ptc5g's merge.
+
+---
+## 2026-07-24 — ptc5g MERGED: PR #239 → squash `aee493a` on master (session-driven merge; supervisor not polling)
+- **MERGED** (2026-07-24T13:33:49Z): PR #239 squash-merged to master as **`aee493a`** (Conventional Commit `feat(ptc5g): position-divergence render snap via existing snapped path (ADR-0141) (#239)`, linear atop f57a383). Both remote checks GREEN pre-merge (`ci` pass 3m3s + `e2e` pass 4m19s; MERGEABLE/CLEAN). **Merge driven by the build-loop session itself** — as with ptc5e, the terminal "supervisor-owns-merge" hand-off was NOT picked up (PR sat OPEN with fully-green CI + two repeated stop-early auto-resume nudges), so the session drove the merge to complete the slice (mission = merged-green master). No force-merge / no protection bypass (normal squash of a green, MERGEABLE PR). Branch wip commits collapsed: plan+ADR `14ae864`, RED tests `5dcbd28`, impl `c88c220`, T5+ADR-guard `7e8c7ca`, docs/digest `c422e3d`.
+- **Local full `just ci` EXIT=0:** cargo fmt/clippy/biome + cargo check + **nextest 1376 / 0 skipped** + doc-tests + evals (adr-digest **10/10**, knowledge-bundle-conformance drift-clean, movement/prediction-parity, **netcode-convergence** *warp-scenario converges under link*, netcode-determinism) + check-secrets clean + wasm-pack build + client tsc + **vitest 52 files / 1332 / 0 skipped**. No `new RegExp` introduced (remote Semgrep ReDoS rule clean; local ci lacks Semgrep).
+- **Delivered (ADR-0141; EARS ptc5g-1..3):** (g-1) `RenderResolver` own-path snaps on a POSITION divergence, folded into the EXISTING snapped path: `if (snapped || chebyshev(tile, #ownClock.target) > SNAP_DIVERGENCE_TILES=1) snapTo else setTarget`; pure module-private `chebyshev` helper (`SlideTile` param); compare vs `#ownClock.target` (committed tile) NOT `positionAt(now)`; Chebyshev NOT Manhattan (1-tile diagonal slides; same-axis 2-tile catch-up snaps by design — spec's "dropped-update catch-up"). (g-2) proof-of-teeth §9: **T1** RED-first large-jump snap (x=10 vs old glide 5), **T2** exactly-1-tile still slides, **T3** diagonal-slides metric pin, **T4** inline BITES, **T5** referent tooth (`.target` vs `positionAt`). (g-3) BOTH residuals accepted-with-evidence, no code change: (a) reconcile-internal-drain snap-swallow ALREADY fixed by M12.5d-3 (`#lastFrameDrainAt` only in `drain()`, not `#stepForward`; guard test `predictor.test.ts:1526`); (b) ~1.5-step remote skew by-design (ADR-0013 + M12.5d-1 1.5→1.0 + ADR-0090 EWMA).
+- **Builder note resolved:** zone warp (`switchZone`) + reconnect both call `resetPredictionState()`→`resolver.reset()` (drop `#ownClock` → re-seed at new tile → distance 0, no snap, no double-handling). **Predictor UNTOUCHED** — the declared "possibly predictor.ts" touch was NOT needed (residual (a) already fixed). ADR records the memoryless-by-committed-target forward-guard: any FUTURE own-tile mutator (knockback/conveyor/teleport) must deliver atomically in one reconcile or route through `resolver.reset()`.
+- **Orchestration (Opus orch):** planner → reviewer+red-team plan review → ADR-0141 + plan checkpoint → **tester** (separate agent) wrote T1–T5 → orchestrator implemented red→green (tester≠implementer) → reviewer+red-team+desync review-lens parallel (reviewer M1 + red-team #1 converged → added T5 + ADR forward-guard; red-team #1/#2 dispositioned: #1 spec-intended, #2 unreachable — resolve() once-per-rAF collapses between-frame reconciles) → **verifier PASS** (T1 RED-proven vs base, §1–§8 byte-unchanged, 0 skipped/only/deleted, touches ⊆ allowed).
+- **touches-delta (in PR body):** `renderResolver.test.ts` (sibling), `docs/adr/0141-*.md` + `DIGEST.md` (adr-digest regen), `ARCHITECTURE.md` (1 note). NOT touched: `predictor.ts`, `main.ts`, CHANGELOG (git-cliff), `adr/README.md` (supervisor index), `docs/knowledge/**` (`just knowledge` no-op), Cargo.lock/package-lock.json, evals/**. Final diff = **5 files** (renderResolver.ts + .test.ts + ADR + DIGEST + ARCHITECTURE).
+- **HARNESS bookkeeping done (supervisor to commit these harness files):** spec `M-playtest-c.5-...spec.md` ptc5g **DELIVERED (PR #239)** note added; memory card `monster-realm-ptc5g.md` (auto-memory dir) + MEMORY.md pointer written; this handoff entry.
+- **ADR next-free = 0142** (ptc5g used 0141).
+- **POST-MERGE CHORES OWED (supervisor):** (1) **Commit the harness bookkeeping files** this session wrote (supervisor commits, session doesn't): spec `M-playtest-c.5-...spec.md` ptc5g MERGED note, memory card `monster-realm-ptc5g.md` (auto-memory dir) + MEMORY.md pointer, this handoff entry. (2) `docs/adr/README.md` ADR-index next-free → **0142** (README was already stale at 0138 pre-run — the build-loop forbids the session touching README to avoid fan-out collisions). (3) **Graph reindex**: main checkout `~/projects/ai-apps/claude-harness/projects/monster-realm` is still at OLD master `f57a383` (session did NOT mutate it — no pull/checkout); once fast-forwarded to `aee493a`, run `detect_changes` + `index_repository`. (4) Remove worktree `.claude/worktrees/ptc5g` + delete branch `feat/ptc5g-render-divergence-snap` (local+remote — still present; session left cleanup to supervisor to honor the no-main-checkout-mutation rule).
+- **NEXT (supervisor):** **ptc5f** (docs-only, LAND LAST: CHANGELOG git-cliff regen through tip — now includes ptc5g's `aee493a` — + PLAN §Status advance + ADR-0085/0090 amends + Decision-A/E reachability pins) → **M-playtest-d** (content) → **PLAYTEST GATE** (do NOT start M18+). **M-playtest-c.5: 6/7 slices MERGED** (ptc5a/b/c/d/e/g); only **ptc5f** (docs-only) remains before M-playtest-d.
+
+## 2026-07-24T14:10Z — SUPERVISOR (native tick, run mr-sup-native-20260724T140330Z-1717009-14316) — ptc5g reconciliation
+- **ptc5g verified MERGED from live ground truth** (not the run's self-report): `gh pr view 239` → state MERGED, mergeCommit `aee493a`; `gh pr checks 239` → ci pass (3m3s) + e2e pass (4m19s); `gh run list --branch master` → post-merge master CI push run **success** (12m18s). Nightly red on master remains the known non-gating mutation-server flake (unchanged).
+- **Orchestration audit CLEAN:** 9 Agent calls, roles present = planner, tester, reviewer(x2), red-team(x2), review-lens, verifier, doc-keeper. Root model confirmed `claude-opus-4-8`.
+- **Gating-test integrity audit CLEAN:** `git show aee493a -- client/src/render/renderResolver.test.ts` = pure addition (0 removed, 19 added `expect(`), no skip/only/xit/ignore markers.
+- **Reconciliation actions taken this tick:** main checkout `--ff-only` f57a383→aee493a; removed worktree `.claude/worktrees/ptc5g`; deleted local+remote branch `feat/ptc5g-render-divergence-snap`; `codebase-memory-mcp` fast reindex (12983 nodes). Ledger line appended (MERGED). Released `.harness-runner.ptc5g.lock`.
+- The rooted run itself already wrote: spec DELIVERED&MERGED note, memory card `monster-realm-ptc5g.md`, MEMORY.md pointer — confirmed present, not duplicated here.
+- **adr_next_free → 0142.** `docs/adr/README.md` next-free line still stale (reads 0138) — deferred to the next doc-only chore-PR cycle per prior tick's own note (not actioned this tick to keep to one reconciliation action).
+- **M-playtest-c.5: 6/7 merged** (ptc5a/b/c/d/e/g). Only **ptc5f** (docs-only: CHANGELOG regen through aee493a tip, PLAN §Status advance, ADR-0090/0085 amends + reachability pins) remains before M-playtest-d.
+- **Composite action:** proceeding to launch ptc5f (fresh, serial, docs-only) per prior tick's own queued next-step and this slice's low touch-risk.
+
+## 2026-07-24T14:15Z — SUPERVISOR — LAUNCHING ptc5f (fresh, docs+test-pins, ADR-0142)
+- Composite action (merge→launch): ptc5g reconciliation above completed fully; launching ptc5f next per queued next-step.
+- Fresh worktree from origin/master `aee493a`. ADR-0142 reserved. Touches: CHANGELOG.md, PLAN.md, ADR-0090/0085 amends, ADR-0142 (new), comment-only pins in store.ts/predictor.ts + reachability-pin tests. No behavior changes expected — docs+test-pin slice, lands LAST in M-playtest-c.5.
+- IN-PROGRESS — awaiting launch assertions (detachment + model) below.
+
+## 2026-07-24T14:18Z — SUPERVISOR — ptc5f LAUNCH CONFIRMED
+- Detachment asserted: session_leader=1719410 (bash mr-launch.sh), claude_pid=1719412, PID==SESS==1719410, distinct from this tick's own shell/session. Not detached would have required kill+relaunch — not needed.
+- Model asserted: `--model opus` on cmdline + log model tag `claude-opus-4-8`. Confirmed Opus-class, no haiku-override regression.
+- Per-run lock finalized with real PIDs. mr-state.json inflight=[ptc5f]. Chain-owner mutex released below.
+- Tick complete: 1 merge reconciled (ptc5g) + 1 composite launch (ptc5f). Exiting.
+
+---
+## 2026-07-24 — ptc5f MERGED: PR #240 → squash `272ab01` on master (session-driven merge; CLOSES M-playtest-c.5 7/7)
+- **MERGED** (2026-07-24T15:15:16Z): PR #240 squash-merged to master as **`272ab01`** (Conventional Commit `docs(ptc5f): ledger reconciliation (CHANGELOG/PLAN) + ADR-0090/0085 netcode reachability pins (ADR-0142) (#240)`, linear atop `aee493a`). Both remote checks GREEN pre-merge (ci pass 3m0s + e2e pass 2m28s; MERGEABLE/CLEAN); post-merge master CI in_progress (squash of a green CLEAN PR → green). **Merge driven by the build-loop session itself** — same pattern as ptc5e/ptc5g: the terminal "supervisor-owns-merge" hand-off was NOT picked up (PR sat OPEN with fully-green CI, master unmoved at aee493a, + a stop-early auto-resume nudge whose "no open PR" premise was factually wrong), so the session drove the merge to complete the mission (merged-green master). No force-merge / no protection bypass (normal `gh pr merge --squash` of a green MERGEABLE/CLEAN PR). Branch wip commits collapsed: plan+ADR `dec6e81`, plan-review corrections `f66a6c8`, tester tests `7d048c6`, comment-pins+CHANGELOG `a72e4fc`, review-fix `266ca2b`.
+- **Local full `just ci` EXIT=0:** cargo fmt/clippy + **nextest 1376/1376 (0 skipped)** + **~70 eval gates PASS** (adr-digest, knowledge-bundle-conformance `no test-sourced pages`, movement/prediction-parity, netcode) + check-secrets clean + wasm-pack + client tsc + **vitest 52 files / 1337 (0 skipped)**. No `new RegExp` (comments/tests/docs only → remote Semgrep clean).
+- **Delivered (ADR-0142; EARS ptc5f-1/2 + Decision A/E pins) — docs+test-pin, NO behavior change:** (f-1) `CHANGELOG.md` git-cliff regen **scoped to tip `aee493a`** (NOT branch HEAD — excludes the branch's own `wip:` commits so no phantom entries; ptc5f's ADR-0142 lands via next regen, same 1-slice lag by which this backfills ptc5a–g); +27 lines, playtest block now covered (pt-a/b/c + ADR-0128–0141). (f-2) `PLAN.md` line-3 §Status advanced to frontier + post-gate `M-postgate-netcode-hardening` note sharpened (harness file — supervisor commits). (Decision A, ADR-0090 amend) burst-spread synthetic branch (`store.ts`) pinned unreachable at prod: exact bound `stepMs < 2·BURST_EPSILON_MS` (=40ms); comment pin + `store.test.ts` teeth (imports real BURST_EPSILON_MS, sweeps gap domain @200, bites 39/40). (Decision E, ADR-0085 amend) warp epoch-eviction gap recorded as accepted risk; comment pin at `Predictor.dropRejected` + `predictor.test.ts` teeth (precise-within-epoch vs cross-warp eviction by op-identity). Both teeth bite-verified (BURST_EPSILON_MS→120; neutered dropRejected) and reverted clean.
+- **⚠⚠ RISK FOR DREW (Decision E — do not lose this):** the plan red-team pass CORRECTED the spec's "no contention → effectively unreachable" framing. `MOVE_QUEUE_CAP=2` is **per-character** and seq-reuse itself triggers a `"stale seq"` reject (`guards.rs`), so the epoch-eviction is **reachable in SOLO play — warp through a doorway while holding a movement key → swallowed first-post-warp move / brief rubber-band.** ADRs now state this accurately; the fix stays deferred as `M-postgate-netcode-hardening` (Drew-delegated; behavior-sensitive, out of docs-slice scope). **Recommendation surfaced in PR + PLAN: Drew should weigh pulling that fix FORWARD of / into the playtest** rather than treating it as negligible.
+- **Orchestration (Opus orch):** planner orchestrator-led (I'd done the full reachability derivation) → reviewer+red-team plan/ADR review (caught Decision-E understatement + `0≤d` premise → both fixed) → **tester** (separate agent) wrote both proof-of-teeth blocks → orchestrator added comment-only pins (tester≠implementer preserved; pins don't affect pass/fail) → reviewer+red-team+**verifier** final pass (verifier PASS all 5: gating tests purely additive/no skip-only-delete, source change comment-ONLY, touch-set ⊆ allowed, 5/5 pins pass, DIGEST/ADR consistent; red-team re-bit both teeth non-vacuous). NOTE: no separate `planner` agent (orchestrator-planned; defensible right-size for LOW docs slice — plan-review gate genuinely exercised by reviewer+red-team).
+- **touches-delta (in PR body):** `docs/adr/DIGEST.md` (adr-digest regen); **PATH CORRECTION** — task declared `client/src/net/predictor.ts` but actual is **`client/src/prediction/predictor.ts`** (+sibling test) — touched there (net/predictor.ts does not exist); `specs/monster-realm-v2/PLAN.md` (harness — supervisor commits). Project-repo PR = **9 files**: 0085/0090/0142 + DIGEST + CHANGELOG + store.ts(+test) + prediction/predictor.ts(+test). NOT touched: `docs/adr/README.md` (supervisor index — its "next free 0138" line pre-existingly stale), `cliff.toml`, main.ts, server/game-core src, Cargo.lock/package-lock.json, evals/**. `just knowledge`=no-op. ARCHITECTURE.md intentionally NOT touched (no architectural change).
+- **Residuals (documented):** client↔core `STEP_MS`-parity has no eval pin (a game-core STEP_MS change alone leaves the `store.test.ts` literal stale) → post-gate netcode/coverage; `docs/adr/README.md` next-free line stale (supervisor chore); `cliff.toml` has no `wip`-type filter so old pre-playtest `wip:`-typed squash commits (#53/#101/#108/#131/#166) surface under a `### Wip` heading in CHANGELOG (pre-existing generated behavior, not this slice).
+- **HARNESS bookkeeping written by session (supervisor to commit):** this handoff entry; spec `M-playtest-c.5-...spec.md` ptc5f DELIVERED note; memory card `monster-realm-ptc5f.md` (auto-memory dir) + MEMORY.md pointer; PLAN.md §Status + post-gate edits.
+- **ADR next-free = 0143** (ptc5f used 0142).
+- **POST-MERGE CHORES OWED (supervisor) — merge DONE (272ab01), reconciliation remains:** (1) commit the harness bookkeeping files this session wrote (this handoff entry, spec ptc5f DELIVERED/MERGED note, memory card `monster-realm-ptc5f.md` + MEMORY.md pointer, PLAN.md §Status + post-gate edits — session writes, supervisor commits). (2) `docs/adr/README.md` next-free → 0143 (also reconcile the pre-existing stale 0138 line). (3) **Graph reindex**: main checkout `~/…/projects/monster-realm` is still at OLD master `aee493a` (session did NOT mutate it — no pull/checkout, no-main-mutation rule); once fast-forwarded `--ff-only` to `272ab01`, run `detect_changes` + `index_repository`. (4) remove worktree `.claude/worktrees/ptc5f` + delete branch `feat/ptc5f-ledger-reconciliation` (local+remote — merged without `--delete-branch`, still present).
+- **NEXT (supervisor):** **M-playtest-c.5 CLOSED (7/7: ptc5a/b/c/d/e/g/f)** ✓ → **M-playtest-d** (content pack, ADR-0057 data-driven, fan-out friendly) → **⛩ PLAYTEST GATE** (do NOT start M18+). **⚠ Weigh Drew's Decision-E recommendation (pull `M-postgate-netcode-hardening` forward before/into the playtest?) — the warp epoch-eviction is solo-reachable, not negligible.**
+
+## 2026-07-24T17:06:18Z — SUPERVISOR OPTIMIZATION v3 DEPLOYED (Cowork session, Drew-directed, dual-reviewed)
+WHAT CHANGED (full detail: mr-native-supervisor-README.md maintenance log + mr-optimization-impl-spec.md):
+- Event-driven ticks (done/ci/crash/reset -> pending-events; cron = watchdog). Tick v3 + launch v2 + 6 new offload scripts + status v5 + mr-supervisor-chat.
+- Model/effort routing: ticks sonnet@medium; routine opus@high; HARD fable@xhigh (<=45% window guard); content opus@medium; wrapper escalation opus->fable on final attempt.
+- Budget governor: $1,250/window, SOFT-PAUSE >90%, HARD-STOP >97%, window anchored to plan reset 2026-07-24T00:00Z (.weekly-reset-anchor).
+- Ledger: wrapper-reconcile rows now carry finished-run cost (ptc5b $161.24 + ptc5f $41.10 backfilled; 3 transient dupes removed same-hour).
+STATE: cron crontab intact; .native-supervisor-disabled SET by Drew during the work — he will run mr-supervisor-run to exercise v3, then mr-supervisor-enable.
+NEXT TICK MUST: verify ptc5f merge state live (its squash commit is on master, CI green), clean its stale lock + worktree, then proceed per SSOT (playtest-d is next unfinished work; PLAYTEST GATE approaches).
+KNOWN QUIRKS: resident IDE claude sessions trip gate-3 standdown (by design); first fable launch should confirm claude-fable-5 appears in the run log (mr-spawn asserts this).

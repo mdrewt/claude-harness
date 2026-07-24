@@ -1,0 +1,88 @@
+#!/bin/bash
+# mr-spawn <slice> [--dry] — build brief + lock + detached launch + asserts, from /tmp/mr_pass_<slice>.vars.json
+# vars.json: {slice, model, effort, adr, touches, target_desc, resume_block, tier}
+# Kills a failed first attempt BY RECORDED PID before its single retry. Prints one status JSON line.
+set -u
+exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
+PROJ=$HARNESS/projects/monster-realm
+S="${1:?usage: mr-spawn <slice> [--dry]}"; DRY="${2:-}"
+V="/tmp/mr_pass_$S.vars.json"; B="/tmp/mr_pass_$S.md"
+status(){ echo "{\"slice\":\"$S\",\"status\":\"$1\",\"detail\":\"$2\"}"; exit "${3:-0}"; }
+[ -r "$V" ] || status FAIL "vars.json missing: $V" 1
+# mechanical active-session probe (mirror of tick gate 3)
+IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
+WRITES=$(find "$HARNESS" "$PROJ" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path "$MEM/*" -mmin -6 2>/dev/null | head -1)
+[ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
+[ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
+# build brief
+export S V B MEM
+/usr/bin/python3 - <<'PY' || exit 1
+import json, os
+S=os.environ["S"]; v=json.load(open(os.environ["V"]))
+tpl=open(os.environ["MEM"]+"/mr-brief-template.md").read()
+_t=v.get("touches","")
+touches_str=", ".join(_t) if isinstance(_t,list) else str(_t)
+tier=v.get("tier","routine")
+tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard" else "")
+rb=v.get("resume_block","") or ""
+for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCHES>",touches_str),
+              ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block)]:
+    tpl=tpl.replace(k,val)
+open(os.environ["B"],"w").write(tpl)
+print("brief-built bytes=%d tier=%s" % (len(tpl),tier))
+PY
+MODEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('model','opus'))")
+EFFORT=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('effort','high'))")
+rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
+if [ "$DRY" = "--dry" ]; then status DRY "brief built; model=$MODEL effort=$EFFORT; no launch"; fi
+RID="mr-spawn-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+attempt_launch(){
+  setsid bash "$MEM/mr-launch.sh" "$S" "$MODEL" "$EFFORT" >/dev/null 2>&1 & LEADER=$!
+  disown 2>/dev/null || true
+  sleep 4
+  # detachment assert: leader must be its own session
+  SESS=$(ps -o sess= -p "$LEADER" 2>/dev/null | tr -d ' ')
+  [ -n "$SESS" ] && [ "$SESS" = "$LEADER" ] || return 1
+  # model-class assert: poll log <=90s for first model id; must match requested class
+  local want="$MODEL" seen=""
+  for i in $(seq 1 30); do
+    seen=$(grep -m1 -o '"model":"claude-[a-z0-9.-]*"' "/tmp/mr_pass_$S.log" 2>/dev/null | head -1)
+    [ -n "$seen" ] && break; sleep 3
+  done
+  case "$want" in
+    opus)  echo "$seen" | grep -q "claude-opus"  || return 2;;
+    fable) echo "$seen" | grep -q "claude-fable" || return 2;;
+    sonnet) echo "$seen" | grep -q "claude-sonnet" || return 2;;
+  esac
+  return 0
+}
+kill_attempt(){
+  [ -n "${LEADER:-}" ] || return 0
+  CPID=$(pgrep -P "$LEADER" 2>/dev/null | head -1)
+  kill -TERM "$LEADER" ${CPID:+$CPID} 2>/dev/null; sleep 3
+  kill -KILL "$LEADER" ${CPID:+$CPID} 2>/dev/null || true
+}
+if ! attempt_launch; then
+  kill_attempt
+  echo "{\"slice\":\"$S\",\"status\":\"RETRY\",\"detail\":\"first launch failed assert; retrying once\"}"
+  if ! attempt_launch; then kill_attempt; status FAIL "launch asserts failed twice (detach/model)" 1; fi
+fi
+CPID=$(pgrep -P "$LEADER" 2>/dev/null | head -1)
+export S V MEM RID LEADER CPID MODEL EFFORT B
+if ! /usr/bin/python3 - <<'PYLOCK'
+import json, os, datetime
+v=json.load(open(os.environ["V"]))
+t=v.get("touches","")
+touches=t if isinstance(t,list) else [x.strip() for x in str(t).split(",") if x.strip()]
+lock={"run_id":os.environ["RID"],"slice":os.environ["S"],
+ "session_leader":int(os.environ["LEADER"]),"claude_pid":int(os.environ.get("CPID") or 0),
+ "started_utc":datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+ "brief":os.environ["B"],"done_flag":"/tmp/mr_pass_%s.done"%os.environ["S"],
+ "adr_reserved":str(v.get("adr","")),"touches":touches,
+ "model":os.environ["MODEL"],"effort":os.environ["EFFORT"],"tier":v.get("tier","routine")}
+open(os.environ["MEM"]+"/.harness-runner."+os.environ["S"]+".lock","w").write(json.dumps(lock,indent=1))
+PYLOCK
+then kill_attempt; status FAIL "lock write failed after launch (attempt killed)" 1; fi
+status LAUNCHED "leader=$LEADER claude_pid=${CPID:-?} model=$MODEL effort=$EFFORT rid=$RID"

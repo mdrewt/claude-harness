@@ -1,0 +1,71 @@
+#!/bin/bash
+# mr-audit — mechanical pre-merge audits. ALWAYS rc=0; verdicts in JSON (stdout + /tmp/mr_audit_<slice>.json).
+# Verdicts: CLEAN | FLAGGED | AUDIT-ERROR (treat AUDIT-ERROR as FLAGGED).
+# usage: mr-audit --slice S --log /tmp/mr_pass_S.log --repo PATH --base REF --head REF [--tier hard|routine|content] [--doc-only]
+export A_ARGS=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
+/usr/bin/python3 <<'PY'
+import json, os, re, subprocess, sys
+argv=json.loads(os.environ["A_ARGS"]); a={}
+i=0
+while i<len(argv):
+    k=argv[i][2:]
+    if i+1<len(argv) and not argv[i+1].startswith("--"): a[k]=argv[i+1]; i+=2
+    else: a[k]="1"; i+=1
+out={"slice":a.get("slice","?"),"tier":a.get("tier","routine")}
+def finish():
+    s=json.dumps(out, indent=1)
+    print(s)
+    try: open(f"/tmp/mr_audit_{out['slice']}.json","w").write(s)
+    except Exception: pass
+    sys.exit(0)
+try:
+    # --- orchestration evidence ---
+    orch={"agent_calls":0,"roles":[],"models":[]}
+    if a.get("log") and os.path.exists(a["log"]):
+        roles=set(); models=set(); n=0
+        for line in open(a["log"], errors="replace"):
+            if '"name":"Agent"' in line: n+=1
+            for m in re.finditer(r'"subagent_type":"([^"]+)"', line): roles.add(m.group(1))
+            for m in re.finditer(r'"model":"(claude-[^"]+)"', line): models.add(m.group(1))
+        orch.update(agent_calls=n, roles=sorted(roles), models=sorted(models))
+        doc_only=a.get("doc-only")=="1"
+        if doc_only: orch["verdict"]="CLEAN-doc-exempt"
+        elif n==0 or not any("tester" in r for r in orch["roles"]) or not any(r in ("reviewer","verifier","review-lens") or "review" in r or "verif" in r for r in orch["roles"]):
+            orch["verdict"]="FLAGGED"; orch["reason"]="missing tester and/or reviewer/verifier role evidence"
+        else: orch["verdict"]="CLEAN"
+    else:
+        orch["verdict"]="AUDIT-ERROR"; orch["reason"]="log missing: "+str(a.get("log"))
+    out["orchestration"]=orch
+    # --- gating-test integrity ---
+    g={"changed_test_files":[],"deleted_test_files":[],"removed_or_modified_asserts":0,"skip_markers_added":0,"suppressions_added":0}
+    repo=a.get("repo"); base=a.get("base"); head=a.get("head")
+    if repo and base and head and os.path.isdir(repo):
+        r=subprocess.run(["git","-C",repo,"diff","--name-status",f"{base}..{head}"],capture_output=True,text=True,timeout=60)
+        if r.returncode!=0: raise RuntimeError("git diff name-status failed: "+r.stderr[:120])
+        testpat=re.compile(r"(test|spec|evals/|_tests\.rs|\.test\.)", re.I)
+        for ln in r.stdout.splitlines():
+            parts=ln.split("\t")
+            if len(parts)>=2 and testpat.search(parts[-1]):
+                g["changed_test_files"].append(ln[:160])
+                if parts[0].startswith("D"): g["deleted_test_files"].append(parts[-1])
+        r2=subprocess.run(["git","-C",repo,"diff",f"{base}..{head}","--","*test*","*spec*","evals",":(glob)**/*_tests.rs",":(glob)**/*.test.ts"],capture_output=True,text=True,timeout=120)
+        if r2.returncode!=0: raise RuntimeError("git diff content failed: "+r2.stderr[:120])
+        for ln in r2.stdout.splitlines():
+            if ln.startswith("-") and not ln.startswith("---") and re.search(r"assert|expect\(|\.toBe|\.toEqual|panic!|prop_assert", ln): g["removed_or_modified_asserts"]+=1
+            if ln.startswith("+") and not ln.startswith("+++"):
+                if re.search(r"\.skip\b|\.only\b|\bxit\(|\bxdescribe\(|#\[ignore\]|todo!\(", ln): g["skip_markers_added"]+=1
+                if re.search(r"nosemgrep|eslint-disable|@ts-ignore|@ts-expect-error|#\[allow\(", ln): g["suppressions_added"]+=1
+        if a.get("tier")=="hard":
+            g["verdict"]="FLAGGED"; g["reason"]="hard-tier: mandatory LLM diff read"
+        elif g["deleted_test_files"] or g["skip_markers_added"] or g["suppressions_added"] or g["removed_or_modified_asserts"]>0:
+            g["verdict"]="FLAGGED"; g["reason"]="mechanical tripwire (see counters); LLM must read the diff"
+        else:
+            g["verdict"]="CLEAN"
+    else:
+        g["verdict"]="AUDIT-ERROR"; g["reason"]="repo/base/head missing or repo not a dir"
+    out["gating"]=g
+except Exception as e:
+    out["orchestration"]=out.get("orchestration",{"verdict":"AUDIT-ERROR"})
+    out["gating"]={"verdict":"AUDIT-ERROR","reason":str(e)[:200]}
+finish()
+PY

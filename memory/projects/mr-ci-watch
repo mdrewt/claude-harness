@@ -1,0 +1,35 @@
+#!/bin/bash
+# mr-ci-watch <pr-number> <slice> — zero-token CI watcher. Launch DETACHED: setsid bash mr-ci-watch PR SLICE & disown
+# Distinguishes checks-concluded vs gh-error (retry<=3 backoff -> INCONCLUSIVE). Fires a tick via pending-event.
+set -u
+exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+PR="${1:?pr}"; S="${2:?slice}"
+[ -f "$MEM/.native-supervisor-disabled" ] && exit 0
+[ "${MR_NO_EVENT_BRIDGE:-0}" = "1" ] && exit 0
+LOCKD="/tmp/mr_ciwatch_$S.lock.d"
+mkdir "$LOCKD" 2>/dev/null || { OP=$(cat "$LOCKD/pid" 2>/dev/null); [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null && grep -q mr-ci-watch "/proc/$OP/cmdline" 2>/dev/null && exit 0; rm -rf "$LOCKD"; mkdir "$LOCKD" || exit 0; }
+echo $$ > "$LOCKD/pid"
+trap 'rm -rf "$LOCKD"' EXIT
+fire(){ # $1=state $2=detail
+  EV="$MEM/pending-events/$S.ci.md"
+  { echo "EVENT src=ci slice=$S pr=$PR state=$1 at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; echo "$2"; } > "$EV"
+  MR_EVENT_SRC=ci setsid /bin/bash "$MEM/mr-native-tick.sh" "$EV" >/dev/null 2>&1 &
+}
+for TRY in 1 2 3; do
+  # merged/closed? then no watch needed
+  ST=$(timeout 30 gh pr view "$PR" -R mdrewt/monster-realm --json state,mergedAt 2>/dev/null)
+  case "$ST" in *'"MERGED"'*|*'"CLOSED"'*) exit 0;; esac
+  if timeout 3300 gh pr checks "$PR" -R mdrewt/monster-realm --watch >/dev/null 2>&1; then
+    fire green "all checks passed"; exit 0
+  else
+    RC=$?
+    # rc=8 means checks pending timeout w/ gh<2.x variants; non-zero can also mean failed checks (concluded)
+    CONC=$(timeout 30 gh pr checks "$PR" -R mdrewt/monster-realm 2>/dev/null | grep -cE "fail|pass" || true)
+    PEND=$(timeout 30 gh pr checks "$PR" -R mdrewt/monster-realm 2>/dev/null | grep -c "pending" || true)
+    if [ "${PEND:-0}" = "0" ] && [ "${CONC:-0}" != "0" ]; then fire red "checks concluded with failures (watch rc=$RC)"; exit 0; fi
+    sleep $((30*TRY))
+  fi
+done
+fire inconclusive "CI-WATCH-INCONCLUSIVE after 3 attempts (gh errors or still pending past timeout)"
+exit 0

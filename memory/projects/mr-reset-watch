@@ -1,0 +1,24 @@
+#!/bin/bash
+# mr-reset-watch <resets_at: epoch-or-ISO8601> — sleep until rate-limit reset +120s, then fire a tick. Launch detached.
+set -u
+exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+R="${1:?resets_at}"
+[ "${MR_NO_EVENT_BRIDGE:-0}" = "1" ] && exit 0
+E=$(/usr/bin/python3 - "$R" <<'PY'
+import sys, datetime
+v=sys.argv[1]
+try: print(int(float(v)))
+except ValueError:
+    try: print(int(datetime.datetime.strptime(v.replace("Z","+0000"),"%Y-%m-%dT%H:%M:%S%z").timestamp()))
+    except Exception: print(0)
+PY
+)
+[ "$E" = "0" ] && exit 0
+NOW=$(date +%s); WAIT=$(( E - NOW + 120 )); [ "$WAIT" -lt 0 ] && WAIT=0
+[ "$WAIT" -gt 604800 ] && exit 0   # >7d: nonsense value, let cron handle it
+sleep "$WAIT"
+EV="$MEM/pending-events/rate-limit.reset.md"
+echo "EVENT src=reset at=$(date -u +%Y-%m-%dT%H:%M:%SZ) — recorded resetsAt ($R) has passed; re-evaluate parked work" > "$EV"
+MR_EVENT_SRC=reset setsid /bin/bash "$MEM/mr-native-tick.sh" "$EV" >/dev/null 2>&1 &
+exit 0

@@ -1,0 +1,122 @@
+#!/bin/bash
+# mr-situation — one-shot JSON state bundle for supervisor ticks. HINTS-ONLY (re-verify before mutating).
+# Contract: ALWAYS rc=0, ALWAYS valid JSON; failures become per-field "error:..." strings.
+# Flags: --fresh (bypass 45s cache) · --no-gh (skip gh calls; for tests)
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+CACHE="$MEM/.situation-cache.json"
+FRESH=0; NOGH=0
+for a in "$@"; do case "$a" in --fresh) FRESH=1;; --no-gh) NOGH=1;; esac; done
+if [ "$FRESH" = 0 ] && [ -f "$CACHE" ]; then
+  AGE=$(( $(date +%s) - $(stat -c %Y "$CACHE") ))
+  if [ "$AGE" -lt 45 ]; then cat "$CACHE"; exit 0; fi
+fi
+export MEM NOGH
+/usr/bin/python3 - <<'PY' > "$CACHE.tmp" 2>/dev/null || echo '{"authority":"HINTS-ONLY","error":"situation-generator-crashed"}' > "$CACHE.tmp"
+import json, os, glob, subprocess, time, datetime
+MEM=os.environ["MEM"]; NOGH=os.environ.get("NOGH")=="1"
+out={"authority":"HINTS-ONLY (re-verify anything you are about to mutate)",
+     "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+def safe(fn, default):
+    try: return fn()
+    except Exception as e: return "error:"+str(e)[:120] if isinstance(default,str) else default
+def run(cmd, t=20):
+    r=subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=t)
+    return r.returncode, r.stdout.strip(), r.stderr.strip()
+out["disabled"]=os.path.exists(MEM+"/.native-supervisor-disabled")
+locks=[]
+for L in glob.glob(MEM+"/.harness-runner.*.lock"):
+    sl=os.path.basename(L)[len(".harness-runner."):-len(".lock")]
+    try:
+        d=json.load(open(L)); pid=d.get("session_leader")
+        alive=False
+        if pid:
+            try: os.kill(int(pid),0); alive=True
+            except Exception: alive=False
+        locks.append({"slice":sl,"leader":pid,"alive":alive,"done":os.path.exists(f"/tmp/mr_pass_{sl}.done")})
+    except Exception as e: locks.append({"slice":sl,"error":str(e)[:80]})
+out["locks"]=locks
+out["done_files"]=[os.path.basename(p) for p in glob.glob("/tmp/mr_pass_*.done")]
+out["pending_events"]=sorted(os.path.basename(p) for p in glob.glob(MEM+"/pending-events/*.md"))
+def ghpr():
+    if NOGH: return "skipped:--no-gh"
+    rc,so,se=run("gh pr list -R mdrewt/monster-realm --state open --json number,headRefName,mergeStateStatus", 25)
+    if rc!=0: return "error:gh:"+se[:100]
+    return json.loads(so or "[]")
+out["open_prs"]=safe(ghpr,"error")
+def masterci():
+    if NOGH: return "skipped:--no-gh"
+    rc,so,se=run("gh run list -R mdrewt/monster-realm -b master -L1 --json conclusion,status,displayTitle", 20)
+    if rc!=0: return "error:gh:"+se[:100]
+    return json.loads(so or "[]")
+out["master_ci_latest"]=safe(masterci,"error")
+rc,so,_=run(f"git -C /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm rev-parse --short HEAD", 10)
+out["master_sha_local"]=so if rc==0 else "error:git"
+# budget
+WEEKLY=1250.0; SOFT=0.90; HARD=0.97; FGUARD=0.45
+def budget():
+    now=time.time()
+    ws=now-7*86400
+    try:
+        a=float(open(MEM+"/.weekly-reset-anchor").read().strip())
+        if a<=now: ws=a+int((now-a)//(7*86400))*7*86400
+    except Exception: pass
+    d7=0.0; fab=0.0; latest={}
+    for l in open(MEM+"/monster-realm-usage-ledger.jsonl"):
+        l=l.strip()
+        if not l: continue
+        try: d=json.loads(l)
+        except Exception: continue
+        ts=d.get("ts") or ""
+        try: e=datetime.datetime.strptime(ts[:19],"%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
+        except Exception: continue
+        sl=str(d.get("slice")); latest[sl]=d
+        if e<ws: continue
+        try: c=float(d.get("cost_usd") or 0)
+        except (TypeError,ValueError): c=0.0
+        d7+=c
+        if "fable" in str(d.get("model","")).lower(): fab+=c
+    unrec=0
+    for df in glob.glob("/tmp/mr_pass_*.done"):
+        sl=os.path.basename(df)[len("mr_pass_"):-len(".done")]
+        last=latest.get(sl)
+        if last is None or str(last.get("outcome","")).upper().startswith("LAUNCH"): unrec+=1
+    for L in glob.glob(MEM+"/.harness-runner.*.lock"):
+        sl=os.path.basename(L)[len(".harness-runner."):-len(".lock")]
+        if os.path.exists(f"/tmp/mr_pass_{sl}.done"): continue
+        try:
+            pid=json.load(open(L)).get("session_leader")
+            os.kill(int(pid),0)
+        except Exception:
+            unrec+=1
+    est=unrec*25.0
+    eff=d7+est
+    state="NORMAL"
+    if eff>HARD*WEEKLY: state="HARD-STOP"
+    elif eff>SOFT*WEEKLY: state="SOFT-PAUSE"
+    return {"window_start_utc":datetime.datetime.fromtimestamp(ws,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
+            "unreconciled_est_usd":est,"effective_usd":round(eff,2),"weekly_limit_usd":WEEKLY,
+            "soft_pause_frac":SOFT,"hard_stop_frac":HARD,"fable_guard_frac":FGUARD,
+            "fable_guard_usd":round(FGUARD*WEEKLY,2),"fable_ok": fab < FGUARD*WEEKLY,"state":state}
+b=safe(budget,{"state":"UNKNOWN","error":"budget-computation-failed"})
+if not isinstance(b,dict) or "state" not in b: b={"state":"UNKNOWN","error":str(b)[:120]}
+out["budget"]=b
+def state_extra():
+    d=json.load(open(MEM+"/mr-state.json")); return d.get("rate_limit_resets_at")
+out["rate_limit_resets_at"]=safe(state_extra,"error")
+def lastfail():
+    p=MEM+"/.native-supervisor-last-failure"
+    return open(p).read().strip() if os.path.exists(p) else None
+out["last_failure"]=safe(lastfail,"error")
+def blockers():
+    rc,so,_=run(f"tail -c 20000 '{MEM}/monster-realm-handoff.md' | grep -n 'BLOCKER' | tail -5", 10)
+    return [x[:200] for x in so.splitlines()] if so else []
+out["recent_blockers"]=safe(blockers,[])
+def watchers():
+    rc,so,_=run("pgrep -af 'mr-ci-watch|mr-reset-watch' | grep -v grep", 5)
+    return so.splitlines() if so else []
+out["live_watchers"]=safe(watchers,[])
+print(json.dumps(out, indent=1))
+PY
+mv "$CACHE.tmp" "$CACHE"
+cat "$CACHE"
+exit 0
