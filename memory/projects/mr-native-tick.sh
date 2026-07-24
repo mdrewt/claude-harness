@@ -198,21 +198,26 @@ timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-sk
   --output-format stream-json --verbose \
   -p "$(cat "$PROMPTF")" >> "$TLOG" 2>&1
 RC=$?
-COST=$(/usr/bin/python3 - "$TLOG" <<'PY'
-import json,sys
-t=0.0; f=False
+read -r COST TICKMODEL <<< "$(/usr/bin/python3 - "$TLOG" <<'PYX'
+import json,sys,re
+t=0.0; f=False; model=""
 try:
     for l in open(sys.argv[1],errors="replace"):
+        if not model:
+            m=re.search(r'"model":"(claude-[a-z0-9.-]+)"', l)
+            if m: model=m.group(1)
         if '"type":"result"' in l:
             try:
                 c=json.loads(l).get("total_cost_usd")
                 if c is not None: t+=float(c); f=True
             except Exception: pass
 except Exception: pass
-print(round(t,4) if f else "")
-PY
-)
-log "SPAWN-DONE rc=$RC cost=${COST:-unknown} rid=$RID"
+print((str(round(t,4)) if f else "-"), (model or "-"))
+PYX
+)"
+[ "$COST" = "-" ] && COST=""
+[ "$TICKMODEL" = "-" ] && TICKMODEL="$SUP_MODEL"
+log "SPAWN-DONE rc=$RC cost=${COST:-unknown} model=$TICKMODEL rid=$RID"
 
 if [ "$RC" -eq 0 ]; then
   date -u +%s > "$MEM/.native-supervisor-last-success"
@@ -221,7 +226,7 @@ if [ "$RC" -eq 0 ]; then
   mkdir -p "$MEM/pending-events/archive"
   for EV in $CONSUMED; do [ -f "$EV" ] && mv "$EV" "$MEM/pending-events/archive/$(date -u +%s).$(basename "$EV")" 2>/dev/null; done
   "$MEM/mr-record" ledger --run_id "$RID" --slice SUPERVISOR --outcome "tick-ok src=$SRC" \
-    ${COST:+--cost "$COST"} --model "claude-sonnet-5" --notes "governor=$GSTATE" >> "$LOG" 2>&1 || true
+    ${COST:+--cost "$COST"} --model "$TICKMODEL" --notes "governor=$GSTATE" >> "$LOG" 2>&1 || true
 else
   REASON=$(grep -m1 -iE 'not logged in|please run /login|invalid api key|api key|authentication|unauthorized|forbidden' "$TLOG" 2>/dev/null | tr -d '\r' | head -c 200)
   [ -z "$REASON" ] && REASON=$(tail -n 3 "$TLOG" 2>/dev/null | tr '\r\n' '  ' | head -c 200)
