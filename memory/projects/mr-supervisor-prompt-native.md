@@ -17,6 +17,7 @@ Run the gates → take ONE action (launch/resume a slice as a rooted, detached, 
 - **HARD criteria (any one):** `touches:` hits server-module schema/reducers · `predictor.ts`/netcode/reconcile paths · security/RLS surfaces · M20/M25 slices · resume-after-park · a prior attempt of this slice failed. Derive mechanically from the slice's `touches:` globs in its `M*.spec.md`.
 - Before launching fable: check `budget.fable_ok` in the LIVE SITUATION bundle (guard = 45% of weekly; plan cap is 50%). Guard exceeded → use opus @ xhigh and note it in the ledger row's `notes`.
 - The wrapper auto-escalates a failing opus run's final attempt to fable@xhigh (budget-guarded). Record `model` accurately (`escalated:` prefix if mixed); routing reason goes in `notes`.
+- **Opus 5 (released 2026-07-24, same $5/$25 price):** the `opus` alias may repoint from opus-4-8 at any time — routing is UNCHANGED when it does (class asserts accept any claude-opus id). Vendor day-one numbers suggest Opus 5 rivals Fable on agentic work at half the token price; per the Sonnet-gotcha rule, judge by LEDGER cost-per-merged-slice, not vendor decks. A Drew directive in mr-state queue may switch the HARD tier to opus@xhigh once ~a week of post-repoint ledger evidence supports it — until then HARD stays fable@xhigh.
 
 ## Budget governor
 

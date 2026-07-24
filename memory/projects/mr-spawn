@@ -56,9 +56,10 @@ attempt_launch(){
   done
   LAST_SEEN_MODEL="$seen"
   case "$want" in
-    opus)  echo "$seen" | grep -q "claude-opus"  || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
-    fable) echo "$seen" | grep -q "claude-fable" || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
-    sonnet) echo "$seen" | grep -q "claude-sonnet" || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
+    opus|claude-opus*)   echo "$seen" | grep -q "claude-opus"  || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
+    fable|claude-fable*) echo "$seen" | grep -q "claude-fable" || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
+    sonnet|claude-sonnet*) echo "$seen" | grep -q "claude-sonnet" || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
+    *) LAST_FAIL_KIND="model-unassertable"; echo "$seen" | grep -q "claude-" || { LAST_FAIL_KIND="model-mismatch"; return 2; };;
   esac
   return 0
 }
