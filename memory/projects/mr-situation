@@ -22,7 +22,8 @@ def safe(fn, default):
 def run(cmd, t=20):
     r=subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=t)
     return r.returncode, r.stdout.strip(), r.stderr.strip()
-out["disabled"]=os.path.exists(MEM+"/.native-supervisor-disabled")
+# NOTE (DRY, Drew 2026-07-24): the pause flag is deliberately NOT in this bundle. It is enforced solely by
+# the wrapper's gate -1; status/fallback/watchers read the flag FILE directly. Decision runs never see it.
 locks=[]
 for L in glob.glob(MEM+"/.harness-runner.*.lock"):
     sl=os.path.basename(L)[len(".harness-runner."):-len(".lock")]
