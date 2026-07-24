@@ -32,15 +32,16 @@ except Exception as e:
     print("OLLAMA-UNAVAILABLE:", str(e)[:100])
 PY
 }
+mark(){ printf '%s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SUB" "$1" > "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.ollama-last" 2>/dev/null; }
 case "$SUB" in
   ping)
-    echo "Reply with exactly: PONG" > "$PF"; TMO=60 gen 10;;
+    echo "Reply with exactly: PONG" > "$PF"; OUT=$(TMO=60 gen 10); case "$OUT" in OLLAMA-UNAVAILABLE*) mark UNAVAILABLE;; *) mark OK;; esac; printf '%s\n' "$OUT";;
   summarize-run)
     [ -n "$S" ] || { echo "OLLAMA-UNAVAILABLE: no slice given"; exit 0; }
     L="/tmp/mr_pass_$S.log"; E="/tmp/mr_pass_$S.err"; D="/tmp/mr_pass_$S.done"
     [ -f "$L" ] || { echo "OLLAMA-UNAVAILABLE: no log for $S"; exit 0; }
     { echo "You are summarizing evidence from an autonomous coding run (slice: $S) for a supervisor."
-      echo "Output <=14 terse bullet lines: goal, what was built/changed, final state (PR opened? merged? parked? crashed?), attempts/escalations, errors hit, and anything the supervisor MUST verify before acting. No preamble."
+      echo "Output <=14 terse bullet lines IN THIS ORDER: (1) anything the supervisor MUST verify before acting, (2) final state (PR opened? merged? parked? crashed?), (3) goal, (4) what was built/changed, (5) attempts/escalations, (6) errors hit. Most important first — output may be truncated from the end. No preamble."
       echo "STRICT RULE: state ONLY what the evidence below literally shows. If the evidence does not show something, write (not in evidence) — NEVER infer or invent details."
       echo "=== slice brief scope (ground truth for the goal) ==="; head -c 1500 "/tmp/mr_pass_$S.md" 2>/dev/null
       echo "=== .done ==="; cat "$D" 2>/dev/null
@@ -49,14 +50,14 @@ case "$SUB" in
       echo "=== last assistant messages ==="; grep '"type":"assistant"' "$L" 2>/dev/null | tail -18 | cut -c1-350
       echo "=== stderr tail ==="; tail -n 12 "$E" 2>/dev/null | cut -c1-300
     } | head -c 26000 > "$PF"
-    gen 420;;
+    OUT=$(gen 420); case "$OUT" in OLLAMA-UNAVAILABLE*) mark UNAVAILABLE;; *) mark OK;; esac; printf '%s\n' "$OUT";;
   triage)
     [ -n "$S" ] || { echo "OLLAMA-UNAVAILABLE: no slice given"; exit 0; }
     { echo "A headless coding session exited non-zero. Classify the cause as exactly one word on the first line: transient (API/network/infra blip worth auto-resume) or real (code/logic/config failure needing triage). Then one short reason line."
       echo "=== stderr tail ==="; tail -c 2000 "/tmp/mr_pass_$S.err" 2>/dev/null
       echo "=== log tail ==="; tail -n 5 "/tmp/mr_pass_$S.log" 2>/dev/null | cut -c1-300
     } > "$PF"
-    TMO=90 gen 60;;
+    OUT=$(TMO=90 gen 60); case "$OUT" in OLLAMA-UNAVAILABLE*) mark UNAVAILABLE;; *) mark OK;; esac; printf '%s\n' "$OUT";;
   *) echo "OLLAMA-UNAVAILABLE: unknown subcommand $SUB";;
 esac
 exit 0

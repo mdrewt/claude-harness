@@ -20,6 +20,7 @@ B="/tmp/mr_pass_$S.md"; L="/tmp/mr_pass_$S.log"; E="/tmp/mr_pass_$S.err"; D="/tm
 fire_event(){ # $1=src(done|crash) $2=headline
   [ "${MR_NO_EVENT_BRIDGE:-0}" = "1" ] && return 0
   EV="$MEM/pending-events/$S.$1.md"
+  EVT="$EV.building.$$"
   { echo "EVENT src=$1 slice=$S at=$(date -u +%Y-%m-%dT%H:%M:%SZ) — $2"
     echo "--- .done ---"; cat "$D" 2>/dev/null
     echo "--- log tail (40) ---"; tail -n 40 "$L" 2>/dev/null | cut -c1-400
@@ -28,15 +29,17 @@ fire_event(){ # $1=src(done|crash) $2=headline
       WT=$(git -C "$HARNESS/projects/monster-realm" worktree list 2>/dev/null | grep -i "$S" | awk '{print $1}' | head -1)
       [ -n "$WT" ] && { echo "--- worktree status ($WT) ---"; git -C "$WT" status --short 2>/dev/null | head -20; }
     fi
-  } > "$EV" 2>/dev/null
-  # advisory local-model summary (free, async-safe: we are already detached). Never gates anything.
+  } > "$EVT" 2>/dev/null
+  # advisory local-model summary (free; we are already detached). Never gates anything.
+  # Assembled into the temp file and mv'd atomically so a concurrent tick can never consume a half-built event.
   if [ "${MR_NO_OLLAMA:-0}" != "1" ] && [ -x "$MEM/mr-ollama" ]; then
-    SUMM=$("$MEM/mr-ollama" summarize-run "$S" 2>/dev/null | head -c 2400)
+    SUMM=$("$MEM/mr-ollama" summarize-run "$S" 2>/dev/null | head -c 3000)
     case "$SUMM" in
       OLLAMA-UNAVAILABLE*|"") : ;;
-      *) { echo "--- LOCAL-MODEL SUMMARY (ornith, ADVISORY ONLY — verify against ground truth) ---"; echo "$SUMM"; } >> "$EV" 2>/dev/null ;;
+      *) { echo "--- LOCAL-MODEL SUMMARY (ornith, ADVISORY ONLY — verify against ground truth) ---"; echo "$SUMM"; } >> "$EVT" 2>/dev/null ;;
     esac
   fi
+  mv "$EVT" "$EV" 2>/dev/null || true
   MR_EVENT_SRC=$1 setsid /bin/bash "$MEM/mr-native-tick.sh" "$EV" >/dev/null 2>&1 &
 }
 fail() { echo "EXIT=$1 ATTEMPTS=${A:-0}" >"$D"; fire_event crash "wrapper-fail rc=$1"; exit "$1"; }

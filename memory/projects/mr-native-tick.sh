@@ -24,6 +24,27 @@ _hb_fail=$(cat "$MEM/.native-supervisor-last-failure-epoch" 2>/dev/null || echo 
 _hb_ok=$(cat "$MEM/.native-supervisor-last-success" 2>/dev/null || echo 0)
 if [ "${_hb_fail:-0}" -le "${_hb_ok:-0}" ]; then date -u +%s > "$MEM/.native-supervisor-heartbeat"; fi
 
+# OLLAMA PREFLIGHT (best-effort, bounded, never blocks the loop): verify/start the local model server,
+# fire a DETACHED warm-up so event summaries hit a warm model. Any failure -> marker only; all consumers
+# of mr-ollama already degrade to pre-ollama behavior on OLLAMA-UNAVAILABLE.
+if [ "${MR_NO_OLLAMA:-0}" != "1" ] && command -v ollama >/dev/null 2>&1; then
+  if ! curl -s -m 2 http://localhost:11434/api/version >/dev/null 2>&1; then
+    setsid ollama serve </dev/null >>/tmp/mr_ollama_serve.log 2>&1 &
+    for i in 1 2 3 4 5; do sleep 2; curl -s -m 2 http://localhost:11434/api/version >/dev/null 2>&1 && break; done
+  fi
+  if curl -s -m 2 http://localhost:11434/api/version >/dev/null 2>&1; then
+    if ollama list 2>/dev/null | grep -q "^${MR_OLLAMA_MODEL:-ornith:35b}"; then
+      # detached warm-up + 30m keep_alive; tick does NOT wait for the 21GB load
+      setsid curl -s -m 300 http://localhost:11434/api/generate -d "{\"model\":\"${MR_OLLAMA_MODEL:-ornith:35b}\",\"prompt\":\"ok\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":1},\"keep_alive\":\"30m\"}" </dev/null >/dev/null 2>&1 &
+      log "OLLAMA preflight: server up, ${MR_OLLAMA_MODEL:-ornith:35b} present, warm-up dispatched"
+    else
+      printf '%s preflight MODEL-MISSING\n' "$(TS)" > "$MEM/.ollama-last"; log "OLLAMA preflight: model missing — advisory features degrade"
+    fi
+  else
+    printf '%s preflight SERVER-DOWN\n' "$(TS)" > "$MEM/.ollama-last"; log "OLLAMA preflight: server down, start failed — advisory features degrade"
+  fi
+fi
+
 # RECONCILE (accounting; runs even when disabled/over-budget): backfill ledger for finished runs
 for DF in /tmp/mr_pass_*.done; do
   [ -e "$DF" ] || continue
