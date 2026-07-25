@@ -32,6 +32,7 @@ if SUB=="handoff":
     print("handoff-appended: "+title); sys.exit(0)
 if SUB!="ledger": die("unknown subcommand "+SUB)
 slice_=a.get("slice") or die("--slice required")
+if slice_=="SUPERVISOR" and os.environ.get("MR_RECORD_WRAPPER")!="1": die("SUPERVISOR rows are wrapper-owned (duplicate written by a decision run 2026-07-25); record outcomes on the SLICE row instead")
 outcome=a.get("outcome") or die("--outcome required")
 model=a.get("model","")
 if model and not re.match(r"^(claude-(opus|sonnet|haiku|fable)[-a-z0-9.]*|opus|sonnet|haiku|fable|escalated:.*|n/a)$", model):

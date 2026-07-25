@@ -1,0 +1,101 @@
+#!/bin/bash
+# mr-metrics — read-only telemetry rollup (judge-approved definitions, 2026-07-25).
+# usage: mr-metrics --since 2026-07-24T23:30 --until 2026-07-25T04:10 [--label NAME]
+# Prints per-tier cost (ranges + n), overhead ratio, attempts histogram, latency
+# decomposition where timestamps exist, human-wait/blocker lines, governor spend.
+# LIMITS (printed): n<=3 figures are INDICATIVE; idle-time needs manual classification.
+set -u
+SINCE=""; UNTIL=""; LABEL="window"
+while [ $# -gt 0 ]; do case "$1" in
+  --since) SINCE="$2"; shift 2;; --until) UNTIL="$2"; shift 2;; --label) LABEL="$2"; shift 2;;
+  *) echo "unknown arg $1"; exit 1;; esac; done
+[ -n "$SINCE" ] && [ -n "$UNTIL" ] || { echo "need --since and --until (ISO, UTC)"; exit 1; }
+export SINCE UNTIL LABEL
+/usr/bin/python3 - <<'PY'
+import json, os, re, statistics
+MEM="/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
+S=os.environ["SINCE"]; U=os.environ["UNTIL"]; L=os.environ["LABEL"]
+tmap=json.load(open(MEM+"/mr-tier-map.json"))
+rows=[]
+for l in open(MEM+"/monster-realm-usage-ledger.jsonl"):
+    l=l.strip()
+    if not l: continue
+    try: d=json.loads(l)
+    except Exception: continue
+    ts=str(d.get("ts",""))
+    if S <= ts <= U: rows.append(d)
+def tier_of(d):
+    m=re.search(r"tier=(\w+)", str(d.get("notes","")))
+    if m: return m.group(1)
+    return tmap.get(str(d.get("slice")), "untagged")
+def fnum(v):
+    try: return float(v)
+    except (TypeError,ValueError): return 0.0
+# --- slices: launch/finish/merge triples ---
+sl={}
+for d in rows:
+    s=str(d.get("slice")); o=str(d.get("outcome","")).upper()
+    e=sl.setdefault(s,{})
+    if o.startswith("LAUNCH"): e["launch"]=d["ts"]; e["tier"]=tier_of(d)
+    if o.startswith("FINISHED"):
+        e["finish"]=d["ts"]; e["cost"]=e.get("cost",0)+fnum(d.get("cost_usd"))
+        m=re.search(r"ATTEMPTS=(\d+)", o); e["attempts"]=int(m.group(1)) if m else None
+        e.setdefault("tier",tier_of(d))
+    if o.startswith("MERGED"):
+        e["merge"]=d["ts"]; e.setdefault("tier",tier_of(d))
+        if fnum(d.get("cost_usd"))>0: e["cost"]=e.get("cost",0)+fnum(d.get("cost_usd"))
+sup=sum(fnum(d.get("cost_usd")) for d in rows if d.get("slice")=="SUPERVISOR")
+def mins(a,b):
+    import datetime
+    try:
+        pa=datetime.datetime.strptime(a[:19],"%Y-%m-%dT%H:%M:%S"); pb=datetime.datetime.strptime(b[:19],"%Y-%m-%dT%H:%M:%S")
+        return round((pb-pa).total_seconds()/60)
+    except Exception: return None
+merged={k:v for k,v in sl.items() if "merge" in v and k not in ("SUPERVISOR",) and not k.startswith("adr-")}
+chores={k:v for k,v in sl.items() if k.startswith("adr-")}
+print(f"===== mr-metrics [{L}] {S} .. {U} =====")
+print(f"LIMITS: all n<=3 figures INDICATIVE (range + n shown); idle-time not auto-computed (see event standdowns).")
+bytier={}
+for k,v in merged.items(): bytier.setdefault(v.get("tier","untagged"),[]).append((k,v))
+print("-- merged slices --")
+for t,items in bytier.items():
+    costs=[v.get("cost",0) for _,v in items if v.get("cost")]
+    if costs:
+        print(f"  tier={t}: n={len(items)} cost range ${min(costs):.2f}-${max(costs):.2f}" + (f" median ${statistics.median(costs):.2f}" if len(costs)>1 else ""))
+    for k,v in items:
+        b=mins(v.get("launch",""),v.get("finish","")) if v.get("launch") and v.get("finish") else None
+        mw=mins(v.get("finish",""),v.get("merge","")) if v.get("finish") and v.get("merge") else None
+        print(f"    {k}: cost=${v.get('cost',0):.2f} attempts={v.get('attempts')} build_min={b} merge_wait_min={mw}")
+if chores: print(f"  chores merged: {len(chores)} ({', '.join(chores)})")
+rooted=sum(v.get("cost",0) for v in sl.values() if v.get("cost"))
+print(f"-- spend -- rooted=${rooted:.2f} supervision=${sup:.2f} total=${rooted+sup:.2f} overhead_ratio={sup/max(rooted+sup,0.01)*100:.1f}%")
+att=[v.get("attempts") for v in merged.values() if v.get("attempts")]
+print(f"-- attempts histogram (merged) -- {dict((a,att.count(a)) for a in sorted(set(att))) if att else 'n/a'}")
+# --- tick log analysis ---
+tl=[]
+for line in open(MEM+"/mr-native-tick.log",errors="replace"):
+    m=re.match(r"(20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d)Z (.*)", line.strip())
+    if m and S <= m.group(1) <= U: tl.append((m.group(1), m.group(2)))
+# launch-ts fallback from DECISION lines (e.g. Drew-resumed sessions skip the ledger LAUNCHED row)
+for ts,t in tl:
+    m=re.search(r"launched ([a-zA-Z0-9._+-]+)", t)
+    if m:
+        for name in re.split(r"[+]", m.group(1)):
+            if name in sl and "launch" not in sl[name]: sl[name]["launch"]=ts
+# recompute merged view after fallback
+merged={k:v for k,v in sl.items() if "merge" in v and k not in ("SUPERVISOR",) and not k.startswith("adr-")}
+spawns=[x for x in tl if "SPAWN " in x[1]]; dones=[x for x in tl if "SPAWN-DONE" in x[1]]
+sd=[x for x in tl if "STANDDOWN" in x[1]]; skips=[x for x in tl if "SKIP" in x[1]]
+ev_sd=[x for x in sd if "src=done" in x[1] or "src=ci" in x[1]]
+blk=[x for x in tl if "blocked-on-drew" in x[1] or "resolved-blocker" in x[1] or "BLOCKER" in x[1]]
+print(f"-- ticks -- spawns={len(spawns)} standdowns={len(sd)} (event-source standdowns={len(ev_sd)}: self-write/probe delays) skips={len(skips)}")
+print("-- human-wait / blocker trail --")
+for ts,t in blk: print(f"    {ts} {t[:130]}")
+print("-- latency (post-fallback) --")
+for k,v in merged.items():
+    b=mins(v.get("launch",""),v.get("finish","")) if v.get("launch") and v.get("finish") else None
+    mw=mins(v.get("finish",""),v.get("merge","")) if v.get("finish") and v.get("merge") else None
+    lm=mins(v.get("launch",""),v.get("merge","")) if v.get("launch") and v.get("merge") else None
+    print(f"    {k}: build_min={b} merge_wait_min={mw} launch_to_merge_min={lm}")
+print("-- governor spend in window (from rows) --", f"${rooted+sup:.2f}")
+PY

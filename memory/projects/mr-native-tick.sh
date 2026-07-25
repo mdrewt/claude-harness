@@ -160,7 +160,15 @@ WRITES=$(find "$HARNESS" "$PROJ" -type f \
   -not -path "$HARNESS/memory/*" -mmin -6 2>/dev/null | head -1)
 # (worktrees are AGENT-owned by design — sibling fan-out writes are not human activity; retro 2026-07-24)
 if [ -n "$IDE" ]; then log "STANDDOWN human-ide-session"; exit 0; fi
-if [ -n "$WRITES" ]; then log "STANDDOWN recent-writes: $WRITES"; exit 0; fi
+if [ -n "$WRITES" ]; then
+  log "STANDDOWN recent-writes: $WRITES"
+  if [ "$SRC" != "cron" ] && [ "$SRC" != "manual" ] && [ ! -f "/tmp/mr_evretry_$SRC" ]; then
+    touch "/tmp/mr_evretry_$SRC"
+    setsid /bin/bash -c "sleep 420; rm -f /tmp/mr_evretry_$SRC; MR_EVENT_SRC=${SRC} exec /bin/bash '$MEM/mr-native-tick.sh'" </dev/null >/dev/null 2>&1 &
+    log "RETRY scheduled in 7min (src=$SRC)"
+  fi
+  exit 0
+fi
 
 # gate 4: chain-owner mutex freshness (TTL 600s)
 if [ -d "$MEM/.harness-runner.lock.d" ]; then
@@ -231,7 +239,7 @@ if [ "$RC" -eq 0 ]; then
   date -u +%s > "$MEM/.native-supervisor-heartbeat"
   mkdir -p "$MEM/pending-events/archive"
   for EV in $CONSUMED; do [ -f "$EV" ] && mv "$EV" "$MEM/pending-events/archive/$(date -u +%s).$(basename "$EV")" 2>/dev/null; done
-  "$MEM/mr-record" ledger --run_id "$RID" --slice SUPERVISOR --outcome "tick-ok src=$SRC" \
+  MR_RECORD_WRAPPER=1 "$MEM/mr-record" ledger --run_id "$RID" --slice SUPERVISOR --outcome "tick-ok src=$SRC" \
     ${COST:+--cost "$COST"} --model "$TICKMODEL" --notes "governor=$GSTATE" >> "$LOG" 2>&1 || true
 else
   REASON=$(grep -m1 -iE 'not logged in|please run /login|invalid api key|api key|authentication|unauthorized|forbidden' "$TLOG" 2>/dev/null | tr -d '\r' | head -c 200)

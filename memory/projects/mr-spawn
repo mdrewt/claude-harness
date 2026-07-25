@@ -27,7 +27,7 @@ S=os.environ["S"]; v=json.load(open(os.environ["V"]))
 tpl=open(os.environ["MEM"]+"/mr-brief-template.md").read()
 _t=v.get("touches","")
 touches_str=", ".join(_t) if isinstance(_t,list) else str(_t)
-tier=v.get("tier","routine")
+tier=v.get("tier") or (_ for _ in ()).throw(SystemExit("vars.json missing required field: tier (hard|routine|content)"))
 tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard"
  else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models (sonnet-class) — do not bump lens models upward on a content slice (THIS OVERRIDES the build-loop prompt bump-one-tier default for this slice). The tester requirement is UNCHANGED — meaningful tests first, always.\n" if tier=="content" else "")
 rb=v.get("resume_block","") or ""

@@ -1,0 +1,9 @@
+{
+ "_rules_frozen_2026-07-25": "Rule-based tags for pre-tier-era slices, applied mechanically BEFORE any cost computation (judge-approved anti-gaming guard). Rules: name matches ^m[0-9]+[.]5|^ptc → routine (review-residual/code); ^pt-[abc] → routine (playtest infra/code); ^pt-d → content; ^fix-|deflake|-review$|^adr- → maintenance; hard tier exists only from v3 routing (no pre-era slice is retro-tagged hard).",
+ "m17.5d": "routine", "m17.5e": "routine", "m17.5f": "routine", "m17.5g": "routine",
+ "pt-a1": "routine", "pt-a2": "routine", "pt-b1": "routine", "pt-b2": "routine",
+ "pt-c1": "routine", "pt-c1b": "routine", "pt-c2": "routine",
+ "ptc5a": "routine", "ptc5b": "routine", "ptc5c": "routine", "ptc5d": "routine",
+ "ptc5e": "routine", "ptc5f": "routine", "ptc5g": "routine",
+ "pt-d1": "content", "pt-d2": "content", "pt-d3": "content"
+}
