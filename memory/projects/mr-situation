@@ -96,12 +96,24 @@ def budget():
         except Exception:
             unrec+=1
     est=unrec*25.0
-    eff=d7+est
+    # in-flight committed exposure: live runs have spent tokens the ledger cannot see yet.
+    # Rough per-tier medians (from ledger history); matters at N>=3 where 4 slices ~ $300 committed.
+    tier_est={"hard":90.0,"routine":25.0,"content":35.0}
+    committed=0.0; live=0
+    for L in glob.glob(MEM+"/.harness-runner.*.lock"):
+        sl=os.path.basename(L)[len(".harness-runner."):-len(".lock")]
+        if os.path.exists(f"/tmp/mr_pass_{sl}.done"): continue
+        try:
+            lk=json.load(open(L)); pid=lk.get("session_leader")
+            os.kill(int(pid),0)
+            committed+=tier_est.get(str(lk.get("tier","routine")),25.0); live+=1
+        except Exception: pass
+    eff=d7+est+committed
     state="NORMAL"
     if eff>HARD*WEEKLY: state="HARD-STOP"
     elif eff>SOFT*WEEKLY: state="SOFT-PAUSE"
     return {"window_start_utc":datetime.datetime.fromtimestamp(ws,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
-            "unreconciled_est_usd":est,"effective_usd":round(eff,2),"weekly_limit_usd":WEEKLY,
+            "unreconciled_est_usd":est,"inflight_committed_est_usd":round(committed,2),"inflight_runs":live,"effective_usd":round(eff,2),"weekly_limit_usd":WEEKLY,
             "soft_pause_frac":SOFT,"hard_stop_frac":HARD,"fable_guard_frac":FGUARD,
             "fable_allowance_usd":FALLOW,"fable_guard_usd":round(FGUARD*FALLOW,2),"fable_ok": fab < FGUARD*FALLOW,"state":state}
 b=safe(budget,{"state":"UNKNOWN","error":"budget-computation-failed"})
