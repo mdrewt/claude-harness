@@ -1,7 +1,16 @@
 {
- "weekly_limit_usd": 1250,
+ "calibration_anchor": {
+   "ts": "2026-07-25T17:00:00Z",
+   "note": "Drew ground truth 2026-07-25: 36% of total weekly usage, 30% of fable allowance, against internal-$ ledger sums since the 2026-07-24T00:00Z weekly reset. Limits are DERIVED from this anchor (per-axis): weekly = internal_total/drew_total_pct; fable_allowance = internal_fable/drew_fable_pct. Re-anchor whenever Drew reports fresh percentages.",
+   "internal_total_usd": 1002,
+   "drew_total_pct": 0.36,
+   "internal_fable_usd": 689,
+   "drew_fable_pct": 0.30
+ },
+ "weekly_limit_usd": 2783,
+ "fable_allowance_usd": 2298,
  "soft_pause_frac": 0.90,
  "hard_stop_frac": 0.97,
- "fable_guard_frac": 0.45,
- "_comment": "Single source of truth for governor knobs. Read by mr-situation and mr-launch.sh (bounds-validated; both fall back to these same defaults on missing/invalid file). Recalibrate weekly_limit_usd + .weekly-reset-anchor at the next real rate-limit park."
+ "fable_guard_frac": 0.90,
+ "_semantics": "soft/hard fracs apply to weekly_limit_usd; fable_ok = fable_spend < fable_guard_frac * fable_allowance_usd (allowance is its own axis now, NOT a fraction of weekly). Old fields kept for reader fallback compatibility."
 }

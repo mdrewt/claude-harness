@@ -53,11 +53,12 @@ out["master_ci_latest"]=safe(masterci,"error")
 rc,so,_=run(f"git -C /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm rev-parse --short HEAD", 10)
 out["master_sha_local"]=so if rc==0 else "error:git"
 # budget
-WEEKLY,SOFT,HARD,FGUARD=1250.0,0.90,0.97,0.45
+WEEKLY,SOFT,HARD,FGUARD,FALLOW=1250.0,0.90,0.97,0.45,625.0
 try:
     _c=json.load(open(MEM+"/mr-budget-config.json"))
     _w,_s,_h,_f=float(_c["weekly_limit_usd"]),float(_c["soft_pause_frac"]),float(_c["hard_stop_frac"]),float(_c["fable_guard_frac"])
-    if _w>0 and 0<_s<=_h<=1 and 0<_f<=1: WEEKLY,SOFT,HARD,FGUARD=_w,_s,_h,_f
+    _fa=float(_c.get("fable_allowance_usd") or 0.5*_w)
+    if _w>0 and 0<_s<=_h<=1 and 0<_f<=1 and _fa>0: WEEKLY,SOFT,HARD,FGUARD,FALLOW=_w,_s,_h,_f,_fa
 except Exception: pass  # fall back to defaults above
 def budget():
     now=time.time()
@@ -102,7 +103,7 @@ def budget():
     return {"window_start_utc":datetime.datetime.fromtimestamp(ws,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
             "unreconciled_est_usd":est,"effective_usd":round(eff,2),"weekly_limit_usd":WEEKLY,
             "soft_pause_frac":SOFT,"hard_stop_frac":HARD,"fable_guard_frac":FGUARD,
-            "fable_guard_usd":round(FGUARD*WEEKLY,2),"fable_ok": fab < FGUARD*WEEKLY,"state":state}
+            "fable_allowance_usd":FALLOW,"fable_guard_usd":round(FGUARD*FALLOW,2),"fable_ok": fab < FGUARD*FALLOW,"state":state}
 b=safe(budget,{"state":"UNKNOWN","error":"budget-computation-failed"})
 if not isinstance(b,dict) or "state" not in b: b={"state":"UNKNOWN","error":str(b)[:120]}
 out["budget"]=b

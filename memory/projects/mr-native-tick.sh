@@ -179,7 +179,7 @@ if [ -n "$WRITES" ]; then
   log "STANDDOWN recent-writes: $WRITES"
   if [ "$SRC" != "cron" ] && [ "$SRC" != "manual" ] && [ ! -f "/tmp/mr_evretry_$SRC" ]; then
     touch "/tmp/mr_evretry_$SRC"
-    setsid /bin/bash -c "sleep 420; rm -f /tmp/mr_evretry_$SRC; MR_EVENT_SRC=${SRC} exec /bin/bash '$MEM/mr-native-tick.sh'" </dev/null >/dev/null 2>&1 &
+    setsid /bin/bash -c "exec 9>&- 2>/dev/null; sleep 420; rm -f /tmp/mr_evretry_$SRC; MR_EVENT_SRC=${SRC} exec /bin/bash '$MEM/mr-native-tick.sh'" </dev/null >/dev/null 2>&1 &
     log "RETRY scheduled in 7min (src=$SRC)"
   fi
   exit 0
