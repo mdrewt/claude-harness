@@ -1,0 +1,39 @@
+#!/bin/bash
+# mr-disjoint — mechanical fan-out disjointness check (A2, judge-adjudicated 2026-07-26).
+# usage: mr-disjoint "sliceA:path1,path2,..." "sliceB:path3,..." [...]
+# ALWAYS rc=0; JSON verdict on stdout. NECESSARY-NOT-SUFFICIENT: the supervisor may still
+# SERIALIZE on semantic grounds this check cannot see; it may NEVER override toward parallel.
+# Operates on DECLARED touches only — boyscout deltas live inside declared files by
+# construction and are never inputs here (D6 doctrine).
+set -u
+export DJ_ARGS=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
+/usr/bin/python3 <<'PY'
+import json, os, fnmatch
+argv=json.loads(os.environ["DJ_ARGS"])
+STRUCTURAL=["Cargo.lock","package-lock.json","client/src/module_bindings/*","evals/run.mjs","*schema*","*migration*"]
+slices={}
+for a in argv:
+    if ":" not in a: continue
+    name,paths=a.split(":",1)
+    slices[name]=[p.strip() for p in paths.split(",") if p.strip()]
+out={"slices":list(slices),"pairs":[],"structural_hits":{},"verdict":"SAFE"}
+def hits_structural(p):
+    return any(fnmatch.fnmatch(p,pat) or pat.strip("*") in p for pat in STRUCTURAL)
+for n,ps in slices.items():
+    h=[p for p in ps if hits_structural(p)]
+    if h: out["structural_hits"][n]=h
+names=list(slices)
+for i in range(len(names)):
+    for j in range(i+1,len(names)):
+        a,b=names[i],names[j]
+        inter=set()
+        for pa in slices[a]:
+            for pb in slices[b]:
+                if pa==pb or fnmatch.fnmatch(pa,pb) or fnmatch.fnmatch(pb,pa): inter.add(pa)
+        out["pairs"].append({"pair":[a,b],"overlap":sorted(inter),"disjoint":not inter})
+if out["structural_hits"]: out["verdict"]="SERIAL-REQUIRED(structural)"
+elif any(not p["disjoint"] for p in out["pairs"]): out["verdict"]="SERIAL-REQUIRED(overlap)"
+out["note"]="SAFE means file-disjoint only. Shared registry/enum/namespace AXES still require PARTITION-THEN-PARALLEL per SSOT 3-state rule; semantic overlap still permits supervisor serialize-override."
+print(json.dumps(out,indent=1))
+PY
+exit 0
