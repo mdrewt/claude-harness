@@ -1,33 +1,30 @@
 {
  "authority": "HINTS-ONLY (re-verify anything you are about to mutate)",
- "generated_at": "2026-07-24T18:54:38Z",
- "disabled": true,
+ "generated_at": "2026-07-25T04:00:08Z",
  "locks": [
   {
-   "slice": "ptc5f",
-   "leader": 1719410,
+   "slice": "pt-d3",
+   "leader": 322349,
    "alive": false,
    "done": true
   }
  ],
  "done_files": [
-  "mr_pass_ptc5f.done",
-  "mr_pass_ptc5e.done",
-  "mr_pass_ptc5b.done",
-  "mr_pass_ptc5g.done",
-  "mr_pass_ptc5c.done"
+  "mr_pass_pt-d3.done"
  ],
- "pending_events": [],
+ "pending_events": [
+  "pt-d3.done.md"
+ ],
  "open_prs": "error:gh:/bin/sh: 1: gh: not found",
  "master_ci_latest": "error:gh:/bin/sh: 1: gh: not found",
- "master_sha_local": "aee493a",
+ "master_sha_local": "d2a3e5b",
  "budget": {
   "window_start_utc": "2026-07-24T00:00:00Z",
-  "d7_usd": 226.78,
-  "fable_d7_usd": 0.0,
+  "d7_usd": 376.92,
+  "fable_d7_usd": 114.21,
   "unreconciled_runs": 0,
   "unreconciled_est_usd": 0.0,
-  "effective_usd": 226.78,
+  "effective_usd": 376.92,
   "weekly_limit_usd": 1250.0,
   "soft_pause_frac": 0.9,
   "hard_stop_frac": 0.97,

@@ -1,0 +1,123 @@
+# Playtest gate decision — 2026-07-25
+
+**Status:** decision recommended (assistant synthesis, root-caused against live code + live playtest DB) · pending Drew's confirmation/veto
+**Governs:** `playtest-replan-2026-07.md` §1 item 6 (⛩ PLAYTEST GATE) · PLAN.md §9 Phase D (post-gate queue, currently `blocked:playtest-gate`)
+**Input:** Drew's closed solo playtest, 2026-07-25 — full session narrative in `memory/projects/PlaytestReport.md` (not duplicated here verbatim; this doc analyzes and acts on it) + the H1/H2 proxy report from `just playtest-report` (ADR-0131/pt-b2), captured from the same session after fixing that script (see `fix(playtest): playtest-report...` PR #246 — it had never actually run before this session; see §5).
+
+## 1. What the gate is testing (game-design.md §4)
+
+Three falsifiable fun hypotheses, gated at end of Phase A before Phases B–D proceed:
+- **H1** — weaken-to-recruit is a satisfying puzzle, not a slot machine.
+- **H2** — visible individual divergence creates attachment (proxy: do players re-catch for a better individual?).
+- **H3** — server-authoritative fairness makes individuals feel valuable enough to drive trading/ranked.
+
+## 2. Quantitative proxy results (single session, n=7 recruit-attempt events — directional only, not statistically powered)
+
+```
+H1 weaken-first rate: 1.0000   (7/7 recruit attempts happened after weakening the target — strong directional H1 signal)
+H1 recatch rate:      0.4000   (2/5 species groups were attempted more than once)
+H2 success rate:      0.7143
+H2 bait rate:         0.0000   (bait was never used — see §4 UX findings; likely undiscovered, not undesired)
+```
+H3 has no proxy instrumentation yet (trading/ranked feel is qualitative-only from this session — Drew tested trade UI but not PvP).
+
+**Caveat:** n=1 session, n=7 events. This is a smoke-test-scale signal, not validation. Treat H1's 1.0 rate as "consistent with the hypothesis, not proof of it" — re-run `just playtest-report` after every future playtest session to accumulate a real sample.
+
+**Second caveat, found via server telemetry (§4 item 10): these 7 events are split across up to 6 different anonymous identities** (the session reconnected at least 5 times, each time as a brand-new character — see finding 10). `aggregateReport` groups by `(identity, species_id)`, so a recatch of the same species across two reset identities is invisible to `recatchRate` — it looks like two different players' single attempts instead of one player re-catching. The reported `recatchRate=0.4` is very likely an *undercount* of Drew's actual re-catch behavior. This will self-correct once nh4 (§8) ships and reconnects stop resetting identity.
+
+## 3. Qualitative signal (from the full report)
+
+Drew completed a real session: multiple wild encounters, a successful recruit, several battles, tested fusion, inventory, trading (two browser windows), shopping, and party management. He voluntarily explored menus by "pressing random keys" rather than giving up — that's a genuine engagement signal underneath the friction. He also proposed a substantive alternative to the fusion system (energy-typed evolution) — see §6.
+
+The dominant complaint, repeated across almost every stage, is **UI/UX friction**: no onboarding, inconsistent overlay design, no on-screen affordances for how to continue/exit, and (see §4) two concrete input-handling bugs that make movement feel bad. This friction is a **confound** on the fun hypotheses — it's hard to tell "is weaken-to-recruit fun" from "is weaken-to-recruit fun *despite* fighting the controls to get there."
+
+## 4. Root-caused findings (grounded against live code, 2026-07-25 — not speculation)
+
+Investigated by reproducing Drew's report against `master` @ `bbc7a28` (pre-fix) plus live code reading. Full detail and EARS acceptance criteria are in the two new specs this doc spawns (§7); summarized here:
+
+1. **Input freeze / arrow-keys-scroll-the-page (real bug, high-confidence root cause).** The movement-suppression block that skips movement input while an overlay is open (`client/src/main.ts:1006-1023`) never calls `e.preventDefault()`, unlike every other overlay-toggle branch in the same keydown handler. Once **any** overlay is opened and left open (nothing auto-closes quest-log/trade), every subsequent arrow-key press falls through to the browser's native scroll instead of being captured — exactly Drew's "arrow keys started manipulating the page's scrollbars." This is *not* the same thing as the server's `queue full` log spam, which is a deliberate, fuzz-tested anti-flood mechanism (ADR-0052, `MOVE_QUEUE_CAP=2`) working as designed — Drew's own report already suspected these were unrelated, and code reading confirms it.
+2. **"Slippery" movement — overshoot on tap, stutter-then-extra-tile on release (real bug, high-confidence root cause).** `main.ts`'s keyup handler only releases local held-key bookkeeping; `predictor.clearQueue()`/`setMove()` (`client/src/prediction/predictor.ts:142-150`) are never called anywhere in the client. With `MOVE_QUEUE_CAP=2`, up to 2 already-enqueued steps always play out to completion after a key is released, regardless of player intent — this single mechanism explains both the overshoot and the release-stutter complaints. This is a distinct mechanism from the already-known, already-deferred warp-epoch predictor gap (ADR-0085, `M-postgate-netcode-hardening`) — both are real, and both now get addressed together (§7).
+3. **`just playtest-up` doesn't check SpacetimeDB is running (confirmed as diagnosed).** No preflight check anywhere in `playtest-up`/`playtest-wipe` before `spacetime publish`; no recipe anywhere starts `spacetime start` for the tester. Quick, low-risk fix.
+4. **Player/NPC "moving together" on shared tile — NOT reproduced in code; flagged, not fixed blind.** No tile-occupancy/collision system exists at all (the game allows walking onto an NPC's tile by design/absence), and the renderer keys each entity independently by entity id — no coupling mechanism found. Best-grounded hypothesis: two independently-moving, visually-overlapping sprites, worsened by separate sprite-recoloring confusion — not an actual state-coupling defect. No fix is proposed without a real repro; flagged for a targeted repro capture if it recurs. **→ RE-INVESTIGATED + CLOSED 2026-07-25 as a confirmed non-defect (see §10).**
+5. **Sprite "randomly changing color" — NOT reproduced in code; flagged, not fixed blind.** No tint/random-color/palette-reassignment logic was found anywhere in the render path for player/NPC sprites. Not fabricating a root cause here — needs a targeted repro (screen recording or entity-id log) before anyone touches this. **→ RE-INVESTIGATED + CLOSED 2026-07-25: intended action-coded placeholder tint, not a fault (see §10).**
+6. **Battle "no way to switch monsters" — likely NOT a missing feature; likely a team-vs-box discoverability gap.** `battleView.ts`/`battleModel.ts` already implement a swap-to-bench-member UI (`canSwap: bench.length > 0`, rendered swap buttons). The most likely explanation is that Drew's newly-recruited Sproutlet went into the **box**, not the active **team**, and moving a boxed monster onto the team is itself an undiscovered mechanic (same discoverability family as the help overlay below) — not proven, but not a blind guess either; §7 books a repro-and-confirm step before deciding whether code changes anything.
+7. **Battle-result overlay (victory/flee) dismissal, and the help overlay itself, are both real *discoverability* gaps, not missing features.** A `?`-bound help overlay already exists (`pt-c2b`, ADR-0135) but has **no persistent on-screen affordance** telling a new player it exists — Drew found it only by mashing keys. Same root cause as "how do I get past the victory screen": there's no persistent on-screen hint anywhere. One small, generic fix (a persistent corner hint) addresses both.
+8. **Shop shows item prices but never the player's own balance — this is a privacy-model consequence, not an oversight, and has a precedented fix.** `player_wallet` is deliberately PRIVATE (ADR-0081/0040) with no client-visible balance subscription. The codebase already has an established pattern for exactly this shape of problem — an owner-scoped `#[view]` (used for `player_conversation`, ADR-0087) that exposes only the caller's own row. The fix is to add the same pattern for `player_wallet`, not a client-side tally hack.
+9. **"I'd expect one main menu with submenus" / inconsistent overlay design — already a named, parked slice.** `M-postgate-overlay-registry` (parked at ptc5c, Decision B, 2026-07-21) already exists to unify the ~15 open-coded overlay-guard sites into one registry. Drew's feedback is strong corroborating evidence for that slice's value; it doesn't need a new slice, it needs its acceptance criteria to absorb this feedback when it's eventually built (noted in §7, not re-specified here).
+10. **6 separate anonymous identities in one reported session — silent progress loss on every reload (confirmed via live server telemetry, not just code reading).** Pulling `spacetime logs monster-realm-playtest` (the module logs, distinct from the `playtest_event` table) shows 6 `join`/`starter_granted` pairs, strictly sequential, spanning Drew's session — meaning at least 5 times, all recruited monsters/items/currency reset to a fresh starter. The gaps between identities line up with the report's narrative (a 13.5-minute gap right where Stage five's freeze investigation happens; a 35-second gap suggesting an immediate reload-and-recheck). Root cause: `client/src/net/connection.ts` never persists a reconnect token — every page load calls the SDK's connection builder with no `.withToken(...)`, so every reload mints a brand-new identity, even though the SDK explicitly supports token persistence for exactly this. Finding 1 (the freeze bug) is the most likely reason Drew was reloading at all — meaning it wasn't just an annoyance, it was silently destroying playtest progress each time. Folded into `M-postgate-netcode-hardening.spec.md` as nh4, and raises nh1's effective severity.
+11. **Responsive viewport scaling, shop-via-NPC-interaction, and a full main-menu redesign are real but *larger, separate design questions* — deliberately NOT bundled into the hardening slices below** (anti-scope-creep; each deserves its own sizing pass, not a rider on a bug-fix milestone). Recorded as deferred, named, owned in §8.
+
+## 5. Process finding: `just playtest-report` had never actually been exercised
+
+Independent of the game itself: `just playtest-report` (ADR-0131/pt-b2, shipped weeks ago) has been completely non-functional since it was written — the pinned `spacetime` CLI (2.6.0) has no `--json` output mode and its SQL dialect rejects `ORDER BY` outright, and the recipe is deliberately excluded from `just ci` as live-DB-only, so neither failure was ever caught. The gating eval for it only unit-tested the pure aggregation function and string-scanned the SQL text for `"ORDER BY event_id"` — which proved the clause was present, never that it worked. **This is a real, if narrow, process gap: a live-DB-only tool with no live-DB smoke test can silently rot indefinitely.** Fixed in PR #246 (merged, `3d02b385`), with the eval rewritten to prove the ordering guarantee functionally instead of by source-text scan. No broader process change is being proposed on the strength of one incident — noting it for the record; revisit if another live-only tool turns up broken.
+
+## 6. Fusion vs. energy-typed evolution (Drew's proposal) — EVALUATED + DECIDED 2026-07-25 (see §11)
+
+Drew proposed replacing/supplementing the current fixed fusion-recipe system with an energy-accumulation evolution system (monsters collect typed energy from battle/feeding; evolve at a threshold based on accumulated ratios), reasoning that fusion erases individual monster identity while evolution lets an individual grow. Drew's own explicit call on this (2026-07-25 session): **evaluate first, don't implement.** That evaluation ran as a full 35-agent research → brainstorm → debate → judge → converge workflow the same day (§11) — **outcome: repair `fuse()`'s field-carry formula (a real, verified drift from `adr/0019-evolution-fusion-model.md`'s own stated intent), ship Drew's worked example via the already-live `Item(id)` evolution trigger, and explicitly defer the typed-energy system pending playtest evidence.** Implementation-ready: `M-postgate-evolution-fusion-hardening.spec.md`.
+
+## 7. Recommended verdict
+
+**CONDITIONAL PASS — do not revise the core design, but insert a hardening round before the next playtest round or any Phase D/new-systems work.**
+
+Rationale: the quantitative H1 signal is directionally positive and Drew engaged with the full loop (recruit → battle → fuse → trade → shop → party-manage) despite friction, which argues the *design* isn't the problem. But two of the friction sources (findings 1 and 2 above) are concrete, high-confidence code bugs that directly degrade the moment-to-moment movement feel — the core "hook" per game-design.md §3 — meaning **the current friction is loud enough to make the H1-H3 measurement itself unreliable.** Finding 10 raises the stakes further: the freeze bug (finding 1) was likely triggering repeated reloads that silently reset Drew's progress and undercounted the H2 recatch proxy — so this isn't just a feel problem, it's a *data validity* problem. Fix the input/movement/identity bugs and the sharpest discoverability gaps first; then a second playtest session (even a short one) will give a much cleaner read before committing to any Phase D work.
+
+This **lifts** `blocked:playtest-gate` on the post-gate queue (PLAN.md §9 Phase D) and **reorders** it: the two hardening milestones below go first, ahead of `M-postgate-client-coverage` and M20+.
+
+## 8. Reshaped post-gate queue
+
+New/promoted, both spawned by this doc (full EARS specs, `touches:`, proof-of-teeth — see the two new spec files):
+
+1. **`M-postgate-netcode-hardening`** (promoted from a PLAN.md bullet to a full spec) — now carries four slices: the two newly-found input/movement bugs (findings 1–2, high playtest-feel impact), the newly-found reconnect-identity-persistence gap (finding 10, high data-integrity impact — nh4), plus the pre-existing warp-epoch predictor guard (already known, ADR-0085-pinned, folded in since it's the same code region and the same symptom family).
+2. **`M-postgate-ux-hardening`** (new) — persistent help/continue affordance (finding 7), owner-scoped wallet-balance view (finding 8), `playtest-up`/`playtest-wipe` preflight check (finding 3), and a repro-and-confirm step for the battle-swap discoverability question (finding 6).
+
+Unchanged, stays queued after the above: `M-postgate-client-coverage`, `M-postgate-overlay-registry` (scope note added per finding 9), M20–M25 in existing order.
+
+Deferred, named, NOT scheduled as slices (§4 item 10 + the two NOT-reproduced findings):
+- ~~Responsive viewport scaling~~ — **DESIGNED 2026-07-25** → `M-postgate-ux-design.spec.md` §uxd1 (own sizing pass done; implementation post-gate provisional).
+- ~~Shop-via-NPC-interaction~~ — **DESIGNED 2026-07-25** → `M-postgate-ux-design.spec.md` §uxd2 (server-anchored `NpcInteraction` enum + generalized interact key; implementation post-gate provisional).
+- ~~Full main-menu redesign~~ — **DESIGNED 2026-07-25** → `M-postgate-ux-design.spec.md` §uxd3, which **SUBSUMES + RETIRES** the parked `M-postgate-overlay-registry` (delivers the registry substrate + the menu IA in one). (This resolves finding 9: the main-menu feedback is now scoped, not just corroborating.)
+- ~~Player/NPC tile-merge visual bug (finding 4)~~ — **CLOSED 2026-07-25 (re-investigated non-defect; see §10).** Only residual is an optional server-side tile-occupancy feature, not scheduled.
+- ~~Sprite recoloring-over-time (finding 5)~~ — **CLOSED 2026-07-25 (intended placeholder tint; see §10).** Only residual is an optional placeholder-color-legend / real-art UX note, not scheduled.
+- ~~Fusion vs. energy-typed evolution (§6)~~ — **EVALUATED + DECIDED 2026-07-25; see §11.** Now scheduled as `M-postgate-evolution-fusion-hardening` (slice A0 recommended HIGH priority, near-front of the queue alongside the netcode/UX hardening milestones above — see that spec's §5 for the full priority breakdown across its 5 slices).
+
+## 9. Next steps
+
+1. Drew confirms or amends this verdict (§7) and the queue reshape (§8) — this doc is a recommendation, not a unilateral decision.
+2. On confirmation, the two new specs (`M-postgate-netcode-hardening.spec.md`, `M-postgate-ux-hardening.spec.md`) are queued for the native supervisor loop, same as any other milestone.
+3. After both land, run a second (even short) playtest session and re-run `just playtest-report` to get a cleaner H1/H2 read before deciding on Phase D / any new-systems work.
+
+## 10. Re-investigation & closure of the two un-reproduced visual bugs (2026-07-25, Drew-directed)
+
+Both findings 4 and 5 were given a deeper second read-only investigation against `master` @ `3d02b38` (Drew's direct instruction: re-investigate and, if still no defect, close them). Both are **CLOSED as not-reproduced — confirmed non-defects**, now with concrete structural evidence rather than an absence-of-evidence flag.
+
+### Finding 4 — Player/NPC "moving together" / tile-merge → CLOSED (no render defect)
+The client render pipeline is per-entity end-to-end; there is no shared or non-uniquely-keyed mutable state two co-located entities could collide on:
+- Views are keyed by unique `bigint` entityId (`client/src/render/world.ts:45`), reconcile is `Set`-deduped (`viewRegistry.ts:15-27`), each `CharacterView` owns one Sprite and reads only its own tile (`characterView.ts:34-55`).
+- No shared clocks: the resolver's single `SlideClock` is own-entity-only (`renderResolver.ts:60,82`); every remote/NPC interpolates from its own per-character snapshot buffer (`renderResolver.ts:108-113`, `store.ts:293-305`).
+- Camera-follow is a whole-stage scroll keyed to the own player only (`camera.ts:9-26`, `world.ts:143-156`) — it cannot make one entity's position depend on another's.
+- Same-tile z-order is deterministic + stable-sorted (equal y → equal zIndex, stable tie-break) — no flicker/swap (`world.ts:140`, `zorder.ts:33`, `zorderZIndex.test.ts:75-79`).
+
+Benign explanation: two independent sprites drawn at the same tile center fully overlap (co-occupancy is allowed by design — there is no occupancy/collision system), and the follow-camera scroll makes their shared on-screen translation read as "moving together." **Residual (design, not a bug):** if we later decide entities should not visually overlap, that is a *server-side tile-occupancy* feature, not a render fix — remains PARKED, not scheduled.
+
+### Finding 5 — Sprite "randomly changing color" → CLOSED (intended placeholder behavior)
+There is no code path that can randomly or erroneously recolor a sprite. Overworld placeholder color is a pure deterministic function of the entity's `action`: `ACTION_TINT` Idle=green / Walking=blue / Jumping=yellow (`placeholderAssets.ts:15-19,60`), and `action` is live movement state (`renderResolver.ts:98,118`), so a placeholder square legitimately flips color as its character moves.
+- The suspected **texture-cache-key collision is disproven**: the cache key is `${action}:${facing}` only (`characterView.ts:14-18`, `placeholderAssets.ts:31,48-53`) — never entity/species — and `#build` is a pure function of (action,facing) with no per-entity content, so one entity's update can never overwrite another's texture/color.
+- Exhaustive grep: no `.tint`, `Filter`/`ColorMatrixFilter`, `.alpha` mutation, `hue`/`palette`/`recolor`, or id/species/status/affinity-derived color anywhere in the render path. Battle sprites are DOM/CSS, not Pixi.
+
+Benign explanation: the featureless colored placeholder square encodes *action* as color; a player unaware of that reads Idle↔Walking↔Jumping as "the color randomly changed." This is a real-art-deferral artifact, not a fault. **Residual (UX, optional, not required):** if action-coded color is judged confusing, either document the color legend in `PLAYTEST.md` or move the action indicator off the body color onto the facing-notch/shape (`placeholderAssets.ts:15-19,60`). Neither is needed to resolve the report; folds naturally into real-art work.
+
+Both bugs are removed from the §8 "needs a real repro" deferred list. If either genuinely recurs in a future session, capture a screen recording + entity-id log first — but the code as of `3d02b38` structurally precludes both as defects.
+
+## 11. Fusion-vs-evolution: research, debate, and decision (2026-07-25, `ultracode` multi-agent workflow)
+
+Per Drew's explicit direction ("evaluate first, don't implement" + a follow-up request to run a full research/brainstorm/debate/judge/converge process autonomously and document the result), the §6 evaluation ran as a 35-agent `Workflow` (`monster-realm-evolution-fusion-redesign`) rather than being decided ad hoc. Full trail: harness memory card `monster-realm-evolution-fusion-workflow-2026-07-25.md`; the decision itself is recorded as a dated amendment to `adr/0019-evolution-fusion-model.md` (the correct instrument — this is a repair of that ADR's own stated intent, not a new decision from scratch); the implementation-ready breakdown is `M-postgate-evolution-fusion-hardening.spec.md`.
+
+**Grounding finding (the whole evaluation turns on this):** `fuse()` (`game-core/src/evolution/transform.rs:69-106`) already implements DQM-style genetic inheritance correctly (per-stat max IV, higher-bond-parent nature — exactly what ADR-0019's "considered alternatives" chose over a fresh reroll) but resets ALL relationship-state (level→1, EVs→0, bond→default 70, nickname→`None`) on every fusion, even though ADR-0019's stated intent was explicitly "identity isn't erased by a transform." `evolve()` (`transform.rs:28-46`) already carries 100% of that state verbatim — full compliance. Drew's complaint is an accurate, evidenced description of a real implementation drift, not a misunderstanding of what fusion does.
+
+**Process:** 7 research angles (Digimon Digivolution/Jogress, Dragon Quest Monsters synthesis, SMT/Persona fusion, modern indies incl. Cassette Beasts/Coromon/Palworld, Monster Rancher/Monster Crown breeding, cross-genre individuality-legibility UX, Pokémon temporary-transform precedent) → 5 divergent brainstormed candidates (literal-proposal, coexistence, minimal-fix, temporary-fusion, lineage/breeding) → 2 adversarially-debated axes (fusion permanence; evolution-trigger restructuring) with independent judged verdicts → a 3-judge panel scoring all candidates independently → 4 rounds of adversarial critique-and-refine (each round found and fixed real issues, including a bond-tax-exemption exploit and an xp/level consistency bug in the process's own earlier drafts) → a final structured, engineering-ready design.
+
+**Decision:** repair `fuse()`'s field-carry formula (broaden the *combine, don't erase* treatment ADR-0019 already grants IVs/nature to level/EVs/bond too — taxed/averaged rather than hard-reset); ship Drew's own worked example (a Water-Energy-flavored evolution branch) through the evolution-trigger enum's already-live `Item(id)` variant, zero engine changes; keep fusion permanent/destructive (its economy-sink role and Steamveil's sole acquisition path both depend on it — no candidate proposing temporary/reversible fusion resolved what would replace the sink); explicitly defer the full typed multi-energy-accumulator system pending playtest evidence that the cheap item-triggered version doesn't already satisfy H2. Both debate axes were won by the "don't restructure, fix the narrow gap" side — recorded honestly with the losing side's real evidence (see the ADR amendment and the memory card for the full verdicts, not just the outcome).
+
+**Not unanimous, recorded not smoothed over:** whether fusion should remain a distinct mechanic long-term at all (minority position across the critique rounds, given its 1-recipe vs. 6-evolution-block content footprint); the exact tax/floor constants (structurally proven, not playtest-tuned); where `fusion_eligible()` should live in the module structure. All three are live open items in the new spec's Decisions section, not settled by fiat.
+
+This closes §6/§8's "needs a `/debate` or `/consult` pass" deferral. `M-postgate-evolution-fusion-hardening` is now queued in PLAN.md §9 Phase D, un-blocked, with slice A0 recommended HIGH priority near the front of the reshaped queue (§8 above).

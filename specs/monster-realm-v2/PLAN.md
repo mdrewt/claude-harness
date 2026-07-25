@@ -1,6 +1,6 @@
 # Monster Realm (v2) — Greenfield Plan
 
-> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#158 + #162–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals CLOSED (a–g, ADR-0112–0117, PRs #180–#193). M17 ranked ladder CLOSED (m17a #196 / m17b #199 / m17c #198, ADR-0119–0121); M17.5 tenth-review residuals CLOSED (ADR-0124–0127). **2026-07-17 playtest-first replan underway** (`playtest-replan-2026-07.md`): M-playtest-a (client build hygiene + local ops, ADR-0128/0129) & M-playtest-b (observability, ADR-0130/0131) CLOSED; M-playtest-c UX completion CLOSED (rename/trade-propose/help, ADR-0132–0135, PR #230); **M-playtest-c.5 pre-gate residuals 6/7 merged** — ptc5a #232 (0136) · ptc5d #234 (0137) · ptc5b #236 (0138) · ptc5c #237 (0139) · ptc5e #238 (0140) · ptc5g #239 (0141) — with **ptc5f (this slice, ADR-0142, ledger reconciliation) closing it out**. Next: **M-playtest-d** (content pack) → **⛩ PLAYTEST GATE** (game-design.md §4); M18+ demoted to post-gate provisional (see the Phase D post-gate block).
+> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#158 + #162–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals CLOSED (a–g, ADR-0112–0117, PRs #180–#193). M17 ranked ladder CLOSED (m17a #196 / m17b #199 / m17c #198, ADR-0119–0121); M17.5 tenth-review residuals CLOSED (ADR-0124–0127). **2026-07-17 playtest-first replan underway** (`playtest-replan-2026-07.md`): M-playtest-a (client build hygiene + local ops, ADR-0128/0129) & M-playtest-b (observability, ADR-0130/0131) CLOSED; M-playtest-c UX completion CLOSED (rename/trade-propose/help, ADR-0132–0135, PR #230); **M-playtest-c.5 pre-gate residuals 6/7 merged** — ptc5a #232 (0136) · ptc5d #234 (0137) · ptc5b #236 (0138) · ptc5c #237 (0139) · ptc5e #238 (0140) · ptc5g #239 (0141) — with **ptc5f (this slice, ADR-0142, ledger reconciliation) closing it out**. **M-playtest-d content pack CLOSED** (pt-d1 #241/ADR-0143, pt-d2 #242/ADR-0144, pt-d3 #244/ADR-0145) — all pre-gate milestones (M-playtest-a/b/c/c.5/d) CLOSED 2026-07-25. **⛩ PLAYTEST GATE RUN 2026-07-25** (Drew's closed solo session; verdict + root-caused findings in `playtest-gate-decision-2026-07-25.md`): CONDITIONAL PASS — core loop engaged despite friction; two concrete input/movement bugs found and two hardening milestones spawned (`M-postgate-netcode-hardening`, `M-postgate-ux-hardening`), reordered to the FRONT of the post-gate queue, `blocked:playtest-gate` LIFTED for those two only. M18+ and the rest of Phase D remain post-gate provisional pending a second, cleaner playtest read (see the Phase D post-gate block).
 > **Relationship to v1:** This is a *new, from-scratch* project — the spiritual sequel to
 > `projects/pokemon-mmo` (published db `monster-tamer-mmo`). It is **not** that project and does
 > **not** modify it. Working repo name: **`monster-realm`** (rename freely; must stay kebab-case for
@@ -308,14 +308,88 @@ fan-out per each spec's pairing notes):**
 - **M-playtest-d Playtest content pack** (`M-playtest-d-content-pack.spec.md`) — roster 6→~16 forms +
   distinct-silhouette sprites + encounter/recruit/economy tuning to GDD §5 MVP scope; pure content/data
   on ADR-0057, fan-out friendly.
-- **⛩ PLAYTEST GATE** (GDD §4/§9) — **not a runner slice**: when all pre-gate milestones are CLOSED the
-  runner surfaces a BLOCKER-style handoff ("playtest ready") and stops advancing milestones; Drew runs the
-  closed playtest; the gate decision doc re-opens (and may reshape) the post-gate queue below.
+- **⛩ PLAYTEST GATE** (GDD §4/§9) — **RUN 2026-07-25.** Drew's closed solo playtest + `just playtest-report`
+  H1/H2 proxies analyzed in `playtest-gate-decision-2026-07-25.md`: **CONDITIONAL PASS** (core loop engaged
+  despite friction; H1 signal directionally positive at n=7 events — not yet statistically powered). Two
+  concrete input/movement bugs were root-caused against live code and spawned two new pre-post-gate
+  milestones (below), reordered to the front of Phase D. Fusion-vs-evolution (Drew's proposed alternative
+  design) is PARKED pending a `/debate`/`/consult` pass, not decided by the gate doc. Re-run the playtest +
+  `just playtest-report` after the two hardening milestones land, before committing to any further Phase D
+  work — the friction found was loud enough to be a confound on the H1-H3 read.
 
-**Phase D — Production readiness (post-gate provisional, `blocked:playtest-gate` — order unchanged, contingent on the gate):**
+**Phase D — Production readiness (`blocked:playtest-gate` LIFTED for the two hardening milestones only; the
+rest stays post-gate provisional pending a cleaner second playtest read):**
 
-- **M-postgate-client-coverage** (client-hardening; M-playtest-c.5 Decision D, Drew-delegated 2026-07-20) — extract the inline decision logic in `main.ts`/`battleView.ts`/`boxView.ts` into tested pure `*Model.ts` cores and drop the coverage-denominator exclusions; a mechanical fence lands pre-gate (fail if the `vite.config.ts` excluded set grows). Pairs with the ptc5c-2 overlay-registry client-hardening work.
-- **M-postgate-netcode-hardening** (netcode; M-playtest-c.5 Decision E, Drew-delegated 2026-07-20) — the warp-path `Predictor` epoch/generation guard so a stale cross-warp rejection's `.catch` no-ops on a rebuilt predictor. ADR-0085 was amended pre-gate (in ptc5f, ADR-0142) to accept the risk for the closed playtest + pin the reachability bound (predictor.test.ts). **⚠ ptc5f's red-team pass sharpened the reachability: the gap is NOT contention-gated — it is reachable in _solo_ play by warping while holding a movement key (per-character `MOVE_QUEUE_CAP` / seq-reuse `"stale seq"` rejection), causing a swallowed first-post-warp move / brief rubber-band. Recommend Drew weigh pulling this fix forward of / into the playtest rather than treating it as negligible.** The guard itself lands here.
+- **M-postgate-netcode-hardening** (`M-postgate-netcode-hardening.spec.md`) — **UN-BLOCKED, front of queue.**
+  Promoted from a PLAN bullet to a full spec 2026-07-25. Three newly-found HIGH slices from the 2026-07-25
+  playtest: nh1 movement-suppression missing `preventDefault()` (arrow keys get hijacked by browser scroll
+  once any overlay is left open — root cause of Drew's reported "controls stopped working"), nh2 released
+  movement keys don't cancel already-queued steps (root cause of the "slippery"/overshoot/stutter
+  complaints, `MOVE_QUEUE_CAP=2` steps always drain after release regardless of intent), nh4 the client
+  never persists a reconnect token — server telemetry (`spacetime logs`) showed the session actually
+  spanned 6 separate anonymous identities, each reload (likely triggered by the nh1 freeze) silently
+  resetting all progress to a fresh starter, also undercounting the H2 recatch proxy. Plus the
+  pre-existing nh3, same code region: the warp-path `Predictor` epoch/generation guard so a stale
+  cross-warp rejection's `.catch` no-ops on a rebuilt predictor (M-playtest-c.5 Decision E,
+  Drew-delegated 2026-07-20; ADR-0085 amended pre-gate in ptc5f/ADR-0142 to accept the risk for the closed
+  playtest + pin the reachability bound). ptc5f's red-team pass had already sharpened the reachability —
+  reachable in _solo_ play by warping while holding a movement key — and recommended pulling it forward;
+  the 2026-07-25 gate is that pull-forward.
+- **M-postgate-ux-hardening** (`M-postgate-ux-hardening.spec.md`) — **UN-BLOCKED, front of queue** (new,
+  spawned 2026-07-25). ux1 persistent on-screen hint for the existing (but undiscovered) `?` help overlay +
+  battle-result continue hint; ux2 owner-scoped `player_wallet` view (mirrors the `player_conversation`
+  ADR-0087 pattern) so the shop can show the player's own balance without weakening the privacy model; ux3
+  `playtest-up`/`playtest-wipe` preflight check for a running SpacetimeDB instance (confirmed gap — first
+  action Drew hit); ux4 repro-and-confirm step for a suspected box-vs-team discoverability gap around the
+  battle swap UI (which already exists in code) before deciding whether anything there needs a code fix.
+  Larger design questions from the same playtest (responsive viewport scaling, shop-via-NPC-interaction,
+  full main-menu redesign) are deliberately NOT bundled in — recorded as deferred/owned in the gate
+  decision doc §8, each needing its own sizing pass.
+- **M-postgate-evolution-fusion-hardening** (`M-postgate-evolution-fusion-hardening.spec.md`) —
+  **UN-BLOCKED, slice A0 near-front of queue** (new, spawned 2026-07-25 via a 35-agent `ultracode`
+  research/brainstorm/debate/judge/converge workflow evaluating Drew's fusion-replacement proposal —
+  outcome recorded as a dated amendment to `adr/0019-evolution-fusion-model.md`, full trail in the harness
+  memory card `monster-realm-evolution-fusion-workflow-2026-07-25.md`). Finding: `fuse()` genuinely drifts
+  from ADR-0019's own "identity isn't erased by a transform" intent (resets level/EVs/bond/nickname on
+  every fusion; `evolve()` already carries all of that verbatim) — Drew's complaint was accurate, but the
+  fix is narrower than replacing fusion with evolution. **A0** (HIGH priority, comparable to
+  `M-postgate-netcode-hardening`): broadens `fuse()`'s field-carry formula (bond/level/EVs taxed-not-reset,
+  closing a bond-tax-exemption exploit found during adversarial critique) + extracts a shared
+  `fusion_eligible()` gate — no schema, no client. **B** (MEDIUM): ships Drew's own worked example
+  (elemental-flavored evolution branch) through the evolution-trigger enum's already-live `Item(id)`
+  variant — zero engine changes. **A1** (fusion preview UI) sits alongside `M-postgate-ux-hardening`/
+  `M-postgate-client-coverage`, not ahead of them. **C** (lineage display fields) is low/opportunistic. The
+  full typed multi-energy-accumulator system Drew originally proposed is **explicitly deferred, not
+  rejected** — gated on playtest evidence that Slice B's cheap version doesn't already satisfy H2; stays
+  below M20+ in priority. Both debate axes (fusion permanence; evolution-trigger restructuring) were won by
+  the "fix the narrow gap, don't restructure" side, with the losing side's evidence recorded, not discarded.
+- **M-postgate-client-coverage** (client-hardening; M-playtest-c.5 Decision D, Drew-delegated 2026-07-20) — extract the inline decision logic in `main.ts`/`battleView.ts`/`boxView.ts` into tested pure `*Model.ts` cores and drop the coverage-denominator exclusions; a mechanical fence lands pre-gate (fail if the `vite.config.ts` excluded set grows). Pairs with the ptc5c-2 overlay-registry client-hardening work. Stays post-gate provisional (order unchanged) behind the two hardening milestones above.
+- **M-postgate-ux-design** (`M-postgate-ux-design.spec.md`) — **DESIGNED 2026-07-25** (the three larger UX
+  design questions from the gate, sized via a brainstorm→debate→judge→synthesize multi-agent convergence
+  pass; all three converged). Three slices: **uxd1** responsive viewport scaling (DPR-correct + device-integer
+  crisp + fill-model follow-camera + small-map centering; render-edge-only, netcode-safe by construction);
+  **uxd2** shop-via-NPC context-sensitive interaction (server-anchored `NpcInteraction{Dialogue,Shop,Heal}`
+  enum + generalized `KeyT` + on-world prompt; MVP touches no reducer); **uxd3** unified overlay IA / two-level
+  main menu opened by a pinned `KeyM`, governed by a `canOpen` modality policy that preserves the
+  guard-only-never-hide gate — **this SUBSUMES `M-postgate-overlay-registry`** (delivers the registry substrate
+  + the menu in one). Designs are complete; **implementation stays post-gate provisional** (built after a
+  cleaner second playtest read, in normal queue order, ADR per slice at build). Sequencing: uxd3 is `main.ts`-
+  SERIAL and lands AFTER netcode-hardening nh1/nh2; uxd1/uxd2 are largely disjoint. See spec §4 for the full
+  sequencing/fan-out notes and the per-slice open-questions-for-Drew (each with a recommended default).
+- **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
+  delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
+  main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
+  schedule this separately.
+- **M-postgate-roster-wave-3** (content; **deprioritized, DE-GATED**) — complete the roster toward the GDD §5
+  ~16-form target by adding the currently-unrepresented **Electric + Light** species lines. These have
+  **zero forms AND zero skills** today, so this is net-new species *and* net-new skill kits (the Electric/
+  Light skills the ADR-0143 STAB gate requires), not a top-up — it also closes the Dark-doubled / 14-vs-16
+  residual accepted at pt-d3 (ADR-0145). Follows the ADR-0057 content fan-out + ADR-0143/0144 wave
+  conventions (reserved id/filename bands, STAB + RON comment-hygiene gates). **DECISION (Drew, 2026-07-25):
+  DE-GATED** — supersedes the earlier "gated on playtest feedback / no auto-launch without a fresh Drew
+  decision"; the loop MAY auto-launch this as normal content queue work with no fresh Drew decision, but it
+  is **deprioritized to the tail** of this block (sequence it after the two hardening milestones + the
+  UX-design specs; do not pull it ahead of them). ADR reserved at build time.
 - **M20 Observability, performance & load hardening** (`M20-observability-performance.spec.md`; ADR-0029) —
   the capstone: production monitoring (OTel→Datadog dashboards/alerts), full-system load testing (scaled
   sim-harness), profiling the named hot paths, and the **measured** performance-tuning pass + SLO baselines.
