@@ -1,0 +1,12 @@
+# runtime state — written every tick/run; tracking them churns every commit (untracked 2026-07-26)
+.blocked-on-human
+.last-tick-spawn-epoch
+.native-supervisor-disabled
+.native-supervisor-heartbeat
+.native-supervisor-last-failure
+.native-supervisor-last-failure-epoch
+.native-supervisor-last-success
+.native-supervisor-tick-alive
+.ollama-last
+.situation-cache.json
+pending-events/

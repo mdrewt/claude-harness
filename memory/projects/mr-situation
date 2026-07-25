@@ -95,7 +95,14 @@ def budget():
             os.kill(int(pid),0)
         except Exception:
             unrec+=1
-    est=unrec*25.0
+    est=0.0
+    for df in glob.glob("/tmp/mr_pass_*.done"):
+        sl=os.path.basename(df)[len("mr_pass_"):-len(".done")]
+        last=latest.get(sl)
+        if last is None or str(last.get("outcome","")).upper().startswith("LAUNCH"):
+            try: t=json.load(open(MEM+f"/.harness-runner.{sl}.lock")).get("tier","routine")
+            except Exception: t="routine"
+            est+={"hard":90.0,"routine":25.0,"content":35.0}.get(str(t),25.0)
     # in-flight committed exposure: live runs have spent tokens the ledger cannot see yet.
     # Rough per-tier medians (from ledger history); matters at N>=3 where 4 slices ~ $300 committed.
     tier_est={"hard":90.0,"routine":25.0,"content":35.0}
