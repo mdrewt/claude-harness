@@ -48,10 +48,14 @@ cd "$HARNESS" || fail 127
 [ -r "$B" ] || fail 66
 
 terminal_pr_open() {
-  # Terminal = a PR for this slice is OPEN **or already MERGED** (a merged PR previously looked
-  # non-terminal and triggered ghost resume attempts + pointless escalations — 2026-07-24 retro).
-  gh pr list -R mdrewt/monster-realm --state all -L 40 --json headRefName,state \
-    -q '.[] | select(.state=="OPEN" or .state=="MERGED") | .headRefName' 2>/dev/null | grep -qi "$S"
+  # Terminal = PR OPEN or MERGED (2026-07-24). FAIL-SAFE (2026-07-25 gh outage): gh itself failing
+  # (missing shim/auth/network) means we CANNOT know -> treat as TERMINAL: stop resumes, let the
+  # supervisor triage from .done + crash event. Blind resumes cost attempts; early stop is cheap.
+  local out rc
+  out=$(gh pr list -R mdrewt/monster-realm --state all -L 40 --json headRefName,state \
+    -q '.[] | select(.state=="OPEN" or .state=="MERGED") | .headRefName' 2>/dev/null); rc=$?
+  if [ "$rc" -ne 0 ]; then echo "TERMINAL-CHECK-INDETERMINATE gh rc=$rc" >>"$L" 2>/dev/null; return 0; fi
+  printf '%s\n' "$out" | grep -qi "$S"
 }
 transient_failure() {
   { tail -c 4096 "$E" 2>/dev/null; tail -n 3 "$L" 2>/dev/null; } | grep -qiE \
