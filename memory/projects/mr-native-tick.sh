@@ -100,6 +100,21 @@ if [ -f "$MEM/.native-supervisor-disabled" ]; then
     log "SKIP disabled-flag (event requeued: ${EVFILE:-none})"; exit 0; fi
 fi
 
+# gate -0.5: human-gate marker (written by decision runs on gate-class BLOCKERs; makes multi-day
+# waits FREE instead of $0.25-1.60/hour of "still waiting" decision runs). Wakes on: the wake_file
+# appearing · any event tick (state changed) · manual/forced runs · marker older than 7 days (safety).
+if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ]; then
+  WAKE=$(grep -m1 -oE "wake_file=[^ ]+" "$MEM/.blocked-on-human" 2>/dev/null | cut -d= -f2)
+  MAGE=$(( $(date +%s) - $(stat -c %Y "$MEM/.blocked-on-human" 2>/dev/null || echo 0) ))
+  if [ -n "$WAKE" ] && [ -e "$WAKE" ]; then
+    rm -f "$MEM/.blocked-on-human"; log "GATE-LIFTED wake_file present: $WAKE"
+  elif [ "$MAGE" -lt 604800 ]; then
+    log "STANDDOWN gated-on-human ($(head -c 100 "$MEM/.blocked-on-human" | tr '\n' ' '))"; exit 0
+  else
+    log "NOTE human-gate marker >7d old — proceeding for a fresh look"
+  fi
+fi
+
 # gate 0: tick-overlap lock — on contention, REQUEUE the event (never drop it)
 exec 9>/tmp/mr_native_tick.flock
 if ! flock -n 9; then
