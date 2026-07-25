@@ -33,7 +33,26 @@ for i in range(len(names)):
         out["pairs"].append({"pair":[a,b],"overlap":sorted(inter),"disjoint":not inter})
 if out["structural_hits"]: out["verdict"]="SERIAL-REQUIRED(structural)"
 elif any(not p["disjoint"] for p in out["pairs"]): out["verdict"]="SERIAL-REQUIRED(overlap)"
-out["note"]="SAFE means file-disjoint only. Shared registry/enum/namespace AXES still require PARTITION-THEN-PARALLEL per SSOT 3-state rule; semantic overlap still permits supervisor serialize-override."
+# ADVISORY coupling annotation (judge-sanctioned trial, 2026-07-26): one-shot CLI queries (~40ms via
+# resident daemon). CONTEXT ONLY — a "coupled" note is NOT a verdict (known false-positive: nh4+ux1
+# were import-coupled and parallelized cleanly). Supervisor may use it to serialize, never to overrule SERIAL.
+import subprocess
+PROJ="home-mdrewt-projects-ai-apps-claude-harness-projects-monster-realm"
+def coupling(pa_list, pb_list):
+    try:
+        fa=json.dumps([p for p in pa_list][:6]); fb=json.dumps([p for p in pb_list][:6])
+        q=f"MATCH (a)-[r:CALLS|USAGE|IMPORTS]-(b) WHERE a.file_path IN {fa} AND b.file_path IN {fb} RETURN count(r)"
+        r=subprocess.run(["codebase-memory-mcp","cli","query_graph",json.dumps({"project":PROJ,"query":q})],
+                         capture_output=True,text=True,timeout=10)
+        n=json.loads(r.stdout).get("rows",[[0]])[0][0]
+        return int(n)
+    except Exception:
+        return None  # graph unavailable -> annotation absent, never blocking
+for pr in out["pairs"]:
+    a,b=pr["pair"]
+    c=coupling(slices[a],slices[b])
+    if c is not None: pr["advisory_coupling_edges"]=c
+out["note"]="SAFE means file-disjoint only. Shared registry/enum/namespace AXES still require PARTITION-THEN-PARALLEL per SSOT 3-state rule; semantic overlap still permits supervisor serialize-override. advisory_coupling_edges is CONTEXT (trial 2026-07-26): >0 means graph sees same-language coupling between the sets — weigh it, never auto-serialize on it, never override SERIAL with it. Content/.ron and cross-language (WASM) coupling are INVISIBLE to it."
 print(json.dumps(out,indent=1))
 PY
 exit 0
