@@ -55,7 +55,9 @@ terminal_pr_open() {
   out=$(gh pr list -R mdrewt/monster-realm --state all -L 40 --json headRefName,state \
     -q '.[] | select(.state=="OPEN" or .state=="MERGED") | .headRefName' 2>/dev/null); rc=$?
   if [ "$rc" -ne 0 ]; then echo "TERMINAL-CHECK-INDETERMINATE gh rc=$rc" >>"$L" 2>/dev/null; return 0; fi
-  printf '%s\n' "$out" | grep -qi "$S"
+  # ANCHORED match (2026-07-25): unanchored grep cross-matched slice ids (pt-c1 hit pt-c1b's branch;
+  # slice 'B' matched any branch containing 'b') — false terminal states mask premature stops.
+  printf '%s\n' "$out" | grep -qiE "(^|/|-)${S}(-|$)"
 }
 transient_failure() {
   { tail -c 4096 "$E" 2>/dev/null; tail -n 3 "$L" 2>/dev/null; } | grep -qiE \
