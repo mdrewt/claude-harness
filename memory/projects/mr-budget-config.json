@@ -1,16 +1,17 @@
 {
  "calibration_anchor": {
-   "ts": "2026-07-25T17:00:00Z",
-   "note": "Drew ground truth 2026-07-25: 36% of total weekly usage, 30% of fable allowance, against internal-$ ledger sums since the 2026-07-24T00:00Z weekly reset. Limits are DERIVED from this anchor (per-axis): weekly = internal_total/drew_total_pct; fable_allowance = internal_fable/drew_fable_pct. Re-anchor whenever Drew reports fresh percentages.",
-   "internal_total_usd": 1002,
-   "drew_total_pct": 0.36,
-   "internal_fable_usd": 689,
-   "drew_fable_pct": 0.30
+  "ts": "2026-07-25T17:00:00Z",
+  "note": "Drew ground truth 2026-07-25: 36% of total weekly usage, 30% of fable allowance, against internal-$ ledger sums since the 2026-07-24T00:00Z weekly reset. Limits are DERIVED from this anchor (per-axis): weekly = internal_total/drew_total_pct; fable_allowance = internal_fable/drew_fable_pct. Re-anchor whenever Drew reports fresh percentages.",
+  "internal_total_usd": 1002,
+  "drew_total_pct": 0.36,
+  "internal_fable_usd": 689,
+  "drew_fable_pct": 0.3
  },
  "weekly_limit_usd": 2783,
  "fable_allowance_usd": 2298,
- "soft_pause_frac": 0.90,
+ "soft_pause_frac": 0.9,
  "hard_stop_frac": 0.97,
- "fable_guard_frac": 0.90,
- "_semantics": "soft/hard fracs apply to weekly_limit_usd; fable_ok = fable_spend < fable_guard_frac * fable_allowance_usd (allowance is its own axis now, NOT a fraction of weekly). Old fields kept for reader fallback compatibility."
+ "fable_guard_frac": 0.9,
+ "_semantics": "soft/hard fracs apply to weekly_limit_usd; fable_ok = fable_spend < fable_guard_frac * fable_allowance_usd (allowance is its own axis now, NOT a fraction of weekly). Old fields kept for reader fallback compatibility.",
+ "single_run_alert_usd": 150
 }

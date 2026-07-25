@@ -77,6 +77,24 @@ PYCHK
   grep -q "^ESCALATED" "$RLOG" 2>/dev/null && MDL="escalated:${MDL}-to-fable"
   "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
     --model "$MDL" --from-log "$RLOG" --notes "mechanical backfill by tick v3 reconcile" >> "$LOG" 2>&1 && touch "$DF.recorded"
+  # single-run spend alert (visibility only, never a gate): flag unusually expensive runs same-hour
+  RCOST=$(/usr/bin/python3 - "$RLOG" <<'PYC'
+import json,sys
+t=0.0
+try:
+    for l in open(sys.argv[1],errors="replace"):
+        if '"type":"result"' in l:
+            try: t+=float(json.loads(l).get("total_cost_usd") or 0)
+            except Exception: pass
+except Exception: pass
+print(round(t,2))
+PYC
+)
+  THRESH=$(/usr/bin/python3 -c "import json;print(json.load(open('$MEM/mr-budget-config.json')).get('single_run_alert_usd',150))" 2>/dev/null || echo 150)
+  if /usr/bin/python3 -c "import sys;sys.exit(0 if float('$RCOST'or 0)>float('$THRESH') else 1)" 2>/dev/null; then
+    log "SPEND-ALERT slice=$SL cost=\$$RCOST exceeds single_run_alert_usd=\$$THRESH"
+    "$MEM/mr-record" handoff --title "SPEND-ALERT: $SL cost \$$RCOST (> \$$THRESH threshold)" --body "Single-run spend exceeded the alert threshold (visibility only, not a gate). Verify the slice's size was justified (right-sizing rule) at merge adjudication; adjust single_run_alert_usd in mr-budget-config.json if this class of slice is expected." >> "$LOG" 2>&1 || true
+  fi
 done
 
 # RECONCILE part 2: dead-pid locks with no .done (SIGKILL/reboot class) -> CRASHED row, cost unknown

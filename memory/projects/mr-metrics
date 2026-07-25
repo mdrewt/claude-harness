@@ -97,5 +97,13 @@ for k,v in merged.items():
     mw=mins(v.get("finish",""),v.get("merge","")) if v.get("finish") and v.get("merge") else None
     lm=mins(v.get("launch",""),v.get("merge","")) if v.get("launch") and v.get("merge") else None
     print(f"    {k}: build_min={b} merge_wait_min={mw} launch_to_merge_min={lm}")
+print("-- dual-anchor (judge-mandated: internal-$ vs operator-reported, never blended) --")
+try:
+    _c=json.load(open(MEM+"/mr-budget-config.json")); _a=_c.get("calibration_anchor")
+    if _a:
+        print(f"    anchor {_a['ts']}: internal ${_a['internal_total_usd']} = {100*_a['drew_total_pct']:.0f}% real total; internal fable ${_a['internal_fable_usd']} = {100*_a['drew_fable_pct']:.0f}% real fable allowance")
+        print(f"    derived limits: weekly ${_c['weekly_limit_usd']} · fable allowance ${_c.get('fable_allowance_usd')} · latest operator anchor is authoritative; internal-$ is the proxy")
+    else: print("    (no calibration anchor recorded — internal-$ only; treat as UNANCHORED)")
+except Exception as e: print("    (anchor unavailable)")
 print("-- governor spend in window (from rows) --", f"${rooted+sup:.2f}")
 PY
