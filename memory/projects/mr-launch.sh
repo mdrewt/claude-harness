@@ -77,22 +77,7 @@ try:
 except Exception:
     print("OVER")' 2>/dev/null || echo OVER
 }
-haiku_triage(){ # -> transient|real
-  OUT=$(timeout 120 claude --model haiku --effort low --dangerously-skip-permissions -p \
-"A headless coding session exited non-zero. Classify the cause as exactly one word, 'transient' (API/network/infrastructure blip worth an automatic resume) or 'real' (code/logic/config failure needing triage). Evidence follows.
---- stderr tail ---
-$(tail -c 2000 "$E" 2>/dev/null)
---- log tail ---
-$(tail -n 5 "$L" 2>/dev/null | cut -c1-300)
-Respond with exactly one word." 2>/dev/null)
-  if echo "$OUT" | grep -qi '^ *transient'; then echo transient; return; fi
-  if [ -z "$OUT" ] || ! echo "$OUT" | grep -qiE 'transient|real'; then
-    # claude CLI unavailable (e.g. auth outage) -> local-model fallback triage
-    LOUT=$("$MEM/mr-ollama" triage "$S" 2>/dev/null | head -1)
-    case "$LOUT" in [Tt]ransient*) echo transient; return;; esac
-  fi
-  echo real
-}
+# (haiku triage hop removed 2026-07-26 — 0 invocations ever; the local-model triage below covers the identical ambiguous-failure class for $0 and works during API outages. Rollback: git history.)
 
 A=1
 echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
@@ -112,7 +97,7 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
   elif transient_failure; then
     sleep $((60 * A))
     P="Your previous session was interrupted by a transient API/network error mid-work. Re-verify the worktree and branch state (git status, git log) before assuming anything completed, then continue the brief from where you actually left off. Push any unpushed commits first."
-  elif [ "$(haiku_triage)" = "transient" ]; then
+  elif [ "$("$MEM/mr-ollama" triage "$S" 2>/dev/null | head -1 | grep -io "^transient" || echo real)" = "transient" ]; then
     sleep $((60 * A))
     P="Your previous session was interrupted by what appears to be a transient infrastructure error. Re-verify worktree/branch state before assuming anything completed, then continue the brief from where you actually left off."
   else

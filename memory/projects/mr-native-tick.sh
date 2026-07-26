@@ -77,6 +77,15 @@ PYCHK
   grep -q "^ESCALATED" "$RLOG" 2>/dev/null && MDL="escalated:${MDL}-to-fable"
   "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
     --model "$MDL" --from-log "$RLOG" --notes "mechanical backfill by tick v3 reconcile" >> "$LOG" 2>&1 && touch "$DF.recorded"
+  # P3 durability (2026-07-26): persist the run census into the pending done-event so forensics survive /tmp loss
+  EVF="$MEM/pending-events/$SL.done.md"
+  if [ -f "$EVF" ] && [ -f "$RLOG" ]; then
+    { echo "--- RUN CENSUS (reconcile-time; durable) ---"
+      grep -aE "^ATTEMPT=|^ESCALAT" "$RLOG" | head -6
+      echo "model event counts:"; grep -ao "\"model\":\"claude-[a-z0-9.-]*\"" "$RLOG" | sort | uniq -c | head -6
+      echo "cost: recorded in the ledger FINISHED row"
+    } >> "$EVF" 2>/dev/null || true
+  fi
   # single-run spend alert (visibility only, never a gate): flag unusually expensive runs same-hour
   RCOST=$(/usr/bin/python3 - "$RLOG" <<'PYC'
 import json,sys
@@ -139,12 +148,7 @@ if ! flock -n 9; then
   [ -n "$EVFILE" ] && [ -f "$EVFILE" ] && case "$EVFILE" in "$MEM/pending-events/"*) : ;; *) mv "$EVFILE" "$MEM/pending-events/" 2>/dev/null;; esac
   log "SKIP flock-held (event requeued: ${EVFILE:-none})"; exit 0
 fi
-# debounce: cron-source only, and only when nothing is pending
-if [ "$SRC" = "cron" ] && [ -z "$(ls -A "$MEM/pending-events" 2>/dev/null)" ]; then
-  LSE=$(cat "$MEM/.last-tick-spawn-epoch" 2>/dev/null || echo 0)
-  LSE=${LSE:-0}; case "$LSE" in ""|*[!0-9]*) LSE=0;; esac
-  if [ $(( $(date +%s) - LSE )) -lt 120 ]; then log "SKIP debounce (<120s since last spawn)"; exit 0; fi
-fi
+# (debounce removed 2026-07-26 — 0 fires in 60+ production ticks; flock + durable-event requeue cover the class. Rollback: restore from git history if paired cron+event spawns ever double-run.)
 
 # gate 1: fast-path — live rooted run and no .done awaiting merge and no pending events -> standdown
 LIVE=0; DONE_WAIT=0; LIVE_SLICES=""
@@ -157,7 +161,7 @@ except Exception: print('')" 2>/dev/null)
   if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then LIVE=1; LIVE_SLICES="$LIVE_SLICES $SLICE($PID)"; fi
   [ -f "/tmp/mr_pass_${SLICE}.done" ] && DONE_WAIT=1
 done
-PENDING=$(ls -A "$MEM/pending-events" 2>/dev/null | head -1)
+PENDING=$(ls -A "$MEM/pending-events" 2>/dev/null | grep -v "^archive$" | head -1)   # archive/ lives inside this dir — excluding it restores the FREE fastpath (bug 2026-07-26: every live-chain standdown was a paid spawn since first archival)
 if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ] && [ -z "$PENDING" ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
 
 # gate 2: rate-limit reset-time from mr-state.json
@@ -239,7 +243,6 @@ if [ "${MR_TICK_DRYRUN:-0}" = "1" ]; then
   echo "DECISION-NEEDED (dryrun) prompt=$PROMPTF"; exit 0
 fi
 log "SPAWN model=$SUP_MODEL effort=$SUP_EFFORT governor=$GSTATE rid=$RID tlog=$TLOG events=$(echo $CONSUMED | wc -w)"
-date +%s > "$MEM/.last-tick-spawn-epoch"
 cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
 timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-skip-permissions \
   --output-format stream-json --verbose \

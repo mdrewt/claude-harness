@@ -101,3 +101,6 @@ Cleaned up both the `ux4` worktree/branch (merged this tick) and the orphaned `u
 **Queued for whoever picks up Phase D next** (from ux4's own findings, not yet spec'd):
 - `M-postgate-pvp-side-b-overlay` — PvP side-B player gets no battle overlay at all (`store.latestPlayerBattle` misses `opponent_identity`-keyed rows); no cards/skills/swap/forfeit until 60s timeout. Real playtest-visible defect.
 - `set_party_slot` missing `is_in_ongoing_battle` guard — traced NOT exploitable (HP write-back keys off id snapshot, not slot) but emergent/untested; no `monster_mgmt_tests.rs` exists yet.
+
+## 2026-07-26T13:22:11Z — Retro-5 plan implemented (P1 fastpath bug, P3 census durability, P4 removals, P5 insurance list)
+P1: paid live-chain standdowns since Jul 25 root-caused to archive/ nested in pending-events breaking the emptiness check; fixed both sites — free fastpath restored (verify: next live-chain cron tick should log STANDDOWN live-chain WITHOUT a SPAWN). P3: done-events now carry a reconcile-time RUN CENSUS. P4 removals (rollback = git history): debounce, haiku triage hop (local triage retained), chore-batching prose. P2 deferred pending census evidence. Keep-as-insurance list ratified in README. Loop remains gated on playtest-2 (free standdowns).
