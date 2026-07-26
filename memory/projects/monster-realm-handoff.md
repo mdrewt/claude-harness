@@ -89,3 +89,15 @@ Squash-merged f8f50cb2 to master (ff-only local checkout updated). Audits CLEAN 
 **Residual risks on the PR (all disclosed in ADR-0155 + PR body):** `battleView`'s root has no `overflow` (unlike `boxView`'s `overflow-y:auto`), so ~20px of added height needs a 720p measurement — happy-dom does no layout, folds into deferral D2 (`client/e2e/swap-hint.spec.ts`). `To Party` now matches TWO nodes (hint div + real button) ⇒ future specs must use `getByRole('button', …)`. Copy hardcodes `Esc`/`B` and nothing pins `boxView?.toggle()` as KeyB's effect. Pre-existing `client/e2e/recruit.spec.ts` citations into both shells were shifted by these insertions but `client/e2e/**` is out of touch-set; two stale citations also left in the pre-ux4 ux1-2 region of `battleView.test.ts` (`battleView.ts:401` → `:421`).
 
 **Next for the supervisor:** delegate the #256 CI wait to `mr-ci-watch`, squash-merge on the event (6 commits incl. 3 `wip:` — squash is required, the repo's `commit-msg` hook rejects `wip(...)`), then remove `.claude/worktrees/ux4` + the local branch, and raise the playtest-2 gate BLOCKER.
+
+## 2026-07-26T03:36Z — ux4 MERGED, PLAYTEST-2 GATE raised
+
+PR#256 squash-merged as `dd51bde` (both audits CLEAN: orchestration 16 agent calls incl. tester/red-team/reviewer/verifier; gating-test integrity clean, no removed asserts/skips). `docs/adr/DIGEST.md` + `ARCHITECTURE.md` carried through as-merged. Local `master` fast-forwarded to `dd51bde`; remote CI on the merge commit was still `in_progress` at tick-exit (PR's own checks had already passed green: ci 2m49s, e2e 3m42s — same diff, low risk, not re-polled per no-babysit-CI rule).
+
+Cleaned up both the `ux4` worktree/branch (merged this tick) and the orphaned `ux2` worktree/branch (PR#255 had merged in a prior tick but its worktree was left behind — removed now, no PR was open on it).
+
+**M-postgate-netcode-hardening and M-postgate-ux-hardening are BOTH now closed** (ux4 was the last of the four ux slices: ux1 #251, ux3 #253, ux2 #255, ux4 #256). Per the 2026-07-26 PLAYTEST-2 GATE directive, no further Phase D work starts. Raised `.blocked-on-human` with wake_file=`specs/monster-realm-v2/playtest-feedback-2026-07-r2.md` (does not yet exist — verified live). No launch this tick.
+
+**Queued for whoever picks up Phase D next** (from ux4's own findings, not yet spec'd):
+- `M-postgate-pvp-side-b-overlay` — PvP side-B player gets no battle overlay at all (`store.latestPlayerBattle` misses `opponent_identity`-keyed rows); no cards/skills/swap/forfeit until 60s timeout. Real playtest-visible defect.
+- `set_party_slot` missing `is_in_ongoing_battle` guard — traced NOT exploitable (HP write-back keys off id snapshot, not slot) but emergent/untested; no `monster_mgmt_tests.rs` exists yet.
