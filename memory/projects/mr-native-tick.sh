@@ -136,6 +136,12 @@ if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" 
   if [ -n "$WAKE" ] && [ -e "$WAKE" ]; then
     rm -f "$MEM/.blocked-on-human"; log "GATE-LIFTED wake_file present: $WAKE"
   elif [ "$MAGE" -lt 604800 ]; then
+    WI=$(grep -m1 -oE "wake_issue=[0-9]+" "$MEM/.blocked-on-human" 2>/dev/null | cut -d= -f2)
+    if [ -n "$WI" ] && ! { OP=$(cat "/tmp/mr_decwatch_$WI.lock.d/pid" 2>/dev/null); [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null; }; then
+      WSLUG=$(grep -m1 -oE "DECISION\([^)]+\)" "$MEM/.blocked-on-human" 2>/dev/null | sed 's/DECISION(//;s/)//'); WSLUG=${WSLUG:-decision}
+      setsid bash "$MEM/mr-decision-watch" "$WI" "$WSLUG" >/dev/null 2>&1 & disown
+      log "DECISION-WATCH respawned issue=$WI (was dead — reboot?)"
+    fi
     log "STANDDOWN gated-on-human ($(head -c 100 "$MEM/.blocked-on-human" | tr '\n' ' '))"; exit 0
   else
     log "NOTE human-gate marker >7d old — proceeding for a fresh look"

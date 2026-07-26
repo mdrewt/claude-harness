@@ -1,0 +1,56 @@
+#!/bin/bash
+# mr-decision-watch ISSUE_NUM SLUG — zero-token decision watcher. Launch DETACHED.
+# Polls the DECISION github issue every 5 min (7-day cap). Answered = closed OR any comment by
+# the operator. On answer: writes $MEM/decisions/issue-N.answer.md (this IS the wake_file the
+# blocker points at), clears a matching .blocked-on-human, fires a pending event for an
+# immediate tick. gh failures degrade to longer sleeps, never crash. (Companion of mr-ask-drew.)
+set -u
+exec 9>&- 2>/dev/null || true
+unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true
+export PATH="$PATH:/home/mdrewt/.asdf/shims:/home/mdrewt/bin"
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+REPO=mdrewt/claude-harness
+OPERATOR=mdrewt
+N="${1:?issue}"; S="${2:?slug}"
+[ "${MR_NO_EVENT_BRIDGE:-0}" = "1" ] && exit 0
+LOCKD="/tmp/mr_decwatch_$N.lock.d"
+mkdir "$LOCKD" 2>/dev/null || { OP=$(cat "$LOCKD/pid" 2>/dev/null); [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null && grep -q mr-decision-watch "/proc/$OP/cmdline" 2>/dev/null && exit 0; rm -rf "$LOCKD"; mkdir "$LOCKD" || exit 0; }
+echo $$ > "$LOCKD/pid"
+trap 'rm -rf "$LOCKD"' EXIT
+DEADLINE=$(( $(date +%s) + 7*24*3600 ))
+FAILS=0
+while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+  J=$(gh issue view "$N" --repo "$REPO" --json state,title,body,comments 2>/dev/null) || J=""
+  if [ -z "$J" ]; then FAILS=$((FAILS+1)); sleep $(( FAILS > 6 ? 1800 : 300 )); continue; fi
+  FAILS=0
+  ANSWERED=$(printf '%s' "$J" | /usr/bin/python3 -c '
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: print("no"); raise SystemExit
+ops=[c for c in d.get("comments",[]) if c.get("author",{}).get("login")=="'"$OPERATOR"'"]
+print("yes" if d.get("state")=="CLOSED" or ops else "no")' 2>/dev/null || echo no)
+  if [ "$ANSWERED" = "yes" ]; then
+    mkdir -p "$MEM/decisions"
+    printf '%s' "$J" | /usr/bin/python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+out=["# DECISION ANSWER — issue '"$N"' ("+d.get("state","?")+")","","## Question (issue title)",d.get("title",""),"","## Operator response(s)"]
+ops=[c for c in d.get("comments",[]) if c.get("author",{}).get("login")=="'"$OPERATOR"'"]
+if ops:
+    for c in ops: out += ["", "### "+c.get("createdAt",""), c.get("body","")]
+else:
+    out += ["(closed without comment — treat the Recommendation in the issue body as accepted)","","## Issue body (for the recommendation)", d.get("body","")]
+open("'"$MEM"'/decisions/issue-'"$N"'.answer.md","w",encoding="utf-8").write("\n".join(out)+"\n")' 2>/dev/null \
+      || { echo "answered (transcript-write-failed) state-only" > "$MEM/decisions/issue-$N.answer.md"; }
+    grep -q "wake_issue=$N\b" "$MEM/.blocked-on-human" 2>/dev/null && rm -f "$MEM/.blocked-on-human"
+    if [ ! -f "$MEM/.native-supervisor-disabled" ]; then
+      EV="$MEM/pending-events/$S.decision.md"; EVT="$EV.building.$$"
+      { echo "EVENT src=decision slice=$S at=$(date -u +%Y-%m-%dT%H:%M:%SZ) — operator answered DECISION issue #$N"
+        echo "--- answer transcript ---"; cat "$MEM/decisions/issue-$N.answer.md"
+      } > "$EVT" && mv "$EVT" "$EV"
+    fi
+    exit 0
+  fi
+  sleep 300
+done
+exit 0

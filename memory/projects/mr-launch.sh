@@ -15,6 +15,7 @@ MODEL="${2:-opus}"
 EFFORT="${3:-high}"
 MAX_ATTEMPTS=3
 HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
+PROJDIR="$HARNESS/projects/monster-realm"  # cwd for rooted runs: project-level .claude (31 domain skills, desync-guard, reducer-security-auditor) is only discovered from inside PROJ; harness .claude still inherited via ancestor walk (probe-verified 2026-07-26)
 MEM=$HARNESS/memory/projects
 B="/tmp/mr_pass_$S.md"; L="/tmp/mr_pass_$S.log"; E="/tmp/mr_pass_$S.err"; D="/tmp/mr_pass_$S.done"
 
@@ -81,8 +82,8 @@ except Exception:
 
 A=1
 echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
-claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
-  --output-format stream-json --verbose </dev/null >>"$L" 2>"$E"
+( cd "$PROJDIR" && claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
+  --add-dir "$HARNESS" --output-format stream-json --verbose ) </dev/null >>"$L" 2>"$E"
 RC=$?
 PREV_SIG=""
 while [ "$A" -lt "$MAX_ATTEMPTS" ] \
@@ -118,9 +119,9 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
   SID=$(grep -o '"session_id":"[^"]*"' "$L" | tail -1 | cut -d'"' -f4)
   [ -n "$SID" ] || break
   echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
-  claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
+  ( cd "$PROJDIR" && claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
     -p "$P" \
-    --output-format stream-json --verbose </dev/null >>"$L" 2>>"$E"
+    --add-dir "$HARNESS" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
   RC=$?
 done
 

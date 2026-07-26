@@ -1,0 +1,46 @@
+#!/bin/bash
+# mr-ask-drew SLUG --question "..." [--root "..."] [--recommend "..."] [--alts "..."] [--context "..."]
+#             [--body-file FILE] [--blocking]
+# Opens a standardized DECISION issue on github (repo mdrewt/claude-harness) so Drew gets a push
+# notification, a readable brief, and a comment box. --blocking additionally writes
+# $MEM/.blocked-on-human (wake_file = the answer transcript mr-decision-watch will write) and
+# spawns the watcher. ALWAYS exits 0; on gh failure prints ASK-DREW-UNAVAILABLE — caller falls
+# back to the plain .blocked-on-human flow. (Drew-approved channel 2026-07-26.)
+set -u
+export PATH="$PATH:/home/mdrewt/.asdf/shims:/home/mdrewt/bin"
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+REPO=mdrewt/claude-harness
+S="${1:?slug}"; shift
+Q=""; ROOT=""; REC=""; ALTS=""; CTX=""; BF=""; BLOCKING=0
+while [ $# -gt 0 ]; do case "$1" in
+  --question) Q="$2"; shift 2;; --root) ROOT="$2"; shift 2;; --recommend) REC="$2"; shift 2;;
+  --alts) ALTS="$2"; shift 2;; --context) CTX="$2"; shift 2;; --body-file) BF="$2"; shift 2;;
+  --blocking) BLOCKING=1; shift;; *) echo "ASK-DREW-BADARG $1"; exit 0;;
+esac; done
+[ -n "$Q" ] || [ -n "$BF" ] || { echo "ASK-DREW-UNAVAILABLE no question"; exit 0; }
+BODY=$(mktemp /tmp/mr_ask_XXXX.md)
+if [ -n "$BF" ] && [ -f "$BF" ]; then cp "$BF" "$BODY"; else
+  { echo "## Root issue"; echo "${ROOT:-(not stated)}"; echo
+    echo "## Question"; echo "$Q"; echo
+    echo "## Recommendation"; echo "${REC:-(none)}"; echo
+    echo "## Alternatives"; echo "${ALTS:-(none listed — non-exhaustive)}"; echo
+    echo "## Additional context"; echo "${CTX:-(none)}"; echo
+    echo "---"; echo "_Answer by commenting (or closing) this issue. A watcher polls every 5 min; your first comment (or close) resumes the loop. Slice/topic: \`$S\`._"
+  } > "$BODY"
+fi
+gh label create decision --repo "$REPO" --color 5319e7 --description "Operator decision needed" --force >/dev/null 2>&1
+TITLE="DECISION($S): $(echo "${Q:-see body}" | tr '\n' ' ' | head -c 70)"
+URL=$(gh issue create --repo "$REPO" --title "$TITLE" --label decision --body-file "$BODY" 2>/dev/null)
+rm -f "$BODY"
+case "$URL" in
+  https://*/issues/*) N="${URL##*/}";;
+  *) echo "ASK-DREW-UNAVAILABLE gh issue create failed"; exit 0;;
+esac
+mkdir -p "$MEM/decisions"
+echo "$URL" > "$MEM/decisions/issue-$N.url"
+if [ "$BLOCKING" = "1" ]; then
+  echo "DECISION($S) pending: $TITLE wake_issue=$N wake_file=$MEM/decisions/issue-$N.answer.md issue=$URL" > "$MEM/.blocked-on-human"
+fi
+setsid bash "$MEM/mr-decision-watch" "$N" "$S" >/dev/null 2>&1 & disown
+echo "ASK-DREW-OK issue=$N url=$URL blocking=$BLOCKING"
+exit 0
