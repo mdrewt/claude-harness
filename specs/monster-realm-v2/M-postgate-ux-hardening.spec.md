@@ -19,6 +19,37 @@ Evidence: a `?`-bound help overlay already exists (`client/src/main.ts:877-899`,
 - **ux1-3 (proof-of-teeth):** a test SHALL assert the persistent hint element exists and is visible under normal play state, and a battle-result-specific test SHALL assert the continue-hint renders on victory/flee/defeat view models.
 - Touches: `client/index.html`, `client/src/main.ts` or a small new `client/src/ui/*.ts` (hint rendering), `client/src/ui/battleView.ts` (+ sibling tests). Client, mostly-additive → parallel-friendly with ux2/ux3.
 
+**DELIVERED (PR #251, ADR-0151).** Persistent `#help-hint` badge (static markup in
+`client/index.html`, no new view class) + "Press Esc to continue" hint on battle-result
+(victory/flee/defeat) states in `battleView.ts`. 9 files, `main.ts` untouched → ran
+fan-out-safe alongside concurrent `nh4`.
+
+- **ux1-1 EXTENDED (disclosed):** the badge advertises an overlay that did not render on
+  screen. `#help-overlay` carried **only** `style="display:none"` — a static, in-flow `<div>`
+  after a `window.innerHeight`-tall PixiJS canvas in `#app`, and the repo has **zero CSS
+  files** — so `show()` painted it below the fold (measured in real Chromium: `top=724` at
+  `innerHeight=720`), in default black text on the `#0b0d12` body. ux1-1 therefore also
+  viewport-anchors `#help-overlay` (`position:fixed;inset:0` + z-index band on the shell;
+  `HelpView.show()` sets `style.display=''`, which removes only that declaration, so no view
+  class changed). Without this the slice would have shipped an affordance pointing at a no-op.
+- **DEFERRED to `M-postgate-overlay-registry`:** the **nine** remaining in-flow shells in
+  `client/index.html` (dialogue, quest-log, heal, shop, trade, pvp-challenge, leaderboard,
+  rename, tradepropose) plus the JS-created `errorOverlayView` have the **identical** defect;
+  only box/raising/evolution/battle build fixed roots in JS. Direct cause of
+  `PlaytestReport.md:81/:85/:97`. This deferral is **load-bearing, not cosmetic**: the new
+  badge is **dishonest while any overlay is open**, because `?` is a dead key then (the
+  keydown handler's overlay-suppression path owns it) — the badge keeps advertising an action
+  that cannot be taken until the registry lands.
+- **ux1-3 PARTIALLY MET.** New `client/src/indexShell.test.ts` parses the REAL
+  `client/index.html` (via `import.meta.url` + `DOMParser`) rather than the repo's usual
+  hand-mirrored inline fixture (vacuous for this claim), and must live under `client/src/`
+  because `vite.config.ts` restricts discovery to `src/**/*.test.ts`. But **happy-dom does no
+  layout**, so the test proves *present / body-anchored / not-obviously-invisible*, never
+  *visible* (`opacity:0`, `visibility:hidden`, `font-size:0`, `left:-9999px`,
+  `transform:scale(0)`, `clip-path`, `content-visibility`, the `hidden` attribute and a
+  zero-size ancestor all pass). Named follow-up: `client/e2e/help-hint.spec.ts` using
+  Playwright `toBeInViewport()`.
+
 ### ux2 — MEDIUM: owner-scoped view of the caller's own currency balance
 
 Evidence: `player_wallet` is deliberately PRIVATE (ADR-0081/0040) — `shopModel.ts:6` documents "balance is not accessible via subscription — only reducer-feedback messages are available." Shop items already show individual prices (`shopView.ts:105,125`, "`${item.name} — ${item.buyPrice} gold`") but there is no running balance display anywhere, matching Drew's "a cost is listed, but the amount of money I have is not obvious." The codebase already has a precedented pattern for exactly this shape of problem: an owner-scoped `#[view]` exposing only the caller's own row (used for `player_conversation`, ADR-0087, M13.5c) — the fix should follow that precedent, not invent a client-side balance tally (which would drift on reconnect/multi-tab and duplicate server-authoritative state).
@@ -36,6 +67,38 @@ Evidence: confirmed exactly as Drew diagnosed. `justfile` (`playtest-up`, ~line 
 - **ux3-2:** `docs/playtest-ops.md` SHALL gain a one-line "start SpacetimeDB first: `spacetime start`" step if one doesn't already exist for a first-time tester.
 - **ux3-3 (proof-of-teeth):** the existing `playtest-verify.eval.mjs`-style structural-scan pattern (pt-a2) SHALL gain a check that both recipes contain the preflight check before their first `spacetime build`/`publish` call.
 - Touches: `justfile`, `docs/playtest-ops.md`, `evals/playtest-verify.eval.mjs` (or a sibling). Tooling-only → parallel-friendly with ux1/ux2.
+
+**DELIVERED (PR #253, ADR-0153).** Shared `playtest-preflight` recipe called from both
+`playtest-up` and `playtest-wipe` after their `MR_PLAYTEST_DB` guard and before the first
+`spacetime build`/`publish`; `spacetime start` step + preflight step in
+`docs/playtest-ops.md`; gate extension in `playtest-verify.eval.mjs`. 7 files, no code
+dirs touched → ran fan-out-safe alongside concurrent `nh3`.
+
+- **ux3-1 DEVIATES FROM THE SPEC'S SUGGESTED MECHANISM (disclosed).** The parenthetical
+  `curl -sf "$STDB_SERVER/v1/ping"` was measurably wrong: `spacetime publish -s` accepts
+  server **nicknames** (`spacetime server list` ships `local` and `maincloud`), so
+  `STDB_SERVER=local` publishes fine while a URL-constructing curl probe fails DNS and
+  confidently misdiagnoses a healthy server — strictly worse than the opaque error ux3
+  exists to remove. Shipped `timeout 10 spacetime server ping "$STDB_SERVER"`, which
+  shares `publish -s`'s resolution path. The spec's "e.g." makes this spec-compliant.
+- **A SECOND DEFECT, found only by adversarial testing:** `spacetime server ping` exits
+  **0 for any completed HTTP round-trip** — trailing slash and path suffix return
+  `Server returned 404` at exit 0, and an unrelated service on the port returns
+  `Server could not be reached (500 …)` at exit 0, all of which `publish -s` rejects. The
+  first implementation shipped exit-code-only and passed them. The probe now matches the
+  literal `Server is online` line and echoes the CLI's last output line so the failure
+  names the real cause. Also load-bearing: **`timeout 0` disables the timeout** in GNU
+  coreutils, and `server ping` has no timeout of its own.
+- **ux3-3 EXCEEDED.** A source-scan-only gate (what ux3-3 literally asks for) let **9 of
+  19** functionally-broken implementations pass GREEN — two proven to exit 0 against a
+  dead server. Four **behavioral** teeth were added: negative (dead port), positive
+  control (live stub — without it "the preflight always fails" is a passing
+  implementation), non-SpacetimeDB responder (500 stub), and a **call-site** tooth that
+  runs both callers with a fake `spacetime` first on PATH and proves they abort without
+  invoking it — the only assertion gating that the *callers* honor the preflight rather
+  than merely containing the line. Final mutation probe: **13/13 killed**.
+- **Deliberate non-scope:** `playtest-report` and `playtest-verify-release` reach the same
+  server and keep the opaque failure mode — named rather than silently omitted.
 
 ### ux4 — LOW: repro-and-confirm the battle monster-switch discoverability gap (no blind fix)
 

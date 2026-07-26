@@ -49,6 +49,37 @@ Evidence: `client/src/net/connection.ts:482-486` builds the connection via `DbCo
 - **nh4-4 (proof-of-teeth):** a test SHALL assert a token is written to storage on first connect, and that a subsequent `buildConnection()` call reads and supplies it via `withToken`. A scenario test SHALL assert that after a simulated `playtest-wipe`, stale-token reconnect fails gracefully (clear + fresh join) rather than hanging or erroring opaquely.
 - Touches: `client/src/net/connection.ts` (+ sibling test), possibly `docs/playtest-ops.md` (note the new persistence behavior + the wipe interaction). Client, additive to the connection-build path → mostly disjoint from nh1-nh3 (different function region of the same file family) but still SERIAL vs them out of caution (same file).
 
+> **DELIVERED (PR #252, ADR-0150) — with TWO corrections to the text above.**
+>
+> **(1) nh4-3's stated mechanism is FALSE.** A `playtest-wipe` does **not** leave a stale,
+> invalid token. The token is a **host**-issued JWT verified at the host-level
+> `/v1/identity/websocket-token`; `spacetime publish --delete-data` clears one *database's*
+> rows and re-runs `init`, and the "owner re-register" note in `docs/playtest-ops.md`
+> concerns the publishing **CLI** identity, not the browser's anonymous one. Nothing rotates
+> the host signing key, so post-wipe the reconnect **succeeds** as the same identity into an
+> empty DB and the unconditional `joinGame` + `!has_monsters` gate yields a clean fresh
+> start — already graceful, nothing to clear. Since `--delete-data` leaves the database
+> *name* unchanged, no key derivation could distinguish a wiped DB from a live one anyway.
+> The genuinely reachable failure is a **host reset** (fresh `spacetime start` data dir,
+> recreated container volume, changed `STDB_SERVER`), which rotates the signing key and —
+> because `reconnectPolicy.ts` keeps attempts unbounded with no give-up state — would loop
+> forever re-supplying a dead token. Recovery is mandatory, just not for the stated reason.
+>
+> **(2) "Clear the stale token" is itself a data-loss bug, so it was NOT implemented.** The
+> SDK throws the identical `Failed to verify token: <statusText>` for a transient
+> 500/502/503 as for a genuine 401, and HTTP/2 mandates an empty `statusText`. Clearing on
+> classification would delete a player's identity on a server hiccup. Shipped instead:
+> **suppress, never clear** — count rejections since the last success, withhold the token at
+> a threshold of 2, and let the anonymous connect that succeeds overwrite it.
+>
+> Also delivered beyond the text: storage is per-tab **`sessionStorage`**, not
+> `localStorage`, because `on_disconnect` keys purely on identity with no live-connection
+> check (an origin-shared token lets closing a stray second tab forfeit the first tab's PvP
+> battle and delete its character row). nh4-4's `buildConnection()` does not exist — it is
+> the closure-local `build()` inside `connect()`; the intent is satisfied. **Parked:**
+> `nh4-e2e` (a reload tooth asserting same identity + no second `starter_granted`) — the only
+> true end-to-end proof of nh4-2; `e2e/**` was out of the slice's touch-set.
+
 ## 3. Decisions
 
 - **Bundling nh1–nh4 in one milestone vs. splitting:** kept together because all four touch the same sensitive `main.ts`/`predictor.ts`/`connection.ts` input-and-session path and the same symptom cluster a playtester experiences as "the game fights me" — splitting would just serialize them across milestones for no benefit (they're already SERIAL against each other within this one).
