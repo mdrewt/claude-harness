@@ -15,6 +15,7 @@
 // No new RegExp() — all patterns are literal (detect-non-literal-regexp safe).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // Registered type vocabulary (extend here + update lint — one-line change per type).
 // See standards/knowledge-format.md §vocabulary.
@@ -227,7 +228,7 @@ export function lint(bundleDir) {
 // CLI entry
 // ---------------------------------------------------------------------------
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const dir = args.find((a) => !a.startsWith('--'));
   if (!dir) {

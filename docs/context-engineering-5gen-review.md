@@ -130,3 +130,15 @@ absorbed two mechanics from the operator-local `grilling` skill: a recommended
 answer per question, and answer-from-the-codebase-when-discoverable. Open: №1
 (observation window runs from 2026-07-27), №2's re-derivation, №5's progress-
 file archival, №6, №7.
+
+Follow-up wave (same day): the ADR/spec/supervisor format question was taken
+further — ADR `## Confirmation` with a mechanical gate (`scripts/adr-lint.mjs`
+as `just adr-gate` in `just ci`, strict on the backfilled harness corpus), the
+canonical spec skeleton + Non-goals codified in `standards/spec-driven.md`, and
+knowledge-promotion dispositions at close (grammar single-homed in
+`docs/workflow-loops.md` §Disposition markers). Recorded as ADR-0009; refined
+through a two-round adversarial-judge debate, then a fresh-subagent
+implementation review whose blocker/major findings were fixed, with judge
+sign-off on the two shipped deviations. Rejected by design (don't re-propose):
+gotchas/algorithm/pattern sections in ADRs/specs, full upstream MADR fields,
+and any harness-CI lint over the fleet-hot `memory/projects/` directory.

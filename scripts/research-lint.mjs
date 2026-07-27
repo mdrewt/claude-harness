@@ -14,6 +14,7 @@
 // Importable: `import { lint } from "./research-lint.mjs"`.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const REQUIRED = [
   'title',
@@ -113,7 +114,7 @@ export function lint(dir, { shared = false } = {}) {
   return failCount === 0;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const shared = args.includes('--shared');
   const dir = args.find((a) => !a.startsWith('--'));
