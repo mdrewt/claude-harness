@@ -1,4 +1,4 @@
-# mr-feedback-doctrine — operator feedback handling (v1.1 ACTIVE 2026-07-27)
+# mr-feedback-doctrine — operator feedback handling (v1.2 ACTIVE 2026-07-27)
 Binds: the native loop whenever it processes operator feedback artifacts (playtest gates lifting,
 feedback/notes files, decision-issue answers) or fleshes out milestone skeletons into specs.
 §1 INVARIANTS bind everywhere in REDUCED form: outside the loop (casual/Cowork), I-1 means RELAY
@@ -191,6 +191,10 @@ STATES & TRANSITIONS (this table is the authority; `mr-feedback` implements exac
   with the burden of proof on choosing the LIGHTER class (I-3).
 
 ## §9 COMMUNICATION (push, batched by urgency; sessions are ephemeral — state is files + issues)
+- REPO RULE (operator 2026-07-27): decision issues open in the github repo of the PROJECT the
+  decision primarily impacts (game decisions → `mdrewt/monster-realm`; loop/harness-process
+  decisions → `mdrewt/claude-harness`; future projects → their own repos). Pass `--repo` when the
+  default (monster-realm) is wrong.
 - BLOCKING decisions: `mr-ask-drew <slug> --blocking` — standardized issue (root issue / question /
   recommendation / alternatives / context), written for a human deciding on his phone;
   `mr-decision-watch` resumes the loop on his comment/close (close-without-comment = recommendation
@@ -250,6 +254,8 @@ must make (vs. scripts) are legitimate — scripts enforce state, models interpr
 substitutes for the other.
 
 ## Changelog
+- v1.2 (2026-07-27): REPO RULE — decision issues go to the repo of the primarily-impacted project
+  (operator directive; multi-project future planned).
 - v1.1 (2026-07-27): first-live-run round — MAXIMAL-PROGRESS/BATCHED-DECISIONS rule in §9 (run
   r2-triage blocked all 91 items on one 5-question issue with a "see body" title); mr-ask-drew
   gains --title + body-file title fallback; mr-feedback list sanitizes embedded tabs.
