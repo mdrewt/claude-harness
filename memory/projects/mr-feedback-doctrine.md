@@ -1,4 +1,4 @@
-# mr-feedback-doctrine — operator feedback handling (v1.0 ACTIVE 2026-07-26)
+# mr-feedback-doctrine — operator feedback handling (v1.1 ACTIVE 2026-07-27)
 Binds: the native loop whenever it processes operator feedback artifacts (playtest gates lifting,
 feedback/notes files, decision-issue answers) or fleshes out milestone skeletons into specs.
 §1 INVARIANTS bind everywhere in REDUCED form: outside the loop (casual/Cowork), I-1 means RELAY
@@ -196,6 +196,15 @@ STATES & TRANSITIONS (this table is the authority; `mr-feedback` implements exac
   `mr-decision-watch` resumes the loop on his comment/close (close-without-comment = recommendation
   accepted; for destructive or HEAVY decisions the acceptance is echoed in the next brief BEFORE
   execution — one accidental phone-close must not spend real money silently). Fallback on ASK-DREW-UNAVAILABLE: plain `.blocked-on-human` + wake_file.
+- MAXIMAL PROGRESS BEFORE BLOCKING (operator directive 2026-07-27, from first live run): a
+  processing run stands down ONLY when nothing further can proceed without an answer. First
+  disposition every item resolvable without Drew (reversible calls take documented defaults +
+  `decision-defaulted:` records), advance all planning/spec work independent of open questions,
+  THEN raise every remaining question as its OWN self-contained issue — descriptive title (the
+  title ALONE must say what is being decided; "see body" is a defect), one issue per decision, one
+  batch at the end. The blocker lists every open decision issue; each answer's event tick resumes
+  whatever that answer unblocked. NEVER close an unanswered decision issue (close = acceptance) —
+  edit or comment-supersede instead.
 - NON-BLOCKING: batched into the DISPOSITION BRIEF — the pre-playtest gate artifact (I-4): Fixed
   (PR links) / Deferred (reason, target) / Declined (reason) / Parked (needs) / Answered, plus
   `decision-defaulted:` records for async review, plus the reconciliation line "N received, N
@@ -241,6 +250,9 @@ must make (vs. scripts) are legitimate — scripts enforce state, models interpr
 substitutes for the other.
 
 ## Changelog
+- v1.1 (2026-07-27): first-live-run round — MAXIMAL-PROGRESS/BATCHED-DECISIONS rule in §9 (run
+  r2-triage blocked all 91 items on one 5-question issue with a "see body" title); mr-ask-drew
+  gains --title + body-file title fallback; mr-feedback list sanitizes embedded tabs.
 - v1.0 (2026-07-26): ACTIVATED — `mr-feedback` built (event-sourced JSONL, transition validation,
   reconciler w/ dedup'd decision-issue alerting, covermap extract/verify, 15-check seeded-fault
   selftest PASSED); tick reconciler hook; SSOT paragraph → pointer (r2 addendum preserved);

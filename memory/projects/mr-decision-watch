@@ -9,9 +9,11 @@ exec 9>&- 2>/dev/null || true
 unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true
 export PATH="$PATH:/home/mdrewt/.asdf/shims:/home/mdrewt/bin"
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
-REPO=mdrewt/claude-harness
 OPERATOR=mdrewt
 N="${1:?issue}"; S="${2:?slug}"
+REPO="${3:-}"
+[ -z "$REPO" ] && [ -f "$MEM/decisions/issue-$N.url" ] && REPO=$(sed "s|https://github.com/||;s|/issues/.*||" "$MEM/decisions/issue-$N.url")
+REPO="${REPO:-mdrewt/monster-realm}"
 [ "${MR_NO_EVENT_BRIDGE:-0}" = "1" ] && exit 0
 LOCKD="/tmp/mr_decwatch_$N.lock.d"
 mkdir "$LOCKD" 2>/dev/null || { OP=$(cat "$LOCKD/pid" 2>/dev/null); [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null && grep -q mr-decision-watch "/proc/$OP/cmdline" 2>/dev/null && exit 0; rm -rf "$LOCKD"; mkdir "$LOCKD" || exit 0; }
@@ -27,7 +29,7 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
 import json,sys
 try: d=json.load(sys.stdin)
 except Exception: print("no"); raise SystemExit
-ops=[c for c in d.get("comments",[]) if c.get("author",{}).get("login")=="'"$OPERATOR"'"]
+ops=[c for c in d.get("comments",[]) if c.get("author",{}).get("login")=="'"$OPERATOR"'" and not c.get("body","").lstrip().startswith("<!--mr-system-->")]
 print("yes" if d.get("state")=="CLOSED" or ops else "no")' 2>/dev/null || echo no)
   if [ "$ANSWERED" = "yes" ]; then
     mkdir -p "$MEM/decisions"
@@ -35,7 +37,7 @@ print("yes" if d.get("state")=="CLOSED" or ops else "no")' 2>/dev/null || echo n
 import json,sys
 d=json.load(sys.stdin)
 out=["# DECISION ANSWER — issue '"$N"' ("+d.get("state","?")+")","","## Question (issue title)",d.get("title",""),"","## Operator response(s)"]
-ops=[c for c in d.get("comments",[]) if c.get("author",{}).get("login")=="'"$OPERATOR"'"]
+ops=[c for c in d.get("comments",[]) if c.get("author",{}).get("login")=="'"$OPERATOR"'" and not c.get("body","").lstrip().startswith("<!--mr-system-->")]
 if ops:
     for c in ops: out += ["", "### "+c.get("createdAt",""), c.get("body","")]
 else:
@@ -48,6 +50,7 @@ open("'"$MEM"'/decisions/issue-'"$N"'.answer.md","w",encoding="utf-8").write("\n
       { echo "EVENT src=decision slice=$S at=$(date -u +%Y-%m-%dT%H:%M:%SZ) — operator answered DECISION issue #$N"
         echo "--- answer transcript ---"; cat "$MEM/decisions/issue-$N.answer.md"
       } > "$EVT" && mv "$EVT" "$EV"
+      MR_EVENT_SRC=decision setsid /bin/bash "$MEM/mr-native-tick.sh" "$EV" >/dev/null 2>&1 &
     fi
     exit 0
   fi

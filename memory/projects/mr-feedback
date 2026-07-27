@@ -114,14 +114,15 @@ def cmd_list(argv):
     for v in sorted(st.values(), key=lambda x: x["id"]):
         if kv.get("episode") and v.get("episode") != kv["episode"]: continue
         if kv.get("state") and v.get("state") != kv["state"]: continue
-        print(f"{v['id']}\t{v.get('state')}\t{v.get('kind')}\t{v.get('weight')}\t{(v.get('quote') or '')[:60]}")
+        q=(v.get('quote') or '').replace('\t',' ').replace('\n',' ')[:60]
+        print(f"{v['id']}\t{v.get('state')}\t{v.get('kind')}\t{v.get('weight')}\t{q}")
     return 0
 
 def decisions_since(ts):
     try:
         n = 0
         for ln in open(TICKLOG, encoding="utf-8", errors="replace"):
-            m = re.match(r"(\S+)\s+\S+\s+DECISION", ln)
+            m = re.match(r"(\d{4}-\d{2}-\d{2}T[\d:]{8}Z)\s+\S+\s+DECISION", ln)  # ISO-anchored: old "utc=" prefixed lines sorted lexically AFTER every date and phantom-counted (issue #5 misfire)
             if m and m.group(1) > ts: n += 1
         return n
     except Exception: return -1  # tick log unreadable -> unknown, report as such
@@ -148,7 +149,7 @@ def cmd_check(argv):
         if prev != sig:
             open(alert,"w").write(sig)
             if os.environ.get("MR_FB_NO_ISSUE") != "1":
-                subprocess.run(["bash", MEM + "/mr-ask-drew", "feedback-reconcile",
+                subprocess.run(["bash", MEM + "/mr-ask-drew", "feedback-reconcile", "--repo", "mdrewt/claude-harness",
                     "--question", f"Feedback ledger reconciler found {bad} issue(s) — override or investigate? (see mr-feedback check output)",
                     "--root", "Doctrine §8 conservation/staleness check failed",
                     "--recommend", "Investigate before next playtest gate; override by closing this issue"],
