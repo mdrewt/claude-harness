@@ -93,4 +93,7 @@ open(os.environ["MEM"]+"/.harness-runner."+os.environ["S"]+".lock","w").write(js
 PYLOCK
 then kill_attempt; status FAIL "lock write failed after launch (attempt killed)" 1; fi
 TIER=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('tier','routine'))" 2>/dev/null)
+# auto-flip covered feedback items to IN-WORK (doctrine §8; mechanical so no run has to remember)
+ITEMS=$(/usr/bin/python3 -c "import json,sys;d=json.load(open('/tmp/mr_pass_$S.vars.json'));i=d.get('items') or [];print(' '.join(i) if isinstance(i,list) else str(i))" 2>/dev/null)
+for IT in $ITEMS; do "$MEM/mr-feedback" set "$IT" --state IN-WORK >/dev/null 2>&1; done
 status LAUNCHED "leader=$LEADER claude_pid=${CPID:-?} model=$MODEL effort=$EFFORT tier=${TIER:-?} brief_bytes=$(stat -c %s "$B" 2>/dev/null || echo ?) rid=$RID"

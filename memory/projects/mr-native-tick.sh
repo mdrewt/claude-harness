@@ -134,6 +134,13 @@ fi
 FBERR=$("$MEM/mr-feedback" check 2>/dev/null | grep -v "^FEEDBACK-CHECK-OK" | head -4)
 [ -n "$FBERR" ] && log "FEEDBACK-CHECK: $(echo "$FBERR" | tr '\n' ' ')"
 
+# DAILY SELFCHECK (mechanical corpus health; 24h marker gate)
+if [ ! -f "$MEM/.selfcheck-last" ] || [ $(( $(date +%s) - $(stat -c %Y "$MEM/.selfcheck-last" 2>/dev/null || echo 0) )) -gt 86400 ]; then
+  SC=$("$MEM/mr-selfcheck" 2>/dev/null | grep -v "^SELFCHECK-OK" | head -3)
+  [ -n "$SC" ] && log "SELFCHECK: $(echo "$SC" | tr '\n' ' ')"
+  touch "$MEM/.selfcheck-last"
+fi
+
 if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ]; then
   WAKE=$(grep -m1 -oE "wake_file=[^ ]+" "$MEM/.blocked-on-human" 2>/dev/null | cut -d= -f2)
   MAGE=$(( $(date +%s) - $(stat -c %Y "$MEM/.blocked-on-human" 2>/dev/null || echo 0) ))
@@ -278,6 +285,9 @@ PYX
 [ "$COST" = "-" ] && COST=""
 [ "$TICKMODEL" = "-" ] && TICKMODEL="$SUP_MODEL"
 log "SPAWN-DONE rc=$RC cost=${COST:-unknown} model=$TICKMODEL rid=$RID"
+CEN=$(grep -o '"subagent_type":"[a-z-]*"' "$TLOG" 2>/dev/null | sort | uniq -c | awk '{printf "%s=%s ",$2,$1}' | tr -d '"' | sed 's/subagent_type=//g; s/subagent_type://g')
+CEN2=$(grep -c '"name":"Skill"' "$TLOG" 2>/dev/null || echo 0)
+[ -n "$CEN$CEN2" ] && log "CENSUS rid=$RID agents: ${CEN:-none} skills=$CEN2"
 
 if [ "$RC" -eq 0 ]; then
   date -u +%s > "$MEM/.native-supervisor-last-success"

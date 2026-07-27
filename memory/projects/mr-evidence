@@ -1,0 +1,15 @@
+#!/bin/bash
+# mr-evidence <cmd...> — run a command, save FULL output to a file, print only a short digest.
+# Purpose: keep bulky evidence OUT of model context (context bloat = the dominant ops-session cost,
+# measured 2026-07-27: ~99.6M cache-read tokens/24h). Ops sessions should use this for any command
+# expected to print >20 lines, then Read the file selectively if needed.
+set -u
+D=/tmp/mr-evidence; mkdir -p "$D"
+F="$D/$(date -u +%Y%m%dT%H%M%S)-$$.txt"
+{ echo "\$ $*"; "$@" 2>&1; } > "$F"
+RC=$?
+L=$(wc -l < "$F")
+echo "evidence: $F (rc=$RC, $L lines)"
+head -3 "$F" | cut -c1-160
+[ "$L" -gt 6 ] && echo "  [... $((L-6)) more lines ...]" && tail -3 "$F" | cut -c1-160
+exit 0

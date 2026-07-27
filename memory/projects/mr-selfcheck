@@ -1,0 +1,16 @@
+#!/bin/bash
+# mr-selfcheck — mechanical corpus health check (daily via tick). rc=0 always; prints FAIL lines.
+set -u
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+BAD=0
+for f in "$MEM"/mr-*.sh "$MEM"/mr-launch.sh "$MEM"/mr-native-tick.sh "$MEM"/mr-ask-drew "$MEM"/mr-decision-watch "$MEM"/mr-ci-watch "$MEM"/mr-reset-watch "$MEM"/mr-evidence "$MEM"/mr-retro-request "$MEM"/mr-usage-snap "$MEM"/mr-disjoint "$MEM"/mr-spawn "$MEM"/mr-ollama "$MEM"/mr-situation "$MEM"/mr-record "$MEM"/mr-audit "$MEM"/mr-metrics; do
+  [ -f "$f" ] || continue
+  head -1 "$f" | grep -q python && { /usr/bin/python3 -m py_compile "$f" 2>/dev/null || { echo "SELFCHECK-FAIL py: $f"; BAD=1; }; continue; }
+  bash -n "$f" 2>/dev/null || { echo "SELFCHECK-FAIL sh: $f"; BAD=1; }
+done
+/usr/bin/python3 -m py_compile "$MEM/mr-feedback" 2>/dev/null || { echo "SELFCHECK-FAIL py: mr-feedback"; BAD=1; }
+"$MEM/mr-feedback" selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-feedback selftest"; BAD=1; }
+grep -q "Feedback doctrine (ACTIVE" "$MEM/mr-supervisor-prompt-native.md" || { echo "SELFCHECK-FAIL SSOT doctrine pointer missing"; BAD=1; }
+grep -q "ACTIVE 2026" "$MEM/mr-feedback-doctrine.md" || { echo "SELFCHECK-FAIL doctrine not ACTIVE"; BAD=1; }
+[ "$BAD" = 0 ] && echo "SELFCHECK-OK"
+exit 0

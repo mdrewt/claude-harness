@@ -27,3 +27,5 @@ Run the Monster Realm v2 build loop in this harness per `specs/monster-realm-v2/
 End with a structured summary: slice · merged|parked|blocked|stopped · PR URL · CI · what changed · ADRs · risks.
 
 **Foreground-only execution (IMPORTANT — added 2026-07-15 after m16.5e lost 3 attempts/$41 to this):** run every subagent and long build/test step in the FOREGROUND of your turn — never end your turn while subagents, builds, or test runs are still executing in the background. Ending the turn with work in flight kills the session at the runtime's turn ceiling and loses the in-flight work. If you are waiting on something long (CI, big build), poll it inside the same turn or checkpoint (`wip:` commit + push + handoff) and exit cleanly at a valid stopping point instead.
+
+PR description MUST include a line `Items: <feedback-ledger ids, or none>` (mechanical ledger linkage; census + reconcile read it).

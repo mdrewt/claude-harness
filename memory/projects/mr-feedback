@@ -187,6 +187,31 @@ def cmd_covermap(argv):
         print(f"COVERMAP-OK n={len(ps)}"); return 0
     print("FEEDBACK-ERR covermap subcommand"); return 0
 
+
+def cmd_brief(argv):
+    """Mechanically render the Disposition Brief skeleton from the ledger (doctrine §9).
+    Model adds only judgment prose. Usage: brief --episode E"""
+    _, kv = args_kv(argv); st = fold(rows()[0])
+    ep = kv.get("episode")
+    items = [v for v in st.values() if (not ep or v.get("episode")==ep)]
+    B = {"Fixed":[],"In progress":[],"Parked (needs you)":[],"Declined":[],"Deferred":[],"Answered":[],"Logged remarks":[]}
+    for v in sorted(items,key=lambda x:x["id"]):
+        s_=v.get("state"); q=(v.get("quote") or "").replace("\n"," ")[:70]
+        line=f"- `{v['id']}` {q} — ev: {v.get('evidence','—')} tgt: {v.get('target','—')}"
+        if s_=="SHIPPED-VERIFIED": B["Fixed"].append(line)
+        elif s_ in ("DISPOSED","IN-WORK","VERIFIED","CLASSIFIED","CAPTURED"): B["In progress"].append(line)
+        elif s_=="PARKED": B["Parked (needs you)"].append(line)
+        elif s_=="DECLINED-COMMUNICATED": B["Declined"].append(line)
+        elif s_=="ANSWERED": B["Answered"].append(line)
+        elif s_=="LOGGED": B["Logged remarks"].append(line)
+        elif s_=="OPERATOR-CLOSED": B["Fixed"].append(line+" (operator-closed)")
+    print(f"# Disposition Brief — episode {ep or 'ALL'} ({time.strftime('%Y-%m-%d',time.gmtime())})")
+    print("<!-- mechanically rendered by mr-feedback brief; supervisor: add reasons for Declined/Deferred, decision-defaulted records, and the manifest prose -->")
+    for k,ls in B.items():
+        if ls: print(f"\n## {k} ({len(ls)})"); [print(l) for l in ls]
+    print(f"\n**Reconciliation: {len(items)} items in episode, {len(items)} accounted.**")
+    return 0
+
 def cmd_selftest(argv):
     import shutil
     d = tempfile.mkdtemp(prefix="mrfb_")
@@ -234,7 +259,7 @@ def cmd_selftest(argv):
         print("SELFTEST-FAIL"); [print("  " + f) for f in fails]; return 1
     print("SELFTEST-PASS (15 checks)"); return 0
 
-CMDS = {"add":cmd_add,"set":cmd_set,"get":cmd_get,"list":cmd_list,"check":cmd_check,"covermap":cmd_covermap,"selftest":cmd_selftest}
+CMDS = {"brief":cmd_brief,"add":cmd_add,"set":cmd_set,"get":cmd_get,"list":cmd_list,"check":cmd_check,"covermap":cmd_covermap,"selftest":cmd_selftest}
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in CMDS:
         print(__doc__); sys.exit(0)

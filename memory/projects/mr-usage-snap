@@ -1,0 +1,45 @@
+#!/bin/bash
+# mr-usage-snap — daily all-source usage rollup (cron 05:35Z). Appends one JSON row per day to
+# $MEM/mr-usage-daily.jsonl: Cowork/session tokens+est-cost (from session .jsonl usage blocks,
+# fable priced at opus rates = LOWER BOUND) + native-loop ledger cost. Zero model calls.
+set -u
+export PATH="$PATH:/home/mdrewt/.asdf/shims:/home/mdrewt/bin"
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+B=/mnt/c/Users/mdrewt/AppData/Roaming/Claude/local-agent-mode-sessions
+CUT="${1:-$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M)}"
+TMP=$(mktemp); find "$B" -name "*.jsonl" -mmin -1500 ! -name "audit*" 2>/dev/null | while read -r f; do grep -h '"usage"' "$f" 2>/dev/null; done > "$TMP"
+CUT="$CUT" TMP="$TMP" MEM="$MEM" /usr/bin/python3 - <<'PYX'
+import json,os,time
+cut=os.environ["CUT"]; MEM=os.environ["MEM"]
+agg={}
+for ln in open(os.environ["TMP"],encoding="utf-8",errors="replace"):
+    try: d=json.loads(ln)
+    except: continue
+    if d.get("timestamp","") < cut: continue
+    m=d.get("message",{}); u=m.get("usage") or {}
+    if not u.get("output_tokens"): continue
+    a=agg.setdefault(m.get("model","?"),[0,0,0,0,0])
+    a[0]+=u.get("input_tokens",0); a[1]+=u.get("output_tokens",0)
+    a[2]+=u.get("cache_read_input_tokens",0); a[3]+=u.get("cache_creation_input_tokens",0); a[4]+=1
+P={"opus":(5,25,.5,6.25),"sonnet":(3,15,.3,3.75),"haiku":(1,5,.1,1.25),"fable":(5,25,.5,6.25)}
+cw=0; permodel={}
+for mod,(i,o,cr,cwr,n) in agg.items():
+    p=P[next((k for k in P if k in mod),"opus")]
+    c=(i*p[0]+o*p[1]+cr*p[2]+cwr*p[3])/1e6; cw+=c
+    permodel[mod]={"calls":n,"in":i,"out":o,"cache_read":cr,"cache_write":cwr,"est_usd":round(c,2)}
+nat=0.0
+try:
+    for ln in open(MEM+"/monster-realm-usage-ledger.jsonl"):
+        try: r=json.loads(ln)
+        except: continue
+        if str(r.get("ts",""))>=cut:
+            try: nat+=float(r.get("cost_usd") or 0)
+            except: pass
+except Exception: pass
+row={"date":time.strftime("%Y-%m-%d",time.gmtime()),"window_start":cut,
+     "cowork_est_usd":round(cw,2),"native_ledger_usd":round(nat,2),"models":permodel,
+     "note":"fable priced at opus rates = lower bound"}
+open(MEM+"/mr-usage-daily.jsonl","a").write(json.dumps(row)+"\n")
+print(f"USAGE-SNAP {row['date']} cowork~${cw:.2f} native=${nat:.2f}")
+PYX
+rm -f "$TMP"

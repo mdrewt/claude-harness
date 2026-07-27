@@ -28,6 +28,8 @@ The LIVE SITUATION bundle computes `budget.state` from the ledger (weekly calibr
 - **UNKNOWN** (budget uncomputable) → proceed but record a BLOCKER: the governor is blind and needs repair.
 
 ## Offload tools (mechanical work stays out of your token budget — all in `$MEM`)
+- `mr-feedback brief --episode E` — mechanically renders the Disposition Brief skeleton from the ledger; you add ONLY the judgment prose (reasons, manifest, decision-defaulted records).
+- **retro-request events** (`retro.request.md`): follow `$MEM/mr-retro-playbook.md` exactly, write the report to `$MEM/retros/<utc>.md`, do NOT launch build work in the same run, <=2 sonnet deep-dive agents unless evidence demands more.
 - `mr-feedback` — feedback ledger (add/set/list/check/covermap/selftest; doctrine §8 state machine enforced; append-only JSONL, git-tracked). Triage adds items; ONLY supervisor decision runs write dispositions/terminals.
 - `mr-ask-drew SLUG --question ... [--root|--recommend|--alts|--context ...] [--blocking]` — opens a standardized DECISION issue on github (Drew-preferred channel 2026-07-26: push-notified, commentable, closable). --blocking also writes `.blocked-on-human` (wake_file = the answer transcript) and spawns `mr-decision-watch` (5-min poll, 7-day cap; answer → transcript in `$MEM/decisions/` + gate lift + immediate event tick). Prints ASK-DREW-UNAVAILABLE on gh failure — then fall back to the plain `.blocked-on-human` flow.
 
@@ -99,7 +101,7 @@ Open additional slots only if ALL hold: (1) candidate's **code/test** `touches:`
 
 ## Launch
 
-When a launched slice covers feedback-ledger items: `mr-feedback set <id> --state IN-WORK` per item at launch, `--state VERIFIED` after the non-author complaint-repro, `--state SHIPPED-VERIFIED --evidence PR#N` at merge adjudication (doctrine §8; first-cycle gap 2026-07-27: items sat DISPOSED while slices ran).
+Include `items:[...]` (covered feedback-ledger IDs) in the pass-vars — mr-spawn flips them IN-WORK mechanically; the PR body carries `Items:` per the brief template. When a launched slice covers feedback-ledger items: `mr-feedback set <id> --state IN-WORK` per item at launch, `--state VERIFIED` after the non-author complaint-repro, `--state SHIPPED-VERIFIED --evidence PR#N` at merge adjudication (doctrine §8; first-cycle gap 2026-07-27: items sat DISPOSED while slices ran).
 
 Per-run files by slice id: brief `/tmp/mr_pass_<slice>.md` · log/err `/tmp/mr_pass_<slice>.{log,err}` · `.done` · stop-flags `/tmp/mr_stop_<slice>`, `/tmp/mr_stop_all`. Clear stale stop flags first.
 
