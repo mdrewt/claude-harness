@@ -363,6 +363,31 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   rejected** — gated on playtest evidence that Slice B's cheap version doesn't already satisfy H2; stays
   below M20+ in priority. Both debate axes (fusion permanence; evolution-trigger restructuring) were won by
   the "fix the narrow gap, don't restructure" side, with the losing side's evidence recorded, not discarded.
+  **SUPERSEDED IN PART 2026-07-27** (r2 playtest feedback, ledger items 062-086, feedback doctrine
+  correction — Drew overrules this milestone's own outcome): A0's field-carry fix stays merged/historical
+  (PR#248), but fusion itself is being REMOVED per `M-evolution-essence-redesign.spec.md`. **B2 (item-
+  triggered evolution, still un-shipped) must be reconciled against the essence-graph redesign before
+  either ships** — do not build B2 standalone without checking essence-redesign compatibility first.
+- **M-evolution-essence-redesign** (`M-evolution-essence-redesign.spec.md`) — **NEW, queued, post-gate,
+  un-blocked** (r2 feedback 2026-07-26, ledger items 062-086; supersedes the fusion-removal question this
+  milestone's own hardening pass had resolved the other way). HEAVY: schema + economy + redesign risk-
+  promoted. Skeleton only — next unit of work is the full HEAVY ceremony (investigation/6-way ideation/
+  judge synthesis), not implementation. Must land before the playtest-3 gate per the 2026-07-26 operator
+  gate-timing directive (all r2-created milestones close first).
+- **M-postgate-battle-0hp-fix** (`M-postgate-battle-0hp-fix.spec.md`) — **NEW, queued, post-gate,
+  un-blocked** (r2 feedback, items 005/030/031/036-039). LIGHT bug fix: 0hp lead-monster sent out at
+  battle start, ghost-attack accepted, silent round-2 swap. Disjoint from other r2 milestones — fan-out
+  candidate.
+- **M-postgate-movement-investigation** (`M-postgate-movement-investigation.spec.md`) — **NEW, queued,
+  post-gate, un-blocked** (r2 feedback, items 003/015/029/040-042). Residual double-move defect distinct
+  from nh1/nh2 (already merged); root-cause client-vs-server before fixing; OBSERVABILITY fallback if
+  undiagnosable within budget.
+- **M-postgate-dev-observability** (`M-postgate-dev-observability.spec.md`) — **NEW, queued, post-gate,
+  un-blocked** (r2 feedback, items 043/045/046). Toggleable dev-console outbound-event logging, dev-only.
+  Disjoint — fan-out candidate.
+- **M-postgate-feel-polish** (`M-postgate-feel-polish.spec.md`) — **NEW, queued, post-gate, un-blocked**
+  (r2 feedback item 091's sibling process-defect closure + r1 strays finally sized: care-button no-op,
+  movement/NPC feel tuning, no walk animation; items 087-090). LIGHT, bundle as one slice.
 - **M-postgate-client-coverage** (client-hardening; M-playtest-c.5 Decision D, Drew-delegated 2026-07-20) — extract the inline decision logic in `main.ts`/`battleView.ts`/`boxView.ts` into tested pure `*Model.ts` cores and drop the coverage-denominator exclusions; a mechanical fence lands pre-gate (fail if the `vite.config.ts` excluded set grows). Pairs with the ptc5c-2 overlay-registry client-hardening work. Stays post-gate provisional (order unchanged) behind the two hardening milestones above.
 - **M-postgate-ux-design** (`M-postgate-ux-design.spec.md`) — **DESIGNED 2026-07-25** (the three larger UX
   design questions from the gate, sized via a brainstorm→debate→judge→synthesize multi-agent convergence
@@ -380,6 +405,12 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
   schedule this separately.
+- **RELEASED FOR IMPLEMENTATION 2026-07-27** (r2 playtest feedback, per the SSOT's r2-specific addendum):
+  `M-postgate-ux-design` uxd1 (responsive viewport) and uxd3 (overlay/menu cohesion) are no longer
+  build-after-second-playtest-provisional — r2's items 006-014/016/035/047-061/060/091 land here directly
+  and the milestone proceeds now, in normal queue order. uxd2 (context-sensitive NPC interaction) also
+  absorbs r2's interact-key redesign ask (items 022-026/032) — extend its `NpcInteraction` enum scope
+  accordingly at build time.
 - **M-postgate-roster-wave-3** (content; **deprioritized, DE-GATED**) — complete the roster toward the GDD §5
   ~16-form target by adding the currently-unrepresented **Electric + Light** species lines. These have
   **zero forms AND zero skills** today, so this is net-new species *and* net-new skill kits (the Electric/
