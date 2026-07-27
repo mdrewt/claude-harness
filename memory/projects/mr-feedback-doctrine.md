@@ -1,4 +1,4 @@
-# mr-feedback-doctrine — operator feedback handling (v1.3 ACTIVE 2026-07-27)
+# mr-feedback-doctrine — operator feedback handling (v1.4 ACTIVE 2026-07-27)
 Binds: the native loop whenever it processes operator feedback artifacts (playtest gates lifting,
 feedback/notes files, decision-issue answers) or fleshes out milestone skeletons into specs.
 §1 INVARIANTS bind everywhere in REDUCED form: outside the loop (casual/Cowork), I-1 means RELAY
@@ -258,6 +258,10 @@ must make (vs. scripts) are legitimate — scripts enforce state, models interpr
 substitutes for the other.
 
 ## Changelog
+- v1.4 (2026-07-27): reconciler alert class restricted to intake/integrity failures; STALE is
+  report-only (internal queue-front escalation, --verbose) — DISPOSED-awaiting-queued-milestone is
+  progress, not staleness (issues #11/#12 false-positive incident); alert bodies carry actual
+  findings; consuming run must close the issue with an <!--mr-system--> comment.
 - v1.3 (2026-07-27): ceremony ATTRIBUTION TABLE required in synthesis (instruments the 6-vs-4
   brainstormer question); first-cycle retro note — launching runs must transition covered items to
   IN-WORK (gap: 83 DISPOSED / 0 IN-WORK with 2 slices live).

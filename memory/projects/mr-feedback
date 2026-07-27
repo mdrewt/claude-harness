@@ -129,18 +129,23 @@ def decisions_since(ts):
 
 def cmd_check(argv):
     _, kv = args_kv(argv); strict = "strict" in kv
-    rws, corrupt = rows(); st = fold(rws); bad = corrupt
+    rws, corrupt = rows(); st = fold(rws); bad = corrupt; issues=[]
     for v in st.values():
         if kv.get("episode") and v.get("episode") != kv["episode"]: continue
         s = v.get("state","CAPTURED")
         if s == "DISPOSED" and not (v.get("action") and v.get("weight") and v.get("target")):
-            print(f"FEEDBACK-BARE-DISPOSITION {v['id']}"); bad += 1
+            msg=f"FEEDBACK-BARE-DISPOSITION {v['id']}"; print(msg); issues.append(msg); bad += 1
         if s in ("CAPTURED","CLASSIFIED"):
             d = decisions_since(v.get("ts",""))
-            if d >= 2: print(f"FEEDBACK-UNDISPOSED {v['id']} ({d} decision runs since capture — doctrine: <2)"); bad += 1
-        elif s in LIVE and s not in ("PARKED",):
+            if d >= 2: msg=f"FEEDBACK-UNDISPOSED {v['id']} ({d} decision runs since capture — doctrine: <2)"; print(msg); issues.append(msg); bad += 1
+        elif s in ("IN-WORK","VERIFIED"):
+            # stale = REPORT class (doctrine: internal queue-front escalation, never an operator alert).
+            # DISPOSED items waiting for their queued milestone are NOT stale — the queue is progress.
+            # (2026-07-27 incident: issues #11/#12 — DISPOSED-in-queue alerted as "83/79 issues", zero
+            # actionable content, signature churn spawned duplicate issues. Alert class must stay
+            # reserved for intake/integrity failures a human might need to act on.)
             d = decisions_since(v.get("ts",""))
-            if d >= 3: print(f"FEEDBACK-STALE {v['id']} state={s} ({d} cycles)"); bad += 1
+            if d >= 3 and "verbose" in kv: print(f"FEEDBACK-STALE {v['id']} state={s} ({d} cycles) [report-only]")
     if bad:
         print(f"FEEDBACK-CHECK-ISSUES n={bad}")
         alert = os.path.join(os.path.dirname(LEDGER), ".feedback-check-alert")  # follows env override — selftest must never write production state
@@ -149,9 +154,10 @@ def cmd_check(argv):
         if prev != sig:
             open(alert,"w").write(sig)
             if os.environ.get("MR_FB_NO_ISSUE") != "1":
-                subprocess.run(["bash", MEM + "/mr-ask-drew", "feedback-reconcile", "--repo", "mdrewt/claude-harness",
+                findings="; ".join(issues[:8]) + (f" (+{len(issues)-8} more)" if len(issues)>8 else "") + (f"; corrupt-lines={corrupt}" if corrupt else "")
+                subprocess.run(["bash", MEM + "/mr-ask-drew", "feedback-reconcile", "--repo", "mdrewt/claude-harness", "--context", "Findings: " + findings,
                     "--question", f"Feedback ledger reconciler found {bad} issue(s) — override or investigate? (see mr-feedback check output)",
-                    "--root", "Doctrine §8 conservation/staleness check failed",
+                    "--root", "Doctrine §8 intake/integrity check failed (NOT staleness — that is report-only)",
                     "--recommend", "Investigate before next playtest gate; override by closing this issue"],
                     capture_output=True, timeout=60)
         return 1 if strict else 0
