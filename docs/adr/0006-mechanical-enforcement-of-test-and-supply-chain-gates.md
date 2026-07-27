@@ -32,3 +32,9 @@ broken for the one stack that referenced StrykerJS); coverage had no floor.
 - Consequences: CI is the authoritative quality gate; thresholds are conservative
   floors projects should raise. Deviations (per-language mutation/coverage rollout)
   are tracked here rather than hidden.
+
+## Confirmation
+`scripts/tests/invariants.test.mjs` asserts each stack keeps its mutation /
+coverage / SCA gates (in `just test`, in `just ci`); `just validate-templates`
+scaffolds every stack and runs its real gates end-to-end (scheduled/manual —
+too heavy for the fast suite).

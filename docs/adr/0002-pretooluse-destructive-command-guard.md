@@ -22,3 +22,8 @@ dropped.
 - Consequences: destructive commands are blocked across platforms; an invariants
   test asserts the hook file and its `settings.json` wiring exist so it can't be
   dropped from a new stack.
+
+## Confirmation
+`scripts/tests/invariants.test.mjs` asserts `templates/_base/.claude/hooks/guard-bash.mjs`
+exists and that `templates/_base/.claude/settings.json` wires PreToolUse → guard-bash.mjs;
+runs in `just test` (in `just ci`).

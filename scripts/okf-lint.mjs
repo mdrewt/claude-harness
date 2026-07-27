@@ -80,8 +80,7 @@ export function parseFrontmatter(txt) {
 export function extractBundleLinks(txt) {
   const links = [];
   const re = /\[([^\]]*)\]\(([^)]+)\)/g;
-  let m;
-  while ((m = re.exec(txt)) !== null) {
+  for (const m of txt.matchAll(re)) {
     const url = m[2].trim();
     if (url.startsWith('http://')) continue;
     if (url.startsWith('https://')) continue;

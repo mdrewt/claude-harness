@@ -21,8 +21,10 @@ Refactor.
    ADR is a finding.
 5. **Refactor** — improve with tests green.
 6. **Repeat** — next slice; `doc-keeper` records ADR/changelog/memory at close,
-   folding Deviations into the memory card (`implementation-notes.md` itself is
-   worktree scratch — it never merges).
+   folding Deviations into the memory card with an explicit disposition each
+   (`promoted → <path>` to a skill's Gotchas / knowledge concept / ADR, or
+   `local-only` — see the doc-keeper's promotion rules; the notes file itself is
+   worktree scratch and never merges). Missing dispositions are an audit finding.
 
 ## Parallelism
 Specialists run in separate worktrees so they never collide; merges are

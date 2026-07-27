@@ -17,3 +17,8 @@ wasting a full loop. We want formatting applied immediately after each edit.
   outputs, wired via `_base/.claude/settings.json`.
 - Consequences: edits are normalized on the spot; an invariants test asserts the
   hook file and `settings.json` wiring exist so it can't be silently dropped.
+
+## Confirmation
+`scripts/tests/invariants.test.mjs` asserts `templates/_base/.claude/hooks/format-edited.mjs`
+exists and that `templates/_base/.claude/settings.json` wires PostToolUse → format-edited.mjs;
+runs in `just test` (in `just ci`).

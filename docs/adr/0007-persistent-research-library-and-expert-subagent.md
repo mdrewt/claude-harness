@@ -38,3 +38,9 @@ without re-polluting the main context (`docs/context-hygiene.md`).
     (acceptable for now); new pieces must earn invocations or `just audit` will flag them;
     propagate the hook/generator to the remaining projects via `just sync`; optionally add
     a persisted generator unit test to `scripts/tests/`.
+
+## Confirmation
+`just research-gate` (in `just ci`) runs `scripts/research-index.mjs` `--check`
+(index sync, duplicate slugs) and `scripts/research-lint.mjs` `--shared`
+(frontmatter + purity); the index itself is regenerated automatically by the
+format-edited PostToolUse hook on research writes.

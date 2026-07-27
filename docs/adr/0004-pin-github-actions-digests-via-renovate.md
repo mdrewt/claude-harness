@@ -18,3 +18,9 @@ immutable, auditable action references that still receive managed updates.
   managed PRs.
 - Consequences: CI runs immutable action versions with an upgrade path;
   depends on Renovate being enabled for the repo.
+
+## Confirmation
+The preset lives single-sourced in `templates/_base/renovate.json`
+(`helpers:pinGitHubActionDigests`); no test asserts its presence, and the actual
+pinning depends on Renovate being enabled per repo — beyond the file itself this
+is unenforced — review-only.

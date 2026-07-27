@@ -20,3 +20,10 @@ and `memory/decisions-log.md` (with empty ADR pointers).
   the per-project convention.
 - Consequences: harness rationale stays with the code and is diffable;
   `memory/decisions-log.md` can point to concrete ADRs.
+
+## Confirmation
+Corpus structure (number/title match, status enum, supersede links, this
+section's teeth) is enforced by `scripts/adr-lint.mjs` via `just adr-gate` in
+`just ci`. Decision *capture* — that a qualifying decision gets an ADR at all —
+is unenforced — review-only (the reviewer verifies an ADR exists when a
+dependency or pattern was added).

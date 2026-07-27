@@ -15,3 +15,8 @@ burning runner minutes and producing confusing, out-of-date statuses.
   `cancel-in-progress: true` so a new run supersedes the prior one.
 - Consequences: only the newest commit's CI runs to completion; in-flight runs on
   the same ref are cancelled automatically.
+
+## Confirmation
+The concurrency group ships in `templates/_base/.github/workflows/ci.yml`
+(`cancel-in-progress: true`); no test asserts it stays — beyond the file itself,
+unenforced — review-only.

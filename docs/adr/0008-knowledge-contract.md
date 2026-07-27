@@ -65,3 +65,10 @@ pieces, if any, do we adopt, and how do we keep them from violating SSOT?
     producer + a CI gate to maintain (justified only where a bundle pays its
     way — appropriateness-per-project). Security: bundles are untrusted data;
     never ingest third-party bundles (no OKF provenance). Extends ADR-0007.
+
+## Confirmation
+`scripts/okf-lint.mjs` lints bundle conformance (required frontmatter, registered
+`type` vocabulary); the research libraries are additionally gated by
+`just research-gate` in `just ci`. Generated bundles are drift-checked
+(regenerate → must equal committed) by their own project gates (e.g. M8.95's
+schema bundle), per `standards/knowledge-format.md`.

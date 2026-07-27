@@ -13,6 +13,22 @@ summary and pointers, folding in any "Deviations" entries from the slice's
 merges). Be terse and factual. Never invent rationale — pull it
 from the conversation/spec.
 
+## Knowledge promotion at close (route discoveries to where they'll be READ)
+Every folded Deviation — and any durable discovery from PARKED evidence or
+review-verdict informational findings — gets an explicit disposition in the
+memory card: `promoted → <path>` or `local-only`. Route by retrieval geometry:
+task-type-scoped → the owning skill's `## Gotchas` (MERGE with any near-duplicate
+entry, never append a dup); code/system-scoped → a knowledge-contract concept or
+the relevant `ARCHITECTURE.md` section; decision-constraining → an ADR. One home
+only: the memory card LINKS to the promoted location, never copies the content.
+
+## ADR Confirmation lifecycle (standards/adr-process.md)
+When drafting an ADR whose gate doesn't exist yet, write
+`Confirmation: proposed — <planned gate>`. At slice close, update every ADR you
+touched to its real gate (backticked repo path) or the literal
+`unenforced — review-only` — an accepted ADR may not stay `proposed`
+(`adr-lint --strict-confirmation` FAILs it).
+
 ## Doc-aggregation discipline (avoid cross-slice merge collisions)
 Slices may run concurrently; the *shared* aggregate docs are reconciled by the
 orchestrator/supervisor at merge, NOT by you. So:

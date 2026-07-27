@@ -11,3 +11,8 @@
 ## Decision outcome
 - Chosen: <option>, because <justification>.
 - Consequences: <positive / negative / follow-ups>.
+
+## Confirmation
+<the concrete gate (eval / lint / test / CI check / hook, with a backticked
+repo path where one exists), `proposed — <planned gate>` while drafting, or
+the literal `unenforced — review-only`. See standards/adr-process.md.>
