@@ -90,7 +90,7 @@ memory-prune *ARGS:
     found=$(find memory/projects -maxdepth 1 -name '*.bak.*' -type f -mtime +14 2>/dev/null || true)
     if [ -z "$found" ]; then echo "memory-prune: no *.bak.* files older than 14 days"; exit 0; fi
     if [ "{{ARGS}}" = "--delete" ]; then
-        echo "$found" | xargs -r rm -v --
+        find memory/projects -maxdepth 1 -name '*.bak.*' -type f -mtime +14 -print -delete
     else
         echo "memory-prune candidates (rerun with --delete to remove):"
         echo "$found"

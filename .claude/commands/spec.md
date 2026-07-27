@@ -9,6 +9,11 @@ otherwise write the spec to `docs/specs/`. Hand off to `/loop` for implementatio
 
 Before finalizing the spec, interview the operator one question at a time about
 the ambiguities you found — prioritize questions whose answers would change the
-architecture, data model, or UX flow (mechanical details can default). If the
-domain is unfamiliar to the operator, offer a blind-spot pass first (`/consult`:
-"what should we be asking about this domain that we're not?").
+architecture, data model, or UX flow (mechanical details can default). Give your
+recommended answer with each question, so the operator corrects an assumption
+rather than drafting from scratch. If the codebase can answer a question,
+explore it instead of asking. If the domain is unfamiliar to the operator, offer
+a blind-spot pass first (`/consult`: "what should we be asking about this domain
+that we're not?"). For a gnarly design that warrants an exhaustive stress-test,
+escalate to `/grilling` (operator-local skill in `~/.claude`, not shipped with
+the harness — skip gracefully if absent).

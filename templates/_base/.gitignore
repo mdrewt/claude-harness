@@ -10,3 +10,5 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+# PRERRR worktree scratch (docs/workflow-loops.md) — Deviations feed the memory card; the file never merges
+implementation-notes.md

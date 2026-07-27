@@ -25,6 +25,9 @@ Record which gating tests changed and your correction/weakening verdict in the
 PASS/FAIL evidence.
 
 ## Deviations log
-Read the slice's `implementation-notes.md` (see `docs/workflow-loops.md`). Every
+Read the slice's `implementation-notes.md` if present (see
+`docs/workflow-loops.md`; absence just means no deviations were logged). Every
 entry under "Deviations" must be accounted for by a test, spec note, or ADR — an
-unaccounted deviation is a finding in your PASS/FAIL evidence.
+unaccounted deviation is a finding in your PASS/FAIL evidence. If the file is
+absent but the diff plainly deviates from the plan, flag that too. The notes
+file is worktree scratch — it appearing in the merged diff is itself a finding.
