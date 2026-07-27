@@ -103,9 +103,13 @@ Each slice carries the converged design's **key decisions**, **EARS acceptance c
 
 **Open questions for Drew (recommended defaults in the design):**
 - **Shopkeeper flow** — `KeyT` opens the shop DIRECTLY (matches "walk up and shop", simplest — design default), or GREET-THEN-SHOP via a one-node dialogue with Shop/Leave (more immersive, uses the validator-required tree, adds a hop)?
+  - Answer provided by Drew: GREET-THEN-SHOP
 - **Keep global `KeyG`/`KeyH` shortcuts** once world interaction ships? *NOT e2e-forced either way (`trade.spec`'s `KeyG` check is a negative assertion). Recommendation: keep for discoverability/back-compat.*
+  - Answer provided by Drew: Do not keep.
 - **Heal scope this milestone** — include heal-via-TILE now (near-zero server cost — recommended), and defer a Heal-on-NPC nurse until genuinely needed (recommended)?
+  - Answer provided by Drew: Recommendations accepted.
 - **Shopkeeper placement in zone 1** — at the warp landing tile (found immediately) or deeper (exploration reward)? And its greeting line?
+  - Answer provided by Drew: Deeper, with a placeholder greeting line of "Hello, customer!"
 
 **Residuals (confirm-not-block):** the AC path (direct-open) is the labeled default vs the still-open greet-then-shop question — reconcile at build; a Shop NPC still needs a live `dialogue_tree_id` so the seeded greeting is dead content under direct-open (acceptable, note the coupling).
 
@@ -156,9 +160,13 @@ Each slice carries the converged design's **key decisions**, **EARS acceptance c
 
 **Open questions for Drew (recommended defaults in the design):**
 - **Front-door key** — confirm `KeyM` (recommended, verified-unbound, non-Escape). The only alternative considered, Tab, is recommended AGAINST (M23 focus-traversal collision + browser default).
+  - Answer provided by Drew: Recommendations accepted
 - **Category taxonomy** — confirm the five categories (Party / World / Shop & Trade / Compete / System) and leaf assignments (UX-feel call).
+  - Answer provided by Drew: Don't forget "Backpack" for an item inventory and "Journal" for a quest log. Use your best judgement to determine if these should be added as a main category, or a leaf.
 - **Hotkeys** — keep ALL quick-hotkeys live alongside the menu (recommended: yes, veteran speed), or make rarely-used ones (Rename N, Offer O) menu-only?
+  - Answer provided by Drew: Recommendations accepted, they are shortcuts to quickly navigate to the same screens that you would see by navigating through the menus.
 - **Launcher-ownership handoff** — accept "whichever of {this, ux1} lands first hosts the single corner element; `KeyM` guarantees no block", or force ux1 to land first?
+  - Answer provided by Drew: Recommendations accepted, use your best judgement.
 
 **Residuals (confirm-not-block):** SSOT copy says "Challenge a nearby player" (P) / "Offer a trade to a nearby player" (O) but `Offer`/`PvP` availability is online-existence not proximity — reconcile the SSOT copy or scope the label pull to the key token only; the menu→dialogue-preempt teardown must be specified at the exact site where an incoming conversation row tears down `menuView` (dialogue is GUARD_ONLY/store-derived, not a `canOpen` call site); AC-7's `preventDefault` only holds if nh1 has landed — hard-gate on nh1.
 

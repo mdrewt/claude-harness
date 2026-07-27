@@ -183,3 +183,7 @@
 {"ev": "set", "id": "r2-2026-07-26-033", "evidence": "decisions/issue-4.answer.md", "state": "ANSWERED", "ts": "2026-07-27T03:47:45Z"}
 {"ev": "set", "id": "r2-2026-07-26-034", "action": "ANSWER", "weight": "FEATHER", "target": "r2-disposition-pass", "note": "r2-q2 answer: truncated queue line is copy-paste noise; r1 sequencing stands.", "state": "DISPOSED", "ts": "2026-07-27T03:47:45Z"}
 {"ev": "set", "id": "r2-2026-07-26-034", "evidence": "decisions/issue-6.answer.md", "state": "ANSWERED", "ts": "2026-07-27T03:47:45Z"}
+{"ev": "set", "id": "r2-2026-07-26-087", "note": "launched: feel-polish slice, ADR-0159, run_id=mr-spawn-20260727T110353Z-746724, leader=746745", "state": "IN-WORK", "ts": "2026-07-27T11:04:24Z"}
+{"ev": "set", "id": "r2-2026-07-26-088", "note": "launched: feel-polish slice, ADR-0159, run_id=mr-spawn-20260727T110353Z-746724, leader=746745", "state": "IN-WORK", "ts": "2026-07-27T11:04:24Z"}
+{"ev": "set", "id": "r2-2026-07-26-089", "note": "launched: feel-polish slice, ADR-0159, run_id=mr-spawn-20260727T110353Z-746724, leader=746745", "state": "IN-WORK", "ts": "2026-07-27T11:04:24Z"}
+{"ev": "set", "id": "r2-2026-07-26-090", "note": "launched: feel-polish slice, ADR-0159, run_id=mr-spawn-20260727T110353Z-746724, leader=746745", "state": "IN-WORK", "ts": "2026-07-27T11:04:24Z"}

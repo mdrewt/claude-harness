@@ -202,3 +202,159 @@ fail with a confusing `"step_ms" is not exported by "../client-wasm/pkg/client_w
 this run (two different subagents). Always use `just wasm`. Also: the default `node` on PATH is **v18**;
 project commands need `export PATH="/home/mdrewt/.asdf/installs/nodejs/24.13.1/bin:$HOME/.cargo/bin:$PATH"`
 or evals fail with bogus `node:fs`/`glob` errors. A fresh worktree also needs `npm ci` in `client/`.
+
+## 2026-07-27T05:5xZ — battle-0hp-fix TERMINAL STATE: PR#258 open, local `just ci` green, remote CI running
+**Slice:** battle-0hp-fix (M-postgate-battle-0hp-fix, LIGHT) · **Branch:** `feat/battle-0hp-fix` · **Worktree:** `.claude/worktrees/battle-0hp-fix` · **ADR-0156** · **PR:** https://github.com/mdrewt/monster-realm/pull/258 · **`gh pr merge` NOT run — supervisor owns the merge.**
+
+**Gates:** `just ci` **exit 0** (fmt, clippy workspace `-D warnings`, biome, 1476 Rust tests, **72 evals / 0 fail**, secrets, wasm, tsc, 1497 client tests). `just mutate-core` run separately: **missed=0** (ADR-0050 zero-tolerance; all 3 mutants on the new `with_lead` line caught; the 5 timeouts are pre-existing `tiled_import.rs` parser arithmetic). Note a fresh worktree needs `just client-setup` before `just ci` — biome is not resolvable otherwise (cost one red cycle).
+
+**Roster:** planner → reviewer + red-team + /simplify on the PLAN → tester (RED, verified red by me — tester agents have no Bash) → reviewer + red-team on the TESTS → specialist (red→green) → reviewer + red-team + /simplify + reducer-security-auditor + desync-guard (5 parallel lenses) → verifier. Verifier **PASS** on all 6 mandate items.
+
+**The load-bearing decision — a planned change was REJECTED, do not let a later slice "complete" it.** The plan included a fainted-actor early return at the top of `resolve_one_attack`. Red-team PoC'd it as a **permanent non-terminating fixpoint** when both actives are fainted (100 turns, zero progress) where current code self-repairs in **2 turns**; in ranked PvP the only exit degenerates to "whoever disconnects first takes a rated loss". /simplify independently showed it unreachable-by-construction after the constructor fix, and the reviewer showed its stated rationale ("the general form of `second_had_faint`") was factually inverted — the two rules have disjoint firing conditions, so publishing that framing would invite deleting `second_had_faint` and handing every KO'd side a free retaliation. Dropped; ADR-0156 D3 records it with evidence and `a_zero_hp_active_state_self_repairs_and_never_becomes_a_fixpoint` is the sentinel (verified: it is the ONLY test that catches the re-addition).
+
+**HIDDEN DEPENDENCY — needs supervisor re-serialization, recommend as the next slice.** `server-module/src/pvp.rs` carries the byte-identical defect (`start_pvp_battle`: `any(conscious)` then `active: 0`; `submit_pvp_action`'s attack arm accepts a skill for a fainted active). Outside the declared `touches:` set, so it was recorded not widened into — but the spec's EARS E1 says "for both PvE and PvP starts", so **that criterion is half-delivered**. PvP is not made worse (zero `game-core` behavior change ⇒ bit-identical to master), but a live **sac-lead exploit** remains on the rating-affecting surface: a deliberately 0 HP lead deals full damage (`calc_damage` never reads attacker HP), absorbs the opponent's turn-1 attack, and buys a free switch costing no turn. Fix is a mechanical two-call adoption of `BattleSide::with_lead` + a `submit_pvp_action` mirror of the `submit_attack` guard — no design decisions left. Filed as ADR-0156 residual P1 and in the spec's new §3b.
+
+**`touches:` DEFECT to fix in the spec corpus:** the declared path `game-core/src/battle/*` **does not exist** — the module is `game-core/src/combat/`. Work landed where the code actually lives; declared under `touches-delta:` in the PR body. Any future fan-out disjointness check against that path is vacuous until corrected. (Corrected in the spec's §3b this run.)
+
+**Carry-forward that bit this run (will bite the next `server-module` slice):**
+- **`server-module/src/battle_tests.rs` has no reducer-executing harness** — it is `include_str!("battle.rs")` source-scanning. A red-team pass built a tree with the defect 100% intact that passed **all 374** server tests, via three inline evasions: a dead `let _ = ...is_fainted()` binding satisfying a needle; adopting the constructor then writing `side_a.active = 0`; and permuting `team` at the call site. Presence-only needles are near-worthless here. What works: per-function **occurrence counts**, **argument pinning**, block-scoped `return Err` assertions, and **whitelists over blacklists** (`.active` may appear only inside `.active_monster`; `.team` only as `.iter()`/`.iter_mut()`) — a blacklist of assignment operators rots on the eleventh spelling, and a naive `.team.` needle false-trips on four legitimate `.team.iter()` calls. Recorded as ADR-0156 residual **P7**: the missing harness is the largest standing gap in this subsystem's gate.
+- **`BattleSide.active` privatization is mechanically blocked**, not merely deferred: `evals/spacetime-type-snapshot.eval.mjs` regex-parses `pub <field>:` and exact-matches the baseline, so dropping `pub` reads as a **wire-breaking field removal**. Needs a slice that also owns `evals/`. `#[non_exhaustive]` on `BattleSide` would sidestep the regex but requires converting ~16 test-file literals. (Supersedes ADR-0053 residual (a)'s weaker "touch-set width" reason.)
+- **Positional coupling is unguarded:** `side.team[i]` ↔ `party_monster_ids[i]` drives HP write-back and the XP loop, and `check_team_coupling` compares **lengths only** — a permutation is silent cross-monster corruption. Any future constructor/refactor here needs full-`Vec` equality teeth, not `.len()`.
+- **ADR-0104 gate:** the `**Decision:**` header is capped at **240 chars** and `scripts/adr-digest.mjs` hard-fails over it — cost one red cycle at 303 then 241. `just adr-digest` AND `just knowledge` must both be run and committed; the knowledge bundle drifts on pure line-number shifts in any scanned reducer file.
+
+**Also corrected this run:** ADR-0155's claim that "a fainted active never coexists with `Ongoing`" — true mid-battle, false at construction. ADR-0156 amends it and 0155 gained the reciprocal `**Amended-by:**` header.
+
+**Next for the supervisor:** delegate #258's CI wait to `mr-ci-watch`, squash-merge (4 `wip:` commits — squash required, the `commit-msg` hook rejects `wip(...)`), remove `.claude/worktrees/battle-0hp-fix` + the local branch, then **launch the PvP follow-up**. adr_next_free 156 → **157** (157 was reserved for the concurrent `dev-observability` slice, so next free is 158).
+
+## 2026-07-27T06:58:55Z — dev-observability + battle-0hp-fix: both MERGED
+PR#257 (dev-observability, ADR-0157) squash-merged -> master@b741a74. PR#258 (battle-0hp-fix, ADR-0156, r2-playtest defect items 005/030/031/036-039) squash-merged -> master@a920a4b.
+
+Sequence: both slices reached terminal state (PR open, CLEAN, mergeable) at the same tick. mr-audit CLEAN on both (orchestration + gating). Merged 257 first (client-only, disjoint touches). PR#258's merge-base was behind by one commit after 257 landed -> mergeStateStatus flipped DIRTY/CONFLICTING, but the only conflict was docs/adr/DIGEST.md (generated file, both slices reserved adjacent ADR numbers 0156/0157). Resolved deterministically per doctrine (doc-set-only conflict): merged origin/master into feat/battle-0hp-fix, ran `just adr-digest` to regenerate DIGEST.md cleanly (both ADR rows present), committed, pushed. CI re-ran green, merged.
+
+Post-merge: master fast-forwarded locally to a920a4b, worktrees + local/remote feature branches cleaned, master CI verified green (gh run watch, both ci+e2e success).
+
+Ledger: both slice costs already captured by wrapper-reconcile rows (dev-observability $60.64, battle-0hp-fix $69.89) — this merge tick's ledger rows carry outcome=merged with cost_usd=null by design (C1 guard, no double-count).
+
+## 2026-07-27T07:14:18Z — native tick (forced/manual, rid=native-20260727T071038Z-549139): standdown -- live human edit detected
+Live ground truth at tick start: no locks/PRs/inflight, master CI green at a920a4b, both battle-0hp-fix(PR#258) and dev-observability(PR#257) already merged by the prior 06:59Z tick. Reviewed the merged battle-0hp-fix spec addendum (uncommitted in harness working tree, written by that slice's doc-keeper): flags a real follow-up need -- server-module/src/pvp.rs was NOT in touches: and carries the identical 0hp-lead exploit (start_pvp_battle any(conscious)-then-active:0 shape; submit_pvp_action accepts a skill for a fainted active), a live rating-affecting sac-lead exploit on PvP. Spec recommends a follow-up slice M-postgate-battle-0hp-fix-pvp (mechanical two-call adoption of BattleSide::with_lead + a submit_pvp_action mirror of the submit_attack guard) -- not yet queued as its own milestone; left as-is this tick (not this tick's scope to draft it, surfacing for the next tick/session). Selected movement-investigation as the next Phase D pick (PLAN SS9 order, HARD tier per predictor/main.ts-adjacent touches, fable@xhigh, ADR 158 reserved) since it was the first unblocked slice and its ambiguous/undiagnosed touches made it unsafe to fan out alongside feel-polish/uxd1-3 this tick (matches the prior tick's own caution note). Acquired the chain-owner mutex, wrote pass-vars, called mr-spawn -- it returned PROBE-TRIPPED: a write to specs/monster-realm-v2/M-postgate-ux-design.spec.md at 2026-07-27T07:12:50Z (41s before the probe, well inside the ~6min window). Verified live: git diff shows a one-line addition answering the uxd2 shopkeeper-flow open question ('Answer provided by Drew: GREET-THEN-SHOP') -- a genuine live human edit, not a stale artifact or my own action. Correctly aborted the launch per doctrine (never override a tripped probe), released the mutex, cleaned up pass-vars/vars.json, did NOT relaunch as a workaround. No mutating action taken this tick. adr_next_free unchanged at 158. Governor NORMAL throughout (d7=$1558.68/2783). Next tick should re-derive fresh: if Drew's edit session has ended (no further recent writes), movement-investigation remains the next pick; also consider drafting M-postgate-battle-0hp-fix-pvp as a queued follow-up milestone given the live PvP exploit finding.
+
+## 2026-07-27T07:35Z native tick (forced/manual, rid=native-20260727T073239Z-559279): launched movement-investigation
+
+Live ground truth at tick start: no locks/PRs/inflight, master CI green at a920a4b, both prior slices (battle-0hp-fix/dev-observability) confirmed merged. The 07:14Z tick had aborted movement-investigation on PROBE-TRIPPED (live human edit on M-postgate-ux-design.spec.md at 07:12:50Z answering the uxd2 shopkeeper-flow question). Re-checked this tick: that write's mtime is now well past 6 minutes stale, no other recent non-supervisor writes found in either repo tree. Probe clear.
+
+Also observed: a mechanical FEEDBACK-CHECK reconciler (wrapper-level, not this tick) opened decision issue #11 (mdrewt/claude-harness) at 07:30:29Z -- "Feedback ledger reconciler found 83 issue(s) -- override or investigate?" -- with mr-decision-watch already polling it. This is informational/non-blocking (doctrine: reconciler issues surface via mr-feedback check, tick-run) -- left untouched, watcher will fire an event on Drew's answer. Not this tick's scope to investigate further given movement-investigation was the clear next action.
+
+Selected movement-investigation (M-postgate-movement-investigation, HARD tier per predictor/main.ts-adjacent touches criterion) as the sole launch -- solo not fanned out, matching the 07:14Z tick's own reasoning: its scope is undiagnosed/root-cause-first (client vs server) and its declared touches overlap feel-polish/uxd1-3 candidates, so fanning out alongside them risked a collision the disjoint-check can't see pre-diagnosis. fable@xhigh (HARD tier per Model & effort routing; fable_ok=true, d7=$1560.64/2783, fable_d7=$707.15 well under the $2068.2 guard). ADR-0158 consumed. Acquired chain-owner mutex (was clear), wrote pass-vars (initially missing the required tier field -- mr-spawn correctly SystemExit'd on the missing field with no launch attempt, no partial state; fixed and re-ran). mr-spawn returned LAUNCHED, detachment+model asserted (leader=562147, claude_pid=562150, session=562147 own-session confirmed, first model line = claude-fable). Per-run lock written. Ledger row recorded (cost 0, pending wrapper reconcile). adr_next_free 158->159.
+
+No merge/park/BLOCKER this tick. Governor NORMAL throughout.
+
+## 2026-07-27 — movement-investigation TERMINAL STATE: PR#259 open, local `just ci` EXIT=0, remote CI running
+**Slice:** movement-investigation (M-postgate-movement-investigation, r2 items 003/015/029/040-042) · **Branch:** `feat/movement-investigation` · **Worktree:** `.claude/worktrees/movement-investigation` · **ADR-0158** (consumed; adr_next_free → 159) · **PR:** https://github.com/mdrewt/monster-realm/pull/259 · **`gh pr merge` NOT run — supervisor owns the merge.** 8 `wip:` commits — squash required.
+
+**EARS E1 answered: CLIENT-side, server proven innocent.** Committed deterministic sim (movementSim.test.ts) reproduced Drew's exact sequence: double fires iff server tick phase < tap duration (P ≈ tapMs/200) — the nh2 continuation re-issue keyed on tick phase, not player intent. Edge incidental. This was ADR-0148's accepted {1,2} tap residual, operator-reported. Observability arm NOT taken (root cause found inside the 2h budget).
+
+**Shipped:** hold-commit discrimination — heldKeys.ts press timestamps (required nowMs), `committedActive(now)`, `HOLD_COMMIT_MS=150` (two-sided sweep: walk-start slack 22.9ms at 150 / −0.6 at 175; maxSafeTap(X)=X). main.ts exactly 3 code lines. Contract: taps ≤140ms ⇒ 1 tile always; ≥240ms walks; (150,240) declared indeterminate. New `evals/hold-commit-step-budget.eval.mjs` binds the budget to the REAL game-core STEP_MS (a cadence retune now reds CI — desync-guard finding).
+
+**Roster:** diagnosing-bugs loop (sim-first) → planner → reviewer+red-team+/simplify (plan) → tester@opus (RED verified by orchestrator — tester has no Bash) → reviewer+red-team on tests (red-team found+fixed 2 real evasions: module-mutable-default backdoor → W-MVI-HELDKEYS-IMPORT-SEALED; decoy-string/bracket-notation → per-region reissueDir( count) → specialist (red→green, no test edits) → reviewer+red-team(14/14 mutants killed, zero survivors)+/simplify+desync-guard (4 parallel lenses; reducer-security-auditor skipped: zero .rs changes) → verifier PASS all 6 items → doc-keeper.
+
+**Carry-forward for future slices:**
+- The doc-keeper subagent WROTE TO THE MAIN CHECKOUT (docs/adr/ paths without the worktree prefix) despite the worktree being named in its prompt — repaired with pure file ops (no git mutations against main), main checkout verified clean. Future orchestrators: give doc agents ABSOLUTE worktree paths per file and verify `git -C <main> status` after any Write-capable subagent.
+- ADR header must be one-field-per-line — a `·`-joined single-line header parses but BLEEDS into DIGEST's Slice column (caught by reading the digest row, not by adr-digest-check).
+- movementSim.test.ts is the authoritative post-mvi loop model (predictor.test.ts's runLoop stays deliberately pre-mvi; scope note in-file). Sorted-insert EventQueue; grids run in ~ms.
+- ADR-0148 residual 1b (ArrowRight+KeyD dual-code ungated keydown double) is now the SOLE same-direction double path → recommend `M-postgate-dualkey-dedup` (small, sketched in ADR-0158 residual 3). `mvi-e2e` Playwright keyboard tooth still the only closure for `if (true || …)`.
+
+**Next for the supervisor:** delegate #259 CI wait to `mr-ci-watch`, squash-merge, remove `.claude/worktrees/movement-investigation` + local branch; tick the harness spec status (outside slice touches); adr_next_free = 159.
+
+## 2026-07-27T09:56Z native tick (rid=native-20260727T095630Z-726467): movement-investigation PR#259 open (mergeable=MERGEABLE, mergeStateStatus=UNSTABLE) with ci+e2e checks IN_PROGRESS at tick start (started 09:55:10Z). Per-run lock for movement-investigation confirmed dead (leader 562147 not alive, matches LIVE SITUATION's alive:false/done:true) -- run reached terminal state (PR opened, no crash). No live chain-owner mutex, no other inflight per mr-state.json (the recorded `inflight[movement-investigation]` entry is now stale breadcrumb, superseded by live PR/lock state). Delegated CI-wait per doctrine: `setsid bash mr-ci-watch 259 movement-investigation` launched detached (confirmed live pid=728514), will resume via event tick on completion -- did not sit-poll. No merge attempted this tick (checks not yet green). Governor NORMAL throughout (d7=$1644.89/2783, fable_ok=true). No BLOCKER. Next tick / event: when mr-ci-watch reports checks green, run `mr-audit` (tier=hard per HARD criteria: movement/predictor client-shaped + a prior stall was in-scope) before merging; if red, triage per .err/.log rather than blind-relaunch. Remaining Phase D queue unchanged: feel-polish, uxd1, uxd2, uxd3 (main.ts overlap caution still applies).
+
+## 2026-07-27T10:00:25Z — movement-investigation MERGED (PR#259, d18cadb)
+native tick (rid=native-20260727T095812Z-729517 / sup run mr-sup-native-20260727T095904Z-730425-27336): EVENT delivered movement-investigation.ci.md (PR#259 all checks green). Re-verified live: gh pr view 259 mergeStateStatus=CLEAN, mergeable=MERGEABLE, ci+e2e both SUCCESS. mr-audit --tier hard: orchestration CLEAN (14 agent calls, roles claude/desync-guard/doc-keeper/planner/red-team/reviewer/tester/verifier across fable/opus/sonnet/haiku). gating FLAGGED per hard-tier mandatory-read (not evidence of weakening) -- adjudicated the diff myself: client/src/prediction/heldKeys.ts adds committedActive(nowMs) + per-entry press stamps (HOLD_COMMIT_MS=150, squeezed both sides per the ADR-0158 doc comment); main.ts changes are 3 one-liners (2x reissueDir(held.active()->held.committedActive(now)) call sites + held.press(dir)->held.press(dir, performance.now())); zero deletions/skip-markers/suppressions/weakened asserts; the +1842/-55 stat is almost entirely new tests (movementSim.test.ts 1068 lines + main.wiring.test.ts +297 covering both re-issue emitter sites + decoy/occurrence-count hardening). Squash-merged (d18cadb), removed the movement-investigation worktree + local branch, ff-only advanced local master checkout to d18cadb. Post-merge master CI run started (in_progress at record time -- no watcher spawned since mr-doctrine defines mr-ci-watch for open-PR checks only, not post-merge master runs; next tick/event will re-verify green). ADR-0158 reserved slot consumed (adr_next_free was 159 pre-tick, already reflected in mr-state.json from the prior tick's reservation). No new slice launched this tick -- deferred pending live master-CI confirmation (single mutating action = the merge). Governor NORMAL throughout (d7=$1645.61/2783, fable_ok=true).
+
+## 2026-07-27T11:01:21Z — movement-investigation merged (PR#259, ADR-0158)
+Native tick rid=native-20260727T110010Z-742802: reconciled from live ground truth — PR#259 (feat/movement-investigation) was already MERGED with ci+e2e green (a prior tick had delegated CI-wait to mr-ci-watch). master local==origin==d18cadb, post-merge master CI green. mr-audit run base=a920a4b head=d18cadb tier=hard: orchestration CLEAN (tester+reviewer+verifier+red-team+desync-guard+doc-keeper roles, 14 agent calls). gating auto-FLAGGED (hard-tier mandatory-read policy, not a real weakening signal) — read the diff: pure test additions across main.wiring.test.ts/heldKeys.test.ts/movementSim.test.ts(new)/predictor.test.ts/hold-commit-step-budget.eval.mjs(new), 0 deleted tests, 0 removed asserts, 0 skip markers, 0 suppressions, heavy anti-vacuity + decoy-string-closure hardening documented inline. Adjudicated CLEAN. Cleanup: deleted merged remote branch feat/movement-investigation, released per-run lock, removed .done flag. No open PRs remain; queue empty per prior movement-investigation gate-fix cycle. Governor NORMAL (d7=$1646.90 of $2783 weekly). No merge/launch/park/BLOCKER further needed this tick beyond the reconcile.
+
+## 2026-07-27T11:04:36Z — feel-polish launched (ADR-0159)
+Native tick rid=native-20260727T110010Z-742802, composite continuation after movement-investigation reconcile: master CI confirmed green (d18cadb) this tick, clearing the prior tick's deferred next-slice-selection note. Picked M-postgate-feel-polish per PLAN §9 order (next unblocked un-merged slice after battle-0hp-fix/movement-investigation/dev-observability, all already merged). Solo launch (no other slice in-flight, so no fan-out/disjointness check needed). model=opus effort=high tier=routine (LIGHT per spec, no HARD-criteria hits). adr_next_free 159->160. Launched via mr-spawn: leader=746745 claude_pid=746748, brief 12250 bytes. Flipped feedback items r2-2026-07-26-087/088/089/090 (care-button no-op, walk-speed tuning, jerky NPC movement, no walk animation) from DISPOSED to IN-WORK -- note: these were record straight via mr-feedback set since the ids use the r2-2026-07-26-NNN prefix, not bare integers; the vars.json items:[87,88,89,90] passed to mr-spawn used bare ints so its auto-IN-WORK step likely no-op'd on unknown ids (worth checking mr-spawn's item-id handling/logging in a future tick -- silent no-op on bad ids is a latent gap). Governor NORMAL (d7=$1646.90/2783, fable_ok=true, unused this launch).
+
+## 2026-07-27T~13:00Z — feel-polish TERMINAL STATE: PR#260 open, local `just ci` exit 0, remote CI running
+
+**Slice:** feel-polish (M-postgate-feel-polish, r2 ledger items 087-090) · **Branch:** `feat/feel-polish` ·
+**Worktree:** `.claude/worktrees/feel-polish` · **ADR-0159** · **PR:** https://github.com/mdrewt/monster-realm/pull/260
+· MERGEABLE, mergeStateStatus=UNSTABLE only because ci+e2e are still pending. **`gh pr merge` NOT run — supervisor owns the merge.**
+
+**Right-sized 4 items -> 2 shipped, 2 parked.** Scope verification showed the spec's "four LIGHT items"
+estimate held for only two.
+
+- **087 care feedback — SHIPPED.** Confirmed NOT a server bug first. Two client causes: `onCare` used
+  `sendGuarded` (only a `.catch`, no success branch at all), and `CARE_COOLDOWN_MS` is **6 hours** so most
+  playtest clicks are legitimate rejections — whose message went to `statusEl`, which the `z-index:100;
+  inset:0` raising overlay paints over. Fixed via the existing `showFeedback` idiom (5 sibling precedents),
+  a new coverage-measured `client/src/ui/careAction.ts` functional core, and a per-monster pending guard.
+- **089 jerky NPC — SHIPPED.** "NPCs lack interpolation" hypothesis REFUTED. Real cause: `npc_decide` ignored
+  walls/radius and elder_oak's home has a wall directly south => 14.3% of ticks were wall-bumps. Now
+  collision-/radius-aware with a 1-in-6 re-roll. Measured: bumps 14.3%->0%, immediate reversals 32.3%->24.1%,
+  mean run 1.14->2.48, all 8 legal tiles reached.
+- **088 walk speed — PARKED, HIDDEN DEPENDENCY, needs supervisor re-serialization.** Only lever is
+  `STEP_MS=200` at `game-core/src/world.rs:13`, which is ALSO the server tick interval — outside the declared
+  `touches:`. Blast radius + the ADR-0158 ~22.9ms slack documented in the spec's new §5 and the PR body.
+- **090 walk animation — PARKED, own render slice.** Assets ARE ready (`hero.png`/`hero.json`, 20 frames,
+  `walk_*` per direction) — code-only, NOT art-blocked. But needs a net-new async atlas-loading seam;
+  ADR-0144 §D7 already deferred exactly this. Do NOT animate the placeholders.
+
+**Gates:** full `just ci` **exit 0** (1486 Rust, 74/74 evals, 1575 client tests, wasm, secrets, tsc, clippy
+-D warnings). Also ran the nightly-only gates because this touches a mutation-gated core: `just mutate-core`
+**missed=0** across 1095 mutants (`.cargo/mutants.toml` byte-identical to master — no exclusion smuggled in);
+`just coverage` **97.8%** vs 96 floor.
+
+**Verdict roster (10 agent invocations):** planner -> reviewer + red-team + /simplify (plan) -> 2x tester
+(RED, verified red by the orchestrator since tester agents have no Bash) -> 2x specialist (red->green) ->
+reviewer + red-team + desync-guard + reducer-security-auditor + /simplify (impl) -> desync-guard re-audit ->
+doc-keeper -> verifier. **Verifier PASS on both jobs**, including proving four teeth still bite by reverting
+the real pre-fix implementations into throwaway clones outside the repo. Test counts only increased
+(13->21, 2->4, 94->101); zero deletions/skips/ignores.
+
+**The review chain was load-bearing — five defects caught that would otherwise have shipped, two of them in
+work the orchestrator had personally verified:**
+1. The obvious one-liner (tick quantization) was empirically REFUTED pre-implementation — would have caused
+   5.4s freezes.
+2. The replacement design had an **absorbing state** (NPC reached 5 of 8 tiles, became an E<->W metronome).
+   The orchestrator's simulation measured reversals and bumps but never TILE COVERAGE. desync-guard caught it.
+   A wander-coverage gating test now exists for that class.
+3. The ADR's canonical `Decision:` line still described the REJECTED variant — and that line is what
+   `DIGEST.md` propagates as the agent-facing entry point.
+4. A netcode claim in the ADR was backwards (bumps DID write rows), and then mis-denominated on the retry
+   (14.3% of ticks vs 17.4% of row updates). Two measurement errors in one paragraph.
+5. red-team found `deps.callCare()` sat OUTSIDE the `try` — the SDK serializes args synchronously, so a sync
+   throw showed the player nothing, reproducing the exact bug the slice fixes.
+
+**FOLLOW-UP WORTH SPEC'ING (pre-existing, well-evidenced, NOT introduced here):** `npc_decide`'s homing branch
+can **livelock**. `toward_home` has no legality check, so if its axis is a wall the NPC bumps forever. Driven
+100 000 ticks from (5,2)/home (5,5): **zero escapes**. A sweep found **56 (start, new-home) pairs that freeze
+permanently**, and `server-module/src/content.rs:513-538` preserves an NPC's live position across a republish
+that moves `home` or shrinks `wander_radius` — so a code-free content edit can trigger it. Nothing validates
+that `home_x/home_y` is even walkable. This slice leaves the branch byte-unchanged and in fact makes it LESS
+reachable (post-D2 the NPC can never leave its radius). Not fixed here because the gating suite deliberately
+pins current semantics (Fixture B asserts `Some(South)` into a wall). Full detail + recommended fix in
+ADR-0159 §12.
+
+**touches-delta / notes for the supervisor:**
+- `specs/monster-realm-v2/M-postgate-feel-polish.spec.md` gained a §5 DELIVERED/PARKED block — left
+  **UNCOMMITTED** in the harness repo, which already had 8 dirty files from prior supervisor work.
+- `docs/adr/0068` got a one-line `**Amended-by:** ..., ADR-0159` (ADR-0104 convention). `docs/adr/DIGEST.md`
+  regenerated mechanically. `CHANGELOG.md` and `docs/adr/README.md` untouched by design.
+- Code graph: `detect_changes` on the main checkout = 0 (still on master). **Re-index after this merges.**
+- **Operational gotcha that cost time:** the Bash cwd silently drifted from the worktree to the main checkout
+  (on master) and a batch of "verification" ran against the wrong tree — tests passed, diffs were empty, and
+  it briefly looked like a tester's work had been lost. Always `cd` to the worktree explicitly. The main
+  checkout was never mutated. Project commands need `bash -lc '...'` (plain shell has Node 18, project needs 24.13.1).
+
+**adr_next_free = 0160** (0159 consumed here).
+
+## 2026-07-27T14:00:53Z — SPEND-ALERT: feel-polish cost $306.83 (> $150 threshold)
+Single-run spend exceeded the alert threshold (visibility only, not a gate). Verify the slice's size was justified (right-sizing rule) at merge adjudication; adjust single_run_alert_usd in mr-budget-config.json if this class of slice is expected.
+
+## 2026-07-27T14:01:45Z — native tick mr-sup-native-20260727T140133Z-2806405-3788: feel-polish CI-wait delegated
+PR#260 (feat/feel-polish) verified live: state=OPEN mergeable=MERGEABLE mergeStateStatus=UNSTABLE, ci+e2e both IN_PROGRESS. No human activity detected, chain-owner mutex was free. Delegated CI-wait to mr-ci-watch (detached, log /tmp/mr_ciwatch_feel-polish.log) rather than polling. Resumes via event tick on completion. No merge/launch action taken this tick. master@d18cadb, CI green (Nightly success).
+
+## 2026-07-27T14:06:19Z — feel-polish merged (PR#260); ADR index reconciled
+Native tick rid=native-20260727T140220Z-2807199: EVENT reported PR#260 (feat/feel-polish, ADR-0159) checks green. Re-verified live: mergeStateStatus=CLEAN, mergeable=MERGEABLE, ci+e2e SUCCESS, PR diff scope (client/src/*, game-core/src/npc/rules.rs, server-module/src/movement.rs) matched declared touches. mr-audit --tier routine: orchestration CLEAN (21 agent calls, full role roster incl. tester/reviewer/verifier/red-team/desync-guard across opus/sonnet/haiku). gating FLAGGED on mechanical tripwire (2 modified asserts, 1 suppression added, 0 deleted tests, 0 skip markers) -- read the diff and adjudicated CLEAN: the modified asserts in game-core/src/npc/m12a_gating_tests.rs relocate (not weaken) the RT-NPC-01 hash-aliasing coverage to game-core/src/npc/rules.rs::mod tests (npc_hash_non_commutative_known_pair / npc_hash_sum_aliasing_pairs_do_not_all_collide, confirmed present at head) as a consequence of the npc_decide signature change (added facing+map params, ADR-0159 D2 collision-aware wander); the +1 clippy allow(cast_precision_loss) carries an inline bounded-value justification (MAX_TICKS 60_000). Squash-merged PR#260 -> 89fd16d, ff-only'd master, removed the feel-polish worktree + local/remote branches. Noticed docs/adr/README.md 'next free' index was stale at 0146 despite ADR-0156/0157/0158/0159 having merged since PR#245 (three prior ticks skipped the doc-only reconciliation step) -- opened + squash-merged chore PR#261 (0146->0160; DIGEST.md already current via just adr-digest, no diff needed there). Master ff-only'd 89fd16d->3063149. Both master CI runs (feel-polish merge commit + the doc-only chore commit) still in_progress at tick-exit -- no watcher exists for post-merge master runs (mr-ci-watch is PR-scoped); left for the next tick/event per the 10:00Z tick's precedent rather than sit-polling. Ledger row + this handoff recorded. adr_next_free in mr-state.json already correctly at 160 pre-tick (no change needed there). Did not compose a merge->launch: two doc/code merges plus adjudication already exceeds normal one-action discipline for a clean re-derivation next tick. No BLOCKER; governor NORMAL throughout (d7=$1956.17/2783, fable_ok=true, unaffected by this doc-only/merge-only tick).

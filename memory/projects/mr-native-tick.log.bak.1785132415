@@ -1,0 +1,533 @@
+2026-07-21T16:12:03Z pid=891480 STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-c.5-pregate-review-residuals.spec.md
+2026-07-21T16:12:03Z pid=891518 SKIP disabled-flag
+2026-07-21T16:12:04Z pid=891528 SKIP flock-held (previous tick still running)
+2026-07-21T16:14:09Z pid=891874 STANDDOWN live-chain: faketest(887126)
+2026-07-21T16:30:09Z pid=895982 SPAWN model=sonnet rid=native-20260721T163009Z-895982 tlog=/tmp/mr_native_tick_native-20260721T163009Z-895982.log
+2026-07-21T16:42:44Z mr-sup-native-20260721T163119Z-897553-8318 DECISION merged:ptc5b(PR#236/a80912c,CI:GREEN) launched:ptc5c(sess=902320,claude=902322,ADR-0139,model=opus-4-8)
+2026-07-21T16:43:11Z pid=895982 SPAWN-DONE rc=0 rid=native-20260721T163009Z-895982
+2026-07-21T17:00:07Z pid=910813 STANDDOWN live-chain: ptc5c(902320)
+2026-07-21T17:30:09Z pid=948751 SPAWN model=sonnet rid=native-20260721T173009Z-948751 tlog=/tmp/mr_native_tick_native-20260721T173009Z-948751.log
+2026-07-21T17:37:46Z mr-sup-native-20260721T173151Z-949865-19843 DECISION ptc5c MERGED (PR#237/05ca7b1/ADR-0139, ci+e2e PASS, $153.34, 3 attempts) + ptc5e LAUNCHED (leader=951508/ADR-0140, SSOT/content/dedup)
+2026-07-21T17:38:14Z pid=948751 SPAWN-DONE rc=0 rid=native-20260721T173009Z-948751
+2026-07-21T18:00:04Z pid=962056 STANDDOWN live-chain: ptc5e(951508)
+2026-07-21T18:30:04Z pid=1013574 STANDDOWN live-chain: ptc5e(951508)
+2026-07-21T19:00:10Z pid=1020033 SPAWN model=sonnet rid=native-20260721T190010Z-1020033 tlog=/tmp/mr_native_tick_native-20260721T190010Z-1020033.log
+2026-07-21T19:06:33Z mr-sup-native-20260721T190148Z-1021237-7520 DECISION ptc5e MERGED (PR#238/348326ba/ADR-0140/8.57/3att/CI-green); PARKED rate-limit seven_day 98% resetsAt=2026-07-24T00:00:00Z; next=ptc5g+ptc5f after reset
+2026-07-21T19:09:30Z pid=1020033 SPAWN-DONE rc=0 rid=native-20260721T190010Z-1020033
+2026-07-21T19:23:14Z pid=1027078 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-21T19:30:07Z pid=1028111 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-21T20:00:07Z pid=1032425 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-21T20:30:07Z pid=1036754 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-21T21:00:04Z pid=1041071 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-21T21:30:04Z pid=1045354 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-21T22:00:07Z pid=1049635 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-21T22:30:07Z pid=1053909 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-21T23:00:04Z pid=1058224 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-21T23:30:07Z pid=1062478 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T00:00:07Z pid=1066749 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T00:30:07Z pid=1071092 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T01:00:07Z pid=1075415 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T01:30:04Z pid=1079730 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T02:00:04Z pid=1084046 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T02:30:07Z pid=1088371 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T03:00:07Z pid=1092701 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T03:30:07Z pid=1097034 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T04:00:07Z pid=1101354 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T04:30:04Z pid=1105724 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T05:00:03Z pid=1110064 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T05:30:07Z pid=1114407 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T06:00:07Z pid=1118750 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T06:30:07Z pid=1123098 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T07:00:07Z pid=1127442 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T07:30:04Z pid=1131787 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T08:00:04Z pid=1136135 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T08:30:07Z pid=1140469 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T09:00:08Z pid=1144816 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T09:30:08Z pid=1149099 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T10:00:08Z pid=1153385 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T10:30:05Z pid=1158535 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T11:00:08Z pid=1162824 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T11:30:09Z pid=1167114 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T12:00:08Z pid=1171407 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T12:30:05Z pid=1175679 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T13:00:05Z pid=1179977 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T13:30:08Z pid=1184311 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T14:00:08Z pid=1188610 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T14:30:08Z pid=1192914 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T15:00:04Z pid=1197489 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T15:30:08Z pid=1204077 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T16:00:08Z pid=1209826 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T16:30:09Z pid=1219249 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T17:00:05Z pid=1231389 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T17:30:08Z pid=1235750 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T18:00:08Z pid=1245838 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T18:30:08Z pid=1250146 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T19:00:08Z pid=1276783 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T19:30:08Z pid=1284413 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T20:00:05Z pid=1293250 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T20:30:05Z pid=1297517 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T21:00:09Z pid=1301784 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T21:30:08Z pid=1306123 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T22:00:05Z pid=1310416 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T22:30:08Z pid=1314722 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T23:00:05Z pid=1319105 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-22T23:30:04Z pid=1323414 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T00:00:08Z pid=1327697 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T00:30:08Z pid=1332021 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T01:00:08Z pid=1336327 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T01:30:05Z pid=1340631 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T02:00:08Z pid=1344943 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T02:30:09Z pid=1349255 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T03:00:09Z pid=1353566 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T03:30:08Z pid=1357880 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T04:00:08Z pid=1362187 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T04:30:04Z pid=1366605 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T05:00:04Z pid=1370927 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T05:30:08Z pid=1375249 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T06:00:08Z pid=1379570 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T06:30:05Z pid=1383886 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T07:00:05Z pid=1388210 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T07:30:09Z pid=1392518 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T08:00:08Z pid=1396841 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T08:30:08Z pid=1401174 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T09:00:04Z pid=1405492 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T09:30:08Z pid=1409825 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T10:00:08Z pid=1414149 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T10:30:08Z pid=1419664 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T11:00:05Z pid=1423988 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T11:30:08Z pid=1428262 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T12:00:09Z pid=1432562 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T12:30:08Z pid=1436866 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T13:00:05Z pid=1441145 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T13:30:04Z pid=1445478 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T14:00:08Z pid=1449772 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T14:30:08Z pid=1454088 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T15:00:08Z pid=1458384 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T15:30:08Z pid=1462698 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T16:00:08Z pid=1467020 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T16:30:05Z pid=1471326 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T17:00:04Z pid=1475696 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T17:30:07Z pid=1480093 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T18:00:07Z pid=1484485 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T18:30:07Z pid=1488882 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T19:00:07Z pid=1493283 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T19:30:04Z pid=1497660 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T20:00:04Z pid=1502018 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T20:30:04Z pid=1506319 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T21:00:08Z pid=1510618 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T21:30:08Z pid=1515461 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T22:00:09Z pid=1519744 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T22:30:05Z pid=1524033 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T23:00:09Z pid=1528393 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-23T23:30:08Z pid=1532750 STANDDOWN rate-limit BLOCKED_UNTIL_2026-07-24T00:00:00Z
+2026-07-24T00:00:12Z pid=1537065 SPAWN model=sonnet rid=native-20260724T000012Z-1537065 tlog=/tmp/mr_native_tick_native-20260724T000012Z-1537065.log
+2026-07-24T00:00:14Z pid=1537065 SPAWN-DONE rc=1 rid=native-20260724T000012Z-1537065
+2026-07-24T00:30:05Z pid=1541516 SPAWN model=sonnet rid=native-20260724T003005Z-1541516 tlog=/tmp/mr_native_tick_native-20260724T003005Z-1541516.log
+2026-07-24T00:30:06Z pid=1541516 SPAWN-DONE rc=1 rid=native-20260724T003005Z-1541516
+2026-07-24T01:00:08Z pid=1545911 SPAWN model=sonnet rid=native-20260724T010008Z-1545911 tlog=/tmp/mr_native_tick_native-20260724T010008Z-1545911.log
+2026-07-24T01:00:09Z pid=1545911 SPAWN-DONE rc=1 rid=native-20260724T010008Z-1545911
+2026-07-24T01:30:09Z pid=1550348 SPAWN model=sonnet rid=native-20260724T013009Z-1550348 tlog=/tmp/mr_native_tick_native-20260724T013009Z-1550348.log
+2026-07-24T01:30:10Z pid=1550348 SPAWN-DONE rc=1 rid=native-20260724T013009Z-1550348
+2026-07-24T02:00:09Z pid=1554742 SPAWN model=sonnet rid=native-20260724T020009Z-1554742 tlog=/tmp/mr_native_tick_native-20260724T020009Z-1554742.log
+2026-07-24T02:00:10Z pid=1554742 SPAWN-DONE rc=1 rid=native-20260724T020009Z-1554742
+2026-07-24T02:30:05Z pid=1559178 SPAWN model=sonnet rid=native-20260724T023005Z-1559178 tlog=/tmp/mr_native_tick_native-20260724T023005Z-1559178.log
+2026-07-24T02:30:07Z pid=1559178 SPAWN-DONE rc=1 rid=native-20260724T023005Z-1559178
+2026-07-24T03:00:05Z pid=1563554 SPAWN model=sonnet rid=native-20260724T030005Z-1563554 tlog=/tmp/mr_native_tick_native-20260724T030005Z-1563554.log
+2026-07-24T03:00:10Z pid=1563554 SPAWN-DONE rc=1 rid=native-20260724T030005Z-1563554
+2026-07-24T03:30:08Z pid=1567986 SPAWN model=sonnet rid=native-20260724T033008Z-1567986 tlog=/tmp/mr_native_tick_native-20260724T033008Z-1567986.log
+2026-07-24T03:30:09Z pid=1567986 SPAWN-DONE rc=1 rid=native-20260724T033008Z-1567986
+2026-07-24T04:00:09Z pid=1572405 SPAWN model=sonnet rid=native-20260724T040009Z-1572405 tlog=/tmp/mr_native_tick_native-20260724T040009Z-1572405.log
+2026-07-24T04:00:10Z pid=1572405 SPAWN-DONE rc=1 rid=native-20260724T040009Z-1572405
+2026-07-24T04:30:09Z pid=1576948 SPAWN model=sonnet rid=native-20260724T043009Z-1576948 tlog=/tmp/mr_native_tick_native-20260724T043009Z-1576948.log
+2026-07-24T04:30:10Z pid=1576948 SPAWN-DONE rc=1 rid=native-20260724T043009Z-1576948
+2026-07-24T05:00:05Z pid=1581342 SPAWN model=sonnet rid=native-20260724T050005Z-1581342 tlog=/tmp/mr_native_tick_native-20260724T050005Z-1581342.log
+2026-07-24T05:00:06Z pid=1581342 SPAWN-DONE rc=1 rid=native-20260724T050005Z-1581342
+2026-07-24T05:30:08Z pid=1585788 SPAWN model=sonnet rid=native-20260724T053008Z-1585788 tlog=/tmp/mr_native_tick_native-20260724T053008Z-1585788.log
+2026-07-24T05:30:10Z pid=1585788 SPAWN-DONE rc=1 rid=native-20260724T053008Z-1585788
+2026-07-24T06:00:08Z pid=1590195 SPAWN model=sonnet rid=native-20260724T060008Z-1590195 tlog=/tmp/mr_native_tick_native-20260724T060008Z-1590195.log
+2026-07-24T06:00:09Z pid=1590195 SPAWN-DONE rc=1 rid=native-20260724T060008Z-1590195
+2026-07-24T06:30:09Z pid=1594641 SPAWN model=sonnet rid=native-20260724T063009Z-1594641 tlog=/tmp/mr_native_tick_native-20260724T063009Z-1594641.log
+2026-07-24T06:30:10Z pid=1594641 SPAWN-DONE rc=1 rid=native-20260724T063009Z-1594641
+2026-07-24T07:00:05Z pid=1599020 SPAWN model=sonnet rid=native-20260724T070005Z-1599020 tlog=/tmp/mr_native_tick_native-20260724T070005Z-1599020.log
+2026-07-24T07:00:06Z pid=1599020 SPAWN-DONE rc=1 rid=native-20260724T070005Z-1599020
+2026-07-24T07:30:09Z pid=1603464 SPAWN model=sonnet rid=native-20260724T073009Z-1603464 tlog=/tmp/mr_native_tick_native-20260724T073009Z-1603464.log
+2026-07-24T07:30:10Z pid=1603464 SPAWN-DONE rc=1 rid=native-20260724T073009Z-1603464
+2026-07-24T08:00:08Z pid=1607886 SPAWN model=sonnet rid=native-20260724T080008Z-1607886 tlog=/tmp/mr_native_tick_native-20260724T080008Z-1607886.log
+2026-07-24T08:00:10Z pid=1607886 SPAWN-DONE rc=1 rid=native-20260724T080008Z-1607886
+2026-07-24T08:30:08Z pid=1612341 SPAWN model=sonnet rid=native-20260724T083008Z-1612341 tlog=/tmp/mr_native_tick_native-20260724T083008Z-1612341.log
+2026-07-24T08:30:09Z pid=1612341 SPAWN-DONE rc=1 rid=native-20260724T083008Z-1612341
+2026-07-24T09:00:05Z pid=1616741 SPAWN model=sonnet rid=native-20260724T090005Z-1616741 tlog=/tmp/mr_native_tick_native-20260724T090005Z-1616741.log
+2026-07-24T09:00:06Z pid=1616741 SPAWN-DONE rc=1 rid=native-20260724T090005Z-1616741
+2026-07-24T09:30:09Z pid=1621191 SPAWN model=sonnet rid=native-20260724T093009Z-1621191 tlog=/tmp/mr_native_tick_native-20260724T093009Z-1621191.log
+2026-07-24T09:30:10Z pid=1621191 SPAWN-DONE rc=1 rid=native-20260724T093009Z-1621191
+2026-07-24T10:00:09Z pid=1625606 SPAWN model=sonnet rid=native-20260724T100009Z-1625606 tlog=/tmp/mr_native_tick_native-20260724T100009Z-1625606.log
+2026-07-24T10:00:10Z pid=1625606 SPAWN-DONE rc=1 rid=native-20260724T100009Z-1625606
+2026-07-24T10:30:10Z pid=1630899 SPAWN model=sonnet rid=native-20260724T103010Z-1630899 tlog=/tmp/mr_native_tick_native-20260724T103010Z-1630899.log
+2026-07-24T10:30:11Z pid=1630899 SPAWN-DONE rc=1 rid=native-20260724T103010Z-1630899
+2026-07-24T11:00:05Z pid=1635313 SPAWN model=sonnet rid=native-20260724T110005Z-1635313 tlog=/tmp/mr_native_tick_native-20260724T110005Z-1635313.log
+2026-07-24T11:00:06Z pid=1635313 SPAWN-DONE rc=1 rid=native-20260724T110005Z-1635313
+2026-07-24T11:30:05Z pid=1639774 SPAWN model=sonnet rid=native-20260724T113005Z-1639774 tlog=/tmp/mr_native_tick_native-20260724T113005Z-1639774.log
+2026-07-24T11:30:06Z pid=1639774 SPAWN-DONE rc=1 rid=native-20260724T113005Z-1639774
+2026-07-24T11:57:51Z pid=1646199 SPAWN model=sonnet rid=native-20260724T115751Z-1646199 tlog=/tmp/mr_native_tick_native-20260724T115751Z-1646199.log
+2026-07-24T12:00:09Z pid=1647583 SKIP flock-held (previous tick still running)
+2026-07-24T12:03:48Z pid=1649045 DRYRUN would-spawn model=sonnet rid=native-20260724T120348Z-1649045
+2026-07-24T12:17:21Z pid=1652013 SKIP disabled-flag
+2026-07-24T12:17:21Z pid=1652030 NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T12:17:22Z pid=1652030 DRYRUN would-spawn model=sonnet rid=native-20260724T121722Z-1652030
+2026-07-24T12:19:31Z pid=1654302 SPAWN model=sonnet rid=native-20260724T121931Z-1654302 tlog=/tmp/mr_native_tick_native-20260724T121931Z-1654302.log
+2026-07-24T12:31:56Z mr-sup-native-20260724T122525Z-1658847-28103 DECISION launched ptc5g (fresh, opus, ADR-0141, f57a383); no open/parked work; rate-limit reset passed; cleaned stale merged worktree/branches
+2026-07-24T12:32:59Z pid=1654302 SPAWN-DONE rc=0 rid=native-20260724T121931Z-1654302
+2026-07-24T13:00:08Z pid=1677884 STANDDOWN live-chain: ptc5g(1660474)
+2026-07-24T14:00:10Z pid=1715443 SPAWN model=sonnet rid=native-20260724T140010Z-1715443 tlog=/tmp/mr_native_tick_native-20260724T140010Z-1715443.log
+2026-07-24T14:20:00Z mr-sup-native-20260724T140330Z-1717009-14316 DECISION merged ptc5g (PR#239->aee493a, audits CLEAN) + composite-launched ptc5f (ADR-0142, opus, detached confirmed)
+2026-07-24T14:08:44Z pid=1715443 SPAWN-DONE rc=0 rid=native-20260724T140010Z-1715443
+2026-07-24T15:00:08Z pid=1740210 STANDDOWN live-chain: ptc5f(1719410)
+ledger-appended: {"ts": "2026-07-24T16:00:08Z", "run_id": "wrapper-reconcile", "slice": "ptc5b", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)", "cost_usd": 161.2368, "model": "n/a", 
+ledger-appended: {"ts": "2026-07-24T16:00:08Z", "run_id": "wrapper-reconcile", "slice": "ptc5c", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 87.2665, "model": "n/a", "
+ledger-appended: {"ts": "2026-07-24T16:00:09Z", "run_id": "wrapper-reconcile", "slice": "ptc5e", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 48.5654, "model": "n/a", "
+ledger-appended: {"ts": "2026-07-24T16:00:09Z", "run_id": "wrapper-reconcile", "slice": "ptc5f", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 41.0977, "model": "n/a", "
+ledger-appended: {"ts": "2026-07-24T16:00:09Z", "run_id": "wrapper-reconcile", "slice": "ptc5g", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 24.4496, "model": "n/a", "
+2026-07-24T16:00:09Z pid=1785541 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-24T17:00:09Z pid=1808501 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-24T17:01:21Z pid=1809281 src=manual NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T17:01:24Z pid=1809281 src=manual STANDDOWN human-ide-session
+2026-07-24T17:03:28Z pid=1810499 src=manual NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T17:03:28Z pid=1810499 src=manual DRYRUN would-spawn model=sonnet effort=medium governor=NORMAL prompt_bytes=21739 events=1
+2026-07-24T17:47:09Z pid=2148650 src=manual OLLAMA preflight: server up, ornith:35b present, warm-up dispatched
+2026-07-24T17:47:09Z pid=2148650 src=manual NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T17:47:11Z pid=2148650 src=manual DRYRUN would-spawn model=sonnet effort=medium governor=NORMAL prompt_bytes=21948 events=0
+2026-07-24T18:00:08Z pid=2154140 src=cron OLLAMA preflight: server up, ornith:35b present, warm-up dispatched
+2026-07-24T18:00:08Z pid=2154140 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-24T18:54:36Z pid=2826523 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-24T18:54:36Z pid=2826523 src=manual NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T18:54:38Z pid=2826523 src=manual DRYRUN would-spawn model=sonnet effort=medium governor=NORMAL prompt_bytes=21948 events=0
+2026-07-24T19:00:08Z pid=2829276 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-24T19:00:08Z pid=2829276 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-24T19:35:52Z pid=1069 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-24T19:35:52Z", "run_id": "wrapper-reconcile", "slice": "ptc5f", "outcome": "CRASHED(no-done, dead leader 1719410)", "cost_usd": null, "model": "
+2026-07-24T19:35:52Z pid=1069 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-24T19:38:12Z pid=4280 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-24T19:38:12Z pid=4280 src=cron NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T19:38:12Z pid=4280 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260724T193812Z-4280 tlog=/tmp/mr_native_tick_native-20260724T193812Z-4280.log events=0
+2026-07-24T19:41:15Z mr-sup-native-20260724T194011Z-6568-15325 DECISION reconciled ptc5f (dead lock, merged PR#240 272ab01 ADR-0142 prior to tick); M-playtest-c.5 CLOSED 7/7; ff-only'd master, cleaned worktree/branch/lock; no new launch (disabled flag intentionally set for Drew's v3 exercise)
+2026-07-24T19:41:29Z pid=4280 src=cron SPAWN-DONE rc=0 cost=1.0367 model=claude-sonnet-5 rid=native-20260724T193812Z-4280
+ledger-appended: {"ts": "2026-07-24T19:41:29Z", "run_id": "native-20260724T193812Z-4280", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.0367, "model": "cla
+2026-07-24T19:48:21Z pid=10459 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-24T19:48:21Z pid=10459 src=manual NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T19:48:23Z pid=10459 src=manual DRYRUN would-spawn model=sonnet effort=medium governor=NORMAL prompt_bytes=23052 events=0
+2026-07-24T19:50:12Z pid=11201 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-24T19:50:12Z pid=11201 src=manual NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T19:50:13Z pid=11201 src=manual DRYRUN would-spawn model=sonnet effort=medium governor=NORMAL prompt_bytes=23052 events=0
+2026-07-24T19:53:58Z pid=12229 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-24T19:53:58Z pid=12229 src=manual NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T19:53:58Z pid=12229 src=manual DRYRUN would-spawn model=sonnet effort=medium governor=NORMAL prompt_bytes=22415 events=0
+2026-07-24T20:00:04Z pid=13855 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-24T20:00:04Z pid=13855 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-24T19:59:57Z pid=14238 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-24T19:59:57Z pid=14238 src=manual NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T19:59:58Z pid=14238 src=manual SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260724T195958Z-14238 tlog=/tmp/mr_native_tick_native-20260724T195958Z-14238.log events=0
+2026-07-24T20:03:23Z mr-sup-native-20260724T200221Z-16799-12012 DECISION launched pt-d1+pt-d2 (M-playtest-d start); master green@272ab01; governor NORMAL
+2026-07-24T20:03:34Z pid=14238 src=manual SPAWN-DONE rc=0 cost=1.0484 model=claude-sonnet-5 rid=native-20260724T195958Z-14238
+ledger-appended: {"ts": "2026-07-24T20:03:34Z", "run_id": "native-20260724T195958Z-14238", "slice": "SUPERVISOR", "outcome": "tick-ok src=manual", "cost_usd": 1.0484, "model": "
+2026-07-24T20:05:23Z pid=21681 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-24T20:05:23Z pid=21681 src=manual NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T20:05:23Z pid=21681 src=manual STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/pt-d2/.gitleaks.toml
+2026-07-24T21:00:05Z pid=99935 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-24T21:00:05Z pid=99935 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-24T21:19:58Z pid=212218 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-24T21:19:58Z", "run_id": "wrapper-reconcile", "slice": "pt-d1", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 60.3042, "model": "opus", 
+2026-07-24T21:19:58Z pid=212218 src=done NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T21:19:59Z pid=212218 src=done STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/.claude/worktrees/pt-d2/ARCHITECTURE.md
+2026-07-24T21:22:18Z pid=249572 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-24T21:22:18Z", "run_id": "wrapper-reconcile", "slice": "pt-d2", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 53.9101, "model": "opus", 
+2026-07-24T21:22:18Z pid=249572 src=done NOTE disabled-flag overridden (MR_FORCE=1 manual run)
+2026-07-24T21:22:18Z pid=249572 src=done STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/.claude/worktrees/pt-d2/docs/adr/DIGEST.md
+2026-07-24T22:00:06Z pid=256887 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-24T22:00:06Z pid=256887 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-24T23:00:04Z pid=274726 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-24T23:00:04Z pid=274726 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T00:00:04Z pid=286319 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-24T23:59:35Z pid=286319 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260724T235935Z-286319 tlog=/tmp/mr_native_tick_native-20260724T235935Z-286319.log events=2
+2026-07-25T00:03:23Z native-20260725T000007Z-event-pt-d1-pt-d2 DECISION reconcile-only: pt-d1+pt-d2 audited CLEAN+cleaned, chore PR#243 opened (ADR index), mr-ci-watch delegated, no new slice launched
+2026-07-25T00:03:35Z pid=286319 src=cron SPAWN-DONE rc=0 cost=1.59 model=claude-sonnet-5 rid=native-20260724T235935Z-286319
+ledger-appended: {"ts": "2026-07-25T00:03:35Z", "run_id": "native-20260724T235935Z-286319", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.59, "model": "cla
+2026-07-25T00:05:06Z pid=290784 src=ci OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T00:05:06Z pid=290784 src=ci STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/ARCHITECTURE.md
+2026-07-25T01:00:07Z pid=299509 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T01:00:09Z pid=299509 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T010009Z-299509 tlog=/tmp/mr_native_tick_native-20260725T010009Z-299509.log events=1
+2026-07-25T01:02:36Z mr-sup-native-20260725T010035Z-300414-17344 DECISION merged PR#243 (doc-only ADR index chore) -> d2a3e5b; ff-only'd master; did not launch pt-d3 pending Drew's roster-scope decision
+2026-07-25T01:02:44Z pid=299509 src=cron SPAWN-DONE rc=0 cost=1.0437 model=claude-sonnet-5 rid=native-20260725T010009Z-299509
+ledger-appended: {"ts": "2026-07-25T01:02:44Z", "run_id": "native-20260725T010009Z-299509", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.0437, "model": "c
+2026-07-25T02:00:07Z pid=313551 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T02:00:09Z pid=313551 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T020009Z-313551 tlog=/tmp/mr_native_tick_native-20260725T020009Z-313551.log events=0
+2026-07-25T02:00:45Z mr-sup-native-20260725T020045Z-314582-11047 DECISION standdown:blocked-on-drew-decision (pt-d3 scope; nothing new since last tick; master CI green d2a3e5b; no inflight/parked/PRs)
+2026-07-25T02:00:59Z pid=313551 src=cron SPAWN-DONE rc=0 cost=0.4147 model=claude-sonnet-5 rid=native-20260725T020009Z-313551
+ledger-appended: {"ts": "2026-07-25T02:00:59Z", "run_id": "native-20260725T020009Z-313551", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 0.4147, "model": "c
+2026-07-25T02:30:28Z mr-sup-native-20260725T022747Z-321670-13628 DECISION resolved-blocker:pt-d3-roster-scope=accept-14-form-gap; launched pt-d3 tier=content model=opus effort=medium adr=145 (relaunched after tier-omission self-catch)
+2026-07-25T03:00:05Z pid=335109 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T03:00:07Z pid=335109 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T030007Z-335109 tlog=/tmp/mr_native_tick_native-20260725T030007Z-335109.log events=0
+2026-07-25T03:00:24Z native-20260725T030007Z-335109 DECISION standdown: pt-d3 live (pid 322349 alive, no .done)
+2026-07-25T03:00:26Z pid=335109 src=cron SPAWN-DONE rc=0 cost=0.2542 model=claude-sonnet-5 rid=native-20260725T030007Z-335109
+ledger-appended: {"ts": "2026-07-25T03:00:26Z", "run_id": "native-20260725T030007Z-335109", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 0.2542, "model": "c
+2026-07-25T03:40:49Z pid=435717 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-25T03:40:49Z", "run_id": "wrapper-reconcile", "slice": "pt-d3", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)", "cost_usd": 30.5309, "model": "opus", 
+2026-07-25T03:40:51Z pid=435717 src=done STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-d-content-pack.spec.md
+2026-07-25T04:00:07Z pid=439858 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T04:00:08Z pid=439858 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T040008Z-439858 tlog=/tmp/mr_native_tick_native-20260725T040008Z-439858.log events=1
+2026-07-25T04:02:35Z native-20260725T040008Z-439858 DECISION merged pt-d3 (PR#244, bbc7a28, audit CLEAN); opened chore PR#245 (ADR index) delegated to mr-ci-watch; M-playtest-d CLOSED -> PLAYTEST READY blocker raised, no launch this tick
+2026-07-25T04:02:42Z pid=439858 src=cron SPAWN-DONE rc=0 cost=1.0875 model=claude-sonnet-5 rid=native-20260725T040008Z-439858
+ledger-appended: {"ts": "2026-07-25T04:02:42Z", "run_id": "native-20260725T040008Z-439858", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.0875, "model": "c
+2026-07-25T04:05:14Z pid=443836 src=ci OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T04:05:15Z pid=443836 src=ci STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/ARCHITECTURE.md
+2026-07-25T05:00:07Z pid=466237 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T05:00:07Z pid=466237 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T06:00:04Z pid=482793 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T06:00:04Z pid=482793 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T07:00:06Z pid=497380 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T07:00:06Z pid=497380 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T08:00:07Z pid=512473 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T08:00:07Z pid=512473 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T08:35:26Z pid=533307 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T08:35:26Z pid=533307 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T08:36:31Z pid=535598 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T08:36:31Z pid=535598 src=cron STANDDOWN gated-on-human (PLAYTEST GATE: M-playtest-d closed; awaiting Drew playtest verdict. wake_file=/home/mdrewt/projects/)
+2026-07-25T08:36:31Z pid=535653 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T08:36:31Z pid=535653 src=cron GATE-LIFTED wake_file present: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/playtest-feedback-2026-07.md
+2026-07-25T08:36:32Z pid=535653 src=cron STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md
+2026-07-25T09:00:07Z pid=550949 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T09:00:07Z pid=550949 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T10:00:07Z pid=585731 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T10:00:07Z pid=585731 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T11:00:04Z pid=634387 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T11:00:04Z pid=634387 src=cron GATE-LIFTED wake_file present: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/playtest-feedback-2026-07.md
+2026-07-25T11:00:06Z pid=634387 src=cron STANDDOWN human-ide-session
+2026-07-25T11:30:45Z pid=643279 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T11:30:47Z pid=643279 src=manual SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T113047Z-643279 tlog=/tmp/mr_native_tick_native-20260725T113047Z-643279.log events=0
+2026-07-25T11:39:19Z native-20260725T113047Z-643279 DECISION reconciled pt-d3(merged)+cleaned stale artifacts, no BLOCKER, launched fan-out nh1(opus@high routine ADR-146)+A0(fable@xhigh hard ADR-147)
+2026-07-25T11:39:28Z pid=643279 src=manual SPAWN-DONE rc=0 cost=1.4955 model=claude-sonnet-5 rid=native-20260725T113047Z-643279
+ledger-appended: {"ts": "2026-07-25T11:39:28Z", "run_id": "native-20260725T113047Z-643279", "slice": "SUPERVISOR", "outcome": "tick-ok src=manual", "cost_usd": 1.4955, "model": 
+2026-07-25T12:00:06Z pid=660800 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T12:00:08Z pid=660800 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T120008Z-660800 tlog=/tmp/mr_native_tick_native-20260725T120008Z-660800.log events=0
+2026-07-25T12:00:08Z native-20260725T120008Z-660800 DECISION standdown:live-chains(A0,nh1)
+2026-07-25T12:00:29Z pid=660800 src=cron SPAWN-DONE rc=0 cost=0.2985 model=claude-sonnet-5 rid=native-20260725T120008Z-660800
+ledger-appended: {"ts": "2026-07-25T12:00:29Z", "run_id": "native-20260725T120008Z-660800", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 0.2985, "model": "c
+2026-07-25T12:35:55Z pid=750357 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-25T12:35:55Z", "run_id": "wrapper-reconcile", "slice": "nh1", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)", "cost_usd": 19.4567, "model": "opus", "a
+2026-07-25T12:35:57Z pid=750357 src=done SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T123557Z-750357 tlog=/tmp/mr_native_tick_native-20260725T123557Z-750357.log events=1
+2026-07-25T12:39:20Z mr-sup-native-20260725T123627Z-752302-17476 DECISION merged nh1 (PR#247, squash 96c9c0d); master ff to 96c9c0d; A0 remains sole live run; no fan-out launch this tick
+2026-07-25T12:39:27Z pid=750357 src=done SPAWN-DONE rc=0 cost=1.4584 model=claude-sonnet-5 rid=native-20260725T123557Z-750357
+ledger-appended: {"ts": "2026-07-25T12:39:27Z", "run_id": "native-20260725T123557Z-750357", "slice": "SUPERVISOR", "outcome": "tick-ok src=done", "cost_usd": 1.4584, "model": "c
+2026-07-25T13:00:06Z pid=872264 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T13:00:08Z pid=872264 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T130008Z-872264 tlog=/tmp/mr_native_tick_native-20260725T130008Z-872264.log events=0
+2026-07-25T13:00:21Z pid=872264 src=cron SPAWN-DONE rc=0 cost=0.2363 model=claude-sonnet-5 rid=native-20260725T130008Z-872264
+ledger-appended: {"ts": "2026-07-25T13:00:21Z", "run_id": "native-20260725T130008Z-872264", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 0.2363, "model": "c
+2026-07-25T14:00:06Z pid=1066640 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-25T14:00:06Z", "run_id": "wrapper-reconcile", "slice": "A0", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)", "cost_usd": 575.2098, "model": "fable", "
+2026-07-25T14:00:08Z pid=1066640 src=cron STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-postgate-evolution-fusion-hardening.spec.md
+2026-07-25T14:00:30Z pid=1100190 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T14:00:31Z pid=1100190 src=done STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-postgate-evolution-fusion-hardening.spec.md
+2026-07-25T14:00:31Z pid=1100190 src=done RETRY scheduled in 7min (src=done)
+2026-07-25T14:08:02Z pid=1100251 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T14:08:02Z pid=1100251 src=done SKIP flock-held (event requeued: none)
+2026-07-25T15:00:07Z pid=1114980 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T15:00:10Z pid=1114980 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T150010Z-1114980 tlog=/tmp/mr_native_tick_native-20260725T150010Z-1114980.log events=1
+utc=2026-07-25T15:05:28Z mr-sup-native-20260725T150216Z-1118053-5379 DECISION merged A0 (PR#248 -> ee8bd0d7, master ff-only to ee8bd0d); mr-audit adjudicated CLEAN; worktree/branch cleaned; no new launch (master CI still in_progress, deferring to next tick)
+2026-07-25T15:05:35Z pid=1114980 src=cron SPAWN-DONE rc=0 cost=1.3541 model=claude-sonnet-5 rid=native-20260725T150010Z-1114980
+ledger-appended: {"ts": "2026-07-25T15:05:35Z", "run_id": "native-20260725T150010Z-1114980", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.3541, "model": "
+2026-07-25T16:00:06Z pid=1142164 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T16:00:09Z pid=1142164 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T160009Z-1142164 tlog=/tmp/mr_native_tick_native-20260725T160009Z-1142164.log events=0
+2026-07-25T16:02:32Z mr-sup-native-20260725T160009Z-1142164 DECISION governor=NORMAL fanout-launched nh2(opus@xhigh,hard,ADR-0148) + B(opus@medium,content,ADR-0149); prior tick's A0/PR#248 merge reconfirmed green at ee8bd0d; no blockers
+2026-07-25T16:02:39Z pid=1142164 src=cron SPAWN-DONE rc=0 cost=1.0118 model=claude-sonnet-5 rid=native-20260725T160009Z-1142164
+ledger-appended: {"ts": "2026-07-25T16:02:39Z", "run_id": "native-20260725T160009Z-1142164", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.0118, "model": "
+2026-07-25T16:52:00Z pid=1253928 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-25T16:52:00Z", "run_id": "wrapper-reconcile", "slice": "B", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 23.3204, "model": "opus", "att
+2026-07-25T16:52:00Z pid=1253928 src=done SKIP disabled-flag (event requeued: /home/mdrewt/projects/ai-apps/claude-harness/memory/projects/pending-events/B.done.md)
+2026-07-25T17:00:07Z pid=1257349 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T17:00:07Z pid=1257349 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T18:00:07Z pid=1282578 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T18:00:09Z pid=1282578 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T180009Z-1282578 tlog=/tmp/mr_native_tick_native-20260725T180009Z-1282578.log events=1
+2026-07-25T18:02:24Z mr-sup-native-20260725T180054Z-1284942-9793 DECISION merged:B(PR#249->5ccb366,audits CLEAN); nh2 live untouched; no new launch (master CI in_progress, no sit-poll)
+2026-07-25T18:02:30Z pid=1282578 src=cron SPAWN-DONE rc=0 cost=0.9674 model=claude-sonnet-5 rid=native-20260725T180009Z-1282578
+ledger-appended: {"ts": "2026-07-25T18:02:30Z", "run_id": "native-20260725T180009Z-1282578", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 0.9674, "model": "
+2026-07-25T18:46:00Z pid=1373899 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-25T18:46:00Z", "run_id": "wrapper-reconcile", "slice": "nh2", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 94.1548, "model": "opus", "a
+2026-07-25T18:46:02Z pid=1373899 src=done SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T184602Z-1373899 tlog=/tmp/mr_native_tick_native-20260725T184602Z-1373899.log events=1
+2026-07-25T18:48:08Z mr-sup-native-20260725T184602Z-1373899 DECISION merged nh2 (PR#250 -> bb87d74); no fan-out this tick (master CI in_progress at tick end)
+2026-07-25T18:48:16Z pid=1373899 src=done SPAWN-DONE rc=0 cost=1.1313 model=claude-sonnet-5 rid=native-20260725T184602Z-1373899
+ledger-appended: {"ts": "2026-07-25T18:48:16Z", "run_id": "native-20260725T184602Z-1373899", "slice": "SUPERVISOR", "outcome": "tick-ok src=done", "cost_usd": 1.1313, "model": "
+2026-07-25T19:00:04Z pid=1380560 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T19:00:06Z pid=1380560 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T190006Z-1380560 tlog=/tmp/mr_native_tick_native-20260725T190006Z-1380560.log events=0
+2026-07-25T19:02:42Z mr-sup-native-20260725T190006Z-1380560 DECISION launched nh4+ux1 (fan-out N=2) after confirming master CI green at bb87d74; corrected stale nh3-next handoff note to nh4 per spec build order
+2026-07-25T19:02:48Z pid=1380560 src=cron SPAWN-DONE rc=0 cost=1.0965 model=claude-sonnet-5 rid=native-20260725T190006Z-1380560
+ledger-appended: {"ts": "2026-07-25T19:02:48Z", "run_id": "native-20260725T190006Z-1380560", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.0965, "model": "
+2026-07-25T20:00:04Z pid=1474508 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-25T20:00:04Z pid=1474508 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T200004Z-1474508 tlog=/tmp/mr_native_tick_native-20260725T200004Z-1474508.log events=0
+2026-07-25T20:00:18Z native-20260725T200004Z-1474508 DECISION standdown-live-chain nh4+ux1 both alive no .done
+2026-07-25T20:00:23Z pid=1474508 src=cron SPAWN-DONE rc=0 cost=0.2749 model=claude-sonnet-5 rid=native-20260725T200004Z-1474508
+ledger-appended: {"ts": "2026-07-25T20:00:23Z", "run_id": "native-20260725T200004Z-1474508", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 0.2749, "model": "
+2026-07-25T20:11:51Z pid=1532351 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-25T20:11:51Z", "run_id": "wrapper-reconcile", "slice": "nh4", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 35.9464, "model": "opus", "a
+2026-07-25T20:11:52Z pid=1532351 src=done STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-postgate-ux-hardening.spec.md
+2026-07-25T20:11:52Z pid=1532351 src=done RETRY scheduled in 7min (src=done)
+2026-07-25T20:12:23Z pid=1578850 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-25T20:12:23Z", "run_id": "wrapper-reconcile", "slice": "ux1", "outcome": "FINISHED(EXIT=0 ATTEMPTS=3)", "cost_usd": 51.4986, "model": "opus", "a
+2026-07-25T20:12:23Z pid=1578850 src=done STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-postgate-ux-hardening.spec.md
+2026-07-25T20:19:27Z pid=1532438 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T20:19:27Z pid=1532438 src=done SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T201927Z-1532438 tlog=/tmp/mr_native_tick_native-20260725T201927Z-1532438.log events=2
+2026-07-25T20:25:16Z pid=1532438 src=done SPAWN-DONE rc=0 cost=2.8315 model=claude-sonnet-5 rid=native-20260725T201927Z-1532438
+ledger-appended: {"ts": "2026-07-25T20:25:16Z", "run_id": "native-20260725T201927Z-1532438", "slice": "SUPERVISOR", "outcome": "tick-ok src=done", "cost_usd": 2.8315, "model": "
+2026-07-25T20:26:47Z pid=1596915 src=ci OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T20:26:49Z pid=1596915 src=ci STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/ARCHITECTURE.md
+2026-07-25T20:26:49Z pid=1596915 src=ci RETRY scheduled in 7min (src=ci)
+2026-07-25T20:34:53Z pid=1597190 src=ci OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T20:34:54Z pid=1597190 src=ci SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T203454Z-1597190 tlog=/tmp/mr_native_tick_native-20260725T203454Z-1597190.log events=1
+2026-07-25T20:40:37Z mr-sup-native-20260725T203855Z-1601224-1006 DECISION merged ux1(PR#251->cfbf59e); nh4 confirmed already-merged; worktrees+branches cleaned; composite launch of nh3+ux3 aborted PROBE-TRIPPED (self-triggered by ff-only touching ARCHITECTURE.md), standing down; governor NORMAL
+2026-07-25T20:40:48Z pid=1597190 src=ci SPAWN-DONE rc=0 cost=1.5251 model=claude-sonnet-5 rid=native-20260725T203454Z-1597190
+ledger-appended: {"ts": "2026-07-25T20:40:48Z", "run_id": "native-20260725T203454Z-1597190", "slice": "SUPERVISOR", "outcome": "tick-ok src=ci", "cost_usd": 1.5251, "model": "cl
+2026-07-25T21:00:04Z pid=1607164 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T21:00:05Z pid=1607164 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T210005Z-1607164 tlog=/tmp/mr_native_tick_native-20260725T210005Z-1607164.log events=0
+2026-07-25T21:03:48Z mr-sup-native-20260725T210005Z-1607164 DECISION reconciled stale nh4/ux1 artifacts (already merged PR#252/#251); launched nh3(fable@xhigh,hard,ADR-152)+ux3(opus@high,routine,ADR-153); master green cfbf59e
+2026-07-25T21:03:56Z pid=1607164 src=cron SPAWN-DONE rc=0 cost=1.6833 model=claude-sonnet-5 rid=native-20260725T210005Z-1607164
+ledger-appended: {"ts": "2026-07-25T21:03:56Z", "run_id": "native-20260725T210005Z-1607164", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.6833, "model": "
+2026-07-25T21:44:46Z pid=1683821 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-25T21:44:46Z", "run_id": "wrapper-reconcile", "slice": "nh3", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)", "cost_usd": 17.7255, "model": "fable", "
+2026-07-25T21:44:47Z pid=1683821 src=done SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T214447Z-1683821 tlog=/tmp/mr_native_tick_native-20260725T214447Z-1683821.log events=1
+2026-07-25T21:47:00Z mr-sup-native-20260725T214447Z-1683821 DECISION nh3 relaunched (touch-set widened +main.ts, scope decision-defaulted guard+floor); ux3 still live; no merge this tick
+2026-07-25T21:47:27Z pid=1683821 src=done SPAWN-DONE rc=0 cost=1.0824 model=claude-sonnet-5 rid=native-20260725T214447Z-1683821
+ledger-appended: {"ts": "2026-07-25T21:47:27Z", "run_id": "native-20260725T214447Z-1683821", "slice": "SUPERVISOR", "outcome": "tick-ok src=done", "cost_usd": 1.0824, "model": "
+2026-07-25T22:00:06Z pid=1696434 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T22:00:09Z pid=1696434 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260725T220009Z-1696434 tlog=/tmp/mr_native_tick_native-20260725T220009Z-1696434.log events=0
+2026-07-25T22:01:01Z native-20260725T220009Z-1696434 DECISION standdown: both chains LIVE (ux3 pid 1609735 alive/no .done; nh3 pid 1685678 alive, .done@21:43:08Z predates current attempt start 21:46:07Z — stale from prior park, not a completion). No mutex taken, no ledger row (live-chain standdown).
+2026-07-25T22:01:07Z pid=1696434 src=cron SPAWN-DONE rc=0 cost=0.4438 model=claude-sonnet-5 rid=native-20260725T220009Z-1696434
+ledger-appended: {"ts": "2026-07-25T22:01:07Z", "run_id": "native-20260725T220009Z-1696434", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 0.4438, "model": "
+2026-07-25T22:41:32Z pid=1826984 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-25T22:41:33Z", "run_id": "wrapper-reconcile", "slice": "ux3", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)", "cost_usd": 53.9209, "model": "opus", "a
+2026-07-25T22:41:33Z pid=1826984 src=done SKIP disabled-flag (event requeued: /home/mdrewt/projects/ai-apps/claude-harness/memory/projects/pending-events/ux3.done.md)
+2026-07-25T23:00:35Z pid=1849196 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T23:00:35Z pid=1849196 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-25T23:01:16Z pid=1895547 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-25T23:01:16Z pid=1895547 src=done SKIP disabled-flag (event requeued: /home/mdrewt/projects/ai-apps/claude-harness/memory/projects/pending-events/nh3.done.md)
+2026-07-26T00:00:07Z pid=1907174 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T00:00:07Z pid=1907174 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-26T00:08:35Z pid=1909912 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-26T00:08:37Z pid=1909912 src=manual STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/future-prompts.md
+2026-07-26T00:17:14Z pid=1912039 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-26T00:17:15Z pid=1912039 src=manual SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260726T001715Z-1912039 tlog=/tmp/mr_native_tick_native-20260726T001715Z-1912039.log events=2
+2026-07-26T00:22:38Z native-20260726T001715Z-1912039 DECISION merged ux3(PR#253); nh3(PR#254) doc-conflict-resolved+pushed(e13f09f), CI-watch delegated; no new launch (ux2/ux4 incomplete, no gate trigger yet)
+2026-07-26T00:22:53Z pid=1912039 src=manual SPAWN-DONE rc=0 cost=2.1774 model=claude-sonnet-5 rid=native-20260726T001715Z-1912039
+ledger-appended: {"ts": "2026-07-26T00:22:53Z", "run_id": "native-20260726T001715Z-1912039", "slice": "SUPERVISOR", "outcome": "tick-ok src=manual", "cost_usd": 2.1774, "model":
+2026-07-26T00:22:58Z pid=1916853 src=ci OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-26T00:23:02Z pid=1916853 src=ci SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260726T002302Z-1916853 tlog=/tmp/mr_native_tick_native-20260726T002302Z-1916853.log events=1
+2026-07-26T00:28:15Z native-20260726T002302Z-1916853 DECISION merged nh3(PR#254,ADR-0152); reconciled ux3(PR#253 already merged); M-postgate-netcode-hardening CLOSED; no launch this tick (master CI confirm via bg watch, deferred to next tick)
+2026-07-26T00:29:33Z pid=1916853 src=ci SPAWN-DONE rc=0 cost=1.9851 model=claude-sonnet-5 rid=native-20260726T002302Z-1916853
+ledger-appended: {"ts": "2026-07-26T00:29:33Z", "run_id": "native-20260726T002302Z-1916853", "slice": "SUPERVISOR", "outcome": "tick-ok src=ci", "cost_usd": 1.9851, "model": "cl
+2026-07-26T01:00:06Z pid=1927650 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T01:00:09Z pid=1927650 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260726T010009Z-1927650 tlog=/tmp/mr_native_tick_native-20260726T010009Z-1927650.log events=0
+2026-07-26T01:03:37Z pid=1927650 src=cron SPAWN-DONE rc=0 cost=1.6967 model=claude-sonnet-5 rid=native-20260726T010009Z-1927650
+ledger-appended: {"ts": "2026-07-26T01:03:38Z", "run_id": "native-20260726T010009Z-1927650", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.6967, "model": "
+2026-07-26T02:00:06Z pid=1972337 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T02:00:08Z pid=1972337 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260726T020008Z-1972337 tlog=/tmp/mr_native_tick_native-20260726T020008Z-1972337.log events=0
+2026-07-26T02:00:22Z native-20260726T020008Z-1972337 DECISION standdown-fastpath both ux4(pid1930229) ux2(pid1930027) live, no .done
+2026-07-26T02:00:25Z pid=1972337 src=cron SPAWN-DONE rc=0 cost=0.2632 model=claude-sonnet-5 rid=native-20260726T020008Z-1972337
+ledger-appended: {"ts": "2026-07-26T02:00:25Z", "run_id": "native-20260726T020008Z-1972337", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 0.2632, "model": "
+2026-07-26T03:00:07Z pid=2080509 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T03:00:11Z pid=2080509 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260726T030011Z-2080509 tlog=/tmp/mr_native_tick_native-20260726T030011Z-2080509.log events=0
+2026-07-26T03:00:11Z native-20260726T030011Z-2080509 DECISION standdown: ux2+ux4 both live (session_leader pids alive, no .done) — fast-path exit, no ledger row
+2026-07-26T03:00:31Z pid=2080509 src=cron SPAWN-DONE rc=0 cost=0.2696 model=claude-sonnet-5 rid=native-20260726T030011Z-2080509
+ledger-appended: {"ts": "2026-07-26T03:00:31Z", "run_id": "native-20260726T030011Z-2080509", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 0.2696, "model": "
+2026-07-26T03:03:36Z pid=2134636 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-26T03:03:36Z", "run_id": "wrapper-reconcile", "slice": "ux2", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)", "cost_usd": 62.9387, "model": "opus", "a
+2026-07-26T03:03:37Z pid=2134636 src=done STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-postgate-ux-hardening.spec.md
+2026-07-26T03:03:37Z pid=2134636 src=done RETRY scheduled in 7min (src=done)
+2026-07-26T03:11:15Z pid=2134727 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-26T03:11:16Z pid=2134727 src=done SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260726T031116Z-2134727 tlog=/tmp/mr_native_tick_native-20260726T031116Z-2134727.log events=1
+2026-07-26T03:15:48Z mr-sup-native-20260726T031116Z-2134727 DECISION merged ux2 PR#255 (ADR-0154, f8f50cb); ux4 remains live; master CI in_progress at tick-exit, no new slot opened
+2026-07-26T03:15:55Z pid=2134727 src=done SPAWN-DONE rc=0 cost=1.1499 model=claude-sonnet-5 rid=native-20260726T031116Z-2134727
+ledger-appended: {"ts": "2026-07-26T03:15:55Z", "run_id": "native-20260726T031116Z-2134727", "slice": "SUPERVISOR", "outcome": "tick-ok src=done", "cost_usd": 1.1499, "model": "
+2026-07-26T03:27:09Z pid=2191579 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+ledger-appended: {"ts": "2026-07-26T03:27:09Z", "run_id": "wrapper-reconcile", "slice": "ux4", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)", "cost_usd": 77.7896, "model": "opus", "a
+2026-07-26T03:27:11Z pid=2191579 src=done STANDDOWN recent-writes: /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-postgate-ux-hardening.spec.md
+2026-07-26T03:27:11Z pid=2191579 src=done RETRY scheduled in 7min (src=done)
+2026-07-26T03:34:48Z pid=2191723 src=done OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-26T03:34:49Z pid=2191723 src=done SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260726T033449Z-2191723 tlog=/tmp/mr_native_tick_native-20260726T033449Z-2191723.log events=1
+2026-07-26T03:37:23Z native-20260726T033449Z-2191723 DECISION merged ux4 (PR#256, dd51bde); both hardening milestones closed; PLAYTEST-2 GATE raised, standing down
+2026-07-26T03:37:31Z pid=2191723 src=done SPAWN-DONE rc=0 cost=1.207 model=claude-sonnet-5 rid=native-20260726T033449Z-2191723
+ledger-appended: {"ts": "2026-07-26T03:37:31Z", "run_id": "native-20260726T033449Z-2191723", "slice": "SUPERVISOR", "outcome": "tick-ok src=done", "cost_usd": 1.207, "model": "c
+2026-07-26T04:00:06Z pid=2200876 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-26T04:00:06Z pid=2200876 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T05:00:07Z pid=2211533 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T05:00:07Z pid=2211533 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T06:00:07Z pid=2222568 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T06:00:07Z pid=2222568 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T07:00:06Z pid=2233533 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T07:00:06Z pid=2233533 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T08:00:07Z pid=2244417 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T08:00:07Z pid=2244417 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T09:00:07Z pid=2255336 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T09:00:07Z pid=2255336 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T10:00:07Z pid=2266300 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T10:00:07Z pid=2266300 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T11:00:04Z pid=2277870 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T11:00:04Z pid=2277870 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T12:00:07Z pid=2288679 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T12:00:07Z pid=2288679 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T13:00:05Z pid=2309471 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T13:00:05Z pid=2309471 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T14:00:07Z pid=2324236 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T14:00:07Z pid=2324236 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T15:00:05Z pid=2335280 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T15:00:05Z pid=2335280 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T16:00:02Z pid=2346449 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T16:00:02Z pid=2346449 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T17:00:07Z pid=2357264 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T17:00:07Z pid=2357264 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T18:00:05Z pid=2368093 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T18:00:05Z pid=2368093 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T19:00:04Z pid=2379204 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T19:00:04Z pid=2379204 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T20:00:06Z pid=2391138 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T20:00:07Z pid=2391138 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T21:00:07Z pid=2402345 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T21:00:07Z pid=2402345 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T22:00:04Z pid=2413260 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T22:00:04Z pid=2413260 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-26T23:00:05Z pid=2426991 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-26T23:00:05Z pid=2426991 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-27T00:00:34Z pid=2438926 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-27T00:00:35Z pid=2438926 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-27T01:00:05Z pid=2450645 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-27T01:00:05Z pid=2450645 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-27T02:00:05Z pid=2461518 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-27T02:00:05Z pid=2461518 src=cron STANDDOWN gated-on-human (PLAYTEST-2 GATE: M-postgate-netcode-hardening + M-postgate-ux-hardening BOTH closed (ux4/#256 merged)
+2026-07-27T02:30:54Z pid=2467769 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-27T02:30:57Z pid=2467769 src=manual SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260727T023057Z-2467769 tlog=/tmp/mr_native_tick_native-20260727T023057Z-2467769.log events=0
+2026-07-27T02:46:55Z native-20260727T023057Z-2467769 DECISION r2-triage: wake_file appeared, feedback-triage ran (91 items CLASSIFIED, covermap clean), opened blocking decision issue #4, standing down pending Drew
+2026-07-27T02:46:34Z pid=2467769 src=manual SPAWN-DONE rc=0 cost=4.5636 model=claude-sonnet-5 rid=native-20260727T023057Z-2467769
+ledger-appended: {"ts": "2026-07-27T02:47:08Z", "run_id": "native-20260727T023057Z-2467769", "slice": "SUPERVISOR", "outcome": "tick-ok src=manual", "cost_usd": 4.5636, "model":
+2026-07-27T03:00:05Z pid=2478909 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-27T03:00:06Z pid=2478909 src=cron FEEDBACK-CHECK: FEEDBACK-UNDISPOSED r2-2026-07-26-001 (2 decision runs since capture — doctrine: <2) FEEDBACK-UNDISPOSED r2-2026-07-26-002 (2 decision runs since capture — doctrine: <2) FEEDBACK-UNDISPOSED r2-2026-07-26-003 (2 decision runs since capture — doctrine: <2) FEEDBACK-UNDISPOSED r2-2026-07-26-004 (2 decision runs since capture — doctrine: <2) 
+2026-07-27T03:00:06Z pid=2478909 src=cron STANDDOWN gated-on-human (DECISION(r2-triage) pending: DECISION(r2-triage): see body  wake_issue=4 wake_file=/home/mdrewt/proj)
+2026-07-27T03:34:32Z pid=2486308 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-27T03:34:35Z pid=2486308 src=manual SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260727T033435Z-2486308 tlog=/tmp/mr_native_tick_native-20260727T033435Z-2486308.log events=6
+2026-07-27T03:36:25Z native-20260727T033435Z-2486308 DECISION reconciled 5 answered decision issues (#4,#6,#7,#8,#9) — closed+archived, no gate-lift needed (already unblocked); next unit = disposition r2 episode + draft milestones; no launch/merge this tick
+2026-07-27T03:36:34Z pid=2486308 src=manual SPAWN-DONE rc=0 cost=0.6804 model=claude-sonnet-5 rid=native-20260727T033435Z-2486308
+ledger-appended: {"ts": "2026-07-27T03:36:34Z", "run_id": "native-20260727T033435Z-2486308", "slice": "SUPERVISOR", "outcome": "tick-ok src=manual", "cost_usd": 0.6804, "model":
+2026-07-27T03:41:36Z pid=2490895 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-27T03:41:37Z pid=2490895 src=manual FEEDBACK-CHECK: FEEDBACK-UNDISPOSED r2-2026-07-26-001 (2 decision runs since capture — doctrine: <2) FEEDBACK-UNDISPOSED r2-2026-07-26-002 (2 decision runs since capture — doctrine: <2) FEEDBACK-UNDISPOSED r2-2026-07-26-003 (2 decision runs since capture — doctrine: <2) FEEDBACK-UNDISPOSED r2-2026-07-26-004 (2 decision runs since capture — doctrine: <2) 
+2026-07-27T03:41:40Z pid=2490895 src=manual SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260727T034140Z-2490895 tlog=/tmp/mr_native_tick_native-20260727T034140Z-2490895.log events=0
+2026-07-27T03:52:25Z pid=2501228 src=decision OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-27T03:52:25Z pid=2501228 src=decision SKIP flock-held (event requeued: /home/mdrewt/projects/ai-apps/claude-harness/memory/projects/pending-events/feedback-reconcile.decision.md)
+2026-07-27T03:58:00Z native-20260727T034140Z-2490895 DECISION r2-feedback-episode-dispositioned: 91/91 items DISPOSED/LOGGED/ANSWERED, 5 milestone specs drafted, uxd1/uxd3 released, no slice launched
+2026-07-27T03:53:31Z pid=2490895 src=manual SPAWN-DONE rc=0 cost=3.5159 model=claude-sonnet-5 rid=native-20260727T034140Z-2490895
+ledger-appended: {"ts": "2026-07-27T03:53:31Z", "run_id": "native-20260727T034140Z-2490895", "slice": "SUPERVISOR", "outcome": "tick-ok src=manual", "cost_usd": 3.5159, "model":
+2026-07-27T04:00:07Z pid=2504105 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-27T04:00:10Z pid=2504105 src=cron SPAWN model=sonnet effort=medium governor=NORMAL rid=native-20260727T040010Z-2504105 tlog=/tmp/mr_native_tick_native-20260727T040010Z-2504105.log events=0
+2026-07-27T04:03:17Z mr-sup-native-20260727T040010Z-2504105 DECISION launched battle-0hp-fix(opus@high,ADR-0156)+dev-observability(opus@high,ADR-0157) fan-out N=2, governor NORMAL
+2026-07-27T04:03:36Z pid=2504105 src=cron SPAWN-DONE rc=0 cost=1.3674 model=claude-sonnet-5 rid=native-20260727T040010Z-2504105
+ledger-appended: {"ts": "2026-07-27T04:03:36Z", "run_id": "native-20260727T040010Z-2504105", "slice": "SUPERVISOR", "outcome": "tick-ok src=cron", "cost_usd": 1.3674, "model": "
+2026-07-27T04:16:34Z pid=2513708 src=manual OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed:latest present, warm-up dispatched
+2026-07-27T04:16:34Z pid=2513708 src=manual STANDDOWN live-chain: battle-0hp-fix(2505535) dev-observability(2505772)
+2026-07-27T05:00:34Z pid=2624431 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-27T05:00:34Z pid=2624431 src=cron SKIP disabled-flag (event requeued: none)
+2026-07-27T06:00:04Z pid=3366487 src=cron OLLAMA preflight: server up, hrbrmstr/ornith-35b-fixed present, warm-up dispatched
+2026-07-27T06:00:04Z pid=3366487 src=cron SKIP disabled-flag (event requeued: none)
