@@ -1,0 +1,240 @@
+#!/usr/bin/python3
+"""mr-feedback — feedback ledger + reconciler + covermap (doctrine §8; event-sourced, append-only).
+Subcommands:
+  add   --episode E --source F --quote Q [--kind K --confidence C] [--weight W] [--note N]
+  set   ID [--state S] [--action A] [--weight W] [--target T] [--evidence EV] [--kind K] [--note N]
+  get   ID | list [--episode E] [--state S]
+  check [--strict] [--episode E]     reconciler: parseability, conservation, bare dispositions, staleness
+  covermap extract SRC | covermap verify SRC MAP [--strict]
+  selftest                            seeded-fault suite (activation gate; nonzero rc on failure)
+Runtime subcommands always exit 0 (house rule); --strict enables nonzero rc for gating/tests."""
+import json, os, sys, time, subprocess, tempfile, re
+
+MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
+LEDGER = os.environ.get("MR_FB_LEDGER", MEM + "/feedback-ledger.jsonl")
+TICKLOG = os.environ.get("MR_FB_TICKLOG", MEM + "/mr-native-tick.log")
+KINDS = {"correction","directive","suggestion","issue-report","question","preference","remark","delegation","review-request"}
+WEIGHTS = {"FEATHER","LIGHT","HEAVY"}
+TERMINAL = {"SHIPPED-VERIFIED","ANSWERED","DECLINED-COMMUNICATED","LOGGED","OPERATOR-CLOSED"}
+LIVE = {"CAPTURED","CLASSIFIED","DISPOSED","IN-WORK","PARKED","VERIFIED"}
+LEGAL = {  # doctrine §8 table — this dict must match it exactly
+ "CAPTURED": {"CLASSIFIED"},
+ "CLASSIFIED": {"DISPOSED","LOGGED"},
+ "DISPOSED": {"IN-WORK","PARKED","ANSWERED","DECLINED-COMMUNICATED"},
+ "IN-WORK": {"VERIFIED","PARKED"},
+ "PARKED": {"IN-WORK","OPERATOR-CLOSED","SHIPPED-VERIFIED"},
+ "VERIFIED": {"SHIPPED-VERIFIED","ANSWERED","DECLINED-COMMUNICATED"},
+}
+# any live state may go OPERATOR-CLOSED; any terminal may reopen -> CLASSIFIED (regression+1)
+
+def now(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+def rows():
+    out, corrupt = [], 0
+    if not os.path.exists(LEDGER): return out, corrupt
+    for i, ln in enumerate(open(LEDGER, encoding="utf-8", errors="replace"), 1):
+        ln = ln.strip()
+        if not ln: continue
+        try: out.append(json.loads(ln))
+        except Exception: corrupt += 1; print(f"FEEDBACK-CORRUPT line {i}")
+    return out, corrupt
+def fold(rws):
+    st = {}
+    for r in rws:
+        i = r.get("id")
+        if not i: continue
+        cur = st.setdefault(i, {"id": i, "regression": 0})
+        for k, v in r.items():
+            if k in ("ev",): continue
+            if k == "regression": cur["regression"] = v
+            elif v is not None: cur[k] = v
+    return st
+def append(row):
+    row["ts"] = now()
+    with open(LEDGER, "a", encoding="utf-8") as f: f.write(json.dumps(row) + "\n")
+def args_kv(argv):
+    pos, kv = [], {}
+    i = 0
+    while i < len(argv):
+        if argv[i].startswith("--"): kv[argv[i][2:]] = argv[i+1] if i+1 < len(argv) else ""; i += 2
+        else: pos.append(argv[i]); i += 1
+    return pos, kv
+
+def cmd_add(argv):
+    _, kv = args_kv(argv)
+    for req in ("episode","source","quote"):
+        if req not in kv: print(f"FEEDBACK-ERR add missing --{req}"); return 0
+    k = kv.get("kind")
+    if k and k not in KINDS: print(f"FEEDBACK-ERR bad kind {k} (valid: {sorted(KINDS)})"); return 0
+    st = fold(rows()[0])
+    # deterministic id: episode + running count of that episode's items
+    epn = 1 + sum(1 for v in st.values() if v.get("episode") == kv["episode"])
+    iid = f"{kv['episode']}-{epn:03d}"
+    row = {"ev":"add","id":iid,"episode":kv["episode"],"source":kv["source"],"quote":kv["quote"],
+           "state":"CLASSIFIED" if k else "CAPTURED","kind":k,"confidence":kv.get("confidence"),
+           "weight":kv.get("weight"),"note":kv.get("note"),"regression":0}
+    append(row); print(f"FEEDBACK-ADDED {iid} state={row['state']}"); return 0
+
+def cmd_set(argv):
+    pos, kv = args_kv(argv)
+    if not pos: print("FEEDBACK-ERR set needs ID"); return 0
+    iid = pos[0]
+    st = fold(rows()[0])
+    if iid not in st: print(f"FEEDBACK-ERR unknown id {iid}"); return 0
+    cur = st[iid]; new = kv.get("state")
+    row = {"ev":"set","id":iid}
+    for f in ("action","weight","target","evidence","kind","confidence","note"):
+        if f in kv: row[f] = kv[f]
+    if "kind" in kv and kv["kind"] not in KINDS: print(f"FEEDBACK-ERR bad kind {kv['kind']}"); return 0
+    if "weight" in kv and kv["weight"] not in WEIGHTS: print(f"FEEDBACK-ERR bad weight {kv['weight']}"); return 0
+    if new:
+        old = cur.get("state","CAPTURED")
+        eff = {**cur, **row}  # fields after this set
+        ok = (new in LEGAL.get(old,set())) or (new == "OPERATOR-CLOSED" and old in LIVE) or (old in TERMINAL and new == "CLASSIFIED")
+        if not ok: print(f"FEEDBACK-ERR illegal transition {old} -> {new} (id {iid})"); return 0
+        if new == "DISPOSED" and not (eff.get("action") and eff.get("weight") and eff.get("target")):
+            print(f"FEEDBACK-ERR DISPOSED requires action+weight+target (a bare 'FIX, someday' is the r1 failure)"); return 0
+        if new == "LOGGED" and eff.get("kind") != "remark":
+            print(f"FEEDBACK-ERR LOGGED is kind=remark only (LOG is not a garbage disposal)"); return 0
+        if new in ("SHIPPED-VERIFIED","ANSWERED","DECLINED-COMMUNICATED") and not eff.get("evidence"):
+            print(f"FEEDBACK-ERR {new} requires --evidence (I-8: every terminal links evidence)"); return 0
+        if old in TERMINAL and new == "CLASSIFIED":
+            row["regression"] = int(cur.get("regression",0)) + 1
+            print(f"FEEDBACK-REOPEN {iid} regression={row['regression']}")
+        row["state"] = new
+    append(row); print(f"FEEDBACK-SET {iid}" + (f" state={new}" if new else "")); return 0
+
+def cmd_get(argv):
+    st = fold(rows()[0])
+    if argv and argv[0] in st: print(json.dumps(st[argv[0]], indent=1))
+    else: print("FEEDBACK-ERR unknown id")
+    return 0
+
+def cmd_list(argv):
+    _, kv = args_kv(argv); st = fold(rows()[0])
+    for v in sorted(st.values(), key=lambda x: x["id"]):
+        if kv.get("episode") and v.get("episode") != kv["episode"]: continue
+        if kv.get("state") and v.get("state") != kv["state"]: continue
+        print(f"{v['id']}\t{v.get('state')}\t{v.get('kind')}\t{v.get('weight')}\t{(v.get('quote') or '')[:60]}")
+    return 0
+
+def decisions_since(ts):
+    try:
+        n = 0
+        for ln in open(TICKLOG, encoding="utf-8", errors="replace"):
+            m = re.match(r"(\S+)\s+\S+\s+DECISION", ln)
+            if m and m.group(1) > ts: n += 1
+        return n
+    except Exception: return -1  # tick log unreadable -> unknown, report as such
+
+def cmd_check(argv):
+    _, kv = args_kv(argv); strict = "strict" in kv
+    rws, corrupt = rows(); st = fold(rws); bad = corrupt
+    for v in st.values():
+        if kv.get("episode") and v.get("episode") != kv["episode"]: continue
+        s = v.get("state","CAPTURED")
+        if s == "DISPOSED" and not (v.get("action") and v.get("weight") and v.get("target")):
+            print(f"FEEDBACK-BARE-DISPOSITION {v['id']}"); bad += 1
+        if s in ("CAPTURED","CLASSIFIED"):
+            d = decisions_since(v.get("ts",""))
+            if d >= 2: print(f"FEEDBACK-UNDISPOSED {v['id']} ({d} decision runs since capture — doctrine: <2)"); bad += 1
+        elif s in LIVE and s not in ("PARKED",):
+            d = decisions_since(v.get("ts",""))
+            if d >= 3: print(f"FEEDBACK-STALE {v['id']} state={s} ({d} cycles)"); bad += 1
+    if bad:
+        print(f"FEEDBACK-CHECK-ISSUES n={bad}")
+        alert = MEM + "/.feedback-check-alert"
+        sig = f"{bad}:{sorted(v['id'] for v in st.values())[:3]}"
+        prev = open(alert).read().strip() if os.path.exists(alert) else ""
+        if prev != sig:
+            open(alert,"w").write(sig)
+            if os.environ.get("MR_FB_NO_ISSUE") != "1":
+                subprocess.run(["bash", MEM + "/mr-ask-drew", "feedback-reconcile",
+                    "--question", f"Feedback ledger reconciler found {bad} issue(s) — override or investigate? (see mr-feedback check output)",
+                    "--root", "Doctrine §8 conservation/staleness check failed",
+                    "--recommend", "Investigate before next playtest gate; override by closing this issue"],
+                    capture_output=True, timeout=60)
+        return 1 if strict else 0
+    print("FEEDBACK-CHECK-OK items=" + str(len(st)))
+    return 0
+
+def paragraphs(src):
+    txt = open(src, encoding="utf-8", errors="replace").read()
+    blocks, out = re.split(r"\n\s*\n", txt), []
+    for b in blocks:
+        b = b.strip()
+        if not b: continue
+        if all(l.strip().startswith(("<!--","#")) and not l.strip("# ").strip() == "" or l.strip().startswith("<!--") for l in b.splitlines() if l.strip()) and "<!--" in b and "-->" in b and b.startswith("<!--"): continue
+        out.append(b)
+    return out
+
+def cmd_covermap(argv):
+    if not argv: print("FEEDBACK-ERR covermap extract|verify"); return 0
+    if argv[0] == "extract":
+        for i, p in enumerate(paragraphs(argv[1]), 1):
+            print(f"P{i}\t{p[:80].replace(chr(10),' ')}")
+        return 0
+    if argv[0] == "verify":
+        _, kv = args_kv(argv[3:]); strict = "strict" in kv
+        ps = paragraphs(argv[1])
+        mapped = set()
+        for ln in open(argv[2], encoding="utf-8", errors="replace"):
+            m = re.match(r"\s*(P\d+)\s+(\S+)", ln)
+            if m: mapped.add(m.group(1))
+        missing = [f"P{i}" for i in range(1, len(ps)+1) if f"P{i}" not in mapped]
+        if missing:
+            print("COVERMAP-MISSING " + " ".join(missing)); return 1 if strict else 0
+        print(f"COVERMAP-OK n={len(ps)}"); return 0
+    print("FEEDBACK-ERR covermap subcommand"); return 0
+
+def cmd_selftest(argv):
+    import shutil
+    d = tempfile.mkdtemp(prefix="mrfb_")
+    os.environ["MR_FB_LEDGER"] = d + "/l.jsonl"; os.environ["MR_FB_NO_ISSUE"] = "1"
+    os.environ["MR_FB_TICKLOG"] = d + "/t.log"; open(d + "/t.log","w").write("")
+    global LEDGER, TICKLOG; LEDGER = d + "/l.jsonl"; TICKLOG = d + "/t.log"
+    fails = []
+    def run(name, fn, expect):
+        import io as _io, contextlib
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf): rc = fn()
+        out = buf.getvalue()
+        ok = expect in out
+        if not ok: fails.append(f"{name}: expected '{expect}' got: {out.strip()[:120]}")
+        print(("PASS " if ok else "FAIL ") + name)
+    # t1 valid flow
+    run("t1-add", lambda: cmd_add(["--episode","e1","--source","s.md","--quote","q1","--kind","issue-report","--confidence","high"]), "FEEDBACK-ADDED e1-001")
+    run("t1-dispose", lambda: cmd_set(["e1-001","--state","DISPOSED","--action","FIX","--weight","LIGHT","--target","M-x-a1"]), "FEEDBACK-SET e1-001 state=DISPOSED")
+    run("t1-work", lambda: cmd_set(["e1-001","--state","IN-WORK"]), "state=IN-WORK")
+    run("t1-verify", lambda: cmd_set(["e1-001","--state","VERIFIED"]), "state=VERIFIED")
+    run("t1-ship", lambda: cmd_set(["e1-001","--state","SHIPPED-VERIFIED","--evidence","PR#999"]), "state=SHIPPED-VERIFIED")
+    run("t1-check-clean", lambda: cmd_check(["--strict"]), "FEEDBACK-CHECK-OK")
+    # t4 bare disposition rejected
+    run("t4-add", lambda: cmd_add(["--episode","e1","--source","s.md","--quote","q2","--kind","suggestion"]), "FEEDBACK-ADDED e1-002")
+    run("t4-bare", lambda: cmd_set(["e1-002","--state","DISPOSED","--action","FIX"]), "FEEDBACK-ERR DISPOSED requires")
+    # t5 illegal transition
+    run("t5-illegal", lambda: cmd_set(["e1-002","--state","VERIFIED"]), "FEEDBACK-ERR illegal transition")
+    # t6 LOGGED non-remark
+    run("t6-log-nonremark", lambda: cmd_set(["e1-002","--state","LOGGED"]), "FEEDBACK-ERR LOGGED is kind=remark")
+    # t7 reopen regression
+    run("t7-reopen", lambda: cmd_set(["e1-001","--state","CLASSIFIED"]), "FEEDBACK-REOPEN e1-001 regression=1")
+    # dispose e1-002 properly so check is clean before t3
+    run("t-dispose2", lambda: cmd_set(["e1-002","--state","DISPOSED","--action","IMPLEMENT","--weight","FEATHER","--target","polish-1"]), "state=DISPOSED")
+    # t3 corrupt line detected
+    open(LEDGER,"a").write("{corrupt not json\n")
+    run("t3-corrupt", lambda: cmd_check(["--strict"]), "FEEDBACK-CORRUPT")
+    # t2 covermap: planted omission
+    open(d+"/src.md","w").write("para one text\n\npara two text\n\npara three text\n")
+    open(d+"/map.txt","w").write("P1 e1-001\nP3 no-op:greeting\n")
+    run("t2-covermap-miss", lambda: cmd_covermap(["verify", d+"/src.md", d+"/map.txt", "--strict"]), "COVERMAP-MISSING P2")
+    open(d+"/map2.txt","w").write("P1 e1-001\nP2 e1-002\nP3 no-op:greeting\n")
+    run("t2-covermap-ok", lambda: cmd_covermap(["verify", d+"/src.md", d+"/map2.txt"]), "COVERMAP-OK n=3")
+    shutil.rmtree(d, ignore_errors=True)
+    if fails:
+        print("SELFTEST-FAIL"); [print("  " + f) for f in fails]; return 1
+    print("SELFTEST-PASS (15 checks)"); return 0
+
+CMDS = {"add":cmd_add,"set":cmd_set,"get":cmd_get,"list":cmd_list,"check":cmd_check,"covermap":cmd_covermap,"selftest":cmd_selftest}
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] not in CMDS:
+        print(__doc__); sys.exit(0)
+    sys.exit(CMDS[sys.argv[1]](sys.argv[2:]) or 0)

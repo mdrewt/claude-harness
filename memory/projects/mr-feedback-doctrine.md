@@ -1,4 +1,4 @@
-# mr-feedback-doctrine — operator feedback handling (DRAFT v0.95, 2026-07-26 — NOT YET ACTIVE)
+# mr-feedback-doctrine — operator feedback handling (v1.0 ACTIVE 2026-07-26)
 Binds: the native loop whenever it processes operator feedback artifacts (playtest gates lifting,
 feedback/notes files, decision-issue answers) or fleshes out milestone skeletons into specs.
 §1 INVARIANTS bind everywhere in REDUCED form: outside the loop (casual/Cowork), I-1 means RELAY
@@ -6,8 +6,7 @@ the statement verbatim into a §2 channel or tell Drew explicitly it won't be tr
 duty itself attaches only at §2 channels (an unenforceable invariant breached daily would teach the
 system that breaches are tolerable). The invariants are the lightweight doctrine; everything else
 scales in via §5 routing. Runs cite the version they
-followed. Supersedes-at-activation: the SSOT "Playtest feedback coverage doctrine" paragraph
-(becomes a pointer here; §10 subsumes it).
+followed. Supersedes (2026-07-26): the SSOT coverage-doctrine paragraph — now a pointer here; §10 subsumes it.
 
 ## §1 INVARIANTS (universal; breach = tracked PROCESS defect)
 - I-1 NOTHING VANISHES. Every operator statement, every channel, becomes a ledger item (verbatim
@@ -37,16 +36,17 @@ issue answers (`$MEM/decisions/`). Spawn the `feedback-triage` agent (harness `.
 decompose: one item per independently-dispositionable claim; ID + verbatim quote + source pointer +
 relations. Appendices/asides/parentheticals are items (that is exactly what fell through in r1).
 COVERAGE MAP: every source paragraph maps to >=1 item ID or an explicit `no-op:<reason>` marker —
-mechanically verifiable; and the §11 auditor independently recounts dispositionable claims from the
-RAW text and compares to N (triage must never be its own checker — conservation against triage's
-own N would pass with an item silently dropped at intake).
+mechanically verifiable; and `mr-feedback covermap verify` checks the map mechanically; the §11 auditor
+then samples the `no-op:` markers and multi-claim paragraphs for buried items (triage must never
+be its own checker; a full recount would pay triage twice — the verified map narrows residual risk
+to exactly the no-op'd and merged paragraphs).
 Operator lists are non-exhaustive; interpret intent over literal wording (typos, misused words,
 omissions) — but record the interpretation, and fact-check his assertions honestly in both
 directions: he may be wrong; so may we (I-2 applies to our corrections too).
 
 ## §3 CLASSIFICATION — kinds, deference, bias
-Two axes, recorded per item with phrasing-strength + confidence: DEFERENCE to his stated direction,
-and OBLIGATION to act. Perceive continuously, act discretely — snap to the nearest kind below;
+Two axes — DEFERENCE to his stated direction and OBLIGATION to act — are the MODEL behind the
+kinds; the ledger records kind + confidence only (axes are derived, not data). Perceive continuously, act discretely — snap to the nearest kind below;
 interpolation lives in the tie-break: prefer the interpretation CHEAPEST TO REVERSE, and for
 HEAVY-adjacent ambiguity post a read-back (one paragraph of intended interpretation, via decision
 issue, non-blocking) before budget commits.
@@ -78,11 +78,12 @@ issue, non-blocking) before budget commits.
 - REVIEW/ADVERSARIAL REQUEST: slight bias against the subject — assume unreliable, double-check
   everything — but findings must be real, evidenced, hallucination-free; "it was correct" is an
   acceptable verdict.
-- RETRACTION/CONFLICT: explicit beats implied; later beats earlier; specific beats general. A
-  retraction closes the old item LINKED to its reversal (history preserved, I-8).
-- META-FEEDBACK (about this doctrine): route to §12 revision process, never absorbed silently.
-- DESCRIPTION/CONTEXT: rarely shifts bias by itself; attaches as context to related items.
-- OTHER: best judgment; lean unbiased.
+CROSS-KIND RULES (not kinds — fewer bins classify better): (1) PRECEDENCE — explicit beats
+implied; later beats earlier; specific beats general; a retraction closes the old item LINKED to
+its reversal (history preserved, I-8). (2) CONTEXT — descriptions/added information rarely shift
+bias; they attach as context to related items. (3) TARGET=DOCTRINE — feedback about this doctrine
+routes to §12, never absorbed silently. (4) DEFAULT — unclassifiable: best judgment, lean
+unbiased; if plausible kinds differ materially in behavior, ASK (I-3).
 
 ## §4 ACTION TAXONOMY (what each item becomes; never duplicated — reconcile against the EXISTING
 backlog (PLAN §9, open specs/milestones) before creating: update, don't duplicate)
@@ -142,25 +143,22 @@ Research what the §4 actions actually need — via `expert` over `<project>/doc
 (≤3 docs); missing domain → `researcher` persist-mode (`/research-domain`), paid once, cached.
 Research docs carry dates; treat agentic-coding and fast-moving-dependency advice as perishable —
 re-verify stale docs before relying on them. Sources are unreliable by default; "best" is
-situational; hunt pros/cons/gotchas/alternatives, not just the first answer. Seed domains (Drew
-2026-07-26, non-exhaustive): comparable-genre games (originality preserved — no clones, no
-plagiarism/copyright infringement); standard practices + when to break them; current project state
-(codebase-memory-mcp CLI is available); design patterns; deps' docs (Rust/TS/WASM/SpacetimeDB/
-PixiJS); agentic-coding gotchas; harness `standards/`; UI/UX + game design (a known friction
-point); graphic design/pixel art/composition/palettes; SE methodologies; security incl. online-game
-cheating/exploits; testing/observability/tracing/logging/debugging; performance/profiling/load/
-scaling; git/webhooks/CI-CD/mechanical enforcement.
+situational; hunt pros/cons/gotchas/alternatives, not just the first answer. Seed domains: `docs/research/
+SEED-DOMAINS.md` in the project research library (Drew 2026-07-26, non-exhaustive — reference
+data, not doctrine; mine via `/research-domain` as §4 actions demand).
 
 ## §8 TRACKING & CONSERVATION (the part r1 lacked; enforcement is scripted, not aspirational)
-Ledger: `$MEM/feedback-ledger.jsonl` (built at activation as `mr-feedback`). Work rows in the usage ledger carry the feedback-item
+Ledger: `$MEM/feedback-ledger.jsonl` via `mr-feedback` (state machine enforced at write time). Work rows in the usage ledger carry the feedback-item
 ID so `mr-metrics` can report cost-per-feedback-item (the evidence base for tuning §5 caps).
 STATES & TRANSITIONS (this table is the authority; `mr-feedback` implements exactly this):
   CAPTURED→CLASSIFIED (triage) | CLASSIFIED→DISPOSED (supervisor decision run; DISPOSED is INVALID
   unless it records action type §4 + weight §5 + scheduled target — a bare "FIX, someday" is the
-  r1 failure with a ledger row; reconciler flags it) | DISPOSED→IN-WORK (launch) | IN-WORK→VERIFIED
+  r1 failure with a ledger row; reconciler flags it) | CLASSIFIED→LOGGED (remarks) |
+  DISPOSED→ANSWERED / DECLINED-COMMUNICATED (at communication time) | DISPOSED→IN-WORK (launch) |
+  IN-WORK→VERIFIED
   (non-author complaint-repro, I-5) | VERIFIED→terminal (supervisor only, at communication time) |
   DISPOSED→PARKED (diagnosis budget exhausted; PARKED is a held substate of DISPOSED — counts as
-  accounted for conservation, staleness-exempt while waiting on operator) | PARKED→terminal
+  accounted for conservation, staleness-exempt while waiting on operator) | PARKED→IN-WORK (repro found) | PARKED→terminal
   (operator ack, or 2 consecutive playtests clean OF THAT SYMPTOM — auto-close recorded in the
   brief: "closing X; object to reopen"). Terminals: SHIPPED-VERIFIED, ANSWERED (LIGHT+ answers get
   a non-author source-check first — invented answer content is exactly failure (c)),
@@ -171,9 +169,9 @@ STATES & TRANSITIONS (this table is the authority; `mr-feedback` implements exac
   auto-creates a top-priority PROCESS item AND a decision issue offering Drew an explicit override
   to raise the gate anyway — the tool must never deadlock the loop it serves.
 - LEDGER INTEGRITY: append-only JSONL, git-tracked; reconciler validates parseability every run —
-  corruption is a top-priority PROCESS item, never silent. ACTIVATION GATE: `mr-feedback` +
-  reconciler + coverage-map check must pass a seeded-fault suite (planted omission, planted orphan,
-  corrupt line, false mismatch) BEFORE v1.0 binds — day-zero code may not enforce invariants unproven.
+  corruption is a top-priority PROCESS item, never silent. ACTIVATION GATE (PASSED 2026-07-26, 15 checks):
+  `mr-feedback selftest` — seeded faults (omission, bare disposition, illegal transition, corrupt
+  line, non-remark LOG, covermap gap) must stay green; re-run after any `mr-feedback` change.
 - DISPOSITION cannot sit unmade across two cycles; "deferred past next playtest" is valid only if
   Drew's own text says so for that item (§10).
 - STALENESS: 3 cycles unchanged → escalate = move to queue FRONT (kind-order tiebreak among
@@ -228,8 +226,8 @@ manifest (I-4). An undispositioned item = incomplete table = gate does not raise
 ## §11 VERIFICATION SUMMARY (who checks what — no overlap, no gap)
 Plan quality: ideation adversaries + judge (§6.2-3). Code quality/standards: review pass (§6.5,
 mr-audit gating block). Outcome vs complaint: complaint-repro check (I-5) by a non-author. Set
-completeness: coverage map (§2, mechanical) + auditor recount vs raw source; ledger-internal
-consistency: conservation reconciler (§8, script). Expectation alignment: Disposition Brief gate
+completeness: coverage map (§2, `mr-feedback covermap verify`, mechanical) + auditor sampling of
+no-op/multi-claim paragraphs; ledger-internal consistency: conservation reconciler (§8, script). Expectation alignment: Disposition Brief gate
 (§9). Process compliance: pre-playtest auditor samples I-2/I-3/I-5/I-8 (subagent; never audits work
 it touched; findings are falsifiable or per-criterion attestations). Sample >=8 items per gate
 (or all, if fewer); every CONFIRMED breach auto-files a PROCESS item and appears in the Disposition
@@ -243,6 +241,14 @@ must make (vs. scripts) are legitimate — scripts enforce state, models interpr
 substitutes for the other.
 
 ## Changelog
+- v1.0 (2026-07-26): ACTIVATED — `mr-feedback` built (event-sourced JSONL, transition validation,
+  reconciler w/ dedup'd decision-issue alerting, covermap extract/verify, 15-check seeded-fault
+  selftest PASSED); tick reconciler hook; SSOT paragraph → pointer (r2 addendum preserved);
+  `feedback-triage` agent aligned; seed domains → research library.
+- v0.96 (2026-07-26): simplification round (operator-requested) — kinds 13→9 with cross-kind rules
+  extracted; seed domains moved to research library; ledger schema = kind+confidence (axes are
+  model, not data); auditor full recount → mechanical covermap verify + targeted no-op/multi-claim
+  sampling; transition table gains ANSWER/LOG/DECLINE communication-time paths + PARKED→IN-WORK.
 - v0.95 (2026-07-26): adversarial-review round — 20/20 findings applied (coverage map + auditor
   recount; DECLINE/DEFER added + LOG restricted to remarks; ledger integrity + activation gate +
   false-block override; FEATHER non-author verification; anti-self-serving extended to weight/

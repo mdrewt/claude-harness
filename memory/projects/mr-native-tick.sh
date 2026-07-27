@@ -130,6 +130,10 @@ fi
 # gate -0.5: human-gate marker (written by decision runs on gate-class BLOCKERs; makes multi-day
 # waits FREE instead of $0.25-1.60/hour of "still waiting" decision runs). Wakes on: the wake_file
 # appearing · any event tick (state changed) · manual/forced runs · marker older than 7 days (safety).
+# FEEDBACK LEDGER RECONCILER (doctrine §8; cheap, always rc0; dedup'd decision issue on new signature)
+FBERR=$("$MEM/mr-feedback" check 2>/dev/null | grep -v "^FEEDBACK-CHECK-OK" | head -4)
+[ -n "$FBERR" ] && log "FEEDBACK-CHECK: $(echo "$FBERR" | tr '\n' ' ')"
+
 if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ]; then
   WAKE=$(grep -m1 -oE "wake_file=[^ ]+" "$MEM/.blocked-on-human" 2>/dev/null | cut -d= -f2)
   MAGE=$(( $(date +%s) - $(stat -c %Y "$MEM/.blocked-on-human" 2>/dev/null || echo 0) ))
