@@ -55,5 +55,5 @@
  "costwatch_enforce": false,
  "_costwatch_note": "enforce=false => MONITOR mode (warn flag + logs only; no stop/kill). Arm after live-run verification that subagent usage streams in real time (adversarial-review blocking condition F3): compare mr-cost-watch price <log> timeline vs ledger on one completed run.",
  "costwatch_stream_factor": 0.8,
- "_stream_factor_note": "raw pass-log usage sum overcounts (312/893 duplicate events on fixture battle-0hp) while missing some subagent detail; ledger/raw = 69.89/87.42 = 0.80. Recalibrate from (ledger cost, COSTWATCH final= log line) pairs as runs complete."
+ "_stream_factor_note": "Factor is for REPORTING/calibration only \u2014 enforcement thresholds use the RAW sum (overcount fires early = safe direction; adversarial review verdict). Measured: raw overcounts ~25% (312/893 dup events, fixture battle-0hp); ledger/raw=0.80. Recalibrate from (ledger, COSTWATCH final-raw) pairs."
 }

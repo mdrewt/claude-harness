@@ -14,14 +14,16 @@ MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 CFG="$MEM/mr-budget-config.json"
 
 price_log(){ # $1=logfile ; prints cumulative USD (per-event model pricing from config)
-  /usr/bin/python3 - "$1" "$CFG" <<'PY'
+  /usr/bin/python3 - "$1" "$CFG" "${2:-cal}" <<'PY'
 import json,sys
 log,cfgp=sys.argv[1],sys.argv[2]
 _cfg=json.load(open(cfgp)); P=_cfg.get("pricing_per_mtok",{}); F=_cfg.get("costwatch_stream_factor",1.0)
+import sys as _s; RAW = len(_s.argv)>3 and _s.argv[3]=="raw"
+DEF={"in":5,"out":25,"cache_read":0.5,"cache_write_5m":6.25}
 def rate(model):
     for k in ("fable","opus","sonnet","haiku"):
-        if k in (model or ""): return P[k]
-    return P["opus"]
+        if k in (model or "") and k in P: return P[k]
+    return P.get("opus",DEF)
 tot=0.0
 try:
     for ln in open(log,encoding="utf-8",errors="replace"):
@@ -35,12 +37,12 @@ try:
         tot+=(u.get("input_tokens",0)*r["in"]+u.get("output_tokens",0)*r["out"]
               +u.get("cache_read_input_tokens",0)*r["cache_read"]
               +u.get("cache_creation_input_tokens",0)*r["cache_write_5m"])/1e6
-except FileNotFoundError: pass
-print(f"{tot*F:.4f}")
+except Exception: pass  # any read/parse failure -> partial total, never a traceback (F-B)
+print(f"{tot:.4f}" if RAW else f"{tot*F:.4f}")
 PY
 }
 
-if [ "${1:-}" = "price" ]; then price_log "${2:?logfile}"; exit 0; fi
+if [ "${1:-}" = "price" ]; then price_log "${2:?logfile}" "${3:-cal}"; exit 0; fi
 [ "${1:-}" = "watch" ] && shift
 S="${1:?slice}"; CAP="${2:?cap}"; LEADER="${3:?leader_pid}"
 L="/tmp/mr_pass_$S.log"; D="/tmp/mr_pass_$S.done"
@@ -50,48 +52,60 @@ mkdir "$LOCKD" 2>/dev/null || { OP=$(cat "$LOCKD/pid" 2>/dev/null); [ -n "$OP" ]
 echo $$ > "$LOCKD/pid"
 trap 'rm -rf "$LOCKD"' EXIT
 # scoped stale-flag cleanup: NEVER touch a rate-limit stop (review F6) — only cost-cap leftovers
-rm -f "$WARN" "$FIRED"
-grep -q "cost-cap" "$STOP.reason" 2>/dev/null && rm -f "$STOP" "$STOP.reason"
-ENFORCE=$(/usr/bin/python3 -c "import json;print(1 if json.load(open('$CFG')).get('costwatch_enforce') else 0)" 2>/dev/null || echo 0)
+# flag cleanup is mr-spawn's job PRE-LAUNCH (review F-C: a restarted watcher must never erase live pass state)
+read_enforce(){ /usr/bin/python3 -c "import json;print(1 if json.load(open('$CFG')).get('costwatch_enforce') else 0)" 2>/dev/null || echo 0; }
+ENFORCE=$(read_enforce)
 log(){ echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) COSTWATCH $S $*" >> "$MEM/mr-native-tick.log"; }
 log "started cap=\$$CAP enforce=$ENFORCE leader=$LEADER"
-WARNED=0; STOPPED=0; ORPHAN=0
+WARNED=0; STOPPED=0; ORPHAN=0; HM=0; PREV_SZ=0; STALL=0
 claude_child(){ # newest claude child of the leader, identity-checked
   for C in $(pgrep -P "$LEADER" 2>/dev/null | sort -rn); do
     grep -qa claude "/proc/$C/cmdline" 2>/dev/null && { echo "$C"; return 0; }
   done; return 1
 }
 while :; do
-  [ -f "$D" ] && { log "done-file present, exiting (final=\$$(price_log "$L"))"; exit 0; }
+  [ -f "$D" ] && { log "done-file present, exiting (final-cal=\$$(price_log "$L") raw=\$$(price_log "$L" raw))"; exit 0; }
   if ! kill -0 "$LEADER" 2>/dev/null; then
     ORPHAN=$((ORPHAN+1)); [ "$ORPHAN" -ge 3 ] && { log "leader gone + no done-file, orphan exit"; exit 0; }
   else ORPHAN=0; fi
-  # escalation headroom top-up (one-shot, file-based comm from mr-launch)
   if [ -f "/tmp/mr_cap_topup_$S" ]; then
     TOP=$(cat "/tmp/mr_cap_topup_$S" 2>/dev/null); rm -f "/tmp/mr_cap_topup_$S"
-    CAP=$(/usr/bin/python3 -c "print(f'{$CAP+${TOP:-0}:.2f}')"); log "cap topped up to \$$CAP (escalation headroom)"
+    NEWCAP=$(/usr/bin/python3 -c "print(f'{$CAP+${TOP:-0}:.2f}')" 2>/dev/null)
+    case "$NEWCAP" in ''|*[!0-9.]*) log "TOPUP-ERR kept cap=\$$CAP";; *) CAP="$NEWCAP"; log "cap topped up to \$$CAP (escalation headroom)";; esac
   fi
-  COST=$(price_log "$L")
-  OVER=$(/usr/bin/python3 -c "c=$COST;p=$CAP;print('HARD' if c>=1.25*p else 'STOP' if c>=p else 'WARN' if c>=0.8*p else 'OK')")
+  ENFORCE=$(read_enforce)
+  # F-A: log-liveness — a claude child alive while the log never grows = blind watcher; never take HARD action blind
+  SZ=$(stat -c %s "$L" 2>/dev/null || echo 0)
+  if [ "$SZ" = "$PREV_SZ" ]; then STALL=$((STALL+1)); else STALL=0; fi
+  PREV_SZ="$SZ"
+  [ "$STALL" -eq 6 ] && log "LOG-STALL log not growing for 2min while pass live — enforcement suspended (blind watcher, review F-A)"
+  COST=$(price_log "$L" raw)   # threshold on RAW (overcount fires early = safe direction); factor is for reporting/calibration only
+  case "$COST" in ''|*[!0-9.]*) log "PRICE-ERR '$COST'"; sleep 20; continue;; esac
+  OVER=$(/usr/bin/python3 -c "c=$COST;p=$CAP;print('HARD' if c>=1.25*p else 'STOP' if c>=p else 'WARN' if c>=0.8*p else 'OK')" 2>/dev/null || echo ERR)
   case "$OVER" in
-    WARN) [ "$WARNED" = 0 ] && { touch "$WARN"; log "WARN 80% (\$$COST/\$$CAP) — landing-pattern flag set"; WARNED=1; };;
+    ERR) log "OVER-ERR cost=$COST cap=$CAP";;
+    WARN) [ "$WARNED" = 0 ] && { touch "$WARN"; log "WARN 80% (raw \$$COST/\$$CAP) — landing-pattern flag set"; WARNED=1; };;
     STOP) [ "$WARNED" = 0 ] && { touch "$WARN"; WARNED=1; }
           if [ "$STOPPED" = 0 ]; then
-            if [ "$ENFORCE" = 1 ]; then echo "cost-cap \$$COST/\$$CAP $(date -u +%FT%TZ)" > "$STOP.reason"; touch "$STOP"; log "STOP 100% (\$$COST/\$$CAP) — cooperative stop flag set"
-            else log "STOP-MONITOR 100% (\$$COST/\$$CAP) — enforce=false, no flag"; fi
+            if [ "$ENFORCE" = 1 ]; then echo "cost-cap raw \$$COST/\$$CAP $(date -u +%FT%TZ)" > "$STOP.reason"; touch "$STOP"; log "STOP 100% (raw \$$COST/\$$CAP) — cooperative stop flag set"
+            else log "STOP-MONITOR 100% (raw \$$COST/\$$CAP) — enforce=false, no flag"; fi
             STOPPED=1; STOP_TS=$(date +%s)
           fi;;
-    HARD) if [ "$ENFORCE" = 1 ]; then
-            [ "$STOPPED" = 0 ] && { echo "cost-cap \$$COST/\$$CAP" > "$STOP.reason"; touch "$STOP"; STOPPED=1; STOP_TS=$(date +%s); }
-            if [ $(( $(date +%s) - ${STOP_TS:-0} )) -ge 120 ]; then   # grace (review F9)
-              C=$(claude_child) || { log "HARD 125% but no claude child (between attempts) — retiring; mr-launch loop gate blocks next spawn"; echo "cost-cap-hard \$$COST/\$$CAP no-child" > "$FIRED"; exit 0; }
-              log "HARD 125% (\$$COST/\$$CAP) — TERM $C after grace"
-              kill -TERM "$C" 2>/dev/null; sleep 30
-              kill -0 "$C" 2>/dev/null && grep -qa claude "/proc/$C/cmdline" 2>/dev/null && { kill -KILL "$C" 2>/dev/null; log "KILL $C (TERM ignored)"; }
-              echo "cost-cap-hard \$$COST/\$$CAP killed=$C" > "$FIRED"
-              exit 0   # retire BEFORE wrap (review F4 resolution)
+    HARD) if [ "$ENFORCE" = 1 ] && [ "$STALL" -lt 6 ]; then
+            [ -f "/tmp/mr_wrap_$S" ] && { log "HARD during wrap pass — retiring, never kill the wrap (review F-E)"; echo "cost-cap-hard raw \$$COST/\$$CAP wrap-active" > "$FIRED"; exit 0; }
+            [ "$STOPPED" = 0 ] && { echo "cost-cap raw \$$COST/\$$CAP" > "$STOP.reason"; touch "$STOP"; STOPPED=1; STOP_TS=$(date +%s); }
+            if [ $(( $(date +%s) - ${STOP_TS:-0} )) -ge 120 ]; then
+              C=$(claude_child)
+              if [ -z "$C" ]; then log "HARD 125% but no claude child found — retrying next tick (review F-F: never retire while spend may continue)"
+              else
+                log "HARD 125% (raw \$$COST/\$$CAP) — TERM $C after grace"
+                kill -TERM "$C" 2>/dev/null; sleep 30
+                kill -0 "$C" 2>/dev/null && { kill -KILL "$C" 2>/dev/null; log "KILL $C (TERM ignored)"; }
+                echo "cost-cap-hard raw \$$COST/\$$CAP killed=$C" > "$FIRED"
+                exit 0
+              fi
             fi
-          else log "HARD-MONITOR 125% (\$$COST/\$$CAP) — enforce=false"; fi;;
+          elif [ "$HM" = 0 ]; then log "HARD-MONITOR 125% (raw \$$COST/\$$CAP) — enforce=false or log-stalled"; HM=1; fi;;
   esac
   sleep 20
 done

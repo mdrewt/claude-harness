@@ -128,7 +128,9 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
 done
 
 # ===== cost-cap wrap pass (plan v2: watcher retired; unpoliced-but-bounded; stop flag PERSISTS through wrap — cleanup happens only at next spawn, review cond iii) =====
+RC=${RC:-1}
 if grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && [ "$RC" -ne 0 ] && ! terminal_pr_open; then
+  touch "/tmp/mr_wrap_$S"   # F-E: watcher retires instead of killing the wrap
   WSID=$(grep -o '"session_id":"[^"]*"' "$L" | tail -1 | cut -d'"' -f4)
   ACT=$(head -c 120 "/tmp/mr_stop_$S.reason" 2>/dev/null | tr '\n' ' ')
   if [ -n "$WSID" ]; then
@@ -144,6 +146,7 @@ if grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && [ "$RC" -ne 0 ] &&
     "$MEM/mr-ask-drew" "costpark-$S" --repo mdrewt/claude-harness --question "FYI: slice $S was cost-cap parked ($ACT; wrap-pass WIP committed). It will NOT relaunch without cap_override in pass-vars." --root "Fire-time cost-cap notification (review F14)" --recommend "None needed now; the supervisor proposes next steps at reconcile" >/dev/null 2>&1 || true
   fi
   echo "$ACT parked=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MEM/.costpark-$S"
+  rm -f "/tmp/mr_wrap_$S"
 fi
 echo "EXIT=$RC ATTEMPTS=$A" >"$D"
 if [ "$RC" -eq 0 ] || terminal_pr_open; then fire_event done "run finished rc=$RC attempts=$A model=$MODEL"
