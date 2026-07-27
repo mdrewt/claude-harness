@@ -11,11 +11,18 @@ Refactor.
 
 1. **Plan** — `planner` decomposes the spec task into small vertical slices.
 2. **Refine** — tighten acceptance criteria (EARS); `tester` derives failing tests.
-3. **Execute** — `specialist` implements in an isolated git worktree to green.
+3. **Execute** — `specialist` implements in an isolated git worktree to green,
+   keeping an `implementation-notes.md` there: when an edge case forces a
+   deviation from the plan, pick the conservative option, log it under a
+   **Deviations** heading, and keep going.
 4. **Review** — `reviewer` (correctness/smells/over-engineering) + `verifier`
-   (tests, evals, security) gate the change.
+   (tests, evals, security) gate the change. Both read the slice's
+   `implementation-notes.md`; a Deviation with no matching test, spec note, or
+   ADR is a finding.
 5. **Refactor** — improve with tests green.
-6. **Repeat** — next slice; `doc-keeper` records ADR/changelog/memory at close.
+6. **Repeat** — next slice; `doc-keeper` records ADR/changelog/memory at close,
+   folding Deviations into the memory card (`implementation-notes.md` itself is
+   worktree scratch — it never merges).
 
 ## Parallelism
 Specialists run in separate worktrees so they never collide; merges are

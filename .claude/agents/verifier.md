@@ -23,3 +23,8 @@ test between the RED checkpoint and the green tip and classify each change:
   weakening, treat it as **weakening → FAIL.**
 Record which gating tests changed and your correction/weakening verdict in the
 PASS/FAIL evidence.
+
+## Deviations log
+Read the slice's `implementation-notes.md` (see `docs/workflow-loops.md`). Every
+entry under "Deviations" must be accounted for by a test, spec note, or ADR — an
+unaccounted deviation is a finding in your PASS/FAIL evidence.

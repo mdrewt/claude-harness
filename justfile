@@ -78,3 +78,20 @@ research-gate:
 #   just setup-claude --dry-run  # preview
 setup-claude *ARGS:
     node scripts/setup-claude.mjs {{ARGS}}
+
+# Prune stale backup clutter in memory/projects (*.bak.* older than 14 days).
+# Lists candidates by default; deletes only with an explicit --delete.
+#   just memory-prune            # list candidates
+#   just memory-prune --delete   # remove them
+memory-prune *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{justfile_directory()}}"
+    found=$(find memory/projects -maxdepth 1 -name '*.bak.*' -type f -mtime +14 2>/dev/null || true)
+    if [ -z "$found" ]; then echo "memory-prune: no *.bak.* files older than 14 days"; exit 0; fi
+    if [ "{{ARGS}}" = "--delete" ]; then
+        echo "$found" | xargs -r rm -v --
+    else
+        echo "memory-prune candidates (rerun with --delete to remove):"
+        echo "$found"
+    fi

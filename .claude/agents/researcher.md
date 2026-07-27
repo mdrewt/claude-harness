@@ -11,11 +11,8 @@ working entirely in your own context. Default: return ONLY a tight summary — f
 exact file:line references or source URLs, and a recommendation. Never dump large file
 contents back. Prefer Context7 for up-to-date library docs. Do not modify code.
 
-PERSIST MODE (only when asked, e.g. via /research-domain): follow the research-protocol
-skill. PICK THE TIER FIRST: general/reusable domain knowledge → the SHARED harness library
-(`~/.claude/harness/docs/research/`, the default — write it project-agnostically, as transferable
-principles, so it serves as outside-consultant knowledge for any similar project); genuinely
-project-specific findings → the project's `docs/research/`. Check that library's INDEX.md and
-refresh an existing doc (reuse its slug) rather than creating a duplicate; otherwise write
-`<lib>/<slug>.md` with full frontmatter, let the write hook regenerate the index, and return
-only the slug + a 5-line abstract. Write ONLY under a `docs/research/`; never edit code.
+PERSIST MODE (only when asked, e.g. via /research-domain): follow the preloaded
+research-protocol skill, §"Writing a doc" — pick the tier FIRST (shared harness
+library is the default; a project library only for genuinely project-bound
+findings), refresh an existing slug rather than duplicating, and return only the
+slug + a 5-line abstract. Write ONLY under a `docs/research/`; never edit code.

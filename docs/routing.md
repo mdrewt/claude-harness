@@ -3,6 +3,14 @@
 Two independent dials — *which model* and *how much effort/orchestration*.
 Correct model routing alone saves ~60–80% vs. all-Opus.
 
+> **Generation-staleness note (2026-07):** the tier table, the savings figure,
+> and the effort policy below were calibrated on the 4.x generation. The 5-gen
+> lineup (Opus 5 / Fable 5) shifts quality and price per tier — re-derive the
+> boundaries from current pricing + this harness's own eval gates before
+> trusting these numbers, and re-check each agent's pinned `model:` tier in
+> `.claude/agents/` (under-tiering hurts most at verifier/judge; over-tiering
+> wastes most at doc-keeper). See memory: `context-engineering-5gen-review`.
+
 ## Model
 | Tier   | Use for |
 |--------|---------|
@@ -15,8 +23,8 @@ one tier; hard latency forces Haiku. Switch mid-session with `/model`.
 
 ## Effort (`/effort`)
 - Persistent levels: low / medium / high / max. Session-only: `ultracode`.
-- On 4.6-class models thinking is **adaptive** — `ultrathink` is legacy; prefer
-  `/effort`.
+- Since the 4.6 generation, thinking is **adaptive** — `ultrathink` is legacy;
+  prefer `/effort`.
 - Policy: default low/medium; **high** for features/reviews; **max / ultracode**
   for architecture, multi-file refactors, gnarly debugging, security.
 
