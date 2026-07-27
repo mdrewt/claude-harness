@@ -99,6 +99,8 @@ Open additional slots only if ALL hold: (1) candidate's **code/test** `touches:`
 
 ## Launch
 
+When a launched slice covers feedback-ledger items: `mr-feedback set <id> --state IN-WORK` per item at launch, `--state VERIFIED` after the non-author complaint-repro, `--state SHIPPED-VERIFIED --evidence PR#N` at merge adjudication (doctrine §8; first-cycle gap 2026-07-27: items sat DISPOSED while slices ran).
+
 Per-run files by slice id: brief `/tmp/mr_pass_<slice>.md` · log/err `/tmp/mr_pass_<slice>.{log,err}` · `.done` · stop-flags `/tmp/mr_stop_<slice>`, `/tmp/mr_stop_all`. Clear stale stop flags first.
 
 1. **Write `/tmp/mr_pass_<slice>.vars.json`** — {slice, model, effort, adr, touches, target_desc, resume_block, tier} — target/touches from the slice's `M*.spec.md` entry (NOT PLAN §9 — see RESOURCE LOCATIONS); tier per the Model & effort routing section; resume_block: omit/empty for fresh, park facts for resume (READ the park memo `memory/projects/monster-realm-<slice>-progress.md` FIRST).

@@ -1,4 +1,4 @@
-# mr-feedback-doctrine — operator feedback handling (v1.2 ACTIVE 2026-07-27)
+# mr-feedback-doctrine — operator feedback handling (v1.3 ACTIVE 2026-07-27)
 Binds: the native loop whenever it processes operator feedback artifacts (playtest gates lifting,
 feedback/notes files, decision-issue answers) or fleshes out milestone skeletons into specs.
 §1 INVARIANTS bind everywhere in REDUCED form: outside the loop (casual/Cowork), I-1 means RELAY
@@ -125,6 +125,10 @@ original item PARKs (§8) — it does not close.
    lenses, 2 + research context (§7); each refines against its own adversarial reviewer.
 3. SYNTHESIS: the `judge` agent (structural bias protocol is part of its definition) synthesizes
    the optimal plan; the synthesis is refined by its own adversarial reviewer.
+   The synthesis MUST include an ATTRIBUTION TABLE: per brainstormer, its unique elements ADOPTED
+   (with where they landed) and REJECTED (with why) — this is the evidence base for the operator's
+   open 6-vs-4 brainstormer calibration question (2026-07-27); a synthesis without the table is
+   incomplete.
 4. EXECUTION: per action type (§4) — code, or specs/milestones/ADRs for DRAFT/REDESIGN.
 5. REVIEW: adversarial pass for quality/standards/correctness PLUS the distinct complaint-repro
    verification (I-5): does the thing Drew reported actually not happen anymore?
@@ -254,6 +258,9 @@ must make (vs. scripts) are legitimate — scripts enforce state, models interpr
 substitutes for the other.
 
 ## Changelog
+- v1.3 (2026-07-27): ceremony ATTRIBUTION TABLE required in synthesis (instruments the 6-vs-4
+  brainstormer question); first-cycle retro note — launching runs must transition covered items to
+  IN-WORK (gap: 83 DISPOSED / 0 IN-WORK with 2 slices live).
 - v1.2 (2026-07-27): REPO RULE — decision issues go to the repo of the primarily-impacted project
   (operator directive; multi-project future planned).
 - v1.1 (2026-07-27): first-live-run round — MAXIMAL-PROGRESS/BATCHED-DECISIONS rule in §9 (run
