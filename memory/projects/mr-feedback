@@ -142,7 +142,7 @@ def cmd_check(argv):
             if d >= 3: print(f"FEEDBACK-STALE {v['id']} state={s} ({d} cycles)"); bad += 1
     if bad:
         print(f"FEEDBACK-CHECK-ISSUES n={bad}")
-        alert = MEM + "/.feedback-check-alert"
+        alert = os.path.join(os.path.dirname(LEDGER), ".feedback-check-alert")  # follows env override — selftest must never write production state
         sig = f"{bad}:{sorted(v['id'] for v in st.values())[:3]}"
         prev = open(alert).read().strip() if os.path.exists(alert) else ""
         if prev != sig:

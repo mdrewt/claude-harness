@@ -63,7 +63,7 @@ issue, non-blocking) before budget commits.
 - ISSUE-REPORT (symptom, ± proposed solution): symptom is ground truth; moderate action-bias but
   ZERO solution-bias — his proposal is one candidate among ours; optimize for most-correctly
   addressing the issue. Unreproducible/undiagnosable → OBSERVABILITY disposition (§4 note).
-- INFO/OPINION REQUEST: zero bias, enforced structurally (§6 protocol), grounded in evidence,
+- INFO/OPINION REQUEST (ledger token `question`): zero bias, enforced structurally (§6 protocol), grounded in evidence,
   research, and reasoning. Answered within the processing episode or it becomes a tracked item;
   never silently converts to work and never silently goes unanswered.
 - PREFERENCE: weigh in future decisions at judged strength; distinguish from idle remarks.
@@ -75,7 +75,7 @@ issue, non-blocking) before budget commits.
   what needs action at all. BEFORE spend: written scope statement (what "better" was taken to
   mean), budget cap, definition-of-done; HEAVY delegations route the scope statement through
   `judge` first.
-- REVIEW/ADVERSARIAL REQUEST: slight bias against the subject — assume unreliable, double-check
+- REVIEW/ADVERSARIAL REQUEST (ledger token `review-request`): slight bias against the subject — assume unreliable, double-check
   everything — but findings must be real, evidenced, hallucination-free; "it was correct" is an
   acceptable verdict.
 CROSS-KIND RULES (not kinds — fewer bins classify better): (1) PRECEDENCE — explicit beats
