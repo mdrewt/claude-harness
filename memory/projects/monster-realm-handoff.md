@@ -146,3 +146,59 @@ Picked up the queued "disposition the r2 episode + draft milestones" unit of wor
 **Not done this tick** (one-action discipline; this tick scoped to feedback-episode planning, not slice execution): no slice launched, no merge, no ADR consumed (`adr_next_free` unchanged at 156 — none of this tick's work required a project-level ADR yet; each new milestone reserves its own at build time). The reshaped Phase D queue (battle-0hp-fix / movement-investigation / dev-observability / feel-polish / uxd1 / uxd2 / uxd3 all launchable now; essence-redesign needs its ceremony first) is what the NEXT tick should pick from under the normal gates. Governor stayed NORMAL throughout; no rate-limit event.
 
 **Gotcha found live:** the supervisor's own investigative `gh issue comment` on non-blocking reconciler issue #10 was indistinguishable to `mr-decision-watch` from an operator answer — it fired a "operator answered" event (a second tick, pid=2501228, correctly SKIP'd on the still-held flock and requeued it). Archived the resulting duplicate event (`feedback-reconcile-issue10.decision.md`) since its content was already fully incorporated by this tick. Future supervisor comments on non-blocking/advisory decision issues should account for this — either avoid commenting until genuinely done, or expect a self-triggered follow-up tick.
+
+## 2026-07-27T04:02Z — Native supervisor tick (rid=native-20260727T040010Z-2504105): fan-out launch, battle-0hp-fix + dev-observability
+
+Picked up the reshaped Phase D queue (unblocked by the prior two ticks' decision-closing + disposition work). Live ground truth first: no chain/per-run locks, no open PRs, master local==origin at `d66e867` with CI green (nightly RED unchanged, known non-gating flake), no pending events. No human-session collision: the only `claude`-named processes are the `mr-native-tick.sh` wrapper itself and a stale `vite preview`/esbuild pair with zero recent writes; nothing in either repo tree was touched in the last 6 min. Left the two pre-existing uncommitted files as-is (`memory/projects/PlaytestReport.md` hand-edit, `memory/projects/decisions/issue-10.answer.md` — a duplicate decision-watch transcript whose content is already fully incorporated per commit `e1896e0`'s "archived the duplicate event" note) — not this tick's scope.
+
+`mr-disjoint battle-0hp-fix vs dev-observability` → SAFE, file-disjoint, no shared registry/enum/namespace axis (no partitioning needed). Both LIGHT weight per their specs, routine tier (neither hits a HARD criterion — no schema/predictor/RLS/M20-M25/resume-after-park). `free -g` showed 17G/45G, ample for N=2. Governor NORMAL (d7=$1424.37/2783, fable_ok=true, neither slice needed fable).
+
+LAUNCHED **battle-0hp-fix** (opus@high, ADR-0156, `server-module/src/battle*.rs` — never select a 0hp lead monster, reject actions on an already-0hp active monster, verify the 0hp swap-in reject path, document a double-KO/speed-tie comparator rule, regression test for Drew's exact repro) and **dev-observability** (opus@high, ADR-0157, client-only — toggleable dev-console logging of outbound reducer calls, reusing the pt-b1 eventRing/error-overlay substrate, pt-a1-style prod-safe flag). Both asserted LAUNCHED+detached by `mr-spawn` (leader=2505535/claude_pid=2505538 for battle-0hp-fix; leader=2505772/claude_pid=2505775 for dev-observability). `adr_next_free` 156→158.
+
+**Remaining Phase D queue** for the next pick: `movement-investigation`, `feel-polish`, `uxd1`, `uxd2` (HARD/full-stack-schema, serial vs any concurrent schema-touching slice), `uxd3` (`main.ts`-SERIAL, must land after nh1/nh2 — already merged — and after any uxd2 `main.ts` edit). Note for next tick: `movement-investigation` and `feel-polish` both plausibly touch client movement/`main.ts` — re-run `mr-disjoint` against each other and against whichever of `uxd2`/`uxd3` is still queued before the next fan-out; don't assume today's pair's disjointness carries over. `M-evolution-essence-redesign` remains not-launchable (needs its own HEAVY ceremony first).
+
+No merge, no park, no BLOCKER. governor=NORMAL throughout.
+
+## 2026-07-27T02:15Z — dev-observability: PR #257 OPEN, local `just ci` green (terminal state)
+
+**Slice `dev-observability`** (M-postgate-dev-observability, r2 items 043/045/046) built and pushed on
+`feat/dev-observability` (worktree `.claude/worktrees/dev-observability`, 7 `wip:` commits — **squash
+required**, the `commit-msg` hook rejects `wip(...)`). PR: https://github.com/mdrewt/monster-realm/pull/257
+**Local `just ci` EXIT=0** (73/73 evals, 1459 Rust tests, 1529 client tests, biome/tsc/secrets clean).
+Remote CI running at hand-off; `gh pr merge` deliberately NOT run — supervisor owns the merge.
+
+**What shipped:** `client/src/net/devLog.ts` (new, pure, zero runtime imports) + ~10 lines of wiring in
+`main.ts`/`connection.ts`. `VITE_MR_DEVLOG` (`off`|`send`|`send-move`, default off) gates a Proxy
+installed at `build()`'s return; strict identity when off. Covers all 38 outbound reducer call sites via
+one seam. **ADR-0157** consumed (`docs/adr/0157-dev-console-outbound-reducer-log.md`) — so
+`adr_next_free` should advance to 158.
+
+**Two decisions worth knowing:** (1) the pt-a1 fail-loud asymmetry is **inverted** — throws in dev,
+degrades to `off` + one `console.error` in prod, because the eager module-scope resolve runs before the
+error listeners exist and a debug-flag typo would otherwise blank the whole playtest session and kill the
+F9 path. (2) PII key-name redaction was considered and **rejected** (it would blank exactly the reducers
+being debugged); the real control is console-only + zero runtime imports, so the module structurally
+cannot reach the F9 bundle.
+
+**Two flag-on-only defects were found in review and fixed** (both invisible to CI, which runs flag-off):
+the `Reflect.get` receiver does not fix `this` for later invocation (`#private` brand-check throw) →
+`.bind(target)`; and the SDK's plain-`{}` reducers object leaked `toString`/`hasOwnProperty`/`constructor`
+into the log as fake reducer calls → `Object.hasOwn` guard. Both now have gates that bite.
+
+**touches-delta** (audit): `evals/dev-observability-gating.eval.mjs` (new file only, auto-discovered) and
+`docs/adr/DIGEST.md` (generated by `just adr-digest`, CI drift-gated). `CHANGELOG.md`,
+`docs/adr/README.md`, `docs/knowledge/**` untouched. boyscout-delta: none.
+
+**Supervisor follow-ups:** (a) delegate the #257 CI wait to `mr-ci-watch`, squash-merge, then remove the
+worktree + branch; (b) the harness spec `specs/monster-realm-v2/M-postgate-dev-observability.spec.md` is
+OUTSIDE this slice's touch-set and still reads "queued" — needs its status ticked to delivered;
+(c) four named deferrals recorded in ADR-0157 — `obs-b` inbound stream, `obs-c` `Connection.reducers`
+accessor (would retire the outer Proxy entirely), `obs-d` runtime toggle, `obs-e` devlog into the F9
+bundle behind a per-reducer arg allowlist.
+
+**ENVIRONMENT HAZARD worth propagating to every future client slice:** a bare `wasm-pack build
+client-wasm` (without `--target bundler`) silently corrupts `client-wasm/pkg` and makes the vite build
+fail with a confusing `"step_ms" is not exported by "../client-wasm/pkg/client_wasm.js"`. It bit twice
+this run (two different subagents). Always use `just wasm`. Also: the default `node` on PATH is **v18**;
+project commands need `export PATH="/home/mdrewt/.asdf/installs/nodejs/24.13.1/bin:$HOME/.cargo/bin:$PATH"`
+or evals fail with bogus `node:fs`/`glob` errors. A fresh worktree also needs `npm ci` in `client/`.
