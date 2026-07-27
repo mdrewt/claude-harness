@@ -13,5 +13,47 @@
  "hard_stop_frac": 0.97,
  "fable_guard_frac": 0.9,
  "_semantics": "soft/hard fracs apply to weekly_limit_usd; fable_ok = fable_spend < fable_guard_frac * fable_allowance_usd (allowance is its own axis now, NOT a fraction of weekly). Old fields kept for reader fallback compatibility.",
- "single_run_alert_usd": 150
+ "single_run_alert_usd": 150,
+ "pricing_per_mtok": {
+  "opus": {
+   "in": 5,
+   "out": 25,
+   "cache_read": 0.5,
+   "cache_write_5m": 6.25,
+   "cache_write_1h": 10
+  },
+  "sonnet": {
+   "in": 3,
+   "out": 15,
+   "cache_read": 0.3,
+   "cache_write_5m": 3.75,
+   "cache_write_1h": 6
+  },
+  "haiku": {
+   "in": 1,
+   "out": 5,
+   "cache_read": 0.1,
+   "cache_write_5m": 1.25,
+   "cache_write_1h": 2
+  },
+  "fable": {
+   "in": 7.5,
+   "out": 37.5,
+   "cache_read": 0.75,
+   "cache_write_5m": 9.375,
+   "cache_write_1h": 15,
+   "_note": "ESTIMATE 1.5x opus (overcount = earlier kill = safe); CALIBRATE from first fable run: ledger total vs mr-cost-watch price"
+  }
+ },
+ "slice_caps_usd": {
+  "hard": 150,
+  "routine": 60,
+  "content": 60,
+  "default": 60
+ },
+ "escalation_headroom_usd": 60,
+ "costwatch_enforce": false,
+ "_costwatch_note": "enforce=false => MONITOR mode (warn flag + logs only; no stop/kill). Arm after live-run verification that subagent usage streams in real time (adversarial-review blocking condition F3): compare mr-cost-watch price <log> timeline vs ledger on one completed run.",
+ "costwatch_stream_factor": 0.8,
+ "_stream_factor_note": "raw pass-log usage sum overcounts (312/893 duplicate events on fixture battle-0hp) while missing some subagent detail; ledger/raw = 69.89/87.42 = 0.80. Recalibrate from (ledger cost, COSTWATCH final= log line) pairs as runs complete."
 }

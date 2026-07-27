@@ -179,6 +179,12 @@ except Exception: print('')" 2>/dev/null)
   [ -f "/tmp/mr_pass_${SLICE}.done" ] && DONE_WAIT=1
 done
 PENDING=$(ls -A "$MEM/pending-events" 2>/dev/null | grep -v "^archive$" | head -1)   # archive/ lives inside this dir — excluding it restores the FREE fastpath (bug 2026-07-26: every live-chain standdown was a paid spawn since first archival)
+for LK in /tmp/mr_pass_*.vars.json; do
+  [ -f "$LK" ] || continue; LS=$(basename "$LK" .vars.json); LS=${LS#mr_pass_}
+  [ -f "/tmp/mr_pass_$LS.done" ] && continue
+  CW=$(cat "/tmp/mr_costwatch_$LS.lock.d/pid" 2>/dev/null)
+  { [ -n "$CW" ] && kill -0 "$CW" 2>/dev/null; } || log "WATCHER-DEAD costwatch missing for live slice $LS (SPEND-ALERT remains the post-hoc net)"
+done
 if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ] && [ -z "$PENDING" ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
 
 # gate 2: rate-limit reset-time from mr-state.json

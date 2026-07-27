@@ -1,4 +1,4 @@
-# mr-feedback-doctrine — operator feedback handling (v1.4 ACTIVE 2026-07-27)
+# mr-feedback-doctrine — operator feedback handling (v1.5 ACTIVE 2026-07-27)
 Binds: the native loop whenever it processes operator feedback artifacts (playtest gates lifting,
 feedback/notes files, decision-issue answers) or fleshes out milestone skeletons into specs.
 §1 INVARIANTS bind everywhere in REDUCED form: outside the loop (casual/Cowork), I-1 means RELAY
@@ -116,6 +116,12 @@ original item PARKs (§8) — it does not close.
   `mr-budget-config.json`; $150 at ratification, hard-tier p90 evidence),
   process (non-implementation) share ≤40% (~$60).
 - FLOOR at every weight: one independent verification (I-5). Cap hit → park + notify (I-6).
+- ENFORCEMENT (mechanical since 2026-07-27, `mr-cost-watch`): 80% warn-flag and 100% stop-flag are
+  ADVISORY mid-attempt (cooperative, brief-driven); only the 125% hard ceiling (grace → TERM →
+  KILL → bounded wrap pass for WIP+handoff) is mechanical. Cost-cap parks count against the slice;
+  relaunch requires explicit cap_override; a second cost-park raises a decision issue. Escalated
+  rescue attempts get a headroom top-up. MONITOR mode until live-streaming verification passes
+  (costwatch_enforce in mr-budget-config).
 - Playtest-initiated design changes are typically HEAVY: the full ceremony is warranted there
   (operator ruling 2026-07-26); FEATHER/LIGHT exist so trivia never pays design-change overhead.
 
@@ -258,6 +264,9 @@ must make (vs. scripts) are legitimate — scripts enforce state, models interpr
 substitutes for the other.
 
 ## Changelog
+- v1.5 (2026-07-27): mechanical cap enforcement (mr-cost-watch; honest 80/100 advisory vs 125
+  mechanical), wrap-pass shutdown semantics (operator design), respawn gate, escalation headroom,
+  stream-factor calibration (0.80, fixture battle-0hp $69.93 vs $69.89).
 - v1.4 (2026-07-27): reconciler alert class restricted to intake/integrity failures; STALE is
   report-only (internal queue-front escalation, --verbose) — DISPOSED-awaiting-queued-milestone is
   progress, not staleness (issues #11/#12 false-positive incident); alert bodies carry actual

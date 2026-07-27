@@ -112,12 +112,14 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
     if [ "$(fable_budget_ok)" = "OK" ]; then
       MODEL=fable; EFFORT=xhigh
       echo "ESCALATED final attempt to fable@xhigh TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+      /usr/bin/python3 -c "import json;print(json.load(open('$MEM/mr-budget-config.json')).get('escalation_headroom_usd',60))" > "/tmp/mr_cap_topup_$S" 2>/dev/null || true   # cost-watch cap top-up (review F12: rescue attempt gets headroom, not crumbs)
     else
       echo "ESCALATION-SKIPPED fable 7d spend over guard TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
     fi
   fi
   SID=$(grep -o '"session_id":"[^"]*"' "$L" | tail -1 | cut -d'"' -f4)
   [ -n "$SID" ] || break
+  { [ -f "/tmp/mr_stop_$S" ] || [ -f /tmp/mr_stop_all ]; } && break   # mechanical gate before EVERY spawn (cost-watch review cond i)
   echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
   ( cd "$PROJDIR" && claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
     -p "$P" \
@@ -125,6 +127,24 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
   RC=$?
 done
 
+# ===== cost-cap wrap pass (plan v2: watcher retired; unpoliced-but-bounded; stop flag PERSISTS through wrap — cleanup happens only at next spawn, review cond iii) =====
+if grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && [ "$RC" -ne 0 ] && ! terminal_pr_open; then
+  WSID=$(grep -o '"session_id":"[^"]*"' "$L" | tail -1 | cut -d'"' -f4)
+  ACT=$(head -c 120 "/tmp/mr_stop_$S.reason" 2>/dev/null | tr '\n' ' ')
+  if [ -n "$WSID" ]; then
+    echo "COST-CAP-WRAP start TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+    WRAPP="Cost-cap shutdown ($ACT). Do NOT start new work, new scope, or ANY new subagents (the stop flag is active and stays active). If .git/index.lock is stale in the worktree, remove it. Commit all WIP on the slice branch as wip($S): cost-cap park, push the branch, then write the handoff (mr-record handoff): state of work, exactly what remains, and the SIZING LESSON — why this slice exceeded its cap. Any local-model summary you include must be labeled UNVERIFIED advisory. Then stop. NEVER run gh pr merge."
+    ( cd "$PROJDIR" && timeout 900 claude --model "$MODEL" --effort low --dangerously-skip-permissions --resume "$WSID" -p "$WRAPP" \
+      --add-dir "$HARNESS" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E" || true
+    echo "COST-CAP-WRAP end rc=$? TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+  fi
+  if [ -f "$MEM/.costpark-$S" ]; then
+    "$MEM/mr-ask-drew" "costpark2-$S" --repo mdrewt/claude-harness --question "Slice $S hit its cost cap a SECOND time ($ACT). Resize (cap_override in pass-vars), split, or abandon?" --root "Repeated cost-cap park = sizing failure (doctrine §5)" --recommend "Split the slice; review both handoffs for the seam" >/dev/null 2>&1 || true
+  else
+    "$MEM/mr-ask-drew" "costpark-$S" --repo mdrewt/claude-harness --question "FYI: slice $S was cost-cap parked ($ACT; wrap-pass WIP committed). It will NOT relaunch without cap_override in pass-vars." --root "Fire-time cost-cap notification (review F14)" --recommend "None needed now; the supervisor proposes next steps at reconcile" >/dev/null 2>&1 || true
+  fi
+  echo "$ACT parked=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MEM/.costpark-$S"
+fi
 echo "EXIT=$RC ATTEMPTS=$A" >"$D"
 if [ "$RC" -eq 0 ] || terminal_pr_open; then fire_event done "run finished rc=$RC attempts=$A model=$MODEL"
 else fire_event crash "run ended rc=$RC attempts=$A model=$MODEL (real failure or stop-flag)"; fi

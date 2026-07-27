@@ -16,6 +16,19 @@ fail_evidence(){ printf 'kind=%s seen=%s log_tail=%s err_tail=%s' "${LAST_FAIL_K
 [ -r "$V" ] || status FAIL "vars.json missing: $V" 1
 # mechanical active-session probe (mirror of tick gate 3)
 IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
+# cost-cap respawn gate (review F13) + cap resolution
+CAPO=$(/usr/bin/python3 -c "import json;d=json.load(open('/tmp/mr_pass_$S.vars.json'));print(d.get('cap_override') or '')" 2>/dev/null)
+if [ -f "$MEM/.costpark-$S" ] && [ -z "$CAPO" ]; then
+  status COSTPARK-GATE "slice was cost-cap parked ($(head -c 80 "$MEM/.costpark-$S")); relaunch requires cap_override in pass-vars"
+fi
+[ -n "$CAPO" ] && rm -f "$MEM/.costpark-$S"
+CAP=$(/usr/bin/python3 -c "
+import json
+v=json.load(open('/tmp/mr_pass_$S.vars.json'))
+c=json.load(open('$MEM/mr-budget-config.json'))
+caps=c.get('slice_caps_usd',{})
+print(v.get('cap_override') or v.get('cap_usd') or caps.get(v.get('tier',''),caps.get('default',60)))" 2>/dev/null || echo 60)
+export CAP
 WRITES=$(find "$HARNESS" "$PROJ" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/.claude/worktrees/*' -not -path "$MEM/*" -mmin -6 2>/dev/null | head -1)
 [ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
 [ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
@@ -32,7 +45,7 @@ tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; 
  else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models (sonnet-class) — do not bump lens models upward on a content slice (THIS OVERRIDES the build-loop prompt bump-one-tier default for this slice). The tester requirement is UNCHANGED — meaningful tests first, always.\n" if tier=="content" else "")
 rb=v.get("resume_block","") or ""
 for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCHES>",touches_str),
-              ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block)]:
+              ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block),("<CAP_USD>",str(__import__("os").environ.get("CAP","60")))]:
     tpl=tpl.replace(k,val)
 open(os.environ["B"],"w").write(tpl)
 print("brief-built bytes=%d tier=%s" % (len(tpl),tier))
@@ -93,6 +106,7 @@ open(os.environ["MEM"]+"/.harness-runner."+os.environ["S"]+".lock","w").write(js
 PYLOCK
 then kill_attempt; status FAIL "lock write failed after launch (attempt killed)" 1; fi
 TIER=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('tier','routine'))" 2>/dev/null)
+setsid bash "$MEM/mr-cost-watch" watch "$S" "$CAP" "$LEADER" >/dev/null 2>&1 & disown   # zero-token cap watcher (monitor until costwatch_enforce=true)
 # auto-flip covered feedback items to IN-WORK (doctrine §8; mechanical so no run has to remember)
 ITEMS=$(/usr/bin/python3 -c "import json,sys;d=json.load(open('/tmp/mr_pass_$S.vars.json'));i=d.get('items') or [];print(' '.join(i) if isinstance(i,list) else str(i))" 2>/dev/null)
 for IT in $ITEMS; do

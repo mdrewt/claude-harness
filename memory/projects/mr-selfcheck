@@ -3,7 +3,7 @@
 set -u
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 BAD=0
-for f in "$MEM"/mr-*.sh "$MEM"/mr-launch.sh "$MEM"/mr-native-tick.sh "$MEM"/mr-ask-drew "$MEM"/mr-decision-watch "$MEM"/mr-ci-watch "$MEM"/mr-reset-watch "$MEM"/mr-evidence "$MEM"/mr-retro-request "$MEM"/mr-usage-snap "$MEM"/mr-disjoint "$MEM"/mr-spawn "$MEM"/mr-ollama "$MEM"/mr-situation "$MEM"/mr-record "$MEM"/mr-audit "$MEM"/mr-metrics; do
+for f in "$MEM"/mr-*.sh "$MEM"/mr-launch.sh "$MEM"/mr-native-tick.sh "$MEM"/mr-ask-drew "$MEM"/mr-decision-watch "$MEM"/mr-ci-watch "$MEM"/mr-reset-watch "$MEM"/mr-evidence "$MEM"/mr-retro-request "$MEM"/mr-usage-snap "$MEM"/mr-cost-watch "$MEM"/mr-disjoint "$MEM"/mr-spawn "$MEM"/mr-ollama "$MEM"/mr-situation "$MEM"/mr-record "$MEM"/mr-audit "$MEM"/mr-metrics; do
   [ -f "$f" ] || continue
   head -1 "$f" | grep -q python && { /usr/bin/python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$f" 2>/dev/null || { echo "SELFCHECK-FAIL py: $f"; BAD=1; }; continue; }
   bash -n "$f" 2>/dev/null || { echo "SELFCHECK-FAIL sh: $f"; BAD=1; }
