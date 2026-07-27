@@ -4,6 +4,7 @@
 # measured 2026-07-27: ~99.6M cache-read tokens/24h). Ops sessions should use this for any command
 # expected to print >20 lines, then Read the file selectively if needed.
 set -u
+[ $# -gt 0 ] || { echo "usage: mr-evidence <cmd...>"; exit 0; }
 D=/tmp/mr-evidence; mkdir -p "$D"
 F="$D/$(date -u +%Y%m%dT%H%M%S)-$$.txt"
 { echo "\$ $*"; "$@" 2>&1; } > "$F"
