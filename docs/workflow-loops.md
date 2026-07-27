@@ -26,6 +26,15 @@ Refactor.
    `local-only` — see the doc-keeper's promotion rules; the notes file itself is
    worktree scratch and never merges). Missing dispositions are an audit finding.
 
+## Disposition markers (single grammar — usage sites reference this section)
+- **Work items** (spec closure, `standards/spec-driven.md`): every PARKED item
+  ends `parked → <queued spec id | wontfix>`.
+- **Knowledge** (close-out, doc-keeper): every folded Deviation / durable
+  discovery ends `promoted → <path>` or `local-only`.
+Marker **presence** is audited supervisor-side (the mr-audit layer), not by the
+pre-merge verifier — markers are written at close, after the verifier has run.
+Marker **quality** (right home, merged-not-duplicated) is reviewer duty.
+
 ## Parallelism
 Specialists run in separate worktrees so they never collide; merges are
 sequential and verifier-gated. Subagents never spawn subagents (depth = 1).

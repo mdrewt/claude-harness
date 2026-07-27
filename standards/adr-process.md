@@ -50,9 +50,16 @@ goes stale or lives only in someone's memory.
 
 ## Mechanical gate
 `just adr-gate` (in `just ci`) runs `scripts/adr-lint.mjs docs/adr
---strict-confirmation`: filename↔title number match, no duplicate numbers,
-status pinned to the enum above, `superseded by NNNN` must resolve, and
-Confirmation teeth — an accepted ADR missing/still-`proposed` Confirmation
-FAILs, and a Confirmation naming a nonexistent repo path FAILs (false-green).
-A project corpus adopts non-strict first (missing Confirmation = WARN) and
-ratchets to strict once backfilled.
+--strict-confirmation`: filename↔title number match (all `*.md` must be
+`NNNN-slug.md` — malformed names FAIL rather than escape), duplicate numbers
+(numeric — `0139` == `139`), status enum, `superseded by [ADR-]NNNN` must
+resolve, and Confirmation teeth — strict FAILs an accepted ADR whose
+Confirmation is missing/empty, still `proposed — …`, junk prose (it must name
+an existing backticked repo path or a `just <recipe>`, or carry the literal
+`unenforced — review-only`), or names a nonexistent repo path (false-green;
+`~/…`-anchor, absolute, glob, and prose-slash tokens are skipped, not checked).
+Prose cross-references (`ADR-0139`, markdown links) are OUT OF SCOPE — only
+supersede targets resolve. A project corpus adopts non-strict first (missing
+Confirmation = WARN, accepted/proposed only) and ratchets once backfilled.
+The lint's existence check proves the gate FILE exists, not that it still
+asserts what the ADR claims — that staleness channel is the reviewer's duty.

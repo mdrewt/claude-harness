@@ -21,13 +21,18 @@ task-type-scoped → the owning skill's `## Gotchas` (MERGE with any near-duplic
 entry, never append a dup); code/system-scoped → a knowledge-contract concept or
 the relevant `ARCHITECTURE.md` section; decision-constraining → an ADR. One home
 only: the memory card LINKS to the promoted location, never copies the content.
+(Disposition grammar + audit ownership: `docs/workflow-loops.md` §Disposition
+markers.)
 
 ## ADR Confirmation lifecycle (standards/adr-process.md)
 When drafting an ADR whose gate doesn't exist yet, write
 `Confirmation: proposed — <planned gate>`. At slice close, update every ADR you
 touched to its real gate (backticked repo path) or the literal
 `unenforced — review-only` — an accepted ADR may not stay `proposed`
-(`adr-lint --strict-confirmation` FAILs it).
+(`adr-lint --strict-confirmation` FAILs it). After ADR edits at close, run the
+corpus lint (`just adr-gate`, or `just adr-lint <dir> --strict-confirmation`)
+yourself — a dangling path you commit post-merge would otherwise surface as the
+NEXT slice's CI failure, misattributed.
 
 ## Doc-aggregation discipline (avoid cross-slice merge collisions)
 Slices may run concurrently; the *shared* aggregate docs are reconciled by the

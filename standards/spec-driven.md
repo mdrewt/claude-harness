@@ -47,7 +47,8 @@ optional. Omit empty sections — never fill with filler.
 - **Closure:** each Delivered/Parked item carries evidence (root cause, measured
   blast radius). Every PARKED item ends with a disposition:
   `parked → <queued spec id | wontfix>` — parked work without a disposition is
-  how carry-overs go unsized.
+  how carry-overs go unsized. (Disposition grammar + audit ownership:
+  `docs/workflow-loops.md` §Disposition markers.)
 
 ## Rules
 - No implementation task starts without an accepted spec + acceptance criteria.

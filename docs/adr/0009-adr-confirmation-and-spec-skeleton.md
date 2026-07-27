@@ -50,6 +50,7 @@ two-round adversarial-judge debate before implementation.
 
 ## Confirmation
 `scripts/adr-lint.mjs` (proof-of-teeth: `scripts/tests/adr-lint.test.mjs` — the
-gate is proven to pass clean input and bite each defect class), wired as
-`just adr-gate` inside `just ci`. This ADR's own corpus is linted by the gate it
-records — the lint enforces itself.
+gate is proven to pass clean input and bite each defect class, and a wiring
+assertion in that test file verifies the justfile's `ci` recipe still includes
+`adr-gate`, so silently unwiring the gate is itself a test failure). This ADR's
+own corpus is linted by the gate it records.
