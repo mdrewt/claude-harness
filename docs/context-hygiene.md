@@ -9,7 +9,10 @@ information *before* it reaches the model.
 - **On-demand skills** for anything that matters only sometimes.
 - **Subagent isolation** — research/exploration/large outputs run in their own
   context and return a clean summary. The single biggest lever. Use
-  `/deep-research`.
+  `/deep-research`. Counter-rule: a *compact* graph query (cbm `query_graph`/
+  `get_code_snippet`, `codegraph node`/`callers` — 0.25–4 KB) is cheaper inline
+  than spawning a subagent; survey-shaped exploration and large graph dumps
+  still go to the `researcher` (see the `code-intel` skill).
 - **Small authoritative memory.** Read `memory/index.md` (a map), then pull only
   the relevant project card.
 - **Compaction discipline.** `/compact` at task boundaries; `/clear` between

@@ -10,13 +10,16 @@ Kit task (never a freeform prompt). Review gates sit between Execute and
 Refactor.
 
 1. **Plan** — `planner` decomposes the spec task into small vertical slices.
+   Scope/impact discovery is graph-first in indexed repos (`code-intel` skill):
+   affected callers come from the union of both graphs, not a grep sweep.
 2. **Refine** — tighten acceptance criteria (EARS); `tester` derives failing tests.
 3. **Execute** — `specialist` implements in an isolated git worktree to green,
    keeping an `implementation-notes.md` there: when an edge case forces a
    deviation from the plan, pick the conservative option, log it under a
    **Deviations** heading, and keep going.
 4. **Review** — `reviewer` (correctness/smells/over-engineering) + `verifier`
-   (tests, evals, security) gate the change. Both read the slice's
+   (tests, evals, security) gate the change; blast-radius checks use both code
+   graphs (`code-intel` skill), never a single graph. Both read the slice's
    `implementation-notes.md`; a Deviation with no matching test, spec note, or
    ADR is a finding.
 5. **Refactor** — improve with tests green.

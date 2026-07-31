@@ -69,11 +69,13 @@ Wire each rule to a tool so it never depends on someone remembering:
 
 ## Impact analysis before changing shared signatures
 Before changing a signature/type used across a boundary or by multiple modules,
-identify and report the affected callers/tests **first**, not after. For larger
-codebases a **code-knowledge-graph MCP** (AST + type resolution) answers
+identify and report the affected callers/tests **first**, not after. In indexed
+repos the code-knowledge graphs (**CodeGraph** + **codebase-memory-mcp**) answer
 "what-calls-X / what-depends-on-X" far more cheaply than grepping or reading
-files — prefer it for structural questions and load it lazily. A missed caller
-across a marshaling boundary is how client/server or producer/consumer contracts
+files — but each has verified blind spots, so blast radius = the **union of both
+graphs**, plus a grep when the symbol can be invoked dynamically (callbacks,
+trait objects). Route per the `code-intel` skill. A missed caller across a
+marshaling boundary is how client/server or producer/consumer contracts
 silently desync.
 
 ## Red flags the reviewer enforces

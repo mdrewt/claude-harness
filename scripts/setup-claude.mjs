@@ -14,6 +14,7 @@ import {
   lstatSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   readlinkSync,
   rmSync,
   symlinkSync,
@@ -166,6 +167,48 @@ for (const rel of RESOURCES) {
     console.log(`  MISSING-RES  ~/.claude/${rel}  (referenced by a skill/agent)`);
   }
 }
+
+// Vendor-doctrine drift (ADR-0010): a codebase-memory-mcp install/update re-registers
+// its "ALWAYS FIRST" SessionStart banner and restores its stale skill — both were
+// deliberately retired in favor of the code-intel skill. Catch the resurrection.
+try {
+  const settings = readFileSync(join(CLAUDE, 'settings.json'), 'utf8');
+  if (settings.includes('cbm-session-reminder')) {
+    failures++;
+    console.log(
+      '  VENDOR-DRIFT ~/.claude/settings.json registers cbm-session-reminder — retired by ADR-0010; remove the SessionStart entries (a cbm install/update re-adds them)',
+    );
+  }
+} catch {}
+try {
+  const vendorSkill = join(CLAUDE, 'skills', 'codebase-memory', 'SKILL.md');
+  if (existsSync(vendorSkill) && !readFileSync(vendorSkill, 'utf8').includes('superseded by the code-intel skill')) {
+    failures++;
+    console.log(
+      '  VENDOR-DRIFT ~/.claude/skills/codebase-memory/SKILL.md lost its supersession marker — a cbm install/update restored stale vendor content (see ADR-0010)',
+    );
+  }
+} catch {}
+try {
+  const settings = readFileSync(join(CLAUDE, 'settings.json'), 'utf8');
+  if (settings.includes('mcp__codegraph__*')) {
+    failures++;
+    console.log(
+      '  VENDOR-DRIFT ~/.claude/settings.json has the mcp__codegraph__* wildcard back — a codegraph install/upgrade restored it; re-enumerate codegraph_explore (ADR-0010)',
+    );
+  }
+} catch {}
+try {
+  const userClaudeMd = readFileSync(join(CLAUDE, 'CLAUDE.md'), 'utf8');
+  const noteAt = userClaudeMd.indexOf('Code intelligence routing');
+  const fenceAt = userClaudeMd.indexOf('CODEGRAPH_START');
+  if (noteAt === -1 || (fenceAt !== -1 && noteAt > fenceAt)) {
+    failures++;
+    console.log(
+      '  VENDOR-DRIFT ~/.claude/CLAUDE.md routing note missing or below the CODEGRAPH fence — a codegraph install/upgrade likely rewrote the file; restore the note above the fence (ADR-0010)',
+    );
+  }
+} catch {}
 
 const mode = CHECK ? 'check' : DRY ? 'dry-run' : 'apply';
 console.log(

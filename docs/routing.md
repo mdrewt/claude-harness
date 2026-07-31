@@ -50,6 +50,23 @@ from: effort routing, subagent isolation, model routing, cloud offload, and
 compaction. Caveat: availability of `ultracode`/`ultraplan` is version-gated —
 confirm in your Claude Code build.
 
+## Code discovery (cost-aware)
+Two graph indexes (CodeGraph + codebase-memory-mcp) cover the harness root and
+`projects/monster-realm`. **Route by question type — the `code-intel` skill is
+the SSOT** (routing table, verified syntax, gotchas). The short version:
+- **Symbol questions** (where is X, who calls X, read X): one graph call beats a
+  grep+read loop — `codegraph node X` for reading; **both** graphs unioned for
+  blast radius (each misses callers the other finds).
+- **Content/text search**: cbm `search_code` or plain Grep. **Docs/decisions**:
+  per-repo decision docs first (DIGEST.md / knowledge bundle / research INDEX).
+- **Architecture roles and dead code**: neither graph — read the docs / use
+  compiler tooling.
+- **Inline vs subagent**: compact calls (query_graph, node, callers) inline;
+  survey-shaped exploration → `researcher` subagent (it has the graph tools).
+- **Freshness**: graphs answer from the canonical checkout's last index — check
+  `codegraph status` / cbm `detect_changes` before trusting; never for pinned
+  clones or worktrees.
+
 ## Documentation lookups (cost-aware)
 Library docs are a major token + quota cost. Discipline:
 - **Prefer no-quota sources first** — a repo's `llms.txt`, official vendor skills,
