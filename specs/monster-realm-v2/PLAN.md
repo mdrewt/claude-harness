@@ -320,7 +320,9 @@ fan-out per each spec's pairing notes):**
 **Phase D — Production readiness (`blocked:playtest-gate` LIFTED for the two hardening milestones only; the
 rest stays post-gate provisional pending a cleaner second playtest read):**
 
-- **M-postgate-netcode-hardening** (`M-postgate-netcode-hardening.spec.md`) — **UN-BLOCKED, front of queue.**
+- **M-postgate-netcode-hardening** (`M-postgate-netcode-hardening.spec.md`) — **CLOSED 2026-07-31** (11r-d
+  ledger reconciliation): all four slices merged — nh1 #247/ADR-0146, nh2 #250/ADR-0148, nh4 #252/ADR-0150,
+  nh3 #254/ADR-0152. Historical scope below.
   Promoted from a PLAN bullet to a full spec 2026-07-25. Three newly-found HIGH slices from the 2026-07-25
   playtest: nh1 movement-suppression missing `preventDefault()` (arrow keys get hijacked by browser scroll
   once any overlay is left open — root cause of Drew's reported "controls stopped working"), nh2 released
@@ -335,7 +337,12 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   playtest + pin the reachability bound). ptc5f's red-team pass had already sharpened the reachability —
   reachable in _solo_ play by warping while holding a movement key — and recommended pulling it forward;
   the 2026-07-25 gate is that pull-forward.
-- **M-postgate-ux-hardening** (`M-postgate-ux-hardening.spec.md`) — **UN-BLOCKED, front of queue** (new,
+- **M-postgate-ux-hardening** (`M-postgate-ux-hardening.spec.md`) — **MERGED 2026-07-31 with one named
+  partial** (11r-d ledger reconciliation): ux1 #251/ADR-0151, ux2 #255/ADR-0154, ux3 #253/ADR-0153,
+  ux4 #256/ADR-0155 all merged. **NOT fully closed:** ux2 delivered the SERVER half only — the client
+  wallet wiring (ADR-0154 D7: `my_wallet` subscription, `rowConvert` converter, both `buildShopViewModel`
+  call sites, two-identity e2e privacy tooth) is **ux2b**, now scheduled as slice **11r-e** of
+  `M-postgate-eleventh-review-residuals`. Close this milestone when 11r-e merges. Historical scope below (new,
   spawned 2026-07-25). ux1 persistent on-screen hint for the existing (but undiscovered) `?` help overlay +
   battle-result continue hint; ux2 owner-scoped `player_wallet` view (mirrors the `player_conversation`
   ADR-0087 pattern) so the shop can show the player's own balance without weakening the privacy model; ux3
@@ -374,22 +381,36 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   promoted. Skeleton only — next unit of work is the full HEAVY ceremony (investigation/6-way ideation/
   judge synthesis), not implementation. Must land before the playtest-3 gate per the 2026-07-26 operator
   gate-timing directive (all r2-created milestones close first).
-- **M-postgate-battle-0hp-fix** (`M-postgate-battle-0hp-fix.spec.md`) — **NEW, queued, post-gate,
-  un-blocked** (r2 feedback, items 005/030/031/036-039). LIGHT bug fix: 0hp lead-monster sent out at
+- **M-postgate-battle-0hp-fix** (`M-postgate-battle-0hp-fix.spec.md`) — **PvE HALF MERGED 2026-07-31,
+  PvP HALF PARKED** (11r-d ledger reconciliation): #258/ADR-0156 landed the PvE fix (never seat a 0 HP
+  lead; reject actions from a fainted active). **The PvP half was deliberately parked by ADR-0156** and is
+  now folded into `M-postgate-eleventh-review-residuals` slices **11r-a** (PvP server-guard parity) and
+  **11r-b** (PvP side-B battle overlay). Do NOT mark CLOSED until those merge. Historical scope below (originally: NEW, queued, post-gate, un-blocked; r2 feedback, items 005/030/031/036-039). LIGHT bug fix: 0hp lead-monster sent out at
   battle start, ghost-attack accepted, silent round-2 swap. Disjoint from other r2 milestones — fan-out
   candidate.
-- **M-postgate-movement-investigation** (`M-postgate-movement-investigation.spec.md`) — **NEW, queued,
-  post-gate, un-blocked** (r2 feedback, items 003/015/029/040-042). Residual double-move defect distinct
+- **M-postgate-movement-investigation** (`M-postgate-movement-investigation.spec.md`) — **CLOSED 2026-07-31**
+  (11r-d ledger reconciliation): #259/ADR-0158 root-caused the residual double-move to the CLIENT
+  (server proved innocent) and shipped the hold-commit tap/hold gate; the OBSERVABILITY fallback was not
+  needed. Historical scope below (originally: NEW, queued, post-gate, un-blocked; r2 feedback, items 003/015/029/040-042). Residual double-move defect distinct
   from nh1/nh2 (already merged); root-cause client-vs-server before fixing; OBSERVABILITY fallback if
   undiagnosable within budget.
-- **M-postgate-dev-observability** (`M-postgate-dev-observability.spec.md`) — **NEW, queued, post-gate,
-  un-blocked** (r2 feedback, items 043/045/046). Toggleable dev-console outbound-event logging, dev-only.
+- **M-postgate-dev-observability** (`M-postgate-dev-observability.spec.md`) — **CLOSED 2026-07-31** (11r-d
+  ledger reconciliation): #257/ADR-0157 shipped the flag-gated dev-console outbound-reducer log.
+  Historical scope below (originally: NEW, queued, post-gate, un-blocked; r2 feedback, items 043/045/046). Toggleable dev-console outbound-event logging, dev-only.
   Disjoint — fan-out candidate.
-- **M-postgate-feel-polish** (`M-postgate-feel-polish.spec.md`) — **NEW, queued, post-gate, un-blocked**
-  (r2 feedback item 091's sibling process-defect closure + r1 strays finally sized: care-button no-op,
+- **M-postgate-feel-polish** (`M-postgate-feel-polish.spec.md`) — **CLOSED 2026-07-31** (11r-d ledger
+  reconciliation): #260/ADR-0159 shipped care-button confirmation feedback + collision-aware NPC wander.
+  Historical scope below (originally: NEW, queued, post-gate, un-blocked; r2 feedback item 091's sibling process-defect closure + r1 strays finally sized: care-button no-op,
   movement/NPC feel tuning, no walk animation; items 087-090). LIGHT, bundle as one slice.
 - **M-postgate-client-coverage** (client-hardening; M-playtest-c.5 Decision D, Drew-delegated 2026-07-20) — extract the inline decision logic in `main.ts`/`battleView.ts`/`boxView.ts` into tested pure `*Model.ts` cores and drop the coverage-denominator exclusions; a mechanical fence lands pre-gate (fail if the `vite.config.ts` excluded set grows). Pairs with the ptc5c-2 overlay-registry client-hardening work. Stays post-gate provisional (order unchanged) behind the two hardening milestones above.
-- **M-postgate-ux-design** (`M-postgate-ux-design.spec.md`) — **DESIGNED 2026-07-25** (the three larger UX
+- **M-postgate-ux-design** (`M-postgate-ux-design.spec.md`) — **CLOSED 2026-07-31** (11r-d ledger
+  reconciliation): all three designed slices merged — uxd1 #262/ADR-0160 (responsive viewport), uxd2
+  #264/ADR-0161 (shop-via-NPC context interact), uxd3 in three parts a/b/c #266/ADR-0162, #267/ADR-0163,
+  #268/ADR-0164 (overlay IA → probe substrate → write substrate + `canOpen` migration). uxd3-c
+  **also closed `M-postgate-overlay-registry`**, which this milestone subsumed. Named residual, NOT
+  blocking closure: the Escape-tooth re-anchoring boy-scout was deferred three times as over-cap
+  (~73 lines / 4 hunks, atomic) → carry as `uxd3-d` if it is ever wanted. Historical scope below
+  (DESIGNED 2026-07-25, the three larger UX
   design questions from the gate, sized via a brainstorm→debate→judge→synthesize multi-agent convergence
   pass; all three converged). Three slices: **uxd1** responsive viewport scaling (DPR-correct + device-integer
   crisp + fill-model follow-camera + small-map centering; render-edge-only, netcode-safe by construction);
@@ -401,6 +422,21 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   cleaner second playtest read, in normal queue order, ADR per slice at build). Sequencing: uxd3 is `main.ts`-
   SERIAL and lands AFTER netcode-hardening nh1/nh2; uxd1/uxd2 are largely disjoint. See spec §4 for the full
   sequencing/fan-out notes and the per-slice open-questions-for-Drew (each with a recommended default).
+- **M-postgate-eleventh-review-residuals** (`M-postgate-eleventh-review-residuals.spec.md`) — **NEW,
+  queued 2026-07-31; inserted between `M-postgate-ux-design` (in flight) and
+  `M-evolution-essence-redesign`** per the weekly-review insertion convention. Verified eleventh
+  multi-lens review findings @ `3063149`: three HIGH product defects — PvP 0hp-lead exploit
+  (the ADR-0156-parked PvP half, folds in `M-postgate-battle-0hp-fix-pvp`), PvP side-B has no
+  battle overlay in production (ADR-0155 D6, folds in `M-postgate-pvp-side-b-overlay`), and the
+  server lacks the battle movement lock the sim-harness models (the `battle_lock_convergence`
+  eval criterion certifies a fictional invariant) — plus the skipped post-gate-wave ledger
+  reconciliation (CHANGELOG stops at #239 vs HEAD #261; ADR README catalog stops at 0134),
+  ux2b wallet completion (ADR-0154 D7), resume-from-idle interpolation smoothness, a server
+  hardening basket (silent encounter failures, ADR-0089 abilities/type-chart cache completion,
+  `HealLocationRow.cost_currency`), test-integrity residuals, and gate-coverage extensions.
+  Four DECISIONS for Drew in spec §4 (battle-table team exposure, unsolicited-trade escrow
+  griefing, held-key RTT pin, changelog gate). `main.ts` slices are SERIAL with uxd3 — see
+  spec §3 sequencing. No new game-design surface outside the §4 decisions.
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
