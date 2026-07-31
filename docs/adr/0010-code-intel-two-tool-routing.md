@@ -84,9 +84,18 @@ followed by a 3-lens adversarial design review (27 findings), established:
   upgrade restores its settings wildcard and may rewrite `~/.claude/CLAUDE.md`
   — all four resurrection modes are caught by the `setup-claude --check`
   vendor-drift teeth (cbm banner re-registration, vendor-skill marker loss,
-  codegraph wildcard return, routing-note loss/reorder); − cbm 0.8.1 staleness
-  remains a standing wrong-answer hazard until the 0.9.0 upgrade (recommended
-  follow-up, forces full re-index).
+  codegraph wildcard return, routing-note loss/reorder); − cbm CLI staleness
+  remains a standing wrong-answer hazard even on 0.9.0 (see addendum).
+- Addendum 2026-07-31 (upgrade performed, Drew-approved): cbm 0.8.1 → 0.9.0 via
+  `update -y --ui` (non-TTY needs the variant flag; the flagless attempt deleted
+  all indexes then aborted). The installer resurrected the banner + stale skill
+  + `~/.claude/.mcp.json` exactly as predicted; the `--check` teeth caught it
+  and all were re-repaired. All 6 real indexes rebuilt (monster-realm in 2.4 s).
+  Verified on 0.9.0: exact `project` slugs are STILL required (short names
+  rejected), and `auto_watch=true` (new default) helps only a resident MCP
+  server — CLI one-shots measured stale ≥16 s after an edit, so the
+  snapshot/probe/re-index discipline is unchanged. Resident MCP servers keep
+  running the old binary until each Claude Code session restarts.
 
 ## Confirmation
 `scripts/setup-claude.mjs --check` fails on vendor-doctrine resurrection

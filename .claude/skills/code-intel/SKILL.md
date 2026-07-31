@@ -44,11 +44,14 @@ as it overrides the cbm banner if you ever see one.
   (`projectPath` to another repo) and CLI-only workflows read an unwatched
   index** — run `codegraph status <abs-path>` first (it reports Pending Changes
   reliably) and `codegraph sync <abs-path>` if pending (~36 ms/file).
-- **codebase-memory-mcp 0.8.1:** NO watcher, ever — the graph is a snapshot.
-  `detect_changes` probes dirtiness (10 ms); re-index is cheap and incremental
-  (`index_repository`, ~71 ms small repo). **Never trust `get_code_snippet` or
-  line numbers after local edits without re-indexing** — it silently applies
-  stale line ranges to the live file and returns skewed source.
+- **codebase-memory-mcp (0.9.0):** treat the graph as a snapshot. The 0.9.0
+  `auto_watch=true` watcher lives only in a resident MCP server process —
+  verified 2026-07-31 that CLI one-shots still serve stale data ≥16 s after an
+  edit, so the discipline is unchanged: `detect_changes` probes dirtiness
+  (10 ms); re-index is cheap and incremental (`index_repository`). **Never
+  trust `get_code_snippet` or line numbers after local edits without
+  re-indexing** — it silently applies stale line ranges to the live file and
+  returns skewed source.
 - **Both graphs track the canonical checkout.** For a pinned review clone,
   an older SHA, or a `.claude/worktrees/<slice>` tree: use Read/Grep only.
   Never index worktree paths (pollutes the cache; build-loop doctrine).
@@ -119,7 +122,7 @@ stdout looks like success.
 - **cbm `search_graph` `direction` param accepted but inert** → not in the real schema. **Avoid:** fan-in/fan-out via `query_graph` Cypher.
 - **Grep/Glob hook injects symbols from the wrong repo** → the cbm PreToolUse augmenter resolves the project from **cwd**, not the searched path. **Avoid:** ignore injected symbols whose repo ≠ the path you grepped.
 - **`{"error":"project not found"}` with a correct-looking name** → query tools need the exact `list_projects` slug; there is no cwd resolution in 0.8.1. (Promoted from wsl-harness-exec.)
-- **cbm answers reflect old code with no error** → no watcher; snapshot staleness. **Avoid:** `detect_changes` probe; re-index post-merge; never trust snippets on a dirty tree.
+- **cbm answers reflect old code with no error** → snapshot staleness (0.9.0's auto_watch only helps a resident MCP server, never CLI one-shots — verified). **Avoid:** `detect_changes` probe; re-index post-merge; never trust snippets on a dirty tree.
 - **`manage_adr` is NOT the repo's ADRs** → it's the tool's own per-project memo inside the index db (`adr_present:false` despite 150+ real ADR files); its `sections` filter on get is ignored.
 - **`ingest_traces` accepts and discards** → unimplemented stub. Don't build on it.
 - **Vendor updates resurrect stale doctrine** → `codebase-memory-mcp install`/`update` re-adds its SessionStart banner + rewrites its skill; `codegraph install --refresh`/upgrade restores its settings wildcard and may rewrite `~/.claude/CLAUDE.md`. **Avoid:** run `just setup-claude --check` after any vendor install/update — it fails on all four resurrection modes (banner re-registration, skill-marker loss, codegraph wildcard return, routing-note loss).
