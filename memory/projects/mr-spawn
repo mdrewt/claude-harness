@@ -32,7 +32,7 @@ export CAP
 # pre-launch cost-flag hygiene (review F-C/F-G: spawn owns cleanup; a watcher must never erase live state)
 rm -f "/tmp/mr_warn_$S" "/tmp/mr_costwatch_$S.fired" "/tmp/mr_cap_topup_$S" "/tmp/mr_wrap_$S"
 grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && rm -f "/tmp/mr_stop_$S" "/tmp/mr_stop_$S.reason"
-WRITES=$(find "$HARNESS" "$PROJ" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/.claude/worktrees/*' -not -path "$MEM/*" -mmin -6 2>/dev/null | head -1)
+WRITES=$(find "$HARNESS" "$PROJ" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/.claude/worktrees/*' -not -path "$MEM/*" -not -path '*/.codegraph/*' -mmin -6 2>/dev/null | head -1)
 [ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
 [ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
 # build brief

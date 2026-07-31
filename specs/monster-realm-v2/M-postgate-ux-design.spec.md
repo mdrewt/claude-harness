@@ -66,6 +66,8 @@ Each slice carries the converged design's **key decisions**, **EARS acceptance c
 
 ### uxd2 — Shop-via-NPC: a context-sensitive interact system (server-anchored `NpcInteraction` enum + generalized `KeyT` + on-world prompt)
 
+**DELIVERED (2026-07-31, ADR-0161, PR pending).** Reconciliations vs literal spec: **(a)** GREET-THEN-SHOP implemented per Drew's direction — AC "nearest interactable is an NPC with Shop(shopId), THE client SHALL open the shop overlay ... without calling any reducer" satisfied via greeting hop (KeyT sends `talk` reducer for Dialogue, enum-derived Shop button dismisses greeting then opens bound shop overlay with no reducer call); **(b)** "WHEN KeyG is pressed..." AC SUPERSEDED by Drew's "Do not keep" — `KeyG`/`KeyH` handlers and helpModel rows removed, default first-shop/first-location model arms preserved and regression-pinned; **(c)** heal overlay binding is VIEW-only (`buildHealViewModelForLocation`), heal_party SEND retains first-location default (residual: bind send when second heal location exists). Note: `touches:` under-enumeration found at build (rowConvert.ts, connection.ts mirror, dialogueContent.ts, dialogueView.ts, helpModel.ts+test, main.wiring key lists, world.ts screenFor) — recorded in PR touches-delta; trade.spec.ts KeyG/KeyH press blocks now vacuously green (follow-up flagged).
+
 **Intent.** One context-sensitive interact action: based on the nearest in-range interactable, the interact key opens the right thing — talk to a Dialogue NPC, shop at a Shop NPC, heal at a heal target. Matches the playtester's "walk up to a shopkeeper and interact" mental model and ADR-0069's "NPCs may offer healing at their location" intent.
 
 **Key decisions.**
