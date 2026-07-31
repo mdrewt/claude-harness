@@ -197,6 +197,28 @@ for (const file of transcripts) {
     if (!Number.isNaN(ts) && ts < transcriptFloor) transcriptFloor = ts;
     const msg = d.message;
     const content = msg && typeof msg === 'object' ? msg.content : null;
+    // User slash invocations (<command-name>/x</command-name>) are skill usage
+    // too — without counting them, user-invoked skills (and slash-only skills
+    // marked disable-model-invocation, which can never auto-fire) always look
+    // "defined but never invoked". Dedup on line uuid, since resumed/forked
+    // transcripts repeat lines the way they repeat tool_use ids.
+    if (d.type === 'user' && content != null) {
+      const raw = typeof content === 'string' ? content : JSON.stringify(content);
+      const m = raw.match(/<command-name>\/([a-z0-9:_-]{1,40})<\/command-name>/);
+      if (m) {
+        const key = `cmd:${d.uuid || `${file}:${d.timestamp || ''}`}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          if (!Number.isNaN(ts)) {
+            if (ts < dataMin) dataMin = ts;
+            if (ts > dataMax) dataMax = ts;
+          }
+          if (Number.isNaN(ts) || (ts >= since && ts <= until)) {
+            bump(skills, m[1], Number.isNaN(ts) ? 0 : ts, d.sessionId);
+          }
+        }
+      }
+    }
     if (!Array.isArray(content)) continue;
     const session = d.sessionId;
     for (const b of content) {

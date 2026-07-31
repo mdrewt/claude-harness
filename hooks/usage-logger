@@ -1,71 +1,79 @@
-#!/usr/bin/env python3
-"""PostToolUse hook: append every Skill / Agent invocation to ~/.claude/usage-log.csv.
+#!/usr/bin/env node
+// PostToolUse hook: append every Skill / Agent invocation to ~/.claude/usage-log.csv.
+//
+// Canonical source lives in the harness repo (hooks/usage-logger); `just setup-claude`
+// symlinks ~/.claude/hooks/usage-logger to it. Wired in ~/.claude/settings.json under
+// PostToolUse with matcher "Skill|Agent|Task". Never blocks and never errors out the
+// tool call: always exits 0. Read back by scripts/audit-usage.mjs.
+//
+// Node, not python: asdf has no global python pin, so a python3 shebang dies (exit 126)
+// in every cwd without a .tool-versions python entry — which silently dropped all
+// interactive-session rows while cron-spawned runs (system python3 on PATH) kept
+// logging. nodejs IS pinned globally and /usr/bin/node covers cron. CommonJS, not ESM:
+// cron's /usr/bin/node is v18, which cannot auto-detect module syntax in an
+// extensionless file.
+//
+// Security: the skill/agent name and project come from model-controlled tool input, so
+// each field is sanitized before it lands in the CSV — control chars are flattened (so a
+// field can't break the row) and a leading =,+,-,@ is escaped so the value can never be
+// interpreted as a formula if the log is opened in a spreadsheet (CSV-injection guard).
 
-Canonical source lives in the harness repo (hooks/usage-logger); `just setup-claude`
-symlinks ~/.claude/hooks/usage-logger to it. Wired in ~/.claude/settings.json under
-PostToolUse with matcher "Skill|Agent|Task". Never blocks and never errors out the
-tool call: always exits 0. Read back by scripts/audit-usage.mjs.
+'use strict';
+const { appendFileSync, existsSync, readFileSync } = require('node:fs');
+const { homedir } = require('node:os');
+const { basename, join } = require('node:path');
 
-Security: the skill/agent name and project come from model-controlled tool input, so
-each field is sanitized before it lands in the CSV — control chars are flattened (so a
-field can't break the row) and a leading =,+,-,@ is escaped so the value can never be
-interpreted as a formula if the log is opened in a spreadsheet (CSV-injection guard).
-"""
+const LOG = join(homedir(), '.claude', 'usage-log.csv');
+const HEADER = 'timestamp,kind,name,session,project';
 
-import csv
-import datetime
-import json
-import os
-import sys
+// Neutralize CSV/formula injection from untrusted (model/path-derived) fields.
+const safe = (value) => {
+  let s = String(value).replace(/[\r\n\t]/g, ' ');
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return s;
+};
 
-LOG = os.path.join(os.path.expanduser("~"), ".claude", "usage-log.csv")
-HEADER = ["timestamp", "kind", "name", "session", "project"]
+// Minimal CSV field encoder (matches python csv.writer semantics: quote when the
+// field contains a comma, quote, or newline; double internal quotes).
+const csvField = (s) => (/[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s);
 
+const main = () => {
+  let data;
+  try {
+    data = JSON.parse(readFileSync(0, 'utf8'));
+  } catch {
+    return;
+  }
+  const tool = data.tool_name;
+  const inp = data.tool_input || {};
+  let kind;
+  let name;
+  if (tool === 'Skill') {
+    kind = 'skill';
+    name = inp.skill || '(unknown)';
+  } else if (tool === 'Agent' || tool === 'Task') {
+    kind = 'agent';
+    name = inp.subagent_type || '(unknown)';
+  } else {
+    return;
+  }
+  const cwd = String(data.cwd || '').replace(/\/+$/, '');
+  const row = [
+    new Date().toISOString(),
+    kind,
+    safe(name),
+    String(data.session_id || ''),
+    cwd ? safe(basename(cwd)) : '',
+  ]
+    .map(csvField)
+    .join(',');
+  const prefix = existsSync(LOG) ? '' : HEADER + '\n';
+  appendFileSync(LOG, prefix + row + '\n');
+};
 
-def safe(value):
-    """Neutralize CSV/formula injection from untrusted (model/path-derived) fields."""
-    s = str(value)
-    # Flatten control chars so a value can never break the CSV row structure.
-    for ch in ("\r", "\n", "\t"):
-        s = s.replace(ch, " ")
-    # Escape spreadsheet formula triggers (=, +, -, @) with a leading apostrophe.
-    if s[:1] in ("=", "+", "-", "@"):
-        s = "'" + s
-    return s
-
-
-def main():
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        return
-    tool = data.get("tool_name")
-    inp = data.get("tool_input") or {}
-    if tool == "Skill":
-        kind, name = "skill", inp.get("skill", "(unknown)")
-    elif tool in ("Agent", "Task"):
-        kind, name = "agent", inp.get("subagent_type", "(unknown)")
-    else:
-        return
-    cwd = (data.get("cwd") or "").rstrip("/")
-    row = [
-        datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        kind,
-        safe(name),
-        data.get("session_id", ""),
-        safe(os.path.basename(cwd)) if cwd else "",
-    ]
-    new = not os.path.exists(LOG)
-    with open(LOG, "a", newline="") as f:
-        w = csv.writer(f)
-        if new:
-            w.writerow(HEADER)
-        w.writerow(row)
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception:
-        pass
-    sys.exit(0)
+try {
+  main();
+} catch {
+  /* never fail the tool call */
+}
+process.exit(0);

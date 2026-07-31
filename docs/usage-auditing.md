@@ -25,6 +25,19 @@ agents and skills by invocation count and splits the laggards into two buckets:
 A zero count means *useless* **or** *never triggered*. Check the description
 before deleting — a good skill with a bad trigger looks identical to dead weight.
 
+Two signal caveats (2026-07-31 diagnosis):
+- **Slash-only skills never auto-fire.** A skill whose frontmatter sets
+  `disable-model-invocation: true` (~20 of the Matt Pocock pack: handoff,
+  implement, wizard, writing-*, teach, …) is invisible to the model and only
+  runs when YOU type `/<name>`. The audit now counts those slash invocations
+  from transcripts; judge these skills by that number, never by model dispatch.
+- **The usage-log CSV has a gap.** The logger hook ran `#!/usr/bin/env python3`,
+  which exits 126 under asdf in any cwd without a python pin — so interactive
+  and SDK sessions logged NOTHING (only cron-spawned supervisor runs, whose
+  PATH finds system python3, kept logging) until the hook was ported to node
+  on 2026-07-31. CSV-era counts before that date undercount interactive usage;
+  transcript-derived counts are unaffected.
+
 Extra flags: `--since/--until YYYY-MM-DD`, `--by-project`, `--json` (machine
 output), `--roots a,b,c` (where to scan for definitions, default `~/projects`),
 `--config <dir>` (default `~/.claude`).
