@@ -96,6 +96,23 @@ followed by a 3-lens adversarial design review (27 findings), established:
   server — CLI one-shots measured stale ≥16 s after an edit, so the
   snapshot/probe/re-index discipline is unchanged. Resident MCP servers keep
   running the old binary until each Claude Code session restarts.
+- Addendum 2026-07-31b (final review pass, Drew-directed): a two-lens re-review
+  under 0.9.0 re-verified every documented command and 9/11 behavioral claims.
+  Doctrine updates it forced: the 0.9.0 index rebuild FIXED cbm's cross-module
+  edge drops (attempt_recruit et al. now resolved — cbm ⊇ CodeGraph in every
+  caller probe), so the union rule is currently one-directionally justified
+  (CodeGraph's qualified-path blind spot persists) and is kept as cheap
+  insurance against either side regressing; `.claude/worktrees` pollution is
+  gone from the rebuilt monster-realm index (Cypher filter kept as
+  precaution; pixi.min pollution fully persists, 4k+ nodes); the raw-JSON
+  `cli <tool> '<json>'` arg form is deprecated in 0.9.0 (stderr warning, still
+  works). Context-cost trims: the always-loaded surfaces were cut ~130 tok/
+  session everywhere, ~240/mr session, ~240/build session, ~55/skill-list
+  (routing detail collapsed into the skill as SSOT). The vendor
+  `codebase-memory` skill stub was deleted outright — the drift tooth now
+  fires on existence-without-marker, and a vendor reinstall recreating the
+  skill still fails `--check`. `get_architecture` was removed from both
+  allowlists (doctrine bans it; enumerating it signaled endorsement).
 
 ## Confirmation
 `scripts/setup-claude.mjs --check` fails on vendor-doctrine resurrection

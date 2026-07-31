@@ -179,22 +179,19 @@ try {
       '  VENDOR-DRIFT ~/.claude/settings.json registers cbm-session-reminder — retired by ADR-0010; remove the SessionStart entries (a cbm install/update re-adds them)',
     );
   }
+  if (settings.includes('mcp__codegraph__*')) {
+    failures++;
+    console.log(
+      '  VENDOR-DRIFT ~/.claude/settings.json has the mcp__codegraph__* wildcard back — a codegraph install/upgrade restored it; re-enumerate codegraph_explore (ADR-0010)',
+    );
+  }
 } catch {}
 try {
   const vendorSkill = join(CLAUDE, 'skills', 'codebase-memory', 'SKILL.md');
   if (existsSync(vendorSkill) && !readFileSync(vendorSkill, 'utf8').includes('superseded by the code-intel skill')) {
     failures++;
     console.log(
-      '  VENDOR-DRIFT ~/.claude/skills/codebase-memory/SKILL.md lost its supersession marker — a cbm install/update restored stale vendor content (see ADR-0010)',
-    );
-  }
-} catch {}
-try {
-  const settings = readFileSync(join(CLAUDE, 'settings.json'), 'utf8');
-  if (settings.includes('mcp__codegraph__*')) {
-    failures++;
-    console.log(
-      '  VENDOR-DRIFT ~/.claude/settings.json has the mcp__codegraph__* wildcard back — a codegraph install/upgrade restored it; re-enumerate codegraph_explore (ADR-0010)',
+      '  VENDOR-DRIFT ~/.claude/skills/codebase-memory/SKILL.md exists without its supersession marker — a cbm install/update restored stale vendor content; delete it or re-stub (see ADR-0010)',
     );
   }
 } catch {}

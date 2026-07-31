@@ -1,6 +1,6 @@
 ---
 name: code-intel
-description: Route code-intelligence queries between CodeGraph and codebase-memory-mcp. Triggers on: explore the codebase, understand the architecture, what functions exist, show me the structure, who calls this function, what does X call, trace the call chain, find callers of, show dependencies, impact analysis, blast radius, dead code, unused functions, high fan-out, refactor candidates, code quality audit, complexity hotspots, graph query syntax, Cypher query examples, how to use search_graph, codegraph explore, read a symbol's source, knowledge graph, code intelligence tools.
+description: Route code-intelligence queries between CodeGraph and codebase-memory-mcp. Triggers on: who calls / callers of / blast radius / impact analysis, what does X call, trace the call chain, show dependencies, dead code, complexity hotspots, explore or understand the codebase, graph query syntax (Cypher, search_graph, codegraph explore), read a symbol's source, code intelligence tools.
 ---
 
 # Code intelligence — routing CodeGraph + codebase-memory-mcp
@@ -28,7 +28,7 @@ as it overrides the cbm banner if you ever see one.
 | Question | Route |
 |----------|-------|
 | Read/understand symbol X + neighborhood | CodeGraph: `codegraph node X` (best single call: source + calls + called-by) or `codegraph explore "<symbol bag>"` — verbatim line-numbered source, Edit-safe |
-| Who calls X? / blast radius | **Union BOTH graphs**: cbm `query_graph` Cypher callers **+** `codegraph callers X -l 50`. Each has verified blind spots the other covers (CG misses Rust qualified-path calls like `game_core::f(...)`; cbm has dropped cross-module edges). **Additionally grep** when X can be invoked dynamically — TS callbacks / `on*` properties / DI closures / e2e `window` hooks / Rust trait objects — both graphs are blind there |
+| Who calls X? / blast radius | **Union BOTH graphs**: cbm `query_graph` Cypher callers **+** `codegraph callers X -l 50`. CG verifiably misses Rust qualified-path calls (`game_core::f(...)`); cbm's 0.8.1 index dropped cross-module edges until the 0.9.0 rebuild fixed them — the union is cheap insurance against either side regressing. **Additionally grep** when X can be invoked dynamically — TS callbacks / `on*` properties / DI closures / e2e `window` hooks / Rust trait objects — both graphs are blind there |
 | What does X call (pipeline orientation) | `codegraph callees X` or cbm Cypher (both verified accurate) |
 | Text/content search | cbm `search_code` (grep + graph dedup, definitions ranked first) or plain Grep |
 | Complexity / hot-path metrics | cbm `query_graph` on Function props (`complexity`, `linear_scan_in_loop`, …) — **always** filter `NOT f.file_path CONTAINS 'pixi.min'` and `NOT ... '.claude/worktrees'` |
@@ -95,7 +95,9 @@ Latency: warm 5–90 ms. **First cbm CLI call of a session can take ~40 s** (col
 start), and rare ~40 s MID-session stalls occur too (daemon contention) — keep
 a generous timeout (≥ 60 s) on every cbm CLI call and treat a stall as
 retryable, not tool failure. Errors go to stderr; don't `2>/dev/null` or empty
-stdout looks like success.
+stdout looks like success. 0.9.0 prints a stderr deprecation warning for the
+raw-JSON arg form above (still works, clean JSON on stdout — not an error; a
+future release moves to flags/stdin).
 
 ## Safety
 
@@ -116,7 +118,7 @@ stdout looks like success.
 - **CG blast radius asserts "1 caller / no covering tests" yet callers exist** → qualified-path Rust calls (`game_core::f(...)`) aren't resolved as CALLS edges. **Avoid:** never trust single-graph caller lists; union per routing table.
 - **CG `callers` list looks complete but misses the production caller** → silent default `-l 20` truncation. **Avoid:** always `-l 50`.
 - **CG NL question returns plausible-looking wrong symbols (even fabricated flows)** → keyword retrieval, not semantic. **Avoid:** symbol-bag queries only.
-- **cbm caller/callee trace suddenly lists 40+ minified symbols** → name collision with the indexed `pixi.min.mjs` vendor bundle (callee direction is untrustworthy). **Avoid:** inbound direction + path filters; ignore callee garbage.
+- **cbm results polluted by minified symbols** → the indexed `pixi.min.mjs` vendor bundle (4k+ nodes) skews BM25 ranking, degree hubs, and architecture output. 0.9.0's `trace_path` now refuses ambiguous short names (returns suggestions), which mitigates the worst collision-callee garbage — still use qualified names + path filters.
 - **cbm `search_graph` with a text `query` ignores `max_degree`/filters silently** → BM25 mode overrides structural filters. **Avoid:** don't combine; use `query_graph` for structural precision.
 - **Three pattern syntaxes:** `search_graph` `name_pattern`/`qn_pattern` = regex, `file_pattern` = **glob** (regex silently returns 0); `search_code` `path_filter` = regex, `file_pattern` = glob. **Avoid:** check which param you're using.
 - **cbm `search_graph` `direction` param accepted but inert** → not in the real schema. **Avoid:** fan-in/fan-out via `query_graph` Cypher.
