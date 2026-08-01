@@ -1169,3 +1169,34 @@ FOR THE OPERATOR.
 4. Synthetic log lines: mr-native-tick.log carries WATCHER-DEAD/ORPHAN-RUN entries for slices
    `faketest` and `orphantest` at 09:58-10:02Z. Those are verification fixtures, both removed; a
    NOTE line marks the window. No real slice was live.
+
+## 2026-08-01T10:30:01Z — CORRECTION to the ADR-0011 handoff above: the loop is ENABLED, not disabled
+The entry above states "the loop is STILL DISABLED". That was true when written (~10:05Z) and is
+now FALSE. Correcting rather than editing, per append-only discipline.
+
+WHAT CHANGED. `.native-supervisor-disabled` was present at 10:02:22Z (five ticks in that minute
+logged "NOTE disabled-flag overridden (MR_FORCE=1 manual run)" from my dry runs, which prove the
+flag existed) and was ABSENT by the 10:27:09Z cron tick, which logged a bare
+"STANDDOWN human-ide-session" with no SKIP line.
+
+WHO. Not me, and not any script I ran. `MR_FORCE=1` only overrides gate -1, it never removes the
+flag (mr-native-tick.sh:123-125); `mr-ci-watch:9` and `mr-decision-watch` only READ it.
+`~/.local/bin/mr-supervisor-enable` is the only thing in the tree that rm's it, and bash history
+carries a match. Attributing this to the operator re-enabling during the session.
+
+CURRENT STATE, verified 10:29Z:
+- Loop ENABLED. Every tick since has stood down at gate 3 on human-ide-session (this session), so
+  nothing has spawned and no money has been spent since 08:02Z.
+- ONCE THE HUMAN SESSION ENDS the next hourly tick will proceed normally, and it will run the
+  ADR-0011 code: mr-cost-sum-derived costs, the re-keyed WATCHER-DEAD, ORPHAN-RUN, gate-2 arming,
+  the new CENSUS fields. All are committed (7df734d), selfcheck-gated, and regression-tested
+  against the 11 surviving pass logs and all 28 tick logs.
+- No locks, no live slices, no pending events. /tmp/mr_pass_11r-g.done is the only .done and is
+  already reconciled.
+- master GREEN at e13a69c (CI). Nightly at e13a69c was still in_progress at 09:58Z -- STILL NOT
+  ADJUDICATED; the first tick to run should check it.
+- Governor: d7=$806.41 / $2783 (29.0%), fable_d7=$382.52, state=NORMAL -- both axes now truthful.
+
+NOTHING TO UNDO. The enable is a legitimate operator action and the shipped code is safe to run.
+Flagged only because the record above would otherwise mislead the next tick about the kill-switch
+state, which is exactly the class of stale-assertion error this retro was about.
