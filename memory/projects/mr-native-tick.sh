@@ -64,6 +64,10 @@ try:
         try: d=json.loads(l)
         except Exception: continue
         if d.get("slice")!=sl or not d.get("cost_usd"): continue
+        # reversal rows are accounting, not evidence that a run was recorded — without this a
+        # CORRECTION row would make any rerun of the same slice within 12h look already-backfilled
+        # and its real cost would be silently dropped (2026-08-01 cost-correction pass)
+        if str(d.get("outcome","")).upper().startswith("CORRECTION"): continue
         try: e=datetime.datetime.strptime(str(d.get("ts",""))[:19],"%Y-%m-%dT%H:%M:%S").timestamp()
         except Exception: continue
         if e >= dm - 12*3600: hit="YES"; break
@@ -87,18 +91,14 @@ PYCHK
     } >> "$EVF" 2>/dev/null || true
   fi
   # single-run spend alert (visibility only, never a gate): flag unusually expensive runs same-hour
-  RCOST=$(/usr/bin/python3 - "$RLOG" <<'PYC'
-import json,sys
-t=0.0
-try:
-    for l in open(sys.argv[1],errors="replace"):
-        if '"type":"result"' in l:
-            try: t+=float(json.loads(l).get("total_cost_usd") or 0)
-            except Exception: pass
-except Exception: pass
-print(round(t,2))
-PYC
-)
+  # cost via the mr-cost-sum SSOT — total_cost_usd is CUMULATIVE per accumulation run, so the
+  # naive sum this replaced overcounted multi-attempt runs (uxd2 $423.65 vs a true $165.65)
+  RCOST=$("$MEM/mr-cost-sum" "$RLOG" 2>/dev/null)
+  # "-" is a legitimate COST-UNKNOWN (no result events). EMPTY means the helper itself failed
+  # (missing, non-executable, truncated) — degrade LOUDLY, because silently substituting 0 would
+  # suppress the SPEND-ALERT for a genuinely expensive run.
+  [ -z "$RCOST" ] && log "COST-HELPER-FAILED mr-cost-sum produced no output for slice $SL — SPEND-ALERT suppressed this run"
+  case "$RCOST" in ''|'-') RCOST=0 ;; esac   # float('-') would raise in the threshold compare below
   THRESH=$(/usr/bin/python3 -c "import json;print(json.load(open('$MEM/mr-budget-config.json')).get('single_run_alert_usd',150))" 2>/dev/null || echo 150)
   if /usr/bin/python3 -c "import sys;sys.exit(0 if float('$RCOST'or 0)>float('$THRESH') else 1)" 2>/dev/null; then
     log "SPEND-ALERT slice=$SL cost=\$$RCOST exceeds single_run_alert_usd=\$$THRESH"
@@ -168,22 +168,45 @@ fi
 # (debounce removed 2026-07-26 — 0 fires in 60+ production ticks; flock + durable-event requeue cover the class. Rollback: restore from git history if paired cron+event spawns ever double-run.)
 
 # gate 1: fast-path — live rooted run and no .done awaiting merge and no pending events -> standdown
-LIVE=0; DONE_WAIT=0; LIVE_SLICES=""
+LIVE=0; DONE_WAIT=0; LIVE_SLICES=""; LIVE_BARE=""
 for L in "$MEM"/.harness-runner.*.lock; do
   [ -e "$L" ] || continue
   SLICE=$(basename "$L"); SLICE=${SLICE#.harness-runner.}; SLICE=${SLICE%.lock}
   PID=$(/usr/bin/python3 -c "import json,sys
 try: print(json.load(open('$L')).get('session_leader') or '')
 except Exception: print('')" 2>/dev/null)
-  if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then LIVE=1; LIVE_SLICES="$LIVE_SLICES $SLICE($PID)"; fi
+  if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then LIVE=1; LIVE_SLICES="$LIVE_SLICES $SLICE($PID)"; LIVE_BARE="$LIVE_BARE $SLICE"; fi
   [ -f "/tmp/mr_pass_${SLICE}.done" ] && DONE_WAIT=1
 done
 PENDING=$(ls -A "$MEM/pending-events" 2>/dev/null | grep -v "^archive$" | head -1)   # archive/ lives inside this dir — excluding it restores the FREE fastpath (bug 2026-07-26: every live-chain standdown was a paid spawn since first archival)
-for LK in /tmp/mr_pass_*.vars.json; do
-  [ -f "$LK" ] || continue; LS=$(basename "$LK" .vars.json); LS=${LS#mr_pass_}
+# WATCHER liveness — keyed on a LIVE per-slice lock, NOT on vars.json. Nothing anywhere deletes
+# vars.json (decision runs rm the .done and leave it), so the old predicate fired for every
+# long-merged slice forever: 199/199 fires in the 48h to 2026-08-01 were false, and 3 of the 5
+# lines in the `tail -5` the supervisor reads first each tick were this spam. The lock is written
+# at mr-spawn:108 and the watcher spawned at :112, so lock-exists => watcher-was-started holds.
+# The .done guard STAYS: mr-cost-watch exits the moment .done appears (mr-cost-watch:67) while
+# mr-launch.sh:151 keeps the leader alive through fire_event's mr-ollama summarize-run, so
+# lock-alive + no-watcher is EXPECTED for that window and must not alarm.
+for LS in $LIVE_BARE; do
   [ -f "/tmp/mr_pass_$LS.done" ] && continue
   CW=$(cat "/tmp/mr_costwatch_$LS.lock.d/pid" 2>/dev/null)
   { [ -n "$CW" ] && kill -0 "$CW" 2>/dev/null; } || log "WATCHER-DEAD costwatch missing for live slice $LS (SPEND-ALERT remains the post-hoc net)"
+done
+# ORPHAN-RUN — retains the one class the vars.json predicate genuinely covered. mr-spawn writes
+# vars.json and launches at :62 but only writes the lock at :97-109, after sleep 4 + up to 90s of
+# model-assert polling (doubled on retry), so a PAID run can be live with no lock at all — and if
+# mr-spawn is killed in that window the run is invisible to gate 1, mr-situation and the reconcile.
+# A fresh pass-log mtime is what separates that from the stale vars.json every merged slice leaves.
+for LK in /tmp/mr_pass_*.vars.json; do
+  [ -f "$LK" ] || continue; LS=$(basename "$LK" .vars.json); LS=${LS#mr_pass_}
+  [ -f "/tmp/mr_pass_$LS.done" ] && continue
+  [ -e "$MEM/.harness-runner.$LS.lock" ] && continue
+  RL="/tmp/mr_pass_$LS.log"; [ -f "$RL" ] || continue
+  RLAGE=$(( $(date +%s) - $(stat -c %Y "$RL" 2>/dev/null || echo 0) ))
+  # age must be in [0,600): a FUTURE mtime (clock skew, a restored/copied file) would otherwise
+  # satisfy "< 600" forever and recreate exactly the always-on false alarm this pass removed.
+  [ "$RLAGE" -ge 0 ] && [ "$RLAGE" -lt 600 ] \
+    && log "ORPHAN-RUN $LS: live pass-log but no lock (mr-spawn died between launch and lock?) — verify by hand"
 done
 if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ] && [ -z "$PENDING" ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
 
@@ -219,13 +242,27 @@ WRITES=$(find "$HARNESS" "$PROJ" -type f \
   -not -path '*/.claude/worktrees/*' \
   -not -path "$HARNESS/memory/*" -mmin -6 2>/dev/null | head -1)
 # (worktrees are AGENT-owned by design — sibling fan-out writes are not human activity; retro 2026-07-24)
+# DELIBERATE DIVERGENCE from mr-spawn:35, which additionally excludes '*/.codegraph/*' (added
+# 2026-07-31, commit 8082e5c). Reviewed 2026-08-01 (ADR-0011) and kept: this is the LAST gate
+# before an unattended $60-400 run starts, and codegraph daemon writes are the only remaining
+# accidental backstop for human edits made INSIDE a worktree (excluded above). The measured cost
+# of the false trips is $0 — a standdown exits before any spawn, pending events requeue, and the
+# worst observed case was 15 min of merge latency. Do not "unify" these two lists by widening
+# this one; if they are ever unified, unify toward the stricter list.
 if [ -n "$IDE" ]; then log "STANDDOWN human-ide-session"; exit 0; fi
 if [ -n "$WRITES" ]; then
   log "STANDDOWN recent-writes: $WRITES"
-  if [ "$SRC" != "cron" ] && [ "$SRC" != "manual" ] && [ ! -f "/tmp/mr_evretry_$SRC" ]; then
-    touch "/tmp/mr_evretry_$SRC"
-    setsid /bin/bash -c "exec 9>&- 2>/dev/null; sleep 420; rm -f /tmp/mr_evretry_$SRC; MR_EVENT_SRC=${SRC} exec /bin/bash '$MEM/mr-native-tick.sh'" </dev/null >/dev/null 2>&1 &
-    log "RETRY scheduled in 7min (src=$SRC)"
+  # retry marker is keyed on EVENT identity, not on $SRC: two slices finishing inside the same
+  # 7-minute window both carry SRC=done, so the old per-source key silently dropped the second
+  # one's retry. Sanitized with `tr -dc` because EVKEY is interpolated into the double-quoted
+  # `bash -c` string below and both inputs are caller-supplied ($EVFILE is $1 / mr-launch.sh:24
+  # whose slice component is LLM-authored; $SRC is the MR_EVENT_SRC env var) — this is
+  # injection hardening, not just filename hygiene.
+  EVKEY=$(basename -- "${EVFILE:-$SRC}" 2>/dev/null | tr -dc 'A-Za-z0-9._-'); EVKEY=${EVKEY:-evt}
+  if [ "$SRC" != "cron" ] && [ "$SRC" != "manual" ] && [ ! -f "/tmp/mr_evretry_$EVKEY" ]; then
+    touch "/tmp/mr_evretry_$EVKEY"
+    setsid /bin/bash -c "exec 9>&- 2>/dev/null; sleep 420; rm -f /tmp/mr_evretry_$EVKEY; MR_EVENT_SRC=${SRC} exec /bin/bash '$MEM/mr-native-tick.sh'" </dev/null >/dev/null 2>&1 &
+    log "RETRY scheduled in 7min (src=$SRC key=$EVKEY)"
   fi
   exit 0
 fi
@@ -271,29 +308,27 @@ timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-sk
   --output-format stream-json --verbose \
   -p "$(cat "$PROMPTF")" >> "$TLOG" 2>&1
 RC=$?
-read -r COST TICKMODEL <<< "$(/usr/bin/python3 - "$TLOG" <<'PYX'
-import json,sys,re
-t=0.0; f=False; model=""
-try:
-    for l in open(sys.argv[1],errors="replace"):
-        if not model:
-            m=re.search(r'"model":"(claude-[a-z0-9.-]+)"', l)
-            if m: model=m.group(1)
-        if '"type":"result"' in l:
-            try:
-                c=json.loads(l).get("total_cost_usd")
-                if c is not None: t+=float(c); f=True
-            except Exception: pass
-except Exception: pass
-print((str(round(t,4)) if f else "-"), (model or "-"))
-PYX
-)"
+# cost via the mr-cost-sum SSOT (third and last copy of the old naive sum — see mr-cost-sum's
+# header). A tick is a single `claude -p` invocation so this site was never miscounted in
+# practice; it calls the helper so the buggy loop exists nowhere in the tree.
+COST=$("$MEM/mr-cost-sum" "$TLOG" 2>/dev/null)
+[ -z "$COST" ] && log "COST-HELPER-FAILED mr-cost-sum produced no output for tick $RID — SUPERVISOR row will record COST-UNKNOWN"
+COST=${COST:--}
+TICKMODEL=$(grep -m1 -o '"model":"claude-[a-z0-9.-]*"' "$TLOG" 2>/dev/null | sed 's/.*:"//;s/"$//')
+TICKMODEL=${TICKMODEL:--}
 [ "$COST" = "-" ] && COST=""
 [ "$TICKMODEL" = "-" ] && TICKMODEL="$SUP_MODEL"
 log "SPAWN-DONE rc=$RC cost=${COST:-unknown} model=$TICKMODEL rid=$RID"
 CEN=$(grep -o '"subagent_type":"[a-z-]*"' "$TLOG" 2>/dev/null | sort | uniq -c | awk '{printf "%s=%s ",$2,$1}' | tr -d '"' | sed 's/subagent_type=//g; s/subagent_type://g')
-CEN2=$(grep -c '"name":"Skill"' "$TLOG" 2>/dev/null || echo 0)
-[ -n "$CEN$CEN2" ] && log "CENSUS rid=$RID agents: ${CEN:-none} skills=$CEN2"
+# NOTE: `grep -c` prints 0 AND exits 1 on no match, so the old `|| echo 0` appended a SECOND
+# line and CEN2 became the two-line string "0\n0" — log() echoes it unquoted-expanded, which put
+# 39 orphan bare-`0` lines into mr-native-tick.log and broke every ^2026--anchored log parse.
+CEN2=$(grep -c '"name":"Skill"' "$TLOG" 2>/dev/null); CEN2=${CEN2:-0}
+# monitor= counts session-scoped Monitor waits. REVIEW-ONLY — nothing gates on it. A tick that
+# delegates a cross-tick wait to Monitor loses it when the session exits ~2min later (observed
+# 2026-08-01T08:00Z: CI-rerun watch never fired, mr-state.json left asserting a stale RED).
+CEN3=$(grep -c '"name":"Monitor"' "$TLOG" 2>/dev/null); CEN3=${CEN3:-0}
+[ -n "$CEN$CEN2$CEN3" ] && log "CENSUS rid=$RID agents: ${CEN:-none} skills=$CEN2 monitor=$CEN3"
 
 if [ "$RC" -eq 0 ]; then
   date -u +%s > "$MEM/.native-supervisor-last-success"
@@ -309,6 +344,74 @@ else
   date -u +%s > "$MEM/.native-supervisor-last-failure-epoch"
   printf '%s\trc=%s\trid=%s\treason=%s\n' "$(TS)" "$RC" "$RID" "$REASON" > "$MEM/.native-supervisor-last-failure"
   log "SPAWN-FAIL rc=$RC rid=$RID reason=${REASON}"
+  # RATE-LIMIT GATE ARMING. Gate 2 is the loop's only SELF-CLEARING standdown, but until
+  # 2026-08-01 nothing in the tree ever wrote rate_limit_resets_at — it was read-only at
+  # :197 and mr-situation:130 — so every rate-limit lockout fell through to the human-only
+  # .native-supervisor-disabled kill switch. That is what made the 2026-07-27 incident a 74h
+  # hand-cleared outage instead of a self-clearing standdown.
+  # ALLOWLIST on status=="rejected" ONLY. A denylist would be wrong: "allowed_warning" events
+  # also carry a resetsAt (seven_day, ~6 days out) and appear in EVERY tick log since
+  # 2026-07-31 — arming on one would stand the loop down for days over a routine utilization
+  # warning, i.e. reproduce the outage this fix exists to prevent.
+  ARMED=$(/usr/bin/python3 - "$TLOG" "$MEM/mr-state.json" <<'PYRL'
+import json, sys, time, os, datetime
+tlog, state = sys.argv[1], sys.argv[2]
+best = None
+def walk(o):
+    global best
+    if isinstance(o, dict):
+        if str(o.get("status")) == "rejected" and o.get("resetsAt") is not None:
+            # EARLIEST rejection wins, not the last one. A log can carry both a five_hour and a
+            # seven_day rejection; last-wins could arm a 6-day standdown when a 2-hour one was
+            # correct. The asymmetry is stark: guessing low costs one ~$1 tick that re-stands-down,
+            # guessing high costs days of unattended-loop downtime — the exact failure this arming
+            # exists to prevent. (Mirrors the SSOT prompt's "prefer five_hour".)
+            try:
+                v = int(o["resetsAt"])
+                best = v if best is None else min(best, v)
+            except (TypeError, ValueError): pass
+        for v in o.values(): walk(v)
+    elif isinstance(o, list):
+        for v in o: walk(v)
+try:
+    for l in open(tlog, errors="replace"):
+        if '"resetsAt"' not in l or '"rejected"' not in l: continue
+        try: walk(json.loads(l))
+        except Exception: pass
+except Exception: pass
+if best is None:
+    print("NONE"); raise SystemExit(0)
+if best > 1e11: best = best / 1000.0            # defensive: epoch ms -> s
+now = time.time()
+if best <= now:
+    print("SKIPPED past(%d)" % best); raise SystemExit(0)
+if best > now + 14 * 86400:                      # a bad write here is a silent multi-day outage
+    print("SKIPPED implausible(%d)" % best); raise SystemExit(0)
+try:
+    with open(state) as f: d = json.load(f)      # re-read immediately before write: the Cowork/DC
+    if not isinstance(d, dict):                  # fallback writes mr-state.json without our flock
+        print("SKIPPED state-not-object"); raise SystemExit(0)
+except SystemExit: raise
+except Exception:
+    print("SKIPPED state-unreadable"); raise SystemExit(0)
+iso = datetime.datetime.fromtimestamp(best, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+d["rate_limit_resets_at"] = iso                  # gate 2 parses epoch-or-ISO (:198-203)
+d["rate_limit_armed_by"] = "wrapper"             # breadcrumb: wrapper-armed vs LLM-armed
+tmp = state + ".tmp.%d" % os.getpid()
+try:
+    with open(tmp, "w") as f: json.dump(d, f, indent=2)   # indent=2 matches the committed file
+    os.replace(tmp, state)
+except Exception as e:
+    try: os.unlink(tmp)
+    except Exception: pass
+    print("SKIPPED write-failed(%s)" % type(e).__name__); raise SystemExit(0)
+print("ARMED %s" % iso)
+PYRL
+)
+  case "$ARMED" in
+    ARMED*)   log "RATE-LIMIT-GATE $ARMED — gate 2 will stand down (free) until then" ;;
+    SKIPPED*) log "RATE-LIMIT-GATE-SKIPPED $ARMED" ;;
+  esac
   if [ "${MR_NO_TOAST:-0}" != "1" ] && echo "$REASON" | grep -qiE "not logged in|/login"; then
     powershell.exe -NoProfile -Command "(New-Object -ComObject WScript.Shell).Popup('Claude CLI in WSL is logged out - Monster Realm supervisor is paused. Run: claude /login', 0, 'MR Supervisor', 48)" >/dev/null 2>&1 &
   fi

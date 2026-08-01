@@ -1,0 +1,241 @@
+#!/usr/bin/python3
+"""mr-cost-sum — SSOT for deriving a run's true USD cost from a stream-json log.
+
+WHY THIS EXISTS
+---------------
+`total_cost_usd` on a `"type":"result"` stream-json event is CUMULATIVE for the emitting
+session's current accumulation run — it is NOT the cost of that one invocation. Summing it
+across every result event in a pass log therefore multiplies the true spend.
+
+Measured on 2026-08-01 against the 11 surviving /tmp/mr_pass_*.log files:
+    uxd2  naive $423.6470  ->  true $165.6512   (2.56x overcount)
+    uxd3  naive $ 66.4075  ->  true $ 47.5320   (1.40x)
+    the other 9 (single result event)            (1.00x — unchanged)
+Cross-check: mr-cost-watch's independent token-priced calibration for uxd2 was $155.21,
+within 6.7% of $165.65 and nowhere near $423.65.
+
+Before this helper existed the buggy loop was copy-pasted in three places (mr-record,
+and twice in mr-native-tick.sh). That triplication is why the bug survived; this file is
+the single implementation and all three call it.
+
+SEGMENTATION
+------------
+A "segment" is one accumulation run. Its cost is the MAX value seen inside it (the last
+cumulative reading; max is used so an out-of-order or truncated tail cannot lose spend).
+Total = sum of segment maxima. A new segment opens on either:
+
+  1. an ATTEMPT / ESCALATED / COST-CAP-WRAP marker line written by mr-launch.sh
+     (lines 84, 114, 123, 137) — the AUTHORITATIVE invocation boundary; or
+  2. the value decreasing (counter reset) — the fallback for logs with no markers,
+     e.g. the supervisor's own /tmp/mr_native_tick_*.log.
+
+Rule 1 is required, not cosmetic: mr-launch.sh:110-115 escalates the final attempt to
+fable@xhigh with a +$60 cap top-up, so "attempt N costs MORE than attempt N-1" is a
+DESIGNED outcome. Under rule 2 alone the earlier attempt's spend would be swallowed —
+an undercount, which is the unsafe direction for a budget governor.
+
+NOT USED, and why:
+  session_id  — useless here. `mr-launch.sh:124` resumes with --resume, so all 8 uxd2
+                result events across 3 separate claude invocations share one session_id.
+  modelUsage  — uxd2 events 1-4 all report the session-FINAL breakdown ($152.69) while
+                total_cost_usd is still climbing; summing it overcounts worse than naive.
+  "subtype":"init" — not 1:1 with invocations (uxd2 attempt 1 emits 4).
+  uuid / num_turns / duration_ms — carry no boundary information.
+
+CONTRACT
+--------
+  mr-cost-sum <logfile>    -> total to 4dp on stdout, or "-" when no cost is derivable.
+                              ALWAYS exits 0. Output is always /^([0-9]+\\.[0-9]{4}|-)$/
+                              so callers may interpolate it into a shell or python literal.
+  mr-cost-sum --selftest   -> exit 0 pass, 1 fail.
+
+  * zero result events, unreadable file, missing file  -> "-"
+  * >=1 result event whose costs sum to zero           -> "0.0000"  (NOT "-", so a genuine
+                                                          $0 run is distinguishable from an
+                                                          absent one, matching prior behaviour)
+  * result events with total_cost_usd absent/null are skipped WITHOUT opening a segment.
+
+Callers MUST treat "-" as COST-UNKNOWN. Never let "-" reach float().
+"""
+
+import json
+import math
+import os
+import sys
+
+# Invocation-boundary markers written by mr-launch.sh at the start of each attempt.
+_MARKERS = ("ATTEMPT=", "ESCALAT", "COST-CAP-WRAP start")
+
+
+def cost_of_log(path):
+    """Return (total_float, saw_result_event). Never raises."""
+    total = 0.0
+    seg = 0.0
+    prev = -1.0
+    seg_open = False
+    saw = False
+    try:
+        fh = open(path, errors="replace")
+    except Exception:
+        return 0.0, False
+    with fh:
+        for line in fh:
+            # 1. explicit invocation boundary -> close the current segment
+            if line.startswith(_MARKERS):
+                if seg_open:
+                    total += seg
+                    seg = 0.0
+                    prev = -1.0
+                    seg_open = False
+                continue
+            if '"type":"result"' not in line:
+                continue
+            try:
+                val = json.loads(line).get("total_cost_usd")
+            except Exception:
+                continue
+            if val is None:
+                continue
+            try:
+                val = float(val)
+            except (TypeError, ValueError):
+                continue
+            # Reject non-finite and negative readings WITHOUT opening a segment. json.loads
+            # accepts bare NaN/Infinity and float() accepts "Infinity", so a single such event
+            # would otherwise reach %.4f as "nan"/"inf", break the output contract, and land in
+            # the append-only ledger. A NaN there makes EVERY governor comparison in
+            # mr-situation false — SOFT-PAUSE and HARD-STOP would be silently disabled forever.
+            if not math.isfinite(val) or val < 0:
+                continue
+            saw = True
+            if not seg_open:
+                seg, prev, seg_open = val, val, True
+            elif val < prev:
+                # 2. counter reset -> new accumulation run
+                total += seg
+                seg, prev = val, val
+            else:
+                seg = max(seg, val)
+                prev = val
+    if seg_open:
+        total += seg
+    return total, saw
+
+
+def emit(path):
+    total, saw = cost_of_log(path)
+    # Final backstop for the output contract: per-event values are already screened, so the only
+    # way here is float overflow across segments. Emit "-" (COST-UNKNOWN) rather than a token no
+    # caller can parse — never fabricate a number, and never emit one that breaks the regex.
+    if saw and not math.isfinite(total):
+        saw = False
+    sys.stdout.write("%.4f\n" % total if saw else "-\n")
+    return 0
+
+
+# --------------------------------------------------------------------------- selftest
+_UXD2 = """ATTEMPT=1
+{"type":"result","total_cost_usd":65.82754760}
+{"type":"result","total_cost_usd":67.84430235}
+{"type":"result","total_cost_usd":124.32392735}
+{"type":"result","total_cost_usd":152.68635385}
+ATTEMPT=2
+{"type":"result","total_cost_usd":0}
+{"type":"result","total_cost_usd":11.048952}
+ATTEMPT=3
+{"type":"result","total_cost_usd":0}
+{"type":"result","total_cost_usd":1.91589}
+"""
+
+_CASES = [
+    # (name, log body, expected stdout)
+    ("uxd2-real-shape", _UXD2, "165.6512"),
+    ("single-event-identity",
+     '{"type":"result","total_cost_usd":111.62030490}\n', "111.6203"),
+    ("no-result-events", 'ATTEMPT=1\nsome noise\n', "-"),
+    ("empty-file", "", "-"),
+    ("monotone-only-no-markers",
+     '{"type":"result","total_cost_usd":1.0}\n'
+     '{"type":"result","total_cost_usd":5.0}\n', "5.0000"),
+    ("decrease-splits-without-markers",
+     '{"type":"result","total_cost_usd":5.0}\n'
+     '{"type":"result","total_cost_usd":2.0}\n', "7.0000"),
+    # The case pure value-decrease gets WRONG: an escalated attempt costing more than the
+    # previous one. Without the ATTEMPT marker this would report 25.0000 and lose $10.
+    ("escalation-attempt-costs-more",
+     'ATTEMPT=1\n{"type":"result","total_cost_usd":10.0}\n'
+     'ATTEMPT=2\n{"type":"result","total_cost_usd":25.0}\n', "35.0000"),
+    ("null-cost-skipped-no-segment",
+     '{"type":"result","total_cost_usd":null}\n'
+     '{"type":"result","total_cost_usd":3.0}\n', "3.0000"),
+    ("genuine-zero-is-not-unknown",
+     '{"type":"result","total_cost_usd":0}\n', "0.0000"),
+    ("malformed-json-tolerated",
+     '{"type":"result", BROKEN\n'
+     '{"type":"result","total_cost_usd":2.5}\n', "2.5000"),
+    # --- output-contract hostiles. json.loads accepts bare NaN/Infinity and float() accepts the
+    # string forms, so without screening these reach %.4f as "nan"/"inf". A NaN in the ledger
+    # makes every governor comparison in mr-situation false, silently disabling SOFT-PAUSE and
+    # HARD-STOP; a leading "-" breaks the shell-safe output regex callers rely on.
+    ("nan-rejected", '{"type":"result","total_cost_usd":NaN}\n', "-"),
+    ("infinity-rejected", '{"type":"result","total_cost_usd":Infinity}\n', "-"),
+    ("infinity-string-rejected", '{"type":"result","total_cost_usd":"Infinity"}\n', "-"),
+    ("negative-rejected", '{"type":"result","total_cost_usd":-5.0}\n', "-"),
+    ("overflow-across-segments",
+     'ATTEMPT=1\n{"type":"result","total_cost_usd":1e308}\n'
+     'ATTEMPT=2\n{"type":"result","total_cost_usd":1e308}\n', "-"),
+    ("garbage-does-not-poison-valid",
+     '{"type":"result","total_cost_usd":NaN}\n'
+     '{"type":"result","total_cost_usd":3.0}\n', "3.0000"),
+]
+
+_SHAPE = r"[0-9]+\.[0-9]{4}|-"
+
+
+def selftest():
+    import io
+    import re
+    import tempfile
+    bad = 0
+    for name, body, want in _CASES:
+        fd, p = tempfile.mkstemp(prefix="mr-cost-sum-selftest-")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(body)
+            # Drive emit() through real stdout, not cost_of_log() — the shell-safe output shape
+            # and the always-rc-0 promise ARE the contract, and re-implementing the formatting
+            # here would leave both untested (a "%.2f" typo in emit would still pass).
+            buf, real = io.StringIO(), sys.stdout
+            try:
+                sys.stdout = buf
+                rc = emit(p)
+            finally:
+                sys.stdout = real
+            got = buf.getvalue()
+        finally:
+            os.unlink(p)
+        if rc != 0:
+            print("FAIL %-32s nonzero rc=%s" % (name, rc)); bad += 1
+        if not got.endswith("\n") or not re.fullmatch(_SHAPE, got[:-1]):
+            print("FAIL %-32s output violates the shell-safe contract: %r" % (name, got)); bad += 1
+        elif got[:-1] != want:
+            print("FAIL %-32s want=%s got=%s" % (name, want, got[:-1])); bad += 1
+    # missing file must be "-" and must not raise
+    total, saw = cost_of_log("/nonexistent/mr-cost-sum/definitely-not-here")
+    if saw:
+        print("FAIL missing-file want=- got=%.4f" % total)
+        bad += 1
+    if bad:
+        print("mr-cost-sum SELFTEST FAIL (%d)" % bad)
+        return 1
+    print("mr-cost-sum SELFTEST OK (%d cases)" % (len(_CASES) + 1))
+    return 0
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
+        sys.exit(selftest())
+    if len(sys.argv) != 2:
+        sys.stdout.write("-\n")
+        sys.exit(0)
+    sys.exit(emit(sys.argv[1]))

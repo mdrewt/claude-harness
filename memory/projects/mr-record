@@ -9,7 +9,7 @@ export MEM SUB
 ARGS_JSON=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
 export ARGS_JSON
 /usr/bin/python3 <<'PY'
-import json, os, sys, re, datetime
+import json, os, sys, re, datetime, subprocess
 MEM=os.environ["MEM"]; SUB=os.environ["SUB"]; argv=json.loads(os.environ["ARGS_JSON"])
 LEDGER=os.environ.get("MR_RECORD_LEDGER") or (MEM+"/monster-realm-usage-ledger.jsonl")
 HANDOFF=os.environ.get("MR_RECORD_HANDOFF") or (MEM+"/monster-realm-handoff.md")
@@ -58,14 +58,39 @@ if a.get("from-log") and a.get("run_id")!="wrapper-reconcile" and wrapper_cost_e
         notes=(notes+" | " if notes else "")+"cost omitted: already captured by wrapper-reconcile row"
         cost=None
 if (cost in (None,"","null")) and a.get("from-log") and os.path.exists(a["from-log"]):
-    tot=0.0; found=False
-    for line in open(a["from-log"], errors="replace"):
-        if '"type":"result"' in line:
-            try:
-                o=json.loads(line); c=o.get("total_cost_usd")
-                if c is not None: tot+=float(c); found=True
-            except Exception: pass
-    if found: cost=round(tot,4)
+    # Cost comes from the mr-cost-sum SSOT. `total_cost_usd` is CUMULATIVE for the emitting
+    # session's accumulation run, so the naive sum this replaced overcounted every multi-attempt
+    # run (uxd2 recorded $423.65 against a true $165.65) and inflated the governor's d7 by 37%.
+    # Invoked via sys.executable rather than the shebang so exec-bit / ENOEXEC / asdf-shim
+    # breakage cannot take out a cron-critical path.
+    out=None
+    try:
+        r=subprocess.run([sys.executable, MEM+"/mr-cost-sum", a["from-log"]],
+                         capture_output=True, text=True, timeout=60)
+        if r.returncode==0: out=r.stdout.strip()
+    except Exception: out=None
+    if out and out!="-":
+        try: cost=round(float(out),4)
+        except ValueError: out=None
+    # NOTE the empty-string case is deliberately grouped with None: a truncated/zero-byte helper
+    # exits 0 with NO stdout, and treating that as "-" would record COST-UNKNOWN, which
+    # mr-situation counts as $0 and would let the loop overspend unseen. Only a literal "-"
+    # (helper ran and found no result events) means genuine COST-UNKNOWN.
+    if out is None or out=="":
+        # Helper unavailable/unusable -> fall back to the naive sum, which OVERCOUNTS. That is
+        # deliberately the safe direction: an overcount trips SOFT-PAUSE early, whereas leaving
+        # cost None counts as $0 in mr-situation:81 and would let the loop overspend unseen.
+        # ("-" is NOT this case — it means zero result events, i.e. genuine COST-UNKNOWN.)
+        tot=0.0; found=False
+        for line in open(a["from-log"], errors="replace"):
+            if '"type":"result"' in line:
+                try:
+                    o=json.loads(line); c=o.get("total_cost_usd")
+                    if c is not None: tot+=float(c); found=True
+                except Exception: pass
+        if found:
+            cost=round(tot,4)
+            notes=(notes+" | " if notes else "")+"COST-FALLBACK-NAIVE (mr-cost-sum unavailable; may overcount multi-attempt runs)"
 if cost in (None,"","null"):
     cost=None
     notes=(notes+" | " if notes else "")+"COST-UNKNOWN (no result event; true spend unrecorded)"

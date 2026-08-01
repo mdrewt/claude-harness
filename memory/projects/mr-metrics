@@ -44,6 +44,11 @@ for d in rows:
     if o.startswith("MERGED"):
         e["merge"]=d["ts"]; e.setdefault("tier",tier_of(d))
         if fnum(d.get("cost_usd"))>0: e["cost"]=e.get("cost",0)+fnum(d.get("cost_usd"))
+    # CORRECTION rows are signed reversals against an earlier FINISHED row (ledger is append-only,
+    # so a miscount is fixed by adding its negation, never by rewriting). Fold them in unconditionally
+    # — the MERGED branch above filters >0 and would silently drop them, leaving per-slice cost stale.
+    if o.startswith("CORRECTION"):
+        e["cost"]=e.get("cost",0)+fnum(d.get("cost_usd"))
 sup=sum(fnum(d.get("cost_usd")) for d in rows if d.get("slice")=="SUPERVISOR")
 def mins(a,b):
     import datetime

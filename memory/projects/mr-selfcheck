@@ -3,13 +3,53 @@
 set -u
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 BAD=0
-for f in "$MEM"/mr-*.sh "$MEM"/mr-launch.sh "$MEM"/mr-native-tick.sh "$MEM"/mr-ask-drew "$MEM"/mr-decision-watch "$MEM"/mr-ci-watch "$MEM"/mr-reset-watch "$MEM"/mr-evidence "$MEM"/mr-retro-request "$MEM"/mr-usage-snap "$MEM"/mr-cost-watch "$MEM"/mr-disjoint "$MEM"/mr-spawn "$MEM"/mr-ollama "$MEM"/mr-situation "$MEM"/mr-record "$MEM"/mr-audit "$MEM"/mr-metrics; do
+for f in "$MEM"/mr-*.sh "$MEM"/mr-launch.sh "$MEM"/mr-native-tick.sh "$MEM"/mr-ask-drew "$MEM"/mr-decision-watch "$MEM"/mr-ci-watch "$MEM"/mr-reset-watch "$MEM"/mr-evidence "$MEM"/mr-retro-request "$MEM"/mr-usage-snap "$MEM"/mr-cost-watch "$MEM"/mr-disjoint "$MEM"/mr-spawn "$MEM"/mr-ollama "$MEM"/mr-situation "$MEM"/mr-record "$MEM"/mr-audit "$MEM"/mr-metrics "$MEM"/mr-cost-sum; do
   [ -f "$f" ] || continue
   head -1 "$f" | grep -q python && { /usr/bin/python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$f" 2>/dev/null || { echo "SELFCHECK-FAIL py: $f"; BAD=1; }; continue; }
   bash -n "$f" 2>/dev/null || { echo "SELFCHECK-FAIL sh: $f"; BAD=1; }
 done
 /usr/bin/python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$MEM/mr-feedback" 2>/dev/null || { echo "SELFCHECK-FAIL py: mr-feedback"; BAD=1; }
 "$MEM/mr-feedback" selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-feedback selftest"; BAD=1; }
+# ADR-0011 Confirmation: the cost SSOT must keep reconstructing per-invocation spend from the
+# cumulative total_cost_usd field. Its fixtures include the real uxd2 shape (naive $423.65 ->
+# true $165.65) and the escalation case a pure value-decrease split would undercount.
+"$MEM/mr-cost-sum" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-sum selftest"; BAD=1; }
+# python heredocs embedded in bash wrappers. `bash -n` above cannot see inside them, yet that is
+# where most of the real logic lives (mr-record's cost path, mr-native-tick's reconcile/gate-2/
+# rate-limit-arming). Without this, a python syntax error in any of them ships silently and only
+# surfaces at 03:00 from cron. Added with ADR-0011, whose own edits live in two of these blocks.
+/usr/bin/python3 - "$MEM" <<'PYHD' || BAD=1
+import ast, re, sys, os
+mem = sys.argv[1]; bad = 0
+# The opener regex MUST tolerate anything after the closing quote: mr-situation:14 is
+# `python3 - <<'PY' > "$CACHE.tmp" 2>/dev/null || echo ...`, and a pattern anchored on \n right
+# after the tag silently matched ZERO blocks there — leaving budget(), the governor itself,
+# unchecked. A SyntaxError in that block degrades to GSTATE=UNKNOWN, which does NOT stand the
+# loop down, so it would keep spawning $60-400 slices with no budget gate at all.
+OPEN = re.compile(r"^[^\n]*python3[^\n]*<<-?'([A-Za-z0-9_]+)'[^\n]*$", re.M)
+for name in ("mr-record", "mr-metrics", "mr-situation", "mr-native-tick.sh",
+             "mr-cost-watch", "mr-audit", "mr-spawn"):
+    p = os.path.join(mem, name)
+    if not os.path.exists(p): continue
+    src = open(p, errors="replace").read()
+    openers = OPEN.findall(src); found = 0
+    for tag in set(openers):
+        pat = r"^[^\n]*python3[^\n]*<<-?'%s'[^\n]*\n(.*?)^\t*%s$" % (re.escape(tag), re.escape(tag))
+        for m in re.finditer(pat, src, re.M | re.S):
+            found += 1
+            try: ast.parse(m.group(1))
+            except SyntaxError as e:
+                print("SELFCHECK-FAIL py-heredoc: %s <<%s line %s: %s" % (name, tag, e.lineno, e.msg))
+                bad = 1
+    # Coverage assertion: a scanner that silently matches nothing is worse than no scanner,
+    # because it reports green. If openers exist that we failed to pair with a terminator,
+    # the pattern has drifted — fail loudly rather than skip.
+    if len(openers) != found:
+        print("SELFCHECK-FAIL py-heredoc-coverage: %s has %d python-heredoc opener(s) but the "
+              "scanner paired %d — pattern drift, blocks are going unchecked" % (name, len(openers), found))
+        bad = 1
+sys.exit(bad)
+PYHD
 grep -q "Feedback doctrine (ACTIVE" "$MEM/mr-supervisor-prompt-native.md" || { echo "SELFCHECK-FAIL SSOT doctrine pointer missing"; BAD=1; }
 grep -q "ACTIVE 2026" "$MEM/mr-feedback-doctrine.md" || { echo "SELFCHECK-FAIL doctrine not ACTIVE"; BAD=1; }
 [ "$BAD" = 0 ] && echo "SELFCHECK-OK"
