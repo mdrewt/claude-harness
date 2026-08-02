@@ -1,3 +1,5 @@
+CEREMONY COMPLETE — see M-evolution-essence-graph.spec.md for the converged, implementation-ready design.
+
 # Spec: M-evolution-essence-redesign — essence-graph evolution, fusion removed (SUPERSEDES ADR-0147/0149)
 
 **Status:** DRAFT skeleton only — queued, post-gate, un-blocked (spawned by r2 playtest feedback

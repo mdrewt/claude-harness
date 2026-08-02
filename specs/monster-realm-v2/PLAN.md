@@ -353,34 +353,17 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   full main-menu redesign) are deliberately NOT bundled in — recorded as deferred/owned in the gate
   decision doc §8, each needing its own sizing pass.
 - **M-postgate-evolution-fusion-hardening** (`M-postgate-evolution-fusion-hardening.spec.md`) —
-  **UN-BLOCKED, slice A0 near-front of queue** (new, spawned 2026-07-25 via a 35-agent `ultracode`
-  research/brainstorm/debate/judge/converge workflow evaluating Drew's fusion-replacement proposal —
-  outcome recorded as a dated amendment to `adr/0019-evolution-fusion-model.md`, full trail in the harness
-  memory card `monster-realm-evolution-fusion-workflow-2026-07-25.md`). Finding: `fuse()` genuinely drifts
-  from ADR-0019's own "identity isn't erased by a transform" intent (resets level/EVs/bond/nickname on
-  every fusion; `evolve()` already carries all of that verbatim) — Drew's complaint was accurate, but the
-  fix is narrower than replacing fusion with evolution. **A0** (HIGH priority, comparable to
-  `M-postgate-netcode-hardening`): broadens `fuse()`'s field-carry formula (bond/level/EVs taxed-not-reset,
-  closing a bond-tax-exemption exploit found during adversarial critique) + extracts a shared
-  `fusion_eligible()` gate — no schema, no client. **B** (MEDIUM): ships Drew's own worked example
-  (elemental-flavored evolution branch) through the evolution-trigger enum's already-live `Item(id)`
-  variant — zero engine changes. **A1** (fusion preview UI) sits alongside `M-postgate-ux-hardening`/
-  `M-postgate-client-coverage`, not ahead of them. **C** (lineage display fields) is low/opportunistic. The
-  full typed multi-energy-accumulator system Drew originally proposed is **explicitly deferred, not
-  rejected** — gated on playtest evidence that Slice B's cheap version doesn't already satisfy H2; stays
-  below M20+ in priority. Both debate axes (fusion permanence; evolution-trigger restructuring) were won by
-  the "fix the narrow gap, don't restructure" side, with the losing side's evidence recorded, not discarded.
-  **SUPERSEDED IN PART 2026-07-27** (r2 playtest feedback, ledger items 062-086, feedback doctrine
-  correction — Drew overrules this milestone's own outcome): A0's field-carry fix stays merged/historical
-  (PR#248), but fusion itself is being REMOVED per `M-evolution-essence-redesign.spec.md`. **B2 (item-
-  triggered evolution, still un-shipped) must be reconciled against the essence-graph redesign before
-  either ships** — do not build B2 standalone without checking essence-redesign compatibility first.
-- **M-evolution-essence-redesign** (`M-evolution-essence-redesign.spec.md`) — **NEW, queued, post-gate,
-  un-blocked** (r2 feedback 2026-07-26, ledger items 062-086; supersedes the fusion-removal question this
-  milestone's own hardening pass had resolved the other way). HEAVY: schema + economy + redesign risk-
-  promoted. Skeleton only — next unit of work is the full HEAVY ceremony (investigation/6-way ideation/
-  judge synthesis), not implementation. Must land before the playtest-3 gate per the 2026-07-26 operator
-  gate-timing directive (all r2-created milestones close first).
+  **PARTIALLY RETIRED 2026-08-02** (ceremony outcome: `M-evolution-essence-graph.spec.md`, per ADR-0019
+  Amendment 2026-08-02). Historical record for context: spawned 2026-07-25 via a 35-agent debate workflow;
+  A0's field-carry fix was delivered (PR#248/ADR-0147) and subsequently **DELETED** by essence-graph
+  migration EG1-9 (fusion removed entirely). Slices **A1** (fusion preview UI, never shipped) and **C**
+  (lineage fields, never shipped) are **RETIRED** — EG4 replaces A1 with an always-on requirements-panel
+  built entirely from public schema, and single-parent evolution makes C's lineage semantics inapplicable.
+  **B2's content intent** (item-triggered evolution access) **SURVIVES, TRANSFORMED**: the discrete
+  `Item(id)` trigger reducer (ADR-0149, now Superseded) is replaced by `consume_crystalized_essence()`
+  (EG2-4), and its RON branches are re-authored as accumulating-essence-pool triggers (EG3-6/EG3-8); no
+  separate B2 implementation needed.
+- **M-evolution-essence-redesign** (`M-evolution-essence-redesign.spec.md` input skeleton → `M-evolution-essence-graph.spec.md` converged spec) — **CEREMONY COMPLETE 2026-08-02**. HEAVY redesign (r2 feedback 2026-07-26, ledger items 062-086): fusion removed; evolution becomes a directed essence-graph with five AND-combined gates (tier, level, essence-type/amount, Trust, Quality-Time); essence-train reducer + item consumption path; Bond retired; Trust Bayesian-smoothed; Nutrition re-labeled from EV totals; five sequential slices (EG1 schema → EG2/EG3/EG4 parallel → EG5 tail), full details in implementation-ready spec. Four DECISIONS remain open for Drew confirmation (Bond full-retirement, graph visibility, strict tier +1 per edge, full essence reset; all implemented at default so build not blocked). Five design-panel highlights in ADR-0019 Amendment 2026-08-02 + M-evolution-essence-graph.spec.md §4. Ready for implementation; runner picks up per spec's build order (EG1 first, serially; EG2/EG3/EG4 fan-out in parallel).
 - **M-postgate-battle-0hp-fix** (`M-postgate-battle-0hp-fix.spec.md`) — **PvE HALF MERGED 2026-07-31,
   PvP HALF PARKED** (11r-d ledger reconciliation): #258/ADR-0156 landed the PvE fix (never seat a 0 HP
   lead; reject actions from a fainted active). **The PvP half was deliberately parked by ADR-0156** and is
