@@ -110,6 +110,16 @@ against this ADR's own stated intent, not re-deriving fusion design from genre f
 
 Implementation-ready spec (updated): `M-evolution-essence-graph.spec.md` §2 (EG1-4, EG1-6, EG1-12, EG2-1), §4 (two new decision items + amplified stakes on the existing tier-per-edge item), §5 (R1 note, R11 revised, new R12), §6 (two new deferred items).
 
+### Addendum — 2026-08-02 (event-based auto-evolution, per Drew's clarification)
+
+**Trigger:** Drew clarified the original directive's intent — evolution is not a standing player action gated by a manual "Evolve" button. A monster with exactly one currently-satisfied path evolves automatically, the moment it becomes eligible. Player choice is needed ONLY when a monster is simultaneously eligible for 2+ paths — the genuine-ambiguity case the original synthesis's "never auto-resolve" principle was actually protecting against. This is a real interaction-model change, not a restatement: `evolve(monster_id, to_species)` (the earlier addendum, above) goes from being the sole path to evolution to being reachable, in practice, only for disambiguation.
+
+**Mechanism:** eligibility is re-checked, fresh, every time any gate value (essence/level/Trust/Quality-Time) changes — a new shared `check_and_evolve` helper called from the same five reducers already established for Quality-Time accrual (a confirmed complete covering set, since Quality-Time itself changes on all five and is one of the checked gates). 0 eligible → no-op; exactly 1 → auto-apply immediately, same transaction; 2+ → unchanged player-choice UI, now additionally surfaced via a party-roster badge (client-computed, no new server state) rather than only being discoverable by opening a monster's own panel. Evolving can itself make the next tier immediately reachable (Trust/Quality-Time/level persist across evolution) — per Drew's directive this cascades automatically, bounded structurally by the tier cap (R5+R11), with an explicit defensive iteration cap as well.
+
+**Explicitly deferred, not built:** a player-facing decline/cancel affordance. Drew flagged a possible future direction instead — equippable items that freeze specific gate values from changing (an XP-blocking or essence-blocking item) — noted in the spec (§6) as a forward-looking idea only, no design or schema commitment made now.
+
+Implementation-ready spec (updated): `M-evolution-essence-graph.spec.md` §1 (event-triggered framing), §2 (EG2-11/12/13 new; EG2-1, EG4-2 revised; EG4-8 new; EG5-4 updated), §6 (decline/cancel note).
+
 **Supersessions:** this amendment supersedes ADR-0147 (evolution-fusion-taxed-carry — the A0 work to repair fusion and carry fields through fuse() is explicitly not inherited) and ADR-0149 (item-triggered-evolution-content — the discrete item-trigger design is subsumed into the essence-source model, a generalization rather than a deployment of that design). Full detail on what survived the redesign (species 30/31 BST/flavor/migration-fidelity, the shop-stocking convention, Steamveil sidegrade flavor) vs. what was discarded (the reduce-to-average fusion model, A0's field-tax math, A1's preview-reducer, C's lineage-tracking) is in §8–§10 of the implementation-ready spec.
 
 Implementation-ready spec: `M-evolution-essence-graph.spec.md`.
