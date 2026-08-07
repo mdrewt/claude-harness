@@ -22,6 +22,43 @@ Spec: `specs/monster-realm-v2/M-postgate-twelfth-review-residuals.spec.md:177-24
 | `content_cache_tests.rs:776-796` forbids `r#` and `'"'` in `battle.rs` | out-of-scope file — our edit must not trip it |
 | Existing R4 tests use non-degenerate values (50/Friendly/2/40) | `content.rs:3299`, `:3317` — stay green under the fix |
 
+## IMPLEMENTATION RECORD (what actually shipped)
+
+- **Item 1** `game-core/src/content.rs` — R4 is now an inline `let binds = ...` with five `||`
+  terms in `path_satisfied`'s gate order (A9 honored: no helper fns, matching the file's
+  twelve-rule inline idiom). Rule doc-block R1 and R4 lines both rewritten. **game-core: 991
+  passed, 0 failed.**
+- **Item 2** `server-module/src/battle.rs` — `lead_party_ids` is the BASE helper (query, sort,
+  ids; parses nothing, cannot fail for a non-empty party); `lead_party` delegates to it,
+  point-reads `ids[0]`, and rate-limits its warn through a new `LEAD_LEVEL_ERR_LIMITER`
+  (`crate::movement::RateLimiter`, 5000 ms window) per A5. `movement.rs:150` consumes
+  `lead_party_ids`; `movement.rs:436` and `battle.rs`'s wild-encounter caller keep `lead_party`.
+- **Item 3** `server-module/src/content.rs` — the 15-line backstop deleted; replaced by a
+  do-NOT-re-add comment carrying the 1:1-map argument, so the re-add loop is closed in the
+  code and not only in the ADR.
+- **Item 4** `server-module/src/raising.rs` — `return false` in the `creditable == 0` branch,
+  no re-anchor, with the mutual-exclusion proof inline. **server-module: 501 passed, 0 failed.**
+- **ADR-0178** written; `0174` gains `, ADR-0178` on its existing `**Amended-by:**` line plus an
+  in-body `Amendment (12r-e)` note under D5; `0175` gains a new `**Amended-by:** ADR-0178` line
+  plus a `[CLOSED by 12r-e]` marker on Consequences (4). `just adr-digest` regenerated
+  `DIGEST.md` (144 project ADRs).
+- **A18 CONFIRMED:** `just knowledge-check` reports "bundle in sync (no drift)" — the knowledge
+  regen is a genuine no-op, as predicted. `scripts/check-secrets.mjs`: clean.
+- **`ARCHITECTURE.md` NOT touched** — verified it never mentions the seed-gate backstop, and the
+  new helper is `pub(crate)`. `CHANGELOG.md` and `docs/adr/README.md` NOT touched.
+- **An eval regression was caught and fixed mid-slice:** `evals/monster-dual-write.eval.mjs`
+  went RED because a tester assertion-message STRING literal contained
+  `ctx.db.monster().monster_id().update(` contiguously — that eval strips `//` comments but
+  NOT string literals, so the needle landed inside `daily_cap_stops_credit`'s column-0 `fn`
+  span, which has no `monster_pub` write. Confirmed pre-existing-clean on `origin/master` in a
+  throwaway worktree before diagnosing. **Generalises the landmine family: a needle written as
+  DOCUMENTATION can trip a different gate that scans the same file.**
+- **`/tmp/mr_warn_12r-e` appeared after the implementation commit.** Landing pattern honored:
+  the 5-lens impl-review batch was NOT run; `verifier` ran as the single remaining required
+  gate (same call as 12r-d). Adversarial coverage already banked: full `red-team` passes on
+  BOTH the plan and the tests (the latter with applied, executed PoCs), plus `reviewer` and
+  `/simplify` on the plan.
+
 ## PLAN-REVIEW ADJUDICATION (reviewer + red-team + /simplify, all opus, run in parallel)
 
 Every ruling below overrides the corresponding section further down. Rulings are recorded with

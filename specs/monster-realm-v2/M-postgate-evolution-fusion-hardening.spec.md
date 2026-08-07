@@ -4,6 +4,8 @@
 **Stack:** spacetimedb-game · **Project:** monster-realm · **Depends on:** M-playtest-a/b/c/c.5/d CLOSED; playtest gate run 2026-07-25.
 **Full deliberation trail:** harness memory card `monster-realm-evolution-fusion-workflow-2026-07-25.md` (research across 7 comparator-game clusters, 5 brainstormed candidates, 2 adversarially-debated axes, a 3-judge panel, 4 rounds of adversarial critique-and-refine). This spec carries only the converged, implementation-ready output — read the memory card or `adr/0019-evolution-fusion-model.md`'s amendment for the "why," not just the "what."
 
+> **PARTIALLY RETIRED 2026-08-02** (ceremony outcome: `M-evolution-essence-graph.spec.md`, per `adr/0019-evolution-fusion-model.md`'s **Amendment — 2026-08-02**, Drew's r2 override). **A0** DELIVERED (PR#248/ADR-0147) then its entire output DELETED outright by essence-graph EG1-9 — not repurposed. **A1** and **C** are RETIRED, never shipped — see essence-graph spec §3 for exact disposition (A1's preview intent resurfaces, strictly improved, as EG4-1's always-on client-computed panel; C's lineage fields do not resurface, single-parent evolution has nothing structurally analogous). **B2** is RE-VERIFIED, NOT retired — its *content intent* survives, folded into `consume_crystalized_essence()` (essence-graph EG2-4/EG3-6); its reducer shape does not. **B**'s RON edges are superseded in place by essence-graph EG3-7/EG3-8. Do not schedule A1/B2/B/C from this file — `M-evolution-essence-graph.spec.md` is the active implementation target for all evolution/fusion work going forward; per §5 below, it also fully covers deferred-energy re-evaluation (superseded by EG2-7's essence-typed-via-Affinity resolution — no separate re-evaluation needed).
+
 ## 1. Problem / intent
 
 Drew's 2026-07-25 playtest report proposed replacing the fixed fusion-recipe system with a typed-energy-accumulation evolution system, reasoning that fusion "erases the individual monsters... while evolution allows the individual monsters to grow and develop." Grounding this against live code found the complaint is accurate but the underlying gap is narrower than "replace fusion with evolution": `evolve()` already carries 100% of a monster's individuality state (nickname/level/xp/IVs/nature/EVs/bond — full ADR-0019 compliance); `fuse()` correctly combines the *genetic* half (IVs via per-stat max, nature from the higher-bond parent — exactly the DQM-inheritance model ADR-0019 chose) but silently resets the *relationship* half (level→1, EVs→0, bond→default 70, nickname→`None`) on every fusion — a real, verified drift from ADR-0019's own "carry/combine... not erase" intent, not a misunderstanding of what fusion does.
@@ -31,6 +33,8 @@ Evidence: `fuse()` (`game-core/src/evolution/transform.rs:69-106`) computes IVs 
 
 ### B2 — MEDIUM (SPAWNED 2026-07-25 by slice B, ADR-0149 D6): make item-triggered evolution reachable
 
+> **RE-VERIFIED, NOT RETIRED — reducer shape superseded 2026-08-02.** Content intent (rare item as an essence-acquisition path) survives fully in essence-graph EG3-6/EG2-4 (`consume_crystalized_essence`); this slice's `apply_evolution_item`/`resolve_evolution`-delegation shape does not — the essence-graph model is an accumulating-balance-then-explicit-commit process, not a discrete single-shot trigger. Do not build B2 as specced below.
+
 > **Why this exists:** slice B's premise ("`Item(id)` is already live") was verified FALSE at build time. `Item(id)` is *declared* in the enum and *validated* by `validate_evolution_fusion`, but no production caller ever supplies `Some(item_id)`: `compute_evolves_to` (`server-module/src/evolution.rs`) hardcodes `applied_item = None` at both of its call sites (the `evolve` reducer and `sync_content_inner`), and `evolve(ctx, monster_id)` takes no item argument. B's content therefore ships **inert** — items 4/5 are unobtainable and species 30/31 unreachable — until B2 lands. B is still worth shipping first: it is engine-free, independently reviewable, and closes the FIRST-wins ordering trap in content before any reducer can hit it.
 
 - **B2-1:** A new `apply_evolution_item(monster_id, item_id)` reducer SHALL delegate to the SAME `resolve_evolution` the passive path uses, passing `applied_item = Some(item_id)` alongside the monster's real level/bond.
@@ -43,6 +47,8 @@ Evidence: `fuse()` (`game-core/src/evolution/transform.rs:69-106`) computes IVs 
 
 ### A1 — MEDIUM (fast-follow, gated on A0, not blocking it): fusion preview + nickname UI
 
+> **RETIRED 2026-08-02, never shipped.** Its "preview before committing" intent resurfaces, strictly improved, as essence-graph EG4-1's always-on, fully client-computable requirements/progress panel — no new server-side table/view/reducer needed (every eligibility input is already public on `MonsterPub`/`evolution_path`), unlike this slice's `fusion_preview` table + `my_fusion_preview` view design. Do not build A1 as specced below.
+
 Evidence: `player_wallet`'s owner-scoped `#[view]` precedent (`player_conversation`, ADR-0087, also reused by `M-postgate-ux-hardening` ux2) is the established pattern for "let a player see a preview of something before committing," and A0 leaves `chosen_nickname` wired but unreachable from the client.
 
 - **A1-1:** WHEN a player calls a new `preview_fuse(a_id, b_id)` reducer, THE system SHALL evaluate the SAME `fusion_eligible()` the real `fuse` reducer uses and write a private `fusion_preview` row (owner-keyed, overwritten in place — no TTL reaper needed, unlike append-only precedents) visible only to that player via a new owner-scoped `#[view] my_fusion_preview`.
@@ -54,6 +60,8 @@ Evidence: `player_wallet`'s owner-scoped `#[view]` precedent (`player_conversati
 
 ### B — MEDIUM: item-triggered evolution content (ships Drew's worked example through existing plumbing)
 
+> **Superseded in place 2026-08-02, not a standalone retirement.** These `evolutions.ron` edges are entirely replaced by essence-graph EG3's new `evolution_path` content (EG3-7/EG3-8) — B's content was always going to be re-authored once A0/A1/C's disposition was decided. Do not author B's edges as specced below.
+
 Evidence: the evolution-trigger primitive (`resolve_evolution`, `game-core/src/evolution/eligibility.rs:29-45`) is FIRST-wins, declaration-order, exhaustive-match over `EvolutionTrigger::{Level(l), Bond(b), Item(id)}` with **no wildcard arm** (a compiler-enforced guard against silently missing a trigger type — already-built ADR-0061 discipline). `Item(id)` is already live and already exercised by species 1/Flameling's branch structure; `content/evolutions.ron` has 6 evolution edges across 5 species blocks, all single-branch except species 1.
 
 - **B-1:** WHEN two of species 7 (Cragling), 8 (Shadelet), 20 (Umbraquill), or 21 (Gustwyrm) are chosen for a new branch, THE content SHALL append an `Item(id)` trigger entry to that species' EXISTING `evolutions:` list — not create a new `SpeciesEvolutions` block (mirrors species 1's already-live multi-branch pattern).
@@ -64,6 +72,8 @@ Evidence: the evolution-trigger primitive (`resolve_evolution`, `game-core/src/e
 - Touches: `game-core/content/evolutions.ron`, `game-core/content/000-core.ron` (or wherever the new `ItemDef` rows land per the existing M13b item-content location). Zero Rust engine changes — `EvolutionTrigger`/`EvolutionCondition`/`SpeciesEvolutions` struct shapes are unchanged.
 
 ### C — LOW (opportunistic, bundle into a future content wave): lineage/provenance display fields
+
+> **RETIRED 2026-08-02, never shipped.** Evolution is single-parent and in-place (same `monster_id`, no combining of two rows) under the essence-graph model, so there is nothing structurally analogous for C to display. A future `evolved_via_edge_id: Option<u32>` is noted as a deferred nice-to-have (essence-graph spec §6) if flavor text ever wants edge provenance — not this design. Do not build C as specced below.
 
 Evidence: none of the current fields record a fused monster's parentage; this is purely cosmetic/display, addressing the "erasure feels total" perception even where A0 already fixes the mechanics.
 

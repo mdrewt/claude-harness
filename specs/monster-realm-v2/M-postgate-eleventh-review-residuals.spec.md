@@ -56,6 +56,7 @@ suppression prevents it).
 - EARS: E1 in-battle character with queued moves stays at its pre-lock tile across ticks (server
   integration test — fails today). E2 `enqueue_move` while in an Ongoing battle → `Err`.
   E3 the harness comment is now true; `battle_lock_convergence` certifies real server behavior.
+- **Delivered (ADR-0168, PR pending):** drain-time battle lock in `movement_tick` + intake rejects in `enqueue_move`/`set_move`; `clear_queue` deliberately unguarded; W3 R3 de-vacuified + new eval W6; sim-harness R10 drift closed (comment now true).
 
 ### 11r-d — Ledger & backlog reconciliation (MED, docs-only, run EARLY) — `touches: CHANGELOG.md, docs/adr/README.md, docs/adr/{0119,0122}, ARCHITECTURE.md, PLAN.md, docs/adr/DIGEST.md`
 The customary post-wave reconciliation never ran: CHANGELOG stops at #239 (HEAD is #261, ~19 ADRs
@@ -75,6 +76,23 @@ Executes ADR-0154 D7 exactly as specified there: `my_wallet` subscription in `co
 call sites (`main.ts:719, 1286`), plus the two-identity e2e privacy tooth D7 names (ux2's proof
 is structural only). Resolves the original playtest complaint (player can't see their gold).
 `main.ts`-SERIAL with uxd3/11r-b.
+- **Delivered (PR #TBD — PR not yet open at close-out time; supervisor fills the number, 2026-07-31):**
+  ADR-0169 (amends ADR-0154). `'SELECT * FROM my_wallet'` in the single `.subscribe([...])` array +
+  an **insert-only** `conn.db.my_wallet.onInsert` handler (deliberately no `onDelete`/`onUpdate` —
+  ADR-0154 D4) in `connection.ts`; pure pass-through `playerWalletRowToStore` in `rowConvert.ts`
+  (`balance: bigint` uncoerced); `store.ownWallet(identity)` at every `buildShopViewModel*` call
+  site; and the two-identity behavioral privacy e2e `client/e2e/wallet-balance.spec.ts`, funded by
+  the deterministic `quest_001` 50-gold faucet and asserting **first paint** via a
+  `MutationObserver` (a retrying `toHaveText` cannot red a batch-listener-only patch, since
+  `movement_tick` re-renders an open overlay every ~200 ms). Resolves the playtest complaint.
+- **Two factual corrections this slice established — the spec text above is WRONG, do not trust it:**
+  1. The `touches:` line and body say `main.ts:719, 1286` and "BOTH `buildShopViewModel` call
+     sites". There are **THREE** (`main.ts:1378` dialogue-open, `:1437`/`:1445` the shop batch
+     listener's bound/unbound arms, as merged): ADR-0154 D7 — which this spec restates — predates
+     uxd2/ADR-0161 D5, which added `buildShopViewModelForShop`. ADR-0169 D4 corrects the count and
+     freezes it at 3 with a count tooth.
+  2. The `main.ts`-SERIAL constraint against uxd3/11r-b (also stated in §3) is **discharged**: both
+     merged before this slice (uxd3-c, and 11r-b at #271).
 
 ### 11r-f — Resume-from-idle interpolation smoothness (MED) — `touches: client/src/net/store.ts, client/src/render/interpolation.ts (+unit tests)`
 Two verified pure-core defects make every remote/NPC pause-resume ugly:
@@ -86,6 +104,19 @@ Two verified pure-core defects make every remote/NPC pause-resume ugly:
   (treat `prev.receivedAt` as `next.receivedAt − stepMs`).
 - EARS: E1 a 1-tile step after a ≥5s idle renders as one smooth ≤stepMs slide (unit-test the pure
   cores; no pop, no post-resume max-delay clamp).
+- **DELIVERED (ADR-0171, PR #277, 2026-08-01):** both fixes shipped exactly as
+  specified — `JITTER_IDLE_GAP_STEPS = 3` gate (`<=` admits / `>` skips, one-sided, baseline +
+  ring append unconditional, EWMA carried across gaps) and `interpolateHistory(…, stepMs = 0)`
+  re-anchor (`REANCHOR_SPAN_STEPS = 2`, strictly `>`, window `[next−stepMs, next]`, dead-zone
+  hold at prev). The spec's `touches:` line was incomplete: the fix is inert without the sole
+  production consumer forwarding `stepMs` — `renderResolver.ts` (1 line) + its sibling test
+  shipped as declared touches-delta. 25 gating tests (19 started red; 6 executed reward-hack
+  holes closed pre-implementation; 12/12 hand-run source mutants killed). E1's "no post-resume
+  max-delay clamp" clause is scoped in ADR-0171: the resume interval itself must not cause the
+  clamp — genuine pre-idle jitter may legitimately keep the delay high across a gap.
+  Known band recorded as D-D evidence: sustained cadences in `(2×stepMs, 3×stepMs]` render
+  correctly but hold the delay at the clamp (never a regression). ≥2-tile resumes still snap
+  (M12.5d-2, intended).
 
 ### 11r-g — Server hardening basket (MED, independent items) — `touches: server-module/{movement,battle,raising,guards,content_cache,schema}.rs, client/src/ui/healModel.ts`
 - Silent wild-encounter failures: `movement.rs:268-283` (`let Ok(..) else continue`,
@@ -103,6 +134,20 @@ Two verified pure-core defects make every remote/NPC pause-resume ugly:
   silent-debit trap. Add the column, read the row, surface currency in the heal UI.
 - `log_reject` (`guards.rs:16-17`) interpolates reasons into hand-built JSON unescaped; RON/serde
   parse errors embed quotes → malformed log lines. Add a `json_escape` at the choke point.
+
+**DELIVERED (11r-g, ADR-0170, PR pending merge):** items 1/2/4 shipped for the declared touch-set;
+item 3 SPLIT. Shipped: rate-limited gated logging of both swallow sites (RateLimiter struct,
+routine fainted-party reason filtered at source via shared const — hostile-client limiter
+saturation closed); `cached_abilities()` + a `content_version`-keyed rebuildable type-chart cache
+(NOT a sync_content hook — that would need out-of-touches `content.rs`; version-key is coherent by
+the single-writer + same-txn-stamp proof) with `battle.rs` swaps only; `cached_heal_locations()`
+ending `heal_party`'s per-call re-parse + the `healModel.ts` `costCurrency`/`isFree` seam (inert).
+**PARKED as hidden dependency (spec's touches line was incomplete):** the `cost_currency` COLUMN —
+its seed site is a `content.rs:702` struct literal, and the column amends ADR-0083 §A; needs a
+follow-up slice with touches `server-module/{schema,content}.rs` + bindings regen +
+`client/src/net/{store,rowConvert}.ts` + `client/src/ui/healView.ts` (currency display arm is a
+non-optional pairing). Also residual: `pvp.rs`/`taming.rs` cache swaps; unescaped JSON log sites
+in `battle.rs:1087/:1124/:1310`, `pvp.rs`, `content.rs`, `npc.rs`. Full list: ADR-0170 residuals.
 
 ### 11r-h — Test-integrity & diagnostics residuals (LOW) — `touches: client tests, game-core tests, evals/spec-gap-revival.eval.mjs, client/src/{main.ts,net/devLog.ts}`
 - RT-SZ-02 (`client/src/net/switchZoneAtomicity.test.ts:262`) is `expect(true).toBe(true)` —

@@ -304,5 +304,5 @@ them when you pass one it doesn't recognize.
 - **`AGENTS.md`** — the rules the AI follows (start here to understand agent behavior).
 - **`WORKSPACE-PLAN.md`** — the full design rationale and decision history.
 - **`SETUP.md`** — one-time host setup.
-- **`standards/`** — the engineering standards themselves.
+- **`standards/`** — the engineering standards themselves. keep these in mind when writing or reviewing code.
 - **`docs/`** — workflow loops, context hygiene, and model/effort routing.
