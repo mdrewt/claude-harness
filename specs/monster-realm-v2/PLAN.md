@@ -363,7 +363,7 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   `Item(id)` trigger reducer (ADR-0149, now Superseded) is replaced by `consume_crystalized_essence()`
   (EG2-4), and its RON branches are re-authored as accumulating-essence-pool triggers (EG3-6/EG3-8); no
   separate B2 implementation needed.
-- **M-evolution-essence-redesign** (`M-evolution-essence-redesign.spec.md` input skeleton → `M-evolution-essence-graph.spec.md` converged spec) — **CEREMONY COMPLETE 2026-08-02**. HEAVY redesign (r2 feedback 2026-07-26, ledger items 062-086): fusion removed; evolution becomes a directed essence-graph with five AND-combined gates (tier, level, essence-type/amount, Trust, Quality-Time); essence-train reducer + item consumption path; Bond retired; Trust Bayesian-smoothed; Nutrition re-labeled from EV totals; five sequential slices (EG1 schema → EG2/EG3/EG4 parallel → EG5 tail), full details in implementation-ready spec. Four DECISIONS remain open for Drew confirmation (Bond full-retirement, graph visibility, strict tier +1 per edge, full essence reset; all implemented at default so build not blocked). Five design-panel highlights in ADR-0019 Amendment 2026-08-02 + M-evolution-essence-graph.spec.md §4. Ready for implementation; runner picks up per spec's build order (EG1 first, serially; EG2/EG3/EG4 fan-out in parallel).
+- **M-evolution-essence-redesign** (`M-evolution-essence-redesign.spec.md` input skeleton → `M-evolution-essence-graph.spec.md` converged spec) — **CEREMONY COMPLETE 2026-08-02**. HEAVY redesign (r2 feedback 2026-07-26, ledger items 062-086): fusion removed; evolution becomes a directed essence-graph with five AND-combined gates (tier, level, essence-type/amount, Trust, Quality-Time); essence-train reducer + item consumption path; Bond retired; Trust Bayesian-smoothed; Nutrition re-labeled from EV totals; five sequential slices (EG1 schema → EG2/EG3/EG4 parallel → EG5 tail), full details in implementation-ready spec. **5 of 6 decisions CONFIRMED by Drew 2026-08-02** (Bond full-retirement, graph visibility, strict tier +1 per edge, full essence reset, Trust-tier granularity expanded 4→5); only the tier cap remains explicitly open (deliberately — its PROVISIONAL framing is confirmed accurate, not a blocker; `Species.tier <= 5` stands as the interim value). All six implemented at their stated default regardless, so the build is never blocked. Five design-panel highlights in ADR-0019 Amendment 2026-08-02 + M-evolution-essence-graph.spec.md §4. Ready for implementation; runner picks up per spec's build order (EG1 first, serially; EG2/EG3/EG4 fan-out in parallel).
 - **M-postgate-battle-0hp-fix** (`M-postgate-battle-0hp-fix.spec.md`) — **PvE HALF MERGED 2026-07-31,
   PvP HALF PARKED** (11r-d ledger reconciliation): #258/ADR-0156 landed the PvE fix (never seat a 0 HP
   lead; reject actions from a fainted active). **The PvP half was deliberately parked by ADR-0156** and is
@@ -420,6 +420,33 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   Four DECISIONS for Drew in spec §4 (battle-table team exposure, unsolicited-trade escrow
   griefing, held-key RTT pin, changelog gate). `main.ts` slices are SERIAL with uxd3 — see
   spec §3 sequencing. No new game-design surface outside the §4 decisions.
+- **M-postgate-twelfth-review-residuals** (`M-postgate-twelfth-review-residuals.spec.md`) —
+  **NEW, queued 2026-08-07; inserted after `M-postgate-eleventh-review-residuals` (fully
+  merged) and after the in-flight `M-evolution-essence-graph` (EG4/EG5 outstanding)**, per the
+  weekly-review insertion convention. Verified twelfth multi-lens review findings @ `3c1cf08`
+  (10 lenses, every finding independently re-verified by separate verifier agents; four
+  severities revised DOWN by the verifiers and the revised values are what the spec records).
+  The EG1/EG2/EG3 + 11r delta is unusually clean — six of ten lenses found nothing reportable,
+  and the security, netcode and test-integrity lenses each returned an explicit "no findings".
+  What remains is the enforcement-and-documentation layer around the code: two HIGH slices —
+  **12r-a** append-only id baselines for species/items/skills were never updated as content
+  grew (`[1,2,3]` vs 16 live species; the gate only flags *removed* baseline ids, so deleting
+  or renumbering species 20 / item 4 / skill 7 passes green today) and **12r-b** `PLAYTEST.md`
+  still documents the `G`/`H` hotkeys uxd2 deleted while omitting `M` entirely, in a doc that
+  claims to be kept in sync with `helpModel.ts` — plus **12r-c** the `monster-dual-write` eval
+  ignores `pub(crate) fn` boundaries and so no longer verifies each function's own mirror,
+  **12r-d** the ADR-0170 residual basket (heal `cost_currency` silent-debit trap, `pvp`/`taming`
+  cache swaps, six unescaped JSON log sites) which was honestly disclosed at 11r-g but queued
+  nowhere, **12r-e** a validator/core hardening tail (R4 vacuous-path tests field presence not
+  gate semantics; `lead_party`'s silent whole-party accrual disable, which ADR-0175 names in
+  its own Consequences and no queue picked up; a provably-dead R1 backstop; Quality-Time cap
+  write amplification on the hottest reducer), and **12r-f** ledger/doc reconciliation
+  (CHANGELOG re-drifted 13 PRs one delta after 11r-d fixed it; four missing ADR `Amended-by:`
+  back-links that the digest gate structurally cannot catch). ONE decision for Drew
+  (issue #284: whether per-monster raising progress stays world-readable on public
+  `monster_pub` — deliberately has no slice). a/b/c/f are pairwise disjoint fan-out
+  candidates; d → e is SERIAL; **12r-d touches `schema.rs` and so must be ordered explicitly
+  against EG5-6 Migration B**. No new game-design surface.
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
