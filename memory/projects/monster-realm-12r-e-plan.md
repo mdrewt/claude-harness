@@ -42,8 +42,15 @@ Spec: `specs/monster-realm-v2/M-postgate-twelfth-review-residuals.spec.md:177-24
   in-body `Amendment (12r-e)` note under D5; `0175` gains a new `**Amended-by:** ADR-0178` line
   plus a `[CLOSED by 12r-e]` marker on Consequences (4). `just adr-digest` regenerated
   `DIGEST.md` (144 project ADRs).
-- **A18 CONFIRMED:** `just knowledge-check` reports "bundle in sync (no drift)" — the knowledge
-  regen is a genuine no-op, as predicted. `scripts/check-secrets.mjs`: clean.
+- **A18 was WRONG — corrected by the verifier.** I checked `just knowledge-check` BEFORE item 2
+  landed and recorded "no drift / genuine no-op". Once `battle.rs` gained lines, the bundle DID
+  drift: commit `6a76762` regenerated **8 reducer pages**, all `resource: …#Lnnn` line-anchor
+  shifts only. The prediction's *reasoning* was right (`okf-export` harvests only
+  `#[spacetimedb::reducer]` fns, so no NEW page appeared and `lead_party_ids` is invisible to it)
+  but its *conclusion* was wrong, because existing pages carry line anchors into the files we
+  edited. **S4's STOP condition did NOT trigger**: no `docs/knowledge/tables/**`, no
+  `schema-overview.md`. Lesson: re-run a drift probe AFTER the code lands, never before.
+  `scripts/check-secrets.mjs`: clean.
 - **`ARCHITECTURE.md` NOT touched** — verified it never mentions the seed-gate backstop, and the
   new helper is `pub(crate)`. `CHANGELOG.md` and `docs/adr/README.md` NOT touched.
 - **An eval regression was caught and fixed mid-slice:** `evals/monster-dual-write.eval.mjs`
