@@ -294,25 +294,25 @@ corrections rather than silently rewriting the draft.
 
 ## §4 Task checkboxes
 
-- [ ] `Account`, `AccountStatus`, `GuestClaim`, `GuestClaimReaperSchedule` tables + `my_account` view
-  in `server-module/src/schema.rs`
-- [ ] `server-module/src/accounts.rs` — reducers `complete_guest_claim`, `start_guest_claim`,
+- [x] DONE (M21a, PR #298) `Account`, `AccountStatus`, `GuestClaim`, `GuestClaimReaperSchedule` tables + `my_account` view
+  in `server-module/src/schema.rs` *(GuestClaimReaperSchedule colocated in `accounts.rs` with its reducer per the ADR-0056 scheduled-table exception — the `scheduled(` name-scanners require a bare ident)*
+- [x] DONE (M21a, PR #298) `server-module/src/accounts.rs` — reducers `complete_guest_claim`, `start_guest_claim`,
   `delete_account`, `cancel_account_deletion`; helpers `provision_or_touch_account`,
   `account_has_game_data`, `consume_claim_and_disarm`, `rekey_all`, `is_pending_deletion` (SSOT
   reused by `complete_guest_claim`, and by M22's additional gameplay call sites)
-- [ ] `server-module/src/accounts_tests.rs`
-- [ ] `client_connected` reducer (`on_connect`) + `guest_claim_reaper` scheduled reducer wired in
+- [x] DONE (M21a, PR #298) `server-module/src/accounts_tests.rs`
+- [x] DONE (M21a, PR #298) `client_connected` reducer (`on_connect`) + `guest_claim_reaper` scheduled reducer wired in
   `server-module/src/lib.rs`
-- [ ] `rekey_monsters` in `monster_mgmt.rs` (dual-write `monster` + `monster_pub` in one fn body)
-- [ ] `rekey_inventory` in `inventory.rs`
-- [ ] `rekey_npc_state` in `npc.rs` (`player_quest` + `player_dialogue_state`)
-- [ ] `rekey_heal_cooldown` in `raising.rs`
-- [ ] `rekey_wallet` in `economy.rs` (credit-forward + zero-in-place, never delete)
-- [ ] `rekey_profile` in `ranking.rs` (copy-forward + zero-in-place-on-guest-row + tombstone, never
+- [x] DONE (M21a, PR #298) `rekey_monsters` in `monster_mgmt.rs` (dual-write `monster` + `monster_pub` in one fn body)
+- [x] DONE (M21a, PR #298) `rekey_inventory` in `inventory.rs`
+- [x] DONE (M21a, PR #298) `rekey_npc_state` in `npc.rs` (`player_quest` + `player_dialogue_state`)
+- [x] DONE (M21a, PR #298) `rekey_heal_cooldown` in `raising.rs`
+- [x] DONE (M21a, PR #298) `rekey_wallet` in `economy.rs` (credit-forward + zero-in-place, never delete)
+- [x] DONE (M21a, PR #298) `rekey_profile` in `ranking.rs` (copy-forward + zero-in-place-on-guest-row + tombstone, never
   delete; NOT a `#[spacetimedb::reducer]`)
-- [ ] Read-only existence helpers per owning module: `wallet_exists`, `profile_exists`,
+- [x] DONE (M21a, PR #298) Read-only existence helpers per owning module: `wallet_exists`, `profile_exists`,
   `has_monsters`, `has_items`, `has_quest_or_dialogue_state`, `has_heal_cooldown`
-- [ ] `PROFILE_TOMBSTONE_NAME` constant (≤ `MAX_NAME_LEN` = 24)
+- [x] DONE (M21a, PR #298) `PROFILE_TOMBSTONE_NAME` constant (≤ `MAX_NAME_LEN` = 24)
 - [ ] `evals/account-privacy.eval.mjs` (table privacy, `my_account` body-exact pin,
   `ViewContext::new(`/`ViewContext {` ban, NO_PII_IN_REJECT_LOGS)
 - [ ] `evals/guest-claim-integrity.eval.mjs` (NO_CLIENT_IDENTITY, ANON_PASSTHROUGH,
@@ -324,20 +324,20 @@ corrections rather than silently rewriting the draft.
   `accounts.rs` + each new re-key helper file
 - [ ] Extend `evals/currency-integrity.eval.mjs` with a negative assertion that `accounts.rs` is not
   added to the ACCESSOR_BYPASS allowlist
-- [ ] Regenerate client bindings (`just gen-bindings`)
+- [x] DONE (M21a, PR #298) Regenerate client bindings (`just gen` — the recipe is `just gen`, not `just gen-bindings`)
 - [ ] Client: `authToken.ts` companion marker key (e.g. `mr.authToken.v1.kind`) — additive, existing
   logic untouched
 - [ ] Client: `connection.ts` silent-renewal-before-`withToken` + session-expired state
 - [ ] Client: claim-code UI (client-minted code, sessionStorage, same-tab redirect or
   popup+`postMessage` OIDC return)
 - [ ] Client: guest→account claim prompt + first-run multi-device nudge copy
-- [ ] Tests: proof-of-teeth coverage for AUTH-1..AUTH-38
-- [ ] `just knowledge` regeneration (`evals/knowledge-bundle-conformance.eval.mjs` is a live, currently-wired
+- [x] DONE (M21a, PR #298) Tests: proof-of-teeth coverage for AUTH-1..AUTH-38 *(server-side AUTH-1..29/34..38; the client-only AUTH-31/32/33 are M21b. 17 proof-of-teeth mutations executed and observed RED, then reverted.)*
+- [x] DONE (M21a, PR #298) `just knowledge` regeneration (`evals/knowledge-bundle-conformance.eval.mjs` is a live, currently-wired
   `just ci` drift gate — M21a adds 3 new tables plus a new domain module, `accounts.rs`; missing this task
   would leave the committed `docs/knowledge/` bundle stale and fail CI on landing. Corrected this review pass
   — the original task list omitted it, unlike every other recent schema-touching milestone, e.g.
   `M17.5-tenth-review-residuals.spec.md`'s 17.5g-3.)
-- [ ] `just adr-digest` regeneration after ADR-0179 lands
+- [x] DONE (M21a, PR #298) `just adr-digest` regeneration after ADR-0179 lands *(M21a's ADR-0179 edits are body-only — Amendments/Consequences — so `just adr-digest` produces zero DIGEST.md drift; the header-derived digest was already generated when ADR-0179 landed in #294)*
 
 ## §5 Slice decomposition
 
