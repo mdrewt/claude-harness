@@ -1,16 +1,34 @@
 {
     "schema_version": 1,
-    "updated_utc": "2026-08-08T19:58:00Z",
-    "updated_by": "native tick native-20260808T195529Z-4152597: merged M21a (PR#298->b5bbe1d), audits CLEAN/adjudicated-CLEAN; master CI on merge commit in_progress at record time, not sit-polled",
+    "updated_utc": "2026-08-08T21:03:00Z",
+    "updated_by": "native tick native-20260808T210012Z-4165008: master CI confirmed green on b5bbe1d, committed stray M21a docs (b7c6d36), fan-out launched M21b+M21c (mr-disjoint SAFE, routine/opus@high both)",
     "master": {
         "sha": "b5bbe1d",
-        "ci": "in_progress (run 31275687239 on b5bbe1d; confirm next tick)",
+        "ci": "success (run 31275687239 on b5bbe1d)",
         "nightly": "SUCCESS on 3c1cf08 (run 31090022421, 2026-08-06T09:39:33Z) -- confirms EG2/EG3 essence-graph content is nightly-mutant-clean. Not yet re-run since."
     },
     "adr_next_free": 181,
-    "inflight": [],
+    "inflight": [
+        {
+            "slice": "M21b",
+            "leader": 4167441,
+            "claude_pid": 4167444,
+            "model": "opus",
+            "tier": "routine",
+            "launched_utc": "2026-08-08T21:02:09Z"
+        },
+        {
+            "slice": "M21c",
+            "leader": 4167893,
+            "claude_pid": 4167896,
+            "model": "opus",
+            "tier": "routine",
+            "launched_utc": "2026-08-08T21:02:16Z"
+        }
+    ],
     "awaiting_merge": [],
     "queue": [
+        "2026-08-08T21:03Z native tick (rid=native-20260808T210012Z-4165008): see handoff entry of same timestamp for full detail.",
         "2026-08-08T19:57Z native tick (rid=native-20260808T195529Z-4152597): PR#298 CI turned green since prior tick's UNSTABLE snapshot; ran mr-audit --tier hard (base=8defbd0, head=67659c8): orchestration CLEAN, gating FLAGGED-adjudicated-CLEAN (2 'skip' hits were Rust .skip(N) iterator calls in scan machinery, not test-skip markers; 3 removed/modified asserts were a documented ranking_tests.rs pin re-scoping -- whole-file update-count==2 pin split into 3 per-function pins (apply_pvp_rating==2/get_or_init_profile==0/rekey_profile==2) + a total==4 backstop, because M21a's rekey_profile legitimately adds 2 writers; new AUTH-24/25 pure-seam tests also landed -- net coverage increase). Squash-merged -> b5bbe1d, worktree+branch cleaned, local checkout ff-only synced. master CI on the merge commit (run 31275687239) still in_progress at record time -- did not sit-poll it, no composite launch this tick. Full detail in handoff entry of the same timestamp. NEXT: confirm master CI green on b5bbe1d, then M21b/M21c become launchable per M21-accounts-auth.spec.md Sec5.",
         "2026-08-08T13:58Z interactive session: full mr-feedback-doctrine.md sec6 HEAVY CEREMONY for M21 (accounts/auth) then M20 (observability/perf), 38-agent Workflow, per Drew's explicit interactive instruction to skip playtest-3 and greenlight Phase D. Both milestones now BUILD-READY (specs/monster-realm-v2/M21-accounts-auth.spec.md + M20-observability-performance.spec.md, 38+40 EARS criteria). New ADR-0179 (accounts/auth) + ADR-0180 (observability stack) in project docs/adr/, PR#294 merged->62dce75. ADR-0029 amended (Datadog->7-container self-hosted OSS stack: Prometheus+Alloy+Loki+Tempo+Grafana OSS+node_exporter+Caddy). M20 investigation corrected a false claim: M0's observability substrate (tracing/criterion/OTel) was never actually built despite ADR-0029/M0 claiming so -- confirmed via live code+live SpacetimeDB 2.6.0 instance checks. Also found a real SpacetimeDB security gap (/v1/metrics unauthenticated by a permanent upstream code gap, reproduced twice). Two non-blocking open questions for Drew in each spec (M21: OIDC provider three-way non-convergence + a ranked-ladder decision defaulted to 'no'; M20: network topology, likely pre-answered by M-playtest-a-deployment.spec.md's local-only scope). NEXT TICK: gate + launch M21a (structural spine: schema.rs+accounts.rs+6 domain rekey_* helpers, HARD tier/fable@xhigh, ADR-0179 already Accepted so no new ADR reservation) SOLO -- per Drew's explicit build-order instruction, do NOT fan out M20a/m20b alongside it even though touches: would technically allow it; complete all of M21 (M21a/b/c) before starting any M20 slice. Full detail in the handoff entry of the same timestamp. Cleared .native-supervisor-disabled.",
         "2026-08-08T09:13Z operator interactively resumed the loop after answering DECISION issue #284 (rev12-monsterpub-raising-privacy) directly on github. Decision: owner-scoped RLS on monster_pub -- own monsters always full-visible; other players' monsters visible only contextually (active battle/trade/quest need), not persistently. Broader than the issue's a/b/c options (whole table, not just EG1 raising columns). Per the issue's own footer (record-and-ignore, consumer=weekly generate-improvement-plan run) did NOT close/comment/spec/build it -- recorded only (memory/projects/decisions/issue-284.answer.md, committed). Re-verified live: master local==origin==42c134e both repos, push-CI SUCCESS (nightly run 31247038046 in_progress, unrelated), zero PRs/locks/inflight, feedback ledger clean, no new specs authored in the 8h gap (7 consecutive disabled-flag SKIPs 02:00-09:00Z per mr-native-tick.log). Confirms the answer does NOT unblock any slice -- terminal DONE stands on its true cause (roster-wave-3/client-coverage spec-less). Cleared .native-supervisor-disabled per explicit operator instruction; expect the next cron tick to independently re-derive the same no-launchable-slice state and likely re-disable -- that is correct, not a regression.",
@@ -33,7 +51,7 @@
     "park_counters": {},
     "consecutive_standdowns": 0,
     "rate_limit_resets_at": null,
-    "notes": "M21a MERGED 2026-08-08T19:56:54Z (PR#298->b5bbe1d, squash). master CI on the merge commit still in_progress at 19:58Z record time -- NEXT TICK gate-1 must re-verify green before launching M21b/M21c. Both are spec-declared as depending on M21a's merge; check M21-accounts-auth.spec.md Sec5 for their touches:/tier before spawning. Do not start any M20 slice until all of M21 (a/b/c) is merged (Drew build-order directive).",
+    "notes": "M21b+M21c launched in parallel 2026-08-08T21:02Z (fan-out, mr-disjoint SAFE). Both depend only on M21a (merged, PR#298->b5bbe1d, master CI confirmed green). M21 milestone closes when both merge -- post-integration verification per M21-accounts-auth.spec.md \u00a75 (full just ci, bindings-drift=0, schema-snapshot, full connect->provision->claim->rekey e2e). Do not start M20 until M21a/b/c all merged (Drew build-order directive).",
     "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
     "parked": [],
     "open_chore_prs": [],
