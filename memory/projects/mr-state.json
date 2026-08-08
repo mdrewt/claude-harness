@@ -1,14 +1,24 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-08-08T13:58:00Z",
- "updated_by": "interactive heavy-ceremony session: M21+M20 build-ready, PR#294 (project ADRs 0179/0180) merged -> master@62dce75; M21a is the next launchable slice",
+ "updated_utc": "2026-08-08T16:03:00Z",
+ "updated_by": "native tick native-20260808T160005Z-3812990: fixed master CI red (ADR-0179 Subsystems vocab violation) via PR#295 -> 8defbd0; M21a still next once CI confirmed green",
  "master": {
-  "sha": "62dce75221994c4c2b0edd5a985dd5ca30b69d2c",
-  "ci": "in_progress (post-merge push-CI on the doc-only PR#294, unwatched per no-post-merge-watcher precedent -- doc-only change, low risk)",
+  "sha": "8defbd0",
+  "ci": "success",
   "nightly": "SUCCESS on 3c1cf08 (run 31090022421, 2026-08-06T09:39:33Z) -- confirms EG2/EG3 essence-graph content is nightly-mutant-clean. Not yet re-run since."
  },
  "adr_next_free": 181,
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "M21a",
+   "run_id": "mr-spawn-20260808T170213Z-3864566",
+   "leader": 3864602,
+   "model": "fable",
+   "effort": "xhigh",
+   "tier": "hard",
+   "started_utc": "2026-08-08T17:02:17Z"
+  }
+ ],
  "awaiting_merge": [],
  "queue": [
   "2026-08-08T13:58Z interactive session: full mr-feedback-doctrine.md sec6 HEAVY CEREMONY for M21 (accounts/auth) then M20 (observability/perf), 38-agent Workflow, per Drew's explicit interactive instruction to skip playtest-3 and greenlight Phase D. Both milestones now BUILD-READY (specs/monster-realm-v2/M21-accounts-auth.spec.md + M20-observability-performance.spec.md, 38+40 EARS criteria). New ADR-0179 (accounts/auth) + ADR-0180 (observability stack) in project docs/adr/, PR#294 merged->62dce75. ADR-0029 amended (Datadog->7-container self-hosted OSS stack: Prometheus+Alloy+Loki+Tempo+Grafana OSS+node_exporter+Caddy). M20 investigation corrected a false claim: M0's observability substrate (tracing/criterion/OTel) was never actually built despite ADR-0029/M0 claiming so -- confirmed via live code+live SpacetimeDB 2.6.0 instance checks. Also found a real SpacetimeDB security gap (/v1/metrics unauthenticated by a permanent upstream code gap, reproduced twice). Two non-blocking open questions for Drew in each spec (M21: OIDC provider three-way non-convergence + a ranked-ladder decision defaulted to 'no'; M20: network topology, likely pre-answered by M-playtest-a-deployment.spec.md's local-only scope). NEXT TICK: gate + launch M21a (structural spine: schema.rs+accounts.rs+6 domain rekey_* helpers, HARD tier/fable@xhigh, ADR-0179 already Accepted so no new ADR reservation) SOLO -- per Drew's explicit build-order instruction, do NOT fan out M20a/m20b alongside it even though touches: would technically allow it; complete all of M21 (M21a/b/c) before starting any M20 slice. Full detail in the handoff entry of the same timestamp. Cleared .native-supervisor-disabled.",
@@ -32,7 +42,7 @@
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "M21 (accounts/auth) and M20 (observability/perf) are BUILD-READY as of 2026-08-08T13:58Z (interactive heavy-ceremony session, see queue entry + handoff of the same timestamp). M21a is the next launchable slice -- HARD tier (schema.rs touch) / fable@xhigh, ADR-0179 already Accepted (no reservation needed). Build order is Drew-mandated: M21 fully (a/b/c) before any M20 slice, even though M20a/m20b are touches-disjoint from M21a and would otherwise be fan-out-eligible. Two non-blocking open-questions-for-Drew live in the specs themselves (see handoff) -- do not treat them as park triggers, the specs already state safe defaults/provider-agnostic designs that let build proceed. .native-supervisor-disabled CLEARED.",
+ "notes": "M21a launched 2026-08-08T17:02Z (rid=mr-spawn-20260808T170213Z-3864566, leader=3864602, fable@xhigh, hard tier). Master CI green on 8defbd0 (16:00Z tick fixed the adr-digest Subsystems-vocab red via PR#295). NEXT: monitor M21a to completion; on merge, M21b+M21c become parallel-eligible (both depend on M21a, mutually disjoint touches) -- launch both per M21 Sec5 slice decomposition table. Do not start any M20 slice until all of M21 (a/b/c) is merged (Drew build-order directive).",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],
