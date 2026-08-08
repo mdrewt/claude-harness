@@ -320,6 +320,19 @@ fan-out per each spec's pairing notes):**
 **Phase D — Production readiness (`blocked:playtest-gate` LIFTED for the two hardening milestones only; the
 rest stays post-gate provisional pending a cleaner second playtest read):**
 
+> **2026-08-08 operator override (Drew, interactive):** explicitly skips the playtest-3 gate check for
+> Phase D and greenlights it now — supersedes the "post-gate provisional pending a cleaner second playtest
+> read" framing above and the 2026-07-26 playtest-3 directive (`b0e37b5`) for Phase D specifically (that
+> directive still governs `M-postgate-roster-wave-3`, which is unaffected). Build order: **M21
+> (accounts & authentication) first, M20 (observability/performance capstone) second** — both explicitly
+> assigned the full `mr-feedback-doctrine.md` §6 HEAVY CEREMONY treatment (investigation → 6-way ideation →
+> judge synthesis → execution → review), producing full build-ready specs + ADRs, not just implementation.
+> M20's Decision (ADR-0029) is being amended in the same ceremony: the harness-default Datadog dashboard
+> sink is replaced with a self-hosted/OSS stack (Drew's explicit preference — free tooling, Docker-hosted
+> locally, no 3rd-party dependency) selected via the ceremony's research-context ideation lenses.
+
+
+
 - **M-postgate-netcode-hardening** (`M-postgate-netcode-hardening.spec.md`) — **CLOSED 2026-07-31** (11r-d
   ledger reconciliation): all four slices merged — nh1 #247/ADR-0146, nh2 #250/ADR-0148, nh4 #252/ADR-0150,
   nh3 #254/ADR-0152. Historical scope below.
