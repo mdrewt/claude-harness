@@ -420,4 +420,79 @@ affordance are parked to M21b-2 with their provider. **AUTH-33 parked entire** �
 designed unblock path irreversible player-data loss, and F1 makes the flow unable to succeed at all
 today. Spec §4 client checkboxes stay UNTICKED except the marker bullet.
 
+---
+
+# ADDENDUM 2 — the RED phase forced one more descope (SUPERSEDES both sections above)
+
+The tester hit a hard blocker writing the gating tests, and it is the type system reporting a real
+dependency rather than a puzzle to be worked around.
+
+**The blocker.** `build()` is annotated `function build(): DbConnection {` and `let current = build();`
+is non-optional. The `sessionExpired` path requires "surface the state and do NOT build" — i.e. a
+bare `return;` — which does not typecheck. Widening `build()` / `current` to `DbConnection |
+undefined` cascades into `get conn()` and every `conn.conn.reducers.*` call site in `main.ts`, and
+the anchor `'function build(): DbConnection {'` bounds SIX existing teeth
+(`connection.test.ts:249/253/263/380/383/651/656`). That is reviewer B1's "public-surface decision"
+in concrete form.
+
+**S14 — RULING: the READ-side guard ships with the cold-start contract in M21b-2. This slice ships
+the WRITE-side guard plus the discriminator it needs.** There is no correct behavior for
+`sessionExpired` without an affordance to leave it (S3 cut `continueAnonymously` as unreachable) AND
+a `current`-may-be-absent contract (parked item 6). Those three are one indivisible unit; splitting
+them is what produced the contradiction. **CUT from this slice:** `decideConnectCredential`,
+`SESSION_EXPIRED_MESSAGE`, `onSessionExpired`, the `ConnectionOptions`/`Connection` widening, the
+whole `sessionExpired` branch, `W-M21B-NO-ANON-FALLTHROUGH`, and the `main.ts` + `main.wiring.test.ts`
+changes.
+
+**Bonus: `W-NH4-TOKEN-SUPPLIED` is no longer touched at all.** `.withToken(auth.tokenForNextAttempt())`
+stays byte-identical to master, so AUTH-31's "no behavior change to the anonymous path" becomes
+literally true rather than argued — and the slice loosens exactly ONE gating test instead of two.
+
+**S15 — the write-side guard alone is NOT sufficient; this MUST be pinned in prose.** With the
+marker at `'account'` the account token would not be stored (correct), but the next build still
+supplies the stale *anon* token through the unchanged `.withToken(auth.tokenForNextAttempt())` — a
+silent drop to a different identity. So `writeAuthKind` carries a comment stating that **no
+production caller may write `'account'` until M21b-2's read-side credential guard lands**, and a
+source-scan tooth asserts that comment's presence so it cannot be silently deleted. This is S11's
+named YAGNI exception, now load-bearing rather than decorative.
+
+## FINAL file set (post-ADDENDUM-2) — 4 files
+1. `client/src/net/authToken.ts` — ADDITIVE ONLY: `AuthKind`, `AUTH_KIND_KEY_PREFIX = 'mr.authKind.v1'`,
+   `authKindStorageKey`, `readAuthKind`, `writeAuthKind` (+ the S15 hazard comment). Zero edits to
+   any existing body.
+2. `client/src/net/authToken.test.ts` — APPENDED block only (lines 1-630 byte-unchanged = AUTH-31's
+   own proof).
+3. `client/src/net/connection.ts` — TWO wiring points: `const buildKind = readAuthKind(globalThis,
+   opts.uri, opts.db);` fresh per build inside `build()`; `if (buildKind === 'anon')
+   auth.onConnected(token);` in `onConnect` under the stale guard. Plus the `my_account` tripwire
+   comment. **`build()`'s signature, `.withToken(...)`, `ConnectionOptions`, `Connection`, and every
+   other existing line are UNCHANGED.**
+4. `client/src/net/connection.test.ts` — `W-NH4-SAVE-WIRED` re-pin (the slice's one gating-test
+   loosening; tester-owned, justified in-file, reviewer-audited) + new `W-M21B-KIND-READ`.
+Plus `docs/adr/0179-*.md` body amendment. **NO `claim*.ts`, NO env var, NO `main.ts` change, NO
+`ARCHITECTURE.md` OIDC section.**
+
+## FINAL mutations that must bite (5 + regression task)
+un-guard `auth.onConnected(token)` (today's shape) · invert the guard (`!== 'anon'` / `=== 'account'`) ·
+re-read the marker inside the `onConnect` callback instead of the build-scoped binding (TOCTOU) ·
+`readAuthKind` returns `'account'` on a missing key · `readAuthKind` returns `'account'` on a
+throwing getter · `authKindStorageKey` drops `encodeURIComponent` / reuses `KEY_PREFIX` (key
+collision) · delete the S15 hazard comment.
+Regression TASK: re-verify `W-NH4-GATE-CONSTRUCTED`, `W-NH4-TOKEN-SUPPLIED` (must be byte-identical
+to master), `W-NH4-FAILURE-WIRED`, `W-NH4-NO-CLEAR-ON-DROP`, `SDK-DRIFT`, `W-DEVLOG-WRAP`.
+
+## Scope honesty (FINAL — state plainly in the PR)
+**AUTH-31 satisfied** — and now provably, since the anonymous path's source is byte-unchanged.
+**AUTH-32 NOT satisfied this slice** — the never-replay *write* half ships and is structural; the
+credential decision, silent renewal, session-expired state and explicit-choice affordance are one
+indivisible unit with the cold-start contract, parked to M21b-2.
+**AUTH-33 NOT satisfied this slice** — F2 makes every designed unblock path irreversible player-data
+loss and F1 makes the flow unable to succeed at all today.
+Spec §4: tick ONLY the `authToken.ts` companion-marker bullet; the other three client bullets stay
+unticked with a deferral note.
+
+**What this slice IS, in one sentence:** the anonymous token slot must never receive an account JWT,
+and the discriminator + write-side guard land *before* the path that could violate it — so M21b-2
+cannot ship the C4 replay hole by accident.
+
 ## Toolchain: `export PATH="$HOME/.asdf/shims:$HOME/.cargo/bin:$HOME/.local/bin:$PATH"`
