@@ -188,8 +188,10 @@ answered. **Everything else in this spec is decided** and does not need Drew's i
   table; a scheduled reducer's `connection_id` is always `None`, so its lines correlate by `(function, ts)`
   plus a natural key already in the payload (e.g. `zone_id`). **(d) OBS-2's bare-`log::` ban is a ratchet
   against the current tree, corrected this finalization pass** — see OBS-2 and the `.log-baseline` §4 task;
-   the ban is enforced going forward, not retroactively against the 56 pre-existing call sites a review found
-  it would otherwise fail against on landing.
+   the ban is enforced going forward, not retroactively against the 53 pre-existing call sites a review found
+  it would otherwise fail against on landing (corrected from an earlier draft's "56," which counted 3
+  doc-comment *mentions* of `log::error!`/`log::warn!` in `movement.rs`/`battle.rs`/`npc.rs` as if they were
+  invocations — a substring-match error, not a code-content one; see OBS-2's own note for the anchoring fix).
 - **D7 — Perf-budget gate is a `criterion` dev-dependency scoped to `game-core` only.** Zero
   `spacetimedb`/wasm coupling (the feature-isolation invariant M0 already enforces stays intact — `criterion`
   never becomes a `server-module` or `client-wasm` dependency). Benchmarks cover the named hot paths already
@@ -303,7 +305,12 @@ bullet below says otherwise.
   push; doubled log volume **and reducer-side CPU/allocation cost** (two heap-allocating hand-rolled JSON
   string builds — `format!`/`json_escape` — per paired invocation, inline in the reducer's own transaction,
   not previously disclosed) for whichever calls are in `$trace_pair_set`, bounded by the exclusion above and
-  checked pre-merge per §5.
+  checked pre-merge per §5. **Single source of truth (added this review pass):** `$trace_pair_set` has two
+  independent representations — which reducers' source code actually contains the paired `mr_log` enter/exit
+  calls, and the relay's own committed config listing which reducer names to reconstruct trees for — and
+  nothing previously verified they agree. The relay's committed config is authoritative; OBS-50's gate (G9)
+  additionally asserts the set of reducers with real breadcrumb code in `server-module/src/*.rs` is *exactly*
+  equal to it, catching drift in either direction.
 - **D16 — Client and server traces are pivoted, not merged, in v1 — unchanged rationale.** No `trace_id`
   reducer argument. The join stays a Grafana trace-to-logs (span-time-window) plus a `connection_id`
   correlation pivot (D17). A merged trace id would cost reducer signature changes across the hot API surface,
@@ -320,8 +327,9 @@ bullet below says otherwise.
   shift; (2) a `connection_id` correlation pivot — **which first-party Grafana mechanism (Correlations vs.
   Loki derived fields) is correct for this specific join is UNVERIFIED and is a build-time spike, not a
   settled fact**; (3) shared time-range linkage across Prometheus/Loki/Tempo surfaces; (4) `mr-trace-relay`
-  itself, stateless and restart-safe, its liveness folded into OBS-39's existing dead-man's-switch alert rule
-  (extended, not duplicated). Its failure degrades trace *assembly* only — logs still reach Loki on the
+  itself, stateless and restart-safe, with its own `/health` scrape target and a dedicated dead-man's-switch
+  alert rule (OBS-46, corrected this review pass — see OBS-46's own note; NOT OBS-39's rule reused, which
+  watches a different process). Its failure degrades trace *assembly* only — logs still reach Loki on the
   independent Alloy path (S2) regardless. Real, disclosed loss from staying: a true ClickHouse-backed
   all-in-one's native single-pane cross-signal correlation is still smoother than Grafana's trace-to-logs
   pivot even after this addition — D15 narrows that gap, it does not close it.
@@ -357,11 +365,21 @@ mirroring this amendment, to keep the two documents' numbering synchronized — 
   excluding `_tests.rs` files, and excluding a call site already listed in the committed pre-existing-call-
   site baseline — see §4) calls `log::info!`, `log::warn!`, or `log::error!` directly THEN a CI lint/eval
   SHALL fail. *(proof-of-teeth: a seeded bare-`log::` fixture must be caught. **Corrected this finalization
-  pass:** as originally worded with no baseline exclusion, this criterion would fail against 56 already-
+  pass:** as originally worded with no baseline exclusion, this criterion would fail against 53 already-
   shipped, currently-passing call sites across 10 domain files — confirmed by grep at amendment time — the
   moment it landed, with no task anywhere in this milestone budgeted to migrate them. The baseline makes this
   a ratchet against new bare-`log::` calls, not a same-day blanket failure against existing code; migrating
-  the baseline's entries to `mr_log` is an explicit, named follow-up, out of this milestone's scope.)*
+  the baseline's entries to `mr_log` is an explicit, named follow-up, out of this milestone's scope.
+  **Corrected again, this review pass:** the count was originally reported as "56," which counted 3
+  doc-comment lines (`movement.rs:274`, `battle.rs:280`, `npc.rs:21` — each a `///` comment that merely
+  *mentions* `log::error!`/`log::warn!` in prose) as if they were real invocations, a plain substring-match
+  error. The real number, from an invocation-anchored scan (`log::(info|warn|error)!\(`, requiring the
+  opening paren), is 53. Both the `.log-baseline` GENERATION script (§4) and G1's own CI check MUST anchor
+  on the same invocation pattern — not a bare substring match — or the baseline will itself pick up
+  doc-comment mentions as grandfathered "call sites," and a future genuinely-new bare-`log::` call inside a
+  doc comment could confuse the gate the same way. This is the identical failure class ADR-0179's
+  `REKEY_COMPLETENESS` gate hit once already on this same codebase (a naive whole-file scan false-positived
+  on ~17 non-table sites, forcing an AST/syntax-aware rewrite) — do not repeat it here.)*
 - **OBS-3** — WHEN a reducer call carries `ctx.connection_id = Some(_)` THE SYSTEM SHALL use that
   `connection_id` as the sole correlation key for that call's log lines; no shared mutable counter table
   SHALL be introduced anywhere in `server-module/src` for correlation purposes.
@@ -518,8 +536,15 @@ conditions referenced below live in ADR-0180's dated amendment, not in this spec
   in its OTLP/HTTP JSON export, never base64.
 - **OBS-45** — `mr-trace-relay` SHALL read `module_logs/*.log` via the same read-only bind mount as Alloy,
   and SHALL NOT require or accept a module-owner credential.
-- **OBS-46** — THE SYSTEM SHALL fire an alert when `mr-trace-relay`'s liveness signal is absent for longer
-  than the existing OBS-39 threshold, extending (not duplicating) that dead-man's-switch rule.
+- **OBS-46** — `mr-trace-relay` SHALL expose a `/health` HTTP endpoint (a bare 200 response is sufficient),
+  Prometheus SHALL scrape it as its own target (`job="mr-trace-relay"`), and THE SYSTEM SHALL fire a Grafana
+  OSS alert, distinct from OBS-39's own rule, when that target's `up` metric is `0` for longer than OBS-39's
+  threshold. *(Corrected this review pass: the original wording — "fold into the existing OBS-39... rule" —
+  was unbuildable as written. OBS-39 watches Prometheus's scrape of Alloy's self-metrics endpoint; it carries
+  no signal about whether the separate `mr-trace-relay` process is alive, since Alloy keeps running fine if
+  the relay dies. This criterion now names a real, distinct scrape target and a real, distinct alert rule —
+  mirroring OBS-39's shape on a different target, not reusing OBS-39's own rule for two unrelated
+  processes.)*
 - **OBS-47** — IF a future milestone un-cuts S3 (per D2, as amended by D18a) THEN the read path SHALL be a
   `#[view]`-based owner-scoped projection (mirroring `my_wallet`/`my_conversation`), not
   `client_visibility_filter`-based RLS, unless a subsequent SpacetimeDB release documents RLS as stable.
@@ -532,7 +557,11 @@ conditions referenced below live in ADR-0180's dated amendment, not in this spec
   confirm or rule out whether `movement_tick` was in scope)* — THE SYSTEM SHALL define a named reducer
   allowlist (`$trace_pair_set`, mirroring OBS-22's `$slo_set`) used only for D15's enter/exit breadcrumb
   pairing, and `$trace_pair_set` SHALL NOT include `movement_tick` or any reducer already gated by the
-  `STEP_MS` SLO (OBS-24) or a `criterion` benchmark budget (OBS-5/D7).
+  `STEP_MS` SLO (OBS-24) or a `criterion` benchmark budget (OBS-5/D7). *(Extended this review pass — closes
+  a single-source-of-truth gap: `$trace_pair_set`'s committed config (in `mr-trace-relay`) SHALL exactly
+  equal the set of `server-module/src/*.rs` reducers that actually contain a paired `mr_log(...)`
+  `phase:"enter"`/`phase:"exit"` call — neither a superset nor a subset — checked by G9, not left to two
+  independently-maintained lists silently drifting apart.)*
 - **OBS-51** *(added this finalization pass — closes the pre-merge performance-gate gap a review found:
   `criterion`, D7's only pre-merge perf gate, is permanently walled off from `server-module` by design)* —
   BEFORE any reducer is added to `$trace_pair_set`, `mr-load-driver` (OBS-27) SHALL be run with that
@@ -548,11 +577,14 @@ conditions referenced below live in ADR-0180's dated amendment, not in this spec
   `movement_tick_schedule` wiring)
 - [ ] `evals/observability-log-wrapper.eval.mjs` (new) — OBS-2's bare-`log::` ban + proof-of-teeth fixture
 - [ ] `server-module/src/.log-baseline` (new, exact name/format decided at build time) — the committed
-  pre-existing-call-site baseline OBS-2's ratchet reads: enumerate, by scanning the tree at build time, every
-  bare `log::info!/warn!/error!` call site outside `guards.rs`/`observability.rs` that predates this retrofit
-  (confirmed 56 across 10 files as of this finalization pass — `movement.rs`, `content.rs`, `lib.rs`,
-  `trading.rs`, `pvp.rs`, `evolution.rs`, `taming.rs`, `raising.rs`, `battle.rs`, `npc.rs`); migrating these to
-  `mr_log` is an explicit, out-of-scope follow-up, not silently dropped
+  pre-existing-call-site baseline OBS-2's ratchet reads: enumerate, by scanning the tree at build time using
+  an INVOCATION-ANCHORED pattern (`log::(info|warn|error)!\(` — the opening paren is load-bearing, see OBS-2)
+  not a bare substring match, every bare `log::info!/warn!/error!` call site outside
+  `guards.rs`/`observability.rs` that predates this retrofit (confirmed 53 across 10 files as of this review
+  pass — `movement.rs`, `content.rs`, `lib.rs`, `trading.rs`, `pvp.rs`, `evolution.rs`, `taming.rs`,
+  `raising.rs`, `battle.rs`, `npc.rs`; corrected from an earlier "56," which miscounted 3 doc-comment
+  *mentions* of the macro as invocations); migrating these to `mr_log` is an explicit, out-of-scope follow-up,
+  not silently dropped
 - [ ] `game-core/Cargo.toml`: `criterion` dev-dependency + `[[bench]]` entries; `game-core/benches/*.rs` for
   each named hot path in `observability-performance-plan.md` §2
 - [ ] Root `Cargo.toml`: uncomment/populate the `criterion` line in `[workspace.dependencies]` (currently a
@@ -575,11 +607,14 @@ conditions referenced below live in ADR-0180's dated amendment, not in this spec
 - [ ] `ops/observability/relay/` (new dir) — `mr-trace-relay` implementation (Node, D15): NDJSON tail of
   `module_logs/*.log` (read-only bind mount, OBS-45), `ts`-based enter/exit pairing (OBS-43), duration
   computation (OBS-42), trace-tree reconstruction, OTLP/HTTP JSON POST to Alloy with lowercase-hex
-  `trace_id`/`span_id` (OBS-44); a committed `$trace_pair_set` config (OBS-50) listing the reducers
-  instrumented for pairing, explicitly excluding `movement_tick` and any `STEP_MS`/criterion-gated reducer
-- [ ] `ops/observability/prometheus.yml` — S1 (`/v1/metrics`) + S1b (Alloy self-metrics) + node_exporter
-  scrape jobs; recording rules only, no `alerting:` block and no `alert:` stanza in any loaded rule file
-  (OBS-18)
+  `trace_id`/`span_id` (OBS-44); a bare `/health` endpoint returning 200 (OBS-46, new this review pass —
+  the relay's own liveness signal, distinct from anything Alloy exposes); a committed `$trace_pair_set`
+  config (OBS-50) listing the reducers instrumented for pairing, explicitly excluding `movement_tick` and
+  any `STEP_MS`/criterion-gated reducer
+- [ ] `ops/observability/prometheus.yml` — S1 (`/v1/metrics`) + S1b (Alloy self-metrics) + node_exporter +
+  `mr-trace-relay`'s `/health` (OBS-46, new this review pass — a real, distinct scrape target, not folded
+  into S1b) scrape jobs; recording rules only, no `alerting:` block and no `alert:` stanza in any loaded
+  rule file (OBS-18)
 - [ ] `ops/observability/alloy/config.alloy` — `loki.source.file` + `loki.process` (`stage.metrics`,
   bounded labels per D12) + `loki.write`; `otelcol.receiver.otlp` (CORS) + `otelcol.exporter.otlp` (Tempo) +
   `otelcol.exporter.prometheus` → a `prometheus.remote_write` component pointed at Prometheus's remote-write
@@ -587,7 +622,9 @@ conditions referenced below live in ADR-0180's dated amendment, not in this spec
 - [ ] `ops/observability/grafana/` provisioning — RED/domain/netcode-smoothness/client-fps dashboards
   (including the named `$slo_set` allowlist variable, the movement-tick and client-fps SLO panels, and the
   connect-success/saturation panel set — OBS-22–26) + unified alerting rules (including the S1b-scrape
-  dead-man's-switch rule, OBS-39) + contact points (ntfy self-hosted is an acceptable optional contact point)
+  dead-man's-switch rule for Alloy, OBS-39, AND a separate dead-man's-switch rule for `mr-trace-relay`'s own
+  `/health` scrape target, OBS-46 — two distinct rules on two distinct targets, not one rule reused) + contact
+  points (ntfy self-hosted is an acceptable optional contact point)
 - [ ] `ops/observability/Caddyfile` — dual posture (D5/OBS-20/OBS-21); `caddy-ratelimit` built via `xcaddy`
 - [ ] `ops/observability/Dockerfile` (new, for Caddy's `xcaddy` build) — pinned Caddy + `caddy-ratelimit`
   versions; this is the build-pipeline artifact D3 flags as Caddy's differentiated maintenance line versus
@@ -608,7 +645,16 @@ conditions referenced below live in ADR-0180's dated amendment, not in this spec
   auth directive while the Grafana route does; every `stage.metrics` label matches the D12 bounded enum; the
   Grafana provisioning JSON names the `$slo_set` allowlist variable and includes the movement-tick,
   client-fps, and connect-success/saturation dashboard panels (OBS-22–26) and the S1b dead-man's-switch
-  alert rule (OBS-39)
+  alert rule (OBS-39). **Missing from an earlier draft, added this review pass — this bullet is the actual
+  build task for G9 (ADR-0180), and the §5 m20e row already describes this scope; this bullet did not match
+  it:** the relay service (`mr-trace-relay`) is present in `docker-compose.yml` and reads `module_logs` via a
+  read-only bind mount (not `rw`); the trace-to-logs + `connection_id` correlation-pivot config exists in
+  Grafana provisioning (D17); the committed `$trace_pair_set` config (OBS-50) does NOT list `movement_tick`
+  or any other `$slo_set`/criterion-benched reducer, AND exactly equals the set of `server-module/src/*.rs`
+  reducers that actually contain a paired `mr_log` enter/exit breadcrumb call — neither a superset nor a
+  subset (OBS-50's single-source-of-truth extension); `prometheus.yml` has a `job="mr-trace-relay"` scrape
+  target pointed at the relay's `/health` endpoint, and Grafana provisioning includes a SEPARATE dead-man's-
+  switch alert rule on that target's `up` metric, distinct from the S1b/Alloy rule above (OBS-46)
 - [ ] `client/src/observability/` (new dir) — OTel Web SDK wiring: fps/frame-time, prediction-divergence
   rate, reconcile-correction rate, remote-interp gap, RTT, wasm-init time; OTLP/HTTP export to Alloy (S4)
 - [ ] Wire client observability init in `client/src/main.ts`
@@ -628,11 +674,11 @@ conditions referenced below live in ADR-0180's dated amendment, not in this spec
 
 | Slice | Touches | Notes |
 |-------|---------|-------|
-| **m20a — Layer-1 retrofit** | `server-module/src/observability.rs` (new), `server-module/src/observability_tests.rs` (new), `server-module/src/.log-baseline` (new), `server-module/src/lib.rs`, `game-core/Cargo.toml`, `game-core/benches/**` (new), root `Cargo.toml`, `justfile`, `evals/observability-log-wrapper.eval.mjs` (new), `evals/observability-metrics-contract.eval.mjs` (new) | **SERIAL relative to any other server-module slice touching `schema.rs`/`lib.rs`** (none exist in this milestone) — the new `mr_heartbeat_schedule` scheduled table is a schema-touching addition per the M8.9 exception (colocated with its reducer, mirrors `movement_tick_schedule`). Bundles the `criterion`/perf-budget-gate work in with `mr_log`/heartbeat rather than splitting further — both are small, and `Cargo.toml`/`justfile` are shared files a second slice would just conflict on (mirrors M21a's own bundling rationale). **Amendment 2026-08-08:** `observability.rs` additionally gains the `cause`/`sched`/`phase` fields for D15's causal-tracing breadcrumbs — additive within this same file, no new touches, no new `schema.rs` table (OBS-49). **Finalization-pass addition:** `.log-baseline` (OBS-2's ratchet, enumerating the 56 pre-existing bare-`log::` call sites) lands alongside `observability.rs` in this same slice. |
+| **m20a — Layer-1 retrofit** | `server-module/src/observability.rs` (new), `server-module/src/observability_tests.rs` (new), `server-module/src/.log-baseline` (new), `server-module/src/lib.rs`, `game-core/Cargo.toml`, `game-core/benches/**` (new), root `Cargo.toml`, `justfile`, `evals/observability-log-wrapper.eval.mjs` (new), `evals/observability-metrics-contract.eval.mjs` (new) | **SERIAL relative to any other server-module slice touching `schema.rs`/`lib.rs`** (none exist in this milestone) — the new `mr_heartbeat_schedule` scheduled table is a schema-touching addition per the M8.9 exception (colocated with its reducer, mirrors `movement_tick_schedule`). Bundles the `criterion`/perf-budget-gate work in with `mr_log`/heartbeat rather than splitting further — both are small, and `Cargo.toml`/`justfile` are shared files a second slice would just conflict on (mirrors M21a's own bundling rationale). **Amendment 2026-08-08:** `observability.rs` additionally gains the `cause`/`sched`/`phase` fields for D15's causal-tracing breadcrumbs — additive within this same file, no new touches, no new `schema.rs` table (OBS-49). **Finalization-pass addition:** `.log-baseline` (OBS-2's ratchet, enumerating the 53 pre-existing bare-`log::` call sites — corrected from an earlier miscount of 56, see OBS-2) lands alongside `observability.rs` in this same slice. |
 | **m20b — self-hosted stack config** | `ops/observability/**` (all new), `docs/observability-dr-runbook.md` (new) | **Touches-disjoint from m20a — may start immediately alongside it, not blocked on its merge.** Alloy's `stage.metrics` rules target the `evt` vocabulary this spec fixes (D6: `"heartbeat"`, `"reject"`). The `"reject"` half is a genuine no-dependency case — `guards.rs` already emits `evt:"reject"` today, unchanged by this milestone. The `"heartbeat"` half is narrower: `mr_log`/`mr_heartbeat` don't exist yet, and ADR-0180's own code sample is explicitly flagged illustrative-only, refined at build time — so m20b's heartbeat-derivation rule is written against a contract m20a is still free to adjust before it lands. This is a real, if narrow, Layer-1→Layer-3 contract dependency, not zero dependency; it is deliberately not serialized (the two slices are small and the shared surface is one `evt` string), but the mitigation is explicit: m20e's post-merge integration eval is what catches any drift, not a pre-merge check. **Amendment 2026-08-08:** scope grows to include `ops/observability/relay/**` (new — `mr-trace-relay`, D15) and the Tempo→Loki trace-to-logs + `connection_id` correlation-pivot config (D17) — still inside the already-declared `ops/observability/**` wildcard, still touches-disjoint from m20a, no new slice row needed. The relay's contract with m20a is the same `evt`/field vocabulary named above, now including `cause`/`sched`/`phase` — mitigated the same way, by m20e's post-merge integration eval, not a pre-merge check. |
 | **m20c — client real OTel** | `client/src/observability/**` (new), `client/src/main.ts`, sibling tests | Touches-disjoint from m20a/m20b/m20d; no bindings dependency (client-side instrumentation only, no server schema read). Full end-to-end verification needs m20b's Alloy OTLP ingress reachable, but unit-level SDK wiring can build and test against a mocked endpoint independently. |
 | **m20d — load driver** | `sim-harness/src/bin/mr_load_driver.rs` (new), `sim-harness/src/lib.rs`/`world.rs` only if a shared helper is needed | Touches-disjoint from all above; depends only on the already-published live module and S1 metrics (host-native, zero coupling to m20a/b/c). Could in principle build first of all. |
-| **m20e — evals tail** | `evals/observability-stack-config.eval.mjs` (new), the third (Alloy self-metrics) assertion in `evals/observability-metrics-contract.eval.mjs` if not completed in m20a, Rust-side mirror additions to `observability_tests.rs` | **SERIAL, after m20a AND m20b merge** — needs both `mr_log`/heartbeat artifacts (m20a) and the committed `ops/observability/**` config files (m20b) to scan/exercise. **Amendment 2026-08-08:** also covers `mr-trace-relay`'s reconstruction rules as pure-function unit tests with a seeded-ambiguity proof-of-teeth fixture — two interleaved zone-tick chains that must not cross-pollinate (G8) — and extends `observability-stack-config.eval.mjs` to confirm the relay service is present, reads `module_logs` read-only, and that the trace-to-logs + correlation-pivot config exists in Grafana provisioning (G9). Still SERIAL after m20a AND m20b, unchanged. **Finalization-pass addition:** G9 also statically confirms `$trace_pair_set` (OBS-50) does not list `movement_tick` or any `$slo_set`/criterion-benched reducer; and also runs G11 (OBS-51) — `mr-load-driver` with `$trace_pair_set`'s breadcrumbs active, checked against each paired reducer's own SLO/budget — before `$trace_pair_set` gains its initial membership; G11 is a pre-merge check needing the live stack + a published module (same precondition as the metrics-contract/stack-config evals), not a plain `just ci` step. |
+| **m20e — evals tail** | `evals/observability-stack-config.eval.mjs` (new), the third (Alloy self-metrics) assertion in `evals/observability-metrics-contract.eval.mjs` if not completed in m20a, Rust-side mirror additions to `observability_tests.rs`, `ops/observability/relay/**` pure-function unit tests + the seeded-ambiguity proof-of-teeth fixture (G8 — added this review pass; the row's own Notes already described this work, the Touches column hadn't caught up) | **SERIAL, after m20a AND m20b merge** — needs both `mr_log`/heartbeat artifacts (m20a) and the committed `ops/observability/**` config files (m20b) to scan/exercise. **Amendment 2026-08-08:** also covers `mr-trace-relay`'s reconstruction rules as pure-function unit tests with a seeded-ambiguity proof-of-teeth fixture — two interleaved zone-tick chains that must not cross-pollinate (G8) — and extends `observability-stack-config.eval.mjs` to confirm the relay service is present, reads `module_logs` read-only, and that the trace-to-logs + correlation-pivot config exists in Grafana provisioning (G9). Still SERIAL after m20a AND m20b, unchanged. **Finalization-pass addition:** G9 also statically confirms `$trace_pair_set` (OBS-50) does not list `movement_tick` or any `$slo_set`/criterion-benched reducer; and also runs G11 (OBS-51) — `mr-load-driver` with `$trace_pair_set`'s breadcrumbs active, checked against each paired reducer's own SLO/budget — before `$trace_pair_set` gains its initial membership; G11 is a pre-merge check needing the live stack + a published module (same precondition as the metrics-contract/stack-config evals), not a plain `just ci` step. |
 
 **Post-integration verification** (after m20a + m20b + m20c + m20d + m20e all merge): full `just ci`
 green-and-meaningful; bindings-drift = 0 (client bindings are untouched by this milestone but the gate still
@@ -651,6 +697,14 @@ Keep it as a documented, manually-triggered (or separately-scheduled, network-ga
 
 ## Risks / decisions
 
+- **Cross-milestone ordering dependency (added on review, 2026-08-08):** m20a's touches: include
+  `server-module/src/lib.rs` (the new `mr_heartbeat_schedule` wiring). M21a's touches: also include
+  `server-module/src/lib.rs` (the new `client_connected` reducer wiring). These two slices are NOT touches:
+  disjoint, even though nothing in either spec's own dependency section previously said so — the ordering
+  that makes this safe (M21 fully merged before any M20 slice launches) lived only in PLAN.md and the
+  supervisor handoff, external to this spec. Stated here directly so it survives even if that external
+  context is lost: **do not launch m20a until M21 (all of a/b/c) has fully merged**, regardless of what a
+  touches:-disjointness check against only the currently-declared file lists would suggest.
 - `/v1/metrics`'s permanent unauthenticated-by-design gap is the one real, confirmed network-exposure risk
   this milestone surfaces — resolved by network topology (OQ1), not by anything M20 builds into the module
   (there is nothing to fix in the module; the host binary's gap is out of this project's control).

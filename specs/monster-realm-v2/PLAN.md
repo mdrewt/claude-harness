@@ -483,18 +483,27 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
 - **M20 Observability, performance & load hardening** (`M20-observability-performance.spec.md`; ADR-0029) —
   the capstone: production monitoring (self-hosted OSS dashboards/alerts — ADR-0180 replaces the original
   OTel→Datadog sink, see Status below), full-system load testing (scaled sim-harness), profiling the named
-  hot paths, and the **measured** performance-tuning pass + SLO baselines.
+  hot paths, and the **measured** performance-tuning pass + SLO baselines. **New ops surface, not previously
+  used in this project:** an 8-container `docker-compose.yml` stack (Prometheus/Grafana Alloy/Loki/Tempo/
+  Grafana OSS/node_exporter/Caddy/`mr-trace-relay`) — the first Docker usage anywhere in the repo.
   The always-on substrate (structured logging, OTel seams, a benchmark + perf-budget CI gate, health/
   readiness) is built in **M0**; every milestone instruments + benchmarks + load-tests what it adds (a
   cross-cutting invariant). See `observability-performance-plan.md`; backup/DR runbook folded in.
   **Slimmed 2026-07:** the playtest-scale error-surface/event-capture layer moved to **M-playtest-b**;
   M20 remains the production capstone (export/dashboards/load/SLOs) and consumes `playtest_event` learnings.
   **Status:** design sketch → elaborated at build time (heavy ceremony, 2026-08-08) — ADR-0029 amended
-  (self-hosted OSS stack replaces Datadog) + new ADR-0180 (tool selection + data path).
-- **M21 Accounts & authentication** (`M21-accounts-auth.spec.md`; ADR-0030) — OIDC-backed stable identity
-  (cross-device, recovery) replacing anonymous identities; guest→account claim. No game-data schema churn
-  (the identity keying pays off). **Status:** design sketch → elaborated at build time (heavy ceremony,
-  2026-08-08).
+  (self-hosted OSS stack replaces Datadog) + new ADR-0180 (tool selection + data path). **Reconsidered
+  same day** (2026-08-08, second pass — 96GB RAM removed the ClickHouse-footprint objection; a beta
+  SpacetimeDB API was conditionally pre-cleared): rejected the beta API after live-testing found it stalls
+  SpacetimeDB's entire scheduler; kept the 7-container backend (re-litigated, not defaulted to) and added an
+  8th service, `mr-trace-relay`, reconstructing real server-side causal spans from log breadcrumbs instead —
+  new EARS OBS-41–51, gates G8–G11, ADR-0180's second dated amendment.
+- **M21 Accounts & authentication** (`M21-accounts-auth.spec.md`; ADR-0030 + new ADR-0179) — OIDC-backed
+  stable identity (cross-device, recovery) replacing anonymous identities; guest→account claim. No
+  game-data schema churn (the identity keying pays off). **Status:** design sketch → elaborated at build
+  time (heavy ceremony, 2026-08-08). **Build order:** M21 (all of a/b/c) lands fully before any M20 slice
+  launches — both milestones' `touches:` sets share `server-module/src/lib.rs`, so this is a real ordering
+  dependency, not just a priority preference.
 - **M22 Privacy, data deletion & compliance** (`M22-privacy-compliance.spec.md`; ADR-0031) — registry-driven
   deletion cascade (erase/anonymize), data export, retention; a deletion-completeness eval.
 - **M23 Accessibility** (`M23-accessibility.spec.md`; ADR-0032) — keyboard/screen-reader/colorblind/

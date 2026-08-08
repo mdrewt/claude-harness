@@ -53,6 +53,15 @@ attribution table, and decision record: **ADR-0180** (`docs/adr/`), which elabor
 way ADR-0106 elaborates ADR-0024 or ADR-0179 elaborates ADR-0030 — this amendment records the top-level
 override; ADR-0180 records the concrete tool selection and data-path architecture.
 
+**Pointer note, added on review (2026-08-08 — this ADR is not updated further below; noted here so a
+reader isn't left with a stale picture of what ADR-0180 now contains):** ADR-0180 was itself amended a
+second time, same day, after this amendment landed — a brainstorm/debate/review pass reconsidered
+server-side tracing (rejected a beta SpacetimeDB API after live-testing found it stalls the whole
+scheduler; added a new log-relay service, `mr-trace-relay`, instead) and re-litigated the backend-stack
+choice at 96GB RAM (kept, not defaulted to). That second amendment is entirely inside ADR-0180's own scope
+(concrete tool selection / data-path architecture) and does not change anything this top-level ADR-0029
+amendment decided — no update to *this* document's own content is warranted, only this pointer.
+
 **Finding: this ADR's own Consequences line is also corrected, not just the tool choice.** "M0 gains the
 substrate + the always-on benchmark/perf-budget gate" was written as an accomplished fact. Live verification
 found it never fully happened: `Cargo.toml` names `criterion`/`opentelemetry` only in code comments, no

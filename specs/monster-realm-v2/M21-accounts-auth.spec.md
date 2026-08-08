@@ -160,10 +160,20 @@ external key-custody mechanism.
 - **AUTH-1** — WHEN a client connects without a JWT THE SYSTEM SHALL return `Ok` from
   `client_connected` without inserting, updating, or deleting any row. *(negative test required)*
 - **AUTH-2** — WHEN a client connects with a JWT whose `iss` is not in `ALLOWED_ISSUERS` THE SYSTEM
-  SHALL return `Err` (disconnecting the client) and SHALL NOT insert an `account` row.
+  SHALL return `Ok` from `client_connected` (leaving the connection anonymous) and SHALL NOT insert
+  an `account` row. *(amended 2026-08-08 during M21a — D1″ below. The original "SHALL return `Err`
+  (disconnecting)" was falsified by a live probe: SpacetimeDB's host mints its own JWT for every
+  connection, including a tokenless first connect (`iss=localhost`, `aud=["spacetimedb"]`), which
+  authToken.ts then replays — so `has_jwt()` is true on every connection and an `Err` on an
+  unrecognized issuer would disconnect every player. The load-bearing half — "SHALL NOT insert an
+  `account` row" — is preserved. This is the host's-own-anonymous-token path and MUST fail safe to
+  anonymous. Invariant: the host's anonymous issuer is never in `ALLOWED_ISSUERS`.)*
 - **AUTH-3** — WHEN a client connects with a JWT whose `iss` is allowed but whose `aud` contains no
   entry from `ALLOWED_AUDIENCE` THE SYSTEM SHALL return `Err` (disconnecting the client) and SHALL
-  NOT insert an `account` row.
+  NOT insert an `account` row. *(unchanged — this branch is only reachable by a token whose issuer
+  was explicitly allowlisted, i.e. a same-issuer cross-app "confused-deputy" token; a legitimate
+  player never presents an allowed-issuer/wrong-audience token, so the disconnect is outage-safe
+  and preserves `aud` as a real authorization control. See D1″ + the CRITICAL-2 note in ADR-0179.)*
 - **AUTH-4** — WHEN a client connects with an issuer- and audience-valid JWT and no `account` row
   exists for `ctx.sender` THE SYSTEM SHALL insert exactly one `account` row with `status = Active`
   and `claimed_from = None`.
@@ -199,8 +209,12 @@ external key-custody mechanism.
   characters, OR that has no matching `guest_claim` row, THE SYSTEM SHALL reject with "invalid or
   already-used code" and modify no row.
 - **AUTH-16** — WHEN `complete_guest_claim` receives a `code` whose `guest_claim.expires_at_ms` has
-  elapsed THE SYSTEM SHALL reject with "code expired" AND delete that `guest_claim` row and disarm
-  its reaper as the only side effect.
+  elapsed THE SYSTEM SHALL reject with "code expired" and modify no row; the expired `guest_claim`
+  row is reaped by `guest_claim_reaper` in its own transaction. *(amended 2026-08-08 during M21a —
+  the original "AND delete that row + disarm its reaper as the only side effect" was falsified by a
+  live probe: a reducer that returns `Err` rolls back ALL of its own writes, so a delete performed
+  on the same call that returns `Err("code expired")` cannot persist. Expired-claim cleanup is owned
+  solely by the scheduled reaper — see D5/D6 in ADR-0179.)*
 - **AUTH-17** — WHEN `complete_guest_claim`'s resolved guest identity equals the caller's identity
   THE SYSTEM SHALL reject it.
 - **AUTH-18** — WHEN `complete_guest_claim` is called and a `player` row still exists for the guest
@@ -224,8 +238,11 @@ external key-custody mechanism.
   its `name` with the tombstone constant (≤ `MAX_NAME_LEN` characters), leaving the row present. The
   zero step is mandatory, not cosmetic: it is what prevents the same guest identity from donating the
   same stats again to a second fresh account via a later claim.
-- **AUTH-26** — WHEN `complete_guest_claim` returns `Err` for any reason other than expiry THE
-  SYSTEM SHALL leave the `guest_claim` row intact and unconsumed.
+- **AUTH-26** — WHEN `complete_guest_claim` returns `Err` THE SYSTEM SHALL leave the `guest_claim`
+  row intact and unconsumed. *(simplified 2026-08-08 during M21a: the original "for any reason other
+  than expiry" carve-out is now moot — per the AUTH-16 amendment the expiry path also leaves the row
+  intact, since a reducer `Err` cannot persist a delete. Every `Err` path is uniformly
+  non-mutating.)*
 - **AUTH-27** — WHEN a `guest_claim` row's `expires_at_ms` elapses without being consumed THE SYSTEM
   SHALL delete that row via the reaper, matched on the indexed `guest_identity` column, and SHALL NOT
   delete any other `guest_claim` row.
@@ -315,6 +332,11 @@ corrections rather than silently rewriting the draft.
   popup+`postMessage` OIDC return)
 - [ ] Client: guest→account claim prompt + first-run multi-device nudge copy
 - [ ] Tests: proof-of-teeth coverage for AUTH-1..AUTH-38
+- [ ] `just knowledge` regeneration (`evals/knowledge-bundle-conformance.eval.mjs` is a live, currently-wired
+  `just ci` drift gate — M21a adds 3 new tables plus a new domain module, `accounts.rs`; missing this task
+  would leave the committed `docs/knowledge/` bundle stale and fail CI on landing. Corrected this review pass
+  — the original task list omitted it, unlike every other recent schema-touching milestone, e.g.
+  `M17.5-tenth-review-residuals.spec.md`'s 17.5g-3.)
 - [ ] `just adr-digest` regeneration after ADR-0179 lands
 
 ## §5 Slice decomposition
@@ -332,6 +354,14 @@ tab) → complete_guest_claim → re-key verified` flow passes end-to-end, AUTH-
 against the integrated whole (not merely per-slice).
 
 ## Risks / decisions
+- **Cross-milestone ordering dependency (added on review, 2026-08-08):** M21a's touches: include
+  `server-module/src/lib.rs` (the new `client_connected` reducer wiring). M20's m20a slice also touches
+  `server-module/src/lib.rs` (the new `mr_heartbeat_schedule` wiring). These two slices are NOT touches:
+  disjoint, even though nothing in either spec's own dependency section previously said so — the ordering
+  that makes this safe (M21 fully merged — a/b/c — before any M20 slice launches) lived only in PLAN.md and
+  the supervisor handoff, external to this spec. Stated here directly so it survives even if that external
+  context is lost: **do not fan out M20a alongside M21a**, regardless of what a touches:-disjointness check
+  against only the currently-declared file lists would suggest.
 - Server-minted claim token brute-forceable → `ctx.rng()` is not a CSPRNG (pinned crate's own doc);
   the claim secret is client-minted instead (D3), which also decouples TTL from security.
 - Guest→account collision ("sign up → play a bit → then claim") silently clobbering data → fail
