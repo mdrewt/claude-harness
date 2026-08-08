@@ -1,16 +1,17 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-08-07T20:50:57Z",
- "updated_by": "native tick rid=native-20260807T204855Z-3180918 (merged 12r-d PR#292 -> b616249, post-merge master CI in_progress)",
+ "updated_utc": "2026-08-08T01:03:32Z",
+ "updated_by": "native tick rid=mr-sup-native-20260808T010010Z-3438269 (terminal DONE -- no launchable slice, loop disabled)",
  "master": {
   "sha": "42c134ee354e3b7e7f5415dcee49378dfd54f516",
-  "ci": "in_progress",
+  "ci": "success",
   "nightly": "SUCCESS on 3c1cf08 (run 31090022421, 2026-08-06T09:39:33Z) -- confirms EG2/EG3 essence-graph content is nightly-mutant-clean. Not yet re-run on b616249."
  },
  "adr_next_free": 178,
  "inflight": [],
  "awaiting_merge": [],
  "queue": [
+  "2026-08-08T01:03Z native tick (rid=mr-sup-native-20260808T010010Z-3438269): committed the prior tick's uncommitted handoff/mr-state writes (9493344). Re-derived queue fresh from PLAN Sec9: M-postgate-twelfth-review-residuals CLOSED (6/6), M-evolution-essence-graph CLOSED (EG1-5 all merged 2026-08-04..07, PLAN.md's 'EG4/EG5 outstanding' prose is stale). No launchable slice: M-postgate-client-coverage and M-postgate-roster-wave-3 are spec-less (no M*.spec.md); M-postgate-evolution-fusion-hardening A1/C target the deleted fuse(). Issue #284 open, non-blocking. playtest-3 gate NOT raised -- roster-wave-3 is un-retired (DE-GATED, not CLOSED), so the b0e37b5 ALL-queued-CLOSED condition isn't met. Wrote DONE + recreated .native-supervisor-disabled. NEXT: wake on a new weekly-review-inserted milestone, a spec authored for roster-wave-3/client-coverage, or issue #284 answered.",
   "2026-08-07T22:02Z native tick (rid=native-20260807T220010Z-3195003): gate-2 confirmed master CI success on b616249 (12r-d merge). Launched 12r-e (last remaining slice, M-postgate-twelfth-review-residuals) solo, routine tier, opus@high, leader=3197266. Merging it closes the milestone. NEXT: reconcile 12r-e on finish -> re-derive next milestone from PLAN Sec9.",
   "2026-08-07T20:50Z native tick (rid=native-20260807T204855Z-3180918, event src=ci off 12r-d.ci.md, rerun green): merged PR#292 (12r-d ADR-0170 residual closure -- heal cost_currency number->bigint, pvp/taming cache swaps, json_escape on 12 log sites) -> master@b616249. mr-audit --tier hard: orchestration CLEAN, gating FLAGGED-adjudicated-CLEAN (30 asserts were 1:1 number->bigint fixture migration incl. new 2^53+1/u64::MAX discriminator cases; 2 flagged skip markers were Rust .iter().skip() calls, not test skips). Worktree+branch cleaned, local checkout ff-only synced. Post-merge master CI (run created 20:50:01Z) still in_progress at record time -- no post-merge watcher exists for master pushes (mr-ci-watch is PR-scoped, exits on MERGED); per 12r-c precedent (17:47Z tick) did NOT composite-launch pending that confirmation. NEXT: gate-2 on next tick re-verifies master CI green on b616249, then 12r-e is eligible (was noted SERIAL-after-12r-d: both touch schema.rs, collision with EG5-6/Migration B).",
   "2026-08-07T17:47Z native tick (rid=mr-sup-native-20260807T174328Z-3014247, event src=ci off 12r-c.ci.md): merged PR#291 (12r-c dual-write eval fn-boundary fix) -> master@b4c55b5. Audit CLEAN/CLEAN, diff==touches, worktree+branch cleaned, cost already captured by 17:25:58Z wrapper-reconcile row. Post-merge master CI (run 31203670939) still in_progress after a 2min watch -- no post-merge watcher exists for master pushes (mr-ci-watch is PR-scoped, exits on MERGED); did not composite-launch this tick pending that confirmation. NEXT: gate-2 on next tick re-verifies master CI green on b4c55b5, then pick next unfinished slice per PLAN \u00a79 order (12r-d was noted SERIAL-before-12r-e, collides with EG5-6/Migration B on schema.rs).",
@@ -29,7 +30,7 @@
  "park_counters": {},
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "12r-d merged -> master@b616249. No open PRs, no inflight slices. Post-merge master CI in_progress, unwatched (no master-push watcher exists). Next tick: confirm CI green, then launch 12r-e (SERIAL-after-12r-d, schema.rs collision with EG5-6/Migration B).",
+ "notes": "TERMINAL DONE (2026-08-08T01:03Z): M-postgate-twelfth-review-residuals and M-evolution-essence-graph both fully CLOSED; no launchable slice remains (roster-wave-3/client-coverage are spec-less; fusion-hardening A1/C target deleted fuse()). .native-supervisor-disabled is SET. playtest-3 gate not yet raised (roster-wave-3 still un-retired in PLAN Sec9). Loop resumes on: new weekly-review milestone, a spec authored for roster-wave-3/client-coverage, or issue #284 answered.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],
