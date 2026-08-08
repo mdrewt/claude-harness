@@ -313,24 +313,75 @@ corrections rather than silently rewriting the draft.
 - [x] DONE (M21a, PR #298) Read-only existence helpers per owning module: `wallet_exists`, `profile_exists`,
   `has_monsters`, `has_items`, `has_quest_or_dialogue_state`, `has_heal_cooldown`
 - [x] DONE (M21a, PR #298) `PROFILE_TOMBSTONE_NAME` constant (≤ `MAX_NAME_LEN` = 24)
-- [ ] `evals/account-privacy.eval.mjs` (table privacy, `my_account` body-exact pin,
+- [x] DONE (M21c, PR #300) `evals/account-privacy.eval.mjs` (table privacy, `my_account` body-exact pin,
   `ViewContext::new(`/`ViewContext {` ban, NO_PII_IN_REJECT_LOGS)
-- [ ] `evals/guest-claim-integrity.eval.mjs` (NO_CLIENT_IDENTITY, ANON_PASSTHROUGH,
+- [x] DONE (M21c, PR #300) `evals/guest-claim-integrity.eval.mjs` (NO_CLIENT_IDENTITY, ANON_PASSTHROUGH,
   ISSUER_AND_AUDIENCE_CHECKED, NO_SERVER_RNG, MODULE_WRITE_ISOLATION, REKEY_COMPLETENESS,
   SINGLE_USE_CONSUMED)
-- [ ] Extend `evals/ranking-security.eval.mjs` with a positive fixture proving `rekey_profile` stays
+- [x] DONE (M21c, PR #300) Extend `evals/ranking-security.eval.mjs` with a positive fixture proving `rekey_profile` stays
   green under A2 and A1's reducer count is unaffected
-- [ ] Extend `pvp_tests.rs::m17a_rl2_profile_never_deleted_scan`'s hardcoded file list with
+- [x] DONE (M21c, PR #300) Extend `pvp_tests.rs::m17a_rl2_profile_never_deleted_scan`'s hardcoded file list with
   `accounts.rs` + each new re-key helper file
-- [ ] Extend `evals/currency-integrity.eval.mjs` with a negative assertion that `accounts.rs` is not
+- [x] DONE (M21c, PR #300) Extend `evals/currency-integrity.eval.mjs` with a negative assertion that `accounts.rs` is not
   added to the ACCESSOR_BYPASS allowlist
 - [x] DONE (M21a, PR #298) Regenerate client bindings (`just gen` — the recipe is `just gen`, not `just gen-bindings`)
-- [ ] Client: `authToken.ts` companion marker key (e.g. `mr.authToken.v1.kind`) — additive, existing
-  logic untouched
-- [ ] Client: `connection.ts` silent-renewal-before-`withToken` + session-expired state
-- [ ] Client: claim-code UI (client-minted code, sessionStorage, same-tab redirect or
-  popup+`postMessage` OIDC return)
-- [ ] Client: guest→account claim prompt + first-run multi-device nudge copy
+- [x] DONE (M21b) `authToken.ts` companion marker key — shipped as `mr.authKind.v1` (**not** the
+  illustrative `mr.authToken.v1.kind`: that string is a *superstring* of the existing
+  `mr.authToken.v1` token prefix, so key-space disjointness would have rested on a subtle argument
+  about segment encoding; with `mr.authKind.v1` neither prefix is a prefix of the other and a
+  collision — which would overwrite a player's reconnect token with the literal `"account"` — is
+  impossible by construction). Additive, existing logic byte-untouched. M21b also gated
+  `connection.ts`'s `auth.onConnected(token)` call site on the marker, closing a replay path that
+  already shipped: the SDK echoes the credential given to `.withToken()` back as `onConnect`'s third
+  argument, so the previously-unconditional save would have written an account JWT into the
+  **anonymous** token slot (ADR-0179 D8 amendment, P3).
+- [ ] **DEFERRED to M21b-2 (blocked on OQ1)** — Client: `connection.ts` silent-renewal-before-`withToken`
+  + session-expired state *(AUTH-32)*
+- [ ] **DEFERRED to M21b-2 (blocked on OQ1)** — Client: claim-code UI (client-minted code,
+  sessionStorage, same-tab redirect or popup+`postMessage` OIDC return)
+- [ ] **DEFERRED to M21b-2 (blocked on OQ1)** — Client: guest→account claim prompt + first-run
+  multi-device nudge copy
+
+> **§4 deferral note (added during M21b, 2026-08-08).** The three bullets above, and **AUTH-32 and
+> AUTH-33 with them**, are deferred rather than attempted. Four findings force it; all are recorded
+> with evidence in ADR-0179's D8 amendment.
+>
+> 1. **The account path cannot execute at all today (F1).** `ALLOWED_ISSUERS` is the fail-closed
+>    `.invalid` OQ1 placeholder, so per D1″ every connection resolves to *unrecognized issuer → `Ok`,
+>    anonymous, no `account` row*, and `complete_guest_claim` guard 2 returns `"no account"` for every
+>    producible token.
+> 2. **`join_game` is irreversible with respect to claiming (F2).** It grants a starter `monster` that
+>    no server path ever deletes; `account_has_game_data` short-circuits on `has_monsters`; guard 11
+>    then rejects `"already has game data"` permanently, and AUTH-14 allows one claim per account ever.
+>    A join-gate whose failure paths fall through to `join_game` — as every timeout/reconnect escape
+>    hatch does — would convert each claim attempt into **irreversible player-data loss**. **Hard
+>    constraint on the redesign: no path may auto-join while a live claim record exists** (no timeout
+>    hatch, no reconnect bypass; only an explicit, consequence-labelled decline), plus reconnect
+>    re-issue of `complete_guest_claim` since the pre-drop promise never settles (ADR-0085 D3).
+> 3. **A redirect without a `state`/nonce is exploitable.** An attacker who gets a victim's mid-claim
+>    tab to load the attacker's own OIDC callback re-keys the victim's monsters, inventory, wallet and
+>    ranked profile onto the attacker's account — atomically and irreversibly, needing no secret. A
+>    `state` parameter cannot be built from an opaque authorize-URL string; it requires knowing the
+>    provider, i.e. OQ1. The return leg must also `history.replaceState`-scrub `location.search`/`hash`.
+> 4. **AUTH-32's pieces are indivisible.** The credential decision, silent renewal, the session-expired
+>    state, the explicit continue-anonymously affordance and the **cold-start contract** are one unit:
+>    `build()` is typed `(): DbConnection` and `let current = build()` is non-optional, so "surface
+>    session-expired and do not connect" cannot return without widening `build()`/`current` to
+>    `DbConnection | undefined` — which cascades into `get conn()` and every `conn.conn.reducers.*`
+>    call site in `main.ts`. (Note the same-tab OIDC redirect *return* is itself a cold start with
+>    populated sessionStorage, so the authenticated path **is** the cold-start path.)
+>
+> **Also for M21b-2:** the shipped marker guard is *best-effort, not structural* — `readAuthKind` fails
+> to `'anon'` on every lossy storage path and `'anon'` is the permissive direction, while AUTH-31
+> requires exactly that fail direction. One lossy boolean cannot satisfy both, so the discriminator
+> must be **replaced** by the provenance of the credential actually supplied (carried in memory beside
+> the token), which requires re-pinning `W-NH4-TOKEN-SUPPLIED`. And `my_account` must be subscribed:
+> it is the only observable of whether a connection is *actually* authenticated, versus the marker's
+> record of intent.
+>
+> **Post-integration consequence:** this milestone's §5 e2e (`connect (JWT) → account provisioned →
+> start_guest_claim → complete_guest_claim → re-key verified`) **cannot run at M21b/M21c merge** — it
+> needs a real issuer. It becomes runnable only once OQ1 is answered.
 - [x] DONE (M21a, PR #298) Tests: proof-of-teeth coverage for AUTH-1..AUTH-38 *(server-side AUTH-1..29/34..38; the client-only AUTH-31/32/33 are M21b. 17 proof-of-teeth mutations executed and observed RED, then reverted.)*
 - [x] DONE (M21a, PR #298) `just knowledge` regeneration (`evals/knowledge-bundle-conformance.eval.mjs` is a live, currently-wired
   `just ci` drift gate — M21a adds 3 new tables plus a new domain module, `accounts.rs`; missing this task
