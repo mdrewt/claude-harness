@@ -1,6 +1,8 @@
 # M20 — Observability, Performance & Load Hardening
 
-**Status:** design sketch → **elaborated at build time** (heavy ceremony, 2026-08-08) · **Phase D** · **Decision:** ADR-0029 (amended 2026-08-08) + ADR-0180
+**Status:** design sketch → **elaborated at build time** (heavy ceremony, 2026-08-08); **server-tracing +
+backend-stack calls reconsidered same day** (2026-08-08, see the amendment note below and D14–D18) · **Phase
+D** · **Decision:** ADR-0029 (amended 2026-08-08) + ADR-0180 (amended 2026-08-08)
 
 > Provisional sketch promoted to build-ready spec via the harness heavy-ceremony pipeline (investigation →
 > 6-way independent ideation, each adversarially reviewed → judge synthesis → a second, independent
@@ -11,6 +13,24 @@
 > fixed four defects in the synthesis (a factual error on the logs-endpoint auth posture, a mis-cited GitHub
 > issue date, an alerting-role incoherence, and a missing metrics-ingestion hop) — all closed below, not
 > hand-waved. See ADR-0180 for the full decision record and evidence log.
+
+> **Same-day amendment (2026-08-08).** After the pass above landed, Drew reconsidered the server-tracing and
+> backend-stack calls in light of two new facts that did not exist when it ran: his desktop has **96GB RAM**
+> (removing the ClickHouse-backed-footprint objection that would have ruled out an OTel-native all-in-one
+> such as SigNoz/Uptrace/HyperDX/OpenObserve — cost is no longer the deciding factor, single-developer
+> debugging ergonomics is; **D17 below, once reached, finds this objection was never actually evaluated or
+> recorded anywhere in this project's prior corpus** — read this framing as removing a hypothetical/assumed
+> blocker to reconsidering, not a previously-written-down one), and he is explicitly willing to adopt a
+> **BETA SpacetimeDB API** (scheduled
+> Procedures with outbound HTTP, the `unstable` Cargo feature) now, conditional on it producing a
+> *meaningfully* better design, not merely because it is technically possible. Several subagents
+> brainstormed, debated, and adversarially reviewed competing designs against this widened decision space,
+> explicitly guarding against status-quo bias and novelty bias alike. Verdict: **stay on the 7-container
+> backend (D3, unchanged); reject Procedures/`unstable` for M20 v1; add server-side causal tracing with real
+> per-call durations via a log-relay, not a procedure or a private table** — see D14–D18 below and
+> ADR-0180's own dated amendment for the full evidence ledger, attribution table, bias-guard/reward-hacking
+> discussion, and rollback plan. This is an amendment to already-Accepted content, not a fresh draft — D1–D13
+> above stand except where D14–D18 says otherwise.
 
 ## Problem / intent
 
@@ -102,10 +122,18 @@ answered. **Everything else in this spec is decided** and does not need Drew's i
   independent wiring, since S1b's scrape does not carry S4's numbers; see OBS-38, which closes this second
   half of the same missing-ingestion-hop defect). **S3** (a
   private `perf_event`-style table + a polling exporter reducer) is **cut for v1** — RED-per-reducer and
-  table/queue metrics are already free — and recorded as a pre-approved escape hatch: if ever exercised, the
+  table/queue metrics are already free — and recorded as a pre-approved escape hatch: ~~if ever exercised, the
   new table needs an explicit row-level-security policy and must be read via
   `POST /v1/database/<id>/sql`, never a `spacetime sql` CLI subprocess (the CLI has no stable JSON output at
-  the pin; the HTTP endpoint's tagged-object wire encoding is documented in ADR-0180).
+  the pin; the HTTP endpoint's tagged-object wire encoding is documented in ADR-0180)~~ — superseded below.
+  **Amended 2026-08-08 (D18a):** the sentence struck above is corrected in full, not just its RLS half —
+  D18a's own wording rejects RLS *and* the SQL-POST transport together ("not RLS+SQL"). `client_visibility_
+  filter` (RLS) is gated behind the same `unstable` flag as Procedures and is documented by the crate itself
+  as unimplemented/unenforced; upstream now explicitly recommends Views instead of RLS for access control
+  generally. If S3 is ever un-cut, the default path is a `#[view]`-based owner-scoped projection (the
+  `my_wallet`/`my_conversation` pattern), subscribed via the SDK — not RLS, and not `POST
+  /v1/database/<id>/sql` either — see OBS-47 (already stated this way) and OBS-15 (rewritten to match, this
+  finalization pass).
 - **D3 — 7-container self-hosted OSS stack replaces Datadog:** Prometheus (storage, scraping S1 + S1b, **and**
   a remote-write receiver — `--web.enable-remote-write-receiver` — for S4's pushed metrics; **recording rules
   only** for its own rule evaluation), Grafana Alloy (the *sole* telemetry agent — file-tail→Loki plus
@@ -124,7 +152,11 @@ answered. **Everything else in this spec is decided** and does not need Drew's i
   agent, its own failure would silently black out both S2 and S4 ingestion at once with nothing else in the
   stack noticing; the S1b scrape target Prometheus already polls doubles as a liveness probe with no new
   signal or container needed — a Grafana OSS alert rule on that scrape target's `up` metric being `0` past 3
-  consecutive scrape intervals catches it (OBS-39).
+  consecutive scrape intervals catches it (OBS-39). **Amended 2026-08-08 (D17):** this 7-container backend
+  tool selection stands unchanged — re-litigated at 96GB RAM and re-confirmed, not defaulted to. A
+  functionally-separate 8th `docker-compose.yml` service, `mr-trace-relay`, is added for server-side causal
+  tracing (D15); it is genuine new ops infrastructure, disclosed as a real cost below, not a change to this
+  backend tool selection.
 - **D4 — Alerting is owned entirely by Grafana OSS, not split with Alertmanager.** Prometheus's native
   `alerting:` block has no sink except Alertmanager — giving Prometheus "alert rule evaluation" while
   separately excluding Alertmanager (the pre-refinement draft's mistake) means an evaluated alert fires into
@@ -154,7 +186,10 @@ answered. **Everything else in this spec is decided** and does not need Drew's i
   and `mr_heartbeat`, a scheduled reducer that logs one `mr_log("heartbeat", …)` line per interval and
   mutates no table. (c) Correlation is `ctx.connection_id` (session-scoped) — no shared mutable counter
   table; a scheduled reducer's `connection_id` is always `None`, so its lines correlate by `(function, ts)`
-  plus a natural key already in the payload (e.g. `zone_id`).
+  plus a natural key already in the payload (e.g. `zone_id`). **(d) OBS-2's bare-`log::` ban is a ratchet
+  against the current tree, corrected this finalization pass** — see OBS-2 and the `.log-baseline` §4 task;
+   the ban is enforced going forward, not retroactively against the 56 pre-existing call sites a review found
+  it would otherwise fail against on landing.
 - **D7 — Perf-budget gate is a `criterion` dev-dependency scoped to `game-core` only.** Zero
   `spacetimedb`/wasm coupling (the feature-isolation invariant M0 already enforces stays intact — `criterion`
   never becomes a `server-module` or `client-wasm` dependency). Benchmarks cover the named hot paths already
@@ -201,14 +236,132 @@ answered. **Everything else in this spec is decided** and does not need Drew's i
   M20 answers **operational** questions (is the server healthy, fast, and recoverable). The pull-forward
   framing there ("M20 keeps the production capstone") is now concretely this stack, not Datadog.
 
+### Amendment 2026-08-08 — server-side tracing reconsidered (D14–D18)
+
+Per Drew's direct instruction, D1–D13 above were re-litigated with two facts that did not exist at the
+original heavy-ceremony pass: **(A)** Drew's desktop has 96GB RAM, so the ClickHouse-backed-footprint
+objection that would have ruled out an OTel-native all-in-one (SigNoz/Uptrace/HyperDX/OpenObserve) no longer
+applies — resource cost is not the deciding factor, single-developer debugging ergonomics is; **(B)** Drew is
+explicitly willing to adopt a BETA SpacetimeDB API (scheduled Procedures with outbound HTTP, the `unstable`
+Cargo feature) now, conditional on it producing a *meaningfully* better design, not merely because it is
+technically possible. Several subagents brainstormed, debated, and adversarially reviewed competing designs
+against this widened decision space, explicitly guarding against status-quo bias and novelty bias and
+flagging any sign of evaluation-gaming. Full evidence ledger (V1–V12), attribution table, bias-guard and
+reward-hacking discussion, and rollback plan: ADR-0180's own dated amendment. D1–D13 stand except where a
+bullet below says otherwise.
+
+- **D14 — D1 stands, unamended; Procedures and `features = ["unstable"]` are explicitly considered and
+  rejected for M20 v1.** The module still never times itself and never initiates an outbound call — this is
+  forced, not a preference: `Instant`/`SystemTime::now/elapsed` are clippy-banned workspace-wide
+  (`clippy.toml`), a hard CI failure, so the module structurally cannot time itself regardless of what timing
+  APIs exist. Verified this pass: adopting Procedures is a one-line Cargo feature flag against the pinned
+  crate (`spacetimedb-1.12.0`), not a major-version migration some upstream inputs assumed — that cost
+  objection is false for this repo and is retracted. Procedures are rejected anyway, on a **necessity**
+  argument, not a fear argument: D15 below delivers real causal server-side tracing, including real per-call
+  durations, with no new outbound-HTTP surface and no new in-module timing mechanism at all — so the beta
+  API's risk (pinned upstream docs call Procedures "currently in beta," their API "may change in upcoming
+  SpacetimeDB releases," and advise preferring reducers "unless you need" a procedure) buys nothing D15
+  doesn't already cover. ADR-0180's amendment names the exact falsifier that would flip this.
+- **D15 — Server-side causal spans, with real durations, are reconstructed from the log stream — no
+  procedure, no new table, no new credential.** `observability.rs`'s `mr_log` envelope (D6) gains three
+  optional, bounded fields: `cause` (the call's natural key — `zone_id`/`battle_id`/`trade_id`, already
+  present in the payload), `sched` (`{target_reducer, scheduled_at}`, logged when a reducer enqueues scheduled
+  work), and `phase` (`enter` | `exit` | `event`). For **causally-interesting calls only** — reducers that
+  enqueue or are triggered by scheduled work, and cross-reducer chains, **not** blanket instrumentation of
+  every reducer (which would double S2 log volume project-wide for marginal benefit) — `mr_log` is called
+  twice, once at entry and once at exit (every return path including error paths), sharing the same
+  `cause`/`sched` key. **Scoping is a named, enumerated allowlist — `$trace_pair_set`, mirroring D8/OBS-22's
+  `$slo_set` pattern — decided and committed at build time, corrected from a qualitative-only rule in this
+  finalization pass** (a review found the prior wording left it unverifiable whether `movement_tick`, this
+  feature's own named motivating case, was in scope). `$trace_pair_set` explicitly **EXCLUDES `movement_tick`
+  and any other reducer already gated by `STEP_MS` (OBS-24) or a `criterion` benchmark (D7)** — those
+  reducers' durations are already measured free, host-side, by S1's per-reducer histogram; doubling their
+  `mr_log` emission risks adding reducer-side latency on exactly the hot path least able to absorb it.
+  Breadcrumb pairing targets reducers *around* those hot ticks, not the ticks themselves; any future addition
+  of a `$slo_set`/criterion-gated reducer to `$trace_pair_set` is a deliberate exception gated by the
+  pre-merge check in §5's post-integration verification, not a default. A new stateless service,
+  **`mr-trace-relay`** (`ops/observability/relay/`, Node,
+  mirroring `scripts/playtest-report.mjs`'s toolchain), tails the same read-only `module_logs/*.log` bind
+  mount Alloy already tails, pairs and orders enter/exit breadcrumbs **by the host-populated `ts` field**
+  (each `module_logs` line already carries an independent, host-stamped, microsecond-precision timestamp —
+  confirmed against the pinned crate's `logger.rs`, which passes no timestamp parameter to the host call, and
+  against real on-disk log data from this project) — never by file-tail arrival order, since a log-rotation
+  boundary or relay restart could in principle deliver `exit` before its matching `enter` — and computes
+  `duration = exit.ts − enter.ts`, a real, host-attributed wall-clock duration that is D1-compliant because
+  the module never reads a clock to produce it; the subtraction happens entirely in the relay, outside the
+  wasm sandbox. It reconstructs trace trees (client-originated root keyed on `(connection_id, entry
+  timestamp)`; scheduled root keyed on `(function, ts)` per OBS-4; cross-reducer edges via joining a child's
+  `scheduled_at` to its parent's `sched` breadcrumb) and POSTs OTLP/HTTP JSON to Alloy's existing OTLP
+  receiver → Tempo, encoding `trace_id`/`span_id` as lowercase hex (32/16 characters), never base64.
+  **Integrity rule:** a paired enter/exit breadcrumb gets a real, non-negotiable duration; an unpaired
+  breadcrumb (process crashed mid-call, or the call wasn't scoped for pairing) stays `start == end` —
+  honestly representing "we know this happened, not how long it took." Never synthesize a duration for an
+  unpaired span from an aggregate histogram. **Disclosed costs** (ADR-0180's amendment has the full list): a
+  genuine new artifact (`mr-trace-relay` itself); only paired calls get real durations, so sub-call timing
+  within one reducer invocation is still invisible; reconstruction is heuristic, not propagated context, so
+  ambiguous interleavings can still mis-parent a span; seconds-scale (file-tail + batch) latency versus a
+  push; doubled log volume **and reducer-side CPU/allocation cost** (two heap-allocating hand-rolled JSON
+  string builds — `format!`/`json_escape` — per paired invocation, inline in the reducer's own transaction,
+  not previously disclosed) for whichever calls are in `$trace_pair_set`, bounded by the exclusion above and
+  checked pre-merge per §5.
+- **D16 — Client and server traces are pivoted, not merged, in v1 — unchanged rationale.** No `trace_id`
+  reducer argument. The join stays a Grafana trace-to-logs (span-time-window) plus a `connection_id`
+  correlation pivot (D17). A merged trace id would cost reducer signature changes across the hot API surface,
+  a bindings regen, and an amendment to OBS-3's correlation rule, to buy what one dashboard click already
+  provides. Distributed context propagation is deferred behind ADR-0180's falsifier.
+- **D17 — Backend tool selection: STAY on the Grafana/Prometheus/Loki/Tempo stack (D3, 7 containers,
+  unchanged); add one functionally-separate 8th service to close the correlation gap that motivated this
+  reconsideration.** Verified this pass: ADR-0180 and this spec contain zero mentions of SigNoz, ClickHouse,
+  Uptrace, HyperDX, or OpenObserve anywhere — the ClickHouse-family tools were never evaluated, let alone
+  rejected on footprint, so 96GB RAM doesn't change a decision that was never made on that basis. "STAY" is a
+  statement about which observability *tools* are selected, not a claim that total ops footprint stays at 7
+  — `mr-trace-relay` (D15) is genuinely new ops infrastructure, disclosed as a real cost, not hidden inside a
+  "no new mechanism" claim. Added to m20b, all additive: (1) Tempo→Loki trace-to-logs with span-time-window
+  shift; (2) a `connection_id` correlation pivot — **which first-party Grafana mechanism (Correlations vs.
+  Loki derived fields) is correct for this specific join is UNVERIFIED and is a build-time spike, not a
+  settled fact**; (3) shared time-range linkage across Prometheus/Loki/Tempo surfaces; (4) `mr-trace-relay`
+  itself, stateless and restart-safe, its liveness folded into OBS-39's existing dead-man's-switch alert rule
+  (extended, not duplicated). Its failure degrades trace *assembly* only — logs still reach Loki on the
+  independent Alloy path (S2) regardless. Real, disclosed loss from staying: a true ClickHouse-backed
+  all-in-one's native single-pane cross-signal correlation is still smoother than Grafana's trace-to-logs
+  pivot even after this addition — D15 narrows that gap, it does not close it.
+- **D18 — Two corrections to already-Accepted content, found and fixed by this pass, plus the deferral entry
+  the original ceremony left implicit.** **(a)** ADR-0180's own D2 escape hatch is wrong on the current
+  toolchain: it names `POST /v1/database/<id>/sql`, "governed by RLS," as the sanctioned path if S3 is ever
+  un-cut, but RLS is gated behind the same `unstable` flag as Procedures, documented by the crate itself as
+  unenforced, and upstream now actively steers developers to Views instead. **The corrected default, if S3 is
+  ever un-cut: a Views-based per-owner read path** (the `my_wallet`/`my_conversation` pattern, already shipped
+  twice, stable, un-gated), not RLS+SQL — see OBS-47 and ADR-0180's amendment D18a. This corrects D2 above
+  (amended directly there) and OBS-15 below (amended directly there). **(b)** A factual correction to an
+  upstream pipeline claim, not to this spec or ADR-0180: a prior synthesis pass asserted Uptrace's license is
+  BSL, "not AGPLv3." Checked directly against the live `uptrace/uptrace` repository this pass: it is
+  **AGPL-3.0** — confirmed by both GitHub's SPDX detector and the raw `LICENSE` file's literal text. This
+  doesn't change the deferral in (c) — it never rested on licensing — but a wrong "correction" should not
+  stand uncorrected. **(c)** SigNoz/Uptrace/HyperDX-ClickStack/OpenObserve remain deferred, now for a stated
+  reason: RAM was never the operative reason (they were never evaluated — see D17 above); the deferral rests
+  on correlated-fate risk across one ClickHouse instance, non-transfer of D4/OBS-18/OBS-19's alerting-
+  correctness work, and the fact that native cross-signal correlation is unreachable in *either* backend
+  without server-side trace context, which D15 now supplies regardless of backend. ADR-0180's amendment names
+  the re-open trigger.
+
+**D-numbering note:** these new decisions continue directly from this spec's own D13 — no numbering gap here
+(this spec has always had a D13; ADR-0180 itself stops at D12 and deliberately skips its own D13 when
+mirroring this amendment, to keep the two documents' numbering synchronized — see the ADR amendment).
+
 ## EARS acceptance criteria
 
 **Layer-1 retrofit**
 - **OBS-1** — WHEN `mr_heartbeat` fires THE SYSTEM SHALL emit exactly one `mr_log` line with
   `evt = "heartbeat"` and the current `content_version`, and SHALL NOT insert, update, or delete any row.
 - **OBS-2** — IF any file in `server-module/src` (excluding `guards.rs` and `observability.rs` themselves,
-  and excluding `_tests.rs` files) calls `log::info!`, `log::warn!`, or `log::error!` directly THEN a CI
-  lint/eval SHALL fail. *(proof-of-teeth: a seeded bare-`log::` fixture must be caught)*
+  excluding `_tests.rs` files, and excluding a call site already listed in the committed pre-existing-call-
+  site baseline — see §4) calls `log::info!`, `log::warn!`, or `log::error!` directly THEN a CI lint/eval
+  SHALL fail. *(proof-of-teeth: a seeded bare-`log::` fixture must be caught. **Corrected this finalization
+  pass:** as originally worded with no baseline exclusion, this criterion would fail against 56 already-
+  shipped, currently-passing call sites across 10 domain files — confirmed by grep at amendment time — the
+  moment it landed, with no task anywhere in this milestone budgeted to migrate them. The baseline makes this
+  a ratchet against new bare-`log::` calls, not a same-day blanket failure against existing code; migrating
+  the baseline's entries to `mr_log` is an explicit, named follow-up, out of this milestone's scope.)*
 - **OBS-3** — WHEN a reducer call carries `ctx.connection_id = Some(_)` THE SYSTEM SHALL use that
   `connection_id` as the sole correlation key for that call's log lines; no shared mutable counter table
   SHALL be introduced anywhere in `server-module/src` for correlation purposes.
@@ -252,9 +405,17 @@ answered. **Everything else in this spec is decided** and does not need Drew's i
   stays cut per D2). *(mechanically enforced by the project's existing schema-snapshot gate, which flags any
   new `schema.rs` table including a private one, plus code review — no new eval is needed for this
   criterion.)*
-- **OBS-15** — IF a future milestone un-cuts S3 THEN the new table SHALL declare an explicit row-level-
-  security policy before use, and SHALL be accessed only via `POST /v1/database/<id>/sql`, never a
-  `spacetime sql` CLI subprocess.
+- **OBS-15** — IF a future milestone un-cuts S3 THEN, unless a subsequent SpacetimeDB release documents RLS
+  (`client_visibility_filter`) as stable, the new table's read path SHALL be a `#[view]`-based owner-scoped
+  projection (mirroring `my_wallet`/`my_conversation`, subscribed via the SDK) — NOT `client_visibility_filter`
+  -based RLS, and NOT accessed via `POST /v1/database/<id>/sql` or a `spacetime sql` CLI subprocess either.
+  *(Amended 2026-08-08 — D18a corrects this criterion, which originally named RLS-governed
+  `POST /v1/database/<id>/sql` as the sanctioned path. D18a's own wording rejects both together — "not
+  RLS+SQL" — not merely the RLS half; an earlier version of this amendment note narrowed the correction to
+  "the RLS clause" only, leaving the SQL-POST requirement standing and contradicting D18a — a coherence gap a
+  later review pass found and this rewrite of the clause itself fixes, rather than leaving a narrow note
+  beside an uncorrected requirement. See OBS-47, which states the same corrected rule for the causal-tracing
+  amendment's own context.)*
 - **OBS-16** — WHEN the browser client emits telemetry via the OTel Web SDK THE SYSTEM SHALL send it over
   OTLP/HTTP to Alloy's `otelcol.receiver.otlp` endpoint, and THE SYSTEM SHALL NOT require or accept an
   authentication credential from the browser on that path.
@@ -343,6 +504,41 @@ found)*
   recent successful backup, and SHALL define an alert or a documented manual check that fires when that age
   exceeds twice the operator-configured backup interval (OBS-30).
 
+**Server-side causal tracing** *(added post-amendment, 2026-08-08 — implements D14–D18; the falsifier
+conditions referenced below live in ADR-0180's dated amendment, not in this spec)*
+- **OBS-41** — WHEN a reducer call in `$trace_pair_set` (OBS-50) begins and ends THE SYSTEM SHALL emit paired
+  `mr_log` breadcrumbs (`phase:"enter"`, `phase:"exit"`) sharing the same `cause` or `sched` key, on every
+  return path including error returns.
+- **OBS-42** — `mr-trace-relay` SHALL compute a span duration only from a matched `enter`/`exit` pair's
+  host-populated `ts` values, and SHALL NEVER estimate or backfill a duration for an unpaired breadcrumb.
+- **OBS-43** — `mr-trace-relay` SHALL pair and order breadcrumbs by their host-populated `ts` field, not by
+  file-tail arrival order, so out-of-order delivery across a log-rotation boundary or relay restart cannot
+  invert an enter/exit pair.
+- **OBS-44** — `mr-trace-relay` SHALL encode `trace_id`/`span_id` as lowercase hex strings (32/16 characters)
+  in its OTLP/HTTP JSON export, never base64.
+- **OBS-45** — `mr-trace-relay` SHALL read `module_logs/*.log` via the same read-only bind mount as Alloy,
+  and SHALL NOT require or accept a module-owner credential.
+- **OBS-46** — THE SYSTEM SHALL fire an alert when `mr-trace-relay`'s liveness signal is absent for longer
+  than the existing OBS-39 threshold, extending (not duplicating) that dead-man's-switch rule.
+- **OBS-47** — IF a future milestone un-cuts S3 (per D2, as amended by D18a) THEN the read path SHALL be a
+  `#[view]`-based owner-scoped projection (mirroring `my_wallet`/`my_conversation`), not
+  `client_visibility_filter`-based RLS, unless a subsequent SpacetimeDB release documents RLS as stable.
+- **OBS-48** — THE M20 v1 deployment SHALL NOT enable `features = ["unstable"]` in any workspace
+  `Cargo.toml`, and SHALL NOT define a `#[spacetimedb::procedure]` anywhere in `server-module/src` (D14) —
+  outbound-HTTP-based export is deferred behind ADR-0180's amendment's falsifier trigger, not built now.
+- **OBS-49** — THE SYSTEM SHALL NOT add a new table to `schema.rs` for server-side trace reconstruction
+  (D15); the `cause`/`sched`/`phase` fields SHALL be additive to the existing `mr_log` envelope only.
+- **OBS-50** *(added this finalization pass — closes a gap a review found: no enumerated list existed to
+  confirm or rule out whether `movement_tick` was in scope)* — THE SYSTEM SHALL define a named reducer
+  allowlist (`$trace_pair_set`, mirroring OBS-22's `$slo_set`) used only for D15's enter/exit breadcrumb
+  pairing, and `$trace_pair_set` SHALL NOT include `movement_tick` or any reducer already gated by the
+  `STEP_MS` SLO (OBS-24) or a `criterion` benchmark budget (OBS-5/D7).
+- **OBS-51** *(added this finalization pass — closes the pre-merge performance-gate gap a review found:
+  `criterion`, D7's only pre-merge perf gate, is permanently walled off from `server-module` by design)* —
+  BEFORE any reducer is added to `$trace_pair_set`, `mr-load-driver` (OBS-27) SHALL be run with that
+  reducer's breadcrumbs active, and the reducer's own relevant SLO/budget (if any) SHALL be compared with
+  pairing on vs. off; a measurable regression SHALL block the addition from merging.
+
 ## §4 Task checkboxes
 
 - [ ] `server-module/src/observability.rs` (new domain module, ADR-0056/M8.9 convention): `mr_log` helper
@@ -351,6 +547,12 @@ found)*
 - [ ] Wire `mr_heartbeat`'s schedule arm in `server-module/src/lib.rs` (`init`/`sync_content`, mirrors
   `movement_tick_schedule` wiring)
 - [ ] `evals/observability-log-wrapper.eval.mjs` (new) — OBS-2's bare-`log::` ban + proof-of-teeth fixture
+- [ ] `server-module/src/.log-baseline` (new, exact name/format decided at build time) — the committed
+  pre-existing-call-site baseline OBS-2's ratchet reads: enumerate, by scanning the tree at build time, every
+  bare `log::info!/warn!/error!` call site outside `guards.rs`/`observability.rs` that predates this retrofit
+  (confirmed 56 across 10 files as of this finalization pass — `movement.rs`, `content.rs`, `lib.rs`,
+  `trading.rs`, `pvp.rs`, `evolution.rs`, `taming.rs`, `raising.rs`, `battle.rs`, `npc.rs`); migrating these to
+  `mr_log` is an explicit, out-of-scope follow-up, not silently dropped
 - [ ] `game-core/Cargo.toml`: `criterion` dev-dependency + `[[bench]]` entries; `game-core/benches/*.rs` for
   each named hot path in `observability-performance-plan.md` §2
 - [ ] Root `Cargo.toml`: uncomment/populate the `criterion` line in `[workspace.dependencies]` (currently a
@@ -365,10 +567,16 @@ found)*
   S2's log-derived path only, not S4 (OBS-38's remote-write path is a static config check, see the
   `observability-stack-config.eval.mjs` bullet below) (three assertions, one file — cheap and hermetic per
   this project's existing proof-of-teeth idiom)
-- [ ] `ops/observability/docker-compose.yml` (new dir, new file) — the 7-container SSOT: Prometheus (with
-  `--web.enable-remote-write-receiver` in its command args, for S4's push — OBS-38), Alloy, Loki, Tempo,
-  Grafana OSS, node_exporter, Caddy; set a `mem_limit`/`cpus` resource cap per container once D9's load test
+- [ ] `ops/observability/docker-compose.yml` (new dir, new file) — the 7-container backend SSOT: Prometheus
+  (with `--web.enable-remote-write-receiver` in its command args, for S4's push — OBS-38), Alloy, Loki, Tempo,
+  Grafana OSS, node_exporter, Caddy; **plus the 8th, functionally-separate `mr-trace-relay` service (D15/D17,
+  G9)** — 8 containers total; set a `mem_limit`/`cpus` resource cap per container once D9's load test
   produces a real footprint figure to size against — not guessed at spec time, but not left unset either
+- [ ] `ops/observability/relay/` (new dir) — `mr-trace-relay` implementation (Node, D15): NDJSON tail of
+  `module_logs/*.log` (read-only bind mount, OBS-45), `ts`-based enter/exit pairing (OBS-43), duration
+  computation (OBS-42), trace-tree reconstruction, OTLP/HTTP JSON POST to Alloy with lowercase-hex
+  `trace_id`/`span_id` (OBS-44); a committed `$trace_pair_set` config (OBS-50) listing the reducers
+  instrumented for pairing, explicitly excluding `movement_tick` and any `STEP_MS`/criterion-gated reducer
 - [ ] `ops/observability/prometheus.yml` — S1 (`/v1/metrics`) + S1b (Alloy self-metrics) + node_exporter
   scrape jobs; recording rules only, no `alerting:` block and no `alert:` stanza in any loaded rule file
   (OBS-18)
@@ -406,6 +614,11 @@ found)*
 - [ ] Wire client observability init in `client/src/main.ts`
 - [ ] `sim-harness/src/bin/mr_load_driver.rs` (new) — scaled multi-client load driver (D9); reads S1 metrics
   to report the measured breaking point (OBS-27)
+- [ ] `mr-trace-relay`'s pure-function unit tests + a seeded-ambiguity proof-of-teeth fixture (two interleaved
+  zone-tick chains that must not cross-pollinate — G8, OBS-42/OBS-43)
+- [ ] Pre-merge check (G11, OBS-51): before landing `$trace_pair_set`'s initial membership, run
+  `mr-load-driver` with those reducers' breadcrumbs active and record the with/without-pairing comparison
+  against each one's own relevant SLO/budget in the PR/handoff notes
 - [ ] Update `M0-foundation.spec.md`'s EARS line `:142` and annotate the unchecked `:211` checkbox as
   deferred-to-M20 — bookkeeping edit, **out of this ceremony's write scope**, do at the next build tick
   (OBS-8)
@@ -415,19 +628,26 @@ found)*
 
 | Slice | Touches | Notes |
 |-------|---------|-------|
-| **m20a — Layer-1 retrofit** | `server-module/src/observability.rs` (new), `server-module/src/observability_tests.rs` (new), `server-module/src/lib.rs`, `game-core/Cargo.toml`, `game-core/benches/**` (new), root `Cargo.toml`, `justfile`, `evals/observability-log-wrapper.eval.mjs` (new), `evals/observability-metrics-contract.eval.mjs` (new) | **SERIAL relative to any other server-module slice touching `schema.rs`/`lib.rs`** (none exist in this milestone) — the new `mr_heartbeat_schedule` scheduled table is a schema-touching addition per the M8.9 exception (colocated with its reducer, mirrors `movement_tick_schedule`). Bundles the `criterion`/perf-budget-gate work in with `mr_log`/heartbeat rather than splitting further — both are small, and `Cargo.toml`/`justfile` are shared files a second slice would just conflict on (mirrors M21a's own bundling rationale). |
-| **m20b — self-hosted stack config** | `ops/observability/**` (all new), `docs/observability-dr-runbook.md` (new) | **Touches-disjoint from m20a — may start immediately alongside it, not blocked on its merge.** Alloy's `stage.metrics` rules target the `evt` vocabulary this spec fixes (D6: `"heartbeat"`, `"reject"`). The `"reject"` half is a genuine no-dependency case — `guards.rs` already emits `evt:"reject"` today, unchanged by this milestone. The `"heartbeat"` half is narrower: `mr_log`/`mr_heartbeat` don't exist yet, and ADR-0180's own code sample is explicitly flagged illustrative-only, refined at build time — so m20b's heartbeat-derivation rule is written against a contract m20a is still free to adjust before it lands. This is a real, if narrow, Layer-1→Layer-3 contract dependency, not zero dependency; it is deliberately not serialized (the two slices are small and the shared surface is one `evt` string), but the mitigation is explicit: m20e's post-merge integration eval is what catches any drift, not a pre-merge check. |
+| **m20a — Layer-1 retrofit** | `server-module/src/observability.rs` (new), `server-module/src/observability_tests.rs` (new), `server-module/src/.log-baseline` (new), `server-module/src/lib.rs`, `game-core/Cargo.toml`, `game-core/benches/**` (new), root `Cargo.toml`, `justfile`, `evals/observability-log-wrapper.eval.mjs` (new), `evals/observability-metrics-contract.eval.mjs` (new) | **SERIAL relative to any other server-module slice touching `schema.rs`/`lib.rs`** (none exist in this milestone) — the new `mr_heartbeat_schedule` scheduled table is a schema-touching addition per the M8.9 exception (colocated with its reducer, mirrors `movement_tick_schedule`). Bundles the `criterion`/perf-budget-gate work in with `mr_log`/heartbeat rather than splitting further — both are small, and `Cargo.toml`/`justfile` are shared files a second slice would just conflict on (mirrors M21a's own bundling rationale). **Amendment 2026-08-08:** `observability.rs` additionally gains the `cause`/`sched`/`phase` fields for D15's causal-tracing breadcrumbs — additive within this same file, no new touches, no new `schema.rs` table (OBS-49). **Finalization-pass addition:** `.log-baseline` (OBS-2's ratchet, enumerating the 56 pre-existing bare-`log::` call sites) lands alongside `observability.rs` in this same slice. |
+| **m20b — self-hosted stack config** | `ops/observability/**` (all new), `docs/observability-dr-runbook.md` (new) | **Touches-disjoint from m20a — may start immediately alongside it, not blocked on its merge.** Alloy's `stage.metrics` rules target the `evt` vocabulary this spec fixes (D6: `"heartbeat"`, `"reject"`). The `"reject"` half is a genuine no-dependency case — `guards.rs` already emits `evt:"reject"` today, unchanged by this milestone. The `"heartbeat"` half is narrower: `mr_log`/`mr_heartbeat` don't exist yet, and ADR-0180's own code sample is explicitly flagged illustrative-only, refined at build time — so m20b's heartbeat-derivation rule is written against a contract m20a is still free to adjust before it lands. This is a real, if narrow, Layer-1→Layer-3 contract dependency, not zero dependency; it is deliberately not serialized (the two slices are small and the shared surface is one `evt` string), but the mitigation is explicit: m20e's post-merge integration eval is what catches any drift, not a pre-merge check. **Amendment 2026-08-08:** scope grows to include `ops/observability/relay/**` (new — `mr-trace-relay`, D15) and the Tempo→Loki trace-to-logs + `connection_id` correlation-pivot config (D17) — still inside the already-declared `ops/observability/**` wildcard, still touches-disjoint from m20a, no new slice row needed. The relay's contract with m20a is the same `evt`/field vocabulary named above, now including `cause`/`sched`/`phase` — mitigated the same way, by m20e's post-merge integration eval, not a pre-merge check. |
 | **m20c — client real OTel** | `client/src/observability/**` (new), `client/src/main.ts`, sibling tests | Touches-disjoint from m20a/m20b/m20d; no bindings dependency (client-side instrumentation only, no server schema read). Full end-to-end verification needs m20b's Alloy OTLP ingress reachable, but unit-level SDK wiring can build and test against a mocked endpoint independently. |
 | **m20d — load driver** | `sim-harness/src/bin/mr_load_driver.rs` (new), `sim-harness/src/lib.rs`/`world.rs` only if a shared helper is needed | Touches-disjoint from all above; depends only on the already-published live module and S1 metrics (host-native, zero coupling to m20a/b/c). Could in principle build first of all. |
-| **m20e — evals tail** | `evals/observability-stack-config.eval.mjs` (new), the third (Alloy self-metrics) assertion in `evals/observability-metrics-contract.eval.mjs` if not completed in m20a, Rust-side mirror additions to `observability_tests.rs` | **SERIAL, after m20a AND m20b merge** — needs both `mr_log`/heartbeat artifacts (m20a) and the committed `ops/observability/**` config files (m20b) to scan/exercise. |
+| **m20e — evals tail** | `evals/observability-stack-config.eval.mjs` (new), the third (Alloy self-metrics) assertion in `evals/observability-metrics-contract.eval.mjs` if not completed in m20a, Rust-side mirror additions to `observability_tests.rs` | **SERIAL, after m20a AND m20b merge** — needs both `mr_log`/heartbeat artifacts (m20a) and the committed `ops/observability/**` config files (m20b) to scan/exercise. **Amendment 2026-08-08:** also covers `mr-trace-relay`'s reconstruction rules as pure-function unit tests with a seeded-ambiguity proof-of-teeth fixture — two interleaved zone-tick chains that must not cross-pollinate (G8) — and extends `observability-stack-config.eval.mjs` to confirm the relay service is present, reads `module_logs` read-only, and that the trace-to-logs + correlation-pivot config exists in Grafana provisioning (G9). Still SERIAL after m20a AND m20b, unchanged. **Finalization-pass addition:** G9 also statically confirms `$trace_pair_set` (OBS-50) does not list `movement_tick` or any `$slo_set`/criterion-benched reducer; and also runs G11 (OBS-51) — `mr-load-driver` with `$trace_pair_set`'s breadcrumbs active, checked against each paired reducer's own SLO/budget — before `$trace_pair_set` gains its initial membership; G11 is a pre-merge check needing the live stack + a published module (same precondition as the metrics-contract/stack-config evals), not a plain `just ci` step. |
 
 **Post-integration verification** (after m20a + m20b + m20c + m20d + m20e all merge): full `just ci`
 green-and-meaningful; bindings-drift = 0 (client bindings are untouched by this milestone but the gate still
 runs); schema-snapshot updated to include `mr_heartbeat_schedule`; the `observability-metrics-contract` and
 `observability-stack-config` evals both green against the real `docker-compose.yml` stack brought up via
 `docker compose up -d`; a real restore drill run once, with its measured RTO recorded in
-`docs/observability-dr-runbook.md`; every OBS-1..OBS-40 criterion satisfied against the integrated whole
-(config files + running containers + a published module), not merely per-slice.
+`docs/observability-dr-runbook.md`; `mr-load-driver` run with `$trace_pair_set`'s breadcrumbs active per
+OBS-51/G11 before `$trace_pair_set` gains its initial membership; every OBS-1..OBS-51 criterion satisfied
+against the integrated whole (config files + running containers + a published module), not merely per-slice.
+
+**Amendment 2026-08-08 (G10, not a `just ci` gate):** a `procedure-http-clamp` harness for the Procedures-
+adoption falsifier trigger (ADR-0180's amendment) requires live network egress and toggling
+`features = ["unstable"]` in a disposable scratch module — neither belongs in the always-on `just ci` path.
+Keep it as a documented, manually-triggered (or separately-scheduled, network-gated) script, never wired into
+`just ci`.
 
 ## Risks / decisions
 
@@ -447,8 +667,8 @@ runs); schema-snapshot updated to include `mr_heartbeat_schedule`; the `observab
   Caddy/network posture reworked once `M-playtest-a2` finally picks a host. This is a real, accepted
   sequencing cost, surfaced explicitly here rather than left implicit inside OQ1.
 - Log→metric derivation inside Alloy could prove lossy or high-cardinality enough to be unusable for domain
-  rates → if so, S3 is un-cut via the HTTP SQL endpoint (D2), with an RLS policy applied, not via a CLI
-  subprocess.
+  rates → if so, S3 is un-cut via a `#[view]`-based owner-scoped read path (D2 as amended by D18a), not RLS
+  (RLS is unstable-gated and documented unenforced on the pinned toolchain), and never via a CLI subprocess.
 - `--enable-tracy` might not build/run cleanly in the pinned distribution when actually tried under load → if
   so, T4 (wasmtime jitdump + perf) is promoted from deferred to scheduled; the corrected debug-symbol
   citation (D10) means this is not blocked by a stripped-symbols risk either way.
@@ -468,9 +688,10 @@ The self-hosted log pipeline (S2, Loki) and dashboards this milestone stands up 
 the rest of Phase D reuses, not a one-off: M22 (privacy/deletion) can audit its cascade against the same
 structured logs; M23/M24/M25 each still owe their own hot-path benchmark + load test per the Layer-2
 cross-cutting invariant (`observability-performance-plan.md` §1), now backed by a real, working perf-budget
-gate instead of a specified-but-unbuilt one. The D2 escape hatch (S3, RLS-gated) is the documented on-ramp if
-any future milestone needs a genuine domain-specific metric the host's native signals + Alloy's log
-derivation can't cover.
+gate instead of a specified-but-unbuilt one. The D2 escape hatch (S3, Views-gated as of D18a's 2026-08-08
+amendment — not RLS) is the documented on-ramp if any future milestone needs a genuine domain-specific
+metric the host's native signals + Alloy's log derivation can't cover. `mr-trace-relay` (D15) is a separate,
+already-built on-ramp for causal server-side latency the log stream alone can now answer.
 
 ## Fan-out & integration note (for the slicing agent)
 
