@@ -481,16 +481,20 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   is **deprioritized to the tail** of this block (sequence it after the two hardening milestones + the
   UX-design specs; do not pull it ahead of them). ADR reserved at build time.
 - **M20 Observability, performance & load hardening** (`M20-observability-performance.spec.md`; ADR-0029) —
-  the capstone: production monitoring (OTel→Datadog dashboards/alerts), full-system load testing (scaled
-  sim-harness), profiling the named hot paths, and the **measured** performance-tuning pass + SLO baselines.
+  the capstone: production monitoring (self-hosted OSS dashboards/alerts — ADR-0180 replaces the original
+  OTel→Datadog sink, see Status below), full-system load testing (scaled sim-harness), profiling the named
+  hot paths, and the **measured** performance-tuning pass + SLO baselines.
   The always-on substrate (structured logging, OTel seams, a benchmark + perf-budget CI gate, health/
   readiness) is built in **M0**; every milestone instruments + benchmarks + load-tests what it adds (a
   cross-cutting invariant). See `observability-performance-plan.md`; backup/DR runbook folded in.
   **Slimmed 2026-07:** the playtest-scale error-surface/event-capture layer moved to **M-playtest-b**;
   M20 remains the production capstone (export/dashboards/load/SLOs) and consumes `playtest_event` learnings.
+  **Status:** design sketch → elaborated at build time (heavy ceremony, 2026-08-08) — ADR-0029 amended
+  (self-hosted OSS stack replaces Datadog) + new ADR-0180 (tool selection + data path).
 - **M21 Accounts & authentication** (`M21-accounts-auth.spec.md`; ADR-0030) — OIDC-backed stable identity
   (cross-device, recovery) replacing anonymous identities; guest→account claim. No game-data schema churn
-  (the identity keying pays off).
+  (the identity keying pays off). **Status:** design sketch → elaborated at build time (heavy ceremony,
+  2026-08-08).
 - **M22 Privacy, data deletion & compliance** (`M22-privacy-compliance.spec.md`; ADR-0031) — registry-driven
   deletion cascade (erase/anonymize), data export, retention; a deletion-completeness eval.
 - **M23 Accessibility** (`M23-accessibility.spec.md`; ADR-0032) — keyboard/screen-reader/colorblind/

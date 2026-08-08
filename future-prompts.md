@@ -586,6 +586,14 @@ All commands were read-only (git status shows no tracked-file changes from this 
 
 
 
+ ultracode Go ahead and skip the playtest gate and greenlight Phase D now. I agree that the fisrt milestone is M21 and that it deserves heavy planning (per the "§6 HEAVY CEREMONY (operator's pipeline, kept intact)" section of the `mr-feedback-doctrine`) where "execution" refers to writing a thorough and fully detailed set of specs/milestones/ADRs with all the information needed for a future tick to implement it. Additionally, I would like M20 (Observability, performance & load hardening) to be the next milestone worked on after M21 and for M20 to also receive heavy planning (per the heavy ceremony).For context, I would like to achieve a level of obserability + metrics + telemetry + tracing + profiling + analytics + logging equal to (or better than) that provided by Datadog withg a properly configured project, but I want to use free and open-source tools that I can host locally instead of relying on 3rd party services. To achieve this, I am considering using OpenTelemetry and selecting from various compatible tools such as Prometheus, Graphana OSS, OpenTelemetry OSS, Apache Doris, SigNoz, Loki, Temp, Uptrace, and several other related tools that can be hosted and deployed locally in docker containers. I have not decided on which tools to use, so I will trust your best judgement. You may recommend the best combination of tools that fit this project's needs (monster realm is an open-source indie MMORPG built by a single developer using Rust, SpacetimeDB, Typescript, and PixiJS). You are not limited to the tools that I have listed and may suggest any other tools that you believe would be best for the project. The final set of tools that you select should be able to integrate with each other well (preferably not overlapping in purpose too much) and be compatible with SpacetimeDB and any tools it natively supports for logging/debugging/tracing/profiling (etc...). You may do research as you deem necessary and ask me any questions that you judge to be useful. Keep in mind that the majority of the implementation of these features will by done by future ticks of the hourly task. 
+
+
+
+
+
+
+
 
 
 

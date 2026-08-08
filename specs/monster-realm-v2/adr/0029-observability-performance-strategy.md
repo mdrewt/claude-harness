@@ -37,3 +37,62 @@ designed-in and mechanically enforced without over-building before there is load
   consolidates production monitoring + comprehensive load/profiling/tuning. Smoothness metrics (ADR-0013)
   become runtime-observable (divergence/reconcile rates), so feel regressions are visible in prod. Tooling
   (Datadog/OTel/criterion versions) is confirmed against the pinned environment at build time.
+
+## Amendment — 2026-08-08 (self-hosted OSS stack replaces Datadog)
+
+**Trigger:** Drew explicitly overrode the Datadog choice for M20 (interactive, 2026-08-08): a self-hosted,
+free, OSS observability stack instead of the harness-default Datadog plugin — no ongoing third-party
+dependency, no recurring cost, full data control for a solo-operator project. This override was run through
+the full `mr-feedback-doctrine.md` §6 heavy-ceremony pipeline (investigation → 6-way independent ideation,
+each refined by its own adversarial reviewer → judge synthesis → a second, independent adversarial-refinement
+pass) rather than swapped in unilaterally. The refinement pass went further than reading the judge's
+evidence: it spun up fresh SpacetimeDB 2.6.0 standalone instances, published the real
+`monster_realm_module.wasm`, and independently reproduced nearly every load-bearing claim (metric-family
+counts, log-line shape, CLI flags, file/commitlog sizes) against a live instance. Full evidence log,
+attribution table, and decision record: **ADR-0180** (`docs/adr/`), which elaborates this amendment the same
+way ADR-0106 elaborates ADR-0024 or ADR-0179 elaborates ADR-0030 — this amendment records the top-level
+override; ADR-0180 records the concrete tool selection and data-path architecture.
+
+**Finding: this ADR's own Consequences line is also corrected, not just the tool choice.** "M0 gains the
+substrate + the always-on benchmark/perf-budget gate" was written as an accomplished fact. Live verification
+found it never fully happened: `Cargo.toml` names `criterion`/`opentelemetry` only in code comments, no
+`benches/` directory exists anywhere in the workspace, and `M0-foundation.spec.md`'s EARS line `:142` ("WHEN
+a reducer/tick/wasm-boundary executes THE SYSTEM SHALL emit OTel spans/metrics through the instrumentation
+seam") was never implemented. More importantly, that line's own model — module code emitting OTel spans/
+metrics from inside a reducer — is the **wrong** model: independently reproduced against a freshly-published
+copy of the real module, the SpacetimeDB host itself (pinned 2.6.0) already supplies full RED-per-reducer
+metrics, table/subscription/queue metrics, a health signal, and structured, host-attributed logs, entirely
+free, with zero module-side OTel SDK and zero wasm-sandbox-crossing risk. So the substrate was simultaneously
+over-claimed (the CI benchmark/perf-budget gate was never built) and over-specified (the OTel-seam item
+describes work that turns out to be unnecessary once the host's free signals are used instead). M20's
+retrofit now targets what's actually still missing — a structured-logging helper, a correlation-id
+convention, and the `criterion`/perf-budget gate — not what the original wording assumed was already done.
+
+**Decision: the top-level Decision Outcome's dashboard/alert sink changes from "OTel→Datadog" to a
+self-hosted, 7-container, all-open-source stack** — Prometheus (scraping + recording rules), Grafana Alloy
+(the sole telemetry agent: log-tail→Loki plus log→metric derivation, browser-OTLP→Tempo/Prometheus-exporter
+— a genuine CNCF OTel Collector distribution), Loki (log storage), Tempo (client trace storage), Grafana OSS
+(dashboards **and** 100% of alert-rule evaluation/routing via its unified alerting — no separate
+Alertmanager), node_exporter (host metrics), and Caddy (the only externally reachable process, with two
+distinct exposure policies: authenticated for Grafana, public+CORS+rate-limited for the browser-OTLP
+ingress a public game client must be able to reach without a login). Licensing: Loki/Tempo/Grafana OSS are
+AGPLv3; the rest are Apache-2.0. Run as stock, unmodified vendor images (config only, to a single solo
+operator) — the AGPL network-copyleft clause, which triggers on distributing a *modified* copy to other
+users over a network, has nothing to trigger on either count under that posture. See ADR-0180 for the full
+per-tool rationale, the rejected-alternatives list, and the WASM-sandbox-crossing data-path design.
+
+**Everything else in this ADR's original Decision Outcome stands, unreversed:** the three-layer strategy
+shape (always-on substrate + per-milestone invariant + M20 capstone), RED/domain metrics, `criterion`
+benchmarks with a perf-budget CI gate (now actually being built — see ADR-0180 and the M20 spec), sim-harness
+load testing, health/readiness, and the ADR-0013 smoothness-metrics-become-prod-observable tie-back (still
+true — delivered via client-side OTel to the new stack instead of Datadog). This amendment is a tool-and-
+correction change, not a redesign of the strategy.
+
+**Consequences:** M20 (`M20-observability-performance.spec.md`) is rewritten to build against this stack, with
+EARS acceptance criteria and task checkboxes for both the retrofit and the stack wiring. `observability-
+performance-plan.md` §4 ("Tooling") is updated to name the new stack; §1/§5's stale "Datadog" mentions and
+the "M0 already built it" claim carry small inline corrections pointing here, without a full rewrite of those
+sections. `M0-foundation.spec.md`'s EARS line `:142` still needs its own correcting edit — flagged as a
+tracked task in the M20 spec, not done here (out of this amendment's own write scope). No shipped code,
+gate, or milestone is reversed by this amendment; it is additive/corrective only, consistent with the DRAFT
+action-taxonomy treatment Drew specified for this ceremony.
