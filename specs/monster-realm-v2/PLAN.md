@@ -460,6 +460,31 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   `monster_pub` — deliberately has no slice). a/b/c/f are pairwise disjoint fan-out
   candidates; d → e is SERIAL; **12r-d touches `schema.rs` and so must be ordered explicitly
   against EG5-6 Migration B**. No new game-design surface.
+- **M-postgate-thirteenth-review-residuals** (`M-postgate-thirteenth-review-residuals.spec.md`) —
+  **NEW, queued 2026-08-09; inserted after `M-postgate-twelfth-review-residuals` (fully
+  merged)**, per the weekly-review insertion convention. Verified thirteenth multi-lens review
+  findings @ `f9a063d` (9 lenses, all 16 claims independently re-verified by separate
+  verifier agents, zero dropped). The M20/M21/12r delta code is again clean (correctness lens:
+  explicit "no findings"); what remains is the disclosed-but-untracked class at its starkest:
+  **13r-a** (CRITICAL) the committed `ops/observability` stack cannot boot — four config
+  defects (tempo undefined CLI flag, alloy EACCES, caddy EPERM file-capability, grafana 15s
+  alert interval) live-reproduced in ADR-0180's own m20e amendment with the fixes left
+  uncommitted, plus the `build_sha` cardinality pin; **13r-b** the parked `m20e-2`/`m20b-2`
+  relay-integration scope (OBS-45/46: tail-follow daemon, /health, scrape job, dead-man
+  alert) exists in no queue while M20 is recorded closed; **13r-c** three security evals
+  (currency-integrity/ranking-security/wallet-privacy) strip `//`-comments without
+  string-literal awareness — false-GREEN capable the moment the answered OQ1 issuer URL
+  lands, so it must precede M21b-2 wiring; **13r-d** the additive-schema gate is blind to
+  the append-at-end + `#[default]` live-DB invariant (mid-struct insert + re-baseline passes
+  green today, reproduced); **13r-e** (HEAVY, Drew-directed via answered issue #284)
+  monster_pub need-to-know privacy — owner always sees own rows, other players' monster info
+  revealed only during battle/trade/necessary interactions; **13r-f** the twice-disclosed
+  never-queued `nh5` held-key-wiped-on-warp feel defect; **13r-g** CHANGELOG re-drifted 18
+  PRs because ADR-0165's nightly freshness check was never implemented — implement it;
+  **13r-h** Rust test-mirror parity tail (G2 hardcoded reducer list, `scheduled_scan_sources`
+  missing accounts/observability, `Account` illegal-states hardening). ONE decision open with
+  Drew (issue #307, OQ2 ranked-requires-account — no slice depends on it). Serial chains:
+  a→b, c→h, d→e; f and g independent.
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
