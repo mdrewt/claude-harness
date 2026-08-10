@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "updated_utc": "2026-08-10T04:02:00Z",
-  "updated_by": "2026-08-10T04:02Z native tick (cron, forced, rid=native-20260810T040008Z-1590274): reconciled+merged 13r-c (PR#309->0d13923, mr-audit routine-tier CLEAN/FLAGGED-adjudicated-CLEAN) -- full detail in ledger row + handoff entry of same timestamp. No mechanical slice launchable after (M21b-2 and 13r-c-2 both need a scoping/spec pass; M22-25 unelaborated). Governor NORMAL (d7=$1521.90/2783, fable_ok=true). No BLOCKER.",
+  "updated_utc": "2026-08-10T08:26:03Z",
+  "updated_by": "interactive-session-m21b2-heavy-ceremony",
   "master": {
     "sha": "0d13923",
     "ci": "SUCCESS (run 31351961261, ci+e2e both pass, confirmed live post-merge)",
     "nightly": "SUCCESS on 3c1cf08 (run 31090022421, 2026-08-06T09:39:33Z) -- confirms EG2/EG3 essence-graph content is nightly-mutant-clean. Not yet re-run since."
   },
-  "adr_next_free": 182,
+  "adr_next_free": 183,
   "inflight": [],
   "awaiting_merge": [],
   "queue": [
@@ -46,7 +46,7 @@
   "park_counters": {},
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "2026-08-09T05:01Z: m20c+m20d launched (fable@xhigh hard tier), leaders 688734/690204. m20e (evals tail) queued next, touches-disjoint from both, eligible once m20c/m20d underway.",
+  "notes": "2026-08-10T~08:30Z: interactive session ran the M21b-2 heavy-ceremony scoping pass (6-way ideation each adversarially reviewed -> judge synthesis -> adversarial review -> 2 finalization reviews: security+completeness). Landed ADR-0182 (monster-realm PR#310, merged 9dcfb39) + spec AUTH-39..60 (harness commit da110c7). OQ1/OQ4/OQ5/OQ6 all resolved. M21b-2 is now BUILD-READY (touches/gates/tasks fully scoped in the spec, HARD tier per touches: connection.ts+security-authz surfaces). Flagged, NOT started: M21b-3 (Steam integration) \u2014 deferred pending native-build packaging timeline per operator directive; see spec OQ5 resolution.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
   "parked": [],
   "open_chore_prs": [],

@@ -937,3 +937,87 @@ Slice 13r-c (string-literal-aware source scanners) reached its terminal state: *
 
 ## 2026-08-10T04:02:25Z — 2026-08-10T04:02Z — native tick: reconciled + merged 13r-c (PR#309)
 Prior tick (rid=native-20260810T032956Z-1582716, src=done) merged PR#309 live (master local==origin 0d13923, both ci+e2e SUCCESS, mergedAt 03:30:39Z) and ran mr-audit --tier routine (saved at /tmp/mr_audit_13r-c.json: orchestration CLEAN 7 calls/planner+red-team+reviewer+tester+verifier; gating FLAGGED on 4 removed/modified asserts) but exited before writing the ledger MERGED row / this handoff entry / mr-state.json reconciliation -- picked that up this tick from live ground truth per gotcha No .done+empty .err -> finish the mechanical step directly (here: no .done was missing, just the post-merge record). Read the flagged gating diff: all 4 hits are doc-comment rewrites inside main.wiring.test.ts explaining the new string-literal-aware stripLineComments (old stripBlockComments/stripLineComments helpers deleted, delegated to m20cScan) -- zero real assertion values/thresholds/bodies changed, 0 skip/xit/.only/#[ignore] added, 0 deleted test files. Adjudicated CLEAN. Re-verified master CI green on 0d13923 independently (run 31351961261, ci+e2e both pass) rather than trusting the situation bundle snapshot. Worktree/branch already clean (no 13r-c branch remained -- prior tick cleaned it before exiting). Ledger MERGED row written. M-postgate-thirteenth-review-residuals slice 13r-c CLOSED.\n\nCarried forward from 13r-c own terminal note: PARKED 13r-c-2 (accounts.rs concat!() literal-URL patch fails evals/trade-escrow-guards.eval.mjs TR-11, outside 13r-c touches -- needs its own slice migrating trade-escrow-guards onto rust-scan.mjs first). M21b-2 real-issuer-URL wiring must not land before 13r-c-2.\n\nGate-3 (pick work): checked queue -- no other open PRs/locks/inflight. M21b-2 needs a scoping/spec pass (heavy-ceremony, not mechanical-tick work, per repeated prior-tick deferrals). 13r-c-2 itself is undrafted (no M*.spec.md entry yet) -- also scoping work, not launchable as-is. M22-25 still design-sketch/unelaborated (unchanged assessment since 2026-08-09). No mechanical slice launchable this tick. Governor NORMAL (d7=$1521.90/2783, fable_ok=true). No BLOCKER.\n\nNEXT: an interactive/ceremony session should scope 13r-c-2 (small, mechanical-sounding but needs the trade-escrow-guards migration plan) and/or M21b-2 (larger, blocked-then-unblocked accounts client wiring) into build-ready M*.spec.md entries; native ticks cannot self-serve heavy spec ceremony. Until then, continue standing down.
+
+## 2026-08-10T08:28:42Z — interactive session: M21b-2 heavy-ceremony scoping pass, landed + build-ready
+Drew requested the heavy-ceremony spec-scoping pass for M21b-2 be run interactively (native ticks had
+repeatedly deferred it as "needs a scoping/spec pass, not mechanical-tick work"). Ran the full doctrine
+§6 pipeline via the Workflow tool: 6 independent brainstormers (unbiased; deep repo-grounded
+implementer; security/red-team; player-UX; OIDC/Better-Auth integration research with live doc fetches;
+deployment/DR-ops research), each refined by its own adversarial reviewer, judge synthesis with a
+mandatory attribution table, an independent adversarial review of the synthesis, then two further
+independent finalization reviews (security; completeness) — same shape that produced ADR-0179 for M21
+itself. 16 agents, ~3.15M subagent tokens, 826 tool uses.
+
+**Findings the finalization passes caught (fixed before landing):** CRITICAL — attemptBuild()'s 'retry'
+outcome fell through to build() with nothing scheduling a retry, a permanent hang on the first
+ambiguous auth-service hiccup. CRITICAL — consecutiveTransientErrors referenced but never
+declared/mutated, so the escalation-to-auth-service-unreachable threshold could never fire. CRITICAL
+(security finalization) — no exception boundary around `await resolveCredential()`, an ordinary
+Better Auth network hiccup could permanently hang the tab. HIGH — isReturnLegAttempt stayed true for a
+tab's entire remaining page life after the first OIDC return leg, misdriving every later ordinary
+reconnect. HIGH — Better Auth's JWT-signing-key backup custody was left an unresolved residual for a
+total/permanent/cross-account failure mode instead of a prescribed default. Plus MAJOR/MODERATE gaps:
+a "reactivate" task pointing at an e2e test file that does not exist anywhere in the repo (confirmed by
+exhaustive search — it needed authoring from scratch, not reactivating); AUTH-50/AUTH-51 (my_account
+subscription + reconciliation authority) had zero gates despite an exact existing precedent
+(my_wallet's own gate); the first-run multi-device nudge had no home anywhere in the design; an
+attribution-table gap the synthesis-review document claimed to have fixed but never actually did;
+claim-code minting had no EARS criterion. All fixed — see ADR-0182's Amendments section for the full
+list with attributions.
+
+**My own final review pass** (before commit, at Drew's request) additionally caught: the ADR's own
+Consequences/Follow-ups paragraph still carried a superseded "reopens the single-issuer trust model"
+conclusion after a later conversation turn refined that understanding (Better-Auth-as-broker likely
+avoids it entirely) — fixed in place. Leaked `[[wikilink]]` memory-tool syntax into the committed ADR
+and spec (my own Claude memory-card references, meaningless to a human reader or Drew's tooling) —
+replaced with plain prose. Two dangling "Open Question #1/#2" references left over from before OQ4/OQ5
+were assigned their final numbers (worse: "OQ2" collides with this same spec's own pre-existing,
+unrelated OQ2 — ranked-ladder-requires-account). A **real cross-slice hazard this ceremony's own
+artifacts had NOT surfaced**: the 13r-c handoff entry (2026-08-10T04:02Z, same day, immediately above in
+this file) explicitly recorded "M21b-2's real-issuer-URL wiring must not land before 13r-c-2" — added as
+an explicit hard sequencing gate in the spec/ADR (it wasn't there before; the ceremony's own D18 only
+said concat!() must stay, not that the whole deployment sub-task is blocked).
+
+**Landed (both repos, both merged to their default branch):**
+- harness `main`: da110c7 (AUTH-39..60, M21b-2 slice row, OQ4/OQ5/OQ6 resolved) + fce53bd (13r-c-2
+  sequencing gate + PLAN.md M21 status + stale-ref fixes)
+- monster-realm `master`: PR#310 (9dcfb39) — ADR-0182, ADR-0179 back-link, README/DIGEST reconciled.
+  `adr_next_free` in mr-state.json bumped 182→183 to match.
+
+**Genuinely new scope surfaced (NOT designed, NOT started — Drew was explicit these are deferred):**
+Drew confirmed a native Steam-client build IS on the roadmap but explicitly deferred until closer to
+release. He wants auth protocols pluggable per platform simultaneously (email+password for local/private
+dev servers — confirmed shipping, dev/QA only; Steam OpenID 2.0 for browser play on public/cloud
+servers; Steamworks SDK auth-ticket flow for the eventual native client) and stated a standing
+"design for change" principle for all future auth/authz work (recorded as a feedback memory card,
+`feedback-auth-modularity.md`, plus a project memory card `projects/monster-realm-m21b2-steam-platform-auth.md`).
+This is flagged in the spec's OQ5 resolution as a follow-up milestone (tentatively **M21b-3**) — do NOT
+launch it; it needs its own heavy-ceremony scoping pass, and that pass should wait until the native-build
+packaging timeline is closer to confirmed (the OpenID-2.0-for-browser half could reasonably be scoped
+sooner and independently if Drew wants browser Steam login before the native client). The leading
+candidate architecture (routing every upstream method through Better Auth as a single broker, so
+SpacetimeDB's server-side single-issuer trust model — ADR-0179 D1/D1″/CRITICAL-2 — never needs to
+change) is UNCONFIRMED against Better Auth's actual plugin capabilities and is the first thing that
+future ceremony must verify.
+
+**M21b-2 eligibility for a future tick to launch as a build slice:**
+- **NOT blocked** on any open question — OQ1/OQ4/OQ5/OQ6 all resolved.
+- **HARD tier** (touches `client/src/net/connection.ts` + new security-authz-surface files — OIDC
+  credential handling, not just UI) — derive this mechanically from the touches: globs per the
+  Model & effort routing section, do not default to routine/opus.
+- Depends on M21a+M21b+M21c (already merged — no new dependency to check).
+- **The bulk of the slice is launchable now.** Its own deployment-timed follow-up sub-task (flipping the
+  real ALLOWED_ISSUERS/ALLOWED_AUDIENCE values) is HARD-GATED on `13r-c-2` landing first (undrafted —
+  migrates `evals/trade-escrow-guards.eval.mjs` off its old whole-crate comment-stripping approach) —
+  this is now stated explicitly in both the spec task item and ADR-0182 D18, not just cross-referenced.
+  A launching tick can build everything except that one sub-task, or split it into its own tiny
+  follow-up commit once 13r-c-2 lands (the spec already frames it as a separate commit for this reason).
+- 18 gates (G13–G30) fully specified with BAD/GOOD fixtures per ADR-0010 proof-of-teeth discipline.
+- Full touches:/task-checklist/EARS (AUTH-39..60) in
+  `specs/monster-realm-v2/M21-accounts-auth.spec.md` §5's M21b-2 row; full design in ADR-0182.
+
+**NEXT for a native tick:** M21b-2 is a legitimate launch candidate at the next tick that reaches gate 3
+with governor NORMAL and no live chain — route it HARD tier per the touches: above. 13r-c-2 itself is
+still undrafted (also needs a scoping pass, smaller than M21b-2's — migrating one eval's scanner
+approach). M21b-3 (Steam) is explicitly NOT ready — do not attempt to scope or launch it without an
+explicit operator go-ahead on the native-build timeline first.
