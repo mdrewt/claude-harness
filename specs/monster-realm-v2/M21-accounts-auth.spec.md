@@ -36,7 +36,15 @@ is an edge concern layered on top, not a rewrite.
 
 ## Open questions for Drew (do not let a build tick guess these)
 
-**OQ1 — OIDC provider.** Genuine three-way non-convergence; a solo-operator ops/risk call, not an
+**OQ1 — OIDC provider. RESOLVED 2026-08-09 (issue #301): Better Auth, self-hosted.** Operator
+decision, verbatim: "Go with the self-hosted Better Auth." A tested backup/DR plan for the IdP
+database is now a launch prerequisite (`Identity = f(iss, sub)`; DB loss permanently orphans every
+player) — carry this into M21b-2's deployment-config task and into M-playtest ops docs. This
+unblocks M21b-2 (client redirect wiring, silent JWT renewal, claim-code UI, guest→account claim
+prompt), which still needs its own scoping/spec pass before build (deferred 2026-08-08 pending this
+answer) — not launched by this decision alone.
+
+Genuine three-way non-convergence; a solo-operator ops/risk call, not an
 engineering one. **The module code below is provider-agnostic** — it depends on exactly two
 constants, `ALLOWED_ISSUERS` and `ALLOWED_AUDIENCE` — so M21a–M21c can build and merge before this
 is answered; it blocks only deployment config and the client's redirect wiring (M21b).

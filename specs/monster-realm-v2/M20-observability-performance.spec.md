@@ -655,9 +655,9 @@ conditions referenced below live in ADR-0180's dated amendment, not in this spec
   subset (OBS-50's single-source-of-truth extension); `prometheus.yml` has a `job="mr-trace-relay"` scrape
   target pointed at the relay's `/health` endpoint, and Grafana provisioning includes a SEPARATE dead-man's-
   switch alert rule on that target's `up` metric, distinct from the S1b/Alloy rule above (OBS-46)
-- [ ] `client/src/observability/` (new dir) — OTel Web SDK wiring: fps/frame-time, prediction-divergence
+- [x] DONE (PR #304) `client/src/observability/` (new dir) — OTel Web SDK wiring: fps/frame-time, prediction-divergence
   rate, reconcile-correction rate, remote-interp gap, RTT, wasm-init time; OTLP/HTTP export to Alloy (S4)
-- [ ] Wire client observability init in `client/src/main.ts`
+- [x] DONE (PR #304) Wire client observability init in `client/src/main.ts`
 - [ ] `sim-harness/src/bin/mr_load_driver.rs` (new) — scaled multi-client load driver (D9); reads S1 metrics
   to report the measured breaking point (OBS-27)
 - [ ] `mr-trace-relay`'s pure-function unit tests + a seeded-ambiguity proof-of-teeth fixture (two interleaved

@@ -1,0 +1,37 @@
+# m20a plan memo — ADJUDICATED (planner + reviewer + red-team + /simplify)
+
+Slice: m20a — Layer-1 observability retrofit (M20 §5, ADR-0180). Branch feat/m20a-observability-layer1, worktree .claude/worktrees/m20a.
+Base plan: monster-realm-m20a-plan-draft.md + /tmp/m20a-plan-full.md (planner a33759a1865c3caf9). Lenses: reviewer aeebea62443cd3c9b, red-team ad9703ffb802c6985, /simplify (orchestrator). ALL amendments below SUPERSEDE the draft where they conflict.
+
+## Amendments from plan review (binding)
+
+**AM1 (red-team 2.1, CRITICAL) — criterion stale-dir resurrection.** The hot_paths harness DELETES each budgeted id's $CRITERION_HOME/<id> dir before running criterion (in-process, tested); the `perf-budget:` recipe ALSO removes "$CRITERION_HOME" recursively first (belt). Read-back extracted as a testable fn (`read_measurements(dir, ids)`) in budgets.rs; budget_check_tests.rs gains temp-dir integration teeth: missing estimates.json -> Err naming the id; pre-seeded stale file + clean() -> gone. Swatinem/rust-cache restores target/ across CI runs — this is the attack path.
+**AM2 (red-team 1.1/1.2/1.3) — needle-set extension, both G1 and G7:** needles = log::info! log::warn! log::error! log::log! each followed by optional whitespace + any of ( { [ (manual char check, no regex). PLUS flat ban (zero tolerance, no baseline rows): `use log` (covers use log::x / use log as l / use log;) and `extern crate log` in any non-exempt server-module file. clippy disallowed-macros is NOT implementable in-slice (would blanket-fail the 53 grandfathered sites; clippy.toml outside touches) -> follow-up flag.
+**AM3 (red-team 1.4) — guards.rs + observability.rs join the baseline** with their own pinned rows (guards.rs warn=1; observability.rs info=1 post-impl) instead of being excluded from counting. Landing fact-check: the 10 grandfathered files sum to exactly 53; blessed-file rows documented separately in the header comment. Strictly stronger than OBS-2's minimum, still conformant (G1's exemption = their blessed sites pass, new calls there now fail).
+**AM4 (red-team 1.5) — recursive scan** in both G1 and G7 (mirror spacetime-type-snapshot collectRustSrc), so a subdirectory can't dodge the ratchet.
+**AM5 (reviewer H1) — resolve_turn bench uses iter_batched(|| state.clone(), BatchSize::SmallInput)** — in-place mutation drives the battle terminal after a few iters and the early-return at combat/resolve.rs:256 would dominate the measurement; blanket build-once applies to the other 6 benches only. BattleState derives Clone (combat/types.rs:164).
+**AM6 (red-team 4.3/5.2, HIGH) — extra_fields_json reserved-key enforcement:** debug_assert! in mr_log_breadcrumb that the fragment contains none of "evt": "cause": "sched": "phase": (substring, quote-inclusive); #[should_panic] test pins it. Closes duplicate-key JSON injection (Loki last-key-wins) AND the trace-pair-set smuggling blind spot.
+**AM7 (red-team 5.1) — trace-pair-empty guard needle:** flag `Some("enter")` / `Some("exit")` anywhere in server-module/src (currently zero); m20e's G9 replaces it. Not a bare "enter" substring (doc-comment false positive).
+**AM8 (red-team 2.2) — A7 also asserts `set -euo pipefail` present in perf-budget: body.**
+**AM9 (red-team 3.1/3.2) — metrics-contract:** skip detail carries the residual forward ("skipped: no live instance in this CI job by design — OBS-9/10 last verified <commit>; re-run MR_OBS_LIVE=1 after any host-facing change"); pin tripwire is comment-aware (trimmed-# skip, anchorIsWired idiom) and checks BOTH ci.yml occurrences of `spacetime version install` agree.
+**AM10 (red-team A9) — OBS-48 needle:** flag quoted substring "unstable" anywhere in any workspace Cargo.toml (fail-loud on comment mention accepted) + `#[spacetimedb::procedure]` / `spacetimedb::procedure` in server-module/src.
+**AM11 (red-team 2.3) — each ceiling's inline comment records measured value + date + conditions (release bench profile, idle machine, sample count).**
+**AM12 (reviewer M3) — verify CRITERION_HOME honored under default-features=false BEFORE writing the harness read-back (its own step, ahead of harness authoring); if not honored, re-enable minimum features.**
+**AM13 (reviewer L6) — TypeChart bench fixture via game-core's public TypeChart::new(&[TypeRelation]) (combat/type_chart.rs:22) + load_type_chart(); NOT content_cache.rs (pub(crate), wrong shape).**
+**AM14 (reviewer M2) — evolution_tests.rs EG2-9 scheduled_scan_sources() cannot see observability.rs (hardcoded 10-file include_str! array; NOT in touches).** Handling: NAMED RESIDUAL in PR/handoff (exact M21c precedent — same gap already recorded for accounts.rs/guest_claim_reaper). A4's stricter zero-mutator assertion covers mr_heartbeat's actual risk. Follow-up flag, do NOT touch the file.
+**AM15 (/simplify) — CUT docs/specs/m20a-plan.md** (harness memo suffices, M21 precedent). ADR duty = body-only "Amendment — m20a build notes" on ADR-0180 (serde_json dev-dep, baseline format, needle extensions, estimates.json mechanism + cargo-criterion fallback, 60s interval, Config-row content_version) — must not touch the Decision: line (DIGEST).
+**AM16 (red-team 4.2) — handoff forward-pointer for m20b:** heartbeat-liveness alerting must key off the S2 evt:"heartbeat" log-derived counter, NEVER mr_heartbeat's committed="false" rate (trivially inflatable by any client calling the reducer by name; the log line is guard-gated so unspoofable).
+**AM17 (red-team 1.7, reviewer L5) — document in eval header:** same-file same-level call-site moves are invisible BY DESIGN (not a hole; per-file per-level exact equality catches cross-file moves); trailing-comment needles over-count (fail-loud direction, shared rule).
+
+## Otherwise the draft stands: API shape (Breadcrumb<'a>/build_log_line/mr_log/mr_log_breadcrumb, phase as &str literal, sched tuple), heartbeat (60s, Config-row cv, unwrap_or(0), scheduler guard, plan_reaper_arm reuse), lib.rs 3 additive edits, baseline format (per-file per-level TSV + # total self-check, --write main-guard SSOT), perf gate (perf-budget: recipe from eval: body — ci: line untouched; budgets.rs compiled Rust, ceilings ~20x, violations()/missing() pure + fail-loud), 7 bench ids (verified signatures; attempt_recruit + client-wasm marshaling declined), metrics-contract (skip-when-no-instance + pure-teeth-always + MR_OBS_LIVE opt-in + one recorded live run = slice DoD), G5 -> m20e, $trace_pair_set EMPTY, teeth T-new-call..T-rustfmt, impl order 1-12, touches-delta forecast (Cargo.lock, table-schemas.json, types.ts, docs/knowledge/**; spacetime-types.json expected UNCHANGED; ci.yml untouched), risks R1-R8, anti-patterns 1-9.
+
+## Phase status — SLICE TERMINAL 2026-08-09
+- [x] Plan + review (this memo)
+- [x] Tester (opus) wrote gating tests/evals RED (742d309)
+- [x] Test review (reviewer + red-team EXECUTED teeth; 2 CRITICAL + 2 HIGH closed, 7a12e23)
+- [x] Specialist red->green, no gating-test edits (82134f7)
+- [x] Full just ci green + regens (types.ts, table-schemas.json, knowledge in sync)
+- [x] Impl review (reviewer + red-team + reducer-security-auditor PASS + /simplify; desync-guard skipped with justification) + guard-pin gate added (241b4c4) + MR_OBS_LIVE live run PASS (5a1ecea)
+- [x] Docs: ADR-0180 body-only m20a amendment, zero DIGEST drift + ARCHITECTURE row (e45c523)
+- [x] Verifier APPROVE (full ci twice; anti-weakening clean; 4 own bite-proofs fired)
+- [x] **PR #303 OPEN** — https://github.com/mdrewt/monster-realm/pull/303 — supervisor owns the merge
