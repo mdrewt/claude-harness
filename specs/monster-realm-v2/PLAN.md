@@ -523,12 +523,19 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   SpacetimeDB's entire scheduler; kept the 7-container backend (re-litigated, not defaulted to) and added an
   8th service, `mr-trace-relay`, reconstructing real server-side causal spans from log breadcrumbs instead —
   new EARS OBS-41–51, gates G8–G11, ADR-0180's second dated amendment.
-- **M21 Accounts & authentication** (`M21-accounts-auth.spec.md`; ADR-0030 + new ADR-0179) — OIDC-backed
-  stable identity (cross-device, recovery) replacing anonymous identities; guest→account claim. No
-  game-data schema churn (the identity keying pays off). **Status:** design sketch → elaborated at build
-  time (heavy ceremony, 2026-08-08). **Build order:** M21 (all of a/b/c) lands fully before any M20 slice
-  launches — both milestones' `touches:` sets share `server-module/src/lib.rs`, so this is a real ordering
-  dependency, not just a priority preference.
+- **M21 Accounts & authentication** (`M21-accounts-auth.spec.md`; ADR-0030 + ADR-0179 + ADR-0182) —
+  OIDC-backed stable identity (cross-device, recovery) replacing anonymous identities; guest→account
+  claim. No game-data schema churn (the identity keying pays off). **Status:** M21a/M21b/M21c merged
+  (PR#298/#299/#300); **M21b-2 elaborated 2026-08-10** (heavy ceremony, ADR-0182) and is **build-ready**
+  — client OIDC redirect/PKCE wiring, claim-code UI, session lifecycle, Better Auth deployment + DR
+  plan; touches `client/src/net/connection.ts` + new client/net files (security-authz surface — route
+  as HARD tier per the supervisor's own tier-routing rule) — does NOT touch `server-module/src/lib.rs`,
+  so the M20/M21 `lib.rs`-collision ordering note below no longer constrains it (M20 is itself
+  substantially merged as of this writing). **M21b-3 (Steam login integration) is flagged but NOT
+  scoped** — deferred pending a native-build packaging timeline the operator has not set as imminent;
+  do not launch it speculatively. **Historical build order (M21a/b/c only):** M21 (all of a/b/c) lands
+  fully before any M20 slice launches — both milestones' `touches:` sets shared `server-module/src/lib.rs`,
+  a real ordering dependency, not just a priority preference; satisfied as of M21c's merge.
 - **M22 Privacy, data deletion & compliance** (`M22-privacy-compliance.spec.md`; ADR-0031) — registry-driven
   deletion cascade (erase/anonymize), data export, retention; a deletion-completeness eval.
 - **M23 Accessibility** (`M23-accessibility.spec.md`; ADR-0032) — keyboard/screen-reader/colorblind/
