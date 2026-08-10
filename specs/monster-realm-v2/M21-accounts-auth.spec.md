@@ -1,6 +1,16 @@
 # M21 — Accounts & authentication
 
-**Status:** design sketch → **elaborated at build time** (heavy ceremony, 2026-08-08) · **Phase D** · **Decision:** ADR-0030 + ADR-0179
+**Status:** design sketch → **elaborated at build time** (heavy ceremony, 2026-08-08) · **Phase D** · **Decision:** ADR-0030 + ADR-0179 + ADR-0182 (M21b-2, 2026-08-10)
+
+> **M21b-2 elaborated 2026-08-10** (heavy ceremony: 6-way independent ideation, each adversarially
+> reviewed → judge synthesis with mandatory attribution table, itself adversarially reviewed → two
+> further independent finalization reviews, security + completeness). Full design in
+> [ADR-0182](../../projects/monster-realm/docs/adr/0182-m21b2-oidc-client-claim-ui-better-auth-deployment.md).
+> The finalization passes found and fixed one CRITICAL unhandled-throw deadlock, one CRITICAL
+> uninitialized counter, one HIGH stale-flag bug, one HIGH deferred-not-defaulted DR residual, plus
+> several MAJOR/MODERATE gaps (a "reactivate" task pointing at a test file that does not exist; two
+> ungated EARS criteria; an unfixed attribution-table gap; missing claim-code-minting coverage) — all
+> closed in ADR-0182 and reflected in AUTH-39..60 below. This is a scoping pass only — no code changes.
 
 > Provisional sketch promoted to build-ready spec via the harness heavy-ceremony pipeline
 > (investigation → 6-way independent ideation, each adversarially reviewed → synthesis, itself
@@ -80,6 +90,92 @@ any build task** — D9's schema already ships with the field omitted as its def
 explicit ack on ADR-0179's Amendments section that "hashed/private" is being read as "not captured."
 If a future support-lookup feature needs it, that is the trigger to revisit, together with a real
 external key-custody mechanism.
+
+**OQ4 — RESOLVED 2026-08-10.** Better Auth's deployment origin relative to the game client's: **a
+dedicated subdomain of the game's own domain** (operator-confirmed default), for the safer
+`SameSite=Lax` cookie posture. Carry into the deployment-timed follow-up task's `trustedOrigins`/CORS
+config.
+
+**OQ5 — RESOLVED 2026-08-10, materially different from the ceremony's proposed default — scope
+addition, see the Steam follow-up note below.** Operator answer, verbatim: "Native email+password and
+Steam login. Native credentials are intended for development and QA so that engineers may have
+duplicate accounts while testing multiplayer features. Regular players that buy the game after release
+will use the Steamworks API to get an auth token using their Steam account." Two consequences:
+1. **Native email+password ships, scoped to dev/QA, not the general player population.** D20's DR
+   severity finding still applies as stated — the backup exposes whatever the database contains
+   regardless of how many accounts use that credential class — so the sub-opacity hardening noted in
+   the security finalization review's L3 applies, and `ops/auth/README.md` must state explicitly that
+   native sign-up is for internal dev/QA use, not a public-facing entry point (a config/policy note,
+   not a code gate this ceremony scopes).
+2. **Steam login is a NEW architectural surface this ceremony did not design and ADR-0182 does not
+   cover — and, per operator clarification 2026-08-10, it is actually TWO distinct candidate
+   mechanisms, not one, gated by a packaging decision this spec has no visibility into:**
+   - **(a) Steam as an OpenID 2.0 provider** — a redirect-based web flow (`checkid_setup` /
+     `check_authentication` against `steamcommunity.com/openid/login`) that returns a `claimed_id` URL
+     encoding the SteamID64, not a JWT. Reachable directly from the *current* browser/pixi.js client —
+     no native code needed. Does not fit Better Auth's `@better-auth/oauth-provider` plugin (which
+     makes monster-realm an OIDC *issuer*, not a *consumer* of external ones); would need either
+     Better Auth's separate social-provider-consumption mechanism (unconfirmed whether it has a legacy
+     OpenID 2.0 adapter — must be checked against live docs, not assumed) or a bespoke verify-and-mint
+     bridge.
+   - **(b) The Steamworks SDK's Auth Session Ticket flow** (`GetAuthSessionTicket`/
+     `GetAuthTicketForWebApi`, verified server-side via Steam's Web API) — the mechanism real
+     Steamworks-integrated games use. Requires native Steamworks SDK access *client-side*, which the
+     current browser/pixi.js client does not have; only reachable once/if monster-realm ships a
+     Steam-native build (e.g. an Electron wrapper with a native Steamworks binding) — a
+     packaging/distribution decision, not merely an auth one, and not one this spec corpus has
+     recorded as decided.
+   - ADR-0179's own OQ1 analysis already flagged the underlying limitation: "No first-party Steam
+     plugin [for Better Auth] ... revisit if Steam distribution becomes a real roadmap item" — it now
+     is (SpacetimeAuth, OQ1's rejected alternative, was noted at the time as having Steam
+     session-ticket support in its *current*, non-pinned docs — not re-opening OQ1 over this, but
+     worth knowing that alternative existed).
+   - **Operator clarification 2026-08-10 (broader than just Steam):** a native Steam-client build **is
+     on the roadmap, but explicitly deferred until closer to release** — not imminent. Drew wants
+     *different* auth protocols live *simultaneously* per platform going forward (email+password for
+     local/private dev servers, OpenID 2.0 for browser play on public/cloud servers, Steamworks SDK
+     for the eventual native client), and the codebase "architected in such a way that the
+     authentication is modular and flexible, able to be easily switched depending on the client's
+     specific build" — a standing design-for-change principle for all future auth/authz work, not
+     scoped to this milestone.
+   - **Corrected assessment, superseding this note's earlier draft:** this does NOT necessarily reopen
+     D1/D1″'s single-issuer framing or CRITICAL-2's confused-deputy analysis (ADR-0179). The leading
+     candidate architecture routes every upstream sign-in method — native email+password, Steam OpenID
+     2.0, and later the Steamworks-ticket flow — THROUGH Better Auth as a single broker (Better Auth's
+     own plugin system consuming each as an upstream provider, then minting Better Auth's own JWT
+     regardless of upstream method). Under that architecture, SpacetimeDB's `accounts.rs` continues to
+     trust exactly one issuer (Better Auth) as D1/D1″/CRITICAL-2 already assume — no server-side
+     change needed. **Unconfirmed, needs live-doc verification before the eventual ceremony treats it
+     as settled:** whether Better Auth's plugin system actually supports Steam's OpenID 2.0 as a
+     consumable upstream provider (email+password is Better Auth's own built-in plugin, high
+     confidence; Steam-as-upstream-OpenID-2.0 is not a commonly-documented Better Auth integration and
+     needs a direct docs check, the same rigor ADR-0182 D11 already applied to PKCE/refresh-rotation).
+     Separately: ADR-0182's own `resolveCredential()`/`ConnectCredential` boundary in `connection.ts`
+     already keeps OIDC-specific concepts (code_verifier/state/redirect) confined inside `oidc.ts` —
+     that seam is very likely sufficient, unmodified, to let a future Steamworks-ticket implementation
+     swap in behind the same `{kind, token}` contract, since `connection.ts`/`build()` never inspects
+     *how* a credential was obtained.
+   - **This still needs its own heavy-ceremony scoping pass before build** (call it M21b-3 or fold
+     into a dedicated Steam-integration milestone) to verify the Better-Auth-as-broker assumption and
+     work out the client-side build-target selection mechanism — but the blast radius looks smaller
+     than originally flagged. That pass should wait until the native-build packaging timeline is
+     closer to confirmed for its Steamworks-ticket half; the OpenID-2.0-for-browser half could
+     reasonably be scoped independently and sooner if browser Steam login is wanted before the native
+     client ships. Not started by this ceremony — flagged here so none of this context is lost.
+
+**OQ6 — RESOLVED 2026-08-10.** Backup destination for the Better Auth DR plan: **a second machine Drew
+already owns.** Per ADR-0182 D20's own stated interaction, this makes excluding the JWT signing key
+from the routine backup sweep (or the compensating mandatory-rotation-on-exposure procedure) *more*
+important, not less — carry this into the deployment-timed follow-up task's runbook work.
+
+Everything else M21b-2 touches — SQLite as Better Auth's DB engine, same-tab redirect (PKCE, no popup
+capability exists), a hand-rolled `oidc.ts` over Better Auth's own OIDC endpoints, `KeyC` as the menu
+binding, `AUTH_SERVICE_TRANSIENT_THRESHOLD = 2`, `claimView` as `GUARD_ONLY`/`sessionView` outside the
+overlay registry, restic reuse with nightly/14d+8w+6m retention, preserving `accounts.rs`'s `concat!()`
+workaround, the `forcedAnon`/`consecutiveTransientErrors`/`isReturnLegAttempt` in-memory mechanism
+design — is a documented default in [ADR-0182](../../projects/monster-realm/docs/adr/0182-m21b2-oidc-client-claim-ui-better-auth-deployment.md),
+not escalated here, per this project's BLOCKER discipline (maximize progress before blocking;
+reversible/tunable choices take a default and proceed).
 
 ## Key design decisions (ADR-0179)
 
@@ -300,6 +396,120 @@ corrections rather than silently rewriting the draft.
   `Active` THE SYSTEM SHALL return `Ok` and change no state (idempotent no-op, symmetric with
   AUTH-28's `delete_account` double-call idempotency).
 
+**M21b-2 (client, ADR-0182, 2026-08-10) — OIDC redirect, state, PKCE**
+- **AUTH-39** — WHEN the client initiates an OIDC sign-in redirect (claim-flow or plain
+  re-authentication) THE CLIENT SHALL generate a `state` value and a PKCE `code_verifier`/
+  `code_challenge` (S256) pair via `crypto.getRandomValues`/`crypto.subtle.digest`, persist `state`
+  and `code_verifier` in this tab's sessionStorage before navigating, and include `state` and
+  `code_challenge` in the authorization request.
+- **AUTH-40** — WHEN the client's page loads and `location.search` carries an OIDC-return marker, THE
+  CLIENT SHALL compare the returned `state` against the stored value byte-for-byte; IF they do not
+  match, or no stored value exists, THE CLIENT SHALL treat the load as an ordinary cold start and
+  SHALL NOT exchange the authorization code or attempt any claim-specific handling on the strength of
+  that marker alone.
+- **AUTH-41** — WHEN the client evaluates an OIDC-return marker (matched or not), THE CLIENT SHALL
+  delete the stored `state`/`code_verifier` (single-use) and call `history.replaceState` to scrub the
+  return marker from `location.search`/`hash` before any other boot work, unconditionally.
+- **AUTH-42** — WHEN silent OIDC renewal or code exchange succeeds, THE CLIENT SHALL persist the newly
+  issued `refresh_token`, overwriting any previously stored value, before the returned token is used
+  to build a connection.
+
+**Credential provenance / attempt gating**
+- **AUTH-43** — WHEN `build()` supplies a token to `.withToken()`, THE CLIENT SHALL derive both the
+  token and the write-guard's credential-kind classification from one in-memory resolution computed
+  fresh for that attempt, and SHALL NOT re-derive the write-guard's classification from a subsequent
+  storage read.
+- **AUTH-44** — WHILE a tab has never held an account credential (per the existing auth-kind marker)
+  AND is not classified as an OIDC return leg for this page load AND has not had `continueAnonymously()`
+  invoked this page life, THE CLIENT SHALL make no call to the Better Auth token endpoint on connect or
+  reconnect.
+
+**Renewal outcome classification**
+- **AUTH-45** — WHEN silent renewal or code exchange fails with an ambiguous/transient result on fewer
+  than `AUTH_SERVICE_TRANSIENT_THRESHOLD` consecutive attempts since the last definitive result, THE
+  CLIENT SHALL NOT declare session-expired or auth-service-unreachable, SHALL NOT construct a
+  `DbConnection` for that attempt, and SHALL schedule the next attempt via the same reconnect/backoff
+  ladder a socket-level connect failure uses, unchanged.
+- **AUTH-46** — WHEN silent renewal for a previously-authenticated tab fails ambiguously on
+  `AUTH_SERVICE_TRANSIENT_THRESHOLD` or more consecutive attempts since the last definitive result, THE
+  CLIENT SHALL surface an auth-service-unreachable state offering the same continue-anonymously
+  affordance as session-expired, without discarding the stored credential or permanently ceasing
+  retries.
+- **AUTH-47** — WHEN silent renewal for a previously-authenticated tab returns a definitive rejection
+  (no session / invalid credential), THE CLIENT SHALL surface the session-expired state and SHALL NOT
+  construct a `DbConnection` for that attempt.
+- **AUTH-48** — WHEN an OIDC code exchange fails on a tab with no prior authenticated session (a
+  first-time claim-flow sign-in), THE CLIENT SHALL surface a distinct sign-in-failed outcome through
+  the claim UI, SHALL NOT surface the session-expired state, and SHALL NOT persist a refresh token.
+- **AUTH-49** — WHILE the session-expired or auth-service-unreachable state is showing, THE CLIENT
+  SHALL NOT connect anonymously except in direct, synchronous response to an explicit "continue as
+  guest" action; that action SHALL set a connect()-scoped, in-memory flag that suppresses all further
+  Better Auth calls for the remainder of this tab's page life, independent of the sessionStorage
+  auth-kind marker's value.
+
+**`my_account` subscription + reconciliation**
+- **AUTH-50** — THE CLIENT SHALL subscribe `SELECT * FROM my_account` on every (re)built connection.
+- **AUTH-51** — WHILE deciding whether to display any "signed in" or claim-eligible UI affordance, THE
+  CLIENT SHALL use only the subscribed `my_account` row's presence as the source of truth, and SHALL
+  NOT use the in-memory credential provenance (AUTH-43) or the auth-kind marker for that decision.
+
+**Claim-code UI / F2**
+- **AUTH-52** — WHILE a live, unconsumed claim code exists in this tab's sessionStorage, THE CLIENT
+  SHALL NOT call `join_game` on any connection whose supplied credential is account-class
+  (`credential.kind === 'account'`) — including across any number of reconnects — until
+  `complete_guest_claim` returns `Ok` or the player explicitly declines; this holds independent of
+  whether `my_account` has yet been observed for the connected identity. An anonymous-class connection
+  on this tab is unaffected by this criterion: while a claim code is outstanding, every anonymous
+  credential this tab can produce belongs to the guest identity the code was minted for (never a fresh
+  identity — the single anon-token-slot design of D11/D14), so its own `join_game` re-issue remains
+  AUTH-33's ordinary, harmless "already joined" idempotent path. *(Corrected during this ceremony's
+  own synthesis-review pass: the original draft's "on any connection" wording overstated the design's
+  actual `shouldJoin` mechanism, which deliberately exempts anonymous-class builds — narrowed to name
+  the actual scope so a mechanical gate built from this text does not flag the correct implementation
+  as a violation.)*
+- **AUTH-53** — WHEN a connection carrying an unconsumed claim code reconnects, THE CLIENT SHALL
+  re-issue `complete_guest_claim` with the stored code on the new connection's first `onApplied`,
+  unconditionally (never gated on a UI action), rather than treating a promise that never settled
+  across the drop as a terminal outcome.
+- **AUTH-54** — WHEN `complete_guest_claim` returns `Err` with `"invalid or already-used code"` or
+  `"code expired"`, THE CLIENT SHALL delete the stored code and permit `join_game`. WHEN it returns
+  `Err` with `"already has game data"`, `"account already claimed"`, or `"cannot claim your own
+  session"`, THE CLIENT SHALL retain the code, surface that this destination account cannot complete
+  the claim, and SHALL NOT auto-retry against the same account. WHEN it returns `Err` with `"close
+  your other tab, then retry"` or `"already in an ongoing battle"`, THE CLIENT SHALL retain the code
+  and surface the reason without auto-retrying. WHEN it returns `Err` with `"sign in required"`, `"no
+  account"`, or `"account pending deletion"`, THE CLIENT SHALL retain the code, take no destructive
+  action, and SHALL NOT present the failure as claim-specific. *("SHALL NOT auto-retry" throughout this
+  criterion means SHALL NOT retry on a client-side timer, per AUTH-55 — it does not conflict with
+  AUTH-53's unconditional reconnect-triggered reissue, which is not a retry in that sense: it fires
+  once per new connection, not on an elapsed-time basis. Parenthetical added during finalization to
+  resolve a wording ambiguity the security review flagged between AUTH-53 and AUTH-54.)*
+- **AUTH-55** — THE CLIENT SHALL NOT use client-side elapsed time as grounds to resume automatic
+  `join_game` calls while a claim code from AUTH-52 remains present and not explicitly declined.
+- **AUTH-56** — WHEN the player explicitly declines a pending claim, THE CLIENT SHALL require a
+  distinct confirmation step naming the irreversible consequence before deleting the stored code and
+  permitting `join_game`.
+- **AUTH-59** — WHEN a join, retry-join, or continue-anonymously action is attempted while no live
+  connection exists, THE CLIENT SHALL surface the same visible feedback as an ordinary disconnected
+  action and SHALL NOT silently discard it. *(Split from AUTH-56 during finalization: the two clauses
+  bundled unrelated behaviors — decline-confirmation UX vs. generic no-live-connection feedback —
+  breaking the otherwise-atomic pattern the rest of AUTH-39..60 follows.)*
+- **AUTH-60** — WHEN the client mints a claim code, THE CLIENT SHALL generate exactly 32 bytes via
+  `crypto.getRandomValues` and hex-encode them to a 64-lowercase-hex-character string matching the
+  server's AUTH-8 validation, and SHALL write the code to this tab's sessionStorage before calling
+  `start_guest_claim`. *(Added during finalization: the claim-code-minting mechanism — the brief's own
+  deferred-scope item — had no EARS coverage in the original draft.)*
+
+**Logging / storage discipline**
+- **AUTH-57** — THE CLIENT SHALL NOT pass a raw id_token, access_token, or refresh_token value, nor an
+  unclassified Better-Auth-originated error/reason string, as an argument to any `console.*`,
+  `opts.onError`, `opts.onSend`, or telemetry-recording call in `oidc.ts`, `credentialDecision.ts`, or
+  `connection.ts`; only static reason strings, a classifier-mapped `credential.reason`, or
+  `Error.message` values may be passed. *(Scope extended during finalization to cover
+  `credential.reason` and third-party error text, not just raw token values.)*
+- **AUTH-58** — THE CLIENT SHALL NOT persist an OIDC state value, code_verifier, refresh token, or
+  claim code in `localStorage`; all SHALL live only in per-tab sessionStorage (ADR-0150 D3).
+
 ## §4 Task checkboxes
 
 - [x] DONE (M21a, PR #298) `Account`, `AccountStatus`, `GuestClaim`, `GuestClaimReaperSchedule` tables + `my_account` view
@@ -343,12 +553,15 @@ corrections rather than silently rewriting the draft.
   already shipped: the SDK echoes the credential given to `.withToken()` back as `onConnect`'s third
   argument, so the previously-unconditional save would have written an account JWT into the
   **anonymous** token slot (ADR-0179 D8 amendment, P3).
-- [ ] **DEFERRED to M21b-2 (blocked on OQ1)** — Client: `connection.ts` silent-renewal-before-`withToken`
-  + session-expired state *(AUTH-32)*
-- [ ] **DEFERRED to M21b-2 (blocked on OQ1)** — Client: claim-code UI (client-minted code,
-  sessionStorage, same-tab redirect or popup+`postMessage` OIDC return)
-- [ ] **DEFERRED to M21b-2 (blocked on OQ1)** — Client: guest→account claim prompt + first-run
-  multi-device nudge copy
+- [x] **SCOPED 2026-08-10 (ADR-0182)**, was DEFERRED to M21b-2 (blocked on OQ1, now resolved) — Client:
+  `connection.ts` silent-renewal-before-`withToken` + session-expired state *(AUTH-32, AUTH-45..49)* —
+  see the M21b-2 task list below
+- [x] **SCOPED 2026-08-10 (ADR-0182)**, was DEFERRED to M21b-2 — Client: claim-code UI (client-minted
+  code, sessionStorage, same-tab redirect + PKCE + `state` — popup+`postMessage` rejected, Better Auth
+  supports redirect only) *(AUTH-39..41, AUTH-52..56, AUTH-59, AUTH-60)*
+- [x] **SCOPED 2026-08-10 (ADR-0182)**, was DEFERRED to M21b-2 — Client: guest→account claim prompt +
+  first-run multi-device nudge copy *(AUTH-52..56, AUTH-59; nudge copy is a task-checklist item only
+  per ADR-0179 D8 item 6 — no EARS criterion by design)*
 
 > **§4 deferral note (added during M21b, 2026-08-08).** The three bullets above, and **AUTH-32 and
 > AUTH-33 with them**, are deferred rather than attempted. Four findings force it; all are recorded
@@ -390,6 +603,68 @@ corrections rather than silently rewriting the draft.
 > **Post-integration consequence:** this milestone's §5 e2e (`connect (JWT) → account provisioned →
 > start_guest_claim → complete_guest_claim → re-key verified`) **cannot run at M21b/M21c merge** — it
 > needs a real issuer. It becomes runnable only once OQ1 is answered.
+
+**M21b-2 task checklist (scoped 2026-08-10, ADR-0182 — build tasks, not yet built):**
+- [ ] `client/src/net/oidc.ts` + `.test.ts` — discovery fetch/cache, `state`+PKCE mint/store/validate,
+  `history.replaceState` scrub, code exchange, refresh-token rotation persistence. `renewOrExchange()`
+  is a TOTAL function (never throws across the module boundary; internal errors map to
+  `'transient-error'`) and branches on what is actually present in storage, not on a caller-supplied
+  flag (ADR-0182 D13/D14, closes the finalization security review's H1 finding).
+- [ ] `client/src/net/credentialDecision.ts` + `.test.ts` — `decideConnectCredential`,
+  `ConnectCredential`, `AUTH_SERVICE_TRANSIENT_THRESHOLD`; pure, full `outcome × everAuthenticated ×
+  consecutiveTransientErrors` branch coverage (G16).
+- [ ] `authToken.ts` — add `wasEverAuthenticated`; narrow (do not delete) `readAuthKind`/
+  `writeAuthKind`'s doc comments. `authToken.test.ts` — test it; positive-pin `writeAuthKind`'s one
+  gated call site.
+- [ ] `client/src/net/claimCode.ts` + `.test.ts` — mint (AUTH-60)/read/hasUnconsumed/clear over
+  `mr.claimCode.v1`.
+- [ ] `connection.ts` — `resolveCredential`/`build(credential)`/`attemptBuild` split;
+  `isReturnLegAttempt`/`consecutiveTransientErrors`/`forcedAnon` (all three connect()-scope, mutable,
+  in-memory, single-use where specified); the `'retry'`-climbs-the-ladder branch (G24); a try/catch
+  around `await resolveCredential()` in `attemptBuild()` (closes the finalization security review's
+  CRITICAL C1 finding, G27); the RT-01 `try/catch` around `build(` preserved; `my_account` subscribe +
+  `onInsert`/`onUpdate` ingest (G28); corrected join-gate inside `onApplied` that actually calls
+  `completeGuestClaim` on the reissue path, not just a UI callback (G18); `attemptJoin`/`retryJoin`/
+  `continueAnonymously` (with its body); `Connection.live()`. Re-pin/retire teeth: `W-NH4-TOKEN-SUPPLIED`
+  (G13), `W-M21B-KIND-READ`→retired (G14), `W-DEVLOG-WRAP` boundary (G15).
+- [ ] `store.ts`/`rowConvert.ts` — `#ownAccount`, `upsertAccount`/`ownAccount`, `SdkAccountRow`/
+  `accountRowToStore`. All "signed in" UI decisions read `store.ownAccount` exclusively (AUTH-51, G29).
+- [ ] `client/src/ui/claimModel.ts`+`claimView.ts` (+tests) — full claim flow incl. the 4-way reject
+  taxonomy (AUTH-54); the first-run multi-device nudge copy, shown once per tab on first claim-UI open
+  (tracked in the `mr.claimCode.v1` namespace, no new storage key); join `overlayRegistry.ts` as
+  `GUARD_ONLY` (G19).
+- [ ] `client/src/ui/sessionModel.ts`+`sessionView.ts` (+tests) — `hidden | expired | unreachable`;
+  registry-external (not in `OverlayId` — closes the `EXCLUSIVE_TOP`/`decide()` incompatibility, D17);
+  wire the pre-dispatch input-block gate in `main.ts`, checked before `anyOverlayVisible()` and before
+  `battleView`'s own Escape branch on every input path (G20).
+- [ ] `overlayRegistry.ts`/`.test.ts` — add `claimView` (`GUARD_ONLY`); manifest-count `+1` (G19).
+- [ ] `menuModel.ts`/`helpModel.ts` — `'account'` leaf, `KeyC` (confirmed free — not banned by
+  `W-INTERACT-NO-GH`, scoped to `KeyG`/`KeyH` only), matching `CONTROLS` SSOT row.
+- [ ] `main.ts` — new `ConnectionOptions` callbacks (`onSessionExpired`/`onAuthServiceUnreachable`/
+  `onSignInFailed`/`onClaimPending`/`onClaimAwaitingAccount`/`onClaimResult`) wired; the ~10-site
+  `live()` refactor (G26); `KeyC` handler; session-first dispatch gate (G20).
+- [ ] `vite.config.ts` + `dom-shell-coverage-exclusion.eval.mjs` — add `claimView.ts`/`sessionView.ts`.
+- [ ] Author `evals/account-e2e.eval.mjs` **from scratch** implementing the flow already described in
+  this spec's own Post-integration verification bullet above (G22). *(Corrected during the finalization
+  completeness review: this file does not exist anywhere in the repo today — confirmed by exhaustive
+  filename and content search — so this is new test-authoring work, not a "reactivation" as an earlier
+  draft of this task mis-scoped it.)*
+- [ ] Deployment-timed follow-up (separate commit — OQ1/OQ4/OQ5/OQ6 are all resolved, so this task is
+  unblocked; it stays a separate commit because it needs a real deployed Better Auth instance, not
+  because anything is still pending): flip `ALLOWED_ISSUERS`/`ALLOWED_AUDIENCE` in `accounts.rs` to the
+  real Better Auth issuer/`client_id` on the OQ4-resolved dedicated subdomain, preserving `concat!()`
+  (still required — ADR-0181 defers its removal to unlanded `13r-c-2`); tighten `audience_allowed` to
+  exact single-value equality (closes the finalization security review's M2 finding, an unconfirmed
+  assumption about Better Auth's `aud` population); write `ops/auth/docker-compose.yml`/`.env.example`/
+  `README.md`'s single-client-registration invariant, the `sub`-opacity configuration note (native
+  email+password is confirmed shipping, OQ5 — not conditional), and an explicit dev/QA-only policy note
+  for the native credential path; write the Better Auth DR section in `docs/observability-dr-runbook.md`
+  extending §7's port-drift list, with signing-key custody as its first line item (D20 — a prescribed
+  default, not left open) and OQ6's backup-destination answer (a second machine Drew already owns)
+  recorded; run the identity-equality-verified restore drill (G23).
+- [ ] Append AUTH-39..60 (done, this pass) + [ADR-0182](../../projects/monster-realm/docs/adr/0182-m21b2-oidc-client-claim-ui-better-auth-deployment.md)
+  (done, this pass) to the corpus; at build time regenerate `just knowledge`/`just adr-digest` after the
+  code lands.
 - [x] DONE (M21a, PR #298) Tests: proof-of-teeth coverage for AUTH-1..AUTH-38 *(server-side AUTH-1..29/34..38; the client-only AUTH-31/32/33 are M21b. 17 proof-of-teeth mutations executed and observed RED, then reverted.)*
 - [x] DONE (M21a, PR #298) `just knowledge` regeneration (`evals/knowledge-bundle-conformance.eval.mjs` is a live, currently-wired
   `just ci` drift gate — M21a adds 3 new tables plus a new domain module, `accounts.rs`; missing this task
@@ -405,12 +680,19 @@ corrections rather than silently rewriting the draft.
 | **M21a** (structural spine) | `server-module/src/schema.rs`, `server-module/src/accounts.rs`, `server-module/src/accounts_tests.rs`, `server-module/src/lib.rs`, `server-module/src/monster_mgmt.rs`, `server-module/src/inventory.rs`, `server-module/src/npc.rs`, `server-module/src/raising.rs`, `server-module/src/economy.rs`, `server-module/src/ranking.rs` (+ each domain's `_tests.rs`), `client/src/module_bindings/**`, spec file | Schema-touching + cross-cutting re-key delegation → **SERIAL, no sibling** (mirrors m15a: guard/schema wiring spanning many domain files is bound to one PR, same as trading's guard-wiring slice). The six domain-file `rekey_*` additions are individually disjoint but are bundled into this one slice rather than split N-way: `accounts.rs`'s `rekey_all` cannot compile until all six exist, so splitting them wouldn't shorten the critical path, and doing so would exceed this project's fan-out cap (N≤2, `docs/routing.md`). |
 | **M21b** (client) | `client/src/net/authToken.ts` (companion-key addition only, existing logic untouched), `client/src/net/connection.ts`, `client/src/ui/claim*.ts` (new), `client/src/main.ts` | Depends on M21a (bindings); parallel-eligible with M21c |
 | **M21c** (evals + hardening extensions) | `evals/account-privacy.eval.mjs` (new), `evals/guest-claim-integrity.eval.mjs` (new), `evals/ranking-security.eval.mjs` (extend), `evals/currency-integrity.eval.mjs` (extend), `pvp_tests.rs` (extend `include_str!` list) | Depends on M21a merge; parallel-eligible with M21b |
+| **M21b-2** (client OIDC wiring, claim UI, session lifecycle, Better Auth deployment — scoped 2026-08-10, ADR-0182) | New: `client/src/net/oidc.ts`(+test), `client/src/net/credentialDecision.ts`(+test), `client/src/net/claimCode.ts`(+test), `client/src/ui/claimModel.ts`(+test), `client/src/ui/claimView.ts`, `client/src/ui/sessionModel.ts`(+test), `client/src/ui/sessionView.ts`, `evals/account-e2e.eval.mjs`, `evals/client-no-pii-logs.eval.mjs`, `ops/auth/docker-compose.yml`, `ops/auth/.env.example`, `ops/auth/README.md`. Modified: `client/src/net/connection.ts`, `client/src/net/connection.test.ts`, `client/src/net/authToken.ts`(+test), `client/src/net/store.ts`, `client/src/net/rowConvert.ts`, `client/src/ui/overlayRegistry.ts`(+test), `client/src/ui/menuModel.ts`(+test), `client/src/ui/helpModel.ts`(+test), `client/src/main.ts`, `client/vite.config.ts`, `evals/dom-shell-coverage-exclusion.eval.mjs`, `server-module/src/accounts.rs` (lines 48/50 real values + `audience_allowed` tightening, deployment-timed), `docs/observability-dr-runbook.md`, `docs/adr/0179-accounts-auth-implementation-design.md` (Amendments pointer). **Explicitly not touched:** `REKEY_MANIFEST`, `accounts_tests.rs`'s D0-D10 coverage, any other reducer/schema, `evals/trade-escrow-guards.eval.mjs` (its `13r-c-2` migration is out of scope here). `client/package.json` is confirmed unchanged (zero new runtime deps) — not listed as touched. | Depends on M21a+M21b+M21c all merged (per the Cross-milestone ordering risk below, and because this slice widens `connection.ts`'s `build()` signature the earlier slices established). One slice — do not split further (N≤2 fan-out cap, `docs/routing.md`; this client work is not touches:-disjoint from itself). Gates G13–G30 (ADR-0182). Not blocked: OQ1/OQ4/OQ5/OQ6 are all resolved (above) — the only internally-sequenced part is the slice's own deployment-timed follow-up task (real `ALLOWED_ISSUERS`/`ALLOWED_AUDIENCE`, DR runbook), which needs a real deployed Better Auth instance to exist, not a pending decision. |
 
-**Post-integration verification** (after M21b + M21c merge): full `just ci` green-and-meaningful,
+**Post-integration verification (M21a+M21b+M21c):** full `just ci` green-and-meaningful,
 `bindings-drift = 0`, schema-snapshot updated to include `account`/`guest_claim`/
-`guest_claim_reaper_schedule`, e2e `connect (JWT) → account provisioned → start_guest_claim (anon
-tab) → complete_guest_claim → re-key verified` flow passes end-to-end, AUTH-1..AUTH-38 satisfied
-against the integrated whole (not merely per-slice).
+`guest_claim_reaper_schedule`, AUTH-1..AUTH-38 satisfied against the integrated whole (not merely
+per-slice). The e2e (`connect (JWT) → account provisioned → start_guest_claim (anon tab) →
+complete_guest_claim → re-key verified`) **cannot run at this stage** — it needs a real issuer, which
+only exists after M21b-2's deployment-timed follow-up task lands (§5 M21b-2 row above); it is authored
+and gated as G22/`evals/account-e2e.eval.mjs` there, not here.
+
+**Post-integration verification (M21b-2, additionally):** the above, plus AUTH-39..60 satisfied against
+the integrated whole; Gates G13–G30 all green; `evals/account-e2e.eval.mjs` (G22) passes against a
+real self-hosted Better Auth test instance; the identity-equality restore drill (G23) run at least once.
 
 ## Risks / decisions
 - **Cross-milestone ordering dependency (added on review, 2026-08-08):** M21a's touches: include
