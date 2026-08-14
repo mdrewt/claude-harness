@@ -1021,3 +1021,82 @@ with governor NORMAL and no live chain — route it HARD tier per the touches: a
 still undrafted (also needs a scoping pass, smaller than M21b-2's — migrating one eval's scanner
 approach). M21b-3 (Steam) is explicitly NOT ready — do not attempt to scope or launch it without an
 explicit operator go-ahead on the native-build timeline first.
+
+## 2026-08-10T09:08:22Z — M21b-2 launched (native tick)
+2026-08-10T09:05Z native tick (forced, rid=mr-sup-native-20260810T090529Z-1770792): re-verified live -- master local==origin 8814416 both repos, no locks/PRs/inflight, probe clear (no resident IDE pid, only supervisor-infra writes in last 6min). M21b-2 (client OIDC redirect/PKCE wiring, guest->account claim-code UI, session lifecycle, Better Auth self-hosted deployment+DR) was elaborated this session via heavy ceremony (ADR-0182, adr_next_free 182->183) and PLAN.md marks it build-ready -- the sequencing gate note (13r-c-2 must land before the accounts.rs ALLOWED_ISSUERS/ALLOWED_AUDIENCE real-value flip) applies only to that deployment-timed follow-up task, which the brief explicitly excludes from this slice's touches:. Launched fable@xhigh, HARD tier (security-authz surface, connection.ts widening), $150 budget cap, leader pid=1771902 claude_pid=1771905, rid=mr-spawn-20260810T090720Z-1771863. No fan-out second slot opened: roster-wave-3 (de-gated, tail-sequenced) has no drafted M*.spec.md yet; M22-25 remain design-sketch/unelaborated. Governor NORMAL (d7=$1523.91/2783, fable_ok=true). No BLOCKER. NEXT: mr-ci-watch/event-tick resumes when M21b-2 reaches PR-open or parks; separately, 13r-c-2 and M22-25 still need their own scoping/spec passes (heavy-ceremony, not mechanical-tick work).
+
+## 2026-08-10 — M21b-2 BUILD SLICE: PR OPEN (terminal), local `just ci` green, remote CI running
+Slice **M21b-2** (OIDC client wiring, guest→account claim UI, session lifecycle, Better Auth deployment) built to terminal state. **PR #312** open on `mdrewt/monster-realm` (branch `feat/m21b-2-oidc-client-claim-ui`, HEAD `0d51756`, base `master`). **Supervisor owns the merge — do NOT `gh pr merge` was not run.**
+
+**State:** local full `just ci` GREEN (exit 0 — verified the real exit line, not the wrapper): lint + both typechecks + rust test + evals (incl. the self-contained live `account-e2e` G22) + security + wasm + client-test (2387 client tests). All gates G13–G30 pass. Verifier PASS (anti-weakening audit clean; the two sanctioned retirements — `W-M21B-KIND-READ`, `W-M21B-WRITE-HAZARD-DOCUMENTED` — faithfully replaced with stronger guards; no skip/only/xit/ignore added; count pins intact). Worktree `.claude/worktrees/M21b-2` clean at `0d51756`; main checkout untouched on `master`.
+
+**Orchestration:** planner → reviewer+red-team on plan → 3 opus testers (pure/wiring/evals) wrote gating teeth → orchestrator ran RED proof → 2 opus specialists implemented → reviewer+red-team on impl (found the UI entry point was built-but-unreachable + a claim-code console leak + 2 ops bugs — all fixed) → tester+specialist completed the UI wiring → verifier. Empirical spikes de-risked G22 (plain-http loopback issuer accepted by the host; ES256 raw-sig JWT verified via stub discovery/JWKS; module_bindings importable from node via a loader hook; patched-copy publish 6.7s warm; `spacetime sql` owner-reads private `account`). ADR-0182 was already on master (no new ADR authored); ADR-0179 got a landing amendment.
+
+**HARD sequencing constraint honored:** `accounts.rs` doc-comment ONLY — the real `ALLOWED_ISSUERS`/`ALLOWED_AUDIENCE` flip + `audience_allowed` exact-equality tightening + live restore drill remain the **deployment-timed follow-up, hard-gated on `13r-c-2` landing first** (ADR-0182 D18). `evals/trade-escrow-guards.eval.mjs` untouched; `client/package.json` unchanged.
+
+**touches-delta (in PR body):** `.gitignore` (required — ignore `ops/auth/{app,data,secrets}/` so the JWKS signing key can't be committed, D20) and `docs/PLAYTEST.md` (mechanically forced by `playtestControlsDoc.test.ts`'s doc↔CONTROLS gate on the new KeyC row). boyscout-delta: none.
+
+**Follow-ups for the supervisor / next tick:**
+1. **Merge PR #312** on remote-CI green (supervisor-owned).
+2. **Tick spec §4/§5 M21b-2 checkboxes** in the harness spec `specs/monster-realm-v2/M21-accounts-auth.spec.md` (cross-repo — the project PR can't tick the harness spec; supervisor/doc-keeper owns it) with PR #312 ref.
+3. **`13r-c-2`** is still undrafted and remains the gate before M21b-2's deployment-timed real-issuer-URL commit can land (migrate `trade-escrow-guards.eval.mjs` onto `rust-scan.mjs`).
+4. **M21b-3** (Steam / native-client auth) remains explicitly deferred (OQ5) — not started.
+
+## 2026-08-10T14:05:43Z — SPEND-ALERT: M21b-2 cost $274.3706 (> $150 threshold)
+Single-run spend exceeded the alert threshold (visibility only, not a gate). Verify the slice's size was justified (right-sizing rule) at merge adjudication; adjust single_run_alert_usd in mr-budget-config.json if this class of slice is expected.
+
+## 2026-08-14T01:04:31Z — rev14 weekly review: M-postgate-fourteenth-review-residuals inserted (7 slices); nightly mutation gate red 5 days
+Fourteenth weekly multi-lens review completed 2026-08-14T00:41Z against master @ 8814416
+(88144164c3aaffeab9983907d661f58dada70ff2), isolated detached clone (torn down). 7 lenses,
+3 independent verifiers; 15 findings verified, 2 dropped in verification.
+
+**Inserted:** `specs/monster-realm-v2/M-postgate-fourteenth-review-residuals.spec.md`, PLAN.md
+bullet inserted directly after `M-postgate-thirteenth-review-residuals` (still queued,
+unstarted except 13r-c merged #309). Seven slices, ROI order: **14r-a** nightly mutation-gate
+triage + ADR-0118 par.4 re-baseline + failure-visibility wiring (nightly `mutation-server` RED
+5 consecutive days, 324 survivors vs cap 299, unnoticed -- nightly has no alerting and no
+fix-red insertion policy for mutation/coverage jobs); **14r-b** trading reducer behavioral
+negative-path suite (all four trade reducers have ZERO dynamic negative-path coverage anywhere;
+gates are static source scanners, operator-blind at the authorize_respond/confirm call sites);
+**14r-c** scanner-migration wave (~29 evals still comment-strip without string-awareness per
+ADR-0181's own measurement; only trade-escrow-guards is tracked as 13r-c-2, which stays separate
+and keeps its M21b-2-deploy gate role); **14r-d** PvE settle log-and-commit hardening
+(write_back ?-abort softlock, ADR-0168 disclosure); **14r-e** dualkey-dedup + mvi-e2e runtime
+proof (ADR-0158 residuals 3+4); **14r-f** small-hygiene sweep (evolution.rs json_escape x3 per
+ADR-0170 residual 8, movement.rs grass both-role guard per ADR-0166 R4, tradeProposeModel 64-cap
+per R6, map-shaped id baselines); **14r-g** ranked-requires-account enforcement (implements
+Drew's rev13 answer; enforcement at pvp.rs challenge_pvp/accept_challenge via
+accounts::is_account_holder).
+
+**OPEN rev-issues (supervisor: record-and-ignore; stand-aside context for answer-fired ticks):**
+- mdrewt/monster-realm#313 DECISION(rev14-guest-rating-legacy) -- pre-enforcement guest ladder
+  ratings: keep-inert (recommended) vs zero-out. Only 14r-g's migration sub-step depends on it.
+- mdrewt/claude-harness#14 DECISION(rev14-nightly-red-policy) -- auto-insert fix-red slice +
+  issue-on-failure for nightly mutation/coverage vs issue-only vs as-is. Only 14r-a's wiring
+  sub-step depends on it.
+
+**Prior-cycle sweep:** mdrewt/monster-realm#307 (rev13-ranked-requires-account) answered
+("Require accounts for ranked") -- CONSUMED and CLOSED this cycle; implemented as 14r-g.
+mdrewt/claude-harness#13 (rev-ledger-row) answered ("yes") -- CONSUMED, ledger row written
+(cost-null, notes tier=review), but the CLOSE was blocked by the Cowork permission classifier
+(gh issue close on the harness repo repeatedly denied; the monster-realm close succeeded). NEXT
+CYCLE: close ch#13 with a <!--mr-system--> consume comment.
+
+**decision-defaulted:** mutation-cap-rebaseline=follow-ADR-0118-par4-in-14r-a;
+scanner-migration-scope=security-privacy-evals-first-tail-rest;
+lineage-name=fourteenth-review-residuals; rate-limit-defer=n/a (no park live).
+
+**Cleanup:** review clone /home/mdrewt/mr-review/20260814-8814416 removed after Phase 6; runner
+worktree list + branches verified unchanged (master @ 8814416, M21b-2 worktree @ 0d51756
+untouched). PR #312 merge remains supervisor-owned; this review did not touch it.
+
+## 2026-08-14T02:27:01Z — M21b-2 reconciled (mechanical finish of stale-mutex merge) -- native tick native-20260814T022408Z-2807018
+PR#312 (M21b-2: OIDC client wiring, guest->account claim UI, session lifecycle, Better Auth self-hosted deployment) was already squash-merged to master@4d789bd by a prior tick (mr-sup-native-20260814T015311Z-2799253-5396) with master ci+e2e SUCCESS confirmed live (run 31762172628). That tick left the chain-owner mutex stale (heartbeat 01:53Z, session_leader 1771902 dead, no PR awaiting merge) without finishing the mechanical record. Took over the mutex per the stale-heartbeat+no-live-pid+no-pending-merge rule and finished it this tick.
+
+mr-audit --tier hard (already run, saved /tmp/mr_audit_M21b-2.json): orchestration CLEAN (15 agent calls, full role roster: general-purpose/planner/red-team/reviewer/tester/verifier; models fable+opus+sonnet). Gating FLAGGED (hard-tier mandatory LLM read; 70 removed/modified asserts) -- read the full diff. Every changed assertion is a manifest-count bump (OVERLAY_IDS 15->16, open-handlers 12->13, hide-thunks 14->15) as the new claimView overlay joins the existing UXD3B/UXD3C static-manifest wiring tests in main.wiring.test.ts, plus large NEW test blocks for the M21b-2 session-gate contract (sessionGateBlocks/G20/G29). Zero skip/xit/.only/[ignore] markers added, zero deleted test files, zero weakened thresholds -- every count went UP to match a real new overlay/handler, never down. Adjudicated CLEAN.
+
+Cleanup: removed worktree .claude/worktrees/M21b-2 and local branch feat/m21b-2-oidc-client-claim-ui (squash-merged; git branch -d refused on 'not fully merged' as expected for a squash merge -- confirmed via gh pr view #312 state=MERGED/mergeCommit=4d789bd before force-deleting). Remote branch was already auto-deleted by GitHub. mr-state.json inflight cleared, master.sha/ci updated to 4d789bd/live-green. Ledger row written (cost omitted -- already captured by the 2026-08-10T14:05:42Z wrapper-reconcile row, $274.3706).
+
+Two rev14 DECISION issues remain correctly OPEN and unanswered: mdrewt/claude-harness#14 (nightly-red-policy) and mdrewt/monster-realm#313 (guest-rating-legacy) -- both record-and-ignore per doctrine, no action taken, 0 comments each confirmed live.
+
+NEXT: 14r-a (nightly mutation-gate triage/re-baseline/failure-visibility) is build-ready per M-postgate-fourteenth-review-residuals.spec.md -- HIGH priority, no after: dependency, LIGHT-MED, routine tier (touches justfile/.github/workflows/nightly.yml/evals/nightly-smoke-wiring.eval.mjs/docs/adr -- no schema/reducer/predictor/netcode/security/M20/M25 surface). Launching it this tick as the composite merge->launch action.
