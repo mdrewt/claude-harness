@@ -485,6 +485,25 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   missing accounts/observability, `Account` illegal-states hardening). ONE decision open with
   Drew (issue #307, OQ2 ranked-requires-account — no slice depends on it). Serial chains:
   a→b, c→h, d→e; f and g independent.
+- **M-postgate-fourteenth-review-residuals** (`M-postgate-fourteenth-review-residuals.spec.md`) —
+  **NEW, queued 2026-08-14; inserted after `M-postgate-thirteenth-review-residuals`**, per the
+  weekly-review insertion convention. Verified fourteenth multi-lens review findings @ `8814416`
+  (7 lenses, 3 independent verifiers, 15 verified / 2 dropped). The #308–#311 delta is clean;
+  the headline is operational instead: **14r-a** the nightly `mutation-server` ratchet has been
+  RED for 5 straight days (324 survivors vs cap 299, ADR-0050) with no alerting and no fix-red
+  policy — triage + ADR-0118 §4 re-baseline + failure-visibility wiring; **14r-b** the four
+  trade reducers have ZERO dynamic negative-path coverage anywhere (all gates are static source
+  scanners, operator-blind at the authorize call sites) — behavioral negative-path suite;
+  **14r-c** ~29 evals remain on false-GREEN-capable comment stripping (ADR-0181's own
+  measurement) with only 13r-c-2 tracked — scanner-migration wave (trade-escrow-guards
+  excluded, stays 13r-c-2); **14r-d** PvE settle `?`-abort softlock hardening to log-and-commit
+  (ADR-0168 residual); **14r-e** ArrowRight+KeyD dualkey double-move + `mvi-e2e` runtime proof
+  (ADR-0158 residuals 3+4); **14r-f** hygiene sweep of routed-but-never-queued residuals
+  (evolution.rs JSON-log escaping per ADR-0170 r8, grass both-role guard per ADR-0166 R4,
+  trade selection 64-cap per R6, map-shaped id baselines); **14r-g** (game-visible,
+  Drew-directed) ranked-requires-account enforcement per answered issue #307. TWO decisions
+  open (issues mdrewt/monster-realm#313, mdrewt/claude-harness#14 — no slice blocked; only
+  sub-steps depend on the answers). Serial: a→b; rest independent.
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
