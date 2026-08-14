@@ -8,7 +8,19 @@
     "nightly": "SUCCESS on 3c1cf08 (run 31090022421, 2026-08-06T09:39:33Z) -- confirms EG2/EG3 essence-graph content is nightly-mutant-clean. Not yet re-run since. Note: nightly mutation-server has been RED 5 consecutive days (324 survivors vs cap 299) per M-postgate-fourteenth-review-residuals -- 14r-a addresses this."
   },
   "adr_next_free": 183,
-  "inflight": [],
+  "inflight": [
+    {
+      "slice": "14r-a",
+      "run_id": "mr-spawn-20260814T022736Z-2811340",
+      "session_leader": 2811412,
+      "claude_pid": 2811415,
+      "started_utc": "2026-08-14T02:27:43Z",
+      "model": "opus",
+      "effort": "high",
+      "tier": "routine",
+      "adr": "next-free-if-needed (0183)"
+    }
+  ],
   "awaiting_merge": [],
   "queue": [
     "2026-08-14T02:24Z native tick (forced, rid=native-20260814T022408Z-2807018): reconciled M21b-2 -- a prior tick (mr-sup-native-20260814T015311Z-2799253-5396) merged PR#312->4d789bd (ci+e2e SUCCESS confirmed live) and ran mr-audit --tier hard, but left the chain-owner mutex stale (heartbeat 01:53Z, 31min old at gate-top, session_leader 1771902 dead, no .done awaiting unstarted merge) and the mechanical finish (worktree/branch cleanup, mr-state.json, ledger, handoff) incomplete. Took over the mutex per doctrine (stale heartbeat + no live pid + no pending merge). mr-audit verdict: orchestration CLEAN (15 calls, full role roster incl. planner/red-team/reviewer/tester/verifier, models fable+opus+sonnet), gating FLAGGED (hard-tier mandatory read; 70 removed/modified asserts) -- read the diff: every changed assertion is a manifest-count bump (15->16 overlays, 12->13 open-handlers, 14->15 hide-thunks) driven by the new claimView overlay joining the existing UXD3B/UXD3C static-manifest tests, plus new dedicated M21b-2 session-gate test blocks (sessionGateBlocks/G20/G29) -- all additive/count-tracking, 0 skip/xit/.only/[ignore] markers, 0 deleted test files, 0 weakened thresholds -- adjudicated CLEAN. Cleaned worktree .claude/worktrees/M21b-2 + local branch feat/m21b-2-oidc-client-claim-ui (squash-merged, remote already deleted). Two rev14 DECISION issues (mdrewt/claude-harness#14, mdrewt/monster-realm#313) remain correctly OPEN/unanswered (0 comments each) -- record-and-ignore per doctrine, no action. inflight cleared. Governor NORMAL (d7=$1.89/2783, fable_ok=true). No BLOCKER. NEXT: launch 14r-a (nightly mutation-gate triage+re-baseline+failure-visibility, HIGH/LIGHT-MED, no after: dep) per M-postgate-fourteenth-review-residuals.spec.md -- build-ready, routine tier (no schema/reducer/predictor/netcode/security/M20/M25 touches).",
