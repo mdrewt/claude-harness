@@ -1,123 +1,115 @@
-# 13r-c — progress memo
+# 13r-c — progress memo (2026-08-15 re-spawn)
 
-Branch: `feat/13r-c-string-aware-rust-scan` · worktree `.claude/worktrees/13r-c`
-Base: `origin/master` @ `30922ca` · ADR: `docs/adr/0181-string-literal-aware-source-scanners.md`
+> **Supersedes nothing.** The 2026-08-09 memo of the same name described the ORIGINAL
+> 13r-c run, which merged as PR #309. This memo describes the 2026-08-15 **re-spawn**
+> on a stale queue entry. Both are true; read this one for current state.
+
+## HEADLINE
+
+**`13r-c` was already merged.** `0d13923` — `fix(13r-c): string-literal-aware source
+scanners — shared evals/rust-scan.mjs, three security gates de-blinded (ADR-0181)
+(#309)`, merged 2026-08-09 — is an ancestor of `master`. `monster-realm-handoff.md`
+already records the MERGED row and "slice 13r-c CLOSED". The spawn brief re-issued the
+original scope verbatim with `adr_reserved: 195`.
+
+**Action for the supervisor: reconcile `mr-state.json` / the launch queue so 13r-c is
+not spawned a third time. ADR 195 unused — returned to the pool.**
 
 ## DONE
 
-- **`evals/rust-scan.mjs` (new, 516 lines)** — SSOT string-aware Rust scanner.
-  Extracted from the two verbatim ~450-line copies; took guest-claim's
-  **angle-aware `splitArgs`** (the diverged, stricter copy). 12 exports;
-  `matchRawString` / `STRIP_ANCHORS` / `independentAnchorCount` kept private
-  (no external consumer).
-- **Dedupe** — `account-privacy.eval.mjs` 2024→1579, `guest-claim-integrity`
-  3524→3075. Both re-run GREEN with byte-identical detail strings.
-- **`currency-integrity`** — routed to `stripRustSource`; teeth T1a/T1b green.
-  Plus a red-team **BLOCKER fix**: `walletTableIsPrivate` anchored on a raw
-  `indexOf('name = player_wallet')`, so a `#[doc = "name = player_wallet"]`
-  decoy on any earlier table made a genuinely `public` wallet report PRIVATE.
-  Now `parseTables(stripRustSource(...))` + select by parsed name. PoC closed.
-- **`ranking-security`** — `stripBoth`/`scanCode` kept as aliases over the shared
-  scanner (~25 call sites untouched); tooth T2 green; stale header prose fixed.
-- **`conversation-privacy`** — `stripComments` → **`stripTsComments`**, a
-  single-pass TS scanner that strips comments ONLY and keeps literal payloads
-  VERBATIM. Rust call sites → `stripRustSource`.
-- **`wallet-privacy`** — imports split per language; **F18 re-pointed**
-  `[B/F5-hidden]` → `[B/3a]` (the forged-comment attack is now closed at the
-  lexer, so the count tripwire correctly stays silent and the real clause sees
-  the leak directly — strictly stronger).
-- **Stripper-soundness gates** in 4 evals — `assertStripperSound` per file,
-  **NON-TEST only** (the desync detector is quote-blind, so `*_tests.rs` fixture
-  strings holding `#[spacetimedb::` produce 7 phantom anchors).
-- **`client/src/main.wiring.test.ts`** — `stripLineComments` delegates to the
-  string-aware `m20cScan`; `stripBlockComments` deleted; **0 of 78 call sites
-  edited**. New per-file anti-truncation guard in the offenders loop keyed on
-  **newline count**, not a size ratio (measured: newline count is preserved
-  exactly across all non-test `client/src/**/*.ts`, whereas `interpConfig.ts`
-  legitimately strips to 8.5% of raw). 12 comment sites corrected that cited the
-  deleted bail-and-drop behaviour as a live property.
-- **Semgrep round-trip avoided** — `detect-insecure-websocket` matched the
-  websocket-scheme token inside COMMENT text (6 blocking findings, all in prose
-  this slice added). Rewritten, not suppressed. Repo-wide re-run: 517 rules /
-  990 files / **0 findings**.
+- **Verified the merge, deliverable by deliverable.** PR #309's diffstat covers every
+  file in the declared `touches:` set **except `server-module/src/accounts.rs`**:
+  `rust-scan.mjs` (new, 13 exports), `currency-integrity`, `ranking-security`,
+  `conversation-privacy`, `wallet-privacy`, `account-privacy`, `guest-claim-integrity`,
+  `main.wiring.test.ts`, plus `ADR-0181` + `ARCHITECTURE.md` + `DIGEST.md`.
+- **Confirmed `master` CI green** (run 31869334918, 13r-e) — the red-master override did
+  not apply.
+- **Re-measured the parked blocker on today's `master` (`7eb6980`)** rather than trusting
+  the 2026-08-09 note. Method: patch `accounts.rs:54` to
+  `&["https://auth.monster-realm.invalid/"]`, run both suites, restore.
+  - `cargo test -p monster-realm-module` → **614 passed, 0 failed** (form-agnostic).
+  - `node evals/run.mjs` → **85 PASS / 2 FAIL**:
+    1. `trade-escrow-guards` (TR-11) — `start_battle` "not found". Known ADR-0181 blocker:
+       `stripRustComments` runs before `stripRustStrings` over a whole-crate blob
+       (`evals/trade-escrow-guards.eval.mjs:37,73,114-130`), so the bare literal
+       unbalances quote-pairing and blanks later files.
+    2. `account-e2e` — `patchAllowedIssuers` N4 throw. **NEW since 2026-08-09.**
+       `ISSUER_NEEDLE` (`evals/account-e2e.eval.mjs:77`) pins the exact `concat!()` token
+       and `splitForConcat`/`patchAllowedIssuers` re-emit that form. Landed with
+       **PR #312 (M21b-2)**.
+  - Reproduced independently by the `red-team` and `verifier` lenses.
+- **Delivered the one unblocked, in-`touches:` sub-item** — "update the hazard comment to
+  point at the fixed scanners" — as **PR #327**. Old text pointed at `M21c`, which never
+  owned that work (13r-c/ADR-0181 and 14r-c/ADR-0186 did).
+  - Branch `feat/13r-c-residual-verify` @ `545cc4f`, worktree `.claude/worktrees/13r-c`.
+  - `server-module/src/accounts.rs:40-47` only. **Line-count neutral** (7/7; file stays
+    534 lines; `ALLOWED_ISSUERS` stays on line 54) so the six `docs/knowledge/**` pins
+    (`#L342/#L377/#L448/#L471/#L495/#L511`) and `pvp_tests.rs`'s "SSOT: accounts.rs:54"
+    all still resolve — **no `just knowledge` regen needed** (verifier-confirmed).
+  - Local **`just ci` EXIT 0**, run twice (me + verifier independently): 87/87 evals,
+    1934 nextest passed / 0 skipped, 81 client files / 2447 tests, fmt+clippy `-D warnings`
+    clean, check-secrets clean, wasm clean.
+  - Lenses: `tester`(opus) PASS · `reviewer` PASS w/ MAJOR-1 · `red-team` PASS ·
+    `verifier` PASS. MAJOR-1 fixed in `545cc4f` (see BLOCKERS note 2).
 
-## GATES (all local, all green)
+## REMAINING (not this slice)
 
-- `just ci` → **exit 0**
-- `node evals/run.mjs` → **83 PASS / 0 FAIL** (baseline was 83)
-- `cd client && npx vitest run` → **76 files / 2163 tests pass**
-- Semgrep repo-wide → 0 findings · gitleaks (8 commits) → no leaks
+Nothing in 13r-c's declared scope is deliverable without out-of-`touches:` files. The
+remainder is `13r-c-2`, still **undrafted** (no `M*.spec.md` entry).
 
-**RED proof captured for every tooth before its fix** (orchestrator-run, since
-the `tester` has no Bash): T1a/T1b, T2, T3a, T3b each returned a specific
-false-GREEN failure message; T4 was 3 failed / 163 passed in vitest.
+## BLOCKERS
 
-## STATUS: TERMINAL — PR OPEN
+1. **`13r-c-2` — the `concat!()` removal. Hidden dependency; blocker set has GROWN.**
+   The old handoff named only `evals/trade-escrow-guards.eval.mjs`. As of 2026-08-15 the
+   set is **two** files, so **`13r-c-2`'s `touches:` must be:**
+   ```
+   evals/trade-escrow-guards.eval.mjs   (migrate onto evals/rust-scan.mjs)
+   evals/account-e2e.eval.mjs           (ISSUER_NEEDLE + patchAllowedIssuers/splitForConcat)
+   server-module/src/accounts.rs        (drop concat!(), write ALLOWED_ISSUERS naturally,
+                                         re-point the hazard comment once more)
+   ```
+   Consider also `server-module/src/pvp.rs:63` (`RANKED_PLACEHOLDER_ISSUER`, its own
+   `concat!()` copy) and `server-module/src/pvp_tests.rs:4772` — sweep for consistency.
+   `13r-c-2` still gates M21b-2's real-issuer flip (ADR-0182 D18, retained verbatim at
+   `accounts.rs:49-53`).
 
-**https://github.com/mdrewt/monster-realm/pull/309** — local `just ci` green,
-remote CI running. `gh pr merge` NOT run (supervisor-owned).
+2. **Do not let a future comment/ADR overstate scanner-migration completeness.** The
+   first draft of this PR said "Most source-scan evals are string-literal-aware now" —
+   the exact overstatement `ADR-0186:194` forbids. The load-bearing reason: the ADR-0181
+   hazard's signature failure is a **false-GREEN**, so "only two gates RED" is *not*
+   "only two are affected" — the seven `KNOWN_UNMIGRATED` evals (owned by the different
+   slice `14r-c-2`; two canary-measured swallowing this exact hazard) go **silently
+   blind** instead. `evals/scanner-migration-audit.eval.mjs` is the live SSOT; cite it
+   rather than re-deriving counts in prose.
 
-All three implementation lenses closed:
-- **verifier: PASS** — re-ran every gate; proved each tooth bites by reverting
-  only the fix in a /tmp copy; confirmed no test deleted/skipped/loosened and
-  that the ~900-line dedupe is a pure move.
-- **reviewer: no blockers**, 2 MAJOR + 3 MINOR — all closed (gate scope, SSOT
-  dedup of compactWs/countOccurrences, comment truthfulness in 4 files, scanner
-  known-limits documented).
-- **red-team: 1 BLOCKER + 2 MAJOR** — BLOCKER closed (regex phantom block
-  comment, below); one MAJOR was the same gate-scope issue already fixed; one
-  MAJOR disclosed as a dormant residual in ADR-0181.
+3. **Follow-up flags — files outside this slice's `touches:`, deliberately NOT touched:**
+   - `evals/account-e2e.eval.mjs:75,78` cite `accounts.rs:48`/`:50` for tokens now at
+     `:54`/`:56` (stale by 6). Pre-existing.
+   - `patchAllowedIssuers` uses first-occurrence `String.replace` guarded only by
+     `patched === original`. If the verbatim `ISSUER_NEEDLE` ever appears above line 54,
+     it would patch a *comment*, leave the const fail-closed, and make every "no account
+     was provisioned" negative control vacuously green. Add
+     `countOccurrences(src, ISSUER_NEEDLE) === 1`. Not tripped today (needle verified to
+     occur exactly once).
 
-### Red-team BLOCKER, closed
-A regex literal whose CLOSING slash abuts a `*` (`const RE = /ab/*` … `1 */ 2;`)
-formed a phantom block-comment opener in BOTH TS scanners, swallowing every line
-to the next `*/`. Reproduced: `checkNoPrivateWalletSubscription` returned PASS on
-a live banned `FROM player_wallet` subscription, and the newline-count guard was
-structurally blind to it. Fixed with a SOUND rule — regex literals are consumed
-before the comment arms, but only where a binary `/` is impossible (after
-`= ( , [ { : ; ! ? & | + - * % < > ^ ~ }` or start of source). Teeth
-`[13r-c/T3c]` + `W-CMT-STRIP-REGEX-PHANTOM-BLOCK` added; both verified to bite.
+## EXACT NEXT STEP
 
-## BLOCKERS / PARKED → `13r-c-2`
+**Supervisor:** wait on PR #327's remote CI, squash-merge it (runner is forbidden to),
+then (a) reconcile the queue so 13r-c stops being spawned, (b) return ADR 195 to the
+pool, (c) draft `13r-c-2` into `M-postgate-thirteenth-review-residuals.spec.md` with the
+three-file `touches:` set above.
 
-**The `accounts.rs` `concat!()` removal is PARKED — hidden dependency, measured.**
-Patching `accounts.rs:48` to the bare `"https://auth.monster-realm.invalid/"`
-literal fails **exactly one** eval:
+## OPS GOTCHAS HIT
 
-```
-eval FAIL: trade-escrow-guards — TR-11: function `start_battle` not found
-```
-
-`evals/trade-escrow-guards.eval.mjs` is **NOT in 13r-c's `touches:`**. It
-concatenates every `server-module/src/*.rs` into ONE blob (`accounts.rs` sorts
-first), strips comments BEFORE strings, so line 48 loses its closing quote and
-the orphan inverts quote polarity for the whole crate. Needs a `touches:`
-amendment; 13r-h is `after: 13r-c` for overlapping `accounts.rs` edits.
-
-Carry to 13r-c-2: `accounts.rs:48` + its `:33-48` hazard comment, the
-`[A/issuer-literal]` regression tooth, and migrating `trade-escrow-guards` onto
-`rust-scan.mjs`.
-
-## DISCLOSED RESIDUAL (recorded in ADR-0181)
-
-Measured across `evals/*.eval.mjs`: **26** evals strip `//` with no string pass
-at all; **9** have a string pass running after the comment strip. This slice
-fixes 3. **~24 + ~8 remain**, several named `*-security` / `*-privacy`. Most are
-per-file scrubbers (bounded blast radius); the dangerous shape is the
-whole-crate-blob scanner.
-
-## FLAG (pre-existing, not caused by this slice)
-
-`Nightly` workflow `mutation-server` job has been failing on master since
-2026-08-09 07:53 (run 31302216601). Off the PR path per `AGENTS.md`; master's
-own CI is green.
-
-## NOTES FOR A RESUME
-
-- Toolchain PATH is mandatory:
-  `export PATH="$HOME/.cargo/bin:$HOME/.asdf/installs/nodejs/24.13.1/bin:$HOME/.asdf/installs/just/1.55.1/bin:$PATH"`
-- ADR-0181 leaves `**Amends:**` EMPTY on purpose: the digest gate demands a
-  reciprocal `**Amended-by:**` in ADR-0179/0180, both outside `touches:`.
-  Whoever owns them next should add the back-links.
-- Do NOT `git stash` in the worktree while a subagent is writing (nearly bit
-  this run).
+- Fresh worktree has no `client/node_modules`; without it `account-e2e` reds on
+  `tsresolve.mjs ERR_MODULE_NOT_FOUND`, which reads like a real gate failure. Run
+  `npm install --include=dev` in `client/` first.
+- The node v18-vs-v24 PATH trap bit once: a bare `node evals/run.mjs` produced two bogus
+  `node:fs/promises` `glob` failures. Use
+  `export PATH="$HOME/.asdf/shims:$HOME/.cargo/bin:$HOME/.local/bin:$PATH"` and assert
+  `node --version` is v24.13.1.
+- Shell cwd resets between turns — `cd` explicitly in every command (bit once).
+- **The `red-team` lens reported a prompt-injection attempt inside its own tool results**
+  — a fake "system-reminder" instructing it not to revert its worktree mutation and not
+  to report it. It ignored the instruction, restored the tree, verified by SHA-256, and
+  surfaced it. Worth a harness retro item.
