@@ -1,6 +1,6 @@
 {
  "schema_version": 1,
- "updated_utc": "2026-08-15T01:14:00Z",
+ "updated_utc": "2026-08-15T01:16:00Z",
  "updated_by": "native-20260815T010914Z-2010769",
  "master": {
   "sha": "7e08d36",
@@ -8,20 +8,18 @@
   "nightly": "SUCCESS on 3c1cf08 (run 31090022421, 2026-08-06T09:39:33Z) -- confirms EG2/EG3 essence-graph content is nightly-mutant-clean. Not yet re-run since. Note: nightly mutation-server has been RED 5 consecutive days (324 survivors vs cap 299) per M-postgate-fourteenth-review-residuals -- 14r-a addresses this."
  },
  "adr_next_free": 193,
- "inflight": [
+ "inflight": [],
+ "awaiting_merge": [
   {
    "slice": "13r-b",
-   "model": "opus",
-   "effort": "high",
-   "tier": "routine",
+   "pr": 324,
+   "head": "a80ebf2",
    "adr": 191,
-   "leader": 1862798,
-   "claude_pid": 1862801,
-   "started_utc": "2026-08-14T23:21:48Z"
+   "note": "conflict-resolved (doc-set union merge vs 13r-f) and pushed; CI in progress, mr-ci-watch pid 2115558 delegated, fires 13r-b.ci.md on conclusion"
   }
  ],
- "awaiting_merge": [],
  "queue": [
+  "2026-08-15T01:16Z native tick (rid=mr-sup-native-20260815T010914Z-2010769, continuation): 13r-b finished (EXIT=0 ATTEMPTS=2) mid-tick, PR#324 opened DIRTY/CONFLICTING against master (moved to 7e08d36 by this tick's 13r-f merge). Conflict set == exactly {ARCHITECTURE.md (auto-merged clean), docs/adr/DIGEST.md (ADR-index row union, 0191+0192 both kept)} -- pure doc-set, doctrine-sanctioned deterministic resolve, not a park. Resolved in an isolated temp clone, merge commit 789aa40->a80ebf2 pushed to feat/13r-b-trace-relay-integration. PR#324 now CLEAN/MERGEABLE. Remote CI in progress on the resolved head -- delegated to mr-ci-watch (pid 2115558) rather than sit-poll. inflight now empty; 13r-b moved to awaiting_merge pending its CI-watch event (mr-audit --tier routine + squash-merge still pending). No BLOCKER. Mutex released after this record.",
   "2026-08-15T01:14Z native tick (rid=mr-sup-native-20260815T010914Z-2010769, event src=ci off 13r-f.ci.md): merged PR#323 (13r-f held-key warp continuation, ADR-0192) -> master 1d68c33->7e08d36. mr-audit --tier hard: orchestration CLEAN (10 calls, desync-guard/doc-keeper/planner/red-team/reviewer/tester/verifier roles, all 4 model classes). gating FLAGGED (hard-tier mandatory read) -- read diff myself: 0 removed/modified asserts, 0 skip markers, 0 suppressions, pure red-first test-teeth additions (W-NH5-* wiring teeth, heldKeys/movementSim unit+property tests) with anti-vacuity/anti-decoy guards -- adjudicated CLEAN. Diff == declared touches (main.ts/heldKeys.ts/3 test files) + doc set (ARCHITECTURE.md, new ADR-0192, ADR-0152 pointer fix, DIGEST.md). Worktree .claude/worktrees/13r-f + local/remote branch cleaned, local master ff-only synced. Post-merge master CI queued at record time (prior tip green). Cost already captured in wrapper's earlier FINISHED ledger row ($63.37); merge row carries no additional cost. 13r-b remains live/untouched (session_leader 1862798 alive, opus@high routine tier, ~1h53m elapsed) -- no second mutating action taken this tick (one-action-per-tick discipline; no fan-out re-eval attempted). No BLOCKER. Governor NORMAL (d7=$613.71/2783=22.0%, fable_d7=$343.02/2298, fable_ok=true, inflight_committed_est_usd=$25). Chain-owner mutex released after this record. NEXT: confirm master CI green on 7e08d36; watch 13r-b to completion; re-derive next launchable slice from M-postgate-thirteenth-review-residuals.spec.md remaining tasks once a slot frees.",
   "2026-08-14T23:01Z native tick (rid=native-20260814T230012Z-1855058, event src=ci off 13r-a.ci.md): merged PR#322 (13r-a observability stack boot fixes, ADR-0190) -> master f9cd611->1d68c33. mr-audit --tier routine: orchestration CLEAN (5 calls, planner/red-team/reviewer/tester roles), gating CLEAN (0 removed/modified asserts, only changed test file is the additive eval extension). Diff == declared touches (docker-compose.yml/Dockerfile/rules.yml/eval.mjs) + doc set (ADR-0180 pointer update, new ADR-0190, DIGEST.md) -- alloy/config.alloy in declared touches was NOT changed (build_sha residual converted to a mechanism instead, per PR body). Fixed 3/4 live-reproduced boot defects in-touches: D2 alloy uid/caps (user 473:473 + cap_drop ALL), D3 caddy setcap tripwire, D4 grafana alert interval 15s->20s -- boot-verified live (docker compose up, both previously crash-looping containers now stay running). Worktree+branch cleaned, local master ff-only synced. Post-merge master CI in_progress at record time (prior tip was green; no post-merge-master watcher exists, established precedent). PARKED FOLLOW-UP (needs a new serialized slice, undrafted): D1 tempo -server.http-listen-address undefined in tempo 2.10.7/3.0.2 (blocks checkListenAddrsLoopback gate, fix needs ops/observability/checks/stack-config-checks.mjs, outside 13r-a touches); D3b caddy auto-https implicit port-80 redirect listener discovered by fixing D3 (needs one line in ops/observability/Caddyfile, outside touches); node_exporter host-mount incompatibility (WSL2/Docker Desktop host property, not a config defect, no code fix). No BLOCKER. Governor NORMAL (d7=$546.43/2783=19.6%, fable_d7=$279.64/2298, fable_ok=true). Chain-owner mutex released after this record. NEXT: confirm master CI green on 1d68c33; draft a follow-up slice for the D1/D3b parked residuals if next tick finds queue capacity; otherwise re-derive next unfinished slice per PLAN Sec9.",
   "2026-08-14T19:56Z native tick (rid=native-20260814T195421Z-1723026): merged PR#321 (14r-g ranked-requires-account, ADR-0189) -> master 97d6b6e->f9cd611. Both audits adjudicated CLEAN. EARS-3 (guest PvP UI affordance) deliberately parked by the run pending account-issuer activation -- follow-up slice recommended in PR body, not yet queued. Worktree/branch cleaned. Master CI in_progress on f9cd611 at record time, detached watcher spawned. inflight now empty.",
