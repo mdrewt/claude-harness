@@ -8,6 +8,11 @@ license = "MIT"
 crate-type = ["cdylib"]
 
 [dependencies]
-# Match the SpacetimeDB version you publish against (the docs target 2.x).
-# Uncomment when you implement tables/reducers (see src/lib.rs sketch). Version-specific.
-# spacetimedb = "2"
+# Pin this to the SAME version as the `spacetime` CLI/host you publish against.
+# The crate version IS the product version (since crate 2.0.0): CLI 2.8.1 <-> crate
+# 2.8.1. There is no crate/product decoupling — if these drift you are writing
+# against a different API than you deploy on. Check with:
+#   spacetime --version
+#   curl -s https://crates.io/api/v1/crates/spacetimedb/versions | head
+# Uncomment when you implement tables/reducers (see src/lib.rs sketch).
+# spacetimedb = "2.8.1"
