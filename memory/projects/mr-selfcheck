@@ -37,6 +37,7 @@ EOF
 # lp-09: the kill switch is the operator's only control while pacing is manual. Its fail-safe (no
 # provenance => OPERATOR => never auto-clearable) is the property that must never regress silently.
 "$MEM/mr-hold" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-hold selftest"; BAD=1; }
+"$MEM/mr-branch-audit" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-branch-audit selftest"; BAD=1; }
 # python heredocs embedded in bash wrappers. `bash -n` above cannot see inside them, yet that is
 # where most of the real logic lives (mr-record's cost path, mr-native-tick's reconcile/gate-2/
 # rate-limit-arming). Without this, a python syntax error in any of them ships silently and only

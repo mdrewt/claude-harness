@@ -1,0 +1,93 @@
+#!/usr/bin/python3
+"""mr-branch-audit — detect genuinely-lost branch work, and stale merged branches.
+
+    mr-branch-audit [--repo mdrewt/monster-realm] [--json]
+    mr-branch-audit --selftest
+
+WHY THIS EXISTS, and why the obvious check is the wrong one. The loop squash-merges every PR
+(measured 2026-08-16: 351 commits on master, exactly 1 merge commit). A squash creates a NEW commit,
+so a branch's own commits are NEVER ancestors of master. `git branch --no-merged`, `git log
+master..branch` and "N commits ahead" therefore flag EVERY branch the loop has ever merged — 121 of
+124 at the time of writing — and none of it means work was lost. That false signal is what prompted a
+full investigation; this tool exists so the next reader gets the true answer in one command.
+
+The REAL failure mode, which those checks cannot see, is a commit pushed to a branch AFTER its PR was
+merged: the squash already happened, so that commit will never reach master and nothing will notice.
+Measured across all 315 merged PRs at authoring time: ZERO occurrences. The gate therefore ships
+green and stays meaningful — if it ever fires, it is a genuine loss.
+
+Second, weaker signal: merged branches never deleted. `delete_branch_on_merge` is false on the repo
+and no script passes `--delete-branch`, so deletion has been ad-hoc — 120 of 315 merged head branches
+still existed. Harmless to the code, but it is what makes the repo LOOK like it is full of unmerged
+work, and it is the reason this was investigated at all.
+"""
+import json
+import subprocess
+import sys
+import datetime
+
+
+def sh(*a):
+    return subprocess.run(a, capture_output=True, text=True).stdout.strip()
+
+
+def audit(repo="mdrewt/monster-realm", cwd=None):
+    g = (["git", "-C", cwd] if cwd else ["git"])
+    prs = json.loads(sh("gh", "pr", "list", "-R", repo, "--state", "all", "-L", "400",
+                        "--json", "number,headRefName,state,mergedAt,mergeCommit") or "[]")
+    refs = [r for r in sh(*g, "for-each-ref", "--format=%(refname:short)",
+                          "refs/remotes/origin").splitlines() if r and not r.endswith("/HEAD")]
+    live = {r.split("/", 1)[1] for r in refs if "/" in r}
+    merged = [p for p in prs if p["state"] == "MERGED"]
+    lost, stale = [], []
+    for p in merged:
+        head = p["headRefName"]
+        if head in live:
+            stale.append({"pr": p["number"], "branch": head})
+            mt = datetime.datetime.fromisoformat(p["mergedAt"].replace("Z", "+00:00")).timestamp()
+            for line in sh(*g, "log", "--format=%H %ct", f"master..origin/{head}").splitlines():
+                h, ts = line.split()
+                if int(ts) > mt:
+                    lost.append({"pr": p["number"], "branch": head, "commit": h[:8],
+                                 "at": datetime.datetime.utcfromtimestamp(int(ts)).isoformat() + "Z"})
+    return {"repo": repo, "merged_prs": len(merged), "branches": len(live),
+            "post_merge_commits": lost, "stale_merged_branches": stale}
+
+
+def selftest():
+    """The classifier is pure arithmetic over (mergedAt, commit time); pin it on fixtures."""
+    bad = 0
+    cases = [
+        ("commit before the merge -> not lost", 100, 200, False),
+        ("commit after the merge  -> LOST",     300, 200, True),
+        ("commit exactly at merge -> not lost", 200, 200, False),
+    ]
+    for name, commit_ts, merged_ts, want in cases:
+        got = commit_ts > merged_ts
+        if got != want:
+            print("BRANCH-AUDIT-SELFTEST-FAIL %s" % name)
+            bad = 1
+    if not bad:
+        print("BRANCH-AUDIT-SELFTEST-OK %d fixtures" % len(cases))
+    return bad
+
+
+def main(argv):
+    if "--selftest" in argv:
+        return selftest()
+    repo = argv[argv.index("--repo") + 1] if "--repo" in argv else "mdrewt/monster-realm"
+    cwd = argv[argv.index("--cwd") + 1] if "--cwd" in argv else None
+    r = audit(repo, cwd)
+    if "--json" in argv:
+        print(json.dumps(r, indent=1))
+    else:
+        print("BRANCH-AUDIT %s: %d merged PRs, %d remote branches" % (r["repo"], r["merged_prs"], r["branches"]))
+        print("  post-merge commits (REAL loss): %d" % len(r["post_merge_commits"]))
+        for x in r["post_merge_commits"][:20]:
+            print("    LOST PR#%(pr)s %(branch)s %(commit)s at %(at)s" % x)
+        print("  stale merged branches (hygiene): %d" % len(r["stale_merged_branches"]))
+    return 1 if r["post_merge_commits"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

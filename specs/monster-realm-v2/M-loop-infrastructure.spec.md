@@ -447,6 +447,40 @@ live tree, whose expected answer changes the moment `15r-sec-a` merges. On that 
 documented-only parser returns empty, a retirement-blind parser returns `B2`, a two-shape parser
 misses 10 of 15 declaring files, and the correct parser returns `15r-sec-a` (ADR-0010).
 
+### lp-git-workflow — squash on the branch, fast-forward onto the base (MED, MED)
+`touches: memory/projects/mr-brief-template.md, memory/projects/mr-supervisor-prompt-native.md, .claude/hooks/guard-bash.mjs, memory/projects/mr-branch-audit`
+`after:` lp-00 · `blocked:lp-00` — coordinate with `15r-f`, which creates the protection object this
+depends on (see the ordering note below).
+
+**Measured: 120 of 120 merged PRs produced a merge commit whose SHA differs from the branch tip** (§6).
+Squash-merge already gives linear history and one commit per feature; what this buys is **ancestry** —
+merge state becoming mechanically true instead of needing a tool to interpret. **The constraint that
+shapes the design: GitHub's PR button cannot fast-forward** — all three methods create new commit
+objects, and "Rebase and merge" rewrites SHAs even when the branch already sits on the base, so
+switching the button would deliver none of the benefit. A true FF means pushing the branch's own commit
+onto the base (`git push origin <branch>:<base>`), moving the merge out of `gh pr merge`.
+**Ordering: land after `15r-f`**, whose `enforce_admins: false` is what permits that push — incidental
+before, load-bearing now — and extend its canary to exercise a real FF.
+
+Three deliberate changes, each with a cost worth naming rather than absorbing. **(1)** The run squashes
+its own branch to one Conventional Commit **at terminal state only**, with `--force-with-lease` — the
+continuous `wip:` checkpoint-push discipline is unchanged during the work, because it exists so a
+rate-limit stop never loses progress; only the final collapse rewrites. **(2)** `guard-bash` must
+permit `--force-with-lease` on a slice branch while still blocking any force-push to `main`/`master`.
+**(3)** Doctrine's *"NEVER rebase or resolve code"* becomes: rebasing **one squashed commit** onto the
+base is permitted and expected; a conflict there is a judged resolve-or-park, not an automatic park.
+That rule was written when a branch was a dozen `wip:` commits, where rebasing is genuinely hazardous.
+
+EARS: WHEN a run reaches terminal state, its branch SHALL contain exactly one commit ahead of the base.
+WHEN the supervisor merges, the base's new tip SHA SHALL equal the branch tip SHA. WHEN a branch is
+parked or carries `wip:` commits, THE SYSTEM SHALL NOT squash or force-push it. WHEN a force-push
+targets `main` or `master`, THE SYSTEM SHALL refuse.
+Tests: proof-of-teeth — after one real slice, `git branch --merged` names it and `git log base..branch`
+is empty (neither is true for any of the 124 branches today); a parked-branch fixture must be refused
+by the squash step; a force-push-to-base fixture must be refused by `guard-bash`. `mr-branch-audit`
+gains an assertion that merged branches are ancestors of the base, which is only satisfiable under FF
+(ADR-0010).
+
 ### lp-10 — Reboot-only PID guard (MED, LIGHT)
 `touches: memory/projects/mr-native-tick.sh`
 `after:` lp-00 · `blocked:wave-1-exit`
@@ -1091,4 +1125,13 @@ Recorded here and as one row in `memory/decisions-log.md`.
   written back into its EARS. It is now a record of shipped work rather than a brief to hand a
   session, so the decomposition signal the bound exists to raise does not apply; the implementation
   detail lives in §2.6, not in the entry.
+- **Why `lp-git-workflow` exists, measured 2026-08-16.** Master carries 351 commits and exactly **1**
+  merge commit — every PR is squash-merged, so a branch's own commits are never ancestors of master.
+  `git branch --merged`, `git log master..branch` and "N commits ahead" therefore flag **121 of 124**
+  branches and mean nothing about lost work. A full investigation off that false signal found **zero**
+  actually-lost commits: no commit was ever added after its PR merged (checked across all 315 merged
+  PRs), the five apparent partial-captures were all `ARCHITECTURE.md`/ADR files master also changed,
+  and the one closed-unmerged PR (#289) was deliberately superseded by #290. The genuine defect was
+  hygiene — `delete_branch_on_merge` false and 120 merged branches never deleted, which is what made
+  the repo look full of outstanding work. `mr-branch-audit` now reports both signals directly.
 - **`lp-09` runs alone.** It is the file that stops the loop.
