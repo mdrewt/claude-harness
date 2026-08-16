@@ -4,9 +4,9 @@ slug: spacetimedb
 domain: toolchain
 tags: [spacetimedb, database-oriented-design, reducers, subscriptions, wasm-modules, realtime-multiplayer, state-sync, row-level-security, scheduled-reducers, clockwork-labs, serverless-backend]
 status: active
-updated: 2026-06-27
+updated: 2026-08-16
 confidence: high
-sources: 18
+sources: 24
 supersedes:
 abstract: "Database-that-is-a-server: logic runs as in-DB transactional reducers; clients subscribe to SQL for live row-deltas."
 ---
@@ -15,11 +15,13 @@ abstract: "Database-that-is-a-server: logic runs as in-DB transactional reducers
 
 A **project-agnostic** architecture and decision reference for SpacetimeDB (Clockwork Labs), covering the "database IS the server" mental model; the WASM module runtime; reducers as the only write path; SQL subscriptions as built-in interest management; row-level security and views for access control; scheduled reducers as the server game-loop tick; the storage and concurrency model; and the full tradeoff surface for choosing (or rejecting) SpacetimeDB on a real-time multiplayer project.
 
-Version anchor: **SpacetimeDB 2.6.0** — confirmed the **Latest** release (tagged 16 Jun 2026). The docs are versioned at the **2.0.0** line (the current docs major; 2.0 shipped early 2026 with substantial breaking changes from 1.x), and releases 2.1–2.6 continue under that docs line with no second major. **2.6.0** specifically added primary-key support for **Views** (Rust/TS/C#), event-table automigration improvements, commitlog tuning knobs (default `write_buffer_size` raised 8KiB→128KiB), ARM-cross-compiled CLI binaries, and a deterministic-reducer-randomness docs clarification (full changelog v2.5.0…v2.6.0). Behavior here is verified against the live **2.0.0** docs and the **v2.6.0** release notes.
+Version anchor: **SpacetimeDB 2.8.1** — confirmed the **Latest** release (12 Aug 2026) via `GET /releases/latest`, the crates.io `max_version`, and the npm `latest` dist-tag. The docs are versioned at the **2.0.0** line (the current docs major; 2.0 shipped early 2026 with substantial breaking changes from 1.x), and releases 2.1–2.8 continue under that docs line with no second major. See **§13 (Version notes)** for the full 2.6.0 → 2.8.1 delta, and **§12** for the coding-agent/MCP surface added in 2.8.1. Behavior here is verified against the live **2.0.0** docs, the GitHub release notes, and — for the version-sensitive claims — the tagged source of `crates/bindings`, `crates/bindings-macro`, `crates/cli` and `crates/core` at `v1.12.0`, `v2.6.0` and `v2.8.1`.
+
+> **The single most-mistaken fact about this project.** The `spacetimedb` **Rust crate version IS the product version — always has been, in both majors.** SpacetimeDB is a single-version monorepo: `[workspace.package] version` equals the product version at every tag (`1.0.0`→"1.0.0", `1.11.0`→"1.11.0", `1.12.0`→"1.12.0", `2.6.0`→"2.6.0", `2.8.1`→"2.8.1"), and the crate is published from it. Crate `2.6.0` shipped 16 Jun 2026 alongside CLI 2.6.0; crate `2.8.1` alongside CLI 2.8.1. **`1.12.0` (4 Feb 2026) is the last 1.x crate**, published 16 days before 2.0.0. So if a project pins `spacetimedb = "1.12"` against a 2.x CLI, it is a **full major version behind** — the pin matched the CLI *of the day it was written* and then stopped following it. **There has never been a crate/product version decoupling to appeal to.** Verify with `curl -s https://crates.io/api/v1/crates/spacetimedb/versions`.
 
 Pairs with [[netcode-authoritative-multiplayer]] (the DB is the authoritative server) and [[state-sync-interest-management]] (subscriptions are the interest-management layer). Touches [[online-game-security-anticheat]] where access control and server-authoritative validation are discussed.
 
-**Confidence: high** for the architecture and the 2.x/2.6.0 facts — verified against the live official docs (version 2.0.0) and the confirmed **v2.6.0** GitHub release. **Caveat:** SpacetimeDB is still young (1.0 shipped March 2025, 2.0 early 2026) and churns APIs across versions, so re-verify version-sensitive specifics against the current docs. A few internals (e.g. exact per-language WASM overhead) remain **[UNVERIFIED]** and are flagged inline.
+**Confidence: high** for the architecture and the 2.x/2.8.1 facts — verified against the live official docs (version 2.0.0), the GitHub release notes, and the tagged crate/CLI/host source. **Caveat:** SpacetimeDB is still young (1.0 shipped March 2025, 2.0 early 2026) and churns APIs across versions, so re-verify version-sensitive specifics against the current docs. **Where the docs site and the crate source disagree, the crate source wins** — §5 documents a live case (RLS) where the docs materially oversell a feature the crate marks unimplemented. A few internals (e.g. exact per-language WASM overhead) remain **[UNVERIFIED]** and are flagged inline.
 
 ---
 
@@ -85,11 +87,37 @@ This is **built-in state replication**. SpacetimeDB automatically mirrors releva
 
 ### 5. Row-level security and views
 
-SpacetimeDB provides two **complementary** mechanisms here — the earlier "use Views instead of RLS" framing is outdated; the current 2.x workflow uses both for different jobs:
+> ### ⚠ RLS DOES NOT WORK. Do not design access control around it.
+>
+> **Verified against `crates/bindings/src/lib.rs` at BOTH `v1.12.0` and `v2.8.1`** — unchanged across the entire 1.x→2.8.1 span:
+>
+> ```rust
+> #[cfg(feature = "unstable")]
+> #[doc(inline, hidden)] // TODO: RLS filters are currently unimplemented, and are not enforced.
+> pub use spacetimedb_bindings_macro::client_visibility_filter;
+> ```
+>
+> `#[client_visibility_filter]` is (a) behind the `unstable` Cargo feature and (b) carries the crate's own TODO saying it is **unimplemented and not enforced**. A module using it **publishes clean and filters nothing** — a silent data leak, not a loud failure.
+>
+> **The docs site oversells this.** The prose quoted below is the vendor's official 2.x workflow description, and it is what an agent reading the docs (or a doc-fetch MCP server) will be told. It does not match the shipped crate. **When the docs and the crate disagree, the crate wins.** Re-check this TODO on every version bump before trusting RLS — the day it is deleted, RLS becomes usable.
+>
+> **What to do instead:** put must-never-leak data in a **private table** (the default) and expose exactly the caller's own rows through an **owner-scoped `#[view]`** keyed on `ctx.sender()` — a real, stable, enforced mechanism (§5 "Views", below).
 
-**RLS filters — the access-control / client-scoping layer.** Per the official 2.x workflow, *"RLS filters restrict the data view server-side before subscriptions are evaluated; these filters can be used for access control or client scoping."* They are SQL access rules declared in the module (`#[client_visibility_filter]` in Rust, `[SpacetimeDB.ClientVisibilityFilter]` in C#); each is a `SELECT` optionally filtered by the special `:sender` parameter (the caller's Identity), applied automatically to every subscription (evaluated as OR; recursive across RLS-protected tables). This is what stops a client subscribing to rows it should not see — the defense-in-depth boundary in [[online-game-security-anticheat]]. (The module-level RLS *filter API* may still carry an `unstable` feature flag in some language bindings — verify for your pinned version.)
+SpacetimeDB nominally provides two mechanisms here; in practice, as of 2.8.1, only one of them works:
 
-**Views — read-only computed functions.** A View is a `public`, context-only function that queries tables and returns derived/aggregated/joined results, **subscribable** like a table and auto-updating when its inputs change; it runs inside a transaction (consistent snapshot). Use Views for computed data a client needs server-side — **not** as a substitute for RLS access control. (2.6.0 added **primary-key support for Views** in Rust/TS/C#; C++ view PKs are slated for a later release.)
+**RLS filters — the *intended* access-control / client-scoping layer, NOT YET FUNCTIONAL (see the box above).** Per the official 2.x workflow, *"RLS filters restrict the data view server-side before subscriptions are evaluated; these filters can be used for access control or client scoping."* They are SQL access rules declared in the module (`#[client_visibility_filter]` in Rust, `[SpacetimeDB.ClientVisibilityFilter]` in C#); each is a `SELECT` optionally filtered by the special `:sender` parameter (the caller's Identity), intended to be applied automatically to every subscription (evaluated as OR; recursive across RLS-protected tables). **Treat this paragraph as a description of the roadmap, not of shipped behavior.**
+
+**Views — read-only computed functions, and (today) the *working* scoping mechanism.** A View is a `public`, context-only function that queries tables and returns derived/aggregated/joined results, **subscribable** like a table and auto-updating when its inputs change; it runs inside a transaction (consistent snapshot). Views serve two jobs: computed/derived data a client needs server-side, **and** — because RLS does not work — per-caller row scoping, via an owner-scoped view over a **private** table:
+
+```rust
+// The table stays PRIVATE (the default). The view is the entire security boundary.
+#[spacetimedb::view(accessor = my_wallet, public)]
+fn my_wallet(ctx: &spacetimedb::ViewContext) -> Option<PlayerWallet> {
+    ctx.db.player_wallet().owner_identity().find(ctx.sender())
+}
+```
+
+Two hazards, both load-bearing: (1) **the view body IS the security boundary** — a multi-row (`Vec`) view has no return-type bound on the result set, so the filter must be pinned by a test/eval, signature included; (2) **a view that accepts an extra `owner`-style parameter is a caller-chosen-owner leak** — scope only on `ctx.sender()`. (2.6.0 added **primary-key support for Views** in Rust/TS/C#; C++ view PKs landed in 2.7.0.)
 
 **Owner exemption**: The module's own Identity (the database owner) has unrestricted access to all tables regardless of RLS. This is relevant for [[online-game-security-anticheat]]: admin tools and server-side diagnostics can always read full state.
 
@@ -178,7 +206,17 @@ The highest-leverage practical guidance is **decompose tables by access pattern,
 
 **Workflow:** `spacetime init --template <name>` scaffolds a working module + client; the templates and a published "LLM benchmark" reflect a deliberate push to make the platform legible to coding agents. The vendor's "build a multiplayer game with Claude Code" walkthrough shows the **start-from-a-working-template, then iterate in small focused prompts** pattern.
 
-> **Caveat (rigorous-build posture):** that walkthrough is a **TypeScript, single-prompt, ~30-minute prototype** on maincloud. The same primitives apply to a Rust, test-first, spec-driven build, but its engineering discipline does not transfer — keep determinism in a pure rule core, gate with tests/evals, and treat a template as a starting scaffold, not a substitute for the standards. **Where the walkthrough's TS / one-shot / maincloud guidance conflicts with the Rust + 2.6.0 + self-hosted specifics, prefer the latter.**
+**Coding-agent surface (as of 2.8.1).** Three distinct things, often conflated:
+
+1. **`spacetime mcp` — a LIVE-DATABASE MCP bridge (new in 2.8.1 exactly; absent at 2.8.0).** `spacetime mcp [database] [-s <server>] [--anonymous]` serves MCP over **stdio**, bridging JSON-RPC to an HTTP route: db-scoped `POST /v1/database/<db>/mcp` (added 2.7.0) or host-wide `POST /v1/mcp` (added 2.8.1, used when no database argument is given). Auth is inherited from the saved CLI token. Protocol `2025-06-18`. It exposes exactly five tools — `list_databases` (host-wide mode only), `ping`, `get_schema`, `sql`, `call`. Registration for Claude Code:
+   ```json
+   { "mcpServers": { "spacetimedb": { "command": "spacetime", "args": ["mcp"] } } }
+   ```
+   **It is marked UNSTABLE, and it requires a running instance** — it introspects a live database (schema, SQL, reducer calls). It is **not** a documentation server and does **not** replace a docs-fetch MCP; there is no `logs`, `publish`, or docs-search tool. There is no official MCP npm/cargo package — the only distribution is the `spacetime` binary itself.
+2. **Docs for LLMs:** `https://spacetimedb.com/llms.txt` and `https://spacetimedb.com/docs/llms-full.txt`. A repo-scoped doc-fetch MCP (e.g. gitmcp over `clockworklabs/SpacetimeDB`) is the other option — **pin it to the tag you actually build against**, because an unpinned/master-pinned server will describe a *newer* API than a version-pinned crate provides, and agents will cite it as the contract.
+3. **Scaffolded agent rules:** `spacetime init` has emitted `CLAUDE.md`, `AGENTS.md`, `.windsurfrules`, `.cursor/rules/*.mdc` and `.github/copilot-instructions.md` since at least 2.6.0 — this is *not* new in 2.8.x. It does not emit a `.mcp.json`. A `.claude-plugin/marketplace.json` exists on `master` but is **not** in the v2.8.1 tag.
+
+> **Caveat (rigorous-build posture):** that walkthrough is a **TypeScript, single-prompt, ~30-minute prototype** on maincloud. The same primitives apply to a Rust, test-first, spec-driven build, but its engineering discipline does not transfer — keep determinism in a pure rule core, gate with tests/evals, and treat a template as a starting scaffold, not a substitute for the standards. **Where the walkthrough's TS / one-shot / maincloud guidance conflicts with the Rust + self-hosted specifics pinned in this document, prefer the latter.**
 
 ---
 
@@ -224,8 +262,8 @@ The in-memory, global-mutex architecture is not a secret flaw — it is a delibe
 **4. SpacetimeDB does not replace client-side netcode; it replaces the server tier.**
 Client prediction, entity interpolation, lag compensation, and the two-clocks decoupling (see [[netcode-authoritative-multiplayer]] §2–§6) are still entirely the client developer's responsibility. SpacetimeDB delivers authoritative state deltas via subscriptions; what the client does with those deltas to produce a smooth, low-latency experience is unchanged. Do not mistake "subscriptions deliver state changes in real time" for "netcode is solved." The subscription callback fires when the server commits a state change — that is equivalent to receiving a server snapshot, not a smoothed interpolated position.
 
-**5. Use RLS filters for access control, Views for computed data — they are complementary.**
-Per the current 2.x workflow, **RLS filters** are the server-side mechanism that scopes which rows a client may subscribe to (the per-player visibility case: each player sees only their own inventory, adjacent-zone entities, etc.) via `:sender` Identity filtering. **Views** are for derived/aggregated read-only data computed server-side. Do not treat Views as an RLS replacement (an older docs framing) — use each for its job, and verify the RLS filter API stability flag for your pinned version.
+**5. Enforce per-client visibility with private tables + owner-scoped Views. RLS is not enforced (as of 2.8.1) — do not rely on it.**
+The docs present **RLS filters** (`#[client_visibility_filter]`, `:sender`) as the row-scoping mechanism, but the Rust crate marks them `unstable` **and** "currently unimplemented, and are not enforced" at both 1.12.0 and 2.8.1 (§5). A module that declares one publishes successfully and leaks anyway. Until that TODO is deleted upstream: make the table **private** (the default) and expose the caller's own rows through a **`public` `#[view]` scoped on `ctx.sender()`**. Pin the view body (and its signature) with a test — the body is the whole boundary, and an extra owner-ish parameter turns it into a caller-chosen-owner leak. Re-check the TODO each version bump; this is the highest-value single line to re-verify in this document.
 
 **6. Design schema evolution into the module from day one.**
 The migration limitations are the most operationally significant constraint for a live game. Columns cannot be removed or reordered by automatic migration. Plan schemas to be additive: if you might change a field, consider whether it should be a separate table row (easily added) rather than a new column (requires default values, cannot be reordered). Follow the incremental migration pattern — the docs describe it explicitly — and test migrations with representative data before shipping.
@@ -254,7 +292,7 @@ In any subscription/replication system (SpacetimeDB or otherwise), split entitie
 
 ## Open questions
 
-- **Version currency.** The pin **2.6.0** is confirmed Latest (16 Jun 2026); 2.0→2.6 were additive/perf releases (no second major), so the 1.0→2.0 migration checklist in the docs remains the breaking-change reference. Re-confirm Latest before a new project — the 2.x line iterates fast.
+- **Version currency.** The pin **2.8.1** is confirmed Latest (12 Aug 2026); 2.0→2.8 were additive/perf releases (no second major), so the 1.0→2.0 migration checklist in the docs remains the breaking-change reference — **and there is still no official 2.6→2.8 upgrade guide** (`/docs/upgrade/` is the 1.0→2.0 document). The release notes plus source diffs are the only migration sources. Re-confirm Latest before a new project — the 2.x line iterates fast.
 
 - **What is the RAM budget for the project's world state?** This is the binding capacity constraint. Estimate the number of entities × bytes per entity and add headroom for indices and the WAL buffer. SpacetimeDB provides no automatic sharding or disk-overflow path.
 
@@ -268,15 +306,50 @@ In any subscription/replication system (SpacetimeDB or otherwise), split entitie
 
 - **Is the project's game-server workload read-heavy or write-heavy?** The global RWMutex allows multiple concurrent readers or one exclusive writer. A workload with many short writes and lighter reads is the sweet spot. A workload with expensive View computations competing with writes could cause reader starvation or writer starvation depending on mutex fairness policy.
 
-- **Is Procedures (HTTP I/O from within a module) required?** As of 2.0 launch, Procedures were in Beta. If the project needs to call external services (payment APIs, anti-cheat backends, third-party matchmaking) from within the module, verify that Procedures are stable in the pinned 2.6.x version before depending on them.
+- **Is Procedures (HTTP I/O from within a module) required?** **Procedures are STABLE in the 2.x line — not `unstable`-gated.** Verified in `crates/bindings/src/lib.rs`: at `v1.12.0` the export reads `#[cfg(feature = "unstable")] pub use spacetimedb_bindings_macro::procedure;`, and at **both `v2.6.0` and `v2.8.1` that `cfg` line is absent** (same for `ProcedureContext`). The `unstable` feature still exists, it just no longer gates procedures. **A project that believes procedures are beta/unstable is reading its own stale 1.x pin, not the 2.x platform** — and note the trap: the *docs* requirement text is byte-identical between 2.6.0 and 2.8.1, so a docs-only check confirms the wrong answer. This is the §5 lesson again: the crate wins.
+
+- **Does anything parse `spacetime describe --json`?** If so, it breaks with **CLI 2.8.0+ — and this is a property of the CLI, not the host.** `crates/cli/src/api.rs::module_def` returns `RawModuleDefV9` and requests `version=9` at 2.6.0/2.7.1; at 2.8.0+ it returns `RawModuleDefV10`, requests `version=10`, and *on a client error falls back to `version=9` and upgrades the V9 result to V10 before printing*. So a 2.8.x CLI emits `{"sections":[…]}` even against an old host, and a 2.6.0 CLI emits the flat `{"reducers":[…],"tables":[…]}` even against a 2.8.1 host. Reducer entries also lose `lifecycle` and gain `source_name`/`visibility`/`ok_return_type`/`err_return_type`. Parse by **payload shape**, never by a probed host version. Separately, 2.7.1 made V10 serialization preserve column defaults, shifting `describe`/schema-snapshot output again — re-baseline those gates on the upgrade.
+
+- **Is there a module test harness yet?** **No.** GitHub issue #2833 is still open; there is no `spacetime test`; `crates/testing` remains `publish = false` (internal), and the new `crates/dst` deterministic-simulation crate is an internal harness, not a user-facing API. The pure-rule-core + integration-test split (§7 below) remains the only workable approach.
 
 ---
 
 ## Version notes: SpacetimeDB 2.x
 
-**Confidence: high** — verified against the live official docs (version label "2.0.0") and the confirmed **v2.6.0** GitHub release.
+**Confidence: high** — verified against the live official docs (version label "2.0.0"), the GitHub releases API, crates.io/npm registry APIs, and the tagged source of `crates/bindings`, `crates/bindings-macro`, `crates/cli` and `crates/core`.
 
-**2.6.0** (Latest; released 16 Jun 2026): primary-key support for **Views** in Rust/TypeScript/C# (C++ view PKs deferred); layout-altering automigrations now allowed for **event tables**; commitlog config knobs (`max_segment_size`, `write_buffer_size` default 8KiB→128KiB, `preallocate_segments`); Timestamp primary keys in C#; ARM-cross-compiled CLI binaries; deterministic-reducer-randomness docs clarification. (Full changelog v2.5.0…v2.6.0.)
+### The 2.6.0 → 2.8.1 delta (5 releases, 153 commits)
+
+Releases in the window: **2.6.1** (1 Jul), **2.7.0** (22 Jul — the GitHub release is published on tag `v2.7.0-hotfix3`; the plain `v2.7.0` tag has no release notes), **2.7.1** (30 Jul), **2.8.0** (5 Aug), **2.8.1** (12 Aug, Latest). Several `-hotfixN` tags exist with no release notes and no crates.io/npm artifact.
+
+**Breaking changes — TypeScript client only. The Rust module side is additive.**
+
+| # | Change | Version | Impact |
+|---|---|---|---|
+| B1 | `spacetime generate --lang typescript` emits **camelCase** table/view accessors (`conn.db.playerWallet`). snake_case retained as `@deprecated` aliases — both runtime getters *and* TS types — "removed in the next major". Reducer accessors unchanged. | 2.7.0 | Regeneration produces a bindings diff; **existing client code still compiles**. |
+| B2 | Generated `Option<T>` fields: `{ foo: T \| undefined }` → `{ foo?: T \| undefined }` | 2.6.1 | The only PR in the window labelled `api-break`. |
+
+**Rust module SDK (2.6.0 → 2.8.1): only three source files changed.** Additive: 8 context-capability traits (`CtxDbRead`/`CtxDbWrite`/`CtxWithSender`/`CtxWithTimestamp`/`CtxWithSenderAuth`/`CtxWithTxManagement`/`CtxWithRng`/`CtxWithHttp`, 2.7.1); `DbContext` deprecated; `ProcedureContext::identity()` deprecated in favour of `database_identity()`; `#[default(value)]` accepts `&'static str` for `String` columns (2.8.1); granular table traits and generated `TableAccessor` marker types (2.7.0). **MSRV (1.93.0), edition (2024), crate features, wasm target and the module ABI are all unchanged.**
+
+**Host / CLI**
+- **`spacetime mcp`** — new in **2.8.1 exactly** (absent at 2.8.0). See §12.
+- `spacetime lock` / `spacetime unlock` (guard against accidental database deletion), `spacetime sql --format json` (2.7.0).
+- Adding `#[unique]` / `#[primary_key]` to an **existing** table is now a **non-breaking automigration** when the data satisfies the constraint; it fails during precheck and names the duplicates otherwise (2.7.0).
+- Scheduled reducers compute the next interval from the reducer's own `timestamp` parameter instead of `Timestamp::now()` — removes accumulated drift on interval schedules (2.7.1).
+- TypeScript **submodules**: import/mount modules under a namespace; namespaced `spacetime call`/`sql`; `ModuleDef` gains a `submodule` field, so a submodule-using module requires host ≥ 2.8.0 (2.8.0).
+- C# .NET 10 + NativeAOT-LLVM (2.7.0); C++ primary keys on procedural views (2.7.0).
+
+**Observability (all Prometheus; no OTel, no tracing export, no self-hosted dashboard).** `GET /v1/metrics` and `/v1/prometheus/sd_config` already existed at 2.6.0 and are **unauthenticated** behind a permissive CORS layer (the auth middleware in `crates/client-api/src/routes/metrics.rs` is written but commented out) — do not expose them publicly. New *series* in the window: WebSocket disconnect/rejection cause breakdowns, idle-timeout counters, outgoing-queue-full disconnects, server-measured client ping/pong RTT, `module_host_init_attempts`, view-vs-reducer work separation (`view_call_time_usec`, `view_calls_triggered_by_reducer`), richer startup/snapshot-replay metrics. One genuinely new *detector*: `spacetime_scheduled_function_delay_seconds` plus a `log::warn!` when a scheduled function starts late — **the source threshold is 30 ms at 2.8.0 and 2.8.1; the 2.8.0 release note's "50ms" is wrong.** Also new: `GET /internal/task-dump` (tokio task backtraces), alongside the pre-existing `/internal/heap` jemalloc pprof endpoints. Still absent: slow-*reducer* warnings, per-database metrics endpoints, metrics config keys, JSON log format. Energy accounting is inert on standalone (`withdraw_energy` returns `Ok(())`; "The energy balance code is obsolete").
+
+**⚠ 2.8.0 log-level change.** Routine host logs for client-connection lifecycle, SQL queries, JWT lookups, PostgreSQL processing, migration planning and reducer errors were "reduced to quieter levels or module logs." Anything that *parses host log output* must be re-verified after upgrading. (Module-emitted `log::` breadcrumbs are unaffected.)
+
+**Unchanged and still true at 2.8.1:** RLS remains `unstable` + "unimplemented, and are not enforced" (§5); the module wasm ABI is major **10** (`spacetime_10.0`…`10.5`); `RawModuleDef` still accepts `V8BackCompat | V9 | V10`.
+
+**Procedures are NOT unstable in 2.x** (a common misreading — see Open questions): `#[procedure]` and `ProcedureContext` lost their `#[cfg(feature = "unstable")]` gate at or before `v2.6.0`. They were gated at `v1.12.0`, which is why a 1.x-pinned project sees them as beta.
+
+**Upgrade compatibility (verified from source).** A module built against crate **1.12.0** imports `spacetime_10.0`…`10.4`; a 2.8.1 host implements `10.5` and accepts any same-major module with a minor ≤ its own — so **an existing 1.x-built module still publishes and runs on a 2.8.1 host.** Bumping the crate is therefore a deliberate improvement, not a forced migration. The 1.x→2.x source port is small and compiler-guided: replace `name = <ident>` with `accessor = <ident>` on `#[table]`/`#[view]`/`#[index]`, and `ctx.sender` (field) with `ctx.sender()` (method); `ReducerContext::identity()` becomes a deprecation warning (use `database_identity()`). The canonical SQL table name **defaults to the accessor identifier**, so this rename is schema-neutral — no table renames, no migration. `crates/bindings-macro/src/table.rs` emits this migration advice in its own compile errors.
+
+**2.6.0** (16 Jun 2026): primary-key support for **Views** in Rust/TypeScript/C# (C++ view PKs deferred to 2.7.0); layout-altering automigrations now allowed for **event tables**; commitlog config knobs (`max_segment_size`, `write_buffer_size` default 8KiB→128KiB, `preallocate_segments`); Timestamp primary keys in C#; ARM-cross-compiled CLI binaries; deterministic-reducer-randomness docs clarification.
 
 Key changes introduced in **2.0** (breaking from 1.x):
 - Reducer argument broadcasting removed; replaced by explicit **event tables** for cross-client notification
@@ -293,7 +366,7 @@ Key changes introduced in **2.0** (breaking from 1.x):
 - `withModuleName` replaced by `withDatabaseName` on client connection builder
 - Private items excluded from `spacetime generate` by default; use `--include-private` to include
 
-**Module languages as of 2.x**: Rust, C#, C++, TypeScript (TS compiles to a JS bundle rather than Wasm). Parity is close but not exact — e.g. **C++ does not yet support primary keys on Views as of 2.6.0** (slated for a later release). See https://spacetimedb.com/docs/intro/language-support for the current matrix.
+**Module languages as of 2.x**: Rust, C#, C++, TypeScript (TS compiles to a JS bundle rather than Wasm). Parity is close but not exact, and the gaps move release to release — e.g. C++ gained primary keys on procedural views in 2.7.0, and TypeScript gained submodules in 2.8.0 (Rust has no submodule support). See https://spacetimedb.com/docs/intro/language-support for the current matrix.
 
 **Unreal Engine** support added officially September 2025 (after 1.0, before 2.0). Unreal SDK uses C++ and Blueprint.
 
@@ -313,9 +386,15 @@ Key changes introduced in **2.0** (breaking from 1.x):
 10. https://spacetimedb.com/blog/introducing-spacetimedb-1-0 — Tyler Cloutier, "Introducing SpacetimeDB 1.0," March 4, 2025; production announcement, BitCraft backstory
 11. https://gdcvault.com/play/1035359/-Database-Oriented-Design-Why — GDC 2025, "Database-Oriented Design: Why We Built Our MMORPG Inside a Database," presented by SpacetimeDB
 12. https://github.com/clockworklabs/SpacetimeDB/issues/2833 — GitHub issue #2833: "testing reducers" — open feature request for isolated test environments, multi-identity test scenarios
-13. https://github.com/clockworklabs/SpacetimeDB/releases/tag/v2.6.0 — Release v2.6.0 (16 Jun 2026, Latest): View primary keys (Rust/TS/C#), event-table automigration, commitlog knobs, ARM CLI binaries, deterministic-reducer-randomness docs note
+13. https://github.com/clockworklabs/SpacetimeDB/releases/tag/v2.6.0 — Release v2.6.0 (16 Jun 2026): View primary keys (Rust/TS/C#), event-table automigration, commitlog knobs, ARM CLI binaries, deterministic-reducer-randomness docs note
 14. https://spacetimedb.com/docs/intro/what-is-spacetimedb — "What is SpacetimeDB?": database-that-is-a-server, in-memory + commit log, RLS-filters-before-subscriptions workflow, read-only state mirroring
 15. https://spacetimedb.com/docs/functions — Functions overview: the reducers vs procedures vs views capability matrix (procedures beta; views read-only/subscribable)
 16. https://spacetimedb.com/docs/tables — Tables: in-memory + auto-persist, data-oriented design (ECS as a relational subset), decompose-by-access-pattern, private/public visibility, system tables, per-language accessors
 17. https://spacetimedb.com/blog/building-with-claude-code — vendor walkthrough (Jan 2026): template-start + small-prompt iteration, maincloud dashboard, scheduled-table game loop (a TypeScript prototype)
 18. https://spacetimedb.com/blog/databases-and-data-oriented-design — Data-oriented design: tables as the full relational model vs. ECS as a strict subset
+19. https://github.com/clockworklabs/SpacetimeDB/releases/tag/v2.8.1 — Release v2.8.1 (12 Aug 2026, **Latest**): `spacetime mcp` + Codex plugin, `#[default]` for `&'static str`, subscription-removal deadlock fix, TS `readUInt8Array` owned-copy fix, Unity domain-reload support
+20. https://github.com/clockworklabs/SpacetimeDB/releases/tag/v2.8.0 — Release v2.8.0 (5 Aug 2026): TypeScript submodules (`ModuleDef.submodule`), scheduled-function-lateness warning + Prometheus metric, routine host logs quieted
+21. https://github.com/clockworklabs/SpacetimeDB/releases/tag/v2.7.0-hotfix3 — Release "v2.7.0" (22 Jul 2026) — **note the tag**: the plain `v2.7.0` git tag is a stale mid-cycle version bump; the release notes live on `v2.7.0-hotfix3`. Contains the **breaking TypeScript camelCase codegen change**, `spacetime lock`/`unlock`, `sql --format json`, `AddConstraint` automigration, expanded Prometheus metrics
+22. https://github.com/clockworklabs/SpacetimeDB/releases/tag/v2.7.1 — Release v2.7.1 (30 Jul 2026): scheduled-interval drift fix (uses the reducer's `timestamp`), TS SDK reconnect on `visibilitychange`/`focus`/`online`/`pageshow`, V10 schema serialization retains column defaults, Convex migration guide
+23. https://crates.io/api/v1/crates/spacetimedb/versions — canonical proof that the Rust crate version tracks the product version (2.0.0 onward) and that 1.12.0 is the last 1.x crate
+24. https://raw.githubusercontent.com/clockworklabs/SpacetimeDB/v2.8.1/crates/bindings/src/lib.rs — the authoritative RLS status: `#[cfg(feature = "unstable")]` + `// TODO: RLS filters are currently unimplemented, and are not enforced.` (identical at `v1.12.0`)
