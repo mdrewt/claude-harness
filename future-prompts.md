@@ -105,7 +105,7 @@ ultracode ultraplan ultrathink
 
 # Build-loop prompt — implement the Monster Realm (v2) milestones
 
-The build-phase companion to milestone-loop-prompt.md (which *specs*); this one *builds* the specs into a real project under projects/. Run it in the harness at ~/projects/ai-apps/claude-harness, working in the **real Ubuntu/WSL** via Desktop Commander (a persistent wsl -d Ubuntu bash -i shell), per the project's AGENTS.md — never run project commands in the sandbox (Rust 1.96.0 · spacetime 2.6.x · wasm-pack 0.15.0 · node 24.13.1 · just).
+The build-phase companion to milestone-loop-prompt.md (which *specs*); this one *builds* the specs into a real project under projects/. Run it in the harness at ~/projects/ai-apps/claude-harness, working in the **real Ubuntu/WSL** via Desktop Commander (a persistent wsl -d Ubuntu bash -i shell), per the project's AGENTS.md — never run project commands in the sandbox (Rust 1.96.0 · spacetime 2.8.1 · wasm-pack 0.15.0 · node 24.13.1 · just).
 
 
 ## Mission
@@ -522,71 +522,9 @@ No test files, scratch files, or repo modifications were left behind — this wa
 
 
 
-hg-engine-heartgold-generations — Data/Config Integrity Audit
-Scope covered: data/Species.c, data/Evolutions.c, data/Trainers.c, data/Encounters.c, data/itemdata/itemdata.c, data/learnsets/learnsets.json, data/Headbutt.c, data/BabyMons.c, data/SafariEncounters.c, include/config.h, include/constants/item.h, include/constants/species.h (plus the moves/ability/pokemon headers needed to resolve symbols). Read-only; all analysis done with hand-written Python parsers (brace-matching + regex extraction), cross-checked against include/pokemon.h's EvoMethod enum and src/individual/GetMonEvolutionInternal.c's switch statement only to confirm/refute whether a data finding is actually reachable (I did not audit that file's logic otherwise — that's other agents' scope).
-
-Findings, ranked by severity
-HIGH — 7 evolution lines are permanently unreachable (declared method has zero implementation)
-include/pokemon.h's EvoMethod enum declares 50 methods; src/individual/GetMonEvolutionInternal.c implements only 37 (after stripping comments — a naive grep case false-matches a commented-out case). Cross-referencing the 13 methods with no live case against actual usage in data/Evolutions.c (1474/1476 species entries; 2 trailing custom-Mega slots correctly default to "no evolution" via zero-init):
-
-Method	Species affected (file:line)	Target
-EVO_FORM_ARGUMENT	SPECIES_STANTLER (Evolutions.c:3295)	SPECIES_WYRDEER
-EVO_FORM_ARGUMENT	SPECIES_BISHARP (9469)	SPECIES_KINGAMBIT
-EVO_FORM_ARGUMENT	SPECIES_GIMMIGHOUL (14705)	SPECIES_GHOLDENGO
-EVO_LETS_GO	SPECIES_PAWMO (13627)	SPECIES_PAWMOT
-EVO_LETS_GO	SPECIES_BRAMBLIN (13963)	SPECIES_BRAMBLEGHAST
-EVO_LETS_GO	SPECIES_RELLOR (14061)	SPECIES_RABSCA
-EVO_SPIN_* (all 9 variants)	SPECIES_MILCERY (12869-12878)	SPECIES_ALCREMIE (all 9 flavors)
-For all 7 of these, the evolution table has only one entry and no fallback (the other 8 slots are EVO_NONE) — verified by dumping each full 9-slot table. These Pokémon can never evolve through any code path that exists today. This is exactly what the task flagged EVO_FORM_ARGUMENT as a known instance of; the other two families (EVO_LETS_GO, all 9 EVO_SPIN_*) are the "rest" the task asked me to find.
-
-One near-miss I want to be precise about, to avoid overclaiming: EVO_TRADE_SPECIFIC_MON is also commented out (GetMonEvolutionInternal.c:378, //case EVO_TRADE_SPECIFIC_MON:) and used twice (SPECIES_KARRABLAST→SPECIES_ESCAVALIER, SPECIES_SHELMET→SPECIES_ACCELGOR, Evolutions.c:8951/9343). However, both entries have a second, working table row right after them using EVO_OTHER_PARTY_MON (which is implemented, GetMonEvolutionInternal.c:182-186) targeting the identical species. So Karrablast/Shelmet evolution is not actually broken — it's just carrying one dead/redundant table row alongside a functioning alternate trigger (level up with the other species in the party instead of via trade). Not reporting this as broken.
-
-MEDIUM — BabyMons.c breeding bug: two evolved forms hatch as themselves instead of their baby
-Verified by cross-referencing data/BabyMons.c against data/Evolutions.c (evolution edges) and data/Species.c (egg groups, to rule out inert Undiscovered-egg-group species):
-
-data/BabyMons.c:840 — [SPECIES_HAKAMO_O] = SPECIES_HAKAMO_O (should be SPECIES_JANGMO_O, per :839)
-data/BabyMons.c:841 — [SPECIES_KOMMO_O] = SPECIES_KOMMO_O (should also be SPECIES_JANGMO_O)
-Jangmo_o/Hakamo_o/Kommo_o are all EGG_GROUP_DRAGON (breedable, not Undiscovered), and Evolutions.c:11667/11681 confirms the real chain Jangmo_o→(lvl35)→Hakamo_o→(lvl45)→Kommo_o. Confirmed reachable: SPECIES_JANGMO_O appears in data/Encounters.c (wild) and SPECIES_HAKAMO_O is on a trainer's team in data/Trainers.c. Breeding a Hakamo_o or Kommo_o with a Ditto today produces an egg that hatches directly into a Hakamo_o/Kommo_o instead of a baby Jangmo_o — skips the entire level-up ladder. Every other 2-/3-stage family in the same file (e.g. Bulbasaur/Ivysaur/Venusaur all → SPECIES_BULBASAUR) redirects correctly; this pair is the outlier.
-
-data/BabyMons.c:924 — [SPECIES_RUNERIGUS] = SPECIES_RUNERIGUS (self-maps) vs. its sibling data/BabyMons.c:620 — [SPECIES_COFAGRIGUS] = SPECIES_YAMASK (correct). Runerigus and Cofagrigus share identical egg groups (EGG_GROUP_MINERAL/EGG_GROUP_AMORPHOUS, both breedable), so this is a genuine inconsistency in the same table. I could not confirm SPECIES_YAMASK_GALARIAN (Runerigus's pre-evolution) is itself wild/trainer-reachable in the in-scope data files (0 hits in Encounters/Trainers/Headbutt/Safari — it may be obtainable via a static/gift script outside this audit's scope), so I'm ranking this Medium rather than High, but the data defect itself is confirmed regardless of reachability.
-Note for completeness: SPECIES_SILVALLY and SPECIES_NAGANADEL show the identical self-mapping pattern, but both are EGG_GROUP_UNDISCOVERED/EGG_GROUP_UNDISCOVERED (Type: Null and Poipole are also Undiscovered) — i.e. not breedable at all, so this is inert. Also confirmed: of the ~400 species entirely absent from BabyMons.c (all Mega/Gigantamax/regional-variant/cosmetic-form slots), zero are both breedable and reachable via Encounters/Trainers/Headbutt/Safari, so that large "missing" set is not a live issue.
-
-LOW — numeric literal instead of symbolic constant in an evolution table (landmine, not currently broken)
-data/Evolutions.c:3954 (SPECIES_KIRLIA→SPECIES_GALLADE) and :5074 (SPECIES_SNORUNT→SPECIES_FROSLASS) both write { EVO_STONE_MALE, 109, SPECIES_GALLADE } / { EVO_STONE_FEMALE, 109, SPECIES_FROSLASS } — a bare 109 where every other one of the ~1900 other item/move/species evolution params in the file uses a symbolic constant. 109 does currently equal ITEM_DAWN_STONE (include/constants/item.h:115), so this is not presently a crash or wrong-item bug — but it is the one place in the whole file where an item-id renumbering (very plausible mid-rebase, as this repo's own framing warns) would silently break without any compiler diagnostic, while every symbolic reference elsewhere would track the renumbering automatically. Grep confirms this is the only raw-numeral instance in Species.c/Trainers.c/Evolutions.c/Encounters.c/Headbutt.c/SafariEncounters.c/BabyMons.c for species/item/move/ability fields.
-
-LOW — Species.c genderRatio precision/rounding bug (cosmetic, quantified)
-27 of 1476 species carry a genderRatio byte that is exactly one unit off the canonical Pokémon gender-ratio byte table {0,31,63,127,191,225,254,255}:
-
-26 species (e.g. SPECIES_CLEFAIRY at data/Species.c:2031, plus Clefable/Vulpix/Ninetales/Jigglypuff/Wigglytuff/Cleffa/Igglybuff/Snubbull/Granbull/Corsola/Azurill/Skitty/Delcatty/Luvdisc/Glameow/Purugly/Minccino/Cinccino/Gothita/Gothorita/Gothitelle/Oricorio/Comfey/Cursola/Mega Clefable) have 190 instead of the canonical 191 (the "75% female" tier).
-SPECIES_LITLEO has 222 instead of the canonical 225 (the "87.5% female" tier).
-This is not random corruption — it exactly matches floor(254 × p) for p ∈ {0.125, 0.25, 0.5, 0.75, 0.875} (254×0.75=190.5→190, 254×0.875=222.25→222), which happens to reproduce the other canonical values (31, 63, 127) by coincidence but diverges from the two upper female-biased tiers. A generator script clearly computed the byte from a percentage rather than using the fixed 8-value lookup table. Runtime impact is negligible (a 0.4-1.2 percentage-point shift in gender odds via pid_low_byte < genderRatio), not a crash — flagging for precision/rounding correctness per your instructions to probe this hardest, but this one is genuinely low-stakes.
-
-LOW — itemdata.c: invalid/sentinel numeric type literal (confirmed inert)
-.naturalGiftType uses raw numerals 18 (701 items) and 31 (759 items) instead of symbolic TYPE_* constants across data/itemdata/itemdata.c. 18 happens to equal TYPE_TYPELESS; 31 does not correspond to any defined type (valid range is 0-19, plus sentinel 255) — out of range. However, I verified all 1460 occurrences pair with .naturalGiftPower = 0, and Natural Gift only ever reads these fields for berries — 0 real berries in the whole table use either sentinel. Confirmed dead/inert in every instance; flagging only for hygiene.
-
-LOW — config.h: one dead option, one comment/name mismatch
-DISABLE_END_OF_TURN_WEATHER_MESSAGE (include/config.h:106) has zero references anywhere in src/, include/, or armips/ — toggling it does nothing.
-The comment above FOG_WEATHER_MISTY_TERRAIN (include/config.h:204-205) calls the option FOG_SETS_MISTY_TERRAIN in prose, but the actual macro (and the one #ifdef site that consults it, src/battle/battle_input.c:841) is FOG_WEATHER_MISTY_TERRAIN. Purely a documentation typo — the real macro is wired correctly — but someone editing based on the comment text alone would add the wrong name.
-Checked and ruled out as a bug: IMPLEMENT_LEVEL_CAP ships enabled by default with LEVEL_CAP_VARIABLE 0x416F. I was concerned an unset save-file variable (defaults to 0) would cap every Pokémon at level 0 from turn one, but src/pokemon.c's GetLevelCap() explicitly guards if (levelCap > 100 || levelCap == 0) levelCap = 100; — safe.
-Verified clean (quantified, per your "say so with the count" instruction)
-Species.c: 1476/1476 designated entries, exactly covering indices 0..MAX_SPECIES_INCLUDING_FORMS(1475), zero duplicates/undefined/out-of-range keys. Zero undefined or out-of-range references across all 1476 entries' types, wildHeldItems.{common,rare}, eggGroups, expRate (growth rate), and abilities fields. Zero species with partially-zeroed base stats (some-but-not-all stats = 0). The only all-zero-stat entries (SPECIES_508..SPECIES_543, 36 species) are explicitly blank placeholder slots (name "-----", identical to SPECIES_NONE's own template) and are not referenced anywhere else in Evolutions.c/Trainers.c/Encounters.c/Headbutt.c/SafariEncounters.c/learnsets.json — inert, not a live bug. (I also verified the widespread "mega stone held by the pre-evolution" pattern in wildHeldItems, e.g. Bulbasaur holding ITEM_VENUSAURITE — this is a deliberate, file-wide, ~300-instance-consistent design convention matching official Gen 6+ wild-held-item mechanics, not a data-shift bug.)
-Evolutions.c: Zero undefined/out-of-range species symbols in any source or target position, including MON_WITH_FORM(...)-encoded targets (confirmed the encoding is a real, intentional engine idiom via PokeFormDataTbl.c/FormToSpeciesMapping.c/PokeOtherFormMonsNoGet(), not a bug). Zero EVO_*≠NONE entries with target SPECIES_NONE. Zero self-targeting (infinite-loop) evolutions. Zero undefined/out-of-range item or move params outside the 2 flagged above. All 18 EVO_HAS_MOVE entries' required move is confirmed learnable by the correct pre-evolution via at least one of Level/TM/Egg/Tutor pools in learnsets.json — 0/18 unreachable.
-Trainers.c: 738/738 trainers, contiguous indices 0..737, no duplicates. Zero undefined trainerClass/item/species/move/ability symbols across 1798 party-Pokémon entries. Zero levels outside 1-100. Zero parties >6 members (TRAINER_SOURCE_MAX_PARTY_SIZE). Zero trainers declaring TRAINER_DATA_TYPE_MOVES with an all-MOVE_NONE moveset. Zero text-array overflows (>10).
-Encounters.c: 142/142 tables clean across every land/surf/rock-smash/old-good-super-rod slot and every swarm species — zero undefined/out-of-range species, zero level violations (all within 1-100, min≤max), zero rates >100, zero array-length mismatches. The ENCDATA_* enum (144 entries) matches usage exactly (142 used, 1 explicitly named ENCDATA_UNUSED_142).
-itemdata.c: 2688/2688 entries — exactly MAX_TOTAL_ITEM_NUM+1, zero gaps, zero duplicates, zero undefined item keys.
-Headbutt.c: 1080 tree-encounter slots, zero undefined/out-of-range species, zero level-range violations.
-SafariEncounters.c: 2484 slot entries across all 12 SAFARI_ZONE_AREA_* tables, zero undefined/out-of-range species, zero level-range violations.
-learnsets.json: Valid JSON, 1110 species. Zero undefined species/move symbols across LevelMoves/MachineMoves/EggMoves/TutorMoves. Zero levels outside 0-100. Zero duplicate (move, level) pairs, zero duplicates within any move pool. 365 species defined in Species.c have no separate learnset entry — all 365 confirmed to be Mega/Gigantamax/cosmetic-form/regional-cap/unused-placeholder species, and 0 of them are reachable via any wild/trainer/headbutt/safari table, consistent with them sharing their base species' moveset by engine design rather than being a real gap.
-Symbol tables: ITEM_*, MOVE_*, ABILITY_* constants have zero duplicate-value collisions in their valid ranges. The 10 SPECIES_* duplicate values found are all intentional "SECTION_START" anchor constants (e.g. SPECIES_MEGA_START == SPECIES_MEGA_VENUSAUR) used for X - SECTION_START arithmetic elsewhere in the codebase, not bugs.
-All commands were read-only (git status shows no tracked-file changes from this session); no files were modified and the build was not run.
 
 
-
-
-
-
-
- ultracode Go ahead and skip the playtest gate and greenlight Phase D now. I agree that the fisrt milestone is M21 and that it deserves heavy planning (per the "§6 HEAVY CEREMONY (operator's pipeline, kept intact)" section of the `mr-feedback-doctrine`) where "execution" refers to writing a thorough and fully detailed set of specs/milestones/ADRs with all the information needed for a future tick to implement it. Additionally, I would like M20 (Observability, performance & load hardening) to be the next milestone worked on after M21 and for M20 to also receive heavy planning (per the heavy ceremony).For context, I would like to achieve a level of obserability + metrics + telemetry + tracing + profiling + analytics + logging equal to (or better than) that provided by Datadog withg a properly configured project, but I want to use free and open-source tools that I can host locally instead of relying on 3rd party services. To achieve this, I am considering using OpenTelemetry and selecting from various compatible tools such as Prometheus, Graphana OSS, OpenTelemetry OSS, Apache Doris, SigNoz, Loki, Temp, Uptrace, and several other related tools that can be hosted and deployed locally in docker containers. I have not decided on which tools to use, so I will trust your best judgement. You may recommend the best combination of tools that fit this project's needs (monster realm is an open-source indie MMORPG built by a single developer using Rust, SpacetimeDB, Typescript, and PixiJS). You are not limited to the tools that I have listed and may suggest any other tools that you believe would be best for the project. The final set of tools that you select should be able to integrate with each other well (preferably not overlapping in purpose too much) and be compatible with SpacetimeDB and any tools it natively supports for logging/debugging/tracing/profiling (etc...). You may do research as you deem necessary and ask me any questions that you judge to be useful. Keep in mind that the majority of the implementation of these features will by done by future ticks of the hourly task. 
+ ultracode Go ahead and skip the playtest gate and greenlight Phase D now. I agree that the first milestone is M21 and that it deserves heavy planning (per the "§6 HEAVY CEREMONY (operator's pipeline, kept intact)" section of the `mr-feedback-doctrine`) where "execution" refers to writing a thorough and fully detailed set of specs/milestones/ADRs with all the information needed for a future tick to implement it. Additionally, I would like M20 (Observability, performance & load hardening) to be the next milestone worked on after M21 and for M20 to also receive heavy planning (per the heavy ceremony).For context, I would like to achieve a level of obserability + metrics + telemetry + tracing + profiling + analytics + logging equal to (or better than) that provided by Datadog withg a properly configured project, but I want to use free and open-source tools that I can host locally instead of relying on 3rd party services. To achieve this, I am considering using OpenTelemetry and selecting from various compatible tools such as Prometheus, Graphana OSS, OpenTelemetry OSS, Apache Doris, SigNoz, Loki, Temp, Uptrace, and several other related tools that can be hosted and deployed locally in docker containers. I have not decided on which tools to use, so I will trust your best judgement. You may recommend the best combination of tools that fit this project's needs (monster realm is an open-source indie MMORPG built by a single developer using Rust, SpacetimeDB, Typescript, and PixiJS). You are not limited to the tools that I have listed and may suggest any other tools that you believe would be best for the project. The final set of tools that you select should be able to integrate with each other well (preferably not overlapping in purpose too much) and be compatible with SpacetimeDB and any tools it natively supports for logging/debugging/tracing/profiling (etc...). You may do research as you deem necessary and ask me any questions that you judge to be useful. Keep in mind that the majority of the implementation of these features will by done by future ticks of the hourly task. 
 
 
 
@@ -598,35 +536,7 @@ All commands were read-only (git status shows no tracked-file changes from this 
 
 
 
-Process
-Four parallel reviewers (HoF crash, src/battle/, src/+src/field/, data/config), then I re-derived every finding from source myself, then adversarial review of the plan, then of the implementation.
 
-That layering earned its keep — 4 of 13 candidate fixes were killed, two of which would have introduced bugs:
-
-rejected	why
-StatBoostModifiers "missing +6"	states[] is 6-biased (= 6 resets to neutral, == 12 is maxed). Adding +6 would index 6..18 into a 13-entry table — creating the OOB read it claimed to fix
-pokedex.c array[i-1] → array[i]	Looks like an OOB write, isn't. armips/asm/pokedex.s derives the array pointer and the 0x1002 ball-tile write from the same base: array == balltile + 2. The first "digit" write deliberately recolours that tile
-overlay idempotent registration	The duplicate plausibly acts as a crude refcount letting Field and HoF unload independently; collapsing it risks freeing an overlay still in use
-GF_ASSERT, PCStorage, daycare bounds	Real gaps, but no demonstrated reachable trigger; fixing means changing control flow broadly — fails your low-risk bar
-The 9 fixes shipped
-Memory safety
-
-item.c — item table allocated MAX_TOTAL_ITEM_NUM entries, but that's the last id, so ids 0–2686 were covered and the last item read one struct past the heap (including fieldUseFunc, used as a table index). NARC genuinely has 2688 members; the data existed and wasn't loaded
-battle_controller_player.c — two reads used old_moveTbl, declared [467+1] for vanilla's move count. Every expanded move indexed past it into BattleAIWorkTable, corrupting Mirror Move and the last-damaging-move state Counter/Mirror Coat read
-rock_smash_item.c — loop bounded by a 3-entry table while indexing a 2-entry one
-Gameplay data
-
-BabyMons.c — Hakamo-o and Kommo-o self-mapped, so breeding them hatched the evolved form and skipped the line. Runerigus likewise; all five Galarian siblings map to the plain base, so → Yamask. Review confirmed these were the only two live instances
-Latent/robustness — NULL guard on NewMsgDataFromNarc (mirroring its sibling), sizeof vs NELEMS, overlay priority-list row indexing, and a bare 109 → ITEM_DAWN_STONE (item IDs demonstrably shift here).
-
-On the Hall of Fame crash — I have not fixed it
-The best-supported candidate is an overlay slot leak, but it's unproven, and the one change that would address it is exactly what review rejected as risky. The ov63/ov64 overlays and CanOverlayBeLoaded aren't source in this repo, so it can't be closed statically.
-
-One thing that is certain and relevant: when overlay slots do run out, GF_ASSERT(0) is a no-op, so the failure returns FALSE silently and the caller proceeds against an overlay that never loaded. That's consistent with a hang at a transition.
-
-Also worth knowing, since it affects playthrough completeness: 7 evolution lines can never trigger — Wyrdeer, Kingambit, Gholdengo, Pawmot, Brambleghast, Rabsca, Alcremie. Their methods (EVO_FORM_ARGUMENT, EVO_LETS_GO, EVO_SPIN_*) have no case in the handler. That's engine feature work or a data re-point (as the fork already did for Primeape → EVO_HAS_MOVE), so it needs your call rather than a silent fix.
-
-I'll confirm the build and re-run the content audit when it finishes.
 
 
 
@@ -638,3 +548,13 @@ The owner of the upstream repo is a human, so write a detailed explanation of wh
 The execption to the "one fix per PR" rule is when 2 or more fixes depend on each other. In this case, you may bundle dependent changes into the same PR in order to prevent additional issues. Any changes that you deem properly belong to the ROM hack's fork do not need a branch or a PR, they may be kept in the current branch (`hg-generations-full`) along with all the other fixes. Avoid reward hacking when making these (and other) decisions and focus on making the correct determinations.
 
 Finally, create a new branch based off of the current `origin/hg-generations-full` branch and make the "Hall of Fame" fix that was previously deemed risky on this branch, as well as fixing the 7 evolution lines that can never trigger. This will allow an easy rollback if your fix causes any issues, but you should try to resolve it properly and not to create any bugs. Have a reviewer double check your work on the new branch and test it out by compiling the ROM and including all the changes/edited content that the ROM hack intentionally adds so that I can playtest everything. Make sure you don't forget any of the steps that you are supposed to do.
+
+
+
+
+
+ The other session is mid-migration in the project repo (Cargo.toml, lib.rs, ADRs, skills). My remaining work is harness-only, so no collision — but the specs currently tell the loop to build 15r-sec-a on 1.12.0 assumptions, and that becomes wrong within the hour. Re-sequencing first.
+ 
+ 15r-sec-a and 15r-sec-vis now carry blocked:stdb-2x. View primary keys arrive with 2.x, which deletes 15r-sec-a's hardest half — the no-PK ingest reshape. Building it first guarantees rework, and sdk-d says so itself.
+
+ I also have to correct myself: I recorded "crate version ≠ product version" as a fact. ADR-0197 shows that's false — the crate tracks the product since 2.0.0, and 1.12.0 was just a pin that never followed the CLI.

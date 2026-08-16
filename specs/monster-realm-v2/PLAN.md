@@ -1,6 +1,6 @@
 # Monster Realm (v2) — Greenfield Plan
 
-> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#158 + #162–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals CLOSED (a–g, ADR-0112–0117, PRs #180–#193). M17 ranked ladder CLOSED (m17a #196 / m17b #199 / m17c #198, ADR-0119–0121); M17.5 tenth-review residuals CLOSED (ADR-0124–0127). **2026-07-17 playtest-first replan underway** (`playtest-replan-2026-07.md`): M-playtest-a (client build hygiene + local ops, ADR-0128/0129) & M-playtest-b (observability, ADR-0130/0131) CLOSED; M-playtest-c UX completion CLOSED (rename/trade-propose/help, ADR-0132–0135, PR #230); **M-playtest-c.5 pre-gate residuals 6/7 merged** — ptc5a #232 (0136) · ptc5d #234 (0137) · ptc5b #236 (0138) · ptc5c #237 (0139) · ptc5e #238 (0140) · ptc5g #239 (0141) — with **ptc5f (this slice, ADR-0142, ledger reconciliation) closing it out**. **M-playtest-d content pack CLOSED** (pt-d1 #241/ADR-0143, pt-d2 #242/ADR-0144, pt-d3 #244/ADR-0145) — all pre-gate milestones (M-playtest-a/b/c/c.5/d) CLOSED 2026-07-25. **⛩ PLAYTEST GATE RUN 2026-07-25** (Drew's closed solo session; verdict + root-caused findings in `playtest-gate-decision-2026-07-25.md`): CONDITIONAL PASS — core loop engaged despite friction; two concrete input/movement bugs found and two hardening milestones spawned (`M-postgate-netcode-hardening`, `M-postgate-ux-hardening`), reordered to the FRONT of the post-gate queue, `blocked:playtest-gate` LIFTED for those two only. M18+ and the rest of Phase D remain post-gate provisional pending a second, cleaner playtest read (see the Phase D post-gate block).
+> **Status:** In progress — Phase A (M0–M13.5) complete; Phase B (M14) complete; M14.5 residuals complete (PRs #147–#158 + #162–#164); Phase C underway — M15 Trading CLOSED (m15a–m15c, ADR-0106–0108, PRs #165/#168/#170); M16 PvP CLOSED (m16a–m16c, ADR-0109–0111, PRs #172/#176/#178); M-infra-d ADR digest merged (#159/#161); M16.5 ninth-review residuals CLOSED (a–g, ADR-0112–0117, PRs #180–#193). M17 ranked ladder CLOSED (m17a #196 / m17b #199 / m17c #198, ADR-0119–0121); M17.5 tenth-review residuals CLOSED (ADR-0124–0127). **2026-07-17 playtest-first replan underway** (`playtest-replan-2026-07.md`): M-playtest-a (client build hygiene + local ops, ADR-0128/0129) & M-playtest-b (observability, ADR-0130/0131) CLOSED; M-playtest-c UX completion CLOSED (rename/trade-propose/help, ADR-0132–0135, PR #230); **M-playtest-c.5 pre-gate residuals 6/7 merged** — ptc5a #232 (0136) · ptc5d #234 (0137) · ptc5b #236 (0138) · ptc5c #237 (0139) · ptc5e #238 (0140) · ptc5g #239 (0141) — with **ptc5f (this slice, ADR-0142, ledger reconciliation) closing it out**. **M-playtest-d content pack CLOSED** (pt-d1 #241/ADR-0143, pt-d2 #242/ADR-0144, pt-d3 #244/ADR-0145) — all pre-gate milestones (M-playtest-a/b/c/c.5/d) CLOSED 2026-07-25. **⛩ PLAYTEST GATE RUN 2026-07-25** (Drew's closed solo session; verdict + root-caused findings in `playtest-gate-decision-2026-07-25.md`): CONDITIONAL PASS — core loop engaged despite friction; two concrete input/movement bugs found and two hardening milestones spawned (`M-postgate-netcode-hardening`, `M-postgate-ux-hardening`), reordered to the FRONT of the post-gate queue, `blocked:playtest-gate` LIFTED for those two only. M18+ and the rest of Phase D remain post-gate provisional pending a second, cleaner playtest read (see the Phase D post-gate block). **🔧 TOOLCHAIN 2026-08-16 — SpacetimeDB CLI/host 2.6.0 → 2.8.1** (ADR-0197; operator runbook at `../../projects/monster-realm/docs/spacetimedb-2.8.1-upgrade-runbook.md`): **and the Rust module crate 1.12.0 → 2.8.1** (`M-stdb-2x-module-sdk` **EXECUTED** in the same slice). Schema-neutral and non-breaking: 77/77 table names identical, no migration, no client code change; bindings regenerated (camelCase handles, one file); 629 Rust tests green. **Write 2.x module syntax** (`#[table(accessor = x)]`, `ctx.sender()`, `ctx.database_identity()`). Corrects two false facts the corpus had recorded as verified: the "crate ≠ product version" decoupling (there is none — 1.12.0 is just the last 1.x crate) and ADR-0054's "no cargo-feature passthrough". **RLS remains unenforced at 2.8.1** — the re-open triggers in M20 OBS-15/OBS-47, `validation-checklist` item 1, M6/M16/M19/M25 and `security-threat-model` do **not** fire.
 > **Relationship to v1:** This is a *new, from-scratch* project — the spiritual sequel to
 > `projects/pokemon-mmo` (published db `monster-tamer-mmo`). It is **not** that project and does
 > **not** modify it. Working repo name: **`monster-realm`** (rename freely; must stay kebab-case for
@@ -504,6 +504,106 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   Drew-directed) ranked-requires-account enforcement per answered issue #307. TWO decisions
   open (issues mdrewt/monster-realm#313, mdrewt/claude-harness#14 — no slice blocked; only
   sub-steps depend on the answers). Serial: a→b; rest independent.
+- **M-loop-infrastructure** (`M-loop-infrastructure.spec.md`) — **NEW, queued 2026-08-16; placed
+  AHEAD of `M-postgate-fifteenth-review-residuals` by operator decision 2026-08-16.** Pacing through
+  Waves 0–4 is manual (`mr-supervisor-disable`), so the un-clearable kill switch (`lp-09`) and the real
+  utilization gauge (`lp-01`) are pulled to the front, behind only `lp-00`'s harness-PR path; the
+  CRITICAL `15r-sec-a` battle-privacy fix follows them. **The first spec in this corpus for harness work
+  rather than game work** — all 59 others target `mdrewt/monster-realm`. It is filed in this
+  directory deliberately, because the supervisor selects work from PLAN §9 order plus the sibling
+  `M*.spec.md` and a spec filed elsewhere would be invisible to its only consumer; recorded as
+  `decision-defaulted:loop-spec-location=specs/monster-realm-v2/` and revisitable once `lp-08` gives
+  `mr-ready` an explicit spec-root list. Twenty-six slices carrying the post-mortem's four root failures:
+  binary-tripwire instrumentation, no pacing, records-that-are-not-queues, and unbounded context.
+  **`lp-00` is a hard blocker the implementation plan did not contain and spec authoring found:** the
+  loop has **no path to build a harness-repo slice at all** — `mr-launch.sh:18` cds into
+  `projects/monster-realm`, `:56` polls `gh pr list -R mdrewt/monster-realm`, and the brief instructs
+  the run to open its PR there, so a `memory/projects/**` slice would edit the main checkout and open
+  an empty-diff PR; corroborated by the harness having had exactly **2 PRs ever**, both from June
+  interactive sessions. Wave 1 instruments and never gates: **lp-03** nightly failure notification
+  (zero dependencies, ships first; `permissions` must gain `issues: write` in the *same* diff or the
+  step fails silently), **lp-01** reads `seven_day.utilization` — which is not merely discarded but
+  never parsed, because the arming walker's input is pre-filtered on the literal `"rejected"` —
+  **lp-02** ledger columns with a slice-size denominator (259 distinct keys over 710 rows;
+  `master_ci_after` empty on 467; `remote_red_fix_cycles` dead since 2026-07-20), **lp-04** splits
+  `mr-audit`'s policy from its 0-true-positive detector and finally implements the **already
+  documented** disposition-marker audit, **lp-skills** names must-apply skills in the brief keyed to
+  `touches:` (measured: 828 agent invocations vs 34 skill invocations in 30 days — agents fire because
+  the brief names them), plus **lp-brief-cost**, **lp-ollama** (803 warm-ups, 0 invocations),
+  **lp-05**, **lp-06**, **lp-07**, **lp-doc-a**. Wave 2 gives the loop a kill switch it cannot clear
+  and a place to put a residual: **lp-08** `mr-ready` + the one-task-per-tick mode ladder, **lp-09**
+  kill-switch provenance (checked on `rm`, never on `touch`; zero-byte defaults to OPERATOR; **do not
+  neuter `MR_FORCE`**), **lp-10**, **lp-11**, **lp-registry** (implements the existing
+  `parked → <queued spec id | wontfix>` grammar, seeded with a disposition on **every** row so the new
+  audit can pass on the day it ships), **lp-spec-mode** (Tier A/B spec authoring, skill invoked by name,
+  output path pinned), **lp-milestone-mode** (Tier C over an allowlist that ships **populated** with
+  every incomplete milestone in scheduled order — `[M18, M19, M22, M23, M24, M25]` — one per tick),
+  **lp-decision-block** (a milestone with an unresolved blocking decision is barred from spec-writing
+  AND implementation until answered; every tick reads live issue state first — the scoped counterpart
+  to the global `.blocked-on-human`), **lp-disjoint**, **lp-gitattr**. Wave 5 is the credit levers
+  — **lp-12** p90 lookahead spending to ~99% with a floor as well as a ceiling, **lp-13** a
+  cooperative cordon, **lp-14** context segmentation that **must** use a fresh spawn (`--resume` does
+  not reset context, and `mr-launch.sh`'s only relaunch path is `--resume`). Wave 7 ships as sketches.
+  THREE decisions to be opened at W0-Q (Q-B1 attribution-only, Q-B2 overage auto-purchase,
+  Q-SPEC-HOME), none blocking. **The one non-negotiable ordering constraint is R13: instrument → one
+  full reset cycle → gate, never the same slice and never the same week** — the v3 cutover replaced
+  its own instrument in the same commit and is permanently unevaluable.
+- **M-stdb-2x-module-sdk** (`M-stdb-2x-module-sdk.spec.md`; ADR-0197) — **NEW, queued 2026-08-16;
+  placed AHEAD of `M-postgate-fifteenth-review-residuals`.** Bumped the Rust module SDK 1.12.0 → 2.8.1.
+  **COMPLETE 2026-08-16** — verified: CLI 2.8.1, crate 2.8.1, `schema.rs` on `accessor =`. Caveat
+  measured the same day: the work sat in the **working tree, uncommitted**, while `origin/master` was
+  still 1.x, and slices branch from origin — confirm it is committed and pushed before briefing any
+  `15r-*` slice.
+  Slices **sdk-a** module transform (two mechanical rewrites — `name =` → `accessor =` ×61,
+  `ctx.sender` → `ctx.sender()` ×66 — leaving the 16 teeth red on purpose), **sdk-b** gate
+  re-baseline by a *different* agent (golden rule #2), **sdk-c** bindings + client + full CI,
+  **sdk-d** opportunistic follow-ups. **It goes first because it rewrites the exact surface the
+  fifteenth milestone reads:** `schema.rs` table/view attributes, 16 Rust source-scanning teeth, and
+  several `evals/` scanners (`battle-schema-snapshot`, `account-privacy`, `encounter-privacy`,
+  `gate-teeth`, …). Two consequences recorded there and honoured here: **view primary keys arrive**,
+  which deletes the no-PK client-ingest reshape from `15r-sec-a`; and **RLS stays inert at 2.8.1**
+  (verified byte-identical), so private-table + owner-scoped `#[view]` remains the pattern and W0-6's
+  answer stands — do not re-check it.
+- **M-postgate-fifteenth-review-residuals** (`M-postgate-fifteenth-review-residuals.spec.md`) —
+  **NEW, queued 2026-08-16, after `M-loop-infrastructure`** (see that entry for why the loop-infra
+  slices go first; `M-postgate-fourteenth-review-residuals` is fully merged, 7/7). **Provenance differs from ordinals 11–14 and
+  the difference is load-bearing:** not a multi-lens review of a master delta, but the
+  monster-realm-resident subset of the 2026-08-15 build-loop post-mortem (7 lanes, 116 findings, 232
+  adjudications) and its implementation plan v7, every claim re-measured at `67fbff8` on 2026-08-16.
+  Seventeen slices. The headline is a **live data exposure**: **15r-sec-a** `schema.rs:396` is still
+  `#[spacetimedb::table(name = battle, public)]` with `connection.ts:709` subscribing it unfiltered,
+  so every client receives every battle's both-side derived stats — ADR-0042:30 declared M16 blocked
+  from reusing this schema and M16 shipped anyway; it is **R13-exempt and is the first launchable
+  slice of the milestone**, and the mechanism question is now settled (`#[view]` with a `.chain()` of
+  two btree point scans; `client_visibility_filter` is inert — `unstable`-gated *and* documented
+  in-crate as unimplemented/unenforced). **15r-sec-vis** adds `visibility` to the schema snapshot as
+  the regression gate for the whole public-table class (net-new: the 38-table baseline carries only
+  `{pk, columns, order}`), because a one-table fix without a class gate is how ADR-0042 was violated
+  in the first place. Then the scanner-integrity chain: **15r-a2** makes the migration cap advisory
+  so four migration slices cannot race on one line; **13r-c-2** (an id referenced 9× across 3 specs
+  and defined in none, gating M21b-2's issuer flip) migrates the trade family, whose
+  `trade-escrow-guards` blob-scans the whole crate; **15r-sec-mig-a/b/c** own the **seven** blind
+  `*-security` evals whose `KNOWN_UNMIGRATED` owner id `14r-c-2` exists in no spec — two of them
+  canary-measured to *swallow* the needle — with **-c** additionally fixing two verified-dead recruit
+  gate clauses; **15r-sec-mig-d** deletes the park machinery once the ledger empties. Then
+  **15r-d-0/15r-d** retire the `concat!()` dodge (**two** production sites; the account-e2e patcher
+  pins only one, so a silent needle drift is a false green on authentication — and removing the dodge
+  first blinds `pvp-challenge-reaper`, measured PASS→FAIL, which is why the migration is split out), **15r-g** adds `merge=ours`
+  for generated artefacts only (never union on prose; its harness half is `lp-gitattr`), and **15r-f**
+  enables branch protection alone at the wave boundary (measured: `master` is **unprotected**, 404;
+  required checks are the job ids **`ci`** and **`e2e`**, not the display name `CI`). Testing
+  capability follows: **15r-h1** pure-seam extraction as the primary idiom (`evaluate_train` at
+  `server-module/src/raising.rs:121` delegating to `game-core`'s `focus_train` — *not* in game-core,
+  a citation error that would send implementers to the wrong crate), **15r-h2** the CLI harness for
+  the irreducible residue, **15r-consolidate** collapsing the 23 evals / 27,243 lines / 29.1% of eval
+  LOC that regex-scan schema visibility onto the new declarative invariant, **15r-i-1** retiring one
+  subsystem's costume scans, and **15r-tst-i** ratcheting mutation on survival **rate** per module
+  (five red nights were population growth misread as regression). TWO decisions to be opened at W0-Q
+  (Q-B4 battle-visibility hard-refresh — the only one that may escalate, and only against its own
+  slice; Q-B6 consolidate scope). Serial chains: sec-a→sec-vis→consolidate · a′→{13r-c-2, sec-mig-a}
+  →sec-mig-b→sec-mig-c→sec-mig-d · 13r-c-2→15r-d→15r-f · 15r-f→{h1, i-1} · h1→{h2, consolidate,
+  tst-i}. **All four `15r-sec-mig-*` and `13r-c-2` declare `scanner-migration-audit.eval.mjs`, which
+  `mr-disjoint`'s STRUCTURAL `*migration*` rule forces SERIAL-REQUIRED — they cannot fan out.**
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT

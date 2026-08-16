@@ -1628,3 +1628,89 @@ Both verified detached (own sessions, setsid) with correct model class post-laun
 **Slice `13r-c`** was a stale-queue re-spawn (2026-08-15). Investigation found the original scope (`evals/rust-scan.mjs` + de-blinding of 3 security gates, ADR-0181) already merged 2026-08-09 as PR#309 — `monster-realm-handoff.md` already recorded that MERGED row and slice CLOSED. Only one in-`touches:` sub-item remained deliverable without out-of-scope files: correcting the `accounts.rs` hazard comment (it pointed at M21c, which never owned the fix — 13r-c/ADR-0181 and 14r-c/ADR-0186 did). Delivered as PR#327 (`545cc4f` -> squash `b95c9b9`), single 7-line comment change, line-count neutral (doc pins unaffected). Re-measured the parked blocker set on today's master (7eb6980): now **two** gates RED on a bare issuer literal — `trade-escrow-guards` (pre-existing) + `account-e2e` (NEW since 2026-08-09, landed with PR#312/M21b-2). 4 lenses (tester/reviewer/red-team/verifier) PASS; MAJOR-1 fixed pre-merge. mr-audit: orchestration CLEAN, gating FLAGGED-by-tier-policy (mandatory hard-tier read, not a real finding) — adjudicated CLEAN after manual diff read (comment-only, matches memo). Master CI green post-merge (b95c9b9). Worktree/branch cleaned. ADR-195 was reserved but UNUSED — returned to the pool. **Follow-up drafted, not yet spec'd:** `13r-c-2` must own `evals/trade-escrow-guards.eval.mjs` + `evals/account-e2e.eval.mjs` + `server-module/src/accounts.rs` (drop `concat!()`, re-point hazard comment once more) — full detail in `monster-realm-13r-c-progress.md`. Also noted for a harness retro: the red-team lens hit a prompt-injection attempt embedded in its own tool results during this run (fake system-reminder telling it to hide a worktree mutation); it ignored the instruction, reverted, verified via SHA-256, and reported it.
 
 Queue reconciliation: 13r-c must not be spawned a third time — mr-state.json queue updated. 13r-g remains live (in-flight, not touched this tick).
+
+---
+
+## 13r-g — Docs/ledger freshness (2026-08-15) — **PR OPEN, awaiting supervisor merge**
+
+**PR:** https://github.com/mdrewt/monster-realm/pull/328 · branch `feat/13r-g-docs-ledger-freshness`
+· worktree `.claude/worktrees/13r-g` (kept; `client/node_modules` installed there)
+· ADR **0196** (amends 0165). **Items: none.**
+
+**Terminal state:** PR open + local `just ci` **exit 0** (three full runs) + remote CI running.
+`gh pr merge` NOT run (supervisor-owned). Adr next-free should advance past 0196; **0195 was
+deliberately skipped** (supervisor-assigned number kept, and `adr-digest.mjs` requires the 4-digit
+`0196-` filename form — nothing in CI requires contiguity).
+
+**Delivered:** (1) CHANGELOG regen through #326 (34 entries, pure append) as the branch's FIRST
+commit; (2) ADR-0165's never-implemented nightly changelog-freshness check —
+`scripts/changelog-freshness.mjs` + a 72-test tester-authored sibling suite + a 5th `nightly.yml`
+job; (3) `m13.5r-plan.md` → `docs/specs/`.
+
+**The design call worth remembering:** the failure rule is a **lag×age conjunction** (fail iff
+`missing >= 15` AND oldest missing entry `>= 6` days), not a count threshold. Derived by replaying
+the real signal — `git cliff` at each of the last 150 master commits vs that commit's committed
+ledger. Drift here is a **weekly sawtooth reaching 20–26 on a HEALTHY wave**, so `>15` would red
+21 of 32 nights (66%) and `>25` would miss half the real episodes; the conjunction fires 5/32.
+Age is the oldest missing entry's commit date via a verified subject→entry transform (341/341),
+clock injected — **never file mtime**, which in a fresh `actions/checkout` is always ~0 days old
+and would make the gate permanently, silently green.
+
+**Gates:** `just ci` exit 0 (87 evals, 1934 cargo tests, 2447 client tests / 81 files, clippy
+`-D warnings`, wasm, security). `verifier` **PASS** — it re-ran the full CI itself, confirmed the
+gating suite was never edited after the tester's final round (byte-identical across the last two
+commits), that boundary fixtures derive from the exported constants, and ran semgrep `--config
+auto` over both new files (zero findings). **15/15 mutation bite-proofs killed.** Domain auditors
+not run — no server-module/game-core/wasm/reducer/schema surface.
+
+**Ops notes for the next run:**
+- **`node --test <file>` EXITS 0 WHEN THE FILE DEFINES ZERO TESTS** (node 24.13.1 counts the file
+  itself as one passing test). Any nightly/CI step running `node --test` needs a pass-count floor
+  from the runner's own TAP tally — a text count of `it(` is satisfied by a block comment.
+- GitHub's default Linux `run:` shell is `bash -e` **without pipefail**, so `cmd | tee` discards
+  `cmd`'s exit status. Add `shell: bash` when piping.
+- A `git clone --no-hardlinks <worktree>` carries only COMMITTED state — verifying an uncommitted
+  fix in a clone silently tests the old code (cost one confusing round here).
+- `taiki-e/install-action` supports `tool: git-cliff@<version>`; pin the version, since the gate
+  compares generated-vs-committed and an unpinned reader flips every entry on an upstream
+  rendering change.
+
+**Follow-ups this slice could NOT do (all need `evals/` or `justfile` in touches):** (1) MOVE the
+gating into `evals/changelog-freshness-teeth.eval.mjs` so `just ci` catches comparator rot per-PR
+and pins the thresholds cross-directory (do not duplicate the fixtures); (2) a `just
+changelog-check` recipe, and more importantly a `just changelog` that **pins the git-cliff
+version** (the workflow pins the reader at 2.13.1 while `justfile:172` uses whatever the developer
+has); (3) add `changelog-freshness` to `nightly-smoke-wiring`'s guarded-job list (today deleting
+the job or adding `continue-on-error: true` is invisible to `just ci`); (4) a subprocess smoke
+test for `main()` — the suite imports only pure functions, so 18 shell mutations ship suite-green.
+
+**NEXT:** merge #328 after remote CI. Remaining thirteenth-review tail: **13r-h** only
+(`after: 13r-c`, already merged — eligible; structural, touches `server-module/src/schema.rs`, so
+it must run alone).
+
+## 2026-08-15T08:57:55Z — 13r-g CI-watch delegated
+Native tick rid=mr-sup-native-20260815T085725Z-2697721-17620. Event: 13r-g.done.md (run finished rc=0, attempts=1, opus, $50.86 recorded in wrapper's FINISHED ledger row). PR#328 (feat/13r-g-docs-ledger-freshness, ADR-0196 changelog-freshness nightly check) is OPEN, mergeStateStatus=UNSTABLE, ci+e2e checks still pending. Delegated CI-wait to mr-ci-watch (pid 2697825, detached setsid) per doctrine -- did not sit polling. No merge action taken this tick. Remaining thirteenth-review tail per the run's own handoff note: 13r-h only (touches server-module/src/schema.rs, structural, must run alone) -- eligible once 13r-g merges. No BLOCKERs. Chain-owner mutex released after delegation.
+
+## 2026-08-15T09:17:42Z — Native tick 2026-08-15T09:14:47Z (rid=native-20260815T091447Z-2701123) — merged 13r-g
+Fast-path standdown re-check: 13r-g lock's session_leader (2438031) not alive, .done present (EXIT=0 ATTEMPTS=1). No live chain, no chain-owner mutex held. Live-verified PR#328 (feat/13r-g-docs-ledger-freshness, nightly changelog-freshness check ADR-0165 implemented + ADR-0196, docs/scripts rehome) CI green (ci+e2e SUCCESS) and mergeStateStatus=CLEAN, remote matched origin. mr-audit --tier routine: orchestration CLEAN (6 roles: doc-keeper/planner/red-team/reviewer/tester/verifier), gating CLEAN (0 removed/modified asserts). Diff (9 files) within declared touches; ARCHITECTURE.md addendum is minor doc scope, judged in-scope. Squash-merged PR#328 -> 6469503. Cleaned worktree .claude/worktrees/13r-g + local/remote branch feat/13r-g-docs-ledger-freshness. master fast-forwarded b95c9b9->6469503. Ledger row written (MERGED, cost already captured by wrapper's earlier FINISHED row $50.86). Post-merge master CI (run 31876536077) was still in_progress at tick close -- NOT confirmed green this tick; next tick/event must re-verify before trusting master@6469503. Composite launch of 13r-h (next-eligible: 13r-c->13r-h serial chain satisfied, both 13r-c original PR#309 and re-spawn PR#327 merged) DEFERRED this tick: my own ff-only merge write to ARCHITECTURE.md/CHANGELOG.md (09:15:40Z) sits inside mr-spawn's ~6-min active-session write-recency window and would likely PROBE-TRIP as a false positive (same pattern documented at the 2026-08-15T03:41Z tick's 13r-e composite-launch abort) -- not overriding per doctrine. 13r-h is HARD tier (touches schema.rs, server-module/src/accounts.rs, structural-set adjacent) -> fable@xhigh, budget.fable_ok=true (d7 fable $465.91 / allowance $2298, guard $2068.20), adr_next_free=195 (reuse, previously reserved-unused). No BLOCKERs. Releasing chain-owner mutex; standing down for the next tick to launch 13r-h once the write-recency window has aged out.
+
+## 2026-08-15T~09:00Z — 13r-h PR OPEN (terminal state, awaiting supervisor merge)
+Slice 13r-h (Rust test-mirror parity tail, last of M-postgate-thirteenth-review-residuals) built to terminal state: **PR#329 OPEN** (https://github.com/mdrewt/monster-realm/pull/329), branch feat/13r-h-test-mirror-parity @ 0753059, **local full `just ci` GREEN (exit 0)** — the exact remote gate (1949 workspace nextest + 2447 client vitest + 87 evals + security/wasm/typecheck). Do NOT `gh pr merge` early: supervisor owns the squash-merge after remote CI. `Items: none`.
+
+**What shipped (zero production-behavior delta):** (1) accounts_tests.rs G2 mirror → source-derived reducer enumeration at full checkNoClientIdentity parity (wire-safe param allowlist + scheduled-struct-with-guard carve-out + Identity-ctor ban + exact name-set pin) + 9 machinery self-teeth; (2) evolution_tests.rs EG2-9 → derived per-file recursive read_dir scan (7 anchors + basename + body anchors), L1_ALLOWED + vacuity guards preserved; (3) accounts.rs account_state_is_legal pure predicate + 5 debug_asserts (release-compiled-out, exhaustive match) + schema.rs doc note + exact-equality struct-shape tripwire. NO enum fold (non-additive migration, deferred to M22 per ADR-0195 D1).
+
+**Orchestration (HARD tier, all 6 roles):** planner → reviewer+red-team plan review → tester (opus, authored all tests, RED-first) → specialist (general-purpose, red→green production only) → reviewer+reducer-security-auditor impl review → red-team on non-security gates → verifier PASS. Proof-of-teeth T1-T17 all bit with correct attribution. ADR-0195 written (amends 0179, reciprocal back-link), digest + knowledge bundle regenerated.
+
+**touches-delta:** accounts_tests.rs/evolution_tests.rs (sibling tests of declared code files), docs/adr/0195 (new), docs/adr/0179 (backlink only), docs/adr/DIGEST.md (adr-digest regen), docs/knowledge/** 11 files (knowledge regen, line-pin shifts only), ARCHITECTURE.md (1 para). boyscout-delta: none.
+
+**Follow-up residuals (recorded in ADR-0195 consequences — each needs a slice touching evals/** or shared strippers, all OUT of 13r-h scope):** (a) char-literal brace-walk truncation class in EG2-9 + no-idle-accrual.eval.mjs (benign today, 5 pre-existing scheduled reducers anchor-free); (b) SHARED identity-ctor ban gap — both Rust mirror and JS twin miss Identity::from_claims(/from_u256( (latent, needs lockstep Rust+JS extension); (c) stripper-desync self-check is eval-only in the Rust mirror (port assertStripperSound with the shared-Rust-scanner follow-up). Plus still-open ADR-0179 §9: G12 identifier list, write_target_accessors rfind, //-before-strings in 3 evals. Tombstone re-anchor (#307/OQ2) explicitly excluded.
+
+**Two lessons this run (saved to auto-memory):** (1) the recruit-reducer-security.eval.mjs (+ other unmigrated *-reducer-security debt evals) concatenate ALL server-module/src/*.rs INCLUDING *_tests.rs and strip block comments with a naive `/\*...\*/` regex — a stray `/*` substring (e.g. a `src/**` glob) in ANY comment in an alphabetically-early file (accounts*.rs) desyncs `/*`↔`*/` pairing and blanks a LATER file's fn (write_back_battle_results), a false-RED invisible to local module tests and only caught by full `just ci` eval stage. Fixed by dropping the glob from a machinery comment. (2) the doc-keeper subagent resolved a worktree-relative ARCHITECTURE.md edit to the MAIN CHECKOUT path — reverted via Edit tool (NOT git, per the no-mutating-git-on-main rule) and re-applied to the worktree; always verify subagent doc edits landed in the worktree with `git -C <worktree> status`.
+
+**M-postgate-thirteenth-review-residuals is now FULLY CLOSED** once #329 merges (13r-a..h all delivered: PRs 322/324/309+327/325/326/323/328/329).
+
+## 2026-08-15T13:22:01Z — 13r-h merged — thirteenth-review-residuals milestone CLOSED
+Native tick rid=mr-sup-native-20260815T131740Z-2886871. Event: 13r-h.done.md (fable, rc=0, attempts=1, verifier PASS, $61.33 already in wrapper FINISHED row). Live-reverified: PR#329 mergeStateStatus CLEAN, ci+e2e SUCCESS. Diff scope = declared touches (accounts.rs/accounts_tests.rs/evolution_tests.rs/schema.rs) plus expected docs/ADR/knowledge files. mr-audit --tier hard: orchestration CLEAN (8 roles incl. reducer-security-auditor); gating mechanically FLAGGED (hard-tier mandatory read) but adjudicated CLEAN by hand — the 3 flagged 'removed asserts'/'suppressions' were doc-comment text matching assert/#[allow] substrings, not real code; only real assert diff (EG2-9 vacuity guard) was WIDENED from single-source .contains to any-of-derived-sources .contains, matching ADR-0195's derived-scan-sets rationale. No skip/ignore/only markers; diff is 1625 added / 109 removed lines. Squash-merged 67fbff8 (ADR-0195 in). master fast-forwarded 6469503->67fbff8. Worktree .claude/worktrees/13r-h + branch feat/13r-h-test-mirror-parity cleaned. adr_next_free stays 197 (195 was consumed by this slice's real ADR-0195; 196 remains reserved for 13r-g per earlier note -- verify at next ADR reconciliation). Master CI (run 31886864117) still in_progress at tick end after ~2min observed -- NOT sitting to poll it (no open-PR mr-ci-watch target post-merge); next tick/event must re-verify green before any further master-affecting action. This closes M-postgate-thirteenth-review-residuals: all of 13r-a/b/c/d/e/f/g/h now merged. No new slice launched this tick (composite launch deferred pending master CI confirmation). No BLOCKERs.
+
+## 2026-08-15T14:03:40Z — 13r/14r milestones confirmed CLOSED — no launchable slice, native supervisor standing down
+Native tick rid=mr-sup-native-20260815T140011Z-2896235. Fast-path found the sole live-looking artifact (13r-h lock) already dead+done; chain-owner mutex was stale (heartbeat 13:20Z, action=merge-13r-h, session_leader 2724359 dead) with that merge already fully completed (PR#329->67fbff8) by the prior tick — took over, cleaned it plus 6 other stale /tmp/mr_pass_13r-*.done leftovers (all already-merged, live-reverified via gh pr list --state open (empty) and gh run list --branch master (67fbff8 CI SUCCESS)).\n\nLive-reconciled milestone state: M-postgate-thirteenth-review-residuals (13r-a..h) and M-postgate-fourteenth-review-residuals (14r-a..g) are BOTH fully merged (mr-state.json queue history confirms all 15 slice PRs). M20 (m20a-e) and M21a/b/c + M21b-2 also confirmed fully merged (handoff history 2026-08-09/2026-08-14). M21b-3 (Steam) deliberately deferred, not to be launched speculatively.\n\nChecked what's next per PLAN.md Sec9: M22/M23/M24/M25 are all still 'design sketch (provisional)' status — EARS/touches/slices deferred to build time, requiring the same heavy-ceremony spec-elaboration session M20/M21b-2 got (an interactive/Drew-initiated pass), which is explicitly out of scope for a mechanical native tick per repeated prior-tick precedent (2026-08-09T16:01Z, 2026-08-10T~ tick). M-postgate-client-coverage and M-postgate-roster-wave-3 (DE-GATED, governed by the 2026-07-26 playtest-3 directive) remain only PLAN.md bullets with no per-slice touches:/spec decomposition — also not mechanically launchable as-is.\n\nNo BLOCKER (nothing is stuck; there's just no shovel-ready work). Governor NORMAL (d7=89.51/2783=35.6%, fable_d7=27.24/2298, fable_ok=true). Released chain-owner mutex. Writing DONE + recreating .native-supervisor-disabled per doctrine gate 3 ('nothing remains'). \n\nNEXT: wake on (a) an interactive/Drew-run heavy-ceremony spec-elaboration session for M22 (or client-coverage/roster-wave-3 decomposition), or (b) a new weekly-review (fifteenth) inserting fresh residual slices, whichever comes first.

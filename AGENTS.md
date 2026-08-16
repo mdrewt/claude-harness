@@ -67,7 +67,8 @@ the full rationale and `standards/` for the engineering rules.
 
 ## Working style
 - Keep diffs minimal and focused; match the style of the file you're editing;
-  don't reformat untouched code. Flag unrelated issues separately, not inline.
+  don't reformat untouched code, unless appropriately following the boyscout rule. Flag
+  unrelated issues separately, not inline.
 - If you can't verify a change (test, assertion, or repro), say so — don't claim it works.
 - Scope work to the files named; don't explore the whole workspace unprompted —
   use the `researcher` subagent / `/deep-research` so exploration doesn't fill the

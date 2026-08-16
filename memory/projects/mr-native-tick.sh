@@ -122,9 +122,15 @@ done
 
 # gate -1: kill-switch (MR_FORCE=1 overrides the pause for on-demand manual runs)
 if [ -f "$MEM/.native-supervisor-disabled" ]; then
-  if [ "${MR_FORCE:-0}" = "1" ]; then log "NOTE disabled-flag overridden (MR_FORCE=1 manual run)"; else
+  # lp-09: report WHO holds and how deep the queue behind it is. The flag used to be a zero-byte
+  # file written by two indistinguishable actors, and the backlog behind it was invisible — one
+  # done-event once sat 83.9h unprocessed with nothing surfacing that fact.
+  HOLD_BY=$("$MEM/mr-hold" status --json 2>/dev/null | /usr/bin/python3 -c "import json,sys;print(json.load(sys.stdin).get('by') or '?')" 2>/dev/null || echo "?")
+  QDEPTH=$(find "$MEM/pending-events" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l)
+  if [ "${MR_FORCE:-0}" = "1" ]; then log "NOTE hold overridden by MR_FORCE=1 (manual run; hold by=$HOLD_BY REMAINS set) queued_events=$QDEPTH"; else
     [ -n "$EVFILE" ] && [ -f "$EVFILE" ] && case "$EVFILE" in "$MEM/pending-events/"*) : ;; *) mv "$EVFILE" "$MEM/pending-events/" 2>/dev/null;; esac
-    log "SKIP disabled-flag (event requeued: ${EVFILE:-none})"; exit 0; fi
+    QDEPTH=$(find "$MEM/pending-events" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l)
+    log "SKIP hold by=$HOLD_BY (event requeued: ${EVFILE:-none}) queued_events=$QDEPTH"; exit 0; fi
 fi
 
 # gate -0.5: human-gate marker (written by decision runs on gate-class BLOCKERs; makes multi-day

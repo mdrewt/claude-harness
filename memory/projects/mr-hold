@@ -1,0 +1,235 @@
+#!/usr/bin/python3
+"""mr-hold — provenance-aware kill switch for the native supervisor loop (lp-09).
+
+    mr-hold status [--json]
+    mr-hold set   --by operator|supervisor [--reason "..."]
+    mr-hold clear [--by supervisor]        # refuses to clear an OPERATOR hold
+    mr-hold --selftest
+
+Shebang is `/usr/bin/python3` on purpose (asdf `env python3` exits 126 in unpinned cwds).
+
+THE DEFECT THIS CLOSES. `.native-supervisor-disabled` was a **zero-byte** file written by two
+indistinguishable actors: the operator via `~/.local/bin/mr-supervisor-disable` (a bare `touch`) and
+the supervisor itself, because doctrine ordered it to when the queue emptied. Nothing recorded which.
+So "the operator paused to protect credits" and "the loop finished its queue" were the same byte
+sequence, and the loop could clear a pause the operator had set. With pacing manual (operator
+decision 2026-08-16) that flag is the ONLY control over spend, which is what moved this slice to the
+front of the milestone.
+
+THE CORRECTION RUNS OPPOSITE TO THE INTUITIVE FIX, and each half matters:
+
+  (a) Provenance is checked on CLEAR, never on SET. Anyone may pause the loop — that direction is
+      always safe. Only clearing is privileged.
+  (b) Absent-or-empty provenance defaults to OPERATOR, fail-safe, and is never auto-cleared. This is
+      what lets the UNCHANGED `~/.local/bin/mr-supervisor-disable` keep working with no edit outside
+      version control — `~/.local/bin` has no git history, so a `git revert` of this slice could not
+      undo an edit there. The zero-byte flag on disk right now is therefore already an operator hold.
+  (c) MR_FORCE=1 still overrides an operator hold for a manual run. Do NOT neuter it: it is already
+      provenance-scoped by construction — only the operator can set it, and all five child spawners
+      `unset` it, so it cannot reach a spawned session. It is the operator's only escape hatch.
+
+MECHANICAL ENFORCEMENT, not just doctrine. `.claude/hooks/guard-bash.mjs` blocks any Bash command
+that would `rm` the hold file, so a supervisor session cannot clear an operator hold by ignoring the
+rules — `mr-hold clear` becomes the only path, and it checks provenance. That matters because the
+tick never removed the flag itself: the clear always came from an LLM session running `rm`.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+
+MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
+FLAG = os.path.join(MEM, ".native-supervisor-disabled")
+VALID = ("operator", "supervisor")
+
+
+def read_hold(flag=None):
+    """-> None if no hold, else {'by':..., 'reason':..., 'at':..., 'raw_bytes':int}.
+
+    The fail-safe is here and it is the whole design: anything we cannot positively attribute to the
+    supervisor is an OPERATOR hold. Empty file, missing header, garbage, unreadable — all OPERATOR.
+    """
+    # Resolve at CALL time, not definition time. `flag=FLAG` as a default argument binds the live
+    # path permanently, so rebinding the global (as --selftest does) would silently keep reading the
+    # real kill switch — which is how the first version of this selftest "failed" while the code was
+    # fine, and would have hidden a real regression just as easily.
+    flag = flag or FLAG
+    if not os.path.exists(flag):
+        return None
+    try:
+        raw = open(flag, errors="replace").read()
+    except OSError:
+        raw = ""
+    by = "operator"
+    m = re.search(r"^by=(\w+)\s*$", raw, re.M)
+    if m and m.group(1) in VALID:
+        by = m.group(1)
+    rm = re.search(r"^reason=(.*)$", raw, re.M)
+    at = re.search(r"^at=(.*)$", raw, re.M)
+    try:
+        mtime = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(os.path.getmtime(flag)))
+    except OSError:
+        mtime = "?"
+    return {
+        "by": by,
+        "reason": (rm.group(1).strip() if rm else ""),
+        "at": (at.group(1).strip() if at else mtime),
+        "raw_bytes": len(raw),
+        "attributed": bool(m),   # False => defaulted to operator by the fail-safe
+    }
+
+
+def cmd_status(argv):
+    h = read_hold()
+    if "--json" in argv:
+        print(json.dumps(h or {"by": None}))
+        return 0
+    if not h:
+        print("HOLD-NONE loop is enabled")
+        return 0
+    note = "" if h["attributed"] else "  (no provenance record -> defaulted to OPERATOR, fail-safe)"
+    print("HOLD-%s by=%s at=%s bytes=%d%s%s"
+          % (h["by"].upper(), h["by"], h["at"], h["raw_bytes"],
+             ("  reason=" + h["reason"]) if h["reason"] else "", note))
+    return 0
+
+
+def _arg(argv, name, default=None):
+    if name in argv:
+        i = argv.index(name)
+        if i + 1 < len(argv):
+            return argv[i + 1]
+    return default
+
+
+def cmd_set(argv):
+    by = _arg(argv, "--by")
+    if by not in VALID:
+        print("mr-hold set: --by must be one of %s" % (VALID,), file=sys.stderr)
+        return 2
+    reason = _arg(argv, "--reason", "") or ""
+    existing = read_hold()
+    if existing and existing["by"] == "operator" and by == "supervisor":
+        # Never downgrade an operator hold to a supervisor one — that would make it self-clearable.
+        print("HOLD-REFUSED an OPERATOR hold is already in place; refusing to relabel it as "
+              "supervisor (that would make it self-clearable). Nothing changed.", file=sys.stderr)
+        return 1
+    body = "by=%s\nat=%s\nreason=%s\npid=%d\n" % (
+        by, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), reason.replace("\n", " "), os.getpid())
+    d = os.path.dirname(FLAG)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".hold.tmp.")
+    with os.fdopen(fd, "w") as f:
+        f.write(body)
+    os.replace(tmp, FLAG)          # atomic: a tick can never read a half-written hold
+    print("HOLD-SET by=%s%s" % (by, ("  reason=" + reason) if reason else ""))
+    return 0
+
+
+def cmd_clear(argv):
+    h = read_hold()
+    if not h:
+        print("HOLD-NONE nothing to clear")
+        return 0
+    by = _arg(argv, "--by", "supervisor")
+    if h["by"] == "operator":
+        print("HOLD-REFUSED this hold is OPERATOR-set%s and the loop may never clear it. "
+              "The operator clears it with `mr-supervisor-enable`. If a manual run is wanted now, "
+              "use MR_FORCE=1, which overrides without clearing."
+              % ("" if h["attributed"] else " (no provenance record -> fail-safe default)"),
+              file=sys.stderr)
+        return 1
+    if by != "supervisor":
+        print("HOLD-REFUSED --by=%s cannot clear a supervisor hold" % by, file=sys.stderr)
+        return 1
+    os.remove(FLAG)
+    print("HOLD-CLEARED was by=supervisor at=%s" % h["at"])
+    return 0
+
+
+# --------------------------------------------------------------------------------------------
+def selftest():
+    """Fixtures run against a TEMP flag path — never the live one."""
+    global FLAG
+    live = FLAG
+    bad = 0
+    checks = []
+
+    def check(name, cond):
+        nonlocal bad
+        checks.append((name, bool(cond)))
+        if not cond:
+            bad = 1
+
+    with tempfile.TemporaryDirectory() as d:
+        FLAG = os.path.join(d, ".native-supervisor-disabled")
+
+        check("no flag -> no hold", read_hold() is None)
+
+        # (b) the fail-safe: the exact shape ~/.local/bin/mr-supervisor-disable produces
+        open(FLAG, "w").close()
+        h = read_hold()
+        check("zero-byte flag -> OPERATOR", h and h["by"] == "operator")
+        check("zero-byte flag -> not attributed", h and h["attributed"] is False)
+        check("clear refuses a zero-byte (operator) hold", cmd_clear([]) == 1)
+        check("...and the flag still exists afterwards", os.path.exists(FLAG))
+
+        # garbage must not be mistaken for a supervisor hold
+        open(FLAG, "w").write("by=lolwhat\nnonsense\n")
+        check("unrecognised provenance -> OPERATOR", read_hold()["by"] == "operator")
+        check("clear still refuses", cmd_clear([]) == 1)
+
+        # relabelling an operator hold as supervisor is refused
+        check("set --by supervisor over an operator hold is refused",
+              cmd_set(["--by", "supervisor"]) == 1)
+        check("...and it is still an operator hold", read_hold()["by"] == "operator")
+
+        os.remove(FLAG)
+
+        # supervisor hold: self-clearable, and only by the supervisor
+        check("set --by supervisor", cmd_set(["--by", "supervisor", "--reason", "queue empty"]) == 0)
+        h = read_hold()
+        check("supervisor hold reads back", h and h["by"] == "supervisor" and h["attributed"])
+        check("reason round-trips", h["reason"] == "queue empty")
+        check("--by=operator cannot clear a supervisor hold", cmd_clear(["--by", "operator"]) == 1)
+        check("supervisor clears its own hold", cmd_clear(["--by", "supervisor"]) == 0)
+        check("flag gone after an authorised clear", not os.path.exists(FLAG))
+
+        # operator hold WITH provenance is still unclearable by the loop
+        check("set --by operator", cmd_set(["--by", "operator", "--reason", "credit pause"]) == 0)
+        check("attributed operator hold refuses clear", cmd_clear(["--by", "supervisor"]) == 1)
+        check("...flag survives", os.path.exists(FLAG))
+
+        # invalid input
+        check("set with no --by is rejected", cmd_set([]) == 2)
+
+    FLAG = live
+    for name, ok in checks:
+        if not ok:
+            print("HOLD-SELFTEST-FAIL %s" % name)
+    if not bad:
+        print("HOLD-SELFTEST-OK %d fixtures" % len(checks))
+    return bad
+
+
+def main(argv):
+    if len(argv) < 2 or argv[1] in ("-h", "--help"):
+        print(__doc__.split("\n\n")[1].strip())
+        return 0
+    sub = argv[1]
+    if sub == "--selftest":
+        return selftest()
+    if sub == "status":
+        return cmd_status(argv[2:])
+    if sub == "set":
+        return cmd_set(argv[2:])
+    if sub == "clear":
+        return cmd_clear(argv[2:])
+    print("mr-hold: unknown subcommand %r" % sub, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

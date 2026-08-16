@@ -14,6 +14,57 @@ emit(){ SLICE="$S" ST="$1" DET="$2" /usr/bin/python3 -c "import json,os;print(js
 status(){ emit "$1" "$2"; exit "${3:-0}"; }
 fail_evidence(){ printf 'kind=%s seen=%s log_tail=%s err_tail=%s' "${LAST_FAIL_KIND:-?}" "${LAST_SEEN_MODEL:-none}" "$(tail -n 5 "/tmp/mr_pass_$S.log" 2>/dev/null | tr '\n' ' ' | head -c 200)" "$(tail -n 5 "/tmp/mr_pass_$S.err" 2>/dev/null | tr '\n' ' ' | head -c 200)"; }
 [ -r "$V" ] || status FAIL "vars.json missing: $V" 1
+# lp-09: no launch while ANY hold is present, regardless of provenance. The tick gates itself at
+# gate -1, but a spawn can also be reached from an event tick or a hand-run; this is the launch-level
+# refusal, which is where the money is actually committed.
+if [ -f "$MEM/.native-supervisor-disabled" ]; then
+  status HOLD-PRESENT "$("$MEM/mr-hold" status 2>/dev/null || echo 'hold present') — refusing to launch"
+fi
+# lp-00 repo routing — cheapest gate first, before the probe and before any launch cost.
+# mr-repo-of is the SSOT (mr-launch.sh reads the same verdict via the lock), so the rule cannot
+# drift between spawner and launcher. MIXED/EXTERNAL are REJECTIONS on purpose: a slice whose
+# declared paths span both repos must be re-declared or split by a human. Splitting it silently is
+# how half a diff ends up stranded, ungated, in a main checkout.
+TOUCHES_RAW=$(/usr/bin/python3 -c "
+import json
+t=json.load(open('$V')).get('touches','')
+print(', '.join(t) if isinstance(t,list) else str(t))" 2>/dev/null)
+REPO=$("$MEM/mr-repo-of" "$TOUCHES_RAW" 2>/dev/null || echo ROUTE-ERROR)
+case "$REPO" in
+  harness) PR_REPO="mdrewt/claude-harness"; BASE_BRANCH="main";   WT_ROOT="$HARNESS/.claude/worktrees" ;;
+  project) PR_REPO="mdrewt/monster-realm";  BASE_BRANCH="master"; WT_ROOT="$PROJ/.claude/worktrees" ;;
+  MIXED)    status REPO-MIXED "declared touches span BOTH repos; re-declare or split the slice — refusing to split it silently. touches=$(echo "$TOUCHES_RAW" | head -c 300)" ;;
+  EXTERNAL) status REPO-EXTERNAL "declared touches include a path in neither repo (no worktree, no PR target); this slice needs an attended session. touches=$(echo "$TOUCHES_RAW" | head -c 300)" ;;
+  *)        status REPO-UNRESOLVED "mr-repo-of returned '$REPO' for touches=$(echo "$TOUCHES_RAW" | head -c 200)" ;;
+esac
+export REPO PR_REPO BASE_BRANCH WT_ROOT
+# lp-00 sync precondition. The brief tells the run to branch from `origin/<BASE_BRANCH>`, so if the
+# local default branch is AHEAD of its remote the slice builds on a base missing that work and its
+# PR silently reverts it. Measured at authoring time: monster-realm was 0/0, but the harness was
+# **9 commits ahead** of origin/main — every one an unpushed `chore(mr-sup):` — so the first harness
+# slice would have hit this. Cheap mechanical gate; turns an expensive silent failure into a free
+# loud one. Applies to both repos: it is a no-op whenever the branch is in sync.
+SYNCDIR=$([ "$REPO" = harness ] && echo "$HARNESS" || echo "$PROJ")
+timeout 30 git -C "$SYNCDIR" fetch origin --quiet 2>/dev/null || true   # bounded: an unbounded fetch stalls every spawn on a slow link
+if ! git -C "$SYNCDIR" rev-parse --verify --quiet "refs/remotes/origin/$BASE_BRANCH" >/dev/null; then
+  status REPO-OUT-OF-SYNC "$SYNCDIR has no origin/$BASE_BRANCH ref; the brief branches from it, so the run would fail after launch. Fetch or create the remote branch first."
+fi
+# Fail CLOSED on a rev-list error: an unreadable count must not read as "in sync" — that is exactly
+# the false-green shape this gate exists to prevent.
+AHEAD=$(git -C "$SYNCDIR" rev-list --count "origin/$BASE_BRANCH".."$BASE_BRANCH" 2>/dev/null || echo ERR)
+BEHIND=$(git -C "$SYNCDIR" rev-list --count "$BASE_BRANCH".."origin/$BASE_BRANCH" 2>/dev/null || echo ERR)
+case "$AHEAD$BEHIND" in *ERR*) status REPO-OUT-OF-SYNC "$SYNCDIR: could not compute divergence vs origin/$BASE_BRANCH (ahead=$AHEAD behind=$BEHIND)";; esac
+# Same failure as the divergence check, different cause: work that exists ONLY in the main
+# checkout's working tree is invisible to a worktree branched from origin. Real case that exposed
+# this hole in the gate: 2026-08-16, the SpacetimeDB 2.8.1 migration sat as 48 uncommitted files
+# while origin/master was still 1.x, so a slice would have built against the pre-bump syntax.
+# ADVISORY, not a refusal — a dirty project tree is routine (doctrine says stash strays, not commit
+# them) and blocking on it would stop ordinary work. The supervisor decides.
+DIRTY=$(git -C "$SYNCDIR" status --porcelain --untracked-files=no 2>/dev/null | wc -l)
+[ "${DIRTY:-0}" -gt 0 ] && emit DIRTY-TREE-ADVISORY "$SYNCDIR has $DIRTY uncommitted tracked change(s); the slice branches from origin/$BASE_BRANCH and will NOT see them. Confirm that is intended before relying on this run."
+if [ "${AHEAD:-0}" != 0 ] || [ "${BEHIND:-0}" != 0 ]; then
+  status REPO-OUT-OF-SYNC "$SYNCDIR $BASE_BRANCH is ahead=$AHEAD behind=$BEHIND vs origin/$BASE_BRANCH; the brief branches from origin/$BASE_BRANCH, so the slice would build on the wrong base. Push (or ff-only sync) first, then re-spawn."
+fi
 # mechanical active-session probe (mirror of tick gate 3)
 IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
 # cost-cap respawn gate (review F13) + cap resolution
@@ -47,11 +98,25 @@ tier=v.get("tier") or (_ for _ in ()).throw(SystemExit("vars.json missing requir
 tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard"
  else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models (sonnet-class) — do not bump lens models upward on a content slice (THIS OVERRIDES the build-loop prompt bump-one-tier default for this slice). The tester requirement is UNCHANGED — meaningful tests first, always.\n" if tier=="content" else "")
 rb=v.get("resume_block","") or ""
+repo=os.environ["REPO"]
+# The gate differs by repo and saying so is load-bearing. monster-realm `just ci` is the real gate.
+# Harness `just ci` runs only scripts/tests/{harness,invariants,adr-lint}.test.mjs and lints only
+# scripts/ — so for a slice touching solely memory/projects/** it CANNOT fail. Gating a harness
+# slice on it would be a green light that means nothing, which is the defect class lp-00 removes.
+repo_block=("REPO: **harness** (`mdrewt/claude-harness`). Worktree from `origin/main`; PR on the harness repo.\n"
+ "GATE — read this, it is not the project gate: harness `just ci` runs only `scripts/tests/*` and lints only `scripts/`, so for a slice touching solely `memory/projects/**` it **cannot fail** and proves nothing. Your gate is **`memory/projects/mr-selfcheck` printing SELFCHECK-OK** plus **the `--selftest` of every tool you touched or added**. mr-selfcheck DERIVES its tool set (lp-00), so a new executable `mr-*` is picked up automatically — but it must carry a bash or python shebang or the gate fails it as unclassifiable, and anything with real logic should ship a `--selftest` wired in beside mr-cost-sum's. Run harness `just ci` too (cheap, catches script-lint regressions), but never report it as the gate.\n"
+ "There is no remote CI on this repo and no branch protection, so 'PR open + local gate green' IS the terminal state; the supervisor merges.\n"
+ if repo=="harness" else
+ "REPO: **project** (`mdrewt/monster-realm`). Worktree from `origin/master`; PR on the project repo.\n"
+ "GATE: the full `just ci` (the exact gate remote runs — incl. Semgrep/security) green locally before opening the PR.\n")
 for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCHES>",touches_str),
-              ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block),("<CAP_USD>",str(__import__("os").environ.get("CAP","60")))]:
+              ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block),
+              ("<REPO_BLOCK>",repo_block),("<PR_REPO>",os.environ["PR_REPO"]),
+              ("<BASE_BRANCH>",os.environ["BASE_BRANCH"]),("<WT_ROOT>",os.environ["WT_ROOT"]),
+              ("<CAP_USD>",str(__import__("os").environ.get("CAP","60")))]:
     tpl=tpl.replace(k,val)
 open(os.environ["B"],"w").write(tpl)
-print("brief-built bytes=%d tier=%s" % (len(tpl),tier))
+print("brief-built bytes=%d tier=%s repo=%s" % (len(tpl),tier,repo))
 PY
 MODEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('model','opus'))")
 EFFORT=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('effort','high'))")
@@ -59,7 +124,7 @@ rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
 if [ "$DRY" = "--dry" ]; then status DRY "brief built; model=$MODEL effort=$EFFORT; no launch"; fi
 RID="mr-spawn-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 attempt_launch(){
-  setsid bash "$MEM/mr-launch.sh" "$S" "$MODEL" "$EFFORT" >/dev/null 2>&1 & LEADER=$!
+  setsid bash "$MEM/mr-launch.sh" "$S" "$MODEL" "$EFFORT" "$REPO" >/dev/null 2>&1 & LEADER=$!
   LAST_SEEN_MODEL=""
   disown 2>/dev/null || true
   sleep 4
@@ -93,7 +158,7 @@ if ! attempt_launch; then
   if ! attempt_launch; then kill_attempt; status FAIL "launch asserts failed twice — $(fail_evidence)" 1; fi
 fi
 CPID=$(pgrep -P "$LEADER" 2>/dev/null | head -1)
-export S V MEM RID LEADER CPID MODEL EFFORT B
+export S V MEM RID LEADER CPID MODEL EFFORT B REPO PR_REPO BASE_BRANCH
 if ! /usr/bin/python3 - <<'PYLOCK'
 import json, os, datetime
 v=json.load(open(os.environ["V"]))
@@ -104,7 +169,8 @@ lock={"run_id":os.environ["RID"],"slice":os.environ["S"],
  "started_utc":datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
  "brief":os.environ["B"],"done_flag":"/tmp/mr_pass_%s.done"%os.environ["S"],
  "adr_reserved":str(v.get("adr","")),"touches":touches,
- "model":os.environ["MODEL"],"effort":os.environ["EFFORT"],"tier":v.get("tier","routine")}
+ "model":os.environ["MODEL"],"effort":os.environ["EFFORT"],"tier":v.get("tier","routine"),
+ "repo":os.environ["REPO"],"pr_repo":os.environ["PR_REPO"],"base_branch":os.environ["BASE_BRANCH"]}
 open(os.environ["MEM"]+"/.harness-runner."+os.environ["S"]+".lock","w").write(json.dumps(lock,indent=1))
 PYLOCK
 then kill_attempt; status FAIL "lock write failed after launch (attempt killed)" 1; fi
@@ -116,4 +182,4 @@ for IT in $ITEMS; do
   FR=$("$MEM/mr-feedback" set "$IT" --state IN-WORK 2>&1)
   case "$FR" in FEEDBACK-SET*) :;; *) emit ITEMS-FLIP-FAIL "$IT: $FR";; esac   # emit only — status() exits
 done
-status LAUNCHED "leader=$LEADER claude_pid=${CPID:-?} model=$MODEL effort=$EFFORT tier=${TIER:-?} brief_bytes=$(stat -c %s "$B" 2>/dev/null || echo ?) rid=$RID"
+status LAUNCHED "leader=$LEADER claude_pid=${CPID:-?} model=$MODEL effort=$EFFORT tier=${TIER:-?} repo=$REPO pr_repo=$PR_REPO brief_bytes=$(stat -c %s "$B" 2>/dev/null || echo ?) rid=$RID"

@@ -10,13 +10,26 @@
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
 unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # operator-forced-ness must NOT propagate to event ticks (pause semantics)
-S="${1:?usage: mr-launch.sh <slice> [model] [effort]}"
+S="${1:?usage: mr-launch.sh <slice> [model] [effort] [repo]}"
 MODEL="${2:-opus}"
 EFFORT="${3:-high}"
 MAX_ATTEMPTS=3
 HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
 PROJDIR="$HARNESS/projects/monster-realm"  # cwd for rooted runs: project-level .claude (31 domain skills, desync-guard, reducer-security-auditor) is only discovered from inside PROJ; harness .claude still inherited via ancestor walk (probe-verified 2026-07-26)
 MEM=$HARNESS/memory/projects
+# lp-00 repo routing. $4 is authoritative (mr-spawn passes it, derived from declared touches via
+# mr-repo-of); absent, fall back to the lock, then to `project` — so a hand-run mr-launch.sh keeps
+# its pre-lp-00 behaviour exactly. RUNDIR is the cwd (and therefore which .claude is discovered);
+# PRREPO is what terminal_pr_open polls. Getting PRREPO wrong is the expensive one: polling the
+# wrong repo makes terminal_pr_open permanently false, which burns all 3 attempts on a finished run.
+REPO="${4:-}"
+if [ -z "$REPO" ] && [ -r "$MEM/.harness-runner.$S.lock" ]; then
+  REPO=$(/usr/bin/python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('repo','') or '')" "$MEM/.harness-runner.$S.lock" 2>/dev/null || echo "")
+fi
+case "${REPO:-project}" in
+  harness) RUNDIR="$HARNESS"; OTHERDIR="$PROJDIR"; PRREPO="mdrewt/claude-harness" ;;
+  *)       REPO=project; RUNDIR="$PROJDIR"; OTHERDIR="$HARNESS"; PRREPO="mdrewt/monster-realm" ;;
+esac
 B="/tmp/mr_pass_$S.md"; L="/tmp/mr_pass_$S.log"; E="/tmp/mr_pass_$S.err"; D="/tmp/mr_pass_$S.done"
 
 fire_event(){ # $1=src(done|crash) $2=headline
@@ -28,7 +41,7 @@ fire_event(){ # $1=src(done|crash) $2=headline
     echo "--- log tail (40) ---"; tail -n 40 "$L" 2>/dev/null | cut -c1-400
     echo "--- err tail (20) ---"; tail -n 20 "$E" 2>/dev/null | cut -c1-400
     if [ "$1" = "crash" ]; then
-      WT=$(git -C "$HARNESS/projects/monster-realm" worktree list 2>/dev/null | grep -i "$S" | awk '{print $1}' | head -1)
+      WT=$(git -C "$RUNDIR" worktree list 2>/dev/null | grep -i "$S" | awk '{print $1}' | head -1)
       [ -n "$WT" ] && { echo "--- worktree status ($WT) ---"; git -C "$WT" status --short 2>/dev/null | head -20; }
     fi
   } > "$EVT" 2>/dev/null
@@ -53,7 +66,7 @@ terminal_pr_open() {
   # (missing shim/auth/network) means we CANNOT know -> treat as TERMINAL: stop resumes, let the
   # supervisor triage from .done + crash event. Blind resumes cost attempts; early stop is cheap.
   local out rc
-  out=$(gh pr list -R mdrewt/monster-realm --state all -L 40 --json headRefName,state \
+  out=$(gh pr list -R "$PRREPO" --state all -L 40 --json headRefName,state \
     -q '.[] | select(.state=="OPEN" or .state=="MERGED") | .headRefName' 2>/dev/null); rc=$?
   if [ "$rc" -ne 0 ]; then echo "TERMINAL-CHECK-INDETERMINATE gh rc=$rc" >>"$L" 2>/dev/null; return 0; fi
   # ANCHORED match (2026-07-25): unanchored grep cross-matched slice ids (pt-c1 hit pt-c1b's branch;
@@ -81,9 +94,9 @@ except Exception:
 # (haiku triage hop removed 2026-07-26 — 0 invocations ever; the local-model triage below covers the identical ambiguous-failure class for $0 and works during API outages. Rollback: git history.)
 
 A=1
-echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
-( cd "$PROJDIR" && claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
-  --add-dir "$HARNESS" --output-format stream-json --verbose ) </dev/null >>"$L" 2>"$E"
+echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$PRREPO TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+( cd "$RUNDIR" && claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
+  --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>"$E"
 RC=$?
 PREV_SIG=""
 while [ "$A" -lt "$MAX_ATTEMPTS" ] \
@@ -121,9 +134,9 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
   [ -n "$SID" ] || break
   { [ -f "/tmp/mr_stop_$S" ] || [ -f /tmp/mr_stop_all ]; } && break   # mechanical gate before EVERY spawn (cost-watch review cond i)
   echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
-  ( cd "$PROJDIR" && claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
+  ( cd "$RUNDIR" && claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
     -p "$P" \
-    --add-dir "$HARNESS" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
+    --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
   RC=$?
 done
 
@@ -136,8 +149,8 @@ if grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && [ "$RC" -ne 0 ] &&
   if [ -n "$WSID" ]; then
     echo "COST-CAP-WRAP start TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
     WRAPP="Cost-cap shutdown ($ACT). Do NOT start new work, new scope, or ANY new subagents (the stop flag is active and stays active). If .git/index.lock is stale in the worktree, remove it. Commit all WIP on the slice branch as wip($S): cost-cap park, push the branch, then write the handoff (mr-record handoff): state of work, exactly what remains, and the SIZING LESSON — why this slice exceeded its cap. Any local-model summary you include must be labeled UNVERIFIED advisory. Then stop. NEVER run gh pr merge."
-    ( cd "$PROJDIR" && timeout 900 claude --model "$MODEL" --effort low --dangerously-skip-permissions --resume "$WSID" -p "$WRAPP" \
-      --add-dir "$HARNESS" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E" || true
+    ( cd "$RUNDIR" && timeout 900 claude --model "$MODEL" --effort low --dangerously-skip-permissions --resume "$WSID" -p "$WRAPP" \
+      --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E" || true
     echo "COST-CAP-WRAP end rc=$? TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
   fi
   if [ -f "$MEM/.costpark-$S" ]; then

@@ -3,17 +3,40 @@
 set -u
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 BAD=0
-for f in "$MEM"/mr-*.sh "$MEM"/mr-launch.sh "$MEM"/mr-native-tick.sh "$MEM"/mr-ask-drew "$MEM"/mr-decision-watch "$MEM"/mr-ci-watch "$MEM"/mr-reset-watch "$MEM"/mr-evidence "$MEM"/mr-retro-request "$MEM"/mr-usage-snap "$MEM"/mr-cost-watch "$MEM"/mr-disjoint "$MEM"/mr-spawn "$MEM"/mr-ollama "$MEM"/mr-situation "$MEM"/mr-record "$MEM"/mr-audit "$MEM"/mr-metrics "$MEM"/mr-cost-sum; do
-  [ -f "$f" ] || continue
-  head -1 "$f" | grep -q python && { /usr/bin/python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$f" 2>/dev/null || { echo "SELFCHECK-FAIL py: $f"; BAD=1; }; continue; }
-  bash -n "$f" 2>/dev/null || { echo "SELFCHECK-FAIL sh: $f"; BAD=1; }
-done
+# The tool set is DERIVED, not hand-maintained (lp-00). The old hardcoded 19-path list had already
+# drifted: it omitted mr-selfcheck itself and mr-feedback, and every new tool had to be remembered
+# into it — the hand-maintained-list failure mode scripts/tests/invariants.test.mjs exists to prevent
+# elsewhere. `.bak*` is excluded deliberately: several backups are executable and one bad archived
+# copy must not red the live check.
+TOOLS=$(find "$MEM" -maxdepth 1 -type f -perm -u+x -name 'mr-*' \
+        ! -name '*.bak*' ! -name '*.log' ! -name '*.md' ! -name '*.json' ! -name '*.jsonl' 2>/dev/null | sort)
+[ -n "$TOOLS" ] || { echo "SELFCHECK-FAIL tool-enumeration found ZERO mr-* executables in $MEM — the glob has rotted"; BAD=1; }
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  SB=$(head -1 "$f")
+  case "$SB" in
+    *python*) /usr/bin/python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$f" 2>/dev/null || { echo "SELFCHECK-FAIL py: $f"; BAD=1; } ;;
+    *bash*|*/sh) bash -n "$f" 2>/dev/null || { echo "SELFCHECK-FAIL sh: $f"; BAD=1; } ;;
+    # Coverage assertion, same rationale as the heredoc one below: a tool the classifier cannot
+    # route is a tool that ships UNCHECKED while the gate still prints OK. Fail loudly instead.
+    *) echo "SELFCHECK-FAIL unclassifiable-shebang: $f (first line: $(echo "$SB" | cut -c1-40))"; BAD=1 ;;
+  esac
+done <<EOF
+$TOOLS
+EOF
 /usr/bin/python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$MEM/mr-feedback" 2>/dev/null || { echo "SELFCHECK-FAIL py: mr-feedback"; BAD=1; }
 "$MEM/mr-feedback" selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-feedback selftest"; BAD=1; }
 # ADR-0011 Confirmation: the cost SSOT must keep reconstructing per-invocation spend from the
 # cumulative total_cost_usd field. Its fixtures include the real uxd2 shape (naive $423.65 ->
 # true $165.65) and the escalation case a pure value-decrease split would undercount.
 "$MEM/mr-cost-sum" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-sum selftest"; BAD=1; }
+# lp-00: repo routing is the SSOT both mr-spawn and mr-launch.sh read. Its register carries the real
+# declared touches of live slices, so a classification regression reds HERE rather than at spawn —
+# where the cost is a slice launched into the wrong repo's main checkout.
+"$MEM/mr-repo-of" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-repo-of selftest"; BAD=1; }
+# lp-09: the kill switch is the operator's only control while pacing is manual. Its fail-safe (no
+# provenance => OPERATOR => never auto-clearable) is the property that must never regress silently.
+"$MEM/mr-hold" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-hold selftest"; BAD=1; }
 # python heredocs embedded in bash wrappers. `bash -n` above cannot see inside them, yet that is
 # where most of the real logic lives (mr-record's cost path, mr-native-tick's reconcile/gate-2/
 # rate-limit-arming). Without this, a python syntax error in any of them ships silently and only
@@ -27,12 +50,32 @@ mem = sys.argv[1]; bad = 0
 # unchecked. A SyntaxError in that block degrades to GSTATE=UNKNOWN, which does NOT stand the
 # loop down, so it would keep spawning $60-400 slices with no budget gate at all.
 OPEN = re.compile(r"^[^\n]*python3[^\n]*<<-?'([A-Za-z0-9_]+)'[^\n]*$", re.M)
-for name in ("mr-record", "mr-metrics", "mr-situation", "mr-native-tick.sh",
-             "mr-cost-watch", "mr-audit", "mr-spawn"):
+# A line whose first non-space character is `#` is a bash COMMENT and cannot open a heredoc.
+# Skipping those is strictly correct, and it is load-bearing now that the scan set is derived:
+# this very file documents `python3 - <<'PY'` inside a comment, and counting it produced an
+# unpairable opener -> a coverage FAIL that was pure noise. A carve-out for mr-selfcheck would
+# have hidden the same false positive in every other tool that documents a heredoc.
+def _openers(src):
+    # OPEN is ^-anchored, so m.group(0) IS the whole line — test that, not a prefix before it.
+    return [m for m in OPEN.finditer(src) if not m.group(0).lstrip().startswith("#")]
+# DERIVED, like the syntax set above: any bash wrapper may grow a python heredoc, and the old
+# 7-name tuple would simply not scan a new one.
+names = sorted(
+    n for n in os.listdir(mem)
+    if n.startswith("mr-")
+    and not any(k in n for k in (".bak", ".log"))
+    and not n.endswith((".md", ".json", ".jsonl"))
+    and os.path.isfile(os.path.join(mem, n))
+    and os.access(os.path.join(mem, n), os.X_OK)
+)
+if not names:
+    print("SELFCHECK-FAIL py-heredoc-enumeration found zero tools — the enumeration has rotted")
+    bad = 1
+for name in names:
     p = os.path.join(mem, name)
     if not os.path.exists(p): continue
     src = open(p, errors="replace").read()
-    openers = OPEN.findall(src); found = 0
+    openers = [m.group(1) for m in _openers(src)]; found = 0
     for tag in set(openers):
         pat = r"^[^\n]*python3[^\n]*<<-?'%s'[^\n]*\n(.*?)^\t*%s$" % (re.escape(tag), re.escape(tag))
         for m in re.finditer(pat, src, re.M | re.S):

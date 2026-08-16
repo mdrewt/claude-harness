@@ -1,0 +1,207 @@
+#!/usr/bin/python3
+"""mr-repo-of — decide which repo a slice's declared `touches:` belong to. Routing SSOT (lp-00).
+
+    mr-repo-of "<touches string>"   -> prints: harness | project | MIXED | EXTERNAL
+    mr-repo-of --json "<touches>"   -> {"repo":..., "harness":[...], "project":[...], ...}
+    mr-repo-of --selftest           -> fixtures; rc=0 pass, rc=1 fail
+
+Shebang is `/usr/bin/python3` on purpose: `#!/usr/bin/env python3` exits 126 in unpinned cwds under
+asdf (harness memory: asdf-shebang-hook-trap), and cron ticks mask it.
+
+WHY THIS EXISTS. `mr-launch.sh` used to `cd projects/monster-realm` unconditionally and the brief
+hard-coded `mdrewt/monster-realm` as the PR target, so a slice touching only `memory/projects/**`
+would edit the harness MAIN checkout (no worktree isolation) and open an empty-diff PR on the wrong
+repo. One classifier, read by both spawner and launcher, so the rule cannot drift between them
+(the duplicated-constant class `lp-16` exists to lint).
+
+MIXED and EXTERNAL are REJECTIONS, not routes: a slice whose declared paths span both repos must be
+re-declared or split by a human. Splitting it silently is how half a diff ends up stranded, ungated,
+in a main checkout.
+"""
+import json
+import os
+import re
+import sys
+
+HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
+PROJ = HARNESS + "/projects/monster-realm"
+
+# Unambiguous first-segment markers. Anything not matched here and not absolute falls through to
+# PROJECT, because project-relative is the corpus convention (58 of 61 specs declare that way).
+HARNESS_PREFIXES = (
+    "memory/",
+    "specs/",
+    "standards/",
+    "templates/",
+    "docs/research/",
+    "docs/workflow-loops",
+    "docs/routing",
+    "WORKSPACE-PLAN",
+)
+PROJECT_PREFIXES = (
+    "projects/monster-realm/",
+    "server-module/",
+    "game-core/",
+    "client/",
+    "client-wasm/",
+    "sim-harness/",
+    "evals/",
+    "content/",
+    "ops/",
+    ".github/",
+    "justfile",
+    "Cargo.toml",
+    "Cargo.lock",
+    "biome.json",
+    "cliff.toml",
+    "clippy.toml",
+    "rust-toolchain.toml",
+    "lefthook.yml",
+    "renovate.json",
+)
+# Paths that exist in BOTH repos. They are NOT evidence of either side; they inherit the verdict of
+# the unambiguous paths in the same set. Treating `docs/adr/` as harness would misroute lp-doc-a;
+# treating it as project evidence would misroute a harness slice that also edits an ADR.
+AMBIGUOUS_PREFIXES = (
+    "docs/",
+    "scripts/",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "CHANGELOG.md",
+    "ARCHITECTURE.md",
+    ".gitignore",
+    ".gitattributes",
+)
+
+
+def _tokens(raw):
+    """Split a declared touches string into candidate path tokens.
+
+    Real declarations carry annotations and prose: `mr-residuals.jsonl (new)`, `band config`,
+    `repo settings via gh api (no code)`. Strip the annotations; drop the prose.
+    """
+    raw = raw.replace("`", " ")
+    raw = re.sub(r"\([^)]*\)", " ", raw)          # drop parentheticals: "(new)", "(no code)"
+    raw = re.sub(r"\*\*|\*", " ", raw)            # drop markdown emphasis
+    out = []
+    for tok in re.split(r"[,\n]", raw):
+        tok = tok.strip().strip(".;:").strip()
+        if not tok:
+            continue
+        # Prose, not a path: contains whitespace and no separator. "band config", "segmentation
+        # config", "runner git config". A real path may contain no space at all.
+        if " " in tok and "/" not in tok:
+            continue
+        if " " in tok:
+            # "repo settings via gh api" style — words around a slash-free noun. Keep only if the
+            # first whitespace-delimited word looks like a path.
+            first = tok.split()[0]
+            if "/" not in first and "." not in first:
+                continue
+            tok = first
+        out.append(tok)
+    return out
+
+
+def _classify(tok):
+    """-> 'harness' | 'project' | 'ambiguous' | 'external'"""
+    if tok.startswith("~/") or tok.startswith("/"):
+        p = os.path.expanduser(tok)
+        if p.startswith(PROJ):
+            return "project"
+        if p.startswith(HARNESS + "/"):
+            return "harness"
+        return "external"
+    for pre in PROJECT_PREFIXES:
+        if tok == pre or tok.startswith(pre):
+            return "project"
+    for pre in HARNESS_PREFIXES:
+        if tok == pre or tok.startswith(pre):
+            return "harness"
+    for pre in AMBIGUOUS_PREFIXES:
+        if tok == pre or tok.startswith(pre):
+            return "ambiguous"
+    return "ambiguous"
+
+
+def route(raw):
+    buckets = {"harness": [], "project": [], "ambiguous": [], "external": []}
+    for tok in _tokens(raw):
+        buckets[_classify(tok)].append(tok)
+    if buckets["external"]:
+        repo = "EXTERNAL"
+    elif buckets["harness"] and buckets["project"]:
+        repo = "MIXED"
+    elif buckets["harness"]:
+        repo = "harness"
+    else:
+        # ambiguous-only, or project-only, or nothing parseable -> project (corpus default)
+        repo = "project"
+    return {"repo": repo, **buckets}
+
+
+FIXTURES = [
+    # (declared touches, expected verdict, why it is in the register)
+    ("memory/projects/mr-launch.sh, memory/projects/mr-spawn", "harness", "lp-00 core"),
+    ("memory/projects/mr-native-tick.sh, memory/projects/mr-hold (new), memory/projects/mr-spawn",
+     "harness", "lp-09: parenthetical annotation must not break the token"),
+    ("memory/projects/mr-cost-watch, memory/projects/mr-spawn, band config",
+     "harness", "lp-12: trailing prose token must be ignored, not classified"),
+    ("memory/projects/mr-disjoint, memory/projects/mr-spawn, one shared companion-rules JSON (new)",
+     "harness", "lp-disjoint: prose with an annotation"),
+    (".github/workflows/nightly.yml, evals/nightly-smoke-wiring.eval.mjs",
+     "project", "lp-03: project-relative, the corpus convention"),
+    ("ops/observability/validate.mjs, justfile, .github/workflows/ci.yml",
+     "project", "lp-05"),
+    ("docs/adr/", "project", "lp-doc-a: ambiguous-only must default to project, not harness"),
+    ("server-module/src/schema.rs, client/src/net/connection.ts, evals/monster-privacy.eval.mjs",
+     "project", "15r-sec-a"),
+    (".gitattributes", "project", "15r-g: ambiguous-only"),
+    ("repo settings via gh api (no code); the pre-change protection JSON recorded in the memo",
+     "project", "15r-f: pure prose must not throw and must not become MIXED"),
+    ("memory/projects/mr-selfcheck, .gitattributes",
+     "harness", "ambiguous paths inherit the unambiguous verdict"),
+    ("memory/projects/mr-selfcheck, server-module/src/schema.rs",
+     "MIXED", "the rejection case lp-00 exists to produce"),
+    ("/home/mdrewt/.claude/settings.json", "EXTERNAL", "lp-07: in neither repo"),
+    ("memory/projects/mr-audit", "harness", "lp-04"),
+    ("justfile, evals/nightly-smoke-wiring.eval.mjs, .github/workflows/nightly.yml, docs/adr/0050-*.md",
+     "project", "15r-tst-i: project + ambiguous"),
+]
+
+
+def selftest():
+    bad = 0
+    for raw, want, why in FIXTURES:
+        got = route(raw)["repo"]
+        if got != want:
+            print("REPO-OF-SELFTEST-FAIL want=%s got=%s (%s)\n    touches: %s" % (want, got, why, raw))
+            bad = 1
+    # Negative control: the classifier must not answer 'harness' for everything, nor 'project' for
+    # everything. A stuck classifier would pass every same-verdict fixture above.
+    verdicts = {route(r)["repo"] for r, _, _ in FIXTURES}
+    if len(verdicts) < 4:
+        print("REPO-OF-SELFTEST-FAIL degenerate: only %d distinct verdicts across the register (%s)"
+              % (len(verdicts), sorted(verdicts)))
+        bad = 1
+    if not bad:
+        print("REPO-OF-SELFTEST-OK %d fixtures, %d distinct verdicts" % (len(FIXTURES), len(verdicts)))
+    return bad
+
+
+def main(argv):
+    if len(argv) >= 2 and argv[1] == "--selftest":
+        return selftest()
+    as_json = len(argv) >= 2 and argv[1] == "--json"
+    args = argv[2:] if as_json else argv[1:]
+    if not args:
+        print("usage: mr-repo-of [--json] \"<touches>\" | --selftest", file=sys.stderr)
+        return 2
+    r = route(" , ".join(args))
+    print(json.dumps(r) if as_json else r["repo"])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
