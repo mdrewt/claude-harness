@@ -20,7 +20,15 @@ process.stdin.on("end", () => {
     /\brm\s+-\w*r\w*\s+-\w*f/i, // rm -r -f
     /\brm\s+(-\w+\s+)*--recursive/i, // rm --recursive ...
     /\brm\s+-\w*r\w*\s+.*(\/|~|\*)/i, // rm -r <root/home/glob>
-    /git\s+push\s+(--force|-f)\b/i,
+    // lp-git-workflow: a BARE force-push discards whatever the remote had, with no check that you
+    // were looking at it. `--force-with-lease` refuses unless the remote is where you last saw it,
+    // which is the safe primitive the squash-on-branch step needs — so it is allowed on a slice
+    // branch and still refused against the base. Rewriting `main`/`master` stays blocked either way.
+    // Anchored at command position (start, or after ; && || | & or a subshell paren) for the same
+    // reason as the kill-switch rules below: an unanchored match blocks merely *writing about* the
+    // command, which blocked this rule's own test harness. An over-firing guard gets switched off.
+    /(^|[;&|(]\s*)git\s+push\b[^\n;&|]*\s(-f|--force)(?!-with-lease)\b/i,
+    /(^|[;&|(]\s*)git\s+push\b[^\n;&|]*--force(-with-lease)?[^\n;&|]*\b(main|master)\b/i,
     /git\s+reset\s+--hard\s+origin/i,
     // lp-09: the supervisor kill switch. The tick only ever READS this flag — every clear came from
     // an LLM session running `rm`, which is why provenance had to be enforced somewhere the model
