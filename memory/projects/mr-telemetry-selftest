@@ -130,16 +130,16 @@ F9A = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning",
 F9B = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"five_hour","utilization":0.22,"isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000009","session_id":"s1"}'
 # F10: utilization arrives as a STRING, not a float. PINNED (not left ambiguous): persisted VERBATIM
 # as received — i.e. the row's `utilization` must be the string "0.5", not silently coerced to the
-# float 0.5 — because silent coercion is itself a place data could be lossily reshaped (T16).
+# float 0.5 — because silent coercion is itself a place data could be lossily reshaped (T17).
 F10 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"five_hour","utilization":"0.5","isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000010","session_id":"s1"}'
 # F11/F12: `rate_limit_info` present but the WRONG JSON type (list / string, not an object). Must be
-# skipped without a crash — a `.get()` on a list or string either raises or silently misbehaves (T17).
+# skipped without a crash — a `.get()` on a list or string either raises or silently misbehaves (T18).
 F11 = '{"type":"rate_limit_event","rate_limit_info":[1,2,3],"uuid":"f1-0000-0000-0000-000000000011","session_id":"s1"}'
 F12 = '{"type":"rate_limit_event","rate_limit_info":"not-an-object","uuid":"f1-0000-0000-0000-000000000012","session_id":"s1"}'
 # F13: control characters + non-ASCII inside a string field. Built with json.dumps (not hand-escaped)
 # so the ENCODING itself is guaranteed correct and the fixture's only variable is what the READER
 # does with it — proves the implementer used `json.dumps` end-to-end rather than hand-formatting a
-# row (hand-formatting is exactly what would break on a literal control character) (T18).
+# row (hand-formatting is exactly what would break on a literal control character) (T19).
 F13 = json.dumps({
     "type": "rate_limit_event",
     "rate_limit_info": {
@@ -152,6 +152,10 @@ F13 = json.dumps({
     "uuid": "f1-0000-0000-0000-000000000013",
     "session_id": "s1",
 })
+# F14: the small VALID event placed immediately after the runtime-generated giant/oversized line in
+# the edge corpus — proves a following event is still persisted (T20), i.e. the oversized-line skip
+# does not corrupt or abort the rest of the read.
+F14 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"seven_day","utilization":0.44,"isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000014","session_id":"s1"}'
 
 FIXTURES = [
     ("F1", F1, "allowed_warning + utilization present -> T1 (defect a: filtered on status==rejected)"),
@@ -164,10 +168,11 @@ FIXTURES = [
     ("F8-garbage", F8_GARBAGE, "truncated/garbage non-JSON line, must not raise"),
     ("F8-blank", F8_BLANK, "empty line, must not raise"),
     ("F9A/F9B", F9A + "\n" + F9B, "same uuid twice in ONE log, different bodies -> T15 (dedup not cross-run-only)"),
-    ("F10", F10, "utilization arrives as a STRING -> T16 (pinned: persisted verbatim, not coerced)"),
-    ("F11", F11, "rate_limit_info is a LIST, not an object -> T17 (skip, never crash)"),
-    ("F12", F12, "rate_limit_info is a STRING, not an object -> T17 (skip, never crash)"),
-    ("F13", F13, "control char + non-ASCII inside a string field -> T18 (json.dumps round-trip)"),
+    ("F10", F10, "utilization arrives as a STRING -> T17 (pinned: persisted verbatim, not coerced)"),
+    ("F11", F11, "rate_limit_info is a LIST, not an object -> T18 (skip, never crash)"),
+    ("F12", F12, "rate_limit_info is a STRING, not an object -> T18 (skip, never crash)"),
+    ("F13", F13, "control char + non-ASCII inside a string field -> T19 (json.dumps round-trip)"),
+    ("F14", F14, "valid event immediately after the runtime-generated oversized line -> T20"),
 ]
 
 # Vacuity control (mirrors mr-repo-of's degenerate-verdict check): a corpus that only ever exercises
@@ -195,9 +200,80 @@ def _derive_rate_limit_types():
 
 _RATE_LIMIT_TYPES = _derive_rate_limit_types()
 
+# The exact line set RUN_MAIN writes, shared with the T16 accounting-identity cross-check below so
+# "how many input lines did we write" is computed from ONE place, never re-counted by hand at the
+# call site (a hand-recount is exactly the kind of drift the identity check exists to catch).
+MAIN_CORPUS_LINES = [F1, F2, F3, F4, F5, F6, F7, F8_GARBAGE, F8_BLANK]
+
 
 def _corpus_body(lines):
     return "\n".join(lines) + "\n"
+
+
+OK_STDOUT_RE = re.compile(r"OK rows=(\d+) util=(\d+) dup=(\d+) skip=(\d+)")
+
+
+def _giant_oversized_line(target_bytes=2 * 1024 * 1024):
+    """T20 fixture, GENERATED AT RUNTIME (never embedded — a 2 MiB literal has no place in source
+    control). A syntactically-valid `rate_limit_event` whose `rate_limit_info.status` string is
+    padded out past the 1 MiB per-line cap this reader must enforce. Rationale (put here, not just
+    in the assertion, because it is the reason this fixture exists at all): a 220 MB single line was
+    measured to cost 468 MB RSS to `json.loads` in one shot, and this reader runs on the tick's HOT
+    PATH — so the implementation must cap per-line reads at 1 MiB rather than buffer, and this
+    fixture is what proves that cap exists instead of merely being documented."""
+    pad = "x" * target_bytes
+    obj = {
+        "type": "rate_limit_event",
+        "rate_limit_info": {
+            "status": "allowed_warning:" + pad,
+            "resetsAt": 1786060800,
+            "rateLimitType": "seven_day",
+            "utilization": 0.5,
+            "isUsingOverage": False,
+        },
+        "uuid": "f1-0000-0000-0000-000000000099",
+        "session_id": "s1",
+    }
+    return json.dumps(obj)
+
+
+def _build_generated_corpus(n=4):
+    """T14 fixture generator (never hardcoded — a filename/uuid->row lookup table cannot know these
+    values in advance, which is exactly what closes the red-team's PROVEN cheat #1: a stub that
+    dispatched on `os.path.basename(LOGFILE)` against a fixed set of fixture filenames and emitted
+    pre-baked rows copied from this file's own fixture literals). Returns (rows, lines): `rows` are
+    the raw dicts (used to compute the EXPECTED values this assertion checks against), `lines` are
+    their `json.dumps` serializations in log order.
+
+    utilization: deterministic-but-run-varying, derived from os.getpid()+index (NOT `random` — pid
+    changes across runs, but is stable for the lifetime of one run, which is all a generated-per-run
+    corpus needs), kept in 0..1 at 2 decimals. resetsAt: genuinely randomized. rateLimitType: mixed
+    across the N rows. Exactly one row (index 1) carries NO `utilization` key at all — the EARS-2
+    shape, `rejected` + absent utilization."""
+    types = ["seven_day", "five_hour", "seven_day", "five_hour"]
+    statuses = ["allowed_warning", "rejected", "allowed", "allowed_warning"]
+    rows = []
+    for i in range(n):
+        u = str(_uuidlib.uuid4())
+        raw = (os.getpid() * 7 + i * 13) % 100
+        utilization = round(raw / 100.0, 2)
+        resets_at = int(time.time()) + random.randint(1000, 900000)
+        info = {
+            "status": statuses[i % len(statuses)],
+            "resetsAt": resets_at,
+            "rateLimitType": types[i % len(types)],
+            "isUsingOverage": False,
+        }
+        if i != 1:  # index 1 is the deliberate "utilization absent" row
+            info["utilization"] = utilization
+        rows.append({
+            "type": "rate_limit_event",
+            "rate_limit_info": info,
+            "uuid": u,
+            "session_id": "gen",
+        })
+    lines = [json.dumps(r) for r in rows]
+    return rows, lines
 
 
 # =================================================================================================
@@ -312,7 +388,7 @@ def run_invocation_battery(tmp):
     # ---- RUN_MAIN: the full positive+negative corpus, gate=live-standdown, nslices=3 ----
     main_log = os.path.join(tmp, "mr_pass_corpus.log")
     with open(main_log, "w") as f:
-        f.write(_corpus_body([F1, F2, F3, F4, F5, F6, F7, F8_GARBAGE, F8_BLANK]))
+        f.write(_corpus_body(MAIN_CORPUS_LINES))
     main_out = os.path.join(tmp, "out_main.jsonl")
 
     # T8 proof-of-teeth: snapshot the lock-dir glob strictly around THIS invocation. Never a wider
@@ -329,15 +405,22 @@ def run_invocation_battery(tmp):
     # Captured BEFORE the rerun below — this is the only way T6 can actually catch a rerun that
     # doubles the row count. Reading the file only once, after both invocations, would make the
     # "before" and "after" comparison the same read and pass vacuously against a buggy re-appender.
+    # ALSO the "before" half of the T16 rows= accounting identity (main_out never existed prior to
+    # this call, so rows_before is always 0 here, but it is still computed rather than assumed —
+    # the identity check must never itself hardcode a number it could instead derive).
+    rows_before_main = 0  # main_out is a fresh tempdir path; nothing could have written to it first
     rowcount_after_first = len(_read_rows(main_out)) if not to1 else -1
     results["main"] = dict(log=main_log, out=main_out, rc=rc1, stdout=out1, timed_out=to1,
                             gate="live-standdown", nslices=3, source="slice:corpus",
-                            rowcount_after_first=rowcount_after_first)
+                            rowcount_after_first=rowcount_after_first,
+                            rows_before=rows_before_main,
+                            input_line_count=len(MAIN_CORPUS_LINES))
 
     # ---- T6 idempotency: rerun the SAME log+outfile ----
     rc2, out2, err2, to2 = invoke([main_log, "live-standdown", "3", main_out])
     _record_rc("RUN_MAIN_RERUN", rc2)
-    results["main_rerun"] = dict(rc=rc2, stdout=out2, timed_out=to2)
+    results["main_rerun"] = dict(rc=rc2, stdout=out2, timed_out=to2,
+                                  input_line_count=len(MAIN_CORPUS_LINES))
 
     # ---- source derivation: mr_native_tick_<rid>.log -> tick:<rid> ----
     tick_log = os.path.join(tmp, "mr_native_tick_native-20260817T000000Z-123.log")
@@ -384,6 +467,52 @@ def run_invocation_battery(tmp):
     rc7, out7, err7, to7 = invoke([missing_log, "live-standdown", "1", missing_out])
     _record_rc("RUN_MISSING_LOGFILE", rc7)
     results["missing"] = dict(rc=rc7, stdout=out7, timed_out=to7)
+
+    # ---- T15/T17/T18/T19/T20: the "edge" corpus — defect classes beyond dropped-row/null-util ----
+    giant = _giant_oversized_line()
+    edge_lines = [F9A, F9B, F10, F11, F12, F13, giant, F14]
+    edge_log = os.path.join(tmp, "mr_pass_edge.log")
+    with open(edge_log, "w") as f:
+        f.write(_corpus_body(edge_lines))
+    edge_out = os.path.join(tmp, "out_edge.jsonl")
+    rc8, out8, err8, to8 = invoke([edge_log, "live-standdown", "1", edge_out])
+    _record_rc("RUN_EDGE", rc8)
+    results["edge"] = dict(out=edge_out, rc=rc8, stdout=out8, timed_out=to8,
+                            input_line_count=len(edge_lines))
+
+    # ---- T14: a corpus a hardcodable filename->row table CANNOT pass. N=4 rows with uuid4()
+    # uuids, a pid+index-derived (deterministic-but-run-varying) utilization, a randomized resetsAt,
+    # a mix of rateLimitType, one row with utilization absent — under a randomized basename. A stub
+    # that dispatches on `os.path.basename(LOGFILE)` against a fixed fixture table (the red-team's
+    # PROVEN cheat #1) has no entry for this filename and cannot fabricate the right bytes.
+    gen_rows, gen_lines = _build_generated_corpus()
+    gen_suffix = _uuidlib.uuid4().hex[:8]
+    gen_log = os.path.join(tmp, "mr_pass_gen-%s.log" % gen_suffix)
+    with open(gen_log, "w") as f:
+        f.write(_corpus_body(gen_lines))
+    gen_out = os.path.join(tmp, "out_gen-%s.jsonl" % gen_suffix)
+    rc9, out9, err9, to9 = invoke([gen_log, "live-standdown", "1", gen_out])
+    _record_rc("RUN_GEN", rc9)
+    results["gen"] = dict(out=gen_out, rc=rc9, stdout=out9, timed_out=to9,
+                           rows=gen_rows, input_line_count=len(gen_lines))
+
+    # ---- T14 byte-mutation half: COPY one generated line under a NEW random filename with
+    # resetsAt changed by +1, into a FRESH outfile (never dedup-adjacent to the run above). Proves
+    # the reader parses CONTENT, not filenames or a cached uuid->row table: a basename-keyed stub
+    # has no entry for either the new filename OR the mutated resetsAt.
+    mutated_row = dict(gen_rows[0])
+    mutated_row["rate_limit_info"] = dict(mutated_row["rate_limit_info"])
+    mutated_row["rate_limit_info"]["resetsAt"] = mutated_row["rate_limit_info"]["resetsAt"] + 1
+    mut_suffix = _uuidlib.uuid4().hex[:8]
+    mut_log = os.path.join(tmp, "mr_pass_gen-%s.log" % mut_suffix)
+    with open(mut_log, "w") as f:
+        f.write(json.dumps(mutated_row) + "\n")
+    mut_out = os.path.join(tmp, "out_gen-%s.jsonl" % mut_suffix)
+    rc10, out10, err10, to10 = invoke([mut_log, "live-standdown", "1", mut_out])
+    _record_rc("RUN_GEN_MUTATED", rc10)
+    results["gen_mutated"] = dict(out=mut_out, rc=rc10, stdout=out10, timed_out=to10,
+                                   expected_uuid=mutated_row["uuid"],
+                                   expected_resets_at=mutated_row["rate_limit_info"]["resetsAt"])
 
     return results
 
@@ -539,7 +668,9 @@ def assert_t7_negative_control(results):
 
 def assert_t6_idempotency(results):
     """T6: rerunning the emitter over the SAME log+outfile must not double the row count, and the
-    second run's stdout must report dup= > 0."""
+    second run's stdout must report dup= EXACTLY equal to the number of events already persisted by
+    the first run (tightened from a loose `> 0` — a stub could satisfy `> 0` by fabricating any
+    positive number; the exact count cannot be satisfied without actually having deduped)."""
     main = results["main"]
     rerun = results["main_rerun"]
     if main["timed_out"] or rerun["timed_out"]:
@@ -551,9 +682,10 @@ def assert_t6_idempotency(results):
     check(rows_after_first == rows_after_second, "T6-idempotent-rowcount",
           "row count changed across a rerun over the same log+outfile: %d -> %d"
           % (rows_after_first, rows_after_second))
-    m = re.match(r"OK rows=(\d+) util=(\d+) dup=(\d+) skip=(\d+)", rerun["stdout"].strip())
-    check(m is not None and int(m.group(3)) > 0, "T6-idempotent-dup-reported",
-          "rerun stdout must report dup=<n> with n>0, got %r" % rerun["stdout"])
+    m = OK_STDOUT_RE.match(rerun["stdout"].strip())
+    check(m is not None and int(m.group(3)) == rows_after_first, "T6-idempotent-dup-reported",
+          "rerun stdout must report dup=%d EXACTLY (the event count the first run persisted), got %r"
+          % (rows_after_first, rerun["stdout"]))
 
 
 def assert_t11_t12(results):
@@ -584,6 +716,231 @@ def assert_t11_t12(results):
     for label, rc in _ALL_RCS:
         check(rc == 0, "T12-rc-zero-%s" % label,
               "invocation %s did not return rc=0 (rc=%r) — an emitter must always exit 0" % (label, rc))
+
+
+# =================================================================================================
+# T16 — stdout counters CROSS-CHECKED against reality, never merely shape-matched.
+#
+# A red-team PROVED a stub printing a FIXED `OK rows=7777 util=8888 dup=<n> skip=0` on every call
+# passes T11's shape-only `re.fullmatch` check. Injecting a defect that incremented `skip` four
+# extra times left the whole suite green (skip=7 where 3 was right) before this existed — grep for
+# `skip` used to return exactly one assertion, a shape regex. These counters are the ONLY signal
+# `mr-native-tick.log` gets that distinguishes "reader alive, nothing new" (rows=0, a NORMAL steady
+# state per the contract) from "reader silently stopped persisting" — the multi-week loss (lp-12/
+# lp-13 blocked on one full reset cycle of this file) this whole slice exists to prevent.
+#
+# `skip`'s exact COMPOSITION is deliberately NOT recomputed from the fixtures — it includes
+# encode/finitize drops that are implementation-internal, and hand-recomputing it here would just be
+# a second, parallel, driftable copy of the implementation's own bookkeeping. Instead an ACCOUNTING
+# IDENTITY is checked: rows + dup + skip == the number of input lines in LOGFILE. No single counter
+# can be inflated or deflated without breaking that sum, which is what makes it robust rather than
+# guessable.
+# =================================================================================================
+def assert_t16_numeric_cross_check(results):
+    def _numbers(stdout):
+        m = OK_STDOUT_RE.match(stdout.strip())
+        if not m:
+            return None
+        return tuple(int(x) for x in m.groups())  # (rows, util, dup, skip)
+
+    # --- main corpus, first run: rows/util EXACT against reality; full accounting identity ---
+    main = results["main"]
+    if main["timed_out"]:
+        _fail_missing("T16-main-numbers", main, "main-corpus stdout counters")
+    else:
+        nums = _numbers(main["stdout"])
+        if check(nums is not None, "T16-main-stdout-parses",
+                 "could not parse OK-line counters out of %r" % main["stdout"]):
+            rows_c, util_c, dup_c, skip_c = nums
+            rows_real = main["rowcount_after_first"]
+            rows_final = _read_rows(main["out"])
+            util_real = sum(1 for r in rows_final if isinstance(r, dict) and r.get("utilization") is not None)
+            check(rows_c == rows_real, "T16-main-rows-exact",
+                  "stdout claimed rows=%d, OUTFILE actually gained %d line(s)" % (rows_c, rows_real))
+            check(util_c == util_real, "T16-main-util-exact",
+                  "stdout claimed util=%d, %d persisted row(s) actually carry non-null utilization"
+                  % (util_c, util_real))
+            total = main["input_line_count"]
+            check(rows_c + dup_c + skip_c == total, "T16-main-accounting-identity",
+                  "rows(%d)+dup(%d)+skip(%d)=%d != %d input lines in LOGFILE — claimed=%r"
+                  % (rows_c, dup_c, skip_c, rows_c + dup_c + skip_c, total, (rows_c, dup_c, skip_c)))
+
+    # --- main corpus, idempotent rerun: rows must be EXACTLY 0 (dup-exactness lives in T6) ---
+    rerun = results["main_rerun"]
+    if rerun["timed_out"]:
+        _fail_missing("T16-rerun-rows-zero", rerun, "idempotent rerun stdout counters")
+    else:
+        nums = _numbers(rerun["stdout"])
+        if check(nums is not None, "T16-rerun-stdout-parses",
+                 "could not parse OK-line counters out of %r" % rerun["stdout"]):
+            rows_c2, util_c2, dup_c2, skip_c2 = nums
+            check(rows_c2 == 0, "T16-rerun-rows-zero",
+                  "an idempotent rerun over an UNCHANGED log must claim rows=0, got rows=%d (claimed "
+                  "tuple rows/util/dup/skip=%r)" % (rows_c2, nums))
+            total2 = rerun["input_line_count"]
+            check(rows_c2 + dup_c2 + skip_c2 == total2, "T16-rerun-accounting-identity",
+                  "rows(%d)+dup(%d)+skip(%d)=%d != %d input lines in LOGFILE — claimed=%r"
+                  % (rows_c2, dup_c2, skip_c2, rows_c2 + dup_c2 + skip_c2, total2, nums))
+
+    # --- generated corpus (T14): independent evidence, a DIFFERENT corpus shape/size each run ---
+    gen = results.get("gen")
+    if gen is None:
+        check(False, "T16-gen-run-present", "no generated-corpus run result to cross-check")
+        return
+    if gen["timed_out"]:
+        _fail_missing("T16-gen-numbers", gen, "generated-corpus stdout counters")
+        return
+    nums = _numbers(gen["stdout"])
+    if not check(nums is not None, "T16-gen-stdout-parses",
+                 "could not parse OK-line counters out of %r" % gen["stdout"]):
+        return
+    rows_c, util_c, dup_c, skip_c = nums
+    gen_rows_final = _read_rows(gen["out"])
+    rows_real = len(gen_rows_final)  # gen_out is a fresh path — every persisted row was appended NOW
+    util_real = sum(1 for r in gen_rows_final if isinstance(r, dict) and r.get("utilization") is not None)
+    check(rows_c == rows_real, "T16-gen-rows-exact",
+          "stdout claimed rows=%d, OUTFILE actually gained %d line(s)" % (rows_c, rows_real))
+    check(util_c == util_real, "T16-gen-util-exact",
+          "stdout claimed util=%d, %d persisted row(s) actually carry non-null utilization"
+          % (util_c, util_real))
+    check(dup_c == 0, "T16-gen-dup-zero",
+          "a first run over a fresh OUTFILE must claim dup=0, got dup=%d" % dup_c)
+    total = gen["input_line_count"]
+    check(rows_c + dup_c + skip_c == total, "T16-gen-accounting-identity",
+          "rows(%d)+dup(%d)+skip(%d)=%d != %d input lines in LOGFILE — claimed=%r"
+          % (rows_c, dup_c, skip_c, rows_c + dup_c + skip_c, total, nums))
+
+
+# =================================================================================================
+# T14 — closes PROVEN CHEAT #1: a stub that dispatches purely on `os.path.basename(LOGFILE)` against
+# a hardcoded table of this file's fixture filenames, emitting pre-baked rows copied from the
+# fixture literals. It printed TELEMETRY-SELFTEST-OK. The corpus below is generated AT RUNTIME —
+# random uuids, a pid-derived utilization, a randomized resetsAt, a randomized filename — so no
+# lookup table built in advance can have an entry for it.
+# =================================================================================================
+def assert_t14_generated_corpus(results):
+    gen = results.get("gen")
+    if gen is None:
+        check(False, "T14-gen-run-present", "no generated-corpus run result")
+        return
+    if gen["timed_out"]:
+        _fail_missing("T14-gen-round-trip", gen, "generated-corpus round-trip")
+    else:
+        rows = _read_rows(gen["out"])
+        by_uuid = {r.get("uuid"): r for r in rows if isinstance(r, dict)}
+        for i, expected in enumerate(gen["rows"]):
+            u = expected["uuid"]
+            ri = expected["rate_limit_info"]
+            row = by_uuid.get(u)
+            if not check(row is not None, "T14-gen-row-%d-present" % i,
+                         "generated uuid %s missing from OUTFILE — a basename-dispatch stub has no "
+                         "entry for this run's randomized filename/content" % u):
+                continue
+            check(row.get("rateLimitType") == ri.get("rateLimitType"), "T14-gen-row-%d-rateLimitType" % i,
+                  "claimed=%r generated=%r" % (row.get("rateLimitType"), ri.get("rateLimitType")))
+            check(row.get("status") == ri.get("status"), "T14-gen-row-%d-status" % i,
+                  "claimed=%r generated=%r" % (row.get("status"), ri.get("status")))
+            check(row.get("resetsAt") == ri.get("resetsAt"), "T14-gen-row-%d-resetsAt" % i,
+                  "claimed=%r generated=%r" % (row.get("resetsAt"), ri.get("resetsAt")))
+            expected_util = ri.get("utilization")  # absent (None via .get) on the deliberate null row
+            check(row.get("utilization") == expected_util, "T14-gen-row-%d-utilization" % i,
+                  "claimed=%r generated=%r" % (row.get("utilization"), expected_util))
+
+    # --- byte-mutation half: proves CONTENT is parsed, not filename/uuid dispatch ---
+    mut = results.get("gen_mutated")
+    if mut is None:
+        check(False, "T14-mutation-run-present", "no byte-mutation run result")
+        return
+    if mut["timed_out"]:
+        _fail_missing("T14-mutation-reflects-content", mut, "byte-mutated-copy run")
+        return
+    mrows = _read_rows(mut["out"])
+    check(len(mrows) == 1, "T14-mutation-rowcount",
+          "expected exactly 1 row from the single-line mutated-copy log, got %d" % len(mrows))
+    if mrows:
+        row = mrows[0]
+        check(row.get("uuid") == mut["expected_uuid"], "T14-mutation-uuid",
+              "claimed=%r expected=%r" % (row.get("uuid"), mut["expected_uuid"]))
+        check(row.get("resetsAt") == mut["expected_resets_at"], "T14-mutation-resets-at-reflects-mutation",
+              "the mutated copy's resetsAt must reflect the +1 mutation: claimed=%r expected=%r — a "
+              "reader dispatching on filename/uuid instead of parsing content would return the OLD "
+              "(unmutated) value or nothing at all" % (row.get("resetsAt"), mut["expected_resets_at"]))
+
+
+# =================================================================================================
+# T15/T17/T18/T19/T20 — defect classes beyond "dropped row"/"utilization discarded", all from the
+# SAME 'edge' corpus (F9-F14 + a runtime-generated oversized line, never embedded). Every one of
+# these must be persisted-or-skipped WITHOUT a traceback, rc 0, and must not stop LATER lines in the
+# same log from being parsed — proven directly by F14 (T20) sitting immediately after the giant line.
+# =================================================================================================
+def assert_t15_t20_edge_cases(results):
+    run = results.get("edge")
+    if run is None:
+        check(False, "T15-edge-run-present", "no edge-corpus run result")
+        return
+    if run["timed_out"]:
+        for tid in ("T15", "T17", "T18", "T19", "T20"):
+            _fail_missing("%s-edge-corpus" % tid, run, "edge-corpus run")
+        return
+    rows = _read_rows(run["out"])
+
+    # T15 — duplicate uuid WITHIN one log (F9A/F9B, different bodies) -> persisted exactly ONCE.
+    dup_uuid = "f1-0000-0000-0000-000000000009"
+    dup_rows = [r for r in rows if isinstance(r, dict) and r.get("uuid") == dup_uuid]
+    check(len(dup_rows) == 1, "T15-duplicate-uuid-persisted-once",
+          "F9A/F9B share uuid=%s and must persist as exactly 1 row, got %d" % (dup_uuid, len(dup_rows)))
+
+    # T17 — utilization arrives as a STRING -> persisted VERBATIM (pinned: not coerced to float),
+    # and 0 <= float(x) <= 1 when coercible.
+    r10 = _by_uuid(rows, "f1-0000-0000-0000-000000000010")
+    if check(r10 is not None, "T17-string-utilization-present", "F10 row missing"):
+        u = r10.get("utilization")
+        check(isinstance(u, str) and u == "0.5", "T17-string-utilization-verbatim",
+              "F10's utilization must be persisted verbatim as the STRING \"0.5\" (pinned, not "
+              "coerced to a float), got %r (type %s)" % (u, type(u).__name__))
+        if isinstance(u, str):
+            try:
+                fu = float(u)
+                check(0 <= fu <= 1, "T17-string-utilization-coercible-range",
+                      "F10's utilization %r must be in [0,1] when coerced to float, got %r" % (u, fu))
+            except ValueError:
+                check(False, "T17-string-utilization-coercible-range",
+                      "F10's utilization %r is not coercible to float at all" % u)
+
+    # T18 — rate_limit_info is the wrong JSON type (list / string, not an object) -> skipped, no row.
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000011") is None, "T18-list-rate-limit-info-skipped",
+          "F11 (rate_limit_info is a LIST) must not produce a row")
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000012") is None, "T18-string-rate-limit-info-skipped",
+          "F12 (rate_limit_info is a STRING) must not produce a row")
+
+    # T19 — control char + non-ASCII inside a string field -> persisted as ONE valid standalone-JSON
+    # line (proves json.dumps was used end-to-end; hand-formatting is exactly what breaks on a
+    # literal control character, e.g. by splitting the row across two lines).
+    r13 = _by_uuid(rows, "f1-0000-0000-0000-000000000013")
+    check(r13 is not None, "T19-control-char-row-present",
+          "F13 (control char + non-ASCII) must be persisted — it is a well-formed rate_limit_event")
+    if r13 is not None:
+        raw_hits = []
+        for ln in _read_raw_lines(run["out"]):
+            if not ln.strip():
+                continue
+            try:
+                d = json.loads(ln)
+            except Exception:
+                continue
+            if isinstance(d, dict) and d.get("uuid") == "f1-0000-0000-0000-000000000013":
+                raw_hits.append(ln)
+        check(len(raw_hits) == 1, "T19-control-char-single-line",
+              "F13's row must be exactly ONE raw line in OUTFILE; found %d — a hand-formatted writer "
+              "is exactly what would split it across lines on the embedded control character"
+              % len(raw_hits))
+
+    # T20 — a giant (~2 MiB) oversized line -> skipped (no row), and the NEXT valid event (F14) is
+    # still persisted — proves the oversized-line skip does not corrupt/abort the rest of the read.
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000099") is None, "T20-oversized-line-skipped",
+          "the runtime-generated ~2 MiB oversized line must not produce a row")
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000014") is not None, "T20-following-event-persisted",
+          "F14, the valid event immediately AFTER the oversized line, must still be persisted")
 
 
 # =================================================================================================
@@ -956,6 +1313,9 @@ def selftest():
         assert_t7_negative_control(results)
         assert_t6_idempotency(results)
         assert_t11_t12(results)
+        assert_t16_numeric_cross_check(results)
+        assert_t14_generated_corpus(results)
+        assert_t15_t20_edge_cases(results)
 
     # Best-effort, narrowly-scoped cleanup of the ONE deterministically-named lock dir this file's
     # own invocations can create (see the COLLATERAL NOTE). Never a wildcard delete.
