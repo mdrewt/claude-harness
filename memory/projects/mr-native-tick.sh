@@ -157,20 +157,40 @@ if [ -f "$MEM/.native-supervisor-disabled" ]; then
   # call here is `|| true` regardless, because a notification failure must never take the cron
   # entrypoint down — that would trade a visible outage for an invisible one.
   HOLD_ATTR=$("$MEM/mr-hold" status --json 2>/dev/null | /usr/bin/python3 -c "import json,sys;print('1' if json.load(sys.stdin).get('attributed') else '0')" 2>/dev/null || echo 0)
+  FMT=$(stat -c %Y "$MEM/.native-supervisor-disabled" 2>/dev/null || echo 0)
+  HOLD_AGE_H=$(( ( $(date +%s) - ${FMT:-0} ) / 3600 ))
+  # One escalation path, two triggers. Every call is `|| true` and every notification is deduped on
+  # the flag's MTIME, so a long deliberate pause produces exactly one issue and then stays quiet,
+  # while a genuinely NEW flag escalates again. `timeout` bounds the gh call: mr-ask-drew exits 0 by
+  # contract, but contract is not the same as bounded, and this is the cron entrypoint.
+  hold_escalate() {  # $1=slug  $2=sentinel  $3=headline  $4=question  $5=recommendation
+    [ -e "$2" ] && return 0
+    touch "$2" 2>/dev/null || true
+    log "$3 $(qstat)"
+    timeout 60 "$MEM/mr-record" handoff --title "$3" --body "$4 $5" >> "$LOG" 2>&1 || true
+    timeout 90 "$MEM/mr-ask-drew" "$1" --repo mdrewt/claude-harness \
+      --question "$4" --recommend "$5" \
+      --context "Hold: by=$HOLD_BY attributed=$HOLD_ATTR age=${HOLD_AGE_H}h mtime=$FMT. $(qstat). Escalated once per flag instance; the loop remains held either way — only the operator clears it." \
+      >> "$LOG" 2>&1 || true
+  }
   if [ "${HOLD_ATTR:-0}" = "0" ]; then
-    FMT=$(stat -c %Y "$MEM/.native-supervisor-disabled" 2>/dev/null || echo 0)
-    ESC="/tmp/mr_hold_unattributed_$FMT"
-    if [ ! -e "$ESC" ]; then
-      touch "$ESC" 2>/dev/null || true
-      log "HOLD-UNATTRIBUTED flag carries no provenance record (mtime=$FMT) — escalating once; loop stays held $(qstat)"
-      "$MEM/mr-record" handoff --title "HOLD-UNATTRIBUTED: supervisor loop is held by a flag with no provenance" \
-        --body "The kill switch at \$MEM/.native-supervisor-disabled carries no 'by=' record, so the fail-safe reads it as an OPERATOR hold and the loop will skip every tick until a human clears it. If you paused deliberately, nothing is wrong — close the issue. If you did NOT, something fired the switch by accident (a mis-invoked tool did exactly this on 2026-08-17) and the loop is losing a tick per hour until you run mr-supervisor-enable." >> "$LOG" 2>&1 || true
-      "$MEM/mr-ask-drew" hold-unattributed --repo mdrewt/claude-harness \
-        --question "The build loop is held by a kill-switch flag with no provenance record. Did you pause it?" \
-        --root "\$MEM/.native-supervisor-disabled exists but carries no 'by=' line, so the fail-safe defaults it to OPERATOR and the loop can never clear it itself." \
-        --recommend "If you did not pause deliberately: run mr-supervisor-enable. Every tick until then is a skipped hour." \
-        --context "Escalated once per flag instance (mtime=$FMT). Attributed holds set via mr-supervisor-disable/mr-hold do NOT trigger this." >> "$LOG" 2>&1 || true
-    fi
+    # TRIGGER 1 — no provenance at all. This is the signature of an accidental `touch`, and it is
+    # what wedged the loop for 8 silent hours on 2026-08-17.
+    hold_escalate hold-unattributed "/tmp/mr_hold_unattributed_$FMT" \
+      "HOLD-UNATTRIBUTED flag carries no provenance record (mtime=$FMT) — escalating once; loop stays held" \
+      "The build loop is held by a kill-switch flag with no provenance record. Did you pause it?" \
+      "If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour."
+  elif [ "${HOLD_AGE_H:-0}" -ge 6 ]; then
+    # TRIGGER 2 — attributed, but old. Attribution is NOT proof of intent: `mr-hold set --by
+    # operator` is unrestricted by caller, so a stray session can write a perfectly well-formed
+    # OPERATOR hold that the loop may never clear and that trigger 1 would wave straight through.
+    # Age catches that, and catches a supervisor self-pause whose clearing condition never arrived.
+    # Deliberate multi-day pauses cost exactly one notification, which is the right price for
+    # never again losing a day to a hold nobody remembers setting.
+    hold_escalate hold-aged "/tmp/mr_hold_aged_$FMT" \
+      "HOLD-AGED by=$HOLD_BY in force ${HOLD_AGE_H}h — escalating once; loop stays held" \
+      "The build loop has been held for ${HOLD_AGE_H}h (by=$HOLD_BY). Is that still intended?" \
+      "If the pause has served its purpose, run mr-supervisor-enable. If it is deliberate, close this — it will not ask again for this hold."
   fi
   if [ "${MR_FORCE:-0}" = "1" ]; then log "NOTE hold overridden by MR_FORCE=1 (manual run; hold by=$HOLD_BY REMAINS set) $(qstat)"; else
     [ -n "$EVFILE" ] && [ -f "$EVFILE" ] && case "$EVFILE" in "$MEM/pending-events/"*) : ;; *) mv "$EVFILE" "$MEM/pending-events/" 2>/dev/null;; esac

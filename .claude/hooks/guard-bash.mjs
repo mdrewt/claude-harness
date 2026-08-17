@@ -43,14 +43,36 @@ if (process.argv[2] === "--selftest") {
     // shapes are restored explicitly underneath. `xargs` can be anchored like any other verb — it
     // only ever appears after a pipe — while `-exec rm` is mid-command by construction, so it is
     // scoped to a line that actually invokes `find`.
+    // COMMAND POSITION, ONE DEFINITION (lp-11a review). Anchoring is what stops the guard blocking
+    // prose, but a naive anchor also stops it seeing `sudo rm -rf /` — the verb is no longer at
+    // index 0, so the rule simply misses. That regression was caught by running the anchored rules
+    // against wrapper-prefixed forms; 14 of 15 destructive shapes went straight through, including
+    // `sudo rm <the kill switch>`.
+    //
+    // So command position TOLERATES WRAPPERS. `WRAP` is the set of one-token prefixes an agent
+    // reaches for casually, each allowed to carry up to 4 of its own arguments (`sudo -u nobody`,
+    // `nice -n 5`, `env FOO=1`) and to nest (`time sudo …`). The 4-argument bound is deliberate: it
+    // covers every real invocation while keeping the regex from backtracking over a long command,
+    // and it stops the wrapper clause swallowing an entire pipeline to find a verb far away.
+    //
+    // This replaces the weaker inline `((env|sudo|command|nohup|time|exec)\s+)?` that the write-verb
+    // rule carried — one optional bare token, which `sudo -u x` already defeated. One definition,
+    // used by every rule below, so the tolerance cannot drift between them again.
+    const AT = "(?:^|[;&|(\\n])\\s*";
+    const WRAP =
+      "(?:(?:env|sudo|doas|command|nohup|time|exec|nice|setsid|stdbuf|timeout)\\s+(?:[^\\s;&|]+\\s+){0,4})*";
+    const at = (rest) => new RegExp(AT + WRAP + rest, "i");
     const danger = [
-      /(^\s*|[;&|(\n]\s*)rm\s+-\w*r\w*f\w*/i, // rm -rf, -Rf, -rfv ...
-      /(^\s*|[;&|(\n]\s*)rm\s+-\w*f\w*r\w*/i, // rm -fr ...
-      /(^\s*|[;&|(\n]\s*)rm\s+-\w*r\w*\s+-\w*f/i, // rm -r -f
-      /(^\s*|[;&|(\n]\s*)rm\s+(-\w+\s+)*--recursive/i, // rm --recursive ...
-      /(^\s*|[;&|(\n]\s*)rm\s+-\w*r\w*\s+.*(\/|~|\*)/i, // rm -r <root/home/glob>
-      /(^\s*|[;&|(\n]\s*)(xargs|parallel)\s+(-\S+\s+)*rm\b/i, // find … | xargs rm -rf
-      /\bfind\b[^\n;&|]*-exec\s+rm\b/i, // find … -exec rm -rf {} \;
+      at("rm\\s+-\\w*r\\w*f\\w*"), // rm -rf, -Rf, -rfv ...
+      at("rm\\s+-\\w*f\\w*r\\w*"), // rm -fr ...
+      at("rm\\s+-\\w*r\\w*\\s+-\\w*f"), // rm -r -f
+      at("rm\\s+(?:-\\w+\\s+)*--recursive"), // rm --recursive ...
+      at("rm\\s+-\\w*r\\w*\\s+.*(?:\\/|~|\\*)"), // rm -r <root/home/glob>
+      // Indirection. `xargs`/`parallel` are NOT in WRAP: putting them there would make the bare
+      // `rm` rules fire on any `xargs rm`, which is right, but these two also have to block
+      // `xargs rm` when the filename is upstream and no flag/-rf appears at all.
+      at("(?:xargs|parallel)\\s+(?:-\\S+\\s+)*rm\\b"), // find … | xargs rm
+      /\bfind\b[^\n;&|]*-exec\s+rm\b/i, // find … -exec rm {} \;
       // lp-git-workflow: a BARE force-push discards whatever the remote had, with no check that you
       // were looking at it. `--force-with-lease` refuses unless the remote is where you last saw it,
       // which is the safe primitive the squash-on-branch step needs — so it is allowed on a slice
@@ -58,9 +80,9 @@ if (process.argv[2] === "--selftest") {
       // Anchored at command position (start, or after ; && || | & or a subshell paren) for the same
       // reason as the kill-switch rules below: an unanchored match blocks merely *writing about* the
       // command, which blocked this rule's own test harness. An over-firing guard gets switched off.
-      /(^|[;&|(]\s*)git\s+push\b[^\n;&|]*\s(-f|--force)(?!-with-lease)\b/i,
-      /(^|[;&|(]\s*)git\s+push\b[^\n;&|]*--force(-with-lease)?[^\n;&|]*\b(main|master)\b/i,
-      /git\s+reset\s+--hard\s+origin/i,
+      at("git\\s+push\\b[^\\n;&|]*\\s(?:-f|--force)(?!-with-lease)\\b"),
+      at("git\\s+push\\b[^\\n;&|]*--force(?:-with-lease)?[^\\n;&|]*\\b(?:main|master)\\b"),
+      at("git\\s+reset\\s+--hard\\s+origin"),
       // lp-09: the supervisor kill switch. The tick only ever READS this flag — every clear came from
       // an LLM session running `rm`, which is why provenance had to be enforced somewhere the model
       // cannot route around. `mr-hold clear` is the sanctioned path and checks provenance; it does not
@@ -82,9 +104,18 @@ if (process.argv[2] === "--selftest") {
       // — matched nothing at all, and neither did a single leading space. Two independent review
       // lenses found that by execution. Widening the anchor can only ever block MORE, which is the
       // fail-safe direction for a spend control.
-      /(^\s*|[;&|(\n]\s*)rm\s+[^\n;&|]*\.native-supervisor-disabled/i,
-      /(^\s*|[;&|(\n]\s*)mv\s+[^\n;&|]*\.native-supervisor-disabled/i,
-      /(^\s*|[;&|(\n]\s*)mr-supervisor-enable\b/i,
+      at("rm\\s+[^\\n;&|]*\\.native-supervisor-disabled"),
+      at("mv\\s+[^\\n;&|]*\\.native-supervisor-disabled"),
+      at("mr-supervisor-enable\\b"),
+      // SYMMETRIC WITH ENABLE (lp-11a review). `mr-supervisor-disable` is the OPERATOR's pause, and
+      // it now routes through `mr-hold set --by operator` — which nothing restricts by caller. So a
+      // session running it creates an ATTRIBUTED operator hold: permanent (the loop may never clear
+      // an operator hold) and, because it carries provenance, it does NOT trip the tick's
+      // unattributed-hold escalation. That is a silent wedge reachable by one word, and shipping the
+      // versioned wrapper is what put it within reach — so the wrapper gets the same treatment as
+      // its opposite. Sessions that genuinely need to pause use `mr-hold set --by supervisor`, which
+      // records provenance AND stays self-clearable; that path is deliberately untouched.
+      at("mr-supervisor-disable\\b"),
       // lp-09 residual: `rm` was never the only way through. Provenance lives in the file's
       // CONTENT, so a session could WRITE `by=supervisor` itself and then clear the hold through
       // the perfectly sanctioned `mr-hold clear --by supervisor` — forging past the fail-safe
@@ -94,9 +125,10 @@ if (process.argv[2] === "--selftest") {
       // the fail-safe reads as OPERATOR and the loop may then never clear — a session could wedge
       // the loop permanently by accident. Sessions set holds via `mr-hold set --by supervisor`,
       // which records provenance and stays self-clearable. Reads (`cat`/`stat`/`ls`) are untouched.
-      // An optional `env`/`sudo`/`command`/`nohup`/`time`/`exec` wrapper is tolerated — those are
-      // one-token prefixes an agent reaches for casually, so leaving them out would have been a
-      // free bypass of the whole verb list.
+      // Wrapper prefixes are tolerated via the shared `at()` helper above — this rule used to carry
+      // its own weaker `((env|sudo|command|nohup|time|exec)\s+)?`, which allowed exactly ONE bare
+      // token and so was already defeated by `sudo -u nobody touch …`. It now shares one definition
+      // with every other rule, which is the only way that tolerance stays consistent between them.
       //
       // KNOWN, UNCLOSED GAPS — enumerated because a control you misread is worse than no control.
       // ALL of these reach the flag and are NOT blocked, each pinned by a known-gap `--selftest`
@@ -109,7 +141,7 @@ if (process.argv[2] === "--selftest") {
       //     (the flag is gitignored)
       // The primary control is and remains `mr-hold`'s provenance check. This hook raises the cost
       // of the CASUAL routes — the ones an agent takes without meaning to defeat anything.
-      /(^\s*|[;&|(\n]\s*)((env|sudo|command|nohup|time|exec)\s+)?(tee|sed|chmod|truncate|cp|ln|unlink|touch|dd|install|rsync|shred)\s+[^\n;&|]*\.native-supervisor-disabled/i,
+      at("(?:tee|sed|chmod|truncate|cp|ln|unlink|touch|dd|install|rsync|shred)\\s+[^\\n;&|]*\\.native-supervisor-disabled"),
       />>?\s*[^\n;&|]*\.native-supervisor-disabled/i, // any redirect ONTO the flag forges provenance
       /\bdrop\s+database\b/i,
       /\btruncate\s+table\b/i,
@@ -159,6 +191,28 @@ function runSelftest() {
   check("pin: subshell (rm -rf)", "(rm -rf /tmp/y)", true);
   check("pin: find | xargs rm -rf", "find . -name x | xargs rm -rf", true);
   check("pin: find -exec rm -rf", "find . -name x -exec rm -rf {} \\;", true);
+  // lp-11a review: WRAPPER PREFIXES. Anchoring at command position made `sudo rm -rf /` invisible —
+  // 14 of 15 destructive shapes went through, including `sudo rm <kill switch>`. These pin that a
+  // wrapper does not launder a destructive verb, in every shape that actually gets typed: bare,
+  // with the wrapper's own flags, and nested.
+  check("pin: sudo rm -rf /", "sudo rm -rf /", true);
+  check("pin: doas rm -rf", "doas rm -rf /tmp/x", true);
+  check("pin: env VAR=1 rm -rf", "env FOO=1 rm -rf /tmp/x", true);
+  check("pin: nice -n 5 rm -rf", "nice -n 5 rm -rf /tmp/x", true);
+  check("pin: sudo -u nobody rm -rf", "sudo -u nobody rm -rf /tmp/x", true);
+  check("pin: nested time sudo rm -rf", "time sudo rm -rf /tmp/x", true);
+  check("pin: timeout 5 rm -rf", "timeout 5 rm -rf /tmp/x", true);
+  check("pin: sudo rm <kill switch>", "sudo rm /p/.native-supervisor-disabled", true);
+  check("pin: env X=1 rm <kill switch>", "env X=1 rm /p/.native-supervisor-disabled", true);
+  check("pin: time mv <kill switch>", "time mv /p/.native-supervisor-disabled /tmp/", true);
+  check("pin: sudo touch <kill switch>", "sudo touch /p/.native-supervisor-disabled", true);
+  check("pin: sudo mr-supervisor-enable", "sudo mr-supervisor-enable", true);
+  check("pin: mr-supervisor-disable (operator pause, not a session action)", "mr-supervisor-disable", true);
+  check("pin: sudo mr-supervisor-disable", "sudo mr-supervisor-disable", true);
+  check("pin: chained mr-supervisor-disable", "cd /x && mr-supervisor-disable oops", true);
+  // The session's own pause stays open — provenance recorded AND self-clearable.
+  check("allow: mr-hold set --by supervisor (the session's sanctioned pause)",
+    "mr-hold set --by supervisor --reason paced", false);
   check("pin: git push --force origin main", "git push --force origin main", true);
   check("pin: git reset --hard origin/main", "git reset --hard origin/main", true);
   check("pin: drop database", "drop database foo", true);
@@ -205,6 +259,15 @@ function runSelftest() {
   // blocking it stalled a headless 08:00Z tick on an approval prompt nobody could answer, which
   // is what left the stale per-slice locks and the MUTEX RELEASE FAILED behind it.
   check("allow: mr-unlock (the sanctioned lock-release path)", "mr-unlock mutex", false);
+  // The other direction of the wrapper change: tolerating wrappers must not turn every prefixed
+  // command into a block. A wrapper in front of a READ is still a read.
+  check("allow: sudo grep for the literal", "sudo grep -n 'rm -rf' /tmp/notes.md", false);
+  check("allow: timeout + gh (routine tick call)", "timeout 60 gh run list --limit 5", false);
+  check("allow: sudo cat", "sudo cat /etc/hosts", false);
+  check("allow: time mr-hold clear (sanctioned, wrapped)", "time mr-hold clear --by supervisor", false);
+  check("allow: env + mr-unlock", "env FOO=1 mr-unlock stale", false);
+  check("allow: sudo ls", "sudo ls -la /tmp", false);
+  check("allow: timeout + git status", "timeout 30 git status --porcelain", false);
   check("allow: mr-hold status --json", "mr-hold status --json", false);
   check("allow: mr-hold set --by supervisor --reason x", "mr-hold set --by supervisor --reason x", false);
   check("allow: cat flag", "cat /p/.native-supervisor-disabled", false);
