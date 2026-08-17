@@ -2,6 +2,93 @@
 # mr-cost-watch — zero-token live cost enforcement for rooted runs (plan v2, adversarially reviewed).
 #   watch SLICE CAP_USD LEADER_PID   (spawned DETACHED by mr-spawn beside each launch)
 #   price LOGFILE                    (one-shot: per-model-priced sum of a pass log; fixture tests)
+#   telemetry LOGFILE GATE NSLICES [OUTFILE]
+#                                    (one-shot: rate-limit telemetry reader; appends JSONL rows)
+#
+# ---------------------------------------------------------------------------------------------
+# `telemetry` (lp-01) — the utilization SSOT.
+# ---------------------------------------------------------------------------------------------
+# WHY IT IS A SEPARATE READER. mr-native-tick.sh's rate-limit ARMING path pre-filters stream-json
+# lines on BOTH `"resetsAt"` AND `"rejected"` before any parse runs, so a routine `allowed_warning`
+# row — the one that actually carries the plan's `utilization` gauge — is never even looked at.
+# That pre-filter is CORRECT for arming (arming on a seven_day utilization warning would stand the
+# loop down for days; see the PYRL heredoc's own comment) and this subcommand does not touch it.
+# `telemetry` is a NEW, side-effect-free reader that persists what arming deliberately ignores.
+#
+# ROW SCHEMA — EXACTLY these 12 top-level keys, always present, null where the wire lacks them:
+#   ts                        ISO8601 %Y-%m-%dT%H:%M:%SZ UTC. HONEST CAVEAT: this is the time the
+#                             row was READ, not the time the event happened — stream-json
+#                             rate_limit_event lines carry no timestamp of their own. Treat it as a
+#                             sample time with up to one tick of lag, never as an event time.
+#   source                    derived from the LOGFILE basename:
+#                               mr_pass_<slice>.log       -> slice:<slice>
+#                               mr_native_tick_<rid>.log  -> tick:<rid>
+#                               otherwise                 -> log:<basename>
+#   gate_reached              the GATE argument (closed vocabulary at the call sites:
+#                             live-standdown | tick-post-spawn)
+#   slices_running_at_sample  int(NSLICES), 0 on garbage
+#   rateLimitType             from the wire (seven_day | five_hour | null)
+#   status                    from the wire (allowed | allowed_warning | rejected | ...)
+#   utilization               from the wire. A 0..1 FRACTION, persisted VERBATIM and NEVER
+#                             rescaled: a downstream consumer thinks in percent, and a silent 100x
+#                             here is the cheapest bug in this whole file to prevent.
+#   resetsAt                  from the wire, as received, except epoch-MILLISECONDS are normalized
+#                             to seconds with the same `> 1e11 => /1000` rule the arming path uses
+#                             — one unit per column, or the column is a lie.
+#   isUsingOverage            from the wire
+#   overageStatus             from the wire
+#   uuid                      from the LINE ENVELOPE (not from rate_limit_info); the dedup key
+#   ri                        the VERBATIM rate_limit_info object
+#
+# WHY `ri` IS VERBATIM AND NOT MORE COLUMNS. overageResetsAt / overageDisabledReason /
+# overageInUse / surpassedThreshold are real fields that show up on real rows. A hand-picked
+# column list is exactly how this corpus lost data before, so the whole object is kept and new
+# wire fields arrive for free. (`ri` is dropped, and marked as dropped, only if a row would
+# otherwise exceed the 4096-byte row cap.)
+#
+# ALL WINDOWS, NO STATUS FILTER (recorded decision: monster-realm-lp-01-plan.md D2). seven_day,
+# five_hour, and rows carrying no rateLimitType at all are ALL persisted, and `status` is never
+# filtered on. rateLimitType is a first-class column precisely so consumers filter — a reader that
+# filters at write time cannot be un-filtered after the fact.
+#
+# GROWTH. ~500 events/day x 432 B/row (MEASURED against the real verified wire field set, not
+# estimated — an earlier ~250 B guess predated the `ri`-plus-flat-columns decision and was ~2x low)
+# ~= 216 KB/day ~= 79 MB/year. NO ROTATION, deliberately: revisit only above 200 MB, which is
+# ~2.5 years out, not ~12. A rotation racing the concurrent appenders (a tick plus every live
+# slice's standdown sample) would silently drop rows from the cost SSOT, which is strictly worse
+# than an oversized file.
+#
+# CONTRACT. rc is ALWAYS 0 — this runs on the tick's hot path and from cron, and a telemetry
+# reader must never fail its caller. stdout is EXACTLY ONE line:
+#   OK rows=<n> util=<n> dup=<n> skip=<n>   | ERR <kind> <detail>
+# rows = appended by THIS call; util = of those, how many carry a non-null utilization;
+# dup = events skipped because their uuid was already present in OUTFILE's LAST 2 MiB (TAIL_CAP)
+#       or earlier in this run. The tail bound is the honest limit of the property: at 432 B/row
+#       that is ~4,850 rows ~= 10 days, so a caller re-reading a log older than that horizon can
+#       legitimately re-append. Every real caller re-reads a log for hours, not weeks.
+# skip = input lines not persisted = not-a-rate_limit_event + failed-to-parse + oversized.
+# `rows=0` is the NORMAL steady state and must never be read as failure — that is the entire
+# reason the ERR channel exists as a separate shape.
+#
+# CONCURRENCY. read-seen -> append -> close is held under an EXCLUSIVE advisory fcntl.flock on
+# OUTFILE itself, acquired non-blockingly with a bounded retry (never an unbounded wait on the
+# tick's hot path; `ERR lock-busy` if it cannot be taken). Without it the snapshot-then-append
+# sequence is a TOCTOU: 8 concurrent invocations over one 50-uuid log were MEASURED writing 190
+# rows. The dedup key is the PERSISTED (clipped) uuid string, never the raw one — clipping the key
+# and the column differently made every over-long uuid a permanent duplicate on every later pass.
+#
+# HOSTILE INPUTS. LOGFILE and OUTFILE must both be REGULAR files, fstat-checked on the already-open
+# fd so there is no TOCTOU window. A FIFO hung the process forever and a character device
+# (/dev/full) got it OOM-killed; both call sites run SYNCHRONOUSLY inside the tick, so either one
+# wedges the supervisor loop. Non-regular -> `ERR not-regular-file <path>`, rc still 0. Every read
+# is bounded — 1 MiB per log line, TAIL_CAP for the dedup tail, never a bare read().
+# NaN/Infinity are nulled at BOTH boundaries (`parse_constant` on the way in, `allow_nan=False` on
+# the way out): json.loads accepts bare NaN and json.dumps re-emits it, which would write a row
+# that jq and JSON.parse both reject and poison the SSOT for every strict consumer — on the very
+# field this header calls the cheapest bug in the file to prevent.
+# A short write (ENOSPC) is rolled back with ftruncate to the pre-write offset, so a failed append
+# can never leave a newline-less partial row for the NEXT O_APPEND to concatenate onto.
+#
 # Thresholds: 80% warn-flag (advisory) | 100% stop-flag+reason (cooperative; honored between
 # attempts + by brief) | 125% grace 120s -> identity-checked TERM of the claude child -> 30s ->
 # KILL -> write .fired -> RETIRE (mr-launch then runs the bounded wrap pass unpoliced-but-bounded).
@@ -42,7 +129,385 @@ print(f"{tot:.4f}" if RAW else f"{tot*F:.4f}")
 PY
 }
 
+telemetry_log(){ # $1=logfile $2=gate $3=nslices $4=outfile ; rc always 0, ONE line on stdout
+  # Quoted heredoc tag => NO shell interpolation; everything crosses via argv, exactly like
+  # price_log above. Keep it that way: LOGFILE/GATE are caller-supplied strings.
+  /usr/bin/python3 - "$1" "$2" "$3" "$4" <<'PYTEL'
+import datetime
+import fcntl
+import json
+import math
+import os
+import re
+import stat
+import sys
+import time
+
+SAFE = re.compile(r"[^A-Za-z0-9._:-]")
+LINE_CAP = 1 << 20   # per-line read cap. A 220MB single line measured 468MB RSS when slurped, and
+                     # this runs on the tick's hot path — never buffer a whole giant line.
+ROW_CAP = 4096       # rows are kept STRICTLY UNDER this, newline included (contract wording). WHY
+                     # this number: a typical row is 432 B, so the cap is ~9x normal — generous for
+                     # every real event, while denying ONE crafted event the ability to eat a
+                     # month of the growth budget in a single line.
+STR_CAP = 96         # per-string-field truncation, applied to every wire-sourced column before the
+                     # row cap. WHY 96: it makes the row-cap arithmetic provable (6 string columns
+                     # x 96 B ~= 0.6 KiB, leaving `ri` the rest of the 4 KiB), while comfortably
+                     # clearing every observed value — a uuid is 36 chars, the longest observed
+                     # status/overageStatus token is ~24.
+TAIL_CAP = 2 << 20   # how much of OUTFILE's tail is scanned for already-seen uuids. Dedup is by
+                     # uuid, never by byte offset: the callers re-read whole logs by design. WHY
+                     # 2 MiB: this constant IS the dedup horizon quoted in the CONTRACT above —
+                     # 2 MiB / 432 B ~= 4,850 rows ~= 10 days at ~500 events/day. Raising it widens
+                     # the horizon at a linear cost in per-call read + parse.
+NSLICES_CAP = 9999   # a pathological NSLICES must not falsify the row-cap arithmetic above
+LOCK_WAIT_S = 10.0   # BOUNDED. An unbounded flock wait on the tick's hot path is the same wedge
+LOCK_POLL_S = 0.02   # class as the FIFO hang; a stuck holder must degrade to ERR, never to a hang.
+
+
+class ShortWrite(Exception):
+    pass
+
+
+def san(s):
+    """Reduce to a single greppable token, max 64 chars.
+
+    JSON integrity is json.dumps' job and neither field ever reaches a shell, so the character
+    class is NOT injection hardening: the load-bearing property is that `source` and `gate_reached`
+    stay single whitespace-free tokens a grep/awk over the JSONL can key on."""
+    return SAFE.sub("_", s)[:64]
+
+
+def one_line(v):
+    try:
+        return " ".join(str(v).split())[:160] or "-"
+    except Exception:
+        return "-"
+
+
+def derive_source(logpath):
+    b = os.path.basename(str(logpath))
+    if b.startswith("mr_pass_") and b.endswith(".log"):
+        return san("slice:" + b[len("mr_pass_"):-len(".log")])
+    if b.startswith("mr_native_tick_") and b.endswith(".log"):
+        return san("tick:" + b[len("mr_native_tick_"):-len(".log")])
+    return san("log:" + b)
+
+
+def loads(text):
+    # parse_constant nulls the bare NaN / Infinity / -Infinity tokens json.loads otherwise accepts.
+    return json.loads(text, parse_constant=lambda _tok: None)
+
+
+def finitize(o, depth=0):
+    """Replace every non-finite float with None, recursively.
+
+    Applied at ROW-BUILD time, not just as a serialization backstop: `1e400` parses to inf through
+    parse_float (parse_constant never sees it), and nulling it only inside json.dumps would leave
+    `util=` counting a value the persisted row does not contain. Raises on pathological nesting so
+    such a line lands in `skip=` — the same outcome json.dumps' RecursionError already produced."""
+    if depth > 60:
+        raise ValueError("nesting-too-deep")
+    if isinstance(o, float):
+        return o if math.isfinite(o) else None
+    if isinstance(o, dict):
+        return dict((k, finitize(v, depth + 1)) for k, v in o.items())
+    if isinstance(o, list):
+        return [finitize(v, depth + 1) for v in o]
+    return o
+
+
+def read_seen(fd):
+    """uuids already persisted, read from the BOUNDED tail of OUTFILE via the already-locked fd.
+    os.pread never advances the fd offset and never reads more than TAIL_CAP — a bare read() here
+    is what OOM-killed the process against a character device."""
+    seen = set()
+    try:
+        size = os.fstat(fd).st_size
+        off = size - TAIL_CAP if size > TAIL_CAP else 0
+        data = os.pread(fd, TAIL_CAP, off)
+    except Exception:
+        return seen
+    for raw in data.split(b"\n"):
+        if not raw.strip():
+            continue
+        try:
+            o = loads(raw.decode("utf-8", "replace"))
+        except Exception:
+            continue  # a partial first line from the tail seek, or a torn row
+        if isinstance(o, dict) and isinstance(o.get("uuid"), str):
+            seen.add(o["uuid"])
+    return seen
+
+
+def norm_resets(v):
+    # epoch-ms -> s, the same rule the arming path uses. One unit per column, or the column is
+    # a lie. (bool is an int subclass, but True > 1e11 is False, so it falls through unchanged.)
+    if isinstance(v, (int, float)) and v > 1e11:
+        return v / 1000.0
+    return v
+
+
+def clip(v):
+    """Bound a wire value. A no-op for anything that is not an over-long string, so it is safe —
+    and REQUIRED — on every wire-sourced column: an unclipped 5000-char `utilization` pushed the
+    row past ROW_CAP and made the whole event vanish into skip=."""
+    if isinstance(v, str) and len(v) > STR_CAP:
+        return v[:STR_CAP]
+    return v
+
+
+def dumps(row):
+    """Serialize a row, or return None if it cannot be made RFC-8259 valid.
+
+    allow_nan=False is the second half of the NaN defence: `1e400` parses to inf through
+    parse_float, never through parse_constant, and json.dumps would happily re-emit `Infinity` —
+    a row that jq and JSON.parse both reject, permanently poisoning the SSOT."""
+    try:
+        return json.dumps(row, ensure_ascii=True, separators=(",", ":"), allow_nan=False)
+    except Exception:
+        pass
+    try:
+        return json.dumps(finitize(row), ensure_ascii=True, separators=(",", ":"), allow_nan=False)
+    except Exception:
+        return None
+
+
+def encode(row):
+    """Row -> bytes STRICTLY UNDER ROW_CAP, or None (caller counts it in skip=)."""
+    line = dumps(row)
+    if line is None:
+        return None
+    blob = (line + "\n").encode("utf-8")
+    if len(blob) >= ROW_CAP:
+        # ri is the only unbounded field left once strings are clipped. Drop it, and SAY so.
+        row = dict(row)
+        row["ri"] = {"_dropped": "row-reached-%d-bytes" % ROW_CAP}
+        line = dumps(row)
+        if line is None:
+            return None
+        blob = (line + "\n").encode("utf-8")
+        if len(blob) >= ROW_CAP:
+            # Now genuinely unreachable: EVERY wire column goes through clip(), so the 11 remaining
+            # fields are bounded by 6 x STR_CAP + a small int, and `ri` is already gone. Kept as a
+            # hard backstop — an oversized row must never reach the file.
+            return None
+    return blob
+
+
+def open_regular(path, flags, mode=0o644):
+    """os.open + fstat S_ISREG on the OPEN fd (no TOCTOU window). O_NONBLOCK so opening a FIFO
+    cannot block before we get the chance to reject it. Returns (fd, err_or_None)."""
+    try:
+        fd = os.open(path, flags | os.O_NONBLOCK, mode)
+    except Exception as e:
+        return None, "%s %s" % (type(e).__name__, e)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            os.close(fd)
+            return None, "NOT-REGULAR"
+    except Exception as e:
+        try:
+            os.close(fd)
+        except Exception:
+            pass
+        return None, "%s %s" % (type(e).__name__, e)
+    return fd, None
+
+
+def main(argv):
+    if len(argv) < 4:
+        return "ERR args expected-LOGFILE-GATE-NSLICES-OUTFILE"
+    log, gate, nsl, out = argv[0], argv[1], argv[2], argv[3]
+
+    gate_s = san(gate)
+    try:
+        nslices = int(str(nsl).strip())
+    except Exception:
+        nslices = 0
+    nslices = max(0, min(NSLICES_CAP, nslices))
+    source = derive_source(log)
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # LOGFILE first, so an unreadable log never creates OUTFILE as a side effect.
+    lfd, lerr = open_regular(log, os.O_RDONLY)
+    if lfd is None:
+        if lerr == "NOT-REGULAR":
+            return "ERR not-regular-file %s" % one_line(log)
+        return "ERR read-failed %s" % one_line(lerr)
+
+    ofd, oerr = open_regular(out, os.O_RDWR | os.O_CREAT | os.O_APPEND)
+    if ofd is None:
+        try:
+            os.close(lfd)
+        except Exception:
+            pass
+        if oerr == "NOT-REGULAR":
+            return "ERR not-regular-file %s" % one_line(out)
+        return "ERR write-failed %s" % one_line(oerr)
+
+    rows = util = dup = skip = 0
+
+    def emit(row):
+        blob = encode(row)
+        if blob is None:
+            return False
+        # Roll-back point. With O_APPEND held under an exclusive lock this IS the row's start
+        # offset, so a short write can be undone rather than left as a newline-less fragment for
+        # the next O_APPEND to concatenate onto (which corrupts TWO rows, not one).
+        try:
+            start = os.lseek(ofd, 0, os.SEEK_END)
+        except Exception:
+            start = None
+        n = os.write(ofd, blob)
+        if n != len(blob):
+            if start is not None:
+                try:
+                    os.ftruncate(ofd, start)
+                except Exception:
+                    pass
+            raise ShortWrite("%d/%d" % (n, len(blob)))
+        return True
+
+    try:
+        # EXCLUSIVE, non-blocking with a bounded retry: read-seen -> append -> close must be atomic
+        # against every other invocation, but a stuck holder must degrade to ERR, never to a hang.
+        deadline = time.time() + LOCK_WAIT_S
+        while True:
+            try:
+                fcntl.flock(ofd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.time() >= deadline:
+                    try:
+                        os.close(lfd)   # not yet owned by an fdopen wrapper on this path
+                    except Exception:
+                        pass
+                    return "ERR lock-busy %s" % one_line(out)
+                time.sleep(LOCK_POLL_S)
+
+        seen = read_seen(ofd)
+        with os.fdopen(lfd, "rb") as fh:
+            while True:
+                try:
+                    chunk = fh.readline(LINE_CAP)
+                except Exception as e:
+                    return "ERR read-failed %s" % one_line("%s %s" % (type(e).__name__, e))
+                if not chunk:
+                    break
+                if not chunk.endswith(b"\n"):
+                    # Either the final unterminated line, or a line longer than LINE_CAP. Drain the
+                    # remainder in BOUNDED chunks without accumulating it, so parsing of every
+                    # subsequent line stays correct and RSS stays flat.
+                    oversized = False
+                    while True:
+                        more = fh.readline(LINE_CAP)
+                        if not more:
+                            break
+                        oversized = True
+                        if more.endswith(b"\n"):
+                            break
+                    if oversized:
+                        skip += 1
+                        continue
+                try:
+                    obj = loads(chunk.decode("utf-8", "replace"))
+                except Exception:
+                    skip += 1
+                    continue
+                # NEVER a raw substring test on the line: a type:"user" line can carry
+                # "rateLimitType" inside tool_use_result (a log of a log) and must NOT be
+                # persisted. That false positive is the defect class this reader exists to fix.
+                if not isinstance(obj, dict) or obj.get("type") != "rate_limit_event":
+                    skip += 1
+                    continue
+                ri = obj.get("rate_limit_info")
+                if not isinstance(ri, dict):
+                    skip += 1
+                    continue
+                uu = obj.get("uuid")
+                # Clip ONCE, here: the dedup key and the persisted column MUST be the same string.
+                # Keying on the raw uuid while persisting a clipped one made every uuid longer than
+                # STR_CAP a permanent miss on the next pass — and call site (a) re-reads a live
+                # pass log every tick, so one such line appended a duplicate row forever.
+                uu = clip(uu) if isinstance(uu, str) else None
+                if uu is not None and uu in seen:
+                    dup += 1
+                    continue
+                row = {
+                    "ts": ts,
+                    "source": source,
+                    "gate_reached": gate_s,
+                    "slices_running_at_sample": nslices,
+                    "rateLimitType": clip(ri.get("rateLimitType")),
+                    "status": clip(ri.get("status")),
+                    # clip() is a no-op on the float/bool these two normally carry, but it is what
+                    # keeps a STRING-typed wire value from blowing the row past ROW_CAP and taking
+                    # the entire event with it. Leaving these two unclipped made a 5000-char
+                    # `utilization` vanish into skip= — on the one field this reader exists for.
+                    "utilization": clip(ri.get("utilization")),    # VERBATIM 0..1, never rescaled
+                    "resetsAt": norm_resets(clip(ri.get("resetsAt"))),
+                    "isUsingOverage": clip(ri.get("isUsingOverage")),
+                    "overageStatus": clip(ri.get("overageStatus")),
+                    "uuid": uu,          # already clipped above — same string as the dedup key
+                    "ri": ri,
+                }
+                # NaN/inf are nulled HERE so the row and the util= counter below agree, and so no
+                # non-RFC-8259 token can reach the file. Pathological nesting -> skip=, as before.
+                try:
+                    row = finitize(row)
+                except Exception:
+                    skip += 1
+                    continue
+                try:
+                    wrote = emit(row)
+                except ShortWrite as e:
+                    return "ERR write-incomplete %s" % one_line(e)
+                except Exception as e:
+                    return "ERR write-failed %s" % one_line("%s %s" % (type(e).__name__, e))
+                if not wrote:
+                    skip += 1
+                    continue
+                if uu is not None:
+                    seen.add(uu)   # in-run dedup too: a duplicate uuid inside one log persists once
+                rows += 1
+                if row["utilization"] is not None:
+                    util += 1
+    finally:
+        # Closing the fd releases the flock; do it in a finally so an early ERR return cannot
+        # leave the lock held for the lifetime of a hung caller.
+        try:
+            os.close(ofd)
+        except Exception:
+            pass
+    return "OK rows=%d util=%d dup=%d skip=%d" % (rows, util, dup, skip)
+
+
+# House rule (see the `except Exception: pass` at price_log's tail): this is invoked from the cron
+# entrypoint and from the tick's hot path, so a traceback is never acceptable and rc is always 0.
+try:
+    _out = main(sys.argv[1:])
+except Exception as _e:
+    _out = "ERR internal %s" % type(_e).__name__
+try:
+    print(_out)
+except Exception:
+    pass
+raise SystemExit(0)
+PYTEL
+}
+
 if [ "${1:-}" = "price" ]; then price_log "${2:?logfile}" "${3:-cal}"; exit 0; fi
+# The inline `exit 0` is LOAD-BEARING and is separately gated: without it this dispatch falls
+# through into the `watch` path below, which was PROVEN to create a bogus
+# /tmp/mr_costwatch_telemetry.lock.d and start a 20s-poll loop.
+# OUTFILE defaults beside THIS copy of the tool (self-locating, like mr-selfcheck), never to a
+# hardcoded production path — a worktree copy must never append to the live SSOT.
+if [ "${1:-}" = "telemetry" ]; then
+  TELDIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+  telemetry_log "${2:-}" "${3:-}" "${4:-}" "${5:-$TELDIR/mr-rate-limit-telemetry.jsonl}"
+  exit 0
+fi
 [ "${1:-}" = "watch" ] && shift
 S="${1:?slice}"; CAP="${2:?cap}"; LEADER="${3:?leader_pid}"
 L="/tmp/mr_pass_$S.log"; D="/tmp/mr_pass_$S.done"

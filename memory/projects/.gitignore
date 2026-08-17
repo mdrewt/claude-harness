@@ -10,3 +10,5 @@
 .ollama-last
 .situation-cache.json
 pending-events/
+# lp-01 rate-limit telemetry rows — appended by production several times an hour (tick + every live-slice standdown); tracking it would conflict on every parallel slice branch
+mr-rate-limit-telemetry.jsonl
