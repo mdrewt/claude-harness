@@ -188,7 +188,10 @@ try {
 } catch {}
 try {
   const vendorSkill = join(CLAUDE, 'skills', 'codebase-memory', 'SKILL.md');
-  if (existsSync(vendorSkill) && !readFileSync(vendorSkill, 'utf8').includes('superseded by the code-intel skill')) {
+  if (
+    existsSync(vendorSkill) &&
+    !readFileSync(vendorSkill, 'utf8').includes('superseded by the code-intel skill')
+  ) {
     failures++;
     console.log(
       '  VENDOR-DRIFT ~/.claude/skills/codebase-memory/SKILL.md exists without its supersession marker — a cbm install/update restored stale vendor content; delete it or re-stub (see ADR-0010)',

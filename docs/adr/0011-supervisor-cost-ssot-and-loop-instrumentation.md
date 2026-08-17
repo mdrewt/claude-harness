@@ -210,8 +210,8 @@ slice); both prompt sites were corrected in the same pass.
 
 ## Confirmation
 
-`mr-selfcheck` — which runs daily from the tick (`mr-native-tick.sh` §DAILY SELFCHECK) — now
-gates on `mr-cost-sum --selftest`. The 11 embedded fixtures include the **real uxd2 shape**
+`memory/projects/mr-selfcheck` — which runs daily from the tick (`memory/projects/mr-native-tick.sh`
+§DAILY SELFCHECK) — now gates on `memory/projects/mr-cost-sum --selftest`. The 11 embedded fixtures include the **real uxd2 shape**
 (asserting $165.6512, not the naive $423.65), the **escalation case** (`ATTEMPT=1` $10 then
 `ATTEMPT=2` $25 must total $35, which a pure value-decrease split would report as $25), a
 genuine-zero case that must print `0.0000` rather than `-`, and null/malformed/missing-file
