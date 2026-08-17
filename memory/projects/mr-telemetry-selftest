@@ -1,0 +1,665 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands — that is precisely how the
+# 2026-08-17 kill-switch wedge happened (full postmortem in mr-hold's header). Python reads this
+# line as a no-op string; sh/bash re-execs the file under python3 before reaching any other line.
+# Statically enforced for every python mr-* tool by mr-selfcheck.
+"""mr-telemetry-selftest — TDD RED-PHASE gate for lp-01 (`mr-cost-watch telemetry`).
+
+    mr-telemetry-selftest [--selftest]   -> identical behaviour either way; TELEMETRY-SELFTEST-OK/FAIL
+
+WHY THIS EXISTS (lp-01, spec M-loop-infrastructure.spec.md:141-167)
+---------------------------------------------------------------------
+`mr-native-tick.sh`'s rate-limit reader is pre-filtered at the ARMED/PYRL heredoc by a raw substring
+test requiring BOTH `"resetsAt"` and `"rejected"` in the line. A routine `allowed_warning` row (which
+carries the plan's actual `utilization` gauge) never reaches a parser at all — not "discarded by a
+walker", never even looked at. `mr-cost-watch telemetry LOGFILE GATE NSLICES [OUTFILE]` is the NEW
+reader this slice adds; it must NOT touch the arming predicate (which is correct and deliberate — see
+the PYRL heredoc's own comment on why arming must stay allowlisted on `status=="rejected"`).
+
+THIS FILE IS WRITTEN BEFORE THE FEATURE EXISTS (TDD tester ownership; implementer is a different
+agent). Every assertion below that depends on the `telemetry` subcommand is expected to be RED right
+now, and must fail with a clear message naming what is missing — never a traceback, never a silent
+skip. T3 (the arming-predicate pin) is the one exception: it exercises PRE-EXISTING code (the PYRL
+heredoc already ships) and is expected to already pass, proving EARS-3 ("SHALL NOT alter any existing
+trip condition") is not yet violated.
+
+COLLATERAL NOTE (read before treating a slow run as a bug). `mr-cost-watch`'s dispatcher today has no
+`telemetry` branch, so `mr-cost-watch telemetry X Y Z` falls through into `watch` mode (S="telemetry",
+CAP=<LOGFILE path>, LEADER=<GATE literal>) — the EXACT hazard the spec names ("a missing inline exit 0
+in the dispatch would fall through into the watcher — proven hazard", also T8 below). That fallback
+loop does not exit on its own for ~40s (three failed `kill -0` orphan checks, 20s apart), so every
+invocation in this file is wrapped with a short timeout and force-killed. Two side effects are
+UNAVOIDABLE while testing the REAL file under its REAL (currently-buggy) dispatch and are accepted as
+documented, bounded collateral of proving the RED state honestly: (a) 1-2 harmless `COSTWATCH
+telemetry ...` lines land in the real `$MEM/mr-native-tick.log` (a file that already receives constant
+real traffic in this shape; NOT one of the two files T10's non-pollution check scopes); (b) a
+`/tmp/mr_costwatch_telemetry.lock.d` directory is created and force-killed rather than trap-cleaned —
+T8 exists BECAUSE of this, and this file removes that specific, deterministically-named directory in
+a final best-effort sweep after every check has run. No test ever touches a glob wider than that exact
+name, and no test ever executes `mr-native-tick.sh` (enforced by a runtime guard on every subprocess
+call, not just by convention).
+
+Self-locating (`MEM = dirname(__file__)`), NO env override — see mr-selfcheck:4-10 for why an
+override is a surface for greening production vacuously. Standard library only, no network.
+"""
+import glob
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+
+MEM = os.path.dirname(os.path.abspath(__file__))
+COST_WATCH = os.path.join(MEM, "mr-cost-watch")
+TICK = os.path.join(MEM, "mr-native-tick.sh")
+STATE_JSON = os.path.join(MEM, "mr-state.json")
+TELEMETRY_JSONL = os.path.join(MEM, "mr-rate-limit-telemetry.jsonl")
+
+EXPECTED_KEYS = {
+    "ts", "source", "gate_reached", "slices_running_at_sample",
+    "rateLimitType", "status", "utilization", "resetsAt",
+    "isUsingOverage", "overageStatus", "uuid", "ri",
+}
+CLOSED_GATES = {"live-standdown", "tick-post-spawn"}
+INVOKE_TIMEOUT = 1.5  # seconds; see COLLATERAL NOTE above — every RED-phase call hangs on 20s sleep
+
+# =================================================================================================
+# Fixtures — embedded verbatim (never read from /tmp; those logs get swept, and a fixture that reads
+# /tmp is a false green). Measured/real shapes, per the slice brief.
+# =================================================================================================
+F1 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"seven_day","utilization":0.87,"isUsingOverage":false,"surpassedThreshold":0.75},"uuid":"f1-0000-0000-0000-000000000001","session_id":"s1"}'
+F2 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"seven_day","utilization":0.32,"isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000002","session_id":"s1"}'
+F3 = '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1785546000,"rateLimitType":"five_hour","overageStatus":"allowed","overageResetsAt":1788220800,"isUsingOverage":true,"overageInUse":true},"uuid":"f1-0000-0000-0000-000000000003","session_id":"s1"}'
+F4 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1785492000,"rateLimitType":"five_hour","overageStatus":"rejected","overageDisabledReason":"org_level_disabled_until","isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000004","session_id":"s1"}'
+F5 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000005","session_id":"s1"}'
+# real measured shape: mr-postmortem-2026-08-15-evidence.json:2753 (mr_pass_11r-c.log, 2026-07-31)
+F6 = '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"seven_day","overageStatus":"allowed","overageResetsAt":1788220800,"isUsingOverage":true,"overageInUse":true},"uuid":"f1-0000-0000-0000-000000000006","session_id":"s1"}'
+# NEGATIVE CONTROL: a log-of-a-log line. A raw-substring reader (grep for "rateLimitType"/"utilization")
+# would eat this; it must not be persisted (T7).
+F7 = '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"x","content":"ok"}]},"tool_use_result":"stdout: ... \\"rateLimitType\\":\\"seven_day\\" ... \\"utilization\\":0.99 ... \\"resetsAt\\":1786060800 ...","uuid":"f1-0000-0000-0000-000000000007","session_id":"s1"}'
+F8_GARBAGE = '{"type":"rate_limit_event", THIS IS NOT VALID JSON'
+F8_BLANK = ""
+
+FIXTURES = [
+    ("F1", F1, "allowed_warning + utilization present -> T1 (defect a: filtered on status==rejected)"),
+    ("F2", F2, "allowed_warning + utilization present, no surpassedThreshold -> T1"),
+    ("F3", F3, "rejected five_hour, NO utilization -> T2 (defect b: utilization-absent silently skipped)"),
+    ("F4", F4, "allowed five_hour, overageStatus=rejected, NO utilization -> T2"),
+    ("F5", F5, "allowed, no rateLimitType/resetsAt at all, NO utilization -> T2"),
+    ("F6", F6, "rejected seven_day WITH overageStatus, real measured shape (postmortem evidence.json:2753)"),
+    ("F7", F7, "NEGATIVE CONTROL: log-of-a-log substring trap -> T7"),
+    ("F8-garbage", F8_GARBAGE, "truncated/garbage non-JSON line, must not raise"),
+    ("F8-blank", F8_BLANK, "empty line, must not raise"),
+]
+
+# Vacuity control (mirrors mr-repo-of's degenerate-verdict check): a corpus that only ever exercises
+# ONE rateLimitType would let a reader that hardcodes that one type pass T1/T2 for the wrong reason.
+_RATE_LIMIT_TYPES = {"seven_day", "five_hour"}  # present across F1/F2(seven_day), F3/F4(five_hour), F6(seven_day)
+
+
+def _corpus_body(lines):
+    return "\n".join(lines) + "\n"
+
+
+# =================================================================================================
+# Assertion bookkeeping
+# =================================================================================================
+_ASSERTIONS = 0
+_FAILURES = []
+_ALL_RCS = []  # (label, rc) for every emitter invocation — T12
+
+
+def check(cond, id_, detail=""):
+    global _ASSERTIONS
+    _ASSERTIONS += 1
+    if not cond:
+        _FAILURES.append((id_, detail))
+    return cond
+
+
+# =================================================================================================
+# Subprocess guard — centralizes EVERY subprocess call in this file so "never invokes
+# mr-native-tick.sh, spawns claude, or writes the kill-switch flag path" is a runtime property,
+# not a convention. Any call whose argv[0] basename is mr-native-tick.sh, or whose argv contains
+# "claude", or whose argv mentions the kill-switch flag basename, raises loudly instead of running.
+# =================================================================================================
+_FORBIDDEN_ARGV0 = {"mr-native-tick.sh"}
+
+
+def _safe_run(argv, timeout=None):
+    b0 = os.path.basename(str(argv[0]))
+    if b0 in _FORBIDDEN_ARGV0:
+        raise RuntimeError("REFUSED: this selftest must never execute %s" % b0)
+    for a in argv:
+        sa = str(a)
+        if "claude" == os.path.basename(sa) or sa.strip() == "claude":
+            raise RuntimeError("REFUSED: this selftest must never spawn claude (argv=%r)" % (argv,))
+        if ".native-supervisor-disabled" in sa:
+            raise RuntimeError("REFUSED: this selftest must never touch the kill-switch flag path")
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, r.stdout or "", r.stderr or "", False
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout if isinstance(e.stdout, str) else (e.stdout or b"").decode(errors="replace")
+        err = e.stderr if isinstance(e.stderr, str) else (e.stderr or b"").decode(errors="replace")
+        return None, out, err, True
+
+
+def invoke(args, timeout=INVOKE_TIMEOUT):
+    """Run the real `mr-cost-watch telemetry ...` under test. Returns (rc, stdout, stderr, timed_out)."""
+    return _safe_run([COST_WATCH, "telemetry"] + list(args), timeout=timeout)
+
+
+def _record_rc(label, rc):
+    _ALL_RCS.append((label, rc))
+
+
+# =================================================================================================
+# Row helpers
+# =================================================================================================
+def _read_raw_lines(path):
+    try:
+        with open(path, errors="replace") as f:
+            return f.read().splitlines()
+    except OSError:
+        return []
+
+
+def _read_rows(path):
+    """Parse OUTFILE as one-JSON-object-per-line. Silently skips unparseable lines (there should be
+    none in a healthy file); callers assert row COUNT separately so a silently-shrunk file still bites."""
+    rows = []
+    for ln in _read_raw_lines(path):
+        if not ln.strip():
+            continue
+        try:
+            rows.append(json.loads(ln))
+        except Exception:
+            continue
+    return rows
+
+
+def _by_uuid(rows, uuid):
+    for r in rows:
+        if isinstance(r, dict) and r.get("uuid") == uuid:
+            return r
+    return None
+
+
+# =================================================================================================
+# T1/T2/T4/T5/T6/T7/T8/T10/T11/T12 — a handful of real invocations against the running binary.
+# Kept to the minimum count that still gives every assertion group independent evidence, because
+# EVERY invocation right now hangs on the fallback watch loop until our timeout fires (see the
+# COLLATERAL NOTE in the module docstring).
+# =================================================================================================
+def run_invocation_battery(tmp):
+    results = {}
+
+    # ---- RUN_MAIN: the full positive+negative corpus, gate=live-standdown, nslices=3 ----
+    main_log = os.path.join(tmp, "mr_pass_corpus.log")
+    with open(main_log, "w") as f:
+        f.write(_corpus_body([F1, F2, F3, F4, F5, F6, F7, F8_GARBAGE, F8_BLANK]))
+    main_out = os.path.join(tmp, "out_main.jsonl")
+
+    # T8 proof-of-teeth: snapshot the lock-dir glob strictly around THIS invocation. Never a wider
+    # glob for cleanup — only ever removes the one deterministic name this file's own calls can
+    # create, so a real concurrent slice's costwatch lock is never touched.
+    before_locks = set(glob.glob("/tmp/mr_costwatch_*.lock.d"))
+    rc1, out1, err1, to1 = invoke([main_log, "live-standdown", "3", main_out])
+    after_locks = set(glob.glob("/tmp/mr_costwatch_*.lock.d"))
+    new_locks = after_locks - before_locks
+    check(not new_locks, "T8-no-lock-dir",
+          "mr-cost-watch telemetry created %s — the missing dispatch branch fell through into the "
+          "watcher (proven hazard the spec calls out explicitly)" % sorted(new_locks))
+    _record_rc("RUN_MAIN", rc1)
+    # Captured BEFORE the rerun below — this is the only way T6 can actually catch a rerun that
+    # doubles the row count. Reading the file only once, after both invocations, would make the
+    # "before" and "after" comparison the same read and pass vacuously against a buggy re-appender.
+    rowcount_after_first = len(_read_rows(main_out)) if not to1 else -1
+    results["main"] = dict(log=main_log, out=main_out, rc=rc1, stdout=out1, timed_out=to1,
+                            gate="live-standdown", nslices=3, source="slice:corpus",
+                            rowcount_after_first=rowcount_after_first)
+
+    # ---- T6 idempotency: rerun the SAME log+outfile ----
+    rc2, out2, err2, to2 = invoke([main_log, "live-standdown", "3", main_out])
+    _record_rc("RUN_MAIN_RERUN", rc2)
+    results["main_rerun"] = dict(rc=rc2, stdout=out2, timed_out=to2)
+
+    # ---- source derivation: mr_native_tick_<rid>.log -> tick:<rid> ----
+    tick_log = os.path.join(tmp, "mr_native_tick_native-20260817T000000Z-123.log")
+    with open(tick_log, "w") as f:
+        f.write(_corpus_body([F1]))
+    tick_out = os.path.join(tmp, "out_tick.jsonl")
+    rc3, out3, err3, to3 = invoke([tick_log, "tick-post-spawn", "1", tick_out])
+    _record_rc("RUN_TICKSRC", rc3)
+    results["tick"] = dict(out=tick_out, rc=rc3, stdout=out3, timed_out=to3,
+                            gate="tick-post-spawn", nslices=1,
+                            source="tick:native-20260817T000000Z-123")
+
+    # ---- source derivation: anything else -> log:<basename> ----
+    other_log = os.path.join(tmp, "weird-name.log")
+    with open(other_log, "w") as f:
+        f.write(_corpus_body([F1]))
+    other_out = os.path.join(tmp, "out_other.jsonl")
+    rc4, out4, err4, to4 = invoke([other_log, "live-standdown", "2", other_out])
+    _record_rc("RUN_OTHERSRC", rc4)
+    results["other"] = dict(out=other_out, rc=rc4, stdout=out4, timed_out=to4,
+                             gate="live-standdown", nslices=2, source="log:weird-name.log")
+
+    # ---- T4 vacuity: F7+F8 only -> rows=0 ----
+    vac_log = os.path.join(tmp, "mr_pass_vacuity.log")
+    with open(vac_log, "w") as f:
+        f.write(_corpus_body([F7, F8_GARBAGE, F8_BLANK]))
+    vac_out = os.path.join(tmp, "out_vac.jsonl")
+    rc5, out5, err5, to5 = invoke([vac_log, "live-standdown", "1", vac_out])
+    _record_rc("RUN_VACUITY", rc5)
+    results["vacuity"] = dict(out=vac_out, rc=rc5, stdout=out5, timed_out=to5)
+
+    # ---- T7 negative control in isolation: F7 alone -> rows=0 ----
+    f7_log = os.path.join(tmp, "mr_pass_negctrl.log")
+    with open(f7_log, "w") as f:
+        f.write(_corpus_body([F7]))
+    f7_out = os.path.join(tmp, "out_f7.jsonl")
+    rc6, out6, err6, to6 = invoke([f7_log, "tick-post-spawn", "1", f7_out])
+    _record_rc("RUN_F7ONLY", rc6)
+    results["f7only"] = dict(out=f7_out, rc=rc6, stdout=out6, timed_out=to6)
+
+    # ---- T11 failure case: LOGFILE does not exist ----
+    missing_log = os.path.join(tmp, "does-not-exist.log")
+    missing_out = os.path.join(tmp, "out_missing.jsonl")
+    rc7, out7, err7, to7 = invoke([missing_log, "live-standdown", "1", missing_out])
+    _record_rc("RUN_MISSING_LOGFILE", rc7)
+    results["missing"] = dict(rc=rc7, stdout=out7, timed_out=to7)
+
+    return results
+
+
+def _fail_missing(id_, run, what):
+    """One shared, clear failure shape for 'the run never produced usable output' — avoids a
+    traceback from indexing into an empty/absent result and names the missing subcommand plainly."""
+    if run.get("timed_out"):
+        check(False, id_, "%s: mr-cost-watch telemetry timed out after %ss — the `telemetry` "
+              "subcommand does not exist yet (dispatch fell through to the `watch` fallback)"
+              % (what, INVOKE_TIMEOUT))
+    else:
+        check(False, id_, "%s: rc=%r stdout=%r" % (what, run.get("rc"), run.get("stdout")))
+
+
+def assert_t1_t2_t5_on_main(results):
+    """T1 (EARS-1, defect a): F1/F2 (allowed_warning) each produce exactly one row with the correct
+    utilization. This REDs against a reader that filters on status=="rejected" (today's PYRL
+    pre-filter behaviour, misapplied to this NEW reader) because F1/F2 would never be read at all.
+
+    T2 (EARS-2, defect b): F3/F4/F5 each produce a row with utilization is None — never dropped.
+    REDs against `if utilization is None: continue`.
+
+    T5: every row carries EXACTLY the 12-key set, 0<=utilization<=1 when non-null, <1024 bytes,
+    parses standalone, slices_running_at_sample/gate_reached/source match the call's arguments."""
+    run = results["main"]
+    rows = _read_rows(run["out"]) if not run["timed_out"] else []
+    EXPECTED_ROWS = 6  # F1,F2,F3,F4,F5,F6 — F7/garbage/blank must not appear
+    if not check(len(rows) == EXPECTED_ROWS, "T5-row-count",
+                 "expected exactly %d rows from the corpus (F1..F6), got %d (out=%s, timed_out=%s)"
+                 % (EXPECTED_ROWS, len(rows), run["out"], run["timed_out"])):
+        _fail_missing("T1-allowed-warning-rows", run, "F1/F2 rows")
+        _fail_missing("T2-utilization-null-rows", run, "F3/F4/F5 rows")
+        return
+
+    # T1
+    r1 = _by_uuid(rows, "f1-0000-0000-0000-000000000001")
+    r2 = _by_uuid(rows, "f1-0000-0000-0000-000000000002")
+    check(r1 is not None and r1.get("utilization") == 0.87, "T1-F1-allowed-warning",
+          "F1 (status=allowed_warning) row missing or utilization != 0.87: %r" % r1)
+    check(r2 is not None and r2.get("utilization") == 0.32, "T1-F2-allowed-warning",
+          "F2 (status=allowed_warning) row missing or utilization != 0.32: %r" % r2)
+
+    # T2
+    for uuid, label in (
+        ("f1-0000-0000-0000-000000000003", "F3-rejected-no-utilization"),
+        ("f1-0000-0000-0000-000000000004", "F4-allowed-no-utilization"),
+        ("f1-0000-0000-0000-000000000005", "F5-no-ratelimittype-at-all"),
+    ):
+        row = _by_uuid(rows, uuid)
+        check(row is not None, "T2-%s-present" % label, "row for uuid=%s missing (dropped, not just null)" % uuid)
+        if row is not None:
+            check(row.get("utilization") is None, "T2-%s-null" % label,
+                  "expected utilization: null, got %r" % (row.get("utilization"),))
+
+    # T5 — key set, ranges, byte size, standalone parse
+    for i, ln in enumerate(_read_raw_lines(run["out"])):
+        if not ln.strip():
+            continue
+        check(len(ln.encode("utf-8")) < 1024, "T5-row-size-%d" % i, "row %d is >=1024 bytes" % i)
+        try:
+            row = json.loads(ln)
+        except Exception as e:
+            check(False, "T5-row-standalone-json-%d" % i, "row %d does not parse standalone: %s" % (i, e))
+            continue
+        check(set(row.keys()) == EXPECTED_KEYS, "T5-row-keys-%d" % i,
+              "row %d key set != the 12-key contract: got %s" % (i, sorted(row.keys())))
+        u = row.get("utilization")
+        if u is not None:
+            check(0 <= u <= 1, "T5-row-utilization-range-%d" % i, "utilization out of [0,1]: %r" % u)
+        check(row.get("slices_running_at_sample") == 3 and isinstance(row.get("slices_running_at_sample"), int),
+              "T5-row-nslices-%d" % i,
+              "slices_running_at_sample != int(3): %r" % (row.get("slices_running_at_sample"),))
+        check(row.get("gate_reached") == "live-standdown", "T5-row-gate-%d" % i,
+              "gate_reached != 'live-standdown': %r" % (row.get("gate_reached"),))
+        check(row.get("source") == "slice:corpus", "T5-row-source-slice-%d" % i,
+              "source != 'slice:corpus' for mr_pass_corpus.log: %r" % (row.get("source"),))
+
+
+def assert_t5_source_variants(results):
+    """T5 (source derivation, remaining two branches): mr_native_tick_<rid>.log -> tick:<rid>;
+    anything else -> log:<basename>."""
+    tick = results["tick"]
+    if tick["timed_out"] or not tick.get("out"):
+        _fail_missing("T5-source-tick", tick, "mr_native_tick_*.log source derivation")
+    else:
+        rows = _read_rows(tick["out"])
+        check(len(rows) == 1, "T5-source-tick-rowcount", "expected 1 row, got %d" % len(rows))
+        if rows:
+            check(rows[0].get("source") == "tick:native-20260817T000000Z-123", "T5-source-tick",
+                  "source != 'tick:native-20260817T000000Z-123': %r" % rows[0].get("source"))
+            check(rows[0].get("gate_reached") == "tick-post-spawn", "T5-source-tick-gate",
+                  "gate_reached != 'tick-post-spawn': %r" % rows[0].get("gate_reached"))
+            check(rows[0].get("slices_running_at_sample") == 1, "T5-source-tick-nslices",
+                  "slices_running_at_sample != 1: %r" % rows[0].get("slices_running_at_sample"))
+
+    other = results["other"]
+    if other["timed_out"] or not other.get("out"):
+        _fail_missing("T5-source-fallback", other, "otherwise -> log:<basename> source derivation")
+    else:
+        rows = _read_rows(other["out"])
+        check(len(rows) == 1, "T5-source-fallback-rowcount", "expected 1 row, got %d" % len(rows))
+        if rows:
+            check(rows[0].get("source") == "log:weird-name.log", "T5-source-fallback",
+                  "source != 'log:weird-name.log': %r" % rows[0].get("source"))
+
+
+def assert_t4_vacuity(results):
+    """T4 (vacuity control): F7+F8 alone -> rows=0, OUTFILE has zero rows. Paired with the corpus
+    check that >=2 distinct rateLimitType values are represented across F1-F6, so a reader that
+    hardcodes one type could not pass T1/T2 above for the wrong reason."""
+    run = results["vacuity"]
+    if run["timed_out"]:
+        _fail_missing("T4-vacuity-rows-zero", run, "F7+F8-only corpus")
+    else:
+        rows = _read_rows(run["out"]) if os.path.exists(run["out"]) else []
+        check(len(rows) == 0, "T4-vacuity-rows-zero",
+              "F7+F8-only corpus must yield 0 rows, got %d" % len(rows))
+        check(not os.path.exists(run["out"]) or os.path.getsize(run["out"]) == 0,
+              "T4-vacuity-outfile-empty",
+              "OUTFILE must be absent or zero-length for a corpus with no real rate_limit_info")
+    check(len(_RATE_LIMIT_TYPES) >= 2, "T4-corpus-not-degenerate",
+          "fixture corpus only exercises %d distinct rateLimitType value(s) — a reader hardcoding "
+          "one type could pass T1/T2 vacuously" % len(_RATE_LIMIT_TYPES))
+
+
+def assert_t7_negative_control(results):
+    """T7: F7 ALONE (a log-of-a-log line whose payload string happens to contain the substrings
+    'rateLimitType'/'utilization'/'resetsAt') -> zero rows. REDs a raw-substring reader that greps
+    the whole line instead of checking `type == "rate_limit_event"` and reading the real
+    `rate_limit_info` object."""
+    run = results["f7only"]
+    if run["timed_out"]:
+        _fail_missing("T7-f7-alone-zero-rows", run, "F7-only corpus")
+        return
+    rows = _read_rows(run["out"]) if os.path.exists(run["out"]) else []
+    check(len(rows) == 0, "T7-f7-alone-zero-rows",
+          "a log containing only the log-of-a-log fixture F7 must yield 0 rows, got %d" % len(rows))
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000007") is None, "T7-f7-uuid-absent",
+          "F7's uuid must never appear in the output — a substring reader would eat this line")
+
+
+def assert_t6_idempotency(results):
+    """T6: rerunning the emitter over the SAME log+outfile must not double the row count, and the
+    second run's stdout must report dup= > 0."""
+    main = results["main"]
+    rerun = results["main_rerun"]
+    if main["timed_out"] or rerun["timed_out"]:
+        _fail_missing("T6-idempotent-rowcount", rerun, "idempotent rerun")
+        _fail_missing("T6-idempotent-dup-reported", rerun, "idempotent rerun stdout")
+        return
+    rows_after_first = main["rowcount_after_first"]
+    rows_after_second = len(_read_rows(main["out"]))  # read AFTER the rerun completed
+    check(rows_after_first == rows_after_second, "T6-idempotent-rowcount",
+          "row count changed across a rerun over the same log+outfile: %d -> %d"
+          % (rows_after_first, rows_after_second))
+    m = re.match(r"OK rows=(\d+) util=(\d+) dup=(\d+) skip=(\d+)", rerun["stdout"].strip())
+    check(m is not None and int(m.group(3)) > 0, "T6-idempotent-dup-reported",
+          "rerun stdout must report dup=<n> with n>0, got %r" % rerun["stdout"])
+
+
+def assert_t11_t12(results):
+    """T11: stdout contract. Success -> exactly one `OK rows=<int> util=<int> dup=<int> skip=<int>`
+    line. Missing/unreadable LOGFILE -> exactly one `ERR ...` line, rc still 0 (a telemetry reader
+    must never fail its caller). T12: rc of every emitter invocation is 0."""
+    main = results["main"]
+    if main["timed_out"]:
+        _fail_missing("T11-success-stdout-shape", main, "successful run stdout")
+    else:
+        lines = [ln for ln in main["stdout"].splitlines() if ln.strip()]
+        check(len(lines) == 1, "T11-success-stdout-single-line",
+              "successful run stdout must be exactly one line, got %d: %r" % (len(lines), main["stdout"]))
+        if lines:
+            check(re.fullmatch(r"OK rows=\d+ util=\d+ dup=\d+ skip=\d+", lines[0]) is not None,
+                  "T11-success-stdout-shape", "stdout does not match the OK contract: %r" % lines[0])
+
+    missing = results["missing"]
+    if missing["timed_out"]:
+        _fail_missing("T11-failure-stdout-shape", missing, "missing-logfile run stdout")
+    else:
+        lines = [ln for ln in missing["stdout"].splitlines() if ln.strip()]
+        check(len(lines) == 1 and lines[0].startswith("ERR "), "T11-failure-stdout-shape",
+              "missing-LOGFILE run stdout must be exactly one `ERR ...` line, got %r" % missing["stdout"])
+        check(missing["rc"] == 0, "T11-failure-rc-still-zero",
+              "a telemetry reader must never fail its caller even on a missing LOGFILE: rc=%r" % missing["rc"])
+
+    for label, rc in _ALL_RCS:
+        check(rc == 0, "T12-rc-zero-%s" % label,
+              "invocation %s did not return rc=0 (rc=%r) — an emitter must always exit 0" % (label, rc))
+
+
+# =================================================================================================
+# T3 — behavioural arming pin (EARS-3, defect c). Extracted BY CONTENT MARKER, modeled on
+# mr-selfcheck's A4/A8 pattern: locate `<<'PYRL'` by content, find the line that is exactly `PYRL`,
+# and FAIL LOUDLY if either marker is missing (a silently-skipped extraction is a false green).
+# =================================================================================================
+def assert_t3_arming_pin():
+    if not os.path.isfile(TICK):
+        check(False, "T3-arming-tick-not-found", "mr-native-tick.sh not found at %s" % TICK)
+        return
+    with open(TICK, errors="replace") as f:
+        tick_src = f.read()
+
+    # The character class in place of a bare `'` keeps THIS line from matching mr-selfcheck's own
+    # heredoc-opener scanner (`^…python3…<<-?'TAG'…$`), which would otherwise read this file as
+    # opening an unterminated PYRL heredoc and RED py-heredoc-coverage. `[']PYRL[']` matches the
+    # exact same literal text in mr-native-tick.sh (`<<'PYRL'`) — semantics unchanged, T3 unweakened.
+    open_m = re.search(r"^[^\n]*python3[^\n]*<<[']PYRL['][^\n]*$", tick_src, re.M)
+    if not check(open_m is not None, "T3-arming-extraction-open",
+                 "could not locate the `<<'PYRL'` opener by content — extraction has rotted"):
+        return
+    tail = tick_src[open_m.end() + 1:]
+    close_m = re.search(r"^PYRL\s*$", tail, re.M)
+    if not check(close_m is not None, "T3-arming-extraction-close",
+                 "could not locate the closing `PYRL` marker line by content — extraction has rotted"):
+        return
+    body = tail[:close_m.start()]
+    check(len(body.strip()) > 0, "T3-arming-extraction-nonempty", "extracted PYRL body is empty")
+
+    with tempfile.TemporaryDirectory() as gx:
+        script = os.path.join(gx, "extracted_pyrl.py")
+        with open(script, "w") as f:
+            f.write(body)
+
+        def _mkstate(name):
+            p = os.path.join(gx, name)
+            with open(p, "w") as f:
+                json.dump({"foo": "bar"}, f)
+            return p
+
+        # (i) F1+F2 only (allowed_warning; no "rejected" substring anywhere) -> NONE, state untouched.
+        tlog_i = os.path.join(gx, "tlog_none.log")
+        with open(tlog_i, "w") as f:
+            f.write(_corpus_body([F1, F2]))
+        state_i = _mkstate("state_none.json")
+        with open(state_i, "rb") as f:
+            state_i_before = f.read()
+        rc, out, err, to = _safe_run([sys.executable or "/usr/bin/python3", script, tlog_i, state_i],
+                                      timeout=10)
+        check(not to, "T3-arming-none-not-timed-out", "extracted PYRL script timed out")
+        check(rc == 0, "T3-arming-none-rc", "extracted PYRL script rc=%r stderr=%r" % (rc, err))
+        check(out.strip() == "NONE", "T3-arming-none-stdout",
+              "a log with only allowed_warning rows must arm nothing — a WIDENED arming predicate "
+              "REDs here: got %r" % out.strip())
+        with open(state_i, "rb") as f:
+            state_i_after = f.read()
+        check(state_i_before == state_i_after, "T3-arming-none-state-untouched",
+              "state file must be byte-identical when nothing arms")
+
+        # (ii) a rejected row with resetsAt = now+3600 -> ARMED
+        future = int(time.time()) + 3600
+        tlog_ii = os.path.join(gx, "tlog_armed.log")
+        with open(tlog_ii, "w") as f:
+            f.write('{"type":"rate_limit_event","rate_limit_info":{"status":"rejected",'
+                    '"resetsAt":%d,"rateLimitType":"five_hour"},"uuid":"t3-ii","session_id":"s1"}\n'
+                    % future)
+        state_ii = _mkstate("state_armed.json")
+        rc2, out2, err2, to2 = _safe_run(
+            [sys.executable or "/usr/bin/python3", script, tlog_ii, state_ii], timeout=10)
+        check(not to2, "T3-arming-armed-not-timed-out", "extracted PYRL script timed out")
+        check(out2.strip().startswith("ARMED"), "T3-arming-armed-stdout",
+              "a future-resetsAt rejected row must arm — a NARROWED arming predicate REDs here: "
+              "got %r" % out2.strip())
+
+        # (iii) a rejected row with resetsAt in the past -> SKIPPED past(
+        past = int(time.time()) - 3600
+        tlog_iii = os.path.join(gx, "tlog_past.log")
+        with open(tlog_iii, "w") as f:
+            f.write('{"type":"rate_limit_event","rate_limit_info":{"status":"rejected",'
+                    '"resetsAt":%d,"rateLimitType":"five_hour"},"uuid":"t3-iii","session_id":"s1"}\n'
+                    % past)
+        state_iii = _mkstate("state_past.json")
+        rc3, out3, err3, to3 = _safe_run(
+            [sys.executable or "/usr/bin/python3", script, tlog_iii, state_iii], timeout=10)
+        check(not to3, "T3-arming-past-not-timed-out", "extracted PYRL script timed out")
+        check(out3.strip().startswith("SKIPPED past("), "T3-arming-past-stdout",
+              "a past-resetsAt rejected row must be skipped as past, got %r" % out3.strip())
+
+
+# =================================================================================================
+# T9 — static call-site pins over mr-native-tick.sh, by CONTENT never by line number.
+# =================================================================================================
+CALL_RE = re.compile(r'"\$MEM/mr-cost-watch"\s+telemetry\s+"[^"]*"\s+([A-Za-z0-9_-]+)')
+
+
+def assert_t9_call_sites():
+    if not os.path.isfile(TICK):
+        check(False, "T9-tick-not-found", "mr-native-tick.sh not found at %s" % TICK)
+        return
+    with open(TICK, errors="replace") as f:
+        src = f.read()
+
+    matches = list(CALL_RE.finditer(src))
+    check(len(matches) == 2, "T9-exactly-two-call-sites",
+          "expected exactly 2 `mr-cost-watch telemetry` call-sites, found %d" % len(matches))
+
+    bad_gates = [m.group(1) for m in matches if m.group(1) not in CLOSED_GATES]
+    check(not bad_gates, "T9-closed-gate-vocabulary",
+          "GATE literal(s) outside {live-standdown, tick-post-spawn}: %s" % bad_gates)
+
+    rc_idx = src.find('if [ "$RC" -eq 0 ]')
+    pyrl_open_m = re.search(r"<<'PYRL'", src)
+    pyrl_idx = pyrl_open_m.start() if pyrl_open_m else None
+    standdown_idx = src.find("STANDDOWN live-chain")
+
+    tick_post_spawn = [m for m in matches if m.group(1) == "tick-post-spawn"]
+    if check(len(tick_post_spawn) >= 1, "T9-tick-post-spawn-present",
+             "no `tick-post-spawn` telemetry call-site found"):
+        m = tick_post_spawn[0]
+        check(rc_idx != -1 and m.start() < rc_idx, "T9-tick-post-spawn-before-rc-check",
+              "the tick-post-spawn call must appear before `if [ \"$RC\" -eq 0 ]`")
+        check(pyrl_idx is not None and m.start() < pyrl_idx, "T9-tick-post-spawn-before-pyrl",
+              "the tick-post-spawn call must appear before the `<<'PYRL'` opener")
+
+    live_standdown = [m for m in matches if m.group(1) == "live-standdown"]
+    if check(len(live_standdown) >= 1, "T9-live-standdown-present",
+             "no `live-standdown` telemetry call-site found"):
+        m = live_standdown[0]
+        check(standdown_idx != -1 and m.start() < standdown_idx, "T9-live-standdown-before-standdown-log",
+              "the live-standdown call must appear before the `STANDDOWN live-chain` log line")
+
+
+# =================================================================================================
+# T10 — production non-pollution. Snapshot (exists, size, sha256) of mr-state.json and
+# mr-rate-limit-telemetry.jsonl BEFORE the whole run and compare AFTER. Any change is a FAIL.
+# =================================================================================================
+def _snapshot(path):
+    if not os.path.exists(path):
+        return (False, None, None)
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        return (True, len(data), hashlib.sha256(data).hexdigest())
+    except OSError:
+        return (True, None, None)
+
+
+# =================================================================================================
+# Main
+# =================================================================================================
+def selftest():
+    before_state = _snapshot(STATE_JSON)
+    before_telem = _snapshot(TELEMETRY_JSONL)
+
+    assert_t3_arming_pin()
+    assert_t9_call_sites()
+
+    with tempfile.TemporaryDirectory(prefix="mr-telemetry-selftest-") as tmp:
+        results = run_invocation_battery(tmp)
+        assert_t1_t2_t5_on_main(results)
+        assert_t5_source_variants(results)
+        assert_t4_vacuity(results)
+        assert_t7_negative_control(results)
+        assert_t6_idempotency(results)
+        assert_t11_t12(results)
+
+    # Best-effort, narrowly-scoped cleanup of the ONE deterministically-named lock dir this file's
+    # own invocations can create (see the COLLATERAL NOTE). Never a wildcard delete.
+    try:
+        import shutil
+        stray = "/tmp/mr_costwatch_telemetry.lock.d"
+        if os.path.isdir(stray):
+            shutil.rmtree(stray, ignore_errors=True)
+    except Exception:
+        pass
+
+    after_state = _snapshot(STATE_JSON)
+    after_telem = _snapshot(TELEMETRY_JSONL)
+    check(before_state == after_state, "T10-no-mr-state-json-pollution",
+          "mr-state.json changed across the run: before=%s after=%s" % (before_state, after_state))
+    check(before_telem == after_telem, "T10-no-telemetry-jsonl-pollution",
+          "mr-rate-limit-telemetry.jsonl changed across the run: before=%s after=%s"
+          % (before_telem, after_telem))
+
+    if _FAILURES:
+        for id_, detail in _FAILURES:
+            line = "TELEMETRY-SELFTEST-FAIL %s" % id_
+            if detail:
+                line += ": %s" % detail
+            print(line)
+        return 1
+    print("TELEMETRY-SELFTEST-OK %d fixtures / %d assertions" % (len(FIXTURES), _ASSERTIONS))
+    return 0
+
+
+if __name__ == "__main__":
+    # Bare invocation and `--selftest` are identical — there is nothing else this tool does.
+    sys.exit(selftest())
