@@ -26,4 +26,59 @@ dropped.
 ## Confirmation
 `scripts/tests/invariants.test.mjs` asserts `templates/_base/.claude/hooks/guard-bash.mjs`
 exists and that `templates/_base/.claude/settings.json` wires PreToolUse → guard-bash.mjs;
-runs in `just test` (in `just ci`).
+runs in `just test` (in `just ci`). The harness-local hook's own rules are covered separately by
+`.claude/hooks/guard-bash.mjs --selftest` (31 fixtures, both must-block and must-NOT-block),
+which `memory/projects/mr-selfcheck` runs as check A7 — `just ci` never exercised the root hook.
+
+## Amendment 2026-08-17 (lp-09) — the harness-local kill switch
+
+`memory/projects/.native-supervisor-disabled` is the operator's only control over autonomous spend
+while loop pacing is manual. `memory/projects/mr-hold` makes it provenance-aware: provenance is
+checked on **clear**, never on **set**; absent, empty or unparseable provenance defaults to
+**OPERATOR** and is never auto-cleared. That fail-safe is what lets the unchanged
+`~/.local/bin/mr-supervisor-disable` (a bare `touch`, outside version control, so a `git revert`
+here could not undo an edit to it) keep working with no out-of-repo change.
+
+Decisions recorded here because they are guard-hook decisions:
+
+- **Flag rules are anchored at COMMAND POSITION** (`rm`/`mv` naming the flag,
+  `mr-supervisor-enable`, the write verbs). An unanchored match blocked merely *writing about* the
+  kill switch, including this slice's own tests and docs. An over-firing guard gets switched off,
+  which is how decorative gates are born.
+- **The anchor's definition of "command position" was wrong, and it was a real bypass.** It read
+  `(^|[;&|(]\s*)`; these regexes carry no `m` flag, so `^` is *string-start only* and the separator
+  class omits `\n`. A single leading space, or an ordinary two-line Bash call (`ls -la` ⏎
+  `rm …/.native-supervisor-disabled`, no `;`), therefore matched **nothing** — for the pre-existing
+  `rm`/`mv` rules as much as the new ones. Two independent review lenses found it by execution. Now
+  `(^\s*|[;&|(\n]\s*)`, with fixtures pinning the leading-space, leading-tab and newline-separated
+  cases for `rm`, `touch` and `cp`. Widening an anchor can only block more, which is the fail-safe
+  direction for a spend control.
+- **Write verbs are blocked too** (`tee`/`sed`/`chmod`/`truncate`/`cp`/`ln`/`unlink`/`touch` naming
+  the flag, and any `>`/`>>` redirect onto it). Provenance lives in file *content*, so `rm` was never
+  the only route: a session could write `by=supervisor` itself and then clear the hold through the
+  perfectly sanctioned `mr-hold clear --by supervisor`. No local secret closes that — an adversary
+  with the filesystem reads it too — so the mitigation is to make the write itself unavailable to a
+  Bash call. `touch` is blocked for the mirror-image reason: a bare touch creates an *unattributed*
+  hold that the fail-safe reads as OPERATOR, which the loop may then never clear, so a session could
+  wedge the loop permanently by accident. Doctrine now orders `mr-hold set --by supervisor`.
+- **REJECTED: narrowing the anchors with a `(?<!\\)` lookbehind.** The proposal was to stop the
+  measured false positive where a `grep` pattern's BRE alternation `\|` reads as a shell pipe. The
+  premise ("`\|` is always an escaped, literal pipe") is false for `\\|`: bash consumes `\\` as an
+  escaped backslash, leaving a **real** pipe — verified, `bash -c 'true \\| echo X'` prints `X`. The
+  lookbehind would therefore have let `true \\| rm …flag` through, trading an annoying false positive
+  for a genuine bypass. The over-fire is accepted as fail-safe and pinned by a `--selftest` fixture
+  whose comment carries this reasoning, so nobody re-opens the hole as a "cleanup".
+- **Known, unclosed gaps, every one pinned by a `--selftest` fixture** so the list can never quietly
+  diverge from the code, and so nobody mistakes this hook for a sandbox:
+  `settings.json` wires it to the **Bash tool only**, so `Write`/`Edit` bypass every rule; and the
+  pattern cannot see through indirection — `bash -c '…'`, `xargs rm`, `find -exec rm {} +`,
+  `F=…; rm "$F"`, `python3 -c "os.remove(...)"`, a glob instead of the literal name, or
+  `git clean -fdx` (the flag is gitignored). What the hook buys is that the *casual* route — the one
+  a session takes without meaning to defeat anything — is closed; the primary control remains
+  `mr-hold`'s provenance check. Closing the Write/Edit gap needs a `.claude/settings.json` matcher —
+  outside lp-09's declared touches, filed as a follow-up. An `env`/`sudo`/`command`/`nohup`/`time`/
+  `exec` prefix IS tolerated by the verb rules (those are one-token wrappers an agent reaches for
+  casually), and `dd`/`install`/`rsync`/`shred` are in the verb list for the same reason `cp` is.
+- **`templates/_base/.claude/hooks/guard-bash.mjs` intentionally does NOT carry these rules.**
+  Generated projects have no `.native-supervisor-disabled`. The divergence is correct in both
+  directions; do not "sync" it.

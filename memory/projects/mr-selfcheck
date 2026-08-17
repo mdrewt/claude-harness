@@ -1,7 +1,14 @@
 #!/bin/bash
 # mr-selfcheck — mechanical corpus health check (daily via tick). rc=0 always; prints FAIL lines.
 set -u
-MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+# SELF-LOCATING (lp-09), not hardcoded. This gate attests the corpus it SHIPS BESIDE, so whichever
+# copy you run must check that copy's tools — otherwise a slice's own worktree run silently gates the
+# live main-checkout files and every assertion below is a false green. Deliberately NOT an env
+# override (`MR_SELFCHECK_MEM=…`): an override is a surface for greening production vacuously, which
+# is the exact failure class this gate exists to prevent. Cron invokes this by absolute path in its
+# own directory, so production behaviour is unchanged. (mr-hold is the opposite call — it addresses a
+# singleton machine-wide artifact and MUST stay hardcoded; the reason is in its header.)
+MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 BAD=0
 # The tool set is DERIVED, not hand-maintained (lp-00). The old hardcoded 19-path list had already
 # drifted: it omitted mr-selfcheck itself and mr-feedback, and every new tool had to be remembered
@@ -96,5 +103,399 @@ sys.exit(bad)
 PYHD
 grep -q "Feedback doctrine (ACTIVE" "$MEM/mr-supervisor-prompt-native.md" || { echo "SELFCHECK-FAIL SSOT doctrine pointer missing"; BAD=1; }
 grep -q "ACTIVE 2026" "$MEM/mr-feedback-doctrine.md" || { echo "SELFCHECK-FAIL doctrine not ACTIVE"; BAD=1; }
+# lp-09: kill-switch provenance derived assertions (A1-A8). Tester-authored, TDD RED PHASE —
+# do not edit these to fit a buggy implementation; a wrong expectation is corrected FROM THE
+# SPEC (M-loop-infrastructure.spec.md, slice lp-09), never retargeted to match the code.
+/usr/bin/python3 - "$MEM" <<'PYENV' || BAD=1
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+MEM = sys.argv[1]
+HARNESS = os.path.dirname(os.path.dirname(MEM))
+bad = 0
+
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL %s" % name) + (": " + detail if detail else ""))
+
+
+def _mr_files(mem):
+    # Same exclusion shape as the tool enumeration above (mr-selfcheck's own TOOLS glob and
+    # the PYHD heredoc scanner): `.bak*`/`.log`/`.md`/`.json`/`.jsonl` are documentation,
+    # backups or data, never scannable executables.
+    return sorted(
+        n for n in os.listdir(mem)
+        if n.startswith("mr-")
+        and not any(k in n for k in (".bak", ".log"))
+        and not n.endswith((".md", ".json", ".jsonl"))
+        and os.path.isfile(os.path.join(mem, n))
+    )
+
+
+def _bash_mr_tools(mem):
+    out = []
+    for n in _mr_files(mem):
+        p = os.path.join(mem, n)
+        if not os.access(p, os.X_OK):
+            continue
+        try:
+            with open(p, errors="replace") as f:
+                first = f.readline()
+        except OSError:
+            continue
+        # python tools CANNOT carry a bash `unset` line — including them here would be a
+        # permanent false positive against A1's anchor requirement.
+        if "bash" in first or first.strip().endswith("/sh"):
+            out.append(n)
+    return out
+
+
+def _nonblank_noncomment_lines(path):
+    try:
+        with open(path, errors="replace") as f:
+            src = f.read()
+    except OSError:
+        return []
+    return [ln for ln in src.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+
+
+SETSID_RE = re.compile(r"\bsetsid\b")
+# Deliberately requires "claude" followed by whitespace then a flag: a bare `\bclaude\b`
+# also matches every mention of the harness's own directory name ("ai-apps/claude-harness"
+# contains the standalone word "claude" at a word boundary before the hyphen), which would
+# make EVERY mr-* tool a "spawner" and defeat the predicate entirely. Every real invocation
+# in this corpus (`claude --model ...`, `timeout N claude --model ...`) passes a flag.
+CLAUDE_RE = re.compile(r"\bclaude\s+-")
+
+
+def _is_spawner(path):
+    for ln in _nonblank_noncomment_lines(path):
+        if SETSID_RE.search(ln) or CLAUDE_RE.search(ln):
+            return True
+    return False
+
+
+MR_FORCE_DEREF_RE = re.compile(r"\$MR_FORCE\b|\$\{MR_FORCE")
+
+
+def _dereferences_mr_force(path):
+    for ln in _nonblank_noncomment_lines(path):
+        if MR_FORCE_DEREF_RE.search(ln):
+            return True
+    return False
+
+
+UNSET_ANCHOR = "unset MR_FORCE MR_TICK_DRYRUN"
+
+# =============================================================================================
+# A2 — sole-consumer cardinality. Computed FIRST because A1's exemption is DERIVED from it
+# (never a hardcoded name list) — a second escape hatch appearing anywhere reds A2 on its own,
+# which is what makes A1's exemption derived rather than hand-maintained.
+# =============================================================================================
+all_mr_files = _mr_files(MEM)
+if not all_mr_files:
+    fail("A2-sole-consumer-cardinality", "zero mr-* files enumerated in %s — the glob has rotted" % MEM)
+# The OBSERVER is excluded from the OBSERVED SET, and only the observer: this file necessarily
+# quotes the very pattern it enforces (see MR_FORCE_DEREF_RE above), so scanning itself reports a
+# permanent false positive. This is not the hand-maintained spawner allowlist A2 exists to avoid —
+# every other tool, present and future, is still scanned. mr-selfcheck launches nothing, so the
+# blind spot it creates is a non-spawner that would have to dereference the variable for no reason.
+consumers = [n for n in all_mr_files
+             if n != "mr-selfcheck" and _dereferences_mr_force(os.path.join(MEM, n))]
+if all_mr_files and set(consumers) != {"mr-native-tick.sh"}:
+    fail("A2-sole-consumer-cardinality",
+         "expected exactly {mr-native-tick.sh} to dereference $MR_FORCE, got %s" % (sorted(consumers),))
+exempt = set(consumers)  # derived exemption for A1 — never a hardcoded name
+
+# =============================================================================================
+# A1 — spawner unset anchor. Deliberately OVER-inclusive: a false positive costs one harmless
+# extra `unset` line; a false negative is an undetected bypass of the operator's spend
+# control. Residual blind spot, named honestly: a PYTHON tool that shells the tick via
+# `subprocess` would spawn a paid session while carrying no bash `unset` line at all, and
+# this scan — which only classifies BASH/SH shebangs — would never see it.
+# =============================================================================================
+bash_tools = _bash_mr_tools(MEM)
+if not bash_tools:
+    fail("A1-spawner-unset", "zero bash/sh mr-* tools enumerated in %s — the glob has rotted" % MEM)
+for n in bash_tools:
+    # Same observer/observed carve-out as A2, and for a sharper reason: this file's own fixture
+    # STRINGS contain `setsid`, so it classifies ITSELF as a spawner and then passes only because
+    # UNSET_ANCHOR happens to appear verbatim elsewhere in it — a coincidence, not a design. Reword
+    # either literal and the gate starts reding on itself for no real regression. mr-selfcheck
+    # launches nothing, so excluding it costs no coverage.
+    if n in exempt or n == "mr-selfcheck":
+        continue
+    p = os.path.join(MEM, n)
+    if _is_spawner(p):
+        with open(p, errors="replace") as f:
+            src = f.read()
+        if UNSET_ANCHOR not in src:
+            fail("A1-spawner-unset",
+                 "%s launches a child (setsid/claude) but is missing the exact anchor %r" % (n, UNSET_ANCHOR))
+
+# --- A1/A2 vacuity fixtures: a derived predicate that never fires on ANYTHING is worse than
+# no predicate at all (silent green forever). Synthetic tempdir corpora only. ---
+with tempfile.TemporaryDirectory() as fx:
+    def _mk(name, body):
+        p = os.path.join(fx, name)
+        with open(p, "w") as f:
+            f.write(body)
+        os.chmod(p, 0o755)
+        return p
+
+    spawner_no_unset = _mk("mr-fixture-spawner", "#!/bin/bash\nsetsid bash foo &\n")
+    if not _is_spawner(spawner_no_unset):
+        fail("A1-fixture-spawner-detected", "a synthetic bash tool containing setsid was not classified as a spawner")
+    with open(spawner_no_unset, errors="replace") as f:
+        if UNSET_ANCHOR in f.read():
+            fail("A1-fixture-vacuity", "the no-anchor fixture unexpectedly already contains the anchor")
+
+    spawner_with_unset = _mk("mr-fixture-spawner-ok",
+                              "#!/bin/bash\n%s 2>/dev/null || true\nsetsid bash foo &\n" % UNSET_ANCHOR)
+    with open(spawner_with_unset, errors="replace") as f:
+        has_anchor = UNSET_ANCHOR in f.read()
+    if not (_is_spawner(spawner_with_unset) and has_anchor):
+        fail("A1-fixture-with-anchor", "a synthetic spawner carrying the anchor failed the predicate that should pass it")
+
+    fx_two = os.path.join(fx, "two-consumers")
+    os.makedirs(fx_two)
+    with open(os.path.join(fx_two, "consumer-a"), "w") as f:
+        f.write("#!/bin/bash\necho ${MR_FORCE:-0}\n")
+    with open(os.path.join(fx_two, "consumer-b"), "w") as f:
+        f.write("#!/bin/bash\necho $MR_FORCE\n")
+    two_consumers = [n for n in os.listdir(fx_two) if _dereferences_mr_force(os.path.join(fx_two, n))]
+    if len(two_consumers) != 2:
+        fail("A2-fixture-two-dereferencers",
+             "a synthetic corpus with two $MR_FORCE dereferencers did not detect both — got %s" % (two_consumers,))
+
+    fx_empty = os.path.join(fx, "empty-corpus")
+    os.makedirs(fx_empty)
+    empty_consumers = [n for n in os.listdir(fx_empty) if _dereferences_mr_force(os.path.join(fx_empty, n))]
+    # An EMPTY corpus must not vacuously "pass" the sole-consumer check.
+    if set(empty_consumers) == {"mr-native-tick.sh"}:
+        fail("A2-fixture-empty-corpus-vacuous-pass", "an EMPTY corpus was mistaken for the real sole consumer")
+
+# =============================================================================================
+# Shared read of the sole consumer's source (A3, A4, A8 all extract from it BY CONTENT, never
+# by line number, so the extraction survives future edits to mr-native-tick.sh).
+# =============================================================================================
+consumer_path = os.path.join(MEM, "mr-native-tick.sh")
+tick_src = None
+if not os.path.isfile(consumer_path):
+    fail("A3-launch-site-strip", "sole consumer mr-native-tick.sh not found")
+    fail("A4-hold-gate-reporting", "sole consumer mr-native-tick.sh not found")
+    fail("A8-gate-behavioural", "sole consumer mr-native-tick.sh not found")
+else:
+    with open(consumer_path, errors="replace") as f:
+        tick_src = f.read()
+
+# =============================================================================================
+# A3 — launch-site strip: the `claude --model` launch line (the paid session launch) must
+# carry `env -u MR_FORCE`.
+# =============================================================================================
+if tick_src is not None:
+    launch_lines = [ln for ln in tick_src.splitlines() if re.search(r"\bclaude\s+--model\b", ln)]
+    if not launch_lines:
+        fail("A3-launch-site-strip", "no line invoking `claude --model` found by content — extraction has rotted")
+    elif not any("env -u MR_FORCE" in ln for ln in launch_lines):
+        fail("A3-launch-site-strip", "the `claude --model` launch line does not carry `env -u MR_FORCE`")
+
+# =============================================================================================
+# A4 — hold-gate reporting (EARS-4). Scoped to the kill-switch gate ONLY: the file has 9
+# SKIP/STANDDOWN log lines and only the hold gate is reachable while a hold stands, so a
+# blanket rule across every gate would red on unrelated lines.
+# =============================================================================================
+gate_block = None
+if tick_src is not None:
+    gm = re.search(r"^#\s*gate -1:.*$", tick_src, re.M)
+    if not gm:
+        fail("A4-hold-gate-reporting", "could not locate the `gate -1` marker comment — extraction has rotted")
+    else:
+        fim = re.search(r"^fi\s*$", tick_src[gm.start():], re.M)
+        if not fim:
+            fail("A4-hold-gate-reporting", "could not locate gate -1's closing `fi` — extraction has rotted")
+        else:
+            gate_block = tick_src[gm.start():gm.start() + fim.end()]
+            # TRUNCATION GUARD. The closing-`fi` search stops at the first line that is bare `fi`,
+            # which is gate -1's real end ONLY because its inner if/else is written `…; fi` on one
+            # line. Reformat that inner branch and the extraction would silently capture a PARTIAL
+            # block — and a partial block still satisfies "found a fi", so A4/A8 would pass on a
+            # fragment. Balance the keywords and fail loudly instead of gating on a fragment.
+            # ONE findall per keyword — two overlapping alternations double-counted the outer `if`
+            # and made the guard itself a false positive on the very block it protects.
+            _opens = len(re.findall(r"(?:^\s*|;\s*|&&\s*|\|\|\s*|\bthen\s+)if\s", gate_block, re.M))
+            _closes = len(re.findall(r"(?:^\s*|;\s*)fi\b", gate_block, re.M))
+            if _closes and _opens and _closes < _opens:
+                fail("A4-hold-gate-reporting",
+                     "gate -1 extraction looks TRUNCATED (%d if / %d fi in the captured block) — the "
+                     "marker-to-bare-`fi` extraction has drifted; A4/A8 would be gating a fragment"
+                     % (_opens, _closes))
+            # Comment lines are excluded: a `#` line cannot emit anything, and the gate's own
+            # commentary discusses log lines, so counting them is a guaranteed false positive.
+            log_lines = [ln for ln in gate_block.splitlines()
+                         if re.search(r"\blog\s+", ln) and not ln.lstrip().startswith("#")]
+            if not log_lines:
+                fail("A4-hold-gate-reporting", "gate -1 block contains no `log` line — extraction has rotted")
+            for ln in log_lines:
+                # A call to the `qstat` helper counts as reporting. Demanding the literal tokens on
+                # the log line would force the arithmetic to be re-derived inline at each site — the
+                # duplication this slice removed. A4 is the cheap static aid; A8 below EXECUTES the
+                # extracted gate and asserts the tokens really do appear in the emitted line, which
+                # is the assertion with teeth (it is what caught `|| echo` not firing on empty output).
+                if "qstat" in ln:
+                    continue
+                if "queued_events=" not in ln or "oldest_event_age_h=" not in ln:
+                    fail("A4-hold-gate-reporting",
+                         "gate -1 log line missing queued_events=/oldest_event_age_h=: %s" % ln.strip()[:160])
+
+# =============================================================================================
+# A5 — doctrine (EARS-2).
+# =============================================================================================
+doctrine_path = os.path.join(MEM, "mr-supervisor-prompt-native.md")
+if not os.path.isfile(doctrine_path):
+    fail("A5-doctrine", "mr-supervisor-prompt-native.md not found")
+else:
+    with open(doctrine_path, errors="replace") as f:
+        doctrine_lines = f.readlines()
+    if "mr-hold set --by supervisor" not in "".join(doctrine_lines):
+        fail("A5-doctrine", "doctrine never instructs `mr-hold set --by supervisor`")
+    for i, ln in enumerate(doctrine_lines, 1):
+        if re.search(r"(create|touch)[^\n]*\.native-supervisor-disabled", ln, re.I) and "mr-hold" not in ln:
+            fail("A5-doctrine",
+                 "line %d instructs creating/touching the flag without naming mr-hold — with the merged "
+                 "fail-safe, a bare zero-byte create is attributed to OPERATOR and is therefore permanently "
+                 "unclearable by the loop; the doctrine as written wedges the loop the first time it empties "
+                 "its queue: %s" % (i, ln.strip()[:160]))
+
+# =============================================================================================
+# A6 — mr-spawn gate ordering (EARS-3, STATIC PROXY). Proves POSITION only — that the hold
+# check appears before the launch invocation — NOT that the refusal short-circuits execution.
+# Say so honestly rather than let it be mistaken for behavioural coverage.
+# =============================================================================================
+spawn_path = os.path.join(MEM, "mr-spawn")
+if not os.path.isfile(spawn_path):
+    fail("A6-spawn-gate-ordering", "mr-spawn not found")
+else:
+    with open(spawn_path, errors="replace") as f:
+        spawn_lines = f.readlines()
+    hold_idx = next((i for i, ln in enumerate(spawn_lines)
+                      if ".native-supervisor-disabled" in ln and re.search(r"\bif\b", ln)), None)
+    launch_idx = next((i for i, ln in enumerate(spawn_lines) if "mr-launch.sh" in ln), None)
+    if hold_idx is None or launch_idx is None:
+        fail("A6-spawn-gate-ordering", "could not locate hold check and/or first launch invocation by content")
+    elif not (hold_idx < launch_idx):
+        fail("A6-spawn-gate-ordering",
+             "hold check (line %d) is not before the first launch invocation (line %d) — static proxy only, "
+             "proves position, not that the refusal short-circuits" % (hold_idx + 1, launch_idx + 1))
+
+# =============================================================================================
+# A7 — guard selftest wiring. cwd MUST be HARNESS: asdf shims need a cwd carrying
+# `.tool-versions`, and a relative path would resolve against cron's home dir instead — the
+# exact trap already recorded for env-python3 hooks in this harness.
+# =============================================================================================
+guard_path = os.path.join(HARNESS, ".claude", "hooks", "guard-bash.mjs")
+if not os.path.isfile(guard_path):
+    fail("A7-guard-selftest-wiring", "guard-bash.mjs not found under %s" % guard_path)
+else:
+    try:
+        r = subprocess.run(["node", guard_path, "--selftest"], cwd=HARNESS,
+                            capture_output=True, text=True, timeout=60)
+    except FileNotFoundError:
+        fail("guard-selftest-unrunnable", "`node` is not on PATH — cannot run guard-bash.mjs --selftest")
+    except Exception as e:
+        fail("guard-selftest-unrunnable", "%s: %s" % (type(e).__name__, e))
+    else:
+        if r.returncode != 0:
+            tail = (r.stdout + r.stderr).strip().splitlines()
+            fail("A7-guard-selftest-wiring",
+                 "guard-bash.mjs --selftest exited %d: %s" % (r.returncode, " | ".join(tail[-6:])))
+        elif "GUARD-SELFTEST-OK" not in r.stdout:
+            fail("A7-guard-selftest-wiring", "guard-bash.mjs --selftest did not print GUARD-SELFTEST-OK")
+
+# =============================================================================================
+# A8 — gate -1 behavioural test: the spec's literal Tests clause (spec.md:137-139), proven
+# SAFELY. We never run the real tick (it spawns a paid session) — instead the gate -1 block is
+# extracted by marker + closing `fi` (never by line number) and executed via a tempdir wrapper
+# with a fixture MEM, a fixture zero-byte flag, a fixture pending-events/, and stub mr-hold/log
+# definitions. If the markers cannot be found, FAIL LOUDLY — a silently-skipped extraction is a
+# false green.
+# =============================================================================================
+if tick_src is not None and gate_block is None:
+    # A4 already failed to extract the block by marker; re-derive it here independently so A8
+    # does not silently skip when A4's extraction succeeded but for a different reason failed.
+    gm2 = re.search(r"^#\s*gate -1:.*$", tick_src, re.M)
+    fim2 = re.search(r"^fi\s*$", tick_src[gm2.start():], re.M) if gm2 else None
+    if gm2 and fim2:
+        gate_block = tick_src[gm2.start():gm2.start() + fim2.end()]
+
+if tick_src is None:
+    fail("A8-gate-behavioural", "sole consumer mr-native-tick.sh not found — cannot extract gate -1")
+elif gate_block is None:
+    fail("A8-gate-behavioural", "could not extract the gate -1 block by marker/closing-fi — extraction has "
+         "rotted; a silently-skipped extraction would be a false green")
+else:
+    with tempfile.TemporaryDirectory() as gx:
+        fixture_mem = os.path.join(gx, "mem")
+        os.makedirs(os.path.join(fixture_mem, "pending-events"))
+        flag = os.path.join(fixture_mem, ".native-supervisor-disabled")
+        open(flag, "w").close()  # zero-byte, exactly the historical shape
+        evlog = os.path.join(gx, "gate.log")
+        stub_hold = os.path.join(fixture_mem, "mr-hold")
+        with open(stub_hold, "w") as f:
+            f.write("#!/bin/bash\n"
+                    "if [ \"$1\" = status ]; then echo '{\"by\":\"operator\"}'; fi\n")
+        os.chmod(stub_hold, 0o755)
+        wrapper = os.path.join(gx, "wrapper.sh")
+        wrapper_src = (
+            "#!/bin/bash\n"
+            "set -u\n"
+            "MEM='%s'\n"
+            "EVFILE=\"${1:-}\"\n"
+            "log(){ echo \"$*\" >> '%s'; }\n"
+            "%s\n"
+            "echo GATE-FELL-THROUGH\n"
+        ) % (fixture_mem, evlog, gate_block)
+        with open(wrapper, "w") as f:
+            f.write(wrapper_src)
+        os.chmod(wrapper, 0o755)
+
+        def run_wrapper(env_extra):
+            env = dict(os.environ)
+            env.update(env_extra)
+            open(evlog, "w").close()
+            r = subprocess.run(["bash", wrapper], capture_output=True, text=True, env=env, timeout=30)
+            log_text = open(evlog).read() if os.path.exists(evlog) else ""
+            return r, log_text
+
+        # (i)+(ii)+(iv, half): unforced -> stands down, exit 0, flag survives, backlog reported
+        r1, log1 = run_wrapper({})
+        if r1.returncode != 0:
+            fail("A8-gate-behavioural-unforced-exit0",
+                 "unforced gate -1 wrapper exited %d (expected 0)" % r1.returncode)
+        if "SKIP hold" not in log1:
+            fail("A8-gate-behavioural-unforced-skip-logged", "unforced run did not log 'SKIP hold': %r" % log1)
+        if not os.path.exists(flag):
+            fail("A8-gate-behavioural-flag-survives",
+                 "the fixture flag was removed by the gate (must never auto-clear)")
+        if "queued_events=" not in log1 or "oldest_event_age_h=" not in log1:
+            fail("A8-gate-behavioural-unforced-reporting",
+                 "unforced SKIP line missing queued_events=/oldest_event_age_h=: %r" % log1)
+
+        # (iii)+(iv, half): MR_FORCE=1 -> falls through (does not exit at the gate)
+        r2, log2 = run_wrapper({"MR_FORCE": "1"})
+        if "GATE-FELL-THROUGH" not in r2.stdout:
+            fail("A8-gate-behavioural-forced-falls-through",
+                 "MR_FORCE=1 did not fall through the gate (fell-through marker missing)")
+        if "queued_events=" not in log2 or "oldest_event_age_h=" not in log2:
+            fail("A8-gate-behavioural-forced-reporting",
+                 "MR_FORCE=1 NOTE line missing queued_events=/oldest_event_age_h=: %r" % log2)
+
+sys.exit(bad)
+PYENV
 [ "$BAD" = 0 ] && echo "SELFCHECK-OK"
 exit 0

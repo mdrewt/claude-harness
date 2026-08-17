@@ -126,11 +126,19 @@ if [ -f "$MEM/.native-supervisor-disabled" ]; then
   # file written by two indistinguishable actors, and the backlog behind it was invisible — one
   # done-event once sat 83.9h unprocessed with nothing surfacing that fact.
   HOLD_BY=$("$MEM/mr-hold" status --json 2>/dev/null | /usr/bin/python3 -c "import json,sys;print(json.load(sys.stdin).get('by') or '?')" 2>/dev/null || echo "?")
-  QDEPTH=$(find "$MEM/pending-events" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l)
-  if [ "${MR_FORCE:-0}" = "1" ]; then log "NOTE hold overridden by MR_FORCE=1 (manual run; hold by=$HOLD_BY REMAINS set) queued_events=$QDEPTH"; else
+  # DEPTH ALONE WAS NOT ENOUGH — that is the whole lesson of the 83.9h event. A queue of 1 looks
+  # healthy; a queue of 1 that has been sitting for three and a half days does not. `mr-hold queue`
+  # owns the arithmetic (one implementation, selftested) and this replaces the two duplicate
+  # `find | wc -l` copies that used to live here. The `|| echo` fallback is load-bearing: a broken
+  # helper must degrade a log line, never take the cron entrypoint down with it.
+  # Degrade on EMPTY, not merely on non-zero: a helper that exits 0 and prints nothing would
+  # otherwise emit `SKIP hold by=operator ` with the reporting silently absent — a green-looking log
+  # line that reports nothing is exactly the failure class this gate exists to surface. (Caught by
+  # the A8 behavioural fixture, whose stub mr-hold does precisely that.)
+  qstat(){ QS=$("$MEM/mr-hold" queue 2>/dev/null); [ -n "${QS:-}" ] || QS="queued_events=? oldest_event_age_h=? (mr-hold queue produced no output)"; printf '%s' "$QS"; }
+  if [ "${MR_FORCE:-0}" = "1" ]; then log "NOTE hold overridden by MR_FORCE=1 (manual run; hold by=$HOLD_BY REMAINS set) $(qstat)"; else
     [ -n "$EVFILE" ] && [ -f "$EVFILE" ] && case "$EVFILE" in "$MEM/pending-events/"*) : ;; *) mv "$EVFILE" "$MEM/pending-events/" 2>/dev/null;; esac
-    QDEPTH=$(find "$MEM/pending-events" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l)
-    log "SKIP hold by=$HOLD_BY (event requeued: ${EVFILE:-none}) queued_events=$QDEPTH"; exit 0; fi
+    log "SKIP hold by=$HOLD_BY (event requeued: ${EVFILE:-none}) $(qstat)"; exit 0; fi
 fi
 
 # gate -0.5: human-gate marker (written by decision runs on gate-class BLOCKERs; makes multi-day
@@ -311,7 +319,12 @@ if [ "${MR_TICK_DRYRUN:-0}" = "1" ]; then
 fi
 log "SPAWN model=$SUP_MODEL effort=$SUP_EFFORT governor=$GSTATE rid=$RID tlog=$TLOG events=$(echo $CONSUMED | wc -w)"
 cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
-timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-skip-permissions \
+# lp-09: `env -u MR_FORCE` is the real leak this slice closes. Only the OPERATOR sets MR_FORCE, and
+# every child spawner unsets it — but the paid session launched HERE inherited it, and a session that
+# can re-enter this script with MR_FORCE=1 can override the operator's hold. The tick needs the
+# variable for its own gates above; the session does not — it is TOLD `forced=` as prompt text in the
+# TICK PROVENANCE block. Asserted by mr-selfcheck's A3 so it cannot silently regress.
+env -u MR_FORCE timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-skip-permissions \
   --output-format stream-json --verbose \
   -p "$(cat "$PROMPTF")" >> "$TLOG" 2>&1
 RC=$?

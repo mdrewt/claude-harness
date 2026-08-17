@@ -4,6 +4,7 @@
     mr-hold status [--json]
     mr-hold set   --by operator|supervisor [--reason "..."]
     mr-hold clear [--by supervisor]        # refuses to clear an OPERATOR hold
+    mr-hold queue                          # one line: queued_events=N oldest_event_age_h=X
     mr-hold --selftest
 
 Shebang is `/usr/bin/python3` on purpose (asdf `env python3` exits 126 in unpinned cwds).
@@ -25,24 +26,54 @@ THE CORRECTION RUNS OPPOSITE TO THE INTUITIVE FIX, and each half matters:
       version control — `~/.local/bin` has no git history, so a `git revert` of this slice could not
       undo an edit there. The zero-byte flag on disk right now is therefore already an operator hold.
   (c) MR_FORCE=1 still overrides an operator hold for a manual run. Do NOT neuter it: it is already
-      provenance-scoped by construction — only the operator can set it, and all five child spawners
-      `unset` it, so it cannot reach a spawned session. It is the operator's only escape hatch.
+      provenance-scoped by construction — only the operator can set it, every child spawner `unset`s
+      it, and the tick strips it from the paid session's environment (`env -u MR_FORCE`, lp-09), so
+      it cannot reach a spawned session. It is the operator's only escape hatch. The count is
+      derived, never quoted: mr-selfcheck's A1/A2 enumerate the spawners and assert that the ONLY
+      file dereferencing MR_FORCE is the tick itself. (An earlier version of this note said "all
+      five"; the mechanical count was six, which is exactly why the number is not written down.)
 
-MECHANICAL ENFORCEMENT, not just doctrine. `.claude/hooks/guard-bash.mjs` blocks any Bash command
-that would `rm` the hold file, so a supervisor session cannot clear an operator hold by ignoring the
-rules — `mr-hold clear` becomes the only path, and it checks provenance. That matters because the
-tick never removed the flag itself: the clear always came from an LLM session running `rm`.
+MECHANICAL ENFORCEMENT, not just doctrine — but calibrate the claim. `.claude/hooks/guard-bash.mjs`
+blocks the direct Bash routes to this file (`rm`/`mv`, the write verbs, any redirect onto it), which
+matters because the tick never removed the flag itself: the clear always came from an LLM session
+running `rm`. It is NOT a sandbox: indirection it cannot see through (`bash -c`, `xargs`,
+`find -exec`, a variable-expanded filename, python `os.remove`) still reaches the file, and the hook
+is wired to the Bash tool only. Those gaps are enumerated in the hook and pinned by its `--selftest`
+fixtures so the list cannot drift from the code. What the guard buys is that the CASUAL route — the
+one a session takes without meaning to defeat anything — is closed.
+
+KNOWN LIMIT, stated because a gate you misread is worse than no gate: provenance lives in the file's
+CONTENT, so a session with a shell could in principle write `by=supervisor` itself and then use the
+sanctioned `mr-hold clear`. No local secret closes that — an adversary with the filesystem reads it
+too. The guard therefore blocks the Bash *write* verbs against the flag as well (`>`/`tee`/`sed -i`/
+`chmod`/`truncate`/`cp`/`ln`/`unlink`), which reduces forgery to paths a session cannot take
+casually. The residual (the `Write`/`Edit` tools have no PreToolUse matcher) is a real gap recorded
+in ADR-0002 and needs a `.claude/settings.json` change, which is outside this tool's remit.
+
+QUEUE VISIBILITY (spec item (d)). The hold sits ABOVE the event queue: `mr-native-tick.sh` requeues
+into `pending-events/` correctly, but nothing drained it and nothing surfaced how deep it was — one
+done-event once sat 83.9 h unprocessed. Depth alone would not have surfaced that (a depth of 1 looks
+healthy), so the AGE of the oldest entry is the number that matters. It is computed here, once, so
+the tick interpolates a value instead of carrying a second copy of the arithmetic.
 """
+import contextlib
+import io
 import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
+# Deliberately NOT self-locating (unlike mr-selfcheck, which is). The kill switch is a SINGLETON
+# machine-wide runtime artifact: there is one loop and one flag. A copy of this tool running in a
+# worktree must still report on the real hold, or `mr-spawn`'s refusal would read HOLD-NONE from a
+# worktree and launch straight through an operator pause.
 MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
 FLAG = os.path.join(MEM, ".native-supervisor-disabled")
+QUEUE_DIR = os.path.join(MEM, "pending-events")
 VALID = ("operator", "supervisor")
 
 
@@ -82,17 +113,79 @@ def read_hold(flag=None):
     }
 
 
+def queue_stats(qdir=None):
+    """-> {'queued_events': int, 'oldest_event_age_h': float|None} over `pending-events/*.md`.
+
+    Resolved at CALL time for the same reason as read_hold's flag (see the comment there).
+
+    STAT-ONLY, never opens a file. This is not a micro-optimisation: the tick interpolates this into
+    a log line via $(...) on every held tick, so a blocking read on a stray FIFO in that directory
+    would hang the cron entrypoint indefinitely. `os.scandir` + `st_mtime` cannot block.
+
+    Directories are skipped so `archive/` (which lives INSIDE pending-events/ — see
+    mr-native-tick.sh:187, where forgetting that once cost the free fastpath) is never counted.
+    Non-directories are counted even if not regular files: a FIFO named `*.md` in the queue is an
+    anomaly worth SEEING in the depth, not silently dropping to zero.
+
+    Never raises. A gate that dies on a weird directory entry is a gate that takes the loop with it.
+    """
+    qdir = qdir or QUEUE_DIR
+    n = 0
+    oldest = None
+    try:
+        with os.scandir(qdir) as it:
+            for e in it:
+                if not e.name.endswith(".md"):
+                    continue
+                try:
+                    if e.is_dir(follow_symlinks=False):
+                        continue
+                    mt = e.stat(follow_symlinks=False).st_mtime
+                except OSError:
+                    continue
+                n += 1
+                if oldest is None or mt < oldest:
+                    oldest = mt
+    except OSError:
+        pass                       # missing dir is the NORMAL shape in a fresh worktree (gitignored)
+    age = None
+    if oldest is not None:
+        # NOT clamped at zero. A future mtime (clock skew after a VM restore, a `cp -p` from a
+        # skewed host) would then report a genuinely stuck event as a healthy `0.0` — silently
+        # hiding the exact incident class this number exists to surface. A NEGATIVE age is visibly
+        # wrong, which is the behaviour we want: it says "look at me", not "all fine".
+        age = round((time.time() - oldest) / 3600.0, 1)
+    return {"queued_events": n, "oldest_event_age_h": age}
+
+
+def _queue_line(q=None):
+    q = q or queue_stats()
+    age = q["oldest_event_age_h"]
+    return "queued_events=%d oldest_event_age_h=%s" % (
+        q["queued_events"], "-" if age is None else ("%.1f" % age))
+
+
+def cmd_queue(argv):
+    """One bash-interpolable line. The tick reads THIS rather than re-deriving the numbers."""
+    print(_queue_line())
+    return 0
+
+
 def cmd_status(argv):
     h = read_hold()
+    q = queue_stats()
     if "--json" in argv:
-        print(json.dumps(h or {"by": None}))
+        # Both branches carry the queue keys: there can be a backlog with no hold at all (the
+        # flock-contention path), and a consumer that has to special-case that is a consumer that
+        # will read `queued_events` as 0 when it is not.
+        print(json.dumps(dict(h or {"by": None}, **q)))
         return 0
     if not h:
-        print("HOLD-NONE loop is enabled")
+        print("HOLD-NONE loop is enabled  %s" % _queue_line(q))
         return 0
     note = "" if h["attributed"] else "  (no provenance record -> defaulted to OPERATOR, fail-safe)"
-    print("HOLD-%s by=%s at=%s bytes=%d%s%s"
-          % (h["by"].upper(), h["by"], h["at"], h["raw_bytes"],
+    print("HOLD-%s by=%s at=%s bytes=%d  %s%s%s"
+          % (h["by"].upper(), h["by"], h["at"], h["raw_bytes"], _queue_line(q),
              ("  reason=" + h["reason"]) if h["reason"] else "", note))
     return 0
 
@@ -152,8 +245,12 @@ def cmd_clear(argv):
 # --------------------------------------------------------------------------------------------
 def selftest():
     """Fixtures run against a TEMP flag path — never the live one."""
-    global FLAG
+    global FLAG, QUEUE_DIR
     live = FLAG
+    try:
+        live_qdir = QUEUE_DIR
+    except NameError:
+        live_qdir = None   # QUEUE_DIR global does not exist yet (pre-implementation, lp-09 RED phase)
     bad = 0
     checks = []
 
@@ -165,6 +262,7 @@ def selftest():
 
     with tempfile.TemporaryDirectory() as d:
         FLAG = os.path.join(d, ".native-supervisor-disabled")
+        QUEUE_DIR = os.path.join(d, "pending-events")  # lp-09: a SAFE default; rebound per-fixture below
 
         check("no flag -> no hold", read_hold() is None)
 
@@ -205,7 +303,179 @@ def selftest():
         # invalid input
         check("set with no --by is rejected", cmd_set([]) == 2)
 
+        # ------------------------------------------------------------------------------
+        # lp-09: queue_stats(qdir=None) — NOT YET IMPLEMENTED (nor is the QUEUE_DIR global,
+        # nor the `mr-hold queue` presenter, nor status --json's new keys). Every fixture
+        # below is written against that not-yet-existing contract per
+        # M-loop-infrastructure.spec.md's lp-09 EARS-4 ("WHEN events are queued behind a
+        # hold, THE SYSTEM SHALL report the backlog depth every tick") and closes the
+        # concrete incident it names: one done-event sat 83.9h unprocessed with nothing
+        # surfacing it.
+        def _qs(qdir):
+            """Call queue_stats defensively. Pre-implementation the name does not exist at
+            all; post-implementation it must NEVER raise (stat-only contract, fixture 7).
+            Either way a broken call must FAIL a check() below, not crash the whole
+            selftest module and skip the FLAG/QUEUE_DIR restore at the end of this function."""
+            try:
+                return queue_stats(qdir)
+            except Exception as e:
+                return {"_exc": "%s: %s" % (type(e).__name__, e)}
+
+        # 1. missing queue dir -> 0 / None (the real shape in a fresh worktree:
+        # pending-events/ is gitignored and absent)
+        q_missing = os.path.join(d, "pending-events-missing")
+        r = _qs(q_missing)
+        check("queue: missing dir -> queued_events=0", r.get("queued_events") == 0)
+        check("queue: missing dir -> oldest_event_age_h=None", r.get("oldest_event_age_h") is None)
+
+        # 2. empty dir -> 0 / None
+        q_empty = os.path.join(d, "pending-events-empty")
+        os.makedirs(q_empty)
+        r = _qs(q_empty)
+        check("queue: empty dir -> queued_events=0", r.get("queued_events") == 0)
+        check("queue: empty dir -> oldest_event_age_h=None", r.get("oldest_event_age_h") is None)
+
+        # 3. ONE file utime'd to now-83.9h -> depth 1, age==83.9 (+-0.1). PINS THE LITERAL
+        # 83.9 — this is the historical incident (one done-event sat 83.9h unprocessed with
+        # nothing surfacing it) and this fixture is the reason the number is visible at all.
+        q_incident = os.path.join(d, "pending-events-83h")
+        os.makedirs(q_incident)
+        f_incident = os.path.join(q_incident, "incident.md")
+        open(f_incident, "w").close()
+        t_incident = time.time() - 83.9 * 3600
+        os.utime(f_incident, (t_incident, t_incident))
+        r = _qs(q_incident)
+        check("queue: single 83.9h-old file -> queued_events=1", r.get("queued_events") == 1)
+        age = r.get("oldest_event_age_h")
+        check("queue: single 83.9h-old file -> oldest_event_age_h==83.9 (+-0.1, PINS the incident number)",
+              age is not None and abs(age - 83.9) <= 0.1)
+
+        # 4. two files, one fresh -> depth 2, age is the OLDEST. Mutation-sensitive: a
+        # min()-instead-of-max() implementation reports the fresh file's age here and fails.
+        q_two = os.path.join(d, "pending-events-two")
+        os.makedirs(q_two)
+        f_old = os.path.join(q_two, "old.md"); open(f_old, "w").close()
+        f_new = os.path.join(q_two, "new.md"); open(f_new, "w").close()
+        t_old = time.time() - 10 * 3600
+        t_new = time.time() - 1 * 3600
+        os.utime(f_old, (t_old, t_old))
+        os.utime(f_new, (t_new, t_new))
+        r = _qs(q_two)
+        check("queue: two files -> queued_events=2", r.get("queued_events") == 2)
+        age = r.get("oldest_event_age_h")
+        check("queue: two files -> age is the OLDEST (~10h, NOT the fresh ~1h — kills a "
+              "min()-for-max() mutant)", age is not None and 9.5 <= age <= 10.5)
+
+        # 5. a non-.md file present -> not counted
+        q_nonmd = os.path.join(d, "pending-events-nonmd")
+        os.makedirs(q_nonmd)
+        open(os.path.join(q_nonmd, "note.txt"), "w").close()
+        open(os.path.join(q_nonmd, "real.md"), "w").close()
+        r = _qs(q_nonmd)
+        check("queue: non-.md file excluded -> queued_events=1 (only real.md)", r.get("queued_events") == 1)
+
+        # 6. archive/ subdir with a .md inside -> NOT counted (non-recursive, top-level
+        # only — mirrors mr-native-tick.sh:129,187's own archive/ exclusion)
+        q_arch = os.path.join(d, "pending-events-archive")
+        os.makedirs(os.path.join(q_arch, "archive"))
+        open(os.path.join(q_arch, "top.md"), "w").close()
+        open(os.path.join(q_arch, "archive", "old.md"), "w").close()
+        r = _qs(q_arch)
+        check("queue: archive/ subdir excluded -> queued_events=1 (only top.md)", r.get("queued_events") == 1)
+
+        # 6b. ADDED during the green phase, not by the test author: fixture 6 above is excluded by
+        # NAME (`archive` does not end in `.md`), so it never exercised the is_dir() guard at all —
+        # deleting that guard left the suite GREEN. A directory that DOES end in `.md` is the case
+        # with teeth, and it is reachable in practice (an unpacked event bundle, a stray mkdir).
+        q_dirmd = os.path.join(d, "pending-events-dirmd")
+        os.makedirs(os.path.join(q_dirmd, "stale.md"))
+        open(os.path.join(q_dirmd, "real.md"), "w").close()
+        r = _qs(q_dirmd)
+        check("queue: a DIRECTORY named *.md is not counted as an event (bites the is_dir guard)",
+              r.get("queued_events") == 1)
+
+        # 7. a FIFO named x.md -> queue_stats RETURNS (stat-only; must never open/read the
+        # file, so a FIFO with no reader on the other end must not hang it). Hard-timeout
+        # guard via a daemon thread: if queue_stats ever opens the FIFO for reading, this
+        # thread never finishes and the check below fails loudly instead of wedging the
+        # whole selftest run.
+        q_fifo = os.path.join(d, "pending-events-fifo")
+        os.makedirs(q_fifo)
+        fifo_path = os.path.join(q_fifo, "x.md")
+        fifo_made = True
+        try:
+            os.mkfifo(fifo_path)
+        except OSError:
+            fifo_made = False
+        if fifo_made:
+            box = {}
+            def _call_qs():
+                box["r"] = _qs(q_fifo)
+            th = threading.Thread(target=_call_qs, daemon=True)
+            th.start()
+            th.join(timeout=5)
+            check("queue: FIFO present -> queue_stats returns within 5s (stat-only; never opens/reads)",
+                  not th.is_alive())
+            if not th.is_alive():
+                r = box.get("r", {})
+                check("queue: FIFO present -> counted via stat, not opened (queued_events includes it)",
+                      r.get("queued_events") == 1)
+        else:
+            check("queue: FIFO fixture skipped cleanly (platform refused os.mkfifo)", True)
+
+        # 8. `mr-hold queue` presenter: exactly one bash-interpolable line
+        q_present = os.path.join(d, "pending-events-presenter")
+        os.makedirs(q_present)
+        f_present = os.path.join(q_present, "e1.md")
+        open(f_present, "w").close()
+        t_present = time.time() - 2 * 3600
+        os.utime(f_present, (t_present, t_present))
+        QUEUE_DIR = q_present
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                rc_q = main(["mr-hold", "queue"])
+        except Exception as e:
+            rc_q = None
+            buf.write("EXCEPTION %s: %s" % (type(e).__name__, e))
+        out = buf.getvalue().strip()
+        check("mr-hold queue: subcommand recognized (main returns 0)", rc_q == 0)
+        check("mr-hold queue: prints exactly one 'queued_events=<int> oldest_event_age_h=<float|->' line",
+              bool(re.fullmatch(r"queued_events=\d+ oldest_event_age_h=(-|\d+\.\d)", out)))
+        check("mr-hold queue: reports the fixture depth/age (queued_events=1 oldest_event_age_h=2.0)",
+              out == "queued_events=1 oldest_event_age_h=2.0")
+
+        # 9. status --json carries both new keys when NO hold exists
+        QUEUE_DIR = os.path.join(d, "pending-events-status-nohold")
+        os.makedirs(QUEUE_DIR)
+        FLAG = os.path.join(d, "status-nohold-flag")  # deliberately never created -> no hold
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                cmd_status(["--json"])
+            payload = json.loads(buf.getvalue())
+        except Exception as e:
+            payload = {"_exc": "%s: %s" % (type(e).__name__, e)}
+        check("status --json (no hold): carries queued_events", "queued_events" in payload)
+        check("status --json (no hold): carries oldest_event_age_h", "oldest_event_age_h" in payload)
+
+        # 10. status --json carries both new keys when a supervisor hold DOES exist —
+        # there can be a queue with no hold, and both branches must report it
+        FLAG = os.path.join(d, "status-hold-flag")
+        cmd_set(["--by", "supervisor", "--reason", "queue-stats fixture"])
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                cmd_status(["--json"])
+            payload = json.loads(buf.getvalue())
+        except Exception as e:
+            payload = {"_exc": "%s: %s" % (type(e).__name__, e)}
+        check("status --json (hold present): carries queued_events", "queued_events" in payload)
+        check("status --json (hold present): carries oldest_event_age_h", "oldest_event_age_h" in payload)
+
     FLAG = live
+    if live_qdir is not None:
+        QUEUE_DIR = live_qdir
     for name, ok in checks:
         if not ok:
             print("HOLD-SELFTEST-FAIL %s" % name)
@@ -227,6 +497,8 @@ def main(argv):
         return cmd_set(argv[2:])
     if sub == "clear":
         return cmd_clear(argv[2:])
+    if sub == "queue":
+        return cmd_queue(argv[2:])
     print("mr-hold: unknown subcommand %r" % sub, file=sys.stderr)
     return 2
 
