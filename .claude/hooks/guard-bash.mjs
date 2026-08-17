@@ -52,14 +52,24 @@ if (process.argv[2] === "--selftest") {
       // name the file, so it is unaffected. `mr-supervisor-enable` is the OPERATOR's clear and is
       // blocked here on purpose — the operator runs it in their own terminal, not through a session.
       //
-      // These are anchored at COMMAND POSITION (start, or after ; && || | & or a subshell paren), not
-      // as bare substrings. The first version matched anywhere and blocked merely *writing about* the
-      // kill switch — it blocked this slice's own documentation and test scripts. An over-firing guard
-      // is worse than a narrow one: it gets switched off, which is how decorative gates are born. This
-      // is defense-in-depth behind `mr-hold`'s provenance check, not a sandbox.
-      /(^|[;&|(]\s*)rm\s+[^\n;&|]*\.native-supervisor-disabled/i,
-      /(^|[;&|(]\s*)mv\s+[^\n;&|]*\.native-supervisor-disabled/i,
-      /(^|[;&|(]\s*)mr-supervisor-enable\b/i,
+      // These are anchored at COMMAND POSITION, not as bare substrings. The first version matched
+      // anywhere and blocked merely *writing about* the kill switch — it blocked this slice's own
+      // documentation and test scripts. An over-firing guard is worse than a narrow one: it gets
+      // switched off, which is how decorative gates are born. This is defense-in-depth behind
+      // `mr-hold`'s provenance check, NOT a sandbox — see the honest gap list below.
+      //
+      // COMMAND POSITION = start-of-string, start-of-LINE, or after `;` `&&` `||` `|` `&` `(`.
+      // The newline and the leading-whitespace tolerance are load-bearing and were MISSING: the
+      // original `(^|[;&|(]\s*)` required the verb at literal index 0 (these regexes carry no `m`
+      // flag, so `^` is string-start only), so an entirely ordinary TWO-LINE Bash call —
+      //     ls -la
+      //     rm …/.native-supervisor-disabled
+      // — matched nothing at all, and neither did a single leading space. Two independent review
+      // lenses found that by execution. Widening the anchor can only ever block MORE, which is the
+      // fail-safe direction for a spend control.
+      /(^\s*|[;&|(\n]\s*)rm\s+[^\n;&|]*\.native-supervisor-disabled/i,
+      /(^\s*|[;&|(\n]\s*)mv\s+[^\n;&|]*\.native-supervisor-disabled/i,
+      /(^\s*|[;&|(\n]\s*)mr-supervisor-enable\b/i,
       // lp-09 residual: `rm` was never the only way through. Provenance lives in the file's
       // CONTENT, so a session could WRITE `by=supervisor` itself and then clear the hold through
       // the perfectly sanctioned `mr-hold clear --by supervisor` — forging past the fail-safe
@@ -69,10 +79,22 @@ if (process.argv[2] === "--selftest") {
       // the fail-safe reads as OPERATOR and the loop may then never clear — a session could wedge
       // the loop permanently by accident. Sessions set holds via `mr-hold set --by supervisor`,
       // which records provenance and stays self-clearable. Reads (`cat`/`stat`/`ls`) are untouched.
-      // KNOWN, UNCLOSED GAP (recorded in ADR-0002, deliberately not fixed here): settings.json
-      // wires this hook to the Bash tool ONLY, so the Write/Edit tools bypass every rule above.
-      // Closing it needs a settings change, outside this slice's declared touches.
-      /(^|[;&|(]\s*)(tee|sed|chmod|truncate|cp|ln|unlink|touch)\s+[^\n;&|]*\.native-supervisor-disabled/i,
+      // An optional `env`/`sudo`/`command`/`nohup`/`time`/`exec` wrapper is tolerated — those are
+      // one-token prefixes an agent reaches for casually, so leaving them out would have been a
+      // free bypass of the whole verb list.
+      //
+      // KNOWN, UNCLOSED GAPS — enumerated because a control you misread is worse than no control.
+      // ALL of these reach the flag and are NOT blocked, each pinned by a known-gap `--selftest`
+      // fixture so the list cannot quietly diverge from the code:
+      //   · `Write`/`Edit` tools — settings.json wires this hook to the Bash tool ONLY (needs a
+      //     settings.json matcher, outside this slice's declared touches; filed as a follow-up)
+      //   · indirection the pattern cannot see through: `bash -c '…'`, `xargs rm`,
+      //     `find -exec rm {} \;`, `F=…; rm "$F"`, `python3 -c "os.remove(...)"`
+      //   · a glob instead of the literal name (`rm …/.native*`), and `git clean -fdx`
+      //     (the flag is gitignored)
+      // The primary control is and remains `mr-hold`'s provenance check. This hook raises the cost
+      // of the CASUAL routes — the ones an agent takes without meaning to defeat anything.
+      /(^\s*|[;&|(\n]\s*)((env|sudo|command|nohup|time|exec)\s+)?(tee|sed|chmod|truncate|cp|ln|unlink|touch|dd|install|rsync|shred)\s+[^\n;&|]*\.native-supervisor-disabled/i,
       />>?\s*[^\n;&|]*\.native-supervisor-disabled/i, // any redirect ONTO the flag forges provenance
       /\bdrop\s+database\b/i,
       /\btruncate\s+table\b/i,
@@ -159,6 +181,33 @@ function runSelftest() {
   // hole (e.g. narrowing the glob case still leaves other globs; see the KNOWN-GAP list in
   // M-loop-infrastructure.spec.md's lp-09 section).
   check("KNOWN-GAP: rm /p/.native* (glob defeats the literal-name match)", "rm /p/.native*", false);
+  // Indirection the adjacency pattern structurally cannot see through. Each is pinned so the
+  // ADR's gap list and the code can never quietly disagree about what is actually covered.
+  // --- ANCHOR-POSITION regressions. These were ALL allowed before the anchor was widened to
+  // tolerate leading whitespace and a newline separator: `^` without the `m` flag is string-start
+  // only, so an ordinary two-line Bash call slipped every flag rule. Found by two independent
+  // review lenses, by execution. Each of these must stay BLOCKED.
+  check("ANCHOR: leading space before rm", " rm /p/.native-supervisor-disabled", true);
+  check("ANCHOR: leading tab before rm", "\trm /p/.native-supervisor-disabled", true);
+  check("ANCHOR: newline-separated rm (two-line command, no `;`)",
+    "ls -la\nrm /p/.native-supervisor-disabled", true);
+  check("ANCHOR: newline-separated touch (would forge an unclearable OPERATOR hold)",
+    "echo prep\ntouch /p/.native-supervisor-disabled", true);
+  check("ANCHOR: newline-separated cp (forge provenance)",
+    "echo prep\ncp /tmp/forged /p/.native-supervisor-disabled", true);
+  check("ANCHOR: leading space before mr-supervisor-enable", " mr-supervisor-enable", true);
+  check("VERB: env-prefixed chmod", "env chmod 644 /p/.native-supervisor-disabled", true);
+  check("VERB: sudo-prefixed tee", "sudo tee /p/.native-supervisor-disabled", true);
+  check("VERB: dd onto the flag", "dd if=/dev/zero of=/p/.native-supervisor-disabled bs=1 count=0", true);
+  check("VERB: install onto the flag", "install -m 644 /tmp/forged /p/.native-supervisor-disabled", true);
+  check("VERB: rsync onto the flag", "rsync /tmp/forged /p/.native-supervisor-disabled", true);
+  check("VERB: shred the flag", "shred -u /p/.native-supervisor-disabled", true);
+
+  check("KNOWN-GAP: bash -c wrapper", "bash -c 'rm /p/.native-supervisor-disabled'", false);
+  check("KNOWN-GAP: xargs (filename is upstream of the verb)",
+    "echo /p/.native-supervisor-disabled | xargs rm", false);
+  check("KNOWN-GAP: find -exec", "find /p -name '.native-supervisor-disabled' -exec rm {} +", false);
+  check("KNOWN-GAP: variable indirection", 'F=/p/.native-supervisor-disabled; rm "$F"', false);
   check("KNOWN-GAP: python3 os.remove() (guard pattern-matches shell verbs, not python calls)",
     "python3 -c \"import os;os.remove('/p/.native-supervisor-disabled')\"", false);
   check("KNOWN-GAP: git clean -fdx (the flag is gitignored, so this deletes it)", "git clean -fdx", false);

@@ -41,10 +41,18 @@ here could not undo an edit to it) keep working with no out-of-repo change.
 
 Decisions recorded here because they are guard-hook decisions:
 
-- **Three flag rules are anchored at COMMAND POSITION** (`rm`/`mv` naming the flag,
-  `mr-supervisor-enable`). An unanchored match blocked merely *writing about* the kill switch,
-  including this slice's own tests and docs. An over-firing guard gets switched off, which is how
-  decorative gates are born.
+- **Flag rules are anchored at COMMAND POSITION** (`rm`/`mv` naming the flag,
+  `mr-supervisor-enable`, the write verbs). An unanchored match blocked merely *writing about* the
+  kill switch, including this slice's own tests and docs. An over-firing guard gets switched off,
+  which is how decorative gates are born.
+- **The anchor's definition of "command position" was wrong, and it was a real bypass.** It read
+  `(^|[;&|(]\s*)`; these regexes carry no `m` flag, so `^` is *string-start only* and the separator
+  class omits `\n`. A single leading space, or an ordinary two-line Bash call (`ls -la` ⏎
+  `rm …/.native-supervisor-disabled`, no `;`), therefore matched **nothing** — for the pre-existing
+  `rm`/`mv` rules as much as the new ones. Two independent review lenses found it by execution. Now
+  `(^\s*|[;&|(\n]\s*)`, with fixtures pinning the leading-space, leading-tab and newline-separated
+  cases for `rm`, `touch` and `cp`. Widening an anchor can only block more, which is the fail-safe
+  direction for a spend control.
 - **Write verbs are blocked too** (`tee`/`sed`/`chmod`/`truncate`/`cp`/`ln`/`unlink`/`touch` naming
   the flag, and any `>`/`>>` redirect onto it). Provenance lives in file *content*, so `rm` was never
   the only route: a session could write `by=supervisor` itself and then clear the hold through the
@@ -60,12 +68,17 @@ Decisions recorded here because they are guard-hook decisions:
   lookbehind would therefore have let `true \\| rm …flag` through, trading an annoying false positive
   for a genuine bypass. The over-fire is accepted as fail-safe and pinned by a `--selftest` fixture
   whose comment carries this reasoning, so nobody re-opens the hole as a "cleanup".
-- **Known, unclosed gaps, asserted as such by fixtures** so the guard is not misread as a sandbox:
-  `settings.json` wires this hook to the **Bash tool only**, so `Write`/`Edit` bypass every rule;
-  and `rm .native*` (glob), `python3 -c "os.remove(...)"` and `git clean -fdx` (the flag is
-  gitignored) are not matched. The primary control remains `mr-hold`'s provenance check. Closing the
-  Write/Edit gap needs a `.claude/settings.json` matcher — outside lp-09's declared touches, filed as
-  a follow-up.
+- **Known, unclosed gaps, every one pinned by a `--selftest` fixture** so the list can never quietly
+  diverge from the code, and so nobody mistakes this hook for a sandbox:
+  `settings.json` wires it to the **Bash tool only**, so `Write`/`Edit` bypass every rule; and the
+  pattern cannot see through indirection — `bash -c '…'`, `xargs rm`, `find -exec rm {} +`,
+  `F=…; rm "$F"`, `python3 -c "os.remove(...)"`, a glob instead of the literal name, or
+  `git clean -fdx` (the flag is gitignored). What the hook buys is that the *casual* route — the one
+  a session takes without meaning to defeat anything — is closed; the primary control remains
+  `mr-hold`'s provenance check. Closing the Write/Edit gap needs a `.claude/settings.json` matcher —
+  outside lp-09's declared touches, filed as a follow-up. An `env`/`sudo`/`command`/`nohup`/`time`/
+  `exec` prefix IS tolerated by the verb rules (those are one-token wrappers an agent reaches for
+  casually), and `dd`/`install`/`rsync`/`shred` are in the verb list for the same reason `cp` is.
 - **`templates/_base/.claude/hooks/guard-bash.mjs` intentionally does NOT carry these rules.**
   Generated projects have no `.native-supervisor-disabled`. The divergence is correct in both
   directions; do not "sync" it.

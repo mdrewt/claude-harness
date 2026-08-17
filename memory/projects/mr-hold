@@ -26,13 +26,21 @@ THE CORRECTION RUNS OPPOSITE TO THE INTUITIVE FIX, and each half matters:
       version control — `~/.local/bin` has no git history, so a `git revert` of this slice could not
       undo an edit there. The zero-byte flag on disk right now is therefore already an operator hold.
   (c) MR_FORCE=1 still overrides an operator hold for a manual run. Do NOT neuter it: it is already
-      provenance-scoped by construction — only the operator can set it, and all five child spawners
-      `unset` it, so it cannot reach a spawned session. It is the operator's only escape hatch.
+      provenance-scoped by construction — only the operator can set it, every child spawner `unset`s
+      it, and the tick strips it from the paid session's environment (`env -u MR_FORCE`, lp-09), so
+      it cannot reach a spawned session. It is the operator's only escape hatch. The count is
+      derived, never quoted: mr-selfcheck's A1/A2 enumerate the spawners and assert that the ONLY
+      file dereferencing MR_FORCE is the tick itself. (An earlier version of this note said "all
+      five"; the mechanical count was six, which is exactly why the number is not written down.)
 
-MECHANICAL ENFORCEMENT, not just doctrine. `.claude/hooks/guard-bash.mjs` blocks any Bash command
-that would `rm` the hold file, so a supervisor session cannot clear an operator hold by ignoring the
-rules — `mr-hold clear` becomes the only path, and it checks provenance. That matters because the
-tick never removed the flag itself: the clear always came from an LLM session running `rm`.
+MECHANICAL ENFORCEMENT, not just doctrine — but calibrate the claim. `.claude/hooks/guard-bash.mjs`
+blocks the direct Bash routes to this file (`rm`/`mv`, the write verbs, any redirect onto it), which
+matters because the tick never removed the flag itself: the clear always came from an LLM session
+running `rm`. It is NOT a sandbox: indirection it cannot see through (`bash -c`, `xargs`,
+`find -exec`, a variable-expanded filename, python `os.remove`) still reaches the file, and the hook
+is wired to the Bash tool only. Those gaps are enumerated in the hook and pinned by its `--selftest`
+fixtures so the list cannot drift from the code. What the guard buys is that the CASUAL route — the
+one a session takes without meaning to defeat anything — is closed.
 
 KNOWN LIMIT, stated because a gate you misread is worse than no gate: provenance lives in the file's
 CONTENT, so a session with a shell could in principle write `by=supervisor` itself and then use the
@@ -142,7 +150,11 @@ def queue_stats(qdir=None):
         pass                       # missing dir is the NORMAL shape in a fresh worktree (gitignored)
     age = None
     if oldest is not None:
-        age = round(max(0.0, (time.time() - oldest) / 3600.0), 1)
+        # NOT clamped at zero. A future mtime (clock skew after a VM restore, a `cp -p` from a
+        # skewed host) would then report a genuinely stuck event as a healthy `0.0` — silently
+        # hiding the exact incident class this number exists to surface. A NEGATIVE age is visibly
+        # wrong, which is the behaviour we want: it says "look at me", not "all fine".
+        age = round((time.time() - oldest) / 3600.0, 1)
     return {"queued_events": n, "oldest_event_age_h": age}
 
 

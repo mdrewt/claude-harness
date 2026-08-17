@@ -223,7 +223,12 @@ bash_tools = _bash_mr_tools(MEM)
 if not bash_tools:
     fail("A1-spawner-unset", "zero bash/sh mr-* tools enumerated in %s — the glob has rotted" % MEM)
 for n in bash_tools:
-    if n in exempt:
+    # Same observer/observed carve-out as A2, and for a sharper reason: this file's own fixture
+    # STRINGS contain `setsid`, so it classifies ITSELF as a spawner and then passes only because
+    # UNSET_ANCHOR happens to appear verbatim elsewhere in it — a coincidence, not a design. Reword
+    # either literal and the gate starts reding on itself for no real regression. mr-selfcheck
+    # launches nothing, so excluding it costs no coverage.
+    if n in exempt or n == "mr-selfcheck":
         continue
     p = os.path.join(MEM, n)
     if _is_spawner(p):
@@ -316,6 +321,20 @@ if tick_src is not None:
             fail("A4-hold-gate-reporting", "could not locate gate -1's closing `fi` — extraction has rotted")
         else:
             gate_block = tick_src[gm.start():gm.start() + fim.end()]
+            # TRUNCATION GUARD. The closing-`fi` search stops at the first line that is bare `fi`,
+            # which is gate -1's real end ONLY because its inner if/else is written `…; fi` on one
+            # line. Reformat that inner branch and the extraction would silently capture a PARTIAL
+            # block — and a partial block still satisfies "found a fi", so A4/A8 would pass on a
+            # fragment. Balance the keywords and fail loudly instead of gating on a fragment.
+            # ONE findall per keyword — two overlapping alternations double-counted the outer `if`
+            # and made the guard itself a false positive on the very block it protects.
+            _opens = len(re.findall(r"(?:^\s*|;\s*|&&\s*|\|\|\s*|\bthen\s+)if\s", gate_block, re.M))
+            _closes = len(re.findall(r"(?:^\s*|;\s*)fi\b", gate_block, re.M))
+            if _closes and _opens and _closes < _opens:
+                fail("A4-hold-gate-reporting",
+                     "gate -1 extraction looks TRUNCATED (%d if / %d fi in the captured block) — the "
+                     "marker-to-bare-`fi` extraction has drifted; A4/A8 would be gating a fragment"
+                     % (_opens, _closes))
             # Comment lines are excluded: a `#` line cannot emit anything, and the gate's own
             # commentary discusses log lines, so counting them is a guaranteed false positive.
             log_lines = [ln for ln in gate_block.splitlines()
