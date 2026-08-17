@@ -30,12 +30,27 @@ if (process.argv[2] === "--selftest") {
     }
     // Defense-in-depth: catch common flag spellings (-rf, -fr, -r -f, --recursive
     // / --force), not only the literal "rm -rf" the deny-list matches.
+    //
+    // ANCHORED AT COMMAND POSITION (lp-11a) — these five were the last unanchored rules in the
+    // file, and `\b` cost real uptime. `\brm\s+-rf` matches the characters "rm -rf" ANYWHERE,
+    // including inside a quoted argument, so `grep -n 'rm -rf' notes.md` and `echo "rm -rf"` were
+    // blocked: reading about the command was as forbidden as running it. The same over-match hit
+    // the git-push and kill-switch rules below and was fixed there; it was simply never carried
+    // back up here. An over-firing guard is worse than a narrow one — it gets switched off, which
+    // is how decorative gates are born.
+    //
+    // Anchoring alone would LOSE indirection (`find | xargs rm -rf`), so the two indirection
+    // shapes are restored explicitly underneath. `xargs` can be anchored like any other verb — it
+    // only ever appears after a pipe — while `-exec rm` is mid-command by construction, so it is
+    // scoped to a line that actually invokes `find`.
     const danger = [
-      /\brm\s+-\w*r\w*f\w*/i, // rm -rf, -Rf, -rfv ...
-      /\brm\s+-\w*f\w*r\w*/i, // rm -fr ...
-      /\brm\s+-\w*r\w*\s+-\w*f/i, // rm -r -f
-      /\brm\s+(-\w+\s+)*--recursive/i, // rm --recursive ...
-      /\brm\s+-\w*r\w*\s+.*(\/|~|\*)/i, // rm -r <root/home/glob>
+      /(^\s*|[;&|(\n]\s*)rm\s+-\w*r\w*f\w*/i, // rm -rf, -Rf, -rfv ...
+      /(^\s*|[;&|(\n]\s*)rm\s+-\w*f\w*r\w*/i, // rm -fr ...
+      /(^\s*|[;&|(\n]\s*)rm\s+-\w*r\w*\s+-\w*f/i, // rm -r -f
+      /(^\s*|[;&|(\n]\s*)rm\s+(-\w+\s+)*--recursive/i, // rm --recursive ...
+      /(^\s*|[;&|(\n]\s*)rm\s+-\w*r\w*\s+.*(\/|~|\*)/i, // rm -r <root/home/glob>
+      /(^\s*|[;&|(\n]\s*)(xargs|parallel)\s+(-\S+\s+)*rm\b/i, // find … | xargs rm -rf
+      /\bfind\b[^\n;&|]*-exec\s+rm\b/i, // find … -exec rm -rf {} \;
       // lp-git-workflow: a BARE force-push discards whatever the remote had, with no check that you
       // were looking at it. `--force-with-lease` refuses unless the remote is where you last saw it,
       // which is the safe primitive the squash-on-branch step needs — so it is allowed on a slice
@@ -135,6 +150,15 @@ function runSelftest() {
   // --- must-BLOCK, ALREADY PASSING (regression pins — the implementer's edits to `danger`
   // must never silently drop one of these) ---
   check("pin: rm -rf", "rm -rf /tmp/x", true);
+  // lp-11a: anchoring the rm family must not narrow it. These pin the shapes that MUST still
+  // block after the `\b` -> command-position change, including the two indirection routes that
+  // anchoring would otherwise have silently dropped.
+  check("pin: cd && rm -rf", "cd /x && rm -rf /tmp/y", true);
+  check("pin: rm -rf on second LINE", "ls -la\nrm -rf /tmp/y", true);
+  check("pin: leading whitespace rm -rf", "   rm -rf /tmp/y", true);
+  check("pin: subshell (rm -rf)", "(rm -rf /tmp/y)", true);
+  check("pin: find | xargs rm -rf", "find . -name x | xargs rm -rf", true);
+  check("pin: find -exec rm -rf", "find . -name x -exec rm -rf {} \\;", true);
   check("pin: git push --force origin main", "git push --force origin main", true);
   check("pin: git reset --hard origin/main", "git reset --hard origin/main", true);
   check("pin: drop database", "drop database foo", true);
@@ -165,6 +189,22 @@ function runSelftest() {
   // suite, so these pin the opposite direction. ---
   check("allow: mr-hold clear --by supervisor (THE sanctioned path — must never be blocked)",
     "mr-hold clear --by supervisor", false);
+  // lp-11a: the over-match these anchors close. Every one of these READS about a destructive
+  // command without running one, and every one was blocked before. The first two are not
+  // hypothetical — they are the literal commands this slice's own investigation was refused.
+  check("allow: grep for the literal 'rm -rf'", "grep -n 'rm -rf' /tmp/notes.md", false);
+  check("allow: echo the literal 'rm -rf'", 'echo "rm -rf /"', false);
+  check("allow: pipe into grep for 'rm -rf'", "cat notes.md | grep 'rm -rf'", false);
+  // ACCEPTED false positive, pinned so it stays visible: a heredoc BODY line is indistinguishable
+  // from a command line to a regex, and the newline anchor is load-bearing (an ordinary two-line
+  // Bash call must still be caught). Writing `rm -rf` inside a heredoc is therefore blocked. The
+  // fail-safe direction is the right one to err in for a spend control, and the workaround is
+  // trivial (write the file with Write, not a heredoc), so this is not worth a parser.
+  check("accepted-FP: rm -rf inside a heredoc body", "cat <<'EOF'\nrm -rf /tmp/x\nEOF", true);
+  // The loop's OWN routine cleanup. mr-unlock exists so the tick never needs `rm -rf` for this;
+  // blocking it stalled a headless 08:00Z tick on an approval prompt nobody could answer, which
+  // is what left the stale per-slice locks and the MUTEX RELEASE FAILED behind it.
+  check("allow: mr-unlock (the sanctioned lock-release path)", "mr-unlock mutex", false);
   check("allow: mr-hold status --json", "mr-hold status --json", false);
   check("allow: mr-hold set --by supervisor --reason x", "mr-hold set --by supervisor --reason x", false);
   check("allow: cat flag", "cat /p/.native-supervisor-disabled", false);
@@ -204,9 +244,13 @@ function runSelftest() {
   check("VERB: shred the flag", "shred -u /p/.native-supervisor-disabled", true);
 
   check("KNOWN-GAP: bash -c wrapper", "bash -c 'rm /p/.native-supervisor-disabled'", false);
-  check("KNOWN-GAP: xargs (filename is upstream of the verb)",
-    "echo /p/.native-supervisor-disabled | xargs rm", false);
-  check("KNOWN-GAP: find -exec", "find /p -name '.native-supervisor-disabled' -exec rm {} +", false);
+  // CLOSED by lp-11a (were KNOWN-GAPs). Anchoring the rm family at command position would have
+  // dropped indirection entirely, so both routes got explicit rules — which means these two
+  // fixtures flip from "asserted NOT blocked" to pins. They are kept, not deleted: a fixture that
+  // records a gap is the cheapest possible regression test once the gap closes.
+  check("pin (was KNOWN-GAP): xargs rm", "echo /p/.native-supervisor-disabled | xargs rm", true);
+  check("pin (was KNOWN-GAP): find -exec rm",
+    "find /p -name '.native-supervisor-disabled' -exec rm {} +", true);
   check("KNOWN-GAP: variable indirection", 'F=/p/.native-supervisor-disabled; rm "$F"', false);
   check("KNOWN-GAP: python3 os.remove() (guard pattern-matches shell verbs, not python calls)",
     "python3 -c \"import os;os.remove('/p/.native-supervisor-disabled')\"", false);

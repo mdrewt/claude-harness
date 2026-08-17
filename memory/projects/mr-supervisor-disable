@@ -1,0 +1,33 @@
+#!/bin/bash
+# mr-supervisor-disable — operator pause for the native supervisor loop, WITH provenance (lp-11a).
+#
+#   mr-supervisor-disable [reason words ...]
+#
+# Replaces the untracked `~/.local/bin/mr-supervisor-disable`, whose entire body was:
+#
+#     touch "$MEM/.native-supervisor-disabled"
+#
+# A bare `touch` writes a ZERO-BYTE flag, and a zero-byte flag is indistinguishable from one created
+# by accident. That ambiguity is not theoretical: on 2026-08-17 a session ran `bash mr-hold status`
+# instead of `python3`, bash interpreted the tool's docstring as shell, a backticked mention of the
+# old wrapper became command substitution, and the wrapper RAN — producing a flag nobody set and
+# nobody could attribute. The fail-safe read it as OPERATOR (correctly — it cannot prove otherwise)
+# and the loop skipped 8 ticks in silence.
+#
+# Writing `by=operator` costs nothing and makes the two cases distinguishable forever after: a hold
+# set through this tool is attributed and the tick stays quiet; a hold with no provenance is now an
+# ANOMALY the tick escalates once (mr-native-tick.sh gate -1). The pause itself behaves identically.
+#
+# Delegating to `mr-hold set` rather than writing the file here is deliberate — mr-hold is the SSOT
+# for the flag's format and the only place provenance rules live, so there is no second copy of the
+# format to drift. To adopt it:
+#
+#     ln -sf /home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-disable \
+#            ~/.local/bin/mr-supervisor-disable
+#
+# `mr-supervisor-enable` (the clear) deliberately stays the operator's own untracked script: the
+# guard blocks it at command position so no session can run it, which is the point.
+set -u
+MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+REASON="${*:-manual pause (mr-supervisor-disable)}"
+exec "$MEM/mr-hold" set --by operator --reason "$REASON"

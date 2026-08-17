@@ -45,6 +45,72 @@ EOF
 # provenance => OPERATOR => never auto-clearable) is the property that must never regress silently.
 "$MEM/mr-hold" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-hold selftest"; BAD=1; }
 "$MEM/mr-branch-audit" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-branch-audit selftest"; BAD=1; }
+# lp-11a: the lock-release SSOT. Exists so the tick never needs `rm -rf` for routine cleanup — the
+# guard blocks that (rightly), and a headless tick that hits a block stops to ask a human who is not
+# there. Its must-never-regress property is that a LIVE owner is refused.
+"$MEM/mr-unlock" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-unlock selftest"; BAD=1; }
+# lp-11a: POLYGLOT INTERPRETER GUARD on every python mr-* tool.
+#
+# `bash <a python file>` does not read the shebang — it interprets the source as shell, which
+# executes any backticked prose in it as commands. That is not a hypothetical: it fired the
+# operator's kill switch out of mr-hold's own docstring on 2026-08-17 and wedged the loop for 8
+# hours. Line 2 of every python tool re-execs the file under python3, making the mis-invocation
+# correct instead of catastrophic.
+#
+# The split below is deliberate and is itself a safety property. Real tools are checked STATICALLY
+# (string compare on line 2) and are never executed under bash by this gate — running an unguarded
+# copy under bash is precisely the accident being closed, so the checker must not be able to cause
+# it. The behavioural proof that the guard actually WORKS runs against synthetic fixtures whose
+# only side effect is a sentinel file in a temp dir, and it asserts BOTH directions: guarded => the
+# hazard does not fire, unguarded => it does. Without that second assertion this is a decoration.
+/usr/bin/python3 - "$MEM" <<'PYGUARD' || BAD=1
+import os, subprocess, sys, tempfile
+mem = sys.argv[1]
+bad = 0
+GUARD = '''\'\'\'\'exec /usr/bin/python3 "$0" "$@" # \'\'\''''
+
+# --- static: every python mr-* tool carries the guard on line 2 ---
+n = 0
+for name in sorted(os.listdir(mem)):
+    p = os.path.join(mem, name)
+    if not name.startswith("mr-") or not os.path.isfile(p) or not os.access(p, os.X_OK):
+        continue
+    if any(s in name for s in (".bak", ".log", ".md", ".json")):
+        continue
+    try:
+        lines = open(p, errors="replace").read().splitlines()
+    except OSError:
+        continue
+    if not lines or "python" not in lines[0]:
+        continue
+    n += 1
+    if len(lines) < 2 or lines[1].rstrip() != GUARD:
+        print("SELFCHECK-FAIL polyglot-guard missing on line 2 of %s" % name)
+        bad = 1
+if n == 0:
+    print("SELFCHECK-FAIL polyglot-guard scan matched ZERO python tools — the enumeration has rotted")
+    bad = 1
+
+# --- behavioural: prove the guard closes the hazard, and that this check can fail ---
+BODY = '"""doc mentioning `touch %s` in backticks."""\nprint("PY-REACHED")\n'
+with tempfile.TemporaryDirectory() as d:
+    for guarded in (True, False):
+        sent = os.path.join(d, "sentinel-%s" % guarded)
+        tool = os.path.join(d, "probe-%s" % guarded)
+        with open(tool, "w") as fh:
+            fh.write("#!/usr/bin/python3\n" + (GUARD + "\n" if guarded else "") + BODY % sent)
+        os.chmod(tool, 0o755)
+        subprocess.run(["bash", tool], cwd=d, capture_output=True, timeout=30)
+        fired = os.path.exists(sent)
+        if guarded and fired:
+            print("SELFCHECK-FAIL polyglot-guard did NOT stop bash from executing docstring prose")
+            bad = 1
+        if not guarded and not fired:
+            print("SELFCHECK-FAIL polyglot-guard behavioural fixture is INERT "
+                  "(unguarded copy did not fire the hazard, so the guarded pass proves nothing)")
+            bad = 1
+sys.exit(bad)
+PYGUARD
 # python heredocs embedded in bash wrappers. `bash -n` above cannot see inside them, yet that is
 # where most of the real logic lives (mr-record's cost path, mr-native-tick's reconcile/gate-2/
 # rate-limit-arming). Without this, a python syntax error in any of them ships silently and only

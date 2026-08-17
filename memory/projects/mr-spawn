@@ -83,7 +83,37 @@ export CAP
 # pre-launch cost-flag hygiene (review F-C/F-G: spawn owns cleanup; a watcher must never erase live state)
 rm -f "/tmp/mr_warn_$S" "/tmp/mr_costwatch_$S.fired" "/tmp/mr_cap_topup_$S" "/tmp/mr_wrap_$S"
 grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && rm -f "/tmp/mr_stop_$S" "/tmp/mr_stop_$S.reason"
-WRITES=$(find "$HARNESS" "$PROJ" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/.claude/worktrees/*' -not -path "$MEM/*" -not -path '*/.codegraph/*' -mmin -6 2>/dev/null | head -1)
+# lp-11a: this probe had TWO independent defects, both measured over 2026-08-17. It tripped on 10
+# of 14 ticks, and every trip costs a WHOLE tick, because doctrine (correctly) forbids hand-launching
+# around it. Neither defect was in the doctrine — both were here.
+#
+# (1) SCOPE. It scanned BOTH repos regardless of which one the slice targets. lp-00 added repo
+#     routing 60 lines above and never wired it in down here, so lp-01 — a HARNESS slice — was
+#     refused twice (10:43Z, 11:00Z) over a write to ARCHITECTURE.md in monster-realm, a repo it
+#     does not touch. It now scans $SYNCDIR: the repo this slice will actually write to.
+#
+# (2) AUTHORSHIP. The question this probe exists to answer is "is a human working here?", but all
+#     it could actually see was "was this file written recently" — and the tick's own
+#     `git merge --ff-only` writes land squarely inside the 6-minute window. So the loop kept
+#     tripping over its own merges (06:54Z, and the same class back to 2026-08-09). A human edit
+#     leaves a file DIRTY or untracked; a merge leaves it clean and byte-identical to HEAD. Asking
+#     git separates the two exactly, with none of the time-based guesswork that caused the misread.
+#
+# FAILS CLOSED: if git cannot answer (not a repo, git absent), the candidate counts as a human
+# write and the probe trips — the pre-lp-11a behaviour. Candidates are capped because this runs on
+# every spawn; 40 recent files is far past any real editing session, and the cap only ever makes
+# the probe trip on a file it already found.
+WRITES=""
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  if ST=$(git -C "$SYNCDIR" status --porcelain -- "$f" 2>/dev/null); then
+    [ -n "$ST" ] && { WRITES="$f"; break; }
+  else
+    WRITES="$f (git could not attribute it — failing closed)"; break
+  fi
+done <<EOF
+$(find "$SYNCDIR" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/.claude/worktrees/*' -not -path "$MEM/*" -not -path '*/.codegraph/*' -mmin -6 2>/dev/null | head -40)
+EOF
 [ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
 [ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
 # build brief

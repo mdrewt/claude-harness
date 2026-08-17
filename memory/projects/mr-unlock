@@ -1,0 +1,140 @@
+#!/bin/bash
+# mr-unlock — release the chain-owner mutex and reap dead per-slice locks, WITHOUT `rm -rf` (lp-11a).
+#
+#   mr-unlock mutex          # release .harness-runner.lock.d (only if its owner pid is dead)
+#   mr-unlock stale          # reap .harness-runner.<slice>.lock whose session_leader is dead
+#   mr-unlock all            # both
+#   mr-unlock --selftest
+#
+# WHY THIS EXISTS. On 2026-08-17T08:00Z a tick tried its ordinary post-merge cleanup:
+#
+#     rm -f  "$MEM/.harness-runner.15r-sec-vis.lock"
+#     rmdir  "$MEM/.harness-runner.lock.d" || rm -rf "$MEM/.harness-runner.lock.d"
+#
+# `guard-bash.mjs` blocked it on the `rm -rf` fallback — correctly, that rule is not wrong — and the
+# supervisor, running headless under cron with no human to approve anything, STOPPED and asked
+# "OK to proceed?". Nobody answered. That single block is the whole explanation for two symptoms
+# that looked unrelated in the logs: three stale per-slice locks left lying around
+# (15r-a2 / 15r-sec-vis / lp-09), and the `MUTEX RELEASE FAILED` at 10:43Z.
+#
+# The fix belongs HERE, not in the guard. `rm -rf` was never needed: the mutex directory holds known
+# filenames, so removing them by name and then `rmdir`-ing the (now empty) directory does the job
+# with no recursive delete anywhere — which is exactly what the 04:17Z tick did, successfully, the
+# same morning. The idiom was simply inconsistent between ticks. One tool, one idiom, selftested.
+#
+# SAFETY: liveness is checked BEFORE every removal and the tool refuses on a live owner. A lock whose
+# holder is still running is the one thing that must never be reaped — that is a concurrent-merge
+# race, which is what the mutex exists to prevent in the first place.
+set -u
+MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+MUTEX="$MEM/.harness-runner.lock.d"
+RC=0
+
+# Read a pid out of a lock artifact. Returns "" when absent/garbage; callers treat "" as DEAD, which
+# is the correct fail direction here: a lock we cannot attribute to a running process is exactly the
+# leftover this tool is for, and refusing to clean it would re-create the wedge it fixes.
+pid_of() {
+  /usr/bin/python3 -c "
+import json,sys
+try:
+    d=json.load(open(sys.argv[1]))
+except Exception:
+    print(''); sys.exit(0)
+v=d.get('session_leader') or d.get('pid') or ''
+print(str(v).strip())" "$1" 2>/dev/null
+}
+
+alive() { [ -n "${1:-}" ] && kill -0 "$1" 2>/dev/null; }
+
+release_mutex() {
+  local D="${1:-$MUTEX}"
+  [ -d "$D" ] || { echo "UNLOCK-MUTEX-ABSENT $D"; return 0; }
+  local OWNER; OWNER=$(pid_of "$D/owner.json")
+  if alive "$OWNER"; then
+    echo "UNLOCK-MUTEX-REFUSED owner pid $OWNER is ALIVE — not releasing a held mutex"
+    return 1
+  fi
+  # Named removals only. No glob, no -r: the directory's contents are ours and enumerable.
+  rm -f "$D/owner.json" "$D/pid" 2>/dev/null
+  if rmdir "$D" 2>/dev/null; then
+    echo "UNLOCK-MUTEX-RELEASED $D (owner ${OWNER:-none} dead)"
+    return 0
+  fi
+  # Do NOT escalate to a recursive delete. An unexpected file here means an assumption broke, and
+  # the honest move is to name it and stop rather than delete something nobody predicted.
+  echo "UNLOCK-MUTEX-FAILED $D still holds: $(ls -A "$D" 2>/dev/null | tr '\n' ' ')"
+  return 1
+}
+
+reap_stale() {
+  local D="${1:-$MEM}" n=0
+  for LK in "$D"/.harness-runner.*.lock; do
+    [ -e "$LK" ] || continue
+    local SL; SL=$(basename "$LK"); SL=${SL#.harness-runner.}; SL=${SL%.lock}
+    local P; P=$(pid_of "$LK")
+    if alive "$P"; then
+      echo "UNLOCK-KEEP $SL (session_leader $P alive)"
+      continue
+    fi
+    rm -f "$LK" 2>/dev/null && { echo "UNLOCK-REAPED $SL (session_leader ${P:-none} dead)"; n=$((n+1)); }
+  done
+  [ "$n" = 0 ] && echo "UNLOCK-STALE-NONE"
+  return 0
+}
+
+selftest() {
+  local T BAD=0 OUT
+  T=$(mktemp -d)
+  ck() { if [ "$2" = "$3" ]; then :; else echo "UNLOCK-SELFTEST-FAIL $1 (got '$2' want '$3')"; BAD=1; fi; }
+
+  # 1. absent mutex is a no-op success, not an error
+  OUT=$(release_mutex "$T/nope" | head -1 | cut -d' ' -f1); ck "absent-mutex" "$OUT" "UNLOCK-MUTEX-ABSENT"
+
+  # 2. dead-owner mutex releases, directory actually gone
+  mkdir -p "$T/m1"; echo '{"session_leader": 999999}' > "$T/m1/owner.json"
+  OUT=$(release_mutex "$T/m1" | head -1 | cut -d' ' -f1); ck "dead-owner-releases" "$OUT" "UNLOCK-MUTEX-RELEASED"
+  [ -d "$T/m1" ] && { echo "UNLOCK-SELFTEST-FAIL dead-owner mutex dir still exists"; BAD=1; }
+
+  # 3. LIVE owner is refused — the property that must never regress
+  mkdir -p "$T/m2"; echo "{\"session_leader\": $$}" > "$T/m2/owner.json"
+  OUT=$(release_mutex "$T/m2" | head -1 | cut -d' ' -f1); ck "live-owner-refused" "$OUT" "UNLOCK-MUTEX-REFUSED"
+  [ -d "$T/m2" ] || { echo "UNLOCK-SELFTEST-FAIL live mutex was destroyed"; BAD=1; }
+
+  # 4. unexpected content is NAMED, never recursively deleted
+  mkdir -p "$T/m3"; echo '{"session_leader": 999999}' > "$T/m3/owner.json"; echo x > "$T/m3/surprise"
+  OUT=$(release_mutex "$T/m3" | head -1 | cut -d' ' -f1); ck "surprise-content-fails-loud" "$OUT" "UNLOCK-MUTEX-FAILED"
+  [ -f "$T/m3/surprise" ] || { echo "UNLOCK-SELFTEST-FAIL surprise file was deleted"; BAD=1; }
+
+  # 5. stale reap removes dead, keeps live
+  echo '{"session_leader": 999999}' > "$T/.harness-runner.deadslice.lock"
+  echo "{\"session_leader\": $$}"   > "$T/.harness-runner.liveslice.lock"
+  reap_stale "$T" >/dev/null
+  [ -e "$T/.harness-runner.deadslice.lock" ] && { echo "UNLOCK-SELFTEST-FAIL dead lock survived"; BAD=1; }
+  [ -e "$T/.harness-runner.liveslice.lock" ] || { echo "UNLOCK-SELFTEST-FAIL LIVE lock was reaped"; BAD=1; }
+
+  # 6. garbage json reads as dead (documented fail direction), and is reaped
+  echo 'not json at all' > "$T/.harness-runner.garbage.lock"
+  reap_stale "$T" >/dev/null
+  [ -e "$T/.harness-runner.garbage.lock" ] && { echo "UNLOCK-SELFTEST-FAIL garbage lock survived"; BAD=1; }
+
+  # 7. a directory with no locks at all reaps to NONE. Deliberately a FRESH dir: reusing $T here
+  # would still hold fixture 5's live lock and report UNLOCK-KEEP, which is how this fixture first
+  # failed — the assertion was wrong, not the code.
+  mkdir -p "$T/empty"
+  OUT=$(reap_stale "$T/empty" | head -1); ck "empty-reap" "$OUT" "UNLOCK-STALE-NONE"
+  rmdir "$T/empty" 2>/dev/null
+
+  rm -f "$T"/.harness-runner.*.lock 2>/dev/null
+  rmdir "$T" 2>/dev/null
+  [ "$BAD" = 0 ] && echo "UNLOCK-SELFTEST-OK 11 fixtures"
+  return $BAD
+}
+
+case "${1:-}" in
+  mutex)      release_mutex || RC=1 ;;
+  stale)      reap_stale ;;
+  all)        release_mutex || RC=1; reap_stale ;;
+  --selftest) selftest || RC=1 ;;
+  *) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; RC=2 ;;
+esac
+exit $RC

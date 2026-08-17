@@ -136,6 +136,42 @@ if [ -f "$MEM/.native-supervisor-disabled" ]; then
   # line that reports nothing is exactly the failure class this gate exists to surface. (Caught by
   # the A8 behavioural fixture, whose stub mr-hold does precisely that.)
   qstat(){ QS=$("$MEM/mr-hold" queue 2>/dev/null); [ -n "${QS:-}" ] || QS="queued_events=? oldest_event_age_h=? (mr-hold queue produced no output)"; printf '%s' "$QS"; }
+  # lp-11a: ESCALATE AN UNATTRIBUTED HOLD. This is the single change that bounds the damage of every
+  # future accident of this shape, including ones nobody has thought of yet.
+  #
+  # On 2026-08-17 a mis-invoked tool fired the operator's kill switch by accident. The fail-safe
+  # below did exactly what it should — no provenance means OPERATOR, and the loop may never clear an
+  # OPERATOR hold — but the result was 8 consecutive ticks skipping in SILENCE (13:00Z-20:00Z), one
+  # log line each, no notification. The operator found out by asking. An 8-hour outage and a 1-hour
+  # outage differ only in whether anyone was told.
+  #
+  # So: the fail-safe is untouched (we still SKIP, and still never clear), but a hold we cannot
+  # ATTRIBUTE now says so out loud, exactly once. `attributed:false` means the flag carries no
+  # `by=` record at all — which is precisely the signature of an accidental `touch`, and NOT the
+  # signature of an operator pause once `mr-supervisor-disable` routes through `mr-hold set`
+  # (shipped alongside this change). Default on helper failure is UNATTRIBUTED: if mr-hold cannot
+  # answer, something is wrong with the kill switch and that is itself worth one issue.
+  #
+  # Deduped on the flag's MTIME, so a long deliberate pause escalates once and stays quiet, while a
+  # genuinely new accidental flag escalates again. mr-ask-drew always exits 0 by contract; every
+  # call here is `|| true` regardless, because a notification failure must never take the cron
+  # entrypoint down — that would trade a visible outage for an invisible one.
+  HOLD_ATTR=$("$MEM/mr-hold" status --json 2>/dev/null | /usr/bin/python3 -c "import json,sys;print('1' if json.load(sys.stdin).get('attributed') else '0')" 2>/dev/null || echo 0)
+  if [ "${HOLD_ATTR:-0}" = "0" ]; then
+    FMT=$(stat -c %Y "$MEM/.native-supervisor-disabled" 2>/dev/null || echo 0)
+    ESC="/tmp/mr_hold_unattributed_$FMT"
+    if [ ! -e "$ESC" ]; then
+      touch "$ESC" 2>/dev/null || true
+      log "HOLD-UNATTRIBUTED flag carries no provenance record (mtime=$FMT) — escalating once; loop stays held $(qstat)"
+      "$MEM/mr-record" handoff --title "HOLD-UNATTRIBUTED: supervisor loop is held by a flag with no provenance" \
+        --body "The kill switch at \$MEM/.native-supervisor-disabled carries no 'by=' record, so the fail-safe reads it as an OPERATOR hold and the loop will skip every tick until a human clears it. If you paused deliberately, nothing is wrong — close the issue. If you did NOT, something fired the switch by accident (a mis-invoked tool did exactly this on 2026-08-17) and the loop is losing a tick per hour until you run mr-supervisor-enable." >> "$LOG" 2>&1 || true
+      "$MEM/mr-ask-drew" hold-unattributed --repo mdrewt/claude-harness \
+        --question "The build loop is held by a kill-switch flag with no provenance record. Did you pause it?" \
+        --root "\$MEM/.native-supervisor-disabled exists but carries no 'by=' line, so the fail-safe defaults it to OPERATOR and the loop can never clear it itself." \
+        --recommend "If you did not pause deliberately: run mr-supervisor-enable. Every tick until then is a skipped hour." \
+        --context "Escalated once per flag instance (mtime=$FMT). Attributed holds set via mr-supervisor-disable/mr-hold do NOT trigger this." >> "$LOG" 2>&1 || true
+    fi
+  fi
   if [ "${MR_FORCE:-0}" = "1" ]; then log "NOTE hold overridden by MR_FORCE=1 (manual run; hold by=$HOLD_BY REMAINS set) $(qstat)"; else
     [ -n "$EVFILE" ] && [ -f "$EVFILE" ] && case "$EVFILE" in "$MEM/pending-events/"*) : ;; *) mv "$EVFILE" "$MEM/pending-events/" 2>/dev/null;; esac
     log "SKIP hold by=$HOLD_BY (event requeued: ${EVFILE:-none}) $(qstat)"; exit 0; fi

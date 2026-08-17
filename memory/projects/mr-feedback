@@ -1,5 +1,13 @@
 #!/usr/bin/python3
-"""mr-feedback — feedback ledger + reconciler + covermap (doctrine §8; event-sourced, append-only).
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands — that is precisely how the
+# 2026-08-17 kill-switch wedge happened (full postmortem in mr-hold's header). Python reads this
+# line as a no-op string; sh/bash re-execs the file under python3 before reaching any other line.
+# Statically enforced for every python mr-* tool by mr-selfcheck. `__doc__` is ASSIGNED (not left a
+# bare literal) because the guard line above is now the module's first string and would otherwise
+# become __doc__ — this tool prints __doc__ as its usage text, so the guard would have replaced it.
+__doc__ = """mr-feedback — feedback ledger + reconciler + covermap (doctrine §8; event-sourced, append-only).
 Subcommands:
   add   --episode E --source F --quote Q [--kind K --confidence C] [--weight W] [--note N]
   set   ID [--state S] [--action A] [--weight W] [--target T] [--evidence EV] [--kind K] [--note N]

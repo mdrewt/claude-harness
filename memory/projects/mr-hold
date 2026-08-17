@@ -1,5 +1,30 @@
 #!/usr/bin/python3
-"""mr-hold — provenance-aware kill switch for the native supervisor loop (lp-09).
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). Not decoration — this line closes an 8-hour outage.
+#
+# 2026-08-17T12:01:09Z a supervisor session ran `bash mr-hold status` instead of `python3`. Bash
+# does not read the shebang of a file it is handed; it interpreted this PYTHON SOURCE as shell,
+# line by line. The docstring below documents the kill switch and named the operator's wrapper in
+# BACKTICKS — which is command substitution — so bash EXECUTED
+# `~/.local/bin/mr-supervisor-disable`, whose body is a bare `touch` on the flag's absolute path.
+# A zero-byte, unattributed hold appeared out of nowhere; the fail-safe below correctly read it as
+# OPERATOR, which the loop may never clear; 8 consecutive cron ticks then skipped in silence.
+# Bash also ran `rm`/`mv`/`cp`/`chmod`/`truncate`/`unlink`/`ln`/`sed -i`/`git revert` out of other
+# backticked prose in this same file — harmless ONLY because they happened to get no operands.
+#
+# guard-bash.mjs cannot see any of this: the hook inspects the top-level Bash string
+# (`bash /path/mr-hold status`), not what that sub-process does once bash starts executing the
+# file's contents. Sanitising the prose would be whack-a-mole and would make the docs worse; this
+# line instead makes the mis-invocation CORRECT. Python parses it as a string expression (a no-op);
+# sh/bash strips the quotes and runs `exec /usr/bin/python3 "$0" "$@"`, re-execing this file under
+# the right interpreter before reaching line 3. Verified under `python3 X`, `bash X`, `sh X`, `./X`.
+#
+# `__doc__` is ASSIGNED below rather than left as a bare literal: the guard line is now the module's
+# first string, so it would otherwise BECOME __doc__ and break `--help`, which reads
+# `__doc__.split("\n\n")[1]`. Enforced statically for every python mr-* tool by mr-selfcheck, and
+# proven behaviourally there against synthetic fixtures (never against the real tools — running an
+# unguarded copy under bash is the very accident this closes).
+__doc__ = """mr-hold — provenance-aware kill switch for the native supervisor loop (lp-09).
 
     mr-hold status [--json]
     mr-hold set   --by operator|supervisor [--reason "..."]

@@ -1,4 +1,10 @@
 #!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands — that is precisely how the
+# 2026-08-17 kill-switch wedge happened (full postmortem in mr-hold's header). Python reads this
+# line as a no-op string; sh/bash re-execs the file under python3 before reaching any other line.
+# Statically enforced for every python mr-* tool by mr-selfcheck.
 """mr-repo-of — decide which repo a slice's declared `touches:` belong to. Routing SSOT (lp-00).
 
     mr-repo-of "<touches string>"   -> prints: harness | project | MIXED | EXTERNAL
