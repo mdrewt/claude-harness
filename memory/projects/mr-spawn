@@ -4,7 +4,7 @@
 # Kills a failed first attempt BY RECORDED PID before its single retry. Prints one status JSON line.
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
-unset MR_TICK_DRYRUN 2>/dev/null || true
+unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # lp-09: forced-ness must not propagate to what we launch
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
 PROJ=$HARNESS/projects/monster-realm

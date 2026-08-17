@@ -7,6 +7,7 @@
 # spawns the watcher. ALWAYS exits 0; on gh failure prints ASK-DREW-UNAVAILABLE — caller falls
 # back to the plain .blocked-on-human flow. (Drew-approved channel 2026-07-26.)
 set -u
+unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # lp-09: this setsid-spawns mr-decision-watch, which can fire a later tick
 export PATH="$PATH:/home/mdrewt/.asdf/shims:/home/mdrewt/bin"
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 REPO=mdrewt/monster-realm  # default = where Drew looks (2026-07-27); --repo overrides (process/infra issues -> claude-harness)

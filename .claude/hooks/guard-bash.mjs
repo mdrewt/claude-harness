@@ -60,6 +60,20 @@ if (process.argv[2] === "--selftest") {
       /(^|[;&|(]\s*)rm\s+[^\n;&|]*\.native-supervisor-disabled/i,
       /(^|[;&|(]\s*)mv\s+[^\n;&|]*\.native-supervisor-disabled/i,
       /(^|[;&|(]\s*)mr-supervisor-enable\b/i,
+      // lp-09 residual: `rm` was never the only way through. Provenance lives in the file's
+      // CONTENT, so a session could WRITE `by=supervisor` itself and then clear the hold through
+      // the perfectly sanctioned `mr-hold clear --by supervisor` — forging past the fail-safe
+      // without ever naming a blocked verb. No local secret closes that (the forger reads the same
+      // filesystem), so the answer is to block the Bash write verbs against this one path too.
+      // `touch` is listed for the OPPOSITE reason: a bare touch creates an UNATTRIBUTED hold, which
+      // the fail-safe reads as OPERATOR and the loop may then never clear — a session could wedge
+      // the loop permanently by accident. Sessions set holds via `mr-hold set --by supervisor`,
+      // which records provenance and stays self-clearable. Reads (`cat`/`stat`/`ls`) are untouched.
+      // KNOWN, UNCLOSED GAP (recorded in ADR-0002, deliberately not fixed here): settings.json
+      // wires this hook to the Bash tool ONLY, so the Write/Edit tools bypass every rule above.
+      // Closing it needs a settings change, outside this slice's declared touches.
+      /(^|[;&|(]\s*)(tee|sed|chmod|truncate|cp|ln|unlink|touch)\s+[^\n;&|]*\.native-supervisor-disabled/i,
+      />>?\s*[^\n;&|]*\.native-supervisor-disabled/i, // any redirect ONTO the flag forges provenance
       /\bdrop\s+database\b/i,
       /\btruncate\s+table\b/i,
     ];

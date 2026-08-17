@@ -1,7 +1,14 @@
 #!/bin/bash
 # mr-selfcheck — mechanical corpus health check (daily via tick). rc=0 always; prints FAIL lines.
 set -u
-MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+# SELF-LOCATING (lp-09), not hardcoded. This gate attests the corpus it SHIPS BESIDE, so whichever
+# copy you run must check that copy's tools — otherwise a slice's own worktree run silently gates the
+# live main-checkout files and every assertion below is a false green. Deliberately NOT an env
+# override (`MR_SELFCHECK_MEM=…`): an override is a surface for greening production vacuously, which
+# is the exact failure class this gate exists to prevent. Cron invokes this by absolute path in its
+# own directory, so production behaviour is unchanged. (mr-hold is the opposite call — it addresses a
+# singleton machine-wide artifact and MUST stay hardcoded; the reason is in its header.)
+MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 BAD=0
 # The tool set is DERIVED, not hand-maintained (lp-00). The old hardcoded 19-path list had already
 # drifted: it omitted mr-selfcheck itself and mr-feedback, and every new tool had to be remembered
@@ -193,7 +200,13 @@ UNSET_ANCHOR = "unset MR_FORCE MR_TICK_DRYRUN"
 all_mr_files = _mr_files(MEM)
 if not all_mr_files:
     fail("A2-sole-consumer-cardinality", "zero mr-* files enumerated in %s — the glob has rotted" % MEM)
-consumers = [n for n in all_mr_files if _dereferences_mr_force(os.path.join(MEM, n))]
+# The OBSERVER is excluded from the OBSERVED SET, and only the observer: this file necessarily
+# quotes the very pattern it enforces (see MR_FORCE_DEREF_RE above), so scanning itself reports a
+# permanent false positive. This is not the hand-maintained spawner allowlist A2 exists to avoid —
+# every other tool, present and future, is still scanned. mr-selfcheck launches nothing, so the
+# blind spot it creates is a non-spawner that would have to dereference the variable for no reason.
+consumers = [n for n in all_mr_files
+             if n != "mr-selfcheck" and _dereferences_mr_force(os.path.join(MEM, n))]
 if all_mr_files and set(consumers) != {"mr-native-tick.sh"}:
     fail("A2-sole-consumer-cardinality",
          "expected exactly {mr-native-tick.sh} to dereference $MR_FORCE, got %s" % (sorted(consumers),))
@@ -303,10 +316,20 @@ if tick_src is not None:
             fail("A4-hold-gate-reporting", "could not locate gate -1's closing `fi` — extraction has rotted")
         else:
             gate_block = tick_src[gm.start():gm.start() + fim.end()]
-            log_lines = [ln for ln in gate_block.splitlines() if re.search(r"\blog\s+", ln)]
+            # Comment lines are excluded: a `#` line cannot emit anything, and the gate's own
+            # commentary discusses log lines, so counting them is a guaranteed false positive.
+            log_lines = [ln for ln in gate_block.splitlines()
+                         if re.search(r"\blog\s+", ln) and not ln.lstrip().startswith("#")]
             if not log_lines:
                 fail("A4-hold-gate-reporting", "gate -1 block contains no `log` line — extraction has rotted")
             for ln in log_lines:
+                # A call to the `qstat` helper counts as reporting. Demanding the literal tokens on
+                # the log line would force the arithmetic to be re-derived inline at each site — the
+                # duplication this slice removed. A4 is the cheap static aid; A8 below EXECUTES the
+                # extracted gate and asserts the tokens really do appear in the emitted line, which
+                # is the assertion with teeth (it is what caught `|| echo` not firing on empty output).
+                if "qstat" in ln:
+                    continue
                 if "queued_events=" not in ln or "oldest_event_age_h=" not in ln:
                     fail("A4-hold-gate-reporting",
                          "gate -1 log line missing queued_events=/oldest_event_age_h=: %s" % ln.strip()[:160])

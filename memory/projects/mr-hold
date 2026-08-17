@@ -4,6 +4,7 @@
     mr-hold status [--json]
     mr-hold set   --by operator|supervisor [--reason "..."]
     mr-hold clear [--by supervisor]        # refuses to clear an OPERATOR hold
+    mr-hold queue                          # one line: queued_events=N oldest_event_age_h=X
     mr-hold --selftest
 
 Shebang is `/usr/bin/python3` on purpose (asdf `env python3` exits 126 in unpinned cwds).
@@ -32,6 +33,20 @@ MECHANICAL ENFORCEMENT, not just doctrine. `.claude/hooks/guard-bash.mjs` blocks
 that would `rm` the hold file, so a supervisor session cannot clear an operator hold by ignoring the
 rules — `mr-hold clear` becomes the only path, and it checks provenance. That matters because the
 tick never removed the flag itself: the clear always came from an LLM session running `rm`.
+
+KNOWN LIMIT, stated because a gate you misread is worse than no gate: provenance lives in the file's
+CONTENT, so a session with a shell could in principle write `by=supervisor` itself and then use the
+sanctioned `mr-hold clear`. No local secret closes that — an adversary with the filesystem reads it
+too. The guard therefore blocks the Bash *write* verbs against the flag as well (`>`/`tee`/`sed -i`/
+`chmod`/`truncate`/`cp`/`ln`/`unlink`), which reduces forgery to paths a session cannot take
+casually. The residual (the `Write`/`Edit` tools have no PreToolUse matcher) is a real gap recorded
+in ADR-0002 and needs a `.claude/settings.json` change, which is outside this tool's remit.
+
+QUEUE VISIBILITY (spec item (d)). The hold sits ABOVE the event queue: `mr-native-tick.sh` requeues
+into `pending-events/` correctly, but nothing drained it and nothing surfaced how deep it was — one
+done-event once sat 83.9 h unprocessed. Depth alone would not have surfaced that (a depth of 1 looks
+healthy), so the AGE of the oldest entry is the number that matters. It is computed here, once, so
+the tick interpolates a value instead of carrying a second copy of the arithmetic.
 """
 import contextlib
 import io
@@ -44,8 +59,13 @@ import tempfile
 import threading
 import time
 
+# Deliberately NOT self-locating (unlike mr-selfcheck, which is). The kill switch is a SINGLETON
+# machine-wide runtime artifact: there is one loop and one flag. A copy of this tool running in a
+# worktree must still report on the real hold, or `mr-spawn`'s refusal would read HOLD-NONE from a
+# worktree and launch straight through an operator pause.
 MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
 FLAG = os.path.join(MEM, ".native-supervisor-disabled")
+QUEUE_DIR = os.path.join(MEM, "pending-events")
 VALID = ("operator", "supervisor")
 
 
@@ -85,17 +105,75 @@ def read_hold(flag=None):
     }
 
 
+def queue_stats(qdir=None):
+    """-> {'queued_events': int, 'oldest_event_age_h': float|None} over `pending-events/*.md`.
+
+    Resolved at CALL time for the same reason as read_hold's flag (see the comment there).
+
+    STAT-ONLY, never opens a file. This is not a micro-optimisation: the tick interpolates this into
+    a log line via $(...) on every held tick, so a blocking read on a stray FIFO in that directory
+    would hang the cron entrypoint indefinitely. `os.scandir` + `st_mtime` cannot block.
+
+    Directories are skipped so `archive/` (which lives INSIDE pending-events/ — see
+    mr-native-tick.sh:187, where forgetting that once cost the free fastpath) is never counted.
+    Non-directories are counted even if not regular files: a FIFO named `*.md` in the queue is an
+    anomaly worth SEEING in the depth, not silently dropping to zero.
+
+    Never raises. A gate that dies on a weird directory entry is a gate that takes the loop with it.
+    """
+    qdir = qdir or QUEUE_DIR
+    n = 0
+    oldest = None
+    try:
+        with os.scandir(qdir) as it:
+            for e in it:
+                if not e.name.endswith(".md"):
+                    continue
+                try:
+                    if e.is_dir(follow_symlinks=False):
+                        continue
+                    mt = e.stat(follow_symlinks=False).st_mtime
+                except OSError:
+                    continue
+                n += 1
+                if oldest is None or mt < oldest:
+                    oldest = mt
+    except OSError:
+        pass                       # missing dir is the NORMAL shape in a fresh worktree (gitignored)
+    age = None
+    if oldest is not None:
+        age = round(max(0.0, (time.time() - oldest) / 3600.0), 1)
+    return {"queued_events": n, "oldest_event_age_h": age}
+
+
+def _queue_line(q=None):
+    q = q or queue_stats()
+    age = q["oldest_event_age_h"]
+    return "queued_events=%d oldest_event_age_h=%s" % (
+        q["queued_events"], "-" if age is None else ("%.1f" % age))
+
+
+def cmd_queue(argv):
+    """One bash-interpolable line. The tick reads THIS rather than re-deriving the numbers."""
+    print(_queue_line())
+    return 0
+
+
 def cmd_status(argv):
     h = read_hold()
+    q = queue_stats()
     if "--json" in argv:
-        print(json.dumps(h or {"by": None}))
+        # Both branches carry the queue keys: there can be a backlog with no hold at all (the
+        # flock-contention path), and a consumer that has to special-case that is a consumer that
+        # will read `queued_events` as 0 when it is not.
+        print(json.dumps(dict(h or {"by": None}, **q)))
         return 0
     if not h:
-        print("HOLD-NONE loop is enabled")
+        print("HOLD-NONE loop is enabled  %s" % _queue_line(q))
         return 0
     note = "" if h["attributed"] else "  (no provenance record -> defaulted to OPERATOR, fail-safe)"
-    print("HOLD-%s by=%s at=%s bytes=%d%s%s"
-          % (h["by"].upper(), h["by"], h["at"], h["raw_bytes"],
+    print("HOLD-%s by=%s at=%s bytes=%d  %s%s%s"
+          % (h["by"].upper(), h["by"], h["at"], h["raw_bytes"], _queue_line(q),
              ("  reason=" + h["reason"]) if h["reason"] else "", note))
     return 0
 
@@ -293,6 +371,17 @@ def selftest():
         r = _qs(q_arch)
         check("queue: archive/ subdir excluded -> queued_events=1 (only top.md)", r.get("queued_events") == 1)
 
+        # 6b. ADDED during the green phase, not by the test author: fixture 6 above is excluded by
+        # NAME (`archive` does not end in `.md`), so it never exercised the is_dir() guard at all —
+        # deleting that guard left the suite GREEN. A directory that DOES end in `.md` is the case
+        # with teeth, and it is reachable in practice (an unpacked event bundle, a stray mkdir).
+        q_dirmd = os.path.join(d, "pending-events-dirmd")
+        os.makedirs(os.path.join(q_dirmd, "stale.md"))
+        open(os.path.join(q_dirmd, "real.md"), "w").close()
+        r = _qs(q_dirmd)
+        check("queue: a DIRECTORY named *.md is not counted as an event (bites the is_dir guard)",
+              r.get("queued_events") == 1)
+
         # 7. a FIFO named x.md -> queue_stats RETURNS (stat-only; must never open/read the
         # file, so a FIFO with no reader on the other end must not hang it). Hard-timeout
         # guard via a daemon thread: if queue_stats ever opens the FIFO for reading, this
@@ -396,6 +485,8 @@ def main(argv):
         return cmd_set(argv[2:])
     if sub == "clear":
         return cmd_clear(argv[2:])
+    if sub == "queue":
+        return cmd_queue(argv[2:])
     print("mr-hold: unknown subcommand %r" % sub, file=sys.stderr)
     return 2
 
