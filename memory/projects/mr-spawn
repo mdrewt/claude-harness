@@ -101,19 +101,52 @@ grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && rm -f "/tmp/mr_stop_$
 #
 # FAILS CLOSED: if git cannot answer (not a repo, git absent), the candidate counts as a human
 # write and the probe trips — the pre-lp-11a behaviour. Candidates are capped because this runs on
-# every spawn; 40 recent files is far past any real editing session, and the cap only ever makes
-# the probe trip on a file it already found.
-WRITES=""
-while IFS= read -r f; do
-  [ -n "$f" ] || continue
-  if ST=$(git -C "$SYNCDIR" status --porcelain -- "$f" 2>/dev/null); then
-    [ -n "$ST" ] && { WRITES="$f"; break; }
-  else
-    WRITES="$f (git could not attribute it — failing closed)"; break
-  fi
-done <<EOF
-$(find "$SYNCDIR" -type f -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/.claude/worktrees/*' -not -path "$MEM/*" -not -path '*/.codegraph/*' -mmin -6 2>/dev/null | head -40)
-EOF
+# every spawn.
+#
+# ORDER MATTERS, and the obvious order is wrong. Enumerating recent files first and then asking git
+# about each needs a cap to stay cheap — and a cap applied to the RECENT set is unsound, because a
+# merge that rewrites 50 clean files can crowd the one dirty file a human just edited out of the
+# window, silently. So the sets are taken the other way round: ask git for the dirty/untracked set
+# (a human's working set — small, and a merge adds nothing to it), then keep only those touched
+# inside the window. No cap is needed, and nothing can be crowded out.
+#
+# `-z` because porcelain paths are quoted/escaped when they contain spaces or unicode, and a rename
+# entry carries two NUL-separated paths; splitting on NUL sidesteps all of that. `-uall` lists
+# untracked FILES rather than collapsing them into a `dir/` entry that no mtime check could read.
+# Python runs git ITSELF rather than reading a shell variable. That is not a style preference: NUL
+# is the one byte a bash variable cannot carry, so `GST=$(git status -z)` silently DROPS every
+# separator and the whole listing arrives as a single run-on entry. With exactly one dirty file that
+# still happens to work, which is precisely how it survived the first round of testing here — with
+# several it yields one garbage path, finds nothing, and the probe under-trips: a launch straight
+# into a repo somebody is editing. Owning the subprocess also lets the fail-closed branch key off
+# git's real return code instead of a pipeline's last stage.
+WRITES=$(/usr/bin/python3 -c "
+import os, subprocess, sys, time
+root, mem = sys.argv[1], sys.argv[2]
+try:
+    r = subprocess.run(['git', '-C', root, 'status', '--porcelain', '-z', '-uall'],
+                       capture_output=True, timeout=30)
+except Exception as e:
+    print('%s (git status could not run: %s — failing closed)' % (root, type(e).__name__)); raise SystemExit(0)
+if r.returncode != 0:
+    print('%s (git status rc=%d — cannot attribute recent writes, failing closed)' % (root, r.returncode))
+    raise SystemExit(0)
+SKIP = ('/.git/', '/node_modules/', '/target/', '/.claude/worktrees/', '/.codegraph/')
+cutoff = time.time() - 360
+for ent in r.stdout.split(b'\0'):
+    if not ent:
+        continue
+    # 'XY path'; a rename's second NUL-separated field is a bare path with no status prefix.
+    raw = ent[3:] if len(ent) > 3 and ent[2:3] == b' ' else ent
+    p = os.path.join(root, raw.decode('utf-8', 'replace'))
+    if p.startswith(mem.rstrip('/') + '/') or any(s in p for s in SKIP):
+        continue
+    try:
+        if os.path.getmtime(p) >= cutoff:
+            print(p); break
+    except OSError:
+        continue" "$SYNCDIR" "$MEM" 2>/dev/null) \
+  || WRITES="$SYNCDIR (probe helper failed — failing closed)"
 [ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
 [ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
 # build brief

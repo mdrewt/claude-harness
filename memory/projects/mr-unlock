@@ -117,6 +117,22 @@ selftest() {
   reap_stale "$T" >/dev/null
   [ -e "$T/.harness-runner.garbage.lock" ] && { echo "UNLOCK-SELFTEST-FAIL garbage lock survived"; BAD=1; }
 
+  # 7b. THE KILL SWITCH IS NOT A LOCK. This tool must never, by any path, remove
+  # `.native-supervisor-disabled` — doing so would silently resume a paused loop and start spending
+  # credits against an operator hold that is still meant to be in force. Structurally it cannot:
+  # `reap_stale` globs `.harness-runner.*.lock` and `release_mutex` removes only named files INSIDE
+  # `.harness-runner.lock.d/`, and neither takes a path from the command line (the case block calls
+  # both with no argument). But "structurally it cannot" is exactly the kind of claim that rots the
+  # moment someone widens a glob, so it is pinned here rather than argued in a comment.
+  : > "$T/.native-supervisor-disabled"
+  echo '{"session_leader": 999999}' > "$T/.harness-runner.alongside.lock"
+  mkdir -p "$T/m4"; echo '{"session_leader": 999999}' > "$T/m4/owner.json"
+  reap_stale "$T" >/dev/null
+  release_mutex "$T/m4" >/dev/null
+  [ -f "$T/.native-supervisor-disabled" ] || { echo "UNLOCK-SELFTEST-FAIL KILL SWITCH REMOVED by mr-unlock"; BAD=1; }
+  [ -e "$T/.harness-runner.alongside.lock" ] && { echo "UNLOCK-SELFTEST-FAIL dead lock beside the flag survived"; BAD=1; }
+  rm -f "$T/.native-supervisor-disabled"
+
   # 7. a directory with no locks at all reaps to NONE. Deliberately a FRESH dir: reusing $T here
   # would still hold fixture 5's live lock and report UNLOCK-KEEP, which is how this fixture first
   # failed — the assertion was wrong, not the code.
@@ -126,7 +142,7 @@ selftest() {
 
   rm -f "$T"/.harness-runner.*.lock 2>/dev/null
   rmdir "$T" 2>/dev/null
-  [ "$BAD" = 0 ] && echo "UNLOCK-SELFTEST-OK 11 fixtures"
+  [ "$BAD" = 0 ] && echo "UNLOCK-SELFTEST-OK 13 fixtures"
   return $BAD
 }
 
