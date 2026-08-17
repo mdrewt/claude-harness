@@ -45,6 +45,9 @@ EOF
 # provenance => OPERATOR => never auto-clearable) is the property that must never regress silently.
 "$MEM/mr-hold" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-hold selftest"; BAD=1; }
 "$MEM/mr-branch-audit" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-branch-audit selftest"; BAD=1; }
+# lp-01: the utilization SSOT. lp-12/lp-13 are blocked on a full reset cycle of its output, so a
+# reader that silently stops persisting rows is a multi-week loss that no other gate would catch.
+"$MEM/mr-telemetry-selftest" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-telemetry-selftest"; BAD=1; }
 # lp-11a: the lock-release SSOT. Exists so the tick never needs `rm -rf` for routine cleanup — the
 # guard blocks that (rightly), and a headless tick that hits a block stops to ask a human who is not
 # there. Its must-never-regress property is that a LIVE owner is refused.

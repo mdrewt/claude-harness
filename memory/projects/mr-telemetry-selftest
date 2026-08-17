@@ -1,0 +1,1359 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands — that is precisely how the
+# 2026-08-17 kill-switch wedge happened (full postmortem in mr-hold's header). Python reads this
+# line as a no-op string; sh/bash re-execs the file under python3 before reaching any other line.
+# Statically enforced for every python mr-* tool by mr-selfcheck.
+"""mr-telemetry-selftest — TDD RED-PHASE gate for lp-01 (`mr-cost-watch telemetry`).
+
+    mr-telemetry-selftest [--selftest]   -> identical behaviour either way; TELEMETRY-SELFTEST-OK/FAIL
+
+WHY THIS EXISTS (lp-01, spec M-loop-infrastructure.spec.md:141-167)
+---------------------------------------------------------------------
+`mr-native-tick.sh`'s rate-limit reader is pre-filtered at the ARMED/PYRL heredoc by a raw substring
+test requiring BOTH `"resetsAt"` and `"rejected"` in the line. A routine `allowed_warning` row (which
+carries the plan's actual `utilization` gauge) never reaches a parser at all — not "discarded by a
+walker", never even looked at. `mr-cost-watch telemetry LOGFILE GATE NSLICES [OUTFILE]` is the NEW
+reader this slice adds; it must NOT touch the arming predicate (which is correct and deliberate — see
+the PYRL heredoc's own comment on why arming must stay allowlisted on `status=="rejected"`).
+
+THIS FILE IS WRITTEN BEFORE THE FEATURE EXISTS (TDD tester ownership; implementer is a different
+agent). Every assertion below that depends on the `telemetry` subcommand is expected to be RED right
+now, and must fail with a clear message naming what is missing — never a traceback, never a silent
+skip. T3 (the arming-predicate pin) is the one exception: it exercises PRE-EXISTING code (the PYRL
+heredoc already ships) and is expected to already pass, proving EARS-3 ("SHALL NOT alter any existing
+trip condition") is not yet violated.
+
+COLLATERAL NOTE (read before treating a slow run as a bug). `mr-cost-watch`'s dispatcher today has no
+`telemetry` branch, so `mr-cost-watch telemetry X Y Z` falls through into `watch` mode (S="telemetry",
+CAP=<LOGFILE path>, LEADER=<GATE literal>) — the EXACT hazard the spec names ("a missing inline exit 0
+in the dispatch would fall through into the watcher — proven hazard", also T8 below). That fallback
+loop does not exit on its own for ~40s (three failed `kill -0` orphan checks, 20s apart), so every
+invocation in this file is wrapped with a short timeout and force-killed. Two side effects are
+UNAVOIDABLE while testing the REAL file under its REAL (currently-buggy) dispatch and are accepted as
+documented, bounded collateral of proving the RED state honestly: (a) 1-2 harmless `COSTWATCH
+telemetry ...` lines land in the real `$MEM/mr-native-tick.log` (a file that already receives constant
+real traffic in this shape; NOT one of the two files T10's non-pollution check scopes); (b) a
+`/tmp/mr_costwatch_telemetry.lock.d` directory is created and force-killed rather than trap-cleaned —
+T8 exists BECAUSE of this, and this file removes that specific, deterministically-named directory in
+a final best-effort sweep after every check has run. No test ever touches a glob wider than that exact
+name, and no test ever executes `mr-native-tick.sh` (enforced by a runtime guard on every subprocess
+call, not just by convention).
+
+SCOPE (settled, D2 in memory/projects/monster-realm-lp-01-plan.md — do not narrow the fixtures for
+this). EARS-1's literal text names `seven_day`; this suite persists `five_hour` and typeless rows
+too (F3/F4/F5) because `rateLimitType` is a first-class output column, a type FILTER at read time is
+more code than no filter, and lp-12/lp-13 are blocked on one full 7-day reset cycle of this file —
+narrowing now and widening later restarts that week. Flagged in the PR as a spec-amendment request.
+
+Self-locating (`MEM = dirname(__file__)`), NO env override — see mr-selfcheck:4-10 for why an
+override is a surface for greening production vacuously. Standard library only, no network.
+"""
+import glob
+import hashlib
+import json
+import os
+import random
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import uuid as _uuidlib
+
+MEM = os.path.dirname(os.path.abspath(__file__))
+COST_WATCH = os.path.join(MEM, "mr-cost-watch")
+TICK = os.path.join(MEM, "mr-native-tick.sh")
+STATE_JSON = os.path.join(MEM, "mr-state.json")
+TELEMETRY_JSONL = os.path.join(MEM, "mr-rate-limit-telemetry.jsonl")
+# T10 blind spot fix: the `MEM=` assignment near the top of mr-cost-watch hardcodes it to the
+# PRODUCTION absolute path regardless of which worktree copy of the SCRIPT is invoked — deliberately
+# not cited by line number, which already rotted once as the file grew a header — a buggy
+# implementation writes there even when
+# COST_WATCH above is this worktree's copy. Snapshotting only the self-located pair is a false
+# green on exactly the property T10 exists to catch, so both pairs are watched. Read-only: never
+# written by this file, even when the two paths happen to coincide (a non-worktree checkout).
+_PROD_MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
+PROD_STATE_JSON = os.path.join(_PROD_MEM, "mr-state.json")
+PROD_TELEMETRY_JSONL = os.path.join(_PROD_MEM, "mr-rate-limit-telemetry.jsonl")
+
+# The 4 keys not named verbatim in the EARS text, and why each earns a column:
+#   source          — provenance (slice:<x> / tick:<x> / log:<x>); without it two concurrent
+#                      slices' readings are indistinguishable in one shared OUTFILE.
+#   rateLimitType   — first-class column (D2, monster-realm-lp-01-plan.md) so CONSUMERS filter by
+#                      window instead of the reader guessing which windows matter — see the
+#                      module docstring's SCOPE note on the seven_day/five_hour superset.
+#   uuid            — the wire's own idempotency key; T6's dedup and this file's per-fixture
+#                      lookups both depend on it being carried through unchanged.
+#   ri              — the VERBATIM rate_limit_info object. Carried whole so fields nobody
+#                      enumerated (overageResetsAt, overageDisabledReason, overageInUse,
+#                      surpassedThreshold, and whatever the wire adds next) are not lost — a
+#                      hand-picked column list is EXACTLY how this corpus lost `utilization` the
+#                      first time (see the module docstring's WHY THIS EXISTS section).
+EXPECTED_KEYS = {
+    "ts", "source", "gate_reached", "slices_running_at_sample",
+    "rateLimitType", "status", "utilization", "resetsAt",
+    "isUsingOverage", "overageStatus", "uuid", "ri",
+}
+CLOSED_GATES = {"live-standdown", "tick-post-spawn"}
+INVOKE_TIMEOUT = 8  # seconds; short so the RED phase stays fast. See `invoke()` for the retry-once-
+# -at-20s-before-concluding-"not implemented" flake fix (a correct-but-momentarily-slow
+# implementation running on a box that concurrently spawns paid sessions must not be misdiagnosed).
+INVOKE_TIMEOUT_RETRY = 20
+
+# =================================================================================================
+# Fixtures — embedded verbatim (never read from /tmp; those logs get swept, and a fixture that reads
+# /tmp is a false green). Measured/real shapes, per the slice brief.
+# =================================================================================================
+F1 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"seven_day","utilization":0.87,"isUsingOverage":false,"surpassedThreshold":0.75},"uuid":"f1-0000-0000-0000-000000000001","session_id":"s1"}'
+F2 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"seven_day","utilization":0.32,"isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000002","session_id":"s1"}'
+F3 = '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1785546000,"rateLimitType":"five_hour","overageStatus":"allowed","overageResetsAt":1788220800,"isUsingOverage":true,"overageInUse":true},"uuid":"f1-0000-0000-0000-000000000003","session_id":"s1"}'
+F4 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1785492000,"rateLimitType":"five_hour","overageStatus":"rejected","overageDisabledReason":"org_level_disabled_until","isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000004","session_id":"s1"}'
+F5 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000005","session_id":"s1"}'
+# F6 is the SPEC-LITERAL EARS-2 case: `seven_day` + `rejected` + utilization absent — the exact shape
+# EARS-2's text describes ("documented on `rejected` rows"). F3/F4/F5 extend the same never-drop-on-
+# null-utilization property to the persisted SUPERSET this slice's D2 decision adds (five_hour rows,
+# and a row with no rateLimitType at all) — real, but not what the EARS text itself names. Real
+# measured shape: mr-postmortem-2026-08-15-evidence.json:2753 (mr_pass_11r-c.log, 2026-07-31).
+F6 = '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"seven_day","overageStatus":"allowed","overageResetsAt":1788220800,"isUsingOverage":true,"overageInUse":true},"uuid":"f1-0000-0000-0000-000000000006","session_id":"s1"}'
+# NEGATIVE CONTROL: a log-of-a-log line. A raw-substring reader (grep for "rateLimitType"/"utilization")
+# would eat this; it must not be persisted (T7).
+F7 = '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"x","content":"ok"}]},"tool_use_result":"stdout: ... \\"rateLimitType\\":\\"seven_day\\" ... \\"utilization\\":0.99 ... \\"resetsAt\\":1786060800 ...","uuid":"f1-0000-0000-0000-000000000007","session_id":"s1"}'
+F8_GARBAGE = '{"type":"rate_limit_event", THIS IS NOT VALID JSON'
+F8_BLANK = ""
+
+# --- item 6 additions: defect classes beyond "dropped row"/"utilization discarded" ---
+# F9A/F9B: the SAME uuid twice within ONE log, different bodies (so a reader that happens to write
+# the same bytes twice couldn't be mistaken for correct dedup). "dup is not only cross-run" (T15).
+F9A = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"five_hour","utilization":0.11,"isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000009","session_id":"s1"}'
+F9B = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"five_hour","utilization":0.22,"isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000009","session_id":"s1"}'
+# F10: utilization arrives as a STRING, not a float. PINNED (not left ambiguous): persisted VERBATIM
+# as received — i.e. the row's `utilization` must be the string "0.5", not silently coerced to the
+# float 0.5 — because silent coercion is itself a place data could be lossily reshaped (T17).
+F10 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"five_hour","utilization":"0.5","isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000010","session_id":"s1"}'
+# F11/F12: `rate_limit_info` present but the WRONG JSON type (list / string, not an object). Must be
+# skipped without a crash — a `.get()` on a list or string either raises or silently misbehaves (T18).
+F11 = '{"type":"rate_limit_event","rate_limit_info":[1,2,3],"uuid":"f1-0000-0000-0000-000000000011","session_id":"s1"}'
+F12 = '{"type":"rate_limit_event","rate_limit_info":"not-an-object","uuid":"f1-0000-0000-0000-000000000012","session_id":"s1"}'
+# F13: control characters + non-ASCII inside a string field. Built with json.dumps (not hand-escaped)
+# so the ENCODING itself is guaranteed correct and the fixture's only variable is what the READER
+# does with it — proves the implementer used `json.dumps` end-to-end rather than hand-formatting a
+# row (hand-formatting is exactly what would break on a literal control character) (T19).
+F13 = json.dumps({
+    "type": "rate_limit_event",
+    "rate_limit_info": {
+        "status": "allowed_warning\x07é\U0001F600",  # BEL control char + \xe9 + emoji
+        "resetsAt": 1786060800,
+        "rateLimitType": "five_hour",
+        "utilization": 0.5,
+        "isUsingOverage": False,
+    },
+    "uuid": "f1-0000-0000-0000-000000000013",
+    "session_id": "s1",
+})
+# F14: the small VALID event placed immediately after the runtime-generated giant/oversized line in
+# the edge corpus — proves a following event is still persisted (T20), i.e. the oversized-line skip
+# does not corrupt or abort the rest of the read.
+F14 = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1786060800,"rateLimitType":"seven_day","utilization":0.44,"isUsingOverage":false},"uuid":"f1-0000-0000-0000-000000000014","session_id":"s1"}'
+
+FIXTURES = [
+    ("F1", F1, "allowed_warning + utilization present -> T1 (defect a: filtered on status==rejected)"),
+    ("F2", F2, "allowed_warning + utilization present, no surpassedThreshold -> T1"),
+    ("F3", F3, "rejected five_hour, NO utilization -> T2 superset (defect b)"),
+    ("F4", F4, "allowed five_hour, overageStatus=rejected, NO utilization -> T2 superset"),
+    ("F5", F5, "allowed, no rateLimitType/resetsAt at all, NO utilization -> T2 superset"),
+    ("F6", F6, "rejected seven_day WITH overageStatus -> T2 SPEC-LITERAL case (defect b)"),
+    ("F7", F7, "NEGATIVE CONTROL: log-of-a-log substring trap -> T7"),
+    ("F8-garbage", F8_GARBAGE, "truncated/garbage non-JSON line, must not raise"),
+    ("F8-blank", F8_BLANK, "empty line, must not raise"),
+    ("F9A/F9B", F9A + "\n" + F9B, "same uuid twice in ONE log, different bodies -> T15 (dedup not cross-run-only)"),
+    ("F10", F10, "utilization arrives as a STRING -> T17 (pinned: persisted verbatim, not coerced)"),
+    ("F11", F11, "rate_limit_info is a LIST, not an object -> T18 (skip, never crash)"),
+    ("F12", F12, "rate_limit_info is a STRING, not an object -> T18 (skip, never crash)"),
+    ("F13", F13, "control char + non-ASCII inside a string field -> T19 (json.dumps round-trip)"),
+    ("F14", F14, "valid event immediately after the runtime-generated oversized line -> T20"),
+]
+
+# Vacuity control (mirrors mr-repo-of's degenerate-verdict check): a corpus that only ever exercises
+# ONE rateLimitType would let a reader that hardcodes that one type pass T1/T2 for the wrong reason.
+# DERIVED from the fixture bodies (mirrors mr-repo-of:189's computed-verdict set), not hand-listed —
+# as a hardcoded literal this check could never fail even if every fixture regressed to one type.
+def _derive_rate_limit_types():
+    types = set()
+    for _name, body, _why in FIXTURES:
+        for line in body.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                d = json.loads(line)
+            except Exception:
+                continue
+            if not isinstance(d, dict) or d.get("type") != "rate_limit_event":
+                continue
+            ri = d.get("rate_limit_info")
+            if isinstance(ri, dict) and "rateLimitType" in ri:
+                types.add(ri["rateLimitType"])
+    return types
+
+
+_RATE_LIMIT_TYPES = _derive_rate_limit_types()
+
+# The exact line set RUN_MAIN writes, shared with the T16 accounting-identity cross-check below so
+# "how many input lines did we write" is computed from ONE place, never re-counted by hand at the
+# call site (a hand-recount is exactly the kind of drift the identity check exists to catch).
+MAIN_CORPUS_LINES = [F1, F2, F3, F4, F5, F6, F7, F8_GARBAGE, F8_BLANK]
+
+
+def _corpus_body(lines):
+    return "\n".join(lines) + "\n"
+
+
+OK_STDOUT_RE = re.compile(r"OK rows=(\d+) util=(\d+) dup=(\d+) skip=(\d+)")
+
+
+def _giant_oversized_line(target_bytes=2 * 1024 * 1024):
+    """T20 fixture, GENERATED AT RUNTIME (never embedded — a 2 MiB literal has no place in source
+    control). A syntactically-valid `rate_limit_event` whose `rate_limit_info.status` string is
+    padded out past the 1 MiB per-line cap this reader must enforce. Rationale (put here, not just
+    in the assertion, because it is the reason this fixture exists at all): a 220 MB single line was
+    measured to cost 468 MB RSS to `json.loads` in one shot, and this reader runs on the tick's HOT
+    PATH — so the implementation must cap per-line reads at 1 MiB rather than buffer, and this
+    fixture is what proves that cap exists instead of merely being documented."""
+    pad = "x" * target_bytes
+    obj = {
+        "type": "rate_limit_event",
+        "rate_limit_info": {
+            "status": "allowed_warning:" + pad,
+            "resetsAt": 1786060800,
+            "rateLimitType": "seven_day",
+            "utilization": 0.5,
+            "isUsingOverage": False,
+        },
+        "uuid": "f1-0000-0000-0000-000000000099",
+        "session_id": "s1",
+    }
+    return json.dumps(obj)
+
+
+def _build_generated_corpus(n=4):
+    """T14 fixture generator (never hardcoded — a filename/uuid->row lookup table cannot know these
+    values in advance, which is exactly what closes the red-team's PROVEN cheat #1: a stub that
+    dispatched on `os.path.basename(LOGFILE)` against a fixed set of fixture filenames and emitted
+    pre-baked rows copied from this file's own fixture literals). Returns (rows, lines): `rows` are
+    the raw dicts (used to compute the EXPECTED values this assertion checks against), `lines` are
+    their `json.dumps` serializations in log order.
+
+    utilization: deterministic-but-run-varying, derived from os.getpid()+index (NOT `random` — pid
+    changes across runs, but is stable for the lifetime of one run, which is all a generated-per-run
+    corpus needs), kept in 0..1 at 2 decimals. resetsAt: genuinely randomized. rateLimitType: mixed
+    across the N rows. Exactly one row (index 1) carries NO `utilization` key at all — the EARS-2
+    shape, `rejected` + absent utilization."""
+    types = ["seven_day", "five_hour", "seven_day", "five_hour"]
+    statuses = ["allowed_warning", "rejected", "allowed", "allowed_warning"]
+    rows = []
+    for i in range(n):
+        u = str(_uuidlib.uuid4())
+        raw = (os.getpid() * 7 + i * 13) % 100
+        utilization = round(raw / 100.0, 2)
+        resets_at = int(time.time()) + random.randint(1000, 900000)
+        info = {
+            "status": statuses[i % len(statuses)],
+            "resetsAt": resets_at,
+            "rateLimitType": types[i % len(types)],
+            "isUsingOverage": False,
+        }
+        if i != 1:  # index 1 is the deliberate "utilization absent" row
+            info["utilization"] = utilization
+        rows.append({
+            "type": "rate_limit_event",
+            "rate_limit_info": info,
+            "uuid": u,
+            "session_id": "gen",
+        })
+    lines = [json.dumps(r) for r in rows]
+    return rows, lines
+
+
+# =================================================================================================
+# Assertion bookkeeping
+# =================================================================================================
+_ASSERTIONS = 0
+_FAILURES = []
+_ALL_RCS = []  # (label, rc) for every emitter invocation — T12
+
+
+def check(cond, id_, detail=""):
+    global _ASSERTIONS
+    _ASSERTIONS += 1
+    if not cond:
+        _FAILURES.append((id_, detail))
+    return cond
+
+
+# =================================================================================================
+# Subprocess guard — centralizes EVERY subprocess call in this file so "never invokes
+# mr-native-tick.sh, spawns claude, or writes the kill-switch flag path" is a runtime property,
+# not a convention. Any call whose argv[0] basename is mr-native-tick.sh, or whose argv contains
+# "claude", or whose argv mentions the kill-switch flag basename, raises loudly instead of running.
+# =================================================================================================
+_FORBIDDEN_ARGV0 = {"mr-native-tick.sh"}
+
+
+def _safe_run(argv, timeout=None):
+    b0 = os.path.basename(str(argv[0]))
+    if b0 in _FORBIDDEN_ARGV0:
+        raise RuntimeError("REFUSED: this selftest must never execute %s" % b0)
+    for a in argv:
+        sa = str(a)
+        if "claude" == os.path.basename(sa) or sa.strip() == "claude":
+            raise RuntimeError("REFUSED: this selftest must never spawn claude (argv=%r)" % (argv,))
+        if ".native-supervisor-disabled" in sa:
+            raise RuntimeError("REFUSED: this selftest must never touch the kill-switch flag path")
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, r.stdout or "", r.stderr or "", False
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout if isinstance(e.stdout, str) else (e.stdout or b"").decode(errors="replace")
+        err = e.stderr if isinstance(e.stderr, str) else (e.stderr or b"").decode(errors="replace")
+        return None, out, err, True
+
+
+def invoke(args, timeout=INVOKE_TIMEOUT, retry_timeout=INVOKE_TIMEOUT_RETRY):
+    """Run the real `mr-cost-watch telemetry ...` under test. Returns (rc, stdout, stderr, timed_out).
+
+    FLAKE FIX: this suite runs unattended from cron on a box that concurrently runs paid sessions —
+    a correct-but-momentarily-slow implementation must not be misdiagnosed as "subcommand does not
+    exist yet" off one unlucky short timeout. On a first-attempt timeout, retry ONCE at a much
+    longer timeout before concluding not-implemented. `timed_out=True` is only ever returned after
+    BOTH attempts have timed out. During the actual RED phase (today) every invocation still times
+    out on both attempts — the fallback `watch` dispatch this file's COLLATERAL NOTE describes takes
+    ~40s to exit on its own, well past even the retry window — so RED-phase runs pay the full
+    `timeout + retry_timeout` per call; this is the accepted, temporary cost of a flake-safe check
+    that will be fast once the real subcommand ships (a working call returns in well under a second,
+    so the retry path is never actually taken post-implementation)."""
+    argv = [COST_WATCH, "telemetry"] + list(args)
+    rc, out, err, to = _safe_run(argv, timeout=timeout)
+    if not to:
+        return rc, out, err, to
+    return _safe_run(argv, timeout=retry_timeout)
+
+
+def _record_rc(label, rc):
+    _ALL_RCS.append((label, rc))
+
+
+# =================================================================================================
+# Row helpers
+# =================================================================================================
+def _read_raw_lines(path):
+    try:
+        with open(path, errors="replace") as f:
+            return f.read().splitlines()
+    except OSError:
+        return []
+
+
+def _read_rows(path):
+    """Parse OUTFILE as one-JSON-object-per-line. Silently skips unparseable lines (there should be
+    none in a healthy file); callers assert row COUNT separately so a silently-shrunk file still bites."""
+    rows = []
+    for ln in _read_raw_lines(path):
+        if not ln.strip():
+            continue
+        try:
+            rows.append(json.loads(ln))
+        except Exception:
+            continue
+    return rows
+
+
+def _by_uuid(rows, uuid):
+    for r in rows:
+        if isinstance(r, dict) and r.get("uuid") == uuid:
+            return r
+    return None
+
+
+# =================================================================================================
+# T1/T2/T4/T5/T6/T7/T8/T10/T11/T12 — a handful of real invocations against the running binary.
+# Kept to the minimum count that still gives every assertion group independent evidence, because
+# EVERY invocation right now hangs on the fallback watch loop until our timeout fires (see the
+# COLLATERAL NOTE in the module docstring).
+# =================================================================================================
+def run_invocation_battery(tmp):
+    results = {}
+
+    # ---- RUN_MAIN: the full positive+negative corpus, gate=live-standdown, nslices=3 ----
+    main_log = os.path.join(tmp, "mr_pass_corpus.log")
+    with open(main_log, "w") as f:
+        f.write(_corpus_body(MAIN_CORPUS_LINES))
+    main_out = os.path.join(tmp, "out_main.jsonl")
+
+    # T8 proof-of-teeth: snapshot the lock-dir glob strictly around THIS invocation. Never a wider
+    # glob for cleanup — only ever removes the one deterministic name this file's own calls can
+    # create, so a real concurrent slice's costwatch lock is never touched.
+    before_locks = set(glob.glob("/tmp/mr_costwatch_*.lock.d"))
+    rc1, out1, err1, to1 = invoke([main_log, "live-standdown", "3", main_out])
+    after_locks = set(glob.glob("/tmp/mr_costwatch_*.lock.d"))
+    new_locks = after_locks - before_locks
+    check(not new_locks, "T8-no-lock-dir",
+          "mr-cost-watch telemetry created %s — the missing dispatch branch fell through into the "
+          "watcher (proven hazard the spec calls out explicitly)" % sorted(new_locks))
+    _record_rc("RUN_MAIN", rc1)
+    # Captured BEFORE the rerun below — this is the only way T6 can actually catch a rerun that
+    # doubles the row count. Reading the file only once, after both invocations, would make the
+    # "before" and "after" comparison the same read and pass vacuously against a buggy re-appender.
+    # ALSO the "before" half of the T16 rows= accounting identity (main_out never existed prior to
+    # this call, so rows_before is always 0 here, but it is still computed rather than assumed —
+    # the identity check must never itself hardcode a number it could instead derive).
+    rows_before_main = 0  # main_out is a fresh tempdir path; nothing could have written to it first
+    rowcount_after_first = len(_read_rows(main_out)) if not to1 else -1
+    results["main"] = dict(log=main_log, out=main_out, rc=rc1, stdout=out1, timed_out=to1,
+                            gate="live-standdown", nslices=3, source="slice:corpus",
+                            rowcount_after_first=rowcount_after_first,
+                            rows_before=rows_before_main,
+                            input_line_count=len(MAIN_CORPUS_LINES))
+
+    # ---- T6 idempotency: rerun the SAME log+outfile ----
+    rc2, out2, err2, to2 = invoke([main_log, "live-standdown", "3", main_out])
+    _record_rc("RUN_MAIN_RERUN", rc2)
+    results["main_rerun"] = dict(rc=rc2, stdout=out2, timed_out=to2,
+                                  input_line_count=len(MAIN_CORPUS_LINES))
+
+    # ---- source derivation: mr_native_tick_<rid>.log -> tick:<rid> ----
+    tick_log = os.path.join(tmp, "mr_native_tick_native-20260817T000000Z-123.log")
+    with open(tick_log, "w") as f:
+        f.write(_corpus_body([F1]))
+    tick_out = os.path.join(tmp, "out_tick.jsonl")
+    rc3, out3, err3, to3 = invoke([tick_log, "tick-post-spawn", "1", tick_out])
+    _record_rc("RUN_TICKSRC", rc3)
+    results["tick"] = dict(out=tick_out, rc=rc3, stdout=out3, timed_out=to3,
+                            gate="tick-post-spawn", nslices=1,
+                            source="tick:native-20260817T000000Z-123")
+
+    # ---- source derivation: anything else -> log:<basename> ----
+    other_log = os.path.join(tmp, "weird-name.log")
+    with open(other_log, "w") as f:
+        f.write(_corpus_body([F1]))
+    other_out = os.path.join(tmp, "out_other.jsonl")
+    rc4, out4, err4, to4 = invoke([other_log, "live-standdown", "2", other_out])
+    _record_rc("RUN_OTHERSRC", rc4)
+    results["other"] = dict(out=other_out, rc=rc4, stdout=out4, timed_out=to4,
+                             gate="live-standdown", nslices=2, source="log:weird-name.log")
+
+    # ---- T4 vacuity: F7+F8 only -> rows=0 ----
+    vac_log = os.path.join(tmp, "mr_pass_vacuity.log")
+    with open(vac_log, "w") as f:
+        f.write(_corpus_body([F7, F8_GARBAGE, F8_BLANK]))
+    vac_out = os.path.join(tmp, "out_vac.jsonl")
+    rc5, out5, err5, to5 = invoke([vac_log, "live-standdown", "1", vac_out])
+    _record_rc("RUN_VACUITY", rc5)
+    results["vacuity"] = dict(out=vac_out, rc=rc5, stdout=out5, timed_out=to5)
+
+    # ---- T7 negative control in isolation: F7 alone -> rows=0 ----
+    f7_log = os.path.join(tmp, "mr_pass_negctrl.log")
+    with open(f7_log, "w") as f:
+        f.write(_corpus_body([F7]))
+    f7_out = os.path.join(tmp, "out_f7.jsonl")
+    rc6, out6, err6, to6 = invoke([f7_log, "tick-post-spawn", "1", f7_out])
+    _record_rc("RUN_F7ONLY", rc6)
+    results["f7only"] = dict(out=f7_out, rc=rc6, stdout=out6, timed_out=to6)
+
+    # ---- T11 failure case: LOGFILE does not exist ----
+    missing_log = os.path.join(tmp, "does-not-exist.log")
+    missing_out = os.path.join(tmp, "out_missing.jsonl")
+    rc7, out7, err7, to7 = invoke([missing_log, "live-standdown", "1", missing_out])
+    _record_rc("RUN_MISSING_LOGFILE", rc7)
+    results["missing"] = dict(rc=rc7, stdout=out7, timed_out=to7)
+
+    # ---- T15/T17/T18/T19/T20: the "edge" corpus — defect classes beyond dropped-row/null-util ----
+    giant = _giant_oversized_line()
+    edge_lines = [F9A, F9B, F10, F11, F12, F13, giant, F14]
+    edge_log = os.path.join(tmp, "mr_pass_edge.log")
+    with open(edge_log, "w") as f:
+        f.write(_corpus_body(edge_lines))
+    edge_out = os.path.join(tmp, "out_edge.jsonl")
+    rc8, out8, err8, to8 = invoke([edge_log, "live-standdown", "1", edge_out])
+    _record_rc("RUN_EDGE", rc8)
+    results["edge"] = dict(out=edge_out, rc=rc8, stdout=out8, timed_out=to8,
+                            input_line_count=len(edge_lines))
+
+    # ---- T14: a corpus a hardcodable filename->row table CANNOT pass. N=4 rows with uuid4()
+    # uuids, a pid+index-derived (deterministic-but-run-varying) utilization, a randomized resetsAt,
+    # a mix of rateLimitType, one row with utilization absent — under a randomized basename. A stub
+    # that dispatches on `os.path.basename(LOGFILE)` against a fixed fixture table (the red-team's
+    # PROVEN cheat #1) has no entry for this filename and cannot fabricate the right bytes.
+    gen_rows, gen_lines = _build_generated_corpus()
+    gen_suffix = _uuidlib.uuid4().hex[:8]
+    gen_log = os.path.join(tmp, "mr_pass_gen-%s.log" % gen_suffix)
+    with open(gen_log, "w") as f:
+        f.write(_corpus_body(gen_lines))
+    gen_out = os.path.join(tmp, "out_gen-%s.jsonl" % gen_suffix)
+    rc9, out9, err9, to9 = invoke([gen_log, "live-standdown", "1", gen_out])
+    _record_rc("RUN_GEN", rc9)
+    results["gen"] = dict(out=gen_out, rc=rc9, stdout=out9, timed_out=to9,
+                           rows=gen_rows, input_line_count=len(gen_lines))
+
+    # ---- T14 byte-mutation half: COPY one generated line under a NEW random filename with
+    # resetsAt changed by +1, into a FRESH outfile (never dedup-adjacent to the run above). Proves
+    # the reader parses CONTENT, not filenames or a cached uuid->row table: a basename-keyed stub
+    # has no entry for either the new filename OR the mutated resetsAt.
+    mutated_row = dict(gen_rows[0])
+    mutated_row["rate_limit_info"] = dict(mutated_row["rate_limit_info"])
+    mutated_row["rate_limit_info"]["resetsAt"] = mutated_row["rate_limit_info"]["resetsAt"] + 1
+    mut_suffix = _uuidlib.uuid4().hex[:8]
+    mut_log = os.path.join(tmp, "mr_pass_gen-%s.log" % mut_suffix)
+    with open(mut_log, "w") as f:
+        f.write(json.dumps(mutated_row) + "\n")
+    mut_out = os.path.join(tmp, "out_gen-%s.jsonl" % mut_suffix)
+    rc10, out10, err10, to10 = invoke([mut_log, "live-standdown", "1", mut_out])
+    _record_rc("RUN_GEN_MUTATED", rc10)
+    results["gen_mutated"] = dict(out=mut_out, rc=rc10, stdout=out10, timed_out=to10,
+                                   expected_uuid=mutated_row["uuid"],
+                                   expected_resets_at=mutated_row["rate_limit_info"]["resetsAt"])
+
+    return results
+
+
+def _fail_missing(id_, run, what):
+    """One shared, clear failure shape for 'the run never produced usable output' — avoids a
+    traceback from indexing into an empty/absent result and names the missing subcommand plainly."""
+    if run.get("timed_out"):
+        check(False, id_, "%s: mr-cost-watch telemetry timed out after %ss+%ss (short attempt + "
+              "flake-safety retry) — the `telemetry` subcommand does not exist yet (dispatch fell "
+              "through to the `watch` fallback)" % (what, INVOKE_TIMEOUT, INVOKE_TIMEOUT_RETRY))
+    else:
+        check(False, id_, "%s: rc=%r stdout=%r" % (what, run.get("rc"), run.get("stdout")))
+
+
+def assert_t1_t2_t5_on_main(results):
+    """T1 (EARS-1, defect a): F1/F2 (allowed_warning) each produce exactly one row with the correct
+    utilization. This REDs against a reader that filters on status=="rejected" (today's PYRL
+    pre-filter behaviour, misapplied to this NEW reader) because F1/F2 would never be read at all.
+
+    T2 (EARS-2, defect b): F3/F4/F5 each produce a row with utilization is None — never dropped.
+    REDs against `if utilization is None: continue`.
+
+    T5: every row carries EXACTLY the 12-key set, 0<=utilization<=1 when non-null, <1024 bytes,
+    parses standalone, slices_running_at_sample/gate_reached/source match the call's arguments."""
+    run = results["main"]
+    rows = _read_rows(run["out"]) if not run["timed_out"] else []
+    EXPECTED_ROWS = 6  # F1,F2,F3,F4,F5,F6 — F7/garbage/blank must not appear
+    if not check(len(rows) == EXPECTED_ROWS, "T5-row-count",
+                 "expected exactly %d rows from the corpus (F1..F6), got %d (out=%s, timed_out=%s)"
+                 % (EXPECTED_ROWS, len(rows), run["out"], run["timed_out"])):
+        _fail_missing("T1-allowed-warning-rows", run, "F1/F2 rows")
+        _fail_missing("T2-utilization-null-rows", run, "F3/F4/F5 rows")
+        return
+
+    # T1
+    r1 = _by_uuid(rows, "f1-0000-0000-0000-000000000001")
+    r2 = _by_uuid(rows, "f1-0000-0000-0000-000000000002")
+    check(r1 is not None and r1.get("utilization") == 0.87, "T1-F1-allowed-warning",
+          "F1 (status=allowed_warning) row missing or utilization != 0.87: %r" % r1)
+    check(r2 is not None and r2.get("utilization") == 0.32, "T1-F2-allowed-warning",
+          "F2 (status=allowed_warning) row missing or utilization != 0.32: %r" % r2)
+
+    # T2 — F3/F4/F5 extend the null-utilization-must-not-drop property to the persisted superset
+    # (D2). None of these three is the SPEC-LITERAL EARS-2 shape on its own (see below).
+    for uuid, label in (
+        ("f1-0000-0000-0000-000000000003", "F3-rejected-no-utilization"),
+        ("f1-0000-0000-0000-000000000004", "F4-allowed-no-utilization"),
+        ("f1-0000-0000-0000-000000000005", "F5-no-ratelimittype-at-all"),
+    ):
+        row = _by_uuid(rows, uuid)
+        check(row is not None, "T2-%s-present" % label, "row for uuid=%s missing (dropped, not just null)" % uuid)
+        if row is not None:
+            check(row.get("utilization") is None, "T2-%s-null" % label,
+                  "expected utilization: null, got %r" % (row.get("utilization"),))
+
+    # T2 — F6 is the SPEC-LITERAL EARS-2 row (seven_day + rejected + utilization absent, the exact
+    # shape EARS-2's text names), named explicitly so this criterion has dedicated in-spec coverage
+    # rather than riding entirely on the out-of-scope-of-EARS-1 F3/F4/F5 superset fixtures above.
+    r6 = _by_uuid(rows, "f1-0000-0000-0000-000000000006")
+    check(r6 is not None, "T2-F6-present",
+          "F6 (spec-literal EARS-2 row: seven_day+rejected+no-utilization) missing — dropped, not just null")
+    if r6 is not None:
+        check(r6.get("utilization") is None, "T2-F6-utilization-null",
+              "F6 expected utilization: null, got %r" % (r6.get("utilization"),))
+
+    # T5 — key set, ranges, byte size, standalone parse
+    for i, ln in enumerate(_read_raw_lines(run["out"])):
+        if not ln.strip():
+            continue
+        check(len(ln.encode("utf-8")) < 1024, "T5-row-size-%d" % i, "row %d is >=1024 bytes" % i)
+        try:
+            row = json.loads(ln)
+        except Exception as e:
+            check(False, "T5-row-standalone-json-%d" % i, "row %d does not parse standalone: %s" % (i, e))
+            continue
+        check(set(row.keys()) == EXPECTED_KEYS, "T5-row-keys-%d" % i,
+              "row %d key set != the 12-key contract: got %s" % (i, sorted(row.keys())))
+        u = row.get("utilization")
+        if u is not None:
+            check(0 <= u <= 1, "T5-row-utilization-range-%d" % i, "utilization out of [0,1]: %r" % u)
+        check(row.get("slices_running_at_sample") == 3 and isinstance(row.get("slices_running_at_sample"), int),
+              "T5-row-nslices-%d" % i,
+              "slices_running_at_sample != int(3): %r" % (row.get("slices_running_at_sample"),))
+        check(row.get("gate_reached") == "live-standdown", "T5-row-gate-%d" % i,
+              "gate_reached != 'live-standdown': %r" % (row.get("gate_reached"),))
+        check(row.get("source") == "slice:corpus", "T5-row-source-slice-%d" % i,
+              "source != 'slice:corpus' for mr_pass_corpus.log: %r" % (row.get("source"),))
+
+
+def assert_t5_source_variants(results):
+    """T5 (source derivation, remaining two branches): mr_native_tick_<rid>.log -> tick:<rid>;
+    anything else -> log:<basename>."""
+    tick = results["tick"]
+    if tick["timed_out"] or not tick.get("out"):
+        _fail_missing("T5-source-tick", tick, "mr_native_tick_*.log source derivation")
+    else:
+        rows = _read_rows(tick["out"])
+        check(len(rows) == 1, "T5-source-tick-rowcount", "expected 1 row, got %d" % len(rows))
+        if rows:
+            check(rows[0].get("source") == "tick:native-20260817T000000Z-123", "T5-source-tick",
+                  "source != 'tick:native-20260817T000000Z-123': %r" % rows[0].get("source"))
+            check(rows[0].get("gate_reached") == "tick-post-spawn", "T5-source-tick-gate",
+                  "gate_reached != 'tick-post-spawn': %r" % rows[0].get("gate_reached"))
+            check(rows[0].get("slices_running_at_sample") == 1, "T5-source-tick-nslices",
+                  "slices_running_at_sample != 1: %r" % rows[0].get("slices_running_at_sample"))
+
+    other = results["other"]
+    if other["timed_out"] or not other.get("out"):
+        _fail_missing("T5-source-fallback", other, "otherwise -> log:<basename> source derivation")
+    else:
+        rows = _read_rows(other["out"])
+        check(len(rows) == 1, "T5-source-fallback-rowcount", "expected 1 row, got %d" % len(rows))
+        if rows:
+            check(rows[0].get("source") == "log:weird-name.log", "T5-source-fallback",
+                  "source != 'log:weird-name.log': %r" % rows[0].get("source"))
+
+
+def assert_t4_vacuity(results):
+    """T4 (vacuity control): F7+F8 alone -> rows=0, OUTFILE has zero rows. Paired with the corpus
+    check that >=2 distinct rateLimitType values are represented across F1-F6, so a reader that
+    hardcodes one type could not pass T1/T2 above for the wrong reason."""
+    run = results["vacuity"]
+    if run["timed_out"]:
+        _fail_missing("T4-vacuity-rows-zero", run, "F7+F8-only corpus")
+    else:
+        rows = _read_rows(run["out"]) if os.path.exists(run["out"]) else []
+        check(len(rows) == 0, "T4-vacuity-rows-zero",
+              "F7+F8-only corpus must yield 0 rows, got %d" % len(rows))
+        check(not os.path.exists(run["out"]) or os.path.getsize(run["out"]) == 0,
+              "T4-vacuity-outfile-empty",
+              "OUTFILE must be absent or zero-length for a corpus with no real rate_limit_info")
+    check(len(_RATE_LIMIT_TYPES) >= 2, "T4-corpus-not-degenerate",
+          "fixture corpus only exercises %d distinct rateLimitType value(s) — a reader hardcoding "
+          "one type could pass T1/T2 vacuously" % len(_RATE_LIMIT_TYPES))
+
+
+def assert_t7_negative_control(results):
+    """T7: F7 ALONE (a log-of-a-log line whose payload string happens to contain the substrings
+    'rateLimitType'/'utilization'/'resetsAt') -> zero rows. REDs a raw-substring reader that greps
+    the whole line instead of checking `type == "rate_limit_event"` and reading the real
+    `rate_limit_info` object."""
+    run = results["f7only"]
+    if run["timed_out"]:
+        _fail_missing("T7-f7-alone-zero-rows", run, "F7-only corpus")
+        return
+    rows = _read_rows(run["out"]) if os.path.exists(run["out"]) else []
+    check(len(rows) == 0, "T7-f7-alone-zero-rows",
+          "a log containing only the log-of-a-log fixture F7 must yield 0 rows, got %d" % len(rows))
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000007") is None, "T7-f7-uuid-absent",
+          "F7's uuid must never appear in the output — a substring reader would eat this line")
+
+
+def assert_t6_idempotency(results):
+    """T6: rerunning the emitter over the SAME log+outfile must not double the row count, and the
+    second run's stdout must report dup= EXACTLY equal to the number of events already persisted by
+    the first run (tightened from a loose `> 0` — a stub could satisfy `> 0` by fabricating any
+    positive number; the exact count cannot be satisfied without actually having deduped)."""
+    main = results["main"]
+    rerun = results["main_rerun"]
+    if main["timed_out"] or rerun["timed_out"]:
+        _fail_missing("T6-idempotent-rowcount", rerun, "idempotent rerun")
+        _fail_missing("T6-idempotent-dup-reported", rerun, "idempotent rerun stdout")
+        return
+    rows_after_first = main["rowcount_after_first"]
+    rows_after_second = len(_read_rows(main["out"]))  # read AFTER the rerun completed
+    check(rows_after_first == rows_after_second, "T6-idempotent-rowcount",
+          "row count changed across a rerun over the same log+outfile: %d -> %d"
+          % (rows_after_first, rows_after_second))
+    m = OK_STDOUT_RE.match(rerun["stdout"].strip())
+    check(m is not None and int(m.group(3)) == rows_after_first, "T6-idempotent-dup-reported",
+          "rerun stdout must report dup=%d EXACTLY (the event count the first run persisted), got %r"
+          % (rows_after_first, rerun["stdout"]))
+
+
+def assert_t11_t12(results):
+    """T11: stdout contract. Success -> exactly one `OK rows=<int> util=<int> dup=<int> skip=<int>`
+    line. Missing/unreadable LOGFILE -> exactly one `ERR ...` line, rc still 0 (a telemetry reader
+    must never fail its caller). T12: rc of every emitter invocation is 0."""
+    main = results["main"]
+    if main["timed_out"]:
+        _fail_missing("T11-success-stdout-shape", main, "successful run stdout")
+    else:
+        lines = [ln for ln in main["stdout"].splitlines() if ln.strip()]
+        check(len(lines) == 1, "T11-success-stdout-single-line",
+              "successful run stdout must be exactly one line, got %d: %r" % (len(lines), main["stdout"]))
+        if lines:
+            check(re.fullmatch(r"OK rows=\d+ util=\d+ dup=\d+ skip=\d+", lines[0]) is not None,
+                  "T11-success-stdout-shape", "stdout does not match the OK contract: %r" % lines[0])
+
+    missing = results["missing"]
+    if missing["timed_out"]:
+        _fail_missing("T11-failure-stdout-shape", missing, "missing-logfile run stdout")
+    else:
+        lines = [ln for ln in missing["stdout"].splitlines() if ln.strip()]
+        check(len(lines) == 1 and lines[0].startswith("ERR "), "T11-failure-stdout-shape",
+              "missing-LOGFILE run stdout must be exactly one `ERR ...` line, got %r" % missing["stdout"])
+        check(missing["rc"] == 0, "T11-failure-rc-still-zero",
+              "a telemetry reader must never fail its caller even on a missing LOGFILE: rc=%r" % missing["rc"])
+
+    for label, rc in _ALL_RCS:
+        check(rc == 0, "T12-rc-zero-%s" % label,
+              "invocation %s did not return rc=0 (rc=%r) — an emitter must always exit 0" % (label, rc))
+
+
+# =================================================================================================
+# T16 — stdout counters CROSS-CHECKED against reality, never merely shape-matched.
+#
+# A red-team PROVED a stub printing a FIXED `OK rows=7777 util=8888 dup=<n> skip=0` on every call
+# passes T11's shape-only `re.fullmatch` check. Injecting a defect that incremented `skip` four
+# extra times left the whole suite green (skip=7 where 3 was right) before this existed — grep for
+# `skip` used to return exactly one assertion, a shape regex. These counters are the ONLY signal
+# `mr-native-tick.log` gets that distinguishes "reader alive, nothing new" (rows=0, a NORMAL steady
+# state per the contract) from "reader silently stopped persisting" — the multi-week loss (lp-12/
+# lp-13 blocked on one full reset cycle of this file) this whole slice exists to prevent.
+#
+# `skip`'s exact COMPOSITION is deliberately NOT recomputed from the fixtures — it includes
+# encode/finitize drops that are implementation-internal, and hand-recomputing it here would just be
+# a second, parallel, driftable copy of the implementation's own bookkeeping. Instead an ACCOUNTING
+# IDENTITY is checked: rows + dup + skip == the number of input lines in LOGFILE. No single counter
+# can be inflated or deflated without breaking that sum, which is what makes it robust rather than
+# guessable.
+# =================================================================================================
+def assert_t16_numeric_cross_check(results):
+    def _numbers(stdout):
+        m = OK_STDOUT_RE.match(stdout.strip())
+        if not m:
+            return None
+        return tuple(int(x) for x in m.groups())  # (rows, util, dup, skip)
+
+    # --- main corpus, first run: rows/util EXACT against reality; full accounting identity ---
+    main = results["main"]
+    if main["timed_out"]:
+        _fail_missing("T16-main-numbers", main, "main-corpus stdout counters")
+    else:
+        nums = _numbers(main["stdout"])
+        if check(nums is not None, "T16-main-stdout-parses",
+                 "could not parse OK-line counters out of %r" % main["stdout"]):
+            rows_c, util_c, dup_c, skip_c = nums
+            rows_real = main["rowcount_after_first"]
+            rows_final = _read_rows(main["out"])
+            util_real = sum(1 for r in rows_final if isinstance(r, dict) and r.get("utilization") is not None)
+            check(rows_c == rows_real, "T16-main-rows-exact",
+                  "stdout claimed rows=%d, OUTFILE actually gained %d line(s)" % (rows_c, rows_real))
+            check(util_c == util_real, "T16-main-util-exact",
+                  "stdout claimed util=%d, %d persisted row(s) actually carry non-null utilization"
+                  % (util_c, util_real))
+            total = main["input_line_count"]
+            check(rows_c + dup_c + skip_c == total, "T16-main-accounting-identity",
+                  "rows(%d)+dup(%d)+skip(%d)=%d != %d input lines in LOGFILE — claimed=%r"
+                  % (rows_c, dup_c, skip_c, rows_c + dup_c + skip_c, total, (rows_c, dup_c, skip_c)))
+
+    # --- main corpus, idempotent rerun: rows must be EXACTLY 0 (dup-exactness lives in T6) ---
+    rerun = results["main_rerun"]
+    if rerun["timed_out"]:
+        _fail_missing("T16-rerun-rows-zero", rerun, "idempotent rerun stdout counters")
+    else:
+        nums = _numbers(rerun["stdout"])
+        if check(nums is not None, "T16-rerun-stdout-parses",
+                 "could not parse OK-line counters out of %r" % rerun["stdout"]):
+            rows_c2, util_c2, dup_c2, skip_c2 = nums
+            check(rows_c2 == 0, "T16-rerun-rows-zero",
+                  "an idempotent rerun over an UNCHANGED log must claim rows=0, got rows=%d (claimed "
+                  "tuple rows/util/dup/skip=%r)" % (rows_c2, nums))
+            total2 = rerun["input_line_count"]
+            check(rows_c2 + dup_c2 + skip_c2 == total2, "T16-rerun-accounting-identity",
+                  "rows(%d)+dup(%d)+skip(%d)=%d != %d input lines in LOGFILE — claimed=%r"
+                  % (rows_c2, dup_c2, skip_c2, rows_c2 + dup_c2 + skip_c2, total2, nums))
+
+    # --- generated corpus (T14): independent evidence, a DIFFERENT corpus shape/size each run ---
+    gen = results.get("gen")
+    if gen is None:
+        check(False, "T16-gen-run-present", "no generated-corpus run result to cross-check")
+        return
+    if gen["timed_out"]:
+        _fail_missing("T16-gen-numbers", gen, "generated-corpus stdout counters")
+        return
+    nums = _numbers(gen["stdout"])
+    if not check(nums is not None, "T16-gen-stdout-parses",
+                 "could not parse OK-line counters out of %r" % gen["stdout"]):
+        return
+    rows_c, util_c, dup_c, skip_c = nums
+    gen_rows_final = _read_rows(gen["out"])
+    rows_real = len(gen_rows_final)  # gen_out is a fresh path — every persisted row was appended NOW
+    util_real = sum(1 for r in gen_rows_final if isinstance(r, dict) and r.get("utilization") is not None)
+    check(rows_c == rows_real, "T16-gen-rows-exact",
+          "stdout claimed rows=%d, OUTFILE actually gained %d line(s)" % (rows_c, rows_real))
+    check(util_c == util_real, "T16-gen-util-exact",
+          "stdout claimed util=%d, %d persisted row(s) actually carry non-null utilization"
+          % (util_c, util_real))
+    check(dup_c == 0, "T16-gen-dup-zero",
+          "a first run over a fresh OUTFILE must claim dup=0, got dup=%d" % dup_c)
+    total = gen["input_line_count"]
+    check(rows_c + dup_c + skip_c == total, "T16-gen-accounting-identity",
+          "rows(%d)+dup(%d)+skip(%d)=%d != %d input lines in LOGFILE — claimed=%r"
+          % (rows_c, dup_c, skip_c, rows_c + dup_c + skip_c, total, nums))
+
+
+# =================================================================================================
+# T14 — closes PROVEN CHEAT #1: a stub that dispatches purely on `os.path.basename(LOGFILE)` against
+# a hardcoded table of this file's fixture filenames, emitting pre-baked rows copied from the
+# fixture literals. It printed TELEMETRY-SELFTEST-OK. The corpus below is generated AT RUNTIME —
+# random uuids, a pid-derived utilization, a randomized resetsAt, a randomized filename — so no
+# lookup table built in advance can have an entry for it.
+# =================================================================================================
+def assert_t14_generated_corpus(results):
+    gen = results.get("gen")
+    if gen is None:
+        check(False, "T14-gen-run-present", "no generated-corpus run result")
+        return
+    if gen["timed_out"]:
+        _fail_missing("T14-gen-round-trip", gen, "generated-corpus round-trip")
+    else:
+        rows = _read_rows(gen["out"])
+        by_uuid = {r.get("uuid"): r for r in rows if isinstance(r, dict)}
+        for i, expected in enumerate(gen["rows"]):
+            u = expected["uuid"]
+            ri = expected["rate_limit_info"]
+            row = by_uuid.get(u)
+            if not check(row is not None, "T14-gen-row-%d-present" % i,
+                         "generated uuid %s missing from OUTFILE — a basename-dispatch stub has no "
+                         "entry for this run's randomized filename/content" % u):
+                continue
+            check(row.get("rateLimitType") == ri.get("rateLimitType"), "T14-gen-row-%d-rateLimitType" % i,
+                  "claimed=%r generated=%r" % (row.get("rateLimitType"), ri.get("rateLimitType")))
+            check(row.get("status") == ri.get("status"), "T14-gen-row-%d-status" % i,
+                  "claimed=%r generated=%r" % (row.get("status"), ri.get("status")))
+            check(row.get("resetsAt") == ri.get("resetsAt"), "T14-gen-row-%d-resetsAt" % i,
+                  "claimed=%r generated=%r" % (row.get("resetsAt"), ri.get("resetsAt")))
+            expected_util = ri.get("utilization")  # absent (None via .get) on the deliberate null row
+            check(row.get("utilization") == expected_util, "T14-gen-row-%d-utilization" % i,
+                  "claimed=%r generated=%r" % (row.get("utilization"), expected_util))
+
+    # --- byte-mutation half: proves CONTENT is parsed, not filename/uuid dispatch ---
+    mut = results.get("gen_mutated")
+    if mut is None:
+        check(False, "T14-mutation-run-present", "no byte-mutation run result")
+        return
+    if mut["timed_out"]:
+        _fail_missing("T14-mutation-reflects-content", mut, "byte-mutated-copy run")
+        return
+    mrows = _read_rows(mut["out"])
+    check(len(mrows) == 1, "T14-mutation-rowcount",
+          "expected exactly 1 row from the single-line mutated-copy log, got %d" % len(mrows))
+    if mrows:
+        row = mrows[0]
+        check(row.get("uuid") == mut["expected_uuid"], "T14-mutation-uuid",
+              "claimed=%r expected=%r" % (row.get("uuid"), mut["expected_uuid"]))
+        check(row.get("resetsAt") == mut["expected_resets_at"], "T14-mutation-resets-at-reflects-mutation",
+              "the mutated copy's resetsAt must reflect the +1 mutation: claimed=%r expected=%r — a "
+              "reader dispatching on filename/uuid instead of parsing content would return the OLD "
+              "(unmutated) value or nothing at all" % (row.get("resetsAt"), mut["expected_resets_at"]))
+
+
+# =================================================================================================
+# T15/T17/T18/T19/T20 — defect classes beyond "dropped row"/"utilization discarded", all from the
+# SAME 'edge' corpus (F9-F14 + a runtime-generated oversized line, never embedded). Every one of
+# these must be persisted-or-skipped WITHOUT a traceback, rc 0, and must not stop LATER lines in the
+# same log from being parsed — proven directly by F14 (T20) sitting immediately after the giant line.
+# =================================================================================================
+def assert_t15_t20_edge_cases(results):
+    run = results.get("edge")
+    if run is None:
+        check(False, "T15-edge-run-present", "no edge-corpus run result")
+        return
+    if run["timed_out"]:
+        for tid in ("T15", "T17", "T18", "T19", "T20"):
+            _fail_missing("%s-edge-corpus" % tid, run, "edge-corpus run")
+        return
+    rows = _read_rows(run["out"])
+
+    # T15 — duplicate uuid WITHIN one log (F9A/F9B, different bodies) -> persisted exactly ONCE.
+    dup_uuid = "f1-0000-0000-0000-000000000009"
+    dup_rows = [r for r in rows if isinstance(r, dict) and r.get("uuid") == dup_uuid]
+    check(len(dup_rows) == 1, "T15-duplicate-uuid-persisted-once",
+          "F9A/F9B share uuid=%s and must persist as exactly 1 row, got %d" % (dup_uuid, len(dup_rows)))
+
+    # T17 — utilization arrives as a STRING -> persisted VERBATIM (pinned: not coerced to float),
+    # and 0 <= float(x) <= 1 when coercible.
+    r10 = _by_uuid(rows, "f1-0000-0000-0000-000000000010")
+    if check(r10 is not None, "T17-string-utilization-present", "F10 row missing"):
+        u = r10.get("utilization")
+        check(isinstance(u, str) and u == "0.5", "T17-string-utilization-verbatim",
+              "F10's utilization must be persisted verbatim as the STRING \"0.5\" (pinned, not "
+              "coerced to a float), got %r (type %s)" % (u, type(u).__name__))
+        if isinstance(u, str):
+            try:
+                fu = float(u)
+                check(0 <= fu <= 1, "T17-string-utilization-coercible-range",
+                      "F10's utilization %r must be in [0,1] when coerced to float, got %r" % (u, fu))
+            except ValueError:
+                check(False, "T17-string-utilization-coercible-range",
+                      "F10's utilization %r is not coercible to float at all" % u)
+
+    # T18 — rate_limit_info is the wrong JSON type (list / string, not an object) -> skipped, no row.
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000011") is None, "T18-list-rate-limit-info-skipped",
+          "F11 (rate_limit_info is a LIST) must not produce a row")
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000012") is None, "T18-string-rate-limit-info-skipped",
+          "F12 (rate_limit_info is a STRING) must not produce a row")
+
+    # T19 — control char + non-ASCII inside a string field -> persisted as ONE valid standalone-JSON
+    # line (proves json.dumps was used end-to-end; hand-formatting is exactly what breaks on a
+    # literal control character, e.g. by splitting the row across two lines).
+    r13 = _by_uuid(rows, "f1-0000-0000-0000-000000000013")
+    check(r13 is not None, "T19-control-char-row-present",
+          "F13 (control char + non-ASCII) must be persisted — it is a well-formed rate_limit_event")
+    if r13 is not None:
+        raw_hits = []
+        for ln in _read_raw_lines(run["out"]):
+            if not ln.strip():
+                continue
+            try:
+                d = json.loads(ln)
+            except Exception:
+                continue
+            if isinstance(d, dict) and d.get("uuid") == "f1-0000-0000-0000-000000000013":
+                raw_hits.append(ln)
+        check(len(raw_hits) == 1, "T19-control-char-single-line",
+              "F13's row must be exactly ONE raw line in OUTFILE; found %d — a hand-formatted writer "
+              "is exactly what would split it across lines on the embedded control character"
+              % len(raw_hits))
+
+    # T20 — a giant (~2 MiB) oversized line -> skipped (no row), and the NEXT valid event (F14) is
+    # still persisted — proves the oversized-line skip does not corrupt/abort the rest of the read.
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000099") is None, "T20-oversized-line-skipped",
+          "the runtime-generated ~2 MiB oversized line must not produce a row")
+    check(_by_uuid(rows, "f1-0000-0000-0000-000000000014") is not None, "T20-following-event-persisted",
+          "F14, the valid event immediately AFTER the oversized line, must still be persisted")
+
+
+# =================================================================================================
+# Shared PYRL-block locator — BY CONTENT MARKER, modeled on mr-selfcheck's A4/A8 pattern: locate
+# `<<'PYRL'` by content, find the line that is exactly `PYRL`. Returns (open_start, block_end, body)
+# byte offsets into `src`, or (None, None, None) if either marker is missing — callers FAIL LOUDLY
+# on that rather than silently skip (a silently-skipped extraction is a false green). Shared by T3
+# (which EXECUTES the body) and T13 (which asserts nothing else in the file writes the arming output
+# from OUTSIDE this exact byte range) so the two can never disagree about where the block is.
+# =================================================================================================
+def _locate_pyrl_block(tick_src):
+    # The character class in place of a bare `'` keeps THIS line from matching mr-selfcheck's own
+    # heredoc-opener scanner (`^…python3…<<-?'TAG'…$`), which would otherwise read this file as
+    # opening an unterminated PYRL heredoc and RED py-heredoc-coverage. `[']PYRL[']` matches the
+    # exact same literal text in mr-native-tick.sh (`<<'PYRL'`) — semantics unchanged.
+    open_m = re.search(r"^[^\n]*python3[^\n]*<<[']PYRL['][^\n]*$", tick_src, re.M)
+    if open_m is None:
+        return None, None, None
+    tail_start = open_m.end() + 1
+    close_m = re.search(r"^PYRL\s*$", tick_src[tail_start:], re.M)
+    if close_m is None:
+        return None, None, None
+    body = tick_src[tail_start:tail_start + close_m.start()]
+    block_end = tail_start + close_m.end()
+    return open_m.start(), block_end, body
+
+
+# =================================================================================================
+# T3 — behavioural arming pin (EARS-3, defect c).
+# =================================================================================================
+def assert_t3_arming_pin():
+    if not os.path.isfile(TICK):
+        check(False, "T3-arming-tick-not-found", "mr-native-tick.sh not found at %s" % TICK)
+        return
+    with open(TICK, errors="replace") as f:
+        tick_src = f.read()
+
+    open_start, block_end, body = _locate_pyrl_block(tick_src)
+    if not check(open_start is not None, "T3-arming-extraction-open",
+                 "could not locate the `<<'PYRL'` opener by content — extraction has rotted"):
+        return
+    if not check(block_end is not None, "T3-arming-extraction-close",
+                 "could not locate the closing `PYRL` marker line by content — extraction has rotted"):
+        return
+    check(len(body.strip()) > 0, "T3-arming-extraction-nonempty", "extracted PYRL body is empty")
+
+    with tempfile.TemporaryDirectory() as gx:
+        script = os.path.join(gx, "extracted_pyrl.py")
+        with open(script, "w") as f:
+            f.write(body)
+
+        def _mkstate(name):
+            p = os.path.join(gx, name)
+            with open(p, "w") as f:
+                json.dump({"foo": "bar"}, f)
+            return p
+
+        # (i) F1+F2 only (allowed_warning; no "rejected" substring anywhere) -> NONE, state untouched.
+        tlog_i = os.path.join(gx, "tlog_none.log")
+        with open(tlog_i, "w") as f:
+            f.write(_corpus_body([F1, F2]))
+        state_i = _mkstate("state_none.json")
+        with open(state_i, "rb") as f:
+            state_i_before = f.read()
+        rc, out, err, to = _safe_run([sys.executable or "/usr/bin/python3", script, tlog_i, state_i],
+                                      timeout=10)
+        check(not to, "T3-arming-none-not-timed-out", "extracted PYRL script timed out")
+        check(rc == 0, "T3-arming-none-rc", "extracted PYRL script rc=%r stderr=%r" % (rc, err))
+        check(out.strip() == "NONE", "T3-arming-none-stdout",
+              "a log with only allowed_warning rows must arm nothing — a WIDENED arming predicate "
+              "REDs here: got %r" % out.strip())
+        with open(state_i, "rb") as f:
+            state_i_after = f.read()
+        check(state_i_before == state_i_after, "T3-arming-none-state-untouched",
+              "state file must be byte-identical when nothing arms")
+
+        # (ii) a rejected row with resetsAt = now+3600 -> ARMED
+        future = int(time.time()) + 3600
+        tlog_ii = os.path.join(gx, "tlog_armed.log")
+        with open(tlog_ii, "w") as f:
+            f.write('{"type":"rate_limit_event","rate_limit_info":{"status":"rejected",'
+                    '"resetsAt":%d,"rateLimitType":"five_hour"},"uuid":"t3-ii","session_id":"s1"}\n'
+                    % future)
+        state_ii = _mkstate("state_armed.json")
+        rc2, out2, err2, to2 = _safe_run(
+            [sys.executable or "/usr/bin/python3", script, tlog_ii, state_ii], timeout=10)
+        check(not to2, "T3-arming-armed-not-timed-out", "extracted PYRL script timed out")
+        check(out2.strip().startswith("ARMED"), "T3-arming-armed-stdout",
+              "a future-resetsAt rejected row must arm — a NARROWED arming predicate REDs here: "
+              "got %r" % out2.strip())
+
+        # (iii) a rejected row with resetsAt in the past -> SKIPPED past(
+        past = int(time.time()) - 3600
+        tlog_iii = os.path.join(gx, "tlog_past.log")
+        with open(tlog_iii, "w") as f:
+            f.write('{"type":"rate_limit_event","rate_limit_info":{"status":"rejected",'
+                    '"resetsAt":%d,"rateLimitType":"five_hour"},"uuid":"t3-iii","session_id":"s1"}\n'
+                    % past)
+        state_iii = _mkstate("state_past.json")
+        rc3, out3, err3, to3 = _safe_run(
+            [sys.executable or "/usr/bin/python3", script, tlog_iii, state_iii], timeout=10)
+        check(not to3, "T3-arming-past-not-timed-out", "extracted PYRL script timed out")
+        check(out3.strip().startswith("SKIPPED past("), "T3-arming-past-stdout",
+              "a past-resetsAt rejected row must be skipped as past, got %r" % out3.strip())
+
+
+# =================================================================================================
+# T13 — single-assignment-site scan (EARS-3, the STRONGEST tooth here). A red-team PROVED that T3
+# (executes the real PYRL body) and T9 (pins the two telemetry call sites) can BOTH stay green while
+# a SECOND, unreviewed arming path writes `rate_limit_resets_at`/`rate_limit_armed_by` from OUTSIDE
+# the PYRL block — e.g. `python3 -c "..."` appended after a real call site. Neither T3 nor T9 is
+# positioned to see that: T3 only ever executes the block it already found; T9 only looks at
+# `mr-cost-watch telemetry` call shape, not at who else writes to mr-state.json.
+#
+# This scans the WHOLE FILE, in two layers:
+#   1. COMMENT LINES ARE SKIPPED OUTRIGHT (first non-whitespace char is `#`) — they cannot be code.
+#      Same reasoning already load-bearing in mr-selfcheck's own heredoc scanner (`_openers` there
+#      excludes `#`-prefixed lines for the identical reason: THIS FILE documents a heredoc opener
+#      inside a comment, at T3's own `_locate_pyrl_block`, and counting prose as an opener produced
+#      a pure false positive there). Prose that merely MENTIONS a field name in English ("gate 2
+#      reads rate_limit_resets_at as data") is exactly the false-positive class comment-skipping
+#      closes, and it is the one a first version of T13 actually hit.
+#   2. Only an ASSIGNMENT SHAPE counts as a write — `d["rate_limit_resets_at"] = iso` /
+#      `d["rate_limit_armed_by"] = "wrapper"` (key, closing quote, closing bracket, optional space,
+#      `=` NOT followed by a second `=`). Gate 2's legitimate READ (`d.get("rate_limit_resets_at")`)
+#      has a `)` where the write shape needs `]=`, so it is excluded BY SHAPE, not by an allowlist —
+#      there is nothing to keep in sync if gate 2's exact spacing changes.
+# `rate_limit_armed_by` is write-only everywhere in this file (nothing reads it back) and is scanned
+# the same way. Both fields must resolve to EXACTLY ONE write, and that write must fall inside the
+# PYRL block's byte range, reusing `_locate_pyrl_block`'s own offsets so T3 and T13 can never
+# disagree about where the block is. Zero writes found is loud failure, never silent green — this
+# corpus's standing doctrine (mr-selfcheck's own coverage/vacuity assertions) is that a scanner
+# matching nothing must never be mistaken for "nothing to fix".
+# =================================================================================================
+WRITE_RESETS_AT_RE = re.compile(r"""rate_limit_resets_at['"]\]\s*=(?!=)""")
+WRITE_ARMED_BY_RE = re.compile(r"""rate_limit_armed_by['"]\]\s*=(?!=)""")
+# Sanity/drift guard only (not used to exclude anything from the write count above — exclusion is by
+# shape, not by allowlist): confirms gate 2's known-legitimate read is still present in the file, so
+# a T13 that never fires isn't quietly scanning a file where the read line itself has vanished.
+READ_RESETS_AT_RE = re.compile(r"""\.get\(\s*['"]rate_limit_resets_at['"]""")
+
+
+def assert_t13_single_arming_site():
+    if not os.path.isfile(TICK):
+        check(False, "T13-tick-not-found", "mr-native-tick.sh not found at %s" % TICK)
+        return
+    with open(TICK, errors="replace") as f:
+        src = f.read()
+    start, end, _body = _locate_pyrl_block(src)
+    if not check(start is not None and end is not None, "T13-pyrl-block-located",
+                 "could not locate the PYRL block by content — cannot bound the single arming site"):
+        return
+
+    src_lines = src.splitlines()
+
+    def _line_no(idx):
+        return src.count("\n", 0, idx) + 1
+
+    def _line_text(idx):
+        return src_lines[_line_no(idx) - 1].strip()[:160]
+
+    def _is_comment_line(idx):
+        return src_lines[_line_no(idx) - 1].lstrip().startswith("#")
+
+    def _writes(pattern, field_label):
+        hits = [m for m in pattern.finditer(src) if not _is_comment_line(m.start())]
+        check(len(hits) == 1, "T13-%s-single-write" % field_label,
+              "assignment of `%s` must occur from EXACTLY ONE place, found %d at line(s) %s"
+              % (field_label, len(hits), [_line_no(m.start()) for m in hits]))
+        for m in hits:
+            check(start <= m.start() < end, "T13-%s-write-inside-pyrl" % field_label,
+                  "`%s` write outside the PYRL block, line %d: %s"
+                  % (field_label, _line_no(m.start()), _line_text(m.start())))
+        return hits
+
+    _writes(WRITE_ARMED_BY_RE, "rate_limit_armed_by")
+    _writes(WRITE_RESETS_AT_RE, "rate_limit_resets_at")
+
+    read_hits = [m for m in READ_RESETS_AT_RE.finditer(src) if not _is_comment_line(m.start())]
+    check(len(read_hits) >= 1, "T13-resets-at-read-detected",
+          "expected to find gate 2's `.get(\"rate_limit_resets_at\")` read; found 0 — either it was "
+          "removed or its shape drifted, and this scan's exclusion-by-shape is unverified without it")
+
+
+# =================================================================================================
+# T9 — static call-site pins over mr-native-tick.sh, by CONTENT never by line number.
+#
+# A red-team PROVED two bypasses of the original (text-match-only) version of this check:
+#  (i)  commenting out the live-standdown call and wrapping the tick-post-spawn call in
+#       `if false; then … fi` kept T9 green with BOTH call sites dead in production;
+#  (ii) appending `; python3 -c "…"` after a real call site kept T9 green with a second,
+#       unreviewed statement riding on the same line.
+# Tightenings (a)/(b)/(c) below close both. (a) rejects `;`/multi-`&&`/`||` chaining after the
+# call — closes (ii). (b) rejects a call inside a disabled `if false`-ish or `: <<TAG` block, or on
+# a `#`-comment line — closes (i). (c) pins the LOGFILE argument per gate (different sources ON
+# PURPOSE: at the gate-1 standdown point $TLOG does not exist yet, so live-standdown must read a
+# `/tmp/mr_pass_` path while tick-post-spawn must read `"$TLOG"`), which independently makes a
+# swapped/wrong-argument call site fail even if (a)+(b) somehow didn't catch it.
+# =================================================================================================
+CALL_RE = re.compile(r'"\$MEM/mr-cost-watch"\s+telemetry\s+("[^"]*")\s+([A-Za-z0-9_-]+)')
+
+_IF_OPEN_RE = re.compile(r"^\s*if\s+(.*)$")
+_IF_FALSE_COND_RE = re.compile(r"^\s*(false\b|\[\s*0\s*-eq\s*1\s*\]|\[\[\s*0\s*-eq\s*1\s*\]\])")
+_BARE_FI_RE = re.compile(r"^\s*fi\b")
+_SELF_CLOSING_IF_RE = re.compile(r"\bfi\s*$")
+_COLON_HEREDOC_OPEN_RE = re.compile(r"^\s*:\s*<<-?\s*['\"]?([A-Za-z0-9_]+)['\"]?\s*$")
+
+
+def _call_site_disabled(src_lines, line_idx):
+    """T9(b). Upward scan from the call site's line for an unclosed `if false`-ish opener or an
+    unclosed `: <<TAG` block-comment opener, or a leading-`#` comment on the call's own line.
+    HONEST LIMITATION (documented, not hidden): only the INNERMOST unclosed `if` is checked — a call
+    nested two-plus levels inside a disabled OUTER `if` with a live inner `if` between it and the
+    call would not be caught — and heredoc-comment detection assumes `: <<TAG` blocks are not
+    nested. Both are accepted trade-offs for a real-shell-parser-free check; good enough to catch
+    the PROVEN attack shape (a flat `if false; then … fi` or `: <<'X' … X` wrapped directly around a
+    real call site). Self-contained one-liners (`if …; then …; fi` all on one line — this file's own
+    dominant style, e.g. the gate-1 STANDDOWN line) are explicitly skipped as SIBLINGS, never
+    ancestors, or every earlier one-liner in the file would be misread as still open."""
+    if re.match(r"^\s*#", src_lines[line_idx]):
+        return True, "the call-site line itself is a comment"
+    fi_skip = 0
+    for i in range(line_idx - 1, -1, -1):
+        ln = src_lines[i]
+        if _BARE_FI_RE.match(ln):
+            fi_skip += 1
+            continue
+        m_if = _IF_OPEN_RE.match(ln)
+        if m_if:
+            if _SELF_CLOSING_IF_RE.search(ln):
+                continue  # one-liner if/fi on one line — a sibling, not an ancestor
+            if fi_skip > 0:
+                fi_skip -= 1
+                continue
+            if _IF_FALSE_COND_RE.match(m_if.group(1)):
+                return True, "inside a disabled `if %s` opened at line %d" % (m_if.group(1).strip()[:60], i + 1)
+            return False, None  # innermost open if is LIVE
+        m_colon = _COLON_HEREDOC_OPEN_RE.match(ln)
+        if m_colon:
+            tag = m_colon.group(1)
+            closer = re.compile(r"^%s\s*$" % re.escape(tag))
+            if not any(closer.match(src_lines[j]) for j in range(i + 1, line_idx)):
+                return True, "inside a `: <<%s` block-comment opened at line %d" % (tag, i + 1)
+            return False, None
+    return False, None
+
+
+def _call_site_not_whole_statement(tail_of_line):
+    """T9(a). `tail_of_line` is everything on the source line AFTER the matched call. Rejects any
+    `;` (a second statement chained on) and any `&&`/`||` chain that does not resolve to a bare
+    `true` or an empty-string variable assignment (`VAR=`) — the two shapes this corpus uses
+    elsewhere for "never let this call fail the tick". Returns a reason string, or None if OK."""
+    if ";" in tail_of_line:
+        return "line contains `;` after the call (a second statement is chained on)"
+    ops = re.findall(r"&&|\|\|", tail_of_line)
+    if len(ops) > 1:
+        return "line contains more than one &&/|| chain after the call"
+    if len(ops) == 1:
+        idx = max(tail_of_line.rfind("&&"), tail_of_line.rfind("||"))
+        trailing = tail_of_line[idx + 2:].split("#", 1)[0].strip()
+        if trailing != "true" and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=", trailing):
+            return "chain after the call resolves to %r, not a bare `true`/empty-string assignment" % trailing
+    return None
+
+
+def assert_t9_call_sites():
+    if not os.path.isfile(TICK):
+        check(False, "T9-tick-not-found", "mr-native-tick.sh not found at %s" % TICK)
+        return
+    with open(TICK, errors="replace") as f:
+        src = f.read()
+    src_lines = src.split("\n")
+
+    matches = list(CALL_RE.finditer(src))
+    check(len(matches) == 2, "T9-exactly-two-call-sites",
+          "expected exactly 2 `mr-cost-watch telemetry` call-sites, found %d" % len(matches))
+
+    bad_gates = [m.group(2) for m in matches if m.group(2) not in CLOSED_GATES]
+    check(not bad_gates, "T9-closed-gate-vocabulary",
+          "GATE literal(s) outside {live-standdown, tick-post-spawn}: %s" % bad_gates)
+
+    # (a) + (b): every match must be a live, whole, uncommented statement.
+    for m in matches:
+        line_idx = src.count("\n", 0, m.start())
+        line_start = src.rfind("\n", 0, m.start()) + 1
+        line_end = src.find("\n", m.end())
+        if line_end == -1:
+            line_end = len(src)
+        tail = src[m.end():line_end]
+        reason_a = _call_site_not_whole_statement(tail)
+        check(reason_a is None, "T9-call-whole-statement",
+              "gate=%s at line %d is not a whole statement: %s — full line: %s"
+              % (m.group(2), line_idx + 1, reason_a, src[line_start:line_end].strip()[:200]))
+        disabled, reason_b = _call_site_disabled(src_lines, line_idx)
+        check(not disabled, "T9-call-not-disabled",
+              "gate=%s at line %d is unreachable: %s — full line: %s"
+              % (m.group(2), line_idx + 1, reason_b, src_lines[line_idx].strip()[:200]))
+
+    rc_idx = src.find('if [ "$RC" -eq 0 ]')
+    pyrl_open_m = re.search(r"<<'PYRL'", src)
+    pyrl_idx = pyrl_open_m.start() if pyrl_open_m else None
+    standdown_idx = src.find("STANDDOWN live-chain")
+
+    tick_post_spawn = [m for m in matches if m.group(2) == "tick-post-spawn"]
+    if check(len(tick_post_spawn) >= 1, "T9-tick-post-spawn-present",
+             "no `tick-post-spawn` telemetry call-site found"):
+        m = tick_post_spawn[0]
+        check(rc_idx != -1 and m.start() < rc_idx, "T9-tick-post-spawn-before-rc-check",
+              "the tick-post-spawn call must appear before `if [ \"$RC\" -eq 0 ]`")
+        check(pyrl_idx is not None and m.start() < pyrl_idx, "T9-tick-post-spawn-before-pyrl",
+              "the tick-post-spawn call must appear before the `<<'PYRL'` opener")
+        # (c): tick-post-spawn's LOGFILE must be "$TLOG" — $TLOG is what exists at that point.
+        check(m.group(1) == '"$TLOG"', "T9-tick-post-spawn-logfile-arg",
+              "tick-post-spawn's LOGFILE argument must be exactly \"$TLOG\", got %s" % m.group(1))
+
+    live_standdown = [m for m in matches if m.group(2) == "live-standdown"]
+    if check(len(live_standdown) >= 1, "T9-live-standdown-present",
+             "no `live-standdown` telemetry call-site found"):
+        m = live_standdown[0]
+        check(standdown_idx != -1 and m.start() < standdown_idx, "T9-live-standdown-before-standdown-log",
+              "the live-standdown call must appear before the `STANDDOWN live-chain` log line")
+        # (c): live-standdown's LOGFILE must be a /tmp/mr_pass_ path — $TLOG does not exist yet here.
+        check(m.group(1).startswith('"/tmp/mr_pass_'), "T9-live-standdown-logfile-arg",
+              "live-standdown's LOGFILE argument must be a \"/tmp/mr_pass_...\" path, got %s" % m.group(1))
+
+
+# =================================================================================================
+# T10 — production non-pollution. Snapshot (exists, size, sha256) of mr-state.json and
+# mr-rate-limit-telemetry.jsonl BEFORE the whole run and compare AFTER. Any change is a FAIL.
+#
+# BLIND SPOT FIX: the `MEM=` assignment near the top of mr-cost-watch hardcodes
+# `/home/.../claude-harness/memory/projects` — the PRODUCTION absolute path — regardless of which
+# copy of the SCRIPT is invoked (deliberately not cited by line number: it already rotted once as
+# the file grew a header). A buggy
+# implementation can therefore write to the production files while this suite's self-located
+# `STATE_JSON`/`TELEMETRY_JSONL` (this worktree's copies) stay untouched, a false green on exactly
+# the property T10 exists to catch. Both the self-located AND the hardcoded-production pair are
+# snapshotted below. Read-only: never written by this file, even when the two happen to coincide
+# (running this suite from a non-worktree checkout).
+# =================================================================================================
+def _snapshot(path):
+    if not os.path.exists(path):
+        return (False, None, None)
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        return (True, len(data), hashlib.sha256(data).hexdigest())
+    except OSError:
+        return (True, None, None)
+
+
+# =================================================================================================
+# Main
+# =================================================================================================
+def selftest():
+    before_state = _snapshot(STATE_JSON)
+    before_telem = _snapshot(TELEMETRY_JSONL)
+    before_prod_state = _snapshot(PROD_STATE_JSON)
+    before_prod_telem = _snapshot(PROD_TELEMETRY_JSONL)
+
+    assert_t3_arming_pin()
+    assert_t13_single_arming_site()
+    assert_t9_call_sites()
+
+    with tempfile.TemporaryDirectory(prefix="mr-telemetry-selftest-") as tmp:
+        results = run_invocation_battery(tmp)
+        assert_t1_t2_t5_on_main(results)
+        assert_t5_source_variants(results)
+        assert_t4_vacuity(results)
+        assert_t7_negative_control(results)
+        assert_t6_idempotency(results)
+        assert_t11_t12(results)
+        assert_t16_numeric_cross_check(results)
+        assert_t14_generated_corpus(results)
+        assert_t15_t20_edge_cases(results)
+
+    # Best-effort, narrowly-scoped cleanup of the ONE deterministically-named lock dir this file's
+    # own invocations can create (see the COLLATERAL NOTE). Never a wildcard delete.
+    try:
+        import shutil
+        stray = "/tmp/mr_costwatch_telemetry.lock.d"
+        if os.path.isdir(stray):
+            shutil.rmtree(stray, ignore_errors=True)
+    except Exception:
+        pass
+
+    after_state = _snapshot(STATE_JSON)
+    after_telem = _snapshot(TELEMETRY_JSONL)
+    after_prod_state = _snapshot(PROD_STATE_JSON)
+    after_prod_telem = _snapshot(PROD_TELEMETRY_JSONL)
+    check(before_state == after_state, "T10-no-mr-state-json-pollution",
+          "mr-state.json (self-located) changed across the run: before=%s after=%s" % (before_state, after_state))
+    check(before_telem == after_telem, "T10-no-telemetry-jsonl-pollution",
+          "mr-rate-limit-telemetry.jsonl (self-located) changed across the run: before=%s after=%s"
+          % (before_telem, after_telem))
+    check(before_prod_state == after_prod_state, "T10-no-prod-mr-state-json-pollution",
+          "mr-state.json (hardcoded PRODUCTION path %s) changed across the run: before=%s after=%s"
+          % (PROD_STATE_JSON, before_prod_state, after_prod_state))
+    check(before_prod_telem == after_prod_telem, "T10-no-prod-telemetry-jsonl-pollution",
+          "mr-rate-limit-telemetry.jsonl (hardcoded PRODUCTION path %s) changed across the run: "
+          "before=%s after=%s" % (PROD_TELEMETRY_JSONL, before_prod_telem, after_prod_telem))
+
+    if _FAILURES:
+        for id_, detail in _FAILURES:
+            line = "TELEMETRY-SELFTEST-FAIL %s" % id_
+            if detail:
+                line += ": %s" % detail
+            print(line)
+        return 1
+    print("TELEMETRY-SELFTEST-OK %d fixtures / %d assertions" % (len(FIXTURES), _ASSERTIONS))
+    return 0
+
+
+if __name__ == "__main__":
+    # Bare invocation and `--selftest` are identical — there is nothing else this tool does.
+    sys.exit(selftest())

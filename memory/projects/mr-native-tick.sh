@@ -278,6 +278,28 @@ for LK in /tmp/mr_pass_*.vars.json; do
   [ "$RLAGE" -ge 0 ] && [ "$RLAGE" -lt 600 ] \
     && log "ORPHAN-RUN $LS: live pass-log but no lock (mr-spawn died between launch and lock?) — verify by hand"
 done
+# lp-01 RATE-LIMIT TELEMETRY, site (a) — LIVE-STANDDOWN sampler. It sits HERE, above the gate-1
+# standdown exit on the next line, on purpose: during a long slice most ticks stand down before they
+# ever spawn, so a tick-log-only reader samples nothing at exactly the times budget is burning. Each
+# live slice's own pass log is the only place its rate_limit_event rows appear. Non-fatal by
+# construction: mr-cost-watch telemetry always exits 0 and prints one line, so nothing here can
+# fail the tick. The gate-0 flock serializes the TICK's two sample sites against each other, but it
+# says nothing about the telemetry FILE — the tool is also runnable by hand and by any future
+# caller, so the file's single-writer property is enforced by mr-cost-watch's own exclusive flock on
+# OUTFILE, not by this lock.
+NLIVE=$(echo "$LIVE_BARE" | wc -w)
+for LS in $LIVE_BARE; do
+  TEL=$("$MEM/mr-cost-watch" telemetry "/tmp/mr_pass_$LS.log" live-standdown "$NLIVE" 2>/dev/null)
+  # SILENT IN THE STEADY STATE. This site fires once per live slice on EVERY tick, and the
+  # supervisor reads `tail -5` of this log first (mr-supervisor-prompt-native.md:66). This exact
+  # file already paid for that lesson once — see :252-256, where 3 of those 5 lines were watcher
+  # spam. Only `OK rows=0 ...` is suppressed: anything else (new rows, any ERR, or no output at
+  # all) is by definition news and is always logged.
+  case "$TEL" in
+    "OK rows=0 "*) : ;;
+    *) log "RATE-LIMIT-TELEMETRY slice=$LS ${TEL:-no-output}" ;;
+  esac
+done
 if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ] && [ -z "$PENDING" ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
 
 # gate 2: rate-limit reset-time from mr-state.json
@@ -405,6 +427,22 @@ CEN2=$(grep -c '"name":"Skill"' "$TLOG" 2>/dev/null); CEN2=${CEN2:-0}
 # 2026-08-01T08:00Z: CI-rerun watch never fired, mr-state.json left asserting a stale RED).
 CEN3=$(grep -c '"name":"Monitor"' "$TLOG" 2>/dev/null); CEN3=${CEN3:-0}
 [ -n "$CEN$CEN2$CEN3" ] && log "CENSUS rid=$RID agents: ${CEN:-none} skills=$CEN2 monitor=$CEN3"
+
+# lp-01 RATE-LIMIT TELEMETRY, site (b) — POST-SPAWN sampler. Deliberately OUTSIDE the `if [ "$RC" ...
+# branch below so it samples on success AND on failure: a rate-limited tick is precisely the one
+# whose rate_limit_event rows matter most, and that tick fails. It reads $TLOG only; it must not
+# touch the arming path further down (the ARMED/PYRL block owns mr-state.json and its trip
+# conditions are unchanged by this slice). RC is captured above and consumed below — nothing here
+# may disturb it, so the call's rc is swallowed into a command substitution and never tested.
+# slices_running_at_sample on these rows is the GATE-1 count (:290), taken before the spawn, so on
+# a long tick it can be up to `timeout 5400` = 90 minutes older than the row's `ts`. Read it as
+# "slices live when this tick started", which is also the more useful number: the spawn spanned that
+# whole window. Recomputing here is NOT one line — it means a second copy of gate 1's liveness
+# predicate (a python read of each lock's session_leader plus a kill -0), and a duplicated predicate
+# that can drift from the original is a worse defect than a documented-stale column.
+# Unconditional, unlike site (a): this fires only on ticks that actually spawned.
+TEL=$("$MEM/mr-cost-watch" telemetry "$TLOG" tick-post-spawn "${NLIVE:-0}" 2>/dev/null)
+log "RATE-LIMIT-TELEMETRY rid=$RID ${TEL:-no-output}"
 
 if [ "$RC" -eq 0 ]; then
   date -u +%s > "$MEM/.native-supervisor-last-success"
