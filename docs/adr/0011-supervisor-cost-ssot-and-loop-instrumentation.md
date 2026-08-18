@@ -236,3 +236,104 @@ is worse than no scanner, so pattern drift now fails loudly.
 Both gates were verified to bite by injecting a real `SyntaxError` into `mr-record` and into
 `mr-situation`'s `budget()` and confirming `SELFCHECK-FAIL`. Hand-running the selftest is not the
 gate; the daily tick invocation is.
+
+## Amendment 2026-08-18 (lp-02) — quality columns, a closed CI vocabulary, and their query script
+
+This ADR already owns the ledger's invariants ("`cost_usd` may be negative. Any new ledger
+consumer must handle signed rows"), so lp-02 extends it here rather than opening a number.
+**No standalone ADR number was reserved by the supervisor for this slice**, and self-assigning one
+risks colliding with a concurrent sibling; a number for D1/D4 below is requested in the PR.
+
+**Measured problem.** 749 rows carry **259 distinct keys**, 157 of them appearing exactly once and
+dozens baking a milestone id into the key name — schema *collapse*, not richness. Two columns were
+unusable as written: `master_ci_after` was empty on **498/749 (66.5%)** and the populated values
+spanned at least six vocabularies plus sha-suffixed and prose variants; `remote_red_fix_cycles`
+summed **27 over all rows with its last nonzero value dated 2026-07-20**. And nothing recorded a
+**size denominator**, so no cost-per-slice or planning-accuracy claim was normalisable.
+
+**D1 — derive at the first close, replay from the ledger.** A closing row (`MERGED` / `FINISHED` /
+`CRASHED` / `PARKED`; never `SUPERVISOR`, never `CORRECTION*`) now carries `files_changed`,
+`prod_lines_added`, `prod_lines_deleted`, `test_lines_added`, `ears_criteria_count`,
+`skills_invoked` and `quality_source`. Non-closing rows omit them entirely — emitting six nulls on
+every `tick-ok` row would amplify the very collapse this measures and would destroy the reader's
+row-selection rule.
+
+`mr-record` is the writer, because the row that closes a slice is `MERGED` and that is written by
+the supervisor LLM, not by the tick. Measurement lives in `mr-slice-quality` (a helper with a real
+fixture battery) rather than inline, because `mr-record` is a bash wrapper around one python
+heredoc with no `--selftest` — the `mr-cost-sum` delegation this ADR introduced is the precedent.
+The worktree is deleted **before** the `MERGED` row is written
+(`mr-supervisor-prompt-native.md:125` precedes `:127`), so a later closing row **replays from the
+ledger** — the durable append-only SSOT. A `/tmp` sidecar was designed and rejected: slice ids are
+reused across park→relaunch and 86 of 220 slices carry ≥2 closing rows, so a name-keyed sidecar
+replays a *previous run's* numbers under the label that is supposed to certify provenance.
+
+This is not the "later reconciliation" the slice's own spec forbids. What is banned is a backfill
+pass over historical rows, which this ADR already forbids; derivation happens at the moment the
+closing row is written, from live ground truth, at the earliest mechanically-possible point.
+
+**Honesty over convenience.** An unmeasurable slice is `null`, never `0`. `git -C` on a removed
+worktree walks **up** into the enclosing repo and answers rc 0 with an empty diff — `isdir` plus a
+returncode check both pass and yield a confident, fabricated `files_changed=0`, and that is the
+*normal* post-merge state. Only an identity assertion (`rev-parse --show-toplevel` == the resolved
+worktree path) catches it. A dirty worktree yields `partial` with null diff columns, because
+`CRASHED`/`PARKED` rows are precisely the uncommitted-WIP case. There are deliberately **no**
+per-column flags: derivation-only makes the denominator unfakeable by prompt.
+
+**D4 — `master_ci_after` takes a closed vocabulary: `green | red | pending | not-applicable |
+not-recorded | unknown`.** Normalise, never reject: this writer's contract is that a row is never
+lost, so `die()` on an unmappable value would trade a data-*quality* problem for a data-*loss* one.
+Matching scans the **whole** string, never the head token — a head-token rule was measured to map
+**21 real rows to `green`**, headed by `GREEN (CI wf); Nightly RED (mutation job, …)`, because
+compound verdicts are how reds actually get written here. A red token anywhere wins; then a hedge
+token (`unverified`, `flaked`, `cancelled`, `expected`, …) yields `unknown`, since an unverified or
+cancelled claim is not a verdict; then two verdict families yield `unknown` rather than collapsing.
+The tick's two reconcile writes now pass `--ci not-applicable` — they are pre-merge rows, so
+"master CI after this slice" is not yet a defined property — which converts most of the measured
+empty mass into a truthful value going forward. An absent `--ci` on a closing row is
+`not-recorded`; on a non-closing row it stays `""`, so the ~400 existing `tick-ok` rows do not churn.
+
+`remote_red_fix_cycles` is marked **DEPRECATED** in `mr-record`'s usage header and stays accepted
+forever: the ledger is append-only and a past reader must never break.
+
+**Bounding a cron-critical path.** `mr-record` runs inside the tick's reconcile, which sits *after*
+both liveness heartbeats are refreshed and ~180 lines *before* the flock — so an unbounded stall
+there leaves the loop looking alive while nothing progresses, the "~2 days undetected" failure this
+corpus has already recorded once. The helper is therefore invoked with a 20s timeout and killed by
+**process group** (killing only the direct child orphans a `git` grandchild, once per tick,
+forever); the row is assembled and appended independently of derivation, so no derivation defect
+can become a row-loss defect; and the two tick call sites plus the daily `mr-selfcheck` invocation
+are now wrapped in `timeout 60` / `timeout 300`.
+
+## Confirmation (lp-02 amendment)
+
+`memory/projects/mr-selfcheck` gates `memory/projects/mr-slice-quality --selftest` (**640
+assertions**) and additionally carries an `lp02-*` **behavioural block** that builds two real
+`git init` fixture repos and drives the **real `mr-record`** against a redirected ledger, asserting
+the exact six values on the appended row.
+
+The behavioural block exists because it is the only thing in the repo that observes `mr-record`'s
+output: harness `just ci` lints only `scripts/` and never runs over `memory/projects/`. Before it
+was added, a red-team built a five-cheat implementation that scored **418/419** on the unit battery
+while reporting a slice whose true size was `4/53/0/11` as a hardcoded `8/6/1/7` labelled
+`derived`. The battery now defeats that class: a second fixture repo computes its expectations
+from what it writes, classification rules are routed through a real diff with distinct per-file
+line counts, and `skills_invoked` / `worktree_path_for` are exercised **through** `derive` rather
+than only in isolation.
+
+The gate runs `--selftest` against synthetic fixtures, **not** the real ledger, and that is
+deliberate: zero rows carry the new columns today, and `Skill` tool_use blocks appear in only ~5
+pass logs corpus-wide — a real-ledger gate would RED on day one and be disabled within the week.
+When `skills_invoked` does trip the degeneracy ladder on real data, that exit 1 is a **true finding
+about the loop**, not a broken gate.
+
+Proof-of-teeth, per ADR-0010 ("non-null on 5 rows is not a gate"): `mr-slice-quality variance`
+folds to one observation per slice and REDs on `all-null`, `all-identical`, `half-blind`
+(`null_rate ≥ 0.5`, descended from the measured 66.5% empty) and `silent-zero-suspect`
+(`zero_rate ≥ 0.5`, which catches a systematically-zero column that every null-based test passes).
+A **vacuity sweep** blanks each of the six columns in turn against an otherwise-healthy fixture and
+requires each mutation to RED *naming that column*, so an implementation that only ever checks
+`files_changed` cannot pass; and exactly one degeneracy kind may be named per line, so a blob line
+cannot satisfy every kind assertion at once. `INSUFFICIENT-DATA` (fewer than 8 distinct slices)
+exits **2 and is not green** — conflating "no data yet" with "collapsed schema" is the dishonesty
+this amendment exists to remove.
