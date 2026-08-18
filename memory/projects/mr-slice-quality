@@ -44,6 +44,21 @@ EARS CRITERIA SERVED
   T   Proof-of-teeth: the query REDs on a synthetic ledger where a new column is all-identical or
       all-null. "Non-null on 5 rows" is not a gate (ADR-0010).
 
+TWO ROOTS, AND WHY THEY DIFFER (orchestrator decision A)
+--------------------------------------------------------
+The GATE is self-locating; the SUBJECT is a machine singleton.
+
+  * `SELF_ROOT` (dirname(dirname(MEM))) is the checkout this copy of the tool SHIPS BESIDE. It is
+    used only to attest that corpus: the spec text and `mr-native-tick.sh`'s call sites. Same
+    argument as mr-selfcheck:4-10 — a gate must check the copy it ships with.
+  * `harness_root()` is the SUBJECT root: `MR_HARNESS_ROOT` if set, else the hardcoded
+    `/home/mdrewt/projects/ai-apps/claude-harness`. Per-run locks
+    (`.harness-runner.<slice>.lock`), pass logs (`/tmp/mr_pass_<slice>.log`) and worktrees
+    (`.claude/worktrees/<slice>`) are machine-singleton artifacts — exactly the class of thing
+    `mr-hold` hardcodes, and for the same stated reason. If this defaulted to `SELF_ROOT`, then
+    every `MR_QUALITY_BIN`-redirected call and the T8 dogfood would look for locks inside a
+    worktree that has none, degrade to `quality_source=unavailable`, and READ AS A PASS.
+
 FIXTURE -> DEFECT CLASS (the R-J list in memory/projects/monster-realm-lp-02-plan.md)
 ------------------------------------------------------------------------------------
   F1  binary numstat `-<TAB>-<TAB>path` counted in files_changed, contributes 0 lines, never int('-')
@@ -51,43 +66,65 @@ FIXTURE -> DEFECT CLASS (the R-J list in memory/projects/monster-realm-lp-02-pla
       two records and the counts silently double)
   F3  classification table TEST / OTHER / PROD incl. the mr-selfcheck + *selftest carve-out and
       the widened `bindings` DIRECTORY-segment rule (`module_bindings/` is what monster-realm
-      actually generates; the plan's literal `/bindings/` matched nothing)
-  R-E worktree_path_for: repo-keyed routing (harness vs monster-realm), keyed on `repo` and NEVER
-      on `pr_repo`, hostile id -> None before any path join. Pure, so it finally puts a tooth on
-      the silent biased-subpopulation failure no repo-backed fixture here can reach
+      actually generates; the plan's literal `/bindings/` matched nothing). The table is a
+      SUPPLEMENT: the load-bearing classification coverage is inside fixture B's diff, because a
+      transcribed lookup table passes any pure table.
   F4  removed worktree -> all six null + `unavailable`, NEVER 0     <-- the A2/R-C headline tooth
-  F5  dirty worktree -> `partial`, the four diff columns null (CRASHED/PARKED rows are exactly the
-      uncommitted-WIP case; reporting files_changed=0 there feeds a fabricated zero downstream)
+  F5  dirty worktree -> `partial`, the four diff columns null
   F6  clean worktree at HEAD == merge-base -> a GENUINE 0, `derived`
-  F7  derive against a REAL `git init` fixture repo, never a stub (the lp-01 fabricated-counter shape)
+  F7  derive against a REAL `git init` fixture repo, never a stub. TWO repos: A (harness-routed,
+      fixed shape, rename + binary) and B (project-routed, sizes derived from os.getpid() so no
+      expected number in this file is transcribable, deletion-heavy, and carrying the
+      classification rules INSIDE the diff)
   F8  degeneracy ladder: healthy 0 / all-null 1 / all-identical 1 / half-null 1 / all-zero 1 /
-      below-floor 2
-  F9  vacuity tooth: blank EACH of the six columns in turn; an implementation that only ever checks
-      `files_changed` must fail here
-  F10 ci_normalizer_never_greens_a_red, seeded with the REAL corpus strings
+      zero-rate-at-the-0.5-boundary 1 / below-floor 2
+  F9  vacuity tooth: EVERY column x EVERY degeneracy shape, each asserting exactly ONE kind token
+  F10 ci_normalizer_never_greens_a_red, seeded with the REAL corpus strings, incl. the SOFT-RED
+      class (unverified / flaked / cancelled / expected / unmerged / stood-down / pre-merge)
   F11 `--ci` mapping table + unmappable -> `unknown` + raw truncated to 120 + rc 0
-  F12 absent `--ci` -> `not-recorded` (the closing-row half; the `""` half is asserted on a real
-      appended row inside mr-selfcheck)
-  F16 skills_invoked: 3 real Skill tool_use blocks with one streaming duplicate -> 3; a log stuffed
-      with the WORD Skill -> 0; absent log -> null
+  F12 absent `--ci` -> `not-recorded`
+  F16 skills_invoked, both as a unit and THROUGH derive: real blocks -> N, prose-only -> 0,
+      absent log -> null
   F17 ears_criteria_count: anchored `^### <slice>` heading -> 4 for lp-02; unknown slice -> null
   F18 slice id failing [A-Za-z0-9._-]{1,64} -> `unavailable`, no path touched, no die()
   F19 variance folds to one observation per slice (a 4-row slice votes once)
+  R-E worktree_path_for: repo-keyed routing (harness vs monster-realm), keyed on `repo` and NEVER
+      on `pr_repo`, hostile id -> None before any path join
+  T4  STATIC assertions about `mr-native-tick.sh`'s two `mr-record ledger` call sites and its
+      `mr-selfcheck` invocation (precedent: mr-telemetry-selftest's T9)
+  CLI `variance` is exercised as a SUBPROCESS over a synthetic ledger, because the spec's Tests
+      clause says "the query SCRIPT REDs", not "a function returns 1"
 
   R-J items 13, 14, 15 and the NEGATIVE direction of item 4 are asserted against the REAL
-  `mr-record` binary inside `mr-selfcheck` (see the PYSQ block there) — they need an appended row,
+  `mr-record` binary inside `mr-selfcheck` (the PYSQ block there) — they need an appended row,
   which this tool must never produce.
+
+ACCEPTED DUPLICATION (orchestrator decision D)
+----------------------------------------------
+`mr-record` implements the 4-line closing-row predicate INLINE rather than shelling out to this
+tool to classify a row: a subprocess per ledger write, plus a new failure mode, to decide four
+lines of boolean is a bad trade on a cron-critical path. The duplication is deliberate and BOTH
+copies are tested — this one by `assert_is_closing`, `mr-record`'s by the PYSQ block in
+`mr-selfcheck`, which drives real rows through `LAUNCHED`, `tick-ok`, `CORRECTION(...)`,
+`SUPERVISOR`, `FINISHED` and `PARKED`. There is deliberately NO `is-closing` subcommand.
+
+READING THE FAILURE COUNT
+-------------------------
+Roughly 40 of the assertions below are logically dependent restatements (one `derive()` call feeds
+six to eight `check()`s; one degeneracy verdict feeds an rc check and a naming check). "N of M
+RED" therefore over-states the number of independent facts by about that much, and is not a
+progress metric. Read the assertion IDS, not the count.
 
 OWNERSHIP
 ---------
-This file is split into an IMPLEMENTER-OWNED region and a TESTER-OWNED region, each banner-marked.
-The tester region was written BEFORE the feature existed. Every fixture is expected to be RED right
-now and must fail with a message naming what is missing — never a traceback, never a silent skip.
+Three regions, banner-marked: SHARED RUNTIME-SAFETY, IMPLEMENTER-OWNED, TESTER-OWNED. The tester
+region was written BEFORE the feature existed. Every fixture is expected to be RED right now and
+must fail with a message naming what is missing — never a traceback, never a silent skip.
 
-Self-locating (`MEM = dirname(__file__)`), NO env override for MEM — see mr-selfcheck:4-10 for why
-an override is a surface for greening production vacuously. Standard library only, no network, no
-`gh`, no `claude`, no `ollama`; every subprocess call goes through `_safe_run`, which REFUSES to
-execute mr-native-tick.sh, to spawn claude, or to name the kill-switch flag path.
+Standard library only, no network, no `gh`, no `claude`, no `ollama`; every subprocess call goes
+through `_safe_run`, which REFUSES to execute mr-native-tick.sh, to spawn claude, or to name the
+kill-switch flag path — and a static fixture asserts the implementer region contains no direct
+`subprocess.` reference at all, so that header claim is enforced rather than merely written down.
 """
 
 import json
@@ -99,7 +136,12 @@ import sys
 import tempfile
 
 MEM = os.path.dirname(os.path.abspath(__file__))
-HARNESS = os.path.dirname(os.path.dirname(MEM))
+# The checkout this copy ships beside. ONLY for attesting that corpus (spec text, tick call sites).
+SELF_ROOT = os.path.dirname(os.path.dirname(MEM))
+# The SUBJECT root. A machine singleton, hardcoded like mr-hold's flag path and mr-record's MEM.
+PROD_HARNESS_ROOT = "/home/mdrewt/projects/ai-apps/claude-harness"
+PROD_PROJECT_ROOT = "projects/monster-realm"     # relative to the harness root, per mr-launch.sh:31
+PROD_LOG_DIR = "/tmp"
 
 # The six EARS-named columns, in the order E1 names them. Everything downstream iterates THIS list
 # rather than repeating the names, so a column added later cannot be half-wired.
@@ -114,10 +156,16 @@ COLUMNS = (
 QUALITY_KEY = "quality_source"
 QUALITY_SOURCES = ("derived", "replayed", "partial", "unavailable")
 CI_VOCAB = ("green", "red", "pending", "not-applicable", "not-recorded", "unknown")
+# E3 conformance set (orchestrator decision B): a post-cutover row is CONFORMANT only if its
+# master_ci_after is an actual verdict. `unknown`, `not-recorded`, "", an absent key and any
+# surviving legacy raw string all count AGAINST the rate.
+CI_CONFORMANT = ("green", "red", "pending", "not-applicable")
+CI_UNKNOWN_RATE_MAX = 0.10
 CI_RAW_NOTE_MAX = 120          # R-B/M7: `--ci` is LLM-supplied and unbounded
 N_MIN_SLICES = 8               # R-F: one floor, ~1 week of measured cadence, 4x ADR-0010's "5 rows"
 SLICE_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
 SPEC_GLOB_DIR = os.path.join("specs", "monster-realm-v2")
+DEGEN_KINDS = ("all-null", "all-identical", "half-blind", "silent-zero-suspect")
 
 USAGE = (
     "usage: mr-slice-quality derive <slice>\n"
@@ -126,12 +174,60 @@ USAGE = (
 )
 
 
+def harness_root():
+    """The SUBJECT root (see the module header's TWO ROOTS section).
+
+    `MR_HARNESS_ROOT` if set, else the hardcoded production path. Read at CALL time, never cached
+    at import, so a fixture can redirect an already-loaded module. This is a READ root only: it
+    cannot green a gate (A5's concern is about thresholds and row selection), and every fixture in
+    this file that depends on it also asserts the values it produces."""
+    return os.environ.get("MR_HARNESS_ROOT") or PROD_HARNESS_ROOT
+
+
 # #################################################################################################
-# IMPLEMENTER-OWNED REGION — everything from here to the TESTER banner.
+# ===== SHARED RUNTIME-SAFETY REGION =====
+#
+# Owned jointly. The IMPLEMENTER must route EVERY subprocess through `_safe_run` — a tester fixture
+# asserts the implementer region below contains no direct `subprocess.` reference and no shell
+# invocation, so the header's safety claim is a checked property rather than a promise.
+# #################################################################################################
+_FORBIDDEN_ARGV0 = {"mr-native-tick.sh"}
+_FORBIDDEN_ANYWHERE = {"claude", "gh", "ollama"}
+_KILL_SWITCH_BASENAME = ".native-supervisor-disabled"
+
+
+def _safe_run(argv, cwd=None, timeout=120, env=None):
+    """Run a child process, refusing the three things this tool must never do.
+
+    Returns (returncode, stdout, stderr); returncode is None on timeout or a missing binary."""
+    b0 = os.path.basename(str(argv[0]))
+    if b0 in _FORBIDDEN_ARGV0:
+        raise RuntimeError("REFUSED: mr-slice-quality must never execute %s" % b0)
+    for a in argv:
+        sa = str(a)
+        if os.path.basename(sa) in _FORBIDDEN_ANYWHERE or sa.strip() in _FORBIDDEN_ANYWHERE:
+            raise RuntimeError("REFUSED: mr-slice-quality must never invoke %r (argv=%r)" % (sa, argv))
+        if _KILL_SWITCH_BASENAME in sa:
+            raise RuntimeError("REFUSED: mr-slice-quality must never touch the kill-switch flag path")
+    try:
+        r = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, r.stdout or "", r.stderr or ""
+    except FileNotFoundError as exc:
+        return None, "", "NOT-FOUND: %s" % exc
+    except subprocess.TimeoutExpired:
+        return None, "", "TIMEOUT after %ss" % timeout
+
+
+# #################################################################################################
+# ===== IMPLEMENTER-OWNED REGION =====
 #
 # The signatures, return shapes and contracts below are FIXED (they are what the gating fixtures
 # call and what mr-record will call). Fill in the bodies; do not change the names or the shapes.
 # Each body currently raises NotImplementedError so the battery starts RED with a legible message.
+# Route every child process through `_safe_run` above; a direct module-qualified subprocess call in
+# this region is a gate failure (asserted by S16 — and note that this comment must not spell the
+# forbidden token out, or the scanner would hit itself, which is exactly how the previous static
+# pin made --selftest permanently unfixable).
 # #################################################################################################
 
 
@@ -140,37 +236,44 @@ def normalize_ci(raw):
 
     Returns a 2-tuple ``(value, raw_note)``:
       * ``value``    — exactly one of CI_VOCAB.
-      * ``raw_note`` — ``None`` unless ``value == "unknown"``, in which case it is the stripped raw
+      * ``raw_note`` — ``None`` unless ``value == "unknown"``, in which case it is the STRIPPED raw
                        string truncated to CI_RAW_NOTE_MAX chars (mr-record puts it in `notes`).
 
-    NEVER raises, never dies, never returns anything outside CI_VOCAB (A3: `mr-record`'s contract
-    is that a row is never lost; dying on an unmappable `--ci` would trade a data-QUALITY problem
-    for a data-LOSS one the first time the supervisor types `GREEN (abc1234)`).
+    NEVER raises — including on a non-string input — never dies, never returns anything outside
+    CI_VOCAB (A3: `mr-record`'s contract is that a row is never lost; dying on an unmappable
+    `--ci` would trade a data-QUALITY problem for a data-LOSS one).
 
-    Precedence scan over the WHOLE string, never the head token (the head-token rule specified in
-    the original plan mismapped 21 real rows to `green`, headed by
-    'GREEN (CI wf); Nightly RED (mutation job, ...)' — compound verdicts are HOW the supervisor
-    writes reds):
-      0. empty / None / whitespace-only              -> ("not-recorded", None)
-      1. a red token anywhere                        -> ("red", None)
-         red tokens are word-bounded: red, fail, fails, failed, failing, failure, broken.
+    EVALUATION ORDER, over the WHOLE string, never the head token (the head-token rule in the
+    original plan mismapped 21 real rows to `green`, headed by
+    'GREEN (CI wf); Nightly RED (mutation job, ...)' — compound verdicts are HOW reds get written):
+
+      0. empty / None / whitespace-only / non-string  -> ("not-recorded", None)
+      1. any RED token anywhere                       -> ("red", None)
+             \\bred\\b | \\bfail(ed|ure|ing)?\\b | \\bbroken\\b
          Word-bounded is load-bearing, not cosmetic: the real corpus value `rerun-triggered`
          CONTAINS the substring "red" (trigge-RED) and is a PENDING row.
-      2. else two or more distinct verdict FAMILIES present -> ("unknown", <raw>)
-         (never collapse a compound verdict to one of its halves)
-      3. else map the single family:
-              green   <- green, success, pass, ok
-              pending <- pending, in_progress, queued, rerun*
-              not-applicable <- n/a, not-applicable, no-remote-ci*
-         The `no-remote-ci*` pattern is matched as a UNIT and consumes the rest of the token, so
-         the real corpus value `no-remote-ci-local-gate-green` is `not-applicable` (there is no
-         remote CI on the harness repo; the trailing word describes the LOCAL gate) rather than a
-         rule-2 compound. R-B names this string explicitly as one the new rule handles.
-      4. else -> ("unknown", <raw truncated>)
+      2. else any HEDGE token anywhere                -> ("unknown", <raw>)
+             unverified | expected | assumed | presumed | flake | flaked | flaky |
+             cancel | cancelled | canceled | unmerged | stood down | pre-merge | not verified
+         An unverified, flaked, cancelled, expected or pre-merge claim is NOT a verdict. 11 real
+         corpus rows fall here, and every one of them previously mapped to `green` — e.g.
+         'GREEN @ 0421f2c (unverified this tick; stood down before any mutation)'. This rule sits
+         ABOVE the compound rule on purpose: several of them name only one verdict family and
+         would otherwise map straight to `green`.
+      3. else >=2 distinct verdict FAMILIES present   -> ("unknown", <raw>)
+      4. else map the single family:
+             green   <- green | success | pass | ok
+             pending <- pending | in_progress | queued | rerun* | re-run* | retry
+             not-applicable <- n/a | not-applicable | no-remote-ci*
+         `no-remote-ci*` is matched as a UNIT and consumes the rest of the token, so the real
+         corpus value `no-remote-ci-local-gate-green` is `not-applicable` (there is no remote CI on
+         the harness repo; the trailing word describes the LOCAL gate) rather than a rule-3
+         compound. R-B names this string explicitly as one the new rule handles.
+      5. else -> ("unknown", <raw stripped, truncated to CI_RAW_NOTE_MAX>)
     """
     raise NotImplementedError(
         "lp-02 RED: normalize_ci() is not implemented — the closed-vocabulary `--ci` mapper (E3, "
-        "plan R-B precedence scan) does not exist yet")
+        "plan R-B plus the hedge rule) does not exist yet")
 
 
 def classify_path(path):
@@ -198,6 +301,11 @@ def classify_path(path):
     that repo, which would corrupt the denominator this whole slice exists to create. The rule is
     SEGMENT-scoped and excludes the basename on purpose: a hand-written `src/bindings.ts` is
     production, and a substring-anywhere rule would silently reclassify it.
+
+    NOTE FOR THE IMPLEMENTER: a lookup table keyed on the fixture paths in this file's
+    CLASSIFY_TABLE passes that table and nothing else — fixture repo B routes five of these rules
+    through a real diff with distinct line counts per file, so a table or a substring rule produces
+    the wrong `prod_lines_added` / `test_lines_added` totals there.
     """
     raise NotImplementedError(
         "lp-02 RED: classify_path() is not implemented — the TEST/OTHER/PROD line classifier "
@@ -212,6 +320,9 @@ def is_closing(slice_, outcome):
         outcome.upper() CORRECTION...   -> False   (accounting reversal; mr-native-tick.sh:70)
         else startswith MERGED/FINISHED/CRASHED/PARKED -> True
     Whitespace-tolerant, case-insensitive, never raises on a non-string outcome.
+
+    `mr-record` carries its own inline copy of this predicate on purpose — see ACCEPTED
+    DUPLICATION in the module header. Keep the two in step; both are tested.
     """
     raise NotImplementedError(
         "lp-02 RED: is_closing() is not implemented — the closing-row predicate (plan D2) does not "
@@ -223,8 +334,10 @@ def count_skill_invocations(log_path):
 
     Contract (plan R-E):
       * Parse properly: a line whose `type` == "assistant", whose `message.content` is a list, and
-        within it blocks whose `type` == "tool_use" and whose `name` == "Skill" EXACTLY.
-      * DEDUPE BY BLOCK `id` — the stream repeats blocks as they arrive.
+        within it blocks whose `type` == "tool_use" and whose `name` == "Skill" EXACTLY (a block
+        named `SkillJump` is a different tool and does not count).
+      * DEDUPE BY BLOCK `id`, not by message id — the stream repeats a block as it arrives, AND a
+        single assistant message may legitimately carry two distinct Skill blocks.
       * Substring counting is a FABRICATION: the word `Skill` occurs 69x in one real pass log from
         the init event's tool allowlist and from monster-realm's own `SkillRow` Rust type, for a
         slice that invoked zero. A `/simplify` mentioned in PROSE is not an invocation (measured:
@@ -244,12 +357,15 @@ def count_ears_criteria(slice_, specs_dir=None):
     """Count `SHALL` occurrences in the slice's OWN spec section. Returns an int, or None.
 
     Contract (plan R-E):
-      * `specs_dir` defaults to <HARNESS>/specs/monster-realm-v2 (both repos' specs live in the
-        harness). It is a TEST SEAM; the CLI never passes it.
+      * `specs_dir` defaults to `<harness_root()>/specs/monster-realm-v2` — the SUBJECT root, not
+        the self-located one (see TWO ROOTS in the module header); both repos' specs live in the
+        harness. It is also the TEST SEAM; the CLI never passes it.
       * Locate the section by an ANCHORED heading `^### <slice>\\b` across `*.spec.md`; the section
-        ends at the next `^### `. Anchoring is load-bearing: an unanchored search for `lp-02`
-        matches the `lp-02b` heading first (the same defect mr-launch.sh:72-74 had to fix).
-      * Count `\\bSHALL\\b` inside that section. `SHALL NOT` counts once.
+        ends at the next `^### `, or at END OF FILE when the section is the last one. Anchoring is
+        load-bearing: an unanchored search for `lp-02` matches the `lp-02b` heading first (the same
+        defect mr-launch.sh:72-74 had to fix).
+      * Count `\\bSHALL\\b`, CASE-SENSITIVE, inside that section. `SHALL NOT` counts once; a
+        lowercase `shall` in prose does not count.
       * Heading not found -> None. NEVER fall back to the brief: the brief is a 14 KB single-line
         blob embedding spec prose AND EARS-shaped boilerplate, so a count over it returns a
         plausible integer for the wrong thing.
@@ -278,21 +394,15 @@ def worktree_path_for(lock, root=None):
     mr-launch.sh reads, and deriving a directory name from a GitHub slug would invent a second,
     drifting source of truth.
 
-    In production these resolve to
+    `root` defaults to `harness_root()`. In production that is
         /home/mdrewt/projects/ai-apps/claude-harness/.claude/worktrees/<slice>
         /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/<slice>
-
-    `root` defaults to HARNESS (self-located: dirname(dirname(MEM))) and is the TEST SEAM; the CLI
-    never passes it. Self-location is correct in production rather than merely convenient: the
-    helper mr-record actually invokes lives in the MAIN checkout (mr-record's MEM is hardcoded
-    there, and MR_QUALITY_BIN only overrides it for a deliberate dogfood), so dirname(dirname(MEM))
-    IS the main checkout, which is the repo whose `.claude/worktrees/` holds every slice.
 
     WHY THIS IS ITS OWN FUNCTION: getting `project` wrong does not fail loudly — it makes every
     monster-realm slice `unavailable`, and `variance` then satisfies its N_MIN_SLICES=8 floor from
     a harness-only subpopulation while reporting a green gate. That is the biased-subpopulation
-    risk R-E names, and as a pure string function it can finally carry a fixture that bites without
-    a repo on disk.
+    risk R-E names, and as a pure string function it can carry a fixture that bites without a repo
+    on disk (fixture B then proves `derive` actually calls it).
     """
     raise NotImplementedError(
         "lp-02 RED: worktree_path_for() is not implemented — the repo-keyed worktree resolver "
@@ -310,18 +420,20 @@ def derive(slice_, root=None, log_dir=None):
                                                     else a short non-empty slug naming the cause
                                                     (mr-record renders it as
                                                      `QUALITY(<source>): <reason>` in `notes`)
+    All eight keys are ALWAYS present, so `mr-record` can emit them unconditionally on a closing
+    row (E1 is literal: a closed row SHALL CARRY the columns, explicitly null when unmeasurable).
 
     RESOLUTION (plan R-E; never `git worktree list | grep`, whose unanchored match makes `lp-02`
     select an `lp-02b` worktree):
-      * `root` defaults to HARNESS. TEST SEAM ONLY — the CLI never passes it.
+      * `root` defaults to `harness_root()`; `log_dir` to /tmp. Both are the SUBJECT root — see
+        TWO ROOTS in the module header — and both are the fixtures' seams.
       * Lock:      <root>/memory/projects/.harness-runner.<slice>.lock  (JSON as written by
                    mr-spawn: `repo`, `pr_repo`, `base_branch`, ...).
-      * Worktree:  `worktree_path_for(lock, root)` — see its contract. Repo-keyed, mirroring
-                   mr-launch.sh:29-31; None for an unsanitisable slice id.
+      * Worktree:  `worktree_path_for(lock, root)`. Repo-keyed; None for an unsanitisable id.
       * Base:      the lock's `base_branch`, ALWAYS. The harness base is `main` and
                    monster-realm's is `master`; a hardcoded `main` would make every project slice
                    `unavailable` and leave N_MIN_SLICES satisfied by a biased subpopulation.
-      * Pass log:  <log_dir or /tmp>/mr_pass_<slice>.log   (TEST SEAM, as above.)
+      * Pass log:  <log_dir>/mr_pass_<slice>.log
       * Specs:     <root>/specs/monster-realm-v2/*.spec.md
 
     IDENTITY ASSERTION, NOT EXISTENCE (plan R-C — this is the whole point of the slice):
@@ -357,13 +469,13 @@ def derive(slice_, root=None, log_dir=None):
         lines. NEVER int('-').
       * A rename record counts ONCE and is classified on the DESTINATION path.
       * files_changed counts every record including binary and OTHER; prod_lines_* sum PROD only;
-        test_lines_added sums TEST only.
+        `test_lines_added` sums TEST **additions only** — never additions plus deletions (fixture B
+        shrinks a TEST file precisely to catch that).
 
     SAFETY (plan R-D — the tick bumps its heartbeats BEFORE the reconcile and takes its flock 184
     lines later, so a stall here leaves the loop looking alive while it silently does nothing):
     list-argv only and NEVER a shell hop, read-only git subcommands only, never `fetch`,
-    GIT_TERMINAL_PROMPT=0, GIT_OPTIONAL_LOCKS=0, per-call timeouts, and every call routed through
-    `_safe_run` below.
+    GIT_TERMINAL_PROMPT=0, GIT_OPTIONAL_LOCKS=0, per-call timeouts, every call through `_safe_run`.
     """
     raise NotImplementedError(
         "lp-02 RED: derive() is not implemented — nothing measures files_changed / prod_lines_* / "
@@ -377,9 +489,12 @@ def variance(rows):
 
     PIPELINE (plan R-F, which SUPERSEDES the original D6):
       1. Keep only rows where `is_closing(row["slice"], row["outcome"])`.
-      2. FOLD to one observation per slice, preferring `quality_source == "derived"`. This is what
-         makes ledger-replay statistically harmless and it is what the spec's phrase "slice-size
-         denominator" actually asks for. `N_MIN_ROWS` is therefore redundant and was CUT.
+      2. FOLD to one observation per slice. Preference order
+             derived > replayed > partial > unavailable > (no quality_source key)
+         and among equally-preferred rows for the same slice the LAST in input order wins (the
+         ledger is append-only, so last == newest). This is what makes ledger-replay statistically
+         harmless and it is what the spec's phrase "slice-size denominator" asks for; `N_MIN_ROWS`
+         is therefore redundant and was CUT.
       3. Per column, over the folded observations (a "null" is key-absent OR None):
              n_slices < N_MIN_SLICES  -> INSUFFICIENT-DATA        (exit 2, and NOT green)
              null_rate == 1.0         -> DEGENERATE all-null
@@ -389,10 +504,19 @@ def variance(rows):
              zero_rate >= 0.5         -> DEGENERATE silent-zero-suspect   (descends from A2; a
                                                                    systematically-zero column
                                                                    passes every null-based test)
-      4. `master_ci_after` is EXCLUDED from the degeneracy ladder (the harness has no remote CI, so
-         for harness slices it is permanently `not-applicable` and `distinct <= 1` would be a
-         guaranteed false RED) and instead gets the hard R-B threshold: DEGENERATE when
-         (unknown + not-recorded) / n_slices > 0.10.
+         Exactly ONE kind is reported per degenerate column — the first that fires. A line naming
+         several kinds discriminates nothing and is a gate failure.
+      4. `master_ci_after` is EXCLUDED from that ladder (the harness has no remote CI, so it is
+         permanently `not-applicable` for harness slices and `distinct <= 1` would be a guaranteed
+         false RED) and instead gets a CONFORMANCE check (orchestrator decision B):
+            * denominator: POST-CUTOVER folded observations only, defined mechanically as those
+              carrying a `quality_source` key — the marker this slice introduces. Scoping this way
+              is what makes the historical 12.7% `unknown` rate irrelevant instead of a threshold
+              tuned to fail against its own corpus.
+            * non-conformant: `master_ci_after` NOT in CI_CONFORMANT. That includes `unknown`,
+              `not-recorded`, `""`, an absent key, AND any surviving legacy raw string. Counting
+              only the two labels scores the motivating corpus at 0.000 and passes.
+            * DEGENERATE master_ci_after when the non-conformant share > CI_UNKNOWN_RATE_MAX.
       5. Overall: any DEGENERATE -> 1; else n_slices < N_MIN_SLICES -> 2; else 0.
 
     LINE CONTRACT (fixed, machine-checkable; the fixtures match on these tokens). `n_rows` counts
@@ -404,10 +528,12 @@ def variance(rows):
         INFO quality_source derived=<n> replayed=<n> partial=<n> unavailable=<n> absent=<n>
         INFO unavailable_rate=<float>
         OK <column> n=<n> null_rate=<f> zero_rate=<f> distinct=<n>
-        DEGENERATE <column> <all-null|all-identical|half-blind|silent-zero-suspect> <detail...>
+        DEGENERATE <column> <one of DEGEN_KINDS> <detail...>
         INSUFFICIENT-DATA <column> n_slices=<n> floor=<N_MIN_SLICES>
-        OK master_ci_after unknown_rate=<f>
-        DEGENERATE master_ci_after unknown-rate=<f> threshold=0.10
+        OK master_ci_after post_cutover=<n> nonconformant_rate=<f>
+        DEGENERATE master_ci_after nonconformant-rate=<f> threshold=0.10
+    EVERY column gets a line every run — an `OK` line for a healthy column must carry both
+    `null_rate=` and `distinct=`, so "healthy" is a reported measurement rather than silence.
     The quality_source distribution and the unavailable rate are FIRST-CLASS lines because the
     missingness is non-random: mr-native-tick.sh:57-78 skips the FINISHED write whenever a
     cost-bearing row already exists within 12h — i.e. whenever the slice agent self-recorded — so
@@ -488,7 +614,7 @@ def main(argv):
 
 
 # #################################################################################################
-# ===================================== TESTER-OWNED REGION =======================================
+# ===== TESTER-OWNED REGION =====
 #
 # GATING TESTS — TDD RED PHASE. Written by the tester before the feature existed; the implementer
 # is a different agent by design (ownership is split so a failing expectation cannot be "fixed" by
@@ -501,8 +627,7 @@ def main(argv):
 #     preserve or strengthen the bite plus carry a one-line rationale tying it to the spec.
 #   * Every fixture runs inside a tempfile.TemporaryDirectory and cleans up. Nothing here writes
 #     into $MEM, appends to the real ledger, or touches the real handoff — asserted at the end of
-#     selftest() by a before/after snapshot of both the self-located and the hardcoded-production
-#     copies of those files.
+#     selftest().
 #   * A9: when `git` is absent this battery FAILS LOUDLY. It never skips. Skip = false green
 #     (mr-selfcheck:93-95 and :148-150 set that precedent twice).
 # #################################################################################################
@@ -533,41 +658,15 @@ def call(fn, *args, **kwargs):
         return False, "%s: %s" % (type(exc).__name__, exc)
 
 
-# -------------------------------------------------------------------------------------------------
-# Subprocess guard. Centralises EVERY subprocess call this file makes so "never executes the tick,
-# never spawns a paid session, never names the kill-switch flag" is a RUNTIME property rather than
-# a convention. Same shape as mr-telemetry-selftest's guard, extended with gh/ollama because this
-# tool's charter forbids them outright.
-# -------------------------------------------------------------------------------------------------
-_FORBIDDEN_ARGV0 = {"mr-native-tick.sh"}
-_FORBIDDEN_ANYWHERE = {"claude", "gh", "ollama"}
-_KILL_SWITCH_BASENAME = ".native-supervisor-disabled"
-
-
-def _safe_run(argv, cwd=None, timeout=120, env=None):
-    b0 = os.path.basename(str(argv[0]))
-    if b0 in _FORBIDDEN_ARGV0:
-        raise RuntimeError("REFUSED: mr-slice-quality must never execute %s" % b0)
-    for a in argv:
-        sa = str(a)
-        if os.path.basename(sa) in _FORBIDDEN_ANYWHERE or sa.strip() in _FORBIDDEN_ANYWHERE:
-            raise RuntimeError("REFUSED: mr-slice-quality must never invoke %r (argv=%r)" % (sa, argv))
-        if _KILL_SWITCH_BASENAME in sa:
-            raise RuntimeError("REFUSED: mr-slice-quality must never touch the kill-switch flag path")
-    try:
-        r = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout)
-        return r.returncode, r.stdout or "", r.stderr or ""
-    except FileNotFoundError as exc:
-        return None, "", "NOT-FOUND: %s" % exc
-    except subprocess.TimeoutExpired:
-        return None, "", "TIMEOUT after %ss" % timeout
-
-
 def _git_env(home):
+    """A hermetic git environment. The user's ~/.gitconfig can flip results under this battery's
+    feet — `diff.renames=false` alone turns fixture A's files_changed from 8 into 9 — so HOME is
+    redirected, system/global config is disabled, and any inherited repo pointers are removed."""
     env = dict(os.environ)
     env.update({
         "HOME": home,
         "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_TERMINAL_PROMPT": "0",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_AUTHOR_NAME": "lp02 fixture",
@@ -575,6 +674,8 @@ def _git_env(home):
         "GIT_COMMITTER_NAME": "lp02 fixture",
         "GIT_COMMITTER_EMAIL": "lp02@fixture.invalid",
     })
+    for leaked in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "XDG_CONFIG_HOME"):
+        env.pop(leaked, None)
     return env
 
 
@@ -601,11 +702,11 @@ def _write_bytes(path, data):
 # =================================================================================================
 # F3 — classification table (plan D5). Pure, no git required.
 #
-# What each row kills: a classifier that greps the basename for "test" (see the `latest.ts` row —
-# "la|test|.ts" contains the word), one that checks the extension BEFORE the path segments (see
-# `tests/README.md` and `docs/tests/helper.rs`, where first-match-wins is the whole rule), and one
-# that forgets the harness carve-out (`mr-selfcheck` / `mr-*selftest`) and therefore reports
-# test_lines_added=0 for every harness slice — a silent zero in the exact column E1 names.
+# SUPPLEMENTARY BY DESIGN. A transcribed `dict` plus `return "prod"` passes every row here — that
+# cheat was built and scored. The load-bearing classification coverage is inside fixture repo B's
+# diff, where five of these rules carry DISTINCT line counts, so a lookup table or a substring rule
+# produces the wrong prod/test totals. This table exists to name the rules and to pin the negative
+# controls cheaply.
 # =================================================================================================
 CLASSIFY_TABLE = [
     # (path, expected, why)
@@ -634,10 +735,7 @@ CLASSIFY_TABLE = [
     ("pnpm-lock.yaml", "other", "D5.2 lockfile basename"),
     ("client/bindings/gen.ts", "other", "D5.2 a `bindings` directory segment"),
     # The clause the plan wrote as a literal `/bindings/` never fired on the path it was written
-    # FOR: monster-realm's generated dir is `client/src/module_bindings/`. Widened to a
-    # segment-contains match (orchestrator decision). Without this row a bindings regeneration —
-    # the largest single source of fake production volume in that repo — lands in
-    # prod_lines_added and corrupts the denominator.
+    # FOR: monster-realm's generated dir is `client/src/module_bindings/`.
     ("client/src/module_bindings/gen.ts", "other", "D5.2 WIDENED: `module_bindings` segment"),
     ("server/src/module_bindings/mod.rs", "other", "D5.2 WIDENED: same, other repo half"),
     ("src/bindings.ts", "prod",
@@ -669,17 +767,16 @@ def assert_f3_classification():
 
 
 # =================================================================================================
-# F10/F11/F12 — the `--ci` normalizer (E3, plan R-B).
+# F10/F11/F12 — the `--ci` normalizer (E3, plan R-B + the hedge rule).
 #
 # The strings below are REAL, lifted verbatim from the live ledger's distinct `master_ci_after`
 # values. They are embedded as literals on purpose: the ledger is gitignored, so a fixture that
 # READ it would silently pass (or silently vanish) on any machine without it.
 # =================================================================================================
 
-# Every one of these carries a red verdict somewhere in the string. Rule 1 must fire on all of
-# them. This is the fixture that kills the ORIGINAL plan's head-token rule, which mapped the first
-# entry below to `green` — measured: 21 real rows mismapped, and compound verdicts are exactly how
-# the supervisor writes reds.
+# RULE 1. Every one of these carries a red verdict somewhere in the string. This is the fixture
+# that kills the original head-token rule, which mapped the first entry to `green` — measured: 21
+# real rows mismapped, and compound verdicts are exactly how the supervisor writes reds.
 CI_RED_RAW = [
     "GREEN (CI wf); Nightly RED (mutation job, run 29146681177) — queued follow-up",
     "RED — ci/SAST(Semgrep) blocking: javascript detect-non-literal-regexp (ReDoS) in "
@@ -699,21 +796,45 @@ CI_RED_RAW = [
     "RED",
 ]
 
-# No red token, but two or more distinct verdict FAMILIES. Rule 2 must return `unknown`: collapsing
-# these to `green` is how a half-finished CI run gets recorded as a pass.
+# RULE 2 — THE SOFT-RED CLASS. No red token, and several name only ONE verdict family, so without
+# the hedge rule they map straight to `green`. An unverified / flaked / cancelled / expected /
+# unmerged / stood-down / pre-merge claim is not a verdict. All real corpus values.
+CI_SOFT_RED_RAW = [
+    "re-running from merge (PR ci+e2e passed pre-merge; expected GREEN on 66f7871)",
+    "expected green (same tree as PR checks)",
+    "GREEN (tip 138-merge; b6363dc e2e recruit-R2 flake reran->cancelled by #138 push; tip run "
+    "29132420280 success)",
+    "green (35945f8; e2e job flaked once on dialogue 13.5c-5, green on rerun)",
+    "GREEN (1f21ab1, PR#147 unmerged)",
+    "GREEN (6f32178, PR #165 unmerged)",
+    "GREEN @ 0421f2c (unverified this tick; stood down before any mutation)",
+    "master green pre-merge; post-merge run in_progress at record time",
+    "in_progress-preverified-green-pre-merge",
+    "in_progress (05ca7b1, expected green — ci+e2e were green on the PR)",
+    "green pre-merge",
+    "green pre-merge (ci+e2e pass)",
+    # ISOLATION VARIANT (synthetic, and the reason it exists is worth stating): the real
+    # `…green on rerun` row above escapes `green` only BY ACCIDENT, because `rerun` puts a second
+    # family in the string and rule 3 catches it. Strip that accident out and only rule 2 can
+    # save it. An implementation that skipped the hedge rule passes every other soft-red row here
+    # and fails exactly this one.
+    "green (35945f8; e2e job flaked once on dialogue 13.5c-5, green afterwards)",
+]
+
+# RULE 3. No red token, NO hedge token, but two or more distinct verdict families. Kept clean of
+# hedges on purpose so this rule is exercised independently of rule 2.
 CI_COMPOUND_RAW = [
     "GREEN@969e1be (chore doc-only CI in_progress at record time)",
     "GREEN (1e2716a); chore 3eeb484 in_progress",
     "green-pending(post-merge run in_progress at d18cadb)",
-    "master green pre-merge; post-merge run in_progress at record time",
-    "in_progress-preverified-green-pre-merge",
     "GREEN@3eeb484 (CI success; Nightly in_progress at launch)",
     "GREEN @ 18bf4e6 (m17.5b #205; CI run 29633602479 success); chore 90090fc (#206) doc-only CI "
     "in_progress",
-    "in_progress (05ca7b1, expected green — ci+e2e were green on the PR)",
+    "in_progress at tick-exit (2m32s, same-diff PR CI already green)",
 ]
 
-# Single-family mappings, all real corpus values.
+# RULE 4 — single-family mappings. All real corpus values except the five marked SYNTHETIC, which
+# cover contract tokens the corpus happens not to contain yet.
 CI_MAP_TABLE = [
     ("GREEN@15bd08b", "green"),
     ("GREEN 62ee457", "green"),
@@ -723,15 +844,23 @@ CI_MAP_TABLE = [
     ("SUCCESS(run 31762172628)", "green"),
     ("green", "green"),
     ("pass", "green"),
+    ("ok", "green"),                                    # SYNTHETIC: contract token
+    # NEGATIVE CONTROL for the `unmerged` hedge: `never merged` is not `unmerged` under \\b, and
+    # this row is a genuine unchanged-green.
     ("GREEN@78ec655 (unchanged; parked slice never merged)", "green"),
     ("n/a (no merge this tick)", "not-applicable"),
     ("n/a", "not-applicable"),
-    # R-B names this string explicitly as one the new rule HANDLES (the original rule dropped it to
-    # `unknown`). There is no remote CI on the harness repo, so "master CI after" is not-applicable;
-    # `-local-gate-green` describes the LOCAL gate, and `no-remote-ci*` is matched as a unit.
+    ("not-applicable", "not-applicable"),               # SYNTHETIC: the literal vocabulary value
+    # R-B names this string explicitly as one the new rule HANDLES. There is no remote CI on the
+    # harness repo, so "master CI after" is not-applicable; `-local-gate-green` describes the LOCAL
+    # gate, and `no-remote-ci*` is matched as a unit.
     ("no-remote-ci-local-gate-green", "not-applicable"),
     # THE substring trap: "trigge-RED". A naive `"red" in raw.lower()` maps this PENDING row to red.
     ("rerun-triggered", "pending"),
+    ("rerun", "pending"),                               # SYNTHETIC: bare rerun* form
+    ("re-run scheduled", "pending"),                    # SYNTHETIC: hyphenated form
+    ("retry", "pending"),                               # SYNTHETIC: contract token
+    ("queued", "pending"),                              # SYNTHETIC: contract token
     ("in_progress", "pending"),
     ("pending", "pending"),
     ("pending-on-pr280", "pending"),
@@ -742,51 +871,61 @@ CI_MAP_TABLE = [
 ]
 
 
+def _ci_pair(raw, label):
+    """Returns (value, note) or None after recording a failure."""
+    ok, got = call(normalize_ci, raw)
+    if not ok:
+        check(False, label, got)
+        return None
+    if not check(isinstance(got, tuple) and len(got) == 2, label,
+                 "normalize_ci must return (value, raw_note), got %r" % (got,)):
+        return None
+    return got
+
+
 def assert_f10_ci_never_greens_a_red():
     for raw in CI_RED_RAW:
-        ok, got = call(normalize_ci, raw)
-        label = "F10-red[%s]" % raw[:44].replace("\n", " ")
-        if not ok:
-            check(False, label, got)
+        pair = _ci_pair(raw, "F10-red[%s]" % raw[:44].replace("\n", " "))
+        if pair is None:
             continue
-        if not check(isinstance(got, tuple) and len(got) == 2, label,
-                     "normalize_ci must return (value, raw_note), got %r" % (got,)):
-            continue
-        value = got[0]
-        check(value == "red", label,
+        value, note = pair
+        check(value == "red", "F10-red[%s]" % raw[:44].replace("\n", " "),
               "a string carrying a RED verdict normalised to %r — expected 'red'. raw=%r" % (value, raw))
-        check(value != "green", "F10-never-green[%s]" % raw[:32].replace("\n", " "),
-              "NEVER green while a red token is present; got %r for raw=%r" % (value, raw))
+        check(note is None, "F10-red-note[%s]" % raw[:32].replace("\n", " "),
+              "raw_note is reserved for `unknown`; a mapped `red` must carry None, got %r" % (note,))
+
+    for raw in CI_SOFT_RED_RAW:
+        lab = "F10-soft-red[%s]" % raw[:44].replace("\n", " ")
+        pair = _ci_pair(raw, lab)
+        if pair is None:
+            continue
+        value = pair[0]
+        check(value == "unknown", lab,
+              "a HEDGED claim (unverified / flaked / cancelled / expected / unmerged / stood down "
+              "/ pre-merge) is not a verdict and must be 'unknown'; got %r for raw=%r" % (value, raw))
+        check(value != "green", "F10-soft-red-never-green[%s]" % raw[:32].replace("\n", " "),
+              "an unverified or flaked claim recorded as green is how a broken master looks "
+              "healthy in the ledger: raw=%r" % raw)
 
     for raw in CI_COMPOUND_RAW:
-        ok, got = call(normalize_ci, raw)
-        label = "F10-compound[%s]" % raw[:44].replace("\n", " ")
-        if not ok:
-            check(False, label, got)
+        lab = "F10-compound[%s]" % raw[:44].replace("\n", " ")
+        pair = _ci_pair(raw, lab)
+        if pair is None:
             continue
-        if not check(isinstance(got, tuple) and len(got) == 2, label,
-                     "normalize_ci must return (value, raw_note), got %r" % (got,)):
-            continue
-        value = got[0]
-        check(value == "unknown", label,
+        value = pair[0]
+        check(value == "unknown", lab,
               "a COMPOUND multi-verdict string must never collapse to one half; expected 'unknown', "
               "got %r for raw=%r" % (value, raw))
-        check(value != "green", "F10-compound-never-green[%s]" % raw[:32],
-              "compound verdict normalised to green: raw=%r" % raw)
 
 
 def assert_f11_ci_mapping():
     for raw, expected in CI_MAP_TABLE:
-        ok, got = call(normalize_ci, raw)
-        label = "F11-map[%s]" % raw[:44]
-        if not ok:
-            check(False, label, got)
+        lab = "F11-map[%s]" % raw[:44]
+        pair = _ci_pair(raw, lab)
+        if pair is None:
             continue
-        if not check(isinstance(got, tuple) and len(got) == 2, label,
-                     "normalize_ci must return (value, raw_note), got %r" % (got,)):
-            continue
-        value, note = got
-        check(value == expected, label, "expected %r, got %r for raw=%r" % (expected, value, raw))
+        value, note = pair
+        check(value == expected, lab, "expected %r, got %r for raw=%r" % (expected, value, raw))
         check(value in CI_VOCAB, "F11-vocab[%s]" % raw[:32],
               "%r is outside the closed vocabulary %s" % (value, list(CI_VOCAB)))
         check(note is None, "F11-note-absent[%s]" % raw[:32],
@@ -794,26 +933,41 @@ def assert_f11_ci_mapping():
 
     # Unmappable -> unknown + the raw string preserved, rc 0 (never a die()).
     weird = "zzqq not a verdict at all"
-    ok, got = call(normalize_ci, weird)
-    if ok and isinstance(got, tuple) and len(got) == 2:
-        check(got[0] == "unknown", "F11-unmappable-value",
-              "an unmappable string must map to 'unknown', got %r" % (got[0],))
-        check(got[1] == weird, "F11-unmappable-note",
-              "the raw string must be preserved for `notes`; expected %r, got %r" % (weird, got[1]))
-    else:
-        check(False, "F11-unmappable-value", got if not ok else "bad return shape %r" % (got,))
+    pair = _ci_pair(weird, "F11-unmappable-value")
+    if pair is not None:
+        check(pair[0] == "unknown", "F11-unmappable-value",
+              "an unmappable string must map to 'unknown', got %r" % (pair[0],))
+        check(pair[1] == weird, "F11-unmappable-note",
+              "the raw string must be preserved for `notes`; expected %r, got %r" % (weird, pair[1]))
+
+    # ...and the preserved note is the STRIPPED raw, per the contract.
+    padded = "  zzqq not a verdict  "
+    pair = _ci_pair(padded, "F11-unmappable-stripped")
+    if pair is not None:
+        check(pair[0] == "unknown" and pair[1] == padded.strip(), "F11-unmappable-stripped",
+              "expected ('unknown', %r) for a padded unmappable string, got %r"
+              % (padded.strip(), pair))
 
     # M7: `--ci` is LLM-supplied and unbounded, and every mr-record call re-reads the ledger tail.
     long_raw = "qq" * 300
-    ok, got = call(normalize_ci, long_raw)
-    if ok and isinstance(got, tuple) and len(got) == 2:
-        check(got[0] == "unknown", "F11-long-unmappable-value",
-              "expected 'unknown' for a 600-char blob, got %r" % (got[0],))
-        check(isinstance(got[1], str) and len(got[1]) == CI_RAW_NOTE_MAX, "F11-long-note-truncated",
+    pair = _ci_pair(long_raw, "F11-long-unmappable-value")
+    if pair is not None:
+        check(pair[0] == "unknown", "F11-long-unmappable-value",
+              "expected 'unknown' for a 600-char blob, got %r" % (pair[0],))
+        check(isinstance(pair[1], str) and len(pair[1]) == CI_RAW_NOTE_MAX, "F11-long-note-truncated",
               "the preserved raw note must be truncated to %d chars, got %r"
-              % (CI_RAW_NOTE_MAX, None if got[1] is None else len(got[1])))
-    else:
-        check(False, "F11-long-unmappable-value", got if not ok else "bad return shape %r" % (got,))
+              % (CI_RAW_NOTE_MAX, None if pair[1] is None else len(pair[1])))
+
+    # The contract says NEVER raises. mr-record hands this whatever the supervisor typed, and a
+    # crash here is a lost ledger row (R1).
+    for bad in (12345, [], {}, 3.5, True):
+        lab = "F11-non-string[%s]" % type(bad).__name__
+        pair = _ci_pair(bad, lab)
+        if pair is None:
+            continue
+        check(pair[0] in CI_VOCAB, lab,
+              "a non-string input must still return a value inside the closed vocabulary, got %r"
+              % (pair[0],))
 
 
 def assert_f12_absent_ci():
@@ -826,22 +980,19 @@ def assert_f12_absent_ci():
     The NON-closing half (the value stays `""`, no churn on the ~400 tick-ok rows) needs a real
     appended row and is asserted against the real mr-record inside mr-selfcheck."""
     for raw, label in ((None, "None"), ("", "empty"), ("   ", "whitespace")):
-        ok, got = call(normalize_ci, raw)
         lab = "F12-absent-ci[%s]" % label
-        if not ok:
-            check(False, lab, got)
+        pair = _ci_pair(raw, lab)
+        if pair is None:
             continue
-        if not check(isinstance(got, tuple) and len(got) == 2, lab,
-                     "normalize_ci must return (value, raw_note), got %r" % (got,)):
-            continue
-        check(got[0] == "not-recorded", lab,
-              "an absent/empty --ci on a closing row must be 'not-recorded', got %r" % (got[0],))
+        check(pair[0] == "not-recorded", lab,
+              "an absent/empty --ci on a closing row must be 'not-recorded', got %r" % (pair[0],))
+        check(pair[1] is None, "F12-absent-ci-note[%s]" % label,
+              "raw_note is reserved for `unknown`; got %r" % (pair[1],))
 
 
 def assert_is_closing():
-    """D2 support. Not one of the numbered R-J items (13-15 assert the same predicate through a
-    REAL appended row inside mr-selfcheck), but is_closing is part of the fixed contract and a
-    silently-wrong predicate would decide which rows carry the columns at all."""
+    """D2. `mr-record` carries an inline copy of this predicate (accepted duplication, module
+    header); that copy is driven through real rows by the PYSQ block in mr-selfcheck."""
     closing = [
         ("lp-02", "FINISHED(EXIT=0)"),
         ("lp-02", "CRASHED(rc=1)"),
@@ -877,42 +1028,40 @@ def assert_is_closing():
 # =================================================================================================
 # R-E worktree resolution — a PURE fixture, no repo on disk.
 #
-# Why this earns its own battery: getting the `project` branch wrong FAILS SILENTLY. Every
-# monster-realm slice becomes `unavailable`, and `variance` then meets its N_MIN_SLICES=8 floor out
-# of a harness-only subpopulation while printing a green gate — the biased-subpopulation risk R-E
-# names, and the one risk no repo-backed fixture in this file can reach, because they are all
-# harness-shaped by construction.
+# Getting the `project` branch wrong FAILS SILENTLY: every monster-realm slice becomes
+# `unavailable`, and `variance` then meets its N_MIN_SLICES=8 floor out of a harness-only
+# subpopulation while printing a green gate. Fixture repo B proves `derive` actually CALLS this;
+# this table proves the routing itself.
 #
 # Expected values are the PRODUCTION absolutes, asserted by passing the production root explicitly
 # so they cannot drift with wherever this copy happens to be running from. Routing mirrors
 # mr-launch.sh:29-31 (`case "${REPO:-project}" in harness) RUNDIR="$HARNESS";; *) RUNDIR="$PROJDIR"`).
 # =================================================================================================
-PROD_HARNESS_ROOT = "/home/mdrewt/projects/ai-apps/claude-harness"
-PROD_PROJECT_ROOT = PROD_HARNESS_ROOT + "/projects/monster-realm"
+_PROD_PROJECT_ABS = os.path.join(PROD_HARNESS_ROOT, PROD_PROJECT_ROOT)
 
 WORKTREE_PATH_TABLE = [
     ({"slice": "lp-02", "repo": "harness", "pr_repo": "mdrewt/claude-harness", "base_branch": "main"},
      PROD_HARNESS_ROOT + "/.claude/worktrees/lp-02",
      "repo=harness"),
     ({"slice": "M17.5f", "repo": "project", "pr_repo": "mdrewt/monster-realm", "base_branch": "master"},
-     PROD_PROJECT_ROOT + "/.claude/worktrees/M17.5f",
+     _PROD_PROJECT_ABS + "/.claude/worktrees/M17.5f",
      "repo=project"),
     # mr-launch.sh:29 reads `${REPO:-project}`: an ABSENT or EMPTY repo is already treated as the
     # project everywhere else in the corpus, and a resolver that disagreed would send those slices
     # to a harness path that does not exist.
     ({"slice": "pt-c2b", "pr_repo": "mdrewt/monster-realm"},
-     PROD_PROJECT_ROOT + "/.claude/worktrees/pt-c2b",
+     _PROD_PROJECT_ABS + "/.claude/worktrees/pt-c2b",
      "repo key absent -> project"),
     ({"slice": "pt-c2b", "repo": ""},
-     PROD_PROJECT_ROOT + "/.claude/worktrees/pt-c2b",
+     _PROD_PROJECT_ABS + "/.claude/worktrees/pt-c2b",
      "repo empty -> project"),
     ({"slice": "pt-c2b", "repo": "somethingelse"},
-     PROD_PROJECT_ROOT + "/.claude/worktrees/pt-c2b",
+     _PROD_PROJECT_ABS + "/.claude/worktrees/pt-c2b",
      "repo unrecognised -> project (the literal `anything else` branch)"),
     # THE anti-drift tooth: keyed on `repo`, never on `pr_repo`. A resolver that built the
     # directory name out of the GitHub slug returns .../projects/some-fork/... here.
     ({"slice": "m8.5d", "repo": "project", "pr_repo": "mdrewt/some-fork"},
-     PROD_PROJECT_ROOT + "/.claude/worktrees/m8.5d",
+     _PROD_PROJECT_ABS + "/.claude/worktrees/m8.5d",
      "keyed on repo, NOT basename(pr_repo)"),
     # Sanitiser fires BEFORE any path join -> None, on either branch.
     ({"slice": "lp/02", "repo": "harness"}, None, "hostile id: path separator"),
@@ -935,20 +1084,52 @@ def assert_worktree_path_for():
               "makes every monster-realm slice unavailable and lets variance meet its floor from a "
               "harness-only subpopulation" % (expected, got, lock))
 
-    # The self-locating default. dirname(dirname(MEM)) IS the checkout this copy ships beside, which
-    # in production is the main checkout — the repo whose `.claude/worktrees/` holds every slice.
-    ok, got = call(worktree_path_for, {"slice": "lp-02", "repo": "harness"})
-    if ok:
-        check(got == os.path.join(HARNESS, ".claude", "worktrees", "lp-02"),
-              "R-E-worktree-self-located",
-              "with no explicit root the resolver must self-locate to %r, got %r"
-              % (os.path.join(HARNESS, ".claude", "worktrees", "lp-02"), got))
-    else:
-        check(False, "R-E-worktree-self-located", got)
+
+def assert_root_env_seam(tmp):
+    """The SUBJECT root is `harness_root()`: MR_HARNESS_ROOT else the hardcoded production path
+    (orchestrator decision A). Pinned here because the whole mr-selfcheck behavioural block depends
+    on the override working, and because a default of `dirname(dirname(MEM))` would make every
+    MR_QUALITY_BIN-redirected call quietly resolve to a worktree with no locks — `unavailable`
+    everywhere, read as a pass."""
+    saved = os.environ.get("MR_HARNESS_ROOT")
+    try:
+        os.environ.pop("MR_HARNESS_ROOT", None)
+        check(harness_root() == PROD_HARNESS_ROOT, "A-root-default",
+              "with MR_HARNESS_ROOT unset the subject root must be the hardcoded production path "
+              "%r, got %r" % (PROD_HARNESS_ROOT, harness_root()))
+        os.environ["MR_HARNESS_ROOT"] = tmp
+        check(harness_root() == tmp, "A-root-env-override",
+              "MR_HARNESS_ROOT must win; got %r" % (harness_root(),))
+        # ...and the override must reach the functions that use it, read at CALL time.
+        ok, got = call(worktree_path_for, {"slice": "lp-02", "repo": "harness"})
+        if ok:
+            check(got == os.path.join(tmp, ".claude", "worktrees", "lp-02"), "A-root-reaches-resolver",
+                  "worktree_path_for must read harness_root() at call time; expected %r, got %r"
+                  % (os.path.join(tmp, ".claude", "worktrees", "lp-02"), got))
+        else:
+            check(False, "A-root-reaches-resolver", got)
+        # ...including the spec lookup, whose default specs_dir is <harness_root()>/specs/...
+        _write(os.path.join(tmp, SPEC_GLOB_DIR, "seam.spec.md"),
+               "### seam-fixture-slice — a section only reachable through MR_HARNESS_ROOT\n"
+               "THE SYSTEM SHALL one. THE SYSTEM SHALL two.\n")
+        ok, got = call(count_ears_criteria, "seam-fixture-slice")
+        if ok:
+            check(got == 2, "A-root-reaches-specs",
+                  "count_ears_criteria's default specs_dir must be <harness_root()>/%s; expected 2, "
+                  "got %r" % (SPEC_GLOB_DIR, got))
+        else:
+            check(False, "A-root-reaches-specs", got)
+    finally:
+        if saved is None:
+            os.environ.pop("MR_HARNESS_ROOT", None)
+        else:
+            os.environ["MR_HARNESS_ROOT"] = saved
 
 
 # =================================================================================================
-# F16 — skills_invoked. Synthetic stream-json logs, written to a tempdir.
+# F16 — skills_invoked. Synthetic stream-json logs. Exercised BOTH as a unit and THROUGH derive:
+# replacing derive's call to this counter with a literal `None` scored 418/419 against the previous
+# battery, because nothing ever asserted a non-null value coming out of derive.
 # =================================================================================================
 def _assistant_event(blocks, msg_id):
     return json.dumps({
@@ -963,21 +1144,32 @@ def _skill_block(block_id, name="Skill"):
 
 
 def _build_skill_log_real():
-    """3 DISTINCT Skill tool_use blocks; the first is repeated with the SAME block id, which is what
-    the stream actually does as a block arrives. Expected: 3, not 4."""
+    """Returns (log_text, expected_count). The count is DERIVED from the block ids written, so the
+    fixture and its expectation cannot drift apart.
+
+    Shape: one block repeated with the SAME id (streaming), TWO distinct blocks inside ONE message
+    (which is why the dedupe key must be the BLOCK id, not the message id), a `Read` block, a
+    `SkillJump` block (the exact-name rule), prose, garbage and a blank line."""
+    ids = ["toolu_A", "toolu_B", "toolu_C", "toolu_D", "toolu_E"]
     lines = [
         json.dumps({"type": "system", "subtype": "init", "tools": ["Task", "Bash", "Skill", "Read"]}),
         _assistant_event([{"type": "text", "text": "planning"}], "msg_0"),
-        _assistant_event([_skill_block("toolu_A")], "msg_1"),
-        _assistant_event([_skill_block("toolu_A")], "msg_1"),      # streaming duplicate
-        _assistant_event([_skill_block("toolu_B"), _skill_block("toolu_R", name="Read")], "msg_2"),
-        "",                                                         # blank line, must not raise
-        "{ this line is not json at all",                           # garbage, must not raise
-        _assistant_event([_skill_block("toolu_C")], "msg_3"),
+        _assistant_event([_skill_block(ids[0])], "msg_1"),
+        _assistant_event([_skill_block(ids[0])], "msg_1"),      # streaming duplicate, same block id
+        _assistant_event([_skill_block(ids[1]), _skill_block("toolu_R", name="Read")], "msg_2"),
+        "",                                                      # blank line, must not raise
+        "{ this line is not json at all",                        # garbage, must not raise
+        _assistant_event([_skill_block(ids[2])], "msg_3"),
+        # TWO DISTINCT Skill blocks in ONE assistant message. A dedupe keyed on the message id
+        # counts these as one and reports 4.
+        _assistant_event([_skill_block(ids[3]), _skill_block(ids[4])], "msg_4"),
+        # NEGATIVE CONTROL for the exact-name rule: a different tool whose name merely starts with
+        # `Skill`. A `startswith`/`in` name test counts it and reports 6.
+        _assistant_event([_skill_block("toolu_J", name="SkillJump")], "msg_5"),
         json.dumps({"type": "user", "message": {"role": "user", "content": [
-            {"type": "tool_result", "tool_use_id": "toolu_C", "content": "the Skill returned ok"}]}}),
+            {"type": "tool_result", "tool_use_id": ids[2], "content": "the Skill returned ok"}]}}),
     ]
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n", len(ids)
 
 
 def _build_skill_log_prose():
@@ -1003,13 +1195,17 @@ def _build_skill_log_prose():
 
 
 def assert_f16_skills(tmp):
+    real_text, real_expected = _build_skill_log_real()
     real = os.path.join(tmp, "mr_pass_f16real.log")
-    _write(real, _build_skill_log_real())
+    _write(real, real_text)
     ok, got = call(count_skill_invocations, real)
     if ok:
-        check(got == 3, "F16-real-blocks",
-              "expected 3 (three distinct Skill tool_use block ids; the 4th occurrence repeats "
-              "block id toolu_A and a Read block must not count), got %r" % (got,))
+        check(got == real_expected, "F16-real-blocks",
+              "expected %d distinct Skill tool_use block ids. %d means the streaming duplicate was "
+              "counted twice; %d means the dedupe key is the MESSAGE id (the two blocks in msg_4 "
+              "collapsed); %d means a startswith/substring name test counted the SkillJump block. "
+              "got %r" % (real_expected, real_expected + 1, real_expected - 1,
+                          real_expected + 1, got))
     else:
         check(False, "F16-real-blocks", got)
 
@@ -1055,24 +1251,39 @@ This section SHALL never be counted for lp-02. It SHALL NOT be counted either.
 ### lp-02 — the section actually under test (HIGH, MED)
 EARS: WHEN a thing happens, THE SYSTEM SHALL do the first thing. THE SYSTEM SHALL NOT do the second
 thing. Prose mentioning lp-02 inline, and a line that says ### lp-03 not at the start, must not end
-the section. THE SYSTEM SHALL do the third thing.
+the section. The word shall in lowercase is prose, not a criterion, and shall not be counted.
+THE SYSTEM SHALL do the third thing.
 
 ### lp-03 — the next section (LOW, LIGHT)
 This SHALL not be counted. Neither SHALL this.
 """
 
+# A section that is the LAST in its file, with no terminating `^### `. An implementation that
+# requires a closing heading returns None here — and the last slice in every real spec file is in
+# exactly this position.
+SYNTHETIC_SPEC_TAIL = """# Synthetic fixture spec, second file
+
+### lp-99-tail — the last section in the file (LOW, LIGHT)
+EARS: THE SYSTEM SHALL alpha. THE SYSTEM SHALL beta. THE SYSTEM SHALL NOT gamma.
+No heading follows this line; the section ends at EOF.
+"""
+
 
 def assert_f17_ears(tmp):
-    # (a) the REAL spec corpus: the measured ground truth cited in the plan.
-    ok, got = call(count_ears_criteria, "lp-02")
+    # (a) the REAL spec corpus THIS COPY SHIPS BESIDE (SELF_ROOT, not the subject root): a gate
+    # attests its own corpus. Passed explicitly so the assertion is unambiguous about which file
+    # it read.
+    self_specs = os.path.join(SELF_ROOT, SPEC_GLOB_DIR)
+    ok, got = call(count_ears_criteria, "lp-02", self_specs)
     if ok:
         check(got == 4, "F17-real-lp-02",
-              "the lp-02 section of specs/monster-realm-v2/M-loop-infrastructure.spec.md carries "
-              "exactly 4 SHALL occurrences (measured); got %r" % (got,))
+              "the lp-02 section of %s/M-loop-infrastructure.spec.md carries 4 SHALL occurrences "
+              "(measured); got %r. If the spec section legitimately changed, update the SPEC or "
+              "this expectation — this is not necessarily a code bug" % (self_specs, got))
     else:
         check(False, "F17-real-lp-02", got)
 
-    ok, got = call(count_ears_criteria, "lp-no-such-slice-zzz")
+    ok, got = call(count_ears_criteria, "lp-no-such-slice-zzz", self_specs)
     if ok:
         check(got is None, "F17-unknown-slice-null",
               "an unknown slice has no spec section and must yield None (never 0, never a brief "
@@ -1080,17 +1291,19 @@ def assert_f17_ears(tmp):
     else:
         check(False, "F17-unknown-slice-null", got)
 
-    # (b) the anchoring tooth, on a synthetic corpus so the expected number cannot drift with the
-    # real spec. `lp-02b` is deliberately placed BEFORE `lp-02`: an unanchored search finds the
-    # sibling first and returns 2 — the same unanchored-match defect mr-launch.sh:72-74 had to fix.
+    # (b) anchoring + lowercase-decoy, on a synthetic corpus so the expected number cannot drift.
+    # `lp-02b` is deliberately placed BEFORE `lp-02`: an unanchored search finds the sibling first
+    # and returns 2 — the same unanchored-match defect mr-launch.sh:72-74 had to fix.
     sdir = os.path.join(tmp, "synthetic-specs")
     _write(os.path.join(sdir, "fixture.spec.md"), SYNTHETIC_SPEC)
+    _write(os.path.join(sdir, "tail.spec.md"), SYNTHETIC_SPEC_TAIL)
     ok, got = call(count_ears_criteria, "lp-02", sdir)
     if ok:
         check(got == 3, "F17-anchored-heading",
               "expected 3 from the anchored `### lp-02` section (SHALL, SHALL NOT, SHALL); got %r "
-              "— 2 means the unanchored match landed on the `lp-02b` sibling section, 5+ means the "
-              "section did not stop at the next `### ` heading" % (got,))
+              "— 2 means the unanchored match landed on the `lp-02b` sibling, 5 means the two "
+              "lowercase `shall`s were counted, 5+ means the section did not stop at the next "
+              "`### ` heading" % (got,))
     else:
         check(False, "F17-anchored-heading", got)
 
@@ -1100,6 +1313,16 @@ def assert_f17_ears(tmp):
               "the `lp-02b` section carries 2 SHALL occurrences; got %r" % (got,))
     else:
         check(False, "F17-sibling-heading", got)
+
+    ok, got = call(count_ears_criteria, "lp-99-tail", sdir)
+    if ok:
+        check(got == 3, "F17-last-section-in-file",
+              "a section that is LAST in its file has no terminating `### ` and must still be "
+              "counted (expected 3, got %r). The last slice in every real spec file is in exactly "
+              "this position, so an implementation requiring a closing heading loses it silently"
+              % (got,))
+    else:
+        check(False, "F17-last-section-in-file", got)
 
 
 # =================================================================================================
@@ -1154,9 +1377,8 @@ def assert_f18_bad_slice_ids(tmp):
               "a slice id failing [A-Za-z0-9._-]{1,64} must yield quality_source='unavailable' "
               "(never a die(), never a path join); got %r" % (got.get(QUALITY_KEY),))
         for col in COLUMNS:
-            # PRESENT-and-null, not merely absent-or-null: derive's dict contract is that all six
-            # keys exist on every return, so mr-record can emit them unconditionally on a closing
-            # row (orchestrator decision on the E1-literal reading).
+            # PRESENT-and-null: derive's dict contract is that all eight keys exist on every
+            # return, so mr-record can emit them unconditionally on a closing row.
             check(col in got and got.get(col) is None, "F18-null[%s][%r]" % (col, bad),
                   "expected the key %s to be PRESENT and null; present=%s value=%r"
                   % (col, col in got, got.get(col)))
@@ -1193,16 +1415,28 @@ def assert_f18_bad_slice_ids(tmp):
 
 
 # =================================================================================================
-# F1/F2/F3(diff)/F4/F5/F6/F7 — a REAL git repository, never a stub.
+# F1/F2/F4/F5/F6/F7 — TWO REAL git repositories, never a stub.
 #
 # Layout mirrors production exactly, because the production layout IS the defect (R-C):
-#     <root>/                                  a git repo, branch `main`
-#     <root>/memory/projects/.harness-runner.<slice>.lock
-#     <root>/.claude/worktrees/<slice>         a real `git worktree add` INSIDE that repo
+#     <root>/                                             harness repo, branch `main`
+#     <root>/memory/projects/.harness-runner.<slice>.lock  (both slices' locks live here)
+#     <root>/.claude/worktrees/<harness slice>             a real worktree INSIDE that repo
+#     <root>/projects/monster-realm/                       project repo, branch `master`
+#     <root>/projects/monster-realm/.claude/worktrees/<project slice>
 #     <root>/specs/monster-realm-v2/fixture.spec.md
+#
+# WHY TWO. Repo A pins the fixed-shape properties that need an exactly-known diff (rename under -M,
+# binary record, genuine zero, dirty tree, the walk-up). Repo B exists because repo A's four
+# numbers are a transcribable constant: an implementation returning the literal tuple whenever the
+# diff is non-empty passed the entire previous battery. B's line counts are derived from
+# os.getpid() — deterministic within a run, different across runs — so no expected number in this
+# file can be copied into an implementation. B is also PROJECT-routed (so derive must actually call
+# worktree_path_for), DELETION-heavy (repo A's prod_lines_deleted is 1 everywhere), and it carries
+# five classification rules INSIDE the diff with distinct per-file line counts.
 # =================================================================================================
 FX_SLICE = "lp-fixture-a"
 FX_SLICE_CLEAN = "lp-fixture-clean"
+FX_SLICE_B = "lp-fixture-b"
 
 FX_SPEC = """# fixture spec
 
@@ -1211,9 +1445,12 @@ EARS: THE SYSTEM SHALL count one. THE SYSTEM SHALL count two. THE SYSTEM SHALL c
 
 ### %s — the clean-worktree fixture slice (LOW, LIGHT)
 EARS: THE SYSTEM SHALL count exactly one here.
-""" % (FX_SLICE, FX_SLICE_CLEAN)
 
-# The known diff, asserted to the unit. Derivation of every expected number:
+### %s — the project-routed fixture slice (HIGH, MED)
+EARS: THE SYSTEM SHALL alpha. THE SYSTEM SHALL NOT beta.
+""" % (FX_SLICE, FX_SLICE_CLEAN, FX_SLICE_B)
+
+# Repo A's known diff, asserted to the unit:
 #   src/prod.py           +5  -0   PROD    (new file, 5 lines)
 #   src/keep.py           +1  -1   PROD    (one line changed)
 #   oldname.py => src/renamed.py
@@ -1221,89 +1458,210 @@ EARS: THE SYSTEM SHALL count exactly one here.
 #   src/thing_tests.rs    +7  -0   TEST    (D5.1 *_tests.rs)
 #   docs/x.md             +1  -1   OTHER   (D5.2 docs/ and .md -> contributes no lines)
 #   Cargo.lock            +2  -0   OTHER   (D5.2 lockfile        -> contributes no lines)
-#   client/bindings/gen.ts +9 -0   OTHER   (D5.2 /bindings/      -> contributes no lines)
-#   assets/blob.bin        -   -   BINARY  (numstat `-\t-\tpath`; counted, 0 lines, never int('-'))
-EXPECT_FILES_CHANGED = 8
-EXPECT_PROD_ADDED = 6
-EXPECT_PROD_DELETED = 1
-EXPECT_TEST_ADDED = 7
-EXPECT_EARS = 3
+#   client/bindings/gen.ts +9 -0   OTHER   (D5.2 bindings segment-> contributes no lines)
+#   assets/blob.bin        -   -   BINARY  (numstat dash-dash; counted, 0 lines, never int('-'))
+EXPECT_A_FILES = 8
+EXPECT_A_PROD_ADD = 6
+EXPECT_A_PROD_DEL = 1
+EXPECT_A_TEST_ADD = 7
+EXPECT_A_EARS = 3
+EXPECT_CLEAN_EARS = 1
+EXPECT_B_EARS = 2
 
 
-def _build_fixture_repo(tmp):
-    """Returns (root, wt, wt_clean, error_or_None). Never raises."""
+def _fx_b_plan():
+    """Repo B's file plan. Sizes derive from os.getpid(): deterministic inside one run, different
+    across runs, so nothing here is transcribable. (Precedent: mr-telemetry-selftest's generated
+    corpus, which closed a proven lookup-table cheat in lp-01.)
+
+    Each entry is (path, klass, base_n, head_n, base_tag, head_tag).
+      base_n None -> created on the branch;  head_n None -> deleted on the branch.
+    Content is `<tag><i>` per line, so a size change is a pure suffix append/truncation (added or
+    deleted is exactly the difference) and a TAG change rewrites every line (added == deleted == n).
+    """
+    def sz(i):
+        return 5 + (os.getpid() + i * 7) % 13          # 5..17, never small enough to underflow
+
+    return [
+        # (path, klass, base_n, head_n, base_tag, head_tag)
+        ("src/alpha.rs", "prod", None, sz(0), "a", "a"),              # created
+        ("src/beta.rs", "prod", sz(1), None, "b", "b"),               # DELETED outright
+        ("src/gamma.rs", "prod", sz(2), sz(2) - 2, "c", "c"),         # shrunk
+        ("src/delta.rs", "prod", sz(3), sz(3), "d", "D"),             # every line rewritten
+        ("tests/seg.py", "test", sz(4), sz(4) + 3, "e", "e"),         # D5.1 segment rule
+        ("src/x.test.ts", "test", None, sz(5), "f", "f"),             # D5.1 basename rule
+        ("memory/projects/mr-selfcheck", "test", sz(6), sz(6) - 3, "g", "g"),  # carve-out + TEST DELETION
+        ("src/latest.ts", "prod", None, sz(7), "h", "h"),             # negative control (substring)
+        ("src/bindings.ts", "prod", None, sz(8), "i", "i"),           # negative control (segment)
+        ("client/src/module_bindings/gen.ts", "other", None, sz(9), "j", "j"),  # widened clause
+        ("docs/note.md", "other", sz(10), sz(10) + 4, "k", "k"),      # OTHER, contributes nothing
+    ]
+
+
+def _fx_b_expect(plan):
+    """The expectation, COMPUTED from the same plan the files are written from."""
+    exp = {"files_changed": len(plan), "prod_lines_added": 0, "prod_lines_deleted": 0,
+           "test_lines_added": 0, "test_lines_deleted_ignored": 0}
+    for _path, klass, bn, hn, bt, ht in plan:
+        if bn is None:
+            add, dele = hn, 0
+        elif hn is None:
+            add, dele = 0, bn
+        elif bt != ht:
+            add, dele = hn, bn
+        elif hn > bn:
+            add, dele = hn - bn, 0
+        elif hn < bn:
+            add, dele = 0, bn - hn
+        else:
+            add, dele = 0, 0
+        if klass == "prod":
+            exp["prod_lines_added"] += add
+            exp["prod_lines_deleted"] += dele
+        elif klass == "test":
+            exp["test_lines_added"] += add
+            exp["test_lines_deleted_ignored"] += dele
+    return exp
+
+
+def _lines_of(tag, n):
+    return "".join("%s%d\n" % (tag, i) for i in range(n))
+
+
+def _lock_json(slice_, repo, base_branch, pr_repo):
+    return json.dumps({
+        "run_id": "fixture", "slice": slice_, "session_leader": 1, "claude_pid": 0,
+        "started_utc": "2026-08-17T00:00:00Z", "brief": "/dev/null",
+        "done_flag": "/tmp/mr_pass_%s.done" % slice_, "adr_reserved": "", "touches": [],
+        "model": "n/a", "effort": "low", "tier": "routine",
+        "repo": repo, "pr_repo": pr_repo, "base_branch": base_branch,
+    }, indent=1)
+
+
+def _init_repo(path, default_branch, env):
+    os.makedirs(path)
+    for args in (["-c", "init.defaultBranch=" + default_branch, "init"],
+                 ["config", "user.email", "lp02@fixture.invalid"],
+                 ["config", "user.name", "lp02 fixture"],
+                 ["config", "commit.gpgsign", "false"],
+                 ["config", "diff.renames", "true"]):
+        rc, _o, err = _git(path, args, env)
+        if rc != 0:
+            return "git %s in %s failed rc=%r: %s" % (args[0], path, rc, err.strip()[:140])
+    return None
+
+
+def _commit_all(path, message, env):
+    for args in (["add", "-A"], ["commit", "-m", message]):
+        rc, _o, err = _git(path, args, env)
+        if rc != 0:
+            return "git %s in %s failed rc=%r: %s" % (args[0], path, rc, err.strip()[:140])
+    return None
+
+
+def _build_fixture_repos(tmp):
+    """Returns a dict describing both repos, or {"error": "..."} — never raises."""
     root = os.path.join(tmp, "root")
     home = os.path.join(tmp, "fakehome")
-    os.makedirs(root)
+    log_dir = os.path.join(tmp, "logs")
     os.makedirs(home)
+    os.makedirs(log_dir)
     env = _git_env(home)
 
     rc, _out, err = _safe_run(["git", "--version"], env=env)
     if rc != 0:
-        return None, None, None, ("git is not usable in this environment (%s) — this battery FAILS "
-                                  "rather than skips (A9: skip = false green)" % (err.strip()[:120],))
+        return {"error": "git is not usable in this environment (%s) — this battery FAILS rather "
+                         "than skips (A9: skip = false green)" % (err.strip()[:120],)}
 
-    steps = [
-        ["-c", "init.defaultBranch=main", "init"],
-        ["config", "user.email", "lp02@fixture.invalid"],
-        ["config", "user.name", "lp02 fixture"],
-        ["config", "commit.gpgsign", "false"],
-    ]
-    for args in steps:
-        rc, _o, err = _git(root, args, env)
-        if rc != 0:
-            return None, None, None, "git %s failed rc=%r: %s" % (args[:2], rc, err.strip()[:160])
-
+    # ---- harness repo (A + clean) ----
+    e = _init_repo(root, "main", env)
+    if e:
+        return {"error": e}
     _write(os.path.join(root, "src", "keep.py"), "a\nb\nc\nd\n")
     _write(os.path.join(root, "oldname.py"), "x\ny\nz\n")
     _write(os.path.join(root, "Cargo.lock"), "l1\nl2\n")
     _write(os.path.join(root, "docs", "x.md"), "d1\n")
     _write(os.path.join(root, SPEC_GLOB_DIR, "fixture.spec.md"), FX_SPEC)
     _write(os.path.join(root, "memory", "projects", ".keep"), "")
+    e = _commit_all(root, "base", env)
+    if e:
+        return {"error": e}
 
-    for args in (["add", "-A"], ["commit", "-m", "base"]):
-        rc, _o, err = _git(root, args, env)
-        if rc != 0:
-            return None, None, None, "git %s failed rc=%r: %s" % (args[0], rc, err.strip()[:160])
-
-    wt = os.path.join(root, ".claude", "worktrees", FX_SLICE)
-    rc, _o, err = _git(root, ["worktree", "add", wt, "-b", "feat/" + FX_SLICE], env)
+    wt_a = os.path.join(root, ".claude", "worktrees", FX_SLICE)
+    rc, _o, err = _git(root, ["worktree", "add", wt_a, "-b", "feat/" + FX_SLICE], env)
     if rc != 0:
-        return None, None, None, "git worktree add failed rc=%r: %s" % (rc, err.strip()[:160])
-
+        return {"error": "git worktree add (A) failed rc=%r: %s" % (rc, err.strip()[:140])}
     wt_clean = os.path.join(root, ".claude", "worktrees", FX_SLICE_CLEAN)
     rc, _o, err = _git(root, ["worktree", "add", wt_clean, "-b", "feat/" + FX_SLICE_CLEAN], env)
     if rc != 0:
-        return None, None, None, "git worktree add (clean) failed rc=%r: %s" % (rc, err.strip()[:160])
+        return {"error": "git worktree add (clean) failed rc=%r: %s" % (rc, err.strip()[:140])}
 
-    # ---- the known diff, committed on the slice branch ----
-    _write(os.path.join(wt, "src", "prod.py"), "p1\np2\np3\np4\np5\n")
-    _write(os.path.join(wt, "src", "keep.py"), "a\nB\nc\nd\n")
-    rc, _o, err = _git(wt, ["mv", "oldname.py", os.path.join("src", "renamed.py")], env)
+    _write(os.path.join(wt_a, "src", "prod.py"), "p1\np2\np3\np4\np5\n")
+    _write(os.path.join(wt_a, "src", "keep.py"), "a\nB\nc\nd\n")
+    rc, _o, err = _git(wt_a, ["mv", "oldname.py", os.path.join("src", "renamed.py")], env)
     if rc != 0:
-        return None, None, None, "git mv failed rc=%r: %s" % (rc, err.strip()[:160])
-    _write(os.path.join(wt, "src", "thing_tests.rs"), "".join("t%d\n" % i for i in range(7)))
-    _write(os.path.join(wt, "docs", "x.md"), "d2\n")
-    _write(os.path.join(wt, "Cargo.lock"), "l1\nl2\nl3\nl4\n")
-    _write(os.path.join(wt, "client", "bindings", "gen.ts"),
-           "".join("b%d\n" % i for i in range(9)))
-    _write_bytes(os.path.join(wt, "assets", "blob.bin"),
+        return {"error": "git mv failed rc=%r: %s" % (rc, err.strip()[:140])}
+    _write(os.path.join(wt_a, "src", "thing_tests.rs"), _lines_of("t", 7))
+    _write(os.path.join(wt_a, "docs", "x.md"), "d2\n")
+    _write(os.path.join(wt_a, "Cargo.lock"), "l1\nl2\nl3\nl4\n")
+    _write(os.path.join(wt_a, "client", "bindings", "gen.ts"), _lines_of("b", 9))
+    _write_bytes(os.path.join(wt_a, "assets", "blob.bin"),
                  b"\x00\x01\x02\x00\xff\xfe" + bytes(range(256)) * 4)
-    for args in (["add", "-A"], ["commit", "-m", "the known diff"]):
-        rc, _o, err = _git(wt, args, env)
-        if rc != 0:
-            return None, None, None, "git %s (worktree) failed rc=%r: %s" % (args[0], rc, err.strip()[:160])
+    e = _commit_all(wt_a, "the known diff", env)
+    if e:
+        return {"error": e}
 
-    # ---- the locks (lp-00 routing SSOT; never `git worktree list | grep`) ----
-    for sl in (FX_SLICE, FX_SLICE_CLEAN):
-        lock = {"run_id": "fixture", "slice": sl, "session_leader": 1, "claude_pid": 0,
-                "started_utc": "2026-08-17T00:00:00Z", "brief": "/dev/null",
-                "done_flag": "/tmp/mr_pass_%s.done" % sl, "adr_reserved": "", "touches": [],
-                "model": "n/a", "effort": "low", "tier": "routine",
-                "repo": "harness", "pr_repo": "mdrewt/claude-harness", "base_branch": "main"}
-        _write(os.path.join(root, "memory", "projects", ".harness-runner.%s.lock" % sl),
-               json.dumps(lock, indent=1))
-    return root, wt, wt_clean, None
+    # ---- project repo (B) ----
+    proj = os.path.join(root, PROD_PROJECT_ROOT)
+    e = _init_repo(proj, "master", env)
+    if e:
+        return {"error": e}
+    plan = _fx_b_plan()
+    for path, _k, bn, _hn, bt, _ht in plan:
+        if bn is not None:
+            _write(os.path.join(proj, path), _lines_of(bt, bn))
+    _write(os.path.join(proj, "README.md"), "project fixture\n")
+    e = _commit_all(proj, "base", env)
+    if e:
+        return {"error": e}
+
+    wt_b = os.path.join(proj, ".claude", "worktrees", FX_SLICE_B)
+    rc, _o, err = _git(proj, ["worktree", "add", wt_b, "-b", "feat/" + FX_SLICE_B], env)
+    if rc != 0:
+        return {"error": "git worktree add (B) failed rc=%r: %s" % (rc, err.strip()[:140])}
+    for path, _k, _bn, hn, _bt, ht in plan:
+        target = os.path.join(wt_b, path)
+        if hn is None:
+            try:
+                os.remove(target)
+            except OSError as exc:
+                return {"error": "could not delete %s in fixture B: %s" % (path, exc)}
+        else:
+            _write(target, _lines_of(ht, hn))
+    e = _commit_all(wt_b, "fixture B diff", env)
+    if e:
+        return {"error": e}
+
+    # ---- locks (lp-00 routing SSOT; never `git worktree list | grep`) ----
+    lockdir = os.path.join(root, "memory", "projects")
+    _write(os.path.join(lockdir, ".harness-runner.%s.lock" % FX_SLICE),
+           _lock_json(FX_SLICE, "harness", "main", "mdrewt/claude-harness"))
+    _write(os.path.join(lockdir, ".harness-runner.%s.lock" % FX_SLICE_CLEAN),
+           _lock_json(FX_SLICE_CLEAN, "harness", "main", "mdrewt/claude-harness"))
+    _write(os.path.join(lockdir, ".harness-runner.%s.lock" % FX_SLICE_B),
+           _lock_json(FX_SLICE_B, "project", "master", "mdrewt/monster-realm"))
+
+    # ---- pass logs: this is what pins the /tmp/mr_pass_<slice>.log naming convention, and what
+    # makes skills_invoked non-null THROUGH derive. Replacing derive's counter call with a literal
+    # None previously scored 418/419 because nothing asserted a non-null value coming out. ----
+    real_text, real_expected = _build_skill_log_real()
+    _write(os.path.join(log_dir, "mr_pass_%s.log" % FX_SLICE), real_text)
+    _write(os.path.join(log_dir, "mr_pass_%s.log" % FX_SLICE_CLEAN), _build_skill_log_prose())
+    # FX_SLICE_B deliberately has NO log -> the null direction.
+
+    return {"root": root, "env": env, "log_dir": log_dir, "wt_a": wt_a, "wt_clean": wt_clean,
+            "wt_b": wt_b, "proj": proj, "plan": plan, "expect_b": _fx_b_expect(plan),
+            "skills_a": real_expected, "error": None}
 
 
 def _derive_dict(label, slice_, root, log_dir):
@@ -1316,91 +1674,128 @@ def _derive_dict(label, slice_, root, log_dir):
     missing = [k for k in tuple(COLUMNS) + (QUALITY_KEY, "reason") if k not in got]
     if not check(not missing, label + "-keys",
                  "derive's dict is missing required key(s): %s (E1 names six columns; "
-                 "quality_source and reason are the plan's D3/R-G additions)" % missing):
+                 "quality_source and reason are the plan's D3/R-G additions, and ALL of them are "
+                 "present on every return so mr-record can emit them unconditionally)" % missing):
         return None
     return got
 
 
 def assert_repo_fixtures(tmp):
-    root, wt, wt_clean, err = _build_fixture_repo(tmp)
-    if err:
-        for lab in ("F1-binary-record", "F2-rename-once", "F4a-worktree-absent",
-                    "F4b-worktree-walks-up", "F5-dirty-partial", "F6-genuine-zero",
-                    "F7-real-repo-counts"):
-            check(False, lab, "fixture repo could not be built: %s" % err)
+    fx = _build_fixture_repos(tmp)
+    labels = ("F1-binary-record", "F2-rename-once", "F4a-worktree-absent", "F4b-worktree-walks-up",
+              "F5-dirty-partial", "F6-genuine-zero", "F7a-real-repo-counts", "F7b-computed-counts",
+              "F7b-project-routed", "F16-through-derive")
+    if fx.get("error"):
+        for lab in labels:
+            check(False, lab, "fixture repos could not be built: %s" % fx["error"])
         return
-    log_dir = os.path.join(tmp, "nologs")
-    os.makedirs(log_dir)
+    root, env, log_dir = fx["root"], fx["env"], fx["log_dir"]
+    wt_a, wt_b = fx["wt_a"], fx["wt_b"]
 
     # ---------------------------------------------------------------------------------------------
-    # F7 (+F1, +F2, +F3 through the diff): the numbers, against a real repo. This is the fixture a
-    # lookup-table stub cannot satisfy — the repo is created at runtime and the counts come out of
-    # git, not out of this file.
+    # F7a (+F1, +F2): repo A's exactly-known shape.
     # ---------------------------------------------------------------------------------------------
-    d = _derive_dict("F7-real-repo-counts", FX_SLICE, root, log_dir)
+    d = _derive_dict("F7a-real-repo-counts", FX_SLICE, root, log_dir)
     if d is not None:
-        check(d.get("files_changed") == EXPECT_FILES_CHANGED, "F7-files-changed",
+        check(d.get("files_changed") == EXPECT_A_FILES, "F7a-files-changed",
               "expected files_changed=%d (7 text records + 1 binary; the rename is ONE record). "
               "got %r — %d means the rename was counted as an add+delete pair, i.e. `-M` is missing "
               "and every renamed file inflates the denominator"
-              % (EXPECT_FILES_CHANGED, d.get("files_changed"), EXPECT_FILES_CHANGED + 1))
-        check(d.get("prod_lines_added") == EXPECT_PROD_ADDED, "F7-prod-added",
+              % (EXPECT_A_FILES, d.get("files_changed"), EXPECT_A_FILES + 1))
+        check(d.get("prod_lines_added") == EXPECT_A_PROD_ADD, "F7a-prod-added",
               "expected prod_lines_added=%d (5 from src/prod.py + 1 from src/keep.py + 0 from the "
-              "rename); got %r. 15+ means OTHER paths (docs/, Cargo.lock, /bindings/) were summed "
-              "as production" % (EXPECT_PROD_ADDED, d.get("prod_lines_added")))
-        check(d.get("prod_lines_deleted") == EXPECT_PROD_DELETED, "F7-prod-deleted",
+              "rename); got %r. 15+ means OTHER paths (docs/, Cargo.lock, bindings) were summed as "
+              "production" % (EXPECT_A_PROD_ADD, d.get("prod_lines_added")))
+        check(d.get("prod_lines_deleted") == EXPECT_A_PROD_DEL, "F7a-prod-deleted",
               "expected prod_lines_deleted=%d (src/keep.py only); got %r. 4 means the rename was "
-              "read as a delete of oldname.py" % (EXPECT_PROD_DELETED, d.get("prod_lines_deleted")))
-        check(d.get("test_lines_added") == EXPECT_TEST_ADDED, "F7-test-added",
+              "read as a delete of oldname.py" % (EXPECT_A_PROD_DEL, d.get("prod_lines_deleted")))
+        check(d.get("test_lines_added") == EXPECT_A_TEST_ADD, "F7a-test-added",
               "expected test_lines_added=%d (src/thing_tests.rs); got %r. 0 means `*_tests.rs` is "
-              "not in the TEST clause" % (EXPECT_TEST_ADDED, d.get("test_lines_added")))
-        check(d.get("ears_criteria_count") == EXPECT_EARS, "F7-ears",
+              "not in the TEST clause" % (EXPECT_A_TEST_ADD, d.get("test_lines_added")))
+        check(d.get("ears_criteria_count") == EXPECT_A_EARS, "F7a-ears",
               "expected ears_criteria_count=%d from the fixture spec section; got %r"
-              % (EXPECT_EARS, d.get("ears_criteria_count")))
-        check(d.get("skills_invoked") is None, "F7-skills-null-not-zero",
-              "there is no pass log for this fixture slice, so skills_invoked must be None. A 0 "
-              "here is the A2 fabricated-zero defect in the exact column E1 names; got %r"
-              % (d.get("skills_invoked"),))
-        check(d.get(QUALITY_KEY) == "derived", "F7-quality-source",
+              % (EXPECT_A_EARS, d.get("ears_criteria_count")))
+        check(d.get(QUALITY_KEY) == "derived", "F7a-quality-source",
               "a clean worktree whose identity checks out is `derived`; got %r" % (d.get(QUALITY_KEY),))
-        check(d.get("reason") == "", "F7-reason-empty",
+        check(d.get("reason") == "", "F7a-reason-empty",
               "`derived` carries no QUALITY(...) note; reason must be empty, got %r" % (d.get("reason"),))
-        # F1/F2 restated as their own named assertions so a regression reports the DEFECT CLASS,
-        # not just "a number moved".
-        check(d.get("files_changed") == EXPECT_FILES_CHANGED, "F1-binary-record",
-              "the binary record `-\\t-\\tassets/blob.bin` must count toward files_changed and "
-              "contribute 0 lines (never int('-') — that raises ValueError and, wrapped in the "
-              "plan's try/except, silently voids the whole row). files_changed=%r"
+        # F16 THROUGH derive: the real pass log lives at <log_dir>/mr_pass_<slice>.log.
+        check(d.get("skills_invoked") == fx["skills_a"], "F16-through-derive",
+              "expected skills_invoked=%d, read from <log_dir>/mr_pass_%s.log; got %r. A literal "
+              "None here (the shape a red-team used to score 418/419) is indistinguishable from "
+              "`no log` and hides the column entirely"
+              % (fx["skills_a"], FX_SLICE, d.get("skills_invoked")))
+        # F1/F2 restated so a regression reports the DEFECT CLASS, not just "a number moved".
+        check(d.get("files_changed") == EXPECT_A_FILES, "F1-binary-record",
+              "the binary record (dash TAB dash TAB assets/blob.bin) must count toward "
+              "files_changed and contribute 0 lines — never int('-'), which raises ValueError and, "
+              "wrapped in the plan's try/except, silently voids the whole row. files_changed=%r"
               % (d.get("files_changed"),))
-        check(d.get("prod_lines_added") == EXPECT_PROD_ADDED
-              and d.get("prod_lines_deleted") == EXPECT_PROD_DELETED, "F2-rename-once",
+        check(d.get("prod_lines_added") == EXPECT_A_PROD_ADD
+              and d.get("prod_lines_deleted") == EXPECT_A_PROD_DEL, "F2-rename-once",
               "the rename oldname.py => src/renamed.py must count ONCE, contribute 0 lines and be "
               "classified on the DESTINATION. got added=%r deleted=%r"
               % (d.get("prod_lines_added"), d.get("prod_lines_deleted")))
 
     # ---------------------------------------------------------------------------------------------
+    # F7b — repo B: PROJECT-routed, pid-derived sizes, deletion-heavy, classification IN the diff.
+    #
+    # This is the fixture that cannot be satisfied by a constant. It also forces
+    #   * worktree_path_for's `project` branch (the lock says repo=project, base_branch=master);
+    #   * TEST additions WITHOUT test deletions (mr-selfcheck shrinks by 3 lines here);
+    #   * the classification rules to be applied per-file, since every file has a different size.
+    # ---------------------------------------------------------------------------------------------
+    exp = fx["expect_b"]
+    d = _derive_dict("F7b-computed-counts", FX_SLICE_B, root, log_dir)
+    if d is not None:
+        check(d.get(QUALITY_KEY) == "derived", "F7b-project-routed",
+              "the lock routes this slice to %s/.claude/worktrees/%s (repo=project, base=master). "
+              "quality_source=%r — `unavailable` means worktree_path_for's project branch or the "
+              "lock's base_branch was ignored, which is the silent failure that leaves every "
+              "monster-realm slice out of the sample"
+              % (PROD_PROJECT_ROOT, FX_SLICE_B, d.get(QUALITY_KEY)))
+        for col in ("files_changed", "prod_lines_added", "prod_lines_deleted", "test_lines_added"):
+            check(d.get(col) == exp[col], "F7b-%s" % col,
+                  "expected %s=%d (computed from this run's pid-derived fixture, so it cannot be "
+                  "transcribed); got %r" % (col, exp[col], d.get(col)))
+        check(d.get("test_lines_added") == exp["test_lines_added"], "H13-test-added-not-plus-deleted",
+              "test_lines_added must sum TEST ADDITIONS ONLY. The fixture also DELETES %d test "
+              "lines (memory/projects/mr-selfcheck shrinks); an implementation summing additions "
+              "plus deletions reports %d instead of %d"
+              % (exp["test_lines_deleted_ignored"],
+                 exp["test_lines_added"] + exp["test_lines_deleted_ignored"], exp["test_lines_added"]))
+        check(d.get("ears_criteria_count") == EXPECT_B_EARS, "F7b-ears",
+              "expected ears_criteria_count=%d; got %r" % (EXPECT_B_EARS, d.get("ears_criteria_count")))
+        check(d.get("skills_invoked") is None, "F7b-skills-null-not-zero",
+              "fixture B has no pass log, so skills_invoked must be None. A 0 here is the A2 "
+              "fabricated-zero defect in the exact column E1 names; got %r" % (d.get("skills_invoked"),))
+
+    # ---------------------------------------------------------------------------------------------
     # F6: clean worktree, HEAD == merge-base -> a GENUINE zero, `derived`. This is the row that
     # makes F4 meaningful: `0` must remain expressible, so `unavailable` cannot be implemented by
-    # simply nulling everything that looks empty.
+    # nulling everything that looks empty. Its pass log is the PROSE one -> skills_invoked == 0,
+    # the other half of the "0 is a real measurement" property.
     # ---------------------------------------------------------------------------------------------
     d = _derive_dict("F6-genuine-zero", FX_SLICE_CLEAN, root, log_dir)
     if d is not None:
-        for col, want in (("files_changed", 0), ("prod_lines_added", 0),
-                          ("prod_lines_deleted", 0), ("test_lines_added", 0)):
-            check(d.get(col) == want, "F6-%s" % col,
-                  "a clean worktree sitting at merge-base has a genuine %s=%d; got %r"
-                  % (col, want, d.get(col)))
+        for col in ("files_changed", "prod_lines_added", "prod_lines_deleted", "test_lines_added"):
+            check(d.get(col) == 0, "F6-%s" % col,
+                  "a clean worktree sitting at merge-base has a genuine %s=0; got %r" % (col, d.get(col)))
         check(d.get(QUALITY_KEY) == "derived", "F6-quality-source",
               "a measured zero is `derived`, not `unavailable`; got %r" % (d.get(QUALITY_KEY),))
-        check(d.get("ears_criteria_count") == 1, "F6-ears",
-              "the clean fixture's spec section carries 1 SHALL; got %r" % (d.get("ears_criteria_count"),))
+        check(d.get("ears_criteria_count") == EXPECT_CLEAN_EARS, "F6-ears",
+              "the clean fixture's spec section carries %d SHALL; got %r"
+              % (EXPECT_CLEAN_EARS, d.get("ears_criteria_count")))
+        check(d.get("skills_invoked") == 0, "F6-skills-measured-zero",
+              "this slice's pass log is the prose-only one: a MEASURED 0, which must be "
+              "distinguishable from the None fixture B gets; got %r" % (d.get("skills_invoked"),))
 
     # ---------------------------------------------------------------------------------------------
     # F5: dirty worktree -> `partial`, the FOUR diff columns null, ears/skills still measured.
     # CRASHED and PARKED rows are exactly the uncommitted-WIP case, so an implementation that
     # reports the committed diff here publishes a number that is not the slice's size.
     # ---------------------------------------------------------------------------------------------
-    scratch = os.path.join(wt, "scratch-wip.txt")
+    scratch = os.path.join(wt_a, "scratch-wip.txt")
     _write(scratch, "uncommitted work in progress\n")
     d = _derive_dict("F5-dirty-partial", FX_SLICE, root, log_dir)
     if d is not None:
@@ -1411,10 +1806,13 @@ def assert_repo_fixtures(tmp):
             check(d.get(col) is None, "F5-%s-null" % col,
                   "a dirty tree's diff columns must be None, not the committed-only number "
                   "(%s=%r) and certainly not 0" % (col, d.get(col)))
-        check(d.get("ears_criteria_count") == EXPECT_EARS, "F5-ears-still-measured",
+        check(d.get("ears_criteria_count") == EXPECT_A_EARS, "F5-ears-still-measured",
               "`partial` scopes the DIFF measurement only — ears_criteria_count comes from the spec "
               "and is unaffected by a dirty tree; expected %d, got %r"
-              % (EXPECT_EARS, d.get("ears_criteria_count")))
+              % (EXPECT_A_EARS, d.get("ears_criteria_count")))
+        check(d.get("skills_invoked") == fx["skills_a"], "F5-skills-still-measured",
+              "`partial` scopes the DIFF measurement only; skills_invoked must still be %d, got %r"
+              % (fx["skills_a"], d.get("skills_invoked")))
         check(isinstance(d.get("reason"), str) and d.get("reason"), "F5-reason",
               "`partial` must carry a non-empty reason for the QUALITY(partial): ... note; got %r"
               % (d.get("reason"),))
@@ -1432,15 +1830,14 @@ def assert_repo_fixtures(tmp):
     #     files_changed=0 prod_lines_added=0 ... quality_source=derived
     # confidently, about a tree it never inspected. That is A2 in its purest form and it is the
     # NORMAL post-merge state. Only an IDENTITY assertion (rev-parse --show-toplevel == the
-    # resolved worktree path) catches it, which is precisely what this fixture forces.
+    # resolved worktree path) catches it.
     # ---------------------------------------------------------------------------------------------
-    env = _git_env(os.path.join(tmp, "fakehome"))
-    rc, _o, err = _git(root, ["worktree", "remove", "--force", wt], env)
+    rc, _o, _err = _git(root, ["worktree", "remove", "--force", wt_a], env)
     if rc != 0:
-        shutil.rmtree(wt, ignore_errors=True)
+        shutil.rmtree(wt_a, ignore_errors=True)
         _git(root, ["worktree", "prune"], env)
-    os.makedirs(wt, exist_ok=True)   # the dir exists, but it is NOT a worktree — the walk-up shape
-    rc_top, top, _e = _safe_run(["git", "-C", wt, "rev-parse", "--show-toplevel"], env=env)
+    os.makedirs(wt_a, exist_ok=True)   # exists, but is NOT a worktree — the walk-up shape
+    rc_top, top, _e = _safe_run(["git", "-C", wt_a, "rev-parse", "--show-toplevel"], env=env)
     check(rc_top == 0 and os.path.realpath(top.strip() or "/nonexistent") == os.path.realpath(root),
           "F4b-fixture-is-live",
           "the fixture no longer reproduces the walk-up (rc=%r toplevel=%r, expected %r) — without "
@@ -1450,43 +1847,42 @@ def assert_repo_fixtures(tmp):
         check(d.get(QUALITY_KEY) == "unavailable", "F4b-quality-source",
               "the resolved path is inside the ENCLOSING repo, not the slice worktree, so the row "
               "is unmeasurable: expected quality_source='unavailable', got %r. 'derived' here means "
-              "the identity assertion (rev-parse --show-toplevel) is missing"
-              % (d.get(QUALITY_KEY),))
+              "the identity assertion (rev-parse --show-toplevel) is missing" % (d.get(QUALITY_KEY),))
         for col in COLUMNS:
-            check(d.get(col) is None, "F4b-%s-null-not-zero" % col,
-                  "expected %s=None; got %r. A 0 is the fabricated zero R-C describes — git walked "
-                  "up into <root>, whose HEAD is `main`, and honestly reported an empty diff for "
-                  "the wrong tree" % (col, d.get(col)))
+            check(col in d and d.get(col) is None, "F4b-%s-null-not-zero" % col,
+                  "expected %s PRESENT and None; got %r. A 0 is the fabricated zero R-C describes — "
+                  "git walked up into <root>, whose HEAD is `main`, and honestly reported an empty "
+                  "diff for the wrong tree" % (col, d.get(col)))
         check(isinstance(d.get("reason"), str) and d.get("reason"), "F4b-reason",
               "`unavailable` must carry a non-empty reason; got %r" % (d.get("reason"),))
 
     # ---------------------------------------------------------------------------------------------
     # F4a — the simpler direction: the path does not exist at all.
     # ---------------------------------------------------------------------------------------------
-    shutil.rmtree(wt, ignore_errors=True)
+    shutil.rmtree(wt_a, ignore_errors=True)
     d = _derive_dict("F4a-worktree-absent", FX_SLICE, root, log_dir)
     if d is not None:
         check(d.get(QUALITY_KEY) == "unavailable", "F4a-quality-source",
               "an absent worktree is `unavailable`; got %r" % (d.get(QUALITY_KEY),))
         for col in COLUMNS:
-            check(d.get(col) is None, "F4a-%s-null-not-zero" % col,
-                  "expected %s=None, got %r" % (col, d.get(col)))
+            check(col in d and d.get(col) is None, "F4a-%s-null-not-zero" % col,
+                  "expected %s PRESENT and None, got %r" % (col, d.get(col)))
 
 
 # =================================================================================================
 # F8/F9/F19 — variance. Pure: rows in, (rc, lines) out. No ledger is read or written.
 # =================================================================================================
 def _healthy_rows():
+    """Ten post-cutover closing rows, one per slice, every column varied and every
+    `master_ci_after` CONFORMANT. Nothing in this fixture sits on a threshold boundary: the
+    boundary cases live in their own fixtures so that a single off-by-one there cannot move twenty
+    unrelated assertions."""
     fc = [3, 7, 12, 5, 9, 2, 14, 6, 8, 11]
     pa = [40, 120, 15, 300, 7, 55, 220, 18, 90, 5]
-    pd = [2, 30, 0, 11, 4, 60, 7, 0, 22, 9]
-    ta = [10, 0, 45, 120, 8, 33, 0, 17, 60, 25]
+    pd = [2, 30, 1, 11, 4, 60, 7, 3, 22, 9]
+    ta = [10, 4, 45, 120, 8, 33, 2, 17, 60, 25]
     ec = [4, 5, 3, 6, 4, 7, 5, 3, 4, 6]
-    sk = [1, 0, 2, 3, 1, 2, 4, 1, 0, 3]
-    # Exactly 1 of 10 is `unknown` -> a 0.10 share, which is NOT > 0.10 and therefore passes. The
-    # boundary is chosen deliberately: the R-B threshold fixture below adds ONE more and must RED.
-    ci = ["not-applicable", "green", "not-applicable", "green", "pending",
-          "not-applicable", "green", "not-applicable", "red", "unknown"]
+    sk = [1, 5, 2, 3, 1, 2, 4, 1, 6, 3]
     rows = []
     for i in range(10):
         rows.append({
@@ -1494,7 +1890,9 @@ def _healthy_rows():
             "slice": "fx-%02d" % i,
             "outcome": "FINISHED(EXIT=0)",
             "quality_source": "derived",
-            "master_ci_after": ci[i],
+            # Derived from the vocabulary, never hand-listed, so a change to CI_CONFORMANT cannot
+            # leave a stale literal behind.
+            "master_ci_after": CI_CONFORMANT[i % len(CI_CONFORMANT)],
             "files_changed": fc[i],
             "prod_lines_added": pa[i],
             "prod_lines_deleted": pd[i],
@@ -1532,15 +1930,42 @@ def _run_variance(label, rows):
 
 def _degen_line(lines, col, kind=None):
     for ln in lines:
-        if not str(ln).startswith("DEGENERATE"):
+        s = str(ln)
+        if not s.startswith("DEGENERATE"):
             continue
-        if col in str(ln) and (kind is None or kind in str(ln)):
-            return str(ln)
+        if col in s and (kind is None or kind in s):
+            return s
     return None
 
 
+def _check_degenerate(lines, col, kind, label):
+    """One DEGENERATE line naming that column and EXACTLY that kind.
+
+    The exclusivity half is not pedantry: a single blob line listing all four kind tokens satisfies
+    every kind assertion in this file while discriminating nothing, and that shape was built and
+    scored. The ladder's ORDER is what the kind token reports, so it must be singular."""
+    ln = _degen_line(lines, col, kind)
+    if not check(ln is not None, label,
+                 "no `DEGENERATE ... %s ... %s` line; lines=%s" % (col, kind, lines)):
+        return
+    others = [k for k in DEGEN_KINDS if k != kind and k in ln]
+    check(not others, label + "-single-kind",
+          "the DEGENERATE line for %s names %s in addition to %s — a line naming several kinds "
+          "reports no verdict at all: %r" % (col, others, kind, ln))
+
+
 def _has_token(lines, token):
-    return any(token in str(ln) for ln in lines)
+    """Substring match ANCHORED on the right, so `n_slices=10` does not match `n_slices=100`."""
+    pat = re.compile(re.escape(token) + r"(?![0-9A-Za-z._-])")
+    return any(pat.search(str(ln)) for ln in lines)
+
+
+def _ok_line(lines, col):
+    for ln in lines:
+        s = str(ln)
+        if s.startswith("OK ") and re.search(r"\bOK\s+" + re.escape(col) + r"\b", s):
+            return s
+    return None
 
 
 def assert_f8_degeneracy():
@@ -1549,35 +1974,39 @@ def assert_f8_degeneracy():
     rc, lines = _run_variance("F8-healthy", healthy)
     if rc is not None:
         check(rc == 0, "F8-healthy",
-              "a healthy 10-slice fixture must exit 0; got %r. lines=%s" % (rc, lines[:12]))
+              "a healthy 10-slice fixture must exit 0; got %r. lines=%s" % (rc, lines[:14]))
         check(_has_token(lines, "n_slices=10"), "F8-healthy-n-slices",
-              "the report must carry `INFO n_slices=10`; lines=%s" % (lines[:12],))
+              "the report must carry `INFO n_slices=10`; lines=%s" % (lines[:14],))
         check(_has_token(lines, "quality_source"), "F8-healthy-quality-distribution",
               "the quality_source distribution is a FIRST-CLASS line (R-F: the missingness is "
-              "non-random and correlates with well-behaved slices); lines=%s" % (lines[:12],))
+              "non-random and correlates with well-behaved slices); lines=%s" % (lines[:14],))
         check(_has_token(lines, "unavailable_rate"), "F8-healthy-unavailable-rate",
-              "the unavailable rate is a first-class line (R-F); lines=%s" % (lines[:12],))
+              "the unavailable rate is a first-class line (R-F); lines=%s" % (lines[:14],))
+        # E4's SUCCESS output. Without this a `variance` that prints three INFO lines and exits 0
+        # satisfies "print a variance summary" while reporting nothing per column.
+        for col in COLUMNS:
+            ln = _ok_line(lines, col)
+            check(ln is not None and "null_rate=" in ln and "distinct=" in ln,
+                  "E4-ok-line[%s]" % col,
+                  "every column needs an `OK <col> ... null_rate=... distinct=...` line on a "
+                  "healthy run — `healthy` must be a reported measurement, not silence. got %r"
+                  % (ln,))
 
-    # all-null
     rc, lines = _run_variance("F8-all-null", _mutate(healthy, "files_changed", [None] * 10))
     if rc is not None:
         check(rc == 1, "F8-all-null", "an all-null column must exit 1 DEGENERATE; got %r" % rc)
-        check(_degen_line(lines, "files_changed", "all-null") is not None, "F8-all-null-named",
-              "the report must name files_changed and the all-null kind; lines=%s" % (lines,))
+        _check_degenerate(lines, "files_changed", "all-null", "F8-all-null-named")
 
-    # all-identical (the spec's literal proof-of-teeth clause, non-null)
     rc, lines = _run_variance("F8-all-identical", _mutate(healthy, "files_changed", [5] * 10))
     if rc is not None:
         check(rc == 1, "F8-all-identical",
               "an all-identical column must exit 1 DEGENERATE (the spec's literal Tests clause); "
               "got %r" % rc)
-        check(_degen_line(lines, "files_changed", "all-identical") is not None,
-              "F8-all-identical-named",
-              "the report must name files_changed and the all-identical kind; lines=%s" % (lines,))
+        _check_degenerate(lines, "files_changed", "all-identical", "F8-all-identical-named")
 
     # half-null: 5 nulls, 5 DISTINCT non-nulls, so only the >=0.5 null_rate clause can fire. This
-    # is the clause that descends directly from the measured 65.8%-empty master_ci_after — without
-    # it that column would have passed as "has variance".
+    # clause descends directly from the measured 65.8%-empty master_ci_after — without it that
+    # column would have passed as "has variance".
     rc, lines = _run_variance(
         "F8-half-null",
         _mutate(healthy, "files_changed", [3, 7, 12, 5, 9, None, None, None, None, None]))
@@ -1585,30 +2014,27 @@ def assert_f8_degeneracy():
         check(rc == 1, "F8-half-null",
               "null_rate == 0.5 must exit 1 DEGENERATE(half-blind); got %r. A `> 0.5` comparison "
               "instead of `>= 0.5` passes this and is the bug the fixture is aimed at" % rc)
-        check(_degen_line(lines, "files_changed", "half-blind") is not None, "F8-half-null-named",
-              "the report must name files_changed and the half-blind kind; lines=%s" % (lines,))
+        _check_degenerate(lines, "files_changed", "half-blind", "F8-half-null-named")
 
-    # all-zero
     rc, lines = _run_variance("F8-all-zero", _mutate(healthy, "skills_invoked", [0] * 10))
     if rc is not None:
         check(rc == 1, "F8-all-zero",
               "an all-zero column must exit 1 — `0` is non-null and passes every null-based test, "
               "which is exactly the A2 hole; got %r" % rc)
-        check(_degen_line(lines, "skills_invoked") is not None, "F8-all-zero-named",
-              "the report must name skills_invoked; lines=%s" % (lines,))
+        # all-identical fires first on the ladder; the kind is asserted rather than assumed.
+        _check_degenerate(lines, "skills_invoked", "all-identical", "F8-all-zero-named")
 
-    # silent-zero-suspect: >=50% zeros but genuinely varied elsewhere, so all-identical cannot fire.
+    # zero_rate EXACTLY 0.5, with distinct>1 so all-identical cannot fire: the `>` vs `>=` twin of
+    # the half-null boundary above.
     rc, lines = _run_variance(
-        "F8-silent-zero",
-        _mutate(healthy, "skills_invoked", [0, 0, 0, 0, 0, 0, 2, 3, 4, 5]))
+        "F8-zero-rate-boundary",
+        _mutate(healthy, "skills_invoked", [0, 0, 0, 0, 0, 2, 3, 4, 5, 6]))
     if rc is not None:
-        check(rc == 1, "F8-silent-zero",
-              "zero_rate 0.6 must exit 1 DEGENERATE(silent-zero-suspect); got %r" % rc)
-        check(_degen_line(lines, "skills_invoked", "silent-zero") is not None,
-              "F8-silent-zero-named",
-              "the report must name skills_invoked and the silent-zero kind; lines=%s" % (lines,))
+        check(rc == 1, "F8-zero-rate-boundary",
+              "zero_rate == 0.5 must exit 1 DEGENERATE(silent-zero-suspect); got %r. A `> 0.5` "
+              "comparison passes this" % rc)
+        _check_degenerate(lines, "skills_invoked", "silent-zero-suspect", "F8-zero-rate-boundary-named")
 
-    # below floor
     rc, lines = _run_variance("F8-below-floor", healthy[:7])
     if rc is not None:
         check(rc == 2, "F8-below-floor",
@@ -1620,80 +2046,140 @@ def assert_f8_degeneracy():
         check(_has_token(lines, "n_slices=7"), "F8-below-floor-count",
               "the report must state n_slices=7; lines=%s" % (lines,))
 
-    # E3 teeth (R-B): (unknown + not-recorded) share > 0.10 on the folded observations.
-    ci_bad = ["not-applicable", "green", "not-applicable", "green", "pending",
-              "not-applicable", "green", "not-recorded", "red", "unknown"]
-    rc, lines = _run_variance("F8-ci-threshold", _mutate(_healthy_rows(), "master_ci_after", ci_bad))
+
+def assert_e3_conformance():
+    """E3 with teeth (orchestrator decision B). The denominator is POST-CUTOVER rows only — those
+    carrying a `quality_source` key — and NON-CONFORMANT means `master_ci_after` is not an actual
+    verdict: `unknown`, `not-recorded`, `""`, an absent key and any surviving legacy raw string all
+    count against it.
+
+    Counting only the two labels `unknown`/`not-recorded` scores the motivating corpus at 0.000 and
+    passes, which is how a column that is empty on 65.8% of rows survived the original design."""
+    # Boundary: exactly 1 of 10 == 0.10, which is NOT > 0.10 -> still green. Kept in its own
+    # fixture so a threshold off-by-one cannot silently move the healthy battery.
+    ci = [CI_CONFORMANT[i % len(CI_CONFORMANT)] for i in range(10)]
+    ci[9] = "unknown"
+    rc, lines = _run_variance("E3-boundary-exactly-10pct", _mutate(_healthy_rows(), "master_ci_after", ci))
     if rc is not None:
-        check(rc == 1, "F8-ci-threshold",
-              "2 of 10 closing rows carrying unknown/not-recorded is 0.20 > 0.10 and must exit 1 "
-              "(a report with no threshold is not a gate); got %r" % rc)
-        check(_degen_line(lines, "master_ci_after") is not None, "F8-ci-threshold-named",
+        check(rc == 0, "E3-boundary-exactly-10pct",
+              "exactly 0.10 non-conformant is NOT > 0.10 and must stay green, so the threshold "
+              "cannot be satisfied by always failing; got %r" % rc)
+
+    # Over threshold, via the two labels.
+    ci2 = list(ci)
+    ci2[8] = "not-recorded"
+    rc, lines = _run_variance("E3-over-threshold-labels",
+                              _mutate(_healthy_rows(), "master_ci_after", ci2))
+    if rc is not None:
+        check(rc == 1, "E3-over-threshold-labels",
+              "2 of 10 post-cutover rows carrying unknown/not-recorded is 0.20 > 0.10 and must "
+              "exit 1 (a report with no threshold is not a gate); got %r" % rc)
+        check(_degen_line(lines, "master_ci_after") is not None, "E3-over-threshold-named",
               "the report must name master_ci_after; lines=%s" % (lines,))
-    # ...and the boundary stays green, so the threshold cannot be satisfied by always failing.
-    rc, lines = _run_variance("F8-ci-threshold-boundary", _healthy_rows())
+
+    # THE S2 KILLER: over threshold via values that are neither label — a legacy raw string, an
+    # empty string, and an ABSENT key. An implementation counting only the two labels scores 0.000
+    # here and passes.
+    rows = _healthy_rows()
+    rows[0]["master_ci_after"] = "GREEN@15bd08b"      # a real, surviving legacy raw string
+    rows[1]["master_ci_after"] = ""
+    del rows[2]["master_ci_after"]                     # key absent entirely
+    rc, lines = _run_variance("E3-nonconformant-not-just-labels", rows)
     if rc is not None:
-        check(rc == 0, "F8-ci-threshold-boundary",
-              "exactly 0.10 is NOT > 0.10 and must stay green; got %r" % rc)
+        check(rc == 1, "E3-nonconformant-not-just-labels",
+              "3 of 10 post-cutover rows carry a value outside %s (a legacy raw string, \"\" and an "
+              "absent key) — 0.30 > 0.10 and must exit 1; got %r. Counting only the `unknown` and "
+              "`not-recorded` LABELS scores the motivating corpus at 0.000 and passes"
+              % (list(CI_CONFORMANT), rc))
+        check(_degen_line(lines, "master_ci_after") is not None,
+              "E3-nonconformant-not-just-labels-named",
+              "the report must name master_ci_after; lines=%s" % (lines,))
+
+    # SCOPE: pre-cutover rows (no `quality_source` key) are outside the denominator entirely. Five
+    # legacy rows with raw CI strings must NOT drag the rate over the threshold — that scoping is
+    # what stops this gate from being tuned to fail against its own history.
+    legacy = []
+    legacy_ci = ["GREEN@15bd08b", "success (348326ba)", "n/a (no merge this tick)",
+                 "in_progress", ""]
+    for i, raw in enumerate(legacy_ci):
+        legacy.append({"ts": "2026-07-0%dT00:00:00Z" % (i + 1), "slice": "legacy-%d" % i,
+                       "outcome": "MERGED", "master_ci_after": raw})
+    rc, lines = _run_variance("E3-pre-cutover-excluded", _healthy_rows() + legacy)
+    if rc is not None:
+        check(rc == 0, "E3-pre-cutover-excluded",
+              "rows with no `quality_source` key are PRE-cutover and are not part of the E3 "
+              "denominator; 5 legacy raw strings alongside 10 conformant post-cutover rows must "
+              "stay green, got %r. (Their missing columns raise null_rate to 5/15 = 0.33, which is "
+              "below the 0.5 half-blind clause, so this fixture isolates the CI scope.)" % rc)
 
 
 def assert_f9_vacuity():
-    """F9 — THE VACUITY TOOTH. Blank each of the six columns in turn.
+    """F9 — THE VACUITY SWEEP. Every column against every degeneracy shape.
 
-    Kills: an implementation that computes the ladder for `files_changed` and then reports OK for
-    everything else (the cheapest way to make F8 pass), and any implementation that iterates a
-    hardcoded subset of the columns. Every one of the six must be able to RED on its own, and the
-    report must NAME the offending column — a bare exit 1 does not tell a reader which column
-    collapsed, which is the entire deliverable of E4."""
+    Kills: an implementation that ladders `files_changed` and reports OK for everything else (the
+    cheapest way to pass F8); one that iterates a hardcoded subset of the columns; and one that
+    implements only the clause the previous battery happened to exercise per column — `all-identical`
+    used to be tested on `files_changed` alone and the zero clauses on `skills_invoked` alone."""
     healthy = _healthy_rows()
+    shapes = (
+        ("all-null", [None] * 10),
+        ("all-identical", [5] * 10),
+        ("half-blind", [3, 7, 12, 5, 9, None, None, None, None, None]),
+        # zero_rate exactly 0.5 with distinct>1, so the silent-zero clause is the only one that
+        # can fire — the per-column form of the `>` vs `>=` boundary.
+        ("silent-zero-suspect", [0, 0, 0, 0, 0, 2, 3, 4, 5, 6]),
+    )
     for col in COLUMNS:
-        rc, lines = _run_variance("F9-blank[%s]" % col, _mutate(healthy, col, [None] * 10))
-        if rc is None:
-            continue
-        check(rc == 1, "F9-blank[%s]" % col,
-              "blanking %s must exit 1 DEGENERATE; got %r. An implementation that only checks "
-              "files_changed returns 0 here for the other five columns" % (col, rc))
-        check(_degen_line(lines, col, "all-null") is not None, "F9-named[%s]" % col,
-              "the report must name %s as all-null; lines=%s" % (col, lines))
+        for kind, values in shapes:
+            lab = "F9-%s[%s]" % (kind, col)
+            rc, lines = _run_variance(lab, _mutate(healthy, col, values))
+            if rc is None:
+                continue
+            check(rc == 1, lab,
+                  "%s shaped as %s must exit 1 DEGENERATE; got %r" % (col, kind, rc))
+            _check_degenerate(lines, col, kind, lab + "-named")
 
 
 def assert_f19_fold_per_slice():
     """F19 — one observation per slice.
 
-    (a) A slice with 4 closing rows votes ONCE, and the fold prefers `derived` over `replayed`, so
-        a replayed row can never displace the measurement it copied.
+    (a) Every slice gets a later `replayed` row. If the fold takes the last row rather than
+        preferring `derived`, HALF of them are null and the other half are all 999 — either clause
+        REDs. A correct fold sees the original ten and exits 0. This is a VALUE assertion: the
+        earlier version only matched a `derived=10 replayed=0` token, which a distribution line
+        can print without the fold being right.
     (b) A corpus of 7 distinct slices spread over 10 rows is BELOW the floor. An unfolded
-        implementation counts 10 and reports a green gate over a 7-slice sample — which is exactly
-        the "non-null on 5 rows is not a gate" failure ADR-0010 names."""
+        implementation counts 10 and reports a green gate over a 7-slice sample — exactly the
+        "non-null on 5 rows is not a gate" failure ADR-0010 names."""
     healthy = _healthy_rows()
 
     replays = []
-    for i in range(3):
-        d = dict(healthy[0])
+    for i in range(10):
+        d = dict(healthy[i])
+        d["ts"] = "2026-08-20T00:00:0%dZ" % (i % 10)
         d["outcome"] = "MERGED"
         d["quality_source"] = "replayed"
-        d["files_changed"] = 999 + i          # different numbers, same slice
+        d["files_changed"] = None if i < 5 else 999
         replays.append(d)
-    rows_a = healthy + replays
-    rc, lines = _run_variance("F19a-fold", rows_a)
+    rc, lines = _run_variance("F19a-fold", healthy + replays)
     if rc is not None:
         check(rc == 0, "F19a-fold-exit",
-              "13 rows over 10 slices is still a healthy 10-slice sample; got %r" % rc)
+              "20 rows over 10 slices is still a healthy 10-slice sample; got %r. A last-row-wins "
+              "fold sees 5 nulls and 5x999 -> half-blind or all-identical -> 1" % rc)
         check(_has_token(lines, "n_slices=10"), "F19a-fold-n-slices",
-              "expected `n_slices=10` after folding (13 rows, 10 slices); lines=%s" % (lines[:12],))
-        check(_has_token(lines, "n_rows=13"), "F19a-fold-n-rows",
-              "expected `n_rows=13` so a reader can see the fold happened; lines=%s" % (lines[:12],))
+              "expected `n_slices=10` after folding (20 rows, 10 slices); lines=%s" % (lines[:14],))
+        check(_has_token(lines, "n_rows=20"), "F19a-fold-n-rows",
+              "expected `n_rows=20` so a reader can see the fold happened; lines=%s" % (lines[:14],))
         check(_has_token(lines, "derived=10") and _has_token(lines, "replayed=0"),
               "F19a-fold-prefers-derived",
-              "the fold must PREFER quality_source='derived': expected derived=10 replayed=0 in the "
-              "distribution line. A last-row-wins fold reports replayed=1 and publishes 999 as "
-              "fx-00's size. lines=%s" % (lines[:12],))
+              "the distribution must show derived=10 replayed=0 — the fold PREFERS `derived` over "
+              "`replayed`, so a replayed row can never displace the measurement it copied. "
+              "lines=%s" % (lines[:14],))
 
-    rows_b = []
-    for i in range(7):
-        rows_b.append(healthy[i])
+    rows_b = list(healthy[:7])
     for i in range(3):
         d = dict(healthy[0])
+        d["ts"] = "2026-08-21T00:00:0%dZ" % i
         d["outcome"] = "MERGED"
         d["files_changed"] = 40 + i
         rows_b.append(d)
@@ -1703,7 +2189,7 @@ def assert_f19_fold_per_slice():
               "10 rows drawn from 7 slices is below N_MIN_SLICES=%d and must exit 2; got %r — 0 "
               "means rows were counted instead of slices" % (N_MIN_SLICES, rc))
         check(_has_token(lines, "n_slices=7"), "F19b-fold-floor-count",
-              "expected `n_slices=7`; lines=%s" % (lines[:12],))
+              "expected `n_slices=7`; lines=%s" % (lines[:14],))
 
     # Non-closing rows must never reach the statistics at all (D2/A4): they carry no columns, and
     # counting them would inflate both n_slices and every zero rate.
@@ -1720,67 +2206,225 @@ def assert_f19_fold_per_slice():
               "non-closing rows must be filtered before anything is computed; got %r" % rc)
         check(_has_token(lines, "n_slices=10"), "F19c-non-closing-excluded",
               "expected n_slices=10 — the 5 `tick-ok` rows are not slice closures and their zeros "
-              "must not enter the zero_rate; lines=%s" % (lines[:12],))
+              "must not enter the zero_rate; lines=%s" % (lines[:14],))
 
 
 # =================================================================================================
-# Static safety pin (R-D). `shell=True` is never legitimate in this tool: every git call is
-# list-argv by contract, and a shell hop is how an unsanitised slice id becomes a command.
+# CLI — the spec's Tests clause says "the query SCRIPT REDs on a synthetic ledger", not "a function
+# returns 1". Everything above tests `variance()` in-process; this runs the committed script.
 # =================================================================================================
-def assert_no_shell_true():
-    # The needle is ASSEMBLED at runtime rather than written as a literal: a checker that spells
-    # out the forbidden token is itself a hit and would red permanently on its own source.
-    needle = "shell" + "=" + "True"
+def _write_ledger(path, rows, extra_lines=()):
+    with open(path, "w") as fh:
+        for r in rows:
+            fh.write(json.dumps(r) + "\n")
+        for ln in extra_lines:
+            fh.write(ln + "\n")
+
+
+def _run_variance_cli(path):
+    return _safe_run([sys.executable, os.path.abspath(__file__), "variance", "--ledger", path])
+
+
+def assert_variance_cli(tmp):
+    healthy = _healthy_rows()
+
+    p = os.path.join(tmp, "healthy.jsonl")
+    _write_ledger(p, healthy)
+    rc, out, err = _run_variance_cli(p)
+    check(rc == 0, "CLI-healthy-rc0",
+          "`mr-slice-quality variance --ledger <healthy>` must exit 0; rc=%r stderr=%r"
+          % (rc, err.strip()[:200]))
+    check("n_slices=10" in out, "CLI-healthy-stdout",
+          "the report goes to STDOUT (a consumer pipes it); got %r" % (out[:300],))
+
+    p = os.path.join(tmp, "allnull.jsonl")
+    _write_ledger(p, _mutate(healthy, "files_changed", [None] * 10))
+    rc, out, err = _run_variance_cli(p)
+    check(rc == 1, "CLI-all-null-rc1",
+          "the SCRIPT must exit 1 on an all-null column — this is the spec's literal proof-of-teeth "
+          "clause; rc=%r stderr=%r" % (rc, err.strip()[:200]))
+    check("DEGENERATE" in out and "files_changed" in out, "CLI-all-null-stdout",
+          "stdout must name the degenerate column; got %r" % (out[:300],))
+
+    p = os.path.join(tmp, "belowfloor.jsonl")
+    _write_ledger(p, healthy[:7])
+    rc, out, err = _run_variance_cli(p)
+    check(rc == 2, "CLI-below-floor-rc2",
+          "the SCRIPT must exit 2 INSUFFICIENT-DATA below the floor, never 0; rc=%r stderr=%r"
+          % (rc, err.strip()[:200]))
+
+    # A corrupt line in an append-only ledger is a fact of life (a partial write, a crashed
+    # writer). It must be skipped, not fatal, and must not change the verdict.
+    p = os.path.join(tmp, "garbage.jsonl")
+    _write_ledger(p, healthy, extra_lines=("{ this is not json", "", "   "))
+    rc, out, err = _run_variance_cli(p)
+    check(rc == 0, "CLI-unparseable-line-skipped",
+          "an unparseable ledger line must be skipped, not crash the query and not flip the "
+          "verdict; rc=%r stderr=%r" % (rc, err.strip()[:200]))
+
+    # A missing ledger is an IO error, not a green gate.
+    rc, out, err = _run_variance_cli(os.path.join(tmp, "does-not-exist.jsonl"))
+    check(rc == 3, "CLI-missing-ledger-rc3",
+          "a missing ledger must exit 3 (usage/IO), never 0; rc=%r" % (rc,))
+
+
+# =================================================================================================
+# T4 — STATIC assertions about mr-native-tick.sh. The implementer could otherwise skip that file
+# entirely and stay green: nothing else in the slice observes it.
+#
+# Read from $MEM's copy — the gate attesting the corpus it ships beside, NOT the subject-root
+# singleton the measurement uses (see TWO ROOTS in the module header): a worktree that edits the
+# tick must be gated on its own edit. Anchored by CONTENT, never by line number.
+# =================================================================================================
+def assert_tick_call_sites():
+    tick = os.path.join(MEM, "mr-native-tick.sh")
+    if not check(os.path.isfile(tick), "T4-tick-present",
+                 "mr-native-tick.sh not found at %s — extraction has rotted" % tick):
+        return
+    try:
+        with open(tick, errors="replace") as fh:
+            src = fh.read()
+    except OSError as exc:
+        check(False, "T4-tick-readable", "cannot read %s: %s" % (tick, exc))
+        return
+
+    # Join backslash continuations so a two-line invocation is examined as one statement — the
+    # FINISHED write is written across two lines and its flags could land on either.
+    joined = src.replace("\\\n", " ")
+    all_writes = [ln.strip() for ln in joined.splitlines()
+                  if re.search(r"mr-record\"?\s+ledger\b", ln) and not ln.lstrip().startswith("#")]
+    # ORCHESTRATOR CORRECTION (2026-08-18, plan-review round): the original expectation was
+    # `len(all_writes) == 2` and it was factually WRONG about production — mr-native-tick.sh has
+    # THREE ledger writers, and the third is legitimate. The reconcile pair (`--run_id
+    # "wrapper-reconcile"`, the FINISHED and CRASHED writes) emits SLICE rows and is what T4 gates;
+    # the SUPERVISOR write emits a `tick-ok` BOOKKEEPING row, which is NOT a closing row and must
+    # therefore never claim a CI verdict. Partitioning is strictly stronger than the count it
+    # replaces: it pins the exclusion as a property instead of leaving it as an off-by-one.
+    stmts = [s for s in all_writes if "wrapper-reconcile" in s]
+    others = [s for s in all_writes if "wrapper-reconcile" not in s]
+    if not check(len(stmts) == 2, "T4-two-reconcile-ledger-writes",
+                 "expected exactly 2 `--run_id \"wrapper-reconcile\"` ledger invocations in "
+                 "mr-native-tick.sh (the FINISHED and CRASHED reconcile writes, the only writers "
+                 "that close a SLICE), found %d — extraction has rotted or the reconcile grew a "
+                 "third writer that also needs the flags" % len(stmts)):
+        return
+    for stmt in others:
+        check(re.search(r"--ci\s", stmt) is None,
+              "T4-supervisor-write-claims-no-ci",
+              "a non-reconcile ledger write in mr-native-tick.sh passes `--ci`. SUPERVISOR "
+              "`tick-ok` rows are wrapper bookkeeping, not closing rows (mr-record refuses them "
+              "without MR_RECORD_WRAPPER=1), so they must not claim a master-CI verdict — doing "
+              "so would put a vocabulary value on a row the reader never folds. line=%s"
+              % stmt[:200])
+    for stmt in stmts:
+        tag = "FINISHED" if "FINISHED" in stmt else ("CRASHED" if "CRASHED" in stmt else "?")
+        check(re.search(r"--ci\s+\"?not-applicable\"?", stmt) is not None,
+              "T4-ci-not-applicable[%s]" % tag,
+              "the %s reconcile write must pass `--ci not-applicable`: these are PRE-MERGE rows, "
+              "so `master CI after this slice` is not yet a defined property, and that single "
+              "change converts most of the measured 65.8%%-empty mass into a truthful "
+              "closed-vocabulary value. line=%s" % (tag, stmt[:200]))
+        check(re.search(r"\btimeout\s+60\s+\"?\$?\{?MEM", stmt) is not None
+              or re.search(r"\btimeout\s+60\b[^\n]*mr-record", stmt) is not None,
+              "T4-timeout-60[%s]" % tag,
+              "the %s reconcile write must be prefixed by `timeout 60` (R-D): the tick bumps both "
+              "heartbeats BEFORE the reconcile and takes its flock 184 lines later, so a stall "
+              "here leaves the loop looking alive while nothing progresses — byte-for-byte the "
+              "~2-days-undetected failure the README records. Precedent: the handoff write already "
+              "does this. line=%s" % (tag, stmt[:200]))
+
+    sc = [ln.strip() for ln in joined.splitlines()
+          if re.search(r"\$MEM/mr-selfcheck", ln) and not ln.lstrip().startswith("#")]
+    if check(len(sc) >= 1, "T4-selfcheck-invocation-present",
+             "no live `$MEM/mr-selfcheck` invocation found in mr-native-tick.sh"):
+        for ln in sc:
+            check(re.search(r"\btimeout\s+300\b", ln) is not None, "T4-selfcheck-timeout-300",
+                  "the mr-selfcheck invocation must be wrapped in `timeout 300`. This slice adds a "
+                  "behavioural block to mr-selfcheck that runs a real git fixture and a real "
+                  "mr-record, so the gate is no longer instantaneous — and it runs inside the "
+                  "tick's post-heartbeat, pre-flock window. line=%s" % ln[:200])
+
+
+# =================================================================================================
+# Static safety pins. The module header claims two properties; without these they are decoration.
+# The region split is by BANNER, and a failure to find the banners is itself a failure.
+# =================================================================================================
+_IMPL_BANNER = "===== IMPLEMENTER-OWNED REGION ====="
+_TESTER_BANNER = "===== TESTER-OWNED REGION ====="
+
+
+def _implementer_region():
     try:
         with open(os.path.abspath(__file__), errors="replace") as fh:
             src = fh.read()
     except OSError as exc:
-        check(False, "S1-source-readable", "cannot read own source: %s" % exc)
+        return None, "cannot read own source: %s" % exc
+    i = src.find(_IMPL_BANNER)
+    j = src.find(_TESTER_BANNER)
+    if i < 0 or j < 0 or j <= i:
+        return None, "region banners not found (impl=%d tester=%d) — the static pins below are " \
+                     "scanning nothing" % (i, j)
+    return src[i:j], None
+
+
+def assert_static_safety():
+    region, err = _implementer_region()
+    if not check(region is not None, "S1-region-split", err or ""):
         return
-    check(needle not in src, "S1-no-shell-hop",
-          "mr-slice-quality must never run a subprocess through a shell — every git call is "
+    # Needles are ASSEMBLED at runtime: a checker that spells out the forbidden token is itself a
+    # hit, which is how the previous version of this check made --selftest permanently unfixable.
+    shell_pat = re.compile("shell" + r"\s*=\s*" + "True")
+    check(shell_pat.search(region) is None, "S1-no-shell-hop",
+          "the implementer region must never run a subprocess through a shell — every git call is "
           "list-argv by contract (R-D), and a shell hop turns an unsanitised slice id into a command")
+    subproc_pat = re.compile(r"\bsubprocess\s*\.")
+    hits = subproc_pat.findall(region)
+    check(not hits, "S16-subprocess-only-via-safe-run",
+          "the implementer region references `subprocess.` %d time(s). Every child process must go "
+          "through _safe_run in the SHARED region, which is what refuses to execute the tick, spawn "
+          "a paid session, or name the kill-switch flag — the module header claims that property "
+          "and this is what enforces it" % len(hits))
 
 
 # =================================================================================================
 # Non-pollution. The ledger is the durable standdown record and is append-only (ADR-0011); nothing
-# in a TEST may add a byte to it. Both the SELF-LOCATED copies (this worktree) and the hardcoded
-# PRODUCTION copies are watched, because mr-record's `MEM=` points at the production path
-# regardless of which copy of a tool is invoked — a buggy implementation writes THERE while the
-# self-located files stay clean, which is a false green on exactly the property this check exists
-# for (the same blind spot mr-telemetry-selftest's T10 had to close).
+# in a TEST may add a byte to it. Both the SELF-LOCATED copies and the hardcoded PRODUCTION copies
+# are watched, because mr-record's `MEM=` points at the production path regardless of which copy of
+# a tool is invoked — a buggy implementation writes THERE while the self-located files stay clean.
 #
-# Deliberately NOT a byte/sha snapshot of those files: the real ledger legitimately GROWS while
-# this runs (mr-selfcheck is invoked from the hourly tick, which also writes rows), so a hash
-# compare would be a flake, and a flaky gate gets disabled — the failure mode this corpus keeps
-# re-learning. The property that actually matters is narrower and stable: NONE OF OUR BYTES may
-# appear in the real corpus, and none of our fixture artifacts may be left behind in $MEM.
+# Deliberately NOT a byte/sha snapshot: the real ledger legitimately GROWS while this runs
+# (mr-selfcheck is invoked from the hourly tick, which also writes rows), so a hash compare would
+# be a flake — and a flaky gate gets disabled. The stable property is narrower: NONE OF OUR BYTES
+# may appear in the real corpus.
 # =================================================================================================
-_PROD_MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
 _WATCHED = [
     os.path.join(MEM, "monster-realm-usage-ledger.jsonl"),
     os.path.join(MEM, "monster-realm-handoff.md"),
-    os.path.join(_PROD_MEM, "monster-realm-usage-ledger.jsonl"),
-    os.path.join(_PROD_MEM, "monster-realm-handoff.md"),
+    os.path.join(PROD_HARNESS_ROOT, "memory", "projects", "monster-realm-usage-ledger.jsonl"),
+    os.path.join(PROD_HARNESS_ROOT, "memory", "projects", "monster-realm-handoff.md"),
 ]
-_FIXTURE_MARKERS = ("lp-fixture-", "f18-root", "mr-slice-quality-repo-")
+_FIXTURE_MARKERS = ("lp-fixture-", "f18-root", "mr-slice-quality-repo-", "seam-fixture-slice")
 
 
 def _fixture_bytes_in(path):
+    """Returns (markers_found, io_error). An UNREADABLE watched file is NOT treated as clean —
+    that distinction is the difference between `nothing was written` and `we could not look`."""
     try:
         with open(path, errors="replace") as fh:
             text = fh.read()
-    except OSError:
-        return []
-    return [m for m in _FIXTURE_MARKERS if m in text]
+    except FileNotFoundError:
+        return [], None
+    except OSError as exc:
+        return [], "%s: %s" % (type(exc).__name__, exc)
+    return [m for m in _FIXTURE_MARKERS if m in text], None
 
 
 def _fixture_leftovers_in_mem():
     try:
         names = os.listdir(MEM)
-    except OSError:
-        return []
-    return sorted(n for n in names if any(m in n for m in _FIXTURE_MARKERS))
+    except OSError as exc:
+        return None, "%s: %s" % (type(exc).__name__, exc)
+    return sorted(n for n in names if any(m in n for m in _FIXTURE_MARKERS)), None
 
 
 # =================================================================================================
@@ -1794,14 +2438,18 @@ def selftest():
         ("ci-absent", lambda tmp: assert_f12_absent_ci()),
         ("is-closing", lambda tmp: assert_is_closing()),
         ("worktree-path", lambda tmp: assert_worktree_path_for()),
+        ("root-seam", assert_root_env_seam),
         ("skills", assert_f16_skills),
         ("ears", assert_f17_ears),
         ("bad-slice-ids", assert_f18_bad_slice_ids),
         ("repo", assert_repo_fixtures),
         ("degeneracy", lambda tmp: assert_f8_degeneracy()),
+        ("e3-conformance", lambda tmp: assert_e3_conformance()),
         ("vacuity", lambda tmp: assert_f9_vacuity()),
         ("fold", lambda tmp: assert_f19_fold_per_slice()),
-        ("static", lambda tmp: assert_no_shell_true()),
+        ("variance-cli", assert_variance_cli),
+        ("tick-call-sites", lambda tmp: assert_tick_call_sites()),
+        ("static", lambda tmp: assert_static_safety()),
     )
     for name, fn in stages:
         try:
@@ -1812,12 +2460,17 @@ def selftest():
                   "the fixture stage itself raised %s: %s" % (type(exc).__name__, exc))
 
     for path in _WATCHED:
-        hits = _fixture_bytes_in(path)
+        hits, io_err = _fixture_bytes_in(path)
+        check(io_err is None, "P1-watched-readable[%s]" % os.path.basename(path),
+              "could not read %s to verify non-pollution (%s) — `unreadable` is not `clean`"
+              % (path, io_err))
         check(not hits, "P1-no-pollution[%s]" % os.path.basename(path),
-              "%s contains fixture marker(s) %s — a fixture reached the real corpus instead of its "
-              "tempdir. The ledger is append-only (ADR-0011) and a test row in it is unremovable."
-              % (path, hits))
-    leftovers = _fixture_leftovers_in_mem()
+              "%s contains fixture marker(s) %s — a fixture reached the real corpus instead of "
+              "its tempdir. The ledger is append-only (ADR-0011) and a test row in it is "
+              "unremovable." % (path, hits))
+    leftovers, io_err = _fixture_leftovers_in_mem()
+    check(io_err is None, "P1-mem-listable",
+          "could not list %s to verify non-pollution (%s)" % (MEM, io_err))
     check(not leftovers, "P1-no-fixture-leftovers-in-MEM",
           "the selftest left fixture artifact(s) in %s: %s" % (MEM, leftovers))
 
@@ -1827,7 +2480,8 @@ def selftest():
             if detail:
                 line += ": %s" % detail
             print(line)
-        print("SLICE-QUALITY-SELFTEST-FAIL summary: %d of %d assertion(s) failed"
+        print("SLICE-QUALITY-SELFTEST-FAIL summary: %d of %d assertion(s) failed "
+              "(~40 are dependent restatements — read the ids, not the count)"
               % (len(_FAILURES), _ASSERTIONS))
         return 1
     print("SLICE-QUALITY-SELFTEST-OK %d assertions" % _ASSERTIONS)
