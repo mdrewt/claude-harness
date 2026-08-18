@@ -210,7 +210,14 @@ def lp02_derive(sl):
         if p.returncode!=0: return blank
         d=json.loads(out)
         if not isinstance(d,dict): return blank
-        row=dict((c,d.get(c)) for c in CI_COLUMNS)
+        # COERCE, never copy verbatim. The ledger is append-only and a bad row can never be
+        # removed, so a helper that returned a string (or a float, or a dict) for a COUNT column
+        # would permanently corrupt the SSOT and break every arithmetic reader downstream. Anything
+        # that is not a non-negative integer becomes None — the honest "unmeasurable" value.
+        def _count(v):
+            if isinstance(v,bool) or not isinstance(v,int) or v<0: return None
+            return v
+        row=dict((c,_count(d.get(c))) for c in CI_COLUMNS)
         q=d.get("quality_source")
         row["quality_source"]=q if q in ("derived","replayed","partial","unavailable") else "unavailable"
         row["reason"]=str(d.get("reason") or "")

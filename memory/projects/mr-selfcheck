@@ -801,7 +801,12 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-lp02-") as TMP:
                      ["config", "user.email", "lp02@fixture.invalid"],
                      ["config", "user.name", "lp02 fixture"],
                      ["config", "commit.gpgsign", "false"],
-                     ["config", "diff.renames", "true"]):
+                     # ORCHESTRATOR CORRECTION (verifier gate B): pinned FALSE, not true.
+                     # `-M` is a NO-OP whenever diff.renames=true, so pinning true made the
+                     # rename tooth INERT — dropping `-M` from derive() left the whole battery
+                     # green at 640/640. Pinned false, the fixture is also strictly MORE
+                     # hermetic: it now defends against both settings of the operator config.
+                     ["config", "diff.renames", "false"]):
             rc, _o, err = git(ROOT, args, env)
             if rc != 0:
                 setup_error = "git %s failed rc=%r %s" % (args[0], rc, err.strip()[:120])
