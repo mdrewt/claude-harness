@@ -231,6 +231,35 @@ def _safe_run(argv, cwd=None, timeout=120, env=None):
 # #################################################################################################
 
 
+# --- normalize_ci token tables (plan R-B + orchestrator decision C) ------------------------------
+# Word-bounded throughout. `\bred\b` rather than a substring is load-bearing: the real corpus
+# value `rerun-triggered` contains "red" (trigge-RED) and is a PENDING row.
+_CI_RED_RE = re.compile(r"\bred\b|\bfail(?:ed|ure|ing|s)?\b|\bbroken\b")
+_CI_HEDGE_RE = re.compile(
+    r"\bunverified\b|\bexpected\b|\bassumed\b|\bpresumed\b|\bflak(?:e|ed|y|es)\b"
+    r"|\bcancel(?:led|ed|s)?\b|\bunmerged\b|\bstood\s+down\b|\bpre-merge\b"
+    r"|\bnot\s+verified\b")
+# `no-remote-ci*` is consumed as a UNIT before family scanning, so the real corpus value
+# `no-remote-ci-local-gate-green` is one not-applicable family rather than a green/na compound.
+# A lowercase, non-word sentinel: `low` is already lowercased, so an uppercase
+# marker would never match the membership test below.
+_CI_NA_MARK = " \x00na\x00 "
+_CI_NA_UNIT_RE = re.compile(r"\bno[-_ ]remote[-_ ]ci[a-z0-9._-]*")
+_CI_NA_RE = re.compile(r"\bn/a\b|\bnot[-_ ]applicable\b")
+_CI_GREEN_RE = re.compile(r"\bgreen\b|\bsuccess(?:ful)?\b|\bpass(?:ed|ing)?\b|\bok\b")
+_CI_PENDING_RE = re.compile(
+    r"\bpending\b|\bin[-_ ]?progress\b|\bqueued\b|\brerun[a-z-]*|\bre-run[a-z-]*|\bretry\b"
+    r"|\bretriggered\b|\brunning\b")
+
+# --- classify_path tables (plan D5, first match wins) -------------------------------------------
+_TEST_SEGMENTS = {"tests", "test", "__tests__", "e2e", "evals", "fixtures"}
+_TEST_BASENAME_RE = re.compile(r"[._-](?:test|spec|eval)\.[A-Za-z0-9]+$")
+_TEST_PY_RE = re.compile(r"^test_.*\.py$")
+_MR_SELFTEST_RE = re.compile(r"^mr-.*selftest$")
+_OTHER_EXTS = {".md", ".mdx", ".txt", ".rst"}
+_OTHER_BASENAMES = {"Cargo.lock", "package-lock.json", "pnpm-lock.yaml"}
+
+
 def normalize_ci(raw):
     """Map an arbitrary `--ci` string onto the closed vocabulary (E3, plan R-B).
 
@@ -271,9 +300,36 @@ def normalize_ci(raw):
          compound. R-B names this string explicitly as one the new rule handles.
       5. else -> ("unknown", <raw stripped, truncated to CI_RAW_NOTE_MAX>)
     """
-    raise NotImplementedError(
-        "lp-02 RED: normalize_ci() is not implemented — the closed-vocabulary `--ci` mapper (E3, "
-        "plan R-B plus the hedge rule) does not exist yet")
+
+    if not isinstance(raw, str):
+        return ("not-recorded", None)
+    s = raw.strip()
+    if not s:
+        return ("not-recorded", None)
+    low = s.lower()
+    note = s[:CI_RAW_NOTE_MAX]
+    # 1. RED anywhere. Word-bounded: the real corpus value `rerun-triggered` contains "red".
+    if _CI_RED_RE.search(low):
+        return ("red", None)
+    # 2. HEDGE anywhere. An unverified / flaked / cancelled / expected / pre-merge claim is not a
+    #    verdict; 11 real corpus rows land here and every one of them used to map to `green`.
+    if _CI_HEDGE_RE.search(low):
+        return ("unknown", note)
+    # 3/4. Which verdict FAMILIES does the string name? `no-remote-ci*` is consumed as a unit
+    #      first, so `no-remote-ci-local-gate-green` is one not-applicable family, not a compound.
+    scan = _CI_NA_UNIT_RE.sub(_CI_NA_MARK, low)
+    fams = set()
+    if _CI_NA_MARK.strip() in scan or _CI_NA_RE.search(scan):
+        fams.add("not-applicable")
+    if _CI_GREEN_RE.search(scan):
+        fams.add("green")
+    if _CI_PENDING_RE.search(scan):
+        fams.add("pending")
+    if len(fams) >= 2:
+        return ("unknown", note)
+    if len(fams) == 1:
+        return (fams.pop(), None)
+    return ("unknown", note)
 
 
 def classify_path(path):
@@ -307,9 +363,31 @@ def classify_path(path):
     through a real diff with distinct line counts per file, so a table or a substring rule produces
     the wrong `prod_lines_added` / `test_lines_added` totals there.
     """
-    raise NotImplementedError(
-        "lp-02 RED: classify_path() is not implemented — the TEST/OTHER/PROD line classifier "
-        "(plan D5, first-match-wins) does not exist yet")
+
+    p = str(path).replace("\\", "/").strip("/")
+    if not p:
+        return "prod"
+    segs = p.split("/")
+    base = segs[-1]
+    dirs = segs[:-1]
+    # 1. TEST
+    if any(sg in _TEST_SEGMENTS for sg in segs):
+        return "test"
+    if _TEST_BASENAME_RE.search(base) or _TEST_PY_RE.match(base) or base.endswith("_tests.rs"):
+        return "test"
+    if base == "mr-selfcheck" or _MR_SELFTEST_RE.match(base):
+        return "test"
+    # 2. OTHER
+    if os.path.splitext(base)[1].lower() in _OTHER_EXTS:
+        return "other"
+    if dirs[:1] == ["docs"]:
+        return "other"
+    if base in _OTHER_BASENAMES:
+        return "other"
+    if any("bindings" in sg for sg in dirs):
+        return "other"
+    # 3. PROD
+    return "prod"
 
 
 def is_closing(slice_, outcome):
@@ -324,9 +402,15 @@ def is_closing(slice_, outcome):
     `mr-record` carries its own inline copy of this predicate on purpose — see ACCEPTED
     DUPLICATION in the module header. Keep the two in step; both are tested.
     """
-    raise NotImplementedError(
-        "lp-02 RED: is_closing() is not implemented — the closing-row predicate (plan D2) does not "
-        "exist yet")
+
+    if slice_ == "SUPERVISOR":
+        return False
+    if not isinstance(outcome, str):
+        return False
+    head = outcome.strip().upper()
+    if head.startswith("CORRECTION"):
+        return False
+    return head.startswith(("MERGED", "FINISHED", "CRASHED", "PARKED"))
 
 
 def count_skill_invocations(log_path):
@@ -348,9 +432,50 @@ def count_skill_invocations(log_path):
       * A parseable log with no Skill blocks -> 0.
       * Unparseable individual lines are skipped, never fatal.
     """
-    raise NotImplementedError(
-        "lp-02 RED: count_skill_invocations() is not implemented — the stream-json tool_use "
-        "counter (plan R-E, dedup by block id) does not exist yet")
+
+    if not log_path:
+        return None
+    try:
+        fh = open(log_path, errors="replace")
+    except OSError:
+        return None
+    seen = set()
+    parsed = 0
+    try:
+        with fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                if not isinstance(obj, dict):
+                    continue
+                parsed += 1
+                if obj.get("type") != "assistant":
+                    continue
+                msg = obj.get("message")
+                if not isinstance(msg, dict):
+                    continue
+                blocks = msg.get("content")
+                if not isinstance(blocks, list):
+                    continue
+                for blk in blocks:
+                    if not isinstance(blk, dict):
+                        continue
+                    if blk.get("type") != "tool_use" or blk.get("name") != "Skill":
+                        continue
+                    # Dedupe by BLOCK id, not message id: the stream repeats a block as it
+                    # arrives, and one message may legitimately carry two distinct Skill blocks.
+                    bid = blk.get("id")
+                    seen.add(bid if bid is not None else ("\x00anon", len(seen)))
+    except OSError:
+        return None
+    if parsed == 0:
+        return None
+    return len(seen)
 
 
 def count_ears_criteria(slice_, specs_dir=None):
@@ -371,9 +496,29 @@ def count_ears_criteria(slice_, specs_dir=None):
         plausible integer for the wrong thing.
       * Measured ground truth: the `lp-02` section of M-loop-infrastructure.spec.md yields 4.
     """
-    raise NotImplementedError(
-        "lp-02 RED: count_ears_criteria() is not implemented — the anchored spec-section SHALL "
-        "counter (plan R-E) does not exist yet")
+
+    if not isinstance(slice_, str) or not slice_:
+        return None
+    if specs_dir is None:
+        specs_dir = os.path.join(harness_root(), SPEC_GLOB_DIR)
+    try:
+        names = sorted(n for n in os.listdir(specs_dir) if n.endswith(".spec.md"))
+    except OSError:
+        return None
+    head_re = re.compile(r"^### %s\b" % re.escape(slice_), re.M)
+    for name in names:
+        try:
+            with open(os.path.join(specs_dir, name), errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        m = head_re.search(text)
+        if not m:
+            continue
+        nxt = re.compile(r"^### ", re.M).search(text, m.end())
+        section = text[m.start():nxt.start()] if nxt else text[m.start():]
+        return len(re.findall(r"\bSHALL\b", section))
+    return None
 
 
 def worktree_path_for(lock, root=None):
@@ -404,9 +549,54 @@ def worktree_path_for(lock, root=None):
     risk R-E names, and as a pure string function it can carry a fixture that bites without a repo
     on disk (fixture B then proves `derive` actually calls it).
     """
-    raise NotImplementedError(
-        "lp-02 RED: worktree_path_for() is not implemented — the repo-keyed worktree resolver "
-        "(plan R-E, mirroring mr-launch.sh:29-31) does not exist yet")
+
+    if not isinstance(lock, dict):
+        return None
+    slice_ = lock.get("slice")
+    # Sanitiser BEFORE any join: a hostile id must never reach a filesystem call.
+    if not isinstance(slice_, str) or not SLICE_ID_RE.fullmatch(slice_):
+        return None
+    if root is None:
+        root = harness_root()
+    repo = lock.get("repo") or ""
+    if repo == "harness":
+        return os.path.join(root, ".claude", "worktrees", slice_)
+    return os.path.join(root, PROD_PROJECT_ROOT, ".claude", "worktrees", slice_)
+
+
+_QUALITY_PREF = {"derived": 4, "replayed": 3, "partial": 2, "unavailable": 1}
+
+
+def _QUALITY_RANK(row):
+    """Fold preference (plan R-F). An absent quality_source ranks below every present value."""
+    return _QUALITY_PREF.get(row.get(QUALITY_KEY), 0)
+
+
+def _git_child_env():
+    """A hermetic, non-interactive git environment. Never fetches, never prompts, never waits on
+    an optional lock — the tick bumps its heartbeats BEFORE the reconcile and takes its flock 184
+    lines later, so a stall here leaves the loop looking alive while nothing progresses."""
+    env = dict(os.environ)
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    for k in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
+        env.pop(k, None)
+    return env
+
+
+def _numstat_dest(path):
+    """The destination path of a numstat record, which may be a rename in either git form:
+    `old => new` or the braced `a/{old => new}/b`. A rename counts ONCE, classified on the
+    destination — misreading it as the source silently misclassifies moved files."""
+    p = path.strip()
+    if "{" in p and "=>" in p and "}" in p:
+        pre, rest = p.split("{", 1)
+        mid, post = rest.split("}", 1)
+        return (pre + mid.split("=>", 1)[1].strip() + post).replace("//", "/")
+    if "=>" in p:
+        return p.split("=>", 1)[1].strip()
+    return p
 
 
 def derive(slice_, root=None, log_dir=None):
@@ -477,9 +667,117 @@ def derive(slice_, root=None, log_dir=None):
     list-argv only and NEVER a shell hop, read-only git subcommands only, never `fetch`,
     GIT_TERMINAL_PROMPT=0, GIT_OPTIONAL_LOCKS=0, per-call timeouts, every call through `_safe_run`.
     """
-    raise NotImplementedError(
-        "lp-02 RED: derive() is not implemented — nothing measures files_changed / prod_lines_* / "
-        "test_lines_added / ears_criteria_count / skills_invoked yet")
+
+    out = dict((c, None) for c in COLUMNS)
+    out[QUALITY_KEY] = "unavailable"
+    out["reason"] = "unknown"
+    try:
+        if root is None:
+            root = harness_root()
+        if log_dir is None:
+            log_dir = PROD_LOG_DIR
+        if not isinstance(slice_, str) or not SLICE_ID_RE.fullmatch(slice_ or ""):
+            # No path is constructed or touched. 64 real ledger rows carry ids that fail this,
+            # including one containing a path separator; mr-record:34 checks only non-emptiness.
+            out["reason"] = "slice-id-not-path-safe"
+            return out
+
+        lock_path = os.path.join(root, "memory", "projects",
+                                 ".harness-runner.%s.lock" % slice_)
+        try:
+            with open(lock_path, errors="replace") as fh:
+                lock = json.load(fh)
+            if not isinstance(lock, dict):
+                raise ValueError("lock is not an object")
+        except Exception:
+            out["reason"] = "lock-missing"
+            return out
+        lock.setdefault("slice", slice_)
+
+        # These two are independent of the worktree and stay measurable when the diff is not.
+        ears = count_ears_criteria(slice_, os.path.join(root, SPEC_GLOB_DIR))
+        skills = count_skill_invocations(os.path.join(log_dir, "mr_pass_%s.log" % slice_))
+
+        wt = worktree_path_for(lock, root)
+        if not wt or not os.path.isdir(wt):
+            out["reason"] = "worktree-absent"
+            return out
+        # IDENTITY, NOT EXISTENCE (plan R-C). `.claude/worktrees/` lives INSIDE the repo, so after
+        # `git worktree remove` a `git -C <that path>` walks UP into the enclosing repo and answers
+        # rc 0 with an empty diff — isdir and returncode both pass, and the result is a confident
+        # fabricated `files_changed=0, derived`. Only a toplevel identity check catches it.
+        rc, top, _ = _safe_run(["git", "-C", wt, "--no-optional-locks",
+                                "rev-parse", "--show-toplevel"], timeout=20, env=_git_child_env())
+        if rc != 0 or os.path.realpath(top.strip() or "\x00") != os.path.realpath(wt):
+            out["reason"] = "worktree-identity-mismatch"
+            return out
+
+        out["ears_criteria_count"] = ears
+        out["skills_invoked"] = skills
+
+        rc, dirty, _ = _safe_run(["git", "-C", wt, "--no-optional-locks",
+                                  "status", "--porcelain"], timeout=30, env=_git_child_env())
+        if rc != 0:
+            out["reason"] = "git-status-failed"
+            out["ears_criteria_count"] = None
+            out["skills_invoked"] = None
+            return out
+        if dirty.strip():
+            # CRASHED/PARKED rows are precisely the uncommitted-WIP case; a committed-diff number
+            # there would feed a fabricated zero into the denominator.
+            out[QUALITY_KEY] = "partial"
+            out["reason"] = "dirty-worktree"
+            return out
+
+        base_branch = lock.get("base_branch") or "main"
+        rc, mb, _ = _safe_run(["git", "-C", wt, "--no-optional-locks",
+                               "merge-base", base_branch, "HEAD"], timeout=30, env=_git_child_env())
+        base = mb.strip()
+        if rc != 0 or not base:
+            out[QUALITY_KEY] = "partial"
+            out["reason"] = "merge-base-unresolved"
+            return out
+        rc, numstat, _ = _safe_run(["git", "-C", wt, "--no-optional-locks", "diff",
+                                    "--numstat", "-M", base, "HEAD"], timeout=60, env=_git_child_env())
+        if rc != 0:
+            out[QUALITY_KEY] = "partial"
+            out["reason"] = "diff-failed"
+            return out
+
+        files = prod_add = prod_del = test_add = 0
+        for line in numstat.splitlines():
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+            add_s, del_s, path = parts[0], parts[1], "\t".join(parts[2:])
+            files += 1
+            if add_s == "-" or del_s == "-":
+                continue          # binary record: counts as a file, contributes 0 lines
+            try:
+                add_n, del_n = int(add_s), int(del_s)
+            except ValueError:
+                continue
+            kind = classify_path(_numstat_dest(path))
+            if kind == "prod":
+                prod_add += add_n
+                prod_del += del_n
+            elif kind == "test":
+                test_add += add_n     # ADDITIONS only, never additions+deletions
+        out["files_changed"] = files
+        out["prod_lines_added"] = prod_add
+        out["prod_lines_deleted"] = prod_del
+        out["test_lines_added"] = test_add
+        out[QUALITY_KEY] = "derived"
+        out["reason"] = ""
+        return out
+    except Exception as exc:      # never raises, never dies — mr-record must always write its row
+        for c in COLUMNS:
+            out[c] = None
+        out[QUALITY_KEY] = "unavailable"
+        out["reason"] = "derive-error-%s" % type(exc).__name__
+        return out
 
 
 def variance(rows):
@@ -542,9 +840,82 @@ def variance(rows):
     No `--min-rows` override and no `MR_*_MEM` override (A5): an override is a surface for greening
     the gate vacuously.
     """
-    raise NotImplementedError(
-        "lp-02 RED: variance() is not implemented — the fold-per-slice degeneracy report (plan R-F, "
-        "EARS-4 and the proof-of-teeth clause) does not exist yet")
+
+    lines = []
+    closing = [r for r in rows
+               if isinstance(r, dict) and is_closing(r.get("slice"), r.get("outcome"))]
+    folded = {}
+    for r in closing:
+        sl = r.get("slice")
+        cur = folded.get(sl)
+        # Preference order, then last-wins among equals (the ledger is append-only, so last is
+        # newest). This is what makes ledger-replay statistically harmless.
+        if cur is None or _QUALITY_RANK(r) >= _QUALITY_RANK(cur):
+            folded[sl] = r
+    obs = list(folded.values())
+    n = len(obs)
+    lines.append("INFO n_rows=%d" % len(closing))
+    lines.append("INFO n_slices=%d" % n)
+    dist = dict((q, 0) for q in QUALITY_SOURCES)
+    dist["absent"] = 0
+    for r in obs:
+        q = r.get(QUALITY_KEY)
+        dist[q if q in dist else "absent"] += 1
+    lines.append("INFO quality_source derived=%d replayed=%d partial=%d unavailable=%d absent=%d"
+                 % (dist["derived"], dist["replayed"], dist["partial"],
+                    dist["unavailable"], dist["absent"]))
+    lines.append("INFO unavailable_rate=%.4f" % (float(dist["unavailable"]) / n if n else 0.0))
+
+    degenerate = False
+    insufficient = n < N_MIN_SLICES
+    for col in COLUMNS:
+        if insufficient:
+            lines.append("INSUFFICIENT-DATA %s n_slices=%d floor=%d" % (col, n, N_MIN_SLICES))
+            continue
+        vals = [r.get(col) for r in obs]
+        nonnull = [v for v in vals if v is not None]
+        null_rate = float(len(vals) - len(nonnull)) / len(vals)
+        zero_rate = (float(sum(1 for v in nonnull if v == 0)) / len(vals)) if vals else 0.0
+        distinct = len(set(nonnull))
+        kind = None
+        if null_rate == 1.0:
+            kind = "all-null"
+        elif distinct <= 1:
+            kind = "all-identical"
+        elif null_rate >= 0.5:
+            kind = "half-blind"
+        elif zero_rate >= 0.5:
+            kind = "silent-zero-suspect"
+        if kind:
+            degenerate = True
+            lines.append("DEGENERATE %s %s n=%d null_rate=%.4f zero_rate=%.4f distinct=%d"
+                         % (col, kind, n, null_rate, zero_rate, distinct))
+        else:
+            lines.append("OK %s n=%d null_rate=%.4f zero_rate=%.4f distinct=%d"
+                         % (col, n, null_rate, zero_rate, distinct))
+
+    # master_ci_after: EXCLUDED from the ladder (no remote CI on the harness repo makes it
+    # permanently not-applicable there, so `distinct <= 1` would be a guaranteed false RED) and
+    # given a conformance check instead, scoped to POST-CUTOVER rows only (decision B).
+    post = [r for r in obs if QUALITY_KEY in r]
+    if post:
+        bad = sum(1 for r in post if r.get("master_ci_after") not in CI_CONFORMANT)
+        rate = float(bad) / len(post)
+        if rate > CI_UNKNOWN_RATE_MAX:
+            degenerate = True
+            lines.append("DEGENERATE master_ci_after nonconformant-rate=%.4f threshold=%.2f"
+                         % (rate, CI_UNKNOWN_RATE_MAX))
+        else:
+            lines.append("OK master_ci_after post_cutover=%d nonconformant_rate=%.4f"
+                         % (len(post), rate))
+    else:
+        lines.append("OK master_ci_after post_cutover=0 nonconformant_rate=0.0000")
+
+    if degenerate:
+        return (1, lines)
+    if insufficient:
+        return (2, lines)
+    return (0, lines)
 
 
 def _load_ledger_rows(path):

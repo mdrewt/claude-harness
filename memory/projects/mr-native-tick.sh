@@ -79,7 +79,13 @@ PYCHK
   RLOG="/tmp/mr_pass_$SL.log"
   MDL=$(/usr/bin/python3 -c "import json;print(json.load(open('$MEM/.harness-runner.$SL.lock')).get('model','n/a'))" 2>/dev/null || echo "n/a")
   grep -q "^ESCALATED" "$RLOG" 2>/dev/null && MDL="escalated:${MDL}-to-fable"
-  "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
+  # lp-02: `--ci not-applicable` because this is a PRE-MERGE row — "master CI after this slice" is
+  # not yet a defined property, and leaving it empty is 65.8% of the measured master_ci_after hole.
+  # `timeout 60` because this write now derives the slice-size columns via mr-slice-quality: the
+  # heartbeats at :21/:25 are already fresh and the flock is ~180 lines below, so a stall here
+  # leaves the loop looking alive while nothing progresses. Precedent: the handoff write below.
+  timeout 60 "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
+    --ci not-applicable \
     --model "$MDL" --from-log "$RLOG" --notes "mechanical backfill by tick v3 reconcile" >> "$LOG" 2>&1 && touch "$DF.recorded"
   # P3 durability (2026-07-26): persist the run census into the pending done-event so forensics survive /tmp loss
   EVF="$MEM/pending-events/$SL.done.md"
@@ -116,7 +122,9 @@ for LK in "$MEM"/.harness-runner.*.lock; do
   SUTC=$(/usr/bin/python3 -c "import json;print(json.load(open('$LK')).get('started_utc','x'))" 2>/dev/null | tr -dc 'A-Za-z0-9')
   MARK="/tmp/mr_crash_rec_${SL}_${SUTC}"
   [ -e "$MARK" ] && continue
-  "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "CRASHED(no-done, dead leader $PIDL)" \
+  # lp-02: same pre-merge `--ci not-applicable` and same `timeout 60` bound as the FINISHED write.
+  timeout 60 "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "CRASHED(no-done, dead leader $PIDL)" \
+    --ci not-applicable \
     --from-log "/tmp/mr_pass_$SL.log" --notes "dead-pid lock reconcile; verify true spend" >> "$LOG" 2>&1 && touch "$MARK"
 done
 
@@ -206,7 +214,10 @@ FBERR=$("$MEM/mr-feedback" check 2>/dev/null | grep -v "^FEEDBACK-CHECK-OK" | he
 
 # DAILY SELFCHECK (mechanical corpus health; 24h marker gate)
 if [ ! -f "$MEM/.selfcheck-last" ] || [ $(( $(date +%s) - $(stat -c %Y "$MEM/.selfcheck-last" 2>/dev/null || echo 0) )) -gt 86400 ]; then
-  SC=$("$MEM/mr-selfcheck" 2>/dev/null | grep -v "^SELFCHECK-OK" | head -3)
+  # lp-02: bounded. mr-selfcheck now runs a real git fixture and real mr-record invocations
+  # (the lp02-* behavioural block), so it is no longer instantaneous — and it runs in the same
+  # post-heartbeat, pre-flock window as the reconcile above.
+  SC=$(timeout 300 "$MEM/mr-selfcheck" 2>/dev/null | grep -v "^SELFCHECK-OK" | head -3)
   [ -n "$SC" ] && log "SELFCHECK: $(echo "$SC" | tr '\n' ' ')"
   touch "$MEM/.selfcheck-last"
 fi
