@@ -9,11 +9,10 @@ MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
 PROJ=$HARNESS/projects/monster-realm
 # lp-skills: required-skill mapping computed from a slice's declared `touches:`, emitted into the
-# rendered brief's role chain. ONE python heredoc holds both the mapping impl (specialist-owned,
-# added below the END marker) and the gating-test battery above it (tester-owned, fenced — do not
-# edit to fit the implementation). `build_brief` (specialist-owned, defined further below in this
-# file) wraps the moved-verbatim render heredoc and calls mr_skills() internally; both the live
-# spawn path and --selftest go through that one function, so there is nothing to wire twice.
+# rendered brief's role chain. ONE heredoc holds the mapping impl (specialist, below the END
+# marker) and the fenced gating-test battery above it (tester-owned — do not edit to fit the
+# implementation). `build_brief` (specialist, defined further below) wraps the moved-verbatim
+# render heredoc and calls mr_skills() internally; live spawn and --selftest share one function.
 mr_skills() {
   timeout 30 /usr/bin/python3 - "$@" <<'PYSKILLS'
 """mr_skills() heredoc body -- required-skill mapping for mr-spawn's rendered brief (lp-skills).
@@ -21,66 +20,75 @@ mr_skills() {
     mr_skills --selftest <selfdir>   -> runs the gating-test battery below; rc=0 pass, rc=1 fail
     mr_skills <raw touches>          -> prints the rendered <SKILLS_BLOCK> substitution value
 
-TESTER-AUTHORED, TDD RED PHASE (lp-skills). SKILL_MAP, tokens_of(), skills_for(), and
-render_block() are referenced below but deliberately left UNDEFINED -- the specialist adds them
-between the END marker and `def main` below, without touching anything inside the fence. A wrong
-expectation here is corrected FROM THE SPEC (the lp-skills plan), never retargeted to match the
-implementation.
+TESTER-AUTHORED, TDD RED PHASE. SKILL_MAP/tokens_of/skills_for/render_block are referenced below
+but left UNDEFINED -- the specialist adds them between the END marker and `def main`, without
+touching the fence. A wrong expectation is corrected FROM THE SPEC, never to fit the impl.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 
 HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
 PROJ = HARNESS + "/projects/monster-realm"
 
 # ===== GATING TESTS (lp-skills, tester-authored) — DO NOT EDIT TO FIT THE IMPLEMENTATION =====
 
-# (raw touches, expected skill list in SKILL_MAP table order, why this row is in the register)
+
+def _run(args, timeout=30, env=None):
+    """Single subprocess.run() wrapper shared by every real-process test below (t6, t8) -- may
+    still raise subprocess.TimeoutExpired; callers catch it."""
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout, env=env)
+
+
+# (raw touches, expected skill list in SKILL_MAP table order, short tag -- printed on FAIL only)
 FIXTURES = [
     ("server-module/src/battle.rs", ["spacetimedb-reducer", "code-intel"],
-     "alone-1: spacetimedb-reducer fires on server-module/; code-intel co-fires because "
-     "server-module/ is ALSO a code-intel CODE ROOT (R5) -- the pairing is by design, not a bug"),
+     "alone: reducer + CODE-ROOT co-fire"),
     ("game-core/src/evolution.rs", ["game-core-testing", "code-intel"],
-     "alone-2: game-core-testing fires on game-core/; code-intel co-fires via the same CODE ROOT"),
+     "alone: game-core-testing + CODE-ROOT co-fire"),
     ("client/src/net/subscription.ts", ["spacetimedb-client", "code-intel"],
-     "alone-3: spacetimedb-client fires on client/src/net/; code-intel co-fires via the client/ "
-     "CODE ROOT and the .ts extension"),
+     "alone: client + CODE-ROOT + .ts ext"),
     ("client-wasm/Cargo.toml", ["wasm-boundary", "code-intel"],
-     "alone-4: wasm-boundary fires; code-intel fires via the client-wasm/ CODE ROOT ALONE -- "
-     ".toml is not a codegraph-indexed extension, proving the prefix rule fires independently"),
+     "alone: wasm-boundary + ROOT-only (non-indexed ext proves prefix rule)"),
     ("docs/adr/0166-postgate.spec.md", ["spec-kit"],
-     "alone-5: TRULY alone -- spec-kit fires via the .spec.md SUFFIX rule outside the specs/ "
-     "prefix; docs/ is not a code-intel CODE ROOT and .md is not codegraph-indexed"),
+     "TRULY alone: .spec.md SUFFIX branch outside specs/"),
     ("evals/nightly-smoke-wiring.eval.mjs", ["code-intel"],
-     "alone-6: TRULY alone -- code-intel fires via the .mjs extension; evals/ is deliberately "
-     "excluded from the CODE ROOT set (R5)"),
+     "TRULY alone: .mjs ext; evals/ excluded from CODE ROOT (R5)"),
     ("server-module/src/schema.rs, client/src/net/connection.ts, evals/monster-privacy.eval.mjs",
      ["spacetimedb-reducer", "spacetimedb-client", "code-intel"],
-     "multi-skill row (corpus-real, 15r-sec-a); evals/*.mjs matches code-intel by EXTENSION only"),
+     "multi-skill corpus row (15r-sec-a)"),
     ("memory/projects/mr-brief-template.md, memory/projects/mr-spawn", [],
-     "this very slice's own declared touches: must render EMPTY, not accidentally match a skill"),
+     "this slice's own touches -> empty"),
     ("memory/projects/mr-hold (new), memory/projects/mr-spawn", [],
-     "a (new) annotation must not create a spurious token or a spurious match"),
+     "(new) annotation -> no spurious token"),
     ("game-core/src/battle.rs (new)", ["game-core-testing", "code-intel"],
-     "annotation + extension together -- the reason tokenization is DELEGATED to mr-repo-of "
-     "rather than hand-rolled"),
+     "annotation + extension together"),
     ("client/src/prediction/, client/e2e/", ["code-intel"],
-     "DIRECTORY tokens, no extension -- corpus-real case (M-postgate-fourteenth-review-residuals"
-     ".spec.md:129) an extension-only rule silently missed"),
+     "DIRECTORY tokens, no ext (14r-e spec:129)"),
     ("client/src/ui/hud.ts", ["code-intel"],
-     "NEGATIVE: client/ but NOT client/src/net/ -- spacetimedb-client must NOT fire; code-intel "
-     "fires via the client/ CODE ROOT and the .ts extension"),
+     "NEGATIVE: client/ != client/src/net/"),
     ("docs/adr/0166-x.md", [],
-     "NEGATIVE: docs/ is ambiguous for repo routing but matches NO skill at all"),
+     "NEGATIVE: docs/ matches nothing"),
     ("server-module/src/x.rs, game-core/src/y.rs, client/src/net/z.ts, client-wasm/w.rs, "
      "specs/monster-realm-v2/foo.spec.md, evals/e.mjs",
      ["spacetimedb-reducer", "game-core-testing", "spacetimedb-client", "wasm-boundary",
       "spec-kit", "code-intel"],
-     "ALL SIX at once -- also the TABLE-ORDER pin (folded in per R8, no separate order row)"),
+     "ALL SIX + TABLE-ORDER pin (R8: no separate order row)"),
+    ("sim-harness/scenarios/replay.toml", ["code-intel"],
+     "B1: sim-harness/ ROOT alone (non-indexed ext)"),
+    ("specs/monster-realm-v2/notes.md", ["spec-kit"],
+     "B2: specs/ PREFIX branch alone (no .spec.md suffix)"),
+    ("evals/manifest.json", [],
+     "B3: R5 exclusion -- evals/ is not a CODE ROOT, .json not indexed"),
+    ("content/species/000-core.ron", [],
+     "B3: R5 exclusion -- content/ is not a CODE ROOT, .ron not indexed"),
+    ("ops/observability/validate.mjs", ["code-intel"],
+     "B3: ops/ excluded from ROOT, but .mjs ext fires independently"),
 ]
 
 
@@ -206,7 +214,9 @@ def t5_map_integrity():
 
 def t6_end_to_end(selfdir):
     """The highest-value tooth: without this, every other test can be green while the block
-    never reaches the WRITTEN brief bytes. Drives the REAL --render-brief mode end to end."""
+    never reaches the WRITTEN brief bytes. Drives the REAL --render-brief mode end to end,
+    against the REAL self-located template (never a temp copy) -- deliberately strengthens the
+    plan's literal wording rather than drifting from it: same file t4 pins the placement of."""
     bad = 0
     self_path = os.path.join(selfdir, "mr-spawn")
     tpl_path = os.path.join(selfdir, "mr-brief-template.md")
@@ -230,10 +240,8 @@ def t6_end_to_end(selfdir):
         })
         out_path = os.path.join(tmpdir, "brief.md")
         try:
-            r = subprocess.run(
-                ["bash", self_path, "--render-brief", tpl_path, out_path,
-                 "server-module/src/x.rs"],
-                capture_output=True, text=True, timeout=60, env=env)
+            r = _run(["bash", self_path, "--render-brief", tpl_path, out_path,
+                      "server-module/src/x.rs"], timeout=60, env=env)
         except subprocess.TimeoutExpired:
             print("SKILLS-SELFTEST-FAIL t6-timeout")
             return 1
@@ -260,10 +268,8 @@ def t6_end_to_end(selfdir):
             bad = 1
 
         out_path2 = os.path.join(tmpdir, "brief-empty.md")
-        r2 = subprocess.run(
-            ["bash", self_path, "--render-brief", tpl_path, out_path2,
-             "memory/projects/mr-spawn"],
-            capture_output=True, text=True, timeout=60, env=env)
+        r2 = _run(["bash", self_path, "--render-brief", tpl_path, out_path2,
+                   "memory/projects/mr-spawn"], timeout=60, env=env)
         if not os.path.isfile(out_path2):
             print("SKILLS-SELFTEST-FAIL t6-empty-no-output: rc=%s stderr=%r"
                   % (r2.returncode, r2.stderr[-300:]))
@@ -281,75 +287,49 @@ def t6_end_to_end(selfdir):
 
 
 def t7_no_echo_regression():
-    """Injection-surface pin: the brief runs as a prompt under --dangerously-skip-permissions,
-    so emitted text must come ONLY from the fixed SKILL_MAP labels, never echo caller input."""
+    """HELD-OUT PROPERTY rows (fresh uuid4 every run) defeat a `skills_for` that is really a
+    fixture-overfit lookup table -- a dict keyed on FIXTURES' raw strings returns [] for a path
+    it has never seen. Per path: (i) skills_for(tokens_of(path)) must still compute the right
+    set from first principles; (ii) render_block must not echo the marker (the brief runs as a
+    prompt under --dangerously-skip-permissions -- emitted text must come ONLY from SKILL_MAP)."""
     bad = 0
-    marker = "ZZINJECTZZ"
-    raw = "server-module/src/%s.rs" % marker
-    block = render_block(skills_for(tokens_of(raw)))
-    if marker in block:
-        print("SKILLS-SELFTEST-FAIL t7-no-echo: rendered block echoed caller-controlled input %r"
-              % marker)
-        bad = 1
+    cases = [
+        ("server-module", ["spacetimedb-reducer", "code-intel"]),
+        ("game-core", ["game-core-testing", "code-intel"]),
+    ]
+    for root, want in cases:
+        marker = uuid.uuid4().hex
+        raw = "%s/src/%s.rs" % (root, marker)
+        got = skills_for(tokens_of(raw))
+        if got != want:
+            print("SKILLS-SELFTEST-FAIL t7-held-out-property: %r want=%s got=%s -- a lookup "
+                  "table keyed on FIXTURES strings cannot have known this path" % (raw, want, got))
+            bad = 1
+        block = render_block(got)
+        if marker in block:
+            print("SKILLS-SELFTEST-FAIL t7-no-echo: rendered block echoed caller-controlled "
+                  "input %r" % marker)
+            bad = 1
     return bad
 
 
 def t8_zero_arg_usage(selfdir):
-    """CORRECTED against the real baseline (coordinator finding, verified on unmodified main):
-    mr-spawn:6 is `exec 9>&- 2>/dev/null || true` -- an `exec` with redirections and NO command,
-    which applies `2>/dev/null` to the CURRENT SHELL for the REST OF THE SCRIPT's execution. That
-    permanently discards stderr, including the `${1:?...}` refusal's own error message. The
-    unmodified baseline is: zero-arg `bash mr-spawn` prints NOTHING on either stream and exits
-    rc=1. There is no "usage:" text to pin -- the original instruction to assert one was wrong,
-    and this docstring records that so the false premise is not re-introduced.
-
-    What IS pinned, because it is what the baseline actually guarantees and what this slice could
-    plausibly break:
-      (a) rc is non-zero -- the `${1:?...}` refusal still fires; the new `case "${1:-}"` dispatch
-          must not swallow the zero-arg case into a success path.
-      (b) combined stdout+stderr contains no 'unbound variable' -- the real regression this test
-          exists to catch: a bare `$1` (instead of `${1:-}`) in the new dispatch would raise
-          exactly that text under `set -u`, BEFORE the ${1:?...} guard is ever reached.
-      (c) the zero-arg run creates/modifies no lock or brief artifact for the empty slice name
-          (`/tmp/mr_pass_.md`, `/tmp/mr_pass_.vars.json`, `<selfdir>/.harness-runner..lock`).
-      (d) an argument that merely STARTS with a dash but is not one of the two recognised modes
-          must fall through to the ORIGINAL slice-arg path, not be mistaken for a mode. Proven by
-          a REAL subprocess run, deterministically and without touching the live loop: that
-          path's very next gate after S=/V=/B= is
-          `[ -r "$V" ] || status FAIL "vars.json missing: $V" 1`, which exits before the hold
-          gate, any git fetch, or a launch -- so running it for real is side-effect-free by
-          construction of the untouched code below this slice's insertion point.
-    """
+    """Baseline (verified against unmodified main): mr-spawn:6's `exec 9>&- 2>/dev/null || true`
+    discards stderr for the REST OF THE SCRIPT, including the `${1:?...}` refusal's own message
+    -- zero-arg `bash mr-spawn` prints NOTHING and exits rc=1; there is no "usage:" text to pin.
+    Pinned instead: (a) rc stays non-zero -- the new `case "${1:-}"` dispatch must not swallow
+    the zero-arg case into success; (b) no 'unbound variable' leaks -- what a bare `$1` (instead
+    of `${1:-}`) in the new dispatch would produce under `set -u`."""
     bad = 0
     self_path = os.path.join(selfdir, "mr-spawn")
     if not os.path.isfile(self_path):
         print("SKILLS-SELFTEST-FAIL t8-missing-self: %s" % self_path)
         return 1
-
-    # (a)+(b)+(c): zero-arg invocation
-    empty_targets = [
-        "/tmp/mr_pass_.md",
-        "/tmp/mr_pass_.vars.json",
-        os.path.join(selfdir, ".harness-runner..lock"),
-    ]
-
-    def _snap(paths):
-        snap = {}
-        for p in paths:
-            try:
-                st = os.stat(p)
-                snap[p] = (st.st_mtime_ns, st.st_size)
-            except OSError:
-                snap[p] = None
-        return snap
-
-    before = _snap(empty_targets)
     try:
-        r = subprocess.run(["bash", self_path], capture_output=True, text=True, timeout=30)
+        r = _run(["bash", self_path])
     except subprocess.TimeoutExpired:
         print("SKILLS-SELFTEST-FAIL t8-timeout")
         return 1
-    after = _snap(empty_targets)
     combined = (r.stdout or "") + (r.stderr or "")
     if r.returncode == 0:
         print("SKILLS-SELFTEST-FAIL t8-zero-arg-must-refuse: zero-arg invocation exited 0 "
@@ -360,28 +340,64 @@ def t8_zero_arg_usage(selfdir):
               "variable' -- the new dispatch must use ${1:-}, never a bare $1: %r"
               % combined[-300:])
         bad = 1
-    changed = [p for p in empty_targets if after[p] != before[p]]
-    if changed:
-        print("SKILLS-SELFTEST-FAIL t8-empty-slice-artifact: zero-arg run created/modified %s "
-              "-- the refusal must fire before any lock/brief write" % changed)
+    return bad
+
+
+def t9_live_path_wired(selfdir):
+    """STATIC SELF-SOURCE PROXY (cf. mr-selfcheck's A6: proves WIRING, not runtime behavior).
+    Paired with t6 (which exercises build_brief's real behavior via --render-brief), this closes
+    the R2 gap: build_brief could be correct but reachable ONLY from --render-brief, leaving the
+    real `mr-spawn <slice>` path rendering a brief with a literal, unsubstituted <SKILLS_BLOCK>
+    token -- never exercising the live path for real, which must NEVER run here (hold gate, git
+    fetch, IDE probe, a real launch). Scoped to the BASH region after this heredoc's own
+    terminator (tag discovered dynamically from the opener, never hardcoded) so this test's
+    source -- which necessarily quotes its own anchors -- can never match itself.
+
+    (i) build_brief is called AFTER the live entry point (`S="${1:?`); (ii) the substitution
+    call `tpl.replace(k,val)` exists EXACTLY ONCE in that region (0 = anchor drifted, >1 = a
+    second copy of the render logic -- the R2 failure mode); (iii) `<SKILLS_BLOCK>` appears in
+    the `for k,val in [...]:` list feeding that call."""
+    bad = 0
+    self_path = os.path.join(selfdir, "mr-spawn")
+    try:
+        src = open(self_path).read()
+    except OSError as exc:
+        print("SKILLS-SELFTEST-FAIL t9-missing-self: %s (%s)" % (self_path, exc))
+        return 1
+
+    # Same opener shape mr-selfcheck's own py-heredoc scanner looks for -- discovered, never
+    # hardcoded, so this test's own source is never the thing it is searching for.
+    opener = re.search(r"^[^\n]*python3[^\n]*<<-?'([A-Za-z0-9_]+)'[^\n]*$", src, re.M)
+    term = opener and re.search(r"\n" + re.escape(opener.group(1)) + r"\n", src)
+    if not term:
+        print("SKILLS-SELFTEST-FAIL t9-no-heredoc-anchor: could not locate this heredoc's own "
+              "opener+terminator by content -- cannot scope the scan away from this test's source")
+        return 1
+    bash_region = src[term.end():]
+
+    entry_idx = bash_region.find('S="${1:?')
+    if entry_idx == -1:
+        print("SKILLS-SELFTEST-FAIL t9-no-entry-point: live entry point not found by content")
+        bad = 1
+    elif "build_brief" not in bash_region[entry_idx:]:
+        print("SKILLS-SELFTEST-FAIL t9-live-path-unwired: no build_brief call after the live "
+              "entry point -- `mr-spawn <slice>` would render an unsubstituted <SKILLS_BLOCK>")
         bad = 1
 
-    # (d): dash-prefixed but unrecognised argument must not be mistaken for a mode.
-    try:
-        r2 = subprocess.run(["bash", self_path, "--bogus"], capture_output=True, text=True,
-                             timeout=30)
-    except subprocess.TimeoutExpired:
-        print("SKILLS-SELFTEST-FAIL t8-bogus-timeout")
-        return 1
-    combined2 = (r2.stdout or "") + (r2.stderr or "")
-    if r2.returncode == 0:
-        print("SKILLS-SELFTEST-FAIL t8-bogus-must-refuse: `--bogus` exited 0 (expected "
-              "non-zero -- it must fall through to the slice-arg path, not a success)")
+    anchor = "tpl.replace(k,val)"
+    count = bash_region.count(anchor)
+    if count != 1:
+        print("SKILLS-SELFTEST-FAIL t9-duplicate-render-logic: expected %r exactly ONCE in the "
+              "bash region, found %d (0=anchor drifted, >1=second render copy, the R2 failure "
+              "mode)" % (anchor, count))
         bad = 1
-    if "SKILLS-SELFTEST" in combined2:
-        print("SKILLS-SELFTEST-FAIL t8-bogus-mistaken-for-mode: `--bogus` entered the "
-              "--selftest render path: %r" % combined2[-300:])
-        bad = 1
+    else:
+        idx = bash_region.find(anchor)
+        loop_start = bash_region.rfind("for k,val in [", 0, idx)
+        if loop_start == -1 or "<SKILLS_BLOCK>" not in bash_region[loop_start:idx]:
+            print("SKILLS-SELFTEST-FAIL t9-skills-block-not-substituted: <SKILLS_BLOCK> missing "
+                  "from the `for k,val in [...]:` substitution list feeding %r" % anchor)
+            bad = 1
     return bad
 
 
@@ -396,6 +412,7 @@ def selftest(selfdir):
         ("t6-end-to-end", t6_end_to_end, (selfdir,)),
         ("t7-no-echo-regression", t7_no_echo_regression, ()),
         ("t8-zero-arg-usage", t8_zero_arg_usage, (selfdir,)),
+        ("t9-live-path-wired", t9_live_path_wired, (selfdir,)),
     ]
     for name, fn, args in battery:
         try:
