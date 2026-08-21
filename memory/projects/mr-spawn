@@ -11,8 +11,7 @@ PROJ=$HARNESS/projects/monster-realm
 # lp-skills: required-skill mapping computed from a slice's declared `touches:`, emitted into the
 # rendered brief's role chain. ONE heredoc holds the mapping impl (specialist, below the END
 # marker) and the fenced gating-test battery above it (tester-owned — do not edit to fit the
-# implementation). `build_brief` (specialist, defined further below) wraps the moved-verbatim
-# render heredoc and calls mr_skills() internally; live spawn and --selftest share one function.
+# implementation).
 mr_skills() {
   timeout 30 /usr/bin/python3 - "$@" <<'PYSKILLS'
 """mr_skills() heredoc body -- required-skill mapping for mr-spawn's rendered brief (lp-skills).
@@ -568,6 +567,12 @@ def selftest(selfdir):
 # Roots matter beyond documentation: t5 resolves <root>/.claude/skills/<name>/SKILL.md on the
 # real filesystem, so a wrong root fails the gate instead of shipping a dangling instruction.
 # ORDER IS THE RENDER ORDER and is pinned by the all-six fixture — append, never reshuffle.
+#
+# COUPLING, UNTIED: code-intel's prefix tuple below is a second statement of mr-repo-of's
+# PROJECT_PREFIXES. They agree today with nothing enforcing it, so a future slice that adds a
+# project code root THERE and not HERE makes code-intel silently under-fire. mr-repo-of is
+# outside this slice's touches; unifying them (or linting the pair, cf. the lp-16 duplicated-
+# constant class) is the follow-up.
 SKILL_MAP = [
     ("spacetimedb-reducer", PROJ, ("server-module/",), (), "`server-module/`"),
     ("game-core-testing",   PROJ, ("game-core/",),     (), "`game-core/`"),
@@ -583,8 +588,11 @@ SKILL_MAP = [
 SKILLS_HEADER = ("**Must-apply skills (invoke each via the Skill tool before writing code there "
                  "— not optional):**")
 
-# Where mr-repo-of lives. MEM is exported by mr-spawn on the live path; the fallback keeps
-# `--selftest` (which does not export it) working without a second hardcoded constant.
+# Where mr-repo-of lives. On the LIVE path the fallback always wins: mr-spawn does not export
+# MEM until well after build_brief runs, so the constant below (a mirror of mr-spawn's line 8 —
+# they must not drift) is what is actually used. The env branch exists for the two self-locating
+# dispatch branches, which export MEM to their OWN directory so a worktree run resolves the
+# worktree's mr-repo-of instead of the main checkout's.
 MEM_DIR = os.environ.get("MEM") or (HARNESS + "/memory/projects")
 
 
@@ -594,9 +602,9 @@ def tokens_of(raw):
     A hand-rolled comma split looks adequate and is not: it leaves annotated declarations like
     `game-core/src/battle.rs (new)` as the token "game-core/src/battle.rs (new)", which still
     satisfies the PREFIX rules while silently failing every SUFFIX rule — a partial, invisible
-    UNDER-fire, i.e. precisely the defect this slice exists to remove. mr-repo-of already solves
-    annotations and prose with tested code (its own fixture register), and mr-spawn already hard-
-    depends on it one gate above for routing, so this adds no new dependency.
+    UNDER-fire. mr-repo-of already solves annotations and prose with tested code (its own fixture
+    register), and mr-spawn already hard-depends on it one gate above for routing, so this adds
+    no new dependency.
 
     HONEST COST: this promotes mr-repo-of's `_tokens()` to a de-facto interface and inherits its
     quirks — notably that a comma-free clause like `server-module/tests/ or scripts/` collapses
@@ -636,6 +644,20 @@ def skills_for(tokens):
     return out
 
 
+def installed_only(skills):
+    """Render-time map-drift defense (plan T6/failure-modes): drop any row whose SKILL.md is
+    absent rather than naming a skill the run cannot invoke — silence beats a dangling
+    instruction. Deliberately NOT inside skills_for(), which must stay pure and filesystem-free.
+
+    HONEST: there is no loud runtime signal here. stdout carries the block itself and mr-spawn:6
+    has already discarded stderr, so a notice would go nowhere. The loud signal is t5's
+    map-integrity check, which fails the selftest — i.e. the gate, not the spawn.
+    """
+    roots = dict((row[0], row[1]) for row in SKILL_MAP)
+    return [n for n in skills
+            if os.path.isfile(os.path.join(roots[n], ".claude", "skills", n, "SKILL.md"))]
+
+
 def render_block(skills):
     """Skill names -> the <SKILLS_BLOCK> substitution value. "" when nothing matched, so the
     rendered brief is byte-identical to today for every unmatched slice.
@@ -656,10 +678,13 @@ def render_block(skills):
 
 def main(argv):
     if len(argv) >= 2 and argv[1] == "--selftest":
-        selfdir = argv[2] if len(argv) >= 3 else None
-        return selftest(selfdir)
+        if len(argv) < 3:
+            # The helpers all resolve paths under selfdir; None would crash confusingly deep.
+            print("SKILLS-SELFTEST-FAIL usage: --selftest <directory containing mr-spawn>")
+            return 1
+        return selftest(argv[2])
     raw = argv[1] if len(argv) >= 2 else ""
-    skills = skills_for(tokens_of(raw))
+    skills = installed_only(skills_for(tokens_of(raw)))
     sys.stdout.write(render_block(skills))
     return 0
 
@@ -676,27 +701,75 @@ PYSKILLS
 # ADVISORY BY DESIGN: mr-spawn sits on the critical path of every autonomous launch, so a cosmetic
 # defect in the skill mapping must never become a launch refusal (that would wedge the loop). Any
 # failure yields an empty block plus a notice, and the brief still renders.
+# `emit` is only defined after the live entry point, so it does not exist on the --render-brief
+# path; `status` must never be used here — it EXITS. One guard, both call sites below.
+# The fallback writes to STDOUT, not stderr: mr-spawn:6 discards stderr for the whole script, so
+# a stderr notice would be invisible — which is the exact silence this notice exists to break.
+brief_notice(){
+  if declare -f emit >/dev/null 2>&1; then
+    emit "$1" "$2"
+  else
+    printf '%s %s\n' "$1" "$2"
+  fi
+}
+
 build_brief(){
-  local raw="${1:-}" tpl="${2:-}" out="${3:-}"
+  local raw="${1:-}" tpl="${2:-}" out="${3:-}" rc=0
   # `local blk=$(...)` would MASK the subprocess exit status (`local`'s own status wins), so the
   # error branch below would silently never fire. Reproduced; keep these two statements apart.
   local blk
   blk=$(mr_skills "$raw") || {
-    # `emit` is only defined after the live entry point, so it does not exist on the
-    # --render-brief path. Never `status` here — that EXITS, which is the refusal we must not do.
-    if declare -f emit >/dev/null 2>&1; then
-      emit SKILLS-MAP-ERROR "required-skill mapping failed for touches=$(echo "$raw" | head -c 200); brief rendered WITHOUT the skills block (advisory — the spawn continues)"
-    else
-      printf 'SKILLS-MAP-ERROR required-skill mapping failed; brief rendered without the skills block\n' >&2
-    fi
+    brief_notice SKILLS-MAP-ERROR "required-skill mapping failed for touches=$(echo "$raw" | head -c 200); brief rendered WITHOUT the skills block (advisory — the spawn continues)"
     blk=""
   }
   # S/V stay environment-passed (unchanged from the original block); the three moved inputs do not.
   export S V
-  /usr/bin/python3 - "$tpl" "$out" "$blk" <<'PYBRIEF' || return 1
+  # F2: a render failure is a REFUSAL (template drift must not ship a mangled brief), but this
+  # file promises "one status JSON line" and mr-spawn:6 has discarded stderr — so a bare `exit 1`
+  # here is a silent death. Say what happened first, then propagate. `rc=$?` must be the very
+  # next statement after the heredoc: any command in between (including `local`) overwrites it.
+  /usr/bin/python3 - "$tpl" "$out" "$blk" <<'PYBRIEF'
 import json, os, sys
 S=os.environ["S"]; v=json.load(open(os.environ["V"]))
-tpl=open(sys.argv[1]).read()
+# lp-skills F1 — SINGLE-PASS SUBSTITUTION. The renderer applies the keys below as a CHAIN of
+# .replace() calls, so with a plain string every later key re-scans text an earlier key's VALUE
+# inserted. `touches`/`target_desc`/`resume_block` are freeform planner prose and this corpus
+# writes literal `<SLICE>`-shaped tokens constantly, so that quirk (a) let a `<SLICE>` arriving
+# inside `touches` survive to the end, where the leftover assert mistook it for template drift
+# and SystemExited — killing the spawn silently — and (b) let a value carrying `<SKILLS_BLOCK>`
+# duplicate and RELOCATE the real skills header, i.e. a template-injection primitive for every
+# placeholder ordered after `<TOUCHES>`. Both are pre-existing second-order quirks of the chain;
+# the leftover assert is what turned (a) into an abort.
+#
+# So the document is carried as SEGMENTS: plain str = still template (rescannable), _Done = an
+# already-substituted value that no later key may look at. Values become literal text, exactly
+# once, wherever the TEMPLATE put them. A welcome consequence: substitution ORDER no longer
+# affects the result. Literal string ops only — no regex, per house doctrine.
+class _Done(str):
+    """A substituted value. Final text; later keys skip it."""
+
+
+class _Doc(list):
+    def replace(self, key, val):
+        out = _Doc()
+        for seg in self:
+            if isinstance(seg, _Done) or key not in seg:
+                out.append(seg)
+                continue
+            for i, part in enumerate(seg.split(key)):
+                if i:
+                    out.append(_Done(val))
+                out.append(part)
+        return out
+
+    def __contains__(self, key):
+        # Template-derived segments ONLY: a placeholder that arrived inside a value is data.
+        return any(key in seg for seg in self if not isinstance(seg, _Done))
+
+    def __str__(self):
+        return "".join(self)
+
+tpl=_Doc([open(sys.argv[1]).read()])
 _t=v.get("touches","")
 touches_str=", ".join(_t) if isinstance(_t,list) else str(_t)
 tier=v.get("tier") or (_ for _ in ()).throw(SystemExit("vars.json missing required field: tier (hard|routine|content)"))
@@ -727,21 +800,38 @@ for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCH
               ("<SKILLS_BLOCK>",sys.argv[3])]:
     _subbed.append(k)
     tpl=tpl.replace(k,val)
-# Keyed to the list JUST iterated, so a renamed placeholder cannot drift out of the check.
+# Keyed to the list JUST iterated, so a renamed placeholder cannot drift out of the check, and
+# scoped to template segments so caller content never trips it. Post-F1 this is a POST-CONDITION
+# on the segment machinery rather than a template-drift detector (a template segment cannot
+# survive its own key); it bites if _Doc.replace ever regresses. Genuine template drift is caught
+# by the pre-loop <SKILLS_BLOCK> assert above.
 _left=[k for k in _subbed if k in tpl]
 if _left:
     raise SystemExit("unsubstituted placeholder(s) survived rendering: %s" % _left)
-open(sys.argv[2],"w").write(tpl)
-print("brief-built bytes=%d tier=%s repo=%s" % (len(tpl),tier,repo))
+rendered=str(tpl)
+open(sys.argv[2],"w").write(rendered)
+print("brief-built bytes=%d tier=%s repo=%s" % (len(rendered),tier,repo))
 PYBRIEF
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    brief_notice BRIEF-RENDER-FAILED "rendering $tpl -> $out failed (rc=$rc); most likely the template lost a placeholder the renderer requires. Refusing — a partially-substituted brief must never launch."
+    return 1
+  fi
 }
 
+# Both branches are SELF-LOCATING and exit immediately, so they export MEM to THIS copy's own
+# directory: a pre-merge worktree run then resolves the worktree's mr-repo-of rather than the
+# main checkout's, which is the difference between testing this diff and testing main. Line 8's
+# live MEM is deliberately untouched — exporting it globally would change the environment of
+# every launched child process, which is out of scope here.
 case "${1:-}" in
   --selftest)
-    mr_skills --selftest "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+    MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"; export MEM
+    mr_skills --selftest "$MEM"
     exit $?
     ;;
   --render-brief)
+    MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"; export MEM
     build_brief "${4:-}" "${2:-}" "${3:-}"
     exit $?
     ;;
