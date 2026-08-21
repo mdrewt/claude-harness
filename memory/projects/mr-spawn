@@ -401,6 +401,109 @@ def t9_live_path_wired(selfdir):
     return bad
 
 
+def t10_hostile_values(selfdir):
+    """Regression pin (post-implementation red-team, reproduced against this worktree): the
+    render substitutes placeholders as a SEQUENTIAL chain of `tpl.replace(k, val)` calls, so a
+    later `.replace()` re-scans text a PRIOR substitution's VALUE inserted. `<SLICE>`/`<ADR_NUM>`
+    go first; a freeform field (`touches`/`target_desc`/`resume_block` -- all planner-authored
+    prose, and this corpus writes literal `<SLICE>`-shaped tokens constantly) that happens to
+    contain one of those tokens carries it through untouched, and the NEW leftover-placeholder
+    assert then mistakes that harmless quirk for a template gap and SystemExits -- silently,
+    because mr-spawn:6 discards stderr and the abort bypasses status()/emit(). The fix is
+    single-pass substitution (values never re-scanned), so the assert only ever fires for a
+    placeholder genuinely missing from the TEMPLATE, never one arriving inside a value. Drives
+    the REAL --render-brief path (not the pure functions) for four independent hostile values:
+    (a) render must SUCCEED (rc=0, output file exists and is non-empty) -- hostile-looking
+    content must degrade to literal text, never abort; (b) the literal token must survive
+    VERBATIM into the output -- values are data, not template; (c) a value containing literal
+    `<SKILLS_BLOCK>` must not duplicate or relocate the real skills header (exactly one
+    'Must-apply skills' line)."""
+    bad = 0
+    self_path = os.path.join(selfdir, "mr-spawn")
+    tpl_path = os.path.join(selfdir, "mr-brief-template.md")
+    if not os.path.isfile(self_path) or not os.path.isfile(tpl_path):
+        print("SKILLS-SELFTEST-FAIL t10-missing-inputs: self=%s tpl=%s" % (self_path, tpl_path))
+        return 1
+    tmpdir = tempfile.mkdtemp(prefix="mr-skills-t10-")
+    try:
+        base = {
+            "slice": "lp-skills-t10-fixture", "model": "sonnet", "effort": "high", "adr": "42",
+            "touches": "server-module/src/x.rs", "target_desc": "baseline",
+            "resume_block": "", "tier": "routine",
+        }
+
+        def render(name, overrides, raw_touches):
+            v = dict(base)
+            v.update(overrides)
+            vars_json = os.path.join(tmpdir, "vars-%s.json" % name)
+            with open(vars_json, "w") as f:
+                json.dump(v, f)
+            env = dict(os.environ)
+            env.update({
+                "S": v["slice"], "V": vars_json, "MEM": selfdir,
+                "REPO": "harness", "PR_REPO": "mdrewt/claude-harness", "BASE_BRANCH": "main",
+                "WT_ROOT": os.path.join(HARNESS, ".claude", "worktrees"), "CAP": "60",
+            })
+            out_path = os.path.join(tmpdir, "brief-%s.md" % name)
+            try:
+                r = _run(["bash", self_path, "--render-brief", tpl_path, out_path, raw_touches],
+                         timeout=60, env=env)
+            except subprocess.TimeoutExpired:
+                return None, None
+            written = None
+            if os.path.isfile(out_path) and os.path.getsize(out_path) > 0:
+                with open(out_path, errors="replace") as f:
+                    written = f.read()
+            return r, written
+
+        # (a)+(b): one hostile field at a time, each carrying a token substituted EARLIER in the
+        # chain -- both <SLICE> and <ADR_NUM> are covered across the three freeform fields.
+        cases = [
+            ("touches", {"touches": "server-module/src/x.rs <SLICE> extra"},
+             "server-module/src/x.rs <SLICE> extra", "<SLICE>"),
+            ("target_desc", {"target_desc": "implements <ADR_NUM> pattern"},
+             "server-module/src/x.rs", "<ADR_NUM>"),
+            ("resume_block", {"resume_block": "resuming after <SLICE> merged"},
+             "server-module/src/x.rs", "<SLICE>"),
+        ]
+        for name, overrides, raw_touches, token in cases:
+            r, written = render(name, overrides, raw_touches)
+            if r is None:
+                print("SKILLS-SELFTEST-FAIL t10-%s-timeout" % name)
+                bad = 1
+                continue
+            if r.returncode != 0 or written is None:
+                print("SKILLS-SELFTEST-FAIL t10-%s-aborted: hostile %s=%r must degrade to "
+                      "literal text, never abort the render -- rc=%s stdout=%r stderr=%r"
+                      % (name, name, overrides[name], r.returncode,
+                         (r.stdout or "")[-300:], (r.stderr or "")[-300:]))
+                bad = 1
+                continue
+            if token not in written:
+                print("SKILLS-SELFTEST-FAIL t10-%s-dropped: literal token %r did not survive "
+                      "verbatim into the rendered output -- values are data, not template"
+                      % (name, token))
+                bad = 1
+
+        # (c): a hostile value containing <SKILLS_BLOCK> must not duplicate/relocate the header.
+        r, written = render("skills-block",
+                             {"touches": "server-module/src/y.rs <SKILLS_BLOCK> more"},
+                             "server-module/src/y.rs <SKILLS_BLOCK> more")
+        if r is None or r.returncode != 0 or written is None:
+            print("SKILLS-SELFTEST-FAIL t10-skills-block-aborted: hostile <SKILLS_BLOCK> value "
+                  "must degrade to literal text, never abort the render")
+            bad = 1
+        else:
+            count = written.count("Must-apply skills")
+            if count != 1:
+                print("SKILLS-SELFTEST-FAIL t10-skills-block-duplicated: expected the header "
+                      "exactly ONCE, found %d" % count)
+                bad = 1
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    return bad
+
+
 def selftest(selfdir):
     bad = 0
     battery = [
@@ -413,6 +516,7 @@ def selftest(selfdir):
         ("t7-no-echo-regression", t7_no_echo_regression, ()),
         ("t8-zero-arg-usage", t8_zero_arg_usage, (selfdir,)),
         ("t9-live-path-wired", t9_live_path_wired, (selfdir,)),
+        ("t10-hostile-values", t10_hostile_values, (selfdir,)),
     ]
     for name, fn, args in battery:
         try:
