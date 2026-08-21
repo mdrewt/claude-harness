@@ -8,6 +8,436 @@ unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # lp-09: forced-ness must no
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
 PROJ=$HARNESS/projects/monster-realm
+# lp-skills: required-skill mapping computed from a slice's declared `touches:`, emitted into the
+# rendered brief's role chain. ONE python heredoc holds both the mapping impl (specialist-owned,
+# added below the END marker) and the gating-test battery above it (tester-owned, fenced — do not
+# edit to fit the implementation). `build_brief` (specialist-owned, defined further below in this
+# file) wraps the moved-verbatim render heredoc and calls mr_skills() internally; both the live
+# spawn path and --selftest go through that one function, so there is nothing to wire twice.
+mr_skills() {
+  timeout 30 /usr/bin/python3 - "$@" <<'PYSKILLS'
+"""mr_skills() heredoc body -- required-skill mapping for mr-spawn's rendered brief (lp-skills).
+
+    mr_skills --selftest <selfdir>   -> runs the gating-test battery below; rc=0 pass, rc=1 fail
+    mr_skills <raw touches>          -> prints the rendered <SKILLS_BLOCK> substitution value
+
+TESTER-AUTHORED, TDD RED PHASE (lp-skills). SKILL_MAP, tokens_of(), skills_for(), and
+render_block() are referenced below but deliberately left UNDEFINED -- the specialist adds them
+between the END marker and `def main` below, without touching anything inside the fence. A wrong
+expectation here is corrected FROM THE SPEC (the lp-skills plan), never retargeted to match the
+implementation.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
+PROJ = HARNESS + "/projects/monster-realm"
+
+# ===== GATING TESTS (lp-skills, tester-authored) — DO NOT EDIT TO FIT THE IMPLEMENTATION =====
+
+# (raw touches, expected skill list in SKILL_MAP table order, why this row is in the register)
+FIXTURES = [
+    ("server-module/src/battle.rs", ["spacetimedb-reducer", "code-intel"],
+     "alone-1: spacetimedb-reducer fires on server-module/; code-intel co-fires because "
+     "server-module/ is ALSO a code-intel CODE ROOT (R5) -- the pairing is by design, not a bug"),
+    ("game-core/src/evolution.rs", ["game-core-testing", "code-intel"],
+     "alone-2: game-core-testing fires on game-core/; code-intel co-fires via the same CODE ROOT"),
+    ("client/src/net/subscription.ts", ["spacetimedb-client", "code-intel"],
+     "alone-3: spacetimedb-client fires on client/src/net/; code-intel co-fires via the client/ "
+     "CODE ROOT and the .ts extension"),
+    ("client-wasm/Cargo.toml", ["wasm-boundary", "code-intel"],
+     "alone-4: wasm-boundary fires; code-intel fires via the client-wasm/ CODE ROOT ALONE -- "
+     ".toml is not a codegraph-indexed extension, proving the prefix rule fires independently"),
+    ("docs/adr/0166-postgate.spec.md", ["spec-kit"],
+     "alone-5: TRULY alone -- spec-kit fires via the .spec.md SUFFIX rule outside the specs/ "
+     "prefix; docs/ is not a code-intel CODE ROOT and .md is not codegraph-indexed"),
+    ("evals/nightly-smoke-wiring.eval.mjs", ["code-intel"],
+     "alone-6: TRULY alone -- code-intel fires via the .mjs extension; evals/ is deliberately "
+     "excluded from the CODE ROOT set (R5)"),
+    ("server-module/src/schema.rs, client/src/net/connection.ts, evals/monster-privacy.eval.mjs",
+     ["spacetimedb-reducer", "spacetimedb-client", "code-intel"],
+     "multi-skill row (corpus-real, 15r-sec-a); evals/*.mjs matches code-intel by EXTENSION only"),
+    ("memory/projects/mr-brief-template.md, memory/projects/mr-spawn", [],
+     "this very slice's own declared touches: must render EMPTY, not accidentally match a skill"),
+    ("memory/projects/mr-hold (new), memory/projects/mr-spawn", [],
+     "a (new) annotation must not create a spurious token or a spurious match"),
+    ("game-core/src/battle.rs (new)", ["game-core-testing", "code-intel"],
+     "annotation + extension together -- the reason tokenization is DELEGATED to mr-repo-of "
+     "rather than hand-rolled"),
+    ("client/src/prediction/, client/e2e/", ["code-intel"],
+     "DIRECTORY tokens, no extension -- corpus-real case (M-postgate-fourteenth-review-residuals"
+     ".spec.md:129) an extension-only rule silently missed"),
+    ("client/src/ui/hud.ts", ["code-intel"],
+     "NEGATIVE: client/ but NOT client/src/net/ -- spacetimedb-client must NOT fire; code-intel "
+     "fires via the client/ CODE ROOT and the .ts extension"),
+    ("docs/adr/0166-x.md", [],
+     "NEGATIVE: docs/ is ambiguous for repo routing but matches NO skill at all"),
+    ("server-module/src/x.rs, game-core/src/y.rs, client/src/net/z.ts, client-wasm/w.rs, "
+     "specs/monster-realm-v2/foo.spec.md, evals/e.mjs",
+     ["spacetimedb-reducer", "game-core-testing", "spacetimedb-client", "wasm-boundary",
+      "spec-kit", "code-intel"],
+     "ALL SIX at once -- also the TABLE-ORDER pin (folded in per R8, no separate order row)"),
+]
+
+
+def _check(raw, expected):
+    """The single comparator every fixture-driven test below goes through. Calls the REAL
+    skills_for(tokens_of(raw)) -- never a second hand-rolled copy of the mapping."""
+    return skills_for(tokens_of(raw)) == list(expected)
+
+
+def t1_fixture_register():
+    bad = 0
+    for raw, want, why in FIXTURES:
+        if not _check(raw, want):
+            got = skills_for(tokens_of(raw))
+            print("SKILLS-SELFTEST-FAIL t1-fixture want=%s got=%s (%s)\n    touches: %s"
+                  % (want, got, why, raw))
+            bad = 1
+    return bad
+
+
+def t2_proof_of_teeth():
+    """EARS proof-of-teeth: a server-module/** fixture OMITTING spacetimedb-reducer must be
+    REJECTED by the comparator, plus the anti-degeneracy control (precedent: mr-repo-of's own
+    `len(verdicts) < 4` control) so a stuck always-all-six or always-empty impl cannot pass."""
+    bad = 0
+    if _check("server-module/src/battle.rs", ["spacetimedb-reducer", "code-intel"]) is not True:
+        print("SKILLS-SELFTEST-FAIL t2-positive: server-module/src/battle.rs must match "
+              "[spacetimedb-reducer, code-intel]")
+        bad = 1
+    if _check("server-module/src/battle.rs", ["code-intel"]) is not False:
+        print("SKILLS-SELFTEST-FAIL t2-negative-control: a server-module/** fixture OMITTING "
+              "spacetimedb-reducer wrongly compared equal -- the comparator has degenerated")
+        bad = 1
+    distinct = set(tuple(skills_for(tokens_of(raw))) for raw, _want, _why in FIXTURES)
+    if len(distinct) < 4:
+        print("SKILLS-SELFTEST-FAIL t2-degenerate: only %d distinct skill-set(s) across the "
+              "register (%s) -- a stuck always-all-six or always-empty implementation would pass "
+              "every same-verdict fixture" % (len(distinct), sorted(distinct)))
+        bad = 1
+    empties = [s for s in distinct if s == ()]
+    if len(empties) != 1:
+        print("SKILLS-SELFTEST-FAIL t2-degenerate-empty: expected exactly ONE distinct empty "
+              "skill-set across the register, found %d" % len(empties))
+        bad = 1
+    return bad
+
+
+def t3_rf4_shape():
+    """RF-4: the brief is multiplied by ~500 turns, so the block must be exactly 1 header line
+    plus 1 line per skill, every line <=100 chars, and the empty case must be "" BY IDENTITY."""
+    bad = 0
+    if render_block([]) is not "":
+        print("SKILLS-SELFTEST-FAIL t3-empty-identity: render_block([]) must be the identity "
+              "empty string")
+        bad = 1
+    for raw, _want, why in FIXTURES:
+        skills = skills_for(tokens_of(raw))
+        block = render_block(skills)
+        if not skills:
+            if block is not "":
+                print("SKILLS-SELFTEST-FAIL t3-empty-row: %r -> empty skill list must render "
+                      "'' exactly (%s)" % (raw, why))
+                bad = 1
+            continue
+        if not block.startswith("\n\n"):
+            print("SKILLS-SELFTEST-FAIL t3-leading-blank-lines: block for %r does not start "
+                  "with exactly '\\n\\n'" % raw)
+            bad = 1
+        lines = block.strip("\n").splitlines()
+        if len(lines) != len(skills) + 1:
+            print("SKILLS-SELFTEST-FAIL t3-line-count: %r expected %d lines (1 header + %d "
+                  "skills), got %d" % (raw, len(skills) + 1, len(skills), len(lines)))
+            bad = 1
+        for ln in lines:
+            if len(ln) > 100:
+                print("SKILLS-SELFTEST-FAIL t3-line-length: line exceeds 100 chars (%d) for "
+                      "%r: %r" % (len(ln), raw, ln))
+                bad = 1
+    return bad
+
+
+def t4_template_placement(selfdir):
+    """Reads the template SELF-LOCATED (never the hardcoded MEM) so a pre-merge worktree run
+    tests ITS OWN copy, not main's placeholder-free one."""
+    bad = 0
+    path = os.path.join(selfdir, "mr-brief-template.md")
+    try:
+        with open(path) as f:
+            text = f.read()
+    except OSError as exc:
+        print("SKILLS-SELFTEST-FAIL t4-template-missing: %s (%s)" % (path, exc))
+        return 1
+    count = text.count("<SKILLS_BLOCK>")
+    if count != 1:
+        print("SKILLS-SELFTEST-FAIL t4-placeholder-count: expected exactly 1 <SKILLS_BLOCK>, "
+              "found %d" % count)
+        bad = 1
+    anchors = [ln for ln in text.splitlines() if "Test-first, gated" in ln]
+    if len(anchors) != 1:
+        print("SKILLS-SELFTEST-FAIL t4-anchor-line: expected exactly 1 line containing "
+              "'Test-first, gated', found %d" % len(anchors))
+        bad = 1
+    elif not anchors[0].endswith("<SKILLS_BLOCK>"):
+        print("SKILLS-SELFTEST-FAIL t4-placeholder-position: <SKILLS_BLOCK> must be at the END "
+              "of the 'Test-first, gated' line; line=%r" % anchors[0])
+        bad = 1
+    return bad
+
+
+def t5_map_integrity():
+    """The only check validated against the FILESYSTEM instead of expectations baked into this
+    file: catches a wrong `root` (4 skills live under PROJ, 2 under HARNESS)."""
+    bad = 0
+    for row in SKILL_MAP:
+        name, root = row[0], row[1]
+        skill_path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
+        if not os.path.isfile(skill_path):
+            print("SKILLS-SELFTEST-FAIL t5-map-integrity: %s -> %s does not exist"
+                  % (name, skill_path))
+            bad = 1
+    return bad
+
+
+def t6_end_to_end(selfdir):
+    """The highest-value tooth: without this, every other test can be green while the block
+    never reaches the WRITTEN brief bytes. Drives the REAL --render-brief mode end to end."""
+    bad = 0
+    self_path = os.path.join(selfdir, "mr-spawn")
+    tpl_path = os.path.join(selfdir, "mr-brief-template.md")
+    if not os.path.isfile(self_path) or not os.path.isfile(tpl_path):
+        print("SKILLS-SELFTEST-FAIL t6-missing-inputs: self=%s tpl=%s" % (self_path, tpl_path))
+        return 1
+    tmpdir = tempfile.mkdtemp(prefix="mr-skills-t6-")
+    try:
+        vars_json = os.path.join(tmpdir, "vars.json")
+        with open(vars_json, "w") as f:
+            json.dump({
+                "slice": "lp-skills-t6-fixture", "model": "sonnet", "effort": "high", "adr": "",
+                "touches": "server-module/src/x.rs", "target_desc": "t6 fixture",
+                "resume_block": "", "tier": "routine",
+            }, f)
+        env = dict(os.environ)
+        env.update({
+            "S": "lp-skills-t6-fixture", "V": vars_json, "MEM": selfdir,
+            "REPO": "harness", "PR_REPO": "mdrewt/claude-harness", "BASE_BRANCH": "main",
+            "WT_ROOT": os.path.join(HARNESS, ".claude", "worktrees"), "CAP": "60",
+        })
+        out_path = os.path.join(tmpdir, "brief.md")
+        try:
+            r = subprocess.run(
+                ["bash", self_path, "--render-brief", tpl_path, out_path,
+                 "server-module/src/x.rs"],
+                capture_output=True, text=True, timeout=60, env=env)
+        except subprocess.TimeoutExpired:
+            print("SKILLS-SELFTEST-FAIL t6-timeout")
+            return 1
+        if not os.path.isfile(out_path):
+            print("SKILLS-SELFTEST-FAIL t6-no-output: rc=%s stdout=%r stderr=%r"
+                  % (r.returncode, r.stdout[-300:], r.stderr[-300:]))
+            return 1
+        with open(out_path, errors="replace") as f:
+            written = f.read()
+        if "spacetimedb-reducer" not in written:
+            print("SKILLS-SELFTEST-FAIL t6-missing-skill-name: rendered brief does not name "
+                  "spacetimedb-reducer")
+            bad = 1
+        if "Must-apply skills" not in written:
+            print("SKILLS-SELFTEST-FAIL t6-missing-header: rendered brief has no skills header")
+            bad = 1
+        placeholders = ["<SLICE>", "<ADR_NUM>", "<TOUCHES>", "<TARGET_DESC>", "<RESUME_BLOCK>",
+                         "<TIER_BLOCK>", "<REPO_BLOCK>", "<PR_REPO>", "<BASE_BRANCH>",
+                         "<WT_ROOT>", "<CAP_USD>", "<SKILLS_BLOCK>"]
+        leftover = [p for p in placeholders if p in written]
+        if leftover:
+            print("SKILLS-SELFTEST-FAIL t6-leftover-placeholder: %s survived substitution"
+                  % leftover)
+            bad = 1
+
+        out_path2 = os.path.join(tmpdir, "brief-empty.md")
+        r2 = subprocess.run(
+            ["bash", self_path, "--render-brief", tpl_path, out_path2,
+             "memory/projects/mr-spawn"],
+            capture_output=True, text=True, timeout=60, env=env)
+        if not os.path.isfile(out_path2):
+            print("SKILLS-SELFTEST-FAIL t6-empty-no-output: rc=%s stderr=%r"
+                  % (r2.returncode, r2.stderr[-300:]))
+            bad = 1
+        else:
+            with open(out_path2, errors="replace") as f:
+                written2 = f.read()
+            if "Must-apply skills" in written2:
+                print("SKILLS-SELFTEST-FAIL t6-empty-touches-emitted-header: empty touches must "
+                      "render NO skills header at all")
+                bad = 1
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    return bad
+
+
+def t7_no_echo_regression():
+    """Injection-surface pin: the brief runs as a prompt under --dangerously-skip-permissions,
+    so emitted text must come ONLY from the fixed SKILL_MAP labels, never echo caller input."""
+    bad = 0
+    marker = "ZZINJECTZZ"
+    raw = "server-module/src/%s.rs" % marker
+    block = render_block(skills_for(tokens_of(raw)))
+    if marker in block:
+        print("SKILLS-SELFTEST-FAIL t7-no-echo: rendered block echoed caller-controlled input %r"
+              % marker)
+        bad = 1
+    return bad
+
+
+def t8_zero_arg_usage(selfdir):
+    """CORRECTED against the real baseline (coordinator finding, verified on unmodified main):
+    mr-spawn:6 is `exec 9>&- 2>/dev/null || true` -- an `exec` with redirections and NO command,
+    which applies `2>/dev/null` to the CURRENT SHELL for the REST OF THE SCRIPT's execution. That
+    permanently discards stderr, including the `${1:?...}` refusal's own error message. The
+    unmodified baseline is: zero-arg `bash mr-spawn` prints NOTHING on either stream and exits
+    rc=1. There is no "usage:" text to pin -- the original instruction to assert one was wrong,
+    and this docstring records that so the false premise is not re-introduced.
+
+    What IS pinned, because it is what the baseline actually guarantees and what this slice could
+    plausibly break:
+      (a) rc is non-zero -- the `${1:?...}` refusal still fires; the new `case "${1:-}"` dispatch
+          must not swallow the zero-arg case into a success path.
+      (b) combined stdout+stderr contains no 'unbound variable' -- the real regression this test
+          exists to catch: a bare `$1` (instead of `${1:-}`) in the new dispatch would raise
+          exactly that text under `set -u`, BEFORE the ${1:?...} guard is ever reached.
+      (c) the zero-arg run creates/modifies no lock or brief artifact for the empty slice name
+          (`/tmp/mr_pass_.md`, `/tmp/mr_pass_.vars.json`, `<selfdir>/.harness-runner..lock`).
+      (d) an argument that merely STARTS with a dash but is not one of the two recognised modes
+          must fall through to the ORIGINAL slice-arg path, not be mistaken for a mode. Proven by
+          a REAL subprocess run, deterministically and without touching the live loop: that
+          path's very next gate after S=/V=/B= is
+          `[ -r "$V" ] || status FAIL "vars.json missing: $V" 1`, which exits before the hold
+          gate, any git fetch, or a launch -- so running it for real is side-effect-free by
+          construction of the untouched code below this slice's insertion point.
+    """
+    bad = 0
+    self_path = os.path.join(selfdir, "mr-spawn")
+    if not os.path.isfile(self_path):
+        print("SKILLS-SELFTEST-FAIL t8-missing-self: %s" % self_path)
+        return 1
+
+    # (a)+(b)+(c): zero-arg invocation
+    empty_targets = [
+        "/tmp/mr_pass_.md",
+        "/tmp/mr_pass_.vars.json",
+        os.path.join(selfdir, ".harness-runner..lock"),
+    ]
+
+    def _snap(paths):
+        snap = {}
+        for p in paths:
+            try:
+                st = os.stat(p)
+                snap[p] = (st.st_mtime_ns, st.st_size)
+            except OSError:
+                snap[p] = None
+        return snap
+
+    before = _snap(empty_targets)
+    try:
+        r = subprocess.run(["bash", self_path], capture_output=True, text=True, timeout=30)
+    except subprocess.TimeoutExpired:
+        print("SKILLS-SELFTEST-FAIL t8-timeout")
+        return 1
+    after = _snap(empty_targets)
+    combined = (r.stdout or "") + (r.stderr or "")
+    if r.returncode == 0:
+        print("SKILLS-SELFTEST-FAIL t8-zero-arg-must-refuse: zero-arg invocation exited 0 "
+              "(expected non-zero -- the ${1:?...} refusal must still fire)")
+        bad = 1
+    if "unbound variable" in combined:
+        print("SKILLS-SELFTEST-FAIL t8-unbound-variable: zero-arg invocation printed 'unbound "
+              "variable' -- the new dispatch must use ${1:-}, never a bare $1: %r"
+              % combined[-300:])
+        bad = 1
+    changed = [p for p in empty_targets if after[p] != before[p]]
+    if changed:
+        print("SKILLS-SELFTEST-FAIL t8-empty-slice-artifact: zero-arg run created/modified %s "
+              "-- the refusal must fire before any lock/brief write" % changed)
+        bad = 1
+
+    # (d): dash-prefixed but unrecognised argument must not be mistaken for a mode.
+    try:
+        r2 = subprocess.run(["bash", self_path, "--bogus"], capture_output=True, text=True,
+                             timeout=30)
+    except subprocess.TimeoutExpired:
+        print("SKILLS-SELFTEST-FAIL t8-bogus-timeout")
+        return 1
+    combined2 = (r2.stdout or "") + (r2.stderr or "")
+    if r2.returncode == 0:
+        print("SKILLS-SELFTEST-FAIL t8-bogus-must-refuse: `--bogus` exited 0 (expected "
+              "non-zero -- it must fall through to the slice-arg path, not a success)")
+        bad = 1
+    if "SKILLS-SELFTEST" in combined2:
+        print("SKILLS-SELFTEST-FAIL t8-bogus-mistaken-for-mode: `--bogus` entered the "
+              "--selftest render path: %r" % combined2[-300:])
+        bad = 1
+    return bad
+
+
+def selftest(selfdir):
+    bad = 0
+    battery = [
+        ("t1-fixture-register", t1_fixture_register, ()),
+        ("t2-proof-of-teeth", t2_proof_of_teeth, ()),
+        ("t3-rf4-shape", t3_rf4_shape, ()),
+        ("t4-template-placement", t4_template_placement, (selfdir,)),
+        ("t5-map-integrity", t5_map_integrity, ()),
+        ("t6-end-to-end", t6_end_to_end, (selfdir,)),
+        ("t7-no-echo-regression", t7_no_echo_regression, ()),
+        ("t8-zero-arg-usage", t8_zero_arg_usage, (selfdir,)),
+    ]
+    for name, fn, args in battery:
+        try:
+            r = fn(*args)
+        except Exception as exc:
+            print("SKILLS-SELFTEST-FAIL %s crashed: %s: %s" % (name, type(exc).__name__, exc))
+            bad = 1
+            continue
+        if r:
+            bad = 1
+    if not bad:
+        print("SKILLS-SELFTEST-OK %d fixtures" % len(FIXTURES))
+    return 1 if bad else 0
+
+# ===== END GATING TESTS =====
+
+def main(argv):
+    if len(argv) >= 2 and argv[1] == "--selftest":
+        selfdir = argv[2] if len(argv) >= 3 else None
+        return selftest(selfdir)
+    raw = argv[1] if len(argv) >= 2 else ""
+    skills = skills_for(tokens_of(raw))
+    sys.stdout.write(render_block(skills))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+PYSKILLS
+}
+
+case "${1:-}" in
+  --selftest)
+    mr_skills --selftest "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+    exit $?
+    ;;
+  --render-brief)
+    build_brief "${4:-}" "${2:-}" "${3:-}"
+    exit $?
+    ;;
+esac
+
 S="${1:?usage: mr-spawn <slice> [--dry]}"; DRY="${2:-}"
 V="/tmp/mr_pass_$S.vars.json"; B="/tmp/mr_pass_$S.md"
 emit(){ SLICE="$S" ST="$1" DET="$2" /usr/bin/python3 -c "import json,os;print(json.dumps({'slice':os.environ['SLICE'],'status':os.environ['ST'],'detail':' '.join(os.environ['DET'].split())[:600]}))"; }
