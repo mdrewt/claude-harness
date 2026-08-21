@@ -63,6 +63,243 @@ EOF
 # — that mr-record actually WRITES the columns — is the PYSQ block at the bottom of this file;
 # without it every gate here stays green while the writer emits nothing at all.
 "$MEM/mr-slice-quality" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-slice-quality selftest"; BAD=1; }
+# lp-04: mr-audit's policy/detector split + the disposition sweep.
+#
+# The one-line house form — `"$MEM/mr-audit" --selftest >/dev/null 2>&1 || BAD=1` — is DELIBERATELY
+# not used here, because against this particular tool it has ZERO teeth. mr-audit is rc=0 ALWAYS
+# (that is a promise in its own header, which the supervisor prompt relies on) and its argument
+# loop ignores unknown flags, so the one-liner passes identically against today's unmodified tool,
+# against a complete implementation, and against a ten-line stub. A red-team copied
+# memory/projects/ twice, wired that line into both copies, and the output diff was IDENTICAL.
+#
+# So the wiring is three parts, and each closes a hole the other two cannot:
+#   (a) the marker AND the fixture COUNT are parsed from stdout — a battery that shrinks must red;
+#   (b) an EXTERNAL behavioural probe drives the real tool over synthetic logs and asserts real
+#       verdicts, real key names and the real artifact. mr-audit's in-file battery necessarily
+#       drives its functions in process, so if main() stopped calling audit_gating altogether
+#       every in-file assertion would still pass. This is the half that sees that;
+#   (c) neither the probe nor the selftest may leave a /tmp/mr_audit_*.json behind.
+#
+# Tester-authored, TDD RED PHASE — do not edit these to fit a buggy implementation; a wrong
+# expectation is corrected FROM THE SPEC (M-loop-infrastructure.spec.md:224-253 and the binding
+# amendments in memory/projects/monster-realm-lp-04-plan.md), never retargeted to match the code.
+/usr/bin/python3 - "$MEM" <<'PYAUDIT' || BAD=1
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+MEM = sys.argv[1]
+AUDIT = os.path.join(MEM, "mr-audit")
+FIXTURE_SLICE = "mr-audit-fixture"          # never a live slice id: the artifact path is shared
+FIXTURE_ARTIFACT = "/tmp/mr_audit_%s.json" % FIXTURE_SLICE
+COUNT_FLOOR = 24
+bad = 0
+
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL %s" % name) + (": " + detail if detail else ""))
+
+
+def run(args, timeout):
+    try:
+        r = subprocess.run(["bash", AUDIT] + list(args), capture_output=True, text=True,
+                           timeout=timeout)
+        return r.returncode, r.stdout or "", r.stderr or ""
+    except FileNotFoundError as exc:
+        return None, "", "NOT-FOUND: %s" % exc
+    except subprocess.TimeoutExpired:
+        return None, "", "TIMEOUT after %ss" % timeout
+
+
+def tmp_artifacts():
+    import glob
+    snap = {}
+    for p in glob.glob("/tmp/mr_audit_*.json"):
+        try:
+            s = os.stat(p)
+            snap[p] = (s.st_mtime_ns, s.st_size)
+        except OSError:
+            snap[p] = None
+    return snap
+
+
+if not os.path.isfile(AUDIT):
+    fail("lp04-audit-missing", "mr-audit not found at %s" % AUDIT)
+    sys.exit(bad)
+
+# =============================================================================================
+# (a) marker + count. rc alone proves nothing (rc=0 always); the marker alone is one print
+# statement away from being faked; the COUNT is what makes a quietly-deleted fixture visible.
+# =============================================================================================
+before = tmp_artifacts()
+rc, out, err = run(["--selftest"], 300)
+if rc is None:
+    fail("lp04-selftest-unrunnable", err.strip()[:200])
+elif rc != 0:
+    tail = (out + err).strip().splitlines()
+    fail("lp04-selftest", "mr-audit --selftest exited %d: %s" % (rc, " | ".join(tail[-8:])))
+m = re.search(r"^AUDIT-SELFTEST-OK ([0-9]+)$", out, re.M)
+if not m:
+    fail("lp04-selftest-marker",
+         "mr-audit --selftest did not print `AUDIT-SELFTEST-OK <n>` (rc=%r). Until lp-04 lands "
+         "this is the expected RED: the battery is dead code below finish() and nothing "
+         "dispatches --selftest. stdout tail: %s" % (rc, out.strip()[-200:]))
+elif int(m.group(1)) < COUNT_FLOOR:
+    fail("lp04-selftest-count",
+         "the battery ran %s fixtures, floor is %d — fixtures have been deleted, or the count "
+         "is being reported instead of measured" % (m.group(1), COUNT_FLOOR))
+after = tmp_artifacts()
+leaked = sorted([p for p in after if p not in before or after[p] != before.get(p)])
+if leaked:
+    fail("lp04-selftest-tmp-pollution",
+         "--selftest created or modified %s; every emit() in the battery must be handed an "
+         "artifact_dir inside its own tempdir" % (leaked,))
+
+# =============================================================================================
+# (b) EXTERNAL behavioural probe. A stub that prints the marker cannot fake ANY of this.
+# =============================================================================================
+AGENT = '{"name":"Agent","input":{"subagent_type":"%s"},"model":"claude-opus-5"}\n'
+
+
+def probe(label, args, timeout=120):
+    rc, out, err = run(args, timeout)
+    if rc is None:
+        fail(label, err.strip()[:200])
+        return None
+    if rc != 0:
+        fail(label, "mr-audit exited %d — the rc=0-ALWAYS contract in its own header is what "
+                    "lets the supervisor call it unguarded; stderr: %s" % (rc, err.strip()[:160]))
+    try:
+        return json.loads(out)
+    except Exception as exc:
+        fail(label, "stdout is not JSON (%s): %r" % (exc, out.strip()[:200]))
+        return None
+
+
+with tempfile.TemporaryDirectory(prefix="mr-selfcheck-lp04-") as TMP:
+    flagged_log = os.path.join(TMP, "flagged.jsonl")
+    with open(flagged_log, "w") as fh:
+        fh.write('{"type":"user","content":"no agent calls at all"}\n')
+    clean_log = os.path.join(TMP, "clean.jsonl")
+    with open(clean_log, "w") as fh:
+        fh.write((AGENT % "tester") + (AGENT % "reviewer"))
+    dir_log = os.path.join(TMP, "a-directory")
+    os.makedirs(dir_log)
+
+    obj = probe("lp04-probe-flagged", ["--slice", FIXTURE_SLICE, "--log", flagged_log])
+    if obj is not None:
+        got = (obj.get("orchestration") or {}).get("verdict")
+        if got != "FLAGGED":
+            fail("lp04-probe-flagged",
+                 "a log with zero Agent calls must be FLAGGED; got %r. This is the assertion a "
+                 "marker-printing stub cannot satisfy" % (got,))
+        # AM3: the key was renamed, the VOCABULARY was not. mr-supervisor-prompt-native.md:39,
+        # :122-123 and mr-record's gating_test_audit column both key on the FLAGGED token.
+        if "gating_advisory" not in obj:
+            fail("lp04-probe-key", "top-level `gating_advisory` is missing (AM3)")
+        if "gating" in obj:
+            fail("lp04-probe-legacy-key",
+                 "the legacy `gating` key is still emitted; AM3 renames it so a reader reaching "
+                 "for gating.verdict gets a visible absence instead of a stale block")
+        # AM4: no --repo was passed, so the advisory inputs are unavailable and the AUDIT-ERROR
+        # -treated-as-FLAGGED convention from mr-audit's own header must survive as policy.
+        if obj.get("mandatory_read") is not True:
+            fail("lp04-probe-mandatory-read",
+                 "advisory inputs unavailable must hoist mandatory_read=True at TOP LEVEL; got "
+                 "%r. Without it a typo'd --repo is a silent proceed" % (obj.get("mandatory_read"),))
+        if obj.get("read_reason") != ["advisory-inputs-unavailable"]:
+            fail("lp04-probe-read-reason",
+                 "expected ['advisory-inputs-unavailable']; got %r" % (obj.get("read_reason"),))
+        disp = obj.get("disposition")
+        if not isinstance(disp, dict):
+            fail("lp04-probe-disposition", "no top-level `disposition` block on a real run")
+        else:
+            if disp.get("advisory") is not True:
+                fail("lp04-probe-disposition", "the disposition block must carry advisory=True")
+            if "verdict" in disp:
+                fail("lp04-probe-disposition",
+                     "AM11: the corpus sweep uses status OK|FINDINGS|AUDIT-ERROR, never a "
+                     "verdict — a FLAGGED here attaches unactionable findings to every merge "
+                     "forever and corrupts AM6's falsification, which reads gating_advisory only")
+            if disp.get("status") not in ("OK", "FINDINGS", "AUDIT-ERROR"):
+                fail("lp04-probe-disposition", "status %r is outside the closed vocabulary"
+                     % (disp.get("status"),))
+        # emit()'s artifact half, proven on the real binary before we clean it up.
+        if not os.path.exists(FIXTURE_ARTIFACT):
+            fail("lp04-probe-artifact", "%s was not written" % FIXTURE_ARTIFACT)
+        else:
+            with open(FIXTURE_ARTIFACT, errors="replace") as fh:
+                if json.loads(fh.read()) != obj:
+                    fail("lp04-probe-artifact", "the artifact and stdout disagree")
+
+    obj = probe("lp04-probe-clean", ["--slice", FIXTURE_SLICE, "--log", clean_log])
+    if obj is not None:
+        got = (obj.get("orchestration") or {}).get("verdict")
+        if got != "CLEAN":
+            fail("lp04-probe-clean",
+                 "tester + reviewer role evidence must be CLEAN; got %r" % (got,))
+
+    # The AM2 shape, on the REAL tool: os.path.exists() is true for a directory, open() raises,
+    # and the SINGLE outer try takes both halves down together. Any per-function error handling
+    # turns this into a populated orchestration block and a computed gating CLEAN — strictly
+    # less conservative than today.
+    obj = probe("lp04-probe-directory-log", ["--slice", FIXTURE_SLICE, "--log", dir_log])
+    if obj is not None:
+        if obj.get("orchestration") != {"verdict": "AUDIT-ERROR"}:
+            fail("lp04-probe-directory-log",
+                 "`--log <a directory>` must yield the degraded shape {'verdict':'AUDIT-ERROR'} "
+                 "with no reason/agent_calls/roles/models; got %r" % (obj.get("orchestration"),))
+        if (obj.get("gating_advisory") or {}).get("verdict") != "AUDIT-ERROR":
+            fail("lp04-probe-directory-log",
+                 "the shared try must take the gating half down with it; got %r"
+                 % (obj.get("gating_advisory"),))
+        # AM17, and THIS is where it bites. mr-audit's own battery has to mirror the exception
+        # handler to reach this path at all, so the real :71-73 body is only ever executed here.
+        # A handler that leaves mandatory_read at its init value reports "the audit blew up" and
+        # "no mandatory read" in the same object — the silent proceed AM4 closes for a typo'd
+        # --repo, reached through the other door.
+        if obj.get("mandatory_read") is not True:
+            fail("lp04-probe-directory-log-am17",
+                 "an audit that RAISED must force the diff read: expected mandatory_read=True, "
+                 "got %r" % (obj.get("mandatory_read"),))
+        if obj.get("read_reason") != ["advisory-inputs-unavailable"]:
+            fail("lp04-probe-directory-log-am17",
+                 "expected ['advisory-inputs-unavailable'] exactly once; got %r"
+                 % (obj.get("read_reason"),))
+
+    # The hard-tier half of the same door: `hard-tier` can only have come from the init, which
+    # runs BEFORE the try. A handler that ASSIGNS the list instead of appending loses it, and an
+    # init moved inside the try never produced it. Order is asserted, not membership.
+    obj = probe("lp04-probe-directory-log-hard",
+                ["--slice", FIXTURE_SLICE, "--tier", "hard", "--log", dir_log])
+    if obj is not None:
+        if obj.get("read_reason") != ["hard-tier", "advisory-inputs-unavailable"]:
+            fail("lp04-probe-directory-log-hard",
+                 "expected ['hard-tier', 'advisory-inputs-unavailable'] in that order; got %r"
+                 % (obj.get("read_reason"),))
+        if obj.get("mandatory_read") is not True:
+            fail("lp04-probe-directory-log-hard",
+                 "got mandatory_read=%r" % (obj.get("mandatory_read"),))
+
+# =============================================================================================
+# (c) no artifact survives. The probe slice id is deliberately one no live slice can carry, so
+# the removal below can never delete a real audit.
+# =============================================================================================
+try:
+    if os.path.exists(FIXTURE_ARTIFACT):
+        os.remove(FIXTURE_ARTIFACT)
+except OSError as exc:
+    fail("lp04-probe-cleanup", "could not remove %s: %s" % (FIXTURE_ARTIFACT, exc))
+if os.path.exists(FIXTURE_ARTIFACT):
+    fail("lp04-probe-cleanup", "%s survived the probe" % FIXTURE_ARTIFACT)
+
+sys.exit(bad)
+PYAUDIT
 # lp-11a: POLYGLOT INTERPRETER GUARD on every python mr-* tool.
 #
 # `bash <a python file>` does not read the shebang — it interprets the source as shell, which

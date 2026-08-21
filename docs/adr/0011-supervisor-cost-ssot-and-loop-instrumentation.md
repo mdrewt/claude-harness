@@ -337,3 +337,180 @@ requires each mutation to RED *naming that column*, so an implementation that on
 cannot satisfy every kind assertion at once. `INSUFFICIENT-DATA` (fewer than 8 distinct slices)
 exits **2 and is not green** — conflating "no data yet" with "collapsed schema" is the dishonesty
 this amendment exists to remove.
+
+## Amendment 2026-08-20 (lp-04) — mr-audit's policy/detector split, and a disposition detector
+
+This ADR already owns the supervisor offload layer that `mr-audit` belongs to (see the heredoc
+paragraph above, which names it), so lp-04 extends it here rather than opening a number. **No
+standalone ADR number was assigned by the supervisor for this slice**, and self-assigning one risks
+colliding with a concurrent sibling.
+
+**Measured problem.** `mr-audit` emitted two blocks that spoke the same vocabulary and read as the
+same kind of claim. `orchestration` is a real policy verdict — it is the mechanism behind the
+pre-code reviewer/red-team gauntlet and is on the DO-NOT-BREAK list. `gating` was an evidence
+detector with **0 true positives across all 446 v3-era rows**, and it set `FLAGGED` for every
+hard-tier slice *by construction*, so the supervisor's mandatory diff read was driven by the tier
+label rather than by any evidence. A signal that fires 100% of the time carries no information, and
+a reader cannot tell it apart from the verdict that does.
+
+**D1 — the policy signal is hoisted OUT of the detector, to top level.** `mandatory_read` and
+`read_reason` are now top-level keys beside `orchestration`, set at dict-init so they survive the
+exception path. `mandatory_read` is true when `tier == "hard"` **or** when the advisory inputs are
+unavailable. The second disjunct is not incidental: it carries this file's own
+"treat `AUDIT-ERROR` as `FLAGGED`" convention forward, which `M-loop-infrastructure.spec.md:235`
+explicitly requires of any rule that leans on the hard-tier behaviour. Without it a typo'd `--repo`
+would degrade from "mandatory read" to a silent proceed.
+
+**D2 — the detector half is renamed, not re-vocabularised.** `out["gating"]` becomes
+`out["gating_advisory"]` (the EARS "distinct field": a reader reaching for `gating.verdict` gets a
+visible absence) and carries `advisory: true` plus a `contract` string stating in-band that it is
+evidence for an LLM diff read and never a merge predicate. **The `CLEAN | FLAGGED | AUDIT-ERROR`
+values are deliberately KEPT.** Three independent review lenses converged on this: `mr-audit`'s only
+runtime consumer is the supervisor LLM reading `mr-supervisor-prompt-native.md:39,:122-123`, which
+keys on the literal token `FLAGGED`; `mr-record`'s `gating_test_audit` ledger column is filled from
+that same free text; and a third vocabulary would contradict this file's own header convention. A
+rename that made `FLAGGED` unemittable would not have reclassified the mandatory read — it would
+have **deleted** it, silently and permissively, which is the opposite of the spec's intent.
+
+**D3 — the hard-tier-by-construction flag is deleted.** `gating_advisory.verdict` is now computed
+from the mechanical tripwire counters alone. **Reported honestly, because the falsification test
+invites overclaiming:** the surviving tripwire rule was measured firing on **12 of the last 40**
+first-parent `monster-realm` commits (30%), so the spec's target of "<=2 FLAGGED across the next 5
+hard-tier slices" is satisfied with p~=0.84 by this change alone and is only weakly discriminating.
+The metric is measured over `gating_advisory.verdict` **only**. The corpus's own recorded design for
+the noise itself — a per-file NET assert-delta rule, measured at 30% -> 2.5%, with a retrospective
+replay over 44 archived audit ranges as its falsification — is a distinct change with a distinct
+measurement and is **parked -> lp-04d**. Folding it in here would have made neither half readable.
+
+**D4 — a disposition detector, implemented as a bold-parity rule.** `docs/workflow-loops.md:32-39`
+already defines the grammar (`parked -> <queued spec id | wontfix>`), the location, the rule and the
+owner ("marker presence is audited supervisor-side (the mr-audit layer)"); `disposition` appeared
+zero times in `mr-audit`. The detector reports (a) a park with no disposition marker and (b) a
+disposition naming a spec id that exists in no spec file. The parse rule is the whole design
+decision: **`PARKED` used as a status label is always bold in this corpus, and `PARKED` used as
+prose never is.** Splitting a logical item (a line joined with its continuation lines) on `**` and
+testing only the odd, inside-bold segments finds every true positive in ~8 lines and needs no
+closure-section, table-row or bold-span machinery. **It is not false-positive free, and an earlier
+draft of this paragraph wrongly claimed it was.** A red-team pass falsified that: of the 13 live
+findings, two (`M17-ranked-ladder.spec.md:132`, `playtest-gate-decision-2026-07-25.md:46`) are the
+word "parked" used as *prose that happens to sit inside a bold span*, and three more report
+`missing_disposition` against parks whose disposition is present but written `Parked to X:` rather
+than in the `parked -> X` grammar. Those five are honest reports against the SSOT grammar rather
+than parser faults, but calling the rule zero-FP was an overstatement, and this corpus has a
+recorded history of ADR prose overstating what shipped. Known blind spots, stated rather than
+discovered later: `**` inside a fenced code block, an inline code span, an HTML comment or a URL is
+not distinguished from a real bold span; an unbalanced `**` earlier in a line flips the parity for
+the rest of it in both directions. A drafted
+section-scoped parser was measured against the live corpus first and rejected: it false-positived a
+table *header* row and two slice headings that merely contain the word "parked", audited 53 ADR
+files as if they were specs, and was blind to the corpus's dominant closure style
+(`**pt-c1b DELIVERED** ... **Parked -> pt-c1b2:**`) — and therefore to both live orphans.
+
+**D5 — the orphan check is occurrence-based, after normalisation.** Targets are stripped of
+backticks, asterisks and trailing punctuation before an id-shape test of
+`^[a-z0-9]+(?:-[a-z0-9]+)+$`; an id exists if it occurs anywhere in the corpus on a line that is not
+itself a marker line. This is the literal reading of the criterion and is robust to heading-style
+drift. The rejected alternative — enumerating declaration forms (`# Spec:` lines, `###` headings,
+filename stems) — was measured **inert**: every real target in the corpus is backticked or
+punctuated and failed the bare-id shape test, so it would have reported "0 orphans" forever. That is
+why **`AUDIT-ERROR` is raised when park markers exist but zero id-shaped targets resolve**: a
+tokenizer that matched nothing must never read as "nothing is wrong".
+
+**D6 — the disposition block is corpus-scoped and uses its own status vocabulary.**
+`disposition.status: OK | FINDINGS | AUDIT-ERROR`, never `verdict`/`FLAGGED`. For a monster-realm
+slice the specs live in the *harness* repo and are never in the audited `base..head` at all, so
+these findings are a backlog signal about the corpus, not a fact about the diff. Emitting `FLAGGED`
+would attach unactionable findings to every merge forever — the decorative-gate failure this corpus
+keeps re-learning — and would corrupt D3's measurement. The specs root is **self-located**
+(`dirname($0)/../../specs`) with no flag and no env override, per `mr-selfcheck:4-11`: a gate
+attests the corpus it ships beside, and an override is a surface for greening production vacuously.
+Two consequences are accepted and stated rather than hidden: run from a worktree it audits that
+worktree's corpus, and being a corpus check it is structurally one merge behind the slice that
+introduces a park.
+
+**D8 — the read obligation is emitted in the vocabulary its consumer keys on.** Deleting the
+hard-tier `FLAGGED` (D3) and moving the obligation to `mandatory_read` was, on its own, **not a
+reclassification — it was a deletion**, and a red-team demonstrated it live: a hard-tier slice with
+a clean diff produced `orchestration: CLEAN`, `gating_advisory: CLEAN`, and the token `FLAGGED`
+nowhere in the document, while `mr-supervisor-prompt-native.md:39/:122` — the only consumer —
+instructs "CLEAN -> proceed" and never mentions `mandatory_read`. The pre-merge diff read would
+simply have stopped happening. A top-level `policy` key therefore carries the token
+(`FLAGGED - mandatory diff read (policy, not evidence; see read_reason)`) whenever a read is owed.
+**The detector half still never emits `FLAGGED` except from its own tripwire counters**, which is
+the property the split exists to create and the one the falsification measures. This is the slice's
+own anti-pattern A6 ("a metric satisfied by removing the source") caught in its own implementation.
+
+**D9 — "could not look" forces the read on every path, including the new one.** An unreadable or
+missing spec corpus now raises the same obligation (`read_reason: disposition-corpus-unreadable`),
+the corpus sweep runs OUTSIDE the shared `try` so a failure in it cannot clobber a successfully
+computed `gating_advisory`, and non-regular files (a FIFO named `*.md` would have blocked a merge
+audit forever) and absurd sizes are refused into `unreadable[]` rather than opened.
+
+**D7 — the file keeps its `#!/bin/bash` + python-heredoc shape.** A whole-file conversion to
+standalone python was drafted and rejected. The spec's hardest constraint is that the orchestration
+half's semantics must not change, and today that is provable by `git diff` in one second; a rewrite
+would have destroyed that free mechanical proof and replaced it with "trust the fixtures the same PR
+authored". The refactor is therefore in place — the block is wrapped in a function with its body
+byte-identical modulo indentation, **inside the existing single outer `try`**, because a
+`--log <directory>` raises there (`os.path.exists`, not `isfile`) and today that suppresses the
+whole gating half; per-function error handling would have quietly converted that to `CLEAN`. The
+house-style conversion is **parked -> lp-04e** as a behaviour-neutral slice of its own. `--only`
+selector flags, a schema-version key and a `--specs` override were all cut as YAGNI: the EARS
+sentence defines addressability as distinct fields, which distinct top-level keys already give.
+
+## Confirmation (lp-04 amendment)
+
+`memory/projects/mr-selfcheck` gates `memory/projects/mr-audit --selftest`, and the wiring is
+deliberately **not** the corpus's usual one-line `|| BAD=1` form. A red-team proved that shape has
+zero teeth here: `mr-audit` is `rc=0` **always** and ignores unknown flags, so the one-liner cannot
+distinguish the unmodified tool, a full implementation, or a ten-line stub that prints the marker —
+it built all three and the gate's output was identical. The wiring therefore (a) asserts the literal
+`AUDIT-SELFTEST-OK <n>` marker with a **fixture-count floor**, so a shrinking battery reds; (b)
+carries an **external behavioural probe** that a stub cannot fake — it writes synthetic logs to a
+tempdir, runs the real `mr-audit`, and asserts `FLAGGED` on one and `CLEAN` on the other; and (c)
+asserts the run left no `/tmp/mr_audit_*.json` behind, so a fixture can never clobber the live
+artifact the supervisor reads.
+
+Proof-of-teeth, per ADR-0010: the orchestration battery's expected values are **goldens captured
+from the pre-slice tool** (`git show <base>:memory/projects/mr-audit`) and asserted as exact JSON,
+including the two cases a plausible rewrite silently inverts — `--doc-only` with a **missing** log
+must stay `AUDIT-ERROR` (a hoisted doc-only short-circuit would turn a doc-only slice carrying zero
+orchestration evidence into an auto-merge), and `--log <a directory>` must keep its degraded,
+`reason`-less shape. The disposition battery asserts the **false-positive direction** against five
+prose decoys copied verbatim from the live corpus, rather than pinning a true-positive count:
+prose is never fixed, so that assertion is stable, whereas pinning today's true positives would RED
+the moment someone does the right thing. The battery also carries a control that runs its own
+comparison helper against a deliberately mismatched pair and requires it to register a failure, so
+"the selftest can fail" is proven rather than assumed, and a hermeticity assertion on every git
+fixture (`rev-parse --show-toplevel` must equal the tempdir) — the red-team reproduced a fixture
+recipe that, missing `GIT_DIR` from its env scrub, committed the operator's entire working tree into
+the live repo.
+
+Pre-registered: the disposition scanner's live findings are recorded in the PR **by file:line**, not
+as a count. More than 15 findings means the parse is too loose and must be tightened before merge,
+never muted; zero `missing_disposition` findings means the parser is broken. Shipped result: **13
+findings** (11 `missing_disposition`, 2 `orphan_disposition`), enumerated in the PR body. That is
+2.2x the 6 predicted at plan time and passes only because the ceiling sat 2.5x above the
+prediction — recorded here rather than smoothed over, because a ceiling that generous is weak
+pre-registration and the next slice in this family should tighten it.
+
+**Measured cost (AM16 requires this number, and it is the number that decides whether the gate is
+safe to run daily).** `mr-selfcheck` runs from `mr-native-tick.sh:220` under `timeout 300`, where a
+timeout kill produces empty output, logs nothing, and touches `.selfcheck-last` anyway — a slow
+gate fails silently GREEN. Measured: `mr-selfcheck` **29s** post-slice against a **28.8s** baseline
+(delta ~0.2s); `mr-audit --selftest` **165ms**. Ample margin. **Known residual, parked -> lp-04f:**
+`mr-selfcheck`'s inner `run(["--selftest"], 300)` uses the same 300s budget as the tick's outer
+`timeout 300`, so the inner bound can never fire first and a HUNG selftest would still present as a
+silent green. Lower the inner bound to 60-120s.
+
+**Surviving mutants, recorded rather than implied away.** Twelve mutants were killed by named
+fixtures, and a red-team then found twelve more that survive the full gate. The important ones are
+test-coverage gaps, not code faults: the live corpus writes the marker with a **unicode arrow**
+(21 occurrences of `parked ->` in its unicode form, zero ASCII) while every in-file fixture uses
+ASCII, so the arm that actually runs in production is uncovered; the external probe never passes
+`--repo/--base/--head`, so no gating counter is asserted by value from outside; the probe accepts
+`disposition.status: AUDIT-ERROR` as green, so a broken `specs_root` reads as clean; and the
+fixture-count floor is 24 against 57, so 33 fixtures can be deleted silently. A 41-line stub
+therefore still passes the gate. **All parked -> lp-04g** with the four named hardening tests, and
+called out in the PR body: the gate is materially stronger than the one-line form it replaced, and
+it is not yet stub-proof.
