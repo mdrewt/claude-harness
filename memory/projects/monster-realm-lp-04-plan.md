@@ -268,3 +268,59 @@ PR, not as a count. Expected today: the 4 `missing_disposition` `/simplify` meas
 `orphan_disposition` the red-team measured (`pt-c1b2`, `pt-c2c`). **> 15 findings => the parse is
 too loose; tighten it before merge, never mute it.** **0 `missing_disposition` => the parser is
 broken.** **0 id-shaped targets resolved => AM10 must have fired.**
+
+---
+
+## Post-implementation lens round (2026-08-20) — what changed after the batch
+
+Four lenses ran on the shipped implementation; two (`reviewer`, `review-lens`) died mid-run on API
+errors and their partial output carried no findings. `red-team` and `/simplify` completed.
+
+**Adjudicated IN and fixed in this slice (production-only; no gating test was edited by the
+implementer, and all 57 fixtures stayed green across every fix):**
+
+- **AM18 (red-team KILL-1, the important one).** Deleting the hard-tier `FLAGGED` and relying on a
+  new `mandatory_read` key **deleted the pre-merge diff read** rather than reclassifying it, because
+  the only consumer keys on the `FLAGGED` token and has never heard of `mandatory_read`. Fixed by
+  emitting the token from the POLICY half (`out["policy"]`) whenever a read is owed, while the
+  DETECTOR half still never emits it. My earlier adjudication that the prompt edit was "invited, not
+  required" was wrong on this point and the lens was right; the fix removes the requirement honestly
+  instead of arguing it away.
+- **red-team M-2** — an unreadable/missing spec corpus reported `AUDIT-ERROR` while
+  `mandatory_read` stayed false: the exact permissive class AM4 exists to close, reached through the
+  new detector. Now forces the read (`disposition-corpus-unreadable`).
+- **red-team MINOR + `/simplify` §2** — the corpus sweep ran inside the shared `try`, so any raise
+  in it clobbered a successfully computed `gating_advisory`. Moved out; the handler now preserves
+  `gating_advisory` the way it already preserved `orchestration`.
+- **red-team M-4 / FP6** — an id declared on a line that also carries a marker became a permanent
+  self-orphan, and that is the corpus's DOMINANT closure style. The existence corpus now strips only
+  the marker span, not the whole line. Latent today; it would have fired the day `pt-c1b2` shipped.
+- **red-team MINOR** — a FIFO named `*.md` under `specs/` blocked the tool forever and a 205MB file
+  cost ~1GB RSS. Non-regular files and oversized files go to `unreadable[]`.
+
+**Parked, with dispositions (all recorded in the ADR and the PR body):**
+
+- **parked -> lp-04f** — `mr-selfcheck`'s inner `--selftest` timeout equals the tick's outer
+  `timeout 300`, so a hung selftest still presents as a silent green (red-team M-7).
+- **parked -> lp-04g** — the gate is not yet stub-proof (red-team KILL-2/KILL-3). Four named
+  hardening tests: assert `disposition.scanned.files` and `park_items` by value on the live corpus;
+  build a fixture repo inside the probe and assert the gating counters by value; add unicode-arrow
+  marker fixtures (the live corpus uses ONLY the unicode form and every fixture uses ASCII, so the
+  production arm is uncovered); raise the fixture floor from 24 toward 57. **Requires the `tester`
+  role** — the implementer must not author these, and the landing-pattern flag (`/tmp/mr_warn_lp-04`,
+  observed before this round) forbids a new fan-out. This is the single most valuable follow-up.
+- **parked -> lp-04h** — `--tier=hard` parses to `tier: routine` with `mandatory_read false`, and
+  `--tier HARD` is not normalised. Fixing it requires INVERTING fixture `P17`, which currently pins
+  the case-sensitivity as correct, so it needs the tester (red-team M-1).
+- **parked -> lp-04i** — `/simplify` demonstrated ~150 removable lines (four external-gate
+  duplicates, three duplicate-input fixture blocks, `P19` whose kill set it showed to be empty, two
+  redundant decoys, and the AM17 narrative repeated four times) with no mutant kill lost. Deferred
+  because every one of them edits the gating battery.
+- **parked -> lp-04j** — a `markers == 0 while park_items > 0` vacuity guard. Proposed by the
+  red-team (M-3) and NOT implemented: as stated it would fire on any corpus of dispositionless
+  parks, including fixture `D1`. It needs a corpus-scale formulation and its own fixtures.
+
+**Rejected, recorded so it is not re-proposed:** `/simplify`'s suggestion to cut the `wontfix`
+guard in `_normalise_target` as unreachable is correct on today's `_ID_SHAPE`, but it is one line of
+defence-in-depth on the exact token the SSOT grammar names, and it becomes load-bearing the moment
+the shape test admits a hyphen-free id.

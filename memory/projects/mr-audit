@@ -17,7 +17,7 @@ export A_ARGS=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[
 # is a surface for greening production vacuously.
 export A_MEM=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 /usr/bin/python3 <<'PY'
-import json, os, re, subprocess, sys
+import json, os, re, stat, subprocess, sys
 
 ADVISORY_CONTRACT = ("ADVISORY EVIDENCE ONLY - never a merge predicate; evidence for an LLM diff "
                      "read. The policy verdict is `orchestration`; the read obligation is the "
@@ -51,6 +51,18 @@ def force_read(out, reason):
     out["mandatory_read"] = True
     if reason not in out["read_reason"]:
         out["read_reason"].append(reason)
+    out["policy"] = POLICY_FLAGGED
+
+
+# AM18 (red-team KILL-1, adjudicated 2026-08-20).  The read obligation has to be expressed in the
+# vocabulary the ONLY consumer keys on.  mr-supervisor-prompt-native.md:39/:122 says "CLEAN ->
+# proceed. FLAGGED or AUDIT-ERROR -> YOU read the diff"; the string `mandatory_read` appears
+# nowhere in it.  Deleting the hard-tier FLAGGED (D3) without emitting the token somewhere the
+# supervisor still trips over would not have RECLASSIFIED the mandatory read, it would have
+# DELETED it -- the slice's own anti-pattern A6.  So the POLICY half, and only the policy half,
+# carries `FLAGGED`; the DETECTOR half never does by construction.  That is the actual split.
+POLICY_FLAGGED = "FLAGGED - mandatory diff read (policy, not evidence; see read_reason)"
+POLICY_CLEAN = "CLEAN - no policy-mandated read"
 
 
 def audit_orchestration(a, out):
@@ -200,6 +212,13 @@ def scan_dispositions(specs_root):
     for p in sorted(files):
         rel = os.path.relpath(p, specs_root)
         try:
+            st = os.stat(p)
+            # A FIFO named *.md under specs/ would block the read forever, and the pre-lp-04 tool
+            # never touched specs/ at all -- so this sweep must not be the thing that hangs a merge.
+            if not stat.S_ISREG(st.st_mode):
+                raise OSError("not a regular file")
+            if st.st_size > 4_000_000:
+                raise OSError("spec file too large to scan: %d bytes" % st.st_size)
             with open(p, "rb") as fh:
                 text = fh.read().decode("utf-8")
         except Exception:
@@ -211,6 +230,10 @@ def scan_dispositions(specs_root):
         for ln in lines:
             if _MARKER.search(ln):
                 marker_lines.setdefault(rel, []).append(ln)
+                # Keep the rest of the line: the corpus's dominant closure style declares an id and
+                # disposes of the previous one on the SAME line, so dropping the whole line made
+                # every such id a permanent false orphan.
+                keep.append(_MARKER.sub(" ", ln))
             else:
                 keep.append(ln)
         nonmarker_blobs.append("\n".join(keep))
@@ -1424,6 +1447,7 @@ if a.get("selftest") == "1":
     sys.exit(selftest())
 _mr, _rr = mandatory_read_init(a)
 out = {"slice": a.get("slice", "?"), "tier": a.get("tier", "routine"),
+       "policy": POLICY_FLAGGED if _mr else POLICY_CLEAN,
        "mandatory_read": _mr, "read_reason": _rr}
 try:
     # ONE shared try, unchanged from pre-lp-04: a log that cannot be read (a directory, say —
@@ -1432,12 +1456,30 @@ try:
     # gating verdict from inputs nothing had successfully looked at.
     audit_orchestration(a, out)
     audit_gating(a, out)
-    out["disposition"] = scan_dispositions(os.path.normpath(os.path.join(os.environ["A_MEM"], "..", "..", "specs")))
 except Exception as e:
     out["orchestration"] = out.get("orchestration", {"verdict": "AUDIT-ERROR"})
-    out["gating_advisory"] = {"advisory": True, "contract": ADVISORY_CONTRACT,
-                              "verdict": "AUDIT-ERROR", "reason": str(e)[:200]}
+    # Preserve a successfully computed advisory block for the same reason the line above preserves
+    # orchestration: a later failure must not erase earlier evidence.
+    out["gating_advisory"] = out.get("gating_advisory",
+                                     {"advisory": True, "contract": ADVISORY_CONTRACT,
+                                      "verdict": "AUDIT-ERROR", "reason": str(e)[:200]})
     force_read(out, "advisory-inputs-unavailable")
+# The corpus sweep sits OUTSIDE the shared try on purpose. It is effectively total (os.walk on a
+# missing root yields nothing; per-file reads are caught; the status ladder is a complete failure
+# vocabulary), and inside the try any raise in it would have clobbered a perfectly good
+# gating_advisory and reported "advisory inputs unavailable" when the advisory inputs were fine.
+try:
+    out["disposition"] = scan_dispositions(
+        os.path.normpath(os.path.join(os.environ["A_MEM"], "..", "..", "specs")))
+except Exception as e:
+    out["disposition"] = {"advisory": True, "contract": DISPOSITION_CONTRACT,
+                          "status": "AUDIT-ERROR", "reason": str(e)[:200],
+                          "findings": [], "unreadable": []}
+# F-C / red-team M-2: "I could not look at the corpus" must force the read too. Before this, a
+# missing or unreadable specs tree reported AUDIT-ERROR while mandatory_read stayed false --
+# exactly the permissive failure class AM4 exists to close, reached through the new detector.
+if out["disposition"].get("status") == "AUDIT-ERROR":
+    force_read(out, "disposition-corpus-unreadable")
 emit(out)
 sys.exit(0)
 PY

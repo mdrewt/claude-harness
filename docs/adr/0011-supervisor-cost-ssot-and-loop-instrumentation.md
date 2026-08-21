@@ -389,8 +389,18 @@ zero times in `mr-audit`. The detector reports (a) a park with no disposition ma
 disposition naming a spec id that exists in no spec file. The parse rule is the whole design
 decision: **`PARKED` used as a status label is always bold in this corpus, and `PARKED` used as
 prose never is.** Splitting a logical item (a line joined with its continuation lines) on `**` and
-testing only the odd, inside-bold segments reproduces every true positive with zero false positives
-in ~8 lines, and needs no closure-section, table-row or bold-span machinery. A drafted
+testing only the odd, inside-bold segments finds every true positive in ~8 lines and needs no
+closure-section, table-row or bold-span machinery. **It is not false-positive free, and an earlier
+draft of this paragraph wrongly claimed it was.** A red-team pass falsified that: of the 13 live
+findings, two (`M17-ranked-ladder.spec.md:132`, `playtest-gate-decision-2026-07-25.md:46`) are the
+word "parked" used as *prose that happens to sit inside a bold span*, and three more report
+`missing_disposition` against parks whose disposition is present but written `Parked to X:` rather
+than in the `parked -> X` grammar. Those five are honest reports against the SSOT grammar rather
+than parser faults, but calling the rule zero-FP was an overstatement, and this corpus has a
+recorded history of ADR prose overstating what shipped. Known blind spots, stated rather than
+discovered later: `**` inside a fenced code block, an inline code span, an HTML comment or a URL is
+not distinguished from a real bold span; an unbalanced `**` earlier in a line flips the parity for
+the rest of it in both directions. A drafted
 section-scoped parser was measured against the live corpus first and rejected: it false-positived a
 table *header* row and two slice headings that merely contain the word "parked", audited 53 ADR
 files as if they were specs, and was blind to the corpus's dominant closure style
@@ -417,6 +427,24 @@ attests the corpus it ships beside, and an override is a surface for greening pr
 Two consequences are accepted and stated rather than hidden: run from a worktree it audits that
 worktree's corpus, and being a corpus check it is structurally one merge behind the slice that
 introduces a park.
+
+**D8 — the read obligation is emitted in the vocabulary its consumer keys on.** Deleting the
+hard-tier `FLAGGED` (D3) and moving the obligation to `mandatory_read` was, on its own, **not a
+reclassification — it was a deletion**, and a red-team demonstrated it live: a hard-tier slice with
+a clean diff produced `orchestration: CLEAN`, `gating_advisory: CLEAN`, and the token `FLAGGED`
+nowhere in the document, while `mr-supervisor-prompt-native.md:39/:122` — the only consumer —
+instructs "CLEAN -> proceed" and never mentions `mandatory_read`. The pre-merge diff read would
+simply have stopped happening. A top-level `policy` key therefore carries the token
+(`FLAGGED - mandatory diff read (policy, not evidence; see read_reason)`) whenever a read is owed.
+**The detector half still never emits `FLAGGED` except from its own tripwire counters**, which is
+the property the split exists to create and the one the falsification measures. This is the slice's
+own anti-pattern A6 ("a metric satisfied by removing the source") caught in its own implementation.
+
+**D9 — "could not look" forces the read on every path, including the new one.** An unreadable or
+missing spec corpus now raises the same obligation (`read_reason: disposition-corpus-unreadable`),
+the corpus sweep runs OUTSIDE the shared `try` so a failure in it cannot clobber a successfully
+computed `gating_advisory`, and non-regular files (a FIFO named `*.md` would have blocked a merge
+audit forever) and absurd sizes are refused into `unreadable[]` rather than opened.
 
 **D7 — the file keeps its `#!/bin/bash` + python-heredoc shape.** A whole-file conversion to
 standalone python was drafted and rejected. The spec's hardest constraint is that the orchestration
@@ -460,4 +488,29 @@ the live repo.
 
 Pre-registered: the disposition scanner's live findings are recorded in the PR **by file:line**, not
 as a count. More than 15 findings means the parse is too loose and must be tightened before merge,
-never muted; zero `missing_disposition` findings means the parser is broken.
+never muted; zero `missing_disposition` findings means the parser is broken. Shipped result: **13
+findings** (11 `missing_disposition`, 2 `orphan_disposition`), enumerated in the PR body. That is
+2.2x the 6 predicted at plan time and passes only because the ceiling sat 2.5x above the
+prediction — recorded here rather than smoothed over, because a ceiling that generous is weak
+pre-registration and the next slice in this family should tighten it.
+
+**Measured cost (AM16 requires this number, and it is the number that decides whether the gate is
+safe to run daily).** `mr-selfcheck` runs from `mr-native-tick.sh:220` under `timeout 300`, where a
+timeout kill produces empty output, logs nothing, and touches `.selfcheck-last` anyway — a slow
+gate fails silently GREEN. Measured: `mr-selfcheck` **29s** post-slice against a **28.8s** baseline
+(delta ~0.2s); `mr-audit --selftest` **165ms**. Ample margin. **Known residual, parked -> lp-04f:**
+`mr-selfcheck`'s inner `run(["--selftest"], 300)` uses the same 300s budget as the tick's outer
+`timeout 300`, so the inner bound can never fire first and a HUNG selftest would still present as a
+silent green. Lower the inner bound to 60-120s.
+
+**Surviving mutants, recorded rather than implied away.** Twelve mutants were killed by named
+fixtures, and a red-team then found twelve more that survive the full gate. The important ones are
+test-coverage gaps, not code faults: the live corpus writes the marker with a **unicode arrow**
+(21 occurrences of `parked ->` in its unicode form, zero ASCII) while every in-file fixture uses
+ASCII, so the arm that actually runs in production is uncovered; the external probe never passes
+`--repo/--base/--head`, so no gating counter is asserted by value from outside; the probe accepts
+`disposition.status: AUDIT-ERROR` as green, so a broken `specs_root` reads as clean; and the
+fixture-count floor is 24 against 57, so 33 fixtures can be deleted silently. A 41-line stub
+therefore still passes the gate. **All parked -> lp-04g** with the four named hardening tests, and
+called out in the PR body: the gate is materially stronger than the one-line form it replaced, and
+it is not yet stub-proof.
