@@ -8,6 +8,836 @@ unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # lp-09: forced-ness must no
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
 PROJ=$HARNESS/projects/monster-realm
+# lp-skills: required-skill mapping computed from a slice's declared `touches:`, emitted into the
+# rendered brief's role chain. ONE heredoc holds the mapping impl (specialist, below the END
+# marker) and the fenced gating-test battery above it (tester-owned — do not edit to fit the
+# implementation).
+mr_skills() {
+  timeout 30 /usr/bin/python3 - "$@" <<'PYSKILLS'
+"""mr_skills() heredoc body -- required-skill mapping for mr-spawn's rendered brief (lp-skills).
+
+    mr_skills --selftest <selfdir>   -> runs the gating-test battery below; rc=0 pass, rc=1 fail
+    mr_skills <raw touches>          -> prints the rendered <SKILLS_BLOCK> substitution value
+
+The fenced battery below is TESTER-AUTHORED and was written against these symbols before any of them
+existed; the implementation (SKILL_MAP/tokens_of/skills_for/render_block) lives between the END
+marker and `def main`. Keep that split: a wrong expectation in the fence is corrected FROM THE SPEC,
+never edited to fit the implementation.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import uuid
+
+HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
+PROJ = HARNESS + "/projects/monster-realm"
+
+# ===== GATING TESTS (lp-skills, tester-authored) — DO NOT EDIT TO FIT THE IMPLEMENTATION =====
+
+
+def _run(args, timeout=30, env=None):
+    """Single subprocess.run() wrapper shared by every real-process test below (t6, t8) -- may
+    still raise subprocess.TimeoutExpired; callers catch it."""
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout, env=env)
+
+
+# (raw touches, expected skill list in SKILL_MAP table order, short tag -- printed on FAIL only)
+FIXTURES = [
+    ("server-module/src/battle.rs", ["spacetimedb-reducer", "code-intel"],
+     "alone: reducer + CODE-ROOT co-fire"),
+    ("game-core/src/evolution.rs", ["game-core-testing", "code-intel"],
+     "alone: game-core-testing + CODE-ROOT co-fire"),
+    ("client/src/net/subscription.ts", ["spacetimedb-client", "code-intel"],
+     "alone: client + CODE-ROOT + .ts ext"),
+    ("client-wasm/Cargo.toml", ["wasm-boundary", "code-intel"],
+     "alone: wasm-boundary + ROOT-only (non-indexed ext proves prefix rule)"),
+    ("docs/adr/0166-postgate.spec.md", ["spec-kit"],
+     "TRULY alone: .spec.md SUFFIX branch outside specs/"),
+    ("evals/nightly-smoke-wiring.eval.mjs", ["code-intel"],
+     "TRULY alone: .mjs ext; evals/ excluded from CODE ROOT (R5)"),
+    ("server-module/src/schema.rs, client/src/net/connection.ts, evals/monster-privacy.eval.mjs",
+     ["spacetimedb-reducer", "spacetimedb-client", "code-intel"],
+     "multi-skill corpus row (15r-sec-a)"),
+    ("memory/projects/mr-brief-template.md, memory/projects/mr-spawn", [],
+     "this slice's own touches -> empty"),
+    ("memory/projects/mr-hold (new), memory/projects/mr-spawn", [],
+     "(new) annotation -> no spurious token"),
+    ("game-core/src/battle.rs (new)", ["game-core-testing", "code-intel"],
+     "annotation + extension together"),
+    ("client/src/prediction/, client/e2e/", ["code-intel"],
+     "DIRECTORY tokens, no ext (14r-e spec:129)"),
+    ("client/src/ui/hud.ts", ["code-intel"],
+     "NEGATIVE: client/ != client/src/net/"),
+    ("docs/adr/0166-x.md", [],
+     "NEGATIVE: docs/ matches nothing"),
+    ("server-module/src/x.rs, game-core/src/y.rs, client/src/net/z.ts, client-wasm/w.rs, "
+     "specs/monster-realm-v2/foo.spec.md, evals/e.mjs",
+     ["spacetimedb-reducer", "game-core-testing", "spacetimedb-client", "wasm-boundary",
+      "spec-kit", "code-intel"],
+     "ALL SIX + TABLE-ORDER pin (R8: no separate order row)"),
+    ("sim-harness/scenarios/replay.toml", ["code-intel"],
+     "B1: sim-harness/ ROOT alone (non-indexed ext)"),
+    ("specs/monster-realm-v2/notes.md", ["spec-kit"],
+     "B2: specs/ PREFIX branch alone (no .spec.md suffix)"),
+    ("evals/manifest.json", [],
+     "B3: R5 exclusion -- evals/ is not a CODE ROOT, .json not indexed"),
+    ("content/species/000-core.ron", [],
+     "B3: R5 exclusion -- content/ is not a CODE ROOT, .ron not indexed"),
+    ("ops/observability/validate.mjs", ["code-intel"],
+     "B3: ops/ excluded from ROOT, but .mjs ext fires independently"),
+]
+
+
+def _check(raw, expected):
+    """The single comparator every fixture-driven test below goes through. Calls the REAL
+    skills_for(tokens_of(raw)) -- never a second hand-rolled copy of the mapping."""
+    return skills_for(tokens_of(raw)) == list(expected)
+
+
+def t1_fixture_register():
+    bad = 0
+    for raw, want, why in FIXTURES:
+        if not _check(raw, want):
+            got = skills_for(tokens_of(raw))
+            print("SKILLS-SELFTEST-FAIL t1-fixture want=%s got=%s (%s)\n    touches: %s"
+                  % (want, got, why, raw))
+            bad = 1
+    return bad
+
+
+def t2_proof_of_teeth():
+    """EARS proof-of-teeth: a server-module/** fixture OMITTING spacetimedb-reducer must be
+    REJECTED by the comparator, plus the anti-degeneracy control (precedent: mr-repo-of's own
+    `len(verdicts) < 4` control) so a stuck always-all-six or always-empty impl cannot pass."""
+    bad = 0
+    if _check("server-module/src/battle.rs", ["spacetimedb-reducer", "code-intel"]) is not True:
+        print("SKILLS-SELFTEST-FAIL t2-positive: server-module/src/battle.rs must match "
+              "[spacetimedb-reducer, code-intel]")
+        bad = 1
+    if _check("server-module/src/battle.rs", ["code-intel"]) is not False:
+        print("SKILLS-SELFTEST-FAIL t2-negative-control: a server-module/** fixture OMITTING "
+              "spacetimedb-reducer wrongly compared equal -- the comparator has degenerated")
+        bad = 1
+    distinct = set(tuple(skills_for(tokens_of(raw))) for raw, _want, _why in FIXTURES)
+    if len(distinct) < 4:
+        print("SKILLS-SELFTEST-FAIL t2-degenerate: only %d distinct skill-set(s) across the "
+              "register (%s) -- a stuck always-all-six or always-empty implementation would pass "
+              "every same-verdict fixture" % (len(distinct), sorted(distinct)))
+        bad = 1
+    empties = [s for s in distinct if s == ()]
+    if len(empties) != 1:
+        print("SKILLS-SELFTEST-FAIL t2-degenerate-empty: expected exactly ONE distinct empty "
+              "skill-set across the register, found %d" % len(empties))
+        bad = 1
+    return bad
+
+
+def t3_rf4_shape():
+    """RF-4: the brief is multiplied by ~500 turns, so the block must be exactly 1 header line
+    plus 1 line per skill, every line <=100 chars, and the empty case must be "" BY IDENTITY."""
+    bad = 0
+    if render_block([]) is not "":
+        print("SKILLS-SELFTEST-FAIL t3-empty-identity: render_block([]) must be the identity "
+              "empty string")
+        bad = 1
+    for raw, _want, why in FIXTURES:
+        skills = skills_for(tokens_of(raw))
+        block = render_block(skills)
+        if not skills:
+            if block is not "":
+                print("SKILLS-SELFTEST-FAIL t3-empty-row: %r -> empty skill list must render "
+                      "'' exactly (%s)" % (raw, why))
+                bad = 1
+            continue
+        if not block.startswith("\n\n"):
+            print("SKILLS-SELFTEST-FAIL t3-leading-blank-lines: block for %r does not start "
+                  "with exactly '\\n\\n'" % raw)
+            bad = 1
+        lines = block.strip("\n").splitlines()
+        if len(lines) != len(skills) + 1:
+            print("SKILLS-SELFTEST-FAIL t3-line-count: %r expected %d lines (1 header + %d "
+                  "skills), got %d" % (raw, len(skills) + 1, len(skills), len(lines)))
+            bad = 1
+        for ln in lines:
+            if len(ln) > 100:
+                print("SKILLS-SELFTEST-FAIL t3-line-length: line exceeds 100 chars (%d) for "
+                      "%r: %r" % (len(ln), raw, ln))
+                bad = 1
+    return bad
+
+
+def t4_template_placement(selfdir):
+    """Reads the template SELF-LOCATED (never the hardcoded MEM) so a pre-merge worktree run
+    tests ITS OWN copy, not main's placeholder-free one."""
+    bad = 0
+    path = os.path.join(selfdir, "mr-brief-template.md")
+    try:
+        with open(path) as f:
+            text = f.read()
+    except OSError as exc:
+        print("SKILLS-SELFTEST-FAIL t4-template-missing: %s (%s)" % (path, exc))
+        return 1
+    count = text.count("<SKILLS_BLOCK>")
+    if count != 1:
+        print("SKILLS-SELFTEST-FAIL t4-placeholder-count: expected exactly 1 <SKILLS_BLOCK>, "
+              "found %d" % count)
+        bad = 1
+    anchors = [ln for ln in text.splitlines() if "Test-first, gated" in ln]
+    if len(anchors) != 1:
+        print("SKILLS-SELFTEST-FAIL t4-anchor-line: expected exactly 1 line containing "
+              "'Test-first, gated', found %d" % len(anchors))
+        bad = 1
+    elif not anchors[0].endswith("<SKILLS_BLOCK>"):
+        print("SKILLS-SELFTEST-FAIL t4-placeholder-position: <SKILLS_BLOCK> must be at the END "
+              "of the 'Test-first, gated' line; line=%r" % anchors[0])
+        bad = 1
+    return bad
+
+
+def t5_map_integrity():
+    """The only check validated against the FILESYSTEM instead of expectations baked into this
+    file: catches a wrong `root` (4 skills live under PROJ, 2 under HARNESS)."""
+    bad = 0
+    for row in SKILL_MAP:
+        name, root = row[0], row[1]
+        skill_path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
+        if not os.path.isfile(skill_path):
+            print("SKILLS-SELFTEST-FAIL t5-map-integrity: %s -> %s does not exist"
+                  % (name, skill_path))
+            bad = 1
+    return bad
+
+
+def t6_end_to_end(selfdir):
+    """The highest-value tooth: without this, every other test can be green while the block
+    never reaches the WRITTEN brief bytes. Drives the REAL --render-brief mode end to end,
+    against the REAL self-located template (never a temp copy) -- deliberately strengthens the
+    plan's literal wording rather than drifting from it: same file t4 pins the placement of."""
+    bad = 0
+    self_path = os.path.join(selfdir, "mr-spawn")
+    tpl_path = os.path.join(selfdir, "mr-brief-template.md")
+    if not os.path.isfile(self_path) or not os.path.isfile(tpl_path):
+        print("SKILLS-SELFTEST-FAIL t6-missing-inputs: self=%s tpl=%s" % (self_path, tpl_path))
+        return 1
+    tmpdir = tempfile.mkdtemp(prefix="mr-skills-t6-")
+    try:
+        vars_json = os.path.join(tmpdir, "vars.json")
+        with open(vars_json, "w") as f:
+            json.dump({
+                "slice": "lp-skills-t6-fixture", "model": "sonnet", "effort": "high", "adr": "",
+                "touches": "server-module/src/x.rs", "target_desc": "t6 fixture",
+                "resume_block": "", "tier": "routine",
+            }, f)
+        env = dict(os.environ)
+        env.update({
+            "S": "lp-skills-t6-fixture", "V": vars_json, "MEM": selfdir,
+            "REPO": "harness", "PR_REPO": "mdrewt/claude-harness", "BASE_BRANCH": "main",
+            "WT_ROOT": os.path.join(HARNESS, ".claude", "worktrees"), "CAP": "60",
+        })
+        out_path = os.path.join(tmpdir, "brief.md")
+        try:
+            r = _run(["bash", self_path, "--render-brief", tpl_path, out_path,
+                      "server-module/src/x.rs"], timeout=60, env=env)
+        except subprocess.TimeoutExpired:
+            print("SKILLS-SELFTEST-FAIL t6-timeout")
+            return 1
+        if not os.path.isfile(out_path):
+            print("SKILLS-SELFTEST-FAIL t6-no-output: rc=%s stdout=%r stderr=%r"
+                  % (r.returncode, r.stdout[-300:], r.stderr[-300:]))
+            return 1
+        with open(out_path, errors="replace") as f:
+            written = f.read()
+        if "spacetimedb-reducer" not in written:
+            print("SKILLS-SELFTEST-FAIL t6-missing-skill-name: rendered brief does not name "
+                  "spacetimedb-reducer")
+            bad = 1
+        if "Must-apply skills" not in written:
+            print("SKILLS-SELFTEST-FAIL t6-missing-header: rendered brief has no skills header")
+            bad = 1
+        placeholders = ["<SLICE>", "<ADR_NUM>", "<TOUCHES>", "<TARGET_DESC>", "<RESUME_BLOCK>",
+                         "<TIER_BLOCK>", "<REPO_BLOCK>", "<PR_REPO>", "<BASE_BRANCH>",
+                         "<WT_ROOT>", "<CAP_USD>", "<SKILLS_BLOCK>"]
+        leftover = [p for p in placeholders if p in written]
+        if leftover:
+            print("SKILLS-SELFTEST-FAIL t6-leftover-placeholder: %s survived substitution"
+                  % leftover)
+            bad = 1
+
+        out_path2 = os.path.join(tmpdir, "brief-empty.md")
+        r2 = _run(["bash", self_path, "--render-brief", tpl_path, out_path2,
+                   "memory/projects/mr-spawn"], timeout=60, env=env)
+        if not os.path.isfile(out_path2):
+            print("SKILLS-SELFTEST-FAIL t6-empty-no-output: rc=%s stderr=%r"
+                  % (r2.returncode, r2.stderr[-300:]))
+            bad = 1
+        else:
+            with open(out_path2, errors="replace") as f:
+                written2 = f.read()
+            if "Must-apply skills" in written2:
+                print("SKILLS-SELFTEST-FAIL t6-empty-touches-emitted-header: empty touches must "
+                      "render NO skills header at all")
+                bad = 1
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    return bad
+
+
+def t7_no_echo_regression():
+    """HELD-OUT PROPERTY rows (fresh uuid4 every run) defeat a `skills_for` that is really a
+    fixture-overfit lookup table -- a dict keyed on FIXTURES' raw strings returns [] for a path
+    it has never seen. Per path: (i) skills_for(tokens_of(path)) must still compute the right
+    set from first principles; (ii) render_block must not echo the marker (the brief runs as a
+    prompt under --dangerously-skip-permissions -- emitted text must come ONLY from SKILL_MAP)."""
+    bad = 0
+    cases = [
+        ("server-module", ["spacetimedb-reducer", "code-intel"]),
+        ("game-core", ["game-core-testing", "code-intel"]),
+    ]
+    for root, want in cases:
+        marker = uuid.uuid4().hex
+        raw = "%s/src/%s.rs" % (root, marker)
+        got = skills_for(tokens_of(raw))
+        if got != want:
+            print("SKILLS-SELFTEST-FAIL t7-held-out-property: %r want=%s got=%s -- a lookup "
+                  "table keyed on FIXTURES strings cannot have known this path" % (raw, want, got))
+            bad = 1
+        block = render_block(got)
+        if marker in block:
+            print("SKILLS-SELFTEST-FAIL t7-no-echo: rendered block echoed caller-controlled "
+                  "input %r" % marker)
+            bad = 1
+    return bad
+
+
+def t8_zero_arg_usage(selfdir):
+    """Baseline (verified against unmodified main): mr-spawn:6's `exec 9>&- 2>/dev/null || true`
+    discards stderr for the REST OF THE SCRIPT, including the `${1:?...}` refusal's own message
+    -- zero-arg `bash mr-spawn` prints NOTHING and exits rc=1; there is no "usage:" text to pin.
+    Pinned instead: (a) rc stays non-zero -- the new `case "${1:-}"` dispatch must not swallow
+    the zero-arg case into success; (b) no 'unbound variable' leaks -- what a bare `$1` (instead
+    of `${1:-}`) in the new dispatch would produce under `set -u`."""
+    bad = 0
+    self_path = os.path.join(selfdir, "mr-spawn")
+    if not os.path.isfile(self_path):
+        print("SKILLS-SELFTEST-FAIL t8-missing-self: %s" % self_path)
+        return 1
+    try:
+        r = _run(["bash", self_path])
+    except subprocess.TimeoutExpired:
+        print("SKILLS-SELFTEST-FAIL t8-timeout")
+        return 1
+    combined = (r.stdout or "") + (r.stderr or "")
+    if r.returncode == 0:
+        print("SKILLS-SELFTEST-FAIL t8-zero-arg-must-refuse: zero-arg invocation exited 0 "
+              "(expected non-zero -- the ${1:?...} refusal must still fire)")
+        bad = 1
+    if "unbound variable" in combined:
+        print("SKILLS-SELFTEST-FAIL t8-unbound-variable: zero-arg invocation printed 'unbound "
+              "variable' -- the new dispatch must use ${1:-}, never a bare $1: %r"
+              % combined[-300:])
+        bad = 1
+    return bad
+
+
+def t9_live_path_wired(selfdir):
+    """STATIC SELF-SOURCE PROXY (cf. mr-selfcheck's A6: proves WIRING, not runtime behavior).
+    Paired with t6 (which exercises build_brief's real behavior via --render-brief), this closes
+    the R2 gap: build_brief could be correct but reachable ONLY from --render-brief, leaving the
+    real `mr-spawn <slice>` path rendering a brief with a literal, unsubstituted <SKILLS_BLOCK>
+    token -- never exercising the live path for real, which must NEVER run here (hold gate, git
+    fetch, IDE probe, a real launch). Scoped to the BASH region after this heredoc's own
+    terminator (tag discovered dynamically from the opener, never hardcoded) so this test's
+    source -- which necessarily quotes its own anchors -- can never match itself.
+
+    (i) build_brief is called AFTER the live entry point (`S="${1:?`); (ii) the substitution
+    call `tpl.replace(k,val)` exists EXACTLY ONCE in that region (0 = anchor drifted, >1 = a
+    second copy of the render logic -- the R2 failure mode); (iii) `<SKILLS_BLOCK>` appears in
+    the `for k,val in [...]:` list feeding that call."""
+    bad = 0
+    self_path = os.path.join(selfdir, "mr-spawn")
+    try:
+        src = open(self_path).read()
+    except OSError as exc:
+        print("SKILLS-SELFTEST-FAIL t9-missing-self: %s (%s)" % (self_path, exc))
+        return 1
+
+    # Same opener shape mr-selfcheck's own py-heredoc scanner looks for -- discovered, never
+    # hardcoded, so this test's own source is never the thing it is searching for.
+    opener = re.search(r"^[^\n]*python3[^\n]*<<-?'([A-Za-z0-9_]+)'[^\n]*$", src, re.M)
+    term = opener and re.search(r"\n" + re.escape(opener.group(1)) + r"\n", src)
+    if not term:
+        print("SKILLS-SELFTEST-FAIL t9-no-heredoc-anchor: could not locate this heredoc's own "
+              "opener+terminator by content -- cannot scope the scan away from this test's source")
+        return 1
+    bash_region = src[term.end():]
+
+    entry_idx = bash_region.find('S="${1:?')
+    if entry_idx == -1:
+        print("SKILLS-SELFTEST-FAIL t9-no-entry-point: live entry point not found by content")
+        bad = 1
+    elif "build_brief" not in bash_region[entry_idx:]:
+        print("SKILLS-SELFTEST-FAIL t9-live-path-unwired: no build_brief call after the live "
+              "entry point -- `mr-spawn <slice>` would render an unsubstituted <SKILLS_BLOCK>")
+        bad = 1
+
+    anchor = "tpl.replace(k,val)"
+    count = bash_region.count(anchor)
+    if count != 1:
+        print("SKILLS-SELFTEST-FAIL t9-duplicate-render-logic: expected %r exactly ONCE in the "
+              "bash region, found %d (0=anchor drifted, >1=second render copy, the R2 failure "
+              "mode)" % (anchor, count))
+        bad = 1
+    else:
+        idx = bash_region.find(anchor)
+        loop_start = bash_region.rfind("for k,val in [", 0, idx)
+        if loop_start == -1 or "<SKILLS_BLOCK>" not in bash_region[loop_start:idx]:
+            print("SKILLS-SELFTEST-FAIL t9-skills-block-not-substituted: <SKILLS_BLOCK> missing "
+                  "from the `for k,val in [...]:` substitution list feeding %r" % anchor)
+            bad = 1
+    return bad
+
+
+def t10_hostile_values(selfdir):
+    """Regression pin (post-implementation red-team, reproduced against this worktree): the
+    render substitutes placeholders as a SEQUENTIAL chain of `tpl.replace(k, val)` calls, so a
+    later `.replace()` re-scans text a PRIOR substitution's VALUE inserted. `<SLICE>`/`<ADR_NUM>`
+    go first; a freeform field (`touches`/`target_desc`/`resume_block` -- all planner-authored
+    prose, and this corpus writes literal `<SLICE>`-shaped tokens constantly) that happens to
+    contain one of those tokens carries it through untouched, and the NEW leftover-placeholder
+    assert then mistakes that harmless quirk for a template gap and SystemExits -- silently,
+    because mr-spawn:6 discards stderr and the abort bypasses status()/emit(). The fix is
+    single-pass substitution (values never re-scanned), so the assert only ever fires for a
+    placeholder genuinely missing from the TEMPLATE, never one arriving inside a value. Drives
+    the REAL --render-brief path (not the pure functions) for four independent hostile values:
+    (a) render must SUCCEED (rc=0, output file exists and is non-empty) -- hostile-looking
+    content must degrade to literal text, never abort; (b) the literal token must survive
+    VERBATIM into the output -- values are data, not template; (c) a value containing literal
+    `<SKILLS_BLOCK>` must not duplicate or relocate the real skills header (exactly one
+    'Must-apply skills' line)."""
+    bad = 0
+    self_path = os.path.join(selfdir, "mr-spawn")
+    tpl_path = os.path.join(selfdir, "mr-brief-template.md")
+    if not os.path.isfile(self_path) or not os.path.isfile(tpl_path):
+        print("SKILLS-SELFTEST-FAIL t10-missing-inputs: self=%s tpl=%s" % (self_path, tpl_path))
+        return 1
+    tmpdir = tempfile.mkdtemp(prefix="mr-skills-t10-")
+    try:
+        base = {
+            "slice": "lp-skills-t10-fixture", "model": "sonnet", "effort": "high", "adr": "42",
+            "touches": "server-module/src/x.rs", "target_desc": "baseline",
+            "resume_block": "", "tier": "routine",
+        }
+
+        def render(name, overrides, raw_touches):
+            v = dict(base)
+            v.update(overrides)
+            vars_json = os.path.join(tmpdir, "vars-%s.json" % name)
+            with open(vars_json, "w") as f:
+                json.dump(v, f)
+            env = dict(os.environ)
+            env.update({
+                "S": v["slice"], "V": vars_json, "MEM": selfdir,
+                "REPO": "harness", "PR_REPO": "mdrewt/claude-harness", "BASE_BRANCH": "main",
+                "WT_ROOT": os.path.join(HARNESS, ".claude", "worktrees"), "CAP": "60",
+            })
+            out_path = os.path.join(tmpdir, "brief-%s.md" % name)
+            try:
+                r = _run(["bash", self_path, "--render-brief", tpl_path, out_path, raw_touches],
+                         timeout=60, env=env)
+            except subprocess.TimeoutExpired:
+                return None, None
+            written = None
+            if os.path.isfile(out_path) and os.path.getsize(out_path) > 0:
+                with open(out_path, errors="replace") as f:
+                    written = f.read()
+            return r, written
+
+        # (a)+(b): one hostile field at a time, each carrying a token substituted EARLIER in the
+        # chain -- both <SLICE> and <ADR_NUM> are covered across the three freeform fields.
+        cases = [
+            ("touches", {"touches": "server-module/src/x.rs <SLICE> extra"},
+             "server-module/src/x.rs <SLICE> extra", "<SLICE>"),
+            ("target_desc", {"target_desc": "implements <ADR_NUM> pattern"},
+             "server-module/src/x.rs", "<ADR_NUM>"),
+            ("resume_block", {"resume_block": "resuming after <SLICE> merged"},
+             "server-module/src/x.rs", "<SLICE>"),
+        ]
+        for name, overrides, raw_touches, token in cases:
+            r, written = render(name, overrides, raw_touches)
+            if r is None:
+                print("SKILLS-SELFTEST-FAIL t10-%s-timeout" % name)
+                bad = 1
+                continue
+            if r.returncode != 0 or written is None:
+                print("SKILLS-SELFTEST-FAIL t10-%s-aborted: hostile %s=%r must degrade to "
+                      "literal text, never abort the render -- rc=%s stdout=%r stderr=%r"
+                      % (name, name, overrides[name], r.returncode,
+                         (r.stdout or "")[-300:], (r.stderr or "")[-300:]))
+                bad = 1
+                continue
+            if token not in written:
+                print("SKILLS-SELFTEST-FAIL t10-%s-dropped: literal token %r did not survive "
+                      "verbatim into the rendered output -- values are data, not template"
+                      % (name, token))
+                bad = 1
+
+        # (c): a hostile value containing <SKILLS_BLOCK> must not duplicate/relocate the header.
+        r, written = render("skills-block",
+                             {"touches": "server-module/src/y.rs <SKILLS_BLOCK> more"},
+                             "server-module/src/y.rs <SKILLS_BLOCK> more")
+        if r is None or r.returncode != 0 or written is None:
+            print("SKILLS-SELFTEST-FAIL t10-skills-block-aborted: hostile <SKILLS_BLOCK> value "
+                  "must degrade to literal text, never abort the render")
+            bad = 1
+        else:
+            count = written.count("Must-apply skills")
+            if count != 1:
+                print("SKILLS-SELFTEST-FAIL t10-skills-block-duplicated: expected the header "
+                      "exactly ONCE, found %d" % count)
+                bad = 1
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    return bad
+
+
+def selftest(selfdir):
+    bad = 0
+    battery = [
+        ("t1-fixture-register", t1_fixture_register, ()),
+        ("t2-proof-of-teeth", t2_proof_of_teeth, ()),
+        ("t3-rf4-shape", t3_rf4_shape, ()),
+        ("t4-template-placement", t4_template_placement, (selfdir,)),
+        ("t5-map-integrity", t5_map_integrity, ()),
+        ("t6-end-to-end", t6_end_to_end, (selfdir,)),
+        ("t7-no-echo-regression", t7_no_echo_regression, ()),
+        ("t8-zero-arg-usage", t8_zero_arg_usage, (selfdir,)),
+        ("t9-live-path-wired", t9_live_path_wired, (selfdir,)),
+        ("t10-hostile-values", t10_hostile_values, (selfdir,)),
+    ]
+    for name, fn, args in battery:
+        try:
+            r = fn(*args)
+        except Exception as exc:
+            print("SKILLS-SELFTEST-FAIL %s crashed: %s: %s" % (name, type(exc).__name__, exc))
+            bad = 1
+            continue
+        if r:
+            bad = 1
+    if not bad:
+        print("SKILLS-SELFTEST-OK %d fixtures" % len(FIXTURES))
+    return 1 if bad else 0
+
+# ===== END GATING TESTS =====
+
+# ---------------------------------------------------------------------------------------------
+# IMPLEMENTATION (lp-skills, specialist). Everything above is the tester's fence; nothing here
+# reaches back into it.
+#
+# WHY A MAP AT ALL. `touches:` is the only machine-readable statement of what a run will edit,
+# and it is already parsed one gate above for repo routing. Deriving the required skills from it
+# turns "remember to invoke the skill" — which ~500 turns of brief reliably erode — into a line
+# the run cannot miss. The block NAMES skills and never inlines their content: the Skill tool is
+# the loader, and inlining would multiply every skill's bytes by every turn of the run.
+#
+# WHY code-intel IS DEFINED AS "touches code" RATHER THAN "navigation-heavy" (D1, plan R5).
+# An extension-only rule silently missed the corpus's very common DIRECTORY declarations
+# (`client/src/prediction/, client/e2e/`), and a "looks navigation-heavy" heuristic would have to
+# guess intent from a path list. So the rule is deliberately coarse: any token under a project
+# CODE ROOT, or any token with a codegraph-indexed extension. It consequently fires on ~every
+# project code slice. That asymmetry is the point: over-firing costs one ignored line in the
+# brief and is recoverable, while under-firing is the exact defect this slice exists to remove
+# and is invisible from the outside. The pre-registered confirm step pairs the fire count with
+# the parent's actual codegraph calls, which is what detects load-and-ignore.
+#
+# WHY evals/ content/ ops/ docs/ ARE NOT CODE ROOTS. They are data, config and prose: a `.ron`
+# content drop or an `evals/manifest.json` has no call graph to navigate. Their code-shaped FILES
+# still fire through the extension rule (`ops/observability/validate.mjs`), which is the intended
+# split rather than an accident. Fixtures pin both halves — a regression here is a silent
+# OVER-fire, which nobody would report.
+#
+# WHY HARNESS memory/** SLICES RENDER AN EMPTY BLOCK, deliberately. The loop tools are
+# extensionless bash/python under memory/projects/ — not codegraph-indexed, not a project root —
+# so this slice's own touches render "". That is correct, not a gap; it does mean the one-month
+# confirm step must use PROJECT slices as its denominator.
+#
+# Row shape: (skill name, root that owns it, prefixes, suffixes, label emitted in the brief).
+# Roots matter beyond documentation: t5 resolves <root>/.claude/skills/<name>/SKILL.md on the
+# real filesystem, so a wrong root fails the gate instead of shipping a dangling instruction.
+# ORDER IS THE RENDER ORDER and is pinned by the all-six fixture — append, never reshuffle.
+#
+# COUPLING, UNTIED: code-intel's prefix tuple below is a second statement of mr-repo-of's
+# PROJECT_PREFIXES. They agree today with nothing enforcing it, so a future slice that adds a
+# project code root THERE and not HERE makes code-intel silently under-fire. mr-repo-of is
+# outside this slice's touches; unifying them (or linting the pair, cf. the lp-16 duplicated-
+# constant class) is the follow-up.
+SKILL_MAP = [
+    ("spacetimedb-reducer", PROJ, ("server-module/",), (), "`server-module/`"),
+    ("game-core-testing",   PROJ, ("game-core/",),     (), "`game-core/`"),
+    ("spacetimedb-client",  PROJ, ("client/src/net/",), (), "`client/src/net/`"),
+    ("wasm-boundary",       PROJ, ("client-wasm/",),   (), "`client-wasm/`"),
+    ("spec-kit",            HARNESS, ("specs/",), (".spec.md",), "`specs/`"),
+    ("code-intel",          HARNESS,
+     ("server-module/", "game-core/", "client/", "client-wasm/", "sim-harness/"),
+     (".rs", ".ts", ".tsx", ".mjs", ".js"),
+     "codegraph-indexed code"),
+]
+
+SKILLS_HEADER = ("**Must-apply skills (invoke each via the Skill tool before writing code there "
+                 "— not optional):**")
+
+# Where mr-repo-of lives. On the LIVE path the fallback always wins: mr-spawn does not export
+# MEM until well after build_brief runs, so the constant below (a mirror of mr-spawn's line 8 —
+# they must not drift) is what is actually used. The env branch exists for the two self-locating
+# dispatch branches, which export MEM to their OWN directory so a worktree run resolves the
+# worktree's mr-repo-of instead of the main checkout's.
+MEM_DIR = os.environ.get("MEM") or (HARNESS + "/memory/projects")
+
+
+def tokens_of(raw):
+    """Tokenize a raw `touches:` string by DELEGATING to mr-repo-of --json (D3).
+
+    A hand-rolled comma split looks adequate and is not: it leaves annotated declarations like
+    `game-core/src/battle.rs (new)` as the token "game-core/src/battle.rs (new)", which still
+    satisfies the PREFIX rules while silently failing every SUFFIX rule — a partial, invisible
+    UNDER-fire. mr-repo-of already solves annotations and prose with tested code (its own fixture
+    register), and mr-spawn already hard-depends on it one gate above for routing, so this adds
+    no new dependency.
+
+    HONEST COST: this promotes mr-repo-of's `_tokens()` to a de-facto interface and inherits its
+    quirks — notably that a comma-free clause like `server-module/tests/ or scripts/` collapses
+    into a single token. Union of ALL buckets (incl. ambiguous/external), because skill matching
+    cares about the path shape, not which repo the router assigned it to.
+
+    RAISES on any failure (non-zero rc, unparseable JSON, timeout). The bash caller converts that
+    into the advisory empty-block path; swallowing it here would hide the failure instead.
+    """
+    proc = subprocess.run([MEM_DIR + "/mr-repo-of", "--json", raw],
+                          capture_output=True, text=True, timeout=10)
+    if proc.returncode != 0:
+        raise RuntimeError("mr-repo-of --json rc=%s stderr=%r"
+                           % (proc.returncode, proc.stderr[-200:]))
+    routed = json.loads(proc.stdout)
+    out = []
+    for bucket in ("harness", "project", "ambiguous", "external"):
+        for tok in routed.get(bucket) or []:
+            if tok not in out:
+                out.append(tok)
+    return out
+
+
+def skills_for(tokens):
+    """PURE: tokens -> skill names, in SKILL_MAP order, deduped. No I/O, no state.
+
+    Literal `startswith`/`endswith` over tuples rather than a regex, per house doctrine (no
+    dynamic pattern construction): the rules are literal path prefixes and literal extensions,
+    and a regex here would only add an escaping hazard to data that comes from a spec file.
+    """
+    out = []
+    for name, _root, prefixes, suffixes, _label in SKILL_MAP:
+        for tok in tokens:
+            if tok.startswith(prefixes) or (suffixes and tok.endswith(suffixes)):
+                out.append(name)
+                break
+    return out
+
+
+def installed_only(skills):
+    """Render-time map-drift defense (plan T6/failure-modes): drop any row whose SKILL.md is
+    absent rather than naming a skill the run cannot invoke — silence beats a dangling
+    instruction. Deliberately NOT inside skills_for(), which must stay pure and filesystem-free.
+
+    HONEST: there is no loud runtime signal here. stdout carries the block itself and mr-spawn:6
+    has already discarded stderr, so a notice would go nowhere. The loud signal is t5's
+    map-integrity check, which fails the selftest — i.e. the gate, not the spawn.
+    """
+    roots = dict((row[0], row[1]) for row in SKILL_MAP)
+    return [n for n in skills
+            if os.path.isfile(os.path.join(roots[n], ".claude", "skills", n, "SKILL.md"))]
+
+
+def render_block(skills):
+    """Skill names -> the <SKILLS_BLOCK> substitution value. "" when nothing matched, so the
+    rendered brief is byte-identical to today for every unmatched slice.
+
+    The leading "\\n\\n" is carried by the VALUE, not by the template, which is what makes the
+    empty case a no-op after an end-of-line placeholder.
+
+    INJECTION BOUNDARY: every emitted byte comes from SKILL_MAP. The caller's raw `touches:` is
+    never echoed — the brief is executed as a prompt under --dangerously-skip-permissions, so
+    reflecting caller-controlled text into it would be an injection surface (t7 pins this).
+    """
+    if not skills:
+        return ""
+    labels = dict((row[0], row[4]) for row in SKILL_MAP)
+    lines = ["- `%s` - matched by %s" % (n, labels[n]) for n in skills]
+    return "\n\n" + SKILLS_HEADER + "\n" + "\n".join(lines)
+
+
+def main(argv):
+    if len(argv) >= 2 and argv[1] == "--selftest":
+        if len(argv) < 3:
+            # The helpers all resolve paths under selfdir; None would crash confusingly deep.
+            print("SKILLS-SELFTEST-FAIL usage: --selftest <directory containing mr-spawn>")
+            return 1
+        return selftest(argv[2])
+    raw = argv[1] if len(argv) >= 2 else ""
+    skills = installed_only(skills_for(tokens_of(raw)))
+    sys.stdout.write(render_block(skills))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+PYSKILLS
+}
+
+# lp-skills: ONE render path, two entry points (live spawn + --render-brief, which the selftest
+# drives end to end). The skills block is computed here and passed POSITIONALLY into the heredoc
+# alongside the template and output paths — there is no environment variable to forget to export.
+#
+# ADVISORY BY DESIGN: mr-spawn sits on the critical path of every autonomous launch, so a cosmetic
+# defect in the skill mapping must never become a launch refusal (that would wedge the loop). Any
+# failure yields an empty block plus a notice, and the brief still renders.
+# `emit` is only defined after the live entry point, so it does not exist on the --render-brief
+# path; `status` must never be used here — it EXITS. One guard, both call sites below.
+# The fallback writes to STDOUT, not stderr: mr-spawn:6 discards stderr for the whole script, so
+# a stderr notice would be invisible — which is the exact silence this notice exists to break.
+brief_notice(){
+  if declare -f emit >/dev/null 2>&1; then
+    emit "$1" "$2"
+  else
+    printf '%s %s\n' "$1" "$2"
+  fi
+}
+
+build_brief(){
+  local raw="${1:-}" tpl="${2:-}" out="${3:-}" rc=0
+  # `local blk=$(...)` would MASK the subprocess exit status (`local`'s own status wins), so the
+  # error branch below would silently never fire. Reproduced; keep these two statements apart.
+  local blk
+  blk=$(mr_skills "$raw") || {
+    brief_notice SKILLS-MAP-ERROR "required-skill mapping failed for touches=$(echo "$raw" | head -c 200); brief rendered WITHOUT the skills block (advisory — the spawn continues)"
+    blk=""
+  }
+  # S/V stay environment-passed (unchanged from the original block); the three moved inputs do not.
+  export S V
+  # F2: a render failure is a REFUSAL (template drift must not ship a mangled brief), but this
+  # file promises "one status JSON line" and mr-spawn:6 has discarded stderr — so a bare `exit 1`
+  # here is a silent death. Say what happened first, then propagate. `rc=$?` must be the very
+  # next statement after the heredoc: any command in between (including `local`) overwrites it.
+  /usr/bin/python3 - "$tpl" "$out" "$blk" <<'PYBRIEF'
+import json, os, sys
+S=os.environ["S"]; v=json.load(open(os.environ["V"]))
+# lp-skills F1 — SINGLE-PASS SUBSTITUTION. The renderer applies the keys below as a CHAIN of
+# .replace() calls, so with a plain string every later key re-scans text an earlier key's VALUE
+# inserted. `touches`/`target_desc`/`resume_block` are freeform planner prose and this corpus
+# writes literal `<SLICE>`-shaped tokens constantly, so that quirk (a) let a `<SLICE>` arriving
+# inside `touches` survive to the end, where the leftover assert mistook it for template drift
+# and SystemExited — killing the spawn silently — and (b) let a value carrying `<SKILLS_BLOCK>`
+# duplicate and RELOCATE the real skills header, i.e. a template-injection primitive for every
+# placeholder ordered after `<TOUCHES>`. Both are pre-existing second-order quirks of the chain;
+# the leftover assert is what turned (a) into an abort.
+#
+# So the document is carried as SEGMENTS: plain str = still template (rescannable), _Done = an
+# already-substituted value that no later key may look at. Values become literal text, exactly
+# once, wherever the TEMPLATE put them. A welcome consequence: substitution ORDER no longer
+# affects the result. Literal string ops only — no regex, per house doctrine.
+class _Done(str):
+    """A substituted value. Final text; later keys skip it."""
+
+
+class _Doc(list):
+    def replace(self, key, val):
+        out = _Doc()
+        for seg in self:
+            if isinstance(seg, _Done) or key not in seg:
+                out.append(seg)
+                continue
+            for i, part in enumerate(seg.split(key)):
+                if i:
+                    out.append(_Done(val))
+                out.append(part)
+        return out
+
+    def __contains__(self, key):
+        # Template-derived segments ONLY: a placeholder that arrived inside a value is data.
+        return any(key in seg for seg in self if not isinstance(seg, _Done))
+
+    def __str__(self):
+        return "".join(self)
+
+tpl=_Doc([open(sys.argv[1]).read()])
+_t=v.get("touches","")
+touches_str=", ".join(_t) if isinstance(_t,list) else str(_t)
+tier=v.get("tier") or (_ for _ in ()).throw(SystemExit("vars.json missing required field: tier (hard|routine|content)"))
+tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard"
+ else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models (sonnet-class) — do not bump lens models upward on a content slice (THIS OVERRIDES the build-loop prompt bump-one-tier default for this slice). The tester requirement is UNCHANGED — meaningful tests first, always.\n" if tier=="content" else "")
+rb=v.get("resume_block","") or ""
+repo=os.environ["REPO"]
+# The gate differs by repo and saying so is load-bearing. monster-realm `just ci` is the real gate.
+# Harness `just ci` runs only scripts/tests/{harness,invariants,adr-lint}.test.mjs and lints only
+# scripts/ — so for a slice touching solely memory/projects/** it CANNOT fail. Gating a harness
+# slice on it would be a green light that means nothing, which is the defect class lp-00 removes.
+repo_block=("REPO: **harness** (`mdrewt/claude-harness`). Worktree from `origin/main`; PR on the harness repo.\n"
+ "GATE — read this, it is not the project gate: harness `just ci` runs only `scripts/tests/*` and lints only `scripts/`, so for a slice touching solely `memory/projects/**` it **cannot fail** and proves nothing. Your gate is **`memory/projects/mr-selfcheck` printing SELFCHECK-OK** plus **the `--selftest` of every tool you touched or added**. mr-selfcheck DERIVES its tool set (lp-00), so a new executable `mr-*` is picked up automatically — but it must carry a bash or python shebang or the gate fails it as unclassifiable, and anything with real logic should ship a `--selftest` wired in beside mr-cost-sum's. Run harness `just ci` too (cheap, catches script-lint regressions), but never report it as the gate.\n"
+ "There is no remote CI on this repo and no branch protection, so 'PR open + local gate green' IS the terminal state; the supervisor merges.\n"
+ if repo=="harness" else
+ "REPO: **project** (`mdrewt/monster-realm`). Worktree from `origin/master`; PR on the project repo.\n"
+ "GATE: the full `just ci` (the exact gate remote runs — incl. Semgrep/security) green locally before opening the PR.\n")
+# lp-skills: fail LOUD if the template lost the anchor. Silently rendering a brief with no
+# skills block is the invisible under-fire this slice exists to remove.
+if "<SKILLS_BLOCK>" not in tpl:
+    raise SystemExit("brief template is missing the <SKILLS_BLOCK> placeholder: %s" % sys.argv[1])
+_subbed=[]
+for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCHES>",touches_str),
+              ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block),
+              ("<REPO_BLOCK>",repo_block),("<PR_REPO>",os.environ["PR_REPO"]),
+              ("<BASE_BRANCH>",os.environ["BASE_BRANCH"]),("<WT_ROOT>",os.environ["WT_ROOT"]),
+              ("<CAP_USD>",str(__import__("os").environ.get("CAP","60"))),
+              ("<SKILLS_BLOCK>",sys.argv[3])]:
+    _subbed.append(k)
+    tpl=tpl.replace(k,val)
+# Keyed to the list JUST iterated, so a renamed placeholder cannot drift out of the check, and
+# scoped to template segments so caller content never trips it. Post-F1 this is a POST-CONDITION
+# on the segment machinery rather than a template-drift detector (a template segment cannot
+# survive its own key); it bites if _Doc.replace ever regresses. Genuine template drift is caught
+# by the pre-loop <SKILLS_BLOCK> assert above.
+_left=[k for k in _subbed if k in tpl]
+if _left:
+    raise SystemExit("unsubstituted placeholder(s) survived rendering: %s" % _left)
+rendered=str(tpl)
+open(sys.argv[2],"w").write(rendered)
+print("brief-built bytes=%d tier=%s repo=%s" % (len(rendered),tier,repo))
+PYBRIEF
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    brief_notice BRIEF-RENDER-FAILED "rendering $tpl -> $out failed (rc=$rc); most likely the template lost a placeholder the renderer requires. Refusing — a partially-substituted brief must never launch."
+    return 1
+  fi
+}
+
+# Both branches are SELF-LOCATING and exit immediately, so they export MEM to THIS copy's own
+# directory: a pre-merge worktree run then resolves the worktree's mr-repo-of rather than the
+# main checkout's, which is the difference between testing this diff and testing main. Line 8's
+# live MEM is deliberately untouched — exporting it globally would change the environment of
+# every launched child process, which is out of scope here.
+case "${1:-}" in
+  --selftest)
+    MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"; export MEM
+    mr_skills --selftest "$MEM"
+    exit $?
+    ;;
+  --render-brief)
+    MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"; export MEM
+    build_brief "${4:-}" "${2:-}" "${3:-}"
+    exit $?
+    ;;
+esac
+
 S="${1:?usage: mr-spawn <slice> [--dry]}"; DRY="${2:-}"
 V="/tmp/mr_pass_$S.vars.json"; B="/tmp/mr_pass_$S.md"
 emit(){ SLICE="$S" ST="$1" DET="$2" /usr/bin/python3 -c "import json,os;print(json.dumps({'slice':os.environ['SLICE'],'status':os.environ['ST'],'detail':' '.join(os.environ['DET'].split())[:600]}))"; }
@@ -149,38 +979,9 @@ for ent in r.stdout.split(b'\0'):
   || WRITES="$SYNCDIR (probe helper failed — failing closed)"
 [ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
 [ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
-# build brief
-export S V B MEM
-/usr/bin/python3 - <<'PY' || exit 1
-import json, os
-S=os.environ["S"]; v=json.load(open(os.environ["V"]))
-tpl=open(os.environ["MEM"]+"/mr-brief-template.md").read()
-_t=v.get("touches","")
-touches_str=", ".join(_t) if isinstance(_t,list) else str(_t)
-tier=v.get("tier") or (_ for _ in ()).throw(SystemExit("vars.json missing required field: tier (hard|routine|content)"))
-tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard"
- else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models (sonnet-class) — do not bump lens models upward on a content slice (THIS OVERRIDES the build-loop prompt bump-one-tier default for this slice). The tester requirement is UNCHANGED — meaningful tests first, always.\n" if tier=="content" else "")
-rb=v.get("resume_block","") or ""
-repo=os.environ["REPO"]
-# The gate differs by repo and saying so is load-bearing. monster-realm `just ci` is the real gate.
-# Harness `just ci` runs only scripts/tests/{harness,invariants,adr-lint}.test.mjs and lints only
-# scripts/ — so for a slice touching solely memory/projects/** it CANNOT fail. Gating a harness
-# slice on it would be a green light that means nothing, which is the defect class lp-00 removes.
-repo_block=("REPO: **harness** (`mdrewt/claude-harness`). Worktree from `origin/main`; PR on the harness repo.\n"
- "GATE — read this, it is not the project gate: harness `just ci` runs only `scripts/tests/*` and lints only `scripts/`, so for a slice touching solely `memory/projects/**` it **cannot fail** and proves nothing. Your gate is **`memory/projects/mr-selfcheck` printing SELFCHECK-OK** plus **the `--selftest` of every tool you touched or added**. mr-selfcheck DERIVES its tool set (lp-00), so a new executable `mr-*` is picked up automatically — but it must carry a bash or python shebang or the gate fails it as unclassifiable, and anything with real logic should ship a `--selftest` wired in beside mr-cost-sum's. Run harness `just ci` too (cheap, catches script-lint regressions), but never report it as the gate.\n"
- "There is no remote CI on this repo and no branch protection, so 'PR open + local gate green' IS the terminal state; the supervisor merges.\n"
- if repo=="harness" else
- "REPO: **project** (`mdrewt/monster-realm`). Worktree from `origin/master`; PR on the project repo.\n"
- "GATE: the full `just ci` (the exact gate remote runs — incl. Semgrep/security) green locally before opening the PR.\n")
-for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCHES>",touches_str),
-              ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block),
-              ("<REPO_BLOCK>",repo_block),("<PR_REPO>",os.environ["PR_REPO"]),
-              ("<BASE_BRANCH>",os.environ["BASE_BRANCH"]),("<WT_ROOT>",os.environ["WT_ROOT"]),
-              ("<CAP_USD>",str(__import__("os").environ.get("CAP","60")))]:
-    tpl=tpl.replace(k,val)
-open(os.environ["B"],"w").write(tpl)
-print("brief-built bytes=%d tier=%s repo=%s" % (len(tpl),tier,repo))
-PY
+# build brief — ONE render path (build_brief, above), shared with --render-brief so the selftest
+# exercises the same bytes this line writes.
+build_brief "$TOUCHES_RAW" "$MEM/mr-brief-template.md" "$B" || exit 1
 MODEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('model','opus'))")
 EFFORT=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('effort','high'))")
 rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
