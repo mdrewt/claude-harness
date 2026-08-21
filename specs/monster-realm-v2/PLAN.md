@@ -604,6 +604,32 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   →sec-mig-b→sec-mig-c→sec-mig-d · 13r-c-2→15r-d→15r-f · 15r-f→{h1, i-1} · h1→{h2, consolidate,
   tst-i}. **All four `15r-sec-mig-*` and `13r-c-2` declare `scanner-migration-audit.eval.mjs`, which
   `mr-disjoint`'s STRUCTURAL `*migration*` rule forces SERIAL-REQUIRED — they cannot fan out.**
+- **M-postgate-sixteenth-review-residuals** (`M-postgate-sixteenth-review-residuals.spec.md`) —
+  **NEW, queued 2026-08-21; inserted after `M-postgate-fifteenth-review-residuals`**, per the
+  weekly-review insertion convention. Verified sixteenth multi-lens review findings @ `064e627`
+  (8 lenses, 2 independent verifiers, 9 verified / 1 dropped). The `67fbff8..064e627` delta
+  (2.8.1 SDK migration + 15r-sec-a/sec-vis/a2 + lp-03) is clean at the code level — the
+  security, test-integrity and correctness lenses each returned an explicit "no findings", and
+  15r-sec-a's `my_battle` view was verified byte-for-byte against ADR-0198 D2. What remains is
+  doc-truth and disclosed-but-untracked debt: **16r-a** post-2.8.1 doc-truth sweep (AGENTS.md
+  still instructs writing 1.x module syntax that no longer compiles; ARCHITECTURE/Cargo.toml/
+  ADR-0197 view-PK language corrections), **16r-c** ADR-0196 follow-ups (the
+  `nightly-smoke-wiring` eval is blind to a neutered `changelog-freshness` job — its guarded-job
+  list stops at mutation/mutation-server/coverage), **16r-b** ADR-0195's seven named
+  scanner-machinery residuals queued nowhere (Rust-side mirror machinery + the wallet-privacy/
+  ranking-security/currency-integrity stripper ordering — verified disjoint from the 15r
+  scanner-migration family's JS eval scope), **16r-d** `playtest-report` still hand-parses pipe
+  tables citing a 2.6.0 CLI constraint lifted at 2.7.0 (`--format json`), **16r-e**
+  `spacetime_scheduled_function_delay_seconds` unwired in the ops stack (source threshold 30 ms),
+  **16r-f** the `battleReseedPending` one-shot reconnect latch consumed before the `my_battle`
+  post-reconnect snapshot lands (ADR-0198 D7 atomicity seam; spurious battleStart telemetry),
+  **16r-g** Bond/`apply_care`/`CareError` retirement (ADR-0177 D3's named follow-up), and
+  **16r-h** (Drew-directed via answered issue claude-harness#14) the red-response policy half of
+  the nightly mutation/coverage story, mirroring the smoke-republish precedent (lp-03 delivered
+  the notification half). ONE decision open (mdrewt/monster-realm#342 rev16-obs48-procedures —
+  no slice depends on it). 16r-b is SERIAL-REQUIRED against the 15r scanner-migration family;
+  16r-h after 16r-c; 16r-a/d/e/f/g pairwise disjoint fan-out candidates. No new game-design
+  surface.
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
