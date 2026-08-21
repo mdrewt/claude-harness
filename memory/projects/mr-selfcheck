@@ -1467,11 +1467,13 @@ sys.exit(bad)
 PYSQ
 
 # =================================================================================================
-# lp-tester-tools — tester-guard selftest wiring. Same rationale as the guard-bash.mjs coverage
-# above: this hook is the ONLY mechanical enforcement of tester's Bash allowlist, so a regex-array
-# unit test could pass while the stdin/agent_type wiring silently breaks in production. Runs the
-# REAL hook's own --selftest (33 fixtures incl. the two design-review regressions) and separately
-# proves BOTH settings.json's PreToolUse array actually names it, so the hook can't ship un-wired.
+# lp-tester-tools — tester-guard selftest wiring, BOTH guards (Bash + Write/Edit/MultiEdit). Same
+# rationale as the guard-bash.mjs coverage above: a regex-array unit test could pass while the
+# stdin/agent_type wiring silently breaks in production. Runs each REAL hook's own --selftest and
+# separately proves settings.json's PreToolUse array actually names both, so neither can ship
+# un-wired. guard-tester-write.mjs exists because unrestricted Write/Edit (pre-existing, unchanged
+# by this slice) is a same-session bypass of the Bash allowlist otherwise -- tester could simply
+# Edit guard-tester-bash.mjs or settings.json to disable it (caught at post-implementation review).
 # =================================================================================================
 /usr/bin/python3 - "$MEM" <<'PYTG' || BAD=1
 import json, os, subprocess, sys
@@ -1485,24 +1487,27 @@ def fail(name, detail=""):
     bad = 1
     print(("SELFCHECK-FAIL %s" % name) + (": " + detail if detail else ""))
 
-hook_path = os.path.join(HARNESS, ".claude", "hooks", "guard-tester-bash.mjs")
-if not os.path.isfile(hook_path):
-    fail("A9-tester-guard-selftest-wiring", "guard-tester-bash.mjs not found under %s" % hook_path)
-else:
+def check_hook_selftest(hook_name, ok_marker, label):
+    hook_path = os.path.join(HARNESS, ".claude", "hooks", hook_name)
+    if not os.path.isfile(hook_path):
+        fail(label, "%s not found under %s" % (hook_name, hook_path))
+        return
     try:
         r = subprocess.run(["node", hook_path, "--selftest"], cwd=HARNESS,
                             capture_output=True, text=True, timeout=60)
     except FileNotFoundError:
-        fail("tester-guard-selftest-unrunnable", "`node` is not on PATH")
+        fail(label + "-unrunnable", "`node` is not on PATH")
     except Exception as e:
-        fail("tester-guard-selftest-unrunnable", "%s: %s" % (type(e).__name__, e))
+        fail(label + "-unrunnable", "%s: %s" % (type(e).__name__, e))
     else:
         if r.returncode != 0:
             tail = (r.stdout + r.stderr).strip().splitlines()
-            fail("A9-tester-guard-selftest-wiring",
-                 "guard-tester-bash.mjs --selftest exited %d: %s" % (r.returncode, " | ".join(tail[-6:])))
-        elif "TESTER-GUARD-SELFTEST-OK" not in r.stdout:
-            fail("A9-tester-guard-selftest-wiring", "did not print TESTER-GUARD-SELFTEST-OK")
+            fail(label, "%s --selftest exited %d: %s" % (hook_name, r.returncode, " | ".join(tail[-6:])))
+        elif ok_marker not in r.stdout:
+            fail(label, "did not print %s" % ok_marker)
+
+check_hook_selftest("guard-tester-bash.mjs", "TESTER-GUARD-SELFTEST-OK", "A9-tester-guard-selftest-wiring")
+check_hook_selftest("guard-tester-write.mjs", "TESTER-WRITE-GUARD-SELFTEST-OK", "A9-tester-write-guard-selftest-wiring")
 
 # Static wiring proxy (same caveat as any presence check: proves the hook is NAMED, not that
 # Claude Code actually invokes it -- the live-agent spawn test at slice build time covers that).
@@ -1514,11 +1519,17 @@ except Exception as e:
     fail("A9-tester-guard-not-wired", "could not read/parse %s: %s" % (settings_path, e))
 else:
     pre = settings.get("hooks", {}).get("PreToolUse", [])
-    named = any("guard-tester-bash.mjs" in h.get("command", "")
-                for entry in pre if entry.get("matcher") == "Bash"
-                for h in entry.get("hooks", []))
-    if not named:
+    bash_named = any("guard-tester-bash.mjs" in h.get("command", "")
+                      for entry in pre if entry.get("matcher") == "Bash"
+                      for h in entry.get("hooks", []))
+    if not bash_named:
         fail("A9-tester-guard-not-wired", "%s's Bash PreToolUse array does not name guard-tester-bash.mjs" % settings_path)
+    write_named = any("guard-tester-write.mjs" in h.get("command", "")
+                       for entry in pre if entry.get("matcher") == "Write|Edit|MultiEdit"
+                       for h in entry.get("hooks", []))
+    if not write_named:
+        fail("A9-tester-write-guard-not-wired",
+             "%s's Write|Edit|MultiEdit PreToolUse array does not name guard-tester-write.mjs" % settings_path)
 
 sys.exit(bad)
 PYTG

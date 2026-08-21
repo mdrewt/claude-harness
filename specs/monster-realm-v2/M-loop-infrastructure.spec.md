@@ -393,8 +393,8 @@ EARS: WHEN a session starts, the configured PATH SHALL include the harness tool 
 edit is reverted, the file SHALL be byte-identical to the recorded pre-edit copy.
 Tests: assert the pre-edit copy exists in `$MEM` before the edit lands (ADR-0010).
 
-### lp-tester-tools — Scoped Bash for tester: syntax checks only, never execution (HIGH, LIGHT)
-`touches: .claude/agents/tester.md, .claude/hooks/guard-tester-bash.mjs (new), .claude/settings.json, memory/projects/mr-selfcheck`
+### lp-tester-tools — Scoped Bash (+ a Write/Edit guard) for tester: syntax checks only (HIGH, LIGHT)
+`touches: .claude/agents/tester.md, .claude/hooks/guard-tester-bash.mjs (new), .claude/hooks/guard-tester-write.mjs (new), .claude/settings.json, memory/projects/mr-selfcheck`
 `after:` (none) — **split from a monster-realm-side twin (same title, project-repo touches:) per
 `lp-00`'s own `REPO-MIXED` refusal**: a single cross-repo entry can't be fed to `mr-spawn` at all;
 these are two independent PRs, cross-referenced, not a spec-level dependency on each other.
@@ -402,31 +402,38 @@ these are two independent PRs, cross-referenced, not a spec-level dependency on 
 Measured (lp-skills session): a tester thread needed to confirm its own edited file's shell syntax,
 had zero Bash by design (reward-hacking split — the specialist implements, the verifier runs), and
 substituted 32 manual full-file re-reads over 87 turns. `tools:` frontmatter cannot pattern-scope
-Bash (`Bash(cmd:*)` exists only in settings.json permission rules); the fix grants bare `Bash` and
-gates it with a NEW PreToolUse hook keyed on the payload's `agent_type` field. The hook is an
-ALLOWLIST of four non-executing shapes only — `bash -n`, `sh -n`, `node --check`/`-c`, and the exact
-`python3 -c "...ast.parse..."` idiom `mr-selfcheck` already uses — anchored whole-string against a
-relative, non-traversing path with no `.env`/`.pem`/`.key` target. **`--selftest` is deliberately
-excluded**: for a loop-infra tool it IS the test suite, so allowing it reopens the pass/fail peek the
-split forbids. Two defects caught at design red-team by executing the code, not just reasoning about
-it: an earlier metachar guard made the one allowed Python shape unreachable (fixed); an earlier path
-pattern was a real content-disclosure oracle against `.pem`/`.env`/`.key`, sidestepping the Read
-tool's own existing deny-list for the same class (fixed). **Known gaps, documented not assumed
-away:** `node --check` is not unconditionally non-executing under `NODE_OPTIONS=--require` (nothing
-sets it here today); and the Agent tool resolves subagents from the session's original root, not a
-worktree's copy, so a live tester-spawn from this slice's own worktree could not confirm the real
-`agent_type` payload value — the 33-fixture `--selftest` exercises the real hook end-to-end against
-the documented schema, but first production use is this design's true proof.
+Bash; the fix grants bare `Bash` and gates it with `guard-tester-bash.mjs`, a PreToolUse hook keyed
+on `agent_type`, ALLOWLISTING four non-executing shapes (`bash -n`/`sh -n`/`node --check`-`c`/the
+exact `mr-selfcheck` `python3 -c "...ast.parse..."` idiom) on a relative, non-dotfile path that
+resolves — following symlinks — to a regular file inside the project with a recognised extension or
+a `#!` shebang. **Two rounds of adversarial review, both catching real defects by executing the code
+against the live repo rather than reasoning about it.** Design-round: a metachar guard that made the
+one allowed Python shape unreachable; a `.env`/`.pem`/`.key` suffix denylist that still disclosed
+`.npmrc`/`id_rsa`/`.git-credentials` content on a syntax error (both fixed pre-ship). Post-
+implementation round (fresh, independent pass on the shipped code): the same suffix-denylist class
+of gap persisted for ANY secret-shaped filename not ending in those three extensions — closed by
+switching to the extension/shebang allowlist above, verified against real proven exploits (`.npmrc`
+token disclosure, a symlink escaping the project root via a real repo artifact, a FIFO hanging
+`bash -n` indefinitely — all now blocked, the FIFO case provably non-blocking via `statSync`, never
+`open()`); and a genuine BLOCKER — tester's pre-existing, unchanged Write/Edit is unscoped by Claude
+Code, so tester could simply Edit `guard-tester-bash.mjs` or `settings.json` to disable the Bash
+guard, then use the harness's own top-level `Bash(npm:*)`/`Bash(cargo:*)`/`Bash(pytest:*)` grants to
+run the real test suite — closed by `guard-tester-write.mjs`, a second hook blocking tester's
+Write/Edit/MultiEdit from ever targeting `.claude/`. **Known gaps, documented not assumed away:**
+`node --check` is not unconditionally non-executing under `NODE_OPTIONS=--require` (nothing sets it
+here today); the Agent tool resolves subagents from the session's original root, so a live
+tester-spawn from this slice's own worktree could not confirm the real `agent_type` payload value.
 
 EARS: WHEN a Bash call's `agent_type` is exactly `tester`, THE SYSTEM SHALL block it unless the full
-command matches one of the four allowlisted non-executing shapes on a safe path. WHEN `agent_type` is
-anything else, including absent, THE SYSTEM SHALL NOT alter the call. THE SYSTEM SHALL NOT allowlist
-any tool's `--selftest`. `mr-selfcheck` SHALL verify the hook exists, is wired into `settings.json`,
-and its own `--selftest` exits 0 printing `TESTER-GUARD-SELFTEST-OK`.
-Tests: proof-of-teeth — `guard-tester-bash.mjs --selftest` (33 fixtures): allowed shapes for
-`tester`; blocked test/build/`--selftest`/metachar-smuggling/absolute-path/traversal/`.env`-`.pem`-
-`.key` shapes for `tester`; the SAME blocked shapes asserted NOT blocked for `agent_type` ∈
-{verifier, red-team, reviewer, absent, differently-cased}, proving scope (ADR-0010).
+command matches one of the four allowlisted shapes on a path that resolves to a safe regular file.
+WHEN a Write/Edit/MultiEdit's `agent_type` is exactly `tester` and its target resolves under
+`.claude/`, THE SYSTEM SHALL block it. WHEN `agent_type` is anything else, including absent, neither
+hook SHALL alter the call. THE SYSTEM SHALL NOT allowlist any tool's `--selftest`.
+Tests: proof-of-teeth — `guard-tester-bash.mjs --selftest` (36 fixtures) and `guard-tester-write.mjs
+--selftest` (14 fixtures): allowed shapes; blocked build/test/`--selftest`/metachar/path-traversal/
+dotfile/symlink-escape/FIFO/self-tampering shapes; the SAME blocked shapes asserted NOT blocked for
+non-tester `agent_type`, proving scope; `mr-selfcheck` verifies both hooks exist, are wired, and pass
+(ADR-0010).
 
 ### lp-doc-a — Close the obsolete residual prose (MED, LIGHT)
 `touches: docs/adr/` *(project-relative per corpus convention — monster-realm; exempt from `lp-00`)*
@@ -449,25 +456,28 @@ SHALL describe a currently-green gate as expected-red.
 Tests: `just adr-digest --check` green; proof-of-teeth: re-run the ADR digest gate against a
 deliberately un-regenerated digest and show it RED (ADR-0010).
 
-### lp-tester-tools-project — Scoped Bash for tester, monster-realm half (HIGH, LIGHT)
-`touches: monster-realm/.claude/agents/tester.md, monster-realm/.claude/hooks/guard-tester-bash.mjs (new), monster-realm/.claude/settings.json`
-`after:` (none) — twin of `lp-tester-tools` (harness half); same design, same red-team, same fixture
-battery, vendored identically per the `lp-09` `guard-bash.mjs` cross-repo precedent. Split into its
-own entry, not folded into the harness one, because `lp-00`'s `mr-spawn` refuses any `touches:` line
-spanning two repos (`REPO-MIXED`) — this is a routing necessity, not a second design decision.
+### lp-tester-tools-project — Scoped Bash + Write/Edit guard for tester, monster-realm half (HIGH, LIGHT)
+`touches: monster-realm/.claude/agents/tester.md, monster-realm/.claude/hooks/guard-tester-bash.mjs (new), monster-realm/.claude/hooks/guard-tester-write.mjs (new), monster-realm/.claude/settings.json`
+`after:` (none) — twin of `lp-tester-tools` (harness half); same design, same two rounds of
+adversarial review, same fixture batteries, vendored identically per the `lp-09` `guard-bash.mjs`
+cross-repo precedent. Split into its own entry, not folded into the harness one, because `lp-00`'s
+`mr-spawn` refuses any `touches:` line spanning two repos (`REPO-MIXED`) — a routing necessity.
 
-Full rationale, the allowlist, both defects the design red-team caught, and both known gaps are in
+Full rationale, both hooks, all defects either review round caught, and both known gaps are in
 `lp-tester-tools`'s entry above — do not re-derive them here. This entry exists to give the
 monster-realm-repo half of the change its own `touches:`/PR, since a single cross-repo entry can't be
 fed to `mr-spawn` at all. Ship both halves in the same attended session (like `lp-00`/`lp-09`), two
-PRs, cross-referencing each other's number once both are open.
+PRs, cross-referencing each other's number once both are open. Note (caught fixing the
+post-implementation-review findings): the "allowed" fixtures must not hardcode harness-only paths
+(`memory/projects/mr-spawn` doesn't exist here) — both `--selftest` batteries use scratch-created
+fixtures precisely so they're portable across both repos; verify this stays true on any future edit.
 
-EARS: identical to `lp-tester-tools`'s, scoped to the monster-realm-repo copies of the same three
-files. `mr-selfcheck` (harness-side) is NOT expected to reach into this repo to verify it — parity
-between the two copies is a manual check at slice head (the same accepted gap `guard-bash.mjs`
-already lives with), not a new one this slice introduces.
-Tests: `guard-tester-bash.mjs --selftest` (identical 33 fixtures) green in the monster-realm checkout
-(ADR-0010).
+EARS: identical to `lp-tester-tools`'s, scoped to the monster-realm-repo copies of the same files.
+`mr-selfcheck` (harness-side) is NOT expected to reach into this repo to verify it — parity between
+the two copies is a manual check at slice head (the same accepted gap `guard-bash.mjs` already lives
+with), not a new one this slice introduces.
+Tests: `guard-tester-bash.mjs --selftest` (identical 36 fixtures) and `guard-tester-write.mjs
+--selftest` (identical 14 fixtures), both green in the monster-realm checkout (ADR-0010).
 
 ### lp-08 — `mr-ready` and the tick-mode ladder (HIGH, MED)
 `touches: memory/projects/mr-ready (new), memory/projects/mr-native-tick.sh, memory/projects/mr-supervisor-prompt-native.md`
