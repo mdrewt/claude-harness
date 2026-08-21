@@ -1524,6 +1524,12 @@ def reset_state():
 # A real, stable heading to point --spec-file at (already merged, will not move).
 REAL_SPEC = "specs/monster-realm-v2/M-loop-infrastructure.spec.md"
 REAL_HEADINGS = ["lp-06", "lp-07", "lp-10", "lp-11", "lp-11b", "lp-git-workflow"]
+# A real DIGIT-LEADING heading -- the entire review-residuals convention is digit-first
+# (15r-sec-a, 13r-c-2, 15r-a2, ...), which a letter-first-only SLICE_ID_RE rejected in an
+# earlier revision (caught at post-implementation review; queue-add --slice 15r-sec-a died).
+# This fixture pins the regression so a future edit can't silently reintroduce it.
+DIGIT_SPEC = "specs/monster-realm-v2/M-postgate-fifteenth-review-residuals.spec.md"
+DIGIT_HEADING = "15r-sec-a"
 
 # --- queue-add: validation ---
 reset_state()
@@ -1535,6 +1541,19 @@ if rc == 0: fail("lp-queue-rejects-traversal-path", "a .. --spec-file must be re
 
 rc, out, err = rec("queue-add", ["--slice", "lp-does-not-exist-fixture", "--spec-file", REAL_SPEC, "--reason", "x"])
 if rc == 0: fail("lp-queue-rejects-missing-heading", "a slice with no matching '### <slice>' heading must be refused")
+
+# REGRESSION: digit-leading slice ids (the norm for game-milestone slices, not the exception)
+# must be accepted, not just letter-leading lp-* ids.
+rc, out, err = rec("queue-add", ["--slice", DIGIT_HEADING, "--spec-file", DIGIT_SPEC, "--reason", "digit-led id"])
+if rc != 0:
+    fail("lp-queue-accepts-digit-leading-id",
+         "a real digit-leading slice id (%s) must be accepted; mr-record exited %r (stderr=%r)"
+         % (DIGIT_HEADING, rc, err.strip()[:200]))
+else:
+    q = json.load(open(STATE)).get("queue", [])
+    if not any(e.get("slice") == DIGIT_HEADING for e in q):
+        fail("lp-queue-accepts-digit-leading-id", "digit-leading slice %s did not persist: %r" % (DIGIT_HEADING, q))
+reset_state()
 
 # --- queue-add: a valid add persists the exact fields ---
 rc, out, err = rec("queue-add", ["--slice", REAL_HEADINGS[0], "--spec-file", REAL_SPEC,

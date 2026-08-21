@@ -191,7 +191,12 @@ QUEUE_CAP = 5   # generous headroom over the "typically 1-3" design guidance (wi
                 # fan-out candidates); a refused add is a LOUD failure surfaced in the tick's own
                 # output when something isn't consuming the array, instead of the silent months-long
                 # regrowth that produced the original 67-entry RF-3 journal this replaces.
-SLICE_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9.-]*$")
+# DIGIT-LEADING IDS ARE THE NORM, NOT THE EXCEPTION (bug caught at post-implementation review): the
+# entire currently-open review-residuals convention is digit-first -- 15r-sec-a, 13r-c-2, 15r-a2,
+# 15r-d-0, etc. -- and a letter-first-only pattern rejects effectively every real game-milestone
+# slice while only accepting this PR's own lp-* naming. Confirmed against the live corpus before
+# fixing (queue-add --slice 15r-sec-a died on this exact regex).
+SLICE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.-]*$")
 
 def _load_state():
     with open(STATE, encoding="utf-8") as f: return json.load(f)
