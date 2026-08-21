@@ -429,6 +429,127 @@ def selftest(selfdir):
 
 # ===== END GATING TESTS =====
 
+# ---------------------------------------------------------------------------------------------
+# IMPLEMENTATION (lp-skills, specialist). Everything above is the tester's fence; nothing here
+# reaches back into it.
+#
+# WHY A MAP AT ALL. `touches:` is the only machine-readable statement of what a run will edit,
+# and it is already parsed one gate above for repo routing. Deriving the required skills from it
+# turns "remember to invoke the skill" — which ~500 turns of brief reliably erode — into a line
+# the run cannot miss. The block NAMES skills and never inlines their content: the Skill tool is
+# the loader, and inlining would multiply every skill's bytes by every turn of the run.
+#
+# WHY code-intel IS DEFINED AS "touches code" RATHER THAN "navigation-heavy" (D1, plan R5).
+# An extension-only rule silently missed the corpus's very common DIRECTORY declarations
+# (`client/src/prediction/, client/e2e/`), and a "looks navigation-heavy" heuristic would have to
+# guess intent from a path list. So the rule is deliberately coarse: any token under a project
+# CODE ROOT, or any token with a codegraph-indexed extension. It consequently fires on ~every
+# project code slice. That asymmetry is the point: over-firing costs one ignored line in the
+# brief and is recoverable, while under-firing is the exact defect this slice exists to remove
+# and is invisible from the outside. The pre-registered confirm step pairs the fire count with
+# the parent's actual codegraph calls, which is what detects load-and-ignore.
+#
+# WHY evals/ content/ ops/ docs/ ARE NOT CODE ROOTS. They are data, config and prose: a `.ron`
+# content drop or an `evals/manifest.json` has no call graph to navigate. Their code-shaped FILES
+# still fire through the extension rule (`ops/observability/validate.mjs`), which is the intended
+# split rather than an accident. Fixtures pin both halves — a regression here is a silent
+# OVER-fire, which nobody would report.
+#
+# WHY HARNESS memory/** SLICES RENDER AN EMPTY BLOCK, deliberately. The loop tools are
+# extensionless bash/python under memory/projects/ — not codegraph-indexed, not a project root —
+# so this slice's own touches render "". That is correct, not a gap; it does mean the one-month
+# confirm step must use PROJECT slices as its denominator.
+#
+# Row shape: (skill name, root that owns it, prefixes, suffixes, label emitted in the brief).
+# Roots matter beyond documentation: t5 resolves <root>/.claude/skills/<name>/SKILL.md on the
+# real filesystem, so a wrong root fails the gate instead of shipping a dangling instruction.
+# ORDER IS THE RENDER ORDER and is pinned by the all-six fixture — append, never reshuffle.
+SKILL_MAP = [
+    ("spacetimedb-reducer", PROJ, ("server-module/",), (), "`server-module/`"),
+    ("game-core-testing",   PROJ, ("game-core/",),     (), "`game-core/`"),
+    ("spacetimedb-client",  PROJ, ("client/src/net/",), (), "`client/src/net/`"),
+    ("wasm-boundary",       PROJ, ("client-wasm/",),   (), "`client-wasm/`"),
+    ("spec-kit",            HARNESS, ("specs/",), (".spec.md",), "`specs/`"),
+    ("code-intel",          HARNESS,
+     ("server-module/", "game-core/", "client/", "client-wasm/", "sim-harness/"),
+     (".rs", ".ts", ".tsx", ".mjs", ".js"),
+     "codegraph-indexed code"),
+]
+
+SKILLS_HEADER = ("**Must-apply skills (invoke each via the Skill tool before writing code there "
+                 "— not optional):**")
+
+# Where mr-repo-of lives. MEM is exported by mr-spawn on the live path; the fallback keeps
+# `--selftest` (which does not export it) working without a second hardcoded constant.
+MEM_DIR = os.environ.get("MEM") or (HARNESS + "/memory/projects")
+
+
+def tokens_of(raw):
+    """Tokenize a raw `touches:` string by DELEGATING to mr-repo-of --json (D3).
+
+    A hand-rolled comma split looks adequate and is not: it leaves annotated declarations like
+    `game-core/src/battle.rs (new)` as the token "game-core/src/battle.rs (new)", which still
+    satisfies the PREFIX rules while silently failing every SUFFIX rule — a partial, invisible
+    UNDER-fire, i.e. precisely the defect this slice exists to remove. mr-repo-of already solves
+    annotations and prose with tested code (its own fixture register), and mr-spawn already hard-
+    depends on it one gate above for routing, so this adds no new dependency.
+
+    HONEST COST: this promotes mr-repo-of's `_tokens()` to a de-facto interface and inherits its
+    quirks — notably that a comma-free clause like `server-module/tests/ or scripts/` collapses
+    into a single token. Union of ALL buckets (incl. ambiguous/external), because skill matching
+    cares about the path shape, not which repo the router assigned it to.
+
+    RAISES on any failure (non-zero rc, unparseable JSON, timeout). The bash caller converts that
+    into the advisory empty-block path; swallowing it here would hide the failure instead.
+    """
+    proc = subprocess.run([MEM_DIR + "/mr-repo-of", "--json", raw],
+                          capture_output=True, text=True, timeout=10)
+    if proc.returncode != 0:
+        raise RuntimeError("mr-repo-of --json rc=%s stderr=%r"
+                           % (proc.returncode, proc.stderr[-200:]))
+    routed = json.loads(proc.stdout)
+    out = []
+    for bucket in ("harness", "project", "ambiguous", "external"):
+        for tok in routed.get(bucket) or []:
+            if tok not in out:
+                out.append(tok)
+    return out
+
+
+def skills_for(tokens):
+    """PURE: tokens -> skill names, in SKILL_MAP order, deduped. No I/O, no state.
+
+    Literal `startswith`/`endswith` over tuples rather than a regex, per house doctrine (no
+    dynamic pattern construction): the rules are literal path prefixes and literal extensions,
+    and a regex here would only add an escaping hazard to data that comes from a spec file.
+    """
+    out = []
+    for name, _root, prefixes, suffixes, _label in SKILL_MAP:
+        for tok in tokens:
+            if tok.startswith(prefixes) or (suffixes and tok.endswith(suffixes)):
+                out.append(name)
+                break
+    return out
+
+
+def render_block(skills):
+    """Skill names -> the <SKILLS_BLOCK> substitution value. "" when nothing matched, so the
+    rendered brief is byte-identical to today for every unmatched slice.
+
+    The leading "\\n\\n" is carried by the VALUE, not by the template, which is what makes the
+    empty case a no-op after an end-of-line placeholder.
+
+    INJECTION BOUNDARY: every emitted byte comes from SKILL_MAP. The caller's raw `touches:` is
+    never echoed — the brief is executed as a prompt under --dangerously-skip-permissions, so
+    reflecting caller-controlled text into it would be an injection surface (t7 pins this).
+    """
+    if not skills:
+        return ""
+    labels = dict((row[0], row[4]) for row in SKILL_MAP)
+    lines = ["- `%s` - matched by %s" % (n, labels[n]) for n in skills]
+    return "\n\n" + SKILLS_HEADER + "\n" + "\n".join(lines)
+
+
 def main(argv):
     if len(argv) >= 2 and argv[1] == "--selftest":
         selfdir = argv[2] if len(argv) >= 3 else None
@@ -442,6 +563,73 @@ def main(argv):
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
 PYSKILLS
+}
+
+# lp-skills: ONE render path, two entry points (live spawn + --render-brief, which the selftest
+# drives end to end). The skills block is computed here and passed POSITIONALLY into the heredoc
+# alongside the template and output paths — there is no environment variable to forget to export.
+#
+# ADVISORY BY DESIGN: mr-spawn sits on the critical path of every autonomous launch, so a cosmetic
+# defect in the skill mapping must never become a launch refusal (that would wedge the loop). Any
+# failure yields an empty block plus a notice, and the brief still renders.
+build_brief(){
+  local raw="${1:-}" tpl="${2:-}" out="${3:-}"
+  # `local blk=$(...)` would MASK the subprocess exit status (`local`'s own status wins), so the
+  # error branch below would silently never fire. Reproduced; keep these two statements apart.
+  local blk
+  blk=$(mr_skills "$raw") || {
+    # `emit` is only defined after the live entry point, so it does not exist on the
+    # --render-brief path. Never `status` here — that EXITS, which is the refusal we must not do.
+    if declare -f emit >/dev/null 2>&1; then
+      emit SKILLS-MAP-ERROR "required-skill mapping failed for touches=$(echo "$raw" | head -c 200); brief rendered WITHOUT the skills block (advisory — the spawn continues)"
+    else
+      printf 'SKILLS-MAP-ERROR required-skill mapping failed; brief rendered without the skills block\n' >&2
+    fi
+    blk=""
+  }
+  # S/V stay environment-passed (unchanged from the original block); the three moved inputs do not.
+  export S V
+  /usr/bin/python3 - "$tpl" "$out" "$blk" <<'PYBRIEF' || return 1
+import json, os, sys
+S=os.environ["S"]; v=json.load(open(os.environ["V"]))
+tpl=open(sys.argv[1]).read()
+_t=v.get("touches","")
+touches_str=", ".join(_t) if isinstance(_t,list) else str(_t)
+tier=v.get("tier") or (_ for _ in ()).throw(SystemExit("vars.json missing required field: tier (hard|routine|content)"))
+tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard"
+ else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models (sonnet-class) — do not bump lens models upward on a content slice (THIS OVERRIDES the build-loop prompt bump-one-tier default for this slice). The tester requirement is UNCHANGED — meaningful tests first, always.\n" if tier=="content" else "")
+rb=v.get("resume_block","") or ""
+repo=os.environ["REPO"]
+# The gate differs by repo and saying so is load-bearing. monster-realm `just ci` is the real gate.
+# Harness `just ci` runs only scripts/tests/{harness,invariants,adr-lint}.test.mjs and lints only
+# scripts/ — so for a slice touching solely memory/projects/** it CANNOT fail. Gating a harness
+# slice on it would be a green light that means nothing, which is the defect class lp-00 removes.
+repo_block=("REPO: **harness** (`mdrewt/claude-harness`). Worktree from `origin/main`; PR on the harness repo.\n"
+ "GATE — read this, it is not the project gate: harness `just ci` runs only `scripts/tests/*` and lints only `scripts/`, so for a slice touching solely `memory/projects/**` it **cannot fail** and proves nothing. Your gate is **`memory/projects/mr-selfcheck` printing SELFCHECK-OK** plus **the `--selftest` of every tool you touched or added**. mr-selfcheck DERIVES its tool set (lp-00), so a new executable `mr-*` is picked up automatically — but it must carry a bash or python shebang or the gate fails it as unclassifiable, and anything with real logic should ship a `--selftest` wired in beside mr-cost-sum's. Run harness `just ci` too (cheap, catches script-lint regressions), but never report it as the gate.\n"
+ "There is no remote CI on this repo and no branch protection, so 'PR open + local gate green' IS the terminal state; the supervisor merges.\n"
+ if repo=="harness" else
+ "REPO: **project** (`mdrewt/monster-realm`). Worktree from `origin/master`; PR on the project repo.\n"
+ "GATE: the full `just ci` (the exact gate remote runs — incl. Semgrep/security) green locally before opening the PR.\n")
+# lp-skills: fail LOUD if the template lost the anchor. Silently rendering a brief with no
+# skills block is the invisible under-fire this slice exists to remove.
+if "<SKILLS_BLOCK>" not in tpl:
+    raise SystemExit("brief template is missing the <SKILLS_BLOCK> placeholder: %s" % sys.argv[1])
+_subbed=[]
+for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCHES>",touches_str),
+              ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block),
+              ("<REPO_BLOCK>",repo_block),("<PR_REPO>",os.environ["PR_REPO"]),
+              ("<BASE_BRANCH>",os.environ["BASE_BRANCH"]),("<WT_ROOT>",os.environ["WT_ROOT"]),
+              ("<CAP_USD>",str(__import__("os").environ.get("CAP","60"))),
+              ("<SKILLS_BLOCK>",sys.argv[3])]:
+    _subbed.append(k)
+    tpl=tpl.replace(k,val)
+# Keyed to the list JUST iterated, so a renamed placeholder cannot drift out of the check.
+_left=[k for k in _subbed if k in tpl]
+if _left:
+    raise SystemExit("unsubstituted placeholder(s) survived rendering: %s" % _left)
+open(sys.argv[2],"w").write(tpl)
+print("brief-built bytes=%d tier=%s repo=%s" % (len(tpl),tier,repo))
+PYBRIEF
 }
 
 case "${1:-}" in
@@ -596,38 +784,9 @@ for ent in r.stdout.split(b'\0'):
   || WRITES="$SYNCDIR (probe helper failed — failing closed)"
 [ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
 [ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
-# build brief
-export S V B MEM
-/usr/bin/python3 - <<'PY' || exit 1
-import json, os
-S=os.environ["S"]; v=json.load(open(os.environ["V"]))
-tpl=open(os.environ["MEM"]+"/mr-brief-template.md").read()
-_t=v.get("touches","")
-touches_str=", ".join(_t) if isinstance(_t,list) else str(_t)
-tier=v.get("tier") or (_ for _ in ()).throw(SystemExit("vars.json missing required field: tier (hard|routine|content)"))
-tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard"
- else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models (sonnet-class) — do not bump lens models upward on a content slice (THIS OVERRIDES the build-loop prompt bump-one-tier default for this slice). The tester requirement is UNCHANGED — meaningful tests first, always.\n" if tier=="content" else "")
-rb=v.get("resume_block","") or ""
-repo=os.environ["REPO"]
-# The gate differs by repo and saying so is load-bearing. monster-realm `just ci` is the real gate.
-# Harness `just ci` runs only scripts/tests/{harness,invariants,adr-lint}.test.mjs and lints only
-# scripts/ — so for a slice touching solely memory/projects/** it CANNOT fail. Gating a harness
-# slice on it would be a green light that means nothing, which is the defect class lp-00 removes.
-repo_block=("REPO: **harness** (`mdrewt/claude-harness`). Worktree from `origin/main`; PR on the harness repo.\n"
- "GATE — read this, it is not the project gate: harness `just ci` runs only `scripts/tests/*` and lints only `scripts/`, so for a slice touching solely `memory/projects/**` it **cannot fail** and proves nothing. Your gate is **`memory/projects/mr-selfcheck` printing SELFCHECK-OK** plus **the `--selftest` of every tool you touched or added**. mr-selfcheck DERIVES its tool set (lp-00), so a new executable `mr-*` is picked up automatically — but it must carry a bash or python shebang or the gate fails it as unclassifiable, and anything with real logic should ship a `--selftest` wired in beside mr-cost-sum's. Run harness `just ci` too (cheap, catches script-lint regressions), but never report it as the gate.\n"
- "There is no remote CI on this repo and no branch protection, so 'PR open + local gate green' IS the terminal state; the supervisor merges.\n"
- if repo=="harness" else
- "REPO: **project** (`mdrewt/monster-realm`). Worktree from `origin/master`; PR on the project repo.\n"
- "GATE: the full `just ci` (the exact gate remote runs — incl. Semgrep/security) green locally before opening the PR.\n")
-for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCHES>",touches_str),
-              ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block),
-              ("<REPO_BLOCK>",repo_block),("<PR_REPO>",os.environ["PR_REPO"]),
-              ("<BASE_BRANCH>",os.environ["BASE_BRANCH"]),("<WT_ROOT>",os.environ["WT_ROOT"]),
-              ("<CAP_USD>",str(__import__("os").environ.get("CAP","60")))]:
-    tpl=tpl.replace(k,val)
-open(os.environ["B"],"w").write(tpl)
-print("brief-built bytes=%d tier=%s repo=%s" % (len(tpl),tier,repo))
-PY
+# build brief — ONE render path (build_brief, above), shared with --render-brief so the selftest
+# exercises the same bytes this line writes.
+build_brief "$TOUCHES_RAW" "$MEM/mr-brief-template.md" "$B" || exit 1
 MODEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('model','opus'))")
 EFFORT=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('effort','high'))")
 rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
