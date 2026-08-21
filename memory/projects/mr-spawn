@@ -19,9 +19,10 @@ mr_skills() {
     mr_skills --selftest <selfdir>   -> runs the gating-test battery below; rc=0 pass, rc=1 fail
     mr_skills <raw touches>          -> prints the rendered <SKILLS_BLOCK> substitution value
 
-TESTER-AUTHORED, TDD RED PHASE. SKILL_MAP/tokens_of/skills_for/render_block are referenced below
-but left UNDEFINED -- the specialist adds them between the END marker and `def main`, without
-touching the fence. A wrong expectation is corrected FROM THE SPEC, never to fit the impl.
+The fenced battery below is TESTER-AUTHORED and was written against these symbols before any of them
+existed; the implementation (SKILL_MAP/tokens_of/skills_for/render_block) lives between the END
+marker and `def main`. Keep that split: a wrong expectation in the fence is corrected FROM THE SPEC,
+never edited to fit the implementation.
 """
 import json
 import os
