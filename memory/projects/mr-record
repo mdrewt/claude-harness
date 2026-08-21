@@ -1,8 +1,17 @@
 #!/bin/bash
-# mr-record — validated writes to ledger/handoff. Subcommands:
-#   ledger  --run_id X --slice S --outcome O [--cost N|--from-log LOG] [--model M] [--attempts N]
-#           [--orch A] [--gating G] [--ci V] [--notes "..."]   (ts auto-UTC; refuses empty slice/outcome; validates JSON)
-#   handoff --title T (--body "..." | --body-file F)
+# mr-record — validated writes to ledger/handoff/queue. Subcommands:
+#   ledger      --run_id X --slice S --outcome O [--cost N|--from-log LOG] [--model M] [--attempts N]
+#               [--orch A] [--gating G] [--ci V] [--notes "..."]   (ts auto-UTC; refuses empty slice/outcome; validates JSON)
+#   handoff     --title T (--body "..." | --body-file F)
+#               Auto-rotates the live file once it exceeds ~40KB (lp-handoff-rotate) — see the
+#               ENTRY_RE/rotate_handoff block below for the algorithm.
+#   queue-add   --slice S --spec-file F --reason "..." [--run_id R]
+#   queue-remove --slice S
+#               (lp-queue) mr-state.json's `queue[]` fast-path-hint pointers — see the queue block
+#               below. These are the SOLE writers of the `queue` key: a tick's own end-of-tick
+#               mr-state.json write must re-read `queue` fresh immediately before writing (never its
+#               gate-0 snapshot) rather than touch it directly, since a mid-tick queue-add/-remove call
+#               can have changed it after that snapshot was taken.
 #
 # lp-02 — SLICE-SIZE DENOMINATOR. When a row CLOSES a slice (MERGED/FINISHED/CRASHED/PARKED, and
 # never SUPERVISOR or CORRECTION*), this writer attaches six measured columns plus quality_source:
@@ -28,15 +37,19 @@ MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 # own gate exercises its own mr-slice-quality instead of silently degrading against the main
 # checkout's (which is what made an earlier design's dogfood read as a clean pass).
 MEM_SELF="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-SUB="${1:?usage: mr-record ledger|handoff ...}"; shift
+SUB="${1:?usage: mr-record ledger|handoff|queue-add|queue-remove ...}"; shift
 export MEM MEM_SELF SUB
 ARGS_JSON=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
 export ARGS_JSON
 /usr/bin/python3 <<'PY'
-import json, os, sys, re, datetime, subprocess
+import json, os, sys, re, datetime, subprocess, fcntl
 MEM=os.environ["MEM"]; SUB=os.environ["SUB"]; argv=json.loads(os.environ["ARGS_JSON"])
 LEDGER=os.environ.get("MR_RECORD_LEDGER") or (MEM+"/monster-realm-usage-ledger.jsonl")
 HANDOFF=os.environ.get("MR_RECORD_HANDOFF") or (MEM+"/monster-realm-handoff.md")
+STATE=os.environ.get("MR_RECORD_STATE") or (MEM+"/mr-state.json")
+# lp-queue: same hardcoding rationale as MEM (:24-29) — mr-state.json is a machine SINGLETON and
+# queue[] pointers must validate against the REAL spec corpus, not a worktree-local fork of it.
+HARNESS="/home/mdrewt/projects/ai-apps/claude-harness"
 def die(m): print("ERROR: "+m); sys.exit(1)
 a={}; i=0
 while i<len(argv):
@@ -45,15 +58,208 @@ while i<len(argv):
     if i+1>=len(argv) or argv[i+1].startswith("--"): die("flag "+k+" requires a value")
     v=argv[i+1]
     key=k[2:]
-    if key not in ("run_id","slice","outcome","cost","model","attempts","orch","gating","cycles","standdowns","ci","notes","from-log","title","body","body-file"): die("unknown flag --"+key+" (allowed: run_id slice outcome cost model attempts orch gating cycles standdowns ci notes from-log title body body-file)")
+    if key not in ("run_id","slice","outcome","cost","model","attempts","orch","gating","cycles","standdowns","ci","notes","from-log","title","body","body-file","spec-file","reason"): die("unknown flag --"+key+" (allowed: run_id slice outcome cost model attempts orch gating cycles standdowns ci notes from-log title body body-file spec-file reason)")
     a[key]=v; i+=2
 ts=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+# ============================== lp-handoff-rotate: rotation helpers ==============================
+HANDOFF_BUDGET = 40_000                 # bytes, operator decision (2026-08-21) — NOT tokens, NOT
+                                         # entry count. Matches the doctrine's own "> 40 KB" line.
+# Boundary = bare "## <token>", NOT "## <token> — " (an em-dash requirement silently mis-split 11
+# of 197 real live entries during design red-team — several older entries have no em-dash at all,
+# e.g. "## 2026-08-02T13:00Z native tick (cron, ...)"). A body line that coincidentally starts a
+# line with "## " would still mis-split; this is a plain-text log with no escaping, inherent to the
+# format, not a bug this rotation introduces.
+ENTRY_RE = re.compile(r"(?m)^(?=## \S)")
+TS_RE = re.compile(r"^## (\S+)")
+
+def _parse_entry_ts(chunk):
+    """This entry's own timestamp, or None if unparseable. Never raises -- an entry mr-record can't
+    date must be PINNED (kept live forever, reported, never archived or dropped), so the caller
+    needs a clean None signal, not an exception mid-rotation."""
+    m = TS_RE.match(chunk)
+    if not m: return None
+    tok = m.group(1).rstrip("Z")
+    try: return datetime.datetime.fromisoformat(tok)
+    except ValueError: pass
+    try: return datetime.datetime.combine(datetime.date.fromisoformat(tok), datetime.time.min)
+    except ValueError: return None
+
+def _rotate_handoff():
+    """Runs after every append, under the same flock. The live file may have entries out of
+    chronological FILE ORDER (some prior sessions hand-edited it directly, prepending, instead of
+    going through this function) -- so this can NEVER key off file position, only each entry's own
+    embedded timestamp. Keeps as many whole entries as fit ~40KB (never splits one; always keeps the
+    single newest dated entry even if it alone exceeds budget), moves the rest oldest-first into
+    their OWN calendar month's archive file, and rewrites the live file canonical newest-first.
+    Archive writes are IDEMPOTENT (skip any entry already present) so a crash between the archive
+    write and the live-file swap can never duplicate a row on the next rotation's retry. Archive
+    dir/name are derived from HANDOFF itself, never from MEM/HARNESS, so a selftest pointed at a
+    fixture file can never touch the real archives."""
+    if not os.path.exists(HANDOFF): return
+    if os.path.getsize(HANDOFF) <= HANDOFF_BUDGET: return   # cheap stat()-only fast path -- runs on
+                                                              # EVERY append
+    raw = open(HANDOFF, encoding="utf-8", errors="surrogateescape").read()
+    parts = ENTRY_RE.split(raw)
+    header, chunks = parts[0], parts[1:]
+    if not chunks: return              # over budget but nothing recognisable as an entry -- nothing
+                                        # safe to move; leave it for a human to look at
+    stem = os.path.splitext(os.path.basename(HANDOFF))[0]
+    arc_dir = os.path.dirname(HANDOFF) or "."
+    archive_re = re.compile(re.escape(stem) + r"-archive-(\d{4}-\d{2})\.md$")
+
+    entries = []
+    for idx, c in enumerate(chunks):
+        entries.append({"text": c, "ts": _parse_entry_ts(c), "orig_idx": idx,
+                         "size": len(c.encode("utf-8", "surrogateescape"))})
+
+    def sort_key(e):
+        if e["ts"] is None: return (1, -e["orig_idx"])   # pinned: always sorts before any dated entry
+        return (0, e["ts"].timestamp())
+    ordered = sorted(entries, key=sort_key, reverse=True)
+
+    keep, drop = [], []
+    budget_left = HANDOFF_BUDGET - len(header.encode("utf-8", "surrogateescape"))
+    kept_any_dated = False
+    for e in ordered:
+        if e["ts"] is None:
+            keep.append(e); continue                     # pinned -- free, never archived
+        if not kept_any_dated or e["size"] <= budget_left:
+            keep.append(e); budget_left -= e["size"]; kept_any_dated = True
+        else:
+            drop.append(e)
+    if not drop: return                # everything fit (oversized header, or all pinned) -- done
+
+    by_month = {}
+    for e in drop:
+        by_month.setdefault(e["ts"].strftime("%Y-%m"), []).append(e)
+    for ym in sorted(by_month):
+        bucket = sorted(by_month[ym], key=lambda e: e["ts"])     # oldest-first WITHIN the month
+        arc = os.path.join(arc_dir, f"{stem}-archive-{ym}.md")
+        existing = open(arc, encoding="utf-8", errors="surrogateescape").read() if os.path.exists(arc) else None
+        # Idempotent: a prior rotation may have already written some/all of this batch before
+        # crashing (e.g. an unattended-loop SIGKILL) before the live-file swap landed, in which case
+        # this exact batch gets recomputed identically on retry -- skip anything already present
+        # rather than risk a duplicated row.
+        missing = [e for e in bucket if existing is None or e["text"] not in existing]
+        if not missing: continue
+        new_content = (existing or (f"# monster-realm v2 -- supervisor handoff ARCHIVE ({ym}, "
+                       "entries appended oldest-first -- this file is never rewritten)\n\n---\n"))
+        new_content += "".join(e["text"] for e in missing)
+        tmp = arc + f".tmp.{os.getpid()}"
+        with open(tmp, "w", encoding="utf-8") as f: f.write(new_content)
+        os.replace(tmp, arc)
+
+    archive_files = sorted((n for n in os.listdir(arc_dir) if archive_re.match(n)), reverse=True)
+    ptr = ("older entries in " + ", ".join(archive_files)) if archive_files else "no archives yet"
+    new_header = f"# monster-realm v2 — supervisor handoff (rolling; {ptr})\n\n---\n\n"
+    tmp = HANDOFF + f".tmp.{os.getpid()}"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(new_header + "".join(e["text"] for e in keep))
+    os.replace(tmp, HANDOFF)           # atomic -- a crash mid-write must never leave the live file
+                                        # half-written (mirrors mr-state.json's own temp+mv pattern)
+
+    print(f"handoff-rotated: moved {len(drop)} entries "
+          f"({sum(e['size'] for e in drop)/1024:.1f} KB) to " + ", ".join(sorted(by_month))
+          + f"; kept {len(keep)} live")
+    pinned = [e for e in keep if e["ts"] is None]
+    if pinned:
+        print(f"WARN handoff-rotate: {len(pinned)} entry(ies) with no parseable "
+              "'## <ISO8601> ...' header -- pinned live, never archived, needs a manual look")
+# ============================================ end lp-handoff-rotate ==============================
+
 if SUB=="handoff":
     title=a.get("title") or die("--title required")
     body=a.get("body") or (open(a["body-file"]).read() if a.get("body-file") else "")
-    with open(HANDOFF,"a") as f:
-        f.write(f"\n## {ts} — {title}\n{body.rstrip()}\n")
+    # flock, not just append-then-check: rotation is a read-modify-write (it can rewrite the whole
+    # live file), unlike the single append it follows. Two racing slice sessions calling
+    # `mr-record handoff` concurrently (N_MAX up to 4) could otherwise interleave a rotation with
+    # another process's in-flight append. flock is process-scoped and self-releases on crash/SIGKILL,
+    # so a dead holder can never wedge the next call (same property the wrapper's own mutex relies on).
+    with open(HANDOFF + ".lock", "a+") as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            with open(HANDOFF,"a") as f:
+                f.write(f"\n## {ts} — {title}\n{body.rstrip()}\n")
+            _rotate_handoff()
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
     print("handoff-appended: "+title); sys.exit(0)
+
+# ==================================== lp-queue: queue-add / queue-remove =========================
+QUEUE_CAP = 5   # generous headroom over the "typically 1-3" design guidance (winner + N_MAX-up-to-4
+                # fan-out candidates); a refused add is a LOUD failure surfaced in the tick's own
+                # output when something isn't consuming the array, instead of the silent months-long
+                # regrowth that produced the original 67-entry RF-3 journal this replaces.
+SLICE_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9.-]*$")
+
+def _load_state():
+    with open(STATE, encoding="utf-8") as f: return json.load(f)
+
+def _write_state_atomic(state):
+    tmp = STATE + f".tmp.{os.getpid()}"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=1); f.write("\n")
+    os.replace(tmp, STATE)
+
+def _with_state_lock(fn):
+    """Re-read STATE fresh under an exclusive flock, let fn(state) mutate ONLY the `queue` key in
+    place, write back atomically. This is the SOLE writer of `queue[]` -- deliberately decoupled
+    from the tick's own separate "first read, last write of every tick" free-hand reconstruction of
+    every OTHER key, which is why a mid-tick queue-add/-remove call is safe even though it writes
+    mr-state.json outside that tick's own end-of-tick write (design red-team finding #1: without this
+    split, a stale end-of-tick snapshot silently re-writes back a just-removed entry)."""
+    with open(STATE + ".lock", "a+") as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            state = _load_state()
+            fn(state)
+            _write_state_atomic(state)
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
+
+if SUB=="queue-add":
+    slice_=a.get("slice") or die("--slice required")
+    spec_file=a.get("spec-file") or die("--spec-file required")
+    reason=a.get("reason") or die("--reason required")
+    if not SLICE_ID_RE.match(slice_): die("--slice fails validation (expected e.g. lp-08, 15r-sec-a): "+slice_)
+    if "\n" in reason: die("--reason must be a single line")
+    # Repo-relative under specs/ only -- every real M*.spec.md lives there (confirmed at design
+    # time), and it incidentally bounds path traversal the same way the lp-tester-tools allowlist
+    # does for a different reason.
+    if spec_file.startswith("/") or ".." in spec_file.split("/") or not spec_file.startswith("specs/"):
+        die("--spec-file must be a specs/-relative path with no leading / or .. segment: "+spec_file)
+    full_spec = os.path.join(HARNESS, spec_file)
+    if not os.path.isfile(full_spec): die("--spec-file does not exist: "+full_spec)
+    heading_re = re.compile(r"(?m)^### " + re.escape(slice_) + r"\b")
+    if not heading_re.search(open(full_spec, encoding="utf-8", errors="replace").read()):
+        die(f"--spec-file has no '### {slice_}' heading -- refusing to queue a pointer to nothing")
+    result = {}
+    def _add(state):
+        q = state.setdefault("queue", [])
+        if any(e.get("slice")==slice_ for e in q):
+            die(f"--slice {slice_} is already queued -- queue-remove it first to replace")
+        if len(q) >= QUEUE_CAP:
+            die(f"queue[] is at its cap ({QUEUE_CAP}) -- something isn't consuming it; delete a stale entry before adding")
+        q.append({"slice": slice_, "spec_file": spec_file, "reason": reason,
+                  "added_utc": ts, "added_by": a.get("run_id") or "n/a",
+                  "derived_from_master_sha": (state.get("master") or {}).get("sha", "n/a")})
+        result["n"] = len(q)
+    _with_state_lock(_add)
+    print(f"queue-added: {slice_} (queue now has {result.get('n','?')} entries)"); sys.exit(0)
+
+if SUB=="queue-remove":
+    slice_=a.get("slice") or die("--slice required")
+    result = {}
+    def _remove(state):
+        q = state.get("queue", [])
+        before = len(q)
+        state["queue"] = [e for e in q if e.get("slice")!=slice_]
+        result["removed"] = before - len(state["queue"])
+    _with_state_lock(_remove)
+    print(f"queue-removed: {slice_} ({result.get('removed',0)} entr{'y' if result.get('removed',0)==1 else 'ies'} removed)"); sys.exit(0)
+# ================================================== end lp-queue =================================
+
 if SUB!="ledger": die("unknown subcommand "+SUB)
 slice_=a.get("slice") or die("--slice required")
 if slice_=="SUPERVISOR" and os.environ.get("MR_RECORD_WRAPPER")!="1": die("SUPERVISOR rows are wrapper-owned (duplicate written by a decision run 2026-07-25); record outcomes on the SLICE row instead")
