@@ -258,6 +258,33 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-lp04-") as TMP:
             fail("lp04-probe-directory-log",
                  "the shared try must take the gating half down with it; got %r"
                  % (obj.get("gating_advisory"),))
+        # AM17, and THIS is where it bites. mr-audit's own battery has to mirror the exception
+        # handler to reach this path at all, so the real :71-73 body is only ever executed here.
+        # A handler that leaves mandatory_read at its init value reports "the audit blew up" and
+        # "no mandatory read" in the same object — the silent proceed AM4 closes for a typo'd
+        # --repo, reached through the other door.
+        if obj.get("mandatory_read") is not True:
+            fail("lp04-probe-directory-log-am17",
+                 "an audit that RAISED must force the diff read: expected mandatory_read=True, "
+                 "got %r" % (obj.get("mandatory_read"),))
+        if obj.get("read_reason") != ["advisory-inputs-unavailable"]:
+            fail("lp04-probe-directory-log-am17",
+                 "expected ['advisory-inputs-unavailable'] exactly once; got %r"
+                 % (obj.get("read_reason"),))
+
+    # The hard-tier half of the same door: `hard-tier` can only have come from the init, which
+    # runs BEFORE the try. A handler that ASSIGNS the list instead of appending loses it, and an
+    # init moved inside the try never produced it. Order is asserted, not membership.
+    obj = probe("lp04-probe-directory-log-hard",
+                ["--slice", FIXTURE_SLICE, "--tier", "hard", "--log", dir_log])
+    if obj is not None:
+        if obj.get("read_reason") != ["hard-tier", "advisory-inputs-unavailable"]:
+            fail("lp04-probe-directory-log-hard",
+                 "expected ['hard-tier', 'advisory-inputs-unavailable'] in that order; got %r"
+                 % (obj.get("read_reason"),))
+        if obj.get("mandatory_read") is not True:
+            fail("lp04-probe-directory-log-hard",
+                 "got mandatory_read=%r" % (obj.get("mandatory_read"),))
 
 # =============================================================================================
 # (c) no artifact survives. The probe slice id is deliberately one no live slice can carry, so

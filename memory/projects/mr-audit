@@ -1,24 +1,67 @@
 #!/bin/bash
-# mr-audit — mechanical pre-merge audits. ALWAYS rc=0; verdicts in JSON (stdout + /tmp/mr_audit_<slice>.json).
-# Verdicts: CLEAN | FLAGGED | AUDIT-ERROR (treat AUDIT-ERROR as FLAGGED).
+# mr-audit — mechanical pre-merge audits. rc=0 for every AUDIT run; verdicts in JSON
+# (stdout + /tmp/mr_audit_<slice>.json).  `--selftest` is a SEPARATE mode and DOES exit 1 on failure.
+#
+# TWO HALVES, deliberately different kinds of claim (lp-04, ADR-0011 amendment 2026-08-20):
+#   POLICY   — `orchestration` (+ top-level `mandatory_read` / `read_reason`).  A real verdict.
+#              Verdicts: CLEAN | CLEAN-doc-exempt | FLAGGED | AUDIT-ERROR (treat AUDIT-ERROR as FLAGGED).
+#   ADVISORY — `gating_advisory` and `disposition`.  EVIDENCE for an LLM diff read, NEVER a merge
+#              predicate.  Both carry `"advisory": true` and an in-band `contract` string, because
+#              the reader is an LLM and the contract has to sit where the reader already looks.
 # usage: mr-audit --slice S --log /tmp/mr_pass_S.log --repo PATH --base REF --head REF [--tier hard|routine|content] [--doc-only]
+#        mr-audit --selftest
 export A_ARGS=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
+# SELF-LOCATING, same doctrine as mr-selfcheck: the disposition half attests the spec corpus that
+# ships beside THIS copy of the tool, so a worktree run audits the worktree and a main-checkout run
+# audits main.  Deliberately not a --specs flag and not an env override: an override on a gate input
+# is a surface for greening production vacuously.
+export A_MEM=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 /usr/bin/python3 <<'PY'
 import json, os, re, subprocess, sys
-argv=json.loads(os.environ["A_ARGS"]); a={}
-i=0
-while i<len(argv):
-    k=argv[i][2:]
-    if i+1<len(argv) and not argv[i+1].startswith("--"): a[k]=argv[i+1]; i+=2
-    else: a[k]="1"; i+=1
-out={"slice":a.get("slice","?"),"tier":a.get("tier","routine")}
-def finish():
-    s=json.dumps(out, indent=1)
-    print(s)
-    try: open(f"/tmp/mr_audit_{out['slice']}.json","w").write(s)
-    except Exception: pass
-    sys.exit(0)
-try:
+
+ADVISORY_CONTRACT = ("ADVISORY EVIDENCE ONLY - never a merge predicate; evidence for an LLM diff "
+                     "read. The policy verdict is `orchestration`; the read obligation is the "
+                     "top-level `mandatory_read`.")
+DISPOSITION_CONTRACT = (ADVISORY_CONTRACT + " CORPUS-SCOPED: findings are about the harness specs/ "
+                        "tree, not about the audited base..head diff.")
+
+
+def parse_args(argv):
+    a = {}
+    i = 0
+    while i < len(argv):
+        k = argv[i][2:]
+        if i+1 < len(argv) and not argv[i+1].startswith("--"): a[k] = argv[i+1]; i += 2
+        else: a[k] = "1"; i += 1
+    return a
+
+
+def mandatory_read_init(a):
+    # POLICY, and computed from --tier ALONE so it survives every failure path (AM4/AM5).  Before
+    # lp-04 the hard-tier read obligation was expressed by setting the DETECTOR's verdict to
+    # FLAGGED by construction, which made a 100%-firing signal indistinguishable from evidence.
+    if a.get("tier") == "hard":
+        return True, ["hard-tier"]
+    return False, []
+
+
+def force_read(out, reason):
+    # AM4/AM17: carry this file's own "treat AUDIT-ERROR as FLAGGED" convention forward. An audit
+    # that could not look must never read as an audit that looked and found nothing.
+    out["mandatory_read"] = True
+    if reason not in out["read_reason"]:
+        out["read_reason"].append(reason)
+
+
+def audit_orchestration(a, out):
+    # ---------------------------------------------------------------------------------------
+    # FROZEN (spec M-loop-infrastructure.spec.md:248 — "lp-04 SHALL NOT change :22-38's
+    # semantics").  This body is the pre-lp-04 :22-38 BYTE-IDENTICAL modulo indentation; the
+    # freeze is therefore provable by `git diff -w` rather than only by the fixtures this PR
+    # authored.  Do not "clean it up": the substring role predicates, the line-count (not
+    # occurrence-count) agent tally, the `== "1"` doc-only test and the `os.path.exists` (not
+    # isfile) guard are all pinned by goldens captured from the pre-slice tool.
+    # ---------------------------------------------------------------------------------------
     # --- orchestration evidence ---
     orch={"agent_calls":0,"roles":[],"models":[]}
     if a.get("log") and os.path.exists(a["log"]):
@@ -36,8 +79,14 @@ try:
     else:
         orch["verdict"]="AUDIT-ERROR"; orch["reason"]="log missing: "+str(a.get("log"))
     out["orchestration"]=orch
-    # --- gating-test integrity ---
-    g={"changed_test_files":[],"deleted_test_files":[],"removed_or_modified_asserts":0,"skip_markers_added":0,"suppressions_added":0}
+    # --- end frozen region ---
+
+
+def audit_gating(a, out):
+    # ADVISORY. Measured across all 446 v3-era rows: 0 true positives. It stays a detector.
+    g={"advisory":True,"contract":ADVISORY_CONTRACT,
+       "changed_test_files":[],"deleted_test_files":[],"removed_or_modified_asserts":0,
+       "skip_markers_added":0,"suppressions_added":0}
     repo=a.get("repo"); base=a.get("base"); head=a.get("head")
     if repo and base and head and os.path.isdir(repo):
         r=subprocess.run(["git","-C",repo,"diff","--name-status",f"{base}..{head}"],capture_output=True,text=True,timeout=60)
@@ -55,29 +104,184 @@ try:
             if ln.startswith("+") and not ln.startswith("+++"):
                 if re.search(r"\.skip\b|\.only\b|\bxit\(|\bxdescribe\(|#\[ignore\]|todo!\(", ln): g["skip_markers_added"]+=1
                 if re.search(r"nosemgrep|eslint-disable|@ts-ignore|@ts-expect-error|#\[allow\(", ln): g["suppressions_added"]+=1
-        if a.get("tier")=="hard":
-            g["verdict"]="FLAGGED"; g["reason"]="hard-tier: mandatory LLM diff read"
-        elif g["deleted_test_files"] or g["skip_markers_added"] or g["suppressions_added"] or g["removed_or_modified_asserts"]>0:
+        # lp-04 D3: the `if tier == "hard": verdict = FLAGGED` branch that stood here is DELETED.
+        # It fired on 100% of hard-tier slices regardless of evidence, so it carried no
+        # information and made the detector unreadable next to the policy verdict. The read
+        # obligation it was standing in for now lives in the top-level `mandatory_read`.
+        if g["deleted_test_files"] or g["skip_markers_added"] or g["suppressions_added"] or g["removed_or_modified_asserts"]>0:
             g["verdict"]="FLAGGED"; g["reason"]="mechanical tripwire (see counters); LLM must read the diff"
         else:
             g["verdict"]="CLEAN"
-        # pre-filtered evidence: embed the TEST-FILE diff hunks when flagged (no new git calls; str-sliced = utf-8 safe).
-        # NOTE: scoped to test paths only — on hard-tier flags of non-test changes this may be empty; the full diff read is still on the LLM.
-        if g["verdict"]!="CLEAN" and r2.stdout.strip():
+        # Pre-filtered evidence: embed the TEST-FILE diff hunks whenever a read is owed (no new git
+        # calls; str-sliced = utf-8 safe).  AM7: gated on `mandatory_read` too, not on the verdict
+        # alone — deleting the hard-tier flag would otherwise have removed the pre-filtered evidence
+        # from exactly the runs where the mandatory read still applies.
+        # NOTE: scoped to test paths only — on a flagged non-test change this may be empty; the full
+        # diff read is still on the LLM.
+        if (out.get("mandatory_read") or g["verdict"]!="CLEAN") and r2.stdout.strip():
             g["test_diff_hunks"]="\n".join(r2.stdout.splitlines()[:200])[:12000]
     else:
         g["verdict"]="AUDIT-ERROR"; g["reason"]="repo/base/head missing or repo not a dir"
-    out["gating"]=g
-except Exception as e:
-    out["orchestration"]=out.get("orchestration",{"verdict":"AUDIT-ERROR"})
-    out["gating"]={"verdict":"AUDIT-ERROR","reason":str(e)[:200]}
-finish()
+        force_read(out, "advisory-inputs-unavailable")
+    out["gating_advisory"]=g
+
+
+# --- disposition markers (docs/workflow-loops.md:32-39; ADR-0011 amendment 2026-08-20 D4/D5) -----
+# `parked -> <queued spec id | wontfix>`.  The grammar, the location, the rule and the owner
+# ("marker presence is audited supervisor-side (the mr-audit layer)") were already specified; this
+# implements them and invents nothing.
+#
+# THE parse decision, and it is the whole design: PARKED used as a STATUS LABEL is always bold in
+# this corpus, and PARKED used as PROSE never is.  Splitting a logical item on `**` and testing only
+# the odd (inside-bold) segments therefore needs no closure-section, table-row or bold-span-window
+# machinery.  A section-scoped parser was drafted, measured against the live corpus, and rejected:
+# it false-positived a table HEADER row and two slice headings containing the word "parked", audited
+# the ADR tree as if it were specs, and was blind to the corpus's dominant closure style
+# (`**pt-c1b DELIVERED** ... **Parked -> pt-c1b2:**`) and therefore to both live orphans.
+_PARK_TOKEN = re.compile(r"\bPARKED\b", re.I)
+_MARKER = re.compile(r"parked\s*(?:->|→)\s*(\S+)", re.I)
+# Lowercase, at least one hyphen.  Admits pt-c1b2 / lp-doc-a / 13r-c-2 / 15r-sec-mig-a; skips
+# `wontfix`, `Wave`, `terminal`, `<queued`, and the `-b` / `-c` continuation shorthands.
+_ID_SHAPE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+$")
+_ITEM_START = re.compile(r"^\s*(?:[-*+]\s+|\d+\.\s+)")
+
+
+def _normalise_target(tok):
+    return tok.strip("`*_'\"<>()[]").rstrip(",;:.!?").strip("`*")
+
+
+def _logical_items(lines):
+    """(anchor_lineno_1based, joined_text, [(lineno, text), ...]) — each line joined with its
+    continuation lines, so a marker that wraps onto the next line is still seen as part of the
+    same item (D12).  A blockquote paragraph break (`>` with nothing after it) ends an item: it
+    reads as blank to a human, and treating it as a continuation once joined a 30-line quoted
+    block into a single item whose reported line was 27 lines from the actual park."""
+    items = []
+    cur = None
+    for idx, raw in enumerate(lines, 1):
+        s = raw.rstrip("\n")
+        body = s.lstrip()
+        while body.startswith(">"):
+            body = body[1:].lstrip()
+        if not body:
+            cur = None
+            continue
+        starts = (body.startswith("#") or body.startswith("|")
+                  or _ITEM_START.match(body) is not None)
+        if cur is None or starts:
+            cur = [idx, [(idx, s.strip())]]
+            items.append(cur)
+        else:
+            cur[1].append((idx, s.strip()))
+    return [(i, " ".join(t for _, t in parts), parts) for i, parts in items]
+
+
+def _is_park(text):
+    # odd indices are inside a `**...**` span
+    return any(_PARK_TOKEN.search(seg) for i, seg in enumerate(text.split("**")) if i % 2 == 1)
+
+
+def scan_dispositions(specs_root):
+    d = {"advisory": True, "contract": DISPOSITION_CONTRACT,
+         "specs_root": os.path.abspath(specs_root),
+         "scanned": {"files": 0, "park_items": 0, "markers": 0, "id_targets": 0},
+         "findings": [], "unreadable": []}
+    files = []
+    for root, dirs, names in os.walk(specs_root):
+        # ADRs are decisions with their own Amendment/Confirmation lifecycle (ADR-0009), not
+        # work-item closures.  Auditing them as specs was a measured false-positive source.
+        dirs[:] = sorted(n for n in dirs if n != "adr")
+        for n in sorted(names):
+            if n.endswith(".md"):
+                files.append(os.path.join(root, n))
+    marker_lines = {}
+    nonmarker_blobs = []
+    targets = []
+    for p in sorted(files):
+        rel = os.path.relpath(p, specs_root)
+        try:
+            with open(p, "rb") as fh:
+                text = fh.read().decode("utf-8")
+        except Exception:
+            d["unreadable"].append(rel)
+            continue
+        d["scanned"]["files"] += 1
+        lines = text.splitlines()
+        keep = []
+        for ln in lines:
+            if _MARKER.search(ln):
+                marker_lines.setdefault(rel, []).append(ln)
+            else:
+                keep.append(ln)
+        nonmarker_blobs.append("\n".join(keep))
+        for lineno, item, parts in _logical_items(lines):
+            if not _is_park(item):
+                continue
+            d["scanned"]["park_items"] += 1
+            if _MARKER.search(item):
+                continue
+            # Report the line the park token is actually ON, not the item anchor. A paragraph-
+            # anchored finding whose excerpt does not contain the word is not actionable, and an
+            # unactionable finding is how a detector becomes decoration.
+            hit_no, hit_txt = lineno, lines[lineno-1].strip()
+            for ln_no, ln_txt in parts:
+                if _PARK_TOKEN.search(ln_txt):
+                    hit_no, hit_txt = ln_no, ln_txt
+                    break
+            d["findings"].append({"kind": "missing_disposition", "file": rel,
+                                  "line": hit_no, "excerpt": hit_txt[:160]})
+        for lineno, raw in enumerate(lines, 1):
+            for m in _MARKER.finditer(raw):
+                d["scanned"]["markers"] += 1
+                tgt = _normalise_target(m.group(1))
+                if tgt.lower() == "wontfix" or not _ID_SHAPE.match(tgt):
+                    continue
+                d["scanned"]["id_targets"] += 1
+                targets.append((rel, lineno, tgt, raw.strip()[:160]))
+    corpus = "\n".join(nonmarker_blobs)
+    for rel, lineno, tgt, excerpt in targets:
+        # An id EXISTS if it occurs anywhere in the corpus on a line that is not itself a marker
+        # line.  Occurrence-based is the literal reading of the criterion and is robust to
+        # heading-style drift; enumerating declaration forms was measured INERT.
+        if re.search(r"(?<![A-Za-z0-9_-])" + re.escape(tgt) + r"(?![A-Za-z0-9_-])", corpus):
+            continue
+        d["findings"].append({"kind": "orphan_disposition", "file": rel, "line": lineno,
+                              "id": tgt, "excerpt": excerpt})
+    d["findings"].sort(key=lambda f: (f["file"], f["line"], f["kind"]))
+    if d["scanned"]["files"] == 0:
+        d["status"] = "AUDIT-ERROR"
+        d["reason"] = "no .md files under specs_root: " + d["specs_root"]
+    elif d["unreadable"]:
+        d["status"] = "AUDIT-ERROR"
+        d["reason"] = "unreadable spec file(s): " + ", ".join(d["unreadable"][:5])
+    elif d["scanned"]["markers"] > 0 and d["scanned"]["id_targets"] == 0:
+        # A tokenizer that matched nothing must NEVER read as "no orphans" — that is the exact
+        # vacuity signature the rejected draft would have shipped green.
+        d["status"] = "AUDIT-ERROR"
+        d["reason"] = ("orphan tokenizer matched nothing: %d marker(s) but 0 id-shaped targets"
+                       % d["scanned"]["markers"])
+    elif d["findings"]:
+        d["status"] = "FINDINGS"
+    else:
+        d["status"] = "OK"
+    return d
+
+
+def emit(out, artifact_dir="/tmp"):
+    """Print, THEN write the artifact. Never raises, never exits."""
+    s = json.dumps(out, indent=1)
+    print(s)
+    try:
+        with open(os.path.join(artifact_dir, "mr_audit_%s.json" % out.get("slice", "?")), "w") as fh:
+            fh.write(s)
+    except Exception:
+        pass
 
 # ============================ SELFTEST (gating tests — lp-04) ============================
 # TESTER-AUTHORED, TDD RED PHASE. The implementer MUST NOT edit anything below this line to
 # fit a buggy implementation; a wrong expectation is corrected FROM THE SPEC/PLAN by the tester.
 #
-# Frozen contract (memory/projects/monster-realm-lp-04-plan.md AM1-AM16; spec
+# Frozen contract (memory/projects/monster-realm-lp-04-plan.md AM1-AM17; spec
 # M-loop-infrastructure.spec.md:224-253). Every name below must be defined ABOVE this section:
 #   parse_args(argv) -> dict                 today's :9-13 loop, verbatim
 #   mandatory_read_init(a) -> (bool, [str])  from --tier ALONE
@@ -86,6 +290,14 @@ finish()
 #   scan_dispositions(specs_root) -> dict    PURE; never touches `out`
 #   emit(out, artifact_dir="/tmp") -> None   prints, THEN writes; never raises, never exits
 # Until those exist this battery raises NameError. That IS the correct RED state.
+#
+# AM17 (adjudicated in from this battery's RED-phase report, so it is not in the plan file's
+# AM1-AM16 list): the single outer except handler SHALL also set out["mandatory_read"] = True
+# and append "advisory-inputs-unavailable" to out["read_reason"], without duplicating an entry
+# that is already there. Asserted by P10, P10h, G-exc and S3. The handler is NOT frozen — AM3
+# already requires it to change (it writes the renamed key) and :22-38 is the only block the
+# spec freezes; leaving it alone made a raised audit report "no mandatory read", which is the
+# silent proceed AM4 exists to close, reached through a different door.
 #
 # PLACEMENT REQUIREMENT: the `--selftest` dispatch that calls selftest() must sit AFTER this
 # section (i.e. at the very bottom of the block). Python binds names as execution reaches them,
@@ -170,6 +382,14 @@ def _st_run(argv):
     would swallow a missing/renamed implementation into a tidy `AUDIT-ERROR` and the whole P
     battery would pass against a tool that has no audit_gating at all — a vacuous green of
     exactly the class this file exists to prevent (A5).
+
+    The handler body is the AM17 shape the implementer must reproduce at :71-73. Note what that
+    means for the exception-path fixtures: the APPEND itself is mirrored here, so mr-selfcheck's
+    lp04-probe-directory-log is where that half actually bites. What P10/P10h/G-exc still prove
+    in process is everything around it and it is not small — that audit_orchestration really
+    raises on a directory instead of handling it locally, that mandatory_read_init really seeded
+    "hard-tier" before the try, that the seed is not lost, and that a successfully computed
+    orchestration block is not clobbered.
     """
     a = parse_args(argv)
     out = {"slice": a.get("slice", "?"), "tier": a.get("tier", "routine")}
@@ -184,6 +404,9 @@ def _st_run(argv):
     except Exception as e:
         out["orchestration"] = out.get("orchestration", {"verdict": "AUDIT-ERROR"})
         out["gating_advisory"] = {"verdict": "AUDIT-ERROR", "reason": str(e)[:200]}
+        out["mandatory_read"] = True                                        # AM17
+        if "advisory-inputs-unavailable" not in out["read_reason"]:
+            out["read_reason"].append("advisory-inputs-unavailable")
     return out
 
 
@@ -352,6 +575,9 @@ def _st_p_battery(chk, tmp, L):
     # same silent proceed AM4 closes for a typo'd --repo (G6), reached by a different door. The
     # :71-73 handler is not frozen — AM3 already requires it to change (it writes the renamed
     # key), and :22-38 is the only block the spec freezes.
+    # The append is mirrored in _st_run, so this pair's teeth are in mr-selfcheck's
+    # lp04-probe-directory-log against the real binary; what it pins HERE is that nothing
+    # upstream (a routine tier, a locally-handled orchestration error) suppresses it.
     chk.check("P10/mandatory_read", True, _st_get(out, "mandatory_read"),
               "AM17: an audit that raised is an audit that saw nothing; it must force the read")
     chk.check("P10/read_reason", ["advisory-inputs-unavailable"], _st_get(out, "read_reason"))
@@ -1185,4 +1411,33 @@ def selftest():
         return 1
     print("AUDIT-SELFTEST-OK %d" % n)
     return 0
+
+
+# ================================== MAIN (dispatch) ======================================
+# Placed LAST: python binds names as execution reaches them, so dispatch above the selftest
+# section would NameError on `selftest` itself.
+argv = json.loads(os.environ["A_ARGS"])
+a = parse_args(argv)
+if a.get("selftest") == "1":
+    # --selftest is a SEPARATE mode and may exit 1.  The rc=0-always contract covers audit runs;
+    # a gate wired to a mode that can never fail is a decoration, not a gate.
+    sys.exit(selftest())
+_mr, _rr = mandatory_read_init(a)
+out = {"slice": a.get("slice", "?"), "tier": a.get("tier", "routine"),
+       "mandatory_read": _mr, "read_reason": _rr}
+try:
+    # ONE shared try, unchanged from pre-lp-04: a log that cannot be read (a directory, say —
+    # the guard is os.path.exists, not isfile) takes the advisory half down with it, and that is
+    # the CONSERVATIVE behaviour.  Per-function error handling would quietly compute a CLEAN
+    # gating verdict from inputs nothing had successfully looked at.
+    audit_orchestration(a, out)
+    audit_gating(a, out)
+    out["disposition"] = scan_dispositions(os.path.normpath(os.path.join(os.environ["A_MEM"], "..", "..", "specs")))
+except Exception as e:
+    out["orchestration"] = out.get("orchestration", {"verdict": "AUDIT-ERROR"})
+    out["gating_advisory"] = {"advisory": True, "contract": ADVISORY_CONTRACT,
+                              "verdict": "AUDIT-ERROR", "reason": str(e)[:200]}
+    force_read(out, "advisory-inputs-unavailable")
+emit(out)
+sys.exit(0)
 PY
