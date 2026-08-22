@@ -3433,3 +3433,13 @@ entries (PLAN §9 / `M-loop-infrastructure.spec.md`) before assuming they're lau
 are currently empty on disk despite the "unblocked" note.
 
 
+## 2026-08-21T11:01:50Z — 2026-08-21T10:59Z native tick — lp-skills merged (PR#28)
+Reconciled the lp-skills EVENT (rc=0, opus, 77 turns, \$43.36; run finished during the prior tick's idle window and was queued as an unmerged .done). Live-reverified PR#28 (mdrewt/claude-harness) mergeStateStatus=CLEAN/MERGEABLE, session_leader 536918 confirmed dead, .done EXIT=0. mr-audit: policy CLEAN (no mandatory read), orchestration CLEAN (15 agent_calls, 8 roles: doc-keeper/general-purpose/planner/red-team/review-lens/reviewer/tester/verifier), gating_advisory CLEAN (0 removed/modified asserts, 0 skip markers, 0 suppressions). The corpus-scoped disposition scan flagged 13 pre-existing specs/ park-item findings — advisory-only per its own contract, unrelated to this diff, not a merge predicate; not actioned this tick. Diff (mr-brief-template.md +2/-1, mr-spawn +865/-32... net 834/33) matched declared touches: exactly — the run's own mid-pass Edit fixed two stale red-phase-preamble comments the tester flagged, verified via bash -n + SKILLS-SELFTEST-OK 19 fixtures before commit.
+
+Merged: gh pr merge --squash --delete-branch -> 0782294 (e52e51e..0782294). Harness repo has no GitHub Actions workflows (confirmed again) — local gate is the actual gate and was green pre-merge. Local main ff-only synced after stashing 7 pre-existing DIRTY-TREE-ADVISORY strays (future-prompts.md, monster-realm-handoff.md, mr-native-tick.sh, mr-state.json, mr-usage-daily.jsonl, spacetime-db-testing.md, M-postgate-fifteenth-review-residuals.spec.md — untouched, not mine, popped back cleanly post-merge). Worktree .claude/worktrees/lp-skills removed, local+remote branch feat/lp-skills-brief-skill-dispatch deleted, per-run lock released.
+
+lp-04 and lp-05 stale .done files (from mr_pass_lp-04.done, mr_pass_lp-05.done) were already fully reconciled and merged in earlier ticks (PR#27 -> e52e51e, PR#343 project-repo respectively per the ledger) — removed the stale flag files, no further action.
+
+Post-merge inflight is now empty. Governor NORMAL (d7=\$265.92/\$2783=10%, fable_ok=true). No composite launch this tick: deferred to keep this tick's scope to the merge reconciliation + verification above; next tick should pick the next unfinished lp-sequence slice per PLAN §9 (state.json queue has pre-drafted context for lp-01/lp-doc follow-ons — re-derive fresh from live ground truth, don't trust the queue blob's pass-vars without re-checking REPO-OUT-OF-SYNC / disjointness first). No BLOCKER.
+
+
