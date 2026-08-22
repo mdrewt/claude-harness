@@ -326,6 +326,7 @@ IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- 
 WRITES=$(find "$HARNESS" "$PROJ" -type f \
   -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' \
   -not -path '*/.claude/worktrees/*' \
+  -not -path "$HARNESS/.codegraph/*" \
   -not -path "$HARNESS/projects/monster-scraper/*" \
   -not -path "$HARNESS/memory/*" -mmin -6 2>/dev/null | head -1)
 # (worktrees are AGENT-owned by design — sibling fan-out writes are not human activity; retro 2026-07-24)

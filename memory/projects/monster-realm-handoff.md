@@ -273,6 +273,11 @@ and fully redundant with the working tree — harmless to leave, since a permiss
 **lp-skills / lp-brief-cost / lp-ollama / lp-06 / lp-git-workflow are unblocked** — their pre-staged
 `/tmp/mr_pass_*.vars.json` files are still valid; the next tick can `mr-spawn` normally.
 
+## 2026-08-22T12:03:30Z — 2026-08-22T12:00Z native tick — no eligible work, wave-1-exit gate still open
+Gate3 fresh derivation (queue[] empty): both repos fetched+synced, no open PRs, inflight/awaiting_merge empty, no wip:/parked branches, no active human session. **M-loop-infrastructure**: every Wave-1 slice merged except `lp-07` (`blocked:operator-attended`, touches ~/.claude/settings.json, out-of-repo — needs an attended session). Wave-2 slices (`lp-08`, `lp-10`, `lp-11`, `lp-11b`, `lp-registry`, `lp-spec-mode`, `lp-milestone-mode`, `lp-decision-block`, `lp-disjoint`, `lp-gitattr`, ...) stay ineligible: the spec's Wave-1-exit is a **measurement** gate (one full reset cycle of `seven_day.utilization` samples + `lp-02` non-degenerate variance over 5 slices + a forced-nightly-red drill opening exactly one issue + `lp-01`'s selftest RED demo), not merely 'all Wave-1 slices merged' — same finding as the prior tick (line 343), no new drill/variance evidence recorded since. **M-postgate-fifteenth-review-residuals**: `15r-sec-a`, `15r-sec-vis`, `15r-a2` all merged (project PRs #336-338); every remaining slice (`13r-c-2` onward) is itself `blocked:wave-2-exit`, so nothing there is launchable either. SDK bump (`stdb-281`, ADR-0197) confirmed committed on `master` (crate 2.8.1). Left untouched: pre-existing DIRTY-TREE-ADVISORY strays on harness `main` (future-prompts.md, mr-native-tick.sh, mr-usage-daily.jsonl, spacetime-db-testing.md, the fifteenth-review spec's uncommitted 'Delivered 2026-08-17' doc note, plus several untracked memory/ files) — not ours, not blocking. No BLOCKER raised: this is a time/measurement gate, not a Drew decision. Governor NORMAL (d7=$358.95/$2783≈13%, fable_ok=true). Mutex released, standing down for this tick.
+## 2026-08-22T11:16:29Z — lp-06 MERGED — mr-backup + stray-handoff rule
+PR #33 squash-merged to `main`@51073c8 (mdrewt/claude-harness). Delivered: `mr-backup` tool (snapshot/restore/diff for the durable ledger+handoff copy), a stray-handoff predicate added to `mr-selfcheck`, and `lp-06-teeth.sh` proof-of-teeth fixtures. mr-audit verdict CLEAN (orchestration CLEAN, gating-advisory CLEAN, mandatory_read=false; disposition findings were pre-existing corpus-wide spec-ledger gaps unrelated to this diff — not a merge predicate). Post-merge: fast-forwarded main, removed the lp-06 worktree + local/remote `feat/lp-06` branches, ran `mr-backup snapshot` to clear a transient post-merge backup-drift SELFCHECK-FAIL, re-ran `mr-selfcheck` -> SELFCHECK-OK. Governor NORMAL (d7≈$358/$2783≈13%, fable_ok=true). No composite launch this tick — inflight now empty but scope kept to the merge reconciliation; next tick derives the next slice fresh from PLAN §9 (queue[] is empty).
+
 ## 2026-08-22T11:12:34Z — lp-06 — mr-backup + stray-handoff rule: PR #33 open, gate green
 **lp-06 — PR #33 OPEN, local gate GREEN. Terminal state reached; supervisor owns the merge.**
 
@@ -450,34 +455,3 @@ brief resolves, re-derive vars for `lp-brief-cost`/`lp-ollama`/`lp-06`/`lp-git-w
 entries (PLAN §9 / `M-loop-infrastructure.spec.md`) before assuming they're launch-ready — their vars files
 are currently empty on disk despite the "unblocked" note.
 
-## 2026-08-21T08:00Z native tick (rid=native-20260821T080009Z-505506, src=cron forced)
-
-Fast-path/live re-verification: no live per-run locks, no chain-owner mutex held, no `.blocked-on-human`,
-no operator hold. Both outstanding `.done` files (lp-04, lp-05) are stale/already-reconciled by prior ticks
-(lp-04 = PR#27 merged to `mdrewt/claude-harness` origin/main at e52e51e; lp-05 = PR#343 merged to
-`mdrewt/monster-realm` at a5179ac) — confirmed live via `gh pr list`/`git log`, no action needed. lp-doc-a
-(PR#344, ADR-0202) also already merged (master 83c1204); its CI run for that push is `completed/success`
-(6m30s) — master CI is green, the `in_progress` entry in the situation bundle is the unrelated scheduled
-Nightly workflow, not a merge gate.
-
-**e78422d ("c0 base") still unresolved on the harness `main` checkout — re-confirmed, not re-escalated.**
-Same diverged local-only commit flagged at 02:57Z/04:00Z/06:03Z (author `lp04 fixture <lp04@fixture.invalid>`,
-not a `chore(mr-sup):` commit, diff reverts large chunks of `memory/projects/mr-audit` (-1468) and
-`memory/projects/mr-selfcheck` (-237) relative to `origin/main` — i.e. it would silently undo lp-04's
-audit-policy-split work if pushed/merged). Per constraints (never rebase, never force-push, never discard
-local work, never push a suspicious/unreviewed commit) it stays exactly as prior ticks left it: untouched,
-unpushed, unresolved. Per the 06:03Z tick's own note this needs Drew's eyes, not another supervisor
-re-flag — no new github issue opened this tick. `lp-skills`/`lp-brief-cost`/`lp-ollama`/`lp-06`/
-`lp-git-workflow` remain queued behind this resolution; their pre-staged vars files are untouched.
-
-No open PRs, nothing awaiting merge, nothing inflight. No monster-realm-repo slice is queued under the
-current operator-directed lp-sequence (harness-only work remains, and it's blocked). No new launch this
-tick. Governor NORMAL (d7=$220.68/$2783=8%, fable_ok=true). No BLOCKER beyond the standing e78422d risk.
-Mutex was not taken (no mutating action performed). Standing down.
-
-NEXT: resolve e78422d (Drew) to unblock lp-skills et al; re-verify master CI green on 83c1204 next tick
-(Nightly still in_progress at record time).
-
-
-## 2026-08-22T11:16:29Z — lp-06 MERGED — mr-backup + stray-handoff rule
-PR #33 squash-merged to `main`@51073c8 (mdrewt/claude-harness). Delivered: `mr-backup` tool (snapshot/restore/diff for the durable ledger+handoff copy), a stray-handoff predicate added to `mr-selfcheck`, and `lp-06-teeth.sh` proof-of-teeth fixtures. mr-audit verdict CLEAN (orchestration CLEAN, gating-advisory CLEAN, mandatory_read=false; disposition findings were pre-existing corpus-wide spec-ledger gaps unrelated to this diff — not a merge predicate). Post-merge: fast-forwarded main, removed the lp-06 worktree + local/remote `feat/lp-06` branches, ran `mr-backup snapshot` to clear a transient post-merge backup-drift SELFCHECK-FAIL, re-ran `mr-selfcheck` -> SELFCHECK-OK. Governor NORMAL (d7≈$358/$2783≈13%, fable_ok=true). No composite launch this tick — inflight now empty but scope kept to the merge reconciliation; next tick derives the next slice fresh from PLAN §9 (queue[] is empty).
