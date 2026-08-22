@@ -18,9 +18,9 @@
   "park_counters": {
     "14r-e": 1
   },
-  "consecutive_standdowns": 4,
+  "consecutive_standdowns": 5,
   "rate_limit_resets_at": null,
-  "notes": "2026-08-22T15:00Z native tick: fresh gate3 derivation -- no locks/mutex/open-PRs/inflight/queue, no active human session, mr-selfcheck SELFCHECK-OK, master CI green (Nightly + last CI runs success). M-loop-infrastructure Wave-1-exit still a measurement gate: lp-02 landed 2026-08-21T00:32Z, required one-full-reset-cycle has not elapsed, no drill/variance evidence since 14:00Z. M-postgate-fifteenth-review-residuals: remaining slices all blocked:wave-2/3/4-exit. Issue #342 record-and-ignore, not a gate. No BLOCKER. Governor NORMAL (d7=$362.25/$2783~13%, fable_ok=true). Standing down.",
+  "notes": "2026-08-22T16:00Z native tick: fresh gate3 derivation -- no locks/mutex/open-PRs/inflight/queue, no active human session, mr-selfcheck SELFCHECK-OK, master CI green (project 2290f47; harness has no CI workflow). M-loop-infrastructure Wave-1-exit still a measurement gate: lp-02 landed 2026-08-21T00:32Z, required one-full-reset-cycle (next Thu 20:00 ET) has not elapsed, no drill/variance evidence since 15:00Z. M-postgate-fifteenth-review-residuals: remaining slices all blocked:wave-2/3/4-exit. Issue #342 record-and-ignore, not a gate. No BLOCKER. Governor NORMAL (d7=$362.91/$2783~13%, fable_ok=true). Standing down.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
   "parked": [],
   "open_chore_prs": [],
