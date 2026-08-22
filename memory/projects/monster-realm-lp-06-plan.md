@@ -29,7 +29,7 @@ dynamic-dispatch case the routing doctrine says grep must cover.
 
 | File | Invoked by |
 |---|---|
-| `mr-record`    | `mr-native-tick.sh` (under `timeout 60`), `mr-launch.sh`, `mr-spawn`, `mr-selfcheck` (lp-02 + lp-queue fixture batteries), the supervisor prompt |
+| `mr-record`    | `mr-native-tick.sh` (under `timeout 60`), `mr-launch.sh`, `mr-selfcheck` (lp-02 + lp-queue fixture batteries), the supervisor prompt |
 | `mr-selfcheck` | `mr-native-tick.sh` (daily 24h-marker block), `lp-brief-cost-teeth.sh` (extracts a block by content anchor) |
 
 Two consequences: (a) `mr-native-tick.sh` is NOT in `touches:`, so the 2026-08-15 draft's tick-driven daily
@@ -453,3 +453,47 @@ behaviour.
 
 `mr-backup` ~200-260 lines · `mr-selfcheck` new block ~110-140 (v1's ~110-140 minus the manifest guard, plus
 the external round-trip probe and the laundering probe) · `lp-06-teeth.sh` ~350-450.
+
+---
+
+# 8. Delivered — what actually shipped, and what the second review round changed
+
+Plan v2 shipped essentially as designed. Three independent lenses then reviewed the CODE and produced
+two proven defects plus five hardening items, all closed in `b90030b`; the tester added two new
+anti-vacuity cases (`W8`, `W9`) that were RED until those fixes landed.
+
+| # | Finding (lens) | Status |
+|---|---|---|
+| CRITICAL | `mr-selfcheck` learned about `mr-backup`'s ROOT-SAFETY invariant only from the tool's own `--selftest` marker+count. Red-team stubbed `_root_illegal()` to `return None` and `selftest()` to a bare `print("BACKUP-SELFTEST-OK 11")`; the block still exited 0 — then drove that stub to `rmtree` seven real 8-digit directories out of a `$HOME`-shaped root. (red-team, PROVEN) | FIXED — new **external illegal-root probe** (check 4b) drives `mr-backup snapshot` against a bad-basename root and an in-git-tree root and asserts BOTH refuse AND neither root is created. Pinned by `W8`. |
+| HIGH | `_backup()`'s `communicate(timeout=10)` bounds waiting-for-data, not output VOLUME: a stub writing 64 KB/iteration to stdout ran **32.8 s and buffered 7.46 GB** against a documented 10 s ceiling the cron `timeout 60` depends on. (red-team, PROVEN) | FIXED — `stdout=subprocess.DEVNULL`, **stderr inherited** (no pipe at all), `p.wait(timeout=10)`. Re-measured against the same flooding stub: rc 0, elapsed exactly 10 s, row intact. Removing the pipes beats capping the read, and inheriting stderr puts `mr-backup`'s own diagnostics straight in the tick log. |
+| MAJOR | The static wiring check was `"mr-backup" not in record_text` — satisfied by the rationale COMMENTS beside the call sites, so deleting both `_backup(...)` calls passed it. (reviewer) | FIXED — anchored on the literal call expressions `_backup(LEDGER)` / `_backup(HANDOFF)`, naming which is missing. Pinned by `W9`. |
+| MED | `_prune` sorted `^\d{8}$` names lexicographically with no calendar check: `99999999` sorts newest, permanently steals a retention slot, is never pruned. (red-team, PROVEN) | FIXED — `datetime.strptime(name, "%Y%m%d")`; unparseable names are neither counted nor deleted (not ours to remove, not a day either). |
+| MINOR | `_prune`'s `rmtree(..., ignore_errors=True)` hid sustained deletion failures, so the root could grow unbounded with no signal. (reviewer) | FIXED — failures reported through `_err()`, still non-fatal. |
+| LOW | An interrupted `_copy` left a `<dst>.tmp.<pid>` orphan that `_prune` (directories only) never sweeps. (red-team, PROVEN) | FIXED — best-effort `os.remove(tmp)` on the exception path, then re-raise. |
+| LOW | The ignore-laundering probe tested two synthetic literals, so a `.gitignore` line `handoff.md` laundered a real `docs/handoff.md` past both check 1 and the probe. (red-team, PROVEN) | FIXED — a 3x4 grid of realistic basenames across the repo root, `memory/` and `docs/`, in one batched `git check-ignore --stdin` call. |
+| MAJOR (declined) | Author `docs/adr/0012-*.md` now rather than deferring. (reviewer) | **DECLINED, deliberately.** The supervisor allocated no ADR number to this slice (assigned number is literally `None`), and the loop's doc-aggregation rule is explicit that a slice never self-assigns one — that rule exists to stop concurrent siblings colliding on the ADR index. The four non-obvious calls ship as load-bearing tool-header rationale (this corpus's de facto pattern) and the ADR is carried as a PR/handoff follow-up awaiting an allocated number. |
+| MINOR (declined) | Cut the redundant `S2-path`/`S4-path` sub-assertions. (`/simplify`) | Declined — `/simplify` itself rated it "not worth churning at this point in the slice", and they are tester-owned. |
+
+**Independently reproduced by the verifier** (copies under `/tmp`, production untouched): the stray-handoff
+RED/green flip, the B0 byte-for-byte restore, and both `W8`/`W9` stub mutations still biting.
+
+**T9 done on real data.** `mr-backup snapshot` seeded `~/.local/state/mr-backup/20260822/` with the live
+562,127-byte ledger and the 71,876-byte handoff — the ledger's **first recoverable copy since
+2026-07-24** — and `restore` into a temp dir `cmp`s byte-identical against the live file. That seeding is
+also what keeps the drift check green on the day it ships: without it, `mr-selfcheck` at the main
+checkout would correctly RED with "the ledger has NO recoverable copy".
+
+**Final sizes:** `mr-backup` 375 · `mr-selfcheck` lp-06 block 231 · `mr-record` +85 · `lp-06-teeth.sh` 945
+(37 cases). Over the plan's targets; the excess is the mandated WHY headers, the 11-fixture battery, and
+the four checks the review round added — no cut item was rebuilt (verified by grep: `flock`, `manifest`,
+`status`, `--at`, `sha256`, `mtime` appear only in the header's own "DELIBERATELY NOT BUILT" list).
+
+**Follow-up flags (outside `touches:`, NOT actioned here):**
+- **lp-06a** — `memory/monster-realm-handoff.md` is a TRACKED wrong-path handoff (1,781 bytes, committed by
+  `e3b6b29`). Its content is native-tick entries that belong in `memory/projects/`. The new rule is green
+  against it by design (the `untracked` clause); a `git rm --cached` would make it untracked and fire the
+  gate immediately.
+- **ADR** — needs a supervisor-allocated number; `docs/adr/` holds 0001-0011 and the harness has no
+  next-free SSOT (monster-realm does).
+- `memory/projects/mr-native-supervisor-README.md` does not mention `mr-backup`. Outside `touches:` —
+  flagged, not touched.
