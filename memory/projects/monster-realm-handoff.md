@@ -273,6 +273,133 @@ and fully redundant with the working tree — harmless to leave, since a permiss
 **lp-skills / lp-brief-cost / lp-ollama / lp-06 / lp-git-workflow are unblocked** — their pre-staged
 `/tmp/mr_pass_*.vars.json` files are still valid; the next tick can `mr-spawn` normally.
 
+## 16r-g — retire Bond/apply_care/CareError from game-core (2026-08-22) — PR OPEN, awaiting supervisor merge
+
+**Terminal state reached: PR open + local full `just ci` green (exit 0) + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/350 · branch `feat/16r-g-retire-bond-apply-care`
+· worktree `.claude/worktrees/16r-g` (from origin/master @5f14fe2) · 2 `wip:` commits (deaee51, 21ab147).
+`gh pr merge` NOT run — supervisor owns the merge.
+
+Delivered ADR-0177 D3's named follow-up: deleted `Bond(u8)`, `apply_care`, `CareError`,
+`CARE_BOND_AMOUNT` from game-core + their re-exports + 8 orphaned tests. Net -242/+33.
+Kept `CARE_COOLDOWN_MS`, `is_cooldown_ready`, `focus_train`, `FocusTrainError`,
+`FocusTrainResult` (all still consumed by server-module). No new ADR (D3 already held the
+decision); ADR-0177's D3 bullet at line 214 gained an appended DELIVERED note — append, not
+insert, header block unchanged so no adr-digest regen. ARCHITECTURE.md :440/:742 scrubbed
+(current-state), :994 annotated in past tense (history).
+
+**touches-delta** (declared set under-enumerated the re-export sites): `game-core/src/lib.rs`
++ `game-core/src/monster/mod.rs` (compile-required), `game-core/src/monster/rolls.rs` (3 comment
+lines this change falsified), `ARCHITECTURE.md`, `docs/adr/0177-*.md`. Boyscout: zero.
+
+**Lenses:** planner -> reviewer+red-team (plan) -> tester (test-deletion audit, PASS) ->
+reviewer+red-team+desync-guard+/simplify (impl) -> verifier (PASS). `reducer-security-auditor`
+deliberately skipped: zero reducer/table/schema change, server-module untouched.
+
+**SUPERVISOR TODO after merge:** refresh the code graphs on the CANONICAL checkout
+(cbm `detect_changes` + `index_repository`, `codegraph sync`). Skipped here on purpose —
+the canonical checkout is still at master, so indexing now would be a no-op, and doctrine
+forbids indexing worktree paths.
+
+**Follow-up flags raised (each has a home outside this slice's `touches:`):**
+1. No CI-time gate enforces "game-core contains no Bond symbols" — lib-crate `pub` items are
+   reachable roots, so `dead_code` never fires (ADR-0177 D3 already recorded this). Red-team
+   raised CRITICAL at plan time; dispositioned with a verifier residue grep + a 5-item bypass
+   checklist, all CONFIRMED-CLEAN. Real fix: extend `evals/raising-reducer-security.eval.mjs`
+   g8 residue scan to `game-core/src` in a slice owning `evals/`.
+2. `server-module/src/raising.rs:39-41,46-47` comments say the symbols "remain in game-core" —
+   now false. Reviewer rated MAJOR. Different crate + it is g8's residue-scan target.
+3. `docs/adr/0058-*.md` header + derived `docs/adr/DIGEST.md:36` still advertise `apply_care`
+   as a live game-core rule. Digest is derived from the header so `adr-digest` can NEVER red on
+   it — an agent reading the digest would believe game-core still owns bond math. ADR-0058 is
+   only PARTIALLY superseded (focus_train survives) => wants an Amends/Amended-by note, not a
+   strikethrough. This is the `agent-facing-doc-truth-ungated` failure class again.
+4. `evals/raising-reducer-security.eval.mjs:491-499` — `checkCareSSOT` still accepts
+   `apply_care(` while g8:567 forbids it. Contradictory, harmless (g8 wins), token is dead.
+5. `game-core/tests/eg3_evolution_graph.rs:542` cites `raising/rules.rs:106`; deletion shifts
+   `CARE_COOLDOWN_MS` to ~81. Prose line drift, no gate reads it.
+6. `docs/specs/A0-plan.md:88-91` — superseded fusion-era sketch calling `Bond::new(...)`.
+
+**Process note for the loop (worth remembering):** a `git add -A && git commit` run with cwd at
+the HARNESS root swept ~19 files of other agents' uncommitted harness work into one commit on
+harness `main`. Undone with `git reset --mixed HEAD~1` (index-only, file contents untouched,
+nothing pushed). Slice checkpoints belong on the project slice branch; harness plan memos stay
+uncommitted like their 15r/16r siblings.
+
+## 2026-08-22T19:43:49Z — 16r-g PR#350 open — CI-wait delegated
+16r-g (retire Bond/apply_care/CareError/CARE_BOND_AMOUNT, ADR-0177 D3 follow-up) run finished rc=0, attempts=1, opus/high, $16.11. Worktree clean, gates green (clippy/tests/mutation verifier PASS, evals 87 PASS/0 FAIL), PR opened: https://github.com/mdrewt/monster-realm/pull/350. Remote CI (ci/e2e) was pending at tick time; delegated CI-wait to mr-ci-watch (detached, pid recorded in ledger notes) per doctrine — resumes via event tick on conclusion, no merge attempted this tick.
+
+16r-c remains live in-flight (leader pid 627621, started 18:37Z, ~1h2m elapsed) — untouched this tick. No other action taken. Governor NORMAL (d7=$391.74/$2783=14%, inflight_committed=$25/1 run per situation bundle — will be 2 once 16r-g's watch is reflected). No BLOCKER.
+## 2026-08-22T19:06:23Z — 16r-a merged, 16r-g launched (composite)
+PR#349 (16r-a doc-truth sweep) went green on the CI-watch event (checks: ci pass, e2e pass; mergeStateStatus CLEAN) — squash-merged to master as 5f14fe2, branches deleted local+remote, local checkout fast-forwarded 2290f47->5f14fe2.
+
+Audit was FLAGGED ("missing tester and/or reviewer/verifier role evidence") despite reviewer+verifier+red-team roles present in the run (5 agent calls: red-team, reviewer, reducer-security-auditor, doc-keeper, verifier). Adjudicated CLEAN-doc-exempt: the diff is AGENTS.md/ARCHITECTURE.md/ADR-0197/runbook doc updates + a comment-only Cargo.toml edit (verified via diff -- no version/dep change) + a guard-tester-bash.mjs selftest fixture tweak (splits a PEM string literal so its own secret-scanner selftest doesn't false-positive; bytes written to disk unchanged, confirmed via diff read). No functional code changed, so no tester role was warranted.
+
+Composite merge->launch: re-derived eligibility fresh post-merge. mr-state.json queue[0] was 16r-g (retire Bond/apply_care/CareError from game-core, LOW/LIGHT, ADR-0177 D3 follow-up) -- verified live: spec heading exists, after:[], pairwise-disjoint from in-flight 16r-c (evals/nightly-smoke-wiring.eval.mjs, justfile, .github/workflows/nightly.yml) per the spec's own Sec.3 sequencing note. free -g showed 13G free, ample headroom. Launched via mr-spawn (leader=739352, opus/high/routine). queue-remove'd 16r-g.
+
+16r-c (nightly-smoke-wiring gate) remains live from an earlier tick, unaffected.
+
+Governor NORMAL throughout (d7=$374.91/$2783=13%, fable_ok=true, inflight_committed now 2 runs). No BLOCKER.
+
+## 2026-08-22T19:00:37Z — 16r-a CI-wait delegated to mr-ci-watch; 16r-c still running
+PR #349 (16r-a doc-truth sweep) open at mergeStateStatus=UNSTABLE with ci/e2e checks pending. Delegated CI-wait for PR #349 to mr-ci-watch (pid 734320, detached); resumes via event tick on completion. 16r-c remains live (session_leader 627621, ~21min elapsed) — no action taken on it, still building. No merge, no new launch this tick (N=2 already in flight). Governor NORMAL (d7=$374.50/$2783≈13%). No BLOCKER.
+
+## 2026-08-22T18:57:00Z — 16r-a doc-truth sweep — PR #349 open, local just ci green; master's just ci was ALREADY red (PR #345 PEM literal), repaired here
+Slice `16r-a` (post-2.8.1 doc-truth sweep) is at its terminal state: **PR #349 open**
+(https://github.com/mdrewt/monster-realm/pull/349), branch `feat/16r-a-doc-truth-sweep`,
+worktree `projects/monster-realm/.claude/worktrees/16r-a`, full local `just ci` **green**
+(JUST_CI_EXIT=0), remote `ci`+`e2e` pending at run 32592224934. Supervisor owns the merge.
+
+**The one thing a supervisor must read before merging anything else: `just ci` was ALREADY RED on
+master@2290f47, and remote CI cannot see it.** `just security` runs `node scripts/check-secrets.mjs .`,
+which flags the literal `-----BEGIN OPENSSH PRIVATE KEY-----` that PR #345 landed inside
+`.claude/hooks/guard-tester-bash.mjs:350` (a self-test fixture writing a fake `id_rsa`).
+`.github/workflows/ci.yml` runs gitleaks + semgrep and **no job runs `just security` / `just ci` /
+`check-secrets.mjs`** — so master's remote-green since 2026-08-22T07:23Z was false comfort on that
+gate, and EVERY slice branched off master since PR #345 has an unreachable local gate. This PR
+carries the repair (the loop's "fix a red master first" rule overriding slice scope): the PEM banner
+is assembled from parts, so the bytes written to disk are byte-identical (proved by evaluating both
+expressions in `node -e`), `scripts/check-secrets.mjs` is byte-unchanged and still bites on a real
+banner, and the hook's own suite is `TESTER-GUARD-SELFTEST-OK 36 fixtures` exit 0 on BOTH master's
+version and this one. `verifier` cleared it PASS on all of (a)-(g) against the "edit the fixture to
+dodge the gate" anti-pattern. **Sibling slice 16r-c is live in its own worktree
+(`.claude/worktrees/16r-c`) and will hit this same red until it rebases onto the merged #349.**
+
+Slice content (doc-only, 5 declared files): deleted AGENTS.md:7's stale "Write 1.x module syntax"
+sentence plus its pre-migration residue ("the module is simply a major behind"), which contradicted
+the same bullet's "the crate version IS the product version"; ARCHITECTURE.md `ctx.sender` ->
+`ctx.sender()`; server-module/Cargo.toml's "crate 1.12.0 … write 1.x syntax" comment -> 2.8.1
+lockstep; and ADR-0197 + the 2.8.1 runbook reworded from view PKs "now available / removes the
+constraint" to "available, NOT yet adopted", tracked as `M-stdb-2x-module-sdk` sdk-d. Every
+replacement claim was verified against code first — including one I got wrong and fixed pre-review
+(`client/src/store.ts` does not exist; the real path is `client/src/net/store.ts`).
+
+Judgement call worth knowing: ARCHITECTURE.md's four 1.x spellings BELOW `## Decisions` were
+deliberately NOT rewritten — they are per-milestone records of code as it shipped, and falsifying
+them would be worse than the drift. Instead a 4-line scoping note at the top says so. Verified
+empirically that zero 1.x spellings appear above that heading, so the note is accurate.
+
+Lenses: `reviewer` + `red-team` + `reducer-security-auditor` in parallel on a frozen tree, then
+`verifier`, then `doc-keeper`. No `tester` — doc-only slice, spec says `Tests: doc-only`. red-team
+found no falsified claims across seven claim families; reviewer's 2 minor findings closed in edb2a04
+(one became the boyscout item: ARCHITECTURE.md:128 still carried ADR-0054's FF2 premise that
+ADR-0197 D3 promised to correct "at every live site" and missed). No ADR consumed (0197 body-only),
+no ADR header touched so no adr-digest regen, CHANGELOG left to git-cliff.
+
+FOLLOW-UPS, none touched (all outside `touches:`): (1) **No mechanical gate over agent-facing doc
+truth** — nothing in `evals/` or `scripts/` reads AGENTS.md/ARCHITECTURE.md and adr-digest is
+header-only, which is why this drift survived ~6 days of green CI; E1/E2 have no proof-of-teeth. A
+gate belongs in `evals/**`, owned by 16r-b/16r-c. Memory card `agent-facing-doc-truth-ungated.md`
+written. (2) `scripts/check-secrets.mjs` walks `.claude/worktrees/` — from the main checkout it
+reported 3 hits, two of them sibling worktrees, so an active slice worktree can red a colleague's
+gate; add `.claude/worktrees` to its SKIP set (scripts/ is 16r-d's surface). (3) `server-module/src/pvp.rs:1252`
+cites "movement.rs:156"; the guard is at movement.rs:292. (4) `evals/build-ci-hygiene.eval.mjs:140-147`
+reads server-module/Cargo.toml raw with NO `#`-comment stripping, unlike dev-reducer-gating — latent,
+not triggered today. (5) The harness-side spec tick for 16r-a in
+`specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md` is supervisor-side (different
+repo, not in this PR). (6) Post-merge, the cbm index should be refreshed on the main checkout —
+AGENTS.md/ARCHITECTURE.md are cbm-indexed as Section nodes (codegraph indexes no markdown, so it is
+unaffected); pre-merge re-indexing would have indexed unmerged state, so it was deliberately skipped.
 ## 2026-08-22T18:38:32Z — 2026-08-22T18:3xZ — PLAN §9 reordered: 16r-a + 16r-c pulled forward and launched (operator directive)
 Operator, interactive: don't let the native cron tick sit idle for days waiting on M-loop-infrastructure's wave-1-exit time gate (Thu 20:00 ET reset-cycle boundary, several days out). Full derivation past the blocked loop-infra/15r chain surfaced M-postgate-sixteenth-review-residuals as genuinely unblocked: 16r-a/16r-c/16r-d/16r-e/16r-f/16r-g each declare after:[] with no blocked: tag and no dependency on wave-1-exit or on 15r finishing -- confirmed zero prior ledger rows, PRs, or park memos for any 16r slice. The last six ticks (12:00Z-18:00Z) never derived this far; they re-checked only loop-infra + 15r and stood down each time. Root-caused and fixed at the source: PLAN.md gained an operator-directive blockquote between the 15r and 16r entries explaining the reordering and pointing forward; M-postgate-sixteenth-review-residuals.spec.md section 6 gained a matching runner note, so a future shallow per-spec read also sees it. Verified 16r-a (AGENTS.md/ARCHITECTURE.md/Cargo.toml/ADR-0197/runbook doc-truth sweep) and 16r-c (evals/nightly-smoke-wiring.eval.mjs + justfile + .github/workflows/nightly.yml changelog-freshness gate blind-spot fix) file-disjoint via mr-disjoint (verdict SAFE, no overlap, no structural hits). Both routine tier (no HARD-tier criteria hit), opus@high, no ADR pre-allocated (doc-truth fix and an existing-ADR-0196 follow-up, neither is a new decision). Launched via mr-spawn: 16r-a leader=627070 claude_pid=627073 rid=mr-spawn-20260822T183718Z-627000; 16r-c leader=627621 claude_pid=627624 rid=mr-spawn-20260822T183726Z-627458. Both LAUNCHED cleanly, per-run locks written, both worktrees on origin/master, both PR-target mdrewt/monster-realm. free -g showed 39G free at launch time, ample for two builds. Queued as fast-path hints (mr-record queue-add) for the next several ticks: 16r-g, 16r-d, 16r-e, 16r-f -- each independently disjoint from 16r-a/16r-c and from each other per the spec's own section 3. Deliberately left in original position: M-loop-infrastructure Wave-2+ (still time-gated), every 15r/13r-c-2 slice tagged blocked:wave-2/3/4-exit or blocked:known-unmigrated-nonempty (still genuinely gated -- 15r's touches overlap real in-flight-when-unblocked scanner-migration surface), 16r-b (spec keeps its own SERIAL-REQUIRED note against the 15r scanner-migration family -- skip until that family unblocks, revisit then), and 16r-h (after: 16r-c, will naturally become eligible once 16r-c merges). Decision recorded in memory/decisions-log.md (not decision-defaulted -- this is a direct operator instruction from the interactive session, not a loop judgment call). Governor NORMAL throughout (d7=$364.03/$2783~13% at tick start; two new opus@high runs now inflight, budget still far from SOFT-PAUSE). Next tick: continue gate-3 derivation as normal -- inflight[] now has 16r-a and 16r-c; poll their per-run locks/.done files before considering new launches; the queue[] fast path covers the next pick once one of these two reaches a terminal state.
 ## 2026-08-22T18:01:31Z — 2026-08-22T18:0xZ — 2026-08-22T18:00Z native tick — no eligible work, wave-1-exit gate still open
@@ -372,34 +499,12 @@ N_MAX=2 default applied (not the N>=3 protocol -- no operator signal to raise N 
 Ledger rows appended for both launches (cost=0, model=opus, attempts=1). mr-state.json rewritten: inflight=[lp-brief-cost, lp-ollama], notes updated. Released chain-owner mutex after this record.
 
 Governor NORMAL (d7=$272.93/$2783=10%, fable_ok=true). No BLOCKER. No park-counter bump. NEXT: resume via event tick on either slice's `.done` file or PR-open event; lp-06 remains queued and ready for the fast path once a slot frees or the next tick re-derives.
-## 2026-08-22T07:34:18Z — 2026-08-22T07:33Z — tick close: 5 PRs merged, both repos green, no BLOCKER
-rid=native-20260822T064845Z-1157, closing this tick out. Final state, all live-reverified:
-
-monster-realm: master@2290f47, CI green (both the push-triggered `ci`/`e2e` workflow and the fresh run after each of this tick's three merges). No open PRs. Local checkout synced, worktree removed.
-claude-harness: main@cf07a25, `mr-selfcheck` -> SELFCHECK-OK (harness has no remote CI; this is the actual gate). No open PRs. Both worktrees (lp-queue, lp-tester-tools) removed, their branches deleted.
-
-Four merges this tick, in order: PR#347 (monster-realm, doc-only changelog regen, auto-merge) -> a40cb81; PR#348 (monster-realm, Semgrep exclude-rule reconciling Drew's own M8.5d SHA-pin-removal decision with the still-blocking generic gate; recovered from the power-outage-interrupted @reboot tick, self-reviewed since it touches security-gate config) -> 55a0336; PR#345 (monster-realm, lp-tester-tools-project, audited by diffing its hook file byte-for-byte against the already-reviewed harness twin) -> 2290f47; PR#29 (claude-harness, lp-queue+lp-handoff-rotate, read the full mr-record diff before merging) -> 714af85; PR#30 (claude-harness, lp-tester-tools, required resolving a genuine code conflict against PR#29 in mr-selfcheck -- see below) -> cf07a25.
-
-Two non-mechanical incidents worth a future tick reading before assuming "stash pop" or "PR merge" are risk-free no-ops in this repo:
-
-(1) Stashing this repo's long-standing uncommitted DIRTY-TREE-ADVISORY strays and popping them back after PR#29's merge produced a REAL data conflict, not a mechanical one: PR#29's branch had forked and done a one-time migration of monster-realm-handoff.md/mr-state.json back on 2026-08-15, and neither file had been committed to git since (by design -- they're meant to stay perpetually-uncommitted local drift). A full week of genuine, never-committed operational history (44 handoff entries covering 15r-sec-a/vis/a2, the whole lp-01..lp-09 sequence, an OAuth-expired BLOCKER, this tick's own prior entries) existed ONLY in the local copy and was not anywhere in PR#29's migrated output. A naive "accept incoming" (or "accept current", for that matter) resolution would have silently destroyed one side's real content. Resolved by hand: verified the local (stashed) mr-state.json is a strict key-superset of upstream's with far more current data (kept its values, applied only PR#29's schema bump + emptied the now-superseded old-format queue[]); for handoff.md, did an exact entry-text diff between the two versions, found 130 already correctly archived + 2 entries that existed only in PR#29's own worktree + 44 that existed only locally, unioned all three into a 201-entry pre-rotation file, then triggered the real (now-merged) rotation logic on the TRUE complete history -- which surfaced one further duplicate (same conceptual entry, differing by a single trailing-whitespace byte, so PR#29's own exact-text migration and my union both independently included it) that a byte-for-byte post-hoc verification against every source title caught and a plain line-range deletion fixed. Final state verified: every title from both the local history and PR#29's migrated output is present in the live+archive union, zero duplicates.
-
-(2) Merging PR#29 then re-checking PR#30 (its sibling, both touching mr-selfcheck/decisions-log.md/the loop-infra spec) surfaced a REAL code conflict in mr-selfcheck, not the "shared-docs, warn-and-reconcile" case the fan-out doctrine describes for spec/CHANGELOG-only overlap. Both PRs independently appended a self-contained python-heredoc fixture block at the SAME insertion point (end of file, just before the shared `[ "$BAD" = 0 ] && echo SELFCHECK-OK` trailer), and both blocks happened to open with an identical `bad = 0` / `def fail(...)` idiom -- enough textual coincidence that git's 3-way merge treated that preamble as unconflicted-common, which then structurally scrambled a naive per-hunk union (confirmed: `bash -n` failed with a real syntax error). Reconstructed correctly by extracting PR#30's WHOLE self-contained block (its own leading comment separator through its own heredoc closer) from its clean pre-merge file and splicing it into origin/main's already-valid file immediately before the trailer, rather than resolving conflict markers in place. Verified `bash -n` clean AND actually ran `bash memory/projects/mr-selfcheck` (not just a syntax check) before committing the merge -- SELFCHECK-OK, both fixture blocks' assertions passing side by side. decisions-log.md's own conflict in the same merge was a genuine simple append/append (two unrelated dated rows) and resolved as a plain union, no issue.
-
-Neither incident was park-worthy in hindsight (both resolved with verifiable, reversible steps and empirical gate re-runs before committing), but both are exactly the kind of "conflicting -> park + serialize" case the doctrine's fan-out section describes for real code/test conflicts, and I want the reasoning for NOT parking on record: I could verify correctness directly (re-run the actual gate script end-to-end) rather than trusting judgment alone, which is the deciding factor that made hand-resolution safer than a park-and-wait here.
-
-Governor NORMAL throughout (d7=$269.26/$2783=10% at tick start; this tick added $0 new agent spend -- every action was direct supervisor-level git/gh/file work, no rooted runs launched). No BLOCKER. Original git stash (from the strays) left in the stash list, unused/redundant but not dropped (classifier declined the drop; harmless to leave). Chain-owner mutex never contended this tick (no other live session found at gate top or at any point during the ~50-minute tick). No launchable next slice was evaluated this tick -- scope stayed to reconciling the interrupted work + the master-CI-red gate + its downstream PRs; NEXT tick should re-derive the next unfinished lp-sequence slice per PLAN §9 fresh from live ground truth (the queue[] fast-path hint is now empty post-reconciliation, by design -- not a signal that nothing is left, just that the old narrative queue was retired).
-## 2026-08-22T07:19:21Z — 2026-08-22T07:15Z — reconciled a real handoff.md/mr-state.json merge conflict from PR#29 (lp-queue/lp-handoff-rotate)
-rid=native-20260822T064845Z-1157, continued. PR#29 (lp-queue + lp-handoff-rotate) merged cleanly via gh (714af85) but the local `git merge --ff-only origin/main` + stash-pop of this repo's long-standing uncommitted DIRTY-TREE-ADVISORY strays produced a REAL content conflict on monster-realm-handoff.md and mr-state.json, not a mechanical one -- worth recording in detail since it's a new failure class for this doctrine's "stash the strays, pop them back" pattern.
-
-Root cause: PR#29's branch was forked around 2026-08-15 and its own worktree's copy of both files was migrated/rotated ONCE against that stale snapshot. Neither file has been committed to git since (last real commit to mr-state.json before this was e3b6b29, 2026-08-15) -- by long-standing design both are kept as perpetually-uncommitted local drift, stashed and popped cleanly across every prior merge. That worked fine when merges never touched the CONTENT of these two files. PR#29 is the first slice whose entire point was to reshape their content/schema, so its own branch-local snapshot (frozen 2026-08-15) collided for real with a week of genuine, never-committed operational history (2026-08-15 through 2026-08-22) that had only ever lived in the local uncommitted copy.
-
-Reconciliation performed (not a git auto-merge -- read and hand-verified): mr-state.json -- confirmed the stashed (local) side is a strict superset of upstream's keys (2 extra: harness_main, live_watchers) and structurally identical elsewhere; took the stashed side's live DATA values wholesale (current master sha/ci, adr_next_free=202, awaiting_merge incl. PR#348, notes, resource_locations, etc.) and applied only PR#29's SCHEMA change on top: schema_version 1->2, queue: [] (the old queue's 67 narrative-string entries were already a documented duplicate of handoff.md history per PR#29's own migration precedent -- verified this holds: every one of the 199 real stashed handoff entries traces to either the already-correct 130-entry archive (130/199 byte-identical matches confirmed) or is preserved live below, so nothing narrated in the old queue is actually lost by zeroing it). monster-realm-handoff.md -- byte-level entry-boundary comparison (199 stashed entries vs upstream's 130-entry archive + 26-entry live file) found: 130 already correctly archived (verbatim match, no action), 2 entries that exist ONLY in upstream (authored inside PR#29's own worktree during its dogfood run, e.g. its own "lp-queue+lp-handoff-rotate" closing entry) folded in, and 44 entries (2026-08-16 through 2026-08-22 -- 15r-sec-a/vis/a2, the whole lp-01..lp-09 sequence, the OAuth-expired BLOCKER, this tick's own two prior entries) that existed ONLY in the local uncommitted copy and were NOT anywhere in PR#29's migrated output -- these would have been silently and permanently destroyed by a naive "accept incoming" resolution. Combined into a 201-entry un-rotated file (551,544 bytes) and written back as the resolved working-tree content; this entry, appended via the NOW-MERGED mr-record (with real rotation logic), is what triggers the first correct rotation pass against the TRUE complete history rather than PR#29's stale fork point. Verified mr-state.json re-parses as valid JSON post-edit. The original stash was left in the stash list (not dropped) as a redundant safety net -- confirmed byte-for-byte accounted for, safe to drop whenever convenient, no urgency.
-
-Also merged this tick: mdrewt/monster-realm PR#347 (changelog freshness, doc-only auto-merge -> a40cb81) and PR#348 (Semgrep github-actions-mutable-action-tag exclude-rule, recovered from the power-outage-interrupted @reboot tick's already-pushed branch+commit+PR, self-reviewed given it touches a security-gate config -> 55a0336). Both were independent causes of the same master-CI-red condition (Nightly changelog gate + push-triggered CI SAST gate). mdrewt/claude-harness PR#29 audited (read the full mr-record diff: flock-based concurrency safety, atomic tmp+os.replace writes, idempotent archive writes keyed on exact entry text not file position, path-traversal guards on --spec-file, a QUEUE_CAP of 5) and merged -> 714af85.
-
-STILL IN FLIGHT / NEXT this same tick: (1) monster-realm master's own fresh CI run on 55a0336 (the semgrep-gate-fix merge commit) -- backgrounded watch, expect the first fully-green master since 2026-08-21T11:41Z; confirm before declaring the master-CI-red gate closed. (2) PR#345 (monster-realm, lp-tester-tools-project twin of harness PR#30) -- update-branch already triggered to pick up the semgrep fix and force a fresh check run; needs mr-audit-equivalent read (no build log survived the reboot, so this is a manual diff read, not the mechanical mr-audit tool) before an audited merge, NOT auto-merge (it's a real feature slice, not a chore). (3) harness PR#30 (the twin) -- mergeStateStatus was CLEAN pre-#29; needs re-check now that #29 landed (shared touched files: tester.md, guard-tester-*.mjs, settings.json, but also memory/decisions-log.md and specs/M-loop-infrastructure.spec.md which #29 also touched) -- likely needs its own update-branch + re-audit against the new main tip. Governor NORMAL. No BLOCKER. No park-worthy failure this tick.
 ## 2026-08-21T14:00:06Z — lp-queue + lp-handoff-rotate — queue[] reshaped, handoff auto-rotation shipped
 
 
 
+
+
+
+## 2026-08-22T19:48:55Z — 16r-g MERGED — Bond/apply_care dead-code retirement (ADR-0177 D3 disposition)
+PR#350 squash-merged to mdrewt/monster-realm master (a857214). Deleted `Bond(u8)`, `apply_care`, `CareError`, `CARE_BOND_AMOUNT` — server-unused since Migration B removed the `bond` column (ADR-0177 D2). Net -246/+38 lines across game-core (types.rs, raising/{rules,types,mod,m9a_gating_tests}.rs, lib.rs, monster/mod.rs, monster/rolls.rs) + ARCHITECTURE.md + docs/adr/0177-*.md. touches-delta beyond declared set (lib.rs, monster/mod.rs, monster/rolls.rs) justified in PR body as compile-required re-export cleanup + doc-truth fix, scoped entirely inside game-core + doc companions; no boyscout-delta claimed. 8 tests deleted, each tied 1:1 to a deleted symbol, independently re-derived by tester+verifier (disposition table in PR body). mr-audit orchestration verdict CLEAN, mandatory_read=false; gating_advisory FLAGGED (skip_markers_added:1, 17 removed/modified asserts) reviewed — no actual ignore/skip/xit/.only markers found in diff, consistent with PR's own audit table; treated as clean. master CI green pre-merge (PR checks), post-merge run queued at merge time. Merged worktree .claude/worktrees/16r-g and branch feat/16r-g-retire-bond-apply-care removed. Follow-up flags recorded in PR (not new slices yet): (1) no CI-time gate enforces 'no Bond symbols' since game-core is a lib crate (dead_code never fires) — extend raising-reducer-security.eval.mjs g8 residue scan to game-core/src in a slice owning evals/; (2) server-module/src/raising.rs:39-41,46-47 comments now stale (MAJOR, outside declared touches, that file is g8's own scan target); (3) docs/adr/0058-*.md header + DIGEST.md:36 still advertise apply_care as live — needs Amends/Amended-by note, doc slice owning ADR-0058; (4) evals/raising-reducer-security.eval.mjs:491-499 dead accept-token for apply_care(, harmless; (5) game-core/tests/eg3_evolution_graph.rs:542 line-number citation drift; (6) docs/specs/A0-plan.md:88-91 superseded fusion-era sketch, not compiled. 16r-c remains in-flight (pid 627621, live chain, untouched this tick).
