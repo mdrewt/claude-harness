@@ -442,6 +442,237 @@ grep -F 'Definition of done (the authority)' "$MEM/mr-brief-template.md" | grep 
 # The proof-of-teeth fixture for A1-A5, RUN rather than merely committed (ADR-0010): an uninvoked
 # fixture rots, and it is not named mr-* so the tool enumeration above never even syntax-checks it.
 "$MEM/lp-brief-cost-teeth.sh" >/dev/null 2>&1 || { echo "SELFCHECK-FAIL lp-brief-cost proof-of-teeth: lp-brief-cost-teeth.sh did not report TEETH-ALL-OK -- run it directly for the failing case; an A1-A5 assertion has stopped biting, or the block's sed anchors have drifted"; BAD=1; }
+# lp-06: mr-backup + the stray-handoff rule
+#   EARS-1 (a recoverable copy of the ledger/handoff outside the working tree) and EARS-2 (an
+#   untracked handoff-shaped file outside memory/projects/ must red). Placed AFTER the lp-brief-cost
+#   block and its teeth invocation on purpose: lp-brief-cost-teeth.sh extracts that block with the
+#   sed range /^# lp-brief-cost:/,/^grep -F .Definition of done/, and a block landing inside that
+#   window would silently change what its teeth measure.
+#
+#   PREDICATE DRIFT, recorded so no reader is misled: the spec's motivating artifact -- an untracked
+#   memory/monster-realm-handoff.md -- is TRACKED today (committed by e3b6b29), so the untracked
+#   clause makes this green against it right now. That clause stays: dropping it reds the two
+#   doctrine-sanctioned tracked archives on day one, the disabled-gate failure this corpus keeps
+#   re-learning. The gate is PREVENTIVE -- the next wrong-path write will be untracked. Follow-up
+#   flag lp-06a (moving the tracked file is outside this slice's touches:).
+#
+#   ENUMERATED BLIND SPOTS (accepted, not undetected-by-accident): tracked wrong-path files; anything
+#   under projects/ (gitignored, so --exclude-standard drops it); anything inside ANY directory
+#   containing a .git -- registered worktrees AND a bare `mkdir X && git init X` -- since
+#   `git ls-files --others` reports such a directory as ONE opaque entry and does not recurse (that
+#   checkout's own mr-selfcheck covers it); and handoff content in a file with no "handoff" in its
+#   name, out of a name-based predicate's reach. Gating fixtures: lp-06-teeth.sh (S0-S8/B0-B6/W1-W7).
+/usr/bin/python3 - "$MEM" <<'PYLP06' || BAD=1
+import os, re, subprocess, sys, tempfile
+
+MEM = sys.argv[1]
+BACKUP = os.path.join(MEM, "mr-backup")
+RECORD = os.path.join(MEM, "mr-record")
+LEDGER = os.path.join(MEM, "monster-realm-usage-ledger.jsonl")
+SELFTEST_FLOOR = 11        # the count mr-backup's battery ships with; see the marker check below
+bad = 0
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL %s" % name) + (": " + detail if detail else ""))
+
+def run(argv, env=None, timeout=180, stdin_text=None):
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, env=env or dict(os.environ),
+                           timeout=timeout, input=stdin_text)
+        return r.returncode, r.stdout or "", r.stderr or ""
+    except Exception as exc:
+        return None, "", "%s: %s" % (type(exc).__name__, exc)
+
+def git(args, timeout=90, stdin_text=None):
+    """GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE are REMOVED from the environment: red-team proved
+    they override `git -C` SILENTLY and with exit 0, so an ambient leak would aim the scan below at
+    a different repository entirely without ever tripping the unverifiable-is-not-clean rule -- the
+    same bug class as the MR_FORCE leak lp-09 closed in mr-native-tick.sh."""
+    env = dict(os.environ)
+    for leaked in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
+        env.pop(leaked, None)
+    return run(["git"] + args, env=env, timeout=timeout, stdin_text=stdin_text)
+
+def listing(root):
+    """(path, size, mtime) of every file under a root -- the before/after pollution witness."""
+    out = []
+    for dirpath, _dirs, files in os.walk(root):
+        for n in files:
+            p = os.path.join(dirpath, n)
+            try:
+                st = os.stat(p); out.append((p, st.st_size, st.st_mtime_ns))
+            except OSError:
+                out.append((p, None, None))
+    return sorted(out)
+
+# Derived from XDG_STATE_HOME/HOME, IGNORING MR_BACKUP_ROOT ENTIRELY. That is the whole point: an
+# ambient MR_BACKUP_ROOT redirects mr-backup's writes while this gate keeps watching the REAL root,
+# so a misdirected root REDS at the drift check instead of going self-consistently green against the
+# very root it was misdirected to.
+ROOT = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.join(
+    os.environ.get("HOME") or os.path.expanduser("~"), ".local", "state"), "mr-backup")
+ROOT_BEFORE = listing(ROOT)
+
+# --- 1. the stray-handoff rule. The repo root comes from the SELF-LOCATED MEM, so a slice-worktree
+# run scans THAT worktree -- a slice's gate attests the corpus it ships beside. `--others
+# --exclude-standard` IS the untracked clause (untracked-and-not-ignored), not a second filter.
+rc, out, err = git(["-C", MEM, "rev-parse", "--show-toplevel"])
+repo = out.strip() if rc == 0 else ""
+if not repo:
+    fail("stray-handoff", "could not resolve a git repo root from %s (%s) -- UNVERIFIABLE IS NOT "
+         "CLEAN, so this is a FAIL rather than a skip" % (MEM, (err or "").strip()[:120]))
+else:
+    rc, out, err = git(["-C", repo, "ls-files", "--others", "--exclude-standard", "-z"])
+    if rc != 0:
+        fail("stray-handoff", "`git ls-files --others --exclude-standard` failed in %s (%s) -- "
+             "unverifiable is not clean" % (repo, (err or "").strip()[:120]))
+    else:
+        for p in out.split("\0"):
+            if not p or p.endswith("/"):
+                continue          # a nested repo/worktree is ONE opaque entry -- see blind spots
+            base = os.path.basename(p).lower()
+            if "handoff" not in base or not base.endswith(".md"):
+                continue
+            if p.startswith("memory/projects/"):
+                continue          # the sanctioned home
+            fail("stray-handoff", "%s is an untracked handoff-shaped file OUTSIDE memory/projects/ "
+                 "-- move it into memory/projects/ (where the rolling handoff and its archives "
+                 "live) or delete it" % p)
+    # --- 2. ignore-laundering probe. --exclude-standard honours .gitignore, .git/info/exclude and
+    # core.excludesFile, so an ignore rule matching handoff-shaped names hides a genuinely stray file
+    # from check 1 with no error and no output -- a silent, zero-error bypass (proven by red-team).
+    # The probe set is a GRID, not two literals: red-team showed a .gitignore carrying the exact line
+    # `handoff.md` launders a real docs/handoff.md past check 1 AND past a two-literal probe. All
+    # paths are synthetic and never created on disk, and one batched --stdin call keeps it cheap.
+    probes = [os.path.join(repo, d, b) for d in ("", "memory", "docs")
+              for b in ("handoff.md", "HANDOFF.md", "monster-realm-handoff.md", "x-handoff.md")]
+    rc, out, _e = git(["-C", repo, "check-ignore", "--stdin"], stdin_text="\n".join(probes) + "\n")
+    laundered = [l for l in out.splitlines() if l.strip()]
+    if laundered:
+        fail("ignore-laundering", "an ignore rule matches %d handoff-shaped path(s) (e.g. %s), so "
+             "files there are invisible to `git ls-files --others --exclude-standard` and the "
+             "stray-handoff check above has been laundered into silence -- remove the rule"
+             % (len(laundered), ", ".join(os.path.relpath(x, repo) for x in laundered[:4])))
+
+# --- 3. mr-backup --selftest: the MARKER *and* the fixture COUNT are parsed. A bare `|| BAD=1`
+# passes identically against a ten-line stub (the mr-audit precedent, :66-160 of this file), and a
+# battery that quietly shrinks must red. Invoked through sys.executable for the same reason
+# mr-record invokes it that way: a lost exec bit must not silently disable a check.
+if not os.path.isfile(BACKUP):
+    fail("backup-missing", "mr-backup not found at %s -- EARS-1 has no implementation here" % BACKUP)
+else:
+    rc, out, err = run([sys.executable, BACKUP, "--selftest"], timeout=180)
+    m = re.search(r"^BACKUP-SELFTEST-OK ([0-9]+)$", out, re.M)
+    if rc != 0:
+        fail("backup-selftest", "mr-backup --selftest exited %r: %s" % (rc, (out + err).strip()[-200:]))
+    elif not m:
+        fail("backup-selftest-marker", "mr-backup --selftest printed no `BACKUP-SELFTEST-OK <n>`: %s"
+             % out.strip()[-200:])
+    elif int(m.group(1)) < SELFTEST_FLOOR:
+        fail("backup-selftest-count", "the battery ran %s fixtures, floor is %d -- fixtures have "
+             "been deleted, or the count is reported instead of measured" % (m.group(1), SELFTEST_FLOOR))
+
+    # --- 4. EXTERNAL round-trip probe. The spec's byte-for-byte restore mandate is this slice's one
+    # irreversible-harm surface, and --selftest grades itself: a fixture degraded from a byte-compare
+    # to a size-check keeps printing the same OK <n> forever. So the comparison happens HERE, in
+    # mr-selfcheck's own code, against a hermetic tmp root -- a broken restore reds the next cron run
+    # rather than the next PR.
+    with tempfile.TemporaryDirectory(prefix="mr-selfcheck-lp06-") as T:
+        src = os.path.join(T, "src", "monster-realm-usage-ledger.jsonl")
+        os.makedirs(os.path.dirname(src))
+        blob = os.urandom(3333) + "café ☃ trailing-with-no-newline".encode("utf-8")
+        open(src, "wb").write(blob)
+        env = dict(os.environ); env["MR_BACKUP_ROOT"] = os.path.join(T, "mr-backup")
+        out_dir = os.path.join(T, "restored")
+        rc1, _o1, e1 = run([sys.executable, BACKUP, "snapshot", "--file", src], env=env, timeout=60)
+        rc2, _o2, e2 = run([sys.executable, BACKUP, "restore", "--file", os.path.basename(src),
+                            "--to", out_dir], env=env, timeout=60)
+        try:
+            got = open(os.path.join(out_dir, os.path.basename(src)), "rb").read()
+        except OSError:
+            got = None
+        if rc1 != 0 or rc2 != 0:
+            fail("backup-roundtrip", "snapshot rc=%r (%s) / restore rc=%r (%s) in a hermetic tmp root"
+                 % (rc1, (e1 or "").strip()[:100], rc2, (e2 or "").strip()[:100]))
+        elif got != blob:
+            fail("backup-roundtrip", "the restored file is NOT byte-identical to the source (got %s "
+                 "bytes, source %d) -- restore is broken"
+                 % (len(got) if got is not None else "no", len(blob)))
+
+        # --- 4b. EXTERNAL illegal-root probe. Root safety is the ONE invariant here whose failure is
+        # DESTRUCTIVE rather than merely undetected -- _prune() unlinks 8-digit-named directories
+        # under whatever root it is handed -- so it may never be graded by the subject binary's own
+        # report. Red-team stubbed _root_illegal() to `return None` and --selftest to a bare
+        # `print("BACKUP-SELFTEST-OK 11")`: checks 3 and 4 both stayed green (check 4 only ever uses
+        # a validly-named root), and the stub then rmtree'd seven real 8-digit directories of user
+        # data out of a $HOME-shaped root. Both refusals are driven here, out of process, and BOTH
+        # halves are asserted: a non-zero exit AND that the illegal root was never created on disk.
+        os.makedirs(os.path.join(T, "gitrepo", ".git"))
+        for why, bad_root in (("basename is not literally `mr-backup`",
+                               os.path.join(T, "backup-scratch")),
+                              ("inside a git working tree",
+                               os.path.join(T, "gitrepo", "mr-backup"))):
+            env_bad = dict(os.environ)
+            env_bad["MR_BACKUP_ROOT"] = bad_root
+            rcb, _ob, _eb = run([sys.executable, BACKUP, "snapshot", "--file", src], env=env_bad,
+                                timeout=60)
+            if rcb == 0 or os.path.exists(bad_root):
+                fail("backup-root-safety", "mr-backup ACCEPTED an illegal root (%s): exit=%r, "
+                     "root-created-on-disk=%s. It must refuse with a non-zero exit and write "
+                     "nothing -- _prune() deletes 8-digit-named directories under the root it is "
+                     "given, so an unenforced root check is an rmtree loose in $HOME"
+                     % (why, rcb, os.path.exists(bad_root)))
+
+# --- 5. drift: the "a backup silently stopped running" detector. CONTENT, never wall-clock age -- a
+# freshness threshold would red purely from the operator hold and be commented out within the week.
+# Both halves are computed here; nothing self-reported by mr-backup is trusted. (An append landing
+# between the two reads is a theoretical flake: mr-record snapshots on EVERY append, so in steady
+# state the newest copy is the live file byte for byte.)
+if not os.path.isfile(LEDGER):
+    print("NOTE lp-06 backup-drift: no live ledger beside %s -- the normal worktree state (it is "
+          "gitignored), so this check is SKIPPED here and runs at the main checkout" % MEM)
+else:
+    newest = None
+    for day in (sorted((d for d in os.listdir(ROOT) if re.match(r"^\d{8}$", d)), reverse=True)
+                if os.path.isdir(ROOT) else []):
+        if os.path.isfile(os.path.join(ROOT, day, os.path.basename(LEDGER))):
+            newest = os.path.join(ROOT, day, os.path.basename(LEDGER)); break
+    if newest is None:
+        fail("backup-drift", "no snapshot of %s exists under %s -- the ledger has NO recoverable "
+             "copy; run `%s snapshot`" % (os.path.basename(LEDGER), ROOT, BACKUP))
+    elif open(newest, "rb").read() != open(LEDGER, "rb").read():
+        fail("backup-drift", "%s differs from the live ledger -- the backup trigger on mr-record's "
+             "write path has stopped running; run `%s snapshot`" % (newest, BACKUP))
+
+# --- 6. static wiring: mr-record must still NAME mr-backup on its write path, so a refactor that
+# drops the call reds here rather than a month later at a restore.
+try:
+    record_text = open(RECORD, encoding="utf-8", errors="replace").read()
+except OSError as exc:
+    fail("backup-wiring", "could not read %s (%s)" % (RECORD, exc))
+else:
+    # Anchored on the literal CALL expressions, never on the substring `mr-backup`: mr-record's
+    # rationale comments (and _backup_bin()'s own path construction) keep that substring alive even
+    # after both call lines are deleted, so a bare substring check is satisfiable by PROSE -- proven
+    # by red-team and pinned by lp-06-teeth.sh W9.
+    missing = [c for c in ("_backup(LEDGER)", "_backup(HANDOFF)") if c not in record_text]
+    if missing:
+        fail("backup-wiring", "%s no longer contains the call expression(s) %s -- the backup trigger "
+             "has been removed from that write path, so nothing copies it any more (the rationale "
+             "comments naming mr-backup survive such a deletion, which is why this anchors on the "
+             "CALLS)" % (RECORD, " and ".join(missing)))
+
+# --- 7. this block's own non-pollution proof: every fixture above used its own tempdir, so the REAL
+# default root must be exactly as we found it (the direct analogue of the two pollution guards
+# already in this file).
+if listing(ROOT) != ROOT_BEFORE:
+    fail("backup-root-pollution", "the REAL default backup root %s changed while this block ran -- "
+         "a fixture escaped its tempdir" % ROOT)
+
+sys.exit(bad)
+PYLP06
 # lp-09: kill-switch provenance derived assertions (A1-A8). Tester-authored, TDD RED PHASE —
 # do not edit these to fit a buggy implementation; a wrong expectation is corrected FROM THE
 # SPEC (M-loop-infrastructure.spec.md, slice lp-09), never retargeted to match the code.
@@ -1167,7 +1398,13 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-lp02-") as TMP:
             e["GIT_CONFIG_NOSYSTEM"] = "1"
             e["GIT_CONFIG_GLOBAL"] = os.devnull
             e["GIT_TERMINAL_PROMPT"] = "0"
-            for leaked in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "XDG_CONFIG_HOME"):
+            # MR_BACKUP_* are popped alongside the GIT_* vars (lp-06): a leaked ambient
+            # MR_BACKUP_ROOT would switch mr-record's backup trigger into mr-backup's FIXTURE mode,
+            # where any readable file is an accepted source -- so this battery's fixture ledgers
+            # would start landing in whatever root the leak names. MR_BACKUP_BIN goes with it so a
+            # leaked stub cannot silently replace the copier under a battery that is not testing it.
+            for leaked in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "XDG_CONFIG_HOME",
+                           "MR_BACKUP_ROOT", "MR_BACKUP_BIN"):
                 e.pop(leaked, None)
             if env_extra:
                 e.update(env_extra)
