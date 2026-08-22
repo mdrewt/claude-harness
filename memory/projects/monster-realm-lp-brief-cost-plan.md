@@ -2,7 +2,8 @@
 
 **Slice:** delete the false premise in the brief's budget line, keep the preference.
 **Tier:** routine · **ADR:** none (loop-infra) · **Gate:** `mr-selfcheck` prints `SELFCHECK-OK` (+ harness `just ci`).
-**touches:** `memory/projects/mr-brief-template.md` · **touches-delta:** `mr-selfcheck` (the prescribed gating tooth), this plan memo.
+**touches:** `memory/projects/mr-brief-template.md` · **touches-delta:** `mr-selfcheck` (the prescribed
+gating tooth), `lp-brief-cost-teeth.sh` (the proof-of-teeth fixture, ADR-0010), this plan memo.
 
 ## Verified ground truth
 
@@ -77,7 +78,7 @@ path**. Never a derived or corpus-wide scan: the banned phrases legitimately sur
 also match this block's own comment text — the self-reference hazard `mr-selfcheck:378-382` already
 documents.
 
-### A6 (config coupling) — considered and CUT
+### Config coupling (`costwatch_enforce`) — considered and CUT
 
 The planner proposed asserting `costwatch_enforce` is still `false`. Cut, for three reasons:
 
@@ -106,8 +107,9 @@ blocks and the signal is unreadable.
 | M2 | re-insert `favor thoroughness over frugality` | FAIL (A3) |
 | M3 | re-insert `only the 125% hard ceiling is mechanical` | FAIL (A4) |
 | M4 | delete the retained E2 clause | FAIL (A5) |
-| M5 | `rm` the fixture template | FAIL (A1) |
+| M5 | `rm` the fixture template | FAIL (A5; grep rc=2 leaves the `&&`-form A2-A4 inert) |
 | M5b | keep the file, delete the `BUDGET: $<CAP_USD>` anchor | FAIL (A1) |
+| M6 | gut the DoD sentence to unrestricted-spend language, leave a **fossil copy** of the E2 phrase elsewhere in the file | FAIL (anchored A5) |
 
 **Layer 2 (wiring, once).** Apply M1 to the **worktree's** real template, run the real `mr-selfcheck`,
 confirm the FAIL line prints and `SELFCHECK-OK` is suppressed, then `git -C <worktree> checkout --`.
@@ -119,13 +121,46 @@ matrix but **cannot execute either**: `.claude/hooks/guard-tester-bash.mjs:130-1
 tester's Bash to a few syntax-check shapes, of which only `bash -n <path>` applies here. Execution of
 Layers 1-2 is the specialist's; the `verifier` independently re-runs Layer 1.
 
+## Post-implementation revision (after reviewer + red-team + /simplify on the shipped diff)
+
+Three findings were actioned; each was a **strengthening**, never a weakening, and the gating files
+were byte-identical to the RED checkpoint (`7807cb8`) before this pass:
+
+1. **red-team HIGH — A5 went green on a fossil.** The original A5 grepped the whole file, so gutting
+   the Definition-of-done sentence back to *"Spend what you judge necessary."* while leaving a stray
+   copy of the phrase in an HTML comment elsewhere passed the gate. This is *subtractive* and needs no
+   paraphrasing skill, so it is distinct from — and worse than — the accepted paraphrase residual, and
+   is a plausible bad-merge artifact. A5 is now anchored to the Definition-of-done LINE. Proven: the
+   old form PASSES that fixture, the new form FAILS it; regression-pinned as matrix case **M6**.
+2. **red-team MEDIUM — the matrix was blind to gate wiring.** It sources the extracted block with its
+   own fresh `BAD=0`, so a stray `BAD=0` later in `mr-selfcheck` (plausibly from sibling `lp-06`,
+   which also edits this file) would silence every FAIL while `SELFCHECK-OK` still printed. Added a
+   **wiring guard**: exactly one `BAD=0` initialiser must exist in `mr-selfcheck`. Proven to bite.
+3. **/simplify — the fixture was committed but never run**, and dodges the `mr-*` tool glob so it was
+   not even syntax-checked. `mr-selfcheck` now **invokes** it (house form, as with every `--selftest`).
+   Also cut ~7 lines of comment that duplicated the plan memo and the lp-09 boilerplate six lines
+   below, and cut the extraction needle loop (empirically dominated by M1-M5b).
+
+The runaway guard earned its keep during this pass: re-anchoring A5 broke the `sed` terminator, the
+guard caught the 1331-line run-to-EOF, and the gate went red rather than silently sourcing the rest of
+`mr-selfcheck`. The extraction range must stop at A5 and must **not** reach the line that invokes the
+fixture — `run_case` sources the block, so including it would re-enter the harness and break M0.
+
+**Not actioned, by decision:** a single zero-width or homoglyph codepoint inside a banned phrase
+defeats `grep -qF` on A2/A3/A4 while rendering identically (red-team HIGH). Unicode normalisation is
+not worth building into five greps for an anti-regression pin; it is folded into the accepted residual
+below rather than silently ignored. **A4's bare `125%` ban** was kept over `/simplify`'s over-breadth
+objection — it is the most direct encoding of E3 — but its failure message now says to NARROW the
+assertion if a legitimate unrelated `125%` ever appears, never to delete it.
+
 ## Accepted residual
 
-**The tooth is anti-regression, not anti-paraphrase.** Red-team demonstrated a working bypass: insert
+**The tooth is anti-regression, not anti-paraphrase — and not anti-evasion.** Red-team demonstrated a working bypass: insert
 *"On any trade-off between spend and rigor, choose rigor … do not economize on lenses to save money"*
 anywhere in the template and A1-A5 all pass green while the spend-more meaning is fully restored.
-Accepted for this slice — the general doctrine linter (`mr-doctrine-lint`) is separately queued as
-`lp-16`, and building it here would steal that slice. **Nobody may read "A2-A4 green" as "the doctrine
+The same holds for a zero-width space or a Cyrillic homoglyph inside a banned phrase: the text renders
+identically and `grep -qF` misses it. Accepted for this slice — the general doctrine linter
+(`mr-doctrine-lint`) is separately queued as `lp-16`, and building it here would steal that slice. **Nobody may read "A2-A4 green" as "the doctrine
 is enforced."**
 
 ## Follow-up flags (outside `touches:` — do NOT touch, hand to the supervisor)
