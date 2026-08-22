@@ -1749,5 +1749,414 @@ else:
 sys.exit(bad)
 PYTG
 
+# lp-ollama: the per-tick ollama preflight is DELETED (mr-native-tick.sh:27-47 used to start
+# `ollama serve` if absent, probe the model and dispatch a detached warm-up on EVERY tick —
+# measured 803 warm-ups / 0 invocations across two generations). `mr-ollama` itself is retained
+# for manual/experimental use, so this must prove the tick is quiet WITHOUT breaking the tool.
+#
+# The spec (M-loop-infrastructure.spec.md:305-334) binds the tooth to BEHAVIOUR, not the log
+# string, and says so explicitly: "a preflight that still runs but stops logging that phrase
+# would pass a grep-only check". So the primary leg RUNS the tick's startup region under
+# recording PATH shims and asserts the union of witnessed argv contains no `11434` and no
+# `ollama` command; the phrase grep is kept only as a cheap secondary, and is run against the
+# SOURCE (mr-native-tick.log carries 803 historical matches and rotates at 1 MB).
+#
+# Four legs, each closing a hole the others cannot:
+#   (a) a CANARY control proves the shim/witness mechanism is not inert — without it, "nothing
+#       was recorded" is trivially true forever and the whole block is a false green;
+#   (b) BEHAVIOURAL: the tick's PREFIX is extracted BY CONTENT at the `# RECONCILE` anchor
+#       (never by line number) and run in a sandbox HARNESS/MEM. The real tick is never run —
+#       past that anchor it mutates live /tmp/mr_pass_*.done markers, can make mr-ask-drew file
+#       a real GitHub issue, recurses into this very file (:216-220) and can self-respawn
+#       (:369). Both sandbox rewrites are FATAL-if-unmatched before any subprocess starts, and
+#       the real cron-liveness markers are mtime-checked for containment;
+#   (c) STATIC over the WHOLE file (whole-line comments stripped only — inline `#` stripping
+#       would mangle `${SL#mr_pass_}`) — the only leg that sees a preflight RELOCATED below the
+#       extraction anchor, which is precisely the "just move it lower" alternative the spec
+#       rejects at :313-314;
+#   (d) EARS-2: mr-ollama stays invocable and its consumers still degrade on
+#       OLLAMA-UNAVAILABLE. Runs under the shims with its OWN unasserted witness, because
+#       mr-ollama's pick_model() curls localhost:11434/api/ps BEFORE its MR_NO_OLLAMA exit —
+#       un-shimmed, this gate would itself do the thing the slice forbids.
+#
+# Tester-authored, TDD RED PHASE — do not edit these to fit a buggy implementation; a wrong
+# expectation is corrected FROM THE SPEC (M-loop-infrastructure.spec.md:305-334), never
+# retargeted to match the code.
+/usr/bin/python3 - "$MEM" <<'PYOLL' || BAD=1
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+MEM = sys.argv[1]
+TICK = os.path.join(MEM, "mr-native-tick.sh")
+LAUNCH = os.path.join(MEM, "mr-launch.sh")
+OLLAMA_TOOL = os.path.join(MEM, "mr-ollama")
+bad = 0
+
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL %s" % name) + (": " + detail if detail else ""))
+
+
+tick_src = None
+if not os.path.isfile(TICK):
+    fail("lp-ollama-tick-missing", "mr-native-tick.sh not found at %s" % TICK)
+else:
+    with open(TICK, errors="replace") as f:
+        tick_src = f.read()
+
+launch_src = None
+if not os.path.isfile(LAUNCH):
+    fail("lp-ollama-launch-missing", "mr-launch.sh not found at %s" % LAUNCH)
+else:
+    with open(LAUNCH, errors="replace") as f:
+        launch_src = f.read()
+
+if not os.path.isfile(OLLAMA_TOOL):
+    fail("lp-ollama-tool-missing", "mr-ollama not found at %s" % OLLAMA_TOOL)
+
+GENERIC_SHIM = '''#!/bin/bash
+echo "$(basename "$0") $*" >> "$WITNESS_FILE"
+exit 0
+'''
+
+OLLAMA_SHIM = '''#!/bin/bash
+echo "ollama $*" >> "$WITNESS_FILE"
+if [ "${1:-}" = "list" ]; then
+  echo "${OLLAMA_LIST_MODEL:-}"
+fi
+exit 0
+'''
+
+TMPROOT = tempfile.mkdtemp(prefix="mr-selfcheck-lp-ollama-")
+try:
+    shimdir = os.path.join(TMPROOT, "shim")
+    os.makedirs(shimdir)
+
+    def write_shim(name, body):
+        p = os.path.join(shimdir, name)
+        with open(p, "w") as f:
+            f.write(body)
+        os.chmod(p, 0o755)
+        return p
+
+    write_shim("curl", GENERIC_SHIM)
+    write_shim("wget", GENERIC_SHIM)
+    write_shim("setsid", GENERIC_SHIM)
+    write_shim("ollama", OLLAMA_SHIM)
+
+    SHIM_PATH = shimdir + ":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+    # =========================================================================================
+    # Leg A -- canary / witness-mechanism control. LOAD-BEARING, not decorative: shim
+    # interception via PATH is the ONLY containment for `setsid ... &`, which by construction
+    # escapes the wrapper's own subprocess timeout (S2) -- if the shims silently failed to
+    # intercept, legs B/D's "no 11434 / no ollama" assertions would be trivially, uselessly
+    # green (nothing recorded because nothing ran through the shim at all). Proven BEFORE it is
+    # trusted anywhere else in this block.
+    # =========================================================================================
+    def leg_a():
+        canary = os.path.join(TMPROOT, "canary-witness")
+        open(canary, "w").close()
+        env = dict(os.environ)
+        env["PATH"] = SHIM_PATH
+        env["WITNESS_FILE"] = canary
+        for args in (["curl", "http://localhost:11434/api/version"],
+                     ["ollama", "list"],
+                     ["setsid", "ollama", "serve"]):
+            try:
+                subprocess.run(args, env=env, cwd=TMPROOT, capture_output=True,
+                                text=True, timeout=20)
+            except subprocess.TimeoutExpired:
+                fail("lp-ollama-witness-mechanism-timeout",
+                     "%s hung under the shim PATH (>20s)" % " ".join(args))
+            except Exception as exc:
+                fail("lp-ollama-witness-mechanism-error", "%s: %s" % (" ".join(args), exc))
+        canary_lines = [ln for ln in open(canary, errors="replace").read().splitlines() if ln.strip()]
+        if len(canary_lines) != 3:
+            fail("lp-ollama-witness-mechanism-inert",
+                 "expected 3 canary lines (curl, ollama, setsid each recorded once via PATH "
+                 "interception); got %d: %r" % (len(canary_lines), canary_lines))
+
+    leg_a()
+
+    # =========================================================================================
+    # Leg B -- behavioural (the primary tooth; spec:327-329 explicitly rejects a grep-only
+    # check). Extracts the tick's PREFIX by content up to the `^# RECONCILE` anchor -- never by
+    # line number -- and runs ONLY that, because past the anchor the tick mutates live
+    # /tmp/mr_pass_*.done markers, can file a real GitHub issue, recurses into mr-selfcheck and
+    # can self-respawn. Never runs the real tick.
+    # =========================================================================================
+    def leg_b():
+        if tick_src is None:
+            fail("lp-ollama-behavioural-no-source", "mr-native-tick.sh was not readable -- cannot extract leg B's prefix")
+            return
+        am = re.search(r"^# RECONCILE\b", tick_src, re.M)
+        if not am:
+            # Anchor-not-found is a LOUD FAIL, never a silent skip (A8's rule) -- a
+            # silently-skipped extraction is a false green.
+            fail("lp-ollama-anchor-missing",
+                 "could not locate the `^# RECONCILE` anchor in mr-native-tick.sh by content -- "
+                 "extraction has rotted; a silently-skipped extraction would be a false green")
+            return
+        prefix = tick_src[:am.start()]
+        prefix_lines = prefix.splitlines()
+        if len(prefix_lines) <= 15 or "native-supervisor-tick-alive" not in prefix:
+            fail("lp-ollama-anchor-suspicious",
+                 "the extracted prefix is %d line(s) and tick-alive-mention=%s -- looks "
+                 "truncated, not a real tick prefix"
+                 % (len(prefix_lines), "native-supervisor-tick-alive" in prefix))
+            return
+
+        sandbox_harness = os.path.join(TMPROOT, "sandbox-harness")
+        sandbox_mem = os.path.join(sandbox_harness, "memory", "projects")
+        try:
+            os.makedirs(os.path.join(sandbox_mem, "pending-events"))
+            if os.path.isfile(OLLAMA_TOOL):
+                shutil.copy2(OLLAMA_TOOL, os.path.join(sandbox_mem, "mr-ollama"))
+                os.chmod(os.path.join(sandbox_mem, "mr-ollama"), 0o755)
+            # defence in depth against the recursion branch (mr-native-tick.sh:216-220): if it
+            # is ever reached inside the extracted prefix, a pre-existing .selfcheck-last makes
+            # it degrade to a no-op instead of recursing into a real mr-selfcheck invocation.
+            open(os.path.join(sandbox_mem, ".selfcheck-last"), "w").close()
+        except OSError as exc:
+            fail("lp-ollama-sandbox-setup", "could not build the sandbox MEM: %s" % exc)
+            return
+
+        # S6: prime the `ollama list` shim's answer with the tag the SANDBOXED mr-ollama itself
+        # resolves, via the same shim PATH -- so a restored preflight reaches the deepest branch
+        # (the /api/generate warm-up) instead of dead-ending in MODEL-MISSING. Not asserted on.
+        ollama_list_model = "hrbrmstr/ornith-35b-fixed"
+        if os.path.isfile(os.path.join(sandbox_mem, "mr-ollama")):
+            priming_witness = os.path.join(TMPROOT, "priming-witness")
+            open(priming_witness, "w").close()
+            penv = dict(os.environ)
+            penv["PATH"] = SHIM_PATH
+            penv["WITNESS_FILE"] = priming_witness
+            try:
+                rp = subprocess.run(["bash", os.path.join(sandbox_mem, "mr-ollama"), "model"],
+                                     env=penv, capture_output=True, text=True, timeout=20)
+                tag = (rp.stdout or "").strip()
+                if tag:
+                    ollama_list_model = tag
+            except subprocess.TimeoutExpired:
+                fail("lp-ollama-priming-timeout",
+                     "sandboxed `mr-ollama model` hung under the shim PATH while priming the "
+                     "ollama-list shim (S6); falling back to the known-good default tag")
+
+        # Two content rewrites. `n == 1` failure is FATAL to this leg and must `return` BEFORE
+        # any subprocess.run -- not the house record-and-continue fail() idiom (S1): a silent
+        # no-op on the HARNESS rewrite would let the extracted prefix's unconditional :21/:25
+        # writes land on the REAL .native-supervisor-tick-alive / heartbeat on every daily cron
+        # selfcheck, corrupting the gate -1 escalation reads.
+        rewritten, n_harness = re.subn(r"^HARNESS=.*$", "HARNESS=%s" % sandbox_harness,
+                                        prefix, count=1, flags=re.M)
+        if n_harness != 1:
+            fail("lp-ollama-rewrite-harness-fatal",
+                 "the `^HARNESS=` rewrite matched %d time(s) (expected exactly 1) -- aborting "
+                 "leg B before any subprocess.run so the real state can never be touched (S1)"
+                 % n_harness)
+            return
+        rewritten, n_path = re.subn(
+            r"^export PATH=.*$",
+            "export PATH=%s:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" % shimdir,
+            rewritten, count=1, flags=re.M)
+        if n_path != 1:
+            fail("lp-ollama-rewrite-path-fatal",
+                 "the `^export PATH=` rewrite matched %d time(s) (expected exactly 1) -- the "
+                 "hardcoded PATH at :10 would clobber the env-passed shim and curl/ollama/setsid "
+                 "would resolve to the REAL binaries; aborting leg B before any subprocess.run (S1)"
+                 % n_path)
+            return
+
+        rewritten = rewritten + "\necho LP-OLLAMA-PREFIX-END\n"
+        wrapper = os.path.join(TMPROOT, "tick-prefix-wrapper.sh")
+        with open(wrapper, "w") as f:
+            f.write(rewritten)
+        os.chmod(wrapper, 0o755)
+
+        real_alive = os.path.join(MEM, ".native-supervisor-tick-alive")
+        real_hb = os.path.join(MEM, ".native-supervisor-heartbeat")
+
+        def snap(p):
+            try:
+                return os.stat(p).st_mtime_ns
+            except OSError:
+                return None
+
+        alive_before, hb_before = snap(real_alive), snap(real_hb)
+
+        tick_witness = os.path.join(TMPROOT, "tick-witness")
+        open(tick_witness, "w").close()
+        env = dict(os.environ)
+        env["PATH"] = SHIM_PATH
+        env["WITNESS_FILE"] = tick_witness
+        env["OLLAMA_LIST_MODEL"] = ollama_list_model
+        # Inert by construction for the extracted prefix -- the DRYRUN branch lives at :406,
+        # well past the `# RECONCILE` anchor -- kept anyway so this honours the spec's dry-run
+        # framing and stays correct if the anchor ever moves.
+        env["MR_TICK_DRYRUN"] = "1"
+
+        try:
+            r = subprocess.run(["bash", wrapper], env=env, cwd=sandbox_harness,
+                                capture_output=True, text=True, timeout=20)
+        except subprocess.TimeoutExpired:
+            fail("lp-ollama-behavioural-timeout",
+                 "the extracted tick prefix hung under the shim PATH (>20s) -- TimeoutExpired "
+                 "is a FAIL, never a pass")
+            return
+
+        alive_after, hb_after = snap(real_alive), snap(real_hb)
+        if alive_after != alive_before:
+            fail("lp-ollama-live-marker-mutated",
+                 "the REAL .native-supervisor-tick-alive mtime changed during leg B -- the "
+                 "HARNESS/MEM sandbox rewrite leaked onto live cron-liveness state")
+        if hb_after != hb_before:
+            fail("lp-ollama-live-heartbeat-mutated",
+                 "the REAL .native-supervisor-heartbeat mtime changed during leg B -- the "
+                 "HARNESS/MEM sandbox rewrite leaked onto live cron-liveness state")
+
+        if r.returncode != 0:
+            fail("lp-ollama-behavioural-rc",
+                 "the extracted tick prefix exited %d (expected 0); stderr tail: %s"
+                 % (r.returncode, r.stderr.strip()[-300:]))
+        # Liveness sentinel: an assertion-of-absence with no liveness proof is worthless -- both
+        # the stdout sentinel AND the sandbox tick-alive marker must exist, proving the prefix
+        # really executed rather than dying silently before reaching the preflight at all.
+        if "LP-OLLAMA-PREFIX-END" not in r.stdout:
+            fail("lp-ollama-behavioural-liveness",
+                 "the sentinel echoed after the extracted prefix never appeared in stdout")
+        sandbox_alive = os.path.join(sandbox_mem, ".native-supervisor-tick-alive")
+        if not os.path.exists(sandbox_alive):
+            fail("lp-ollama-behavioural-sandbox-alive-missing",
+                 "the sandbox .native-supervisor-tick-alive was never created -- proves :21 "
+                 "never really executed, so an absence of ollama activity would prove nothing")
+
+        witness_text = open(tick_witness, errors="replace").read()
+        if "11434" in witness_text:
+            fail("lp-ollama-behavioural-11434",
+                 "the extracted tick prefix contacted (or attempted to contact) "
+                 "localhost:11434 -- witness: %r" % witness_text[:400])
+        if any("ollama" in ln.split() for ln in witness_text.splitlines()):
+            fail("lp-ollama-behavioural-ollama-invoked",
+                 "the extracted tick prefix invoked an `ollama` command -- witness: %r"
+                 % witness_text[:400])
+
+    leg_b()
+
+    # =========================================================================================
+    # Leg C -- static (catches the relocation the spec explicitly rejects at :313-314). Strips
+    # WHOLE-LINE `#` comments only -- never inline `#` (`${SL#mr_pass_}` would be mangled) --
+    # from the WHOLE file, not just the prefix, so a preflight moved BELOW the leg B extraction
+    # anchor is still caught.
+    # =========================================================================================
+    def strip_whole_line_comments(text):
+        return "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+
+    def leg_c():
+        if tick_src is None:
+            fail("lp-ollama-static-no-source", "mr-native-tick.sh was not readable -- cannot run leg C")
+            return
+        stripped = strip_whole_line_comments(tick_src)
+        stripped_lines = stripped.splitlines()
+        if len(stripped_lines) <= 100 or "native-supervisor-tick-alive" not in stripped:
+            fail("lp-ollama-static-vacuity",
+                 "the whole-line-comment-stripped mr-native-tick.sh is %d line(s) and "
+                 "tick-alive-mention=%s -- the strip is too aggressive or scanning the wrong file"
+                 % (len(stripped_lines), "native-supervisor-tick-alive" in stripped))
+            return
+        if "11434" in stripped:
+            fail("lp-ollama-static-11434",
+                 "mr-native-tick.sh still contains the literal port 11434 after whole-line-"
+                 "comment stripping")
+        if any("ollama" in ln.split() for ln in stripped_lines):
+            fail("lp-ollama-static-ollama-cmd",
+                 "mr-native-tick.sh still invokes an `ollama` command after whole-line-comment "
+                 "stripping")
+        # Log-grep secondary (spec:327-329 explicitly says grep-only is not enough -- cheap
+        # secondary only) -- run against the SOURCE, never against mr-native-tick.log (which
+        # holds 803 historical matches and rotates at 1 MB).
+        if "OLLAMA preflight" in tick_src:
+            fail("lp-ollama-static-log-phrase",
+                 "mr-native-tick.sh still contains the retired 'OLLAMA preflight' log phrase")
+        if launch_src is not None:
+            launch_stripped = strip_whole_line_comments(launch_src)
+            if "11434" in launch_stripped:
+                fail("lp-ollama-static-launch-11434",
+                     "mr-launch.sh (the child the tick spawns) contains a literal 11434 after "
+                     "whole-line-comment stripping")
+
+    leg_c()
+
+    # =========================================================================================
+    # Leg D -- EARS-2 (mr-ollama survives). Runs under the SAME shim PATH with its OWN witness
+    # file and NO assertions on that witness (S4): mr-ollama's pick_model() curls
+    # localhost:11434/api/ps BEFORE the MR_NO_OLLAMA early-exit, so an un-shimmed probe here
+    # would make the daily gate itself contact the real model server -- the very thing this
+    # slice forbids -- and a shared witness with leg B would manufacture a false RED.
+    # =========================================================================================
+    def leg_d():
+        if not os.path.isfile(OLLAMA_TOOL):
+            fail("lp-ollama-mrollama-missing-for-legd", "mr-ollama not found -- cannot run leg D")
+            return
+        d_witness = os.path.join(TMPROOT, "leg-d-witness")
+        open(d_witness, "w").close()
+        denv = dict(os.environ)
+        denv["PATH"] = SHIM_PATH
+        denv["WITNESS_FILE"] = d_witness
+
+        try:
+            r = subprocess.run(["bash", OLLAMA_TOOL, "model"], env=denv,
+                                capture_output=True, text=True, timeout=20)
+        except subprocess.TimeoutExpired:
+            fail("lp-ollama-mrollama-model-timeout", "`mr-ollama model` hung under the shim PATH (>20s)")
+        else:
+            if r.returncode != 0:
+                fail("lp-ollama-mrollama-model-rc",
+                     "`mr-ollama model` exited %d (expected 0): %s"
+                     % (r.returncode, r.stderr.strip()[:200]))
+            if not (r.stdout or "").strip():
+                # Never assert the tag itself -- host-dependent resolution.
+                fail("lp-ollama-mrollama-model-empty",
+                     "`mr-ollama model` printed empty stdout -- it SHALL remain invocable "
+                     "manually (EARS-2)")
+
+        denv2 = dict(denv)
+        denv2["MR_NO_OLLAMA"] = "1"
+        try:
+            r2 = subprocess.run(["bash", OLLAMA_TOOL, "ping"], env=denv2,
+                                 capture_output=True, text=True, timeout=20)
+        except subprocess.TimeoutExpired:
+            fail("lp-ollama-mrollama-ping-timeout",
+                 "`MR_NO_OLLAMA=1 mr-ollama ping` hung under the shim PATH (>20s)")
+        else:
+            if r2.returncode != 0:
+                fail("lp-ollama-mrollama-ping-rc",
+                     "`MR_NO_OLLAMA=1 mr-ollama ping` exited %d (expected 0)" % r2.returncode)
+            if not (r2.stdout or "").startswith("OLLAMA-UNAVAILABLE"):
+                fail("lp-ollama-mrollama-ping-degrade",
+                     "`MR_NO_OLLAMA=1 mr-ollama ping` must degrade with a leading "
+                     "OLLAMA-UNAVAILABLE; got %r" % ((r2.stdout or "").strip()[:120]))
+
+        # Static pin: the child the tick spawns still carries its degrade arm around the
+        # `mr-ollama summarize-run` call.
+        if launch_src is not None and (
+                "OLLAMA-UNAVAILABLE" not in launch_src or "mr-ollama" not in launch_src):
+            fail("lp-ollama-launch-degrade-arm-missing",
+                 "mr-launch.sh no longer carries its OLLAMA-UNAVAILABLE degrade arm around the "
+                 "`mr-ollama summarize-run` call (EARS-2)")
+
+    leg_d()
+finally:
+    shutil.rmtree(TMPROOT, ignore_errors=True)
+
+sys.exit(bad)
+PYOLL
+
 [ "$BAD" = 0 ] && echo "SELFCHECK-OK"
 exit 0
