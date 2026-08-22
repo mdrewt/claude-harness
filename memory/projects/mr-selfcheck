@@ -1785,10 +1785,12 @@ PYTG
 /usr/bin/python3 - "$MEM" <<'PYOLL' || BAD=1
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 MEM = sys.argv[1]
 TICK = os.path.join(MEM, "mr-native-tick.sh")
@@ -1801,6 +1803,45 @@ def fail(name, detail=""):
     global bad
     bad = 1
     print(("SELFCHECK-FAIL %s" % name) + (": " + detail if detail else ""))
+
+
+def _ollama_basename_hit(text):
+    """CRITICAL-2 fix: match the BASENAME of each whitespace-separated token (surrounding
+    quotes and common trailing shell punctuation stripped), never the raw token -- so an
+    absolute-path bypass of a bare `ollama` PATH lookup (`/usr/local/bin/ollama`) is caught,
+    while `"$MEM/mr-ollama"` (basename mr-ollama) is correctly NOT caught."""
+    for line in text.splitlines():
+        for tok in line.split():
+            t = tok.strip("'\"").rstrip(";)}&|,")
+            if not t:
+                continue
+            base = t.rsplit("/", 1)[-1]
+            if base == "ollama":
+                return True
+    return False
+
+
+def _mr_helper_names(mem):
+    # CRITICAL-3(a): every EXECUTABLE mr-* file, same exclusion shape used elsewhere in this
+    # corpus (mr-selfcheck's own TOOLS glob) -- a preflight refactored to call ANY other
+    # "$MEM/..." helper must still resolve inside the sandbox, or it 127s silently and nothing
+    # is witnessed.
+    try:
+        names = os.listdir(mem)
+    except OSError:
+        return []
+    out = []
+    for n in names:
+        if not n.startswith("mr-"):
+            continue
+        if any(k in n for k in (".bak", ".log")):
+            continue
+        if n.endswith((".md", ".json", ".jsonl")):
+            continue
+        p = os.path.join(mem, n)
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            out.append(n)
+    return sorted(out)
 
 
 tick_src = None
@@ -1894,7 +1935,8 @@ try:
     # =========================================================================================
     def leg_b():
         if tick_src is None:
-            fail("lp-ollama-behavioural-no-source", "mr-native-tick.sh was not readable -- cannot extract leg B's prefix")
+            fail("lp-ollama-behavioural-no-source",
+                 "mr-native-tick.sh was not readable -- cannot extract leg B's prefix")
             return
         am = re.search(r"^# RECONCILE\b", tick_src, re.M)
         if not am:
@@ -1917,12 +1959,20 @@ try:
         sandbox_mem = os.path.join(sandbox_harness, "memory", "projects")
         try:
             os.makedirs(os.path.join(sandbox_mem, "pending-events"))
-            if os.path.isfile(OLLAMA_TOOL):
-                shutil.copy2(OLLAMA_TOOL, os.path.join(sandbox_mem, "mr-ollama"))
-                os.chmod(os.path.join(sandbox_mem, "mr-ollama"), 0o755)
-            # defence in depth against the recursion branch (mr-native-tick.sh:216-220): if it
-            # is ever reached inside the extracted prefix, a pre-existing .selfcheck-last makes
-            # it degrade to a no-op instead of recursing into a real mr-selfcheck invocation.
+            # CRITICAL-3(a): copy EVERY executable mr-* helper, not just mr-ollama, so any
+            # "$MEM/..." call the extracted prefix makes resolves through the proven shim
+            # mechanism instead of exiting 127 inside the sandbox with nothing witnessed.
+            for name in _mr_helper_names(MEM):
+                src = os.path.join(MEM, name)
+                dst = os.path.join(sandbox_mem, name)
+                try:
+                    shutil.copy2(src, dst)
+                    os.chmod(dst, 0o755)
+                except OSError:
+                    pass  # best-effort; one unreadable helper must not abort the whole leg
+            # defence in depth against the recursion branch (mr-native-tick.sh:216-220): it is
+            # unreachable from THIS prefix (the anchor cuts before it), but stays as cheap
+            # insurance against a future anchor move or an indirect call path.
             open(os.path.join(sandbox_mem, ".selfcheck-last"), "w").close()
         except OSError as exc:
             fail("lp-ollama-sandbox-setup", "could not build the sandbox MEM: %s" % exc)
@@ -1932,14 +1982,16 @@ try:
         # resolves, via the same shim PATH -- so a restored preflight reaches the deepest branch
         # (the /api/generate warm-up) instead of dead-ending in MODEL-MISSING. Not asserted on.
         ollama_list_model = "hrbrmstr/ornith-35b-fixed"
-        if os.path.isfile(os.path.join(sandbox_mem, "mr-ollama")):
+        sandbox_ollama = os.path.join(sandbox_mem, "mr-ollama")
+        if os.path.isfile(sandbox_ollama):
             priming_witness = os.path.join(TMPROOT, "priming-witness")
             open(priming_witness, "w").close()
             penv = dict(os.environ)
             penv["PATH"] = SHIM_PATH
             penv["WITNESS_FILE"] = priming_witness
+            penv.pop("MR_OLLAMA_MODEL", None)  # keep the priming call self-contained too
             try:
-                rp = subprocess.run(["bash", os.path.join(sandbox_mem, "mr-ollama"), "model"],
+                rp = subprocess.run(["bash", sandbox_ollama, "model"],
                                      env=penv, capture_output=True, text=True, timeout=20)
                 tag = (rp.stdout or "").strip()
                 if tag:
@@ -1954,8 +2006,11 @@ try:
         # no-op on the HARNESS rewrite would let the extracted prefix's unconditional :21/:25
         # writes land on the REAL .native-supervisor-tick-alive / heartbeat on every daily cron
         # selfcheck, corrupting the gate -1 escalation reads.
-        rewritten, n_harness = re.subn(r"^HARNESS=.*$", "HARNESS=%s" % sandbox_harness,
-                                        prefix, count=1, flags=re.M)
+        # LOW-7: shlex.quote both interpolated paths -- a TMPDIR containing a space would
+        # otherwise break the rewritten wrapper (`HARNESS: unbound variable` cascade).
+        rewritten, n_harness = re.subn(
+            r"^HARNESS=.*$", "HARNESS=%s" % shlex.quote(sandbox_harness),
+            prefix, count=1, flags=re.M)
         if n_harness != 1:
             fail("lp-ollama-rewrite-harness-fatal",
                  "the `^HARNESS=` rewrite matched %d time(s) (expected exactly 1) -- aborting "
@@ -1964,7 +2019,8 @@ try:
             return
         rewritten, n_path = re.subn(
             r"^export PATH=.*$",
-            "export PATH=%s:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" % shimdir,
+            "export PATH=%s:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            % shlex.quote(shimdir),
             rewritten, count=1, flags=re.M)
         if n_path != 1:
             fail("lp-ollama-rewrite-path-fatal",
@@ -1974,7 +2030,15 @@ try:
                  % n_path)
             return
 
-        rewritten = rewritten + "\necho LP-OLLAMA-PREFIX-END\n"
+        # HIGH-4: `wait` before the sentinel. The shims are ordinary NON-detaching scripts (no
+        # further setsid/fork of their own), so a `... &` backgrounded call the replayed prefix
+        # makes (the real preflight's warm-up dispatch) is a same-shell job `wait` blocks on --
+        # this closes the race where subprocess.run returns before the backgrounded shim has
+        # appended its witness line. The witness line always carries the fully bash-expanded
+        # argv (variable/arithmetic expansion happens before exec), so a computed port
+        # (`OLPORT=$((11000+434))`) still lands in the witness as the literal digits "11434" --
+        # no special-casing needed for that variant.
+        rewritten = rewritten + "\nwait\necho LP-OLLAMA-PREFIX-END\n"
         wrapper = os.path.join(TMPROOT, "tick-prefix-wrapper.sh")
         with open(wrapper, "w") as f:
             f.write(rewritten)
@@ -1989,37 +2053,78 @@ try:
             except OSError:
                 return None
 
-        alive_before, hb_before = snap(real_alive), snap(real_hb)
+        def settled_read(path, timeout=1.5, interval=0.15):
+            # HIGH-4, second half: bounded settle in case `wait` somehow still raced (belt and
+            # suspenders) -- re-read until two consecutive reads agree on non-empty content, or
+            # the timeout elapses.
+            end = time.time() + timeout
+            prev = None
+            while True:
+                try:
+                    cur = open(path, errors="replace").read()
+                except OSError:
+                    cur = ""
+                if cur and cur == prev:
+                    return cur
+                prev = cur
+                if time.time() >= end:
+                    return cur
+                time.sleep(interval)
 
-        tick_witness = os.path.join(TMPROOT, "tick-witness")
-        open(tick_witness, "w").close()
-        env = dict(os.environ)
-        env["PATH"] = SHIM_PATH
-        env["WITNESS_FILE"] = tick_witness
-        env["OLLAMA_LIST_MODEL"] = ollama_list_model
-        # Inert by construction for the extracted prefix -- the DRYRUN branch lives at :406,
-        # well past the `# RECONCILE` anchor -- kept anyway so this honours the spec's dry-run
-        # framing and stays correct if the anchor ever moves.
-        env["MR_TICK_DRYRUN"] = "1"
+        def run_once():
+            a_before, h_before = snap(real_alive), snap(real_hb)
+            witness = os.path.join(TMPROOT, "tick-witness-%d" % time.monotonic_ns())
+            open(witness, "w").close()
+            env = dict(os.environ)
+            env["PATH"] = SHIM_PATH
+            env["WITNESS_FILE"] = witness
+            env["OLLAMA_LIST_MODEL"] = ollama_list_model
+            # Inert by construction for the extracted prefix -- the DRYRUN branch lives at
+            # :406, well past the `# RECONCILE` anchor -- kept anyway so this honours the
+            # spec's dry-run framing and stays correct if the anchor ever moves.
+            env["MR_TICK_DRYRUN"] = "1"
+            # MEDIUM-6: pin explicitly. The preflight is gated on
+            # `"${MR_NO_OLLAMA:-0}" != "1"` -- an ambient MR_NO_OLLAMA=1 in the selfcheck's own
+            # environment would otherwise make this leg pass vacuously regardless of whether
+            # the deletion happened.
+            env["MR_NO_OLLAMA"] = "0"
+            try:
+                r = subprocess.run(["bash", wrapper], env=env, cwd=sandbox_harness,
+                                    capture_output=True, text=True, timeout=20)
+            except subprocess.TimeoutExpired:
+                return None, a_before, h_before, None, None, witness
+            a_after, h_after = snap(real_alive), snap(real_hb)
+            return r, a_before, h_before, a_after, h_after, witness
 
-        try:
-            r = subprocess.run(["bash", wrapper], env=env, cwd=sandbox_harness,
-                                capture_output=True, text=True, timeout=20)
-        except subprocess.TimeoutExpired:
+        r, alive_before, hb_before, alive_after, hb_after, tick_witness = run_once()
+        if r is None:
             fail("lp-ollama-behavioural-timeout",
                  "the extracted tick prefix hung under the shim PATH (>20s) -- TimeoutExpired "
                  "is a FAIL, never a pass")
             return
 
-        alive_after, hb_after = snap(real_alive), snap(real_hb)
-        if alive_after != alive_before:
-            fail("lp-ollama-live-marker-mutated",
-                 "the REAL .native-supervisor-tick-alive mtime changed during leg B -- the "
-                 "HARNESS/MEM sandbox rewrite leaked onto live cron-liveness state")
-        if hb_after != hb_before:
-            fail("lp-ollama-live-heartbeat-mutated",
-                 "the REAL .native-supervisor-heartbeat mtime changed during leg B -- the "
-                 "HARNESS/MEM sandbox rewrite leaked onto live cron-liveness state")
+        mutated = (alive_after != alive_before) or (hb_after != hb_before)
+        if mutated:
+            # MEDIUM-5: defence in depth ONLY -- containment is already structurally guaranteed
+            # by the fatal n_harness/n_path aborts above; a genuinely leaked HARNESS/PATH
+            # rewrite can never reach this point. mr-native-tick.sh:20-25 writes BOTH markers
+            # UNCONDITIONALLY before the flock, and a detached tick can fire from fire_event on
+            # every slice done/crash, hourly cron, or the 7-minute retry respawn, so an observed
+            # mutation here is far more likely a concurrent REAL tick than a sandbox leak.
+            # Retry once and fail only if the mutation reproduces: a genuine leak reproduces on
+            # every run; a concurrent tick essentially never lands twice back-to-back.
+            r2, alive_before2, hb_before2, alive_after2, hb_after2, tick_witness2 = run_once()
+            if r2 is None:
+                fail("lp-ollama-behavioural-timeout",
+                     "the extracted tick prefix hung under the shim PATH on retry (>20s)")
+                return
+            mutated2 = (alive_after2 != alive_before2) or (hb_after2 != hb_before2)
+            if mutated2:
+                fail("lp-ollama-live-marker-mutated",
+                     "the REAL .native-supervisor-tick-alive/.heartbeat mtime changed on BOTH "
+                     "the initial run and an immediate retry -- reproduces, so this is a "
+                     "genuine sandbox leak, not a concurrent tick")
+            r, tick_witness = r2, tick_witness2
 
         if r.returncode != 0:
             fail("lp-ollama-behavioural-rc",
@@ -2037,14 +2142,28 @@ try:
                  "the sandbox .native-supervisor-tick-alive was never created -- proves :21 "
                  "never really executed, so an absence of ollama activity would prove nothing")
 
-        witness_text = open(tick_witness, errors="replace").read()
+        # CRITICAL-3(b): a silent 127 (a helper the sandbox MEM does not carry) during
+        # behavioural verification is exactly A8's "silently-skipped extraction == false
+        # green" -- LOUD-FAIL instead of letting an un-shimmed, un-witnessed helper call pass
+        # unnoticed.
+        missing_helper = re.search(re.escape(sandbox_mem) + r"\S*: No such file or directory",
+                                    r.stderr)
+        if missing_helper:
+            fail("lp-ollama-sandbox-helper-missing",
+                 "the extracted prefix tried to call a helper the sandbox MEM does not carry: "
+                 "%s -- a helper this young/renamed must still be enumerated by "
+                 "_mr_helper_names, or this leg is silently blind to whatever it does"
+                 % missing_helper.group(0)[:200])
+
+        witness_text = settled_read(tick_witness)
         if "11434" in witness_text:
             fail("lp-ollama-behavioural-11434",
                  "the extracted tick prefix contacted (or attempted to contact) "
                  "localhost:11434 -- witness: %r" % witness_text[:400])
-        if any("ollama" in ln.split() for ln in witness_text.splitlines()):
+        if _ollama_basename_hit(witness_text):
             fail("lp-ollama-behavioural-ollama-invoked",
-                 "the extracted tick prefix invoked an `ollama` command -- witness: %r"
+                 "the extracted tick prefix invoked an `ollama` command (matched by basename, "
+                 "so an absolute-path invocation counts too) -- witness: %r"
                  % witness_text[:400])
 
     leg_b()
@@ -2074,16 +2193,21 @@ try:
             fail("lp-ollama-static-11434",
                  "mr-native-tick.sh still contains the literal port 11434 after whole-line-"
                  "comment stripping")
-        if any("ollama" in ln.split() for ln in stripped_lines):
+        if _ollama_basename_hit(stripped):
             fail("lp-ollama-static-ollama-cmd",
-                 "mr-native-tick.sh still invokes an `ollama` command after whole-line-comment "
-                 "stripping")
-        # Log-grep secondary (spec:327-329 explicitly says grep-only is not enough -- cheap
-        # secondary only) -- run against the SOURCE, never against mr-native-tick.log (which
-        # holds 803 historical matches and rotates at 1 MB).
-        if "OLLAMA preflight" in tick_src:
+                 "mr-native-tick.sh still invokes an `ollama` command (matched by basename, so "
+                 "an absolute-path bypass is caught too) after whole-line-comment stripping")
+        # BLOCKER-1 fix: scan `stripped`, not the raw source, and match a CALL SITE
+        # (`log "OLLAMA preflight`) rather than any mention of the phrase. The specialist's
+        # required tombstone comment (house form, like :249's debounce tombstone) is free to
+        # say e.g. "removed the OLLAMA preflight" in prose without tripping this -- it is a
+        # whole-line `#` comment and is stripped before this check ever runs. Only a live `log`
+        # call still quoting the retired phrase trips it. This is the cheap secondary the spec
+        # explicitly says is not sufficient alone (:327-329) -- the 11434/ollama-basename checks
+        # above are the real tooth.
+        if re.search(r'log\s+"OLLAMA preflight', stripped):
             fail("lp-ollama-static-log-phrase",
-                 "mr-native-tick.sh still contains the retired 'OLLAMA preflight' log phrase")
+                 "mr-native-tick.sh still contains a `log \"OLLAMA preflight` call site")
         if launch_src is not None:
             launch_stripped = strip_whole_line_comments(launch_src)
             if "11434" in launch_stripped:
@@ -2109,6 +2233,10 @@ try:
         denv = dict(os.environ)
         denv["PATH"] = SHIM_PATH
         denv["WITNESS_FILE"] = d_witness
+        # LOW-8: an ambient MR_OLLAMA_MODEL (whitespace-only or otherwise) makes pick_model()
+        # echo it straight back, which can trip the empty-stdout assertion below for the wrong
+        # reason -- pop it so this leg is self-contained.
+        denv.pop("MR_OLLAMA_MODEL", None)
 
         try:
             r = subprocess.run(["bash", OLLAMA_TOOL, "model"], env=denv,
