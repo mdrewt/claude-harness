@@ -158,6 +158,49 @@ that guard through a profile today — the profile matcher rejects them first, m
 guard genuine defence-in-depth for future profile additions rather than the live control.
 Wrapper overhead is ~60 ms per filtered command, guard subprocess included.
 
+### Found by the full adversarial review (35 agents, every finding reproduced by execution)
+
+The review returned **31 confirmed, 0 refuted**. Beyond those already listed above, eight
+more were real and are fixed here — the first is the serious one:
+
+- **A backslash-escaped quote laundered a second shell operation past the permission
+  layer.** bash reads `\'` as a literal quote and leaves the word unquoted, so every
+  operator between two escaped quotes is live; `blankQuoted`'s `/'[^']*'/g` read it as
+  the *start* of a quoted span and blanked them. `cargo test \'a; <destructive>\'`
+  therefore passed the shape gate and was rewritten into an opaque
+  `node quiet-run.mjs --b64=…` call, which is all the permission layer ever saw.
+  Fail-open could not help: the gate mis-read the shape as safe and affirmatively
+  rewrote. Replaced with a left-to-right bash quoting scanner that returns null on any
+  unterminated state. `peelEnv`'s unquoted value branch had the same hole
+  (`FOO=a;<destructive> cargo test`) and is now operator-free.
+- **The source-location guard was quadratic.** Its character class contained `.`, the
+  same character as the literal following it, making every position ambiguous: a 128 KB
+  line took 6.9 s, stalling one real wrapped command by 10.5 s against 0.017 s
+  unwrapped. Excluding `.` costs nothing (the regex is unanchored, so `foo.bar.ts:12`
+  matches from `bar`) and makes it linear — re-measured at 0.8 ms.
+- **That same guard stole the matched rule's count**, so `summariseEvals` reported
+  **85 of 87** passing evals on the real suite. It now counts the promotion separately.
+- **Scope was decided from the raw command**, and the `just` predicate is `^`-anchored,
+  so `cd projects/monster-realm && just ci-fast` was classified a full sweep and
+  withheld the pass lines that are the entire point of a scoped run. There is now one
+  exported `isTargeted()` so production and the gate cannot diverge again.
+- **Concurrent runs collided on the raw-log filename.** The name was timestamp +
+  command-hash only, opened with `'w'`; the supervisor runs several agents at once, so
+  identical commands truncated each other's logs — the recovery path the banner points
+  at. Now pid-qualified and opened `wx`.
+- **The raw tee was not byte-exact.** Decoding to a string before writing turned every
+  non-UTF-8 byte into U+FFFD, so the file the banner calls "full raw output" was a lossy
+  transcription. The bytes are now teed before decoding.
+- **Every fatal signal was reported as 143.** A four-entry lookup table meant SIGABRT,
+  SIGSEGV and SIGBUS all came back as the code meaning "the harness killed me", pointing
+  diagnosis of a genuine crash at the wrong layer. Uses `os.constants.signals` now.
+- **The withheld-lines notice promised a raw log that did not exist**, printing "full
+  text in the raw log" on the same screen as "(log unavailable)". Availability is now
+  threaded into the notice and into the search summariser.
+- A vanished stdout reader (quiet-run inside a pipeline) raised an unhandled EPIPE,
+  replacing the child's exit code with a Node stack trace — this hook becoming the wall
+  of text it exists to delete. Handled.
+
 ### Rejected during implementation, recorded so they are not re-tried
 
 - **A "always keep the last N lines" guard.** It resurrected the very lines the
