@@ -79,6 +79,18 @@ for (const name of GLOBAL_HOOKS) {
   });
 }
 
+// The Bash noise filter (ADR-0012) is linked as a DIRECTORY: quiet-bash.mjs imports
+// quiet-lib.mjs and quiet-profiles.mjs as siblings, so the whole folder has to
+// travel together. It is wired at the user level as well as per project because the
+// supervisor loop `cd`s into projects/monster-realm before launching, and a
+// harness-only wiring would miss every build-loop run — which is where the tokens
+// actually go.
+links.push({
+  label: 'hook-dir',
+  src: join(HARNESS, '.claude', 'hooks', 'quiet'),
+  dst: join(CLAUDE, 'hooks', 'quiet'),
+});
+
 const isLink = (p) => {
   try {
     return lstatSync(p).isSymbolicLink();

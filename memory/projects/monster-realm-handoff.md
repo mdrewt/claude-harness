@@ -326,6 +326,148 @@ harness `main`. Undone with `git reset --mixed HEAD~1` (index-only, file content
 nothing pushed). Slice checkpoints belong on the project slice branch; harness plan memos stay
 uncommitted like their 15r/16r siblings.
 
+## 2026-08-22T~18:4xZ — 16r-c COMPLETE (terminal state: PR #351 open + local `just ci` green)
+
+**PR:** https://github.com/mdrewt/monster-realm/pull/351 — branch `feat/16r-c-changelog-freshness-gate`,
+worktree `.claude/worktrees/16r-c`, forked from `2290f47`, **merged up to `origin/master` @ `a857214`**.
+OPEN / MERGEABLE, ci+e2e QUEUED at exit. **`gh pr merge` NOT run — supervisor owns the merge.**
+
+Local full `just ci` **exit 0**: 87/87 evals, 1942 cargo tests, 2461 client tests, clippy `-D warnings`,
+fmt, biome, wasm, perf-budget 7/7, secret-scan clean, observability 8/8. `node evals/run.mjs` ×3
+deterministic. `adr-digest --check` clean. Semgrep run LOCALLY on the changed files (remote-only
+gate): 0 findings. Independent `verifier` verdict **PASS** — teeth re-bitten, no test weakened,
+scope exact, ADR append verified byte-identical for its first 296 lines.
+
+**Diff (4 files):** `evals/nightly-smoke-wiring.eval.mjs`, `justfile`, `docs/adr/0196-*.md`,
+`ARCHITECTURE.md`. `touches-delta:` the last two (always-in-scope doc companions).
+**`.github/workflows/nightly.yml` was DECLARED but NOT CHANGED** — the job was already correctly
+shaped. No new ADR (none assigned; ADR-0196 D8 pre-authorized this as its own follow-ups).
+`boyscout-delta: none`. CHANGELOG/ADR-README/DIGEST untouched.
+
+**Delivered:** ADR-0196 follow-ups **#3** and **#2**. `jobIsNotNeutered` gained an additive
+`opts.gates` data-descriptor array; `CHANGELOG_FRESHNESS_GATES` pins the job's two gate steps
+VERBATIM; seven new real checks (24-30). `justfile` gained `GIT_CLIFF_VERSION := "2.13.1"` +
+version-asserting `changelog:`/`changelog-check:` recipes, pinned three ways.
+
+**Review found a REGRESSION THIS SLICE CAUSED — disclosed, not buried.** Round 1 widened
+`{kind:'just'}` to read block-scalar bodies, LOOSENING the pre-existing mutation/coverage/
+mutation-server gate (a `run: |` step was fail-closed at `2290f47`). The multi-command class is
+closed (tooth V29); a **single-line** `run: |` body starting with `just ` is STILL accepted where
+the fork point fail-closed. Named in ADR-0196 with the real fix: promote those three gates to
+`{kind:'script'}` verbatim pins. **Recommend that as an early follow-up slice.**
+
+**Two genuinely pre-existing BLOCKERs closed in passing** (both affect all guarded jobs):
+job-level `defaults: run: shell:` no-ops every run step with the pin intact; `strictJobBlock`
+scanned from line 0, so a decoy job block in a top-level `run-name:` block scalar beat the real
+`if: false` definition. Also closed: gate-step `working-directory:`, folded `run: >` scalars, and
+`justRecipeBody` first-wins (that one was round-1 self-inflicted, corrected in the ADR).
+
+**Deferred, DATED 2026-08-22 in ADR-0196 (never silently dropped):** follow-ups **#1**
+(dedicated `changelog-freshness-teeth.eval.mjs`) and **#4** (shell `main()` subprocess coverage) —
+both need `scripts/**`, outside `touches:`. Next carrier: a slice declaring `scripts/` + `evals/`.
+
+**Named residuals still open (measured live, all pre-existing, all guarded jobs):** a `uses:` step
+running arbitrary shell before the gates; `env: NODE_OPTIONS: --require …` (the env scan is a
+PATH-only DENYLIST); zero-instance `strategy: matrix:`; a skip-inducing job `needs:`;
+`runs-on:`/`container:` relocation. **Closing them needs a step-key/`uses:`/`env:` ALLOWLIST across
+all guarded jobs — its own slice, because a strict env allowlist false-REDs FROZEN tooth U2c**,
+which pins that ordinary non-PATH env keys are ACCEPTED. Re-authoring U2c is a deliberate decision.
+
+**16r-h is now UNBLOCKED** (`after: 16r-c`), but note it shares
+`evals/nightly-smoke-wiring.eval.mjs` — serialize it after this merges.
+
+### Operational findings worth acting on (harness-level, not this repo)
+- **The `tester` subagent cannot write to its own slice.** `.claude/hooks/guard-tester-write.mjs`
+  blocks every `tester` Write/Edit under `.claude/`, and slice worktrees live at
+  `.claude/worktrees/<slice>`. The tester staged its 1472 lines in `/tmp` and the ORCHESTRATOR
+  applied them. `guard-tester-bash.mjs` likewise blocked the tester-lens from executing anything,
+  so it delivered a static trace instead of the requested repeat-runs. **Fix options for the
+  supervisor:** move slice worktrees outside `.claude/`, or exempt `.claude/worktrees/<slice>/`
+  from the write guard (it is a checkout, not the harness's control plane).
+- A fresh worktree has **no `client/node_modules`** — `just ci` dies at exit 127 on biome until
+  `cd client && npm ci --include=dev` (~1 min).
+- The fork point `2290f47` was **locally red** on `just security` (a literal PEM banner in
+  `.claude/hooks/guard-tester-bash.mjs`, added by that very commit); sibling 16r-a fixed it in
+  `5f14fe2`. Merging up cleared it. Remote CI never caught it — worth understanding why.
+
+## 2026-08-22T22:24:14Z — HARNESS: Bash output noise filter live (ADR-0012) — stop piping gate output through | tail
+**Harness change, applies to EVERY loop run from the next tick onward.** A
+PreToolUse(Bash) hook now filters noisy command output before it reaches any agent
+(ADR-0012, harness `.claude/hooks/quiet/`). It is wired at the USER level
+(`~/.claude/settings.json` -> `~/.claude/hooks/quiet/quiet-bash.mjs`, a symlink into
+the harness) as well as per project, specifically so it covers `mr-launch.sh` runs,
+which `cd` into `projects/monster-realm` and would miss a harness-only wiring.
+
+WHAT CHANGES FOR A SLICE AGENT
+- `just ci`, `just test`, `cargo nextest`, `node evals/run.mjs`, `biome check`,
+  `node --test`, `vitest`, cargo build/clippy/bench and `npm install` come back with
+  the pass wall and compile progress withheld. Failures, diagnostics, panics,
+  assertion diffs, `Summary [...]`, `ℹ pass N`/`ℹ fail N` and eval FAIL/THREW lines
+  are kept whole. Measured: `cargo nextest run --workspace` 227,406 B -> 176 B;
+  `node evals/run.mjs` 53,285 B -> 68 B; a live `just test` 118 lines -> 38.
+- `node evals/run.mjs` prints NO summary of its own, so the filter SYNTHESISES one:
+  `[quiet-run] evals: 87 passed`. A green eval run now shows that line instead of 87
+  lines averaging 611 chars.
+- Exit codes are unchanged and pass through exactly. `[quiet-run] exit N` is printed.
+- Every run tees the COMPLETE raw output to
+  `$TMPDIR/claude-quiet-logs/<session-id>/<ts>-<profile>-<hash>.log`, and the banner
+  prints that path. Read it when a filtered result is not enough.
+
+WHAT THE SUPERVISOR AND ITS BRIEF-WRITERS MUST KNOW
+- **Stop instructing agents to pipe gate output through `| tail -N` / `| grep`.** A
+  piped command is NOT rewritten (the hook only touches commands it can read
+  literally), so an added pipe silently opts that command OUT of filtering AND keeps
+  the blind-tail failure mode the filter exists to remove. Existing briefs that say
+  `just ci 2>&1 | tail -60` now cost MORE than an unpiped `just ci`.
+- `just ci > /tmp/x.log 2>&1` is likewise unfiltered (redirect = not rewritten).
+  That remains fine when the intent is to keep a full log for the handoff.
+- Escape hatch for one command: `NOFILTER=1 <cmd>`. Global kill switch:
+  `CLAUDE_QUIET_BASH=0` in the environment. Both are honoured before any rewrite.
+- A re-run of a command that just failed is flagged `verbose` in the banner; it
+  loosens failure-context caps but deliberately does NOT restore the pass wall.
+- Cost accounting is unaffected — this changes tokens per tool result, not the
+  ledger schema, `mr-record`, or any `.done`/lock file.
+
+RISK POSTURE
+Fail-open by construction: an unrecognised line is KEPT, and an unrecognised command
+shape is not rewritten at all. The wrapper refuses to run anything that does not
+match a filter profile and re-invokes `guard-bash.mjs` on the decoded command, so it
+cannot be used to launder a destructive command past the guard. If anything looks
+wrong, set `CLAUDE_QUIET_BASH=0` and report it — do not edit the rule tables mid-slice.
+
+GATES: `.claude/hooks/quiet/quiet.test.mjs` (33 tests, in `just test`/`just ci`) and
+four new assertions in `scripts/tests/invariants.test.mjs`. The harness copy,
+`templates/_base` copy and the monster-realm copy are asserted byte-identical.
+## 2026-08-22T21:13:39Z — 16r-d merged; composite launch 16r-f
+PR#352 (16r-d, spacetime sql --format json decode) squash-merged + branch deleted; mr-audit CLEAN (orchestration CLEAN, gating-advisory CLEAN, no mandatory read; the disposition findings block is a pre-existing repo-wide spec-ledger scan, unrelated to this diff). Local master ff-only'd b5ff14f->d4fa9fe. Master CI kicked off post-merge, in_progress at record time (not yet observed green -- next tick/event verifies).
+
+Composite launch: 16r-f (battleReseedPending sticky latch, client/src/main.ts reconnect-flush ordering) picked via fast-path queue[0] (pulled forward 2026-08-22 operator directive). mr-disjoint verdict SAFE vs in-flight 16r-e (ops/observability/** only) -- no shared axis, no partition needed. Classified HARD tier (netcode/reconcile: subscription-batch flush ordering around reconnect, per ADR-0198 D7's 'assumed' atomicity) -> fable/xhigh (fable_ok=true, d7=$464.33/$2783). Launched leader=1124388.
+
+Governor NORMAL throughout (d7$464.33/$2783~=17%, fable_ok=true). No BLOCKER, no park-counter bump. 16r-e remains live in parallel (leader=1107821, started 20:59:42Z). NEXT: resume via event tick on either slice's .done or PR-open/CI-green event.
+
+## 2026-08-22T21:00:06Z — 16r-c MERGED, 16r-d CI-watch delegated, 16r-e launched (composite)
+PR #351 (16r-c, changelog-freshness nightly gate) squash-merged clean — mr-audit orchestration=CLEAN,
+no mandatory read (routine tier). Disposition findings were all advisory/corpus-scoped pre-existing
+spec-ledger gaps, unrelated to this diff. master fast-forwarded a857214->b5ff14f. Worktree/branch
+cleaned; mr-branch-audit shows 0 post-merge-commit loss.
+
+PR #352 (16r-d, spacetime sql --format json parser) still has ci/e2e IN_PROGRESS at tick time —
+delegated to `mr-ci-watch 352 16r-d` (detached, setsid) rather than polling; resumes via its own
+event tick on completion.
+
+Composite merge->launch: with the merge fully closed out and no live compute in flight (16r-d's
+agent session already finished; it's only waiting on CI/merge), took the queue[] fast path and
+launched 16r-e (scheduled-function-delay observability wiring: prometheus recording rule + Grafana
+panel + alert for spacetime_scheduled_function_delay_seconds, per
+specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md). touches are ops/observability/**
+only — disjoint from everything else in flight/pending. tier=routine, opus/high, no ADR pre-allocated
+(config/dashboard-only change). queue-removed 16r-e; 16r-f remains queued.
+
+Governor NORMAL throughout (d7=$463.26/$2783≈17%, fable_ok=true). No BLOCKER, no park-counter bump.
+
+## 2026-08-22T19:48:55Z — 16r-g MERGED — Bond/apply_care dead-code retirement (ADR-0177 D3 disposition)
+PR#350 squash-merged to mdrewt/monster-realm master (a857214). Deleted `Bond(u8)`, `apply_care`, `CareError`, `CARE_BOND_AMOUNT` — server-unused since Migration B removed the `bond` column (ADR-0177 D2). Net -246/+38 lines across game-core (types.rs, raising/{rules,types,mod,m9a_gating_tests}.rs, lib.rs, monster/mod.rs, monster/rolls.rs) + ARCHITECTURE.md + docs/adr/0177-*.md. touches-delta beyond declared set (lib.rs, monster/mod.rs, monster/rolls.rs) justified in PR body as compile-required re-export cleanup + doc-truth fix, scoped entirely inside game-core + doc companions; no boyscout-delta claimed. 8 tests deleted, each tied 1:1 to a deleted symbol, independently re-derived by tester+verifier (disposition table in PR body). mr-audit orchestration verdict CLEAN, mandatory_read=false; gating_advisory FLAGGED (skip_markers_added:1, 17 removed/modified asserts) reviewed — no actual ignore/skip/xit/.only markers found in diff, consistent with PR's own audit table; treated as clean. master CI green pre-merge (PR checks), post-merge run queued at merge time. Merged worktree .claude/worktrees/16r-g and branch feat/16r-g-retire-bond-apply-care removed. Follow-up flags recorded in PR (not new slices yet): (1) no CI-time gate enforces 'no Bond symbols' since game-core is a lib crate (dead_code never fires) — extend raising-reducer-security.eval.mjs g8 residue scan to game-core/src in a slice owning evals/; (2) server-module/src/raising.rs:39-41,46-47 comments now stale (MAJOR, outside declared touches, that file is g8's own scan target); (3) docs/adr/0058-*.md header + DIGEST.md:36 still advertise apply_care as live — needs Amends/Amended-by note, doc slice owning ADR-0058; (4) evals/raising-reducer-security.eval.mjs:491-499 dead accept-token for apply_care(, harmless; (5) game-core/tests/eg3_evolution_graph.rs:542 line-number citation drift; (6) docs/specs/A0-plan.md:88-91 superseded fusion-era sketch, not compiled. 16r-c remains in-flight (pid 627621, live chain, untouched this tick).
+
 ## 2026-08-22T19:43:49Z — 16r-g PR#350 open — CI-wait delegated
 16r-g (retire Bond/apply_care/CareError/CARE_BOND_AMOUNT, ADR-0177 D3 follow-up) run finished rc=0, attempts=1, opus/high, $16.11. Worktree clean, gates green (clippy/tests/mutation verifier PASS, evals 87 PASS/0 FAIL), PR opened: https://github.com/mdrewt/monster-realm/pull/350. Remote CI (ci/e2e) was pending at tick time; delegated CI-wait to mr-ci-watch (detached, pid recorded in ledger notes) per doctrine — resumes via event tick on conclusion, no merge attempted this tick.
 
@@ -483,22 +625,6 @@ already exists, so two simultaneous runs make one of them fail on setup. Not a d
 Supervisor tick native-20260822T094703Z-348495 merged lp-ollama: deletes the unconditional per-tick ollama preflight from mr-native-tick.sh (803 warm-ups / 0 invocations measured), keeps mr-ollama for manual use, adds a 4-leg mr-selfcheck block (canary/behavioural/static/EARS-2) with proof-of-teeth. Audit CLEAN (orchestration+gating), no mandatory read; diff scope = declared touches (mr-native-tick.sh) + companions (mr-selfcheck, plan doc), matching the PR's touches-delta. Pre-existing dirty-tree strays on main (future-prompts.md, handoff files, mr-state.json, mr-usage-daily.jsonl, spacetime-db-testing.md, a spec file) were stashed labeled, ff-only merge applied, then popped back cleanly (mr-native-tick.sh auto-merged, no conflict markers). Worktree + feat/lp-ollama branch removed post-merge. Note for future ticks: /usr/bin/node v18.19.1 on PATH ahead of the asdf node 24.13.1 shim makes 'just ci' false-red on scripts/tests/adr-lint.test.mjs (import.meta.dirname undefined pre-Node 20.11) -- always source asdf shims before trusting a harness just ci result; this slice's real gate (mr-selfcheck SELFCHECK-OK) was green throughout. lp-06 remains live in a separate worktree (untouched this tick) -- its PR body already flags a shared mr-selfcheck append-point collision with this now-merged slice; it will need to rebase onto d3d1df5 before its own merge.
 ## 2026-08-22T09:05:18Z — lp-brief-cost MERGED — false budget premise removed from the brief template
 PR #31 squash-merged to main (1493e4a), branch feat/lp-brief-cost deleted. Removed the false-premise budget line from mr-brief-template.md (previously claimed budget was ample / cited an unmeasured 125% figure as mechanical, though costwatch_enforce is false) and replaced it with a bounded-budget instruction, per EARS E1-E3. Added lp-brief-cost-teeth.sh proof-of-teeth fixture (A1-A5, TEETH-ALL-OK) and 5 mr-selfcheck gate assertions wired to it. mr-audit CLEAN (orchestration+gating, 1 attempt, opus/high). Re-verified mr-selfcheck + the teeth fixture green live on the merged tip before merging. This repo carries no GH Actions checks (statusCheckRollup/gh run list both empty) — the harness-slice gate is mr-selfcheck + touched-tool selftests, not remote CI. No ADR (loop-infra slice). lp-ollama (feat/lp-ollama, session_leader 69830) remained live throughout, untouched — disjoint touches (mr-native-tick.sh).
-## 2026-08-22T08:04:41Z — native tick: launched lp-brief-cost + lp-ollama (wave-1 tail), queued lp-06
-Native tick rid=mr-sup-native-20260822T080011Z-65497 (src=cron forced). Fast-path clean: no live per-run locks, no chain-owner mutex held, no .done files, no open PRs, no operator hold, no pending events. Active-session probe clean: no resident stream-json claude pid; last tracked file writes were 2026-08-22T07:34:18Z local (mr-state.json/handoff), well outside the ~6min window, and match the DIRTY-TREE-ADVISORY strays already flagged by many prior ticks (not touched).
-
-master@2290f47 CI green (feat(lp-tester-tools-project) run success on that sha); the in_progress `Nightly` entry in the situation bundle is the unrelated scheduled workflow, not a merge gate. No inflight/awaiting_merge/queue at tick start.
-
-Derived next-eligible pool from M-loop-infrastructure.spec.md: lp-00 already satisfied (many prior ticks confirmed), but wave-1-exit is a measurement gate (one full reset cycle of seven_day.utilization + lp-02 variance + a forced-red drill + lp-01 selftest demo, R13-ordered) -- not merely "all wave-1 slices merged" -- so no wave-2 slice (lp-08 etc, all `blocked:wave-1-exit`) is eligible yet regardless of PR count. Checked remaining wave-1 slices against merged history (harness PRs #1-30, project PRs up to #348): lp-00/01/02/03/04/05/09/skills/queue/handoff-rotate/tester-tools/tester-tools-project/doc-a/git-workflow/branch-audit all merged. Four remained open: lp-06, lp-07, lp-brief-cost, lp-ollama. lp-07 is `blocked:operator-attended` (touches ~/.claude/settings.json, out-of-repo, no worktree/PR path) -- not autonomously launchable, left alone. The other three are `after: lp-00 / blocked:lp-00`, now cleared.
-
-mr-disjoint "lp-brief-cost:memory/projects/mr-brief-template.md" "lp-ollama:memory/projects/mr-native-tick.sh" "lp-06:memory/projects/mr-backup,memory/projects/mr-selfcheck,memory/projects/mr-record" -> verdict SAFE, all three pairs disjoint, no shared registry/namespace axis (three independent mechanical fixes, no content/schema surface). free -g: 19G free, ample. None HARD-tier (no schema/reducer/netcode/security/M20/M25 touches, no prior failed attempt) -- routine tier, opus@high for both.
-
-Took chain-owner mutex. Wrote pass-vars for lp-brief-cost and lp-ollama (first attempt failed BRIEF-RENDER-FAILED -- vars.json was missing the required `tier` field; fixed and re-ran). `mr-spawn lp-brief-cost` -> LAUNCHED leader=69455 claude_pid=69458 model=opus effort=high tier=routine repo=harness pr_repo=mdrewt/claude-harness rid=mr-spawn-20260822T080342Z-69411. `mr-spawn lp-ollama` -> LAUNCHED leader=69830 claude_pid=69833 model=opus effort=high tier=routine repo=harness pr_repo=mdrewt/claude-harness rid=mr-spawn-20260822T080350Z-69691. Both DIRTY-TREE-ADVISORY (expected, pre-existing, unrelated -- slices branch from origin/main). Post-launch verified: both leaders are their own session/process-group leaders (PPID=1, SID==PGID==leader pid), both claude children correctly running `--model opus --effort high --dangerously-skip-permissions`, matching the brief. Per-run locks written for both.
-
-N_MAX=2 default applied (not the N>=3 protocol -- no operator signal to raise N this tick). Third disjoint candidate lp-06 queued via `mr-record queue-add` for the next tick's fast path rather than launched, per doctrine (a launchable winner plus an eligible runner-up not launched this tick gets queued).
-
-Ledger rows appended for both launches (cost=0, model=opus, attempts=1). mr-state.json rewritten: inflight=[lp-brief-cost, lp-ollama], notes updated. Released chain-owner mutex after this record.
-
-Governor NORMAL (d7=$272.93/$2783=10%, fable_ok=true). No BLOCKER. No park-counter bump. NEXT: resume via event tick on either slice's `.done` file or PR-open event; lp-06 remains queued and ready for the fast path once a slot frees or the next tick re-derives.
 ## 2026-08-21T14:00:06Z — lp-queue + lp-handoff-rotate — queue[] reshaped, handoff auto-rotation shipped
 
 
@@ -506,5 +632,47 @@ Governor NORMAL (d7=$272.93/$2783=10%, fable_ok=true). No BLOCKER. No park-count
 
 
 
-## 2026-08-22T19:48:55Z — 16r-g MERGED — Bond/apply_care dead-code retirement (ADR-0177 D3 disposition)
-PR#350 squash-merged to mdrewt/monster-realm master (a857214). Deleted `Bond(u8)`, `apply_care`, `CareError`, `CARE_BOND_AMOUNT` — server-unused since Migration B removed the `bond` column (ADR-0177 D2). Net -246/+38 lines across game-core (types.rs, raising/{rules,types,mod,m9a_gating_tests}.rs, lib.rs, monster/mod.rs, monster/rolls.rs) + ARCHITECTURE.md + docs/adr/0177-*.md. touches-delta beyond declared set (lib.rs, monster/mod.rs, monster/rolls.rs) justified in PR body as compile-required re-export cleanup + doc-truth fix, scoped entirely inside game-core + doc companions; no boyscout-delta claimed. 8 tests deleted, each tied 1:1 to a deleted symbol, independently re-derived by tester+verifier (disposition table in PR body). mr-audit orchestration verdict CLEAN, mandatory_read=false; gating_advisory FLAGGED (skip_markers_added:1, 17 removed/modified asserts) reviewed — no actual ignore/skip/xit/.only markers found in diff, consistent with PR's own audit table; treated as clean. master CI green pre-merge (PR checks), post-merge run queued at merge time. Merged worktree .claude/worktrees/16r-g and branch feat/16r-g-retire-bond-apply-care removed. Follow-up flags recorded in PR (not new slices yet): (1) no CI-time gate enforces 'no Bond symbols' since game-core is a lib crate (dead_code never fires) — extend raising-reducer-security.eval.mjs g8 residue scan to game-core/src in a slice owning evals/; (2) server-module/src/raising.rs:39-41,46-47 comments now stale (MAJOR, outside declared touches, that file is g8's own scan target); (3) docs/adr/0058-*.md header + DIGEST.md:36 still advertise apply_care as live — needs Amends/Amended-by note, doc slice owning ADR-0058; (4) evals/raising-reducer-security.eval.mjs:491-499 dead accept-token for apply_care(, harmless; (5) game-core/tests/eg3_evolution_graph.rs:542 line-number citation drift; (6) docs/specs/A0-plan.md:88-91 superseded fusion-era sketch, not compiled. 16r-c remains in-flight (pid 627621, live chain, untouched this tick).
+
+## 2026-08-22T~22:5xZ — 16r-f COMPLETE (terminal state: PR #353 open + local `just ci` green)
+
+**PR:** https://github.com/mdrewt/monster-realm/pull/353 — branch `feat/16r-f-battle-reseed-sticky-latch`,
+worktree `.claude/worktrees/16r-f`, forked from master `d4fa9fe`. OPEN / MERGEABLE, ci+e2e IN_PROGRESS at
+exit. **`gh pr merge` NOT run — supervisor owns the merge.**
+
+Local full `just ci` **exit 0** (single run, all recipes through observability-validate 8/8): 2472 client
+tests (82 files), Rust suites, evals, perf-budget 7/7, secret-scan clean. Semgrep run LOCALLY on both
+changed files (remote-only gate): 1074 rules, 0 findings. Independent `verifier` verdict **PASS** (RED
+proof + T10 bite reproduced from scratch; test-file history purely additive except 2 disclosed docblock
+header lines; scope exact).
+
+**Diff (4 wip commits → squash):** `client/src/main.ts` (+20/−6: sticky latch, `reseedPrevBattleId`
+guarded capture as onReconnect's first statement, id-gated silent re-baseline) · NEW
+`client/src/main.battle-reseed.test.ts` (523 lines, 11 runtime tests — the repo's FIRST runtime-import
+gate over main.ts) · `docs/adr/0130-client-observability.md` (+41, APPEND-ONLY amendment; DIGEST
+unchanged). `main.wiring.test.ts` declared but untouched (185 teeth green unmodified).
+
+**Spec deviation, reviewed + recorded:** the spec's minimal "don't clear on undefined" shape swallows the
+next NEW battleStart for zero-battle-row players (server GCs battles). Plan review adopted the drop-time
+id-capture refinement; EARS unchanged. Rationale + residuals (c)/(d)/(e) in the ADR-0130 amendment.
+
+**Test-first, audited:** tester (opus) authored T1-T9 → orchestrator ran RED proof at fork (exactly T1+T8
+red) → impl → lenses (reviewer APPROVED, red-team 6-mutation table + Semgrep, desync-guard PASS, /simplify
+clean) → both red-team and desync-guard independently found the multi-episode gap → tester authored T10
+(kills capture-once-ever AND never-clear cheats, both bite-proofs MEASURED by the orchestrator) → verifier
+PASS. One provably-inert mutation (`reseedPrevBattleId = null` deletion) documented, not papered over.
+
+**Follow-up flags (supervisor; none blocking):**
+1. justfile: `client-test` should depend on `wasm` + justfile:271 "no wasm import" comment now stale — the
+   new test resolves `client-wasm/pkg` (safe under `just ci` ordering; bare `npm test` on unbuilt tree reds
+   with a clear resolve error).
+2. ADR-0198 D7 "assumed" subscription-batch atomicity — falsified-and-moot for the battle listener; needs
+   an Amends note from a slice owning that file.
+3. Pre-existing, red-team-MEASURED: `latestPlayerBattle()` single-highest-id design makes the lower of two
+   simultaneous Ongoing battles invisible to the event ring for its whole lifecycle (store.ts design).
+4. Pre-existing: main.ts `identity` never refreshed on reconnect — an identity-minting reconnect silences
+   every identity-scoped listener with the latch armed (ADR-0130 residual (e)); worth its own slice.
+5. /tmp cleanup: `/tmp/16rf-verify-*` + `/tmp/mr16rf-bite2` copies left (rm hook-blocked, harmless);
+   a leftover 16r-d spacetime instance still runs on 127.0.0.1:3099 (`--data-dir /tmp/mr16rd-stdb-a`).
+
+Budget: well under the $150 target (planner + 2 plan lenses + tester(opus)×2 + 3 impl lenses + verifier +
+doc-keeper; no thrash — RED proof and all suites first-try).

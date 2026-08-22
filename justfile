@@ -2,7 +2,7 @@ set windows-shell := ["cmd.exe", "/c"]
 # Harness self-management (dogfoods the standard the projects follow).
 
 test:
-    node --test scripts/tests/harness.test.mjs scripts/tests/invariants.test.mjs scripts/tests/adr-lint.test.mjs
+    node --test scripts/tests/harness.test.mjs scripts/tests/invariants.test.mjs scripts/tests/adr-lint.test.mjs .claude/hooks/quiet/quiet.test.mjs
 
 # Full harness gate (dogfoods what projects do): lint its own scripts, then test.
 ci: lint test research-gate adr-gate

@@ -2,7 +2,7 @@
 // Run: node --test scripts/tests/*.test.mjs
 
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -323,5 +323,107 @@ test('every *.eval.mjs default-exports a function', async () => {
         `${s}/evals/${f}: must default-export a function`,
       );
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Bash noise filter (ADR-0012)
+// ---------------------------------------------------------------------------
+// The hook ships in three places: the harness's own .claude/, templates/_base (so a
+// generated project keeps the behaviour when opened standalone), and — via
+// sync-templates — every scaffolded project. `guard-bash.mjs` demonstrates what
+// happens without a drift gate: 24483 B in the harness, 1349 B in _base, 5260 B in
+// monster-realm, three rule tables that no longer agree. These assertions exist so
+// the same thing cannot happen to this one.
+
+const QUIET_FILES = [
+  'quiet-lib.mjs',
+  'quiet-profiles.mjs',
+  'quiet-run.mjs',
+  'quiet-bash.mjs',
+  'quiet.test.mjs',
+];
+
+test('generated projects ship the Bash noise-filter hook', async () => {
+  for (const f of QUIET_FILES) {
+    assert.ok(
+      existsSync(tpl('_base', '.claude', 'hooks', 'quiet', f)),
+      `_base must ship .claude/hooks/quiet/${f}`,
+    );
+  }
+  const settings = JSON.parse(await readFile(tpl('_base', '.claude', 'settings.json'), 'utf8'));
+  assert.match(
+    JSON.stringify(settings.hooks?.PreToolUse ?? []),
+    /quiet-bash\.mjs/,
+    '_base/.claude/settings.json must wire PreToolUse -> quiet/quiet-bash.mjs',
+  );
+});
+
+test('the noise-filter hook never diverges between the harness and _base', async () => {
+  for (const f of QUIET_FILES) {
+    const harness = await readFile(path.join(HARNESS, '.claude', 'hooks', 'quiet', f), 'utf8');
+    const base = await readFile(tpl('_base', '.claude', 'hooks', 'quiet', f), 'utf8');
+    assert.equal(harness, base, `.claude/hooks/quiet/${f} diverges from templates/_base`);
+  }
+});
+
+// A rewrite that the permission layer reads as "multiple operations" is rejected
+// outright (measured against Claude Code 2.1.240). The hook therefore has exactly
+// one legal output shape, and this pins it end to end through the real process.
+test('the noise filter rewrites to a single operator-free command, and only for noisy commands', () => {
+  const hook = path.join(HARNESS, '.claude', 'hooks', 'quiet', 'quiet-bash.mjs');
+  const ask = (command) => {
+    const res = spawnSync(process.execPath, [hook], {
+      input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, session_id: 's' }),
+      encoding: 'utf8',
+    });
+    assert.equal(res.status, 0, 'the hook must never block a tool call');
+    return res.stdout.trim() ? JSON.parse(res.stdout) : null;
+  };
+
+  const rewritten = ask('cargo nextest run --workspace')?.hookSpecificOutput?.updatedInput?.command;
+  assert.ok(rewritten, 'a noisy command must be rewritten');
+  assert.doesNotMatch(rewritten, /[;&|<>`$()]/, 'the rewrite must contain no shell operator');
+
+  for (const safe of ['ls -la', 'git status', 'cat README.md', 'cargo test 2>&1 | tail -5']) {
+    assert.equal(ask(safe), null, `must not rewrite: ${safe}`);
+  }
+});
+
+// The two settings files that govern REAL sessions were previously ungated: only
+// templates/_base was asserted, so the harness's own wiring and monster-realm's
+// could both be deleted with every gate still green.
+test('the settings files that govern real sessions wire the noise filter', async () => {
+  const targets = [
+    path.join(HARNESS, '.claude', 'settings.json'),
+    path.join(HARNESS, 'projects', 'monster-realm', '.claude', 'settings.json'),
+  ];
+  for (const file of targets) {
+    if (!existsSync(file)) continue; // monster-realm is a separate, optional checkout
+    const settings = JSON.parse(await readFile(file, 'utf8'));
+    const pre = JSON.stringify(settings.hooks?.PreToolUse ?? []);
+    assert.match(pre, /quiet-bash\.mjs/, `${file} must wire PreToolUse -> quiet/quiet-bash.mjs`);
+    assert.match(pre, /guard-bash\.mjs/, `${file} must still wire the destructive-command guard`);
+  }
+});
+
+// quiet.test.mjs reads its fixtures relative to itself, so a copy of the test
+// without a matching copy of the fixtures is a test that cannot run.
+test('the noise-filter fixtures never diverge between the harness and _base', async () => {
+  const dirOf = (root) => path.join(root, '.claude', 'hooks', 'quiet', 'fixtures');
+  const harnessDir = dirOf(HARNESS);
+  const baseDir = dirOf(path.join(HARNESS, 'templates', '_base'));
+  const names = readdirSync(harnessDir).sort();
+  assert.deepEqual(
+    readdirSync(baseDir).sort(),
+    names,
+    'fixture SETS differ between the harness and _base',
+  );
+  for (const n of names) {
+    assert.equal(
+      await readFile(path.join(harnessDir, n), 'utf8'),
+      await readFile(path.join(baseDir, n), 'utf8'),
+      `fixtures/${n} diverges from templates/_base`,
+    );
   }
 });

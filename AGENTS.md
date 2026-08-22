@@ -83,6 +83,17 @@ the full rationale and `standards/` for the engineering rules.
   is subordinate to it.
 - Before changing a signature/type used across a boundary or by several modules,
   report the affected callers/tests first (impact analysis) — see `standards/principles.md`.
+- **Noisy command output is filtered automatically** (ADR-0012). Test/build/lint
+  output reaches you with the pass wall and compile progress withheld; failures,
+  diagnostics and summaries are kept whole, and a targeted run (`-p <crate>`, a
+  named test file, a single `*.eval.mjs`) keeps its passing lines too. Every run
+  tees the COMPLETE output to a log file whose path is printed in the trailing
+  `[quiet-run]` banner — read that file when you need everything (that log is the
+  recovery path; re-running one eval or one test usually will not reproduce the
+  withheld detail). To bypass the
+  filter for one command, prefix it: `NOFILTER=1 just ci`. Do **not** add your own
+  `| tail -40` on top; that suppresses the filter entirely (piped commands are
+  never rewritten) and a fixed tail is exactly what loses a failure.
 
 ## Authoring these instruction files
 Keep `AGENTS.md` a lean lookup table, not a brain dump. If an agent already does

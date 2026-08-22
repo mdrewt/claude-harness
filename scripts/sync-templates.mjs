@@ -30,6 +30,26 @@ const MANAGED = [
   'scripts/check-secrets.mjs',
   'scripts/check-commit-msg.mjs',
   'evals/run.mjs',
+  // The Bash noise filter (ADR-0012). Listed file-by-file because MANAGED is a flat
+  // path list, and synced so a fix to the rule tables reaches every scaffolded
+  // project instead of rotting into divergent copies the way guard-bash.mjs did
+  // (24483 B in the harness vs 1349 B in _base when this was written).
+  '.claude/hooks/quiet/quiet-lib.mjs',
+  '.claude/hooks/quiet/quiet-profiles.mjs',
+  '.claude/hooks/quiet/quiet-run.mjs',
+  '.claude/hooks/quiet/quiet-bash.mjs',
+  '.claude/hooks/quiet/quiet.test.mjs',
+  // The gate reads these relative to itself, so syncing the test without its data
+  // would push a suite that ENOENTs in every mirror.
+  '.claude/hooks/quiet/fixtures/nextest-green.txt',
+  '.claude/hooks/quiet/fixtures/nextest-fail.txt',
+  '.claude/hooks/quiet/fixtures/node-test-green.txt',
+  '.claude/hooks/quiet/fixtures/node-test-fail.txt',
+  '.claude/hooks/quiet/fixtures/vitest-green.txt',
+  '.claude/hooks/quiet/fixtures/vitest-fail.txt',
+  '.claude/hooks/quiet/fixtures/biome-green.txt',
+  '.claude/hooks/quiet/fixtures/clippy-fail.txt',
+  '.claude/hooks/quiet/fixtures/evals-green.txt',
 ];
 
 const args = process.argv.slice(2);
