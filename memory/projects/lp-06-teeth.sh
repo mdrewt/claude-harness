@@ -787,6 +787,13 @@ fi
 # rotated-file risk) must red. Bounded to the handoff block specifically (between `if
 # SUB=="handoff":` and the lp-queue section marker) because mr-record's OTHER flock (state,
 # for queue-add/-remove) also contains a LOCK_UN line the naive first-match would otherwise hit.
+#
+# ANCHOR TIGHTENED (Hole 2, red-team-proven): the bare word `mr-backup` also matches the block's
+# own rationale COMMENTS (e.g. "snapshot via mr-backup only AFTER the flock is released"), which
+# sit textually AFTER LOCK_UN regardless of whether the real _backup(HANDOFF) call line survives
+# a refactor -- a mutation that deletes ONLY the call and leaves the prose would still pass a
+# bare-word anchor. Anchoring on the literal call expression `_backup(HANDOFF)` closes that: a
+# comment can say anything, it can never contain that exact call syntax by accident.
 W6_START=$(grep -n '^if SUB=="handoff":' "$RECORD" | head -1 | cut -d: -f1)
 W6_END=$(grep -n 'lp-queue: queue-add' "$RECORD" | head -1 | cut -d: -f1)
 if [ -z "$W6_START" ] || [ -z "$W6_END" ] || [ "$W6_END" -le "$W6_START" ]; then
@@ -795,15 +802,126 @@ else
   W6_BLOCK="$WORK/w6-handoff-block.txt"
   sed -n "${W6_START},${W6_END}p" "$RECORD" > "$W6_BLOCK"
   W6_LOCKUN=$(grep -n 'fcntl.flock(lf, fcntl.LOCK_UN)' "$W6_BLOCK" | head -1 | cut -d: -f1)
-  W6_BACKUP=$(grep -n 'mr-backup' "$W6_BLOCK" | head -1 | cut -d: -f1)
+  W6_BACKUP=$(grep -n '_backup(HANDOFF)' "$W6_BLOCK" | head -1 | cut -d: -f1)
   if [ -z "$W6_LOCKUN" ]; then
     fail W6 "the LOCK_UN anchor was not found inside the handoff block -- extraction has drifted"
   elif [ -z "$W6_BACKUP" ]; then
-    fail W6 "no reference to mr-backup was found inside the handoff block -- the trigger has not been wired yet (expected pre-implementation)"
+    fail W6 "no call to _backup(HANDOFF) was found inside the handoff block -- the trigger has not been wired yet (expected pre-implementation), or a refactor deleted the call while leaving its rationale comments behind"
   elif [ "$W6_BACKUP" -gt "$W6_LOCKUN" ]; then
     ok W6
   else
-    fail W6 "mr-backup is referenced at block-relative line $W6_BACKUP, at or before LOCK_UN at line $W6_LOCKUN -- the backup call has moved INSIDE the flock"
+    fail W6 "_backup(HANDOFF) is called at block-relative line $W6_BACKUP, at or before LOCK_UN at line $W6_LOCKUN -- the backup call has moved INSIDE the flock"
+  fi
+fi
+
+# W8: anti-vacuity pin for mr-selfcheck's ROOT-SAFETY verification (Hole 1, CRITICAL, red-team-
+# proven). Check 3 in the extracted PYLP06 block verifies mr-backup's root-safety invariant only
+# through `mr-backup --selftest`'s OWN self-report (a marker + a count it prints itself), and
+# check 4 (the external round-trip probe) always uses a validly-named tmp root, so it never
+# exercises an illegal one either. Red-team built a stubbed mr-backup whose `_root_illegal()`
+# always returns None (both the literal-basename check AND the in-git-tree check gone) and whose
+# `--selftest` is a bare `print("BACKUP-SELFTEST-OK 11"); return 0` -- the whole lp-06 block still
+# exits 0, zero FAIL lines, and that stub's `_prune()` (untouched, still real) would `shutil.rmtree`
+# whatever 8-digit-named directories happen to sit under a misdirected root like $HOME. This case
+# builds that exact stub as a disposable COPY (never the repo's own mr-backup) and asserts the
+# extracted PYLP06 block, run against a fixture MEM containing it, reports a FAIL naming the
+# root-safety failure -- the gate must verify root safety OUT OF PROCESS, because a self-reported
+# marker+count is one `print` away from being faked, and the consequence of that fake is an
+# `rmtree` loose in $HOME.
+if [ "$EXTRACTION_OK" != 1 ]; then
+  fail W8 "skipped -- PYLP06 extraction failed (see the TEETH-FAIL extraction lines above)"
+elif [ ! -f "$BACKUP" ]; then
+  fail W8 "skipped -- mr-backup not found at $BACKUP"
+else
+  W8_ANCHOR1_BEFORE=$(grep -cxF 'def _root_illegal(root):' "$BACKUP")
+  W8_ANCHOR2_BEFORE=$(grep -cxF 'def selftest():' "$BACKUP")
+  if [ "$W8_ANCHOR1_BEFORE" != "1" ] || [ "$W8_ANCHOR2_BEFORE" != "1" ]; then
+    fail W8 "expected exactly 1 occurrence each of 'def _root_illegal(root):' and 'def selftest():' in $BACKUP (found $W8_ANCHOR1_BEFORE / $W8_ANCHOR2_BEFORE) -- the contract's function shape has drifted; refusing to build the stub"
+  else
+    W8_LINE1='    return None  # W8 stub: root-safety disabled unconditionally (Hole 1 fixture)'
+    W8_LINE2='    print("BACKUP-SELFTEST-OK 11"); return 0  # W8 stub: fabricated marker+count (Hole 1 fixture)'
+    W8_STUB="$WORK/mr-backup-w8"
+    sed -e '/^def _root_illegal(root):$/a\    return None  # W8 stub: root-safety disabled unconditionally (Hole 1 fixture)' \
+        -e '/^def selftest():$/a\    print("BACKUP-SELFTEST-OK 11"); return 0  # W8 stub: fabricated marker+count (Hole 1 fixture)' \
+        "$BACKUP" > "$W8_STUB"
+    chmod +x "$W8_STUB"
+    W8_LANDED1=$(grep -cxF "$W8_LINE1" "$W8_STUB")
+    W8_LANDED2=$(grep -cxF "$W8_LINE2" "$W8_STUB")
+    if [ "$W8_LANDED1" != "1" ] || [ "$W8_LANDED2" != "1" ]; then
+      fail W8 "the sed insertion did not land as expected (root-illegal-stub-lines=$W8_LANDED1 selftest-stub-lines=$W8_LANDED2) -- refusing to run the stub"
+    elif ! /usr/bin/python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$W8_STUB" >"$WORK/w8-ast.err" 2>&1; then
+      fail W8 "the stubbed mr-backup copy fails to parse as python: $(tail -c 300 "$WORK/w8-ast.err")"
+    else
+      W8_REPO="$WORK/w8-repo"
+      mk_repo "$W8_REPO"
+      W8_MEM="$W8_REPO/memory/projects"
+      cp "$W8_STUB" "$W8_MEM/mr-backup"; chmod +x "$W8_MEM/mr-backup"
+      cp "$RECORD" "$W8_MEM/mr-record"; chmod +x "$W8_MEM/mr-record"
+      git_h -C "$W8_REPO" add -A
+      git_h -C "$W8_REPO" commit -q -m "w8 fixture: root-safety-disabled mr-backup stub"
+      W8_OUT=$(run_pylp06 "$W8_MEM")
+      # Anchored on TWO required keyword classes ("root" AND one of illegal/literal/basename/
+      # safety) rather than a specific FAIL id, since the id the implementer's fix uses is not
+      # dictated by the current contract -- but both classes together are specific enough that
+      # nothing else in the block's existing vocabulary (stray-handoff, ignore-laundering,
+      # backup-missing/-selftest/-selftest-marker/-selftest-count, backup-drift, backup-wiring,
+      # backup-root-pollution) can satisfy them by accident.
+      if printf '%s\n' "$W8_OUT" | grep -i 'SELFCHECK-FAIL' | grep -i 'root' | grep -Eqi 'illegal|literal|basename|safety'; then
+        ok W8
+      else
+        fail W8 "expected a SELFCHECK-FAIL naming a root-safety failure when mr-backup's _root_illegal() always returns None and --selftest fabricates its own marker+count; today's check 3 trusts the self-report and check 4 never exercises an illegal root, so nothing catches this -- got: $(printf '%s\n' "$W8_OUT" | grep -i 'SELFCHECK-FAIL' | tr '\n' '|' | cut -c1-500)"
+      fi
+    fi
+  fi
+fi
+
+# W9: anti-vacuity pin for mr-selfcheck's static WIRING check (Hole 2, MAJOR, red-team-proven).
+# Check 6 in the extracted PYLP06 block is `if "mr-backup" not in record_text: fail(...)`, but
+# mr-record carries rationale COMMENTS naming "mr-backup" right beside both call sites (and
+# _backup_bin() itself constructs a literal "mr-backup" path string) -- so a refactor that deletes
+# ONLY the two _backup(LEDGER)/_backup(HANDOFF) CALL lines, leaving every comment intact, still
+# satisfies a bare substring check. This case builds that exact mutation on a disposable COPY
+# (never the repo's own mr-record), asserting the prose demonstrably survives the mutation, and
+# checks the extracted PYLP06 block reports SELFCHECK-FAIL backup-wiring against it.
+if [ "$EXTRACTION_OK" != 1 ]; then
+  fail W9 "skipped -- PYLP06 extraction failed (see the TEETH-FAIL extraction lines above)"
+else
+  W9_CALL_H='    _backup(HANDOFF)'
+  W9_CALL_L='_backup(LEDGER)'
+  W9_CNT_H_BEFORE=$(grep -cxF "$W9_CALL_H" "$RECORD")
+  W9_CNT_L_BEFORE=$(grep -cxF "$W9_CALL_L" "$RECORD")
+  if [ "$W9_CNT_H_BEFORE" != "1" ] || [ "$W9_CNT_L_BEFORE" != "1" ]; then
+    fail W9 "expected exactly 1 occurrence each of the call lines '_backup(HANDOFF)' and '_backup(LEDGER)' in $RECORD (handoff hits=$W9_CNT_H_BEFORE, ledger hits=$W9_CNT_L_BEFORE) -- the contract's call-site shape has drifted; refusing to build the mutated fixture"
+  else
+    W9_MUTANT="$WORK/mr-record-w9"
+    grep -vxF -e "$W9_CALL_H" -e "$W9_CALL_L" "$RECORD" > "$W9_MUTANT"
+    chmod +x "$W9_MUTANT"
+    W9_CNT_H_AFTER=$(grep -cxF "$W9_CALL_H" "$W9_MUTANT")
+    W9_CNT_L_AFTER=$(grep -cxF "$W9_CALL_L" "$W9_MUTANT")
+    W9_PROSE_SURVIVES=$(grep -c 'mr-backup' "$W9_MUTANT")
+    if [ "$W9_CNT_H_AFTER" != "0" ] || [ "$W9_CNT_L_AFTER" != "0" ]; then
+      fail W9 "the mutation did not remove both call lines cleanly (handoff-remaining=$W9_CNT_H_AFTER ledger-remaining=$W9_CNT_L_AFTER)"
+    elif [ "$W9_PROSE_SURVIVES" -lt 1 ]; then
+      fail W9 "setup: no occurrence of the substring 'mr-backup' survives in the mutated copy -- this would no longer be pinning the 'prose survives, trigger gone' defect Hole 2 describes"
+    elif ! bash -n "$W9_MUTANT" >"$WORK/w9-bashn.err" 2>&1; then
+      fail W9 "setup: the mutated mr-record copy fails bash -n: $(tail -c 300 "$WORK/w9-bashn.err")"
+    else
+      W9_REPO="$WORK/w9-repo"
+      mk_repo "$W9_REPO"
+      W9_MEM="$W9_REPO/memory/projects"
+      cp "$W9_MUTANT" "$W9_MEM/mr-record"; chmod +x "$W9_MEM/mr-record"
+      if [ -f "$BACKUP" ]; then
+        cp "$BACKUP" "$W9_MEM/mr-backup"; chmod +x "$W9_MEM/mr-backup"
+      fi
+      git_h -C "$W9_REPO" add -A
+      git_h -C "$W9_REPO" commit -q -m "w9 fixture: mutated mr-record, calls deleted, prose survives"
+      W9_OUT=$(run_pylp06 "$W9_MEM")
+      if printf '%s\n' "$W9_OUT" | grep -q 'SELFCHECK-FAIL backup-wiring'; then
+        ok W9
+      else
+        fail W9 "expected SELFCHECK-FAIL backup-wiring when both _backup(LEDGER)/_backup(HANDOFF) CALL lines are deleted but the surrounding rationale comments (which still mention 'mr-backup') survive -- the static wiring check must not be satisfiable by prose alone; got: $(printf '%s\n' "$W9_OUT" | grep -i 'SELFCHECK-FAIL' | tr '\n' '|' | cut -c1-500)"
+      fi
+    fi
   fi
 fi
 
