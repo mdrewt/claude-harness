@@ -132,6 +132,32 @@ already neutralised by fail-open; these were real and are fixed here:
 - **The gate ran against the live `/tmp/claude-quiet-logs`** and pruned other
   sessions' raw logs, from a lefthook pre-commit hook. It now uses an isolated root.
 
+### Found by a second self-review pass, after the first landed
+
+- **The removed "verbose" mode left write-only bookkeeping behind.** `quiet-run` still
+  read, pruned and atomically rewrote a shared `recent-failures.json` on every single
+  filtered command, and nothing read it back for any decision — dead I/O in the hot
+  path of every command, under a comment block describing behaviour that no longer
+  existed. Deleted (41 lines).
+- **The `search` profile lost match content.** Its carriage-return collapse exists for
+  progress bars, but a grep hit on a file that *contains* a CR is content:
+  `data.txt:3: before<CR>after` was silently truncated to `after`, in the one profile
+  that promises to remove nothing. Normalisation is now content-preserving there
+  (ANSI is still stripped — an escape sequence is never content).
+- **A command that printed nothing came back with a banner.** `cargo fmt --all --check`
+  and `tsc --noEmit` are silent when clean and are run constantly, so that was a pure
+  token *regression* on exactly the commands the filter could not help. A zero-output
+  run is now byte-identical to an unfiltered one; a run that produced output and had
+  all of it withheld still gets the full banner, which is the case that needs saying.
+
+Also verified in that pass, and sound: partial final lines (no trailing newline) are
+emitted; multi-byte UTF-8 split across chunk boundaries is not corrupted; the guard
+re-check resolves correctly through the `~/.claude` symlink (Node resolves it, so the
+sibling lookup lands in the real harness tree); and no destructive command can reach
+that guard through a profile today — the profile matcher rejects them first, making the
+guard genuine defence-in-depth for future profile additions rather than the live control.
+Wrapper overhead is ~60 ms per filtered command, guard subprocess included.
+
 ### Rejected during implementation, recorded so they are not re-tried
 
 - **A "always keep the last N lines" guard.** It resurrected the very lines the
