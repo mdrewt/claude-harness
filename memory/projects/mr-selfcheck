@@ -420,6 +420,28 @@ sys.exit(bad)
 PYHD
 grep -q "Feedback doctrine (ACTIVE" "$MEM/mr-supervisor-prompt-native.md" || { echo "SELFCHECK-FAIL SSOT doctrine pointer missing"; BAD=1; }
 grep -q "ACTIVE 2026" "$MEM/mr-feedback-doctrine.md" || { echo "SELFCHECK-FAIL doctrine not ACTIVE"; BAD=1; }
+# lp-brief-cost: the brief's budget line must not re-assert the false premise that budget is ample,
+# or that the 125% figure is mechanical, and the distinct-lenses instruction that replaced it must
+# survive (E1/E2/E3; the measured evidence is in monster-realm-lp-brief-cost-plan.md).
+# A1 is a POSITIVE anchor, not a duplicate of mr-spawn:263 (which only catches a SURVIVING
+# <CAP_USD> placeholder, never a MISSING one) — dropping <CAP_USD> silently ships a brief with no
+# cap, and without this anchor A2-A4 would pass vacuously against a renamed or moved template.
+# A5 is anchored to the Definition-of-done LINE, not to the file: a bare file-wide grep goes GREEN
+# on a stray fossil copy of the phrase (an archived note, a bad merge) while the real instruction
+# has been deleted — proven exploitable by red-team before this anchor was added.
+# Single explicit path only, never a glob or corpus-wide scan: the banned phrases below legitimately
+# survive in mr-brief-template.md.bak.v2.*, monster-realm-handoff-archive-2026-07.md and
+# M-loop-infrastructure.spec.md:290 (which quotes the defect as its own justification), and a scan
+# would also match this very comment block — the self-reference hazard mr-selfcheck:378-382 documents.
+# Tester-authored, TDD RED PHASE — the lp-09 rule immediately below applies verbatim to these too.
+grep -qF 'BUDGET: $<CAP_USD>' "$MEM/mr-brief-template.md" || { echo "SELFCHECK-FAIL E1/E3 brief-template A1: 'BUDGET: \$<CAP_USD>' anchor missing (mr-brief-template.md is missing, moved, or the <CAP_USD> placeholder was dropped) -- restore the literal 'BUDGET: \$<CAP_USD>' text so mr-spawn:263 has a placeholder to substitute, and so A2-A4 below check the real file"; BAD=1; }
+grep -qF 'Budget is ample' "$MEM/mr-brief-template.md" && { echo "SELFCHECK-FAIL E1 brief-template A2: the false-premise sentence 'Budget is ample' is present in mr-brief-template.md -- restore the locked L21 replacement text from monster-realm-lp-brief-cost-plan.md"; BAD=1; }
+grep -qF 'favor thoroughness over frugality' "$MEM/mr-brief-template.md" && { echo "SELFCHECK-FAIL E1 brief-template A3: 'favor thoroughness over frugality' is present in mr-brief-template.md -- a partial revert of the false-premise sentence that A2 alone would miss; see monster-realm-lp-brief-cost-plan.md"; BAD=1; }
+grep -qF '125%' "$MEM/mr-brief-template.md" && { echo "SELFCHECK-FAIL E3 brief-template A4: an unmeasured '125%' ceiling figure is present in mr-brief-template.md -- mr-cost-watch's 125% HARD rung is enforce-gated and costwatch_enforce is false, so quoting it as mechanical is FALSE. If you have introduced a legitimate, unrelated 125% figure, NARROW this assertion to the retired phrase -- do not delete it"; BAD=1; }
+grep -F 'Definition of done (the authority)' "$MEM/mr-brief-template.md" | grep -qF 'distinct defect classes over redundant re-runs' || { echo "SELFCHECK-FAIL E2 brief-template A5: the Definition-of-done line no longer carries 'distinct defect classes over redundant re-runs' -- restore the locked L21 replacement text from monster-realm-lp-brief-cost-plan.md (a copy of the phrase elsewhere in the file does NOT satisfy this)"; BAD=1; }
+# The proof-of-teeth fixture for A1-A5, RUN rather than merely committed (ADR-0010): an uninvoked
+# fixture rots, and it is not named mr-* so the tool enumeration above never even syntax-checks it.
+"$MEM/lp-brief-cost-teeth.sh" >/dev/null 2>&1 || { echo "SELFCHECK-FAIL lp-brief-cost proof-of-teeth: lp-brief-cost-teeth.sh did not report TEETH-ALL-OK -- run it directly for the failing case; an A1-A5 assertion has stopped biting, or the block's sed anchors have drifted"; BAD=1; }
 # lp-09: kill-switch provenance derived assertions (A1-A8). Tester-authored, TDD RED PHASE —
 # do not edit these to fit a buggy implementation; a wrong expectation is corrected FROM THE
 # SPEC (M-loop-infrastructure.spec.md, slice lp-09), never retargeted to match the code.
