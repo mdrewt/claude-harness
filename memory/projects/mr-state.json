@@ -1,12 +1,17 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-15T14:03:00Z",
- "updated_by": "mr-sup-native-20260815T140011Z-2896235",
+ "updated_utc": "2026-08-22T11:16:23Z",
+ "updated_by": "mr-sup-native-20260822T111423Z-509571-26556",
  "master": {
-  "sha": "67fbff8",
-  "ci": "success"
+  "sha": "2290f47",
+  "ci": "success",
+  "nightly": "fixed_at_a40cb81_confirmed_green"
  },
- "adr_next_free": 197,
+ "harness_main": {
+  "sha": "51073c8",
+  "ci": "no-remote-ci-local-gate-green (mr-selfcheck SELFCHECK-OK re-verified live post-merge; mr-backup --selftest OK)"
+ },
+ "adr_next_free": 202,
  "inflight": [],
  "awaiting_merge": [],
  "queue": [],
@@ -15,7 +20,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-08-10T~08:30Z: interactive session ran the M21b-2 heavy-ceremony scoping pass (6-way ideation each adversarially reviewed -> judge synthesis -> adversarial review -> 2 finalization reviews: security+completeness). Landed ADR-0182 (monster-realm PR#310, merged 9dcfb39) + spec AUTH-39..60 (harness commit da110c7). OQ1/OQ4/OQ5/OQ6 all resolved. M21b-2 is now BUILD-READY (touches/gates/tasks fully scoped in the spec, HARD tier per touches: connection.ts+security-authz surfaces). Flagged, NOT started: M21b-3 (Steam integration) \u2014 deferred pending native-build packaging timeline per operator directive; see spec OQ5 resolution. | 2026-08-14T05:15Z: 14r-b launch probe-tripped on own ff-only write; vars staged at /tmp/mr_pass_14r-b.vars.json for next tick. | 2026-08-14T06:03Z: 14r-b's earlier probe-trip (05:15Z note) resolved this tick -- fresh launch succeeded (mr-spawn confirmed LAUNCHED, pids verified alive). Fanned out with 14r-d (routine tier) after mr-disjoint SAFE verdict. Stale staged-vars note superseded. | 14r-e merged 4fd3c6e, master CI watch delegated (run 31818031893)",
+ "notes": "2026-08-22T11:16Z native tick: reconciled lp-06's finished run (EXIT=0, PR #33). mr-audit CLEAN (orchestration CLEAN, gating-advisory CLEAN, mandatory_read=false; disposition findings were pre-existing corpus-wide spec-ledger gaps, unrelated to this diff). Squash-merged PR #33 to main (d3d1df5..51073c8), ff-only fast-forwarded local main, removed lp-06 worktree + local/remote feat/lp-06 branches. Post-merge mr-selfcheck initially SELFCHECK-FAIL on backup-drift (expected transient -- the backup snapshot lags the merge); ran mr-backup snapshot, re-ran selfcheck -> SELFCHECK-OK. inflight now empty; no composite launch this tick (scope kept to the merge reconciliation, matching prior ticks' convention -- next tick derives the next eligible slice fresh from PLAN section-9 since queue[] is empty). Pre-existing DIRTY-TREE-ADVISORY strays on main (future-prompts.md, handoff files, mr-usage-daily.jsonl, spacetime-db-testing.md, a spec file) left untouched, not ours. Governor NORMAL (d7=$358.12/$2783=~13%, fable_ok=true).",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],
@@ -43,5 +48,6 @@
   "gate_log": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.log",
   "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
- }
+ },
+ "live_watchers": []
 }
