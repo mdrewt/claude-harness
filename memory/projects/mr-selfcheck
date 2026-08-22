@@ -477,15 +477,15 @@ def fail(name, detail=""):
     bad = 1
     print(("SELFCHECK-FAIL %s" % name) + (": " + detail if detail else ""))
 
-def run(argv, env=None, timeout=180):
+def run(argv, env=None, timeout=180, stdin_text=None):
     try:
         r = subprocess.run(argv, capture_output=True, text=True, env=env or dict(os.environ),
-                           timeout=timeout)
+                           timeout=timeout, input=stdin_text)
         return r.returncode, r.stdout or "", r.stderr or ""
     except Exception as exc:
         return None, "", "%s: %s" % (type(exc).__name__, exc)
 
-def git(args, timeout=90):
+def git(args, timeout=90, stdin_text=None):
     """GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE are REMOVED from the environment: red-team proved
     they override `git -C` SILENTLY and with exit 0, so an ambient leak would aim the scan below at
     a different repository entirely without ever tripping the unverifiable-is-not-clean rule -- the
@@ -493,7 +493,7 @@ def git(args, timeout=90):
     env = dict(os.environ)
     for leaked in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
         env.pop(leaked, None)
-    return run(["git"] + args, env=env, timeout=timeout)
+    return run(["git"] + args, env=env, timeout=timeout, stdin_text=stdin_text)
 
 def listing(root):
     """(path, size, mtime) of every file under a root -- the before/after pollution witness."""
@@ -541,15 +541,20 @@ else:
                  "-- move it into memory/projects/ (where the rolling handoff and its archives "
                  "live) or delete it" % p)
     # --- 2. ignore-laundering probe. --exclude-standard honours .gitignore, .git/info/exclude and
-    # core.excludesFile, so ONE rule matching *handoff*.md hides a genuinely stray file from check 1
-    # with no error and no output -- a silent, zero-error bypass (proven by red-team). Two synthetic
-    # paths, never created on disk; check-ignore rc 0 means "would be ignored".
-    for probe in ("probe-handoff.md", os.path.join("memory", "probe-handoff.md")):
-        rc, _o, _e = git(["-C", repo, "check-ignore", "-q", os.path.join(repo, probe)])
-        if rc == 0:
-            fail("ignore-laundering", "an ignore rule matches %s, so handoff-shaped files there are "
-                 "invisible to `git ls-files --others --exclude-standard` and the stray-handoff "
-                 "check above has been laundered into silence -- remove the rule" % probe)
+    # core.excludesFile, so an ignore rule matching handoff-shaped names hides a genuinely stray file
+    # from check 1 with no error and no output -- a silent, zero-error bypass (proven by red-team).
+    # The probe set is a GRID, not two literals: red-team showed a .gitignore carrying the exact line
+    # `handoff.md` launders a real docs/handoff.md past check 1 AND past a two-literal probe. All
+    # paths are synthetic and never created on disk, and one batched --stdin call keeps it cheap.
+    probes = [os.path.join(repo, d, b) for d in ("", "memory", "docs")
+              for b in ("handoff.md", "HANDOFF.md", "monster-realm-handoff.md", "x-handoff.md")]
+    rc, out, _e = git(["-C", repo, "check-ignore", "--stdin"], stdin_text="\n".join(probes) + "\n")
+    laundered = [l for l in out.splitlines() if l.strip()]
+    if laundered:
+        fail("ignore-laundering", "an ignore rule matches %d handoff-shaped path(s) (e.g. %s), so "
+             "files there are invisible to `git ls-files --others --exclude-standard` and the "
+             "stray-handoff check above has been laundered into silence -- remove the rule"
+             % (len(laundered), ", ".join(os.path.relpath(x, repo) for x in laundered[:4])))
 
 # --- 3. mr-backup --selftest: the MARKER *and* the fixture COUNT are parsed. A bare `|| BAD=1`
 # passes identically against a ten-line stub (the mr-audit precedent, :66-160 of this file), and a
@@ -596,6 +601,30 @@ else:
                  "bytes, source %d) -- restore is broken"
                  % (len(got) if got is not None else "no", len(blob)))
 
+        # --- 4b. EXTERNAL illegal-root probe. Root safety is the ONE invariant here whose failure is
+        # DESTRUCTIVE rather than merely undetected -- _prune() unlinks 8-digit-named directories
+        # under whatever root it is handed -- so it may never be graded by the subject binary's own
+        # report. Red-team stubbed _root_illegal() to `return None` and --selftest to a bare
+        # `print("BACKUP-SELFTEST-OK 11")`: checks 3 and 4 both stayed green (check 4 only ever uses
+        # a validly-named root), and the stub then rmtree'd seven real 8-digit directories of user
+        # data out of a $HOME-shaped root. Both refusals are driven here, out of process, and BOTH
+        # halves are asserted: a non-zero exit AND that the illegal root was never created on disk.
+        os.makedirs(os.path.join(T, "gitrepo", ".git"))
+        for why, bad_root in (("basename is not literally `mr-backup`",
+                               os.path.join(T, "backup-scratch")),
+                              ("inside a git working tree",
+                               os.path.join(T, "gitrepo", "mr-backup"))):
+            env_bad = dict(os.environ)
+            env_bad["MR_BACKUP_ROOT"] = bad_root
+            rcb, _ob, _eb = run([sys.executable, BACKUP, "snapshot", "--file", src], env=env_bad,
+                                timeout=60)
+            if rcb == 0 or os.path.exists(bad_root):
+                fail("backup-root-safety", "mr-backup ACCEPTED an illegal root (%s): exit=%r, "
+                     "root-created-on-disk=%s. It must refuse with a non-zero exit and write "
+                     "nothing -- _prune() deletes 8-digit-named directories under the root it is "
+                     "given, so an unenforced root check is an rmtree loose in $HOME"
+                     % (why, rcb, os.path.exists(bad_root)))
+
 # --- 5. drift: the "a backup silently stopped running" detector. CONTENT, never wall-clock age -- a
 # freshness threshold would red purely from the operator hold and be commented out within the week.
 # Both halves are computed here; nothing self-reported by mr-backup is trusted. (An append landing
@@ -624,9 +653,16 @@ try:
 except OSError as exc:
     fail("backup-wiring", "could not read %s (%s)" % (RECORD, exc))
 else:
-    if "mr-backup" not in record_text:
-        fail("backup-wiring", "%s never names mr-backup -- the trigger has been removed, so nothing "
-             "copies the ledger or handoff any more" % RECORD)
+    # Anchored on the literal CALL expressions, never on the substring `mr-backup`: mr-record's
+    # rationale comments (and _backup_bin()'s own path construction) keep that substring alive even
+    # after both call lines are deleted, so a bare substring check is satisfiable by PROSE -- proven
+    # by red-team and pinned by lp-06-teeth.sh W9.
+    missing = [c for c in ("_backup(LEDGER)", "_backup(HANDOFF)") if c not in record_text]
+    if missing:
+        fail("backup-wiring", "%s no longer contains the call expression(s) %s -- the backup trigger "
+             "has been removed from that write path, so nothing copies it any more (the rationale "
+             "comments naming mr-backup survive such a deletion, which is why this anchors on the "
+             "CALLS)" % (RECORD, " and ".join(missing)))
 
 # --- 7. this block's own non-pollution proof: every fixture above used its own tempdir, so the REAL
 # default root must be exactly as we found it (the direct analogue of the two pollution guards

@@ -121,8 +121,19 @@ def _copy(src, dst):
     """tmp + os.replace: a crash mid-copy must never leave a truncated file that LOOKS like a
     backup (the pattern mr-record's rotation and mr-state.json's writer already use)."""
     tmp = "%s.tmp.%d" % (dst, os.getpid())
-    shutil.copyfile(src, tmp)
-    os.replace(tmp, dst)
+    try:
+        shutil.copyfile(src, tmp)
+        os.replace(tmp, dst)
+    except BaseException:
+        # Best-effort sweep of the partial file. An interrupted copy (mr-record's own 10s kill is
+        # the realistic case) otherwise leaves a `<dst>.tmp.<pid>` orphan that _prune never
+        # collects -- it only ever touches whole day-directories. BaseException, not Exception, so
+        # a signal-driven SystemExit/KeyboardInterrupt cleans up too.
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _prune(root):
@@ -131,11 +142,29 @@ def _prune(root):
     delete (the standing corpus rule mr-unlock exists for)."""
     if not os.path.isdir(root):
         return
-    days = [n for n in os.listdir(root) if DAY_RE.match(n)
-            and not os.path.islink(os.path.join(root, n))
-            and os.path.isdir(os.path.join(root, n))]
+    days = []
+    for n in os.listdir(root):
+        p = os.path.join(root, n)
+        if not DAY_RE.match(n) or os.path.islink(p) or not os.path.isdir(p):
+            continue
+        try:
+            datetime.datetime.strptime(n, "%Y%m%d")
+        except ValueError:
+            # ASYMMETRY, on purpose: an `^\d{8}$` name that is not a real calendar date is neither
+            # DELETED (it is not ours to remove) nor COUNTED. Counting it would be the actual bug:
+            # `99999999` sorts lexicographically newest, so it would hold a retention slot forever
+            # and silently break the stated 14-day/~20 MB bound while every other check stayed green.
+            continue
+        days.append(n)
     for name in sorted(days, reverse=True)[RETENTION:]:
-        shutil.rmtree(os.path.join(root, name), ignore_errors=True)
+        try:
+            shutil.rmtree(os.path.join(root, name))
+        except OSError as exc:
+            # Reported, never fatal. Silently swallowing this (the old ignore_errors=True) let a
+            # sustained permission/disk failure grow the root without bound with no operator-visible
+            # signal -- the only failure path in this tool that produced no diagnostic at all.
+            _err("could not prune %s: %s -- the %d-day retention bound is not being held"
+                 % (os.path.join(root, name), exc, RETENTION))
 
 
 def snapshot(files):
