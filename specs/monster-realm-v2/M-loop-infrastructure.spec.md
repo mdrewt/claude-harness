@@ -376,6 +376,71 @@ files, and a gate that red-lines on its first run gets disabled within a week.
 Tests: proof-of-teeth — create a stray handoff and show the check RED; delete it and show green;
 restore the ledger from a backup into a temp dir and diff it byte-for-byte (ADR-0010).
 
+### lp-queue — `queue[]` becomes a real pointer backlog, not a journal (HIGH, LIGHT)
+`touches: memory/projects/mr-state.json, memory/projects/mr-record, memory/projects/mr-selfcheck, memory/projects/mr-supervisor-prompt-native.md`
+`after:` lp-00 · shares `mr-record` with unblocked `lp-06` (different concern); serialize by hand.
+
+RF-3, in `queue[]`'s own words: 58 committed past-tense narrative strings, a duplicate of
+`monster-realm-handoff.md` (every entry mechanically or manually confirmed present there), read by
+zero code — `mr-native-tick.sh`/`mr-record`/`mr-spawn`/`mr-situation` all grep clean. Reshaped into
+the fast path "Pick work" never had: one entry = `{slice, spec_file, reason, added_utc, added_by,
+derived_from_master_sha}`, written by Pick-work's own PLAN §9 + `M*.spec.md` full derivation as
+exhaust — never a separate mechanical `touches:`/`blocked:`/retirement parser; that parser stays
+`lp-08`'s alone. `mr-record queue-add`/`queue-remove` are the SOLE writers of the `queue` key —
+each re-reads `mr-state.json` fresh under an exclusive flock and writes back atomically, independent
+of a tick's own separate end-of-tick write of every other key (which must re-read `queue` fresh
+rather than reuse its gate-0 snapshot, or a mid-tick removal is silently undone). Stays a cache,
+never authority: an invalid entry is deleted and the tick falls through to full derivation exactly
+as it would against an empty queue today. Mechanically capped at 5 so a stuck consumer fails loudly
+instead of regrowing silently for months. Migrated by replacing the 58 committed strings with `[]`
+(`schema_version` 1→2) — the pre-migration array is the parent commit, recoverable via `git show`.
+
+EARS: WHEN Pick-work's full derivation names a launchable slice it does not launch this tick, THE
+SYSTEM SHALL append it to `queue[]` via `mr-record queue-add` (refusing any `spec_file` lacking a
+matching `### <slice>` heading, an absolute or `..`-traversing path, a duplicate slice, or a queue
+already at its cap of 5). WHEN a tick is about to act on a `queue[]`-sourced candidate, THE SYSTEM
+SHALL re-verify it live before launching and remove it via `mr-record queue-remove` regardless of
+outcome. WHEN a slice merges, THE SYSTEM SHALL remove any `queue[]` entry naming it.
+Tests: proof-of-teeth — `mr-selfcheck`'s queue block (11 fixtures): rejects an absolute/traversing
+`spec_file`, a missing heading, a duplicate slice, a 6th add past the cap-of-5; two independent
+`queue-add` calls both durably persist (regression for the mid-tick-write-clobber defect design
+review found); `queue-remove` deletes the right entry and no-ops on an absent one; corpus-pollution
+guard proves the real `mr-state.json` is untouched (ADR-0010).
+
+### lp-handoff-rotate — Rotate the handoff by embedded timestamp, keep newest live (HIGH, MED)
+`touches: memory/projects/mr-record, memory/projects/mr-selfcheck, memory/projects/mr-supervisor-prompt-native.md, memory/projects/.gitignore`
+`after:` lp-00 · shares `mr-record` with unblocked `lp-06` (different concern — lp-06 flags a stray
+untracked handoff file, not in-place rotation of this tracked one); serialize by hand.
+
+Measured live: `monster-realm-handoff.md` was 536,613 bytes / ~197 entries — 13.4x the doctrine's
+"archive when > 40 KB" line, last archived 2026-08-02. `mr-record handoff` was a bare unconditional
+append with no size check — the doctrine describes a control that was never built (RF-3, again).
+Worse: the file had drifted to two regions with opposite entry order (some sessions hand-edited it
+directly instead of going through `mr-record`, which can only ever append), so a naive "keep the
+last N lines/bytes" rotation would drop the real newest entry and keep stale ones instead. Fix:
+after every append, rotate over a ~40 KB **byte** budget (operator decision, not tokens or entry
+count), splitting on each entry's own `## <timestamp> ...` header — bare, no em-dash requirement (an
+earlier design draft that required one silently mis-split 11 of 197 real live entries; caught and
+fixed at red-team) — never on file position. Newest-first becomes canonical going forward; an entry
+whose timestamp can't be parsed is pinned live forever, never silently archived or dropped, and
+reported loudly. Dropped entries move oldest-first, grouped by their own calendar month, into
+`monster-realm-handoff-archive-<YYYY-MM>.md`, extending the existing -2026-07/-2026-08 precedent.
+Archive writes are idempotent (skip any entry already present) so a crash between the archive write
+and the live-file swap — a real vector, since an unattended loop already SIGKILLs stragglers on a
+rate-limit trip — can never duplicate a row on retry. `flock` around append+rotate.
+
+EARS: WHEN an append leaves the live file over ~40 KB, `mr-record handoff` SHALL rotate the oldest
+entries — by parsed timestamp, never file position — into that entry's own calendar-month archive
+file, oldest-first, without duplicating an entry already archived by a prior partial run, and SHALL
+NOT split an entry across files. THE SYSTEM SHALL always keep at least the single newest entry live.
+WHEN a timestamp can't be parsed, THE SYSTEM SHALL keep that entry live and report it. Doctrine SHALL
+name `mr-record handoff` as the sole entry path (no hook enforces this yet).
+Tests: proof-of-teeth — `mr-selfcheck`'s rotation block: a non-em-dash header survives exactly once,
+split as its own entry, never glued to its neighbour (regression for the boundary-regex defect
+design review found by running it against the live corpus); re-triggering rotation on the same
+oversized batch produces zero duplicate archive entries (regression for the crash-safety defect);
+corpus-pollution guard proves the real handoff is untouched (ADR-0010).
+
 ### lp-07 — `settings.json` env PATH (LOW, XS)
 `touches: /home/mdrewt/.claude/settings.json` *(out-of-repo machine state — see the rollback note)*
 `after:` (none) · `blocked:operator-attended` — **`lp-00` does not unblock this one.** The path lies in

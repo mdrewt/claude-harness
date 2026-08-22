@@ -1467,6 +1467,199 @@ sys.exit(bad)
 PYSQ
 
 # =================================================================================================
+# lp-queue / lp-handoff-rotate — behavioural fixtures against the REAL mr-record, same isolation
+# discipline as the lp-02 block above: MR_RECORD_STATE and MR_RECORD_HANDOFF are redirected into a
+# tempdir and this block REFUSES to run if either would resolve under $MEM, so no fixture can ever
+# reach the real corpus. Tester-authored, TDD RED PHASE (M-loop-infrastructure.spec.md
+# §lp-queue/§lp-handoff-rotate) — a wrong expectation is corrected FROM THE SPEC, never retargeted.
+#
+# Regression coverage for the two design-review findings that would otherwise ship silently broken:
+# (1) mid-tick queue-add/-remove must be independently durable (not clobbered by a later free-hand
+# mr-state.json write) -- proven here by two SEPARATE queue-add calls both surviving, since a
+# stale-snapshot bug would show as the second call's write appearing to lose the first's; (2) an
+# entry-boundary regex requiring an em-dash silently glued 11/197 real entries onto their neighbour
+# during design red-team -- proven here with a non-em-dash header mixed into the fixture.
+/usr/bin/python3 - "$MEM" <<'PYQH' || BAD=1
+import json, os, re, sys, tempfile, hashlib
+
+MEM = sys.argv[1]
+RECORD = os.path.join(MEM, "mr-record")
+REAL_STATE = os.path.join(MEM, "mr-state.json")
+REAL_HANDOFF = os.path.join(MEM, "monster-realm-handoff.md")
+bad = 0
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL %s" % name) + (": " + detail if detail else ""))
+
+def sha(path):
+    try:
+        return hashlib.sha256(open(path, "rb").read()).hexdigest()
+    except FileNotFoundError:
+        return None
+
+real_state_before, real_handoff_before = sha(REAL_STATE), sha(REAL_HANDOFF)
+
+TMP = tempfile.mkdtemp(prefix="mr-selfcheck-qh-")
+STATE = os.path.join(TMP, "mr-state.json")
+HANDOFF = os.path.join(TMP, "monster-realm-handoff.md")
+
+import subprocess
+def rec(sub, args, timeout=30):
+    e = dict(os.environ)
+    e["MR_RECORD_STATE"] = STATE
+    e["MR_RECORD_HANDOFF"] = HANDOFF
+    for key in ("MR_RECORD_STATE", "MR_RECORD_HANDOFF"):
+        if not e[key].startswith(TMP):
+            raise RuntimeError("REFUSED: %s=%r is outside the tempdir" % (key, e[key]))
+    r = subprocess.run(["bash", RECORD, sub] + list(args), env=e, capture_output=True,
+                        text=True, timeout=timeout)
+    return r.returncode, r.stdout, r.stderr
+
+def reset_state():
+    with open(STATE, "w") as f:
+        json.dump({"schema_version": 2, "master": {"sha": "fixture0"}, "queue": []}, f)
+
+# A real, stable heading to point --spec-file at (already merged, will not move).
+REAL_SPEC = "specs/monster-realm-v2/M-loop-infrastructure.spec.md"
+REAL_HEADINGS = ["lp-06", "lp-07", "lp-10", "lp-11", "lp-11b", "lp-git-workflow"]
+# A real DIGIT-LEADING heading -- the entire review-residuals convention is digit-first
+# (15r-sec-a, 13r-c-2, 15r-a2, ...), which a letter-first-only SLICE_ID_RE rejected in an
+# earlier revision (caught at post-implementation review; queue-add --slice 15r-sec-a died).
+# This fixture pins the regression so a future edit can't silently reintroduce it.
+DIGIT_SPEC = "specs/monster-realm-v2/M-postgate-fifteenth-review-residuals.spec.md"
+DIGIT_HEADING = "15r-sec-a"
+
+# --- queue-add: validation ---
+reset_state()
+rc, out, err = rec("queue-add", ["--slice", "lp-06", "--spec-file", "/etc/passwd", "--reason", "x"])
+if rc == 0: fail("lp-queue-rejects-absolute-path", "an absolute --spec-file must be refused")
+
+rc, out, err = rec("queue-add", ["--slice", "lp-06", "--spec-file", "../" + REAL_SPEC, "--reason", "x"])
+if rc == 0: fail("lp-queue-rejects-traversal-path", "a .. --spec-file must be refused")
+
+rc, out, err = rec("queue-add", ["--slice", "lp-does-not-exist-fixture", "--spec-file", REAL_SPEC, "--reason", "x"])
+if rc == 0: fail("lp-queue-rejects-missing-heading", "a slice with no matching '### <slice>' heading must be refused")
+
+# REGRESSION: digit-leading slice ids (the norm for game-milestone slices, not the exception)
+# must be accepted, not just letter-leading lp-* ids.
+rc, out, err = rec("queue-add", ["--slice", DIGIT_HEADING, "--spec-file", DIGIT_SPEC, "--reason", "digit-led id"])
+if rc != 0:
+    fail("lp-queue-accepts-digit-leading-id",
+         "a real digit-leading slice id (%s) must be accepted; mr-record exited %r (stderr=%r)"
+         % (DIGIT_HEADING, rc, err.strip()[:200]))
+else:
+    q = json.load(open(STATE)).get("queue", [])
+    if not any(e.get("slice") == DIGIT_HEADING for e in q):
+        fail("lp-queue-accepts-digit-leading-id", "digit-leading slice %s did not persist: %r" % (DIGIT_HEADING, q))
+reset_state()
+
+# --- queue-add: a valid add persists the exact fields ---
+rc, out, err = rec("queue-add", ["--slice", REAL_HEADINGS[0], "--spec-file", REAL_SPEC,
+                                  "--reason", "fixture reason", "--run_id", "fixture-run-1"])
+if rc != 0:
+    fail("lp-queue-add-valid", "mr-record exited %r (stderr=%r)" % (rc, err.strip()[:200]))
+else:
+    q = json.load(open(STATE)).get("queue", [])
+    if len(q) != 1 or q[0].get("slice") != REAL_HEADINGS[0]:
+        fail("lp-queue-add-valid", "expected exactly one queue entry for %s, got %r" % (REAL_HEADINGS[0], q))
+    else:
+        e = q[0]
+        for k in ("spec_file", "reason", "added_utc", "added_by", "derived_from_master_sha"):
+            if k not in e: fail("lp-queue-add-fields", "queue entry missing field %r: %r" % (k, e))
+        if e.get("derived_from_master_sha") != "fixture0":
+            fail("lp-queue-add-fields", "derived_from_master_sha must come from the state's own master.sha, got %r" % (e.get("derived_from_master_sha"),))
+
+# --- queue-add: dedup ---
+rc, out, err = rec("queue-add", ["--slice", REAL_HEADINGS[0], "--spec-file", REAL_SPEC, "--reason", "dup"])
+if rc == 0: fail("lp-queue-rejects-duplicate", "adding an already-queued slice a second time must be refused")
+
+# --- REGRESSION for design-review finding #1: two SEPARATE calls must both durably persist --
+# a stale-snapshot bug (writing back a cached copy of `queue` instead of re-reading fresh) would
+# show here as the second call silently losing the first's entry.
+rc, out, err = rec("queue-add", ["--slice", REAL_HEADINGS[1], "--spec-file", REAL_SPEC, "--reason", "second"])
+if rc != 0:
+    fail("lp-queue-independent-writes", "second queue-add exited %r" % (rc,))
+else:
+    q = json.load(open(STATE)).get("queue", [])
+    slices = sorted(e.get("slice") for e in q)
+    if slices != sorted([REAL_HEADINGS[0], REAL_HEADINGS[1]]):
+        fail("lp-queue-independent-writes",
+             "two separate queue-add calls must BOTH survive (each re-reads fresh before writing) -- got %r" % (slices,))
+
+# --- queue-add: cap enforcement ---
+reset_state()
+for s in REAL_HEADINGS[:5]:
+    rc, out, err = rec("queue-add", ["--slice", s, "--spec-file", REAL_SPEC, "--reason", "fill"])
+    if rc != 0: fail("lp-queue-fill-to-cap", "filling to cap failed on %s: %r" % (s, err.strip()[:160]))
+rc, out, err = rec("queue-add", ["--slice", REAL_HEADINGS[5], "--spec-file", REAL_SPEC, "--reason", "over"])
+if rc == 0: fail("lp-queue-cap-enforced", "a 6th add beyond the cap must be refused")
+
+# --- queue-remove ---
+rc, out, err = rec("queue-remove", ["--slice", REAL_HEADINGS[0]])
+q = json.load(open(STATE)).get("queue", [])
+if any(e.get("slice") == REAL_HEADINGS[0] for e in q):
+    fail("lp-queue-remove", "queue-remove did not remove the targeted slice")
+if len(q) != 4:
+    fail("lp-queue-remove", "expected 4 entries remaining after removing 1 of 5, got %d" % len(q))
+rc, out, err = rec("queue-remove", ["--slice", "lp-not-queued-fixture"])
+if rc != 0: fail("lp-queue-remove-noop", "removing an absent slice must be a no-op (rc=0), got %r" % (rc,))
+
+# --- handoff-rotate: boundary regex must split a NON-em-dash header as its own entry (the exact
+# defect a stricter regex introduced during design red-team) ---
+open(HANDOFF, "w").close()
+rc, out, err = rec("handoff", ["--title", "seed", "--body", "seed body"])
+# Directly append a non-em-dash entry the way an older session's hand-edit shape looks, then force
+# rotation by appending enough padding to cross the budget in one more real mr-record call.
+with open(HANDOFF, "a") as f:
+    f.write("\n## 2026-01-01T00:00:00Z no em dash at all here\nbody text for the no-dash entry\n")
+    f.write("\n## 2026-01-02T00:00:00Z — normal entry\n" + ("pad " * 12000) + "\n")  # push over ~40KB
+rc, out, err = rec("handoff", ["--title", "trigger", "--body", "trigger"])
+if rc != 0:
+    fail("lp-handoff-rotate-runs", "mr-record handoff exited %r (stderr=%r)" % (rc, err.strip()[:200]))
+# The non-em-dash entry may land live or archived depending on what else fits the budget -- either
+# is fine (nothing here asserts WHICH side). What matters: it survives EXACTLY ONCE, split as its
+# OWN entry, never glued onto its neighbour (the padded "normal entry" it sits directly beside).
+ENTRY_RE = re.compile(r"(?m)^(?=## \S)")
+arc = os.path.join(TMP, "monster-realm-handoff-archive-2026-01.md")
+live_txt = open(HANDOFF, encoding="utf-8").read()
+arc_txt = open(arc, encoding="utf-8").read() if os.path.exists(arc) else ""
+all_chunks = ENTRY_RE.split(live_txt)[1:] + ENTRY_RE.split(arc_txt)[1:]
+hits = [c for c in all_chunks if "no em dash at all here" in c]
+if len(hits) != 1:
+    fail("lp-handoff-rotate-nondash-entry",
+         "expected the non-em-dash entry exactly once across live+archive, found %d" % len(hits))
+elif "pad pad pad" in hits[0]:
+    fail("lp-handoff-rotate-nondash-entry",
+         "the non-em-dash entry was GLUED onto the padded entry beside it instead of split on its own")
+
+# --- handoff-rotate: idempotent re-run must not duplicate archive rows on retry ---
+arc_2026_01 = os.path.join(TMP, "monster-realm-handoff-archive-2026-01.md")
+before_txt = open(arc_2026_01, encoding="utf-8").read() if os.path.exists(arc_2026_01) else ""
+# Re-append the identical oversized padding entry + re-trigger rotation, simulating a retry after a
+# crash between the archive write and the live-file swap (design-review finding #2).
+with open(HANDOFF, "a") as f:
+    f.write("\n## 2026-01-02T00:00:00Z — normal entry\n" + ("pad " * 12000) + "\n")
+rec("handoff", ["--title", "retrigger", "--body", "retrigger"])
+after_txt = open(arc_2026_01, encoding="utf-8").read() if os.path.exists(arc_2026_01) else ""
+ENTRY_RE = re.compile(r"(?m)^(?=## \S)")
+after_chunks = ENTRY_RE.split(after_txt)[1:]
+dup_count = len(after_chunks) - len(set(after_chunks))
+if dup_count > 0:
+    fail("lp-handoff-rotate-idempotent", "re-running rotation duplicated %d archive entr%s -- not crash-safe"
+         % (dup_count, "y" if dup_count == 1 else "ies"))
+
+# --- corpus-pollution guard: none of this block's fixtures may have touched the REAL corpus ---
+if sha(REAL_STATE) != real_state_before:
+    fail("lp-queue-corpus-pollution", "the REAL mr-state.json changed during this selftest")
+if sha(REAL_HANDOFF) != real_handoff_before:
+    fail("lp-queue-corpus-pollution", "the REAL monster-realm-handoff.md changed during this selftest")
+
+sys.exit(bad)
+PYQH
+
+# =================================================================================================
 # lp-tester-tools — tester-guard selftest wiring, BOTH guards (Bash + Write/Edit/MultiEdit). Same
 # rationale as the guard-bash.mjs coverage above: a regex-array unit test could pass while the
 # stdin/agent_type wiring silently breaks in production. Runs each REAL hook's own --selftest and

@@ -12,3 +12,8 @@
 pending-events/
 # lp-01 rate-limit telemetry rows — appended by production several times an hour (tick + every live-slice standdown); tracking it would conflict on every parallel slice branch
 mr-rate-limit-telemetry.jsonl
+# lp-queue / lp-handoff-rotate — mr-record's own flock lock files, and crash-orphaned rotation temp
+# files (a process killed between os.replace()'s temp-write and rename leaves one of these behind,
+# uniquely pid-suffixed so it never collides with or blocks a later run)
+*.lock
+*.tmp.[0-9]*

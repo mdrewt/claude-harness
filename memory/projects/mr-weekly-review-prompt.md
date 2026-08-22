@@ -253,8 +253,10 @@ no commit — decision issues may still be opened). Otherwise:
    (advisory for the supervisor's planning read — no mechanical consumer today, but
    structured beats prose sequencing), per-slice test files, EARS acceptance criteria.
    NO tier hints (the supervisor derives HARD/routine mechanically from `touches:`).
-   NO ADR number pre-allocation (supervisor-owned via `adr_next_free`). Do NOT edit `mr-state.json` (its `queue[]` is
-   a narrative journal, not a work queue — scheduling flows through PLAN §9 order).
+   NO ADR number pre-allocation (supervisor-owned via `adr_next_free`). Do NOT edit `mr-state.json` directly
+   (as of `lp-queue`, 2026-08-21: its `queue[]` is a fast-path pointer cache written only via
+   `mr-record queue-add`/`queue-remove` by the native tick's own "Pick work" derivation — this review
+   process doesn't run that derivation and has no business populating or clearing it).
    Optionally run `$MEM/mr-disjoint` on proposed sibling pairs and record the verdicts in
    the spec's fan-out notes (advisory: NECESSARY-NOT-SUFFICIENT, never overrides toward
    parallel). Overflow decisions attach as per-slice decision-hooks referencing issue URLs.
