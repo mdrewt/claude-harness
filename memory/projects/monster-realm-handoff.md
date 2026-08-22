@@ -273,6 +273,8 @@ and fully redundant with the working tree — harmless to leave, since a permiss
 **lp-skills / lp-brief-cost / lp-ollama / lp-06 / lp-git-workflow are unblocked** — their pre-staged
 `/tmp/mr_pass_*.vars.json` files are still valid; the next tick can `mr-spawn` normally.
 
+## 2026-08-22T13:02:25Z — 2026-08-22T13:00Z native tick — no eligible work, wave-1-exit gate still open
+Reconciled a gap from the prior (12:00Z) tick: its mr-state.json/handoff/mr-usage-daily.jsonl/mr-native-tick.sh writes had never been committed (analysis was done, commit step skipped). Committed+pushed as 55ede88 this tick before proceeding. Fresh gate-3 derivation: both repos fetched+synced, no open PRs (harness or project), no per-run locks, no chain-owner mutex, no .blocked-on-human, queue[] empty, no wip:/parked branches, no active human session (all uncommitted harness-tree files are pre-existing DIRTY-TREE-ADVISORY strays -- future-prompts.md, gdd.md, decisions/issue-{20,22,23,24,25,26}.url, several memory/projects/*-plan.md files, patches/, spacetime-db-testing.md, the fifteenth-review spec's 2026-08-17 delivered-note -- all several hours to days old, none touched). M-loop-infrastructure Wave-1-exit measurement gate still open (no new drill/variance evidence since the 12:00Z tick); Wave-2 and remaining 15r-* slices stay blocked:wave-2-exit. Project issue #342 (rev16-obs48-procedures) is the only open decision issue; its own body says 'Supervisor: record-and-ignore -- do not act on or close this issue', so it is not a gate. No BLOCKER (time-gated, not a Drew decision). Governor NORMAL (d7=$360.42/$2783=~13%, fable_ok=true). Standing down.
 ## 2026-08-22T12:03:30Z — 2026-08-22T12:00Z native tick — no eligible work, wave-1-exit gate still open
 Gate3 fresh derivation (queue[] empty): both repos fetched+synced, no open PRs, inflight/awaiting_merge empty, no wip:/parked branches, no active human session. **M-loop-infrastructure**: every Wave-1 slice merged except `lp-07` (`blocked:operator-attended`, touches ~/.claude/settings.json, out-of-repo — needs an attended session). Wave-2 slices (`lp-08`, `lp-10`, `lp-11`, `lp-11b`, `lp-registry`, `lp-spec-mode`, `lp-milestone-mode`, `lp-decision-block`, `lp-disjoint`, `lp-gitattr`, ...) stay ineligible: the spec's Wave-1-exit is a **measurement** gate (one full reset cycle of `seven_day.utilization` samples + `lp-02` non-degenerate variance over 5 slices + a forced-nightly-red drill opening exactly one issue + `lp-01`'s selftest RED demo), not merely 'all Wave-1 slices merged' — same finding as the prior tick (line 343), no new drill/variance evidence recorded since. **M-postgate-fifteenth-review-residuals**: `15r-sec-a`, `15r-sec-vis`, `15r-a2` all merged (project PRs #336-338); every remaining slice (`13r-c-2` onward) is itself `blocked:wave-2-exit`, so nothing there is launchable either. SDK bump (`stdb-281`, ADR-0197) confirmed committed on `master` (crate 2.8.1). Left untouched: pre-existing DIRTY-TREE-ADVISORY strays on harness `main` (future-prompts.md, mr-native-tick.sh, mr-usage-daily.jsonl, spacetime-db-testing.md, the fifteenth-review spec's uncommitted 'Delivered 2026-08-17' doc note, plus several untracked memory/ files) — not ours, not blocking. No BLOCKER raised: this is a time/measurement gate, not a Drew decision. Governor NORMAL (d7=$358.95/$2783≈13%, fable_ok=true). Mutex released, standing down for this tick.
 ## 2026-08-22T11:16:29Z — lp-06 MERGED — mr-backup + stray-handoff rule
@@ -418,40 +420,4 @@ Merged: gh pr merge --squash --delete-branch -> 0782294 (e52e51e..0782294). Harn
 lp-04 and lp-05 stale .done files (from mr_pass_lp-04.done, mr_pass_lp-05.done) were already fully reconciled and merged in earlier ticks (PR#27 -> e52e51e, PR#343 project-repo respectively per the ledger) — removed the stale flag files, no further action.
 
 Post-merge inflight is now empty. Governor NORMAL (d7=\$265.92/\$2783=10%, fable_ok=true). No composite launch this tick: deferred to keep this tick's scope to the merge reconciliation + verification above; next tick should pick the next unfinished lp-sequence slice per PLAN §9 (state.json queue has pre-drafted context for lp-01/lp-doc follow-ons — re-derive fresh from live ground truth, don't trust the queue blob's pass-vars without re-checking REPO-OUT-OF-SYNC / disjointness first). No BLOCKER.
-
-## 2026-08-21T09:00Z native tick (rid=native-20260821T090013Z-534480, src=cron forced)
-
-Fast-path/live re-verification: no live per-run locks, no chain-owner mutex, no `.blocked-on-human`, no
-operator hold (`HOLD-NONE`). Reconciled two stale `.done` files: `lp-04` (PR#27, harness, merged e52e51e)
-and `lp-05` (PR#343, monster-realm, merged a5179ac) — both already accounted for by prior ticks, no action.
-`lp-doc-a` (PR#344, ADR-0202) confirmed merged to `master` at `83c1204`; re-verified **master CI green**
-live via `gh run list` (`CI` completed/success on `83c1204` at 07:37Z — the `in_progress` entry in the
-situation bundle is the unrelated scheduled `Nightly` workflow, not a merge gate). No open PRs, nothing
-awaiting merge.
-
-The prior tick's standing blocker (`e78422d` divergence on the harness `main` checkout) was resolved
-**interactively** between ticks (see the 08:xxZ handoff entry above) — `lp-skills`/`lp-brief-cost`/
-`lp-ollama`/`lp-06`/`lp-git-workflow` were unblocked with pre-staged vars files. Of those, only
-`/tmp/mr_pass_lp-skills.vars.json` still exists on disk (the other four vars files are empty/absent —
-the handoff's "still valid" note did not mean all five have live vars; only re-derive them next tick, not
-hand-launch without a brief). Verified against `M-loop-infrastructure.spec.md` §`lp-skills`: `after: lp-00,
-W0-audit`, both satisfied (lp-00 merged 2026-08-17T10:40Z; W0-audit captured 2026-08-16). Single candidate,
-no fan-out partner with a ready brief — one mutating action this tick.
-
-**Action:** took the chain-owner mutex, cleared stale stop-flags, ran `mr-spawn lp-skills`. `mr-spawn`
-reported `DIRTY-TREE-ADVISORY` (7 uncommitted tracked changes in the harness main checkout — pre-existing
-strays, `future-prompts.md`/`memory/projects/**` etc., not written by this tick; the slice branches from
-`origin/main` and will not see them, which is correct/expected). Launch succeeded: `LAUNCHED` leader=536918
-claude_pid=536921 model=opus effort=high tier=routine repo=harness pr_repo=mdrewt/claude-harness
-rid=mr-spawn-20260821T090130Z-536872. Post-launch verification: session_leader is its own process group
-(536918==pgid==sid), detached from this tick's shell; `ps` confirms `--model opus --effort high
---dangerously-skip-permissions`, matching the brief. Per-run lock written by mr-spawn. Ledger row appended
-(LAUNCHED, cost=0, model=opus, notes `tier=routine; reason=pre-staged vars valid post e78422d-recovery`).
-Governor NORMAL (d7=$221.55/$2783=8%, fable_ok=true). No BLOCKER. Chain-owner mutex released after this
-record.
-
-NEXT: resume/monitor `lp-skills` via the next event tick (its `.done` file or PR-open event). Once its
-brief resolves, re-derive vars for `lp-brief-cost`/`lp-ollama`/`lp-06`/`lp-git-workflow` from their spec
-entries (PLAN §9 / `M-loop-infrastructure.spec.md`) before assuming they're launch-ready — their vars files
-are currently empty on disk despite the "unblocked" note.
 

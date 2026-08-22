@@ -3396,3 +3396,40 @@ NEXT: resolve e78422d (Drew) to unblock lp-skills et al; re-verify master CI gre
 (Nightly still in_progress at record time).
 
 
+## 2026-08-21T09:00Z native tick (rid=native-20260821T090013Z-534480, src=cron forced)
+
+Fast-path/live re-verification: no live per-run locks, no chain-owner mutex, no `.blocked-on-human`, no
+operator hold (`HOLD-NONE`). Reconciled two stale `.done` files: `lp-04` (PR#27, harness, merged e52e51e)
+and `lp-05` (PR#343, monster-realm, merged a5179ac) — both already accounted for by prior ticks, no action.
+`lp-doc-a` (PR#344, ADR-0202) confirmed merged to `master` at `83c1204`; re-verified **master CI green**
+live via `gh run list` (`CI` completed/success on `83c1204` at 07:37Z — the `in_progress` entry in the
+situation bundle is the unrelated scheduled `Nightly` workflow, not a merge gate). No open PRs, nothing
+awaiting merge.
+
+The prior tick's standing blocker (`e78422d` divergence on the harness `main` checkout) was resolved
+**interactively** between ticks (see the 08:xxZ handoff entry above) — `lp-skills`/`lp-brief-cost`/
+`lp-ollama`/`lp-06`/`lp-git-workflow` were unblocked with pre-staged vars files. Of those, only
+`/tmp/mr_pass_lp-skills.vars.json` still exists on disk (the other four vars files are empty/absent —
+the handoff's "still valid" note did not mean all five have live vars; only re-derive them next tick, not
+hand-launch without a brief). Verified against `M-loop-infrastructure.spec.md` §`lp-skills`: `after: lp-00,
+W0-audit`, both satisfied (lp-00 merged 2026-08-17T10:40Z; W0-audit captured 2026-08-16). Single candidate,
+no fan-out partner with a ready brief — one mutating action this tick.
+
+**Action:** took the chain-owner mutex, cleared stale stop-flags, ran `mr-spawn lp-skills`. `mr-spawn`
+reported `DIRTY-TREE-ADVISORY` (7 uncommitted tracked changes in the harness main checkout — pre-existing
+strays, `future-prompts.md`/`memory/projects/**` etc., not written by this tick; the slice branches from
+`origin/main` and will not see them, which is correct/expected). Launch succeeded: `LAUNCHED` leader=536918
+claude_pid=536921 model=opus effort=high tier=routine repo=harness pr_repo=mdrewt/claude-harness
+rid=mr-spawn-20260821T090130Z-536872. Post-launch verification: session_leader is its own process group
+(536918==pgid==sid), detached from this tick's shell; `ps` confirms `--model opus --effort high
+--dangerously-skip-permissions`, matching the brief. Per-run lock written by mr-spawn. Ledger row appended
+(LAUNCHED, cost=0, model=opus, notes `tier=routine; reason=pre-staged vars valid post e78422d-recovery`).
+Governor NORMAL (d7=$221.55/$2783=8%, fable_ok=true). No BLOCKER. Chain-owner mutex released after this
+record.
+
+NEXT: resume/monitor `lp-skills` via the next event tick (its `.done` file or PR-open event). Once its
+brief resolves, re-derive vars for `lp-brief-cost`/`lp-ollama`/`lp-06`/`lp-git-workflow` from their spec
+entries (PLAN §9 / `M-loop-infrastructure.spec.md`) before assuming they're launch-ready — their vars files
+are currently empty on disk despite the "unblocked" note.
+
+

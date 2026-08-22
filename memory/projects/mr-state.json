@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-22T12:03:41Z",
-  "updated_by": "mr-sup-native-20260822T120041Z-525292-972",
+  "updated_utc": "2026-08-22T13:00:10Z",
+  "updated_by": "mr-sup-native-20260822T130010Z-538375",
   "master": {
     "sha": "2290f47",
     "ci": "success",
@@ -18,9 +18,9 @@
   "park_counters": {
     "14r-e": 1
   },
-  "consecutive_standdowns": 1,
+  "consecutive_standdowns": 2,
   "rate_limit_resets_at": null,
-  "notes": "2026-08-22T12:00Z native tick: gate3 fresh derivation, nothing eligible. Wave-1-exit measurement gate (M-loop-infrastructure) still open (no new drill/variance evidence since prior tick); every Wave-2 slice + every remaining 15r-* slice is blocked:wave-2-exit. lp-07 blocked:operator-attended (unlaunchable autonomously). 15r-sec-a/15r-sec-vis/15r-a2 confirmed merged this tick (project PRs #336-338); sdk-281 confirmed committed on master. No BLOCKER (time-gated, not a Drew decision). Governor NORMAL (d7=$358.95/$2783~13%, fable_ok=true). Standing down.",
+  "notes": "2026-08-22T13:00Z native tick: reconciled a gap first -- the prior (12:00Z) tick's mr-state/handoff/mr-usage-daily.jsonl/mr-native-tick.sh writes were never committed; committed+pushed as 55ede88 before proceeding. Fresh gate3 derivation: no open PRs (harness or project), no locks/mutex, no .blocked-on-human, queue[] empty, no active human session (harness-tree uncommitted files are pre-existing DIRTY-TREE-ADVISORY strays, several hours to days old, untouched). Wave-1-exit measurement gate (M-loop-infrastructure) still open, no new drill/variance evidence -- same as 12:00Z. Project issue #342 (rev16-obs48-procedures) is the only open decision issue; its body says 'Supervisor: record-and-ignore', not a gate. No BLOCKER. Governor NORMAL (d7=$360.42/$2783~13%, fable_ok=true). Standing down. Minor risk noted (not acted on): mr-record handoff --title flagged 10 pre-existing handoff entries with unparseable '## <ISO8601>' headers, pinned live -- needs a manual look at some point.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
   "parked": [],
   "open_chore_prs": [],
