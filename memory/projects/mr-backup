@@ -1,0 +1,342 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` does not read a shebang; it would
+# interpret this PYTHON SOURCE as shell, line by line, and EXECUTE any backticked prose in it --
+# exactly how the 2026-08-17 kill-switch wedge happened (full postmortem in mr-hold's header).
+# Python reads this line as a no-op string expression; sh/bash strips the quotes and re-execs this
+# file under python3 before reaching line 3. Enforced for every python mr-* tool by mr-selfcheck.
+#
+# `__doc__` is ASSIGNED, not left as a bare literal: the guard line above is already this module's
+# first string, so a bare docstring below it would never become __doc__ at all.
+__doc__ = """mr-backup -- recoverable copies of the two loop singletons, kept OUTSIDE every worktree.
+
+    mr-backup snapshot [--file PATH]...        no --file => both canonical sources
+    mr-backup restore --file <basename> --to <dir>
+    mr-backup --selftest
+
+WHY THIS EXISTS (EARS-1, M-loop-infrastructure.spec.md:356-377). The usage ledger is gitignored
+(root .gitignore:37), so git is NOT its backup and it had no recoverable copy at all since
+2026-07-24. The handoff is tracked, but `_rotate_handoff` is a whole-file read-modify-write that can
+run between commits. Everything else the loop writes (both handoff archives, mr-state.json) is
+tracked and small -- git already is their backup, so they are deliberately NOT copied here.
+
+WHY THE ROOT IS OUTSIDE THE TREE. Default `${XDG_STATE_HOME:-$HOME/.local/state}/mr-backup`: a
+machine singleton that survives `git clean -xfd` and `git worktree remove`. An earlier draft put the
+copies under $MEM, which deletes the insurance along with the accident -- the whole point of EARS-1.
+
+WHY MR_BACKUP_ROOT IS AN ALLOWED OVERRIDE while mr-selfcheck deliberately REFUSES an equivalent
+MR_SELFCHECK_MEM: mr-selfcheck is a GATE, where an override is a surface for greening production
+vacuously. mr-backup is a DATA COPIER, not a verdict -- an override cannot fabricate a pass, only
+redirect where bytes land, and a misdirected root is caught by mr-selfcheck's drift check, which
+reads the DEFAULT root and ignores MR_BACKUP_ROOT entirely. Without it every selftest and teeth run
+would write into the real root: the "selftest pollutes the real corpus" anti-pattern this corpus
+already carries two guards against.
+
+ROOT SAFETY -- BOTH checks run before anything is written OR pruned, and neither creates a directory:
+  1. a `backup` token in the resolved root's basename (`mr-backup`, `b0-root/mr-backup`,
+     `w2-backup-root` pass; `$HOME`, `/tmp`, `notbackup` do not). The prune deletes 8-digit-named
+     DIRECTORIES, so without this `MR_BACKUP_ROOT=$HOME` -- a plausible typo for
+     `$HOME/.local/state/mr-backup` -- would let it delete real 8-digit-named directories under
+     $HOME. Production's name is literally `mr-backup`; the check is a token match rather than
+     string equality only so hermetic fixtures may name their own tmp roots.
+  2. the root must not sit inside a git working tree (walk up looking for a `.git`) -- restating
+     the paragraph above as an illegal state rather than a convention.
+
+THE CANONICAL-SOURCE BOUNDARY (parse-don't-validate, enforced HERE, never at the call site). With
+MR_BACKUP_ROOT UNSET (production) a snapshot source must be EXACTLY one of the two canonical
+absolute paths by os.path.realpath; anything else is exit 0 plus one `skip:` line on stderr. With
+MR_BACKUP_ROOT SET (fixture mode) any readable regular file is accepted. This one rule is what makes
+mr-selfcheck's MR_RECORD_LEDGER/MR_RECORD_HANDOFF fixture batteries incapable of polluting the real
+root -- and because it lives in ONE place, mr-record's call site carries no conditional to regress.
+The two paths are HARDCODED absolutes for the same reason mr-record's MEM is: they are machine
+SINGLETONS, and a self-located copy would let a worktree fork the SSOT.
+
+RETENTION: the newest 14 UTC day-directories, pruned during `snapshot`. Bound ~14 x 1.4 MB ~= 20 MB.
+ACCEPTED RISK: one directory per UTC day, overwritten within the day, so a same-day corruption can
+overwrite that day's good copy -- worst case <= 1 day, the previous day's copy remains. For the
+append-only ledger that makes a restore a strict PREFIX of truth, never a corrupted file. This is
+insurance, not a backup product.
+
+DELIBERATELY NOT BUILT (named so nobody "restores" them): no manifest, no flock, no `status`
+subcommand, no sha/mtime change detection, no `--at`, no list/compress/remote/encrypt/
+restore-in-place. The /simplify lens cut them: with no manifest there is no shared mutable state, so
+the lock protecting it goes too; restore's path is a pure function of (day, basename); and change
+detection is an EFFICIENCY mechanism in a slice the spec calls insurance -- near-inert besides,
+since every ledger append changes the ledger by definition, making the "unchanged, skip" branch dead
+code for the primary caller. `snapshot` therefore copies UNCONDITIONALLY.
+"""
+import datetime
+import os
+import re
+import shutil
+import sys
+
+CANONICAL = (
+    "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/monster-realm-usage-ledger.jsonl",
+    "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/monster-realm-handoff.md",
+)
+RETENTION = 14
+DAY_RE = re.compile(r"^\d{8}$")
+
+
+def _canon():
+    """Resolved canonical paths + their basenames, recomputed per call so the selftest can rebind
+    CANONICAL to a disposable fixture instead of pointing a test at the real ledger."""
+    return [os.path.realpath(p) for p in CANONICAL], [os.path.basename(p) for p in CANONICAL]
+
+
+def _err(msg):
+    sys.stderr.write("mr-backup: ERROR %s\n" % msg)
+
+
+def _root():
+    r = os.environ.get("MR_BACKUP_ROOT")
+    if not r:
+        base = os.environ.get("XDG_STATE_HOME") or os.path.join(
+            os.environ.get("HOME") or os.path.expanduser("~"), ".local", "state")
+        r = os.path.join(base, "mr-backup")
+    return os.path.realpath(r)
+
+
+def _root_illegal(root):
+    """The reason this root may not be used, or None. NEVER creates anything: a skipped snapshot
+    must leave no root behind for a later reader to mistake for a backup."""
+    if "backup" not in re.split(r"[-_]", os.path.basename(root)):
+        return ("refusing root %s: its basename carries no `backup` token, so this is not a backup "
+                "root (the prune deletes 8-digit directories -- see the header)" % root)
+    p = root
+    while True:
+        if os.path.exists(os.path.join(p, ".git")):
+            return ("refusing root %s: it is inside the git working tree at %s -- a backup that "
+                    "`git clean -xfd` deletes is not a backup" % (root, p))
+        parent = os.path.dirname(p)
+        if parent == p:
+            return None
+        p = parent
+
+
+def _copy(src, dst):
+    """tmp + os.replace: a crash mid-copy must never leave a truncated file that LOOKS like a
+    backup (the pattern mr-record's rotation and mr-state.json's writer already use)."""
+    tmp = "%s.tmp.%d" % (dst, os.getpid())
+    shutil.copyfile(src, tmp)
+    os.replace(tmp, dst)
+
+
+def _prune(root):
+    """Direct children only, `^\\d{8}$` only, real directories only, symlinks neither followed nor
+    removed. Everything else under the root is left strictly alone -- no unguarded recursive
+    delete (the standing corpus rule mr-unlock exists for)."""
+    if not os.path.isdir(root):
+        return
+    days = [n for n in os.listdir(root) if DAY_RE.match(n)
+            and not os.path.islink(os.path.join(root, n))
+            and os.path.isdir(os.path.join(root, n))]
+    for name in sorted(days, reverse=True)[RETENTION:]:
+        shutil.rmtree(os.path.join(root, name), ignore_errors=True)
+
+
+def snapshot(files):
+    root = _root()
+    illegal = _root_illegal(root)
+    if illegal:
+        _err(illegal)
+        return 2
+    fixture_mode = bool(os.environ.get("MR_BACKUP_ROOT"))
+    canon_paths, _names = _canon()
+    day = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d")
+    for src in (files or list(CANONICAL)):
+        real = os.path.realpath(src)
+        if not fixture_mode and real not in canon_paths:
+            sys.stderr.write("skip: not a canonical source (MR_BACKUP_ROOT unset): %s\n" % src)
+            continue
+        if not os.path.isfile(real):
+            sys.stderr.write("skip: not a readable regular file: %s\n" % src)
+            continue
+        try:
+            os.makedirs(os.path.join(root, day), exist_ok=True)
+            dst = os.path.join(root, day, os.path.basename(real))
+            _copy(real, dst)
+        except OSError as exc:
+            _err("could not write the snapshot of %s: %s" % (src, exc))
+            return 2
+        print("snapshot: %s -> %s" % (real, dst))
+    _prune(root)
+    return 0
+
+
+def restore(name, to):
+    """The NEWEST snapshot of a canonical basename. `name` is a CLOSED VOCABULARY -- those two
+    basenames and nothing else -- which is also what makes separators and `..` unreachable; the
+    explicit re-check is belt-and-braces against a future edit that widens the vocabulary without
+    remembering why it was closed."""
+    canon_paths, canon_names = _canon()
+    if name not in canon_names or "/" in name or os.sep in name or ".." in name:
+        _err("refusing --file %r: allowed values are exactly %s" % (name, canon_names))
+        return 2
+    root = _root()
+    illegal = _root_illegal(root)
+    if illegal:
+        _err(illegal)
+        return 2
+    src = None
+    if os.path.isdir(root):
+        for day in sorted((d for d in os.listdir(root) if DAY_RE.match(d)), reverse=True):
+            if os.path.isfile(os.path.join(root, day, name)):
+                src = os.path.join(root, day, name)
+                break
+    if src is None:
+        _err("no snapshot of %s exists under %s" % (name, root))
+        return 2
+    dst = os.path.join(os.path.realpath(to), name)
+    # Checked BEFORE the write, never after: the ledger is append-only, so a restore landing on top
+    # of the live file is the one irreversible harm this tool can do.
+    if dst in canon_paths:
+        _err("refusing to restore onto the live canonical source %s -- restore into a scratch "
+             "directory and diff it by hand" % dst)
+        return 2
+    try:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        _copy(src, dst)
+    except OSError as exc:
+        _err("could not write %s: %s" % (dst, exc))
+        return 2
+    print("restored: %s -> %s" % (src, dst))
+    return 0
+
+
+def main(argv):
+    if argv[:1] == ["--selftest"]:
+        return selftest()
+    if argv[:1] == ["snapshot"]:
+        files, rest = [], argv[1:]
+        while rest:
+            if rest[0] != "--file" or len(rest) < 2:
+                _err("usage: mr-backup snapshot [--file PATH]...")
+                return 2
+            files.append(rest[1])
+            rest = rest[2:]
+        return snapshot(files)
+    if argv[:1] == ["restore"]:
+        a = dict(zip(argv[1::2], argv[2::2]))
+        if len(argv) % 2 == 0 or len(a) != 2 or set(a) != {"--file", "--to"}:
+            _err("usage: mr-backup restore --file <basename> --to <dir>")
+            return 2
+        return restore(a["--file"], a["--to"])
+    _err("usage: mr-backup snapshot|restore|--selftest (see the header)")
+    return 2
+
+
+def selftest():
+    """A real in-process fixture battery at a tmp root: it never touches the real root (every case
+    either sets MR_BACKUP_ROOT under the tempdir or points HOME there) and leaves nothing behind.
+    mr-selfcheck parses BOTH the marker and this COUNT -- a bare `|| BAD=1` passes identically
+    against a ten-line stub, and a battery that quietly shrinks must red."""
+    import contextlib
+    import io
+    import tempfile
+    global CANONICAL
+    n = [0, 0]                                      # [cases, failures]
+
+    def run(argv, **envset):
+        """Drives real main() through real argv, with an env overlay restored afterwards."""
+        old = dict((k, os.environ.get(k)) for k in envset)
+        for k, v in envset.items():
+            os.environ.pop(k, None) if v is None else os.environ.update({k: v})
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                rc = main(argv)
+        finally:
+            for k, v in old.items():
+                os.environ.pop(k, None) if v is None else os.environ.update({k: v})
+        return rc, out.getvalue(), err.getvalue()
+
+    def check(name, cond, detail=""):
+        n[0] += 1
+        if not cond:
+            n[1] += 1
+            print("FAIL %s %s" % (name, detail))
+
+    with tempfile.TemporaryDirectory(prefix="mr-backup-selftest-") as T:
+        root, home = os.path.join(T, "mr-backup"), os.path.join(T, "home")
+        src = os.path.join(T, "src", "monster-realm-usage-ledger.jsonl")
+        os.makedirs(os.path.dirname(src)); os.makedirs(home)
+        # Non-ASCII plus a trailing partial line with no newline: a size-only or text-mode compare
+        # passes on identical files but fails on these, so the byte-compare below has real teeth.
+        blob = ("".join('{"i": %d, "n": "café ☃"}\n' % i for i in range(200))
+                + '{"partial": true').encode("utf-8")
+        open(src, "wb").write(blob)
+
+        rc, _o, err = run(["snapshot", "--file", src], MR_BACKUP_ROOT=root)
+        out_dir = os.path.join(T, "restored")
+        rc2, _o2, _e2 = run(["restore", "--file", "monster-realm-usage-ledger.jsonl",
+                             "--to", out_dir], MR_BACKUP_ROOT=root)
+        got = open(os.path.join(out_dir, os.path.basename(src)), "rb").read() if rc2 == 0 else b""
+        check("roundtrip-byte-identical", (rc, rc2, got) == (0, 0, blob),
+              "rc=%s/%s err=%r identical=%s" % (rc, rc2, err[:120], got == blob))
+
+        run(["snapshot", "--file", src], MR_BACKUP_ROOT=root)
+        dirs = [d for d in os.listdir(root) if DAY_RE.match(d)]
+        check("idempotent-one-day-dir",
+              len(dirs) == 1 and len(os.listdir(os.path.join(root, dirs[0]))) == 1, "%r" % (dirs,))
+
+        for i in range(1, 21):
+            os.makedirs(os.path.join(root, "202001%02d" % i))
+        open(os.path.join(root, "20260199"), "w").write("decoy file")
+        os.makedirs(os.path.join(root, "keepme"))
+        run(["snapshot", "--file", src], MR_BACKUP_ROOT=root)
+        kept = sorted(d for d in os.listdir(root)
+                      if DAY_RE.match(d) and os.path.isdir(os.path.join(root, d)))
+        check("prune-keeps-newest-14", len(kept) == RETENTION, "kept %r" % (kept,))
+        check("prune-spares-non-day-entries",
+              os.path.isfile(os.path.join(root, "20260199"))
+              and os.path.isdir(os.path.join(root, "keepme")),
+              "an 8-digit FILE or a non-matching directory was deleted")
+
+        bad_root = os.path.join(T, "notbackup")
+        rc, _o, _e = run(["snapshot", "--file", src], MR_BACKUP_ROOT=bad_root)
+        check("illegal-root-basename", rc != 0 and not os.path.exists(bad_root),
+              "rc=%s exists=%s" % (rc, os.path.exists(bad_root)))
+
+        in_tree = os.path.join(T, "repo", "mr-backup")
+        os.makedirs(os.path.join(T, "repo", ".git"))
+        rc, _o, _e = run(["snapshot", "--file", src], MR_BACKUP_ROOT=in_tree)
+        check("illegal-root-in-git-tree", rc != 0 and not os.path.exists(in_tree),
+              "rc=%s exists=%s" % (rc, os.path.exists(in_tree)))
+
+        rc, out, err = run(["snapshot", "--file", os.path.join(T, "src")],
+                           MR_BACKUP_ROOT=None, XDG_STATE_HOME=None, HOME=home)
+        check("production-skips-non-canonical",
+              rc == 0 and "skip:" in err and "snapshot:" not in out
+              and not os.path.exists(os.path.join(home, ".local", "state", "mr-backup")),
+              "rc=%s out=%r err=%r" % (rc, out[:80], err[:120]))
+
+        for label, fname in (("restore-rejects-foreign-name", "some-other-name.md"),
+                             ("restore-rejects-traversal", "../../etc/passwd"),
+                             ("restore-without-snapshot", "monster-realm-handoff.md")):
+            check(label, run(["restore", "--file", fname, "--to", T], MR_BACKUP_ROOT=root)[0] != 0)
+
+        # The destination guard needs a --to that RESOLVES ONTO a canonical source, so the constant
+        # is rebound to a disposable fixture for this one case: a battery that pointed --to at the
+        # real ledger to get a true positive would BE the defect it is testing for.
+        saved = CANONICAL
+        try:
+            CANONICAL = (src, CANONICAL[1])
+            rc, _o, _e = run(["restore", "--file", "monster-realm-usage-ledger.jsonl",
+                              "--to", os.path.dirname(src)], MR_BACKUP_ROOT=root)
+            check("restore-refuses-canonical-destination",
+                  rc != 0 and open(src, "rb").read() == blob,
+                  "rc=%s live-file-changed=%s" % (rc, open(src, "rb").read() != blob))
+        finally:
+            CANONICAL = saved
+
+    if n[1]:
+        print("BACKUP-SELFTEST-FAIL %d/%d" % (n[1], n[0]))
+        return 1
+    print("BACKUP-SELFTEST-OK %d" % n[0])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

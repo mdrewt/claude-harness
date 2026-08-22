@@ -43,7 +43,11 @@ ARGS_JSON=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:])
 export ARGS_JSON
 /usr/bin/python3 <<'PY'
 import json, os, sys, re, datetime, subprocess, fcntl
-MEM=os.environ["MEM"]; SUB=os.environ["SUB"]; argv=json.loads(os.environ["ARGS_JSON"])
+# SUB first so this line does NOT start with `MEM=` (lp-06). Fixtures patch the ONE shell-level
+# `^MEM=` constant above with `sed 's|^MEM=.*|MEM=<fixture>|'` and assert the substitution count is
+# exactly 1; while this line also matched, that sed would have rewritten it to `MEM=<fixture>` and
+# silently destroyed the SUB and argv bindings with it. Same ordering as mr-usage-snap:13.
+SUB=os.environ["SUB"]; MEM=os.environ["MEM"]; argv=json.loads(os.environ["ARGS_JSON"])
 LEDGER=os.environ.get("MR_RECORD_LEDGER") or (MEM+"/monster-realm-usage-ledger.jsonl")
 HANDOFF=os.environ.get("MR_RECORD_HANDOFF") or (MEM+"/monster-realm-handoff.md")
 STATE=os.environ.get("MR_RECORD_STATE") or (MEM+"/mr-state.json")
@@ -61,6 +65,66 @@ while i<len(argv):
     if key not in ("run_id","slice","outcome","cost","model","attempts","orch","gating","cycles","standdowns","ci","notes","from-log","title","body","body-file","spec-file","reason"): die("unknown flag --"+key+" (allowed: run_id slice outcome cost model attempts orch gating cycles standdowns ci notes from-log title body body-file spec-file reason)")
     a[key]=v; i+=2
 ts=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+# ================================ lp-06: the backup trigger ======================================
+# EARS-1: the ledger and handoff must have a recoverable copy OUTSIDE the working tree. The trigger
+# lives HERE, at the writer, rather than in mr-native-tick.sh, because "WHEN the ledger or handoff
+# changes" is precisely this file's own write path -- and because a tick-driven copy misses every
+# write a slice session makes between ticks.
+#
+# Both calls are placed strictly AFTER the durable write (see their call sites). That ordering IS
+# the row-never-lost proof: the row is on disk and its handle closed before mr-backup is even named,
+# so a kill, hang or crash in the backup path cannot cost accounting data.
+#
+# NO conditional at either call site. mr-backup's own canonical-source boundary is what keeps
+# fixture runs (MR_RECORD_LEDGER/MR_RECORD_HANDOFF, used by mr-selfcheck's batteries) from polluting
+# the real backup root -- one rule, in one place, instead of a guard here that can drift out of
+# agreement with it.
+def _backup_bin():
+    """Mirrors lp02_quality_bin's tier order: explicit MR_BACKUP_BIN, then the copy beside the
+    mr-record actually being run, then the hardcoded MEM; None => skip silently. It differs on one
+    point deliberately: an explicit MR_BACKUP_BIN is returned WITHOUT an os.path.exists() screen, so
+    a fixture that points at a missing binary exercises the real failure path (a caught
+    FileNotFoundError plus one WARN line) instead of being indistinguishable from `no helper here`."""
+    env=os.environ.get("MR_BACKUP_BIN")
+    if env: return env
+    for c in (os.path.join(os.environ.get("MEM_SELF") or MEM,"mr-backup"), MEM+"/mr-backup"):
+        if os.path.exists(c): return c
+    return None
+
+def _backup(path):
+    """BOUNDED and TOTAL: no exception, timeout or nonzero return may propagate, and none of them
+    may change the row that was just written or this process's exit code. Any failure prints ONE
+    `WARN backup:` line to STDERR (mr-record's stdout is parsed by fixtures) and returns.
+
+    DELIBERATELY NO start_new_session=True, which is where this diverges from lp02_quality_bin: that
+    helper shells out to git and therefore genuinely needs a process-GROUP kill to avoid orphaned
+    grandchildren. mr-backup spawns nothing, and keeping the child in mr-record's OWN process group
+    is what lets the cron `timeout 60` wrapper's group signal reach it -- red-team proved a
+    start_new_session=True child SURVIVES its parent being SIGTERM'd by timeout, which would leave
+    an orphaned copier once per tick, forever. 10s, not longer: the tick's worst case is already
+    ~80s against that 60s wrapper (do not make it worse). Invoked via sys.executable so a lost exec
+    bit, ENOEXEC or an asdf shim cannot take out a cron-critical path."""
+    b=_backup_bin()
+    if not b: return
+    try:
+        p=subprocess.Popen([sys.executable,b,"snapshot","--file",path],
+                           stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        try:
+            _out,err=p.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            try: p.kill()
+            except Exception: pass
+            try: p.communicate(timeout=10)      # drain, so no pipe buffer keeps the child alive
+            except Exception: pass
+            sys.stderr.write("WARN backup: snapshot of %s timed out after 10s (child killed)\n"%path)
+            return
+        if p.returncode!=0:
+            sys.stderr.write("WARN backup: mr-backup exited %s for %s: %s\n"
+                             %(p.returncode,path,(err or "").strip().replace("\n"," ")[:160]))
+    except Exception as exc:
+        sys.stderr.write("WARN backup: %s: %s\n"%(type(exc).__name__,exc))
+# ================================ end lp-06 ======================================================
 
 # ============================== lp-handoff-rotate: rotation helpers ==============================
 HANDOFF_BUDGET = 40_000                 # bytes, operator decision (2026-08-21) — NOT tokens, NOT
@@ -184,6 +248,12 @@ if SUB=="handoff":
             _rotate_handoff()
         finally:
             fcntl.flock(lf, fcntl.LOCK_UN)
+    # lp-06: snapshot via mr-backup only AFTER the flock is released AND the `with` block has exited.
+    # Never inside: _rotate_handoff still holds the lock there, so a snapshot taken inside would
+    # either read a half-rotated file or contend with the rotation it is trying to preserve.
+    # lp-06-teeth.sh pins this ordering BY LINE NUMBER (W6) so a refactor that "helpfully" moves the
+    # call up into the lock reds instead of silently corrupting a backup.
+    _backup(HANDOFF)
     print("handoff-appended: "+title); sys.exit(0)
 
 # ==================================== lp-queue: queue-add / queue-remove =========================
@@ -488,4 +558,7 @@ json.loads(line)  # verify parse
 if not row["ts"]: die("empty ts")
 with open(LEDGER,"a") as f: f.write(line+"\n")
 print("ledger-appended: "+line[:160])
+# lp-06: the row is appended, the handle is closed and the append is REPORTED before mr-backup is
+# named -- see the trigger's header for why that ordering is the row-never-lost proof.
+_backup(LEDGER)
 PY
