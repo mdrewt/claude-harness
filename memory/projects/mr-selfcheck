@@ -1821,6 +1821,17 @@ def _ollama_basename_hit(text):
     return False
 
 
+# FIX-1: mr-hold is DELIBERATELY hardcoded to the real production MEM path (see its own header --
+# it is a singleton machine-wide artifact, never per-instance). Copying it into the sandbox would
+# be a LIE: invoking the copy still reads/writes the REAL kill switch, which is the exact opposite
+# of the isolation this leg promises. Excluded by name, not "sandboxed and trusted" -- if a future
+# preflight ever calls "$MEM/mr-hold", CRITICAL-3(b)'s missing-helper loud-fail fires instead of
+# silently mutating operator state. Named honestly as the general residual: ANY helper that
+# hardcodes a live path escapes this sandbox the same way; mr-hold is just the only one that does
+# so today.
+SANDBOX_UNSAFE_HELPERS = {"mr-hold"}
+
+
 def _mr_helper_names(mem):
     # CRITICAL-3(a): every EXECUTABLE mr-* file, same exclusion shape used elsewhere in this
     # corpus (mr-selfcheck's own TOOLS glob) -- a preflight refactored to call ANY other
@@ -1959,10 +1970,13 @@ try:
         sandbox_mem = os.path.join(sandbox_harness, "memory", "projects")
         try:
             os.makedirs(os.path.join(sandbox_mem, "pending-events"))
-            # CRITICAL-3(a): copy EVERY executable mr-* helper, not just mr-ollama, so any
-            # "$MEM/..." call the extracted prefix makes resolves through the proven shim
-            # mechanism instead of exiting 127 inside the sandbox with nothing witnessed.
+            # CRITICAL-3(a): copy EVERY executable mr-* helper (minus SANDBOX_UNSAFE_HELPERS,
+            # FIX-1), so any "$MEM/..." call the extracted prefix makes resolves through the
+            # proven shim mechanism instead of exiting 127 inside the sandbox with nothing
+            # witnessed.
             for name in _mr_helper_names(MEM):
+                if name in SANDBOX_UNSAFE_HELPERS:
+                    continue
                 src = os.path.join(MEM, name)
                 dst = os.path.join(sandbox_mem, name)
                 try:
@@ -1997,9 +2011,13 @@ try:
                 if tag:
                     ollama_list_model = tag
             except subprocess.TimeoutExpired:
-                fail("lp-ollama-priming-timeout",
-                     "sandboxed `mr-ollama model` hung under the shim PATH while priming the "
-                     "ollama-list shim (S6); falling back to the known-good default tag")
+                # FIX-2: NOT a fail(). This value is explicitly unasserted (S6) -- it only helps
+                # a manually RESTORED preflight reach its deepest branch during a proof-of-teeth
+                # run. Flipping BAD here would false-RED the daily gate on any machine where this
+                # priming call is merely slow, over a value nothing downstream checks. Fall back
+                # to the known-good default tag and note it instead.
+                print("lp-ollama-note: sandboxed `mr-ollama model` timed out while priming the "
+                      "ollama-list shim (S6); continuing with the default tag")
 
         # Two content rewrites. `n == 1` failure is FATAL to this leg and must `return` BEFORE
         # any subprocess.run -- not the house record-and-continue fail() idiom (S1): a silent
@@ -2079,9 +2097,10 @@ try:
             env["PATH"] = SHIM_PATH
             env["WITNESS_FILE"] = witness
             env["OLLAMA_LIST_MODEL"] = ollama_list_model
-            # Inert by construction for the extracted prefix -- the DRYRUN branch lives at
-            # :406, well past the `# RECONCILE` anchor -- kept anyway so this honours the
-            # spec's dry-run framing and stays correct if the anchor ever moves.
+            # FIX-4: inert by construction for the extracted prefix -- the DRYRUN branch (the
+            # `if [ "${MR_TICK_DRYRUN:-0}" = "1" ]` guard, currently at :388) lives well past the
+            # `# RECONCILE` anchor -- kept anyway so this honours the spec's dry-run framing and
+            # stays correct if the anchor -- or this guard's own line number -- ever moves.
             env["MR_TICK_DRYRUN"] = "1"
             # MEDIUM-6: pin explicitly. The preflight is gated on
             # `"${MR_NO_OLLAMA:-0}" != "1"` -- an ambient MR_NO_OLLAMA=1 in the selfcheck's own
@@ -2142,10 +2161,10 @@ try:
                  "the sandbox .native-supervisor-tick-alive was never created -- proves :21 "
                  "never really executed, so an absence of ollama activity would prove nothing")
 
-        # CRITICAL-3(b): a silent 127 (a helper the sandbox MEM does not carry) during
-        # behavioural verification is exactly A8's "silently-skipped extraction == false
-        # green" -- LOUD-FAIL instead of letting an un-shimmed, un-witnessed helper call pass
-        # unnoticed.
+        # CRITICAL-3(b): a silent 127 (a helper the sandbox MEM does not carry -- including
+        # SANDBOX_UNSAFE_HELPERS, FIX-1) during behavioural verification is exactly A8's
+        # "silently-skipped extraction == false green" -- LOUD-FAIL instead of letting an
+        # un-shimmed, un-witnessed helper call pass unnoticed.
         missing_helper = re.search(re.escape(sandbox_mem) + r"\S*: No such file or directory",
                                     r.stderr)
         if missing_helper:
@@ -2197,6 +2216,19 @@ try:
             fail("lp-ollama-static-ollama-cmd",
                  "mr-native-tick.sh still invokes an `ollama` command (matched by basename, so "
                  "an absolute-path bypass is caught too) after whole-line-comment stripping")
+        # FIX-3: cheap PARTIAL mitigant only. Bash's own `/dev/tcp` pseudo-device
+        # (`exec 3<>/dev/tcp/localhost/11434`) needs no external binary at all, so it bypasses
+        # every PATH shim leg B relies on, and with an arithmetic port
+        # (`$((11000+434))`) it leaves no literal "11434" in source either -- proven live by the
+        # red-team against the real production ollama server while every other leg stayed green.
+        # This raises the bar (a plain `/dev/tcp` reference now reds) but does NOT close the
+        # class: arbitrary further obfuscation and `disown`-detached jobs remain accepted
+        # residuals named in the PR. A real fix (network namespace isolation) is out of scope at
+        # this slice's size (XS).
+        if "/dev/tcp" in stripped:
+            fail("lp-ollama-static-devtcp",
+                 "mr-native-tick.sh contains `/dev/tcp` -- bash's built-in TCP pseudo-device "
+                 "needs no external binary and bypasses every PATH shim leg B relies on")
         # BLOCKER-1 fix: scan `stripped`, not the raw source, and match a CALL SITE
         # (`log "OLLAMA preflight`) rather than any mention of the phrase. The specialist's
         # required tombstone comment (house form, like :249's debounce tombstone) is free to

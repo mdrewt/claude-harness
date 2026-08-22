@@ -117,16 +117,50 @@ not extend leg D to `ping` without `MR_NO_OLLAMA=1`, `summarize-run` or `triage`
 
 ## Named residual risks (state them in the PR, do not pretend they are closed)
 
-1. Leg B covers the tick **prefix** only; leg C covers the whole file statically. A preflight both
-   relocated below `# RECONCILE` **and** obfuscated (port in a variable, `$OLBIN` instead of
-   `ollama`) evades both. Closing it means executing the whole tick, whose hazards (live `/tmp`
-   marker mutation, a real GitHub issue, selfcheck recursion, self-respawn) exceed the value.
-2. Bash never consults PATH for a command name containing `/`, so an absolute-path
-   `/usr/local/bin/ollama` bypasses leg B's shims entirely (S8). Leg C's literal scan still catches
-   the `11434`/`ollama` tokens. The proof-of-teeth claim holds for a byte-for-byte restore.
-3. Transitive: a callee's callee could probe without any scanned file containing `11434`.
-4. `mr-ollama:22` reads the real `~/.hermes/hermes-agent/.env` even from the sandboxed copy —
-   read-only, harmless, noted so it is not a surprise later.
+Rewritten after the tests were hardened (v2/v3 closed eight reviewer + red-team findings and one
+CRITICAL containment defect); this list is what a red-team could still get past, each verified
+empirically rather than assumed.
+
+1. **Relocated AND obfuscated.** Leg B only replays the tick's prefix; leg C scans the whole file
+   statically. A preflight moved below `# RECONCILE` *and* written without the tokens `ollama` or
+   `11434` evades both. Closing it means executing the whole tick, whose hazards (live `/tmp`
+   marker mutation, a real GitHub issue via `mr-ask-drew`, selfcheck recursion, self-respawn)
+   exceed the value.
+2. **A probe that spawns no process at all.** `exec 3<>/dev/tcp/localhost/$((11000+434))` uses a
+   bash built-in, so no PATH shim can witness it and no literal port appears in source — the
+   red-team proved this live (the real ollama server logged the connection while all four legs
+   stayed green). Leg C now reds on a literal `/dev/tcp`, which raises the bar but does not close
+   the class; a real fix is network-namespace isolation of leg B's replay, which is out of scope at
+   this size.
+3. **A `disown`ed background job.** The wrapper's `wait` blocks on jobs the shell still owns; a job
+   that `disown`s itself (or double-forks) can outrun both `wait` and the 1.5 s settled read. The
+   historical preflight used `setsid … &`, which `wait` does catch (verified: the witness now
+   carries the `/api/generate` warm-up line).
+4. **A helper that hardcodes a live path.** Leg B copies every executable `mr-*` helper into the
+   sandbox so a delegated preflight still runs through the shims — but a helper that ignores `$MEM`
+   escapes containment. `mr-hold` is hardcoded by design and is therefore EXCLUDED by name
+   (`SANDBOX_UNSAFE_HELPERS`), so a call to it loud-fails as a missing helper rather than mutating
+   the operator's real kill switch. This is a named-instance fix, not a structural one.
+5. **Out-of-band surfaces.** A probe added to the crontab entry itself, or to any file outside
+   `mr-native-tick.sh` / `mr-launch.sh` / `mr-ollama`, is invisible to every leg — a repo-scoped
+   gate cannot see the crontab.
+6. **Transitive.** A correctly-shimmed helper can call a further program that talks to the model
+   server; no leg traces beyond one hop.
+7. **Read-only escape, harmless:** `mr-ollama:22` reads the real `~/.hermes/hermes-agent/.env` even
+   from the sandboxed copy.
+
+## Follow-ups this slice deliberately did NOT take (out of `touches:`; for the supervisor to route)
+
+- `memory/projects/mr-native-supervisor-README.md:59` still describes the tick warming the model.
+- `memory/projects/monster-realm-lp-04-plan.md:173` and `docs/adr/0011-…:498` cite the mr-selfcheck
+  call site as `mr-native-tick.sh:220`; the deletion moved it to `:203`.
+- `mr-native-tick.sh`'s own in-file self-references (`:267`, `:277`, `:306`, `:449`, `:475`, `:524`
+  pre-deletion) shift by 21 lines; the corpus doctrine is content anchors, so the fix is to convert
+  them, not to renumber — a separate slice.
+- `mr-selfcheck:1504`'s `mr-selfcheck-qh-*` fixture (pre-existing, unrelated to this slice) has no
+  cleanup; 48 leftover directories were found in `/tmp` during review.
+- `mr-native-tick.sh:25`'s `[ "${_hb_fail:-0}" -le "${_hb_ok:-0}" ]` is unhardened against
+  non-numeric marker content.
 
 ## Anti-patterns fenced
 

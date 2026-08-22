@@ -25,7 +25,7 @@ _hb_ok=$(cat "$MEM/.native-supervisor-last-success" 2>/dev/null || echo 0)
 if [ "${_hb_fail:-0}" -le "${_hb_ok:-0}" ]; then date -u +%s > "$MEM/.native-supervisor-heartbeat"; fi
 
 # (per-tick ollama preflight removed 2026-08-22 by lp-ollama — 803 warm-ups, 0 invocations across two
-# generations; the haiku hop it replaced is recorded at mr-launch.sh:81 as "0 invocations ever". mr-ollama
+# generations; the haiku hop it replaced is recorded at mr-launch.sh:94 as "0 invocations ever". mr-ollama
 # and the local stack are deliberately RETAINED for manual/experimental use — its consumers still degrade
 # on OLLAMA-UNAVAILABLE. Rollback: restore from git history if a real per-tick consumer ever appears.)
 
