@@ -604,7 +604,25 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   →sec-mig-b→sec-mig-c→sec-mig-d · 13r-c-2→15r-d→15r-f · 15r-f→{h1, i-1} · h1→{h2, consolidate,
   tst-i}. **All four `15r-sec-mig-*` and `13r-c-2` declare `scanner-migration-audit.eval.mjs`, which
   `mr-disjoint`'s STRUCTURAL `*migration*` rule forces SERIAL-REQUIRED — they cannot fan out.**
+
+> **2026-08-22 operator directive (interactive, live session):** every remaining slice above is
+> `blocked:wave-2/3/4-exit` — a **time** gate on `M-loop-infrastructure`'s Wave-1-exit measurement
+> (one full reset cycle since `lp-02` landed 2026-08-21T00:32Z; boundary is the following Thu 20:00
+> ET, several days out as of this writing). Six native-tick standdowns in a row (12:00Z–18:00Z on
+> 2026-08-22) re-derived only this far and stopped, because the loop-infra/15r chain sits first in
+> PLAN §9 listing order and dominates a shallow re-check — **not** because later milestones are
+> actually gated on it. **`M-postgate-sixteenth-review-residuals` is pulled forward**: its own spec
+> declares no `blocked:` tag on 16r-a/16r-c/16r-d/16r-e/16r-f/16r-g (each `after: []`) and nothing in
+> it depends on wave-1-exit or on this 15r chain finishing — see that milestone's entry below, now
+> annotated in-place, and its own §6 "Notes for the runner". The supervisor may launch 16r-a/c/d/e/f/g
+> now, out of PLAN §9 listed order, while continuing to leave `M-loop-infrastructure` Wave-2+, every
+> `blocked:wave-*-exit`/`blocked:known-unmigrated-nonempty` slice above, and `16r-b` (its spec keeps
+> its own SERIAL-REQUIRED note against the — still blocked — 15r scanner-migration family; skip it for
+> now, revisit once that family unblocks) in their original position. Not decision-defaulted: this is
+> a direct operator instruction, not a loop judgment call under BLOCKER discipline.
 - **M-postgate-sixteenth-review-residuals** (`M-postgate-sixteenth-review-residuals.spec.md`) —
+  **PULLED FORWARD 2026-08-22 (operator directive — see the note directly above): 16r-a/c/d/e/f/g are
+  launchable now, ahead of listed order, unrelated to wave-1-exit or the blocked 15r chain.**
   **NEW, queued 2026-08-21; inserted after `M-postgate-fifteenth-review-residuals`**, per the
   weekly-review insertion convention. Verified sixteenth multi-lens review findings @ `064e627`
   (8 lenses, 2 independent verifiers, 9 verified / 1 dropped). The `67fbff8..064e627` delta

@@ -182,6 +182,15 @@ after 16r-c (shared `evals/nightly-smoke-wiring.eval.mjs`). Everything else —
 
 ## 6. Notes for the runner
 
+- **PULLED FORWARD 2026-08-22 (operator directive, interactive):** while
+  `M-loop-infrastructure`'s Wave-1-exit measurement gate sits on a multi-day time boundary,
+  16r-a/16r-c/16r-d/16r-e/16r-f/16r-g are explicitly launchable now, ahead of this
+  milestone's PLAN §9 listed position — none of them carry a `blocked:` tag or depend on
+  wave-1-exit or on `M-postgate-fifteenth-review-residuals` finishing (§5 already scopes
+  15r's own family out of *this* milestone's work, not the other way around). 16r-b keeps
+  its SERIAL-REQUIRED note against the 15r scanner-migration family (§3) — leave it until
+  that family unblocks. 16r-h stays gated on 16r-c per its own `after:`. See PLAN.md's
+  matching 2026-08-22 operator-directive note for the full rationale.
 - Verification-dropped finding (for the record): "view-PK adoption untracked" — refuted
   (tracked via sdk-d + 15r-sec-a slice text); only the doc language ships, in 16r-a.
 - The review's full report lives in the 2026-08-21 Cowork task chat; headline counts:

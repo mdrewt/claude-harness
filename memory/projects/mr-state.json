@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-22T18:00:49Z",
+  "updated_utc": "2026-08-22T18:38:10Z",
   "updated_by": "mr-sup-native-20260822T180010Z-609346",
   "master": {
     "sha": "2290f47",
@@ -12,13 +12,65 @@
     "ci": "no-remote-ci-local-gate-green (mr-selfcheck SELFCHECK-OK re-verified live post-merge; mr-backup --selftest OK)"
   },
   "adr_next_free": 202,
-  "inflight": [],
+  "inflight": [
+    {
+      "slice": "16r-a",
+      "run_id": "mr-spawn-20260822T183718Z-627000",
+      "session_leader": 627070,
+      "claude_pid": 627073,
+      "repo": "project",
+      "started_utc": "2026-08-22T18:37:22Z",
+      "note": "pulled forward 2026-08-22 (operator directive) ahead of wave-1-exit-blocked chain"
+    },
+    {
+      "slice": "16r-c",
+      "run_id": "mr-spawn-20260822T183726Z-627458",
+      "session_leader": 627621,
+      "claude_pid": 627624,
+      "repo": "project",
+      "started_utc": "2026-08-22T18:37:33Z",
+      "note": "pulled forward 2026-08-22 (operator directive) ahead of wave-1-exit-blocked chain"
+    }
+  ],
   "awaiting_merge": [],
-  "queue": [],
+  "queue": [
+    {
+      "slice": "16r-g",
+      "spec_file": "specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md",
+      "reason": "pulled forward 2026-08-22 (operator directive): after:[] LOW/LIGHT dead-code retirement (Bond/apply_care/CareError), disjoint from 16r-a/16r-c in flight, not gated on wave-1-exit",
+      "added_utc": "2026-08-22T18:37:50Z",
+      "added_by": "mr-sup-native-20260822T180010Z-609346",
+      "derived_from_master_sha": "2290f47"
+    },
+    {
+      "slice": "16r-d",
+      "spec_file": "specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md",
+      "reason": "pulled forward 2026-08-22 (operator directive): after:[] MED/LIGHT-MED playtest-report JSON-format migration, disjoint from 16r-a/16r-c in flight, not gated on wave-1-exit",
+      "added_utc": "2026-08-22T18:37:50Z",
+      "added_by": "mr-sup-native-20260822T180010Z-609346",
+      "derived_from_master_sha": "2290f47"
+    },
+    {
+      "slice": "16r-e",
+      "spec_file": "specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md",
+      "reason": "pulled forward 2026-08-22 (operator directive): after:[] LOW-MED/LIGHT observability-stack wiring, disjoint from 16r-a/16r-c in flight, not gated on wave-1-exit",
+      "added_utc": "2026-08-22T18:37:50Z",
+      "added_by": "mr-sup-native-20260822T180010Z-609346",
+      "derived_from_master_sha": "2290f47"
+    },
+    {
+      "slice": "16r-f",
+      "spec_file": "specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md",
+      "reason": "pulled forward 2026-08-22 (operator directive): after:[] LOW-MED/LIGHT client reconnect-latch telemetry fix, disjoint from 16r-a/16r-c in flight, not gated on wave-1-exit",
+      "added_utc": "2026-08-22T18:37:50Z",
+      "added_by": "mr-sup-native-20260822T180010Z-609346",
+      "derived_from_master_sha": "2290f47"
+    }
+  ],
   "park_counters": {
     "14r-e": 1
   },
-  "consecutive_standdowns": 7,
+  "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
   "notes": "2026-08-22T17:00Z native tick: fresh gate3 derivation -- no locks/mutex/open-PRs/inflight/queue, no active human session, mr-selfcheck SELFCHECK-OK, master CI green (project 2290f47; harness has no CI workflow). Reconciled missed 16:00Z commit (3faa943) at tick start. M-loop-infrastructure Wave-1-exit still a measurement gate: lp-02 landed 2026-08-21T00:32Z, required one-full-reset-cycle (next Thu 20:00 ET) has not elapsed, no drill/variance evidence since 16:00Z. M-postgate-fifteenth-review-residuals: remaining slices all blocked:wave-2/3/4-exit. Issue #342 record-and-ignore, not a gate. No BLOCKER. Governor NORMAL (d7=$363.44/$2783~13%, fable_ok=true). Standing down.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
