@@ -296,7 +296,7 @@ fi
 # about its ABSENCE (B4), and B5(c) never points at a real corpus path (see its own comment).
 # =====================================================================================
 if [ ! -f "$BACKUP" ]; then
-  for id in B0 B1 B2 B3a B3b B4 B5a B5b B5c B5d B6; do
+  for id in B0 B1 B2 B3a B3b B3c B4 B5a B5b B5c B5d B6; do
     echo "TEETH-FAIL $id: skipped -- mr-backup not found at $BACKUP"
     BAD=1
   done
@@ -410,6 +410,24 @@ elif [ -e "$B3B_ROOT" ]; then
   fail B3b "illegal root was created on disk despite the non-zero exit"
 else
   ok B3b
+fi
+
+# B3c: illegal root -- basename CONTAINS the token "backup" (a plausible near-miss) but is NOT
+# literally "mr-backup" -- must still be refused. The contract's rule is literal-name EQUALITY,
+# not a substring/token match: a token match would admit MR_BACKUP_ROOT=$HOME/backup (or
+# $HOME/backup-old, etc.), which defeats the whole point of the basename check -- bounding what
+# the prune loop is allowed to unlink to directories it can prove are this tool's own. Pinned here
+# so a future relaxation to "contains backup as a -/_ delimited token" reds instead of shipping.
+B3C_ROOT="$WORK/b3c/backup-scratch"
+B3C_SRC="$WORK/b3c-src/monster-realm-handoff.md"; mkdir -p "$(dirname "$B3C_SRC")"; printf 'x\n' > "$B3C_SRC"
+timeout 15 env MR_BACKUP_ROOT="$B3C_ROOT" "$BACKUP" snapshot --file "$B3C_SRC" >"$WORK/b3c.out" 2>"$WORK/b3c.err"
+RC=$?
+if [ "$RC" -eq 0 ]; then
+  fail B3c "expected non-zero exit for a root whose basename ('backup-scratch') contains the token 'backup' but is not literally 'mr-backup', got 0"
+elif [ -e "$B3C_ROOT" ]; then
+  fail B3c "illegal root was created on disk despite the non-zero exit -- basename equality is not being enforced literally"
+else
+  ok B3c
 fi
 
 # B4: boundary -- non-canonical source with NO MR_BACKUP_ROOT anywhere in the environment.
@@ -611,7 +629,7 @@ if [ "$W2_BUILD_OK" != 1 ]; then
   fail W2-ledger "skipped -- the patched mr-record copy failed to build correctly (see W2-subst-trap above)"
   fail W2-handoff "skipped -- the patched mr-record copy failed to build correctly (see W2-subst-trap above)"
 else
-  W2_ROOT="$WORK/w2-backup-root"
+  W2_ROOT="$WORK/w2-root/mr-backup"
   W2_FIXLEDGER="$W2_FIXMEM/monster-realm-usage-ledger.jsonl"
   W2_FIXHANDOFF="$W2_FIXMEM/monster-realm-handoff.md"
   timeout 30 env -u MR_RECORD_LEDGER -u MR_RECORD_HANDOFF -u MR_RECORD_STATE MR_BACKUP_ROOT="$W2_ROOT" MR_BACKUP_BIN="$BACKUP" \

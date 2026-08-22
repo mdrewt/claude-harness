@@ -33,12 +33,14 @@ would write into the real root: the "selftest pollutes the real corpus" anti-pat
 already carries two guards against.
 
 ROOT SAFETY -- BOTH checks run before anything is written OR pruned, and neither creates a directory:
-  1. a `backup` token in the resolved root's basename (`mr-backup`, `b0-root/mr-backup`,
-     `w2-backup-root` pass; `$HOME`, `/tmp`, `notbackup` do not). The prune deletes 8-digit-named
-     DIRECTORIES, so without this `MR_BACKUP_ROOT=$HOME` -- a plausible typo for
-     `$HOME/.local/state/mr-backup` -- would let it delete real 8-digit-named directories under
-     $HOME. Production's name is literally `mr-backup`; the check is a token match rather than
-     string equality only so hermetic fixtures may name their own tmp roots.
+  1. the resolved root's basename must be LITERALLY `mr-backup` (`.../mr-backup`,
+     `<tmpdir>/mr-backup` pass; `$HOME`, `/tmp`, `notbackup`, `$HOME/backup-scratch` do not). The
+     prune unlinks 8-digit-named DIRECTORIES, so without this `MR_BACKUP_ROOT=$HOME` -- a plausible
+     typo for `$HOME/.local/state/mr-backup` -- would let it delete real 8-digit-named directories
+     under $HOME. Fixtures do not get a concession here: they NEST their own root as
+     `<tmpdir>/mr-backup`. A substring or `-`/`_`-token match is explicitly REJECTED, because it
+     admits `$HOME/backup` and `$HOME/backup-old`, and the entire job of this check is to bound
+     what the prune loop may unlink to directories it can prove are this tool's own.
   2. the root must not sit inside a git working tree (walk up looking for a `.git`) -- restating
      the paragraph above as an illegal state rather than a convention.
 
@@ -101,9 +103,9 @@ def _root():
 def _root_illegal(root):
     """The reason this root may not be used, or None. NEVER creates anything: a skipped snapshot
     must leave no root behind for a later reader to mistake for a backup."""
-    if "backup" not in re.split(r"[-_]", os.path.basename(root)):
-        return ("refusing root %s: its basename carries no `backup` token, so this is not a backup "
-                "root (the prune deletes 8-digit directories -- see the header)" % root)
+    if os.path.basename(root) != "mr-backup":
+        return ("refusing root %s: a backup root's basename must be literally `mr-backup` (the "
+                "prune unlinks 8-digit directories under it -- see the header)" % root)
     p = root
     while True:
         if os.path.exists(os.path.join(p, ".git")):
@@ -294,9 +296,11 @@ def selftest():
               and os.path.isdir(os.path.join(root, "keepme")),
               "an 8-digit FILE or a non-matching directory was deleted")
 
-        bad_root = os.path.join(T, "notbackup")
+        # `backup-scratch`, not `notbackup`: a near-miss that a substring/token match would WAVE
+        # THROUGH is the only fixture that actually pins literal-name equality.
+        bad_root = os.path.join(T, "backup-scratch")
         rc, _o, _e = run(["snapshot", "--file", src], MR_BACKUP_ROOT=bad_root)
-        check("illegal-root-basename", rc != 0 and not os.path.exists(bad_root),
+        check("illegal-root-basename-not-literal", rc != 0 and not os.path.exists(bad_root),
               "rc=%s exists=%s" % (rc, os.path.exists(bad_root)))
 
         in_tree = os.path.join(T, "repo", "mr-backup")
