@@ -420,6 +420,28 @@ sys.exit(bad)
 PYHD
 grep -q "Feedback doctrine (ACTIVE" "$MEM/mr-supervisor-prompt-native.md" || { echo "SELFCHECK-FAIL SSOT doctrine pointer missing"; BAD=1; }
 grep -q "ACTIVE 2026" "$MEM/mr-feedback-doctrine.md" || { echo "SELFCHECK-FAIL doctrine not ACTIVE"; BAD=1; }
+# lp-brief-cost: the rendered brief's budget line must not re-assert the false premise that
+# budget is ample / the 125% figure is mechanical (mr-cost-watch:555/561 gate BOTH on
+# `[ "$ENFORCE" = 1 ]`, and mr-budget-config.json ships costwatch_enforce=false — MONITOR
+# mode only; live proof: COSTWATCH ... HARD-MONITOR 125% ... enforce=false or log-stalled,
+# run continued to 183% of cap), while the distinct-lenses-over-redundant-re-runs instruction
+# it was replaced with must survive (E1/E2/E3, monster-realm-lp-brief-cost-plan.md). A1 is a
+# POSITIVE anchor, not a duplicate of mr-spawn:263 (which only catches a SURVIVING <CAP_USD>
+# placeholder, never a MISSING one) — dropping <CAP_USD> would silently ship a brief with no
+# cap, and without this anchor A2-A4 below would pass vacuously against a renamed/moved
+# template. Single explicit path only, never a glob or corpus-wide scan: the banned phrases
+# below legitimately survive in mr-brief-template.md.bak.v2.*,
+# monster-realm-handoff-archive-2026-07.md and M-loop-infrastructure.spec.md:290 (which
+# quotes the defect as its own justification), and a scan would also match this very comment
+# block's own text — the self-reference hazard mr-selfcheck:378-382 already documents.
+# Tester-authored, TDD RED PHASE — do not edit these to fit a buggy implementation; a wrong
+# expectation is corrected FROM THE SPEC (M-loop-infrastructure.spec.md, slice lp-brief-cost),
+# never retargeted to match the prose. Proof of teeth: ./lp-brief-cost-teeth.sh (M0-M5b).
+grep -qF 'BUDGET: $<CAP_USD>' "$MEM/mr-brief-template.md" || { echo "SELFCHECK-FAIL E1/E3 brief-template A1: 'BUDGET: \$<CAP_USD>' anchor missing (mr-brief-template.md is missing, moved, or the <CAP_USD> placeholder was dropped) -- restore the literal 'BUDGET: \$<CAP_USD>' text so mr-spawn:263 has a placeholder to substitute, and so A2-A4 below check the real file"; BAD=1; }
+grep -qF 'Budget is ample' "$MEM/mr-brief-template.md" && { echo "SELFCHECK-FAIL E1 brief-template A2: the false-premise sentence 'Budget is ample' is present in mr-brief-template.md -- restore the locked L21 replacement text from monster-realm-lp-brief-cost-plan.md"; BAD=1; }
+grep -qF 'favor thoroughness over frugality' "$MEM/mr-brief-template.md" && { echo "SELFCHECK-FAIL E1 brief-template A3: 'favor thoroughness over frugality' is present in mr-brief-template.md -- a partial revert of the false-premise sentence A2 alone would miss; restore the locked L21 replacement text from monster-realm-lp-brief-cost-plan.md"; BAD=1; }
+grep -qF '125%' "$MEM/mr-brief-template.md" && { echo "SELFCHECK-FAIL E3 brief-template A4: an unmeasured '125%' ceiling figure is present in mr-brief-template.md -- mr-cost-watch's 125% HARD gate is enforce=false in production, so quoting it as mechanical is false; restore the locked L33 replacement text from monster-realm-lp-brief-cost-plan.md"; BAD=1; }
+grep -qF 'distinct defect classes over redundant re-runs' "$MEM/mr-brief-template.md" || { echo "SELFCHECK-FAIL E2 brief-template A5: the retained instruction 'distinct defect classes over redundant re-runs' is missing from mr-brief-template.md -- restore the locked L21 replacement text from monster-realm-lp-brief-cost-plan.md"; BAD=1; }
 # lp-09: kill-switch provenance derived assertions (A1-A8). Tester-authored, TDD RED PHASE —
 # do not edit these to fit a buggy implementation; a wrong expectation is corrected FROM THE
 # SPEC (M-loop-infrastructure.spec.md, slice lp-09), never retargeted to match the code.
