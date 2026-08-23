@@ -27,6 +27,26 @@ privacy/deletion surface is part of the threat model + audit.
 Incomplete deletion → registry + completeness eval. Erase vs anonymize → erase personal, anonymize shared.
 Export leaks another user → owner-scoped + fixture.
 
+## Recency check (2026-08-23, review pass — ceremony AUTHORIZED, PLAN.md §9)
+
+This sketch's premise ("the M21 hook") is **confirmed real, not speculative** — M21a/b/c are merged.
+`server-module/src/accounts.rs` already implements `delete_account` with a two-call gated
+grace-window/`PendingDeletion` state machine (AUTH-28/AUTH-37 proof-of-teeth in `accounts_tests.rs`), and
+`schema.rs:722` carries its own forward-reference: `// M22 extends delete_account's body with the grace
+window + cascade.` Cite the real reducer and its current signature at ceremony time instead of designing
+the hook fresh. The **owner-keyed-tables-registry + deletion-completeness-eval** idea (this sketch's central
+mechanism) now has two direct implementation precedents to model against rather than invent from scratch:
+**ADR-0194** (`monster_pub` — private table + owner-scoped `my_monster_pub` view) and **ADR-0198**
+(`battle` — private table + two-identity `my_battle` view); both establish the private-table-plus-scoped-
+view idiom this project already uses for "who can read this row," which is the same shape a deletion/export
+registry needs for "who owns this row." The "no PII in logs" rule cites `ADR-0029` (harness design ADR,
+still the intent-of-record) — M20's own no-PII logging discipline landed as `ADR-0180`
+(`mr_log`/observability stack); cross-reference both at build time rather than only the original design
+ADR. Per the 2026-08-23 unstable-feature policy ruling (`mdrewt/monster-realm#342`), consider whether a
+now-stable 2.8.1 feature (e.g. scheduled Procedures, stable since ADR-0197 FF4) is a genuinely better fit
+for the retention-window reaper than the existing scheduled-reducer pattern — not a mandate, just a live
+option to weigh during ideation. Scope, out-of-scope framing, and the M25 boundary are otherwise unaffected.
+
 ## Fan-out & integration note (for the slicing agent)
 
 When finalizing this milestone's slices and `touches:` sets — drafted at build time per `PLAN.md` §9 for the M15–M25 sketches; refined from the existing task breakdown for the fuller M11–M14 specs — design for **`touches:`-disjoint parallel fan-out** and plan for **post-integration correctness**:

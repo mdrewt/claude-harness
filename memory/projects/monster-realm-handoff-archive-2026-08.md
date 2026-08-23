@@ -3830,3 +3830,13 @@ no markdown and models no workflow YAML, so the graphs contributed little beyond
 single-caller blast-radius confirmation on `jobHasFailurePolicyComment` (both graphs agreed:
 the eval's own default export is the only caller). Said rather than skipped silently.
 
+## 2026-08-22T19:00:37Z — 16r-a CI-wait delegated to mr-ci-watch; 16r-c still running
+PR #349 (16r-a doc-truth sweep) open at mergeStateStatus=UNSTABLE with ci/e2e checks pending. Delegated CI-wait for PR #349 to mr-ci-watch (pid 734320, detached); resumes via event tick on completion. 16r-c remains live (session_leader 627621, ~21min elapsed) — no action taken on it, still building. No merge, no new launch this tick (N=2 already in flight). Governor NORMAL (d7=$374.50/$2783≈13%). No BLOCKER.
+
+
+
+---
+
+
+
+

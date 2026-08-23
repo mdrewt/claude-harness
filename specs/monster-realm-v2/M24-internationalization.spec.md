@@ -24,6 +24,18 @@ A new language is a **data drop** + the hard-coded-string lint makes externaliza
 Hard-coded literal ships → extraction lint fails. Missing default key → `validate_content` fails. Partial
 locale → fallback + coverage report.
 
+## Recency check (2026-08-23, review pass — ceremony AUTHORIZED, PLAN.md §9)
+
+"Rides the ADR-0006 pipeline" is only half the current mechanism. ADR-0006 (schema-evolution +
+content-sync) is the original single-pipeline decision; content loading itself moved to **directory-based
+glob loading** in `M8.9e` (`ADR-0057` — `build.rs` embeds `game-core/content/<registry>/*.ron`, proven by
+the wave-file pattern `000-core.ron`/`010-derived.ron`/`020-playtest-wave1.ron`/`050-wave2.ron`/
+`060-item-evo-derived.ron` this session confirmed live). Any locale-variant RON scheme (e.g. a
+`<registry>/<locale>/*.ron` layer, or a locale field inside each entry) needs to be designed against the
+**ADR-0057 glob-loader**, not the older ADR-0006 description alone — cite both, but treat 0057 as the
+mechanism a new locale scheme actually extends. Everything else (message-catalog externalization, the
+extraction lint, RTL, the M23 copy-composition boundary) is unaffected by intervening work.
+
 ## Fan-out & integration note (for the slicing agent)
 
 When finalizing this milestone's slices and `touches:` sets — drafted at build time per `PLAN.md` §9 for the M15–M25 sketches; refined from the existing task breakdown for the fuller M11–M14 specs — design for **`touches:`-disjoint parallel fan-out** and plan for **post-integration correctness**:

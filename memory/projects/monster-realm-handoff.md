@@ -497,6 +497,57 @@ interpolation caveat this slice avoided. (5) pre-existing biome warning at
   (it added in-suite teeth the hand-written clauses lacked). Both were re-proven by execution.
 - `/tmp/mr_warn_16r-e` appeared mid-run; landing pattern was honoured (no new fan-outs after it).
 
+## 2026-08-23T16:35:11Z — PLAN §9 tail review: roster-wave-3 pulled forward + M22-M25 ceremony authorized
+**Interactive session (Drew present), docs-only, no code touched. Written ahead of the
+`wave-2/3/4-exit` gate lifting (Thu 20:00 ET) so the native loop has real work in the meantime.**
+
+**(1) `M-postgate-roster-wave-3` pulled forward.** PLAN.md gained an operator-directive blockquote
+(same pattern as the 2026-08-22 16r fix) immediately before its entry: it's launchable now, its
+DE-GATED sequencing precondition (hardening + ux-design milestones) is satisfied, and re-verified
+live content confirms Electric/Light still have zero species and zero skills — the gap is real and
+unstarted. **It has no spec file yet** (`M-postgate-roster-wave-3.spec.md` doesn't exist), so
+`queue[]`/`mr-record queue-add` doesn't apply — the first tick action on it is content-spec
+authorship (content/data tier, `opus @ medium`), following the `M-playtest-d` precedent, then
+normal content-pack slicing/fan-out. Read the PLAN.md note in full before acting on it.
+
+**(2) M22–M25 heavy-ceremony spec-writing AUTHORIZED.** Same `mr-feedback-doctrine.md` §6 treatment
+the 2026-08-08 override gave M20/M21 — launch as an ordinary rooted-run slice (`mr-spawn`), not
+through `lp-milestone-mode` (still unbuilt, `blocked:wave-1-exit` — the 2026-08-16 W0-0 Tier-C
+allowlist populate doesn't help you here, it's for that future automation). Architectural/
+irreversible decisions the ceremony surfaces still go through `mr-ask-drew` as normal — this only
+authorizes *starting* the four ceremonies. Implementation still waits its normal PLAN §9 turn; M18/
+M19 were reviewed but NOT authorized (still `blocked:playtest-gate`).
+
+**(3) All six sketches (M18/M19/M22/M23/M24/M25) + `security-threat-model.md` got a recency pass**
+against everything that's shipped since they were written (15r-sec-a's private `battle`+`my_battle`
+view, 13r-e's `monster_pub` privacy, M21's `delete_account`, uxd3's `overlayRegistry.ts`, ADR-0057's
+content-dir loader, and the confirmed RLS-unenforced-at-2.8.1 fact). Each sketch gained a "Recency
+check (2026-08-23)" section — **read it before running that milestone's ceremony**, it names stale
+citations and one real open design question (M18: the raid's 3-participant battle-visibility model
+isn't covered by `my_battle`'s two-identity view — needs a decision, not an assumption).
+`security-threat-model.md` §0/§1/§4 were corrected in place: RLS is confirmed unenforced (not
+"experimental, verify per-version"), and the standing mitigation is private-table + scoped
+`#[view]`, proven twice (ADR-0194, ADR-0198).
+
+**(4) `mdrewt/monster-realm#342` read and incorporated, left OPEN.** Drew's ruling: M20's OBS-48
+overstated his intent (blanket-forbid unstable features); softened to "require justification, not
+avoidance," and generalized — a version bump promoting a feature to stable makes it available if
+genuinely useful, not limited to Procedures or SpacetimeDB. This is now referenced in the M22–M25
+ceremony note (weigh it during ideation) and in the threat-model correction (explicitly does NOT
+extend to RLS, which stays inert on its own evidence). **Deliberately not acted on:** OBS-48's own
+EARS text and `ADR-0180` were left untouched — the issue's own text names a different consumer
+("weekly generate-improvement-plan run") and says "Supervisor: record-and-ignore — do not act on or
+close this issue." Don't close it; don't be surprised it's still open.
+
+**(5) Full detail:** `memory/decisions-log.md`'s 2026-08-23 monster-realm entry has the complete,
+grounded writeup (file:line citations, ADR numbers, what was and wasn't changed). Read that before
+re-deriving any of this from scratch.
+
+Files touched (harness repo, `main`): `specs/monster-realm-v2/PLAN.md`,
+`M18-coop-raids.spec.md`, `M19-social.spec.md`, `M22-privacy-compliance.spec.md`,
+`M23-accessibility.spec.md`, `M24-internationalization.spec.md`, `M25-security-audit.spec.md`,
+`security-threat-model.md`, `memory/decisions-log.md`. Nothing in the `monster-realm` project repo
+changed. Committed and pushed to `main` this session (see the commit for the exact SHA).
 ## 2026-08-23T14:02:59Z — 2026-08-23T14:02:59Z — native tick: standdown, nothing actionable
 Re-verified live ground truth for this tick (rid=native-20260823T140007Z-2481740). No open PRs in either repo. Project master CI green at 588b24e (matches mr-state). Harness main has no CI workflow, working tree synced with origin/main. mr-hold status HOLD-NONE. No per-run locks, no chain-owner mutex. Reconciled the three flagged .done files (lp-brief-cost, lp-06, lp-ollama): all three already merged (PR#31 1493e4a, PR#33 51073c8, PR#32 d3d1df5) and already recorded in the ledger/handoff per 2026-08-22 entries; the .done/.done.recorded pairs are stale leftovers only, consistent with the 2026-08-22 tick that first flagged them — no action needed. mr-gates residuals list --unclaimed is empty. queue[]/inflight[]/awaiting_merge[] all empty per mr-state.json. Checked PLAN §9 eligibility fresh: every non-launched slice in M-loop-infrastructure is blocked:wave-1-exit (a time-gated one-full-reset-cycle measurement, not yet reached) and every M-postgate-fifteenth-review-residuals slice is blocked:wave-2-exit or later, except 16r-b which is serial-blocked behind the unstarted 15r-sec-mig-a/b/c/d + 13r-c-2 family. Nothing changed since the prior tick's (13:03Z) identical derivation. Uncommitted harness git strays (future-prompts.md, memory/spacetime-db-testing.md diffs; gdd.md; specs/monster-realm-v2/M-postgate-fifteenth-review-residuals.spec.md 'Delivered (2026-08-17)' doc-truth annotation; memory/projects/decisions/*.url + *.answer.md; several monster-realm-*-plan.md/progress.md memos; memory/projects/patches/lp-09-guard-bash-monster-realm.patch) are the same set multiple prior ticks (including the 2026-08-22T\xxx and 2026-08-23T13:03Z ticks) have already characterized as pre-existing legitimate artifacts (decision-issue records, per-slice plan memos, a saved patch, and human/agent doc edits) — left untouched again this tick, no destructive action taken. Took no mutating action. Governor NORMAL (d7≈$605/$2783≈22%). No BLOCKER.
 ## 2026-08-23T11:57:08Z — 16r-h merged; M-postgate-sixteenth-review-residuals closed except serial-blocked 16r-b; hold-aged/hold-unattributed decisions closed
@@ -702,13 +753,4 @@ The build loop is held by a kill-switch flag with no provenance record. Did you 
 
 ## 2026-08-22T23:07:54Z — HOLD-UNATTRIBUTED flag carries no provenance record (mtime=1787439637) — escalating once; loop stays held
 The build loop is held by a kill-switch flag with no provenance record. Did you pause it? If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour.
-
-## 2026-08-22T19:00:37Z — 16r-a CI-wait delegated to mr-ci-watch; 16r-c still running
-PR #349 (16r-a doc-truth sweep) open at mergeStateStatus=UNSTABLE with ci/e2e checks pending. Delegated CI-wait for PR #349 to mr-ci-watch (pid 734320, detached); resumes via event tick on completion. 16r-c remains live (session_leader 627621, ~21min elapsed) — no action taken on it, still building. No merge, no new launch this tick (N=2 already in flight). Governor NORMAL (d7=$374.50/$2783≈13%). No BLOCKER.
-
-
-
----
-
-
 

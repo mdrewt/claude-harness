@@ -27,6 +27,20 @@ are real HTML, reduced-motion is a clean visual switch. A11y copy **composes wit
 Color-only info → icon/text + color. Reduced-motion breaking netcode → visual-only switch. Inaccessible canvas
 → DOM overlays + `pixijs-accessibility` (don't make the WebGL scene a screen-reader target).
 
+## Recency check (2026-08-23, review pass — ceremony AUTHORIZED, PLAN.md §9)
+
+The DOM-overlay-menus premise this sketch leans on (ADR-0014) is **more concrete today** than when written:
+`M-postgate-ux-design`'s uxd3 (ADR-0162–0164, merged) built the actual substrate —
+`client/src/ui/overlayRegistry.ts` + a `canOpen` modality-policy reducer unifying what were ~15 open-coded
+overlay-guard sites, opened via a pinned `KeyM` two-level main menu. Ceremony time should retrofit
+roles/labels/ARIA into **this real registry**, not a hypothetical future overlay system — read
+`overlayRegistry.ts`/`overlayRegistry.test.ts` directly rather than re-deriving the menu shape from ADR-0014
+alone. The retrofit-into-M19 sub-scope stays explicitly **conditional/deferred**: M19 (guilds/chat/social)
+remains unbuilt (`blocked:playtest-gate`), so write its a11y criteria as forward-looking (what M19's chat/
+guild UI must satisfy *when* it builds) rather than criteria this milestone can gate today — don't let that
+sub-scope block the rest of M23's ceremony or implementation. M4/M7 retrofit scope is unaffected (both
+built, stable). ADR-0013's visual/netcode split (the reduced-motion switch's foundation) is unchanged.
+
 ## Fan-out & integration note (for the slicing agent)
 
 When finalizing this milestone's slices and `touches:` sets — drafted at build time per `PLAN.md` §9 for the M15–M25 sketches; refined from the existing task breakdown for the fuller M11–M14 specs — design for **`touches:`-disjoint parallel fan-out** and plan for **post-integration correctness**:

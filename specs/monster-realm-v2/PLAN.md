@@ -658,16 +658,37 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   and the milestone proceeds now, in normal queue order. uxd2 (context-sensitive NPC interaction) also
   absorbs r2's interact-key redesign ask (items 022-026/032) — extend its `NpcInteraction` enum scope
   accordingly at build time.
-- **M-postgate-roster-wave-3** (content; **deprioritized, DE-GATED**) — complete the roster toward the GDD §5
+> **2026-08-23 operator directive (interactive session): `M-postgate-roster-wave-3` is pulled forward —
+> launchable now, ahead of its listed position, unrelated to `wave-2/3/4-exit`.** Same underlying gap as
+> the 2026-08-22 16r fix: this entry sits textually after the blocked loop-infra/15r chain, so a
+> listing-order derivation stops before reaching it. Its own sequencing precondition ("land after the two
+> hardening milestones + the UX-design specs") is independently satisfied — `M-postgate-netcode-hardening`,
+> `M-postgate-ux-hardening`, and `M-postgate-ux-design` are all CLOSED (2026-07-31 and earlier). Re-verified
+> 2026-08-23 against live content: `game-core/content/species/020-playtest-wave1.ron:23` and
+> `050-wave2.ron:14` both still carry the original wave-authoring comment confirming Electric and Light
+> have zero species and zero skills today (Dark/Earth/Fire/Plant/Water/Wind are the only six live
+> affinities) — the gap this milestone closes is unchanged and unstarted (zero PRs, zero commits reference
+> it). **Unlike 16r, this milestone has no spec file yet** (`M-postgate-roster-wave-3.spec.md` does not
+> exist — "ADR reserved at build time" per its own entry below) and therefore no slice headings `queue[]`
+> can point at; the fast-path `mr-record queue-add` mechanism does not apply until a spec exists. The first
+> action a tick takes on it is content-spec authorship (not code) — normal single-tick content/data-tier
+> work (`opus @ medium`), following the `M-playtest-d-content-pack.spec.md` precedent: draft the RON wave
+> (reserved id/filename band immediately after `060-item-evo-derived.ron`), the matching skill kits (STAB
+> gate requires both affinities to have skills before species do), reserve a project ADR from
+> `adr_next_free` (204 as of this writing) for the wave decision, and hand slicing/fan-out to the normal
+> content-pack pattern (pt-d1/pt-d2/pt-d3 precedent: content additions are `touches:`-disjoint from
+> everything else in flight). No fresh Drew decision needed — DE-GATED status (below) already covers it.
+- **M-postgate-roster-wave-3** (content; **deprioritized, DE-GATED; PULLED FORWARD 2026-08-23 — see the
+  operator note directly above**) — complete the roster toward the GDD §5
   ~16-form target by adding the currently-unrepresented **Electric + Light** species lines. These have
   **zero forms AND zero skills** today, so this is net-new species *and* net-new skill kits (the Electric/
   Light skills the ADR-0143 STAB gate requires), not a top-up — it also closes the Dark-doubled / 14-vs-16
   residual accepted at pt-d3 (ADR-0145). Follows the ADR-0057 content fan-out + ADR-0143/0144 wave
   conventions (reserved id/filename bands, STAB + RON comment-hygiene gates). **DECISION (Drew, 2026-07-25):
   DE-GATED** — supersedes the earlier "gated on playtest feedback / no auto-launch without a fresh Drew
-  decision"; the loop MAY auto-launch this as normal content queue work with no fresh Drew decision, but it
-  is **deprioritized to the tail** of this block (sequence it after the two hardening milestones + the
-  UX-design specs; do not pull it ahead of them). ADR reserved at build time.
+  decision"; the loop MAY auto-launch this as normal content queue work with no fresh Drew decision, and as
+  of 2026-08-23 its deprioritization-to-the-tail precondition is satisfied (see the note above) so it is no
+  longer waiting on anything. ADR reserved at build time.
 - **M20 Observability, performance & load hardening** (`M20-observability-performance.spec.md`; ADR-0029) —
   the capstone: production monitoring (self-hosted OSS dashboards/alerts — ADR-0180 replaces the original
   OTel→Datadog sink, see Status below), full-system load testing (scaled sim-harness), profiling the named
@@ -699,15 +720,60 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   do not launch it speculatively. **Historical build order (M21a/b/c only):** M21 (all of a/b/c) lands
   fully before any M20 slice launches — both milestones' `touches:` sets shared `server-module/src/lib.rs`,
   a real ordering dependency, not just a priority preference; satisfied as of M21c's merge.
+> **2026-08-23 operator authorization (interactive session): the full `mr-feedback-doctrine.md` §6 HEAVY
+> CEREMONY treatment (investigation → 6-way ideation → judge synthesis → execution → review) is now
+> AUTHORIZED for M22, M23, M24, and M25 — the same treatment the 2026-08-08 override assigned to M20/M21.**
+> This closes a real gap, not a redundant one: the 2026-08-16 W0-0 record already populated the Tier-C
+> `spec_authoring_allowlist` with all six sketch-sized milestones (`[M18, M19, M22, M23, M24, M25]`), but
+> that allowlist belongs to **`lp-milestone-mode`**, which is itself still `blocked:wave-1-exit` and does
+> not exist yet — so it authorized nothing a native tick could act on *before* Thursday. This note grants
+> the missing piece: a native tick may run the M22–M25 ceremony **now**, as an ordinary rooted-run slice
+> launch (`mr-spawn`), exactly the way the 2026-08-08 override launched M20/M21's ceremony — **not** by
+> waiting for `lp-milestone-mode`. **Unchanged:** any architectural, irreversible, security, or
+> spec-contradicting choice the ceremony itself surfaces still goes through `mr-ask-drew` per standing
+> BLOCKER discipline (`lp-decision-block`'s intent, even though that gate isn't built either) — this
+> authorization covers *starting* the four ceremonies, not skipping a decision found along the way.
+> **Implementation still waits its normal turn in PLAN §9 order** and Phase D's `blocked:playtest-gate`
+> framing for anything not already exempted. A fresh recency pass (2026-08-23, this session) re-read all four sketches against the current
+> codebase and found their scope premises **hold** but their concrete file/mechanism citations are dated —
+> each sketch below gained a "Recency check (2026-08-23)" section naming what a ceremony run should pull
+> forward: **M22** cites the already-shipped `delete_account` reducer + `PendingDeletion` state machine
+> (`server-module/src/accounts.rs`, `schema.rs:722`) as a concrete hook, not a future one, and should model
+> its owner-keyed registry directly on the now-proven private-table+view precedent (ADR-0194 `monster_pub`,
+> ADR-0198 `battle`) rather than inventing the pattern fresh. **M23** should retrofit ARIA into the
+> now-built `overlayRegistry.ts`/`canOpen` substrate (`client/src/ui/overlayRegistry.ts`, ADR-0162–0164)
+> rather than a hypothetical future overlay system. **M24** should cite the real content pipeline —
+> `game-core/content/<registry>/*.ron` directory-glob loading (ADR-0057), not only the original
+> single-pipeline ADR-0006 — since that's the mechanism any locale-variant RON scheme rides. **M25** and its
+> SSOT `security-threat-model.md` currently frame RLS as "experimental, verify on the pinned version" —
+> that framing is now **factually superseded**: RLS is confirmed **unenforced** at 2.8.1 (not merely
+> unverified; `client_visibility_filter` remains `unstable`-gated per ADR-0197 FF3/W0-6), and the mitigation
+> M25 was deferring a decision on ("verify RLS, or move data to private tables") has already been exercised
+> twice in production (ADR-0194, ADR-0198) — M25's actual job is now auditing *completeness* of that
+> migration across every stakes-classified table, not discovering RLS's status from scratch. **Also apply
+> the 2026-08-23 unstable/beta-feature policy ruling** (`mdrewt/monster-realm#342`, Drew's comment — general
+> policy, not limited to SpacetimeDB or to Procedures): don't reflexively avoid an unstable API; a version
+> bump that promotes a feature to stable (or ships a new stable one) makes it available to use if it
+> genuinely improves the design, used as intended — weigh this during each milestone's ideation lenses
+> rather than defaulting to avoidance the way the original M20 OBS-48 criterion did before this ruling
+> corrected it. **Sequencing for the ceremony passes themselves:** design/spec authorship is pure docs (no
+> `touches:` conflicts), so M22/M23/M24/M25 ceremonies may run in any order or fan out in parallel; M23's
+> retrofit scope for M19 stays explicitly forward-looking/conditional since M19 itself remains unbuilt
+> (post-gate provisional) — write that sub-scope as deferred, not blocking the rest of M23's ceremony.
 - **M22 Privacy, data deletion & compliance** (`M22-privacy-compliance.spec.md`; ADR-0031) — registry-driven
-  deletion cascade (erase/anonymize), data export, retention; a deletion-completeness eval.
+  deletion cascade (erase/anonymize), data export, retention; a deletion-completeness eval. **Ceremony
+  AUTHORIZED 2026-08-23** — see the operator note above and the sketch's own Recency check.
 - **M23 Accessibility** (`M23-accessibility.spec.md`; ADR-0032) — keyboard/screen-reader/colorblind/
-  reduced-motion (a visual switch on ADR-0013), WCAG-AA; retrofits across M4/M7/M19.
+  reduced-motion (a visual switch on ADR-0013), WCAG-AA; retrofits across M4/M7/M19. **Ceremony AUTHORIZED
+  2026-08-23** — see the operator note above and the sketch's own Recency check.
 - **M24 Internationalization** (`M24-internationalization.spec.md`; ADR-0033) — externalized catalogs +
-  locale-keyed RON content; a new language is a data drop; chat untranslated.
+  locale-keyed RON content; a new language is a data drop; chat untranslated. **Ceremony AUTHORIZED
+  2026-08-23** — see the operator note above and the sketch's own Recency check.
 - **M25 Security audit & threat-model gate** (`M25-security-audit.spec.md`; ADR-0034; `security-threat-
   model.md`) — the **final pre-launch gate**: consolidated threat model + a tooled/manual audit (RLS-leak
-  verification on the pinned version is the headline check) + a blocking security sign-off + re-audit cadence.
+  verification on the pinned version is the headline check) + a blocking security sign-off + re-audit
+  cadence. **Ceremony AUTHORIZED 2026-08-23** — see the operator note above; `security-threat-model.md`'s
+  RLS framing was corrected the same day (RLS is confirmed unenforced at 2.8.1, not merely unverified).
 
 Phases gate on the prior phase's CI being green-and-meaningful. Phase B/C items stay **named YAGNI
 exceptions** until their phase — declared, not silently dropped.

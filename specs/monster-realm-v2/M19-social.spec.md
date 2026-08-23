@@ -11,8 +11,9 @@ user content handled safely** (no XSS/abuse) and **moderation built in**. The se
 chat is user content rendered to *other* users.
 
 ## Scope (condensed)
-- **Chat** on RLS-scoped channels (global/zone/guild/whisper): validated server-side, **rendered escaped/
-  sanitized** (never raw HTML), **rate-limited**; a block list suppresses blocked senders.
+- **Chat** on private-table + scoped-`#[view]` channels (global/zone/guild/whisper — see Recency check: not
+  RLS): validated server-side, **rendered escaped/sanitized** (never raw HTML), **rate-limited**; a block
+  list suppresses blocked senders.
 - **Guilds** (`guild` + `guild_member` with roles): create/invite/join/leave/kick/promote, **role-permission-
   checked**; guild chat + roster.
 - **Social graph:** `friendship` (mutual consent, reuses the ADR-0024 handshake) + one-sided `block`.
@@ -26,8 +27,24 @@ Final Phase-C milestone.
 
 ## Risks / decisions
 XSS/markup → escape on render (inert text) + fixture. Spam → rate limit. Harassment → block + report + mute/
-ban. Channel leak → RLS scoping + fixture. Client-set role/mute → server role-checks, mod-gated. PII in logs →
-no-PII discipline.
+ban. Channel leak → private-table + participant-scoped `#[view]` + fixture (see Recency check — not RLS).
+Client-set role/mute → server role-checks, mod-gated. PII in logs → no-PII discipline.
+
+## Recency check (2026-08-23, review pass — not a ceremony; M19 stays `blocked:playtest-gate`)
+
+This sketch's "RLS-scoped channels" framing (Scope + Key design + the Risks line above, pre-edit) predates
+the now-repeated finding that `client_visibility_filter` RLS is **confirmed unenforced** at the pinned
+2.8.1 toolchain (`ADR-0197` FF3/W0-6 — an `unstable`-gated, unimplemented feature, not merely "experimental
+and unverified" as `security-threat-model.md` still worded it before today's companion fix). Two production
+precedents now show the actual mechanism to design channel/guild/friend visibility around: **ADR-0198**
+(`battle` → private table + two-identity-scoped `my_battle` view) and **ADR-0194** (`monster_pub` → private
+table + owner-scoped view). At build time, `guild`/`guild_member`/`friendship`/`block`/zone-and-guild chat
+channels should each be modeled as a **private table read through a scoped `#[view]`** (participant-set for
+a channel, membership-set for a guild roster), not "RLS-scoped" — update the Scope/Key-design language
+accordingly rather than carrying the RLS framing into the ceremony. The **ADR-0024 dual-consent escrow**
+reuse for `friendship` remains accurate (Trading's decision, unaffected by the RLS finding — friendship
+mutual-consent is a reducer-side handshake, not a read-visibility mechanism). No other part of this sketch
+(chat rate-limiting, moderation/report/mute-ban, no-PII logging) was affected by intervening work.
 
 ## Fan-out & integration note (for the slicing agent)
 

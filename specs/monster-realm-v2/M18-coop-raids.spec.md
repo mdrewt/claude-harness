@@ -26,6 +26,23 @@ organize raids.
 Ally drop hangs/crashes → degrade path + reaper + one-ally proof-of-teeth. `resolve_turn` regressed → separate
 rule + regression fixture. Raid abandon → fails the team, no rating (raids unranked).
 
+## Recency check (2026-08-23, review pass — not a ceremony; M18 stays `blocked:playtest-gate`)
+
+This sketch predates `15r-sec-a` (ADR-0198, merged 2026-08-16), which made the `battle` table **private**
+and gated the sole client read path through `my_battle` — a **two-identity**-scoped `#[view]`
+(`player_identity` OR `opponent_identity` matching `ctx.sender()`; see
+`docs/adr/0198-participant-scoped-battle-view.md` D2, project root). A raid battle has **three** real
+participants — two allies + the AI boss — and this sketch's "shared raid `battle` where `opponent_identity`
+is the ally" framing was written when `battle` was still public and any subscriber could read any row. That
+premise no longer holds: with `battle` private, whichever ally is neither `player_identity` nor
+`opponent_identity` on the row cannot read it through `my_battle` as shipped. **This needs a design decision
+at build time, not an assumption carried over from the pre-privacy sketch** — plausible options: (a) extend
+`my_battle` (or add a sibling `my_raid_battle` view) with a third scoped identity column, (b) model a raid
+as two linked `battle` rows (one per ally) with boss-side state mirrored, or (c) something the ceremony's
+ideation surfaces that this note hasn't anticipated. Flag it explicitly in M18's own ideation lenses rather
+than re-deriving `my_battle`'s two-identity limit from scratch. No other part of this sketch (the M16
+both-submit machinery, the M17 unranked framing) was affected by intervening work.
+
 ## Fan-out & integration note (for the slicing agent)
 
 When finalizing this milestone's slices and `touches:` sets — drafted at build time per `PLAN.md` §9 for the M15–M25 sketches; refined from the existing task breakdown for the fuller M11–M14 specs — design for **`touches:`-disjoint parallel fan-out** and plan for **post-integration correctness**:

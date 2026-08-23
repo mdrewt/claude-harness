@@ -27,8 +27,32 @@ Consolidation + a gate, not new per-system controls — the standing mechanical 
 chain/no-PII) do the continuous work; M25 is the periodic human+tooled assurance. The final pre-launch item.
 
 ## Risks / decisions
-RLS silently not enforcing → verify on the pinned version; fall back to private tables. Audit theater →
-severity-triaged findings + a blocking sign-off, not a checkbox.
+RLS confirmed not enforcing at 2.8.1 (see Recency check — this is settled, not a thing to discover) →
+private-table-plus-scoped-view migration, audited for completeness. Audit theater → severity-triaged
+findings + a blocking sign-off, not a checkbox.
+
+## Recency check (2026-08-23, review pass — ceremony AUTHORIZED, PLAN.md §9)
+
+**The "RLS-leak verification on the pinned version" headline check's premise moved from open question to
+settled fact.** RLS (`client_visibility_filter`) is confirmed **unenforced** at 2.8.1 — `ADR-0197` FF3/W0-6
+verified it byte-identically `unstable`-gated and unimplemented on the pinned toolchain, corroborated by
+`OBS-47`'s standing instruction to build any future read-path as a `#[view]` "unless a subsequent
+SpacetimeDB release documents RLS as stable" (still not the case). This is stronger than
+`security-threat-model.md`'s current wording ("RLS is experimental... accepted as defense-in-depth,"
+"verified per-version") suggests — that doc (this milestone's own SSOT) has been corrected in the same
+session (2026-08-23) to say RLS is confirmed unenforced, not merely unverified; re-read it fresh at ceremony
+time rather than trusting a cached summary. **The mitigation this sketch deferred a choice on ("verify RLS,
+or move data to private tables") has already been exercised twice in production**: `ADR-0194`
+(`monster_pub`) and `ADR-0198` (`battle`), both private-table + owner/participant-scoped `#[view]`. M25's
+actual audit job is now narrower and more concrete than "resolve ADR-0015's caveat" — **verify completeness**
+of that migration: enumerate every stakes-classified table in the threat model and confirm each either (a)
+has no real confidentiality stakes, or (b) is private with a scoped view proven to match its stakes class,
+with no table silently still relying on RLS for anything that matters. Per the 2026-08-23 unstable-feature
+policy ruling (`mdrewt/monster-realm#342`), do not let this finding read as "avoid all unstable/beta
+SpacetimeDB surface forever" — the ruling is specifically that RLS *itself* is not usable (still unstable,
+zero evidence of stabilization), not a blanket stance against newly-stable features elsewhere in the audit
+scope. Everything else (STRIDE coverage, chat-XSS/economy-dupe/auth audit scope, the blocking sign-off gate,
+re-audit cadence) is unaffected.
 
 ## Fan-out & integration note (for the slicing agent)
 
