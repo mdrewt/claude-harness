@@ -492,10 +492,19 @@ piece that moves the measured number; if it slips, the slice has not shipped its
 *(Operator question, 2026-08-22: should the drains and work queues be a single SSOT with explicit
 rules about what enters at the front vs the back?)*
 
-**Yes for ORDERING. No for INTAKE. And the corpus has already proved why it matters:
-`mr-feedback` has 189 rows and 0 of them ever reached a terminal state** — `lp-15` exists to
-retire it. A sink was built here once and it rotted. Shipping `mr-residuals.jsonl` beside it
-without a consolidation path would make three ledgers and repeat the mistake.
+**Yes for ORDERING. No for INTAKE.**
+
+**CORRECTED 2026-08-23 (operator decision).** v2 of this section said `mr-feedback`'s 189 rows with
+0 terminal proved the two intake ledgers were "a genuine duplicate pair" that `lp-15` should
+resolve by retirement. Re-measured properly — the ledger is event-sourced, so 189 rows fold to
+**91 items: 79 DISPOSED, every one carrying an action and a target, and 76 of 79 targets resolving
+to a real spec file or `### <slice>` heading.** The triage worked. What never happened is the
+TRANSITION to a terminal state when the target merged. So the diagnosis "duplicate ledger" was
+wrong; the right one is **"two ledgers, no drain between them and the work queue"** — the same
+RF-3 shape as everything else in this plan. Two typed intake records (a feedback item carries
+`kind`/`confidence`/`weight`/`episode`/an operator quote; a residual carries
+`gate_id`/`source_slice`/`defer_count`) are the right shape and flattening them would lose fields.
+**Two typed doors, one drain, one line.** `lp-15` is rewritten from retirement to repair.
 
 ### 13.1 What actually exists, sorted by KIND (the fragmentation is smaller than it looks)
 
@@ -505,10 +514,12 @@ without a consolidation path would make three ledgers and repeat the mistake.
 | **Ordering** | `PLAN.md §9` + `blocked:`/`after:` + `mr-disjoint`; `mr-ready` (lp-08, unbuilt) | SSOT for *what is next* |
 | **Ordering cache** | `queue[]` in `mr-state.json`, cap 5 | a memoised fast path over the above — explicitly "never authority" |
 | **Live state** | `inflight[]`, `awaiting_merge[]`, `parked[]`, master CI | observed each tick, never queued |
-| **Intake** | `mr-feedback` (0/189 terminal), `mr-residuals.jsonl` (new), playtest reports, decision issues | things *discovered* that are not yet work items |
+| **Intake** | `mr-feedback` (91 items, 79 disposed with resolvable targets, 0 transitioned), `mr-residuals.jsonl` (new), playtest reports, decision issues | things *discovered* that are not yet work items |
 
-Only ONE of these is a genuine duplicate pair: the two **intake** ledgers. `queue[]` is a derived
-cache, not a backlog — merging it with an intake ledger would fuse a source with a projection.
+**None of these is a duplicate.** `queue[]` is a derived cache, not a backlog — merging it with an
+intake ledger would fuse a source with a projection. And the two intake ledgers are typed records
+for different origins (see the correction above); what they lacked was a shared drain, which is
+what this slice builds and what `lp-15` extends to the feedback half.
 
 ### 13.2 The invariant that removes the fragmentation
 
@@ -551,8 +562,10 @@ residual aging out while the queue is full waits; `residual-stale` fires at T2 a
 ### 13.4 What this slice does about it
 
 - **Route the drain through `queue-add`** — no new queue, no new priority path. *(Done in §10.2.)*
-- **Make `mr-residuals.jsonl`'s schema a SUPERSET of `mr-feedback`'s row shape**, so `lp-15` becomes
-  a migration rather than a rewrite. Cheap now, expensive later.
+- **`lp-15` is rewritten from retirement to repair** (operator decision 2026-08-23). The
+  field-mapping table drafted for a migration is withdrawn: `mr-feedback` keeps its ledger,
+  doctrine and state machine, and gains the same drain, the same gate-proved terminal transition
+  and the same aggregated aging alarms this slice built for residuals. Reuse, do not duplicate.
 - **Write the ladder in §13.3 down once**, in the supervisor doctrine, and reference it from the
   `lp-08` and `lp-registry` spec entries so the unbuilt SSOT inherits it instead of inventing a
   second one.

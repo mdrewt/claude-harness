@@ -459,6 +459,27 @@ edit is reverted, the file SHALL be byte-identical to the recorded pre-edit copy
 Tests: assert the pre-edit copy exists in `$MEM` before the edit lands (ADR-0010).
 
 ### lp-tester-tools — Scoped Bash (+ a Write/Edit guard) for tester: syntax checks only (HIGH, LIGHT)
+
+**AMENDED 2026-08-23 (operator-reported; same finding as `16r-c`, previously unfixed).** The
+Write/Edit guard blocked ALL of `.claude/`, on the reasoning that "tester has no legitimate reason
+to write there". That was wrong about the one path that matters: **every slice's work happens in a
+worktree at `<repo>/.claude/worktrees/<slice>`** (`mr-spawn:864-865`), so the guard blocked tester
+from writing its gating tests where the work is — costing a staging round-trip through `/tmp` on
+**every slice**. A guard everyone routes around is worse than none: it spends tokens per slice and
+trains the loop to treat the restriction as an obstacle. `.claude/worktrees/<slice>/**` is now
+ALLOWED, with one carve-out that is the whole reason this is not simply "allow worktrees": a
+worktree is a FULL CHECKOUT, so it carries its own `.claude/hooks/` and `.claude/settings.json`.
+Editing those does not disarm the running session (hooks load from `CLAUDE_PROJECT_DIR`) but the
+worktree IS what the PR merges, so a disarmed guard committed there reaches `master` and disarms
+every FUTURE session — the same exploit on a delay. So: allow the worktree, keep protecting the
+worktree's own `.claude/`. Path resolution was hardened at the same time (`resolveDeepest`):
+`realpathSync` throws on a non-existent leaf, so a Write CREATING a file beneath an existing
+symlinked directory was judged on its logical path — harmless under a blanket block, an escape once
+a subtree is allowed. Fixtures 21 -> 23 including a REAL on-disk symlink sandbox; 5 injected
+defects RED. Both copies (harness + monster-realm) synced and byte-identical. The companion
+`guard-tester-bash.mjs` was checked and needs no change — worktree paths already pass its
+existing-regular-file test.
+
 `touches: .claude/agents/tester.md, .claude/hooks/guard-tester-bash.mjs (new), .claude/hooks/guard-tester-write.mjs (new), .claude/settings.json, memory/projects/mr-selfcheck`
 `after:` (none) — **split from a monster-realm-side twin (same title, project-repo touches:) per
 `lp-00`'s own `REPO-MIXED` refusal**: a single cross-repo entry can't be fed to `mr-spawn` at all;
@@ -1012,31 +1033,74 @@ Deliberately **not** authored at full fidelity: entry is Wave 6's above-the-cut 
 re-prioritised, which is months out, and `spec-kit`'s own rule is sketches for later milestones. Each
 is elaborated at slice head.
 
-- **`lp-15` — ceremony retirement.** Archive `mr-feedback` (0 of 189 rows ever terminal) and its
-  doctrine, and edit **all four** `mr-selfcheck` sites in the same diff — `:11` (ast-parse of
-  `mr-feedback`, **which also breaks on a `git mv`**), `:12` (`mr-feedback selftest`), `:53` (grep
-  `"Feedback doctrine (ACTIVE"`), `:54` (grep `"ACTIVE 2026"`) — plus the tick call site at
-  `mr-native-tick.sh:139`. Must be **one slice**: archiving without the selfcheck edits leaves an
-  interruptible boundary that is RED. Sequenced strictly **after `lp-registry`** takes over playtest
-  intake, or the retirement removes the only (broken) consumer and leaves nothing. Driven by
-  `just audit`'s KEEP/PROTECT/REVIEW/TRIM verdicts rather than hand-derived judgement.
-  **MIGRATION TARGET NOW EXISTS (lp-gates, 2026-08-22) — this is a MIGRATION, not a deletion.**
-  Operator note on this slice in the implementation plan: *"ensure that all remaining (and still
-  valid, aka not obsolete) work is in an appropriate place to be picked up and worked on by future
-  ticks rather than being lost due to the archiving of `mr-feedback`."* Re-measured 2026-08-22:
-  **189 rows, 0 terminal** — 91 CLASSIFIED, 86 DISPOSED, 5 LOGGED, 4 IN-WORK, 3 ANSWERED. The 90
-  DISPOSED+IN-WORK rows are the live work; CLASSIFIED-without-a-disposition is the pool
-  `lp-registry` must dispose, not carry.
-  Field mapping into `mr-residuals.jsonl` (`mr-gates`): `id`->`id` (prefix `F-` so it cannot collide
-  with `R-<slice>-<gate>`) · `ts`->`disclosed_at` · `state`->`status` · `target`->`target` ·
-  `action`->`reason` · `weight`->`severity` · `quote`/`note`->`title` · `evidence`->`closed_by_pr`.
-  **Unmapped keys (`kind`, `source`, `episode`, `confidence`, `regression`, `ev`) survive
-  automatically** — rows are plain JSON dicts, `residual_append` writes what it is given and
-  `fold_residuals` merges by id, so the format is lossless by construction. Two hard requirements:
-  (1) migrate the 90 live rows with a real `target` or dispose them explicitly — a bulk import of
-  status-less rows recreates the graveyard inside the new mechanism; (2) `mr-gates`'s anti-rot
-  alarms are AGGREGATED one-line-per-class precisely so a 189-row import cannot emit 189
-  `SELFCHECK-FAIL` lines (regression-pinned as fixtures K6/K7).
+- **`lp-15` — feedback-pipeline REPAIR (was "ceremony retirement"; reframed by operator decision
+  2026-08-23).** The retirement framing was wrong, and the measurement that justified it was read
+  the wrong way round. Re-measured 2026-08-23 by folding the event-sourced ledger (189 rows are
+  appends over **91 distinct items**): **79 DISPOSED, 4 IN-WORK, 5 LOGGED, 3 ANSWERED, 0 terminal.**
+  Every one of the 79 dispositions carries an `action` (all `FIX`) and a `target`, and **76 of 79
+  targets resolve to a spec file or an actual `### <slice>` heading** (44 milestone-level, 32
+  slice-level, 3 unresolved). **The triage worked.** What never happened is the TRANSITION:
+  nothing moves `DISPOSED -> IN-WORK -> VERIFIED -> SHIPPED-VERIFIED` when the named target
+  actually merges. The supervisor prompt instructs it in prose (`mr-feedback set <id> --state
+  IN-WORK` at launch, `VERIFIED` after the complaint-repro, `SHIPPED-VERIFIED --evidence PR#N` at
+  merge) and the handoff already recorded the gap on 2026-07-27 ("items sat DISPOSED while slices
+  ran"). Median age of a DISPOSED item: **27 days.**
+
+  Operator decision: *"The items in the feedback queue should absolutely be moved to a centralized
+  queue so that they actually get worked on instead of ignored. However, I believe this should be
+  more of an edit/refactor/redesign to `mr-feedback` and its associated files/doctrines/scripts
+  than a 'retirement'. The problem isn't the intent behind these processes, its that the execution
+  left holes that allowed work to become forgotten/stale. I'd rather patch the holes and keep the
+  valuable parts of the process."* That is the correct call and this entry is rewritten to it.
+  `mr-feedback` is not ceremony: it is the only channel carrying operator/playtest signal, and its
+  classification, weight/routing, action taxonomy, coverage map, Disposition Brief and reconciler
+  (`check`) exist nowhere else. Deleting a working triage because a downstream transition was
+  prose-only would throw away the part that worked to fix the part that did not.
+
+  **KEEP:** the tool, the doctrine, the state machine, `check`, `covermap`, `brief`, and the
+  ledger's history. **PATCH the four holes, all the same shape as the residual drain `lp-gates`
+  already shipped — reuse that machinery rather than inventing a parallel one:**
+  1. **A drain.** A `DISPOSED` item with a resolvable target is promoted/linked the same way a
+     residual is: an existing `### <slice>` target is queued via `mr-record queue-add`; a
+     milestone-level target needs a slice section first (`mr-gates residuals promote`'s mechanism,
+     generalised). **Nothing new is queued in a second place** — the invariant from the lp-gates
+     plan §13 holds: *nothing is launchable until it is a spec section*, and there is ONE line.
+  2. **Mechanical transitions.** `IN-WORK` at launch (`mr-spawn` already flips `items[]`, so extend
+     that path rather than the prompt) and terminal at merge, **gate-proved** exactly as
+     `mr-gates residuals close` is — the promoted slice's own ledger must be resolved.
+  3. **Aging alarms**, AGGREGATED one-line-per-class (a 91-item backlog must never emit 91
+     `SELFCHECK-FAIL` lines — that is how a gate becomes decorative; pinned as `mr-gates` fixtures
+     K6/K7). Constants read from `mr-gates residuals policy --json`; do not restate them.
+  4. **Playtest intake gets a path.** The template's *"What didn't"* and *"Bugs / rough edges
+     observed"* sections are read once and land nowhere; each bullet becomes an item under the
+     existing grammar.
+
+  **Two intake ledgers is the right shape, and the lp-gates plan §13.1 is corrected accordingly:**
+  a feedback item (`kind`, `confidence`, `weight`, `episode`, `regression`, operator quote) and a
+  residual (`gate_id`, `source_slice`, `defer_count`) are genuinely different records with
+  different lifecycles; flattening them would lose the classification fields or bloat the residual
+  row. What was wrong was never "two ledgers" — it was **two ledgers with no drain between them and
+  the work queue.** Two typed doors, one drain, one line.
+
+  **Migration is therefore NOT required** and the field-mapping table drafted on 2026-08-22 is
+  withdrawn; it was written for the retirement framing. If a future slice still wants one ledger,
+  it can do it then, on evidence, as a separate decision.
+
+  **NOT in scope here:** the `mr-selfcheck` teardown sites (`:11`, `:12`, `:53`, `:54`) and the
+  tick call site at `mr-native-tick.sh:139` — those existed to support archiving and are simply not
+  touched. `lp-15b` (`N_MAX=2`) stays split out and unaffected.
+
+  EARS: WHEN a feedback item reaches `DISPOSED` with a resolvable target, THE SYSTEM SHALL place it
+  on the single work line rather than leaving it in the ledger. WHEN a slice covering a feedback
+  item merges, THE SYSTEM SHALL transition that item to a terminal state, gate-proved against the
+  slice's own acceptance ledger. WHEN a `DISPOSED` item has not reached `IN-WORK` past the shared
+  aging constant, THE SYSTEM SHALL alarm, aggregated one line per class. WHEN a playtest report is
+  filed, each bug bullet SHALL become a ledger item.
+  Tests: proof-of-teeth — a fixture item disposed to an existing slice must appear on the line and
+  reach terminal when that slice's ledger resolves; a 91-item aged backlog must produce exactly ONE
+  alarm line per class, not 91; an item whose target resolves to nothing must FAIL loudly rather
+  than sit (ADR-0010). Falsification: `feedback_items_closed` over the first month — 0 means the
+  drain is as inert as the prose it replaced.
 - **`lp-15b` — `N_MAX=2` + `NMAX-GATE`.** Split from `lp-15` for two reasons: bundling means the revert
   that rescues a RED selfcheck also silently restores `N_MAX=3`, two unrelated failure modes sharing
   one rollback; and a credit justification would be the mirror of a known dead end (concurrency changes
