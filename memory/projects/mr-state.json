@@ -1,18 +1,30 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-23T19:00:15Z",
- "updated_by": "native-20260823T190015Z-2683700",
+ "updated_utc": "2026-08-23T20:02:30Z",
+ "updated_by": "native-20260823T200008Z-2698360",
  "master": {
-  "sha": "a842116",
-  "ci": "green (PR#37 rw3a spec-authorship squash-merged; local+origin main confirmed in sync at a8421163)",
+  "sha": "8add7d7",
+  "ci": "green (project repo synced via ff-only from 8f7fca3->8add7d7, PR#356 knowledge-bundle regen; local+origin master confirmed in sync)",
   "nightly": "fixed_at_a40cb81_confirmed_green"
  },
  "harness_main": {
-  "sha": "51073c8",
-  "ci": "no-remote-ci-local-gate-green (mr-selfcheck SELFCHECK-OK re-verified live post-merge; mr-backup --selftest OK)"
+  "sha": "a85d229",
+  "ci": "no-remote-ci-local-gate-green; pushed 2 pending chore(mr-sup) commits (970da52, a85d229) to origin/main this tick, now in sync"
  },
  "adr_next_free": 204,
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "rw3b",
+   "repo": "project",
+   "model": "opus",
+   "effort": "medium",
+   "tier": "content",
+   "leader_pid": 2700302,
+   "claude_pid": 2700305,
+   "run_id": "mr-spawn-20260823T200138Z-2700237",
+   "started_utc": "2026-08-23T20:01:43Z"
+  }
+ ],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -20,7 +32,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-08-23T19:00Z native tick: reconciled a stale record left by the 18:04Z tick that merged rw3a (PR#37 squash-merged, ledger MERGED row + handoff COMPLETE entry already present) but was cut off before updating mr-state.json/committing bookkeeping -- inflight[] still listed rw3a as running (leader_pid 2571046; process confirmed not live, no per-run lock present). Verified live: no locks, no per-run lock, no open PRs either repo, local main == origin/main @ a842116, no resident human session. Committed the accumulated supervisor-owned uncommitted exhaust (handoff.md, handoff archive, this file, the 15r spec 'Delivered' annotation, decisions/*, patches/, branch-cleanup tsv, per-slice plan/progress memory cards) in one chore(mr-sup) commit -- left Drew's own future-prompts.md and gdd.md untouched (DIRTY-TREE-ADVISORY carried forward for those two only). Handoff names rw3b/rw3c as the next queue candidates (project repo, must chain serially -- both bump CONTENT_VERSION) but neither was queue-added or launched this tick (reconciliation was the one action taken).",
+ "notes": "2026-08-23T20:00Z native tick: launched rw3b (M-postgate-roster-wave-3 atomic content drop, project repo, opus@medium/content tier, ADR-0204 reserved). Derivation: queue/residuals/open-PRs all empty, no inflight/parked, master CI green -> full PLAN \u00a79 derivation via rw3a-COMPLETE handoff entry landed on rw3b (rw3c is after:rw3b, not parallel-safe, stays queued). First spawn attempt hit REPO-OUT-OF-SYNC (project master behind origin by 1, PR#356 merged since last tick) -- ff-only synced (8f7fca3->8add7d7), deleted stale local chore/knowledge-bundle-regen-20260823 branch (-D, already-squash-merged/remote-gone), respawned clean. mr-gates seed returned SPEC-SECTION-NOT-FOUND (criteria=0) -- RW3-01..09 live under the spec's shared Acceptance section, not a per-slice rw3b heading; advisory, flagged for manual merge-time cross-check. Also pushed 2 pending harness chore(mr-sup) commits to origin/main. Left Drew's uncommitted future-prompts.md/gdd.md untouched (old mtimes, no active session).",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],

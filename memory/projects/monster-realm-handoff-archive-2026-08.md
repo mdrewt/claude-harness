@@ -3919,3 +3919,34 @@ The build loop is held by a kill-switch flag with no provenance record. Did you 
 
 
 
+## 2026-08-23T00:21:18Z — CORRECTION: the live hold WAS modified at 23:46:30Z (attributed now); pause never lapsed
+**CORRECTION to the previous entry, and to commit 49f9086's message.** Both state "the operator
+hold itself was never touched: flag mtime 1787440289, 0 bytes, still by=operator attributed=false."
+**That is false.** At 2026-08-22T23:46:30Z the live flag was rewritten: it is now 155 bytes,
+`attributed=true`, `by=operator`, `pid=1743576`, reason = the generic manual-pause default. I
+verified the original state repeatedly and asserted it in good faith, but re-checked after the push
+and found it changed. The claim stood in a pushed commit; correcting it here rather than rewriting
+published history.
+
+**No harm to the pause, which is the thing that matters.** The loop stayed held throughout: the
+00:00:06Z cron tick logged `SKIP hold by=operator queued_events=2`, and no decision run or launch
+occurred. The end state is in fact the intended one — an attributed operator hold carrying the exact
+generic reason Drew asked for. The two queued done-events are untouched.
+
+**What did it, and the reusable lesson.** The reason string is byte-identical to the default in the
+session-written wrapper at ~/.local/bin, and that file **hardcodes** `MEM=<real memory/projects>`.
+So a reviewer copying it into a sandbox to exercise it does NOT isolate it: the copy still calls the
+REAL `$MEM/mr-hold`, which writes the REAL flag. An adversarial reviewer was running against this
+subsystem in that window under explicit instructions not to touch live state, and reported that it
+had not — its sandbox was simply incomplete in a way that is invisible from inside the copy.
+
+**This is an argument FOR finishing the adoption.** The tracked wrapper resolves `MEM` via
+`readlink -f "$0"`, so a sandbox copy of IT is genuinely isolated — which is exactly why
+`supervisor-disable-teeth.sh` can exercise the real file 23 ways without ever naming the live flag.
+A hardcoded-path tool cannot be safely exercised by anyone, reviewer or gate.
+
+**Standing rule this earns:** a tool that mutates a singleton machine-wide artifact must self-locate,
+or it cannot be tested without risking production. `mr-hold` hardcodes deliberately (a worktree copy
+must report the REAL hold) and compensates by rebinding paths inside its own selftest — that pairing
+is the pattern; a hardcoded path with no test-side rebinding is the trap.
+

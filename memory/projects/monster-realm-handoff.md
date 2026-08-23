@@ -538,6 +538,18 @@ interpolation caveat this slice avoided. (5) pre-existing biome warning at
   (it added in-suite teeth the hand-written clauses lacked). Both were re-proven by execution.
 - `/tmp/mr_warn_16r-e` appeared mid-run; landing pattern was honoured (no new fan-outs after it).
 
+## 2026-08-23T20:02:10Z — rw3b LAUNCHED (M-postgate-roster-wave-3 content drop)
+**Slice:** rw3b — atomic content drop for M-postgate-roster-wave-3 (Electric+Light species/skills/evolution, ADR-0204). **Repo:** project (mdrewt/monster-realm). **Model:** opus@medium (tier=content). **run_id:** mr-spawn-20260823T200138Z-2700237, session_leader=2700302.
+
+Derivation: queue[] empty, residuals unclaimed empty, no open PRs either repo, no inflight/parked slices, master CI green both repos. Full PLAN §9 derivation (via the handoff's rw3a-COMPLETE entry, which already named rw3b as the unlocked next candidate) landed on rw3b — rw3c is `after: rw3b` per spec (both bump CONTENT_VERSION, not parallel-safe), so only rw3b launched this tick; rw3c stays queued behind it.
+
+**Pre-launch fix:** first `mr-spawn rw3b` returned `REPO-OUT-OF-SYNC` (project local master behind origin/master by 1 — PR#356 knowledge-bundle-regen chore had merged since the last tick). Checked out `master`, `git merge --ff-only origin/master` (8f7fca3→8add7d7, 89 docs/knowledge files only), deleted the now-fully-squash-merged local `chore/knowledge-bundle-regen-20260823` branch (`-D`, remote already gone). Respawn succeeded clean.
+
+**Gate-seed note:** `mr-gates` returned `SPEC-SECTION-NOT-FOUND` (criteria=0 seeded) — the milestone spec's `## Acceptance criteria (EARS)` section (RW3-01..09) is shared across rw3b/rw3c rather than living under a per-slice `### rw3b` heading, so the auto-seeder found nothing to attach. Advisory gap, not a stop condition: at merge-time adjudication, manually cross-check RW3-01/02/03/04/05/08/09 (rw3b's subset; RW3-06/07 are rw3c's) against the ledger read since the mechanical seed has nothing there.
+
+Harness repo had 2 local unpushed `chore(mr-sup):` commits (970da52, a85d229) from the 19:00Z tick — pushed to origin/main this tick (REPO-OUT-OF-SYNC prevention for any future harness-repo slice). Drew's own uncommitted `future-prompts.md`/`gdd.md` edits in the harness tree are untouched (pre-existing strays, old mtimes, no active session detected).
+
+Next candidate after rw3b merges: rw3c (encounter placement/tuning, `after: rw3b`, project repo, not parallel-safe with rw3b).
 ## 2026-08-23T19:04:12Z — 2026-08-23T19:00Z — reconciliation tick: rw3a merge record fixed, bookkeeping committed, issue #34 closed
 The 18:04Z tick squash-merged rw3a (PR#37) and wrote the ledger MERGED row + a COMPLETE handoff entry, but was cut off before updating mr-state.json (inflight[] still listed rw3a as running) and before committing anything to git. This tick (native-20260823T190015Z-2683700): verified live (no per-run/chain locks, no open PRs either repo, local main == origin/main @ a842116, no resident human session) that rw3a is genuinely done; cleared inflight[], updated master.sha; committed the supervisor-owned files that had been sitting uncommitted across several ticks (this handoff + its 2026-08 archive, mr-state.json, the 15r-a1 spec Delivered annotation, decisions/*.url+.answer.md, the lp-09 patch, branch-cleanup tsv, and 12 per-slice plan/progress memory cards — 33 files, commit 970da52) — left Drew's own future-prompts.md and gdd.md untouched. Also closed github issue #34 (claude-harness) per close-the-loop doctrine: Drew answered it 2026-08-23T11:48:56Z ('yes, no provenance always means it is an operator hold') and a prior tick had consumed the answer into decisions/issue-34.answer.md, but never closed the issue; mr-hold status is HOLD-NONE so this was pure bookkeeping catch-up, not a live gate lift. No new slice launched or merged — reconciliation was this tick's one action. Handoff's rw3a-COMPLETE entry (above) still names rw3b/rw3c as the next queue candidates (project repo, chain serially — both bump CONTENT_VERSION); neither was queue-added this tick, left for the next tick's full derivation.
 ## 2026-08-23T18:04:42Z — rw3a MERGED — PR#37, roster-wave-3 spec authored
@@ -732,33 +744,3 @@ The build loop has been held for 6h (by=operator). Is that still intended? If th
 **OPERATOR ACTION, pre-existing and NOT caused by this work — `mr-selfcheck` B2 is RED.** `~/.local/bin/mr-supervisor-disable` is a 2921-byte COPY, not a symlink to the tracked 5830-byte SSOT, so the deployed pause wrapper is an older build than the reviewed one. The one-line fix is in B2's own message. **A session cannot apply it** — `guard-bash.mjs` protects that path by design — so it stays for Drew. Expect exactly this one SELFCHECK-FAIL line until then; everything else is clean.
 
 **Not done, and tracked as real spec sections rather than prose:** `lp-gates-arm` (arming, plus three named hook repairs and the residual WIP cordon). `lp-registry` was AMENDED, not silently contradicted — its emitter and drain halves are delivered here; seeding the 329 pre-existing OUTSTANDING items and the playtest intake channel remain its job. `lp-15`'s entry now carries a measured `mr-feedback` -> `mr-residuals.jsonl` field mapping (189 rows, 0 terminal, 90 live) so its archiving is a migration, not a loss — that was an operator instruction on that entry.
-## 2026-08-23T00:21:18Z — CORRECTION: the live hold WAS modified at 23:46:30Z (attributed now); pause never lapsed
-**CORRECTION to the previous entry, and to commit 49f9086's message.** Both state "the operator
-hold itself was never touched: flag mtime 1787440289, 0 bytes, still by=operator attributed=false."
-**That is false.** At 2026-08-22T23:46:30Z the live flag was rewritten: it is now 155 bytes,
-`attributed=true`, `by=operator`, `pid=1743576`, reason = the generic manual-pause default. I
-verified the original state repeatedly and asserted it in good faith, but re-checked after the push
-and found it changed. The claim stood in a pushed commit; correcting it here rather than rewriting
-published history.
-
-**No harm to the pause, which is the thing that matters.** The loop stayed held throughout: the
-00:00:06Z cron tick logged `SKIP hold by=operator queued_events=2`, and no decision run or launch
-occurred. The end state is in fact the intended one — an attributed operator hold carrying the exact
-generic reason Drew asked for. The two queued done-events are untouched.
-
-**What did it, and the reusable lesson.** The reason string is byte-identical to the default in the
-session-written wrapper at ~/.local/bin, and that file **hardcodes** `MEM=<real memory/projects>`.
-So a reviewer copying it into a sandbox to exercise it does NOT isolate it: the copy still calls the
-REAL `$MEM/mr-hold`, which writes the REAL flag. An adversarial reviewer was running against this
-subsystem in that window under explicit instructions not to touch live state, and reported that it
-had not — its sandbox was simply incomplete in a way that is invisible from inside the copy.
-
-**This is an argument FOR finishing the adoption.** The tracked wrapper resolves `MEM` via
-`readlink -f "$0"`, so a sandbox copy of IT is genuinely isolated — which is exactly why
-`supervisor-disable-teeth.sh` can exercise the real file 23 ways without ever naming the live flag.
-A hardcoded-path tool cannot be safely exercised by anyone, reviewer or gate.
-
-**Standing rule this earns:** a tool that mutates a singleton machine-wide artifact must self-locate,
-or it cannot be tested without risking production. `mr-hold` hardcodes deliberately (a worktree copy
-must report the REAL hold) and compensates by rebinding paths inside its own selftest — that pairing
-is the pattern; a hardcoded path with no test-side rebinding is the trap.
