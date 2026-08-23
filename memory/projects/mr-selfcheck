@@ -95,7 +95,7 @@ MEM = sys.argv[1]
 AUDIT = os.path.join(MEM, "mr-audit")
 FIXTURE_SLICE = "mr-audit-fixture"          # never a live slice id: the artifact path is shared
 FIXTURE_ARTIFACT = "/tmp/mr_audit_%s.json" % FIXTURE_SLICE
-COUNT_FLOOR = 24
+COUNT_FLOOR = 62   # mirrors mr-audit's _ST_COUNT_FLOOR (lp-gates: 24 -> 62)
 bad = 0
 
 
@@ -2566,6 +2566,139 @@ finally:
 
 sys.exit(bad)
 PYOLL
+
+# ================================ lp-gates ==================================================
+# Three concerns, one block: the two selftests, the ADOPTION-DRIFT guard (the check whose absence
+# cost five days in lp-11a — a tool shipped with instructions nobody ran), and the residual
+# anti-rot alarms, which are the mechanical answer to "does the drain actually drain?".
+"$MEM/mr-gates" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-gates selftest"; BAD=1; }
+/usr/bin/python3 - "$MEM" <<'PYGATES' || BAD=1
+import json, os, re, subprocess, sys
+
+MEM = sys.argv[1]
+HARNESS = os.path.normpath(os.path.join(MEM, "..", ".."))
+HOOK = os.path.join(HARNESS, ".claude", "hooks", "gates-stop.mjs")
+USER_SETTINGS = os.path.expanduser("~/.claude/settings.json")
+GATES = os.path.join(MEM, "gates")
+bad = 0
+
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print("SELFCHECK-FAIL %s%s" % (name, (": " + detail) if detail else ""))
+
+
+# --- G1: the Stop hook's own battery -----------------------------------------------------------
+if not os.path.exists(HOOK):
+    fail("gates-hook-missing", HOOK)
+else:
+    r = subprocess.run(["node", HOOK, "--selftest"], capture_output=True, text=True, timeout=120)
+    if r.returncode != 0 or "GATES-STOP-SELFTEST-OK" not in r.stdout:
+        fail("gates-hook-selftest", (r.stdout + r.stderr).strip()[-200:])
+
+# --- G2: ADOPTION-DRIFT. lp-11a shipped a tracked tool with `ln -sf` instructions that were never
+# run: every operator pause read `attributed:false` for five days and opened a decision issue each
+# time. The lesson was not "write better instructions", it was "check that adoption happened".
+# gates-stop.mjs lives in the harness but is registered in the USER settings, which is outside
+# version control -- exactly the same shape. So assert the registration, by absolute path.
+try:
+    with open(USER_SETTINGS) as fh:
+        us = json.load(fh)
+except Exception as e:
+    fail("gates-hook-adoption", "cannot read %s (%s)" % (USER_SETTINGS, type(e).__name__))
+else:
+    cmds = [h.get("command", "")
+            for entry in (us.get("hooks", {}).get("Stop") or [])
+            for h in (entry.get("hooks") or [])]
+    hits = [c for c in cmds if "gates-stop.mjs" in c]
+    if not hits:
+        fail("gates-hook-adoption",
+             "gates-stop.mjs is NOT registered as a Stop hook in %s. Hooks are not inherited "
+             "across the ancestor walk (probed on 2.1.240), so without this the instrument is "
+             "blind to every project-rooted slice run -- which is most of them." % USER_SETTINGS)
+    elif not any(HOOK in c for c in hits):
+        fail("gates-hook-adoption",
+             "registered, but not at the harness path %s (found %r) -- a stale copy will drift, "
+             "which is exactly how the two guard-bash.mjs copies diverged" % (HOOK, hits[:1]))
+
+# --- G3: constants have ONE definition. lp-11b's whole defect was two 7-day literals in two
+# files. mr-selfcheck therefore READS the policy from the tool instead of restating it.
+POLICY = {}
+try:
+    r = subprocess.run([os.path.join(MEM, "mr-gates"), "residuals", "policy", "--json"],
+                       capture_output=True, text=True, timeout=60)
+    POLICY = json.loads(r.stdout)
+except Exception as e:
+    fail("gates-policy-unreadable", "%s: %s" % (type(e).__name__, str(e)[:120]))
+for k in ("t1_promote_days", "t2_stale_days", "graveyard_window_days"):
+    if not isinstance(POLICY.get(k), int):
+        fail("gates-policy-shape", "missing or non-int %s" % k)
+
+# --- G4: the drain actually drains. These are the ADR-0010 falsification metrics for this
+# mechanism: a sink whose rows never reach a terminal state is a graveyard, and this corpus has
+# already built one (mr-feedback: 189 rows, 0 ever terminal).
+try:
+    r = subprocess.run([os.path.join(MEM, "mr-gates"), "residuals", "list", "--json"],
+                       capture_output=True, text=True, timeout=60)
+    data = json.loads(r.stdout or "{}")
+except Exception as e:
+    fail("gates-residuals-unreadable", "%s: %s" % (type(e).__name__, str(e)[:120]))
+else:
+    for alarm in data.get("alarms", []):
+        # residual-over-cap is OBSERVE-ONLY in this slice (the launch-blocking cordon is a
+        # separate slice, per R13), so it is reported without setting BAD.
+        if alarm.startswith("residual-over-cap"):
+            print("SELFCHECK-NOTE %s" % alarm)
+        else:
+            fail(alarm.split(":")[0], alarm.split(": ", 1)[-1])
+
+# --- G6: MR_SLICE containment, mirroring lp-09's A3 (which pins the MR_FORCE scrub the same way).
+# mr-launch.sh's fire_event() re-enters mr-native-tick.sh with the WRAPPER's environment, so a
+# script-scope `export MR_SLICE` would hand a SUPERVISOR decision tick a finished slice's ledger.
+# Two halves, both asserted, because a future "simplification" of either is silent otherwise.
+LAUNCH = os.path.join(MEM, "mr-launch.sh")
+TICK = os.path.join(MEM, "mr-native-tick.sh")
+try:
+    lsrc = open(LAUNCH, errors="replace").read()
+except OSError:
+    lsrc = ""
+    fail("gates-mrslice-launch-unreadable", LAUNCH)
+if lsrc:
+    if re.search(r"^\s*export\s+[^\n]*\bMR_SLICE\b", lsrc, re.M):
+        fail("gates-mrslice-exported",
+             "mr-launch.sh EXPORTS MR_SLICE at script scope; it must be prefix-scoped on each "
+             "`claude` invocation or fire_event's child tick inherits it")
+    n_pref = len(re.findall(r'MR_SLICE="\$S"\s+(?:timeout\s+\d+\s+)?claude\b', lsrc))
+    n_claude = len(re.findall(r"^\s*\(\s*cd\s+\"\$RUNDIR\"[^\n]*claude\b", lsrc, re.M))
+    if n_claude and n_pref != n_claude:
+        fail("gates-mrslice-coverage",
+             "mr-launch.sh has %d `claude` invocation(s) under $RUNDIR but only %d carry a "
+             "prefix-scoped MR_SLICE" % (n_claude, n_pref))
+try:
+    tsrc = open(TICK, errors="replace").read()
+except OSError:
+    tsrc = ""
+    fail("gates-mrslice-tick-unreadable", TICK)
+if tsrc and not re.search(r"env\s+(?:-u\s+\S+\s+)*-u\s+MR_SLICE\b", tsrc):
+    fail("gates-mrslice-tick-scrub",
+         "mr-native-tick.sh does not scrub MR_SLICE (`env -u MR_SLICE`) before spawning the "
+         "supervisor session")
+
+# --- G5: no orphaned stop-state. A .stopstate.json with no gates file beside it means a slice's
+# ledger was deleted while its instrument state survived -- which would make the arming slice's
+# block-rate denominator wrong.
+try:
+    names = os.listdir(GATES)
+except OSError:
+    names = []
+for n in names:
+    m = re.match(r"^\.(.+)\.stopstate\.json$", n)
+    if m and not os.path.exists(os.path.join(GATES, "%s.gates.md" % m.group(1))):
+        fail("gates-orphan-stopstate", "%s has no gates file" % n)
+
+sys.exit(bad)
+PYGATES
 
 [ "$BAD" = 0 ] && echo "SELFCHECK-OK"
 exit 0

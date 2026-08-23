@@ -397,7 +397,12 @@ cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
 # can re-enter this script with MR_FORCE=1 can override the operator's hold. The tick needs the
 # variable for its own gates above; the session does not — it is TOLD `forced=` as prompt text in the
 # TICK PROVENANCE block. Asserted by mr-selfcheck's A3 so it cannot silently regress.
-env -u MR_FORCE timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-skip-permissions \
+# MR_SLICE is scrubbed for the same reason (lp-gates): mr-launch.sh's fire_event() re-enters THIS
+# script with the wrapper's environment, so without this a supervisor decision tick could inherit a
+# finished slice's MR_SLICE and bind itself to that slice's acceptance ledger. mr-launch.sh already
+# prefix-scopes the variable rather than exporting it; this is the belt-and-braces half, and it is
+# the layer that holds if anyone ever "simplifies" that prefix into an export.
+env -u MR_FORCE -u MR_SLICE timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-skip-permissions \
   --output-format stream-json --verbose \
   -p "$(cat "$PROMPTF")" >> "$TLOG" 2>&1
 RC=$?

@@ -17,3 +17,10 @@ mr-rate-limit-telemetry.jsonl
 # uniquely pid-suffixed so it never collides with or blocks a later run)
 *.lock
 *.tmp.[0-9]*
+# lp-gates — per-slice acceptance ledgers, the Stop-hook instrument log and its state, plus the
+# residual registry. All written by production runs (a ledger per slice, a stoplog line per stop,
+# a registry row per DEFER); tracking them would conflict on every parallel slice branch, exactly
+# as mr-rate-limit-telemetry.jsonl does. The DURABLE record of a residual is its promoted spec
+# section, which IS tracked — the registry is the routing layer, not the archive.
+gates/
+mr-residuals.jsonl

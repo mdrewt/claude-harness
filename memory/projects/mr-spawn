@@ -911,6 +911,18 @@ caps=c.get('slice_caps_usd',{})
 print(v.get('cap_override') or v.get('cap_usd') or caps.get(v.get('tier',''),caps.get('default',60)))" 2>/dev/null || echo 60)
 export CAP
 # pre-launch cost-flag hygiene (review F-C/F-G: spawn owns cleanup; a watcher must never erase live state)
+#
+# `.done` + `.done.recorded` added 2026-08-22 (lp-gates). mr-launch.sh writes `.done` at :164 and
+# NOTHING removes it — removal was delegated to the decision run (mr-native-tick.sh:247) with no
+# mechanical enforcement, so a relaunched slice started with its predecessor's flag on disk.
+# Consequences, measured: gate 1's `DONE_WAIT` is computed over EVERY lock-bearing slice
+# (mr-native-tick.sh:243), so one stale `.done` defeats the FREE live-chain standdown for all
+# subsequent ticks (~4 paid decision spawns in 7d, ~$4); mr-cost-watch:532 exits on its first
+# iteration; and WATCHER-DEAD / ORPHAN-RUN both `continue` past it.
+#
+# THE TWO MUST GO TOGETHER. Removing `.done` alone is WORSE than nothing: `.done.recorded` would
+# survive, mr-native-tick.sh:35 would skip the relaunched run's ledger backfill, and a $1 waste
+# becomes an unrecorded multi-tens-of-dollars run feeding the budget governor.
 rm -f "/tmp/mr_warn_$S" "/tmp/mr_costwatch_$S.fired" "/tmp/mr_cap_topup_$S" "/tmp/mr_wrap_$S"
 grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && rm -f "/tmp/mr_stop_$S" "/tmp/mr_stop_$S.reason"
 # lp-11a: this probe had TWO independent defects, both measured over 2026-08-17. It tripped on 10
@@ -986,6 +998,28 @@ MODEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('model'
 EFFORT=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('effort','high'))")
 rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
 if [ "$DRY" = "--dry" ]; then status DRY "brief built; model=$MODEL effort=$EFFORT; no launch"; fi
+# lp-gates: seed the ACCEPTANCE LEDGER from the slice's spec section before the run starts, so its
+# EARS criteria live in a file instead of in a spec the run reads once. Two placement rules:
+#   * BELOW the --dry exit, so a dry run never seeds real state;
+#   * ADVISORY on failure — `emit`, never `status` (status exits). mr-spawn:702-704's precedent is
+#     explicit: a cosmetic defect on the critical path must never become a launch refusal, because
+#     that wedges the loop. A missing ledger surfaces as FLAGGED at mr-audit, not as a refusal.
+# Completion-flag hygiene, deliberately placed BELOW every refusal gate and below the --dry exit.
+# Above them, an abort after this point (PROBE-TRIPPED, a brief-render refusal) would leave a
+# RESUMED slice's stale lock on disk with its `.done` deleted and no new run started — which is
+# exactly RECONCILE part 2's "dead-pid lock with no .done" predicate, injecting a phantom CRASHED
+# row into the ledger the budget governor reads.
+rm -f "/tmp/mr_pass_$S.done" "/tmp/mr_pass_$S.done.recorded"
+GSCOPE=$(/usr/bin/python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('target_desc',''))" "$V" 2>/dev/null || echo "")
+if [ -x "$MEM/mr-gates" ]; then
+  if GOUT=$("$MEM/mr-gates" init --slice "$S" --repo "$REPO" --scope "$GSCOPE" 2>&1); then
+    emit GATES "$GOUT"
+  else
+    emit GATES-SEED-FAILED "$GOUT"
+  fi
+else
+  emit GATES-SEED-SKIPPED "mr-gates missing or not executable at $MEM/mr-gates"
+fi
 RID="mr-spawn-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 attempt_launch(){
   setsid bash "$MEM/mr-launch.sh" "$S" "$MODEL" "$EFFORT" "$REPO" >/dev/null 2>&1 & LEADER=$!

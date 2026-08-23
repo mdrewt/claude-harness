@@ -10,6 +10,11 @@
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
 unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # operator-forced-ness must NOT propagate to event ticks (pause semantics)
+# lp-gates: MR_SLICE binds a session to its acceptance ledger for the Stop hook. It is
+# PREFIX-SCOPED on each `claude` invocation below and deliberately NOT exported at script scope:
+# fire_event() spawns mr-native-tick.sh with this wrapper's environment, so a script-scope export
+# would hand a SUPERVISOR decision tick a slice's MR_SLICE — the same leak class the line above
+# exists to prevent. mr-native-tick.sh additionally scrubs it (`env -u MR_SLICE`) as belt-and-braces.
 S="${1:?usage: mr-launch.sh <slice> [model] [effort] [repo]}"
 MODEL="${2:-opus}"
 EFFORT="${3:-high}"
@@ -95,7 +100,7 @@ except Exception:
 
 A=1
 echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$PRREPO TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
-( cd "$RUNDIR" && claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
+( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
   --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>"$E"
 RC=$?
 PREV_SIG=""
@@ -134,7 +139,7 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
   [ -n "$SID" ] || break
   { [ -f "/tmp/mr_stop_$S" ] || [ -f /tmp/mr_stop_all ]; } && break   # mechanical gate before EVERY spawn (cost-watch review cond i)
   echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
-  ( cd "$RUNDIR" && claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
+  ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
     -p "$P" \
     --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
   RC=$?
@@ -149,7 +154,7 @@ if grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && [ "$RC" -ne 0 ] &&
   if [ -n "$WSID" ]; then
     echo "COST-CAP-WRAP start TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
     WRAPP="Cost-cap shutdown ($ACT). Do NOT start new work, new scope, or ANY new subagents (the stop flag is active and stays active). If .git/index.lock is stale in the worktree, remove it. Commit all WIP on the slice branch as wip($S): cost-cap park, push the branch, then write the handoff (mr-record handoff): state of work, exactly what remains, and the SIZING LESSON — why this slice exceeded its cap. Any local-model summary you include must be labeled UNVERIFIED advisory. Then stop. NEVER run gh pr merge."
-    ( cd "$RUNDIR" && timeout 900 claude --model "$MODEL" --effort low --dangerously-skip-permissions --resume "$WSID" -p "$WRAPP" \
+    ( cd "$RUNDIR" && MR_SLICE="$S" timeout 900 claude --model "$MODEL" --effort low --dangerously-skip-permissions --resume "$WSID" -p "$WRAPP" \
       --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E" || true
     echo "COST-CAP-WRAP end rc=$? TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
   fi

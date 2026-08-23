@@ -76,6 +76,11 @@ import sys
 CANONICAL = (
     "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/monster-realm-usage-ledger.jsonl",
     "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/monster-realm-handoff.md",
+    # lp-gates: the residual registry is append-only, gitignored, and is the ONLY record of a
+    # deferred criterion between the DEFER line and its promoted spec section. Losing it loses the
+    # routing for work that has already been declared — the precise failure this mechanism exists
+    # to end. Same argument as the usage ledger, which is why it joins the same canonical set.
+    "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-residuals.jsonl",
 )
 RETENTION = 14
 DAY_RE = re.compile(r"^\d{8}$")

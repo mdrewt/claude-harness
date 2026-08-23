@@ -1,0 +1,1835 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands — that is how the 2026-08-17
+# kill-switch wedge happened (postmortem in mr-hold's header). Python reads this line as a no-op
+# string; sh/bash re-execs the file under python3 before reaching any other line.
+# Statically enforced for every python mr-* tool by mr-selfcheck.
+__doc__ = """mr-gates — the per-slice ACCEPTANCE LEDGER and the residual sink with a drain (lp-gates).
+
+    mr-gates init      --slice S [--scope TEXT] [--repo harness|project]
+    mr-gates status    --slice S [--json]
+    mr-gates lint      --slice S [--json]
+    mr-gates check     --slice S [--timeout N]        # run-side: execute CHECKs, flip boxes
+    mr-gates verify    --slice S [--json] [--budget N]  # SUPERVISOR-side independent re-run
+    mr-gates render    --slice S --format pr|park|handoff
+    mr-gates reseed    --slice S --reason TEXT        # supervisor-only; clears SEED-DRIFT
+    mr-gates residuals list [--unclaimed] [--json] | add | promote --id R --spec-file F
+                            | close --slice S [--pr N] | disposition --id R --as wontfix --reason T
+                            | policy [--json]
+    mr-gates --selftest
+
+WHY THIS EXISTS (lp-gates)
+--------------------------
+Measured: 58.8% of uniquely-named slices live in a remediation milestone; 61% of a classified
+sample exist because an earlier slice left DECLARED work undone; 12 of 18 named continuation slice
+ids never got a spec section; mean disclosure->remediation latency 13.1 days; remediation slices
+carry 49.5% of slice spend. The failure is NOT concealment — parks are honestly declared — it is
+that they are declared into prose nothing consumes (postmortem RF-3, "records are not queues").
+
+Two outputs, one mechanism:
+  1. ACCEPTANCE — a slice's EARS `SHALL` criteria become a file of gates with runnable CHECK/EXPECT
+     and captured EVIDENCE, seeded FROM THE SPEC (not authored by the graded party) and re-executed
+     independently by the supervisor before merge.
+  2. DRAIN — the only legal way to close a gate you did not meet is a `DEFER:` line with a
+     RESOLVABLE target, which emits a residual row that is promoted into a real spec section, aged
+     into the launch queue, and closed only when its criterion passes a gate in a later slice.
+
+TWO ROOTS (mr-slice-quality's rule): the GATE is self-locating, the SUBJECT is a machine singleton.
+`MEM` here is HARDCODED, copying mr-record:33-37 — a self-locating MEM would let a copy running in
+a worktree fork the append-only residual SSOT. Pure functions take explicit paths so `--selftest`
+can drive them over temp dirs; there is deliberately NO env override on any gate input
+(mr-selfcheck:6-8: "an override is a surface for greening production vacuously").
+"""
+
+import fcntl
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+
+# ---------------------------------------------------------------------------------------------
+# Machine singletons (hardcoded on purpose — see TWO ROOTS above)
+# ---------------------------------------------------------------------------------------------
+HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
+MEM = HARNESS + "/memory/projects"
+SPECS = HARNESS + "/specs/monster-realm-v2"
+GATES_DIR = MEM + "/gates"
+RESIDUALS = MEM + "/mr-residuals.jsonl"
+GUARD = HARNESS + "/.claude/hooks/guard-bash.mjs"
+BACKLOG_SPEC = "M-residual-backlog.spec.md"
+
+# ---------------------------------------------------------------------------------------------
+# Drain policy. ONE definition (lp-11b's lesson: two literals in two files IS the defect).
+# mr-selfcheck reads these via `mr-gates residuals policy --json` rather than re-declaring them.
+# ---------------------------------------------------------------------------------------------
+POLICY = {
+    # An unpromoted residual older than this is a stalled promote step. Baseline latency was
+    # 13.1 days; 3 days targets ~4x. Also the age at which a promoted residual becomes
+    # queue-add eligible, which is what guarantees pickup.
+    "t1_promote_days": 3,
+    # Any open residual older than this is a rot alarm.
+    "t2_stale_days": 14,
+    # emitted>0 and closed==0 across this window ⇒ the sink is a graveyard (ADR-0010 falsification).
+    "graveyard_window_days": 28,
+    # Observe-only in slice 1; the launch-blocking cordon is slice 2 (R13: measure first).
+    "open_cap": 12,
+    # >this share of a slice's seeded E* gates DEFERred ⇒ FLAGGED regardless of the rest.
+    "max_defer_ratio": 0.5,
+    # >this share of a slice's LIVE seeded gates declared MANUAL ⇒ FLAGGED. Closes the wholesale
+    # dodge of the runner allowlist (which only binds gates that have a CHECK).
+    "max_manual_ratio": 0.5,
+    "evidence_chars": 200,
+    "check_timeout_s": 120,
+    "verify_budget_s": 600,
+}
+
+SEVERITY_OPERATOR_ONLY = ("HIGH", "CRITICAL")
+LEGAL_DISPOSITIONS = ("wontfix",)
+
+# ---------------------------------------------------------------------------------------------
+# Criterion extraction — TWO SHAPES, both live in the corpus right now.
+# Measured over the live spec tree: 131 of 132 SHALL-bearing sections extract (99%), 522 criteria,
+# 242 of them reusing the spec's own criterion id. A one-shape parser is the lp-08 defect
+# ("parse the de-facto convention, not the documented one").
+# ---------------------------------------------------------------------------------------------
+NEXT_HEAD = re.compile(r"^### ", re.M)
+EARS_START = re.compile(r"^EARS:", re.M)
+EARS_END = re.compile(r"^(Tests?:|Falsification:|Proof-of-teeth:|#{1,4} |\s*$)", re.M)
+BULLET = re.compile(r"^(\s*)[-*+]\s+(.*)$")
+IDLEAD = re.compile(r"^\*\*([A-Za-z0-9][A-Za-z0-9.-]{1,39}?):?\*\*:?\s*")
+SENT_SPLIT = re.compile(r"(?<=[.;])\s+(?=[A-Z`*(\[])")
+SHALL = re.compile(r"\bSHALL\b")
+# Words that lead a bold *label*, never a criterion id.
+NOT_AN_ID = {"note", "warning", "important", "why", "cap", "scope", "required", "measured",
+             "rationale", "caveat", "but", "and", "however", "tests", "ears"}
+
+
+def _norm(s):
+    return " ".join(s.split()).strip()
+
+
+def head_re(slice_id):
+    # Anchored (mr-slice-quality:490): an unanchored search for `lp-02` matches `lp-02b` first.
+    return re.compile(r"^### %s(?![\w.-])" % re.escape(slice_id), re.M)
+
+
+def section_of(text, slice_id):
+    m = head_re(slice_id).search(text)
+    if not m:
+        return None
+    n = NEXT_HEAD.search(text, m.end())
+    return text[m.start(): n.start()] if n else text[m.start():]
+
+
+def find_section(slice_id, specs_dir=None):
+    """-> (spec_filename, section_text) or (None, None)."""
+    specs_dir = specs_dir or SPECS
+    try:
+        names = sorted(n for n in os.listdir(specs_dir) if n.endswith(".spec.md"))
+    except OSError:
+        return None, None
+    for name in names:
+        try:
+            with open(os.path.join(specs_dir, name), errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        sec = section_of(text, slice_id)
+        if sec is not None:
+            return name, sec
+    return None, None
+
+
+def _ears_span(sec):
+    m = EARS_START.search(sec)
+    if not m:
+        return None
+    e = EARS_END.search(sec, m.end())
+    return (m.start(), e.start() if e else len(sec))
+
+
+def _logical_bullets(block):
+    """Fold continuation lines into their bullet so a wrapped criterion is one item."""
+    items, cur = [], None
+    for ln in block.splitlines():
+        b = BULLET.match(ln)
+        if b:
+            if cur is not None:
+                items.append(cur)
+            cur = b.group(2).strip()
+        elif cur is not None and ln.strip() and not ln.startswith("#"):
+            cur += " " + ln.strip()
+        elif cur is not None and not ln.strip():
+            items.append(cur)
+            cur = None
+    if cur is not None:
+        items.append(cur)
+    return items
+
+
+TOUCHES_LINE = re.compile(r"^`?touches:\s*(.+?)`?\s*$", re.M | re.I)
+
+
+def extract_touches(sec):
+    """The slice's declared `touches:` path-set. Recorded in the ledger header so a residual
+    promoted out of this slice inherits a real touches: line — without it every promoted stub says
+    "(inherit from source slice — REVIEW)" and a human has to go and look it up, which is the kind
+    of small friction that turns a mechanism decorative."""
+    m = TOUCHES_LINE.search(sec or "")
+    if not m:
+        return []
+    return [t.strip().strip("`") for t in m.group(1).split(",") if t.strip()]
+
+
+def extract_criteria(sec):
+    """-> [{'id','title','shape'}] . One gate per SHALL-bearing SENTENCE (not per SHALL
+    occurrence: mr-slice-quality:481 counts occurrences and the corpus has sentences with three).
+    EARS paragraph first, then SHALL-bearing bullets OUTSIDE it — a union, not a fallback, so a
+    section carrying both shapes loses nothing."""
+    out, seen = [], set()
+    span = _ears_span(sec)
+    if span:
+        para = re.sub(r"^EARS:\s*", "", _norm(sec[span[0]:span[1]]))
+        n = 0
+        for s in SENT_SPLIT.split(para):
+            s = _norm(s)
+            if SHALL.search(s):
+                n += 1
+                gid = "E%d" % n
+                seen.add(gid)
+                out.append({"id": gid, "title": s, "shape": "ears"})
+    rest = (sec[:span[0]] + sec[span[1]:]) if span else sec
+    n = 0
+    for item in _logical_bullets(rest):
+        if not SHALL.search(item):
+            continue
+        m = IDLEAD.match(item)
+        if m and m.group(1).lower() not in NOT_AN_ID:
+            gid, title = m.group(1), _norm(item[m.end():])
+        else:
+            n += 1
+            gid, title = "B%d" % n, _norm(item)
+        base, k = gid, 2
+        while gid in seen:
+            gid = "%s.%d" % (base, k)
+            k += 1
+        seen.add(gid)
+        out.append({"id": gid, "title": title, "shape": "bullet"})
+    return out
+
+
+def seed_hash(criteria):
+    canon = "\n".join("%s\t%s" % (c["id"], c["title"]) for c in criteria)
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()[:16]
+
+
+def shall_uncaptured(sec, criteria):
+    """SHALLs present in the section but in no extracted criterion. Reported, never silently
+    dropped — 5 such cases exist corpus-wide and a third parser shape would cost more in false
+    positives than it buys."""
+    total = len(SHALL.findall(sec))
+    got = sum(len(SHALL.findall(c["title"])) for c in criteria)
+    return max(0, total - got)
+
+
+# ---------------------------------------------------------------------------------------------
+# Gate-file model
+# ---------------------------------------------------------------------------------------------
+GATE_LINE = re.compile(r"^- \[( |x|X)\] (\S+):\s*(.*)$")
+ATTR_LINE = re.compile(r"^\s+(CHECK|EXPECT|EVIDENCE|MANUAL):\s?(.*)$")
+DEFER_LINE = re.compile(r"^(?:DEFER|ABANDON):\s+(\S+?)\s*(?:->|→)\s*(\S+)\s+(?:—|--)\s+(.+)$")
+# ABANDON with no target is unlazy's shape; accepted and normalised to wontfix, reason still required.
+ABANDON_BARE = re.compile(r"^ABANDON:\s+(\S+?)\s+(?:—|--)?\s*(.+)$")
+HDR = re.compile(r"^([A-Za-z][A-Za-z ]*):\s*(.*)$")
+
+
+class Gate(object):
+    __slots__ = ("id", "title", "checked", "check", "expect", "evidence", "manual",
+                 "line", "ev_line")
+
+    def __init__(self, gid, title, checked, line):
+        self.id, self.title, self.checked, self.line = gid, title, checked, line
+        self.check = self.expect = self.evidence = self.manual = None
+        self.ev_line = -1
+
+    def is_manual(self):
+        return self.manual is not None or not self.check
+
+    def has_evidence(self):
+        return bool(self.evidence) and not re.match(r"^pending$", self.evidence.strip(), re.I)
+
+    def met(self):
+        return self.checked and self.has_evidence()
+
+
+def parse_gates(text):
+    """-> (header dict, [Gate], {gate_id: (target, reason)}, [parse errors])"""
+    lines = text.split("\n")
+    header, gates, defers, errs = {}, [], {}, []
+    cur = None
+    in_header = True
+    for i, line in enumerate(lines):
+        g = GATE_LINE.match(line)
+        if g:
+            in_header = False
+            cur = Gate(g.group(2), g.group(3).strip(), g.group(1).lower() == "x", i)
+            gates.append(cur)
+            continue
+        a = ATTR_LINE.match(line) if cur is not None else None
+        if a:
+            key = a.group(1).lower()
+            setattr(cur, key, a.group(2).strip())
+            if key == "evidence":
+                cur.ev_line = i
+            continue
+        if line.startswith("DEFER:") or line.startswith("ABANDON:"):
+            m = DEFER_LINE.match(line)
+            if m:
+                defers[m.group(1)] = (m.group(2), m.group(3).strip())
+            else:
+                m2 = ABANDON_BARE.match(line)
+                if m2:
+                    defers[m2.group(1)] = ("wontfix", m2.group(2).strip())
+                else:
+                    errs.append("line %d: unparseable DEFER (want "
+                                "`DEFER: <gate> -> <target> — <reason>`): %s" % (i + 1, line[:80]))
+            cur = None
+            continue
+        if in_header:
+            h = HDR.match(line)
+            if h:
+                header[h.group(1).strip()] = h.group(2).strip()
+        if not line.strip():
+            cur = None
+    return header, gates, defers, errs
+
+
+def classify(gates, defers):
+    met, unmet, deferred = [], [], []
+    for g in gates:
+        if g.id in defers:
+            deferred.append(g)
+        elif g.met():
+            met.append(g)
+        else:
+            unmet.append(g)
+    return met, unmet, deferred
+
+
+def unmet_reason(g):
+    if not g.checked:
+        return "unchecked"
+    return "checked but EVIDENCE pending"
+
+
+# ---------------------------------------------------------------------------------------------
+# I/O helpers
+# ---------------------------------------------------------------------------------------------
+def atomic_write(path, text):
+    d = os.path.dirname(path) or "."
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError:
+        pass
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".mr-gates.tmp.")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(text)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def gates_path(slice_id, gates_dir=None):
+    return os.path.join(gates_dir or GATES_DIR, "%s.gates.md" % slice_id)
+
+
+def read_gates_file(path):
+    try:
+        with open(path, errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def cap_evidence(output, limit=None):
+    limit = limit or POLICY["evidence_chars"]
+    ls = [l.strip() for l in (output or "").split("\n") if l.strip()]
+    return (" | ".join(ls[-2:]) or "(no output)")[:limit]
+
+
+def expect_matches(expect, output):
+    if not expect:
+        return None
+    rx = re.match(r"^/(.+)/([a-z]*)$", expect)
+    if rx:
+        flags = re.M          # `/^0$/` and `/1 passed$/` are the natural way to write a
+        if "i" in rx.group(2):  # decisive EXPECT; without re.M they can NEVER match, so `check`
+            flags |= re.I       # could not flip the box and a hand-flipped one read as a mismatch.
+        try:
+            return bool(re.search(rx.group(1), output, flags))
+        except re.error:
+            return False
+    return expect in output
+
+
+def expect_line(expect, output):
+    """The deciding line — the one EXPECT actually matched. Used for the normalized
+    substring comparison in verify (a byte-compare of whole output punishes real test runners
+    for timings and ordering, and rewards static greps)."""
+    for ln in (output or "").split("\n"):
+        if expect_matches(expect, ln):
+            return _norm(ln)
+    return None
+
+
+# ---------------------------------------------------------------------------------------------
+# Lint — the anti-vacuity screen. §5 of the plan.
+# ---------------------------------------------------------------------------------------------
+# An E* gate's CHECK must invoke a real gate runner. CHECKs are authored in the PLAN phase, before
+# tests exist, so the only thing writable then is `grep -q "fn foo" src/…` — which passes every
+# other rule, re-executes deterministically, matches byte-for-byte, and certifies nothing.
+RUNNER_HEADS = {"cargo", "just", "npm", "npx", "pnpm", "node", "vitest", "pytest", "playwright"}
+ENVASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=\S*$")
+
+
+def command_head(cmd):
+    toks = (cmd or "").strip().split()
+    for t in toks:
+        if ENVASSIGN.match(t):
+            continue
+        return t
+    return ""
+
+
+def is_runner(cmd):
+    head = command_head(cmd)
+    if not head:
+        return False
+    base = os.path.basename(head)
+    return base in RUNNER_HEADS or base.startswith("mr-")
+
+
+def lint_gates(gates, defers, specs_dir=None):
+    """-> [ (severity, gate_id, message) ]"""
+    out = []
+    for g in gates:
+        # SEEDED = anything init wrote, i.e. anything that is not a run-authored X* gate. Matching
+        # on an id PREFIX was the defect: seeded ids are frequently the spec's own (`ptc5a-1`).
+        seeded = not g.id.startswith("X")
+        if g.check:
+            c = g.check
+            if seeded and not is_runner(c):
+                out.append(("BLOCK", g.id,
+                            "seeded gate CHECK must invoke a gate runner (%s) or be MANUAL: with a "
+                            "citation; got head %r" % ("|".join(sorted(RUNNER_HEADS)) + "|mr-*",
+                                                       command_head(c))))
+            if re.search(r"\|\|", c) or re.search(r";\s*true\s*$", c):
+                out.append(("BLOCK", g.id, "CHECK cannot fail: trailing `||` / `; true`"))
+            if not g.expect:
+                out.append(("BLOCK", g.id, "CHECK without EXPECT (exit code alone is too weak "
+                                           "for an acceptance gate)"))
+            elif g.expect.strip() == "":
+                out.append(("BLOCK", g.id, "empty EXPECT"))
+            elif g.expect in c:
+                out.append(("BLOCK", g.id, "EXPECT appears verbatim inside its own CHECK "
+                                           "(echo-your-own-answer)"))
+            else:
+                rx = re.match(r"^/(.+)/[a-z]*$", g.expect)
+                if rx and "|" in rx.group(1):
+                    alts = [a.lower() for a in rx.group(1).split("|")]
+                    good = any(re.search(r"pass|ok|success|green|0 failed", a) for a in alts)
+                    bad = any(re.search(r"fail|error|red|panic", a) for a in alts)
+                    if good and bad:
+                        out.append(("BLOCK", g.id,
+                                    "EXPECT alternation covers both success and failure tokens"))
+        else:
+            if not g.manual:
+                out.append(("WARN", g.id, "no CHECK and no MANUAL: rationale"))
+            if g.has_evidence() and not citation_of(g.evidence):
+                out.append(("BLOCK", g.id, "manual gate EVIDENCE must be a resolvable `path:line` "
+                                           "citation or a quoted deciding output line"))
+    for gid, (target, reason) in defers.items():
+        if not reason or len(reason) < 8:
+            out.append(("BLOCK", gid, "DEFER needs a real reason"))
+        if target not in ("backlog",) and target not in LEGAL_DISPOSITIONS:
+            if not re.match(r"^[A-Za-z0-9][A-Za-z0-9.-]*$", target):
+                out.append(("BLOCK", gid, "DEFER target %r is not a slice id, `backlog` or "
+                                          "`wontfix`" % target))
+            elif find_section(target, specs_dir)[1] is None:
+                # An id that exists in no spec is exactly the `14r-c-2` class: it lints clean, the
+                # row is emitted `status:targeted`, and `residuals list --unclaimed` never shows
+                # it. Use `backlog` when no section exists yet — that is what promote is for.
+                out.append(("BLOCK", gid, "DEFER target %r exists in no spec section. Use "
+                                          "`backlog` (the supervisor promotes it into a real "
+                                          "section) or name a section that exists." % target))
+    seeded = [g for g in gates if not g.id.startswith("X")]
+    seeded_ids = [g.id for g in seeded]
+    if seeded_ids:
+        ratio = len([i for i in seeded_ids if i in defers]) / float(len(seeded_ids))
+        if ratio > POLICY["max_defer_ratio"]:
+            out.append(("BLOCK", "-", "%.0f%% of seeded gates DEFERred (cap %.0f%%): this is a "
+                                      "sizing failure, not a scheduling one"
+                        % (ratio * 100, POLICY["max_defer_ratio"] * 100)))
+        # THE MANUAL ESCAPE HATCH, capped. The runner allowlist only binds gates that HAVE a
+        # CHECK, so a run could dodge it wholesale by declaring every criterion MANUAL with a
+        # plausible-looking citation. unlazy's own rule applies: "if you cannot think of a CHECK,
+        # ask whether the outcome is observable at all; if it is not, sharpen it." A minority of
+        # manual gates is normal (doc-truth criteria genuinely have no runner); a majority means
+        # the criteria are not observable, or the run is avoiding proof.
+        live = [g for g in seeded if g.id not in defers]
+        # Minimum sample: a "ratio" over one or two gates is noise, and a 1-criterion doc-truth
+        # slice is legitimate. Corpus median is 3 criteria, so 3 is the smallest honest sample.
+        if len(live) >= 3:
+            man = len([g for g in live if g.is_manual()]) / float(len(live))
+            if man > POLICY["max_manual_ratio"]:
+                out.append(("BLOCK", "-",
+                            "%.0f%% of live seeded gates are MANUAL (cap %.0f%%): acceptance "
+                            "criteria that no command can check are criteria that are not "
+                            "observable -- sharpen them, or this ledger proves nothing"
+                            % (man * 100, POLICY["max_manual_ratio"] * 100)))
+    return out
+
+
+CITATION = re.compile(r"^([\w./+-]+):(\d+)(?:-(\d+))?\b")
+
+
+def citation_of(evidence):
+    m = CITATION.match((evidence or "").strip())
+    return (m.group(1), int(m.group(2))) if m else None
+
+
+def resolve_citation(evidence, root):
+    c = citation_of(evidence)
+    if not c:
+        return None
+    path, lineno = c
+    full = path if os.path.isabs(path) else os.path.join(root, path)
+    try:
+        with open(full, errors="replace") as fh:
+            for i, ln in enumerate(fh, 1):
+                if i == lineno:
+                    return _norm(ln)[:200]
+    except OSError:
+        return None
+    return None
+
+
+# ---------------------------------------------------------------------------------------------
+# Command execution (guard-routed)
+# ---------------------------------------------------------------------------------------------
+def guard_allows(cmd, guard=None):
+    """Route a CHECK string through guard-bash.mjs before executing it. ADR-0012 commitment 3:
+    a python subprocess never reaches PreToolUse, so verify would otherwise execute run-authored
+    shell unguarded inside the supervisor tick. FAILS CLOSED — if the guard cannot be consulted,
+    the command is not run."""
+    g = guard or GUARD
+    if not os.path.exists(g):
+        return False, "guard-not-found"
+    try:
+        r = subprocess.run(["node", g], input=json.dumps({"tool_input": {"command": cmd}}),
+                           capture_output=True, text=True, timeout=30)
+    except Exception as e:
+        return False, "guard-error:%s" % type(e).__name__
+    if r.returncode == 2:
+        return False, "guard-blocked"
+    if r.returncode != 0:
+        return False, "guard-rc%d" % r.returncode
+    return True, ""
+
+
+def child_env():
+    """MR_* scrubbed so a CHECK cannot read loop state and branch on it — but PATH/HOME/CARGO_HOME
+    are INHERITED. cron's PATH is minimal and mr-native-tick.sh installs asdf shims; a truly clean
+    env would make every cargo CHECK NOT-REVERIFIED, which fails closed into permanent FLAGGED."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("MR_")}
+    env.setdefault("PATH", os.environ.get("PATH", "/usr/bin:/bin"))
+    return env
+
+
+PROTECTED = ("native-supervisor-disabled", "mr-hold", "mr-supervisor-disable",
+             "mr-supervisor-enable", "mr-residuals.jsonl", "monster-realm-usage-ledger",
+             "monster-realm-handoff")
+
+
+def run_check(cmd, cwd, timeout, guard=None, screen=True):
+    """-> (ok_to_run, output, elapsed, why_not)"""
+    # Refused BEFORE guard-bash, because guard-bash allows plenty of shapes that merely NAME these
+    # paths and only blocks specific destructive verbs. A gate CHECK has no legitimate reason to
+    # mention loop control state at all.
+    low = (cmd or "").lower()
+    for tok in PROTECTED:
+        if tok in low:
+            return False, "", 0.0, "refused-touches-loop-state:%s" % tok
+    if screen:
+        ok, why = guard_allows(cmd, guard)
+        if not ok:
+            return False, "", 0.0, why
+    t0 = time.time()
+    try:
+        r = subprocess.run(cmd, shell=True, cwd=cwd, env=child_env(), capture_output=True,
+                           text=True, timeout=timeout)
+        out = (r.stdout or "")
+        if r.stderr:
+            out = out + ("" if out.endswith("\n") or not out else "\n") + r.stderr
+    except subprocess.TimeoutExpired:
+        return False, "", time.time() - t0, "timeout"
+    except Exception as e:
+        return False, "", time.time() - t0, "exec-error:%s" % type(e).__name__
+    return True, out, time.time() - t0, ""
+
+
+def worktree_for(slice_id, repo_root):
+    """The slice's worktree, or the repo root. `git -C <missing>` fake-reads empty, so the path is
+    confirmed to exist before it is returned (supervisor prompt Gotchas)."""
+    try:
+        r = subprocess.run(["git", "-C", repo_root, "worktree", "list"],
+                           capture_output=True, text=True, timeout=30)
+        for ln in (r.stdout or "").splitlines():
+            p = ln.split()[0] if ln.split() else ""
+            if p and os.path.basename(p) == slice_id and os.path.isdir(p):
+                return p
+    except Exception:
+        pass
+    return repo_root if os.path.isdir(repo_root) else None
+
+
+# ---------------------------------------------------------------------------------------------
+# Residual registry — the SINK. The DRAIN is promote/close plus the age policy above.
+# ---------------------------------------------------------------------------------------------
+def residual_rows(path=None):
+    p = path or RESIDUALS
+    rows = []
+    try:
+        with open(p, errors="replace") as fh:
+            for ln in fh:
+                ln = ln.strip()
+                if not ln:
+                    continue
+                try:
+                    rows.append(json.loads(ln))
+                except ValueError:
+                    continue
+    except OSError:
+        return []
+    return rows
+
+
+def residual_append(row, path=None):
+    p = path or RESIDUALS
+    d = os.path.dirname(p) or "."
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError:
+        pass
+    line = json.dumps(row, sort_keys=True)
+    json.loads(line)  # verify parse before it reaches an append-only file
+    with open(p, "a") as fh:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        fh.write(line + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def residual_id(source_slice, gate_id):
+    return "R-%s-%s" % (source_slice, gate_id)
+
+
+def fold_residuals(rows):
+    """Append-only: later rows for the same id supersede earlier ones (mr-record's CORRECTION
+    doctrine — never rewrite, always fold)."""
+    folded = {}
+    for r in rows:
+        rid = r.get("id")
+        if not rid:
+            continue
+        folded[rid] = dict(folded.get(rid, {}), **r)
+    return folded
+
+
+def age_days(iso, now=None):
+    # calendar.timegm, NOT time.mktime: every timestamp in this pipeline is UTC, and mktime
+    # interprets the struct as LOCAL time — which skews every age by the machine's offset (4h on
+    # this host) and silently moves the T1/T2 alarm boundaries. Caught by fixture K1.
+    import calendar
+    try:
+        t = calendar.timegm(time.strptime(iso, "%Y-%m-%dT%H:%M:%SZ"))
+    except Exception:
+        return None
+    return ((now or time.time()) - t) / 86400.0
+
+
+def utc_now():
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def open_residuals(rows, now=None):
+    out = []
+    for rid, r in sorted(fold_residuals(rows).items()):
+        if r.get("status") in ("closed", "dispositioned"):
+            continue
+        r = dict(r)
+        r["age_days"] = age_days(r.get("disclosed_at", ""), now)
+        out.append(r)
+    return out
+
+
+def residual_alarms(rows, now=None):
+    """The anti-rot alarms mr-selfcheck surfaces. Constants come from POLICY — one definition."""
+    # AGGREGATED, one line per CLASS — never one line per row. lp-registry's own warning: seeding
+    # 304 dispositionless items "makes lp-04's check fire 304 times on its first run, which is how
+    # the loop acquired its other decorative gates". A selfcheck that prints 189 failures is not
+    # read; it is switched off. The oldest few are named so the line is still actionable.
+    alarms = []
+    folded = fold_residuals(rows)
+    opens = open_residuals(rows, now)
+
+    def _agg(name, picks, why):
+        if not picks:
+            return
+        picks = sorted(picks, key=lambda r: -(r.get("age_days") or 0))
+        named = ", ".join("%s(%.0fd)" % (r["id"], r.get("age_days") or 0) for r in picks[:3])
+        more = "" if len(picks) <= 3 else " +%d more" % (len(picks) - 3)
+        alarms.append((name, "%d residual(s) %s — oldest: %s%s" % (len(picks), why, named, more)))
+
+    _agg("residual-unpromoted",
+         [r for r in opens if r.get("status") == "unpromoted"
+          and (r.get("age_days") or 0) > POLICY["t1_promote_days"]],
+         "unpromoted past t1=%dd (the promote step stalled)" % POLICY["t1_promote_days"])
+    _agg("residual-stale",
+         [r for r in opens if (r.get("age_days") or 0) > POLICY["t2_stale_days"]],
+         "open past t2=%dd" % POLICY["t2_stale_days"])
+    # The window is a MATURITY test, not a filter: "nothing has closed yet" is only evidence of
+    # a graveyard once something has had time to close. The first version fired on day 0 (one fresh
+    # row, nothing closed) and went SILENT on day 40 (the oldest row aged out of the window) —
+    # exactly backwards, and it would have occupied the tick's head -3 window for the whole first
+    # cycle next to the standing B2 line.
+    win = POLICY["graveyard_window_days"]
+    ages = [age_days(r.get("disclosed_at", ""), now) or 0 for r in folded.values()]
+    closed = [r for r in folded.values() if r.get("status") in ("closed", "dispositioned")]
+    emitted = list(folded.values())
+    if emitted and not closed and max(ages or [0]) > win:
+        alarms.append(("residual-graveyard",
+                       "%d residual(s) emitted in the last %dd and 0 closed — the sink has no drain"
+                       % (len(emitted), win)))
+    if len(opens) > POLICY["open_cap"]:
+        alarms.append(("residual-over-cap", "%d open residuals (cap %d, observe-only in slice 1)"
+                       % (len(opens), POLICY["open_cap"])))
+    return alarms
+
+
+# ---------------------------------------------------------------------------------------------
+# init
+# ---------------------------------------------------------------------------------------------
+SEEDED_HDR = "# Gates: %s"
+
+
+def build_gates_text(slice_id, spec_file, criteria, scope, repo, uncaptured, seed,
+                     touches=None):
+    L = [SEEDED_HDR % slice_id]
+    L.append("Spec: %s#%s" % (spec_file or "(none)", slice_id))
+    L.append("Seed: %s" % seed)
+    L.append("Seeded: %s" % utc_now())
+    L.append("Repo: %s" % (repo or "project"))
+    L.append("Scope: %s" % _norm(scope or "(not supplied)"))
+    L.append("Criteria: %d seeded, %d shall-uncaptured" % (len(criteria), uncaptured))
+    if touches:
+        L.append("Touches: %s" % ", ".join(touches))
+    if not spec_file:
+        L.append("Note: SPEC-SECTION-NOT-FOUND — author X* gates for this slice's acceptance.")
+    if uncaptured:
+        L.append("Note: %d SHALL(s) in the section are in no criterion — add X* gates or explain."
+                 % uncaptured)
+    L.append("")
+    L.append("<!-- Fill CHECK/EXPECT during the PLAN phase. A seeded gate's CHECK must invoke a")
+    L.append("     real gate runner (cargo/just/npm/npx/pnpm/node/vitest/pytest or an mr-* tool),")
+    L.append("     or be declared MANUAL: with a resolvable `path:line` citation as EVIDENCE.")
+    L.append("     Not met? The ONLY legal exit is a DEFER line with a resolvable target:")
+    L.append("       DEFER: <gate> -> <existing slice id | backlog | wontfix> — <reason>")
+    L.append("     `backlog` is materialised into a real spec section by the supervisor. -->")
+    for c in criteria:
+        L.append("")
+        L.append("- [ ] %s: %s" % (c["id"], c["title"]))
+        L.append("  CHECK: ")
+        L.append("  EXPECT: ")
+        L.append("  EVIDENCE: pending")
+    L.append("")
+    return "\n".join(L)
+
+
+def cmd_init(a):
+    slice_id = a["slice"]
+    spec_file, sec = find_section(slice_id, a.get("_specs"))
+    criteria = extract_criteria(sec) if sec else []
+    uncap = shall_uncaptured(sec, criteria) if sec else 0
+    seed = seed_hash(criteria)
+    path = gates_path(slice_id, a.get("_gates_dir"))
+    existing = read_gates_file(path)
+
+    if existing is None:
+        atomic_write(path, build_gates_text(slice_id, spec_file, criteria, a.get("scope"),
+                                            a.get("repo"), uncap, seed,
+                                            extract_touches(sec) if sec else []))
+        msg = "GATES-SEEDED %s criteria=%d seed=%s spec=%s" % (
+            slice_id, len(criteria), seed, spec_file or "NONE")
+        if not spec_file:
+            msg += " SPEC-SECTION-NOT-FOUND"
+        if uncap:
+            msg += " shall-uncaptured=%d" % uncap
+        if len(criteria) > 10:
+            msg += (" SIZE-WARN=%d (right-size: ship the smallest coherent increment and DEFER the "
+                    "rest)" % len(criteria))
+        print(msg)
+        return 0
+
+    # Resume-safe: never destroy evidence, never rewrite Seed (blocker 10).
+    header, gates, defers, _errs = parse_gates(existing)
+    have = {g.id for g in gates}
+    new = [c for c in criteria if c["id"] not in have]
+    recorded = header.get("Seed", "")
+    drift = bool(recorded) and recorded != seed
+    if new:
+        add = []
+        for c in new:
+            add += ["", "- [ ] %s: %s" % (c["id"], c["title"]), "  CHECK: ", "  EXPECT: ",
+                    "  EVIDENCE: pending"]
+        atomic_write(path, existing.rstrip("\n") + "\n" + "\n".join(add) + "\n")
+    print("GATES-PRESENT %s existing=%d added=%d seed_recorded=%s seed_now=%s%s" % (
+        slice_id, len(gates), len(new), recorded or "?", seed,
+        " SEED-DRIFT (supervisor must run `mr-gates reseed`)" if drift else ""))
+    return 0
+
+
+def cmd_reseed(a):
+    """Supervisor-only clearance for a LEGITIMATE spec amendment. Deliberately separate from init:
+    if init rewrote Seed on drift, a run could launder a spec edit; if nothing could rewrite it,
+    an honest spec fix would FLAG forever and the arming band would be unreachable."""
+    slice_id = a["slice"]
+    if not a.get("reason"):
+        return die("reseed requires --reason")
+    path = gates_path(slice_id, a.get("_gates_dir"))
+    text = read_gates_file(path)
+    if text is None:
+        return die("no gates file for %s" % slice_id)
+    spec_file, sec = find_section(slice_id, a.get("_specs"))
+    criteria = extract_criteria(sec) if sec else []
+    seed = seed_hash(criteria)
+    header, gates, _d, _e = parse_gates(text)
+    old = header.get("Seed", "?")
+    lines = text.split("\n")
+    for i, ln in enumerate(lines):
+        if ln.startswith("Seed:"):
+            lines[i] = "Seed: %s" % seed
+            break
+    have = {g.id for g in gates}
+    add = []
+    for c in criteria:
+        if c["id"] not in have:
+            add += ["", "- [ ] %s: %s" % (c["id"], c["title"]), "  CHECK: ", "  EXPECT: ",
+                    "  EVIDENCE: pending"]
+    body = "\n".join(lines).rstrip("\n") + ("\n" + "\n".join(add) if add else "") + "\n"
+    atomic_write(path, body)
+    stoplog(slice_id, "RESEED %s -> %s added=%d reason=%s" % (old, seed, len(add), a["reason"]),
+            a.get("_gates_dir"))
+    print("GATES-RESEEDED %s %s -> %s added=%d" % (slice_id, old, seed, len(add)))
+    return 0
+
+
+def stoplog(slice_id, msg, gates_dir=None):
+    p = os.path.join(gates_dir or GATES_DIR, "%s.stoplog" % slice_id)
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "a") as fh:
+            fh.write("%s %s\n" % (utc_now(), msg))
+    except OSError:
+        pass
+
+
+# ---------------------------------------------------------------------------------------------
+# status / check / render
+# ---------------------------------------------------------------------------------------------
+def load(slice_id, gates_dir=None):
+    path = gates_path(slice_id, gates_dir)
+    text = read_gates_file(path)
+    if text is None:
+        return None, None
+    return path, parse_gates(text)
+
+
+def cmd_status(a):
+    path, parsed = load(a["slice"], a.get("_gates_dir"))
+    if parsed is None:
+        if a.get("json"):
+            print(json.dumps({"slice": a["slice"], "verdict": "NO-GATES-FILE"}))
+        else:
+            print("NO-GATES-FILE %s" % a["slice"])
+        return 1
+    header, gates, defers, errs = parsed
+    met, unmet, deferred = classify(gates, defers)
+    if a.get("json"):
+        print(json.dumps({
+            "slice": a["slice"], "seed": header.get("Seed"), "total": len(gates),
+            "met": len(met), "unmet": len(unmet), "deferred": len(deferred),
+            "unmet_ids": [g.id for g in unmet], "deferred": {k: v[0] for k, v in defers.items()},
+            "parse_errors": errs,
+        }, indent=1))
+        return 0 if not unmet else 1
+    print("%s: %d gates — %d met, %d unmet, %d deferred" %
+          (a["slice"], len(gates), len(met), len(unmet), len(deferred)))
+    for g in unmet:
+        print("  UNMET %s (%s): %s" % (g.id, unmet_reason(g), g.title[:90]))
+    for gid, (t, r) in sorted(defers.items()):
+        print("  DEFER %s -> %s — %s" % (gid, t, r[:70]))
+    for e in errs:
+        print("  PARSE-ERROR %s" % e)
+    return 0 if not unmet else 1
+
+
+def cmd_check(a):
+    path, parsed = load(a["slice"], a.get("_gates_dir"))
+    if parsed is None:
+        return die("no gates file for %s (run `mr-gates init --slice %s`)" % (a["slice"], a["slice"]))
+    header, gates, defers, errs = parsed
+    text = read_gates_file(path)
+    lines = text.split("\n")
+    cwd = a.get("cwd") or os.getcwd()
+    timeout = int(a.get("timeout") or POLICY["check_timeout_s"])
+    changed = 0
+    for g in gates:
+        if g.id in defers or g.met() or not g.check or not g.check.strip():
+            continue
+        ok, out, _el, why = run_check(g.check, cwd, timeout, a.get("_guard"),
+                                      screen=not a.get("_no_guard"))
+        if not ok:
+            print("  SKIP %s: %s" % (g.id, why))
+            continue
+        passed = expect_matches(g.expect, out) if g.expect else False
+        if passed:
+            # WRITE ONLY ON PASS. A red must never be launderable into evidence, and the Stop
+            # hook's progress detector must not be gameable by re-running a failing check.
+            lines[g.line] = lines[g.line].replace("- [ ]", "- [x]", 1)
+            ev = cap_evidence(out)
+            if g.ev_line != -1:
+                indent = re.match(r"^\s*", lines[g.ev_line]).group(0)
+                lines[g.ev_line] = "%sEVIDENCE: %s" % (indent, ev)
+            changed += 1
+            print("  PASS %s: %s" % (g.id, g.title[:70]))
+        else:
+            print("  FAIL %s: %s\n        %s" % (g.id, g.title[:70], cap_evidence(out)))
+    if changed:
+        atomic_write(path, "\n".join(lines))
+    _h, gates2, defers2, _e = parse_gates(read_gates_file(path))
+    met, unmet, deferred = classify(gates2, defers2)
+    print("%s: %d/%d met, %d deferred, %d unmet" %
+          (a["slice"], len(met), len(gates2), len(deferred), len(unmet)))
+    return 0 if not unmet else 1
+
+
+def acceptance_line(slice_id, header, gates, defers):
+    met, unmet, deferred = classify(gates, defers)
+    return ("Acceptance: %d/%d met, %d deferred, %d unmet — %s seed:%s"
+            % (len(met), len(gates), len(deferred), len(unmet), slice_id,
+               header.get("Seed", "?")))
+
+
+def cmd_render(a):
+    path, parsed = load(a["slice"], a.get("_gates_dir"))
+    if parsed is None:
+        return die("no gates file for %s" % a["slice"])
+    header, gates, defers, _e = parsed
+    met, unmet, deferred = classify(gates, defers)
+    fmt = a.get("format") or "pr"
+    if fmt == "pr":
+        print(acceptance_line(a["slice"], header, gates, defers))
+        for gid, (t, r) in sorted(defers.items()):
+            print("Deferred: %s -> %s — %s" % (gid, t, r))
+    elif fmt == "park":
+        # The resume brief is built FROM THE LEDGER, not from a hand-written memo (plan §9.5).
+        print("# %s — park memo (generated by mr-gates)\n" % a["slice"])
+        print("## DONE (%d)" % len(met))
+        for g in met:
+            print("- %s: %s\n  evidence: %s" % (g.id, g.title[:110], (g.evidence or "")[:110]))
+        print("\n## REMAINING (%d) — the exact next steps" % len(unmet))
+        for g in unmet:
+            print("- %s (%s): %s" % (g.id, unmet_reason(g), g.title[:110]))
+            if g.check:
+                print("  next: %s" % g.check[:150])
+        print("\n## DEFERRED (%d)" % len(deferred))
+        for gid, (t, r) in sorted(defers.items()):
+            print("- %s -> %s — %s" % (gid, t, r))
+    elif fmt == "handoff":
+        print("%s. %s" % (acceptance_line(a["slice"], header, gates, defers),
+                          "Deferred: " + "; ".join("%s->%s" % (k, v[0])
+                                                   for k, v in sorted(defers.items()))
+                          if defers else "No deferrals."))
+    else:
+        return die("unknown --format %r" % fmt)
+    return 0
+
+
+def die(msg):
+    sys.stderr.write("ERROR: %s\n" % msg)
+    return 2
+
+
+# ---------------------------------------------------------------------------------------------
+# lint
+# ---------------------------------------------------------------------------------------------
+def cmd_lint(a):
+    path, parsed = load(a["slice"], a.get("_gates_dir"))
+    if parsed is None:
+        return die("no gates file for %s" % a["slice"])
+    _h, gates, defers, errs = parsed
+    findings = lint_gates(gates, defers) + [("BLOCK", "-", e) for e in errs]
+    if a.get("json"):
+        print(json.dumps([{"severity": s, "gate": g, "message": m} for s, g, m in findings],
+                         indent=1))
+    else:
+        for s, g, m in findings:
+            print("  %-5s %s: %s" % (s, g, m))
+        if not findings:
+            print("LINT-CLEAN %s" % a["slice"])
+    return 1 if any(s == "BLOCK" for s, _, _ in findings) else 0
+
+
+# ---------------------------------------------------------------------------------------------
+# verify — the SUPERVISOR's independent re-run (verification-hierarchy layer 3)
+# ---------------------------------------------------------------------------------------------
+def spotcheck_pick(slice_id, seed, passing_ids):
+    """Deterministic, but seeded from slice id + SEED HASH — never from head sha, which the run
+    controls and could amend until the draw lands on a favourable gate."""
+    if not passing_ids:
+        return None
+    h = hashlib.sha256(("%s|%s" % (slice_id, seed)).encode("utf-8")).digest()
+    return sorted(passing_ids)[h[0] % len(passing_ids)]
+
+
+def cmd_verify(a):
+    slice_id = a["slice"]
+    out = {"slice": slice_id, "verdict": "CLEAN", "reasons": []}
+    path, parsed = load(slice_id, a.get("_gates_dir"))
+    if parsed is None:
+        out.update(verdict="FLAGGED", reasons=["NO-GATES-FILE"])
+        return _emit_verify(out, a)
+    header, gates, defers, errs = parsed
+    met, unmet, deferred = classify(gates, defers)
+    out.update(seeded=len([g for g in gates if not g.id.startswith("X")]), total=len(gates),
+               met=len(met), unmet=len(unmet), deferred=len(deferred),
+               extra=len([g for g in gates if g.id.startswith("X")]),
+               unmet_ids=[g.id for g in unmet],
+               deferred_targets={k: {"target": v[0], "reason": v[1]}
+                                 for k, v in defers.items()})
+
+    # 1. Seed integrity — the criteria must still be the SPEC's criteria.
+    spec_file, sec = find_section(slice_id, a.get("_specs"))
+    live_seed = seed_hash(extract_criteria(sec)) if sec else None
+    recorded = header.get("Seed")
+    out["seed_recorded"], out["seed_live"] = recorded, live_seed
+    out["seed_drift"] = bool(recorded and live_seed and recorded != live_seed)
+    if live_seed and not recorded:
+        # Deleting the line is easier than editing the hash, so absent must never read as in-sync.
+        out["seed_missing"] = True
+        out["reasons"].append("SEED-MISSING (the ledger has no Seed: line; criteria integrity "
+                              "cannot be established)")
+    if out["seed_drift"]:
+        out["reasons"].append("SEED-DRIFT (spec changed since seeding; supervisor must adjudicate "
+                              "and run `mr-gates reseed`)")
+    if sec is None:
+        out["reasons"].append("SPEC-SECTION-NOT-FOUND")
+
+    # 2/3. Re-execute every CHECK, guard-routed, and compare against recorded evidence.
+    repo_root = a.get("repo") or (HARNESS + "/projects/monster-realm")
+    cwd = a.get("cwd") or worktree_for(slice_id, repo_root) or repo_root
+    out["cwd"] = cwd
+    budget = float(a.get("budget") or POLICY["verify_budget_s"])
+    spent, reverified, not_reverified, mismatch = 0.0, [], [], []
+    for g in gates:
+        if g.id in defers or not g.check or not g.check.strip():
+            continue
+        if spent >= budget:
+            not_reverified.append({"gate": g.id, "why": "global-budget-exhausted"})
+            continue
+        ok, o, el, why = run_check(g.check, cwd, POLICY["check_timeout_s"], a.get("_guard"),
+                                   screen=not a.get("_no_guard"))
+        spent += el
+        if not ok:
+            not_reverified.append({"gate": g.id, "why": why})
+            continue
+        passed = expect_matches(g.expect, o) if g.expect else False
+        fresh = expect_line(g.expect, o) if g.expect else None
+        rec = _norm(g.evidence or "")
+        # Normalized SUBSTRING on the deciding line, never a byte-compare of whole output:
+        # a byte-compare punishes real runners for timings/ordering and rewards static greps.
+        agrees = bool(fresh) and (fresh in rec or rec in fresh or not rec)
+        reverified.append({"gate": g.id, "passed": passed, "agrees_with_evidence": agrees,
+                           "fresh": (fresh or cap_evidence(o))[:160], "seconds": round(el, 1)})
+        if g.checked and not passed:
+            mismatch.append({"gate": g.id, "why": "claimed met; re-run does not match EXPECT"})
+        elif g.checked and not agrees:
+            mismatch.append({"gate": g.id, "why": "re-run passes but recorded EVIDENCE does not "
+                                                  "match the deciding line"})
+    out["reverified"], out["not_reverified"], out["evidence_mismatch"] = \
+        reverified, not_reverified, mismatch
+    out["verify_seconds"] = round(spent, 1)
+
+    # 4. Manual gates: resolve the citation and surface the cited line for the reader.
+    manual = []
+    for g in gates:
+        if g.id in defers or not g.is_manual():
+            continue
+        resolved = resolve_citation(g.evidence, cwd) if g.has_evidence() else None
+        manual.append({"gate": g.id, "has_evidence": g.has_evidence(),
+                       "citation_resolves": bool(resolved), "cited_line": resolved})
+        if g.checked and not resolved:
+            mismatch.append({"gate": g.id, "why": "manual gate checked but its citation does not "
+                                                  "resolve"})
+    out["manual"] = manual
+
+    # 5. Lint.
+    findings = lint_gates(gates, defers) + [("BLOCK", "-", e) for e in errs]
+    out["lint"] = [{"severity": s, "gate": g, "message": m} for s, g, m in findings]
+
+    # 6. Adversarial spot-check of ONE passing gate.
+    passing = [r["gate"] for r in reverified if r["passed"]]
+    pick = spotcheck_pick(slice_id, recorded or "", passing)
+    out["spotcheck"] = None
+    if pick:
+        r = [x for x in reverified if x["gate"] == pick][0]
+        gg = [x for x in gates if x.id == pick][0]
+        out["spotcheck"] = {"gate": pick, "check": gg.check, "expect": gg.expect,
+                            "recorded_evidence": gg.evidence, "fresh": r["fresh"],
+                            "agrees": r["agrees_with_evidence"],
+                            "read_this": "re-read this gate adversarially and try to refute it"}
+
+    # 7. Residual emission for every DEFER (idempotent).
+    emitted = []
+    for gid, (target, reason) in sorted(defers.items()):
+        gtitle = next((g.title for g in gates if g.id == gid), gid)
+        rid = residual_upsert(slice_id, gid, gtitle, target, reason, header,
+                              a.get("_residuals"))
+        if rid:
+            emitted.append(rid)
+    out["residuals_emitted"] = emitted
+    rows = residual_rows(a.get("_residuals"))
+    out["residuals_open"] = len(open_residuals(rows))
+    out["residual_alarms"] = ["%s: %s" % (k, v) for k, v in residual_alarms(rows)]
+
+    # Verdict. Fails CLOSED.
+    if out["seed_drift"] or out.get("seed_missing") or mismatch or not_reverified or \
+            any(f[0] == "BLOCK" for f in findings) or unmet or sec is None \
+            or out.get("total", 0) == 0:
+        out["verdict"] = "FLAGGED"
+    if out.get("total", 0) == 0:
+        out["reasons"].append("ZERO-GATES (no criteria extracted for this slice; the run must "
+                              "author X* gates or this ledger proves nothing)")
+    if mismatch:
+        out["reasons"].append("EVIDENCE-MISMATCH on %d gate(s)" % len(mismatch))
+    if not_reverified:
+        out["reasons"].append("NOT-REVERIFIED on %d gate(s) (fails closed)" % len(not_reverified))
+    if unmet:
+        out["reasons"].append("%d gate(s) neither met nor DEFERred" % len(unmet))
+    if any(f[0] == "BLOCK" for f in findings):
+        out["reasons"].append("lint BLOCK")
+    out["acceptance_line"] = acceptance_line(slice_id, header, gates, defers)
+    return _emit_verify(out, a)
+
+
+def _emit_verify(out, a):
+    # ADVISORY in slice 1 (R13 + lp-04): evidence for the supervisor's read, never a merge
+    # predicate. Promotion to POLICY is slice 2, against the pre-registered 1-4-of-10 band.
+    out["advisory"] = True
+    out["contract"] = ("ADVISORY EVIDENCE ONLY - never a merge predicate; evidence for an LLM read. "
+                       "Unmet or FLAGGED acceptance means READ THE LEDGER and adjudicate; it does "
+                       "not mechanically refuse the merge in this slice.")
+    print(json.dumps(out, indent=1))
+    return 0
+
+
+# ---------------------------------------------------------------------------------------------
+# residuals — the SINK plus its DRAIN
+# ---------------------------------------------------------------------------------------------
+def residual_upsert(source_slice, gate_id, title, target, reason, header, path=None):
+    rid = residual_id(source_slice, gate_id)
+    folded = fold_residuals(residual_rows(path))
+    if rid in folded:
+        return None  # already emitted; append-only, do not duplicate
+    touches = header.get("Touches", "") if header else ""
+    row = {
+        "id": rid, "schema": 1,
+        "slice_id": None,                 # allocated at promote
+        "title": title[:400], "owner": "supervisor",
+        "touches": [t.strip() for t in touches.split(",") if t.strip()],
+        "severity": "MED", "domain": header.get("Repo", "project") if header else "project",
+        "disclosed_at": utc_now(), "adr": None,
+        "status": "unpromoted" if target == "backlog" else
+                  ("dispositioned" if target in LEGAL_DISPOSITIONS else "targeted"),
+        "disposition": target if target in LEGAL_DISPOSITIONS else None,
+        "source_slice": source_slice, "gate_id": gate_id,
+        "target": target, "reason": reason[:400],
+        "defer_count": 1, "promoted_slice": target if target not in
+                          ("backlog",) + LEGAL_DISPOSITIONS else None,
+    }
+    residual_append(row, path)
+    return rid
+
+
+def next_backlog_id(spec_text):
+    n = 0
+    for m in re.finditer(r"^### rb-(\d+)\b", spec_text, re.M):
+        n = max(n, int(m.group(1)))
+    return "rb-%d" % (n + 1)
+
+
+BACKLOG_HEADER = """# M-residual-backlog — the standing drain for deferred acceptance criteria
+
+Generated. Each section below is one criterion a slice DEFERred, promoted here by
+`mr-gates residuals promote` so it becomes a real, launchable work item instead of a prose bullet
+nothing consumes (postmortem RF-3; mean disclosure->remediation latency was 13.1 days).
+
+The criterion text is verbatim from the spec section it was deferred from — promotion is a
+mechanical copy, not spec authoring.
+
+## 2. Slices
+"""
+
+
+def cmd_residuals(a, sub):
+    path = a.get("_residuals")
+    rows = residual_rows(path)
+    if sub == "policy":
+        print(json.dumps(POLICY, indent=1, sort_keys=True))
+        return 0
+    if sub == "list":
+        opens = open_residuals(rows)
+        if a.get("unclaimed"):
+            opens = [r for r in opens if not r.get("promoted_slice")]
+        if a.get("json"):
+            print(json.dumps({"open": opens,
+                              "alarms": ["%s: %s" % (k, v) for k, v in residual_alarms(rows)]},
+                             indent=1))
+        else:
+            for r in opens:
+                print("  %-28s %-11s age=%5.1fd  %s -> %s" %
+                      (r["id"], r.get("status"), r.get("age_days") or -1,
+                       (r.get("title") or "")[:60], r.get("target")))
+            for k, v in residual_alarms(rows):
+                print("  ALARM %s: %s" % (k, v))
+            if not opens:
+                print("  (no open residuals)")
+        return 0
+    if sub == "promote":
+        rid = a.get("id")
+        if not rid:
+            return die("promote requires --id")
+        specs = a.get("_specs") or SPECS
+        spec_name = a.get("spec_file") or BACKLOG_SPEC
+        # Validated FIRST, ahead of every state lookup: the same rule mr-record's queue-add
+        # enforces (a spec file is a BARE NAME inside the corpus). Behind the already-promoted
+        # early return this check is unreachable on exactly the second call, which is the call an
+        # attacker makes.
+        if os.path.isabs(spec_name) or "/" in spec_name or ".." in spec_name \
+                or not spec_name.endswith(".spec.md"):
+            return die("--spec-file must be a bare <name>.spec.md inside the corpus, got %r"
+                       % spec_name)
+        folded = fold_residuals(rows)
+        r = folded.get(rid)
+        if not r:
+            return die("no residual %r" % rid)
+        if r.get("promoted_slice"):
+            print("ALREADY-PROMOTED %s -> %s" % (rid, r["promoted_slice"]))
+            return 0
+        full = os.path.join(specs, spec_name)
+        text = read_gates_file(full)
+        if text is None:
+            text = BACKLOG_HEADER
+        new_id = next_backlog_id(text)
+        touches = ", ".join(r.get("touches") or []) or "(inherit from source slice — REVIEW)"
+        sect = [
+            "",
+            "### %s — %s (from %s %s, deferred %s)" % (
+                new_id, (r.get("title") or "")[:90], r.get("source_slice"), r.get("gate_id"),
+                (r.get("disclosed_at") or "")[:10]),
+            "`touches: %s`" % touches,
+            "`after:` — · source: %s · residual: %s" % (r.get("source_slice"), rid),
+            "",
+            "Deferred with reason: %s" % r.get("reason"),
+            "",
+            "EARS: %s" % r.get("title"),
+            "Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass "
+            "after (ADR-0010).",
+        ]
+        atomic_write(full, text.rstrip("\n") + "\n" + "\n".join(sect) + "\n")
+        residual_append(dict(r, status="promoted", slice_id=new_id, promoted_slice=new_id,
+                             promoted_at=utc_now()), path)
+        print("PROMOTED %s -> %s in %s (queue it with `mr-record queue-add --slice %s "
+              "--spec-file %s`)" % (rid, new_id, spec_name, new_id, spec_name))
+        return 0
+    if sub == "close":
+        sl = a.get("slice")
+        if not sl:
+            return die("close requires --slice")
+        # GATE-PROVED CLOSURE. Closing on "a merge happened with the right branch name" is the
+        # weakest possible predicate and would let a residual be retired by a slice that did not
+        # actually deliver it — which is the failure this whole mechanism exists to end. So the
+        # promoted slice's OWN ledger must be fully resolved before its residuals close.
+        # `--force` is the honest escape (e.g. the slice legitimately DEFERred it onward again),
+        # and it is recorded on the row rather than silently assumed.
+        forced = bool(a.get("force"))
+        if not forced:
+            _pth, parsed = load(sl, a.get("_gates_dir"))
+            if parsed is None:
+                return die("no ledger for %s: cannot prove the criterion was delivered. Re-run "
+                           "after the slice is ledgered, or pass --force with a reason." % sl)
+            _h, gs, ds, _e = parsed
+            _met, unmet, _def = classify(gs, ds)
+            if unmet:
+                return die("%s has %d unmet gate(s) (%s): its residuals are NOT proven delivered."
+                           % (sl, len(unmet), ", ".join(g.id for g in unmet[:5])))
+        folded = fold_residuals(rows)
+        n = 0
+        for rid, r in sorted(folded.items()):
+            if r.get("promoted_slice") == sl and r.get("status") not in ("closed",):
+                residual_append(dict(r, status="closed", closed_at=utc_now(),
+                                     closed_by_pr=a.get("pr"),
+                                     closed_forced=True if forced else None), path)
+                n += 1
+        print("RESIDUALS-CLOSED %d for slice %s%s" % (n, sl, " (FORCED)" if forced else ""))
+        return 0
+    if sub == "disposition":
+        rid, how = a.get("id"), a.get("as")
+        if not rid or how not in LEGAL_DISPOSITIONS:
+            return die("disposition requires --id and --as %s" % "|".join(LEGAL_DISPOSITIONS))
+        if not a.get("reason"):
+            return die("disposition requires --reason")
+        folded = fold_residuals(rows)
+        r = folded.get(rid)
+        if not r:
+            return die("no residual %r" % rid)
+        if (r.get("severity") or "MED").upper() in SEVERITY_OPERATOR_ONLY:
+            return die("severity %s cannot be dispositioned by the loop — open an operator "
+                       "decision with mr-ask-drew first" % r.get("severity"))
+        residual_append(dict(r, status="dispositioned", disposition=how,
+                             disposition_reason=a["reason"], dispositioned_at=utc_now()), path)
+        print("DISPOSITIONED %s as %s" % (rid, how))
+        return 0
+    if sub == "add":
+        for k in ("slice", "gate", "title", "target", "reason"):
+            if not a.get(k):
+                return die("add requires --slice --gate --title --target --reason")
+        rid = residual_upsert(a["slice"], a["gate"], a["title"], a["target"], a["reason"],
+                              {"Repo": a.get("domain", "project")}, path)
+        print("RESIDUAL-ADDED %s" % rid if rid else "RESIDUAL-EXISTS")
+        return 0
+    return die("unknown residuals subcommand %r" % sub)
+
+
+# ---------------------------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------------------------
+FLAGS = {"slice", "scope", "repo", "json", "timeout", "format", "reason", "budget", "cwd",
+         "force",
+         "id", "spec-file", "as", "pr", "unclaimed", "severity", "title", "touches", "gate",
+         "target", "source-slice", "domain"}
+VALUELESS = {"json", "unclaimed", "force"}
+
+
+def parse_args(argv):
+    a, i = {}, 0
+    while i < len(argv):
+        tok = argv[i]
+        if not tok.startswith("--"):
+            return None, "bad arg %r (flags only after the subcommand)" % tok
+        k = tok[2:]
+        if k not in FLAGS:
+            return None, "unknown flag --%s" % k
+        if k in VALUELESS:
+            a[k.replace("-", "_")] = True
+            i += 1
+            continue
+        if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+            return None, "--%s requires a value" % k
+        a[k.replace("-", "_")] = argv[i + 1]
+        i += 2
+    return a, None
+
+
+def main(argv):
+    if len(argv) < 2:
+        sys.stderr.write(__doc__)
+        return 2
+    sub = argv[1]
+    if sub in ("--selftest", "selftest"):
+        return selftest()
+    if sub in ("--help", "-h", "help"):
+        sys.stdout.write(__doc__)
+        return 0
+    rest = argv[2:]
+    rsub = None
+    if sub == "residuals":
+        if not rest or rest[0].startswith("--"):
+            return die("residuals needs a subcommand "
+                       "(list|add|promote|close|disposition|policy)")
+        rsub, rest = rest[0], rest[1:]
+    a, err = parse_args(rest)
+    if err:
+        return die(err)
+    need_slice = ("init", "status", "check", "verify", "render", "reseed", "lint")
+    if sub in need_slice and not a.get("slice"):
+        return die("%s requires --slice" % sub)
+    table = {"init": cmd_init, "status": cmd_status, "check": cmd_check, "render": cmd_render,
+             "reseed": cmd_reseed, "lint": cmd_lint, "verify": cmd_verify}
+    if sub in table:
+        return table[sub](a)
+    if sub == "residuals":
+        return cmd_residuals(a, rsub)
+    return die("unknown subcommand %r" % sub)
+
+
+# ---------------------------------------------------------------------------------------------
+# --selftest. rc 0 pass / 1 fail. Prints MR-GATES-SELFTEST-OK <n> on pass, -FAIL <id> per failure.
+# Every fixture drives the REAL functions over temp dirs — never an env override on a gate input.
+# ---------------------------------------------------------------------------------------------
+_ST_FLOOR = 30
+
+
+class _Chk(object):
+    def __init__(self):
+        self.n = 0
+        self.bad = 0
+
+    def eq(self, fid, want, got, why=""):
+        self.n += 1
+        if want != got:
+            self.bad += 1
+            print("MR-GATES-SELFTEST-FAIL %s: want %r got %r %s" % (fid, want, got, why))
+
+    def ok(self, fid, cond, why=""):
+        self.eq(fid, True, bool(cond), why)
+
+
+_FX_EARS = """## 2. Slices
+
+### fx-a — a fixture slice (HIGH, LIGHT)
+`touches: memory/projects/mr-gates`
+
+Prose that mentions shall in lowercase and should not count.
+
+EARS: WHEN a slice PR opens, THE SYSTEM SHALL append one residual record per named follow-up.
+`mr-ready` SHALL surface unclaimed records. No record SHALL block a merge.
+Tests: proof-of-teeth — three synthetic records (ADR-0010).
+
+### fx-ab — a decoy whose id extends fx-a
+EARS: THE DECOY SHALL NOT be matched by an anchored lookup for fx-a.
+
+### fx-b — bullet-shape fixture
+- **fx-b-1:** `evolve()` SHALL reject an unowned monster.
+- **fx-b-2:** the client SHALL show a progress panel.
+- **Note:** this bullet has no criterion verb and SHALL not be treated as an id... actually it does.
+- a plain bullet that SHALL also count with a generated id.
+
+### fx-c — no criteria at all
+Just prose, no obligations here.
+"""
+
+
+def _st_tmp(chk):
+    import shutil
+    d = tempfile.mkdtemp(prefix="mr-gates-selftest-")
+    return d, lambda: shutil.rmtree(d, ignore_errors=True)
+
+
+def selftest():
+    chk = _Chk()
+    root, cleanup = _st_tmp(chk)
+    try:
+        specs = os.path.join(root, "specs")
+        gdir = os.path.join(root, "gates")
+        os.makedirs(specs)
+        os.makedirs(gdir)
+        resid = os.path.join(root, "mr-residuals.jsonl")
+        with open(os.path.join(specs, "M-fx.spec.md"), "w") as fh:
+            fh.write(_FX_EARS)
+
+        # --- A. extraction -------------------------------------------------------------------
+        name, sec = find_section("fx-a", specs)
+        chk.eq("A1-file", "M-fx.spec.md", name)
+        chk.ok("A2-anchored", "decoy" not in (sec or ""),
+               "an unanchored lookup for fx-a would swallow fx-ab")
+        crit = extract_criteria(sec)
+        chk.eq("A3-ears-count", 3, len(crit))
+        chk.eq("A4-ids", ["E1", "E2", "E3"], [c["id"] for c in crit])
+        chk.ok("A5-verbatim", crit[0]["title"].startswith("WHEN a slice PR opens"))
+        chk.ok("A6-lowercase-shall-ignored",
+               all("lowercase" not in c["title"] for c in crit))
+        chk.eq("A7-uncaptured", 0, shall_uncaptured(sec, crit))
+
+        _n, secb = find_section("fx-b", specs)
+        critb = extract_criteria(secb)
+        chk.ok("A8-bullet-shape", len(critb) >= 3)
+        chk.ok("A9-native-ids", "fx-b-1" in [c["id"] for c in critb],
+               "the spec's own criterion id must be reused, not renumbered")
+        chk.ok("A10-generated-id", any(c["id"].startswith("B") for c in critb))
+
+        _n, secc = find_section("fx-c", specs)
+        chk.eq("A11-no-criteria", 0, len(extract_criteria(secc)))
+        chk.eq("A12-missing-section", (None, None), find_section("fx-nope", specs))
+
+        # --- B. seed hash --------------------------------------------------------------------
+        s1 = seed_hash(crit)
+        chk.eq("B1-stable", s1, seed_hash(extract_criteria(sec)))
+        mutated = [dict(crit[0], title=crit[0]["title"].replace("one residual", "zero residual"))] \
+            + crit[1:]
+        chk.ok("B2-detects-reword", s1 != seed_hash(mutated),
+               "rewording a criterion must move the seed")
+        chk.ok("B3-detects-drop", s1 != seed_hash(crit[:-1]),
+               "dropping a criterion must move the seed")
+
+        # --- C. init / idempotence / reseed ---------------------------------------------------
+        A = {"slice": "fx-a", "_specs": specs, "_gates_dir": gdir, "scope": "fixture"}
+        cmd_init(A)
+        gp = gates_path("fx-a", gdir)
+        chk.ok("C1-created", os.path.exists(gp))
+        h, g, d, e = parse_gates(read_gates_file(gp))
+        chk.eq("C2-gates", 3, len(g))
+        chk.eq("C3-seed-recorded", s1, h.get("Seed"))
+        chk.eq("C4-parse-errors", [], e)
+        chk.ok("C5-all-unmet", all(not x.met() for x in g))
+
+        # hand-fill one gate, then re-init: evidence must survive and Seed must not be rewritten
+        txt = read_gates_file(gp).replace("- [ ] E1:", "- [x] E1:", 1) \
+                                 .replace("EVIDENCE: pending", "EVIDENCE: 3 passed", 1)
+        atomic_write(gp, txt)
+        cmd_init(A)
+        h2, g2, _d, _e = parse_gates(read_gates_file(gp))
+        chk.eq("C6-idempotent", 3, len(g2))
+        chk.eq("C7-evidence-survives", True, g2[0].met())
+        chk.eq("C8-seed-not-rewritten", s1, h2.get("Seed"))
+
+        # --- D. unmet semantics ----------------------------------------------------------------
+        checked_no_ev = "# Gates: x\nSeed: z\n\n- [x] E1: t\n  CHECK: c\n  EXPECT: e\n" \
+                        "  EVIDENCE: pending\n"
+        _h, gg, dd, _e = parse_gates(checked_no_ev)
+        m, u, df = classify(gg, dd)
+        chk.eq("D1-checked-pending-is-unmet", 1, len(u))
+        chk.eq("D2-reason", "checked but EVIDENCE pending", unmet_reason(u[0]))
+
+        # --- E. DEFER grammar --------------------------------------------------------------
+        _h, gg, dd, ee = parse_gates("- [ ] E1: t\n\nDEFER: E1 -> 16r-h — needs the schema bump\n")
+        chk.eq("E1-target", "16r-h", dd.get("E1", (None,))[0])
+        chk.eq("E2-no-errors", [], ee)
+        _h, gg, dd, _e = parse_gates("- [ ] E1: t\n\nABANDON: E1 — genuinely impossible here\n")
+        chk.eq("E3-abandon-normalises", "wontfix", dd.get("E1", (None,))[0])
+        _h, _g, dd, ee = parse_gates("- [ ] E1: t\n\nDEFER: E1 no arrow at all\n")
+        chk.eq("E4-malformed-is-error", 1, len(ee))
+        chk.eq("E5-malformed-not-silent", {}, dd)
+
+        # --- F. lint: the proven evasions ----------------------------------------------------
+        def L(body, sd=None):
+            _h, gs, ds, _e = parse_gates(body)
+            return lint_gates(gs, ds, specs_dir=sd)
+
+        blocked = lambda f: [x for x in f if x[0] == "BLOCK"]
+        chk.ok("F1-grep-on-seeded-gate",
+               blocked(L('- [ ] E1: t\n  CHECK: grep -q "fn foo" src/a.rs\n  EXPECT: /x/\n')),
+               "a static grep is the ONLY thing writable at plan time and certifies nothing")
+        chk.ok("F2-runner-allowed",
+               not blocked(L("- [ ] E1: t\n  CHECK: cargo nextest run -E 'test(a)'\n"
+                             "  EXPECT: /1 passed/\n")))
+        chk.ok("F3-mr-tool-allowed",
+               not blocked(L("- [ ] E1: t\n  CHECK: mr-selfcheck\n  EXPECT: SELFCHECK-OK\n")))
+        chk.ok("F4-or-true",
+               blocked(L("- [ ] E1: t\n  CHECK: cargo test || true\n  EXPECT: /ok/\n")))
+        chk.ok("F5-echo-own-answer",
+               blocked(L("- [ ] E1: t\n  CHECK: just ci 2>&1 | tee /tmp/1 passed\n"
+                         "  EXPECT: 1 passed\n")))
+        chk.ok("F6-no-expect",
+               blocked(L("- [ ] E1: t\n  CHECK: cargo test\n")))
+        chk.ok("F7-both-ways-alternation",
+               blocked(L("- [ ] E1: t\n  CHECK: just ci\n  EXPECT: /passed|failed/\n")))
+        chk.ok("F8-grep-ok-on-extra-gate",
+               not blocked(L('- [ ] X1: t\n  CHECK: grep -c FAIL log\n  EXPECT: /^0$/\n')),
+               "grep -c FAIL -> 0 is the most common honest check here; it must stay legal on X*")
+        chk.ok("F9-manual-prose-evidence",
+               blocked(L("- [ ] E1: t\n  MANUAL: no command can prove it\n  EVIDENCE: done\n")))
+        chk.ok("F10-manual-citation-ok",
+               not blocked(L("- [ ] E1: t\n  MANUAL: doc truth\n  EVIDENCE: AGENTS.md:42\n")))
+        # F11 was VACUOUS on first write: it asserted "some BLOCK appears", and its DEFER reasons
+        # were under the 8-char minimum, so it greened on the reason rule while the cap was
+        # disabled. Injection testing caught it. Both halves below are the repair: assert the
+        # SPECIFIC finding, and assert no OTHER rule fired — a fixture that can green on a
+        # neighbouring rule is not a test of the rule it names.
+        mass = L("- [ ] E1: a\n\n- [ ] E2: b\n\n- [ ] E3: c\n\n"
+                 "DEFER: E1 -> backlog — first reason, long enough to pass the reason rule\n"
+                 "DEFER: E2 -> backlog — second reason, long enough to pass the reason rule\n"
+                 "DEFER: E3 -> backlog — third reason, long enough to pass the reason rule\n")
+        chk.ok("F11-mass-defer",
+               any(s == "BLOCK" and "sizing failure" in m for s, _g, m in mass),
+               ">50%% of seeded gates deferred must FLAG regardless of the rest")
+        manual_heavy = L("- [ ] E1: a\n  MANUAL: no runner\n  EVIDENCE: AGENTS.md:1\n\n"
+                         "- [ ] E2: b\n  MANUAL: no runner\n  EVIDENCE: AGENTS.md:2\n\n"
+                         "- [ ] E3: c\n  CHECK: cargo test\n  EXPECT: /1 passed/\n")
+        chk.ok("F12-manual-escape-hatch-capped",
+               any(s2 == "BLOCK" and "MANUAL" in m for s2, _g, m in manual_heavy),
+               "the runner allowlist binds only gates WITH a CHECK, so declaring everything MANUAL "
+               "would dodge it wholesale")
+        one_manual = L("- [ ] E1: a\n  MANUAL: doc truth\n  EVIDENCE: AGENTS.md:1\n\n"
+                       "- [ ] E2: b\n  CHECK: cargo test\n  EXPECT: /1 passed/\n\n"
+                       "- [ ] E3: c\n  CHECK: just ci\n  EXPECT: /0 failed/\n")
+        chk.ok("F12b-minority-manual-is-fine",
+               not any("MANUAL" in m for s2, _g, m in one_manual if s2 == "BLOCK"),
+               "doc-truth criteria genuinely have no runner; a minority must stay legal or runs "
+               "will write fake CHECKs instead")
+        # F13: the runner rule must bind a SPEC-ID gate. 242 of 526 corpus criteria reuse the
+        # spec's own bold id, and a prefix test on ("E","B") exempted every one of them — i.e. the
+        # rule was inert on 46% of criteria, including exactly the ones the delivery record boasted
+        # about. Caught by the implementation review, not by the original battery.
+        chk.ok("F13-spec-id-gate-is-seeded",
+               blocked(L('- [ ] ptc5a-1: t\n  CHECK: grep -q "fn foo" src/a.rs\n  EXPECT: /x/\n')),
+               "a gate carrying the spec's own criterion id is SEEDED and must obey the runner rule")
+        chk.ok("F13b-X-gate-still-exempt",
+               not blocked(L('- [ ] X9: t\n  CHECK: grep -q "fn foo" src/a.rs\n  EXPECT: /x/\n')),
+               "run-authored X* gates stay exempt, or honest greps become impossible")
+        chk.ok("F14-defer-target-must-exist",
+               any(s2 == "BLOCK" and "exists in no spec" in m
+                   for s2, _g, m in L("- [ ] E1: a\n\nDEFER: E1 -> zz-99-nope — a real reason here\n",
+                                      sd=specs)),
+               "an id that exists in no spec is the 14r-c-2 class: lints clean, emits a targeted "
+               "row, and is invisible to `residuals list --unclaimed`")
+        chk.ok("F14b-backlog-target-ok",
+               not any("exists in no spec" in m for _s, _g, m in
+                       L("- [ ] E1: a\n\nDEFER: E1 -> backlog — a real reason here\n", sd=specs)))
+        chk.ok("F14c-real-target-ok",
+               not any("exists in no spec" in m for _s, _g, m in
+                       L("- [ ] E1: a\n\nDEFER: E1 -> fx-b — a real reason here\n", sd=specs)),
+               "a target that DOES resolve must pass, or every honest deferral is blocked")
+        chk.ok("F11b-fixture-isolates-the-rule",
+               all("sizing failure" in m for s, _g, m in mass if s == "BLOCK"),
+               "the fixture must isolate the rule under test or it greens on an unrelated finding")
+
+        # --- G. check never writes on failure -------------------------------------------------
+        gp2 = gates_path("fx-g", gdir)
+        atomic_write(gp2, "# Gates: fx-g\nSeed: s\n\n- [ ] X1: t\n  CHECK: exit 3\n"
+                          "  EXPECT: /never/\n  EVIDENCE: pending\n")
+        before = read_gates_file(gp2)
+        cmd_check({"slice": "fx-g", "_gates_dir": gdir, "_no_guard": True, "cwd": root,
+                   "timeout": 20})
+        chk.eq("G1-no-write-on-fail", before, read_gates_file(gp2),
+               "a red must never be launderable into evidence, and stasis must not look like "
+               "progress to the Stop hook")
+        atomic_write(gp2, "# Gates: fx-g\nSeed: s\n\n- [ ] X1: t\n  CHECK: echo ALLGOOD\n"
+                          "  EXPECT: ALLGOOD\n  EVIDENCE: pending\n")
+        cmd_check({"slice": "fx-g", "_gates_dir": gdir, "_no_guard": True, "cwd": root,
+                   "timeout": 20})
+        _h, gz, _d, _e = parse_gates(read_gates_file(gp2))
+        chk.ok("G2-writes-on-pass", gz[0].met())
+        chk.ok("G3-evidence-captured", "ALLGOOD" in (gz[0].evidence or ""))
+
+        # MULTI-LINE on purpose. Python's `$` already matches before a TRAILING newline, so
+        # "0\n" matches /^0$/ with or without re.M — a single-line fixture here proves nothing.
+        # Real command output has stderr appended after it, which is exactly the shape that broke.
+        chk.ok("G4-anchored-expect-matches",
+               expect_matches("/^0$/", "counting failures\n0\nwarning: slow\n"),
+               "`/^0$/` is the natural decisive EXPECT for `grep -c FAIL`; without re.M it cannot "
+               "match once anything follows it, so `check` could never flip the box")
+        chk.ok("G5-anchored-tail-matches",
+               expect_matches("/1 passed$/", "running 1 test\ntest result: 1 passed\nDone\n"))
+        chk.ok("G6-anchored-still-discriminates",
+               not expect_matches("/^0$/", "counting\n17\ndone\n"),
+               "re.M must not make the anchor match anything; it still has to be the whole line")
+
+        # --- H. guard routing fails CLOSED ----------------------------------------------------
+        ok, why = guard_allows("echo hi", os.path.join(root, "no-such-guard.mjs"))
+        chk.eq("H1-missing-guard-blocks", (False, "guard-not-found"), (ok, why),
+               "an unscreenable command must not run inside the supervisor tick")
+        # H2: a CHECK that touches loop-control state is refused OUTRIGHT, before guard-bash.
+        # `verify` runs run-authored shell inside the supervisor tick; a CHECK that creates the
+        # kill-switch flag makes an UNATTRIBUTED hold, which the fail-safe reads as OPERATOR and
+        # the loop may never clear. The 2026-08-17 wedge of that shape cost 8 hours and a human.
+        for bad_cmd in ("touch /home/x/.native-supervisor-disabled",
+                        "mr-hold set --by operator",
+                        "cargo test && echo x >> mr-residuals.jsonl"):
+            ran, _o, _e2, why2 = run_check(bad_cmd, root, 5, screen=False)
+            chk.eq("H2-refuses-loop-state[%s]" % bad_cmd.split()[0], False, ran, why2)
+        ran, _o, _e2, _w = run_check("echo ordinary", root, 10, screen=False)
+        chk.eq("H2b-ordinary-still-runs", True, ran,
+               "the refusal must be narrow, or every real CHECK becomes NOT-REVERIFIED")
+
+        # --- I. spot-check determinism --------------------------------------------------------
+        p1 = spotcheck_pick("fx-a", "seed123", ["E1", "E2", "E3"])
+        chk.eq("I1-deterministic", p1, spotcheck_pick("fx-a", "seed123", ["E1", "E2", "E3"]))
+        chk.ok("I2-seed-sensitive",
+               len({spotcheck_pick("fx-a", s, ["E1", "E2", "E3"])
+                    for s in ("a", "b", "c", "d", "e", "f")}) > 1,
+               "a constant pick would make the spot-check decorative")
+        chk.eq("I3-empty", None, spotcheck_pick("fx-a", "s", []))
+
+        # --- J. residual sink + drain ---------------------------------------------------------
+        hdr_real, _g, _d, _e = parse_gates(read_gates_file(gp))
+        chk.ok("J0-header-carries-touches", "mr-gates" in hdr_real.get("Touches", ""),
+               "init must record the slice's declared touches: in the ledger header")
+        rid = residual_upsert("fx-a", "E2", "the client SHALL show a panel", "backlog",
+                              "no time in this slice", hdr_real, resid)
+        chk.eq("J1-id", "R-fx-a-E2", rid)
+        chk.eq("J2-idempotent", None,
+               residual_upsert("fx-a", "E2", "t", "backlog", "r", {}, resid),
+               "verify runs repeatedly; a second emission must not duplicate the row")
+        chk.eq("J3-open", 1, len(open_residuals(residual_rows(resid))))
+        cmd_residuals({"id": rid, "_residuals": resid, "_specs": specs}, "promote")
+        folded = fold_residuals(residual_rows(resid))
+        chk.eq("J4-promoted", "promoted", folded[rid]["status"])
+        newid = folded[rid]["promoted_slice"]
+        chk.ok("J5-slice-id-shape", re.match(r"^[A-Za-z0-9][A-Za-z0-9.-]*$", newid or ""),
+               "must satisfy mr-record queue-add's SLICE_ID_RE or it can never be queued")
+        btext = read_gates_file(os.path.join(specs, BACKLOG_SPEC)) or ""
+        chk.ok("J6-real-heading", re.search(r"^### %s\b" % re.escape(newid), btext, re.M),
+               "12 of 18 continuation ids never got a spec section; this is that fix")
+        chk.ok("J7-criterion-verbatim", "SHALL show a panel" in btext)
+        chk.ok("J7b-touches-inherited", "memory/projects/mr-gates" in btext,
+               "a promoted stub must carry a REAL touches: line from the source slice's spec, or a "
+               "human has to look it up — friction is how a mechanism becomes decorative")
+        chk.eq("J7c-traversal-rejected", 2,
+               cmd_residuals({"id": rid, "_residuals": resid, "_specs": specs,
+                              "spec_file": "../../../etc/evil.spec.md"}, "promote"),
+               "an absolute or traversing --spec-file must be refused, as mr-record queue-add does")
+        chk.ok("J8-findable", find_section(newid, specs)[0] == BACKLOG_SPEC,
+               "the promoted stub must be discoverable by the same lookup the seeder uses")
+        chk.ok("J9-seedable", len(extract_criteria(find_section(newid, specs)[1])) >= 1,
+               "a promoted stub must itself seed gates, or the loop cannot close it")
+        # J10: closure is GATE-PROVED. rb-1 has no ledger, so an unforced close must REFUSE —
+        # "a merge happened with the right branch name" is the weakest possible predicate and
+        # would let a residual be retired by a slice that did not deliver it.
+        chk.eq("J10-refuses-without-ledger", 2,
+               cmd_residuals({"slice": newid, "_residuals": resid, "pr": "999",
+                              "_gates_dir": gdir}, "close"))
+        chk.eq("J10b-still-open", 1, len(open_residuals(residual_rows(resid))))
+        # a ledger with an UNMET gate must also refuse
+        atomic_write(gates_path(newid, gdir),
+                     "# Gates: %s\nSeed: s\n\n- [ ] E1: t\n  EVIDENCE: pending\n" % newid)
+        chk.eq("J10c-refuses-on-unmet", 2,
+               cmd_residuals({"slice": newid, "_residuals": resid, "_gates_dir": gdir}, "close"))
+        # fully met -> closes
+        atomic_write(gates_path(newid, gdir),
+                     "# Gates: %s\nSeed: s\n\n- [x] E1: t\n  EVIDENCE: 3 passed\n" % newid)
+        cmd_residuals({"slice": newid, "_residuals": resid, "pr": "999", "_gates_dir": gdir},
+                      "close")
+        chk.eq("J10d-closed-when-proved", 0, len(open_residuals(residual_rows(resid))))
+
+        # --- K. drain policy alarms -----------------------------------------------------------
+        old = utc_now()
+        past = time.time() + POLICY["t2_stale_days"] * 86400 + 3600
+        rows = [{"id": "R-x-E1", "status": "unpromoted", "disclosed_at": old, "title": "t"}]
+        names = {k for k, _v in residual_alarms(rows, now=past)}
+        chk.ok("K1-stale", "residual-stale" in names)
+        chk.ok("K2-unpromoted", "residual-unpromoted" in names)
+        # The graveyard alarm is a MATURITY test: "nothing has closed" is only evidence once
+        # something has had time to close. K4b pins the direction that was backwards in the first
+        # build — it fired on day 0 and went silent once the oldest row aged past the window.
+        mature = time.time() + (POLICY["graveyard_window_days"] + 5) * 86400
+        chk.ok("K3-graveyard-quiet-when-closed",
+               "residual-graveyard" not in
+               {k for k, _v in residual_alarms(
+                   [{"id": "R-y-E1", "status": "closed", "disclosed_at": old}], now=mature)})
+        chk.ok("K4-graveyard-fires-when-mature",
+               "residual-graveyard" in
+               {k for k, _v in residual_alarms(
+                   [{"id": "R-z-E1", "status": "targeted", "disclosed_at": old}], now=mature)})
+        chk.ok("K4b-quiet-before-maturity",
+               "residual-graveyard" not in
+               {k for k, _v in residual_alarms(
+                   [{"id": "R-z-E1", "status": "targeted", "disclosed_at": old}])},
+               "a fresh unclosed residual is not a graveyard; firing on day 0 would occupy the "
+               "tick's head -3 window for the mechanism's entire first cycle")
+        chk.ok("K4c-still-fires-past-the-window",
+               "residual-graveyard" in
+               {k for k, _v in residual_alarms(
+                   [{"id": "R-z-E1", "status": "targeted", "disclosed_at": old}],
+                   now=time.time() + 400 * 86400)},
+               "the oldest rows are the WORST case; the window is maturity, never a filter")
+        # K6: alarms AGGREGATE. A migrated mr-feedback backlog is 189 rows; one alarm line per row
+        # would make mr-selfcheck unreadable, which is how a gate becomes decorative and then gets
+        # switched off (lp-registry's explicit warning about seeding 304 dispositionless items).
+        many = [{"id": "R-m-%d" % i, "status": "unpromoted", "disclosed_at": old, "title": "t"}
+                for i in range(189)]
+        agg = residual_alarms(many, now=past)
+        chk.eq("K6-one-line-per-class", 1,
+               len([1 for k, _v in agg if k == "residual-stale"]),
+               "189 stale rows must produce ONE aggregated line, not 189")
+        chk.ok("K7-aggregate-names-oldest",
+               any("+186 more" in v for k, v in agg if k == "residual-stale"),
+               "the aggregate must still name specimens and the true count, or it is unactionable")
+        chk.eq("K5-policy-single-source", POLICY, json.loads(json.dumps(POLICY)))
+
+        # --- V. cmd_verify verdicts (end to end, capturing the emitted JSON) ---------------
+        import contextlib
+        import io as _io
+
+        def V(slice_id):
+            buf = _io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cmd_verify({"slice": slice_id, "_specs": specs, "_gates_dir": gdir,
+                            "_residuals": resid, "_no_guard": True, "cwd": root, "repo": root,
+                            "budget": "20"})
+            return json.loads(buf.getvalue())
+
+        # zero extractable criteria must FLAG. 40 of 166 launchable corpus sections extract zero,
+        # and a CLEAN there is an instrument reporting fine with its sensor disconnected — the
+        # arming band is computed from exactly this signal.
+        cmd_init({"slice": "fx-c", "_specs": specs, "_gates_dir": gdir, "scope": "none"})
+        vz = V("fx-c")
+        chk.eq("V1-zero-gates-flags", "FLAGGED", vz["verdict"])
+        chk.ok("V1b-zero-gates-reason", any("ZERO-GATES" in r for r in vz["reasons"]))
+
+        # a MISSING Seed: line must not read as "in sync" — deleting it is easier than editing it
+        gpv = gates_path("fx-a", gdir)
+        keep = read_gates_file(gpv)
+        atomic_write(gpv, "\n".join(l for l in keep.split("\n") if not l.startswith("Seed:")))
+        vm = V("fx-a")
+        chk.ok("V2-seed-missing-flags", vm.get("seed_missing") is True and vm["verdict"] == "FLAGGED",
+               "absent must never read as in-sync")
+        atomic_write(gpv, keep)
+
+        # and the drift path still fires when the recorded hash disagrees with the live spec
+        atomic_write(gpv, keep.replace("Seed: ", "Seed: deadbeefdeadbeef", 1)
+                     if "Seed: " in keep else keep)
+        vd = V("fx-a")
+        chk.eq("V3-seed-drift-flags", True, vd["seed_drift"])
+        atomic_write(gpv, keep)
+        chk.eq("V4-deferred-key-is-int", int, type(V("fx-a")["deferred"]),
+               "`deferred` was emitted twice — an int clobbered by a dict")
+
+        # --- L. render determinism ------------------------------------------------------------
+        _h, gr, dr, _e = parse_gates(read_gates_file(gp))
+        line = acceptance_line("fx-a", _h, gr, dr)
+        chk.ok("L1-shape", line.startswith("Acceptance: ") and "seed:" in line)
+        chk.eq("L2-deterministic", line, acceptance_line("fx-a", _h, gr, dr),
+               "mr-audit byte-compares this against the PR body")
+
+        # --- M. degeneracy control --------------------------------------------------------------
+        verdicts = {bool(blocked(L('- [ ] E1: t\n  CHECK: grep -q x y\n  EXPECT: /z/\n'))),
+                    bool(blocked(L("- [ ] E1: t\n  CHECK: cargo test\n  EXPECT: /1 passed/\n")))}
+        chk.eq("M1-lint-discriminates", {True, False}, verdicts,
+               "a lint that blocks everything or nothing carries no information (lp-04)")
+    finally:
+        cleanup()
+
+    if chk.n < _ST_FLOOR:
+        chk.bad += 1
+        print("MR-GATES-SELFTEST-FAIL battery-size: %d assertions < floor %d" % (chk.n, _ST_FLOOR))
+    if chk.bad:
+        print("MR-GATES-SELFTEST-FAIL %d of %d" % (chk.bad, chk.n))
+        return 1
+    print("MR-GATES-SELFTEST-OK %d" % chk.n)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

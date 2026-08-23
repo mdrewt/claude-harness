@@ -22,6 +22,11 @@ import json, os, re, stat, subprocess, sys
 ADVISORY_CONTRACT = ("ADVISORY EVIDENCE ONLY - never a merge predicate; evidence for an LLM diff "
                      "read. The policy verdict is `orchestration`; the read obligation is the "
                      "top-level `mandatory_read`.")
+ACCEPTANCE_CONTRACT = (ADVISORY_CONTRACT + " SLICE-SCOPED: an independent re-run of the slice's "
+                       "acceptance ledger (mr-gates). ADVISORY IN THIS SLICE BY DESIGN (R13: never "
+                       "ship a gate and its only instrument together). Promotion to POLICY is a "
+                       "separate slice, gated on FLAGGED landing on >=1 and <=4 of the first 10 "
+                       "ledgered slices -- all-10 or 0-of-10 carries no information (lp-04).")
 DISPOSITION_CONTRACT = (ADVISORY_CONTRACT + " CORPUS-SCOPED: findings are about the harness specs/ "
                         "tree, not about the audited base..head diff.")
 
@@ -137,6 +142,56 @@ def audit_gating(a, out):
         force_read(out, "advisory-inputs-unavailable")
     out["gating_advisory"]=g
 
+
+
+def audit_acceptance(a, out, tool=None):
+    """ADVISORY. Independent re-run of the slice's acceptance ledger (lp-gates).
+
+    This is the layer that makes self-certification worthless: the run flips its own checkboxes,
+    and this re-executes every CHECK in a scrubbed environment and compares the deciding line.
+
+    `tool` is a FUNCTION PARAMETER, not an env override -- the CLI never passes it and it is not
+    reachable from argv; the selftest battery uses it to point at a stub. Deliberately NOT wired
+    into `_st_run`: mirroring it there would make every existing fixture shell out to mr-gates and
+    would force a re-golden of read_reason across six sites, for no added coverage.
+    """
+    acc = {"advisory": True, "contract": ACCEPTANCE_CONTRACT}
+    exe = tool or os.path.join(os.environ.get("A_MEM", "."), "mr-gates")
+    if not os.path.exists(exe):
+        acc.update(status="AUDIT-ERROR", reason="mr-gates not found at " + exe)
+        out["acceptance"] = acc
+        return
+    # 90s, not 600s: the supervisor calls mr-audit through a Bash tool with a ~120s timeout, and
+    # a kill there loses the WHOLE audit JSON — including the orchestration POLICY verdict, which
+    # matters far more than the advisory acceptance block. Gate CHECKs are targeted by doctrine
+    # (build-loop step 7), so 90s is generous for a re-run; over-budget reports NOT-REVERIFIED,
+    # which fails closed to FLAGGED rather than silently passing.
+    budget = str(a.get("acceptance-budget") or "90")
+    cmd = [exe, "verify", "--slice", str(a.get("slice", "?")), "--json", "--budget", budget]
+    if a.get("repo"):
+        cmd += ["--repo", a["repo"]]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=int(budget) + 120)
+        v = json.loads(r.stdout)
+        if not isinstance(v, dict):
+            raise ValueError("verify did not return an object")
+    except Exception as e:
+        acc.update(status="AUDIT-ERROR", reason="%s: %s" % (type(e).__name__, str(e)[:160]))
+        out["acceptance"] = acc
+        return
+    # Fold a SUMMARY, not the whole payload: this lands in a supervisor prompt, and evidence is
+    # capped by the same doctrine that caps gate evidence (ADR-0012).
+    for k in ("verdict", "seeded", "total", "met", "unmet", "deferred", "seed_drift",
+              "unmet_ids", "acceptance_line", "residuals_emitted", "residuals_open",
+              "residual_alarms", "reasons", "verify_seconds"):
+        if k in v:
+            acc[k] = v[k]
+    acc["evidence_mismatch"] = v.get("evidence_mismatch", [])
+    acc["not_reverified"] = v.get("not_reverified", [])
+    acc["lint_blocks"] = [f for f in v.get("lint", []) if f.get("severity") == "BLOCK"]
+    acc["spotcheck"] = v.get("spotcheck")
+    acc["status"] = v.get("verdict", "AUDIT-ERROR")
+    out["acceptance"] = acc
 
 # --- disposition markers (docs/workflow-loops.md:32-39; ADR-0011 amendment 2026-08-20 D4/D5) -----
 # `parked -> <queued spec id | wontfix>`.  The grammar, the location, the rule and the owner
@@ -338,7 +393,9 @@ import io
 import tempfile
 
 _ST_MISSING = "<key-absent>"
-_ST_COUNT_FLOOR = 24          # mirrored in mr-selfcheck's wiring; a shrinking battery must red
+_ST_COUNT_FLOOR = 62          # mirrored in mr-selfcheck's wiring; a shrinking battery must red.
+                              # 24 -> 62 with lp-gates' A battery (64 fixtures run). The old floor sat 33
+                              # below actual, so it could not have caught a battery losing half its teeth.
 
 
 class _StChk(object):
@@ -1402,6 +1459,83 @@ def _st_x_battery(chk, tmp, L):
     chk.check("X2/ids-counted-by-prefix", 3, probe.ran())
 
 
+def _st_a_battery(chk, tmp):
+    """lp-gates: the ADVISORY acceptance block. Drives audit_acceptance() directly against a stub
+    `mr-gates`, because wiring it into _st_run would make every pre-existing fixture shell out and
+    would force a re-golden of read_reason across six sites for no added coverage."""
+    d = _st_mkdir(tmp, "acc")
+
+    def stub(name, body, mode=0o755):
+        q = os.path.join(d, name)
+        _st_w(q, body)
+        os.chmod(q, mode)
+        return q
+
+    clean = stub("gates-clean", '#!/bin/sh\ncat <<\'J\'\n'
+                 '{"slice":"s1","verdict":"CLEAN","seeded":3,"total":3,"met":3,"unmet":0,'
+                 '"deferred":0,"seed_drift":false,"unmet_ids":[],"acceptance_line":"Acceptance: '
+                 '3/3 met, 0 deferred, 0 unmet - s1 seed:abc","lint":[],"reverified":'
+                 '[{"gate":"E1","passed":true},{"gate":"E2","passed":true}],"residuals_open":0}\nJ\n')
+    out = {}
+    audit_acceptance({"slice": "s1"}, out, tool=clean)
+    acc = _st_get(out, "acceptance")
+    chk.check("A1/status", "CLEAN", _st_get(acc, "status"))
+    chk.check("A1/met", 3, _st_get(acc, "met"))
+    chk.check("A1/advisory-marked", True, _st_get(acc, "advisory"),
+              "the block is ADVISORY and must carry the structural marker lp-04 introduced, or a "
+              "reader cannot tell a detector from a policy verdict")
+    chk.check("A1/has-contract", True, isinstance(acc.get("contract"), str) and
+              "never a merge predicate" in acc.get("contract", ""))
+    chk.check("A1/no-forced-read", False, out.get("mandatory_read", False),
+              "an ADVISORY block must never force the read by itself -- that is what re-inflating "
+              "lp-04's deflated metric would look like")
+    chk.check("A1/summary-not-payload", False, "reverified" in acc,
+              "fold a SUMMARY; the full re-run payload must not land in a supervisor prompt")
+
+    flagged = stub("gates-flagged", '#!/bin/sh\ncat <<\'J\'\n'
+                   '{"slice":"s2","verdict":"FLAGGED","seeded":4,"met":2,"unmet":2,"deferred":0,'
+                   '"seed_drift":true,"unmet_ids":["E3","E4"],"reasons":["SEED-DRIFT"],'
+                   '"evidence_mismatch":[{"gate":"E1","why":"x"}],"not_reverified":[],'
+                   '"lint":[{"severity":"BLOCK","gate":"E2","message":"vacuous"},'
+                   '{"severity":"WARN","gate":"E3","message":"m"}]}\nJ\n')
+    out2 = {}
+    audit_acceptance({"slice": "s2"}, out2, tool=flagged)
+    acc2 = out2["acceptance"]
+    chk.check("A2/status", "FLAGGED", _st_get(acc2, "status"))
+    chk.check("A2/seed-drift", True, _st_get(acc2, "seed_drift"))
+    chk.check("A2/unmet-ids", ["E3", "E4"], _st_get(acc2, "unmet_ids"))
+    chk.check("A2/lint-blocks-only", 1, len(acc2.get("lint_blocks", [])),
+              "WARNs are noise in a merge conversation; only BLOCKs are folded")
+    chk.check("A2/mismatch-kept", 1, len(acc2.get("evidence_mismatch", [])))
+
+    out3 = {}
+    audit_acceptance({"slice": "s3"}, out3, tool=os.path.join(d, "does-not-exist"))
+    chk.check("A3/missing-tool", "AUDIT-ERROR", _st_get(out3["acceptance"], "status"),
+              "a missing tool must be AUDIT-ERROR, never a silent CLEAN")
+
+    garbage = stub("gates-garbage", "#!/bin/sh\necho 'not json at all'\n")
+    out4 = {}
+    audit_acceptance({"slice": "s4"}, out4, tool=garbage)
+    chk.check("A4/garbage", "AUDIT-ERROR", _st_get(out4["acceptance"], "status"))
+
+    arr = stub("gates-array", '#!/bin/sh\necho \'[1,2,3]\'\n')
+    out5 = {}
+    audit_acceptance({"slice": "s5"}, out5, tool=arr)
+    chk.check("A5/non-object", "AUDIT-ERROR", _st_get(out5["acceptance"], "status"),
+              "valid JSON that is not an object must still fail closed")
+
+    noverdict = stub("gates-noverdict", '#!/bin/sh\necho \'{"slice":"s6"}\'\n')
+    out6 = {}
+    audit_acceptance({"slice": "s6"}, out6, tool=noverdict)
+    chk.check("A6/absent-verdict", "AUDIT-ERROR", _st_get(out6["acceptance"], "status"),
+              "an absent verdict key must not read as CLEAN")
+
+    # A7: the block discriminates. A detector with one output carries no information (lp-04).
+    chk.check("A7/discriminates", 3,
+              len({_st_get(out, "acceptance")["status"], acc2["status"],
+                   out3["acceptance"]["status"]}))
+
+
 def selftest():
     """The lp-04 gating battery. rc 0 = pass, 1 = fail. Prints AUDIT-SELFTEST-OK <n> on pass."""
     chk = _StChk()
@@ -1413,6 +1547,7 @@ def selftest():
         _st_d_battery(chk, tmp)
         _st_s_battery(chk, tmp, logs, ginfo)
         _st_x_battery(chk, tmp, logs)
+        _st_a_battery(chk, tmp)
 
     # ---- X3: the selftest writes NOTHING under /tmp -------------------------------------------
     # Every emit() above is handed an artifact_dir inside the tempdir. A single missed argument
@@ -1456,6 +1591,7 @@ try:
     # gating verdict from inputs nothing had successfully looked at.
     audit_orchestration(a, out)
     audit_gating(a, out)
+    audit_acceptance(a, out)
 except Exception as e:
     out["orchestration"] = out.get("orchestration", {"verdict": "AUDIT-ERROR"})
     # Preserve a successfully computed advisory block for the same reason the line above preserves
@@ -1463,6 +1599,9 @@ except Exception as e:
     out["gating_advisory"] = out.get("gating_advisory",
                                      {"advisory": True, "contract": ADVISORY_CONTRACT,
                                       "verdict": "AUDIT-ERROR", "reason": str(e)[:200]})
+    out["acceptance"] = out.get("acceptance",
+                                {"advisory": True, "contract": ACCEPTANCE_CONTRACT,
+                                 "status": "AUDIT-ERROR", "reason": str(e)[:200]})
     force_read(out, "advisory-inputs-unavailable")
 # The corpus sweep sits OUTSIDE the shared try on purpose. It is effectively total (os.walk on a
 # missing root yields nothing; per-file reads are caught; the status ladder is a complete failure

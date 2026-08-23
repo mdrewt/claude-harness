@@ -548,7 +548,7 @@ Tests: `guard-tester-bash.mjs --selftest` (identical 36 fixtures) and `guard-tes
 `touches: memory/projects/mr-ready (new), memory/projects/mr-native-tick.sh, memory/projects/mr-supervisor-prompt-native.md`
 `after:` lp-00 · `blocked:wave-1-exit`
 
-One task type per tick, so every tick boundary is a safe stopping point. Modes evaluated in order,
+One task type per tick, so every tick boundary is a safe stopping point. **The ORDERING inside `IMPLEMENT` is already specified — inherit it, do not invent a second one:** `monster-realm-lp-gates-plan.md` §13.3 and the `Pick work` section of `mr-supervisor-prompt-native.md` define one line with aging-based entry (residual past T2 → residual past T1 → PLAN §9 order → oldest first within a tier), materialised through the existing `queue[]`. Modes evaluated in order,
 the tick committing to the first eligible: **0 `RECONCILE`** (merge a finished run or reconcile
 CI/state — always free-tier, never budget-blocked, because it harvests credits already spent);
 **1 `IMPLEMENT`** (`mr-ready` names a launchable slice AND the lookahead passes); **2 `SPEC`**;
@@ -671,9 +671,62 @@ age, not from the respawn time.
 Tests: proof-of-teeth — a fixture marker aged past the cap must produce exactly one `HOLD-EXPIRED`
 line and a re-armed watcher; changing the constant in one place must move both consumers (ADR-0010).
 
+### lp-gates-arm — Arm the acceptance gate and the Stop hook (HIGH, MED)
+`touches: memory/projects/mr-gates, memory/projects/mr-audit, .claude/hooks/gates-stop.mjs, memory/projects/mr-selfcheck`
+`after:` lp-gates · `blocked:one-full-reset-cycle-of-stoplog-data`
+
+`lp-gates` shipped the instrument; this arms it. **R13 is the whole reason they are two slices**
+("instrument → one full reset cycle → gate. Never the same slice, never the same week" — the v3
+cutover replaced its own instrument in the same commit and is permanently unevaluable).
+
+Three arming decisions, each against pre-registered evidence rather than judgement:
+1. **`mr-audit`'s `acceptance` block ADVISORY → POLICY** iff, over the first 10 merged slices
+   carrying a ledger, the verdict was FLAGGED on **≥1 and ≤4** of them. All-10 or 0-of-10 means the
+   detector carries no information and must be fixed, not armed (lp-04's measured lesson: the
+   gating detector had 0 true positives across 446 rows).
+2. **`gates-stop.mjs` observe-only → blocking**, against the block-rate in
+   `$MEM/gates/*.stoplog`. Three known repairs are REQUIRED first, all recorded in the hook's own
+   comments: on no progress it must **ESCALATE, not release** (stasis is free and cheaper than
+   progress, so releasing on it rewards exactly what the gate catches); the `/tmp/mr_warn_<S>`
+   landing-pattern valve must become **block-once-with-a-DEFER-only-reason**, because
+   `mr-cost-watch` touches that file unconditionally outside its `ENFORCE` branch and the valve
+   therefore self-disarms on precisely the expensive slices; and three of the five release valves
+   are unreachable code at `costwatch_enforce:false` and must be re-derived or dropped.
+3. **The residual WIP cordon** (`open_cap`, observe-only today): a hard cap that blocks new
+   IMPLEMENT launches until the backlog drains, precedent `queue[]`'s cap of 5 — "so a stuck
+   consumer fails loudly instead of regrowing silently for months". `RECONCILE` and merges stay
+   exempt so in-flight work always lands.
+
+Also close the one accepted gap: `rm`ing a gates file currently disarms everything silently. Harmless
+while nothing is enforced; a blocker once it is. Record seed success in the ledger so **absent ≠
+never-seeded**.
+
+EARS: WHEN the acceptance verdict has been FLAGGED on at least one and at most four of the first ten
+ledgered slices, THE SYSTEM SHALL promote the `acceptance` block from advisory to policy. WHEN
+`gates-stop.mjs` is armed, it SHALL escalate rather than release on absent gate progress. WHEN a
+gates file is absent for a slice that was seeded, THE SYSTEM SHALL report it as unmet rather than as
+never-seeded. THE residual cordon SHALL exempt RECONCILE and merges.
+Tests: proof-of-teeth — a fixture stoplog at 0-of-10 and at 10-of-10 must both REFUSE to arm; an
+armed hook must escalate (not release) on an unchanged gates file; a deleted gates file on a seeded
+slice must RED (ADR-0010).
+
 ### lp-registry — Structured residuals with a sink (HIGH, MED)
 `touches: memory/projects/mr-brief-template.md, memory/projects/mr-residuals.jsonl (new), memory/projects/mr-ready`
 `after:` lp-04, lp-08 · `blocked:wave-1-exit` · **before `lp-15`** retires `mr-feedback`
+
+**AMENDED 2026-08-22 by `lp-gates` (attended).** The EMITTER and the DRAIN halves of this slice are
+DELIVERED: `mr-residuals.jsonl` exists with this schema, `mr-gates` emits one row per `DEFER:` line
+in a slice's acceptance ledger, and `mr-gates residuals promote` materialises a row into a real
+`### <id>` section in the new standing `M-residual-backlog.spec.md`. Two deliberate divergences from
+the text below: (a) the emitter is **not** "the runner appends a record at PR time" — that is
+prose-driven and skippable; a `DEFER:` line is the only legal way to close a gate you did not meet,
+so the emission cannot be skipped without the acceptance verdict going FLAGGED. (b) `mr-ready` does
+**not** read residual rows "as ready-set input": that would create a second class of launchable item
+needing its own `touches:`/EARS handling in `mr-spawn`, `mr-gates init`, `mr-disjoint` and
+`mr-audit`. The invariant instead is **nothing is launchable until it is a spec section**, so intake
+drains INTO the corpus and one derivation orders everything. WHAT REMAINS for `lp-registry`: seeding
+the 329 pre-existing OUTSTANDING items (with a disposition each, per the requirement below) and the
+playtest-feedback intake channel.
 
 **Implement the existing grammar; do not invent one.** `docs/workflow-loops.md:32-39` already
 defines `parked → <queued spec id | wontfix>`. This slice gives it a machine-readable sink and a
@@ -967,6 +1020,23 @@ is elaborated at slice head.
   interruptible boundary that is RED. Sequenced strictly **after `lp-registry`** takes over playtest
   intake, or the retirement removes the only (broken) consumer and leaves nothing. Driven by
   `just audit`'s KEEP/PROTECT/REVIEW/TRIM verdicts rather than hand-derived judgement.
+  **MIGRATION TARGET NOW EXISTS (lp-gates, 2026-08-22) — this is a MIGRATION, not a deletion.**
+  Operator note on this slice in the implementation plan: *"ensure that all remaining (and still
+  valid, aka not obsolete) work is in an appropriate place to be picked up and worked on by future
+  ticks rather than being lost due to the archiving of `mr-feedback`."* Re-measured 2026-08-22:
+  **189 rows, 0 terminal** — 91 CLASSIFIED, 86 DISPOSED, 5 LOGGED, 4 IN-WORK, 3 ANSWERED. The 90
+  DISPOSED+IN-WORK rows are the live work; CLASSIFIED-without-a-disposition is the pool
+  `lp-registry` must dispose, not carry.
+  Field mapping into `mr-residuals.jsonl` (`mr-gates`): `id`->`id` (prefix `F-` so it cannot collide
+  with `R-<slice>-<gate>`) · `ts`->`disclosed_at` · `state`->`status` · `target`->`target` ·
+  `action`->`reason` · `weight`->`severity` · `quote`/`note`->`title` · `evidence`->`closed_by_pr`.
+  **Unmapped keys (`kind`, `source`, `episode`, `confidence`, `regression`, `ev`) survive
+  automatically** — rows are plain JSON dicts, `residual_append` writes what it is given and
+  `fold_residuals` merges by id, so the format is lossless by construction. Two hard requirements:
+  (1) migrate the 90 live rows with a real `target` or dispose them explicitly — a bulk import of
+  status-less rows recreates the graveyard inside the new mechanism; (2) `mr-gates`'s anti-rot
+  alarms are AGGREGATED one-line-per-class precisely so a 189-row import cannot emit 189
+  `SELFCHECK-FAIL` lines (regression-pinned as fixtures K6/K7).
 - **`lp-15b` — `N_MAX=2` + `NMAX-GATE`.** Split from `lp-15` for two reasons: bundling means the revert
   that rescues a RED selfcheck also silently restores `N_MAX=3`, two unrelated failure modes sharing
   one rollback; and a credit justification would be the mirror of a known dead end (concurrency changes
@@ -994,6 +1064,45 @@ is elaborated at slice head.
   `lp-spec-mode`'s Tier A/B/C, which is the answer to the question `lp-20` was posed to ask.
 
 ## 2.6 Delivered
+
+**lp-gates — DELIVERED 2026-08-22 (attended).** Mined from the `unlazy` v2 skill and adapted; plan,
+six-lens adversarial review and judge adjudication in `memory/projects/monster-realm-lp-gates-plan.md`.
+**New `memory/projects/mr-gates`** maintains a per-slice ACCEPTANCE LEDGER (`$MEM/gates/<slice>.gates.md`)
+seeded by `mr-spawn` from the slice's spec `SHALL` criteria — a two-shape parser (`EARS:` paragraphs
+AND `- **ID:** … SHALL` bullets, both live in this corpus) that extracts **132 of 133** SHALL-bearing
+sections, 526 criteria, 242 of them (46%) reusing the spec's own criterion ids (measured 2026-08-23;
+the corpus moves, so the figure is timestamped rather than restated). A `Seed:` hash makes the criteria
+immutable to the graded party; only a supervisor `reseed --reason` clears drift. `mr-gates verify` is
+the independent re-run: every CHECK re-executed through `guard-bash.mjs` (a python `subprocess` never
+reaches PreToolUse — ADR-0012 commitment 3), compared as a normalized substring on the deciding line,
+manual citations resolved, plus one deterministically-drawn passing gate handed back for adversarial
+re-reading. **The load-bearing anti-gaming rule** is that a seeded gate's CHECK must invoke a real
+runner — binding EVERY seeded gate, including the 46% that carry the spec's own criterion id (an
+id-PREFIX test exempted exactly those, and the implementation review caught it): CHECKs are authored in the plan phase *before tests exist*, so the only thing writable then is
+a static `grep`, which passes every other lint and certifies nothing. **`DEFER:` is the only other
+legal exit** and emits a row into `mr-residuals.jsonl`, which the supervisor promotes into a real
+`### <id>` section in the new standing `M-residual-backlog.spec.md` — closing the measured hole where
+12 of 18 continuation ids never got a spec section and latency ran to 13.1 days. A residual closes
+only when the promoted slice's OWN ledger is fully resolved (`residuals close` refuses on a missing
+ledger or any unmet gate; `--force` is recorded on the row) — closing on "a merge happened with the
+right branch name" would let a residual be retired by a slice that did not deliver it. **Enforcement posture
+is deliberately split**: the `mr-audit` `acceptance` block ships ADVISORY and `gates-stop.mjs` ships
+OBSERVE-ONLY (writes `$MEM/gates/<slice>.stoplog`, never blocks, emits nothing), per R13; arming is
+`lp-gates-arm` with a pre-registered 1-to-4-of-10 band. Hook binding is `MR_SLICE`, prefix-scoped on
+each `claude` invocation in `mr-launch.sh` and scrubbed at `mr-native-tick.sh` — a script-scope export
+would have handed a supervisor tick a slice's ledger via `fire_event`. Registered at USER level
+(probed: hooks are NOT inherited across the ancestor walk, so a harness-only registration would be
+blind to project-rooted slices, which are most of them), with an `mr-selfcheck` adoption-drift guard
+mirroring lp-09's B2. **Two bugs found and fixed en route:** `mr-spawn` never cleared
+`/tmp/mr_pass_<slice>.done` (+`.done.recorded` — removing either alone is worse than neither), which
+defeated the free live-chain standdown; and `mr-unlock` now reaps those flags with the lock. Teeth:
+`mr-gates --selftest` 96 assertions (15 injected defects RED, negative control green),
+`gates-stop.mjs --selftest` 20 (5 injected defects RED), a new `mr-audit` `_st_a_battery`
+(floor 24 → 62, mirrored in `mr-selfcheck`), and a `PYGATES` selfcheck block carrying the
+anti-rot alarms. **One of my own fixtures was caught vacuous by injection testing** (it asserted
+"some BLOCK appears" and greened on a neighbouring rule) and was repaired to assert the specific
+finding plus a no-other-rule-fired guard.
+
 
 **lp-09 — DELIVERED 2026-08-16 (attended).** New `memory/projects/mr-hold` is the provenance-aware
 interface (`set --by operator|supervisor`, `clear`, `status`, `--selftest` with 19 fixtures). The
