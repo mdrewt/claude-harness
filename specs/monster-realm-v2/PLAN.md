@@ -678,8 +678,9 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
 > `adr_next_free` (204 as of this writing) for the wave decision, and hand slicing/fan-out to the normal
 > content-pack pattern (pt-d1/pt-d2/pt-d3 precedent: content additions are `touches:`-disjoint from
 > everything else in flight). No fresh Drew decision needed — DE-GATED status (below) already covers it.
-- **M-postgate-roster-wave-3** (content; **deprioritized, DE-GATED; PULLED FORWARD 2026-08-23 — see the
-  operator note directly above**) — complete the roster toward the GDD §5
+- **M-postgate-roster-wave-3** (`M-postgate-roster-wave-3.spec.md`) — (content; **deprioritized,
+  DE-GATED; PULLED FORWARD 2026-08-23 — see the operator note directly above**; **spec authored
+  2026-08-23 by slice rw3a** — the milestone is now build-ready, slices rw3b/rw3c queued) — complete the roster toward the GDD §5
   ~16-form target by adding the currently-unrepresented **Electric + Light** species lines. These have
   **zero forms AND zero skills** today, so this is net-new species *and* net-new skill kits (the Electric/
   Light skills the ADR-0143 STAB gate requires), not a top-up — it also closes the Dark-doubled / 14-vs-16
@@ -688,7 +689,7 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   DE-GATED** — supersedes the earlier "gated on playtest feedback / no auto-launch without a fresh Drew
   decision"; the loop MAY auto-launch this as normal content queue work with no fresh Drew decision, and as
   of 2026-08-23 its deprioritization-to-the-tail precondition is satisfied (see the note above) so it is no
-  longer waiting on anything. ADR reserved at build time.
+  longer waiting on anything. ADR-0204 reserved for the rw3b content slice (project repo), per the spec's Notes.
 - **M20 Observability, performance & load hardening** (`M20-observability-performance.spec.md`; ADR-0029) —
   the capstone: production monitoring (self-hosted OSS dashboards/alerts — ADR-0180 replaces the original
   OTel→Datadog sink, see Status below), full-system load testing (scaled sim-harness), profiling the named
