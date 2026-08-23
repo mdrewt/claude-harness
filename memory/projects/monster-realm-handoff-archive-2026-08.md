@@ -3758,3 +3758,75 @@ wrong, set `CLAUDE_QUIET_BASH=0` and report it — do not edit the rule tables m
 GATES: `.claude/hooks/quiet/quiet.test.mjs` (33 tests, in `just test`/`just ci`) and
 four new assertions in `scripts/tests/invariants.test.mjs`. The harness copy,
 `templates/_base` copy and the monster-realm copy are asserted byte-identical.
+## 2026-08-23 — 16r-h COMPLETE: PR #355 open, local `just ci` green, remote CI running
+
+**Terminal state per doctrine — supervisor owns the merge. `gh pr merge` NOT run.**
+
+Branch `feat/16r-h-nightly-red-response-policy` (worktree `.claude/worktrees/16r-h`, from
+`origin/master` @ `367b3f7`). PR **#355** OPEN / MERGEABLE, `ci` + `e2e` IN_PROGRESS at exit.
+Local full `just ci` green on HEAD `731c5d6`: 87 evals / 0 fail, 1942 Rust tests, 2472 client
+tests, clippy `-D warnings`, `cargo fmt --check`, secrets clean, perf 7/7, observability 8/8.
+
+**Acceptance ledger: 1/1 met, 0 deferred, 0 unmet — `16r-h seed:47a71183decd3d13`.** Deciding
+line: `16r-h-B1:PASS evalGreen=true renamedJobBites=true droppedRowBites=true
+uncitedJobBites=true`. The CHECK runs from the slice worktree (`mr-gates check` uses
+`os.getcwd()`; `mr-gates verify` resolves the worktree by basename, and falls back to the main
+checkout post-merge — the CHECK's paths are repo-relative so it works from either).
+
+**Diff = 6 files.** `.github/workflows/nightly.yml` (+6, purely additive), `ARCHITECTURE.md`
+(1 paragraph), `docs/nightly-red-response-policy.md` (new), `docs/adr/0203-*.md` (new),
+`docs/adr/DIGEST.md` (regen), `evals/nightly-smoke-wiring.eval.mjs` (+~2280).
+`touches-delta:` the three docs/ADR/ARCHITECTURE companions, all always-in-scope.
+`boyscout-delta:` none. `CHANGELOG.md` / `docs/adr/README.md` / `justfile` / `evals/run.mjs`
+verifier-confirmed untouched.
+
+**SUPERVISOR RECONCILIATION OWED:** add the ADR-0203 row to `docs/adr/README.md` and bump its
+hand-maintained "Next free number" — it is **stale at 0184** while 0203 now exists
+(`ARCHITECTURE.md:1450` is the accurate record: "ADR next-free = 0203"). Next free is now 0204.
+
+**What landed.** `docs/nightly-red-response-policy.md` — a job-response matrix (Job | Response
+| Owner | Escalation), one row per job `nightly.yml` declares, plus an escalation ladder
+(ADR-0118 §4 re-baseline, ADR-0183 lockstep cap+ceiling, ADR-0088 kill-first) and a
+`## Measurement substrate` section that names RECIPES and never numbers. Five new predicates +
+Checks 31-35 couple it to the workflow in BOTH directions; `jobHasFailurePolicyComment` is
+byte-identical (the back-edge is a NEW predicate — the "widening a gate matcher can loosen it"
+lesson applied deliberately). Owner is a closed two-member enum, both members required to
+appear. Driven over `declaredJobKeys`, so a seventh job reds until rowed AND cited.
+
+**The red-team earned its cost twice, both times by CONSTRUCTION rather than by reading.**
+Plan phase: prototyped the proposed predicates, 16 fixtures, found a BLOCKER (a blank-line-
+separated re-cased decoy table is invisible to the parser and MORE prominent to a human — it
+falsified the plan's own claim that an illustrative matrix copy would be rejected) plus two
+MAJORs (bare-`indexOf` citation accepted `notdocs/…`; `ADR-9999` satisfied `ADR-\d{4}`). All
+three closed BEFORE any test was written (clause A10, bounded-token match, clause C4). Impl
+phase: re-ran all three against the REAL shipped module — all CLOSED — then attacked 12 more
+axes and found no further bypass. **Precedent worth keeping: prototype the predicate and fire
+fixtures at it during PLAN review; a reading-only pass would have shipped the BLOCKER.**
+
+**Three limitations RECORDED, not closed (ADR-0203 Consequences 4-6, each measured):**
+(1) an HTML `<table>` or bare contradicting prose is invisible to A10 — **deliberately not
+closed**: the prose variant is unclosable by any line-shape rule, so a tag blacklist would buy
+a partial guarantee that reads as a total one (`abort-construct blacklists are unclosable`).
+The policy doc's own "This file is gated" section now states which half is mechanical and which
+is a review obligation. (2) A stale number can leak into prose OUTSIDE the substrate section —
+a digit-run ban would false-RED on every `ADR-0118 §4` citation. (3) D3's recipe-existence
+check is column-0 textual; a colluding justfile+doc edit defeats it (the tractable one to fix).
+
+**Follow-ups (in ADR-0203, unowned, NOT actioned):** (a) extend
+`jobHasFailurePolicyComment`'s guarded-job set to `smoke-republish` + `notify` — blocked only
+by `smoke-republish`'s preamble reading `# Failure policy:` rather than the anchored form,
+whose rewording would touch prose ADR-0079 quotes; Check 35 already gates both by another
+route. (b) When `15r-tst-i` lands, re-read the policy doc's `## Measurement substrate` and its
+`mutation-server` row — prose only, never import a number.
+
+**Note for the next slice — graphs NOT re-indexed on purpose.** cbm `detect_changes` on the
+main checkout reports `.claude/worktrees/` as changed; re-indexing while a slice worktree
+exists under the canonical path would pollute the cache with throwaway paths. Both indexes were
+verified FRESH at run start (`codegraph status` up to date; cbm clean apart from the worktree).
+**Re-index after the merge AND after the worktree is removed**, not before.
+
+**Routing note (for the record):** this was a pure CI/YAML + markdown slice. CodeGraph indexes
+no markdown and models no workflow YAML, so the graphs contributed little beyond a
+single-caller blast-radius confirmation on `jobHasFailurePolicyComment` (both graphs agreed:
+the eval's own default export is the only caller). Said rather than skipped silently.
+

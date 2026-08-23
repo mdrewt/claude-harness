@@ -497,6 +497,8 @@ interpolation caveat this slice avoided. (5) pre-existing biome warning at
   (it added in-suite teeth the hand-written clauses lacked). Both were re-proven by execution.
 - `/tmp/mr_warn_16r-e` appeared mid-run; landing pattern was honoured (no new fan-outs after it).
 
+## 2026-08-23T14:02:59Z — 2026-08-23T14:02:59Z — native tick: standdown, nothing actionable
+Re-verified live ground truth for this tick (rid=native-20260823T140007Z-2481740). No open PRs in either repo. Project master CI green at 588b24e (matches mr-state). Harness main has no CI workflow, working tree synced with origin/main. mr-hold status HOLD-NONE. No per-run locks, no chain-owner mutex. Reconciled the three flagged .done files (lp-brief-cost, lp-06, lp-ollama): all three already merged (PR#31 1493e4a, PR#33 51073c8, PR#32 d3d1df5) and already recorded in the ledger/handoff per 2026-08-22 entries; the .done/.done.recorded pairs are stale leftovers only, consistent with the 2026-08-22 tick that first flagged them — no action needed. mr-gates residuals list --unclaimed is empty. queue[]/inflight[]/awaiting_merge[] all empty per mr-state.json. Checked PLAN §9 eligibility fresh: every non-launched slice in M-loop-infrastructure is blocked:wave-1-exit (a time-gated one-full-reset-cycle measurement, not yet reached) and every M-postgate-fifteenth-review-residuals slice is blocked:wave-2-exit or later, except 16r-b which is serial-blocked behind the unstarted 15r-sec-mig-a/b/c/d + 13r-c-2 family. Nothing changed since the prior tick's (13:03Z) identical derivation. Uncommitted harness git strays (future-prompts.md, memory/spacetime-db-testing.md diffs; gdd.md; specs/monster-realm-v2/M-postgate-fifteenth-review-residuals.spec.md 'Delivered (2026-08-17)' doc-truth annotation; memory/projects/decisions/*.url + *.answer.md; several monster-realm-*-plan.md/progress.md memos; memory/projects/patches/lp-09-guard-bash-monster-realm.patch) are the same set multiple prior ticks (including the 2026-08-22T\xxx and 2026-08-23T13:03Z ticks) have already characterized as pre-existing legitimate artifacts (decision-issue records, per-slice plan memos, a saved patch, and human/agent doc edits) — left untouched again this tick, no destructive action taken. Took no mutating action. Governor NORMAL (d7≈$605/$2783≈22%). No BLOCKER.
 ## 2026-08-23T11:57:08Z — 16r-h merged; M-postgate-sixteenth-review-residuals closed except serial-blocked 16r-b; hold-aged/hold-unattributed decisions closed
 Merged PR#355 (feat(16r-h): nightly red-response policy) into monster-realm master (588b24e), squash+delete-branch. mr-audit acceptance block FLAGGED only on a cwd artifact (B1 exec-error re-verifying from repo root instead of the worktree); mr-gates verify run from the correct worktree cwd (.claude/worktrees/16r-h) got CLEAN 1/1, spotcheck agreed, and all 3 mutation-canary bites (renamed job, dropped row, uncited job) confirmed teeth. Diff reviewed directly (mandatory_read=true): ARCHITECTURE.md + docs/adr/0203 + DIGEST.md additions are scoped and consistent with the ADR catalog; ADR-0203 correctly follows 0202 (no numbering collision despite mr-state adr_next_free showing stale 202). Residuals close: 0 for 16r-h. Local worktree/branch cleaned; stale per-run lock reaped via mr-unlock stale (session_leader 2277590 was dead). Master CI re-verify was still in_progress at merge time (PR-level ci+e2e had already passed CLEAN before merge) — not re-polled to completion this tick; next tick should spot-check it landed green.
 
@@ -695,78 +697,6 @@ clean, `just test` 103/103. `mr-selfcheck` reports only B2, which is TRUE until 
 `.bak.lp11a.20260822T233218Z` (lp-11a's pre-adoption version). Both use a `.bak.` infix on purpose:
 `_mr_files` excludes `.bak` but NOT `.preedit`, so a `.preedit` copy gets enumerated as a live corpus
 tool — worth knowing for any future out-of-repo backup.
-## 2026-08-23 — 16r-h COMPLETE: PR #355 open, local `just ci` green, remote CI running
-
-**Terminal state per doctrine — supervisor owns the merge. `gh pr merge` NOT run.**
-
-Branch `feat/16r-h-nightly-red-response-policy` (worktree `.claude/worktrees/16r-h`, from
-`origin/master` @ `367b3f7`). PR **#355** OPEN / MERGEABLE, `ci` + `e2e` IN_PROGRESS at exit.
-Local full `just ci` green on HEAD `731c5d6`: 87 evals / 0 fail, 1942 Rust tests, 2472 client
-tests, clippy `-D warnings`, `cargo fmt --check`, secrets clean, perf 7/7, observability 8/8.
-
-**Acceptance ledger: 1/1 met, 0 deferred, 0 unmet — `16r-h seed:47a71183decd3d13`.** Deciding
-line: `16r-h-B1:PASS evalGreen=true renamedJobBites=true droppedRowBites=true
-uncitedJobBites=true`. The CHECK runs from the slice worktree (`mr-gates check` uses
-`os.getcwd()`; `mr-gates verify` resolves the worktree by basename, and falls back to the main
-checkout post-merge — the CHECK's paths are repo-relative so it works from either).
-
-**Diff = 6 files.** `.github/workflows/nightly.yml` (+6, purely additive), `ARCHITECTURE.md`
-(1 paragraph), `docs/nightly-red-response-policy.md` (new), `docs/adr/0203-*.md` (new),
-`docs/adr/DIGEST.md` (regen), `evals/nightly-smoke-wiring.eval.mjs` (+~2280).
-`touches-delta:` the three docs/ADR/ARCHITECTURE companions, all always-in-scope.
-`boyscout-delta:` none. `CHANGELOG.md` / `docs/adr/README.md` / `justfile` / `evals/run.mjs`
-verifier-confirmed untouched.
-
-**SUPERVISOR RECONCILIATION OWED:** add the ADR-0203 row to `docs/adr/README.md` and bump its
-hand-maintained "Next free number" — it is **stale at 0184** while 0203 now exists
-(`ARCHITECTURE.md:1450` is the accurate record: "ADR next-free = 0203"). Next free is now 0204.
-
-**What landed.** `docs/nightly-red-response-policy.md` — a job-response matrix (Job | Response
-| Owner | Escalation), one row per job `nightly.yml` declares, plus an escalation ladder
-(ADR-0118 §4 re-baseline, ADR-0183 lockstep cap+ceiling, ADR-0088 kill-first) and a
-`## Measurement substrate` section that names RECIPES and never numbers. Five new predicates +
-Checks 31-35 couple it to the workflow in BOTH directions; `jobHasFailurePolicyComment` is
-byte-identical (the back-edge is a NEW predicate — the "widening a gate matcher can loosen it"
-lesson applied deliberately). Owner is a closed two-member enum, both members required to
-appear. Driven over `declaredJobKeys`, so a seventh job reds until rowed AND cited.
-
-**The red-team earned its cost twice, both times by CONSTRUCTION rather than by reading.**
-Plan phase: prototyped the proposed predicates, 16 fixtures, found a BLOCKER (a blank-line-
-separated re-cased decoy table is invisible to the parser and MORE prominent to a human — it
-falsified the plan's own claim that an illustrative matrix copy would be rejected) plus two
-MAJORs (bare-`indexOf` citation accepted `notdocs/…`; `ADR-9999` satisfied `ADR-\d{4}`). All
-three closed BEFORE any test was written (clause A10, bounded-token match, clause C4). Impl
-phase: re-ran all three against the REAL shipped module — all CLOSED — then attacked 12 more
-axes and found no further bypass. **Precedent worth keeping: prototype the predicate and fire
-fixtures at it during PLAN review; a reading-only pass would have shipped the BLOCKER.**
-
-**Three limitations RECORDED, not closed (ADR-0203 Consequences 4-6, each measured):**
-(1) an HTML `<table>` or bare contradicting prose is invisible to A10 — **deliberately not
-closed**: the prose variant is unclosable by any line-shape rule, so a tag blacklist would buy
-a partial guarantee that reads as a total one (`abort-construct blacklists are unclosable`).
-The policy doc's own "This file is gated" section now states which half is mechanical and which
-is a review obligation. (2) A stale number can leak into prose OUTSIDE the substrate section —
-a digit-run ban would false-RED on every `ADR-0118 §4` citation. (3) D3's recipe-existence
-check is column-0 textual; a colluding justfile+doc edit defeats it (the tractable one to fix).
-
-**Follow-ups (in ADR-0203, unowned, NOT actioned):** (a) extend
-`jobHasFailurePolicyComment`'s guarded-job set to `smoke-republish` + `notify` — blocked only
-by `smoke-republish`'s preamble reading `# Failure policy:` rather than the anchored form,
-whose rewording would touch prose ADR-0079 quotes; Check 35 already gates both by another
-route. (b) When `15r-tst-i` lands, re-read the policy doc's `## Measurement substrate` and its
-`mutation-server` row — prose only, never import a number.
-
-**Note for the next slice — graphs NOT re-indexed on purpose.** cbm `detect_changes` on the
-main checkout reports `.claude/worktrees/` as changed; re-indexing while a slice worktree
-exists under the canonical path would pollute the cache with throwaway paths. Both indexes were
-verified FRESH at run start (`codegraph status` up to date; cbm clean apart from the worktree).
-**Re-index after the merge AND after the worktree is removed**, not before.
-
-**Routing note (for the record):** this was a pure CI/YAML + markdown slice. CodeGraph indexes
-no markdown and models no workflow YAML, so the graphs contributed little beyond a
-single-caller blast-radius confirmation on `jobHasFailurePolicyComment` (both graphs agreed:
-the eval's own default export is the only caller). Said rather than skipped silently.
-
 ## 2026-08-22T23:21:35Z — HOLD-UNATTRIBUTED flag carries no provenance record (mtime=1787440289) — escalating once; loop stays held
 The build loop is held by a kill-switch flag with no provenance record. Did you pause it? If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour.
 
@@ -779,5 +709,6 @@ PR #349 (16r-a doc-truth sweep) open at mergeStateStatus=UNSTABLE with ci/e2e ch
 
 
 ---
+
 
 
