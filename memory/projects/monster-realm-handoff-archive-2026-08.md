@@ -3665,3 +3665,96 @@ repo, not in this PR). (6) Post-merge, the cbm index should be refreshed on the 
 AGENTS.md/ARCHITECTURE.md are cbm-indexed as Section nodes (codegraph indexes no markdown, so it is
 unaffected); pre-merge re-indexing would have indexed unmerged state, so it was deliberately skipped.
 
+## 2026-08-22T19:06:23Z — 16r-a merged, 16r-g launched (composite)
+PR#349 (16r-a doc-truth sweep) went green on the CI-watch event (checks: ci pass, e2e pass; mergeStateStatus CLEAN) — squash-merged to master as 5f14fe2, branches deleted local+remote, local checkout fast-forwarded 2290f47->5f14fe2.
+
+Audit was FLAGGED ("missing tester and/or reviewer/verifier role evidence") despite reviewer+verifier+red-team roles present in the run (5 agent calls: red-team, reviewer, reducer-security-auditor, doc-keeper, verifier). Adjudicated CLEAN-doc-exempt: the diff is AGENTS.md/ARCHITECTURE.md/ADR-0197/runbook doc updates + a comment-only Cargo.toml edit (verified via diff -- no version/dep change) + a guard-tester-bash.mjs selftest fixture tweak (splits a PEM string literal so its own secret-scanner selftest doesn't false-positive; bytes written to disk unchanged, confirmed via diff read). No functional code changed, so no tester role was warranted.
+
+Composite merge->launch: re-derived eligibility fresh post-merge. mr-state.json queue[0] was 16r-g (retire Bond/apply_care/CareError from game-core, LOW/LIGHT, ADR-0177 D3 follow-up) -- verified live: spec heading exists, after:[], pairwise-disjoint from in-flight 16r-c (evals/nightly-smoke-wiring.eval.mjs, justfile, .github/workflows/nightly.yml) per the spec's own Sec.3 sequencing note. free -g showed 13G free, ample headroom. Launched via mr-spawn (leader=739352, opus/high/routine). queue-remove'd 16r-g.
+
+16r-c (nightly-smoke-wiring gate) remains live from an earlier tick, unaffected.
+
+Governor NORMAL throughout (d7=$374.91/$2783=13%, fable_ok=true, inflight_committed now 2 runs). No BLOCKER.
+
+## 2026-08-22T19:43:49Z — 16r-g PR#350 open — CI-wait delegated
+16r-g (retire Bond/apply_care/CareError/CARE_BOND_AMOUNT, ADR-0177 D3 follow-up) run finished rc=0, attempts=1, opus/high, $16.11. Worktree clean, gates green (clippy/tests/mutation verifier PASS, evals 87 PASS/0 FAIL), PR opened: https://github.com/mdrewt/monster-realm/pull/350. Remote CI (ci/e2e) was pending at tick time; delegated CI-wait to mr-ci-watch (detached, pid recorded in ledger notes) per doctrine — resumes via event tick on conclusion, no merge attempted this tick.
+
+16r-c remains live in-flight (leader pid 627621, started 18:37Z, ~1h2m elapsed) — untouched this tick. No other action taken. Governor NORMAL (d7=$391.74/$2783=14%, inflight_committed=$25/1 run per situation bundle — will be 2 once 16r-g's watch is reflected). No BLOCKER.
+## 2026-08-22T19:48:55Z — 16r-g MERGED — Bond/apply_care dead-code retirement (ADR-0177 D3 disposition)
+PR#350 squash-merged to mdrewt/monster-realm master (a857214). Deleted `Bond(u8)`, `apply_care`, `CareError`, `CARE_BOND_AMOUNT` — server-unused since Migration B removed the `bond` column (ADR-0177 D2). Net -246/+38 lines across game-core (types.rs, raising/{rules,types,mod,m9a_gating_tests}.rs, lib.rs, monster/mod.rs, monster/rolls.rs) + ARCHITECTURE.md + docs/adr/0177-*.md. touches-delta beyond declared set (lib.rs, monster/mod.rs, monster/rolls.rs) justified in PR body as compile-required re-export cleanup + doc-truth fix, scoped entirely inside game-core + doc companions; no boyscout-delta claimed. 8 tests deleted, each tied 1:1 to a deleted symbol, independently re-derived by tester+verifier (disposition table in PR body). mr-audit orchestration verdict CLEAN, mandatory_read=false; gating_advisory FLAGGED (skip_markers_added:1, 17 removed/modified asserts) reviewed — no actual ignore/skip/xit/.only markers found in diff, consistent with PR's own audit table; treated as clean. master CI green pre-merge (PR checks), post-merge run queued at merge time. Merged worktree .claude/worktrees/16r-g and branch feat/16r-g-retire-bond-apply-care removed. Follow-up flags recorded in PR (not new slices yet): (1) no CI-time gate enforces 'no Bond symbols' since game-core is a lib crate (dead_code never fires) — extend raising-reducer-security.eval.mjs g8 residue scan to game-core/src in a slice owning evals/; (2) server-module/src/raising.rs:39-41,46-47 comments now stale (MAJOR, outside declared touches, that file is g8's own scan target); (3) docs/adr/0058-*.md header + DIGEST.md:36 still advertise apply_care as live — needs Amends/Amended-by note, doc slice owning ADR-0058; (4) evals/raising-reducer-security.eval.mjs:491-499 dead accept-token for apply_care(, harmless; (5) game-core/tests/eg3_evolution_graph.rs:542 line-number citation drift; (6) docs/specs/A0-plan.md:88-91 superseded fusion-era sketch, not compiled. 16r-c remains in-flight (pid 627621, live chain, untouched this tick).
+
+## 2026-08-22T21:00:06Z — 16r-c MERGED, 16r-d CI-watch delegated, 16r-e launched (composite)
+PR #351 (16r-c, changelog-freshness nightly gate) squash-merged clean — mr-audit orchestration=CLEAN,
+no mandatory read (routine tier). Disposition findings were all advisory/corpus-scoped pre-existing
+spec-ledger gaps, unrelated to this diff. master fast-forwarded a857214->b5ff14f. Worktree/branch
+cleaned; mr-branch-audit shows 0 post-merge-commit loss.
+
+PR #352 (16r-d, spacetime sql --format json parser) still has ci/e2e IN_PROGRESS at tick time —
+delegated to `mr-ci-watch 352 16r-d` (detached, setsid) rather than polling; resumes via its own
+event tick on completion.
+
+Composite merge->launch: with the merge fully closed out and no live compute in flight (16r-d's
+agent session already finished; it's only waiting on CI/merge), took the queue[] fast path and
+launched 16r-e (scheduled-function-delay observability wiring: prometheus recording rule + Grafana
+panel + alert for spacetime_scheduled_function_delay_seconds, per
+specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md). touches are ops/observability/**
+only — disjoint from everything else in flight/pending. tier=routine, opus/high, no ADR pre-allocated
+(config/dashboard-only change). queue-removed 16r-e; 16r-f remains queued.
+
+Governor NORMAL throughout (d7=$463.26/$2783≈17%, fable_ok=true). No BLOCKER, no park-counter bump.
+
+## 2026-08-22T21:13:39Z — 16r-d merged; composite launch 16r-f
+PR#352 (16r-d, spacetime sql --format json decode) squash-merged + branch deleted; mr-audit CLEAN (orchestration CLEAN, gating-advisory CLEAN, no mandatory read; the disposition findings block is a pre-existing repo-wide spec-ledger scan, unrelated to this diff). Local master ff-only'd b5ff14f->d4fa9fe. Master CI kicked off post-merge, in_progress at record time (not yet observed green -- next tick/event verifies).
+
+Composite launch: 16r-f (battleReseedPending sticky latch, client/src/main.ts reconnect-flush ordering) picked via fast-path queue[0] (pulled forward 2026-08-22 operator directive). mr-disjoint verdict SAFE vs in-flight 16r-e (ops/observability/** only) -- no shared axis, no partition needed. Classified HARD tier (netcode/reconcile: subscription-batch flush ordering around reconnect, per ADR-0198 D7's 'assumed' atomicity) -> fable/xhigh (fable_ok=true, d7=$464.33/$2783). Launched leader=1124388.
+
+Governor NORMAL throughout (d7$464.33/$2783~=17%, fable_ok=true). No BLOCKER, no park-counter bump. 16r-e remains live in parallel (leader=1107821, started 20:59:42Z). NEXT: resume via event tick on either slice's .done or PR-open/CI-green event.
+
+## 2026-08-22T22:24:14Z — HARNESS: Bash output noise filter live (ADR-0012) — stop piping gate output through | tail
+**Harness change, applies to EVERY loop run from the next tick onward.** A
+PreToolUse(Bash) hook now filters noisy command output before it reaches any agent
+(ADR-0012, harness `.claude/hooks/quiet/`). It is wired at the USER level
+(`~/.claude/settings.json` -> `~/.claude/hooks/quiet/quiet-bash.mjs`, a symlink into
+the harness) as well as per project, specifically so it covers `mr-launch.sh` runs,
+which `cd` into `projects/monster-realm` and would miss a harness-only wiring.
+
+WHAT CHANGES FOR A SLICE AGENT
+- `just ci`, `just test`, `cargo nextest`, `node evals/run.mjs`, `biome check`,
+  `node --test`, `vitest`, cargo build/clippy/bench and `npm install` come back with
+  the pass wall and compile progress withheld. Failures, diagnostics, panics,
+  assertion diffs, `Summary [...]`, `ℹ pass N`/`ℹ fail N` and eval FAIL/THREW lines
+  are kept whole. Measured: `cargo nextest run --workspace` 227,406 B -> 176 B;
+  `node evals/run.mjs` 53,285 B -> 68 B; a live `just test` 118 lines -> 38.
+- `node evals/run.mjs` prints NO summary of its own, so the filter SYNTHESISES one:
+  `[quiet-run] evals: 87 passed`. A green eval run now shows that line instead of 87
+  lines averaging 611 chars.
+- Exit codes are unchanged and pass through exactly. `[quiet-run] exit N` is printed.
+- Every run tees the COMPLETE raw output to
+  `$TMPDIR/claude-quiet-logs/<session-id>/<ts>-<profile>-<hash>.log`, and the banner
+  prints that path. Read it when a filtered result is not enough.
+
+WHAT THE SUPERVISOR AND ITS BRIEF-WRITERS MUST KNOW
+- **Stop instructing agents to pipe gate output through `| tail -N` / `| grep`.** A
+  piped command is NOT rewritten (the hook only touches commands it can read
+  literally), so an added pipe silently opts that command OUT of filtering AND keeps
+  the blind-tail failure mode the filter exists to remove. Existing briefs that say
+  `just ci 2>&1 | tail -60` now cost MORE than an unpiped `just ci`.
+- `just ci > /tmp/x.log 2>&1` is likewise unfiltered (redirect = not rewritten).
+  That remains fine when the intent is to keep a full log for the handoff.
+- Escape hatch for one command: `NOFILTER=1 <cmd>`. Global kill switch:
+  `CLAUDE_QUIET_BASH=0` in the environment. Both are honoured before any rewrite.
+- A re-run of a command that just failed is flagged `verbose` in the banner; it
+  loosens failure-context caps but deliberately does NOT restore the pass wall.
+- Cost accounting is unaffected — this changes tokens per tool result, not the
+  ledger schema, `mr-record`, or any `.done`/lock file.
+
+RISK POSTURE
+Fail-open by construction: an unrecognised line is KEPT, and an unrecognised command
+shape is not rewritten at all. The wrapper refuses to run anything that does not
+match a filter profile and re-invokes `guard-bash.mjs` on the decoded command, so it
+cannot be used to launder a destructive command past the guard. If anything looks
+wrong, set `CLAUDE_QUIET_BASH=0` and report it — do not edit the rule tables mid-slice.
+
+GATES: `.claude/hooks/quiet/quiet.test.mjs` (33 tests, in `just test`/`just ci`) and
+four new assertions in `scripts/tests/invariants.test.mjs`. The harness copy,
+`templates/_base` copy and the monster-realm copy are asserted byte-identical.

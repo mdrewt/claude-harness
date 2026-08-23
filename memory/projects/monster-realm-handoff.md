@@ -497,6 +497,27 @@ interpolation caveat this slice avoided. (5) pre-existing biome warning at
   (it added in-suite teeth the hand-written clauses lacked). Both were re-proven by execution.
 - `/tmp/mr_warn_16r-e` appeared mid-run; landing pattern was honoured (no new fan-outs after it).
 
+## 2026-08-23T11:57:08Z — 16r-h merged; M-postgate-sixteenth-review-residuals closed except serial-blocked 16r-b; hold-aged/hold-unattributed decisions closed
+Merged PR#355 (feat(16r-h): nightly red-response policy) into monster-realm master (588b24e), squash+delete-branch. mr-audit acceptance block FLAGGED only on a cwd artifact (B1 exec-error re-verifying from repo root instead of the worktree); mr-gates verify run from the correct worktree cwd (.claude/worktrees/16r-h) got CLEAN 1/1, spotcheck agreed, and all 3 mutation-canary bites (renamed job, dropped row, uncited job) confirmed teeth. Diff reviewed directly (mandatory_read=true): ARCHITECTURE.md + docs/adr/0203 + DIGEST.md additions are scoped and consistent with the ADR catalog; ADR-0203 correctly follows 0202 (no numbering collision despite mr-state adr_next_free showing stale 202). Residuals close: 0 for 16r-h. Local worktree/branch cleaned; stale per-run lock reaped via mr-unlock stale (session_leader 2277590 was dead). Master CI re-verify was still in_progress at merge time (PR-level ci+e2e had already passed CLEAN before merge) — not re-polled to completion this tick; next tick should spot-check it landed green.
+
+This closes M-postgate-sixteenth-review-residuals except **16r-b**, which stays SERIAL-REQUIRED behind the 15r-sec-mig-a/b/c/d + 13r-c-2 family; that family has NOT started (no 15r-sec-mig-* merges found in master history) and 15r-sec-mig-a itself carries blocked:wave-2-exit. 15r-sec-a/15r-sec-vis/15r-a2 (the spec's own 'launchable in order once the bump lands' chain) are already merged (#336/#337/#338) — the milestone's actual next launchable step is clearing wave-2-exit for 15r-sec-mig-a, not a fast eligible slice this tick.
+
+Also closed two operator-answered DECISION issues via mr-decision-watch transcripts already staged in $MEM/decisions/: issue #36 (hold-aged, confirmed deliberate/long-running operator hold — future ticks should wait patiently on any hold whose provenance is 'operator' regardless of duration) and issue #35 (hold-unattributed, confirmed unattributed/zero-provenance flags read as operator holds). `mr-hold status` now reports HOLD-NONE — the hold that prompted both questions has since been lifted; both issues closed with `<!--mr-system-->`-prefixed comments per the close-the-loop doctrine.
+
+NOTED, not acted on: the harness working tree carries a large set of pre-existing uncommitted changes unrelated to this tick (modified future-prompts.md, several memory/projects/* files, an uncommitted 'Delivered (2026-08-17)' doc-truth annotation on M-postgate-fifteenth-review-residuals.spec.md for the already-merged 15r-sec-vis slice, plus many untracked plan/progress/decision files). These look like accumulated strays from prior sessions/runs, not this tick's work — left untouched pending investigation rather than stashed or discarded blind.
+## 2026-08-23T11:42:07Z — 16r-h: CI-wait delegated for PR #355
+Supervisor tick mr-sup-native-20260823T114134Z-2446070 reconciled the finished 16r-h run (rc=0, session leader dead, .done present). PR https://github.com/mdrewt/monster-realm/pull/355 is OPEN, mergeable=MERGEABLE, mergeStateStatus=UNSTABLE, checks ci+e2e still IN_PROGRESS. Delegated CI-wait for PR #355 to mr-ci-watch (pid 2447284, detached); resumes via event tick on completion. No merge attempted this tick. Governor NORMAL (d7=$602.03/$2783≈22%, fable_ok=true). No BLOCKER, no park-counter bump.
+## 2026-08-23T10:24:20Z — Native tick: launch 16r-h (nightly red-response policy)
+Gate 0 (fast-path standdown): 16r-a/c/d/e/f per-run locks all showed leader dead + .done present -> not live. Reaped via mr-unlock all (5 stale locks). Live ground truth: 16r-a/c/d/e/f/g all merged (PR#349-354, 2026-08-22..2026-08-23), master CI green at 367b3f7. No open PRs, no residuals unclaimed, feedback check OK (91 items), queue[] empty, no hold. Derived next slice via research agent + live re-verification: 16r-h (nightly red-response policy for mutation/coverage; after:16r-c, satisfied) — routine tier, fresh launch (no park memo), no ADR needed. 16r-b remains correctly blocked (SERIAL-REQUIRED vs still-blocked:wave-2-exit 15r-sec-mig family). Launched 16r-h via mr-spawn: leader=2277590, opus/high, detachment+model asserted. NOTE: found substantial pre-existing uncommitted drift in the harness working tree unrelated to this tick (future-prompts.md, gdd.md, memory/spacetime-db-testing.md look like human/Drew scratch edits -- left untouched; mr-state.json/handoff/usage-daily ledger show local edits from prior ticks' 16r-a/c/d/e/f reconciliation never committed since chore(mr-sup) commit b3216fd -- not committed this tick either, flagged as a risk for a future tick or Drew to reconcile).
+## 2026-08-23T09:59:16Z — 16r-e merged: scheduled-function lateness observability
+PR#354 squash-merged -> 367b3f7 (feat/16r-e-scheduled-function-delay). Recording rule + Grafana dashboard panel + warning alert for scheduled-function lateness (ops/observability/{prometheus.yml,rules/recording.rules.yml,grafana/**}). mr-audit: orchestration=CLEAN (7 agent calls, roles general-purpose/planner/red-team/reviewer/tester/verifier), gating-advisory=CLEAN, mandatory_read=false (routine tier). Acceptance ledger: NO-LEDGER (slice never seeded -- absent measurement, not a failure; no residual close needed). Disposition findings were corpus-scoped park-item citations unrelated to this diff -- informational only. Also reaped an orphaned worktree+branch for 16r-d (PR#352, merged a prior tick but left on disk). Local master fast-forwarded c31db59->367b3f7; remote master CI queued at record time, not yet observed green -- next tick should re-verify live before trusting it. No open PRs remain; queue[] empty; no eligible next slice was derived this tick (single merge action taken; full PLAN section-9 derivation deferred to the next tick).
+
+## 2026-08-23T09:53:51Z — 16r-e e2e triage — reran, delegated to mr-ci-watch
+PR #354 (16r-e, ADR: scheduled-function delay observability) showed e2e FAILURE on its own CI run (32604922710): wallet-balance.spec.ts:911 quest_001 precondition — 'quest_001 was neither started nor already completed after 5 attempts.' 16r-e's diff touches ops/observability/prometheus.yml, rules/recording.rules.yml, grafana/** + sibling tests only — no overlap with the dialogue/quest domain the failing test exercises. Master's own recent CI runs (16r-c, 16r-d merges) are green, so this reads as a pre-existing e2e flake, not a regression from this PR. Reran the failed job (gh run rerun --failed) rather than blind-relaunching the slice. Delegated the wait to mr-ci-watch (PR #354, slice 16r-e); resumes via event tick. If the rerun also fails, next tick should treat it as a real (possibly intermittent-but-real) issue in wallet-balance.spec.ts, not attribute it to 16r-e.
+
+## 2026-08-23T09:52:55Z — 16r-f MERGED
+PR #353 squash-merged to master (e4c73e9). Hard-tier mandatory read: sticky battleReseedPending latch — held pending until a flush observes definite battle state (empty/undefined flush no longer burns the latch), plus capture-before-resetPredictionState in onReconnect so a second drop during a pending reseed keeps the FIRST drop's battle id rather than nulling it. Diff scoped exactly to declared touches (main.ts + new main.battle-reseed.test.ts + ADR-0130 amendment doc). Gating-advisory CLEAN, orchestration CLEAN, acceptance NO-LEDGER (pre-lp-gates slice — absent measurement, forced residuals-close). Worktree + branch cleaned up. master CI running post-merge.
+
 ## 2026-08-23T09:10:21Z — CORRECTION: mr-selfcheck A8 could re-stamp the operator hold (triggered, fixed, reported not repaired)
 **Correction and an operator FYI, appended to the entry below.**
 
@@ -674,105 +695,89 @@ clean, `just test` 103/103. `mr-selfcheck` reports only B2, which is TRUE until 
 `.bak.lp11a.20260822T233218Z` (lp-11a's pre-adoption version). Both use a `.bak.` infix on purpose:
 `_mr_files` excludes `.bak` but NOT `.preedit`, so a `.preedit` copy gets enumerated as a live corpus
 tool — worth knowing for any future out-of-repo backup.
+## 2026-08-23 — 16r-h COMPLETE: PR #355 open, local `just ci` green, remote CI running
+
+**Terminal state per doctrine — supervisor owns the merge. `gh pr merge` NOT run.**
+
+Branch `feat/16r-h-nightly-red-response-policy` (worktree `.claude/worktrees/16r-h`, from
+`origin/master` @ `367b3f7`). PR **#355** OPEN / MERGEABLE, `ci` + `e2e` IN_PROGRESS at exit.
+Local full `just ci` green on HEAD `731c5d6`: 87 evals / 0 fail, 1942 Rust tests, 2472 client
+tests, clippy `-D warnings`, `cargo fmt --check`, secrets clean, perf 7/7, observability 8/8.
+
+**Acceptance ledger: 1/1 met, 0 deferred, 0 unmet — `16r-h seed:47a71183decd3d13`.** Deciding
+line: `16r-h-B1:PASS evalGreen=true renamedJobBites=true droppedRowBites=true
+uncitedJobBites=true`. The CHECK runs from the slice worktree (`mr-gates check` uses
+`os.getcwd()`; `mr-gates verify` resolves the worktree by basename, and falls back to the main
+checkout post-merge — the CHECK's paths are repo-relative so it works from either).
+
+**Diff = 6 files.** `.github/workflows/nightly.yml` (+6, purely additive), `ARCHITECTURE.md`
+(1 paragraph), `docs/nightly-red-response-policy.md` (new), `docs/adr/0203-*.md` (new),
+`docs/adr/DIGEST.md` (regen), `evals/nightly-smoke-wiring.eval.mjs` (+~2280).
+`touches-delta:` the three docs/ADR/ARCHITECTURE companions, all always-in-scope.
+`boyscout-delta:` none. `CHANGELOG.md` / `docs/adr/README.md` / `justfile` / `evals/run.mjs`
+verifier-confirmed untouched.
+
+**SUPERVISOR RECONCILIATION OWED:** add the ADR-0203 row to `docs/adr/README.md` and bump its
+hand-maintained "Next free number" — it is **stale at 0184** while 0203 now exists
+(`ARCHITECTURE.md:1450` is the accurate record: "ADR next-free = 0203"). Next free is now 0204.
+
+**What landed.** `docs/nightly-red-response-policy.md` — a job-response matrix (Job | Response
+| Owner | Escalation), one row per job `nightly.yml` declares, plus an escalation ladder
+(ADR-0118 §4 re-baseline, ADR-0183 lockstep cap+ceiling, ADR-0088 kill-first) and a
+`## Measurement substrate` section that names RECIPES and never numbers. Five new predicates +
+Checks 31-35 couple it to the workflow in BOTH directions; `jobHasFailurePolicyComment` is
+byte-identical (the back-edge is a NEW predicate — the "widening a gate matcher can loosen it"
+lesson applied deliberately). Owner is a closed two-member enum, both members required to
+appear. Driven over `declaredJobKeys`, so a seventh job reds until rowed AND cited.
+
+**The red-team earned its cost twice, both times by CONSTRUCTION rather than by reading.**
+Plan phase: prototyped the proposed predicates, 16 fixtures, found a BLOCKER (a blank-line-
+separated re-cased decoy table is invisible to the parser and MORE prominent to a human — it
+falsified the plan's own claim that an illustrative matrix copy would be rejected) plus two
+MAJORs (bare-`indexOf` citation accepted `notdocs/…`; `ADR-9999` satisfied `ADR-\d{4}`). All
+three closed BEFORE any test was written (clause A10, bounded-token match, clause C4). Impl
+phase: re-ran all three against the REAL shipped module — all CLOSED — then attacked 12 more
+axes and found no further bypass. **Precedent worth keeping: prototype the predicate and fire
+fixtures at it during PLAN review; a reading-only pass would have shipped the BLOCKER.**
+
+**Three limitations RECORDED, not closed (ADR-0203 Consequences 4-6, each measured):**
+(1) an HTML `<table>` or bare contradicting prose is invisible to A10 — **deliberately not
+closed**: the prose variant is unclosable by any line-shape rule, so a tag blacklist would buy
+a partial guarantee that reads as a total one (`abort-construct blacklists are unclosable`).
+The policy doc's own "This file is gated" section now states which half is mechanical and which
+is a review obligation. (2) A stale number can leak into prose OUTSIDE the substrate section —
+a digit-run ban would false-RED on every `ADR-0118 §4` citation. (3) D3's recipe-existence
+check is column-0 textual; a colluding justfile+doc edit defeats it (the tractable one to fix).
+
+**Follow-ups (in ADR-0203, unowned, NOT actioned):** (a) extend
+`jobHasFailurePolicyComment`'s guarded-job set to `smoke-republish` + `notify` — blocked only
+by `smoke-republish`'s preamble reading `# Failure policy:` rather than the anchored form,
+whose rewording would touch prose ADR-0079 quotes; Check 35 already gates both by another
+route. (b) When `15r-tst-i` lands, re-read the policy doc's `## Measurement substrate` and its
+`mutation-server` row — prose only, never import a number.
+
+**Note for the next slice — graphs NOT re-indexed on purpose.** cbm `detect_changes` on the
+main checkout reports `.claude/worktrees/` as changed; re-indexing while a slice worktree
+exists under the canonical path would pollute the cache with throwaway paths. Both indexes were
+verified FRESH at run start (`codegraph status` up to date; cbm clean apart from the worktree).
+**Re-index after the merge AND after the worktree is removed**, not before.
+
+**Routing note (for the record):** this was a pure CI/YAML + markdown slice. CodeGraph indexes
+no markdown and models no workflow YAML, so the graphs contributed little beyond a
+single-caller blast-radius confirmation on `jobHasFailurePolicyComment` (both graphs agreed:
+the eval's own default export is the only caller). Said rather than skipped silently.
+
 ## 2026-08-22T23:21:35Z — HOLD-UNATTRIBUTED flag carries no provenance record (mtime=1787440289) — escalating once; loop stays held
 The build loop is held by a kill-switch flag with no provenance record. Did you pause it? If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour.
 
 ## 2026-08-22T23:07:54Z — HOLD-UNATTRIBUTED flag carries no provenance record (mtime=1787439637) — escalating once; loop stays held
 The build loop is held by a kill-switch flag with no provenance record. Did you pause it? If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour.
 
-## 2026-08-22T22:24:14Z — HARNESS: Bash output noise filter live (ADR-0012) — stop piping gate output through | tail
-**Harness change, applies to EVERY loop run from the next tick onward.** A
-PreToolUse(Bash) hook now filters noisy command output before it reaches any agent
-(ADR-0012, harness `.claude/hooks/quiet/`). It is wired at the USER level
-(`~/.claude/settings.json` -> `~/.claude/hooks/quiet/quiet-bash.mjs`, a symlink into
-the harness) as well as per project, specifically so it covers `mr-launch.sh` runs,
-which `cd` into `projects/monster-realm` and would miss a harness-only wiring.
-
-WHAT CHANGES FOR A SLICE AGENT
-- `just ci`, `just test`, `cargo nextest`, `node evals/run.mjs`, `biome check`,
-  `node --test`, `vitest`, cargo build/clippy/bench and `npm install` come back with
-  the pass wall and compile progress withheld. Failures, diagnostics, panics,
-  assertion diffs, `Summary [...]`, `ℹ pass N`/`ℹ fail N` and eval FAIL/THREW lines
-  are kept whole. Measured: `cargo nextest run --workspace` 227,406 B -> 176 B;
-  `node evals/run.mjs` 53,285 B -> 68 B; a live `just test` 118 lines -> 38.
-- `node evals/run.mjs` prints NO summary of its own, so the filter SYNTHESISES one:
-  `[quiet-run] evals: 87 passed`. A green eval run now shows that line instead of 87
-  lines averaging 611 chars.
-- Exit codes are unchanged and pass through exactly. `[quiet-run] exit N` is printed.
-- Every run tees the COMPLETE raw output to
-  `$TMPDIR/claude-quiet-logs/<session-id>/<ts>-<profile>-<hash>.log`, and the banner
-  prints that path. Read it when a filtered result is not enough.
-
-WHAT THE SUPERVISOR AND ITS BRIEF-WRITERS MUST KNOW
-- **Stop instructing agents to pipe gate output through `| tail -N` / `| grep`.** A
-  piped command is NOT rewritten (the hook only touches commands it can read
-  literally), so an added pipe silently opts that command OUT of filtering AND keeps
-  the blind-tail failure mode the filter exists to remove. Existing briefs that say
-  `just ci 2>&1 | tail -60` now cost MORE than an unpiped `just ci`.
-- `just ci > /tmp/x.log 2>&1` is likewise unfiltered (redirect = not rewritten).
-  That remains fine when the intent is to keep a full log for the handoff.
-- Escape hatch for one command: `NOFILTER=1 <cmd>`. Global kill switch:
-  `CLAUDE_QUIET_BASH=0` in the environment. Both are honoured before any rewrite.
-- A re-run of a command that just failed is flagged `verbose` in the banner; it
-  loosens failure-context caps but deliberately does NOT restore the pass wall.
-- Cost accounting is unaffected — this changes tokens per tool result, not the
-  ledger schema, `mr-record`, or any `.done`/lock file.
-
-RISK POSTURE
-Fail-open by construction: an unrecognised line is KEPT, and an unrecognised command
-shape is not rewritten at all. The wrapper refuses to run anything that does not
-match a filter profile and re-invokes `guard-bash.mjs` on the decoded command, so it
-cannot be used to launder a destructive command past the guard. If anything looks
-wrong, set `CLAUDE_QUIET_BASH=0` and report it — do not edit the rule tables mid-slice.
-
-GATES: `.claude/hooks/quiet/quiet.test.mjs` (33 tests, in `just test`/`just ci`) and
-four new assertions in `scripts/tests/invariants.test.mjs`. The harness copy,
-`templates/_base` copy and the monster-realm copy are asserted byte-identical.
-## 2026-08-22T21:13:39Z — 16r-d merged; composite launch 16r-f
-PR#352 (16r-d, spacetime sql --format json decode) squash-merged + branch deleted; mr-audit CLEAN (orchestration CLEAN, gating-advisory CLEAN, no mandatory read; the disposition findings block is a pre-existing repo-wide spec-ledger scan, unrelated to this diff). Local master ff-only'd b5ff14f->d4fa9fe. Master CI kicked off post-merge, in_progress at record time (not yet observed green -- next tick/event verifies).
-
-Composite launch: 16r-f (battleReseedPending sticky latch, client/src/main.ts reconnect-flush ordering) picked via fast-path queue[0] (pulled forward 2026-08-22 operator directive). mr-disjoint verdict SAFE vs in-flight 16r-e (ops/observability/** only) -- no shared axis, no partition needed. Classified HARD tier (netcode/reconcile: subscription-batch flush ordering around reconnect, per ADR-0198 D7's 'assumed' atomicity) -> fable/xhigh (fable_ok=true, d7=$464.33/$2783). Launched leader=1124388.
-
-Governor NORMAL throughout (d7$464.33/$2783~=17%, fable_ok=true). No BLOCKER, no park-counter bump. 16r-e remains live in parallel (leader=1107821, started 20:59:42Z). NEXT: resume via event tick on either slice's .done or PR-open/CI-green event.
-
-## 2026-08-22T21:00:06Z — 16r-c MERGED, 16r-d CI-watch delegated, 16r-e launched (composite)
-PR #351 (16r-c, changelog-freshness nightly gate) squash-merged clean — mr-audit orchestration=CLEAN,
-no mandatory read (routine tier). Disposition findings were all advisory/corpus-scoped pre-existing
-spec-ledger gaps, unrelated to this diff. master fast-forwarded a857214->b5ff14f. Worktree/branch
-cleaned; mr-branch-audit shows 0 post-merge-commit loss.
-
-PR #352 (16r-d, spacetime sql --format json parser) still has ci/e2e IN_PROGRESS at tick time —
-delegated to `mr-ci-watch 352 16r-d` (detached, setsid) rather than polling; resumes via its own
-event tick on completion.
-
-Composite merge->launch: with the merge fully closed out and no live compute in flight (16r-d's
-agent session already finished; it's only waiting on CI/merge), took the queue[] fast path and
-launched 16r-e (scheduled-function-delay observability wiring: prometheus recording rule + Grafana
-panel + alert for spacetime_scheduled_function_delay_seconds, per
-specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md). touches are ops/observability/**
-only — disjoint from everything else in flight/pending. tier=routine, opus/high, no ADR pre-allocated
-(config/dashboard-only change). queue-removed 16r-e; 16r-f remains queued.
-
-Governor NORMAL throughout (d7=$463.26/$2783≈17%, fable_ok=true). No BLOCKER, no park-counter bump.
-
-## 2026-08-22T19:48:55Z — 16r-g MERGED — Bond/apply_care dead-code retirement (ADR-0177 D3 disposition)
-PR#350 squash-merged to mdrewt/monster-realm master (a857214). Deleted `Bond(u8)`, `apply_care`, `CareError`, `CARE_BOND_AMOUNT` — server-unused since Migration B removed the `bond` column (ADR-0177 D2). Net -246/+38 lines across game-core (types.rs, raising/{rules,types,mod,m9a_gating_tests}.rs, lib.rs, monster/mod.rs, monster/rolls.rs) + ARCHITECTURE.md + docs/adr/0177-*.md. touches-delta beyond declared set (lib.rs, monster/mod.rs, monster/rolls.rs) justified in PR body as compile-required re-export cleanup + doc-truth fix, scoped entirely inside game-core + doc companions; no boyscout-delta claimed. 8 tests deleted, each tied 1:1 to a deleted symbol, independently re-derived by tester+verifier (disposition table in PR body). mr-audit orchestration verdict CLEAN, mandatory_read=false; gating_advisory FLAGGED (skip_markers_added:1, 17 removed/modified asserts) reviewed — no actual ignore/skip/xit/.only markers found in diff, consistent with PR's own audit table; treated as clean. master CI green pre-merge (PR checks), post-merge run queued at merge time. Merged worktree .claude/worktrees/16r-g and branch feat/16r-g-retire-bond-apply-care removed. Follow-up flags recorded in PR (not new slices yet): (1) no CI-time gate enforces 'no Bond symbols' since game-core is a lib crate (dead_code never fires) — extend raising-reducer-security.eval.mjs g8 residue scan to game-core/src in a slice owning evals/; (2) server-module/src/raising.rs:39-41,46-47 comments now stale (MAJOR, outside declared touches, that file is g8's own scan target); (3) docs/adr/0058-*.md header + DIGEST.md:36 still advertise apply_care as live — needs Amends/Amended-by note, doc slice owning ADR-0058; (4) evals/raising-reducer-security.eval.mjs:491-499 dead accept-token for apply_care(, harmless; (5) game-core/tests/eg3_evolution_graph.rs:542 line-number citation drift; (6) docs/specs/A0-plan.md:88-91 superseded fusion-era sketch, not compiled. 16r-c remains in-flight (pid 627621, live chain, untouched this tick).
-
-## 2026-08-22T19:43:49Z — 16r-g PR#350 open — CI-wait delegated
-16r-g (retire Bond/apply_care/CareError/CARE_BOND_AMOUNT, ADR-0177 D3 follow-up) run finished rc=0, attempts=1, opus/high, $16.11. Worktree clean, gates green (clippy/tests/mutation verifier PASS, evals 87 PASS/0 FAIL), PR opened: https://github.com/mdrewt/monster-realm/pull/350. Remote CI (ci/e2e) was pending at tick time; delegated CI-wait to mr-ci-watch (detached, pid recorded in ledger notes) per doctrine — resumes via event tick on conclusion, no merge attempted this tick.
-
-16r-c remains live in-flight (leader pid 627621, started 18:37Z, ~1h2m elapsed) — untouched this tick. No other action taken. Governor NORMAL (d7=$391.74/$2783=14%, inflight_committed=$25/1 run per situation bundle — will be 2 once 16r-g's watch is reflected). No BLOCKER.
-## 2026-08-22T19:06:23Z — 16r-a merged, 16r-g launched (composite)
-PR#349 (16r-a doc-truth sweep) went green on the CI-watch event (checks: ci pass, e2e pass; mergeStateStatus CLEAN) — squash-merged to master as 5f14fe2, branches deleted local+remote, local checkout fast-forwarded 2290f47->5f14fe2.
-
-Audit was FLAGGED ("missing tester and/or reviewer/verifier role evidence") despite reviewer+verifier+red-team roles present in the run (5 agent calls: red-team, reviewer, reducer-security-auditor, doc-keeper, verifier). Adjudicated CLEAN-doc-exempt: the diff is AGENTS.md/ARCHITECTURE.md/ADR-0197/runbook doc updates + a comment-only Cargo.toml edit (verified via diff -- no version/dep change) + a guard-tester-bash.mjs selftest fixture tweak (splits a PEM string literal so its own secret-scanner selftest doesn't false-positive; bytes written to disk unchanged, confirmed via diff read). No functional code changed, so no tester role was warranted.
-
-Composite merge->launch: re-derived eligibility fresh post-merge. mr-state.json queue[0] was 16r-g (retire Bond/apply_care/CareError from game-core, LOW/LIGHT, ADR-0177 D3 follow-up) -- verified live: spec heading exists, after:[], pairwise-disjoint from in-flight 16r-c (evals/nightly-smoke-wiring.eval.mjs, justfile, .github/workflows/nightly.yml) per the spec's own Sec.3 sequencing note. free -g showed 13G free, ample headroom. Launched via mr-spawn (leader=739352, opus/high/routine). queue-remove'd 16r-g.
-
-16r-c (nightly-smoke-wiring gate) remains live from an earlier tick, unaffected.
-
-Governor NORMAL throughout (d7=$374.91/$2783=13%, fable_ok=true, inflight_committed now 2 runs). No BLOCKER.
-
 ## 2026-08-22T19:00:37Z — 16r-a CI-wait delegated to mr-ci-watch; 16r-c still running
 PR #349 (16r-a doc-truth sweep) open at mergeStateStatus=UNSTABLE with ci/e2e checks pending. Delegated CI-wait for PR #349 to mr-ci-watch (pid 734320, detached); resumes via event tick on completion. 16r-c remains live (session_leader 627621, ~21min elapsed) — no action taken on it, still building. No merge, no new launch this tick (N=2 already in flight). Governor NORMAL (d7=$374.50/$2783≈13%). No BLOCKER.
+
+
+
+---
+
 
