@@ -3608,3 +3608,60 @@ Fresh gate-3 derivation: both repos fetched+synced (harness main, project master
 
 ## 2026-08-22T18:38:32Z — 2026-08-22T18:3xZ — PLAN §9 reordered: 16r-a + 16r-c pulled forward and launched (operator directive)
 Operator, interactive: don't let the native cron tick sit idle for days waiting on M-loop-infrastructure's wave-1-exit time gate (Thu 20:00 ET reset-cycle boundary, several days out). Full derivation past the blocked loop-infra/15r chain surfaced M-postgate-sixteenth-review-residuals as genuinely unblocked: 16r-a/16r-c/16r-d/16r-e/16r-f/16r-g each declare after:[] with no blocked: tag and no dependency on wave-1-exit or on 15r finishing -- confirmed zero prior ledger rows, PRs, or park memos for any 16r slice. The last six ticks (12:00Z-18:00Z) never derived this far; they re-checked only loop-infra + 15r and stood down each time. Root-caused and fixed at the source: PLAN.md gained an operator-directive blockquote between the 15r and 16r entries explaining the reordering and pointing forward; M-postgate-sixteenth-review-residuals.spec.md section 6 gained a matching runner note, so a future shallow per-spec read also sees it. Verified 16r-a (AGENTS.md/ARCHITECTURE.md/Cargo.toml/ADR-0197/runbook doc-truth sweep) and 16r-c (evals/nightly-smoke-wiring.eval.mjs + justfile + .github/workflows/nightly.yml changelog-freshness gate blind-spot fix) file-disjoint via mr-disjoint (verdict SAFE, no overlap, no structural hits). Both routine tier (no HARD-tier criteria hit), opus@high, no ADR pre-allocated (doc-truth fix and an existing-ADR-0196 follow-up, neither is a new decision). Launched via mr-spawn: 16r-a leader=627070 claude_pid=627073 rid=mr-spawn-20260822T183718Z-627000; 16r-c leader=627621 claude_pid=627624 rid=mr-spawn-20260822T183726Z-627458. Both LAUNCHED cleanly, per-run locks written, both worktrees on origin/master, both PR-target mdrewt/monster-realm. free -g showed 39G free at launch time, ample for two builds. Queued as fast-path hints (mr-record queue-add) for the next several ticks: 16r-g, 16r-d, 16r-e, 16r-f -- each independently disjoint from 16r-a/16r-c and from each other per the spec's own section 3. Deliberately left in original position: M-loop-infrastructure Wave-2+ (still time-gated), every 15r/13r-c-2 slice tagged blocked:wave-2/3/4-exit or blocked:known-unmigrated-nonempty (still genuinely gated -- 15r's touches overlap real in-flight-when-unblocked scanner-migration surface), 16r-b (spec keeps its own SERIAL-REQUIRED note against the 15r scanner-migration family -- skip until that family unblocks, revisit then), and 16r-h (after: 16r-c, will naturally become eligible once 16r-c merges). Decision recorded in memory/decisions-log.md (not decision-defaulted -- this is a direct operator instruction from the interactive session, not a loop judgment call). Governor NORMAL throughout (d7=$364.03/$2783~13% at tick start; two new opus@high runs now inflight, budget still far from SOFT-PAUSE). Next tick: continue gate-3 derivation as normal -- inflight[] now has 16r-a and 16r-c; poll their per-run locks/.done files before considering new launches; the queue[] fast path covers the next pick once one of these two reaches a terminal state.
+## 2026-08-22T18:57:00Z — 16r-a doc-truth sweep — PR #349 open, local just ci green; master's just ci was ALREADY red (PR #345 PEM literal), repaired here
+Slice `16r-a` (post-2.8.1 doc-truth sweep) is at its terminal state: **PR #349 open**
+(https://github.com/mdrewt/monster-realm/pull/349), branch `feat/16r-a-doc-truth-sweep`,
+worktree `projects/monster-realm/.claude/worktrees/16r-a`, full local `just ci` **green**
+(JUST_CI_EXIT=0), remote `ci`+`e2e` pending at run 32592224934. Supervisor owns the merge.
+
+**The one thing a supervisor must read before merging anything else: `just ci` was ALREADY RED on
+master@2290f47, and remote CI cannot see it.** `just security` runs `node scripts/check-secrets.mjs .`,
+which flags the literal `-----BEGIN OPENSSH PRIVATE KEY-----` that PR #345 landed inside
+`.claude/hooks/guard-tester-bash.mjs:350` (a self-test fixture writing a fake `id_rsa`).
+`.github/workflows/ci.yml` runs gitleaks + semgrep and **no job runs `just security` / `just ci` /
+`check-secrets.mjs`** — so master's remote-green since 2026-08-22T07:23Z was false comfort on that
+gate, and EVERY slice branched off master since PR #345 has an unreachable local gate. This PR
+carries the repair (the loop's "fix a red master first" rule overriding slice scope): the PEM banner
+is assembled from parts, so the bytes written to disk are byte-identical (proved by evaluating both
+expressions in `node -e`), `scripts/check-secrets.mjs` is byte-unchanged and still bites on a real
+banner, and the hook's own suite is `TESTER-GUARD-SELFTEST-OK 36 fixtures` exit 0 on BOTH master's
+version and this one. `verifier` cleared it PASS on all of (a)-(g) against the "edit the fixture to
+dodge the gate" anti-pattern. **Sibling slice 16r-c is live in its own worktree
+(`.claude/worktrees/16r-c`) and will hit this same red until it rebases onto the merged #349.**
+
+Slice content (doc-only, 5 declared files): deleted AGENTS.md:7's stale "Write 1.x module syntax"
+sentence plus its pre-migration residue ("the module is simply a major behind"), which contradicted
+the same bullet's "the crate version IS the product version"; ARCHITECTURE.md `ctx.sender` ->
+`ctx.sender()`; server-module/Cargo.toml's "crate 1.12.0 … write 1.x syntax" comment -> 2.8.1
+lockstep; and ADR-0197 + the 2.8.1 runbook reworded from view PKs "now available / removes the
+constraint" to "available, NOT yet adopted", tracked as `M-stdb-2x-module-sdk` sdk-d. Every
+replacement claim was verified against code first — including one I got wrong and fixed pre-review
+(`client/src/store.ts` does not exist; the real path is `client/src/net/store.ts`).
+
+Judgement call worth knowing: ARCHITECTURE.md's four 1.x spellings BELOW `## Decisions` were
+deliberately NOT rewritten — they are per-milestone records of code as it shipped, and falsifying
+them would be worse than the drift. Instead a 4-line scoping note at the top says so. Verified
+empirically that zero 1.x spellings appear above that heading, so the note is accurate.
+
+Lenses: `reviewer` + `red-team` + `reducer-security-auditor` in parallel on a frozen tree, then
+`verifier`, then `doc-keeper`. No `tester` — doc-only slice, spec says `Tests: doc-only`. red-team
+found no falsified claims across seven claim families; reviewer's 2 minor findings closed in edb2a04
+(one became the boyscout item: ARCHITECTURE.md:128 still carried ADR-0054's FF2 premise that
+ADR-0197 D3 promised to correct "at every live site" and missed). No ADR consumed (0197 body-only),
+no ADR header touched so no adr-digest regen, CHANGELOG left to git-cliff.
+
+FOLLOW-UPS, none touched (all outside `touches:`): (1) **No mechanical gate over agent-facing doc
+truth** — nothing in `evals/` or `scripts/` reads AGENTS.md/ARCHITECTURE.md and adr-digest is
+header-only, which is why this drift survived ~6 days of green CI; E1/E2 have no proof-of-teeth. A
+gate belongs in `evals/**`, owned by 16r-b/16r-c. Memory card `agent-facing-doc-truth-ungated.md`
+written. (2) `scripts/check-secrets.mjs` walks `.claude/worktrees/` — from the main checkout it
+reported 3 hits, two of them sibling worktrees, so an active slice worktree can red a colleague's
+gate; add `.claude/worktrees` to its SKIP set (scripts/ is 16r-d's surface). (3) `server-module/src/pvp.rs:1252`
+cites "movement.rs:156"; the guard is at movement.rs:292. (4) `evals/build-ci-hygiene.eval.mjs:140-147`
+reads server-module/Cargo.toml raw with NO `#`-comment stripping, unlike dev-reducer-gating — latent,
+not triggered today. (5) The harness-side spec tick for 16r-a in
+`specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md` is supervisor-side (different
+repo, not in this PR). (6) Post-merge, the cbm index should be refreshed on the main checkout —
+AGENTS.md/ARCHITECTURE.md are cbm-indexed as Section nodes (codegraph indexes no markdown, so it is
+unaffected); pre-merge re-indexing would have indexed unmerged state, so it was deliberately skipped.
+

@@ -497,6 +497,18 @@ interpolation caveat this slice avoided. (5) pre-existing biome warning at
   (it added in-suite teeth the hand-written clauses lacked). Both were re-proven by execution.
 - `/tmp/mr_warn_16r-e` appeared mid-run; landing pattern was honoured (no new fan-outs after it).
 
+## 2026-08-23T09:10:21Z — CORRECTION: mr-selfcheck A8 could re-stamp the operator hold (triggered, fixed, reported not repaired)
+**Correction and an operator FYI, appended to the entry below.**
+
+**`mr-selfcheck` A8 could MUTATE the operator kill switch — not merely raise a false alarm on it.** I under-described this in the entry below. A8's "unforced" fixture built its environment from `dict(os.environ)` without scrubbing `MR_FORCE`. With `MR_FORCE=1` ambient — which `mr-supervisor-run` sets before the tick runs selfcheck — the sandboxed tick wrapper got PAST gate -1 and **re-stamped the real hold flag**, because `mr-hold`'s MEM is a hardcoded machine singleton (`mr-hold:118`) and a sandboxed copy therefore still writes production state.
+
+**I triggered it myself** with the diagnostic `MR_FORCE=1 mr-selfcheck` at 2026-08-23T08:54:45Z while isolating the A8 failure, before I had written the scrub. Then proved the fix: with the scrub in place, that exact command now leaves the flag untouched (probed alongside `mr-hold status` and a plain `mr-selfcheck`, all three UNCHANGED).
+
+**Impact, stated precisely:** `by=operator` survived every rewrite, so the hold remained fully in force and no tick ever ran — nothing unsafe happened. What was overwritten is the flag's recorded `at=` (now `2026-08-23T08:54:45Z`, was `2026-08-22T23:46:30Z`) and its mtime, which is what the HOLD-AGED nag ages from. Practical consequence: the "held 6h, still intended?" nag will fire later than it should have.
+
+**NOT repaired, deliberately.** Writing to `.native-supervisor-disabled` is precisely what lp-09 doctrine forbids an agent session to do, and `guard-bash.mjs` enforces it. Restoring the timestamp would mean an agent hand-editing the kill switch to cover its own tracks — worse than the wrong timestamp. **Drew: if the original pause time matters, re-run `mr-supervisor-disable` to re-stamp it, or simply `mr-supervisor-enable` when ready — the hold itself is intact and correct.**
+
+**The general rule this earns:** a selfcheck must never be able to mutate the switch it is checking. Any fixture that runs a real wrapper must construct its environment explicitly rather than inheriting `os.environ`, because the tools it drives resolve production paths as hardcoded singletons by design.
 ## 2026-08-23T09:03:53Z — tester write-guard worktree carve-out; lp-15 reframed from retirement to repair (operator-directed)
 **Two operator-directed corrections. Loop still held; hold untouched.**
 
@@ -764,59 +776,3 @@ Governor NORMAL throughout (d7=$374.91/$2783=13%, fable_ok=true, inflight_commit
 ## 2026-08-22T19:00:37Z — 16r-a CI-wait delegated to mr-ci-watch; 16r-c still running
 PR #349 (16r-a doc-truth sweep) open at mergeStateStatus=UNSTABLE with ci/e2e checks pending. Delegated CI-wait for PR #349 to mr-ci-watch (pid 734320, detached); resumes via event tick on completion. 16r-c remains live (session_leader 627621, ~21min elapsed) — no action taken on it, still building. No merge, no new launch this tick (N=2 already in flight). Governor NORMAL (d7=$374.50/$2783≈13%). No BLOCKER.
 
-## 2026-08-22T18:57:00Z — 16r-a doc-truth sweep — PR #349 open, local just ci green; master's just ci was ALREADY red (PR #345 PEM literal), repaired here
-Slice `16r-a` (post-2.8.1 doc-truth sweep) is at its terminal state: **PR #349 open**
-(https://github.com/mdrewt/monster-realm/pull/349), branch `feat/16r-a-doc-truth-sweep`,
-worktree `projects/monster-realm/.claude/worktrees/16r-a`, full local `just ci` **green**
-(JUST_CI_EXIT=0), remote `ci`+`e2e` pending at run 32592224934. Supervisor owns the merge.
-
-**The one thing a supervisor must read before merging anything else: `just ci` was ALREADY RED on
-master@2290f47, and remote CI cannot see it.** `just security` runs `node scripts/check-secrets.mjs .`,
-which flags the literal `-----BEGIN OPENSSH PRIVATE KEY-----` that PR #345 landed inside
-`.claude/hooks/guard-tester-bash.mjs:350` (a self-test fixture writing a fake `id_rsa`).
-`.github/workflows/ci.yml` runs gitleaks + semgrep and **no job runs `just security` / `just ci` /
-`check-secrets.mjs`** — so master's remote-green since 2026-08-22T07:23Z was false comfort on that
-gate, and EVERY slice branched off master since PR #345 has an unreachable local gate. This PR
-carries the repair (the loop's "fix a red master first" rule overriding slice scope): the PEM banner
-is assembled from parts, so the bytes written to disk are byte-identical (proved by evaluating both
-expressions in `node -e`), `scripts/check-secrets.mjs` is byte-unchanged and still bites on a real
-banner, and the hook's own suite is `TESTER-GUARD-SELFTEST-OK 36 fixtures` exit 0 on BOTH master's
-version and this one. `verifier` cleared it PASS on all of (a)-(g) against the "edit the fixture to
-dodge the gate" anti-pattern. **Sibling slice 16r-c is live in its own worktree
-(`.claude/worktrees/16r-c`) and will hit this same red until it rebases onto the merged #349.**
-
-Slice content (doc-only, 5 declared files): deleted AGENTS.md:7's stale "Write 1.x module syntax"
-sentence plus its pre-migration residue ("the module is simply a major behind"), which contradicted
-the same bullet's "the crate version IS the product version"; ARCHITECTURE.md `ctx.sender` ->
-`ctx.sender()`; server-module/Cargo.toml's "crate 1.12.0 … write 1.x syntax" comment -> 2.8.1
-lockstep; and ADR-0197 + the 2.8.1 runbook reworded from view PKs "now available / removes the
-constraint" to "available, NOT yet adopted", tracked as `M-stdb-2x-module-sdk` sdk-d. Every
-replacement claim was verified against code first — including one I got wrong and fixed pre-review
-(`client/src/store.ts` does not exist; the real path is `client/src/net/store.ts`).
-
-Judgement call worth knowing: ARCHITECTURE.md's four 1.x spellings BELOW `## Decisions` were
-deliberately NOT rewritten — they are per-milestone records of code as it shipped, and falsifying
-them would be worse than the drift. Instead a 4-line scoping note at the top says so. Verified
-empirically that zero 1.x spellings appear above that heading, so the note is accurate.
-
-Lenses: `reviewer` + `red-team` + `reducer-security-auditor` in parallel on a frozen tree, then
-`verifier`, then `doc-keeper`. No `tester` — doc-only slice, spec says `Tests: doc-only`. red-team
-found no falsified claims across seven claim families; reviewer's 2 minor findings closed in edb2a04
-(one became the boyscout item: ARCHITECTURE.md:128 still carried ADR-0054's FF2 premise that
-ADR-0197 D3 promised to correct "at every live site" and missed). No ADR consumed (0197 body-only),
-no ADR header touched so no adr-digest regen, CHANGELOG left to git-cliff.
-
-FOLLOW-UPS, none touched (all outside `touches:`): (1) **No mechanical gate over agent-facing doc
-truth** — nothing in `evals/` or `scripts/` reads AGENTS.md/ARCHITECTURE.md and adr-digest is
-header-only, which is why this drift survived ~6 days of green CI; E1/E2 have no proof-of-teeth. A
-gate belongs in `evals/**`, owned by 16r-b/16r-c. Memory card `agent-facing-doc-truth-ungated.md`
-written. (2) `scripts/check-secrets.mjs` walks `.claude/worktrees/` — from the main checkout it
-reported 3 hits, two of them sibling worktrees, so an active slice worktree can red a colleague's
-gate; add `.claude/worktrees` to its SKIP set (scripts/ is 16r-d's surface). (3) `server-module/src/pvp.rs:1252`
-cites "movement.rs:156"; the guard is at movement.rs:292. (4) `evals/build-ci-hygiene.eval.mjs:140-147`
-reads server-module/Cargo.toml raw with NO `#`-comment stripping, unlike dev-reducer-gating — latent,
-not triggered today. (5) The harness-side spec tick for 16r-a in
-`specs/monster-realm-v2/M-postgate-sixteenth-review-residuals.spec.md` is supervisor-side (different
-repo, not in this PR). (6) Post-merge, the cbm index should be refreshed on the main checkout —
-AGENTS.md/ARCHITECTURE.md are cbm-indexed as Section nodes (codegraph indexes no markdown, so it is
-unaffected); pre-merge re-indexing would have indexed unmerged state, so it was deliberately skipped.

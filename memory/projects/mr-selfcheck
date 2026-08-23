@@ -1048,10 +1048,20 @@ else:
 
         def run_wrapper(env_extra):
             # MR_FORCE is SCRUBBED from the base environment, then re-applied only via env_extra.
-            # Without this the "unforced" case is not unforced at all — it inherits whatever the
+            # Without this the "unforced" case is not unforced at all -- it inherits whatever the
             # ambient environment carries, and `mr-supervisor-run` sets MR_FORCE=1 before the tick
-            # runs mr-selfcheck. Measured 2026-08-23: `MR_FORCE=1 mr-selfcheck` fails A8 while a
-            # plain run passes, so every operator-forced tick raised a false alarm on this gate.
+            # runs mr-selfcheck.
+            #
+            # TWO consequences, and the second is the serious one. (a) `MR_FORCE=1 mr-selfcheck`
+            # failed A8 while a plain run passed, so every operator-forced tick raised a false
+            # alarm on this gate. (b) MEASURED AND REPRODUCED 2026-08-23: the forced sandbox
+            # wrapper got PAST gate -1 and RE-STAMPED THE REAL OPERATOR HOLD -- `mr-hold`'s MEM is
+            # a hardcoded machine singleton (mr-hold:118), so a sandboxed copy still writes the
+            # production flag. `by=operator` survived, so the loop stayed held and nothing unsafe
+            # happened, but the operator's recorded `at=` and the flag mtime were overwritten,
+            # which is what the HOLD-AGED nag ages from. A selfcheck must never be able to mutate
+            # the kill switch it is checking.
+            #
             # This does not weaken the fixture: under ambient MR_FORCE it could not exercise the
             # unforced branch it names, so scrubbing is what makes the assertion real.
             env = {k: v for k, v in os.environ.items() if k != "MR_FORCE"}
