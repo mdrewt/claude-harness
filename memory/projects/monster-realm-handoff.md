@@ -497,6 +497,36 @@ interpolation caveat this slice avoided. (5) pre-existing biome warning at
   (it added in-suite teeth the hand-written clauses lacked). Both were re-proven by execution.
 - `/tmp/mr_warn_16r-e` appeared mid-run; landing pattern was honoured (no new fan-outs after it).
 
+## 2026-08-23T00:21:18Z — CORRECTION: the live hold WAS modified at 23:46:30Z (attributed now); pause never lapsed
+**CORRECTION to the previous entry, and to commit 49f9086's message.** Both state "the operator
+hold itself was never touched: flag mtime 1787440289, 0 bytes, still by=operator attributed=false."
+**That is false.** At 2026-08-22T23:46:30Z the live flag was rewritten: it is now 155 bytes,
+`attributed=true`, `by=operator`, `pid=1743576`, reason = the generic manual-pause default. I
+verified the original state repeatedly and asserted it in good faith, but re-checked after the push
+and found it changed. The claim stood in a pushed commit; correcting it here rather than rewriting
+published history.
+
+**No harm to the pause, which is the thing that matters.** The loop stayed held throughout: the
+00:00:06Z cron tick logged `SKIP hold by=operator queued_events=2`, and no decision run or launch
+occurred. The end state is in fact the intended one — an attributed operator hold carrying the exact
+generic reason Drew asked for. The two queued done-events are untouched.
+
+**What did it, and the reusable lesson.** The reason string is byte-identical to the default in the
+session-written wrapper at ~/.local/bin, and that file **hardcodes** `MEM=<real memory/projects>`.
+So a reviewer copying it into a sandbox to exercise it does NOT isolate it: the copy still calls the
+REAL `$MEM/mr-hold`, which writes the REAL flag. An adversarial reviewer was running against this
+subsystem in that window under explicit instructions not to touch live state, and reported that it
+had not — its sandbox was simply incomplete in a way that is invisible from inside the copy.
+
+**This is an argument FOR finishing the adoption.** The tracked wrapper resolves `MEM` via
+`readlink -f "$0"`, so a sandbox copy of IT is genuinely isolated — which is exactly why
+`supervisor-disable-teeth.sh` can exercise the real file 23 ways without ever naming the live flag.
+A hardcoded-path tool cannot be safely exercised by anyone, reviewer or gate.
+
+**Standing rule this earns:** a tool that mutates a singleton machine-wide artifact must self-locate,
+or it cannot be tested without risking production. `mr-hold` hardcodes deliberately (a worktree copy
+must report the REAL hold) and compensates by rebinding paths inside its own selftest — that pairing
+is the pattern; a hardcoded path with no test-side rebinding is the trap.
 ## 2026-08-23T00:16:22Z — kill-switch wrapper ADOPTED (lp-11a shipped 08-17, never symlinked) + CRITICAL guard path-prefix bypass closed
 **Attended session, loop HELD throughout. The operator hold was never touched** — flag mtime
 1787440289, 0 bytes, still `by=operator attributed=false`. Two done-events (16r-e, 16r-f) remain
@@ -743,12 +773,8 @@ Gate3 fresh derivation: no locks/mutex live, no open PRs (harness or project), i
 Reconciled a gap from the prior (12:00Z) tick: its mr-state.json/handoff/mr-usage-daily.jsonl/mr-native-tick.sh writes had never been committed (analysis was done, commit step skipped). Committed+pushed as 55ede88 this tick before proceeding. Fresh gate-3 derivation: both repos fetched+synced, no open PRs (harness or project), no per-run locks, no chain-owner mutex, no .blocked-on-human, queue[] empty, no wip:/parked branches, no active human session (all uncommitted harness-tree files are pre-existing DIRTY-TREE-ADVISORY strays -- future-prompts.md, gdd.md, decisions/issue-{20,22,23,24,25,26}.url, several memory/projects/*-plan.md files, patches/, spacetime-db-testing.md, the fifteenth-review spec's 2026-08-17 delivered-note -- all several hours to days old, none touched). M-loop-infrastructure Wave-1-exit measurement gate still open (no new drill/variance evidence since the 12:00Z tick); Wave-2 and remaining 15r-* slices stay blocked:wave-2-exit. Project issue #342 (rev16-obs48-procedures) is the only open decision issue; its own body says 'Supervisor: record-and-ignore -- do not act on or close this issue', so it is not a gate. No BLOCKER (time-gated, not a Drew decision). Governor NORMAL (d7=$360.42/$2783=~13%, fable_ok=true). Standing down.
 ## 2026-08-22T12:03:30Z — 2026-08-22T12:00Z native tick — no eligible work, wave-1-exit gate still open
 Gate3 fresh derivation (queue[] empty): both repos fetched+synced, no open PRs, inflight/awaiting_merge empty, no wip:/parked branches, no active human session. **M-loop-infrastructure**: every Wave-1 slice merged except `lp-07` (`blocked:operator-attended`, touches ~/.claude/settings.json, out-of-repo — needs an attended session). Wave-2 slices (`lp-08`, `lp-10`, `lp-11`, `lp-11b`, `lp-registry`, `lp-spec-mode`, `lp-milestone-mode`, `lp-decision-block`, `lp-disjoint`, `lp-gitattr`, ...) stay ineligible: the spec's Wave-1-exit is a **measurement** gate (one full reset cycle of `seven_day.utilization` samples + `lp-02` non-degenerate variance over 5 slices + a forced-nightly-red drill opening exactly one issue + `lp-01`'s selftest RED demo), not merely 'all Wave-1 slices merged' — same finding as the prior tick (line 343), no new drill/variance evidence recorded since. **M-postgate-fifteenth-review-residuals**: `15r-sec-a`, `15r-sec-vis`, `15r-a2` all merged (project PRs #336-338); every remaining slice (`13r-c-2` onward) is itself `blocked:wave-2-exit`, so nothing there is launchable either. SDK bump (`stdb-281`, ADR-0197) confirmed committed on `master` (crate 2.8.1). Left untouched: pre-existing DIRTY-TREE-ADVISORY strays on harness `main` (future-prompts.md, mr-native-tick.sh, mr-usage-daily.jsonl, spacetime-db-testing.md, the fifteenth-review spec's uncommitted 'Delivered 2026-08-17' doc note, plus several untracked memory/ files) — not ours, not blocking. No BLOCKER raised: this is a time/measurement gate, not a Drew decision. Governor NORMAL (d7=$358.95/$2783≈13%, fable_ok=true). Mutex released, standing down for this tick.
-## 2026-08-22T11:16:29Z — lp-06 MERGED — mr-backup + stray-handoff rule
-PR #33 squash-merged to `main`@51073c8 (mdrewt/claude-harness). Delivered: `mr-backup` tool (snapshot/restore/diff for the durable ledger+handoff copy), a stray-handoff predicate added to `mr-selfcheck`, and `lp-06-teeth.sh` proof-of-teeth fixtures. mr-audit verdict CLEAN (orchestration CLEAN, gating-advisory CLEAN, mandatory_read=false; disposition findings were pre-existing corpus-wide spec-ledger gaps unrelated to this diff — not a merge predicate). Post-merge: fast-forwarded main, removed the lp-06 worktree + local/remote `feat/lp-06` branches, ran `mr-backup snapshot` to clear a transient post-merge backup-drift SELFCHECK-FAIL, re-ran `mr-selfcheck` -> SELFCHECK-OK. Governor NORMAL (d7≈$358/$2783≈13%, fable_ok=true). No composite launch this tick — inflight now empty but scope kept to the merge reconciliation; next tick derives the next slice fresh from PLAN §9 (queue[] is empty).
-
-## 2026-08-22T09:50:13Z — lp-ollama merged (PR#32, d3d1df5)
-Supervisor tick native-20260822T094703Z-348495 merged lp-ollama: deletes the unconditional per-tick ollama preflight from mr-native-tick.sh (803 warm-ups / 0 invocations measured), keeps mr-ollama for manual use, adds a 4-leg mr-selfcheck block (canary/behavioural/static/EARS-2) with proof-of-teeth. Audit CLEAN (orchestration+gating), no mandatory read; diff scope = declared touches (mr-native-tick.sh) + companions (mr-selfcheck, plan doc), matching the PR's touches-delta. Pre-existing dirty-tree strays on main (future-prompts.md, handoff files, mr-state.json, mr-usage-daily.jsonl, spacetime-db-testing.md, a spec file) were stashed labeled, ff-only merge applied, then popped back cleanly (mr-native-tick.sh auto-merged, no conflict markers). Worktree + feat/lp-ollama branch removed post-merge. Note for future ticks: /usr/bin/node v18.19.1 on PATH ahead of the asdf node 24.13.1 shim makes 'just ci' false-red on scripts/tests/adr-lint.test.mjs (import.meta.dirname undefined pre-Node 20.11) -- always source asdf shims before trusting a harness just ci result; this slice's real gate (mr-selfcheck SELFCHECK-OK) was green throughout. lp-06 remains live in a separate worktree (untouched this tick) -- its PR body already flags a shared mr-selfcheck append-point collision with this now-merged slice; it will need to rebase onto d3d1df5 before its own merge.
 ## 2026-08-21T14:00:06Z — lp-queue + lp-handoff-rotate — queue[] reshaped, handoff auto-rotation shipped
+
 
 
 
