@@ -115,6 +115,8 @@ re-generated in the same commit, THE SYSTEM SHALL fail the gate. WHEN a NEW tabl
 Tests: extend `evals/battle-schema-snapshot.eval.mjs`; proof-of-teeth: flip one private table to
 `public` in a fixture and show the gate RED; re-baseline and show it green (ADR-0010).
 
+**Delivered (2026-08-17):** `evals/baselines/table-schemas.json` gained a `visibility` field on all 38 entries (18 public / 20 private), derived machine-per-table. `evals/battle-schema-snapshot.eval.mjs` gained `parseTableVisibility`, `checkVisibility` and `checkVisibilityEscalation` checkers with `[visibility-shape]`, `[visibility-drift]` and `[visibility-escalation]` failure tags. Regeneration is now a command: `node evals/battle-schema-snapshot.eval.mjs --write`. ADR-0199 was written to document the `visibility_note` marker lifecycle and ADR-0193 D3's amendment widening `[table-count]`'s needle from `#[` to `spacetimedb::table(`, both non-recoverable from code. **Follow-ups:** (1) ADR-0193 D7's escape at `marker.indexOf('ADR-') !== -1` is deliberately unanchored — a literal `"ADR-"` was measured to suppress a real violation, left as out-of-scope; (2) the eval fails open outside a git work tree (pass: true with a warning in detail), inherited from ADR-0193 D4, which now also disarms the escalation layer.
+
 ### 15r-a2 — Scanner-audit cap: advisory, not exact-equality (MED, LIGHT)
 `touches: evals/scanner-migration-audit.eval.mjs`
 `after:` (none) — land it **before** any migration slice; it exists to stop them racing.

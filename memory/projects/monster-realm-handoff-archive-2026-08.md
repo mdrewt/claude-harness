@@ -3840,3 +3840,77 @@ PR #349 (16r-a doc-truth sweep) open at mergeStateStatus=UNSTABLE with ci/e2e ch
 
 
 
+## 2026-08-22T23:07:54Z — HOLD-UNATTRIBUTED flag carries no provenance record (mtime=1787439637) — escalating once; loop stays held
+The build loop is held by a kill-switch flag with no provenance record. Did you pause it? If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour.
+
+
+## 2026-08-23T00:16:22Z — kill-switch wrapper ADOPTED (lp-11a shipped 08-17, never symlinked) + CRITICAL guard path-prefix bypass closed
+**Attended session, loop HELD throughout. The operator hold was never touched** — flag mtime
+1787440289, 0 bytes, still `by=operator attributed=false`. Two done-events (16r-e, 16r-f) remain
+queued behind it; they drain when the loop is re-enabled.
+
+**ONE STEP REMAINS AND IT IS THE OPERATOR'S** (a session cannot do it — `guard-bash.mjs` blocks the
+wrapper, and the permission layer blocked the symlink):
+
+    ln -sfn "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-disable" \
+            "/home/mdrewt/.local/bin/mr-supervisor-disable"
+
+Until it is run, `mr-selfcheck` check **B2 reports SELFCHECK-FAIL** and `~/.local/bin` holds a
+hand-written wrapper from this session rather than the tracked one. B2 only LOGS in the tick, so the
+loop is not wedged.
+
+**WHAT THIS WAS.** Drew ran `mr-supervisor-disable` and asked whether the flag was set and whether it
+would stop cron ticks. It was and it does — gate -1 exits before any paid work, verified against two
+real post-flag ticks that logged `SKIP hold by=operator`. But every pause was tripping the
+HOLD-UNATTRIBUTED escalation (#34, #35), and the cause turned out to be an ADOPTION GAP, not a missing
+fix.
+
+**`lp-11a` already shipped the fix on 2026-08-17** — a tracked provenance-recording wrapper at
+`memory/projects/mr-supervisor-disable`, carrying its own `ln -sf` adoption step. That step was never
+run. `~/.local/bin` kept the bare `touch` for five days while `mr-native-tick.sh:142-143` and
+`guard-bash.mjs:110-118` both asserted the routing was live. **A commit cannot perform an out-of-repo
+symlink, so the repo half shipped, the machine half did not, and nothing measured the difference.**
+
+**Adoption exposed three defects in the vendored file, all fixed:**
+1. **FAIL-OPEN** — `exec "$MEM/mr-hold" …` created NO hold when mr-hold was missing or hung. The
+   operator reads one error line and believes the loop is paused while it keeps spending. It now
+   degrades to a bare flag create. Provenance is the nice-to-have; stopping the loop is the contract.
+2. **Its own `ln -sf` instruction was broken** — bash sets `$0` to the invoking path, so
+   `dirname "$0"` under a symlink resolved MEM to `~/.local/bin` and `$MEM/mr-hold` did not exist,
+   firing defect 1 on every run. Now `readlink -f`.
+3. Success was reported without checking a flag reached disk.
+
+**CRITICAL, PRE-EXISTING, FOUND BY RED-TEAM — `guard-bash.mjs` was bypassable by any path prefix.**
+The shared `at()` anchor tolerated only whitespace before a verb, so a leading `/` defeated EVERY rule
+in the file. Verified by feeding literal strings to the hook's stdin: `/bin/rm -rf …`,
+`/usr/bin/git push --force origin main`, write verbs on the hold flag, and the resume wrapper by
+absolute path — which CLEARS AN OPERATOR HOLD and falsified the README's guarantee that a session
+cannot. `which mr-supervisor-enable` hands over the bypass with no adversarial intent, and
+`permissions.deny` has no `mr-supervisor-*` entry, so this hook was the sole control. Fixed once in
+the shared helper (`PFX`) plus shell names in `WRAP` to close `bash <wrapper-path>`. 81 -> 96
+fixtures, pinning each closed route AND each read that must stay allowed. ADR-0002 amended.
+Accepted cost, recorded: `bash -n <guarded wrapper>` now trips the guard; copy the file first.
+
+**NEW TEETH.** `memory/projects/supervisor-disable-teeth.sh` — 23 assertions, copies the REAL wrapper
+into a sandbox beside a stub `mr-hold` (no env override; `mr-hold` rejected `MR_SELFCHECK_MEM` as a
+surface for greening production vacuously). Proven to bite: **13 RED** against the pre-adoption
+wrapper. Run by `mr-selfcheck` as **B1**. **B2** is the adoption-drift guard — the check whose absence
+cost five days.
+
+**LEFT UNDONE, DELIBERATELY:**
+- `projects/monster-realm/.claude/hooks/guard-bash.mjs` carries the IDENTICAL path-prefix bypass.
+  Separate repo, separate PR. `templates/_base`'s copy predates the `at()` helper and is unaffected.
+- **TRIGGER 2 can be starved.** `mr-hold set` rewrites the flag every call so mtime always moves, and
+  the tick derives hold age by `stat`-ing that mtime. Since attribution now suppresses TRIGGER 1 by
+  design, a hold re-set inside 6h never escalates at all. The old bare `touch` was noisy but always
+  self-alerting; this inverts that trade. Fix shape: have `mr-hold set` preserve the original `at=`
+  when `by=` is unchanged, and have the tick read `at=` from `status --json` instead of `stat`.
+  Not attempted here — it edits the live cron entrypoint and belongs in a gated slice.
+
+**GATES:** mr-hold 39 fixtures, guard 96, wrapper teeth 23 (13 RED against pre-fix), `just lint`
+clean, `just test` 103/103. `mr-selfcheck` reports only B2, which is TRUE until the symlink is made.
+
+**ROLLBACK:** `mr-supervisor-disable.bak.20260822T233218Z` (original bare `touch`) and
+`.bak.lp11a.20260822T233218Z` (lp-11a's pre-adoption version). Both use a `.bak.` infix on purpose:
+`_mr_files` excludes `.bak` but NOT `.preedit`, so a `.preedit` copy gets enumerated as a live corpus
+tool — worth knowing for any future out-of-repo backup.

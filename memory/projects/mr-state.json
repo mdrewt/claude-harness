@@ -1,10 +1,10 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-23T11:58:00Z",
- "updated_by": "mr-sup-native-20260823T115311Z-2451882",
+ "updated_utc": "2026-08-23T19:00:15Z",
+ "updated_by": "native-20260823T190015Z-2683700",
  "master": {
-  "sha": "588b24e",
-  "ci": "in_progress-post-merge-not-yet-observed-green (PR#355 ci+e2e were CLEAN pre-merge; re-verify next tick)",
+  "sha": "a842116",
+  "ci": "green (PR#37 rw3a spec-authorship squash-merged; local+origin main confirmed in sync at a8421163)",
   "nightly": "fixed_at_a40cb81_confirmed_green"
  },
  "harness_main": {
@@ -20,8 +20,8 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-08-23T11:53Z native tick (decision-forced): consumed 2 answered DECISION events (hold-aged issue#36, hold-unattributed issue#35) — both confirmed operator holds; mr-hold status now HOLD-NONE (hold already lifted). Closed both issues with <!--mr-system--> comments per close-the-loop doctrine. Also finished the 16r-h merge that a prior tick (114134Z) had delegated to mr-ci-watch: PR#355 checks went green, merged --squash --delete-branch (588b24e), mr-audit read (mandatory_read=true, diff reviewed directly — scoped, no gating weakening), mr-gates verify from the correct worktree cwd CLEAN 1/1 with spotcheck confirming all 3 mutation-canary teeth, residuals closed (0), worktree+branch cleaned, stale per-run lock reaped via mr-unlock stale. ADR-0203 correctly next-free after 0202 (adr_next_free bumped 202->204). This closes M-postgate-sixteenth-review-residuals except 16r-b, which stays SERIAL-REQUIRED behind the 15r-sec-mig-a/b/c/d + 13r-c-2 family — that family has not started (no 15r-sec-mig-* merges in history) and 15r-sec-mig-a itself carries blocked:wave-2-exit, so it is not a fast-path launch candidate; 15r-sec-a/15r-sec-vis/15r-a2 (the spec's 'launchable in order' chain ahead of it) are already merged (#336/#337/#338). Did not attempt a composite launch this tick pending a fuller wave-2-exit read. NOTED not acted on: harness working tree carries pre-existing uncommitted strays (modified future-prompts.md, several memory/projects/* files, an uncommitted 'Delivered' doc-truth annotation on the fifteenth-review-residuals spec, untracked plan/progress/decision files) — left untouched, flagged in handoff for investigation. Governor NORMAL (d7=$602.74/$2783≈22%, fable_ok=true).",
- "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active — opus alias now resolves to claude-opus-5).",
+ "notes": "2026-08-23T19:00Z native tick: reconciled a stale record left by the 18:04Z tick that merged rw3a (PR#37 squash-merged, ledger MERGED row + handoff COMPLETE entry already present) but was cut off before updating mr-state.json/committing bookkeeping -- inflight[] still listed rw3a as running (leader_pid 2571046; process confirmed not live, no per-run lock present). Verified live: no locks, no per-run lock, no open PRs either repo, local main == origin/main @ a842116, no resident human session. Committed the accumulated supervisor-owned uncommitted exhaust (handoff.md, handoff archive, this file, the 15r spec 'Delivered' annotation, decisions/*, patches/, branch-cleanup tsv, per-slice plan/progress memory cards) in one chore(mr-sup) commit -- left Drew's own future-prompts.md and gdd.md untouched (DIRTY-TREE-ADVISORY carried forward for those two only). Handoff names rw3b/rw3c as the next queue candidates (project repo, must chain serially -- both bump CONTENT_VERSION) but neither was queue-added or launched this tick (reconciliation was the one action taken).",
+ "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],
  "resource_locations": {
@@ -35,7 +35,7 @@
   "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said.",
   "found_easily": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects template + launch script + AGENTS.md two-location note were all accurate; only the harness-vs-project spec path lacked an absolute anchor in the task.",
-  "gh_cli_path": "gh is NOT on the default PATH in this native env — it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation."
+  "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation."
  },
  "native_supervisor": {
   "active_since": "2026-07-21T16:10:57Z",
@@ -50,5 +50,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-23T11:53:11Z"
+ "last_tick_utc": "2026-08-23T19:00:15Z"
 }
