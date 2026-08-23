@@ -122,11 +122,11 @@ Declared per slice in the candidate-slices table above. rw3a itself touches only
 MVP floor and the starting-content target, and completing both empty affinities symmetrically (base +
 evolution each) is what makes Electric and Light as deep as the six that already exist.
 
-**Evolution data lives in `content/evolution_paths/`.** The old `content/evolutions.ron` and
-`content/fusion.ron` were **deleted** by the essence-graph redesign (ADR-0174/0176, spec EG3-1); the
-graph is now one directed edge per entry with an append-only `edge_id`. ⚠️ The precedent spec
-`M-playtest-d-content-pack.spec.md` still names the **deleted** `evolutions.ron` in its pt-d1 row — that
-reference is **stale**; follow this section, not that table.
+**Evolution data lives in `content/evolution_paths/`.** The essence-graph redesign (ADR-0174/0176, spec
+EG3-1) **deleted** `content/evolutions.ron`, and **deleted** `content/fusion.ron` with it; the graph is
+now one directed edge per entry with an append-only `edge_id`. ⚠️ The precedent spec
+`M-playtest-d-content-pack.spec.md` still names the **deleted**, **stale** `evolutions.ron` in its pt-d1
+row — follow this section, not that table.
 
 **ADR-0204 is reserved for rw3b, in the project repo.** `adr_next_free = 204` (highest on disk:
 `0203-nightly-red-response-policy.md`). rw3a deliberately does **not** create it: a harness-repo slice
