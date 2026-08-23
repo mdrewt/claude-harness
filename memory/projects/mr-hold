@@ -6,9 +6,15 @@
 # does not read the shebang of a file it is handed; it interpreted this PYTHON SOURCE as shell,
 # line by line. The docstring below documents the kill switch and named the operator's wrapper in
 # BACKTICKS — which is command substitution — so bash EXECUTED
-# `~/.local/bin/mr-supervisor-disable`, whose body is a bare `touch` on the flag's absolute path.
-# A zero-byte, unattributed hold appeared out of nowhere; the fail-safe below correctly read it as
-# OPERATOR, which the loop may never clear; 8 consecutive cron ticks then skipped in silence.
+# `~/.local/bin/mr-supervisor-disable`, whose body was THEN a bare `touch` on the flag's absolute
+# path. A zero-byte, unattributed hold appeared out of nowhere; the fail-safe below correctly read
+# it as OPERATOR, which the loop may never clear; 8 consecutive cron ticks then skipped in silence.
+#
+# 2026-08-22: that wrapper now routes through `mr-hold set --by operator`, so a REPEAT of this
+# incident would forge an ATTRIBUTED hold — which mr-native-tick.sh's HOLD-UNATTRIBUTED trigger,
+# the control that bounds this failure class, would NOT catch. It would surface only via the AGED
+# trigger six hours later, not immediately. The mis-invocation got QUIETER, not safer, so the
+# polyglot line below matters more now, not less.
 # Bash also ran `rm`/`mv`/`cp`/`chmod`/`truncate`/`unlink`/`ln`/`sed -i`/`git revert` out of other
 # backticked prose in this same file — harmless ONLY because they happened to get no operands.
 #
@@ -35,7 +41,7 @@ __doc__ = """mr-hold — provenance-aware kill switch for the native supervisor 
 Shebang is `/usr/bin/python3` on purpose (asdf `env python3` exits 126 in unpinned cwds).
 
 THE DEFECT THIS CLOSES. `.native-supervisor-disabled` was a **zero-byte** file written by two
-indistinguishable actors: the operator via `~/.local/bin/mr-supervisor-disable` (a bare `touch`) and
+indistinguishable actors: the operator via `~/.local/bin/mr-supervisor-disable` (THEN a bare `touch`) and
 the supervisor itself, because doctrine ordered it to when the queue emptied. Nothing recorded which.
 So "the operator paused to protect credits" and "the loop finished its queue" were the same byte
 sequence, and the loop could clear a pause the operator had set. With pacing manual (operator
@@ -47,9 +53,22 @@ THE CORRECTION RUNS OPPOSITE TO THE INTUITIVE FIX, and each half matters:
   (a) Provenance is checked on CLEAR, never on SET. Anyone may pause the loop — that direction is
       always safe. Only clearing is privileged.
   (b) Absent-or-empty provenance defaults to OPERATOR, fail-safe, and is never auto-cleared. This is
-      what lets the UNCHANGED `~/.local/bin/mr-supervisor-disable` keep working with no edit outside
-      version control — `~/.local/bin` has no git history, so a `git revert` of this slice could not
-      undo an edit there. The zero-byte flag on disk right now is therefore already an operator hold.
+      what let the operator's `~/.local/bin` wrapper keep working UNCHANGED through lp-09 and
+      lp-11a — `~/.local/bin` has no git history, so a `git revert` of a slice could not undo an
+      edit there, which is why lp-09 declined to vendor it. Any zero-byte flag on disk is therefore
+      already an operator hold.
+      SUPERSEDED IN PART 2026-08-22: lp-11a had ALREADY vendored a tracked, provenance-recording
+      wrapper at $MEM/mr-supervisor-disable on 2026-08-17 — it was simply never ADOPTED. Its own
+      header carries the `ln -sf` step into ~/.local/bin, and that step was never run, so the bare
+      `touch` stayed live for five days while two repo-side comments asserted otherwise. Adoption
+      (attended, operator-requested) also fixed three defects in the vendored file: it was
+      fail-OPEN (`exec mr-hold …` created NO hold when this tool was missing or hung — the operator
+      believes the loop is paused while it spends), its own `ln -sf` instruction was broken
+      (`dirname "$0"` resolves a SYMLINK to ~/.local/bin, so `$MEM/mr-hold` did not exist — now
+      `readlink -f`), and it reported success without checking a flag reached the disk. THIS
+      FAIL-SAFE IS UNCHANGED and still primary: the wrapper now degrades to a bare flag create when
+      this tool is unavailable, and that fallback is precisely what (b) keeps working. Teeth:
+      $MEM/supervisor-disable-teeth.sh (21 assertions, run by mr-selfcheck B1).
   (c) MR_FORCE=1 still overrides an operator hold for a manual run. Do NOT neuter it: it is already
       provenance-scoped by construction — only the operator can set it, every child spawner `unset`s
       it, and the tick strips it from the paid session's environment (`env -u MR_FORCE`, lp-09), so
@@ -291,7 +310,11 @@ def selftest():
 
         check("no flag -> no hold", read_hold() is None)
 
-        # (b) the fail-safe: the exact shape ~/.local/bin/mr-supervisor-disable produces
+        # (b) the fail-safe: the zero-byte shape. Until 2026-08-22 this was what
+        #     ~/.local/bin/mr-supervisor-disable produced on EVERY run; it is now only that
+        #     wrapper's FALLBACK path (this tool missing/failing/hung). Do not retire this
+        #     fixture on the strength of the wrapper recording provenance — the fallback is
+        #     exactly the case that still depends on this default.
         open(FLAG, "w").close()
         h = read_hold()
         check("zero-byte flag -> OPERATOR", h and h["by"] == "operator")

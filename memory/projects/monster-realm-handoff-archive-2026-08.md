@@ -3512,3 +3512,63 @@ N_MAX=2 default applied (not the N>=3 protocol -- no operator signal to raise N 
 Ledger rows appended for both launches (cost=0, model=opus, attempts=1). mr-state.json rewritten: inflight=[lp-brief-cost, lp-ollama], notes updated. Released chain-owner mutex after this record.
 
 Governor NORMAL (d7=$272.93/$2783=10%, fable_ok=true). No BLOCKER. No park-counter bump. NEXT: resume via event tick on either slice's `.done` file or PR-open event; lp-06 remains queued and ready for the fast path once a slot frees or the next tick re-derives.
+## 2026-08-22T09:05:18Z — lp-brief-cost MERGED — false budget premise removed from the brief template
+PR #31 squash-merged to main (1493e4a), branch feat/lp-brief-cost deleted. Removed the false-premise budget line from mr-brief-template.md (previously claimed budget was ample / cited an unmeasured 125% figure as mechanical, though costwatch_enforce is false) and replaced it with a bounded-budget instruction, per EARS E1-E3. Added lp-brief-cost-teeth.sh proof-of-teeth fixture (A1-A5, TEETH-ALL-OK) and 5 mr-selfcheck gate assertions wired to it. mr-audit CLEAN (orchestration+gating, 1 attempt, opus/high). Re-verified mr-selfcheck + the teeth fixture green live on the merged tip before merging. This repo carries no GH Actions checks (statusCheckRollup/gh run list both empty) — the harness-slice gate is mr-selfcheck + touched-tool selftests, not remote CI. No ADR (loop-infra slice). lp-ollama (feat/lp-ollama, session_leader 69830) remained live throughout, untouched — disjoint touches (mr-native-tick.sh).
+## 2026-08-22T11:12:34Z — lp-06 — mr-backup + stray-handoff rule: PR #33 open, gate green
+**lp-06 — PR #33 OPEN, local gate GREEN. Terminal state reached; supervisor owns the merge.**
+
+Branch `feat/lp-06` (worktree `.claude/worktrees/lp-06`), 6 commits, base `origin/main` 1493e4a.
+https://github.com/mdrewt/claude-harness/pull/33
+
+**Gate** (harness `just ci` is NOT the gate for a `memory/projects/**` slice — it only runs
+`scripts/tests/*`; it was run anyway and is green under a LOGIN shell):
+`mr-selfcheck` -> SELFCHECK-OK · `mr-backup --selftest` -> BACKUP-SELFTEST-OK 11 ·
+`lp-06-teeth.sh` -> TEETH-ALL-OK (37 cases). `verifier` verdict PASS, incl. an independent
+re-demonstration that the stray-handoff RED/green flip, the B0 byte restore and the W8/W9 stub
+mutations all still bite, and a mechanical check that no gating case was deleted, skipped or loosened
+across the branch history (34 -> 37, growth only).
+
+**Shipped:** `memory/projects/mr-backup` (new, 375 lines, python3: `snapshot`/`restore`/`--selftest`,
+root `${XDG_STATE_HOME:-$HOME/.local/state}/mr-backup`, 14-day retention, tmp+os.replace);
+the backup trigger in `mr-record` (at the WRITER, strictly after durability — ledger after
+append+close, handoff after the flock RELEASES); the untracked-AND-outside stray-handoff rule plus
+six supporting checks in `mr-selfcheck`. touches-delta: `lp-06-teeth.sh` (sibling teeth) and
+`monster-realm-lp-06-plan.md` (plan memo). boyscout-delta: `mr-record:46-50` reorder so exactly one
+line matches `^MEM=` (a pre-existing fixture hazard).
+
+**DONE ON REAL DATA (T9):** `~/.local/state/mr-backup/20260822/` now holds the live 562,127-byte
+ledger and the 71,876-byte handoff — the ledger's FIRST recoverable copy since 2026-07-24 — and
+`restore` into a temp dir cmps byte-identical. This seeding is load-bearing: without it the new
+drift check would correctly RED at the main checkout with "the ledger has NO recoverable copy".
+
+**Two PROVEN defects were found in the shipped code by the second review round and fixed before the
+PR** (full disposition table in `monster-realm-lp-06-plan.md` §8):
+- CRITICAL: root safety was graded only by `mr-backup --selftest`'s own marker+count. A stub with
+  `_root_illegal()` returning None greened the gate and then rmtree'd seven real 8-digit dirs out of
+  a $HOME-shaped root. Fixed by an EXTERNAL illegal-root probe in mr-selfcheck; pinned by W8.
+- HIGH: `_backup()`'s `communicate(timeout=10)` bounds waiting, not output VOLUME — a stdout-flooding
+  stub ran 32.8s / 7.46 GB against a 10s ceiling the cron `timeout 60` depends on. Fixed with
+  `stdout=DEVNULL` + inherited stderr + `p.wait(timeout=10)`; re-measured at exactly 10s, row intact.
+
+**SUPERVISOR ACTIONS AFTER MERGE:**
+1. Allocate an ADR number for lp-06 and have it written. NONE was allocated to this slice (assigned
+   number was literally `None`) and the loop rule forbids self-assignment, so four non-obvious calls
+   currently live only as tool-header rationale: backup-root-outside-tree WITH an env override
+   (contrasted against mr-selfcheck's refused MR_SELFCHECK_MEM); trigger-at-writer-not-tick;
+   untracked-AND-outside with four enumerated blind spots; drift-not-freshness. Harness `docs/adr/`
+   holds 0001-0011 and has NO next-free SSOT (monster-realm does) — worth adding one.
+2. **lp-06a** (new, outside lp-06's touches:) — `memory/monster-realm-handoff.md` is a TRACKED
+   wrong-path handoff, 1,781 bytes, committed by e3b6b29. Its content is native-tick entries that
+   belong in `memory/projects/`. The new rule is green against it BY DESIGN (the untracked clause is
+   what keeps the two doctrine-sanctioned archives from red-lining on day one); `git rm --cached`
+   makes it untracked and fires the gate immediately. Merge the content, then remove the file.
+3. `memory/projects/mr-native-supervisor-README.md` does not mention `mr-backup` — outside touches:,
+   flagged not touched.
+
+**Standing risk, pre-existing and NOT introduced here:** `mr-record`'s worst case is already ~80s
+(mr-cost-sum 60s + lp02_derive 20s) against the tick's `timeout 60` wrapper. The backup adds a hard
+10s bound on top of that. Worth its own slice.
+
+**Note for the next slice that touches `lp-06-teeth.sh`:** never run it concurrently with another
+copy of itself — W5 creates one probe file in the repo's `memory/` and correctly REFUSES to run if it
+already exists, so two simultaneous runs make one of them fail on setup. Not a defect; by design.

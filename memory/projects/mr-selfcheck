@@ -442,6 +442,18 @@ grep -F 'Definition of done (the authority)' "$MEM/mr-brief-template.md" | grep 
 # The proof-of-teeth fixture for A1-A5, RUN rather than merely committed (ADR-0010): an uninvoked
 # fixture rots, and it is not named mr-* so the tool enumeration above never even syntax-checks it.
 "$MEM/lp-brief-cost-teeth.sh" >/dev/null 2>&1 || { echo "SELFCHECK-FAIL lp-brief-cost proof-of-teeth: lp-brief-cost-teeth.sh did not report TEETH-ALL-OK -- run it directly for the failing case; an A1-A5 assertion has stopped biting, or the block's sed anchors have drifted"; BAD=1; }
+# lp-11a ADOPTION (2026-08-22). Two checks, and the SECOND is the one that matters.
+#   B1 runs the wrapper's proof-of-teeth fixture (ADR-0010: run it, do not merely commit it) --
+#      21 assertions, incl. the two defects that adoption exposed: fail-OPEN when mr-hold is
+#      unavailable (a disable that creates no hold), and a symlink-invoked wrapper resolving MEM to
+#      ~/.local/bin so `$MEM/mr-hold` does not exist. Both were RED before 2026-08-22.
+#   B2 is an ADOPTION-DRIFT guard, and it exists because nothing measured this for five days:
+#      lp-11a shipped the tracked wrapper on 2026-08-17 with `ln -sf` adoption instructions, the
+#      symlink was never created, ~/.local/bin kept the bare `touch`, and TWO repo-side comments
+#      asserted the routing was live while every operator pause still escalated (issues #34/#35).
+#      A commit cannot perform an out-of-repo symlink -- so the repo must at least NOTICE.
+"$MEM/supervisor-disable-teeth.sh" >/dev/null 2>&1 || { echo "SELFCHECK-FAIL B1 supervisor-disable proof-of-teeth: supervisor-disable-teeth.sh did not report TEETH-ALL-OK -- run it directly for the failing case"; BAD=1; }
+[ "$(readlink -f "$HOME/.local/bin/mr-supervisor-disable" 2>/dev/null)" = "$(readlink -f "$MEM/mr-supervisor-disable" 2>/dev/null)" ] || { echo "SELFCHECK-FAIL B2 adoption drift: ~/.local/bin/mr-supervisor-disable does not resolve to \$MEM/mr-supervisor-disable, so the operator's pause is NOT the tracked provenance-recording wrapper (this is exactly the 2026-08-17..22 gap). Fix: ln -sf \"$MEM/mr-supervisor-disable\" \"$HOME/.local/bin/mr-supervisor-disable\""; BAD=1; }
 # lp-06: mr-backup + the stray-handoff rule
 #   EARS-1 (a recoverable copy of the ledger/handoff outside the working tree) and EARS-2 (an
 #   untracked handoff-shaped file outside memory/projects/ must red). Placed AFTER the lp-brief-cost

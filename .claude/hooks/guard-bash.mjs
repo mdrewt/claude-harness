@@ -59,9 +59,24 @@ if (process.argv[2] === "--selftest") {
     // rule carried — one optional bare token, which `sudo -u x` already defeated. One definition,
     // used by every rule below, so the tolerance cannot drift between them again.
     const AT = "(?:^|[;&|(\\n])\\s*";
+    // PATH PREFIX (2026-08-22, red-team). Every rule below names a BARE verb -- `rm`, `git`,
+    // `mr-supervisor-enable` -- and AT tolerated only WHITESPACE before it. So the single most
+    // ordinary invocation shape in existence, an absolute path, matched NOTHING:
+    //     /bin/rm -rf /tmp/x                        -> allowed
+    //     /usr/bin/git push --force origin main     -> allowed
+    //     /home/mdrewt/.local/bin/mr-supervisor-enable -> allowed   <-- clears an OPERATOR hold
+    // All three verified by feeding literal strings to this hook's stdin. The last one falsified the
+    // guarantee in mr-native-supervisor-README.md that "an agent session cannot clear an operator
+    // hold": `which mr-supervisor-enable` hands a session the bypass with no adversarial intent
+    // required, and settings.json's permissions.deny carries no mr-supervisor-* entry to catch it.
+    // This is NOT one of the documented KNOWN-GAPS below -- those are indirection (bash -c, xargs,
+    // variable). This was the direct route, and it was open on every rule in the file.
+    // Applied ONCE, in the shared helper, so the tolerance cannot drift between rules -- the same
+    // reason WRAP lives here. Widening can only ever block MORE: the fail-safe direction.
+    const PFX = "(?:[\\w.~+-]*\\/)*";
     const WRAP =
-      "(?:(?:env|sudo|doas|command|nohup|time|exec|nice|setsid|stdbuf|timeout)\\s+(?:[^\\s;&|]+\\s+){0,4})*";
-    const at = (rest) => new RegExp(AT + WRAP + rest, "i");
+      "(?:(?:env|sudo|doas|command|nohup|time|exec|nice|setsid|stdbuf|timeout|bash|sh|zsh|dash|ksh)\\s+(?:[^\\s;&|]+\\s+){0,4})*";
+    const at = (rest) => new RegExp(AT + PFX + WRAP + PFX + rest, "i");
     const danger = [
       at("rm\\s+-\\w*r\\w*f\\w*"), // rm -rf, -Rf, -rfv ...
       at("rm\\s+-\\w*f\\w*r\\w*"), // rm -fr ...
@@ -210,6 +225,35 @@ function runSelftest() {
   check("pin: mr-supervisor-disable (operator pause, not a session action)", "mr-supervisor-disable", true);
   check("pin: sudo mr-supervisor-disable", "sudo mr-supervisor-disable", true);
   check("pin: chained mr-supervisor-disable", "cd /x && mr-supervisor-disable oops", true);
+  // PATH-PREFIX PINS (2026-08-22, red-team). Every one of these was ALLOWED before `PFX` was added
+  // to the shared `at()` helper. An absolute path is the most ordinary invocation shape there is,
+  // and `which <verb>` hands it to a session for free — no indirection, no adversarial intent. The
+  // kill-switch clear was the worst of them: it made mr-native-supervisor-README's guarantee that
+  // "an agent session cannot clear an operator hold" simply false. These are NOT the documented
+  // KNOWN-GAPs below (bash -c, xargs, variable indirection); this was the direct route, open on
+  // every rule in the file — including `rm -rf` and force-push.
+  check("pin: abs-path mr-supervisor-enable", "/home/mdrewt/.local/bin/mr-supervisor-enable", true);
+  check("pin: tilde-path mr-supervisor-enable", "~/.local/bin/mr-supervisor-enable", true);
+  check("pin: dotslash mr-supervisor-enable", "./mr-supervisor-enable", true);
+  check("pin: abs-path rm -rf", "/bin/rm -rf /tmp/x", true);
+  check("pin: abs-path force push to main", "/usr/bin/git push --force origin main", true);
+  check("pin: abs-path write verb on the flag", "/usr/bin/touch /p/.native-supervisor-disabled", true);
+  check("pin: abs-path wrapper AND abs-path verb", "/usr/bin/sudo /bin/rm -rf /tmp/x", true);
+  // The interpreter route: naming an interpreter ahead of the tracked in-repo copy of the
+  // operator's pause ran it straight past the rule written to stop it (red-team, HIGH). Closed by
+  // adding the shell names to WRAP. Cost, accepted knowingly: a syntax check of a guarded wrapper
+  // (`bash -n <it>`) now trips too. That is the fail-safe direction, and copying the file first is
+  // a one-line workaround; silently launching the kill switch is not recoverable that cheaply.
+  check("pin: interpreter + tracked wrapper path", "bash memory/projects/mr-supervisor-disable", true);
+  check("pin: dotslash tracked wrapper", "./memory/projects/mr-supervisor-disable", true);
+  // MUST-NOT-BLOCK. Widening is fail-safe, but an over-firing guard gets switched off — which is
+  // how decorative gates are born. Reads of, and prose about, these same paths stay allowed.
+  check("allow: echo a guarded path", "echo /home/mdrewt/.local/bin/mr-supervisor-enable", false);
+  check("allow: ls a guarded path", "ls -la /home/mdrewt/.local/bin/mr-supervisor-enable", false);
+  check("allow: grep the verb in docs", "grep -rn mr-supervisor-enable docs/", false);
+  check("allow: cat the tracked wrapper", "cat memory/projects/mr-supervisor-disable", false);
+  check("allow: ordinary push", "git push origin main", false);
+  check("allow: ordinary rm -f", "rm -f /tmp/scratch.txt", false);
   // The session's own pause stays open — provenance recorded AND self-clearable.
   check("allow: mr-hold set --by supervisor (the session's sanctioned pause)",
     "mr-hold set --by supervisor --reason paced", false);

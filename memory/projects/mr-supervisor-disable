@@ -16,18 +16,81 @@
 #
 # Writing `by=operator` costs nothing and makes the two cases distinguishable forever after: a hold
 # set through this tool is attributed and the tick stays quiet; a hold with no provenance is now an
-# ANOMALY the tick escalates once (mr-native-tick.sh gate -1). The pause itself behaves identically.
+# ANOMALY the tick escalates once (mr-native-tick.sh gate -1, TRIGGER 1 at :167; the comment naming
+# that signature is at :141).
 #
 # Delegating to `mr-hold set` rather than writing the file here is deliberate — mr-hold is the SSOT
 # for the flag's format and the only place provenance rules live, so there is no second copy of the
-# format to drift. To adopt it:
+# format to drift.
+#
+# ADOPTION (this is the step that was missed for five days — see the 2026-08-22 note below):
 #
 #     ln -sf /home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-disable \
 #            ~/.local/bin/mr-supervisor-disable
 #
 # `mr-supervisor-enable` (the clear) deliberately stays the operator's own untracked script: the
 # guard blocks it at command position so no session can run it, which is the point.
+#
+# ---------------------------------------------------------------------------------------------
+# 2026-08-22 (attended, operator-requested). THIS FILE SHIPPED ON 2026-08-17 AND WAS NEVER ADOPTED.
+# `~/.local/bin/mr-supervisor-disable` stayed the bare `touch`, so every deliberate operator pause
+# still produced an unattributed flag and tripped the TRIGGER-1 escalation it was written to
+# prevent — decision issues #34 and #35, 20 minutes apart, on 2026-08-22. Two repo-side comments
+# (mr-native-tick.sh:142-143 and guard-bash.mjs:110-118) had already asserted this routing was live.
+# A commit cannot perform an out-of-repo symlink, so the repo half shipped and the machine half sat
+# undone with nothing measuring the difference.
+#
+# Three defects fixed here while adopting it:
+#
+#   1. FAIL-OPEN -> FAIL-SAFE. `exec "$MEM/mr-hold" …` created NO hold if mr-hold was missing,
+#      broken or hung: the operator reads one error line and believes the loop is paused while it
+#      keeps spending. A disable that fails to disable is far worse than an unattributed hold, so
+#      an unavailable mr-hold now degrades to the bare flag create — which the fail-safe still
+#      reads as OPERATOR. Provenance is the nice-to-have; STOPPING THE LOOP is the contract.
+#   2. THE ADOPTION INSTRUCTION ABOVE WAS ITSELF BROKEN. Bash sets `$0` to the path used to invoke,
+#      NOT the symlink target, so `dirname "$0"` under `ln -sf` resolved MEM to `~/.local/bin` and
+#      `$MEM/mr-hold` did not exist — defect 1 firing on every single run. `readlink -f` resolves
+#      the link first. Verified both ways (direct and via symlink).
+#   3. NO POST-CONDITION. Success was reported without checking that a flag reached the disk.
+# ---------------------------------------------------------------------------------------------
 set -u
-MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-REASON="${*:-manual pause (mr-supervisor-disable)}"
-exec "$MEM/mr-hold" set --by operator --reason "$REASON"
+# Resolve the symlink FIRST — see defect 2 above. Falls back to `$0` where readlink is unavailable.
+SELF="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+MEM="$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)"
+FLAG="$MEM/.native-supervisor-disabled"
+
+case "${1:-}" in
+  -h|--help) echo "usage: mr-supervisor-disable [reason words ...]"; echo "  Pauses the native supervisor loop (operator provenance) until mr-supervisor-enable."; exit 0 ;;
+esac
+
+REASON="${*:-}"
+[ -n "$REASON" ] || REASON="operator paused the pipeline manually; ticks stay held until the operator runs mr-supervisor-enable"
+
+# `timeout` bounds a hung helper; any non-zero (including 124) falls through to the fail-safe.
+if [ -x "$MEM/mr-hold" ] && timeout 30 "$MEM/mr-hold" set --by operator --reason "$REASON"; then
+  :
+else
+  # Fail-safe, not fail-open. `touch` does not truncate, so if mr-hold DID write provenance and
+  # then failed late, this refreshes the mtime without downgrading an attributed hold.
+  if touch "$FLAG" 2>/dev/null; then
+    # Do NOT infer "unattributed" from "this branch was taken". mr-hold writes atomically and may
+    # have landed provenance and THEN failed late (stdout closed by a pipe, or a timeout SIGTERM in
+    # the window after os.replace). `touch` does not truncate, so that content survives — read what
+    # is actually on disk rather than reporting a state we merely assumed. Reported wrongly, this
+    # line sends the operator hunting an escalation that will never fire.
+    if grep -q "^by=" "$FLAG" 2>/dev/null; then
+      echo "HOLD-SET by=operator (mr-hold reported failure, but provenance IS on disk — no escalation expected)"
+    else
+      echo "HOLD-SET by=operator (FALLBACK: mr-hold unavailable — flag is unattributed and will escalate)"
+    fi
+  fi
+fi
+
+# Post-condition, not decoration: report DISABLED only if the flag actually reached the disk.
+if [ ! -f "$FLAG" ]; then
+  echo "mr-supervisor-disable: FAILED — no hold flag at $FLAG. The loop is NOT paused." >&2
+  exit 1
+fi
+
+echo "Monster Realm supervisor: DISABLED — hourly cron ticks will skip."
+echo "Run one anyway: mr-supervisor-run   |   Resume schedule: mr-supervisor-enable"

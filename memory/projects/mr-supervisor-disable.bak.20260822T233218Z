@@ -1,0 +1,5 @@
+#!/bin/bash
+MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
+touch "$MEM/.native-supervisor-disabled"
+echo "Monster Realm supervisor: DISABLED — hourly cron ticks will skip."
+echo "Run one anyway: mr-supervisor-run   |   Resume schedule: mr-supervisor-enable"

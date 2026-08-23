@@ -1011,6 +1011,51 @@ the hook instead of the `mr-supervisor-disable` vendoring the spec had listed; *
 deliberately NOT done** — that path has no git history, so an edit there could not be reverted with
 the slice, and the fail-safe default makes it unnecessary.
 
+**Amended 2026-08-22 (attended, operator-requested) — the vendoring above WAS done, by `lp-11a`, and
+then never adopted. That gap is the finding.** `lp-11a` (2026-08-17, `90f816f`) shipped a tracked,
+provenance-recording wrapper at `memory/projects/mr-supervisor-disable`, carrying its own `ln -sf`
+adoption step into `~/.local/bin`. **The symlink was never created.** So `~/.local/bin` kept the bare
+`touch` while two repo-side comments asserted the routing was live — `mr-native-tick.sh:142-143`
+("shipped alongside this change") and `guard-bash.mjs:110-118`, which blocks the wrapper as a Bash
+tool call *on the premise that it now records provenance*. Every operator pause therefore still read
+`attributed:false` and tripped the TRIGGER-1 escalation lp-11a wrote to prevent: decision issues #34
+and #35, 20 minutes apart, on 2026-08-22. **A commit cannot perform an out-of-repo symlink, so the
+repo half shipped, the machine half sat undone, and nothing in the corpus measured the difference for
+five days.**
+
+Adoption exposed three defects in the vendored file, all fixed here: (1) it was **fail-OPEN** —
+`exec "$MEM/mr-hold" …` created NO hold when `mr-hold` was missing or hung, so the operator reads one
+error line and believes the loop is paused while it keeps spending; it now degrades to the bare flag
+create, which the fail-safe still reads as OPERATOR. *Provenance is the nice-to-have; stopping the
+loop is the contract.* (2) **its own `ln -sf` instruction was broken** — bash sets `$0` to the
+invoking path, so `dirname "$0"` under a symlink resolved `MEM` to `~/.local/bin` and `$MEM/mr-hold`
+did not exist, firing defect 1 on every run; now `readlink -f`. (3) it reported success without
+checking a flag reached the disk.
+
+Teeth (**this replaces an earlier draft of this paragraph that cited an ephemeral "17 behavioural
+fixtures" — a real but unreproducible ad-hoc count, which in a ledger reads as coverage that does not
+exist**): `memory/projects/supervisor-disable-teeth.sh`, 23 assertions, copying the REAL wrapper into
+a sandbox beside a stub `mr-hold` (never hand-copied logic, per `lp-brief-cost-teeth.sh`). Verified to
+BITE: **13 RED** against the pre-adoption wrapper, including fail-open and the symlink defect. Run by
+`mr-selfcheck` as **B1**; **B2** is an adoption-drift guard asserting `~/.local/bin/mr-supervisor-disable`
+resolves to the tracked file — the check whose absence cost five days. No env override was added to
+make the wrapper testable: `mr-hold` rejected `MR_SELFCHECK_MEM` for the same reason (an override is a
+surface for greening production vacuously), and self-location makes a sandbox copy sufficient.
+
+**Red-team turned up a CRITICAL defect in `guard-bash.mjs` that predates this work** and is recorded
+in ADR-0002's 2026-08-22 amendment: the `at()` anchor tolerated only whitespace before a verb, so
+**any path prefix defeated every rule in the file** — `/bin/rm -rf …`, `/usr/bin/git push --force
+origin main`, and `~/.local/bin/mr-supervisor-enable`, which clears an OPERATOR hold and falsified
+`mr-native-supervisor-README.md`'s guarantee that a session cannot. Closed in the shared helper
+(`PFX`), plus shell names in `WRAP` to stop `bash <wrapper-path>`; 81 → 96 selftest fixtures.
+**The project-repo copy at `projects/monster-realm/.claude/hooks/guard-bash.mjs` carries the same
+defect and is NOT fixed here** — separate repo, separate PR.
+
+**Generalisable lesson:** when a slice narrows `touches:` because a path is outside version control,
+the dependent repo-side changes still ship. The out-of-repo half needs an explicit operator-attended
+step (`lp-07`'s shape) *and* a corpus check that fails while it is undone — otherwise the two halves
+drift silently and the comments lie.
+
 A first version of the guard matched those command names as bare substrings and blocked merely
 *writing about* the kill switch — it blocked this slice's own documentation. The rules are now
 anchored at command position. **An over-firing guard is worse than a narrow one: it gets switched

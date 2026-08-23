@@ -390,6 +390,189 @@ which pins that ordinary non-PATH env keys are ACCEPTED. Re-authoring U2c is a d
   `.claude/hooks/guard-tester-bash.mjs`, added by that very commit); sibling 16r-a fixed it in
   `5f14fe2`. Merging up cleared it. Remote CI never caught it — worth understanding why.
 
+## 2026-08-22T~22:5xZ — 16r-f COMPLETE (terminal state: PR #353 open + local `just ci` green)
+
+**PR:** https://github.com/mdrewt/monster-realm/pull/353 — branch `feat/16r-f-battle-reseed-sticky-latch`,
+worktree `.claude/worktrees/16r-f`, forked from master `d4fa9fe`. OPEN / MERGEABLE, ci+e2e IN_PROGRESS at
+exit. **`gh pr merge` NOT run — supervisor owns the merge.**
+
+Local full `just ci` **exit 0** (single run, all recipes through observability-validate 8/8): 2472 client
+tests (82 files), Rust suites, evals, perf-budget 7/7, secret-scan clean. Semgrep run LOCALLY on both
+changed files (remote-only gate): 1074 rules, 0 findings. Independent `verifier` verdict **PASS** (RED
+proof + T10 bite reproduced from scratch; test-file history purely additive except 2 disclosed docblock
+header lines; scope exact).
+
+**Diff (4 wip commits → squash):** `client/src/main.ts` (+20/−6: sticky latch, `reseedPrevBattleId`
+guarded capture as onReconnect's first statement, id-gated silent re-baseline) · NEW
+`client/src/main.battle-reseed.test.ts` (523 lines, 11 runtime tests — the repo's FIRST runtime-import
+gate over main.ts) · `docs/adr/0130-client-observability.md` (+41, APPEND-ONLY amendment; DIGEST
+unchanged). `main.wiring.test.ts` declared but untouched (185 teeth green unmodified).
+
+**Spec deviation, reviewed + recorded:** the spec's minimal "don't clear on undefined" shape swallows the
+next NEW battleStart for zero-battle-row players (server GCs battles). Plan review adopted the drop-time
+id-capture refinement; EARS unchanged. Rationale + residuals (c)/(d)/(e) in the ADR-0130 amendment.
+
+**Test-first, audited:** tester (opus) authored T1-T9 → orchestrator ran RED proof at fork (exactly T1+T8
+red) → impl → lenses (reviewer APPROVED, red-team 6-mutation table + Semgrep, desync-guard PASS, /simplify
+clean) → both red-team and desync-guard independently found the multi-episode gap → tester authored T10
+(kills capture-once-ever AND never-clear cheats, both bite-proofs MEASURED by the orchestrator) → verifier
+PASS. One provably-inert mutation (`reseedPrevBattleId = null` deletion) documented, not papered over.
+
+**Follow-up flags (supervisor; none blocking):**
+1. justfile: `client-test` should depend on `wasm` + justfile:271 "no wasm import" comment now stale — the
+   new test resolves `client-wasm/pkg` (safe under `just ci` ordering; bare `npm test` on unbuilt tree reds
+   with a clear resolve error).
+2. ADR-0198 D7 "assumed" subscription-batch atomicity — falsified-and-moot for the battle listener; needs
+   an Amends note from a slice owning that file.
+3. Pre-existing, red-team-MEASURED: `latestPlayerBattle()` single-highest-id design makes the lower of two
+   simultaneous Ongoing battles invisible to the event ring for its whole lifecycle (store.ts design).
+4. Pre-existing: main.ts `identity` never refreshed on reconnect — an identity-minting reconnect silences
+   every identity-scoped listener with the latch armed (ADR-0130 residual (e)); worth its own slice.
+5. /tmp cleanup: `/tmp/16rf-verify-*` + `/tmp/mr16rf-bite2` copies left (rm hook-blocked, harmless);
+   a leftover 16r-d spacetime instance still runs on 127.0.0.1:3099 (`--data-dir /tmp/mr16rd-stdb-a`).
+
+Budget: well under the $150 target (planner + 2 plan lenses + tester(opus)×2 + 3 impl lenses + verifier +
+doc-keeper; no thrash — RED proof and all suites first-try).
+
+## 2026-08-22T~19:5xZ — 16r-e COMPLETE (terminal state: PR #354 open + local `just ci` green)
+
+**PR:** https://github.com/mdrewt/monster-realm/pull/354 — branch `feat/16r-e-scheduled-function-delay`,
+worktree `.claude/worktrees/16r-e`, forked from `b5ff14f`, **merged up to `origin/master` @ `d4fa9fe`**.
+OPEN / MERGEABLE; ci QUEUED, e2e IN_PROGRESS at exit. **`gh pr merge` NOT run — supervisor owns the merge.**
+
+Local full `just ci` **exit 0** (twice): 1942 cargo tests, 2461 client tests, 87 evals, clippy
+`-D warnings`, fmt, biome, wasm, observability-validate 8/8 (dockerized `promtool check rules`).
+**Semgrep run LOCALLY** (remote-only gate) over the changed files: 0 findings. Independent
+`verifier` verdict **PASS** (re-ran the gate + 10 mutations itself).
+
+**Diff (5 files):** `evals/observability-stack-config.eval.mjs` (+~2000, teeth-heavy per convention),
+`ops/observability/{rules/recording.rules.yml,grafana/dashboards/monster-realm.json,
+grafana/provisioning/alerting/rules.yml,prometheus.yml}`. `touches-delta:` the eval only (the slice
+spec names it as this slice's test surface). `prometheus.yml` is COMMENT-ONLY — the metric rides the
+existing S1 scrape job. `boyscout-delta: none`. No ADR (none assigned; see below).
+
+**Delivered:** `mr-scheduler` recording group (starts / on_time / late-ratio), dashboard panel id 14,
+and `ScheduledFunctionDelayed` warning alert in a NEW `scheduler-health` group, scoped to
+`movement_tick|trade_offer_reaper|pvp_deadline_reaper|battle_challenge_reaper`.
+
+**THE DESIGN DEPARTS FROM THE SLICE TEXT, DELIBERATELY AND ON MEASUREMENT.** The spec/runbook name a
+30 ms threshold; a live 2.8.1 `/v1/metrics` scrape shows (a) the label is **`function`**, not the
+`reducer` every other rule uses — a spec-literal impl would record an EMPTY series forever; (b) the
+bucket lattice has **no 0.03 edge**; and (c) **p95 is structurally blind to this distribution** —
+p95 sits inside (0.001,0.005] reading "~5 ms healthy" while 158/15186 starts (1.04%) exceeded 50 ms
+and **48 exceeded 60 SECONDS**. The planner recommended p95@0.05; the red-team refuted it; the
+measurement settled it. Shipped signal is an exact **over-edge ratio at the real 0.05 edge**. Full
+rationale is in the two config files' own comment blocks. Details in
+`memory/projects/monster-realm-16r-e-plan.md` and the memory card
+`spacetime-scheduled-delay-metric-shape`.
+
+**26 mutations executed against the real files; all bite.** The FIRST pass found **4 that SURVIVED**
+— all closed and re-proven: `clamp_max(…,0)` (alert can never fire), `… * 0` (always fires),
+`expression: ZZ` (threshold on a nonexistent refId — rule dead, gate green), and a decoy group
+re-recording a series name as `vector(0)` (passed the eval AND real `promtool`). Closed with a
+structural **whitelist** (each expr must equal a template rebuilt from its own parts) rather than a
+denylist of neutering tokens, per the unclosable-blacklist finding. Legitimate changes still pass
+(threshold retune, `for:` retune); a coordinated retune to an OFF-lattice edge still reds.
+
+**No new ADR — none was assigned, and I did not pick one.** The natural home (ADR-0197) was being
+edited concurrently by sibling 16r-d, so touching it would have collided. **Follow-up: allocate a
+number and lift the rationale out of the config comments.**
+
+**Follow-up flags (in the PR body, not new slices):** (1) no rule in `recording.rules.yml` filters on
+`db` — a second published DB (`account-e2e`'s `mr-acct-e2e`) would blend in; pre-existing, shared with
+`mr:movement_tick_latency_p95`/`mr:reducer_wait_p95`. (2) `relativeTimeRange` is read by NO gate, for
+any alert in the file. (3) the un-numbered ADR. (4) `mr:movement_tick_latency_p95` carries the same
+interpolation caveat this slice avoided. (5) pre-existing biome warning at
+`client/src/ui/leaderboardModel.test.ts:32`.
+
+### Operational findings
+- **The bite-proof loop's `git checkout --` destroyed my own uncommitted gate work** when the revert
+  set included `evals/`. Commit gates BEFORE the mutation loop; revert only the mutated paths.
+  Recorded as memory `bite-proof-revert-destroys-gate-work`.
+- **The `tester` subagent again could not write into `.claude/worktrees/<slice>`** (guard blocks all
+  of `.claude/`) — it staged to `/tmp` and the orchestrator applied. Unchanged since 16r-c; the fix
+  (exempt slice worktrees from the write guard) is still not done.
+- The tester delivered its round-3 fix only for 1 of 4 assigned gaps on the first attempt; the
+  orchestrator closed the other 3 by hand, then adopted the tester's fuller version once it landed
+  (it added in-suite teeth the hand-written clauses lacked). Both were re-proven by execution.
+- `/tmp/mr_warn_16r-e` appeared mid-run; landing pattern was honoured (no new fan-outs after it).
+
+## 2026-08-23T00:16:22Z — kill-switch wrapper ADOPTED (lp-11a shipped 08-17, never symlinked) + CRITICAL guard path-prefix bypass closed
+**Attended session, loop HELD throughout. The operator hold was never touched** — flag mtime
+1787440289, 0 bytes, still `by=operator attributed=false`. Two done-events (16r-e, 16r-f) remain
+queued behind it; they drain when the loop is re-enabled.
+
+**ONE STEP REMAINS AND IT IS THE OPERATOR'S** (a session cannot do it — `guard-bash.mjs` blocks the
+wrapper, and the permission layer blocked the symlink):
+
+    ln -sfn "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-disable" \
+            "/home/mdrewt/.local/bin/mr-supervisor-disable"
+
+Until it is run, `mr-selfcheck` check **B2 reports SELFCHECK-FAIL** and `~/.local/bin` holds a
+hand-written wrapper from this session rather than the tracked one. B2 only LOGS in the tick, so the
+loop is not wedged.
+
+**WHAT THIS WAS.** Drew ran `mr-supervisor-disable` and asked whether the flag was set and whether it
+would stop cron ticks. It was and it does — gate -1 exits before any paid work, verified against two
+real post-flag ticks that logged `SKIP hold by=operator`. But every pause was tripping the
+HOLD-UNATTRIBUTED escalation (#34, #35), and the cause turned out to be an ADOPTION GAP, not a missing
+fix.
+
+**`lp-11a` already shipped the fix on 2026-08-17** — a tracked provenance-recording wrapper at
+`memory/projects/mr-supervisor-disable`, carrying its own `ln -sf` adoption step. That step was never
+run. `~/.local/bin` kept the bare `touch` for five days while `mr-native-tick.sh:142-143` and
+`guard-bash.mjs:110-118` both asserted the routing was live. **A commit cannot perform an out-of-repo
+symlink, so the repo half shipped, the machine half did not, and nothing measured the difference.**
+
+**Adoption exposed three defects in the vendored file, all fixed:**
+1. **FAIL-OPEN** — `exec "$MEM/mr-hold" …` created NO hold when mr-hold was missing or hung. The
+   operator reads one error line and believes the loop is paused while it keeps spending. It now
+   degrades to a bare flag create. Provenance is the nice-to-have; stopping the loop is the contract.
+2. **Its own `ln -sf` instruction was broken** — bash sets `$0` to the invoking path, so
+   `dirname "$0"` under a symlink resolved MEM to `~/.local/bin` and `$MEM/mr-hold` did not exist,
+   firing defect 1 on every run. Now `readlink -f`.
+3. Success was reported without checking a flag reached disk.
+
+**CRITICAL, PRE-EXISTING, FOUND BY RED-TEAM — `guard-bash.mjs` was bypassable by any path prefix.**
+The shared `at()` anchor tolerated only whitespace before a verb, so a leading `/` defeated EVERY rule
+in the file. Verified by feeding literal strings to the hook's stdin: `/bin/rm -rf …`,
+`/usr/bin/git push --force origin main`, write verbs on the hold flag, and the resume wrapper by
+absolute path — which CLEARS AN OPERATOR HOLD and falsified the README's guarantee that a session
+cannot. `which mr-supervisor-enable` hands over the bypass with no adversarial intent, and
+`permissions.deny` has no `mr-supervisor-*` entry, so this hook was the sole control. Fixed once in
+the shared helper (`PFX`) plus shell names in `WRAP` to close `bash <wrapper-path>`. 81 -> 96
+fixtures, pinning each closed route AND each read that must stay allowed. ADR-0002 amended.
+Accepted cost, recorded: `bash -n <guarded wrapper>` now trips the guard; copy the file first.
+
+**NEW TEETH.** `memory/projects/supervisor-disable-teeth.sh` — 23 assertions, copies the REAL wrapper
+into a sandbox beside a stub `mr-hold` (no env override; `mr-hold` rejected `MR_SELFCHECK_MEM` as a
+surface for greening production vacuously). Proven to bite: **13 RED** against the pre-adoption
+wrapper. Run by `mr-selfcheck` as **B1**. **B2** is the adoption-drift guard — the check whose absence
+cost five days.
+
+**LEFT UNDONE, DELIBERATELY:**
+- `projects/monster-realm/.claude/hooks/guard-bash.mjs` carries the IDENTICAL path-prefix bypass.
+  Separate repo, separate PR. `templates/_base`'s copy predates the `at()` helper and is unaffected.
+- **TRIGGER 2 can be starved.** `mr-hold set` rewrites the flag every call so mtime always moves, and
+  the tick derives hold age by `stat`-ing that mtime. Since attribution now suppresses TRIGGER 1 by
+  design, a hold re-set inside 6h never escalates at all. The old bare `touch` was noisy but always
+  self-alerting; this inverts that trade. Fix shape: have `mr-hold set` preserve the original `at=`
+  when `by=` is unchanged, and have the tick read `at=` from `status --json` instead of `stat`.
+  Not attempted here — it edits the live cron entrypoint and belongs in a gated slice.
+
+**GATES:** mr-hold 39 fixtures, guard 96, wrapper teeth 23 (13 RED against pre-fix), `just lint`
+clean, `just test` 103/103. `mr-selfcheck` reports only B2, which is TRUE until the symlink is made.
+
+**ROLLBACK:** `mr-supervisor-disable.bak.20260822T233218Z` (original bare `touch`) and
+`.bak.lp11a.20260822T233218Z` (lp-11a's pre-adoption version). Both use a `.bak.` infix on purpose:
+`_mr_files` excludes `.bak` but NOT `.preedit`, so a `.preedit` copy gets enumerated as a live corpus
+tool — worth knowing for any future out-of-repo backup.
+## 2026-08-22T23:21:35Z — HOLD-UNATTRIBUTED flag carries no provenance record (mtime=1787440289) — escalating once; loop stays held
+The build loop is held by a kill-switch flag with no provenance record. Did you pause it? If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour.
+
+## 2026-08-22T23:07:54Z — HOLD-UNATTRIBUTED flag carries no provenance record (mtime=1787439637) — escalating once; loop stays held
+The build loop is held by a kill-switch flag with no provenance record. Did you pause it? If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour.
+
 ## 2026-08-22T22:24:14Z — HARNESS: Bash output noise filter live (ADR-0012) — stop piping gate output through | tail
 **Harness change, applies to EVERY loop run from the next tick onward.** A
 PreToolUse(Bash) hook now filters noisy command output before it reaches any agent
@@ -563,68 +746,8 @@ Gate3 fresh derivation (queue[] empty): both repos fetched+synced, no open PRs, 
 ## 2026-08-22T11:16:29Z — lp-06 MERGED — mr-backup + stray-handoff rule
 PR #33 squash-merged to `main`@51073c8 (mdrewt/claude-harness). Delivered: `mr-backup` tool (snapshot/restore/diff for the durable ledger+handoff copy), a stray-handoff predicate added to `mr-selfcheck`, and `lp-06-teeth.sh` proof-of-teeth fixtures. mr-audit verdict CLEAN (orchestration CLEAN, gating-advisory CLEAN, mandatory_read=false; disposition findings were pre-existing corpus-wide spec-ledger gaps unrelated to this diff — not a merge predicate). Post-merge: fast-forwarded main, removed the lp-06 worktree + local/remote `feat/lp-06` branches, ran `mr-backup snapshot` to clear a transient post-merge backup-drift SELFCHECK-FAIL, re-ran `mr-selfcheck` -> SELFCHECK-OK. Governor NORMAL (d7≈$358/$2783≈13%, fable_ok=true). No composite launch this tick — inflight now empty but scope kept to the merge reconciliation; next tick derives the next slice fresh from PLAN §9 (queue[] is empty).
 
-## 2026-08-22T11:12:34Z — lp-06 — mr-backup + stray-handoff rule: PR #33 open, gate green
-**lp-06 — PR #33 OPEN, local gate GREEN. Terminal state reached; supervisor owns the merge.**
-
-Branch `feat/lp-06` (worktree `.claude/worktrees/lp-06`), 6 commits, base `origin/main` 1493e4a.
-https://github.com/mdrewt/claude-harness/pull/33
-
-**Gate** (harness `just ci` is NOT the gate for a `memory/projects/**` slice — it only runs
-`scripts/tests/*`; it was run anyway and is green under a LOGIN shell):
-`mr-selfcheck` -> SELFCHECK-OK · `mr-backup --selftest` -> BACKUP-SELFTEST-OK 11 ·
-`lp-06-teeth.sh` -> TEETH-ALL-OK (37 cases). `verifier` verdict PASS, incl. an independent
-re-demonstration that the stray-handoff RED/green flip, the B0 byte restore and the W8/W9 stub
-mutations all still bite, and a mechanical check that no gating case was deleted, skipped or loosened
-across the branch history (34 -> 37, growth only).
-
-**Shipped:** `memory/projects/mr-backup` (new, 375 lines, python3: `snapshot`/`restore`/`--selftest`,
-root `${XDG_STATE_HOME:-$HOME/.local/state}/mr-backup`, 14-day retention, tmp+os.replace);
-the backup trigger in `mr-record` (at the WRITER, strictly after durability — ledger after
-append+close, handoff after the flock RELEASES); the untracked-AND-outside stray-handoff rule plus
-six supporting checks in `mr-selfcheck`. touches-delta: `lp-06-teeth.sh` (sibling teeth) and
-`monster-realm-lp-06-plan.md` (plan memo). boyscout-delta: `mr-record:46-50` reorder so exactly one
-line matches `^MEM=` (a pre-existing fixture hazard).
-
-**DONE ON REAL DATA (T9):** `~/.local/state/mr-backup/20260822/` now holds the live 562,127-byte
-ledger and the 71,876-byte handoff — the ledger's FIRST recoverable copy since 2026-07-24 — and
-`restore` into a temp dir cmps byte-identical. This seeding is load-bearing: without it the new
-drift check would correctly RED at the main checkout with "the ledger has NO recoverable copy".
-
-**Two PROVEN defects were found in the shipped code by the second review round and fixed before the
-PR** (full disposition table in `monster-realm-lp-06-plan.md` §8):
-- CRITICAL: root safety was graded only by `mr-backup --selftest`'s own marker+count. A stub with
-  `_root_illegal()` returning None greened the gate and then rmtree'd seven real 8-digit dirs out of
-  a $HOME-shaped root. Fixed by an EXTERNAL illegal-root probe in mr-selfcheck; pinned by W8.
-- HIGH: `_backup()`'s `communicate(timeout=10)` bounds waiting, not output VOLUME — a stdout-flooding
-  stub ran 32.8s / 7.46 GB against a 10s ceiling the cron `timeout 60` depends on. Fixed with
-  `stdout=DEVNULL` + inherited stderr + `p.wait(timeout=10)`; re-measured at exactly 10s, row intact.
-
-**SUPERVISOR ACTIONS AFTER MERGE:**
-1. Allocate an ADR number for lp-06 and have it written. NONE was allocated to this slice (assigned
-   number was literally `None`) and the loop rule forbids self-assignment, so four non-obvious calls
-   currently live only as tool-header rationale: backup-root-outside-tree WITH an env override
-   (contrasted against mr-selfcheck's refused MR_SELFCHECK_MEM); trigger-at-writer-not-tick;
-   untracked-AND-outside with four enumerated blind spots; drift-not-freshness. Harness `docs/adr/`
-   holds 0001-0011 and has NO next-free SSOT (monster-realm does) — worth adding one.
-2. **lp-06a** (new, outside lp-06's touches:) — `memory/monster-realm-handoff.md` is a TRACKED
-   wrong-path handoff, 1,781 bytes, committed by e3b6b29. Its content is native-tick entries that
-   belong in `memory/projects/`. The new rule is green against it BY DESIGN (the untracked clause is
-   what keeps the two doctrine-sanctioned archives from red-lining on day one); `git rm --cached`
-   makes it untracked and fires the gate immediately. Merge the content, then remove the file.
-3. `memory/projects/mr-native-supervisor-README.md` does not mention `mr-backup` — outside touches:,
-   flagged not touched.
-
-**Standing risk, pre-existing and NOT introduced here:** `mr-record`'s worst case is already ~80s
-(mr-cost-sum 60s + lp02_derive 20s) against the tick's `timeout 60` wrapper. The backup adds a hard
-10s bound on top of that. Worth its own slice.
-
-**Note for the next slice that touches `lp-06-teeth.sh`:** never run it concurrently with another
-copy of itself — W5 creates one probe file in the repo's `memory/` and correctly REFUSES to run if it
-already exists, so two simultaneous runs make one of them fail on setup. Not a defect; by design.
 ## 2026-08-22T09:50:13Z — lp-ollama merged (PR#32, d3d1df5)
 Supervisor tick native-20260822T094703Z-348495 merged lp-ollama: deletes the unconditional per-tick ollama preflight from mr-native-tick.sh (803 warm-ups / 0 invocations measured), keeps mr-ollama for manual use, adds a 4-leg mr-selfcheck block (canary/behavioural/static/EARS-2) with proof-of-teeth. Audit CLEAN (orchestration+gating), no mandatory read; diff scope = declared touches (mr-native-tick.sh) + companions (mr-selfcheck, plan doc), matching the PR's touches-delta. Pre-existing dirty-tree strays on main (future-prompts.md, handoff files, mr-state.json, mr-usage-daily.jsonl, spacetime-db-testing.md, a spec file) were stashed labeled, ff-only merge applied, then popped back cleanly (mr-native-tick.sh auto-merged, no conflict markers). Worktree + feat/lp-ollama branch removed post-merge. Note for future ticks: /usr/bin/node v18.19.1 on PATH ahead of the asdf node 24.13.1 shim makes 'just ci' false-red on scripts/tests/adr-lint.test.mjs (import.meta.dirname undefined pre-Node 20.11) -- always source asdf shims before trusting a harness just ci result; this slice's real gate (mr-selfcheck SELFCHECK-OK) was green throughout. lp-06 remains live in a separate worktree (untouched this tick) -- its PR body already flags a shared mr-selfcheck append-point collision with this now-merged slice; it will need to rebase onto d3d1df5 before its own merge.
-## 2026-08-22T09:05:18Z — lp-brief-cost MERGED — false budget premise removed from the brief template
-PR #31 squash-merged to main (1493e4a), branch feat/lp-brief-cost deleted. Removed the false-premise budget line from mr-brief-template.md (previously claimed budget was ample / cited an unmeasured 125% figure as mechanical, though costwatch_enforce is false) and replaced it with a bounded-budget instruction, per EARS E1-E3. Added lp-brief-cost-teeth.sh proof-of-teeth fixture (A1-A5, TEETH-ALL-OK) and 5 mr-selfcheck gate assertions wired to it. mr-audit CLEAN (orchestration+gating, 1 attempt, opus/high). Re-verified mr-selfcheck + the teeth fixture green live on the merged tip before merging. This repo carries no GH Actions checks (statusCheckRollup/gh run list both empty) — the harness-slice gate is mr-selfcheck + touched-tool selftests, not remote CI. No ADR (loop-infra slice). lp-ollama (feat/lp-ollama, session_leader 69830) remained live throughout, untouched — disjoint touches (mr-native-tick.sh).
 ## 2026-08-21T14:00:06Z — lp-queue + lp-handoff-rotate — queue[] reshaped, handoff auto-rotation shipped
 
 
@@ -633,46 +756,3 @@ PR #31 squash-merged to main (1493e4a), branch feat/lp-brief-cost deleted. Remov
 
 
 
-## 2026-08-22T~22:5xZ — 16r-f COMPLETE (terminal state: PR #353 open + local `just ci` green)
-
-**PR:** https://github.com/mdrewt/monster-realm/pull/353 — branch `feat/16r-f-battle-reseed-sticky-latch`,
-worktree `.claude/worktrees/16r-f`, forked from master `d4fa9fe`. OPEN / MERGEABLE, ci+e2e IN_PROGRESS at
-exit. **`gh pr merge` NOT run — supervisor owns the merge.**
-
-Local full `just ci` **exit 0** (single run, all recipes through observability-validate 8/8): 2472 client
-tests (82 files), Rust suites, evals, perf-budget 7/7, secret-scan clean. Semgrep run LOCALLY on both
-changed files (remote-only gate): 1074 rules, 0 findings. Independent `verifier` verdict **PASS** (RED
-proof + T10 bite reproduced from scratch; test-file history purely additive except 2 disclosed docblock
-header lines; scope exact).
-
-**Diff (4 wip commits → squash):** `client/src/main.ts` (+20/−6: sticky latch, `reseedPrevBattleId`
-guarded capture as onReconnect's first statement, id-gated silent re-baseline) · NEW
-`client/src/main.battle-reseed.test.ts` (523 lines, 11 runtime tests — the repo's FIRST runtime-import
-gate over main.ts) · `docs/adr/0130-client-observability.md` (+41, APPEND-ONLY amendment; DIGEST
-unchanged). `main.wiring.test.ts` declared but untouched (185 teeth green unmodified).
-
-**Spec deviation, reviewed + recorded:** the spec's minimal "don't clear on undefined" shape swallows the
-next NEW battleStart for zero-battle-row players (server GCs battles). Plan review adopted the drop-time
-id-capture refinement; EARS unchanged. Rationale + residuals (c)/(d)/(e) in the ADR-0130 amendment.
-
-**Test-first, audited:** tester (opus) authored T1-T9 → orchestrator ran RED proof at fork (exactly T1+T8
-red) → impl → lenses (reviewer APPROVED, red-team 6-mutation table + Semgrep, desync-guard PASS, /simplify
-clean) → both red-team and desync-guard independently found the multi-episode gap → tester authored T10
-(kills capture-once-ever AND never-clear cheats, both bite-proofs MEASURED by the orchestrator) → verifier
-PASS. One provably-inert mutation (`reseedPrevBattleId = null` deletion) documented, not papered over.
-
-**Follow-up flags (supervisor; none blocking):**
-1. justfile: `client-test` should depend on `wasm` + justfile:271 "no wasm import" comment now stale — the
-   new test resolves `client-wasm/pkg` (safe under `just ci` ordering; bare `npm test` on unbuilt tree reds
-   with a clear resolve error).
-2. ADR-0198 D7 "assumed" subscription-batch atomicity — falsified-and-moot for the battle listener; needs
-   an Amends note from a slice owning that file.
-3. Pre-existing, red-team-MEASURED: `latestPlayerBattle()` single-highest-id design makes the lower of two
-   simultaneous Ongoing battles invisible to the event ring for its whole lifecycle (store.ts design).
-4. Pre-existing: main.ts `identity` never refreshed on reconnect — an identity-minting reconnect silences
-   every identity-scoped listener with the latch armed (ADR-0130 residual (e)); worth its own slice.
-5. /tmp cleanup: `/tmp/16rf-verify-*` + `/tmp/mr16rf-bite2` copies left (rm hook-blocked, harmless);
-   a leftover 16r-d spacetime instance still runs on 127.0.0.1:3099 (`--data-dir /tmp/mr16rd-stdb-a`).
-
-Budget: well under the $150 target (planner + 2 plan lenses + tester(opus)×2 + 3 impl lenses + verifier +
-doc-keeper; no thrash — RED proof and all suites first-try).
