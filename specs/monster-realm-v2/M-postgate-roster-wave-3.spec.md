@@ -49,8 +49,9 @@ from the rest of the queue.
 ## Reserved bands
 
 Wave 3 claims **one number across every registry** — band `40..=49` and the `07x-` filename prefix — so a
-future author can check one range instead of four. Ids need not be contiguous; gaps are legal (the
-append-only evals flag removals, never gaps).
+future author can check one range instead of four. Species ids and skill ids are **independent
+registries with independent numbering** — species 40 and skill 40 are not a collision, they are a
+mnemonic. Ids need not be contiguous; gaps are legal (the append-only evals flag removals, never gaps).
 
 | axis | reserved band | owner / file |
 |---|---|---|
@@ -86,8 +87,8 @@ own acceptance is its slice ledger, not this section.
   and ALL wave-3 edge ids SHALL fall inside `100..=199`.
 - **RW3-05** IF a wave-3 species has two or more outgoing evolution edges, THEN THOSE EDGES SHALL either
   share a `min_level` or the lowest SHALL carry an additional non-level gate (ADR-0176 D2).
-- **RW3-06** THE SYSTEM SHALL NOT place any derived (`tier >= 1`) form in an encounter table, and WHEN
-  rw3c lands, EACH wave-3 tier-0 species SHALL appear in at least one encounter entry.
+- **RW3-06** THE SYSTEM SHALL NOT place any wave-3 evolution-edge target (`to_species`) in an encounter
+  table, and WHEN rw3c lands, EACH wave-3 tier-0 species SHALL appear in at least one encounter entry.
 - **RW3-07** THE zone-0 encounter table SHALL remain byte-identical (the `client/e2e/recruit.spec.ts`
   flake budgets are derived from its exact weights and `encounter_rate`).
 - **RW3-08** THE SLICE SHALL NOT modify Rust source other than `CONTENT_VERSION` and its own new test
@@ -140,8 +141,13 @@ fail loudly on their own; these do not.)
    is offered a choice (ADR-0176 D2, pinned by `eg3_evolution_graph.rs` t11). One outgoing edge per base
    form makes this vacuous — the safe default.
 2. **"Spread all forms across encounters" is infeasible as usually stated.** Derived forms in an
-   encounter table are a hard CI failure (`validate_evolution_fusion` step 6). Only tier-0 forms are
-   wild-legal — pt-d3 hit this for real.
+   encounter table are a hard CI failure — rule **R6** of `validate_evolution_paths`
+   (`game-core/src/content.rs:934`, enforced at `:1050`). Only tier-0 forms are wild-legal; pt-d3 hit
+   this for real. ⚠️ R6 keys on the evolution graph, **not** on the `tier` field: it rejects a species
+   that is some edge's `to_species` *and* appears in an encounter table. A derived form that was never
+   given an incoming edge would slip past R6 — which is why RW3-04 requires every derived form to be an
+   edge target. (The name `validate_evolution_fusion`, used in `encounters/000-core.ron` and in the
+   pt-d3 precedent text, is **stale** — no such function exists in `game-core/src` today.)
 3. **RON comment hygiene** (ADR-0143 D7, gated by `pt_d1_roster.rs` pt_d1_7): full-line comments only,
    and no comment may carry an id-shaped needle (`species_id:`, `to_species:`, a bare `id:`) — the
    content scanners strip whole lines and then regex the remainder. Write `id=N` / `edge=N` instead.
@@ -149,6 +155,10 @@ fail loudly on their own; these do not.)
    conflict by keeping both sides — take the next integer and regenerate the baseline.
 5. **A second `zone_id` tuple in a new encounters part file is not a safe merge.** Encounter tables are
    keyed per zone; placement means editing the existing zone tuple in `encounters/000-core.ron`.
+
+**`CONTENT_VERSION` was 19 when this spec was written** (`server-module/src/lib.rs`). Treat that as a
+staleness check, not an instruction: **re-read it live** and take the next integer. Both content slices
+bump it, so the second to land takes 21, not 20.
 
 **Post-integration verification.** Each slice green in isolation is not sufficient: after rw3b and rw3c
 are both merged, a full `just ci` must be green on the combined tree (the wave-2 gate reporting wave-1
