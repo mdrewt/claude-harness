@@ -24,3 +24,6 @@ mr-rate-limit-telemetry.jsonl
 # section, which IS tracked — the registry is the routing layer, not the archive.
 gates/
 mr-residuals.jsonl
+# lp-gates: the durable arming baseline (one row per `mr-gates verify`). Append-only production
+# state, same class as the usage ledger; it is in mr-backup's CANONICAL set instead.
+mr-acceptance-log.jsonl

@@ -26,7 +26,9 @@ ACCEPTANCE_CONTRACT = (ADVISORY_CONTRACT + " SLICE-SCOPED: an independent re-run
                        "acceptance ledger (mr-gates). ADVISORY IN THIS SLICE BY DESIGN (R13: never "
                        "ship a gate and its only instrument together). Promotion to POLICY is a "
                        "separate slice, gated on FLAGGED landing on >=1 and <=4 of the first 10 "
-                       "ledgered slices -- all-10 or 0-of-10 carries no information (lp-04).")
+                       "LEDGERED slices (verdict CLEAN or FLAGGED; NO-LEDGER slices are an absent measurement, "
+                       "not a failed one, and do not count) -- all-10 or 0-of-10 carries no "
+                       "information (lp-04).")
 DISPOSITION_CONTRACT = (ADVISORY_CONTRACT + " CORPUS-SCOPED: findings are about the harness specs/ "
                         "tree, not about the audited base..head diff.")
 

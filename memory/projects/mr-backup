@@ -8,9 +8,9 @@
 #
 # `__doc__` is ASSIGNED, not left as a bare literal: the guard line above is already this module's
 # first string, so a bare docstring below it would never become __doc__ at all.
-__doc__ = """mr-backup -- recoverable copies of the two loop singletons, kept OUTSIDE every worktree.
+__doc__ = """mr-backup -- recoverable copies of the loop's gitignored singletons, kept OUTSIDE every worktree.
 
-    mr-backup snapshot [--file PATH]...        no --file => both canonical sources
+    mr-backup snapshot [--file PATH]...        no --file => every canonical source
     mr-backup restore --file <basename> --to <dir>
     mr-backup --selftest
 
@@ -45,12 +45,12 @@ ROOT SAFETY -- BOTH checks run before anything is written OR pruned, and neither
      the paragraph above as an illegal state rather than a convention.
 
 THE CANONICAL-SOURCE BOUNDARY (parse-don't-validate, enforced HERE, never at the call site). With
-MR_BACKUP_ROOT UNSET (production) a snapshot source must be EXACTLY one of the two canonical
+MR_BACKUP_ROOT UNSET (production) a snapshot source must be EXACTLY one of the canonical
 absolute paths by os.path.realpath; anything else is exit 0 plus one `skip:` line on stderr. With
 MR_BACKUP_ROOT SET (fixture mode) any readable regular file is accepted. This one rule is what makes
 mr-selfcheck's MR_RECORD_LEDGER/MR_RECORD_HANDOFF fixture batteries incapable of polluting the real
 root -- and because it lives in ONE place, mr-record's call site carries no conditional to regress.
-The two paths are HARDCODED absolutes for the same reason mr-record's MEM is: they are machine
+The paths are HARDCODED absolutes for the same reason mr-record's MEM is: they are machine
 SINGLETONS, and a self-located copy would let a worktree fork the SSOT.
 
 RETENTION: the newest 14 UTC day-directories, pruned during `snapshot`. Bound ~14 x 1.4 MB ~= 20 MB.
@@ -81,6 +81,9 @@ CANONICAL = (
     # routing for work that has already been declared — the precise failure this mechanism exists
     # to end. Same argument as the usage ledger, which is why it joins the same canonical set.
     "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-residuals.jsonl",
+    # lp-gates: the acceptance baseline. `verify` cannot be re-run retrospectively (worktrees are
+    # deleted at merge), so if this is lost the pre-registered arming band has no readout at all.
+    "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-acceptance-log.jsonl",
 )
 RETENTION = 14
 DAY_RE = re.compile(r"^\d{8}$")

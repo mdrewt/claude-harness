@@ -93,8 +93,8 @@ LEGAL_DISPOSITIONS = ("wontfix",)
 
 # ---------------------------------------------------------------------------------------------
 # Criterion extraction — TWO SHAPES, both live in the corpus right now.
-# Measured over the live spec tree: 131 of 132 SHALL-bearing sections extract (99%), 522 criteria,
-# 242 of them reusing the spec's own criterion id. A one-shape parser is the lp-08 defect
+# Measured over the live spec tree 2026-08-23: 132 of 133 SHALL-bearing sections extract (99%),
+# 526 criteria, 242 of them (46%) reusing the spec's own criterion id. A one-shape parser is the lp-08 defect
 # ("parse the de-facto convention, not the documented one").
 # ---------------------------------------------------------------------------------------------
 NEXT_HEAD = re.compile(r"^### ", re.M)
@@ -361,8 +361,18 @@ def read_gates_file(path):
         return None
 
 
-def cap_evidence(output, limit=None):
+def cap_evidence(output, limit=None, expect=None):
+    """The DECIDING line when there is one, else the tail.
+
+    Recording a tail while `verify` compares the EXPECT-matching line makes the recorded and the
+    fresh evidence different shapes by construction — the comparison then fails on any command
+    whose last lines carry anything besides the match, which is most of them. unlazy's own rule is
+    "quote the deciding lines"; this makes that literal."""
     limit = limit or POLICY["evidence_chars"]
+    if expect:
+        line = expect_line(expect, output)
+        if line:
+            return line[:limit]
     ls = [l.strip() for l in (output or "").split("\n") if l.strip()]
     return (" | ".join(ls[-2:]) or "(no output)")[:limit]
 
@@ -440,9 +450,17 @@ def lint_gates(gates, defers, specs_dir=None):
                                            "for an acceptance gate)"))
             elif g.expect.strip() == "":
                 out.append(("BLOCK", g.id, "empty EXPECT"))
-            elif g.expect in c:
+            elif _expect_core(g.expect) and _expect_core(g.expect) in c:
+                # Compare the INNER pattern: `EXPECT: /1 passed/` never appears verbatim in a
+                # CHECK, so testing the delimited form let the exact shape the brief teaches
+                # through -- `cargo test --lib nope ; echo "1 passed"` linted clean.
                 out.append(("BLOCK", g.id, "EXPECT appears verbatim inside its own CHECK "
                                            "(echo-your-own-answer)"))
+            elif seeded and re.search(r";\s*(echo|printf)\b", c):
+                # `;` defeats the `||` and `; true` rules and appends a success string after a
+                # command that already failed.
+                out.append(("BLOCK", g.id, "seeded CHECK appends an echo/printf after `;` -- the "
+                                           "command's own result is then irrelevant"))
             else:
                 rx = re.match(r"^/(.+)/[a-z]*$", g.expect)
                 if rx and "|" in rx.group(1):
@@ -498,6 +516,12 @@ def lint_gates(gates, defers, specs_dir=None):
                             "observable -- sharpen them, or this ledger proves nothing"
                             % (man * 100, POLICY["max_manual_ratio"] * 100)))
     return out
+
+
+def _expect_core(expect):
+    """The inner pattern of a `/regex/` EXPECT, else the literal string."""
+    m = re.match(r"^/(.+)/[a-z]*$", (expect or "").strip())
+    return m.group(1) if m else (expect or "").strip()
 
 
 CITATION = re.compile(r"^([\w./+-]+):(\d+)(?:-(\d+))?\b")
@@ -830,6 +854,11 @@ def cmd_reseed(a):
         if ln.startswith("Seed:"):
             lines[i] = "Seed: %s" % seed
             break
+    else:
+        # No Seed line at all -- which is precisely what SEED-MISSING flags. Insert it after the
+        # header rather than reporting a success that changed nothing.
+        at = 1 if lines and lines[0].startswith("# Gates:") else 0
+        lines.insert(at, "Seed: %s" % seed)
     have = {g.id for g in gates}
     add = []
     for c in criteria:
@@ -917,7 +946,7 @@ def cmd_check(a):
             # WRITE ONLY ON PASS. A red must never be launderable into evidence, and the Stop
             # hook's progress detector must not be gameable by re-running a failing check.
             lines[g.line] = lines[g.line].replace("- [ ]", "- [x]", 1)
-            ev = cap_evidence(out)
+            ev = cap_evidence(out, expect=g.expect)
             if g.ev_line != -1:
                 indent = re.match(r"^\s*", lines[g.ev_line]).group(0)
                 lines[g.ev_line] = "%sEVIDENCE: %s" % (indent, ev)
@@ -1018,7 +1047,12 @@ def cmd_verify(a):
     out = {"slice": slice_id, "verdict": "CLEAN", "reasons": []}
     path, parsed = load(slice_id, a.get("_gates_dir"))
     if parsed is None:
-        out.update(verdict="FLAGGED", reasons=["NO-GATES-FILE"])
+        # NOT "FLAGGED": an absent ledger is an absent measurement, not a failed one. Every slice
+        # launched before lp-gates has none, and calling those FLAGGED would both cry wolf through
+        # the whole transition and make the arming band (which counts CLEAN|FLAGGED over LEDGERED
+        # slices) uncomputable. It is still not CLEAN — nothing here reads as a pass.
+        out.update(verdict="NO-LEDGER",
+                   reasons=["NO-GATES-FILE (slice was never seeded, or its ledger was removed)"])
         return _emit_verify(out, a)
     header, gates, defers, errs = parsed
     met, unmet, deferred = classify(gates, defers)
@@ -1045,13 +1079,26 @@ def cmd_verify(a):
                               "and run `mr-gates reseed`)")
     if sec is None:
         out["reasons"].append("SPEC-SECTION-NOT-FOUND")
+    else:
+        # The ledger must still CONTAIN every criterion the spec declares. Without this the Seed
+        # line proves only that the spec did not change -- it says nothing about the file whose
+        # completeness number we are about to believe.
+        want = [c["id"] for c in extract_criteria(sec)]
+        have = {g.id for g in gates}
+        missing = [i for i in want if i not in have]
+        out["criteria_missing"] = missing
+        if missing:
+            out["reasons"].append(
+                "CRITERIA-MISSING: %d seeded criterion/criteria are absent from the ledger (%s). "
+                "Deleting a gate is not a way to finish it -- meet it, or DEFER it with a "
+                "resolvable target." % (len(missing), ", ".join(missing[:6])))
 
     # 2/3. Re-execute every CHECK, guard-routed, and compare against recorded evidence.
     repo_root = a.get("repo") or (HARNESS + "/projects/monster-realm")
     cwd = a.get("cwd") or worktree_for(slice_id, repo_root) or repo_root
     out["cwd"] = cwd
     budget = float(a.get("budget") or POLICY["verify_budget_s"])
-    spent, reverified, not_reverified, mismatch = 0.0, [], [], []
+    spent, reverified, not_reverified, mismatch, drift = 0.0, [], [], [], []
     for g in gates:
         if g.id in defers or not g.check or not g.check.strip():
             continue
@@ -1071,14 +1118,27 @@ def cmd_verify(a):
         # a byte-compare punishes real runners for timings/ordering and rewards static greps.
         agrees = bool(fresh) and (fresh in rec or rec in fresh or not rec)
         reverified.append({"gate": g.id, "passed": passed, "agrees_with_evidence": agrees,
-                           "fresh": (fresh or cap_evidence(o))[:160], "seconds": round(el, 1)})
+                           "fresh": (fresh or cap_evidence(o, expect=g.expect))[:160],
+                           "seconds": round(el, 1)})
         if g.checked and not passed:
-            mismatch.append({"gate": g.id, "why": "claimed met; re-run does not match EXPECT"})
+            # THE fraud signal: the box is ticked and an independent re-run does not agree.
+            mismatch.append({"gate": g.id, "why": "claimed met; re-run does not match EXPECT",
+                             "fresh": (fresh or cap_evidence(o, expect=g.expect))[:160],
+                             "recorded": rec[:160]})
         elif g.checked and not agrees:
-            mismatch.append({"gate": g.id, "why": "re-run passes but recorded EVIDENCE does not "
-                                                  "match the deciding line"})
+            # Informational only. Real runners emit counts, timings and orderings that move between
+            # runs; the gate still PASSES, so the recorded text differing proves nothing.
+            drift.append({"gate": g.id, "recorded": rec[:120], "fresh": (fresh or "")[:120]})
     out["reverified"], out["not_reverified"], out["evidence_mismatch"] = \
         reverified, not_reverified, mismatch
+    out["evidence_drift"] = drift
+    out["reverified_count"] = len(reverified)
+    live_gates = [g for g in gates if g.id not in defers]
+    if live_gates and not reverified:
+        out["no_check_executed"] = True
+        out["reasons"].append(
+            "NO-CHECK-EXECUTED: %d live gate(s) and not one command ran. An acceptance ledger "
+            "that executes nothing certifies nothing." % len(live_gates))
     out["verify_seconds"] = round(spent, 1)
 
     # 4. Manual gates: resolve the citation and surface the cited line for the reader.
@@ -1124,7 +1184,8 @@ def cmd_verify(a):
     out["residual_alarms"] = ["%s: %s" % (k, v) for k, v in residual_alarms(rows)]
 
     # Verdict. Fails CLOSED.
-    if out["seed_drift"] or out.get("seed_missing") or mismatch or not_reverified or \
+    if out["seed_drift"] or out.get("seed_missing") or out.get("criteria_missing") \
+            or out.get("no_check_executed") or mismatch or not_reverified or \
             any(f[0] == "BLOCK" for f in findings) or unmet or sec is None \
             or out.get("total", 0) == 0:
         out["verdict"] = "FLAGGED"
@@ -1143,6 +1204,26 @@ def cmd_verify(a):
     return _emit_verify(out, a)
 
 
+ACCEPTANCE_LOG = MEM + "/mr-acceptance-log.jsonl"
+
+
+def _record_acceptance(out, path=None):
+    """Append-only baseline for the arming decision (lp-gates-arm). Best-effort: a logging failure
+    must never change a verdict."""
+    try:
+        row = {"ts": utc_now(), "slice": out.get("slice"), "verdict": out.get("verdict"),
+               "met": out.get("met"), "total": out.get("total"), "unmet": out.get("unmet"),
+               "deferred": out.get("deferred"), "reverified": out.get("reverified_count"),
+               "reasons": (out.get("reasons") or [])[:4]}
+        line = json.dumps(row, sort_keys=True)
+        json.loads(line)
+        with open(path or ACCEPTANCE_LOG, "a") as fh:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+            fh.write(line + "\n")
+    except Exception:
+        pass
+
+
 def _emit_verify(out, a):
     # ADVISORY in slice 1 (R13 + lp-04): evidence for the supervisor's read, never a merge
     # predicate. Promotion to POLICY is slice 2, against the pre-registered 1-4-of-10 band.
@@ -1150,6 +1231,7 @@ def _emit_verify(out, a):
     out["contract"] = ("ADVISORY EVIDENCE ONLY - never a merge predicate; evidence for an LLM read. "
                        "Unmet or FLAGGED acceptance means READ THE LEDGER and adjudicate; it does "
                        "not mechanically refuse the merge in this slice.")
+    _record_acceptance(out, a.get("_acceptance_log"))
     print(json.dumps(out, indent=1))
     return 0
 
@@ -1267,11 +1349,19 @@ def cmd_residuals(a, sub):
             "Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass "
             "after (ADR-0010).",
         ]
-        atomic_write(full, text.rstrip("\n") + "\n" + "\n".join(sect) + "\n")
+        MARKER = "<!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->"
+        block = "\n".join(sect) + "\n"
+        if MARKER in text:
+            head, _sep, tail = text.partition(MARKER)
+            body = head + MARKER + "\n" + block + tail.lstrip("\n")
+        else:
+            body = text.rstrip("\n") + "\n" + block
+        atomic_write(full, body)
         residual_append(dict(r, status="promoted", slice_id=new_id, promoted_slice=new_id,
                              promoted_at=utc_now()), path)
-        print("PROMOTED %s -> %s in %s (queue it with `mr-record queue-add --slice %s "
-              "--spec-file %s`)" % (rid, new_id, spec_name, new_id, spec_name))
+        print("PROMOTED %s -> %s in %s (queue it with: mr-record queue-add --slice %s "
+              "--spec-file specs/monster-realm-v2/%s --reason 'promoted residual %s')"
+              % (rid, new_id, spec_name, new_id, spec_name, rid))
         return 0
     if sub == "close":
         sl = a.get("slice")
@@ -1284,6 +1374,9 @@ def cmd_residuals(a, sub):
         # `--force` is the honest escape (e.g. the slice legitimately DEFERred it onward again),
         # and it is recorded on the row rather than silently assumed.
         forced = bool(a.get("force"))
+        if forced and not a.get("reason"):
+            return die("--force requires --reason: forcing a residual closed without saying why "
+                       "is how a sink quietly becomes a graveyard")
         if not forced:
             _pth, parsed = load(sl, a.get("_gates_dir"))
             if parsed is None:
@@ -1300,7 +1393,9 @@ def cmd_residuals(a, sub):
             if r.get("promoted_slice") == sl and r.get("status") not in ("closed",):
                 residual_append(dict(r, status="closed", closed_at=utc_now(),
                                      closed_by_pr=a.get("pr"),
-                                     closed_forced=True if forced else None), path)
+                                     closed_forced=True if forced else None,
+                                     closed_forced_reason=a.get("reason") if forced else None),
+                                path)
                 n += 1
         print("RESIDUALS-CLOSED %d for slice %s%s" % (n, sl, " (FORCED)" if forced else ""))
         return 0
@@ -1448,6 +1543,8 @@ def _st_tmp(chk):
 
 
 def selftest():
+    import contextlib
+    import io as _io
     chk = _Chk()
     root, cleanup = _st_tmp(chk)
     try:
@@ -1625,13 +1722,19 @@ def selftest():
         chk.eq("G1-no-write-on-fail", before, read_gates_file(gp2),
                "a red must never be launderable into evidence, and stasis must not look like "
                "progress to the Stop hook")
-        atomic_write(gp2, "# Gates: fx-g\nSeed: s\n\n- [ ] X1: t\n  CHECK: echo ALLGOOD\n"
+        # The deciding line is deliberately NOT last: a tail-based capture would record the
+        # trailing noise instead, and `verify` compares against the EXPECT-matching line, so the
+        # two shapes could never agree. This drives the real cmd_check call site, not the helper.
+        atomic_write(gp2, "# Gates: fx-g\nSeed: s\n\n- [ ] X1: t\n"
+                          "  CHECK: printf 'compiling\\nALLGOOD here\\nFinished in 3.2s\\ncleanup\\n'\n"
                           "  EXPECT: ALLGOOD\n  EVIDENCE: pending\n")
         cmd_check({"slice": "fx-g", "_gates_dir": gdir, "_no_guard": True, "cwd": root,
                    "timeout": 20})
         _h, gz, _d, _e = parse_gates(read_gates_file(gp2))
         chk.ok("G2-writes-on-pass", gz[0].met())
-        chk.ok("G3-evidence-captured", "ALLGOOD" in (gz[0].evidence or ""))
+        chk.eq("G3-evidence-is-the-deciding-line", "ALLGOOD here", gz[0].evidence,
+               "cmd_check must record the EXPECT-matching line, not the output tail — otherwise "
+               "verify's comparison is against a different shape and can never agree")
 
         # MULTI-LINE on purpose. Python's `$` already matches before a TRAILING newline, so
         # "0\n" matches /^0$/ with or without re.M — a single-line fixture here proves nothing.
@@ -1719,6 +1822,10 @@ def selftest():
         # fully met -> closes
         atomic_write(gates_path(newid, gdir),
                      "# Gates: %s\nSeed: s\n\n- [x] E1: t\n  EVIDENCE: 3 passed\n" % newid)
+        chk.eq("J10e-force-needs-a-reason", 2,
+               cmd_residuals({"slice": newid, "_residuals": resid, "_gates_dir": gdir,
+                              "force": True}, "close"),
+               "the docs promised --force is recorded WITH a reason; requiring one makes that true")
         cmd_residuals({"slice": newid, "_residuals": resid, "pr": "999", "_gates_dir": gdir},
                       "close")
         chk.eq("J10d-closed-when-proved", 0, len(open_residuals(residual_rows(resid))))
@@ -1769,15 +1876,14 @@ def selftest():
         chk.eq("K5-policy-single-source", POLICY, json.loads(json.dumps(POLICY)))
 
         # --- V. cmd_verify verdicts (end to end, capturing the emitted JSON) ---------------
-        import contextlib
-        import io as _io
 
-        def V(slice_id):
+        def V(slice_id, alog=None):
             buf = _io.StringIO()
             with contextlib.redirect_stdout(buf):
                 cmd_verify({"slice": slice_id, "_specs": specs, "_gates_dir": gdir,
                             "_residuals": resid, "_no_guard": True, "cwd": root, "repo": root,
-                            "budget": "20"})
+                            "budget": "20",
+                            "_acceptance_log": alog or os.path.join(root, "acc-default.jsonl")})
             return json.loads(buf.getvalue())
 
         # zero extractable criteria must FLAG. 40 of 166 launchable corpus sections extract zero,
@@ -1805,6 +1911,149 @@ def selftest():
         atomic_write(gpv, keep)
         chk.eq("V4-deferred-key-is-int", int, type(V("fx-a")["deferred"]),
                "`deferred` was emitted twice — an int clobbered by a dict")
+
+        # W: evidence semantics. Found by running the mechanism end to end, not by review: the
+        # recorded evidence was a two-line TAIL while verify compared the EXPECT-matching LINE, so
+        # the comparison could not succeed on any command whose tail carried anything else — it
+        # would have FLAGGED essentially every slice and made the arming band unreadable.
+        chk.eq("W1-evidence-is-the-deciding-line", "test result: 1 passed",
+               cap_evidence("Compiling\ntest result: 1 passed\nFinished in 3.2s\n",
+                            expect="/1 passed/"),
+               "evidence must BE the deciding line, or it cannot be compared with one")
+        chk.ok("W2-falls-back-to-tail",
+               "no match here" in cap_evidence("no match here\n", expect="/nope/"),
+               "with no EXPECT match the tail is still better than nothing")
+
+        gpw = gates_path("fx-w", gdir)
+        atomic_write(gpw, "# Gates: fx-w\nSeed: s\n\n- [x] X1: t\n"
+                          "  CHECK: echo 'result: 96 passed'\n  EXPECT: /passed/\n"
+                          "  EVIDENCE: result: 72 passed\n")
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cmd_verify({"slice": "fx-w", "_specs": specs, "_gates_dir": gdir, "_residuals": resid,
+                        "_no_guard": True, "cwd": root, "repo": root, "budget": "20"})
+        vw = json.loads(buf.getvalue())
+        chk.eq("W3-drift-is-not-fraud", [], vw["evidence_mismatch"],
+               "a gate whose CHECK still PASSES is verified; a count that moved between runs is "
+               "drift, not a false claim, and flagging it would fire on nearly every real slice")
+        chk.eq("W4-drift-is-still-reported", 1, len(vw["evidence_drift"]))
+
+        atomic_write(gpw, "# Gates: fx-w\nSeed: s\n\n- [x] X1: t\n"
+                          "  CHECK: echo 'result: FAILED'\n  EXPECT: /passed/\n"
+                          "  EVIDENCE: result: 1 passed\n")
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cmd_verify({"slice": "fx-w", "_specs": specs, "_gates_dir": gdir, "_residuals": resid,
+                        "_no_guard": True, "cwd": root, "repo": root, "budget": "20"})
+        vf = json.loads(buf.getvalue())
+        chk.eq("W5-fraud-still-caught", 1, len(vf["evidence_mismatch"]),
+               "ticked box + a re-run that does NOT pass is the actual fraud signal and must FLAG")
+        chk.eq("W6-fraud-flags", "FLAGGED", vf["verdict"])
+
+        # W7: an absent ledger is an absent measurement, not a failed one.
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cmd_verify({"slice": "fx-never-seeded", "_specs": specs, "_gates_dir": gdir,
+                        "_residuals": resid, "_no_guard": True, "cwd": root, "repo": root})
+        chk.eq("W7-no-ledger-verdict", "NO-LEDGER", json.loads(buf.getvalue())["verdict"],
+               "calling every pre-lp-gates slice FLAGGED would cry wolf through the whole "
+               "transition and make the arming band uncomputable")
+
+        # --- T. the final-review findings, each pinned against its own reproduction -----------
+        # T1 is the keystone: the Seed hash compared spec-derived text with spec-derived text, so
+        # DELETING gates from the ledger was invisible. Reproduced before fixing: 3 criteria
+        # seeded, 2 deleted, 1 greened -> CLEAN, 1/1 met, no drift, no lint. Deleting was also
+        # CHEAPER than DEFER (no resolvable target, no residual that follows you).
+        tspec = os.path.join(specs, "M-t.spec.md")
+        _st_write = lambda q, t: atomic_write(q, t)
+        _st_write(tspec, "## 2. Slices\n\n### t-1 — tamper fixture\n"
+                         "EARS: THE SYSTEM SHALL do A. THE SYSTEM SHALL do B. "
+                         "THE SYSTEM SHALL do C.\n")
+        cmd_init({"slice": "t-1", "_specs": specs, "_gates_dir": gdir, "scope": "x"})
+        tp = gates_path("t-1", gdir)
+        tampered = read_gates_file(tp).split("- [ ] E2")[0].rstrip() + "\n"
+        # The surviving gate must pass lint CLEANLY, so that CRITERIA-MISSING is the ONLY thing
+        # that can drive the verdict. (An earlier version used `console.log('1 passed')` with
+        # EXPECT `/1 passed/` — which trips echo-your-own-answer, masking the rule under test.)
+        tampered = tampered.replace(
+            "  CHECK: \n  EXPECT: \n  EVIDENCE: pending",
+            "  CHECK: node -e \"process.stdout.write('fixture-ran')\"\n  EXPECT: /^fixture-ran$/\n"
+            "  EVIDENCE: fixture-ran")
+        atomic_write(tp, tampered.replace("- [ ] E1", "- [x] E1", 1))
+        vt = V("t-1")
+        chk.eq("T1-deleted-gates-flag", "FLAGGED", vt["verdict"],
+               "deleting a gate must not be a way to finish it")
+        chk.eq("T1b-names-them", ["E2", "E3"], vt.get("criteria_missing"))
+        chk.eq("T1c-is-the-sole-driver", [], vt["lint"],
+               "the surviving gate must lint clean, or this fixture cannot prove CRITERIA-MISSING "
+               "drives the verdict")
+        chk.ok("T1d-reason-is-specific",
+               any("CRITERIA-MISSING" in r for r in vt["reasons"]),
+               "assert the REASON, not the verdict: seven rules can produce FLAGGED, so a verdict "
+               "assertion greens on whichever neighbour happens to fire")
+
+        # T2: the echo-your-own-answer rule was INERT for the `/regex/` EXPECT the brief teaches,
+        # because it tested the delimited string. `;` also defeats the `||` and `; true` rules.
+        # The two rules overlap on the obvious fixture, so each is exercised in ISOLATION on a
+        # CHECK that can only trip that one.
+        # No semicolon here, so ONLY the echo-your-own-answer rule can fire.
+        for exp in ("/1 passed/", "1 passed"):
+            f = L('- [ ] E1: t\n  CHECK: cargo test --lib -- --nocapture "1 passed"\n'
+                  '  EXPECT: %s\n' % exp)
+            chk.ok("T2-echo-own-answer[%s]" % exp,
+                   any(x[0] == "BLOCK" and "echo-your-own-answer" in x[2] for x in f),
+                   "the delimited form must be stripped before the containment test, or the "
+                   "`/regex/` shape the brief teaches sails through")
+        # EXPECT deliberately absent from the CHECK, so ONLY the semicolon rule can fire.
+        f2 = L('- [ ] E1: t\n  CHECK: cargo test --lib nope ; echo ok\n  EXPECT: /passed/\n')
+        chk.ok("T2b-semicolon-echo",
+               any(x[0] == "BLOCK" and "after `;`" in x[2] for x in f2),
+               "`;` defeats the `||` and `; true` rules and appends success after a failure")
+
+        # T3: a ledger where nothing executed reported CLEAN. The manual-ratio cap needs >=3 live
+        # gates and the corpus median IS 3, so many slices sit at or under it.
+        atomic_write(gates_path("t-2", gdir),
+                     "# Gates: t-2\nSeed: z\n\n- [x] X1: a\n  MANUAL: doc\n"
+                     "  EVIDENCE: M-t.spec.md:1\n\n- [x] X2: b\n  MANUAL: doc\n"
+                     "  EVIDENCE: M-t.spec.md:2\n")
+        vn = V("t-2")
+        chk.eq("T3-nothing-executed-flags", "FLAGGED", vn["verdict"])
+        chk.eq("T3b-count", 0, vn.get("reverified_count"))
+        chk.ok("T3c-reason-is-specific",
+               any("NO-CHECK-EXECUTED" in r for r in vn["reasons"]),
+               "the citations in this fixture also fail to resolve, so a bare FLAGGED assertion "
+               "would green with this rule deleted")
+
+        # T4: reseed could not restore an ABSENT Seed line — the exact case SEED-MISSING detects.
+        noseed = "\n".join(l for l in read_gates_file(tp).split("\n")
+                           if not l.startswith("Seed:"))
+        atomic_write(tp, noseed)
+        cmd_reseed({"slice": "t-1", "_specs": specs, "_gates_dir": gdir, "reason": "fixture"})
+        chk.ok("T4-reseed-restores-absent-seed",
+               bool(parse_gates(read_gates_file(tp))[0].get("Seed")),
+               "the documented repair must repair the case it exists for")
+
+        # T5: promote appended at EOF, past the file's own append marker.
+        bl = os.path.join(specs, BACKLOG_SPEC)
+        atomic_write(bl, "# hdr\n\n<!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->\n\n"
+                         "## 5. Explicitly NOT in scope\n- nothing\n")
+        rid2 = residual_upsert("t-1", "E9", "THE SYSTEM SHALL land above the marker", "backlog",
+                               "fixture reason here", {"Repo": "harness"}, resid)
+        cmd_residuals({"id": rid2, "_residuals": resid, "_specs": specs}, "promote")
+        bt = read_gates_file(bl)
+        chk.ok("T5-promote-respects-marker",
+               bt.index("### rb-") < bt.index("## 5. Explicitly NOT in scope"),
+               "the file declares an append marker; appending at EOF puts slices after the "
+               "out-of-scope section")
+
+        # T6: the arming baseline must be DURABLE — worktrees are deleted at merge, so verify
+        # cannot be re-run retrospectively and one reboot would erase it.
+        alog = os.path.join(root, "acc.jsonl")
+        V("t-2", alog)
+        rows = [json.loads(x) for x in open(alog).read().strip().split("\n") if x.strip()]
+        chk.ok("T6-acceptance-logged", rows and rows[-1]["slice"] == "t-2" and
+               rows[-1]["verdict"] == "FLAGGED",
+               "the pre-registered 1-to-4-of-10 band needs the first ten verdicts on disk")
 
         # --- L. render determinism ------------------------------------------------------------
         _h, gr, dr, _e = parse_gates(read_gates_file(gp))

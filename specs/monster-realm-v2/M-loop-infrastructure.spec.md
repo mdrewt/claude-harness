@@ -1072,7 +1072,10 @@ seeded by `mr-spawn` from the slice's spec `SHALL` criteria — a two-shape pars
 AND `- **ID:** … SHALL` bullets, both live in this corpus) that extracts **132 of 133** SHALL-bearing
 sections, 526 criteria, 242 of them (46%) reusing the spec's own criterion ids (measured 2026-08-23;
 the corpus moves, so the figure is timestamped rather than restated). A `Seed:` hash makes the criteria
-immutable to the graded party; only a supervisor `reseed --reason` clears drift. `mr-gates verify` is
+immutable to the graded party by TWO checks, not one: `SEED-DRIFT` catches a reworded criterion
+and `CRITERIA-MISSING` catches a deleted gate (the second was added after a final review
+reproduced a tamper — two of three gates deleted, the third greened — that returned CLEAN). Only a
+supervisor `reseed --reason` clears drift. `mr-gates verify` is
 the independent re-run: every CHECK re-executed through `guard-bash.mjs` (a python `subprocess` never
 reaches PreToolUse — ADR-0012 commitment 3), compared as a normalized substring on the deciding line,
 manual citations resolved, plus one deterministically-drawn passing gate handed back for adversarial
@@ -1088,7 +1091,8 @@ ledger or any unmet gate; `--force` is recorded on the row) — closing on "a me
 right branch name" would let a residual be retired by a slice that did not deliver it. **Enforcement posture
 is deliberately split**: the `mr-audit` `acceptance` block ships ADVISORY and `gates-stop.mjs` ships
 OBSERVE-ONLY (writes `$MEM/gates/<slice>.stoplog`, never blocks, emits nothing), per R13; arming is
-`lp-gates-arm` with a pre-registered 1-to-4-of-10 band. Hook binding is `MR_SLICE`, prefix-scoped on
+`lp-gates-arm` with a pre-registered 1-to-4-of-10 band over LEDGERED slices only (a
+`NO-LEDGER` verdict is an absent measurement, not a failed one, and does not count). Hook binding is `MR_SLICE`, prefix-scoped on
 each `claude` invocation in `mr-launch.sh` and scrubbed at `mr-native-tick.sh` — a script-scope export
 would have handed a supervisor tick a slice's ledger via `fire_event`. Registered at USER level
 (probed: hooks are NOT inherited across the ancestor walk, so a harness-only registration would be
@@ -1096,7 +1100,7 @@ blind to project-rooted slices, which are most of them), with an `mr-selfcheck` 
 mirroring lp-09's B2. **Two bugs found and fixed en route:** `mr-spawn` never cleared
 `/tmp/mr_pass_<slice>.done` (+`.done.recorded` — removing either alone is worse than neither), which
 defeated the free live-chain standdown; and `mr-unlock` now reaps those flags with the lock. Teeth:
-`mr-gates --selftest` 96 assertions (15 injected defects RED, negative control green),
+`mr-gates --selftest` 117 assertions (16 injected defects RED, negative control green),
 `gates-stop.mjs --selftest` 20 (5 injected defects RED), a new `mr-audit` `_st_a_battery`
 (floor 24 → 62, mirrored in `mr-selfcheck`), and a `PYGATES` selfcheck block carrying the
 anti-rot alarms. **One of my own fixtures was caught vacuous by injection testing** (it asserted

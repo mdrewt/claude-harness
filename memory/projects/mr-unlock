@@ -76,13 +76,25 @@ reap_stale() {
       echo "UNLOCK-KEEP $SL (session_leader $P alive)"
       continue
     fi
-    # lp-gates: reap the slice's /tmp completion flags WITH its lock. Measured 2026-08-22 — the
-    # flags outlive the lock, and gate 1's DONE_WAIT is computed over EVERY lock-bearing slice
-    # (mr-native-tick.sh:243), so a merged slice's leftover `.done` beside its leftover lock
-    # defeats the FREE live-chain standdown for every later tick. `.done.recorded` MUST go with
-    # `.done`: alone it would make mr-native-tick.sh:35 skip a future run's ledger backfill.
+    # lp-gates: reap the slice's /tmp completion flags WITH its lock — but ONLY once the tick has
+    # reconciled the run (`.done.recorded` present). Two facts, and they pull in opposite
+    # directions:
+    #   * the flags outlive the lock, and gate 1's DONE_WAIT is computed over EVERY lock-bearing
+    #     slice (mr-native-tick.sh:243), so a merged slice's leftover `.done` beside its leftover
+    #     lock defeats the FREE live-chain standdown for every later tick;
+    #   * but reaping an UNRECONCILED `.done` deletes a finished run's cost before it ever reaches
+    #     the append-only ledger, undercounting the budget governor — and mr-unlock is run
+    #     precisely after the kind of wedge that stops reconciliation.
+    # So: reconciled -> reap both; unreconciled -> keep both and say so. Never one without the
+    # other (`.done.recorded` alone makes mr-native-tick.sh:35 skip a later run's backfill).
     # Scoped to the same $D as the lock so the selftest's temp dir never touches real /tmp state.
-    if [ "$D" = "$MEM" ]; then rm -f "/tmp/mr_pass_$SL.done" "/tmp/mr_pass_$SL.done.recorded" 2>/dev/null; fi
+    if [ "$D" = "$MEM" ]; then
+      if [ -e "/tmp/mr_pass_$SL.done" ] && [ ! -e "/tmp/mr_pass_$SL.done.recorded" ]; then
+        echo "UNLOCK-KEEP-DONE $SL (.done not yet reconciled — leaving both flags for the tick)"
+      else
+        rm -f "/tmp/mr_pass_$SL.done" "/tmp/mr_pass_$SL.done.recorded" 2>/dev/null
+      fi
+    fi
     rm -f "$LK" 2>/dev/null && { echo "UNLOCK-REAPED $SL (session_leader ${P:-none} dead)"; n=$((n+1)); }
   done
   [ "$n" = 0 ] && echo "UNLOCK-STALE-NONE"

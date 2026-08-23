@@ -1047,7 +1047,14 @@ else:
         os.chmod(wrapper, 0o755)
 
         def run_wrapper(env_extra):
-            env = dict(os.environ)
+            # MR_FORCE is SCRUBBED from the base environment, then re-applied only via env_extra.
+            # Without this the "unforced" case is not unforced at all — it inherits whatever the
+            # ambient environment carries, and `mr-supervisor-run` sets MR_FORCE=1 before the tick
+            # runs mr-selfcheck. Measured 2026-08-23: `MR_FORCE=1 mr-selfcheck` fails A8 while a
+            # plain run passes, so every operator-forced tick raised a false alarm on this gate.
+            # This does not weaken the fixture: under ambient MR_FORCE it could not exercise the
+            # unforced branch it names, so scrubbing is what makes the assertion real.
+            env = {k: v for k, v in os.environ.items() if k != "MR_FORCE"}
             env.update(env_extra)
             open(evlog, "w").close()
             r = subprocess.run(["bash", wrapper], capture_output=True, text=True, env=env, timeout=30)

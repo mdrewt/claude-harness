@@ -996,8 +996,11 @@ for ent in r.stdout.split(b'\0'):
 build_brief "$TOUCHES_RAW" "$MEM/mr-brief-template.md" "$B" || exit 1
 MODEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('model','opus'))")
 EFFORT=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('effort','high'))")
-rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
 if [ "$DRY" = "--dry" ]; then status DRY "brief built; model=$MODEL effort=$EFFORT; no launch"; fi
+# Stop-flag clearing sits BELOW the --dry exit (lp-gates final review). `/tmp/mr_stop_all` is the
+# GLOBAL cooperative stop -- mr-launch.sh checks it before every spawn and every run polls it --
+# so clearing it from a dry probe silently disarmed the operator's all-slice stop.
+rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
 # lp-gates: seed the ACCEPTANCE LEDGER from the slice's spec section before the run starts, so its
 # EARS criteria live in a file instead of in a spec the run reads once. Two placement rules:
 #   * BELOW the --dry exit, so a dry run never seeds real state;
