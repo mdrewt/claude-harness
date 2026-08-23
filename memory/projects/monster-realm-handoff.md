@@ -538,6 +538,17 @@ interpolation caveat this slice avoided. (5) pre-existing biome warning at
   (it added in-suite teeth the hand-written clauses lacked). Both were re-proven by execution.
 - `/tmp/mr_warn_16r-e` appeared mid-run; landing pattern was honoured (no new fan-outs after it).
 
+## 2026-08-23T19:04:12Z — 2026-08-23T19:00Z — reconciliation tick: rw3a merge record fixed, bookkeeping committed, issue #34 closed
+The 18:04Z tick squash-merged rw3a (PR#37) and wrote the ledger MERGED row + a COMPLETE handoff entry, but was cut off before updating mr-state.json (inflight[] still listed rw3a as running) and before committing anything to git. This tick (native-20260823T190015Z-2683700): verified live (no per-run/chain locks, no open PRs either repo, local main == origin/main @ a842116, no resident human session) that rw3a is genuinely done; cleared inflight[], updated master.sha; committed the supervisor-owned files that had been sitting uncommitted across several ticks (this handoff + its 2026-08 archive, mr-state.json, the 15r-a1 spec Delivered annotation, decisions/*.url+.answer.md, the lp-09 patch, branch-cleanup tsv, and 12 per-slice plan/progress memory cards — 33 files, commit 970da52) — left Drew's own future-prompts.md and gdd.md untouched. Also closed github issue #34 (claude-harness) per close-the-loop doctrine: Drew answered it 2026-08-23T11:48:56Z ('yes, no provenance always means it is an operator hold') and a prior tick had consumed the answer into decisions/issue-34.answer.md, but never closed the issue; mr-hold status is HOLD-NONE so this was pure bookkeeping catch-up, not a live gate lift. No new slice launched or merged — reconciliation was this tick's one action. Handoff's rw3a-COMPLETE entry (above) still names rw3b/rw3c as the next queue candidates (project repo, chain serially — both bump CONTENT_VERSION); neither was queue-added this tick, left for the next tick's full derivation.
+## 2026-08-23T18:04:42Z — rw3a MERGED — PR#37, roster-wave-3 spec authored
+Slice rw3a (harness, spec-authorship-only for M-postgate-roster-wave-3: Electric+Light roster wave) merged squash via PR#37 (a842116). Acceptance 8/8 met per mr-gates render; PR body line matched.
+
+Adjudication note: mr-gates verify returned FLAGGED (EVIDENCE-MISMATCH on X1-X6, X8) on the post-merge re-run. Root cause: the verify tool's cwd resolved to $PROJ (monster-realm project checkout) instead of the harness worktree for this harness-repo slice, so the node -e checks ran against the wrong tree and X8's `just ci` hit a Rust/cargo project instead of the harness one. Manually re-ran X1's check from the correct harness worktree cwd — output matched the recorded evidence exactly (skeleton ok=8 of 8). X5's scope check (git diff origin/main...HEAD) also confirmed the diff is scoped to specs/monster-realm-v2/ only, matching the recorded evidence. Treated as a tool artifact, not a slice defect, and merged. mr-audit orchestration + gating_advisory verdicts were both CLEAN (7 agent calls incl. tester/reviewer/verifier roles).
+
+Follow-on unblocked: content-authorship slice (project repo: game-core/content/species/*, game-core/content/skills/*, docs/adr/0204-*.md) for M-postgate-roster-wave-3 is now launchable per the normal content-pack pattern. Reserved project ADR-0204 for it (per rw3a's spec). Not queued this tick — flagging for next tick's derivation.
+
+master (harness) fast-forwarded to a842116, worktree/branch cleaned, per-run lock removed.
+
 ## 2026-08-23T17:28:03Z — Native tick: launch rw3a (M-postgate-roster-wave-3 spec authorship)
 Gate 0-2 clean: no live per-run locks, no chain-owner mutex, master CI green both repos
 (project master @ 8add7d7 after PR#356 knowledge-bundle fix; harness main unchanged),
@@ -751,16 +762,3 @@ A hardcoded-path tool cannot be safely exercised by anyone, reviewer or gate.
 or it cannot be tested without risking production. `mr-hold` hardcodes deliberately (a worktree copy
 must report the REAL hold) and compensates by rebinding paths inside its own selftest — that pairing
 is the pattern; a hardcoded path with no test-side rebinding is the trap.
-## 2026-08-22T23:21:35Z — HOLD-UNATTRIBUTED flag carries no provenance record (mtime=1787440289) — escalating once; loop stays held
-The build loop is held by a kill-switch flag with no provenance record. Did you pause it? If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour.
-
-
-
-## 2026-08-23T18:04:42Z — rw3a MERGED — PR#37, roster-wave-3 spec authored
-Slice rw3a (harness, spec-authorship-only for M-postgate-roster-wave-3: Electric+Light roster wave) merged squash via PR#37 (a842116). Acceptance 8/8 met per mr-gates render; PR body line matched.
-
-Adjudication note: mr-gates verify returned FLAGGED (EVIDENCE-MISMATCH on X1-X6, X8) on the post-merge re-run. Root cause: the verify tool's cwd resolved to $PROJ (monster-realm project checkout) instead of the harness worktree for this harness-repo slice, so the node -e checks ran against the wrong tree and X8's `just ci` hit a Rust/cargo project instead of the harness one. Manually re-ran X1's check from the correct harness worktree cwd — output matched the recorded evidence exactly (skeleton ok=8 of 8). X5's scope check (git diff origin/main...HEAD) also confirmed the diff is scoped to specs/monster-realm-v2/ only, matching the recorded evidence. Treated as a tool artifact, not a slice defect, and merged. mr-audit orchestration + gating_advisory verdicts were both CLEAN (7 agent calls incl. tester/reviewer/verifier roles).
-
-Follow-on unblocked: content-authorship slice (project repo: game-core/content/species/*, game-core/content/skills/*, docs/adr/0204-*.md) for M-postgate-roster-wave-3 is now launchable per the normal content-pack pattern. Reserved project ADR-0204 for it (per rw3a's spec). Not queued this tick — flagging for next tick's derivation.
-
-master (harness) fast-forwarded to a842116, worktree/branch cleaned, per-run lock removed.

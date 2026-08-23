@@ -3914,3 +3914,8 @@ clean, `just test` 103/103. `mr-selfcheck` reports only B2, which is TRUE until 
 `.bak.lp11a.20260822T233218Z` (lp-11a's pre-adoption version). Both use a `.bak.` infix on purpose:
 `_mr_files` excludes `.bak` but NOT `.preedit`, so a `.preedit` copy gets enumerated as a live corpus
 tool — worth knowing for any future out-of-repo backup.
+## 2026-08-22T23:21:35Z — HOLD-UNATTRIBUTED flag carries no provenance record (mtime=1787440289) — escalating once; loop stays held
+The build loop is held by a kill-switch flag with no provenance record. Did you pause it? If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour.
+
+
+
