@@ -1,8 +1,69 @@
-# Sketch: M24 — Internationalization (i18n)
+<!-- CEREMONY COMPLETE 2026-08-23 — mr-feedback-doctrine.md §6 heavy ceremony
+     (investigation -> 6-way ideation -> judge synthesis w/ attribution table -> adversarial review).
+     This file is no longer a design sketch. The pre-ceremony sketch is preserved VERBATIM in §11. -->
 
-**Status:** design sketch (provisional) · **Phase D** · **Decision:** ADR-0033 (builds on 0006).
+# Spec: M24 — Internationalization (i18n)
 
-> Provisional sketch — EARS criteria + tasks deferred to build time. Cross-cutting text externalization.
+**Status:** converged, implementation-ready (**CEREMONY COMPLETE**, 2026-08-23) · **Phase D** ·
+**Design authority:** ADR-0033 `i18n-strategy` (harness design ADR, accepted 2026-06-24) — ELABORATED,
+not amended. **Mechanism authorities:** **ADR-0006** (content-is-data / additive schema evolution — the
+invariant) **and ADR-0057** (`content-directory-glob-loading` — the loader a locale-variant RON scheme
+actually extends; see §2 and the sketch's own 2026-08-23 Recency check in §11).
+**Stack:** spacetimedb-game · **Project:** monster-realm
+
+## 1. Problem / intent
+
+Player-facing text is hard-coded English at 243 DOM-write sites across 31 client files, in 10 free-text
+fields across 8 RON content registries, and in 84 `return Err("...")` reducer strings. ADR-0033
+(`accepted`, 2026-06-24) chose keyed message catalogs for UI, locale-keyed RON for content, ICU-style
+composition, default-complete + fallback + RTL, a hard-coded-string lint, and untranslated chat. This
+ceremony converges that decision into an implementation-ready design. It **falsified three of the
+sketch's own premises** along the way.
+
+**Fact 1 — there is NO chat system, so ADR-0033's chat plank defends nothing.** `grep message|Message`
+over `server-module/src/schema.rs` returns zero hits; `player_conversation`
+(`server-module/src/schema.rs:582`) is single-player NPC dialogue-*progress* state (a
+`current_node_id: String`), private to its owner (ADR-0087). M22's ceremony made this identical
+correction for its own milestone (`M22-privacy-compliance.spec.md:88-90, 658-660`). There is no
+player-authored free text rendered anywhere in this client. The one real adjacent surface is
+`set_profile_name` (ADR-0132) — player-chosen display names, which *are* user content and *are*
+rendered (leaderboard, trade, PvP). "Chat is rendered safely but not machine-translated" is therefore
+retired as vacuous and **replaced** by a criterion about the surface that actually exists: player display
+names are never routed through the catalog and never translated.
+
+**Fact 2 — "rides the ADR-0006 pipeline" is half the mechanism, and the other half forbids the obvious
+design.** Content loading moved to directory-glob embedding in M8.9e (ADR-0057): `game-core/build.rs`
+globs `content/<registry>/*.ron`, keeps only regular files whose extension is exactly `ron`
+(`game-core/build.rs:74-81` — a `content/species/fr/` **subdirectory is silently skipped**), sorts by
+filename byte-order (`:102`) and emits `<REG>_RON_PARTS`. `parse_parts`
+(`game-core/src/content.rs:290-301`) then **unconditionally `.extend()`s every part** — there is no
+merge, no override, no keying — and `validate_content` (`game-core/src/content.rs:746`) **rejects
+duplicate ids** (`:753-756`, `:779`; teeth at `:1874`). So the intuitive `species.fr.ron` sibling with
+the same ids fails instantly, and the intuitive `<registry>/<locale>/` subdirectory is not even seen.
+ADR-0006 is the additive/content-is-data invariant; **ADR-0057 is the mechanism any locale-variant RON
+scheme actually extends**, and it is the binding constraint. (Note: no project-side `docs/adr/0006-*.md`
+file exists; 54 in-repo citations treat ADR-0006 as the invariant, whose enforcement lives in
+`evals/battle-schema-snapshot.eval.mjs` and `evals/bsatn-compat-smoke.eval.mjs`.)
+
+**Fact 3 — RTL is a pure DOM/CSS problem, and the CSS file does not exist.** Zero PixiJS
+`Text`/`BitmapText`/`HTMLText` imports exist in `client/src` (only `Texture`, `Sprite`, `Application`,
+`Container`, `Graphics`, `Renderer`), so nothing on the canvas needs bidi. But 100% of client styling is
+inline `style.cssText`/`style="..."`, `client/index.html:2` is `<html lang="en">` with **no `dir`**, and
+`client/src/styles.css` is specced by M23 §2.7 but **not built** — M23 converged the same day as this
+ceremony. Inline `left:`/`margin-left:` cannot be flipped by a `dir` attribute.
+
+Two further facts shape the scope. There is **no pluralization anywhere today** — zero `(s)` or
+singular/plural branching; counts render as bare `${n}` with a unit glyph appended, so M24 *introduces*
+plurals rather than repairing them. And there is **no locale-aware formatting in production code** —
+`toFixed`/`toLocaleString`/`toLocaleDateString` appear only in three test files, and no relative-time
+("3m ago") UI exists at all.
+
+
+## 11. Ceremony input of record
+
+The pre-ceremony design sketch, preserved verbatim.
+
+---
 
 ## Problem / intent
 Externalize player-facing text so reaching another language is **data, not code**. Chat (user content) is
