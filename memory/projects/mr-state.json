@@ -1,18 +1,41 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-24T12:13:24Z",
-  "updated_by": "mr-sup-native-20260824T121031Z-262508",
+  "updated_utc": "2026-08-24T13:03:10Z",
+  "updated_by": "mr-sup-native-20260824T130010Z-277400",
   "master": {
     "sha": "e664fa7",
-    "ci": "in_progress at tick-end (gh run 32725853376 on the merge commit) -- not yet confirmed green; predecessor d60af03 was GREEN. Next event/cron tick reconciles the result live.",
+    "ci": "GREEN, confirmed live this tick via the situation bundle's master_ci_latest (conclusion=success on e664fa7, displayTitle matches m23-s0).",
     "nightly": "fixed_at_a40cb81_confirmed_green"
   },
   "harness_main": {
-    "sha": "856125e",
-    "ci": "no-remote-ci-local-gate-green; m25-ceremony PR#41 squash-merged (856125e)"
+    "sha": "fee5fee",
+    "ci": "no-remote-ci-local-gate-green; chore(mr-sup) reconciliation commit fee5fee (this tick)"
   },
   "adr_next_free": 206,
-  "inflight": [],
+  "inflight": [
+    {
+      "slice": "m23-s1",
+      "repo": "project",
+      "pid": 279806,
+      "claude_pid": 279809,
+      "model": "opus",
+      "effort": "high",
+      "tier": "routine",
+      "touches": ["client/src/ui/focusTrap.ts", "client/src/ui/liveRegion.ts", "client/src/ui/announcements.ts", "client/src/ui/overlayA11y.ts"],
+      "launched_utc": "2026-08-24T13:02:33Z"
+    },
+    {
+      "slice": "m23-s2",
+      "repo": "project",
+      "pid": 280453,
+      "claude_pid": 280456,
+      "model": "opus",
+      "effort": "high",
+      "tier": "routine",
+      "touches": ["client/index.html", "client/src/styles.css", "client/src/indexShell.test.ts"],
+      "launched_utc": "2026-08-24T13:02:46Z"
+    }
+  ],
   "awaiting_merge": [],
   "queue": [],
   "park_counters": {
@@ -20,7 +43,7 @@
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "2026-08-24T12:10Z native tick (rid=native-20260824T121031Z-262508, src=ci event on PR#361/m23-s0 green): gate-0 clean (no locks/kill-switch/human collision; per-run/chain locks empty). Took chain-owner mutex. Re-verified PR#361 LIVE (not from bundle): mergeStateStatus=CLEAN, mergeable=MERGEABLE, both ci+e2e checks SUCCESS. Ran mr-audit (base d60af03, head dec6b56): policy=CLEAN (mandatory_read=false), orchestration=CLEAN. gating_advisory flagged suppressions_added=2 -- read the diff, confirmed FALSE POSITIVE (substring hits on 'ignore'/'expect-error' inside test names/a self-referential doc comment about the scanner's own limitation; zero real @ts-ignore/eslint-disable/.skip/.only). mr-gates verify: 5/5 met, 0 unmet, 0 deferred, all 5 gates independently reverified and agree with recorded evidence (FLAGGED label was only SPEC-SECTION-NOT-FOUND, not an evidence mismatch); PR's Acceptance: line matched verbatim. Merged PR#361 (gh pr merge --squash --delete-branch) -> e664fa7. Cleaned up: removed .claude/worktrees/m23-s0 (verified clean first), deleted local+remote slice/m23-s0 branch, fast-forwarded local master d60af03->e664fa7. mr-gates residuals close --slice m23-s0 --pr 361 -> 0 closed (none were deferred, all 5 gates met outright). Recorded ledger MERGED row + handoff entry. Master CI kicked off on e664fa7 (run 32725853376) and was still in_progress at tick-end -- per doctrine did NOT sit polling; left for the next event/cron tick to reconcile live. No composite merge->launch this tick: deferred picking new work until master CI on e664fa7 is confirmed green (launching atop an unconfirmed head risks stacking a slice on a red master). live_watchers.mr-ci-watch (pid 258656) confirmed exited (its job -- delivering the CI-green event -- is done) and its lock cleaned up. No BLOCKER. Governor NORMAL (d7 $1026.77/2783 eff., fable_ok=true).",
+  "notes": "2026-08-24T13:00Z native tick (rid=native-20260824T130010Z-277400): gate-0 clean (no live locks/kill-switch/human collision; per-run/chain locks empty at entry). Found uncommitted mr-state.json/handoff.md bookkeeping left over from the prior tick (rid=native-20260824T121031Z-262508, which merged PR#361/m23-s0 to e664fa7 but exited before its own git commit) -- committed as fee5fee, leaving future-prompts.md (unrelated human scratch-notes file, not supervisor bookkeeping) untouched. Took chain-owner mutex. Re-verified live: master e664fa7 CI green (situation bundle master_ci_latest), no open PRs, remote origin matches expected repos both sides. Gate-3: all 10 open residuals are <1 day old, well under t1=3d/t2=14d aging thresholds -- none outrank fresh work; queue[] empty. Derived next work from PLAN.md Sec9 + M23-accessibility.spec.md Sec4 dependency spine: S0 merged; S1 (client/src/ui/{focusTrap,liveRegion,announcements,overlayA11y}.ts, all new) and S2 (client/index.html + client/src/styles.css (new) + client/src/indexShell.test.ts, extend-only) are both after:S0 only per the slice table. mr-disjoint verdict SAFE (zero file overlap, no shared registry/enum axis) -- fanned out N=2, routine tier (opus@high; neither slice touches schema/reducers/netcode/security). Both launched via mr-spawn: detachment + model class asserted, per-run locks written (m23-s1 leader=279806/claude=279809, m23-s2 leader=280453/claude=280456). mr-gates seeding returned SPEC-SECTION-NOT-FOUND for both (0 criteria seeded -- the spec lists slices as table rows, not headed sections; advisory-only, will be judged like a NO-LEDGER slice at merge time). Recorded 2 ledger LAUNCHED rows + handoff entry. No BLOCKER. Governor NORMAL (d7=$1027.93/2783 eff., fable_ok=true).",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
   "parked": [],
   "open_chore_prs": [],
@@ -50,5 +73,5 @@
     "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
   },
   "live_watchers": [],
-  "last_tick_utc": "2026-08-24T12:13:24Z"
+  "last_tick_utc": "2026-08-24T13:03:10Z"
 }
