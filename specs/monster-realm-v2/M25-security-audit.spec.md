@@ -67,7 +67,7 @@ sketch, the threat model, and the operator's 2026-08-23 authorization note all p
 4. **Exact-body pinning of the 5 scoped views already ships too.** `schema.rs:369-370,419-420,771` declare
    "THIS BODY is the entire security boundary and is pinned exactly"; `evals/monster-privacy.eval.mjs` carries
    `SANCTIONED_ATTR_BATTLE = 'accessor=my_battle,public'` plus one sanctioned body spelling; and
-   `evals/account-privacy.eval.mjs:212-215` pins the view-name list to **exactly**
+   `evals/account-privacy.eval.mjs:213-219` pins the view-name list to **exactly**
    `['my_account','my_battle','my_conversation','my_monster_pub','my_wallet']`. **Consequence: adding a 6th
    view FAILS that gate until the list is updated** — a hard, non-obvious integration constraint on §2.5.
    Any M25 proposal to "scan that each view's filter binds the caller identity" is rebuilding shipped
@@ -251,7 +251,7 @@ minor composition leak for a broken feature.
 3. **`pvp.rs:827` must be resolved in the SAME PR** (redacted, or explicitly accepted with a finding row).
    The moment step 2 lands, `battle_challenge`'s stakes change and that dormant branch becomes live — this is
    §2.3's `[oracle-coupling-01]` firing on its first real trigger, by design, on day one.
-4. **`evals/account-privacy.eval.mjs:212-215`'s exact view-name list MUST be extended to 6 entries**, and
+4. **`evals/account-privacy.eval.mjs:213-219`'s exact view-name list MUST be extended to 6 entries**, and
    `evals/monster-privacy.eval.mjs`'s sanctioned-view set with it (§1.1(4)). Omitting this is an automatic
    CI red, and it is the kind of coupling that is invisible until it bites.
 
