@@ -824,6 +824,59 @@ in the memory card `monster-realm-m24-ceremony`.
 
 **Remaining M22–M25 ceremony authorization:** M25 (security audit) is still AUTHORIZED, not run.
 
+## 2026-08-24T~10:5xZ — m23-s2 COMPLETE (terminal: PR #363 open + local `just ci` green + remote CI running)
+
+**Slice:** m23-s2 — M23 accessibility **S2**: static-shell ARIA literals for the eleven
+`client/index.html` shells, the single `#a11y-live` region, and the repo's FIRST stylesheet
+(`client/src/styles.css`). Branch `slice/m23-s2` (worktree `.claude/worktrees/m23-s2`), 4 commits,
+all pushed. **PR #363.** Local full `just ci` exit 0. Acceptance ledger **7/7 met, 0 deferred**
+(`m23-s2 seed:e3b0c44298fc1c14`). Scope clean: exactly the 4 permitted files (the 3 declared +
+`ARCHITECTURE.md`, declared under `touches-delta:`). **No ADR authored** — assigned number was `None`
+and ADR-0205 already carries this design; `adr_next_free` unchanged at 206.
+
+**Lenses:** planner, reviewer (plan), tester (gating suite), reviewer (impl + simplify), red-team,
+verifier. Verifier verdict PASS: append-only on `indexShell.test.ts` proven mechanically
+(`removed_or_changed=0`), ledger 7/7 independently re-executed with zero evidence mismatch,
+coverage 98.16% vs the 96% threshold. Domain auditors deliberately NOT run (zero reducers, zero
+schema, zero predictor/renderer surface) — stated in the PR body.
+
+**The red-team round is the story of this slice.** It wrote and RAN the cheats with Chromium
+measurements and found **9 bypasses** that kept every gate green while violating the property —
+including a biome-clean, `#`-free stylesheet (`[id="help-overlay"]{visibility:hidden}`) that hides
+the help overlay, blanks `#help-hint` and removes the live region from the AX tree; `!important`
+inverting BOTH A11Y-11 value checks at once (false green AND false red from one line); inert clip
+values leaving 1651 px² of announcement text painted on screen; and a duplicate `id="a11y-live"`
+that splits A1's and A2's oracles so `getElementById` returns a decoy and **every announcement in
+the game goes to a node with no `aria-live`**. All nine closed, each with a fixture and a
+bite-proof. Final bite-proof tally: **28 red, 3 must-stay-green controls.**
+
+**Registered residuals (in the drain, not prose):** `R-m23-s2-X5` — **the milestone's most likely
+silent a11y failure**: §2.4 puts the live region outside `#app` while A11Y-13 puts
+`aria-modal="true"` on every shell, so the one node S1 announces through sits in the subtree AT is
+told to ignore (VoiceOver/Safari frequently silent). S1/S3 must decide: a second region inside the
+dialog root, or `inert` on siblings. `R-m23-s2-X3` — A11Y-12 as gated is a SHAPE oracle; the
+airtight cascade oracle needs Playwright and belongs with S10's eval. `R-m23-s2-X6` — the CSS
+scanner will exist twice once S10 lands its eval, with no agreement gate. `R-m23-s2-X4` — spec
+§2.5's reduced-motion HP-bar guard is owned by NO slice (S7 lacks `styles.css`, the transition is
+inline `cssText`, the element has no class); fix is S4/S8 adds a class, S9 adds the rule.
+
+**Also flagged, not actioned (outside `touches:`):** ADR-0205:276 says "the ten static-shell
+anchors" — it is eight `-1` plus `#menu-rows` at `0` (rename/tradePropose are native, and a `-1`
+there would remove a native control from the tab order); ADR-0205:64 assigns
+`evals/a11y-static-shell.eval.mjs` to S2 while spec §4 gives it to S10;
+`main.wiring.test.ts` still carries the now-false "no CSS file anywhere in this repo" premise (S5
+also edits `index.html` and is the natural place); spec A11Y-18's prose does not describe what
+`dom-shell-coverage-exclusion.eval.mjs` actually does.
+
+**Note for whoever runs S6:** `client/index.html` carries a `biome-ignore
+lint/a11y/noNoninteractiveTabindex` on `#menu-rows` with its reason inline. The rule is genuinely
+live (measured: 3 errors without it, 0 with). S6's `role="listbox"` retires it — nothing forces that
+mechanically.
+
+**Unblocked next:** S3 and S4 (both `after: S1, S2`) once m23-s1 lands.
+
+## 2026-08-24T14:40:46Z — m23-s2: PR #363 open, CI-watch delegated
+Native tick mr-sup-native-20260824T144035Z-502862-3840: m23-s2 (M23 accessibility S2, static-shell ARIA literals across 11 client/index.html shells + a11y-live div, plus client/src/styles.css and indexShell.test.ts) finished rc=0, attempts=2, model=opus. Ledger held 7/7 gates met, LINT-CLEAN, red-team round (9 measured bypasses) hardened per PR body. Pushed commit 4497816, opened PR #363 (mdrewt/monster-realm). Live re-verify at this tick: mergeStateStatus=UNSTABLE, mergeable=MERGEABLE, ci check SUCCESS, e2e check still IN_PROGRESS. Per gates doctrine, delegated CI-wait to mr-ci-watch (pid 502987, detached via setsid) rather than polling; it will resume the merge via an event tick when checks complete. m23-s1 remains live and unaffected (leader pid 279806, alive, no .done). No merge action taken this tick. Governor NORMAL (d7=$1076.16/2783 eff.).
 ## 2026-08-24T13:03:10Z — native tick 13:00Z (reconciled leftover bookkeeping + M23 s1/s2 fan-out launch)
 Gate-0: no live locks/kill-switch/human collision on entry. Found uncommitted mr-state.json/handoff.md bookkeeping left over from the prior tick (rid=native-20260824T121031Z-262508, which merged PR#361/m23-s0 to e664fa7 but exited before its own commit) -- reconciled and committed (fee5fee), leaving future-prompts.md untouched (unrelated human scratch-notes file, not supervisor bookkeeping). Live situation confirmed master e664fa7 CI green. Gate-3: no residuals past t1/t2 aging thresholds (10 open, all <1 day old, well under t1=3d/t2=14d) -- none outrank fresh work. queue[] empty. Derived next work from PLAN.md Sec9 + M23-accessibility.spec.md Sec4 dependency spine: S0 merged, S1 and S2 are both after:S0 only (S1: client/src/ui/{focusTrap,liveRegion,announcements,overlayA11y}.ts, all new; S2: client/index.html + client/src/styles.css (new) + client/src/indexShell.test.ts). mr-disjoint verdict SAFE, no shared registry/enum axis, no structural-set overlap -- fanned out N=2 (routine tier, opus@high, neither slice touches schema/reducers/netcode/security). Both launched via mr-spawn, detachment+model asserted, per-run locks written. mr-gates seeding reported SPEC-SECTION-NOT-FOUND for both (table-row slice format, not headed sections -- the acceptance ledger has 0 seeded criteria for these two; advisory only, will need to be judged at merge time same as any NO-LEDGER slice). No BLOCKER. Governor NORMAL (d7=$1027.93/2783, fable_ok=true).
 ## 2026-08-24T12:13:32Z — m23-s0 merged (PR#361)
@@ -1005,7 +1058,4 @@ Adjudication note: mr-gates verify returned FLAGGED (EVIDENCE-MISMATCH on X1-X6,
 Follow-on unblocked: content-authorship slice (project repo: game-core/content/species/*, game-core/content/skills/*, docs/adr/0204-*.md) for M-postgate-roster-wave-3 is now launchable per the normal content-pack pattern. Reserved project ADR-0204 for it (per rw3a's spec). Not queued this tick — flagging for next tick's derivation.
 
 master (harness) fast-forwarded to a842116, worktree/branch cleaned, per-run lock removed.
-
-## 2026-08-23T17:02:14Z — master CI red — knowledge-bundle regen chore PR#356
-master HEAD 8f7fca3 (docs(schema): fix stale battle_action comment) tripped knowledge-bundle-conformance (M8.95b): schema.rs comment edit shifted line numbers without regenerating docs/knowledge/. Opened chore/knowledge-bundle-regen-20260823 -> PR#356 (just knowledge regen, 89 files, mechanical, doc-only), gh pr merge --squash --auto armed, CI wait delegated to mr-ci-watch (detached). No slice work launched this tick pending the fix.
 

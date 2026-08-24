@@ -4141,3 +4141,7 @@ future-prompts.md alone) but out of scope for a single-action tick.
 
 No fan-out this tick (single slice; M22-M25 ceremony launches deferred to a follow-up tick to
 keep this one simple and auditable).
+## 2026-08-23T17:02:14Z — master CI red — knowledge-bundle regen chore PR#356
+master HEAD 8f7fca3 (docs(schema): fix stale battle_action comment) tripped knowledge-bundle-conformance (M8.95b): schema.rs comment edit shifted line numbers without regenerating docs/knowledge/. Opened chore/knowledge-bundle-regen-20260823 -> PR#356 (just knowledge regen, 89 files, mechanical, doc-only), gh pr merge --squash --auto armed, CI wait delegated to mr-ci-watch (detached). No slice work launched this tick pending the fix.
+
+
