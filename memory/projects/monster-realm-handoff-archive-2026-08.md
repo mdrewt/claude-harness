@@ -4111,3 +4111,33 @@ Files touched (harness repo, `main`): `specs/monster-realm-v2/PLAN.md`,
 `security-threat-model.md`, `memory/decisions-log.md`. Nothing in the `monster-realm` project repo
 changed. Committed and pushed to `main` this session (see the commit for the exact SHA).
 
+## 2026-08-23T17:28:03Z — Native tick: launch rw3a (M-postgate-roster-wave-3 spec authorship)
+Gate 0-2 clean: no live per-run locks, no chain-owner mutex, master CI green both repos
+(project master @ 8add7d7 after PR#356 knowledge-bundle fix; harness main unchanged),
+mr-state.json inflight/awaiting_merge/queue all empty, no unclaimed residuals, no resident
+human session (probe clean). PLAN §9 derivation: 16r pulled-forward set fully closed except
+16r-b (SERIAL-REQUIRED behind the still-blocked 15r-sec-mig-* family — correctly skipped).
+Next pulled-forward item per the 2026-08-23T16:35Z operator note: M-postgate-roster-wave-3,
+DE-GATED, zero prior PRs/commits, no spec file yet.
+
+First mr-spawn attempt hit REPO-MIXED (touches spanned both harness spec dir and project
+content dirs) — corrected by splitting: this slice (rw3a) is HARNESS-repo spec authorship
+only (write specs/monster-realm-v2/M-postgate-roster-wave-3.spec.md per the
+M-playtest-d-content-pack.spec.md precedent: candidate-slices table reserving the next
+species-id band (top out at 31 in 060-item-evo-derived.ron; recommend 40-49 / 070-wave3.ron),
+Electric+Light skill kits sequenced per the ADR-0143 STAB gate, and a note to reserve project
+ADR-0204 at build time). Second attempt hit vars.json missing required `tier` field — added
+`tier: content`. Launched: opus@medium, tier=content, repo=harness, pr_repo=mdrewt/claude-harness,
+leader pid=2571046, rid=mr-spawn-20260823T172732Z-2570981. mr-gates seeded 0 criteria (expected —
+no spec exists yet for this slice to seed against).
+
+DIRTY-TREE-ADVISORY (non-blocking, already known): harness working tree carries 6 pre-existing
+uncommitted tracked changes (future-prompts.md — Drew's live freeform notes file, untouched;
+mr-state.json/handoff/spacetime-db-testing.md/M-postgate-fifteenth-review-residuals.spec.md/
+archive-2026-08.md — legitimate supervisor-record edits from the 17:02Z master-CI-red-fix tick
+that were never committed). Left untouched again this tick, same as the prior tick's note —
+worth a dedicated reconciliation pass (commit the legitimate mr-record deltas, leave
+future-prompts.md alone) but out of scope for a single-action tick.
+
+No fan-out this tick (single slice; M22-M25 ceremony launches deferred to a follow-up tick to
+keep this one simple and auditable).
