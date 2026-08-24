@@ -89,7 +89,7 @@ ANONYMIZE + 5 JOIN-ONLY + 17 NOT-OWNED.**
   no messaging system exists anywhere in this codebase. Any design predicated on chat is designing for
   a feature that does not exist.
 - `trade_offer` / `battle_challenge`: only currently-**pending** rows can exist at cascade time —
-  terminal rows are already deleted immediately (`server-module/src/schema.rs:645-656`, `:846`, each
+  terminal rows are already deleted immediately (`server-module/src/schema.rs:645-656` and `:843-844`, each
   table's own doc comment). There is no history here to anonymize. Both identity columns are swept
   (`initiator`/`counterparty`; `challenger`/`target` — the latter closes the G6-manifest-flagged
   `battle_challenge.target` orphan hole directly).
@@ -108,17 +108,32 @@ ANONYMIZE + 5 JOIN-ONLY + 17 NOT-OWNED.**
 - `profile` — `name` → tombstone. The row **must never be deleted**: ADR-0119 carries an explicit
   never-delete invariant, restated in the table's own doc comment. Anonymize is a field update, not a
   `.delete()`, so this is compatible **by construction**, not by exception.
-- `account` — `auth_issuer` → null; `identity`/`created_at_ms`/`claimed_from`/`claimed_at_ms` retained
-  (AUTH-29's invariant: a cancel-provenance chain must never read as un-claimed); terminal marker set
-  per §4.
+- `account` — `auth_issuer` → the tombstone **sentinel string** `TOMBSTONE_AUTH_ISSUER`, **not null**.
+  `Account.auth_issuer` is `pub auth_issuer: String` (`server-module/src/schema.rs:758`), not
+  `Option<String>` — widening it to nullable would be exactly the kind of non-additive,
+  semantics-changing column edit §4.1 declines to make for `AccountStatus`, so the sentinel keeps the
+  type unchanged and the write additive-free. Note that column's own doc comment currently reads
+  *"Never updated after insert"* (`schema.rs:755-757`) — **S2 must update that comment**, because M22
+  makes deletion the one sanctioned exception; leaving the comment stale would make the next reader
+  believe the field is immutable. `identity`/`created_at_ms`/`claimed_from`/`claimed_at_ms` are
+  retained (AUTH-29's invariant: a cancel-provenance chain must never read as un-claimed); terminal
+  marker set per §4.
 - `battle` — **the one genuinely necessary identity-swap-on-a-shared-row case.** Unlike `trade_offer`/
   `battle_challenge`, terminal `battle` rows demonstrably **persist** (settle updates, never deletes;
   GC is lazy), so a surviving opponent's `my_battle` view (ADR-0198) can still resolve a terminal row
   naming the deleted party months later. Swap the deleting party's `player_identity` **or**
   `opponent_identity` to a module-level `TOMBSTONE_IDENTITY` via the existing PK-keyed `.update()`
   pattern; leave the opponent's side and every mechanical field untouched.
+  **`TOMBSTONE_IDENTITY` must be a distinct, explicitly non-zero sentinel — it MUST NOT be the
+  all-zero identity.** The precedent to follow in shape, and the collision to avoid in value, is
+  `pub(crate) const WILD_IDENTITY: Identity = Identity::from_byte_array([0u8; 32])`
+  (`server-module/src/lib.rs:84`): a zero-valued tombstone would make every anonymized PvP battle
+  read as a **wild** battle to `guards.rs`'s `opponent_identity != crate::WILD_IDENTITY` checks
+  (`server-module/src/guards.rs:295,352`), silently reclassifying settled ranked history. S1 pins the
+  exact byte array (e.g. `[0xFFu8; 32]`) as a named constant beside `WILD_IDENTITY`'s declaration
+  style, and ships a proof-of-teeth assertion that `TOMBSTONE_IDENTITY != WILD_IDENTITY`.
   **Precedent for rewriting a non-PK indexed `Identity` column in place is `rekey_monsters`
-  (`server-module/src/monster_mgmt.rs:113-133`)** — this is proven, shipped mechanics, not an open
+  (`server-module/src/monster_mgmt.rs:113-137`)** — this is proven, shipped mechanics, not an open
   question. (`rekey_wallet`/`rekey_profile` demonstrate *PII-field tombstoning on a surviving row*, a
   different and separately-cited precedent — see §4/§5.)
 
@@ -280,14 +295,14 @@ in-same-transaction progress marker, which reverts on abort by construction.
 
 `on_connect` (`server-module/src/lib.rs:205-211`, `#[spacetimedb::reducer(client_connected)]`) delegates
 to `accounts::provision_or_touch_account` (`accounts.rs:349-383`), whose `Some`/`None` match at
-`:369-381` does:
+`:371-383` does:
 
 ```rust
 Some(existing) => { ctx.db.account().identity().update(touch_login(existing, now)); }
 None           => { ctx.db.account().insert(new_account_row(...)); }
 ```
 
-`touch_login` (`accounts.rs:153-163`) only stamps `last_login_at_ms` — it neither reads nor gates on
+`touch_login` (`accounts.rs:153-164`) only stamps `last_login_at_ms` — it neither reads nor gates on
 `status`. Since `Identity = f(iss, sub)`, the same real person re-authenticating with the same OAuth
 account hits the `Some` branch and **silently reactivates a terminal-status row, with zero rejection and
 zero gating.** The `Some` branch must check the terminal predicate. **Which behavior it takes is an
@@ -319,8 +334,11 @@ own recheck. So:
   membership in this list is a hard CI failure. The exemption list is not an unchecked ad-hoc allowlist;
   it is a declared, enforced part of the contract.
 
-**Which reducers get the gate in practice** (derived by the rule, not hand-listed): trade propose/accept,
-battle/PvP challenge start and accept, PvP action submission, shop buy/sell if in scope.
+**Which reducers get the gate in practice** (derived by the rule, not hand-listed): trade
+propose/accept, battle/PvP challenge start and accept, and PvP action submission. **Shop buy/sell is
+DECIDED IN, not left "if in scope"** — `player_wallet` and `inventory` are both `ERASE`-policy tables
+(§3), so the §4.7 trigger predicate already selects those reducers mechanically; naming them as
+optional would contradict the rule. The builder does not get to re-decide this.
 
 **The gate rejects NEW commitments only.** It does not retroactively void in-flight state — that is
 handled by §4.4 step 1's force-resolve at actual cascade time. "Don't boot a live game, just stop new
@@ -355,8 +373,10 @@ generated bindings, `onUpdate` **never fires**, and the client reconciles from t
 flush (ADR-0194 :78-87, ADR-0198 D4/D5). A single unbounded `payload_json` blob would force a full-row
 re-diff of an ever-growing string on every subscription update. So `export_bundle` is chunked **by
 source table**: one row per `(owner_identity, request_id, table_name)` with `chunk_index`/`total_chunks`
-fields; a table whose own per-owner row count is large sub-chunks at a fixed row-count boundary (e.g.
-500 rows/chunk) using the same fields. The client waits for `chunks.length === total_chunks` before
+fields; a table whose own per-owner row count is large sub-chunks at a fixed row-count boundary using the
+same fields. That boundary is a **named constant, `EXPORT_CHUNK_ROWS`, declared in S1 alongside the
+other deletion constants** (proposed 500) — not a literal buried in the export loop, so the tuning
+knob is discoverable and testable. The client waits for `chunks.length === total_chunks` before
 assembling the downloadable JSON. A TTL reaper on `export_bundle` (7 days, same shape as the deletion
 reaper) prevents the export snapshot becoming an unretained second copy of the same personal data.
 
@@ -434,8 +454,8 @@ Dependency spine: **S0 → S1 → S2 → S3 → {S4 ‖ S5} → {S6 ‖ S7} → 
 | Slice | Scope | `touches:` | `after:` |
 |---|---|---|---|
 | **S0** | Contract-first. Export `REKEY_MANIFEST`/`findIdentityColumns`/`parseTableSchemas` (or lift to `evals/rekey-registry-shared.mjs` if the file is near a split threshold — check first). Fix `mr-state.json`'s `adr_next_free` drift (0204 → 0205). | `evals/guest-claim-integrity.eval.mjs` (export surface only), `mr-state.json` | — |
-| **S1** | game-core deletion rules: `DELETION_GRACE_MS_DEFAULT` + basis comment, `is_deletion_due(Option<i64>, i64) -> bool`, `TOMBSTONE_IDENTITY`, `STATE_TRANSITION_OWNERS`. | `game-core/src/accounts/deletion.rs` (new) | S0 (naming only) |
-| **S2** | Schema + manifest extension: `deletion_policy`+`basis`+`exportable` per §3; `Account.terminal_at_ms: Option<i64>`; `AccountDeletionReaperSchedule`; `export_bundle`. All additive (ADR-0006). | `server-module/src/schema.rs`, `server-module/src/accounts.rs` (manifest region only) | S1 |
+| **S1** | game-core deletion rules: `DELETION_GRACE_MS_DEFAULT` + basis comment, `is_deletion_due(Option<i64>, i64) -> bool`, `TOMBSTONE_IDENTITY` (non-zero, `!= WILD_IDENTITY`, with its proof-of-teeth assertion), `TOMBSTONE_AUTH_ISSUER`, `EXPORT_CHUNK_ROWS`, `STATE_TRANSITION_OWNERS`. | `game-core/src/accounts/deletion.rs` (new) | S0 (naming only) |
+| **S2** | Schema + manifest extension: `deletion_policy`+`basis`+`exportable` per §3; `Account.terminal_at_ms: Option<i64>`; `AccountDeletionReaperSchedule`; `export_bundle`. All additive (ADR-0006). Also corrects `Account.auth_issuer`'s now-stale "never updated after insert" doc comment (`schema.rs:755-757`). | `server-module/src/schema.rs`, `server-module/src/accounts.rs` (manifest region only) | S1 |
 | **S3** | Cascade + reaper + cancel-disarm + reactivation guard. Extend `delete_account` (append schedule-insert); `cancel_account_deletion` (disarm + distinct terminal error); new `account_deletion_reaper`; `provision_or_touch_account`'s `Some` branch gains the terminal check. | `server-module/src/accounts.rs` (reducer bodies), `server-module/src/lib.rs` (`resolve_all_live_interactions` extraction) | S2 |
 | **S4** | Export: `request_data_export`, `my_export_bundle` view, chunking, `export_bundle` TTL reaper. | `server-module/src/privacy.rs` (new — do NOT append to `accounts.rs`; check its size against the M8.9 split threshold first) | S3 ‖ S5 |
 | **S5** | Gameplay gating fan-out (internally parallel, N≤3). | `server-module/src/trading.rs` ∥ `server-module/src/pvp.rs` ∥ `server-module/src/guards.rs` | S3 ‖ S4 |
