@@ -5,8 +5,9 @@
 # Spec: M24 — Internationalization (i18n)
 
 **Status:** converged, implementation-ready (**CEREMONY COMPLETE**, 2026-08-23) · **Phase D** ·
-**Design authority:** ADR-0033 `i18n-strategy` (harness design ADR, accepted 2026-06-24) — ELABORATED,
-not amended. **Mechanism authorities:** **ADR-0006** (content-is-data / additive schema evolution — the
+**Design authority:** ADR-0033 `i18n-strategy` (harness design ADR, accepted 2026-06-24) — **ELABORATED
+where compatible with its accepted text, and AMENDED where §2.5 / §2.6 / §2.7 diverge from it. The
+amendment is DRAFTED at §8-4 and is a hard BLOCKER on slice S1; it is not yet written into the ADR.** **Mechanism authorities:** **ADR-0006** (content-is-data / additive schema evolution — the
 invariant this project enforces through `evals/battle-schema-snapshot.eval.mjs` and
 `evals/bsatn-compat-smoke.eval.mjs`) **and ADR-0057** (`content-directory-glob-loading` — the loader in
 `game-core/build.rs` that any locale-variant RON scheme actually extends, and the one that rules the
@@ -156,8 +157,8 @@ Four independent constraints force the same shape, and every one of them is veri
 2. **ADR-0033 says "ICU-style" and "a new language is a data drop" (E10).** Deviating from an accepted ADR
    needs an amendment, not silence. The synthesis satisfies the letter of it by making **ICU JSON the
    export/import format of record** (§2.6) — the vendor genuinely receives ICU `plural`/`select` and genuinely
-   ships it back — while the *runtime* stays a typed TS module. The amendment (§8-4) records that the "data
-   drop" is a *typed* drop: a new locale is a PR whose failure mode is a `tsc` error rather than a runtime
+   ships it back — while the *runtime* stays a typed TS module. The amendment drafted at §8-4 — which does **not** yet exist in the ADR
+   file — will record that the "data drop" is a *typed* drop: a new locale is a PR whose failure mode is a `tsc` error rather than a runtime
    blank. That is strictly stronger than what the ADR promised, and the ADR should say so.
 3. **The catalog is engineer-authored TS in M24 but vendor-fed the moment §2.6's importer lands** — inside
    M24's own scope. B6's F1 threat model therefore becomes live within this milestone, which is precisely
@@ -189,6 +190,14 @@ destination; B6 is right that `list.innerHTML = t('shop.empty')` passes all thre
 Converting the clears is not cosmetic tidiness — it is what makes the gate a **pure sink-vocabulary check
 with no RHS exception whatsoever**. A gate that must permit `innerHTML = ''` needs an RHS predicate, and an
 RHS predicate is exactly the thing F1 proves cannot be trusted. Zero exceptions is what kills the vacuity.
+
+> **Adversarial-review correction (2026-08-23, spec §6.5 pass).** An earlier draft of `[I18N-HTML-03]`
+> reused §5.2's `SINK_FLOOR = 169`. That is **unsatisfiable by construction** and would have been a
+> day-one permanent CI red: this eval's vocabulary is only `.innerHTML =`, `.outerHTML =`,
+> `insertAdjacentHTML(`, `document.write(` and `Element.setHTML(`, whose entire live population is **14
+> sites before S0 and exactly 0 after** — and reaching 0 is S0's declared success condition (I18N-1/2).
+> A gate whose target population legitimately shrinks to zero must anti-vacuity-check on **files read**,
+> never on sites matched. `SINK_FLOOR = 169` belongs to §5.2 alone.
 
 **(b) `evals/i18n-no-html-sink.eval.mjs` (new)** asserts **zero** occurrences of `.innerHTML =`,
 `.outerHTML =`, `insertAdjacentHTML(`, `document.write(`, and `Element.setHTML(`-shaped calls anywhere in
@@ -285,6 +294,25 @@ loud. B4's `HARDCODED_FLOOR = 150` was derived from the test-inclusive 243 and i
   Per the 2026-08-23 unstable/beta ruling (dossier §G), `Intl.PluralRules`/`Intl.NumberFormat` are used as
   intended and not reflexively avoided. `Record<Intl.LDMLPluralRule, string>` is *total over CLDR*: a Russian
   catalog omitting `few` does not compile.
+
+  > **Adversarial-review correction (2026-08-23, spec §6.5 pass) — the totality tax is real and is paid,
+  > not waved away.** `Intl.LDMLPluralRule` is `"zero" | "one" | "two" | "few" | "many" | "other"` — **six**
+  > categories (`lib.es2018.intl.d.ts`). A bare total `Record` therefore forces **English and French to
+  > author four permanently-dead branches per pluralized message**, since
+  > `Intl.PluralRules('en').resolvedOptions().pluralCategories` is only `["one","other"]`. That tax was
+  > undeclared in the first draft and it cuts against this spec's own rejection of over-provisioning (C4).
+  > **Resolution — keep the guarantee, delete the tax:** `plural.ts` also exports the two constructors
+  > `export function oneOther(one: string, other: string): Readonly<Record<Intl.LDMLPluralRule, string>>`
+  > and `export function cldr(forms: Readonly<Record<Intl.LDMLPluralRule, string>>):
+  > Readonly<Record<Intl.LDMLPluralRule, string>>`. `oneOther` fills the four unreachable categories with
+  > the `other` form, so a two-category locale authors exactly two strings while the value handed to
+  > `selectPlural` stays structurally total; `cldr` is the identity, used by a locale that genuinely needs
+  > all six. **The type is never weakened to `Partial<…>`** — that would silently reintroduce the runtime
+  > blank the design exists to prevent, and would destroy the "a Russian catalog omitting `few` does not
+  > compile" property, which is the single argument that satisfies B5's generalization objection. What
+  > changes is only who *writes* the dead branches: a named helper, once, instead of a translator, 169
+  > times. `[I18N-SHAPE-06]` pins that `oneOther` is never used by a locale whose CLDR category set
+  > exceeds `{one, other}`.
 - **Every catalog entry carries a `// @desc:` line** (B5's point 2), machine-checked by §5.4 — the datum a
   translator needs to disambiguate a count without pinging engineering.
 - **Keys are semantic, not source-derived** (B5's point 1): `<namespace>.<screen>.<element>`, e.g.
@@ -383,8 +411,11 @@ shipped indie monster-tamers do), not a broken one — but it is not "localized"
 `scripts/catalog-export.mjs` **(new, S8)** emits `build/i18n/<locale>.icu.json` where a plain entry becomes a
 plain string and a `selectPlural` entry becomes `{n, plural, one {…} few {…} other {…}}`;
 `scripts/catalog-import.mjs` **(new, S8)** reads translated ICU JSON back and emits `catalog.<locale>.ts`.
-Both are ADR-0055-compliant character-class cursor scanners over a **depth-1, `plural`/`select`-only**
-subset (B5's point 4) — no `selectordinal`, no gender, no nesting. `// @desc:` lines are carried into the
+Both are ADR-0055-compliant character-class cursor scanners over a **depth-1, `plural`-only**
+subset (B5's point 4 narrowed) — no `selectordinal`, no gender, no nesting. **`select` is deliberately NOT
+in the exporter's grammar**: §2.3's `Catalog` type can only author a plain string or a `selectPlural`
+function, so there is no construct that could produce a non-count `select` and an exporter branch for one
+would be unreachable code. C3 already names the cost. `// @desc:` lines are carried into the
 export as ICU `description` metadata.
 
 **Why B5's "budget it NOW" argument wins on evidence:** the round-trip is one slice against a catalog of
@@ -468,16 +499,28 @@ the `t()`/`tf()` split (§2.4) · the ICU round-trip format (§2.6) · the corre
 | **S0** | Sink elimination: 3 markup sites → `createElement`+`textContent`; 11 `innerHTML=''` clears → `replaceChildren()`; `evals/i18n-no-html-sink.eval.mjs` **(new)** | `client/src/ui/shopView.ts`, `client/src/ui/tradeView.ts`, `client/src/ui/questLogView.ts`, `client/src/ui/healView.ts`, `client/src/ui/dialogueView.ts`, `evals/i18n-no-html-sink.eval.mjs` **(new)** | — |
 | **S1** | i18n module, types only, zero call-site migration: `messageIds.ts` **(new)**, `resolver.ts` **(new)**, `plural.ts` **(new)**, `locale.ts` **(new)**, `catalog.en.ts` **(new)** seeded with `chrome.*` keys only; unit tests | `client/src/ui/i18n/` **(new dir)** | — |
 | **S2** | Extraction lint: `evals/i18n-hardcoded-strings.eval.mjs` **(new)** with the §2.2 default-fail rule, the 19-file scope, `SINK_FLOOR = 169`, `HARDCODED_CEILING` seeded at the S0-measured count; **fixtures run in Phase 0 before any real file is read** | `evals/i18n-hardcoded-strings.eval.mjs` **(new)**, `evals/baselines/i18n-hardcoded.json` **(new)** | S0, S1 |
-| **S3** | Migration batch A — the two densest views (61 sinks) | `client/src/ui/battleView.ts`, `client/src/ui/pvpView.ts`, `client/src/ui/i18n/catalog.en.ts` | S2 |
-| **S4** | Migration batch B — the mid-density views (68 sinks) | `client/src/ui/evolutionView.ts`, `raisingView.ts`, `boxView.ts`, `tradeView.ts`, `shopView.ts` | S2 |
-| **S5** | Migration batch C — the tail (40 sinks) incl. the `<bdi>` wrap at `leaderboardView.ts:57` + `client/index.html` static strings | `client/src/ui/tradeProposeView.ts`, `dialogueView.ts`, `claimView.ts`, `sessionView.ts`, `renameView.ts`, `menuView.ts`, `leaderboardView.ts`, `helpView.ts`, `errorOverlayView.ts`, `questLogView.ts`, `healView.ts`, `client/index.html` | S2 |
+| **S3** | Migration batch A — the two densest views (**43** sinks: 26 + 17, E7) | `client/src/ui/battleView.ts`, `client/src/ui/pvpView.ts`, `client/src/ui/i18n/messageIds.ts`, `client/src/ui/i18n/catalog.en.ts` | S2 |
+| **S4** | Migration batch B — the mid-density views (**77** sinks: 13+17+15+16+16, E7) | `client/src/ui/evolutionView.ts`, `raisingView.ts`, `boxView.ts`, `tradeView.ts`, `shopView.ts`, `client/src/ui/i18n/messageIds.ts`, `client/src/ui/i18n/catalog.en.ts` | S2, S3 |
+| **S5** | Migration batch C — the tail (**45** sinks, E7) incl. the `<bdi>` wrap at `leaderboardView.ts:57` + `client/index.html` static strings | `client/src/ui/tradeProposeView.ts`, `dialogueView.ts`, `claimView.ts`, `sessionView.ts`, `renameView.ts`, `menuView.ts`, `leaderboardView.ts`, `helpView.ts`, `errorOverlayView.ts`, `questLogView.ts`, `healView.ts`, `client/index.html`, `client/src/ui/i18n/messageIds.ts`, `client/src/ui/i18n/catalog.en.ts` | S2, S4 |
 | **S6** | Boot wiring: `negotiateLocale` call, `lang`/`dir` flip in `main.ts`; `evals/i18n-catalog-shape.eval.mjs` **(new)** incl. the 47-char width budget | `client/src/main.ts`, `evals/i18n-catalog-shape.eval.mjs` **(new)** | S1 |
 | **S7** | **Proof slice** — a second locale (`fr`) authored end-to-end; `evals/i18n-catalog-parity.eval.mjs` **(new)** | `client/src/ui/i18n/catalog.fr.ts` **(new)**, `evals/i18n-catalog-parity.eval.mjs` **(new)** | S3, S4, S5, S6 |
 | **S8** | ICU round-trip: `scripts/catalog-export.mjs` **(new)**, `scripts/catalog-import.mjs` **(new)**; nightly completion baseline | `scripts/catalog-export.mjs` **(new)**, `scripts/catalog-import.mjs` **(new)**, `evals/baselines/i18n-locale-completion.json` **(new)**, `justfile` | S7 |
 
-**Dependency spine:** `S0 → S2 → {S3 ‖ S4 ‖ S5} → S7 → S8`, with `S1 → S2` and `S1 → S6 → S7`.
+**Dependency spine:** `S0 → S2 → S3 → S4 → S5 → S7 → S8`, with `S1 → S2` and `S1 → S6 → S7`.
 **Declared fan-out pairs (`touches:`-disjoint, safe to run concurrently, N≤2 per `docs/routing.md`):**
-`S0 ‖ S1` · `S3 ‖ S4` · `S3 ‖ S5` · `S4 ‖ S5` · `S1 ‖ S0`.
+`S0 ‖ S1` · `S1 ‖ S6` (once S1's types are frozen) · `S6 ‖ S3` · `S6 ‖ S4`.
+
+> **Adversarial-review correction (2026-08-23, spec §6.5 pass).** An earlier draft declared
+> `S3 ‖ S4 ‖ S5` a safe three-way fan-out. **It is not, and the `touches:` sets that made it look safe
+> were incomplete.** §2.3 defines exactly ONE flat `MessageId` union and ONE `catalog.en.ts` — there are
+> no per-view catalog shards — and I18N-6 makes it *mandatory* that a migration slice add both its new
+> union members and its new catalog entries. So S3, S4 and S5 each necessarily write
+> `client/src/ui/i18n/messageIds.ts` and `client/src/ui/i18n/catalog.en.ts`. Those two files are now
+> declared in all three `touches:` sets, and **the three migration batches are serialized**
+> (`S3 → S4 → S5`) rather than fanned out. This is the one place the milestone genuinely cannot
+> parallelize, and it is a direct consequence of §2.3's single-union decision — the totality guarantee is
+> worth more than the fan-out, but the trade must be visible in the slice table rather than hidden in an
+> under-declared `touches:` set. Batch order is by descending density so the ratchet moves fastest first.
 **NEVER paired:**
 - `S0 ‖ S5` — both touch `questLogView.ts`, `healView.ts`, `dialogueView.ts`. This is the one real overlap in
   the design and it is resolved by *ordering*, not by splitting a file.
@@ -486,6 +529,8 @@ the `t()`/`tf()` split (§2.4) · the ICU round-trip format (§2.6) · the corre
   migrating `shopView.ts:104` before the sink is deleted externalizes a string *straight into a live
   `innerHTML=`* and the lint waves it through (F1).
 - `S7 ‖ S3/S4/S5` — the parity gate is meaningless against a half-migrated `en` catalog.
+- **`S3 ‖ S4`, `S3 ‖ S5`, `S4 ‖ S5` — all three write `messageIds.ts` and `catalog.en.ts`** (see the
+  correction above). Serial, in that order.
 
 **Nine slices.** Every `touches:` set is confined to `client/`, `evals/`, `scripts/` and `justfile`. **No
 slice touches `game-core/`, `server-module/`, or `client/src/styles.css`** — the §2.5 and §2.8 decisions
@@ -504,7 +549,7 @@ after S2 lands but before S3/S4/S5 complete — `just eval` MUST show `i18n-hard
 known, nonzero, non-full count**, the "expected RED at HEAD" idiom `ci-gate-wiring.eval.mjs` already
 documents for its own anchor. A gate that is green the moment it is written, over a corpus it has not yet
 been used to fix, has not been shown to see the tree. The measured count at S2 is recorded in the spec and
-each of S3/S4/S5 ratchets `HARDCODED_CEILING` down by its own migrated count; S5's landing takes it to 0 and
+each of S3/S4/S5 ratchets `HARDCODED_CEILING` down by its own migrated count (43 → 77 → 45, with `main.ts`'s remaining 4 migrated in S6; 43+77+45+4 = 169 exactly, so the arithmetic closes); S6's landing takes it to 0 and
 the ceiling becomes a permanent 0-ratchet.
 
 **Cross-slice contracts named, each with the test that proves it after integration:**
@@ -527,7 +572,7 @@ fail-loud flag, and none constructs a dynamic `RegExp` (ADR-0055).
 |---|---|
 | `[I18N-HTML-01]` | Zero `.innerHTML =` / `.outerHTML =` assignment sites in `client/src/**/*.ts` excluding `*.test.ts`, matched on the sink token + `=` **independent of RHS** |
 | `[I18N-HTML-02]` | Zero `insertAdjacentHTML(` / `document.write(` / `.setHTML(` call sites in the same scope |
-| `[I18N-HTML-03]` | The scanner read ≥19 files and ≥169 sink-vocabulary sites overall (shared floor with 5.2) — proves it is seeing the tree |
+| `[I18N-HTML-03]` | The scanner read **all 19** in-scope files, each non-empty, and named any it could not read — a **FILE-count** floor, never a site-count one |
 
 **BAD fixtures (must FAIL):** (1) `list.innerHTML = t('shop.empty')` — **fails regardless of the RHS being a
 catalog call**; this is the exact case B1/B2/B3's designs pass. (2) `el.innerHTML = ''` — fails; the design
@@ -540,7 +585,7 @@ stripping and token-boundary matching both work rather than a substring grep fir
 `innerHTML=` — the habit every other candidate's classifier encodes — passes `list.innerHTML = t('x')`
 silently. Killed by matching the **sink alone**, exactly inverting the RHS-classifier axis, and proven by
 BAD fixture (1). A second attack — a scanner pointed at an empty or mistyped glob, going green on nothing —
-is killed by `[I18N-HTML-03]`'s floor and by a hard fail if any of the 19 named target files is missing
+is killed by `[I18N-HTML-03]`'s **file-count** floor and by a hard fail if any of the 19 named target files is missing
 (the `SCAN_TARGETS` idiom at `client-no-pii-logs.eval.mjs:857-867`).
 
 ### 5.2 `evals/i18n-hardcoded-strings.eval.mjs` (new) — closes F2
@@ -603,6 +648,7 @@ parity. Killed by `[I18N-PARITY-02]` treating non-literal as a **finding**, not 
 | `[I18N-SHAPE-03]` | Every key matches `/^[a-z][a-z0-9]*(\.[a-z0-9]+)+$/` (hand-rolled character-class scan, no `RegExp` object) |
 | `[I18N-SHAPE-04]` | **No `a11y.`-prefixed key ever appears as a `tf(` first argument**, and no `a11y.*` key value contains `{` or `}` — M23's `[A11Y-02]` re-asserted from M24's side so the guardrail cannot erode from either direction (§2.4) |
 | `[I18N-SHAPE-05]` | `resolver.ts` exports `t` with M23's exact signature `(key: …) => string` and does **not** export a variadic/overloaded `t` — the M23 seam pinned mechanically |
+| `[I18N-SHAPE-06]` | `oneOther(…)` is used **only** by a locale whose CLDR category set is exactly `{one, other}`; a locale file with more categories that calls `oneOther` fails, because it would fill `few`/`many` with the `other` form and ship a grammatically wrong plural that no other gate can see (§2.3's totality-tax resolution) |
 
 **BAD fixtures:** a 52-char French `chrome.helpHint` against the 47 budget; a key `Battle.HPLine`;
 `tf('a11y.overlay.boxView.title', {n: 1})`; an `a11y.count.items` value containing `{count}`; a
@@ -648,6 +694,11 @@ of `displayName` · exporter↔importer round-trip identity.
  4. Translation *quality* / register / a `{count}` that is grammatically wrong-but-well-formed.
  5. a11y counts are English-enumerated only (§2.4 / C4).
  6. Server `Err(...)` English leakage through `reduceErrorMessage` (C5).
+ 7. **`displayName` never routed through a catalog value that is not a pure interpolation (I18N-21).**
+    §2.1(c) deliberately rejects `evals/i18n-displayname-not-catalog.eval.mjs` as self-contradictory with
+    §2.2's corrected rule, so this property has **no mechanical oracle by design** — it is closed
+    structurally by §2.1(a)+(b) plus §2.7's `<bdi>` wrap, and what remains is a reviewer's eye. It is
+    listed here rather than left carrying a tier-(b) tag that names an eval which does not exist.
 
 **Binding rule, restated because it is the rule most often broken:** a property in tier (e) is tracked in
 `docs/manual-checklists/m24-i18n.md` **(new)** and is **never** reported CI-green, never asserted by an
@@ -662,7 +713,7 @@ tier-(e) list is signed off by a human at the playtest gate, separately and visi
 - **I18N-1** [b] WHEN `evals/i18n-no-html-sink.eval.mjs` scans `client/src/**/*.ts` excluding `*.test.ts`, THE SYSTEM SHALL report zero `.innerHTML =` and `.outerHTML =` assignment sites.
 - **I18N-2** [b] WHEN the same scan runs, THE SYSTEM SHALL report zero `insertAdjacentHTML(`, `document.write(` and `.setHTML(` call sites.
 - **I18N-3** [b] WHEN the fixture `list.innerHTML = t('shop.empty')` is scanned, THE SYSTEM SHALL fail it, independently of the right-hand side being a catalog call.
-- **I18N-4** [b] WHEN the scan completes, THE SYSTEM SHALL confirm it read all 19 in-scope files and ≥169 sink-vocabulary sites, and SHALL fail loudly if any named target file is absent.
+- **I18N-4** [b] WHEN the scan completes, THE SYSTEM SHALL confirm it read all 19 in-scope files and that each was non-empty, and SHALL fail loudly if any named target file is absent or unreadable.
 - **I18N-5** [c] WHEN `ShopView.render` receives a `no-shop` view-model, THE SYSTEM SHALL produce the empty-state row as an element built by `createElement` with its text set via `textContent`.
 
 **S1 — the i18n module**
@@ -685,7 +736,7 @@ tier-(e) list is signed off by a human at the playtest gate, separately and visi
 **S3–S5 — migration**
 - **I18N-19** [b] WHEN S3, S4 and S5 have all landed, THE SYSTEM SHALL report `HARDCODED_CEILING` = 0.
 - **I18N-20** [c] WHEN `LeaderboardView.render` receives a row, THE SYSTEM SHALL emit `displayName` inside a `bdi` element whose text is set via `textContent`.
-- **I18N-21** [b] WHEN any migrated view is scanned, THE SYSTEM SHALL find no `displayName` value routed through a catalog value that is not a pure template interpolation.
+- **I18N-21** [e] WHEN any migrated view is scanned, THE SYSTEM SHALL find no `displayName` value routed through a catalog value that is not a pure template interpolation. **(MANUAL — no mechanical oracle: §2.1(c) deliberately rejects the gate that would have checked this, so it is tracked in the §5.6 manual checklist and is NEVER reported CI-green.)**
 
 **S6 — boot wiring**
 - **I18N-22** [c] WHEN the client boots, THE SYSTEM SHALL set `document.documentElement.lang` and `.dir` exactly once, from the negotiated locale.
@@ -705,6 +756,7 @@ tier-(e) list is signed off by a human at the playtest gate, separately and visi
 **Milestone-wide**
 - **I18N-31** [b] WHEN M24 is complete, THE SYSTEM SHALL show `CONTENT_VERSION` unchanged at 21 and `battle-schema-snapshot` byte-identical to its baseline, proving no content-localization work leaked into scope.
 - **I18N-32** [e] WHEN M24 reaches its gate, THE SYSTEM SHALL require human sign-off on `docs/manual-checklists/m24-i18n.md`, and SHALL NOT report any item on that checklist as CI-green.
+- **I18N-33** [b] IF a `catalog.<locale>.ts` whose CLDR category set exceeds `{one, other}` calls `oneOther(`, THEN THE SYSTEM SHALL fail CI (`[I18N-SHAPE-06]`) — the two-category constructor must never silently supply `few`/`many`.
 
 Ids are unique and contiguous 1–32. No criterion is predicated on chat (dossier §A1: there is none).
 
@@ -742,11 +794,30 @@ None of these is asserted by an M24 eval; none may be cited as M24 acceptance ev
    raw English server errors through `reduceErrorMessage` at launch. **The operator should bless this
    residual explicitly rather than have it discovered in §3's cut table** — B5 is right that a milestone
    cannot silently punt a known player-facing gap.
-4. **[BLOCKS S1] ADR-0033 requires an amendment before S1 lands.** M24 deviates from its accepted text in
-   two recorded ways: content is *not* locale-keyed RON in this milestone (§2.5), and "ICU-style" is
-   satisfied at the interchange layer rather than the runtime (§2.6). The amendment must also record the
-   permanent prohibition on a `locale` column on content row tables (§2.5(2)). An accepted ADR should be
-   amended, not quietly out-voted by a ceremony.
+4. **[BLOCKS S1] ADR-0033 requires an amendment before S1 lands.** An accepted ADR should be amended, not
+   quietly out-voted by a ceremony. **The amendment's full scope is the five corrections catalogued at
+   §1.1 (S-A…S-E) plus one prohibition — a future editor working from this item alone must carry all six:**
+   1. **(S-A)** strike the chat clause — there is no chat system, so "user chat is not machine-translated
+      (rendered safely, ADR-0028)" defends a feature that does not exist; replace it with the
+      `set_profile_name` display-name rule (§2.7, I18N-20).
+   2. **(S-B / §2.5)** content is **not** locale-keyed RON in this milestone — M24 localizes no
+      content-registry text at all, and any future scheme is written against **ADR-0057**'s glob loader,
+      not ADR-0006 alone.
+   3. **(S-C / §2.3)** "a new language is a data drop" is upgraded to **"a typed drop"** — the failure mode
+      of an incomplete locale is a `tsc` error, not a runtime blank. Stronger than promised; say so.
+   4. **(§2.6)** "ICU-style" is satisfied at the **interchange** layer (export/import), never at runtime —
+      the reason is ADR-0055's dynamic-`RegExp` ban, which the ADR does not currently acknowledge.
+   5. **(S-D / §2.7)** "RTL supported" is **narrowed to text direction only**; layout mirroring is C6 and
+      is explicitly out of scope.
+   6. **(§2.5(2))** record the **permanent prohibition** on a `locale` column on content row tables — this
+      is a decided architectural constraint, not a scheduling preference.
+5. **[DEFAULTS to building it in S8] Is the ICU round-trip shim earned with no named vendor?** ADR-0033
+   itself calls the TMS an "ops/vendor concern. Deferred." (C10 keeps it deferred), yet S8 builds
+   `scripts/catalog-export.mjs`/`catalog-import.mjs` now. The ceremony's case is B5's — the round-trip is
+   one slice against ~169 entries but a migration against 40 screens of accreted keys, and it is what makes
+   ADR-0033's "ICU-style" true rather than nominally satisfied. **That case is evidence-based but it is
+   still building for a consumer that does not exist**, which is the same question §8-2 asks about content.
+   If the operator has no localization plan at all, S8 should be deferred with S7 as the milestone's end.
 
 **Decided by the ceremony, explicitly NOT escalated.** The following were arbitrated on evidence and are
 recorded as settled, so the spec author must not reopen them: ICU is interchange-only, not runtime (§2.6 —
@@ -831,7 +902,7 @@ factual corrections (§11) invalidate a load-bearing number in B3, B4 and B6 res
 | E4 | `leaderboardView.ts:57` is verbatim `` li.textContent = `${row.displayName} — ${row.rating} (W${row.wins}/L${row.losses})`; `` — static runs `— `, ` (W`, `/L`, `)`; the alphabetic runs `W` and `L` are **1** character each. | `sed -n 50,62p client/src/ui/leaderboardView.ts` |
 | E5 | **Denominator correction.** With the dossier's exact sink vocabulary, `client/src/**/*.ts` yields **243 sites across 31 files INCLUDING `*.test.ts`**, and **169 sites across 19 files EXCLUDING tests**. The 243/31 figure the dossier reports — and which B1, B3 and B4 all reason from — is test-inclusive. | two `grep -no … \| wc -l` runs over the two file sets; both numbers reproduced exactly |
 | E6 | The real production file set is exactly **19**: the 13 text-bearing members of `DOM_SHELLS` (`DOM_SHELLS`' other 4 entries — `net/connection.ts`, `render/world.ts`, `render/characterView.ts`, `render/placeholderAssets.ts` — write no player-facing text) **plus** the 6 the dossier names as omitted (`leaderboardView`, `menuView`, `renameView`, `tradeProposeView`, `errorOverlayView`, `helpView`). 13 + 6 = 19. | `evals/dom-shell-coverage-exclusion.eval.mjs:34-57`; per-file sink counts |
-| E7 | Per-file non-test sink counts: `battleView` 37, `pvpView` 24, `evolutionView` 18, `raisingView` 17, `boxView` 17, `tradeView` 16, `shopView` 16, `tradeProposeView` 8, `dialogueView` 5, `claimView` 5, `sessionView`/`renameView`/`menuView`/`leaderboardView`/`helpView`/`errorOverlayView`/`main.ts` 4 each, `questLogView` 2, `healView` 2. | `grep -rnc` per file |
+| E7 **[CORRECTED in the §6.5 adversarial pass]** | Per-file non-test sink counts **under §5.2's stated vocabulary** (`.textContent=`, `.innerHTML=`, `replaceChildren(`, `.title=`, and aria/title `setAttribute` — of which there are currently **zero**): `battleView` 26, `pvpView` 17, `raisingView` 17, `tradeView` 16, `shopView` 16, `boxView` 15, `evolutionView` 13, `tradeProposeView` 7, `dialogueView` 5, `claimView` 5, `sessionView`/`renameView`/`menuView`/`leaderboardView`/`helpView`/`errorOverlayView`/`main.ts` 4 each, `questLogView` 2, `healView` 2. **Sum = 169 across 19 files, reproducing `SINK_FLOOR` exactly.** The first draft of this row printed 37/24/18/17 for the top files; those numbers counted **every** `setAttribute(` call regardless of first argument (overwhelmingly `data-testid`), summed to 195, and did not reproduce the floor. | `grep -oE '\.textContent[[:space:]]*=|\.innerHTML[[:space:]]*=|replaceChildren\(|\.title[[:space:]]*=' <file> \| wc -l`, re-run per file |
 | E8 | `client/index.html:125` currently reads `Press ? for help · click or M for menu` = **38 characters**. The adjacent comment at `:118-119` states the *previous* **49**-char text measured **~323px** at 11px monospace and overflowed a 320px viewport from `left:6px`. Implied cell width ≈ 6.59px; available width = 320 − 6 = 314px ⇒ budget ≈ **47** characters. | `sed -n 118,126p client/index.html`; `len()` = 38 |
 | E9 | `client/src/ui/a11yCopy.ts`, `client/src/styles.css` and `client/src/ui/i18n/` **do not exist** (all new) — M23 is unbuilt, as the dossier states; every citation of them in this spec is forward-looking. | `ls` → 3× No such file |
 | E10 | ADR-0033 exists at `specs/monster-realm-v2/adr/0033-i18n-strategy.md` (harness corpus, not the project repo). Its Decision Outcome chooses **"keyed message catalogs (UI) + locale-keyed RON (content), ICU-style, default-complete with fallback + RTL; a hard-coded-string lint"** and states **"the TMS is an ops/vendor concern. Deferred."** It does **not** state that a vendor writes catalog values into the repo. | full file read |
