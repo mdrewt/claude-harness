@@ -763,7 +763,14 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
 > (post-gate provisional) — write that sub-scope as deferred, not blocking the rest of M23's ceremony.
 - **M22 Privacy, data deletion & compliance** (`M22-privacy-compliance.spec.md`; ADR-0031) — registry-driven
   deletion cascade (erase/anonymize), data export, retention; a deletion-completeness eval. **Ceremony
-  AUTHORIZED 2026-08-23** — see the operator note above and the sketch's own Recency check.
+  COMPLETE 2026-08-23** (investigation → 6-way ideation → judge synthesis w/ attribution table →
+  adversarial review) — the spec is no longer a sketch: it is the converged, implementation-ready design
+  (10 slices S0–S9, 24 EARS `SHALL` criteria `PRV1-1…PRV1-20`, an exhaustive 38-table
+  erase/anonymize/join-only/not-owned partition, and the `[DEL-01…06]` deletion-completeness eval).
+  Central decision: the registry **extends the existing `REKEY_MANIFEST`/G6 `REKEY_COMPLETENESS` gate**,
+  whose own text already names M22 as its consumer — it is not a new mechanism. **5 open operator
+  escalations (spec §8) gate the build**; `PRV1-8` (post-deletion re-auth policy) is a hard BLOCKER on
+  slice S3's reactivation guard.
 - **M23 Accessibility** (`M23-accessibility.spec.md`; ADR-0032) — keyboard/screen-reader/colorblind/
   reduced-motion (a visual switch on ADR-0013), WCAG-AA; retrofits across M4/M7/M19. **Ceremony AUTHORIZED
   2026-08-23** — see the operator note above and the sketch's own Recency check.
