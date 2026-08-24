@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-24T12:02:30Z",
-  "updated_by": "mr-sup-native-20260824T120010Z-255843",
+  "updated_utc": "2026-08-24T12:13:24Z",
+  "updated_by": "mr-sup-native-20260824T121031Z-262508",
   "master": {
-    "sha": "d60af03",
-    "ci": "GREEN, confirmed live this tick: gh run 32717269214 (m22-s1) rerun conclusion=success on both ci and e2e jobs -- prior tick's e2e timeout confirmed as a flake, no fix/revert needed.",
+    "sha": "e664fa7",
+    "ci": "in_progress at tick-end (gh run 32725853376 on the merge commit) -- not yet confirmed green; predecessor d60af03 was GREEN. Next event/cron tick reconciles the result live.",
     "nightly": "fixed_at_a40cb81_confirmed_green"
   },
   "harness_main": {
@@ -13,23 +13,14 @@
   },
   "adr_next_free": 206,
   "inflight": [],
-  "awaiting_merge": [
-    {
-      "slice": "m23-s0",
-      "repo": "project",
-      "pr": 361,
-      "mergeStateStatus": "MERGEABLE/UNSTABLE -- conflict (ARCHITECTURE.md only, doc set) resolved this tick via deterministic union merge (dec6b56, pushed to slice/m23-s0). ci+e2e queued on the merge commit; CI-wait delegated to mr-ci-watch (detached, pid 258656) -- resumes via event tick, do not re-derive conflict state, just check CI result.",
-      "target_desc": "M23-accessibility.spec.md S0: A11yMeta + total OVERLAY_A11Y map on overlayRegistry.ts + new a11yCopy.ts; reserves ADR-0205",
-      "finished_utc": "2026-08-24T10:24:35Z"
-    }
-  ],
+  "awaiting_merge": [],
   "queue": [],
   "park_counters": {
     "14r-e": 1
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "2026-08-24T12:00Z native tick (rid=native-20260824T120010Z-255843): gate-0 clean (no locks/kill-switch/human collision). Gate-3: re-verified master CI live -- d60af03 (m22-s1) is GREEN, gh run 32717269214 rerun conclusion=success on ci+e2e -- confirms prior tick's e2e timeout was a flake. PR#361 (m23-s0) was DIRTY/CONFLICTING under m22-s1; `git merge-tree --write-tree origin/master origin/slice/m23-s0` showed the ONLY conflicting file was ARCHITECTURE.md (doc set) -- resolved deterministically per fan-out doctrine (conflict set subset-of doc set -> resolve, don't park): merged origin/master into the pre-existing worktree .claude/worktrees/m23-s0, unioned both milestone paragraphs (m22-s1 first as already-on-master, unchanged M23/m23-s0 second), committed dec6b56, pushed. PR now MERGEABLE/UNSTABLE, ci+e2e queued on the merge commit -- delegated the wait to mr-ci-watch (detached pid 258656) rather than polling inline; this tick's ONE mutating action was the conflict-resolution push. No launch this tick (no eligible fresh slice picked -- awaiting_merge outranks new work). No BLOCKER. Governor NORMAL (d7 $1025.64/2783 eff., fable_ok=true).",
+  "notes": "2026-08-24T12:10Z native tick (rid=native-20260824T121031Z-262508, src=ci event on PR#361/m23-s0 green): gate-0 clean (no locks/kill-switch/human collision; per-run/chain locks empty). Took chain-owner mutex. Re-verified PR#361 LIVE (not from bundle): mergeStateStatus=CLEAN, mergeable=MERGEABLE, both ci+e2e checks SUCCESS. Ran mr-audit (base d60af03, head dec6b56): policy=CLEAN (mandatory_read=false), orchestration=CLEAN. gating_advisory flagged suppressions_added=2 -- read the diff, confirmed FALSE POSITIVE (substring hits on 'ignore'/'expect-error' inside test names/a self-referential doc comment about the scanner's own limitation; zero real @ts-ignore/eslint-disable/.skip/.only). mr-gates verify: 5/5 met, 0 unmet, 0 deferred, all 5 gates independently reverified and agree with recorded evidence (FLAGGED label was only SPEC-SECTION-NOT-FOUND, not an evidence mismatch); PR's Acceptance: line matched verbatim. Merged PR#361 (gh pr merge --squash --delete-branch) -> e664fa7. Cleaned up: removed .claude/worktrees/m23-s0 (verified clean first), deleted local+remote slice/m23-s0 branch, fast-forwarded local master d60af03->e664fa7. mr-gates residuals close --slice m23-s0 --pr 361 -> 0 closed (none were deferred, all 5 gates met outright). Recorded ledger MERGED row + handoff entry. Master CI kicked off on e664fa7 (run 32725853376) and was still in_progress at tick-end -- per doctrine did NOT sit polling; left for the next event/cron tick to reconcile live. No composite merge->launch this tick: deferred picking new work until master CI on e664fa7 is confirmed green (launching atop an unconfirmed head risks stacking a slice on a red master). live_watchers.mr-ci-watch (pid 258656) confirmed exited (its job -- delivering the CI-green event -- is done) and its lock cleaned up. No BLOCKER. Governor NORMAL (d7 $1026.77/2783 eff., fable_ok=true).",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
   "parked": [],
   "open_chore_prs": [],
@@ -58,13 +49,6 @@
     "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
     "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
   },
-  "live_watchers": [
-    {
-      "kind": "mr-ci-watch",
-      "target": "PR#361 m23-s0",
-      "pid": 258656,
-      "started_utc": "2026-08-24T12:02:29Z"
-    }
-  ],
-  "last_tick_utc": "2026-08-24T12:02:30Z"
+  "live_watchers": [],
+  "last_tick_utc": "2026-08-24T12:13:24Z"
 }
