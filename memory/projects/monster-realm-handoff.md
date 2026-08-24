@@ -2,6 +2,97 @@
 
 ---
 
+## 2026-08-24T~10:0xZ — m22-s1 COMPLETE (terminal: PR #360 open + local `just ci` green + remote CI running)
+
+**Slice:** m22-s1 — M22 privacy/compliance **S1, pure `game-core` deletion contract surface**. **Repo:** project (`mdrewt/monster-realm`). **PR:** https://github.com/mdrewt/monster-realm/pull/360 — OPEN / MERGEABLE. Branch `slice/m22-s1` (worktree `.claude/worktrees/m22-s1`), 3 `wip:` commits, all pushed. **Supervisor owns the merge — I did NOT run `gh pr merge`.**
+
+**Gate:** full `just ci` **EXIT=0** — 1996/1996 nextest passed, 2472 client tests, 90 evals PASS / 0 FAIL, clippy `-D warnings`, `cargo fmt --all --check` clean, observability 8/8 gates. **Acceptance ledger: 9/9 met, 0 deferred, 0 unmet** (`seed:e3b0c44298fc1c14`). Seeded with ZERO criteria (`SPEC-SECTION-NOT-FOUND` — spec §7.4's PRV1-* criteria are all S2+, S1 has none), so X1-X9 were authored in the PLAN phase and are LINT-CLEAN. Verifier independently re-ran `mr-gates verify`: 9/9, `seed_drift=false`, `evidence_mismatch=[]`.
+
+**🔴 READ BEFORE STARTING S3 — measured red-on-arrival (this is the headline).** `evals/guest-claim-integrity.eval.mjs:388-394` pins `SANCTIONED_REDUCERS` as an exact set of FIVE reducer names compared by set EQUALITY at `:564-572` — deliberately not `>= 5`. `STATE_TRANSITION_OWNERS` (shipped by this slice) names `account_deletion_reaper`, which does **not exist yet**. The moment S3 declares that reducer in `accounts.rs`, `[R/name-set]` FAILS. Its Rust twin over `ACCOUNTS_RS` in `server-module/src/accounts_tests.rs` needs the same update in the SAME commit. Filed as residual `R-m22-s1-R-m22-s1-X1`. **Also recorded in the shipped doc comment so it is read at the call site:** the `Identity`-typed `TOMBSTONE_IDENTITY` must be declared in `server-module/src/lib.rs` beside `WILD_IDENTITY` (`:84`) as `Identity::from_byte_array(game_core::TOMBSTONE_IDENTITY_BYTES)` — NEVER in `accounts.rs`, whose `[R/identity-ctor]` clause (`evals/guest-claim-integrity.eval.mjs:419-424`, scoped to `ACCOUNTS_PATH` at `:384`) flatly bans that constructor; and never as a second hand-typed literal (SSOT precedent: `server-module/src/lib.rs:77,80`). All three claims independently verified against the live eval AND its Rust twin.
+
+**Two more residuals filed as real queued work** (`mr-gates residuals list --unclaimed`): `R-m22-s1-R-m22-s1-X2` — no display-name tombstone is single-sourced; the only existing one, `server-module/src/ranking.rs:161` `PROFILE_TOMBSTONE_NAME = "(claimed guest)"`, belongs to the guest-claim flow and also zeroes `rating`/`wins`/`losses`, so S3 either misuses it or writes the rule twice. **Spec gap, not a slice defect** — spec §3 requires name tombstoning but §7.2's S1 row omits the constant. `R-m22-s1-R-m22-s1-X3` — S8's grace countdown will duplicate the window in TS; verified by an actual `wasm-pack` build that `client-wasm/pkg` exports only the pre-existing 10 functions. Fix precedent: `client-wasm/src/lib.rs:174-200`.
+
+**Delivered.** `game-core/src/accounts/deletion.rs` (new) with `DELETION_GRACE_MS_DEFAULT: i64 = 604_800_000`, `is_deletion_due(Option<i64>, i64) -> bool`, `TOMBSTONE_IDENTITY_BYTES: [u8;32] = [0xFF;32]`, `TOMBSTONE_AUTH_ISSUER = "account-deleted-tombstone"`, `EXPORT_CHUNK_ROWS: u32 = 500`, `STATE_TRANSITION_OWNERS` (the 3 §4.7 reducers). Plus `accounts/mod.rs`, `accounts/deletion_tests.rs`, `game-core/tests/m22_s1_deletion_surface.rs`, 2 additive hunks in `game-core/src/lib.rs`, 1 paragraph in `ARCHITECTURE.md`. **Zero schema/reducer/client/wasm/eval change.**
+
+**Declared deviation from the spec's name:** `TOMBSTONE_IDENTITY_BYTES`, not `TOMBSTONE_IDENTITY` — `game-core` has no `spacetimedb` dep and `client-wasm` depends on it *without* the feature, so the value must be `[u8;32]`. `_BYTES` is a substring superset so any grep on the spec's name still matches. **Also deviated, declared:** spec §7.2 line 470 says every slice owns a new eval file. S1 shipped none — `evals/` is outside its `touches:`, S1's teeth are native `cargo test` + the nightly zero-tolerance `cargo mutants` gate, and S6 explicitly owns `evals/deletion-completeness.eval.mjs`. The textual coverage an eval would have provided lives in X4/X5/X7's node-side clauses.
+
+**Red-team wrote and ran the cheats — twice, and beat my own gates the second time.** Round 1 (against the plan) produced the test list. Round 2 (against the shipped diff) found THREE real gate bypasses, all closed and re-bitten: X3's and X2's source pins were satisfiable by a decoy `//` comment inside the function body while the live arm was wrong, and X4's cross-crate `WILD_IDENTITY` extractor was a first-match regex fooled by a commented decoy earlier in `server-module/src/lib.rs` — it reported `wild=0u8;32` while the compiled constant had been changed to `0xAA`. All three CHECKs now strip line AND block comments before matching; all four decoys (incl. a block-comment variant) re-measured RED, controls still pass.
+
+**Mutation coverage, stated honestly.** `cargo mutants --file game-core/src/accounts/deletion.rs` → `missed=0 caught=3`. Only 3, because **cargo-mutants mutates FUNCTIONS only** — those 3 cover `is_deletion_due` and never touch the five constants. Separately I hand-ran 10 wrong implementations: 8 killed by the tests, 2 (`None => DELETION_GRACE_MS_DEFAULT == 0` and `unwrap_or(now_ms)`) behaviourally invisible and killed only by X3's source pin; a hardcoded literal replacing the named const is killed only by X2's.
+
+**Process notes worth propagating.** (a) A fresh worktree has no `client/node_modules`, so the FIRST `just ci` dies at `lint` with `biome: not found` / exit 127 — run `npm ci` in `client/` first; a naive `cmd; echo EXIT=$?` wrapper reported this as exit 0. (b) The implementer correctly REFUSED to edit the gating tests when `cargo fmt --check` and `clippy::assertions_on_constants` failed inside them, and escalated instead; both fixes were routed back to the tester (the file owner) and were comment/whitespace/operand-binding only. The clippy failure was fixed by rebinding `assert!(<pub const> > 0)` operands to typed locals — MEASURED to defeat the lint — rather than by an `#[allow]`, so no suppression sits inside a gating test file. (c) Reviewer and red-team INDEPENDENTLY caught the same false tooth-claim in a test's doc comment (it named the wrong mutant shape and overclaimed what it kills); the tester rewrote it to say plainly that the assertion is a PARTIAL tooth and that gate X3, not the assertion, is what kills the shape.
+
+**Housekeeping.** Untracked harness file: `memory/projects/monster-realm-m22-s1-plan.md` (the plan + the three plan-review lenses' adjudication) — commit or discard as you prefer. The gates ledger `memory/projects/gates/m22-s1.gates.md` is filled in and LINT-CLEAN. Main checkout was left on `master` and never mutated.
+
+---
+
+## 2026-08-24T~06:5xZ — m23-s0 COMPLETE (terminal: PR #361 open + local `just ci` green + remote CI running)
+
+**Slice:** m23-s0 — M23 accessibility **S0, the substrate**: `A11yMeta` + total `OVERLAY_A11Y` in
+`ui/overlayRegistry.ts`, new `ui/a11yCopy.ts` (frozen flat catalog + throw-on-miss `t()`).
+**Repo:** project (`mdrewt/monster-realm`). **PR:** https://github.com/mdrewt/monster-realm/pull/361
+Branch `slice/m23-s0` (worktree `.claude/worktrees/m23-s0`), 5 commits, all pushed.
+**Supervisor owns the merge — I did NOT run `gh pr merge`.**
+
+**Gate:** full `just ci` **EXIT=0** — 90 evals PASS / 0 FAIL, 83 client test files / 2485 tests,
+observability 8/8. Verifier re-ran it independently: same numbers.
+**Acceptance ledger: 5/5 met, 0 deferred, 0 unmet** (`seed:e3b0c44298fc1c14`). Seeded with ZERO
+criteria (`SPEC-SECTION-NOT-FOUND`) — but the criteria DO exist: **the seeder missed them because
+M23's EARS block is §6, not a §7.x section.** X1-X5 are a 1:1 transcription of A11Y-1..A11Y-5.
+Worth fixing in the seeder; other M-specs may have the same shape.
+
+**⚠️ LEDGER NOTE — gate ids must be `X1:`, not `X1 (= A11Y-1) [COMPILE]:`.** `GATE_LINE`
+(`mr-gates:243`) is `^- \[( |x|X)\] (\S+):` — an id with a space in it parses as ZERO gates and
+`check` reports a cheerful `0/0 met`. Put the annotation AFTER the colon.
+
+**Three findings the supervisor should propagate:**
+1. **The house textual declaration pin is BYPASSABLE — measured.** `OVERLAY_HANDLES_DECL`-style
+   pins (`main.wiring.test.ts:6046`) are defeated by planting a *used* exported string constant
+   holding the byte-exact expected declaration: `tsc` clean, `countOccurrences(...) === 1` passes,
+   totality destroyed. Structural to ANY pure-text substring pin. The replacement that works is a
+   **negative compile** — spawn `tsc --noEmit` on generated probe modules and assert the polarity
+   of the compiler's verdict, with a guaranteed-uncompilable CONTROL probe so a broken spawn can't
+   make every "must not compile" assertion pass vacuously. ~0.6s/probe. ADR-0205 D6. **This
+   pattern should probably replace every declaration pin in the repo.**
+2. **Two M23 spec defects, amended in ADR-0205 and FLAGGED FOR SIGN-OFF.** (a) §2.1/A11Y-14's
+   "MUST resolve to a **natively** focusable element" is unsatisfiable for 7 of 16 ids without S2
+   shipping four dead controls; amended to "focusable, natively or via `tabindex`". (b) §5.1
+   `[A11Y-02]`'s regex `/^a11y\.[a-z0-9.]+$/` REJECTS the canonical key §2.8 itself gives
+   (capital V) and ACCEPTS `a11y..` / `a11y.....` (both measured `true`). **S10 must not copy §5.1
+   verbatim.**
+3. **`vitest -t "<tag>"` is substring-matched** — a decoy `it('TAG (temporarily stubbed)', () =>
+   expect(1).toBe(1))` prints a byte-identical `✓` line and `Tests 1 passed (1)`. Every ledger
+   CHECK here runs the whole file via `--reporter=json` and asserts exact `fullName` + `status` +
+   `numFailedTests===0` + `numPendingTests===0`. **Recommend that shape for every vitest gate.**
+
+**Red-team found six green-but-wrong bypasses OF THE SHIPPED DIFF**, all closed and re-bitten:
+`initialFocusSelector` had no content gate at all (blanking all 16 to `''` left tsc + the whole
+suite green); the purity scan's `/^\s*import\s/m` was evaded by appending a real import to the END
+of an existing code line; `a11yCopy` was `Readonly<>` but not frozen; `spawnSync` had no timeout
+(vitest's `it()` timeout cannot interrupt a SYNCHRONOUS child — measured).
+**28 mutation bite-proofs red, 2 must-stay-green; the verifier independently re-ran 10.**
+
+**Obligations S0 creates (all in ADR-0205, repeated in the PR body):** S2 adds `tabindex="-1"` to
+ten static-shell anchors and **`tabindex="0"` — never `-1` — to `#menu-rows`** (the most likely
+S2↔S6 integration red in the milestone); S4 adds four constructor-time `data-testid`s,
+**attribute-only** (a wrapper breaks three `recruit.spec.ts` `parentElement.parentElement` chains);
+S3 deletes the two view-local deferred `.focus()` calls; S1 owns orphan-checking `a11y.world.*`.
+
+**touches-delta:** the two sibling `*.test.ts`, `docs/adr/0205-*.md`, `ARCHITECTURE.md`, and
+`docs/adr/DIGEST.md` (mechanically regenerated by `just adr-digest`, drift-gated by `just ci` — an
+ADR cannot land without it). **boyscout-delta:** 3 hunks / 4 lines, all comment-only.
+**Follow-up flag, NOT touched:** `client/src/main.ts:390` carries the same stale "15
+mutual-exclusion overlays" — S5 is the sole `main.ts` slice.
+
+**Code graphs NOT re-indexed, deliberately:** nothing is merged, the main checkout is still at
+`2a6864b`, and `codegraph status` already reports "Index is up to date". Re-indexing now would only
+pull worktree paths into the cache, which the doctrine forbids. Refresh after the squash-merge.
+
+**`reducer-security-auditor` / `desync-guard` not run — scope is mechanically empty:** the diff has
+zero files under `server-module/`, `game-core/`, `client/src/net/` or `client/src/render/`.
+
+---
+
 ## 2026-08-24T~08:5xZ — m22-s0 COMPLETE (terminal: PR #359 open + local `just ci` green + remote CI running)
 
 **Slice:** m22-s0 — M22 privacy/compliance **S0, contract-first**: freeze the export seam S1-S9
@@ -733,6 +824,48 @@ in the memory card `monster-realm-m24-ceremony`.
 
 **Remaining M22–M25 ceremony authorization:** M25 (security audit) is still AUTHORIZED, not run.
 
+## 2026-08-24T10:35:19Z — m22-s1 MERGED — PR#360
+**Slice:** m22-s1 · M22 privacy/compliance S1 (pure game-core deletion rules). **Terminal:** PR #360 squash-merged to master as d60af03. mr-audit: policy CLEAN (mandatory_read=false), orchestration CLEAN (full role set: planner/tester/red-team/reviewer/verifier/doc-keeper), gating_advisory CLEAN. mr-gates verify: 9/9 gates independently reverified and agree with recorded evidence (X1-X9), spotcheck X5 (tombstone auth-issuer sentinel) refuted-and-held. Acceptance sub-verdict showed FLAGGED only due to a benign `SPEC-SECTION-NOT-FOUND` reason (spec-section lookup miss, not a real gap) — 9/9 met, 0 unmet, 0 deferred, no evidence mismatch. Worktree/branch cleaned; residuals close reported 0 (none were open against this slice). Master CI was still in_progress at tick-end (queued right after merge) — next tick should re-verify live before trusting green. No ADR needed (harness ADR-0031 already governs M22).
+## 2026-08-24T09:03:33Z — m22-s1 + m23-s0 LAUNCHED (fan-out N=2)
+Tick rid=native-20260824T090012Z-4095539. Prior tick (08:50Z) merged m22-s0 (PR#359) and explicitly
+deferred the composite launch/full derivation to the next tick ("too large to safely complete within
+an already-large merge tick"). This tick is that derivation.
+
+Gate 0/1/2: no live locks, no chain mutex, no active human session (last harness file writes ~10min
+old were the prior tick's own handoff/mr-state.json/ledger writes; gdd.md/future-prompts.md strays are
+hours-old, pre-existing, untouched). git fetch clean both repos; only remote change was origin/slice/m22-s0
+deletion (post-merge branch cleanup). No open PRs either repo (gh pr list == [] both). master @ 2a6864b
+matches mr-state.json.
+
+Gate 3: master CI green (verified via PR#359's post-merge checks, both green). No resume/open/parked
+slices. Residuals: 7 unclaimed (4 from m22-s0: R-m22-s0-X1..X4, all MED severity age <1h; 3 from rw3b,
+oldest age ~0.3d) -- all well under t1_promote_days=3 / t2_stale_days=14, none outrank new work. queue[]
+was empty. Full PLAN Sec.9 derivation: M22/M23/M24/M25 ceremonies are all COMPLETE-but-gated by operator
+escalations; M22 has S0 merged, next is S1 (game-core deletion rules, non-blocked -- only S3's
+reactivation guard PRV1-8 is a hard BLOCKER per spec Sec.8.2/Sec.11, and escalation #1's grace-period
+number explicitly ships as a documented placeholder per the ceremony's own recommendation, not a
+blocker). M23 has no slices merged yet; S0 (A11yMeta + OVERLAY_A11Y total map + a11yCopy.ts) is the
+milestone's first slice, non-blocked (M23's two hard BLOCKERs gate only S8).
+
+Fan-out: m22-s1 (game-core/src/accounts/deletion.rs, new) and m23-s0 (client/src/ui/overlayRegistry.ts,
+client/src/ui/a11yCopy.ts new) -- mr-disjoint verdict SAFE, zero file overlap, no shared registry/enum
+axis (privacy vs a11y domains), neither touches the structural set, free -g shows 17G free/39G available
+(comfortably >1 build each). Both routine tier (opus@high) -- neither touches schema/reducers/netcode/
+predictor/security-RLS, and only M20/M25 (not M22/M23) are named HARD by the routing doctrine. ADR:
+m22-s1 needs none (M22 already has ADR-0031). m23-s0 reserves project ADR-0205 per the spec's own text
+("Reserve project ADR-0205") -- adr_next_free bumped 205->206 in this tick's mr-state.json write.
+
+Both mr-spawn LAUNCHED cleanly (asserted detachment + opus model class). Gate-seeder reported
+criteria=0/SPEC-SECTION-NOT-FOUND for both -- expected, not a defect: S1's own EARS don't exist (M22
+Sec.7.4 groups deletion-cascade criteria under S2/S3, not S1, since S1 is pure constant/helper
+groundwork); S0's EARS likewise live under later M23 slices per the same pattern m22-s0 already showed
+(m22-s0 also seeded criteria=0 and that was correct).
+
+No BLOCKERs. Governor NORMAL (d7 $965.38/2783 eff., fable_ok=true, unaffected -- opus tier only).
+Next tick: watch for .done files on m22-s1/m23-s0; if either finishes before the other, verify+merge
+serially per doctrine (S2 will be schema-touching and always-serial once S1 lands).
+## 2026-08-24T08:49:22Z — m22-s0 merged (PR#359)
+Merged 2a6864b onto master (ff-only from 12af096). M22 contract-first slice S0: REKEY_MANIFEST/findIdentityColumns exported+frozen in place on evals/guest-claim-integrity.eval.mjs (no split lift -- no size-split convention exists in repo, PR body cites the search). New evals/rekey-contract-surface.eval.mjs (auto-discovered, 3 teeth: T1 contract surface, T2 walker shape, T3 side-effect-free import) gates the surface instead of the declared evals/rekey-registry-shared.mjs. mr-audit: orchestration=CLEAN (6 roles, opus), gating-test-integrity=CLEAN. mr-gates verify: 4/4 met once node/cargo PATH corrected (Bash tool resolves /usr/bin/node v18 by default -- prepend asdf node 24.13.1 + ~/.cargo/bin before running project tooling); X4 flagged ARCHITECTURE.md as CREPT but that file is doc-set-exempt per fan-out doctrine, adjudicated accepted. Master post-merge CI (run for 2a6864b) was still in_progress at merge time -- not polled further this tick. FOLLOW-UP for a future tick: PR body requests a doc-only spec amendment to M22-privacy-compliance.spec.md sec2 (:74-77)/sec7.1/sec7.2 S0 row, naming rust-scan.mjs and battle-schema-snapshot.eval.mjs as the canonical owners of stripRustSource/parseTableSchemas instead of a re-export barrel through the S0 surface. Not actioned this tick (one-mutating-action rule; this is the composite-launch decision point instead).
 ## 2026-08-24T07:03:36Z — m22-s0 launched (M22 privacy/compliance spine start)
 Supervisor tick mr-sup-native-20260824T070014Z-3651371 reconciled live ground truth: no locks/inflight, master CI green both repos (proj @12af096 rw3c, harness main clean modulo pre-existing strays future-prompts.md/gdd.md not touched). All 4 heavy-ceremony specs (M22/M23/M24/M25) confirmed merged+recorded from prior ticks. Residuals R-rw3b-X6/R-rw3b-X8/R-rw3c-X3 all <1d old, well under t1_promote_days=3 -- do not yet outrank new work. queue[] empty. Derived next work from PLAN Sec.9: M-postgate-roster-wave-3 and M-postgate-sixteenth-review-residuals (16r-a/c/d/e/f/g/h) are now fully merged (16r-b remains blocked, SERIAL-REQUIRED against the still-blocked 15r scanner-migration family -- left alone). Selected M22-privacy-compliance spine slice S0 (contract-first export of REKEY_MANIFEST/findIdentityColumns/parseTableSchemas/stripRustSource from evals/guest-claim-integrity.eval.mjs) as the next launchable item: it has no after: dependency, and none of the spec's 5 Sec.8 operator escalations (DELETION_GRACE_MS value, reactivation policy PRV1-8, cascade tx-size, export delivery UX, pseudonymization-copy acknowledgement) gate S0 -- they gate S1/S3/S4-ish/S7 downstream. Scoped touches to evals/ only (project repo); told the run explicitly to skip mr-state.json's adr_next_free entry since that drift (0204->0205) was already corrected by an earlier tick, avoiding a REPO-MIXED launch refusal. mr-spawn LAUNCHED cleanly (leader=3654372, opus/high, tier=routine, repo=project, PR target mdrewt/monster-realm). Gates seeded 0 criteria (SPEC-SECTION-NOT-FOUND, same as prior ceremony slices whose spec section isn't its own heading -- advisory only). Delegating to the normal wrapper poll cycle; next tick reconciles from live PR/git state.
 ## 2026-08-24T06:08:33Z — m25-ceremony merged (PR#41)
@@ -894,64 +1027,3 @@ No fan-out this tick (single slice; M22-M25 ceremony launches deferred to a foll
 keep this one simple and auditable).
 ## 2026-08-23T17:02:14Z — master CI red — knowledge-bundle regen chore PR#356
 master HEAD 8f7fca3 (docs(schema): fix stale battle_action comment) tripped knowledge-bundle-conformance (M8.95b): schema.rs comment edit shifted line numbers without regenerating docs/knowledge/. Opened chore/knowledge-bundle-regen-20260823 -> PR#356 (just knowledge regen, 89 files, mechanical, doc-only), gh pr merge --squash --auto armed, CI wait delegated to mr-ci-watch (detached). No slice work launched this tick pending the fix.
-## 2026-08-23T16:35:11Z — PLAN §9 tail review: roster-wave-3 pulled forward + M22-M25 ceremony authorized
-**Interactive session (Drew present), docs-only, no code touched. Written ahead of the
-`wave-2/3/4-exit` gate lifting (Thu 20:00 ET) so the native loop has real work in the meantime.**
-
-**(1) `M-postgate-roster-wave-3` pulled forward.** PLAN.md gained an operator-directive blockquote
-(same pattern as the 2026-08-22 16r fix) immediately before its entry: it's launchable now, its
-DE-GATED sequencing precondition (hardening + ux-design milestones) is satisfied, and re-verified
-live content confirms Electric/Light still have zero species and zero skills — the gap is real and
-unstarted. **It has no spec file yet** (`M-postgate-roster-wave-3.spec.md` doesn't exist), so
-`queue[]`/`mr-record queue-add` doesn't apply — the first tick action on it is content-spec
-authorship (content/data tier, `opus @ medium`), following the `M-playtest-d` precedent, then
-normal content-pack slicing/fan-out. Read the PLAN.md note in full before acting on it.
-
-**(2) M22–M25 heavy-ceremony spec-writing AUTHORIZED.** Same `mr-feedback-doctrine.md` §6 treatment
-the 2026-08-08 override gave M20/M21 — launch as an ordinary rooted-run slice (`mr-spawn`), not
-through `lp-milestone-mode` (still unbuilt, `blocked:wave-1-exit` — the 2026-08-16 W0-0 Tier-C
-allowlist populate doesn't help you here, it's for that future automation). Architectural/
-irreversible decisions the ceremony surfaces still go through `mr-ask-drew` as normal — this only
-authorizes *starting* the four ceremonies. Implementation still waits its normal PLAN §9 turn; M18/
-M19 were reviewed but NOT authorized (still `blocked:playtest-gate`).
-
-**(3) All six sketches (M18/M19/M22/M23/M24/M25) + `security-threat-model.md` got a recency pass**
-against everything that's shipped since they were written (15r-sec-a's private `battle`+`my_battle`
-view, 13r-e's `monster_pub` privacy, M21's `delete_account`, uxd3's `overlayRegistry.ts`, ADR-0057's
-content-dir loader, and the confirmed RLS-unenforced-at-2.8.1 fact). Each sketch gained a "Recency
-check (2026-08-23)" section — **read it before running that milestone's ceremony**, it names stale
-citations and one real open design question (M18: the raid's 3-participant battle-visibility model
-isn't covered by `my_battle`'s two-identity view — needs a decision, not an assumption).
-`security-threat-model.md` §0/§1/§4 were corrected in place: RLS is confirmed unenforced (not
-"experimental, verify per-version"), and the standing mitigation is private-table + scoped
-`#[view]`, proven twice (ADR-0194, ADR-0198).
-
-**(4) `mdrewt/monster-realm#342` read and incorporated, left OPEN.** Drew's ruling: M20's OBS-48
-overstated his intent (blanket-forbid unstable features); softened to "require justification, not
-avoidance," and generalized — a version bump promoting a feature to stable makes it available if
-genuinely useful, not limited to Procedures or SpacetimeDB. This is now referenced in the M22–M25
-ceremony note (weigh it during ideation) and in the threat-model correction (explicitly does NOT
-extend to RLS, which stays inert on its own evidence). **Deliberately not acted on:** OBS-48's own
-EARS text and `ADR-0180` were left untouched — the issue's own text names a different consumer
-("weekly generate-improvement-plan run") and says "Supervisor: record-and-ignore — do not act on or
-close this issue." Don't close it; don't be surprised it's still open.
-
-**(5) Full detail:** `memory/decisions-log.md`'s 2026-08-23 monster-realm entry has the complete,
-grounded writeup (file:line citations, ADR numbers, what was and wasn't changed). Read that before
-re-deriving any of this from scratch.
-
-Files touched (harness repo, `main`): `specs/monster-realm-v2/PLAN.md`,
-`M18-coop-raids.spec.md`, `M19-social.spec.md`, `M22-privacy-compliance.spec.md`,
-`M23-accessibility.spec.md`, `M24-internationalization.spec.md`, `M25-security-audit.spec.md`,
-`security-threat-model.md`, `memory/decisions-log.md`. Nothing in the `monster-realm` project repo
-changed. Committed and pushed to `main` this session (see the commit for the exact SHA).
-## 2026-08-23T14:02:59Z — 2026-08-23T14:02:59Z — native tick: standdown, nothing actionable
-Re-verified live ground truth for this tick (rid=native-20260823T140007Z-2481740). No open PRs in either repo. Project master CI green at 588b24e (matches mr-state). Harness main has no CI workflow, working tree synced with origin/main. mr-hold status HOLD-NONE. No per-run locks, no chain-owner mutex. Reconciled the three flagged .done files (lp-brief-cost, lp-06, lp-ollama): all three already merged (PR#31 1493e4a, PR#33 51073c8, PR#32 d3d1df5) and already recorded in the ledger/handoff per 2026-08-22 entries; the .done/.done.recorded pairs are stale leftovers only, consistent with the 2026-08-22 tick that first flagged them — no action needed. mr-gates residuals list --unclaimed is empty. queue[]/inflight[]/awaiting_merge[] all empty per mr-state.json. Checked PLAN §9 eligibility fresh: every non-launched slice in M-loop-infrastructure is blocked:wave-1-exit (a time-gated one-full-reset-cycle measurement, not yet reached) and every M-postgate-fifteenth-review-residuals slice is blocked:wave-2-exit or later, except 16r-b which is serial-blocked behind the unstarted 15r-sec-mig-a/b/c/d + 13r-c-2 family. Nothing changed since the prior tick's (13:03Z) identical derivation. Uncommitted harness git strays (future-prompts.md, memory/spacetime-db-testing.md diffs; gdd.md; specs/monster-realm-v2/M-postgate-fifteenth-review-residuals.spec.md 'Delivered (2026-08-17)' doc-truth annotation; memory/projects/decisions/*.url + *.answer.md; several monster-realm-*-plan.md/progress.md memos; memory/projects/patches/lp-09-guard-bash-monster-realm.patch) are the same set multiple prior ticks (including the 2026-08-22T\xxx and 2026-08-23T13:03Z ticks) have already characterized as pre-existing legitimate artifacts (decision-issue records, per-slice plan memos, a saved patch, and human/agent doc edits) — left untouched again this tick, no destructive action taken. Took no mutating action. Governor NORMAL (d7≈$605/$2783≈22%). No BLOCKER.
-## 2026-08-23T11:57:08Z — 16r-h merged; M-postgate-sixteenth-review-residuals closed except serial-blocked 16r-b; hold-aged/hold-unattributed decisions closed
-Merged PR#355 (feat(16r-h): nightly red-response policy) into monster-realm master (588b24e), squash+delete-branch. mr-audit acceptance block FLAGGED only on a cwd artifact (B1 exec-error re-verifying from repo root instead of the worktree); mr-gates verify run from the correct worktree cwd (.claude/worktrees/16r-h) got CLEAN 1/1, spotcheck agreed, and all 3 mutation-canary bites (renamed job, dropped row, uncited job) confirmed teeth. Diff reviewed directly (mandatory_read=true): ARCHITECTURE.md + docs/adr/0203 + DIGEST.md additions are scoped and consistent with the ADR catalog; ADR-0203 correctly follows 0202 (no numbering collision despite mr-state adr_next_free showing stale 202). Residuals close: 0 for 16r-h. Local worktree/branch cleaned; stale per-run lock reaped via mr-unlock stale (session_leader 2277590 was dead). Master CI re-verify was still in_progress at merge time (PR-level ci+e2e had already passed CLEAN before merge) — not re-polled to completion this tick; next tick should spot-check it landed green.
-
-This closes M-postgate-sixteenth-review-residuals except **16r-b**, which stays SERIAL-REQUIRED behind the 15r-sec-mig-a/b/c/d + 13r-c-2 family; that family has NOT started (no 15r-sec-mig-* merges found in master history) and 15r-sec-mig-a itself carries blocked:wave-2-exit. 15r-sec-a/15r-sec-vis/15r-a2 (the spec's own 'launchable in order once the bump lands' chain) are already merged (#336/#337/#338) — the milestone's actual next launchable step is clearing wave-2-exit for 15r-sec-mig-a, not a fast eligible slice this tick.
-
-Also closed two operator-answered DECISION issues via mr-decision-watch transcripts already staged in $MEM/decisions/: issue #36 (hold-aged, confirmed deliberate/long-running operator hold — future ticks should wait patiently on any hold whose provenance is 'operator' regardless of duration) and issue #35 (hold-unattributed, confirmed unattributed/zero-provenance flags read as operator holds). `mr-hold status` now reports HOLD-NONE — the hold that prompted both questions has since been lifted; both issues closed with `<!--mr-system-->`-prefixed comments per the close-the-loop doctrine.
-
-NOTED, not acted on: the harness working tree carries a large set of pre-existing uncommitted changes unrelated to this tick (modified future-prompts.md, several memory/projects/* files, an uncommitted 'Delivered (2026-08-17)' doc-truth annotation on M-postgate-fifteenth-review-residuals.spec.md for the already-merged 15r-sec-vis slice, plus many untracked plan/progress/decision files). These look like accumulated strays from prior sessions/runs, not this tick's work — left untouched pending investigation rather than stashed or discarded blind.
