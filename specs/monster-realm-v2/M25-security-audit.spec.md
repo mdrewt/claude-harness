@@ -55,9 +55,11 @@ sketch, the threat model, and the operator's 2026-08-23 authorization note all p
    **The non-approval currently lives only in ADR prose, enforced by nothing.** Baseline check: **zero** of
    the 38 entries carry a `visibility_note`.
 3. **THE CORRECTION THAT REFRAMES THE MILESTONE: the client-visible surface is exactly TWO channels, and the
-   sketch only ever described one.** All **50 production reducers** across the 21 non-test files in
-   `server-module/src/` return `Result<(), String>` — **zero exceptions**. A SpacetimeDB reducer therefore
-   *structurally cannot* return row data. So everything a hostile client can observe arrives through exactly:
+   sketch only ever described one.** Of the **50 production reducers** across the 21 non-test files in
+   `server-module/src/`, **48 return `Result<(), String>`**; the only two exceptions are the lifecycle hooks
+   `init` and `on_disconnect` (`server-module/src/lib.rs:149,214`), which return `()` and therefore cannot
+   carry an `Err` payload **at all** — they are a *subset* of channel-2 silence, not a counterexample to it.
+   A SpacetimeDB reducer therefore *structurally cannot* return row data. So everything a hostile client can observe arrives through exactly:
    **(1) subscription** over public tables and `#[view]`s, and **(2) the `Err(String)` payload** of a rejected
    reducer call. ADR-0199 gates the *declaration* of channel 1. **Channel 2 is gated by nothing, and a
    read-side completeness audit — which is the entire audit the sketch and the threat model describe — is
@@ -71,7 +73,7 @@ sketch, the threat model, and the operator's 2026-08-23 authorization note all p
    Any M25 proposal to "scan that each view's filter binds the caller identity" is rebuilding shipped
    machinery, and doing it worse (§3, cut 1).
 5. **Two `UNVERIFIED` classifications from the investigation are now SETTLED as correct.**
-   `player_dialogue_state` (`schema.rs:557`) and `heal_cooldown` (`schema.rs:625`) are private with no view
+   `player_dialogue_state` (`schema.rs:556`) and `heal_cooldown` (`schema.rs:624`) are private with no view
    and were flagged as possible *functional* gaps. They are not: `grep` over `client/src/` returns **zero**
    references outside generated `client/src/module_bindings/types.ts`, and both are written server-side only.
    Correctly classified; no latent bug; the flag is closed.
@@ -107,7 +109,7 @@ Stated once, normatively, because every gate below is derived from it:
 | Channel | What carries it | What gates it today | M25's job |
 |---|---|---|---|
 | **1 — subscription** | rows of `public` tables + the 5 `#[view]`s | ADR-0199 (declaration totality + escalation) · per-view exact-body pins · 11 per-table privacy evals | **Nothing new.** One narrow applicability amendment (§2.2) + the two named residuals (§2.4/§2.5) |
-| **2 — `Err(String)`** | the rejection payload of any of 50 reducers | **nothing** | **All of it** (§2.3) |
+| **2 — `Err(String)`** | the rejection payload of the 48 reducers that return one (§1.1(3)) | **nothing** | **All of it** (§2.3) |
 
 **The severity rule for channel 2** (the ceremony's discriminator — without it, every one of the 243 `Err(`
 sites reads as a finding and the audit drowns):
@@ -120,10 +122,10 @@ confirms — which is why it is normative and not advisory:
 
 | Branch | Predicate over | Table's visibility | Verdict |
 |---|---|---|---|
-| `trading.rs:88-96` — `"monster {mid} not found"` vs `"monster {mid} not owned by caller"` | `monster` | **private**, no view | **REAL oracle.** Ownership of an arbitrary probed `monster_id`, for any caller. Highest severity of the set. |
-| `pvp.rs:761,791` — `"target player not found"` / `"target player is offline"` | `player` | **public**, carries `online` | **REFUTED — leaks nothing.** Already fully subscription-visible. |
-| `pvp.rs:798` — `"target is already in an ongoing battle"` | `battle` | **private** + participant-scoped `my_battle` | **REAL oracle.** Not derivable from a participant-scoped view. |
-| `pvp.rs:806` — `"target already has a pending incoming challenge"` | `battle_challenge` | **public** *today* | **DORMANT.** Leaks nothing now — **and becomes a live oracle the instant §2.5's view lands.** |
+| `trading.rs:86,91` — `"monster {mid} not found"` vs `"monster {mid} not owned by caller"` | `monster` | **private**, no view | **REAL oracle.** Ownership of an arbitrary probed `monster_id`, for any caller. Highest severity of the set. |
+| `pvp.rs:764,769` — `"target player not found"` / `"target player is offline"` | `player` | **public**, carries `online` | **REFUTED — leaks nothing.** Already fully subscription-visible. |
+| `pvp.rs:806` — `"target is already in an ongoing battle"` | `battle` | **private** + participant-scoped `my_battle` | **REAL oracle.** Not derivable from a participant-scoped view. (Note `pvp.rs:799` is the *self*-guard `"already in an ongoing battle"` — a different branch, and not an oracle.) |
+| `pvp.rs:827` — `"target already has a pending incoming challenge"` | `battle_challenge` | **public** *today* | **DORMANT.** Leaks nothing now — **and becomes a live oracle the instant §2.5's view lands.** |
 
 Note that `pvp.rs:775-780` shows the project *already reasons this way* — the ranked-account gate is
 deliberately placed after guard 3 "so account existence is only ever disclosed for a target the caller can
@@ -140,8 +142,8 @@ Seeded with the four tables that have real, already-documented stakes:
 
 | Table | `path:line` | The stake | The note must cite |
 |---|---|---|---|
-| `inventory` | `schema.rs:473` | every client reads every owner's item composition + counts (`schema.rs:461-471` accepts this; RLS unavailable for `Vec<u64>` membership) | ADR-0018 / the accepting ADR |
-| `player_quest` | `schema.rs:568` | every player's `quest_id` + `step_index` world-readable | the accepting ADR (benign-on-`inventory`-precedent) |
+| `inventory` | `schema.rs:472` | every client reads every owner's item composition + counts (`schema.rs:459-471` accepts this; RLS unavailable for `Vec<u64>` membership) | ADR-0018 / the accepting ADR |
+| `player_quest` | `schema.rs:567` | every player's `quest_id` + `step_index` world-readable | the accepting ADR (benign-on-`inventory`-precedent) |
 | `trade_offer` | `schema.rs:654` | lower bound on both parties' currency (ADR-0117 D6) **+ the §2.4 residual** | ADR-0117 + the §2.4 tracking ADR |
 | `battle_challenge` | `schema.rs:847` | `challenger_party_ids` team composition (the §2.5 residual) | the §2.5 fix ADR |
 
@@ -171,7 +173,7 @@ New: **`evals/reducer-oracle-coupling.eval.mjs`** + baseline **`evals/baselines/
 (`OWNER_SCOPED|PARTICIPANT_SCOPED|PUBLIC_WRITE|NEEDS_ORACLE_REVIEW`). That is a **category error** and the
 adversarial pass proved it two ways: (a) an oracle is a *pairwise property of two `Err` branches*, not a
 whole-function attribute — 243 branches vs 50 reducers, so a reducer tagged `PARTICIPANT_SCOPED` reads as
-"audited" when one of N branches was looked at; and (b) **`build_cards` (`trading.rs:88-96`) is a bare `fn`,
+"audited" when one of N branches was looked at; and (b) **`build_cards` (`trading.rs:86,91`) is a bare `fn`,
 not a `#[spacetimedb::reducer]` — it has no tag slot at all**, yet it is the single worst oracle site in the
 tree. Branch-level granularity represents it; reducer-level cannot.
 
@@ -206,7 +208,7 @@ and recorded in §2.7's findings ledger — **never** rubber-stamped by the gate
 ADR-0199 says both residuals are *"fixable with the same two-identity view pattern `my_battle` uses."*
 **For `trade_offer` that is false, and it is false twice over.** The ceremony splits it:
 
-**(a) The oracle half — IN SCOPE (S3).** `build_cards` (`trading.rs:88-96`) returns
+**(a) The oracle half — IN SCOPE (S3).** `build_cards` (`trading.rs:86,91`) returns
 `"monster {mid} not found"` vs `"monster {mid} not owned by caller"` for **any** caller probing **any**
 `monster_id`. `monster` is private, so this is a live leak *independent of `trade_offer`'s visibility* — a
 scoped view over the table changes what a *subscription* returns, not what a *reducer call's error* reveals.
@@ -234,7 +236,7 @@ falsified it against the live client, and this is the single most valuable catch
 
 `client/src/ui/pvpModel.ts:89-94` builds a `busyIdentities` set by iterating **every** `Pending`
 `battle_challenge` row and adding **both** `c.challenger` and `c.target`, then derives
-`challengeablePlayers` (`:100-103`) by excluding busy identities from the online player list. That is a
+`challengeablePlayers` (`:100-105`) by excluding busy identities from the online player list. That is a
 **legitimate non-participant read of every challenge row** — the client subscribes `battle_challenge`
 unfiltered. A flat `my_challenge` view would return rows only to the two parties of each challenge, silently
 breaking *"who can I challenge right now"* for every player. The residual is real; the obvious fix trades a
@@ -246,7 +248,7 @@ minor composition leak for a broken feature.
    computation needs, and a fact both parties' `player` rows already make largely inferable.
 2. Move **`challenger_party_ids`** — the actually-sensitive field, a player's PvP team composition — behind a
    **two-identity (`challenger` ∪ `target`) scoped `#[view]`**, on the `my_battle` pattern.
-3. **`pvp.rs:806` must be resolved in the SAME PR** (redacted, or explicitly accepted with a finding row).
+3. **`pvp.rs:827` must be resolved in the SAME PR** (redacted, or explicitly accepted with a finding row).
    The moment step 2 lands, `battle_challenge`'s stakes change and that dormant branch becomes live — this is
    §2.3's `[oracle-coupling-01]` firing on its first real trigger, by design, on day one.
 4. **`evals/account-privacy.eval.mjs:212-215`'s exact view-name list MUST be extended to 6 entries**, and
@@ -347,7 +349,7 @@ gap and the most under-rated item in the sketch.
    `find(ctx.sender())` followed by `find(other)` compiles clean and leaks*; besides, exact-body pinning
    already ships (§1.1(4)). Class B is FATAL and **vacuous by construction** — "no reducer returns the rows"
    is true for all 50 reducers *always* (§1.1(3)), so the gate would be green for a reason unrelated to what
-   it claims, and would sail straight past `trading.rs:88-96`. Class C reduces to §2.2's amendment.
+   it claims, and would sail straight past `trading.rs:86,91`. Class C reduces to §2.2's amendment.
    **Cost:** classification correctness beyond §2.2's four named tables stays human judgment — the same
    limit ADR-0199 already accepted explicitly.
 2. **A second baseline file** (`table-stakes.json` as a sibling of `table-schemas.json`). **Cost:** none —
@@ -368,7 +370,7 @@ gap and the most under-rated item in the sketch.
 6. **Public-table composition analysis** — `character` + `player` + `profile` + `inventory` + `player_quest`
    cross-joined across all players enables stalking, sniping, and market inference. **Cost: the highest of
    any cut, and it is honest.** No mechanism short of RLS (unavailable) closes it, and the individual
-   disclosures are already accepted (ADR-0117 D6, `schema.rs:461-471`). Recorded as an **accepted-risk
+   disclosures are already accepted (ADR-0117 D6, `schema.rs:459-471`). Recorded as an **accepted-risk
    follow-up row in `findings.json`**, not silently dropped (§9-2).
 7. **A third-party pen-test.** Out of scope in the sketch and still out. **Cost:** none for M25; it remains a
    recommendation M25's threat model prepares for.
@@ -386,7 +388,7 @@ Each declares a narrow `touches:` set per PLAN §9 so siblings can fan out `touc
 | **S1** | ADR-0199 **D5-applicability amendment** + the 4 `visibility_note`s (§2.2) | `docs/adr/0199-declared-table-visibility-gate.md`, `evals/battle-schema-snapshot.eval.mjs`, `evals/baselines/table-schemas.json` | S0 |
 | **S2** | The **oracle-coupling gate** + census backstop + seed (§2.3) | `evals/reducer-oracle-coupling.eval.mjs` **(new)**, `evals/baselines/oracle-coupling.json` **(new)** | S1 (reads its `visibility` projection) |
 | **S3** | `trade_offer` **oracle half**: unify the client-facing literal, keep the logged reason (§2.4a) | `server-module/src/trading.rs`, `server-module/src/trading_tests.rs` | S2 |
-| **S4** | `battle_challenge` **payload split** + two-identity view + `pvp.rs:806` + the 6-entry view-list updates (§2.5) | `server-module/src/schema.rs`, `server-module/src/pvp.rs`, `server-module/src/pvp_tests.rs`, `evals/account-privacy.eval.mjs`, `evals/monster-privacy.eval.mjs`, `client/src/ui/pvpModel.ts` | S2 |
+| **S4** | `battle_challenge` **payload split** + two-identity view + `pvp.rs:827` + the 6-entry view-list updates (§2.5) | `server-module/src/schema.rs`, `server-module/src/pvp.rs`, `server-module/src/pvp_tests.rs`, `evals/account-privacy.eval.mjs`, `evals/monster-privacy.eval.mjs`, `client/src/ui/pvpModel.ts` | S2 |
 | **S5** | Findings ledger + CVSS-lite rubric + `SECURITY.md` (§2.7) | `docs/security/findings.json` **(new)**, `docs/security/severity-rubric.md` **(new)**, `SECURITY.md` **(new)** | S0 |
 | **S6** | Sign-off gate + release workflow + `signoffAnchorIsWired` (§2.7) | `justfile`, `.github/workflows/release-gate.yml` **(new)**, `evals/security-signoff.eval.mjs` **(new)**, `evals/ci-gate-wiring.eval.mjs` | S5 |
 | **S7** | RLS version tripwire + nightly wiring (§2.8) | `evals/rls-stabilization-tripwire.eval.mjs` **(new)**, `docs/security/last-verified-spacetime-version.txt` **(new)**, `.github/workflows/nightly.yml`, `docs/nightly-red-response-policy.md`, `justfile` | S0 |
@@ -407,7 +409,7 @@ Slices passing in isolation does not prove the milestone works. After the serial
    `evals/baselines/table-schemas.json` regenerated and its `T-VIS-ANCHORS` split updated **deliberately**
    (S4 flips `battle_challenge`'s effective stakes; that churn is the point, not a defect).
 2. **The cross-slice contract that actually matters:** S4 changes a table's visibility, so
-   `[oracle-coupling-01]` **must fire** on `pvp.rs:806` and the integrated tree must show that branch
+   `[oracle-coupling-01]` **must fire** on `pvp.rs:827` and the integrated tree must show that branch
    re-triaged. A green `[oracle-coupling-01]` after S4 that never fired is proof the gate is inert — the
    integration test is *that the coupling gate reddened and was resolved*, not merely that CI is green.
 3. `client-test` + the PvP e2e prove `challengeablePlayers` still populates for a non-participant after S4's
@@ -630,13 +632,13 @@ gate-mechanism engineer · **B5** research (online-game security / virtual econo
 |---|---|---|
 | **B1** | **First** to split `trade_offer` into two defects and to state that a view changes what a *subscription* returns, not what a *reducer error* leaks → §2.4, the seed of the whole two-channel frame. The launch-gate-not-`just ci` instinct → §2.7. Its explicit concession that a false class-C "none" is undetectable → §2.2's stated limit and SEC-4. | The 3-class taxonomy (§3 cut 1) — Class B is **vacuous by construction**: all 50 reducers return `Result<(), String>`, so "no reducer returns the rows" is true always, leak or not. |
 | **B2** | "The note IS the deferral record" — a mandatory `visibility_note` makes a deferral carried by a gate rather than by prose → §2.4b. The discipline of reusing ADR-0199's *single* parse rather than a sibling file → §3 cut 2. Deliberately scoping notes to the 4 named tables instead of prose-for-everything → §2.2. | Its sign-off wiring (`just security` inside `just ci`, protected by `ci-gate-wiring`) — **mechanically impossible**: `justfileCiDepsAppearInCi` inspects only the `ci` job, so "undroppable" and "not every PR" cannot both hold; it yields permanent red. |
-| **B3** | **The central decision itself** — the only lens to find that the write path/`Err(String)` channel exists at all and that a read-side audit is structurally blind to it → §2.0/§2.1. Both live oracle citations (`trading.rs:88-96`, `pvp.rs:798`) → §2.3's seed. The instinct to extend M22's totality shape rather than invent one → §2.3's census. Its honest cut of composition risk *with* the accepted-risk requirement → §3 cut 6 / §9-2. | The per-reducer `REDUCER_MANIFEST` — **category error**, proven two ways: an oracle is a pairwise property of two `Err` branches (243 vs 50), and **`build_cards` is a bare `fn` with no `#[reducer]` tag slot**, so the manifest structurally cannot represent the worst site in the tree. Its `pvp.rs:761,791` findings — **refuted**: `player` is public and carries `online`. |
+| **B3** | **The central decision itself** — the only lens to find that the write path/`Err(String)` channel exists at all and that a read-side audit is structurally blind to it → §2.0/§2.1. Both live oracle citations (`trading.rs:86,91`, `pvp.rs:806`) → §2.3's seed. The instinct to extend M22's totality shape rather than invent one → §2.3's census. Its honest cut of composition risk *with* the accepted-risk requirement → §3 cut 6 / §9-2. | The per-reducer `REDUCER_MANIFEST` — **category error**, proven two ways: an oracle is a pairwise property of two `Err` branches (243 vs 50), and **`build_cards` is a bare `fn` with no `#[reducer]` tag slot**, so the manifest structurally cannot represent the worst site in the tree. Its `pvp.rs:764,769` findings — **refuted**: `player` is public and carries `online`. |
 | **B4** | The launch-tag/e2e placement diagnosis → §2.7. The **file-count-vs-site-count floor** distinction → §5.1's `≥15 files` and §5.2's `≥1 row`. The warning that a gate accepting any non-empty note is theater → §2.2's `/ADR-\d{4}/` requirement (SEC-2). Explicitly naming that a hand-maintained parallel manifest rots → §3 cut 2. | Its claim of anti-gutting coverage via the existing predicate — **unsupported**, that predicate never inspects the `e2e` job; repaired into a *new*, honestly-named `signoffAnchorIsWired` (§2.7, SEC-21). Its "diff the filter body against a declared `scope:` tag" — the same exact-string pin that already ships, plus an unchecked human label. |
 | **B5** | The **escrow refutation** of "same view pattern" for `trade_offer` — the offer must not be visible *pre-confirmation*, so a scoped view over a world-readable write is necessary-but-insufficient → §2.4b, the strongest single correction to the judge's draft. "Codify freshness, never content" → §2.8. The rollback-policy-before-you-need-it warning → §9-4's decided default. | The live-ops reframe as the *central* decision — **partly refuted**: telemetry exists (ADR-0180, `observability.rs`, `playtest_event`), so the gap is a policy layer, not instrumentation; and a full IR runbook is oversized for a `blocked:playtest-gate` single-operator project (§3 cut 5). |
 | **B6** | The **`SECURITY.md` absence** (verified) → SEC-26. **CVSS-lite** + the `findings.json` lifecycle + the `owner`-non-null rule — "an undefined *critical* cannot gate anything" → §2.7, SEC-16/17. The **second-identity-issuer** insight (`Identity = f(iss, sub)`, so a future Steam issuer can silently invalidate today's sign-off) → §7-5. Its "extend, never duplicate" discipline toward M22 → §2.3. | Per-severity **SLAs and a disclosure inbox** — theater at zero live players and no public release; an SLA clock with nothing on it is the vacuity this spec refuses (§2.7). |
 
 **Adversarial passes** (not lenses, recorded for completeness): Adversary A killed classes A and B and forced
-the `justfileCiDepsAppearInCi` verification; Adversary B settled the severity rule, refuted `pvp.rs:761/791`,
+the `justfileCiDepsAppearInCi` verification; Adversary B settled the severity rule, refuted `pvp.rs:764/769`,
 closed the `player_dialogue_state`/`heal_cooldown` UNVERIFIED pair, and produced the coupling invariant. The
 **synthesis adversary** produced the two most valuable catches of the entire ceremony: that a flat
 `my_challenge` view is a **confirmed feature regression** against `pvpModel.ts:89-94`, and that

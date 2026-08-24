@@ -820,8 +820,9 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   `SHALL` criteria `SEC-1…SEC-28`**, three new `evals/*.eval.mjs` gates plus extensions to three shipped
   ones, all with proof-of-teeth fixtures, and a full oracle-tier classification that keeps every
   non-mechanically-checkable property out of CI-green).
-  **Central decision — the milestone was re-aimed.** All **50 production reducers** return
-  `Result<(), String>` with zero exceptions, so a reducer *structurally cannot* return row data: the
+  **Central decision — the milestone was re-aimed.** **48 of the 50 production reducers** return
+  `Result<(), String>` (the two exceptions are the lifecycle hooks `init`/`on_disconnect`, which return `()`
+  and so cannot carry an `Err` payload at all), and a reducer *structurally cannot* return row data: the
   client-visible surface is exactly **two channels — subscription, and the `Err(String)` rejection
   payload**. `ADR-0199` (2026-08-17) already gates channel 1's declaration enumeratively (38 tables, 18
   public, `T-VIS-ANCHORS` defeating even a compensating double-flip) and says of itself *"this gate records
@@ -832,7 +833,7 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   reducer branch predicating on T into a new write-side oracle* — mechanized triggered-by-change, not as a
   static sweep. The **severity rule** that keeps 243 sites from all reading as findings: an `Err` string is
   an oracle **iff** the predicate it reveals is not already readable from a `public` table (this *refutes*
-  as many candidates as it confirms — `pvp.rs:761,791` leak nothing because `player` is public and carries
+  as many candidates as it confirms — `pvp.rs:764,769` leak nothing because `player` is public and carries
   `online`).
   The ceremony **corrected six of the sketch's own premises** (spec §1.1), including that its headline
   "RLS-leak verification" job is a dead premise *and* its replacement ("verify migration completeness") was
