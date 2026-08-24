@@ -605,6 +605,95 @@ interpolation caveat this slice avoided. (5) pre-existing biome warning at
 
 **Ledger authoring notes** (cost four rejected drafts): `mr-gates` needs an `EVIDENCE: pending` line already present under each gate or it flips the box and records nothing (`status` then reads "checked but EVIDENCE pending" and `check` reports `0/N met`). The `||`-anywhere lint rejects JS logical-or inside a CHECK — use `[a, b].some(Boolean)`. A DEFER target must be an EXISTING spec section; `rw3c` is a candidate-slices table row, not a section, so it is rejected — use `backlog`.
 
+## 2026-08-24T00:06:22Z — launch m22-ceremony (HEAVY design ceremony, per 2026-08-23 operator authorization)
+Native tick (rid=native-20260824T000013Z-3111031). Reconciled a previous-tick gap first: the
+23:33-23:40Z tick had merged PR#358 (rw3c) and updated mr-state.json/handoff/spec locally but
+never committed to the harness repo -- committed those (harness main 48130ef) and pushed, leaving
+two unrelated human stray edits (future-prompts.md, gdd.md) untouched and uncommitted, as usual for
+strays. Re-verified master green at 12af096 (both local git log and live `gh run list`), remotes
+match on both repos, no open PRs, no live locks.
+
+Gate 3 pick-work: master CI green, nothing open/parked. mr-gates residuals list --unclaimed showed
+3 unpromoted MED residuals (R-rw3b-X6-rw3c-half, R-rw3b-X8, R-rw3c-X3), all age <1 day -- well under
+t1_promote_days=3, so none outrank normal PLAN Sec9 work.
+
+Full PLAN Sec9 derivation (delegated recon to an Explore agent, verified its findings myself against
+PLAN.md lines 720-790 directly): M-postgate-roster-wave-3 (rw3a/b/c) is now fully DELIVERED --
+fixed a stale spec line claiming "rw3b not started" as part of the commit above.
+M-postgate-sixteenth-review-residuals is done except 16r-b, which stays SERIAL-REQUIRED against the
+still-blocked 15r-sec-mig-* family. M-evolution-essence-graph (EG1-5) and M21 accounts/auth
+(M21a/b/c + M21b-2) are both fully merged. Everything textually before M22 in PLAN Sec9 order is
+genuinely blocked:wave-2/3/4-exit (time gate, boundary 2026-08-27, not yet reached) or SERIAL
+against it -- not stale, verified against the 2026-08-22 operator note's own boundary language.
+
+That leaves the 2026-08-23 operator authorization (PLAN.md ~line 724): heavy-ceremony treatment
+(mr-feedback-doctrine.md Sec6: investigation -> 6-way ideation -> judge synthesis w/ attribution
+table -> execution -> review) is explicitly AUTHORIZED for M22/M23/M24/M25 NOW via mr-spawn, "not by
+waiting for lp-milestone-mode." I checked this against an older, contradicting finding in this same
+handoff's 2026-08 archive (multiple ticks around 2026-08-01..03 concluded the native loop has "no
+mr-spawn-equivalent mechanism" for a HEAVY ceremony and that the actual M20/M21 and essence-redesign
+ceremonies were run interactively by Drew, not autonomously) -- but the 2026-08-23 note is dated
+after those, explicit, and directly addresses closing that exact gap ("this note grants the missing
+piece"), so I treated it as authoritative over the older ticks' hesitation. A rooted mr-spawn run has
+full Agent-tool access and doesn't need the Workflow tool to run 6+ subagent brainstormer calls plus
+a judge synthesis, so the mechanical objection (Workflow requires opt-in) doesn't actually block a
+rooted run from doing this.
+
+ACTION THIS TICK: launched `m22-ceremony` (content tier, opus@medium -- no code/schema/security
+touches at the ceremony-only stage, so HARD tier doesn't apply despite M25 being explicitly HARD in
+the routing doctrine) via mr-spawn. touches: specs/monster-realm-v2/M22-privacy-compliance.spec.md +
+PLAN.md (harness repo, docs-only). target_desc instructs it to run the full Sec6 ceremony using
+Agent-tool subagents directly (not Workflow), grounded in the sketch's own Recency-check section
+(the real merged M21 delete_account/PendingDeletion machinery + ADR-0194/ADR-0198 private-table+view
+precedent), and to produce a converged implementation-ready spec (EARS criteria + touches + slice
+breakdown) mirroring the M-evolution-essence-graph.spec.md precedent -- explicitly NOT to write or
+touch any code this slice. run_id=mr-spawn-20260824T000541Z-3115320, leader pid=3115370,
+claude_pid=3115373, lock written. NOT fanning out M23 in parallel this tick -- first-ever
+ceremony-via-mr-spawn attempt, no precedent for how well the generic PRERRR brief template maps onto
+the doctrine's ceremony process; want to see how m22-ceremony's actual output looks before
+committing a second one alongside it. NEXT TICK: if m22-ceremony's brief mapping proves workable,
+consider fanning out M23/M24 (pairwise touches-disjoint, pure docs); M25 is explicitly HARD tier
+once it reaches ceremony too. GATES-SEEDED 0 criteria (SPEC-SECTION-NOT-FOUND, expected for a sketch
+with no EARS section yet -- known quirk, not an error).
+
+Governor NORMAL (d7=$783.13/2783, fable_ok=true). No BLOCKER raised. No rate-limit event.
+## 2026-08-23T23:39:30Z — rw3c MERGED (PR#358, 12af096)
+rw3c (M-postgate-roster-wave-3) squash-merged: master ee2e093 -> 12af096. Zone-1 wild
+placement for wave-3 tier-0 forms (Voltkit=40, Aurelet=42); CONTENT_VERSION 20->21.
+New invariant: band max_level strictly below lowest outgoing evolution-edge min_level
+(gated in both rw3c_wave3_tuning.rs and the eval, scoped to wave-3 set only). Red-team
+found+closed 3 gaps (F1 partial-set vacuity, F2 block-comment hygiene, F3 shadow zone-0
+table) before ship.
+
+Adjudicated FLAGGED: pt_d3_tuning.rs pins extended (not weakened) 40/42 into the
+wild-legal set + count 7->9 — disclosed touches-delta, matches ADR-0204:81,103. mr-audit
+orchestration CLEAN. mr-gates 9/10 met, X3 deferred to backlog (RW3-08 wording is
+mechanically unsatisfiable as worded for any placement slice — duplicate of open
+R-rw3b-X8, not a new issue).
+
+Worktree removed, slice/rw3c branch deleted (local+remote). Master CI (run 32674101030)
+was still in_progress at record time — verify green on next tick before further action
+on top of 12af096.
+
+Follow-ups (not touched, outside this slice's scope): species/070-wave3.ron:20-22 stale
+comment; evals/content-version.eval.mjs --update flag doesn't exist; lib.rs
+CONTENT_VERSION changelog missing v19-21 entries; promote band-below-gate rule to a real
+R13 (blocked on pre-existing species-7 violation).
+
+## 2026-08-23T22:02:26Z — rw3c LAUNCHED (M-postgate-roster-wave-3 obtainability + tuning)
+**Slice:** rw3c — wild placement for wave-3 tier-0 forms (species 40 Voltkit Electric, 42 Aurelet Light) in the zone-0 encounter table + level/weight banding. **Repo:** project (mdrewt/monster-realm). **Model:** opus@medium (tier=content). run_id=mr-spawn-20260823T220158Z-2902308, session_leader=2902365.
+
+**Why now:** rw3b merged this session (PR#357, ee2e093). rw3c is after:rw3b per its spec's candidate-slices table and was the only unblocked, unstarted item in the queue (queue[] empty, no promotable residuals -- R-rw3b-X6-rw3c-half and R-rw3b-X8 both <1h old). This closes the RW3-06 second clause and the X6 residual rw3b disclosed.
+
+**Briefed constraints:** RW3-06 (tier-0 only, never an evolution-edge target -- R6 in content.rs), RW3-07 (zone-0 table byte-identical except additive entries -- recruit.spec.ts flake budgets depend on the exact existing weights), RW3-08 (CONTENT_VERSION-only Rust touch), RW3-09 (own eval+test, live CONTENT_VERSION bump, regenerated content-hash.json). No new ADR reserved (rw3c doesn't need one per spec Notes).
+
+**Housekeeping done before launch this tick:** committed+pushed the previous tick's uncommitted rw3b-merge bookkeeping (harness commit 2e48ed9, mr-state.json + handoff + archive). Reaped the stale rw3b per-run lock (dead session_leader 2700302) via mr-unlock. Chain-owner mutex taken for this tick's derivation, will release at tick end.
+
+**Not actioned:** decision issue mdrewt/monster-realm#342 (OBS-48 procedures re-adjudication) is explicitly record-and-ignore per its own text -- left open, untouched.
+
+## 2026-08-23T21:31:56Z — rw3b merged — roster wave 3 (Electric + Light) landed
+PR https://github.com/mdrewt/monster-realm/pull/357 (slice/rw3b -> master) squash-merged as ee2e0930, worktree+branch cleaned. mr-audit: orchestration CLEAN, gating_advisory CLEAN, mandatory_read=false. Acceptance ledger: 12/13 met, 1 legitimately DEFERred (RW3-08, mechanically unsatisfiable as written for any slice adding an evolution edge/derived species — two pre-existing exact-pin tests were extended field-for-field, never weakened), 0 unmet; mr-gates verify independently re-confirmed 12/12 mechanical gates fresh (first pass showed false EVIDENCE-MISMATCH on X1-X5/X10/X11 from a supervisor-shell PATH gap missing ~/.cargo/bin, not a real slice defect — re-ran with PATH fixed and all agreed). Spotcheck X6 held under adversarial re-read. Two residuals emitted to backlog: R-rw3b-X6-rw3c-half (rw3c must place wave-3 tier-0 species in an encounter table) and R-rw3b-X8 (RW3-08 reword needed — both too fresh (<1h) to promote this tick, left unclaimed for a future Pick-work gate). Diff included touches-delta beyond declared touches (two id baselines, evolution-path-edge-ids.json, append-only-ids.eval.mjs, plus doc-set ARCHITECTURE.md/DIGEST.md) — disclosed and reasoned in the PR body as the standard content-id side effect; no sibling slice was in-flight to collide with. Roster now 16 -> 20 forms (species 40-43: Voltkit/Voltarion Electric, Aurelet/Aurelith Light). ADR-0204. master CI was still in_progress at merge-record time (post-merge re-verify pending a future tick/event) — the identical commit's PR checks (ci+e2e) were green. Queue empty, no inflight, nothing launched this tick — next tick needs a full PLAN §9 derivation to pick new work.
+
 ## 2026-08-23T21:21:15Z — rw3b PR#357 e2e flake — reran, delegated to mr-ci-watch
 PR #357 (rw3b, roster wave 3) mergeStateStatus=UNSTABLE: ci job passed, e2e job failed on client/e2e/monster-privacy.spec.ts:394 (PvP battle overlay Accept-button click, DOM-detachment/pointer-intercept retry signature). This file is outside rw3b's declared touches: (content/species/skills/evolution_paths, server-module CONTENT_VERSION 19->20, evals, art gen) -- rw3b never touches client PvP/battle-overlay code. Master's own most recent CI run (17:01Z) passed this exact e2e job cleanly, and the prior 16:46Z master run's e2e job also passed (only the outer 'ci' job failed that run, unrelated). Adjudicated as flake, not a real regression. Reran the failed job: gh run rerun 32666332349 --failed. Delegated the wait to mr-ci-watch (setsid, pid 2873765) rather than polling. Supervisor did not merge; next event tick resumes the merge decision once mr-ci-watch reports back.
 ## 2026-08-23T20:02:10Z — rw3b LAUNCHED (M-postgate-roster-wave-3 content drop)
@@ -764,66 +853,6 @@ So `mr-feedback` KEEPS its ledger, doctrine, state machine, `check` reconciler, 
 **Method note worth keeping:** always FOLD an event-sourced ledger before quoting a count from it. "189 rows, 0 terminal" nearly retired a working triage process.
 
 **Unchanged:** the standing `mr-selfcheck` B2 operator item (`~/.local/bin/mr-supervisor-disable` is a copy, not a symlink to the tracked SSOT). Still the only SELFCHECK-FAIL line.
-## 2026-08-23T08:41:25Z — lp-gates follow-up: keystone tamper closed (CRITERIA-MISSING), kill-switch disarm fixed, A8 false-alarm fixed
-**Follow-up to the lp-gates entry below, after a THIRD adversarial review (4 lenses + judge) run against the committed state. Loop still held; hold untouched.**
-
-**The keystone defence was broken and is now fixed.** `Seed:` compared spec-derived text with spec-derived text, so it proved only that the SPEC had not changed — it said nothing about the ledger. Reproduced before fixing: seed 3 criteria, **delete two, green the third → `CLEAN`, `1/1 met`, no drift, no lint**. Deleting was also CHEAPER than `DEFER` (no resolvable target, no residual that follows you), so the incentive pointed straight at it. `verify` now re-derives the criterion list from the spec and FLAGS `CRITERIA-MISSING`. If you see that verdict: a gate was removed from the ledger — deleting a gate is not a way to finish it.
-
-**Two more ways a slice could pass without proving anything, both closed:** a ledger where NOTHING executed returned CLEAN (all gates `MANUAL:` with self-citing evidence) → now `NO-CHECK-EXECUTED`; and the echo-your-own-answer lint was inert for the `/regex/` EXPECT the brief teaches, because it tested the delimited string — `cargo test --lib nope ; echo "1 passed"` with `EXPECT: /1 passed/` linted clean. Both now blocked, each pinned by an isolated fixture.
-
-**Two defects I introduced, found and fixed:**
-- **`mr-spawn --dry` was disarming the GLOBAL kill switch.** `rm -f /tmp/mr_stop_all` sat ABOVE the `--dry` exit. `/tmp/mr_stop_all` is live — `mr-launch.sh` checks it before every spawn and every run polls it — so a dry probe silently cleared the operator's all-slice cooperative stop. Moved below the exit.
-- **`mr-unlock` could destroy an unreconciled ledger row.** It reaped `.done` + `.done.recorded` for any dead-leader slice, but the tick's reconcile iterates `.done` files and skips those already `.recorded`. Reaping an UNRECONCILED `.done` loses that run's cost before it reaches the append-only ledger and undercounts the governor — and `mr-unlock` is run precisely after the wedge that stops reconciliation. It now keeps both and prints `UNLOCK-KEEP-DONE` unless the run was already reconciled.
-
-**New verdict `NO-LEDGER`** — a slice that was never seeded (every pre-lp-gates slice). An absent measurement, not a failed one; it does NOT count toward the arming band, which counts LEDGERED slices only (`CLEAN`/`FLAGGED`).
-
-**`EVIDENCE-MISMATCH` now means fraud only** (box ticked + independent re-run does NOT pass). Output that merely varies between runs — counts, timings, ordering — is `evidence_drift`, informational. Previously evidence was recorded as a two-line tail while `verify` compared the EXPECT-matching line: different shapes by construction, so it fired on nearly everything and would have made the arming band unreadable.
-
-**New: `$MEM/mr-acceptance-log.jsonl`** — one append-only row per `verify`, because worktrees are deleted at merge so `verify` cannot be re-run retrospectively; without it one reboot erased the arming baseline. Gitignored, and in `mr-backup`'s canonical set alongside the ledger, handoff and residual registry.
-
-**Also fixed:** `mr-record queue-add` hand-off command printed by `promote` was rejected twice (missing `--reason`, bare spec name where a `specs/`-prefixed path is required); `promote` appended past the backlog spec's own append marker; `reseed` could not restore an ABSENT `Seed:` line (the exact case `SEED-MISSING` detects); `residuals close --force` now REQUIRES `--reason`, which the docs already claimed.
-
-**Pre-existing bug fixed while here — `mr-selfcheck` A8 cried wolf on every forced tick.** Its "unforced" fixture built its environment from `dict(os.environ)` without scrubbing `MR_FORCE`, so it was not unforced at all. `mr-supervisor-run` sets `MR_FORCE=1` before the tick runs selfcheck, so **every operator-forced tick raised a false A8 failure**. Isolated (`MR_FORCE=1 mr-selfcheck` failed, plain passed), scrubbed, and verified in both directions.
-
-**Corrected claims in the records** (a false claim in doctrine misleads every future run): the brief and spec no longer say the `Seed:` hash catches a deleted gate — they name both `SEED-DRIFT` and `CRITERIA-MISSING`; the plan's `defer_count >= 2 ⇒ mr-ask-drew` is now marked UNBUILT rather than described as shipped; §5.11 is labelled an LLM instruction rather than a mechanical check; corpus figures restated as measured (132/133 sections, 526 criteria, 242 reusing spec ids).
-
-Teeth now: `mr-gates --selftest` **117 assertions, 16 injected defects all RED**, negative control green. `mr-selfcheck` remains clean except the standing B2 operator item.
 ## 2026-08-23T06:00:06Z — HOLD-AGED by=operator in force 6h — escalating once; loop stays held
 The build loop has been held for 6h (by=operator). Is that still intended? If the pause has served its purpose, run mr-supervisor-enable. If it is deliberate, close this — it will not ask again for this hold.
 
-## 2026-08-23T21:31:56Z — rw3b merged — roster wave 3 (Electric + Light) landed
-PR https://github.com/mdrewt/monster-realm/pull/357 (slice/rw3b -> master) squash-merged as ee2e0930, worktree+branch cleaned. mr-audit: orchestration CLEAN, gating_advisory CLEAN, mandatory_read=false. Acceptance ledger: 12/13 met, 1 legitimately DEFERred (RW3-08, mechanically unsatisfiable as written for any slice adding an evolution edge/derived species — two pre-existing exact-pin tests were extended field-for-field, never weakened), 0 unmet; mr-gates verify independently re-confirmed 12/12 mechanical gates fresh (first pass showed false EVIDENCE-MISMATCH on X1-X5/X10/X11 from a supervisor-shell PATH gap missing ~/.cargo/bin, not a real slice defect — re-ran with PATH fixed and all agreed). Spotcheck X6 held under adversarial re-read. Two residuals emitted to backlog: R-rw3b-X6-rw3c-half (rw3c must place wave-3 tier-0 species in an encounter table) and R-rw3b-X8 (RW3-08 reword needed — both too fresh (<1h) to promote this tick, left unclaimed for a future Pick-work gate). Diff included touches-delta beyond declared touches (two id baselines, evolution-path-edge-ids.json, append-only-ids.eval.mjs, plus doc-set ARCHITECTURE.md/DIGEST.md) — disclosed and reasoned in the PR body as the standard content-id side effect; no sibling slice was in-flight to collide with. Roster now 16 -> 20 forms (species 40-43: Voltkit/Voltarion Electric, Aurelet/Aurelith Light). ADR-0204. master CI was still in_progress at merge-record time (post-merge re-verify pending a future tick/event) — the identical commit's PR checks (ci+e2e) were green. Queue empty, no inflight, nothing launched this tick — next tick needs a full PLAN §9 derivation to pick new work.
-
-## 2026-08-23T22:02:26Z — rw3c LAUNCHED (M-postgate-roster-wave-3 obtainability + tuning)
-**Slice:** rw3c — wild placement for wave-3 tier-0 forms (species 40 Voltkit Electric, 42 Aurelet Light) in the zone-0 encounter table + level/weight banding. **Repo:** project (mdrewt/monster-realm). **Model:** opus@medium (tier=content). run_id=mr-spawn-20260823T220158Z-2902308, session_leader=2902365.
-
-**Why now:** rw3b merged this session (PR#357, ee2e093). rw3c is after:rw3b per its spec's candidate-slices table and was the only unblocked, unstarted item in the queue (queue[] empty, no promotable residuals -- R-rw3b-X6-rw3c-half and R-rw3b-X8 both <1h old). This closes the RW3-06 second clause and the X6 residual rw3b disclosed.
-
-**Briefed constraints:** RW3-06 (tier-0 only, never an evolution-edge target -- R6 in content.rs), RW3-07 (zone-0 table byte-identical except additive entries -- recruit.spec.ts flake budgets depend on the exact existing weights), RW3-08 (CONTENT_VERSION-only Rust touch), RW3-09 (own eval+test, live CONTENT_VERSION bump, regenerated content-hash.json). No new ADR reserved (rw3c doesn't need one per spec Notes).
-
-**Housekeeping done before launch this tick:** committed+pushed the previous tick's uncommitted rw3b-merge bookkeeping (harness commit 2e48ed9, mr-state.json + handoff + archive). Reaped the stale rw3b per-run lock (dead session_leader 2700302) via mr-unlock. Chain-owner mutex taken for this tick's derivation, will release at tick end.
-
-**Not actioned:** decision issue mdrewt/monster-realm#342 (OBS-48 procedures re-adjudication) is explicitly record-and-ignore per its own text -- left open, untouched.
-
-## 2026-08-23T23:39:30Z — rw3c MERGED (PR#358, 12af096)
-rw3c (M-postgate-roster-wave-3) squash-merged: master ee2e093 -> 12af096. Zone-1 wild
-placement for wave-3 tier-0 forms (Voltkit=40, Aurelet=42); CONTENT_VERSION 20->21.
-New invariant: band max_level strictly below lowest outgoing evolution-edge min_level
-(gated in both rw3c_wave3_tuning.rs and the eval, scoped to wave-3 set only). Red-team
-found+closed 3 gaps (F1 partial-set vacuity, F2 block-comment hygiene, F3 shadow zone-0
-table) before ship.
-
-Adjudicated FLAGGED: pt_d3_tuning.rs pins extended (not weakened) 40/42 into the
-wild-legal set + count 7->9 — disclosed touches-delta, matches ADR-0204:81,103. mr-audit
-orchestration CLEAN. mr-gates 9/10 met, X3 deferred to backlog (RW3-08 wording is
-mechanically unsatisfiable as worded for any placement slice — duplicate of open
-R-rw3b-X8, not a new issue).
-
-Worktree removed, slice/rw3c branch deleted (local+remote). Master CI (run 32674101030)
-was still in_progress at record time — verify green on next tick before further action
-on top of 12af096.
-
-Follow-ups (not touched, outside this slice's scope): species/070-wave3.ron:20-22 stale
-comment; evals/content-version.eval.mjs --update flag doesn't exist; lib.rs
-CONTENT_VERSION changelog missing v19-21 entries; promote band-below-gate rule to a real
-R13 (blocked on pre-existing species-7 violation).

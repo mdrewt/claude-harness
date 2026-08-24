@@ -1,18 +1,20 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-23T23:40:00Z",
- "updated_by": "mr-sup-native-20260823T233325Z-3093769",
+ "updated_utc": "2026-08-24T00:06:30Z",
+ "updated_by": "mr-sup-native-20260824T000013Z-3111031",
  "master": {
   "sha": "12af096",
-  "ci": "in_progress at merge-record time (12af096, PR#358 rw3c squash-merge, run 32674101030); identical commit's PR checks (ci+e2e) were green pre-merge; re-verify next tick",
+  "ci": "green (confirmed live via gh run list --branch master: conclusion=success on 12af096, rw3c)",
   "nightly": "fixed_at_a40cb81_confirmed_green"
  },
  "harness_main": {
-  "sha": "a85d229",
-  "ci": "no-remote-ci-local-gate-green; pushed 2 pending chore(mr-sup) commits (970da52, a85d229) to origin/main this tick, now in sync"
+  "sha": "48130ef",
+  "ci": "no-remote-ci-local-gate-green; committed+pushed the prior tick's uncommitted rw3c merge-record (mr-state.json/handoff/spec/plan doc it left staged but never committed) as 48130ef -> origin/main, now in sync"
  },
  "adr_next_free": 204,
- "inflight": [],
+ "inflight": [
+  {"slice": "m22-ceremony", "run_id": "mr-spawn-20260824T000541Z-3115320", "session_leader": 3115370, "model": "opus", "effort": "medium", "tier": "content", "repo": "harness"}
+ ],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -20,7 +22,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-08-23T23:33Z native tick: EVENT rw3c.done (rc=0). Verified PR#358 CLEAN/MERGEABLE, both checks SUCCESS. Reaped stale mutex+per-run lock (owner 2900366 dead). mr-gates verify FLAGGED/SPEC-SECTION-NOT-FOUND (known quirk), 9/10 met 1 deferred (X3->backlog, dup of open R-rw3b-X8). mr-audit orchestration CLEAN; gating_advisory FLAGGED on pt_d3_tuning.rs assert edit, adjudicated as a strict pin extension (diff read, matches disclosed touches-delta + ADR-0204:81,103) -> merged. Squash-merged PR#358 (ee2e093->12af096), worktree removed, slice/rw3c branch deleted local+remote. Master CI still in_progress at record time (~5min+ in) -> no composite launch this tick; next tick should re-verify green before further action.",
+ "notes": "2026-08-24T00:00Z native tick: reconciled prior tick's uncommitted rw3c doc changes (harness main 48130ef, pushed); fixed a stale 'rw3b not started' line in the roster-wave-3 spec (rw3a/b/c all DELIVERED -- milestone complete). mr-gates residuals list --unclaimed: 3 unpromoted MED residuals, all age<1d, none past t1_promote_days=3 -- no preemption. Full PLAN Sec9 derivation: 16r milestone done except 16r-b (SERIAL-REQUIRED vs blocked 15r family); EG1-5 and M21(a/b/c+b-2) fully merged; everything else before M22 is blocked:wave-2/3/4-exit (boundary 2026-08-27, not reached). Acted on the 2026-08-23 operator authorization (PLAN.md ~L724) for M22-M25 HEAVY CEREMONY treatment via mr-spawn -- launched m22-ceremony (content tier, opus@medium, docs-only touches, no code). See handoff for full reasoning incl. reconciling this against an older (pre-2026-08-23) handoff finding that the native loop has no ceremony-launch mechanism. Did not fan out M23 alongside it -- first-ever ceremony-via-mr-spawn, want to see how the output looks before committing a second.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],
@@ -50,5 +52,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-23T23:40:00Z"
+ "last_tick_utc": "2026-08-24T00:06:30Z"
 }
