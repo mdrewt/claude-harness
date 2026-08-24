@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-24T10:36:00Z",
-  "updated_by": "mr-sup-native-20260824T102935Z-157133",
+  "updated_utc": "2026-08-24T11:15:00Z",
+  "updated_by": "mr-sup-native-20260824T110011Z-242211",
   "master": {
     "sha": "d60af03",
-    "ci": "queued/in_progress at tick-end (post-merge push-triggered run for PR#360, d60af03) -- NOT YET CONFIRMED GREEN, next tick must re-verify live",
+    "ci": "RED at d60af03: ci=SUCCESS, e2e=FAILURE (single timeout, e2e/ranked-forfeit.spec.ts m17c RL-18, 68 passed/1 failed/1 skipped, unrelated to m22-s1 touched surface). Rerun triggered (gh run rerun 32717269214 --failed) this tick as a diagnostic -- next tick must re-verify live before any merge/launch.",
     "nightly": "fixed_at_a40cb81_confirmed_green"
   },
   "harness_main": {
@@ -18,7 +18,7 @@
       "slice": "m23-s0",
       "repo": "project",
       "pr": 361,
-      "mergeStateStatus": "CLEAN (re-verified live this tick: ci+e2e SUCCESS, mergeable=MERGEABLE)",
+      "mergeStateStatus": "DIRTY/CONFLICTING (re-verified live this tick -- flipped from prior tick's CLEAN, almost certainly because m22-s1 landed on master out from under this branch). NOT merged -- master CI is also red this tick, higher priority gate. Needs gh pr update-branch or manual rebase-resolution once master is confirmed green.",
       "target_desc": "M23-accessibility.spec.md S0: A11yMeta + total OVERLAY_A11Y map on overlayRegistry.ts + new a11yCopy.ts; reserves ADR-0205",
       "finished_utc": "2026-08-24T10:24:35Z"
     }
@@ -29,8 +29,8 @@
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "2026-08-24T10:29Z native tick (rid=native-20260824T102935Z-157133): both m22-s1 and m23-s0 runs had finished since the prior tick (session leaders dead, .done EXIT=0 ATTEMPTS=1 both). Re-verified live: PR#360 (m22-s1) and PR#361 (m23-s0) both OPEN/MERGEABLE/CLEAN with ci+e2e SUCCESS (situation bundle's UNSTABLE for #361 was stale -- CI finished between bundle generation and this tick's live check). Doctrine allows only ONE merge action per tick (no merge->merge composite, only merge->launch) -- picked m22-s1 first (older finish, 10:06Z vs 10:24Z). Took chain-owner mutex (none held). mr-audit --slice m22-s1 --tier routine: policy CLEAN, mandatory_read=false, orchestration CLEAN (full role set incl. planner/tester/red-team/reviewer/verifier/doc-keeper), gating_advisory CLEAN (2 new test files, 0 removed asserts/skips/suppressions). Acceptance sub-block showed FLAGGED only on a benign SPEC-SECTION-NOT-FOUND reason -- 9/9 met, 0 unmet, 0 deferred; independently confirmed via mr-gates verify --slice m22-s1 (9/9 gates reverified, all agree with recorded evidence, spotcheck X5 held under an adversarial re-read). Diff (game-core/src/accounts/{deletion.rs,deletion_tests.rs,mod.rs}, game-core/src/lib.rs, game-core/tests/m22_s1_deletion_surface.rs, ARCHITECTURE.md) exceeds the single declared touch (deletion.rs) but is legitimate new-module wiring (mod.rs/lib.rs registration + companion tests + doc), not scope creep, and no sibling was in-flight to conflict with -- proceeded. Merged PR#360 --squash --delete-branch (d60af03); local master fast-forwarded 2a6864b->d60af03; worktree+branch slice/m22-s1 removed. mr-gates residuals close --slice m22-s1 --pr 360 -> 0 residuals (none were open against this slice). Master CI (push-triggered run on d60af03) still in_progress after ~2min of polling -- did NOT sit blocking on it per the never-poll-CI doctrine; next tick's gate-3 (master CI red check) will re-verify live. Ledger MERGED row written (cost_usd correctly omitted -- wrapper's earlier FINISHED row already recorded $25.0311, mr-record's wrapper_cost_exists guard suppressed --from-log re-derivation to avoid double count). Handoff entry appended via mr-record (auto-rotated 1 old entry to archive/2026-08; pre-existing WARN about 21 unparseable-header legacy entries noted but NOT actioned -- out of scope for this tick's one-action budget, same pre-existing hygiene debt flagged by the prior tick, not introduced now). m23-s0 (PR#361) intentionally left unmerged this tick -- moved from inflight to awaiting_merge; it is CLEAN/MERGEABLE and should be the FIRST thing the next tick merges (gate-3 'resume open/parked before new work' -- an open ready-to-merge PR outranks everything else). No BLOCKERs. Governor NORMAL (d7 $1023.56/2783 eff., fable_ok=true, unaffected -- no fable spend this tick, no new launch this tick either).",
-  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active — opus alias now resolves to claude-opus-5).",
+  "notes": "2026-08-24T11:00Z native tick (rid=native-20260824T110011Z-242211): gate-0 found uncommitted mr-sup bookkeeping left by the prior tick (native-20260824T102935Z-157133, merged PR#360/m22-s1 but never committed its own ledger/handoff/state/decisions-log/plan-artifact writes) -- committed as chore(mr-sup) 4c2b99b on harness main; future-prompts.md and gdd.md left untouched as human strays. No kill-switch, no live locks, no active-session collision. Gate-3: master CI red outranks all other work -- re-verified live, d60af03 (m22-s1) has ci=SUCCESS/e2e=FAILURE, single test timeout (e2e/ranked-forfeit.spec.ts, unrelated file to m22-s1's game-core/accounts/deletion.rs touch), looks like a flake not a regression. Triggered gh run rerun --failed as a bounded diagnostic (this tick's ONE mutating action); did not sit polling it (no PR to attach mr-ci-watch to for a master-push-triggered run) -- next tick re-verifies live and decides fix/revert vs confirmed-flake. Also found PR#361 (m23-s0) flipped live from CLEAN/MERGEABLE to DIRTY/CONFLICTING (likely m22-s1 landing under it) -- NOT merged this tick (master red takes priority); needs branch update/resolution once master is green. No BLOCKER. Governor NORMAL (d7 $1024.75/2783 eff., fable_ok=true). No launch/park this tick.",
+  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
   "parked": [],
   "open_chore_prs": [],
   "resource_locations": {
@@ -44,7 +44,7 @@
     "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said.",
     "found_easily": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects template + launch script + AGENTS.md two-location note were all accurate; only the harness-vs-project spec path lacked an absolute anchor in the task.",
-    "gh_cli_path": "gh is NOT on the default PATH in this native env — it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation."
+    "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation."
   },
   "native_supervisor": {
     "active_since": "2026-07-21T16:10:57Z",
@@ -59,5 +59,5 @@
     "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
   },
   "live_watchers": [],
-  "last_tick_utc": "2026-08-24T10:36:00Z"
+  "last_tick_utc": "2026-08-24T11:15:00Z"
 }
