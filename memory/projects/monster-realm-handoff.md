@@ -963,6 +963,56 @@ mechanically.
 
 ## 2026-08-24T18:02:33Z — 18:00Z tick -- fan-out launch m23-s3/s7
 Reconciled uncommitted 17:10Z tick bookkeeping first (mr-state.json/handoff/archive; commit 87d9abf) -- that tick had merged m23-s1 PR#364 to 0953db7 but never committed its own records. Live-verified: master green at 0953db7 (run 32755598702 conclusion=success), no open PRs, no live watchers/locks. M23 spine after S0/S1/S2 merged opens {S2 done, S7} and {S3, S4} -- picked the spec-endorsed disjoint pair S3 (static-shell view wiring, ui/*) + S7 (reduced motion, render/*) per section 4's explicit 'S3 || S7' fan-out list, avoiding the never-paired S3||S4 combo. mr-disjoint verdict SAFE, free -g shows 37G free (ample for 2 builds). S3 = routine tier (opus@high). S7 = HARD tier (fable@xhigh, budget fable_ok=true, d7=$1115.61/2783 eff.) -- touches render/renderResolver.ts (reconcile-adjacent) and the spec itself mandates a desync-guard review. Both mr-spawn LAUNCHED cleanly (s3 leader=654704, s7 leader=655336). Both gates-seed calls reported SPEC-SECTION-NOT-FOUND/criteria=0 (same benign pattern noted on m23-s1's prior tick -- the milestone spec's slice table doesn't sub-anchor by S-number the way mr-gates seed expects; not a launch blocker, flag for the merge-time adjudication same as before). No merge this tick (composite budget spent on reconcile + fan-out launch). Governor NORMAL. No BLOCKER.
+## 2026-08-24 — m23-s3 PR OPEN (PR#365) — awaiting supervisor merge
+
+**Slice:** m23-s3 (M23 accessibility S3 — static-shell view wiring, two mechanisms).
+**Terminal state:** PR open + full local `just ci` GREEN + remote CI running. **NOT merged — supervisor owns `gh pr merge`.**
+**PR:** https://github.com/mdrewt/monster-realm/pull/365 (`slice/m23-s3` -> `master`, base 0953db7)
+**Worktree:** `.claude/worktrees/m23-s3` (kept; wasm pkg built there). Branch pushed, tree clean.
+**Acceptance:** `Acceptance: 9/9 met, 0 deferred, 0 unmet — m23-s3 seed:e3b0c44298fc1c14` (byte-matches the PR body line).
+**Local gate:** `just ci` exit 0 — 91 client test files / 2628 tests (baseline 87 / 2542), lint 0 errors, 0 eval FAILs.
+
+**What landed:** all ten static-shell views delegate to m23-s1's `openOverlayA11y`/`closeOverlayA11y`;
+seven via `show()`/`hide()`, three (`dialogueView`, `questLogView`, `healView` — no `show()` exists) via
+the `render(vm|null)` null<->non-null EDGE. Both view-local deferred `.focus()` calls deleted
+(`renameView.ts:102`, `tradeProposeView.ts:124`); `overlayA11y.ts` is now the sole owner of the defer,
+which makes A11Y-15 satisfiable. Edge derived from the existing `visible` getter — no new state.
+
+**Orchestration:** planner -> reviewer + red-team + /simplify on the plan (parallel) -> tester (separate
+agent) wrote the RED suite -> red-team wrote 14 wrong implementations against it -> orchestrator
+implemented. `/tmp/mr_warn_m23-s3` (LANDING PATTERN) appeared right after the tests went green, so the
+post-impl review fan-out was deliberately NOT spawned; the pre-impl red-team cheat pass had already
+constructed and measured a correct implementation (62/62 green, whole client suite green) which covers
+most of that lens's value. **A verifier pass was not run — supervisor may want one before merge.**
+
+**Three green-but-wrong holes the red-team found and closed BEFORE implementing** (all in the tests):
+(1) the `.focus(` scan's CONTROL fixture miscounted its own planted occurrences, so the gate failed even
+on a CORRECT impl and never reached the real scan; (2) `-CLOSE-UNGUARDED` covered 4 of 10 views, so
+guarding `hide()` on the other six shipped 62/62 green while permanently leaking a focus trap (ledger X9
+widened to ten); (3) the comment/string stripper was swallowed by a regex literal containing a quote,
+hiding a real duplicate deferred `.focus(` in seven views.
+
+**FOR S4 (the next M23 slice) — read before planning:**
+- **D7 call-ordering is PROVABLY UNGATED.** An open-first implementation measures 62/62 green. S3's ten
+  overlays are safe either way (every anchor is a static constructor-time child) but S4's four sit beside
+  `replaceChildren()` rebuilds, so **S4 must carry the open-last obligation in its own plan** rather than
+  inherit it from S3's template.
+- S4's four overlays share ONE `#app` root; S1's A12 close-before-open contract still applies. S3's
+  template alone is NOT sufficient there.
+- **Latent S1 gap, out of every slice's `touches:` so far:** `openOverlayA11y` writes `role`/`aria-modal`
+  BEFORE calling `t(meta.labelKey)`, which throws by design on an unwired key. On a throw the DOM keeps
+  both attributes with no record stored, so the later close no-ops and can never strip them —
+  contradicting that module's own "no half-open state" header claim. Unreachable today (all 16 keys
+  pinned present). Needs an owner.
+
+**Other flags:** spec §9.7 is factually wrong ("the only `innerHTML` write in the view layer" — false;
+questLogView/healView/shopView/tradeView all write it; only the one named `dialogueView.ts:30` fix was
+done). Ledger seeded `SPEC-SECTION-NOT-FOUND / 0 criteria` for the THIRD M23 slice running (s0, s1, s3)
+— M23's EARS block is §6, not §7.x; worth fixing in the seeder.
+
+**Code graphs NOT refreshed** — doctrine says re-index the canonical checkout post-merge only, and
+master is still at 0953db7. Whoever merges should run the step-10 refresh.
+
 ## 2026-08-24T17:16:35Z — m23-s1 merged (PR#364, 0953db7)
 Native tick rid=native-20260824T171027Z-612164 consumed the CI-green event (all checks passed at 17:10:24Z) for PR#364 (slice/m23-s1 -> master, mdrewt/monster-realm). Live-reverified OPEN/CLEAN/CI-success before acting. mr-audit: orchestration=CLEAN (12 agent calls, reviewer+red-team+tester+desync-guard present), gating_advisory=CLEAN (no removed asserts/skips/suppressions). mr-gates verify: 14/14 met, 0 unmet, 0 deferred, all reverified TEETH-BITE with agrees_with_evidence=true; overall verdict FLAGGED but solely via reasons=[SPEC-SECTION-NOT-FOUND] with seed_drift=false — adjudicated as a benign spec-table heading-lookup miss (sibling m23-s2/PR#363 edited the same M23-accessibility.spec.md table) rather than a real defect, since every individual gate's fresh re-run evidence matched. PR body Acceptance: line matched mr-gates render --format pr exactly (14/14 met, 0 deferred, 0 unmet). residual_alarms noted residual-over-cap (14 open vs cap 12) but flagged observe-only for slice 1 -- no action taken. Merged via gh pr merge --squash --delete-branch; remote branch auto-deleted. Cleaned stale local worktree .claude/worktrees/m23-s1 and local branch slice/m23-s1 (worktree removal blocked the first delete-branch attempt). master fast-forwarded 5e76945 -> 0953db7. mr-gates residuals close --slice m23-s1 --pr 364 -> 0 residuals to close (nothing deferred). Ledger row recorded outcome=merged, cost_usd=null/COST-UNKNOWN (mr-record --from-log found no result event in the 5MB pass log -- true spend unrecorded, not investigated further this tick). Post-merge master CI (run 32755598702) was launched and is being watched to confirm green before this tick's final output.
 
