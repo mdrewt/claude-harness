@@ -1024,6 +1024,19 @@ mechanically.
 
 **Unblocked next:** S3 and S4 (both `after: S1, S2`) once m23-s1 lands.
 
+## 2026-08-24T21:02:55Z — 21:00Z tick -- reconciled 19:34Z bookkeeping + launched m23-s4
+Native tick rid=native-20260824T210017Z-945121. Gate-0/1: no live per-run locks, no chain-owner mutex held, no operator hold, no resident-session collision. Found the 19:34Z tick's mr-state.json/handoff/archive uncommitted despite having merged BOTH m23-s3 (PR#365, f33a3eb) and m23-s7 (PR#366, 20c893348152ac9f143890e3935067a69fa863fe) -- reconciled via harness commit e545617 (future-prompts.md left untouched, unrelated user scratch content). Live-verified: master CI green at 20c8933 (run 32772891486, conclusion=success), matches local master sha, no open PRs (mdrewt/monster-realm or mdrewt/claude-harness), no worktrees beyond the canonical checkout, no stray branches. Residuals: mr-gates residuals list --unclaimed shows 15 open, max age 0.98d, all far under t1_promote_days=3 -- none outrank new work; 15 vs cap 12 remains observe-only per doctrine (slice 1). M23 spine (S0->S1->{S2||S7}->{S3||S4}->S5->...) now has S0/S1/S2/S3/S7 merged. S4 (after: S1,S2, both merged) is the sole remaining unblocked slice at this spine position -- S3's sibling S4 is 'never paired' with S3 in fan-out, but that's moot now that S3 is already merged; S4 launches solo. touches disjoint from everything else (client/src/ui/{battleView,boxView,raisingView,evolutionView,claimView}.ts + client/src/render/world.ts), no in-flight sibling to collide with. Tier=routine (opus@high) -- no server-module/schema/reducer touch, no predictor/netcode/reconcile path (world.ts is the imperative render shell, not reconcile logic), no security/RLS, not M20/M25, fresh (not a resume-after-park). mr-spawn LAUNCHED cleanly: leader=947588, claude_pid=947591, rid=mr-spawn-20260824T210227Z-947528. GATES-SEEDED criteria=0 SPEC-SECTION-NOT-FOUND (4th occurrence across s0/s1/s3/s4 -- same benign M23-EARS-lives-in-section-6 quirk, not a launch blocker, flag for the seeder fix already noted twice before). Governor NORMAL (d7=$1228.69/2783 eff., fable_ok=true; this launch is opus-tier, unaffected). No BLOCKER. No rate-limit event.
+## 2026-08-24T20:18:59Z — m23-s7 merged (PR#366) — reduced motion
+M23 accessibility S7 (reduced-motion, A11Y-27/28/36, spec §2.5) merged to master as 20c8933 (squash of PR#366). HARD tier (renderResolver.ts predictor-adjacent). model=fable/xhigh, 1 attempt, $61.99.
+
+Delivered: motionPreference.ts (sole matchMedia caller, S5 wires it at main.ts:2719 later — S7 ships it UNCONSUMED, main.ts-free per spec §4), ResolveInput.reduceMotion (optional, default false — additive, non-breaking), own-path forces snapTo every frame under reduceMotion (clock keeps tracking so a later false frame resumes cleanly, no teleport), remote-path bypasses interpolation entirely via new interpolateReducedMotion (authoritative row tile, clock-independent by construction).
+
+mr-audit: orchestration CLEAN (8 roles incl. mandatory desync-guard), gating_advisory CLEAN. mr-gates verify: 10/10 gates independently reverified, X7 spotcheck agreed. X11 (repo-wide matchMedia purity eval) pre-declared DEFER -> S10 backlog per spec §4's ownership split; not a gap. Hard-tier mandatory diff read done by supervisor: diff is small, additive-optional, matches spec intent, no red flags.
+
+Branch/worktree cleaned, remote branch deleted. master CI (ci+e2e) was still in_progress at merge-record time; local `just ci` on the exact merged tree ran green pre-merge (92/92 files, 2644/2644 tests, 90/90 evals) so high confidence, but next tick should re-verify master CI conclusion live before treating it as ground truth.
+
+Residuals: close attempted for m23-s7 as promoted-slice target -> 0 rows (expected; nothing was DEFERred onto m23-s7 itself). Residual backlog remains over cap (15 open vs cap 12, observe-only in slice 1) — unrelated to this slice, unclaimed residuals still exist for pick-work ranking.
+
 ## 2026-08-24T19:33:33Z — m23-s3 merged — PR#365 (a11y two-mechanism wiring, ten static-shell views)
 Native tick rid=native-20260824T193125Z-830859. PR#365 (mdrewt/monster-realm, slice/m23-s3→master) squash-merged: wires ten static-shell overlay views to overlayA11y.ts helpers in the two mechanisms M23 §2.2 requires (show()/hide() delegation for 7 views; render(vm|null) null-edge for 3 views with no show()), deletes the last two view-local deferred .focus() calls. mr-gates verify independently re-ran 9/9 met, 0 unmet, 0 deferred, spotcheck (X2) adversarially re-read and held. mr-audit: orchestration CLEAN, gating-test-integrity CLEAN, mandatory_read=false; acceptance block showed FLAGGED but only on SPEC-SECTION-NOT-FOUND (seeder can't find M23's EARS block, which lives in spec §6 not §7.x — 3rd occurrence across s0/s1/s3, adjudicated benign, worth fixing in the seeder). diff ⊆ declared touches (10 *View.ts) + companion *.test.ts + one ARCHITECTURE.md entry. Items: none. Worktree/branch cleaned (local + remote). master fast-forwarded to f33a3eb; post-merge CI run in_progress at merge time (pre-merge PR checks were both SUCCESS). Flagged upward for S4/S10, not fixed here (out of touches): (1) overlayA11y.ts openOverlayA11y writes role/aria-modal before the t(labelKey) call that can throw, leaving unrecorded half-open DOM state on an unwired key — unreachable today (all 16 catalog keys pinned), but contradicts the module's own no-half-open-state claim; (2) spec §9.7 wrongly claims dialogueView.ts:30 is the only innerHTML write in the view layer — questLogView/healView/shopView/tradeView also write it. residuals: 14 open vs cap 12, observe-only in slice 1, not this slice's residual (0 closed against m23-s3). m23-s7 (fable@xhigh) still live this tick (leader 655336 alive) — no composite launch.
 ## 2026-08-24T19:26:31Z — m23-s3 PR#365 — CI-watch delegated (native tick)
@@ -1112,66 +1125,3 @@ Launched m23-ceremony (harness repo, opus@medium, tier=content, rid=mr-spawn-202
 
 ## 2026-08-24T01:00:56Z — m22-ceremony merged (PR#38)
 Supervisor tick mr-sup-native-20260824T005740Z-3236388 reconciled the finished m22-ceremony run (rc=0, session leader dead, .done present, .err empty). PR https://github.com/mdrewt/claude-harness/pull/38 squash-merged to main at 141aabb. Content-tier doc-only slice: converged the M22 privacy/deletion spec from provisional sketch to implementation-ready via the full mr-feedback-doctrine.md §6 heavy ceremony (19 agent calls: expert/general-purpose/judge/red-team/researcher/reviewer/verifier roles). Decision: DECIDED registry = EXTEND live REKEY_MANIFEST/G6 gate rather than build a second mechanism (compile-time registry falsified — no proc-macro/inventory/linkme in the workspace, wasm32 cdylib has no ctor host). 38 tables classified exhaustively: 12 ERASE + 4 ANONYMIZE + 5 JOIN-ONLY + 17 NOT-OWNED. Review found 2 MAJOR + 4 MINOR issues (auth_issuer sentinel value, tombstone-vs-WILD_IDENTITY collision, citation formatting) — all fixed pre-merge, verifier PASS confirmed. mr-gates verify: 9/9 acceptance gates met, spotcheck agreed. mr-audit (--doc-only 1): orchestration=CLEAN-doc-exempt, gating=CLEAN, policy=CLEAN (mandatory_read=false). Worktree/branch cleaned. adr_next_free correction noted in the spec itself: mr-state.json says 204 but docs/adr/0204-roster-wave-3-electric-and-light.md already exists on disk — true next-free is 0205; a slice-S0 fix-up is specified in the spec's own §7 S0. No new eligible harness/project slices identified this tick; standing down.
-## 2026-08-24T00:06:22Z — launch m22-ceremony (HEAVY design ceremony, per 2026-08-23 operator authorization)
-Native tick (rid=native-20260824T000013Z-3111031). Reconciled a previous-tick gap first: the
-23:33-23:40Z tick had merged PR#358 (rw3c) and updated mr-state.json/handoff/spec locally but
-never committed to the harness repo -- committed those (harness main 48130ef) and pushed, leaving
-two unrelated human stray edits (future-prompts.md, gdd.md) untouched and uncommitted, as usual for
-strays. Re-verified master green at 12af096 (both local git log and live `gh run list`), remotes
-match on both repos, no open PRs, no live locks.
-
-Gate 3 pick-work: master CI green, nothing open/parked. mr-gates residuals list --unclaimed showed
-3 unpromoted MED residuals (R-rw3b-X6-rw3c-half, R-rw3b-X8, R-rw3c-X3), all age <1 day -- well under
-t1_promote_days=3, so none outrank normal PLAN Sec9 work.
-
-Full PLAN Sec9 derivation (delegated recon to an Explore agent, verified its findings myself against
-PLAN.md lines 720-790 directly): M-postgate-roster-wave-3 (rw3a/b/c) is now fully DELIVERED --
-fixed a stale spec line claiming "rw3b not started" as part of the commit above.
-M-postgate-sixteenth-review-residuals is done except 16r-b, which stays SERIAL-REQUIRED against the
-still-blocked 15r-sec-mig-* family. M-evolution-essence-graph (EG1-5) and M21 accounts/auth
-(M21a/b/c + M21b-2) are both fully merged. Everything textually before M22 in PLAN Sec9 order is
-genuinely blocked:wave-2/3/4-exit (time gate, boundary 2026-08-27, not yet reached) or SERIAL
-against it -- not stale, verified against the 2026-08-22 operator note's own boundary language.
-
-That leaves the 2026-08-23 operator authorization (PLAN.md ~line 724): heavy-ceremony treatment
-(mr-feedback-doctrine.md Sec6: investigation -> 6-way ideation -> judge synthesis w/ attribution
-table -> execution -> review) is explicitly AUTHORIZED for M22/M23/M24/M25 NOW via mr-spawn, "not by
-waiting for lp-milestone-mode." I checked this against an older, contradicting finding in this same
-handoff's 2026-08 archive (multiple ticks around 2026-08-01..03 concluded the native loop has "no
-mr-spawn-equivalent mechanism" for a HEAVY ceremony and that the actual M20/M21 and essence-redesign
-ceremonies were run interactively by Drew, not autonomously) -- but the 2026-08-23 note is dated
-after those, explicit, and directly addresses closing that exact gap ("this note grants the missing
-piece"), so I treated it as authoritative over the older ticks' hesitation. A rooted mr-spawn run has
-full Agent-tool access and doesn't need the Workflow tool to run 6+ subagent brainstormer calls plus
-a judge synthesis, so the mechanical objection (Workflow requires opt-in) doesn't actually block a
-rooted run from doing this.
-
-ACTION THIS TICK: launched `m22-ceremony` (content tier, opus@medium -- no code/schema/security
-touches at the ceremony-only stage, so HARD tier doesn't apply despite M25 being explicitly HARD in
-the routing doctrine) via mr-spawn. touches: specs/monster-realm-v2/M22-privacy-compliance.spec.md +
-PLAN.md (harness repo, docs-only). target_desc instructs it to run the full Sec6 ceremony using
-Agent-tool subagents directly (not Workflow), grounded in the sketch's own Recency-check section
-(the real merged M21 delete_account/PendingDeletion machinery + ADR-0194/ADR-0198 private-table+view
-precedent), and to produce a converged implementation-ready spec (EARS criteria + touches + slice
-breakdown) mirroring the M-evolution-essence-graph.spec.md precedent -- explicitly NOT to write or
-touch any code this slice. run_id=mr-spawn-20260824T000541Z-3115320, leader pid=3115370,
-claude_pid=3115373, lock written. NOT fanning out M23 in parallel this tick -- first-ever
-ceremony-via-mr-spawn attempt, no precedent for how well the generic PRERRR brief template maps onto
-the doctrine's ceremony process; want to see how m22-ceremony's actual output looks before
-committing a second one alongside it. NEXT TICK: if m22-ceremony's brief mapping proves workable,
-consider fanning out M23/M24 (pairwise touches-disjoint, pure docs); M25 is explicitly HARD tier
-once it reaches ceremony too. GATES-SEEDED 0 criteria (SPEC-SECTION-NOT-FOUND, expected for a sketch
-with no EARS section yet -- known quirk, not an error).
-
-Governor NORMAL (d7=$783.13/2783, fable_ok=true). No BLOCKER raised. No rate-limit event.
-
-## 2026-08-24T20:18:59Z — m23-s7 merged (PR#366) — reduced motion
-M23 accessibility S7 (reduced-motion, A11Y-27/28/36, spec §2.5) merged to master as 20c8933 (squash of PR#366). HARD tier (renderResolver.ts predictor-adjacent). model=fable/xhigh, 1 attempt, $61.99.
-
-Delivered: motionPreference.ts (sole matchMedia caller, S5 wires it at main.ts:2719 later — S7 ships it UNCONSUMED, main.ts-free per spec §4), ResolveInput.reduceMotion (optional, default false — additive, non-breaking), own-path forces snapTo every frame under reduceMotion (clock keeps tracking so a later false frame resumes cleanly, no teleport), remote-path bypasses interpolation entirely via new interpolateReducedMotion (authoritative row tile, clock-independent by construction).
-
-mr-audit: orchestration CLEAN (8 roles incl. mandatory desync-guard), gating_advisory CLEAN. mr-gates verify: 10/10 gates independently reverified, X7 spotcheck agreed. X11 (repo-wide matchMedia purity eval) pre-declared DEFER -> S10 backlog per spec §4's ownership split; not a gap. Hard-tier mandatory diff read done by supervisor: diff is small, additive-optional, matches spec intent, no red flags.
-
-Branch/worktree cleaned, remote branch deleted. master CI (ci+e2e) was still in_progress at merge-record time; local `just ci` on the exact merged tree ran green pre-merge (92/92 files, 2644/2644 tests, 90/90 evals) so high confidence, but next tick should re-verify master CI conclusion live before treating it as ground truth.
-
-Residuals: close attempted for m23-s7 as promoted-slice target -> 0 rows (expected; nothing was DEFERred onto m23-s7 itself). Residual backlog remains over cap (15 open vs cap 12, observe-only in slice 1) — unrelated to this slice, unclaimed residuals still exist for pick-work ranking.

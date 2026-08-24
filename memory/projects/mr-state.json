@@ -1,18 +1,30 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-24T19:34:00Z",
- "updated_by": "mr-sup-native-20260824T193125Z-830859",
+ "updated_utc": "2026-08-24T21:05:00Z",
+ "updated_by": "mr-sup-native-20260824T210017Z-945121",
  "master": {
   "sha": "20c893348152ac9f143890e3935067a69fa863fe",
-  "ci": "in_progress-at-record",
+  "ci": "GREEN, confirmed live this tick (run 32772891486, conclusion=success, headSha=20c8933...)",
   "nightly": "fixed_at_a40cb81_confirmed_green"
  },
  "harness_main": {
-  "sha": "87d9abf",
-  "ci": "no-remote-ci-local-gate-green; chore(mr-sup) reconciliation commit 87d9abf (this tick, covers the prior 17:10Z tick's un-committed records)"
+  "sha": "e545617",
+  "ci": "no-remote-ci-local-gate-green; chore(mr-sup) reconciliation commit e545617 (this tick, covers the 19:34Z tick's un-committed records for m23-s3 PR#365 + m23-s7 PR#366)"
  },
  "adr_next_free": 206,
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "m23-s4",
+   "repo": "project",
+   "pid": 947588,
+   "claude_pid": 947591,
+   "model": "opus",
+   "effort": "high",
+   "tier": "routine",
+   "touches": ["client/src/ui/battleView.ts", "client/src/ui/boxView.ts", "client/src/ui/raisingView.ts", "client/src/ui/evolutionView.ts", "client/src/ui/claimView.ts", "client/src/render/world.ts"],
+   "launched_utc": "2026-08-24T21:02:27Z"
+  }
+ ],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -20,7 +32,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "m23-s7 merged PR#366 (20c8933); master CI in_progress at record time, local merged-tree just-ci green pre-merge; next tick re-verify live",
+ "notes": "Native tick mr-sup-native-20260824T210017Z-945121 (21:00Z): gate-0 found the 19:34Z tick's bookkeeping (mr-state.json/handoff/archive) uncommitted despite having merged both m23-s3 (PR#365) and m23-s7 (PR#366) -- reconciled via commit e545617 (future-prompts.md untouched, unrelated user scratch). Live-verified: no per-run locks, no chain-owner mutex, no open PRs either repo, no worktrees beyond canonical checkout, master green at 20c8933. Residuals: 15 open unclaimed, max age 0.98d, all far under t1_promote_days=3 -- none outrank new work (over-cap 15 vs 12 remains observe-only, slice 1). M23 spine S0/S1/S2/S3/S7 all merged; S4 (after: S1,S2) is the sole unblocked slot -- launched solo (routine tier, opus@high; no schema/reducer/netcode/security touch). mr-spawn LAUNCHED cleanly (leader=947588). GATES-SEEDED criteria=0/SPEC-SECTION-NOT-FOUND (4th occurrence s0/s1/s3/s4, known benign quirk -- flag for merge-time adjudication). Governor NORMAL (d7=$1228.69/2783 eff., fable_ok=true, unaffected -- opus tier). No BLOCKER.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],
@@ -50,5 +62,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-24T18:00:13Z"
+ "last_tick_utc": "2026-08-24T21:00:17Z"
 }

@@ -4263,3 +4263,56 @@ done). Ledger seeded `SPEC-SECTION-NOT-FOUND / 0 criteria` for the THIRD M23 sli
 master is still at 0953db7. Whoever merges should run the step-10 refresh.
 
 
+## 2026-08-24T00:06:22Z — launch m22-ceremony (HEAVY design ceremony, per 2026-08-23 operator authorization)
+Native tick (rid=native-20260824T000013Z-3111031). Reconciled a previous-tick gap first: the
+23:33-23:40Z tick had merged PR#358 (rw3c) and updated mr-state.json/handoff/spec locally but
+never committed to the harness repo -- committed those (harness main 48130ef) and pushed, leaving
+two unrelated human stray edits (future-prompts.md, gdd.md) untouched and uncommitted, as usual for
+strays. Re-verified master green at 12af096 (both local git log and live `gh run list`), remotes
+match on both repos, no open PRs, no live locks.
+
+Gate 3 pick-work: master CI green, nothing open/parked. mr-gates residuals list --unclaimed showed
+3 unpromoted MED residuals (R-rw3b-X6-rw3c-half, R-rw3b-X8, R-rw3c-X3), all age <1 day -- well under
+t1_promote_days=3, so none outrank normal PLAN Sec9 work.
+
+Full PLAN Sec9 derivation (delegated recon to an Explore agent, verified its findings myself against
+PLAN.md lines 720-790 directly): M-postgate-roster-wave-3 (rw3a/b/c) is now fully DELIVERED --
+fixed a stale spec line claiming "rw3b not started" as part of the commit above.
+M-postgate-sixteenth-review-residuals is done except 16r-b, which stays SERIAL-REQUIRED against the
+still-blocked 15r-sec-mig-* family. M-evolution-essence-graph (EG1-5) and M21 accounts/auth
+(M21a/b/c + M21b-2) are both fully merged. Everything textually before M22 in PLAN Sec9 order is
+genuinely blocked:wave-2/3/4-exit (time gate, boundary 2026-08-27, not yet reached) or SERIAL
+against it -- not stale, verified against the 2026-08-22 operator note's own boundary language.
+
+That leaves the 2026-08-23 operator authorization (PLAN.md ~line 724): heavy-ceremony treatment
+(mr-feedback-doctrine.md Sec6: investigation -> 6-way ideation -> judge synthesis w/ attribution
+table -> execution -> review) is explicitly AUTHORIZED for M22/M23/M24/M25 NOW via mr-spawn, "not by
+waiting for lp-milestone-mode." I checked this against an older, contradicting finding in this same
+handoff's 2026-08 archive (multiple ticks around 2026-08-01..03 concluded the native loop has "no
+mr-spawn-equivalent mechanism" for a HEAVY ceremony and that the actual M20/M21 and essence-redesign
+ceremonies were run interactively by Drew, not autonomously) -- but the 2026-08-23 note is dated
+after those, explicit, and directly addresses closing that exact gap ("this note grants the missing
+piece"), so I treated it as authoritative over the older ticks' hesitation. A rooted mr-spawn run has
+full Agent-tool access and doesn't need the Workflow tool to run 6+ subagent brainstormer calls plus
+a judge synthesis, so the mechanical objection (Workflow requires opt-in) doesn't actually block a
+rooted run from doing this.
+
+ACTION THIS TICK: launched `m22-ceremony` (content tier, opus@medium -- no code/schema/security
+touches at the ceremony-only stage, so HARD tier doesn't apply despite M25 being explicitly HARD in
+the routing doctrine) via mr-spawn. touches: specs/monster-realm-v2/M22-privacy-compliance.spec.md +
+PLAN.md (harness repo, docs-only). target_desc instructs it to run the full Sec6 ceremony using
+Agent-tool subagents directly (not Workflow), grounded in the sketch's own Recency-check section
+(the real merged M21 delete_account/PendingDeletion machinery + ADR-0194/ADR-0198 private-table+view
+precedent), and to produce a converged implementation-ready spec (EARS criteria + touches + slice
+breakdown) mirroring the M-evolution-essence-graph.spec.md precedent -- explicitly NOT to write or
+touch any code this slice. run_id=mr-spawn-20260824T000541Z-3115320, leader pid=3115370,
+claude_pid=3115373, lock written. NOT fanning out M23 in parallel this tick -- first-ever
+ceremony-via-mr-spawn attempt, no precedent for how well the generic PRERRR brief template maps onto
+the doctrine's ceremony process; want to see how m22-ceremony's actual output looks before
+committing a second one alongside it. NEXT TICK: if m22-ceremony's brief mapping proves workable,
+consider fanning out M23/M24 (pairwise touches-disjoint, pure docs); M25 is explicitly HARD tier
+once it reaches ceremony too. GATES-SEEDED 0 criteria (SPEC-SECTION-NOT-FOUND, expected for a sketch
+with no EARS section yet -- known quirk, not an error).
+
+Governor NORMAL (d7=$783.13/2783, fable_ok=true). No BLOCKER raised. No rate-limit event.
+
