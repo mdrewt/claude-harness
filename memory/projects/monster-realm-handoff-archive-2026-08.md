@@ -4174,3 +4174,92 @@ Next candidate after rw3b merges: rw3c (encounter placement/tuning, `after: rw3b
 ## 2026-08-23T21:31:56Z — rw3b merged — roster wave 3 (Electric + Light) landed
 PR https://github.com/mdrewt/monster-realm/pull/357 (slice/rw3b -> master) squash-merged as ee2e0930, worktree+branch cleaned. mr-audit: orchestration CLEAN, gating_advisory CLEAN, mandatory_read=false. Acceptance ledger: 12/13 met, 1 legitimately DEFERred (RW3-08, mechanically unsatisfiable as written for any slice adding an evolution edge/derived species — two pre-existing exact-pin tests were extended field-for-field, never weakened), 0 unmet; mr-gates verify independently re-confirmed 12/12 mechanical gates fresh (first pass showed false EVIDENCE-MISMATCH on X1-X5/X10/X11 from a supervisor-shell PATH gap missing ~/.cargo/bin, not a real slice defect — re-ran with PATH fixed and all agreed). Spotcheck X6 held under adversarial re-read. Two residuals emitted to backlog: R-rw3b-X6-rw3c-half (rw3c must place wave-3 tier-0 species in an encounter table) and R-rw3b-X8 (RW3-08 reword needed — both too fresh (<1h) to promote this tick, left unclaimed for a future Pick-work gate). Diff included touches-delta beyond declared touches (two id baselines, evolution-path-edge-ids.json, append-only-ids.eval.mjs, plus doc-set ARCHITECTURE.md/DIGEST.md) — disclosed and reasoned in the PR body as the standard content-id side effect; no sibling slice was in-flight to collide with. Roster now 16 -> 20 forms (species 40-43: Voltkit/Voltarion Electric, Aurelet/Aurelith Light). ADR-0204. master CI was still in_progress at merge-record time (post-merge re-verify pending a future tick/event) — the identical commit's PR checks (ci+e2e) were green. Queue empty, no inflight, nothing launched this tick — next tick needs a full PLAN §9 derivation to pick new work.
 
+## 2026-08-23T21:21:15Z — rw3b PR#357 e2e flake — reran, delegated to mr-ci-watch
+PR #357 (rw3b, roster wave 3) mergeStateStatus=UNSTABLE: ci job passed, e2e job failed on client/e2e/monster-privacy.spec.ts:394 (PvP battle overlay Accept-button click, DOM-detachment/pointer-intercept retry signature). This file is outside rw3b's declared touches: (content/species/skills/evolution_paths, server-module CONTENT_VERSION 19->20, evals, art gen) -- rw3b never touches client PvP/battle-overlay code. Master's own most recent CI run (17:01Z) passed this exact e2e job cleanly, and the prior 16:46Z master run's e2e job also passed (only the outer 'ci' job failed that run, unrelated). Adjudicated as flake, not a real regression. Reran the failed job: gh run rerun 32666332349 --failed. Delegated the wait to mr-ci-watch (setsid, pid 2873765) rather than polling. Supervisor did not merge; next event tick resumes the merge decision once mr-ci-watch reports back.
+
+
+## 2026-08-23T22:02:26Z — rw3c LAUNCHED (M-postgate-roster-wave-3 obtainability + tuning)
+**Slice:** rw3c — wild placement for wave-3 tier-0 forms (species 40 Voltkit Electric, 42 Aurelet Light) in the zone-0 encounter table + level/weight banding. **Repo:** project (mdrewt/monster-realm). **Model:** opus@medium (tier=content). run_id=mr-spawn-20260823T220158Z-2902308, session_leader=2902365.
+
+**Why now:** rw3b merged this session (PR#357, ee2e093). rw3c is after:rw3b per its spec's candidate-slices table and was the only unblocked, unstarted item in the queue (queue[] empty, no promotable residuals -- R-rw3b-X6-rw3c-half and R-rw3b-X8 both <1h old). This closes the RW3-06 second clause and the X6 residual rw3b disclosed.
+
+**Briefed constraints:** RW3-06 (tier-0 only, never an evolution-edge target -- R6 in content.rs), RW3-07 (zone-0 table byte-identical except additive entries -- recruit.spec.ts flake budgets depend on the exact existing weights), RW3-08 (CONTENT_VERSION-only Rust touch), RW3-09 (own eval+test, live CONTENT_VERSION bump, regenerated content-hash.json). No new ADR reserved (rw3c doesn't need one per spec Notes).
+
+**Housekeeping done before launch this tick:** committed+pushed the previous tick's uncommitted rw3b-merge bookkeeping (harness commit 2e48ed9, mr-state.json + handoff + archive). Reaped the stale rw3b per-run lock (dead session_leader 2700302) via mr-unlock. Chain-owner mutex taken for this tick's derivation, will release at tick end.
+
+**Not actioned:** decision issue mdrewt/monster-realm#342 (OBS-48 procedures re-adjudication) is explicitly record-and-ignore per its own text -- left open, untouched.
+
+## 2026-08-23T23:39:30Z — rw3c MERGED (PR#358, 12af096)
+rw3c (M-postgate-roster-wave-3) squash-merged: master ee2e093 -> 12af096. Zone-1 wild
+placement for wave-3 tier-0 forms (Voltkit=40, Aurelet=42); CONTENT_VERSION 20->21.
+New invariant: band max_level strictly below lowest outgoing evolution-edge min_level
+(gated in both rw3c_wave3_tuning.rs and the eval, scoped to wave-3 set only). Red-team
+found+closed 3 gaps (F1 partial-set vacuity, F2 block-comment hygiene, F3 shadow zone-0
+table) before ship.
+
+Adjudicated FLAGGED: pt_d3_tuning.rs pins extended (not weakened) 40/42 into the
+wild-legal set + count 7->9 — disclosed touches-delta, matches ADR-0204:81,103. mr-audit
+orchestration CLEAN. mr-gates 9/10 met, X3 deferred to backlog (RW3-08 wording is
+mechanically unsatisfiable as worded for any placement slice — duplicate of open
+R-rw3b-X8, not a new issue).
+
+Worktree removed, slice/rw3c branch deleted (local+remote). Master CI (run 32674101030)
+was still in_progress at record time — verify green on next tick before further action
+on top of 12af096.
+
+Follow-ups (not touched, outside this slice's scope): species/070-wave3.ron:20-22 stale
+comment; evals/content-version.eval.mjs --update flag doesn't exist; lib.rs
+CONTENT_VERSION changelog missing v19-21 entries; promote band-below-gate rule to a real
+R13 (blocked on pre-existing species-7 violation).
+
+## 2026-08-24 — m23-s3 PR OPEN (PR#365) — awaiting supervisor merge
+
+**Slice:** m23-s3 (M23 accessibility S3 — static-shell view wiring, two mechanisms).
+**Terminal state:** PR open + full local `just ci` GREEN + remote CI running. **NOT merged — supervisor owns `gh pr merge`.**
+**PR:** https://github.com/mdrewt/monster-realm/pull/365 (`slice/m23-s3` -> `master`, base 0953db7)
+**Worktree:** `.claude/worktrees/m23-s3` (kept; wasm pkg built there). Branch pushed, tree clean.
+**Acceptance:** `Acceptance: 9/9 met, 0 deferred, 0 unmet — m23-s3 seed:e3b0c44298fc1c14` (byte-matches the PR body line).
+**Local gate:** `just ci` exit 0 — 91 client test files / 2628 tests (baseline 87 / 2542), lint 0 errors, 0 eval FAILs.
+
+**What landed:** all ten static-shell views delegate to m23-s1's `openOverlayA11y`/`closeOverlayA11y`;
+seven via `show()`/`hide()`, three (`dialogueView`, `questLogView`, `healView` — no `show()` exists) via
+the `render(vm|null)` null<->non-null EDGE. Both view-local deferred `.focus()` calls deleted
+(`renameView.ts:102`, `tradeProposeView.ts:124`); `overlayA11y.ts` is now the sole owner of the defer,
+which makes A11Y-15 satisfiable. Edge derived from the existing `visible` getter — no new state.
+
+**Orchestration:** planner -> reviewer + red-team + /simplify on the plan (parallel) -> tester (separate
+agent) wrote the RED suite -> red-team wrote 14 wrong implementations against it -> orchestrator
+implemented. `/tmp/mr_warn_m23-s3` (LANDING PATTERN) appeared right after the tests went green, so the
+post-impl review fan-out was deliberately NOT spawned; the pre-impl red-team cheat pass had already
+constructed and measured a correct implementation (62/62 green, whole client suite green) which covers
+most of that lens's value. **A verifier pass was not run — supervisor may want one before merge.**
+
+**Three green-but-wrong holes the red-team found and closed BEFORE implementing** (all in the tests):
+(1) the `.focus(` scan's CONTROL fixture miscounted its own planted occurrences, so the gate failed even
+on a CORRECT impl and never reached the real scan; (2) `-CLOSE-UNGUARDED` covered 4 of 10 views, so
+guarding `hide()` on the other six shipped 62/62 green while permanently leaking a focus trap (ledger X9
+widened to ten); (3) the comment/string stripper was swallowed by a regex literal containing a quote,
+hiding a real duplicate deferred `.focus(` in seven views.
+
+**FOR S4 (the next M23 slice) — read before planning:**
+- **D7 call-ordering is PROVABLY UNGATED.** An open-first implementation measures 62/62 green. S3's ten
+  overlays are safe either way (every anchor is a static constructor-time child) but S4's four sit beside
+  `replaceChildren()` rebuilds, so **S4 must carry the open-last obligation in its own plan** rather than
+  inherit it from S3's template.
+- S4's four overlays share ONE `#app` root; S1's A12 close-before-open contract still applies. S3's
+  template alone is NOT sufficient there.
+- **Latent S1 gap, out of every slice's `touches:` so far:** `openOverlayA11y` writes `role`/`aria-modal`
+  BEFORE calling `t(meta.labelKey)`, which throws by design on an unwired key. On a throw the DOM keeps
+  both attributes with no record stored, so the later close no-ops and can never strip them —
+  contradicting that module's own "no half-open state" header claim. Unreachable today (all 16 keys
+  pinned present). Needs an owner.
+
+**Other flags:** spec §9.7 is factually wrong ("the only `innerHTML` write in the view layer" — false;
+questLogView/healView/shopView/tradeView all write it; only the one named `dialogueView.ts:30` fix was
+done). Ledger seeded `SPEC-SECTION-NOT-FOUND / 0 criteria` for the THIRD M23 slice running (s0, s1, s3)
+— M23's EARS block is §6, not §7.x; worth fixing in the seeder.
+
+**Code graphs NOT refreshed** — doctrine says re-index the canonical checkout post-merge only, and
+master is still at 0953db7. Whoever merges should run the step-10 refresh.
+
+
