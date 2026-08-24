@@ -31,9 +31,9 @@ two load-bearing facts that reshape the sketch's plan:
 `client/index.html`. There are exactly two `.focus()` calls in the whole client, both
 `setTimeout(…,0)`-deferred (`client/src/ui/renameView.ts:102`, `client/src/ui/tradeProposeView.ts:124`).
 But `client/src/ui/overlayRegistry.ts` (226 lines, ADR-0162–0164, merged) is a pure modality core whose
-`OVERLAY_TIERS` at `client/src/ui/overlayRegistry.ts:75` is typed `Readonly<Record<OverlayId, OverlayTier>>`
+`OVERLAY_TIERS` at `client/src/ui/overlayRegistry.ts:76` is typed `Readonly<Record<OverlayId, OverlayTier>>`
 — **omitting an overlay id is a COMPILE error**, and `OVERLAY_IDS` is *derived* from it at
-`client/src/ui/overlayRegistry.ts:99` rather than hand-maintained. That is the anti-drift device this
+`client/src/ui/overlayRegistry.ts:100` rather than hand-maintained. That is the anti-drift device this
 milestone needs, already built and already exercised by 1078 lines of tests
 (`client/src/ui/overlayRegistry.test.ts`).
 
@@ -70,10 +70,10 @@ beside `OVERLAY_TIERS`, and is the single SSOT for every overlay's ARIA role, ac
 initial-focus selector and dismiss semantics. Two thunk-free helpers `openOverlayA11y(id, root)` /
 `closeOverlayA11y(id)` in a new `client/src/ui/overlayA11y.ts` consume it; no view invents its own ARIA.**
 
-Grounded, not asserted. `OVERLAY_TIERS` (`client/src/ui/overlayRegistry.ts:75`) already makes omission a
+Grounded, not asserted. `OVERLAY_TIERS` (`client/src/ui/overlayRegistry.ts:76`) already makes omission a
 compile error and `OVERLAY_IDS` derived (`:99`) — the exact anti-drift device the module's own header
 records as a lesson already paid for. The tier↔modality correlation is real and visible at
-`client/src/ui/overlayRegistry.ts:75`–`91`: every `GUARD_ONLY` overlay is deny-not-hide, i.e. modal, and
+`client/src/ui/overlayRegistry.ts:76`–`91`: every `GUARD_ONLY` overlay is deny-not-hide, i.e. modal, and
 `battleView` is the sole `EXCLUSIVE_TOP`. Splitting role and tier into two hand-kept tables re-creates
 precisely the drift `OVERLAY_IDS` was built against.
 
@@ -81,7 +81,7 @@ precisely the drift `OVERLAY_IDS` was built against.
 
 | Rejected | Falsified by |
 |---|---|
-| An `A11yState` projection emitted by every `*Model.ts` | Duplicates the totality guarantee `client/src/ui/overlayRegistry.ts:75` already provides for free, and scatters a11y state across sixteen model files — the opposite of SSOT. Self-falsified in ideation: a `{role:'generic',label:''}` stub satisfies any presence check. |
+| An `A11yState` projection emitted by every `*Model.ts` | Duplicates the totality guarantee `client/src/ui/overlayRegistry.ts:76` already provides for free, and scatters a11y state across sixteen model files — the opposite of SSOT. Self-falsified in ideation: a `{role:'generic',label:''}` stub satisfies any presence check. |
 | Per-view ad-hoc ARIA attributes | No completeness oracle. `client/src/ui/overlayRegistry.ts`'s own header records this (the "A7" episode) as the mistake already made once and fixed structurally. |
 | Enable the PixiJS `AccessibilitySystem` for the overlays | `eventMode` = 0 hits repo-wide; the canvas mounted at `client/src/render/world.ts:71` is a scrolling tilemap with zero interactive stage objects; the system's `deactivateOnMouseMove: true` default drops the shadow overlay mid-read. Wrong substrate — the overlays are *already real DOM*. See §3. |
 | Bolt a focus trap onto `client/src/main.ts`'s `window` keydown listener | Re-creates the hand-maintained-guard-list anti-pattern that uxd3-c (ADR-0164) retired in favour of `canOpen`. |
@@ -154,7 +154,7 @@ three citations:
 1. **The `role="application"` host cannot be `#app`.** `client/src/main.ts:2180` resolves `#app` as
    `mount` and passes it to `renderer.init(mount, rawMap)`, where `client/src/render/world.ts:71` does
    `mount.appendChild(app.canvas)` — **and then passes the same `mount` to
-   `new BattleViewClass(mount, …)` (`client/src/main.ts:2211`), `new BoxViewClass(mount, …)` (`:2199`),
+   `new BattleViewClass(mount, …)` (`client/src/main.ts:2211`), `new BoxViewClass(mount, …)` (`:2184`),
    `new RaisingViewClass(mount, …)` (`:2266`) and `new EvolutionViewClass(mount, …)` (`:2296`).**
    `role="application"` on `#app` would swallow four dialogs into an application region and destroy
    their dialog semantics. **DECIDED: the attributes go on `app.canvas` itself**, set in
@@ -248,7 +248,7 @@ disqualifying. Four edits and one non-edit:
 - The HP bar's `transition:width 0.3s` (`client/src/ui/battleView.ts:222` — the **only** CSS transition
   in the codebase) is guarded by `@media (prefers-reduced-motion: reduce)` in the new stylesheet: a
   belt-and-braces CSS path with no JS dependency.
-- **Camera: no change.** `FollowCamera.offsetFor` (`client/src/render/camera.ts:18`) already snaps with
+- **Camera: no change.** `FollowCamera.offsetFor` (`client/src/render/camera.ts:40`) already snaps with
   no easing. Inventing camera scope is rejected.
 
 **Netcode-untouched proof.** `reduceMotion` reaches only `resolve()`, which by its own header never
@@ -263,7 +263,7 @@ DOM layer: every status/affinity/outcome badge that is colour-only gains a **tex
 alongside the colour, and the requirement is pushed into the **content pipeline** — a new `StatusEffect`
 or `Affinity` without an icon/text token fails content validation (A11Y-29). The HP bar
 (`client/src/ui/battleView.ts:221`) already carries numeric text at `:226`, and evolution gates already
-use `✓`/`•` glyphs (`client/src/ui/evolutionView.ts:181`), so the DOM surface is smaller than it looks.
+use `✓`/`•` glyphs (`client/src/ui/evolutionView.ts:186`), so the DOM surface is smaller than it looks.
 
 Canvas layer: `ACTION_TINT` (`client/src/render/placeholderAssets.ts:15`) is the entire visual body of
 every sprite and the facing notch (`client/src/render/placeholderAssets.ts:21`) its only direction cue —
@@ -375,6 +375,12 @@ draft also touched `main.ts` for the startup preference read; that read is inste
 `motionPreference.ts` and consumed at the existing render-loop call site inside S5's window, so S7 stays
 `main.ts`-free.
 
+**Co-located unit tests ride with their source slice.** The four specs §5.5 names are owned by the
+slice that owns their subject — `focusTrap.test.ts`/`liveRegion.test.ts`/`announcements.test.ts` with S1,
+`renderResolver.test.ts` with S7 — and only `overlayA11yWiring.test.ts` (which spans every view and so
+cannot exist before S3/S4 land) is listed under S10. A slice that defers its own co-located tests to S10
+is mis-scoped, not efficient.
+
 ### 4.1 Post-integration verification (the milestone's real DoD)
 
 Slices passing in isolation does not prove they work together. After the slices merge (serial,
@@ -407,13 +413,17 @@ parsed textually from `client/src/ui/overlayRegistry.ts:36` vs `OVERLAY_A11Y`'s 
 | `[A11Y-02]` | `labelKey` matches `/^a11y\.[a-z0-9.]+$/`, is non-empty after trim, contains no `{`/`}` (the ICU ban, §2.8), and is unique across the sixteen |
 | `[A11Y-03]` | no id whose tier is `EXCLUSIVE_TOP`/`GUARD_ONLY` declares `dismissible: false` |
 | `[A11Y-04]` | every `labelKey` resolves to a non-empty `a11yCopy.ts` entry, and no copy entry is an orphan (both directions) |
+| `[A11Y-15]` | no `client/src/ui/*View.ts` contains a literal `.focus(` call — the single deferred focus lives only in `overlayA11y.ts` (§2.2); the scan is comment- and string-aware so a `.focus(` inside a comment is not a false positive, and it exempts `*.test.ts` |
 
 **BAD proof-of-teeth fixtures:** a 17th union member absent from the table (`01`); `labelKey:'a11y.x'`
 duplicated on two ids (`02`); `labelKey:'a11y.count.{n}'` (`02`, ICU ban); `helpView` with
-`dismissible:false` (`03`); a `labelKey` with no copy entry, and a copy entry no key references (`04`).
+`dismissible:false` (`03`); a `labelKey` with no copy entry, and a copy entry no key references (`04`); a
+`renameView.ts` that still calls `this.#input.focus()` (`15`).
 **GOOD hostile-but-correct fixture:** all sixteen present with `role` **REUSED** across overlays
 (15× `dialog`, 1× `alertdialog`) and textually identical `initialFocusSelector`s — must PASS, proving the
 oracle does not wrongly demand per-overlay uniqueness.
+A second GOOD fixture for `[A11Y-15]`: a `*View.ts` whose *doc comment* mentions `.focus(` and a
+`*View.test.ts` that asserts on focus — both must PASS, proving the scan is not a naive substring grep.
 **Vacuity attack (declared and killed):** the manifest is pure theatre unless a consumer reads it back —
 `[A11Y-01..04]` alone pass a build in which no view ever reads `OVERLAY_A11Y`. Killed by §5.2 (static
 side) and §5.5 (constructed side); both are **hard requirements**, not "should pair with". `role` being a
@@ -658,7 +668,7 @@ DOM overlay), these could go stale with only the cross-reference to catch it.
    mandatory. The four parity/determinism evals are the mechanical proof; a green run is necessary, not
    sufficient.
 7. **An incidental ADR-0135 inconsistency was found and is NOT fixed here.**
-   `client/src/ui/dialogueView.ts:29` does `this.choicesContainer.innerHTML = '';` — the only
+   `client/src/ui/dialogueView.ts:30` does `this.choicesContainer.innerHTML = '';` — the only
    `innerHTML` write in the view layer, in a file otherwise governed by the textContent-only firewall.
    It is a clearing assignment with a constant, so it is not an injection vector today, but it is
    exactly the line a future edit would extend. S3 already touches this file; **the S3 implementer
@@ -684,7 +694,7 @@ question (2026-07-27).
 
 | Lens | Unique elements ADOPTED (and where) | Unique elements REJECTED (and why) |
 |---|---|---|
-| **B1 — unbiased (no code access)** | `announcementsFor` as a **pure** reducer incl. the coalescing/rate-limit criterion → §2.4, S1, A11Y-8/9. "Reduced motion must not be readable by the netcode module" as an **import-boundary lint** → §5.6, A11Y-28 (made mechanical; B1 flagged it as assumed). "A new StatusEffect/Affinity without an icon/text token fails **content validation**" → §2.6, S8, A11Y-29. "No positive tabindex" → `[A11Y-T5]`, A11Y-26. Two operator rulings → §8.1, §8.3. | The `toA11yState` per-model projection — duplicates the totality `client/src/ui/overlayRegistry.ts:75` gives free and scatters SSOT across sixteen files; self-falsified in its own review. The Pixi text-mirror slices — falsified by 0 `eventMode` hits. The tab-order test — circular, per B1 itself. The rebind-conflict criterion — remapping is cut (§3). A `localStorage` keymap — no localStorage exists (§2.9). "Within one render frame" — untestable. A shipped broken-fixture overlay — a 17th `OverlayId`'s compile ripple; intent preserved as inline BAD fixtures. **Net: six criteria and two escalations, zero adopted architecture.** |
+| **B1 — unbiased (no code access)** | `announcementsFor` as a **pure** reducer incl. the coalescing/rate-limit criterion → §2.4, S1, A11Y-8/9. "Reduced motion must not be readable by the netcode module" as an **import-boundary lint** → §5.6, A11Y-28 (made mechanical; B1 flagged it as assumed). "A new StatusEffect/Affinity without an icon/text token fails **content validation**" → §2.6, S8, A11Y-29. "No positive tabindex" → `[A11Y-T5]`, A11Y-26. Two operator rulings → §8.1, §8.3. | The `toA11yState` per-model projection — duplicates the totality `client/src/ui/overlayRegistry.ts:76` gives free and scatters SSOT across sixteen files; self-falsified in its own review. The Pixi text-mirror slices — falsified by 0 `eventMode` hits. The tab-order test — circular, per B1 itself. The rebind-conflict criterion — remapping is cut (§3). A `localStorage` keymap — no localStorage exists (§2.9). "Within one render frame" — untestable. A shipped broken-fixture overlay — a 17th `OverlayId`'s compile ripple; intent preserved as inline BAD fixtures. **Net: six criteria and two escalations, zero adopted architecture.** |
 | **B2 — investigation-grounded** | **The central decision** — `OVERLAY_A11Y` as a total table in the registry, argued from the tier↔modality correlation → §2.0/§2.1, S0. The **`main.ts` serialization rule** (exactly one slice may touch it; a second touch must sequence after) → §4, S5. "`initialFocusSelector` resolves for all sixteen" as one parameterised loop → A11Y-14, §5.5. Dismissibility-vs-tier → `[A11Y-03]`, A11Y-5. The `DOM_SHELLS` pin → A11Y-18. The finding that the two deferred `.focus()` calls will **race** a trap-on-show → §2.2, S3, A11Y-15. `evolutionView`'s `em`-vs-`px` normalisation → §2.7, S9. Both of its self-review vacuity fixes (allowed-enum → a closed TS union; `contains(activeElement)` → identity + tag assertion). | "The help overlay lists every bound hotkey" — already enforced by `client/src/ui/helpModel.ts`'s MM-KEYGLYPH-FROM-HELP-SSOT; duplicate scope. Its S5 as a single 16-file slice — its own review said 2–3, and the click-only correction reduces it to one slice (S6). Its remap slice — cut (§3). **Net: supplied the architecture and the strongest sequencing rule.** |
 | **B3 — assistive-technology user / WCAG-2.2-AA auditor** | The **hotkey↔quick-nav collision** — the milestone's headline defect, absent from the sketch → §1 Fact 2, §2.3. The `role="application"` + focus-gated listener fix → §2.3, A11Y-17/19/20 (**corrected**: the host is `app.canvas`, not `#app`; the gate is scoped to open branches, not blanket). The stable-live-node vs `replaceChildren` tension → §2.4 (**dissolved** by body-level placement). `.sr-only` must be clip-path, never `display:none` → §2.7, A11Y-11. The explicit WCAG SC mapping and the **partial-conformance declaration** → §3.1. NVDA+Chrome primary / VoiceOver+Safari cross-check / mouse unplugged and **screen covered** → A11Y-32. "Announce what is on top after Escape" → A11Y-22. Cross-AT divergence as unoracled → §9.2. | Its "every `<li>` is an inert click-only row" premise → falsified: ten view files already use native `<button>` and the four `<li>` lists carry zero listeners (§1 Fact 2). The list-semantics sweep that followed from it → cut (§3). The world-summary panel → cut as gold-plating. "Complete a full wild battle" as one manual criterion → its own review split it; A11Y-32 scopes to the Box flow instead. `activeElement === canvasRoot` **as stated** → refuted on three citations (§2.3). **Net: found the headline defect and the honest conformance boundary; its central mechanism needed correction.** |
 | **B4 — CI-gate / verification engineer** | **The vacuity attack — the single most valuable artefact of the ideation** → §5 throughout: manifest-is-theatre-without-read-back promoted to a hard requirement (§5.5); the split-`cssText` dodge killed by a **baseline ratchet** (`[A11Y-11]`); the no-op-keydown dodge killed by **callback identity** (`[A11Y-13]`); `NEGATIVE_TABINDEX_INTERACTIVE` (`[A11Y-T3]`); the preventDefault-everything trap counter-check (`[A11Y-T4]`/A11Y-7); "construct the REAL exported class, never a stand-in". The **oracle-tiering frame** → §5 preamble and every `[TIER]` annotation in §6. The two-way ratchet modelled on `dom-shell-coverage-exclusion` → §5.1. Real WCAG luminance maths plus the hostile GOOD fixture avoiding near-`#000`/`#fff` → §5.3. **The CI-cost ruling** (scans → `just eval`; happy-dom → `client-test`; axe+Playwright → a new nightly `just a11y-e2e`, NOT `REQUIRED_JUST_STEPS`) → §5.7. "No mechanical oracle ⇒ manual doc only, NEVER CI-green" → §5 preamble, A11Y-32. | Its claim that hotkeys dispatch on semantic action strings → false; `client/src/main.ts` is a literal `e.code` if-ladder, which is precisely why remapping is cut. Its "every list row is inert" premise → false, which shrinks `keyboard-operable-rows.eval.mjs` from a sweep-detector to a two-site regression ratchet (kept — the ratchet is the point). **Net: owns §5 almost entirely.** |
