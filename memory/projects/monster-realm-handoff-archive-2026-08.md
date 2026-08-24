@@ -4145,3 +4145,29 @@ keep this one simple and auditable).
 master HEAD 8f7fca3 (docs(schema): fix stale battle_action comment) tripped knowledge-bundle-conformance (M8.95b): schema.rs comment edit shifted line numbers without regenerating docs/knowledge/. Opened chore/knowledge-bundle-regen-20260823 -> PR#356 (just knowledge regen, 89 files, mechanical, doc-only), gh pr merge --squash --auto armed, CI wait delegated to mr-ci-watch (detached). No slice work launched this tick pending the fix.
 
 
+## 2026-08-23T18:04:42Z — rw3a MERGED — PR#37, roster-wave-3 spec authored
+Slice rw3a (harness, spec-authorship-only for M-postgate-roster-wave-3: Electric+Light roster wave) merged squash via PR#37 (a842116). Acceptance 8/8 met per mr-gates render; PR body line matched.
+
+Adjudication note: mr-gates verify returned FLAGGED (EVIDENCE-MISMATCH on X1-X6, X8) on the post-merge re-run. Root cause: the verify tool's cwd resolved to $PROJ (monster-realm project checkout) instead of the harness worktree for this harness-repo slice, so the node -e checks ran against the wrong tree and X8's `just ci` hit a Rust/cargo project instead of the harness one. Manually re-ran X1's check from the correct harness worktree cwd — output matched the recorded evidence exactly (skeleton ok=8 of 8). X5's scope check (git diff origin/main...HEAD) also confirmed the diff is scoped to specs/monster-realm-v2/ only, matching the recorded evidence. Treated as a tool artifact, not a slice defect, and merged. mr-audit orchestration + gating_advisory verdicts were both CLEAN (7 agent calls incl. tester/reviewer/verifier roles).
+
+Follow-on unblocked: content-authorship slice (project repo: game-core/content/species/*, game-core/content/skills/*, docs/adr/0204-*.md) for M-postgate-roster-wave-3 is now launchable per the normal content-pack pattern. Reserved project ADR-0204 for it (per rw3a's spec). Not queued this tick — flagging for next tick's derivation.
+
+master (harness) fast-forwarded to a842116, worktree/branch cleaned, per-run lock removed.
+
+
+## 2026-08-23T19:04:12Z — 2026-08-23T19:00Z — reconciliation tick: rw3a merge record fixed, bookkeeping committed, issue #34 closed
+The 18:04Z tick squash-merged rw3a (PR#37) and wrote the ledger MERGED row + a COMPLETE handoff entry, but was cut off before updating mr-state.json (inflight[] still listed rw3a as running) and before committing anything to git. This tick (native-20260823T190015Z-2683700): verified live (no per-run/chain locks, no open PRs either repo, local main == origin/main @ a842116, no resident human session) that rw3a is genuinely done; cleared inflight[], updated master.sha; committed the supervisor-owned files that had been sitting uncommitted across several ticks (this handoff + its 2026-08 archive, mr-state.json, the 15r-a1 spec Delivered annotation, decisions/*.url+.answer.md, the lp-09 patch, branch-cleanup tsv, and 12 per-slice plan/progress memory cards — 33 files, commit 970da52) — left Drew's own future-prompts.md and gdd.md untouched. Also closed github issue #34 (claude-harness) per close-the-loop doctrine: Drew answered it 2026-08-23T11:48:56Z ('yes, no provenance always means it is an operator hold') and a prior tick had consumed the answer into decisions/issue-34.answer.md, but never closed the issue; mr-hold status is HOLD-NONE so this was pure bookkeeping catch-up, not a live gate lift. No new slice launched or merged — reconciliation was this tick's one action. Handoff's rw3a-COMPLETE entry (above) still names rw3b/rw3c as the next queue candidates (project repo, chain serially — both bump CONTENT_VERSION); neither was queue-added this tick, left for the next tick's full derivation.
+
+## 2026-08-23T20:02:10Z — rw3b LAUNCHED (M-postgate-roster-wave-3 content drop)
+**Slice:** rw3b — atomic content drop for M-postgate-roster-wave-3 (Electric+Light species/skills/evolution, ADR-0204). **Repo:** project (mdrewt/monster-realm). **Model:** opus@medium (tier=content). **run_id:** mr-spawn-20260823T200138Z-2700237, session_leader=2700302.
+
+Derivation: queue[] empty, residuals unclaimed empty, no open PRs either repo, no inflight/parked slices, master CI green both repos. Full PLAN §9 derivation (via the handoff's rw3a-COMPLETE entry, which already named rw3b as the unlocked next candidate) landed on rw3b — rw3c is `after: rw3b` per spec (both bump CONTENT_VERSION, not parallel-safe), so only rw3b launched this tick; rw3c stays queued behind it.
+
+**Pre-launch fix:** first `mr-spawn rw3b` returned `REPO-OUT-OF-SYNC` (project local master behind origin/master by 1 — PR#356 knowledge-bundle-regen chore had merged since the last tick). Checked out `master`, `git merge --ff-only origin/master` (8f7fca3→8add7d7, 89 docs/knowledge files only), deleted the now-fully-squash-merged local `chore/knowledge-bundle-regen-20260823` branch (`-D`, remote already gone). Respawn succeeded clean.
+
+**Gate-seed note:** `mr-gates` returned `SPEC-SECTION-NOT-FOUND` (criteria=0 seeded) — the milestone spec's `## Acceptance criteria (EARS)` section (RW3-01..09) is shared across rw3b/rw3c rather than living under a per-slice `### rw3b` heading, so the auto-seeder found nothing to attach. Advisory gap, not a stop condition: at merge-time adjudication, manually cross-check RW3-01/02/03/04/05/08/09 (rw3b's subset; RW3-06/07 are rw3c's) against the ledger read since the mechanical seed has nothing there.
+
+Harness repo had 2 local unpushed `chore(mr-sup):` commits (970da52, a85d229) from the 19:00Z tick — pushed to origin/main this tick (REPO-OUT-OF-SYNC prevention for any future harness-repo slice). Drew's own uncommitted `future-prompts.md`/`gdd.md` edits in the harness tree are untouched (pre-existing strays, old mtimes, no active session detected).
+
+Next candidate after rw3b merges: rw3c (encounter placement/tuning, `after: rw3b`, project repo, not parallel-safe with rw3b).
+
