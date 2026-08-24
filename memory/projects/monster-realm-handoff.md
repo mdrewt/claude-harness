@@ -1,3 +1,51 @@
+## 2026-08-24T22:52Z — m23-s4: PR #367 open, local `just ci` green, remote CI running (SUPERVISOR OWNS THE MERGE)
+**Slice:** m23-s4 · M23 accessibility S4 — the five constructed-shell views (`battleView`, `boxView`,
+`raisingView`, `evolutionView`, `claimView`) wired to S1's `openOverlayA11y`/`closeOverlayA11y`, plus
+`role="application"`/`tabindex="0"`/`aria-label` on the Pixi canvas in `render/world.ts`.
+**Terminal state:** PR https://github.com/mdrewt/monster-realm/pull/367 open, MERGEABLE/UNSTABLE, `ci`
+and `e2e` both IN_PROGRESS at hand-off. Local `just ci` **EXIT=0** (94 client test files / 2684 tests,
+90 evals PASS / 0 FAIL, wasm ok, perf budget ok, secrets clean, observability 8/8).
+**Acceptance:** `9/9 met, 0 deferred, 0 unmet — m23-s4 seed:e3b0c44298fc1c14` (the PR body carries this
+line verbatim). Ledger authored in the PLAN phase (seeded SPEC-SECTION-NOT-FOUND again — M23's EARS
+block is §6, not §7.x, the same seeder miss m23-s0/s1/s2/s3 all hit). X1–X5 transcribe A11Y-13/14/16/17/15
+scoped to the five S4 views; X6–X9 were authored for the S4-owned behaviours those five do not cover.
+Independently re-verified by the `verifier`: 9/9 agree with recorded evidence, `evidence_mismatch: []`.
+**Orchestration:** planner → reviewer + red-team + /simplify (plan) → tester (RED, a different agent) →
+red-team (~24 wrong impls against the suite) → orchestrator implemented → reviewer + verifier +
+desync-guard in parallel → doc-keeper. Red-team found **zero** green-and-wrong survivors; it did find one
+real defect, fixed BY THE TESTER not the implementer: `S4-battleView-REFRESH-EDGES` asserted two closes
+after a `vi.clearAllMocks()` that only one `refresh(null)` follows — unsatisfiable by any implementation.
+**Five bite-proofs**, each reddening exactly its own tooth with zero collateral (3 by the orchestrator,
+2 independently by the verifier). Tests strictly additive: **0 removed lines vs origin/master** in all
+five extended spec files.
+**`touches-delta:` (2 files, both additive, both in the PR body):** `client/src/ui/a11yCopy.ts` (one key,
+`'a11y.world.region'` — closes the gap the merged m23-s1 ARCHITECTURE entry escalated in writing, and S0
+scoped its set-equality gate to `a11y.overlay.*` on both sides precisely so a later slice could add it);
+`client/src/ui/renameView.test.ts` (one new `it()` reusing S3's hardened stripper over the five S4 files;
+S3's own array and test left byte-identical). No concurrent sibling owned either. **`boyscout-delta:` none.**
+**THREE ITEMS FOR THE SUPERVISOR / LATER SLICES:**
+1. **`ui/overlayA11y.ts`'s cross-slice contract (a) is FACTUALLY WRONG** and so is the `**m23-s1**`
+   ARCHITECTURE block quoting it: the four `#app`-mounted views do NOT share a root — each creates its own
+   and appends into the shared `#app` MOUNT. S4 deliberately did NOT implement the close-before-open that
+   comment demands (it would close an overlay the player still has open) and pinned the correction with
+   `S4-CROSS-VIEW-DISTINCT-ROOTS`. The stale comment is out of S4's `touches:`; it needs an owner —
+   S10's `overlayA11yWiring.test.ts` is the natural home.
+2. **S10 WILL FAIL on four ids as specified.** Spec §5.5's vacuity-killer requires the resolved
+   `initialFocusSelector` element's tag to be in `{BUTTON, INPUT, SELECT, A, TEXTAREA}`, but S0 froze all
+   four constructed-shell selectors onto `<h2 tabindex="-1">` anchors. Widen that list when S10 is planned.
+3. **claimView re-opens after a manual dismiss** (pinned by `S4-claimView-REOPEN-AFTER-HIDE`, not fixed):
+   `ClaimPhase` never returns to `'hidden'` and `main.ts`'s `KeyC` close calls `hide()` directly rather than
+   through `applyClaim`, so a reconnect-driven render arrives `visible:true` while the DOM reads hidden and
+   re-opens — now with a focus move. Fix needs `claimModel.ts` or `main.ts` (S5's file). **Candidate S5 scope.**
+**No ADR** (none assigned; ADR-0205 is the family authority). ADR next-free = 0206.
+**Next in the M23 spine:** S5 (`main.ts` — `worldHasFocus()`, the Escape-ladder announcements, `#help-hint`
+as a native `<button>`), which is `after: S3, S4` and is serial by construction (sole `main.ts` toucher).
+S6 follows S5; S8 remains BLOCKED on operator escalations §8.1/§8.2. S10/S11 wait on S3+S4+S7 (S7 merged).
+**Toolchain note added to memory this run:** the PostToolUse format hook formats with `npx biome` (2.5.7)
+while `just lint` uses the repo-pinned `client/node_modules/.bin/biome` (2.5.1) — the hook's reformat reds
+lint and *looks* like a deleted test in the diff. A fresh worktree has no `client/node_modules` at all until
+`npm ci`, which is why the unpinned binary gets used. Run `npm ci` in `client/` first thing in a new worktree.
+
 # monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
 
 ---
