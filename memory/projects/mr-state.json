@@ -1,18 +1,41 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-24T17:16:00Z",
- "updated_by": "mr-sup-native-20260824T171027Z-612164",
+ "updated_utc": "2026-08-24T18:02:30Z",
+ "updated_by": "mr-sup-native-20260824T180013Z-652838",
  "master": {
   "sha": "0953db7",
-  "ci": "IN-PROGRESS at tick end (run 32755598702 for 0953db7 still running after ~2min live polling) -- NOT yet confirmed green; next tick must re-verify live before trusting this field.",
+  "ci": "GREEN, confirmed live this tick (run 32755598702, conclusion=success, headSha=0953db7...).",
   "nightly": "fixed_at_a40cb81_confirmed_green"
  },
  "harness_main": {
-  "sha": "fee5fee",
-  "ci": "no-remote-ci-local-gate-green; chore(mr-sup) reconciliation commit fee5fee (this tick)"
+  "sha": "87d9abf",
+  "ci": "no-remote-ci-local-gate-green; chore(mr-sup) reconciliation commit 87d9abf (this tick, covers the prior 17:10Z tick's un-committed records)"
  },
  "adr_next_free": 206,
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "m23-s3",
+   "repo": "project",
+   "pid": 654704,
+   "claude_pid": 654707,
+   "model": "opus",
+   "effort": "high",
+   "tier": "routine",
+   "touches": ["client/src/ui/dialogueView.ts", "client/src/ui/questLogView.ts", "client/src/ui/healView.ts", "client/src/ui/shopView.ts", "client/src/ui/tradeView.ts", "client/src/ui/pvpView.ts", "client/src/ui/leaderboardView.ts", "client/src/ui/renameView.ts", "client/src/ui/tradeProposeView.ts", "client/src/ui/helpView.ts"],
+   "launched_utc": "2026-08-24T18:02:03Z"
+  },
+  {
+   "slice": "m23-s7",
+   "repo": "project",
+   "pid": 655336,
+   "claude_pid": 655339,
+   "model": "fable",
+   "effort": "xhigh",
+   "tier": "hard",
+   "touches": ["client/src/render/motionPreference.ts", "client/src/render/renderResolver.ts", "client/src/render/interpolation.ts"],
+   "launched_utc": "2026-08-24T18:02:12Z"
+  }
+ ],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -20,7 +43,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick mr-sup-native-20260824T171027Z-612164 (17:10Z): consumed EVENT m23-s1.ci.md (PR#364 green, both checks SUCCESS). Live-verified OPEN/CLEAN before acting. mr-audit orchestration=CLEAN, gating_advisory=CLEAN. mr-gates verify: 14/14 met, 0 unmet/deferred, all reverified TEETH-BITE agrees_with_evidence=true; overall FLAGGED solely via reasons=[SPEC-SECTION-NOT-FOUND] (seed_drift=false) -- adjudicated as a benign spec-table heading-lookup miss (sibling m23-s2/PR#363 edited the same M23-accessibility.spec.md table), not a real defect; PR Acceptance: line matched mr-gates render exactly. residual_alarms: residual-over-cap 14/12, observe-only in slice 1, no action. Merged gh pr merge --squash --delete-branch -> 0953db7; remote branch confirmed auto-deleted. Local worktree .claude/worktrees/m23-s1 + branch slice/m23-s1 force-removed (worktree lock blocked the first delete-branch attempt), checkout ff'd 5e76945->0953db7. mr-gates residuals close --slice m23-s1 --pr 364 -> 0 residuals to close (nothing deferred). Ledger row COST-UNKNOWN (mr-record --from-log found no result event in the 5MB pass log). Stale mr-ci-watch pid 570061 from a prior tick confirmed already dead (exited on its own once PR merged) -- no cleanup action needed. master CI for 0953db7 (run 32755598702) still in_progress at tick end -- NOT confirmed green, next tick (or this tick's own live re-check before final output) must re-verify. No new launch this tick (one-composite-action budget spent on the merge). Governor NORMAL (d7=$1114.55/2783 eff., fable_ok=true). No BLOCKER.",
+ "notes": "Native tick mr-sup-native-20260824T180013Z-652838 (18:00Z): gate-0 found the prior 17:10Z tick's bookkeeping (mr-state.json/handoff/archive) uncommitted despite having merged m23-s1 PR#364 -- reconciled via commit 87d9abf (future-prompts.md left untouched, unrelated user scratch content). Live-verified: no per-run locks alive, no chain-owner mutex, no open PRs, no live watchers, master green at 0953db7. Residuals check: 3 unpromoted R-m22-s0-X* residuals all age~0.4d, far under t1_promote_days=3 -- do not outrank new work. M23 spine (S0->S1->{S2||S7}->{S3||S4}->S5->...) has S0/S1/S2 merged, opening S3/S4/S7. Picked the spec-endorsed disjoint pair S3+S7 (section 4 explicitly lists 'S3 || S7' as fan-out safe; avoided the 'Never paired: S3||S4' combo). mr-disjoint verdict SAFE (zero file overlap), free -g 37G available (ample for 2 concurrent builds). S3=routine (opus@high, static-shell view wiring). S7=HARD (fable@xhigh; touches render/renderResolver.ts, reconcile-adjacent, spec mandates desync-guard review; fable_ok=true, d7=$1115.61/2783 eff.). Both mr-spawn LAUNCHED cleanly. Both gates-seed calls returned criteria=0/SPEC-SECTION-NOT-FOUND (same benign pattern as m23-s1's prior tick -- flag for merge-time adjudication, not a launch blocker). No merge this tick. Governor NORMAL. No BLOCKER.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],
@@ -50,5 +73,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-24T17:10:27Z"
+ "last_tick_utc": "2026-08-24T18:00:13Z"
 }
