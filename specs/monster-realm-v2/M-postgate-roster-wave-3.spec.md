@@ -169,4 +169,25 @@ ids as `INFO: uncovered` is the precedent that this stays merge-order-independen
 - **rw3a — DELIVERED.** This spec + the PLAN.md bullet link. Evidence: slice ledger
   `memory/projects/gates/rw3a.gates.md`.
 - **rw3b — not started.** parked → queued as the next candidate for this milestone.
-- **rw3c — not started.** parked → queued behind rw3b.
+- **rw3c — DELIVERED.** Zone-1 wild placement for the wave-3 tier-0 forms (40 Voltkit weight 6
+  `10..19`, 42 Aurelet weight 4 `11..20`), `CONTENT_VERSION` 20 → 21, regenerated content-hash
+  baseline, plus `evals/rw3c-wave-3-tuning.eval.mjs` and `game-core/tests/rw3c_wave3_tuning.rs`.
+  Evidence: slice ledger `memory/projects/gates/rw3c.gates.md` (9/10 met, 1 DEFERred).
+  **Placement is ZONE 1, not zone 0** — RW3-07 and `pt_d3_tuning.rs::pt_d3_2_*` freeze zone 0
+  byte-for-byte, so zone 0 could never legally receive an entry; zone 1 is the declared
+  full-wild-legal-roster table and its weights are unpinned tuning data.
+  **RW3-08 DEFERred (second time).** It is mechanically unsatisfiable for any slice that places a
+  species: `pt_d3_tuning.rs:285` pins the wild-legal set by set EQUALITY and `:373` pins an exact
+  count, so placement reds both and neither can be met without editing that file. Both were
+  EXTENDED field-for-field, never weakened. Residual `R-rw3b-X8` (reword RW3-08) covers it.
+  **New invariant recorded:** a placed form's `max_level` must sit STRICTLY below its lowest
+  outgoing evolution-edge `min_level` — `level_gate_met` is inclusive and ADR-0176 D2
+  auto-evolution fires immediately when exactly one path is eligible, so a band reaching the gate
+  ships wild catches that evolve on capture. Nothing in `game-core` validates this, and
+  pre-existing content (species 7, band to 16 vs an edge at 15) already violates the general form,
+  so the new gate is scoped to the wave-3 tier-0 set. Promoting it to a real R13 in
+  `validate_evolution_paths` is a follow-up.
+  **Follow-up flags (untouched, outside this slice's `touches:`):**
+  `game-core/content/species/070-wave3.ron:20-22` now reads stale ("base forms with NO encounter
+  row … wild placement is slice rw3c"), and `evals/content-version.eval.mjs` advertises a
+  `--update` flag it never implemented while checking no version monotonicity.

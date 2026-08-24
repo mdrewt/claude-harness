@@ -2,6 +2,56 @@
 
 ---
 
+## 2026-08-23T??:??Z — rw3c PR OPEN (#358) — wave-3 wild placement, local `just ci` green
+
+PR https://github.com/mdrewt/monster-realm/pull/358 (`slice/rw3c` -> master), 5 `wip:` commits, remote
+CI running. **Supervisor owns the merge** — I did not run `gh pr merge`.
+
+**Local gate:** `just ci` GREEN (`JUST_CI_EXIT=0`) — 1974 tests run / 1974 passed / 0 skipped, 89 evals
+pass / 0 fail. **Acceptance ledger: 9/10 met, 1 DEFERred, 0 unmet** (`seed:e3b0c44298fc1c14`). The
+ledger was seeded with ZERO criteria (`SPEC-SECTION-NOT-FOUND`), so X1..X7 were authored in the PLAN
+phase and are LINT-CLEAN.
+
+**NOTE FOR THE SUPERVISOR'S `mr-gates verify`:** four CHECKs invoke `cargo`. Export
+`PATH="$HOME/.asdf/shims:$HOME/.cargo/bin:$HOME/.local/bin:$PATH"` before verifying or you get the same
+false `EVIDENCE-MISMATCH` rw3b hit. Also: hand-authored gates need an explicit `EVIDENCE: pending` line
+per gate — `mr-gates check` only writes evidence into an existing slot, and without it every gate
+reports "checked but EVIDENCE pending" and stays 0/N met despite PASSing.
+
+**DEFER: X3 -> backlog (RW3-08).** Second slice to hit this; residual `R-rw3b-X8` already open.
+RW3-08 as worded is mechanically unsatisfiable for ANY slice that places a species — `pt_d3_tuning.rs`
+pins the wild-legal set by set EQUALITY and an exact count, both derived from the live registry. Both
+were extended field-for-field, never weakened. Substance proved by X3b, which PASSES.
+
+**Placement is ZONE 1, not zone 0** — the slice brief's "zone-0 encounter table" is impossible
+(RW3-07 + `pt_d3_2_*` freeze zone 0 byte-for-byte). Reasoned in the PR body.
+
+**New invariant, nothing in game-core enforces it:** a placed form's `max_level` must sit strictly
+below its lowest outgoing evolution-edge `min_level`, else the wild catch auto-evolves on capture and
+the tier-0 form is never obtainable. Scoped to wave-3 because pre-existing content (species 7, band to
+16 vs an edge at 15) already violates the general form. Promoting it to a real R13 is a named follow-up.
+
+**Red-team wrote the cheats and ran them.** Its highest-value attack FAILED (a second lower-min_level
+edge is caught — both gates recompute the lowest gate live). Three real gaps found and closed, each
+re-verified by me running the exact cheat: a partially-shrunk tier-0 set that slipped the empty-set
+vacuity guard and turned BOTH gates green with RW3-06 violated; the eval's T-HYGIENE claim being false
+for block comments; and the zone-0 freeze being blind to a shadow duplicate `zone_id: 0` part file. An
+earlier tester tooth was also caught VACUOUS by a mutation bite-proof and repaired.
+
+**touches-delta:** `game-core/tests/pt_d3_tuning.rs` (the RW3-08 defer) and `ARCHITECTURE.md`.
+
+**ACTION NEEDED FROM THE SUPERVISOR — harness-repo edits left UNCOMMITTED in the working tree**
+(I do not commit outside my slice worktree): `specs/monster-realm-v2/M-postgate-roster-wave-3.spec.md`
+(rw3c marked DELIVERED + the zone-1/RW3-08/invariant rationale) and the untracked
+`memory/projects/monster-realm-rw3c-plan.md`. Please commit or discard.
+
+**Follow-up flags (untouched, outside touches):** `species/070-wave3.ron:20-22` is now stale ("NO
+encounter row ... wild placement is slice rw3c"); `evals/content-version.eval.mjs` advertises a
+`--update` flag that does not exist and checks no version monotonicity; `server-module/src/lib.rs`'s
+CONTENT_VERSION doc changelog is missing v19/v20/v21 (deliberately not fixed — a second changed line
+would break gate X3b).
+
+
 ## 2026-08-23T~18:0xZ — rw3a COMPLETE (terminal state: PR #37 open + local harness gate green)
 
 **Slice:** rw3a — spec authorship for `M-postgate-roster-wave-3` (Electric + Light roster wave).
@@ -754,3 +804,26 @@ PR https://github.com/mdrewt/monster-realm/pull/357 (slice/rw3b -> master) squas
 **Housekeeping done before launch this tick:** committed+pushed the previous tick's uncommitted rw3b-merge bookkeeping (harness commit 2e48ed9, mr-state.json + handoff + archive). Reaped the stale rw3b per-run lock (dead session_leader 2700302) via mr-unlock. Chain-owner mutex taken for this tick's derivation, will release at tick end.
 
 **Not actioned:** decision issue mdrewt/monster-realm#342 (OBS-48 procedures re-adjudication) is explicitly record-and-ignore per its own text -- left open, untouched.
+
+## 2026-08-23T23:39:30Z — rw3c MERGED (PR#358, 12af096)
+rw3c (M-postgate-roster-wave-3) squash-merged: master ee2e093 -> 12af096. Zone-1 wild
+placement for wave-3 tier-0 forms (Voltkit=40, Aurelet=42); CONTENT_VERSION 20->21.
+New invariant: band max_level strictly below lowest outgoing evolution-edge min_level
+(gated in both rw3c_wave3_tuning.rs and the eval, scoped to wave-3 set only). Red-team
+found+closed 3 gaps (F1 partial-set vacuity, F2 block-comment hygiene, F3 shadow zone-0
+table) before ship.
+
+Adjudicated FLAGGED: pt_d3_tuning.rs pins extended (not weakened) 40/42 into the
+wild-legal set + count 7->9 — disclosed touches-delta, matches ADR-0204:81,103. mr-audit
+orchestration CLEAN. mr-gates 9/10 met, X3 deferred to backlog (RW3-08 wording is
+mechanically unsatisfiable as worded for any placement slice — duplicate of open
+R-rw3b-X8, not a new issue).
+
+Worktree removed, slice/rw3c branch deleted (local+remote). Master CI (run 32674101030)
+was still in_progress at record time — verify green on next tick before further action
+on top of 12af096.
+
+Follow-ups (not touched, outside this slice's scope): species/070-wave3.ron:20-22 stale
+comment; evals/content-version.eval.mjs --update flag doesn't exist; lib.rs
+CONTENT_VERSION changelog missing v19-21 entries; promote band-below-gate rule to a real
+R13 (blocked on pre-existing species-7 violation).

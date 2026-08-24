@@ -1,10 +1,10 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-23T22:02:30Z",
- "updated_by": "mr-sup-native-20260823T220009Z-2900366",
+ "updated_utc": "2026-08-23T23:40:00Z",
+ "updated_by": "mr-sup-native-20260823T233325Z-3093769",
  "master": {
-  "sha": "ee2e093",
-  "ci": "queued/in_progress at merge-record time (ee2e093, PR#357 rw3b squash-merge); identical commit's PR checks (ci+e2e) were green pre-merge; re-verify next tick",
+  "sha": "12af096",
+  "ci": "in_progress at merge-record time (12af096, PR#358 rw3c squash-merge, run 32674101030); identical commit's PR checks (ci+e2e) were green pre-merge; re-verify next tick",
   "nightly": "fixed_at_a40cb81_confirmed_green"
  },
  "harness_main": {
@@ -12,19 +12,7 @@
   "ci": "no-remote-ci-local-gate-green; pushed 2 pending chore(mr-sup) commits (970da52, a85d229) to origin/main this tick, now in sync"
  },
  "adr_next_free": 204,
- "inflight": [
-  {
-   "slice": "rw3c",
-   "repo": "project",
-   "model": "opus",
-   "effort": "medium",
-   "tier": "content",
-   "leader_pid": 2902365,
-   "claude_pid": 2902368,
-   "run_id": "mr-spawn-20260823T220158Z-2902308",
-   "started_utc": "2026-08-23T22:02:05Z"
-  }
- ],
+ "inflight": [],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -32,7 +20,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-08-23T22:00Z native tick: committed+pushed prior tick's uncommitted rw3b-merge bookkeeping (harness 2e48ed9). Reaped stale rw3b per-run lock (dead leader). Derivation: queue/residuals(both <1h old, unpromoted)/open-PRs all empty or non-actionable -> rw3c is the only unblocked next slice (after:rw3b, now satisfied). Launched rw3c (opus@medium/content, no ADR needed). GATES-SEEDED criteria=0 SPEC-SECTION-NOT-FOUND (same known quirk as rw3b). Decision issue #342 left untouched (record-and-ignore).",
+ "notes": "2026-08-23T23:33Z native tick: EVENT rw3c.done (rc=0). Verified PR#358 CLEAN/MERGEABLE, both checks SUCCESS. Reaped stale mutex+per-run lock (owner 2900366 dead). mr-gates verify FLAGGED/SPEC-SECTION-NOT-FOUND (known quirk), 9/10 met 1 deferred (X3->backlog, dup of open R-rw3b-X8). mr-audit orchestration CLEAN; gating_advisory FLAGGED on pt_d3_tuning.rs assert edit, adjudicated as a strict pin extension (diff read, matches disclosed touches-delta + ADR-0204:81,103) -> merged. Squash-merged PR#358 (ee2e093->12af096), worktree removed, slice/rw3c branch deleted local+remote. Master CI still in_progress at record time (~5min+ in) -> no composite launch this tick; next tick should re-verify green before further action.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],
@@ -62,5 +50,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-23T22:02:30Z"
+ "last_tick_utc": "2026-08-23T23:40:00Z"
 }
