@@ -772,8 +772,24 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   escalations (spec §8) gate the build**; `PRV1-8` (post-deletion re-auth policy) is a hard BLOCKER on
   slice S3's reactivation guard.
 - **M23 Accessibility** (`M23-accessibility.spec.md`; ADR-0032) — keyboard/screen-reader/colorblind/
-  reduced-motion (a visual switch on ADR-0013), WCAG-AA; retrofits across M4/M7/M19. **Ceremony AUTHORIZED
-  2026-08-23** — see the operator note above and the sketch's own Recency check.
+  reduced-motion (a visual switch on ADR-0013), WCAG-AA; retrofits across M4/M7 (M19 deferred). **Ceremony
+  COMPLETE 2026-08-23** (investigation → 6-way ideation → judge synthesis w/ attribution table →
+  adversarial review) — the spec is no longer a sketch: it is the converged, implementation-ready design
+  (**12 slices S0–S11, 36 EARS `SHALL` criteria `A11Y-1…A11Y-36`**, five new `evals/*.eval.mjs` gates with
+  proof-of-teeth fixtures, and an honest WCAG-2.2-AA partial-conformance declaration scoping the claim to
+  the DOM overlay layer). Central decision: a total `OVERLAY_A11Y: Readonly<Record<OverlayId, A11yMeta>>`
+  **added to the now-built `client/src/ui/overlayRegistry.ts`** (ADR-0162–0164) — omitting an overlay is a
+  compile error, exactly as `OVERLAY_TIERS` already is. The ceremony **falsified two of the sketch's own
+  premises**: the "make the menus operable" sweep is a **two-site** fix (ten view files already use native
+  `<button>`; the four `<li>` lists carry zero listeners), and ADR-0032's `pixijs-accessibility` plank is
+  **DORMANT** (0 `eventMode` hits — nothing on the canvas is interactive to mirror), so it is elaborated,
+  not amended. The real headline defect, absent from the sketch, is the **single-letter-hotkey ↔
+  screen-reader quick-nav collision** (`B I E Q U P L N O T M` are all NVDA/JAWS browse-mode keys), closed
+  by a `role="application"` canvas region plus a scoped `worldHasFocus()` guard. Key remapping and any
+  settings store are explicitly **CUT** (YAGNI + the 17th-`OverlayId` ripple). **5 operator escalations
+  (spec §8) — two of them (colourblind-palette default, canvas sprite-tint art call) are hard BLOCKERs on
+  slice S8.** The M19 retrofit sub-scope is recorded as explicitly **deferred and NON-NORMATIVE**
+  (spec §7), per the operator note above.
 - **M24 Internationalization** (`M24-internationalization.spec.md`; ADR-0033) — externalized catalogs +
   locale-keyed RON content; a new language is a data drop; chat untranslated. **Ceremony AUTHORIZED
   2026-08-23** — see the operator note above and the sketch's own Recency check.
