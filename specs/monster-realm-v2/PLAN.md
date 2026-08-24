@@ -814,10 +814,46 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   runtime parser — ADR-0055's dynamic-`RegExp` ban decides that. **5 operator escalations (spec §8)**,
   two of them hard BLOCKERs.
 - **M25 Security audit & threat-model gate** (`M25-security-audit.spec.md`; ADR-0034; `security-threat-
-  model.md`) — the **final pre-launch gate**: consolidated threat model + a tooled/manual audit (RLS-leak
-  verification on the pinned version is the headline check) + a blocking security sign-off + re-audit
-  cadence. **Ceremony AUTHORIZED 2026-08-23** — see the operator note above; `security-threat-model.md`'s
-  RLS framing was corrected the same day (RLS is confirmed unenforced at 2.8.1, not merely unverified).
+  model.md`) — the **final pre-launch gate**. **CEREMONY COMPLETE 2026-08-24** (`mr-feedback-doctrine.md` §6
+  heavy: investigation → 6-way ideation → judge synthesis w/ attribution table → adversarial review) — the
+  spec is no longer a sketch: it is the converged, implementation-ready design (**9 slices S0–S8, 28 EARS
+  `SHALL` criteria `SEC-1…SEC-28`**, three new `evals/*.eval.mjs` gates plus extensions to three shipped
+  ones, all with proof-of-teeth fixtures, and a full oracle-tier classification that keeps every
+  non-mechanically-checkable property out of CI-green).
+  **Central decision — the milestone was re-aimed.** **48 of the 50 production reducers** return
+  `Result<(), String>` (the two exceptions are the lifecycle hooks `init`/`on_disconnect`, which return `()`
+  and so cannot carry an `Err` payload at all), and a reducer *structurally cannot* return row data: the
+  client-visible surface is exactly **two channels — subscription, and the `Err(String)` rejection
+  payload**. `ADR-0199` (2026-08-17) already gates channel 1's declaration enumeratively (38 tables, 18
+  public, `T-VIS-ANCHORS` defeating even a compensating double-flip) and says of itself *"this gate records
+  the split; it does not bless it"*; per-view exact-body pinning already ships too. **Channel 2 is gated by
+  nothing, carries 243 `Err(` sites, and a read-side audit — the only audit the sketch and the threat model
+  describe — is structurally blind to it.** M25 is the audit of that second channel, plus the **coupling
+  invariant** no prior mechanism models: *closing a read-side visibility gap on table T converts every
+  reducer branch predicating on T into a new write-side oracle* — mechanized triggered-by-change, not as a
+  static sweep. The **severity rule** that keeps 243 sites from all reading as findings: an `Err` string is
+  an oracle **iff** the predicate it reveals is not already readable from a `public` table (this *refutes*
+  as many candidates as it confirms — `pvp.rs:764,769` leak nothing because `player` is public and carries
+  `online`).
+  The ceremony **corrected six of the sketch's own premises** (spec §1.1), including that its headline
+  "RLS-leak verification" job is a dead premise *and* its replacement ("verify migration completeness") was
+  already mechanically satisfied — so M25 adds **no new read-side taxonomy**, only a one-line amendment to
+  ADR-0199 **D5's applicability** (mandatory `visibility_note` on the 4 standing-public tables with named
+  stakes). It also **settled** the two `UNVERIFIED` classifications (`player_dialogue_state`,
+  `heal_cooldown` are correctly private-with-no-view — zero client references outside generated bindings)
+  and retired the **chat** clause again (there is no chat system; the UGC surface is `set_profile_name`).
+  Two adversarial catches changed the design outright: the obvious `battle_challenge` fix — a flat
+  two-identity `my_challenge` view — is a **confirmed feature regression** (`client/src/ui/pvpModel.ts:89-94`
+  reads *every* pending challenge to compute `challengeablePlayers`), so the payload is split by stakes
+  instead (public `{challenger,target,status}`; only `challenger_party_ids` behind the view); and the
+  sign-off gate cannot ride `push: tags: v*` because **the repo has zero git tags** — a gate that never
+  fires is worse than none. `trade_offer` is likewise **split**: its `build_cards` ownership oracle is fixed
+  now (unify the *client-facing* literal only, keeping the specific reason in `log_reject` so server
+  diagnosability is not traded away), while its visibility half is **deferred with its mechanism decided**
+  (private staging row + post-confirm materialization — a scoped view is necessary-but-insufficient because
+  `propose_trade` discloses on the *write*). **4 operator escalations (spec §8)**, two of them hard
+  BLOCKERs: the ADR-0034 amendment (two clauses of an accepted ADR are now false) and the release-tag
+  convention.
 
 Phases gate on the prior phase's CI being green-and-meaningful. Phase B/C items stay **named YAGNI
 exceptions** until their phase — declared, not silently dropped.
