@@ -1,28 +1,18 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-24T02:58:40Z",
- "updated_by": "mr-sup-native-20260824T025237Z-3365405",
+ "updated_utc": "2026-08-24T04:10:00Z",
+ "updated_by": "mr-sup-native-20260824T035621Z-3509101",
  "master": {
   "sha": "12af096",
   "ci": "green (confirmed live via gh run list --branch master: conclusion=success on 12af096, rw3c)",
   "nightly": "fixed_at_a40cb81_confirmed_green"
  },
  "harness_main": {
-  "sha": "71f35da",
-  "ci": "no-remote-ci-local-gate-green; m23-ceremony PR#39 squash-merged (71f35da), local main fast-forwarded"
+  "sha": "36e658e",
+  "ci": "no-remote-ci-local-gate-green; m24-ceremony PR#40 squash-merged (db653a5), then chore(mr-sup) bookkeeping-catchup commit rebased on top (36e658e), local main pushed"
  },
  "adr_next_free": 205,
- "inflight": [
-  {
-   "slice": "m24-ceremony",
-   "repo": "harness",
-   "run_id": "mr-spawn-20260824T025831Z-3384833",
-   "leader_pid": 3384907,
-   "model": "opus",
-   "tier": "content",
-   "launched_utc": "2026-08-24T02:58:35Z"
-  }
- ],
+ "inflight": [],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -30,7 +20,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-08-24T02:58Z native tick (rid=native-20260824T025237Z-3365405): reconciled m23-ceremony event (rc=0, session leader dead, .done present). PR https://github.com/mdrewt/claude-harness/pull/39 was OPEN, mergeStateStatus=CLEAN. mr-gates verify tool malfunctioned live (garbled '} | Node.js vX' output uniformly across all 11 non-spotcheck CHECKs -- classic tool-bug signature since different CHECK bodies produced identical garbage) -- manually re-ran X1/X2/X11 in the m23-ceremony worktree (correct asdf node v24 on PATH, correct branch checked out) and all matched recorded evidence exactly, so adjudicated CLEAN rather than EVIDENCE-MISMATCH; this warrants a follow-up look at mr-gates verify's CHECK-invocation path (possible asdf/PATH or quoting bug) but is not this slice's fault. mr-audit: policy=CLEAN/mandatory_read=false (doc-only exemption), orchestration sub-verdict FLAGGED on a role-detection heuristic (roles list already shows reviewer+verifier present; log confirms an actual reviewer+verifier adversarial pass with 2 major+2 minor fixes applied) -- adjudicated CLEAN. gating_advisory CLEAN (0 removed asserts/suppressions, expected for docs-only). Merged --squash --delete-branch (71f35da); worktree removed; local+remote m23-ceremony branches deleted; main ff-only'd. mr-gates residuals close: 0 residuals owned by m23-ceremony (clean). 3 unclaimed residuals remain (R-rw3b-X6-rw3c-half, R-rw3b-X8, R-rw3c-X3), all MED, <1 day old, none past staleness threshold. Composite merge-then-launch: re-verified no stop conditions (no stop flags, no resident human claude pid, no recent human writes, governor NORMAL 827.33/2783 d7 effective, fable_ok=true unused) and launched m24-ceremony (opus@medium, tier=content, ADR-0033, touches M24-internationalization.spec.md+PLAN.md) per the 2026-08-23 M22-M25 operator authorization -- M23 landed clean, M24 next in PLAN sec9 order; briefed it to cite BOTH ADR-0006 and ADR-0057 per the spec's own Recency check. M25 remains eligible next tick. DIRTY-TREE-ADVISORY reconfirmed on spawn: same 4 pre-existing uncommitted harness tracked changes (future-prompts.md, 2 handoff files, this file) + 1 untracked (gdd.md), predate this tick, not supervisor-owned, left untouched.",
+ "notes": "2026-08-24T04:03Z native tick (rid=native-20260824T035621Z-3509101): reconciled the finished m24-ceremony event (rc=0, session leader dead, .done present, .err empty). PR https://github.com/mdrewt/claude-harness/pull/40 was OPEN, mergeStateStatus=CLEAN. mr-gates verify FIRST returned FLAGGED with EVIDENCE-MISMATCH on 12/13 gates -- root-caused to TWO stacked issues, not a real defect: (1) the known harness-node-toolchain-PATH-trap (Bash resolves system node v18, harness pins v24 via asdf -- fixed by prepending the asdf node bin dir to PATH), (2) mr-gates verify defaulting --repo/--cwd to the monster-realm PROJECT root when this slice's spec files live in the HARNESS repo (fixed by passing --repo/--cwd pointed at the m24-ceremony worktree). With both fixed, all 13 gates reverified passed=true agrees_with_evidence=true (mr-audit's acceptance.evidence_mismatch=[]); the sole remaining FLAGGED reason (SPEC-SECTION-NOT-FOUND) is expected for a ceremony slice (seeded=0, all-X author-defined gates, no spec-declared slice section), same as the already-merged m22/m23 ceremonies. mr-audit: policy=CLEAN, mandatory_read=false (doc-only exemption), gating_advisory=CLEAN, orchestration FLAGGED only on the tester-role heuristic (expected doc-only carve-out; reviewer+verifier roles present with a real adversarial pass). Merged --squash --delete-branch (db653a5); worktree removed; local+remote m24-ceremony branches deleted; main advanced. mr-gates residuals close: 0 owned by m24-ceremony (clean). 3 unclaimed residuals remain (R-rw3b-X6-rw3c-half, R-rw3b-X8, R-rw3c-X3), all MED, <1 day old, none past staleness threshold -- no preemption. Reconciliation: found 3 PRIOR supervisor ticks (m22 merge T01:00Z, m23 launch T02:03Z, m23 merge T02:57Z) had written handoff/mr-state.json locally but never committed+pushed -- same gap the T00:06Z tick previously caught once. Committed separately (42e6048, rebased onto db653a5 -> 36e658e after this tick's own merge landed) so each tick's bookkeeping stays attributable to its own commit; pushed. Pre-existing human strays (future-prompts.md edits, untracked gdd.md) stashed+restored around the rebase, left untouched -- not supervisor-owned. No new slice launched this tick: mr-gates verify + the bookkeeping reconciliation consumed the action budget; M25 (last of the M22-M25 operator-authorized ceremony batch) remains eligible next tick. Governor NORMAL (898.26/2783 d7 effective, fable_ok=true unused).",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
  "parked": [],
  "open_chore_prs": [],
@@ -60,5 +50,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-24T01:01:00Z"
+ "last_tick_utc": "2026-08-24T04:10:00Z"
 }

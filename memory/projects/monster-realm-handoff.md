@@ -605,6 +605,46 @@ interpolation caveat this slice avoided. (5) pre-existing biome warning at
 
 **Ledger authoring notes** (cost four rejected drafts): `mr-gates` needs an `EVIDENCE: pending` line already present under each gate or it flips the box and records nothing (`status` then reads "checked but EVIDENCE pending" and `check` reports `0/N met`). The `||`-anywhere lint rejects JS logical-or inside a CHECK — use `[a, b].some(Boolean)`. A DEFER target must be an EXISTING spec section; `rw3c` is a candidate-slices table row, not a section, so it is rejected — use `backlog`.
 
+## m24-ceremony — PR #40 OPEN (terminal state), 2026-08-23
+
+**Slice:** `m24-ceremony` (harness repo, docs-only). Branch `m24-ceremony`, worktree
+`.claude/worktrees/m24-ceremony`. **PR:** https://github.com/mdrewt/claude-harness/pull/40 — supervisor
+owns the merge (no remote CI on this repo).
+
+**State:** TERMINAL. Acceptance ledger **13/13 met, 0 deferred** (`memory/projects/gates/m24-ceremony.gates.md`,
+seed `e3b0c44298fc1c14`). Slice gate green: `mr-selfcheck` → SELFCHECK-OK, `mr-gates lint` → LINT-CLEAN.
+Supplementary harness `just ci` green (103/103) **when run with the asdf-pinned node v24** — the Bash
+tool's default node v18 fails the `import.meta.dirname` wiring test (known trap).
+
+**Delivered:** `specs/monster-realm-v2/M24-internationalization.spec.md` converged (9 slices S0–S8,
+33 EARS `I18N-*`, 4 new evals, full (a)–(e) oracle tiering) + the `PLAN.md` M24 bullet flipped
+AUTHORIZED → COMPLETE. Diff is exactly those two paths.
+
+**For the supervisor, before merging:**
+- Re-execute the CHECKs **from the worktree**, not the main checkout (`mr-gates check` resolves cwd via
+  `os.getcwd()`).
+- One EXPECT was edited mid-slice: X6's, `[2-9][0-9]*` → `(?:[2-9]|[1-9][0-9]+)`. The old regex could not
+  match a legitimate two-digit count (13). The verifier adjudicated it independently as a correction, not
+  a loosening — thresholds are unchanged (ADR-0006 ≥2, ADR-0057 ≥3).
+- The ledger is **not** committed on this branch (it lives in the main checkout by design).
+
+**Open items this slice deliberately leaves for the operator (spec §8, all routed via `mr-ask-drew`):**
+5 escalations, **two hard BLOCKERs** — §8-1 `[BLOCKS S0]` verify the three `<li>` markup sites have no
+structural dependency; §8-4 `[BLOCKS S1]` **ADR-0033 needs a 6-part amendment, drafted in §8-4 but NOT
+yet written into `specs/monster-realm-v2/adr/0033-i18n-strategy.md`** — that write is real follow-up work,
+not bookkeeping. Plus §8-2 (is there a market requirement behind content localization?), §8-3 (bless the
+untranslated server `Err()` strings, tracked as `M-error-codes`), §8-5 (is the ICU round-trip shim earned
+with no named vendor?).
+
+**Ceremony calibration datum** (Drew's open 6-vs-4 question): the adversarial lens produced the central
+decision AND two BLOCKER-grade falsifications of the synthesis; the practitioner lens produced the
+milestone's shape. The two most-cuttable were the minimal-mechanism and content-pipeline lenses. Details
+in the memory card `monster-realm-m24-ceremony`.
+
+**Remaining M22–M25 ceremony authorization:** M25 (security audit) is still AUTHORIZED, not run.
+
+## 2026-08-24T04:03:59Z — m24-ceremony merged (PR#40)
+Supervisor tick mr-sup-native-20260824T035621Z-3509101 reconciled the finished m24-ceremony run (rc=0, session leader dead, .done present, .err empty, 403 turns, $69.66). Converged specs/monster-realm-v2/M24-internationalization.spec.md from provisional sketch to implementation-ready via the mr-feedback-doctrine.md §6 heavy ceremony, citing both ADR-0006 and ADR-0057 per the operator's recency note. mr-gates verify initially reported FLAGGED with EVIDENCE-MISMATCH on 12/13 gates -- root-caused live to the harness-node-toolchain-PATH-trap (Bash resolves system node v18, harness pins v24 via asdf) STACKED with mr-gates defaulting --repo/--cwd to the monster-realm project root instead of the harness repo where this slice's spec files actually live. Re-ran with asdf node v24 on PATH and --repo/--cwd pointed at the m24-ceremony worktree: all 13 gates reverified passed=true agrees_with_evidence=true (evidence_mismatch=[] in mr-audit's acceptance block). Remaining FLAGGED reason (SPEC-SECTION-NOT-FOUND) is expected for this slice class: a ceremony slice authors its own X* gates (seeded=0, all-extra) rather than deriving criteria from a spec-declared slice section, same as the already-merged m22/m23 ceremonies. mr-audit: policy=CLEAN, mandatory_read=false (doc-only exemption), gating_advisory=CLEAN (0 removed asserts/suppressions), orchestration sub-verdict FLAGGED on the tester-role heuristic (expected for a docs-only slice with no code to test; roles already show reviewer+verifier present with a real adversarial pass, 1 fix applied per the run's own PR body). PR #40 squash-merged (db653a5), worktree/branch cleaned (local+remote). mr-gates residuals close: 0 owned by m24-ceremony (clean). 3 unclaimed residuals remain (R-rw3b-X6-rw3c-half, R-rw3b-X8, R-rw3c-X3), all MED, <1 day old, none past staleness threshold -- no preemption. Reconciliation note: found 3 prior supervisor ticks (m22 merge, m23 launch, m23 merge -- 2026-08-24T01:00Z/T02:03Z/T02:57Z) had written handoff/mr-state.json entries locally but never committed+pushed them, the same gap the T00:06Z tick previously caught once. Committed them separately (42e6048, rebased to 36e658e after this tick's own merge landed first) rather than folding into this row, keeping each tick's bookkeeping attributable to its own commit. Pre-existing human strays (future-prompts.md edits, untracked gdd.md) stashed+restored around the rebase, left untouched. Governor NORMAL (898.26/2783 d7 effective, fable_ok=true unused). M25 remains eligible next tick (last of the M22-M25 operator-authorized ceremony batch).
 ## 2026-08-24T02:57:37Z — m23-ceremony merged (PR#39)
 Converged specs/monster-realm-v2/M23-accessibility.spec.md from provisional sketch to implementation-ready spec (12/12 sections, 36 EARS A11Y-* criteria, 12-slice table, 5 evals, attribution table, 5 escalations) per mr-feedback-doctrine.md §6 heavy ceremony, grounded in the now-built overlayRegistry.ts substrate (ADR-0162-0164). PLAN.md M23 bullet updated to COMPLETE. Single opus attempt, 91 turns, $18.93, adversarial review pass applied 2 major + 2 minor fixes before merge. mr-gates local ledger: 12/12 met. mr-gates verify tool malfunctioned on this tick (garbled '} | Node.js vX' output across all 11 non-spotcheck CHECKs, uniform across different checks -- classic tool-bug signature, not a per-check failure); manually re-ran X1/X2/X11 in the m23-ceremony worktree and all matched recorded evidence exactly, so adjudicated CLEAN rather than treating as EVIDENCE-MISMATCH. mr-audit orchestration verdict FLAGGED (missing tester/reviewer/verifier role heuristic) but policy=CLEAN/mandatory_read=false (doc-only exemption) and the run log shows an actual reviewer+verifier pass with fixes applied -- adjudicated CLEAN. Worktree removed, local+remote m23-ceremony branches deleted, main fast-forwarded to 71f35da.
 ## 2026-08-24T02:03:11Z — m23-ceremony LAUNCHED — accessibility heavy-ceremony spec convergence
@@ -829,56 +869,3 @@ PR#354 squash-merged -> 367b3f7 (feat/16r-e-scheduled-function-delay). Recording
 ## 2026-08-23T09:53:51Z — 16r-e e2e triage — reran, delegated to mr-ci-watch
 PR #354 (16r-e, ADR: scheduled-function delay observability) showed e2e FAILURE on its own CI run (32604922710): wallet-balance.spec.ts:911 quest_001 precondition — 'quest_001 was neither started nor already completed after 5 attempts.' 16r-e's diff touches ops/observability/prometheus.yml, rules/recording.rules.yml, grafana/** + sibling tests only — no overlap with the dialogue/quest domain the failing test exercises. Master's own recent CI runs (16r-c, 16r-d merges) are green, so this reads as a pre-existing e2e flake, not a regression from this PR. Reran the failed job (gh run rerun --failed) rather than blind-relaunching the slice. Delegated the wait to mr-ci-watch (PR #354, slice 16r-e); resumes via event tick. If the rerun also fails, next tick should treat it as a real (possibly intermittent-but-real) issue in wallet-balance.spec.ts, not attribute it to 16r-e.
 
-## 2026-08-23T09:52:55Z — 16r-f MERGED
-PR #353 squash-merged to master (e4c73e9). Hard-tier mandatory read: sticky battleReseedPending latch — held pending until a flush observes definite battle state (empty/undefined flush no longer burns the latch), plus capture-before-resetPredictionState in onReconnect so a second drop during a pending reseed keeps the FIRST drop's battle id rather than nulling it. Diff scoped exactly to declared touches (main.ts + new main.battle-reseed.test.ts + ADR-0130 amendment doc). Gating-advisory CLEAN, orchestration CLEAN, acceptance NO-LEDGER (pre-lp-gates slice — absent measurement, forced residuals-close). Worktree + branch cleaned up. master CI running post-merge.
-
-## 2026-08-23T09:10:21Z — CORRECTION: mr-selfcheck A8 could re-stamp the operator hold (triggered, fixed, reported not repaired)
-**Correction and an operator FYI, appended to the entry below.**
-
-**`mr-selfcheck` A8 could MUTATE the operator kill switch — not merely raise a false alarm on it.** I under-described this in the entry below. A8's "unforced" fixture built its environment from `dict(os.environ)` without scrubbing `MR_FORCE`. With `MR_FORCE=1` ambient — which `mr-supervisor-run` sets before the tick runs selfcheck — the sandboxed tick wrapper got PAST gate -1 and **re-stamped the real hold flag**, because `mr-hold`'s MEM is a hardcoded machine singleton (`mr-hold:118`) and a sandboxed copy therefore still writes production state.
-
-**I triggered it myself** with the diagnostic `MR_FORCE=1 mr-selfcheck` at 2026-08-23T08:54:45Z while isolating the A8 failure, before I had written the scrub. Then proved the fix: with the scrub in place, that exact command now leaves the flag untouched (probed alongside `mr-hold status` and a plain `mr-selfcheck`, all three UNCHANGED).
-
-**Impact, stated precisely:** `by=operator` survived every rewrite, so the hold remained fully in force and no tick ever ran — nothing unsafe happened. What was overwritten is the flag's recorded `at=` (now `2026-08-23T08:54:45Z`, was `2026-08-22T23:46:30Z`) and its mtime, which is what the HOLD-AGED nag ages from. Practical consequence: the "held 6h, still intended?" nag will fire later than it should have.
-
-**NOT repaired, deliberately.** Writing to `.native-supervisor-disabled` is precisely what lp-09 doctrine forbids an agent session to do, and `guard-bash.mjs` enforces it. Restoring the timestamp would mean an agent hand-editing the kill switch to cover its own tracks — worse than the wrong timestamp. **Drew: if the original pause time matters, re-run `mr-supervisor-disable` to re-stamp it, or simply `mr-supervisor-enable` when ready — the hold itself is intact and correct.**
-
-**The general rule this earns:** a selfcheck must never be able to mutate the switch it is checking. Any fixture that runs a real wrapper must construct its environment explicitly rather than inheriting `os.environ`, because the tools it drives resolve production paths as hardcoded singletons by design.
-
-## m24-ceremony — PR #40 OPEN (terminal state), 2026-08-23
-
-**Slice:** `m24-ceremony` (harness repo, docs-only). Branch `m24-ceremony`, worktree
-`.claude/worktrees/m24-ceremony`. **PR:** https://github.com/mdrewt/claude-harness/pull/40 — supervisor
-owns the merge (no remote CI on this repo).
-
-**State:** TERMINAL. Acceptance ledger **13/13 met, 0 deferred** (`memory/projects/gates/m24-ceremony.gates.md`,
-seed `e3b0c44298fc1c14`). Slice gate green: `mr-selfcheck` → SELFCHECK-OK, `mr-gates lint` → LINT-CLEAN.
-Supplementary harness `just ci` green (103/103) **when run with the asdf-pinned node v24** — the Bash
-tool's default node v18 fails the `import.meta.dirname` wiring test (known trap).
-
-**Delivered:** `specs/monster-realm-v2/M24-internationalization.spec.md` converged (9 slices S0–S8,
-33 EARS `I18N-*`, 4 new evals, full (a)–(e) oracle tiering) + the `PLAN.md` M24 bullet flipped
-AUTHORIZED → COMPLETE. Diff is exactly those two paths.
-
-**For the supervisor, before merging:**
-- Re-execute the CHECKs **from the worktree**, not the main checkout (`mr-gates check` resolves cwd via
-  `os.getcwd()`).
-- One EXPECT was edited mid-slice: X6's, `[2-9][0-9]*` → `(?:[2-9]|[1-9][0-9]+)`. The old regex could not
-  match a legitimate two-digit count (13). The verifier adjudicated it independently as a correction, not
-  a loosening — thresholds are unchanged (ADR-0006 ≥2, ADR-0057 ≥3).
-- The ledger is **not** committed on this branch (it lives in the main checkout by design).
-
-**Open items this slice deliberately leaves for the operator (spec §8, all routed via `mr-ask-drew`):**
-5 escalations, **two hard BLOCKERs** — §8-1 `[BLOCKS S0]` verify the three `<li>` markup sites have no
-structural dependency; §8-4 `[BLOCKS S1]` **ADR-0033 needs a 6-part amendment, drafted in §8-4 but NOT
-yet written into `specs/monster-realm-v2/adr/0033-i18n-strategy.md`** — that write is real follow-up work,
-not bookkeeping. Plus §8-2 (is there a market requirement behind content localization?), §8-3 (bless the
-untranslated server `Err()` strings, tracked as `M-error-codes`), §8-5 (is the ICU round-trip shim earned
-with no named vendor?).
-
-**Ceremony calibration datum** (Drew's open 6-vs-4 question): the adversarial lens produced the central
-decision AND two BLOCKER-grade falsifications of the synthesis; the practitioner lens produced the
-milestone's shape. The two most-cuttable were the minimal-mechanism and content-pipeline lenses. Details
-in the memory card `monster-realm-m24-ceremony`.
-
-**Remaining M22–M25 ceremony authorization:** M25 (security audit) is still AUTHORIZED, not run.

@@ -4018,3 +4018,19 @@ The build loop has been held for 6h (by=operator). Is that still intended? If th
 
 
 
+## 2026-08-23T09:10:21Z — CORRECTION: mr-selfcheck A8 could re-stamp the operator hold (triggered, fixed, reported not repaired)
+**Correction and an operator FYI, appended to the entry below.**
+
+**`mr-selfcheck` A8 could MUTATE the operator kill switch — not merely raise a false alarm on it.** I under-described this in the entry below. A8's "unforced" fixture built its environment from `dict(os.environ)` without scrubbing `MR_FORCE`. With `MR_FORCE=1` ambient — which `mr-supervisor-run` sets before the tick runs selfcheck — the sandboxed tick wrapper got PAST gate -1 and **re-stamped the real hold flag**, because `mr-hold`'s MEM is a hardcoded machine singleton (`mr-hold:118`) and a sandboxed copy therefore still writes production state.
+
+**I triggered it myself** with the diagnostic `MR_FORCE=1 mr-selfcheck` at 2026-08-23T08:54:45Z while isolating the A8 failure, before I had written the scrub. Then proved the fix: with the scrub in place, that exact command now leaves the flag untouched (probed alongside `mr-hold status` and a plain `mr-selfcheck`, all three UNCHANGED).
+
+**Impact, stated precisely:** `by=operator` survived every rewrite, so the hold remained fully in force and no tick ever ran — nothing unsafe happened. What was overwritten is the flag's recorded `at=` (now `2026-08-23T08:54:45Z`, was `2026-08-22T23:46:30Z`) and its mtime, which is what the HOLD-AGED nag ages from. Practical consequence: the "held 6h, still intended?" nag will fire later than it should have.
+
+**NOT repaired, deliberately.** Writing to `.native-supervisor-disabled` is precisely what lp-09 doctrine forbids an agent session to do, and `guard-bash.mjs` enforces it. Restoring the timestamp would mean an agent hand-editing the kill switch to cover its own tracks — worse than the wrong timestamp. **Drew: if the original pause time matters, re-run `mr-supervisor-disable` to re-stamp it, or simply `mr-supervisor-enable` when ready — the hold itself is intact and correct.**
+
+**The general rule this earns:** a selfcheck must never be able to mutate the switch it is checking. Any fixture that runs a real wrapper must construct its environment explicitly rather than inheriting `os.environ`, because the tools it drives resolve production paths as hardcoded singletons by design.
+
+## 2026-08-23T09:52:55Z — 16r-f MERGED
+PR #353 squash-merged to master (e4c73e9). Hard-tier mandatory read: sticky battleReseedPending latch — held pending until a flush observes definite battle state (empty/undefined flush no longer burns the latch), plus capture-before-resetPredictionState in onReconnect so a second drop during a pending reseed keeps the FIRST drop's battle id rather than nulling it. Diff scoped exactly to declared touches (main.ts + new main.battle-reseed.test.ts + ADR-0130 amendment doc). Gating-advisory CLEAN, orchestration CLEAN, acceptance NO-LEDGER (pre-lp-gates slice — absent measurement, forced residuals-close). Worktree + branch cleaned up. master CI running post-merge.
+
