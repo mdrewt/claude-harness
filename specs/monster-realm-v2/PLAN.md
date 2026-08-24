@@ -811,7 +811,7 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   its mechanism decided normatively (§2.5) so the future milestone inherits the arbitration instead of
   re-running it; M24 touches **no** `game-core/`, `server-module/`, `CONTENT_VERSION` or `styles.css`
   (which belongs to M23 exclusively). ICU is the **interchange** format (export/import shims), never a
-  runtime parser — ADR-0055's dynamic-`RegExp` ban decides that. **4 operator escalations (spec §8)**,
+  runtime parser — ADR-0055's dynamic-`RegExp` ban decides that. **5 operator escalations (spec §8)**,
   two of them hard BLOCKERs.
 - **M25 Security audit & threat-model gate** (`M25-security-audit.spec.md`; ADR-0034; `security-threat-
   model.md`) — the **final pre-launch gate**: consolidated threat model + a tooled/manual audit (RLS-leak

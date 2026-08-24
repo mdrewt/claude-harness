@@ -797,19 +797,19 @@ None of these is asserted by an M24 eval; none may be cited as M24 acceptance ev
 4. **[BLOCKS S1] ADR-0033 requires an amendment before S1 lands.** An accepted ADR should be amended, not
    quietly out-voted by a ceremony. **The amendment's full scope is the five corrections catalogued at
    §1.1 (S-A…S-E) plus one prohibition — a future editor working from this item alone must carry all six:**
-   1. **(S-A)** strike the chat clause — there is no chat system, so "user chat is not machine-translated
+   - **(a) S-A** — strike the chat clause — there is no chat system, so "user chat is not machine-translated
       (rendered safely, ADR-0028)" defends a feature that does not exist; replace it with the
       `set_profile_name` display-name rule (§2.7, I18N-20).
-   2. **(S-B / §2.5)** content is **not** locale-keyed RON in this milestone — M24 localizes no
+   - **(b) S-B / §2.5** — content is **not** locale-keyed RON in this milestone — M24 localizes no
       content-registry text at all, and any future scheme is written against **ADR-0057**'s glob loader,
       not ADR-0006 alone.
-   3. **(S-C / §2.3)** "a new language is a data drop" is upgraded to **"a typed drop"** — the failure mode
+   - **(c) S-C / §2.3** — "a new language is a data drop" is upgraded to **"a typed drop"** — the failure mode
       of an incomplete locale is a `tsc` error, not a runtime blank. Stronger than promised; say so.
-   4. **(§2.6)** "ICU-style" is satisfied at the **interchange** layer (export/import), never at runtime —
+   - **(d) §2.6** — "ICU-style" is satisfied at the **interchange** layer (export/import), never at runtime —
       the reason is ADR-0055's dynamic-`RegExp` ban, which the ADR does not currently acknowledge.
-   5. **(S-D / §2.7)** "RTL supported" is **narrowed to text direction only**; layout mirroring is C6 and
+   - **(e) S-D / §2.7** — "RTL supported" is **narrowed to text direction only**; layout mirroring is C6 and
       is explicitly out of scope.
-   6. **(§2.5(2))** record the **permanent prohibition** on a `locale` column on content row tables — this
+   - **(f) §2.5(2)** — record the **permanent prohibition** on a `locale` column on content row tables — this
       is a decided architectural constraint, not a scheduling preference.
 5. **[DEFAULTS to building it in S8] Is the ICU round-trip shim earned with no named vendor?** ADR-0033
    itself calls the TMS an "ops/vendor concern. Deferred." (C10 keeps it deferred), yet S8 builds
