@@ -790,9 +790,29 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   (spec §8) — two of them (colourblind-palette default, canvas sprite-tint art call) are hard BLOCKERs on
   slice S8.** The M19 retrofit sub-scope is recorded as explicitly **deferred and NON-NORMATIVE**
   (spec §7), per the operator note above.
-- **M24 Internationalization** (`M24-internationalization.spec.md`; ADR-0033) — externalized catalogs +
-  locale-keyed RON content; a new language is a data drop; chat untranslated. **Ceremony AUTHORIZED
-  2026-08-23** — see the operator note above and the sketch's own Recency check.
+- **M24 Internationalization** (`M24-internationalization.spec.md`; ADR-0033) — externalized message
+  catalogs; a new language is a data drop. **Ceremony COMPLETE 2026-08-23** (investigation → 6-way
+  ideation → judge synthesis w/ attribution table → adversarial review) — the spec is no longer a sketch:
+  it is the converged, implementation-ready design (**9 slices S0–S8, 30 EARS `SHALL` criteria
+  `I18N-1…I18N-30`**, four new `evals/*.eval.mjs` gates with proof-of-teeth fixtures, and a full
+  oracle-tier classification that keeps every non-mechanically-checkable property out of CI-green).
+  Central decision: **sink elimination FIRST** — the three live `innerHTML=` markup assignments
+  (`client/src/ui/shopView.ts:104,115,123`) are converted to element construction in S0, *before* any
+  string is externalized, because a catalog value is the one string in this client that will one day be
+  authored outside the team; the extraction lint then matches on the **sink alone, RHS-independent**.
+  The ceremony **falsified three of the sketch's own premises**: there is **no chat system** in this
+  codebase (`player_conversation` is solo NPC dialogue-progress state — the same correction M22 made), so
+  the chat clause is retired and replaced by a criterion about the surface that does exist (`set_profile_name`
+  display names, never catalogued, `<bdi>`-isolated); "rides the ADR-0006 pipeline" is half the mechanism
+  — **ADR-0057**'s glob loader silently skips a `<registry>/<locale>/` subdirectory and rejects a
+  `species.fr.ron` sibling on duplicate id, so both intuitive locale-RON schemes are ruled out *on
+  mechanism*; and RTL is a pure DOM problem (**zero** PixiJS text objects exist). **M24 localizes NO
+  content-registry text** — species/skill/item/dialogue text ships English in every locale, deferred with
+  its mechanism decided normatively (§2.5) so the future milestone inherits the arbitration instead of
+  re-running it; M24 touches **no** `game-core/`, `server-module/`, `CONTENT_VERSION` or `styles.css`
+  (which belongs to M23 exclusively). ICU is the **interchange** format (export/import shims), never a
+  runtime parser — ADR-0055's dynamic-`RegExp` ban decides that. **5 operator escalations (spec §8)**,
+  two of them hard BLOCKERs.
 - **M25 Security audit & threat-model gate** (`M25-security-audit.spec.md`; ADR-0034; `security-threat-
   model.md`) — the **final pre-launch gate**: consolidated threat model + a tooled/manual audit (RLS-leak
   verification on the pinned version is the headline check) + a blocking security sign-off + re-audit
