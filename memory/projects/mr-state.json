@@ -1,29 +1,18 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-25T05:50:00Z",
- "updated_by": "mr-sup-native-20260825T054518Z-1589143",
+ "updated_utc": "2026-08-25T09:10:00Z",
+ "updated_by": "native-20260825T090008Z-1930106",
  "master": {
-  "sha": "2dbfe0c8c52d147c05062f249e31564e36cfefc9",
-  "ci": "PR#369 checks (ci+e2e) SUCCESS pre-merge on 759a7f9; post-merge master run 32814222235 on 2dbfe0c8 in_progress at record time -- verify green next tick",
+  "sha": "00de7055aba717a3d7fe20efaaeed9330e5df50c",
+  "ci": "push run 32829994563 in_progress at record time -- background watcher delegated (pid 1950618), resolves via mr-native-tick.log line, verify next tick if not yet seen",
   "nightly": "fixed_at_a40cb81_confirmed_green"
  },
  "harness_main": {
   "sha": "1779564",
-  "ci": "no-remote-ci-local-gate-green; unpushed chore/fix commits accumulating on local main per known routine gap (chore(mr-sup) commits are never pushed) -- includes this tick's fix(mr-spawn) commit"
+  "ci": "no-remote-ci-local-gate-green; unpushed chore/fix commits accumulating on local main (known routine gap)"
  },
  "adr_next_free": 207,
- "inflight": [
-  {
-   "slice": "m23-s10",
-   "leader": 1598284,
-   "claude_pid": 1598287,
-   "rid": "mr-spawn-20260825T054945Z-1598231",
-   "model": "opus",
-   "effort": "high",
-   "tier": "routine",
-   "repo": "project"
-  }
- ],
+ "inflight": [],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -31,8 +20,8 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick native-20260825T054518Z-1589143 (05:45Z, src=done, event=m23-s6.done.md, rc=0 attempts=1 model=opus). Live-verified PR#369 mergeStateStatus=CLEAN, ci+e2e both SUCCESS. mr-audit orchestration=CLEAN, gating=CLEAN (mandatory_read=false). Acceptance ledger FLAGGED on X15/X16 -- adjudicated FALSE-POSITIVE: this Bash session has no cargo/rust toolchain installed at all (not an asdf PATH-order issue, a genuine absence), reproduced identically on the pre-merge tree independent of the diff; the rooted run's own just-ci log recorded FINAL-CI-EXIT=0 (2734 tests/90 evals) inside an environment that does have cargo, which is the trustworthy signal. 14/16 pure-test gates fresh-reverified true, spotcheck X8 agrees. residuals close --slice m23-s6: 0 (nothing open on this ledger). disposition block findings were CORPUS-SCOPED (harness specs/ tree hygiene), not this diff -- not actioned. Squash-merged PR#369 -> 2dbfe0c8; local+remote slice/m23-s6 branches deleted, worktree removed. Composite launch: m23-s10 (the five a11y evals + baseline + happy-dom specs, routine/opus@high) -- dependency spine's {S8->S9}->{S10||S11} diagram is a display grouping only; the per-slice `after:` column is authoritative and S10's after: is S3,S4,S7 (all merged), NOT S8/S9 (S8 remains BLOCKED on spec sec.8.1/8.2 operator rulings, S9 after S8) -- S10 does not wait on that block. Solo launch, no fan-out partner (S11 depends on S10). Folded 4 accumulated cross-slice corrections into the brief so the run doesn't re-derive them: R-m23-s6-A11Y-25 (member-expression identity extractor + the tabindex=-1 GOOD-fixture correction, red-team-measured wrong in the spec text), R-m23-s6-A11Y-26 (index.html whole-tree tabindex>0 scan), R-m23-s2-X6 (dual CSS-parser-implementation drift risk, needs an explicit agreement gate), R-m23-s7-X11 (reduced-motion-purity.eval.mjs is S10's to build). Residuals: 17 open vs cap 12 (observe-only slice-1), max age ~1.35d, all far under t1_promote_days=3 -- none outrank new work. queue[] empty both before and after. Governor NORMAL (d7 $1382.46/2783 eff., fable_ok=true; opus-tier launch unaffected). No BLOCKERs. Pre-existing (not actioned): handoff-rotate WARNed 27 entries with unparseable '## <ISO8601>' headers, pinned live -- needs a manual doc-only look, not a gate. Next tick: verify master CI green on 2dbfe0c8 (run 32814222235 was in_progress at record time), watch m23-s10.",
- "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded, fable guarded vs its calibrated ALLOWANCE axis (mr-budget-config.json, recalibrated 2026-07-25)), content=opus@medium. Supersedes the 2026-07-19 opus-only note (fable usage limit since recovered; freshness policy active \u2014 opus alias now resolves to claude-opus-5).",
+ "notes": "Native tick native-20260825T090008Z-1930106 (09:00Z, src=done, event=m23-s11.done.md, rc=0 attempts=1 model=opus). Live-verified PR#371 mergeStateStatus=CLEAN, ci+e2e SUCCESS (checks had gone green since the .done event's QUEUED snapshot). mr-gates verify: first pass showed X1/X2/X6 EVIDENCE-MISMATCH from a LOCAL PATH gap in my own shell (missing ~/.cargo/bin -> cargo/vitest calls returned code=127) -- re-ran with cargo on PATH and got a clean 8/8 reverify matching recorded evidence exactly; treat this as a supervisor-shell gotcha, not a slice defect. mr-audit: orchestration CLEAN (6 calls/6 roles/2 models), gating_advisory CLEAN, mandatory_read=False, acceptance FLAGGED only because 2/10 gates are MANUAL-and-deferred (X8/X9, by spec's own never-CI-green rule) -- adjudicated as expected, not a real flag. disposition block: 12 CORPUS-SCOPED findings (pre-existing spec-disposition drift across the harness specs/ tree, unrelated to this diff) -- not actioned, same category flagged last tick. Squash-merged PR#371 -> 00de7055; local+remote slice/m23-s11 branch and worktree deleted. Ledger MERGED row recorded (cost_usd correctly null/COST-UNKNOWN per doctrine -- the wrapper's finished-run reconcile row already carries the real spend). Handoff entry written (rotation fired: 4 entries/7.2KB archived to 2026-08; 28 entries with unparseable headers remain pinned live, same pre-existing doc-hygiene note as last tick, still not actioned). Residuals: 4 new unpromoted rows emitted at build time by m23-s11 itself (X8/X9 MANUAL-execution-pending, X10/X11 axe-core+reduced-motion e2e tier -> intended owner m23-s12, no spec section yet) plus X12 (wontfix, targets operator via mr-ask-drew for the WCAG-AA milestone-exit DoD ruling -- blocks M23 EXIT only, not this slice). residuals list confirms none are promoted-slice closures owned by m23-s11 (it wasn't itself a promoted residual), so \"mr-gates residuals close\" was a no-op / not applicable here. Alarm: 27 open residuals vs cap 12 -- OBSERVE-ONLY in slice 1, none past any aging threshold (oldest ~1.5d), does not outrank new work. Master CI on the merge commit (00de7055) was still in_progress at record time -- delegated to a detached \"gh run watch\" background poll (pid 1950618) rather than sitting on it; NOT re-verified green this tick, next tick or the watcher's log line must confirm before trusting 'green' state. Did NOT attempt a composite merge->launch this tick: master CI on the new tip is unresolved and deriving the next PLAN section-9 candidate (M23's S8/S9 remain BLOCKED on operator rulings per spec section 8; no queue[] hint; a fresh full-derivation pass wasn't run) is real work better done with a confirmed-green base. Governor NORMAL (d7 $1464.85/2783 eff., fable_ok=true). No BLOCKERs. Next tick: confirm master CI green on 00de7055 (check mr-native-tick.log for the MASTER-CI-RESULT line first), then do the full PLAN section-9 / residual-aging derivation for the next launch since queue[] is empty and M23's easy slices are exhausted.",
+ "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
  "resource_locations": {
@@ -60,6 +49,8 @@
   "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
- "live_watchers": [],
- "last_tick_utc": "2026-08-25T05:45:18Z"
+ "live_watchers": [
+  "master-ci-watch: background poll on push run 32829994563 for headSha 00de7055 (m23-s11 merge), notifies via mr-native-tick.log on completion"
+ ],
+ "last_tick_utc": "2026-08-25T07:25:20Z"
 }

@@ -1233,6 +1233,164 @@ mechanically.
 
 **Unblocked next:** S3 and S4 (both `after: S1, S2`) once m23-s1 lands.
 
+## 2026-08-25T~03:2xZ — m23-s10 COMPLETE (terminal: PR open + local `just ci` green + remote CI running)
+
+**Slice:** m23-s10 — M23 accessibility **S10**: the eval tier + the cross-view wiring spec.
+**PR:** https://github.com/mdrewt/monster-realm/pull/370 — OPEN. **Supervisor owns the merge — I did
+NOT run `gh pr merge`.** Branch `slice/m23-s10` (worktree `.claude/worktrees/m23-s10`), 5 commits,
+all pushed. Main checkout left on `master`, never mutated. Forked from `origin/master` @ `2dbfe0c`
+(master CI verified green at that SHA); no rebase needed, no sibling in flight.
+
+**Gate:** full local `just ci` **EXIT=0** — 93 evals PASS / 0 FAIL (was 90), **2818** client tests
+(was 2734), 0 failed/pending/todo. **Acceptance: 15/15 met**, `seed:e3b0c44298fc1c14`, `mr-gates
+lint` LINT-CLEAN, **6 DEFERs → backlog** (X16-X21). Seeded ZERO criteria (**SPEC-SECTION-NOT-FOUND,
+7th occurrence**; M23's EARS live in spec §6). X1-X15 authored in the PLAN phase.
+
+**⚠️ THE SLICE WAS RESHAPED BY MEASUREMENT — read the PR's deviation section before auditing.**
+Two independent lenses measured that EVERY check spec §5.1/§5.2/§5.6 names already ships as an
+equal-or-stronger unit-tier oracle, and `justfile:491` runs `eval` + `client-test` in the SAME
+`just ci` — so re-implementing them adds zero CI surface, and every naive re-implementation measured
+WEAKER (3 of 5 plausible OverlayId-union parsers are wrong on the real file; §5.1's own `[A11Y-02]`
+regex rejects 16/16 shipped keys). The evals therefore ship the measured-NEW teeth for real and
+DELEGATE the rest through a pin that is itself gated (title + code needles, a `.skip`/`.todo`
+suspension scan, a non-inert proof routing a mutated delegate through the shipped predicate, and
+`test.include`+`test.exclude` reachability).
+
+**🔴 CORRECTION R-m23-s2-X6 WAS DISCHARGED, BUT NOT BY THE PROPOSED MECHANISM.** The brief asked for
+a shared fixture corpus proving the `.mjs` and TS CSS oracles agree. Red-team MEASURED that a corpus
+is not a drift gate: a deliberately weak `.mjs` twin agreed on **18/18** of `indexShell.test.ts`'s own
+corpus while shipping four real regressions green (grouped/compound/descendant/CSS-nested `.sr-only`
+selectors). Source-hash pinning dies to a biome reformat; normalised-text comparison dies to a
+one-character string-literal edit. The pin makes the second implementation NOT EXIST instead.
+Residual **R-m23-s10-CSSDRIFT** declared; real fix is X18 (needs `indexShell.test.ts`, S2's file).
+
+**FIFTH ACCUMULATED CORRECTION, not in the launch brief** — ADR-0205 `:284-287` instructs S10 BY
+NAME: `[A11Y-02]`'s regex must permit uppercase and `[A11Y-04]`'s orphan check must stay
+prefix-scoped, or it reds on sixteen valid keys and on S1's `a11y.world.region`.
+
+**⚠️ OPERATOR SIGN-OFF OUTSTANDING (carried into PR#370's body).** ADR-0205 `:56-58` flags its D1
+amendment — "natively focusable" → "focusable, natively or via `tabindex`" — for sign-off in the
+consuming slice's PR. This is that PR. Measured: only **3 of 16** anchors satisfy §5.5's
+`{BUTTON,INPUT,SELECT,A,TEXTAREA}` allow-list; the other 13 are the ARIA APG `tabindex="-1"` fallback
+the milestone deliberately ships. If rejected, S2/S4 absorb it; the registry strings do not change.
+
+**24 MUTATION BITE-PROOFS, ALL BIT** (15 eval + 5 spec + 4 re-runs). **Two survivors were found and
+closed**: (a) `const b = document.body; b.replaceChildren()` — the ALIASED root receiver, invisible
+to a direct-receiver scan and never naming the node, so module ownership was blind too; my own T17
+fixture had mixed it with the direct form and passed on the direct half (fixture monoculture in a
+tooth I wrote). (b) a planted-string forgery of a delegation pin. **Lesson: a fixture that mixes two
+shapes passes on the easy one.**
+
+**Flake:** the wiring spec is clean over 6 isolated repeats + 3 `--sequence.shuffle` runs. A
+shuffle-order FALSE RED was found (the `checked === 16` coverage floor was a trailing `it`) and fixed
+by moving it to `afterAll`, which also makes it bite under `-t` filtering.
+
+**Process notes.** `/tmp/mr_warn_m23-s10` (LANDING PATTERN) appeared after the final `just ci`, so no
+further fan-out was dispatched. The **`tester` lens WAS invoked** but `guard-tester-bash.mjs` rejects
+every path containing a dotfile component, so it could execute NOTHING inside `.claude/worktrees/` —
+it returned static analysis plus 23 hand-written cheats staged at `/tmp/m23-s10-redteam/cheats.sh`
+and a flake harness at `/tmp/m23-s10-redteam/flake.sh`; **the orchestrator executed the measurement
+half itself** (the bite-proofs and the flake matrix above). *That guard makes the tester agent unable
+to do its job in any slice worktree — worth fixing at the harness level.* `reducer-security-auditor`
+and `desync-guard` had no surface (zero reducers, schema, `game-core`, predictor or renderer code —
+`renderResolver.ts` was read, never written). No ADR was authored: no number was assigned.
+
+**Supervisor follow-ups (NOT actioned — outside `touches:`):**
+1. **Allocate an ADR number.** The delegation-pin pattern is new, reusable, and the reviewer called
+   its ADR non-optional. Rationale currently lives in two eval headers + `ARCHITECTURE.md` + the plan
+   memo.
+2. ADR-0205 D1 sign-off (above).
+3. `mr-gates` seeder: 7th `SPEC-SECTION-NOT-FOUND` on M23.
+4. X19's cleanup must retire `renameView.test.ts:1276`'s m23-s4 ledger CHECK in the SAME change, or
+   deleting `S3-NO-VIEW-LOCAL-FOCUS` reds a prior slice's ledger.
+
+**touches-delta:** `ARCHITECTURE.md` only (one targeted paragraph). Nothing else outside the declared
+set. The `.claude/worktrees/m23-s10` worktree stays for the merge pipeline.
+
+## 2026-08-25T09:05:17Z — m23-s11 merged — PR#371, M23 accessibility milestone content complete
+Merged PR#371 (squash) → master@00de705. mr-gates verify: 8/10 met, 2 MANUAL deferred (X8/X9: NVDA+Chrome and aria-modal-inertness protocols authored in docs/a11y-manual-protocol.md, execution pending a human tester — never CI-green by spec's own binding rule). mr-audit: orchestration CLEAN (6 agent calls/6 roles/2 models), gating_advisory CLEAN, mandatory_read=False. Independent re-verify of all 8 checked gates (X1-X7,X13) agreed with recorded evidence after correcting a local PATH gap (missing ~/.cargo/bin caused three false EVIDENCE-MISMATCH readings on the first pass — cargo/vitest calls returned code=127; re-run with cargo on PATH reproduced the recorded evidence exactly).
+
+Three residual DEFER rows beyond the 10-gate ledger: X10/X11 -> backlog, intended owner m23-s12 (axe-core+Playwright e2e tier and a reduced-motion browser oracle — both outside m23-s11's touches:, a genuine spec gap in M23's S4 table, no slice currently owns them). X12 -> wontfix, target operator: the WCAG-2.2-AA conformance Definition-of-Done ruling (self-attest vs third-party audit vs screen-reader playtest) is spec-scoped as blocking M23's MILESTONE EXIT only, not this slice's build/merge — needs mr-ask-drew before the milestone can be declared closed.
+
+Worktree/branch cleanup done (local+remote slice/m23-s11 deleted). Master CI green post-merge (verified live, not from the situation bundle). This closes out M23's queued slices — next tick should check whether any M23 residual promotion or the X12 operator-DoD gate needs raising before moving to new PLAN §9 work.
+## 2026-08-25T09:05Z — m23-s11 PR#371 OPEN — local gate green, remote CI running (supervisor owns the merge)
+
+**Slice:** m23-s11 · M23 accessibility S11, the final slice. **Terminal state:** PR
+https://github.com/mdrewt/monster-realm/pull/371 OPEN, MERGEABLE/UNSTABLE, ci+e2e QUEUED at hand-off.
+Branch `slice/m23-s11` @ worktree `.claude/worktrees/m23-s11` (clean, pushed). `gh pr merge` NOT run.
+
+**Acceptance:** 8/10 met, 2 deferred, 0 unmet — `seed:e3b0c44298fc1c14`. Ledger LINT-CLEAN. The
+`Acceptance:` line in the PR body is byte-identical to `mr-gates render --format pr`.
+
+**Delivered.** `just a11y-e2e floor="169": wasm` as a DECAY RATCHET (not an axe run — see below), an
+`a11y-e2e` nightly job + notify fan-in + policy preamble, three additive predicates and 35
+proof-of-teeth fixtures in `evals/ci-gate-wiring.eval.mjs` (Checks 6/7/8), and
+`docs/a11y-manual-protocol.md`. `just ci` green locally: 96 files / 2818 tests, 93 evals PASS / 0
+FAIL, observability 8/8, biome 0 errors. ZERO test files differ from origin/master.
+
+**SUPERVISOR ACTIONS NEEDED (4):**
+1. **`docs/nightly-red-response-policy.md` is a disclosed `touches-delta:` — audit it.** It is a
+   MECHANICALLY FORCED hidden dependency: `evals/nightly-smoke-wiring.eval.mjs` Check 32 demands the
+   policy matrix job-key set be SET-EQUAL to nightly.yml's declared jobs, so declaring the job
+   without the row reds `just ci` locally (RED captured before adding it). No in-touches design
+   avoids it; piggybacking onto an existing job is worse (notify reports the JOB KEY, so an a11y red
+   would open "nightly failure: coverage"). No sibling was running (0 open PRs). **Fold
+   `docs/nightly-red-response-policy.md` into the declared `touches:` for any future nightly-job
+   slice.**
+2. **ADR number requested.** None was assigned, and doc-aggregation forbids picking one, so NO ADR
+   was authored; the policy row cites existing ADR-0050 + ADR-0205. Warranted topic: "the nightly
+   a11y tier — what `just a11y-e2e` measures, why it is not axe today, and the never-CI-green rule".
+3. **Promote the four backlog DEFERs into real spec sections** (X8/X9/X10/X11 — see below).
+4. **NEW BUG FOUND IN THE MAIN CI GATE, out of this slice's remit.** `isTruthyCoe`
+   (`evals/ci-gate-wiring.eval.mjs:42`) recognises only the literals `true|yes|on|True` and the exact
+   `${{ true }}`. Red-team EXECUTED two bypasses: `continue-on-error: ${{ !cancelled() }}` and
+   `${{ success() || true }}` are unconditionally true in every real run and pass as "unneutered".
+   The new a11y predicate works around it with a VALUE whitelist (literal `false` only), but
+   **`ciStepsUnneutered` — the main per-PR ci.yml gate — still carries the hole.** Not fixed here:
+   isTruthyCoe is shared and its fixtures pin its semantics, so widening it is its own slice.
+
+**Deferred (all with resolvable targets, all in the ledger):**
+- `X8/X9 -> backlog` — the EXECUTION of Protocol A/B. The protocol doc is authored
+  (`docs/a11y-manual-protocol.md:45` and `:75`) but **no human has run it** and the run log is empty
+  by design. Deliberately NOT self-certified: marking A11Y-32/33 met because a document exists would
+  be the exact false conformance claim the doc's own banner warns against. Needs one NVDA 2024.x +
+  Chrome sitting (mouse unplugged, screen covered) on a named SHA.
+- `X10/X11 -> backlog` — the axe-core + real-browser tier. **This is a genuine SPEC GAP, not a
+  scoping choice:** spec §5.7 names "axe-core + Playwright" as the recipe's payload, but no axe-core
+  exists in the repo and NO slice in the spec's own §4 table owns authoring `client/e2e/a11y.spec.ts`
+  or the devDependency. Consequence: the four `[E2E]`-tagged criteria A11Y-19/20/22/23 have NO
+  automated oracle anywhere in M23 today. `just a11y-e2e` is built as the seam. Suggested `m23-s12`.
+- `X12 -> wontfix` — operator escalation #3 (spec §8.3), the AA-conformance DoD. Blocks the MILESTONE
+  exit and any public conformance statement, NOT this slice. Recorded in the protocol doc.
+
+**Red-team round 2 (4 EXECUTED bypasses of round 1, all closed, each with a hostile-good control):**
+CRITICAL — `a11yRecipeBodyIntact` was a substring scan, so `exit 0` planted under `set -euo pipefail`
+above a byte-identical body kept every token present while the recipe ran nothing and exited 0. Fixed
+by pinning the recipe REGION VERBATIM (raw, not comment-stripped, so a deleted shebang also reds) —
+a blacklist of abort constructs is unclosable. HIGH — empty `strategy.matrix` = zero job instances.
+MED-HIGH — phantom `runs-on` label. MED — the isTruthyCoe hole in (4) above.
+
+**Lenses:** planner, tester (27 round-1 fixtures, ≠ implementer), reviewer, red-team, /simplify,
+verifier PASS (re-ran full gate, independently re-executed X1/X2/X4/X13, re-proved the teeth bite),
+desync-guard PASS (nil surface — game-core/server-module/client-wasm/client/src tree hashes
+byte-identical to master; the four A11Y-36 parity evals byte-unmodified and green).
+
+**Two measurement notes for whoever verifies:** (a) the client-suite baseline at 2770ec9 is **2818**,
+not the 2819 m23-s10's ledger recorded — re-measured twice, and zero test files differ from master,
+so the discrepancy is inherited, not caused here. (b) `evals/nightly-smoke-wiring.eval.mjs` has NO
+main guard: `node evals/nightly-smoke-wiring.eval.mjs` exits 0 VACUOUSLY; import it and call
+`m.default()`.
+
+**Boy Scout:** 1 hunk / 2 lines — `justfile:280-281`, a stale "CI-as-required-gate is M5b" comment
+that ci.yml's e2e job has long since shipped. Two other candidates turned out to be historical prose,
+so they were left alone.
+
+
+## 2026-08-25T07:31:02Z — m23-s11 LAUNCHED (composite launch after m23-s10 merge)
+Composite merge->launch: after m23-s10 merged clean (PR#370, 2770ec9), re-derived eligibility fresh. Dependency spine S0->S1->{S2||S7}->{S3||S4}->S5->S6->{S8->S9}->{S10||S11}: S11's after: is S10 only (now merged); S8/S9 remain BLOCKED on spec Sec.8 operator rulings (unrelated branch). No in-flight slices, touches disjoint trivially (solo launch). Re-probed for human activity: only my own merge-produced file writes in the last 6 min, no resident IDE claude pid -- clear. Launched m23-s11 (justfile a11y-e2e recipe + nightly workflow wiring + docs/a11y-manual-protocol.md for the two MANUAL-only criteria A11Y-32/33 + evals/ci-gate-wiring.eval.mjs) opus@high routine tier, leader pid 1757938, rid mr-spawn-20260825T073041Z-1757878. Gate-seeding returned SPEC-SECTION-NOT-FOUND (criteria=0) -- the M23 spec's S11 entry is a table row + bold subheading, not a `## S11` heading the seeder pattern-matches; NO-LEDGER for this slice is expected, not a defect (absent measurement per doctrine). S11's BUILD is unblocked; only its milestone-EXIT sign-off (AA-conformance DoD, escalation #3) awaits an operator ruling -- noted in the brief so the run doesn't stall on it.
+
+## 2026-08-25T07:29:20Z — m23-s10 MERGED — PR#370 (2770ec9)
+Merged via mr-audit CLEAN (policy) + mr-gates verify 15/15 met, spotcheck X9 agreed. gating_advisory FLAGGED skip_markers_added=11/suppressions_added=1 — read the diff hunks: all hits are string literals inside the new eval's own bad-fixture detector (T14c checks that a `describe.skip(` delegate gets flagged SUSPENDED) plus one comment mentioning @ts-expect-error; no real test suppression added. Squash-merged, branch+worktree deleted, master fast-forwarded to 2770ec9. m23-s6 (PR#369) was already merged prior to this tick. Residuals close: 0 (none open for m23-s10). Delegated master-CI wait to a background poll; will confirm green next.
 ## 2026-08-25T05:48:32Z — m23-s6 MERGED (PR#369, sha 2dbfe0c8)
 Supervisor tick native-20260825T054518Z-1589143 merged m23-s6 (menuView ARIA listbox/aria-activedescendant, 16th/last click-only OverlayId gets a11y wiring). Audit: orchestration CLEAN, gating CLEAN, mandatory_read=false. Acceptance ledger FLAGGED on X15/X16 (lint/full-ci gates) -- adjudicated FALSE-POSITIVE: this Bash session has no cargo at all (rust not asdf-installed here), reproduced the identical cargo-not-found failure independent of the diff/commit. Rooted run's own log recorded FINAL-CI-EXIT=0 from a real just ci (2734 tests, 90 evals PASS) inside its own environment which does have cargo -- that is the trustworthy signal. 14/16 pure-test gates all fresh-reverified true incl. adversarial spotcheck (X8, agrees=Y). residuals close: 0 open (nothing to close). Two DEFERs disclosed by this slice (A11Y-25, A11Y-26) both targeted backlog, INTENDED OWNER m23-s10 -- no promotion needed this tick, S10's own spec section already names them. Worktree removed, local+remote slice/m23-s6 branches deleted. Master fast-forwarded to 2dbfe0c8; master CI (run 32814222235) still in_progress at tick end -- next tick/event should re-verify green before trusting it. No BLOCKERs. Governor NORMAL (d7 ~$1382/2783 eff.). Fan-out: none in flight; falling through to gate-3 pick-work next.
 ## 2026-08-25T03:57:03Z — m23-s5 merged (PR#368, 3e062c4) — composite launch m23-s6
@@ -1363,125 +1521,3 @@ PR#361 (feat(m23-s0): A11yMeta + total OVERLAY_A11Y and the flat a11yCopy catalo
 ## 2026-08-24T12:02:33Z — native tick 12:00Z (master confirmed green, m23-s0 conflict resolved + CI-watch delegated)
 Gate-0: no live locks/kill-switch/human collision. Gate-1: fetched both repos. Gate-3: master CI red-at-prior-tick was a flake -- re-verified LIVE: gh run 32717269214 (m22-s1, d60af03) rerun conclusion=success on both ci and e2e jobs. No fix/revert needed. PR#361 (m23-s0) had flipped DIRTY/CONFLICTING under m22-s1 landing on master; git merge-tree confirmed the conflict was confined to ARCHITECTURE.md (doc set per fan-out doctrine) -- resolved deterministically by union (kept m22-s1's paragraph first since already on master, appended the unchanged M23/m23-s0 paragraph) in the pre-existing worktree at .claude/worktrees/m23-s0, committed dec6b56, pushed. PR now MERGEABLE/UNSTABLE with ci+e2e queued on the merge commit -- delegated the wait to mr-ci-watch (detached, pid 258656) per doctrine rather than polling inline. This tick's ONE mutating action = the conflict-resolution push; no new slice launched. Governor NORMAL (d7 ~025.64/2783 eff., fable_ok=true). No BLOCKER.
 
-## 2026-08-24T11:02:20Z — Native tick mr-sup-native-20260824T110011Z-242211: master CI red investigated, e2e rerun triggered
-Gate-0: found uncommitted mr-sup bookkeeping (mr-state.json/handoff/decisions-log/ledger/m22-s1+m23-s0 plan artifacts) left over from the prior tick (native-20260824T102935Z-157133, which merged PR#360/m22-s1 but never committed its own record writes) -- committed as chore(mr-sup) 4c2b99b, leaving future-prompts.md and gdd.md untouched (human strays, unrelated content). No kill-switch, no live per-run locks, no active-session collision. Gate-3 (master CI red outranks everything): re-verified live -- master d60af03 (m22-s1 merge) has ci=SUCCESS but e2e=FAILURE, single test timeout in e2e/ranked-forfeit.spec.ts (m17c ranked PvP forfeit RL-18, Test timeout 120000ms), 68 passed / 1 failed / 1 skipped. Failure is in a file wholly unrelated to m22-s1's touched surface (game-core/src/accounts/deletion.rs) -- looks like a flake (disconnect-flow timeout), not a regression from the merge. Triggered 'gh run rerun 32717269214 --failed' to get independent evidence before concluding flake vs real bug (bounded diagnostic, not a blind relaunch). This is this tick's ONE mutating action; not sitting to poll it (no PR-based mr-ci-watch fit for a master-push-triggered run) -- next tick re-verifies live. Also noted but NOT actioned this tick: PR#361 (m23-s0) flipped from CLEAN/MERGEABLE (prior tick's read) to DIRTY/CONFLICTING live now, almost certainly because m22-s1 landed on master out from under its branch -- needs 'gh pr update-branch' or manual rebase-resolution next tick once master CI is confirmed green again; NOT merged this tick given master is red. No BLOCKER raised (reversible diagnostic step). Governor NORMAL (d7 $1024.75/2783 eff, fable_ok=true); no launch/merge/park this tick.
-
-## 2026-08-24T10:35:19Z — m22-s1 MERGED — PR#360
-**Slice:** m22-s1 · M22 privacy/compliance S1 (pure game-core deletion rules). **Terminal:** PR #360 squash-merged to master as d60af03. mr-audit: policy CLEAN (mandatory_read=false), orchestration CLEAN (full role set: planner/tester/red-team/reviewer/verifier/doc-keeper), gating_advisory CLEAN. mr-gates verify: 9/9 gates independently reverified and agree with recorded evidence (X1-X9), spotcheck X5 (tombstone auth-issuer sentinel) refuted-and-held. Acceptance sub-verdict showed FLAGGED only due to a benign `SPEC-SECTION-NOT-FOUND` reason (spec-section lookup miss, not a real gap) — 9/9 met, 0 unmet, 0 deferred, no evidence mismatch. Worktree/branch cleaned; residuals close reported 0 (none were open against this slice). Master CI was still in_progress at tick-end (queued right after merge) — next tick should re-verify live before trusting green. No ADR needed (harness ADR-0031 already governs M22).
-## 2026-08-24T09:03:33Z — m22-s1 + m23-s0 LAUNCHED (fan-out N=2)
-Tick rid=native-20260824T090012Z-4095539. Prior tick (08:50Z) merged m22-s0 (PR#359) and explicitly
-deferred the composite launch/full derivation to the next tick ("too large to safely complete within
-an already-large merge tick"). This tick is that derivation.
-
-Gate 0/1/2: no live locks, no chain mutex, no active human session (last harness file writes ~10min
-old were the prior tick's own handoff/mr-state.json/ledger writes; gdd.md/future-prompts.md strays are
-hours-old, pre-existing, untouched). git fetch clean both repos; only remote change was origin/slice/m22-s0
-deletion (post-merge branch cleanup). No open PRs either repo (gh pr list == [] both). master @ 2a6864b
-matches mr-state.json.
-
-Gate 3: master CI green (verified via PR#359's post-merge checks, both green). No resume/open/parked
-slices. Residuals: 7 unclaimed (4 from m22-s0: R-m22-s0-X1..X4, all MED severity age <1h; 3 from rw3b,
-oldest age ~0.3d) -- all well under t1_promote_days=3 / t2_stale_days=14, none outrank new work. queue[]
-was empty. Full PLAN Sec.9 derivation: M22/M23/M24/M25 ceremonies are all COMPLETE-but-gated by operator
-escalations; M22 has S0 merged, next is S1 (game-core deletion rules, non-blocked -- only S3's
-reactivation guard PRV1-8 is a hard BLOCKER per spec Sec.8.2/Sec.11, and escalation #1's grace-period
-number explicitly ships as a documented placeholder per the ceremony's own recommendation, not a
-blocker). M23 has no slices merged yet; S0 (A11yMeta + OVERLAY_A11Y total map + a11yCopy.ts) is the
-milestone's first slice, non-blocked (M23's two hard BLOCKERs gate only S8).
-
-Fan-out: m22-s1 (game-core/src/accounts/deletion.rs, new) and m23-s0 (client/src/ui/overlayRegistry.ts,
-client/src/ui/a11yCopy.ts new) -- mr-disjoint verdict SAFE, zero file overlap, no shared registry/enum
-axis (privacy vs a11y domains), neither touches the structural set, free -g shows 17G free/39G available
-(comfortably >1 build each). Both routine tier (opus@high) -- neither touches schema/reducers/netcode/
-predictor/security-RLS, and only M20/M25 (not M22/M23) are named HARD by the routing doctrine. ADR:
-m22-s1 needs none (M22 already has ADR-0031). m23-s0 reserves project ADR-0205 per the spec's own text
-("Reserve project ADR-0205") -- adr_next_free bumped 205->206 in this tick's mr-state.json write.
-
-Both mr-spawn LAUNCHED cleanly (asserted detachment + opus model class). Gate-seeder reported
-criteria=0/SPEC-SECTION-NOT-FOUND for both -- expected, not a defect: S1's own EARS don't exist (M22
-Sec.7.4 groups deletion-cascade criteria under S2/S3, not S1, since S1 is pure constant/helper
-groundwork); S0's EARS likewise live under later M23 slices per the same pattern m22-s0 already showed
-(m22-s0 also seeded criteria=0 and that was correct).
-
-No BLOCKERs. Governor NORMAL (d7 $965.38/2783 eff., fable_ok=true, unaffected -- opus tier only).
-Next tick: watch for .done files on m22-s1/m23-s0; if either finishes before the other, verify+merge
-serially per doctrine (S2 will be schema-touching and always-serial once S1 lands).
-## 2026-08-24T08:49:22Z — m22-s0 merged (PR#359)
-Merged 2a6864b onto master (ff-only from 12af096). M22 contract-first slice S0: REKEY_MANIFEST/findIdentityColumns exported+frozen in place on evals/guest-claim-integrity.eval.mjs (no split lift -- no size-split convention exists in repo, PR body cites the search). New evals/rekey-contract-surface.eval.mjs (auto-discovered, 3 teeth: T1 contract surface, T2 walker shape, T3 side-effect-free import) gates the surface instead of the declared evals/rekey-registry-shared.mjs. mr-audit: orchestration=CLEAN (6 roles, opus), gating-test-integrity=CLEAN. mr-gates verify: 4/4 met once node/cargo PATH corrected (Bash tool resolves /usr/bin/node v18 by default -- prepend asdf node 24.13.1 + ~/.cargo/bin before running project tooling); X4 flagged ARCHITECTURE.md as CREPT but that file is doc-set-exempt per fan-out doctrine, adjudicated accepted. Master post-merge CI (run for 2a6864b) was still in_progress at merge time -- not polled further this tick. FOLLOW-UP for a future tick: PR body requests a doc-only spec amendment to M22-privacy-compliance.spec.md sec2 (:74-77)/sec7.1/sec7.2 S0 row, naming rust-scan.mjs and battle-schema-snapshot.eval.mjs as the canonical owners of stripRustSource/parseTableSchemas instead of a re-export barrel through the S0 surface. Not actioned this tick (one-mutating-action rule; this is the composite-launch decision point instead).
-## 2026-08-24T07:03:36Z — m22-s0 launched (M22 privacy/compliance spine start)
-Supervisor tick mr-sup-native-20260824T070014Z-3651371 reconciled live ground truth: no locks/inflight, master CI green both repos (proj @12af096 rw3c, harness main clean modulo pre-existing strays future-prompts.md/gdd.md not touched). All 4 heavy-ceremony specs (M22/M23/M24/M25) confirmed merged+recorded from prior ticks. Residuals R-rw3b-X6/R-rw3b-X8/R-rw3c-X3 all <1d old, well under t1_promote_days=3 -- do not yet outrank new work. queue[] empty. Derived next work from PLAN Sec.9: M-postgate-roster-wave-3 and M-postgate-sixteenth-review-residuals (16r-a/c/d/e/f/g/h) are now fully merged (16r-b remains blocked, SERIAL-REQUIRED against the still-blocked 15r scanner-migration family -- left alone). Selected M22-privacy-compliance spine slice S0 (contract-first export of REKEY_MANIFEST/findIdentityColumns/parseTableSchemas/stripRustSource from evals/guest-claim-integrity.eval.mjs) as the next launchable item: it has no after: dependency, and none of the spec's 5 Sec.8 operator escalations (DELETION_GRACE_MS value, reactivation policy PRV1-8, cascade tx-size, export delivery UX, pseudonymization-copy acknowledgement) gate S0 -- they gate S1/S3/S4-ish/S7 downstream. Scoped touches to evals/ only (project repo); told the run explicitly to skip mr-state.json's adr_next_free entry since that drift (0204->0205) was already corrected by an earlier tick, avoiding a REPO-MIXED launch refusal. mr-spawn LAUNCHED cleanly (leader=3654372, opus/high, tier=routine, repo=project, PR target mdrewt/monster-realm). Gates seeded 0 criteria (SPEC-SECTION-NOT-FOUND, same as prior ceremony slices whose spec section isn't its own heading -- advisory only). Delegating to the normal wrapper poll cycle; next tick reconciles from live PR/git state.
-
-
-## 2026-08-25T~03:2xZ — m23-s10 COMPLETE (terminal: PR open + local `just ci` green + remote CI running)
-
-**Slice:** m23-s10 — M23 accessibility **S10**: the eval tier + the cross-view wiring spec.
-**PR:** https://github.com/mdrewt/monster-realm/pull/370 — OPEN. **Supervisor owns the merge — I did
-NOT run `gh pr merge`.** Branch `slice/m23-s10` (worktree `.claude/worktrees/m23-s10`), 5 commits,
-all pushed. Main checkout left on `master`, never mutated. Forked from `origin/master` @ `2dbfe0c`
-(master CI verified green at that SHA); no rebase needed, no sibling in flight.
-
-**Gate:** full local `just ci` **EXIT=0** — 93 evals PASS / 0 FAIL (was 90), **2818** client tests
-(was 2734), 0 failed/pending/todo. **Acceptance: 15/15 met**, `seed:e3b0c44298fc1c14`, `mr-gates
-lint` LINT-CLEAN, **6 DEFERs → backlog** (X16-X21). Seeded ZERO criteria (**SPEC-SECTION-NOT-FOUND,
-7th occurrence**; M23's EARS live in spec §6). X1-X15 authored in the PLAN phase.
-
-**⚠️ THE SLICE WAS RESHAPED BY MEASUREMENT — read the PR's deviation section before auditing.**
-Two independent lenses measured that EVERY check spec §5.1/§5.2/§5.6 names already ships as an
-equal-or-stronger unit-tier oracle, and `justfile:491` runs `eval` + `client-test` in the SAME
-`just ci` — so re-implementing them adds zero CI surface, and every naive re-implementation measured
-WEAKER (3 of 5 plausible OverlayId-union parsers are wrong on the real file; §5.1's own `[A11Y-02]`
-regex rejects 16/16 shipped keys). The evals therefore ship the measured-NEW teeth for real and
-DELEGATE the rest through a pin that is itself gated (title + code needles, a `.skip`/`.todo`
-suspension scan, a non-inert proof routing a mutated delegate through the shipped predicate, and
-`test.include`+`test.exclude` reachability).
-
-**🔴 CORRECTION R-m23-s2-X6 WAS DISCHARGED, BUT NOT BY THE PROPOSED MECHANISM.** The brief asked for
-a shared fixture corpus proving the `.mjs` and TS CSS oracles agree. Red-team MEASURED that a corpus
-is not a drift gate: a deliberately weak `.mjs` twin agreed on **18/18** of `indexShell.test.ts`'s own
-corpus while shipping four real regressions green (grouped/compound/descendant/CSS-nested `.sr-only`
-selectors). Source-hash pinning dies to a biome reformat; normalised-text comparison dies to a
-one-character string-literal edit. The pin makes the second implementation NOT EXIST instead.
-Residual **R-m23-s10-CSSDRIFT** declared; real fix is X18 (needs `indexShell.test.ts`, S2's file).
-
-**FIFTH ACCUMULATED CORRECTION, not in the launch brief** — ADR-0205 `:284-287` instructs S10 BY
-NAME: `[A11Y-02]`'s regex must permit uppercase and `[A11Y-04]`'s orphan check must stay
-prefix-scoped, or it reds on sixteen valid keys and on S1's `a11y.world.region`.
-
-**⚠️ OPERATOR SIGN-OFF OUTSTANDING (carried into PR#370's body).** ADR-0205 `:56-58` flags its D1
-amendment — "natively focusable" → "focusable, natively or via `tabindex`" — for sign-off in the
-consuming slice's PR. This is that PR. Measured: only **3 of 16** anchors satisfy §5.5's
-`{BUTTON,INPUT,SELECT,A,TEXTAREA}` allow-list; the other 13 are the ARIA APG `tabindex="-1"` fallback
-the milestone deliberately ships. If rejected, S2/S4 absorb it; the registry strings do not change.
-
-**24 MUTATION BITE-PROOFS, ALL BIT** (15 eval + 5 spec + 4 re-runs). **Two survivors were found and
-closed**: (a) `const b = document.body; b.replaceChildren()` — the ALIASED root receiver, invisible
-to a direct-receiver scan and never naming the node, so module ownership was blind too; my own T17
-fixture had mixed it with the direct form and passed on the direct half (fixture monoculture in a
-tooth I wrote). (b) a planted-string forgery of a delegation pin. **Lesson: a fixture that mixes two
-shapes passes on the easy one.**
-
-**Flake:** the wiring spec is clean over 6 isolated repeats + 3 `--sequence.shuffle` runs. A
-shuffle-order FALSE RED was found (the `checked === 16` coverage floor was a trailing `it`) and fixed
-by moving it to `afterAll`, which also makes it bite under `-t` filtering.
-
-**Process notes.** `/tmp/mr_warn_m23-s10` (LANDING PATTERN) appeared after the final `just ci`, so no
-further fan-out was dispatched. The **`tester` lens WAS invoked** but `guard-tester-bash.mjs` rejects
-every path containing a dotfile component, so it could execute NOTHING inside `.claude/worktrees/` —
-it returned static analysis plus 23 hand-written cheats staged at `/tmp/m23-s10-redteam/cheats.sh`
-and a flake harness at `/tmp/m23-s10-redteam/flake.sh`; **the orchestrator executed the measurement
-half itself** (the bite-proofs and the flake matrix above). *That guard makes the tester agent unable
-to do its job in any slice worktree — worth fixing at the harness level.* `reducer-security-auditor`
-and `desync-guard` had no surface (zero reducers, schema, `game-core`, predictor or renderer code —
-`renderResolver.ts` was read, never written). No ADR was authored: no number was assigned.
-
-**Supervisor follow-ups (NOT actioned — outside `touches:`):**
-1. **Allocate an ADR number.** The delegation-pin pattern is new, reusable, and the reviewer called
-   its ADR non-optional. Rationale currently lives in two eval headers + `ARCHITECTURE.md` + the plan
-   memo.
-2. ADR-0205 D1 sign-off (above).
-3. `mr-gates` seeder: 7th `SPEC-SECTION-NOT-FOUND` on M23.
-4. X19's cleanup must retire `renameView.test.ts:1276`'s m23-s4 ledger CHECK in the SAME change, or
-   deleting `S3-NO-VIEW-LOCAL-FOCUS` reds a prior slice's ledger.
-
-**touches-delta:** `ARCHITECTURE.md` only (one targeted paragraph). Nothing else outside the declared
-set. The `.claude/worktrees/m23-s10` worktree stays for the merge pipeline.
