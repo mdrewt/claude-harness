@@ -1013,6 +1013,17 @@ rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
 # exactly RECONCILE part 2's "dead-pid lock with no .done" predicate, injecting a phantom CRASHED
 # row into the ledger the budget governor reads.
 rm -f "/tmp/mr_pass_$S.done" "/tmp/mr_pass_$S.done.recorded"
+# A resume's log/err are append-only (mr-launch.sh:103-104 uses >>), so a stale prior attempt's
+# log survives underneath the new one. attempt_launch()'s model-class assert greps with -m1 (first
+# match), so on a model-upgraded resume (e.g. opus -> fable after a failure) it can find the OLD
+# attempt's model line before the new session ever writes one, spuriously fail model-mismatch, and
+# kill a correctly-launched attempt twice. Preserve the evidence (never destroy a run's own log)
+# but move it out of the path the new attempt appends to.
+if [ -s "/tmp/mr_pass_$S.log" ] || [ -s "/tmp/mr_pass_$S.err" ]; then
+  TSTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+  mv -f "/tmp/mr_pass_$S.log" "/tmp/mr_pass_$S.log.prev-$TSTAMP" 2>/dev/null || true
+  mv -f "/tmp/mr_pass_$S.err" "/tmp/mr_pass_$S.err.prev-$TSTAMP" 2>/dev/null || true
+fi
 GSCOPE=$(/usr/bin/python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('target_desc',''))" "$V" 2>/dev/null || echo "")
 if [ -x "$MEM/mr-gates" ]; then
   if GOUT=$("$MEM/mr-gates" init --slice "$S" --repo "$REPO" --scope "$GSCOPE" 2>&1); then
