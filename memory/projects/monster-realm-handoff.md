@@ -1410,3 +1410,78 @@ serially per doctrine (S2 will be schema-touching and always-serial once S1 land
 Merged 2a6864b onto master (ff-only from 12af096). M22 contract-first slice S0: REKEY_MANIFEST/findIdentityColumns exported+frozen in place on evals/guest-claim-integrity.eval.mjs (no split lift -- no size-split convention exists in repo, PR body cites the search). New evals/rekey-contract-surface.eval.mjs (auto-discovered, 3 teeth: T1 contract surface, T2 walker shape, T3 side-effect-free import) gates the surface instead of the declared evals/rekey-registry-shared.mjs. mr-audit: orchestration=CLEAN (6 roles, opus), gating-test-integrity=CLEAN. mr-gates verify: 4/4 met once node/cargo PATH corrected (Bash tool resolves /usr/bin/node v18 by default -- prepend asdf node 24.13.1 + ~/.cargo/bin before running project tooling); X4 flagged ARCHITECTURE.md as CREPT but that file is doc-set-exempt per fan-out doctrine, adjudicated accepted. Master post-merge CI (run for 2a6864b) was still in_progress at merge time -- not polled further this tick. FOLLOW-UP for a future tick: PR body requests a doc-only spec amendment to M22-privacy-compliance.spec.md sec2 (:74-77)/sec7.1/sec7.2 S0 row, naming rust-scan.mjs and battle-schema-snapshot.eval.mjs as the canonical owners of stripRustSource/parseTableSchemas instead of a re-export barrel through the S0 surface. Not actioned this tick (one-mutating-action rule; this is the composite-launch decision point instead).
 ## 2026-08-24T07:03:36Z — m22-s0 launched (M22 privacy/compliance spine start)
 Supervisor tick mr-sup-native-20260824T070014Z-3651371 reconciled live ground truth: no locks/inflight, master CI green both repos (proj @12af096 rw3c, harness main clean modulo pre-existing strays future-prompts.md/gdd.md not touched). All 4 heavy-ceremony specs (M22/M23/M24/M25) confirmed merged+recorded from prior ticks. Residuals R-rw3b-X6/R-rw3b-X8/R-rw3c-X3 all <1d old, well under t1_promote_days=3 -- do not yet outrank new work. queue[] empty. Derived next work from PLAN Sec.9: M-postgate-roster-wave-3 and M-postgate-sixteenth-review-residuals (16r-a/c/d/e/f/g/h) are now fully merged (16r-b remains blocked, SERIAL-REQUIRED against the still-blocked 15r scanner-migration family -- left alone). Selected M22-privacy-compliance spine slice S0 (contract-first export of REKEY_MANIFEST/findIdentityColumns/parseTableSchemas/stripRustSource from evals/guest-claim-integrity.eval.mjs) as the next launchable item: it has no after: dependency, and none of the spec's 5 Sec.8 operator escalations (DELETION_GRACE_MS value, reactivation policy PRV1-8, cascade tx-size, export delivery UX, pseudonymization-copy acknowledgement) gate S0 -- they gate S1/S3/S4-ish/S7 downstream. Scoped touches to evals/ only (project repo); told the run explicitly to skip mr-state.json's adr_next_free entry since that drift (0204->0205) was already corrected by an earlier tick, avoiding a REPO-MIXED launch refusal. mr-spawn LAUNCHED cleanly (leader=3654372, opus/high, tier=routine, repo=project, PR target mdrewt/monster-realm). Gates seeded 0 criteria (SPEC-SECTION-NOT-FOUND, same as prior ceremony slices whose spec section isn't its own heading -- advisory only). Delegating to the normal wrapper poll cycle; next tick reconciles from live PR/git state.
+
+
+## 2026-08-25T~03:2xZ — m23-s10 COMPLETE (terminal: PR open + local `just ci` green + remote CI running)
+
+**Slice:** m23-s10 — M23 accessibility **S10**: the eval tier + the cross-view wiring spec.
+**PR:** https://github.com/mdrewt/monster-realm/pull/370 — OPEN. **Supervisor owns the merge — I did
+NOT run `gh pr merge`.** Branch `slice/m23-s10` (worktree `.claude/worktrees/m23-s10`), 5 commits,
+all pushed. Main checkout left on `master`, never mutated. Forked from `origin/master` @ `2dbfe0c`
+(master CI verified green at that SHA); no rebase needed, no sibling in flight.
+
+**Gate:** full local `just ci` **EXIT=0** — 93 evals PASS / 0 FAIL (was 90), **2818** client tests
+(was 2734), 0 failed/pending/todo. **Acceptance: 15/15 met**, `seed:e3b0c44298fc1c14`, `mr-gates
+lint` LINT-CLEAN, **6 DEFERs → backlog** (X16-X21). Seeded ZERO criteria (**SPEC-SECTION-NOT-FOUND,
+7th occurrence**; M23's EARS live in spec §6). X1-X15 authored in the PLAN phase.
+
+**⚠️ THE SLICE WAS RESHAPED BY MEASUREMENT — read the PR's deviation section before auditing.**
+Two independent lenses measured that EVERY check spec §5.1/§5.2/§5.6 names already ships as an
+equal-or-stronger unit-tier oracle, and `justfile:491` runs `eval` + `client-test` in the SAME
+`just ci` — so re-implementing them adds zero CI surface, and every naive re-implementation measured
+WEAKER (3 of 5 plausible OverlayId-union parsers are wrong on the real file; §5.1's own `[A11Y-02]`
+regex rejects 16/16 shipped keys). The evals therefore ship the measured-NEW teeth for real and
+DELEGATE the rest through a pin that is itself gated (title + code needles, a `.skip`/`.todo`
+suspension scan, a non-inert proof routing a mutated delegate through the shipped predicate, and
+`test.include`+`test.exclude` reachability).
+
+**🔴 CORRECTION R-m23-s2-X6 WAS DISCHARGED, BUT NOT BY THE PROPOSED MECHANISM.** The brief asked for
+a shared fixture corpus proving the `.mjs` and TS CSS oracles agree. Red-team MEASURED that a corpus
+is not a drift gate: a deliberately weak `.mjs` twin agreed on **18/18** of `indexShell.test.ts`'s own
+corpus while shipping four real regressions green (grouped/compound/descendant/CSS-nested `.sr-only`
+selectors). Source-hash pinning dies to a biome reformat; normalised-text comparison dies to a
+one-character string-literal edit. The pin makes the second implementation NOT EXIST instead.
+Residual **R-m23-s10-CSSDRIFT** declared; real fix is X18 (needs `indexShell.test.ts`, S2's file).
+
+**FIFTH ACCUMULATED CORRECTION, not in the launch brief** — ADR-0205 `:284-287` instructs S10 BY
+NAME: `[A11Y-02]`'s regex must permit uppercase and `[A11Y-04]`'s orphan check must stay
+prefix-scoped, or it reds on sixteen valid keys and on S1's `a11y.world.region`.
+
+**⚠️ OPERATOR SIGN-OFF OUTSTANDING (carried into PR#370's body).** ADR-0205 `:56-58` flags its D1
+amendment — "natively focusable" → "focusable, natively or via `tabindex`" — for sign-off in the
+consuming slice's PR. This is that PR. Measured: only **3 of 16** anchors satisfy §5.5's
+`{BUTTON,INPUT,SELECT,A,TEXTAREA}` allow-list; the other 13 are the ARIA APG `tabindex="-1"` fallback
+the milestone deliberately ships. If rejected, S2/S4 absorb it; the registry strings do not change.
+
+**24 MUTATION BITE-PROOFS, ALL BIT** (15 eval + 5 spec + 4 re-runs). **Two survivors were found and
+closed**: (a) `const b = document.body; b.replaceChildren()` — the ALIASED root receiver, invisible
+to a direct-receiver scan and never naming the node, so module ownership was blind too; my own T17
+fixture had mixed it with the direct form and passed on the direct half (fixture monoculture in a
+tooth I wrote). (b) a planted-string forgery of a delegation pin. **Lesson: a fixture that mixes two
+shapes passes on the easy one.**
+
+**Flake:** the wiring spec is clean over 6 isolated repeats + 3 `--sequence.shuffle` runs. A
+shuffle-order FALSE RED was found (the `checked === 16` coverage floor was a trailing `it`) and fixed
+by moving it to `afterAll`, which also makes it bite under `-t` filtering.
+
+**Process notes.** `/tmp/mr_warn_m23-s10` (LANDING PATTERN) appeared after the final `just ci`, so no
+further fan-out was dispatched. The **`tester` lens WAS invoked** but `guard-tester-bash.mjs` rejects
+every path containing a dotfile component, so it could execute NOTHING inside `.claude/worktrees/` —
+it returned static analysis plus 23 hand-written cheats staged at `/tmp/m23-s10-redteam/cheats.sh`
+and a flake harness at `/tmp/m23-s10-redteam/flake.sh`; **the orchestrator executed the measurement
+half itself** (the bite-proofs and the flake matrix above). *That guard makes the tester agent unable
+to do its job in any slice worktree — worth fixing at the harness level.* `reducer-security-auditor`
+and `desync-guard` had no surface (zero reducers, schema, `game-core`, predictor or renderer code —
+`renderResolver.ts` was read, never written). No ADR was authored: no number was assigned.
+
+**Supervisor follow-ups (NOT actioned — outside `touches:`):**
+1. **Allocate an ADR number.** The delegation-pin pattern is new, reusable, and the reviewer called
+   its ADR non-optional. Rationale currently lives in two eval headers + `ARCHITECTURE.md` + the plan
+   memo.
+2. ADR-0205 D1 sign-off (above).
+3. `mr-gates` seeder: 7th `SPEC-SECTION-NOT-FOUND` on M23.
+4. X19's cleanup must retire `renameView.test.ts:1276`'s m23-s4 ledger CHECK in the SAME change, or
+   deleting `S3-NO-VIEW-LOCAL-FOCUS` reds a prior slice's ledger.
+
+**touches-delta:** `ARCHITECTURE.md` only (one targeted paragraph). Nothing else outside the declared
+set. The `.claude/worktrees/m23-s10` worktree stays for the merge pipeline.
