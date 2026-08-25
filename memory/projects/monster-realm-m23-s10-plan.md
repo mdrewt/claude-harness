@@ -190,3 +190,80 @@ bite-proofs (it wipes uncommitted gate work) · a bare `cd` sending a later `git
 `S10b-1` contrast eval + baseline · `S10b-2` keyboard-operable-rows · `S10c` CSS-oracle consolidation
 (needs `indexShell.test.ts`) · `S10d` retire the three superseded hand-kept `.focus(` lists (needs
 `renameView.test.ts` + `menuView.test.ts`).
+
+---
+
+## §5 — Red-team measurements (all run against the live worktree; they REVISED the design)
+
+**RT1 — every naive re-implementation is measurably WEAKER than the shipped tooth it duplicates.**
+Confirms §0 F1 independently. Net effect of shipping §5.1/§5.2/§5.6 literally = a *reduction* in gate
+strength wherever a provisional shipped test then gets deleted.
+
+**RT2 — `[A11Y-02]`'s spec regex rejects 16/16 shipped keys** (`/^a11y\.[a-z0-9.]+$/` vs the
+capital-`V` keys). The dangerous *fix* is `/^a11y\..+$/`, which then admits `a11y..`, `a11y.....`
+**and** `a11y.count.{n}` — silently dissolving the ICU ban. `overlayRegistry.test.ts:1332` already
+ships the correct `SHAPE_RE`.
+
+**RT3 — a shared fixture corpus is NOT a drift gate (the decisive measurement).** A deliberately weak
+`.mjs` `srOnlyIsAccessible` agreed with the TS oracle on **18/18** of the A7a corpus while shipping
+**four** real regressions green: grouped (`.a, .sr-only{display:none}`), compound
+(`div.sr-only{…}`), descendant (`body .sr-only{…}`) and CSS-nested selectors. Source-hash pinning is
+defeated by a `biome` reformat + regenerate; normalised-text comparison is defeated by a
+string-literal edit (dropping the space from `SR_ONLY_TOKEN_BOUNDARY`). **This kills the "fixture
+corpus" half of correction R-m23-s2-X6 and vindicates D3.**
+
+**RT4 — `[A11Y-15]`: 7 of 9 bypasses survive even a CORRECT comment-stripped literal scan**
+(`el?.focus?.()`, `el["focus"]()`, `const f = el.focus; f.call(el)`, `HTMLElement.prototype.focus.call(el)`,
+`el . focus()`, computed-string, `autofocus`). Comment-blindness false-REDs **5** real files, not 3
+(add `boxView.ts:26`, `raisingView.ts:27`). The `*.test.ts` exemption is **dead code**
+(`'battleView.test.ts'.endsWith('View.ts') === false`). And the BAD corpus has exactly ONE shape, so
+a gate can collapse to `src.includes('#input.focus(')` and stay green while a *new* view grows a
+focus call.
+
+**RT5 — `[A11Y-05]`: `role="status"` / `role="alert"` are implicit live regions with no `aria-live`
+attribute** — a second one ships green past even a correct `aria-live` count. And §5.2's only nesting
+BAD fixture is "inside `#app`", so a gate collapsing to "not inside `#app`" passes both fixtures while
+the region sits inside a `display:none` overlay and never announces. Clause 3 (`replaceChildren`) is
+**vacuously true today** and receiver-text matching misses all five realistic spellings.
+
+**RT6 — `[A11Y-01]`: 3 of 5 plausible union parsers are wrong on the real file.** A comment-blind
+"scan to the first `;`" truncates at 15 and drops `claimView` (the union body at
+`overlayRegistry.ts:51`–`:53` contains `…breaks decide(); D17…`). The natural fix (`.endsWith('View')`)
+is **green and wrong**: a 17th member added to the union only, with no table entry, passes.
+
+**RT7 — reusing the canonical JS `stripComments` on CSS silently deletes the ban.** It treats `//` as
+a line comment; CSS has none. `background:url(https://cdn/x.png);display:none` → the `display:none`
+is stripped away. The shipped CSS stripper is `indexShell.test.ts:939` `stripCssComments`; the
+name collision with the mandated idiom is the trap.
+
+**RT8 — `[A11Y-RM2]` as specified closes NONE of `S7T-SCAN`'s named residuals**, and two survive by
+**scope**, not by text: a production module named `*.test.ts`, and the read moved into
+`client/index.html`'s inline `<script>` or `client/vite.config.ts` (both outside `client/src/**/*.ts`,
+which is all `S7T-SCAN` readdirs). **That scope escape is the genuinely-new repo-wide half §5.6 asked
+for.**
+
+**RT9 — happy-dom cannot express "focusable".** `.focus()` moves `activeElement` onto a bare `<span>`
+with no `tabindex` and onto nodes inside a `display:none` subtree. So the production bug the view
+headers warn about (`battleView.ts:26` — "`.focus()` on a `display:none` node is a silent no-op") is
+**green in happy-dom and broken in Chromium**. Kill: assert `root.style.display !== 'none'` at the
+instant the deferred callback runs.
+
+**RT10 — none of the three eval artefacts carried an anti-vacuity FILE-COUNT FLOOR.** A mistyped
+`readdirSync` root or a suffix typo yields zero offenders and `pass:true` forever, and
+`evals/run.mjs:23`–`:37` will not catch it. Every shipped analogue has one.
+
+---
+
+## §6 — Design as REVISED by §5 (this supersedes §1 D2's tag list)
+
+Ship value where value was **measured**; delegate where the shipped oracle is stronger.
+
+| Artefact | Genuinely-new teeth (measured gap) | Delegated (shipped oracle is stronger) |
+|---|---|---|
+| `overlay-a11y-manifest.eval.mjs` | `[A11Y-15]` **readdir-derived over all 18** `*View.ts` — `errorOverlayView.ts` + `sessionView.ts` are in **no** shipped list — with multi-spelling matchers (RT4), the dual-mode divergence tooth ported, per-file declaration survival, and a file-count floor (RT10) | `[A11Y-01]`–`[A11Y-04]` (RRT1/RT2/RT6) |
+| `a11y-static-shell.eval.mjs` | `[A11Y-05a]` census over **implicit** live-region roles (`status`/`alert`/`log`/`timer`/`marquee`, RT5) + a not-inside-any-`display:none`-ancestor clause; `[A11Y-05b]` a **module-ownership ratchet** (`'a11y-live'`/`LIVE_REGION_ID` referenced in non-test client TS **only** by `ui/liveRegion.ts`) — strictly stronger than receiver-text matching and non-vacuous today | `[A11Y-06]`, `[A11Y-07]`, `[A11Y-08]` |
+| `reduced-motion-purity.eval.mjs` | `[A11Y-RM2c]` the **scope escape** `S7T-SCAN` structurally cannot see: `client/index.html` and `client/vite.config.ts` (RT8) | the `client/src/**/*.ts` census half |
+| `overlayA11yWiring.test.ts` | totality over 16 (no shipped totality oracle); the **REAL** `index.html` fixture; sentinel-moved; identity; focusable-by-contract; `aria-label` + close-side removal; spy call-count; `display !== 'none'` at defer time (RT9) | — |
+
+**CSS stripping:** a dedicated `stripCssComments` (block-only, no `//`), never the JS scanner (RT7).
+**Anti-vacuity floors are mandatory on every scan** (RT10).
