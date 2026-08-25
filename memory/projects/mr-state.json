@@ -4,15 +4,24 @@
  "updated_by": "native-20260825T090008Z-1930106",
  "master": {
   "sha": "00de7055aba717a3d7fe20efaaeed9330e5df50c",
-  "ci": "push run 32829994563 in_progress at record time -- background watcher delegated (pid 1950618), resolves via mr-native-tick.log line, verify next tick if not yet seen",
+  "ci": "green",
   "nightly": "fixed_at_a40cb81_confirmed_green"
  },
  "harness_main": {
   "sha": "1779564",
   "ci": "no-remote-ci-local-gate-green; unpushed chore/fix commits accumulating on local main (known routine gap)"
  },
- "adr_next_free": 207,
- "inflight": [],
+ "adr_next_free": 208,
+ "inflight": [
+  {
+   "slice": "m22-s2",
+   "run_id": "mr-spawn-20260825T110300Z-1975910",
+   "session_leader": 1975966,
+   "started_utc": "2026-08-25T11:03:04Z",
+   "model": "fable",
+   "tier": "hard"
+  }
+ ],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
