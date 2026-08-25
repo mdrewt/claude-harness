@@ -2,6 +2,215 @@
 
 ---
 
+## 2026-08-25T~05:3xZ — m23-s6 COMPLETE (terminal: PR open + local `just ci` green + remote CI running)
+
+**Slice:** m23-s6 — M23 accessibility **S6**: `menuView` becomes an ARIA listbox, and the **sixteenth
+and last** `OverlayId` gets its overlay-a11y wiring.
+**PR:** https://github.com/mdrewt/monster-realm/pull/369 — OPEN, remote `ci` IN_PROGRESS / `e2e` QUEUED.
+**Repo:** project (`mdrewt/monster-realm`). Branch `slice/m23-s6` (worktree `.claude/worktrees/m23-s6`),
+6 commits, all pushed. **Supervisor owns the merge — I did NOT run `gh pr merge`.** Main checkout left on
+`master`, never mutated. Forked from `origin/master` @ `3e062c4`; no rebase needed, no sibling in flight.
+
+**Gate:** full local `just ci` **EXIT=0** on the shipped tree — 95 client test files / **2734 tests**,
+90 evals PASS, lint + typecheck clean. **Acceptance: 16/16 met, 0 unmet**, `seed:e3b0c44298fc1c14`,
+`mr-gates lint` LINT-CLEAN. Seeded ZERO criteria (**SPEC-SECTION-NOT-FOUND, 6th occurrence** across
+s0/s1/s3/s4/s5/s7 — M23's EARS live in spec §6; the seeder fix has now been flagged six times).
+X1-X16 authored in the PLAN phase. **2 DEFERs → `backlog`, intended owner S10** (A11Y-25, A11Y-26 —
+their sole oracle is `evals/keyboard-operable-rows.eval.mjs`, which S6 may not create).
+
+**⚠️ VERIFY NOTES.** Run CHECKs **from the slice worktree** with the usual PATH export. X14 is a
+not-weakened ratchet against the measured fork baseline (menuView.test.ts was 21/21/0/0/0 at `3e062c4`;
+it is now 40 tests, all 21 legacy blocks **byte-identical**, assertions 57 → 185).
+
+**🔴 SPEC CORRECTION S10 MUST FOLD IN — measured, not reasoned.** Spec §5.4:488-491 names the GOOD
+hostile-but-correct fixture as "…**rows at `tabindex="-1"`** and no per-row listener (the
+`aria-activedescendant` pattern S6 ships)". **That is wrong and S6 deliberately does not ship it.** A
+`tabindex="-1"` `<li>` is *mouse*-focusable: one click focuses the row, the next `replaceChildren`
+destroys that node, focus falls to `<body>`, and `aria-activedescendant` — which only speaks while the
+listbox itself holds DOM focus — goes permanently silent for the rest of the session. Red-team measured
+this on a candidate build. The ARIA APG activedescendant pattern puts tabindex on the **container only**,
+which `index.html:117` already ships. Also for S10: `[A11Y-13]`'s identity extractor must accept a
+**member expression** (`callbacks.onInput`), not a bare identifier — §5.4:489's `handleMenuInput` is
+loose fixture prose, and a bare-identifier scanner would fail this file.
+
+**THE DEFECT THE UNIT TIER ALMOST SHIPPED.** The suite was **37/37 green** and `just ci` was EXIT=0
+before red-team found P1: `buildMenuViewModel` emits `index` = array position at **both** menu levels,
+so the unqualified id `menu-option-<index>` was **identical** for "categories, Party selected" and
+"Party's leaves, Monster Box selected". Descending a level replaced the `<li>` node but left
+`aria-activedescendant` at an **unchanged string**, and ATs announce an option on a *value change* — so
+the slice's headline deliverable was silent on KeyM-then-Enter, the default path into the menu. Fixed by
+level-qualifying (`menu-option-${vm.level}-${row.index}`), with the pointer built from the identical
+expression. **Lesson for the remaining M23 slices: a green a11y unit suite proves attribute presence,
+not announcement.**
+
+**Red-team found 11 green-and-wrong survivors out of 29 hand-written cheats** against the first suite;
+the six material ones were closed in a second tester round (a `render()`-time re-open that yanked focus
+on every arrow key; a pointer from the array position; `dataset.menuIndex` from the array position; a
+hard-coded `'menu-heading'` literal; an inline code→input map duplicating `menuKeyInput`; a `visible`
+getter reading a private boolean). The five remaining are minor and named in the red-team report.
+
+**Supervisor follow-ups (NOT actioned — outside `touches:`):**
+1. **ADR-0207 needs allocating.** No number was assigned to this slice (the prompt's slot was empty), so
+   no ADR was authored — the m23-s1 precedent. But the **split keydown ownership** rule (a view may
+   consume only provably-inert inputs; anything behind a guard chain must bubble to `main.ts`) is a new
+   reusable pattern and the reviewer called its ADR non-optional under `standards/adr-process.md`. The
+   decision currently lives only in `menuView.ts`'s header and the ARCHITECTURE block.
+2. **Backdrop click escapes the focus trap (milestone-wide, NOT caused by S6).** A click on an overlay
+   backdrop focuses `<body>`, bypassing the trap and silencing `aria-activedescendant`. Unfixable inside
+   any `*View.ts` because A11Y-15 bans `.focus(` there; needs `index.html` (a `tabindex="-1"` on the
+   overlay) or `overlayA11y.ts`. Recommend S10/S11.
+3. **`main.a11yFocus.test.ts:313,:568` prose is now false** and its exclusion of `menuView` from
+   `SAMEKEY_OVERLAYS` rests on that dead premise. Behaviour is fine (`main.ts:1332` reads `visible`
+   first) but untested — menuView is now the only overlay of sixteen with focus inside it and no
+   same-key toggle-close tooth. Recommend S10.
+4. **Spec §5.5's `overlayA11yWiring` tag whitelist** (`BUTTON/INPUT/SELECT/A/TEXTAREA`) still reds on
+   eleven of sixteen anchors, `#menu-rows` (`<ul tabindex="0">`) included — S3/S4 already flagged this.
+5. The S5 handoff's `visibleIds(probes)[0]` z-order residual was recommended to "S6 or S10" — **it is
+   not S6's**; both fixes are outside this slice's `touches:`. Still open, recommend S10.
+
+**Process notes.** `/tmp/mr_warn_m23-s6` (LANDING PATTERN) appeared during the fix cycle, so `/simplify`,
+`desync-guard` and the `verifier` subagent were not dispatched; the verifier's checks were run
+mechanically inline (no skipped tests; 21/21 fork blocks byte-identical; a level-qualifier-revert
+bite-proof reds exactly 3). `reducer-security-auditor`/`desync-guard` had no surface regardless (zero
+reducers, schema, `game-core` or predictor/renderer code). The code graphs were NOT re-indexed: the
+canonical checkout is unchanged (slice unmerged) and `codegraph status` reports up to date — re-index
+after the merge. The `.claude/worktrees/m23-s6` worktree stays for the supervisor's merge pipeline.
+
+
+## 2026-08-25T~04:1xZ — m23-s5 e2e-red FIX CYCLE COMPLETE (terminal: PR#368 remote CI GREEN both jobs, 13/13 gates met)
+
+**Resume of attempt 2 (e2e-red fix cycle 1+2), branch `slice/m23-s5`, worktree `.claude/worktrees/m23-s5`, HEAD pushed.**
+PR#368 mergeStateStatus=CLEAN; remote `ci` SUCCESS, remote `e2e` SUCCESS. **Supervisor owns the merge.**
+
+**What was wrong (two layered defects, both mine-to-fix):**
+1. **A1** — the `worldHasFocus()` conjunct gated each WHOLE hotkey branch, including the toggle-CLOSE
+   half; S3/S4's deferred focus made "focus inside the overlay" the universal post-open state, so
+   same-key close (KeyB/KeyU/…) died for everyone → the 3 remote reds. Fix: supervisor candidate (a),
+   uniform: `allow && (<self>?.visible || worldHasFocus())` at all 12 sites. Spec §8.4's acceptance
+   overturned by its own overturn condition; §2.3's "byte-identical for sighted players" premise falsified.
+2. **A1b** — found only by running the REAL e2e locally: real Chromium leaves activeElement STRANDED
+   inside the hidden overlay ~200 ms after any close (`document.body.focus()` restore is a Chromium
+   no-op; blur fixup is async; happy-dom diverges on both halves). Fix: `focusInsideHiddenSubtree()`
+   (inline-display:none ancestor walk) at (i) the frame close edge and (ii) a keydown self-heal above
+   every returning branch (closes the ≤1-frame race, measured 1-in-3 at pvp.spec.ts:117).
+
+**Evidence:** local `just ci` green (95 files / 2715 tests, 90 evals); ledger 13/13 met (all boxes
+unchecked + re-executed fresh by mr-gates; X1 amended for A1); verifier PASS (no test weakened, RED
+receipts provably red vs da0b0ff); reviewer PASS (0 blockers/majors; 3 minors fixed); tester ran 3
+rounds (opus); 6 mutation bite-proofs measured, all bite. ADR-0206 gained appended A1 + A1b.
+
+**Supervisor follow-ups (NOT actioned — outside touches):**
+1. **Spec amendment (harness repo):** M23 §2.3's accepted-change sentence + §8.4 + A11Y-19's "or
+   toggle" wording must reflect A1 (same-key toggle-close is intended behaviour). One-line each.
+2. **`ui/overlayA11y.ts` restore is a Chromium no-op** (`document.body.focus()`, body has no
+   tabindex) — the root cause A1b works around. A real restore (blur(), or a tabindex'd body) is an
+   S6+ follow-up recorded in ADR-0206 A1b residual (iii); landing it would let the discriminator retire.
+3. **Local e2e vs `just ci` collision:** `just ci`'s account-e2e eval cannot run while a dev
+   spacetime holds :3000/the global lock — serialize them (memory file updated).
+4. Local full-suite e2e on this WSL box shows 1–3 ROTATING walk/convergence timeouts per run
+   (different specs each time; every one green in isolation and on the remote runner) — pre-existing
+   local-env flakiness, not slice regressions; don't chase them from a slice.
+
+**Housekeeping:** /tmp/m23s5-* logs + /tmp/m23s5-fix-tests/ left for audit; local spacetime instances
+stopped; stale 16r-d instance on :3099 (Aug 22 leftover) was killed. The `.claude/worktrees/m23-s5`
+worktree stays for the supervisor's merge pipeline.
+
+## 2026-08-24T~21:2xZ — m23-s5 COMPLETE (terminal: PR open + local `just ci` green + remote CI running)
+
+**Slice:** m23-s5 — M23 accessibility **S5, the sole `client/src/main.ts` touch**: the scoped
+`worldHasFocus()` gate on the twelve `overlayVerdict(...)` hotkey branches, ONE frame-loop
+announcement edge + focus return, and `#help-hint` promoted to a native `<button>`.
+**PR:** https://github.com/mdrewt/monster-realm/pull/368 — OPEN / MERGEABLE (remote CI running).
+**Repo:** project (`mdrewt/monster-realm`). Branch `slice/m23-s5` (worktree `.claude/worktrees/m23-s5`),
+7 commits, all pushed. **Supervisor owns the merge — I did NOT run `gh pr merge`.** Main checkout left
+on `master`, never mutated. `origin/master` still `78e2bb2` at finish; no rebase needed, no sibling
+in flight, no doc-aggregation collision.
+
+**Gate:** full `just ci` **EXIT=0** on the shipped tree — 95 client test files / **2705 tests**
+(fork baseline measured in the same worktree first: 94 / 2684), all evals PASS, observability 8/8,
+security clean. **Acceptance: 13/13 met, 0 deferred, 0 unmet** (`seed:e3b0c44298fc1c14`), all with
+recorded evidence. Seeded ZERO criteria (**SPEC-SECTION-NOT-FOUND, 5th occurrence** across
+s0/s1/s3/s4/s7 — M23's EARS live in spec §6; the seeder fix has now been flagged five times);
+X1-X13 authored in the PLAN phase, `mr-gates lint` LINT-CLEAN.
+
+**⚠️ VERIFY NOTES.** Run CHECKs **from the slice worktree** with the usual PATH export. X12 pins the
+**literal fork SHA `78e2bb2e6bb1f6b4d91967593e5d9742e3341dc9`**, not `origin/master` — adopted from
+m23-s7's headline finding that a diff-vs-ref baseline is forgeable. X13 is a not-weakened ratchet
+against the measured fork baseline (>=94 files / >=2684 tests, zero pending/todo).
+
+**🔴 FOR S6 / S10 — the residual this slice found and deliberately did not work around.**
+`visibleIds(probes)[0]` (`overlayRegistry.ts:372-374`) is `OVERLAY_IDS` **declaration** order, not
+z-order, and `announcements.ts:39-40` documents `topOverlay` as exactly that. `dialogueView` renders
+unconditionally on every store batch (`main.ts:1574`) and force-hides only `menuView`, so a
+server-pushed conversation can become visible **under** an already-open overlay. Consequences:
+`topOverlay` does not transition when a dialogue opens over a lower-index overlay (announcement
+silently missed), and `[0]` can name `dialogueView` while a full-screen `z-index:100` `helpView` is
+what actually covers the screen (wrong accessible name). Both fixes are outside S5's `touches:` — one
+is a view/registry constraint, the other changes the `A11ySnapshot` API S1 froze and S10 asserts
+against. **Recommended owner: S6 or S10.** A set-diff heuristic in `main.ts` was considered and
+rejected as diverging from the frozen contract.
+
+**Two more out-of-scope findings, flagged not fixed.** (a) `overlayA11y.ts`'s `fallbackFocus` is
+advertised as a REQUIRED parameter to make the obligation visible at each call site, but it is
+**unreachable on the common path**: `record.returnFocus` is captured as `document.body` for a
+hotkey-opened overlay, which is an `HTMLElement` and always connected, so the restore order picks it
+first. That is precisely why S5 had to own the focus return itself — worth a §4.1 integration note.
+(b) **`menuView` calls neither `openOverlayA11y` nor `closeOverlayA11y`** — it has only its static
+markup ARIA: no focus trap, no deferred initial focus, no registry `aria-label`. That is S6's scope
+by the spec's own slice table, but it is not currently written down anywhere as outstanding.
+
+**Declared behaviour changes (both in the PR body).** `B` no longer toggles the Box closed while
+focus is inside it (spec §8.4's accepted change; Escape still does and the focus return closes the
+loop). **Space no longer jumps while a `<button>`/`<a>` has focus** — this one is NOT in spec §2.3's
+exemption list, so it is declared rather than slipped in. It was forced: the terminal
+`if (e.code === 'Space') { jump(); e.preventDefault(); }` cancels a native button's activation, which
+would have shipped A11Y-23 half-dead (Enter-only) and invisible to every source scan, since `main.ts`
+is coverage-excluded.
+
+**Three gate STRENGTHENINGS, each measured.** `W-ONE-CORNER-AFFORDANCE` went tag- AND depth-agnostic
+(`body > div` → every inline-`position:fixed`, non-`inset:0` element at any depth) — a second corner
+affordance shipped as `<a>` or as a nested `<button>` was invisible to the fork's selector and now
+bites. H4b's allow-list gained `background` outright plus `border`/`padding` **with value clauses**,
+so the growth-knob cheats still fail. And it closed a hole that **predated this slice**: `font` was
+allow-listed with no value constraint, so `font:900px/1 monospace` kept `width:max-content` and every
+allow-listed NAME while rendering the badge as a giant click-eating strip.
+
+**Process notes worth keeping.** (1) The `tester` has no Bash, so **the orchestrator must execute the
+RED proof and every bite-proof** — doing so found two harness defects the tester could not see:
+`overlayIsOpen()` false-positived on every static shell (m23-s2 ships `role="dialog"` as a *markup
+literal*, `index.html:89-92`, so the role never changes), and the `setTimeout(0)` deferred focus was
+never flushed. (2) The tester's own two new teeth were **mutually unsatisfiable** — a whole-file
+`worldHasFocus()` census of 12 contradicted the pump tooth's own expected literal, which contains a
+13th call. Fixed by scoping the census to the keydown listener (12) plus a separate whole-file (13)
+plus an exactly-1 on the snapshot region. (3) `W-UX1-HINT-NO-JS-OWNER` is a **RAW-source** pin: a
+*comment* in `main.ts` mentioning `help-hint` reddened it. (4) 16 mutation bite-proofs measured, all
+BITE.
+
+**Verifier APPROVED (independent, pre-merge).** Re-executed all 13 CHECKs itself — every deciding
+line matched the recorded EVIDENCE byte-for-byte. Not-weakened audit CLEAN: no test deleted/skipped/
+emptied, no `expect` removed, exactly 12 `expectedRaw` hunks add the conjunct and KeyT's block never
+appears in the diff. It chose **four mutants of its own** (none in my 16) and all four BITE:
+`worldHasFocus` stubbed to `return true`, `lastA11ySnapshot = nextSnapshot` deleted,
+`announcementsFor` args swapped, `type="button"` dropped. It also re-ran the `document.body` mutant
+itself and reproduced 11 reds exactly. It accepted the happy-dom substitution for the four
+`[E2E]`-tiered criteria after reading §5.7 independently. **One finding acted on:** the
+`W-ONE-CORNER-AFFORDANCE` rewrite had dropped its anti-vacuity floor 12 → 10; the population changed
+(14 inline-styled elements vs 14 body divs) but the slack did not need to, so it is restored to 12 —
+exactly the pre-widening tightness — and the full `just ci` was re-run to EXIT 0 on that final tree
+with the ledger still 13/13.
+
+**Housekeeping.** Untracked harness files: `memory/projects/monster-realm-m23-s5-plan.md` (plan +
+the three-lens adjudication) and `/tmp/m23s5-tests/TEETH-MEASURED.md` — commit or discard. Code
+graphs NOT re-indexed (nothing merged; main checkout still `78e2bb2`). `reducer-security-auditor`
+and `desync-guard` not run: the diff has zero server-module/schema/reducer files and zero
+predictor/reconcile/interpolation files (mechanically empty scope, m23-s0/m23-s4 precedent).
+**The post-implementation review fan-out was NOT run** — `/tmp/mr_warn_m23-s5` (LANDING PATTERN)
+appeared mid-slice, so per its instruction no new subagent fan-outs were spawned; the three plan
+lenses (reviewer + red-team + `/simplify`) ran BEFORE it appeared and their findings are folded into
+plan §8 and ADR-0206, and a single `verifier` was run as the DoD merge gate. ADR next-free = **0207**.
+
+---
+
 ## 2026-08-24T~15:5xZ — m23-s7 COMPLETE (terminal: PR #366 open + local `just ci` green + remote CI running)
 
 **Slice:** m23-s7 — M23 accessibility **S7, reduced motion** (§2.5): `render/motionPreference.ts` (new,
@@ -1024,6 +1233,41 @@ mechanically.
 
 **Unblocked next:** S3 and S4 (both `after: S1, S2`) once m23-s1 lands.
 
+## 2026-08-25T05:48:32Z — m23-s6 MERGED (PR#369, sha 2dbfe0c8)
+Supervisor tick native-20260825T054518Z-1589143 merged m23-s6 (menuView ARIA listbox/aria-activedescendant, 16th/last click-only OverlayId gets a11y wiring). Audit: orchestration CLEAN, gating CLEAN, mandatory_read=false. Acceptance ledger FLAGGED on X15/X16 (lint/full-ci gates) -- adjudicated FALSE-POSITIVE: this Bash session has no cargo at all (rust not asdf-installed here), reproduced the identical cargo-not-found failure independent of the diff/commit. Rooted run's own log recorded FINAL-CI-EXIT=0 from a real just ci (2734 tests, 90 evals PASS) inside its own environment which does have cargo -- that is the trustworthy signal. 14/16 pure-test gates all fresh-reverified true incl. adversarial spotcheck (X8, agrees=Y). residuals close: 0 open (nothing to close). Two DEFERs disclosed by this slice (A11Y-25, A11Y-26) both targeted backlog, INTENDED OWNER m23-s10 -- no promotion needed this tick, S10's own spec section already names them. Worktree removed, local+remote slice/m23-s6 branches deleted. Master fast-forwarded to 2dbfe0c8; master CI (run 32814222235) still in_progress at tick end -- next tick/event should re-verify green before trusting it. No BLOCKERs. Governor NORMAL (d7 ~$1382/2783 eff.). Fan-out: none in flight; falling through to gate-3 pick-work next.
+## 2026-08-25T03:57:03Z — m23-s5 merged (PR#368, 3e062c4) — composite launch m23-s6
+**Slice:** m23-s5 — M23 accessibility S5, the sole `client/src/main.ts` touch: worldHasFocus()
+conjunct on the twelve open branches, Escape-ladder close announcements, focus return,
+#help-hint -> native <button> (ADR-0206).
+
+**Merge:** PR#368 squash-merged -> 3e062c4 on master. CI: ci+e2e both SUCCESS pre-merge;
+post-merge master CI run in progress at record time (same tree as the passing PR checks).
+Branch deleted, worktree removed, local branch pruned. mr-branch-audit clean (0 post-merge
+commits, 0 stale branches across 345 merged PRs).
+
+**Audit adjudication:** mr-audit orchestration=CLEAN (reviewer+tester+verifier roles present,
+mandatory_read=false). gating_advisory FLAGGED (6 modified asserts, 0 skips/suppressions) —
+read the diff: the a11y bounded-surface allow-list gained `background`/`border`/`padding` for
+the <button> conversion, each `border`/`padding` addition paired with a VALUE-constrained
+assertion (not a bare name-allow), plus closed a pre-existing unconstrained-`font` hole
+(red-team #2, HIGH) the button conversion made exploitable. Net: the diff TIGHTENS the gate,
+does not weaken it. mr-gates verify: 13/13 met, 0 unmet, 0 deferred, spotcheck agrees, seed_drift
+false. FLAGGED reason is SPEC-SECTION-NOT-FOUND — the seeder's known recurring gap for M23
+(5th occurrence per s0/s1/s3/s4/s7), not a semantic problem; hand-authored ledger with real
+CHECK/EXPECT per gate. residual_alarms noted 15 open residuals vs cap 12 (observe-only in
+slice 1, not a blocker this tick).
+
+**Composite launch:** m23-s6 (menuView.ts keyboard/AT semantics — role=listbox/option,
+aria-activedescendant) launched opus@high/routine immediately after, per the M23 dependency
+spine S5->S6. No fan-out partner (serial by construction per spec §4). Fresh slice, no park
+memo, no stale locks/stop-flags, memory headroom ample (37G available).
+
+**Governor:** NORMAL throughout (d7 $1331.13 raw / $1421.13 effective incl. one
+unreconciled run, of $2783 weekly; fable_ok=true).
+## 2026-08-25T01:43:43Z — m23-s5 (PR#368): remote e2e RED, resuming fix cycle 1
+Native tick rid=native-20260825T014010Z-1265099. PR#368 (m23-s5, ADR-0206, worldHasFocus() scoped hotkey gate) opened by the prior run: local just ci green (95/95 files, 2705 tests), remote ci green, but remote e2e RED with 3 failures in pre-existing specs the slice never touched (movement-input.spec.ts 14r-e, pvp.spec.ts m16b, trade.spec.ts M15c) — all consistent with the new 12x && worldHasFocus() conjunct blocking toggle-close / cross-overlay-open once focus leaves canvas/body. Did NOT merge (per doctrine: still-dead CI failure = real failure, triage not blind-relaunch). Resumed on the existing worktree/branch (slice/m23-s5, da0b0ff) as a HARD-tier fix cycle (prior attempt failed -> fable/xhigh; fable_ok=true, d7 fable spend $108.77/$2298 allowance). resume_block hands the run the 3 concrete failures, root-cause hypothesis, and two candidate fix shapes, with instruction to push a new commit to the same branch/PR rather than opening a new one. Governor NORMAL (d7 $1329.58/$2783 eff.). No BLOCKERs.
+## 2026-08-25T00:02:13Z — m23-s5 launched
+Native tick rid=native-20260825T000014Z-1109313. Gate-0/1: no live per-run locks, no chain-owner mutex, no operator hold, no resident-session collision (find -newermt -6min empty both repos; only pre-existing future-prompts.md stray + untracked proj .codegraph/ index, both left untouched). Live-verified master CI green at 78e2bb2 (matches local + situation-bundle sha, run conclusion=success). No open PRs either repo, no worktrees beyond canonical checkouts, no /tmp .done files pending merge. Residuals: mr-gates residuals list --unclaimed shows 15 open (over cap 12, observe-only per doctrine), max age ~1.1d -- all far under t1_promote_days=3, none outrank new work. queue[] empty. M23 spine S0->S1->{S2||S7}->{S3||S4}->S5->S6->{S8->S9}->{S10||S11}: S0/S1/S2/S3/S4/S7 already merged, so S5 (after: S3,S4, both satisfied) is the sole unblocked slice -- serial by construction (only client/src/main.ts touch), no fan-out partner. Tier=routine (opus@high): touches only client/src/main.ts + the #help-hint element in index.html, no server-schema/reducer, predictor/netcode/reconcile, security/RLS, or M20/M25 hit, not a resume. Pre-allocated project ADR-0206 (adr_next_free was 206). mr-spawn LAUNCHED cleanly: leader=1111335, claude_pid=1111338, rid=mr-spawn-20260825T000152Z-1111276. GATES-SEEDED criteria=0 (SPEC-SECTION-NOT-FOUND, same known-benign M23-EARS-lives-in-section-6 quirk seen on every prior M23 slice, not a launch blocker). Governor NORMAL (d7=$1274.70/2783 eff., fable_ok=true; opus-tier launch unaffected). No BLOCKER, no rate-limit event. Standing down this tick after the single launch action.
 ## 2026-08-24T23:14:20Z — m23-s4: PR#367 merged (78e2bb2) — 9/9 gates, audit CLEAN
 Supervisor tick native-20260824T230824Z-1092695 merged m23-s4 (constructed-shell a11y wiring: battleView/boxView/raisingView/evolutionView/claimView + canvas world region ARIA) via squash --delete-branch. Audit: policy=orchestration CLEAN, gating_advisory=CLEAN (no deletions/skips/suppressions), acceptance=FLAGGED-but-advisory (9/9 met, 0 unmet, 0 deferred, spotcheck TEETH-BITE agrees=true; reason=SPEC-SECTION-NOT-FOUND, not evidence_mismatch or seed_drift) — merged per doctrine (advisory never a merge predicate). mr-gates residuals close: 0 residuals for this slice. Local master ff-only'd to 78e2bb2, m23-s4 worktree+branch removed. Master CI on the merge commit was still in_progress past the usual ~9min window at tick-end (not blocked on per no-polling doctrine) — next tick should re-verify live before any further action on master.
 ## 2026-08-24T22:52Z — m23-s4: PR #367 open, local `just ci` green, remote CI running (SUPERVISOR OWNS THE MERGE)
@@ -1166,11 +1410,3 @@ serially per doctrine (S2 will be schema-touching and always-serial once S1 land
 Merged 2a6864b onto master (ff-only from 12af096). M22 contract-first slice S0: REKEY_MANIFEST/findIdentityColumns exported+frozen in place on evals/guest-claim-integrity.eval.mjs (no split lift -- no size-split convention exists in repo, PR body cites the search). New evals/rekey-contract-surface.eval.mjs (auto-discovered, 3 teeth: T1 contract surface, T2 walker shape, T3 side-effect-free import) gates the surface instead of the declared evals/rekey-registry-shared.mjs. mr-audit: orchestration=CLEAN (6 roles, opus), gating-test-integrity=CLEAN. mr-gates verify: 4/4 met once node/cargo PATH corrected (Bash tool resolves /usr/bin/node v18 by default -- prepend asdf node 24.13.1 + ~/.cargo/bin before running project tooling); X4 flagged ARCHITECTURE.md as CREPT but that file is doc-set-exempt per fan-out doctrine, adjudicated accepted. Master post-merge CI (run for 2a6864b) was still in_progress at merge time -- not polled further this tick. FOLLOW-UP for a future tick: PR body requests a doc-only spec amendment to M22-privacy-compliance.spec.md sec2 (:74-77)/sec7.1/sec7.2 S0 row, naming rust-scan.mjs and battle-schema-snapshot.eval.mjs as the canonical owners of stripRustSource/parseTableSchemas instead of a re-export barrel through the S0 surface. Not actioned this tick (one-mutating-action rule; this is the composite-launch decision point instead).
 ## 2026-08-24T07:03:36Z — m22-s0 launched (M22 privacy/compliance spine start)
 Supervisor tick mr-sup-native-20260824T070014Z-3651371 reconciled live ground truth: no locks/inflight, master CI green both repos (proj @12af096 rw3c, harness main clean modulo pre-existing strays future-prompts.md/gdd.md not touched). All 4 heavy-ceremony specs (M22/M23/M24/M25) confirmed merged+recorded from prior ticks. Residuals R-rw3b-X6/R-rw3b-X8/R-rw3c-X3 all <1d old, well under t1_promote_days=3 -- do not yet outrank new work. queue[] empty. Derived next work from PLAN Sec.9: M-postgate-roster-wave-3 and M-postgate-sixteenth-review-residuals (16r-a/c/d/e/f/g/h) are now fully merged (16r-b remains blocked, SERIAL-REQUIRED against the still-blocked 15r scanner-migration family -- left alone). Selected M22-privacy-compliance spine slice S0 (contract-first export of REKEY_MANIFEST/findIdentityColumns/parseTableSchemas/stripRustSource from evals/guest-claim-integrity.eval.mjs) as the next launchable item: it has no after: dependency, and none of the spec's 5 Sec.8 operator escalations (DELETION_GRACE_MS value, reactivation policy PRV1-8, cascade tx-size, export delivery UX, pseudonymization-copy acknowledgement) gate S0 -- they gate S1/S3/S4-ish/S7 downstream. Scoped touches to evals/ only (project repo); told the run explicitly to skip mr-state.json's adr_next_free entry since that drift (0204->0205) was already corrected by an earlier tick, avoiding a REPO-MIXED launch refusal. mr-spawn LAUNCHED cleanly (leader=3654372, opus/high, tier=routine, repo=project, PR target mdrewt/monster-realm). Gates seeded 0 criteria (SPEC-SECTION-NOT-FOUND, same as prior ceremony slices whose spec section isn't its own heading -- advisory only). Delegating to the normal wrapper poll cycle; next tick reconciles from live PR/git state.
-## 2026-08-24T06:08:33Z — m25-ceremony merged (PR#41)
-M25 security-audit spec ceremony converged and merged to main (856125e). All 11 acceptance gates reverified true after fixing a cwd trap: mr-gates verify/mr-audit default --repo to $PROJ (monster-realm) even for harness-repo slices — must pass --repo $HARNESS explicitly, and worktree_for() then auto-locates the PR worktree (.claude/worktrees/<slice>) so the gate CHECK commands read the branch content, not stale main. Running the gates against $HARNESS main checkout directly (no --cwd) gave false EVIDENCE-MISMATCH on 10/11 gates because the new spec file only exists on the branch pre-merge. mr-audit top-level policy=CLEAN (mandatory_read=false); orchestration sub-block flagged missing tester/verifier evidence but roles list already includes both — doc-only ceremony carve-out applies, no code/tests touched. Worktree + branch cleaned. No open residuals for this slice.
-## 2026-08-24T05:02:10Z — m25-ceremony launched
-Native tick rid=native-20260824T050015Z-3543498. Fast-path: reaped a stale m24-ceremony lock (session_leader dead, .done EXIT=0, work already merged per PR#40 and the prior reconcile commit) via mr-unlock stale. No open PRs either repo, master CI green at 12af096, no residuals past t1/t2 thresholds (all ~0.2-0.3d old, t1=3d), queue[] empty. PLAN Sec9 derivation: M22/M23/M24 ceremonies COMPLETE but each gated on 5 open operator escalations (incl. hard BLOCKERs) with no mr-ask-drew issue raised yet -- not launchable this tick without first triaging those 15 escalations. M25's ceremony was only AUTHORIZED (not run) -- launched m25-ceremony (opus/medium/content tier, ADR-0034) to converge M25-security-audit.spec.md + security-threat-model.md into an implementation-ready spec, mirroring the m22/m23/m24-ceremony precedent. Docs-only (harness repo), no touches conflicts. Noted advisory: harness working tree carries pre-existing uncommitted strays (future-prompts.md modified, gdd.md untracked, ~57min old, not from an active session) -- the ceremony branches from origin/main and won't see them; left untouched pending human review. Next tick: if m25-ceremony finished, merge + reconcile; otherwise consider raising mr-ask-drew for the M22-M24 operator escalations to unblock their implementation slices.
-## 2026-08-24T04:03:59Z — m24-ceremony merged (PR#40)
-Supervisor tick mr-sup-native-20260824T035621Z-3509101 reconciled the finished m24-ceremony run (rc=0, session leader dead, .done present, .err empty, 403 turns, $69.66). Converged specs/monster-realm-v2/M24-internationalization.spec.md from provisional sketch to implementation-ready via the mr-feedback-doctrine.md §6 heavy ceremony, citing both ADR-0006 and ADR-0057 per the operator's recency note. mr-gates verify initially reported FLAGGED with EVIDENCE-MISMATCH on 12/13 gates -- root-caused live to the harness-node-toolchain-PATH-trap (Bash resolves system node v18, harness pins v24 via asdf) STACKED with mr-gates defaulting --repo/--cwd to the monster-realm project root instead of the harness repo where this slice's spec files actually live. Re-ran with asdf node v24 on PATH and --repo/--cwd pointed at the m24-ceremony worktree: all 13 gates reverified passed=true agrees_with_evidence=true (evidence_mismatch=[] in mr-audit's acceptance block). Remaining FLAGGED reason (SPEC-SECTION-NOT-FOUND) is expected for this slice class: a ceremony slice authors its own X* gates (seeded=0, all-extra) rather than deriving criteria from a spec-declared slice section, same as the already-merged m22/m23 ceremonies. mr-audit: policy=CLEAN, mandatory_read=false (doc-only exemption), gating_advisory=CLEAN (0 removed asserts/suppressions), orchestration sub-verdict FLAGGED on the tester-role heuristic (expected for a docs-only slice with no code to test; roles already show reviewer+verifier present with a real adversarial pass, 1 fix applied per the run's own PR body). PR #40 squash-merged (db653a5), worktree/branch cleaned (local+remote). mr-gates residuals close: 0 owned by m24-ceremony (clean). 3 unclaimed residuals remain (R-rw3b-X6-rw3c-half, R-rw3b-X8, R-rw3c-X3), all MED, <1 day old, none past staleness threshold -- no preemption. Reconciliation note: found 3 prior supervisor ticks (m22 merge, m23 launch, m23 merge -- 2026-08-24T01:00Z/T02:03Z/T02:57Z) had written handoff/mr-state.json entries locally but never committed+pushed them, the same gap the T00:06Z tick previously caught once. Committed them separately (42e6048, rebased to 36e658e after this tick's own merge landed first) rather than folding into this row, keeping each tick's bookkeeping attributable to its own commit. Pre-existing human strays (future-prompts.md edits, untracked gdd.md) stashed+restored around the rebase, left untouched. Governor NORMAL (898.26/2783 d7 effective, fable_ok=true unused). M25 remains eligible next tick (last of the M22-M25 operator-authorized ceremony batch).
-## 2026-08-24T02:57:37Z — m23-ceremony merged (PR#39)
-Converged specs/monster-realm-v2/M23-accessibility.spec.md from provisional sketch to implementation-ready spec (12/12 sections, 36 EARS A11Y-* criteria, 12-slice table, 5 evals, attribution table, 5 escalations) per mr-feedback-doctrine.md §6 heavy ceremony, grounded in the now-built overlayRegistry.ts substrate (ADR-0162-0164). PLAN.md M23 bullet updated to COMPLETE. Single opus attempt, 91 turns, $18.93, adversarial review pass applied 2 major + 2 minor fixes before merge. mr-gates local ledger: 12/12 met. mr-gates verify tool malfunctioned on this tick (garbled '} | Node.js vX' output across all 11 non-spotcheck CHECKs, uniform across different checks -- classic tool-bug signature, not a per-check failure); manually re-ran X1/X2/X11 in the m23-ceremony worktree and all matched recorded evidence exactly, so adjudicated CLEAN rather than treating as EVIDENCE-MISMATCH. mr-audit orchestration verdict FLAGGED (missing tester/reviewer/verifier role heuristic) but policy=CLEAN/mandatory_read=false (doc-only exemption) and the run log shows an actual reviewer+verifier pass with fixes applied -- adjudicated CLEAN. Worktree removed, local+remote m23-ceremony branches deleted, main fast-forwarded to 71f35da.
