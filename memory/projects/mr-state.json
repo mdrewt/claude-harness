@@ -1,11 +1,11 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-28T01:43:26Z",
- "updated_by": "native-20260828T014142Z-150567",
+ "updated_utc": "2026-08-28T02:02:30Z",
+ "updated_by": "native-20260828T020012Z-159974",
  "master": {
   "sha": "7e75cbd39d1dac945a698cf8357a8b335d6c33f5",
-  "ci": "in_progress_run_33133721912_post_merge_377",
-  "nightly": "fix_merged_PR377_7e75cbd_4nights_root_cause_addressed_awaiting_next_nightly_confirmation"
+  "ci": "success_confirmed_run_33133721912",
+  "nightly": "fix_merged_PR377_7e75cbd_awaiting_next_nightly_confirmation"
  },
  "harness_main": {
   "sha": "1779564",
@@ -14,13 +14,22 @@
  "adr_next_free": 208,
  "inflight": [],
  "awaiting_merge": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-1",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rw3b-X8",
+   "added_utc": "2026-08-28T02:01:50Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "7e75cbd39d1dac945a698cf8357a8b335d6c33f5"
+  }
+ ],
  "park_counters": {
   "14r-e": 1
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick native-20260828T014142Z-150567. Gate-0/1 clean (no live locks/mutex/hold/collision). EVENT: PR#377 all checks green. Verified live (mergeStateStatus CLEAN). mr-audit: orchestration CLEAN, gating_advisory CLEAN, acceptance FLAGGED on X4/X6 EVIDENCE-MISMATCH -- adjudicated as local-sandbox artifact (this Bash tool env lacks wasm-pack/cargo; confirmed by direct repro; CI provisions the toolchain per gate X3 which passed). Squash-merged 7e75cbd, worktree+branches cleaned. Closed duplicate nightly-coverage issues #362/#372/#374/#375. Post-merge master CI (run 33133721912) still in_progress at record time -- NOT YET CONFIRMED GREEN; next tick/event must re-verify before any further composite action assumes master is clean. Ledger+handoff recorded. Did not launch new work this tick (merge not yet fully verified complete). Governor NORMAL (d7=$36.42 of $2783).",
+ "notes": "Native tick native-20260828T020012Z-159974. Gate-0/1 clean: no live per-run locks, no chain mutex, no operator hold, no resident-session collision (fetch both repos clean, no writes in last 8min). Found the 01:41:42Z tick's mr-state.json/handoff/archive edits uncommitted despite having merged PR#377 -- reconciled via harness commit e844add after live-reverifying: PR#377 MERGED (7e75cbd), master CI run 33133721912 conclusion=success, issues #362/#372/#374/#375 CLOSED. No open PRs either repo, no worktrees to reap. Pick-work: residuals list --unclaimed showed 31 open, oldest (R-rw3b-X8/R-rw3b-X6-rw3c-half, disclosed 2026-08-23T21:27:30Z, age 4.19d) past t1_promote_days=3 -- per aging doctrine this outranks new PLAN Sec.9 work. Promoted R-rw3b-X8 (RW3-08 Rust-source-scope constraint) into M-residual-backlog.spec.md as rb-1, queued it (mr-record queue-add), shipped as doc-only chore PR#45 (chore/residual-promote-20260828T020202Z), squash-merged via --squash --auto. Reconciled local main (3 unpushed chore commits) against the resulting origin/main via a merge commit (084ee39; handoff/mr-state conflicts resolved keeping local's newer snapshot content, spec-backlog file took cleanly) -- local main still not pushed (routine gap, chore commits pushed only via PR branches). No launch this tick (queue-add is the one action; rb-1 launches next tick off the fast path). Governor NORMAL (d7=$37.19 of $2783 weekly). No BLOCKERs, no rate-limit event.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -50,5 +59,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-25T17:52:31Z"
+ "last_tick_utc": "2026-08-28T02:02:30Z"
 }
