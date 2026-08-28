@@ -1674,6 +1674,14 @@ orchestrator), verifier ran at its default pin. (3) Two self-inflicted traps, me
 diagnostic line stashed the uncommitted implementation. (4) `just ci` green locally (CI_EXIT=0);
 remote CI (ci + e2e) running at PR-open time.
 
+## 2026-08-28T23:03:21Z — native tick 23:00Z — recovered interrupted tick + promoted rb-6
+rid=native-20260828T230014Z-1055334. Gate-0/1: no live locks/mutex/hold, no session collision. Found the harness working tree carrying an interrupted 22:00-22:05Z tick's uncommitted state (fixed master CI red via PR#382, changelog-freshness, master 4b43dd9->d525eb3, plus a stray rb-4-plan.md) -- that tick crashed before its own commit step. Recovered it first (commit 05df202), re-verified live: PR#382 merged, changelog-freshness job success on manual workflow_dispatch run 33215217814, project repo already clean at d525eb3.
+
+This tick's ONE mutating action per gate-3's aging rule: `mr-gates residuals list --unclaimed` showed 28 unpromoted residuals, several past t1_promote_days=3; oldest disclosed_at tied at 4.54d (R-m22-s1-X1/X2/X3, all 2026-08-24T10:00:40Z). Promoted the oldest (R-m22-s1-X1, "SANCTIONED_REDUCERS exact-set will hard-RED once S3 ships account_deletion_reaper") into rb-6 via `mr-gates residuals promote` + `mr-record queue-add`, opened doc-only chore PR#52 (chore/residual-promote-20260828T230209Z), squash-merged+auto-deleted (harness main c5cc586->e2b0429). Local reconciliation commit (05df202) and the remote squash landed as sibling commits off a2a723e -- merged with `git merge origin/main` (ort, no conflicts).
+
+Did not launch anything else this tick -- the promotion was the tick's one action per doctrine ("that is one tick's action, and the next tick launches it off the fast path"). queue[] now holds rb-5 (still deferred pending a real review of its implementation surface per the 22:05Z tick's note -- evals/run.mjs completeness-check needs a design decision on where the check lives, not a fast-path launch) and rb-6 (freshly promoted, ready for next tick's fast-path re-verify-then-launch). X2/X3 (same source slice m22-s1, same age) remain unpromoted for a future aging pass.
+
+Governor NORMAL (d7=$367.60/2783 effective, fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs. No open PRs, no inflight runs. Standing down.
 ## 2026-08-28T22:05:44Z — correction: prior entry's backtick command got executed
 Prior entry (22:05Z, "fixed master CI red") reads "ran  (git-cliff) on branch" — the intended text was "ran `just changelog` (git-cliff)". My own --body arg used an unquoted heredoc (<<EOF instead of <<'EOF'), so the backtick-quoted `just changelog` inside the prose was executed as a command substitution instead of staying literal text (ran from $MEM cwd, no git-cliff/justfile context there, failed harmlessly with a stderr-only error, empty stdout). No destructive effect, no repo state touched by the stray exec. Flagging per the known python-docstring/backtick-in-heredoc trap so this does not get mis-read later as "no command was ever run" — the actual fix (PR#382, just changelog on the correct branch/cwd) is unaffected and already verified green.
 ## 2026-08-28T22:05:09Z — native tick: fixed master CI red (changelog-freshness)
@@ -1759,6 +1767,3 @@ The build loop has been held for 55h (by=operator). Is that still intended? If t
 
 ## 2026-08-26T14:36:57Z — HOLD-AGED by=operator in force 26h — escalating once; loop stays held
 The build loop has been held for 26h (by=operator). Is that still intended? If the pause has served its purpose, run mr-supervisor-enable. If it is deliberate, close this — it will not ask again for this hold.
-## 2026-08-25T19:00:07Z — HOLD-AGED by=operator in force 6h — escalating once; loop stays held
-The build loop has been held for 6h (by=operator). Is that still intended? If the pause has served its purpose, run mr-supervisor-enable. If it is deliberate, close this — it will not ask again for this hold.
-
