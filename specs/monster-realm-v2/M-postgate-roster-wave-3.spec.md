@@ -106,7 +106,9 @@ own acceptance is its slice ledger, not this section.
   pure addition (a new `fn`, `struct` or `mod tests` block) inside a file the slice legitimately
   extends, and any incidental refactor — SHALL fail this criterion, and THE SLICE SHALL NOT edit
   `Affinity` (`game-core/src/monster/types.rs`), `AbilityEffect` (`game-core/src/combat/ability.rs`)
-  or `game-core/content/type_chart.ron`.
+  or `game-core/content/type_chart.ron`. A comment-only or blank-line change is INERT and is not a
+  modification of Rust source for this criterion's purposes — it cannot weaken a pin or add
+  behaviour — but commenting an assertion OUT is a deletion, and is forbidden above.
 - **RW3-09** EACH content slice SHALL ship its own `evals/rw3*.eval.mjs` and `game-core/tests/rw3*.rs`,
   SHALL bump `CONTENT_VERSION` monotonically, SHALL regenerate `evals/baselines/content-hash.json` with
   its generator, and SHALL NOT edit `evals/run.mjs` or another slice's gate file.

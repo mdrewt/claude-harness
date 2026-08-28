@@ -40,7 +40,11 @@ PERMITTED SHAPE. There is no catch-all "looks fine" path.
 
 NAMED ANTI-PATTERNS (do not reintroduce these; review checklist)
 -------------------------------------------------------------------
-  * No Rust parser / AST / brace matching. The classifier is a line-oriented diff reader.
+  * No Rust parser / AST / brace MATCHING. The classifier is a line-oriented diff reader. (The
+    STRUCTURAL WRAP CHECK below counts one integer -- opens minus closes over a region's added
+    lines -- which is not matching: it pairs nothing, tracks no nesting, and knows no grammar.)
+  * No token blacklist for "neutralising" constructs (`if false`, `if cfg!(…)`, `if 1 == 2`, …).
+    A blacklist is whack-a-mole; the wrap attack is closed STRUCTURALLY instead (see below).
   * No "is this hunk inside `mod tests`" test. The permit condition is WHAT the edit does, not
     WHERE it lives -- which is why the `content.rs` case (a pin extended inside a `mod tests`
     block in a `src/*.rs` file) falls out for free under the line rules alone.
@@ -79,16 +83,49 @@ does not exist in the live spec yet as of this tool's authorship (rb-1 T2, teste
 specialist (rb-1 T3) adds the block below verbatim as part of the spec amendment. Until then
 LINK fixture (a) legitimately fails -- that is a correct, honest RED, not a fixture bug.
 
+PATH RESOLUTION AND NORMALISATION (runs before file classification; rb-1 T6 gap-01/02/03/04/05)
+--------------------------------------------------------------------------------------------------
+A file block's OLD and NEW paths are each resolved independently, from (in order of precedence)
+its `---`/`+++` lines, its `rename from`/`rename to` or `copy from`/`copy to` headers (a pure
+rename carries NO `---`/`+++` at all), and finally the `diff --git a/<old> b/<new>` header itself
+-- which git ALWAYS emits, and which is the ONLY path source in a `Binary files a/… and b/…
+differ` block (gap-05: that block used to resolve to the empty path and be SKIPPED entirely,
+including a banned-path hit).
+
+Every path so parsed is normalised ONCE, at parse time, LEXICALLY: strip the `a/`/`b/` diff
+prefix, then `posixpath.normpath` (collapse `//`, resolve `.` and `..` components). NEVER
+`os.path.realpath`/`abspath` -- those touch the filesystem and would destroy this tool's
+hermeticity. Consequences, each of which was a live evasion before rb-1 T6:
+  * `game-core/tests/../src/battle/resolve.rs` normalises to `game-core/src/battle/resolve.rs`,
+    so a `../` component can no longer buy an EXISTING-SRC file the EXISTING-TEST class and its
+    pure-addition permit (gap-01).
+  * `./game-core/content/type_chart.ron` and `game-core/content/./type_chart.ron` both normalise
+    to `game-core/content/type_chart.ron`, so the exact-string `BANNED_PATHS` test cannot be
+    dodged by respelling the path (gap-02, gap-03).
+A path that still starts with `..` after normalisation has escaped the repo root; it is
+unclassifiable from a diff alone and BITEs (`V-unpermitted-src`), never silently passes. So does
+a `diff --git` block whose path resolves from no header at all.
+
+An input that is non-empty (after stripping whitespace) but yields ZERO file blocks -- e.g. a
+unified diff with no `diff --git` line -- BITEs (`V-unpermitted-src`): an allow-list that cannot
+see which paths a change touches cannot certify it (gap-07). An EMPTY input is a legitimate no-op
+diff with nothing to smuggle through it and stays PERMIT (fixture `permit-08` pins this).
+
 FILE CLASSES (rb-1 plan Sec.2)
 ----------------------------------
   NEW-TEST        new file under a `tests/` dir, or whose basename matches `*_test.rs` /
                   `*_tests.rs`         -> PERMIT wholly (RW3-08's own-new-test-files exception).
   NEW-OTHER-RS    any other brand-new `.rs` file                    -> BITE (`V-new-non-test-rs`).
-  BANNED          exact path in `BANNED_PATHS`                      -> BITE on ANY change,
-                  regardless of content (`V-banned-path`); checked BEFORE any line analysis.
+  BANNED          exact path in `BANNED_PATHS` on EITHER side of the file block (the old path as
+                  well as the new one)                              -> BITE on ANY change,
+                  regardless of content (`V-banned-path`); checked BEFORE any line analysis, and
+                  before the `.rs` test below, so a banned `.ron` cannot slip out as NON-RUST.
+                  Checking the OLD path is what makes `rename from <banned> / rename to <other>`
+                  -- and a deletion of a banned file -- bite (gap-04).
   EXISTING-TEST   pre-existing file under a `tests/` dir             -> line rules below; a hunk
-                  with ZERO removed lines is PERMIT wholesale (pure addition can never weaken an
-                  existing pin).
+                  with ZERO removed lines is PERMIT wholesale PROVIDED it is brace-balanced
+                  within its own region (see "STRUCTURAL WRAP CHECK" below): pure addition can
+                  never weaken an existing pin by REMOVING it, but it can wrap one.
   EXISTING-SRC    pre-existing `.rs` file under `src/`               -> line rules below; a pure
                   ADDED line that is not a comment/blank and matches no P-* rule is
                   `V-unpermitted-src` (this is what kills the smuggled-`pub fn` attack a
@@ -201,6 +238,21 @@ an otherwise-PERMITted pure-addition hunk) that is, once leading whitespace is s
 `#[ignore]`, or matches `#[cfg(feature = "..."` (any feature-gate attribute), is
 `V-added-weakener` regardless of any other classification that line's hunk received.
 
+STRUCTURAL WRAP CHECK (rb-1 T6, gap-06). A replace region with ZERO substantive removed lines in
+an EXISTING-TEST file is a pure addition, and the class rule above permits it -- but a pure
+addition can still NEUTRALISE a pre-existing assertion without touching it: adding `if false {`
+in one region and `}` in another leaves the assertion between them as unchanged CONTEXT that
+never executes and never appears in the diff as a `-` line at all. So, for a pure-addition region
+in an EXISTING-TEST file, compute the NET `{` minus `}` delta over its substantive added lines
+with string contents and `//` comments erased (the same `_erase_strings` machinery every other
+rule uses). A legitimate append -- an expected tuple, a whole new `#[test] fn`, a comment block --
+closes every block it opens, so its delta is 0. A NON-ZERO delta means the addition opens a block
+it does not close, or closes one it did not open: it is wrapping or splicing into pre-existing
+code, and is `V-weakened` (a still-present assertion got looser -- that is precisely what
+`V-weakened` means here; RULES gains no new id, see "THE SSOT LINK"). This is a COUNT, not brace
+matching, and deliberately not a token blacklist. Known imprecision, accepted: a Rust char
+literal `'{'` counts as an open brace; mis-reading one costs a BITE, never a silent PERMIT.
+
 `V-test-count` is a WHOLE-FILE, cross-hunk, cross-diff aggregate check, run ONCE per file that
 classifies as EXISTING-TEST (never for a NEW-TEST file -- this is what stops a slice's own new
 test file from laundering a deletion elsewhere in the SAME diff by making the global sum look
@@ -210,8 +262,15 @@ added_count < removed_count for that file, emit exactly one `("V-test-count", pa
 reason. This count is NEVER summed across files.
 
 `V-banned-path` and `V-new-non-test-rs` and the NEW-TEST/NON-RUST wholesale PERMITs are decided
-purely from a file's path and its old/new existence (`--- /dev/null` vs `+++ /dev/null`), before
-any line-level analysis of that file's hunks runs at all.
+purely from a file's normalised OLD and NEW paths and its old/new existence (`--- /dev/null` vs
+`+++ /dev/null`), before any line-level analysis of that file's hunks runs at all.
+
+`V-unpermitted-src` doubles as this tool's FAIL-CLOSED bucket for an input it cannot read: an
+unparseable input (gap-07), a file block with no resolvable path (gap-05's shape), and a path
+that escapes the repo root all fire it. It is reused rather than given its own id because `RULES`
+is agreed by construction with the spec's `rw3-scope-rules` anchor (see "THE SSOT LINK"), so a
+new id cannot be minted without amending the spec; and because "this change did not positively
+match a permitted shape" is exactly what the id already means under an allow-list.
 
 VERDICT: "BITE" iff `reasons` contains at least one entry whose rule_id is in `VIOLATION_RULES`;
 otherwise "PERMIT". `reasons` MUST be populated with every P-* match and every V-* match this
@@ -224,6 +283,7 @@ import difflib
 import io
 import os
 import hashlib
+import posixpath
 import re
 import subprocess
 import sys
@@ -656,16 +716,75 @@ def _pair_by_similarity(removed, added):
             [j for j in range(len(added)) if j not in used_a])
 
 
+# A `diff --git a/<old> b/<new>` header. Greedy on group 1 so the split lands on
+# the LAST ` b/` on the line, which is the right answer for every path that does
+# not itself contain the literal ` b/`. git ALWAYS emits this line -- including
+# for a `Binary files ... differ` block, which carries no `---`/`+++` at all,
+# which is exactly why it is the path fallback (gap-05).
+_DIFF_GIT_RE = re.compile(r"^diff --git (a/.*) (b/.*)$")
+
+
+def _normalize_diff_path(raw, strip_ab=True):
+    """LEXICAL normalisation of ONE path parsed out of a diff header (gap-01/02/03).
+
+    Strips the `a/`/`b/` diff prefix (not for `rename from`/`copy to` headers,
+    which carry no prefix -- hence `strip_ab`), then collapses `//`, `.` and
+    `..` components with `posixpath.normpath`.
+
+    NEVER `os.path.realpath`/`os.path.abspath`: those consult the FILESYSTEM
+    (symlinks, cwd) and would break this tool's hermeticity -- a diff must
+    classify identically in CI, in a worktree, and years from now. normpath is
+    pure string work, which is all a diff header can honestly support.
+
+    `/dev/null` is passed through untouched: it is the new-file/deleted-file
+    sentinel, not a repo path. A path that normalises to `.` (nothing left)
+    returns "" so the caller's fail-closed branch sees it."""
+    path = (raw or "").split("\t")[0].strip()
+    if not path or path == "/dev/null":
+        return path
+    if strip_ab and path[:2] in ("a/", "b/"):
+        path = path[2:]
+    path = posixpath.normpath(path)
+    if path == ".":
+        return ""
+    return path
+
+
+def _escapes_root(path):
+    """True if a normalised path climbs OUT of the repo root (`..`, `../x`).
+    normpath cannot resolve those away, and this tool has no repo to resolve
+    them against -- so they are unclassifiable and must fail closed, never
+    silently pass (gap-01's sibling case)."""
+    return path == ".." or path.startswith("../")
+
+
 def _parse_diff(diff_text):
-    """Split a unified diff into file blocks. Each block is a dict with `path`,
-    `new_file`, `deleted` and `hunks` (each hunk a list of (tag, text) with tag
-    in ' ', '-', '+'). Hermetic: pure string work, no git."""
+    """Split a unified diff into file blocks. Each block is a dict with `old`,
+    `new`, `path`, `new_file`, `deleted` and `hunks` (each hunk a list of
+    (tag, text) with tag in ' ', '-', '+'). Hermetic: pure string work, no git.
+
+    `old`/`new` are populated from `---`/`+++`, from `rename from`/`rename to`
+    and `copy from`/`copy to` (a pure rename has NO `---`/`+++` lines at all),
+    and finally from the `diff --git a/<old> b/<new>` header itself as the
+    fallback (a `Binary files ... differ` block has only that). Every one of
+    them goes through `_normalize_diff_path`."""
     files = []
     cur = None
     hunk = None
     for raw in diff_text.split("\n"):
         if raw.startswith("diff --git "):
-            cur = {"old": None, "new": None, "new_file": False, "deleted": False, "hunks": []}
+            m = _DIFF_GIT_RE.match(raw)
+            cur = {
+                "old": None,
+                "new": None,
+                # Header-derived fallbacks, used only where `---`/`+++`/rename
+                # headers left the corresponding side unresolved.
+                "git_old": _normalize_diff_path(m.group(1)) if m else None,
+                "git_new": _normalize_diff_path(m.group(2)) if m else None,
+                "new_file": False,
+                "deleted": False,
+                "hunks": [],
+            }
             files.append(cur)
             hunk = None
             continue
@@ -677,13 +796,17 @@ def _parse_diff(diff_text):
             continue
         if hunk is None:
             if raw.startswith("--- "):
-                cur["old"] = raw[4:].split("\t")[0].strip()
+                cur["old"] = _normalize_diff_path(raw[4:])
                 if cur["old"] == "/dev/null":
                     cur["new_file"] = True
             elif raw.startswith("+++ "):
-                cur["new"] = raw[4:].split("\t")[0].strip()
+                cur["new"] = _normalize_diff_path(raw[4:])
                 if cur["new"] == "/dev/null":
                     cur["deleted"] = True
+            elif raw.startswith("rename from ") or raw.startswith("copy from "):
+                cur["old"] = _normalize_diff_path(raw.split(" from ", 1)[1], strip_ab=False)
+            elif raw.startswith("rename to ") or raw.startswith("copy to "):
+                cur["new"] = _normalize_diff_path(raw.split(" to ", 1)[1], strip_ab=False)
             elif raw.startswith("new file mode"):
                 cur["new_file"] = True
             elif raw.startswith("deleted file mode"):
@@ -700,17 +823,26 @@ def _parse_diff(diff_text):
         else:
             hunk.append((" ", raw))  # a truly empty context line
     for f in files:
-        path = f["new"] if f["new"] and f["new"] != "/dev/null" else f["old"]
-        path = path or ""
-        if path[:2] in ("a/", "b/"):
-            path = path[2:]
-        f["path"] = path
+        # Resolve each SIDE independently, falling back to the `diff --git`
+        # header. Both sides survive into the block: classify() checks the OLD
+        # path against BANNED_PATHS too, so renaming a banned file out of the
+        # way no longer smuggles it past (gap-04).
+        old = f["old"] if f["old"] and f["old"] != "/dev/null" else (f["git_old"] or "")
+        new = f["new"] if f["new"] and f["new"] != "/dev/null" else (f["git_new"] or "")
+        f["old"], f["new"] = old, new
+        f["path"] = new or old
     return files
 
 
 def _file_class(path, new_file):
     """The __doc__ FILE CLASSES table, decided from the path and the file's
-    old/new existence alone -- never from hunk content."""
+    old/new existence alone -- never from hunk content.
+
+    `path` is assumed ALREADY normalised by `_normalize_diff_path` (one
+    normalisation, at parse time). That is what makes the `tests` component
+    test below safe: `game-core/tests/../src/battle/resolve.rs` reaches here as
+    `game-core/src/battle/resolve.rs`, so a `../` can no longer buy a file the
+    EXISTING-TEST class and its wholesale pure-addition permit (gap-01)."""
     if path in BANNED_PATHS:
         return "BANNED"
     if not path.endswith(".rs"):
@@ -835,6 +967,36 @@ def _try_multiline_join(removed, added, file_class):
     return None
 
 
+def _brace_delta(lines):
+    """Net `{` minus `}` over `lines` (each a (text, in_string_at_entry) pair),
+    with string CONTENTS and `//` comments erased first via the SAME
+    `_erase_strings` state machine every other rule uses.
+
+    This is NOT a Rust parser and not brace MATCHING: it is one integer, the
+    count of opens minus the count of closes. It answers exactly one question
+    -- "is this run of added lines self-contained?" -- and nothing else. A
+    legitimate append (an expected tuple, a whole new `#[test] fn`, a comment
+    block) closes every block it opens, so its delta is 0. A non-zero delta
+    means the addition opens a block it does not close, or closes one it did
+    not open: it is WRAPPING or SPLICING INTO pre-existing code that never
+    appears in the diff (gap-06's `if false {` / `}` pair).
+
+    Deliberately NOT a token blacklist (`if false`, `if cfg!(`, `if 1 == 2`,
+    ...): a blacklist is whack-a-mole and a named anti-pattern of this tool.
+    KNOWN IMPRECISION, accepted: a Rust char literal `'{'` counts as an open
+    brace. It is the only unbalanced-brace-in-a-non-string shape in Rust, it
+    does not occur in any pinned assertion, and mis-reading one costs a BITE
+    (fail closed), never a silent PERMIT."""
+    delta = 0
+    for text, state in lines:
+        erased, _ = _erase_strings(text, state)
+        cut = erased.find("//")
+        if cut >= 0:
+            erased = erased[:cut]
+        delta += erased.count("{") - erased.count("}")
+    return delta
+
+
 def _classify_region(path, file_class, removed, added):
     """One replace region of one hunk -> a list of (rule_id, path, detail).
     ALLOW-LIST: every substantive changed line leaves here carrying either a
@@ -852,7 +1014,8 @@ def _classify_region(path, file_class, removed, added):
 
     if not rem:
         # ZERO substantive removals: a pure addition. It cannot weaken an
-        # existing pin, so EXISTING-TEST permits it wholesale -- but in
+        # existing pin BY REMOVING one, so EXISTING-TEST permits it -- but only
+        # if it is BRACE-BALANCED within its own region (see below); in
         # EXISTING-SRC a pure `+` hunk is precisely the smuggled-`pub fn`
         # attack the allow-list exists for.
         for text, _state in added:
@@ -862,6 +1025,23 @@ def _classify_region(path, file_class, removed, added):
                 out.append(("V-unpermitted-src", path,
                             "addition to a pre-existing src file matches no permitted shape: %s"
                             % _short(text)))
+        # STRUCTURAL WRAP CHECK (gap-06). A pure addition to an EXISTING-TEST
+        # file can still neutralise a pre-existing assertion WITHOUT touching
+        # it -- `+ if false {` in one region and `+ }` in another leaves the
+        # assertion as unchanged CONTEXT that never runs. Both halves are
+        # brace-UNBALANCED against their own region, and no legitimate append
+        # is: an appended tuple, `#[test] fn`, or comment block closes what it
+        # opens. Reported as V-weakened -- a still-present assertion got
+        # looser, which is exactly what that id means (see the __doc__).
+        substantive = [(t, s) for (t, s) in added if not _is_inert(t)]
+        delta = _brace_delta(substantive) if substantive else 0
+        if file_class == "EXISTING-TEST" and delta != 0:
+            out.append((
+                "V-weakened", path,
+                "pure addition is brace-UNBALANCED within its own region (net `{`-`}` delta "
+                "%+d): it opens or closes a block it does not itself close or open, i.e. it "
+                "wraps or splices into pre-existing code that never appears in this diff: %s"
+                % (delta, _short(substantive[0][0]))))
         return out
 
     add_sub = [(t, s) for (t, s) in added if not _is_inert(t)]
@@ -945,10 +1125,18 @@ def classify(diff_text):
     FULL CONTRACT (see the module __doc__ for the complete rationale and the named
     anti-patterns this contract exists to close off):
 
-    1. FILE CLASSIFICATION (decided per `diff --git a/<path> b/<path>` block, before
+    0. PATH RESOLUTION. Each file block's OLD and NEW path is resolved from its
+       `---`/`+++`, `rename`/`copy`, or `diff --git` headers and normalised
+       LEXICALLY exactly once (see the module __doc__ "PATH RESOLUTION AND
+       NORMALISATION"). A non-empty input with no file block at all, a block with
+       no resolvable path, and a path escaping the repo root each BITE
+       (`V-unpermitted-src`) -- this function never skips a file it cannot read.
+
+    1. FILE CLASSIFICATION (decided per `diff --git a/<old> b/<new>` block, before
        any hunk/line analysis of that file):
-         - path in BANNED_PATHS                                -> BITE, `V-banned-path`,
-           regardless of the hunks' content. No line analysis for this file at all.
+         - EITHER resolved path in BANNED_PATHS                -> BITE, `V-banned-path`,
+           regardless of the hunks' content (so a rename or deletion of a banned
+           path bites too). No line analysis for this file at all.
          - not path.endswith(".rs")                             -> NON-RUST, PERMIT,
            no reasons entry needed for this file.
          - `--- /dev/null` (a brand-new file) and (the path is under a `tests/`
@@ -968,7 +1156,9 @@ def classify(diff_text):
        See the module __doc__ "LINE RULES" section for the full, exact algorithm
        (comment/blank handling, the multi-line-literal join, the greedy
        maximum-similarity pairing with a 0.55 acceptance threshold, the P-* rule
-       order, and the V-* fallback order). This docstring does not repeat it
+       order, the V-* fallback order, and the STRUCTURAL WRAP CHECK that stops a
+       brace-unbalanced pure addition from wrapping a pre-existing assertion in an
+       EXISTING-TEST file). This docstring does not repeat it
        verbatim to avoid the two copies drifting apart; treat the module __doc__ as
        the normative text for this function's line-level behaviour.
 
@@ -991,19 +1181,57 @@ def classify(diff_text):
     the battery that proves it.
     """
     reasons = []
-    for parsed in _parse_diff(diff_text):
+    parsed_files = _parse_diff(diff_text)
+
+    # --- (0) FAIL CLOSED ON AN UNPARSEABLE INPUT (gap-07) --------------------
+    # A non-empty input that yields no `diff --git` file block is not a diff
+    # this tool can see into -- and an allow-list that cannot see a change
+    # cannot certify it. An EMPTY input is a legitimate no-op diff (there is
+    # nothing to smuggle through it) and stays PERMIT; `permit-08` pins that.
+    # `V-unpermitted-src` is the residual "not positively permitted" bucket
+    # (RULES is frozen against the spec anchor, so this fires no new id).
+    if diff_text.strip() and not parsed_files:
+        reasons.append((
+            "V-unpermitted-src", "<unparsed-input>",
+            "input is non-empty but carries no `diff --git a/<old> b/<new>` file block, so this "
+            "tool cannot see which paths it changes -- failing CLOSED rather than PERMITting a "
+            "diff it never read"))
+
+    for parsed in parsed_files:
         path = parsed["path"]
-        if not path:
-            continue
-        file_class = _file_class(path, parsed["new_file"])
+        old_path, new_path = parsed["old"], parsed["new"]
 
         # --- (1) FILE CLASSIFICATION, decided before any line analysis -------
-        if file_class == "BANNED":
+        # Path-only decisions first, and over BOTH sides of the file block.
+        escaped = [p for p in (old_path, new_path) if p and _escapes_root(p)]
+        if escaped:
             reasons.append((
-                "V-banned-path", path,
-                "RW3-08 forbids ANY change to this path (an `Affinity` / `AbilityEffect` "
-                "declaration site, or the type chart)"))
+                "V-unpermitted-src", escaped[0],
+                "path climbs out of the repo root after lexical normalisation -- unclassifiable "
+                "from a diff alone, so it fails CLOSED"))
             continue
+        # BANNED is checked against the OLD path as well as the new one: a
+        # `rename from <banned> / rename to <anything>` block is itself a
+        # change to a banned path (gap-04), and so is a deletion of one.
+        banned_hits = [p for p in dict.fromkeys((old_path, new_path)) if p in BANNED_PATHS]
+        if banned_hits:
+            for hit in banned_hits:
+                reasons.append((
+                    "V-banned-path", hit,
+                    "RW3-08 forbids ANY change to this path (an `Affinity` / `AbilityEffect` "
+                    "declaration site, or the type chart) -- including renaming or deleting it"))
+            continue
+        if not path:
+            # A file block whose path resolves from NEITHER `---`/`+++`, nor a
+            # rename/copy header, nor the `diff --git` line. Skipping it is how
+            # gap-05 hid a banned-path edit; fail closed instead.
+            reasons.append((
+                "V-unpermitted-src", "<unresolved-path>",
+                "a `diff --git` file block whose path could not be resolved from any header -- "
+                "failing CLOSED rather than skipping the file"))
+            continue
+
+        file_class = _file_class(path, parsed["new_file"])
         if file_class == "NON-RUST":
             continue  # governed by RW3-01..07 / RW3-09, not by RW3-08
 
