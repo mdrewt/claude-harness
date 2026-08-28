@@ -1492,6 +1492,8 @@ routing it onward**; budget an orchestrator verification step after every tester
   `_erase_strings` does not handle Rust raw strings; `/* … */` is not inert (fails CLOSED);
   `V-test-count` matches only the literal `#[test]`.
 
+## 2026-08-28T06:03:33Z — Native tick rid=native-20260828T060009Z-359329 — residual-ledger cleanup + rb-2 promoted
+Gate-0/1: no live per-run locks, no chain-owner mutex, no operator hold, no resident-session collision (empty find -mmin -6 in both repos besides the wrapper's own housekeeping files). Both repos fetched/synced clean, remotes match. Master CI green at 7e75cbd (matches situation bundle and local checkout). No open PRs either repo, no wip/parked branches, mr-state.json showed empty inflight/awaiting_merge/queue and park_counters={14r-e:1} unchanged. Pick-work: mr-gates residuals list --unclaimed showed 16 unpromoted-past-t1 residuals (alarm), so per the aging doctrine a residual outranks fresh PLAN Sec.9 derivation this tick. Found the ledger stale rather than genuinely needing new work: (1) R-rw3c-X3 and R-rw3b-X6-rw3c-half were BOTH already resolved by prior merges (rb-1/PR#46 amended RW3-08 and explicitly names R-rw3c-X3 as resolved in the spec text at M-postgate-roster-wave-3.spec.md:119-131,278-280; rw3c's own gates ledger X1/X1b already MET the R-rw3b-X6-rw3c-half clause and its slice header says so verbatim) but neither had been formally closed/dispositioned in mr-residuals.jsonl -- promote's close path only matches promoted_slice==sl, and these were never the id actually promoted into their sibling slice, so they sat open indefinitely. Dispositioned both wontfix with reasons citing the spec/gates evidence, correcting the ledger instead of promoting duplicate work items. (2) The next-oldest, R-m22-s0-X1 (age 3.89d, REKEY_MANIFEST object-ification red-on-arrival -- checkRekeyCompleteness infers REKEY from typeof policy==='string', so a future richer BLOCKED/EXEMPT object entry needs an explicit discriminator first), is genuinely still open (verified live: evals/guest-claim-integrity.eval.mjs:1563 checkRekeyCompleteness still uses the string check; rekey-contract-surface.eval.mjs's own comment flags it as a live trap for a future slice). Promoted it -> rb-2 in M-residual-backlog.spec.md, queued it (mr-record queue-add), shipped as doc-only chore PR#47 (chore/residual-promote-20260828T060240Z, --squash --auto -- merged clean, verified via gh pr view state=MERGED). Fast-forwarded harness main to 076e67d, deleted the local+remote branch (squash-merge means git branch -d correctly refuses; -D used per the documented squash-merge caveat). 14 more unpromoted-past-t1 residuals remain in the backlog for future ticks to triage the same way (verify-before-promote, not blind promotion). No BLOCKER, no rate-limit event. Governor NORMAL (d7=$86.74/2783 eff.). Standing down after the single promote+PR action -- no launch this tick since the promote+queue was itself gate 3's designated one action.
 ## 2026-08-28T05:41:11Z — rb-1 merged (PR#46, 9b160be) — RW3-08 allow-list amendment + mr-content-scope gate
 Native tick rid=mr-sup-native-20260828T053712Z-341478-18247. Gate-0/1: no live per-run locks/mutex/hold, no resident-session collision. Found rb-1's run finished (.done EXIT=0, PR#46 already opened by the run itself). mr-gates verify --slice rb-1: CLEAN 4/4 met, 0 deferred, 0 unmet, X2 spotcheck NO-NEW-FAILS (baseline correctly excludes the 3 pre-existing mr-selfcheck FAILs B2/gates-hook-adoption/residual-unpromoted). mr-audit: orchestration CLEAN (11 calls, planner/red-team/reviewer/tester/verifier), acceptance CLEAN 4/4, gating_advisory FLAGGED on mechanical skip-marker grep — read the diff hunk directly: the hits are prose in the RW3-08 amendment enumerating forbidden test-skip shapes (#[ignore], #[cfg(feature=..), etc.) as examples of what the new allow-list classifier rejects, not actual skipped tests; adjudicated as a false positive. doc_findings (missing/orphan disposition, 12 hits) is CORPUS-SCOPED across the whole specs/ tree, unrelated to this diff — pre-existing. Declared touches: (2 spec files) vs actual diff also included memory/projects/mr-content-scope (NEW, 3073 lines — the proof-of-teeth classifier, the slice's actual deliverable per its scope), memory/projects/mr-selfcheck (+63, one selftest leg), memory/projects/monster-realm-rb-1-plan.md (NEW, plan checkpoint) — all explained under the PR's own touches-delta: heading, justified (no Rust/game code touched, nothing collides, no in-flight sibling). Merged via gh pr merge --squash --delete-branch -> 9b160be. mr-gates residuals close --slice rb-1 --pr 46: RESIDUALS-CLOSED 1. Local main ff-only'd to origin/main (9b160be). Note: found monster-realm-handoff.md and mr-state.json with pre-existing UNCOMMITTED direct edits from the rb-1 run itself (a doctrine violation on the run's part — direct cat>>/Write instead of mr-record) already present at tick start; left the handoff prose in place (real content, low harm) and will reconstruct mr-state.json cleanly this tick rather than compounding the drift. Governor NORMAL (d7=$85.78/2783). No BLOCKER, no rate-limit event.
 ## 2026-08-28T03:03:06Z — rb-1 launched (residual R-rw3b-X8)
@@ -1657,55 +1659,3 @@ Native tick rid=native-20260825T014010Z-1265099. PR#368 (m23-s5, ADR-0206, world
 Native tick rid=native-20260825T000014Z-1109313. Gate-0/1: no live per-run locks, no chain-owner mutex, no operator hold, no resident-session collision (find -newermt -6min empty both repos; only pre-existing future-prompts.md stray + untracked proj .codegraph/ index, both left untouched). Live-verified master CI green at 78e2bb2 (matches local + situation-bundle sha, run conclusion=success). No open PRs either repo, no worktrees beyond canonical checkouts, no /tmp .done files pending merge. Residuals: mr-gates residuals list --unclaimed shows 15 open (over cap 12, observe-only per doctrine), max age ~1.1d -- all far under t1_promote_days=3, none outrank new work. queue[] empty. M23 spine S0->S1->{S2||S7}->{S3||S4}->S5->S6->{S8->S9}->{S10||S11}: S0/S1/S2/S3/S4/S7 already merged, so S5 (after: S3,S4, both satisfied) is the sole unblocked slice -- serial by construction (only client/src/main.ts touch), no fan-out partner. Tier=routine (opus@high): touches only client/src/main.ts + the #help-hint element in index.html, no server-schema/reducer, predictor/netcode/reconcile, security/RLS, or M20/M25 hit, not a resume. Pre-allocated project ADR-0206 (adr_next_free was 206). mr-spawn LAUNCHED cleanly: leader=1111335, claude_pid=1111338, rid=mr-spawn-20260825T000152Z-1111276. GATES-SEEDED criteria=0 (SPEC-SECTION-NOT-FOUND, same known-benign M23-EARS-lives-in-section-6 quirk seen on every prior M23 slice, not a launch blocker). Governor NORMAL (d7=$1274.70/2783 eff., fable_ok=true; opus-tier launch unaffected). No BLOCKER, no rate-limit event. Standing down this tick after the single launch action.
 ## 2026-08-24T23:14:20Z — m23-s4: PR#367 merged (78e2bb2) — 9/9 gates, audit CLEAN
 Supervisor tick native-20260824T230824Z-1092695 merged m23-s4 (constructed-shell a11y wiring: battleView/boxView/raisingView/evolutionView/claimView + canvas world region ARIA) via squash --delete-branch. Audit: policy=orchestration CLEAN, gating_advisory=CLEAN (no deletions/skips/suppressions), acceptance=FLAGGED-but-advisory (9/9 met, 0 unmet, 0 deferred, spotcheck TEETH-BITE agrees=true; reason=SPEC-SECTION-NOT-FOUND, not evidence_mismatch or seed_drift) — merged per doctrine (advisory never a merge predicate). mr-gates residuals close: 0 residuals for this slice. Local master ff-only'd to 78e2bb2, m23-s4 worktree+branch removed. Master CI on the merge commit was still in_progress past the usual ~9min window at tick-end (not blocked on per no-polling doctrine) — next tick should re-verify live before any further action on master.
-## 2026-08-24T22:52Z — m23-s4: PR #367 open, local `just ci` green, remote CI running (SUPERVISOR OWNS THE MERGE)
-**Slice:** m23-s4 · M23 accessibility S4 — the five constructed-shell views (`battleView`, `boxView`,
-`raisingView`, `evolutionView`, `claimView`) wired to S1's `openOverlayA11y`/`closeOverlayA11y`, plus
-`role="application"`/`tabindex="0"`/`aria-label` on the Pixi canvas in `render/world.ts`.
-**Terminal state:** PR https://github.com/mdrewt/monster-realm/pull/367 open, MERGEABLE/UNSTABLE, `ci`
-and `e2e` both IN_PROGRESS at hand-off. Local `just ci` **EXIT=0** (94 client test files / 2684 tests,
-90 evals PASS / 0 FAIL, wasm ok, perf budget ok, secrets clean, observability 8/8).
-**Acceptance:** `9/9 met, 0 deferred, 0 unmet — m23-s4 seed:e3b0c44298fc1c14` (the PR body carries this
-line verbatim). Ledger authored in the PLAN phase (seeded SPEC-SECTION-NOT-FOUND again — M23's EARS
-block is §6, not §7.x, the same seeder miss m23-s0/s1/s2/s3 all hit). X1–X5 transcribe A11Y-13/14/16/17/15
-scoped to the five S4 views; X6–X9 were authored for the S4-owned behaviours those five do not cover.
-Independently re-verified by the `verifier`: 9/9 agree with recorded evidence, `evidence_mismatch: []`.
-**Orchestration:** planner → reviewer + red-team + /simplify (plan) → tester (RED, a different agent) →
-red-team (~24 wrong impls against the suite) → orchestrator implemented → reviewer + verifier +
-desync-guard in parallel → doc-keeper. Red-team found **zero** green-and-wrong survivors; it did find one
-real defect, fixed BY THE TESTER not the implementer: `S4-battleView-REFRESH-EDGES` asserted two closes
-after a `vi.clearAllMocks()` that only one `refresh(null)` follows — unsatisfiable by any implementation.
-**Five bite-proofs**, each reddening exactly its own tooth with zero collateral (3 by the orchestrator,
-2 independently by the verifier). Tests strictly additive: **0 removed lines vs origin/master** in all
-five extended spec files.
-**`touches-delta:` (2 files, both additive, both in the PR body):** `client/src/ui/a11yCopy.ts` (one key,
-`'a11y.world.region'` — closes the gap the merged m23-s1 ARCHITECTURE entry escalated in writing, and S0
-scoped its set-equality gate to `a11y.overlay.*` on both sides precisely so a later slice could add it);
-`client/src/ui/renameView.test.ts` (one new `it()` reusing S3's hardened stripper over the five S4 files;
-S3's own array and test left byte-identical). No concurrent sibling owned either. **`boyscout-delta:` none.**
-**THREE ITEMS FOR THE SUPERVISOR / LATER SLICES:**
-1. **`ui/overlayA11y.ts`'s cross-slice contract (a) is FACTUALLY WRONG** and so is the `**m23-s1**`
-   ARCHITECTURE block quoting it: the four `#app`-mounted views do NOT share a root — each creates its own
-   and appends into the shared `#app` MOUNT. S4 deliberately did NOT implement the close-before-open that
-   comment demands (it would close an overlay the player still has open) and pinned the correction with
-   `S4-CROSS-VIEW-DISTINCT-ROOTS`. The stale comment is out of S4's `touches:`; it needs an owner —
-   S10's `overlayA11yWiring.test.ts` is the natural home.
-2. **S10 WILL FAIL on four ids as specified.** Spec §5.5's vacuity-killer requires the resolved
-   `initialFocusSelector` element's tag to be in `{BUTTON, INPUT, SELECT, A, TEXTAREA}`, but S0 froze all
-   four constructed-shell selectors onto `<h2 tabindex="-1">` anchors. Widen that list when S10 is planned.
-3. **claimView re-opens after a manual dismiss** (pinned by `S4-claimView-REOPEN-AFTER-HIDE`, not fixed):
-   `ClaimPhase` never returns to `'hidden'` and `main.ts`'s `KeyC` close calls `hide()` directly rather than
-   through `applyClaim`, so a reconnect-driven render arrives `visible:true` while the DOM reads hidden and
-   re-opens — now with a focus move. Fix needs `claimModel.ts` or `main.ts` (S5's file). **Candidate S5 scope.**
-**No ADR** (none assigned; ADR-0205 is the family authority). ADR next-free = 0206.
-**Next in the M23 spine:** S5 (`main.ts` — `worldHasFocus()`, the Escape-ladder announcements, `#help-hint`
-as a native `<button>`), which is `after: S3, S4` and is serial by construction (sole `main.ts` toucher).
-S6 follows S5; S8 remains BLOCKED on operator escalations §8.1/§8.2. S10/S11 wait on S3+S4+S7 (S7 merged).
-**Toolchain note added to memory this run:** the PostToolUse format hook formats with `npx biome` (2.5.7)
-while `just lint` uses the repo-pinned `client/node_modules/.bin/biome` (2.5.1) — the hook's reformat reds
-lint and *looks* like a deleted test in the diff. A fresh worktree has no `client/node_modules` at all until
-`npm ci`, which is why the unpinned binary gets used. Run `npm ci` in `client/` first thing in a new worktree.
-
-# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
-
----
-
