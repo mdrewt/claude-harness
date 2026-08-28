@@ -1384,6 +1384,54 @@ and `desync-guard` had no surface (zero reducers, schema, `game-core`, predictor
 **touches-delta:** `ARCHITECTURE.md` only (one targeted paragraph). Nothing else outside the declared
 set. The `.claude/worktrees/m23-s10` worktree stays for the merge pipeline.
 
+## fix-nightly-coverage-wasm — TERMINAL (PR open, local gate green, remote CI running)
+
+- **PR:** https://github.com/mdrewt/monster-realm/pull/377 · branch `slice/fix-nightly-coverage-wasm` ·
+  (PR #376 on `fix/nightly-coverage-wasm` was CLOSED and its branch deleted — same commit 58d7ed3,
+  reopened on the repo's `slice/<slice-id>` convention so PR-to-slice lookup resolves mechanically;
+  the old name's post-slash segment was `nightly-coverage-wasm`, not the slice id.) ·
+  worktree `.claude/worktrees/fix-nightly-coverage-wasm` (from `origin/master` @ 5206446).
+- **State:** local full `just ci` GREEN; acceptance ledger **6/6 met, 0 deferred**; `verifier` PASS
+  (re-executed every CHECK independently + 5 bite-proofs on /tmp copies, confirmed no gating test
+  was weakened). Remote CI run 33132758364 in_progress at handoff. **Supervisor owns the merge.**
+- **Closes on merge (NOT closed in code):** #362, #372, #374, #375 — all duplicates of this fix.
+
+### SUPERVISOR ACTION REQUIRED — disclosed hidden dependency
+`touches:` was **`justfile`** only. The PR also edits **`.github/workflows/nightly.yml`**.
+This is **not optional**: the nightly `coverage` job provisions only node+just (no Rust, no
+wasm-pack), so `coverage: wasm` alone would have traded the unresolved-import red for
+`wasm-pack: command not found`. The slice brief's root cause was incomplete on this point.
+Collision risk verified nil at plan time and at PR time (zero open PRs, one worktree), so the fix
+was shipped complete and disclosed rather than parked. **Re-serialize or reject if a sibling owns
+that file.** Full delta is under `touches-delta:` in the PR body.
+
+### Notable findings worth carrying forward
+- The coverage gate was not merely red, it was **UNENFORCED**: vitest emits no coverage report at
+  all when any test fails (`reportOnFailure` defaults false), so the threshold was never evaluated
+  during the whole red window. Memory: [[vitest-no-coverage-report-on-failure]].
+- A red-team pass that WROTE the cheats found **9 CI-clean bypasses** of a `just --dump`
+  dependency-graph gate (parameterized-recipe arguments, conditional bodies dumping BOTH branches,
+  `-` ignore-failure prefix, shebang, `--out-dir`, gate-step `env:`, trailing-comment version
+  laundering, job-level `needs:`, `if: false` on the gate). All closed; each has a tooth.
+  Memory: [[just-recipe-graph-is-forgeable]].
+- `just` parses `{{ }}` inside recipe-BODY comments — one there is a hard parse error for the whole
+  justfile and breaks every `just` invocation. Memory: [[just-parses-braces-in-recipe-comments]].
+
+### Follow-ups (flagged, not taken — out of slice scope)
+1. ADR-0050 amendment naming `evals/nightly-coverage-wasm-wiring.eval.mjs` (brief specified no ADR;
+   a reviewer argued for one). Needs a supervisor-assigned number.
+2. `nightly.yml`'s header claims "all actions are pinned to 40-hex SHAs"; `@stable`/`@v2` toolchain
+   actions have ridden tags since M8.5d. Pre-existing drift.
+3. The new eval hardcodes `CI_ENTRY_FLOOR`, duplicating `REQUIRED_JUST_STEPS` already exported from
+   `ci-gate-wiring.eval.mjs` — importing it would remove a transcription (and a false-RED source on
+   a legitimate ci.yml refactor).
+4. C2's roster is body-text-derived: a recipe reaching vitest via a wrapper script is invisible.
+   Disclosed in the eval header; floors catch removal of the known four, not addition of a fifth.
+
+## 2026-08-28T01:43:56Z — PR#377 (fix-nightly-coverage-wasm) merged — nightly coverage gate restored
+Native tick rid=native-20260828T014142Z-150567. Gate-0/1: no live per-run locks, no chain-owner mutex, no operator hold, no resident-session collision. EVENT: PR#377 all checks green. Reconciled from live PR state (mergeStateStatus CLEAN, mergeable). No .done/lock artifacts remained for this slice (log present, .err empty, no .done -- treated per doctrine as an abrupt-SIGKILL-of-the-wrapper case; the mechanical remainder was just the merge). Diff: .github/workflows/nightly.yml, ARCHITECTURE.md, evals/nightly-coverage-wasm-wiring.eval.mjs, justfile -- matches declared touches (justfile) plus incidental doc/workflow/eval files from the fix's own scope, no scope violation. mr-audit: orchestration CLEAN (planner/red-team/reviewer/tester/verifier, opus-5), gating_advisory CLEAN, acceptance ledger FLAGGED (X4 'just coverage', X6 'just eval' EVIDENCE-MISMATCH). Adjudicated: this environment's Bash tool lacks wasm-pack/cargo (confirmed by direct repro: 'wasm-pack: not found' exit 127 in the slice worktree), unlike CI which provisions the toolchain per gate X3 (verified PASS, unaffected). Remote gh checks ci+e2e both passed. Teeth spotcheck (X5, 49/49 bit) reproduced exactly matching recorded evidence. Treated as CLEAN-in-effect, not a real regression. Squash-merged 7e75cbd, worktree+local branch cleaned, remote branch auto-deleted. Closed duplicate nightly-coverage issues #362/#372/#374/#375 referencing #377. Post-merge master CI (7e75cbd) kicked off in_progress at record time -- not yet re-verified green; next tick or event should confirm. Ledger row recorded MERGED. Budget state NORMAL (d7=$36.42 of $2783 weekly).
+## 2026-08-28T01:29:23Z — Native tick — fix-nightly-coverage-wasm PR#377 CI-watch delegated
+Native tick rid=mr-sup-native-20260828T012858Z-147751-24456. Reconciled the fix-nightly-coverage-wasm .done event (rc=0, attempts=3, model=opus): the run's own branch (fix/fix-nightly-coverage-wasm) violated the repo's slice/<id> naming convention, so its attempts 2-3 renamed it to slice/fix-nightly-coverage-wasm, pushed, opened PR#377 (base master, justfile coverage: wasm dependency fix for the red Nightly job), and closed the superseded PR#376 (same commit 58d7ed3) with its stale branch deleted. Verified live: PR#377 OPEN, mergeStateStatus UNSTABLE, mergeable=MERGEABLE, both ci+e2e checks IN_PROGRESS. Per-run lock's session_leader (12332) was dead -- reaped via mr-unlock stale. Delegated CI-wait to mr-ci-watch (pid 148042, detached) rather than polling; resumes via event tick on completion. No merge yet. Governor NORMAL (d7=$35.81, well under soft-pause). No BLOCKERs.
 ## 2026-08-28T00:17:04Z — Native tick 2026-08-28T00:13:43Z — hold-aged escalation retired, coverage-wasm fix launched
 Native tick rid=native-20260828T001343Z-5979, forced by operator. Gate 0/1: no live locks, no chain mutex, no operator hold (mr-hold status=HOLD-NONE), no resident-session collision. Confirmed master (5206446) push CI is SUCCESS (was in_progress at last tick's record time). Found and closed 3 stale open DECISION(hold-aged) issues (#42/#43/#44, claude-harness repo): Drew answered #42 on 2026-08-26T00:29:30Z with "Assume operator holds are always deliberate and may last any length of time. Do not raise this kind of issue ever again." Retired the hold-aged escalation TRIGGER 2 in mr-native-tick.sh (kept TRIGGER 1, the unattributed/accidental-hold safety net, unaffected). Killed the stray mr-decision-watch process (pid 1191) that was still polling for #44. Saved a feedback memory (feedback-operator-hold-duration.md) so this directive persists across sessions.
 
@@ -1598,9 +1646,6 @@ Branch/worktree cleaned, remote branch deleted. master CI (ci+e2e) was still in_
 
 Residuals: close attempted for m23-s7 as promoted-slice target -> 0 rows (expected; nothing was DEFERred onto m23-s7 itself). Residual backlog remains over cap (15 open vs cap 12, observe-only in slice 1) — unrelated to this slice, unclaimed residuals still exist for pick-work ranking.
 
-## 2026-08-24T19:33:33Z — m23-s3 merged — PR#365 (a11y two-mechanism wiring, ten static-shell views)
-Native tick rid=native-20260824T193125Z-830859. PR#365 (mdrewt/monster-realm, slice/m23-s3→master) squash-merged: wires ten static-shell overlay views to overlayA11y.ts helpers in the two mechanisms M23 §2.2 requires (show()/hide() delegation for 7 views; render(vm|null) null-edge for 3 views with no show()), deletes the last two view-local deferred .focus() calls. mr-gates verify independently re-ran 9/9 met, 0 unmet, 0 deferred, spotcheck (X2) adversarially re-read and held. mr-audit: orchestration CLEAN, gating-test-integrity CLEAN, mandatory_read=false; acceptance block showed FLAGGED but only on SPEC-SECTION-NOT-FOUND (seeder can't find M23's EARS block, which lives in spec §6 not §7.x — 3rd occurrence across s0/s1/s3, adjudicated benign, worth fixing in the seeder). diff ⊆ declared touches (10 *View.ts) + companion *.test.ts + one ARCHITECTURE.md entry. Items: none. Worktree/branch cleaned (local + remote). master fast-forwarded to f33a3eb; post-merge CI run in_progress at merge time (pre-merge PR checks were both SUCCESS). Flagged upward for S4/S10, not fixed here (out of touches): (1) overlayA11y.ts openOverlayA11y writes role/aria-modal before the t(labelKey) call that can throw, leaving unrecorded half-open DOM state on an unwired key — unreachable today (all 16 catalog keys pinned), but contradicts the module's own no-half-open-state claim; (2) spec §9.7 wrongly claims dialogueView.ts:30 is the only innerHTML write in the view layer — questLogView/healView/shopView/tradeView also write it. residuals: 14 open vs cap 12, observe-only in slice 1, not this slice's residual (0 closed against m23-s3). m23-s7 (fable@xhigh) still live this tick (leader 655336 alive) — no composite launch.
 ## 2026-08-24T19:26:31Z — m23-s3 PR#365 — CI-watch delegated (native tick)
 Reconciled the m23-s3 finish event: PR#365 open (mergeStateStatus UNSTABLE, mergeable=MERGEABLE), ci+e2e checks IN_PROGRESS. Delegated to mr-ci-watch (pid 824821, detached) rather than polling; resumes via event tick on conclusion. m23-s7 (fable/xhigh, hard tier) remains live in the same window — touches disjoint (client/src/ui/*View.ts vs client/src/render/*), no conflict. Governor NORMAL (d7=$1164.22/2783, fable_d7=$46.78, fable_ok=true). No BLOCKER, no rate-limit event.
-## 2026-08-24T18:02:33Z — 18:00Z tick -- fan-out launch m23-s3/s7
-Reconciled uncommitted 17:10Z tick bookkeeping first (mr-state.json/handoff/archive; commit 87d9abf) -- that tick had merged m23-s1 PR#364 to 0953db7 but never committed its own records. Live-verified: master green at 0953db7 (run 32755598702 conclusion=success), no open PRs, no live watchers/locks. M23 spine after S0/S1/S2 merged opens {S2 done, S7} and {S3, S4} -- picked the spec-endorsed disjoint pair S3 (static-shell view wiring, ui/*) + S7 (reduced motion, render/*) per section 4's explicit 'S3 || S7' fan-out list, avoiding the never-paired S3||S4 combo. mr-disjoint verdict SAFE, free -g shows 37G free (ample for 2 builds). S3 = routine tier (opus@high). S7 = HARD tier (fable@xhigh, budget fable_ok=true, d7=$1115.61/2783 eff.) -- touches render/renderResolver.ts (reconcile-adjacent) and the spec itself mandates a desync-guard review. Both mr-spawn LAUNCHED cleanly (s3 leader=654704, s7 leader=655336). Both gates-seed calls reported SPEC-SECTION-NOT-FOUND/criteria=0 (same benign pattern noted on m23-s1's prior tick -- the milestone spec's slice table doesn't sub-anchor by S-number the way mr-gates seed expects; not a launch blocker, flag for the merge-time adjudication same as before). No merge this tick (composite budget spent on reconcile + fan-out launch). Governor NORMAL. No BLOCKER.
+
