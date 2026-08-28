@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-6 — S3 will hard-RED [R/name-set]: SANCTIONED_REDUCERS is exact-set equality and does not cont (from m22-s1 R-m22-s1-X1, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s1 · residual: R-m22-s1-R-m22-s1-X1
+
+Deferred with reason: evals/guest-claim-integrity.eval.mjs:388-394 pins SANCTIONED_REDUCERS as an exact set of 5 names, compared by set EQUALITY at :564-572 (deliberately not >=5). STATE_TRANSITION_OWNERS (shipped by this slice) names account_deletion_reaper, which does not exist yet. The moment S3 declares that reducer in accounts.rs, [R/name-set] fails. The Rust twin over ACCOUNTS_RS in server-module/src/accounts_tes
+
+EARS: S3 will hard-RED [R/name-set]: SANCTIONED_REDUCERS is exact-set equality and does not contain account_deletion_reaper
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-5 — evals/run.mjs has no completeness check: an eval that process.exit()s at module scope trun (from m22-s0 X4, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s0 · residual: R-m22-s0-X4
