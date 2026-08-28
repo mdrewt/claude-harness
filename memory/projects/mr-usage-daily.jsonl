@@ -27,3 +27,4 @@
 {"date": "2026-08-24", "window_start": "2026-08-23T09:35", "cowork_est_usd": 0, "native_ledger_usd": 399.79, "models": {}, "note": "fable priced at opus rates = lower bound"}
 {"date": "2026-08-25", "window_start": "2026-08-24T09:35", "cowork_est_usd": 0.67, "native_ledger_usd": 499.41, "models": {"claude-opus-5": {"calls": 6, "in": 12, "out": 1313, "cache_read": 270697, "cache_write": 80383, "est_usd": 0.67}}, "note": "fable priced at opus rates = lower bound"}
 {"date": "2026-08-26", "window_start": "2026-08-25T09:35", "cowork_est_usd": 0, "native_ledger_usd": 126.3, "models": {}, "note": "fable priced at opus rates = lower bound"}
+{"date": "2026-08-28", "window_start": "2026-08-27T09:35", "cowork_est_usd": 0, "native_ledger_usd": 182.62, "models": {}, "note": "fable priced at opus rates = lower bound"}

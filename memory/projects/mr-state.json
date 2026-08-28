@@ -1,11 +1,11 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-28T06:02:41Z",
- "updated_by": "native-20260828T060009Z-359329",
+ "updated_utc": "2026-08-28T09:56:00Z",
+ "updated_by": "native-20260828T094909Z-553562",
  "master": {
-  "sha": "7e75cbd",
-  "ci": "success",
-  "nightly": "fix_merged_PR377_7e75cbd_awaiting_next_nightly_confirmation"
+  "sha": "ab35926057965545c290c5bcc52691dfda49771e",
+  "ci": "in_progress-post-merge-confirm-next-tick",
+  "nightly": "success"
  },
  "harness_main": {
   "sha": "076e67d",
@@ -14,22 +14,13 @@
  "adr_next_free": 208,
  "inflight": [],
  "awaiting_merge": [],
- "queue": [
-  {
-   "slice": "rb-2",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m22-s0-X1",
-   "added_utc": "2026-08-28T06:02:25Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "7e75cbd"
-  }
- ],
+ "queue": [],
  "park_counters": {
   "14r-e": 1
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "native-20260828T060009Z-359329: no locks/inflight/PRs/parked branches live; master CI green at 7e75cbd. Residual-ledger triage: R-rw3c-X3 and R-rw3b-X6-rw3c-half were already resolved by prior merges (rb-1/PR#46 and rw3c respectively) but never formally closed since neither was the sibling id actually promoted -- dispositioned both wontfix with evidence citations, correcting the ledger. Promoted the next genuinely-open oldest residual, R-m22-s0-X1 (REKEY_MANIFEST object-ification red-on-arrival), -> rb-2 in M-residual-backlog.spec.md, queued it, shipped as doc-only chore PR#47 (--squash --auto, merged clean). Fast-forwarded harness main 3815b9e->076e67d. 14 more unpromoted-past-t1 residuals remain -- next tick should verify-then-promote/disposition the next oldest rather than assume they're all live work.",
+ "notes": "native-20260828T094909Z-553562: rb-2 merged (PR#378, ab35926). mr-audit CLEAN (orchestration/gating/acceptance/scope), hard-tier mandatory diff read done via subagent adjudication (safe -- no vacuous classifier, no unsafe default, anchor demotion-detection holds). mr-gates verify 8/8 reverified CLEAN. Residual R-m22-s0-X1 closed. Worktree/branch cleaned; harness main unaffected. No new launch this tick (kept full attention on the hard-tier diff read). residual_alarms carried forward: 23 unpromoted past t1=3d (oldest 4d), 30 open vs cap 12 -- per gate-3 aging rule this outranks new PLAN §9 work; next tick should promote the oldest unpromoted residual before picking fresh work. Master CI in_progress at tick exit -- next tick's gate-0 must confirm green live, not assume from this note.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -59,5 +50,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-28T06:02:41Z"
+ "last_tick_utc": "2026-08-28T09:56:00Z"
 }
