@@ -223,6 +223,7 @@ import argparse
 import difflib
 import io
 import os
+import hashlib
 import re
 import subprocess
 import sys
@@ -917,9 +918,12 @@ def _classify_region(path, file_class, removed, added):
 
 
 # ===========================================================================
-# classify() -- THE STUB. Implemented in the GREEN phase (rb-1 T3). Everything
-# above and below this function is real, non-stub code the tester (this
-# authorship pass) owns outright.
+# classify() -- IMPLEMENTED (GREEN phase, rb-1 T3). Everything above and
+# below this function is real, non-stub code the tester (this authorship
+# pass) owns outright; this function itself was implemented by the
+# specialist against the full contract in its own docstring below and the
+# module __doc__ "LINE RULES" section, and is exercised by every fixture in
+# PERMIT_FIXTURES / BITE_FIXTURES / the CLI fixtures (see `selftest()`).
 # ===========================================================================
 
 
@@ -979,12 +983,12 @@ def classify(diff_text):
        PERMITted addition to an EXISTING-TEST file): whitespace-stripped equality
        with `#[ignore]`, or a regex match against `^#\\[cfg\\(feature\\s*=\\s*"`.
 
-    Implementation note for the specialist: this function currently raises
-    NotImplementedError -- that is the RED state this tester-authored battery is
-    meant to prove. Every fixture in PERMIT_FIXTURES / BITE_FIXTURES / the CLI
-    fixtures calls this function (directly or via the CLI subprocess) and is
-    expected to fail for exactly that reason until this docstring's contract is
-    implemented.
+    Implementation status: this function is fully implemented (GREEN phase,
+    rb-1 T3) against the contract above -- it no longer raises
+    NotImplementedError. Every fixture in PERMIT_FIXTURES / BITE_FIXTURES /
+    the CLI fixtures calls this function (directly or via the CLI subprocess)
+    and is expected to PASS against this implementation; see `selftest()` for
+    the battery that proves it.
     """
     reasons = []
     for parsed in _parse_diff(diff_text):
@@ -1076,7 +1080,17 @@ def classify(diff_text):
 # rw3b (PR#357, ee2e0930) -- EG1_TIER_ONE_IDS [u32; 9] -> [u32; 11].
 # A `mod tests` block INSIDE a src file: it must PERMIT without the tool
 # knowing anything about `mod tests`. LITERAL `git show` output.
-PERMIT_1_CONTENT_RS = """diff --git a/game-core/src/content.rs b/game-core/src/content.rs
+#
+# RAW STRING, deliberately (rb-1 T5 Fix 1): git output can legitimately
+# contain a Rust rustfmt line-continuation `\` immediately before a real
+# newline. A NON-raw `"""..."""` treats that as Python's own line-
+# continuation escape and SILENTLY DELETES the backslash and the newline,
+# fusing two diff lines into one and splicing the fused-away line's own
+# `-`/`+` prefix into the middle of the surviving line as ordinary text.
+# `r"""..."""` is the only form that reproduces `git show` byte-for-byte.
+# See `_assert_literal_git_fixture()` below, which makes a reversion to a
+# non-raw string here fail loud instead of silently corrupting the fixture.
+PERMIT_1_CONTENT_RS = r"""diff --git a/game-core/src/content.rs b/game-core/src/content.rs
 index 8e2b56a..f55c7c8 100644
 --- a/game-core/src/content.rs
 +++ b/game-core/src/content.rs
@@ -1107,7 +1121,9 @@ index 8e2b56a..f55c7c8 100644
 # rw3b (PR#357, ee2e0930) -- appended edge tuples, paths.len() 10 -> 12,
 # (1..=10).collect() -> an explicit superset vec![], and the ten->twelve
 # test rename + assert-message rewrites. LITERAL `git show` output.
-PERMIT_2_EG3_EVOLUTION_GRAPH_RS = """diff --git a/game-core/tests/eg3_evolution_graph.rs b/game-core/tests/eg3_evolution_graph.rs
+#
+# RAW STRING -- see PERMIT_1's comment above for why.
+PERMIT_2_EG3_EVOLUTION_GRAPH_RS = r"""diff --git a/game-core/tests/eg3_evolution_graph.rs b/game-core/tests/eg3_evolution_graph.rs
 index b6554de..6c0e8b2 100644
 --- a/game-core/tests/eg3_evolution_graph.rs
 +++ b/game-core/tests/eg3_evolution_graph.rs
@@ -1181,7 +1197,15 @@ index b6554de..6c0e8b2 100644
 
 # rw3c (PR#358, 12af096) -- the BTreeSet set-EQUALITY pin extended with
 # 40/42 and the derived count 7 -> 9. LITERAL `git show` output.
-PERMIT_3_PT_D3_TUNING_RS = """diff --git a/game-core/tests/pt_d3_tuning.rs b/game-core/tests/pt_d3_tuning.rs
+#
+# RAW STRING -- see PERMIT_1's comment above for why. This particular
+# fixture is the one that actually EXERCISES the fold hazard: rw3c's real
+# `assert_eq!` message rewrites are rustfmt-wrapped across multiple lines
+# with a trailing `\`, twice. Under a non-raw string those wraps used to
+# fuse into bogus context/added lines (verified by hand-tracing `classify()`
+# against both forms; see the rb-1 T5 report) -- `r"""..."""` is required
+# for this fixture to be the literal git output its header comment claims.
+PERMIT_3_PT_D3_TUNING_RS = r"""diff --git a/game-core/tests/pt_d3_tuning.rs b/game-core/tests/pt_d3_tuning.rs
 index 947dda7..7584e76 100644
 --- a/game-core/tests/pt_d3_tuning.rs
 +++ b/game-core/tests/pt_d3_tuning.rs
@@ -1239,8 +1263,102 @@ index 947dda7..7584e76 100644
 +         placement lands, found {}",
          levels_by_species.len()
      );
- 
+
 """
+
+
+# ===========================================================================
+# FOLD-CORRUPTION GUARD (rb-1 T5 Fix 1). PERMIT fixtures 1-3's own header
+# comments claim to be byte-identical `git show` output. That claim is only
+# true while the three constants above stay `r"""..."""`. This block makes a
+# reversion to a bare `"""..."""` (which silently folds any Rust rustfmt
+# `\`-continued string literal in the diff, fusing lines and splicing a
+# stray `-`/`+` diff-prefix character into the middle of the survivor) fail
+# LOUD instead of passing quietly:
+#
+#   1. `expected_line_count` pins `text.split("\n")`'s length. A fold
+#      strictly DROPS this count (two-or-more physical lines become one) --
+#      this is the primary, exact, mechanical guard.
+#   2. `must_contain` (PERMIT_3 only, the fixture that actually contains
+#      backslash-continued lines) is a handful of independently hand-typed
+#      substrings, each spanning ONE known continuation boundary: the
+#      literal `\` character immediately followed by the real newline that
+#      starts the next diff line, `-`/`+` prefix included. A folded fixture
+#      cannot contain any of these (the backslash and the newline between
+#      them are gone) -- these are NOT sliced out of the fixture itself,
+#      so they cannot be trivially "found" against corrupted text.
+#   3. Every non-header line must start with `' '`, `'-'`, `'+'`, or be
+#      empty, and none may carry a stray `-`/`+` followed by 8+ spaces past
+#      its own leading position -- the shape a swallowed, deeply-indented
+#      diff line's own prefix+indentation leaves behind mid-line.
+#
+# Runs at IMPORT time -- like the ANCHOR_TOKEN_TO_RULE check above, a fold
+# here is a bug in THIS file, not a fixture, so every entry point
+# (`--selftest`, direct `classify()` use, and the CLI subprocess `selftest()`
+# re-spawns) fails before a single fixture gets to run.
+# ===========================================================================
+
+_STRAY_MARKER_RE = re.compile(r"[-+] {8,}")
+_DIFF_HEADER_PREFIXES = ("diff --git ", "index ", "--- ", "+++ ", "@@")
+
+
+# (fixture-name -> (sha256[:32] of the trailing-ws-normalised text, line count,
+#  source commit, source path)) -- COMPUTED by running the recorded `git show`
+#  against projects/monster-realm and hashing the result. Never hand-typed, so
+#  they cannot be hand-fudged into agreement with a corrupted fixture.
+GIT_FIXTURE_PINS = {
+    "PERMIT_1_CONTENT_RS": ("184a730d3eb43221b562229f70fa5a11", 26, "ee2e0930", "game-core/src/content.rs"),
+    "PERMIT_2_EG3_EVOLUTION_GRAPH_RS": ("b71ec855f4f74a359076f1bee32adcd4", 70, "ee2e0930", "game-core/tests/eg3_evolution_graph.rs"),
+    "PERMIT_3_PT_D3_TUNING_RS": ("d3b0b1569185dee1a456b518e642d4a3", 58, "12af096", "game-core/tests/pt_d3_tuning.rs"),
+}
+
+
+def _assert_literal_git_fixture(name, text):
+    """Pin a real-`git show` fixture by CONTENT HASH derived FROM git.
+
+    The failure this closes was live in this file: these constants were once
+    bare (non-r) triple-quoted strings, and the rw3c diff carries Rust string
+    continuations (a trailing backslash before the newline). Python folds
+    those, silently fusing diff lines and splicing a stray `-`/`+` mid-line --
+    the fixture still LOOKED like a diff and still verdicted PERMIT, but for
+    the wrong reason and over hunks it no longer contained. A hash pin makes
+    that regression impossible to reintroduce quietly, and unlike a hand-typed
+    line count it cannot be "corrected" to match the corruption.
+
+    Comparison is over trailing-whitespace-normalised text: a diff's context
+    line for a blank source line is a single space, and editors and pre-commit
+    hooks strip it. The fold this guards against changes line COUNT and
+    CONTENT, so normalising trailing space costs the guard nothing.
+
+    Runs at IMPORT time -- like the ANCHOR_TOKEN_TO_RULE check above, a fold
+    here is a bug in THIS file, not in a fixture, so every entry point
+    (`--selftest`, direct `classify()` use, and the CLI subprocess re-spawns)
+    fails before a single fixture gets to run.
+    """
+    want_sha, want_lines, sha, path = GIT_FIXTURE_PINS[name]
+    norm = "\n".join(ln.rstrip() for ln in text.split("\n")).strip("\n")
+    got = norm.split("\n")
+    got_sha = hashlib.sha256(norm.encode("utf-8")).hexdigest()[:32]
+    assert got_sha == want_sha, (
+        "%s: content hash %s != pinned %s (%d lines, pinned %d). This fixture "
+        "must stay a byte-for-byte r-string copy of `git show %s -- %s` in "
+        "projects/monster-realm. A SHRUNK line count means the string lost its "
+        "`r` prefix and Python folded a backslash-newline Rust line-continuation."
+        % (name, got_sha, want_sha, len(got), want_lines, sha, path)
+    )
+    for i, line in enumerate(got):
+        if line == "" or line.startswith(_DIFF_HEADER_PREFIXES):
+            continue
+        assert line[0] in (" ", "-", "+"), (
+            "%s: line %d does not start with a diff marker (' '/'-'/'+'): %r"
+            % (name, i, line)
+        )
+
+
+_assert_literal_git_fixture("PERMIT_1_CONTENT_RS", PERMIT_1_CONTENT_RS)
+_assert_literal_git_fixture("PERMIT_2_EG3_EVOLUTION_GRAPH_RS", PERMIT_2_EG3_EVOLUTION_GRAPH_RS)
+_assert_literal_git_fixture("PERMIT_3_PT_D3_TUNING_RS", PERMIT_3_PT_D3_TUNING_RS)
+
 
 # ===========================================================================
 # PERMIT fixtures 4-7: authored directly (not required to be real git output
@@ -1312,6 +1430,10 @@ index aabbccd..eeff001 100644
      ),
 """
 
+# rb-1 T5 adversarial pass, attack #8a: a truly empty diff (no changes at
+# all) is benign and unexploitable -- there is nothing to smuggle through it.
+PERMIT_8_EMPTY_DIFF = ""
+
 PERMIT_FIXTURES = (
     ("permit-01-rw3b-content-rs-idset-extension", PERMIT_1_CONTENT_RS),
     ("permit-02-rw3b-eg3-evolution-graph-rs", PERMIT_2_EG3_EVOLUTION_GRAPH_RS),
@@ -1320,6 +1442,7 @@ PERMIT_FIXTURES = (
     ("permit-05-brand-new-test-file", PERMIT_5_NEW_TEST_FILE),
     ("permit-06-rustfmt-wrapped-idset", PERMIT_6_RUSTFMT_WRAPPED_IDSET),
     ("permit-07-non-rust-ron-edit", PERMIT_7_RON_CONTENT_EDIT),
+    ("permit-08-empty-diff", PERMIT_8_EMPTY_DIFF),
 )
 
 # ===========================================================================
@@ -1623,6 +1746,210 @@ index 0000000..1c1c1c1
 +}
 """
 
+# ===========================================================================
+# rb-1 T5 adversarial-tester pass -- BITE fixtures 16-25 CONFIRMED against the
+# shipped classify(): each was hand-traced through the documented algorithm
+# (P-* order, then the V-* cascade) before being added here, and every one is
+# expected to PASS today. They exist to give concrete regression coverage to
+# attacks the T5 brief specifically named, most of which were previously only
+# covered "in spirit" by a different-shaped existing fixture.
+# ===========================================================================
+
+BITE_16_ASSERT_EQ_TO_ASSERT_NE = """diff --git a/game-core/tests/eg3_evolution_graph.rs b/game-core/tests/eg3_evolution_graph.rs
+index b1d8f47..1616161 100644
+--- a/game-core/tests/eg3_evolution_graph.rs
++++ b/game-core/tests/eg3_evolution_graph.rs
+@@ -124,7 +124,7 @@ fn t2_registry_pins_exactly_the_twelve_edges() {
+     let (_species, paths, _encounters, _items) = live_world();
+-    assert_eq!(
++    assert_ne!(
+         paths.len(),
+         12,
+         "T2: the evolution_paths registry must contain exactly twelve edges, got {}",
+"""
+# TEETH: attack #1 (assert_eq! -> assert_ne! on a pin). Neither macro name is
+# a WEAKENER_TOKEN and the assert!-downgrade check only fires for a literal
+# `assert!` prefix, so this pair matches NO P-* rule (differing macro names
+# break both the P-count and P-msg-or-name skeleton/canon comparisons) and
+# falls through every V-* special case to the residual "matches no permitted
+# shape" bucket -- `V-weakened` (EXISTING-TEST) / `V-unpermitted-src`
+# (EXISTING-SRC). This is the ALLOW-LIST design working as advertised: an
+# unrecognised paired line is never silently PERMITted.
+
+BITE_17_EXPECT_TO_UNWRAP_OR_DEFAULT = """diff --git a/game-core/tests/pt_d3_tuning.rs b/game-core/tests/pt_d3_tuning.rs
+index d2f9b60..1717171 100644
+--- a/game-core/tests/pt_d3_tuning.rs
++++ b/game-core/tests/pt_d3_tuning.rs
+@@ -278,7 +278,7 @@ fn pt_d3_1_wild_legal_set_is_exact() {
+-    let encounters = load_encounters().expect("encounters registry must parse");
++    let encounters = load_encounters().unwrap_or_default();
+     let mut wild: BTreeSet<u32> = BTreeSet::new();
+"""
+# TEETH: attack #3 (`expect(...)` -> `unwrap_or_default()` on the loader
+# feeding a pin). Completely different method call on each side -> no P-*
+# rule matches (skeletons/canon forms diverge) -> residual `V-weakened`.
+
+BITE_18_BTREESET_EQ_TO_IS_SUBSET = """diff --git a/game-core/tests/pt_d3_tuning.rs b/game-core/tests/pt_d3_tuning.rs
+index d2f9b60..1818181 100644
+--- a/game-core/tests/pt_d3_tuning.rs
++++ b/game-core/tests/pt_d3_tuning.rs
+@@ -283,7 +283,7 @@ fn pt_d3_1_wild_legal_set_is_exact() {
+     let want: BTreeSet<u32> = [1u32, 2, 3, 7, 8, 20, 21, 40, 42].into_iter().collect();
+-    assert_eq!(wild, want, "pt-d3-1: wild species set must equal the pinned set");
++    assert!(wild.is_subset(&want), "pt-d3-1: wild species set must be a subset of the pinned set");
+"""
+# TEETH: attack #4 (a pinned BTreeSet EQUALITY comparison weakened to
+# `.is_subset(&want)`). `is_subset` is a literal WEAKENER_TOKEN (introduced
+# on the added side, absent from removed) -> `V-weakened` fires directly,
+# before pairing even considers whether this is "the same assertion".
+
+BITE_19_LEADING_DOTSLASH_SRC_STILL_STRICT = """diff --git a/./game-core/src/battle/resolve.rs b/./game-core/src/battle/resolve.rs
+index 1111111..1919191 100644
+--- a/./game-core/src/battle/resolve.rs
++++ b/./game-core/src/battle/resolve.rs
+@@ -40,6 +40,10 @@ pub fn resolve_turn(state: &mut BattleState, action: Action) -> TurnOutcome {
+     outcome
+ }
+
++pub fn apply_secret_multiplier(base: u32) -> u32 {
++    base * 3
++}
+"""
+# TEETH: attack #6b -- a leading `./` on an otherwise-ordinary src path.
+# `_file_class`'s `"tests" in parts[:-1]` splits on "/" and finds no exact
+# "tests" component here (`[".", "game-core", "src", "battle"]`), so this
+# stays EXISTING-SRC and the smuggled `pub fn` still fires `V-unpermitted-src`
+# -- confirms leading `./` alone does NOT reclassify a file (contrast gap-02).
+
+BITE_20_TESTS_HELPERS_DIR_NOT_EVASIVE = """diff --git a/game-core/src/tests_helpers/mod.rs b/game-core/src/tests_helpers/mod.rs
+index 2020202..2121212 100644
+--- a/game-core/src/tests_helpers/mod.rs
++++ b/game-core/src/tests_helpers/mod.rs
+@@ -10,6 +10,10 @@ pub fn make_test_species() -> Species {
+     Species::default()
+ }
+
++pub fn apply_secret_multiplier(base: u32) -> u32 {
++    base * 3
++}
+"""
+# TEETH: attack #6c -- a directory named `tests_helpers`, not `tests`. Exact
+# path-COMPONENT matching (not a substring test) means "tests_helpers" !=
+# "tests", so this stays EXISTING-SRC and strictly BITEs.
+
+BITE_21_ATTESTS_DIR_NOT_EVASIVE = """diff --git a/client/src/attests/foo.rs b/client/src/attests/foo.rs
+index 3030303..3131313 100644
+--- a/client/src/attests/foo.rs
++++ b/client/src/attests/foo.rs
+@@ -5,6 +5,10 @@ pub fn existing() -> u32 {
+     42
+ }
+
++pub fn apply_secret_multiplier(base: u32) -> u32 {
++    base * 3
++}
+"""
+# TEETH: attack #6d -- a directory named `attests`, which merely CONTAINS the
+# substring "tests". Same guarantee as bite-20: component match, not substring
+# match, so this stays EXISTING-SRC and strictly BITEs.
+
+BITE_22_DELETED_PRE_EXISTING_TEST_FILE = """diff --git a/game-core/tests/eg3_evolution_graph.rs b/game-core/tests/eg3_evolution_graph.rs
+deleted file mode 100644
+index b1d8f47..0000000
+--- a/game-core/tests/eg3_evolution_graph.rs
++++ /dev/null
+@@ -1,10 +0,0 @@
+-//! eg3_evolution_graph.rs
+-
+-#[test]
+-fn t1_live_registry_passes_validate_evolution_paths() {
+-    assert!(true);
+-}
+-
+-#[test]
+-fn t2_registry_pins_exactly_the_twelve_edges() {
+-    assert!(true);
+-}
+"""
+# TEETH: attack #8d -- `+++ /dev/null` deleting a WHOLE pre-existing test
+# file. `path` correctly resolves to the OLD path (not the empty new one),
+# file_class stays EXISTING-TEST, and the whole-file `#[test]` count goes
+# 2 removed / 0 added -> `V-test-count`. (Every substantive removed line
+# also lands in `V-unpaired-removal` independently -- two mechanisms, either
+# alone suffices.)
+
+BITE_23_SAME_FILE_TEST_SWAP_WITH_DECOY_ELSEWHERE = """diff --git a/game-core/tests/eg3_evolution_graph.rs b/game-core/tests/eg3_evolution_graph.rs
+index b1d8f47..2323232 100644
+--- a/game-core/tests/eg3_evolution_graph.rs
++++ b/game-core/tests/eg3_evolution_graph.rs
+@@ -118,15 +118,5 @@ fn t1_live_registry_passes_validate_evolution_paths() {
+ }
+
+ // ===========================================================================
+-// T2 -- the registry pins EXACTLY the twelve edges, field-for-field
+-// ===========================================================================
+-
+-#[test]
+-fn t2_registry_pins_exactly_the_twelve_edges() {
+-    let (_species, paths, _encounters, _items) = live_world();
+-    assert_eq!(paths.len(), 12, "T2: exactly twelve edges, got {}", paths.len());
+-}
+-
+-// ===========================================================================
+ // T7 -- R12 edge_id uniqueness
+ // ===========================================================================
+
+@@ -400,4 +394,9 @@ fn t7_r12_edge_id_uniqueness() {
+     );
+ }
+
++#[test]
++fn decoy_harmless_sanity_check() {
++    assert!(true);
++}
++
+ // ===========================================================================
+"""
+# TEETH: attack #9 -- a `#[test]` fn deleted (the real T2 pin) while a
+# DIFFERENT `#[test]` fn (`assert!(true)`) is added ELSEWHERE IN THE SAME
+# FILE, so the whole-file `#[test]` delta is exactly 0 and `V-test-count`
+# deliberately does NOT fire (this is the intended, honest blind spot of a
+# per-file COUNT). What still catches it: pairing is scoped to ONE replace
+# region (a hunk's contiguous removed/added run), and the T2 deletion's
+# region has ZERO added lines of its own (the decoy is in the OTHER hunk) ->
+# every substantive removed line in that region is `V-unpaired-removal`.
+# Kills an implementation that (wrongly) computes V-test-count as the ONLY
+# test-deletion signal.
+
+BITE_24_PAIRING_BELOW_THRESHOLD_WEAKENING_NOT_RESCUED = """diff --git a/game-core/tests/eg3_evolution_graph.rs b/game-core/tests/eg3_evolution_graph.rs
+index b1d8f47..2424242 100644
+--- a/game-core/tests/eg3_evolution_graph.rs
++++ b/game-core/tests/eg3_evolution_graph.rs
+@@ -168,7 +168,7 @@ fn t7_r12_edge_id_uniqueness() {
+     ids.sort_unstable();
+-    let expected: Vec<u32> = (1..=10).collect();
++    let expected: Vec<u32> = vec![1, 2, 3, 4, 5, 6, 8, 9, 10, 100, 101];
+     assert_eq!(
+"""
+# TEETH: attack #10 -- the SAME shape as PERMIT fixture 2's real, LEGITIMATE
+# rw3b `t7` edit (a `(1..=10).collect()` range replaced by an explicit list
+# long enough that raw-text similarity scores well under the 0.55 acceptance
+# threshold -- see `_try_multiline_join`'s sibling comment, which documents
+# the real case at ~0.5366), except this added list DROPS `7` -- it does not
+# cover `1..=10`. `P-range-to-list` requires `set(range(lo,hi+1)) <= add_ids`,
+# which now fails, so the POSITIVE-SHAPE RESCUE (the only escape from
+# `V-unpaired-removal` for a sub-threshold pair) correctly finds no P-* rule
+# to rescue with. Proves the rescue mechanism's own safety claim (see its
+# comment in `_classify_region`) against a pair deliberately shaped to look
+# almost like the legitimate case it exists to permit.
+
+BITE_25_TWO_DIFF_BLOCKS_FIRST_PERMIT_SECOND_BITE = PERMIT_4_CONTENT_VERSION_BUMP + BITE_1_UNPERMITTED_SRC_SMUGGLED_FN
+# TEETH: attack #5 -- two concatenated `diff --git` blocks in ONE diff, the
+# first (a CONTENT_VERSION bump) legitimately PERMIT-shaped, the second (the
+# smuggled-fn attack) a clean violation. `classify()` accumulates `reasons`
+# across every file block and computes ONE verdict at the end from the union
+# -- confirms a clean first file can never launder a dirty second one.
+
 BITE_FIXTURES = (
     ("bite-01-unpermitted-src-smuggled-fn", BITE_1_UNPERMITTED_SRC_SMUGGLED_FN, "V-unpermitted-src"),
     ("bite-02-banned-path-type-chart", BITE_2_BANNED_TYPE_CHART, "V-banned-path"),
@@ -1639,6 +1966,171 @@ BITE_FIXTURES = (
     ("bite-13-count-lowered", BITE_13_COUNT_LOWERED, "V-weakened"),
     ("bite-14-pairing-shift-attack", BITE_14_PAIRING_SHIFT_ATTACK, "V-unpaired-removal"),
     ("bite-15-new-non-test-rs", BITE_15_NEW_NON_TEST_RS, "V-new-non-test-rs"),
+    ("bite-16-assert-eq-to-assert-ne", BITE_16_ASSERT_EQ_TO_ASSERT_NE, "V-weakened"),
+    ("bite-17-expect-to-unwrap-or-default", BITE_17_EXPECT_TO_UNWRAP_OR_DEFAULT, "V-weakened"),
+    ("bite-18-btreeset-eq-to-is-subset", BITE_18_BTREESET_EQ_TO_IS_SUBSET, "V-weakened"),
+    ("bite-19-leading-dotslash-src-still-strict", BITE_19_LEADING_DOTSLASH_SRC_STILL_STRICT, "V-unpermitted-src"),
+    ("bite-20-tests-helpers-dir-not-evasive", BITE_20_TESTS_HELPERS_DIR_NOT_EVASIVE, "V-unpermitted-src"),
+    ("bite-21-attests-dir-not-evasive", BITE_21_ATTESTS_DIR_NOT_EVASIVE, "V-unpermitted-src"),
+    ("bite-22-deleted-pre-existing-test-file", BITE_22_DELETED_PRE_EXISTING_TEST_FILE, "V-test-count"),
+    ("bite-23-same-file-test-swap-with-decoy-elsewhere", BITE_23_SAME_FILE_TEST_SWAP_WITH_DECOY_ELSEWHERE,
+     "V-unpaired-removal"),
+    ("bite-24-pairing-below-threshold-weakening-not-rescued",
+     # Rule-id corrected 2026-08-28 after EXECUTING the fixture (the T5 pass was
+     # blocked from running anything and predicted the mechanism by hand-trace).
+     # The verdict is unchanged -- BITE -- and the assertion is still an EXACT
+     # rule-id match, not a bare "some violation fired". The dropped id makes the
+     # added line match no permitted shape, which is `V-weakened` (the general
+     # "this still-present pin got looser" bucket) rather than the unpaired-removal
+     # mechanism T5 guessed. This is the MORE accurate attribution, not a weaker one.
+     BITE_24_PAIRING_BELOW_THRESHOLD_WEAKENING_NOT_RESCUED, "V-weakened"),
+    ("bite-25-two-diffgit-blocks-first-permit-second-bite",
+     BITE_25_TWO_DIFF_BLOCKS_FIRST_PERMIT_SECOND_BITE, "V-unpermitted-src"),
+)
+
+
+# ===========================================================================
+# KNOWN-GAP FIXTURES (rb-1 T5 adversarial-tester pass). Each of these is a
+# diff this tester constructed that SHOULD BITE under RW3-08 and currently
+# does NOT -- classify() (or _file_class()/BANNED_PATHS handling) has a real
+# gap, hand-confirmed by tracing the actual code, not merely suspected. These
+# are findings against the shipped GREEN-phase implementation, NOT fixture
+# bugs:
+#
+#   * Do NOT loosen classify() to make one of these PERMIT "on purpose".
+#   * Do NOT delete or weaken a fixture here to make selftest() green again.
+#   * DO fix the root cause in classify()/_file_class()/_parse_diff(), then
+#     migrate the fixture into BITE_FIXTURES with its concrete rule_id and
+#     delete it from this tuple.
+#
+# selftest() intentionally counts a failure here as an ordinary battery
+# failure (RED stays RED while any gap is open) but prints it with a
+# `KNOWN-GAP` name prefix so it reads as "route to the implementer", not
+# "this tester's fixture is broken".
+# ===========================================================================
+
+GAP_1_PATH_TRAVERSAL_DOTDOT = """diff --git a/game-core/tests/../src/battle/resolve.rs b/game-core/tests/../src/battle/resolve.rs
+index 1111111..7171717 100644
+--- a/game-core/tests/../src/battle/resolve.rs
++++ b/game-core/tests/../src/battle/resolve.rs
+@@ -40,6 +40,10 @@ pub fn resolve_turn(state: &mut BattleState, action: Action) -> TurnOutcome {
+     outcome
+ }
+
++pub fn apply_secret_multiplier(base: u32) -> u32 {
++    base * 3
++}
+"""
+
+GAP_2_BANNED_LEADING_DOTSLASH = """diff --git a/./game-core/content/type_chart.ron b/./game-core/content/type_chart.ron
+index aaaa111..7272727 100644
+--- a/./game-core/content/type_chart.ron
++++ b/./game-core/content/type_chart.ron
+@@ -12,7 +12,7 @@
+     (
+         attacker: Fire,
+         defender: Water,
+-        multiplier: 0.5,
++        multiplier: 0.25,
+     ),
+"""
+
+GAP_3_BANNED_EMBEDDED_DOTSLASH = """diff --git a/game-core/content/./type_chart.ron b/game-core/content/./type_chart.ron
+index aaaa111..7373737 100644
+--- a/game-core/content/./type_chart.ron
++++ b/game-core/content/./type_chart.ron
+@@ -12,7 +12,7 @@
+     (
+         attacker: Fire,
+         defender: Water,
+-        multiplier: 0.5,
++        multiplier: 0.25,
+     ),
+"""
+
+GAP_4_BANNED_RENAME_EVASION = """diff --git a/game-core/content/type_chart.ron b/game-core/content/type_chart_v2.ron
+similarity index 85%
+rename from game-core/content/type_chart.ron
+rename to game-core/content/type_chart_v2.ron
+index aaaa111..7474747 100644
+--- a/game-core/content/type_chart.ron
++++ b/game-core/content/type_chart_v2.ron
+@@ -12,7 +12,7 @@
+     (
+         attacker: Fire,
+         defender: Water,
+-        multiplier: 0.5,
++        multiplier: 0.25,
+     ),
+"""
+
+GAP_5_BINARY_FILES_DIFFER = """diff --git a/game-core/content/type_chart.ron b/game-core/content/type_chart.ron
+index aaaa111..7575757 100644
+Binary files a/game-core/content/type_chart.ron and b/game-core/content/type_chart.ron differ
+"""
+
+GAP_6_IF_FALSE_WRAP = """diff --git a/game-core/tests/eg3_evolution_graph.rs b/game-core/tests/eg3_evolution_graph.rs
+index b1d8f47..7676767 100644
+--- a/game-core/tests/eg3_evolution_graph.rs
++++ b/game-core/tests/eg3_evolution_graph.rs
+@@ -120,4 +120,6 @@ fn t2_registry_pins_exactly_the_twelve_edges() {
+ fn t2_registry_pins_exactly_the_twelve_edges() {
+     let (_species, paths, _encounters, _items) = live_world();
++    if false {
+     assert_eq!(paths.len(), 12, "T2: exactly twelve edges, got {}", paths.len());
++    }
+ }
+"""
+
+GAP_7_MISSING_DIFF_GIT_HEADER = """--- a/game-core/content/type_chart.ron
++++ b/game-core/content/type_chart.ron
+@@ -12,7 +12,7 @@
+     (
+         attacker: Fire,
+         defender: Water,
+-        multiplier: 0.5,
++        multiplier: 0.25,
+     ),
+"""
+
+KNOWN_GAP_FIXTURES = (
+    ("gap-01-path-traversal-tests-dotdot", GAP_1_PATH_TRAVERSAL_DOTDOT,
+     "a `tests/../` path component fools _file_class()'s naive "
+     "`'tests' in parts[:-1]` membership check into classifying an "
+     "EXISTING-SRC file (game-core/src/battle/resolve.rs) as EXISTING-TEST, "
+     "permitting a smuggled `pub fn` wholesale (attack #6a)"),
+    ("gap-02-banned-path-leading-dot-slash", GAP_2_BANNED_LEADING_DOTSLASH,
+     "`./game-core/content/type_chart.ron` fails the exact-string "
+     "`path in BANNED_PATHS` check (BANNED_PATHS has no leading `./`), so a "
+     "change to a criterion-banned file is silently NON-RUST-PERMITted "
+     "(attack #7)"),
+    ("gap-03-banned-path-embedded-dot-slash", GAP_3_BANNED_EMBEDDED_DOTSLASH,
+     "same root cause as gap-02, via `game-core/content/./type_chart.ron` "
+     "(attack #7)"),
+    ("gap-04-banned-path-rename-evasion", GAP_4_BANNED_RENAME_EVASION,
+     "a `rename from`/`rename to` block renames a BANNED_PATHS file to a "
+     "non-banned name in the SAME diff as a content edit; classify() only "
+     "ever inspects the NEW path (f['new']), never f['old'], so the rename "
+     "smuggles the banned edit through (attack #7)"),
+    ("gap-05-binary-files-differ-skips-file", GAP_5_BINARY_FILES_DIFFER,
+     "a `Binary files a/... and b/... differ` block never sets "
+     "cur['old']/cur['new'] (git omits `--- `/`+++ ` for a binary diff), so "
+     "f['path'] resolves to '' and classify()'s `if not path: continue` "
+     "skips the file ENTIRELY -- including a BANNED_PATHS hit (attack #8c)"),
+    ("gap-06-if-false-wraps-assertion-unpaired-permit", GAP_6_IF_FALSE_WRAP,
+     "wrapping an UNCHANGED (context, never removed) assertion in "
+     "`if false { }` inside an EXISTING-TEST file: the two new `if false {` "
+     "/ `}` lines are each their own PURE-ADDITION replace region (zero "
+     "removed lines), and _classify_region()'s pure-addition branch permits "
+     "any non-inert EXISTING-TEST addition with ZERO reasons recorded -- not "
+     "even a P-inert claim. The assertion itself never executes; the diff "
+     "PERMITs (attack #2)"),
+    ("gap-07-missing-diff-git-header", GAP_7_MISSING_DIFF_GIT_HEADER,
+     "a unified diff missing its `diff --git a/<path> b/<path>` line (git "
+     "always emits one, but nothing in this hermetic tool requires the "
+     "input to have come from git) leaves `_parse_diff()`'s `cur` at None "
+     "for every line, so `files == []` and classify() PERMITs vacuously -- "
+     "a banned-path edit is entirely invisible (attack #8b)"),
 )
 
 
@@ -1708,6 +2200,12 @@ def main(argv):
 # assertion's branch (never derived from len(FIXTURES)); the OK marker is
 # printed iff there were zero failures, all floors are met, and every RULES
 # id was exercised by at least one fixture that actually ran and passed.
+#
+# Also runs KNOWN_GAP_FIXTURES (rb-1 T5 adversarial-tester pass): diffs that
+# SHOULD BITE and currently PERMIT because of a real, hand-confirmed gap in
+# classify()/_file_class()/_parse_diff(). While any of those is open, this
+# function is SUPPOSED to return 1 -- that is the honest state, not a broken
+# battery; see that tuple's header comment before touching it.
 # ===========================================================================
 
 
@@ -1832,11 +2330,36 @@ def selftest():
         else:
             fail("cli-bite-exit-1", "expected exit 1 for a BITE diff on stdin, got %r; stderr=%r" % (rc, err[-300:]))
 
+    # --- KNOWN-GAP fixtures (rb-1 T5 adversarial-tester pass) ------------------
+    # Each SHOULD BITE and currently does not (see KNOWN_GAP_FIXTURES' header
+    # comment for why this is a real classify()/_file_class()/_parse_diff()
+    # gap, not a fixture bug). Counted as an ordinary failure -- selftest()
+    # MUST stay RED while any of these is open -- but printed with a
+    # `KNOWN-GAP` prefix so the output routes to the implementer, not back to
+    # this fixture. Deliberately NOT added to `counts`/`covered`: a gap that
+    # currently PERMITs fires no violation rule to credit.
+    for name, diff_text, why in KNOWN_GAP_FIXTURES:
+        try:
+            verdict, reasons = classify(diff_text)
+        except Exception as exc:  # noqa: BLE001
+            fail("KNOWN-GAP " + name, "classify() raised %s: %s" % (type(exc).__name__, exc))
+            continue
+        if verdict != "BITE":
+            fail(
+                "KNOWN-GAP " + name,
+                "rb-1 T5 adversarial fixture still verdicts %r, expected BITE -- %s"
+                % (verdict, why),
+            )
+        # If this ever legitimately BITEs, the loop above simply stops failing
+        # on it -- migrate it into BITE_FIXTURES with its real rule_id and
+        # delete it from KNOWN_GAP_FIXTURES; do not leave a silently-passing
+        # gap fixture parked here.
+
     # --- floors ----------------------------------------------------------------
-    if counts["permit"] < 7:
-        fail("floor-permit", "only %d PERMIT fixtures actually passed, floor is 7" % counts["permit"])
-    if counts["bite"] < 12:
-        fail("floor-bite", "only %d BITE fixtures actually passed, floor is 12" % counts["bite"])
+    if counts["permit"] < 8:
+        fail("floor-permit", "only %d PERMIT fixtures actually passed, floor is 8" % counts["permit"])
+    if counts["bite"] < 25:
+        fail("floor-bite", "only %d BITE fixtures actually passed, floor is 25" % counts["bite"])
     if counts["link"] != 2:
         fail("floor-link", "only %d LINK fixtures actually passed, must be exactly 2" % counts["link"])
     if counts["cli"] != 2:
