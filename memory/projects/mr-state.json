@@ -1,15 +1,15 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-28T20:00:16Z",
- "updated_by": "native-20260828T200016Z-1019792",
+ "updated_utc": "2026-08-28T21:02:33Z",
+ "updated_by": "native-20260828T210011Z-1031588",
  "master": {
   "sha": "4b43dd9",
-  "ci": "success (run 33201549752 confirmed completed/success live this tick; separate Nightly run 33203158939 in_progress, non-blocking)",
+  "ci": "success (run 33201549752 completed/success; separate Nightly run 33203158939 in_progress, non-blocking) -- unchanged this tick",
   "nightly": "success"
  },
  "harness_main": {
-  "sha": "ddaf428",
-  "ci": "no-remote-ci-local-gate-green; PR#49 (chore/residual-promote-20260828T150014Z, rb-4) merged prior tick"
+  "sha": "c5cc586",
+  "ci": "no-remote-ci-local-gate-green; PR#51 (chore/residual-promote-20260828T200231Z, rb-5) merged this tick -- completed a promotion the prior tick left orphaned unmerged"
  },
  "adr_next_free": 209,
  "inflight": [],
@@ -29,7 +29,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick mr-sup-native-20260828T185310Z-998490 (18:53Z). Reconciled rb-4.ci.md event: PR#380 green (ci+e2e pass), mergeStateStatus CLEAN, diff scope == declared touches. mr-gates verify CLEAN (9/12 met, 3 deferred-to-backlog: X10/X11/X12, none blocking). mr-audit CLEAN (orchestration 8 calls incl red-team+security-auditor+verifier; gating-advisory 0 removed asserts/skips/suppressions; acceptance CLEAN). Hard-tier mandatory diff read done. Squash-merged + branch deleted (gh pr merge --squash --delete-branch), master ff'd to 4b43dd9, worktree removed, residual R-m22-s0-X3/rb-4 closed (mr-gates residuals close --pr 380). Ledger + handoff recorded. Master CI was in-progress at record time -- watching in background (gh run watch 33201549752) rather than polling in-tick; next tick (or this session's own follow-up) confirms green and can then composite-launch off the residual/PLAN-9 derivation. Residual backlog signal (not actioned this tick, single mutating action was the merge): gate-3 residual_alarms showed 25 unpromoted-past-t1 + 33 open (cap 12, observe-only) -- queue-shape signal for the next Pick-work step.",
+ "notes": "Native tick native-20260828T210011Z-1031588 (21:00Z). Gate-0/1: no live locks/mutex/hold, no session collision, master unchanged/green. Found queue[] rb-5 entry (added by the 20:00Z tick) INVALID on live re-verification: M-residual-backlog.spec.md had no ### rb-5 section even though the residuals JSONL already showed status=promoted/promoted_slice=rb-5. Root cause via reflog: the 20:00Z tick ran `mr-gates residuals promote` (file write + commit landed on branch chore/residual-promote-20260828T200231Z) but never opened/merged the doc-only chore PR -- branch sat orphaned on origin. This tick's ONE action: verified the branch diff was a single clean doc-only append matching the JSONL verbatim, opened+squash-merged it (PR#51; PR#50 on the same branch merged concurrently, no duplicate section resulted, file has exactly one rb-5), ff'd harness main to c5cc586. queue[] rb-5 entry is now VALID -- next tick's fast path re-verifies live and launches it directly (no full PLAN-9 derivation needed). Lesson for future ticks: after `mr-gates residuals promote` succeeds, always confirm the doc-only chore PR was actually opened+merged in the SAME tick, don't just trust the JSONL status field.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -59,5 +59,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-28T18:53:10Z"
+ "last_tick_utc": "2026-08-28T21:00:11Z"
 }
