@@ -1,11 +1,11 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-28T01:29:37Z",
- "updated_by": "mr-sup-native-20260828T012858Z-147751-24456",
+ "updated_utc": "2026-08-28T01:43:26Z",
+ "updated_by": "native-20260828T014142Z-150567",
  "master": {
-  "sha": "5206446b53a1fc4bb5a6831edcf3a7ffa6bb2ebb",
-  "ci": "success_confirmed_run_32880262212",
-  "nightly": "red_4_nights_coverage_job_fix_PR377_open_ci_running"
+  "sha": "7e75cbd39d1dac945a698cf8357a8b335d6c33f5",
+  "ci": "in_progress_run_33133721912_post_merge_377",
+  "nightly": "fix_merged_PR377_7e75cbd_4nights_root_cause_addressed_awaiting_next_nightly_confirmation"
  },
  "harness_main": {
   "sha": "1779564",
@@ -13,24 +13,14 @@
  },
  "adr_next_free": 208,
  "inflight": [],
- "awaiting_merge": [
-  {
-   "slice": "fix-nightly-coverage-wasm",
-   "repo": "project",
-   "pr": 377,
-   "pr_repo": "mdrewt/monster-realm",
-   "status": "ci-watch-delegated",
-   "ci_watch_pid": 148042,
-   "rid": "mr-spawn-20260828T001648Z-12273"
-  }
- ],
+ "awaiting_merge": [],
  "queue": [],
  "park_counters": {
   "14r-e": 1
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick mr-sup-native-20260828T012858Z-147751-24456. Reconciled fix-nightly-coverage-wasm .done (rc=0, attempts=3): run's branch violated slice/<id> convention, renamed to slice/fix-nightly-coverage-wasm, opened PR#377 (justfile coverage:wasm dep fix), closed superseded PR#376+deleted its stale branch. Verified live: PR#377 OPEN, mergeable, ci+e2e IN_PROGRESS. Reaped dead per-run lock (leader 12332). Delegated CI-wait to mr-ci-watch pid 148042. Governor NORMAL. No BLOCKERs. Next tick: on green, merge PR#377, verify master CI/nightly, close #362/#372/#374/#375, then resume PLAN \u00a79 / residual-aging derivation (queue[] empty).",
+ "notes": "Native tick native-20260828T014142Z-150567. Gate-0/1 clean (no live locks/mutex/hold/collision). EVENT: PR#377 all checks green. Verified live (mergeStateStatus CLEAN). mr-audit: orchestration CLEAN, gating_advisory CLEAN, acceptance FLAGGED on X4/X6 EVIDENCE-MISMATCH -- adjudicated as local-sandbox artifact (this Bash tool env lacks wasm-pack/cargo; confirmed by direct repro; CI provisions the toolchain per gate X3 which passed). Squash-merged 7e75cbd, worktree+branches cleaned. Closed duplicate nightly-coverage issues #362/#372/#374/#375. Post-merge master CI (run 33133721912) still in_progress at record time -- NOT YET CONFIRMED GREEN; next tick/event must re-verify before any further composite action assumes master is clean. Ledger+handoff recorded. Did not launch new work this tick (merge not yet fully verified complete). Governor NORMAL (d7=$36.42 of $2783).",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
