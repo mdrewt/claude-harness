@@ -51,17 +51,32 @@ What stays forbidden is everything the deferred wording was actually protecting.
 deleted or commented out, no `#[test]` removed, no `#[ignore]` or `#[cfg(feature = "…")]` added, no
 `assert_eq!` downgraded to `assert!` or `debug_assert_eq!`, no `==` relaxed to `>=` / `is_subset` /
 `is_superset`, no id dropped from a pinned set, no pinned count lowered. Every other Rust-source
-change still fails the criterion, including a pure addition — a new `fn`, `struct` or `mod tests`
-block — inside a file the slice legitimately extends, and any incidental refactor. `Affinity`
-(`game-core/src/monster/types.rs`), `AbilityEffect` (`game-core/src/combat/ability.rs`) and
-`game-core/content/type_chart.ron` stay untouchable, exactly as before.
+change still fails the criterion, including any incidental refactor and including a pure addition
+— a new `fn`, `struct` or `mod tests` block — inside a pre-existing `src/*.rs` file the slice
+legitimately extends: that file is production code, and an allow-list that waved a pure-`+` hunk
+through it would miss the exact attack it exists to catch.
+
+That prohibition is deliberately NOT stated for a pre-existing TEST file, and the classifier does
+not enforce it there. A pure, BRACE-BALANCED addition to a file that is already a test file is
+permitted, because it cannot remove or weaken a pin that is already there. Adding a test is not a
+licence to delete one: every removal path still bites — a deleted or commented-out assertion, a
+removed `#[test]`, a removed line with no extension partner, a lowered count, a dropped id — and a
+pure addition that is brace-UNBALANCED is read as wrapping or splicing into pre-existing code and
+bites as well, as does an added `#[ignore]`, an added `#[cfg(feature = "…")]`, and a `macro_rules!`
+redefinition or `use … as` alias of one of the six reserved assertion names. This paragraph and the
+matching one under RW3-08 in `specs/monster-realm-v2/M-postgate-roster-wave-3.spec.md` say the same
+thing on purpose, and both say what `memory/projects/mr-content-scope` actually does: an
+unqualified "any pure addition fails" was FALSE of the shipped tool, which is precisely the class of
+stale claim this slice exists to kill. `Affinity` (`game-core/src/monster/types.rs`),
+`AbilityEffect` (`game-core/src/combat/ability.rs`) and `game-core/content/type_chart.ron` stay
+untouchable, exactly as before.
 
 Proof of teeth. The amended criterion is classified mechanically by
 `memory/projects/mr-content-scope`, an ALLOW-LIST classifier over a slice's unified Rust diff: every
 changed line in a Rust file bites unless it positively matches a permitted shape, because a
 deny-list waves through the pure-addition case this criterion most needs to catch.
 `memory/projects/mr-content-scope --selftest` runs the fixture battery and prints
-`CONTENT-SCOPE-SELFTEST-OK 26 fixtures (permit=7 bite=15 link=2 cli=2)`. It PERMITs the three real
+`CONTENT-SCOPE-SELFTEST-OK 42 fixtures (permit=8 bite=30 link=2 cli=2)`. It PERMITs the three real
 merged diffs this residual is about (rw3b's `EG1_TIER_ONE_IDS` extension in `game-core/src/content.rs`,
 rw3b's edge/count/range extensions in `game-core/tests/eg3_evolution_graph.rs`, and rw3c's
 set-equality and count extensions in `game-core/tests/pt_d3_tuning.rs`), plus a `CONTENT_VERSION`

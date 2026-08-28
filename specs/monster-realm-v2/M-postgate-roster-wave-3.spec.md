@@ -102,9 +102,12 @@ own acceptance is its slice ledger, not this section.
   nothing is removed and no assertion is weakened: no assertion deleted or commented out, no
   `#[test]` removed, no `#[ignore]` or `#[cfg(feature = "…")]` added, no `assert_eq!` downgraded to
   `assert!` or `debug_assert_eq!`, no `==` relaxed to `>=` / `is_subset` / `is_superset`, no id
-  dropped from a pinned set, no pinned count lowered. ANY OTHER Rust-source change — including a
-  pure addition (a new `fn`, `struct` or `mod tests` block) inside a file the slice legitimately
-  extends, and any incidental refactor — SHALL fail this criterion, and THE SLICE SHALL NOT edit
+  dropped from a pinned set, no pinned count lowered. ANY OTHER Rust-source change — including any
+  incidental refactor, and including a pure addition (a new `fn`, `struct` or `mod tests` block)
+  inside a PRE-EXISTING `src/*.rs` file the slice legitimately extends — SHALL fail this criterion.
+  A pure addition to a file that is ALREADY A TEST FILE is NOT covered by that prohibition and is
+  permitted, PROVIDED it is brace-balanced: it cannot remove or weaken a pin that is already there,
+  and every removal path above still applies to it. THE SLICE SHALL NOT edit
   `Affinity` (`game-core/src/monster/types.rs`), `AbilityEffect` (`game-core/src/combat/ability.rs`)
   or `game-core/content/type_chart.ron`. A comment-only or blank-line change is INERT and is not a
   modification of Rust source for this criterion's purposes — it cannot weaken a pin or add
@@ -131,8 +134,24 @@ Exception (c) is deliberately narrow: it licenses making an existing pin COVER n
 relaxing what that pin PROVES. Adding ids to a set pinned by equality keeps the equality exact;
 raising a pinned count keeps the count exact; replacing a pinned range with the explicit list that
 supersets it keeps the enumeration. Everything the criterion enumerates as weakening stays
-forbidden, and so does any pure addition — a new `fn`, `struct` or `mod tests` block — to a file the
-slice legitimately extends.
+forbidden, and so does any pure addition — a new `fn`, `struct` or `mod tests` block — to a
+pre-existing `src/*.rs` file the slice legitimately extends.
+
+The pure-addition prohibition is scoped to `src/*.rs` on purpose, and the classifier is scoped the
+same way — this sentence used to be written unqualified, which made it FALSE of the tool that
+decides the criterion. The distinction is the file's role, not its directory name. A pre-existing
+`src/*.rs` file is production code, and a pure-`+` hunk there is the smuggled-`pub fn` attack an
+allow-list exists to catch. A pre-existing TEST file is the artefact doing the pinning, and a pure,
+BRACE-BALANCED addition to it cannot remove or weaken an existing pin — the pins it does not touch
+still run and still fail. Adding a test is emphatically not a licence to delete one: a deleted or
+commented-out assertion, a removed `#[test]`, a removed line with no extension partner, a lowered
+count and a dropped id all still fail this criterion in a test file exactly as they do anywhere
+else, an added `#[ignore]` or `#[cfg(feature = "…")]` still fails, a `macro_rules!` redefinition or
+`use … as` alias of `assert` / `assert_eq` / `assert_ne` / `debug_assert` / `debug_assert_eq` /
+`debug_assert_ne` still fails (it silences assertions that never appear in the diff), and a pure
+addition that is brace-UNBALANCED still fails, because opening a block it does not close is how a
+`+ if false {` / `+ }` pair wraps an untouched assertion. `M-residual-backlog.spec.md`'s `rb-1`
+section states this identically.
 
 Whether a slice's diff meets this criterion is decided MECHANICALLY rather than by reading: run the
 slice's Rust diff through `memory/projects/mr-content-scope` in the harness repo, an ALLOW-LIST

@@ -71,6 +71,23 @@ ACCEPTED, DOCUMENTED LIMITATIONS (rb-1 plan Sec.2 -- NOT bugs, do not "fix" thes
     (so this tool keeps agreeing with a token set the prose no longer describes accurately).
     Same staleness channel `standards/adr-process.md:64-65` already assigns to the reviewer, not
     to mechanical tooling.
+  * RUST RAW STRINGS ARE NOT ERASED. `_erase_strings` understands only ordinary `"…"` literals
+    with backslash escapes; it does not recognise `r"…"` or `r#"…"#`. A raw string containing a
+    stray `{` or `}` therefore contributes to the STRUCTURAL WRAP CHECK's brace count and can
+    offset it -- in EITHER direction, so this one can mask a wrap as well as invent one. No
+    fixture in this repo's corpus hits it (no pinned assertion in `game-core/tests/` uses a raw
+    string), and closing it properly means a Rust lexer, which is a named anti-pattern above.
+  * `/* … */` BLOCK COMMENTS ARE NOT INERT. `_is_inert` recognises `//`, `///` and `//!` only, and
+    `_brace_delta` strips only a `//` tail. A block comment carrying an unbalanced brace, or a
+    block-commented-out assertion, is read as substantive code. This fails CLOSED -- the result is
+    a spurious BITE (or a `V-unpermitted-src` on a line that is really a comment), never a silent
+    PERMIT -- so it is a usability cost, not a hole.
+  * `V-test-count` MATCHES THE LITERAL `#[test]` ONLY. A test declared with `#[tokio::test]`,
+    `#[rstest]`, `#[test_case(…)]` or any other custom test attribute is not counted, so deleting
+    one does not move this file's count. Every OTHER rule still applies to those lines (the
+    removal still has to find an extension partner or fire `V-unpaired-removal`); it is only the
+    whole-file `#[test]` census that cannot see them. `game-core/tests/` uses plain `#[test]`
+    throughout today.
 
 THE SSOT LINK (D1) -- a DELETION ALARM, not independent proof
 ------------------------------------------------------------------
@@ -92,6 +109,19 @@ rename carries NO `---`/`+++` at all), and finally the `diff --git a/<old> b/<ne
 differ` block (gap-05: that block used to resolve to the empty path and be SKIPPED entirely,
 including a banned-path hit).
 
+Under git's DEFAULT `core.quotePath=true`, a path carrying a byte outside printable ASCII -- a
+`"`, a backslash, a control char, any non-ASCII byte -- is emitted C-QUOTED and backslash-escaped:
+`diff --git "a/game-core/src/weird\\"file.rs" "b/…"`, and likewise on the `---`/`+++` lines. Such
+a token is UNQUOTED AND UNESCAPED FIRST (`\\"`, `\\\\`, the named `\\t`/`\\n`/… escapes,
+and `\\NNN` octal bytes decoded as UTF-8), BEFORE the `a/`/`b/` prefix strip. Omitting that step
+was a TOTAL bypass rather than a cosmetic bug (`bite-26`, `bite-27`): the quoted token does not start with
+`a/`, so the prefix strip was skipped, the quotes survived normalisation, `path.endswith(".rs")`
+was False, and the file classified NON-RUST -- PERMITted wholesale with enforcement disabled
+ENTIRELY, banned paths included. Defence in depth: a token this tool CANNOT unquote (a malformed
+escape, an escape git does not emit) is handed back still quote-wrapped and BITEs via the
+unresolved-path `V-unpermitted-src` branch below, exactly as `Binary files … differ` and a
+header-less input already do -- a path that cannot be resolved cannot be certified.
+
 Every path so parsed is normalised ONCE, at parse time, LEXICALLY: strip the `a/`/`b/` diff
 prefix, then `posixpath.normpath` (collapse `//`, resolve `.` and `..` components). NEVER
 `os.path.realpath`/`abspath` -- those touch the filesystem and would destroy this tool's
@@ -104,7 +134,8 @@ hermeticity. Consequences, each of which was a live evasion before rb-1 T6:
     dodged by respelling the path (gap-02, gap-03).
 A path that still starts with `..` after normalisation has escaped the repo root; it is
 unclassifiable from a diff alone and BITEs (`V-unpermitted-src`), never silently passes. So does
-a `diff --git` block whose path resolves from no header at all.
+a `diff --git` block whose path resolves from no header at all, and so does a path still wearing
+its C-quoting (above).
 
 An input that is non-empty (after stripping whitespace) but yields ZERO file blocks -- e.g. a
 unified diff with no `diff --git` line -- BITEs (`V-unpermitted-src`): an allow-list that cannot
@@ -113,8 +144,16 @@ diff with nothing to smuggle through it and stays PERMIT (fixture `permit-08` pi
 
 FILE CLASSES (rb-1 plan Sec.2)
 ----------------------------------
-  NEW-TEST        new file under a `tests/` dir, or whose basename matches `*_test.rs` /
-                  `*_tests.rs`         -> PERMIT wholly (RW3-08's own-new-test-files exception).
+  NEW-TEST        new file under a `tests/` DIRECTORY component -> PERMIT wholly (RW3-08's
+                  own-new-test-files exception). A new file matched ONLY by the `*_test.rs` /
+                  `*_tests.rs` BASENAME rule earns that wholesale permit ONLY IF it also carries
+                  at least one added `#[test]` or `#[cfg(test)]` line; otherwise it falls through
+                  to NEW-OTHER-RS. A cargo `tests/` directory IS a test target by layout, so a
+                  path under one needs no content evidence -- but a bare NAME is just a name, and
+                  `game-core/src/evil_tests.rs` (nowhere near a `tests/` dir, containing no test
+                  at all) was shipping with zero scrutiny on it (`bite-30`). RW3-08 exception (b)
+                  is "the slice's own new TEST files", not "files named like one". This is the
+                  ONLY place a file's CLASS consults hunk content.
   NEW-OTHER-RS    any other brand-new `.rs` file                    -> BITE (`V-new-non-test-rs`).
   BANNED          exact path in `BANNED_PATHS` on EITHER side of the file block (the old path as
                   well as the new one)                              -> BITE on ANY change,
@@ -162,7 +201,10 @@ replace region, pairing is decided by GLOBAL greedy maximum similarity:
   5. An added line left unconsumed after step 2, in a hunk with NO unpaired removal (e.g. this
      replace region's every removed line found a partner, but there were still-more added
      lines), falls to the file-class rule for a pure/unmatched addition (EXISTING-TEST:
-     permitted; EXISTING-SRC: `V-unpermitted-src` unless comment/blank).
+     permitted; EXISTING-SRC: `V-unpermitted-src` unless comment/blank). In EXISTING-TEST those
+     SURPLUS added lines are not simply dropped: they are collected and run through the
+     STRUCTURAL WRAP CHECK below, because a surplus added line is an ADDITION whatever else its
+     region contains.
 
 MULTI-LINE (RUSTFMT-WRAPPED) LITERALS. Before the pairing above runs, if a replace region has M
 removed lines and N added lines with M != N, and joining ALL of one side's lines (strip each
@@ -234,24 +276,53 @@ If NO P-* rule matches a paired (removed, added) line:
     than silently PERMIT).
 
 Independent of pairing, ANY added line anywhere in a Rust-file hunk (paired, unpaired, or inside
-an otherwise-PERMITted pure-addition hunk) that is, once leading whitespace is stripped, exactly
-`#[ignore]`, or matches `#[cfg(feature = "..."` (any feature-gate attribute), is
-`V-added-weakener` regardless of any other classification that line's hunk received.
+an otherwise-PERMITted pure-addition hunk) is `V-added-weakener`, regardless of any other
+classification that line's hunk received, if -- once leading whitespace is stripped -- it is:
+  * exactly `#[ignore]`; or
+  * a match for `#[cfg(feature = "..."` (any feature-gate attribute); or
+  * a `macro_rules!` REDEFINITION of one of the six reserved assertion names `assert`,
+    `assert_eq`, `assert_ne`, `debug_assert`, `debug_assert_eq`, `debug_assert_ne`, or a
+    `use … as <one of those six>;` ALIAS of one (`bite-28`).
+The third is here, in the token bucket, rather than at the STRUCTURAL WRAP CHECK because no
+structural check could ever reach it: a `macro_rules!` body closes every brace it opens, so the
+shadowing line is brace-BALANCED and is a PURE ADDITION, while the assertions it silences for the
+rest of the scope are unchanged CONTEXT that never appear in the diff at all -- nothing is paired,
+nothing is removed, no delta moves. It is NOT the token-blacklist anti-pattern above: that
+anti-pattern is about chasing an OPEN-ENDED list of neutralising syntax SHAPES (`if false`,
+`if cfg!(…)`, `if 1 == 2`, …), whereas this is a CLOSED set of six reserved names a test may not
+rebind -- the same kind of check `#[ignore]` already is.
 
-STRUCTURAL WRAP CHECK (rb-1 T6, gap-06). A replace region with ZERO substantive removed lines in
-an EXISTING-TEST file is a pure addition, and the class rule above permits it -- but a pure
-addition can still NEUTRALISE a pre-existing assertion without touching it: adding `if false {`
-in one region and `}` in another leaves the assertion between them as unchanged CONTEXT that
-never executes and never appears in the diff as a `-` line at all. So, for a pure-addition region
-in an EXISTING-TEST file, compute the NET `{` minus `}` delta over its substantive added lines
-with string contents and `//` comments erased (the same `_erase_strings` machinery every other
-rule uses). A legitimate append -- an expected tuple, a whole new `#[test] fn`, a comment block --
-closes every block it opens, so its delta is 0. A NON-ZERO delta means the addition opens a block
-it does not close, or closes one it did not open: it is wrapping or splicing into pre-existing
-code, and is `V-weakened` (a still-present assertion got looser -- that is precisely what
-`V-weakened` means here; RULES gains no new id, see "THE SSOT LINK"). This is a COUNT, not brace
-matching, and deliberately not a token blacklist. Known imprecision, accepted: a Rust char
-literal `'{'` counts as an open brace; mis-reading one costs a BITE, never a silent PERMIT.
+STRUCTURAL WRAP CHECK (rb-1 T6, gap-06; WIDENED in the rb-1 review round, `bite-29`). An ADDED
+line in an EXISTING-TEST file can NEUTRALISE a pre-existing assertion without touching it: adding
+`if false {` in one region and `}` in another leaves the assertion between them as unchanged
+CONTEXT that never executes and never appears in the diff as a `-` line at all. So, in an
+EXISTING-TEST file, compute the NET `{` minus `}` delta over substantive added lines with string
+contents and `//` comments erased (the same `_erase_strings` machinery every other rule uses). A
+legitimate append -- an expected tuple, a whole new `#[test] fn`, a comment block -- closes every
+block it opens, so its delta is 0. A NON-ZERO delta means the addition opens a block it does not
+close, or closes one it did not open: it is wrapping or splicing into pre-existing code, and is
+`V-weakened` (a still-present assertion got looser -- that is precisely what `V-weakened` means
+here; RULES gains no new id, see "THE SSOT LINK").
+
+WHICH added lines the delta is taken over, and at what SCOPE, is the whole of this rule's teeth:
+  * In a PURE-ADDITION region (zero substantive removed lines), over EVERY substantive added line
+    of that region. This is gap-06's original shape.
+  * In ANY OTHER region, over exactly the added lines the similarity pairing left UNPAIRED -- the
+    SURPLUS. Lines the pairing consumed are excluded: each already carries its own P-*/V-* claim,
+    and a paired line ending in `{` on both sides would contribute a phantom delta. Gating the
+    check on "this region had no removal", as the first version did, was itself the hole: pairing
+    ONE legitimate `P-count` bump into each half of an `if false { … }` wrap gave both halves a
+    removal, so neither took the pure-addition branch, and each half's surplus brace line was
+    silently DROPPED (`bite-29`). A surplus added line is an addition whatever else its region
+    contains.
+  * PER REGION, never summed across a hunk or a file. The wrap's two halves live in DIFFERENT
+    regions and their deltas (+1 and -1) cancel EXACTLY when summed, so a hunk-wide or file-wide
+    sum would re-open the hole rather than close it.
+This is a COUNT, not brace matching, and deliberately not a token blacklist. Known imprecision,
+accepted: a Rust char literal `'{'` counts as an open brace, and a raw string's braces are not
+erased (see ACCEPTED LIMITATIONS); mis-reading one costs a BITE, never a silent PERMIT. What this
+check structurally CANNOT catch is a self-closing neutraliser such as an assertion-macro
+redefinition, whose delta is 0 by construction -- that is `V-added-weakener`'s job (`bite-28`).
 
 `V-test-count` is a WHOLE-FILE, cross-hunk, cross-diff aggregate check, run ONCE per file that
 classifies as EXISTING-TEST (never for a NEW-TEST file -- this is what stops a slice's own new
@@ -471,6 +542,28 @@ WEAKENER_TOKENS = (
 )
 
 _CFG_FEATURE_RE = re.compile(r'^#\[cfg\(feature\s*=\s*"')
+# The SIX reserved assertion macro names (bite-28). Redefining or aliasing any
+# of them neutralises every assertion for the rest of the scope WITHOUT the
+# neutralised assertions ever appearing in the diff -- so no pairing, no
+# removal and no brace delta can see it (a `macro_rules!` body is self-closing,
+# so its brace delta is 0). This is NOT the token-blacklist anti-pattern: it is
+# a CLOSED set of six reserved names that a test file may not rebind, not an
+# open-ended list of neutralising SYNTAX SHAPES (`if false`, `if cfg!(…)`,
+# `if 1 == 2`, …) that a blacklist would have to chase forever. Longest-first
+# so the alternation cannot stop at the `assert` prefix of `assert_eq`.
+_ASSERT_MACRO_NAMES = (
+    "debug_assert_eq",
+    "debug_assert_ne",
+    "debug_assert",
+    "assert_eq",
+    "assert_ne",
+    "assert",
+)
+_ASSERT_NAME_ALT = "|".join(_ASSERT_MACRO_NAMES)
+# `macro_rules! assert_eq { … }` -- a local redefinition.
+_MACRO_SHADOW_RE = re.compile(r"^macro_rules\s*!\s*(?:%s)\b" % _ASSERT_NAME_ALT)
+# `use some::other_macro as assert_eq;` -- the same shadowing by aliasing.
+_ALIAS_SHADOW_RE = re.compile(r"^use\s+.*\bas\s+(?:%s)\s*;" % _ASSERT_NAME_ALT)
 _CONTENT_VERSION_RE = re.compile(r"CONTENT_VERSION\s*:\s*u32\s*=\s*(\d+)\s*;")
 # A Rust integer literal, optionally carrying a type suffix (`1u32`).
 _INT_LIT = r"\d+(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)?"
@@ -483,8 +576,21 @@ _INT_ELEM_RE = re.compile(_INT_LIT)
 _RANGE_COLLECT_RE = re.compile(r"\(\s*(\d+)\s*\.\.=\s*(\d+)\s*\)\s*\.\s*collect\s*\(\s*\)")
 _FN_NAME_RE = re.compile(r"(\bfn\s+)[A-Za-z_][A-Za-z0-9_]*\s*(?=\()")
 _TEST_ATTR = "#[test]"
+# What makes a brand-new `.rs` file matched ONLY by the `*_test.rs` /
+# `*_tests.rs` BASENAME rule actually a test file (bite-30). A file under a
+# `tests/` directory component is a test target by cargo's own layout rule and
+# needs no content evidence; a bare NAME is just a name, and
+# `game-core/src/evil_tests.rs` -- nowhere near a `tests/` dir, containing no
+# test at all -- was being wholesale-permitted on it. RW3-08 exception (b) is
+# "the slice's own new TEST files", not "files named like one".
+_TEST_MARKERS = ("#[test]", "#[cfg(test)]", "#[cfg(test)")
 
-TEST_CLASSES = ("NEW-TEST", "EXISTING-TEST")
+# The file classes that reach LINE-LEVEL analysis and may therefore use the
+# test-only `P-msg-or-name` rule. NEW-TEST is deliberately ABSENT: classify()
+# permits a NEW-TEST file wholesale and `continue`s before any line rule runs,
+# so listing it here was dead breadth that contradicted the __doc__ ("ONLY
+# inside a file of class EXISTING-TEST").
+TEST_CLASSES = ("EXISTING-TEST",)
 
 
 def _is_inert(text):
@@ -495,9 +601,25 @@ def _is_inert(text):
 
 
 def _is_added_weakener(text):
-    """`#[ignore]` or any `#[cfg(feature = "…"` gate, whitespace-stripped."""
+    """The `V-added-weakener` token bucket, whitespace-stripped:
+
+      * `#[ignore]`;
+      * any `#[cfg(feature = "…"` gate;
+      * a `macro_rules!` REDEFINITION of one of the six reserved assertion
+        names, or a `use … as <one of those names>;` ALIAS of one (bite-28).
+
+    The third arrives here rather than at the structural wrap check on purpose:
+    a `macro_rules!` body is self-closing, so it is brace-BALANCED and no
+    tightening of a brace count could ever catch it, and the assertions it
+    silences never appear in the diff at all. A closed set of six reserved
+    names is a token check of the same kind `#[ignore]` already is -- not the
+    open-ended neutralising-SYNTAX blacklist this tool's anti-pattern list
+    forbids."""
     stripped = text.strip()
-    return stripped == "#[ignore]" or bool(_CFG_FEATURE_RE.match(stripped))
+    return (stripped == "#[ignore]"
+            or bool(_CFG_FEATURE_RE.match(stripped))
+            or bool(_MACRO_SHADOW_RE.match(stripped))
+            or bool(_ALIAS_SHADOW_RE.match(stripped)))
 
 
 def _erase_strings(text, in_string=False):
@@ -721,7 +843,90 @@ def _pair_by_similarity(removed, added):
 # not itself contain the literal ` b/`. git ALWAYS emits this line -- including
 # for a `Binary files ... differ` block, which carries no `---`/`+++` at all,
 # which is exactly why it is the path fallback (gap-05).
-_DIFF_GIT_RE = re.compile(r"^diff --git (a/.*) (b/.*)$")
+#
+# Each side accepts EITHER a bare `a/<path>` token OR a C-QUOTED `"a/<path>"`
+# one: under git's default `core.quotePath=true` a path carrying a byte outside
+# the printable-ASCII set (a `"`, a backslash, a control char, any non-ASCII
+# byte) is emitted quoted and backslash-escaped, and the quoted token does NOT
+# start with `a/` (bite-26/bite-27).
+_DIFF_GIT_RE = re.compile(r'^diff --git ("a/.*"|a/.*) ("b/.*"|b/.*)$')
+
+# The C escapes git's `quote_c_style()` emits: the named single-character ones
+# plus `\NNN` octal for every other byte. Anything else is not a git-produced
+# quoting and must fail CLOSED rather than be guessed at.
+_C_ESCAPE_CHARS = {
+    "a": "\a", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t",
+    "v": "\v", "\\": "\\", '"': '"', "'": "'",
+}
+_OCTAL_DIGITS = "01234567"
+
+
+def _c_unquote(token):
+    """Undo git's C-style quoting of ONE diff-header path token (bite-26/27).
+
+    `token` is the WHOLE quoted token including its wrapping double quotes, as
+    git writes it under the default `core.quotePath=true`:
+
+        "a/game-core/src/battle/weird\\"file.rs"
+        "a/game-core/content/na\\303\\257ve.ron"
+
+    Returns the unquoted, unescaped path, or None if the token is not a
+    well-formed C-quoted string (a dangling backslash, an escape git never
+    emits). None means UNRESOLVABLE, and the caller must fail CLOSED on it --
+    NEVER fall back to treating the raw quoted token as a path, which is the
+    exact bypass this function exists to close: quotes surviving normalisation
+    made `.endswith(".rs")` False and the file misclassified as NON-RUST, which
+    disables enforcement WHOLESALE (banned paths included).
+
+    Octal escapes are BYTES of the path's UTF-8 encoding, so they are collected
+    into a bytearray and decoded once at the end; `surrogateescape` keeps a
+    non-UTF-8 filename representable rather than raising (this tool never writes
+    the path back out, it only classifies it). No dependency, no `codecs`
+    private helper -- an explicit reader of a tiny, closed escape grammar."""
+    body = token[1:-1]
+    buf = bytearray()
+    i, n = 0, len(body)
+    while i < n:
+        ch = body[i]
+        if ch != "\\":
+            buf.extend(ch.encode("utf-8", "surrogateescape"))
+            i += 1
+            continue
+        if i + 1 >= n:
+            return None  # dangling backslash: not git's output
+        nxt = body[i + 1]
+        if nxt in _C_ESCAPE_CHARS:
+            buf.extend(_C_ESCAPE_CHARS[nxt].encode("utf-8"))
+            i += 2
+            continue
+        if nxt in _OCTAL_DIGITS:
+            j = 0
+            while j < 3 and (i + 1 + j) < n and body[i + 1 + j] in _OCTAL_DIGITS:
+                j += 1
+            value = int(body[i + 1:i + 1 + j], 8)
+            if value > 0xFF:
+                return None
+            buf.append(value)
+            i += 1 + j
+            continue
+        return None  # an escape git does not emit: fail closed
+    return buf.decode("utf-8", "surrogateescape")
+
+
+def _is_unresolved_path(path):
+    """DEFENCE IN DEPTH for bite-26/27. True if a normalised path is still
+    wearing C-quoting -- i.e. `_c_unquote` refused it (malformed escape) and
+    `_normalize_diff_path` handed the raw token back. A repo-relative path
+    never legitimately BEGINS with a double quote, so this is unambiguous, and
+    it routes into the SAME fail-closed `V-unpermitted-src` branch that a
+    `Binary files ... differ` block with no resolvable path and a header-less
+    input already use: a path this tool cannot resolve is a path it cannot
+    certify.
+
+    Accepted, documented cost: a file whose name genuinely starts with `"`
+    (git would emit `"a/\\"real.rs"`, which unquotes to `"real.rs`) BITEs
+    spuriously. That is fail-CLOSED -- a false BITE, never a silent PERMIT."""
+    return path.startswith('"')
 
 
 def _normalize_diff_path(raw, strip_ab=True):
@@ -736,12 +941,30 @@ def _normalize_diff_path(raw, strip_ab=True):
     classify identically in CI, in a worktree, and years from now. normpath is
     pure string work, which is all a diff header can honestly support.
 
+    A C-QUOTED token (`"a/…"`, git's default `core.quotePath=true` output for a
+    path carrying a `"`, a backslash, a control char or any non-ASCII byte) is
+    UNQUOTED AND UNESCAPED FIRST, before the `a/`/`b/` strip (bite-26/bite-27).
+    Skipping that step was a TOTAL bypass, not a cosmetic one: the quoted token
+    does not start with `a/`, so the prefix strip was skipped, the quotes
+    survived, `path.endswith(".rs")` was False, and the file classified NON-RUST
+    -> wholesale PERMIT with enforcement disabled entirely, banned paths
+    included. If the token is NOT well-formed C-quoting, the raw quoted token is
+    returned UNCHANGED so `_is_unresolved_path` sees it and the caller fails
+    CLOSED -- it is never silently treated as a path.
+
     `/dev/null` is passed through untouched: it is the new-file/deleted-file
     sentinel, not a repo path. A path that normalises to `.` (nothing left)
     returns "" so the caller's fail-closed branch sees it."""
     path = (raw or "").split("\t")[0].strip()
     if not path or path == "/dev/null":
         return path
+    if len(path) >= 2 and path.startswith('"') and path.endswith('"'):
+        unquoted = _c_unquote(path)
+        if unquoted is None:
+            return path  # still quote-wrapped -> _is_unresolved_path -> fail closed
+        path = unquoted
+        if not path or path == "/dev/null":
+            return path
     if strip_ab and path[:2] in ("a/", "b/"):
         path = path[2:]
     path = posixpath.normpath(path)
@@ -834,9 +1057,26 @@ def _parse_diff(diff_text):
     return files
 
 
-def _file_class(path, new_file):
+def _has_test_marker(added_texts):
+    """True if any added line is an `#[test]` or `#[cfg(test)]` attribute
+    (whitespace-stripped prefix match, so `#[cfg(test)]` and the
+    `#[cfg(test)] mod tests {` one-liner both count). The ONLY content this
+    module ever inspects to decide a file CLASS, and only for the
+    basename-matched new-file case (bite-30)."""
+    for text in added_texts:
+        stripped = text.strip()
+        for marker in _TEST_MARKERS:
+            if stripped.startswith(marker):
+                return True
+    return False
+
+
+def _file_class(path, new_file, added_texts=None):
     """The __doc__ FILE CLASSES table, decided from the path and the file's
-    old/new existence alone -- never from hunk content.
+    old/new existence -- plus, for a brand-new file matched ONLY by the
+    `*_test.rs` / `*_tests.rs` BASENAME rule, whether its added lines actually
+    contain a test (`added_texts`, bite-30). Nothing else consults hunk
+    content.
 
     `path` is assumed ALREADY normalised by `_normalize_diff_path` (one
     normalisation, at parse time). That is what makes the `tests` component
@@ -852,7 +1092,15 @@ def _file_class(path, new_file):
     under_tests_dir = "tests" in parts[:-1]
     test_basename = basename.endswith("_test.rs") or basename.endswith("_tests.rs")
     if new_file:
-        return "NEW-TEST" if (under_tests_dir or test_basename) else "NEW-OTHER-RS"
+        if under_tests_dir:
+            return "NEW-TEST"
+        # BASENAME-ONLY match: require CONTENT evidence that it is a test file
+        # (bite-30). Without it the file falls through to NEW-OTHER-RS ->
+        # `V-new-non-test-rs`, which is the correct class for a brand-new
+        # non-test `.rs` file wherever it lives.
+        if test_basename and _has_test_marker(added_texts or ()):
+            return "NEW-TEST"
+        return "NEW-OTHER-RS"
     # Pre-existing. Anything not under a `tests/` directory is treated as
     # EXISTING-SRC -- the STRICTER of the two, because an allow-list must fail
     # closed on a path shape it has not seen before.
@@ -1087,6 +1335,7 @@ def _classify_region(path, file_class, removed, added):
         out.append(("V-unpaired-removal", path,
                     "removed line has no extension partner in this diff (a deletion, not an "
                     "extension): %s" % _short(rem[i][0])))
+    surplus = []
     for j in unpaired_add:
         text = added[j][0]
         if _is_inert(text):
@@ -1094,6 +1343,43 @@ def _classify_region(path, file_class, removed, added):
         elif file_class != "EXISTING-TEST":
             out.append(("V-unpermitted-src", path,
                         "added line matches no permitted shape: %s" % _short(text)))
+        else:
+            surplus.append(added[j])
+
+    # STRUCTURAL WRAP CHECK, WIDENED (rb-1 review round, bite-29). The pure-
+    # addition branch above runs this same check only when the region had ZERO
+    # substantive removals -- which meant pairing ONE legitimate `P-count` bump
+    # into each half of an `if false { … }` wrap hid BOTH braces from it: each
+    # half's region then had a removal, took this path instead, and its surplus
+    # `+ if false {` / `+ }` line was DROPPED here with no reason recorded at
+    # all. The assertion between them never executed and never appeared in the
+    # diff.
+    #
+    # The fix is to stop gating the check on the presence of a removal: a
+    # SURPLUS added line -- one the similarity pairing could not match to any
+    # removed line -- is an ADDITION whatever else its region contains, and the
+    # same claim holds for it as for a pure-addition region. A legitimate
+    # surplus (an appended expected tuple, a whole new `#[test] fn`, a comment
+    # block) closes every block it opens, so its net delta is 0; a non-zero
+    # delta means it wraps or splices into pre-existing code.
+    #
+    # Scoped PER REGION, not per hunk, for the same reason the pure-addition
+    # check is: the wrap's two halves live in DIFFERENT regions and their
+    # deltas (+1 and -1) cancel EXACTLY when summed across the hunk. Summing
+    # would re-open the hole rather than close it. Lines the pairing DID
+    # consume are excluded -- they are accounted for by their own P-*/V-* rule,
+    # and a paired `assert_eq!(…) {` -> `assert_eq!(…) {` style line would
+    # otherwise contribute a phantom delta.
+    if file_class == "EXISTING-TEST" and surplus:
+        delta = _brace_delta(surplus)
+        if delta != 0:
+            out.append((
+                "V-weakened", path,
+                "added line(s) left UNPAIRED by the similarity pairing are brace-UNBALANCED "
+                "within this region (net `{`-`}` delta %+d): they open or close a block they do "
+                "not themselves close or open, i.e. they wrap or splice into pre-existing code "
+                "that never appears in this diff: %s"
+                % (delta, _short(surplus[0][0]))))
     return out
 
 
@@ -1139,10 +1425,13 @@ def classify(diff_text):
            path bites too). No line analysis for this file at all.
          - not path.endswith(".rs")                             -> NON-RUST, PERMIT,
            no reasons entry needed for this file.
-         - `--- /dev/null` (a brand-new file) and (the path is under a `tests/`
-           directory component, OR its basename matches `*_test.rs` / `*_tests.rs`)
-                                                                  -> NEW-TEST, PERMIT
+         - `--- /dev/null` (a brand-new file) and the path is under a `tests/`
+           directory component                                    -> NEW-TEST, PERMIT
            wholesale, no per-line analysis, no reasons entry needed.
+         - `--- /dev/null` and the path is NOT under a `tests/` directory but its
+           basename matches `*_test.rs` / `*_tests.rs` AND at least one added line
+           is an `#[test]` / `#[cfg(test)]` attribute -> NEW-TEST likewise. Without
+           that content evidence a bare test-shaped NAME earns nothing (`bite-30`).
          - `--- /dev/null` and not NEW-TEST                      -> NEW-OTHER-RS, BITE,
            `V-new-non-test-rs`, once per such file.
          - pre-existing, under a `tests/` directory component     -> EXISTING-TEST,
@@ -1171,7 +1460,10 @@ def classify(diff_text):
        every added line in every Rust-file hunk (including inside an
        otherwise-wholesale-PERMIT NEW-TEST file, and inside an otherwise pure and
        PERMITted addition to an EXISTING-TEST file): whitespace-stripped equality
-       with `#[ignore]`, or a regex match against `^#\\[cfg\\(feature\\s*=\\s*"`.
+       with `#[ignore]`, a regex match against `^#\\[cfg\\(feature\\s*=\\s*"`, or a
+       `macro_rules!` redefinition / `use … as` alias of one of the six reserved
+       assertion names (see the module __doc__ for that closed set and why it is
+       not the token-blacklist anti-pattern).
 
     Implementation status: this function is fully implemented (GREEN phase,
     rb-1 T3) against the contract above -- it no longer raises
@@ -1203,6 +1495,22 @@ def classify(diff_text):
 
         # --- (1) FILE CLASSIFICATION, decided before any line analysis -------
         # Path-only decisions first, and over BOTH sides of the file block.
+        # DEFENCE IN DEPTH for the C-quoted header (bite-26/bite-27). The
+        # unquoting in `_normalize_diff_path` is the fix; this is the backstop
+        # for a quoting shape it refuses (a malformed escape). A path this tool
+        # cannot RESOLVE is a path it cannot CERTIFY, so it takes the same
+        # fail-closed `V-unpermitted-src` exit as a `Binary files ... differ`
+        # block with no header and a header-less input. Checked BEFORE the
+        # banned/`.rs` tests, because a surviving quote is exactly what made
+        # `.endswith(".rs")` False and disabled enforcement wholesale.
+        unresolved = [p for p in (old_path, new_path) if p and _is_unresolved_path(p)]
+        if unresolved:
+            reasons.append((
+                "V-unpermitted-src", unresolved[0],
+                "path is still C-QUOTED after normalisation (git `core.quotePath` output this "
+                "tool could not unescape) -- unresolvable, so it fails CLOSED rather than being "
+                "classified from a quoted token"))
+            continue
         escaped = [p for p in (old_path, new_path) if p and _escapes_root(p)]
         if escaped:
             reasons.append((
@@ -1231,7 +1539,11 @@ def classify(diff_text):
                 "failing CLOSED rather than skipping the file"))
             continue
 
-        file_class = _file_class(path, parsed["new_file"])
+        # Added-line texts, needed ONLY so a brand-new `*_tests.rs` matched by
+        # BASENAME alone must actually contain a test to earn the NEW-TEST
+        # wholesale permit (bite-30).
+        added_texts = [text for h in parsed["hunks"] for (tag, text) in h if tag == "+"]
+        file_class = _file_class(path, parsed["new_file"], added_texts)
         if file_class == "NON-RUST":
             continue  # governed by RW3-01..07 / RW3-09, not by RW3-08
 
@@ -2315,23 +2627,40 @@ BITE_FIXTURES = (
 
 
 # ===========================================================================
-# KNOWN-GAP FIXTURES (rb-1 T5 adversarial-tester pass). Each of these is a
-# diff this tester constructed that SHOULD BITE under RW3-08 and currently
-# does NOT -- classify() (or _file_class()/BANNED_PATHS handling) has a real
-# gap, hand-confirmed by tracing the actual code, not merely suspected. These
-# are findings against the shipped GREEN-phase implementation, NOT fixture
-# bugs:
+# CLOSED-GAP REGRESSION BATTERY (the tuple is still named `KNOWN_GAP_FIXTURES`
+# for the reason given at the bottom of this comment).
+#
+# READ THIS BEFORE BELIEVING THE NAME. As of 2026-08-28 there are NO open gaps
+# here. Every one of the seven entries below BITEs. Each was found by the rb-1
+# T5 adversarial-tester pass as a REAL, hand-confirmed hole in the shipped
+# GREEN-phase classifier, each was CLOSED by the rb-1 T6 fix pass, and each is
+# kept here as a REGRESSION PIN: an attack that once worked, the fix that
+# closed it, and a standing assertion that it still bites. A future reader
+# must not read this tuple as a list of seven live holes -- it is the exact
+# opposite, a list of seven that are shut.
 #
 #   * Do NOT loosen classify() to make one of these PERMIT "on purpose".
-#   * Do NOT delete or weaken a fixture here to make selftest() green again.
-#   * DO fix the root cause in classify()/_file_class()/_parse_diff(), then
-#     migrate the fixture into BITE_FIXTURES with its concrete rule_id and
-#     delete it from this tuple.
+#   * Do NOT delete an entry because "the gap is closed, so why keep it" --
+#     that is precisely when a regression pin earns its keep.
+#   * Do NOT weaken the loop in selftest() that fails when one stops biting.
+#     A silent PERMIT here means a fix was undone.
 #
-# selftest() intentionally counts a failure here as an ordinary battery
-# failure (RED stays RED while any gap is open) but prints it with a
-# `KNOWN-GAP` name prefix so it reads as "route to the implementer", not
-# "this tester's fixture is broken".
+# selftest() runs each through classify() and FAILS the battery if any returns
+# anything but BITE, printing it with a `KNOWN-GAP` name prefix so the output
+# routes to the implementer, not back to the fixture. These entries are NOT
+# added to `counts`/`covered` (that in-body comment in selftest() still gives
+# the ORIGINAL, now-stale reason -- "a gap that currently PERMITs fires no
+# violation rule to credit"; selftest() is frozen for this slice, so it was
+# left as-is). They stay uncounted regardless: each duplicates coverage a
+# BITE_FIXTURES entry already credits, so counting them would only inflate the
+# marker total `mr-selfcheck` floors.
+#
+# WHY THE IDENTIFIER STILL SAYS `KNOWN_GAP_FIXTURES`. It is referenced by
+# `selftest()`, and this slice's brief forbids touching `selftest()`'s body at
+# all. Renaming the tuple would require editing that reference, so the name is
+# left alone deliberately and the comments/`why` strings carry the correct
+# meaning instead. A later slice that is allowed to touch `selftest()` should
+# rename it to `CLOSED_GAP_REGRESSION_FIXTURES`.
 # ===========================================================================
 
 GAP_1_PATH_TRAVERSAL_DOTDOT = """diff --git a/game-core/tests/../src/battle/resolve.rs b/game-core/tests/../src/battle/resolve.rs
@@ -2418,44 +2747,69 @@ GAP_7_MISSING_DIFF_GIT_HEADER = """--- a/game-core/content/type_chart.ron
      ),
 """
 
+# Each `why` reads: WAS -- the attack, as it worked against the shipped T3
+# classifier; CLOSED BY -- the T6 fix; PINS -- what a regression here would
+# mean. All seven BITE today.
 KNOWN_GAP_FIXTURES = (
     ("gap-01-path-traversal-tests-dotdot", GAP_1_PATH_TRAVERSAL_DOTDOT,
-     "a `tests/../` path component fools _file_class()'s naive "
-     "`'tests' in parts[:-1]` membership check into classifying an "
-     "EXISTING-SRC file (game-core/src/battle/resolve.rs) as EXISTING-TEST, "
-     "permitting a smuggled `pub fn` wholesale (attack #6a)"),
+     "CLOSED (rb-1 T6) -- WAS: a `tests/../` path component fooled "
+     "_file_class()'s naive `'tests' in parts[:-1]` membership check into "
+     "classifying an EXISTING-SRC file (game-core/src/battle/resolve.rs) as "
+     "EXISTING-TEST, permitting a smuggled `pub fn` wholesale (attack #6a). "
+     "CLOSED BY: lexical `posixpath.normpath` in _normalize_diff_path(), run "
+     "ONCE at parse time, which resolves the `..` away before _file_class() "
+     "ever sees the path. PINS: that normalisation still happening, and still "
+     "happening BEFORE classification"),
     ("gap-02-banned-path-leading-dot-slash", GAP_2_BANNED_LEADING_DOTSLASH,
-     "`./game-core/content/type_chart.ron` fails the exact-string "
-     "`path in BANNED_PATHS` check (BANNED_PATHS has no leading `./`), so a "
-     "change to a criterion-banned file is silently NON-RUST-PERMITted "
-     "(attack #7)"),
+     "CLOSED (rb-1 T6) -- WAS: `./game-core/content/type_chart.ron` failed "
+     "the exact-string `path in BANNED_PATHS` check (BANNED_PATHS has no "
+     "leading `./`), so a change to a criterion-banned file was silently "
+     "NON-RUST-PERMITted (attack #7). CLOSED BY: the same normpath pass. "
+     "PINS: that BANNED_PATHS is tested against a NORMALISED path, so the "
+     "exact-string set cannot be dodged by respelling"),
     ("gap-03-banned-path-embedded-dot-slash", GAP_3_BANNED_EMBEDDED_DOTSLASH,
-     "same root cause as gap-02, via `game-core/content/./type_chart.ron` "
-     "(attack #7)"),
+     "CLOSED (rb-1 T6) -- WAS: same root cause as gap-02, via "
+     "`game-core/content/./type_chart.ron` (attack #7). CLOSED BY: the same "
+     "normpath pass. PINS: the mid-path spelling, not just the leading one"),
     ("gap-04-banned-path-rename-evasion", GAP_4_BANNED_RENAME_EVASION,
-     "a `rename from`/`rename to` block renames a BANNED_PATHS file to a "
-     "non-banned name in the SAME diff as a content edit; classify() only "
-     "ever inspects the NEW path (f['new']), never f['old'], so the rename "
-     "smuggles the banned edit through (attack #7)"),
+     "CLOSED (rb-1 T6) -- WAS: a `rename from`/`rename to` block renamed a "
+     "BANNED_PATHS file to a non-banned name in the SAME diff as a content "
+     "edit; classify() only ever inspected the NEW path (f['new']), never "
+     "f['old'], so the rename smuggled the banned edit through (attack #7). "
+     "CLOSED BY: _parse_diff() resolving BOTH sides independently (including "
+     "from rename/copy headers) and classify() testing BANNED_PATHS against "
+     "both. PINS: that the OLD path is still checked -- which is also what "
+     "makes DELETING a banned file bite"),
     ("gap-05-binary-files-differ-skips-file", GAP_5_BINARY_FILES_DIFFER,
-     "a `Binary files a/... and b/... differ` block never sets "
-     "cur['old']/cur['new'] (git omits `--- `/`+++ ` for a binary diff), so "
-     "f['path'] resolves to '' and classify()'s `if not path: continue` "
-     "skips the file ENTIRELY -- including a BANNED_PATHS hit (attack #8c)"),
+     "CLOSED (rb-1 T6) -- WAS: a `Binary files a/... and b/... differ` block "
+     "never set cur['old']/cur['new'] (git omits `--- `/`+++ ` for a binary "
+     "diff), so f['path'] resolved to '' and classify()'s `if not path: "
+     "continue` skipped the file ENTIRELY -- including a BANNED_PATHS hit "
+     "(attack #8c). CLOSED BY: the `diff --git a/<old> b/<new>` header as a "
+     "per-side path FALLBACK, plus turning the unresolved-path branch from a "
+     "`continue` into a fail-closed `V-unpermitted-src`. PINS: that a file "
+     "block is never SKIPPED merely because its path was hard to read"),
     ("gap-06-if-false-wraps-assertion-unpaired-permit", GAP_6_IF_FALSE_WRAP,
-     "wrapping an UNCHANGED (context, never removed) assertion in "
-     "`if false { }` inside an EXISTING-TEST file: the two new `if false {` "
-     "/ `}` lines are each their own PURE-ADDITION replace region (zero "
-     "removed lines), and _classify_region()'s pure-addition branch permits "
-     "any non-inert EXISTING-TEST addition with ZERO reasons recorded -- not "
-     "even a P-inert claim. The assertion itself never executes; the diff "
-     "PERMITs (attack #2)"),
+     "CLOSED (rb-1 T6) -- WAS: wrapping an UNCHANGED (context, never removed) "
+     "assertion in `if false { }` inside an EXISTING-TEST file: the two new "
+     "`if false {` / `}` lines are each their own PURE-ADDITION replace region "
+     "(zero removed lines), and _classify_region()'s pure-addition branch "
+     "permitted any non-inert EXISTING-TEST addition with ZERO reasons "
+     "recorded -- not even a P-inert claim. The assertion never executed; the "
+     "diff PERMITted (attack #2). CLOSED BY: the STRUCTURAL WRAP CHECK -- a "
+     "per-region net `{`-`}` delta over added lines, non-zero => V-weakened. "
+     "PINS: the UNPAIRED-half shape of that check; `bite-29` pins the "
+     "camouflaged-by-pairing shape the first version of it missed"),
     ("gap-07-missing-diff-git-header", GAP_7_MISSING_DIFF_GIT_HEADER,
-     "a unified diff missing its `diff --git a/<path> b/<path>` line (git "
-     "always emits one, but nothing in this hermetic tool requires the "
-     "input to have come from git) leaves `_parse_diff()`'s `cur` at None "
-     "for every line, so `files == []` and classify() PERMITs vacuously -- "
-     "a banned-path edit is entirely invisible (attack #8b)"),
+     "CLOSED (rb-1 T6) -- WAS: a unified diff missing its `diff --git "
+     "a/<path> b/<path>` line (git always emits one, but nothing in this "
+     "hermetic tool requires the input to have come from git) left "
+     "`_parse_diff()`'s `cur` at None for every line, so `files == []` and "
+     "classify() PERMITted vacuously -- a banned-path edit was entirely "
+     "invisible (attack #8b). CLOSED BY: the non-empty-input-but-zero-file-"
+     "blocks fail-closed branch at the top of classify(). PINS: that an input "
+     "this tool cannot PARSE is never an input it CERTIFIES -- while an EMPTY "
+     "input legitimately stays PERMIT (`permit-08`)"),
 )
 
 
@@ -2657,12 +3011,16 @@ def selftest():
 
     # --- KNOWN-GAP fixtures (rb-1 T5 adversarial-tester pass) ------------------
     # Each SHOULD BITE and currently does not (see KNOWN_GAP_FIXTURES' header
-    # comment for why this is a real classify()/_file_class()/_parse_diff()
-    # gap, not a fixture bug). Counted as an ordinary failure -- selftest()
-    # MUST stay RED while any of these is open -- but printed with a
-    # `KNOWN-GAP` prefix so the output routes to the implementer, not back to
-    # this fixture. Deliberately NOT added to `counts`/`covered`: a gap that
-    # currently PERMITs fires no violation rule to credit.
+    # comment for the attack it pins, the fix that closed it, and what a
+    # regression here would mean). ALL SEVEN ARE CLOSED -- this is a
+    # closed-gap REGRESSION battery, not a list of open holes; the tuple name
+    # is a historical artifact kept because renaming it means editing this
+    # function, which the tester/implementer split freezes. Any entry that
+    # stops BITEing is an ordinary failure and selftest() goes RED, which is
+    # exactly the regression alarm. Deliberately NOT added to
+    # `counts`/`covered`: these are regression pins over rules the ordinary
+    # BITE fixtures already credit, so counting them twice would inflate the
+    # floors without adding coverage.
     for name, diff_text, why in KNOWN_GAP_FIXTURES:
         try:
             verdict, reasons = classify(diff_text)

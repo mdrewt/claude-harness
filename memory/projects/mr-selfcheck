@@ -2736,9 +2736,13 @@ import os, re, subprocess, sys
 
 MEM = sys.argv[1]
 TOOL = os.path.join(MEM, "mr-content-scope")
-# The count the battery ships with: 7 PERMIT + 15 BITE + 2 LINK + 2 CLI fixtures. A floor, not an
-# equality, so ADDING fixtures never reds -- only deleting them does.
-SELFTEST_FLOOR = 26
+# The count the battery ships with: 8 PERMIT + 30 BITE + 2 LINK + 2 CLI fixtures (rb-1 review
+# round, 2026-08-28 -- was 7/15/2/2 = 26 at rb-1 T3, before the reviewer/red-team fixtures
+# bite-26..bite-30 and the T5 adversarial battery landed). A floor, not an equality, so ADDING
+# fixtures never reds -- only deleting them does; raising it as the battery grows is this file's
+# documented practice, and is what keeps the floor from decaying into a number no deletion can
+# ever cross.
+SELFTEST_FLOOR = 42
 bad = 0
 
 
