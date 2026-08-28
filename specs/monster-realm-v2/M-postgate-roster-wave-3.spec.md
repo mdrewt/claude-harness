@@ -91,11 +91,80 @@ own acceptance is its slice ledger, not this section.
   table, and WHEN rw3c lands, EACH wave-3 tier-0 species SHALL appear in at least one encounter entry.
 - **RW3-07** THE zone-0 encounter table SHALL remain byte-identical (the `client/e2e/recruit.spec.ts`
   flake budgets are derived from its exact weights and `encounter_rate`).
-- **RW3-08** THE SLICE SHALL NOT modify Rust source other than `CONTENT_VERSION` and its own new test
-  files, and SHALL NOT edit `Affinity`, `AbilityEffect`, or `content/type_chart.ron`.
+- **RW3-08** THE SLICE SHALL NOT modify Rust source, WITH EXACTLY THREE EXCEPTIONS: (a) the
+  `CONTENT_VERSION` literal; (b) the slice's own new test files; (c) a STRICTLY-ADDITIVE EXTENSION
+  of a pre-existing exactly-pinned test or registry set that the slice's own new content would
+  otherwise make unsatisfiable — adding ids to a set pinned by equality, raising a pinned count,
+  appending expected tuples, replacing a pinned range with the explicit list that supersets it, or
+  updating an assertion message or test name that states that count — wherever that pin lives
+  (`game-core/tests/*.rs` files and `mod tests` blocks inside `src/*.rs` are the shapes that exist
+  today; the list is illustrative, not exhaustive). AN EXTENSION IS STRICTLY ADDITIVE ONLY IF
+  nothing is removed and no assertion is weakened: no assertion deleted or commented out, no
+  `#[test]` removed, no `#[ignore]` or `#[cfg(feature = "…")]` added, no `assert_eq!` downgraded to
+  `assert!` or `debug_assert_eq!`, no `==` relaxed to `>=` / `is_subset` / `is_superset`, no id
+  dropped from a pinned set, no pinned count lowered. ANY OTHER Rust-source change — including a
+  pure addition (a new `fn`, `struct` or `mod tests` block) inside a file the slice legitimately
+  extends, and any incidental refactor — SHALL fail this criterion, and THE SLICE SHALL NOT edit
+  `Affinity` (`game-core/src/monster/types.rs`), `AbilityEffect` (`game-core/src/combat/ability.rs`)
+  or `game-core/content/type_chart.ron`.
 - **RW3-09** EACH content slice SHALL ship its own `evals/rw3*.eval.mjs` and `game-core/tests/rw3*.rs`,
   SHALL bump `CONTENT_VERSION` monotonically, SHALL regenerate `evals/baselines/content-hash.json` with
   its generator, and SHALL NOT edit `evals/run.mjs` or another slice's gate file.
+
+**RW3-08 — amended 2026-08-28 by slice `rb-1`** (residuals `R-rw3b-X8`, `R-rw3c-X3`). As originally
+worded ("SHALL NOT modify Rust source other than `CONTENT_VERSION` and its own new test files"),
+this criterion forbade every Rust edit outside a slice's own new files — which is mechanically
+unsatisfiable for ANY slice that appends an evolution edge or a derived species, because three
+pre-existing tests pin the affected registries by EQUALITY and go RED the instant new content
+lands: `game-core/tests/eg3_evolution_graph.rs` (the edge table pinned field-for-field, plus
+`paths.len()` and the explicit `edge_id` set), `game-core/src/content.rs`'s `EG1_TIER_ONE_IDS` (the
+derived-species set, pinned inside that file's `mod tests` block), and
+`game-core/tests/pt_d3_tuning.rs` (the wild-legal species set by set EQUALITY, plus the exact
+wild-encounterable count). rw3b (PR#357) extended the first two and rw3c (PR#358) extended the
+third; each extended them field-for-field, each weakened nothing, and each still had to DEFER
+RW3-08 — twice, for the same reason, and the second time knowing the first. The code was never in
+violation; the criterion text was.
+
+Exception (c) is deliberately narrow: it licenses making an existing pin COVER new content, never
+relaxing what that pin PROVES. Adding ids to a set pinned by equality keeps the equality exact;
+raising a pinned count keeps the count exact; replacing a pinned range with the explicit list that
+supersets it keeps the enumeration. Everything the criterion enumerates as weakening stays
+forbidden, and so does any pure addition — a new `fn`, `struct` or `mod tests` block — to a file the
+slice legitimately extends.
+
+Whether a slice's diff meets this criterion is decided MECHANICALLY rather than by reading: run the
+slice's Rust diff through `memory/projects/mr-content-scope` in the harness repo, an ALLOW-LIST
+classifier in which every changed line of a Rust file BITEs unless it positively matches a permitted
+shape (a deny-list cannot enforce a "SHALL NOT … except" criterion: a pure-`+` hunk trips no deny
+predicate). The token block below is the machine-readable link between this criterion and that
+tool — the tool asserts its implemented rule set EQUALS these tokens, so deleting exception (c) from
+this spec, or silently narrowing the tool, reds `mr-selfcheck`.
+
+TWO LIMITATIONS ARE ACCEPTED AND RECORDED, not fixed. First, CAUSALITY IS NOT CHECKED: neither this
+criterion nor the classifier can tell whether ids appended to a pinned set correspond to content the
+slice actually ships. RW3-02, RW3-03, RW3-04 and RW3-06 already gate that at the content-registry
+level, and a cross-registry causality checker here would be scope creep onto a different criterion.
+Second, PROSE ↔ ANCHOR DRIFT: the English above can drift out of sync with the token block below
+while the tokens themselves stay byte-stable, so the tool keeps agreeing with a token set the prose
+no longer describes accurately. That is the same staleness channel `standards/adr-process.md:64-65`
+already assigns to the reviewer, not to mechanical tooling.
+
+<!-- rw3-scope-rules
+permit: inert-line
+permit: content-version-non-decreasing
+permit: pinned-count-increase
+permit: pinned-idset-superset
+permit: range-expanded-to-explicit-list
+permit: test-message-or-name-rename
+forbid: removal-without-extension
+forbid: assertion-commented-out
+forbid: assertion-weakened
+forbid: added-weakener-attribute
+forbid: pre-existing-test-count-regression
+forbid: unpermitted-existing-src-edit
+forbid: banned-path-edit
+forbid: new-non-test-rust-file
+-->
 
 ## Touches
 
@@ -168,7 +237,26 @@ ids as `INFO: uncovered` is the precedent that this stays merge-order-independen
 
 - **rw3a — DELIVERED.** This spec + the PLAN.md bullet link. Evidence: slice ledger
   `memory/projects/gates/rw3a.gates.md`.
-- **rw3b — not started.** parked → queued as the next candidate for this milestone.
+- **rw3b — DELIVERED** (PR#357, `ee2e0930`). The wave's content drop: the Electric line
+  (40 Voltkit → 41 Voltarion) and the Light line (42 Aurelet → 43 Aurelith) in
+  `content/species/070-wave3.ron` + `071-wave3-derived.ron`, their Electric/Light skill kits in
+  `content/skills/070-wave3.ron`, evolution edges **100** and **101** in
+  `content/evolution_paths/070-wave3.ron`, inert placeholder sprites (append-only generator entries
+  plus generated `client/public/assets/monster-*.{png,json}`, not wired into the renderer),
+  `CONTENT_VERSION` **19 → 20**, a regenerated content-hash baseline, and
+  `evals/rw3b-roster-wave-3.eval.mjs` + `game-core/tests/rw3b_roster_wave3.rs`. Affinity/archetype
+  and band decisions recorded in `docs/adr/0204-roster-wave-3-electric-and-light.md`. Evidence:
+  slice ledger `memory/projects/gates/rw3b.gates.md`.
+  **RW3-08 DEFERred (first time).** Two pre-existing exact pins had to be EXTENDED before the new
+  content could be green: `game-core/src/content.rs`'s `EG1_TIER_ONE_IDS` (`[u32; 9]` → `[u32; 11]`,
+  41 and 43 appended) and `game-core/tests/eg3_evolution_graph.rs` (edges 100/101 appended
+  field-for-field to `expected_edges()`, `paths.len() == 10` → `== 12`, `(1..=10).collect()` →
+  the explicit superset `vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100, 101]`, and the `..._ten_edges`
+  test renamed `..._twelve_edges`). Nothing was removed and no assertion was weakened — the
+  substance of the criterion was proved instead by the ledger's X8b gate, which PASSED. Residual
+  `R-rw3b-X8` (reword RW3-08). **RESOLVED by slice `rb-1` (2026-08-28)**, which amended RW3-08
+  above to permit exactly this strictly-additive extension and gave the amended criterion
+  mechanical teeth (`memory/projects/mr-content-scope`).
 - **rw3c — DELIVERED.** Zone-1 wild placement for the wave-3 tier-0 forms (40 Voltkit weight 6
   `10..19`, 42 Aurelet weight 4 `11..20`), `CONTENT_VERSION` 20 → 21, regenerated content-hash
   baseline, plus `evals/rw3c-wave-3-tuning.eval.mjs` and `game-core/tests/rw3c_wave3_tuning.rs`.
@@ -180,6 +268,10 @@ ids as `INFO: uncovered` is the precedent that this stays merge-order-independen
   species: `pt_d3_tuning.rs:285` pins the wild-legal set by set EQUALITY and `:373` pins an exact
   count, so placement reds both and neither can be met without editing that file. Both were
   EXTENDED field-for-field, never weakened. Residual `R-rw3b-X8` (reword RW3-08) covers it.
+  **RW3-08 is now amended** (see the criterion above — 2026-08-28, slice `rb-1`) and is classified
+  mechanically by `memory/projects/mr-content-scope`; both of rw3c's pin extensions PERMIT under it.
+  rw3c's own residual row for this criterion is `R-rw3c-X3` — the same criterion as `R-rw3b-X8`,
+  resolved by the same amendment, so it needs no backlog section of its own.
   **New invariant recorded:** a placed form's `max_level` must sit STRICTLY below its lowest
   outgoing evolution-edge `min_level` — `level_gate_met` is inclusive and ADR-0176 D2
   auto-evolution fires immediately when exactly one path is eligible, so a band reaching the gate

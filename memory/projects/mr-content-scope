@@ -382,6 +382,541 @@ def check_link(spec_path):
 
 
 # ===========================================================================
+# GREEN-phase (rb-1 T3) helpers for classify(). Line-oriented text predicates
+# only: no Rust parser, no AST, no brace matching beyond the `[...]` grouping
+# the P-idset / P-count skeletons need, no "is this inside `mod tests`" test,
+# no content-wave id, no git subprocess, no network, no env override. Every
+# one of these is a named anti-pattern in the module __doc__.
+# ===========================================================================
+
+# The pairing acceptance threshold from the __doc__ "LINE RULES" section. A
+# removed line whose best candidate partner scores below this is UNPAIRED --
+# i.e. a deletion, not an extension. Lowering it re-opens `bite-14`.
+PAIR_ACCEPT_RATIO = 0.55
+
+# The `V-weakened` token set from the __doc__. `debug_assert` also subsumes
+# `debug_assert_eq` / `debug_assert_ne` by substring; all three are listed so
+# the set reads as the criterion does.
+WEAKENER_TOKENS = (
+    ">=",
+    "<=",
+    "is_subset",
+    "is_superset",
+    "debug_assert",
+    "debug_assert_eq",
+    "debug_assert_ne",
+    "|| true",
+    "&& false",
+)
+
+_CFG_FEATURE_RE = re.compile(r'^#\[cfg\(feature\s*=\s*"')
+_CONTENT_VERSION_RE = re.compile(r"CONTENT_VERSION\s*:\s*u32\s*=\s*(\d+)\s*;")
+# A Rust integer literal, optionally carrying a type suffix (`1u32`).
+_INT_LIT = r"\d+(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)?"
+# A bracketed, comma-separated list of them, trailing comma tolerated (rustfmt
+# emits one when it wraps). `[u32; 11]` does NOT match: its first element is
+# not an integer literal, which is exactly why the array-length annotation
+# beside a value list never gets mistaken for the list itself.
+_INT_LIST_RE = re.compile(r"\[\s*%s(?:\s*,\s*%s)*\s*,?\s*\]" % (_INT_LIT, _INT_LIT))
+_INT_ELEM_RE = re.compile(_INT_LIT)
+_RANGE_COLLECT_RE = re.compile(r"\(\s*(\d+)\s*\.\.=\s*(\d+)\s*\)\s*\.\s*collect\s*\(\s*\)")
+_FN_NAME_RE = re.compile(r"(\bfn\s+)[A-Za-z_][A-Za-z0-9_]*\s*(?=\()")
+_TEST_ATTR = "#[test]"
+
+TEST_CLASSES = ("NEW-TEST", "EXISTING-TEST")
+
+
+def _is_inert(text):
+    """A comment (`//`, `///`, `//!`) or a blank/whitespace-only line. Comment
+    CONTENT is never inspected -- only whether the line as a whole is one."""
+    stripped = text.strip()
+    return stripped == "" or stripped.startswith("//")
+
+
+def _is_added_weakener(text):
+    """`#[ignore]` or any `#[cfg(feature = "…"` gate, whitespace-stripped."""
+    stripped = text.strip()
+    return stripped == "#[ignore]" or bool(_CFG_FEATURE_RE.match(stripped))
+
+
+def _erase_strings(text, in_string=False):
+    """Blank out the CONTENTS of every double-quoted string literal, keeping the
+    quotes. `in_string` carries the state in from the previous line of the same
+    side of the hunk, so a rustfmt-wrapped (backslash-continued) message is
+    handled as the one literal it is. Returns (erased_text, in_string_after)."""
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if in_string:
+            if c == "\\":
+                i += 2
+                continue
+            if c == '"':
+                in_string = False
+                out.append('"')
+            i += 1
+            continue
+        if c == '"':
+            in_string = True
+            out.append('"')
+            i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "/":
+            out.append(text[i:])
+            break
+        out.append(c)
+        i += 1
+    return "".join(out), in_string
+
+
+def _digit_skeleton(text):
+    """The line with every maximal ASCII-digit run that is NOT inside a `[...]`
+    bracket replaced by a single `#` (the __doc__ P-count SKELETON)."""
+    out = []
+    depth = 0
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == "[":
+            depth += 1
+        elif c == "]":
+            depth = max(0, depth - 1)
+        elif depth == 0 and c.isdigit():
+            j = i
+            while j < n and text[j].isdigit():
+                j += 1
+            out.append("#")
+            i = j
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _digits_outside_brackets(text):
+    """The integer value of each run `_digit_skeleton` replaced, in order."""
+    vals = []
+    depth = 0
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == "[":
+            depth += 1
+        elif c == "]":
+            depth = max(0, depth - 1)
+        elif depth == 0 and c.isdigit():
+            j = i
+            while j < n and text[j].isdigit():
+                j += 1
+            vals.append(int(text[i:j]))
+            i = j
+            continue
+        i += 1
+    return vals
+
+
+def _int_list_span(text):
+    """(start, end) of the line's ONE bracketed integer list, or None if the
+    line carries no such list or more than one (ambiguous -> not P-idset)."""
+    spans = [m.span() for m in _INT_LIST_RE.finditer(text)]
+    return spans[0] if len(spans) == 1 else None
+
+
+def _int_list_values(fragment):
+    """The integer VALUES inside a bracketed list fragment; a Rust type suffix
+    (`1u32`) is part of the literal and is dropped from the value."""
+    return set(int(re.match(r"\d+", m.group(0)).group(0)) for m in _INT_ELEM_RE.finditer(fragment))
+
+
+def _idset_skeleton(text, span):
+    """The line outside its integer list, with the list replaced by a marker and
+    EVERY remaining digit run elided -- which is what drops the `[TYPE; N]`
+    array-length annotation's N from the comparison (__doc__ P-idset)."""
+    rest = text[: span[0]] + "\x00IDLIST\x00" + text[span[1]:]
+    return " ".join(re.sub(r"\d+", "#", rest).split())
+
+
+def _canon_msg(text, in_string):
+    """The P-msg-or-name canonical form: string contents erased and the
+    identifier after `fn ` erased, so a message rewrite and a test rename are
+    both invisible while every other byte of the line still counts."""
+    erased, _ = _erase_strings(text, in_string)
+    return _FN_NAME_RE.sub(r"\1", erased)
+
+
+def _introduced_weakeners(removed, added):
+    return [t for t in WEAKENER_TOKENS if t in added and t not in removed]
+
+
+def _short(text, width=88):
+    stripped = text.strip()
+    return stripped if len(stripped) <= width else stripped[: width - 1] + "…"
+
+
+def _rule_for_pair(removed, added, rem_in_string, add_in_string, file_class):
+    """The __doc__ P-* order, then the V-* fallback order, for ONE paired
+    (removed, added) line. Returns (rule_id, detail). Never returns None: an
+    unrecognised pair is a violation, never a silent PERMIT (allow-list)."""
+    rem_skel = _digit_skeleton(removed)
+    add_skel = _digit_skeleton(added)
+    rem_span = _int_list_span(removed)
+    add_span = _int_list_span(added)
+    rem_ids = _int_list_values(removed[rem_span[0]: rem_span[1]]) if rem_span else None
+    add_ids = _int_list_values(added[add_span[0]: add_span[1]]) if add_span else None
+
+    # --- P-content-version -------------------------------------------------
+    mrem = _CONTENT_VERSION_RE.search(removed)
+    madd = _CONTENT_VERSION_RE.search(added)
+    if mrem and madd and rem_skel == add_skel and int(madd.group(1)) >= int(mrem.group(1)):
+        return "P-content-version", "CONTENT_VERSION %s -> %s (non-decreasing)" % (
+            mrem.group(1), madd.group(1))
+
+    # --- P-count -----------------------------------------------------------
+    if rem_skel == add_skel:
+        rem_nums = _digits_outside_brackets(removed)
+        add_nums = _digits_outside_brackets(added)
+        if rem_nums and len(rem_nums) == len(add_nums):
+            if all(b >= a for a, b in zip(rem_nums, add_nums)) and any(
+                    b > a for a, b in zip(rem_nums, add_nums)):
+                return "P-count", "pinned count %s -> %s, rest of the line unchanged" % (
+                    rem_nums, add_nums)
+
+    # --- P-idset -----------------------------------------------------------
+    if rem_span and add_span and _idset_skeleton(removed, rem_span) == _idset_skeleton(added, add_span):
+        if rem_ids < add_ids:
+            return "P-idset", "pinned id set extended by %s (nothing dropped)" % sorted(add_ids - rem_ids)
+
+    # --- P-range-to-list ---------------------------------------------------
+    mrange = _RANGE_COLLECT_RE.search(removed)
+    if mrange and add_span:
+        lo, hi = int(mrange.group(1)), int(mrange.group(2))
+        if lo <= hi and set(range(lo, hi + 1)) <= add_ids:
+            return "P-range-to-list", "range (%d..=%d).collect() replaced by an explicit superset list" % (lo, hi)
+
+    # --- P-msg-or-name (test-class files only) -----------------------------
+    if file_class in TEST_CLASSES:
+        if _canon_msg(removed, rem_in_string) == _canon_msg(added, add_in_string):
+            if not _introduced_weakeners(removed, added):
+                return "P-msg-or-name", "differs only in a message string and/or a `fn` name"
+
+    # --- V-commented-out ---------------------------------------------------
+    if _is_inert(added) and not _is_inert(removed):
+        return "V-commented-out", "substantive line replaced by a comment/blank: %s" % _short(removed)
+
+    # --- V-weakened: an introduced weakening token -------------------------
+    introduced = _introduced_weakeners(removed, added)
+    if introduced:
+        return "V-weakened", "added side introduces %s: %s" % (introduced, _short(added))
+
+    # --- V-weakened: an assert_eq!/assert_ne! macro downgrade --------------
+    if ("assert_eq!" in removed or "assert_ne!" in removed) and added.strip().startswith("assert!"):
+        return "V-weakened", "assert_eq!/assert_ne! downgraded to assert!: %s" % _short(added)
+
+    # --- V-weakened: a still-present pin whose bound SHRANK ----------------
+    if rem_skel == add_skel:
+        rem_nums = _digits_outside_brackets(removed)
+        add_nums = _digits_outside_brackets(added)
+        if len(rem_nums) == len(add_nums) and any(b < a for a, b in zip(rem_nums, add_nums)):
+            return "V-weakened", "pinned count LOWERED %s -> %s" % (rem_nums, add_nums)
+    if rem_span and add_span and _idset_skeleton(removed, rem_span) == _idset_skeleton(added, add_span):
+        if not rem_ids <= add_ids:
+            return "V-weakened", "id(s) %s DROPPED from a pinned set" % sorted(rem_ids - add_ids)
+
+    # --- residual ----------------------------------------------------------
+    if file_class == "EXISTING-SRC":
+        return "V-unpermitted-src", "changed line matches no permitted shape: %s" % _short(added)
+    return "V-weakened", "changed line matches no permitted shape: %s" % _short(added)
+
+
+def _pair_by_similarity(removed, added):
+    """GLOBAL greedy maximum-similarity pairing (__doc__ LINE RULES step 1-2).
+    NEVER a positional zip -- that is the `bite-14` attack. Returns
+    (pairs, unpaired_removed_idx, unpaired_added_idx) with pairs a list of
+    (removed_idx, added_idx). Ties break on index order, so the result is
+    deterministic."""
+    candidates = []
+    for i, rem in enumerate(removed):
+        for j, add in enumerate(added):
+            ratio = difflib.SequenceMatcher(None, rem, add).ratio()
+            if ratio >= PAIR_ACCEPT_RATIO:
+                candidates.append((-ratio, i, j))
+    candidates.sort()
+    used_r, used_a, pairs = set(), set(), []
+    for _neg, i, j in candidates:
+        if i in used_r or j in used_a:
+            continue
+        used_r.add(i)
+        used_a.add(j)
+        pairs.append((i, j))
+    pairs.sort()
+    return (pairs,
+            [i for i in range(len(removed)) if i not in used_r],
+            [j for j in range(len(added)) if j not in used_a])
+
+
+def _parse_diff(diff_text):
+    """Split a unified diff into file blocks. Each block is a dict with `path`,
+    `new_file`, `deleted` and `hunks` (each hunk a list of (tag, text) with tag
+    in ' ', '-', '+'). Hermetic: pure string work, no git."""
+    files = []
+    cur = None
+    hunk = None
+    for raw in diff_text.split("\n"):
+        if raw.startswith("diff --git "):
+            cur = {"old": None, "new": None, "new_file": False, "deleted": False, "hunks": []}
+            files.append(cur)
+            hunk = None
+            continue
+        if cur is None:
+            continue
+        if raw.startswith("@@"):
+            hunk = []
+            cur["hunks"].append(hunk)
+            continue
+        if hunk is None:
+            if raw.startswith("--- "):
+                cur["old"] = raw[4:].split("\t")[0].strip()
+                if cur["old"] == "/dev/null":
+                    cur["new_file"] = True
+            elif raw.startswith("+++ "):
+                cur["new"] = raw[4:].split("\t")[0].strip()
+                if cur["new"] == "/dev/null":
+                    cur["deleted"] = True
+            elif raw.startswith("new file mode"):
+                cur["new_file"] = True
+            elif raw.startswith("deleted file mode"):
+                cur["deleted"] = True
+            continue
+        if raw.startswith("\\"):
+            continue  # `\ No newline at end of file`
+        if raw.startswith("-"):
+            hunk.append(("-", raw[1:]))
+        elif raw.startswith("+"):
+            hunk.append(("+", raw[1:]))
+        elif raw.startswith(" "):
+            hunk.append((" ", raw[1:]))
+        else:
+            hunk.append((" ", raw))  # a truly empty context line
+    for f in files:
+        path = f["new"] if f["new"] and f["new"] != "/dev/null" else f["old"]
+        path = path or ""
+        if path[:2] in ("a/", "b/"):
+            path = path[2:]
+        f["path"] = path
+    return files
+
+
+def _file_class(path, new_file):
+    """The __doc__ FILE CLASSES table, decided from the path and the file's
+    old/new existence alone -- never from hunk content."""
+    if path in BANNED_PATHS:
+        return "BANNED"
+    if not path.endswith(".rs"):
+        return "NON-RUST"
+    parts = path.split("/")
+    basename = parts[-1]
+    under_tests_dir = "tests" in parts[:-1]
+    test_basename = basename.endswith("_test.rs") or basename.endswith("_tests.rs")
+    if new_file:
+        return "NEW-TEST" if (under_tests_dir or test_basename) else "NEW-OTHER-RS"
+    # Pre-existing. Anything not under a `tests/` directory is treated as
+    # EXISTING-SRC -- the STRICTER of the two, because an allow-list must fail
+    # closed on a path shape it has not seen before.
+    return "EXISTING-TEST" if under_tests_dir else "EXISTING-SRC"
+
+
+def _annotate_string_state(hunk):
+    """(tag, text, in_string_at_entry) for each hunk line. The old side sees
+    context+removed lines, the new side context+added, so a multi-line string
+    literal is tracked independently down each side."""
+    out = []
+    in_old = in_new = False
+    for tag, text in hunk:
+        if tag == "-":
+            state = in_old
+            _, in_old = _erase_strings(text, in_old)
+        elif tag == "+":
+            state = in_new
+            _, in_new = _erase_strings(text, in_new)
+        else:
+            state = in_old
+            _, in_old = _erase_strings(text, in_old)
+            _, in_new = _erase_strings(text, in_new)
+        out.append((tag, text, state))
+    return out
+
+
+def _replace_regions(annotated):
+    """Split an annotated hunk into replace regions: maximal runs of changed
+    lines, each yielded as (removed, added) lists of (text, in_string)."""
+    regions = []
+    removed, added = [], []
+    for tag, text, state in annotated:
+        if tag == "-":
+            removed.append((text, state))
+        elif tag == "+":
+            added.append((text, state))
+        else:
+            if removed or added:
+                regions.append((removed, added))
+                removed, added = [], []
+    if removed or added:
+        regions.append((removed, added))
+    return regions
+
+
+# The permitted shapes a rustfmt-wrapped statement can legitimately collapse
+# to. P-msg-or-name is here because the wrapped thing is very often an
+# assertion MESSAGE: rw3c's real merged `pt_d3_tuning.rs` edit rewraps
+# `"…expected exactly 7 …"` into a two-line backslash continuation, and
+# without this the classifier BITEs the very diff the amended RW3-08 exists to
+# permit. (The battery's own copy of that hunk cannot show it: Python folds a
+# `\`-at-end-of-line inside a non-raw triple-quoted string, so the fixture
+# holds the flattened one-line form. Verified instead against the live
+# `git show 12af096 -- '*.rs'` output.) It cannot launder anything: every
+# accepted rule demands a POSITIVE shape match across the whole joined line.
+_JOINABLE_RULES = ("P-idset", "P-count", "P-msg-or-name")
+
+
+def _fold_string_continuations(side):
+    """Fold a backslash-continued (multi-line) STRING LITERAL back into the one
+    logical line it is, per side of a replace region.
+
+    The __doc__'s MULTI-LINE (RUSTFMT-WRAPPED) LITERAL rule is stated for a
+    whole side of a region collapsing to one line, which covers a wrapped
+    `[...]` id list but NOT a wrapped assertion MESSAGE sitting beside other
+    changed lines. rw3c's real merged `pt_d3_tuning.rs` hunk is the second
+    shape: `7,` -> `9,` pairs cleanly, but the message beside it is rewrapped
+    across two `+` lines, so half of it would read as an unpaired addition and
+    the other half as a pair that matches no shape. Folding here is the same
+    idea applied one level down, and it is decided by the SAME in-string state
+    machine the rest of the file uses -- not by a Rust parser. It cannot hide a
+    deletion: folding only ever joins lines the compiler already treats as one
+    literal, and both sides are folded identically.
+
+    (The battery cannot exhibit this shape: Python folds a trailing backslash
+    inside a non-raw triple-quoted string, so PERMIT fixture 3 holds the
+    already-flattened form. Verified against live `git show` output instead.)"""
+    folded = []
+    i = 0
+    while i < len(side):
+        text, state = side[i]
+        _erased, in_string = _erase_strings(text, state)
+        while in_string and i + 1 < len(side):
+            i += 1
+            text = text + " " + side[i][0].strip()
+            _erased, in_string = _erase_strings(text, state)
+        folded.append((text, state))
+        i += 1
+    return folded
+
+
+def _try_multiline_join(removed, added, file_class):
+    """The __doc__ MULTI-LINE (RUSTFMT-WRAPPED) LITERAL join. When exactly one
+    side of a region is a single logical line and the other is that same
+    statement wrapped across several, collapse the wrapped side (strip each
+    line, join with one space) and test the pair against _JOINABLE_RULES.
+    Returns (rule_id, detail) or None."""
+    if len(removed) == 1 and len(added) > 1:
+        rem_text, rem_state = removed[0]
+        add_text = " ".join(t.strip() for t, _s in added)
+        add_state = added[0][1]
+    elif len(added) == 1 and len(removed) > 1:
+        add_text, add_state = added[0]
+        rem_text = " ".join(t.strip() for t, _s in removed)
+        rem_state = removed[0][1]
+    else:
+        return None
+    rule, detail = _rule_for_pair(rem_text, add_text, rem_state, add_state, file_class)
+    if rule in _JOINABLE_RULES:
+        return rule, detail + " (rustfmt-wrapped literal, joined before comparison)"
+    return None
+
+
+def _classify_region(path, file_class, removed, added):
+    """One replace region of one hunk -> a list of (rule_id, path, detail).
+    ALLOW-LIST: every substantive changed line leaves here carrying either a
+    P-* claim or a V-* one; there is no silent pass."""
+    out = []
+    # A backslash-continued string literal is ONE logical line on each side.
+    removed = _fold_string_continuations(removed)
+    added = _fold_string_continuations(added)
+    # Comment/blank lines are handled OUTSIDE the pairing machinery. A REMOVED
+    # comment is ALWAYS P-inert, whatever it might have "paired" with.
+    for text, _state in removed:
+        if _is_inert(text):
+            out.append(("P-inert", path, "removed comment/blank line: %s" % _short(text)))
+    rem = [(t, s) for (t, s) in removed if not _is_inert(t)]
+
+    if not rem:
+        # ZERO substantive removals: a pure addition. It cannot weaken an
+        # existing pin, so EXISTING-TEST permits it wholesale -- but in
+        # EXISTING-SRC a pure `+` hunk is precisely the smuggled-`pub fn`
+        # attack the allow-list exists for.
+        for text, _state in added:
+            if _is_inert(text):
+                out.append(("P-inert", path, "added comment/blank line: %s" % _short(text)))
+            elif file_class != "EXISTING-TEST":
+                out.append(("V-unpermitted-src", path,
+                            "addition to a pre-existing src file matches no permitted shape: %s"
+                            % _short(text)))
+        return out
+
+    add_sub = [(t, s) for (t, s) in added if not _is_inert(t)]
+    joined = _try_multiline_join(rem, add_sub, file_class)
+    if joined:
+        rule, detail = joined
+        out.append((rule, path, detail))
+        for text, _state in added:
+            if _is_inert(text):
+                out.append(("P-inert", path, "added comment/blank line: %s" % _short(text)))
+        return out
+
+    pairs, unpaired_rem, unpaired_add = _pair_by_similarity(
+        [t for t, _s in rem], [t for t, _s in added])
+
+    # POSITIVE-SHAPE RESCUE. A removed line whose best candidate fell below
+    # PAIR_ACCEPT_RATIO is a deletion *unless* some surplus added line
+    # POSITIVELY matches a permitted shape against it. The real rw3b `t7` edit
+    # is exactly that case: `(1..=10).collect()` -> the explicit 12-element
+    # list scores 0.5366 on raw text (the added side is deliberately far
+    # longer), so the __doc__'s literal step 3 alone would call a MERGED,
+    # strictly-additive extension a deletion -- see PERMIT fixture 2. This can
+    # never launder a violation: the ONLY escape from V-unpaired-removal here
+    # is a P-* rule firing, and every P-* rule demands the two lines be the
+    # same pinning statement (identical skeleton, superset id list, or
+    # identical after message/`fn`-name erasure). A weakening pair still falls
+    # through to V-weakened / V-unpaired-removal. Deterministic: index order.
+    for i in list(unpaired_rem):
+        for j in list(unpaired_add):
+            rule, detail = _rule_for_pair(
+                rem[i][0], added[j][0], rem[i][1], added[j][1], file_class)
+            if rule in PERMIT_RULES:
+                pairs.append((i, j))
+                unpaired_rem.remove(i)
+                unpaired_add.remove(j)
+                break
+    pairs.sort()
+
+    for i, j in pairs:
+        rule, detail = _rule_for_pair(rem[i][0], added[j][0], rem[i][1], added[j][1], file_class)
+        out.append((rule, path, detail))
+    for i in unpaired_rem:
+        out.append(("V-unpaired-removal", path,
+                    "removed line has no extension partner in this diff (a deletion, not an "
+                    "extension): %s" % _short(rem[i][0])))
+    for j in unpaired_add:
+        text = added[j][0]
+        if _is_inert(text):
+            out.append(("P-inert", path, "added comment/blank line: %s" % _short(text)))
+        elif file_class != "EXISTING-TEST":
+            out.append(("V-unpermitted-src", path,
+                        "added line matches no permitted shape: %s" % _short(text)))
+    return out
+
+
+# ===========================================================================
 # classify() -- THE STUB. Implemented in the GREEN phase (rb-1 T3). Everything
 # above and below this function is real, non-stub code the tester (this
 # authorship pass) owns outright.
@@ -451,7 +986,71 @@ def classify(diff_text):
     expected to fail for exactly that reason until this docstring's contract is
     implemented.
     """
-    raise NotImplementedError("classify(): implemented in the GREEN phase")
+    reasons = []
+    for parsed in _parse_diff(diff_text):
+        path = parsed["path"]
+        if not path:
+            continue
+        file_class = _file_class(path, parsed["new_file"])
+
+        # --- (1) FILE CLASSIFICATION, decided before any line analysis -------
+        if file_class == "BANNED":
+            reasons.append((
+                "V-banned-path", path,
+                "RW3-08 forbids ANY change to this path (an `Affinity` / `AbilityEffect` "
+                "declaration site, or the type chart)"))
+            continue
+        if file_class == "NON-RUST":
+            continue  # governed by RW3-01..07 / RW3-09, not by RW3-08
+
+        hunks = [_annotate_string_state(h) for h in parsed["hunks"]]
+
+        # --- (4) V-added-weakener, independent of every other rule -----------
+        # Every added line of every Rust file, INCLUDING inside a file this
+        # criterion otherwise permits wholesale: an `#[ignore]` smuggled into a
+        # slice's own new test file still silences a gate.
+        for hunk in hunks:
+            for tag, text, _state in hunk:
+                if tag == "+" and _is_added_weakener(text):
+                    reasons.append((
+                        "V-added-weakener", path,
+                        "added line carries a test-disabling attribute: %s" % _short(text)))
+
+        if file_class == "NEW-OTHER-RS":
+            reasons.append((
+                "V-new-non-test-rs", path,
+                "a brand-new non-test `.rs` file is not one of RW3-08's three exceptions"))
+            continue
+        if file_class == "NEW-TEST":
+            continue  # exception (b): the slice's own new test files
+
+        # --- (3) V-test-count, per PRE-EXISTING test file, whole-diff --------
+        # Never summed across files: that is exactly how a brand-new test file
+        # full of decoy `#[test]`s would launder a deletion somewhere else.
+        if file_class == "EXISTING-TEST":
+            removed_tests = added_tests = 0
+            for hunk in hunks:
+                for tag, text, _state in hunk:
+                    if text.strip() != _TEST_ATTR:
+                        continue
+                    if tag == "-":
+                        removed_tests += 1
+                    elif tag == "+":
+                        added_tests += 1
+            if added_tests < removed_tests:
+                reasons.append((
+                    "V-test-count", path,
+                    "this pre-existing test file loses %d `#[test]` function(s) (removed %d, "
+                    "added %d) -- counted for THIS FILE alone"
+                    % (removed_tests - added_tests, removed_tests, added_tests)))
+
+        # --- (2) LINE RULES ---------------------------------------------------
+        for hunk in hunks:
+            for removed, added in _replace_regions(hunk):
+                reasons.extend(_classify_region(path, file_class, removed, added))
+
+    verdict = "BITE" if any(rule in VIOLATION_RULES for (rule, _p, _d) in reasons) else "PERMIT"
+    return verdict, reasons
 
 
 # ===========================================================================
