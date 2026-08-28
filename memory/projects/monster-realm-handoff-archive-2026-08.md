@@ -4525,3 +4525,7 @@ memo, no stale locks/stop-flags, memory headroom ample (37G available).
 
 **Governor:** NORMAL throughout (d7 $1331.13 raw / $1421.13 effective incl. one
 unreconciled run, of $2783 weekly; fable_ok=true).
+## 2026-08-25T01:43:43Z — m23-s5 (PR#368): remote e2e RED, resuming fix cycle 1
+Native tick rid=native-20260825T014010Z-1265099. PR#368 (m23-s5, ADR-0206, worldHasFocus() scoped hotkey gate) opened by the prior run: local just ci green (95/95 files, 2705 tests), remote ci green, but remote e2e RED with 3 failures in pre-existing specs the slice never touched (movement-input.spec.ts 14r-e, pvp.spec.ts m16b, trade.spec.ts M15c) — all consistent with the new 12x && worldHasFocus() conjunct blocking toggle-close / cross-overlay-open once focus leaves canvas/body. Did NOT merge (per doctrine: still-dead CI failure = real failure, triage not blind-relaunch). Resumed on the existing worktree/branch (slice/m23-s5, da0b0ff) as a HARD-tier fix cycle (prior attempt failed -> fable/xhigh; fable_ok=true, d7 fable spend $108.77/$2298 allowance). resume_block hands the run the 3 concrete failures, root-cause hypothesis, and two candidate fix shapes, with instruction to push a new commit to the same branch/PR rather than opening a new one. Governor NORMAL (d7 $1329.58/$2783 eff.). No BLOCKERs.
+
+
