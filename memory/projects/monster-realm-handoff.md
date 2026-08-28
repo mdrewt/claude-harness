@@ -2,6 +2,83 @@
 
 ---
 
+## 2026-08-25T~13:2xZ — m22-s2 COMPLETE (terminal: PR #373 open + local `just ci` green + remote CI running)
+
+**Slice:** m22-s2 — M22 privacy **S2**: the 39-table `DATA_LIFECYCLE_MANIFEST` (policy+basis+exportable)
+in `schema.rs`, `Account.terminal_at_ms` appended with `#[default(None)]` + the legality re-derivation,
+the private `export_bundle` chunk-contract table, the `auth_issuer` doc correction, one REKEY key.
+**PR:** https://github.com/mdrewt/monster-realm/pull/373 — OPEN, remote `ci` + `e2e` IN_PROGRESS at exit.
+Branch `slice/m22-s2` (worktree `.claude/worktrees/m22-s2`), 6 commits, all pushed. **Supervisor owns the
+merge — I did NOT run `gh pr merge`.** Main checkout on `master`, never mutated. Fork `00de705`; no
+sibling in flight, no rebase needed.
+
+**Gate:** full `just ci` **EXIT=0 on the exact shipped tree** — 93 evals PASS / 0 FAIL, 2007/2007
+workspace Rust tests (fork 1996 measured in-worktree, +11 gating tests, 0 skipped), 96 client files /
+2818 tests, observability 8/8. **Acceptance: 15/16 met, 1 DEFERred, 0 unmet** (`seed:e3b0c44298fc1c14`),
+LINT-CLEAN, evidence WIPED AND RE-EXECUTED FRESH on the final tree (m23-s5 precedent). Seeded ZERO
+criteria (SPEC-SECTION-NOT-FOUND, **7th occurrence**). 22/22 bite-proofs bite (2 asymmetry controls),
+2 re-measured post-review-fix. `/tmp/mr_warn_m22-s2` (LANDING) appeared AFTER the three post-impl lenses
++ security auditor completed — the verifier was discharged mechanically inline (fresh gate re-execution,
+not-weakened diff audit vs RED commit `07adca9` [only a rustfmt reflow with byte-identical concat
+chunks], 2 re-measured bites), declared in the PR per the m23-s6 precedent. desync-guard mechanically
+empty (zero game-core/netcode/reducer-body files).
+
+**⚠️ VERIFY NOTES.** Run CHECKs from the slice worktree with the usual PATH export. Two persisted probe
+scripts beside the ledger MUST NOT be deleted: `m22-s2.schema-probe.mjs` (snapshot/bindings/manifest-diff
+modes; manifest-diff VALUE-imports fork-vs-HEAD REKEY_MANIFEST — a line-diff was measured forgeable via
+JS duplicate-key last-write-wins) and `m22-s2.migration-probe.mjs` (X9: REAL republish over a scratch
+`spacetime start --in-memory` on :3777 — additive leg must succeed, mid-struct control must fail with the
+genuine migration rejection; ~5-10 min; do NOT run concurrently with `just ci`). X13 needs the eval's
+SELF-reported name `schema-snapshot`, not the filename.
+
+**🔴 HEADLINE — the DEFER is a platform rule the spec missed.** `AccountDeletionReaperSchedule`
+(X15 → backlog, INTENDED OWNER m22-s3): SpacetimeDB forbids changing a table's scheduled-ness in
+automigration (doc verified both branches; ADR-0193:148-149 corroborates), and declaring the reducer in
+S2 both violates the brief and hard-reds `[R/name-set]` (R-m22-s1-X1). **S3 must land table + reducer
+ATOMICALLY, plus the table's DATA_LIFECYCLE_MANIFEST entry + REKEY key in the same commit, plus the
+SANCTIONED_REDUCERS/Rust-twin updates R-m22-s1-X1 already mandates. Spec §7.2's S2 row needs amending.**
+Same probe also proved "Adding Unique or Primary Key constraints" is automigration-forbidden — decide
+uniqueness before a table's first ship (export_bundle's chunk-tuple uniqueness is therefore
+REDUCER-enforced in S4, documented in the struct doc).
+
+**THREE RESIDUALS FILED for S3 (all found by the review fan-out, all verified out of S2's reach):**
+`R-m22-s2-S3-CANCEL-TERMINAL` — cancel_account_deletion on a terminal account would mint
+Active+Some(terminal) (measured in both build profiles; debug_assert compiled out of release); S3 owns
+the PRV1-4 distinct-error guard + a constructor-level test; ALSO decide release-profile debug-assertions
+or promote the check to Err guards. · `R-m22-s2-S3-GUEST-EXPORT-ORPHAN` — pre-claim export chunks orphan
+under the retired guest identity (cascade keys on the deleting identity); close via claim-time delete
+(preferred) or a claimed_from sweep; the REKEY entry's basis states this HONEST LIMIT verbatim after an
+in-slice audit correction (the first draft's "cascade sweeps this column" was FALSE — caught
+independently by the security auditor AND red-team). · `R-m22-s2-S3-BASIS-CONTENT-FLOOR` — the basis
+length floor is a floor, not a content oracle (measured: 20 filler chars pass); reviewer-owned prose,
+suggest wontfix.
+
+**Decisions the supervisor should sign off (both in ADR-0207, both flagged as spec deviations):**
+(1) the manifest lives as a Rust const in schema.rs, NOT as JS REKEY_MANIFEST object entries (spec §2's
+"extend one manifest") — object entries are the measured R-m22-s0-X1 red-on-arrival trap and accounts.rs
+placement reds the live g5 wallet-token gate; drift closed by bidirectional totality + a cross-manifest
+test. (2) The reaper-table deferral above. ADR next-free = **0208**.
+
+**Process notes worth propagating.** (a) The migration probe's negative control took THREE iterations to
+red for the RIGHT reason (missing workspace member → orphaned doc comment → unbound struct-literal
+field, each a cargo-build red = VOID control); the shipped probe asserts the failure text is
+migration-shaped and rejects build-shaped reds. (b) clippy `-D warnings` hard-fails a test-only-consumed
+pub const on the LIB target; the fix is a const-fn assertion READING every field — and derived
+`PartialEq` was the hidden payload-field reader, so dropping it resurfaced dead_code until the const fn
+validated the ViaJoin payload (now a real compile tooth). (c) battle-schema-snapshot parses RAW source
+string-unaware in BOTH its check and `--write` — no `/` in any schema.rs string literal (gate-tested),
+and every new table needs its T-VIS-ANCHORS pinned-set + count edit (the tooth's designed ritual).
+(d) Three memory cards written (scheduled-attr frozen; snapshot raw-parse + ritual; lib-target dead_code
+const-eval consumer).
+
+**Housekeeping.** Untracked harness files: `memory/projects/monster-realm-m22-s2-plan.md` (plan + lens
+adjudications) — commit or discard. Ledger + probes in `memory/projects/gates/` (gitignored — the
+m23-s7 version-control recommendation still open). /tmp artifacts kept for audit: `m22s2-tests/`
+(tester deliverables + bite runner), `m22s2-docs/` (doc-keeper staging), `m22s2-final-ci.log`,
+`m22s2-notweakened.diff`; red-team scratch in `/tmp/redteam-*`, `/tmp/m22s2-migprobe/target` (probe
+build cache, safe to delete). Code graphs NOT re-indexed (nothing merged; main checkout unchanged —
+refresh after the squash-merge). The `.claude/worktrees/m22-s2` worktree stays for the merge pipeline.
+
 ## 2026-08-25T~05:3xZ — m23-s6 COMPLETE (terminal: PR open + local `just ci` green + remote CI running)
 
 **Slice:** m23-s6 — M23 accessibility **S6**: `menuView` becomes an ARIA listbox, and the **sixteenth
@@ -1307,6 +1384,32 @@ and `desync-guard` had no surface (zero reducers, schema, `game-core`, predictor
 **touches-delta:** `ARCHITECTURE.md` only (one targeted paragraph). Nothing else outside the declared
 set. The `.claude/worktrees/m23-s10` worktree stays for the merge pipeline.
 
+## 2026-08-28T00:17:04Z — Native tick 2026-08-28T00:13:43Z — hold-aged escalation retired, coverage-wasm fix launched
+Native tick rid=native-20260828T001343Z-5979, forced by operator. Gate 0/1: no live locks, no chain mutex, no operator hold (mr-hold status=HOLD-NONE), no resident-session collision. Confirmed master (5206446) push CI is SUCCESS (was in_progress at last tick's record time). Found and closed 3 stale open DECISION(hold-aged) issues (#42/#43/#44, claude-harness repo): Drew answered #42 on 2026-08-26T00:29:30Z with "Assume operator holds are always deliberate and may last any length of time. Do not raise this kind of issue ever again." Retired the hold-aged escalation TRIGGER 2 in mr-native-tick.sh (kept TRIGGER 1, the unattributed/accidental-hold safety net, unaffected). Killed the stray mr-decision-watch process (pid 1191) that was still polling for #44. Saved a feedback memory (feedback-operator-hold-duration.md) so this directive persists across sessions.
+
+Second finding: the Nightly `coverage` job (monster-realm) has been RED for 4 consecutive nights (2026-08-24 through 2026-08-27; auto-filed issues #362/#372/#374/#375, one per run — the notify job doesn't dedupe, worth a follow-up). Root cause confirmed by reading two failure logs (different proximate symptoms each night -- 08-26 was an ECONNREFUSED in a stray test, 08-27 was `Failed to resolve import "../../client-wasm/pkg/client_wasm.js"` plus 36 cascading test failures): the `coverage:` recipe in justfile never builds the client-wasm pkg before running vitest, unlike the sibling `e2e`/`a11y-e2e` recipes which both declare `: wasm` for exactly this documented reason (justfile:315-318). Per docs/nightly-red-response-policy.md the coverage job's response is "queue a fix slice as the next slice, owner build-loop supervisor" -- this outranked PLAN §9 work per gate 3 ordering (master CI red -> fix first). Launched fix-nightly-coverage-wasm (opus/high, routine tier, touches=[justfile], no ADR -- mechanical CI-recipe fix) via mr-spawn: leader pid=12332, claude_pid=12335, rid=mr-spawn-20260828T001648Z-12273. Target: add `: wasm` to the coverage recipe, verify `just coverage` passes >=96% locally, close #362/#372/#374/#375 as duplicates in the PR body.
+
+Governor NORMAL (d7 $0/2783). No BLOCKERs. Next tick: watch fix-nightly-coverage-wasm to completion (mr-ci-watch delegation once its PR opens), then merge + audit + close the 4 duplicate issues, then resume the full PLAN §9 / residual-aging derivation for the next launch (queue[] empty).
+## 2026-08-27T19:30:33Z — HOLD-AGED by=operator in force 55h — escalating once; loop stays held
+The build loop has been held for 55h (by=operator). Is that still intended? If the pause has served its purpose, run mr-supervisor-enable. If it is deliberate, close this — it will not ask again for this hold.
+
+## 2026-08-26T14:36:57Z — HOLD-AGED by=operator in force 26h — escalating once; loop stays held
+The build loop has been held for 26h (by=operator). Is that still intended? If the pause has served its purpose, run mr-supervisor-enable. If it is deliberate, close this — it will not ask again for this hold.
+## 2026-08-25T19:00:07Z — HOLD-AGED by=operator in force 6h — escalating once; loop stays held
+The build loop has been held for 6h (by=operator). Is that still intended? If the pause has served its purpose, run mr-supervisor-enable. If it is deliberate, close this — it will not ask again for this hold.
+
+## 2026-08-25T17:51:38Z — m22-s2 merged (PR#373) — data-lifecycle manifest + Account.terminal_at_ms
+Native tick mr-sup-native-20260825T174544Z-2229567 (17:45Z), forced by operator via MR_FORCE=1 (HOLD-OPERATOR set 2026-08-25T12:30:21Z remains SET afterward -- not cleared). Reconciled the finished m22-s2 run (.done EXIT=0 ATTEMPTS=1, session-leader 1975966 not alive): live-verified PR#373 (mdrewt/monster-realm) mergeStateStatus CLEAN, ci+e2e SUCCESS. Ran mr-gates verify --slice m22-s2 directly (bypassing a path bug in mr-audit's internal sub-invocations -- both its gating_advisory and acceptance blocks threw exec-error:FileNotFoundError / 'repo not a dir'; the top-level orchestration block still ran clean, verdict CLEAN across 6 roles/8 agent calls): 15/16 gates met, 1 legitimate DEFER (X15 AccountDeletionReaperSchedule -> backlog, intended owner m22-s3 -- SpacetimeDB forbids changing whether a table is scheduled post-hoc, so the table can't ship in S2 without a forbidden automigration), 0 unmet, reverified_count=15, evidence_mismatch=[]. Manually read the accounts.rs/schema.rs diff: additive terminal_at_ms field + tightened account_state_is_legal predicate, matches the audit's clean read. Merged --squash --delete-branch (5206446), removed the .claude/worktrees/m22-s2 worktree + local branch, fast-forwarded local master. mr-gates residuals close returned 0 (the X15 DEFER residual stays open by design, routed to m22-s3). Ledger row recorded cost_usd=null / COST-UNKNOWN (no result event in the pass log -- true spend unrecorded, flagged honestly by mr-record, not fabricated). Post-merge master CI (5206446) was still in_progress at record time -- not polled per doctrine (only open-PR checks get mr-ci-watch delegation; this is a post-merge confirmation, non-blocking). Residual-over-cap alarm persists: 31 open residuals vs cap 12 (observe-only in slice 1 -- not actioned this tick, flagging for a future tick/BLOCKER review). mr-audit's path bug (exec-error:FileNotFoundError on its internal mr-gates/gating sub-calls) is a tooling defect worth a follow-up slice -- did not hand-edit mr-audit blind mid-tick. No new launch this tick (one action = the merge); did not re-derive PLAN §9 eligibility after the merge given the residual-cap and audit-tooling flags warranted surfacing rather than composite-launching blind.
+## 2026-08-25T15:36:31Z — m22-s2: PR#373 open, e2e red (flake-suspected, unrelated diff), rerun triggered; operator hold active
+Forced manual tick (MR_FORCE=1) ran despite operator hold (by=operator at=2026-08-25T12:30:21Z, reason: paused pending mr-supervisor-enable). Hold NOT cleared -- still active for all future ticks.
+
+m22-s2 (M22 privacy/compliance S2, schema+manifest slice) finished (fable/xhigh, 1 attempt, $121.07, rc=0) and opened PR#373 (mdrewt/monster-realm, slice/m22-s2 -> master). Acceptance ledger: 15/16 met, 1 DEFERred to m22-s3 (X15, owner declared).
+
+PR#373 CI: `ci` job green, `e2e` job FAILED -- test client/e2e/pvp-side-b.spec.ts:276 (11r-b PvP side-B battle overlay), specifically an AC-7 gap the test's own source comments as "RED TODAY" (from PR#271, 11r-b feature). m22-s2's diff touches ONLY schema.rs/accounts.rs/accounts_tests.rs/module_bindings/docs/evals -- zero client PvP code -- and this same test passes cleanly on other recent same-day PRs (m23-s10, m23-s11, m23-s6 etc), so this reads as a flake (DOM-detachment retry storm then a pointer-event interception by the help-hint button) rather than a regression m22-s2 introduced. Triggered `gh run rerun 32850883489 --failed` to get a clean re-run before adjudicating further.
+
+mr-ci-watch could NOT be delegated: the script hard-exits 0 when .native-supervisor-disabled is present (its own hold guard), so no background watcher is running. PR#373 needs a live re-check next tick -- either another forced tick or after Drew runs mr-supervisor-enable.
+
+No merge, no launch, no lock takeover, no hold clear attempted this tick.
 ## 2026-08-25T11:03:32Z — m22-s2 LAUNCHED — M23 exhausted (S8/S9 blocked), M22 privacy schema slice next
 Native tick rid=mr-sup-native-20260825T110010Z-1972781 (11:00Z). Gate-0: fast-path check found the 3 recorded per-run locks (m23-s10/s11/s6) all dead+done -- no live chain, safe to proceed. Pushed harness main (634b033..500d484, 16 commits) which had drifted REPO-OUT-OF-SYNC since a prior tick's chore commits were never pushed -- fixes the base-branch risk for any future harness-repo slice. Verified master (project) CI green at 00de705 (matches situation bundle), no open PRs either repo, no worktrees to reap. Residuals: 27 open, all unpromoted, max age 1.56d -- far under t1_promote_days=3, none outrank new work. queue[] empty. Derivation: M23 accessibility is now EXHAUSTED per the prior tick's own commit message -- verified live: ledger shows S0-S7,S10,S11 all MERGED; S8/S9 remain BLOCKED per M23-accessibility.spec.md:365-366 on operator escalations Sec.8.1 (colourblind-palette default) and Sec.8.2 (canvas sprite-tint art call) -- checked gh issue list on both repos, no decision issue open for these yet (only #342 unrelated M20 OBS-48, plus two stale nightly-coverage-failure issues #372/#362). Since these are hard BLOCKERs pending an operator art/design call (not a build blocker I can default), and M22 has independent unblocked work, I did NOT file mr-ask-drew this tick (M23's blockers were already known/recorded by the S6 handoff entry; filing is next-tick work if no queue entry appears). Moved to M22 privacy/compliance per PLAN Sec.9 order: S0 (PR#359) and S1 (PR#360) already merged; S2 (schema+manifest extension, M22-privacy-compliance.spec.md:458) is the next unblocked slice (after: S1, satisfied) -- S3 is the one with the actual PRV1-8 hard BLOCKER (reactivation guard), S2 itself is clear. S2 touches server-module/src/schema.rs -- the ALWAYS-SERIAL structural set (schema/migration) -- so no fan-out partner considered this tick even though M24-S0 (client-only, no deps) would otherwise have been disjoint; ran solo by construction. Tier=HARD (touches server-module schema) -> fable@xhigh; budget.fable_ok=true (d7=$1467.28/2783 eff., fable_d7=$108.77/2298 allowance, well under guard). Pre-allocated ADR-0207 (mr-state.json adr_next_free was 207; note project docs/adr/README.md's own hand-maintained 'next free 0184' is known-stale per its own warning, mr-state.json is authoritative). Reaped 3 stale per-run locks via mr-unlock stale before spawn. mr-spawn LAUNCHED cleanly: leader=1975966, claude_pid=1975969, rid=mr-spawn-20260825T110300Z-1975910, verified detached (own sid/pgid) and correct model class (fable) + effort (xhigh) post-launch. GATES-SEEDED criteria=0 SPEC-SECTION-NOT-FOUND (same known-benign M22/M23 EARS-in-prose-not-heading quirk seen on every prior M22/M23 slice -- not a launch blocker). Governor NORMAL. No rate-limit event, no BLOCKER. Standing down after the single launch action.
 ## 2026-08-25T09:05:17Z — m23-s11 merged — PR#371, M23 accessibility milestone content complete
@@ -1501,20 +1604,3 @@ Native tick rid=native-20260824T193125Z-830859. PR#365 (mdrewt/monster-realm, sl
 Reconciled the m23-s3 finish event: PR#365 open (mergeStateStatus UNSTABLE, mergeable=MERGEABLE), ci+e2e checks IN_PROGRESS. Delegated to mr-ci-watch (pid 824821, detached) rather than polling; resumes via event tick on conclusion. m23-s7 (fable/xhigh, hard tier) remains live in the same window — touches disjoint (client/src/ui/*View.ts vs client/src/render/*), no conflict. Governor NORMAL (d7=$1164.22/2783, fable_d7=$46.78, fable_ok=true). No BLOCKER, no rate-limit event.
 ## 2026-08-24T18:02:33Z — 18:00Z tick -- fan-out launch m23-s3/s7
 Reconciled uncommitted 17:10Z tick bookkeeping first (mr-state.json/handoff/archive; commit 87d9abf) -- that tick had merged m23-s1 PR#364 to 0953db7 but never committed its own records. Live-verified: master green at 0953db7 (run 32755598702 conclusion=success), no open PRs, no live watchers/locks. M23 spine after S0/S1/S2 merged opens {S2 done, S7} and {S3, S4} -- picked the spec-endorsed disjoint pair S3 (static-shell view wiring, ui/*) + S7 (reduced motion, render/*) per section 4's explicit 'S3 || S7' fan-out list, avoiding the never-paired S3||S4 combo. mr-disjoint verdict SAFE, free -g shows 37G free (ample for 2 builds). S3 = routine tier (opus@high). S7 = HARD tier (fable@xhigh, budget fable_ok=true, d7=$1115.61/2783 eff.) -- touches render/renderResolver.ts (reconcile-adjacent) and the spec itself mandates a desync-guard review. Both mr-spawn LAUNCHED cleanly (s3 leader=654704, s7 leader=655336). Both gates-seed calls reported SPEC-SECTION-NOT-FOUND/criteria=0 (same benign pattern noted on m23-s1's prior tick -- the milestone spec's slice table doesn't sub-anchor by S-number the way mr-gates seed expects; not a launch blocker, flag for the merge-time adjudication same as before). No merge this tick (composite budget spent on reconcile + fan-out launch). Governor NORMAL. No BLOCKER.
-## 2026-08-24T17:16:35Z — m23-s1 merged (PR#364, 0953db7)
-Native tick rid=native-20260824T171027Z-612164 consumed the CI-green event (all checks passed at 17:10:24Z) for PR#364 (slice/m23-s1 -> master, mdrewt/monster-realm). Live-reverified OPEN/CLEAN/CI-success before acting. mr-audit: orchestration=CLEAN (12 agent calls, reviewer+red-team+tester+desync-guard present), gating_advisory=CLEAN (no removed asserts/skips/suppressions). mr-gates verify: 14/14 met, 0 unmet, 0 deferred, all reverified TEETH-BITE with agrees_with_evidence=true; overall verdict FLAGGED but solely via reasons=[SPEC-SECTION-NOT-FOUND] with seed_drift=false — adjudicated as a benign spec-table heading-lookup miss (sibling m23-s2/PR#363 edited the same M23-accessibility.spec.md table) rather than a real defect, since every individual gate's fresh re-run evidence matched. PR body Acceptance: line matched mr-gates render --format pr exactly (14/14 met, 0 deferred, 0 unmet). residual_alarms noted residual-over-cap (14 open vs cap 12) but flagged observe-only for slice 1 -- no action taken. Merged via gh pr merge --squash --delete-branch; remote branch auto-deleted. Cleaned stale local worktree .claude/worktrees/m23-s1 and local branch slice/m23-s1 (worktree removal blocked the first delete-branch attempt). master fast-forwarded 5e76945 -> 0953db7. mr-gates residuals close --slice m23-s1 --pr 364 -> 0 residuals to close (nothing deferred). Ledger row recorded outcome=merged, cost_usd=null/COST-UNKNOWN (mr-record --from-log found no result event in the 5MB pass log -- true spend unrecorded, not investigated further this tick). Post-merge master CI (run 32755598702) was launched and is being watched to confirm green before this tick's final output.
-
-## 2026-08-24T17:03:25Z — m23-s1 doc-conflict resolved, pushed, CI-watch delegated (17:01Z tick)
-PR#364 (m23-s1) had gone DIRTY/CONFLICTING after m23-s2 (PR#363) merged first; both PRs appended to the same ARCHITECTURE.md region — the sole conflict, doc-set-only per fan-out doctrine. Found Drew had already resolved it locally in the m23-s1 worktree (merge commit 53e9ab3, union of both entries) but never pushed. Verified the resolution: no conflict markers, diff vs origin/master is exactly the 9 expected new/changed files, ran full 'just ci' clean (87 client files/2542 tests, all evals PASS, perf-budget ok, wasm build ok). Pushed slice/m23-s1 (0455954..53e9ab3). PR#364 now MERGEABLE, CI re-triggered (queued). Delegated to mr-ci-watch for PR#364/m23-s1; merge completes on next event tick. No code was resolved by the supervisor — only the doc-set union that doctrine explicitly permits.
-## 2026-08-24T14:55:14Z — m23-s2 merged (PR#363, 14:52Z)
-Native tick mr-sup-native-20260824T145113Z-571966 consumed EVENT m23-s2.ci.md (green). Re-verified live: PR#363 CLEAN/MERGEABLE, both checks SUCCESS. mr-audit CLEAN/CLEAN (opus/high, 2 attempts); acceptance ledger 7/7 met, 0 unmet/deferred (advisory FLAGGED: 14 open residuals over observe-only cap 12, + SPEC-SECTION-NOT-FOUND lookup note — adjudicated non-blocking, spotcheck gate X7 fresh-reproduced and agrees with recorded evidence). Merged via gh pr merge --squash --delete-branch -> 5e76945 on master; remote slice/m23-s2 confirmed deleted post-prune-fetch. Worktree .claude/worktrees/m23-s2 removed, local branch deleted, checkout fast-forwarded to 5e76945. Ledger row recorded COST-UNKNOWN (no result event captured for this run — true spend unrecorded, flagged in notes). master CI for 5e76945 was still in_progress at tick end (queued->in_progress across ~2min of polling) — NOT independently confirmed green despite the ledger's auto-derived master_ci_after=green; next tick should re-verify live before trusting that field. m23-s1 (PR#364, UNSTABLE) unchanged this tick — mr-ci-watch pid 570061 still live and owns that resolution; no action taken on it. No new launch this tick (single merge action; m23-s1 already has a watcher, no other eligible work surfaced). Governor NORMAL (d7=$1112.41/2783, fable_ok=true).
-## 2026-08-24T14:48:13Z — m23-s1 CI-watch delegated (14:48Z tick)
-Native tick mr-sup-native-20260824T144729Z-568778 (14:48Z): consumed EVENT m23-s1.done (rc=0, attempts=1, opus/high, PR#364 opened by the run). Live-verified PR#364 (mdrewt/monster-realm): mergeStateStatus=UNSTABLE, mergeable=MERGEABLE, checks ci+e2e both pending -- per gates doctrine delegated CI-wait to mr-ci-watch (detached pid 570061) rather than polling. Moved m23-s1 from inflight to awaiting_merge in mr-state.json. m23-s2/PR#363 untouched, its own ci-watch (pid 523402) still live. No merge this tick -- event ticks from both watchers will finish their merges. Governor NORMAL (d7=$1111.96/2783 eff., fable_ok=true). No BLOCKER.
-
-## 2026-08-24T14:45:07Z — m23-s2 (PR#363) e2e flake — reran failed job, re-delegated CI-watch
-PR#363 e2e check concluded red on 11r-e (ADR-0169) wallet-balance precondition (quest_001 start via elder_oak dialogue) after quest_001 was neither started nor completed after 5 attempts. Diff for this slice is confined to client/index.html, client/src/styles.css, client/src/indexShell.test.ts, ARCHITECTURE.md — no overlap with quest/dialogue/npc.rs code. master's last 5 CI runs (incl. this PR's m23-s0 base) are all green including this same test, so this reads as an unrelated e2e flake rather than a regression from m23-s2. Reran only the failed e2e job (gh run rerun 32739181938 --failed) rather than relaunching the slice. Re-delegated to mr-ci-watch (PR#363, m23-s2) to wait for the rerun; resumes via event tick. m23-s1 remains in-flight (leader 279806, alive).
-## 2026-08-24T14:40:46Z — m23-s2: PR #363 open, CI-watch delegated
-Native tick mr-sup-native-20260824T144035Z-502862-3840: m23-s2 (M23 accessibility S2, static-shell ARIA literals across 11 client/index.html shells + a11y-live div, plus client/src/styles.css and indexShell.test.ts) finished rc=0, attempts=2, model=opus. Ledger held 7/7 gates met, LINT-CLEAN, red-team round (9 measured bypasses) hardened per PR body. Pushed commit 4497816, opened PR #363 (mdrewt/monster-realm). Live re-verify at this tick: mergeStateStatus=UNSTABLE, mergeable=MERGEABLE, ci check SUCCESS, e2e check still IN_PROGRESS. Per gates doctrine, delegated CI-wait to mr-ci-watch (pid 502987, detached via setsid) rather than polling; it will resume the merge via an event tick when checks complete. m23-s1 remains live and unaffected (leader pid 279806, alive, no .done). No merge action taken this tick. Governor NORMAL (d7=$1076.16/2783 eff.).
-## 2026-08-24T12:13:32Z — m23-s0 merged (PR#361)
-PR#361 (feat(m23-s0): A11yMeta + total OVERLAY_A11Y and the flat a11yCopy catalog with a throw-on-miss t()) squash-merged to e664fa7 after CI-watch delegation reported green (both ci+e2e jobs success, run 32724932608). mr-audit: policy CLEAN (mandatory_read=false), orchestration CLEAN. gating_advisory flagged suppressions_added=2 -- verified as a scanner false positive (substring hits on 'ignore'/'expect-error' inside test names/comments, not real suppressions). mr-gates verify: 5/5 met, 0 unmet, 0 deferred, all 5 gates independently re-executed and agree with recorded evidence; PR's Acceptance: line matched the ledger verbatim. Worktree at .claude/worktrees/m23-s0 removed (clean, no uncommitted changes), local branch slice/m23-s0 deleted, remote branch auto-deleted, master fast-forwarded d60af03->e664fa7. Master CI kicked off on the merge commit (run 32725853376) and was still in_progress at tick-end -- not sat-and-polled per doctrine; next event/cron tick reconciles the result. No composite launch this tick (deferring new work until master CI on e664fa7 is confirmed green). Governor NORMAL (d7=$1026.77/2783, fable_ok=true).
-

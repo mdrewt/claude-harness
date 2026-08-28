@@ -171,18 +171,13 @@ if [ -f "$MEM/.native-supervisor-disabled" ]; then
       "HOLD-UNATTRIBUTED flag carries no provenance record (mtime=$FMT) — escalating once; loop stays held" \
       "The build loop is held by a kill-switch flag with no provenance record. Did you pause it?" \
       "If you did not pause deliberately, something fired the switch by accident — run mr-supervisor-enable. Every tick until then is a skipped hour."
-  elif [ "${HOLD_AGE_H:-0}" -ge 6 ]; then
-    # TRIGGER 2 — attributed, but old. Attribution is NOT proof of intent: `mr-hold set --by
-    # operator` is unrestricted by caller, so a stray session can write a perfectly well-formed
-    # OPERATOR hold that the loop may never clear and that trigger 1 would wave straight through.
-    # Age catches that, and catches a supervisor self-pause whose clearing condition never arrived.
-    # Deliberate multi-day pauses cost exactly one notification, which is the right price for
-    # never again losing a day to a hold nobody remembers setting.
-    hold_escalate hold-aged "/tmp/mr_hold_aged_$FMT" \
-      "HOLD-AGED by=$HOLD_BY in force ${HOLD_AGE_H}h — escalating once; loop stays held" \
-      "The build loop has been held for ${HOLD_AGE_H}h (by=$HOLD_BY). Is that still intended?" \
-      "If the pause has served its purpose, run mr-supervisor-enable. If it is deliberate, close this — it will not ask again for this hold."
   fi
+  # TRIGGER 2 (hold-aged) RETIRED 2026-08-28 per operator directive on issue #42 (answered
+  # 2026-08-26T00:29:30Z): "Assume that operator holds are always deliberate and may last any
+  # length of time. Do not raise this kind of issue ever again." An attributed OPERATOR hold, of
+  # any age, is no longer escalated — TRIGGER 1 (unattributed/accidental holds) is unaffected and
+  # still fires, since the operator's objection was to being asked about deliberate pauses, not to
+  # the accident-safety net. See memory/feedback-operator-hold-duration.md.
   if [ "${MR_FORCE:-0}" = "1" ]; then log "NOTE hold overridden by MR_FORCE=1 (manual run; hold by=$HOLD_BY REMAINS set) $(qstat)"; else
     [ -n "$EVFILE" ] && [ -f "$EVFILE" ] && case "$EVFILE" in "$MEM/pending-events/"*) : ;; *) mv "$EVFILE" "$MEM/pending-events/" 2>/dev/null;; esac
     log "SKIP hold by=$HOLD_BY (event requeued: ${EVFILE:-none}) $(qstat)"; exit 0; fi
