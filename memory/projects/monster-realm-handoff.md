@@ -1572,6 +1572,8 @@ routing it onward**; budget an orchestrator verification step after every tester
   `_erase_strings` does not handle Rust raw strings; `/* … */` is not inert (fails CLOSED);
   `V-test-count` matches only the literal `#[test]`.
 
+## 2026-08-28T11:02:21Z — Native tick rid=mr-sup-native-20260828T110014Z-579685 -- residual promotion, rb-3 queued
+Gate-0: no live per-run locks, no chain-owner mutex held, no operator hold, no resident-session collision (find -mmin -6 empty both repos; only pre-existing untracked proj .codegraph/ index left untouched). Both repos in sync with origin (harness main e9a26d1, proj master ab35926). Master CI green (rb-2 run, conclusion=success). No open PRs, no worktrees to reap, no /tmp .done files pending. queue[] was empty at gate-3 entry. Residuals: mr-gates residuals list --unclaimed showed 28 open, all unpromoted; oldest tier tied at age~4.1d (R-m22-s0-X2/X3/X4, disclosed 2026-08-24T08:37:17Z) -- past t1_promote_days=3, so per the aging doctrine this outranks new PLAN Sec.9 derivation. Promoted R-m22-s0-X2 (the next in gate_id sequence after X1/rb-2, already merged) into M-residual-backlog.spec.md as rb-3 (mr-gates residuals promote), queued it (mr-record queue-add --slice rb-3), shipped the spec change as a doc-only chore PR (#48, chore/residual-promote-20260828T110146Z). claude-harness repo has no branch-protection rules configured so --auto squash-merge is unavailable there (GraphQL error); merged directly with gh pr merge --squash --delete-branch instead -- CLEAN/MERGEABLE, no CI checks configured on this branch. Fast-forwarded local main to 0f1a9e2. X3/X4 remain unpromoted at the same age tier for a future tick. Governor NORMAL (d7=$184.51/2783 eff., fable_ok=true). No BLOCKER, no rate-limit event. Standing down after the single promote+merge action.
 ## 2026-08-28T10:01:57Z — rb-2 tick-record completed (interrupted prior tick)
 Native tick rid=native-20260828T100004Z-567080 (10:00Z). Gate-0 fast-path: no live per-run locks, no .done files, no chain mutex held -- reconciled from live ground truth. Found the prior tick (native-20260828T094909Z-553562, 09:56Z) had merged rb-2 (PR#378, ab35926) with CLEAN audits per its own notes, but the session was cut off before the git commit/push of its record artifacts (handoff, mr-state.json, mr-usage-daily.jsonl, monster-realm-rb-2-plan.md were all dirty/untracked in the working tree). Verified content sanity, committed+pushed as d370c42. Re-verified LIVE (not from the stale situation-bundle hint): master CI at ab35926 is now completed/success (was in_progress at bundle-generation time). origin/slice/rb-2 was already deleted server-side (PR state MERGED) -- local stale tracking ref pruned via fetch --prune. No new mutating action taken this tick (merge/launch/park); this was purely finishing an interrupted mechanical record step. Residual alarms carried forward unchanged from the prior tick's note: 23 unpromoted past t1=3d (oldest 4d), 30 open vs cap 12 -- per gate-3 aging rule the next tick should promote the oldest unpromoted residual before picking fresh PLAN work.
 ## 2026-08-28T09:55:06Z — rb-2 MERGED — PR#378 (ab35926)
@@ -1711,34 +1713,6 @@ Composite merge->launch: after m23-s10 merged clean (PR#370, 2770ec9), re-derive
 Merged via mr-audit CLEAN (policy) + mr-gates verify 15/15 met, spotcheck X9 agreed. gating_advisory FLAGGED skip_markers_added=11/suppressions_added=1 — read the diff hunks: all hits are string literals inside the new eval's own bad-fixture detector (T14c checks that a `describe.skip(` delegate gets flagged SUSPENDED) plus one comment mentioning @ts-expect-error; no real test suppression added. Squash-merged, branch+worktree deleted, master fast-forwarded to 2770ec9. m23-s6 (PR#369) was already merged prior to this tick. Residuals close: 0 (none open for m23-s10). Delegated master-CI wait to a background poll; will confirm green next.
 ## 2026-08-25T05:48:32Z — m23-s6 MERGED (PR#369, sha 2dbfe0c8)
 Supervisor tick native-20260825T054518Z-1589143 merged m23-s6 (menuView ARIA listbox/aria-activedescendant, 16th/last click-only OverlayId gets a11y wiring). Audit: orchestration CLEAN, gating CLEAN, mandatory_read=false. Acceptance ledger FLAGGED on X15/X16 (lint/full-ci gates) -- adjudicated FALSE-POSITIVE: this Bash session has no cargo at all (rust not asdf-installed here), reproduced the identical cargo-not-found failure independent of the diff/commit. Rooted run's own log recorded FINAL-CI-EXIT=0 from a real just ci (2734 tests, 90 evals PASS) inside its own environment which does have cargo -- that is the trustworthy signal. 14/16 pure-test gates all fresh-reverified true incl. adversarial spotcheck (X8, agrees=Y). residuals close: 0 open (nothing to close). Two DEFERs disclosed by this slice (A11Y-25, A11Y-26) both targeted backlog, INTENDED OWNER m23-s10 -- no promotion needed this tick, S10's own spec section already names them. Worktree removed, local+remote slice/m23-s6 branches deleted. Master fast-forwarded to 2dbfe0c8; master CI (run 32814222235) still in_progress at tick end -- next tick/event should re-verify green before trusting it. No BLOCKERs. Governor NORMAL (d7 ~$1382/2783 eff.). Fan-out: none in flight; falling through to gate-3 pick-work next.
-## 2026-08-25T03:57:03Z — m23-s5 merged (PR#368, 3e062c4) — composite launch m23-s6
-**Slice:** m23-s5 — M23 accessibility S5, the sole `client/src/main.ts` touch: worldHasFocus()
-conjunct on the twelve open branches, Escape-ladder close announcements, focus return,
-#help-hint -> native <button> (ADR-0206).
-
-**Merge:** PR#368 squash-merged -> 3e062c4 on master. CI: ci+e2e both SUCCESS pre-merge;
-post-merge master CI run in progress at record time (same tree as the passing PR checks).
-Branch deleted, worktree removed, local branch pruned. mr-branch-audit clean (0 post-merge
-commits, 0 stale branches across 345 merged PRs).
-
-**Audit adjudication:** mr-audit orchestration=CLEAN (reviewer+tester+verifier roles present,
-mandatory_read=false). gating_advisory FLAGGED (6 modified asserts, 0 skips/suppressions) —
-read the diff: the a11y bounded-surface allow-list gained `background`/`border`/`padding` for
-the <button> conversion, each `border`/`padding` addition paired with a VALUE-constrained
-assertion (not a bare name-allow), plus closed a pre-existing unconstrained-`font` hole
-(red-team #2, HIGH) the button conversion made exploitable. Net: the diff TIGHTENS the gate,
-does not weaken it. mr-gates verify: 13/13 met, 0 unmet, 0 deferred, spotcheck agrees, seed_drift
-false. FLAGGED reason is SPEC-SECTION-NOT-FOUND — the seeder's known recurring gap for M23
-(5th occurrence per s0/s1/s3/s4/s7), not a semantic problem; hand-authored ledger with real
-CHECK/EXPECT per gate. residual_alarms noted 15 open residuals vs cap 12 (observe-only in
-slice 1, not a blocker this tick).
-
-**Composite launch:** m23-s6 (menuView.ts keyboard/AT semantics — role=listbox/option,
-aria-activedescendant) launched opus@high/routine immediately after, per the M23 dependency
-spine S5->S6. No fan-out partner (serial by construction per spec §4). Fresh slice, no park
-memo, no stale locks/stop-flags, memory headroom ample (37G available).
-
-**Governor:** NORMAL throughout (d7 $1331.13 raw / $1421.13 effective incl. one
-unreconciled run, of $2783 weekly; fable_ok=true).
 ## 2026-08-25T01:43:43Z — m23-s5 (PR#368): remote e2e RED, resuming fix cycle 1
 Native tick rid=native-20260825T014010Z-1265099. PR#368 (m23-s5, ADR-0206, worldHasFocus() scoped hotkey gate) opened by the prior run: local just ci green (95/95 files, 2705 tests), remote ci green, but remote e2e RED with 3 failures in pre-existing specs the slice never touched (movement-input.spec.ts 14r-e, pvp.spec.ts m16b, trade.spec.ts M15c) — all consistent with the new 12x && worldHasFocus() conjunct blocking toggle-close / cross-overlay-open once focus leaves canvas/body. Did NOT merge (per doctrine: still-dead CI failure = real failure, triage not blind-relaunch). Resumed on the existing worktree/branch (slice/m23-s5, da0b0ff) as a HARD-tier fix cycle (prior attempt failed -> fable/xhigh; fable_ok=true, d7 fable spend $108.77/$2298 allowance). resume_block hands the run the 3 concrete failures, root-cause hypothesis, and two candidate fix shapes, with instruction to push a new commit to the same branch/PR rather than opening a new one. Governor NORMAL (d7 $1329.58/$2783 eff.). No BLOCKERs.
+

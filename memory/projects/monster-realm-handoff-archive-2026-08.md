@@ -4496,3 +4496,32 @@ Native tick rid=native-20260825T000014Z-1109313. Gate-0/1: no live per-run locks
 Supervisor tick native-20260824T230824Z-1092695 merged m23-s4 (constructed-shell a11y wiring: battleView/boxView/raisingView/evolutionView/claimView + canvas world region ARIA) via squash --delete-branch. Audit: policy=orchestration CLEAN, gating_advisory=CLEAN (no deletions/skips/suppressions), acceptance=FLAGGED-but-advisory (9/9 met, 0 unmet, 0 deferred, spotcheck TEETH-BITE agrees=true; reason=SPEC-SECTION-NOT-FOUND, not evidence_mismatch or seed_drift) — merged per doctrine (advisory never a merge predicate). mr-gates residuals close: 0 residuals for this slice. Local master ff-only'd to 78e2bb2, m23-s4 worktree+branch removed. Master CI on the merge commit was still in_progress past the usual ~9min window at tick-end (not blocked on per no-polling doctrine) — next tick should re-verify live before any further action on master.
 
 
+## 2026-08-25T03:57:03Z — m23-s5 merged (PR#368, 3e062c4) — composite launch m23-s6
+**Slice:** m23-s5 — M23 accessibility S5, the sole `client/src/main.ts` touch: worldHasFocus()
+conjunct on the twelve open branches, Escape-ladder close announcements, focus return,
+#help-hint -> native <button> (ADR-0206).
+
+**Merge:** PR#368 squash-merged -> 3e062c4 on master. CI: ci+e2e both SUCCESS pre-merge;
+post-merge master CI run in progress at record time (same tree as the passing PR checks).
+Branch deleted, worktree removed, local branch pruned. mr-branch-audit clean (0 post-merge
+commits, 0 stale branches across 345 merged PRs).
+
+**Audit adjudication:** mr-audit orchestration=CLEAN (reviewer+tester+verifier roles present,
+mandatory_read=false). gating_advisory FLAGGED (6 modified asserts, 0 skips/suppressions) —
+read the diff: the a11y bounded-surface allow-list gained `background`/`border`/`padding` for
+the <button> conversion, each `border`/`padding` addition paired with a VALUE-constrained
+assertion (not a bare name-allow), plus closed a pre-existing unconstrained-`font` hole
+(red-team #2, HIGH) the button conversion made exploitable. Net: the diff TIGHTENS the gate,
+does not weaken it. mr-gates verify: 13/13 met, 0 unmet, 0 deferred, spotcheck agrees, seed_drift
+false. FLAGGED reason is SPEC-SECTION-NOT-FOUND — the seeder's known recurring gap for M23
+(5th occurrence per s0/s1/s3/s4/s7), not a semantic problem; hand-authored ledger with real
+CHECK/EXPECT per gate. residual_alarms noted 15 open residuals vs cap 12 (observe-only in
+slice 1, not a blocker this tick).
+
+**Composite launch:** m23-s6 (menuView.ts keyboard/AT semantics — role=listbox/option,
+aria-activedescendant) launched opus@high/routine immediately after, per the M23 dependency
+spine S5->S6. No fan-out partner (serial by construction per spec §4). Fresh slice, no park
+memo, no stale locks/stop-flags, memory headroom ample (37G available).
+
+**Governor:** NORMAL throughout (d7 $1331.13 raw / $1421.13 effective incl. one
+unreconciled run, of $2783 weekly; fable_ok=true).
