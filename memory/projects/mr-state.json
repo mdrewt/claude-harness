@@ -1,10 +1,10 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-28T09:56:00Z",
- "updated_by": "native-20260828T094909Z-553562",
+ "updated_utc": "2026-08-28T10:15:00Z",
+ "updated_by": "native-20260828T100004Z-567080",
  "master": {
   "sha": "ab35926057965545c290c5bcc52691dfda49771e",
-  "ci": "in_progress-post-merge-confirm-next-tick",
+  "ci": "success",
   "nightly": "success"
  },
  "harness_main": {
@@ -20,7 +20,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "native-20260828T094909Z-553562: rb-2 merged (PR#378, ab35926). mr-audit CLEAN (orchestration/gating/acceptance/scope), hard-tier mandatory diff read done via subagent adjudication (safe -- no vacuous classifier, no unsafe default, anchor demotion-detection holds). mr-gates verify 8/8 reverified CLEAN. Residual R-m22-s0-X1 closed. Worktree/branch cleaned; harness main unaffected. No new launch this tick (kept full attention on the hard-tier diff read). residual_alarms carried forward: 23 unpromoted past t1=3d (oldest 4d), 30 open vs cap 12 -- per gate-3 aging rule this outranks new PLAN §9 work; next tick should promote the oldest unpromoted residual before picking fresh work. Master CI in_progress at tick exit -- next tick's gate-0 must confirm green live, not assume from this note.",
+ "notes": "native-20260828T100004Z-567080: gate-0 fast-path found no live per-run locks/mutex/.done -- reconciled from live ground truth. Prior tick (native-20260828T094909Z-553562) had merged rb-2 (PR#378, ab35926, CLEAN audits per its own note) but was cut off before committing its record artifacts (handoff/mr-state.json/mr-usage-daily.jsonl/rb-2-plan.md left dirty+untracked). Verified content sanity and finished that mechanical step: committed+pushed d370c42. Re-verified LIVE: master CI at ab35926 now completed/success (was in_progress at bundle time). origin/slice/rb-2 already server-deleted (PR MERGED); pruned stale local tracking ref. No new mutating action this tick (no merge/launch/park) -- purely finished an interrupted record step. residual_alarms carried forward unchanged: 23 unpromoted past t1=3d (oldest 4d), 30 open vs cap 12 -- per gate-3 aging rule, next tick should promote the oldest unpromoted residual before picking fresh PLAN work. Also noted (not actioned, out of scope this tick): handoff-rotate WARN'd 32 entries with unparseable headers, pinned live -- needs a manual look.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -50,5 +50,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-28T09:56:00Z"
+ "last_tick_utc": "2026-08-28T10:15:00Z"
 }
