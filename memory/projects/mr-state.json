@@ -1,7 +1,7 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-28T15:03:00Z",
- "updated_by": "mr-sup-native-20260828T150014Z-763053",
+ "updated_utc": "2026-08-28T16:02:29Z",
+ "updated_by": "mr-sup-native-20260828T160011Z-775851",
  "master": {
   "sha": "e112ce6",
   "ci": "success",
@@ -11,25 +11,28 @@
   "sha": "ddaf428",
   "ci": "no-remote-ci-local-gate-green; PR#49 (chore/residual-promote-20260828T150014Z, rb-4) merged this tick"
  },
- "adr_next_free": 208,
- "inflight": [],
- "awaiting_merge": [],
- "queue": [
+ "adr_next_free": 209,
+ "inflight": [
   {
    "slice": "rb-4",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m22-s0-X3",
-   "added_utc": "2026-08-28T15:01:30Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "e112ce6"
+   "model": "fable",
+   "effort": "xhigh",
+   "tier": "hard",
+   "repo": "project",
+   "session_leader": 777274,
+   "claude_pid": 777277,
+   "started_utc": "2026-08-28T16:01:44Z",
+   "adr": 208
   }
  ],
+ "awaiting_merge": [],
+ "queue": [],
  "park_counters": {
   "14r-e": 1
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "mr-sup-native-20260828T150014Z-763053: gate-0 found no live locks/mutex, HOLD-NONE. Prior tick (141452Z) had merged rb-3 (PR#379, e112ce6) and closed residual R-m22-s0-X2 but never committed its own state/handoff files to the harness repo -- reconciled from live ground truth: PR#379 MERGED, master CI run 33179334439 now conclusion=success at e112ce6, worktree clean (only master worktree, no strays), residual R-m22-s0-X2 status=closed/closed_by_pr=379 in mr-residuals.jsonl. Confirmed master.ci success (was pending-reverify). Gate 3: no open/parked slice, queue[] empty, no residual past t2_stale_days=14 -- but 28 unpromoted residuals past t1_promote_days=3 (oldest disclosed_at 2026-08-24T08:37:17Z: R-m22-s0-X3/X4) outrank new PLAN section-9 work per the aging doctrine. Promoted R-m22-s0-X3 (age 4.3d) into rb-4 via mr-gates residuals promote, shipped as doc-only chore PR#49 (chore/residual-promote-20260828T150014Z) to specs/monster-realm-v2/M-residual-backlog.spec.md, squash-merged immediately (no CI gate on this path). queue-added rb-4. That is this tick's one action; no launch attempted (residual promotion outranked it). Committed the prior tick's orphaned state/handoff/plan/progress files plus this tick's own record in one chore(mr-sup) commit to main. Next tick: fast-path queue[0]=rb-4, re-verify live, launch.",
+ "notes": "mr-sup-native-20260828T160011Z-775851: gate-0 fast-path found no live locks, no .native-supervisor-disabled; stale /tmp/mr_pass_rb-3.done (already-reconciled per prior tick's notes, PR#379/e112ce6) removed as housekeeping. No human-session collision, mutex taken clean. Gate-3 fast path: queue[0]=rb-4 re-verified live (spec heading present, status=promoted, not blocked, no open PR, master/main current) -> launched fable@xhigh tier=hard (touches derived from sibling rb-2/rb-3 fixes in the same frozen M22 identity-column walker; template said 'inherit from source slice -- REVIEW'). ADR 208 reserved (adr_next_free now 209). mr-gates seeded 0 criteria (EARS/Tests prose section, not itemized SHALL) -- flagged for merge-time adjudication, not trusted as an auto-pass. Released mutex after recording. Next tick: mr-ci-watch delegation once rb-4 opens a PR, or resume/park reconciliation.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -59,5 +62,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-28T15:03:00Z"
+ "last_tick_utc": "2026-08-28T16:02:29Z"
 }

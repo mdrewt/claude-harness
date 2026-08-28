@@ -4535,3 +4535,76 @@ Supervisor tick native-20260825T054518Z-1589143 merged m23-s6 (menuView ARIA lis
 ## 2026-08-25T07:31:02Z — m23-s11 LAUNCHED (composite launch after m23-s10 merge)
 Composite merge->launch: after m23-s10 merged clean (PR#370, 2770ec9), re-derived eligibility fresh. Dependency spine S0->S1->{S2||S7}->{S3||S4}->S5->S6->{S8->S9}->{S10||S11}: S11's after: is S10 only (now merged); S8/S9 remain BLOCKED on spec Sec.8 operator rulings (unrelated branch). No in-flight slices, touches disjoint trivially (solo launch). Re-probed for human activity: only my own merge-produced file writes in the last 6 min, no resident IDE claude pid -- clear. Launched m23-s11 (justfile a11y-e2e recipe + nightly workflow wiring + docs/a11y-manual-protocol.md for the two MANUAL-only criteria A11Y-32/33 + evals/ci-gate-wiring.eval.mjs) opus@high routine tier, leader pid 1757938, rid mr-spawn-20260825T073041Z-1757878. Gate-seeding returned SPEC-SECTION-NOT-FOUND (criteria=0) -- the M23 spec's S11 entry is a table row + bold subheading, not a `## S11` heading the seeder pattern-matches; NO-LEDGER for this slice is expected, not a defect (absent measurement per doctrine). S11's BUILD is unblocked; only its milestone-EXIT sign-off (AA-conformance DoD, escalation #3) awaits an operator ruling -- noted in the brief so the run doesn't stall on it.
 
+## 2026-08-25T09:05Z — m23-s11 PR#371 OPEN — local gate green, remote CI running (supervisor owns the merge)
+
+**Slice:** m23-s11 · M23 accessibility S11, the final slice. **Terminal state:** PR
+https://github.com/mdrewt/monster-realm/pull/371 OPEN, MERGEABLE/UNSTABLE, ci+e2e QUEUED at hand-off.
+Branch `slice/m23-s11` @ worktree `.claude/worktrees/m23-s11` (clean, pushed). `gh pr merge` NOT run.
+
+**Acceptance:** 8/10 met, 2 deferred, 0 unmet — `seed:e3b0c44298fc1c14`. Ledger LINT-CLEAN. The
+`Acceptance:` line in the PR body is byte-identical to `mr-gates render --format pr`.
+
+**Delivered.** `just a11y-e2e floor="169": wasm` as a DECAY RATCHET (not an axe run — see below), an
+`a11y-e2e` nightly job + notify fan-in + policy preamble, three additive predicates and 35
+proof-of-teeth fixtures in `evals/ci-gate-wiring.eval.mjs` (Checks 6/7/8), and
+`docs/a11y-manual-protocol.md`. `just ci` green locally: 96 files / 2818 tests, 93 evals PASS / 0
+FAIL, observability 8/8, biome 0 errors. ZERO test files differ from origin/master.
+
+**SUPERVISOR ACTIONS NEEDED (4):**
+1. **`docs/nightly-red-response-policy.md` is a disclosed `touches-delta:` — audit it.** It is a
+   MECHANICALLY FORCED hidden dependency: `evals/nightly-smoke-wiring.eval.mjs` Check 32 demands the
+   policy matrix job-key set be SET-EQUAL to nightly.yml's declared jobs, so declaring the job
+   without the row reds `just ci` locally (RED captured before adding it). No in-touches design
+   avoids it; piggybacking onto an existing job is worse (notify reports the JOB KEY, so an a11y red
+   would open "nightly failure: coverage"). No sibling was running (0 open PRs). **Fold
+   `docs/nightly-red-response-policy.md` into the declared `touches:` for any future nightly-job
+   slice.**
+2. **ADR number requested.** None was assigned, and doc-aggregation forbids picking one, so NO ADR
+   was authored; the policy row cites existing ADR-0050 + ADR-0205. Warranted topic: "the nightly
+   a11y tier — what `just a11y-e2e` measures, why it is not axe today, and the never-CI-green rule".
+3. **Promote the four backlog DEFERs into real spec sections** (X8/X9/X10/X11 — see below).
+4. **NEW BUG FOUND IN THE MAIN CI GATE, out of this slice's remit.** `isTruthyCoe`
+   (`evals/ci-gate-wiring.eval.mjs:42`) recognises only the literals `true|yes|on|True` and the exact
+   `${{ true }}`. Red-team EXECUTED two bypasses: `continue-on-error: ${{ !cancelled() }}` and
+   `${{ success() || true }}` are unconditionally true in every real run and pass as "unneutered".
+   The new a11y predicate works around it with a VALUE whitelist (literal `false` only), but
+   **`ciStepsUnneutered` — the main per-PR ci.yml gate — still carries the hole.** Not fixed here:
+   isTruthyCoe is shared and its fixtures pin its semantics, so widening it is its own slice.
+
+**Deferred (all with resolvable targets, all in the ledger):**
+- `X8/X9 -> backlog` — the EXECUTION of Protocol A/B. The protocol doc is authored
+  (`docs/a11y-manual-protocol.md:45` and `:75`) but **no human has run it** and the run log is empty
+  by design. Deliberately NOT self-certified: marking A11Y-32/33 met because a document exists would
+  be the exact false conformance claim the doc's own banner warns against. Needs one NVDA 2024.x +
+  Chrome sitting (mouse unplugged, screen covered) on a named SHA.
+- `X10/X11 -> backlog` — the axe-core + real-browser tier. **This is a genuine SPEC GAP, not a
+  scoping choice:** spec §5.7 names "axe-core + Playwright" as the recipe's payload, but no axe-core
+  exists in the repo and NO slice in the spec's own §4 table owns authoring `client/e2e/a11y.spec.ts`
+  or the devDependency. Consequence: the four `[E2E]`-tagged criteria A11Y-19/20/22/23 have NO
+  automated oracle anywhere in M23 today. `just a11y-e2e` is built as the seam. Suggested `m23-s12`.
+- `X12 -> wontfix` — operator escalation #3 (spec §8.3), the AA-conformance DoD. Blocks the MILESTONE
+  exit and any public conformance statement, NOT this slice. Recorded in the protocol doc.
+
+**Red-team round 2 (4 EXECUTED bypasses of round 1, all closed, each with a hostile-good control):**
+CRITICAL — `a11yRecipeBodyIntact` was a substring scan, so `exit 0` planted under `set -euo pipefail`
+above a byte-identical body kept every token present while the recipe ran nothing and exited 0. Fixed
+by pinning the recipe REGION VERBATIM (raw, not comment-stripped, so a deleted shebang also reds) —
+a blacklist of abort constructs is unclosable. HIGH — empty `strategy.matrix` = zero job instances.
+MED-HIGH — phantom `runs-on` label. MED — the isTruthyCoe hole in (4) above.
+
+**Lenses:** planner, tester (27 round-1 fixtures, ≠ implementer), reviewer, red-team, /simplify,
+verifier PASS (re-ran full gate, independently re-executed X1/X2/X4/X13, re-proved the teeth bite),
+desync-guard PASS (nil surface — game-core/server-module/client-wasm/client/src tree hashes
+byte-identical to master; the four A11Y-36 parity evals byte-unmodified and green).
+
+**Two measurement notes for whoever verifies:** (a) the client-suite baseline at 2770ec9 is **2818**,
+not the 2819 m23-s10's ledger recorded — re-measured twice, and zero test files differ from master,
+so the discrepancy is inherited, not caused here. (b) `evals/nightly-smoke-wiring.eval.mjs` has NO
+main guard: `node evals/nightly-smoke-wiring.eval.mjs` exits 0 VACUOUSLY; import it and call
+`m.default()`.
+
+**Boy Scout:** 1 hunk / 2 lines — `justfile:280-281`, a stale "CI-as-required-gate is M5b" comment
+that ci.yml's e2e job has long since shipped. Two other candidates turned out to be historical prose,
+so they were left alone.
+
+
