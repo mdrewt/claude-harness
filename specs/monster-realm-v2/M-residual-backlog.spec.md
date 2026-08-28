@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-5 — evals/run.mjs has no completeness check: an eval that process.exit()s at module scope trun (from m22-s0 X4, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s0 · residual: R-m22-s0-X4
+
+Deferred with reason: MEASURED on the live tree: with a main guard widened to compare dirname, node evals/run.mjs ran 37 of 90 evals, swallowed 3 already-printed 'eval FAIL:' lines, and exited 0. run.mjs guards only files.length === 0; nothing asserts every discovered eval produced a result. OUT of this slice's declared touches (evals/run.mjs is explicitly off-limits and the M22 spec forbids slices editing it), so flag
+
+EARS: evals/run.mjs has no completeness check: an eval that process.exit()s at module scope truncates CI silently with exit 0
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-4 — findIdentityColumns matches literal type TEXT, so an aliased Identity column is invisible  (from m22-s0 X3, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s0 · residual: R-m22-s0-X3
