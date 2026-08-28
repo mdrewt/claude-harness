@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-4 — findIdentityColumns matches literal type TEXT, so an aliased Identity column is invisible  (from m22-s0 X3, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s0 · residual: R-m22-s0-X3
+
+Deferred with reason: MEASURED: adding 'pub type OwnerId = Identity;' and 'pub delegate: OwnerId,' to a table leaves both gates green while the column carries no D6 policy. Pre-existing walker limitation, but S0 freezes this walker as the shared contract, so a consumer building a completeness gate over it inherits an incomplete column set. Documented as a KNOWN LIMITATION in the contract comment. Real fix: gate 'type X
+
+EARS: findIdentityColumns matches literal type TEXT, so an aliased Identity column is invisible to the frozen walker
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-3 — [G6/declared] uses 'key in manifest', so Object.prototype pollution greens an unclassified (from m22-s0 X2, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s0 · residual: R-m22-s0-X2
