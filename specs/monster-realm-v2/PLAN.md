@@ -648,6 +648,28 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   no slice depends on it). 16r-b is SERIAL-REQUIRED against the 15r scanner-migration family;
   16r-h after 16r-c; 16r-a/d/e/f/g pairwise disjoint fan-out candidates. No new game-design
   surface.
+- **M-postgate-seventeenth-review-residuals** (`M-postgate-seventeenth-review-residuals.spec.md`) —
+  **NEW, queued 2026-08-28; inserted after `M-postgate-sixteenth-review-residuals`**, per the
+  weekly-review insertion convention. Verified seventeenth multi-lens review findings @ `e112ce6`
+  (8 lenses, 0 contradictions, 2 independent verifiers, 11 claims checked / 0 dropped). The
+  `064e627..e112ce6` delta (M23 a11y s0-s11, M22 privacy s0-s2, roster wave 3, 16r fixes,
+  rb-1/2/3, nightly coverage restoration) is structurally clean — the security/privacy,
+  test-integrity and game-core lenses each returned an explicit "no findings". What remains is
+  one HIGH wiring gap and the disclosed-but-untracked class: **17r-a** the entire M23
+  reduced-motion feature is inert in production (`motionPreferenceFromWindow()` has zero
+  production callers; `ResolveInput.reduceMotion` permanently false — the S7→S5 wiring contract
+  was never fulfilled and `reduced-motion-purity.eval.mjs` structurally cannot see it),
+  **17r-b** ADR-0130's two untracked reconnect residuals ((d) partial `my_battle` hydration
+  still yields a spurious battleStart; (e) `main.ts`'s identity is never refreshed on
+  reconnect), **17r-c** OBS-48 softened from forbid to require-justification per Drew's answered
+  issue mdrewt/monster-realm#342 (CONSUMED + closed by this review; eval
+  `observability-log-wrapper` A9 is the sole enforcement site to convert), **17r-d** the M23
+  spec A11Y-19/§2.3/§8.4 amendment that ADR-0206 Amendment A1 explicitly requests (harness
+  doc-only), **17r-e** a four-file comment-truth micro-sweep (overlayA11y stale shared-root
+  claim, two wave-3 content-comment falsehoods, stale EXPECTED-RED eval labels), and **17r-f**
+  the frame-loop catch that bypasses the `pushError`/F9 error pipeline. Serial chain
+  17r-a→17r-b→17r-f (shared `main.ts`); 17r-c/d/e pairwise disjoint fan-out candidates. Zero
+  new decision issues. No new game-design surface.
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
