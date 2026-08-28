@@ -2717,5 +2717,68 @@ for n in names:
 sys.exit(bad)
 PYGATES
 
+# ================================ rb-1 ======================================================
+# mr-content-scope --selftest: the MARKER *and* the fixture COUNT are parsed -- the mr-backup /
+# mr-audit shape, deliberately NOT the one-line `"$MEM/mr-content-scope" --selftest || BAD=1`
+# form. :619-621 above records the red-team that stubbed a sibling tool's --selftest to an
+# unconditional `print("BACKUP-SELFTEST-OK 11")`: two separate bare checks stayed green, because
+# an exit status has no teeth against a tool that grades itself.
+#
+# WHY THIS LEG EXISTS AT ALL -- the G2 ADOPTION-DRIFT lesson (:2617-2621). mr-content-scope is
+# the mechanical classifier for the amended RW3-08 (rb-1, residuals R-rw3b-X8 / R-rw3c-X3), so it
+# has to bite on EVERY future content slice's diff. The only thing that ran it was rb-1's own
+# acceptance ledger, and a ledger closes at merge: a tool run once, by the slice that shipped it,
+# is decoration by the next tick. This leg is what turns it into a standing gate. Its LINK fixture
+# also re-checks the `rw3-scope-rules` anchor in the spec, so deleting the amendment's exception
+# from M-postgate-roster-wave-3.spec.md reds here too.
+/usr/bin/python3 - "$MEM" <<'PYSCOPE' || BAD=1
+import os, re, subprocess, sys
+
+MEM = sys.argv[1]
+TOOL = os.path.join(MEM, "mr-content-scope")
+# The count the battery ships with: 8 PERMIT + 30 BITE + 2 LINK + 2 CLI fixtures (rb-1 review
+# round, 2026-08-28 -- was 7/15/2/2 = 26 at rb-1 T3, before the reviewer/red-team fixtures
+# bite-26..bite-30 and the T5 adversarial battery landed). A floor, not an equality, so ADDING
+# fixtures never reds -- only deleting them does; raising it as the battery grows is this file's
+# documented practice, and is what keeps the floor from decaying into a number no deletion can
+# ever cross.
+SELFTEST_FLOOR = 42
+bad = 0
+
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL %s" % name) + (": " + detail if detail else ""))
+
+
+if not os.path.isfile(TOOL):
+    fail("mr-content-scope-missing",
+         "%s not found -- the amended RW3-08 has no mechanical classifier in this corpus" % TOOL)
+else:
+    # Invoked through sys.executable for the same reason mr-selfcheck invokes mr-backup that way:
+    # a lost exec bit must not silently disable the check.
+    try:
+        r = subprocess.run([sys.executable, TOOL, "--selftest"],
+                           capture_output=True, text=True, timeout=180)
+        rc, out, err = r.returncode, r.stdout or "", r.stderr or ""
+    except Exception as exc:  # noqa: BLE001 -- unrunnable is a FAIL, never a skip
+        rc, out, err = None, "", "%s: %s" % (type(exc).__name__, exc)
+    m = re.search(r"^CONTENT-SCOPE-SELFTEST-OK ([0-9]+) fixtures", out, re.M)
+    if rc != 0:
+        fail("mr-content-scope-selftest",
+             "--selftest exited %r: %s" % (rc, (out + err).strip()[-300:]))
+    elif not m:
+        fail("mr-content-scope-selftest-marker",
+             "--selftest printed no `CONTENT-SCOPE-SELFTEST-OK <n> fixtures (...)` marker: %s"
+             % out.strip()[-200:])
+    elif int(m.group(1)) < SELFTEST_FLOOR:
+        fail("mr-content-scope-selftest-count",
+             "the battery ran %s fixtures, floor is %d -- fixtures have been deleted, or the "
+             "count is reported instead of measured" % (m.group(1), SELFTEST_FLOOR))
+
+sys.exit(bad)
+PYSCOPE
+
 [ "$BAD" = 0 ] && echo "SELFCHECK-OK"
 exit 0
