@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-3 — [G6/declared] uses 'key in manifest', so Object.prototype pollution greens an unclassified (from m22-s0 X2, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s0 · residual: R-m22-s0-X2
+
+Deferred with reason: MEASURED both ways by red-team; independently confirmed byte-identical on origin/master by the reducer-security-auditor, so PRE-EXISTING, not introduced by S0. 'in' walks the prototype chain, which Object.freeze does not seal: a co-resident eval setting Object.prototype['table.col'] makes [G6/declared] skip a genuinely unpoliced column while Object.keys and the detail-string count stay at 23. Veri
+
+EARS: [G6/declared] uses 'key in manifest', so Object.prototype pollution greens an unclassified Identity column
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-2 — REKEY_MANIFEST object-ification is red-on-arrival: checkRekeyCompleteness infers REKEY fro (from m22-s0 X1, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s0 · residual: R-m22-s0-X1
