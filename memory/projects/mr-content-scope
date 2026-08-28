@@ -2178,6 +2178,95 @@ BITE_25_TWO_DIFF_BLOCKS_FIRST_PERMIT_SECOND_BITE = PERMIT_4_CONTENT_VERSION_BUMP
 # across every file block and computes ONE verdict at the end from the union
 # -- confirms a clean first file can never launder a dirty second one.
 
+# ===========================================================================
+# rb-1 review-round fixtures (2026-08-28). Authored from the REPRODUCERS the
+# reviewer and red-team lenses produced against the shipped classifier, before
+# any fix existed -- so each one starts RED and is closed by fixing classify(),
+# never by relaxing an assertion. Provenance is recorded per fixture.
+# ===========================================================================
+
+# red-team #1 (CRITICAL). Produced by REAL `git diff` on a repo whose file name
+# contains a `"`, which makes git emit a C-quoted header under the default
+# core.quotePath=true. The quoted token does not start with `a/`, so the a//b/
+# strip is skipped, the surrounding quotes survive normalisation, `.endswith(
+# ".rs")` is False, and the file misclassifies as NON-RUST -> wholesale PERMIT.
+# Enforcement is disabled ENTIRELY for such a path -- banned-path included.
+BITE_26_QUOTED_HEADER_PATH_DESYNC = (
+    'diff --git "a/game-core/src/battle/weird\\"file.rs" '
+    '"b/game-core/src/battle/weird\\"file.rs"\n'
+    '--- "a/game-core/src/battle/weird\\"file.rs"\n'
+    '+++ "b/game-core/src/battle/weird\\"file.rs"\n'
+    "@@ -1 +1,2 @@\n"
+    " fn a(){}\n"
+    "+pub fn backdoor()->bool{true}\n"
+)
+
+# red-team #1, banned-path half: the identical edit to a BANNED_PATHS file,
+# quoted. Unquoted this correctly fires V-banned-path.
+BITE_27_QUOTED_HEADER_BANNED_PATH = (
+    'diff --git "a/game-core/src/monster/types.rs" "b/game-core/src/monster/types.rs"\n'
+    '--- "a/game-core/src/monster/types.rs"\n'
+    '+++ "b/game-core/src/monster/types.rs"\n'
+    "@@ -1 +1 @@\n"
+    "-pub enum Affinity { Fire }\n"
+    "+pub enum Affinity { Fire, Void }\n"
+)
+
+# red-team #2 (CRITICAL). A brace-BALANCED pure addition that shadows the
+# assertion macros for the rest of the scope. Every assertion below it becomes
+# a no-op WITHOUT ever appearing in the diff, so no pairing, no removal and no
+# brace delta can see it. `macro_rules!` is self-closing by construction, so
+# tuning the wrap check can never catch this -- it needs its own token rule.
+BITE_28_MACRO_SHADOWING_NEUTRALISES_ASSERTIONS = """diff --git a/game-core/tests/eg3_evolution_graph.rs b/game-core/tests/eg3_evolution_graph.rs
+index aaaaaaa..bbbbbbb 100644
+--- a/game-core/tests/eg3_evolution_graph.rs
++++ b/game-core/tests/eg3_evolution_graph.rs
+@@ -5,6 +5,9 @@ fn t7_pinned_edges() {
+     let edges = discover_edges();
++    macro_rules! assert_eq { ($($t:tt)*) => {} }
++    macro_rules! assert { ($($t:tt)*) => {} }
+     assert_eq!(edges.len(), 10);
+     assert!(edges.contains(&EDGE_ID));
+ }
+"""
+
+# red-team #3 (CRITICAL) -- the residual the implementer disclosed, now with a
+# working reproducer. The STRUCTURAL WRAP CHECK only runs on a region with ZERO
+# substantive removals, so pairing one legitimate P-count bump into each half of
+# an `if false { ... }` wrap hides both braces from it. The untouched assertion
+# between them never executes; the classifier reports two clean P-count matches.
+BITE_29_PAIRED_REMOVAL_CAMOUFLAGES_WRAP = """diff --git a/game-core/tests/roster_wave3_tests.rs b/game-core/tests/roster_wave3_tests.rs
+index ccccccc..ddddddd 100644
+--- a/game-core/tests/roster_wave3_tests.rs
++++ b/game-core/tests/roster_wave3_tests.rs
+@@ -20,10 +20,14 @@ fn t9_pin_check() {
+     let paths = discover_paths();
+-    assert_eq!(paths.len(), 9);
++    assert_eq!(paths.len(), 10);
++    if false {
+     assert!(paths.contains(&EXPECTED_NEW_EDGE), "expected new edge present");
+-    let x = 9;
++    let x = 10;
++    }
+     do_cleanup();
+ }
+"""
+
+# red-team #4. The NEW-TEST wholesale permit is a FILENAME match with no content
+# check, so a brand-new `*_tests.rs` placed directly under src/ -- nowhere near a
+# tests/ directory, containing no test at all -- ships with zero scrutiny.
+# RW3-08's exception (b) says "its own new TEST files", not "files named like one".
+BITE_30_NEW_TEST_NAMED_FILE_UNDER_SRC_WITH_NO_TESTS = """diff --git a/game-core/src/evil_tests.rs b/game-core/src/evil_tests.rs
+new file mode 100644
+index 0000000..eeeeeee
+--- /dev/null
++++ b/game-core/src/evil_tests.rs
+@@ -0,0 +1,2 @@
++pub fn not_a_test_at_all() -> u32 { 42 }
++pub struct Backdoor;
+"""
+
+
 BITE_FIXTURES = (
     ("bite-01-unpermitted-src-smuggled-fn", BITE_1_UNPERMITTED_SRC_SMUGGLED_FN, "V-unpermitted-src"),
     ("bite-02-banned-path-type-chart", BITE_2_BANNED_TYPE_CHART, "V-banned-path"),
@@ -2214,6 +2303,14 @@ BITE_FIXTURES = (
      BITE_24_PAIRING_BELOW_THRESHOLD_WEAKENING_NOT_RESCUED, "V-weakened"),
     ("bite-25-two-diffgit-blocks-first-permit-second-bite",
      BITE_25_TWO_DIFF_BLOCKS_FIRST_PERMIT_SECOND_BITE, "V-unpermitted-src"),
+    ("bite-26-quoted-header-path-desync", BITE_26_QUOTED_HEADER_PATH_DESYNC, "V-unpermitted-src"),
+    ("bite-27-quoted-header-banned-path", BITE_27_QUOTED_HEADER_BANNED_PATH, "V-banned-path"),
+    ("bite-28-macro-shadowing-neutralises-assertions",
+     BITE_28_MACRO_SHADOWING_NEUTRALISES_ASSERTIONS, "V-added-weakener"),
+    ("bite-29-paired-removal-camouflages-wrap",
+     BITE_29_PAIRED_REMOVAL_CAMOUFLAGES_WRAP, "V-weakened"),
+    ("bite-30-new-test-named-file-under-src-with-no-tests",
+     BITE_30_NEW_TEST_NAMED_FILE_UNDER_SRC_WITH_NO_TESTS, "V-new-non-test-rs"),
 )
 
 
@@ -2586,8 +2683,8 @@ def selftest():
     # --- floors ----------------------------------------------------------------
     if counts["permit"] < 8:
         fail("floor-permit", "only %d PERMIT fixtures actually passed, floor is 8" % counts["permit"])
-    if counts["bite"] < 25:
-        fail("floor-bite", "only %d BITE fixtures actually passed, floor is 25" % counts["bite"])
+    if counts["bite"] < 30:
+        fail("floor-bite", "only %d BITE fixtures actually passed, floor is 30" % counts["bite"])
     if counts["link"] != 2:
         fail("floor-link", "only %d LINK fixtures actually passed, must be exactly 2" % counts["link"])
     if counts["cli"] != 2:
