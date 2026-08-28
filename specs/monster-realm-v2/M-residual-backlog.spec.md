@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-2 — REKEY_MANIFEST object-ification is red-on-arrival: checkRekeyCompleteness infers REKEY fro (from m22-s0 X1, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s0 · residual: R-m22-s0-X1
+
+Deferred with reason: MEASURED by red-team on the live tree: converting one BLOCKED string entry to an object keeps the S0 contract eval green and reds guest-claim-integrity with FG47 '[G6/consumed] the manifest marks battle.player_identity as REKEY via undefined'. Any object entry is REKEY by definition. The only green workaround forces a lie (borrowed rekey/exists needles advertise a BLOCKED column as re-keyed). The 
+
+EARS: REKEY_MANIFEST object-ification is red-on-arrival: checkRekeyCompleteness infers REKEY from typeof policy === 'string'
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-1 — RW3-08 (verbatim) — THE SLICE SHALL NOT modify Rust source other than `CONTENT_VERSION` an (from rw3b X8, deferred 2026-08-23)
 `touches: specs/monster-realm-v2/M-postgate-roster-wave-3.spec.md, specs/monster-realm-v2/M-residual-backlog.spec.md, memory/projects/mr-content-scope, memory/projects/mr-selfcheck`
 `after:` — · source: rw3b · residual: R-rw3b-X8
