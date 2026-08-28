@@ -1428,6 +1428,74 @@ that file.** Full delta is under `touches-delta:` in the PR body.
 4. C2's roster is body-text-derived: a recipe reaching vitest via a wrapper script is invisible.
    Disclosed in the eval header; floors catch removal of the known four, not addition of a fifth.
 
+## rb-1 — TERMINAL (PR open + local gate green + 4/4 acceptance gates met) — 2026-08-28
+
+**PR:** https://github.com/mdrewt/claude-harness/pull/46 (`slice/rb-1` -> `main`, harness repo).
+Worktree `.claude/worktrees/rb-1` at `a45e0e5`, pushed, clean. **Supervisor owns the merge.**
+No remote CI on this repo, so PR-open + local green is the terminal state.
+
+**Delivered.** RW3-08 in `M-postgate-roster-wave-3.spec.md` amended from a mechanically
+unsatisfiable prohibition into a satisfiable allow-list criterion (three exceptions:
+`CONTENT_VERSION`, own new test files, a strictly-additive pin extension); the two stale
+DEFER notes + the false "rw3b — not started" bullet reconciled; the `### rb-1` section
+closed with a real `touches:` set and a Resolution block; and
+`memory/projects/mr-content-scope` (NEW) added as the mechanical proof-of-teeth, wired
+into `mr-selfcheck` with a marker+count+floor leg.
+
+**Acceptance:** 4/4 met, 0 deferred, 0 unmet — `mr-gates render --slice rb-1 --format pr`
+= `Acceptance: 4/4 met, 0 deferred, 0 unmet — rb-1 seed:6d97183777f61762`.
+
+**Gate:** `CONTENT-SCOPE-SELFTEST-OK 42 fixtures (permit=8 bite=30 link=2 cli=2)` exit 0;
+`mr-selfcheck` FAIL-key set unchanged from the pre-change baseline
+`{B2, gates-hook-adoption, residual-unpromoted}` (all three pre-existing — two are
+worktree self-location artifacts, one is the supervisor's own promote backlog);
+`just ci` exit 0.
+
+**THE REUSABLE LESSON.** A `SHALL NOT X except A, B, C` criterion is an **ALLOW-LIST**, and
+a deny-list classifier cannot enforce it — a pure-`+` hunk trips no deny predicate, so a
+smuggled `pub fn` in an existing `src/*.rs` reads as PERMIT. The first design was a
+deny-list; the red-team lens killed it on the plan, before any code existed.
+
+**SEED TRAP for the next promoted-residual slice.** `mr-gates` hashes a promoted
+`### <id>` section's criteria into `Seed:`; reseed is supervisor-only; and `section_of`
+runs the section **to EOF** (it terminates only on the next `### `). A Resolution note must
+therefore be plain prose — no `SHALL`, no `-`/`*`/`+` bullet, header and `EARS:` line
+byte-identical. Also: `mr-gates status` does NOT compute drift, and `init`/`verify` read
+only the MAIN checkout (`SPECS` hardcoded, no override), so **neither can prove seed
+stability from a worktree pre-merge** — hash the worktree file with mr-gates' own
+extractor (gate X1 does exactly this).
+
+**TESTER CANNOT EXECUTE.** `guard-tester-bash.mjs` blocks the tester from running anything
+(deliberate). Its adversarial pass predicted 7 gaps by hand-trace — all 7 were real, but
+its line counts and one rule-id prediction were wrong. **Execute every tester claim before
+routing it onward**; budget an orchestrator verification step after every tester pass.
+
+**Supervisor decisions requested (all in the PR body):**
+- **No ADR authored** — none assigned, `docs/adr/README.md` off-limits, so one would ship
+  un-indexed; precedent is `mr-gates` (same `mr-*` family, no harness ADR). Assign a number
+  and it gets written.
+- **`R-rw3c-X3` should be dispositioned against rb-1, not promoted as `rb-2`** — same
+  criterion, resolved by this amendment.
+- `mr-gates residuals close --slice rb-1 --pr 46` once merged (ledger is fully resolved, so
+  it will not need `--force`).
+
+**Follow-up flags (NOT done here, out of scope):**
+- **Cross-repo:** `projects/monster-realm/docs/adr/0204:100-103` commits "Reword RW3-08
+  before rw3c… rw3c must do this." Different git repo; ADR-0204 keeps reading as an open
+  commitment until a monster-realm slice closes it.
+- `KNOWN_GAP_FIXTURES` in `mr-content-scope` is now a *closed-gap regression* battery; the
+  identifier is a historical artifact kept because renaming it means editing `selftest()`,
+  which the tester/implementer split freezes. A future slice allowed to touch `selftest()`
+  should rename it to `CLOSED_GAP_REGRESSION_FIXTURES`.
+- Accepted limitations recorded in the tool `__doc__` and the criterion note: causality is
+  not checked (RW3-02/03/04/06 gate that); prose<->anchor drift is a reviewer duty;
+  `_erase_strings` does not handle Rust raw strings; `/* … */` is not inert (fails CLOSED);
+  `V-test-count` matches only the literal `#[test]`.
+
+## 2026-08-28T05:41:11Z — rb-1 merged (PR#46, 9b160be) — RW3-08 allow-list amendment + mr-content-scope gate
+Native tick rid=mr-sup-native-20260828T053712Z-341478-18247. Gate-0/1: no live per-run locks/mutex/hold, no resident-session collision. Found rb-1's run finished (.done EXIT=0, PR#46 already opened by the run itself). mr-gates verify --slice rb-1: CLEAN 4/4 met, 0 deferred, 0 unmet, X2 spotcheck NO-NEW-FAILS (baseline correctly excludes the 3 pre-existing mr-selfcheck FAILs B2/gates-hook-adoption/residual-unpromoted). mr-audit: orchestration CLEAN (11 calls, planner/red-team/reviewer/tester/verifier), acceptance CLEAN 4/4, gating_advisory FLAGGED on mechanical skip-marker grep — read the diff hunk directly: the hits are prose in the RW3-08 amendment enumerating forbidden test-skip shapes (#[ignore], #[cfg(feature=..), etc.) as examples of what the new allow-list classifier rejects, not actual skipped tests; adjudicated as a false positive. doc_findings (missing/orphan disposition, 12 hits) is CORPUS-SCOPED across the whole specs/ tree, unrelated to this diff — pre-existing. Declared touches: (2 spec files) vs actual diff also included memory/projects/mr-content-scope (NEW, 3073 lines — the proof-of-teeth classifier, the slice's actual deliverable per its scope), memory/projects/mr-selfcheck (+63, one selftest leg), memory/projects/monster-realm-rb-1-plan.md (NEW, plan checkpoint) — all explained under the PR's own touches-delta: heading, justified (no Rust/game code touched, nothing collides, no in-flight sibling). Merged via gh pr merge --squash --delete-branch -> 9b160be. mr-gates residuals close --slice rb-1 --pr 46: RESIDUALS-CLOSED 1. Local main ff-only'd to origin/main (9b160be). Note: found monster-realm-handoff.md and mr-state.json with pre-existing UNCOMMITTED direct edits from the rb-1 run itself (a doctrine violation on the run's part — direct cat>>/Write instead of mr-record) already present at tick start; left the handoff prose in place (real content, low harm) and will reconstruct mr-state.json cleanly this tick rather than compounding the drift. Governor NORMAL (d7=$85.78/2783). No BLOCKER, no rate-limit event.
+## 2026-08-28T03:03:06Z — rb-1 launched (residual R-rw3b-X8)
+Native tick rid=mr-sup-native-20260828T030039Z-176940-11563. Gates: no live locks/hold, master CI green (7e75cbd), no open PRs, no wip branches — nothing in-flight. queue[] had rb-1 (promoted last tick, PR#45). Verified live: rw3b (PR#357) and rw3c (PR#358) already merged; the residual is that RW3-08's literal wording (SHALL NOT modify Rust source other than CONTENT_VERSION/own new test files) is unsatisfiable because eg3_evolution_graph.rs and content.rs::EG1_TIER_ONE_IDS pin exact sets that legitimately had to be extended for wave-3 content — code compliant, criterion text wrong. Harness main was ahead=4 behind=0 of origin (unpushed chore(mr-sup) commits) — pushed before spawn per REPO-OUT-OF-SYNC doctrine. Launched rb-1 (opus/high/routine, harness repo, touches=spec files only, no Rust source in scope) via mr-spawn: leader pid 178686, claude pid 178689, both confirmed detached (own session) and model=opus. rid=mr-spawn-20260828T030249Z-178600.
 ## 2026-08-28T02:03:17Z — Native tick — reconciled uncommitted PR#377 bookkeeping, promoted oldest residual (rb-1), queued for next tick
 Native tick rid=native-20260828T020012Z-159974. Gate-0/1 clean (no live locks/mutex/hold/collision, both repos fetched clean, no recent human writes). Found the 01:41:42Z tick had merged PR#377 (fix-nightly-coverage-wasm, 7e75cbd) and closed duplicate issues #362/#372/#374/#375 but crashed before committing its own mr-state.json/handoff/archive edits. Live-reverified: PR#377 MERGED, master CI run 33133721912 conclusion=success at 7e75cbd, all four issues CLOSED. Committed the reconciliation (harness commit e844add). No open PRs, no live watchers, no worktrees to reap either repo.
 
@@ -1640,10 +1708,4 @@ lint and *looks* like a deleted test in the diff. A fresh worktree has no `clien
 # monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
 
 ---
-
-## 2026-08-24T21:02:55Z — 21:00Z tick -- reconciled 19:34Z bookkeeping + launched m23-s4
-Native tick rid=native-20260824T210017Z-945121. Gate-0/1: no live per-run locks, no chain-owner mutex held, no operator hold, no resident-session collision. Found the 19:34Z tick's mr-state.json/handoff/archive uncommitted despite having merged BOTH m23-s3 (PR#365, f33a3eb) and m23-s7 (PR#366, 20c893348152ac9f143890e3935067a69fa863fe) -- reconciled via harness commit e545617 (future-prompts.md left untouched, unrelated user scratch content). Live-verified: master CI green at 20c8933 (run 32772891486, conclusion=success), matches local master sha, no open PRs (mdrewt/monster-realm or mdrewt/claude-harness), no worktrees beyond the canonical checkout, no stray branches. Residuals: mr-gates residuals list --unclaimed shows 15 open, max age 0.98d, all far under t1_promote_days=3 -- none outrank new work; 15 vs cap 12 remains observe-only per doctrine (slice 1). M23 spine (S0->S1->{S2||S7}->{S3||S4}->S5->...) now has S0/S1/S2/S3/S7 merged. S4 (after: S1,S2, both merged) is the sole remaining unblocked slice at this spine position -- S3's sibling S4 is 'never paired' with S3 in fan-out, but that's moot now that S3 is already merged; S4 launches solo. touches disjoint from everything else (client/src/ui/{battleView,boxView,raisingView,evolutionView,claimView}.ts + client/src/render/world.ts), no in-flight sibling to collide with. Tier=routine (opus@high) -- no server-module/schema/reducer touch, no predictor/netcode/reconcile path (world.ts is the imperative render shell, not reconcile logic), no security/RLS, not M20/M25, fresh (not a resume-after-park). mr-spawn LAUNCHED cleanly: leader=947588, claude_pid=947591, rid=mr-spawn-20260824T210227Z-947528. GATES-SEEDED criteria=0 SPEC-SECTION-NOT-FOUND (4th occurrence across s0/s1/s3/s4 -- same benign M23-EARS-lives-in-section-6 quirk, not a launch blocker, flag for the seeder fix already noted twice before). Governor NORMAL (d7=$1228.69/2783 eff., fable_ok=true; this launch is opus-tier, unaffected). No BLOCKER. No rate-limit event.
-## 2026-08-24T19:26:31Z — m23-s3 PR#365 — CI-watch delegated (native tick)
-Reconciled the m23-s3 finish event: PR#365 open (mergeStateStatus UNSTABLE, mergeable=MERGEABLE), ci+e2e checks IN_PROGRESS. Delegated to mr-ci-watch (pid 824821, detached) rather than polling; resumes via event tick on conclusion. m23-s7 (fable/xhigh, hard tier) remains live in the same window — touches disjoint (client/src/ui/*View.ts vs client/src/render/*), no conflict. Governor NORMAL (d7=$1164.22/2783, fable_d7=$46.78, fable_ok=true). No BLOCKER, no rate-limit event.
-
 
