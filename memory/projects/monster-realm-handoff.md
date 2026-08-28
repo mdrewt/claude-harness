@@ -2,6 +2,78 @@
 
 ---
 
+## 2026-08-28T~10:0xZ — rb-3 COMPLETE (terminal: PR #379 open + local `just ci` green + remote CI running)
+
+**Slice:** rb-3 — residual R-m22-s0-X2: `[G6/declared]` in `evals/guest-claim-integrity.eval.mjs` once used
+`key in manifest` (prototype-walking). **Triage measured:** on the pre-rb-2 fork `7e75cbd` a poisoned
+`Object.prototype['table.col']` greens the gate; on master `ab35926` rb-2's `Object.keys`→`Map` (`kinds.has`)
+already closes it **incidentally, with nothing pinning it**. rb-3 = the pin (FG72a-f, ADR-0010 proof-of-teeth), the
+in-file WHY (THE OWN-PROPERTY BOUNDARY banner), and one real code change: the three classifier-result
+`.error !== undefined` reads → `Object.hasOwn` (red-team measured an ambient `Object.prototype.error` flipping the
+GOOD verdict on HEAD — FG72c was RED on that).
+**PR:** https://github.com/mdrewt/monster-realm/pull/379 — OPEN, remote CI running at exit. Branch `slice/rb-3`
+(worktree `.claude/worktrees/rb-3`), 3 wip commits, all pushed, HEAD `297885d`. **Supervisor owns the merge — I did
+NOT run `gh pr merge`.** Main checkout on `master`, never mutated. Fork `ab35926`; no sibling in flight.
+Touches: exactly `evals/guest-claim-integrity.eval.mjs` + `ARCHITECTURE.md` (touches-delta declared). Zero Rust.
+
+**Gate:** full `just ci` **EXIT=0 on the exact shipped tree** (`/tmp/rb3-ci2.log`: 94 evals PASS / 0 FAIL, 2007/2007
+Rust, 96 client files / 2818 tests, check-secrets clean). Local `semgrep --config auto --error` clean on both files.
+**Acceptance: 8/10 met, 2 DEFERred (X9, X10), 0 unmet** (`seed:e3b0c44298fc1c14`), LINT-CLEAN; evidence recorded by
+`mr-gates check` on the final tree. Seeded ZERO criteria (residual-backlog sections are narrative — expected).
+Verifier PASS (re-derived all seven gates, reproduced the RED proof from 37aade4, 4 hand-mutations bite).
+
+**⚠️ VERIFY NOTES.** Run CHECKs from the slice worktree root with the usual PATH export (the CHECKs are v18-safe
+wrappers injecting PATH into node-24/cargo children). Two probes beside the ledger MUST NOT be deleted:
+`rb-3.mutation-probe.mjs` (X2 — mkdtemp copy, 14 mutants each pinned to a TOOTH label, never writes the worktree) and
+`rb-3.ratchet-probe.mjs` (X3 — comment-stripped, exact byte-string floors with zero slack). X8 is a MANUAL gate ticked
+by hand with three path:line cites (banner :1612, FG72c :3967, ARCHITECTURE.md:118). Do NOT run `mr-gates verify`
+concurrently with a `just ci`. Ledger authoring trap hit twice: gates without an `EVIDENCE:` line can never be met
+(check ticks the box, writes nothing, reports 0/N) and `CHECK: MANUAL:` is executed by sh — both now in the
+`mr-gates-check-authoring` memory card.
+
+**🔴 HEADLINE — two DEFERs, both real work, both outside touches.** `X10 -> backlog`: red-team MEASURED the residual's
+exact class LIVE in `evals/battle-schema-snapshot.eval.mjs` (`tableName in parsed` ~:780/:964/:996 —
+`Object.prototype.monster = <baseline entry>` hides a deleted table from `checkSchemaDrift`) plus a `__proto__`-named
+FIELD vanishing from its plain-object column map with no fail-close (the TABLE-level case is fail-closed by
+[G6/parse]); that module supplies `parseTableSchemas` to the G6 walker. `X9 -> backlog`: the ADR — no number reserved
+for rb-3 (empty slot); fold into rb-2's deferred X9 as ONE ADR for the G6 manifest gate (policy discriminator +
+own-property boundary + FG72c's in-process `Object.prototype` write hygiene, which rebuts
+`evals/append-only-ids.eval.mjs:1653` — that file still states the absolute rule with no back-pointer; outside touches).
+Not a gate: `classifyPolicy` reads each field several times (getter-TOCTOU on an injected manifest — not the prototype
+class, unreachable from the frozen manifest; red-team F3).
+
+**What the lenses found that shaped the slice (all measured, all closed in-tree):** the COLUMNS side of the join
+(`columns.has` in [G6/live]/[G6/anchors]) was unpinned — rebuilt as `key in Object.fromEntries(columns)` every gate
+stayed green and with one ambient key per manifest column G6 passed on an EMPTY tree → FG72c now runs four directions
+in one pollution window (declared / verdict / live / anchors; `account.identity` is the only anchor neither
+EXEMPT- nor REKEY-pinned); a hollowed FG72a kept every mutant RED via FG72c → per-mutant TOOTH pin (MIS-TOOTHED),
+and M12 narrowed to a non-`Object.prototype` base when FG72c began catching it first; `error` is a node-internal
+chain-read key (`handleErrorFromBinding`) — a leak silently truncates a file-redirected stdout → delete it first, no
+stdout/fs inside the window; sibling `[G6/…]` tags inside checker messages were false-pass surfaces for `expectTag`
+(indexOf) → de-bracketed. Three memory cards written (`prototype-pollution-teeth-need-the-real-write`,
+`own-property-boundary-has-two-sides`, `mutant-tooth-pin-is-load-bearing`).
+
+**Accepted limits (stated in the PR):** fixture self-assert deletions are unbounded by the ratchet (counts calls, not
+assertions — consistent with FG1-FG71 and rb-2's FG66/FG69 decision); `(72 teeth verified)` is a hand-maintained
+literal; `Object.hasOwn(shipped, 'error')` is source-pinned only (branch unreachable on the success path); M9/M10 share
+FG72c's message; FG72c's two window guards are tamper-evident only if a hoisted hunk carries them.
+
+**Process notes.** (a) Two session teardowns hit mid-`just ci` (SIGTERM at client-test); the second run was launched
+detached (`setsid nohup`) and completed — prefer that for any >10-min gate. (b) `reducer-security-auditor` /
+`desync-guard` not dispatched: zero Rust/game-core/client surface (manifest block sha256 identical fork vs HEAD).
+(c) Budget: HARD tier with 9 subagent invocations (planner, 2× reviewer, 2× red-team, tester + 1 resumed round,
+verifier, doc-keeper) + /simplify inline ×2 — close to the $150 target; the red-team write-the-cheat passes again
+produced both HIGH findings. (d) Code graphs NOT re-indexed: the canonical checkout is unchanged until the supervisor
+merges — re-index post-merge (build-loop step 10).
+
+**Housekeeping.** Untracked harness files: `memory/projects/monster-realm-rb-3-plan.md`,
+`memory/projects/monster-realm-rb-3-progress.md` (now superseded by this entry), `memory/projects/gates/rb-3.*`.
+Tester staging under `/tmp/rb3-tests/`; ci logs `/tmp/rb3-ci*.log`.
+
+# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
+
+---
+
 ## 2026-08-28T~06:4xZ — rb-2 COMPLETE (terminal: PR #378 open + local `just ci` green + remote CI running)
 
 **Slice:** rb-2 — residual R-m22-s0-X1: `REKEY_MANIFEST` entries carry an explicit `policy`
@@ -1572,6 +1644,16 @@ routing it onward**; budget an orchestrator verification step after every tester
   `_erase_strings` does not handle Rust raw strings; `/* … */` is not inert (fails CLOSED);
   `V-test-count` matches only the literal `#[test]`.
 
+## 2026-08-28T15:02:37Z — Native tick mr-sup-native-20260828T150014Z-763053 (15:00Z) -- reconciled orphaned rb-3 merge record, promoted R-m22-s0-X3 into rb-4
+Gate-0: no live locks/mutex, HOLD-NONE. Found the 14:14:52Z tick had fully merged rb-3 (PR#379, e112ce6), closed residual R-m22-s0-X2, and written its mr-state.json/handoff updates -- but never committed them to the harness repo (uncommitted at gate-0). Re-verified everything live: PR#379 state=MERGED, master CI run 33179334439 conclusion=success at e112ce6, worktree clean, residual R-m22-s0-X2 status=closed in mr-residuals.jsonl. Gate 3: no open/parked slice, queue[] empty, nothing past t2_stale_days=14, but 28 residuals past t1_promote_days=3 outrank new PLAN section-9 work. Promoted the oldest (R-m22-s0-X3, age 4.3d, disclosed 2026-08-24T08:37:17Z) into rb-4 via mr-gates residuals promote, shipped as doc-only chore PR#49 (chore/residual-promote-20260828T150014Z), squash-merged clean (no CI on this path). queue-added rb-4 for next tick's fast path. Committed the orphaned prior-tick state/handoff files plus this tick's own record together. No launch this tick (residual-promotion outranked it, per aging doctrine). No BLOCKERs. governor NORMAL (d7 $260.73/2783, fable_ok=true).
+## 2026-08-28T14:16:52Z — rb-3 merged (PR#379, e112ce6)
+Merged rb-3: [G6/declared] own-property boundary fix (residual R-m22-s0-X2) — Object.prototype-pollution hardening on the rekey manifest classifier in evals/guest-claim-integrity.eval.mjs (FG72a-f proof-of-teeth, Object.hasOwn on classifier-result reads). mr-audit: orchestration CLEAN, gating_advisory CLEAN (0 assert/skip/suppression changes), acceptance CLEAN (8/10 met, 2 deferred, 0 unmet, spotcheck X3 agrees). Hard-tier mandatory diff read done manually — legitimate hardening, no test-weakening. Residual closed via mr-gates. Local master fast-forwarded to e112ce6; post-merge CI (run 33179334439) was in_progress at record time, not yet re-verified live.
+
+## 2026-08-28T14:01:40Z — rb-3 PR#379 CI-watch delegated
+Native tick native-20260828T140110Z-748825 (14:01Z). Governor NORMAL (d7 $259.68/2783, fable_ok=true).
+rb-3 run finished rc=0 attempts=3 (fable@xhigh) — local `just ci` green on 297885d, PR #379 opened (mdrewt/monster-realm, slice/rb-3). Live re-verify: state=OPEN, mergeable=MERGEABLE, mergeStateStatus=UNSTABLE, checks ci+e2e both pending.
+Action taken: delegated CI-wait to mr-ci-watch (detached, pid 749802) per doctrine — never poll inline. No merge attempted. Standing down; next event tick finishes merge+audit+gates-verify+close residual R-m22-s0-X2 once checks resolve.
+No BLOCKERs. No new launch (fan-out not evaluated — single in-flight slice already occupies the tick's one action).
 ## 2026-08-28T12:02:00Z — Native tick mr-sup-native-20260828T120039Z-592643-11793 (12:00Z) -- launched rb-3
 Gate-0: no live per-run locks/mutex/.done; HOLD-NONE; no resident session collision (only mechanical writes -- codegraph daemon, situation-cache, heartbeat files -- in the last 6 min). master CI green at ab35926 (rb-2/PR#378 merged prior tick). Fast-pathed queue[0]=rb-3 (residual R-m22-s0-X2, promoted PR#48): re-verified the spec heading exists in M-residual-backlog.spec.md, non-blocked, not already merged (only promotion commits found in git log, no fix PR). Classified HARD tier: this is a security-classification gate (checkRekeyCompleteness / [G6/declared] in evals/guest-claim-integrity.eval.mjs) vulnerable to Object.prototype pollution via its 'key in manifest' lookup, silently greening an unpoliced Identity column while Object.keys/detail-string counts stay unchanged -- matches the HARD criteria's security-surface trigger. Launched fable@xhigh (fable_ok=true, d7 fable spend $93.03 vs guard $2068.2). No inflight siblings so no fan-out/disjointness question. mr-spawn: LAUNCHED leader=593537 claude_pid=593540 pid asserted, brief_bytes=16097, pr_repo=mdrewt/monster-realm. GATES-SEEDED reported criteria=0 for rb-3 (seed=e3b0c44298fc1c14) -- worth a look if the acceptance ledger stays empty at merge time; not blocking (advisory per doctrine). queue[] drained (rb-3 removed on launch). Residual alarms carried forward unchanged from the prior tick's note (23 unpromoted past t1=3d, 30 open vs cap 12) -- next tick without an inflight winner should promote the oldest unpromoted residual per the gate-3 aging rule.
 ## 2026-08-28T11:02:21Z — Native tick rid=mr-sup-native-20260828T110014Z-579685 -- residual promotion, rb-3 queued
@@ -1708,10 +1790,6 @@ that ci.yml's e2e job has long since shipped. Two other candidates turned out to
 so they were left alone.
 
 
-## 2026-08-25T07:31:02Z — m23-s11 LAUNCHED (composite launch after m23-s10 merge)
-Composite merge->launch: after m23-s10 merged clean (PR#370, 2770ec9), re-derived eligibility fresh. Dependency spine S0->S1->{S2||S7}->{S3||S4}->S5->S6->{S8->S9}->{S10||S11}: S11's after: is S10 only (now merged); S8/S9 remain BLOCKED on spec Sec.8 operator rulings (unrelated branch). No in-flight slices, touches disjoint trivially (solo launch). Re-probed for human activity: only my own merge-produced file writes in the last 6 min, no resident IDE claude pid -- clear. Launched m23-s11 (justfile a11y-e2e recipe + nightly workflow wiring + docs/a11y-manual-protocol.md for the two MANUAL-only criteria A11Y-32/33 + evals/ci-gate-wiring.eval.mjs) opus@high routine tier, leader pid 1757938, rid mr-spawn-20260825T073041Z-1757878. Gate-seeding returned SPEC-SECTION-NOT-FOUND (criteria=0) -- the M23 spec's S11 entry is a table row + bold subheading, not a `## S11` heading the seeder pattern-matches; NO-LEDGER for this slice is expected, not a defect (absent measurement per doctrine). S11's BUILD is unblocked; only its milestone-EXIT sign-off (AA-conformance DoD, escalation #3) awaits an operator ruling -- noted in the brief so the run doesn't stall on it.
-
 ## 2026-08-25T07:29:20Z — m23-s10 MERGED — PR#370 (2770ec9)
 Merged via mr-audit CLEAN (policy) + mr-gates verify 15/15 met, spotcheck X9 agreed. gating_advisory FLAGGED skip_markers_added=11/suppressions_added=1 — read the diff hunks: all hits are string literals inside the new eval's own bad-fixture detector (T14c checks that a `describe.skip(` delegate gets flagged SUSPENDED) plus one comment mentioning @ts-expect-error; no real test suppression added. Squash-merged, branch+worktree deleted, master fast-forwarded to 2770ec9. m23-s6 (PR#369) was already merged prior to this tick. Residuals close: 0 (none open for m23-s10). Delegated master-CI wait to a background poll; will confirm green next.
-## 2026-08-25T05:48:32Z — m23-s6 MERGED (PR#369, sha 2dbfe0c8)
-Supervisor tick native-20260825T054518Z-1589143 merged m23-s6 (menuView ARIA listbox/aria-activedescendant, 16th/last click-only OverlayId gets a11y wiring). Audit: orchestration CLEAN, gating CLEAN, mandatory_read=false. Acceptance ledger FLAGGED on X15/X16 (lint/full-ci gates) -- adjudicated FALSE-POSITIVE: this Bash session has no cargo at all (rust not asdf-installed here), reproduced the identical cargo-not-found failure independent of the diff/commit. Rooted run's own log recorded FINAL-CI-EXIT=0 from a real just ci (2734 tests, 90 evals PASS) inside its own environment which does have cargo -- that is the trustworthy signal. 14/16 pure-test gates all fresh-reverified true incl. adversarial spotcheck (X8, agrees=Y). residuals close: 0 open (nothing to close). Two DEFERs disclosed by this slice (A11Y-25, A11Y-26) both targeted backlog, INTENDED OWNER m23-s10 -- no promotion needed this tick, S10's own spec section already names them. Worktree removed, local+remote slice/m23-s6 branches deleted. Master fast-forwarded to 2dbfe0c8; master CI (run 32814222235) still in_progress at tick end -- next tick/event should re-verify green before trusting it. No BLOCKERs. Governor NORMAL (d7 ~$1382/2783 eff.). Fan-out: none in flight; falling through to gate-3 pick-work next.
+
