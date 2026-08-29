@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-13 — A11Y-25 (from m23-s6 A11Y-25, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s6 · residual: R-m23-s6-A11Y-25
+
+Deferred with reason: INTENDED OWNER m23-s10 (M23 spec section 4, row S10). The [SCAN] tier of "an element with a click listener, no paired keydown and no native button/anchor child fails CI" is `evals/keyboard-operable-rows.eval.mjs` ([A11Y-12]/[A11Y-13]), which does not exist and is in S10's declared `touches:` (spec section 4). S6 ships the SUBJECT the eval will scan -- exactly spec section 5.4's GOOD hostile-but-co
+
+EARS: A11Y-25
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-12 — The [A11Y-07] CSS scanner will exist twice once S10 lands its eval, with no agreement gate (from m23-s2 X6, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s2 · residual: R-m23-s2-X6
