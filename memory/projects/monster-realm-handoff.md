@@ -2,6 +2,157 @@
 
 ---
 
+## 2026-08-29T~13:0xZ — rb-11 COMPLETE (terminal: PR #388 open + local `just ci` green + remote CI running)
+
+**Slice:** rb-11 — residual R-m23-s2-X5: `aria-modal="true"` on the overlay shells puts the single
+`#a11y-live` region in the AT-inert subtree. Ships `adoptLiveRegion(root): () => void` in
+`client/src/ui/liveRegion.ts` (moves the region into the open overlay root, returns the release
+closure), consumed opaquely by `client/src/ui/overlayA11y.ts` via a new `OpenRecord.releaseLive`.
+Plus 12 new vitest teeth, a new 17-tooth eval, and two ledger-time probes.
+**PR:** https://github.com/mdrewt/monster-realm/pull/388 — OPEN, remote CI running at exit. Branch
+`slice/rb-11` (worktree `.claude/worktrees/rb-11`), 6 wip commits, all pushed.
+**Supervisor owns the merge — I did NOT run `gh pr merge`.** Main checkout on `master`, never mutated.
+Fork `06393f2`. Sibling in flight: PR #387 (rb-10) — verified DISJOINT file sets.
+
+**Gate:** full `just ci` **EXIT=0 on the exact shipped tree** (`/tmp/rb11-ci.log`): 98 evals PASS /
+0 FAIL (baseline 97), 2832/2832 client (baseline 2820), 2017/2017 Rust, check-secrets clean. Local
+`semgrep --config auto --error` clean on the changed files. `just a11y-e2e` 8 files / 181 tests.
+**Acceptance: 9/9 met, 0 DEFERred, 0 unmet** (`seed:e3b0c44298fc1c14`), LINT-CLEAN. No MANUAL rows.
+
+**🔴 HEADLINE — the slice is IMPOSSIBLE inside its declared `touches:` set, and that is now on the
+record.** `evals/a11y-static-shell.eval.mjs` `[A11Y-05b]` (`:70`, `:74`, `:225-233`, `:686-693`)
+makes `ui/liveRegion.ts` the SOLE module allowed to name `a11y-live`/`LIVE_REGION_ID`, so putting the
+re-parent in the declared `overlayA11y.ts` is a certain `just ci` RED. The three exits were: widen
+the owner set to two (weakens the exact gate protecting the node this change makes mobile), a
+`[data-live-region]` synonym hook (**CI-green**, and a dishonest bypass — refused, recorded as
+R-rb-11-BLACKLIST), or put the seam in the declared owner. The third was chosen; `[A11Y-05b]` is
+untouched and still reports `owners=1 intruders=0 scanned=92`. **`liveRegion.ts` +
+`liveRegion.test.ts` are a declared HIDDEN-DEPENDENCY touches-delta.** The ledger's own
+`Touches: (inherit from source slice — REVIEW)` placeholder is what made this a judgement call rather
+than a stop; collision-checked against PR #387 and `git branch -r` (no other slice branch).
+
+**🔴 SECOND HEADLINE — Chromium does NOT model `aria-modal` AT inertness, so the obvious oracle is
+worthless.** MEASURED with playwright 1.38 + CDP `Accessibility.getFullAXTree`: a sibling of a
+focused `role="dialog" aria-modal="true"` stays `ignored:false`, `ignoredReasons:[]` — green before
+AND after the fix. The probe instead asserts browser-computed AX **ancestry** (`live="polite"` node
+descendant of the `modal=true` node) and PRINTS the `ignored` control in both states so it cannot be
+misread as an inertness oracle. WebKit (VoiceOver's engine, which does prune) is not installed →
+residual R-rb-11-VO.
+
+**Five measured red-team findings changed the work** (two plan-phase, three implementation-phase):
+(1) a never-restored region is PRUNED from the AX tree, so a one-shot up-front anti-vacuity check
+lets the exact permanent-silence defect pass — the closed state now re-asserts `liveFound` on its
+own. (2) AX ancestry cannot distinguish `aria-owns` from a real move (measured identical) → the probe
+also pins light-DOM `parentElement`. (3) a co-occurrence pin is not a call-site pin: a hollowed
+`openOverlayA11y` binding `() => {}` passed the eval at `teeth=12/12 pass:true` while never moving
+the region → the adopt call site is pinned, W12 proves it bites. (4) a gate counting a literal in
+`index.html` MUST strip HTML comments — this fired in CI on the slice's own ADR comment (count read
+12, not 11); the dangerous inverse is a deleted shell propped up by a decoy comment. (5) a probe on a
+FIXED port leaks vite and false-REDs the next run → `detached: true` + process-group kill AND an
+ephemeral port.
+
+**Process notes.** (a) A stray backtick in a comment INSIDE a JS template literal served as a
+browser page silently corrupts it — the served HTML looks right, the module never executes, and there
+is NO console error and NO pageerror; it presents as a bare `waitForFunction` timeout. The probe now
+guards its own template. (b) `pkill -f <pattern>` where the pattern appears in the invoking command
+line kills the invoking bash — two commands died that way; use `pgrep`+`kill` by pid with a split
+literal. (c) A backgrounded `cd <worktree> && …` left the session cwd in the worktree and a later
+relative `./memory/projects/mr-gates` 404'd — `bash-cwd-persists-into-main-checkout` again, benign
+here. (d) The `tester` subagent again could execute nothing (guard allows only `bash -n`/`node
+--check` on project-relative paths) and could not write into `.claude/worktrees/`; it staged to /tmp
+and the orchestrator applied and ran the RED proof. Both cards still hold.
+
+**Process.** 7 subagent invocations (planner, 2× reviewer, 2× red-team, tester, verifier) +
+doc-keeper. `/simplify` applied inline by the orchestrator via the reviewer lens (collapsed the
+adopt/release PAIR into ONE closure-returning function mirroring `installTrap`, dropping a duplicated
+`record.root` fact). `desync-guard` and `reducer-security-auditor` NOT dispatched: zero
+`server-module/`, zero `game-core`, zero `render/` surface — same call as rb-10. Code graphs NOT
+re-indexed (canonical checkout unchanged until the supervisor merges). Untracked harness files:
+`memory/projects/monster-realm-rb-11-{brief,plan}.md`, `memory/projects/gates/rb-11.gates.md`,
+`rb-11.ax-ancestry-probe.mjs`, `rb-11.mutation-probe.mjs` (the last two MUST NOT be deleted — X5/X8).
+CI logs `/tmp/rb11-ci.log`, `/tmp/rb11-ci2.log`; gate logs `/tmp/rb11-gates{,2}.log`.
+
+---
+
+## 2026-08-29T~11:4xZ — rb-10 COMPLETE (terminal: PR #387 open + local `just ci` green + remote CI running)
+
+**Slice:** rb-10 — residual R-m23-s2-X4: the spec-2.5 reduced-motion guard for the battle HP bar was
+owned by no slice. Ships `hpFill.className = 'hp-fill'`, drops the inline transition, adds the base
++ guarded rules to `client/src/styles.css`, a new 48-tooth CI eval, a 259-line DOM tooth, and two
+ledger-time probes (14-mutant proof-of-teeth + a real-Chromium cascade oracle).
+**PR:** https://github.com/mdrewt/monster-realm/pull/387 — OPEN, remote CI running at exit. Branch
+`slice/rb-10` (worktree `.claude/worktrees/rb-10`), 4 wip commits, all pushed, HEAD `5c5c8d3`.
+**Supervisor owns the merge — I did NOT run `gh pr merge`.** Main checkout on `master`, never mutated.
+Fork `ed0a8d9`; no sibling in flight.
+
+**Gate:** full `just ci` **EXIT=0 on the exact shipped tree** (`/tmp/rb10-ci2.log`): 97 evals PASS /
+0 FAIL (baseline 96), 2017/2017 Rust, 2820/2820 client (baseline 2818), check-secrets clean. Local
+`semgrep --config auto --error` clean on the changed files (remote-only gate, de-risked ahead of PR).
+**Acceptance: 8/8 met, 0 DEFERred, 0 unmet** (`seed:e3b0c44298fc1c14`), LINT-CLEAN. No MANUAL rows —
+every gate is a real runner.
+
+**🔴 HEADLINE — the guarded transition CANNOT CURRENTLY FIRE, and that is now disclosed.**
+`#renderMonsterCard` calls `el.replaceChildren()` and `createElement`s a NEW fill every render, so a
+CSS transition has no previous computed value. MEASURED in real Chromium driving the real render
+loop: 120ms after a 90->10% drop the fill is at its FINAL width under BOTH preferences,
+`getAnimations().length === 0` — under `no-preference` the bar SNAPS. **Not a regression** (the
+pre-slice inline transition was equally unreachable on the same fresh node); the slice does exactly
+what the residual asked and deliberately does NOT make the bar animate. ADR-0213 D7 +
+residual **R-rb-10-INERT**. This is load-bearing for the next author: the natural "make the HP bar
+smooth" commit is `element.animate(...)`, which ignores the preference outright — hence the
+repo-wide inline ban.
+
+**🔴 SECOND HEADLINE — the gate was rebuilt TWICE off measured attacks, not review opinion.**
+Red-team transcribed the DRAFT gate and ran 17 stylesheets + 4 hostile views against a real Chromium:
+**9 were gate-GREEN, `just ci`-clean, and animating under `reduce`.** The killer was SOURCE ORDER —
+a media query adds no specificity, so a guard written BEFORE the base rule is completely inert while
+all 13 draft teeth stayed green. A SECOND pass against the SHIPPED gate found 7 more; 5 changed it:
+R1 a sibling-module `element.animate()` (green on the eval, the DOM tooth AND the browser probe —
+happy-dom implements no `Element.animate` and the probe runs none of the app's JS) → inline ban
+widened to all 92 non-test `client/src` modules; R3 five carriers reaching the fill without naming
+the class (`[class^=]`, `[class*=]`, `[class~= i]`, `[style*=]`, `.hp\-fill`) plus the reviewer's
+`div.hp-fill` specificity win → selector policy inverted to **fail-CLOSED**; R4 `url(/*)` deletes a
+whole rule from the stripper's view with braces AND parens balanced; R5 `it.skipIf(TRUE)` suspends
+the DOM tooth silently; R6 **no mutant could ever produce `[A11Y-RM3/delegate]`** — the clause was
+proven only by its own fixtures, and a one-line hollowing kept `teeth=` green with the runtime
+oracle deleted.
+
+**Process notes worth keeping.** (a) The `tester` subagent could NOT execute anything — its bash
+guard allows only `bash -n`/`node --check` on project-relative paths, so every RED claim it made was
+DERIVED. The orchestrator ran the actual RED proof. Card `tester-subagent-has-no-bash` still holds.
+(b) The mutation probe found a real pin mis-attribution mid-run (`div.hp-fill` caught by
+`[A11Y-RM3/base]`, not the pinned `/set`); resolved by NARROWING the mutant, and later the pin moved
+to `/set` legitimately when the fail-closed clause changed the design. (c) `cpSync` + a symlinked
+`client/node_modules` is the workable probe isolation here — a recursive copy of node_modules per
+mutant is unusable, and `cp -al` is not isolation at all. (d) A `git add -A && git commit` intended
+for the worktree ran with cwd inherited from an earlier `cd`; it was a harmless no-op, but it
+re-confirms `bash-cwd-persists-into-main-checkout` — `cd` explicitly in EVERY command.
+
+**Accepted limits (all in ADR-0213 and the PR).** R-rb-10-CASCADE: the real-cascade oracle is
+ledger-time, not CI-time — nothing in `just ci` resolves the cascade (`client/e2e/` is outside
+touches and `a11y-e2e` is not part of `just ci`). R-rb-10-DELEGATE-STRENGTH: the delegation pin is
+PRESENCE-only — a tautological rewrite of the DOM tooth body (needles kept, asserted about a locally
+constructed probe element) passes every clause and was measured to survive the original defect being
+restored; only X2's pass-count floor and the vitest-adjudicated mutant M2 catch it, at ship time.
+R7: the CSS-nesting spelling of the guard is correct CSS and false-REDs — documented in the failure
+message rather than fixed, because teaching the parser nesting late is its own risk.
+
+**Process.** 6 subagent invocations (planner, 2x reviewer, 2x red-team, tester, doc-keeper).
+`/simplify` applied inline by the orchestrator (cut the custom-property row/tooth/mutant to one
+folded assertion; cut the forgeable `git diff --stat` ledger row; narrowed the probe copy set).
+`verifier` NOT dispatched: `/tmp/mr_warn_rb-10` (landing pattern, "no new subagent fan-outs") was
+set before that step, so the orchestrator performed the verifier's function directly — independent
+re-run of the full `just ci`, all 8 ledger CHECKs via `mr-gates check`, both probes, and the
+not-weakened audit (259 added / 0 deleted, 0 assertions removed, 0 suppressions). `desync-guard` and
+`reducer-security-auditor` NOT dispatched: zero `server-module/` and zero `render/` surface.
+Code graphs NOT re-indexed — the canonical checkout is unchanged until the supervisor merges.
+Untracked harness files: `memory/projects/monster-realm-rb-10-plan.md`,
+`memory/projects/monster-realm-rb-10-gate-spec.md`, `memory/projects/gates/rb-10.gates.md`,
+`rb-10.mutation-probe.mjs`, `rb-10.cascade-probe.mjs` (the last two MUST NOT be deleted — X6/X7).
+Red-team artifacts `/tmp/rb10-attack/`; CI logs `/tmp/rb10-ci.log`, `/tmp/rb10-ci2.log`.
+
+---
+
 ## 2026-08-29T~06:2xZ — rb-8 COMPLETE (terminal: PR #386 open + local `just ci` green + remote CI running)
 
 **Slice:** rb-8 — residual R-m22-s1-X3: `DELETION_GRACE_MS_DEFAULT` (game-core/src/accounts/deletion.rs:32)
@@ -1801,6 +1952,21 @@ a slash-star glob spelled in a comment blanked 31 tables and reddened 5 unrelate
 **Next:** supervisor owns the merge (`gh pr merge` is forbidden to the slice run). Remote CI was
 running at hand-off.
 
+## 2026-08-29T18:01:49Z — Native tick 18:00Z — rb-10/rb-11 merge reconciled; promoted R-m23-s2-X6 -> rb-12
+Native tick rid=native-20260829T180012Z-2386136. Gate-0/1: no live per-run locks alive, no chain mutex, no operator hold, no session collision. Found mr-state.json left uncommitted by the 17:05Z tick still showing rb-11 in awaiting_merge with PR#388 checks pending -- live gh/git ground truth showed both rb-10 (PR#387) and rb-11 (PR#388) already MERGED (gh pr view state=MERGED; master ff'd to a3404a0; ledger already carried both MERGED rows with CLEAN audits and closed residuals R-m23-s2-X4/X5 from earlier ticks). Reaped rb-11's stale per-run lock (session_leader 2196118 dead) via mr-unlock stale; cleared stale /tmp .done files. No open PRs either repo. queue[] was empty. Residuals: mr-gates residuals list --unclaimed showed 33 open (cap 12, observe-only per doctrine slice 1), oldest unpromoted R-m23-s2-X6 (age 5.16d, disclosed 2026-08-24T14:11:21Z: the [A11Y-07] CSS scanner will exist twice once S10 lands with no agreement gate) past t1_promote_days=3 -- outranks new PLAN Sec.9 derivation per the aging doctrine. Promoted R-m23-s2-X6 -> rb-12 in M-residual-backlog.spec.md (mr-gates residuals promote), queued (mr-record queue-add --slice rb-12). This was the tick's ONE action. Shipping the spec+state change as a doc-only chore PR next; not yet pushed as of this record. Governor NORMAL (d7=$630.18/2783 eff., fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs, no rate-limit event.
+## 2026-08-29T17:29:40Z — rb-11 merged: live-region custody under aria-modal (R-m23-s2-X5)
+PR#388 squash-merged to master (a3404a0). Fix: the single #a11y-live region now follows the currently-open modal overlay (adopt on open, release on close/re-parent-elsewhere), so Chromium/WebKit-honored aria-modal inertness can no longer silently mute S1 announcements while a modal shell is open. Custody seam lives in the declared owner client/src/ui/liveRegion.ts (called from overlayA11y.ts) — evals/a11y-static-shell.eval.mjs [A11Y-05b] sole-owner scan forced this; a liveRegion.ts + liveRegion.test.ts touches-delta was declared up front in the gate ledger and collision-checked against PR#387/rb-10 before landing. New evals/overlay-live-region-custody.eval.mjs adds custody teeth (not wired into the a11y-e2e roster — byte-pinned recipe region). ADR-0214 records D1-D7 plus residuals R-rb-11-VO (WebKit/VoiceOver inertness probe not run — Chromium doesn't implement aria-modal AX pruning, so X5 asserts AX ancestry instead) / REREGISTER / A13 / SAMEROOT / VIEWFIXTURE / BLACKLIST / PARTIAL / ORDER. Gates: 9/9 met (mr-gates verify, fresh re-run agrees with recorded evidence on all 9, spotcheck X6 adversarial re-read agreed). mr-audit: orchestration CLEAN (8 agent calls, roles doc-keeper/planner/red-team/reviewer/tester/verifier), gating CLEAN (0 removed asserts/skips/suppressions), acceptance CLEAN. Diff (9 files) matched the gate ledger's declared TOUCHES-DELTA exactly. Residual R-m23-s2-X5 closed via mr-gates residuals close --pr 388. Worktree/branch cleaned; local master fast-forwarded to a3404a0.
+## 2026-08-29T17:06:01Z — rb-11 PR#388 open, CI pending — delegated to mr-ci-watch
+Native tick 17:05Z (rid=native-20260829T170451Z-2346192). rb-10/PR#387 confirmed MERGED (15:48:50Z, master ff'd to 06393f2, CI green) — a prior tick's merge that this tick's mr-state.json snapshot had not yet caught up to (still showed rb-11 in inflight with awaiting_merge empty and a stale rb-10 ci-watch entry pid 2162051, already dead). Reconciled state from live gh/ps ground truth, not the stale file.
+
+rb-11 (residual R-m23-s2-X5, aria-modal AT-inert live-region fix, ADR-0214) finished rc=0 attempts=1 opus, opened PR#388 (mdrewt/monster-realm). Live check: ci+e2e both pending, mergeStateStatus=UNSTABLE. Too early for mr-audit/mr-gates verify/merge. Delegated to a fresh mr-ci-watch (pid 2347361) instead of polling. Moved rb-11 mr-state.json inflight -> awaiting_merge. No mutating action beyond the watcher spawn + state reconciliation this tick.
+
+## 2026-08-29T15:49:58Z — rb-10 MERGED — reduced-motion HP-bar guard (PR#387)
+Merged PR#387 (mdrewt/monster-realm, squash 06393f2, master ff'd from ed0a8d9). Closed residual R-m23-s2-X4: moved the battle HP-fill's transition from an inline cssText declaration (unreachable by any stylesheet selector) to `.hp-fill` in client/src/styles.css, gated by `@media (prefers-reduced-motion: reduce)`. ADR-0213. Acceptance: 8/8 met, 0 deferred (mr-gates verify re-run agreed; X7 evidence_drift was pixel-timing jitter, informational per doctrine). mr-audit: orchestration CLEAN; gating_advisory FLAGGED on a mechanical tripwire (15 'skip_markers_added') that I read and confirmed were string literals inside the NEW eval's own suspension-spelling detector (evals/reduced-motion-hp-bar.eval.mjs), not real skipped/xit/only tests — adjudicated as a false positive, no real test weakening. Disclosed D7 in the PR: the guarded transition is currently latent because #renderMonsterCard recreates the fill node every render (replaceChildren), so no transition can interpolate under either motion preference — not a regression (pre-slice inline transition was equally unreachable on the same fresh node). Recorded 2 new residuals: R-rb-10-X7 (inert transition, needs node-reuse or element.animate()+matchMedia in a future slice) and R-rb-10-X6 (real-Chromium cascade probe runs at ledger-time only, not wired into `just ci`). Closed R-m23-s2-X4 via mr-gates residuals close --pr 387. Removed the rb-10 worktree and deleted the merged slice/rb-10 branch (local + remote, already gone via --delete-branch). queue[] still holds rb-11 (promoted residual R-m23-s2-X5, ADR pending) as the next fast-path pick.
+## 2026-08-29T15:40:11Z — rb-10 finished, PR#387 CI-watch delegated
+Native tick rid=native-20260829T153904Z-2160759 (15:39Z). Gate-0: found rb-10.done event (rc=0, attempts=1, model=opus, ~$57.59) with PR#387 opened (mdrewt/monster-realm, R-m23-s2-X4 reduced-motion HP bar CSS guard, ADR-0213). Per-run lock's session_leader (2017957) confirmed dead (agent reached mandated terminal state after opening the PR, per doctrine never merges itself). Live gh check: PR#387 mergeStateStatus=UNSTABLE, mergeable=MERGEABLE, both ci/e2e checks still IN_PROGRESS (not concluded) — not yet safe to run mr-audit/mr-gates verify/merge. Delegated CI-wait via 'setsid bash mr-ci-watch 387 rb-10 & disown' (pid 2162051) rather than polling; it will fire an event tick on conclusion. No other action taken this tick (single mutation rule). rb-11 remains queued (added 13:00:42Z) for the tick after rb-10 merges.
+## 2026-08-29T14:01:57Z — rb-10 launched (residual R-m23-s2-X4 -> reduced-motion HP bar CSS guard)
+Native tick mr-sup-native-20260829T140008Z-2015975 (14:00Z). Gate-0/1: no live locks/mutex, HOLD-NONE, no session collision, master CI green (last push success, ed0a8d9), no open PRs either repo. Gate-3: queue[] had rb-10/rb-11 (both promotion chore-PRs #57/#58 already merged, spec sections exist in M-residual-backlog.spec.md). Re-verified rb-10 live: spec heading present, no existing branch/PR. touches inherited from source m23-s2 did not literally apply (S2 only owns live-region/stylesheet scan, not battleView.ts) -- derived actual touches [client/src/ui/battleView.ts, client/src/styles.css] from the residual's own deferred-reason text (S4/S8+S9 territory). Launched rb-10 opus@high routine tier, adr=213 (adr_next_free in mr-state.json was stale at 212 -- 0212 already exists on disk as deletion-grace-wasm-accessor.md; corrected to 213). queue-removed rb-10. rb-11 remains queued for a future tick.
 ## 2026-08-29T13:01:25Z — tick record — promoted residual R-m23-s2-X5 -> rb-11 (PR#58)
 Native tick mr-sup-native-20260829T130005Z-2004230 (13:00Z). Gate-0/1: no live locks/mutex/hold, no session collision, both repos in sync with origin (harness main 5736f0b, proj master ed0a8d9), remotes verified. Project master CI green (last completed run success, rb-8; Nightly workflow separately in_progress, not the push-CI signal). No open PRs, no wip branches either repo. Gate-3: mr-gates residuals list --unclaimed showed 33 open (over cap 12, observe-only), oldest unpromoted R-m23-s2-X5 (aria-modal=true on shell roots puts #a11y-live in the AT-inert subtree) at age 4.95d, past t1_promote_days=3 -- outranks new PLAN Sec.9 work per the aging doctrine. Promoted it -> rb-11 in M-residual-backlog.spec.md (mr-gates residuals promote), queued (mr-record queue-add). Note: queue[] already held rb-10 (promoted in a prior tick, PR#57, not yet launched) -- rb-11 queued behind it, both awaiting the next tick's fast-path launch. Shipped the spec+state change as a doc-only chore PR#58 (chore/residual-promote-20260829T130101Z, mdrewt/claude-harness), squash-merged+deleted (gh pr merge --auto fell through silently to a direct merge, same as the prior tick's noted --auto unavailability on this repo); harness main fast-forwarded to 7f5ceca. This was the tick's ONE action (promote+ship). No slice launched or merged this tick. Governor NORMAL (d7=$536.28/2783 eff., fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs, no rate-limit event.
 ## 2026-08-29T12:04:35Z — Native tick 2026-08-29T12:00Z — promoted residual X4->rb-10, reconciled REPO-OUT-OF-SYNC
@@ -1941,27 +2107,4 @@ queue[] still holds rb-5 (spec_file M-residual-backlog.spec.md, ### rb-5 section
 No open PRs, no inflight runs. Governor NORMAL (d7=$366.47/2783 effective, fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs. Standing down.
 ## 2026-08-28T21:02:30Z — native tick 21:00Z — completed orphaned rb-5 promotion (PR#51)
 Native tick rid=native-20260828T210011Z-1031588 (forced=0). Gate-0/1: no live locks/mutex/hold, no session collision. Found: mr-state.json queue[] listed rb-5 (added 20:02:31Z by the prior 18:53Z tick) but the residual backlog spec file had NO ### rb-5 section — the queue entry was INVALID per gate-3's live re-verification (spec_file's slice heading did not exist). Root-caused via reflog: the prior tick DID run 'mr-gates residuals promote --id R-m22-s0-X4' (JSONL already showed status=promoted, promoted_slice=rb-5, the file write landed on branch chore/residual-promote-20260828T200231Z, commit 8c7a3e9) but never opened/merged the doc-only chore PR — the branch sat orphaned on origin, unmerged into main. This tick's ONE mutating action: verified the branch's diff was a single clean doc-only append (matches JSONL verbatim), opened PR#51 (found PR#50 already existed on the same branch, merged concurrently — both merges landed, file has exactly one rb-5 section, no duplication), squash-merged with --delete-branch, ff'd local harness main to c5cc586. queue[] rb-5 entry is now VALID (spec heading exists) — next tick's fast path re-verifies live and launches it directly. Master (monster-realm) unchanged this tick, still 4b43dd9, CI confirmed green (push run 33201549752 success; Nightly 33203158939 in_progress non-blocking). Governor NORMAL (d7 $365/2783, fable_ok=true). No BLOCKERs.
-
-## 2026-08-28T20:02:53Z — rb-4 CI confirmed green + residual R-m22-s0-X4 promoted to rb-5
-Native tick native-20260828T200016Z-1019792 (20:00Z). Gate-0: no live locks/inflight; prior tick (18:53Z) had merged rb-4 (PR#380, master ff'd to 4b43dd9) and left mr-state.json/handoff writes uncommitted in the harness repo -- committed them this tick as reconciliation (not a new decision action). Verified live: master CI run 33201549752 on 4b43dd9 completed/success (Nightly run 33203158939 separately in_progress, non-blocking); mr-state.json master.ci updated from in-progress-watch to confirmed success. Gate-3 pick-work: master green, nothing open/parked/inflight, queue[] empty -> checked residuals list --unclaimed: 25/32 open residuals unpromoted past t1=3d (oldest R-m22-s0-X4 at 4.48d), which outranks new PLAN-9 work per aging doctrine. Promoted R-m22-s0-X4 (evals/run.mjs completeness gap, MED, target backlog) -> rb-5 via mr-gates residuals promote, appended to specs/monster-realm-v2/M-residual-backlog.spec.md, queued via mr-record queue-add. Shipping as doc-only chore PR chore/residual-promote-20260828T200231Z (--squash --auto) so next tick's fast path can launch rb-5 straight from queue[0]. Governor NORMAL (d7 $364.60/2783, fable_d7 $267.76/2298, fable_ok=true). No BLOCKERs. Single mutating action this tick: the residual promotion (doc-only chore PR); the state-file commit was reconciliation, not a new decision.
-## 2026-08-28T18:58:44Z — rb-4 merged — G6 alias resolution hardening (ADR-0208 D3)
-Native tick mr-sup-native-20260828T185310Z-998490 (18:53Z). Reconciled the rb-4.ci.md event (PR#380 green, mergeStateStatus CLEAN). Re-verified live: checks (ci, e2e) both pass; diff scope (ARCHITECTURE.md, docs/adr/0208-*, evals/guest-claim-integrity.eval.mjs, evals/rekey-contract-surface.eval.mjs, server-module/src/accounts_tests.rs) matches declared touches:. mr-gates verify CLEAN (9/12 met, 3 deferred to backlog as R-rb-4-X10/X11/X12 — a LIVE-REACHABLE product-type hole outside touches:, a parser field-non-vacuity defect distinct from this walker residual, and aliases declared outside the scanned input set; none blocking). mr-audit CLEAN across orchestration (8 agent calls: planner/red-team/reducer-security-auditor/reviewer/tester/verifier), gating-advisory (0 removed asserts, 0 skip markers, 0 suppressions), and acceptance. Hard-tier mandatory read done: findIdentityColumns now resolves Rust type aliases via a union binding table + token expansion, fail-closed on ambiguity, with a new [G6/alias] clause for macro-shaped bindings the resolver can't read (FG73a-p proof-of-teeth, 88 legs). Squash-merged (gh pr merge --squash --delete-branch), master fast-forwarded to 4b43dd9, worktree removed, residual R-m22-s0-X3/rb-4 closed via mr-gates residuals close --pr 380. Master CI was in-progress at record time; watching in background (gh run watch 33201549752, ID b1ehthy6u) rather than polling in-tick. NOTE: gate-3 residual_alarms flagged 25 unpromoted-past-t1 residuals and 33 open (cap 12, observe-only) — a queue-shape signal for a future tick's Pick-work step, not actioned this tick since the merge was the one mutating action taken.
-## 2026-08-28T18:42:31Z — Review 17 inserted M-postgate-seventeenth-review-residuals (pinned e112ce6)
-Weekly review 17 (generate-improvement-plan, Cowork) — pinned monster-realm @ e112ce6d8fc46fd47f0ab0d2334cc744905fe442, 2026-08-28T18:09Z, isolated clone /home/mdrewt/mr-review/20260828-e112ce6 (torn down at end of run).
-
-INSERTED: specs/monster-realm-v2/M-postgate-seventeenth-review-residuals.spec.md, PLAN §9 bullet directly after M-postgate-sixteenth-review-residuals. Six slices: 17r-a (HIGH: M23 reduced-motion feature is fully inert in production — motionPreferenceFromWindow() has zero production callers, ResolveInput.reduceMotion permanently false; 2-line wiring + wiring test), 17r-b (ADR-0130 untracked reconnect residuals (d) spurious battleStart on partial my_battle hydration + (e) identity never refreshed on reconnect), 17r-c (OBS-48 forbid → require-justification per Drew ruling on issue #342; eval A9 conversion + ADR-0180/0197/runbook amendments; harness M20 spec reword is supervisor doc-follow-up), 17r-d (M23 spec A11Y-19/§2.3/§8.4 amendment ADR-0206 A1 requests; harness doc-only), 17r-e (4-file comment-truth micro-sweep), 17r-f (frame-loop catch bypasses pushError/F9). Serial chain 17r-a→17r-b→17r-f (shared main.ts); 17r-c/d/e disjoint fan-out candidates.
-
-PROVENANCE: 8 sonnet lenses, 0 contradictions (no adjudication needed), 2 independent verifiers, 11 claims → 10 CONFIRMED / 1 PARTIAL (CHANGELOG staleness numbers exact; ADR-0202 actually present in CHANGELOG — wording corrected) / 0 dropped. Security/privacy, test-integrity, and game-core lenses returned explicit no-findings on the 064e627..e112ce6 delta.
-
-OPEN rev-ISSUES: none opened this cycle (cap unused — every finding has an implementable default). mdrewt/monster-realm#342 (rev16-obs48-procedures) was ANSWERED by Drew and CONSUMED: closed 2026-08-28 with the mr-system comment. If an answer-fired watcher tick for #342 arrives, stand aside — the issue is consumed and closed; its ruling ships as 17r-c.
-
-decision-defaulted: rev17-slice-naming=17r-a..17r-f; rev17-adr0130-residual-grouping=single-slice-17r-b(same-touches); rev17-changelog-staleness=no-slice(owned by changelog-freshness gate + ADR-0203 red-response policy; lag=35/6.5d at pin — nightly will/should be red on it); rev17-obs48=close-342-as-consumed.
-
-CLEANUP: review clone teardown executes as the final action of this run (guarded rm of /home/mdrewt/mr-review/20260828-e112ce6); next run startup sweep is the backstop. No writes were made to the project repo or runner git state; harness writes limited to the new spec + PLAN.md (committed with explicit paths) + this handoff.
-
-## 2026-08-28T18:40:06Z — rb-4 CI-watch delegated
-Native tick mr-sup-native-20260828T183952Z-996094-15824 (18:39Z). Reconciled rb-4.done event: run finished rc=0, attempts=2, model=fable, cost $22.42, opened PR #380 (mdrewt/monster-realm) with 9/12 gates met + 3 DEFERred (X10/X11/X12 -> backlog), local just ci green. Live re-verify: PR #380 state OPEN, mergeable=MERGEABLE, mergeStateStatus=UNSTABLE (checks ci+e2e still IN_PROGRESS). No live rooted-run pid for rb-4 (lock leader dead+done). No human-session collision, chain mutex was free. Delegated CI-wait for PR #380 to mr-ci-watch (pid 996243, detached); resumes via event tick on completion -- merge/audit/gates-verify/residuals-close happen then, not now. Governor NORMAL (d7=$363.41 of $2783 weekly, fable d7=$267.76 of $2298 allowance -- fable_ok=true). No BLOCKERs. No new slice launched this tick (the one mutating action was the CI-watch delegation).
-
-## 2026-08-28T15:02:37Z — Native tick mr-sup-native-20260828T150014Z-763053 (15:00Z) -- reconciled orphaned rb-3 merge record, promoted R-m22-s0-X3 into rb-4
-Gate-0: no live locks/mutex, HOLD-NONE. Found the 14:14:52Z tick had fully merged rb-3 (PR#379, e112ce6), closed residual R-m22-s0-X2, and written its mr-state.json/handoff updates -- but never committed them to the harness repo (uncommitted at gate-0). Re-verified everything live: PR#379 state=MERGED, master CI run 33179334439 conclusion=success at e112ce6, worktree clean, residual R-m22-s0-X2 status=closed in mr-residuals.jsonl. Gate 3: no open/parked slice, queue[] empty, nothing past t2_stale_days=14, but 28 residuals past t1_promote_days=3 outrank new PLAN section-9 work. Promoted the oldest (R-m22-s0-X3, age 4.3d, disclosed 2026-08-24T08:37:17Z) into rb-4 via mr-gates residuals promote, shipped as doc-only chore PR#49 (chore/residual-promote-20260828T150014Z), squash-merged clean (no CI on this path). queue-added rb-4 for next tick's fast path. Committed the orphaned prior-tick state/handoff files plus this tick's own record together. No launch this tick (residual-promotion outranked it, per aging doctrine). No BLOCKERs. governor NORMAL (d7 $260.73/2783, fable_ok=true).
 

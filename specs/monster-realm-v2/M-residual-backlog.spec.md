@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-12 — The [A11Y-07] CSS scanner will exist twice once S10 lands its eval, with no agreement gate (from m23-s2 X6, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s2 · residual: R-m23-s2-X6
+
+Deferred with reason: A .mjs eval cannot import the .ts helper, so S10 re-implements parseCssRules/findIdSelectors/srOnlyIsAccessible. Forced by touches:, but two oracles for one criterion drift invisibly -- each keeps passing against its own idea of the file. S10 should carry an explicit gate that both scanners agree over the same fixture corpus, or a third variant appears.
+
+EARS: The [A11Y-07] CSS scanner will exist twice once S10 lands its eval, with no agreement gate
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-11 — aria-modal=true on the eleven shells puts the single #a11y-live region in the AT-inert sub (from m23-s2 X5, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s2 · residual: R-m23-s2-X5
