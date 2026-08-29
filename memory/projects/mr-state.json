@@ -1,9 +1,9 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-29T13:01:30Z",
- "updated_by": "mr-sup-native-20260829T130005Z-2004230",
+ "updated_utc": "2026-08-29T18:05:00Z",
+ "updated_by": "native-20260829T180012Z-2386136",
  "master": {
-  "sha": "7f5ceca",
+  "sha": "a3404a0",
   "ci": "green",
   "nightly": "in_progress"
  },
@@ -11,25 +11,17 @@
   "sha": "221d929",
   "ci": "no-remote-ci-local-gate-green (unchanged this tick)"
  },
- "adr_next_free": 212,
+ "adr_next_free": 214,
  "inflight": [],
  "awaiting_merge": [],
  "queue": [
   {
-   "slice": "rb-10",
+   "slice": "rb-12",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s2-X4",
-   "added_utc": "2026-08-29T12:03:49Z",
+   "reason": "promoted residual R-m23-s2-X6",
+   "added_utc": "2026-08-29T18:01:30Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "ed0a8d9"
-  },
-  {
-   "slice": "rb-11",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s2-X5",
-   "added_utc": "2026-08-29T13:00:42Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "ed0a8d9"
+   "derived_from_master_sha": "06393f24d21b35c0e96d2c40b92d67e2f37e26cd"
   }
  ],
  "park_counters": {
@@ -37,7 +29,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick 13:00Z: promoted residual R-m23-s2-X5 -> rb-11 (PR#58, 7f5ceca). queue[] holds rb-10 (from prior tick) then rb-11 for next tick to launch off the fast path. master CI green.",
+ "notes": "Native tick 18:00Z: reconciled prior tick's stale mr-state.json (still showed rb-11 awaiting_merge/PR#388 checks-pending) against live ground truth -- both rb-10 (PR#387) and rb-11 (PR#388) confirmed MERGED (gh pr view state=MERGED, master ff'd to a3404a0), ledger already carried both MERGED rows from earlier ticks. Reaped rb-11's stale per-run lock (session_leader dead) via mr-unlock stale. queue[] was empty. Residuals: mr-gates residuals list --unclaimed showed 33 open (cap 12, observe-only), oldest unpromoted R-m23-s2-X6 (CSS scanner duplication risk once S10 lands) at age 5.16d, past t1_promote_days=3 -- outranks new PLAN Sec.9 work per the aging doctrine. Promoted R-m23-s2-X6 -> rb-12 in M-residual-backlog.spec.md, queued (mr-record queue-add). This is the tick's ONE action; the spec-change chore PR ships next.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -66,6 +58,14 @@
   "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
- "live_watchers": [],
- "last_tick_utc": "2026-08-29T13:01:30Z"
+ "live_watchers": [
+  {
+   "type": "ci-watch",
+   "slice": "rb-11",
+   "pr": 388,
+   "pid": 2347361,
+   "started_utc": "2026-08-29T17:05:01Z"
+  }
+ ],
+ "last_tick_utc": "2026-08-29T15:39:04Z"
 }
