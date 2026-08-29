@@ -1674,6 +1674,14 @@ orchestrator), verifier ran at its default pin. (3) Two self-inflicted traps, me
 diagnostic line stashed the uncommitted implementation. (4) `just ci` green locally (CI_EXIT=0);
 remote CI (ci + e2e) running at PR-open time.
 
+## 2026-08-29T03:54:47Z — rb-6 merged — PR#384
+Native tick rid=mr-sup-native-20260829T034827Z-1452367. rb-6 (fix/rb-6-sanctioned-reducers) finished EXIT=0 attempts=1 (opus@high, $31.79). PR#384 merged squash+delete-branch; master 013b3f8->07a1c0c, post-merge CI queued at record-time (pre-merge PR checks ci+e2e both pass).
+
+Adjudication: mr-gates verify first returned FLAGGED (EVIDENCE-MISMATCH on X1) — root cause: X1's CHECK line spawned `node` bare (inheriting the tick's PATH -> system node v18.19.1, which lacks fs/promises.glob), unlike sibling X2-X5 which wrap the CHECK in an inner child process with PATH explicitly injected. Manually reproduced the EXACT recorded evidence string with the asdf PATH present, confirming this was a gate-authoring env bug, not a code regression. Fixed the CHECK line in rb-6.gates.md to inject PATH consistent with the TOOLCHAIN NOTE and sibling gates; re-ran mr-gates verify -> CLEAN (5/5 reverified, matches evidence). mr-audit CLEAN (orchestration CLEAN: 9 agent calls across doc-keeper/planner/red-team/reviewer/tester/verifier; gating_advisory CLEAN). diff (ARCHITECTURE.md, docs/adr/0210-*.md, docs/adr/DIGEST.md, evals/guest-claim-integrity.eval.mjs) subset of declared touches.
+
+Closed residual R-m22-s1-X1 (mr-gates residuals close --slice rb-6 --pr 384). The run itself filed 2 new residuals to backlog (R-rb-6-R-rb-6-X1/X2) for the KNOWN GAP the ledger called out up front: server-module/src/accounts_tests.rs:2057 g2_reducer_name_set_is_pinned carries the identical exact-5 Rust pin and will hard-RED when S3 ships a 6th reducer — outside rb-6's touches, tracked for the drain.
+
+Worktree/branch cleaned; master fast-forwarded locally. No new work launched this tick (composite merge->launch deferred — writing this record now).
 ## 2026-08-29T02:02:48Z — rb-6 launched (opus@high, guest-claim-integrity.eval.mjs SANCTIONED_REDUCERS fix)
 Native tick rid=mr-sup-native-20260829T020125Z-1293837-2557 (02:01Z). Recovered the prior
 00:56Z tick's uncommitted state first (commit e3e858f): that tick had merged rb-5 PR#383
@@ -1699,6 +1707,67 @@ rb-5 (eval-harness completeness guard, residual R-m22-s0-X4, ADR-0209) finished 
 
 ## 2026-08-29T00:01:45Z — rb-5 — launched (opus@high, project repo)
 Native tick rid=mr-sup-native-20260829T000008Z-1067112. Gate-0/1: no live per-run locks/mutex/hold, no resident human-session collision (only the wrapper's own housekeeping + codegraph daemon + long-idle biome LSP procs). Both repos fetched clean, no drift; monster-realm master green at d525eb3 (proj master fetch was a no-op, already current); harness main had one deleted remote branch pruned (chore/residual-promote-20260828T230209Z, expected post-merge). No open PRs either repo. queue[] had two entries (rb-5 added 20:02:31Z, rb-6 added 23:02:05Z by the prior tick after promoting it); per fast-path doctrine only queue[0] (rb-5) is re-verified/consumed this tick — rb-6 stays queued for the next tick. Verified rb-5 live: spec section exists at M-residual-backlog.spec.md:37 (from m22-s0 X4, promoted 2026-08-28T20:02:26Z per mr-residuals.jsonl, status=promoted, not blocked), no fix PR yet in either repo's git log (only the two promotion commits, PR#50/#51). Classified routine tier (opus/high): the fix is a CI/eval-harness completeness check in evals/run.mjs, not schema/reducers/predictor/security/RLS/M20/M25 surface, and no prior attempt exists to trigger the failed-prior-attempt HARD criterion. touches=[evals/run.mjs] (project repo) — no fan-out/disjointness question, no in-flight siblings. ADR 209 reserved (project docs/adr numbering, next-free was 209). mr-spawn: GATES-SEEDED criteria=0 (residual-backlog sections are narrative, not SHALL-bulleted, same as every other rb-N so far) — leader=1068473 claude_pid=1068476, both confirmed detached (own session, PPID=1) and model=opus via post-launch ps assert. queue-removed rb-5. Governor NORMAL (d7=$368.65/2783 eff., fable d7=$267.76/2298 allowance, fable_ok=true — not used, routine tier). No BLOCKERs, no rate-limit event. Next tick: mr-ci-watch delegation once rb-5 opens a PR, or resume/park reconciliation if it parks first; rb-6 remains queued as the fast-path candidate after rb-5 resolves.
+## 2026-08-29 — rb-6 COMPLETE — PR #384 open, local `just ci` green, remote CI running
+
+**Terminal state: PR open + local gate green + remote CI running. Supervisor owns the merge.**
+PR: https://github.com/mdrewt/monster-realm/pull/384 · branch `fix/rb-6-sanctioned-reducers`
+(worktree `.claude/worktrees/rb-6`, forked from `origin/master` 013b3f8) · ADR-0210.
+
+**Acceptance: 5/5 met, 0 deferred, 0 unmet — rb-6 seed:e3b0c44298fc1c14.** Ledger seeded 0 criteria
+(narrative rb-* section, same as rb-2..rb-5); X1..X5 authored in the PLAN phase.
+`just ci` exit 0 three times over the slice; final run: 95/95 evals 0 FAIL, client vitest
+96 files / 2818 tests, validate.mjs 8/8.
+
+**TWO probe scripts beside the ledger, both load-bearing for re-verify, `gates/` is gitignored so
+they exist only on this machine:** `gates/rb-6.x1-probe.mjs` (X1) and `gates/rb-6.mutation-probe.mjs`
+(X2/X3/X4, 9 mutants). **Run `mr-gates check`/`verify` FROM THE WORKTREE ROOT** — X5's CHECK is
+`node evals/run.mjs` and reds from anywhere else.
+
+**What shipped.** `evals/guest-claim-integrity.eval.mjs`'s flat five-name `SANCTIONED_REDUCERS`
+(exact sorted set equality) became a frozen `REDUCER_SANCTIONS` ledger with a CLOSED
+`REQUIRED`/`PLANNED` status, so M22 S3 can declare `account_deletion_reaper` without touching this
+eval. Four clauses: `[R/sanction-shape]` (closed discriminator, `.find` over an array — the rb-2
+`[G6/policy]` rule), `[R/planned-set]` (exact pin on the PLANNED key set, both directions),
+`[R/name-set]` (`Object.hasOwn` membership + REQUIRED-presence), `[R/planned-shape]` (a PLANNED name
+that is present must be a same-file `scheduled(...)` target with matching arg type + scheduler
+guard). 13 fixtures FG74a..FG74m; 9 mutants, each caught naming its own tooth.
+
+**TWO measured findings, both worth carrying forward:**
+1. *An unclosed status discriminator is a free silent whitelist slot.* Red-teaming the PLAN built a
+   faithful membership+required-presence implementation, passed 25/25 of its own assertions, and
+   admitted `{status:'LEGACY'}` beside a takeover reducer that the pre-fix gate red.
+2. *A ledger that admits by NAME is not a pin that admits by exact SET.* The first implementation of
+   the PR was **green under the full `just ci` (95/95, exit 0)**, passed every new fixture, and
+   still admitted a reducer that merely REUSED the planned name (wire-safe `String`, victim identity
+   read from a row, no scheduled table) — `[R/param-types]`'s carve-out is reached only AFTER
+   `isWireSafeType` FAILS. → `[R/planned-shape]`. **General rule now in memory: any slice relaxing an
+   exact pin must produce a direct SHIPPED-vs-PRE-FIX differential on adversarial input, not just
+   "my new fixtures pass".** See [[relaxing-an-exact-pin-needs-a-prefix-diff]].
+
+**Two residuals recorded (mechanically, via `mr-gates residuals add`) — NOT left as PR prose:**
+* `R-rb-6-R-rb-6-X1` → backlog — `server-module/src/accounts_tests.rs:2057`
+  `g2_reducer_name_set_is_pinned()` carries the identical exact-5 pin **in Rust** and will also
+  hard-RED when S3 ships. Outside rb-6's touches. **rb-6 removes ONE of TWO S3 blockers.** Assigned
+  to M22 S3 in ADR-0210; S3 must mirror the REQUIRED/PLANNED semantics, not bump the count to 6.
+* `R-rb-6-R-rb-6-X2` → backlog — PRE-EXISTING: `[R/identity-ctor]` has no proof-of-teeth. A
+  body-scoped constructor scan (instead of the whole-file flattened one) leaves the 100-tooth suite
+  fully green and then admits an `Identity::from_hex` one hop away in a plain helper.
+
+**Three new gotchas now in memory** (also see the cards): nested template literals in a clause
+message desync every brace matcher that skips string spans (symptom: `BROKEN-MUTANT` /
+"Illegal return statement" — reads like a probe bug); an acceptance CHECK that hands an eval's own
+path to `node -e` as `argv[1]` is UNSATISFIABLE because the eval's main guard fires during the
+import (caught by the verifier, not the author — repaired with `rb-6.x1-probe.mjs`); and the
+`tester` role now lists Bash but its guard still blocks execution, so the orchestrator must run the
+RED proof and the bite-proofs itself.
+
+**Code graphs NOT refreshed** — `codegraph status` was clean at slice start and `master` has not
+moved; the refresh belongs after the supervisor's squash-merge, on the main checkout.
+
+**Harness-side, uncommitted/untracked:** `specs/monster-realm-v2/M-residual-backlog.spec.md` (rb-6
+resolution note, PR #384 filled in), `memory/projects/monster-realm-rb-6-plan.md` (untracked, same
+precedent as rb-4/rb-5), `memory/projects/gates/rb-6.*` (gitignored).
+
 ## 2026-08-28T23:03:21Z — native tick 23:00Z — recovered interrupted tick + promoted rb-6
 rid=native-20260828T230014Z-1055334. Gate-0/1: no live locks/mutex/hold, no session collision. Found the harness working tree carrying an interrupted 22:00-22:05Z tick's uncommitted state (fixed master CI red via PR#382, changelog-freshness, master 4b43dd9->d525eb3, plus a stray rb-4-plan.md) -- that tick crashed before its own commit step. Recovered it first (commit 05df202), re-verified live: PR#382 merged, changelog-freshness job success on manual workflow_dispatch run 33215217814, project repo already clean at d525eb3.
 
@@ -1765,18 +1834,3 @@ Native tick rid=mr-sup-native-20260828T070043Z-375387-21753 (07:00Z). Gate-0/1: 
 
 ## 2026-08-28T06:03:33Z — Native tick rid=native-20260828T060009Z-359329 — residual-ledger cleanup + rb-2 promoted
 Gate-0/1: no live per-run locks, no chain-owner mutex, no operator hold, no resident-session collision (empty find -mmin -6 in both repos besides the wrapper's own housekeeping files). Both repos fetched/synced clean, remotes match. Master CI green at 7e75cbd (matches situation bundle and local checkout). No open PRs either repo, no wip/parked branches, mr-state.json showed empty inflight/awaiting_merge/queue and park_counters={14r-e:1} unchanged. Pick-work: mr-gates residuals list --unclaimed showed 16 unpromoted-past-t1 residuals (alarm), so per the aging doctrine a residual outranks fresh PLAN Sec.9 derivation this tick. Found the ledger stale rather than genuinely needing new work: (1) R-rw3c-X3 and R-rw3b-X6-rw3c-half were BOTH already resolved by prior merges (rb-1/PR#46 amended RW3-08 and explicitly names R-rw3c-X3 as resolved in the spec text at M-postgate-roster-wave-3.spec.md:119-131,278-280; rw3c's own gates ledger X1/X1b already MET the R-rw3b-X6-rw3c-half clause and its slice header says so verbatim) but neither had been formally closed/dispositioned in mr-residuals.jsonl -- promote's close path only matches promoted_slice==sl, and these were never the id actually promoted into their sibling slice, so they sat open indefinitely. Dispositioned both wontfix with reasons citing the spec/gates evidence, correcting the ledger instead of promoting duplicate work items. (2) The next-oldest, R-m22-s0-X1 (age 3.89d, REKEY_MANIFEST object-ification red-on-arrival -- checkRekeyCompleteness infers REKEY from typeof policy==='string', so a future richer BLOCKED/EXEMPT object entry needs an explicit discriminator first), is genuinely still open (verified live: evals/guest-claim-integrity.eval.mjs:1563 checkRekeyCompleteness still uses the string check; rekey-contract-surface.eval.mjs's own comment flags it as a live trap for a future slice). Promoted it -> rb-2 in M-residual-backlog.spec.md, queued it (mr-record queue-add), shipped as doc-only chore PR#47 (chore/residual-promote-20260828T060240Z, --squash --auto -- merged clean, verified via gh pr view state=MERGED). Fast-forwarded harness main to 076e67d, deleted the local+remote branch (squash-merge means git branch -d correctly refuses; -D used per the documented squash-merge caveat). 14 more unpromoted-past-t1 residuals remain in the backlog for future ticks to triage the same way (verify-before-promote, not blind promotion). No BLOCKER, no rate-limit event. Governor NORMAL (d7=$86.74/2783 eff.). Standing down after the single promote+PR action -- no launch this tick since the promote+queue was itself gate 3's designated one action.
-## 2026-08-28T05:41:11Z — rb-1 merged (PR#46, 9b160be) — RW3-08 allow-list amendment + mr-content-scope gate
-Native tick rid=mr-sup-native-20260828T053712Z-341478-18247. Gate-0/1: no live per-run locks/mutex/hold, no resident-session collision. Found rb-1's run finished (.done EXIT=0, PR#46 already opened by the run itself). mr-gates verify --slice rb-1: CLEAN 4/4 met, 0 deferred, 0 unmet, X2 spotcheck NO-NEW-FAILS (baseline correctly excludes the 3 pre-existing mr-selfcheck FAILs B2/gates-hook-adoption/residual-unpromoted). mr-audit: orchestration CLEAN (11 calls, planner/red-team/reviewer/tester/verifier), acceptance CLEAN 4/4, gating_advisory FLAGGED on mechanical skip-marker grep — read the diff hunk directly: the hits are prose in the RW3-08 amendment enumerating forbidden test-skip shapes (#[ignore], #[cfg(feature=..), etc.) as examples of what the new allow-list classifier rejects, not actual skipped tests; adjudicated as a false positive. doc_findings (missing/orphan disposition, 12 hits) is CORPUS-SCOPED across the whole specs/ tree, unrelated to this diff — pre-existing. Declared touches: (2 spec files) vs actual diff also included memory/projects/mr-content-scope (NEW, 3073 lines — the proof-of-teeth classifier, the slice's actual deliverable per its scope), memory/projects/mr-selfcheck (+63, one selftest leg), memory/projects/monster-realm-rb-1-plan.md (NEW, plan checkpoint) — all explained under the PR's own touches-delta: heading, justified (no Rust/game code touched, nothing collides, no in-flight sibling). Merged via gh pr merge --squash --delete-branch -> 9b160be. mr-gates residuals close --slice rb-1 --pr 46: RESIDUALS-CLOSED 1. Local main ff-only'd to origin/main (9b160be). Note: found monster-realm-handoff.md and mr-state.json with pre-existing UNCOMMITTED direct edits from the rb-1 run itself (a doctrine violation on the run's part — direct cat>>/Write instead of mr-record) already present at tick start; left the handoff prose in place (real content, low harm) and will reconstruct mr-state.json cleanly this tick rather than compounding the drift. Governor NORMAL (d7=$85.78/2783). No BLOCKER, no rate-limit event.
-## 2026-08-28T03:03:06Z — rb-1 launched (residual R-rw3b-X8)
-Native tick rid=mr-sup-native-20260828T030039Z-176940-11563. Gates: no live locks/hold, master CI green (7e75cbd), no open PRs, no wip branches — nothing in-flight. queue[] had rb-1 (promoted last tick, PR#45). Verified live: rw3b (PR#357) and rw3c (PR#358) already merged; the residual is that RW3-08's literal wording (SHALL NOT modify Rust source other than CONTENT_VERSION/own new test files) is unsatisfiable because eg3_evolution_graph.rs and content.rs::EG1_TIER_ONE_IDS pin exact sets that legitimately had to be extended for wave-3 content — code compliant, criterion text wrong. Harness main was ahead=4 behind=0 of origin (unpushed chore(mr-sup) commits) — pushed before spawn per REPO-OUT-OF-SYNC doctrine. Launched rb-1 (opus/high/routine, harness repo, touches=spec files only, no Rust source in scope) via mr-spawn: leader pid 178686, claude pid 178689, both confirmed detached (own session) and model=opus. rid=mr-spawn-20260828T030249Z-178600.
-## 2026-08-28T02:03:17Z — Native tick — reconciled uncommitted PR#377 bookkeeping, promoted oldest residual (rb-1), queued for next tick
-Native tick rid=native-20260828T020012Z-159974. Gate-0/1 clean (no live locks/mutex/hold/collision, both repos fetched clean, no recent human writes). Found the 01:41:42Z tick had merged PR#377 (fix-nightly-coverage-wasm, 7e75cbd) and closed duplicate issues #362/#372/#374/#375 but crashed before committing its own mr-state.json/handoff/archive edits. Live-reverified: PR#377 MERGED, master CI run 33133721912 conclusion=success at 7e75cbd, all four issues CLOSED. Committed the reconciliation (harness commit e844add). No open PRs, no live watchers, no worktrees to reap either repo.
-
-Pick-work: mr-gates residuals list --unclaimed showed 31 open residuals; oldest pair (R-rw3b-X8, R-rw3b-X6-rw3c-half — both disclosed 2026-08-23T21:27:30Z, age 4.19d) past t1_promote_days=3, which per the aging doctrine outranks new PLAN Sec.9 derivation this tick. Promoted R-rw3b-X8 (rw3b's RW3-08 verbatim constraint: no Rust-source edits beyond CONTENT_VERSION/tests) into specs/monster-realm-v2/M-residual-backlog.spec.md as rb-1 (mr-gates residuals promote), queued it (mr-record queue-add --slice rb-1), shipped the spec change as a doc-only chore PR (#45, chore/residual-promote-20260828T020202Z, --squash --auto — merged clean).
-
-Reconciling local main (which had 2 unpushed chore(mr-sup) commits) against the resulting origin/main required a merge commit (084ee39) rather than ff-only, since both sides advanced from the same base; resolved by keeping local's newer handoff/mr-state snapshot content (the incoming side only touched the backlog spec file, which took with no conflict). Local main remains ahead of origin/main by unpushed chore commits (routine, known gap — chore(mr-sup) records are pushed only via PR branches, not directly).
-
-No new work launched this tick — the queue-add to rb-1 was the one mutating action; the next tick's fast path re-verifies rb-1 live and launches it. Governor NORMAL (d7=$37.19 of $2783 weekly). No BLOCKERs, no rate-limit event.
-## 2026-08-28T01:29:23Z — Native tick — fix-nightly-coverage-wasm PR#377 CI-watch delegated
-Native tick rid=mr-sup-native-20260828T012858Z-147751-24456. Reconciled the fix-nightly-coverage-wasm .done event (rc=0, attempts=3, model=opus): the run's own branch (fix/fix-nightly-coverage-wasm) violated the repo's slice/<id> naming convention, so its attempts 2-3 renamed it to slice/fix-nightly-coverage-wasm, pushed, opened PR#377 (base master, justfile coverage: wasm dependency fix for the red Nightly job), and closed the superseded PR#376 (same commit 58d7ed3) with its stale branch deleted. Verified live: PR#377 OPEN, mergeStateStatus UNSTABLE, mergeable=MERGEABLE, both ci+e2e checks IN_PROGRESS. Per-run lock's session_leader (12332) was dead -- reaped via mr-unlock stale. Delegated CI-wait to mr-ci-watch (pid 148042, detached) rather than polling; resumes via event tick on completion. No merge yet. Governor NORMAL (d7=$35.81, well under soft-pause). No BLOCKERs.
-

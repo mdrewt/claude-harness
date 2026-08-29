@@ -34,6 +34,9 @@ Deferred with reason: evals/guest-claim-integrity.eval.mjs:388-394 pins SANCTION
 
 EARS: S3 will hard-RED [R/name-set]: SANCTIONED_REDUCERS is exact-set equality and does not contain account_deletion_reaper
 Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
+
+Resolution (rb-6, 2026-08-28). DONE — fixed in PR #384 (ADR-0210). The `SANCTIONED_REDUCERS` flat array became a frozen `REDUCER_SANCTIONS` ledger with REQUIRED/PLANNED status (5 REQUIRED, 1 PLANNED = `account_deletion_reaper`). `[R/name-set]` is now membership (own keys only) + required-presence. `[R/sanction-shape]` closes the status discriminator to {REQUIRED, PLANNED} with closed field sets (red-team measured a third-status bypass on an unguarded implementation). `[R/planned-set]` pins the PLANNED keys by exact equality. `[R/planned-shape]` asserts that a PLANNED name, if present, is a same-file scheduled reducer with the right argument and guard. Gate red-teaming and re-check against pre-fix revealed that membership checking is orthogonal to set pinning — the first implementation passed all 95 evals and every new fixture while still admitting an unsanctioned reducer that reused the name, because the carve-out was reached only after type-safety failed.
+
 ### rb-5 — evals/run.mjs has no completeness check: an eval that process.exit()s at module scope trun (from m22-s0 X4, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s0 · residual: R-m22-s0-X4

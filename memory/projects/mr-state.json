@@ -1,10 +1,10 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-29T02:03:00Z",
- "updated_by": "mr-sup-native-20260829T020125Z-1293837-2557",
+ "updated_utc": "2026-08-29T03:56:00Z",
+ "updated_by": "mr-sup-native-20260829T034827Z-1452367",
  "master": {
-  "sha": "013b3f8",
-  "ci": "success",
+  "sha": "07a1c0c",
+  "ci": "in_progress-at-record-time (PR#384 pre-merge checks ci+e2e both SUCCESS; post-merge master run https://github.com/mdrewt/monster-realm/actions/runs/33232432795 still running -- next tick re-verify LIVE before trusting)",
   "nightly": "success"
  },
  "harness_main": {
@@ -12,16 +12,7 @@
   "ci": "no-remote-ci-local-gate-green; PR#52 (chore/residual-promote-20260828T230209Z, rb-6) merged this tick"
  },
  "adr_next_free": 211,
- "inflight": [
-  {
-   "slice": "rb-6",
-   "pid": 1294612,
-   "claude_pid": 1294615,
-   "model": "opus",
-   "tier": "routine",
-   "repo": "project"
-  }
- ],
+ "inflight": [],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -29,7 +20,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick rid=mr-sup-native-20260829T020125Z-1293837-2557 (02:01Z). First recovered the prior 00:56Z tick's uncommitted state (it merged rb-5 PR#383 live -> master 013b3f8 but crashed before its own tick-record commit): committed handoff+mr-state.json as e3e858f, left the stray monster-realm-rb-5-plan.md/progress.md untracked (same precedent as rb-4-plan.md). Then ran this tick's own gates fresh: git fetch both repos clean, remotes match, no resident-session collision (empty find -mmin -6 both repos), chain-owner mutex was stale (owner pid 1268408 dead, heartbeat 00:56:58Z) -> released via mr-unlock mutex, took a fresh mutex. No live per-run locks, no operator hold (mr-hold status: HOLD-NONE). Master verified green at exact head 013b3f8 (ci+e2e both SUCCESS via check-runs API; the combined-status 'pending' was just an unstarted non-required workflow, not a red gate). No open PRs either repo -> nothing to resume. Residuals: 32 open, none past t2_stale_days=14 (oldest 4.67d); several past t1_promote_days=3, but queue[] already held rb-6 from a prior tick's promotion and that tick's own note flagged it as 'first candidate for the fast path' -- re-verified it live (spec heading exists at specs/monster-realm-v2/M-residual-backlog.spec.md:29, no blocked:/after: deps, not already merged, no PR) and launched it rather than promoting another residual, per the fast-path rule taking priority over new t1 promotions. rb-6 = residual R-m22-s1-X1: evals/guest-claim-integrity.eval.mjs SANCTIONED_REDUCERS is exact-set equality (5 names) and will hard-RED [R/name-set] once S3 declares account_deletion_reaper. touches inherited 'REVIEW' from source slice m22-s1 -- flagged in the brief for the run to confirm actual scope; assessed as eval/test-classifier work only (no server schema/reducer/netcode/security surface identified), so routine tier, opus@high, ADR-0210. mr-spawn LAUNCHED cleanly (leader pid 1294612, claude_pid 1294615, detached). queue-removed rb-6. Ledger LAUNCHED row + handoff entry written. This tick's ONE action was the launch. Released chain-owner mutex at end of tick. Governor NORMAL (d7=$436.82/2783, fable_ok=true). No BLOCKERs.",
+ "notes": "Native tick rid=mr-sup-native-20260829T034827Z-1452367 (03:48Z). Gate-0: no live per-run locks besides rb-6's own (leader pid 1294612 confirmed DEAD, .done EXIT=0), no operator hold (HOLD-NONE), no resident-session collision. Took chain-owner mutex (was absent/never held). rb-6's run finished cleanly: PR#384 opened, local CI ci+e2e both pass live-reverified via gh pr checks, mergeStateStatus CLEAN. Ran mr-gates verify --slice rb-6 --json BEFORE merging: got FLAGGED (EVIDENCE-MISMATCH on gate X1) -- root-caused as a gate-authoring bug, not a code regression: X1's CHECK line spawned bare `node` (inheriting the tick's own PATH -> system node v18.19.1, missing fs/promises.glob), unlike sibling gates X2-X5 which wrap their CHECK in an inner child process with an explicit PATH override for the known node18-vs-node24 asdf trap (see harness memory harness-node-toolchain-path-trap.md). Manually reran the X1 probe with the asdf PATH present and reproduced the EXACT recorded EVIDENCE string verbatim, confirming the underlying claim was true and only the mechanical CHECK invocation was broken. Fixed the CHECK line in memory/projects/gates/rb-6.gates.md to inject PATH consistent with siblings; re-ran mr-gates verify -> CLEAN (5/5 reverified, evidence agrees). Ran mr-audit --tier routine (first attempt used --repo as a repo SLUG which mr-audit rejects as not-a-dir -> gating_advisory AUDIT-ERROR + policy FLAGGED/mandatory_read; corrected to the actual worktree PATH and got the real result: orchestration CLEAN (9 agent calls: doc-keeper/planner/red-team/reviewer/tester/verifier across haiku/opus/sonnet), gating_advisory CLEAN, policy 'CLEAN - no policy-mandated read'). Confirmed diff (ARCHITECTURE.md, docs/adr/0210-*.md, docs/adr/DIGEST.md, evals/guest-claim-integrity.eval.mjs) subset of declared touches. Merged PR#384 --squash --delete-branch (master 013b3f8 -> 07a1c0c); post-merge master CI run 33232432795 was still in_progress at record time -- next tick must re-verify LIVE before trusting green (pre-merge PR checks on the identical commit set were both SUCCESS, so expected green, but not yet confirmed). Closed residual R-m22-s1-X1 (mr-gates residuals close --slice rb-6 --pr 384). The run itself filed 2 new residuals to backlog (R-rb-6-R-rb-6-X1/X2) for the pre-known gap: server-module/src/accounts_tests.rs:2057 g2_reducer_name_set_is_pinned carries the identical exact-5 Rust pin and will hard-RED once S3 ships a 6th reducer -- outside rb-6's declared touches. Cleaned worktree + deleted local/remote branch; local master fast-forwarded to 07a1c0c. Ledger MERGED row written (--from-log correctly suppressed to COST-UNKNOWN since the wrapper's own reconcile row already carries rb-6's real cost -- guarding against double-count, working as designed) + handoff entry written (handoff auto-rotated 4 entries to the 2026-08 archive; 34 entries flagged unparseable-header, pinned live, pre-existing issue not touched this tick). This tick's ONE action was the merge (with its required adjudication); did NOT also promote a residual or launch new work, since the execution model's composite exception covers ONLY merge->launch, not merge->promote. Checked residuals for next tick: 34 open, 23 past t1_promote_days=3 (none past t2_stale_days=14, oldest 4.7d), so the NEXT tick's fast-path action per gate 3 is promoting the oldest unpromoted residual (tied R-m22-s1-R-m22-s1-X2/X3, disclosed_at 2026-08-24T10:00:40Z) into a spec section -- this outranks new PLAN section-9 work but does not preempt an already-open/parked slice. queue[] confirmed empty (re-read fresh at write time, matches gate-0 snapshot). Released chain-owner mutex at end of tick. Governor NORMAL (d7=$469.72/2783, fable_ok=true). No BLOCKERs.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
