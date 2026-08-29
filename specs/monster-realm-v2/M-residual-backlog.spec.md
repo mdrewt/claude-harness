@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-8 — S8's grace countdown will duplicate DELETION_GRACE_MS_DEFAULT in TypeScript unless a wasm  (from m22-s1 R-m22-s1-X3, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s1 · residual: R-m22-s1-R-m22-s1-X3
+
+Deferred with reason: S8's scope (spec §7.2) is a deletion/cancel UX with a grace countdown, but DELETION_GRACE_MS_DEFAULT is unreachable from TS: client-wasm/pkg exports only the pre-existing 10 functions (verified by an actual wasm-pack build of this worktree), and the schema carries only deletion_requested_at_ms. The path of least resistance is a TS literal that silently drifts the moment the operator resolves escal
+
+EARS: S8's grace countdown will duplicate DELETION_GRACE_MS_DEFAULT in TypeScript unless a wasm accessor is added
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-7 — No display-name tombstone is single-sourced; PROFILE_TOMBSTONE_NAME is a wrong-but-plausib (from m22-s1 R-m22-s1-X2, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s1 · residual: R-m22-s1-R-m22-s1-X2
