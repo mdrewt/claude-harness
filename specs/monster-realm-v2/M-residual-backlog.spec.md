@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-10 — The spec-2.5 reduced-motion CSS guard for the battle HP bar is owned by NO slice (from m23-s2 X4, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s2 · residual: R-m23-s2-X4
+
+Deferred with reason: Spec 2.5 puts it in the new stylesheet, but S7's touches: has no styles.css, the transition is an INLINE cssText declaration in ui/battleView.ts, and the element carries no class -- so no selector can reach it at any specificity and no current slice can land it. Cheapest fix: S4/S8 sets hpFill.className='hp-fill' and drops the inline transition; S9 (which already owns styles.css) adds the rule plu
+
+EARS: The spec-2.5 reduced-motion CSS guard for the battle HP bar is owned by NO slice
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-9 — A11Y-12 bans the '#' character, not reachability: attribute/universal/positional selectors (from m23-s2 X3, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s2 · residual: R-m23-s2-X3
