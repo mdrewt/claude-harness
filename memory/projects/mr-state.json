@@ -22,6 +22,14 @@
    "added_utc": "2026-08-29T12:03:49Z",
    "added_by": "n/a",
    "derived_from_master_sha": "ed0a8d9"
+  },
+  {
+   "slice": "rb-11",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m23-s2-X5",
+   "added_utc": "2026-08-29T13:00:42Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "ed0a8d9"
   }
  ],
  "park_counters": {
