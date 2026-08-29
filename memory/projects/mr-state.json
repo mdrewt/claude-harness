@@ -1,27 +1,18 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-28T23:02:27Z",
-  "updated_by": "native-20260828T230014Z-1055334",
+  "updated_utc": "2026-08-29T00:59:40Z",
+  "updated_by": "mr-sup-native-20260829T005632Z-1268408-18247",
   "master": {
-    "sha": "d525eb3",
-    "ci": "success",
-    "nightly": "in_progress"
+    "sha": "013b3f8",
+    "ci": "in_progress",
+    "nightly": "success"
   },
   "harness_main": {
     "sha": "e2b0429",
     "ci": "no-remote-ci-local-gate-green; PR#52 (chore/residual-promote-20260828T230209Z, rb-6) merged this tick"
   },
   "adr_next_free": 210,
-  "inflight": [
-    {
-      "slice": "rb-5",
-      "pid": 1068473,
-      "claude_pid": 1068476,
-      "model": "opus",
-      "tier": "routine",
-      "repo": "project"
-    }
-  ],
+  "inflight": [],
   "awaiting_merge": [],
   "queue": [
     {
@@ -38,7 +29,7 @@
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "Native tick native-20260828T230014Z-1055334 (23:00Z). Gate-0/1: no live locks/mutex/hold, no session collision. Found harness working tree carrying an interrupted 22:00-22:05Z tick's uncommitted state: it had fixed master CI red (changelog-freshness, PR#382, master 4b43dd9->d525eb3, confirmed live) and left a stray rb-4-plan.md, but crashed before its own commit. Recovered it as this tick's first step (commit 05df202), verified live: PR#382 merged, changelog-freshness job success on workflow_dispatch run 33215217814, project repo already at d525eb3 clean. This tick's ONE mutating action per gate-3 aging rule: residuals list --unclaimed showed 28 unpromoted residuals, several past t1_promote_days=3 (oldest disclosed_at 2026-08-24T10:00:40Z: R-m22-s1-X1/X2/X3, tied at 4.54d) -- promoted the oldest (R-m22-s1-X1) into rb-6 via mr-gates residuals promote + mr-record queue-add + doc-only chore PR#52 (chore/residual-promote-20260828T230209Z), squash-merged+auto-deleted (harness main c5cc586->e2b0429; local commit 05df202 merged with the remote squash commit, ort merge, no conflicts). Did NOT also launch queue[]'s rb-5 or re-verify/launch anything else this tick -- the residual promotion was the tick's one action per doctrine ('that is one tick's action, and the next tick launches it off the fast path'). queue[] now holds rb-5 (deferred pending a real REVIEW of its implementation surface per the 22:05Z tick's note -- do not fast-path launch it without that review) and rb-6 (freshly promoted, needs the same fast-path re-verify-live-then-launch treatment next tick). X2/X3 (same source slice, same age) remain unpromoted for a future tick's t1-aging pass. Governor NORMAL (d7=$367.60/2783, fable_ok=true). No BLOCKERs.",
+  "notes": "Native tick rid=mr-sup-native-20260829T005632Z-1268408-18247 (00:56Z), fired on EVENT src=ci slice=rb-5 pr=383 state=green. Gate-0: rb-5 per-run lock leader(1068473) dead + .done EXIT=0 present -> not a live chain; no chain-owner mutex held, no operator hold, no resident-session collision (empty find -mmin -10 both repos besides pre-existing untracked .claude/worktrees + .codegraph strays). Live-verified PR#383: state=OPEN, mergeStateStatus=CLEAN, mergeable=MERGEABLE, ci+e2e both SUCCESS. Took chain-owner mutex, ran mr-audit (base=d525eb3 head=ba13ab2, tier=routine): orchestration CLEAN (7 agent_calls, planner/red-team/reviewer/tester/verifier, opus+sonnet), gating_advisory CLEAN (0 removed/skip/suppression), acceptance CLEAN (8/10 met, 2 deferred X9/X10->backlog, 0 unmet, spotcheck X2 agrees fresh==recorded), mandatory_read=false. PR's own Acceptance: line matched the audit's independently-derived one verbatim. disposition block flagged 11 pre-existing missing/orphan spec dispositions -- all in unrelated spec files untouched by this diff, not this slice's concern, not actioned. Merged PR#383 via `gh pr merge --squash --delete-branch` -> 013b3f8. Fast-forwarded local project master, removed the rb-5 worktree + local branch, remote branch auto-deleted. mr-gates residuals close --slice rb-5 --pr 383 -> closed R-m22-s0-X4 (its own ledger fully resolved: 8 met/0 unmet/2 deferred, both DEFERs already residualized as R-rb-5-X9/X10 by mr-audit). Ledger MERGED row written (cost_usd null/COST-UNKNOWN -- --from-log found no terminal result event in the 4MB log despite a live total_cost_usd:66.19 mid-stream; consistent with the prior tick's 00:53:27Z FINISHED row hitting the identical gap, so not re-investigated here). Handoff entry appended (rotation fired: moved 2 old entries to the 2026-08 archive; a pre-existing WARN about 34 unparseable-header entries persists from before this tick, not introduced by it, flagged as a risk not a blocker). This tick's ONE action was the merge; did not attempt a composite launch this tick (single mutating action already spent, and re-deriving a fresh eligibility pass properly needs its own full gate-2/3 pass rather than being tacked onto a merge record) -- next tick should re-run Pick-work fresh: queue[] still holds only rb-6 from a prior promotion, unverified live this tick, first candidate for the fast path. Released the chain-owner mutex and the rb-5 per-run lock at end of tick. Governor NORMAL (d7=$436.15/2783, fable_ok=true). No BLOCKERs.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "parked": [],
   "open_chore_prs": [],
@@ -53,7 +44,7 @@
     "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said.",
     "found_easily": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects template + launch script + AGENTS.md two-location note were all accurate; only the harness-vs-project spec path lacked an absolute anchor in the task.",
-    "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation."
+    "gh_cli_path": "gh is NOT on the default PATH in this native env — it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation."
   },
   "native_supervisor": {
     "active_since": "2026-07-21T16:10:57Z",
@@ -68,5 +59,5 @@
     "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
   },
   "live_watchers": [],
-  "last_tick_utc": "2026-08-28T23:00:14Z"
+  "last_tick_utc": "2026-08-29T00:56:32Z"
 }
