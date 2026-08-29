@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-29T09:01:35Z",
-  "updated_by": "mr-sup-native-20260829T090011Z-1809844",
+  "updated_utc": "2026-08-29T10:14:49Z",
+  "updated_by": "mr-sup-native-20260829T101417Z-1945034",
   "master": {
     "sha": "b7ce98a",
     "ci": "success",
@@ -12,28 +12,24 @@
     "ci": "no-remote-ci-local-gate-green (unchanged this tick)"
   },
   "adr_next_free": 212,
-  "inflight": [
+  "inflight": [],
+  "awaiting_merge": [
     {
       "slice": "rb-8",
-      "run_id": "mr-spawn-20260829T090125Z-1811437",
-      "session_leader": 1811490,
-      "claude_pid": 1811493,
-      "model": "opus",
-      "effort": "high",
-      "tier": "routine",
-      "repo": "project",
+      "pr": 386,
       "pr_repo": "mdrewt/monster-realm",
-      "started_utc": "2026-08-29T09:01:25Z"
+      "opened_utc": "2026-08-29T10:12:42Z",
+      "mergeStateStatus": "UNSTABLE",
+      "watched_by": "mr-ci-watch pid 1946278"
     }
   ],
-  "awaiting_merge": [],
   "queue": [],
   "park_counters": {
     "14r-e": 1
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "rb-8 launched 09:01Z (mr-sup-native-20260829T090011Z-1809844); queue[] drained to empty by the fast-path launch.",
+  "notes": "rb-8 run completed (rc=0, attempts=1, opus, $24.60), opened PR#386. CI (ci+e2e) still IN_PROGRESS at reconcile time -- delegated to mr-ci-watch (pid 1946278), which will resume the merge via an event tick.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "parked": [],
   "open_chore_prs": [],
@@ -62,6 +58,13 @@
     "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
     "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
   },
-  "live_watchers": [],
-  "last_tick_utc": "2026-08-29T09:00:11Z"
+  "live_watchers": [
+    {
+      "watcher": "mr-ci-watch",
+      "args": "386 rb-8",
+      "pid": 1946278,
+      "started_utc": "2026-08-29T10:14:17Z"
+    }
+  ],
+  "last_tick_utc": "2026-08-29T10:14:17Z"
 }
