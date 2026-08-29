@@ -1,7 +1,7 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-29T10:40:00Z",
- "updated_by": "mr-sup-native-20260829T103632Z-1953531-3922",
+ "updated_utc": "2026-08-29T12:05:00Z",
+ "updated_by": "mr-sup-native-20260829T120008Z-1989001",
  "master": {
   "sha": "ed0a8d9",
   "ci": "in_progress_at_record_time",
@@ -29,7 +29,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "rb-8 merged PR#386 (squash ed0a8d9); master ff-only advanced b7ce98a->ed0a8d9; worktree/branch cleaned; residual R-m22-s1-R-m22-s1-X3 closed. master CI in_progress for the merge commit at record time -- next tick should re-verify green before any further action.",
+ "notes": "Native tick 12:00Z: promoted residual R-m23-s2-X4 -> rb-10 (PR#57, 61b11d3). Hit REPO-OUT-OF-SYNC mid-tick (parallel tick's PR#55 claimed rb-9 first for a sibling residual) -- reconciled via merge bd3733a, corrected the residual ledger, re-promoted cleanly. queue[] holds rb-10 for next tick to launch. master CI green at ed0a8d9.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
