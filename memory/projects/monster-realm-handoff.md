@@ -1674,6 +1674,57 @@ orchestrator), verifier ran at its default pin. (3) Two self-inflicted traps, me
 diagnostic line stashed the uncommitted implementation. (4) `just ci` green locally (CI_EXIT=0);
 remote CI (ci + e2e) running at PR-open time.
 
+## rb-7 — DONE, PR open (2026-08-29)
+
+**PR https://github.com/mdrewt/monster-realm/pull/385** · branch `slice/rb-7` · worktree
+`projects/monster-realm/.claude/worktrees/rb-7` · ADR-0211 · **Acceptance 8/8 met, 0 unmet,
+1 sub-item DEFERred to backlog** (`memory/projects/gates/rb-7.gates.md`, seed e3b0c44298fc1c14).
+`just ci` exit 0 in the worktree: 95/95 evals 0 FAIL · `cargo nextest run --workspace` 2016 passed
+(fork 2007) · client vitest 96 files / 2818 tests · validate.mjs 8/8. Verifier APPROVE
+(recomputed every CHECK independently; test diff mechanically additions-only).
+
+**Two probe scripts live beside the ledger and are load-bearing for supervisor re-verify** —
+`gates/rb-7.x6-probe.mjs` (X6) and `gates/rb-7.x7-probe.mjs` (X7). `gates/` is gitignored, so they
+exist only on this machine. **Run `mr-gates check`/`verify` FROM THE WORKTREE ROOT** — every CHECK
+path is repo-relative.
+
+**TOUCHES-DELTA needing supervisor audit:** `game-core/src/accounts/mod.rs` and
+`game-core/src/lib.rs` are outside the literal declared set. One symbol was appended to each
+pre-existing `pub use` list. Taken deliberately, not silently: the planner and the reviewer
+independently judged the no-re-export variant actively harmful to this criterion, because
+`game-core/tests/m22_s1_deletion_surface.rs` exists to guarantee the flat `use game_core::TOMBSTONE_*;`
+path for S2/S3/S4, and leaving the deletion name as the one deep-path outlier is how an S3 author
+ends up reaching for the flat, familiar guest-claim constant. Measured gate-neutral.
+
+**Three findings worth carrying forward:**
+1. *The plan's threat model was one axis short, and an auditor — not a reviewer — found it.*
+   Narrowing the CONSTANT to private left `tombstoned_profile` `pub(crate)`, so the wrong tombstone
+   was still one plausibly-named helper call away from S3 — and reached that way it ALSO wipes
+   ladder stats. Three lenses read the plan without seeing it; the reducer-security-auditor found it
+   by asking "what else writes this value", not "is the pin forgeable".
+2. *A declaration-shape text pin is blind to reachability.* Red-team measured four bypasses that all
+   keep the const private: a `use` re-export, a `pub` accessor, a same-valued alias const, a
+   `macro_rules!` carrying the literal. The fix was three disjoint clauses (declaration shape /
+   identifier count / raw value count) plus the writer pin — and the `use` family turned out to be
+   closed by **rustc E0364** rather than by any tooth, which is stronger but must be stated honestly
+   rather than claimed as a gate win.
+3. *A value pin over raw source cannot be closed against a split literal.* `concat!("(claimed ",
+   "guest)")` and `"\u{28}claimed guest)"` are both green against the shipped gate; substring scans
+   cannot evaluate a macro or an escape. DEFERred to backlog with the buildable replacement named
+   (S6 asserts POSITIVELY that the cascade references the constant by symbol, RAW scan for literals).
+
+**Two full-CI-only false REDs hit while building, both already in memory but worth the reminder:**
+a slash-star glob spelled in a comment blanked 31 tables and reddened 5 unrelated evals; and
+`spacetime generate` textually rejects print macros anywhere in the module, `#[cfg(test)]` included.
+
+**Next:** supervisor owns the merge (`gh pr merge` is forbidden to the slice run). Remote CI was
+running at hand-off.
+
+## 2026-08-29T07:44:11Z — rb-7 merged (PR#385) — deletion display-name tombstone single-sourced
+Merged slice/rb-7 -> master (squash b7ce98a). Residual R-m22-s1-X2 closed. New game_core::TOMBSTONE_DISPLAY_NAME ("(deleted account)") is flat crate-root, distinct from ranking.rs's now module-private PROFILE_TOMBSTONE_NAME ("(claimed guest)"); ADR-0211 recorded, DIGEST regenerated. Gates 8/8 met, 1 deferred (X8-residual -> backlog, promoted separately for S6's evals/deletion-completeness.eval.mjs). mr-audit's mechanical pass reported a transient NOT-REVERIFIED on X7 (tool-side global-budget-exhausted, not a real gap) plus evidence_drift noise on X1/X4 timing strings; standalone mr-gates verify came back CLEAN 8/8, and I re-read X1/X2/X4 adversarially against the diff (module-private const, distinct sentinel values, test assertions on non-blank/trim-stability/distinctness) before merging. Worktree/branch cleaned; master fast-forwarded to b7ce98a. Master CI on the new merge commit was still in_progress at record time (its PR pre-merge checks were all green); next tick should confirm.
+## 2026-08-29T07:25:35Z — rb-7 PR opened, CI-wait delegated
+Native tick mr-sup-native-20260829T072535Z-1744233-32236 (07:24Z). Reconciled rb-7.done event: run finished rc=0, attempts=1, model=opus, opened PR #385 (mdrewt/monster-realm), 8/8 gates met (0 unmet, 1 deferred: X8-residual -> backlog, accounts.rs half of guest-claim-value ban). Verifier APPROVE. PR still UNSTABLE (CI running: ci + e2e both IN_PROGRESS). Reaped 2 stale per-run locks (rb-6, rb-7 — both session leaders confirmed dead via ps, both slices already terminal: rb-6 merged PR#384 per master history, rb-7 has open PR#385). No chain-owner mutex held. Delegated CI-wait for PR #385 to mr-ci-watch (detached pid 1744001, own session). Governor NORMAL (d7 $504.44/2783, fable_d7 $267.76/2298, fable_ok=true). No BLOCKERs. queue[] empty. Single mutating action this tick: CI-wait delegation; merge resumes via event tick when mr-ci-watch reports green.
+
 ## 2026-08-29T06:01:45Z — Launched rb-7 (opus@high, PROFILE_TOMBSTONE_NAME single-source fix)
 Native tick mr-sup-native-20260829T060009Z-1485824 (06:00Z). Gate-0: rb-6's per-run lock was stale (leader 1294612 dead, .done present) but already fully reconciled by the 05:00Z tick — master at 07a1c0c (rb-6 merged PR#384), residual R-m22-s1-X1 closed, R-m22-s1-R-m22-s1-X2 promoted to rb-7 and queue-added, harness main at 221d929. Live-reverified before acting: no open PRs either repo, master CI green, harness main in sync with origin, no operator hold, no resident-session collision. Fast path: queue[] had rb-7 ready; re-verified live — M-residual-backlog.spec.md ### rb-7 section exists, unblocked, no after: deps, not yet resolved. Derived touches from source slice m22-s1's S1 row (game-core/src/accounts/deletion.rs) plus the existing PROFILE_TOMBSTONE_NAME constant at server-module/src/ranking.rs:161 that the residual's own text names as the collision risk. Routine tier (name-tombstone SSOT fix touching game-core + one server-module constant, not schema/reducers/netcode/RLS) -> opus@high, matching rb-6's routing. Reserved ADR-0211. Launched via mr-spawn: LAUNCHED, leader=1487239, claude_pid=1487242, brief=16263 bytes; mr-gates seeded 0 criteria for rb-7 (residual-backlog section has no SHALL-formatted bullets yet -- pre-existing gap in promoted-residual sections, not this tick's doing). queue-removed rb-7. This tick's ONE action was the launch. Governor NORMAL (d7=$471.89/2783, fable_ok=true). No BLOCKERs.
 ## 2026-08-29T05:02:15Z — rb-7 residual promoted (aging drain)
@@ -1831,5 +1882,3 @@ Gate-0: no live per-run locks/mutex/.done; HOLD-NONE; no resident session collis
 Gate-0: no live per-run locks, no chain-owner mutex held, no operator hold, no resident-session collision (find -mmin -6 empty both repos; only pre-existing untracked proj .codegraph/ index left untouched). Both repos in sync with origin (harness main e9a26d1, proj master ab35926). Master CI green (rb-2 run, conclusion=success). No open PRs, no worktrees to reap, no /tmp .done files pending. queue[] was empty at gate-3 entry. Residuals: mr-gates residuals list --unclaimed showed 28 open, all unpromoted; oldest tier tied at age~4.1d (R-m22-s0-X2/X3/X4, disclosed 2026-08-24T08:37:17Z) -- past t1_promote_days=3, so per the aging doctrine this outranks new PLAN Sec.9 derivation. Promoted R-m22-s0-X2 (the next in gate_id sequence after X1/rb-2, already merged) into M-residual-backlog.spec.md as rb-3 (mr-gates residuals promote), queued it (mr-record queue-add --slice rb-3), shipped the spec change as a doc-only chore PR (#48, chore/residual-promote-20260828T110146Z). claude-harness repo has no branch-protection rules configured so --auto squash-merge is unavailable there (GraphQL error); merged directly with gh pr merge --squash --delete-branch instead -- CLEAN/MERGEABLE, no CI checks configured on this branch. Fast-forwarded local main to 0f1a9e2. X3/X4 remain unpromoted at the same age tier for a future tick. Governor NORMAL (d7=$184.51/2783 eff., fable_ok=true). No BLOCKER, no rate-limit event. Standing down after the single promote+merge action.
 ## 2026-08-28T10:01:57Z — rb-2 tick-record completed (interrupted prior tick)
 Native tick rid=native-20260828T100004Z-567080 (10:00Z). Gate-0 fast-path: no live per-run locks, no .done files, no chain mutex held -- reconciled from live ground truth. Found the prior tick (native-20260828T094909Z-553562, 09:56Z) had merged rb-2 (PR#378, ab35926) with CLEAN audits per its own notes, but the session was cut off before the git commit/push of its record artifacts (handoff, mr-state.json, mr-usage-daily.jsonl, monster-realm-rb-2-plan.md were all dirty/untracked in the working tree). Verified content sanity, committed+pushed as d370c42. Re-verified LIVE (not from the stale situation-bundle hint): master CI at ab35926 is now completed/success (was in_progress at bundle-generation time). origin/slice/rb-2 was already deleted server-side (PR state MERGED) -- local stale tracking ref pruned via fetch --prune. No new mutating action taken this tick (merge/launch/park); this was purely finishing an interrupted mechanical record step. Residual alarms carried forward unchanged from the prior tick's note: 23 unpromoted past t1=3d (oldest 4d), 30 open vs cap 12 -- per gate-3 aging rule the next tick should promote the oldest unpromoted residual before picking fresh PLAN work.
-## 2026-08-28T09:55:06Z — rb-2 MERGED — PR#378 (ab35926)
-Native tick rid=native-20260828T094909Z-553562. Gate-0: per-run lock rb-2 present, session_leader 376545 not alive, .done EXIT=0. PR#378 was CLEAN/mergeable, both checks (ci, e2e) SUCCESS. mr-audit: orchestration CLEAN (5 roles, 10 agent calls across fable/opus/sonnet), gating-test CLEAN, acceptance CLEAN (8/10 met, X9+X10 DEFERred to backlog), scope IN-SCOPE (evals/guest-claim-integrity.eval.mjs + ARCHITECTURE.md only). Hard-tier policy required a mandatory adversarial diff read (not just mechanical CLEAN) -- delegated to a subagent: verdict safe to merge, no vacuous classifier, no unsafe default on unknown policy value, closed-field-set + [G6/anchors] demotion-detection both hold; the one accepted limit (a hypothetical future 9th REKEY column isn't anchor-pinned until added) is documented in-code as by-design, not a silent gap. mr-gates verify: 8/8 gates reverified CLEAN, no evidence mismatch, 0 unmet. residual R-m22-s0-X1 closed via 'mr-gates residuals close --slice rb-2 --pr 378'. Squash-merged + branch deleted; local worktree/branch cleaned; harness main fast-forwarded to ab35926. Master CI was in_progress at tick exit (queued moments after merge) -- next tick's gate-0 should confirm green rather than assume from this entry. Residual-ledger note carried forward: mr-gates verify flagged 23 residuals unpromoted past t1=3d (oldest R-m22-s0-X4/X3/X2 at 4d) and 30 open residuals against a cap of 12 (observe-only) -- per doctrine gate 3 aging rule this now outranks new PLAN §9 work; next tick should promote the next oldest unpromoted residual before picking fresh work. No new launch this tick (composite merge->launch requires re-deriving eligibility fresh; deferring to keep this tick's diff-read attention un-split -- next tick launches).

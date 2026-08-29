@@ -1,0 +1,224 @@
+# rb-5 — plan memo (evals/run.mjs completeness guard)
+
+Slice: rb-5 · residual R-m22-s0-X4 · spec `M-residual-backlog.spec.md#rb-5`
+Branch: `slice/rb-5` · worktree `.claude/worktrees/rb-5` · fork `origin/master` d525eb3
+ADR: 209 (supervisor-assigned)
+
+## 1. TRIAGE — measured on the slice worktree at d525eb3
+
+`evals/run.mjs` is 39 lines. It globs `evals/*.eval.mjs`, `await import()`s each into ONE
+shared process, calls the default export, prints `eval PASS:`/`eval FAIL:`, counts failures,
+and ends with `process.exit(failed ? 1 : 0)`. Its only vacuity floor is `files.length === 0`.
+
+Because every eval's module BODY runs in this process, a module-scope `process.exit()`
+terminates the whole run mid-loop: the remaining evals never execute and the final
+`process.exit(failed ? 1 : 0)` never runs, so already-printed FAIL lines are swallowed.
+
+REPRODUCED hermetically (mkdtemp, real run.mjs copied in, `cd <tmp> && node evals/run.mjs`):
+
+| fixture | observed |
+|---|---|
+| FAIL, then module-scope `process.exit(0)`, then FAIL | 1 line printed, **exit 0** |
+| module-scope `process.exit = () => {}`, then a genuine FAIL | FAIL printed, **exit 0** |
+
+The second row is a DISTINCT measured class, found during triage and not named in the
+residual: neutering `process.exit` makes run.mjs's own final exit a no-op, and node then
+exits naturally with `process.exitCode === undefined` → 0. Same root cause — the verdict
+rides entirely on one `process.exit` call at the end of the loop.
+
+The live landmine is real and enumerated: **13 evals** ship a standalone-runner main guard
+`if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) { … process.exit(result.pass ? 0 : 1) }`.
+Under the harness `process.argv[1]` is `<repo>/evals/run.mjs` — a SIBLING path in the same
+directory — so any guard widened to `path.dirname(...)` or `endsWith('run.mjs')` fires at
+import time. That is exactly how m22-s0 measured 37/90 evals run and 3 FAILs swallowed.
+
+## 2. FIX (design)
+
+`process.exit(code)` sets `process.exitCode`, EMITS `'exit'`, and only THEN reads
+`process.exitCode` to really exit. Verified on the pinned node 24.13.1: a handler that sets
+`process.exitCode = 7` after `process.exit(0)` yields observed exit 7.
+
+So: count evals that reported in, and assert completeness at exit time.
+
+```js
+let failed = 0;
+let completed = 0;               // ++ AFTER the result line is printed
+process.on('exit', () => {       // registered after the zero-eval guard: `files` is populated
+  const incomplete = completed !== files.length;
+  if (incomplete) console.error('eval: INCOMPLETE RUN — <completed> of <files.length> …');
+  if ((incomplete || failed > 0) && !process.exitCode) process.exitCode = 1;
+});
+```
+
+Neither clause clobbers an already-non-zero code (a module-scope `process.exit(3)` still
+exits 3). The `failed > 0` clause is not speculative generality — it is the second MEASURED
+class above, and it costs one term in an existing boolean.
+
+## 3. SPIKE (design validated before tests, in a mkdtemp copy — nothing written to the worktree)
+
+| # | fixture | want | observed |
+|---|---|---|---|
+| F1 | 2 evals, all pass | 0 | 0 |
+| F2 | genuine FAIL | 1 | 1 |
+| F3 | FAIL → module-scope `exit(0)` → FAIL | non-zero | 1 |
+| F4 | LAST discovered file exits at module scope | non-zero | 1 |
+| F5 | `process.exit = () => {}` + a genuine FAIL | non-zero | 1 |
+| F6 | `process.exit(0)` from INSIDE `default()` | non-zero | 1 |
+| F7 | module-scope `process.exit(3)` | 3 (preserved) | 3 |
+
+## 4. OUT-OF-SCOPE FILES THAT SOURCE-SCAN run.mjs (must not break; both outside `touches:`)
+
+- `evals/ci-gate-wiring.eval.mjs:426 runMjsIsIntact()` requires the substrings
+  `files.length === 0`, `pass: false`, `process.exit(1)`, `catch`.
+- `evals/gate-hardening-config.eval.mjs:54 runMjsHasEvalIsolation()` requires
+  `try`, `catch`, `pass: false`.
+All five substrings verified present in the spiked file.
+
+## 5. /simplify verdict (own pass)
+
+- Minimum viable change is the counter + one exit handler. No new module, no new dependency,
+  no abstraction. KEEP.
+- `failed > 0`: KEEP — a measured second defect class, one boolean term, zero new structure.
+- Per-eval CHILD-PROCESS runner: REJECT as over-engineering AND as a behaviour change.
+  `ARCHITECTURE.md:104-109` and ADR-0208 document evals that deliberately rely on the shared
+  realm ("every eval shares ONE module instance under `run.mjs`" — the frozen `REKEY_MANIFEST`
+  seam, the rb-3 `Object.prototype` teeth). Forking per eval would break those gates and turn
+  a 39-line harness into a process pool. Out of slice, and not obviously desirable.
+- One `console.error`, not several: a single self-diagnosing sentence in CI beats a banner.
+
+## 6. TOUCHES
+
+Declared: `evals/run.mjs`.
+Companions used: `evals/run-completeness.eval.mjs` (the sibling test file for run.mjs — the
+repo's test tier for harness `.mjs` is the eval suite, and it auto-discovers), `docs/adr/209-*.md`,
+`docs/adr/DIGEST.md` (generated by `just adr-digest`; the adr-digest eval reds without it),
+`ARCHITECTURE.md` (one targeted sentence in the mechanical-gates section). All listed under
+`touches-delta:` in the PR body.
+
+CORRECTION (reviewer lens, adopted): `ARCHITECTURE.md:162` — "`evals/run.mjs` fails only at
+ZERO eval files, so an a11y eval can be DELETED with `just ci` staying green" — stays
+LITERALLY TRUE after this slice. A deleted file shrinks `files.length` itself before the loop
+starts, so `completed === files.length` holds trivially. This guard closes mid-loop
+TRUNCATION, not roster DECAY. The ARCHITECTURE edit must therefore ADD a sentence and
+explicitly scope the decay gap OUT, not amend :162. Lines 104-109 stay untouched: that is
+`rekey-contract-surface`'s own local defence against a widened main guard in one file, and it
+remains valid defence-in-depth.
+NOT touched: `CHANGELOG.md` (git-cliff), `docs/adr/README.md` (supervisor-owned).
+
+## 7. PLAN-LENS ADJUDICATION
+
+**reviewer** (closed):
+- B1 duplicate `let failed` → the spiked file declares `failed`/`completed` together once; the
+  original line 22 is REPLACED, not duplicated. Verified: the spike parses and runs.
+- M1 KEEP the terminal `process.exit(failed ? 1 : 0)`. Dropping it would make normal completion
+  depend on the event loop draining, and `account-e2e` spawns a `spacetime` host + a driver it
+  tears down with fire-and-forget kills — the explicit exit masks straggler handles. Trading a
+  fast wrong exit code for an intermittent hang is a worse gate. ADOPTED (the spike already
+  kept it; the handler fires on that call too and can still correct the code).
+- M2 ADR required → ADR-0209 written, with the `## Confirmation` section the harness
+  `standards/adr-process.md` requires and ADR-0208 sets precedent for. (Note: this project has
+  no `adr-lint.mjs` / `just adr-gate`; only `adr-digest-check` runs in `just ci`. The section is
+  authored to the standard, not to the tool.)
+- M3 the new invariant needs its own gate → `evals/run-completeness.eval.mjs`, BEHAVIOURAL
+  (spawns the shipped run.mjs over fixture corpora), which is strictly stronger than adding a
+  substring to the two out-of-touches source scans.
+- m1 RECORDED in the ADR: `ci-gate-wiring`'s `process.exit(1)` needle is satisfied by the
+  ZERO-EVAL guard, not the loop's terminal `process.exit(failed ? 1 : 0)`. Pre-existing.
+- m6 ADOPTED: track the in-flight filename so the diagnostic NAMES the truncating eval instead
+  of asking a reader to infer it from a gap in 94 log lines.
+- m7 ADOPTED: see the CORRECTION above.
+
+**planner** (closed):
+- Sentinel-delimited region + SPLICE-the-live-file to build the pre-fix mutant → ADOPTED. One SSOT;
+  no transcribed copy of the harness that could go stale (its own V3 vacuity shape).
+- Fixture roster F1-F10 + mutant clauses M0-M3 → ADOPTED as RC1-RC15 / RC-M0..M4.
+- `evals/run.mjs:14-20` FROZEN (the only `process.exit(1)` substring, pinned from two
+  out-of-touches files) → ADOPTED.
+- Filename must not end `-security`/`-privacy` (`scanner-migration-audit.eval.mjs` gated set) →
+  `run-completeness.eval.mjs` complies.
+- A2 flush hazard (`console.error` in an exit handler is async-to-pipe) → MEASURED, DID NOT
+  reproduce: guard marker lost 0/25 with both streams loaded. But child STDOUT was lost 4/20 when
+  the child exits with a loaded pipe, so the teeth redirect child stdio to FILES. `console.error`
+  kept; `writeSync` rejected as not buying the claimed safety (it throws on EPIPE too) once the
+  verdict is committed before the print.
+- "Do not author the ADR — DIGEST.md is a hidden dependency" → OVERRULED, with reason: the
+  orchestration prompt makes `docs/adr/**` an ALWAYS-in-scope companion and ASSIGNS number 209.
+  `docs/adr/DIGEST.md` is generated by `just adr-digest` and is listed under `touches-delta:`.
+  The planner's two secondary traps were real and are honoured: 4-digit filename (`0209-`, the
+  digest's `/^[0-9]{4}.*\.md$/` filter would have SILENTLY ignored `209-`), and no
+  `**Amends:** ADR-0208` (bidirectional backlink enforcement above id 0151 would demand an edit
+  inside 0208, which IS out of touches).
+- `.sort()` on discovery → DECLINED as a Boy Scout hunk. It is a behaviour change for 94 evals
+  with documented shared-realm coupling wearing a cleanup label. Logged as a follow-up.
+
+**red-team** (closed; it wrote and ran the cheats):
+- F1 CRITICAL, a genuine fail-OPEN in the first draft: a poisoned `console.error` inside the exit
+  handler aborts it, and node honours the code `process.exit(0)` already committed → exit 0.
+  REPRODUCED independently here: print-then-set = exit 0, set-then-print = exit 1, and
+  `process.exit(5)` still 5. Design CHANGED: verdict first, print second, print in a try/catch.
+  Gate X8 exists only because of this lens.
+- F2 `process.reallyExit(0)`, F3 later exit handler, F4 `exitCode` accessor, F5 hang → in-process
+  unclosable; DISCLOSED in the ADR and DEFERred, not chased.
+- F6 `res.pass` outside the try → pre-existing, fail-closed, better diagnosed; DEFERred.
+- V1 exit-code-only assertions are vacuous (an unrelated bad import also exits 1) and V2 substring
+  markers are vacuous (a FAIL whose detail merely contains the text) → both MEASURED; the teeth
+  assert the anchored stderr message with the exact `N of M` for that fixture plus the in-flight
+  filename, and RC13 proves the zero-eval signature is distinct.
+- V3 stale embedded copy / V4 cwd inheritance / V5 wrong-fail-misread → closed by the splice
+  design, an explicit `cwd`, and RC13 respectively.
+- CONFIRMED no regression: the patched harness over the real 94-eval directory is byte-identical
+  to the unpatched one.
+
+## 8. TESTER LENS — the RED measurement and one tooth returned
+
+INDEPENDENT pre-fix RED (orchestrator, on a staging copy of `git show HEAD:evals/run.mjs` + the
+tester's file), i.e. the ADR-0010 bite, and it is BEHAVIOURAL not structural:
+
+    RC1..RC7, RC12, RC14: "expected status 1, got 0"
+    RC-M0: "BEGIN sentinel occurs 0 time(s)" (+ RC-M1..M4 gated on it)
+    RC8-RC11, RC13, RC15: PASS pre-fix — correct, those are the negative controls that must hold
+    in BOTH states, and a tooth that flipped with the fix would be measuring the wrong thing.
+
+The distinction matters: RC-M0's red alone would be a structural "the sentinels aren't there yet"
+complaint that any typo produces. The nine status reds are the defect itself.
+
+RETURNED TO THE TESTER — RC6 (the deferred `setTimeout(() => process.exit(0), 0)` tooth) is a hard
+tooth that NEVER bites. Measured 40 runs each against the reference impl: the shipped corpus
+truncates 0/40 (every trailing `await import()` resolves from the fs cache inside one event-loop
+turn, so all 8 evals report in and the run correctly exits 0), while the same corpus with trailing
+evals awaiting a 1 ms macrotask truncates 40/40. The file's own KNOWN LIMIT paragraph had this
+inverted ("pushed heavily toward truncation"). A flaky-or-always-red tooth in a merge gate is worse
+than one fewer tooth, so the tester was asked to make it deterministic or delete it — the
+implementer may not edit its own gating test (testing-tdd anti-reward-hacking rule), which is
+exactly why this went back rather than being quietly patched here.
+
+## 9. GREEN — the measured record
+
+- Full `just ci` **exit 0** (lint · typecheck · test · eval · security · wasm · client-typecheck ·
+  client-test · observability-validate · perf-budget). Eval tier inside it: 95 PASS / 0 FAIL /
+  0 THREW / 0 `INCOMPLETE RUN`.
+- `evals/run-completeness.eval.mjs`: `(20 teeth verified)`, 0 failures in 25 consecutive
+  whole-eval runs (RC6, the only timing-shaped tooth, is now deterministic).
+- Pre-fix RED reproduced on a staging copy of `git show HEAD:evals/run.mjs`: RC1-RC7, RC12, RC14
+  all "expected status 1, got 0" — BEHAVIOURAL, plus RC-M0..M4 structurally gated. The
+  distinction is the point: RC-M0 alone would be a "sentinel missing" complaint any typo produces.
+- X6 mutation battery: **9/9 caught**, each by its pinned tooth.
+- Acceptance ledger: **8/10 met with captured evidence, 2 DEFERred to backlog, 0 unmet.**
+- `evals/run.mjs` diff is +53/-0 (purely additive); the frozen zero-eval guard is byte-unchanged.
+
+### /simplify (own pass, on the FINAL diff)
+- 21 code lines + 32 comment lines. The ratio is high but every paragraph records a MEASURED fact
+  a reader would otherwise re-derive (why the verdict precedes the print; why the terminal
+  `process.exit` is retained; why `completed++` sits after the print). House style in this repo
+  runs heavier still (`rekey-contract-surface.eval.mjs` carries an 80-line header).
+- No new module, no new dependency, no abstraction with one caller, no config knob. `inFlight` is
+  the only variable added purely for the diagnostic, and RC1/RC4 pin it, so it is not decorative.
+- The one thing deliberately NOT simplified away: the guard carries BOTH protections (verdict-first
+  AND the guarded print) although either alone suffices. Measured, and recorded in ADR-0209 —
+  keeping both costs two lines and makes a future single-sided edit safe.
+
+### Lens routing note
+`reducer-security-auditor` and `desync-guard` were NOT invoked. The diff contains no Rust, no
+`client/src`, no wasm boundary and no schema — there is no reducer surface and no
+determinism/prediction surface for either to audit, so running them would be a redundant lens
+rather than a distinct defect class (D3: prefer lenses that catch DIFFERENT bug classes).

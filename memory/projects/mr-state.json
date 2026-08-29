@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-29T06:02:00Z",
-  "updated_by": "mr-sup-native-20260829T060009Z-1485824",
+  "updated_utc": "2026-08-29T07:44:20Z",
+  "updated_by": "mr-sup-native-20260829T073733Z-1745992",
   "master": {
-    "sha": "07a1c0c",
-    "ci": "success (unchanged this tick)",
+    "sha": "b7ce98a",
+    "ci": "in_progress (post-merge run on b7ce98a; PR#385 pre-merge checks all green)",
     "nightly": "success"
   },
   "harness_main": {
@@ -12,19 +12,7 @@
     "ci": "no-remote-ci-local-gate-green (unchanged this tick)"
   },
   "adr_next_free": 212,
-  "inflight": [
-    {
-      "slice": "rb-7",
-      "run_id": "mr-spawn-20260829T060121Z-1487186",
-      "leader": 1487239,
-      "model": "opus",
-      "effort": "high",
-      "tier": "routine",
-      "repo": "project",
-      "adr_reserved": 211,
-      "launched_utc": "2026-08-29T06:01:21Z"
-    }
-  ],
+  "inflight": [],
   "awaiting_merge": [],
   "queue": [],
   "park_counters": {
@@ -32,7 +20,7 @@
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "Native tick mr-sup-native-20260829T060009Z-1485824 (06:00Z). Gate-0: rb-6 per-run lock stale (leader dead, .done present) but already fully reconciled by the prior 05:00Z tick (master 07a1c0c, rb-6 merged PR#384, residual promoted to rb-7 and queue-added, harness main 221d929). Live-reverified: no open PRs either repo, master CI green, harness main in sync with origin, no operator hold, no resident-session collision. Fast path: queue[] had rb-7 -- re-verified live (spec section exists, unblocked, no after: deps, not yet resolved) -- launched via mr-spawn (opus@high, routine tier, ADR-0211 reserved). queue-removed rb-7. This tick's ONE action was the launch. Governor NORMAL (d7=$471.89/2783, fable_ok=true). No BLOCKERs.",
+  "notes": "Native tick mr-sup-native-20260829T073733Z-1745992 (07:37Z). Event: mr-ci-watch reported PR#385 green (07:29:58Z), watcher pid 1744001 already exited. Re-verified live: PR#385 CLEAN/MERGEABLE, both checks SUCCESS, no locks/mutex/hold held. Acquired mutex. Ran mr-audit (--tier routine): overall FLAGGED due to a transient NOT-REVERIFIED on X7 (tool-side global-budget-exhausted mid-audit) plus evidence_drift timing-string noise on X1/X4 (recorded/fresh differ only in the '[ 0.00Xs]' prefix) -- re-ran `mr-gates verify` standalone: CLEAN, 8/8 met, 0 unmet, X7 reverified fine. Read X1/X2/X4 source adversarially (deletion_tests.rs assertions + module-private PROFILE_TOMBSTONE_NAME + distinct sentinel values) before trusting the CLEAN verdict -- held up. Merged PR#385 squash (b7ce98a), deleted branch+worktree, ff-only'd master to b7ce98a. Closed residual R-m22-s1-X2 (mr-gates residuals close --pr 385). Wrote ledger MERGED row (cost 0, wrapper's earlier reconcile row already carries the $31.52 run cost) + handoff entry (triggered an automatic archive rotation of 1 old entry; rotate also flagged 35 pre-existing entries with unparseable headers, pinned live -- pre-existing debt, not touched this tick). Governor NORMAL (d7=$504.93/2783, fable_ok=true). No BLOCKERs. queue[] empty -- next tick does the full PLAN section-9 derivation. Master CI on b7ce98a was still in_progress at record time (PR pre-merge checks were all green) -- next tick should confirm green.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "parked": [],
   "open_chore_prs": [],
@@ -62,5 +50,5 @@
     "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
   },
   "live_watchers": [],
-  "last_tick_utc": "2026-08-29T06:00:09Z"
+  "last_tick_utc": "2026-08-29T07:37:33Z"
 }
