@@ -4755,3 +4755,33 @@ Did not launch anything else this tick -- the promotion was the tick's one actio
 
 Governor NORMAL (d7=$367.60/2783 effective, fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs. No open PRs, no inflight runs. Standing down.
 
+## 2026-08-29 — rb-12 COMPLETE (PR #389 open, local gate green, 10/10 gates met)
+Slice rb-12 (residual R-m23-s2-X6) is at its terminal state: **PR #389 open, full local `just ci`
+green (exit 0, 98 evals, 2839 client tests), acceptance ledger 10/10 met, 0 deferred.** Supervisor
+owns the merge; `gh pr merge` was NOT run. Branch `fix/rb-12-css-scanner-agreement`, worktree at
+`.claude/worktrees/rb-12` (safe to remove after merge). ADR-**0215**.
+
+**The residual's premise was stale — the supervisor should read the PR body before auditing.** The
+eval reimplements NONE of `parseCssRules`/`findIdSelectors`/`srOnlyIsAccessible` (m23-s10 chose
+delegation). The real duplicate was the leaf `stripCssComments`, and the predicted "third variant"
+already existed. **DECLARED DEVIATION:** the brief's "do not consolidate — a .mjs cannot import a .ts"
+forbids the WRONG DIRECTION; `.ts -> .mjs` was measured to work, so the slice consolidated (into the
+`.mjs`) AND kept the shared corpus. Both plan lenses recommended this; the corpus-only fix the brief
+mandated was measured bypassable. Plan B (corpus-only, no consolidation) is a ~1h re-cut if rejected.
+
+**Open follow-ups this slice deliberately did NOT absorb (all outside `touches:`):**
+- RK-1: `evals/reduced-motion-hp-bar.eval.mjs:103` remains a third `stripCssComments`, and is NOT
+  convergeable — it refuses comment delimiters inside strings, which `indexShell.test.ts`'s A6a BAD
+  fixture 8 requires to parse. Needs a policy decision, not a refactor.
+- RK-2: `evals/reduced-motion-purity.eval.mjs:354` calls the now fail-loud stripper with no
+  try/catch. Measured inert today; would be a loud RED (never a false green). Two-line fix, own slice.
+- RK-3: `client/src/ui/overlayA11yWiring.test.ts:121` cites `indexShell.test.ts:1988`; stale by ~-50
+  lines after the deletion. Ungated comment citation.
+- RK-4: shipped `client/src/styles.css` has NO quoted string values, so the real-artefact scan
+  exercises only comment open/close — the string/escape half is synthetic-fixture-only.
+- `R-m23-s10-CSSDRIFT` is NOT closed by this slice.
+
+**Reusable artefact:** `memory/projects/rb-12.mutation-probe.mjs` (11 mutants, all bite their NAMED
+tooth; each verifies it actually applied). Do not delete — ledger gate X8 executes it.
+
+

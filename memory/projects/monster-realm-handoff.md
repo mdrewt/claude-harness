@@ -1952,6 +1952,8 @@ a slash-star glob spelled in a comment blanked 31 tables and reddened 5 unrelate
 **Next:** supervisor owns the merge (`gh pr merge` is forbidden to the slice run). Remote CI was
 running at hand-off.
 
+## 2026-08-29T22:02:32Z — Native tick 22:01Z: promoted residual R-m23-s6-A11Y-25 -> rb-13
+Gate-0: rb-12 per-run lock was stale (leader 2398491 dead, .done present) but already fully reconciled by the 20:39Z/20:43Z/21:03Z ticks (PR#389 merged, residual X6 closed) -- reaped via mr-unlock stale. No mutex, no hold, no resident-session collision, no open PRs, no inflight/parked slices. Gate-3: oldest unpromoted residual R-m23-s6-A11Y-25 (4.68d, past t1=3d) outranks new PLAN section-9 work. Read it: predicted gap (evals/keyboard-operable-rows.eval.mjs, S10-declared) CONFIRMED still missing live (S10 PR#370 shipped only 3 of its 5 declared eval files -- overlay-a11y-manifest, a11y-static-shell, reduced-motion-purity landed; contrast-ratio and keyboard-operable-rows did not). Promoted via mr-gates residuals promote -> rb-13 in M-residual-backlog.spec.md, shipped as doc-only chore/residual-promote-20260829T220143Z, gh pr create + --squash --auto (PR#60, mdrewt/claude-harness), merged clean, branch deleted both sides, mr-state.json/handoff advanced. mr-record queue-add rb-13 so next tick launches it off the fast path. Sibling R-m23-s6-A11Y-26 (same disclosed_at, same missing-eval root cause) left unpromoted for a future tick -- one residual promoted per tick per doctrine. STRAY NOTED, not touched this tick (one mutating action already spent): worktree/branch slice/rb-4 still present locally though its PR#380 merged -- orphaned cleanup, not parked/open/wip in the blocking sense, flag for a future tick composite. No launch this tick (budget NORMAL, d7=$659.62/2783, fable_ok=true -- unrelated to the no-launch decision, which is gate-3 residual-outranks-features).
 ## 2026-08-29T21:02:44Z — Native tick 21:00Z — recovered interrupted 20:39Z tick + dispositioned stale residual R-m23-s7-X11
 rid=mr-sup-native-20260829T210008Z-2559626. Gate-0: found the harness working tree carrying the 20:39Z tick's uncommitted mr-state.json/handoff.md/archive writes (that tick had fully merged rb-12 -- PR#389 squash-merged to master@2681ee6, residual R-m23-s2-X6 closed, worktree+branch cleaned, ledger MERGED+tick-ok rows written -- but crashed before its own git commit). Live-reverified before trusting it: gh pr view 389 state=MERGED, gh run list shows fix(rb-12) headSha=2681ee6 conclusion=success, mr-residuals.jsonl shows X6 status=closed by PR#389, no open PRs, no live locks/mutex/hold. Corrected the stale 'ci: pending-verify' in mr-state.json to 'green' before committing the recovery.
 
@@ -2098,33 +2100,4 @@ moved; the refresh belongs after the supervisor's squash-merge, on the main chec
 **Harness-side, uncommitted/untracked:** `specs/monster-realm-v2/M-residual-backlog.spec.md` (rb-6
 resolution note, PR #384 filled in), `memory/projects/monster-realm-rb-6-plan.md` (untracked, same
 precedent as rb-4/rb-5), `memory/projects/gates/rb-6.*` (gitignored).
-
-## 2026-08-29 — rb-12 COMPLETE (PR #389 open, local gate green, 10/10 gates met)
-Slice rb-12 (residual R-m23-s2-X6) is at its terminal state: **PR #389 open, full local `just ci`
-green (exit 0, 98 evals, 2839 client tests), acceptance ledger 10/10 met, 0 deferred.** Supervisor
-owns the merge; `gh pr merge` was NOT run. Branch `fix/rb-12-css-scanner-agreement`, worktree at
-`.claude/worktrees/rb-12` (safe to remove after merge). ADR-**0215**.
-
-**The residual's premise was stale — the supervisor should read the PR body before auditing.** The
-eval reimplements NONE of `parseCssRules`/`findIdSelectors`/`srOnlyIsAccessible` (m23-s10 chose
-delegation). The real duplicate was the leaf `stripCssComments`, and the predicted "third variant"
-already existed. **DECLARED DEVIATION:** the brief's "do not consolidate — a .mjs cannot import a .ts"
-forbids the WRONG DIRECTION; `.ts -> .mjs` was measured to work, so the slice consolidated (into the
-`.mjs`) AND kept the shared corpus. Both plan lenses recommended this; the corpus-only fix the brief
-mandated was measured bypassable. Plan B (corpus-only, no consolidation) is a ~1h re-cut if rejected.
-
-**Open follow-ups this slice deliberately did NOT absorb (all outside `touches:`):**
-- RK-1: `evals/reduced-motion-hp-bar.eval.mjs:103` remains a third `stripCssComments`, and is NOT
-  convergeable — it refuses comment delimiters inside strings, which `indexShell.test.ts`'s A6a BAD
-  fixture 8 requires to parse. Needs a policy decision, not a refactor.
-- RK-2: `evals/reduced-motion-purity.eval.mjs:354` calls the now fail-loud stripper with no
-  try/catch. Measured inert today; would be a loud RED (never a false green). Two-line fix, own slice.
-- RK-3: `client/src/ui/overlayA11yWiring.test.ts:121` cites `indexShell.test.ts:1988`; stale by ~-50
-  lines after the deletion. Ungated comment citation.
-- RK-4: shipped `client/src/styles.css` has NO quoted string values, so the real-artefact scan
-  exercises only comment open/close — the string/escape half is synthetic-fixture-only.
-- `R-m23-s10-CSSDRIFT` is NOT closed by this slice.
-
-**Reusable artefact:** `memory/projects/rb-12.mutation-probe.mjs` (11 mutants, all bite their NAMED
-tooth; each verifies it actually applied). Do not delete — ledger gate X8 executes it.
 
