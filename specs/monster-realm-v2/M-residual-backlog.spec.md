@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-7 — No display-name tombstone is single-sourced; PROFILE_TOMBSTONE_NAME is a wrong-but-plausib (from m22-s1 R-m22-s1-X2, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s1 · residual: R-m22-s1-R-m22-s1-X2
+
+Deferred with reason: Spec §3 requires player.name and profile.name to be overwritten with a tombstone, but §7.2's S1 row lists only six symbols and omits a name tombstone, so S1 shipped none. The only existing constant is server-module/src/ranking.rs:161 PROFILE_TOMBSTONE_NAME = '(claimed guest)', used by tombstoned_profile() for the GUEST-CLAIM flow, which also zeroes rating/wins/losses. If S3 reuses it a deleted acc
+
+EARS: No display-name tombstone is single-sourced; PROFILE_TOMBSTONE_NAME is a wrong-but-plausible duplicate S3 will reach for
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-6 — S3 will hard-RED [R/name-set]: SANCTIONED_REDUCERS is exact-set equality and does not cont (from m22-s1 R-m22-s1-X1, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s1 · residual: R-m22-s1-R-m22-s1-X1
