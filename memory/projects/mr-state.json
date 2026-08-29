@@ -1,9 +1,9 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-29T19:02:30Z",
- "updated_by": "native-20260829T190006Z-2396801",
+ "updated_utc": "2026-08-29T21:03:00Z",
+ "updated_by": "mr-sup-native-20260829T210008Z-2559626",
  "master": {
-  "sha": "a3404a0",
+  "sha": "2681ee6",
   "ci": "green",
   "nightly": "in_progress"
  },
@@ -12,18 +12,7 @@
   "ci": "no-remote-ci-local-gate-green (unchanged this tick)"
  },
  "adr_next_free": 216,
- "inflight": [
-  {
-   "slice": "rb-12",
-   "model": "opus",
-   "effort": "high",
-   "tier": "routine",
-   "adr": 215,
-   "run_id": "mr-spawn-20260829T190205Z-2398438",
-   "session_leader": 2398491,
-   "started_utc": "2026-08-29T19:02:09Z"
-  }
- ],
+ "inflight": [],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -31,7 +20,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick 19:00Z: gate-0/1 clean (no live locks/mutex/hold, no session collision besides harmless stray esbuild watchers orphaned from the already-removed rb-11 worktree). queue[] held rb-12 (promoted last tick, PR#59) -- re-verified live and valid, so this tick's action was the fast-path LAUNCH (not another residual promotion; 29 remain unpromoted, none past t2_stale_days=14). Derived touches [evals/a11y-static-shell.eval.mjs, client/src/indexShell.test.ts] from the residual's own text since source m23-s2's touches didn't literally apply. adr_next_free corrected 214->215 (stale; 0214 already on disk from rb-11) and now advanced to 216 post-reservation. Reaped dead rb-11 ci-watch entry (pid 2347361, confirmed dead) from live_watchers.",
+ "notes": "Native tick 21:00Z: recovered 20:39Z tick uncommitted mr-state/handoff writes (rb-12 merge live-reverified: PR#389 MERGED, master CI green@2681ee6, residual X6 closed, worktree/branch clean). Gate-3: no red/open/parked work; oldest unpromoted residual R-m23-s7-X11 (5.03d, past t1=3d) read and dispositioned wontfix -- its predicted gap (repo-wide reduced-motion-purity eval landing with S10) was already fulfilled by feat(m23-s10) PR#370 before promotion, so no slice launched for it. 28 unpromoted residuals remain, none past t2=14d. No launch this tick.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -61,5 +50,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-29T19:00:06Z"
+ "last_tick_utc": "2026-08-29T21:00:08Z"
 }

@@ -1952,6 +1952,16 @@ a slash-star glob spelled in a comment blanked 31 tables and reddened 5 unrelate
 **Next:** supervisor owns the merge (`gh pr merge` is forbidden to the slice run). Remote CI was
 running at hand-off.
 
+## 2026-08-29T21:02:44Z — Native tick 21:00Z — recovered interrupted 20:39Z tick + dispositioned stale residual R-m23-s7-X11
+rid=mr-sup-native-20260829T210008Z-2559626. Gate-0: found the harness working tree carrying the 20:39Z tick's uncommitted mr-state.json/handoff.md/archive writes (that tick had fully merged rb-12 -- PR#389 squash-merged to master@2681ee6, residual R-m23-s2-X6 closed, worktree+branch cleaned, ledger MERGED+tick-ok rows written -- but crashed before its own git commit). Live-reverified before trusting it: gh pr view 389 state=MERGED, gh run list shows fix(rb-12) headSha=2681ee6 conclusion=success, mr-residuals.jsonl shows X6 status=closed by PR#389, no open PRs, no live locks/mutex/hold. Corrected the stale 'ci: pending-verify' in mr-state.json to 'green' before committing the recovery.
+
+Gate-3: no master CI red, nothing open/parked. mr-gates residuals list --unclaimed: 29 unpromoted, oldest R-m23-s7-X11 at 5.03d -- past t1_promote_days=3, outranking new PLAN section-9 work per the aging rule. Read it before promoting: its reason text ('the repo-wide fixture-backed eval lands with S10') predicted evals/reduced-motion-purity.eval.mjs would ship with a future S10 slice. Checked live -- that file already exists (394 lines, git log shows feat(m23-s10) PR#370, merged 2026-08-25, BEFORE this residual's own disclosed_at 2026-08-24T20:14 -- wait, actually disclosed slightly before PR#370 merged same-day window; the eval was fixture-backed with T1-T10+ proof-of-teeth already in place). The predicted gap never existed as a real gap by the time anyone would promote it. Dispositioned as wontfix (MED severity, mine to disposition) rather than promoting a slice for a already-shipped criterion: 'mr-gates residuals disposition --id R-m23-s7-X11 --as wontfix --reason ...'.
+
+Did not promote/launch anything else this tick -- one action per tick. queue[] remains empty; 28 unpromoted residuals remain, none past t2_stale_days=14, next-oldest at 4.64d.
+
+Governor NORMAL (d7=$658.74/2783 effective, fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs, no rate-limit event. No open PRs, no inflight runs. Standing down.
+## 2026-08-29T20:43:56Z — rb-12 MERGED (PR #389 → master@2681ee6)
+Closed residual R-m23-s2-X6 (CSS-scanner dual-oracle drift, ADR-0010 proof-of-teeth): shared fixture corpus + comparison gate between the two stripCssComments implementations, consolidated to single-owner (ADR-0215). Audit CLEAN (orchestration/gating/acceptance all CLEAN, 10/10 gates met, spotcheck X2 agrees). Squash-merged, branch+worktree deleted, residual closed via mr-gates. Master CI queued at merge time; verifying live.
 ## 2026-08-29T19:02:38Z — rb-12 launched (residual R-m23-s2-X6 -> CSS-scanner dual-oracle agreement gate)
 Native tick rid=native-20260829T190006Z-2396801 (19:00Z). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no session collision (only stray orphaned esbuild watchers from the already-removed rb-11 worktree, and the wrapper/codegraph housekeeping pids -- noted, not acted on). Both repos in sync; project master CI green (a3404a0, rb-11 merge). No open PRs, no inflight/awaiting_merge. Gate-3: queue[] held rb-12 (promoted last tick, PR#59, spec section present in M-residual-backlog.spec.md, no existing branch/PR) -- re-verified live and valid, so this tick's action was the fast-path LAUNCH rather than promoting another residual (29 still unpromoted, oldest R-m23-s7-X11 at 4.95d, none past t2_stale_days=14). touches inherited from source m23-s2 did not literally apply (S2 owns the live-region/stylesheet scan, not the CSS scanner pair) -- derived actual touches [evals/a11y-static-shell.eval.mjs, client/src/indexShell.test.ts] from the residual's own deferred-reason text naming parseCssRules/findIdSelectors/srOnlyIsAccessible as the duplicated oracle (grep-confirmed: those three names exist in exactly these two files, nowhere else). adr_next_free in mr-state.json was stale at 214 (0214 already on disk, rb-11's ADR) -- corrected to 215, same gotcha as rb-10's launch. Launched rb-12 opus@high routine tier (no server-module/schema/reducer/netcode/security/RLS/M20/M25 surface, no resume-after-park, no prior failed attempt). mr-spawn reported LAUNCHED (leader=2398491, claude_pid=2398494, rid=mr-spawn-20260829T190205Z-2398438); GATES-SEEDED criteria=0 (the spec section is prose-only EARS with no bullet SHALL list) -- flagged for extra scrutiny at merge-time mr-gates verify, not treated as a launch blocker. queue-removed rb-12; ledger LAUNCHED row written. Governor NORMAL (d7=$631.00/2783 eff., fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs, no rate-limit event.
 ## 2026-08-29T18:01:49Z — Native tick 18:00Z — rb-10/rb-11 merge reconciled; promoted R-m23-s2-X6 -> rb-12
@@ -2089,21 +2099,32 @@ moved; the refresh belongs after the supervisor's squash-merge, on the main chec
 resolution note, PR #384 filled in), `memory/projects/monster-realm-rb-6-plan.md` (untracked, same
 precedent as rb-4/rb-5), `memory/projects/gates/rb-6.*` (gitignored).
 
-## 2026-08-28T23:03:21Z — native tick 23:00Z — recovered interrupted tick + promoted rb-6
-rid=native-20260828T230014Z-1055334. Gate-0/1: no live locks/mutex/hold, no session collision. Found the harness working tree carrying an interrupted 22:00-22:05Z tick's uncommitted state (fixed master CI red via PR#382, changelog-freshness, master 4b43dd9->d525eb3, plus a stray rb-4-plan.md) -- that tick crashed before its own commit step. Recovered it first (commit 05df202), re-verified live: PR#382 merged, changelog-freshness job success on manual workflow_dispatch run 33215217814, project repo already clean at d525eb3.
+## 2026-08-29 — rb-12 COMPLETE (PR #389 open, local gate green, 10/10 gates met)
+Slice rb-12 (residual R-m23-s2-X6) is at its terminal state: **PR #389 open, full local `just ci`
+green (exit 0, 98 evals, 2839 client tests), acceptance ledger 10/10 met, 0 deferred.** Supervisor
+owns the merge; `gh pr merge` was NOT run. Branch `fix/rb-12-css-scanner-agreement`, worktree at
+`.claude/worktrees/rb-12` (safe to remove after merge). ADR-**0215**.
 
-This tick's ONE mutating action per gate-3's aging rule: `mr-gates residuals list --unclaimed` showed 28 unpromoted residuals, several past t1_promote_days=3; oldest disclosed_at tied at 4.54d (R-m22-s1-X1/X2/X3, all 2026-08-24T10:00:40Z). Promoted the oldest (R-m22-s1-X1, "SANCTIONED_REDUCERS exact-set will hard-RED once S3 ships account_deletion_reaper") into rb-6 via `mr-gates residuals promote` + `mr-record queue-add`, opened doc-only chore PR#52 (chore/residual-promote-20260828T230209Z), squash-merged+auto-deleted (harness main c5cc586->e2b0429). Local reconciliation commit (05df202) and the remote squash landed as sibling commits off a2a723e -- merged with `git merge origin/main` (ort, no conflicts).
+**The residual's premise was stale — the supervisor should read the PR body before auditing.** The
+eval reimplements NONE of `parseCssRules`/`findIdSelectors`/`srOnlyIsAccessible` (m23-s10 chose
+delegation). The real duplicate was the leaf `stripCssComments`, and the predicted "third variant"
+already existed. **DECLARED DEVIATION:** the brief's "do not consolidate — a .mjs cannot import a .ts"
+forbids the WRONG DIRECTION; `.ts -> .mjs` was measured to work, so the slice consolidated (into the
+`.mjs`) AND kept the shared corpus. Both plan lenses recommended this; the corpus-only fix the brief
+mandated was measured bypassable. Plan B (corpus-only, no consolidation) is a ~1h re-cut if rejected.
 
-Did not launch anything else this tick -- the promotion was the tick's one action per doctrine ("that is one tick's action, and the next tick launches it off the fast path"). queue[] now holds rb-5 (still deferred pending a real review of its implementation surface per the 22:05Z tick's note -- evals/run.mjs completeness-check needs a design decision on where the check lives, not a fast-path launch) and rb-6 (freshly promoted, ready for next tick's fast-path re-verify-then-launch). X2/X3 (same source slice m22-s1, same age) remain unpromoted for a future aging pass.
+**Open follow-ups this slice deliberately did NOT absorb (all outside `touches:`):**
+- RK-1: `evals/reduced-motion-hp-bar.eval.mjs:103` remains a third `stripCssComments`, and is NOT
+  convergeable — it refuses comment delimiters inside strings, which `indexShell.test.ts`'s A6a BAD
+  fixture 8 requires to parse. Needs a policy decision, not a refactor.
+- RK-2: `evals/reduced-motion-purity.eval.mjs:354` calls the now fail-loud stripper with no
+  try/catch. Measured inert today; would be a loud RED (never a false green). Two-line fix, own slice.
+- RK-3: `client/src/ui/overlayA11yWiring.test.ts:121` cites `indexShell.test.ts:1988`; stale by ~-50
+  lines after the deletion. Ungated comment citation.
+- RK-4: shipped `client/src/styles.css` has NO quoted string values, so the real-artefact scan
+  exercises only comment open/close — the string/escape half is synthetic-fixture-only.
+- `R-m23-s10-CSSDRIFT` is NOT closed by this slice.
 
-Governor NORMAL (d7=$367.60/2783 effective, fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs. No open PRs, no inflight runs. Standing down.
-## 2026-08-28T22:05:44Z — correction: prior entry's backtick command got executed
-Prior entry (22:05Z, "fixed master CI red") reads "ran  (git-cliff) on branch" — the intended text was "ran `just changelog` (git-cliff)". My own --body arg used an unquoted heredoc (<<EOF instead of <<'EOF'), so the backtick-quoted `just changelog` inside the prose was executed as a command substitution instead of staying literal text (ran from $MEM cwd, no git-cliff/justfile context there, failed harmlessly with a stderr-only error, empty stdout). No destructive effect, no repo state touched by the stray exec. Flagging per the known python-docstring/backtick-in-heredoc trap so this does not get mis-read later as "no command was ever run" — the actual fix (PR#382, just changelog on the correct branch/cwd) is unaffected and already verified green.
-## 2026-08-28T22:05:09Z — native tick: fixed master CI red (changelog-freshness)
-rid=mr-sup-native-20260828T220054Z-1044338-30136 (22:00Z, forced=0). Gate-0/1/2: no live locks/mutex/hold, no session collision, remotes match. Stale rb-4 .done (EXIT=0 ATTEMPTS=2) confirmed already reconciled by an earlier tick (PR#380 merged 18:55Z, R-m22-s0-X4 already promoted to rb-5 per commit 9df9aff) -- ignored as stale exhaust, no action needed.
+**Reusable artefact:** `memory/projects/rb-12.mutation-probe.mjs` (11 mutants, all bite their NAMED
+tooth; each verifies it actually applied). Do not delete — ledger gate X8 executes it.
 
-Found master CI RED: Nightly changelog-freshness failing on master@4b43dd9 (ledger 36 entries / 6.5d stale, first seen 2026-08-26 at an earlier sha). Doctrine gate-3 priority: master CI red outranks everything else. Fix: checked out master, ran  (git-cliff) on branch chore/changelog-refresh-20260828T220134Z, diff was exactly the 36 missing entries appended, opened PR#382, squash-merged+auto-deleted branch (master 4b43dd9 -> d525eb3). Manually triggered workflow_dispatch on nightly.yml to confirm the fix live (scheduled Nightly won't re-run until 07:00Z) rather than trust the diff alone -- changelog-freshness job on the new run (33215217814) came back conclusion=success. Did not wait for the rest of that Nightly run (mutation/coverage are long-running and irrelevant to this gate).
-
-queue[] still holds rb-5 (spec_file M-residual-backlog.spec.md, ### rb-5 section confirmed present, non-blocked, no after: deps, no PR yet -- live-valid). Did NOT launch it this tick: rb-5's touches are declared '(inherit from source slice -- REVIEW)' and its own deferred-reason text says the completeness-check fix is OUT of evals/run.mjs's declared touches because the M22 spec forbids slices editing that file -- i.e. the correct implementation surface (a separate completeness-check script/CI wiring vs. editing run.mjs itself) needs a real REVIEW before a brief can be written, not just a re-verify-and-launch fast path. Left queue[rb-5] as-is for a tick with room to do that review (or escalate if it turns out to need mr-ask-drew).
-
-No open PRs, no inflight runs. Governor NORMAL (d7=$366.47/2783 effective, fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs. Standing down.
