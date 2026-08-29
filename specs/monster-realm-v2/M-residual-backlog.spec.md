@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-9 — A11Y-12 bans the '#' character, not reachability: attribute/universal/positional selectors (from m23-s2 X3, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s2 · residual: R-m23-s2-X3
+
+Deferred with reason: Red-team measured a biome-clean styles.css -- [id="help-overlay"]{visibility:hidden} etc -- that reds nothing, prints X3 GATE-GREEN, and in Chromium hides #help-overlay, blanks #help-hint and removes #a11y-live from the AX tree. Also measured: [id^=], div[id*=], :where([id=]), body>div:nth-child(11) and *{} each reproducing ADR-0151 D1's below-the-fold regression with H6/H7 green. m23-s2 closes th
+
+EARS: A11Y-12 bans the '#' character, not reachability: attribute/universal/positional selectors defeat it
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-8 — S8's grace countdown will duplicate DELETION_GRACE_MS_DEFAULT in TypeScript unless a wasm  (from m22-s1 R-m22-s1-X3, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s1 · residual: R-m22-s1-R-m22-s1-X3
