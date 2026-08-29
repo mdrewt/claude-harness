@@ -1,7 +1,7 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-29T18:05:00Z",
- "updated_by": "native-20260829T180012Z-2386136",
+ "updated_utc": "2026-08-29T19:02:30Z",
+ "updated_by": "native-20260829T190006Z-2396801",
  "master": {
   "sha": "a3404a0",
   "ci": "green",
@@ -11,25 +11,27 @@
   "sha": "221d929",
   "ci": "no-remote-ci-local-gate-green (unchanged this tick)"
  },
- "adr_next_free": 214,
- "inflight": [],
- "awaiting_merge": [],
- "queue": [
+ "adr_next_free": 216,
+ "inflight": [
   {
    "slice": "rb-12",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s2-X6",
-   "added_utc": "2026-08-29T18:01:30Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "06393f24d21b35c0e96d2c40b92d67e2f37e26cd"
+   "model": "opus",
+   "effort": "high",
+   "tier": "routine",
+   "adr": 215,
+   "run_id": "mr-spawn-20260829T190205Z-2398438",
+   "session_leader": 2398491,
+   "started_utc": "2026-08-29T19:02:09Z"
   }
  ],
+ "awaiting_merge": [],
+ "queue": [],
  "park_counters": {
   "14r-e": 1
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick 18:00Z: reconciled prior tick's stale mr-state.json (still showed rb-11 awaiting_merge/PR#388 checks-pending) against live ground truth -- both rb-10 (PR#387) and rb-11 (PR#388) confirmed MERGED (gh pr view state=MERGED, master ff'd to a3404a0), ledger already carried both MERGED rows from earlier ticks. Reaped rb-11's stale per-run lock (session_leader dead) via mr-unlock stale. queue[] was empty. Residuals: mr-gates residuals list --unclaimed showed 33 open (cap 12, observe-only), oldest unpromoted R-m23-s2-X6 (CSS scanner duplication risk once S10 lands) at age 5.16d, past t1_promote_days=3 -- outranks new PLAN Sec.9 work per the aging doctrine. Promoted R-m23-s2-X6 -> rb-12 in M-residual-backlog.spec.md, queued (mr-record queue-add). This is the tick's ONE action; the spec-change chore PR ships next.",
+ "notes": "Native tick 19:00Z: gate-0/1 clean (no live locks/mutex/hold, no session collision besides harmless stray esbuild watchers orphaned from the already-removed rb-11 worktree). queue[] held rb-12 (promoted last tick, PR#59) -- re-verified live and valid, so this tick's action was the fast-path LAUNCH (not another residual promotion; 29 remain unpromoted, none past t2_stale_days=14). Derived touches [evals/a11y-static-shell.eval.mjs, client/src/indexShell.test.ts] from the residual's own text since source m23-s2's touches didn't literally apply. adr_next_free corrected 214->215 (stale; 0214 already on disk from rb-11) and now advanced to 216 post-reservation. Reaped dead rb-11 ci-watch entry (pid 2347361, confirmed dead) from live_watchers.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -58,14 +60,6 @@
   "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
- "live_watchers": [
-  {
-   "type": "ci-watch",
-   "slice": "rb-11",
-   "pr": 388,
-   "pid": 2347361,
-   "started_utc": "2026-08-29T17:05:01Z"
-  }
- ],
- "last_tick_utc": "2026-08-29T15:39:04Z"
+ "live_watchers": [],
+ "last_tick_utc": "2026-08-29T19:00:06Z"
 }
