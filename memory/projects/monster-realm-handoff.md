@@ -1674,6 +1674,24 @@ orchestrator), verifier ran at its default pin. (3) Two self-inflicted traps, me
 diagnostic line stashed the uncommitted implementation. (4) `just ci` green locally (CI_EXIT=0);
 remote CI (ci + e2e) running at PR-open time.
 
+## 2026-08-29T02:02:48Z — rb-6 launched (opus@high, guest-claim-integrity.eval.mjs SANCTIONED_REDUCERS fix)
+Native tick rid=mr-sup-native-20260829T020125Z-1293837-2557 (02:01Z). Recovered the prior
+00:56Z tick's uncommitted state first (commit e3e858f): that tick had merged rb-5 PR#383
+(evals/run.mjs completeness fix, ADR-0209 -> master 013b3f8) live but crashed before its own
+tick-record commit. Verified live: no open PRs either repo, master ci+e2e SUCCESS at exact head
+013b3f8, chain-owner mutex stale (owner pid 1268408 dead, heartbeat 00:56:58Z) -> released via
+mr-unlock mutex, no live per-run locks, no operator hold, no resident-session collision (empty
+find -mmin -6 both repos). Gate-3: no residual past t2_stale_days=14 (oldest 4.67d); several past
+t1_promote_days=3 but queue[] already held rb-6 from a prior promotion per the last tick's own
+note ("first candidate for the fast path") -- re-verified it live (spec heading exists at
+specs/monster-realm-v2/M-residual-backlog.spec.md:29, not blocked:, no after: deps, not already
+merged) and launched it rather than promoting another residual this tick, per the fast-path rule.
+rb-6 = residual R-m22-s1-X1: evals/guest-claim-integrity.eval.mjs's SANCTIONED_REDUCERS is
+exact-set equality (5 names) and will hard-RED [R/name-set] the moment S3 declares
+account_deletion_reaper. touches inherited "REVIEW" from source slice m22-s1 -- flagged in the
+brief for the run to confirm actual scope on read. Launched opus@high/routine tier, ADR-0210,
+detached (leader pid 1294612, claude_pid 1294615), mr-spawn LAUNCHED cleanly. queue-removed rb-6.
+Ledger LAUNCHED row written. Governor NORMAL (d7=$436.82/2783, fable_ok=true). No BLOCKERs.
 ## 2026-08-29T00:59:31Z — rb-5 merged (PR#383)
 Merged evals/run.mjs exit-verdict completeness guard (ADR-0209) to master @013b3f8, squash+delete-branch. Audits CLEAN across orchestration/gating/acceptance (8/10 met, 2 deferred X9/X10->backlog, 0 unmet; spotcheck X2 agrees). Residual R-m22-s0-X4 closed via mr-gates residuals close --pr 383. Master CI for the merge commit was in_progress at record time (Nightly on prior sha was green). No new work launched this tick beyond the merge (single mutating action); next tick should re-derive eligibility fresh for a composite launch.
 ## 2026-08-29T00:53:27Z — rb-5: PR#383 opened, CI-watch delegated
@@ -1759,7 +1777,6 @@ Pick-work: mr-gates residuals list --unclaimed showed 31 open residuals; oldest 
 Reconciling local main (which had 2 unpushed chore(mr-sup) commits) against the resulting origin/main required a merge commit (084ee39) rather than ff-only, since both sides advanced from the same base; resolved by keeping local's newer handoff/mr-state snapshot content (the incoming side only touched the backlog spec file, which took with no conflict). Local main remains ahead of origin/main by unpushed chore commits (routine, known gap — chore(mr-sup) records are pushed only via PR branches, not directly).
 
 No new work launched this tick — the queue-add to rb-1 was the one mutating action; the next tick's fast path re-verifies rb-1 live and launches it. Governor NORMAL (d7=$37.19 of $2783 weekly). No BLOCKERs, no rate-limit event.
-## 2026-08-28T01:43:56Z — PR#377 (fix-nightly-coverage-wasm) merged — nightly coverage gate restored
-Native tick rid=native-20260828T014142Z-150567. Gate-0/1: no live per-run locks, no chain-owner mutex, no operator hold, no resident-session collision. EVENT: PR#377 all checks green. Reconciled from live PR state (mergeStateStatus CLEAN, mergeable). No .done/lock artifacts remained for this slice (log present, .err empty, no .done -- treated per doctrine as an abrupt-SIGKILL-of-the-wrapper case; the mechanical remainder was just the merge). Diff: .github/workflows/nightly.yml, ARCHITECTURE.md, evals/nightly-coverage-wasm-wiring.eval.mjs, justfile -- matches declared touches (justfile) plus incidental doc/workflow/eval files from the fix's own scope, no scope violation. mr-audit: orchestration CLEAN (planner/red-team/reviewer/tester/verifier, opus-5), gating_advisory CLEAN, acceptance ledger FLAGGED (X4 'just coverage', X6 'just eval' EVIDENCE-MISMATCH). Adjudicated: this environment's Bash tool lacks wasm-pack/cargo (confirmed by direct repro: 'wasm-pack: not found' exit 127 in the slice worktree), unlike CI which provisions the toolchain per gate X3 (verified PASS, unaffected). Remote gh checks ci+e2e both passed. Teeth spotcheck (X5, 49/49 bit) reproduced exactly matching recorded evidence. Treated as CLEAN-in-effect, not a real regression. Squash-merged 7e75cbd, worktree+local branch cleaned, remote branch auto-deleted. Closed duplicate nightly-coverage issues #362/#372/#374/#375 referencing #377. Post-merge master CI (7e75cbd) kicked off in_progress at record time -- not yet re-verified green; next tick or event should confirm. Ledger row recorded MERGED. Budget state NORMAL (d7=$36.42 of $2783 weekly).
 ## 2026-08-28T01:29:23Z — Native tick — fix-nightly-coverage-wasm PR#377 CI-watch delegated
 Native tick rid=mr-sup-native-20260828T012858Z-147751-24456. Reconciled the fix-nightly-coverage-wasm .done event (rc=0, attempts=3, model=opus): the run's own branch (fix/fix-nightly-coverage-wasm) violated the repo's slice/<id> naming convention, so its attempts 2-3 renamed it to slice/fix-nightly-coverage-wasm, pushed, opened PR#377 (base master, justfile coverage: wasm dependency fix for the red Nightly job), and closed the superseded PR#376 (same commit 58d7ed3) with its stale branch deleted. Verified live: PR#377 OPEN, mergeStateStatus UNSTABLE, mergeable=MERGEABLE, both ci+e2e checks IN_PROGRESS. Per-run lock's session_leader (12332) was dead -- reaped via mr-unlock stale. Delegated CI-wait to mr-ci-watch (pid 148042, detached) rather than polling; resumes via event tick on completion. No merge yet. Governor NORMAL (d7=$35.81, well under soft-pause). No BLOCKERs.
+
