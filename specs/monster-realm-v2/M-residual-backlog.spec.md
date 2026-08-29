@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-11 — aria-modal=true on the eleven shells puts the single #a11y-live region in the AT-inert sub (from m23-s2 X5, deferred 2026-08-24)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s2 · residual: R-m23-s2-X5
+
+Deferred with reason: Spec 2.4 places the live region as a direct <body> child; A11Y-13 puts aria-modal=true on every shell root. While any overlay is open, AT is instructed to ignore everything outside the dialog -- including the one node S1 announces through. NVDA/JAWS usually still speak it, VoiceOver/Safari frequently do not, so the failure is silent and AT-dependent. The two decisions were made in different spec s
+
+EARS: aria-modal=true on the eleven shells puts the single #a11y-live region in the AT-inert subtree
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-10 — The spec-2.5 reduced-motion CSS guard for the battle HP bar is owned by NO slice (from m23-s2 X4, deferred 2026-08-24)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s2 · residual: R-m23-s2-X4
