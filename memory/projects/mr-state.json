@@ -20,7 +20,7 @@
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "mr-sup-native-20260830T030009Z-2852348 (03:00Z): dispositioned R-m23-s6-A11Y-26 as wontfix (already shipped by rb-13/PR#390). No launch/merge this tick.",
+  "notes": "2026-08-30T04:00Z tick: dispositioned R-m23-s10-X17 wontfix (spec-accepted residual). No launch/merge/promote. queue[] left as-is (re-read fresh, not overwritten).",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "parked": [],
   "open_chore_prs": [],
