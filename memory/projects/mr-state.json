@@ -1,10 +1,10 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-30T19:30:00Z",
- "updated_by": "mr-sup-native-20260830T192635Z-3636120-28520",
+ "updated_utc": "2026-08-30T21:36:00Z",
+ "updated_by": "mr-sup-native-20260830T213158Z-3797314",
  "master": {
-  "sha": "eca6752471142ee561a6c6e35eb55f9de6eb21f5",
-  "ci": "success",
+  "sha": "3b2bcb2536fc397497d75db1db11ec032e22a1ae",
+  "ci": "in_progress",
   "nightly": "in_progress"
  },
  "harness_main": {
@@ -12,14 +12,7 @@
   "ci": "no-remote-ci-local-gate-green"
  },
  "adr_next_free": 219,
- "inflight": [
-  {
-   "slice": "rb-19",
-   "run_id": "mr-spawn-20260830T193603Z-3642908",
-   "session_leader": 3642961,
-   "started_utc": "2026-08-30T19:36:10Z"
-  }
- ],
+ "inflight": [],
  "awaiting_merge": [],
  "queue": [
   {
@@ -36,7 +29,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "rb-18 MERGED (PR#394 -> master@eca6752, CI verified green live). Composite launch: rb-19 launched (residual X10/m23-s11, axe-core+Playwright a11y-e2e tier per spec sec.5.7 DECIDED; adr reserved 218). adr_next_free now 219. rb-20 remains queued (shares Playwright/dependency surface with rb-19 -- not launched this tick, note for fan-out check when it goes). 6 residuals past t1_promote_days still unpromoted -- next tick should promote if rb-19 finishes before them.",
+ "notes": "rb-19 MERGED (PR#395 -> master@3b2bcb2, squash+delete-branch). mr-gates verify CLEAN 8/8; mr-audit orchestration CLEAN, acceptance CLEAN 8/8 (first invocation mis-passed --repo as a github slug -> AUDIT-ERROR/FLAGGED, corrected to worktree path), gating_advisory FLAGGED-then-cleared (skip_markers_added=1 was a false positive on the literal word 'skipped' inside a passing assertion, no real skip/xit/.only/#[ignore] in the diff). Residual R-m23-s11-X10 closed via mr-gates residuals close. 6 new residuals disclosed (incl. R-rb-19-HOLLOWSPEC, HIGH -- do not disposition without mr-ask-drew) sit in the aging queue, not defers. Worktree+branch cleaned, local checkout ff-only to 3b2bcb2. Master CI in_progress at write time -- next tick must re-verify green live. rb-20 remains queued unchanged.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -66,5 +59,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-30T19:36:10Z"
+ "last_tick_utc": "2026-08-30T21:36:00Z"
 }
