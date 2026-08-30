@@ -3,12 +3,12 @@
  "updated_utc": "2026-08-30T15:38:00Z",
  "updated_by": "mr-sup-native-20260830T153207Z-3416185",
  "master": {
-  "sha": "7b3f44f",
+  "sha": "3455155770213ed5e81e5e9116925e4645ef80de",
   "ci": "success",
   "nightly": "in_progress"
  },
  "harness_main": {
-  "sha": "c97b3b6",
+  "sha": "0edbdae",
   "ci": "no-remote-ci-local-gate-green"
  },
  "adr_next_free": 217,
