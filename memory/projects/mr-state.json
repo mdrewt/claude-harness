@@ -1,10 +1,10 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-30T21:36:00Z",
- "updated_by": "mr-sup-native-20260830T213158Z-3797314",
+ "updated_utc": "2026-08-30T22:02:35Z",
+ "updated_by": "mr-sup-native-20260830T220011Z-3807493",
  "master": {
   "sha": "3b2bcb2536fc397497d75db1db11ec032e22a1ae",
-  "ci": "in_progress",
+  "ci": "success",
   "nightly": "in_progress"
  },
  "harness_main": {
@@ -12,24 +12,22 @@
   "ci": "no-remote-ci-local-gate-green"
  },
  "adr_next_free": 219,
- "inflight": [],
- "awaiting_merge": [],
- "queue": [
+ "inflight": [
   {
    "slice": "rb-20",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s11-X11",
-   "added_utc": "2026-08-30T17:01:49Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "3455155770213ed5e81e5e9116925e4645ef80de"
+   "run_id": "mr-spawn-20260830T220215Z-3809122",
+   "session_leader": 3809212,
+   "started_utc": "2026-08-30T22:02:19Z"
   }
  ],
+ "awaiting_merge": [],
+ "queue": [],
  "park_counters": {
   "14r-e": 1
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "rb-19 MERGED (PR#395 -> master@3b2bcb2, squash+delete-branch). mr-gates verify CLEAN 8/8; mr-audit orchestration CLEAN, acceptance CLEAN 8/8 (first invocation mis-passed --repo as a github slug -> AUDIT-ERROR/FLAGGED, corrected to worktree path), gating_advisory FLAGGED-then-cleared (skip_markers_added=1 was a false positive on the literal word 'skipped' inside a passing assertion, no real skip/xit/.only/#[ignore] in the diff). Residual R-m23-s11-X10 closed via mr-gates residuals close. 6 new residuals disclosed (incl. R-rb-19-HOLLOWSPEC, HIGH -- do not disposition without mr-ask-drew) sit in the aging queue, not defers. Worktree+branch cleaned, local checkout ff-only to 3b2bcb2. Master CI in_progress at write time -- next tick must re-verify green live. rb-20 remains queued unchanged.",
+ "notes": "rb-19 merge record committed as catch-up (cac654d, was uncommitted from prior tick). rb-20 LAUNCHED this tick (residual X11/m23-s11, reduced-motion Playwright oracle; adr reserved 219; must deliberately resolve a11y.spec.ts collection collision per rb-19's handoff note). queue now empty. 6 residuals past t1_promote_days still unpromoted (oldest 6d, none past t2=14d) -- next tick should promote the oldest if rb-20 hasn't finished.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -59,5 +57,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-30T21:36:00Z"
+ "last_tick_utc": "2026-08-30T22:02:35Z"
 }
