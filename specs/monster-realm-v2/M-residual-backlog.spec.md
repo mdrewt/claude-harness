@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-15 — X18 (from m23-s10 X18, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s10 · residual: R-m23-s10-X18
+
+Deferred with reason: consolidate the CSS oracle so `[A11Y-06]`/`[A11Y-07]` need no delegation pin. `parseCssRules`/`findIdSelectors`/`srOnlyIsAccessible` exist exactly ONCE, module-locally, at `client/src/indexShell.test.ts:1001`/`:1113`/`:1408`. This slice deliberately did NOT duplicate them (X6, and the plan memo section 1 D3): red-team MEASURED that the shared-fixture-corpus mechanism correction (3) [R-m23-s2-X6] p
+
+EARS: X18
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-14 — X16 (from m23-s10 X16, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s10 · residual: R-m23-s10-X16
