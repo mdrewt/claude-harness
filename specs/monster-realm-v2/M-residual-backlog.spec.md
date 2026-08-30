@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-16 — X19 (from m23-s10 X19, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s10 · residual: R-m23-s10-X19
+
+Deferred with reason: retire the three now-superseded hand-kept `.focus(` file lists that X1/X2 subsume: `client/src/ui/renameView.test.ts:501` (`S3-NO-VIEW-LOCAL-FOCUS`, 10 files — its own `it()` title says "delete when S10 ships"), `renameView.test.ts:1300` (`S4-VIEW-LOCAL-FOCUS-5`) and `client/src/ui/menuView.test.ts:1755` (`MV-NO-FOCUS-CALL`). Blocked: both files are outside this slice's `touches:`, and `renameView
+
+EARS: X19
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-15 — X18 (from m23-s10 X18, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s10 · residual: R-m23-s10-X18
