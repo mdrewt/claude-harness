@@ -4,7 +4,7 @@
  "updated_by": "mr-sup-native-20260830T192635Z-3636120-28520",
  "master": {
   "sha": "eca6752471142ee561a6c6e35eb55f9de6eb21f5",
-  "ci": "in_progress",
+  "ci": "success",
   "nightly": "in_progress"
  },
  "harness_main": {
