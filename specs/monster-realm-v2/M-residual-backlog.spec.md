@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-17 — X20 (from m23-s10 X20, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s10 · residual: R-m23-s10-X20
+
+Deferred with reason: three residuals this slice MEASURED but deliberately did not close, each because the fix needs files outside its `touches:`. (a) **R-m23-s10-RMCSS**: a `@media (prefers-reduced-motion: reduce){:root{--mr-reduce:1}}` block in `client/src/styles.css`, read back via `getComputedStyle(...).getPropertyValue`, escapes all three `[A11Y-RM2]` scans — the walker collects `.ts`-family files only and the sty
+
+EARS: X20
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-16 — X19 (from m23-s10 X19, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s10 · residual: R-m23-s10-X19
