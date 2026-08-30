@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-30T07:01:37Z",
-  "updated_by": "mr-sup-native-20260830T070035Z-2896696-24655",
+  "updated_utc": "2026-08-30T09:24:30Z",
+  "updated_by": "mr-sup-native-20260830T091730Z-3073410",
   "master": {
-    "sha": "32dc092",
-    "ci": "success",
+    "sha": "09c75dc",
+    "ci": "in_progress",
     "nightly": "in_progress"
   },
   "harness_main": {
@@ -12,19 +12,7 @@
     "ci": "no-remote-ci-local-gate-green (pushed to origin/main this tick)"
   },
   "adr_next_free": 217,
-  "inflight": [
-    {
-      "slice": "rb-15",
-      "run_id": "mr-spawn-20260830T070111Z-2897217",
-      "session_leader": 2897270,
-      "model": "opus",
-      "effort": "high",
-      "tier": "routine",
-      "repo": "project",
-      "pr_repo": "mdrewt/monster-realm",
-      "started_utc": "2026-08-30T07:01:15Z"
-    }
-  ],
+  "inflight": [],
   "awaiting_merge": [],
   "queue": [],
   "park_counters": {
@@ -32,7 +20,7 @@
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "2026-08-30T07:00Z tick: gate-0 clean (no live locks/mutex/hold; rb-11 worktree esbuild pids stale from a removed worktree, not a human-session collision). No open PRs either repo. Fast-path: queue[0]=rb-15 re-verified live (spec section present, no blocked:/after: deps, not merged) -- derived concrete touches from source S10 grep (evals/a11y-static-shell.eval.mjs + client/src/indexShell.test.ts both define parseCssRules/findIdSelectors/srOnlyIsAccessible; spec's own touches line said 'inherit -- REVIEW'). Launched rb-15 (opus@high, routine tier, project repo) via mr-spawn; LAUNCHED, detachment+model asserted (leader 2897270, own session, PPID 1). queue-removed rb-15. Note: mr-gates seeded criteria=0 for rb-15 -- residual-promotion slices may not carry parseable SHALL criteria; watch this slice's ledger at merge time and adjudicate via spotcheck rather than assuming full DoD coverage.",
+  "notes": "2026-08-30T09:17Z tick: reconciled the rb-15.done event (EXIT=0, ATTEMPTS=1, opus). PR #391 was OPEN/CLEAN with ci+e2e both SUCCESS -- ran mr-gates verify (11/11 gates re-verified CLEAN, spotcheck X4 survived an adversarial re-read) and mr-audit before merging. First mr-audit pass pointed --log at the CI log by mistake and mis-flagged orchestration; rerun against the real run transcript (/tmp/mr_pass_rb-15.log) showed orchestration CLEAN (8 agent calls: doc-keeper/planner/red-team/reviewer/tester/verifier). gating_advisory tripwire FLAGGED on 22 removed-asserts + 1 skip-marker hit -- adjudicated both as false positives (asserts were deleted duplicate oracle fns now delegated per ADR-0215, the point of the slice; skip-marker hit was the eval's own anti-suspension detector string literal, not a real skip). Squash-merged PR#391 -> 09c75dc, deleted remote+local slice/rb-15 branch, removed worktree, ff-only'd local master. Closed residual R-m23-s10-X18. Ledger+handoff recorded, per-run lock reaped via mr-unlock stale. Master CI on 09c75dc was still in_progress at tick end -- NEXT TICK MUST re-verify green before any further mutating action. Did NOT compose a launch this tick: full residual derivation shows 11 unpromoted residuals already past t1_promote_days=3 (oldest ~5.08d: R-m23-s10-X19/X20/X21), which per gate-3 aging rule outrank new PLAN section-9 work -- but promoting a residual is not the sanctioned merge->launch composite, so it is deferred to a fresh tick rather than chained here.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "parked": [],
   "open_chore_prs": [],
@@ -47,7 +35,7 @@
     "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said.",
     "found_easily": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects template + launch script + AGENTS.md two-location note were all accurate; only the harness-vs-project spec path lacked an absolute anchor in the task.",
-    "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation."
+    "gh_cli_path": "gh is NOT on the default PATH in this native env — it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation."
   },
   "native_supervisor": {
     "active_since": "2026-07-21T16:10:57Z",
@@ -62,5 +50,5 @@
     "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
   },
   "live_watchers": [],
-  "last_tick_utc": "2026-08-30T06:02:29Z"
+  "last_tick_utc": "2026-08-30T09:17:30Z"
 }
