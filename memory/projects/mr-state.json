@@ -1,18 +1,30 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-30T10:03:00Z",
-  "updated_by": "mr-sup-native-20260830T100013Z-3110881",
+  "updated_utc": "2026-08-30T11:03:30Z",
+  "updated_by": "mr-sup-native-20260830T110011Z-3124167",
   "master": {
     "sha": "09c75dc",
     "ci": "success",
     "nightly": "in_progress"
   },
   "harness_main": {
-    "sha": "34aab70",
-    "ci": "no-remote-ci-local-gate-green (pushed to origin/main this tick)"
+    "sha": "c97b3b6",
+    "ci": "no-remote-ci-local-gate-green"
   },
   "adr_next_free": 217,
-  "inflight": [],
+  "inflight": [
+    {
+      "slice": "rb-16",
+      "run_id": "mr-spawn-20260830T110201Z-3125649",
+      "session_leader": 3125702,
+      "claude_pid": 3125705,
+      "model": "opus",
+      "effort": "high",
+      "tier": "routine",
+      "repo": "project",
+      "started_utc": "2026-08-30T11:02:06Z"
+    }
+  ],
   "awaiting_merge": [],
   "queue": [],
   "park_counters": {
@@ -20,7 +32,7 @@
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "2026-08-30T10:00Z tick: found the 09:17Z tick's rb-15-merge record uncommitted (mr-state.json/handoff/ledger content was correct, just never git-committed) -- committed it as f025834 before doing anything else. Pushed harness main (was 1 ahead of origin). Re-verified proj master CI on 09c75dc = SUCCESS. No open PRs, queue/inflight both empty at gate-3. mr-gates residuals list --unclaimed: 24 open, oldest 3 tied at 5.11d (R-m23-s10-X19/X20/X21, all source m23-s10, disclosed 2026-08-25T07:26:22Z) -- past t1_promote_days=3, none past t2_stale_days=14. Promoted X19 (lowest-numbered of the tie) -> rb-16, queue-added it. Shipped as doc-only chore PR#63, squash-auto-merged -> 34aab70, ff-only'd local main, stray branch cleaned. PROMOTED ledger row written (n/a model, cost 0). This was the tick's ONE action -- promoting is not the sanctioned merge->launch composite, so rb-16 stays queued for a fresh tick to launch. Governor NORMAL (d7=$783.98/2783, fable_ok=true). No BLOCKERs. Note for a future tick: handoff-rotate WARNed 40 pre-existing entries with no parseable '## <ISO8601> ...' header, pinned live and never archived -- not this tick's doing, worth a manual look sometime.",
+  "notes": "2026-08-30T11:00Z tick: no live locks/mutex/hold, no session collision (only stray orphaned esbuild --ping procs from the old rb-11 worktree, not in git worktree list, no growing writes). Both repos synced. No open PRs. master CI green on 09c75dc. Found the 10:00Z tick's queue-add for rb-16 was silently lost: that tick's own end-of-tick mr-state.json write reused a stale pre-add queue[] snapshot instead of re-reading fresh -- the exact gotcha the doctrine warns about. Confirmed via mr-gates residuals list --unclaimed (R-m23-s10-X19 no longer listed, so the promotion itself is real) and by reading the M-residual-backlog.spec.md rb-16 section directly (present, non-blocked, no after: deps, not merged). Launched rb-16 directly (opus@high, tier=routine, adr=217) rather than re-deriving from PLAN section-9, since abandoning an already-promoted aged residual for fresh feature work would invert the aging-priority policy. LAUNCHED confirmed live: leader pid 3125702, claude pid 3125705. This tick re-read queue[] fresh immediately before this write to avoid repeating the same race. Governor NORMAL (d7=$785.03/2783, fable_ok=true). No BLOCKERs. Follow-up worth a human look: the queue[] write-race is now an OBSERVED bug (not hypothetical) -- consider moving queue mutations fully out of the supervisor's own end-of-tick state write, or always re-reading the whole file read-modify-write style right before every field is set.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "parked": [],
   "open_chore_prs": [],
