@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-14 — X16 (from m23-s10 X16, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s10 · residual: R-m23-s10-X16
+
+Deferred with reason: `evals/contrast-ratio.eval.mjs` + `evals/baselines/contrast-unresolved.json` (spec section 5.3; criteria A11Y-30/A11Y-31, tags [A11Y-09]/[A11Y-10]/[A11Y-11]). Its ONLY subjects are the inline `style.cssText` literals that slices S8 and S9 remediate, and BOTH are BLOCKED on the spec section 8.1 palette ruling and the section 8.2 art-direction ruling (S9 is `after: S8`). A `NO_BG_UNRESOLVED` baselin
+
+EARS: X16
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-13 — A11Y-25 (from m23-s6 A11Y-25, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s6 · residual: R-m23-s6-A11Y-25
