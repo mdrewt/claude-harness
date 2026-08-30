@@ -4854,3 +4854,24 @@ Native tick rid=mr-sup-native-20260829T000008Z-1067112. Gate-0/1: no live per-ru
 rb-5 (eval-harness completeness guard, residual R-m22-s0-X4, ADR-0209) finished rc=0 attempts=1 model=opus, cost $66.19. PR#383 (slice/rb-5 -> master) opened, mergeStateStatus=UNSTABLE (ci+e2e IN_PROGRESS at reconcile). mr-gates: 8 met, 0 unmet, 2 deferred (X10 -> backlog residual). Delegated CI-wait to mr-ci-watch (pid 1266312, detached); next tick/event resumes the merge. No mutex/chain-owner contention observed; no resident human session detected.
 
 
+## 2026-08-29T00:59:31Z — rb-5 merged (PR#383)
+Merged evals/run.mjs exit-verdict completeness guard (ADR-0209) to master @013b3f8, squash+delete-branch. Audits CLEAN across orchestration/gating/acceptance (8/10 met, 2 deferred X9/X10->backlog, 0 unmet; spotcheck X2 agrees). Residual R-m22-s0-X4 closed via mr-gates residuals close --pr 383. Master CI for the merge commit was in_progress at record time (Nightly on prior sha was green). No new work launched this tick beyond the merge (single mutating action); next tick should re-derive eligibility fresh for a composite launch.
+
+## 2026-08-29T02:02:48Z — rb-6 launched (opus@high, guest-claim-integrity.eval.mjs SANCTIONED_REDUCERS fix)
+Native tick rid=mr-sup-native-20260829T020125Z-1293837-2557 (02:01Z). Recovered the prior
+00:56Z tick's uncommitted state first (commit e3e858f): that tick had merged rb-5 PR#383
+(evals/run.mjs completeness fix, ADR-0209 -> master 013b3f8) live but crashed before its own
+tick-record commit. Verified live: no open PRs either repo, master ci+e2e SUCCESS at exact head
+013b3f8, chain-owner mutex stale (owner pid 1268408 dead, heartbeat 00:56:58Z) -> released via
+mr-unlock mutex, no live per-run locks, no operator hold, no resident-session collision (empty
+find -mmin -6 both repos). Gate-3: no residual past t2_stale_days=14 (oldest 4.67d); several past
+t1_promote_days=3 but queue[] already held rb-6 from a prior promotion per the last tick's own
+note ("first candidate for the fast path") -- re-verified it live (spec heading exists at
+specs/monster-realm-v2/M-residual-backlog.spec.md:29, not blocked:, no after: deps, not already
+merged) and launched it rather than promoting another residual this tick, per the fast-path rule.
+rb-6 = residual R-m22-s1-X1: evals/guest-claim-integrity.eval.mjs's SANCTIONED_REDUCERS is
+exact-set equality (5 names) and will hard-RED [R/name-set] the moment S3 declares
+account_deletion_reaper. touches inherited "REVIEW" from source slice m22-s1 -- flagged in the
+brief for the run to confirm actual scope on read. Launched opus@high/routine tier, ADR-0210,
+detached (leader pid 1294612, claude_pid 1294615), mr-spawn LAUNCHED cleanly. queue-removed rb-6.
+Ledger LAUNCHED row written. Governor NORMAL (d7=$436.82/2783, fable_ok=true). No BLOCKERs.

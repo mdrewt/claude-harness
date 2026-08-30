@@ -2028,6 +2028,8 @@ a slash-star glob spelled in a comment blanked 31 tables and reddened 5 unrelate
 **Next:** supervisor owns the merge (`gh pr merge` is forbidden to the slice run). Remote CI was
 running at hand-off.
 
+## 2026-08-30T06:02:17Z — Native tick mr-sup-native-20260830T060005Z-2883753 (06:00Z) — invalidated rb-14, promoted rb-15
+Gate-0: clean (no live locks/mutex/hold; only harmless orphaned esbuild procs from an already-removed rb-11 worktree). Repos in sync (harness main=9add7bf/origin match, proj master=32dc092 match). No open PRs anywhere pre-tick; prior tick's PR#61 (rb-14 promotion) already merged. Fast-path check on queue[0]=rb-14: mechanically valid (spec heading exists, after: field empty, not merged) BUT live-read of its own deferred-reason prose revealed a real blocker the after: field never captured -- rb-14 (X16, contrast-ratio eval) targets inline style.cssText literals that ONLY slices S8/S9 remediate, and both are explicitly BLOCKED per M23-accessibility.spec.md section 8 on two still-open operator rulings (8.1 colourblind-palette redesign, 8.2 canvas sprite-tint art-direction call) -- searched decisions-log.md, memory/projects/decisions/, and gh issues (monster-realm) for a resolution: none found. Per doctrine, judgment may downgrade toward serial/invalid on grounds the mechanical field can't see; queue-removed rb-14 and fell through to the full residuals derivation rather than launching a slice that cannot pass its own gate. mr-gates residuals list --unclaimed: 24 open, 12 unpromoted past t1=3d. Oldest tied group (2026-08-25T07:26:22Z, m23-s10 X18/X19/X20/X21) -- X16/X17 from this group already resolved (X16->rb-14 previous tick, X17 wontfix). Read X18's own reason text (CSS-oracle consolidation, no blocking dependency) before promoting: clean. Promoted R-m23-s10-X18 -> rb-15, mr-record queue-add'd, shipped as doc-only chore PR mdrewt/claude-harness#62 (chore/residual-promote-20260830T060139Z), squash+auto -- merged same tick (repo auto-merge), harness main fast-forwarded to 5a948ab. One promote = the tick's action; no launch this tick (rb-14 invalidated, rb-15 needs a fresh tick to fast-path). Note left for next tick: do NOT re-trust after: emptiness alone on residual-backlog entries whose prose names an explicit spec-level BLOCKS -- read the prose. Budget NORMAL (d7=$720.47/2783, fable_ok=true). No BLOCKERs.
 ## 2026-08-30T05:01:53Z — 05:00Z tick — promoted R-m23-s10-X16 -> rb-14 (PR#61)
 Gate-0: no live locks/mutex/hold; no inflight/awaiting_merge; queue was empty at start. Residual alarm: 13 unpromoted past t1=3d, 28 open (cap 12, observe-only). Per gate-3 aging rule, promoted the oldest unpromoted residual (m23-s10 group, tied disclosed_at 2026-08-25T07:26:22Z) — R-m23-s10-X16 — into M-residual-backlog.spec.md as rb-14, via mr-gates residuals promote. Queued rb-14 via mr-record queue-add for the next tick's fast path. Shipped the spec edit as doc-only chore PR mdrewt/claude-harness#61 (chore/residual-promote-20260830T050124Z), squash+auto enabled per doctrine. Noted: an already-removed rb-11 worktree left 5 orphaned esbuild --ping processes running (harmless, no lock references them; not cleaned up this tick). No launch/merge this tick — one promote was the action. Governor NORMAL (d7=$719.55/2783, fable_ok=true). No BLOCKERs.
 ## 2026-08-30T04:02:17Z — tick record — dispositioned R-m23-s10-X17 as wontfix (spec-declared accepted limitation)
@@ -2106,23 +2108,3 @@ Adjudication: mr-gates verify first returned FLAGGED (EVIDENCE-MISMATCH on X1) �
 Closed residual R-m22-s1-X1 (mr-gates residuals close --slice rb-6 --pr 384). The run itself filed 2 new residuals to backlog (R-rb-6-R-rb-6-X1/X2) for the KNOWN GAP the ledger called out up front: server-module/src/accounts_tests.rs:2057 g2_reducer_name_set_is_pinned carries the identical exact-5 Rust pin and will hard-RED when S3 ships a 6th reducer — outside rb-6's touches, tracked for the drain.
 
 Worktree/branch cleaned; master fast-forwarded locally. No new work launched this tick (composite merge->launch deferred — writing this record now).
-## 2026-08-29T02:02:48Z — rb-6 launched (opus@high, guest-claim-integrity.eval.mjs SANCTIONED_REDUCERS fix)
-Native tick rid=mr-sup-native-20260829T020125Z-1293837-2557 (02:01Z). Recovered the prior
-00:56Z tick's uncommitted state first (commit e3e858f): that tick had merged rb-5 PR#383
-(evals/run.mjs completeness fix, ADR-0209 -> master 013b3f8) live but crashed before its own
-tick-record commit. Verified live: no open PRs either repo, master ci+e2e SUCCESS at exact head
-013b3f8, chain-owner mutex stale (owner pid 1268408 dead, heartbeat 00:56:58Z) -> released via
-mr-unlock mutex, no live per-run locks, no operator hold, no resident-session collision (empty
-find -mmin -6 both repos). Gate-3: no residual past t2_stale_days=14 (oldest 4.67d); several past
-t1_promote_days=3 but queue[] already held rb-6 from a prior promotion per the last tick's own
-note ("first candidate for the fast path") -- re-verified it live (spec heading exists at
-specs/monster-realm-v2/M-residual-backlog.spec.md:29, not blocked:, no after: deps, not already
-merged) and launched it rather than promoting another residual this tick, per the fast-path rule.
-rb-6 = residual R-m22-s1-X1: evals/guest-claim-integrity.eval.mjs's SANCTIONED_REDUCERS is
-exact-set equality (5 names) and will hard-RED [R/name-set] the moment S3 declares
-account_deletion_reaper. touches inherited "REVIEW" from source slice m22-s1 -- flagged in the
-brief for the run to confirm actual scope on read. Launched opus@high/routine tier, ADR-0210,
-detached (leader pid 1294612, claude_pid 1294615), mr-spawn LAUNCHED cleanly. queue-removed rb-6.
-Ledger LAUNCHED row written. Governor NORMAL (d7=$436.82/2783, fable_ok=true). No BLOCKERs.
-## 2026-08-29T00:59:31Z — rb-5 merged (PR#383)
-Merged evals/run.mjs exit-verdict completeness guard (ADR-0209) to master @013b3f8, squash+delete-branch. Audits CLEAN across orchestration/gating/acceptance (8/10 met, 2 deferred X9/X10->backlog, 0 unmet; spotcheck X2 agrees). Residual R-m22-s0-X4 closed via mr-gates residuals close --pr 383. Master CI for the merge commit was in_progress at record time (Nightly on prior sha was green). No new work launched this tick beyond the merge (single mutating action); next tick should re-derive eligibility fresh for a composite launch.

@@ -1,14 +1,14 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-30T05:03:00Z",
- "updated_by": "mr-sup-native-20260830T050008Z-2871403",
+ "updated_utc": "2026-08-30T06:02:29Z",
+ "updated_by": "mr-sup-native-20260830T060005Z-2883753",
  "master": {
   "sha": "32dc092",
   "ci": "success",
   "nightly": "in_progress"
  },
  "harness_main": {
-  "sha": "666be83",
+  "sha": "5a948ab",
   "ci": "no-remote-ci-local-gate-green (pushed to origin/main this tick)"
  },
  "adr_next_free": 217,
@@ -16,10 +16,10 @@
  "awaiting_merge": [],
  "queue": [
   {
-   "slice": "rb-14",
+   "slice": "rb-15",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s10-X16",
-   "added_utc": "2026-08-30T05:01:06Z",
+   "reason": "promoted residual R-m23-s10-X18",
+   "added_utc": "2026-08-30T06:01:39Z",
    "added_by": "n/a",
    "derived_from_master_sha": "32dc092"
   }
@@ -29,12 +29,10 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "2026-08-30T05:00Z tick: gate-0 clean (no live locks/mutex/hold; only stale orphaned esbuild procs from an already-removed rb-11 worktree, harmless). No inflight/awaiting_merge. Residuals: 13 unpromoted past t1=3d (alarm), 28 open (cap 12, observe-only). Promoted oldest (tied disclosed_at 2026-08-25T07:26:22Z, m23-s10 group) R-m23-s10-X16 -> rb-14 into M-residual-backlog.spec.md; queued via mr-record queue-add. Shipped as doc-only chore PR #61 (chore/residual-promote-20260830T050124Z), squash+auto enabled. No launch this tick (one promote = the tick's action). Next tick: fast-path launch rb-14 once PR#61 lands.",
+ "notes": "2026-08-30T06:00Z tick: gate-0 clean. Fast-path queue[0]=rb-14 INVALIDATED on live re-read (its own deferred-reason prose: S8/S9 remediation targets BLOCKED on M23 spec section 8.1/8.2 operator rulings, unresolved -- after: field didn't show this). queue-removed rb-14, fell through to full residuals derivation. Promoted next-oldest unpromoted residual R-m23-s10-X18 -> rb-15 (doc-only chore PR#62, squash+auto, merged this tick; harness main FF'd to 5a948ab). No launch this tick (one promote = the action). Next tick: fast-path launch rb-15 after re-verifying its own prose has no similar hidden blocker.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
- "open_chore_prs": [
-  "https://github.com/mdrewt/claude-harness/pull/61 (chore/residual-promote-20260830T050124Z, squash+auto)"
- ],
+ "open_chore_prs": [],
  "resource_locations": {
   "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
   "spec_corpus_authoritative": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/  (HARNESS level, NOT /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm). Contains PLAN.md, playtest-replan-2026-07.md, and per-milestone M*.spec.md files.",
@@ -61,5 +59,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-30T02:01:44Z"
+ "last_tick_utc": "2026-08-30T06:02:29Z"
 }
