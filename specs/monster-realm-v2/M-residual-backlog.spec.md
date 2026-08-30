@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-19 — X10 (from m23-s11 X10, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s11 · residual: R-m23-s11-X10
+
+Deferred with reason: the axe-core + real-browser a11y tier that spec §5.7 names as `just a11y-e2e`'s payload ("axe-core + Playwright"). It requires `client/e2e/a11y.spec.ts` (new), `@axe-core/playwright` in `client/package.json`, and a lockfile update — ALL THREE outside m23-s11's declared `touches:`, and, more importantly, **owned by no slice in the spec's own §4 table**: S10 owns "the five evals + baseline + happy-d
+
+EARS: X10
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-18 — X21 (from m23-s10 X21, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s10 · residual: R-m23-s10-X21
