@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-30T11:03:30Z",
-  "updated_by": "mr-sup-native-20260830T110011Z-3124167",
+  "updated_utc": "2026-08-30T12:10:00Z",
+  "updated_by": "mr-sup-native-20260830T120805Z-3232010",
   "master": {
     "sha": "09c75dc",
     "ci": "success",
@@ -12,27 +12,23 @@
     "ci": "no-remote-ci-local-gate-green"
   },
   "adr_next_free": 217,
-  "inflight": [
+  "inflight": [],
+  "awaiting_merge": [
     {
       "slice": "rb-16",
-      "run_id": "mr-spawn-20260830T110201Z-3125649",
-      "session_leader": 3125702,
-      "claude_pid": 3125705,
-      "model": "opus",
-      "effort": "high",
-      "tier": "routine",
-      "repo": "project",
-      "started_utc": "2026-08-30T11:02:06Z"
+      "pr": 392,
+      "repo": "mdrewt/monster-realm",
+      "opened_utc": "2026-08-30T11:50:41Z",
+      "status": "ci-red-rerun-inflight (ranked-forfeit RL-18 timeout on unrelated diff; suspected flake; job rerun 12:09Z; delegated to mr-ci-watch)"
     }
   ],
-  "awaiting_merge": [],
   "queue": [],
   "park_counters": {
     "14r-e": 1
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "2026-08-30T11:00Z tick: no live locks/mutex/hold, no session collision (only stray orphaned esbuild --ping procs from the old rb-11 worktree, not in git worktree list, no growing writes). Both repos synced. No open PRs. master CI green on 09c75dc. Found the 10:00Z tick's queue-add for rb-16 was silently lost: that tick's own end-of-tick mr-state.json write reused a stale pre-add queue[] snapshot instead of re-reading fresh -- the exact gotcha the doctrine warns about. Confirmed via mr-gates residuals list --unclaimed (R-m23-s10-X19 no longer listed, so the promotion itself is real) and by reading the M-residual-backlog.spec.md rb-16 section directly (present, non-blocked, no after: deps, not merged). Launched rb-16 directly (opus@high, tier=routine, adr=217) rather than re-deriving from PLAN section-9, since abandoning an already-promoted aged residual for fresh feature work would invert the aging-priority policy. LAUNCHED confirmed live: leader pid 3125702, claude pid 3125705. This tick re-read queue[] fresh immediately before this write to avoid repeating the same race. Governor NORMAL (d7=$785.03/2783, fable_ok=true). No BLOCKERs. Follow-up worth a human look: the queue[] write-race is now an OBSERVED bug (not hypothetical) -- consider moving queue mutations fully out of the supervisor's own end-of-tick state write, or always re-reading the whole file read-modify-write style right before every field is set.",
+  "notes": "2026-08-30T12:08Z tick (rid native-20260830T120805Z-3232010): event rb-16.ci.md reported PR#392 red (e2e job failed: e2e/ranked-forfeit.spec.ts:265 RL-18, 120s timeout; ci job passed). Verified live: PR#392 diff = client/src/ui/renameView.test.ts, menuView.test.ts, docs/adr/0217-*.md, DIGEST.md only -- disjoint from ranked/PvP forfeit code. Checked last 40 CI runs (2026-08-25..today): all green, no prior ranked-forfeit flake on record. Judged suspected infra flake, not diff-caused. Took chain-owner mutex, ran `gh run rerun 33309936996 --failed`, confirmed e2e job re-queued, re-delegated CI-wait to mr-ci-watch (new pid 3234344; the prior watcher pid 3230006 from the 11:53Z tick had already exited after firing this event). Released mutex after bookkeeping. No launch this tick (one action = rerun+delegate). Governor NORMAL, no BLOCKERs. Known carryover: harness has uncommitted mr-state.json/handoff + rb-16 planning scratch files from the rb-16 run itself (monster-realm-rb-16-plan.md, rb-16.bite-probe.mjs) -- not this tick's to clean up, resolves at merge. handoff-rotate WARNed 41 entries with unparseable headers (pinned live) -- noted as a risk, not actioned this tick (not a mutation this tick's gates called for). Next: if the rerun comes back GREEN, mr-audit + mr-gates verify then merge; if it reds again on the SAME ranked-forfeit test, treat as a real regression/gating concern and do not blind-rerun a second time.",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "parked": [],
   "open_chore_prs": [],
@@ -61,6 +57,14 @@
     "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
     "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
   },
-  "live_watchers": [],
-  "last_tick_utc": "2026-08-30T10:00:13Z"
+  "live_watchers": [
+    {
+      "kind": "ci-watch",
+      "slice": "rb-16",
+      "pr": 392,
+      "pid": 3234344,
+      "spawned_utc": "2026-08-30T12:09:30Z"
+    }
+  ],
+  "last_tick_utc": "2026-08-30T11:52:09Z"
 }
