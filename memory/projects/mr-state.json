@@ -12,17 +12,16 @@
   "ci": "no-remote-ci-local-gate-green"
  },
  "adr_next_free": 217,
- "inflight": [],
- "awaiting_merge": [],
- "queue": [
+ "inflight": [
   {
    "slice": "rb-18",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s10-X21",
-   "added_utc": "2026-08-30T15:37:28Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "95a710168dddb6ff62fc8236c143c519a52f7b4a"
-  },
+   "run_id": "mr-spawn-20260830T180158Z-3468969",
+   "session_leader": 3469022,
+   "started_utc": "2026-08-30T18:02:05Z"
+  }
+ ],
+ "awaiting_merge": [],
+ "queue": [
   {
    "slice": "rb-19",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
@@ -45,7 +44,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "16:00Z tick: promoted R-m23-s11-X10->rb-19 (PR#66 merged); no launch (residual-promote was the one action); queue has rb-18,rb-19 for next tick fast-path; 3 more m23-s11 residuals still unpromoted",
+ "notes": "rb-18 launched (18:00Z tick, opus@high, routine, project repo). rb-19/rb-20 remain queued. 6 residuals past t1_promote_days=3 (oldest R-m23-s11-X8/X9, 5.39d) still unpromoted -- next tick should promote if queue drains before them. handoff-rotate WARN: 41 entries with no parseable ISO header pinned live -- pre-existing, not fixed this tick, flag for a future doc-hygiene pass.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
