@@ -1,25 +1,18 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-30T15:38:00Z",
- "updated_by": "mr-sup-native-20260830T153207Z-3416185",
+ "updated_utc": "2026-08-30T19:30:00Z",
+ "updated_by": "mr-sup-native-20260830T192635Z-3636120-28520",
  "master": {
-  "sha": "3455155770213ed5e81e5e9116925e4645ef80de",
-  "ci": "success",
+  "sha": "eca6752471142ee561a6c6e35eb55f9de6eb21f5",
+  "ci": "in_progress",
   "nightly": "in_progress"
  },
  "harness_main": {
   "sha": "0edbdae",
   "ci": "no-remote-ci-local-gate-green"
  },
- "adr_next_free": 217,
- "inflight": [
-  {
-   "slice": "rb-18",
-   "run_id": "mr-spawn-20260830T180158Z-3468969",
-   "session_leader": 3469022,
-   "started_utc": "2026-08-30T18:02:05Z"
-  }
- ],
+ "adr_next_free": 218,
+ "inflight": [],
  "awaiting_merge": [],
  "queue": [
   {
@@ -44,7 +37,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "rb-18 launched (18:00Z tick, opus@high, routine, project repo). rb-19/rb-20 remain queued. 6 residuals past t1_promote_days=3 (oldest R-m23-s11-X8/X9, 5.39d) still unpromoted -- next tick should promote if queue drains before them. handoff-rotate WARN: 41 entries with no parseable ISO header pinned live -- pre-existing, not fixed this tick, flag for a future doc-hygiene pass.",
+ "notes": "rb-18 MERGED: PR#394 squash-merged eca6752, master ff'd from 3455155. mr-gates verify CLEAN 8/9 met 1 DEFER (X8-NIGHTLY-FLOOR->backlog, residual recorded+closed). mr-audit orchestration CLEAN; gating FLAGGED was a false-positive grep hit on 'it.skip' inside prose (verified no real skip/deleted-assert). adr_next_free corrected 217->218 (0217 already on disk, unrelated slice; rb-18 took no ADR, used ARCHITECTURE.md append-log). Worktree+branch cleaned. Remote master CI for eca6752 was in_progress at record time -- verify live before trusting green. rb-19/rb-20 remain queued. 6 residuals past t1_promote_days still unpromoted -- next tick should promote if queue drains before them.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -74,5 +67,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-30T15:32:07Z"
+ "last_tick_utc": "2026-08-30T19:26:35Z"
 }
