@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-18 — X21 (from m23-s10 X21, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s10 · residual: R-m23-s10-X21
+
+Deferred with reason: the cross-view RE-OPEN edge. `client/src/ui/overlayA11yWiring.test.ts` constructs a fresh view per id and calls the open path once, so it never exercises a repeat `show()` on an already-visible overlay; deleting a view's `if (!wasVisible)` guard would ship green there. NOT a coverage gap today — every one of the sixteen per-view specs already ships its own `-REPEAT-NO-REOPEN` tooth (the m23-s3/s6 
+
+EARS: X21
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-17 — X20 (from m23-s10 X20, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s10 · residual: R-m23-s10-X20
