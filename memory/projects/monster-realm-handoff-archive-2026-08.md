@@ -4785,3 +4785,65 @@ mandated was measured bypassable. Plan B (corpus-only, no consolidation) is a ~1
 tooth; each verifies it actually applied). Do not delete — ledger gate X8 executes it.
 
 
+## 2026-08-29 — rb-6 COMPLETE — PR #384 open, local `just ci` green, remote CI running
+
+**Terminal state: PR open + local gate green + remote CI running. Supervisor owns the merge.**
+PR: https://github.com/mdrewt/monster-realm/pull/384 · branch `fix/rb-6-sanctioned-reducers`
+(worktree `.claude/worktrees/rb-6`, forked from `origin/master` 013b3f8) · ADR-0210.
+
+**Acceptance: 5/5 met, 0 deferred, 0 unmet — rb-6 seed:e3b0c44298fc1c14.** Ledger seeded 0 criteria
+(narrative rb-* section, same as rb-2..rb-5); X1..X5 authored in the PLAN phase.
+`just ci` exit 0 three times over the slice; final run: 95/95 evals 0 FAIL, client vitest
+96 files / 2818 tests, validate.mjs 8/8.
+
+**TWO probe scripts beside the ledger, both load-bearing for re-verify, `gates/` is gitignored so
+they exist only on this machine:** `gates/rb-6.x1-probe.mjs` (X1) and `gates/rb-6.mutation-probe.mjs`
+(X2/X3/X4, 9 mutants). **Run `mr-gates check`/`verify` FROM THE WORKTREE ROOT** — X5's CHECK is
+`node evals/run.mjs` and reds from anywhere else.
+
+**What shipped.** `evals/guest-claim-integrity.eval.mjs`'s flat five-name `SANCTIONED_REDUCERS`
+(exact sorted set equality) became a frozen `REDUCER_SANCTIONS` ledger with a CLOSED
+`REQUIRED`/`PLANNED` status, so M22 S3 can declare `account_deletion_reaper` without touching this
+eval. Four clauses: `[R/sanction-shape]` (closed discriminator, `.find` over an array — the rb-2
+`[G6/policy]` rule), `[R/planned-set]` (exact pin on the PLANNED key set, both directions),
+`[R/name-set]` (`Object.hasOwn` membership + REQUIRED-presence), `[R/planned-shape]` (a PLANNED name
+that is present must be a same-file `scheduled(...)` target with matching arg type + scheduler
+guard). 13 fixtures FG74a..FG74m; 9 mutants, each caught naming its own tooth.
+
+**TWO measured findings, both worth carrying forward:**
+1. *An unclosed status discriminator is a free silent whitelist slot.* Red-teaming the PLAN built a
+   faithful membership+required-presence implementation, passed 25/25 of its own assertions, and
+   admitted `{status:'LEGACY'}` beside a takeover reducer that the pre-fix gate red.
+2. *A ledger that admits by NAME is not a pin that admits by exact SET.* The first implementation of
+   the PR was **green under the full `just ci` (95/95, exit 0)**, passed every new fixture, and
+   still admitted a reducer that merely REUSED the planned name (wire-safe `String`, victim identity
+   read from a row, no scheduled table) — `[R/param-types]`'s carve-out is reached only AFTER
+   `isWireSafeType` FAILS. → `[R/planned-shape]`. **General rule now in memory: any slice relaxing an
+   exact pin must produce a direct SHIPPED-vs-PRE-FIX differential on adversarial input, not just
+   "my new fixtures pass".** See [[relaxing-an-exact-pin-needs-a-prefix-diff]].
+
+**Two residuals recorded (mechanically, via `mr-gates residuals add`) — NOT left as PR prose:**
+* `R-rb-6-R-rb-6-X1` → backlog — `server-module/src/accounts_tests.rs:2057`
+  `g2_reducer_name_set_is_pinned()` carries the identical exact-5 pin **in Rust** and will also
+  hard-RED when S3 ships. Outside rb-6's touches. **rb-6 removes ONE of TWO S3 blockers.** Assigned
+  to M22 S3 in ADR-0210; S3 must mirror the REQUIRED/PLANNED semantics, not bump the count to 6.
+* `R-rb-6-R-rb-6-X2` → backlog — PRE-EXISTING: `[R/identity-ctor]` has no proof-of-teeth. A
+  body-scoped constructor scan (instead of the whole-file flattened one) leaves the 100-tooth suite
+  fully green and then admits an `Identity::from_hex` one hop away in a plain helper.
+
+**Three new gotchas now in memory** (also see the cards): nested template literals in a clause
+message desync every brace matcher that skips string spans (symptom: `BROKEN-MUTANT` /
+"Illegal return statement" — reads like a probe bug); an acceptance CHECK that hands an eval's own
+path to `node -e` as `argv[1]` is UNSATISFIABLE because the eval's main guard fires during the
+import (caught by the verifier, not the author — repaired with `rb-6.x1-probe.mjs`); and the
+`tester` role now lists Bash but its guard still blocks execution, so the orchestrator must run the
+RED proof and the bite-proofs itself.
+
+**Code graphs NOT refreshed** — `codegraph status` was clean at slice start and `master` has not
+moved; the refresh belongs after the supervisor's squash-merge, on the main checkout.
+
+**Harness-side, uncommitted/untracked:** `specs/monster-realm-v2/M-residual-backlog.spec.md` (rb-6
+resolution note, PR #384 filled in), `memory/projects/monster-realm-rb-6-plan.md` (untracked, same
+precedent as rb-4/rb-5), `memory/projects/gates/rb-6.*` (gitignored).
+
+
