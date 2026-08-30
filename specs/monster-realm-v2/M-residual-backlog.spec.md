@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-20 — X11 (from m23-s11 X11, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s11 · residual: R-m23-s11-X11
+
+Deferred with reason: a browser-tier reduced-motion oracle (a Playwright project with `use: { reducedMotion: 'reduce' }`). The cheapest real-browser a11y oracle available: it needs NO axe dependency and would gate A11Y-27 in a real browser rather than in happy-dom, where `renderResolver.test.ts` proves the pure branch but nothing proves the media query actually reaches it end to end. Blocked solely by `client/playwrigh
+
+EARS: X11
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-19 — X10 (from m23-s11 X10, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s11 · residual: R-m23-s11-X10
