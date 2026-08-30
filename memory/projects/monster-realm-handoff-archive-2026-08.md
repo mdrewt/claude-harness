@@ -4875,3 +4875,12 @@ account_deletion_reaper. touches inherited "REVIEW" from source slice m22-s1 -- 
 brief for the run to confirm actual scope on read. Launched opus@high/routine tier, ADR-0210,
 detached (leader pid 1294612, claude_pid 1294615), mr-spawn LAUNCHED cleanly. queue-removed rb-6.
 Ledger LAUNCHED row written. Governor NORMAL (d7=$436.82/2783, fable_ok=true). No BLOCKERs.
+## 2026-08-29T03:54:47Z — rb-6 merged — PR#384
+Native tick rid=mr-sup-native-20260829T034827Z-1452367. rb-6 (fix/rb-6-sanctioned-reducers) finished EXIT=0 attempts=1 (opus@high, $31.79). PR#384 merged squash+delete-branch; master 013b3f8->07a1c0c, post-merge CI queued at record-time (pre-merge PR checks ci+e2e both pass).
+
+Adjudication: mr-gates verify first returned FLAGGED (EVIDENCE-MISMATCH on X1) — root cause: X1's CHECK line spawned `node` bare (inheriting the tick's PATH -> system node v18.19.1, which lacks fs/promises.glob), unlike sibling X2-X5 which wrap the CHECK in an inner child process with PATH explicitly injected. Manually reproduced the EXACT recorded evidence string with the asdf PATH present, confirming this was a gate-authoring env bug, not a code regression. Fixed the CHECK line in rb-6.gates.md to inject PATH consistent with the TOOLCHAIN NOTE and sibling gates; re-ran mr-gates verify -> CLEAN (5/5 reverified, matches evidence). mr-audit CLEAN (orchestration CLEAN: 9 agent calls across doc-keeper/planner/red-team/reviewer/tester/verifier; gating_advisory CLEAN). diff (ARCHITECTURE.md, docs/adr/0210-*.md, docs/adr/DIGEST.md, evals/guest-claim-integrity.eval.mjs) subset of declared touches.
+
+Closed residual R-m22-s1-X1 (mr-gates residuals close --slice rb-6 --pr 384). The run itself filed 2 new residuals to backlog (R-rb-6-R-rb-6-X1/X2) for the KNOWN GAP the ledger called out up front: server-module/src/accounts_tests.rs:2057 g2_reducer_name_set_is_pinned carries the identical exact-5 Rust pin and will hard-RED when S3 ships a 6th reducer — outside rb-6's touches, tracked for the drain.
+
+Worktree/branch cleaned; master fast-forwarded locally. No new work launched this tick (composite merge->launch deferred — writing this record now).
+
