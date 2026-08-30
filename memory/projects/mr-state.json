@@ -11,18 +11,17 @@
   "sha": "0edbdae",
   "ci": "no-remote-ci-local-gate-green"
  },
- "adr_next_free": 218,
- "inflight": [],
- "awaiting_merge": [],
- "queue": [
+ "adr_next_free": 219,
+ "inflight": [
   {
    "slice": "rb-19",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s11-X10",
-   "added_utc": "2026-08-30T16:01:25Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "3455155770213ed5e81e5e9116925e4645ef80de"
-  },
+   "run_id": "mr-spawn-20260830T193603Z-3642908",
+   "session_leader": 3642961,
+   "started_utc": "2026-08-30T19:36:10Z"
+  }
+ ],
+ "awaiting_merge": [],
+ "queue": [
   {
    "slice": "rb-20",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
@@ -37,7 +36,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "rb-18 MERGED: PR#394 squash-merged eca6752, master ff'd from 3455155. mr-gates verify CLEAN 8/9 met 1 DEFER (X8-NIGHTLY-FLOOR->backlog, residual recorded+closed). mr-audit orchestration CLEAN; gating FLAGGED was a false-positive grep hit on 'it.skip' inside prose (verified no real skip/deleted-assert). adr_next_free corrected 217->218 (0217 already on disk, unrelated slice; rb-18 took no ADR, used ARCHITECTURE.md append-log). Worktree+branch cleaned. Remote master CI for eca6752 was in_progress at record time -- verify live before trusting green. rb-19/rb-20 remain queued. 6 residuals past t1_promote_days still unpromoted -- next tick should promote if queue drains before them.",
+ "notes": "rb-18 MERGED (PR#394 -> master@eca6752, CI verified green live). Composite launch: rb-19 launched (residual X10/m23-s11, axe-core+Playwright a11y-e2e tier per spec sec.5.7 DECIDED; adr reserved 218). adr_next_free now 219. rb-20 remains queued (shares Playwright/dependency surface with rb-19 -- not launched this tick, note for fan-out check when it goes). 6 residuals past t1_promote_days still unpromoted -- next tick should promote if rb-19 finishes before them.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -67,5 +66,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-30T19:26:35Z"
+ "last_tick_utc": "2026-08-30T19:36:10Z"
 }
