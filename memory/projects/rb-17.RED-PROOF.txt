@@ -1,0 +1,48 @@
+RB17-TEETH FAIL EXPORT-MOTION_CENSUS_EXTS: MISSING EXPORT: "MOTION_CENSUS_EXTS" is not exported by reduced-motion-purity.eval.mjs
+RB17-TEETH FAIL EXPORT-isCensusSource: MISSING EXPORT: "isCensusSource" is not exported by reduced-motion-purity.eval.mjs
+RB17-TEETH FAIL EXPORT-isCensusSpec: MISSING EXPORT: "isCensusSpec" is not exported by reduced-motion-purity.eval.mjs
+RB17-TEETH FAIL EXPORT-listMotionCensusFiles: MISSING EXPORT: "listMotionCensusFiles" is not exported by reduced-motion-purity.eval.mjs
+RB17-TEETH FAIL EXPORT-censusDifference: MISSING EXPORT: "censusDifference" is not exported by reduced-motion-purity.eval.mjs
+RB17-TEETH FAIL EXPORT-findMotionCustomProps: MISSING EXPORT: "findMotionCustomProps" is not exported by reduced-motion-purity.eval.mjs
+RB17-TEETH FAIL EXPORT-findReadBackApis: MISSING EXPORT: "findReadBackApis" is not exported by reduced-motion-purity.eval.mjs
+RB17-TEETH FAIL EXPORT-READ_BACK_TOKENS: MISSING EXPORT: "READ_BACK_TOKENS" is not exported by reduced-motion-purity.eval.mjs
+RB17-TEETH FAIL e1: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e2: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e3: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e4: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e5: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e6: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e7: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e8: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e9: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e10: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e11: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e12: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e13: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e14: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e15: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL e16: SKIPPED - export "findMotionCustomProps" is missing or not a function
+RB17-TEETH FAIL f1: SKIPPED - export "findReadBackApis" is missing or not a function
+RB17-TEETH FAIL f2: SKIPPED - export "findReadBackApis" is missing or not a function
+RB17-TEETH FAIL f3: SKIPPED - export "findReadBackApis" is missing or not a function
+RB17-TEETH FAIL f4: SKIPPED - export "findReadBackApis" is missing or not a function
+RB17-TEETH FAIL f5: SKIPPED - export "findReadBackApis" is missing or not a function
+RB17-TEETH FAIL f6a: SKIPPED - export "findReadBackApis" is missing or not a function
+RB17-TEETH FAIL f6b: SKIPPED - export "isCensusSource" is missing or not a function
+RB17-TEETH FAIL f6c: SKIPPED - export "isCensusSpec" is missing or not a function
+RB17-TEETH FAIL f7: SKIPPED - export "findReadBackApis" is missing or not a function
+RB17-TEETH FAIL f8: SKIPPED - export "findReadBackApis" is missing or not a function
+RB17-TEETH FAIL f9: SKIPPED - export "READ_BACK_TOKENS" is missing
+RB17-TEETH FAIL g0: SKIPPED - export "MOTION_CENSUS_EXTS" is missing
+RB17-TEETH FAIL g1: SKIPPED - export "isCensusSource" is missing or not a function
+RB17-TEETH FAIL g2: SKIPPED - export "isCensusSource" is missing or not a function
+RB17-TEETH FAIL g3: SKIPPED - export "isCensusSource" is missing or not a function
+RB17-TEETH FAIL g3: SKIPPED - export "isCensusSpec" is missing or not a function
+RB17-TEETH FAIL g3b: SKIPPED - export "isCensusSource" is missing or not a function
+RB17-TEETH FAIL g4a: SKIPPED - export "isCensusSpec" is missing or not a function
+RB17-TEETH FAIL g4b: SKIPPED - export "isCensusSource" is missing or not a function
+RB17-TEETH FAIL g5: SKIPPED - export "censusDifference" is missing or not a function
+RB17-TEETH FAIL g6: SKIPPED - export "listMotionCensusFiles" is missing or not a function
+RB17-TEETH FAIL g6: SKIPPED - listMotionCensusFiles / listClientSourceFiles / censusDifference not all available
+RB17-TEETH FAIL g6: SKIPPED - isCensusSpec not available for the independent spec count
+RB17-TEETH ok=1 fail=47 verdict=N
