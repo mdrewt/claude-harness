@@ -3,8 +3,8 @@
  "updated_utc": "2026-08-30T15:38:00Z",
  "updated_by": "mr-sup-native-20260830T153207Z-3416185",
  "master": {
-  "sha": "3455155770213ed5e81e5e9116925e4645ef80de",
-  "ci": "in_progress",
+  "sha": "7b3f44f",
+  "ci": "success",
   "nightly": "in_progress"
  },
  "harness_main": {
@@ -22,6 +22,14 @@
    "added_utc": "2026-08-30T15:37:28Z",
    "added_by": "n/a",
    "derived_from_master_sha": "95a710168dddb6ff62fc8236c143c519a52f7b4a"
+  },
+  {
+   "slice": "rb-19",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m23-s11-X10",
+   "added_utc": "2026-08-30T16:01:25Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "3455155770213ed5e81e5e9116925e4645ef80de"
   }
  ],
  "park_counters": {
@@ -29,7 +37,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "rb-17 (PR#393) squash-merged to master 3455155 (pre-merge gh checks ci+e2e green; gates verify CLEAN 7/7 reverified + spotcheck X3 refuted-and-held, acceptance 8/8 met; mr-audit orchestration=CLEAN 6 roles, gating_advisory FLAGGED on 1 assertion (tsFiles floor 20->120, a strengthening not a weakening) adjudicated CLEAN, no skip/suppress. Worktree+local+remote branch cleaned. Residuals closed 1 (rb-17's own ledger fully resolved). Post-merge master CI still in_progress at record time (pre-merge checks already green on the same tree). Queue empty + no PR open -> checked residuals list --unclaimed: several unpromoted past t1_promote_days=3, oldest R-m23-s10-X21 (disclosed 2026-08-25T07:26:22Z, 5.3d, tied cohort R-m23-s11-X8/9/10/11 all 08:38:25Z that day -- X21 earliest). Promoted R-m23-s10-X21 -> rb-18 in M-residual-backlog.spec.md, queue-added rb-18. Shipping as doc-only chore PR chore/residual-promote-20260830T153728Z (--squash --auto) this tick; next tick's fast path launches rb-18 once merged. Governor NORMAL (d7=$836.41/2783), no BLOCKERs, no rate-limit event.",
+ "notes": "16:00Z tick: promoted R-m23-s11-X10->rb-19 (PR#66 merged); no launch (residual-promote was the one action); queue has rb-18,rb-19 for next tick fast-path; 3 more m23-s11 residuals still unpromoted",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
