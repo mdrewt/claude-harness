@@ -1,15 +1,15 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-30T01:11:00Z",
- "updated_by": "mr-sup-native-20260830T010111Z-2794072-19036",
+ "updated_utc": "2026-08-30T02:01:44Z",
+ "updated_by": "mr-sup-native-20260830T020013Z-2842175",
  "master": {
   "sha": "32dc092",
-  "ci": "in_progress",
+  "ci": "green",
   "nightly": "in_progress"
  },
  "harness_main": {
-  "sha": "61d39da",
-  "ci": "no-remote-ci-local-gate-green"
+  "sha": "666be83",
+  "ci": "no-remote-ci-local-gate-green (pushed to origin/main this tick)"
  },
  "adr_next_free": 217,
  "inflight": [],
@@ -20,7 +20,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Native tick 01:01Z: reconciled rb-13.done event (finished 00:44Z, rc=0, attempts=1, model=opus). Gate-0: mutex free, per-run lock rb-13 stale (leader 2585051 dead, .done present). PR#390 was open+CLEAN+CI-green at gate top. Took chain-owner mutex. mr-gates verify: CLEAN 9/9, spotcheck X2 refuted-and-held. mr-audit: orchestration/gating/acceptance all CLEAN (mandatory_read=False); `disposition` block showed FINDINGS but those are pre-existing corpus-wide spec-ledger gaps (missing_disposition on old parked items across ~10 unrelated spec files), not scoped to this diff -- not a merge blocker. Merged PR#390 squash+delete-branch -> 32dc0929. master fast-forwarded 2681ee6->32dc092. Cleaned worktree .claude/worktrees/rb-13 + local branch slice/rb-13 (remote auto-deleted on merge). Closed residual R-m23-s6-A11Y-25 via mr-gates residuals close --pr 390. Ledger MERGED row (cost 0 -- wrapper's finished-run row already carries the real cost). Handoff entry appended. Post-merge master CI was still in_progress at record time (~90s in) -- the identical tree passed both checks (ci, e2e) on the PR branch pre-merge, so this is not treated as a red signal; next tick should re-verify live before trusting this state's ci field. No merge->launch composite this tick: mr-gates verify flagged residual-backlog alarms (15 unpromoted past t1=3d, oldest R-m23-s6-A11Y-26/R-m23-s10-X21/X20 at 5d; 31 open vs cap 12) -- per the aging Pick-work rule the NEXT tick's action should be promoting the oldest unpromoted residual (a doc-only chore PR), not launching new PLAN work; leaving queue[] empty on purpose so that happens via the full derivation path rather than a stale fast-path hint. Governor NORMAL (d7=$716.58/2783, fable_ok=true). No BLOCKERs. Released chain-owner mutex + reaped rb-13 per-run lock via mr-unlock at end of tick.",
+ "notes": "Native tick 02:00Z: gate-0 found no live locks/mutex/hold, but the harness working tree carried uncommitted mr-state.json/handoff/archive edits plus an untracked rb-13 plan memo -- the 01:01Z tick's PR#390 merge (rb-13, -> 32dc0929) had fully landed live (confirmed: no open PRs, master CI green run 33284919587, no worktrees) but its own chore(mr-sup) record commit never happened (session ended first). Re-verified all of the above from live gh/git state before touching anything, then committed the recovery (666be83) and pushed to origin/main (was 61d39da, now in sync -- required before any future harness-slice spawn). No merge/launch/promote/residual-promotion this tick -- treated the recovery-commit as the one action. Per the 01:01Z tick's own note, the NEXT tick's action should be promoting the oldest unpromoted residual (15 unpromoted past t1=3d as of that note, oldest ~R-m23-s6-A11Y-26/R-m23-s10-X21/X20) via the full Pick-work derivation -- queue[] intentionally left empty so that happens via full derivation, not a stale fast-path hint. Governor NORMAL (d7=$717.33/2783, fable_ok=true). No BLOCKERs.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -50,5 +50,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-30T01:01:52Z"
+ "last_tick_utc": "2026-08-30T02:01:44Z"
 }
