@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-27 — WHEN a slice records a new gate-hygiene pattern (an in-process Object.prototype write with (from rb-3 X9, deferred 2026-08-28)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-3 · residual: R-rb-3-X9
+
+Deferred with reason: no ADR number was reserved for rb-3 (the supervisor-assigned slot is empty)
+
+EARS: WHEN a slice records a new gate-hygiene pattern (an in-process Object.prototype write with
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-26 — WHEN the classifier no longer infers policy from typeof THE four consumers that STATE (from rb-2 X9, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-2 · residual: R-rb-2-X9
