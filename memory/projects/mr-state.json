@@ -14,7 +14,16 @@
  "adr_next_free": 220,
  "inflight": [],
  "awaiting_merge": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-21",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m22-s2-S3-CANCEL-TERMINAL",
+   "added_utc": "2026-08-31T03:02:10Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "48fc86754e361a7cb43df01a92c157d391939e9e"
+  }
+ ],
  "park_counters": {
   "14r-e": 1
  },
