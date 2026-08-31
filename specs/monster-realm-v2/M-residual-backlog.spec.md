@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-23 — [A11Y-33 / MANUAL] WHEN the manual protocol is executed THE SYSTEM SHALL confirm that `ari (from m23-s11 X9, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s11 · residual: R-m23-s11-X9
+
+Deferred with reason: A11Y-33's EXECUTION, same reasoning and same run. `docs/a11y-manual-protocol.md:75` (Protocol B) is authored and covers all four `#app`-nested overlays (battleView, boxView, raisingView, evolutionView) with a CONTROL step — B4 re-checks reachability AFTER closing the overlay, because a "nothing outside the dialog was read" result on a document that reads nothing anywhere passes for the wrong reaso
+
+EARS: [A11Y-33 / MANUAL] WHEN the manual protocol is executed THE SYSTEM SHALL confirm that `aria-modal` on the four `#app`-nested overlays actually renders the rest of the document inert to the tested AT — a browser/AT implementation detail the source tree cannot prove
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-22 — Pre-claim export_bundle chunks orphan under the retired guest identity — S3 cascade cannot (from m22-s2 S3-GUEST-EXPORT-ORPHAN, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s2 · residual: R-m22-s2-S3-GUEST-EXPORT-ORPHAN
