@@ -1,7 +1,7 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-31T08:06:42Z",
- "updated_by": "mr-sup-native-20260831T080014Z-215824",
+ "updated_utc": "2026-08-31T09:01:37Z",
+ "updated_by": "mr-sup-native-20260831T090035Z-274595-22369",
  "master": {
   "sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a",
   "ci": "success",
@@ -14,13 +14,22 @@
  "adr_next_free": 220,
  "inflight": [],
  "awaiting_merge": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-23",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m23-s11-X9",
+   "added_utc": "2026-08-31T09:01:02Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a"
+  }
+ ],
  "park_counters": {
   "14r-e": 1
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Reconciled a prior tick's crash: rb-22/PR#397 was already MERGED live (master@efdae74) with worktree+branch cleaned before mr-gates verify ran and before that tick committed ledger/handoff/mr-state.json (found 3 uncommitted stray files/diffs in the harness working tree at gate-0 this tick). Recreated a detached worktree at efdae74 to re-run mr-gates verify (7/9 gates reconfirmed true; EO-4 false only for lack of npm install in the reconstruction, remote CI was already green pre-merge; EO-6 evidence genuine, citation line stale) -- then removed it again. Ran mr-gates residuals close --slice rb-22 --pr 397 (closed R-m22-s2-S3-GUEST-EXPORT-ORPHAN; auto-emitted backlog residuals R-rb-22-EO-9/10/11). Wrote the missing ledger MERGED row. No new launch this tick (reconciliation was the one action). Process gap flagged for a future fix: merging ticks should commit their own state atomically as the last step so a crash between merge and commit can't strand records like this again. X8/X9 (manual-AT) remain unpromoted.",
+ "notes": "09:00Z tick: gate-0/1 clean (no live locks/mutex/hold, no session collision, both repos fetched, remotes correct, no open PRs, no wip branches, master@efdae74 CI green). Gate-2: 3 residuals unpromoted past t1=3d (X9/X8 from m23-s11 at 6d, X15 from m22-s2 at 5.6d); promoted oldest R-m23-s11-X9 -> rb-23 spec section via chore PR#70 (chore/residual-promote-20260831T090106Z, squash+auto-merge), queued rb-23. No launch this tick (promote was the one mutating action). X8, X15, and the rest of the 34-open backlog carry forward; residual-over-cap alarm (34 open, cap 12, observe-only) still standing.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -50,5 +59,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-31T08:06:42Z"
+ "last_tick_utc": "2026-08-31T09:01:37Z"
 }
