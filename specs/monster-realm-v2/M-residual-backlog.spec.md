@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-30 — WHEN a table field is declared without `pub` (`owner_backup: Identity,` — the 2.8.1 (from rb-4 X11, deferred 2026-08-28)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-4 · residual: R-rb-4-X11
+
+Deferred with reason: field-level parse non-vacuity, a PARSER defect distinct from this WALKER residual:
+
+EARS: WHEN a table field is declared without `pub` (`owner_backup: Identity,` — the 2.8.1
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-29 — WHEN a SpacetimeType product column carries an Identity (a named-field struct, an enum (from rb-4 X10, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-4 · residual: R-rb-4-X10
