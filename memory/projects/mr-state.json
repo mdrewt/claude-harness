@@ -1,7 +1,7 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-31T15:34:56Z",
- "updated_by": "mr-sup-native-20260831T151542Z-542497",
+ "updated_utc": "2026-08-31T16:03:40Z",
+ "updated_by": "mr-sup-native-20260831T160013Z-650239",
  "master": {
   "sha": "5962b7a7efb2f58535ad7d89cf897b43455f296d",
   "ci": "success",
@@ -45,7 +45,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "rb-24 MERGED PR#398->master@5962b7a (15:27Z); first mr-gates verify pass FLAGGED on PATH/contention artifacts in my own verify shell, all confirmed non-issues on clean isolated re-runs (CLEAN 16/16); residual R-m22-s2-X15 closed; worktree removed, master ff-only clean, post-merge CI green. queue=[rb-25,rb-26] untouched this tick (fast path for next tick). No launch this tick (merge+adjudication was the single mutating action).",
+ "notes": "rb-24 merge record recovered+committed (was orphaned from 15:15Z tick); promoted R-rb-3-X9 -> rb-27 (PR#74 merged); queue=[rb-25,rb-26,rb-27]; no launch this tick (residual-aging outranked queue fast path, per doctrine). residual cap alarm persists (24 open vs cap 12, observe-only); tied-oldest R-rb-3-X10 (3.07d) still unpromoted for next tick.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -75,5 +75,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-31T15:34:56Z"
+ "last_tick_utc": "2026-08-31T16:03:40Z"
 }
