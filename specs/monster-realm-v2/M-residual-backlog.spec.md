@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-25 — WHEN a REKEY entry's `exists`/`rekey` needle names ANOTHER table's live helper (from rb-2 X10, deferred 2026-08-28)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-2 · residual: R-rb-2-X10
+
+Deferred with reason: the needle↔key correspondence hole is PRE-EXISTING in [G6/consumed]
+
+EARS: WHEN a REKEY entry's `exists`/`rekey` needle names ANOTHER table's live helper
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-24 — WHEN the S2 schema ships THE SYSTEM SHALL declare the `AccountDeletionReaperSchedule` (from m22-s2 X15, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s2 · residual: R-m22-s2-X15
