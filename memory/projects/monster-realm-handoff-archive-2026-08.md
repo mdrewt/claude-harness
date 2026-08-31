@@ -5007,3 +5007,52 @@ Native tick mr-sup-native-20260830T130014Z-3271092 (13:00Z). Gate-0: no live loc
 ## 2026-08-30T14:02:38Z — 14:02Z launched rb-17 (residual R-m23-s10-X20)
 Native tick rid=native-20260830T140008Z-3282832. Gate-0/1: no live locks/mutex/hold, no session collision (recent harness writes were mechanical: codegraph daemon, heartbeat, tick log), both repos in sync with origin (harness main, proj master @95a7101). master CI green (last push-CI success 09:23Z rb-15; Nightly still in_progress at tick time, unrelated to push gate). No open PRs, no inflight runs. Fast path: queue had rb-17 (promoted residual R-m23-s10-X20, added 13:01:58Z). Re-verified live: spec section specs/monster-realm-v2/M-residual-backlog.spec.md ### rb-17 present, non-blocked (after: none), not already merged. Residual has three sub-parts (RMCSS/RMEXT/FOCUSHELPER) from m23-s10's deferred X20 -- checked current master before launch: S9's prefers-reduced-motion CSS block IS landed (styles.css:95), so RMCSS is now actionable; S7 merged (#366), may already have reconciled RMEXT; no m23-s10b slice was ever spawned for FOCUSHELPER, so the brief instructs the run to fold it in (main.ts now available) or re-defer with an accurate owner rather than silently drop it. tier=routine (a11y eval/scanner work, no schema/netcode/security/M20/M25 surfaces, no prior failed attempt) -> opus@high. First spawn attempt failed BRIEF-RENDER-FAILED: vars.json was missing the required 'tier' field (not documented in the doctrine's listed vars.json keys but enforced by mr-spawn's python renderer) -- added tier:routine, relaunch clean, brief-built bytes=16983. GATES-SEEDED criteria=0 (the terse rb-* residual spec entries carry no auto-extractable SHALL criteria -- consistent with prior rb-slices). Launched leader=3285080 claude_pid=3285083 rid=mr-spawn-20260830T140216Z-3285027, repo=project pr_repo=mdrewt/monster-realm. queue-removed rb-17. No BLOCKERs, no rate-limit event. Governor NORMAL (d7=$807.85/2783 effective, fable_d7=$267.76/2298).
 
+## 2026-08-30T15:26Z — rb-17 PR OPEN (#393), local `just ci` green, remote CI running
+Slice `rb-17` (promoted residual R-m23-s10-X20). Branch `slice/rb-17`, worktree
+`.claude/worktrees/rb-17`, forked from master 95a7101, HEAD 9bd70a1, PUSHED.
+**PR: https://github.com/mdrewt/monster-realm/pull/393** — remote CI run 33319594385 in_progress
+at hand-off. TERMINAL STATE per the brief: PR open + local gate green. **Supervisor owns the merge.**
+
+DELIVERED — 2 of the residual's 3 sub-parts closed, 1 DEFERred with a corrected blocker.
+ * (a) R-m23-s10-RMCSS -> `[A11Y-RM2e]` (no `--*` custom property under a motion-scoped at-rule;
+   REFUSES CSS Nesting, a case-insensitive top-level `@import`, and symlinks) + `[A11Y-RM2f]`
+   (15 CSS read-back / motion-EVENT tokens, census-filtered).
+ * (b) R-m23-s10-RMEXT -> `[A11Y-RM2g]` two-way walker ratchet + the census made single-owner in
+   the eval and IMPORTED by `client/src/render/motionPreference.test.ts`. Census 92 -> 157.
+ * (c) R-m23-s10-FOCUSHELPER -> DEFER (see below).
+Files: `evals/reduced-motion-purity.eval.mjs`, `client/src/render/motionPreference.test.ts`,
+`ARCHITECTURE.md`. Teeth 10 -> 47.
+
+LEDGER: `memory/projects/gates/rb-17.gates.md` — **8/8 met** (X1-X7 executable and re-executed by
+the `verifier` lens; X8 MANUAL with resolved `ARCHITECTURE.md:235` / `:1927` citations),
+LINT-CLEAN, **4 DEFER lines to `backlog`**: `R-m23-s10-FOCUSHELPER`, `R-rb17-GEOM`,
+`R-rb17-WALKER3`, `R-rb17-ADRCITE`. The supervisor still needs to run
+`mr-gates residuals close --slice rb-17 --pr 393` to drain them into rows.
+
+TWO MEASURED CORRECTIONS TO THE PROMOTED SCOPE (both recorded in the ledger and the PR body):
+ 1. RMEXT's divergence runs the OPPOSITE way from the residual's text and is 65 files wide.
+    Reconciling the way the text implies would have LOOSENED the stronger tier.
+ 2. FOCUSHELPER's recorded blocker ("needs main.ts in touches") is REFUTED — `[A11Y-15]` only
+    READS its subjects and names `main.ts` nowhere. The real blocker is
+    `evals/overlay-a11y-manifest.eval.mjs`. **Recommended packaging: merge that follow-up with the
+    already-queued `R-rb16-COMMENTBAN`** — both are `[A11Y-15]` scope decisions in the same file.
+    `touches:` for it = `evals/overlay-a11y-manifest.eval.mjs` + `client/src/ui/menuView.test.ts`
+    + `docs/adr/**`.
+
+SUPERVISOR ACTION NEEDED — **no ADR number was reserved for rb-17** (the launch brief assigned the
+literal string `None`; picking one is forbidden). Rulings are recorded in the `ARCHITECTURE.md`
+append log ending `ADR next-free = 0218`, per the rb-15 "no new ADR" precedent. The `reviewer` lens
+called this a convention blocker. Allocate 0218 if a standalone record is wanted.
+
+EVIDENCE ARTIFACTS (harness repo, uncommitted — supervisor to commit with its tick):
+ * `memory/projects/monster-realm-rb-17-plan.md` — plan + both measured corrections
+ * `memory/projects/rb-17.teeth.md` / `.wrong-impls.md` / `.RED-PROOF.txt` — tester corpus + RED
+ * `memory/projects/rb-17.teeth-probe.mjs` — independent 65-fixture oracle (`ok=65 fail=0`)
+ * `memory/projects/rb-17.bite-proof.sh` — 6 mutants, 6 distinct tags, 0 unexpected greens
+ * `memory/projects/gates/rb-17.gates.md`
+
+# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
+
+---
+
+
