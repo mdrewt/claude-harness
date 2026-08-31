@@ -4,7 +4,7 @@
  "updated_by": "mr-sup-native-20260831T200013Z-825533",
  "master": {
   "sha": "11cac7e3f1156ffb6c2d63fbfaa3d69eae196036",
-  "ci": "success",
+  "ci": "green",
   "nightly": "in_progress"
  },
  "harness_main": {
@@ -61,7 +61,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "20:00Z tick: no launch. Gate-3 aging outranked queue fast path -- promoted oldest unpromoted residual R-rb-3-X10 (3.24d, past t1_promote_days=3) -> rb-28 in M-residual-backlog.spec.md, queued it. Doc-only chore PR#75 squash-merged (64bbdfd); harness main reconciled with origin via plain git merge (disjoint files, no conflict) after drifting 1 commit ahead again. Cleaned a stale /tmp/mr_pass_rb-25.done left over from the already-fully-reconciled 19:40Z tick. master CI confirmed green (11cac7e) live. queue=[rb-26,rb-27,rb-28].",
+ "notes": "22:00Z tick: promoted R-rb-4-X11 -> rb-30 (chore PR #77 squash-merged, harness main @ 76e789f). R-rb-4-X12 still past t1, next tick's residual action.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
