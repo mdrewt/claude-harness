@@ -1,9 +1,9 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-31T05:03:17Z",
- "updated_by": "mr-sup-native-20260831T050009Z-4089322",
+ "updated_utc": "2026-08-31T08:06:42Z",
+ "updated_by": "mr-sup-native-20260831T080014Z-215824",
  "master": {
-  "sha": "48fc86754e361a7cb43df01a92c157d391939e9e",
+  "sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a",
   "ci": "success",
   "nightly": "in_progress"
  },
@@ -12,19 +12,7 @@
   "ci": "no-remote-ci-local-gate-green"
  },
  "adr_next_free": 220,
- "inflight": [
-  {
-   "slice": "rb-22",
-   "run_id": "mr-spawn-20260831T050225Z-4091405",
-   "session_leader": 4091458,
-   "claude_pid": 4091461,
-   "model": "fable",
-   "effort": "xhigh",
-   "tier": "hard",
-   "repo": "project",
-   "started_utc": "2026-08-31T05:02:30Z"
-  }
- ],
+ "inflight": [],
  "awaiting_merge": [],
  "queue": [],
  "park_counters": {
@@ -32,7 +20,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Launched rb-22 (residual R-m22-s2-S3-GUEST-EXPORT-ORPHAN) via fast-path queue, tier=hard fable@xhigh. Queue now empty. X8/X9 (manual-AT) remain unpromoted. handoff-rotate: 43 unparseable-header entries still pinned live, file was 235KB pre-rotation this tick (rotated 2 entries/2.9KB) -- rotation appears to only be partially effective; flagged for a future tick to investigate.",
+ "notes": "Reconciled a prior tick's crash: rb-22/PR#397 was already MERGED live (master@efdae74) with worktree+branch cleaned before mr-gates verify ran and before that tick committed ledger/handoff/mr-state.json (found 3 uncommitted stray files/diffs in the harness working tree at gate-0 this tick). Recreated a detached worktree at efdae74 to re-run mr-gates verify (7/9 gates reconfirmed true; EO-4 false only for lack of npm install in the reconstruction, remote CI was already green pre-merge; EO-6 evidence genuine, citation line stale) -- then removed it again. Ran mr-gates residuals close --slice rb-22 --pr 397 (closed R-m22-s2-S3-GUEST-EXPORT-ORPHAN; auto-emitted backlog residuals R-rb-22-EO-9/10/11). Wrote the missing ledger MERGED row. No new launch this tick (reconciliation was the one action). Process gap flagged for a future fix: merging ticks should commit their own state atomically as the last step so a crash between merge and commit can't strand records like this again. X8/X9 (manual-AT) remain unpromoted.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -62,5 +50,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-31T05:03:17Z"
+ "last_tick_utc": "2026-08-31T08:06:42Z"
 }

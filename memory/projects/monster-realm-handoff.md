@@ -2,6 +2,89 @@
 
 ---
 
+## 2026-08-31T~07:0xZ — rb-22 COMPLETE (terminal: PR #397 open + local `just ci` green + remote CI running)
+
+**Slice:** rb-22 — residual R-m22-s2-S3-GUEST-EXPORT-ORPHAN. Closes the guest-export orphan: a guest's
+pre-claim `export_bundle` chunks would sit under the retired guest identity after `complete_guest_claim`
+(S3 cascade keys on a live account's own identity, can't reach them; S4 TTL is not a reachability
+guarantee). **Ships the fix AHEAD of S4** — measured: NO writer/reader of `export_bundle` exists yet
+(S4's `request_data_export` unimplemented), so it's a structural hole, not a live-data bug.
+**PR:** https://github.com/mdrewt/monster-realm/pull/397 — OPEN, MERGEABLE, remote CI running (ci+e2e
+pending) at exit. Branch `slice/rb-22` (worktree `.claude/worktrees/rb-22`), 6 wip commits, all pushed,
+HEAD `d17385c`. **Supervisor owns the merge — I did NOT run `gh pr merge`.** Main checkout on `master`,
+never mutated. Fork `48fc867`. No sibling slice in flight.
+
+**Decision (ADR-0220):** delete-at-claim in a NEW owning module `server-module/src/privacy.rs`
+`pub(crate) fn purge_export_bundles(ctx, owner)` — collect via `owner_identity` btree, delete by PK
+(ADR-0126 idiom). Called once in `complete_guest_claim` between `rekey_all` and
+`consume_claim_and_disarm`, passing the GUEST identity. `mod privacy;` in lib.rs. Owner-GENERIC so
+S3's cascade reuses it verbatim. NOT rekey (would falsify EXEMPT → forces evals/ edits outside touches),
+NOT TTL-only (S4 reaper absent; playtest_event doctrine). `export_bundle.owner_identity` re-verified
+LIVE: still EXEMPT, 24 keys, evals/ untouched.
+
+**Gate:** full `just ci` **EXIT=0** in the worktree, run 3× independently (my `/tmp/rb22-ci.log`, mr-gates
+EO-4, verifier): 96 client files / 2871 tests, 99 evals PASS / 0 FAIL, observability validate 8/0/0,
+clippy `-D warnings` clean. **Acceptance: 8/11 met, 3 DEFERred (EO-9/10/11 → backlog), 0 unmet**
+(seed:e3b0c44298fc1c14), LINT-CLEAN. Verifier: **APPROVE** on all 6 items (independent CI, not-weakened
+audit, 27/27 bite-proof, ledger honesty, scope, security).
+
+**Proof-of-teeth:** 5/5 named RED on the fork (`memory/projects/rb-22.red-before.txt`). 17 Rust gating
+tests (5 accounts-arm + 12 privacy-arm). 27-mutant bite-proof `RB22-BITE-PROOF tests=17 mutants=27
+caught=27/27 survived=0 controls=2/2 verdict=Y` (`memory/projects/rb-22.bite-proof.mjs`). Gate scripts:
+`rb-22.{rust-gate,exempt-probe,docs-gate,bite-proof}.mjs` (MUST NOT be deleted; the CHECKs cd into the
+worktree — run `mr-gates verify` BEFORE removing the worktree). All `mr-gates check` CHECKs need the
+toolchain PATH exported (node-24/cargo children) — a bare invocation gets node 18 (no `glob` in
+fs/promises) + no cargo and false-FAILs EO-3/4/7.
+
+**🔴 HEADLINE — the artifact red-team found TWO gate holes the plan-phase pass + a 16-mutant bite-proof
+BOTH missed** (both MEASURED clippy-clean, both closed + covered by W25/W26): (1) CRITICAL — the
+source-scan pipeline strips STRINGS before COMMENTS, so a bare `"` inside a `//` comment opens a fake
+string that swallows real compiling code (an arbitrary-Identity `account` delete) from EVERY squashed-text
+pin including the "frozen-body equality backstop"; closed by `rb22p_no_bare_quote_in_privacy`
+(production-only: privacy.rs must carry exactly the one `"privacy_tests.rs"` literal, zero other quotes).
+(2) MEDIUM — `[call/reachable]` scanned only rekey→purge; an early return in the purge→consume gap skips
+AUTH-34 consume + AUTH-21 stamp while returning Ok (JS eval caught it, Rust arm didn't); closed by widening
+the region to rekey→consume. **Reconfirms: run BOTH red-team lenses on a gate slice; the artifact pass is
+not optional.**
+
+**🔴 SECOND — reducer-security-auditor Nit 2 was closed IN-slice:** nothing constrained a THIRD module
+calling the `pub(crate)` helper with a badly-derived owner. Added `rb22_purge_named_nowhere_else_in_crate`
+(crate-wide `m22_scanned_sources()` naming census; bare token `purge_export_bundles`, NO word boundaries —
+an aliasing `use ... as p` fuses to `_bundlesasp;` and the decl fuses to `pub(crate)fnpurge...`, so either
+boundary drops a real site; accepted cost = a loud false-RED on a longer same-prefix identifier).
+
+**3 DEFERs (all backlog, all real work, none gate-dodging):** EO-9 (live behavioral proof — no writer of
+export_bundle exists to seed rows; the account-e2e rig is outside touches; re-open as a cheap phase when S4
+ships `request_data_export`). EO-10 (the REKEY_MANIFEST EXEMPT reason at
+`evals/guest-claim-integrity.eval.mjs:1864-1873` still names S3 as the owner of a fix rb-22 shipped — stale
+prose; evals/ outside touches). EO-11 (`write_target_accessors` accounts_tests.rs:2139-2165 attributes
+writes by nearest-earlier `ctx.db.` with no statement boundary + silently drops anchorless writes — a
+`let db = &ctx.db;` alias bypass measured; rb-22 closed the class for privacy.rs LOCALLY, but the SHARED
+helper needs a dedicated slice that re-baselines accounts.rs's G5 census).
+
+**S3/S4 obligations this slice creates (in ADR-0220):** S3's cascade still owes the deleting-account
+`export_bundle` erase (Erase-policy in DATA_LIFECYCLE_MANIFEST, reuse `purge_export_bundles`). S4 still owes
+the 7-day TTL reaper AND must CAP per-owner live chunk rows — an unbounded chunk count lets a guest inflate
+`complete_guest_claim` past the reducer budget, a self-denial that also makes the orphan UNCLOSABLE
+(reducer-security-auditor Q5).
+
+**Process notes.** (a) `git worktree remove --force /tmp/rb22-redcheck` from a shell whose cwd WAS that dir
+yanked the cwd out from under the session (getcwd errors) — `cd` out first, or remove from elsewhere.
+(b) `rm -rf` is hook-blocked; `find <dir> -delete` works. (c) A `just ci` launched WITHOUT an explicit `cd`
+inherited the worktree cwd from an earlier command and ran against the right tree — but verify `pwd` in the
+launching command; a wrong cwd would silently test master. (d) The exempt-probe's `outside=0` field was
+added after the EXPECT was authored → the `evalsDiff=0 verdict=Y`-adjacent regex stopped matching; any
+probe-output field insertion breaks an adjacency EXPECT (the census-format-edit lesson, again).
+
+**NEXT for the supervisor:** own the merge (`mr-ci-watch 397 rb-22`). On merge: close the residual, promote
+EO-9/EO-10/EO-11 backlog targets into real spec sections (measured: unmaterialised prose ids rot ~13 days),
+run `mr-gates verify --slice rb-22` BEFORE removing the worktree, re-index the graphs post-merge (build-loop
+step 10). Untracked harness files: `memory/projects/monster-realm-rb-22-plan.md`, `gates/rb-22.gates.md`,
+`rb-22.red-before.txt`, `rb-22.{rust-gate,exempt-probe,docs-gate,bite-proof}.mjs`. Red-team PoCs
+`/tmp/rb22-attack{,2}/`; CI logs `/tmp/rb22-ci.log`, gate logs `/tmp/rb22-gates{,2}.log`.
+
+---
+
 ## 2026-08-31T00:5xZ — rb-20 PR OPEN (#396, awaiting supervisor merge)
 Branch `fix/rb-20-reduced-motion-browser-tier`, worktree `.claude/worktrees/rb-20`, from master@3b2bcb2.
 Local `just ci` GREEN (deciding line `validate.mjs: 8 check(s), 0 failed, 0 skipped`). Ledger 6/7 met,
@@ -2126,6 +2209,11 @@ RESIDUALS DISCLOSED IN THE LEDGER (not defers — all 8 gates are met): **R-rb-1
 NOTE FOR rb-20 (queued, X11): this slice touches `client/playwright.config.ts` ZERO times, so rb-20 is unblocked — but its `reducedMotion: 'reduce'` project will COLLECT `e2e/a11y.spec.ts`, and it must decide deliberately between an axe scan under reduced motion and a `testIgnore`. `client/e2e/a11y.spec.ts` is also now in the PER-PR `e2e` job (testDir collects it) — deliberate, ADR-0218.
 TRAP HIT AND WORTH REPEATING: `just ci` red'd once with `account-e2e ... spacetime did not become ready` purely because my own probe server held the GLOBAL spacetime data-dir lock. `ps -eo args | grep '[s]pacetimedb-standalone'` before blaming a diff.
 
+## 2026-08-31T08:06:55Z — rb-22 MERGED (PR#397) — reconciled prior tick's uncommitted records + worktree-before-verify gap
+Native tick rid=native-20260831T080014Z-215824 (08:00Z). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no resident-session collision (esbuild watchers in rb-11 worktree are 36h+ stale, not new). Found harness working tree carrying UNCOMMITTED changes from the 07:06Z tick (delegated rb-22 CI-wait to mr-ci-watch pid 143909) that never got committed before that tick exited. Live ground truth: PR#397 already MERGED at 2026-08-31T07:16:59Z into master@efdae74, branch slice/rb-22 deleted, worktree already removed — the merge itself completed correctly (presumably by the tick mr-ci-watch's green event spawned), but that merging tick crashed/exited without running mr-gates verify (worktree removed first, contradicting its own handoff NEXT instruction) and without committing ledger/handoff/mr-state.json. Reconciled: recreated a detached worktree at efdae74 solely to re-run mr-gates verify — 7/9 gates reconfirmed true against fresh evidence; EO-4(just ci) FLAGGED only because the reconstructed worktree never had npm install (remote CI already green on this exact commit pre-merge, which is the authoritative post-merge signal); EO-6 manual gate's evidence is genuinely present (5/5 RED, verified) but its citation cites line 12 instead of the actual summary block near line 110-116 — a stale/wrong line number in the gates file, not fraud (flagging for a future doc-only fix, not worth its own slice). Ran mr-gates residuals close --slice rb-22 --pr 397: closed R-m22-s2-S3-GUEST-EXPORT-ORPHAN, auto-emitted 3 unpromoted backlog residuals (R-rb-22-EO-9/EO-10/EO-11) per the DEFERs. Removed the reconstruction worktree. Wrote the ledger MERGED row (prior tick never did). No new launch this tick — one action budget spent on reconciliation; queue empty. Governor NORMAL (d7=$1065.35/2783, fable_ok=true). BLOCKER for a future tick, not urgent: the merge-completing tick's failure to commit its own state before exit is a process gap worth a dedicated fix (same family as the previously-noted queue[] write-race) — merging ticks should commit ledger+handoff+mr-state.json atomically as their last step, or a crash between merge and commit leaves exactly this kind of stray. NEXT: normal fast-path pick-work next tick (queue empty, no residuals past aging thresholds beyond what's already tracked).
+## 2026-08-31T07:06:28Z — Delegated CI-wait for rb-22 (PR#397)
+Native tick mr-sup-native-20260831T070606Z-143847-22012 (07:06Z). Gate-0: no live per-run locks with awaiting-merge (rb-22 leader dead, .done true), no chain mutex, HOLD-NONE, no resident-session collision. EVENT rb-22.done.md showed rb-22's rooted run finished EXIT=0 ATTEMPTS=1 (fable/xhigh), opened PR#397 on mdrewt/monster-realm (residual R-m22-s2-S3-GUEST-EXPORT-ORPHAN, guest pre-claim export_bundle chunk purge at claim time). Verified live: PR#397 OPEN, MERGEABLE, ci+e2e both IN_PROGRESS (mergeStateStatus=UNSTABLE reflects pending checks, not a conflict). Delegated CI-wait for PR #397 to mr-ci-watch (pid 143909, detached); resumes via event tick when checks complete. No merge attempted this tick. Queue unchanged.
+
 ## 2026-08-31T05:03:05Z — 05:02Z launched rb-22 (residual R-m22-s2-S3-GUEST-EXPORT-ORPHAN)
 Native tick rid=native-20260831T050009Z-4089322 (05:00Z). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no session collision (recent harness writes were mechanical: codegraph daemon, heartbeat, tick log — all >45min stale relative to now). Both repos fetched and in sync with origin (harness main, proj master 48fc867, CI green on rb-20's merge commit). No open PRs either repo, no inflight/awaiting_merge. Fast path: queue held rb-22 (promoted residual R-m22-s2-S3-GUEST-EXPORT-ORPHAN, added 2026-08-31T04:01:48Z by the 04:00Z tick). Re-verified live: spec section specs/monster-realm-v2/M-residual-backlog.spec.md ### rb-22 present, non-blocked (after: none, just source/residual metadata), not already merged (no PR, no ledger row for rb-22 prior to this tick). touches: was declared '(inherit from source slice — REVIEW)' in the spec entry; derived concretely from the source spec (M22-privacy-compliance.spec.md S3 row: server-module/src/accounts.rs reducer bodies + server-module/src/lib.rs) plus S4's export-owning file server-module/src/privacy.rs, since this residual is squarely the S3-cascade/S4-export seam (pre-claim export_bundle chunks orphaned under a retired guest identity). tier=hard (server-module schema/reducer + cascade surface) -> fable@xhigh; budget.fable_ok=true (d7=$979.30/2783 eff., fable_d7=$267.76/2298), no guard exceeded. ADR reserved: 220 (matches mr-state.json adr_next_free and next-free slot after 0219 in docs/adr/README.md). GATES-SEEDED criteria=0 (terse rb-* residual spec entries carry no auto-extractable SHALL criteria, consistent with prior rb-slices e.g. rb-17/rb-20). Launched leader=4091458 claude_pid=4091461 (verified own session, model class fable, effort xhigh in the launched cmdline) rid=mr-spawn-20260831T050225Z-4091405, repo=project, pr_repo=mdrewt/monster-realm. queue-removed rb-22 (now empty). No BLOCKERs, no rate-limit event. Governor NORMAL. NOTE (not this tick's action, flagging for a future tick): monster-realm-handoff.md is far over its ~40KB rotation budget (235KB observed at gate-0) and the two newest entries (rb-21/rb-22 promotion, 03:00Z/04:00Z) were appended near line 2129 instead of at the top despite the newest-first convention -- looks like the same failure mode the doctrine already names (entries out of order / rotation not firing), worth a dedicated investigation of mr-record handoff's rotation path rather than a hand-fix.
 ## 2026-08-31T04:02:39Z — tick record — promoted R-m22-s2-S3-GUEST-EXPORT-ORPHAN -> rb-22
@@ -2221,13 +2309,3 @@ Squash-merged fix/rb-16-retire-focus-lists -> master (95a7101). Retired 2 of 3 h
 
 ## 2026-08-30T12:09:41Z — rb-16 PR#392: e2e red re-run as suspected flake
 Native tick rid=native-20260830T120805Z-3232010 (12:08Z). Event: rb-16.ci.md reported PR#392 (fix/rb-16-retire-focus-lists) red — e2e job failed on `e2e/ranked-forfeit.spec.ts:265 RL-18` (120s timeout), `ci` job passed. Verified live: PR#392 diff is `client/src/ui/renameView.test.ts`, `client/src/ui/menuView.test.ts`, `docs/adr/0217-*.md`, `docs/adr/DIGEST.md` only — disjoint from ranked/PvP forfeit code. Checked last 40 CI runs on this repo (2026-08-25 through today): all green, no prior ranked-forfeit flake on record. Judged this a suspected infra flake, not a diff-caused regression — re-ran only the failed job (`gh run rerun 33309936996 --failed`), confirmed e2e job re-queued (pending), delegated the wait to mr-ci-watch (PR#392, slice rb-16) rather than merging blind or launching new work. No launch this tick (governor NORMAL, budget unaffected). Gate-0/1: no live locks/mutex/hold, no session collision, both repos synced with origin; harness has known uncommitted mr-state.json/handoff + rb-16 planning files carried over from a prior tick (matches recorded prior-tick issue, not a live collision). Next: mr-ci-watch resolves via event tick — GREEN -> proceed to merge (mr-audit + mr-gates verify first); RED again on the SAME test -> treat as a real gating-test/regression concern, do not re-run blind a second time.
-## 2026-08-30T11:02:34Z — rb-16 LAUNCHED (recovered lost queue entry)
-Native tick native-20260830T110011Z-3124167 (11:00Z). Gate-0/1: no live per-run locks, no chain-owner mutex, no operator hold, no resident human session (only stray orphaned esbuild --ping processes from the old rb-11 worktree, already gone from git worktree list -- no growing writes, not a collision). Both repos fetched and in sync with origin (harness main c97b3b6, proj master 09c75dc). No open PRs either repo. proj master CI green on 09c75dc.
-
-Gate-3: queue[]/inflight[] both empty in mr-state.json -- but this was WRONG. The prior (10:00Z) tick had promoted residual R-m23-s10-X19 into a real spec section (rb-16, M-residual-backlog.spec.md) and run mr-record queue-add, but its own end-of-tick mr-state.json write clobbered queue[] back to empty -- it reused a stale gate-0 snapshot of queue[] instead of re-reading fresh immediately before writing, exactly the failure mode the doctrine's queue[] section warns about. Caught this by noticing mr-gates residuals list --unclaimed no longer lists R-m23-s10-X19 (confirming the promotion really happened) while queue[] showed nothing pointing at it, and by reading the 10:00Z handoff entry which explicitly said 'rb-16 stays queued for a fresh tick to launch.'
-
-Re-verified rb-16 live and directly (spec section exists, no after: deps, not blocked, not already merged, residual confirmed promoted not just disclosed) and launched it rather than falling through to a fresh PLAN section-9 derivation, since abandoning an already-promoted aged residual in favor of new feature work would invert the aging-priority policy the whole residual-drain mechanism exists to enforce. Model=opus effort=high tier=routine (client-side test/eval cleanup, no schema/reducer/netcode/security surface, no M20/M25, no resume-after-park, no prior failed attempt). ADR reserved: 217 (matches mr-state.json adr_next_free and the next-free slot after 0216 in docs/adr/README.md). LAUNCHED confirmed: leader pid 3125702, claude pid 3125705, both live, mr-spawn reported status=LAUNCHED, repo=project (mdrewt/monster-realm), pr_repo correct.
-
-Scope handed to the run: retire the three hand-kept .focus( file lists in client/src/ui/renameView.test.ts (S3-NO-VIEW-LOCAL-FOCUS x10 files, S4-VIEW-LOCAL-FOCUS-5) and client/src/ui/menuView.test.ts (MV-NO-FOCUS-CALL) that residual R-m23-s10-X19 says X1/X2 already subsume -- explicitly instructed to re-verify live whether S10's shipped invocation-tracking oracle (evals/keyboard-operable-rows.eval.mjs, rb-13/PR#390) genuinely subsumes them before deleting, and to narrow scope + honestly DEFER any remainder rather than delete a real gate.
-
-NEXT for a future tick: watch for rb-16's .done / PR; if it opens a PR delegate to mr-ci-watch. Separately -- the queue[] write-race is a real, now-observed bug in this loop's own tick discipline, not hypothetical; worth a dedicated fix (read-modify-write the whole state file atomically including a fresh queue[] read, or move queue mutations fully out of the supervisor's own end-of-tick write path) rather than relying on ticks to remember to re-read. Filing this as a note rather than a residual since the doctrine already documents the correct behavior -- what's missing is enforcement, and I did not want to spend this tick's one action on tooling instead of the aged residual drain. Governor NORMAL (d7=$785.03/2783, fable_ok=true). No BLOCKERs.

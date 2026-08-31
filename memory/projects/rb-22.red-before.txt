@@ -1,0 +1,117 @@
+# rb-22 EO-6 pre-fix RED evidence — captured 2026-08-31T06:14:02Z
+# Tree: fork master@48fc867 (temp worktree /tmp/rb22-redcheck), gating tests appended verbatim from /tmp/rb-22-tests/accounts_tests.append.rs
+# Command: cargo nextest run -p monster-realm-module -E 'test(/rb22/)' --no-fail-fast
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+────────────
+ Nextest run ID 0cd2e9b0-63d1-4f74-9aad-8edbdd6b839b with nextest profile: default
+    Starting 5 tests across 1 binary (648 tests skipped)
+        FAIL [   0.004s] (1/5) monster-realm-module accounts::accounts_tests::rb22_accounts_header_names_the_privacy_delegate
+  stdout ───
+
+    running 1 test
+    test accounts::accounts_tests::rb22_accounts_header_names_the_privacy_delegate ... FAILED
+
+    failures:
+
+    failures:
+        accounts::accounts_tests::rb22_accounts_header_names_the_privacy_delegate
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 652 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'accounts::accounts_tests::rb22_accounts_header_names_the_privacy_delegate' (4139813) panicked at server-module/src/accounts_tests.rs:4798:9:
+    rb-22 [header/doc-truth]: the accounts.rs WRITE-ISOLATION header does not mention `privacy` (the owning module the export_bundle write is delegated to). The shipped paragraph claims every delegated write goes through a `rekey_` helper in one of six named modules; rb-22 adds a delegate that is neither a re-key nor in that list, so an unedited header states something that is no longer true about this module's write surface.
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.004s] (2/5) monster-realm-module accounts::accounts_tests::rb22_lib_wires_mod_privacy
+  stdout ───
+
+    running 1 test
+    test accounts::accounts_tests::rb22_lib_wires_mod_privacy ... FAILED
+
+    failures:
+
+    failures:
+        accounts::accounts_tests::rb22_lib_wires_mod_privacy
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 652 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'accounts::accounts_tests::rb22_lib_wires_mod_privacy' (4139816) panicked at server-module/src/accounts_tests.rs:4639:5:
+    assertion `left == right` failed: rb-22 [lib/decl-count]: lib.rs must declare `mod privacy;` exactly once; found 0 occurrence(s) of the squashed form `modprivacy;`. Without the declaration the new owning module is not part of the crate at all: privacy.rs is dead text on disk, the call in accounts.rs does not resolve, and the sibling privacy_tests module is never compiled.
+      left: 0
+     right: 1
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.004s] (3/5) monster-realm-module accounts::accounts_tests::rb22_purge_called_exactly_once_in_accounts_rs
+  stdout ───
+
+    running 1 test
+    test accounts::accounts_tests::rb22_purge_called_exactly_once_in_accounts_rs ... FAILED
+
+    failures:
+
+    failures:
+        accounts::accounts_tests::rb22_purge_called_exactly_once_in_accounts_rs
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 652 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'accounts::accounts_tests::rb22_purge_called_exactly_once_in_accounts_rs' (4139815) panicked at server-module/src/accounts_tests.rs:4612:5:
+    assertion `left == right` failed: rb-22 [call/whole-file]: accounts.rs must name `crate::privacy::purge_export_bundles(` EXACTLY once; found 0. Zero means the delegation was deleted or moved into another module's helper (where the claim ceremony's own reviewers never see it); more than one means a second purge site exists that no scoped test in this file constrains.
+      left: 0
+     right: 1
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.004s] (4/5) monster-realm-module accounts::accounts_tests::rb22_privacy_module_exists_with_purge_body
+  stdout ───
+
+    running 1 test
+    test accounts::accounts_tests::rb22_privacy_module_exists_with_purge_body ... FAILED
+
+    failures:
+
+    failures:
+        accounts::accounts_tests::rb22_privacy_module_exists_with_purge_body
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 652 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'accounts::accounts_tests::rb22_privacy_module_exists_with_purge_body' (4139814) panicked at server-module/src/accounts_tests.rs:4699:9:
+    rb-22: server-module/src/privacy.rs must exist and define purge_export_bundles [privacy/missing-file] (read of /tmp/rb22-redcheck/server-module/src/privacy.rs failed: No such file or directory (os error 2))
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+        FAIL [   0.004s] (5/5) monster-realm-module accounts::accounts_tests::rb22_claim_purges_guest_export_bundles_call_site
+  stdout ───
+
+    running 1 test
+    test accounts::accounts_tests::rb22_claim_purges_guest_export_bundles_call_site ... FAILED
+
+    failures:
+
+    failures:
+        accounts::accounts_tests::rb22_claim_purges_guest_export_bundles_call_site
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 652 filtered out; finished in 0.00s
+
+  stderr ───
+
+    thread 'accounts::accounts_tests::rb22_claim_purges_guest_export_bundles_call_site' (4139812) panicked at server-module/src/accounts_tests.rs:4472:5:
+    assertion `left == right` failed: rb-22 [call/count]: complete_guest_claim must call `crate::privacy::purge_export_bundles(` EXACTLY once; found 0. ZERO means a guest's pre-claim export_bundle chunks stay owned by the RETIRED guest identity forever: the S3 deletion cascade keys on a live account's own identity and structurally cannot reach them, and S4's 7-day TTL reaper is a second, independent expiry rather than a reachability guarantee. MORE THAN ONE is a second, unreviewed purge site.
+      left: 0
+     right: 1
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   0.005s] 5 tests run: 0 passed, 5 failed, 648 skipped
+        FAIL [   0.004s] (1/5) monster-realm-module accounts::accounts_tests::rb22_accounts_header_names_the_privacy_delegate
+        FAIL [   0.004s] (2/5) monster-realm-module accounts::accounts_tests::rb22_lib_wires_mod_privacy
+        FAIL [   0.004s] (3/5) monster-realm-module accounts::accounts_tests::rb22_purge_called_exactly_once_in_accounts_rs
+        FAIL [   0.004s] (4/5) monster-realm-module accounts::accounts_tests::rb22_privacy_module_exists_with_purge_body
+        FAIL [   0.004s] (5/5) monster-realm-module accounts::accounts_tests::rb22_claim_purges_guest_export_bundles_call_site
+error: test run failed
+EXIT=100
