@@ -22,6 +22,14 @@
    "added_utc": "2026-08-31T10:02:12Z",
    "added_by": "n/a",
    "derived_from_master_sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a"
+  },
+  {
+   "slice": "rb-25",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-2-X10",
+   "added_utc": "2026-08-31T11:01:25Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a"
   }
  ],
  "park_counters": {
@@ -29,7 +37,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "10:00Z tick: dispositioned R-m23-s11-X8/X9 wontfix (MANUAL AT-testing residuals, not agent-launchable); promoted R-m22-s2-X15 -> rb-24 via PR#71 (merged, harness main=c41b78f); queue holds rb-24 for next tick fast path.",
+ "notes": "rb-25 promoted (R-rb-2-X10) via PR#72 11:00Z tick; queue=[rb-24,rb-25]; R-rb-2-X9 still unpromoted",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
