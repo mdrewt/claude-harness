@@ -2,6 +2,55 @@
 
 ---
 
+## 2026-08-31T00:5xZ — rb-20 PR OPEN (#396, awaiting supervisor merge)
+Branch `fix/rb-20-reduced-motion-browser-tier`, worktree `.claude/worktrees/rb-20`, from master@3b2bcb2.
+Local `just ci` GREEN (deciding line `validate.mjs: 8 check(s), 0 failed, 0 skipped`). Ledger 6/7 met,
+1 DEFERred, 0 unmet. ADR-0219. Terminal state = PR open + local gate green; merge is supervisor-owned.
+
+**THE FINDING — promote this.** A11Y-27's RENDERER arm is unwired in production and always has been.
+`motionPreferenceFromWindow` has ZERO production importers; `client/src/main.ts:2807` calls
+`resolver.resolve({...})` with no `reduceMotion`, so `renderResolver.ts:83`'s `false` default applies
+every frame and `interpolateReducedMotion` is unreachable (desync-guard: the module is tree-shaken
+dead code, not merely unwired). The S7 module's own header declares the S5 wiring contract that never
+landed. Verified 4 ways (grep, codegraph, cbm trace_path, dynamic-dispatch/spread audit). This is
+ledger gate **RM-7, DEFERred to `backlog`** — it needs a real spec section and a slice.
+
+**What RM-7's slice must handle** (from desync-guard, do not lose this):
+ 1. Wire at `main.ts:2807` AND make `ResolveInput.reduceMotion` REQUIRED in the same commit — the
+    optional-with-`false`-default field is exactly what let this ship unwired with green tests.
+ 2. Remote-arm discontinuity: the live MediaQueryList means a mid-session toggle moves every remote
+    entity BACKWARD by up to ~500 ms of interp delay in one frame. Accept the jump-cut, pin it with a
+    both-directions transition test; there is no per-remote clock to re-anchor against.
+ 3. `main.ts:2824`'s `sawFractionalOwnMotion` latch can NEVER set under reduceMotion, and
+    `golden.spec.ts:156` / `zoneSync.spec.ts` assert it — so any environment reporting
+    `prefers-reduced-motion: reduce` (or a widened rb-20 `testMatch`) reds them, and it will read as a
+    netcode regression rather than an a11y setting.
+ 4. `client/e2e/reduced-motion.spec.ts` is the landing spot and is already written to receive it.
+
+**Two red-team bypasses found in the ARTIFACT pass that the PLAN pass and a 19-mutant bite-proof both
+missed** (both fixed + covered by in-repo fixtures): a spread-injected `contextOptions` SIBLING of
+`use` (typechecks clean, runtime no-op, was green through `just ci` + the eval + the RM-1 proof), and
+`testMatch: [/a11y\.spec\.ts$/]` whose escaped dots defeat a literal substring scan while collecting
+that file. Reconfirms: run BOTH red-team lenses on a gate slice.
+
+**Environment gotchas hit this run (cost ~1h):**
+ - RM-3 (browser bite-proof) needs a LIVE spacetime; RM-6 (`just ci` → `account-e2e`) needs NONE —
+   they are mutually exclusive locally. Run `just ci` first, then start spacetime for RM-3, then stop it.
+ - `pgrep -f`/`pkill -f "just ci"` / `"spacetimedb-standalone start"` SELF-MATCH the agent's own giant
+   command line and this session's shell; `pkill` killed my shell (exit 144). Use `ps -eo pid,cmd |
+   grep "[s]pacetime..."` and an explicit `kill <pid>`.
+ - A leftover prometheus container from a killed `observability-validate` squats the port and makes
+   the next run hang for ~50 min with no output. `docker ps` + `docker rm -f` clears it.
+ - The shared `client/node_modules` lacked `@axe-core/playwright` (in package.json since rb-19), so
+   local `client-typecheck` red on rb-19's spec. `npm ci` in the main checkout's client/ fixed it.
+
+Follow-up flagged, NOT taken (scope): halves 2/3/4 of `a11y-e2e` each carry a near-identical inline
+`node -e` floor check; half 1's equivalent was already factored into a bash function.
+
+# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
+
+---
+
 ## 2026-08-30T04:5xZ — rb-15 PR #391 OPEN, local `just ci` green, remote CI running (ci QUEUED / e2e IN_PROGRESS)
 Slice rb-15 (residual R-m23-s10-X18): `evals/a11y-static-shell.eval.mjs` is now the sole owner of the WHOLE CSS oracle (`parseCssRules`/`findIdSelectors`/`srOnlyIsAccessible` + private helpers, joining `stripCssComments`); `client/src/indexShell.test.ts` deleted its copies and reaches them through its EXISTING `rb12CssStripperOracle` namespace import — **zero new import lines**, because pinned biome 2.5.1 merges same-specifier imports and that takes RB12-G1's line count to 0 (measured). The `[A11Y-06]`/`[A11Y-07]` `function NAME(` codeNeedles retired; the eval now RUNS the oracle over two shared frozen tables (14+21 rows, executed IN FULL by BOTH tiers) and over the real `client/src/styles.css`.
 
@@ -2077,6 +2126,8 @@ RESIDUALS DISCLOSED IN THE LEDGER (not defers — all 8 gates are met): **R-rb-1
 NOTE FOR rb-20 (queued, X11): this slice touches `client/playwright.config.ts` ZERO times, so rb-20 is unblocked — but its `reducedMotion: 'reduce'` project will COLLECT `e2e/a11y.spec.ts`, and it must decide deliberately between an axe scan under reduced motion and a `testIgnore`. `client/e2e/a11y.spec.ts` is also now in the PER-PR `e2e` job (testDir collects it) — deliberate, ADR-0218.
 TRAP HIT AND WORTH REPEATING: `just ci` red'd once with `account-e2e ... spacetime did not become ready` purely because my own probe server held the GLOBAL spacetime data-dir lock. `ps -eo args | grep '[s]pacetimedb-standalone'` before blaming a diff.
 
+## 2026-08-31T01:01:16Z — rb-20 MERGED (PR#396 -> master@48fc867)
+Browser-tier reduced-motion oracle closing residual R-m23-s11-X11 (A11Y-27's missing stylesheet-arm coverage from m23-s11). Pre-merge: mr-gates verify FLAGGED on first pass in the supervisor's ad-hoc shell (missing cargo/wasm32 PATH -> RM-6 exec-error; missing local dev server -> RM-3 'connection refused'); re-ran with proper asdf/cargo PATH and got 6/6 fresh-pass except RM-3, which needs a live SpacetimeDB server the verify shell didn't have running (remote CI's own e2e job, which does spin up a server, passed clean, and the run's own log recorded RB20-BROWSER-BITE mutants=3 caught=3/3 at build time) -- adjudicated as an environment gap, not a regression. Acceptance 6/7 met, 1 deferred (RM-7 -> backlog: motionPreferenceFromWindow has zero production callers). orchestration_audit CLEAN (red-team/reviewer/tester/verifier all ran). mr-audit's own internal mr-gates call hit FileNotFoundError on all 6 gates (same PATH issue, one layer removed) -- disregarded in favor of the supervisor's direct re-verify. Residual R-m23-s11-X11 closed against PR#396; new residual R-rb-20-RM-7 opened (unpromoted, backlog target). Master CI for 48fc867 still in_progress at handoff time -- next tick's gate-0/1 will re-verify live before acting on it. Worktree + local branch cleaned, stale per-run locks (rb-19, rb-20) reaped via mr-unlock.
 ## 2026-08-30T22:02:49Z — rb-20 LAUNCHED (fast-path queue, residual X11 from m23-s11)
 Native tick mr-sup-native-20260830T220011Z-3807493 (22:00Z). Gate-0/1: no live per-run locks except the already-dead+done rb-19 lock (session_leader 3642961 confirmed not alive), no chain mutex, HOLD-NONE, no resident-session collision (find -mmin -6 empty both repos). Live ground truth re-verified: PR#395 (rb-19) already MERGED as 3b2bcb2, remote branch auto-deleted, worktree already gone, master ci+e2e both pass live. Found the previous tick's rb-19-merge record (handoff+ledger+mr-state.json+rb-19.bite-proof.mjs) written but never committed to git -- committed it as catch-up (cac654d) before taking this tick's own action, per the doctrine that ticks are recorded via git history. Gate-3 pick-work: master CI green, nothing inflight/awaiting_merge/open/parked. Residual aging: 6 residuals past t1=3d unpromoted (oldest 6d) but none past t2=14d, and none outrank already-promoted queued work (queue[] held rb-20, promoted 17:01Z from a prior tick) -- so the aging rule does not preempt the fast path here (it only outranks NEW PLAN sec.9 work). Re-verified queue[0]=rb-20 live: spec heading M-residual-backlog.spec.md:29 present, no after: dep, not blocked:, no existing branch/PR for rb-20 -- valid. Derived touches from the residual's own deferred-reason text (client/playwright.config.ts, a reducedMotion Playwright project, wiring beside just a11y-e2e) plus rb-19's own handoff note flagging a real collision: the new reducedMotion project will collect client/e2e/a11y.spec.ts by default, so rb-20's brief explicitly requires a deliberate testIgnore-vs-scan-under-reduced-motion decision, not an accidental one. Tier=routine (no HARD-tier criteria: not schema/reducer, not netcode/predictor, not security/RLS, not M20/M25, not resume-after-park, no prior failed attempt) -> opus@high. adr_reserved=219 (adr_next_free was already 219 post rb-19). mr-spawn LAUNCHED cleanly (leader=3809212, claude_pid=3809215, rid=mr-spawn-20260830T220215Z-3809122); verified detachment (PPID=1, own SID/PGID) and model class (opus/high) via ps. queue-removed rb-20. Governor NORMAL (d7=$932.69/2783 eff., fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs. Standing down after this single launch action.
 ## 2026-08-30T21:35:25Z — rb-19 MERGED (PR#395 → master@3b2bcb2)
@@ -2184,11 +2235,9 @@ Gate-0: clean (no live locks/mutex/hold; only harmless orphaned esbuild procs fr
 Gate-0: no live locks/mutex/hold; no inflight/awaiting_merge; queue was empty at start. Residual alarm: 13 unpromoted past t1=3d, 28 open (cap 12, observe-only). Per gate-3 aging rule, promoted the oldest unpromoted residual (m23-s10 group, tied disclosed_at 2026-08-25T07:26:22Z) — R-m23-s10-X16 — into M-residual-backlog.spec.md as rb-14, via mr-gates residuals promote. Queued rb-14 via mr-record queue-add for the next tick's fast path. Shipped the spec edit as doc-only chore PR mdrewt/claude-harness#61 (chore/residual-promote-20260830T050124Z), squash+auto enabled per doctrine. Noted: an already-removed rb-11 worktree left 5 orphaned esbuild --ping processes running (harmless, no lock references them; not cleaned up this tick). No launch/merge this tick — one promote was the action. Governor NORMAL (d7=$719.55/2783, fable_ok=true). No BLOCKERs.
 ## 2026-08-30T04:02:17Z — tick record — dispositioned R-m23-s10-X17 as wontfix (spec-declared accepted limitation)
 Native tick mr-sup-native-20260830T040009Z-2861816 (04:00Z). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no resident-session collision (find -mmin -6 empty both repos; only long-idle biome LSP + stray esbuild --ping procs under an already-removed .claude/worktrees/rb-11/client dir -- zombie handles from a prior cleaned-up worktree, not actionable). Both repos in sync with origin (harness main 05f2ca4, proj master 32dc092). Project master CI green (rb-13 keyboard-operable-rows merge). No open PRs either repo, queue[]/inflight[]/awaiting_merge[] all empty. slice/rb-4 branch exists locally (wip:, last commit 2026-08-28) but is not open/parked in mr-state -- left untouched, not this tick's concern. Gate-3: mr-gates residuals list --unclaimed showed 26 open, none past t2_stale_days=14, all except one past t1_promote_days=3 -- outranking new PLAN Sec.9 work per the aging doctrine. Oldest-tied cluster (age 4.857d, disclosed_at 2026-08-25T07:26:22Z): R-m23-s10-X16..X21. Read X17 in full against its source spec (M23-accessibility.spec.md Sec.5.4, lines 474-495): the residual's own text plus the spec's 'Declared residual' paragraph confirm [A11Y-13]'s string-scanning callback-identity check is a spec-author-accepted design tradeoff (fail-loud-on-unparseable-shape 'which is the correct default'), not a discovered gap -- same shape as the R-m23-s6-A11Y-26 wontfix from the prior tick. Dispositioned as wontfix (MED severity, mine to disposition) via mr-gates residuals disposition. Did not promote/launch anything else this tick -- one action per tick; X16/X18-X21 (same age cluster) remain for future ticks to triage individually. Governor NORMAL (d7=$718.72/2783 eff., fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down after the single disposition action.
-## 2026-08-30T03:01:15Z — Native tick mr-sup-native-20260830T030009Z-2852348 (03:00Z) -- dispositioned already-shipped residual R-m23-s6-A11Y-26 (rb-13 subsumed it)
-Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no resident-session collision (find -mmin -6 empty both repos). Both repos in sync with origin (harness main 05f2ca4, proj master 32dc092). Project master CI green (rb-13 keyboard-operable-rows merge). No open PRs either repo, queue[]/inflight[]/awaiting_merge[] all empty. Gate-3: mr-gates residuals list --unclaimed showed 28 open, none past t2_stale_days=14, 15 past t1_promote_days=3 -- outranking new PLAN Sec.9 work per the aging doctrine. Oldest by disclosed_at: R-m23-s6-A11Y-26 (age 4.885d, disclosed 2026-08-25T05:46:07Z). Read it before promoting: its reason predicted A11Y-26 would sit without an oracle until S10 landed evals/keyboard-operable-rows.eval.mjs. Checked live -- that exact file was just shipped by rb-13 (PR#390, merged 2026-08-30T01:06:54Z, THIS same recent-commits window), and its PR body explicitly states it delivers the oracle for BOTH A11Y-25 and A11Y-26 (names 'the delegated A11Y-26 predicate' with its own mutation bite-proof). The predicted gap never existed as a real gap by the time anyone would promote it -- same shape as the earlier R-m23-s7-X11 case. Dispositioned as wontfix (MED severity, mine to disposition) rather than promoting a slice for an already-shipped criterion: mr-gates residuals disposition --id R-m23-s6-A11Y-26 --as wontfix. Did not promote/launch anything else this tick -- one action per tick. queue[] remains empty; 27 unpromoted residuals remain past t1, next-oldest at ~4.815d (the R-m23-s10-X16..X21 cluster). Governor NORMAL (d7=$718.04/2783 eff., fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down after the single disposition action.
-
 ## 2026-08-29T20:43:56Z — rb-12 MERGED (PR #389 → master@2681ee6)
 Closed residual R-m23-s2-X6 (CSS-scanner dual-oracle drift, ADR-0010 proof-of-teeth): shared fixture corpus + comparison gate between the two stripCssComments implementations, consolidated to single-owner (ADR-0215). Audit CLEAN (orchestration/gating/acceptance all CLEAN, 10/10 gates met, spotcheck X2 agrees). Squash-merged, branch+worktree deleted, residual closed via mr-gates. Master CI queued at merge time; verifying live.
+
 
 
 
