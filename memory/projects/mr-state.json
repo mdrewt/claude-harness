@@ -1,7 +1,7 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-31T03:05:00Z",
- "updated_by": "mr-sup-native-20260831T030007Z-4065534",
+ "updated_utc": "2026-08-31T05:03:17Z",
+ "updated_by": "mr-sup-native-20260831T050009Z-4089322",
  "master": {
   "sha": "48fc86754e361a7cb43df01a92c157d391939e9e",
   "ci": "success",
@@ -12,24 +12,27 @@
   "ci": "no-remote-ci-local-gate-green"
  },
  "adr_next_free": 220,
- "inflight": [],
- "awaiting_merge": [],
- "queue": [
+ "inflight": [
   {
    "slice": "rb-22",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m22-s2-S3-GUEST-EXPORT-ORPHAN",
-   "added_utc": "2026-08-31T04:01:48Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "48fc86754e361a7cb43df01a92c157d391939e9e"
+   "run_id": "mr-spawn-20260831T050225Z-4091405",
+   "session_leader": 4091458,
+   "claude_pid": 4091461,
+   "model": "fable",
+   "effort": "xhigh",
+   "tier": "hard",
+   "repo": "project",
+   "started_utc": "2026-08-31T05:02:30Z"
   }
  ],
+ "awaiting_merge": [],
+ "queue": [],
  "park_counters": {
   "14r-e": 1
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "Promoted R-m22-s2-S3-CANCEL-TERMINAL -> rb-21 (PR#68 merged, harness main 583936d). Pushed 7 previously-unpushed tick-record commits to origin/main. X8/X9 (manual-AT) remain unpromoted, flagged for operator decision on a needs-human disposition category. handoff-rotate WARNed again on 43 unparseable-header entries pinned live -- still not addressed.",
+ "notes": "Launched rb-22 (residual R-m22-s2-S3-GUEST-EXPORT-ORPHAN) via fast-path queue, tier=hard fable@xhigh. Queue now empty. X8/X9 (manual-AT) remain unpromoted. handoff-rotate: 43 unparseable-header entries still pinned live, file was 235KB pre-rotation this tick (rotated 2 entries/2.9KB) -- rotation appears to only be partially effective; flagged for a future tick to investigate.",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -59,5 +62,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-31T02:04:01Z"
+ "last_tick_utc": "2026-08-31T05:03:17Z"
 }
