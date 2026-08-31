@@ -2,6 +2,126 @@
 
 ---
 
+## 2026-08-31T~19:2xZ — rb-25 COMPLETE (terminal: PR #399 open + local `just ci` green + remote CI running)
+
+**Slice:** rb-25 — residual R-rb-2-X10: a REKEY manifest entry could name ANOTHER table's live
+helper and `[G6/consumed]` still passed (it proved PRESENCE, never correspondence), and `indexOf`
+let `et_exists(` hit inside `wallet_exists(`. One production file:
+`evals/guest-claim-integrity.eval.mjs`.
+**PR:** https://github.com/mdrewt/monster-realm/pull/399 — OPEN, MERGEABLE, remote CI running at exit.
+Branch `slice/rb-25` (worktree `.claude/worktrees/rb-25`), 5 wip commits, all pushed, HEAD `9b982cf`.
+**Supervisor owns the merge — I did NOT run `gh pr merge`.** Main checkout on `master`, never mutated.
+Fork `5962b7a`. No sibling slice in flight.
+
+**Decision (ADR-0222, EXTENDS 0208 — see the gotcha below):** `containsCallOf` (left boundary only;
+the needle's own trailing `(` is the right boundary; an immediately-left `.` refused) replaces
+`indexOf` in both `[G6/consumed]` tests. New `[G6/correspondence]` resolves each needle to exactly
+one `fn` in the stripped tree (fail-closed on 0 / >1 / no body / empty body / `#[cfg`/`cfg!(` on the
+item OR in the body / a site inside a macro invocation / a receiver that is not a real db handle) and
+requires that body to reach its OWN `db.<table>(` accessor, with a write verb WITHIN the method chain
+on the rekey half (`isChainChar`-bounded). New `[G6/mirror]` pins the one `monster_pub` exception by
+SET equality + same-needle + staleness. Five LIVE-TREE borrow proofs run against the shipped sources.
+
+**Gate:** full `just ci` **EXIT=0** in the worktree (run 2x — mine + mr-gates).
+**Acceptance: 8/9 met, 1 DEFERred, 0 unmet** (seed:e3b0c44298fc1c14), LINT-CLEAN.
+Teeth 100 -> 351 tooth assertions; expectTag call sites 104 -> 126; 0 tests deleted/skipped/.only'd;
+0 assertions removed; export set byte-identical; REKEY_MANIFEST region byte-identical.
+
+**🔴 HEADLINE — the ARTIFACT red-team found 5 measured bypasses that the plan-phase red-team AND a
+15-mutant bite-proof BOTH missed** (all `just ci`-green + `cargo clippy --all-targets -D warnings`
+clean; all closed; bite-proof now 22/22): (1) a `Vec::insert` in the statement FOLLOWING a bare
+filter satisfied the write-verb rule, because the span ran to the next `db.` rather than to the end
+of the method chain; (2) so did a FOREIGN table's real `.update(` reached through a handle hoisted
+before the accessor; (3) `stringify!(ctx.db.<table>()...)` — a token tree that is never
+name-resolved, so `ctx`/`db` need not exist; (4) `let db = SomeLocalStruct;` with an inherent method
+named after the table; (5) `cfg!(any())` (the EXPRESSION macro, a different token from the `#[cfg(`
+the first draft banned) and `#[cfg(any())]` on the fn ITEM (outside the body the clause read).
+**Reconfirms hard: run BOTH red-team lenses, and the artifact one is where the yield is.**
+
+**🔴 SECOND HEADLINE — `(118 teeth verified)` was unconditional prose.** Inserting
+`if (process.env.MR_FAST !== '0') return null;` as line 1 of `runTeeth()` skipped ALL teeth while
+the eval printed the count and exited 0. Now derived from an `expectTag` counter and pinned
+(`TEETH_PINNED`). Two other claim fragments in the pass summary were literals that survived deleting
+the clause they described — both replaced with run-derived text. **Memory card written:
+[[literal-claim-fragments-survive-clause-deletion]].**
+
+**🔴 THIRD — FG label collision.** The tester's new teeth reused `FG74a-l`, which an unrelated
+pre-existing `[R/planned-set]` family already occupies (eval:3818-4040). Duplicate labels make a
+teeth failure ambiguous and defeat per-mutant label pinning. Renumbered to `FG75`. **Memory card:
+[[fg-tooth-label-space-is-not-append-only]].**
+
+**Proof-of-teeth:** RED receipt `memory/projects/rb-25.red-before.txt` — FG75b (the X10 attack
+verbatim) reported "expected clause [G6/correspondence] to fire, but the checker returned PASS",
+exit 1. Bite-proof `mutants=22 caught=22 survived=0`, each pinned to a DISTINCT tooth label; TWO
+mutants carry deliberate ISOLATION edits (they neutralise an earlier SHADOWING assertion so the
+target tooth is the unique catcher), and THREE carry an explicit PIN NOTE naming the tooth that
+actually fires rather than re-pointing to a convenient neighbour. Gate scripts (untracked harness
+files, MUST NOT delete before `mr-gates verify`): `memory/projects/rb-25.{probe,bite-proof}.mjs`;
+receipts `rb-25.{red-before,bite-proof}.txt`; ledger `memory/projects/gates/rb-25.gates.md`; plan
+`memory/projects/monster-realm-rb-25-plan.md` (its "RESOLVED DESIGN" section supersedes the top).
+All CHECKs need the toolchain PATH export.
+
+**⚠️ ADR gotcha for the next slice:** `**Amends:** ADR-NNNN` makes `adr-digest-check` demand a
+reciprocal `**Amended-by:**` in the AMENDED file — which is a hidden-dependency STOP when that file
+is outside `touches:`. 0222 uses a plain `**Extends:** ADR-0208` line instead. Also: the
+`**Decision:**` header is capped at **240 chars** and the error prints the actual count.
+`just adr-digest` rewrites `docs/adr/DIGEST.md` (which `just ci` then requires) but does NOT touch
+`docs/adr/README.md`. **Memory card: [[adr-amends-forces-a-reciprocal-backlink-edit]].**
+
+**⚠️ Vacuity trap caught by an EXPECT, not by me:** gate X7's first CHECK was
+`cargo test --lib m22_rekey`, which matched ZERO tests and printed `test result: ok. 0 passed`. The
+EXPECT was written as `/test result: ok\. [1-9]/`, so it rejected the vacuous run. The real test is
+`data_lifecycle_cross_manifest_consistency`. **Write the digit class into every `test result: ok`
+EXPECT.**
+
+**Lenses:** planner(opus) · reviewer + red-team on the PLAN (both measured — the plan's own
+`.{table}(` join key and its 5-clause mirror map were both beaten) · tester(opus, staged via /tmp;
+its Bash guard blocks every command on a /tmp path, so the ORCHESTRATOR ran the RED proof and every
+bite-proof) · reviewer + red-team + reducer-security-auditor on the ARTIFACT in ONE parallel batch,
+with red-team isolated in its own throwaway worktree `.claude/worktrees/rb-25-rt` (since removed) so
+the reviewer could not take a torn read — **on the PLAN pass I did not do this and the reviewer
+reported red-team's live scratch impl as "already landed" code.** `/simplify` folded into the
+reviewer (11 cut/dedupe items, all applied). **desync-guard SKIPPED** — zero client/game-core/netcode
+surface. **verifier done INLINE** (the `/tmp/mr_warn_rb-25` landing flag fired before that step, same
+call as rb-24 and rb-10): independent CHECK re-run via `mr-gates check`, plus the not-weakened audit
+quoted above.
+
+`reducer-security-auditor`: **PASS-WITH-NOTES**, and it did real work — it independently established
+the `monster_pub` 1:1 invariant the mirror exception rests on (neither table is EVER deleted from in
+the non-test tree; both inserts are same-transaction pairs; every `monster_pub` write copies
+`owner_identity` through `pub_from_monster`; and MonsterPub's PK is `monster_id`, not
+`owner_identity`, so a stale destination row could not PK-collide even counterfactually).
+
+**Boyscout (well in cap):** `swapHelper`'s docstring (~3 lines) — the pre-existing comment claimed
+`mut` "silently mutates nothing" on 0 hits; it THROWS on 0, only the 2-hit case is silent.
+
+**Follow-ups flagged, NOT taken (all outside `touches:`):**
+- **X9, DEFERred to `backlog`** — the exists-half HOLLOWING hole: a predicate that reads its table
+  and returns a constant is textually indistinguishable from a real one (MEASURED green:
+  `wallet_exists -> { let _ = ctx.db.player_wallet()...find(owner); false }`). Nothing else in the
+  repo covers it — `accounts_tests.rs` references `account_has_game_data` once, for ordering only.
+  Closure = the Rust twin enumerating the six disjuncts beside the `rekey_all` D6-order pin at
+  `accounts_tests.rs:1835`. **Same file and same remedy rb-2's X10 DEFER named as part (a).**
+- `[G6/consumed]` proves a delegation is SPELLED, not that its result is USED —
+  `|| { let _seen = profile_exists(ctx, id); false }` measured green. Same remedy as X9.
+- `pub(crate)` Identity fields and `Identity` nested in a `SpacetimeType` product column are invisible
+  to `findIdentityColumns` (the second is already a documented residual in the eval's header);
+  `[G6/parse]` counts TABLES, not columns, so neither is caught anywhere.
+- The zeroed guest `player_wallet` row survives a claim under the retired identity and no M22 cascade
+  path reaches it — structurally the `export_bundle` orphan rb-22 closed (ADR-0220), same
+  `account.claimed_from` key available.
+- `evals/monster-dual-write.eval.mjs` matches contiguous, NON-whitespace-compacted needles, so a
+  rustfmt-wrapped unmirrored `monster` delete is invisible to it — and that eval now OWNS the 1:1
+  invariant `[G6/mirror]` rests on.
+- Stale `file:line` cites in pre-existing `[G6/consumed]` failure text (`accounts.rs:221-229` ->
+  `:316-324`; `:209-216` -> `:296-303`; `accounts_tests.rs:1320` -> `:1835`).
+- Known FALSE-REDs recorded in ADR-0222 §Consequences 7 so a future agent does not "fix" them by
+  loosening: mutually exclusive `#[cfg]` twins of one helper -> "declared 2 time(s)"; and the live
+  probes' `mutateLive` anchors, which pin exact live source text and fail loud with a re-anchor
+  instruction after a parameter rename or a rustfmt change.
+
+---
+
 ## 2026-08-31T~1x:xxZ — rb-24 COMPLETE (terminal: PR #398 open + local `just ci` green + remote CI running)
 
 **Slice:** rb-24 — residual R-m22-s2-X15: declare the `AccountDeletionReaperSchedule` table (the
@@ -2300,6 +2420,8 @@ RESIDUALS DISCLOSED IN THE LEDGER (not defers — all 8 gates are met): **R-rb-1
 NOTE FOR rb-20 (queued, X11): this slice touches `client/playwright.config.ts` ZERO times, so rb-20 is unblocked — but its `reducedMotion: 'reduce'` project will COLLECT `e2e/a11y.spec.ts`, and it must decide deliberately between an axe scan under reduced motion and a `testIgnore`. `client/e2e/a11y.spec.ts` is also now in the PER-PR `e2e` job (testDir collects it) — deliberate, ADR-0218.
 TRAP HIT AND WORTH REPEATING: `just ci` red'd once with `account-e2e ... spacetime did not become ready` purely because my own probe server held the GLOBAL spacetime data-dir lock. `ps -eo args | grep '[s]pacetimedb-standalone'` before blaming a diff.
 
+## 2026-08-31T19:39:09Z — rb-25 MERGED (PR #399, 11cac7e)
+Native tick mr-sup-native-20260831T193636Z (19:36Z). Gate-0: no live per-run locks (rb-25 session_leader 665772 confirmed dead), no chain mutex, HOLD-NONE. rb-25's own run had already opened PR #399 (mergeable, CLEAN) and reached terminal state before this tick. Verified live: gh checks (ci/e2e) pass, mergeStateStatus CLEAN. mr-gates verify initially returned FLAGGED/EVIDENCE-MISMATCH on 8/9 gates -- root cause was this shell's PATH resolving node 18.19.1 (harness pins 24 via asdf) and missing ~/.cargo/bin, NOT a real regression; re-ran with PATH fixed -> CLEAN (8/9 met, X9 deferred to backlog). mr-audit CLEAN aside from pre-existing spec-ledger missing/orphan-disposition findings unrelated to this diff (diff scope: evals/guest-claim-integrity.eval.mjs + ARCHITECTURE.md + docs/adr/0222 + DIGEST.md, matches declared touches). Spotcheck gate X2 (IDENT-BOUNDARY-BITES) adversarially re-read against the diff's containsCallOf rationale -- holds. Squash-merged PR#399 -> 11cac7e, deleted branch+worktree, fast-forwarded local master to 11cac7e. master CI for the merge commit was still queued at tick end (not polled to completion this tick -- one action per tick already spent on the merge; next tick's gate-3 catches red CI if it lands red). Residual R-rb-25-X9 closed via mr-gates residuals close --pr 399. Queue=[rb-26,rb-27] unchanged.
 ## 2026-08-31T17:01:53Z — rb-25 LAUNCHED (17:01Z tick)
 Native tick mr-sup-native-20260831T170009Z-664080 (17:00Z). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no resident-session collision (find -mmin -6 empty both repos). Both repos in sync with origin (harness main 440f6b0, proj master 5962b7a). Project master CI green (rb-24 merge, PR#398). No open PRs either repo, queue[]/inflight[]/awaiting_merge[] all clean at gate entry except queue held rb-25/rb-26/rb-27 (promoted in prior ticks). Gate-3: master not red, nothing open/parked to resume; residuals check: mr-gates residuals list --unclaimed showed 24 open, none past t2_stale_days=14 (max age 3.11d, R-rb-3-X10), so queue[] (non-empty) took priority per the aging doctrine's fast path over the t1-only-stale residual. Re-verified rb-25 live: spec section exists (M-residual-backlog.spec.md:45-52, no blocked:, after: satisfied -- source rb-2 long merged), no existing branch/PR for rb-25 on either repo. Derived touches=[evals/guest-claim-integrity.eval.mjs] from the residual's own [G6/consumed] gate_id (grepped the eval file for the marker) since the promoted section only carries '(inherit from source slice -- REVIEW)'. Tier=routine (opus@high): eval/gate file only, no server-module schema/reducer, predictor/netcode/reconcile, security/RLS live-code, M20/M25, or resume-after-park. Pre-allocated ADR-0222 (mr-state.json adr_next_free matched disk: highest on-disk 0221). First mr-spawn attempt failed BRIEF-RENDER-FAILED -- my vars.json omitted the required 'tier' key (vars.json schema per mr-spawn's own header comment: {slice, model, effort, adr, touches, target_desc, resume_block, tier}); added tier=routine and retried. mr-spawn LAUNCHED cleanly: leader=665772, claude_pid=665775, rid=mr-spawn-20260831T170133Z-665711, brief_bytes=15709, repo=project, pr_repo=mdrewt/monster-realm. GATES-SEEDED criteria=0 (M-residual-backlog.spec.md's rb-N sections are prose-only EARS with no bullet SHALL list, same known-benign pattern as prior rb-* promotions). queue-removed rb-25 (rb-26/rb-27 remain queued for future ticks). Governor NORMAL (d7=$1168.48/2783 eff., fable_d7=$445.21/2298, fable_ok=true; opus-tier launch unaffected). No BLOCKERs, no rate-limit event. Standing down after the single launch action.
 ## 2026-08-31T16:03:34Z — Native tick 16:00Z — recovered orphaned rb-24-merge record + promoted R-rb-3-X9 -> rb-27, no launch
@@ -2363,7 +2485,6 @@ Native tick mr-sup-native-20260830T220011Z-3807493 (22:00Z). Gate-0/1: no live p
 Squash-merged closing residual R-m23-s11-X10 (axe-core + real-browser a11y tier, ADR-0218, spec M23 §5.7). mr-gates verify CLEAN 8/8, spotcheck (bite-proof X2, 16/16 mutants) re-read and confirmed non-vacuous. mr-audit orchestration CLEAN (planner/red-team/review-lens/reviewer/tester/verifier). mr-audit acceptance/gating tripped AUDIT-ERROR + FLAGGED on the first invocation because --repo was passed a GitHub slug instead of a local path -- rerun with the worktree path gave acceptance CLEAN 8/8 and gating_advisory's single skip_markers_added hit was confirmed a false positive (the diff asserts skipped===0 as a FAILURE condition; no test.skip/xit/.only/#[ignore] anywhere in the diff). Worktree + branch removed, local checkout ff-only to 3b2bcb2. Master CI in_progress at record time (next tick should confirm green). Residual sink gained 6 new disclosed items (R-rb-19-HOLLOWSPEC is HIGH — 2 of its 4 hollow-spec instances still open, real fix needs a runtime evidence file per the run's own note; do not disposition it without mr-ask-drew given its severity) plus NODEOPTS/JOBPIN/JUSTPATH/MANUALDOC/CEILINGS/STDBDUP — none are defers, all 8 ledger gates were met, so these sit in the aging queue for normal promotion. mr-gates residuals close ran clean (1 closed).
 ## 2026-08-30T19:36:25Z — rb-19 launched (residual X10 from m23-s11 -> axe-core+Playwright a11y-e2e tier)
 Composite merge->launch after rb-18 fully reconciled (squash-merged eca6752, master ff'd, audited CLEAN, worktree/branch cleaned, ledger+handoff+state recorded, master CI live-verified green). Fast-path: queue[] held rb-19 (promoted 16:01Z, spec section present, no after: dep, no existing branch/PR) -- re-verified live and valid. No live locks/mutex/session-collision at re-check (only pre-existing orphaned rb-11 esbuild watchers, noted by prior ticks, not acted on). Scope per spec M23-accessibility.spec.md sec.5.7 (DECIDED, not re-litigated): author client/e2e/a11y.spec.ts (new) with axe-core+Playwright, add the @axe-core/playwright dependency + lockfile, wire into/beside the existing just a11y-e2e recipe (justfile:348, currently only a decay-ratchet floor), add an additive-only wiring check in evals/ci-gate-wiring.eval.mjs confirming the recipe exists and nightly.yml invokes it with non-truthy continue-on-error -- explicitly NOT added to REQUIRED_JUST_STEPS or just ci (nightly-only, matching e2e/coverage/mutate*). Flagged for the run: sibling residual rb-20 (R-m23-s11-X11, promoted+queued, not yet launched) covers a related but distinct Playwright project (reducedMotion, no axe dep) -- shared Playwright/dependency surface noted, not launched this tick so no fan-out conflict today. adr_next_free corrected 217->218 this tick (0217 was already on disk from an unrelated slice); rb-19 reserved 218. Governor NORMAL (d7=$869.93/2783 eff., fable_d7=$267.76/2298). Launched opus@high routine tier (no HARD-tier criteria matched: not schema/reducer, not netcode/predictor, not security/RLS, not M20/M25, not resume-after-park, no prior failed attempt). mr-spawn LAUNCHED cleanly (leader=3642961, claude_pid=3642964, rid=mr-spawn-20260830T193603Z-3642908); verified detachment (own sid/pgid) and model class (opus/high) post-launch via ps. rb-20 remains queued. Standing down after this composite action.
-## 2026-08-30T19:27:47Z — rb-18 MERGED (PR #394 → master@eca6752)
-Closed residual R-m23-s10-X21 (cross-view RE-OPEN edge, S10 overlay wiring). overlayA11yWiring.test.ts gains a REQUIRED reopen handle on Opened plus two teeth: S10-WIRE-REPEAT-NO-REOPEN (already-visible re-open is a no-edge) and S10-WIRE-REOPEN-AFTER-CLOSE (after-close re-open is a real edge — added because red-team measured a one-shot-latch bypass of the first tooth alone). mr-gates verify CLEAN: 9 gates, 8 met, 1 DEFER (X8-NIGHTLY-FLOOR -> backlog, residual R-rb-18-X8-NIGHTLY-FLOOR recorded); spotcheck X5 (latch cheat) re-read adversarially, held. mr-audit: orchestration CLEAN (10 agent calls, planner/red-team/reviewer/tester/desync-guard/doc-keeper/verifier); gating_advisory FLAGGED on a mechanical tripwire that was a false positive (grep matched the string 'it.skip' inside a prose comment, not an actual skip -- confirmed by direct diff grep: zero real .skip/xit/.only/#[ignore] additions, 0 removed/modified asserts, 0 suppressions); acceptance sub-check FLAGGED only because 2 of its internal re-checks (X7/X9) hit the audit's own global time budget -- the standalone mr-gates verify (used for the merge decision) reverified 8/9 directly and was CLEAN. One correction disclosed in the PR: the residual assumed all 16 per-view specs ship a -REPEAT-NO-REOPEN tooth; menuView ships the same substance under a different id (MV-A11Y-REOPEN-EDGE-01) -- true in substance, not renamed (declared non-goal, would touch an ARCHITECTURE.md-cited census region). Also disclosed: client/tsconfig.json excludes **/*.test.ts so the file's own prior claim that a missing opener id is 'a COMPILE error' does not hold in CI -- replaced with a runtime opener-return-shape assertion (S10-WIRE-TOTALITY). Requested ADR 0217 was already taken by rb-16 (PR#392); this slice needed none and took the ARCHITECTURE.md append-log path instead (rb-15/rb-17 precedent). Diff was exactly touches ⊆ [overlayA11yWiring.test.ts, ARCHITECTURE.md] (no per-view *View.test.ts changes needed -- all 16 already carry a biting repeat-open tooth). Worktree+branch removed, master ff'd from 3455155 to eca6752. Residual closed via mr-gates (1 closed for rb-18). Ledger row written (cost carried by the run's own reconcile row, not re-derived here). Remote master CI for eca6752 was still in_progress at merge time -- confirming live before final record close.
 ## 2026-08-30T19:05:26Z — rb-18: PR#394 open, CI-watch delegated
 Slice rb-18 (cross-view RE-OPEN edge, R-m23-s10-X21) run finished rc=0 attempts=1 model=opus. mr-gates verify: 9 gates — 8 met, 1 DEFER (X8-NIGHTLY-FLOOR -> backlog, residual R-rb-18-R-rb18-CONCURRENT recorded). PR https://github.com/mdrewt/monster-realm/pull/394 opened against master; mergeStateStatus=UNSTABLE, both checks (ci, e2e) IN_PROGRESS at tick time. No live locks/mutex/hold. Delegated CI-wait to mr-ci-watch (pid 3603102, detached) per doctrine — supervisor took no merge action this tick. Governor NORMAL (d7=$869.49/2783, fable_d7=$267.76/2298).
+

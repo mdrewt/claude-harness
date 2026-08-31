@@ -1,0 +1,1 @@
+eval FAIL: guest-claim-integrity (no client-supplied identity, anonymous connect passthrough, issuer+audience allowlists, no server RNG, module write isolation, single-use claim codes, re-key manifest completeness) — TEETH: FG74b: expected clause [G6/correspondence] to fire, but the checker returned PASS

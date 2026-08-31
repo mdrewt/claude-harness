@@ -1,0 +1,23 @@
+  M1 CAUGHT by FG75b (exit 1) — the correspondence verdict is discarded for every non-excused key (the excused key still gets a real verdict, so the mirror staleness canary does not fire and FG75b must catch it alone)
+  M2 CAUGHT by FG75c (exit 1) — the exists half falls back to a plain substring test
+  M3 CAUGHT by FG75d (exit 1) — the rekey half falls back to a plain substring test
+  M4 CAUGHT by FG75e (exit 1) — a method call is accepted as a free-function call
+  M5 CAUGHT by FG75f (exit 1) — an unresolvable needle is skipped instead of failing closed
+  M6 CAUGHT by FG75g (exit 1) — a decoy declaration can steer the first-hit anchor
+  M7 CAUGHT by FG75h (exit 1) — an empty helper body is accepted
+  M8 CAUGHT by FG75i (exit 1) — an accessor behind #[cfg(any())] satisfies the clause
+  M9 CAUGHT by FG47 (exit 1) — the accessor token loses its `db.` root, so a same-named method on any receiver would count. PIN NOTE: the catcher is the shipped GOOD control, not FG75j (the positive wrong-receiver fixture) — a rootless token has no valid site on CORRECT source either, so this mutant breaks the control by construction and FG75j cannot be isolated from it. The pin names the tooth that fires, never a neighbour chosen after the fact.
+  M10 CAUGHT by FG75l (exit 1) — the rekey half degrades to presence, not effect
+  M11 CAUGHT by FG75m (exit 1) — the write search widens to the whole body, so a neighbouring table’s write counts
+  M12 CAUGHT by FG75n (exit 1) — a stale exception outlives its justification
+  M13 CAUGHT by FG75o (exit 1) — the cover need not share the excused key’s predicate
+  M14 CAUGHT by FG75r (exit 1) — the exception is WIDENED by a row NO behavioural clause can see (a BLOCKED key never reaches the mirror path), leaving the teeth-side SET pin as the only catcher
+  M15 CAUGHT by FG75k (exit 1) — the shared tree is no longer stripped, so a token inside a // comment or a string literal satisfies the clause
+  M16 CAUGHT by FG75m (exit 1) — the write search leaves the method chain again, so a `Vec::insert` in the FOLLOWING statement satisfies the rekey half (red-team FIX-A, measured clippy-clean). PIN NOTE: FG75m (read/write split) exercises the SAME chain bound and runs earlier, so it is the catcher; FG75s is the second, independent fixture for the rule.
+  M17 CAUGHT by FG75u (exit 1) — macro spans are no longer computed, so `stringify!(ctx.db.<table>()...)` — a token tree that is never name-resolved — proves a table touch (red-team B1)
+  M18 CAUGHT by FG75v (exit 1) — the accessor receiver is no longer required to be a real db handle, so `let db = SomeLocalStruct;` fabricates the token (red-team B2/B4)
+  M19 CAUGHT by FG75w (exit 1) — a `#[cfg(any())]` on the fn ITEM (outside the body) no longer disqualifies it (red-team C)
+  M20 CAUGHT by FG75y (exit 1) — the expression macro `cfg!(` drops out of CFG_SPELLINGS, so `if cfg!(any()) { <accessor> }` proves a table touch (red-team B3)
+  M21 CAUGHT by FG32 (exit 1) — WRITE_VERBS is narrowed (the shared G5 list has no pin of its own), silently weakening the rekey write rule for delete-only helpers. PIN NOTE: the catcher is G5's OWN tooth — which is precisely the coupling FG75x documents. M22 below isolates FG75x.
+  M22 CAUGHT by FG75x (exit 1) — the shared WRITE_VERBS list is REORDERED — invisible to G5, whose test is an order-insensitive `.some()`, so only the exact SET pin can see it
+rb-25-X6:TEETH-22-RED mutants=22 caught=22 survived=0
