@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-31 — WHEN an alias of Identity is declared OUTSIDE the scanned input set (`game-core` carries a (from rb-4 X12, deferred 2026-08-28)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-4 · residual: R-rb-4-X12
+
+Deferred with reason: aliases declared outside the scanned input set (game-core's optional spacetimedb
+
+EARS: WHEN an alias of Identity is declared OUTSIDE the scanned input set (`game-core` carries an
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-30 — WHEN a table field is declared without `pub` (`owner_backup: Identity,` — the 2.8.1 (from rb-4 X11, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-4 · residual: R-rb-4-X11
