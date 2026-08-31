@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-24 — WHEN the S2 schema ships THE SYSTEM SHALL declare the `AccountDeletionReaperSchedule` (from m22-s2 X15, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s2 · residual: R-m22-s2-X15
+
+Deferred with reason: INTENDED OWNER m22-s3 (`mr-gates lint` rejects slice-id targets with no
+
+EARS: WHEN the S2 schema ships THE SYSTEM SHALL declare the `AccountDeletionReaperSchedule`
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-23 — [A11Y-33 / MANUAL] WHEN the manual protocol is executed THE SYSTEM SHALL confirm that `ari (from m23-s11 X9, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s11 · residual: R-m23-s11-X9
