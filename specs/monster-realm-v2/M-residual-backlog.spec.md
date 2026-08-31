@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-28 — WHEN `Object.prototype` carries a table name THE schema-drift eval SHALL still report (from rb-3 X10, deferred 2026-08-28)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-3 · residual: R-rb-3-X10
+
+Deferred with reason: PRE-EXISTING and outside touches: `evals/battle-schema-snapshot.eval.mjs`
+
+EARS: WHEN `Object.prototype` carries a table name THE schema-drift eval SHALL still report
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-27 — WHEN a slice records a new gate-hygiene pattern (an in-process Object.prototype write with (from rb-3 X9, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-3 · residual: R-rb-3-X9
