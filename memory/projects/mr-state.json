@@ -1,14 +1,14 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-31T09:01:37Z",
- "updated_by": "mr-sup-native-20260831T090035Z-274595-22369",
+ "updated_utc": "2026-08-31T12:02:45Z",
+ "updated_by": "mr-sup-native-20260831T120008Z-310509",
  "master": {
   "sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a",
   "ci": "success",
   "nightly": "in_progress"
  },
  "harness_main": {
-  "sha": "583936d",
+  "sha": "edc73b4",
   "ci": "no-remote-ci-local-gate-green"
  },
  "adr_next_free": 220,
@@ -30,6 +30,14 @@
    "added_utc": "2026-08-31T11:01:25Z",
    "added_by": "n/a",
    "derived_from_master_sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a"
+  },
+  {
+   "slice": "rb-26",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-2-X9",
+   "added_utc": "2026-08-31T12:01:30Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a"
   }
  ],
  "park_counters": {
@@ -37,7 +45,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "rb-25 promoted (R-rb-2-X10) via PR#72 11:00Z tick; queue=[rb-24,rb-25]; R-rb-2-X9 still unpromoted",
+ "notes": "rb-26 promoted (R-rb-2-X9) via PR#73 12:00Z tick; queue=[rb-24,rb-25,rb-26]; residual cap alarm persists (32 open vs cap 12, observe-only)",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -67,5 +75,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-31T09:01:37Z"
+ "last_tick_utc": "2026-08-31T12:02:45Z"
 }
