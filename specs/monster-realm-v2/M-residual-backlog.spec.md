@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-22 — Pre-claim export_bundle chunks orphan under the retired guest identity — S3 cascade cannot (from m22-s2 S3-GUEST-EXPORT-ORPHAN, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s2 · residual: R-m22-s2-S3-GUEST-EXPORT-ORPHAN
+
+Deferred with reason: Found by the reducer-security-auditor and independently by red-team on m22-s2: export_bundle.owner_identity is EXEMPT from claim-time rekey (correct — object REKEY entries are the R-m22-s0-X1 trap), so chunks a guest exports before claiming sit under the retired guest identity; the S3 cascade keys on the deleting account identity and structurally cannot reach them, and the S4 TTL reaper does not e
+
+EARS: Pre-claim export_bundle chunks orphan under the retired guest identity — S3 cascade cannot reach them via identity
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-21 — S3 MUST guard cancel_account_deletion against terminal accounts (PRV1-4) — the schema now  (from m22-s2 S3-CANCEL-TERMINAL, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s2 · residual: R-m22-s2-S3-CANCEL-TERMINAL
