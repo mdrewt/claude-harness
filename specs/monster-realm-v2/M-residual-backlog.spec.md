@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-29 — WHEN a SpacetimeType product column carries an Identity (a named-field struct, an enum (from rb-4 X10, deferred 2026-08-28)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-4 · residual: R-rb-4-X10
+
+Deferred with reason: LIVE-REACHABLE product-type hole, outside touches: `encounter.entries:
+
+EARS: WHEN a SpacetimeType product column carries an Identity (a named-field struct, an enum
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-28 — WHEN `Object.prototype` carries a table name THE schema-drift eval SHALL still report (from rb-3 X10, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-3 · residual: R-rb-3-X10
