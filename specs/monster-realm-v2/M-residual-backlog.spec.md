@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-26 — WHEN the classifier no longer infers policy from typeof THE four consumers that STATE (from rb-2 X9, deferred 2026-08-28)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-2 · residual: R-rb-2-X9
+
+Deferred with reason: the corrections are doc/comment-only edits in four files OUTSIDE the declared
+
+EARS: WHEN the classifier no longer infers policy from typeof THE four consumers that STATE
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-25 — WHEN a REKEY entry's `exists`/`rekey` needle names ANOTHER table's live helper (from rb-2 X10, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-2 · residual: R-rb-2-X10
