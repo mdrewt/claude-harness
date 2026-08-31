@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
-  "updated_utc": "2026-08-31T13:02:36Z",
-  "updated_by": "mr-sup-native-20260831T130009Z-322886",
+  "updated_utc": "2026-08-31T15:34:56Z",
+  "updated_by": "mr-sup-native-20260831T151542Z-542497",
   "master": {
-    "sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a",
+    "sha": "5962b7a7efb2f58535ad7d89cf897b43455f296d",
     "ci": "success",
     "nightly": "in_progress"
   },
@@ -11,19 +11,8 @@
     "sha": "edc73b4",
     "ci": "no-remote-ci-local-gate-green"
   },
-  "adr_next_free": 221,
-  "inflight": [
-    {
-      "slice": "rb-24",
-      "run_id": "mr-spawn-20260831T130132Z-324222",
-      "session_leader": 324281,
-      "model": "fable",
-      "effort": "xhigh",
-      "tier": "hard",
-      "repo": "project",
-      "started_utc": "2026-08-31T13:01:36Z"
-    }
-  ],
+  "adr_next_free": 222,
+  "inflight": [],
   "awaiting_merge": [],
   "queue": [
     {
@@ -48,7 +37,7 @@
   },
   "consecutive_standdowns": 0,
   "rate_limit_resets_at": null,
-  "notes": "rb-24 launched (fable@xhigh, ADR-0220) 13:00Z tick; queue=[rb-25,rb-26]; residual cap alarm persists (32 open vs cap 12, observe-only); oldest unpromoted residual 2.95d, still under t1_promote_days=3",
+  "notes": "rb-24 MERGED PR#398->master@5962b7a (15:27Z); first mr-gates verify pass FLAGGED on PATH/contention artifacts in my own verify shell, all confirmed non-issues on clean isolated re-runs (CLEAN 16/16); residual R-m22-s2-X15 closed; worktree removed, master ff-only clean, post-merge CI green. queue=[rb-25,rb-26] untouched this tick (fast path for next tick). No launch this tick (merge+adjudication was the single mutating action).",
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "parked": [],
   "open_chore_prs": [],
@@ -78,5 +67,5 @@
     "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
   },
   "live_watchers": [],
-  "last_tick_utc": "2026-08-31T13:02:36Z"
+  "last_tick_utc": "2026-08-31T15:34:56Z"
 }

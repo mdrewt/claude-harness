@@ -2,6 +2,97 @@
 
 ---
 
+## 2026-08-31T~1x:xxZ — rb-24 COMPLETE (terminal: PR #398 open + local `just ci` green + remote CI running)
+
+**Slice:** rb-24 — residual R-m22-s2-X15: declare the `AccountDeletionReaperSchedule` table (the
+schema-declaration slice the M22 spec table named m22-s3) + wire PRV1-1 (`delete_account` arms one
+row) / PRV1-3 (`cancel_account_deletion` disarms it). Additive schema only (ADR-0006).
+**PR:** https://github.com/mdrewt/monster-realm/pull/398 — OPEN, MERGEABLE, remote CI running (ci+e2e
+pending) at exit. Branch `slice/rb-24` (worktree `.claude/worktrees/rb-24`), 7 wip commits, all pushed,
+HEAD `54ab4b8`. **Supervisor owns the merge — I did NOT run `gh pr merge`.** Main checkout on `master`,
+never mutated. Fork `efdae74`. No sibling slice in flight (no open project PRs bar this, no live slice branch).
+
+**Decision (ADR-0221, amends 0207):** the table lands ATOMICALLY with a scheduler-guarded **deliberate
+no-op** `account_deletion_reaper` (scheduled-ness is automigration-frozen — proven on a live host by
+gate X9's negative control: non-scheduled→scheduled republish REJECTED). Classified **NotOwned** (an
+`Erase` entry would force a C3 self-disarm anti-pattern into S3's cascade). `arm_deletion_reaper` (last
+step of `delete_account`, one shared `now`), `disarm_deletion_reaper` (after the AUTH-38 gate + update,
+ADR-0126 D4), pure `deletion_fire_at_ms` seam (`requested + game_core::DELETION_GRACE_MS_DEFAULT`,
+saturating). REKEY_MANIFEST 25th key EXEMPT (VERIFIED non-orphan, unlike export_bundle: arm reachable
+only from delete_account which requires an account row, and AUTH-7 rejects account holders from claims).
+
+**ADR NUMBER COLLISION (supervisor action):** launch assigned 220, but rb-22 consumed
+`docs/adr/0220-*` the same day; rb-24 took **0221** from `mr-state.json adr_next_free`. The launch-prompt
+ADR assignment is racing same-day merges — worth a fix.
+
+**Gate:** full `just ci` **EXIT=0** in the worktree (X15, run 2× — mine + mr-gates), with a
+`client/node_modules` symlink from the main checkout (worktrees don't get node_modules; first `just ci`
+127'd on `client/node_modules/.bin/biome` not found — **carry this: symlink or `npm ci` the worktree's
+client/ before `just ci`**). **Acceptance: 16/16 met, 0 DEFERred, 0 unmet** (seed:f030a265736c965b),
+LINT-CLEAN. Baselines (fork efdae74): nextest 2034 → 2048 (+14 rb24 tests, incl. 1 from the artifact
+red-team; X12 floor 2046); table census 39→40; REKEY 24→25; T-VIS 18/22.
+
+**🔴 HEADLINE — the ARTIFACT red-team found 2 measured survivors the plan pass + a 14-mutant bite-proof
+BOTH missed** (both MEASURED clippy-clean + 13-test-green + 678-suite-green on the cheat; both closed +
+covered by mutants M15/M16, bite-proof now 16/16): (1) `rb24_schedule_table_sole_writers` counted the
+`ctx.db.`-PREFIXED accessor, so an aliased `let d=&ctx.db; d.account_deletion_reaper_schedule()...`
+write (arming a FOREIGN identity) was invisible → now counts the prefix-agnostic `.account_deletion_reaper_schedule(`
+method token. (2) `rb24_net_arm_mentions` (arm−disarm) NETS TO ZERO for an extra `disarm_deletion_reaper()`
+call because disarm CONTAINS arm as a substring → added crate-wide `rb24_disarm_called_exactly_once_in_crate`
+counting the disarm token DIRECTLY. Both are gate-integrity gaps (reaper is a frozen no-op NOW, so no
+live exploit) that would carry into S3's destructive cascade. **Memory card written:
+[[net-zero-token-subtraction-census-hole]]. Reconfirms: run BOTH red-team lenses on a gate slice.**
+
+**Proof-of-teeth:** 5 named RED on the fork (E0425×5 compile receipt, `memory/projects/rb-24.red-before.txt`).
+15 rb24 gating tests + 9 census edits. 16-mutant bite-proof `rb-24-X10:TEETH-16-RED mutants=16 caught=16
+survived=0`, each pinned to a DISTINCT failure-message fragment. Gate scripts (untracked harness files,
+MUST NOT delete before `mr-gates verify`): `memory/projects/rb-24.{rust-gate,eval-gate,bindings-probe,
+migration-probe,bite-proof,scope-gate}.mjs`; ledger `memory/projects/gates/rb-24.gates.md`; plan
+`memory/projects/monster-realm-rb-24-plan.md`. All CHECKs need the toolchain PATH export (node-24/cargo).
+
+**Lenses:** planner(opus) · reviewer+red-team on PLAN (both measured: 12 bypasses + F1-F10, all fixed) ·
+tester(opus, 15 tests staged via /tmp, RED proven by orchestrator) · reviewer+red-team on ARTIFACT
+(2 more survivors, closed) · reducer-security-auditor PASS · desync-guard PASS. **/simplify folded into
+reviewer (no over-engineering).** **verifier done INLINE** (the `/tmp/mr_warn_rb-24` landing flag fired
+before that step — "no new subagent fan-outs", same call as rb-10): independent re-run of all 16 CHECKs
+via mr-gates, not-weakened audit (77 asserts added / 0 removed, 0 tests deleted/skipped/#[ignore]'d,
+16/16 bite). Domain auditors' one shared Nit: `delete_account`/`cancel` have no rate limit — bounded to
+≤1 row/identity by AUTH-28/38, informational only.
+
+**S3 obligations this slice creates (ADR-0221 Residuals):** R1 S3 replaces the no-op body (PRV1-5 recheck
++ PRV1-6 cascade) and deliberately retires `rb24_deletion_reaper_body_is_frozen_noop` (designed to red
+when S3 lands); factor `resolve_all_live_interactions` from lib.rs:214-231, never hand-roll. R2 accounts
+left PendingDeletion-and-unarmed by a fired no-op reaper — S3 owns the re-arm path. R3 **rb-21's PRV1-4
+terminal-cancel guard must be inserted BEFORE this slice's disarm** in cancel_account_deletion. R4 the
+NotOwned classification is truthful only while the reaper is the sole cascade driver (admin path / PRV1-8b
+reactivation forces re-classification + disarm-on-reactivation). R5 consolidate `deletion_fire_at_ms` into
+game-core when a slice owns that file (SSOT for requested+GRACE). R6 the shared eval's `schedulerGuardIsLive`
+now requires a complete `…Err(`/`…Ok(())` (a bare `{return` prefix was forgeable — measured on the shipped
+guest_claim_reaper gate too; boyscout-hardened auth27's Rust twin in-slice).
+
+**Boyscout (in-cap):** `accounts_tests.rs auth27_...` (~16 lines, 1 hunk) — added a guard-FIRST
+`starts_with(guard+"Err(")` clause ALONGSIDE the pre-existing bare-comparison assert (closes the measured
+prefix-forge on the shipped guest reaper's gate). Dead `rb24_nd_accessor_call` needle removed after the
+sole-writer census switched to the method token.
+
+**Follow-ups flagged, NOT taken (out of scope):** the GENERAL accounts.rs write-isolation alias hole
+(`_ctx` allowlisted in the eval's `findAliasedContext`, no Rust `hasEscapedDbHandle` twin) is PRE-EXISTING
+and affects ALL accounts.rs writes — the [[write-target-accessors-alias-bypass]] backlog slice; rb-24
+closed only the NEW table's exposure locally. The eval's `schedulerGuardIsLive` still doesn't require the
+guard be FIRST (reviewer minor #1) — pre-existing, applies to guest_claim_reaper too.
+
+**NEXT for the supervisor:** own the merge (`mr-ci-watch 398 rb-24`). On merge: close residual R-m22-s2-X15
+(`mr-gates residuals close --pr 398`), run `mr-gates verify --slice rb-24` BEFORE removing the worktree
+(every CHECK cds into it; the migration/bite-proof/scope scripts read it live), re-index the graphs
+post-merge (build-loop step 10 — canonical checkout unchanged until merge, so NOT re-indexed by me).
+Reconcile ADR-index/ARCHITECTURE across siblings. CI logs `/tmp/rb24-ci*.log`, gate logs
+`/tmp/rb24-mrgates*.log`, bite-proof `/tmp/rb24-biteproof*.log`, red-team PoCs `/tmp/rb24-artifact-attack/`.
+**Note the phantom X9 task (bdjl85lts) that ran my migration probe unbidden — result matched my own
+independent re-run exactly (additive=ok control=red), so trusted, but flag if the wrapper is
+double-launching gate scripts.**
+
+---
+
 ## 2026-08-31T~07:0xZ — rb-22 COMPLETE (terminal: PR #397 open + local `just ci` green + remote CI running)
 
 **Slice:** rb-22 — residual R-m22-s2-S3-GUEST-EXPORT-ORPHAN. Closes the guest-export orphan: a guest's
@@ -2209,6 +2300,18 @@ RESIDUALS DISCLOSED IN THE LEDGER (not defers — all 8 gates are met): **R-rb-1
 NOTE FOR rb-20 (queued, X11): this slice touches `client/playwright.config.ts` ZERO times, so rb-20 is unblocked — but its `reducedMotion: 'reduce'` project will COLLECT `e2e/a11y.spec.ts`, and it must decide deliberately between an axe scan under reduced motion and a `testIgnore`. `client/e2e/a11y.spec.ts` is also now in the PER-PR `e2e` job (testDir collects it) — deliberate, ADR-0218.
 TRAP HIT AND WORTH REPEATING: `just ci` red'd once with `account-e2e ... spacetime did not become ready` purely because my own probe server held the GLOBAL spacetime data-dir lock. `ps -eo args | grep '[s]pacetimedb-standalone'` before blaming a diff.
 
+## 2026-08-31T15:34:33Z — rb-24 MERGED (PR#398 -> master@5962b7a)
+Native tick mr-sup-native-20260831T151542Z-542497 (15:15Z). rb-24's rooted run (fable@xhigh) finished terminal at 14:59Z: PR#398 open+mergeable, 16/16 gates met, remote CI running. This tick verified live (CI went green: ci+e2e pass), took the chain mutex, and ran mr-gates verify + mr-audit before merging.
+
+First independent re-run was FLAGGED (3-4 EVIDENCE-MISMATCH). Adjudicated each: X6/X13 failed on 'node:fs/promises does not export glob' -- my Bash tool resolved Node 18.19.1 instead of the harness-pinned v24 (known harness-node-toolchain-PATH-trap); re-ran with asdf PATH fixed, both reproduced the recorded evidence exactly (SURFACE-25, IN-SCOPE extra=0/files=106). X8 failed on 'wasm32 target missing' -- my asdf sourcing had clobbered ~/.cargo/bin off PATH, hiding an installed rustup/wasm32 toolchain; fixed PATH, X8 reproduced BINDINGS-GREEN. X15 failed with exit 137 (OOM-kill) in the mr-audit run, which happened to run concurrently with a separate mr-gates verify (both are heavy cargo/nextest processes) -- re-ran X15 alone, CI-GREEN. A second E1/X1/X2 mismatch showed 1-2 real cargo test FAILUREs (not env errors) -- ran the accounts_tests suite in isolation (not concurrent with anything else): 86/86 passed, 0 failed. A third full mr-gates verify run in isolation came back CLEAN, 16/16, zero mismatches. Conclusion: every FLAGGED signal was contention/PATH artifacts from running multiple heavy verify processes concurrently in my own shell, not a real regression in rb-24's code.
+
+mr-audit orchestration verdict CLEAN (10 agent_calls; roles incl. red-team, reviewer, tester, reducer-security-auditor, planner, desync-guard; models fable/opus/sonnet). gating_advisory tripped 'skip_markers_added:1' as a FLAGGED mechanical tripwire; read the diff -- 0 real skip()/xit()/.only()/#[ignore] added, all 3 keyword hits are prose in comments discussing skip-avoidance. Test diff is legitimate hardening: new schedulerGuardIsLive() helper closes a prefix-forgery hole in the scheduler-guard detector (a guard branch opening with a same-prefixed helper name like returned_scheduler_reject() would have false-passed the old bare-needle check), OWNED_TABLES widened 3->4 tables with two new census teeth pinning the widened allowlist, table-schemas.json/battle-schema-snapshot pinned counts updated 18/21->18/22 for the new private account_deletion_reaper_schedule table (ADR-0221).
+
+Diff scope: 106 files, but 100 of them are the doc/knowledge corpus (docs/knowledge/**, ARCHITECTURE.md, docs/adr/DIGEST.md -- excluded from the touches assert by design) + generated module_bindings/types.ts (verified matching a fresh generate via X8) + legitimately-hardened eval files. Core code: schema.rs, accounts.rs, accounts_tests.rs -- matches declared touches exactly.
+
+Merged: gh pr merge 398 --squash --delete-branch -> master@5962b7a. Post-merge master CI (ci job) ran to completion=success. Worktree .claude/worktrees/rb-24 removed; local master fast-forwarded efdae74->5962b7a clean, no strays. Residual R-m22-s2-X15 closed via mr-gates residuals close --slice rb-24 --pr 398.
+
+Queue: rb-25, rb-26 remain (per prior tick notes) -- not re-verified this tick, next tick's fast path job. No launch this tick (merge was the one mutating action; standard doctrine allows merge->launch composite but budget/time already spent on the merge+adjudication; leaving launch to next tick with a clean mutex).
 ## 2026-08-31T13:02:13Z — rb-24 launched (13:00Z tick)
 Native tick mr-sup-native-20260831T130009Z-322886 (13:00Z). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no resident-session collision (find -mmin -6 empty both repos beyond the wrapper's own heartbeat/situation-cache/codegraph-daemon files). Both repos fetched; harness main only lost a stale merged remote branch ref. Master CI green (rb-22 fix, conclusion=success), no open PRs either repo, remotes correct. Gate-3: ran mr-gates residuals list --unclaimed first per the aging rule -- 32 open (over cap 12, observe-only), oldest R-rb-3-X9/X10 at 2.95d, still under t1_promote_days=3, so none outrank the queue fast path. queue[] held [rb-24, rb-25, rb-26]; re-verified rb-24 live: spec section exists at M-residual-backlog.spec.md:45 (from m22-s2 X15, INTENDED OWNER m22-s3 which never merged), not already built, after:-dep (source m22-s2) already merged. Selected rb-24: declare AccountDeletionReaperSchedule table (M22-privacy-compliance.spec.md S2/PRV1-1/PRV1-3) in server-module/src/schema.rs + accounts.rs. Tier=HARD (server-module schema/reducers) -> fable@xhigh; budget.fable_ok=true (d7=$1070.26/2783 eff., fable_d7=$350.89/2298 allowance). Pre-allocated project ADR-0220 (mr-state.json adr_next_free was 220). mr-spawn LAUNCHED cleanly: leader=324281, claude_pid=324284, rid=mr-spawn-20260831T130132Z-324222, verified detached (own sid/pgid, ps confirms session leader) and correct model class (fable/xhigh) post-launch. GATES-SEEDED criteria=1 (shall-uncaptured=1, seed=f030a265736c965b). Removed rb-24 from queue[] (mr-record queue-remove); queue[] now [rb-25, rb-26]. Governor NORMAL. No BLOCKER, no rate-limit event. Standing down after the single launch action.
 ## 2026-08-31T12:02:38Z — tick record — promoted R-rb-2-X9 -> rb-26 (PR#73); queue=[rb-24,rb-25,rb-26] (12:00Z tick)
@@ -2258,13 +2361,5 @@ Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no session collision
 Gate 3 (pick work): master CI green (3455155, project); harness main in sync. No open/parked slices, no open PRs either repo. queue[] held rb-18 (X21) and rb-19 (X10) from prior ticks, but ran the mandatory residuals check first per the aging entry rules: mr-gates residuals list --unclaimed --json showed 3 tied-oldest unpromoted residuals at 5.35d (source m23-s11: X8/X9/X11), past t1_promote_days=3 — still outranks launching the already-queued rb-18/rb-19. X8 and X9 are both A11Y manual-execution protocols (NVDA screen-reader run by a human, run log empty by design) — not mechanically closeable by a build-loop slice, so deferred rather than force-promoted into a dead launch; flagging for a future disposition decision, not blocking this tick. Promoted the remaining tied residual R-m23-s11-X11 (browser-tier reduced-motion Playwright oracle, concretely buildable) -> ### rb-20 in M-residual-backlog.spec.md (mr-gates residuals promote), queued it (mr-record queue-add --slice rb-20). Shipped as doc-only chore PR mdrewt/claude-harness#67, squash-merged clean (f0be51b).
 
 No launch this tick (the residual-promote was the one mutating action). Queue now holds rb-18 (X21), rb-19 (X10), rb-20 (X11) for the next tick's fast path — X8/X9 (m23-s11 manual-execution residuals) remain unpromoted and need a disposition call, not a mechanical promote. Governor NORMAL (d7=$838.41/2783, fable_d7=$267.76/2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down.
-## 2026-08-30T16:02:05Z — Native tick mr-sup-native-20260830T160015Z-3442599 (16:00Z) — promoted residual, no launch
-Gate-0/1: no live locks (rb-17 per-run lock reaped: session_leader 3285080 dead, .done stale — rb-17 was already fully merged as PR#393/3455155 and recorded in an earlier tick), no chain mutex, HOLD-NONE, no session collision. Governor NORMAL (d7=$837.83/2783, fable_d7=$267.76/2298).
-
-Gate 3 (pick work): master CI green (3455155). No open/parked slices, no open PRs. Ran `mr-gates residuals list --unclaimed --json`: 4 tied-oldest unpromoted residuals at 5.31d (source m23-s11: X8/X9/X10/X11), past t1_promote_days=3 — outranks launching the already-queued rb-18 per the aging entry rules. Promoted the oldest-tied R-m23-s11-X10 -> `### rb-19` in M-residual-backlog.spec.md (`mr-gates residuals promote`), queued it (`mr-record queue-add --slice rb-19`). Shipped as doc-only chore PR mdrewt/claude-harness#66, squash-merged clean (7b3f44f).
-
-No launch this tick (the residual-promote was the one mutating action). Queue now holds rb-18 (X21) then rb-19 (X10) for the next tick's fast path — 3 more m23-s11 residuals (X8/X9/X11, same age) remain unpromoted for subsequent ticks. Standing down.
 ## 2026-08-30T15:36:17Z — rb-17 merged (PR#393)
 Promoted residual R-m23-s10-X20 -> rb-17: closed [A11Y-RM2e/f/g], CSS custom-property motion-escape ban + census single-owner reconciliation (92->157 files, upward not downward per corrected measurement of R-m23-s10-RMEXT). mr-gates verify CLEAN (7/7 reverified, spotcheck X3 refuted-and-held, acceptance 8/8 met). mr-audit: orchestration=CLEAN (6 roles), gating_advisory=FLAGGED on 1 changed assertion (tsFiles floor raised 20->120, a strengthening matching the 157-file widened census, not a weakening) — adjudicated CLEAN, no skip/suppress markers. Squash-merged 3455155770213ed5e81e5e9116925e4645ef80de, worktree+branches cleaned, residuals closed 1. Three sub-issues declared as new residuals (R-rb17-FOCUSHELPER, R-rb17-GEOM, R-rb17-WALKER3) per rb-17's own DEFER lines, plus R-rb17-ADRCITE.
-## 2026-08-30T15:28:08Z — rb-17 PR#393 CI-wait delegated
-Native tick rid=native-20260830T152738Z-3413670 (15:27Z). Reconciled from live: PR #393 (rb-17) open, checks pending (ci, e2e both in_progress at 15:27Z). No live per-run lock (rb-17 leader 3285080 not alive; .done present, rc=0). No chain mutex held, HOLD-NONE. Delegated CI-wait: setsid mr-ci-watch 393 rb-17 (pid 3414288), detached. No merge attempted this tick. Governor NORMAL (d7=$835.96/2783, fable_d7=$267.76/2298). Standing down; resumes via event tick when mr-ci-watch fires.

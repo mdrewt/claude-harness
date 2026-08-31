@@ -5056,3 +5056,12 @@ EVIDENCE ARTIFACTS (harness repo, uncommitted — supervisor to commit with its 
 ---
 
 
+## 2026-08-30T15:28:08Z — rb-17 PR#393 CI-wait delegated
+Native tick rid=native-20260830T152738Z-3413670 (15:27Z). Reconciled from live: PR #393 (rb-17) open, checks pending (ci, e2e both in_progress at 15:27Z). No live per-run lock (rb-17 leader 3285080 not alive; .done present, rc=0). No chain mutex held, HOLD-NONE. Delegated CI-wait: setsid mr-ci-watch 393 rb-17 (pid 3414288), detached. No merge attempted this tick. Governor NORMAL (d7=$835.96/2783, fable_d7=$267.76/2298). Standing down; resumes via event tick when mr-ci-watch fires.
+
+## 2026-08-30T16:02:05Z — Native tick mr-sup-native-20260830T160015Z-3442599 (16:00Z) — promoted residual, no launch
+Gate-0/1: no live locks (rb-17 per-run lock reaped: session_leader 3285080 dead, .done stale — rb-17 was already fully merged as PR#393/3455155 and recorded in an earlier tick), no chain mutex, HOLD-NONE, no session collision. Governor NORMAL (d7=$837.83/2783, fable_d7=$267.76/2298).
+
+Gate 3 (pick work): master CI green (3455155). No open/parked slices, no open PRs. Ran `mr-gates residuals list --unclaimed --json`: 4 tied-oldest unpromoted residuals at 5.31d (source m23-s11: X8/X9/X10/X11), past t1_promote_days=3 — outranks launching the already-queued rb-18 per the aging entry rules. Promoted the oldest-tied R-m23-s11-X10 -> `### rb-19` in M-residual-backlog.spec.md (`mr-gates residuals promote`), queued it (`mr-record queue-add --slice rb-19`). Shipped as doc-only chore PR mdrewt/claude-harness#66, squash-merged clean (7b3f44f).
+
+No launch this tick (the residual-promote was the one mutating action). Queue now holds rb-18 (X21) then rb-19 (X10) for the next tick's fast path — 3 more m23-s11 residuals (X8/X9/X11, same age) remain unpromoted for subsequent ticks. Standing down.

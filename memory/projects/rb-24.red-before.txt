@@ -1,0 +1,30 @@
+     |
+5505 |         let fire = deletion_fire_at_ms(t);
+     |                    ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `deletion_fire_at_ms` in this scope
+    --> server-module/src/accounts_tests.rs:5556:9
+     |
+5556 |         deletion_fire_at_ms(i64::MAX - 1),
+     |         ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `deletion_fire_at_ms` in this scope
+    --> server-module/src/accounts_tests.rs:5563:9
+     |
+5563 |         deletion_fire_at_ms(i64::MAX),
+     |         ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `deletion_fire_at_ms` in this scope
+    --> server-module/src/accounts_tests.rs:5569:46
+     |
+5569 |         !is_deletion_due(Some(i64::MAX - 1), deletion_fire_at_ms(i64::MAX - 1)),
+     |                                              ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `deletion_fire_at_ms` in this scope
+    --> server-module/src/accounts_tests.rs:5611:20
+     |
+5611 |         let fire = deletion_fire_at_ms(t);
+     |                    ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `monster-realm-module` (lib test) due to 5 previous errors
