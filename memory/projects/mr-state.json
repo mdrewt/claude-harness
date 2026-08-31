@@ -38,6 +38,14 @@
    "added_utc": "2026-08-31T20:01:16Z",
    "added_by": "n/a",
    "derived_from_master_sha": "11cac7e3f1156ffb6c2d63fbfaa3d69eae196036"
+  },
+  {
+   "slice": "rb-29",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-4-X10",
+   "added_utc": "2026-08-31T21:01:23Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "11cac7e3f1156ffb6c2d63fbfaa3d69eae196036"
   }
  ],
  "park_counters": {
