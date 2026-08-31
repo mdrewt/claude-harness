@@ -1,10 +1,10 @@
 {
  "schema_version": 2,
- "updated_utc": "2026-08-31T01:01:30Z",
- "updated_by": "mr-sup-native-20260831T005538Z-4030229",
+ "updated_utc": "2026-08-31T02:04:01Z",
+ "updated_by": "mr-sup-native-20260831T020100Z-4051862",
  "master": {
   "sha": "48fc86754e361a7cb43df01a92c157d391939e9e",
-  "ci": "in_progress",
+  "ci": "success",
   "nightly": "in_progress"
  },
  "harness_main": {
@@ -20,7 +20,7 @@
  },
  "consecutive_standdowns": 0,
  "rate_limit_resets_at": null,
- "notes": "rb-20 MERGED this tick (PR#396 -> master@48fc867), closing residual R-m23-s11-X11. Acceptance 6/7 met + 1 deferred(RM-7->backlog); mr-gates verify FLAGGED only on RM-3 (missing local dev server in the ad-hoc verify shell, not a defect -- remote e2e CI job passed clean). orchestration_audit CLEAN. Worktree+branch cleaned, stale rb-19/rb-20 per-run locks reaped. Master CI for 48fc867 still in_progress at record time -- next tick must re-verify live before acting. New residual R-rb-20-RM-7 open (unpromoted). handoff-rotate WARNed on 43 unparseable-header entries pinned live -- needs a manual look, not addressed this tick (single-action rule).",
+ "notes": "Recovered the prior tick's uncommitted rb-20-merge record (catch-up commit 78beaa3). Re-verified master CI for 48fc867 now green (was in_progress last tick). No open PRs/inflight/awaiting_merge/queue. Gate-3: residual aging outranked new PLAN work (6 past t1=3d). Oldest tied (X8/X9, m23-s11 A11Y-32/33) require human NVDA/VoiceOver manual execution -- not promotable as a coding slice and not a true wontfix (mr-gates LEGAL_DISPOSITIONS has no needs-human category) -- left unpromoted, flagged for a future operator decision. Dispositioned next-oldest actionable residual R-m22-s2-S3-BASIS-CONTENT-FLOOR as wontfix (its own author text: 'No code change requested; close'). No launch/merge/promote this tick -- single-action rule. handoff-rotate again WARNed on 43 unparseable-header entries pinned live -- still not addressed (needs a manual look outside a single tick's one-action budget).",
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "parked": [],
  "open_chore_prs": [],
@@ -50,5 +50,5 @@
   "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events"
  },
  "live_watchers": [],
- "last_tick_utc": "2026-08-31T01:01:30Z"
+ "last_tick_utc": "2026-08-31T02:04:01Z"
 }
