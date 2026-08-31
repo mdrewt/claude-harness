@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-21 — S3 MUST guard cancel_account_deletion against terminal accounts (PRV1-4) — the schema now  (from m22-s2 S3-CANCEL-TERMINAL, deferred 2026-08-25)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s2 · residual: R-m22-s2-S3-CANCEL-TERMINAL
+
+Deferred with reason: MEASURED by two independent lenses on the m22-s2 tree: needs_cancel_write is matches!(status, PendingDeletion) and a terminal account IS PendingDeletion; cancelled_deletion carries terminal_at_ms through ..existing; the only guard is a debug_assert compiled OUT of release wasm ([profile.release] has no debug-assertions — red-team built both profiles and showed the release path does not panic). Lat
+
+EARS: S3 MUST guard cancel_account_deletion against terminal accounts (PRV1-4) — the schema now makes the resurrected-tombstone state mintable
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-20 — X11 (from m23-s11 X11, deferred 2026-08-25)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s11 · residual: R-m23-s11-X11
