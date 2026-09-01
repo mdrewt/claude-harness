@@ -1,13 +1,22 @@
 {
- "adr_next_free": 228,
+ "adr_next_free": 229,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-01T16:36:47Z",
+ "inflight": [
+  {
+   "effort": "xhigh",
+   "launched_utc": "2026-09-01T18:03:28Z",
+   "leader_pid": 2553083,
+   "model": "fable",
+   "slice": "m22-s3b",
+   "tier": "hard"
+  }
+ ],
+ "last_tick_utc": "2026-09-01T18:03:28Z",
  "live_watchers": [],
  "master": {
   "ci": "pending-post-merge-33535713892",
@@ -27,7 +36,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "17:03Z tick: merged m22-s4 (PR#407 -> 161b04c), squash+delete-branch, worktree removed, master ff-only'd. mr-gates verify initially FLAGGED (14 mismatches) was a false alarm from this tick's shell missing ~/.cargo/bin + asdf node-v24 shim; re-verified clean with corrected PATH. Post-merge master CI (run 33535713892) still in_progress at tick end -- next tick re-verifies live, do not assume green. X17 (export TTL reaper) DEFERred to backlog target S4b -- guest-parked-chunk residual, S4b MUST land before any public exposure. Prior 16:36Z m22-s5 ranked-forfeit flake rerun (33526353724) outcome not yet reconfirmed this tick -- check on next pass. Decision event m22-s3-prv1-8 (issue #403) still unconsumed.",
+ "notes": "18:02Z tick: committed the prior 17:10Z tick's uncommitted m22-s4-merge record as catch-up (c7ace73). Master CI confirmed green post-m22-s4 (161b04c, run 33535713892 SUCCESS). No open PRs, no aged residuals, empty queue -> fell through to PLAN section-9 derivation but first found decision issue #403 (m22-s3-prv1-8) answered by Drew (Option B / PRV1-8(b)), unblocking M22 S3b (ADR-0225's deferred cascade+reactivation-guard scope). Reserved ADR-0228, launched m22-s3b (fable@xhigh, tier=hard, leader 2553083) covering the full ADR-0225 handoff scope + PRV1-8(b) + residuals R-m22-s3-X11..X18 (closed as this slice's own DoD, not separately promoted). Posted mr-system comment on #403 noting consumption; left issue OPEN pending merge. m22-s5 ranked-forfeit flake rerun (33526353724) still not reconfirmed -- check next pass.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -50,6 +59,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T170337Z-2512059",
- "updated_utc": "2026-09-01T17:10:51Z"
+ "updated_by": "mr-sup-native-20260901T180257Z-2552466-348",
+ "updated_utc": "2026-09-01T18:04:25Z"
 }
