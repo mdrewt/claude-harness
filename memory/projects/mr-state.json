@@ -33,40 +33,7 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-08-31T20:01:16Z",
-   "derived_from_master_sha": "11cac7e3f1156ffb6c2d63fbfaa3d69eae196036",
-   "reason": "promoted residual R-rb-3-X10",
-   "slice": "rb-28",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-08-31T21:01:23Z",
-   "derived_from_master_sha": "11cac7e3f1156ffb6c2d63fbfaa3d69eae196036",
-   "reason": "promoted residual R-rb-4-X10",
-   "slice": "rb-29",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-08-31T22:01:01Z",
-   "derived_from_master_sha": "11cac7e3f1156ffb6c2d63fbfaa3d69eae196036",
-   "reason": "promoted residual R-rb-4-X11",
-   "slice": "rb-30",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-01T02:02:38Z",
-   "derived_from_master_sha": "86a4311444964a1021172b528ebc7ef2cd5081b9",
-   "reason": "promoted residual R-rb-5-X9",
-   "slice": "rb-32",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  }
- ],
+ "queue": [],
  "rate_limit_resets_at": null,
  "resource_locations": {
   "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
