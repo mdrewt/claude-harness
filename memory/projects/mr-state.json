@@ -33,7 +33,16 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-33",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-6-R-rb-6-X1",
+   "added_utc": "2026-09-01T05:01:17Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "86a4311444964a1021172b528ebc7ef2cd5081b9"
+  }
+ ],
  "rate_limit_resets_at": null,
  "resource_locations": {
   "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
@@ -49,6 +58,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T020012Z-1046140",
- "updated_utc": "2026-09-01T02:03:40Z"
+ "updated_by": "mr-sup-native-20260901T050210Z-1127819-18018",
+ "updated_utc": "2026-09-01T05:02:30Z"
 }
