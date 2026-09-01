@@ -7,7 +7,7 @@
   "sha": "74a5bc8"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-01T09:25:44Z",
+ "last_tick_utc": "2026-09-01T10:03:18Z",
  "live_watchers": [],
  "master": {
   "ci": "success",
@@ -27,13 +27,22 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "09:18Z tick: m22-s3 PR#404 merged squash (e321442), continuing prior ticks mr-ci-watch delegation. mr-gates verify 11/19 met 8/19 deferred 0 unmet (X11-X18 -> backlog, S3b cascade scope, G5 write-isolation). mr-audit orchestration CLEAN; gating_advisory FLAGGED on mechanical tripwire, adjudicated benign after full diff read (all 3 removed-assert hits were doc-comment prose, both skip/ignore hits were English words in comments, 686/686 tests 0 skipped). Worktree+branch cleaned, local master ff to e321442. Post-merge master CI in_progress at tick-end -- background Monitor watching, verify green before trusting this field on the next tick. 8 residuals emitted unpromoted (X11-X18, target=backlog). NOT actioned this tick (pre-existing, gate-3 pick-work for next tick): residual_alarms show 1 unpromoted-past-t1 (R-rb-7-X8-residual, 3d) and residual-over-cap (24 open, cap 12, observe-only); handoff-rotate WARNed 48 entries with unparseable headers, pinned live, needs a manual look. Env note for future ticks: verification shells here need /home/mdrewt/.asdf/shims and $HOME/.cargo/bin prepended to PATH or mr-gates verify false-flags on stale system node v18 / missing cargo.",
+ "notes": "10:00Z tick: gate-0 committed prior tick's uncommitted m22-s3 PR#404 merge record (e6c2b64, corrected stale master.ci/nightly fields, pushed). No launch/merge eligible this tick's own gate-3: one residual (R-rb-7-X8-residual, rb-7's accounts.rs guest-claim-tombstone gap, real M22 privacy defect) aged past t1_promote_days=3, promoted -> rb-34, queued (PR#82, d5a6cea). Next tick launches rb-34 off the fast path.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-34",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-7-X8-residual",
+   "added_utc": "2026-09-01T10:02:30Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "e32144271470eb83476c8655fd7b572807066b57"
+  }
+ ],
  "rate_limit_resets_at": null,
  "resource_locations": {
   "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
@@ -49,6 +58,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T091816Z-1616617",
- "updated_utc": "2026-09-01T09:25:44Z"
+ "updated_by": "mr-sup-native-20260901T100010Z-1676039",
+ "updated_utc": "2026-09-01T10:03:18Z"
 }
