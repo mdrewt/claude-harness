@@ -1,6 +1,14 @@
 {
  "adr_next_free": 225,
- "awaiting_merge": [],
+ "awaiting_merge": [
+  {
+   "slice": "m22-s3",
+   "pr": 404,
+   "repo": "mdrewt/monster-realm",
+   "status": "ci-in-progress-delegated-to-mr-ci-watch",
+   "updated_utc": "2026-09-01T09:15:35Z"
+  }
+ ],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
@@ -27,7 +35,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "06:00Z tick: rb-33 dispositioned wontfix (stale, already shipped by rb-24); queue emptied; no launch this tick.",
+ "notes": "07:00Z tick: gates clean, master/nightly CI green, residuals none past t1 (queue stayed empty). Launched m22-s3 (privacy cascade/reaper) after full PLAN derivation found M22 stalled at S2 since rb-3..rb-33 chain was entirely eval-tooling self-referential residuals now retired by ADR-0224. Opened non-blocking mr-ask-drew #403 for PRV1-8 reactivation policy; S3 brief scoped to exclude PRV1-8.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1

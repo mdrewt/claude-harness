@@ -1,0 +1,15 @@
+error[E0425]: cannot find value `REJECT_ALREADY_DELETED` in this scope
+error[E0425]: cannot find value `REJECT_ALREADY_DELETED` in this scope
+error[E0425]: cannot find value `REJECT_ALREADY_DELETED` in this scope
+error[E0425]: cannot find function `account_has_terminal_marker` in this scope
+error[E0425]: cannot find function `reaper_should_run_cascade` in this scope
+error[E0425]: cannot find function `reaper_should_run_cascade` in this scope
+error[E0425]: cannot find function `reaper_should_run_cascade` in this scope
+error[E0425]: cannot find function `reaper_should_run_cascade` in this scope
+error[E0425]: cannot find function `reaper_should_run_cascade` in this scope
+error[E0425]: cannot find function `reaper_should_run_cascade` in this scope
+error[E0425]: cannot find function `reaper_should_run_cascade` in this scope
+error[E0425]: cannot find function `should_reject_for_deletion` in this scope
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `monster-realm-module` (lib test) due to 12 previous errors
+error: command `/home/mdrewt/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin/cargo test --no-run --message-format json-render-diagnostics --package monster-realm-module` exited with code 101
