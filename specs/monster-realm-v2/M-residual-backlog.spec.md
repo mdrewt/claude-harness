@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-34 — X8-residual (from rb-7 X8-residual, deferred 2026-08-29)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-7 · residual: R-rb-7-X8-residual
+
+Deferred with reason: the `accounts.rs` half of the guest-claim-value ban cannot be
+
+EARS: X8-residual
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-33 — WONTFIX (stale — fix already shipped) — accounts_tests.rs:2057 g2_reducer_name_set_is_pinned still carried the exact-5 Rust pin (from rb-6 R-rb-6-X1, deferred 2026-08-29)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-6 · residual: R-rb-6-R-rb-6-X1
