@@ -6,22 +6,13 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [
-  {
-   "effort": "xhigh",
-   "launched_utc": "2026-09-01T15:02:01Z",
-   "leader_pid": 2171901,
-   "model": "fable",
-   "slice": "m22-s4",
-   "tier": "hard"
-  }
- ],
+ "inflight": [],
  "last_tick_utc": "2026-09-01T16:36:47Z",
  "live_watchers": [],
  "master": {
-  "ci": "failure-rerun-triggered-33526353724",
+  "ci": "pending-post-merge-33535713892",
   "nightly": "in_progress",
-  "sha": "96cf4bb303949936982cf99a27f09938e86917b5"
+  "sha": "161b04c16b6f4f3667c42d3a99d4765cd1bb2927"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -36,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "16:36Z tick: master CI red on m22-s5 merge (96cf4bb) -- single e2e ranked-forfeit.spec.ts RL-18 120s timeout, diff disjoint from PvP/forfeit code, matches 5x prior chronic-flake signature (11r-i/m20e/14r-a/m22-s1/rb-16). Reran failed job only (gh run rerun 33526353724 --failed), no PR to mr-ci-watch (master-push run) -- next tick re-verifies live. m22-s4 still live (leader 2171901, ~89min). Decision event m22-s3-prv1-8 (issue #403, operator chose Option B) NOT yet consumed -- one-mutation budget spent on the CI diagnostic; issue stays open until a follow-up slice actually implements the answer.",
+ "notes": "17:03Z tick: merged m22-s4 (PR#407 -> 161b04c), squash+delete-branch, worktree removed, master ff-only'd. mr-gates verify initially FLAGGED (14 mismatches) was a false alarm from this tick's shell missing ~/.cargo/bin + asdf node-v24 shim; re-verified clean with corrected PATH. Post-merge master CI (run 33535713892) still in_progress at tick end -- next tick re-verifies live, do not assume green. X17 (export TTL reaper) DEFERred to backlog target S4b -- guest-parked-chunk residual, S4b MUST land before any public exposure. Prior 16:36Z m22-s5 ranked-forfeit flake rerun (33526353724) outcome not yet reconfirmed this tick -- check on next pass. Decision event m22-s3-prv1-8 (issue #403) still unconsumed.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -59,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T152543Z-2264245",
- "updated_utc": "2026-09-01T15:33:45Z"
+ "updated_by": "mr-sup-native-20260901T170337Z-2512059",
+ "updated_utc": "2026-09-01T17:10:51Z"
 }
