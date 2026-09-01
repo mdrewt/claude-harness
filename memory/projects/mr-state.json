@@ -1,14 +1,25 @@
 {
- "adr_next_free": 225,
- "awaiting_merge": [],
+ "adr_next_free": 226,
+ "awaiting_merge": [
+  {
+   "checks": "ci+e2e IN_PROGRESS as of 2026-09-01T12:19Z",
+   "mergeStateStatus": "UNSTABLE",
+   "pr": 405,
+   "repo": "mdrewt/monster-realm",
+   "slice": "rb-34",
+   "watcher_pid": 1869729
+  }
+ ],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-01T10:03:18Z",
- "live_watchers": [],
+ "last_tick_utc": "2026-09-01T12:21:04Z",
+ "live_watchers": [
+  "mr-ci-watch 405 rb-34 (pid 1869729)"
+ ],
  "master": {
   "ci": "success",
   "nightly": "success",
@@ -27,22 +38,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "10:00Z tick: gate-0 committed prior tick's uncommitted m22-s3 PR#404 merge record (e6c2b64, corrected stale master.ci/nightly fields, pushed). No launch/merge eligible this tick's own gate-3: one residual (R-rb-7-X8-residual, rb-7's accounts.rs guest-claim-tombstone gap, real M22 privacy defect) aged past t1_promote_days=3, promoted -> rb-34, queued (PR#82, d5a6cea). Next tick launches rb-34 off the fast path.",
+ "notes": "12:21Z tick: gate-0 clean (rb-34 per-run lock dead+done, no chain mutex, HOLD-NONE). rb-34 run finished rc=0 (fable/xhigh, 1 attempt) -> PR#405 open vs master, mergeStateStatus=UNSTABLE, ci+e2e IN_PROGRESS at live re-check (12:19Z start). Delegated CI-wait to mr-ci-watch (pid 1869729 confirmed live) per doctrine instead of polling; moved rb-34 inflight->awaiting_merge. No launch this tick (single action = delegate).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "slice": "rb-34",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-7-X8-residual",
-   "added_utc": "2026-09-01T10:02:30Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "e32144271470eb83476c8655fd7b572807066b57"
-  }
- ],
+ "queue": [],
  "rate_limit_resets_at": null,
  "resource_locations": {
   "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
@@ -58,6 +60,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T100010Z-1676039",
- "updated_utc": "2026-09-01T10:03:18Z"
+ "updated_by": "mr-sup-native-20260901T122104Z-1868676",
+ "updated_utc": "2026-09-01T12:21:47Z"
 }

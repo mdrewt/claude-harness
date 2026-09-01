@@ -2,6 +2,38 @@
 
 ---
 
+## 2026-09-01T~13:0xZ — rb-34 COMPLETE (terminal: PR #405 open + local `just ci` green + remote CI running)
+
+**Slice:** rb-34 — residual R-rb-7-X8-residual (accounts.rs half of the guest-claim tombstone-value
+ban). The brief's expected outcome was "probably re-defer, blocked on S3b"; the plan-phase red-team
+lens REVERSED that with a measured PoC — accounts.rs already reaches the guest-claim tombstone
+writer by delegation (`rekey_all` → `ranking::rekey_profile`), and a lazy S3b cascade calling the
+delegate (or, reviewer-measured, `rekey_all` itself one hop up) ships the wrong tombstone + zeroed/
+materialised ladder stats with CI green. So the slice ships the closable half now.
+**PR:** https://github.com/mdrewt/monster-realm/pull/405 — OPEN, remote CI (ci+e2e) running at exit.
+Branch `slice/rb-34` (worktree `.claude/worktrees/rb-34`), 3 wip commits, all pushed, HEAD `1af24ad`.
+**Shipped:** ONE born-green ratchet test `rb34_guest_claim_rekey_delegate_reachable_only_from_rekey_all`
+(accounts_tests.rs EOF, 8 clauses) + 10-line ARCHITECTURE.md rb-7-paragraph update. Bite proven by
+the re-runnable probe `memory/projects/gates/rb-34.x3-probe.mjs`: control=PASS + 9 surgical mutants
+each pinned by message tag. Ledger `gates/rb-34.gates.md`: 4/5 met (X1 MANUAL, X2/X3/X4 evidence
+captured by `mr-gates check`), X5 DEFERred → backlog with a 7-item buildable list — **FOLD X5 into
+the S3b slice that lands R-m22-s3-X13, do not queue separately** (residual-over-cap). Verifier PASS
+(all CHECKs re-executed, diff 100% additive, 686→687 module / 2055→2056 workspace, 0 skipped).
+Local `just ci` exit 0 (nextest 2056/2056, clippy/fmt clean, 99 eval PASS, vitest 2871).
+**Lenses:** red-team (plan, PoC) · tester opus (tooth + 9 bypasses; orchestrator ran all proofs —
+tester Bash is HOOK-blocked to syntax checks only, the old memory card is right for the wrong
+reason) · reviewer opus (M1 one-hop-up → clause 5 + m6-m9; 3 minors applied) · /simplify (clean) ·
+verifier (PASS) · reducer-security-auditor/desync-guard judged N/A (test+doc-only diff).
+**SUPERVISOR ATTENTION:** (1) ADR-number COLLISION — rb-34's assigned ADR 225 was taken by m22-s3's
+`0225-s3-rightsized-cascade-deferred-g5-write-isolation.md` (merged 09:18Z, after assignment; the
+assignment raced the merge). rb-34 minted NO ADR (decision recorded in ledger + ARCHITECTURE.md);
+if an ADR is wanted, assign a fresh number to a follow-up. Check the number-reservation flow for
+the race. (2) ADR-0211:72's residual instruction names `evals/deletion-completeness.eval.mjs`,
+banned by ADR-0224:76 — the X5 DEFER re-points the vehicle to ordinary Rust tests; ADR-0211's body
+was NOT edited (outside rb-34's doc scope). (3) rb-7 X8 EVIDENCE's ARCHITECTURE.md:213 citation
+now resolves at :227+ (pre-existing drift, noted in the X5 DEFER). Plan memo:
+`memory/projects/monster-realm-rb-34-plan.md`. Scratch copies under /tmp/rb34-* are disposable.
+
 ## 2026-08-31T~19:2xZ — rb-25 COMPLETE (terminal: PR #399 open + local `just ci` green + remote CI running)
 
 **Slice:** rb-25 — residual R-rb-2-X10: a REKEY manifest entry could name ANOTHER table's live
@@ -2513,6 +2545,8 @@ refresh owed per build-loop step 10). Red-team scratch /tmp/m22s3-rt + /tmp/chea
 supervisor's optional spot-check (safe to delete). rb11-mut vite orphans still present (known
 harmless). Untracked harness files: the m22-s3 plan + receipts above.
 
+## 2026-09-01T11:02:57Z — 11:00Z tick — rb-34 launched (fable@xhigh, hard tier)
+Native tick mr-sup-native-20260901T110006Z-1690564 (11:00Z). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no .done awaiting merge, no active human session (rb-11 esbuild pids known-harmless orphans; mr-decision-watch for issue #403 m22-s3-prv1-8 running as expected). master CI green (e321442). Gate-3: no inflight/awaiting_merge; residuals unclaimed list has 17 open rows, all unpromoted, oldest 1.68 days -- none past t1_promote_days=3, so queue[] fast path wins. queue[0]=rb-34 (R-rb-7-X8-residual, promoted by the prior 10:00Z tick) re-verified live: M-residual-backlog.spec.md section exists, no blocked:, no existing PR/branch. Read rb-7's PR#385 for context (single-sourced deletion tombstone via game_core::TOMBSTONE_DISPLAY_NAME + made ranking.rs's guest-claim sentinel module-private) to derive touches=server-module/src/{accounts.rs,accounts_tests.rs} and a detailed target_desc, since the residual is inherit-touches/REVIEW-flagged. Classified as a real security/privacy defect (guest-claim-value ban), not eval-tooling -- launchable, not wontfix, per ADR-0224 work-selection scope. Tier=HARD (touches server-module reducer file accounts.rs); fable_ok=true in budget bundle, so model=fable effort=xhigh per routing doctrine. mr-spawn's first attempt failed BRIEF-RENDER-FAILED because my vars.json omitted the required tier field -- fixed, re-ran, LAUNCHED clean (leader=1692689 claude_pid=1692692 rid=mr-spawn-20260901T110232Z-1692605, gates seeded criteria=0). mr-record queue-remove rb-34 next; releasing chain mutex; no other action this tick.
 ## 2026-09-01T10:03:35Z — 10:00Z tick — catch-up + rb-34 promoted (R-rb-7-X8-residual), queued
 Native tick mr-sup-native-20260901T100010Z-1676039 (10:00Z, forced). Gate-0: found the 09:18Z tick's m22-s3 PR#404 merge record (mr-state.json/handoff/handoff-archive/mr-usage-daily.jsonl) written but never committed to the harness repo -- same failure pattern as prior catch-ups. Live-reverified PR#404 MERGED (e321442, mergedAt 09:23:36Z), master CI success, nightly last run (2026-08-31) success (no run in progress) -- corrected mr-state.json's stale master.ci=in_progress/nightly=in_progress fields to match live ground truth before committing (e6c2b64), pushed to origin/main.
 
@@ -2570,5 +2604,6 @@ mr-record queue-add for rb-31 refused: queue[] is at its 5-item cap (rb-26, rb-2
 Native tick native-20260831T220009Z-849696 (22:00Z). Gate-0/1: clean (no live per-run locks, no chain mutex, HOLD-NONE, no session collision -- rb-11 esbuild pids are known harmless orphans). Gate-3: master CI green (11cac7e). Residuals check: R-rb-4-X11 and R-rb-4-X12 both past t1_promote_days=3 (age 3.13d, disclosed 2026-08-28). Promoted R-rb-4-X11 -> rb-30 via mr-gates residuals promote (M-residual-backlog.spec.md). Shipped as doc-only chore PR mdrewt/claude-harness#77, squash-merged clean, main fast-forwarded to 76e789f. Queued rb-30 via mr-record queue-add (queue now 5 entries: rb-26/27/28/29/30). No launch this tick (residual-promote was the one action). R-rb-4-X12 remains past t1 for the next tick to promote. Budget NORMAL (d7=$1236.34, fable_ok=true). No BLOCKERs.
 ## 2026-08-31T21:02:19Z — Native tick 21:00Z -- rb-4 residual X10 promoted->rb-29
 Native tick mr-sup-native-20260831T210011Z-838038 (21:00Z). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE, no .done awaiting merge (rb-11 esbuild pids are known harmless orphans). Gate-1/2: both repos fetched clean, no resident-session collision (find -mmin -6 showed only mechanical writes: codegraph daemon, situation-cache, heartbeat, tick log). Remotes correct, project master/harness main both in sync with origin pre-tick. Gate-3: project master CI confirmed green live via check-runs (ci+e2e success on 11cac7e; the commit-status API's 'pending' aggregate was a non-required context, not a real red). No open PRs either repo, no inflight/awaiting_merge, park_counters unchanged ({14r-e:1}). Ran mr-gates residuals list --unclaimed --json per the aging rule: 24 open (cap-alarm persists, 31 total before this tick's promote, observe-only), three tied-oldest at 3.09d (R-rb-4-X10, R-rb-4-X11, R-rb-4-X12, all disclosed 2026-08-28T18:54:06Z) past t1_promote_days=3 -- outranking the queued rb-26/rb-27/rb-28 fast path. Promoted the first-listed, R-rb-4-X10 (LIVE-REACHABLE product-type Identity-column hole outside touches), -> rb-29 in M-residual-backlog.spec.md, queued it (mr-record queue-add). Shipped as doc-only chore PR mdrewt/claude-harness#76 (chore/residual-promote-20260831T210129Z), squash+auto-merged clean (128b2ea). Harness main reconciled: local was 1 commit behind origin (rb-3-X10/rb-28 promotion race with a concurrent PR#75 merge notification, already reflected upstream) -- stashed the in-progress mr-state.json queue-add edit (labeled), --ff-only merged origin/main, popped the stash cleanly (disjoint files). queue now [rb-26, rb-27, rb-28, rb-29]. No launch this tick (promote+merge was the one mutating action, per one-action-per-tick discipline). R-rb-4-X11 and R-rb-4-X12 (same age/disclosed_at as X10) remain unpromoted for a future tick. Governor NORMAL (d7=$1235.52/2783 eff., fable_d7=$445.21/2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down after the single promote action.
-## 2026-08-31T20:02:06Z — 20:00Z tick — rb-3 residual X10 promote
-Native tick mr-sup-native-20260831T200013Z-825533 (20:00Z). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE. Found a stale /tmp/mr_pass_rb-25.done left over from the 19:40Z tick that had already fully reconciled rb-25 (mr-state.json notes + ledger row confirmed MERGED PR#399->11cac7e) -- removed the stale file, not a live chain. Gate-1/2: both repos fetched clean, no resident-session collision (find -mmin -6 empty both repos). Gate-3: project master CI green (11cac7e, rb-25), no open PRs either repo, no parked/inflight slices. Ran mr-gates residuals list --unclaimed per the aging rule first: 24 open, oldest R-rb-3-X10 at 3.24d -- past t1_promote_days=3, outranking the queued rb-26/rb-27 fast path. Promoted R-rb-3-X10 -> rb-28 in M-residual-backlog.spec.md (mr-gates residuals promote), queued it (mr-record queue-add). Shipped as doc-only chore PR mdrewt/claude-harness#75, squash-merged clean (64bbdfd). Harness main had again drifted 1 commit ahead of origin (prior tick's unpushed b9ad744 tick-record) -- reconciled with a plain git merge origin/main (ort, no conflicts, disjoint files: spec-backlog vs mr-state/handoff) rather than --ff-only. queue now [rb-26, rb-27, rb-28]. No launch this tick (promote+merge was the one mutating action, per one-action-per-tick discipline). Governor NORMAL (d7=$1234.61/2783 eff., fable_d7=$445.21/2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down after the single promote action.
+
+## 2026-09-01T12:21:47Z — rb-34 PR#405 — CI in-progress, delegated to mr-ci-watch
+Native tick mr-sup-native-20260901T122104Z-1868676 (12:21Z). rb-34 run finished rc=0 (fable, 1 attempt, single-attempt xhigh, cost recorded in ledger). PR https://github.com/mdrewt/monster-realm/pull/405 open against master, mergeStateStatus=UNSTABLE (mergeable=MERGEABLE), both ci+e2e checks IN_PROGRESS as of 12:19Z live re-check. No chain-owner mutex held, no other live per-run locks. Per doctrine, delegated the CI wait: spawned mr-ci-watch 405 rb-34 detached (pid 1869729 confirmed live) rather than polling. Recorded ledger row (outcome=DELEGATED-CI-WAIT) and exiting; merge/audit/gates-verify to be completed by the resuming event tick once checks land.
