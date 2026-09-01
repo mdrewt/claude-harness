@@ -27,22 +27,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "03:00Z tick: gate-3 fast-path found queue[0]=rb-27 invalid (rb-26 review R-rb-26-X8-rb-3-x9-fg72c showed R-rb-3-X9 already documented in ADR-0208 D2). Closed both residuals (mr-gates residuals close --slice rb-27 --force) and queue-removed rb-27. queue now [rb-28,rb-29,rb-30,rb-32]. No launch this tick (single-action discipline). R-rb-5-X10 remains unpromoted past t1 (3.09d) but was correctly deferred to the fast path per precedent -- a future tick will promote it once queue drains.",
+ "notes": "06:00Z tick: rb-33 dispositioned wontfix (stale, already shipped by rb-24); queue emptied; no launch this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "slice": "rb-33",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-6-R-rb-6-X1",
-   "added_utc": "2026-09-01T05:01:17Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "86a4311444964a1021172b528ebc7ef2cd5081b9"
-  }
- ],
+ "queue": [],
  "rate_limit_resets_at": null,
  "resource_locations": {
   "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
