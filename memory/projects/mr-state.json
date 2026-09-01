@@ -1,24 +1,21 @@
 {
  "adr_next_free": 224,
- "awaiting_merge": [],
+ "awaiting_merge": [
+  {
+   "pr": 400,
+   "repo": "mdrewt/monster-realm",
+   "slice": "rb-26",
+   "watcher_pid": 1035770,
+   "opened_utc": "2026-09-01T01:31:49Z"
+  }
+ ],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [
-  {
-   "effort": "high",
-   "model": "opus",
-   "repo": "project",
-   "run_id": "mr-spawn-20260901T000218Z-875426",
-   "session_leader": 875516,
-   "slice": "rb-26",
-   "started_utc": "2026-09-01T00:02:22Z",
-   "tier": "routine"
-  }
- ],
- "last_tick_utc": "2026-09-01T00:00:10Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-01T01:33:22Z",
  "live_watchers": [],
  "master": {
   "ci": "green",
@@ -38,7 +35,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "00:00Z tick: committed 23:00Z tick's uncommitted catch-up record (rb-31 promotion), then launched rb-26 (residual R-rb-2-X9, prose+ADR-0223 fold with rb-27) via fast-path queue. queue now [rb-27,rb-28,rb-29,rb-30]. rb-31 still unqueued (cap deferred, a future tick queues it once a slot frees).",
+ "notes": "01:33Z tick: rb-26 run finished rc=0, mr-gates verify CLEAN (6/6), opened PR#400 (MERGEABLE, ci+e2e pending). Delegated CI-wait to mr-ci-watch (pid 1035770, event bridges the merge on completion) per doctrine — supervisor never polls CI inline. Reaped rb-26's stale per-run lock (session_leader 875516 dead). queue still [rb-27,rb-28,rb-29,rb-30]; rb-31 still unqueued (cap deferred).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -93,6 +90,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T000010Z-873315",
- "updated_utc": "2026-09-01T00:05:00Z"
+ "updated_by": "mr-sup-native-20260901T013322Z-1034550",
+ "updated_utc": "2026-09-01T01:34:00Z"
 }
