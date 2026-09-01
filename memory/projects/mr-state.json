@@ -6,22 +6,13 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [
-  {
-   "effort": "xhigh",
-   "launched_utc": "2026-09-01T18:03:28Z",
-   "leader_pid": 2553083,
-   "model": "fable",
-   "slice": "m22-s3b",
-   "tier": "hard"
-  }
- ],
- "last_tick_utc": "2026-09-01T18:03:28Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-01T22:00:14Z",
  "live_watchers": [],
  "master": {
-  "ci": "pending-post-merge-33535713892",
+  "ci": "red-e2e-flake-rerun-triggered-33561683660",
   "nightly": "in_progress",
-  "sha": "161b04c16b6f4f3667c42d3a99d4765cd1bb2927"
+  "sha": "5fd93e4ed3f442786ccf805286f288ff3759f775"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -36,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "18:02Z tick: committed the prior 17:10Z tick's uncommitted m22-s4-merge record as catch-up (c7ace73). Master CI confirmed green post-m22-s4 (161b04c, run 33535713892 SUCCESS). No open PRs, no aged residuals, empty queue -> fell through to PLAN section-9 derivation but first found decision issue #403 (m22-s3-prv1-8) answered by Drew (Option B / PRV1-8(b)), unblocking M22 S3b (ADR-0225's deferred cascade+reactivation-guard scope). Reserved ADR-0228, launched m22-s3b (fable@xhigh, tier=hard, leader 2553083) covering the full ADR-0225 handoff scope + PRV1-8(b) + residuals R-m22-s3-X11..X18 (closed as this slice's own DoD, not separately promoted). Posted mr-system comment on #403 noting consumption; left issue OPEN pending merge. m22-s5 ranked-forfeit flake rerun (33526353724) still not reconfirmed -- check next pass.",
+ "notes": "22:00Z tick: master post-merge CI for m22-s3b (5fd93e4, PR#408) resolved to e2e=FAILURE (ci=SUCCESS) on run 33561683660 -- single test wallet-balance.spec.ts:911 11r-e (ADR-0169), quest_001-via-elder_oak precondition, npc.rs:105-120 StartQuest path. Read the full m22-s3b diff against this failure signature: npc.rs's only change is the additive erase_npc_state() helper (PRV1-6b, called only from account_deletion_reaper) -- apply_effects_to_db/talk/advance_dialogue at npc.rs:90-130 is byte-for-byte untouched; lib.rs's 69-line diff is a verbatim extraction (resolve_all_live_interactions, same 4 calls same order) plus a new init/sync_content wiring call to accounts::ensure_deletion_reapers_armed -- no dialogue/quest logic anywhere in the diff. No code-level regression signature ties this to the diff. Classified as a chronic e2e flake (same category/precedent as the 16:36Z tick's diff-disjoint ranked-forfeit RL-18 flake, resolved by plain rerun, not revert/fix-forward). Action: gh run rerun 33561683660 --failed (exit 0). No PR to attach mr-ci-watch to (master-push run). Next tick re-verifies the rerun live before any further action. Untracked scratch files at repo root (m22-s3b.red-1.txt/.red-2.txt/.teeth.txt, monster-realm-m22-s3b-plan.md) are safe leftovers from the completed m22-s3b run, not investigated further this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -59,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T180257Z-2552466-348",
- "updated_utc": "2026-09-01T18:04:25Z"
+ "updated_by": "mr-sup-native-20260901T220014Z-3063051",
+ "updated_utc": "2026-09-01T22:02:48Z"
 }
