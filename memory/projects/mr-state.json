@@ -9,19 +9,19 @@
  "inflight": [
   {
    "slice": "m22-s4",
-   "launched_utc": "2026-09-01T13:04:11Z",
+   "launched_utc": "2026-09-01T15:02:01Z",
    "model": "fable",
    "effort": "xhigh",
    "tier": "hard",
-   "leader_pid": 1907212
+   "leader_pid": 2171901
   },
   {
    "slice": "m22-s5",
-   "launched_utc": "2026-09-01T13:04:11Z",
+   "launched_utc": "2026-09-01T15:02:09Z",
    "model": "fable",
    "effort": "xhigh",
    "tier": "hard",
-   "leader_pid": 1908503
+   "leader_pid": 2172304
   }
  ],
  "last_tick_utc": "2026-09-01T12:25:56Z",
@@ -44,7 +44,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "12:25Z tick (ci-forced): gate-0 committed the 12:21Z tick's uncommitted delegated-CI-wait record (b7a982b, pushed). EVENT confirmed PR#405 (rb-34) both checks green; live re-check matched (CLEAN/MERGEABLE). mr-gates verify 4/5 met, X5 DEFERred->backlog (blocked on S3b); FLAGGED only on X1's benign citation line-drift, substantive claim reconfirmed live. mr-audit orchestration=CLEAN gating_advisory=CLEAN, diff purely additive (ARCHITECTURE.md+accounts_tests.rs, matches touches). Merged --squash --delete-branch -> 87f35e7 (12:28:43Z). Cleaned worktree+branch; master repo ff'd to 87f35e7. mr-gates residuals close: 1 closed (source promotion row); R-rb-34-X5 auto-emitted to sink for future aging-based promotion. Post-merge master CI queued at record time (not blocked on -- no dedicated post-merge watcher exists per doctrine). Ledger+handoff recorded. No composite launch this tick -- queue[] empty, next tick does full PLAN\u00a79/residuals derivation fresh.",
+ "notes": "15:02Z tick: m22-s4+m22-s5 rate-limit crash (five_hour, resetsAt 15:00Z) resumed same tick post-reset; no new merges/parks.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -67,5 +67,6 @@
  },
  "schema_version": 2,
  "updated_by": "mr-sup-native-20260901T122556Z-1871649",
- "updated_utc": "2026-09-01T12:31:00Z"
+ "updated_utc": "2026-09-01T12:31:00Z",
+ "rate_limit_armed_by": "wrapper"
 }

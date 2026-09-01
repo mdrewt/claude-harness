@@ -2545,6 +2545,14 @@ refresh owed per build-loop step 10). Red-team scratch /tmp/m22s3-rt + /tmp/chea
 supervisor's optional spot-check (safe to delete). rb11-mut vite orphans still present (known
 harmless). Untracked harness files: the m22-s3 plan + receipts above.
 
+## 2026-09-01T15:02:34Z — m22-s4 + m22-s5 rate-limit crash — resumed 15:02Z tick
+Both hard-tier fable slices launched 13:00Z (12:56Z tick) crashed at ~14:29-14:30Z on an org-level five_hour rate-limit rejection (overageDisabledReason=org_level_disabled), not a code defect: m22-s4 attempt 2 rejected immediately on relaunch; m22-s5 attempt 1 rejected mid-turn right after a green 15/15 mutant register + 13/13 targeted test pass. Neither had opened a PR. resetsAt=2026-09-01T15:00:00Z; this tick landed at 15:00:09Z, past reset, so both were resumed directly (no mr-reset-watch needed -- the wrapper's own retries had already exhausted before the reset, and by the time this tick ran the window was already clear).
+
+m22-s4 (feat/m22-s4-export, ADR-0226): worktree holds only the 'wip(m22-s4): plan + ADR-0226 checkpoint' commit -- no privacy.rs implementation landed yet. A staged test snippet was written to /tmp/m22s4-tests/privacy_tests_append.rs (outside the worktree, scratch only, not authoritative). Resumed fresh from the plan checkpoint via mr-spawn (leader=2171901).
+
+m22-s5 (slice/m22-s5, ADR-0227): worktree has 3 commits through the PRV1-9 gate + stage-2 behavioral tests (a6411b2), PLUS uncommitted edits to guards_tests.rs/trading_tests.rs (reviewer anchor-ambiguity fix + mutant-hardening) that are real tested work -- the 15/15 mutant-caught result was measured against exactly those edits. Preserved in-worktree, not touched by supervisor. Resumed via mr-spawn (leader=2172304) with resume_block noting to pick the uncommitted diff up rather than redo it.
+
+No park-counter bump (rate-limit parks are exempted per doctrine). Governor NORMAL (d7=$1543.58/$2783, 55%; fable_ok=true). No mutex contention, no other live locks. queue[] empty; no residual past aging thresholds this tick (oldest R-rb-7-X8-residual at 2.93d, below t1_promote_days=3).
 ## 2026-09-01T13:04:05Z — 13:03Z tick — M22 spine resumed: m22-s4 + m22-s5 launched (fan-out)
 Native tick rid=mr-sup-native-20260901T130036Z-1905452-28089 (13:00Z cron). Gate 0/1: no live
 locks, no chain mutex held, HOLD-NONE, no resident-session collision, both repos fetched clean,
@@ -2634,12 +2642,3 @@ Merged: gh pr merge 400 --squash --delete-branch -> 86a4311. Fast-forwarded loca
 Residual R-rb-2-X9 closed via mr-gates residuals close --slice rb-26 --pr 400 (ledger entry now status:closed, closed_by_pr:400). Sibling R-rb-3-X9 remains targeted at rb-27 (untouched by this slice, per DEFER X8).
 
 Master CI post-merge (run 33460252198) was still in_progress at record time after ~2min of polling — did not sit blocking further per doctrine (no dedicated post-merge-master watcher exists; prior master CI (rb-25 merge) was green, and both rb-26 PR checks were SUCCESS pre-merge). No stop condition, no BLOCKER. Ledger row written (mr-sup-native-20260901T015245Z-1043763-15185, outcome=merged, model=opus, orch=CLEAN, gating=CLEAN, ci=success). Governor NORMAL (d7=$1266.13/2783=45.5%, fable d7=$445.21/2298=19.4%, fable_ok=true). Standing down without a composite launch this tick (single-action discipline; next tick can re-derive eligibility fresh and pick up PLAN/queue/residual work).
-## 2026-09-01T01:34:26Z — 01:33Z tick — rb-26 PR#400 delegated to mr-ci-watch
-rb-26 run finished rc=0, mr-gates verify CLEAN (6/6 met, no seed/evidence drift). Opened PR#400 (mdrewt/monster-realm), state OPEN/MERGEABLE, mergeStateStatus UNSTABLE (ci+e2e still pending). Reaped the stale per-run lock (session_leader 875516 dead) and delegated CI-wait to mr-ci-watch (pid 1035770, detached) rather than polling inline — the event bridge will fire the merge tick when checks conclude. No other live locks/mutex; queue unchanged [rb-27,rb-28,rb-29,rb-30].
-## 2026-08-31T23:02:56Z — rb-31 promoted (residual R-rb-4-X12, aging t1) — queue-add deferred (cap)
-Native tick mr-sup-native-20260831T230256Z-865174-4706 (23:00Z). Gate-0/1: clean — no live per-run locks, no chain mutex, HOLD-NONE, no .done awaiting merge, no session collision (recent writes were mechanical: codegraph daemon, situation cache, heartbeat). Harness/project both in sync with origin, no open PRs, master CI green (11cac7e, ci+e2e success).
-
-Gate 3: residuals list --unclaimed showed R-rb-4-X12 (source rb-4, disclosed 2026-08-28T18:54:06Z) at age 3.17d, past t1_promote_days=3 with no promotion — aging rule outranks new PLAN §9 work. Ran mr-gates residuals promote --id R-rb-4-X12 -> appended rb-31 to specs/monster-realm-v2/M-residual-backlog.spec.md. Shipped as doc-only chore PR mdrewt/claude-harness#78, squash-merged, branch deleted, main fast-forwarded to 5c3c17e.
-
-mr-record queue-add for rb-31 refused: queue[] is at its 5-item cap (rb-26, rb-27, rb-28, rb-29, rb-30) with none yet consumed this cycle. Left rb-31 unqueued (correctly excluded from future --unclaimed listings via promoted_slice=rb-31); a later tick will queue-add it once queue-remove frees a slot via the launch fast path. No other action taken this tick (residual aging outranks the queue/full-derivation checks, so no launch attempted). Also swept 2 stale local-only branches (chore/residual-promote-20260831T120140Z, -160217Z) left over from earlier ticks' squash-merged PRs (#76/#77 content, confirmed already in origin/main history) — force-deleted, no remote impact.
-
