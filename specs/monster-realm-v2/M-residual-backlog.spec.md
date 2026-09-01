@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-32 — WHEN an eval ends the harness process by a route that never emits `'exit'` (from rb-5 X9, deferred 2026-08-29)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-5 · residual: R-rb-5-X9
+
+Deferred with reason: Not closable in-process, and the only in-process fix (running each eval in
+
+EARS: WHEN an eval ends the harness process by a route that never emits `'exit'`
+Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
 ### rb-31 — WHEN an alias of Identity is declared OUTSIDE the scanned input set (`game-core` carries a (from rb-4 X12, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-4 · residual: R-rb-4-X12
