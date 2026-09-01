@@ -8,28 +8,20 @@
  },
  "inflight": [
   {
-   "slice": "m22-s4",
+   "effort": "xhigh",
    "launched_utc": "2026-09-01T15:02:01Z",
+   "leader_pid": 2171901,
    "model": "fable",
-   "effort": "xhigh",
-   "tier": "hard",
-   "leader_pid": 2171901
-  },
-  {
-   "slice": "m22-s5",
-   "launched_utc": "2026-09-01T15:02:09Z",
-   "model": "fable",
-   "effort": "xhigh",
-   "tier": "hard",
-   "leader_pid": 2172304
+   "slice": "m22-s4",
+   "tier": "hard"
   }
  ],
- "last_tick_utc": "2026-09-01T12:25:56Z",
+ "last_tick_utc": "2026-09-01T16:36:47Z",
  "live_watchers": [],
  "master": {
-  "ci": "queued",
+  "ci": "failure-rerun-triggered-33526353724",
   "nightly": "in_progress",
-  "sha": "87f35e723921ada8ea884d38fb3364238fa86d17"
+  "sha": "96cf4bb303949936982cf99a27f09938e86917b5"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -44,13 +36,14 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "15:02Z tick: m22-s4+m22-s5 rate-limit crash (five_hour, resetsAt 15:00Z) resumed same tick post-reset; no new merges/parks.",
+ "notes": "16:36Z tick: master CI red on m22-s5 merge (96cf4bb) -- single e2e ranked-forfeit.spec.ts RL-18 120s timeout, diff disjoint from PvP/forfeit code, matches 5x prior chronic-flake signature (11r-i/m20e/14r-a/m22-s1/rb-16). Reran failed job only (gh run rerun 33526353724 --failed), no PR to mr-ci-watch (master-push run) -- next tick re-verifies live. m22-s4 still live (leader 2171901, ~89min). Decision event m22-s3-prv1-8 (issue #403, operator chose Option B) NOT yet consumed -- one-mutation budget spent on the CI diagnostic; issue stays open until a follow-up slice actually implements the answer.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [],
+ "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
   "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
@@ -66,7 +59,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T122556Z-1871649",
- "updated_utc": "2026-09-01T12:31:00Z",
- "rate_limit_armed_by": "wrapper"
+ "updated_by": "mr-sup-native-20260901T152543Z-2264245",
+ "updated_utc": "2026-09-01T15:33:45Z"
 }
