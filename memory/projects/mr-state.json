@@ -1,13 +1,24 @@
 {
- "adr_next_free": 223,
+ "adr_next_free": 224,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "7e766e0"
+  "sha": "74a5bc8"
  },
- "inflight": [],
- "last_tick_utc": "2026-08-31T20:00:13Z",
+ "inflight": [
+  {
+   "effort": "high",
+   "model": "opus",
+   "repo": "project",
+   "run_id": "mr-spawn-20260901T000218Z-875426",
+   "session_leader": 875516,
+   "slice": "rb-26",
+   "started_utc": "2026-09-01T00:02:22Z",
+   "tier": "routine"
+  }
+ ],
+ "last_tick_utc": "2026-09-01T00:00:10Z",
  "live_watchers": [],
  "master": {
   "ci": "green",
@@ -27,21 +38,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "23:00Z tick: promoted R-rb-4-X12->rb-31 via chore PR #78 (harness main now 5c3c17e); queue-add deferred, queue[] at cap 5 (rb-26..rb-30) unchanged",
+ "notes": "00:00Z tick: committed 23:00Z tick's uncommitted catch-up record (rb-31 promotion), then launched rb-26 (residual R-rb-2-X9, prose+ADR-0223 fold with rb-27) via fast-path queue. queue now [rb-27,rb-28,rb-29,rb-30]. rb-31 still unqueued (cap deferred, a future tick queues it once a slot frees).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-08-31T12:01:30Z",
-   "derived_from_master_sha": "efdae74dd7ffaa1eeb89f77b3b12561c280d051a",
-   "reason": "promoted residual R-rb-2-X9",
-   "slice": "rb-26",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-08-31T16:02:05Z",
@@ -90,6 +93,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260831T200013Z-825533",
- "updated_utc": "2026-08-31T20:02:00Z"
+ "updated_by": "mr-sup-native-20260901T000010Z-873315",
+ "updated_utc": "2026-09-01T00:05:00Z"
 }
