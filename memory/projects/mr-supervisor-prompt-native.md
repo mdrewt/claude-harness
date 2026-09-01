@@ -27,35 +27,46 @@ The LIVE SITUATION bundle computes `budget.state` from the ledger (weekly calibr
 - **HARD-STOP** (>97%) → the wrapper stands down before spawning you; if you see this state mid-run, finish records and exit.
 - **UNKNOWN** (budget uncomputable) → proceed but record a BLOCKER: the governor is blind and needs repair.
 
-## Work-selection scope (operator directive 2026-09-01 — Drew)
+## Work-selection scope (operator directive 2026-09-01 — Drew; ADR-0224 supersedes ADR-0010)
 
-**Real game-feature work outranks eval/gate-tooling hardening.** Measured 2026-08-28→2026-09-01: the
-`rb-*` residual-backlog chain (`M-residual-backlog.spec.md`, `mr-gates residuals`) ran 20+ consecutive
-slices (rb-2 through rb-32) that were **entirely** self-referential findings about the eval scripts
-themselves (`evals/*.eval.mjs` false-negatives, scanner parsing gaps, gate-script blind spots) — each fix
-disclosing 1-4 *new* residuals about the fix, with **zero** player-visible game content or mechanics
-landing in that window. That is the failure mode this section closes; it is not a rejection of the review
-process or of ADR-0010 proof-of-teeth in general, only of its unbounded self-referential tail.
+**The bespoke `evals/*.eval.mjs` scanner-script gate architecture is RETIRED, not merely deprioritized.**
+Measured 2026-08-28→2026-09-01: the `rb-*` residual-backlog chain (`M-residual-backlog.spec.md`,
+`mr-gates residuals`) ran 20+ consecutive slices (rb-2 through rb-32) that were **entirely**
+self-referential findings about the eval scripts themselves (`evals/*.eval.mjs` false-negatives, scanner
+parsing gaps, gate-script blind spots) — each fix disclosing 1-4 *new* residuals about the fix, with
+**zero** player-visible game content or mechanics landing in that window. Drew's call (2026-09-01,
+overriding this section's earlier softer framing): the scanner-script *category* was the mistake, not
+just its unbounded tail — string/regex-matching over stripped source to infer Rust/TS invariants is a
+losing game with or without aging discipline. ADR-0010 (falsifiable-gates / proof-of-teeth) is
+**superseded** by `docs/adr/0224-retire-scanner-script-gates.md`: the underlying idea that a check should
+be proven to actually reject a bad input survives (that's just TDD red-green), but its vehicle changes.
 
-- **No new `evals/*.eval.mjs` files, and no new detector/pattern logic appended to an existing one, as a
-  slice's actual deliverable.** A game-feature slice still updates whatever its own spec's proof-of-teeth
-  legitimately requires (e.g. a new table needs a schema-snapshot row, a new reducer needs its
-  security-eval coverage) — that is incidental to shipping the feature, never the goal in itself. Do not
-  chase collateral gate-hardening for its own sake.
+- **No new `evals/*.eval.mjs` files, ever, full stop** — not as a slice's primary deliverable, not as
+  incidental proof-of-teeth for a new table/reducer either. Where a mechanical check is genuinely needed,
+  write it as an ordinary Rust `#[test]` or TS `vitest` test, in the same crate/module the code lives in,
+  using the real compiler/type system — not a standalone script re-deriving Rust/TS semantics via string
+  matching over stripped source.
+- **Existing `evals/*.eval.mjs` files are NOT deleted wholesale** — they keep running and gating CI as-is;
+  ripping them out ungated would silently drop coverage (several encode real security/privacy invariants:
+  `[R/identity-ctor]`, `[G6]` schema-visibility, `guest-claim-integrity`). **Migration is opportunistic**:
+  when a slice or residual touches code adjacent to an eval, port that specific invariant into a real test
+  in the appropriate crate/module, then delete the corresponding eval (or the now-redundant portion of
+  it). Never patch the scanner further to chase a new blind spot — that "fix forward" reflex is exactly
+  what produced the unbounded rb-* tail.
 - **At gate 3, before promoting or launching ANY residual, classify it:** read the residual's `touches:`
-  (or, when it reads `(inherit from source slice — REVIEW)`, its `reason`/`title` text) and decide whether
-  the fix is confined to `evals/**` with no `server-module/src/**`, `client/src/**`, `content/**`, or other
-  game-visible-behavior component. **Eval-tooling-only residuals do NOT get promoted via the normal aging
-  fast path** — disposition instead: `mr-gates residuals disposition --id R-... --as wontfix --reason
-  "operator-directive-2026-09-01: eval/gate-tooling hardening deprioritized, redirect to game-feature
-  work"` (MED/LOW severity clears this bar yourself; HIGH/CRITICAL still needs `mr-ask-drew`, same as any
-  disposition — same rule as gate 3's existing wontfix carve-out). A residual that names a REAL game
-  defect (a11y, security, netcode, economy, content correctness) is **unaffected** by this rule and
-  proceeds normally, even when its slice also happens to touch an eval file while proving the fix.
+  (or, when it reads `(inherit from source slice — REVIEW)`, its `reason`/`title` text). **A residual whose
+  entire scope is an eval script's own scanner correctness is NOT a promotable class anymore** —
+  disposition it `wontfix` instead: `mr-gates residuals disposition --id R-... --as wontfix --reason
+  "operator-directive-2026-09-01 (ADR-0224): scanner-script gates retired, port to a real test when the
+  adjacent code is next touched instead of patching the scanner"` (MED/LOW severity clears this bar
+  yourself; HIGH/CRITICAL still needs `mr-ask-drew`, same as any disposition). A residual that names a REAL
+  game defect (a11y, security, netcode, economy, content correctness) proceeds normally regardless of
+  which file currently encodes the check — the fix is to prove it with an ordinary test, migrating the
+  relevant eval coverage in the same slice where practical.
 - **Once eval-tooling residuals stop dominating gate 3, fall through to PLAN §9 in its normal order** —
   the next unbuilt milestone is real game content and mechanics, not another review generation. Weekly-
-  review / Nth-review-residuals milestones remain valid **when their findings are real game defects**; the
-  review process itself is not retired, only its eval-tooling-only tail.
+  review / Nth-review-residuals milestones remain valid **when their findings are real game defects**,
+  proven with ordinary tests going forward.
 
 ## Offload tools (mechanical work stays out of your token budget — all in `$MEM`)
 - `mr-feedback brief --episode E` — mechanically renders the Disposition Brief skeleton from the ledger; you add ONLY the judgment prose (reasons, manifest, decision-defaulted records).

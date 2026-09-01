@@ -1,7 +1,17 @@
 # 0010. Falsifiable mechanical gates (proof-of-teeth)
-- Status: accepted
+- Status: **superseded 2026-09-01 by [project ADR-0224](../../../projects/monster-realm/docs/adr/0224-retire-scanner-script-gates.md)**
 - Date: 2026-06-24
 - Surfaced by: the M0 red-team review pass
+
+> **2026-09-01 (Drew, operator directive):** the *vehicle* this ADR chose for proof-of-teeth — a bespoke
+> `evals/*.eval.mjs` scanner script per gate, string/regex-matching over stripped source — turned into an
+> unbounded self-referential maintenance spiral (20+ consecutive `rb-*` slices, 2026-08-28→2026-09-01,
+> spent entirely hardening the scanners' own blind spots, zero player-visible content shipped). ADR-0224
+> retires that vehicle: mechanically-checkable invariants become ordinary Rust/TS tests using the real
+> compiler, and whatever isn't test-shaped becomes an explicit review responsibility instead of a CI gate.
+> The underlying idea below — a check that's never proven to reject a bad input is a no-op — is not wrong;
+> it now applies to ordinary tests (plain TDD red-green) rather than to a separate scanner apparatus. Left
+> below verbatim as the historical record; do not cite this ADR to justify a new `evals/*.eval.mjs` file.
 
 ## Context and problem statement
 The harness leans hard on **mechanical enforcement over discipline** (`standards/principles.md`): a long

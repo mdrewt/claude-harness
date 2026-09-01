@@ -1346,8 +1346,8 @@ def cmd_residuals(a, sub):
             "Deferred with reason: %s" % r.get("reason"),
             "",
             "EARS: %s" % r.get("title"),
-            "Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass "
-            "after (ADR-0010).",
+            "Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before "
+            "the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).",
         ]
         MARKER = "<!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->"
         block = "\n".join(sect) + "\n"
