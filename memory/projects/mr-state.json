@@ -1,12 +1,29 @@
 {
- "adr_next_free": 226,
+ "adr_next_free": 228,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "m22-s4",
+   "launched_utc": "2026-09-01T13:04:11Z",
+   "model": "fable",
+   "effort": "xhigh",
+   "tier": "hard",
+   "leader_pid": 1907212
+  },
+  {
+   "slice": "m22-s5",
+   "launched_utc": "2026-09-01T13:04:11Z",
+   "model": "fable",
+   "effort": "xhigh",
+   "tier": "hard",
+   "leader_pid": 1908503
+  }
+ ],
  "last_tick_utc": "2026-09-01T12:25:56Z",
  "live_watchers": [],
  "master": {

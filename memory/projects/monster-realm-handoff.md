@@ -1,4 +1,4 @@
-# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
+# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-09.md, monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
 
 ---
 
@@ -2545,6 +2545,45 @@ refresh owed per build-loop step 10). Red-team scratch /tmp/m22s3-rt + /tmp/chea
 supervisor's optional spot-check (safe to delete). rb11-mut vite orphans still present (known
 harmless). Untracked harness files: the m22-s3 plan + receipts above.
 
+## 2026-09-01T13:04:05Z — 13:03Z tick — M22 spine resumed: m22-s4 + m22-s5 launched (fan-out)
+Native tick rid=mr-sup-native-20260901T130036Z-1905452-28089 (13:00Z cron). Gate 0/1: no live
+locks, no chain mutex held, HOLD-NONE, no resident-session collision, both repos fetched clean,
+master 87f35e7 matches origin (rb-34/PR#405 already merged by the prior 12:25Z tick). Gate 3: no
+open PRs, no wip branches; mr-gates residuals list --unclaimed shows 18 open items, all MED
+severity, max age 1.77d -- none past t1_promote_days=3, so none outrank PLAN sec9 work; queue[]
+empty.
+
+Derivation: M22 (privacy/deletion, ADR-0031) is mid-spine. ADR-0225 (m22-s3, merged today 09:18Z)
+right-sized S3 -- shipped PRV1-4/5/7/19 guards + reaper skeleton (no-op) in accounts.rs, but
+DEFERRED the actual PRV1-6 cascade to a future "S3b" (needs erase/anonymize helpers in ~10 owning
+modules, out of S3's touches under G5 MODULE_WRITE_ISOLATION) and left PRV1-8 (provision_or_touch_
+account reactivation policy) BLOCKED on operator issue #403 (still OPEN, 0 comments). Per ADR-0225
+Consequences: "the S5 fan-out is unblocked (only S3 could ship the predicate)" -- should_reject_
+for_deletion already landed, so S4 (export) and S5 (gameplay gating) are launchable now without
+waiting on S3b or PRV1-8 (S3b's blocked half is the terminal-stamp cascade only; S4/S5 don't stamp
+terminal_at_ms). Chose to fan out both: mr-disjoint m22-s4:server-module/src/privacy.rs vs
+m22-s5:server-module/src/{trading,pvp,guards}.rs -> SAFE, disjoint, no shared registry/enum axis.
+free -g shows 40G available (>>1 full build each). Routed both HARD tier (fable@xhigh) --
+privacy/export and security-authz-guard surfaces both meet the HARD criteria; budget.fable_ok=true,
+fable_d7=602/2298 allowance, well under the 2068 guard.
+
+Launched: m22-s4 (ADR pre-alloc 226, PRV1-11..14) and m22-s5 (ADR pre-alloc 227, PRV1-9/10, delegates
+to accounts::should_reject_for_deletion per ADR-0225's explicit "never re-derive" instruction). Both
+briefs instruct: ADR-0224 retires evals/*.eval.mjs -- write ordinary Rust #[test]s, not new eval
+scripts. mr-gates seed came back criteria=0 SPEC-SECTION-NOT-FOUND for both (the M22 spec lists
+slices as a table row, not a "### S4"/"### S5" heading the auto-seeder parses) -- each brief is
+told to author its own X* acceptance gates manually; not a blocker, just no auto-seed.
+
+NOT launched / deferred: S3b itself (the real cascade + lib.rs resolve_all_live_interactions
+extraction + terminal stamp) stays out because PRV1-8 must land in-or-before whichever slice first
+writes terminal_at_ms:Some (ADR-0225's explicit sequencing constraint), and issue #403 is still
+unanswered -- S3b is not yet buildable. The 8 m22-s3 residuals (R-m22-s3-X11..X18, all describing
+S3b's scope) are correctly left unpromoted; they're exhaust of ADR-0225's own handoff note, not new
+information, and are all well under the promote-aging threshold.
+
+Two live rooted runs at exit: m22-s4 (leader pid 1907212), m22-s5 (leader pid 1908503), both
+pr_repo=mdrewt/monster-realm. No merges, no parks, no BLOCKERs raised this tick (issue #403 already
+open from a prior tick, not reopened). governor state: NORMAL throughout.
 ## 2026-09-01T12:29:30Z — rb-34 MERGED (PR#405 -> 87f35e7)
 Native tick mr-sup-native-20260901T122556Z-1871649 (12:25Z, ci-forced). Gate-0: found the 12:21Z tick's own delegated-CI-wait record (mr-state.json/handoff/handoff-archive + untracked rb-34 plan memo) written but never committed to the harness repo -- same recurring catch-up pattern as prior ticks. Committed it (b7a982b), pushed origin/main. EVENT rb-34.ci.md confirmed PR#405 both checks (ci+e2e) SUCCESS at 12:25:53Z; live re-check matched (mergeStateStatus=CLEAN, mergeable=MERGEABLE). mr-gates verify --slice rb-34: 4/5 met, X5 DEFERred->backlog (blocked on S3b, folds into a future R-m22-s3-X13 slice per rb-34's own buildable DEFER list), FLAGGED only on X1's MANUAL citation (recorded accounts.rs:509-511, live worktree resolves the same content at ~499 -- benign post-doc-edit line drift, not a fraud signal; re-confirmed the substantive claim live: guest_name is the only display-name value accounts.rs writes today, zero TOMBSTONE_* symbol occurrences). mr-audit: orchestration=CLEAN (4 lenses: red-team+reviewer+tester+verifier, models fable/opus/sonnet), gating_advisory=CLEAN (test-file diff is pure addition, 0 removed/modified asserts, 0 skip markers, 0 suppressions). Diff base..head is purely additive: ARCHITECTURE.md (+10) + accounts_tests.rs (+268), matches declared touches exactly. Doc-corpus disposition findings (11 missing_disposition/orphan_disposition rows) are pre-existing gaps across unrelated spec files, corpus-scoped per the tool's own contract, not about this diff -- no action this tick. Merged via gh pr merge --squash --delete-branch (87f35e7, mergedAt 12:28:43Z). Cleaned local worktree .claude/worktrees/rb-34 + branch slice/rb-34 (both local and remote gone); master repo fast-forwarded e321442->87f35e7. mr-gates residuals close --slice rb-34 --pr 405: closed 1 (the promoted-residual source row); R-rb-34-X5 was auto-emitted to the residual sink by mr-gates verify for future aging-based promotion (not queued now -- ages normally). Post-merge master CI run (33507... new sha 87f35e7) was QUEUED at record time; nightly (e321442) separately in_progress -- did not sit blocking on either per doctrine (no dedicated post-merge-master watcher exists). Ledger row appended (outcome=MERGED, model=fable, attempts=1, orch=CLEAN, gating=CLEAN). No composite launch this tick: residuals-unclaimed / queue[] re-derivation deferred to the next tick per one-clean-action discipline after a merge+cleanup sequence this involved; queue[] is currently empty (drained by 11:00Z/10:00Z ticks) so the next tick does the full PLAN§9-or-residuals derivation fresh. Governor NORMAL (d7=$1434.90/2783 eff., fable_d7=$602.14/2298, fable_ok=true). No BLOCKERs, no rate-limit event.
 ## 2026-09-01T12:21:47Z — rb-34 PR#405 — CI in-progress, delegated to mr-ci-watch
@@ -2597,11 +2636,10 @@ Residual R-rb-2-X9 closed via mr-gates residuals close --slice rb-26 --pr 400 (l
 Master CI post-merge (run 33460252198) was still in_progress at record time after ~2min of polling — did not sit blocking further per doctrine (no dedicated post-merge-master watcher exists; prior master CI (rb-25 merge) was green, and both rb-26 PR checks were SUCCESS pre-merge). No stop condition, no BLOCKER. Ledger row written (mr-sup-native-20260901T015245Z-1043763-15185, outcome=merged, model=opus, orch=CLEAN, gating=CLEAN, ci=success). Governor NORMAL (d7=$1266.13/2783=45.5%, fable d7=$445.21/2298=19.4%, fable_ok=true). Standing down without a composite launch this tick (single-action discipline; next tick can re-derive eligibility fresh and pick up PLAN/queue/residual work).
 ## 2026-09-01T01:34:26Z — 01:33Z tick — rb-26 PR#400 delegated to mr-ci-watch
 rb-26 run finished rc=0, mr-gates verify CLEAN (6/6 met, no seed/evidence drift). Opened PR#400 (mdrewt/monster-realm), state OPEN/MERGEABLE, mergeStateStatus UNSTABLE (ci+e2e still pending). Reaped the stale per-run lock (session_leader 875516 dead) and delegated CI-wait to mr-ci-watch (pid 1035770, detached) rather than polling inline — the event bridge will fire the merge tick when checks conclude. No other live locks/mutex; queue unchanged [rb-27,rb-28,rb-29,rb-30].
-## 2026-09-01T00:02:45Z — rb-26 LAUNCHED (fast-path queue, residual X9 from rb-2)
-Native tick mr-sup-native-20260901T000010Z-873315 (00:00Z). Gate-0: found the 23:00Z tick's own state/handoff record (rb-31 promotion, PR#78 already squash-merged live) written but never committed -- committed as catch-up (74a5bc8) before taking this tick's own action, same recovery pattern as prior 22:02Z/02:01Z/etc catch-ups. Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE (queued_events=0), no resident-session collision (find -mmin -6 empty both repos beyond codegraph daemon writes). Both repos fetched and in sync with origin; master CI green (11cac7e, ci+e2e success), no open PRs either repo, nothing inflight/awaiting_merge/parked. Gate-3: mr-gates residuals list --unclaimed showed 31 open (cap 12, observe-only), oldest at 2.96d (R-rb-5-X9/X10) -- under t1_promote_days=3, so residual aging does not outrank the queue fast-path this tick. queue[] held [rb-26,rb-27,rb-28,rb-29,rb-30]; re-verified rb-26 live: spec section exists at M-residual-backlog.spec.md:69 (from rb-2 X9, deferred 2026-08-28), no after:-dep blocking (source rb-2 already merged as PR#378), no existing slice/rb-26 branch or PR in either repo -- valid. Derived full target/touches from rb-2's own PR#378 body (the ledger's truncated 'touches: inherit from source slice' pointer): four stale-prose consumers describing the retired typeof-inference policy as live (evals/rekey-contract-surface.eval.mjs, server-module/src/accounts_tests.rs, docs/adr/0207-*, docs/adr/0179-*) plus reserving ADR-0223 for rb-2's own policy-discriminator decision -- per the 2026-08-30 handoff note (~L712), sibling residual R-rb-3-X9 (queued separately as rb-27) explicitly asks to FOLD into this same ADR, so rb-26's brief instructs writing ADR-0223 broad enough for rb-27 to Amend rather than mint a competing number. Tier=routine (prose/ADR-only, no schema/reducer/netcode/security/M20/M25 surface, no prior attempt) -> opus@high. adr_reserved=223 (adr_next_free was 223). mr-spawn LAUNCHED cleanly: leader=875516, claude_pid=875519, rid=mr-spawn-20260901T000218Z-875426, repo=project (mdrewt/monster-realm), base=master; verified detachment (PPID=1, own SID/PGID) and model class (opus/high) via ps. GATES-SEEDED criteria=0 (this promoted-residual spec section carries EARS/deferred prose, not a bulleted SHALL list -- expected for this class of slice; the acceptance gates for rb-26 will be the proof-of-teeth criterion itself). queue-removed rb-26; queue[] now [rb-27,rb-28,rb-29,rb-30]. Governor NORMAL (d7=$1237.85/2783 eff., fable_d7=$445.21/2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down after this single launch action.
 ## 2026-08-31T23:02:56Z — rb-31 promoted (residual R-rb-4-X12, aging t1) — queue-add deferred (cap)
 Native tick mr-sup-native-20260831T230256Z-865174-4706 (23:00Z). Gate-0/1: clean — no live per-run locks, no chain mutex, HOLD-NONE, no .done awaiting merge, no session collision (recent writes were mechanical: codegraph daemon, situation cache, heartbeat). Harness/project both in sync with origin, no open PRs, master CI green (11cac7e, ci+e2e success).
 
 Gate 3: residuals list --unclaimed showed R-rb-4-X12 (source rb-4, disclosed 2026-08-28T18:54:06Z) at age 3.17d, past t1_promote_days=3 with no promotion — aging rule outranks new PLAN §9 work. Ran mr-gates residuals promote --id R-rb-4-X12 -> appended rb-31 to specs/monster-realm-v2/M-residual-backlog.spec.md. Shipped as doc-only chore PR mdrewt/claude-harness#78, squash-merged, branch deleted, main fast-forwarded to 5c3c17e.
 
 mr-record queue-add for rb-31 refused: queue[] is at its 5-item cap (rb-26, rb-27, rb-28, rb-29, rb-30) with none yet consumed this cycle. Left rb-31 unqueued (correctly excluded from future --unclaimed listings via promoted_slice=rb-31); a later tick will queue-add it once queue-remove frees a slot via the launch fast path. No other action taken this tick (residual aging outranks the queue/full-derivation checks, so no launch attempted). Also swept 2 stale local-only branches (chore/residual-promote-20260831T120140Z, -160217Z) left over from earlier ticks' squash-merged PRs (#76/#77 content, confirmed already in origin/main history) — force-deleted, no remote impact.
+
