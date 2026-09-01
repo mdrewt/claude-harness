@@ -7,10 +7,10 @@
   "sha": "74a5bc8"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-01T01:47:27Z",
+ "last_tick_utc": "2026-09-01T02:00:12Z",
  "live_watchers": [],
  "master": {
-  "ci": "in_progress-post-merge (pre-merge PR checks green; last known master CI green pre-rb-26)",
+  "ci": "green",
   "nightly": "in_progress",
   "sha": "86a4311444964a1021172b528ebc7ef2cd5081b9"
  },
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "01:47Z tick: EVENT rb-26.ci.md (PR#400 green). Live-reverified mergeStateStatus=CLEAN, mr-gates verify CLEAN 6/6, mr-audit orchestration/gating_advisory/acceptance all CLEAN. Merged PR#400 (squash+delete-branch) -> 86a4311. Fast-forwarded local master, removed worktree+branches. Closed residual R-rb-2-X9 against PR#400 (mr-gates residuals close). Master CI (run 33460252198) still in_progress at record time -- not blocked on inline (no dedicated post-merge watcher exists; will self-report if red on next tick). queue unchanged [rb-27,rb-28,rb-29,rb-30]. No launch this tick (single-action discipline).",
+ "notes": "02:00Z tick: committed 01:47Z tick's uncommitted rb-26/PR#400-merge record (catch-up, f93fdc0) plus 3 untracked rb-26 scratch artifacts. Gate-3: residual aging outranked queue -- promoted R-rb-5-X9 (eval-harness swallowed-FAIL risk) -> rb-32 via doc-only chore PR#79 (squash+auto, merged 596673a). queue now [rb-27,rb-28,rb-29,rb-30,rb-32]. Sibling R-rb-5-X10 left unpromoted (lower severity, self-describing). No launch this tick (single-action discipline: catch-up + promote consumed it). Handoff rotation WARN: 47 entries with unparseable headers pinned live -- flagging for a future dedicated look, not actioned.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -65,6 +65,14 @@
    "reason": "promoted residual R-rb-4-X11",
    "slice": "rb-30",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+  },
+  {
+   "added_by": "n/a",
+   "added_utc": "2026-09-01T02:02:38Z",
+   "derived_from_master_sha": "86a4311444964a1021172b528ebc7ef2cd5081b9",
+   "reason": "promoted residual R-rb-5-X9",
+   "slice": "rb-32",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_resets_at": null,
@@ -82,6 +90,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T014727Z-1038903",
- "updated_utc": "2026-09-01T01:53:30Z"
+ "updated_by": "mr-sup-native-20260901T020012Z-1046140",
+ "updated_utc": "2026-09-01T02:03:40Z"
 }
