@@ -26,9 +26,15 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
-### rb-33 — accounts_tests.rs:2057 g2_reducer_name_set_is_pinned still carries the exact-5 Rust pin an (from rb-6 R-rb-6-X1, deferred 2026-08-29)
+### rb-33 — WONTFIX (stale — fix already shipped) — accounts_tests.rs:2057 g2_reducer_name_set_is_pinned still carried the exact-5 Rust pin (from rb-6 R-rb-6-X1, deferred 2026-08-29)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-6 · residual: R-rb-6-R-rb-6-X1
+
+**Status: WONTFIX, dispositioned 2026-09-01T06:00Z.** rb-24 (PR#398, 2026-08-31) already added
+`account_deletion_reaper` to `g2_reducer_name_set_is_pinned`'s expected vector
+(`accounts_tests.rs:2104`), and `accounts.rs:707` already defines the reducer — the premise this
+residual was about to hard-RED on had already landed by the time it reached the promote queue.
+Nothing to build; left in place per doctrine as the disposition record, not an open item.
 
 Deferred with reason: rb-6 fixed the JS half only: evals/guest-claim-integrity.eval.mjs now admits a PLANNED account_deletion_reaper. The Rust twin at server-module/src/accounts_tests.rs:2057 asserts found == a hardcoded 5-name concat! vector and panics under 'just test' the moment S3 declares the reducer. accounts_tests.rs is OUTSIDE rb-6's declared touches (it is the co-located twin of accounts.rs, not of the declare
 
