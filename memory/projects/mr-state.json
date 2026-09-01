@@ -10,7 +10,7 @@
  "last_tick_utc": "2026-09-01T02:00:12Z",
  "live_watchers": [],
  "master": {
-  "ci": "green",
+  "ci": "success",
   "nightly": "in_progress",
   "sha": "86a4311444964a1021172b528ebc7ef2cd5081b9"
  },
@@ -27,21 +27,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "02:00Z tick: committed 01:47Z tick's uncommitted rb-26/PR#400-merge record (catch-up, f93fdc0) plus 3 untracked rb-26 scratch artifacts. Gate-3: residual aging outranked queue -- promoted R-rb-5-X9 (eval-harness swallowed-FAIL risk) -> rb-32 via doc-only chore PR#79 (squash+auto, merged 596673a). queue now [rb-27,rb-28,rb-29,rb-30,rb-32]. Sibling R-rb-5-X10 left unpromoted (lower severity, self-describing). No launch this tick (single-action discipline: catch-up + promote consumed it). Handoff rotation WARN: 47 entries with unparseable headers pinned live -- flagging for a future dedicated look, not actioned.",
+ "notes": "03:00Z tick: gate-3 fast-path found queue[0]=rb-27 invalid (rb-26 review R-rb-26-X8-rb-3-x9-fg72c showed R-rb-3-X9 already documented in ADR-0208 D2). Closed both residuals (mr-gates residuals close --slice rb-27 --force) and queue-removed rb-27. queue now [rb-28,rb-29,rb-30,rb-32]. No launch this tick (single-action discipline). R-rb-5-X10 remains unpromoted past t1 (3.09d) but was correctly deferred to the fast path per precedent -- a future tick will promote it once queue drains.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-08-31T16:02:05Z",
-   "derived_from_master_sha": "5962b7a7efb2f58535ad7d89cf897b43455f296d",
-   "reason": "promoted residual R-rb-3-X9",
-   "slice": "rb-27",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-08-31T20:01:16Z",
