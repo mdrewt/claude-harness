@@ -46,13 +46,36 @@ be proven to actually reject a bad input survives (that's just TDD red-green), b
   write it as an ordinary Rust `#[test]` or TS `vitest` test, in the same crate/module the code lives in,
   using the real compiler/type system — not a standalone script re-deriving Rust/TS semantics via string
   matching over stripped source.
-- **Existing `evals/*.eval.mjs` files are NOT deleted wholesale** — they keep running and gating CI as-is;
-  ripping them out ungated would silently drop coverage (several encode real security/privacy invariants:
-  `[R/identity-ctor]`, `[G6]` schema-visibility, `guest-claim-integrity`). **Migration is opportunistic**:
-  when a slice or residual touches code adjacent to an eval, port that specific invariant into a real test
-  in the appropriate crate/module, then delete the corresponding eval (or the now-redundant portion of
-  it). Never patch the scanner further to chase a new blind spot — that "fix forward" reflex is exactly
-  what produced the unbounded rb-* tail.
+- **Existing `evals/*.eval.mjs` files are NOT deleted wholesale, today** — they keep running and gating CI
+  as-is; ripping them out ungated would silently drop coverage (several encode real security/privacy
+  invariants: `[R/identity-ctor]`, `[G6]` schema-visibility, `guest-claim-integrity`). **Migration is
+  opportunistic and MANDATORY-ON-TOUCH**: when a slice or residual touches code adjacent to an eval, port
+  that specific invariant into a real test in the appropriate crate/module, **then delete the corresponding
+  eval (or the now-redundant portion of it) in the SAME slice** — a migrated invariant left running
+  alongside its replacement test is dead weight, not a safety margin; leaving the old eval in place "just
+  in case" is itself a residual-worthy defect from this point forward. Never patch the scanner further to
+  chase a new blind spot — that "fix forward" reflex is exactly what produced the unbounded rb-* tail.
+- **Proof-of-teeth in moderation (Drew, 2026-09-01 — this governs the replacement, not just the retired
+  vehicle):** the goal is a fun, playable, reliable, well-designed game — not maximum test/gate coverage.
+  Apply proof-of-teeth **once per invariant, non-recursively**: write the test, watch it fail on the real
+  defect it targets, watch it pass after the fix. Done. **Never spawn a follow-up task whose job is
+  auditing whether that test itself has a blind spot** — that is the exact recursion (checks that exist
+  only to check other checks) that produced both the rb-* eval-tooling spiral and patterns like the
+  "nightly decay ratchet" (a bare numeric floor whose sole job was proving other tests weren't deleted —
+  also retired, not just its `evals/ci-gate-wiring.eval.mjs` implementation). A test earns its place only
+  by protecting something that actually matters — core gameplay correctness, player-data security/privacy,
+  data integrity, netcode determinism — not by covering a theoretical edge case or hardening against a
+  hypothetical future refactor. When genuinely uncertain whether a check is worth adding, default to **not
+  adding one**; ship the feature and let real review (multi-lens reviews, red-team, security audits) catch
+  what a mechanical gate would not, rather than manufacturing a new gate to resolve the uncertainty.
+- **Definition of done for the full retirement (long-term, not a task to schedule now):** once every file
+  under `evals/` has been migrated or deleted, delete the `evals/` directory itself, `evals/run.mjs`, and
+  any remaining CI/justfile wiring that references it (`just eval` and friends), then sweep remaining
+  **live** docs (`ARCHITECTURE.md`, `PLAN.md`, this file, READMEs) for lingering operational references —
+  historical ADRs keep their prose verbatim as the record of what was decided and why, never rewritten.
+  No dedicated "finish the migration" milestone should be created to chase this; it falls out naturally
+  once the last opportunistic migration lands. Do not treat an incomplete migration as a residual in its
+  own right.
 - **At gate 3, before promoting or launching ANY residual, classify it:** read the residual's `touches:`
   (or, when it reads `(inherit from source slice — REVIEW)`, its `reason`/`title` text). **A residual whose
   entire scope is an eval script's own scanner correctness is NOT a promotable class anymore** —
