@@ -5146,3 +5146,16 @@ Merged: gh pr merge 398 --squash --delete-branch -> master@5962b7a. Post-merge m
 
 Queue: rb-25, rb-26 remain (per prior tick notes) -- not re-verified this tick, next tick's fast path job. No launch this tick (merge was the one mutating action; standard doctrine allows merge->launch composite but budget/time already spent on the merge+adjudication; leaving launch to next tick with a clean mutex).
 
+## 2026-08-31T16:03:34Z — Native tick 16:00Z — recovered orphaned rb-24-merge record + promoted R-rb-3-X9 -> rb-27, no launch
+Native tick mr-sup-native-20260831T160013Z-650239 (16:00Z).
+
+Gate-0: found the previous tick's (mr-sup-native-20260831T151542Z-542497, 15:15Z) full rb-24 merge record (mr-state.json + handoff + handoff-archive + rb-24 gate/proof artifacts) fully written but never committed to the harness repo — same failure pattern as the 02:01Z incident. Verified the merge itself was fully real and complete (PR#398 squash-merged to master@5962b7a per gh, ledger MERGED row present, master CI green) before treating the uncommitted files as safe recording exhaust, not in-progress work. Committed them as-is (db390eb).
+
+Gate-1/2: no live per-run locks, no chain mutex, no operator hold, no .done awaiting merge, no resident IDE session or human file writes in the last 6 min in either repo. Both repos fetched clean.
+
+Gate-3: master CI green, no open/parked slices, no open PRs either repo. Ran `mr-gates residuals list --unclaimed --json` first per the aging rule: 24 open, two tied-oldest at 3.07d (R-rb-3-X9, R-rb-3-X10) past t1_promote_days=3 — outranks the queued rb-25/rb-26 fast path. Promoted R-rb-3-X9 -> `### rb-27` in M-residual-backlog.spec.md (mr-gates residuals promote), queued it (mr-record queue-add). Shipped as doc-only chore PR mdrewt/claude-harness#74, squash-merged clean.
+
+Push reconciliation: local harness `main` had diverged from `origin/main` after the chore PR's squash-merge (both contained the same db390eb content, no ancestor relationship) — verified `git diff db390eb origin/main` showed only the expected residual-promote delta (no data loss), then used `git merge -X theirs origin/main` (not a hard reset) to reconcile; verified zero diff post-merge before pushing. Harness main now in sync with origin, clean working tree.
+
+No launch this tick (the residual-promote + orphaned-record recovery were the mutating actions). Queue now holds rb-25 (X10), rb-26 (X9), rb-27 (X9, rb-3) for the next tick's fast path — R-rb-3-X10 (same age, tied) remains unpromoted for a subsequent tick. Governor NORMAL (d7=$1167.31/2783, fable_d7=$445.21/2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down.
+
