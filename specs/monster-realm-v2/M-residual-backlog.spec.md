@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-33 — accounts_tests.rs:2057 g2_reducer_name_set_is_pinned still carries the exact-5 Rust pin an (from rb-6 R-rb-6-X1, deferred 2026-08-29)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-6 · residual: R-rb-6-R-rb-6-X1
+
+Deferred with reason: rb-6 fixed the JS half only: evals/guest-claim-integrity.eval.mjs now admits a PLANNED account_deletion_reaper. The Rust twin at server-module/src/accounts_tests.rs:2057 asserts found == a hardcoded 5-name concat! vector and panics under 'just test' the moment S3 declares the reducer. accounts_tests.rs is OUTSIDE rb-6's declared touches (it is the co-located twin of accounts.rs, not of the declare
+
+EARS: accounts_tests.rs:2057 g2_reducer_name_set_is_pinned still carries the exact-5 Rust pin and will hard-RED when M22 S3 ships
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-32 — WHEN an eval ends the harness process by a route that never emits `'exit'` (from rb-5 X9, deferred 2026-08-29)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-5 · residual: R-rb-5-X9
