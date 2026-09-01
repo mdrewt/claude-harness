@@ -1,29 +1,18 @@
 {
  "adr_next_free": 226,
- "awaiting_merge": [
-  {
-   "checks": "ci+e2e IN_PROGRESS as of 2026-09-01T12:19Z",
-   "mergeStateStatus": "UNSTABLE",
-   "pr": 405,
-   "repo": "mdrewt/monster-realm",
-   "slice": "rb-34",
-   "watcher_pid": 1869729
-  }
- ],
+ "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-01T12:21:04Z",
- "live_watchers": [
-  "mr-ci-watch 405 rb-34 (pid 1869729)"
- ],
+ "last_tick_utc": "2026-09-01T12:25:56Z",
+ "live_watchers": [],
  "master": {
-  "ci": "success",
-  "nightly": "success",
-  "sha": "e32144271470eb83476c8655fd7b572807066b57"
+  "ci": "queued",
+  "nightly": "in_progress",
+  "sha": "87f35e723921ada8ea884d38fb3364238fa86d17"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -38,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "12:21Z tick: gate-0 clean (rb-34 per-run lock dead+done, no chain mutex, HOLD-NONE). rb-34 run finished rc=0 (fable/xhigh, 1 attempt) -> PR#405 open vs master, mergeStateStatus=UNSTABLE, ci+e2e IN_PROGRESS at live re-check (12:19Z start). Delegated CI-wait to mr-ci-watch (pid 1869729 confirmed live) per doctrine instead of polling; moved rb-34 inflight->awaiting_merge. No launch this tick (single action = delegate).",
+ "notes": "12:25Z tick (ci-forced): gate-0 committed the 12:21Z tick's uncommitted delegated-CI-wait record (b7a982b, pushed). EVENT confirmed PR#405 (rb-34) both checks green; live re-check matched (CLEAN/MERGEABLE). mr-gates verify 4/5 met, X5 DEFERred->backlog (blocked on S3b); FLAGGED only on X1's benign citation line-drift, substantive claim reconfirmed live. mr-audit orchestration=CLEAN gating_advisory=CLEAN, diff purely additive (ARCHITECTURE.md+accounts_tests.rs, matches touches). Merged --squash --delete-branch -> 87f35e7 (12:28:43Z). Cleaned worktree+branch; master repo ff'd to 87f35e7. mr-gates residuals close: 1 closed (source promotion row); R-rb-34-X5 auto-emitted to sink for future aging-based promotion. Post-merge master CI queued at record time (not blocked on -- no dedicated post-merge watcher exists per doctrine). Ledger+handoff recorded. No composite launch this tick -- queue[] empty, next tick does full PLAN\u00a79/residuals derivation fresh.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -60,6 +49,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T122104Z-1868676",
- "updated_utc": "2026-09-01T12:21:47Z"
+ "updated_by": "mr-sup-native-20260901T122556Z-1871649",
+ "updated_utc": "2026-09-01T12:31:00Z"
 }
