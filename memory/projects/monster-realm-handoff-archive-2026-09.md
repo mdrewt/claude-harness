@@ -193,3 +193,62 @@ PR#408 squash-merged to master (5fd93e4). ADR-0228: delegated erase/anonymize ca
 ## 2026-09-02T00:03:37Z — 00:03Z native tick — master CI confirmed green (m22-s3b rerun), launched m22-s6
 Gate-0: no live per-run locks/chain mutex; done_files showed the stale mr_pass_m22-s3b.done, already fully reconciled and merged by the 21:29Z tick (PR#408 -> 5fd93e4) and re-verified by the 22:00Z tick's diagnostic rerun. This tick: live-reverified master run 33561683660 (headSha 5fd93e4, m22-s3b) -- conclusion is now success (the rerun of the flaky wallet-balance.spec.ts:911 11r-e e2e job completed green), confirming the chronic-flake classification from the 22:00Z tick was correct; no code-level regression signature in the m22-s3b diff. Gate-1: both repos fetched clean, no drift, remotes correct. Gate-2 active-session probe: clean (no new/growing resident IDE claude pid; no non-mechanical file writes in the last ~6min; the resident esbuild watchers found are multi-day stale, from an old rb-11 worktree, not a live human session). Gate-3: no open/parked PRs in either repo; mr-gates residuals list --unclaimed shows 23 open, none past t1_promote_days=3 or t2_stale_days=14 (oldest is rb-18 at 2.22d) -- none outrank new PLAN Sec.9 work; queue[] empty. Derived the next unfinished M22 slice from the spec's dependency spine (Sec.7.2): S0/S1/S2/S3(+S3b amendment)/S4/S5 all merged; S6||S7 now eligible. Launched S6 (deletion-completeness gate, PRV1-15/PRV1-16). **REDIRECTED per ADR-0224** (this session's own 2026-09-01 operator directive retiring the evals/*.eval.mjs scanner-script architecture): spec Sec.7.2's S6 row literally mandates two new eval files (evals/deletion-completeness.eval.mjs, evals/pending-deletion-gate.eval.mjs) plus an account-privacy.eval.mjs seed-set extension -- squarely the now-forbidden pattern. decision-defaulted:S6-mechanism=ordinary-Rust-test (a reversible implementation-vehicle choice; ADR-0224's own text names '#[test]... using the real compiler/type system' as the replacement, so this isn't a fresh judgment call, just applying the standing directive) -- redirected touches to a new server-module/tests/deletion_completeness.rs proving PRV1-15 (missing manifest entry fails CI) and PRV1-16 (cascade call removed/unreachable fails CI) as real integration tests reusing the existing DATA_LIFECYCLE_MANIFEST/REKEY_MANIFEST introspection from S0-S2, never re-deriving scanning logic. Dropped the account-privacy.eval.mjs seed-set sub-scope (no longer applicable once the completeness check is a real test) -- noted for the PR body's touches-delta. Proof-of-teeth once per invariant only (measured-red-then-green on a real fixture), no follow-up audit-the-test task, per the 2026-09-01 'moderation' directive. tier=routine (test/tooling addition, not reducer-body/schema logic) -> opus@high; mr-spawn LAUNCHED (leader=3084792, claude_pid=3084795, rid=mr-spawn-20260902T000256Z-3084739); GATES-SEEDED reported criteria=0/SPEC-SECTION-NOT-FOUND (same known pattern as prior ADR-022x slices whose scope is a spec subsection heading, not its own top-level spec doc -- non-blocking). Governor NORMAL (d7=$1896.33/2783=68.1%, fable_d7=$1052.32/2298, fable_ok=true). No BLOCKER, no rate-limit event. Untracked scratch files under memory/projects/ from the completed m22-s3b run (m22-s3b.red-1.txt, m22-s3b.red-2.txt, m22-s3b.teeth.txt, monster-realm-m22-s3b-plan.md) again left in place -- gate evidence receipts, safe to leave; not investigated further this tick.
 
+## 2026-09-02 — rb-36 COMPLETE (PR #414 open, local `just ci` green, remote CI running)
+
+**Terminal state, not a park.** Slice rb-36 (residual R-rb18-MAINCITE, citation drift).
+Branch `slice/rb-36` (worktree `.claude/worktrees/rb-36`), PR
+https://github.com/mdrewt/monster-realm/pull/414. **Supervisor owns the merge** — `gh pr merge`
+was not run. Remote `ci` + `e2e` were pending at handoff time.
+
+**Shipped:** 7 drifted citations retargeted across 3 files (`client/src/ui/dialogueView.ts`,
+`client/src/ui/dialogueView.test.ts`, `ARCHITECTURE.md`) — 5 stale `main.ts:1574`, 2 stale
+`main.ts:362`, i.e. 3 more than the brief's four. Prose only, zero behaviour change, 25
+insertions / 17 deletions. No ADR (none reserved, none warranted). No new eval (ADR-0224).
+
+**The design call:** re-pointing `:1574` at `:1627-1641` would reproduce the defect on a delay,
+so citations now name landmarks with the number as a dated hint. The force-hide-table citation
+targets the UXD3C-HANDLES marker pair (`main.ts:348`/`:378`), which `client/src/main.wiring.test.ts:4867-4868`
+pins for uniqueness — i.e. a **CI-protected** anchor, strictly better than any line number.
+
+**Acceptance ledger:** 0 gates seeded (`Criteria: 0 seeded`), so 0 met / 0 unmet / 0 deferred.
+`Touches:` line filled in. `mr-gates lint` LINT-CLEAN. Nothing to DEFER.
+PR line: `Acceptance: 0/0 met, 0 deferred, 0 unmet — rb-36 seed:e3b0c44298fc1c14`.
+
+**Three residuals recorded via `mr-gates residuals add`** (all backlog, all the SAME
+citation-drift class, all prose-only/CI-neutral, all outside rb-36's `touches:`):
+`R-rb-36-R-rb36-WIRINGCITE` (`client/src/ui/overlayA11yWiring.test.ts:289-296` — also carries a
+meta-citation that rb-36's own edit falsifies), `R-rb-36-R-rb36-FOCUSCITE`
+(`client/src/main.a11yFocus.test.ts:782`), `R-rb-36-R-rb36-ADR0206CITE` (`docs/adr/0206-...:194`).
+**Worth promoting as ONE sweep slice**, not three.
+
+**NEW LESSON, cost this slice one red CI round-trip** (memory card
+`doc-prose-about-a-pinned-marker-breaks-it.md`): the first draft of the ARCHITECTURE.md `**rb-36**`
+record *quoted* the two bold paragraph markers `evals/rekey-contract-surface.eval.mjs` pins for
+uniqueness. Backticks are not stripped — that planted a second occurrence of each and reddened
+`just ci` with `occurs 2 time(s), expected exactly 1`. **A doc paragraph *about* an anchor can
+break that anchor's gate.** The plan-phase red-team had explicitly cleared this file as safe: it
+checked what the diff *edits*, not what the diff's own new prose *contains*. Any future slice
+writing an ARCHITECTURE.md record that explains a gate must `grep -c` every literal it quotes.
+
+**Harness-repo files left UNCOMMITTED for the supervisor tick** (a concurrent tick owns these):
+`memory/projects/monster-realm-rb-36-plan.md` (new), `memory/projects/gates/rb-36.gates.md`
+(Touches line), the residuals store, and this handoff entry.
+
+**Toolchain notes re-confirmed:** fresh worktree needed `npm ci` + `just wasm`; the backgrounded
+`just ci` wrapper reported **exit 0 while the run was RED** — the `CI_EXIT=` line in the log is the
+only trustworthy signal (this caught the planted-literal red). `tester` and `reviewer` subagents
+both had Bash blocked, so the orchestrator ran every execution proof itself.
+
+## 2026-09-02T02:02:46Z — m22-s6 PR#409 merge bookkeeping recovered — deletion-completeness gate closed
+Native tick mr-sup-native-20260902T020016Z-3247316 (02:00Z). Gate-0 found stale evidence of an incomplete prior action: chain-owner mutex owner.json held (heartbeat 01:36:33Z, action 'merge m22-s6 PR#409', pid 3235932) but that pid was dead, and the m22-s6 per-run lock (leader 3084792) was also dead with .done+.done.recorded already present. Live ground truth showed the merge itself had fully succeeded and was NOT stuck: PR#409 merged at 01:37:22Z (mdrewt/monster-realm), local master already fast-forwarded to 62aea8a, worktree clean, no leftover m22-s6 branch, and master CI on 62aea8a green (run 33580125848, ci+e2e both success). So the prior tick (started ~01:36Z) completed the actual merge + cleanup but was killed before writing the ledger MERGED row / handoff entry / mr-state.json update / releasing the mutex+lock -- exactly the 'abrupt SIGKILL mid-bookkeeping' pattern, not a broken merge. Recovery this tick was purely mechanical: ran mr-audit --slice m22-s6 --repo <local path> --base 5fd93e4 --head 62aea8a --tier routine (first attempt used the GH slug as --repo and returned AUDIT-ERROR; retried with the literal local path plus cargo/asdf on PATH, which is the same known env trap noted on the m22-s4/m22-s3b merges). Result: orchestration CLEAN (7 agent calls, red-team/reducer-security-auditor/reviewer/tester/verifier), gating_advisory CLEAN (0 removed asserts/skips/suppressions), acceptance FLAGGED-advisory only (8/8 gates met, 0 unmet/deferred; SPEC-SECTION-NOT-FOUND is the same m22-slice-vs-spec-heading id mismatch already seen on m22-s3; spotcheck X7 'agrees:false' is a timing-only artifact -- recorded and fresh both read '767 tests run: 767 passed, 0 skipped', only the elapsed-seconds differ -- adjudicated CLEAN-equivalent, consistent with the m22-s4/m22-s3b precedent for this exact pattern). Disposition findings are the same pre-existing corpus-wide spec-doc items flagged on every recent audit, unrelated to this diff. Wrote the ledger MERGED row, this handoff entry, and mr-state.json (cleared m22-s6 from inflight, master sha/ci updated to 62aea8a/success), then released the stale mutex and per-run lock via mr-unlock. Treating this recovery as the tick's one mutating action -- no new launch this tick pending a fresh gate-3 derivation next tick.
+
+## 2026-09-02T03:03:28Z — m22-s7 launched (runbook, ADR-0230)
+03:00Z tick. Gate 0: found /tmp/mr_pass_m22-s3b.done (EXIT=0) but it was already fully reconciled -- PR#408 merged 2026-09-01T21:20Z and its MERGED ledger row already recorded (prior tick). Stale debris, no action needed there. Committed 5 untracked m22-s3b/m22-s6 per-slice artifact files (red-1/red-2/teeth/plan) that a prior recovery tick (3c88181) had left uncommitted after recording their merges -- harness commit 2043297.
+
+Gate 3: master CI green (62aea8a). No inflight, no open PRs, no live locks. Residuals: 23 unclaimed, all MED severity, oldest 2.35d -- none past t1_promote_days=3, none preempt PLAN work. Queue empty. Per M22-privacy-compliance.spec.md sec 7.2 dependency spine (S0->S1->S2->S3->{S4|S5}->{S6|S7}->S8->S9), S0-S6 are merged (S3b covered S3's redirect, S6 shipped as real #[test]s per ADR-0224) -- next eligible is S7 (runbook: pin '## Data deletion & backup retention' into docs/observability-dr-runbook.md + a thin structural phase in evals/account-e2e.eval.mjs, ADR-0224-compliant -- no new eval FILE, briefed to prefer a real test if one proves it better).
+
+Corrected mr-state.json adr_next_free 229->231 (was stale: S6 minted 0229 but the recovery tick never bumped it; reserved 0230 for this launch).
+
+Launched m22-s7: opus@high, tier=routine (docs-only, no schema/reducer/netcode/security surface). mr-spawn: GATES-SEEDED criteria=0 SPEC-SECTION-NOT-FOUND (known cosmetic id-mismatch seen on sibling m22-s3/s6 slices, not a real gap). LAUNCHED leader=3263826 claude_pid=3263829 rid=mr-spawn-20260902T030302Z-3263772.
+
+
