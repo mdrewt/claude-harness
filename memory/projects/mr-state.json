@@ -1,13 +1,25 @@
 {
- "adr_next_free": 229,
+ "adr_next_free": 231,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-02T02:00:16Z",
+ "inflight": [
+  {
+   "adr_reserved": "0230",
+   "effort": "high",
+   "model": "opus",
+   "repo": "project",
+   "run_id": "mr-spawn-20260902T030302Z-3263772",
+   "session_leader": 3263826,
+   "slice": "m22-s7",
+   "started_utc": "2026-09-02T03:03:09Z",
+   "tier": "routine"
+  }
+ ],
+ "last_tick_utc": "2026-09-02T03:03:17Z",
  "live_watchers": [],
  "master": {
   "ci": "success",
@@ -27,7 +39,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "02:00Z tick: recovered a stranded mid-bookkeeping crash from the 01:36Z tick -- its GH merge of m22-s6 PR#409 (62aea8a) had succeeded, master ff-only'd and worktree/branch already clean, but the process died before writing the ledger MERGED row/handoff/state and releasing the mutex+per-run lock. Ran mr-audit fresh (orchestration CLEAN, gating_advisory CLEAN, acceptance FLAGGED-advisory 8/8 met -- adjudicated CLEAN-equivalent, spotcheck X7 mismatch is timing-only). Wrote the ledger row, handoff entry, this state update, then mr-unlock all (mutex owner 3235932 dead, per-run lock leader 3084792 dead). M22 spine now S0-S6 merged; S7-S9 remain. No new launch this tick -- treated the recovery as the one mutating action.",
+ "notes": "03:00Z tick: gate-0 found stale-but-already-reconciled /tmp/mr_pass_m22-s3b.done (PR#408 merged+recorded prior tick); committed 5 untracked m22-s3b/m22-s6 artifact files a prior recovery tick left uncommitted (harness commit 2043297). Corrected adr_next_free 229->231 (0229 was minted for m22-s6 but never bumped by the recovery tick; reserved 0230 here). Gate 3: master CI green, no inflight/open-PRs, residuals all under aging thresholds (oldest 2.35d < t1=3d), queue empty -- fell through to PLAN/spec derivation: M22 spine S0-S6 merged (S3b covered S3 redirect, S6 shipped ADR-0224-compliant real tests), launched S7 (runbook: docs/observability-dr-runbook.md + thin structural phase in evals/account-e2e.eval.mjs) opus@high tier=routine, ADR-0230. mr-spawn LAUNCHED leader=3263826 claude_pid=3263829.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -50,6 +62,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260902T020016Z-3247316",
- "updated_utc": "2026-09-02T02:03:30Z"
+ "updated_by": "mr-sup-native-20260902T030013Z-3261279",
+ "updated_utc": "2026-09-02T03:03:17Z"
 }
