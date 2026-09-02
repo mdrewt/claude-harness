@@ -33,7 +33,32 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-35",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-18-R-rb18-CLAIMDOOR",
+   "added_utc": "2026-09-02T20:03:53Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "b5302aac3eb17167b34427e7b034b5c05ba6416c"
+  },
+  {
+   "slice": "rb-36",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-18-R-rb18-MAINCITE",
+   "added_utc": "2026-09-02T20:03:53Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "b5302aac3eb17167b34427e7b034b5c05ba6416c"
+  },
+  {
+   "slice": "rb-37",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-18-R-rb18-CONCURRENT",
+   "added_utc": "2026-09-02T20:03:53Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "b5302aac3eb17167b34427e7b034b5c05ba6416c"
+  }
+ ],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
