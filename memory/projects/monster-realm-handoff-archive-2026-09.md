@@ -185,3 +185,8 @@ seed order was guard-infeasible); tester(opus) authored the Rust pins (RED-first
 combined adversarial review-lens on the pinned artifact SHA (1 finding, fixed: battle1 clause tags
 split + per-clause teeth); 7 empirical spikes. Full `just ci` green locally (exit 0).
 
+## 2026-09-01T21:36:35Z — m22-s3b merged: M22 §4.4 deletion cascade
+PR#408 squash-merged to master (5fd93e4). ADR-0228: delegated erase/anonymize cascade, one-shot re-arm + R2 sweep, PRV1-8(b) fresh re-registration (per operator issue #403 answer). Audit: acceptance ledger initially FLAGGED with mass FileNotFoundError/CI-mismatch — root cause was this shell's PATH missing ~/.cargo/bin and asdf shims (node v18 system default shadowing harness-pinned v24), not a real defect; re-ran mr-gates verify with corrected PATH -> 17/18 met, 1 deferred (X18, target=backlog, documented reason: PRV1-7 crate-wide enforcement mechanism awaits supervisor ADR-0224/0225 ruling on syn-based-check vs reviewer-checklist). gating_advisory flagged removed_or_modified_asserts=4 in accounts_tests.rs; read the diff — all 4 are the slice's own documented S3b-boundary trap literal bump (occurrence count 2->4), 153 new asserts added same file, legitimate not weakening. PR acceptance line matched fresh measurement exactly. Local worktree+branch cleaned. Master post-merge CI run (33561683660) still in progress at record time; backgrounded a gh run watch instead of polling.
+
+
+
