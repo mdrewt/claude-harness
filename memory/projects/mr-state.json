@@ -10,7 +10,7 @@
   "last_tick_utc": "2026-09-02T14:00:14Z",
   "live_watchers": [],
   "master": {
-    "ci": "rerun_pending_chronic_e2e_flake_wallet_balance_11r_e",
+    "ci": "success",
     "nightly": "success",
     "sha": "09261b13da82cf59cb8ca2a4e6007dc8b7b1ff15"
   },
@@ -27,7 +27,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "Native tick 14:00Z: master post-merge CI on 09261b1 (PR#412, m22-s9/M22-close) came back conclusion=failure -- e2e job hit the SAME chronic flake logged twice before (wallet-balance.spec.ts:911, 11r-e ADR-0169, quest_001/elder_oak dialogue precondition), diff-disjoint from PR#412 (ARCHITECTURE.md, docs/adr/0232-*.md, DIGEST.md, evals/account-e2e.eval.mjs, server-module/src/accounts_tests.rs). Reran the failed job only (gh run rerun 33634979115 --failed); next tick re-verifies live. No merge/launch/park this tick -- single-mutation budget spent on the rerun. Governor NORMAL (d7=$2176.63/2783=78.2%, fable_d7=$1204.54/2298, fable_ok=true). PLAN.md \u00a79 M22-closed status doc-only chore PR still owed (carried from prior tick).",
+  "notes": "POWER OUTAGE 2026-09-02: the host lost power and rebooted at ~16:08Z. The 16:00:14Z cron tick (rid native-20260902T160014Z-4071406) was KILLED MID-GATE -- no SPAWN-DONE, no ledger row -- and the @reboot tick at 16:09:29Z then failed all 10 API retries because WSL networking was not up yet (.native-supervisor-last-failure holds subtype:api_retry 10/10 -- a cold-network artifact, NOT a real API/rate-limit failure; do not triage or park on it). Re-verified live at 16:54Z with the network back: NOTHING WAS IN FLIGHT AND NOTHING WAS LOST -- no per-run locks, no chain mutex, no extra worktrees, zero open PRs in both repos, project master==origin/master==09261b1 with CI success, harness main==origin/main==9716f42, HOLD-NONE, queued_events=0, no .blocked-on-human, inflight/awaiting_merge/queue all empty. /tmp WAS CLEARED by the reboot: all mr_pass_* briefs/logs/.done files are gone (the two stale already-reconciled .done files included) -- do not chase them. SUPERVISOR ledger rows are missing for both the 16:00Z and 16:09Z ticks; those rows are wrapper-owned, do NOT hand-write them. TODO next tick: commit the pending uncommitted records (monster-realm-handoff.md + mr-state.json, carried from the 15:00Z tick whose commit step the outage ate). Gate-3 heads-up: the three oldest residuals (R-rb-18-CLAIMDOOR/MAINCITE/CONCURRENT, all MED) cross t1_promote_days=3 at ~18:38Z 2026-09-02 and then outrank new PLAN \u00a79 work -- classify per ADR-0224 first. FULL DETAIL: see the 2026-09-02T16:58:33Z handoff entry 'POWER OUTAGE + host reboot'. That entry and this note were written by a human-resumed interactive session, not by a tick -- so a 17:00Z tick may stand down on the active-session probe from these very writes.",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
@@ -50,6 +50,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260902T140014Z-4049550",
-  "updated_utc": "2026-09-02T14:03:00Z"
+  "updated_by": "human-resumed-session-16f08a20 (power-outage recovery note; NOT an autonomous tick)",
+  "updated_utc": "2026-09-02T16:59:41Z"
 }
