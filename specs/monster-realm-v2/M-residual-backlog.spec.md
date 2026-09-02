@@ -42,9 +42,17 @@ Deferred with reason: dialogueView.ts:16 and dialogueView.test.ts:243 both cite 
 
 EARS: main.ts:1574 citation for the fresh-view-model-per-batch fact has drifted in two files
 Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
-### rb-35 — claimView's cross-view opener drives show(), but the live production open door is render() (from rb-18 R-rb18-CLAIMDOOR, deferred 2026-08-30)
+### rb-35 — WONTFIX (already covered, no behavioural difference) — claimView's cross-view opener drives show(), but the live production open door is render() (from rb-18 R-rb18-CLAIMDOOR, deferred 2026-08-30)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-18 · residual: R-rb-18-R-rb18-CLAIMDOOR
+
+**Status: WONTFIX, dispositioned 2026-09-02T21:00Z.** `claimView.test.ts:268`'s
+`S4-claimView-THREE-DOORS` (from m23-s4, PR#367, 2026-08-24 — predates rb-18) already replays the
+real production sequence (`main.ts` `openClaim()`: `renderClaim() -> show() -> renderClaim()`) and
+passes today. rb-18's own reviewer already recorded this has no behavioural difference: `render()`
+and `show()` derive `visible` from the same live guard, and `questLogView`/`healView` close via
+`render(null)` where `main.ts` uses `hide()` under the identical equivalence. Nothing to build; left
+in place per doctrine as the disposition record, not an open item.
 
 Deferred with reason: main.ts openClaim() (:454-462) runs applyClaim -> renderClaim() BEFORE show(), so render() has already flipped wasVisible and show()'s guard (claimView.ts:118) is a structural no-op in every current call path. overlayA11yWiring.test.ts's OPENERS.claimView therefore pins a real class invariant but NOT the live production edge; that one is owned by claimView.test.ts's S4-claimView-THREE-DOORS. Re-po
 
