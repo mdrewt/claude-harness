@@ -7,10 +7,10 @@
     "sha": "74a5bc8"
   },
   "inflight": [],
-  "last_tick_utc": "2026-09-02T13:07:16Z",
+  "last_tick_utc": "2026-09-02T14:00:14Z",
   "live_watchers": [],
   "master": {
-    "ci": "in_progress_post_merge_pr_checks_green",
+    "ci": "rerun_pending_chronic_e2e_flake_wallet_balance_11r_e",
     "nightly": "success",
     "sha": "09261b13da82cf59cb8ca2a4e6007dc8b7b1ff15"
   },
@@ -27,7 +27,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "m22-s9 MERGED (PR#412, 09261b1) \u2014 M22 CLOSED (ADR-0232). gates verify FLAGGED->adjudicated CLEAN (X4/X5/X7 evidence-mismatches were re-verify environment artifacts: cargo missing from supervisor shell PATH for X5/X7, and my own 2-min tool timeout killed the live-server X4 check mid-run on first attempt \u2014 reran to completion, clean m22s9-X4:LIVE-GREEN). mr-audit hard-tier mandatory_read: diff subset of declared touches, orchestration CLEAN, gating_advisory CLEAN (0 removed asserts/skips/suppressions). Remote PR checks (ci+e2e) green pre-merge; master post-merge CI still in_progress at tick end, non-blocking (same commit content already validated). Worktree+branch (local+remote) cleaned. 0 residuals to close for this slice. PLAN.md \u00a79 M22-closed status edit still owed as a doc-only chore PR (next tick). Governor NORMAL (d7=$2175.33/2783, fable d7=$1204.54/2298, fable_ok=true).",
+  "notes": "Native tick 14:00Z: master post-merge CI on 09261b1 (PR#412, m22-s9/M22-close) came back conclusion=failure -- e2e job hit the SAME chronic flake logged twice before (wallet-balance.spec.ts:911, 11r-e ADR-0169, quest_001/elder_oak dialogue precondition), diff-disjoint from PR#412 (ARCHITECTURE.md, docs/adr/0232-*.md, DIGEST.md, evals/account-e2e.eval.mjs, server-module/src/accounts_tests.rs). Reran the failed job only (gh run rerun 33634979115 --failed); next tick re-verifies live. No merge/launch/park this tick -- single-mutation budget spent on the rerun. Governor NORMAL (d7=$2176.63/2783=78.2%, fable_d7=$1204.54/2298, fable_ok=true). PLAN.md \u00a79 M22-closed status doc-only chore PR still owed (carried from prior tick).",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
@@ -50,6 +50,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260902T130735Z-3965191-31645",
-  "updated_utc": "2026-09-02T13:25:00Z"
+  "updated_by": "mr-sup-native-20260902T140014Z-4049550",
+  "updated_utc": "2026-09-02T14:03:00Z"
 }
