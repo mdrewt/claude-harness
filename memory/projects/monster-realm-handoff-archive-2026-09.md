@@ -143,3 +143,45 @@ Gate-0: no live per-run locks, no chain mutex, HOLD-NONE. done_files showed mr_p
 ## 2026-09-01T21:14:29Z — SPEND-ALERT: m22-s3b cost $237.5248 (> $150 threshold)
 Single-run spend exceeded the alert threshold (visibility only, not a gate). Verify the slice's size was justified (right-sizing rule) at merge adjudication; adjust single_run_alert_usd in mr-budget-config.json if this class of slice is expected.
 
+## 2026-09-02 — m22-s9 (M22 S9 post-integration verification) — **MILESTONE M22 CLOSES ON THIS SLICE'S MERGE**
+
+Slice m22-s9, branch `slice/m22-s9`, worktree `.claude/worktrees/m22-s9`, on origin/master@7bd5940.
+**PR https://github.com/mdrewt/monster-realm/pull/412 OPEN; local full `just ci` GREEN (exit 0);
+acceptance 8/8 met, 0 deferred, 0 unmet (PR body line byte-matches `mr-gates render`); `gh pr merge`
+NOT run (supervisor-owned).** ADR **0232** minted (injected-clock e2e idiom + finding F1). Diff: `evals/account-e2e.eval.mjs`
+(+~2000: the S9 live cascade flow), `server-module/src/accounts_tests.rs` (+1455: 5 `m22s9_*`
+compile-level contract pins + 4 host-syscall abort stubs), ADR-0232, `docs/adr/DIGEST.md` (regen),
+`ARCHITECTURE.md` (M22-closure block). No reducer/schema/game-core changes — the shipped tree's
+constants stay bare literals; the e2e patches its tmpdir module copy only.
+
+**What now runs on every `just ci`:** the real one-shot deletion reaper fires the real §4.4 cascade
+15 s after a re-armed request against a loaded account (terminal PvP battle on the OPPONENT axis,
+open trade, pending challenge, live wild battle, >500 SQL-seeded playtest_event rows), and the eval
+proves all 22 classified tables (Erase per identity column / Anonymize tombstones incl. provenance
+retention + opponent-side battle swap / ViaJoin unreachability via pre-pinned parent keys / NotOwned
+survival), bystander + world-content controls, seeded floor 785≥520, capped printed vacuity
+allowlist (2/3: battle_action, player_dialogue_state — enum/Vec<String> not DML-expressible),
+PRV1-3 disarm/re-arm schedule censuses, PRV1-4 verbatim over the SDK, and request-wide multi-chunk
+export assembly reconciled row-for-row. 6 consecutive live passes with the identical
+`S9-CASCADE-VERIFIED(classified=22 seeded=785 …)` marker; X6 mutants 2/2 caught by designated tags
+(register: memory/projects/gates/m22-s9.x6-mutant-register.md).
+
+**Measured finding (ADR-0232 F1, adjudicated benign-by-design):** with a live wild battle at cascade
+time, 6a's wild-resolve `write_back_battle_results` runs the ADR-0077 keep-latest GC and DELETES the
+deleting player's prior terminal battles (erasure — stronger than Anonymize) and orphans their
+unfired `pvp_deadline_schedule` rows transiently (self-consume at fire). "Terminal rows persist" is
+retention-scoped, not absolute. The e2e seeds accordingly (D challenges, A accepts).
+
+**Follow-up flags (NOT blockers, NOT touched — outside touches):** (1) `settle_pvp_battle` /
+`apply_pvp_forfeit` could proactively `disarm_pvp_deadlines` on natural termination (defense-in-depth
+vs the pre-existing orphan-until-fire window; review-lens suggestion, zero behavioral cost) —
+pvp.rs is outside m22-s9's touches. (2) **PLAN.md §9 M22 status edit is supervisor-owned** — this
+slice records closure in ARCHITECTURE.md + ADR-0232 + this entry; please flip the PLAN §9 row at
+merge so M22 does not look open. (3) The >500-row seed measures cascade transaction size at modest
+scale only; spec §8.3 full-volume escalation stands.
+
+Lenses run: planner(opus) + reviewer + red-team + simplify on the plan (blocker found & fixed:
+seed order was guard-infeasible); tester(opus) authored the Rust pins (RED-first on T4/T5);
+combined adversarial review-lens on the pinned artifact SHA (1 finding, fixed: battle1 clause tags
+split + per-clause teeth); 7 empirical spikes. Full `just ci` green locally (exit 0).
+
