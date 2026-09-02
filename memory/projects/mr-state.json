@@ -6,19 +6,11 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [
-  {
-   "slice": "m23-s8",
-   "run_id": "mr-spawn-20260902T170321Z-20486",
-   "session_leader": 20545,
-   "repo": "project",
-   "started_utc": "2026-09-02T17:03:25Z"
-  }
- ],
- "last_tick_utc": "2026-09-02T14:00:14Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-02T20:00:13Z",
  "live_watchers": [],
  "master": {
-  "sha": "09261b13da82cf59cb8ca2a4e6007dc8b7b1ff15",
+  "sha": "b5302aac3eb17167b34427e7b034b5c05ba6416c",
   "ci": "success",
   "nightly": "success"
  },
@@ -35,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "17:03Z tick: committed+pushed stranded 15:00Z records (16:00Z tick session died to 10 exhausted API retries); launched m23-s8 (opus/high, ADR-233) after decision-defaulting S8 two reversible operator escalations per spec \u00a78 recommended defaults; residuals all under t1_promote_days, queue empty, no park.",
+ "notes": "20:00Z tick: gate-0 catch-up \u2014 m23-s8 (PR#413) had already fully merged to master (b5302aa, CI green) via the 19:21Z merge tick, but that tick died before committing mr-state.json/handoff/handoff-archive/m23-s8-plan.md to the harness repo (docs/routing.md left untouched \u2014 unrelated human stray, not committed). Reconciled: inflight cleared, master sha/ci updated, remote branch slice/m23-s8 confirmed already deleted (pruned stale local ref), 6 post-merge review residuals recorded (R-m23-s8-postmerge{,-tsdup,-tint,-title,-border,-fallback}, all unpromoted/backlog), gates residuals close run (0 DEFERs \u2014 all X1-X11 met at merge). Bookkeeping only, not this tick's gated action.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -58,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260902T170012Z-16860",
- "updated_utc": "2026-09-02T17:04:05Z"
+ "updated_by": "native-20260902T200013Z-314065",
+ "updated_utc": "2026-09-02T20:05:00Z"
 }

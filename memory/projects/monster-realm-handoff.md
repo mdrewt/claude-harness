@@ -2,6 +2,84 @@
 
 ---
 
+## 2026-09-02T~14:5xZ — m23-s8 PR#413 OPEN — M23 S8 colour independence (A11Y-29), local `just ci` GREEN
+
+Slice m23-s8 (M23 §2.6 + criterion A11Y-29), branch `slice/m23-s8`, worktree `.claude/worktrees/m23-s8`,
+6 commits on origin/master@09261b1. **PR https://github.com/mdrewt/monster-realm/pull/413 open; remote
+CI running at hand-off. `gh pr merge` NOT run (supervisor-owned).** ADR **0233** minted. Acceptance
+**11/11 met, 0 deferred, 0 unmet** — the PR body's `Acceptance:` line byte-matches
+`mr-gates render --slice m23-s8 --format pr`. Full `just ci` exit 0, **99 eval PASS / 0 FAIL**,
+2160/2160 Rust, 2925 client tests.
+
+**BOTH §8 ESCALATIONS DECISION-DEFAULTED, NOT PARKED**, per the launch brief: §8.1 -> (a) CB-safe
+DEFAULT palette (not an opt-in theme); §8.2 -> (a) `ACTION_TINT` OUT OF SCOPE under the spec's own
+§3.1 partial-conformance declaration, zero edits under `client/src/render/`, residual R-m23-s8-TINT.
+
+**THE DESIGN WAS FORCED BY A CONSTRAINT THE SPEC DID NOT ANTICIPATE.** §2.6 says the requirement is
+"pushed into the content pipeline", i.e. a RON file. `evals/content-version.eval.mjs:31`
+`hashContentDir()` walks EVERY file under `game-core/content` (no extension filter) against a
+checked-in baseline keyed to `CONTENT_VERSION` (`server-module/src/lib.rs:75`), so ANY new file there
+forces an out-of-touches edit. The token table therefore ships as a Rust const table in `content.rs`.
+**Supervisor note: this constraint applies to every future slice that wants to add a content file
+under a restricted touch-set — it is not m23-s8-specific.**
+
+**MECHANISM WORTH REUSING — a serde-DERIVED variant roster.** Rust has no variant reflection and a
+hand-kept roster forces nothing (MEASURED: adding a 6th `StatusKind` plus the one match arm it forces
+compiled clean with the validator returning `Ok(())`). `ron::from_str::<T>("<probe>")` returns
+`ron::Error::NoSuchEnumVariant { expected: &'static [&'static str], .. }` — serde's own derive-generated
+variant list. `ron` 0.8.1 is already a `game-core` dep. This is the ADR-0224-compliant successor to a
+source scan for any "every enum variant must have an X" property, and it generalises well beyond a11y.
+
+**REVIEW FOUND SIX DISTINCT DEFECT CLASSES ACROSS FOUR ROUNDS; PLAN-LENS AND ARTIFACT-LENS FINDINGS
+WERE DISJOINT.** (1) the totality ladder was a fiction (above); (2) EIGHT forged validators passed the
+planned test set, five surviving the operator's demanded data mutant, because they re-derived their
+oracle FROM the table — taking a parameter is necessary but NOT sufficient; (3) the honest validator
+accepted U+200B as a "text token" (category `Cf`, so `char::is_whitespace` is false and
+`trim().is_empty()` is false) — validate tokens by CHARSET, never by `trim()`; (4) the badge fix
+HOLLOWED a shipped tooth — with the old `''` default arm, deleting `case 'Poison':` reds 2 tests; with
+a visible fallback the same mutation was **118/118 GREEN**; (5) the wiring check had no bite —
+`if false`, a never-true runtime guard, a **string-literal decoy with no call at all**, and a discarded
+`let _ =` all passed a substring check (the comment-stripper is not string-aware, and its documented
+"worst case is a false RED" reasoning holds for DELETION but not for a needle that is a SUBSTRING of
+surviving text); (6) two forgeries defeated EVERY behavioural fixture — a fast path trusting
+`A11Y_TOKENS` (no fixture reaches it; the one production caller always does) and a
+`cfg!(debug_assertions)` early return that ships a RELEASE binary with no validation while CI's debug
+builds stay green.
+
+**`just ci` WAS RED ON `cargo fmt` AND I ALMOST MISSED IT.** A backgrounded `just ci` reported the
+wrapper's exit code as 0 while the log's own last line read `CI-EXIT=1` (`lint` is CI dep #1, so
+NOTHING downstream had ever run). The artifact red-team caught it independently. **Lesson: read the
+log tail, never the background-task notification's exit code.**
+
+LENSES: planner; reviewer + red-team + simplification on the PLAN; **two `tester` agents** (Rust +
+client, RED-first, staged to /tmp — the write guard still blocks `.claude/`); reviewer + red-team +
+simplification + `desync-guard` on the ARTIFACT; `verifier` (PASS). `reducer-security-auditor` not run
+— no reducer/table/schema change. **The verifier again earned its cost**: it re-measured the m14.5d
+replacement teeth as independently live, added a real `StatusKind::Curse` to confirm the totality
+substitute fires, and asked for the one residual id the ADR was missing.
+
+PROOF-OF-TEETH **12/12 caught** + a control mutation correctly silent; register
+`memory/projects/gates/m23-s8.x11-mutant-register.md`.
+
+RESIDUALS (all in ADR-0233): **R-m23-s8-RUNTIME** (a new enum variant fails CI, not `validate_content`
+at content-sync time; idiomatic fix is a sibling validator in `server-module/src/content.rs`, out of
+touches) · **R-m23-s8-TSDUP** (the five status tokens are duplicated in `battleModel.ts`) ·
+**R-m23-s8-TINT** (§8.2) · **R-m23-s8-TITLE** (`battleView.ts:308` exposes skill affinity only via
+`btn.title`) · **R-m23-s8-BORDER** (the battle card borders `#844`/`#484` are still the same red/green
+pair — same defect class one screenful away, NOT surveyed by this slice; **S9 should not read this area
+as cleared**) · **R-m23-s8-FALLBACK-COLLIDE** (the client fallback has 2 chars of entropy after its `?`).
+
+TOUCHES-DELTA (in the PR body): the two sibling `*.test.ts`, `docs/adr/0233-*.md`, `docs/adr/DIGEST.md`
+(mechanically forced by adding an ADR), `ARCHITECTURE.md`. `game-core/content/` NOT touched.
+BOY SCOUT: none — the three comment corrections were made false by this slice's own change, so they
+are core DoD, not boyscout.
+
+Harness-repo artefacts written but NOT committed (supervisor's gate-0 catch-up owns them):
+`memory/projects/monster-realm-m23-s8-plan.md` (plan + the three-lens reconciliation),
+`memory/projects/gates/m23-s8.gates.md`, `memory/projects/gates/m23-s8.x11-mutant-register.md`, handoff.
+
+---
+
 ## 2026-09-02T~01:15Z — m22-s7 PR#410 OPEN — DR-runbook deletion section + G24 gate, local `just ci` GREEN
 
 Slice m22-s7 (M22 S7, PRV1-18 met; PRV1-17/20 met-by-verification), branch `slice/m22-s7`, worktree
@@ -2751,6 +2829,10 @@ Gates ledger: memory/projects/gates/m22-s3b.gates.md (17/18 met + X18 DEFER, lin
 CHECK-side evidence trap hit again — placeholders were required, memory card exists). Teeth+red
 receipts: m22-s3b.{teeth,red-1,red-2}.txt. Plan memo: monster-realm-m22-s3b-plan.md.
 
+## 2026-09-02T19:21:13Z — m23-s8 merged (PR#413 -> b5302aa)
+M23 S8 — colour independence (spec §2.6, criterion A11Y-29) merged to master. Adds text/glyph tokens for status-effect + affinity badges in battleView/battleModel, content-pipeline validation in game-core/src/content.rs, ADR-0233 (colour-independence token SSOT). Two operator escalations resolved per spec defaults: (a) CB-safe palette is the new default HP palette for everyone (no opt-in theme); (b) canvas sprite ACTION_TINT contrast marked OUT-OF-SCOPE, tracked as an art residual. Audit CLEAN (orchestration + gating), acceptance 11/11 met (advisory FLAGGED only due to a spec-section-lookup quirk in mr-audit — confirmed §2.6 exists in M23-accessibility.spec.md; X1-X4 initial evidence-mismatch was my shell missing the asdf PATH, re-verified clean after fixing it). Worktree/branch cleaned up. master fast-forwarded to b5302aa; CI re-triggered on push, watching to completion.
+## 2026-09-02T17:03:55Z — 17:03Z tick — launched m23-s8 (colour independence), committed stranded 15:00Z records
+Gate-0: no live per-run locks/chain mutex, HOLD-NONE, no done_files. Gate-1: both repos fetched clean. Housekeeping: found the harness working tree carrying uncommitted mr-state.json/handoff/handoff-archive writes from the 15:00Z tick — the 16:00Z tick's session (native-20260902T160929Z-1291) died after 10 exhausted API retries before reaching its commit step (see last_failure in the situation bundle). Committed and pushed those records (abde2f4) per the 15:00Z tick's own handoff note. Gate-3: master CI green (09261b1, m22-s9 SUCCESS, M22 CLOSED). No open PRs, no wip branches. Re-verified the 16:36Z-precedent chronic e2e flake (run 33561683660, m22-s3b/wallet-balance) — its rerun is SUCCESS, consistent with the diff-disjoint-flake classification already recorded; no action needed. Residuals: 27 unclaimed, all unpromoted, oldest 2.93d (rb-18) -- none past t1_promote_days=3, so none outrank new PLAN §9 work this tick. queue[] empty. Full derivation: M18/M19 remain blocked:playtest-gate; M22 CLOSED; M23 accessibility has S0-S7,S10,S11 merged (PRs #361-#371) plus five residual fixes (rb-10,11,12,13,15,16,17,18,19,20 -- all M23-scoped, all merged); only S8 (colour independence, blocked on §8 operator escalations) and its dependent S9 (contrast remediation) remain unbuilt. S8's two blocking escalations are REVERSIBLE scope/content calls (palette redesign default vs opt-in theme; canvas sprite-tint contrast as an art-direction call) -- not irreversible/architectural/security/spec-contradicting/playtest-gated -- so per BLOCKER discipline took the spec's own recommended defaults and proceeded rather than opening mr-ask-drew: decision-defaulted:colourblind-palette=redesign-default(a) [not an opt-in theme, which would drag M25 settings-store scope into M23]; decision-defaulted:canvas-tint-contrast=accept-out-of-scope(a) [tracked as an art residual, not an art pass, per the spec's own §3.1 partial-conformance declaration]. Launched m23-s8 (opus/high, tier=routine, ADR-233, touches client/src/ui/battleView.ts + battleModel.ts + game-core/src/content.rs + game-core/content/, ADR-0224-compliant instruction to implement the content-validation criterion as an ordinary Rust #[test], never a new evals/*.eval.mjs). mr-spawn: brief-built bytes=16431, GATES-SEEDED criteria=0 SPEC-SECTION-NOT-FOUND (the spec has no dedicated ### S8 section, only a table row + EARS ids A11Y-29/§2.6 -- ledger will read NO-LEDGER at merge time, advisory only, not a refusal). LAUNCHED confirmed: leader pid 20545 (setsid, own session, detached from init), claude_pid 20548, model=opus/high verified via ps. Single-mutating-action discipline: this tick's one action was the launch (the stranded-records commit+push was pure bookkeeping, not the gated action). Governor NORMAL (d7=$2178.16/2783=78.3%, fable_d7=$1204.54/2298, fable_ok=true). No BLOCKER, no rate-limit event, no park.
 ## 2026-09-02T16:58:33Z — POWER OUTAGE + host reboot — 16:00Z tick killed mid-gate, 16:09Z @reboot tick failed on cold network; NOTHING was in flight, /tmp cleared
 **WRITTEN BY A HUMAN-RESUMED INTERACTIVE SESSION, NOT BY AN AUTONOMOUS TICK.** Drew resumed the failed post-reboot tick session (`claude --resume 16f08a20-6a0a-4f88-8fe2-f61097704759`) at ~16:50Z solely to record this note; no gate ran, no mutex was taken, no mutating loop action was performed. Read this before the LIVE SITUATION bundle: two consecutive ticks are missing from the ledger and the tick log looks alarming, but the loop is healthy and there is nothing to resume.
 
@@ -2877,12 +2959,6 @@ seed order was guard-infeasible); tester(opus) authored the Rust pins (RED-first
 combined adversarial review-lens on the pinned artifact SHA (1 finding, fixed: battle1 clause tags
 split + per-clause teeth); 7 empirical spikes. Full `just ci` green locally (exit 0).
 
-## 2026-09-01T22:02:28Z — 22:00Z native tick — master CI red diagnostic rerun (m22-s3b, unrelated diff)
-Gate-0: no live per-run locks, no chain mutex, HOLD-NONE. done_files showed mr_pass_m22-s3b.done (EXIT=0, already reconciled and merged by the prior 21:29Z tick — PR#408 -> 5fd93e4). Gate-1: both repos fetched clean (monster-realm origin/slice/m22-s3b branch deleted post-merge, confirming the merge). Gate-3: live-reverified master CI at 5fd93e4 (the prior tick's backgrounded post-merge watch) — run 33561683660 completed ci=SUCCESS, e2e=FAILURE. Failure: e2e/wallet-balance.spec.ts:911 11r-e (ADR-0169) precondition (a), quest_001 never observed started via the elder_oak dialogue choice after 5 attempts, contract cites npc.rs:105-120 (apply_effects_to_db StartQuest insert). 69 passed / 1 skipped / 4 did-not-run / 1 failed. Read the m22-s3b diff (e321442..5fd93e4) in full against this signature before acting: npc.rs's only change is the new erase_npc_state() helper (additive, PRV1-6b, called only from account_deletion_reaper) — the apply_effects_to_db/talk/advance_dialogue code path at npc.rs:90-130 is byte-for-byte untouched. lib.rs's 69-line diff is a verbatim extraction of the on_disconnect resolver bundle into resolve_all_live_interactions() (same four calls, same order) plus one new init/sync_content wiring call (accounts::ensure_deletion_reapers_armed) — no dialogue/quest logic anywhere in the diff. No code-level regression signature connects this failure to the merged diff. Classified as a chronic e2e flake, same category as the 16:36Z tick's unrelated ranked-forfeit RL-18 flake (that precedent: diff-disjoint failure, resolved by a plain job rerun, not a revert or fix-forward). Action taken: gh run rerun 33561683660 --repo mdrewt/monster-realm --failed (exit 0). No PR exists to attach mr-ci-watch to (master-push-triggered run, not a PR-triggered one) — next tick re-verifies the rerun live, same as the 16:36Z precedent. Single-mutating-action discipline: this rerun was the tick's one action; no merge/launch/park attempted. Governor NORMAL (d7=$1894.67/2783=68.1%, fable_d7=$1052.32/2298, fable_ok=true). queue[] empty, park_counters unchanged ({14r-e: 1}). No BLOCKER, no rate-limit event. Untracked files noted at repo root not investigated this tick (m22-s3b.red-1.txt, m22-s3b.red-2.txt, m22-s3b.teeth.txt, monster-realm-m22-s3b-plan.md under memory/projects/ — scratch artifacts from the completed m22-s3b run, safe to leave; harness repo itself carries modified memory/projects/mr-state.json + the two handoff files as this tick's own in-progress writes).
 ## 2026-09-01T21:36:35Z — m22-s3b merged: M22 §4.4 deletion cascade
 PR#408 squash-merged to master (5fd93e4). ADR-0228: delegated erase/anonymize cascade, one-shot re-arm + R2 sweep, PRV1-8(b) fresh re-registration (per operator issue #403 answer). Audit: acceptance ledger initially FLAGGED with mass FileNotFoundError/CI-mismatch — root cause was this shell's PATH missing ~/.cargo/bin and asdf shims (node v18 system default shadowing harness-pinned v24), not a real defect; re-ran mr-gates verify with corrected PATH -> 17/18 met, 1 deferred (X18, target=backlog, documented reason: PRV1-7 crate-wide enforcement mechanism awaits supervisor ADR-0224/0225 ruling on syn-based-check vs reviewer-checklist). gating_advisory flagged removed_or_modified_asserts=4 in accounts_tests.rs; read the diff — all 4 are the slice's own documented S3b-boundary trap literal bump (occurrence count 2->4), 153 new asserts added same file, legitimate not weakening. PR acceptance line matched fresh measurement exactly. Local worktree+branch cleaned. Master post-merge CI run (33561683660) still in progress at record time; backgrounded a gh run watch instead of polling.
 
-## 2026-09-01T21:14:29Z — SPEND-ALERT: m22-s3b cost $237.5248 (> $150 threshold)
-Single-run spend exceeded the alert threshold (visibility only, not a gate). Verify the slice's size was justified (right-sizing rule) at merge adjudication; adjust single_run_alert_usd in mr-budget-config.json if this class of slice is expected.
-## 2026-09-01T16:51:19Z — 16:50Z tick — m22-s4 CI-wait delegated (PR#407)
-Native tick mr-sup-native-20260901T165007Z-2508130. Gate-0: no live per-run locks (m22-s4/m22-s5 session leaders both dead, .done present for both) — reaped via mr-unlock stale. m22-s5 was already merged+recorded in a prior tick (PR#406 -> 96cf4bb, 15:32:59Z ledger row) — nothing further to do. m22-s4 (PR#407, feat/m22-s4-export) is OPEN with remote CI still in_progress (mergeStateStatus UNSTABLE, both checks pending) — no mr-ci-watch was yet running for it, so delegated: `setsid bash mr-ci-watch 407 m22-s4`, detached. Action for this tick = lock reap + CI-wait delegation; no merge, no new launch (budget NORMAL, d7=$1652.67/$2783). mr-state.json inflight cleared (rooted run for m22-s4 finished; awaiting merge on CI green via the watcher event).
