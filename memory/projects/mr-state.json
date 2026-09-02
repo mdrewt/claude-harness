@@ -6,13 +6,25 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "m22-s6",
+   "run_id": "mr-spawn-20260902T000256Z-3084739",
+   "session_leader": 3084792,
+   "claude_pid": 3084795,
+   "model": "opus",
+   "effort": "high",
+   "tier": "routine",
+   "repo": "project",
+   "started_utc": "2026-09-02T00:03:00Z"
+  }
+ ],
  "last_tick_utc": "2026-09-01T22:00:14Z",
  "live_watchers": [],
  "master": {
-  "ci": "red-e2e-flake-rerun-triggered-33561683660",
+  "ci": "success",
   "nightly": "in_progress",
-  "sha": "5fd93e4ed3f442786ccf805286f288ff3759f775"
+  "sha": "5fd93e4"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +39,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "22:00Z tick: master post-merge CI for m22-s3b (5fd93e4, PR#408) resolved to e2e=FAILURE (ci=SUCCESS) on run 33561683660 -- single test wallet-balance.spec.ts:911 11r-e (ADR-0169), quest_001-via-elder_oak precondition, npc.rs:105-120 StartQuest path. Read the full m22-s3b diff against this failure signature: npc.rs's only change is the additive erase_npc_state() helper (PRV1-6b, called only from account_deletion_reaper) -- apply_effects_to_db/talk/advance_dialogue at npc.rs:90-130 is byte-for-byte untouched; lib.rs's 69-line diff is a verbatim extraction (resolve_all_live_interactions, same 4 calls same order) plus a new init/sync_content wiring call to accounts::ensure_deletion_reapers_armed -- no dialogue/quest logic anywhere in the diff. No code-level regression signature ties this to the diff. Classified as a chronic e2e flake (same category/precedent as the 16:36Z tick's diff-disjoint ranked-forfeit RL-18 flake, resolved by plain rerun, not revert/fix-forward). Action: gh run rerun 33561683660 --failed (exit 0). No PR to attach mr-ci-watch to (master-push run). Next tick re-verifies the rerun live before any further action. Untracked scratch files at repo root (m22-s3b.red-1.txt/.red-2.txt/.teeth.txt, monster-realm-m22-s3b-plan.md) are safe leftovers from the completed m22-s3b run, not investigated further this tick.",
+ "notes": "00:03Z tick: master CI re-verified green (m22-s3b rerun 33561683660 success). Launched m22-s6 (deletion-completeness gate, PRV1-15/16), touches REDIRECTED per ADR-0224 (no new evals/*.eval.mjs) to server-module/tests/deletion_completeness.rs real tests. tier=routine opus@high.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
