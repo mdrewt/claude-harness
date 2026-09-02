@@ -45,3 +45,7 @@ mr-gates seed returned criteria=0 SPEC-SECTION-NOT-FOUND for m22-s3 — the acce
 
 No fan-out this tick: S3 is explicitly deliberately non-parallelizable per spec §11 ("largest, highest-risk single-file slice... no sibling fan-out"), and no other disjoint eligible candidate was identified in the PLAN §9 derivation (M24 has zero prior slices and would need contract-first S0 first; not selected this tick to keep to one action).
 
+## 2026-09-01T09:15:29Z — 09:14Z tick — m22-s3 PR#404 open, CI in-progress, delegated to mr-ci-watch
+Native tick mr-sup-native-20260901T091425Z-1613610 (09:14Z). Gate-0/1: no live per-run lock for m22-s3 (leader dead, done=true), no chain mutex, HOLD-NONE, no human-session collision. m22-s3 finished (fable, 1 attempt, $109.81, EXIT=0) — PR#404 open (mdrewt/monster-realm), mergeable=MERGEABLE, mergeStateStatus=UNSTABLE only because ci+e2e checks are still IN_PROGRESS (not failed). Per doctrine, delegated the CI-wait to mr-ci-watch (spawned detached, pid 1614738) rather than polling; it resumes the merge via an event tick once checks resolve. Noted the run's disclosed process incident: a turn-boundary shell-cwd reset pushed a stray gitlink-only commit 695a19d to origin/master, immediately reverted by f161306 (also pushed) -- matches master_ci_latest's visible revert commit; no source content or history rewrite involved, master unaffected. No launch this tick (queue empty, budget NORMAL, d7=$1382.59/$2783 eff., fable_ok=true) -- next tick's fast path is the mr-ci-watch resume event.
+
+

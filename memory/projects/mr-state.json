@@ -6,25 +6,13 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [
-  {
-   "adr_reserved": "0230",
-   "effort": "high",
-   "model": "opus",
-   "repo": "project",
-   "run_id": "mr-spawn-20260902T030302Z-3263772",
-   "session_leader": 3263826,
-   "slice": "m22-s7",
-   "started_utc": "2026-09-02T03:03:09Z",
-   "tier": "routine"
-  }
- ],
+ "inflight": [],
  "last_tick_utc": "2026-09-02T03:03:17Z",
  "live_watchers": [],
  "master": {
   "ci": "success",
   "nightly": "in_progress",
-  "sha": "62aea8a"
+  "sha": "3484ebe6469dfa13716b053228e849fa958c73c8"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -39,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "03:00Z tick: gate-0 found stale-but-already-reconciled /tmp/mr_pass_m22-s3b.done (PR#408 merged+recorded prior tick); committed 5 untracked m22-s3b/m22-s6 artifact files a prior recovery tick left uncommitted (harness commit 2043297). Corrected adr_next_free 229->231 (0229 was minted for m22-s6 but never bumped by the recovery tick; reserved 0230 here). Gate 3: master CI green, no inflight/open-PRs, residuals all under aging thresholds (oldest 2.35d < t1=3d), queue empty -- fell through to PLAN/spec derivation: M22 spine S0-S6 merged (S3b covered S3 redirect, S6 shipped ADR-0224-compliant real tests), launched S7 (runbook: docs/observability-dr-runbook.md + thin structural phase in evals/account-e2e.eval.mjs) opus@high tier=routine, ADR-0230. mr-spawn LAUNCHED leader=3263826 claude_pid=3263829.",
+ "notes": "m22-s7 merged PR#410 (3484ebe); master CI green; no new launch this tick (no queue/aging-residual pressure, budget NORMAL)",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
