@@ -1,0 +1,12 @@
+ FAIL  src/ui/exportAssembly.test.ts [ src/ui/exportAssembly.test.ts ]
+Error: Cannot find module './exportAssembly' imported from /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/m22-s8/client/src/ui/exportAssembly.test.ts
+ FAIL  src/ui/privacyModel.test.ts [ src/ui/privacyModel.test.ts ]
+Error: Cannot find module './privacyModel' imported from /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/m22-s8/client/src/ui/privacyModel.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/net/rowConvert.test.ts > rowConvert M21b-2: accountRowToStore — exact key set, explicit mapping (RC-AC-04) > ★★ RC-AC-04a BITES: the output has EXACTLY the nine account keys — kills the spread impl
+ FAIL  src/net/rowConvert.test.ts > rowConvert M21b-2: accountRowToStore — exact key set, explicit mapping (RC-AC-04) > ★★ RC-AC-04b BITES: the OPTIONAL keys are PRESENT (as undefined), not omitted
+ FAIL  src/net/rowConvert.test.ts > rowConvert M22 S8: accountRowToStore carries terminal_at_ms (PRV1-4) > ★★ S8T-TERMINAL-PASSTHROUGH BITES: a PRESENT marker is carried byte-identically — and 0n is a REAL marker
+ FAIL  src/net/rowConvert.test.ts > rowConvert M22 S8: accountRowToStore carries terminal_at_ms (PRV1-4) > ★★ S8T-TERMINAL-NOT-FABRICATED BITES: an ABSENT marker stays undefined — kills `?? 0n`
+ FAIL  src/net/rowConvert.test.ts > rowConvert M22 S8: accountRowToStore carries terminal_at_ms (PRV1-4) > ★★ S8T-ACCOUNT-KEYSET-9 BITES: the converted row has EXACTLY nine keys, terminalAtMs among them
+ Test Files  3 failed | 1 passed (4)
+      Tests  5 failed | 425 passed (430)

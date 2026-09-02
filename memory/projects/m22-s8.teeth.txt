@@ -1,0 +1,15 @@
+M1 truthiness marker [S8T-TERMINAL-ZERO-IS-MARKER]: applied=true failedTests=1 TARGET_TOOTH_RED=YES
+M2 status-first (marker checked late) [S8T-TERMINAL-BEATS-STATUS]: applied=true failedTests=1 TARGET_TOOTH_RED=YES
+M3 dark pending -> unknown, cancel refused [S8T-COUNTDOWN-DARK-STILL-CANCELLABLE]: applied=true failedTests=2 TARGET_TOOTH_RED=YES
+M4 pre-reject a due cancel [S8T-CANCEL-DUE-STILL-PERMITTED]: applied=true failedTests=1 TARGET_TOOTH_RED=YES
+M5 drop the in-flight guard [S8T-DELETE-INFLIGHT-REFUSED]: applied=true failedTests=2 TARGET_TOOTH_RED=YES
+M6 exact-equality reject match [S8T-TERMINAL-SERVER-MSG-PREFIXED]: applied=true failedTests=1 TARGET_TOOTH_RED=YES
+M7 route terminal on `which` alone [S8T-TERMINAL-NOT-FROM-OTHER-REJECT]: applied=true failedTests=1 TARGET_TOOTH_RED=YES
+M8 owner filter used only to select [S8T-ASSEMBLE-MIXED-OWNER-LEAK]: applied=true failedTests=1 TARGET_TOOTH_RED=YES
+M9 range check without integer check [S8T-ASSEMBLE-NONINTEGER]: applied=true failedTests=1 TARGET_TOOTH_RED=YES
+M10 string sort for newest request [S8T-ASSEMBLE-STALE-9-VS-10]: applied=true failedTests=2 TARGET_TOOTH_RED=YES
+M11 splice input order [S8T-ASSEMBLE-COMPLETE]: applied=true failedTests=1 TARGET_TOOTH_RED=YES
+M12 JSON.parse round trip [S8T-NO-JSON-PARSE-SOURCE]: applied=true failedTests=2 TARGET_TOOTH_RED=YES
+M13 fabricate 0n for an absent marker [S8T-TERMINAL-NOT-FABRICATED]: applied=true failedTests=2 TARGET_TOOTH_RED=YES
+M14 drop the marker key entirely [S8T-ACCOUNT-KEYSET-9]: applied=true failedTests=5 TARGET_TOOTH_RED=YES
+BITE-PROOF SUMMARY: 14/14 mutants caught by their NAMED tooth
