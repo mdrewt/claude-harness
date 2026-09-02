@@ -26,6 +26,30 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-37 — overlayA11yWiring.test.ts is not safe under vitest --sequence.concurrent (pre-existing, co (from rb-18 R-rb18-CONCURRENT, deferred 2026-08-30)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-18 · residual: R-rb-18-R-rb18-CONCURRENT
+
+Deferred with reason: Measured by the verifier: --sequence.concurrent gives 76 failed/40 passed on the rb-18 branch and 43 failed/41 passed on origin/master @ 3455155 — same root cause, so it is a pre-existing file-wide property, NOT introduced by rb-18. Cause: the whole file shares module-scope mutable state (one happy-dom document, one spy on openOverlayA11y/closeOverlayA11y, and OPEN_OVERLAYS inside the real overlay
+
+EARS: overlayA11yWiring.test.ts is not safe under vitest --sequence.concurrent (pre-existing, confirmed on master)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-36 — main.ts:1574 citation for the fresh-view-model-per-batch fact has drifted in two files (from rb-18 R-rb18-MAINCITE, deferred 2026-08-30)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-18 · residual: R-rb-18-R-rb18-MAINCITE
+
+Deferred with reason: dialogueView.ts:16 and dialogueView.test.ts:243 both cite main.ts:1574 for 'main.ts builds a fresh view model on every store batch'. main.ts:1574 is unrelated code (a flatMap building cureItems); the real site is the store.onBatchApplied block at main.ts:1627-1641. rb-18 corrected its own copy in overlayA11yWiring.test.ts and flagged these two: dialogueView.ts is a production file outside rb-18's 
+
+EARS: main.ts:1574 citation for the fresh-view-model-per-batch fact has drifted in two files
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-35 — claimView's cross-view opener drives show(), but the live production open door is render() (from rb-18 R-rb18-CLAIMDOOR, deferred 2026-08-30)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-18 · residual: R-rb-18-R-rb18-CLAIMDOOR
+
+Deferred with reason: main.ts openClaim() (:454-462) runs applyClaim -> renderClaim() BEFORE show(), so render() has already flipped wasVisible and show()'s guard (claimView.ts:118) is a structural no-op in every current call path. overlayA11yWiring.test.ts's OPENERS.claimView therefore pins a real class invariant but NOT the live production edge; that one is owned by claimView.test.ts's S4-claimView-THREE-DOORS. Re-po
+
+EARS: claimView's cross-view opener drives show(), but the live production open door is render() (claimView.ts:107)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-34 — X8-residual (from rb-7 X8-residual, deferred 2026-08-29)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-7 · residual: R-rb-7-X8-residual
