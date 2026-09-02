@@ -64,3 +64,55 @@ Native tick mr-sup-native-20260901T110006Z-1690564 (11:00Z). Gate-0/1: no live p
 Native tick mr-sup-native-20260901T122104Z-1868676 (12:21Z). rb-34 run finished rc=0 (fable, 1 attempt, single-attempt xhigh, cost recorded in ledger). PR https://github.com/mdrewt/monster-realm/pull/405 open against master, mergeStateStatus=UNSTABLE (mergeable=MERGEABLE), both ci+e2e checks IN_PROGRESS as of 12:19Z live re-check. No chain-owner mutex held, no other live per-run locks. Per doctrine, delegated the CI wait: spawned mr-ci-watch 405 rb-34 detached (pid 1869729 confirmed live) rather than polling. Recorded ledger row (outcome=DELEGATED-CI-WAIT) and exiting; merge/audit/gates-verify to be completed by the resuming event tick once checks land.
 
 
+## 2026-09-01T12:29:30Z — rb-34 MERGED (PR#405 -> 87f35e7)
+Native tick mr-sup-native-20260901T122556Z-1871649 (12:25Z, ci-forced). Gate-0: found the 12:21Z tick's own delegated-CI-wait record (mr-state.json/handoff/handoff-archive + untracked rb-34 plan memo) written but never committed to the harness repo -- same recurring catch-up pattern as prior ticks. Committed it (b7a982b), pushed origin/main. EVENT rb-34.ci.md confirmed PR#405 both checks (ci+e2e) SUCCESS at 12:25:53Z; live re-check matched (mergeStateStatus=CLEAN, mergeable=MERGEABLE). mr-gates verify --slice rb-34: 4/5 met, X5 DEFERred->backlog (blocked on S3b, folds into a future R-m22-s3-X13 slice per rb-34's own buildable DEFER list), FLAGGED only on X1's MANUAL citation (recorded accounts.rs:509-511, live worktree resolves the same content at ~499 -- benign post-doc-edit line drift, not a fraud signal; re-confirmed the substantive claim live: guest_name is the only display-name value accounts.rs writes today, zero TOMBSTONE_* symbol occurrences). mr-audit: orchestration=CLEAN (4 lenses: red-team+reviewer+tester+verifier, models fable/opus/sonnet), gating_advisory=CLEAN (test-file diff is pure addition, 0 removed/modified asserts, 0 skip markers, 0 suppressions). Diff base..head is purely additive: ARCHITECTURE.md (+10) + accounts_tests.rs (+268), matches declared touches exactly. Doc-corpus disposition findings (11 missing_disposition/orphan_disposition rows) are pre-existing gaps across unrelated spec files, corpus-scoped per the tool's own contract, not about this diff -- no action this tick. Merged via gh pr merge --squash --delete-branch (87f35e7, mergedAt 12:28:43Z). Cleaned local worktree .claude/worktrees/rb-34 + branch slice/rb-34 (both local and remote gone); master repo fast-forwarded e321442->87f35e7. mr-gates residuals close --slice rb-34 --pr 405: closed 1 (the promoted-residual source row); R-rb-34-X5 was auto-emitted to the residual sink by mr-gates verify for future aging-based promotion (not queued now -- ages normally). Post-merge master CI run (33507... new sha 87f35e7) was QUEUED at record time; nightly (e321442) separately in_progress -- did not sit blocking on either per doctrine (no dedicated post-merge-master watcher exists). Ledger row appended (outcome=MERGED, model=fable, attempts=1, orch=CLEAN, gating=CLEAN). No composite launch this tick: residuals-unclaimed / queue[] re-derivation deferred to the next tick per one-clean-action discipline after a merge+cleanup sequence this involved; queue[] is currently empty (drained by 11:00Z/10:00Z ticks) so the next tick does the full PLAN§9-or-residuals derivation fresh. Governor NORMAL (d7=$1434.90/2783 eff., fable_d7=$602.14/2298, fable_ok=true). No BLOCKERs, no rate-limit event.
+
+## 2026-09-01T13:04:05Z — 13:03Z tick — M22 spine resumed: m22-s4 + m22-s5 launched (fan-out)
+Native tick rid=mr-sup-native-20260901T130036Z-1905452-28089 (13:00Z cron). Gate 0/1: no live
+locks, no chain mutex held, HOLD-NONE, no resident-session collision, both repos fetched clean,
+master 87f35e7 matches origin (rb-34/PR#405 already merged by the prior 12:25Z tick). Gate 3: no
+open PRs, no wip branches; mr-gates residuals list --unclaimed shows 18 open items, all MED
+severity, max age 1.77d -- none past t1_promote_days=3, so none outrank PLAN sec9 work; queue[]
+empty.
+
+Derivation: M22 (privacy/deletion, ADR-0031) is mid-spine. ADR-0225 (m22-s3, merged today 09:18Z)
+right-sized S3 -- shipped PRV1-4/5/7/19 guards + reaper skeleton (no-op) in accounts.rs, but
+DEFERRED the actual PRV1-6 cascade to a future "S3b" (needs erase/anonymize helpers in ~10 owning
+modules, out of S3's touches under G5 MODULE_WRITE_ISOLATION) and left PRV1-8 (provision_or_touch_
+account reactivation policy) BLOCKED on operator issue #403 (still OPEN, 0 comments). Per ADR-0225
+Consequences: "the S5 fan-out is unblocked (only S3 could ship the predicate)" -- should_reject_
+for_deletion already landed, so S4 (export) and S5 (gameplay gating) are launchable now without
+waiting on S3b or PRV1-8 (S3b's blocked half is the terminal-stamp cascade only; S4/S5 don't stamp
+terminal_at_ms). Chose to fan out both: mr-disjoint m22-s4:server-module/src/privacy.rs vs
+m22-s5:server-module/src/{trading,pvp,guards}.rs -> SAFE, disjoint, no shared registry/enum axis.
+free -g shows 40G available (>>1 full build each). Routed both HARD tier (fable@xhigh) --
+privacy/export and security-authz-guard surfaces both meet the HARD criteria; budget.fable_ok=true,
+fable_d7=602/2298 allowance, well under the 2068 guard.
+
+Launched: m22-s4 (ADR pre-alloc 226, PRV1-11..14) and m22-s5 (ADR pre-alloc 227, PRV1-9/10, delegates
+to accounts::should_reject_for_deletion per ADR-0225's explicit "never re-derive" instruction). Both
+briefs instruct: ADR-0224 retires evals/*.eval.mjs -- write ordinary Rust #[test]s, not new eval
+scripts. mr-gates seed came back criteria=0 SPEC-SECTION-NOT-FOUND for both (the M22 spec lists
+slices as a table row, not a "### S4"/"### S5" heading the auto-seeder parses) -- each brief is
+told to author its own X* acceptance gates manually; not a blocker, just no auto-seed.
+
+NOT launched / deferred: S3b itself (the real cascade + lib.rs resolve_all_live_interactions
+extraction + terminal stamp) stays out because PRV1-8 must land in-or-before whichever slice first
+writes terminal_at_ms:Some (ADR-0225's explicit sequencing constraint), and issue #403 is still
+unanswered -- S3b is not yet buildable. The 8 m22-s3 residuals (R-m22-s3-X11..X18, all describing
+S3b's scope) are correctly left unpromoted; they're exhaust of ADR-0225's own handoff note, not new
+information, and are all well under the promote-aging threshold.
+
+Two live rooted runs at exit: m22-s4 (leader pid 1907212), m22-s5 (leader pid 1908503), both
+pr_repo=mdrewt/monster-realm. No merges, no parks, no BLOCKERs raised this tick (issue #403 already
+open from a prior tick, not reopened). governor state: NORMAL throughout.
+
+## 2026-09-01T15:02:34Z — m22-s4 + m22-s5 rate-limit crash — resumed 15:02Z tick
+Both hard-tier fable slices launched 13:00Z (12:56Z tick) crashed at ~14:29-14:30Z on an org-level five_hour rate-limit rejection (overageDisabledReason=org_level_disabled), not a code defect: m22-s4 attempt 2 rejected immediately on relaunch; m22-s5 attempt 1 rejected mid-turn right after a green 15/15 mutant register + 13/13 targeted test pass. Neither had opened a PR. resetsAt=2026-09-01T15:00:00Z; this tick landed at 15:00:09Z, past reset, so both were resumed directly (no mr-reset-watch needed -- the wrapper's own retries had already exhausted before the reset, and by the time this tick ran the window was already clear).
+
+m22-s4 (feat/m22-s4-export, ADR-0226): worktree holds only the 'wip(m22-s4): plan + ADR-0226 checkpoint' commit -- no privacy.rs implementation landed yet. A staged test snippet was written to /tmp/m22s4-tests/privacy_tests_append.rs (outside the worktree, scratch only, not authoritative). Resumed fresh from the plan checkpoint via mr-spawn (leader=2171901).
+
+m22-s5 (slice/m22-s5, ADR-0227): worktree has 3 commits through the PRV1-9 gate + stage-2 behavioral tests (a6411b2), PLUS uncommitted edits to guards_tests.rs/trading_tests.rs (reviewer anchor-ambiguity fix + mutant-hardening) that are real tested work -- the 15/15 mutant-caught result was measured against exactly those edits. Preserved in-worktree, not touched by supervisor. Resumed via mr-spawn (leader=2172304) with resume_block noting to pick the uncommitted diff up rather than redo it.
+
+No park-counter bump (rate-limit parks are exempted per doctrine). Governor NORMAL (d7=$1543.58/$2783, 55%; fable_ok=true). No mutex contention, no other live locks. queue[] empty; no residual past aging thresholds this tick (oldest R-rb-7-X8-residual at 2.93d, below t1_promote_days=3).
+
