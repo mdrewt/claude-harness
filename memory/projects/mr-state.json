@@ -6,25 +6,13 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "74a5bc8"
  },
- "inflight": [
-  {
-   "slice": "m22-s6",
-   "run_id": "mr-spawn-20260902T000256Z-3084739",
-   "session_leader": 3084792,
-   "claude_pid": 3084795,
-   "model": "opus",
-   "effort": "high",
-   "tier": "routine",
-   "repo": "project",
-   "started_utc": "2026-09-02T00:03:00Z"
-  }
- ],
- "last_tick_utc": "2026-09-01T22:00:14Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-02T02:00:16Z",
  "live_watchers": [],
  "master": {
   "ci": "success",
   "nightly": "in_progress",
-  "sha": "5fd93e4"
+  "sha": "62aea8a"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -39,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "00:03Z tick: master CI re-verified green (m22-s3b rerun 33561683660 success). Launched m22-s6 (deletion-completeness gate, PRV1-15/16), touches REDIRECTED per ADR-0224 (no new evals/*.eval.mjs) to server-module/tests/deletion_completeness.rs real tests. tier=routine opus@high.",
+ "notes": "02:00Z tick: recovered a stranded mid-bookkeeping crash from the 01:36Z tick -- its GH merge of m22-s6 PR#409 (62aea8a) had succeeded, master ff-only'd and worktree/branch already clean, but the process died before writing the ledger MERGED row/handoff/state and releasing the mutex+per-run lock. Ran mr-audit fresh (orchestration CLEAN, gating_advisory CLEAN, acceptance FLAGGED-advisory 8/8 met -- adjudicated CLEAN-equivalent, spotcheck X7 mismatch is timing-only). Wrote the ledger row, handoff entry, this state update, then mr-unlock all (mutex owner 3235932 dead, per-run lock leader 3084792 dead). M22 spine now S0-S6 merged; S7-S9 remain. No new launch this tick -- treated the recovery as the one mutating action.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -62,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260901T220014Z-3063051",
- "updated_utc": "2026-09-01T22:02:48Z"
+ "updated_by": "mr-sup-native-20260902T020016Z-3247316",
+ "updated_utc": "2026-09-02T02:03:30Z"
 }
