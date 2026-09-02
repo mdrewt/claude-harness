@@ -6,11 +6,22 @@
     "ci": "no-remote-ci-local-gate-green",
     "sha": "74a5bc8"
   },
-  "inflight": [],
+  "inflight": [
+    {
+      "slice": "rb-36",
+      "run_id": "mr-spawn-20260902T220112Z-337997",
+      "session_leader": 338051,
+      "model": "opus",
+      "effort": "high",
+      "tier": "routine",
+      "repo": "project",
+      "started_utc": "2026-09-02T22:01:16Z"
+    }
+  ],
   "last_tick_utc": "2026-09-02T20:00:13Z",
   "live_watchers": [],
   "master": {
-    "sha": "db0d1c1",
+    "sha": "b5302aa",
     "ci": "success",
     "nightly": "success"
   },
@@ -27,21 +38,13 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "rb-35 dispositioned wontfix pre-launch (PR#85); queue drained to rb-36/rb-37",
+  "notes": "22:00Z tick: launched rb-36 (opus/high, routine tier), single action. queue[]=[rb-37] next.",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
   },
   "parked": [],
   "queue": [
-    {
-      "slice": "rb-36",
-      "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-      "reason": "promoted residual R-rb-18-R-rb18-MAINCITE",
-      "added_utc": "2026-09-02T20:03:53Z",
-      "added_by": "n/a",
-      "derived_from_master_sha": "b5302aac3eb17167b34427e7b034b5c05ba6416c"
-    },
     {
       "slice": "rb-37",
       "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
