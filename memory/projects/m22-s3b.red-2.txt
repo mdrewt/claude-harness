@@ -1,0 +1,38 @@
+        FAIL [   0.004s] (  6/762) monster-realm-module accounts::accounts_tests::auth12_13_14_caller_state_guards_precede_code_resolution
+        FAIL [   0.005s] ( 51/762) monster-realm-module accounts::accounts_tests::m22s3b_anonymized_account_truth
+        FAIL [   0.005s] ( 53/762) monster-realm-module accounts::accounts_tests::m22s3b_erase_monsters_shape
+        FAIL [   0.005s] ( 57/762) monster-realm-module accounts::accounts_tests::m22s3b_erase_inventory_shape
+        FAIL [   0.005s] ( 62/762) monster-realm-module accounts::accounts_tests::m22s3b_plan_deletion_rearms_idempotent
+        FAIL [   0.005s] ( 63/762) monster-realm-module accounts::accounts_tests::m22s3b_reaper_rearm_at_ms_truth_table
+        FAIL [   0.005s] (126/762) monster-realm-module battle::battle_tests::m22s3b_battle_tombstone_truth_table
+        FAIL [   0.005s] (440/762) monster-realm-module npc::npc_tests::m22s3b_erase_npc_state_shape
+        FAIL [   0.005s] (583/762) monster-realm-module pvp::pvp_tests::ea_pvp_05_on_disconnect_calls_pvp_helpers
+        FAIL [   0.005s] (688/762) monster-realm-module ranking::ranking_tests::m22s3b_deleted_name_rows
+        FAIL [   0.005s] (692/762) monster-realm-module ranking::ranking_tests::m22s3b_anonymize_display_names_shape
+        FAIL [   0.005s] (694/762) monster-realm-module ranking::ranking_tests::m22s3b_set_profile_name_gated
+        FAIL [   0.006s] ( 54/762) monster-realm-module accounts::accounts_tests::m22s3b_ensure_rearm_wiring
+        FAIL [   0.006s] ( 55/762) monster-realm-module accounts::accounts_tests::m22s3b_erase_character_rows_shape
+        FAIL [   0.006s] ( 64/762) monster-realm-module accounts::accounts_tests::m22s3b_purge_named_twice_claim_and_cascade
+        FAIL [   0.006s] ( 65/762) monster-realm-module accounts::accounts_tests::m22s3b_provision_terminal_reset_defaults
+        FAIL [   0.006s] ( 71/762) monster-realm-module accounts::accounts_tests::m22s3b_resolver_body_order
+        FAIL [   0.006s] ( 72/762) monster-realm-module accounts::accounts_tests::m22s3b_terminal_account_truth
+        FAIL [   0.006s] ( 85/762) monster-realm-module accounts::accounts_tests::rb22_purge_called_exactly_once_in_accounts_rs
+        FAIL [   0.006s] ( 96/762) monster-realm-module accounts::accounts_tests::rb24_deletion_reaper_body_is_pinned_cascade
+        FAIL [   0.006s] (133/762) monster-realm-module battle::battle_tests::m22s3b_anonymize_battles_sweeps_joins_before_swap
+        FAIL [   0.006s] (239/762) monster-realm-module economy::economy_tests::m22s3b_erase_wallet_sanctioned_shape
+        FAIL [   0.006s] (512/762) monster-realm-module playtest::playtest_tests::m22s3b_erase_playtest_events_shape
+        FAIL [   0.006s] (601/762) monster-realm-module pvp::pvp_tests::m22s3b_on_disconnect_reaches_the_resolver
+        FAIL [   0.006s] (603/762) monster-realm-module pvp::pvp_tests::m22s3b_disarm_pvp_deadlines_shape
+        FAIL [   0.006s] (668/762) monster-realm-module raising::raising_tests::m22s3b_erase_heal_cooldown_shape
+        FAIL [   0.006s] (749/762) monster-realm-module trading::trading_tests::m22s3b_resolver_extraction_chain
+        FAIL [   0.006s] (752/762) monster-realm-module trading::trading_tests::m22s3b_erase_trade_offers_shape
+        FAIL [   0.007s] ( 58/762) monster-realm-module accounts::accounts_tests::m22s3b_cascade_covers_manifest
+        FAIL [   0.007s] ( 61/762) monster-realm-module accounts::accounts_tests::m22s3_terminal_guards_precede_state_writes
+        FAIL [   0.007s] ( 88/762) monster-realm-module accounts::accounts_tests::rb24_arm_called_exactly_once_in_crate
+        FAIL [   0.007s] (253/762) monster-realm-module economy::economy_tests::player_wallet_rows_are_never_deleted
+        FAIL [   0.007s] (611/762) monster-realm-module pvp::pvp_tests::m22s3b_erase_pvp_rows_shape
+        FAIL [   0.007s] (614/762) monster-realm-module pvp::pvp_tests::ptc5b_4_wiring_scan_on_disconnect_calls_resolve_wild_battle
+        FAIL [   0.007s] (695/762) monster-realm-module ranking::ranking_tests::d1_scan_no_eager_write_in_get_or_init
+        FAIL [   0.008s] ( 69/762) monster-realm-module accounts::accounts_tests::m22s3b_guard3_terminal_reason_distinct
+        FAIL [   0.008s] ( 92/762) monster-realm-module accounts::accounts_tests::rb22_purge_named_nowhere_else_in_crate
+     Summary [   0.247s] 762 tests run: 725 passed, 37 failed, 0 skipped

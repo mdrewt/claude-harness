@@ -1,0 +1,37 @@
+MUTANT rearm-removed -> FAILED
+    thread 'accounts::accounts_tests::rb24_deletion_reaper_body_is_pinned_cascade' (2619633) panicked at server-module/src/accounts_tests.rs:6729:5:
+MUTANT rearm-now-clock -> FAILED
+    thread 'accounts::accounts_tests::rb24_deletion_reaper_body_is_pinned_cascade' (2620344) panicked at server-module/src/accounts_tests.rs:6729:5:
+MUTANT resolve-after-erase -> FAILED
+    thread 'accounts::accounts_tests::rb24_deletion_reaper_body_is_pinned_cascade' (2621031) panicked at server-module/src/accounts_tests.rs:6781:5:
+MUTANT character-after-names -> FAILED
+    thread 'accounts::accounts_tests::rb24_deletion_reaper_body_is_pinned_cascade' (2621710) panicked at server-module/src/accounts_tests.rs:6806:5:
+MUTANT terminal-stamp-early -> FAILED
+    thread 'accounts::accounts_tests::rb24_deletion_reaper_body_is_pinned_cascade' (2622419) panicked at server-module/src/accounts_tests.rs:6819:5:
+MUTANT wallet-delete-widened -> FAILED
+    thread 'economy::economy_tests::player_wallet_rows_are_never_deleted' (2623113) panicked at server-module/src/economy_tests.rs:1869:5:
+MUTANT prv18b-arm-dropped: ANCHOR-FAIL
+MUTANT guard3-split-dropped -> FAILED
+    thread 'accounts::accounts_tests::m22s3b_guard3_terminal_reason_distinct' (2623831) panicked at server-module/src/accounts_tests.rs:9661:5:
+MUTANT prv18b-arm-dropped -> FAILED
+    thread 'accounts::accounts_tests::m22s3b_provision_terminal_reset_defaults' (2624766) panicked at server-module/src/accounts_tests.rs:9452:5:
+MUTANT resolver-dead-guard -> FAILED
+    thread 'accounts::accounts_tests::m22s3b_resolver_body_order' (2640097) panicked at server-module/src/accounts_tests.rs:9445:5:
+MUTANT practice-dedup-dropped -> FAILED
+    thread 'battle::battle_tests::m22s3b_anonymize_battles_sweeps_joins_before_swap' (2640782) panicked at server-module/src/battle_tests.rs:6373:5:
+MUTANT sweep-hardcoded-empty -> FAILED
+    thread 'accounts::accounts_tests::m22s3b_ensure_rearm_wiring' (2641476) panicked at server-module/src/accounts_tests.rs:9681:9:
+MUTANT character-unfiltered-iter -> FAILED
+    thread 'accounts::accounts_tests::m22s3b_erase_character_rows_shape' (2642187) panicked at server-module/src/accounts_tests.rs:10281:5:
+MUTANT trade-counterparty-dead-read -> FAILED
+    thread 'trading::trading_tests::m22s3b_erase_trade_offers_shape' (2642873) panicked at server-module/src/trading_tests.rs:3278:5:
+MUTANT battle-action-survives -> FAILED
+    thread 'pvp::pvp_tests::m22s3b_erase_pvp_rows_shape' (2643558) panicked at server-module/src/pvp_tests.rs:5266:5:
+NOTE (verifier audit): rearm-removed and rearm-now-clock both panic first at the frozen-body equality
+line; they are distinguished by a second tooth — rearm-now-clock ALSO reds [rb24/arm-shape-
+account_deletion_reaper] (pinned argument list), which rearm-removed does not. 13 distinct first-
+failure lines across 14 mutants; line numbers recorded pre-r2 (drifted ~30 lines by HEAD).
+MUTATION (verifier, cargo-mutants --in-diff at b7b71d6): 60 mutants — 54 caught, 5 unviable,
+1 MISSED (battle.rs:1567 ==→!= Ongoing skip) → closed by r36 polarity pin; re-run must show 60/60 handled.
+MUTANT ongoing-polarity-flipped -> FAILED (r36 polarity pin bites; verifier survivor closed)
+MUTANT skip-below-sweeps -> FAILED (r36 first-sweep anchor bites; verifier residual closed)
