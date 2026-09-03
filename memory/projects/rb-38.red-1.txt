@@ -1,0 +1,26 @@
+rb-38 — MEASURED RED of the A11Y-27 RENDERER arm
+run: npx playwright test --project=reduced-motion  (worktree at 97c0ea5, base origin/master 69d6f5d)
+spacetime 2.8.1 in-memory @127.0.0.1:3000, chromium-1228, @playwright/test 1.61.1
+
+stats: expected=3 unexpected=1 flaky=0 skipped=0   (playwright exit code 1)
+
+[PASSED] the reduced-motion project config reaches Chromium, and the @media guard is evaluated
+[PASSED] with the preference off, the same rule animates (the guard is conditional, not blanket)
+[FAILED] RENDERER ARM (E1, DISCLOSURE — EXPECTED RED on master): under the reduced-motion project, the own character NEVER renders a fractional sub-tile position
+[PASSED] RENDERER ARM mirror image: with the OS preference OFF, the own character DOES render fractional sub-tile motion (proves the pair is not vacuously all-snapped)
+
+DECIDING LINE (the gate assertion, reduced-motion.spec.ts:450):
+  expect(after.sawFractionalOwnMotion).toBe(false)  ->  Expected: false / Received: true
+
+The RED is on the gate assertion itself, NOT a timeout or a missing hook: every
+anti-vacuity clause ahead of it passed — matchMedia('(prefers-reduced-motion: reduce)')
+was true (so the project config DID reach Chromium), identity was non-empty, ownAuthTile
+was non-null, and the own tile actually advanced by exactly 1 after step('East').
+
+The MIRROR-IMAGE test PASSED (no-preference polarity observed fractional motion), which
+proves the pair is not vacuously all-snapped and that the observable works.
+Both pre-existing STYLESHEET-arm tests still pass.
+
+CONCLUSION: residual R-rb-20-RM-7 is REAL and now measured, not merely argued.
+The renderer ignores the OS reduced-motion preference because client/src/main.ts:2807
+passes no `reduceMotion` key to resolver.resolve(). main.ts is OUT OF SCOPE for rb-38.

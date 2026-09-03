@@ -1,0 +1,271 @@
+{
+  "config": {
+    "argv": [
+      "/home/mdrewt/.asdf/installs/nodejs/24.13.1/bin/node",
+      "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/node_modules/.bin/playwright",
+      "test",
+      "--project=reduced-motion",
+      "--reporter=json"
+    ],
+    "configFile": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/playwright.config.ts",
+    "rootDir": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/e2e/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "default",
+        "name": "default",
+        "testDir": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/e2e",
+        "testIgnore": [
+          "reduced-motion.spec.ts"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "reduced-motion",
+        "name": "reduced-motion",
+        "testDir": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "reduced-motion.spec.ts"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:5290",
+      "reuseExistingServer": false,
+      "timeout": 60000
+    }
+  },
+  "suites": [
+    {
+      "title": "reduced-motion.spec.ts",
+      "file": "reduced-motion.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "the reduced-motion project config reaches Chromium, and the @media guard is evaluated",
+          "ok": true,
+          "tags": [
+            "media"
+          ],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "reduced-motion",
+              "projectName": "reduced-motion",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 427,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T02:18:53.209Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b3e080842fc0b9df9031-2208d10f4a86a9fb4bff",
+          "file": "reduced-motion.spec.ts",
+          "line": 60,
+          "column": 1
+        },
+        {
+          "title": "with the preference off, the same rule animates (the guard is conditional, not blanket)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "reduced-motion",
+              "projectName": "reduced-motion",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 371,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T02:18:53.799Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b3e080842fc0b9df9031-94169de78d29f9d27033",
+          "file": "reduced-motion.spec.ts",
+          "line": 142,
+          "column": 1
+        },
+        {
+          "title": "RENDERER ARM (E1, DISCLOSURE — EXPECTED RED on master): under the reduced-motion project, the own character NEVER renders a fractional sub-tile position",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "reduced-motion",
+              "projectName": "reduced-motion",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 937,
+                  "error": {
+                    "message": "Error: sawFractionalOwnMotion was true after a single move under the OS reduced-motion preference (matchMedia confirmed ON above). This means the own character's slide clock animated a fractional sub-tile position while the user had reduced motion requested — the RENDERER never learned about the preference. MEASURED cause on master: `client/src/main.ts:2807` calls `resolver.resolve({...})` with no `reduceMotion` key, so `renderResolver.ts:83`'s `reduceMotion = false` default applies on every frame. This is the EXPECTED-RED disclosure this slice (rb-38) exists to record — see this file's header RENDERER ARM note. Do NOT edit this assertion to accept `true`; fix the wiring in a successor slice instead.\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mfalse\u001b[39m\nReceived: \u001b[31mtrue\u001b[39m",
+                    "stack": "Error: sawFractionalOwnMotion was true after a single move under the OS reduced-motion preference (matchMedia confirmed ON above). This means the own character's slide clock animated a fractional sub-tile position while the user had reduced motion requested — the RENDERER never learned about the preference. MEASURED cause on master: `client/src/main.ts:2807` calls `resolver.resolve({...})` with no `reduceMotion` key, so `renderResolver.ts:83`'s `reduceMotion = false` default applies on every frame. This is the EXPECTED-RED disclosure this slice (rb-38) exists to record — see this file's header RENDERER ARM note. Do NOT edit this assertion to accept `true`; fix the wiring in a successor slice instead.\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mfalse\u001b[39m\nReceived: \u001b[31mtrue\u001b[39m\n    at /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/e2e/reduced-motion.spec.ts:450:5",
+                    "location": {
+                      "file": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/e2e/reduced-motion.spec.ts",
+                      "column": 5,
+                      "line": 450
+                    },
+                    "snippet": "  448 |       'header RENDERER ARM note. Do NOT edit this assertion to accept `true`; fix the wiring ' +\n  449 |       'in a successor slice instead.',\n> 450 |   ).toBe(false);\n      |     ^\n  451 | });\n  452 |\n  453 | test('RENDERER ARM mirror image: with the OS preference OFF, the own character DOES render fractional sub-tile motion (proves the pair is not vacuously all-snapped)', async ({"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/e2e/reduced-motion.spec.ts",
+                        "column": 5,
+                        "line": 450
+                      },
+                      "message": "Error: sawFractionalOwnMotion was true after a single move under the OS reduced-motion preference (matchMedia confirmed ON above). This means the own character's slide clock animated a fractional sub-tile position while the user had reduced motion requested — the RENDERER never learned about the preference. MEASURED cause on master: `client/src/main.ts:2807` calls `resolver.resolve({...})` with no `reduceMotion` key, so `renderResolver.ts:83`'s `reduceMotion = false` default applies on every frame. This is the EXPECTED-RED disclosure this slice (rb-38) exists to record — see this file's header RENDERER ARM note. Do NOT edit this assertion to accept `true`; fix the wiring in a successor slice instead.\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mfalse\u001b[39m\nReceived: \u001b[31mtrue\u001b[39m\n\n  448 |       'header RENDERER ARM note. Do NOT edit this assertion to accept `true`; fix the wiring ' +\n  449 |       'in a successor slice instead.',\n> 450 |   ).toBe(false);\n      |     ^\n  451 | });\n  452 |\n  453 | test('RENDERER ARM mirror image: with the OS preference OFF, the own character DOES render fractional sub-tile motion (proves the pair is not vacuously all-snapped)', async ({\n    at /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/e2e/reduced-motion.spec.ts:450:5"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T02:18:54.178Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/test-results/reduced-motion-RENDERER-AR-3147d-ractional-sub-tile-position-reduced-motion/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/rb-38/client/e2e/reduced-motion.spec.ts",
+                    "column": 5,
+                    "line": 450
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "b3e080842fc0b9df9031-d6a0e4068cae73c42968",
+          "file": "reduced-motion.spec.ts",
+          "line": 351,
+          "column": 1
+        },
+        {
+          "title": "RENDERER ARM mirror image: with the OS preference OFF, the own character DOES render fractional sub-tile motion (proves the pair is not vacuously all-snapped)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "reduced-motion",
+              "projectName": "reduced-motion",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 884,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T02:18:55.380Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b3e080842fc0b9df9031-1ef83dd97cd7f3cb707c",
+          "file": "reduced-motion.spec.ts",
+          "line": 453,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-03T02:18:39.380Z",
+    "duration": 17012.549,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}
