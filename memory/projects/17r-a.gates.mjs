@@ -15,7 +15,15 @@
 //   purity — `evals/reduced-motion-purity.eval.mjs`. MEASURED bypass this closes: an inline raw
 //            preference read written directly into main.ts (never importing the owner module) is
 //            a real A11Y-28 single-owner violation and passes ALL FOUR behavioural teeth 4/4.
-//            Only this eval sees it. Without this arm the B1 gate is insufficient standing alone.
+//            Only this eval sees THAT shape, which is why the arm is here.
+//            HONEST LIMIT, MEASURED by this slice's artifact red-team — do not read this arm as
+//            proving single-ownership. The eval's census is a RAW SUBSTRING scan for two literal
+//            tokens, so splitting either literal across a `+` / `.join('')` boundary in a new
+//            module evades it entirely: a decoy reader built that way, wired into main.ts in
+//            place of the owner, was measured passing BOTH arms (`intruders=0`, `teeth=4/4`)
+//            while `render/motionPreference.ts` became unconsumed dead code. Token-splitting is
+//            a pre-existing DECLARED residual of that eval, compensated by the mandatory
+//            desync-guard review, not something this gate closes. Tracked as R-17ra-PURITYSPLIT.
 //   teeth  — the four RM17A behavioural teeth over the live render loop.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
