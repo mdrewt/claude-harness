@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-38 — A11Y-27's RENDERER arm SHALL be honoured end to end in a real browser — the OS (from rb-20 RM-7, deferred 2026-08-31)
+`touches: client/playwright.config.ts, client/e2e/a11y.spec.ts, client/e2e/reduced-motion.spec.ts, evals/ci-gate-wiring.eval.mjs, .github/workflows/nightly.yml, justfile`
+`after:` — · source: rb-20 · residual: R-rb-20-RM-7
+
+Deferred with reason: MEASURED, not assumed: `motionPreferenceFromWindow` has zero production
+
+EARS: A11Y-27's RENDERER arm SHALL be honoured end to end in a real browser — the OS
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-37 — overlayA11yWiring.test.ts is not safe under vitest --sequence.concurrent (pre-existing, co (from rb-18 R-rb18-CONCURRENT, deferred 2026-08-30)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-18 · residual: R-rb-18-R-rb18-CONCURRENT
