@@ -252,3 +252,39 @@ Corrected mr-state.json adr_next_free 229->231 (was stale: S6 minted 0229 but th
 Launched m22-s7: opus@high, tier=routine (docs-only, no schema/reducer/netcode/security surface). mr-spawn: GATES-SEEDED criteria=0 SPEC-SECTION-NOT-FOUND (known cosmetic id-mismatch seen on sibling m22-s3/s6 slices, not a real gap). LAUNCHED leader=3263826 claude_pid=3263829 rid=mr-spawn-20260902T030302Z-3263772.
 
 
+## 2026-09-02T04:45Z — m22-s8 PR #411 OPEN (local `just ci` green, remote CI running)
+
+m22-s8 (M22 §7.2 S8, client half) terminal state reached: PR
+https://github.com/mdrewt/monster-realm/pull/411 open against master, branch `slice/m22-s8`,
+worktree `.claude/worktrees/m22-s8` (left in place for the supervisor's verify). Local `just ci`
+exit 0 (2136 Rust tests, 2919 client tests / 98 files, all evals PASS, check-secrets clean,
+observability validate 8/8). ADR-0231 written at the assigned number; `just adr-digest` regenerated.
+
+**Ledger: 8/11 met with recorded evidence, 3 DEFERred -> backlog, 0 unmet.** All 8 CHECKs are
+vitest `--reporter=json` gates that additionally assert the spec file IMPORTS the production
+module (closes the test-local-reimplementation cheat the plan-phase red-team demonstrated).
+14/14 hand-substituted wrong implementations were caught by their NAMED tooth
+(`memory/projects/m22-s8.teeth.txt`); RED proof at `memory/projects/m22-s8.red-1.txt`.
+
+RIGHT-SIZING: shipped the `terminal_at_ms` data path + the two pure cores
+(`client/src/ui/privacyModel.ts`, `client/src/ui/exportAssembly.ts`). Deferred the DOM overlay +
+`main.ts` wiring + the export transport to **m22-s8b** for two measured reasons: (a) one new
+`client/src/ui/*View.ts` is mechanically forced into ~17 files by OR-MANIFEST-COMPLETE
+(`client/src/ui/overlayRegistry.test.ts:184`); (b) the `'SELECT * FROM my_export_bundle'`
+subscription is exact-set pinned by `evals/monster-privacy.eval.mjs:1292-1319`
+(`EXPECTED_SUBSCRIPTIONS`, check `[S/set]`) — a file OUTSIDE the declared `touches: client/**`,
+so it was deferred rather than widened (hidden-dependency rule).
+
+**ACTION FOR THE SUPERVISOR WHEN QUEUEING m22-s8b: its `touches:` MUST include
+`evals/monster-privacy.eval.mjs`** alongside `client/**`, or X11 cannot be met there either.
+
+`/tmp/mr_warn_m22-s8` (landing pattern) appeared after the green increment, so the
+post-implementation lens fan-out (reviewer/red-team/simplify/auditors/verifier) was NOT run —
+verification was done in-session instead (full `just ci`, the gate ledger, the 14-mutant
+bite-proof). Plan-phase `reviewer` + `red-team` DID run and returned 2 BLOCKERs / 8 MAJORs /
+13 measured attacks, all folded in before any test was written. Orchestration roles invoked:
+planner, researcher, reviewer, red-team, tester (tester != implementer).
+
+`gh pr merge` NOT run (supervisor-owned). Remote CI was starting at hand-off.
+
+

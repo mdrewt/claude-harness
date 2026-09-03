@@ -2,6 +2,68 @@
 
 ---
 
+## 2026-09-02T~20:4xZ — rb-37 PR#415 OPEN — overlayA11yWiring.test.ts safe under --sequence.concurrent, local `just ci` GREEN
+
+Slice rb-37 (residual R-rb18-CONCURRENT), branch `slice/rb-37`, worktree `.claude/worktrees/rb-37`,
+4 commits on origin/master@318eb70. **PR https://github.com/mdrewt/monster-realm/pull/415 open;
+remote CI running at hand-off. `gh pr merge` NOT run (supervisor-owned).** **NO ADR minted** — none
+was reserved and `ARCHITECTURE.md` records `ADR next-free = 0234`; rulings are in the append log
+(rb-15/17/18/36 precedent). Acceptance **5/5 met, 0 deferred, 0 unmet**; the PR body's `Acceptance:`
+line byte-matches `mr-gates render --slice rb-37 --format pr`. Full `just ci` exit 0, **99 eval PASS
+/ 0 FAIL**, 2929 client tests across 99 files, 8/8 observability validations.
+
+**THE LEDGER SEEDED ZERO CRITERIA** (promoted residual sections are narrative, not SHALL-bulleted —
+same as rb-2..rb-18/rb-36), so RB37-G1..G5 were authored in the PLAN phase from the residual's own
+required outcome. Gate runner: `memory/projects/rb-37.gates.mjs` (harness repo, UNCOMMITTED —
+supervisor's gate-0 catch-up owns it, the rb-18 precedent).
+
+**THE FIX IS ONE TOKEN AND THE REST IS THE GATE.** `describe(` -> `describe.sequential(` on the
+file's single top-level describe (all 116 tests are inside it, so a 17th inherits it for free).
+MEASURED 76 failed/40 passed before, 116/116 after in all four sequence modes. `vite.config.ts`
+enables neither flag, which is why `just ci` never saw this. Per-test isolation was rejected with a
+reason, not overlooked: four per-FILE/per-MODULE singletons (one happy-dom `document`, the
+module-scope hooks, the process-global `vi.mock(..., {spy:true})` registry, `OPEN_OVERLAYS`) cannot
+be forked per test without injecting `document` into sixteen view classes.
+
+**THE MEASUREMENT EVERY FUTURE GATE AUTHOR SHOULD STEAL.** A vitest JSON report for a run whose
+`afterAll` fails reads `numTotalTests=116 numFailedTests=0 numPassedTests=116` — green by every
+counter — while `success` is FALSE and the process exits 1. red-team's bypass (wrap every `it()`
+body in `try{}catch{}`, never touch the describe) reports exactly that. **A gate reading
+`numFailedTests` alone ships over a fully-blinded spec file.** Assert child EXIT STATUS + `success`.
+Corollary: a `-t` filter is unusable against any spec carrying a completion floor — it marks the
+non-matching arms pending and the floor fails as a suite-level error.
+
+**FOUR LENSES, FOUR DISJOINT FINDING SETS.** `/simplify` on the plan deleted a whole committed
+`client/concurrency-control/` directory + its 4-config exclusion audit by pointing at the in-repo
+ephemeral-probe idiom (`overlayRegistry.test.ts:1126-1157`); plan-`red-team` found the try/catch
+bypass AND corrected a factual error in my own plan (the `S10-WIRE-` prefix count is 116, not 112 —
+a hand-typed second literal would have false-RED'd on correct code); artifact-`red-team` caught the
+slice **committing the very defect class it was fixing** (the new spec cited `:492` for an
+annotation the rationale block had already pushed to `:529`); `reviewer` caught a false claim about
+vitest's default `maxConcurrency` in the ARCHITECTURE paragraph and a hardcoded asdf node path in
+committed test source. `verifier` PASS, and it independently re-ran all 5 CHECKs + 3 bite-proofs.
+
+BITE-PROOFS **11/11 caught**, control silent (table in the PR body).
+
+RESIDUALS: **R-rb37-TOOTHBODY** (68 of 116 teeth carry no completion floor, so a tautology-substituted
+tooth body under an unchanged title is invisible — PRE-EXISTING, orthogonal to concurrency, and
+red-team's own proposed fix does NOT close it: a gutted body that keeps its `x++` passes a counter
+too. RB37-G3's wording was narrowed rather than left over-claiming) · **R-rb37-SELFCOLLECT** (nothing
+floors the client suite's FILE count; adding the new spec to `just a11y-e2e`'s 8-file roster needs
+`justfile` AND the byte-verbatim `A11Y_E2E_RECIPE_REGION` pin moved together, both out of touches).
+
+TOUCHES-DELTA: `client/src/ui/overlayA11yWiring.concurrency.test.ts` (new sibling spec),
+`ARCHITECTURE.md`. `justfile`/`evals/**`/`vite.config.ts`/`tsconfig.json`/`package*.json` byte-identical
+to origin/master, asserted by RB37-G5 BEFORE its `just ci`. BOY SCOUT: one comment-only hunk closing
+**R-rb36-WIRINGCITE** (`overlayA11yWiring.test.ts:286-298` — the stale `main.ts:1574` citation plus
+the now-false "the other two are flagged, not touched" clause rb-36 invalidated).
+
+Harness-repo artefacts written but NOT committed (supervisor's gate-0 catch-up owns them):
+`memory/projects/monster-realm-rb-37-plan.md`, `memory/projects/gates/rb-37.gates.md`,
+`memory/projects/rb-37.gates.mjs`, handoff.
+
+---
+
 ## 2026-09-02T~14:5xZ — m23-s8 PR#413 OPEN — M23 S8 colour independence (A11Y-29), local `just ci` GREEN
 
 Slice m23-s8 (M23 §2.6 + criterion A11Y-29), branch `slice/m23-s8`, worktree `.claude/worktrees/m23-s8`,
@@ -2829,6 +2891,8 @@ Gates ledger: memory/projects/gates/m22-s3b.gates.md (17/18 met + X18 DEFER, lin
 CHECK-side evidence trap hit again — placeholders were required, memory card exists). Teeth+red
 receipts: m22-s3b.{teeth,red-1,red-2}.txt. Plan memo: monster-realm-m22-s3b-plan.md.
 
+## 2026-09-03T00:29:27Z — rb-37 PR#415 open, CI pending — delegated to mr-ci-watch
+Native tick native-20260903T002859Z-653161 (00:28Z). rb-37 finished (EXIT=0, opus, 1 attempt, $22.90): fixed client/src/ui/overlayA11yWiring.test.ts for vitest --sequence.concurrent safety, closing residual R-rb18-CONCURRENT. Local gate green (2929 tests + 99 evals PASS), acceptance 5/5 met. PR https://github.com/mdrewt/monster-realm/pull/415 opened against master. gh pr view showed mergeStateStatus=UNSTABLE, ci+e2e checks still pending — no live chain mutex, no hold. Spawned mr-ci-watch (pid 654285) detached to finish the merge on green; next event tick will complete it. No new launch this tick (single action = delegate).
 ## 2026-09-02T23:02:46Z — 23:02Z tick — launched rb-37 (overlayA11yWiring concurrent-safety fix)
 Native tick mr-sup-native-20260902T230011Z-448990 (23:00Z, cron). Gate-0: no live locks/chain mutex; done_files showed mr_pass_rb-36.done, already fully reconciled by the prior 22:48Z tick (PR#414 merged to master@318eb70, residual R-rb18-MAINCITE closed, ledger+handoff recorded) -- confirmed live via gh pr list (state MERGED), git log, and the ledger tail; no re-action needed. Gate-1: both repos fetched clean, project master in sync with origin at 318eb70, master CI green (rb-36's own run + m23-s8 + m22-s9 all success). No resident IDE claude pid, no non-mechanical writes in last 6min -- active-session probe clean. Gate-3: mr-gates residuals list --unclaimed showed 40 open (3 new ones disclosed by rb-36 itself: R-rb36-WIRINGCITE/FOCUSCITE/ADR0206CITE, all <1h old), oldest unpromoted still R-rb-20-RM-7 at 2.92d -- under t1_promote_days=3, so aging does not outrank the queue fast-path. queue[] held [rb-37] (R-rb18-CONCURRENT, promoted by the 22:00Z tick). Re-verified rb-37 live before launch: spec section exists (M-residual-backlog.spec.md:29), source rb-18 merged, no existing rb-37 branch/PR in either repo -- valid, real pre-existing test-fragility defect (measured by rb-18's verifier: 76/40 fail/pass under --sequence.concurrent on the rb-18 branch vs 43/41 on master -- same root cause, not eval-scanner-self-reference, proceeds normally per ADR-0224). Tier=routine (client test-file-only fix, no schema/reducer/netcode/security surface) -> opus@high. First mr-spawn attempt failed BRIEF-RENDER-FAILED because my hand-authored vars.json omitted the required  field (mr-spawn's PYBRIEF SystemExits on a missing tier with no field named in the top-level error -- had to read the script to find the throw site); added tier:"routine" and relaunched cleanly. mr-spawn LAUNCHED: leader=450899, claude_pid=450902, rid=mr-spawn-20260902T230220Z-450846, repo=project (mdrewt/monster-realm), base=master. Verified detachment (PPID=1, own SID/PGID 450899) and model class (opus/high) via ps. GATES-SEEDED criteria=0 (residual-backlog spec section carries EARS/deferred prose, not a bulleted SHALL list -- expected, non-blocking). queue-removed rb-37; queue[] now empty. Governor NORMAL (d7=$2260.42/2783=81.2%, fable_d7=$1204.54/2298, fable_ok=true). No BLOCKER, no rate-limit event, no park. Single mutating action this tick: the rb-37 launch. Next tick: queue[] empty -- re-derive from residuals aging + PLAN section-9 order (the 3 fresh rb-36-disclosed citation residuals are candidates once/if they age past t1_promote_days, but at <1h old they should NOT be promoted yet).
 ## 2026-09-02T22:50:26Z — rb-36 MERGED (PR #414)
@@ -2885,38 +2949,6 @@ Native tick mr-sup-native-20260902T060012Z-3478116 (06:00Z, cron). Gate-0: found
 
 ## 2026-09-02T05:27:54Z — m22-s7 MERGED (PR#410)
 Merged PR#410 (squash, 3484ebe) — M22 S7 runbook: DR-runbook data-deletion section (EARS PRV1-18) + G24 doc/citation gate; ADR-0230. Local + remote CI green; master CI confirmed green post-merge (run 33594322952). mr-gates verify: 8/9 met, 1 legitimately DEFERred (X8 -> backlog, ADR-0224 supersedes the scanner-eval vehicle; correct replacement noted as an in-crate accounts_tests.rs test needing a slice that owns accounts.rs). Acceptance verdict FLAGGED only on advisory SPEC-SECTION-NOT-FOUND (spec section not locatable by the live finder; all X* gates independently reverified fresh and agreed with recorded evidence, spotcheck non-vacuous). mr-audit: orchestration CLEAN (6 roles/11 calls), gating CLEAN, policy=CLEAN/no mandatory read. Worktree + branch slice/m22-s7 cleaned up. residual-over-cap noted (30 open vs cap 12, observe-only in slice 1) — not actioned this tick.
-## 2026-09-02T04:45Z — m22-s8 PR #411 OPEN (local `just ci` green, remote CI running)
 
-m22-s8 (M22 §7.2 S8, client half) terminal state reached: PR
-https://github.com/mdrewt/monster-realm/pull/411 open against master, branch `slice/m22-s8`,
-worktree `.claude/worktrees/m22-s8` (left in place for the supervisor's verify). Local `just ci`
-exit 0 (2136 Rust tests, 2919 client tests / 98 files, all evals PASS, check-secrets clean,
-observability validate 8/8). ADR-0231 written at the assigned number; `just adr-digest` regenerated.
-
-**Ledger: 8/11 met with recorded evidence, 3 DEFERred -> backlog, 0 unmet.** All 8 CHECKs are
-vitest `--reporter=json` gates that additionally assert the spec file IMPORTS the production
-module (closes the test-local-reimplementation cheat the plan-phase red-team demonstrated).
-14/14 hand-substituted wrong implementations were caught by their NAMED tooth
-(`memory/projects/m22-s8.teeth.txt`); RED proof at `memory/projects/m22-s8.red-1.txt`.
-
-RIGHT-SIZING: shipped the `terminal_at_ms` data path + the two pure cores
-(`client/src/ui/privacyModel.ts`, `client/src/ui/exportAssembly.ts`). Deferred the DOM overlay +
-`main.ts` wiring + the export transport to **m22-s8b** for two measured reasons: (a) one new
-`client/src/ui/*View.ts` is mechanically forced into ~17 files by OR-MANIFEST-COMPLETE
-(`client/src/ui/overlayRegistry.test.ts:184`); (b) the `'SELECT * FROM my_export_bundle'`
-subscription is exact-set pinned by `evals/monster-privacy.eval.mjs:1292-1319`
-(`EXPECTED_SUBSCRIPTIONS`, check `[S/set]`) — a file OUTSIDE the declared `touches: client/**`,
-so it was deferred rather than widened (hidden-dependency rule).
-
-**ACTION FOR THE SUPERVISOR WHEN QUEUEING m22-s8b: its `touches:` MUST include
-`evals/monster-privacy.eval.mjs`** alongside `client/**`, or X11 cannot be met there either.
-
-`/tmp/mr_warn_m22-s8` (landing pattern) appeared after the green increment, so the
-post-implementation lens fan-out (reviewer/red-team/simplify/auditors/verifier) was NOT run —
-verification was done in-session instead (full `just ci`, the gate ledger, the 14-mutant
-bite-proof). Plan-phase `reviewer` + `red-team` DID run and returned 2 BLOCKERs / 8 MAJORs /
-13 measured attacks, all folded in before any test was written. Orchestration roles invoked:
-planner, researcher, reviewer, red-team, tester (tester != implementer).
-
-`gh pr merge` NOT run (supervisor-owned). Remote CI was starting at hand-off.
-
+## 2026-09-03T00:45:49Z — rb-37 merged: overlayA11yWiring concurrent-safety fix
+PR#415 squash-merged to master (69d6f5d). Closed R-rb18-CONCURRENT (residual promoted as rb-37). Fix: describe() -> describe.sequential() on overlayA11yWiring.test.ts's single top-level describe (was 76/116 failing under --sequence.concurrent, now 116/116 in all 4 sequence modes). New proof-of-teeth: overlayA11yWiring.concurrency.test.ts (ordinary TS test per ADR-0224, not a new evals/*.eval.mjs), 4 arms + anti-vacuity controls, 11 bite-proofs. boyscout-delta: retargeted rb-36's own drifted :492 citations (self-caught by red-team) onto stable landmarks. No ADR minted (unreserved-number race avoidance per rb-15/17/18/36 precedent); rulings live in ARCHITECTURE.md append log. mr-audit: orchestration CLEAN; gating_advisory FLAGGED on skip_markers_added=2 adjudicated FALSE POSITIVE by supervisor (grep-verified: only prose mentions of '.skip' as the anti-pattern being avoided, zero actual it.skip/.only/.todo added); acceptance initially EVIDENCE-MISMATCH on RB37-G5 (just-ci-exit=127) traced to the supervisor's own shell missing ~/.cargo/bin on PATH (cargo fmt --check failing with 'not found') -- re-run with corrected PATH reproduced the recorded PASS exactly (gate-surface-delta=0 just-ci-exit=0), confirming no real regression. Acceptance 5/5 met, 0 deferred. Residuals closed for rb-37 (1). Two residuals declared not fixed: R-rb37-TOOTHBODY (pre-existing, orthogonal, needs mutation testing gate) and R-rb37-SELFCOLLECT (no floor on client suite file count; needs justfile+ci-gate-wiring.eval.mjs change outside touches:). Worktree/branch cleaned. Post-merge master CI still in_progress at tick end (pre-merge PR checks ci+e2e both SUCCESS on identical squashed content).
