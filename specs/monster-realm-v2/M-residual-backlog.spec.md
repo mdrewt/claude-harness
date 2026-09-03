@@ -26,6 +26,22 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-40 — WHEN a guest's pre-claim chunks are purged THE SYSTEM SHALL be observable doing so (from rb-22 EO-9, deferred 2026-08-31)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-22 · residual: R-rb-22-EO-9
+
+Deferred with reason: no writer of export_bundle exists (S4 absent), the table is private with no
+
+EARS: WHEN a guest's pre-claim chunks are purged THE SYSTEM SHALL be observable doing so
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-39 — WHEN a write verb in a server module cannot be attributed to a same-statement (from rb-22 EO-11, deferred 2026-08-31)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-22 · residual: R-rb-22-EO-11
+
+Deferred with reason: statement-boundary + fail-loud hardening of `write_target_accessors`
+
+EARS: WHEN a write verb in a server module cannot be attributed to a same-statement
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-38 — A11Y-27's RENDERER arm SHALL be honoured end to end in a real browser — the OS (from rb-20 RM-7, deferred 2026-08-31)
 `touches: client/playwright.config.ts, client/e2e/a11y.spec.ts, client/e2e/reduced-motion.spec.ts, evals/ci-gate-wiring.eval.mjs, .github/workflows/nightly.yml, justfile`
 `after:` — · source: rb-20 · residual: R-rb-20-RM-7
