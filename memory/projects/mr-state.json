@@ -12,7 +12,7 @@
  "master": {
   "ci": "in_progress",
   "nightly": "success",
-  "sha": "c54ffc9"
+  "sha": "8cec6f4"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "native tick 05:41Z: merged 17r-a (PR#417, c54ffc9) -- A11Y-27 renderer-arm E1 wiring closed; gating_advisory FLAGGED was known-defect try/catch guard replaced by direct hard assertion (adjudicated: strengthening); master CI in_progress at hand-off, verify first next tick; queue[] re-read fresh at write time",
+ "notes": "native tick 08:21Z: merged 17r-b (PR#419, 8cec6f4) -- ADR-0130 residuals d+e (hydration-gated battle-reseed latch + identity refresh on reconnect); mr-audit CLEAN (mandatory hard-tier diff read performed, no findings); mr-gates B1 CLEAN teeth=9/9. Worktree+local branch cleaned. Post-merge master CI in_progress at hand-off (verify green next tick). 2 residuals aged past t1 (R-rb-22-EO-9/-11); 43 open vs cap 12 -- next gate-3 should pick these up. Harness repo carries several ticks' worth of uncommitted state writes (last chore(mr-sup) commit 05:41Z) folded into this tick's own commit.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -40,7 +40,7 @@
   "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
   "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
   "found_easily": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects template + launch script + AGENTS.md two-location note were all accurate; only the harness-vs-project spec path lacked an absolute anchor in the task.",
-  "gh_cli_path": "gh is NOT on the default PATH in this native env — it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation.",
+  "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation.",
   "milestone_c5_spec": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-c.5-pregate-review-residuals.spec.md (ptc5a..ptc5g; its section-3 holds Decisions A-E, all RESOLVED 2026-07-20 per PLAN section-9 ~L307).",
   "milestone_d_spec": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-d-content-pack.spec.md (pt-d1..pt-d3).",
   "per_slice_touches_and_EARS": "In the milestone spec file (e.g. M-playtest-c.5-pregate-review-residuals.spec.md), NOT in PLAN.md. PLAN section-9 is only a one-line-per-slice SUMMARY + the resolved-decisions status line. To get a slice's declared touches:/EARS/decision-hooks, open its M*.spec.md.",
@@ -50,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260903T054116Z-980864",
- "updated_utc": "2026-09-03T05:43:30Z"
+ "updated_by": "mr-sup-native-20260903T082130Z-1318805",
+ "updated_utc": "2026-09-03T08:24:50Z"
 }
