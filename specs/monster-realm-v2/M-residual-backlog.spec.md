@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-41 — WHEN a REKEY entry's `exists` predicate is HOLLOWED in Rust (its body still reads the (from rb-25 X9, deferred 2026-08-31)
+`touches: evals/guest-claim-integrity.eval.mjs (+ docs/adr/0222-*.md, ARCHITECTURE.md minimal)`
+`after:` — · source: rb-25 · residual: R-rb-25-X9
+
+Deferred with reason: the exists-half HOLLOWING hole (a predicate that reads its table and returns a
+
+EARS: WHEN a REKEY entry's `exists` predicate is HOLLOWED in Rust (its body still reads the
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-40 — WHEN a guest's pre-claim chunks are purged THE SYSTEM SHALL be observable doing so (from rb-22 EO-9, deferred 2026-08-31)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-22 · residual: R-rb-22-EO-9
