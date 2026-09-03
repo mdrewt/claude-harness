@@ -33,7 +33,24 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-39",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-22-EO-11 (t1_promote_days exceeded)",
+   "added_utc": "2026-09-03T09:01:12Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "8cec6f4"
+  },
+  {
+   "slice": "rb-40",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-22-EO-9 (t1_promote_days exceeded)",
+   "added_utc": "2026-09-03T09:01:12Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "8cec6f4"
+  }
+ ],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
