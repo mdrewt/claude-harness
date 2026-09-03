@@ -366,3 +366,80 @@ PR#415 squash-merged to master (69d6f5d). Closed R-rb18-CONCURRENT (residual pro
 ## 2026-09-03T01:02:43Z — 01:02Z tick — promoted rb-38 (A11Y-27 renderer-arm residual)
 Native tick mr-sup-native-20260903T010012Z-677342 (01:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE, no resident-session collision. done_files showed mr_pass_rb-36.done (18:33Z) but live ground truth confirmed both rb-36 (PR#414) and rb-37 (PR#415) already merged to master by prior ticks — nothing to reconcile there, stale .done leftover only. Master CI green at 69d6f5d (matches situation bundle), no open PRs either repo, no worktrees to reap. queue[] and inflight[] empty at gate-3 entry. Ran mr-gates residuals list --unclaimed: 33 open, oldest R-rb-20-RM-7 (source rb-20, disclosed 2026-08-31T00:56:01Z, age 3.003d) past t1_promote_days=3 -- outranks new PLAN Sec.9 derivation per the aging doctrine. Classified per Work-selection scope: real a11y feature gap (A11Y-27 RENDERER arm — prefers-reduced-motion not honoured end-to-end in a real browser, motionPreferenceFromWindow measured zero production callers), not an eval-tooling-only residual, so promotes normally (touches include real e2e specs + evals/ci-gate-wiring.eval.mjs for opportunistic migration). Promoted via mr-gates residuals promote --id R-rb-20-RM-7 -> rb-38 in M-residual-backlog.spec.md. Harness main was REPO-OUT-OF-SYNC (2 unpushed commits from the 00:41Z tick) -- pushed first (7da0a69). Stashed pre-existing strays (docs/routing.md + memory/projects/monster-realm-rb-37-plan.md + rb-37.gates.mjs, none mine, left untouched) before branching so the chore commit carried only the spec change; popped back after merge. Shipped chore/residual-promote-20260903T010204Z (PR#86, mdrewt/claude-harness), squash-auto-merged (188986f), branch deleted both sides. mr-record queue-add --slice rb-38 for next-tick fast-path launch. Governor NORMAL (d7=$2286.26/2783 eff., fable_ok=true). No BLOCKER, no rate-limit event. Standing down after the single promote+merge action.
 
+## 2026-09-03T01:30Z — 17r-a PR#417 OPEN — reduced-motion wiring landed, local `just ci` green, remote CI running (SUPERVISOR OWNS THE MERGE)
+
+Slice 17r-a (residual R-rb-38-E1) built on `feat/17r-a-reduced-motion-wiring`, worktree
+`.claude/worktrees/17r-a`, forked from `origin/master`@71e1530 (master CI verified green first).
+HEAD `0c99999`. **PR #417 open; local full `just ci` green (exit 0, 100 files, 2933 tests,
+observability 8/8); remote `ci` + `e2e` both pending at hand-off. `gh pr merge` NOT run.**
+
+WHAT SHIPPED. 6 production lines in `client/src/main.ts`: import `motionPreferenceFromWindow`,
+construct it ONCE at module scope beside the RenderResolver, pass `reduceMotion:
+motionPreference.reduceMotion` into the render loop's single `resolve()` call. Plus a new
+happy-dom runtime gate `client/src/main.reducedMotionWiring.test.ts` (4 teeth), the retirement of
+rb-38's known-defect e2e alarm, and ARCHITECTURE.md corrections + slice-log entry.
+
+ACCEPTANCE LEDGER: **1/1 met, 0 deferred, 0 unmet.** `Acceptance: 1/1 met, 0 deferred, 0 unmet —
+17r-a seed:764b7d94d1e7d519`. Gate B1's CHECK is `node memory/projects/17r-a.gates.mjs <worktree>
+b1` (a script because `mr-gates lint` requires a CHECK to START with a runner — the rb-37 shape).
+Two disjoint arms: the purity eval, and vitest over the new spec + the two sibling runtime
+importers of `./main`. Deciding line: `B1 REDUCED-MOTION WIRING OK teeth=4/4 files=3 tests=41
+failed=0 pending=0 todo=0 suites-failed=0 vitest-exit=0`.
+
+**SCOPE EXTENSION THE SUPERVISOR MUST AUDIT — `client/e2e/reduced-motion.spec.ts`, outside the
+seeded `touches:`.** rb-38 deliberately shipped an alarm designed to flip RED the instant this
+wiring landed, and its own message instructs the successor slice to delete it. It runs on the **PR
+path**, not only nightly, because `client/package.json`'s `e2e` script is a bare `playwright test`
+and therefore runs every declared project — so leaving it untouched would have made the PR
+unmergeable. No concurrent sibling existed when this was decided (`gh pr list` empty, one
+worktree). The rb-38 hand-off had already named this file as the successor's; the seeded
+`Touches:` line just never got it. Both pinned test titles kept BYTE-IDENTICAL. Recorded under
+`touches-delta:` in the PR body.
+
+**`client/src/main.wiring.test.ts` was deliberately NOT touched** despite being in the declared
+`touches:` — `/simplify` overturned the planned source-scan tooth as forgeable. The path-set is a
+ceiling, not a checklist; do not read this as an omission.
+
+**NO ADR** — none was reserved (the brief's assigned number was literally `None`), ARCHITECTURE.md
+already records `ADR next-free = 0234` from rb-36 AND rb-37, and no dependency or pattern is added.
+
+EIGHT RESIDUALS DISCLOSED (all outside `touches:`, all in the PR body + ARCHITECTURE.md):
+R-17ra-ADR0219 (ADR-0219 + digest still assert the arm is unimplemented — the one live
+"asserts-the-old-state" artifact missed until the ARTIFACT red-team; needs a reserved number),
+R-17ra-PURITYSPLIT (MEASURED: token-splitting evades the purity census; a decoy reader passed BOTH
+gate arms while the owner module went dead — pre-existing residual of that eval, compensated by
+desync-guard), R-17ra-TOOTHBODY (title census can't see a gutted body; same as R-rb37-TOOTHBODY),
+R-17ra-JUSTPROSE, R-17ra-OWNERHDR, R-17ra-TITLE, R-17ra-REQUIRED, R-17ra-AMBIENT (desync-guard
+MEASURED this one as a robustness nit, not a live flake — Playwright emulates no-preference rather
+than inheriting the host).
+
+ORCHESTRATION (for the audit): planner; reviewer x2; red-team x2 (**plan AND artifact — they found
+disjoint sets, which is exactly why both passes are run**); /simplify x2; tester (wrote the gate,
+different agent than the implementer); desync-guard PASS; verifier PASS with all 7 items
+independently re-run. reducer-security-auditor N/A (no server-module/schema/wasm/game-core change).
+The `tester` again had NO usable Bash (guard-tester-bash blocks everything incl. `true`), so the
+orchestrator executed the RED proof and all mutation bite-proofs — as the standing memory says.
+
+BITE-PROOFS, all measured and re-run by the verifier: CONTROL green; M1/M6 -> ON+OFF+LIVE; M2 ->
+OFF+LIVE; M3 -> ON+LIVE; **M4 read-once-at-boot -> RM17A-LIVE ALONE**; **M5 construct-per-frame ->
+RM17A-SINGLEQ ALONE**; M9 -> ON+LIVE; T0 harness-stops-driving-frames -> all four. Driver kept at
+`/tmp/17r-a-mutants.py`.
+
+ONE REAL CI RED DURING THE SLICE, worth knowing: the new spec first used `describe.sequential(...)`,
+and `motionPreference.test.ts`'s S7T-SCAN scans comment-stripped `.test.ts` files for the LITERAL
+`describe(` as a disguised-production tripwire. The dotted form lacks that token, so `just ci` reded
+at `client-test` with a message that reads like an unrelated failure. Fixed by using the options
+form `describe(name, { sequential: true }, fn)` rather than widening someone else's gate matcher.
+
+NEXT TICK: poll PR #417's `ci` + `e2e` checks; on green, squash-merge and clean the branch +
+worktree, then force-close residual R-rb-38-E1 (met, not deferred) and promote R-17ra-ADR0219 into
+a real spec section — it is the only residual that leaves a false statement in a doc a future agent
+will read. Code-graph re-index on the MAIN checkout belongs to the post-merge step (the slice's
+changes are not in the canonical checkout while unmerged; both indexes confirmed fresh at slice
+start and untouched since).
+
+# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-09.md, monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
+
+---
+
+

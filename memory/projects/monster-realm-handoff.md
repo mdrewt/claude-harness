@@ -2972,6 +2972,11 @@ Gates ledger: memory/projects/gates/m22-s3b.gates.md (17/18 met + X18 DEFER, lin
 CHECK-side evidence trap hit again — placeholders were required, memory card exists). Teeth+red
 receipts: m22-s3b.{teeth,red-1,red-2}.txt. Plan memo: monster-realm-m22-s3b-plan.md.
 
+## 2026-09-03T18:00:57Z — 18:00Z tick — standdown (SOFT-PAUSE, nothing to merge/resume)
+Native tick mr-sup-native-20260903T180008Z-1640847 (18:00Z, cron, forced=0). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE (queued_events=0), no live rooted-run pid. Stale /tmp/mr_pass_rb-36.done reconfirmed already fully reconciled (long-merged PR#414 — same conclusion as every tick since 02:00Z). Gate-1: harness+project fetched clean, no rate-limit park, no active-session collision (only supervisor's own files touched in last 6 min). Project master CI verified live GREEN at 1e738fd (rb-39/PR#420), matches situation bundle. No open PRs either repo (gh pr list both = empty), nothing inflight/awaiting_merge/parked/wip, no worktrees beyond the canonical checkout. Gate-3: residuals list --unclaimed shows only sub-1-day-old rows (17r-c OBS-48 red-team residuals + m22-s3 X11, all <1 day) — none past aging thresholds to preempt; queue[0]=rb-40 (promoted residual R-rb-22-EO-9) remains valid but governor SOFT-PAUSE (d7=$2520.34/$2783=90.6%) forecloses any new launch regardless. No merge/resume/promote action available — pure standdown, consistent with every tick since 12:17Z. docs/routing.md left untouched (pre-existing operator edit). No BLOCKER, no rate-limit event.
+## 2026-09-03T16:01:37Z — 16:00Z tick — standdown (SOFT-PAUSE, nothing to merge/resume)
+Native tick mr-sup-native-20260903T160008Z-1618957 (16:00Z, cron, forced=0). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE (queued_events=0). Stale /tmp/mr_pass_rb-36.done reconfirmed already fully reconciled (long-merged PR#414, no matching action needed). Gate-1: both repos fetched clean, no rate-limit park, no active-session collision. Project master CI verified live GREEN at 1e738fd (rb-39's merge + reconfirm-rerun from the 14:00Z/14:09Z ticks), matches situation bundle. No open PRs either repo, nothing inflight/awaiting_merge. Gate-3: governor SOFT-PAUSE (d7=$2519.32/$2783=90.5%) -- no new launches. queue[0]=rb-40 (promoted residual R-rb-22-EO-9) remains valid and queued for the first NORMAL-governor tick; not re-verified for launch since SOFT-PAUSE forecloses it regardless. No merge/resume/promote action available this tick -- pure standdown, matching the 14:09Z/15:00Z ticks' verdict. Housekeeping note: mr-state.json + handoff writes from the 12:17Z through 15:00Z ticks (6 ticks) had accumulated uncommitted on harness main -- folded into this tick's own end-of-state commit rather than left to drift further toward REPO-OUT-OF-SYNC. docs/routing.md left untouched (pre-existing operator edit, per 10:00Z tick's note). No BLOCKER, no rate-limit event.
+
 ## 2026-09-03T14:10:55Z — 14:09Z tick — master CI reconfirmed green post rb-39
 Consumed EVENT master-ci-1e738fd.md: detached watcher (spawned by the 14:00Z tick after an e2e flake on run 33758650474) reran the job and it passed at 14:09:45Z. master local==origin at 1e738fd, no drift. No live locks/mutex/rooted-run pid (gate-0 clean). Governor SOFT-PAUSE (d7=$2518.49/$2783.00) — no new launch this tick; rb-40 (promoted residual R-rb-22-EO-9) stays queued in mr-state.json for the first NORMAL-governor tick. Updated mr-state.json master.ci rechecking->success; archived the event file. Standdown.
 ## 2026-09-03T14:01:56Z — master CI red on rb-39 merge — reran, delegated watch
@@ -3052,82 +3057,3 @@ Native tick mr-sup-native-20260903T040013Z-839017 (04:00Z, cron). Gate-0: no liv
 Native tick mr-sup-native-20260903T032103Z-829952 (03:21Z, ci-triggered by rb-38 CI green event). No live locks/mutex at gate-0; rb-36 .done was stale-but-already-merged (confirmed in ledger), no action needed. PR#416 (feat/rb-38-reduced-motion-renderer-arm) verified live CLEAN+MERGEABLE, both checks (ci, e2e) SUCCESS. mr-gates verify: FLAGGED on lint (100% of seeded gate E1 DEFERred, cap 50%) — adjudicated legitimate: E1's fix requires client/src/main.ts:2807 wiring, declared OUT OF rb-38 touches (same constraint that also blocked rb-20). mr-audit: orchestration CLEAN (tester/reviewer/red-team/verifier all ran); gating_advisory FLAGGED on a mechanical false positive (skip_markers_added:1 matched the word 'fixme' inside a comment explaining why test.fixme() was REJECTED as the idiom — no real .skip/.only/xit/describe.skip in the diff; rmfloor was RAISED 2->4, strengthening the gate, not weakening it). Squash-merged 71e1530, branch+worktree cleaned. Residual R-rb-38-E1 force-closed (targets backlog; successor slice must extend touches: to client/src/main.ts + main.*.test.ts to wire motionPreferenceFromWindow() into the resolve() call at main.ts:2807 and delete the known-defect try/catch guard in reduced-motion.spec.ts). Master CI on 71e1530 was still in_progress at hand-off (not polled further — single-step tick). Budget NORMAL (d7=$2310.70/$2783 effective, fable_ok=true). Next tick: verify master CI green on 71e1530 before any further action, then continue PLAN §9 / residual-aging derivation (no queue[] entries pending).
 ## 2026-09-03T02:01:33Z — 02:01Z tick — launched rb-38 (A11Y-27 RENDERER-arm real-browser e2e, queue fast-path)
 Native tick mr-sup-native-20260903T020011Z-690280 (02:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE, no session collision. done_files showed mr_pass_rb-36.done — verified live via gh pr list that both rb-36 (PR#414) and rb-37 (PR#415) are already MERGED and fully reconciled in the ledger/handoff by prior ticks (22:50Z and 00:45Z respectively); no action needed, stale debris only. Gate-1/2: both repos fetched clean, master local (69d6f5d) matches origin, project master CI green (last 3 runs success incl. rb-37/rb-36 merge commits). Gate-3: mr-gates residuals list --unclaimed shows 32 open (cap-12 observe-only alarm, no staleness alarm past t1/t2) -- none outrank queue[]. queue[] had one entry (rb-38, added 2026-09-03T01:02:27Z by the prior tick's promotion). Re-verified live: M-residual-backlog.spec.md sec 'rb-38' exists (real section, EARS + Tests present), not blocked:, not already merged -- valid, so took the fast path: mr-record queue-remove --slice rb-38, wrote pass-vars (tier=routine, touches=client/playwright.config.ts+e2e specs+evals/ci-gate-wiring.eval.mjs+nightly.yml+justfile -- none of the HARD-tier criteria apply), mr-spawn rb-38 -> LAUNCHED (leader=691369, claude_pid=691372, rid=mr-spawn-20260903T020115Z-691313, repo=project). GATES-SEEDED criteria=1 (shall-uncaptured=1, same known partial-capture pattern as prior residual-backlog slices). Governor NORMAL (d7=$2287.33/2783=82.2%, fable_d7=$1204.54/2298, fable_ok=true). One mutating action this tick (the launch). No merge/park/promote, no BLOCKER, no rate-limit event.
-## 2026-09-03T01:30Z — 17r-a PR#417 OPEN — reduced-motion wiring landed, local `just ci` green, remote CI running (SUPERVISOR OWNS THE MERGE)
-
-Slice 17r-a (residual R-rb-38-E1) built on `feat/17r-a-reduced-motion-wiring`, worktree
-`.claude/worktrees/17r-a`, forked from `origin/master`@71e1530 (master CI verified green first).
-HEAD `0c99999`. **PR #417 open; local full `just ci` green (exit 0, 100 files, 2933 tests,
-observability 8/8); remote `ci` + `e2e` both pending at hand-off. `gh pr merge` NOT run.**
-
-WHAT SHIPPED. 6 production lines in `client/src/main.ts`: import `motionPreferenceFromWindow`,
-construct it ONCE at module scope beside the RenderResolver, pass `reduceMotion:
-motionPreference.reduceMotion` into the render loop's single `resolve()` call. Plus a new
-happy-dom runtime gate `client/src/main.reducedMotionWiring.test.ts` (4 teeth), the retirement of
-rb-38's known-defect e2e alarm, and ARCHITECTURE.md corrections + slice-log entry.
-
-ACCEPTANCE LEDGER: **1/1 met, 0 deferred, 0 unmet.** `Acceptance: 1/1 met, 0 deferred, 0 unmet —
-17r-a seed:764b7d94d1e7d519`. Gate B1's CHECK is `node memory/projects/17r-a.gates.mjs <worktree>
-b1` (a script because `mr-gates lint` requires a CHECK to START with a runner — the rb-37 shape).
-Two disjoint arms: the purity eval, and vitest over the new spec + the two sibling runtime
-importers of `./main`. Deciding line: `B1 REDUCED-MOTION WIRING OK teeth=4/4 files=3 tests=41
-failed=0 pending=0 todo=0 suites-failed=0 vitest-exit=0`.
-
-**SCOPE EXTENSION THE SUPERVISOR MUST AUDIT — `client/e2e/reduced-motion.spec.ts`, outside the
-seeded `touches:`.** rb-38 deliberately shipped an alarm designed to flip RED the instant this
-wiring landed, and its own message instructs the successor slice to delete it. It runs on the **PR
-path**, not only nightly, because `client/package.json`'s `e2e` script is a bare `playwright test`
-and therefore runs every declared project — so leaving it untouched would have made the PR
-unmergeable. No concurrent sibling existed when this was decided (`gh pr list` empty, one
-worktree). The rb-38 hand-off had already named this file as the successor's; the seeded
-`Touches:` line just never got it. Both pinned test titles kept BYTE-IDENTICAL. Recorded under
-`touches-delta:` in the PR body.
-
-**`client/src/main.wiring.test.ts` was deliberately NOT touched** despite being in the declared
-`touches:` — `/simplify` overturned the planned source-scan tooth as forgeable. The path-set is a
-ceiling, not a checklist; do not read this as an omission.
-
-**NO ADR** — none was reserved (the brief's assigned number was literally `None`), ARCHITECTURE.md
-already records `ADR next-free = 0234` from rb-36 AND rb-37, and no dependency or pattern is added.
-
-EIGHT RESIDUALS DISCLOSED (all outside `touches:`, all in the PR body + ARCHITECTURE.md):
-R-17ra-ADR0219 (ADR-0219 + digest still assert the arm is unimplemented — the one live
-"asserts-the-old-state" artifact missed until the ARTIFACT red-team; needs a reserved number),
-R-17ra-PURITYSPLIT (MEASURED: token-splitting evades the purity census; a decoy reader passed BOTH
-gate arms while the owner module went dead — pre-existing residual of that eval, compensated by
-desync-guard), R-17ra-TOOTHBODY (title census can't see a gutted body; same as R-rb37-TOOTHBODY),
-R-17ra-JUSTPROSE, R-17ra-OWNERHDR, R-17ra-TITLE, R-17ra-REQUIRED, R-17ra-AMBIENT (desync-guard
-MEASURED this one as a robustness nit, not a live flake — Playwright emulates no-preference rather
-than inheriting the host).
-
-ORCHESTRATION (for the audit): planner; reviewer x2; red-team x2 (**plan AND artifact — they found
-disjoint sets, which is exactly why both passes are run**); /simplify x2; tester (wrote the gate,
-different agent than the implementer); desync-guard PASS; verifier PASS with all 7 items
-independently re-run. reducer-security-auditor N/A (no server-module/schema/wasm/game-core change).
-The `tester` again had NO usable Bash (guard-tester-bash blocks everything incl. `true`), so the
-orchestrator executed the RED proof and all mutation bite-proofs — as the standing memory says.
-
-BITE-PROOFS, all measured and re-run by the verifier: CONTROL green; M1/M6 -> ON+OFF+LIVE; M2 ->
-OFF+LIVE; M3 -> ON+LIVE; **M4 read-once-at-boot -> RM17A-LIVE ALONE**; **M5 construct-per-frame ->
-RM17A-SINGLEQ ALONE**; M9 -> ON+LIVE; T0 harness-stops-driving-frames -> all four. Driver kept at
-`/tmp/17r-a-mutants.py`.
-
-ONE REAL CI RED DURING THE SLICE, worth knowing: the new spec first used `describe.sequential(...)`,
-and `motionPreference.test.ts`'s S7T-SCAN scans comment-stripped `.test.ts` files for the LITERAL
-`describe(` as a disguised-production tripwire. The dotted form lacks that token, so `just ci` reded
-at `client-test` with a message that reads like an unrelated failure. Fixed by using the options
-form `describe(name, { sequential: true }, fn)` rather than widening someone else's gate matcher.
-
-NEXT TICK: poll PR #417's `ci` + `e2e` checks; on green, squash-merge and clean the branch +
-worktree, then force-close residual R-rb-38-E1 (met, not deferred) and promote R-17ra-ADR0219 into
-a real spec section — it is the only residual that leaves a false statement in a doc a future agent
-will read. Code-graph re-index on the MAIN checkout belongs to the post-merge step (the slice's
-changes are not in the canonical checkout while unmerged; both indexes confirmed fresh at slice
-start and untouched since).
-
-# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-09.md, monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
-
----
-
-
-## 2026-09-03T16:01:37Z — 16:00Z tick — standdown (SOFT-PAUSE, nothing to merge/resume)
-Native tick mr-sup-native-20260903T160008Z-1618957 (16:00Z, cron, forced=0). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE (queued_events=0). Stale /tmp/mr_pass_rb-36.done reconfirmed already fully reconciled (long-merged PR#414, no matching action needed). Gate-1: both repos fetched clean, no rate-limit park, no active-session collision. Project master CI verified live GREEN at 1e738fd (rb-39's merge + reconfirm-rerun from the 14:00Z/14:09Z ticks), matches situation bundle. No open PRs either repo, nothing inflight/awaiting_merge. Gate-3: governor SOFT-PAUSE (d7=$2519.32/$2783=90.5%) -- no new launches. queue[0]=rb-40 (promoted residual R-rb-22-EO-9) remains valid and queued for the first NORMAL-governor tick; not re-verified for launch since SOFT-PAUSE forecloses it regardless. No merge/resume/promote action available this tick -- pure standdown, matching the 14:09Z/15:00Z ticks' verdict. Housekeeping note: mr-state.json + handoff writes from the 12:17Z through 15:00Z ticks (6 ticks) had accumulated uncommitted on harness main -- folded into this tick's own end-of-state commit rather than left to drift further toward REPO-OUT-OF-SYNC. docs/routing.md left untouched (pre-existing operator edit, per 10:00Z tick's note). No BLOCKER, no rate-limit event.
