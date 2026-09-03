@@ -41,6 +41,14 @@
    "added_utc": "2026-09-03T09:01:12Z",
    "added_by": "n/a",
    "derived_from_master_sha": "8cec6f4"
+  },
+  {
+   "slice": "rb-41",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-25-X9 (t1 exceeded, guest-claim-integrity security gap)",
+   "added_utc": "2026-09-03T20:01:16Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "1e738fd"
   }
  ],
  "rate_limit_armed_by": "wrapper",
