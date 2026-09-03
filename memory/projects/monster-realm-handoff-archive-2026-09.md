@@ -288,3 +288,9 @@ planner, researcher, reviewer, red-team, tester (tester != implementer).
 `gh pr merge` NOT run (supervisor-owned). Remote CI was starting at hand-off.
 
 
+## 2026-09-02T05:27:54Z — m22-s7 MERGED (PR#410)
+Merged PR#410 (squash, 3484ebe) — M22 S7 runbook: DR-runbook data-deletion section (EARS PRV1-18) + G24 doc/citation gate; ADR-0230. Local + remote CI green; master CI confirmed green post-merge (run 33594322952). mr-gates verify: 8/9 met, 1 legitimately DEFERred (X8 -> backlog, ADR-0224 supersedes the scanner-eval vehicle; correct replacement noted as an in-crate accounts_tests.rs test needing a slice that owns accounts.rs). Acceptance verdict FLAGGED only on advisory SPEC-SECTION-NOT-FOUND (spec section not locatable by the live finder; all X* gates independently reverified fresh and agreed with recorded evidence, spotcheck non-vacuous). mr-audit: orchestration CLEAN (6 roles/11 calls), gating CLEAN, policy=CLEAN/no mandatory read. Worktree + branch slice/m22-s7 cleaned up. residual-over-cap noted (30 open vs cap 12, observe-only in slice 1) — not actioned this tick.
+
+## 2026-09-02T06:01:40Z — 06:00Z tick — recovered stranded m22-s7 bookkeeping
+Native tick mr-sup-native-20260902T060012Z-3478116 (06:00Z, cron). Gate-0: found the 05:27:54Z tick's m22-s7 MERGED (PR#410) bookkeeping (handoff, handoff-archive, mr-state.json, plan memo) written but never committed to git -- same stranding pattern as the earlier m22-s3b/m22-s6 incident (2043297). Committed it as harness commit 3a0f25d. Ledger already clean (MERGED + tick-ok rows present pre-commit). No live locks, no chain mutex, HOLD-NONE, no per-run session collision. Treated this recovery as the tick's one action; did not proceed to gate-3 launch/pick-work discovery this tick.
+
