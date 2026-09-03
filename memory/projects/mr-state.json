@@ -1,18 +1,18 @@
 {
  "adr_next_free": 234,
  "awaiting_merge": [],
- "consecutive_standdowns": 3,
+ "consecutive_standdowns": 5,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "188986f"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-03T16:00:08Z",
+ "last_tick_utc": "2026-09-03T23:00:07Z",
  "live_watchers": [],
  "master": {
-  "sha": "1e738fd",
   "ci": "success",
-  "nightly": "success"
+  "nightly": "success",
+  "sha": "1e738fd"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "21:00Z tick (mr-sup-native-20260903T210007Z-1675984): standdown, SOFT-PAUSE (governor forbids new launches), nothing to merge/resume/launch. No residual past t1_promote_days (max age ~2.82d). queue[] rb-40/rb-41 left untouched for next NORMAL tick.",
+ "notes": "23:00Z tick (mr-sup-native-20260903T230007Z-1697253): standdown, SOFT-PAUSE (governor forbids new launches; d7=$2523.17/$2783.00=90.7%). No live locks/mutex, HOLD-NONE queued_events=0, no live rooted-run pid, no open PRs, awaiting_merge/inflight empty. Stale rb-36 .done (Sep2) reconfirmed already fully reconciled by prior ticks (no-op). Residuals: max unpromoted age 2.9d, below t1_promote_days=3 -- none outrank queue/PLAN work. queue[] rb-40/rb-41 re-verified still valid and left untouched for next NORMAL-governor tick. docs/routing.md carries an unrelated pre-existing uncommitted human edit outside supervisor scope -- left alone. Folded in the prior 22:00Z tick's write, which was never committed.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -35,20 +35,20 @@
  "parked": [],
  "queue": [
   {
-   "slice": "rb-40",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-22-EO-9 (t1_promote_days exceeded)",
-   "added_utc": "2026-09-03T09:01:12Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "8cec6f4"
+   "added_utc": "2026-09-03T09:01:12Z",
+   "derived_from_master_sha": "8cec6f4",
+   "reason": "promoted residual R-rb-22-EO-9 (t1_promote_days exceeded)",
+   "slice": "rb-40",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-41",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-25-X9 (t1 exceeded, guest-claim-integrity security gap)",
-   "added_utc": "2026-09-03T20:01:16Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "1e738fd"
+   "added_utc": "2026-09-03T20:01:16Z",
+   "derived_from_master_sha": "1e738fd",
+   "reason": "promoted residual R-rb-25-X9 (t1 exceeded, guest-claim-integrity security gap)",
+   "slice": "rb-41",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -67,6 +67,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260903T210007Z-1675984",
- "updated_utc": "2026-09-03T21:02:00Z"
+ "updated_by": "mr-sup-native-20260903T230007Z-1697253",
+ "updated_utc": "2026-09-03T23:01:00Z"
 }
