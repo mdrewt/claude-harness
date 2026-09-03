@@ -1,7 +1,7 @@
 {
  "adr_next_free": 234,
  "awaiting_merge": [],
- "consecutive_standdowns": 1,
+ "consecutive_standdowns": 2,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "188986f"
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "18:00Z tick standdown: SOFT-PAUSE (90.6%), no open PRs/inflight/parked, queue[0]=rb-40 held pending governor NORMAL.",
+ "notes": "19:00Z tick (mr-sup-native-20260903T190006Z-1651488): standdown, SOFT-PAUSE (governor forbids new launches), nothing to merge/resume/launch. queue[] rb-40 left untouched for next NORMAL tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
