@@ -1,7 +1,7 @@
 {
  "adr_next_free": 234,
  "awaiting_merge": [],
- "consecutive_standdowns": 2,
+ "consecutive_standdowns": 3,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "188986f"
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "19:00Z tick (mr-sup-native-20260903T190006Z-1651488): standdown, SOFT-PAUSE (governor forbids new launches), nothing to merge/resume/launch. queue[] rb-40 left untouched for next NORMAL tick.",
+ "notes": "21:00Z tick (mr-sup-native-20260903T210007Z-1675984): standdown, SOFT-PAUSE (governor forbids new launches), nothing to merge/resume/launch. No residual past t1_promote_days (max age ~2.82d). queue[] rb-40/rb-41 left untouched for next NORMAL tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -67,6 +67,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260903T160008Z-1618957",
- "updated_utc": "2026-09-03T16:01:44Z"
+ "updated_by": "mr-sup-native-20260903T210007Z-1675984",
+ "updated_utc": "2026-09-03T21:02:00Z"
 }
