@@ -26,7 +26,7 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
-### rb-44 — WHEN the S3b cascade lands ITS name writes SHALL reference (from rb-34 X5, deferred 2026-09-01)
+### rb-44 — RESOLVED, do not build (from rb-34 X5, deferred 2026-09-01)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-34 · residual: R-rb-34-X5
 
@@ -34,6 +34,16 @@ Deferred with reason: BLOCKED ON S3b; FOLD into the slice that lands R-m22-s3-X1
 
 EARS: WHEN the S3b cascade lands ITS name writes SHALL reference
 Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+
+RESOLVED 2026-09-04 (mr-gates residuals close --slice rb-44 --force): the fold target
+(m22-s3b, PR#408) already shipped before this section was queued, and independently
+satisfies X5 in full — `ranking.rs:260-276` (`player_with_deleted_name` /
+`profile_with_deleted_name`) write `game_core::TOMBSTONE_DISPLAY_NAME` by symbol through
+owning-module helpers taking no name parameter; `ranking_tests.rs` (PRV1-6c /
+`m22s3b_*` suite, ~L2317-2600) executes the required per-table value-equality,
+never-delete, wrong-tombstone-name and split-binding pins. `anonymize_display_names`
+never calls `tombstoned_profile`, so the second-writer collision X5 guarded against does
+not exist. Do not re-launch this section as a slice; it names no remaining work.
 ### rb-43 — X11-adr-readme-next-free (from rb-26 X11-adr-readme-next-free, deferred 2026-09-01)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-26 · residual: R-rb-26-X11-adr-readme-next-free
