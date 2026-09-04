@@ -1,18 +1,36 @@
 {
   "adr_next_free": 236,
-  "awaiting_merge": [],
+  "awaiting_merge": [
+    {
+      "slice": "rb-41",
+      "pr": 422,
+      "pr_repo": "mdrewt/monster-realm",
+      "head_sha": "8badb55e26ff3494da22bbe160c89a5f68def744",
+      "run_id": "mr-spawn-20260904T030204Z-1997737",
+      "model": "fable",
+      "effort": "xhigh",
+      "tier": "hard",
+      "note": "checks in_progress at tick end; ci-watch delegated"
+    }
+  ],
   "consecutive_standdowns": 0,
   "harness_main": {
     "ci": "no-remote-ci-local-gate-green",
     "sha": "188986f"
   },
   "inflight": [],
-  "last_tick_utc": "2026-09-03T23:00:07Z",
-  "live_watchers": [],
+  "last_tick_utc": "2026-09-04T04:51:01Z",
+  "live_watchers": [
+    {
+      "watcher": "mr-ci-watch",
+      "args": "422 rb-41",
+      "started_utc": "2026-09-04T04:51:00Z"
+    }
+  ],
   "master": {
-    "ci": "pending",
-    "nightly": "success",
-    "sha": "d5a0aef"
+    "sha": "c6826de",
+    "ci": "success",
+    "nightly": "success"
   },
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "native_supervisor": {
@@ -27,22 +45,13 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "02:36Z tick: reconciled rb-40 (fable@xhigh hard, done-event) -- squash-merged PR#421 to d5a0aef (ADR-0235, claim-time export-purge observability, closes R-rb-22-EO-9); worktree/branch reaped; audits CLEAN/7-7-met; queue[rb-41] untouched. Post-merge CI (ci,e2e) still queued/in_progress at tick end -- not composite-launching until confirmed green next tick.",
+  "notes": "04:51Z tick: rb-41 (fable@xhigh hard) done-event rc=0 -- PR#422 already opened by the run (guest-claim-integrity exists-half hollowing, ADR-0222 amended in place). Remote CI (ci,e2e) IN_PROGRESS at tick end -- delegated to mr-ci-watch (pid 2649179), no merge this tick. NOTE: master briefly carried a stray commit 2919a56 (worktree-cwd-reset incident inside the run, disclosed in the PR + handoff) then reverted via c6826de; local main checkout matches origin at c6826de, tree-clean vs d5a0aef. mr-state.json/handoff/handoff-archive were left uncommitted by two prior ticks (03:02Z launch, and this run's direct `cat >>` handoff writes -- doctrine violation, same pattern as rb-39/issue-12) and are folded into this tick's own end-of-state commit.",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
   },
   "parked": [],
-  "queue": [
-    {
-      "added_by": "n/a",
-      "added_utc": "2026-09-03T20:01:16Z",
-      "derived_from_master_sha": "1e738fd",
-      "reason": "promoted residual R-rb-25-X9 (t1 exceeded, guest-claim-integrity security gap)",
-      "slice": "rb-41",
-      "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-    }
-  ],
+  "queue": [],
   "rate_limit_armed_by": "wrapper",
   "rate_limit_resets_at": null,
   "resource_locations": {
@@ -59,6 +68,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260904T023617Z-1966091",
-  "updated_utc": "2026-09-04T02:42:00Z"
+  "updated_by": "native-20260904T045101Z-2647919",
+  "updated_utc": "2026-09-04T04:51:30Z"
 }

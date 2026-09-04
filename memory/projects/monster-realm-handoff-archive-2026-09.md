@@ -460,3 +460,56 @@ Native tick mr-sup-native-20260903T060011Z-988194 (06:00Z). Gate-0: no live per-
 ## 2026-09-03T07:38:02Z — 07:36Z tick — 17r-c CI-watch raced already-green checks, delegated to auto-spawned follow-on tick
 Gate-0: 17r-b lock alive (pid 990499, fable/xhigh, ~87min in) — untouched, live chain. 17r-c lock done (leader 990907 dead), PR#418 open with e2e still 'pending' per the situation bundle. Spawned mr-ci-watch for PR#418/17r-c per doctrine; by the time it ran, both checks (ci, e2e) had already gone green, so it fired its event immediately and auto-spawned a follow-on native tick (pid 1231504) to own the merge. To avoid a double-merge race (no chain-owner mutex held by either process at inspection time), THIS tick took no further action on 17r-c — ceding the merge to the freshly spawned tick per 'one supervisor chain at a time'. No state/ledger/lock mutation made this tick; mr-state.json left untouched (17r-b still correctly inflight; 17r-c still shows its now-stale per-run lock, expected to be reconciled by the follow-on tick's merge).
 
+## 2026-09-03T08:14:43Z — 2026-09-03T08:14:43Z — master CI red on c75fbc8 (17r-c/PR#418) — rerun triggered, PR#419 merge deferred
+Native tick mr-sup-native-20260903T081037Z-1312282 (08:10Z, cron; src=ci, EVENT 17r-b.ci.md: PR#419 checks green).
+
+Gate-0: no live per-run locks/chain mutex, HOLD-NONE (queued_events=1). Gate-1: both repos fetched clean.
+Harness working tree still carries the SAME uncommitted mr-state.json/handoff/docs/routing.md stray noted by
+several prior ticks (docs/routing.md pre-existing/unrelated, left untouched again) plus now-untracked
+17r-b.gates.mjs + monster-realm-17r-b-plan.md + monster-realm-17r-c-plan.md (17r-b's own gate-CHECK script +
+plan memos, never committed by the ticks that authored them). Not committed this tick either — folded into the
+next tick's record once the master-CI question resolves, to avoid a mid-investigation commit.
+
+FINDING: PR#419 (17r-b) is CLEAN/MERGEABLE with both checks green — ready to merge — but master's own HEAD
+(c75fbc8, 17r-c/PR#418, merged 07:59Z) is CI-RED: workflow run 33730838572 shows job `ci` green but job `e2e`
+FAILED on e2e/wallet-balance.spec.ts:911 (11r-e ADR-0169 shop-overlay-gold precondition) — quest_001 never
+started via the elder_oak dialogue choice after 5 attempts. Per gate 3, master-red outranks merging a green PR.
+
+Investigated whether this is a real regression from PR#418: its diff is docs/adr/*.md (3 files) +
+docs/spacetimedb-2.8.1-upgrade-runbook.md + evals/observability-log-wrapper.eval.mjs (existing file, expanded
+per its own OBS-48 justification-manifest slice) — zero touches to quest/dialogue/npc/shop code. Strong prior
+that this is a transient e2e flake (network/timing on the elder_oak dialogue-choice precondition), not a real
+17r-c regression.
+
+ACTION: `gh run rerun 33730838572 --failed` triggered to confirm flake-vs-regression from live ground truth
+rather than assume. Per doctrine ("never sit polling CI"), did not block the tick on it — spawned a detached
+one-shot watcher (`setsid bash /tmp/mr_master_ci_watch.sh 33730838572 c75fbc8… &`, self-contained, not under
+$MEM, mirrors mr-ci-watch's fire-a-pending-event-then-tick pattern since mr-ci-watch itself is PR-scoped and
+this is a post-merge master rerun with no open PR) and exited. It writes
+memory/projects/pending-events/master-ci-rerun-33730838572.md and fires a tick on conclusion (green/failure/
+inconclusive after ~30min of polling).
+
+NEXT TICK (or the fired event tick): read the fired pending-event. If green → confirmed flake, proceed to
+merge PR#419 (17r-b) normally (mr-audit, mr-gates verify, ledger, handoff, mr-state.json, clean worktree/
+branch), then fold in the still-uncommitted prior-tick harness files (handoff.md, mr-state.json,
+17r-b.gates.mjs, monster-realm-17r-b-plan.md, monster-realm-17r-c-plan.md — NOT docs/routing.md) into that
+commit. If still red/failed on rerun → real regression signal (or a genuinely flaky/broken e2e precondition
+worth its own investigation) — do NOT merge PR#419 until master is fixed or the flake is triaged and the test
+hardened; raise as next-target BLOCKER per gate 3, do not park-and-ask-human for this (reversible, mechanical
+triage call).
+
+No merge, no launch, no park-counter changes this tick. governor state NORMAL throughout (budget d7=$2442.64
+of $2783 weekly, fable_ok=true). No BLOCKER raised (investigation still open, not yet gate-class). No ledger
+row written (no cost incurred — read-only investigation + one CI rerun trigger + one detached watcher launch).
+## 2026-09-03T07:59:31Z — 17r-c merged (PR#418) — OBS-48 justification-manifest hardening
+Slice 17r-c (evals/observability-log-wrapper.eval.mjs A9 justification gate, ADR-0180 amendment + ADR-0197 FF4 closed) squash-merged as c75fbc8. mr-audit CLEAN: orchestration CLEAN (6 roles incl. planner/red-team/reviewer/tester/verifier), gating-test CLEAN, acceptance 1/1 met (spotcheck re-read confirmed). Worktree+branch cleaned. Residuals close: 0 (none targeted this slice).
+
+17r-b (PR#419, reconnect hydration latch) NOT merged this tick — remote e2e failed on client/e2e/monster-privacy.spec.ts:394 (13r-e PvP overlay test), unrelated to 17r-b's touches (connection.ts/main.ts identity-rotation + reseed latch); failure signature (pvp-accept-btn intercepted by #help-hint launcher, element detached-from-DOM retries) reads as a pre-existing UI-timing flake, not a regression from this slice's diff. Triggered `gh run rerun --failed`; delegated wait to mr-ci-watch (pid 1309513, detached). Local `just ci` was green per the run's own report; verifier PASS on the delta-mutation re-run (72/72, RSD17B-CARRIES caught) already landed as part of the slice work itself.
+
+Acceptance ledger residual_alarms (informational, not a merge blocker for 17r-c): 2 unpromoted residuals past t1=3d (R-rb-22-EO-9, R-rb-22-EO-11) and 43 open residuals vs cap 12 (observe-only in slice 1) — next tick's gate-3 pick-work should weigh promoting the aged ones per the aging-based entry rule.
+
+
+## 2026-09-03T08:24:38Z — 08:21Z tick — merged 17r-b (PR#419, ADR-0130 residuals d+e reconnect hydration latch)
+Native tick mr-sup-native-20260903T082130Z-1318805 (cron). Gate-0/1/2: no live locks/mutex, HOLD-NONE, no active human session (docs/routing.md stray edit >7h old, left untouched per prior-tick precedent). Prior tick (08:10Z) had deferred PR#419 merge pending confirmation of a master-CI rerun (wallet-balance.spec.ts quest_001 flake on PR#418's docs+eval-only diff, unrelated to 17r-b); this tick's EVENT confirmed the rerun (run 33730838572) concluded success on c75fbc8. Re-verified PR#419 live: mergeStateStatus CLEAN, mergeable, ci+e2e both pass. mr-gates verify: CLEAN (B1 teeth=9/9, 291 tests, spotcheck agrees, adversarial re-read found nothing to refute). mr-audit --tier hard: orchestration CLEAN (7 roles incl. red-team/reviewer/verifier), gating_advisory CLEAN (no weakened/removed/skipped assertions), acceptance CLEAN 1/1. Performed the mandatory hard-tier diff read myself (net/connection.ts + main.ts): onHydrated now fires after view-reconcile/before flushBatch and gates the battle-reseed latch's resolution (previously resolved on ANY flush read, including pre-hydration ones — closes ADR-0130 residual d); onReconnect now carries the connection's (possibly rebuilt) identity and main.ts refreshes its module-local identity from it before any identity-gated listener runs (closes residual e). No concerns. Merged PR#419 squash+delete-branch (merge commit 8cec6f4), removed the 17r-b worktree + local branch, ff-only'd master to 8cec6f4. Post-merge master CI run is in-progress (not yet resolved this tick — will land via the normal CI event mechanism, same as this tick's own triggering event). mr-gates residuals close --slice 17r-b --pr 419: 0 residuals were targeted at this slice (ledger fully resolved pre-merge, none deferred). Noted but did not act on: mr-gates verify surfaced 2 pre-existing residual_alarms (2 unpromoted past t1=3d: R-rb-22-EO-9, R-rb-22-EO-11; 43 open residuals vs. cap 12, observe-only) — unrelated to 17r-b, next tick's gate-3 should pick these up under the aging rule. Also noted but left untouched: harness repo carried ~4 ticks' worth of uncommitted mr-state.json/handoff/handoff-archive writes (last chore(mr-sup) commit was 05:41Z; several ticks since wrote state without committing) plus the now-legitimate untracked 17r-b.gates.mjs/17r-c.gates.mjs plan files — folding all of it into this tick's own end-of-state commit rather than root-causing the commit gap now. No mutating action beyond the single merge (per one-action-per-tick); standing down.
+## 2026-09-03T09:01:03Z — 09:00Z tick — promoted rb-22 residuals EO-9/EO-11, chore PR#87 merged
+Native tick mr-sup-native-20260903T090008Z-1328857 (09:00Z, cron). Gate-0: no live locks/chain mutex, HOLD-NONE (queued_events=0). done_files showed mr_pass_rb-36.done (stale, already fully reconciled by a prior tick per PR#414 — no open PRs, no action needed for it). master CI green (8cec6f4, ci+e2e success). No open/parked PRs. Ran mr-gates residuals list --unclaimed: two rb-22-sourced residuals (R-rb-22-EO-11 write-verb statement-boundary hardening; R-rb-22-EO-9 guest pre-claim export_bundle purge observability) at age 3.08d, past t1_promote_days=3 — outranked PLAN section 9 per lp-gates aging discipline. Classified both as real game/security defects (not eval-tooling-scanner-only) so not ADR-0224 wontfix candidates. Promoted via mr-gates residuals promote -> rb-39 (EO-11), rb-40 (EO-9) in M-residual-backlog.spec.md; queued both via mr-record queue-add for the next tick's fast path. Shipped as doc-only chore/residual-promote-20260903T090100Z, PR#87 (claude-harness repo per repo-routing rule -- loop/process artifacts), gh pr merge --squash --auto -- merged immediately (checks green). Pre-existing stray docs/routing.md left untouched (known stray, modified before this tick per prior blocker notes). No launches this tick (fan-out not evaluated -- promote-residual is the one allowed action; next tick's fast path will pick rb-39 off queue[]).
