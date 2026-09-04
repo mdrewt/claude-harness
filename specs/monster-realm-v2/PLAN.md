@@ -670,6 +670,25 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   the frame-loop catch that bypasses the `pushError`/F9 error pipeline. Serial chain
   17r-a→17r-b→17r-f (shared `main.ts`); 17r-c/d/e pairwise disjoint fan-out candidates. Zero
   new decision issues. No new game-design surface.
+- **M-postgate-eighteenth-review-residuals** (`M-postgate-eighteenth-review-residuals.spec.md`) —
+  **NEW, queued 2026-09-04; inserted after `M-postgate-seventeenth-review-residuals`**, per the
+  weekly-review insertion convention. Verified eighteenth multi-lens review findings @ `1e738fd`
+  (8 lenses, 0 contradictions, 2 independent verifiers, 8 claims checked / 7 confirmed / 1
+  dropped as already-tracked). The `e112ce6..1e738fd` delta (M22 privacy s3–s9 closing M22,
+  m23-s8 colour independence, rb-22..rb-39, 17r-a/b/c) is structurally clean — the
+  security/privacy, netcode, test-integrity, game-core and schema lenses each returned an
+  explicit "no findings" (M22's guard ordering/RLS/cascade delegates verified; 17r-a/17r-b
+  independently re-traced and race-checked; schema additive; no test weakened anywhere in the
+  delta). What remains: **18r-a** the new privacy UI core silently spends an armed delete
+  confirmation on the busy-guard no-op path (`begin()`'s guard returns the caller's spent
+  `confirm` while delivering nothing — notice-less UX reset in the account-deletion flow, MED),
+  **18r-b** a four-site citation/pointer truth sweep (ADR-0231's wrong `main.ts:2756` cite,
+  mr_load_driver's stale `on_disconnect` lines relied on by ADR-0232, ARCHITECTURE.md's taken
+  "ADR next-free = 0234" pointer + missing rb-39 entry, AGENTS.md's wrong pin count), and
+  **18r-c** the 17r-c supervisor doc-follow-up that never executed (M20 OBS-48 still states the
+  blanket forbid — the opposite of Drew's #342 require-justification ruling; harness doc-only).
+  All three pairwise disjoint (mr-disjoint SAFE on 18r-a/18r-b). Zero new decision issues. No
+  new game-design surface.
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
