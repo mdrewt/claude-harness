@@ -10,8 +10,8 @@
  "last_tick_utc": "2026-09-04T18:00:12Z",
  "live_watchers": [],
  "master": {
-  "sha": "4b4ab4b",
-  "ci": "pending",
+  "sha": "2d3f727",
+  "ci": "success",
   "nightly": "success"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "18:00Z cron tick: gate-0 found 18r-b lock dead + done=true, no chain mutex held. Live re-check: PR#427 CLEAN/MERGEABLE, ci+e2e both SUCCESS. mr-gates verify CLEAN 4/4 met; mr-audit orchestration/gating CLEAN, mandatory_read=false; PR Acceptance: line matched render. Squash-merged (0bbd2e1->4b4ab4b), worktree+branches cleaned, residuals close 0 (correct, no DEFERs). Post-merge master CI in_progress at write time (pre-merge checks green on same diff). No composite launch this tick: 4 residuals (R-m22-s5-X11/X12/X13, R-m22-s4-X17) past t1=3d unpromoted outrank new PLAN section-9 work per gate-3 aging -- next tick should promote the oldest (R-m22-s5-X11, real PRV1-7 privacy defect, not eval-tooling) before considering a new slice launch. queue[] re-read fresh at write time (still empty). Governor NORMAL (d7 $319.79/$2783).",
+ "notes": "19:00Z native tick: promoted rb-45/46/47 (m22-s5 residuals, t1-aged); PR#93 merged 2d3f727; no launch this tick (deferred to next-tick fast path)",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
