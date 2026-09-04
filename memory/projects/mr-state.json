@@ -1,17 +1,29 @@
 {
- "adr_next_free": 236,
+ "adr_next_free": 238,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "1dec6f0"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-04T20:00:03Z",
+ "inflight": [
+  {
+   "slice": "rb-47",
+   "run_id": "mr-spawn-20260904T233804Z-66543",
+   "session_leader": 66596,
+   "claude_pid": 66599,
+   "model": "fable",
+   "effort": "xhigh",
+   "tier": "hard",
+   "started_utc": "2026-09-04T23:38:08Z",
+   "repo": "monster-realm"
+  }
+ ],
+ "last_tick_utc": "2026-09-04T23:29:44Z",
  "live_watchers": [],
  "master": {
-  "sha": "4b4ab4b",
-  "ci": "success",
+  "sha": "8cdc8da",
+  "ci": "queued",
   "nightly": "success"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,37 +39,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "20:00Z native tick: promoted rb-48 (m22-s4 residual R-m22-s4-X17, t1-aged); PR#94 merged e514024 (harness); also corrected master.sha (was stale at 2d3f727, PR#427 had already advanced it to 4b4ab4b at 18:06Z); no launch this tick (deferred to next-tick fast path)",
+ "notes": "23:29Z native tick (event: rb-46 CI green PR#428): merged rb-46 (8cdc8da, hard-tier mandatory-read adjudicated CLEAN, guards.rs byte-pin confirmed untouched); worktree+branches cleaned; residual R-m22-s5-X13 was already closed by the run itself. Composite merge->launch: popped rb-47 (queue fast-path, confederate role-swap trade-gate residual) and spawned it fable@xhigh hard-tier (ADR-0237 reserved, adr_next_free now 238). master CI for 8cdc8da queued at handoff -- next tick must confirm green live before trusting it. Residual backlog: 55 open/cap 12 (observe-only), 1 unpromoted past t1 (R-m22-s3b-X18) -- next tick's gate 3 should classify/dispose before new PLAN section-9 work.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "slice": "rb-45",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m22-s5-X11",
-   "added_utc": "2026-09-04T19:01:08Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "4b4ab4b"
-  },
-  {
-   "slice": "rb-46",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m22-s5-X12",
-   "added_utc": "2026-09-04T19:01:08Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "4b4ab4b"
-  },
-  {
-   "slice": "rb-47",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m22-s5-X13",
-   "added_utc": "2026-09-04T19:01:08Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "4b4ab4b"
-  },
   {
    "slice": "rb-48",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
@@ -83,6 +71,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260904T200003Z-3954028",
- "updated_utc": "2026-09-04T20:02:30Z"
+ "updated_by": "mr-sup-native-20260904T232944Z-17037",
+ "updated_utc": "2026-09-04T23:40:00Z"
 }
