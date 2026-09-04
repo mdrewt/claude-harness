@@ -3028,6 +3028,75 @@ Gates ledger: memory/projects/gates/m22-s3b.gates.md (17/18 met + X18 DEFER, lin
 CHECK-side evidence trap hit again — placeholders were required, memory card exists). Teeth+red
 receipts: m22-s3b.{teeth,red-1,red-2}.txt. Plan memo: monster-realm-m22-s3b-plan.md.
 
+## 2026-09-04T12:23:59Z — Native tick mr-sup-native-20260904T122330Z-3488264 (12:23Z) — rb-43 CI-watch delegated
+rb-43 run finished (rc=0, attempts=1, opus, $54.99 recorded via reconcile row). PR #424 open: 11/11 gates met per ledger, mergeStateStatus=UNSTABLE, checks ci+e2e IN_PROGRESS. Delegated to mr-ci-watch (detached, setsid) for resume via event tick — supervisor owns the merge, never sat polling CI. Governor NORMAL (d7=$257.01/$2783 weekly). No launch this tick (pending merge takes priority).
+## 2026-09-04T12:20Z — rb-43 DELIVERED — PR #424 open, local `just ci` green, remote CI running
+
+**Terminal state (not merged — `gh pr merge` is supervisor-only).** Slice `rb-43`, branch
+`slice/rb-43` (3 `wip:` commits, pushed), worktree
+`projects/monster-realm/.claude/worktrees/rb-43`. PR: https://github.com/mdrewt/monster-realm/pull/424
+Acceptance: **11/11 met, 0 deferred, 0 unmet — rb-43 seed:e3b0c44298fc1c14** (0 gates were seeded;
+the promoted spec section carries no `SHALL`, the known-benign rb-24/25/26/42 pattern, so X1-X11
+were authored from the residual verbatim and the two plan-phase lens rounds).
+
+Closes `R-rb-26-X11-adr-readme-next-free`. `docs/adr/README.md`'s hand-maintained
+`Next free number: **0184**` (51 behind a corpus running to `0235`) is gone; `scripts/adr-digest.mjs`
+now DERIVES the number and renders it inside the payload `--check` byte-compares, so it rides the
+pre-existing `just ci` drift gate with **no new gate mechanism** (ADR-0224 respected — `evals/` tree
+hash identical to origin/master). No new ADR number minted (supervisor assigned `None`): recorded as
+an in-place `## Amendment` on ADR-0104, no header relation field, zero DIGEST bytes moved.
+
+**touches (chosen — the spec said "inherit … REVIEW"):** `scripts/adr-digest.mjs`,
+`scripts/adr-digest.test.mjs` (new), `justfile`, `docs/adr/README.md`, `docs/adr/DIGEST.md`,
+`docs/adr/0104-*.md`, `ARCHITECTURE.md`. **`docs/adr/README.md` is normally supervisor-owned and
+forbidden to slices — rb-43 is the declared exception because that file IS the criterion.** Flagged
+here so the audit is mechanical, not inferred. 3 boyscout hunks / ~14 lines, all attributed in the PR.
+
+**Gate:** full local `just ci` CI-EXIT=0 (2188 nextest, 2942 vitest/100 files, 99 eval PASS,
+observability 8/8, secrets clean, `adr-digest test suite: 6 test(s) passed`). Remote CI PENDING at
+handoff time (runs/33872331558, jobs `ci` + `e2e`) — the supervisor owns the merge.
+
+**Lens rounds (all executed against the artifact, not predicted):** planner; reviewer+red-team+
+/simplify on the PLAN (killed a README-validator design as "patching the scanner further" per
+ADR-0224, and killed a hard `README == max+1` equality gate that would have forced every future
+ADR-adding PR to edit a supervisor-owned file); reviewer+red-team on the TEST SUITE — **the red-team
+built TEN wrong implementations that passed the first draft 6/6**, all closed; reviewer+red-team+
+/simplify on the IMPLEMENTATION — two lenses independently caught a FALSE UNIVERSAL in this slice's
+own README edit (the de-enumerated `## Amendment` sentence claimed "no `Amended-by:` header points at
+them", wrong for 8 of 18 files), fixed; verifier **PASS, 18/18 mutants killed**, gating suite
+blob-identical across the implementation commit, RED at `d1edade` / GREEN at HEAD proven with
+`git archive` (no checkout).
+
+**FOUR RESIDUALS FILED (unpromoted, target backlog)** — all measured, none fixed here:
+`R-rb-43-DUPID` (no duplicate-id check: two files claiming `0236` render both rows and a
+self-consistent wrong next-free with the whole gate stack green), `R-rb-43-HEADINGID` (filename
+prefix never cross-checked against the file's own `# ADR-NNNN` heading — one typo vaults the number
+forward), `R-rb-43-COLLECTORSHAPES` (`.MD` casing and nested subdirs are silently MISSED, a 5-digit
+prefix TRUNCATES back into band past the new guard), `R-rb-43-CHANGELOGCITE`
+(`scripts/changelog-freshness.mjs:23` cites `adr-digest.mjs:840-861`; the +76-line block moved those
+exits to :916/:928/:936 — outside touches, left stale deliberately).
+
+**Disclosed in ADR-0104, deliberately NOT built:** the band is not exhaustion-aware at `0999`; and
+the new `just test` block has no tooth on its own wiring (deleting the block is CI-clean) — the check
+that would give it one is the meta-check pattern ADR-0224 retires by name.
+
+**Out-of-repo follow-up for the SUPERVISOR (harness repo, hidden-dependency STOP, not touched):**
+`.claude/commands/adr.md:11-16` still tells `/adr` to read AND UPDATE `docs/adr/README.md`'s
+"Next free number", and `.claude/agents/doc-keeper.md:45` still forbids touching it. That value no
+longer exists in README — both should be repointed at `docs/adr/DIGEST.md`.
+
+**Code-graph refresh deliberately skipped:** `master` is unchanged (nothing merged yet) and indexing
+the ephemeral worktree path is forbidden. Re-index the main checkout after the squash-merge.
+
+**Loop courtesy:** `/tmp/mr_warn_rb-43` (landing pattern) appeared after the green increment — from
+that point on: no new scope, and the only remaining fan-out was the single mandatory `verifier`.
+`doc-keeper` was NOT spawned; its outputs (ARCHITECTURE, the ADR amendment, memory cards, this
+handoff) were written directly. `CHANGELOG.md` untouched — git-cliff generates it from the squash
+commit.
+
+## 2026-09-04T10:19:36Z — rb-43 launched (composite after rb-42 merge)
+Composite launch per doctrine: re-derived eligibility fresh after rb-42's merge completed fully (worktree/branch cleaned, ledger+handoff+state recorded), re-ran the active-session probe (no resident IDE pid, no third-party writes in last 6 min — the only recent writes were my own rb-42 recording). queue[] fast-path: rb-43 (X11-adr-readme-next-free, source rb-26) re-verified live -- spec heading present, not blocked, no existing PR/branch -- launched opus@high/routine, queue entry removed. Target: prove docs/adr/README.md's stale hand-maintained next-free-ADR-number line via an ordinary Rust/TS test (ADR-0224, no new eval script).
+
 ## 2026-09-04T10:18:53Z — rb-42 merged (PR#423)
 Merged fix/rb-42-x9-spec-false-premise -> master @7bb551f. Closed residual R-rb-26-X9-spec-false-premise: the four ADR-0207/ARCHITECTURE.md consumer regions were already corrected by rb-4 (#380) and rb-26 (#400); rb-42's real remaining work was the reciprocal ADR-0208<->0222/0223 Extends back-links (X2/X3), amending ADR-0223 in place to record closure (X7), and disclosing the standing extends-vocabulary gap (X8). mr-gates verify: 8/8 met, FLAGGED on 4 manual-citation resolver false-negatives (X2/X3/X7/X8) -- hand-spot-checked all four against live files, content matches EVIDENCE verbatim, adjudicated as resolver limitation not fraud. mr-audit: orchestration CLEAN, gating CLEAN, top-level mandatory_read=false. 4 new residuals emitted this slice (X9 harness-repo spec drift, X10 Extends-vocabulary unmodelled by adr-digest.mjs, X11 T4 doc-tie ADR-0224 migration, X12 dispositioned wontfix -- line-citation drift in harness memory notes). Worktree/branch cleaned; master fast-forwarded to 7bb551f locally. Master CI was still pending at record time (queue backlog observed on other checks) -- next tick should re-verify green before acting further; not treated as a blocker since the merge itself is via squash off a PR whose own checks were SUCCESS. queue[] still holds rb-43 (promoted, untouched this tick).
 ## 2026-09-04T09:59:25Z — rb-42 PR #423 CI-watch delegated
@@ -3157,19 +3226,3 @@ Native tick mr-sup-native-20260903T200008Z-1662501 (20:00Z, cron). Gate-0: no li
 ## 2026-09-03T19:00:57Z — 19:00Z tick — standdown (SOFT-PAUSE), nothing to merge/resume/launch
 Native tick mr-sup-native-20260903T190006Z-1651488 (19:00Z, cron). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE (queued_events=0), no resident IDE session collision (no writes to harness/project in last 10 min, handoff/ledger mtimes match the 18:00Z tick). The only /tmp done_file is mr_pass_rb-36.done (Sep 2 18:33) — already fully reconciled per every tick since (02:00Z/04:00Z/05:41Z/06:00Z), confirmed stale again this tick, no action taken. Fetched both repos clean; zero open PRs in either repo; mr-state.json shows inflight=[] awaiting_merge=[]; project master (1e738fd, rb-39 #420) and harness main both green/up to date. Governor: budget bundle reports state=SOFT-PAUSE (d7=$2520.75 / weekly_limit=$2783, 90.6% >90% threshold) — per doctrine this forbids new launches; queue[] holds one valid fast-path entry (rb-40, promoted residual R-rb-22-EO-9) but it is NOT launched this tick and is left untouched in queue[] for the next NORMAL-governor tick. Nothing to merge, resume, or launch under SOFT-PAUSE -> stand down. Pre-existing uncommitted docs/routing.md stray in the harness worktree noted but not touched (not this tick's write, not blocking any action taken).
 
-## 2026-09-03T18:00:57Z — 18:00Z tick — standdown (SOFT-PAUSE, nothing to merge/resume)
-Native tick mr-sup-native-20260903T180008Z-1640847 (18:00Z, cron, forced=0). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE (queued_events=0), no live rooted-run pid. Stale /tmp/mr_pass_rb-36.done reconfirmed already fully reconciled (long-merged PR#414 — same conclusion as every tick since 02:00Z). Gate-1: harness+project fetched clean, no rate-limit park, no active-session collision (only supervisor's own files touched in last 6 min). Project master CI verified live GREEN at 1e738fd (rb-39/PR#420), matches situation bundle. No open PRs either repo (gh pr list both = empty), nothing inflight/awaiting_merge/parked/wip, no worktrees beyond the canonical checkout. Gate-3: residuals list --unclaimed shows only sub-1-day-old rows (17r-c OBS-48 red-team residuals + m22-s3 X11, all <1 day) — none past aging thresholds to preempt; queue[0]=rb-40 (promoted residual R-rb-22-EO-9) remains valid but governor SOFT-PAUSE (d7=$2520.34/$2783=90.6%) forecloses any new launch regardless. No merge/resume/promote action available — pure standdown, consistent with every tick since 12:17Z. docs/routing.md left untouched (pre-existing operator edit). No BLOCKER, no rate-limit event.
-## 2026-09-03T16:01:37Z — 16:00Z tick — standdown (SOFT-PAUSE, nothing to merge/resume)
-Native tick mr-sup-native-20260903T160008Z-1618957 (16:00Z, cron, forced=0). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE (queued_events=0). Stale /tmp/mr_pass_rb-36.done reconfirmed already fully reconciled (long-merged PR#414, no matching action needed). Gate-1: both repos fetched clean, no rate-limit park, no active-session collision. Project master CI verified live GREEN at 1e738fd (rb-39's merge + reconfirm-rerun from the 14:00Z/14:09Z ticks), matches situation bundle. No open PRs either repo, nothing inflight/awaiting_merge. Gate-3: governor SOFT-PAUSE (d7=$2519.32/$2783=90.5%) -- no new launches. queue[0]=rb-40 (promoted residual R-rb-22-EO-9) remains valid and queued for the first NORMAL-governor tick; not re-verified for launch since SOFT-PAUSE forecloses it regardless. No merge/resume/promote action available this tick -- pure standdown, matching the 14:09Z/15:00Z ticks' verdict. Housekeeping note: mr-state.json + handoff writes from the 12:17Z through 15:00Z ticks (6 ticks) had accumulated uncommitted on harness main -- folded into this tick's own end-of-state commit rather than left to drift further toward REPO-OUT-OF-SYNC. docs/routing.md left untouched (pre-existing operator edit, per 10:00Z tick's note). No BLOCKER, no rate-limit event.
-
-## 2026-09-03T14:10:55Z — 14:09Z tick — master CI reconfirmed green post rb-39
-Consumed EVENT master-ci-1e738fd.md: detached watcher (spawned by the 14:00Z tick after an e2e flake on run 33758650474) reran the job and it passed at 14:09:45Z. master local==origin at 1e738fd, no drift. No live locks/mutex/rooted-run pid (gate-0 clean). Governor SOFT-PAUSE (d7=$2518.49/$2783.00) — no new launch this tick; rb-40 (promoted residual R-rb-22-EO-9) stays queued in mr-state.json for the first NORMAL-governor tick. Updated mr-state.json master.ci rechecking->success; archived the event file. Standdown.
-## 2026-09-03T14:01:56Z — master CI red on rb-39 merge — reran, delegated watch
-Native tick mr-sup-native-20260903T140012Z-1593991 (14:00Z, cron, forced=0). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE, mr_pass_rb-36.done confirmed stale (mtime 2026-09-02T22:33Z, no matching ledger row for rb-36 outcome — already reconciled per prior tick handoff entries; ledger shows PR#414 squash-merged). Gate-1/2: no rate-limit park, fetch clean, no session collision.
-
-Gate-3: master CI red (run 33758650474, job 'e2e', headSha 1e738fd = PR#420/rb-39, merged 12:15Z). Investigated before acting: PR#420's diff is server-module/src/{accounts_tests.rs,privacy_tests.rs} + docs/adr only (rb-39 = G5 write-attribution hardening) — touches nothing in client/e2e/. Failure is a single flaky spec (client/e2e/monster-privacy.spec.ts:394, 13r-e-2): help-hint overlay button intercepts pointer events on pvp-accept-btn, retries exhaust, times out. 75 passed / 1 failed / 1 skipped — not a wholesale break. Prior 15 consecutive master runs all green. Conclusion: pre-existing UI-overlay click flake unrelated to rb-39's diff, not a regression it introduced — reverting rb-39 (a real security-gate fix, ADR-0234) over unrelated e2e flakiness would be wrong.
-
-Action taken (this tick's ONE mutation): `gh run rerun 33758650474 --failed`, then spawned a detached watcher (/tmp/mr_master_ci_watch.sh, pid recorded) since mr-ci-watch no-ops on an already-merged PR (its merged/closed short-circuit at top of the for-loop) — this watcher polls the rerun via `gh run watch`, writes pending-events/master-ci-1e738fd.md, and fires a tick on completion. Budget: SOFT-PAUSE (d7=$2517.78/$2783, 90.5%) — no new slice launches this tick regardless; a rerun of an existing failed job is not a new launch. Standing down; next tick (cron or the watcher's event) reconciles the rerun result — if still red, root-cause the flake for real (likely a z-index/pointer-events fix on #help-hint, or a stability wait in the spec) rather than re-rerunning indefinitely.
-
-## 2026-09-04T10:19:36Z — rb-43 launched (composite after rb-42 merge)
-Composite launch per doctrine: re-derived eligibility fresh after rb-42's merge completed fully (worktree/branch cleaned, ledger+handoff+state recorded), re-ran the active-session probe (no resident IDE pid, no third-party writes in last 6 min — the only recent writes were my own rb-42 recording). queue[] fast-path: rb-43 (X11-adr-readme-next-free, source rb-26) re-verified live -- spec heading present, not blocked, no existing PR/branch -- launched opus@high/routine, queue entry removed. Target: prove docs/adr/README.md's stale hand-maintained next-free-ADR-number line via an ordinary Rust/TS test (ADR-0224, no new eval script).
