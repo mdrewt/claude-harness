@@ -57,6 +57,14 @@
    "added_utc": "2026-09-04T19:01:08Z",
    "added_by": "n/a",
    "derived_from_master_sha": "4b4ab4b"
+  },
+  {
+   "slice": "rb-48",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m22-s4-X17",
+   "added_utc": "2026-09-04T20:01:01Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "2d3f727"
   }
  ],
  "rate_limit_armed_by": "wrapper",

@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-48 — X17 (from m22-s4 X17, deferred 2026-09-01)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s4 · residual: R-m22-s4-X17
+
+Deferred with reason: PRV1-14 export TTL reaper (target slice: S4b). A scheduled(...) table is automigration-frozen (ADR-0221), so table + reducer must ship atomically, and the table forces schema.rs (DATA_LIFECYCLE_MANIFEST set-equality, accounts_tests.rs:3508+), evals/baselines/table-schemas.json and evals/battle-schema-snapshot.eval.mjs T-VIS-ANCHORS — all out of the declared touches (the ADR-0225 defer shape). No R
+
+EARS: X17
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-47 — [PRV1-9 completeness — confederate role-swap, NOT this slice] WHEN a trade offer NAMING a  (from m22-s5 X13, deferred 2026-09-01)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s5 · residual: R-m22-s5-X13
