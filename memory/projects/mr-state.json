@@ -27,22 +27,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "Native tick mr-sup-native-20260904T130012Z-3534192 (13:00Z, cron). Committed prior ticks catch-up (04d93de). Dispositioned 8 stale m22-s3-X11..X18 residuals wontfix (verified delivered by PR#408/m22-s3b live in code). Promoted R-rb-34-X5 -> rb-44 (genuinely open name-write provenance gap), queued, shipped as harness PR#91 (squash a67fbc2), reconciled REPO-OUT-OF-SYNC via non-conflicting merge 1dec6f0, pushed. No slice launch this tick (promote was the one action). Governor NORMAL. No BLOCKERs.",
+ "notes": "14:00Z tick: rb-44 (R-rb-34-X5) found moot -- fold target already delivered by m22-s3b (PR#408) before rb-44 was queued; closed --force, queue emptied, doc PR#92 merged (harness main c1edce6). No slice launched.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-04T13:03:03Z",
-   "derived_from_master_sha": "e630386",
-   "reason": "promoted residual R-rb-34-X5",
-   "slice": "rb-44",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  }
- ],
+ "queue": [],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {

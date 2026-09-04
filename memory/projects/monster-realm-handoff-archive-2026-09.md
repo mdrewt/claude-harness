@@ -551,3 +551,45 @@ Native tick mr-sup-native-20260903T200008Z-1662501 (20:00Z, cron). Gate-0: no li
 ## 2026-09-03T21:01:15Z — 21:00Z tick — standdown (SOFT-PAUSE), nothing to merge/resume/launch
 Native tick mr-sup-native-20260903T210007Z-1675984 (21:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE (queued_events=0), no live rooted-run pid, no resident-session collision signals. mr_pass_rb-36.done confirmed stale/already-reconciled (rb-36/37/38/39 all merged into master per PR#414-420, per every tick since 02:00Z). Fetched both repos clean: zero open PRs in either repo, master (1e738fd, rb-39 #420) green, inflight=[] awaiting_merge=[]. Gate 3: mr-gates residuals list --unclaimed showed no residual past t1_promote_days (max age ~2.82d, R-rb-26-X9/X11, still under the 3-day promote threshold) -- nothing new to promote this tick; queue[] still holds rb-40 and rb-41 (both already promoted+queued by prior ticks) untouched, pending governor NORMAL. Governor: budget bundle reports state=SOFT-PAUSE (d7=$2522.04 / weekly_limit=$2783, 90.6%>90% threshold) -- per doctrine this forbids new launches. Nothing to merge, resume, or launch -> stand down. Pre-existing uncommitted docs/routing.md stray noted but not touched (not this tick's write, not blocking any action taken).
 
+## 2026-09-03T23:01:16Z — 23:00Z tick — standdown (SOFT-PAUSE)
+Native tick mr-sup-native-20260903T230007Z-1697253 (23:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no live rooted-run pid. done_files showed stale mr_pass_rb-36.done (Sep2) -- reconfirmed already fully reconciled by 5+ prior ticks, no-op. Git: no open PRs (harness or project), master CI green (sha 1e738fd), no wip/parked branches. Governor: SOFT-PAUSE (d7=$2523.17/$2783.00=90.7%) -- no new launches. Residuals: checked mr-gates residuals list --unclaimed (35 open); max unpromoted age 2.9d, below t1_promote_days=3 -- none outrank queue/PLAN work, nothing to promote this tick. queue[] rb-40/rb-41 re-verified still valid (spec sections present, unbuilt, not blocked-by) and left untouched for next NORMAL-governor tick. Folded in the prior 22:00Z tick's mr-state.json write, which was computed but never committed (working tree was dirty at gate-0). docs/routing.md carries an unrelated pre-existing uncommitted human edit outside supervisor scope -- left alone, not committed.
+
+## 2026-09-04T01:08:19Z — Weekly review 18 — M-postgate-eighteenth-review-residuals inserted (3 slices, 0 decisions)
+Weekly review 18 (generate-improvement-plan, Cowork) completed 2026-09-04. Pinned SHA
+1e738fd (master tip at 00:40Z; isolated --no-hardlinks clone at /home/mdrewt/mr-review,
+removed at run end). Delta reviewed: e112ce6..1e738fd. 8 sonnet lenses, 0
+contradictions, 2 independent sonnet verifiers; 8 reportable claims → 7 CONFIRMED, 1
+dropped (already tracked as R-m23-s8-postmerge).
+
+INSERTED: specs/monster-realm-v2/M-postgate-eighteenth-review-residuals.spec.md + PLAN
+§9 bullet directly after M-postgate-seventeenth-review-residuals. Three pairwise-
+disjoint slices: 18r-a (MED — privacyModel.ts busy-guard silently spends the armed
+delete confirmation with no notice; test gap in S8T-DELETE-INFLIGHT-REFUSED), 18r-b
+(LOW — four-site citation/pointer sweep: ADR-0231 main.ts:2756→2777, mr_load_driver.rs
+stale on_disconnect lines, ARCHITECTURE.md next-free=0234 taken by rb-39 + missing
+rb-39 entry, AGENTS.md pin count three→four), 18r-c (LOW, harness repo — M20 OBS-48
+still blanket-forbid; 17r-c's directed doc-follow-up never executed; reword to
+require-justification per #342).
+
+HEADLINE: no Critical/High product defects. M22 privacy machinery, 17r-a/17r-b netcode
+fixes, schema additivity, and test integrity all verified clean by dedicated lenses.
+
+OPEN REV-ISSUES: none (zero decision issues opened this cycle; nothing rose to a
+Drew-level call). Prior-cycle sweep: all DECISION(rev*) issues in both repos already
+closed/consumed — nothing to consume, nothing closed by this run.
+
+DECISION-DEFAULTED (reversible calls made by the review itself):
+- decision-defaulted:privacymodel-severity=MED (verifier downgrade from High — no wrong
+  server action fires; silent UX reset only)
+- decision-defaulted:obs48-why-vacuity=no-slice (80-char floor with no content check is
+  a deliberate, in-source-documented tradeoff; recorded in spec §5 for visibility)
+- decision-defaulted:review-lineage=N18 (derived from M-postgate-seventeenth-review-
+  residuals as newest *-review-residuals spec)
+- decision-defaulted:slice-grouping=3-slices (bug / project-doc-sweep / harness-doc
+  split; mr-disjoint SAFE recorded for 18r-a+18r-b)
+
+LOOP COURTESY: mr-situation checked at start — no rate-limit park
+(rate_limit_resets_at=null), budget NORMAL, rb-40 lock live (review fully isolated from
+it). CLEANUP: review clone teardown is the final action of this run (guarded rm under
+/home/mdrewt/mr-review; next run's startup sweep is the backstop); runner worktrees/
+branches captured at start and re-verified unchanged at teardown.
