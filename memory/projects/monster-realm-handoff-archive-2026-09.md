@@ -593,3 +593,54 @@ LOOP COURTESY: mr-situation checked at start — no rate-limit park
 it). CLEANUP: review clone teardown is the final action of this run (guarded rm under
 /home/mdrewt/mr-review; next run's startup sweep is the backstop); runner worktrees/
 branches captured at start and re-verified unchanged at teardown.
+## 2026-09-04T00:01:58Z — 00:01Z tick — launched rb-40 (fable@xhigh, hard tier)
+Gate-0: no live locks/mutex, HOLD-NONE, no resident active session. Stale /tmp/mr_pass_rb-36.done reconfirmed already-reconciled (no action). master CI green both repos (proj head 1e738fd / rb-39 PR#420; harness head 53ab0ea). No open PRs, no inflight/awaiting_merge. Governor NORMAL (fresh weekly window, d7_usd=0). Gate 3: no residuals list needed — queue[] had 2 valid entries (rb-40 added 09:01Z, rb-41 added 20:01Z); took rb-40 (oldest) via the fast path, re-verified its M-residual-backlog.spec.md heading live and its residual row status=promoted/promoted_slice=rb-40 in mr-residuals.jsonl. Classified as a real defect (guest pre-claim export_bundle purge observability, inherited from rb-22/ADR-0220 server-module privacy code) — not eval-tooling-only — so it proceeds normally, not wontfix. Tier=hard: touches inherited from rb-22 (server-module/src/privacy.rs, accounts.rs, lib.rs) which is server-module schema/reducer + privacy-security-adjacent surface. fable_ok=true, budget NORMAL. **Found and corrected a stale mr_state.json.adr_next_free=234**: ADR 0234 was already consumed by rb-39 (PR#420, docs/adr/0234-write-attribution-rooted-chain-or-loud-refusal.md) but the counter was never bumped after that merge. Verified live via ls docs/adr/ (0220..0234 all present) and reserved 235 for rb-40 instead. Launched rb-40 cleanly: mr-spawn LAUNCHED, leader=1709645, claude_pid=1709648, gates seeded (1 criterion). queue-removed rb-40. Left rb-41 in queue for a future tick. Pre-existing uncommitted docs/routing.md edit in harness worktree (not mine, not touched) and untracked projects/monster-realm/.codegraph/ (not mine, not touched) — both left alone as possible human in-progress state.
+
+## 2026-09-04T02:20:08Z — rb-40 PR#421 OPEN — guest pre-claim export purge is OBSERVABLE (ADR-0235); local `just ci` GREEN; ledger 7/7 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green + remote CI running.** Local gate on the PR head 0fb35c3: `CI-EXIT=0` — Rust 2181/2181, 99 evals PASS (incl. account-e2e), client 100 files / 2942 tests, observability validate 8/8 (`/tmp/rb-40/final-ci-2.log`). One earlier local run right after the verifier's rig tore down reddened account-e2e at S9-cancel-done (WebSocket reset, empty stderr) — passed before and after with no code change: rig-teardown overlap, not a code fault. PR: https://github.com/mdrewt/monster-realm/pull/421 (branch
+`feat/rb-40-export-purge-observability`, worktree `.claude/worktrees/rb-40`, forked from origin/master@1e738fd —
+master CI verified green first; HEAD 0fb35c3, 11 `wip:`/docs commits, all pushed). `gh pr merge` NOT run.
+
+WHAT SHIPPED (design B, ADR-0235 at the supervisor-reserved number). `privacy::purge_export_bundles(ctx, owner) -> usize`
+returns the number of chunks it deleted (count bound BEFORE the move-loop, tail expression; both exact-body pins
+re-frozen, positive control green; the helper still never emits — privacy.rs's gate-enforced hygiene bans `log::`
+with the reason "the caller owns logging"). `complete_guest_claim` binds the count and emits ONE line as its TERMINAL
+statement before `Ok(())` — `{"evt":"guest_claim_export_purge","guest":"<retired guest hex>","chunks":N}` via
+`crate::observability::mr_log` (ADR-0180 D6; OBS-2 ratchet untouched, `.log-baseline` byte-identical). Terminal
+because a host log line survives a later rollback while the deletes do not — BOTH plan lenses found the planned
+mid-reducer placement independently. Pure private `purge_fields(guest, chunks)` builder (planned as
+`claim_purge_fields`; MEASURED: rustfmt's default `fn_call_width`=60 wraps a call whose ARGS exceed 60 cols with a
+trailing comma no squashed statement pin can spell — memory card written). `lib.rs` in touches, no edit needed.
+
+ACCEPTANCE LEDGER: **7/7 met, 0 deferred** — `Acceptance: 7/7 met, 0 deferred, 0 unmet — rb-40 seed:e1f3531521b28025`.
+E1 CHECK = `cargo nextest ... -E 'test(/rb40/)'` → `8 tests run: 8 passed`; X1 fields/envelope 3/3; X2 count-is-the-
+delete-set + re-frozen pins 5/5; X3 OBS-2 (3 tests + `LOGBASELINE_DIRTY=0`); X4 ci-fast exit 0; X5 MANUAL = by-name
+RED capture at `memory/projects/gates/rb-40.red-before.md:24` (`6 tests run: 1 passed, 5 failed`); X6 `just eval`
+exit 0 (first run FALSE-RED: the worktree's `npm ci` had silently run under node v18 and exited 1 → account-e2e S9
+`ERR_MODULE_NOT_FOUND`; memory addendum written). Run every CHECK from the worktree cwd.
+
+ORCHESTRATION (for the audit): planner (opus); plan reviewer (REVISE-PLAN: terminal emission + GREEN-arm compile
+sequencing — adopted) + plan red-team (same survivor independently, + `#[cfg(` look-back, bare-literal evt) +
+/simplify (design B minimal); tester (opus, separate agent; delivered via /tmp; re-derived needles twice — rename +
+the whole-token `log::` hardening); implementer = orchestrator; impl reviewer (code clean, REQUEST-CHANGES on doc
+truth only: misused "OBS-1" label, wrong ADR-0220 decision number, arithmetic slip, stale test names — all fixed);
+ARTIFACT red-team in scratch worktree `rb-40-rt` (33/33 planned mutants killed; every candidate cheat measured
+closed; ONE gate-green clippy-clean survivor: direct `log::__private_api::log(...)` — closed by the tester's
+`[obs2/private-api]` whole-token ban, re-measured RED); reducer-security-auditor PASS; desync-guard PASS;
+verifier PASS on the weakening audit (+8 tests, no deletion/ignore/skip, every re-frozen pin strictly wider), ledger spot-checks and touches; its own mutant (`let guest = me;` before the emission) survived all 8 rb40 teeth and was killed by the re-frozen rb-22 [call/no-shadow] tooth → residual R-rb-40-GUESTSHADOW; its full-gate run caught a REAL knowledge-bundle drift on a stale head (privacy.rs header reflow after the last regen — regen LAST, memory addendum) fixed in 0fb35c3; doc-keeper (ARCHITECTURE.md only; one overclaim softened at fact-check).
+
+RESIDUALS (registered, target backlog): R-rb-40-CASCADE, R-rb-40-ADR0220, R-rb-40-ADR0230, R-rb-40-DASH,
+R-rb-40-G7PRIVATEAPI (the crate-wide OBS-2 ratchet G7 + eval G1 is blind to `log::__private_api` — measured), R-rb-40-GUESTSHADOW (its stored reason lost two backticked code fragments to shell expansion — add-only, cannot be corrected; the PR body carries the full text).
+No `DEFER:` lines.
+
+touches-delta (PR body): the two sibling test files, `docs/adr/DIGEST.md` regen, `docs/knowledge/**` (9 pages),
+`ARCHITECTURE.md` (row :562 clause + slice-log paragraph, `ADR next-free = 0236`), harness memory (plan, ledger,
+red-before, residual rows, memory cards). Boy-scout: 3 in-cap doc clauses (privacy.rs header + helper doc,
+accounts.rs header).
+
+NEXT TICK: poll PR 421 `ci` + `e2e`; on green `mr-gates verify --slice rb-40` (cd into the worktree — the
+CHECKs are cwd-relative), squash-merge, delete the branch + BOTH worktrees (`rb-40`, `rb-40-rt`), re-index the code
+graphs on the canonical checkout (deferred to post-merge: both indexes were fresh at slice start and the canonical
+checkout is unchanged), promote the five residual rows when they age. WARN flag `/tmp/mr_warn_rb-40` appeared during
+the docs phase; the loop converged (verifier was the single remaining lens, no new fan-out).
+
