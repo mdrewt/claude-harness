@@ -26,6 +26,30 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-47 — [PRV1-9 completeness — confederate role-swap, NOT this slice] WHEN a trade offer NAMING a  (from m22-s5 X13, deferred 2026-09-01)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s5 · residual: R-m22-s5-X13
+
+Deferred with reason: reducer-security-auditor M1 (m22-s5 impl review): D requests deletion, confederate C proposes a trade TO D (caller-only gate passes for C by design/D4), D calls the ungated respond_trade(accepted=true), C confirms — a new commitment consummated mid-grace. Out of m22-s5 by the slice brief's explicit "do not touch reducers that only act on an already-open interaction", AND the precise fix needs desi
+
+EARS: [PRV1-9 completeness — confederate role-swap, NOT this slice] WHEN a trade offer NAMING a deletion-gated identity as counterparty was created AFTER that identity's deletion request THE SYSTEM SHALL reject that identity's accepting response before any write (offers predating the request stay completable per PRV1-10).
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-46 — [remaining §4.7 opening reducers — NOT this slice] WHEN battle::start_battle (PvE wild bat (from m22-s5 X12, deferred 2026-09-01)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s5 · residual: R-m22-s5-X12
+
+Deferred with reason: battle.rs and economy.rs are outside m22-s5's declared touches; spec §4.7 names PvE battle start and shop buy/sell as gate targets ("DECIDED IN"). Fold into the PRV1-7 crate-wide slice or its own follow-up; ADR-0227 records the residual. NOTE for the successor: submit_pvp_action must NOT be gated despite §4.7's list (ADR-0227 D5 anti-decision — deadline-forfeit would force-terminate, violating PRV
+
+EARS: [remaining §4.7 opening reducers — NOT this slice] WHEN battle::start_battle (PvE wild battle) or economy::buy/sell open a commitment for a deletion-gated identity THE SYSTEM SHALL reject before any write.
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-45 — [PRV1-7 crate-wide enforcement — NOT this slice] WHEN a reducer writes any manifest-classi (from m22-s5 X11, deferred 2026-09-01)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s5 · residual: R-m22-s5-X11
+
+Deferred with reason: PRV1-7's crate-wide mechanism needs a supervisor decision under ADR-0224 (no new eval scanners; syn-based check vs reviewer-checklist are the candidates, per ADR-0225 Consequences); explicitly out of m22-s5 by the slice brief. The aspirational CHECK documents what the successor must build.
+
+EARS: [PRV1-7 crate-wide enforcement — NOT this slice] WHEN a reducer writes any manifest-classified table without the gate call or STATE_TRANSITION_OWNERS membership THE SYSTEM SHALL fail CI.
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-44 — RESOLVED, do not build (from rb-34 X5, deferred 2026-09-01)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-34 · residual: R-rb-34-X5
