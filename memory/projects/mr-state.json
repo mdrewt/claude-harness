@@ -6,13 +6,20 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "188986f"
  },
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "rb-43",
+   "pid": 3309189,
+   "started_utc": "2026-09-04T10:19:22Z",
+   "tier": "routine"
+  }
+ ],
  "last_tick_utc": "2026-09-04T07:00:10Z",
  "live_watchers": [],
  "master": {
-  "ci": "success",
+  "ci": "pending",
   "nightly": "success",
-  "sha": "f53ece2"
+  "sha": "7bb551f"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -33,24 +40,7 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-04T07:01:36Z",
-   "derived_from_master_sha": "f53ece2",
-   "reason": "promoted residual R-rb-26-X9-spec-false-premise",
-   "slice": "rb-42",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
-  {
-   "slice": "rb-43",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-26-X11-adr-readme-next-free",
-   "added_utc": "2026-09-04T08:01:33Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "f53ece2"
-  }
- ],
+ "queue": [],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
