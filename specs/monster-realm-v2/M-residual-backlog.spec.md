@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-43 — X11-adr-readme-next-free (from rb-26 X11-adr-readme-next-free, deferred 2026-09-01)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-26 · residual: R-rb-26-X11-adr-readme-next-free
+
+Deferred with reason: `docs/adr/README.md`'s next-free-ADR number goes one
+
+EARS: X11-adr-readme-next-free
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-42 — X9-spec-false-premise (from rb-26 X9-spec-false-premise, deferred 2026-09-01)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-26 · residual: R-rb-26-X9-spec-false-premise
