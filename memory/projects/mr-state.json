@@ -1,25 +1,18 @@
 {
   "adr_next_free": 236,
-  "awaiting_merge": [
-    {
-      "note": "ci-watch delegated; checks IN_PROGRESS at delegation time",
-      "pr": 424,
-      "slice": "rb-43",
-      "status_utc": "2026-09-04T12:23:30Z"
-    }
-  ],
+  "awaiting_merge": [],
   "consecutive_standdowns": 0,
   "harness_main": {
     "ci": "no-remote-ci-local-gate-green",
     "sha": "188986f"
   },
   "inflight": [],
-  "last_tick_utc": "2026-09-04T12:23:30Z",
+  "last_tick_utc": "2026-09-04T12:44:00Z",
   "live_watchers": [],
   "master": {
     "ci": "pending",
     "nightly": "success",
-    "sha": "7bb551f"
+    "sha": "e630386"
   },
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "native_supervisor": {
@@ -34,7 +27,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "Native tick mr-sup-native-20260904T122330Z-3488264 (12:23Z, cron). Gate-0: rb-43 .done present (rc=0,attempts=1,opus), lock leader pid 3309189 dead -> reconciled. PR#424 open (11/11 gates met per rb-43 ledger), mergeStateStatus=UNSTABLE, checks ci+e2e IN_PROGRESS at 12:23Z. Delegated to mr-ci-watch (detached) rather than polling; resumes via event tick. No launch (pending merge takes priority per one-action-per-tick). Governor NORMAL (d7=$257.01/$2783).",
+  "notes": "Native tick mr-sup-native-20260904T123626Z-3491774 (12:36Z, cron). Gate-0: rb-43 per-run lock leader pid 3309189 dead, .done EXIT=0 ATTEMPTS=1 -> reconciled. Verified live: PR#424 mergeStateStatus=CLEAN, ci+e2e both pass. mr-audit orchestration=CLEAN (no mandatory read, routine tier); acceptance ledger reported FLAGGED (X10/X11 EVIDENCE-MISMATCH) -- adjudicated as a citation-path resolver artifact (double-nested worktree path prefix), both citations manually verified to resolve correctly and match claims verbatim, 11/11 gates met. Squash-merged e630386, deleted branch+worktree, residual R-rb-26-X11-adr-readme-next-free closed via mr-gates residuals close --pr 424. Master CI queued on e630386 at merge time (doc/tooling-only diff: adr-digest.mjs + README/DIGEST/ARCHITECTURE + justfile, low risk) -- next tick re-verifies live. No composite launch this tick (kept to the one verified action; master CI not yet confirmed green).",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
@@ -57,6 +50,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260904T122330Z-3488264",
-  "updated_utc": "2026-09-04T12:24:00Z"
+  "updated_by": "mr-sup-native-20260904T123626Z-3491774",
+  "updated_utc": "2026-09-04T12:44:00Z"
 }
