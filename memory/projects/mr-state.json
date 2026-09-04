@@ -1,62 +1,55 @@
 {
- "adr_next_free": 236,
- "awaiting_merge": [],
- "consecutive_standdowns": 0,
- "harness_main": {
-  "ci": "no-remote-ci-local-gate-green",
-  "sha": "188986f"
- },
- "inflight": [
-  {
-   "slice": "rb-43",
-   "pid": 3309189,
-   "started_utc": "2026-09-04T10:19:22Z",
-   "tier": "routine"
-  }
- ],
- "last_tick_utc": "2026-09-04T07:00:10Z",
- "live_watchers": [],
- "master": {
-  "ci": "pending",
-  "nightly": "success",
-  "sha": "7bb551f"
- },
- "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
- "native_supervisor": {
-  "active_since": "2026-07-21T16:10:57Z",
-  "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events",
-  "cron": "0 * * * * + @reboot",
-  "decision_model": "sonnet",
-  "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
-  "gate_log": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.log",
-  "heartbeat": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.native-supervisor-heartbeat",
-  "kill_switch": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.native-supervisor-disabled",
-  "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
-  "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
- },
- "notes": "08:00Z native tick (cron, rid=mr-sup-native-20260904T080057Z-3134563-10688). Gate-0: no locks/mutex, HOLD-NONE, mr_pass_rb-36.done reconfirmed stale (already reconciled). Master CI green f53ece2/rb-41. Stashed pre-existing unrelated docs/routing.md edit (preserved, not committed). Gate-3: R-rb-26-X11-adr-readme-next-free at 3.28d (past t1=3) outranked queue[]; classified real (docs/adr/README.md next-free-ADR drift, not eval-tooling); promoted->rb-43, queued. Shipped chore PR#90 (harness repo has no auto-merge/branch-protection configured, unlike monster-realm -- merged directly, CLEAN, no checks configured for doc-only paths). Merged 000aa86, harness main FF'd. ONE action this tick (promote); no slice launched/merged. queue[] now rb-42, rb-43 both fresh for next tick fast-path. Governor NORMAL (d7=$180.11/2783).",
- "open_chore_prs": [],
- "park_counters": {
-  "14r-e": 1
- },
- "parked": [],
- "queue": [],
- "rate_limit_armed_by": "wrapper",
- "rate_limit_resets_at": null,
- "resource_locations": {
-  "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
-  "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
-  "found_easily": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects template + launch script + AGENTS.md two-location note were all accurate; only the harness-vs-project spec path lacked an absolute anchor in the task.",
-  "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation.",
-  "milestone_c5_spec": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-c.5-pregate-review-residuals.spec.md (ptc5a..ptc5g; its section-3 holds Decisions A-E, all RESOLVED 2026-07-20 per PLAN section-9 ~L307).",
-  "milestone_d_spec": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-d-content-pack.spec.md (pt-d1..pt-d3).",
-  "per_slice_touches_and_EARS": "In the milestone spec file (e.g. M-playtest-c.5-pregate-review-residuals.spec.md), NOT in PLAN.md. PLAN section-9 is only a one-line-per-slice SUMMARY + the resolved-decisions status line. To get a slice's declared touches:/EARS/decision-hooks, open its M*.spec.md.",
-  "project_repo": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm  (literal path; never find-discover it). Primary branch master.",
-  "replan_vs_c5_decisions": "BEWARE two different 'section-3's: playtest-replan-2026-07.md section-3 = M17.5 D-17.5-A..E decisions; the M-playtest-c.5 spec has its OWN section-3 (Decisions A-E). State/queue references to 'replan section-3 open decisions' meant the c.5 spec's section-3 (now all resolved).",
-  "spec_corpus_authoritative": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/  (HARNESS level, NOT /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm). Contains PLAN.md, playtest-replan-2026-07.md, and per-milestone M*.spec.md files.",
-  "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
- },
- "schema_version": 2,
- "updated_by": "mr-sup-native-20260904T070010Z-3119774",
- "updated_utc": "2026-09-04T07:05:00Z"
+  "adr_next_free": 236,
+  "awaiting_merge": [],
+  "consecutive_standdowns": 0,
+  "harness_main": {
+    "ci": "no-remote-ci-local-gate-green",
+    "sha": "188986f"
+  },
+  "inflight": [],
+  "last_tick_utc": "2026-09-04T12:44:00Z",
+  "live_watchers": [],
+  "master": {
+    "ci": "pending",
+    "nightly": "success",
+    "sha": "e630386"
+  },
+  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
+  "native_supervisor": {
+    "active_since": "2026-07-21T16:10:57Z",
+    "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events",
+    "cron": "0 * * * * + @reboot",
+    "decision_model": "sonnet",
+    "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
+    "gate_log": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.log",
+    "heartbeat": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.native-supervisor-heartbeat",
+    "kill_switch": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.native-supervisor-disabled",
+    "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
+    "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
+  },
+  "notes": "Native tick mr-sup-native-20260904T123626Z-3491774 (12:36Z, cron). Gate-0: rb-43 per-run lock leader pid 3309189 dead, .done EXIT=0 ATTEMPTS=1 -> reconciled. Verified live: PR#424 mergeStateStatus=CLEAN, ci+e2e both pass. mr-audit orchestration=CLEAN (no mandatory read, routine tier); acceptance ledger reported FLAGGED (X10/X11 EVIDENCE-MISMATCH) -- adjudicated as a citation-path resolver artifact (double-nested worktree path prefix), both citations manually verified to resolve correctly and match claims verbatim, 11/11 gates met. Squash-merged e630386, deleted branch+worktree, residual R-rb-26-X11-adr-readme-next-free closed via mr-gates residuals close --pr 424. Master CI queued on e630386 at merge time (doc/tooling-only diff: adr-digest.mjs + README/DIGEST/ARCHITECTURE + justfile, low risk) -- next tick re-verifies live. No composite launch this tick (kept to the one verified action; master CI not yet confirmed green).",
+  "open_chore_prs": [],
+  "park_counters": {
+    "14r-e": 1
+  },
+  "parked": [],
+  "queue": [],
+  "rate_limit_armed_by": "wrapper",
+  "rate_limit_resets_at": null,
+  "resource_locations": {
+    "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
+    "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
+    "found_easily": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects template + launch script + AGENTS.md two-location note were all accurate; only the harness-vs-project spec path lacked an absolute anchor in the task.",
+    "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation.",
+    "milestone_c5_spec": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-c.5-pregate-review-residuals.spec.md (ptc5a..ptc5g; its section-3 holds Decisions A-E, all RESOLVED 2026-07-20 per PLAN section-9 ~L307).",
+    "milestone_d_spec": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-d-content-pack.spec.md (pt-d1..pt-d3).",
+    "per_slice_touches_and_EARS": "In the milestone spec file (e.g. M-playtest-c.5-pregate-review-residuals.spec.md), NOT in PLAN.md. PLAN section-9 is only a one-line-per-slice SUMMARY + the resolved-decisions status line. To get a slice's declared touches:/EARS/decision-hooks, open its M*.spec.md.",
+    "project_repo": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm  (literal path; never find-discover it). Primary branch master.",
+    "replan_vs_c5_decisions": "BEWARE two different 'section-3's: playtest-replan-2026-07.md section-3 = M17.5 D-17.5-A..E decisions; the M-playtest-c.5 spec has its OWN section-3 (Decisions A-E). State/queue references to 'replan section-3 open decisions' meant the c.5 spec's section-3 (now all resolved).",
+    "spec_corpus_authoritative": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/  (HARNESS level, NOT /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm). Contains PLAN.md, playtest-replan-2026-07.md, and per-milestone M*.spec.md files.",
+    "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
+  },
+  "schema_version": 2,
+  "updated_by": "mr-sup-native-20260904T123626Z-3491774",
+  "updated_utc": "2026-09-04T12:44:00Z"
 }
