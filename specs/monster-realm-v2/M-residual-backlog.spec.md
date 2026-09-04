@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-42 — X9-spec-false-premise (from rb-26 X9-spec-false-premise, deferred 2026-09-01)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-26 · residual: R-rb-26-X9-spec-false-premise
+
+Deferred with reason: `specs/monster-realm-v2/M-residual-backlog.spec.md:65`
+
+EARS: X9-spec-false-premise
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-41 — WHEN a REKEY entry's `exists` predicate is HOLLOWED in Rust (its body still reads the (from rb-25 X9, deferred 2026-08-31)
 `touches: evals/guest-claim-integrity.eval.mjs (+ docs/adr/0222-*.md, ARCHITECTURE.md minimal)`
 `after:` — · source: rb-25 · residual: R-rb-25-X9
