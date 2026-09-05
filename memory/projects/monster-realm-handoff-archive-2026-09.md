@@ -682,3 +682,67 @@ Merged fix/rb-42-x9-spec-false-premise -> master @7bb551f. Closed residual R-rb-
 Native tick mr-sup-native-20260904T095848Z-3280919 (09:58Z, cron). rb-42 run finished (EXIT=0, 1 attempt, opus, $18.25) — PR #423 open on mdrewt/monster-realm, mergeStateStatus UNSTABLE (ci+e2e checks pending). 8/8 gates met, 4 residuals deferred to backlog. session_leader 3148846 already dead; per-run lock reconciled, mutex taken and released. Delegated CI-wait to mr-ci-watch (detached, pid recorded in /tmp/mr_ci_watch_rb-42.log) rather than polling — resumes via event tick. No merge this tick.
 
 
+## 2026-09-04T12:20Z — rb-43 DELIVERED — PR #424 open, local `just ci` green, remote CI running
+
+**Terminal state (not merged — `gh pr merge` is supervisor-only).** Slice `rb-43`, branch
+`slice/rb-43` (3 `wip:` commits, pushed), worktree
+`projects/monster-realm/.claude/worktrees/rb-43`. PR: https://github.com/mdrewt/monster-realm/pull/424
+Acceptance: **11/11 met, 0 deferred, 0 unmet — rb-43 seed:e3b0c44298fc1c14** (0 gates were seeded;
+the promoted spec section carries no `SHALL`, the known-benign rb-24/25/26/42 pattern, so X1-X11
+were authored from the residual verbatim and the two plan-phase lens rounds).
+
+Closes `R-rb-26-X11-adr-readme-next-free`. `docs/adr/README.md`'s hand-maintained
+`Next free number: **0184**` (51 behind a corpus running to `0235`) is gone; `scripts/adr-digest.mjs`
+now DERIVES the number and renders it inside the payload `--check` byte-compares, so it rides the
+pre-existing `just ci` drift gate with **no new gate mechanism** (ADR-0224 respected — `evals/` tree
+hash identical to origin/master). No new ADR number minted (supervisor assigned `None`): recorded as
+an in-place `## Amendment` on ADR-0104, no header relation field, zero DIGEST bytes moved.
+
+**touches (chosen — the spec said "inherit … REVIEW"):** `scripts/adr-digest.mjs`,
+`scripts/adr-digest.test.mjs` (new), `justfile`, `docs/adr/README.md`, `docs/adr/DIGEST.md`,
+`docs/adr/0104-*.md`, `ARCHITECTURE.md`. **`docs/adr/README.md` is normally supervisor-owned and
+forbidden to slices — rb-43 is the declared exception because that file IS the criterion.** Flagged
+here so the audit is mechanical, not inferred. 3 boyscout hunks / ~14 lines, all attributed in the PR.
+
+**Gate:** full local `just ci` CI-EXIT=0 (2188 nextest, 2942 vitest/100 files, 99 eval PASS,
+observability 8/8, secrets clean, `adr-digest test suite: 6 test(s) passed`). Remote CI PENDING at
+handoff time (runs/33872331558, jobs `ci` + `e2e`) — the supervisor owns the merge.
+
+**Lens rounds (all executed against the artifact, not predicted):** planner; reviewer+red-team+
+/simplify on the PLAN (killed a README-validator design as "patching the scanner further" per
+ADR-0224, and killed a hard `README == max+1` equality gate that would have forced every future
+ADR-adding PR to edit a supervisor-owned file); reviewer+red-team on the TEST SUITE — **the red-team
+built TEN wrong implementations that passed the first draft 6/6**, all closed; reviewer+red-team+
+/simplify on the IMPLEMENTATION — two lenses independently caught a FALSE UNIVERSAL in this slice's
+own README edit (the de-enumerated `## Amendment` sentence claimed "no `Amended-by:` header points at
+them", wrong for 8 of 18 files), fixed; verifier **PASS, 18/18 mutants killed**, gating suite
+blob-identical across the implementation commit, RED at `d1edade` / GREEN at HEAD proven with
+`git archive` (no checkout).
+
+**FOUR RESIDUALS FILED (unpromoted, target backlog)** — all measured, none fixed here:
+`R-rb-43-DUPID` (no duplicate-id check: two files claiming `0236` render both rows and a
+self-consistent wrong next-free with the whole gate stack green), `R-rb-43-HEADINGID` (filename
+prefix never cross-checked against the file's own `# ADR-NNNN` heading — one typo vaults the number
+forward), `R-rb-43-COLLECTORSHAPES` (`.MD` casing and nested subdirs are silently MISSED, a 5-digit
+prefix TRUNCATES back into band past the new guard), `R-rb-43-CHANGELOGCITE`
+(`scripts/changelog-freshness.mjs:23` cites `adr-digest.mjs:840-861`; the +76-line block moved those
+exits to :916/:928/:936 — outside touches, left stale deliberately).
+
+**Disclosed in ADR-0104, deliberately NOT built:** the band is not exhaustion-aware at `0999`; and
+the new `just test` block has no tooth on its own wiring (deleting the block is CI-clean) — the check
+that would give it one is the meta-check pattern ADR-0224 retires by name.
+
+**Out-of-repo follow-up for the SUPERVISOR (harness repo, hidden-dependency STOP, not touched):**
+`.claude/commands/adr.md:11-16` still tells `/adr` to read AND UPDATE `docs/adr/README.md`'s
+"Next free number", and `.claude/agents/doc-keeper.md:45` still forbids touching it. That value no
+longer exists in README — both should be repointed at `docs/adr/DIGEST.md`.
+
+**Code-graph refresh deliberately skipped:** `master` is unchanged (nothing merged yet) and indexing
+the ephemeral worktree path is forbidden. Re-index the main checkout after the squash-merge.
+
+**Loop courtesy:** `/tmp/mr_warn_rb-43` (landing pattern) appeared after the green increment — from
+that point on: no new scope, and the only remaining fan-out was the single mandatory `verifier`.
+`doc-keeper` was NOT spawned; its outputs (ARCHITECTURE, the ADR amendment, memory cards, this
+handoff) were written directly. `CHANGELOG.md` untouched — git-cliff generates it from the squash
+commit.
+

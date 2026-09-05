@@ -3151,6 +3151,8 @@ NEXT TICK: poll PR 426 CI; on green `mr-gates verify --slice 18r-a` (cd into the
 is cwd-relative), squash-merge, delete branch + worktree, re-index the code graphs on the canonical
 checkout.
 
+## 2026-09-05T08:04:04Z — 08:00Z tick — removed rb-49 as substantively blocked; fan-out launched 17r-d + 17r-e
+Gate-0/1: no live locks/mutex, HOLD-NONE queued_events=0, no active-session collision (only wrapper/codegraph writes <6min). Both repos in sync with origin (harness main 0ed602f, proj master 0ed602f-equivalent), remotes correct, master CI green (rb-48 PR#430). Gate-3: mr-gates residuals list --unclaimed showed nothing past t1_promote_days=3 (oldest 2.02d, the 17r-c OBS48-* MED cluster) -- residual aging did not outrank the queue fast path this tick. queue[] held rb-49 (R-m22-s3b-X18). Re-verifying it live per the fast-path rule surfaced the SAME invalidity a prior tick (04:something Z, handoff line ~3222) already found for its sibling rb-45: rb-49's own deferred-reason text states it needs the supervisor's ADR-0224/0225 ruling on the PRV1-7 crate-wide DEL-06 enforcement mechanism (syn-based check vs reviewer-checklist) before it is buildable -- substantively blocked pending an open architectural decision even without literal blocked: text. Treated identically: queue-removed rb-49 rather than launching blind (mr-record queue-remove --slice rb-49), and fell through to the full PLAN Sec.9 derivation since queue[] was then empty. This is now the SECOND residual stalled on the same unresolved ADR-0224/0225 mechanism choice (rb-45 previously, now rb-49) -- flagging for a future tick or Drew to consider whether this now warrants an mr-ask-drew, per the batch-policy note already left at handoff line ~3228. Full derivation: M-loop-infrastructure/M-stdb-2x-module-sdk (COMPLETE)/M-postgate-fifteenth-review-residuals chain remains blocked:wave-2/3/4-exit (2026-08-22 operator directive, time-gated). 16r-a/c/d/e/f/g/h all verified merged (16r-b remains SERIAL-REQUIRED against the still-blocked 15r scanner-migration family -- skipped). 17r-a/17r-b/17r-c verified merged. Of 17r's remaining slices (17r-d/17r-e/17r-f, ROI order in spec Sec.2), 17r-f is after:[17r-b] (satisfied, unblocked) but 17r-d and 17r-e are the ROI-first pair and are pairwise disjoint from each other, from 17r-f, and from everything in flight (after: [] each). mr-disjoint 17r-d vs 17r-e: SAFE, disjoint, no shared registry/enum axis (harness spec-doc fix vs project comment/RON-comment sweep) -- no partition needed. Both LIGHT/LOW severity, no schema/reducer/netcode/security/M20/M25 touch, fresh (not resume) -> tier=routine, opus@high. free -g showed 17G free, ample for N=2. Reserved no ADR for either (pure doc/comment-truth fixes, same class as the m22 hygiene-only precedents). 17r-d touches only specs/monster-realm-v2/M23-accessibility.spec.md (harness repo) -- rewords the ADR-0206 Amendment A1 self-open exemption into Sec.2.3/Sec.8.4/A11Y-19, which the shipped code (main.ts:1151-1348 toggle-close exemption at all 12 hotkey guard sites) already implements but the spec text still contradicts (SHALL NOT open or toggle). mr-spawn flagged DIRTY-TREE-ADVISORY (1 uncommitted tracked change, memory/projects/mr-state.json -- my own queue-remove edit from this tick, harmless: the harness-repo worktree branches from origin/main and the slice never touches that file) -- confirmed intended, proceeded. LAUNCHED cleanly: leader=1012259, claude_pid=1012262, rid=mr-spawn-20260905T080300Z-1012179, repo=harness, pr_repo=mdrewt/claude-harness. GATES-SEEDED criteria=2. 17r-e touches client/src/ui/overlayA11y.ts + game-core/content/species/070-wave3.ron + 071-wave3-derived.ron + evals/playtest-report.eval.mjs (project repo) -- four independently-verified comment-truth corrections (four-distinct-roots claim, Electric's Water-weakness omission, Tempestrix's non-unique Regeneration-pivot claim, and stale EXPECTED-RED playtest-report.eval.mjs qualifiers whose tightening already landed and verified GREEN). LAUNCHED cleanly: leader=1012462, claude_pid=1012465, rid=mr-spawn-20260905T080307Z-1012396, repo=project, pr_repo=mdrewt/monster-realm. GATES-SEEDED criteria=1. Two ledger LAUNCHED rows recorded. Governor NORMAL (d7=$582.32/2783 eff., fable_d7=$421.67/2298, fable_ok=true -- unaffected, both launches are opus-tier). No BLOCKERs raised this tick (deferred the ADR-0224/0225 mr-ask-drew consideration per batch policy -- non-blocked fan-out work was available and took priority). No rate-limit event. Delegating both to the normal wrapper poll cycle; next tick reconciles from live PR/git state for both.
 ## 2026-09-05T07:24:06Z — rb-48 merged: PRV1-14 export_bundle TTL reaper (PR#430, ADR-0238)
 Merged 0ed602f to master. Hourly interval-singleton reaper (cap 256/tick, 7-day TTL) armed from request_data_export and init/sync_content; closes residual R-m22-s4-X17. mr-audit FLAGGED on two benign tripwires, both read and adjudicated: (1) eval assertion count bumped 40->41 reflecting the real new export_bundle_reaper_schedule manifest row (not a weakening); (2) X5 gate citation (rb-48.red-before.md:18) resolves only to the round-1 mutant summary (42/42 CAUGHT) — the round-2 red-team survivors (7/7 CAUGHT, line 68 same file) are real but on a different line than the single cited pointer, a citation-formatting gap not a fraud signal. Acceptance ledger 10/10 met. Master CI green post-merge. Worktree cleaned. Residual closed via mr-gates residuals close --slice rb-48 --pr 430.
 ## 2026-09-05T06:01:33Z — rb-48 resumed after attempt-3-exhaustion park
@@ -3253,70 +3255,7 @@ Native tick mr-sup-native-20260904T130012Z-3534192 (13:00Z, cron). Gate-0: no li
 PR#424 squash-merged e630386 (from 7bb551f). rb-43 fixed the promoted residual R-rb-26-X11-adr-readme-next-free: docs/adr/README.md's hand-maintained 'Next free number' line (51 stale) is retired; scripts/adr-digest.mjs now derives it (max(id)+1, zero-padded) and renders it into the already drift-gated docs/adr/DIGEST.md. ARCHITECTURE.md:848 repointed at DIGEST.md for the next-free claim; docs/adr/0060's pointer to README is kept true by README's replacement wording. ADR-0104 amended in-place (no new ADR minted, no header field added — self-amendment). mr-audit orchestration verdict CLEAN (no mandatory read, routine tier). Acceptance ledger reported FLAGGED (X10/X11 EVIDENCE-MISMATCH) — adjudicated: both are a citation-path resolver artifact (gates file cited the full projects/monster-realm/.claude/worktrees/rb-43/... path while mr-gates already resolves from that cwd, producing a double-nested lookup); manually confirmed both citations resolve at the correct path and match their claims verbatim. 11/11 gates met. Residual closed via mr-gates residuals close --slice rb-43 --pr 424. Master CI queued on e630386 at merge time (doc/tooling-only diff, low risk) — next tick re-verifies live.
 ## 2026-09-04T12:23:59Z — Native tick mr-sup-native-20260904T122330Z-3488264 (12:23Z) — rb-43 CI-watch delegated
 rb-43 run finished (rc=0, attempts=1, opus, $54.99 recorded via reconcile row). PR #424 open: 11/11 gates met per ledger, mergeStateStatus=UNSTABLE, checks ci+e2e IN_PROGRESS. Delegated to mr-ci-watch (detached, setsid) for resume via event tick — supervisor owns the merge, never sat polling CI. Governor NORMAL (d7=$257.01/$2783 weekly). No launch this tick (pending merge takes priority).
-## 2026-09-04T12:20Z — rb-43 DELIVERED — PR #424 open, local `just ci` green, remote CI running
-
-**Terminal state (not merged — `gh pr merge` is supervisor-only).** Slice `rb-43`, branch
-`slice/rb-43` (3 `wip:` commits, pushed), worktree
-`projects/monster-realm/.claude/worktrees/rb-43`. PR: https://github.com/mdrewt/monster-realm/pull/424
-Acceptance: **11/11 met, 0 deferred, 0 unmet — rb-43 seed:e3b0c44298fc1c14** (0 gates were seeded;
-the promoted spec section carries no `SHALL`, the known-benign rb-24/25/26/42 pattern, so X1-X11
-were authored from the residual verbatim and the two plan-phase lens rounds).
-
-Closes `R-rb-26-X11-adr-readme-next-free`. `docs/adr/README.md`'s hand-maintained
-`Next free number: **0184**` (51 behind a corpus running to `0235`) is gone; `scripts/adr-digest.mjs`
-now DERIVES the number and renders it inside the payload `--check` byte-compares, so it rides the
-pre-existing `just ci` drift gate with **no new gate mechanism** (ADR-0224 respected — `evals/` tree
-hash identical to origin/master). No new ADR number minted (supervisor assigned `None`): recorded as
-an in-place `## Amendment` on ADR-0104, no header relation field, zero DIGEST bytes moved.
-
-**touches (chosen — the spec said "inherit … REVIEW"):** `scripts/adr-digest.mjs`,
-`scripts/adr-digest.test.mjs` (new), `justfile`, `docs/adr/README.md`, `docs/adr/DIGEST.md`,
-`docs/adr/0104-*.md`, `ARCHITECTURE.md`. **`docs/adr/README.md` is normally supervisor-owned and
-forbidden to slices — rb-43 is the declared exception because that file IS the criterion.** Flagged
-here so the audit is mechanical, not inferred. 3 boyscout hunks / ~14 lines, all attributed in the PR.
-
-**Gate:** full local `just ci` CI-EXIT=0 (2188 nextest, 2942 vitest/100 files, 99 eval PASS,
-observability 8/8, secrets clean, `adr-digest test suite: 6 test(s) passed`). Remote CI PENDING at
-handoff time (runs/33872331558, jobs `ci` + `e2e`) — the supervisor owns the merge.
-
-**Lens rounds (all executed against the artifact, not predicted):** planner; reviewer+red-team+
-/simplify on the PLAN (killed a README-validator design as "patching the scanner further" per
-ADR-0224, and killed a hard `README == max+1` equality gate that would have forced every future
-ADR-adding PR to edit a supervisor-owned file); reviewer+red-team on the TEST SUITE — **the red-team
-built TEN wrong implementations that passed the first draft 6/6**, all closed; reviewer+red-team+
-/simplify on the IMPLEMENTATION — two lenses independently caught a FALSE UNIVERSAL in this slice's
-own README edit (the de-enumerated `## Amendment` sentence claimed "no `Amended-by:` header points at
-them", wrong for 8 of 18 files), fixed; verifier **PASS, 18/18 mutants killed**, gating suite
-blob-identical across the implementation commit, RED at `d1edade` / GREEN at HEAD proven with
-`git archive` (no checkout).
-
-**FOUR RESIDUALS FILED (unpromoted, target backlog)** — all measured, none fixed here:
-`R-rb-43-DUPID` (no duplicate-id check: two files claiming `0236` render both rows and a
-self-consistent wrong next-free with the whole gate stack green), `R-rb-43-HEADINGID` (filename
-prefix never cross-checked against the file's own `# ADR-NNNN` heading — one typo vaults the number
-forward), `R-rb-43-COLLECTORSHAPES` (`.MD` casing and nested subdirs are silently MISSED, a 5-digit
-prefix TRUNCATES back into band past the new guard), `R-rb-43-CHANGELOGCITE`
-(`scripts/changelog-freshness.mjs:23` cites `adr-digest.mjs:840-861`; the +76-line block moved those
-exits to :916/:928/:936 — outside touches, left stale deliberately).
-
-**Disclosed in ADR-0104, deliberately NOT built:** the band is not exhaustion-aware at `0999`; and
-the new `just test` block has no tooth on its own wiring (deleting the block is CI-clean) — the check
-that would give it one is the meta-check pattern ADR-0224 retires by name.
-
-**Out-of-repo follow-up for the SUPERVISOR (harness repo, hidden-dependency STOP, not touched):**
-`.claude/commands/adr.md:11-16` still tells `/adr` to read AND UPDATE `docs/adr/README.md`'s
-"Next free number", and `.claude/agents/doc-keeper.md:45` still forbids touching it. That value no
-longer exists in README — both should be repointed at `docs/adr/DIGEST.md`.
-
-**Code-graph refresh deliberately skipped:** `master` is unchanged (nothing merged yet) and indexing
-the ephemeral worktree path is forbidden. Re-index the main checkout after the squash-merge.
-
-**Loop courtesy:** `/tmp/mr_warn_rb-43` (landing pattern) appeared after the green increment — from
-that point on: no new scope, and the only remaining fan-out was the single mandatory `verifier`.
-`doc-keeper` was NOT spawned; its outputs (ARCHITECTURE, the ADR amendment, memory cards, this
-handoff) were written directly. `CHANGELOG.md` untouched — git-cliff generates it from the squash
-commit.
-
 ## 2026-09-04T10:19:36Z — rb-43 launched (composite after rb-42 merge)
 Composite launch per doctrine: re-derived eligibility fresh after rb-42's merge completed fully (worktree/branch cleaned, ledger+handoff+state recorded), re-ran the active-session probe (no resident IDE pid, no third-party writes in last 6 min — the only recent writes were my own rb-42 recording). queue[] fast-path: rb-43 (X11-adr-readme-next-free, source rb-26) re-verified live -- spec heading present, not blocked, no existing PR/branch -- launched opus@high/routine, queue entry removed. Target: prove docs/adr/README.md's stale hand-maintained next-free-ADR-number line via an ordinary Rust/TS test (ADR-0224, no new eval script).
+
 
