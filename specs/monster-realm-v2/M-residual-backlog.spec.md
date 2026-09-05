@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-54 — content-pipeline validation runs at CI time, not content-sync time — a new enum variant fa (from m23-s8 postmerge, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s8 · residual: R-m23-s8-postmerge
+
+Deferred with reason: idiomatic fix is a sibling validator in server-module/src/content.rs, out of m23-s8 touches
+
+EARS: content-pipeline validation runs at CI time, not content-sync time — a new enum variant fails CI rather than validate_content
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-53 — [PRV1-11/12/13 live transport + download] WHEN request_data_export completes THE CLIENT SH (from m22-s8 X11, deferred 2026-09-02)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s8 · residual: R-m22-s8-X11
