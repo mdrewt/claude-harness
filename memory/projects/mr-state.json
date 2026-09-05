@@ -6,25 +6,13 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "1dec6f0"
  },
- "inflight": [
-  {
-   "slice": "rb-47",
-   "run_id": "mr-spawn-20260904T233804Z-66543",
-   "session_leader": 66596,
-   "claude_pid": 66599,
-   "model": "fable",
-   "effort": "xhigh",
-   "tier": "hard",
-   "started_utc": "2026-09-04T23:38:08Z",
-   "repo": "monster-realm"
-  }
- ],
- "last_tick_utc": "2026-09-04T23:29:44Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-05T03:00:09Z",
  "live_watchers": [],
  "master": {
-  "sha": "8cdc8da",
-  "ci": "queued",
-  "nightly": "success"
+  "ci": "success",
+  "nightly": "success",
+  "sha": "c136a8d"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -39,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "23:29Z native tick (event: rb-46 CI green PR#428): merged rb-46 (8cdc8da, hard-tier mandatory-read adjudicated CLEAN, guards.rs byte-pin confirmed untouched); worktree+branches cleaned; residual R-m22-s5-X13 was already closed by the run itself. Composite merge->launch: popped rb-47 (queue fast-path, confederate role-swap trade-gate residual) and spawned it fable@xhigh hard-tier (ADR-0237 reserved, adr_next_free now 238). master CI for 8cdc8da queued at handoff -- next tick must confirm green live before trusting it. Residual backlog: 55 open/cap 12 (observe-only), 1 unpromoted past t1 (R-m22-s3b-X18) -- next tick's gate 3 should classify/dispose before new PLAN section-9 work.",
+ "notes": "03:00Z native tick (cron, forced=0). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE queued_events=0, no active-session collision. Found the prior (02:31-02:38Z) tick's rb-47 merge work sitting UNCOMMITTED in the harness working tree (mr-state.json/handoff/archive modified, rb-47 plan+progress untracked) -- that tick evidently ended without its own git-commit step. Re-verified live before trusting any of it: PR#429 MERGED (mergedAt 02:37:01Z), master fast-forwarded to c136a8d, master CI for c136a8d is now completed/success (was in_progress at that tick's handoff -- confirmed green this tick), R-m22-s5-X13 closed against PR#429. All of it checked out, so this tick owns finishing the record: committed the harness-repo state files (this write) rather than leaving them stranded another cycle. Gate-3: residuals list --unclaimed showed 49 open, top-aged R-m22-s3b-X18 at 3.23d, past t1_promote_days=3 -- outranks queue[] (rb-48 was already queued+valid but aging doctrine wins). Classified against Work-selection scope: PRV1-7 crate-wide deletion-gate enforcement mechanism is a real game-defect class (mechanical guard enforcement, not eval-script self-reference) -- promotable. Promoted -> rb-49 in M-residual-backlog.spec.md, queued (mr-record queue-add). Shipped as doc-only chore PR#95 (chore/residual-promote-20260905T030134Z), repo automerge enabled -- merged 0b0507e, harness main fast-forwarded, branch deleted local+remote. This was the tick's ONE action; no slice launched (residual outranked the queue fast path) or merged (rb-47 merge was already complete from the prior tick, not this one's action). Governor NORMAL (d7=$503.66/2783, fable_ok=true). queue[] now: rb-48, rb-49 (both fresh, next tick can fast-path either, subject to fresh gate-3 re-check).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -47,12 +35,20 @@
  "parked": [],
  "queue": [
   {
-   "slice": "rb-48",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m22-s4-X17",
-   "added_utc": "2026-09-04T20:01:01Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "2d3f727"
+   "added_utc": "2026-09-04T20:01:01Z",
+   "derived_from_master_sha": "2d3f727",
+   "reason": "promoted residual R-m22-s4-X17",
+   "slice": "rb-48",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+  },
+  {
+   "slice": "rb-49",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m22-s3b-X18",
+   "added_utc": "2026-09-05T03:01:26Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "c136a8d"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -71,6 +67,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260904T232944Z-17037",
- "updated_utc": "2026-09-04T23:40:00Z"
+ "updated_by": "mr-sup-native-20260905T030009Z-579767",
+ "updated_utc": "2026-09-05T03:03:00Z"
 }
