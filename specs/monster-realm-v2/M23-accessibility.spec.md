@@ -206,12 +206,14 @@ reasons, and the second is the important one:
   no future edit can silently drop it.
 
 **Accepted behaviour change (§8.4) — AMENDED by ADR-0206 Amendment A1.** At all twelve open branches
-the shipped guard is `verdict.kind === 'allow' && (<selfView>?.visible || worldHasFocus())`:
+the shipped guard is, schematically (the concrete verdict local differs per branch),
+`verdict.kind === 'allow' && (<selfView>?.visible || worldHasFocus())`:
 `worldHasFocus()` gates only cross-overlay OPEN transitions, and pressing an overlay's own key while
-it is already open is a toggle-CLOSE, exempt from the gate. `B` therefore still closes boxView,
-subject only to the registry verdict — a `GUARD_ONLY` overlay visible underneath still denies the
-press regardless of this gate. `Escape` still closes it too, and the frame-loop focus return
-(ADR-0206 D4) puts focus back on the canvas, so the loop closes.
+it is already open is a toggle-CLOSE, exempt from the gate. `B` therefore still closes boxView —
+subject, as before, to the listener's earlier unconditional returns (`sessionGateBlocks()`, `e.repeat`)
+and to the registry verdict, which is independent of this gate: a `GUARD_ONLY` overlay visible
+underneath still denies the press. `Escape` still closes it too, and the frame-loop close edge returns
+focus to the canvas when the close left focus inside the overlay (ADR-0206 D4), so the loop closes.
 
 ### 2.4 Live regions — the `replaceChildren` tension dissolved, not traded off
 
