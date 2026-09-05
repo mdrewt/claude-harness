@@ -6,13 +6,25 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "48c32a2"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-05T11:02:55Z",
+ "inflight": [
+  {
+   "claude_pid": 1526821,
+   "effort": "high",
+   "model": "opus",
+   "repo": "project",
+   "run_id": "mr-spawn-20260905T140235Z-1526762",
+   "session_leader": 1526818,
+   "slice": "rb-52",
+   "started_utc": "2026-09-05T14:02:39Z",
+   "tier": "routine"
+  }
+ ],
+ "last_tick_utc": "2026-09-05T13:59:33Z",
  "live_watchers": [],
  "master": {
-  "ci": "success",
+  "ci": "in_progress",
   "nightly": "success",
-  "sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75"
+  "sha": "14068164f6395f29710c3f777f07717b2f53aaf3"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,29 +39,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "11:00Z tick: reaped stale 17r-d lock (already merged by 10:00Z tick). Verified rb-47 (PR#429)/rb-48 (PR#430) both MERGED live (handoff prose calling them OPEN was stale; mr-state inflight/awaiting_merge=[] was correct). master@1d8d2dd CI confirmed green (ci+e2e success; the 10:00Z tick note about an in-progress e2e rerun resolved green). Promoted R-m22-s8-X9/X10/X11 (privacy UI, past t1_promote_days=3, real game defects) -> rb-51/rb-52/rb-53 in M-residual-backlog.spec.md, queued. Doc-only chore PR#98 (harness) merged directly (auto-merge unavailable on claude-harness repo -- no branch protection configured there; merged --squash after confirming mergeStateStatus=CLEAN, zero required checks) -- harness main now 48c32a2. Also found+cleared a stale open_chore_prs entry for PR#96 which had already merged at 07:25:29Z. NEXT TICK: queue fast-path should launch rb-51 (re-verify live first, as always).",
+ "notes": "13:59Z tick: gate-0 saw rb-51 .done (EXIT=0) + PR#432 open, mergeStateStatus CLEAN, CI/e2e checks pass. mr-gates verify CLEAN 1/1 (spotcheck agreed). mr-audit: orchestration CLEAN; acceptance CLEAN (first invocation mis-passed --repo as a relative label, not a path -- re-ran with the absolute worktree path and got a real verdict, don't repeat that mistake); gating_advisory FLAGGED on 2 modified asserts in privacyModel.test.ts, read the diff -- both are failure-MESSAGE text edits pointing at rb-52 as the new render owner, .toBe(...) targets unchanged, adjudicated as not a weakening. Squash-merged PR#432 (--delete-branch), ff-only'd master to 1406816, removed the rb-51 worktree+local branch, closed residual R-m22-s8-X9 via mr-gates residuals close. Composite launch: re-verified rb-52 live off queue[] (spec section intact, not blocked, no existing PR) -- disjoint from nothing in-flight (rb-51 done) -- launched with touches widened to include the two existing evals (overlay-a11y-manifest, dom-shell-coverage-exclusion) per rb-51's landed design-call note, since rb-52's EARS ('WHEN the player opens the privacy surface') plausibly is overlay-shaped where rb-51's was HUD-shaped -- flagged for the run to confirm against real UX intent rather than assume. queue-removed rb-52; rb-53 remains queued. Master post-merge CI (14068164) was still in_progress at record time -- NEXT TICK: re-verify it went green before trusting master.ci above.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-05T11:02:11Z",
-   "derived_from_master_sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75",
-   "reason": "promoted residual R-m22-s8-X9",
-   "slice": "rb-51",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-05T11:02:11Z",
-   "derived_from_master_sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75",
-   "reason": "promoted residual R-m22-s8-X10",
-   "slice": "rb-52",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-09-05T11:02:11Z",
@@ -75,6 +71,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260905T071952Z-981394-10094",
- "updated_utc": "2026-09-05T07:26:00Z"
+ "updated_by": "native-20260905T135933Z-1522043",
+ "updated_utc": "2026-09-05T14:03:30Z"
 }

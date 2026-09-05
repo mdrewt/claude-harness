@@ -2,6 +2,48 @@
 
 ---
 
+## 2026-09-05T13:5xZ — rb-51 PR#432 OPEN — PRV1-1 ticking deletion-grace countdown (pure `ui/privacyBanner.ts` + `main.ts` frame-tick HUD reading `deletion_grace_ms_default()`; closes R-m22-s8-X9); local `just ci` GREEN; ledger 1/1 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green (CI-EXIT=0) + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/432 (branch `feat/rb-51-privacy-countdown-view`,
+worktree `.claude/worktrees/rb-51`, forked from origin/master@1d8d2dd — master CI verified green;
+HEAD 63fead1, 4 `wip:` commits, all pushed). `gh pr merge` NOT run.
+
+Full memo: `memory/projects/monster-realm-rb-51-progress.md`.
+
+Ledger: **1/1 met, 0 deferred, 0 unmet** (`seed:c7ab9fd8d4aed23e`). **Run `mr-gates verify --slice
+rb-51` FROM the worktree** — the E1 CHECK (`npm --prefix client run test -- …`) is cwd-relative and
+FAILs from the harness root (observed this run). Fresh clone needs `just wasm` + `cd client &&
+npm ci` first; otherwise the check is ~1 s.
+
+DESIGN CALL WORTH KNOWING FOR rb-52/rb-53: the countdown ships as a runtime-created
+`#privacy-countdown` HUD banner, NOT a `client/src/ui/*View.ts` overlay. A new `*View.ts` is pinned
+by `overlayRegistry.test.ts` OR-MANIFEST-COMPLETE **and** by `evals/overlay-a11y-manifest.eval.mjs`
+`KNOWN_VIEW_FILES` (a frozen roster OUTSIDE `client/**`), so the overlay route was a
+hidden-dependency STOP. The EARS also favours the banner ("SHALL *see*" vs rb-52's "WHEN the player
+*opens* the privacy surface"). **rb-52 still pays that ~17-file fan-out — seed its `touches:` with
+`evals/overlay-a11y-manifest.eval.mjs` + `evals/dom-shell-coverage-exclusion.eval.mjs` or it parks
+on the same wall.**
+
+No ADR number was reserved (assigned `None`), so D1-D5 landed as **ADR-0231 Amendment A1**
+(self-amendment, ADR-0104 precedent; no header field changed, DIGEST.md byte-unchanged). Promote to
+a standalone ADR at reconcile if wanted. `docs/adr/README.md` untouched; CHANGELOG not hand-edited.
+
+Orchestration: planner + reviewer + red-team on the PLAN; a separate `tester` wrote the RED teeth,
+then a second `tester` pass strengthened them after reviewer+red-team reviewed the impl. 11 mutants
+applied to the shipped source, all killed. `/tmp/mr_warn_rb-51` appeared before the final round, so
+`desync-guard`/`reducer-security-auditor` were NOT spawned (zero reducer/schema/game-core/prediction
+diff) and the verifier checks were run inline. Flagged in the PR body under "Lens compression".
+
+Named follow-ups (do not lose): (1) one-shot a11y announcement on the `active -> grace` edge,
+deferred to rb-52 with the copy catalog it needs; (2) memo write-count unpinned; (3) a TZ-offset
+mutant on `nowMs` survives on a UTC runner (no TZ pin in the harness).
+
+NEXT TICK (supervisor): poll PR 432 `ci`; `mr-gates verify --slice rb-51` FROM the worktree;
+`mr-audit`; squash-merge as ONE Conventional Commit; `mr-gates residuals close --slice rb-51 --pr
+432`; reconcile ADR/ARCHITECTURE; re-index codegraph + cbm; then rb-52.
+
+---
+
 ## 2026-09-05T0x:xxZ — rb-48 PR#430 OPEN — PRV1-14 export_bundle TTL reaper (hourly interval singleton, cap 256, armed from request_data_export + init/sync_content; ADR-0238, closes R-m22-s4-X17); local `just ci` GREEN via ledger X4; ledger 10/10 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
 **TERMINAL STATE: PR open + local full `just ci` green + remote CI running.** PR https://github.com/mdrewt/monster-realm/pull/430 (branch `feat/rb-48-export-bundle-ttl-reaper`, worktree `.claude/worktrees/rb-48`, forked from origin/master@c136a8d — master CI verified green; HEAD 4fdc22b, 12 `wip:` commits, all pushed). `gh pr merge` NOT run. Attempt 4 (resume from the attempt-3 park; no rate-limit park, no counter bump).
 
@@ -3251,6 +3293,10 @@ Promoting them is supervisor-only work outside any slice's `touches:`. Independe
 **Code-graph refresh deliberately skipped:** `main` is unchanged (nothing merged yet) and indexing the
 ephemeral worktree path is forbidden. No project code was touched, so no re-index is owed.
 
+## 2026-09-05T14:02:13Z — rb-51 MERGED PR#432 — supervisor merge
+Squash-merged to master@1406816 (mergeStateStatus CLEAN, ci+e2e checks pass on PR branch, gh pr merge --squash --delete-branch). mr-audit: orchestration CLEAN (planner/red-team/reviewer/tester); acceptance CLEAN 1/1 (re-run from correct --repo path after an initial invocation mis-resolved repo=project as a literal relative path); gating_advisory FLAGGED on 2 modified asserts — adjudicated as message-string-only edits (failure-message text updated to point at rb-52 as the new render owner; .toBe(...) values unchanged), not a weakening. Worktree + local branch cleaned. Residual R-m22-s8-X9 closed via mr-gates residuals close --slice rb-51 --pr 432. Master post-merge CI (14068164) still in_progress at record time — not re-verified green this tick; next tick should confirm. Composite launch follows: rb-52 next off queue[].
+## 2026-09-05T12:02:56Z — 12:00Z tick — launched rb-51 (fast-path queue)
+Native tick mr-sup-native-20260905T120008Z-1361737 (12:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no live rooted-run pid, no .done/pending events. Both repos in sync (harness main=7cc960b, project master=1d8d2dd). Probe: no resident IDE claude pid actively writing, no non-supervisor writes in either repo in the last 10 min (only .codegraph/ daemon churn + our own supervisor state files); handoff/ledger mtimes matched their last recorded content. Noted a stray orphaned docker container (e1a4364d7612, prom/prometheus promtool check, up 2h) referencing a since-removed worktree path (.claude/worktrees/17r-e/ops/observability) -- no live worktree named 17r-e exists (git worktree list shows only the main checkout); left untouched this tick (not part of the gate procedure, low resource impact, flagging for cleanup). mr-gates residuals list --unclaimed: 57 open, all unpromoted, oldest 2.67d -- none past t1=3d, so no promote action outranked queue work. queue[] held rb-51/52/53 (added 11:02Z, promoted from R-m22-s8-X9/X10/X11). Re-verified rb-51 live: its M-residual-backlog.spec.md section exists, non-blocked, source slice m22-s8 (PR#411) already merged, no existing branch/PR for rb-51. rb-51 and rb-52 explicitly share the same client/src/main.ts + overlayRegistry fan-out surface per rb-52's own deferred-reason text (same overlay fan-out as X9) -- NOT disjoint, so only rb-51 launched this tick (serial), rb-52/rb-53 left queued. touches inherited from source slice m22-s8's declared client/** (M22-privacy-compliance.spec.md S8 row). Classified routine tier (client-only UI countdown display, no schema/reducer/netcode/security-enforcement-mechanism/M20/M25 hits) -> opus@high. Launched via mr-spawn: leader pid 1363968, claude_pid 1363971, rid=mr-spawn-20260905T120216Z-1363915, gates seeded (1 criterion, seed c7ab9fd8d4aed23e). queue-removed rb-51. Governor NORMAL (d7=$635.77/$2783, fable_d7=$421.67/$2298, fable_ok=true). No merge this tick (nothing awaiting-merge), no BLOCKER, no rate-limit event.
 ## 2026-09-05T11:03:10Z — 11:00Z tick — promoted 3 aged privacy-UI residuals to rb-51/52/53, queued
 Native tick mr-sup-native-20260905T110011Z-1347491 (11:00Z, cron). Gate-0: reaped one stale per-run lock (17r-d, session_leader 1012259 dead, EXIT=0, already fully merged by the 10:00Z tick per the git log — the .done/lock pair was simply never cleaned up). Live ground truth confirmed: rb-47 (PR#429) and rb-48 (PR#430) both MERGED (the handoff prose describing them as OPEN was stale — mr-state.json inflight/awaiting_merge=[] was actually correct); master@1d8d2dd CI green (ci+e2e both success). No open PRs, no active human session, no chain mutex held.
 
@@ -3358,8 +3404,3 @@ Native tick mr-sup-native-20260904T162641Z-3796135 (16:26Z, CI event). Gate-0: 1
 Gate-0: locks showed 18r-a done=true (leader 3564599 dead, PR#426 open UNSTABLE) and 18r-b leader 3564930 alive (routine slice, untouched). Verified PR#426 live: ci job SUCCESS, e2e job FAILURE — 1 test: wallet-balance.spec.ts:911 (11r-e/ADR-0169 shop-gold-privacy) precondition 'A starts quest_001 via elder_oak dialogue' timed out after 5 attempts. Checked PR diff (`gh pr diff 426 --name-only`): ARCHITECTURE.md, client/src/ui/privacyModel.ts, privacyModel.test.ts only — zero overlap with quest/dialogue/wallet code. Checked master's last 15 CI runs: 14 success + 1 cancelled, no persistent flake pattern for this test, but the isolated unrelated failure + already-built-in 5-attempt retry in the test itself points to environmental e2e flake (real-spacetime two-window test), not a regression from this diff. Reran via `gh run rerun 33892726320 --failed`. Delegated CI-wait: `setsid bash mr-ci-watch 426 18r-a &` (pid 3778167), resumes via event tick on completion — did NOT sit polling. Took no mutating action on 18r-b (leader 3564930 alive, elapsed ~68min at check time, unrelated touches: sim-harness/mr_load_driver.rs, docs/adr/0231, ARCHITECTURE.md, AGENTS.md) — left it running.
 
 NEXT TICK: on mr-ci-watch's event, if e2e now green: cd worktree, `mr-gates verify --slice 18r-a`, squash-merge PR#426, delete branch+worktree. If e2e fails AGAIN on the SAME test with the SAME symptom, escalate: no longer treat as flake — investigate whether it's a genuinely pre-existing flake unrelated to any recent slice (check quest/dialogue/npc.rs history) or a real CI-infra regression; do not rerun a third time blindly.
-## 2026-09-04T15:04:51Z — 18r-a + 18r-b LAUNCHED — rb-42/rb-43 already merged (#423/#424), residual chain dry
-Native tick mr-sup-native-20260904T150010Z-3561512 (15:00Z, cron). Gate-0: no live locks/mutex, HOLD-NONE queued_events=0. Verified live: rb-42 (#423) and rb-43 (#424) already merged prior ticks (12:41Z/10:16Z) — the stale handoff top entry claiming rb-42 'OPEN' predates its own merge; git log/gh confirm MERGED, master CI green (e630386). mr-gates residuals list: 43 open rows, none unpromoted past t1=3d (oldest unpromoted ~2.98d), none past t2=14d — no promote action this tick. queue[] empty. Fell through to full PLAN §9 derivation (rb-* eval-tooling chain genuinely dry per operator directive): next unbuilt, unblocked milestone is M-postgate-eighteenth-review-residuals (18r-a/b/c, spec dated 2026-09-04, zero commits). mr-disjoint SAFE + no shared axis for {18r-a, 18r-b} -> launched both (N=2 default fan-out, both project-repo/mdrewt-monster-realm, opus@high, routine tier). 18r-a: privacyModel.ts busy-guard silently spends an armed delete confirmation on a no-op in-flight path (MED state-machine bug, client/src/ui/privacyModel.ts+test). 18r-b: 4-site citation/pointer drift sweep (ADR-0231 main.ts cite, mr_load_driver.rs on_disconnect cite, ARCHITECTURE.md stale ADR-next-free pointer, AGENTS.md pin-count miscount) — doc/comment-only. 18r-c (harness-repo M20 spec OBS-48 reword per issue #342) NOT launched this tick — different repo, deferred to next fast-path pick. NEXT: watch 18r-a/18r-b to completion, audit+merge each, then launch 18r-c.
-## 2026-09-04T12:42:26Z — rb-43 merged (PR#424) — ADR next-free single-sourced into DIGEST.md
-PR#424 squash-merged e630386 (from 7bb551f). rb-43 fixed the promoted residual R-rb-26-X11-adr-readme-next-free: docs/adr/README.md's hand-maintained 'Next free number' line (51 stale) is retired; scripts/adr-digest.mjs now derives it (max(id)+1, zero-padded) and renders it into the already drift-gated docs/adr/DIGEST.md. ARCHITECTURE.md:848 repointed at DIGEST.md for the next-free claim; docs/adr/0060's pointer to README is kept true by README's replacement wording. ADR-0104 amended in-place (no new ADR minted, no header field added — self-amendment). mr-audit orchestration verdict CLEAN (no mandatory read, routine tier). Acceptance ledger reported FLAGGED (X10/X11 EVIDENCE-MISMATCH) — adjudicated: both are a citation-path resolver artifact (gates file cited the full projects/monster-realm/.claude/worktrees/rb-43/... path while mr-gates already resolves from that cwd, producing a double-nested lookup); manually confirmed both citations resolve at the correct path and match their claims verbatim. 11/11 gates met. Residual closed via mr-gates residuals close --slice rb-43 --pr 424. Master CI queued on e630386 at merge time (doc/tooling-only diff, low risk) — next tick re-verifies live.
-
