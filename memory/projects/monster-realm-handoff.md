@@ -3151,6 +3151,54 @@ NEXT TICK: poll PR 426 CI; on green `mr-gates verify --slice 18r-a` (cd into the
 is cwd-relative), squash-merge, delete branch + worktree, re-index the code graphs on the canonical
 checkout.
 
+## 17r-e — comment-truth micro-sweep — PR OPEN (2026-09-05)
+
+**State: terminal — PR #431 open, local `just ci` green, remote CI running. Supervisor owns the merge.**
+
+- Branch `feat/17r-e-comment-truth`, worktree `.claude/worktrees/17r-e`, forked from `origin/master` @ `0ed602f`.
+- PR: https://github.com/mdrewt/monster-realm/pull/431
+- Ledger `memory/projects/gates/17r-e.gates.md`: **6/7 met, 1 deferred (B1), 0 unmet.** Seed `c72289d6e73087e8`.
+  Gate runner `memory/projects/17r-e.claim-truth.mjs` (subcommands E1/E3/E4/E5/E6/all);
+  proof-of-teeth register `memory/projects/17r-e.bite-proof.mjs` (10 mutants, 10 caught, 10 distinct reasons).
+  Plan memo: `memory/projects/monster-realm-17r-e-plan.md`.
+- **Note for re-execution:** `mr-gates check` caps each CHECK at 120 s, so E6 (`just ci`) needs
+  `--timeout 2400` or it reports `SKIP … timeout` (which does NOT red).
+
+**Shipped (2 of the spec's 4 claims):** `overlayA11y.ts:51-54` retracts the false "share ONE root" /
+CLOSE-BEFORE-OPEN claim (line-count neutral — the file is line-cited 102× from 18 files);
+`evals/playtest-report.eval.mjs` drops the stale `EXPECTED RED` qualifier at 5 sites (`:1859`
+summary echo deliberately untouched). `ARCHITECTURE.md` gained an appended `**17r-e**` block
+(touches-delta; `ADR next-free = 0239` — 0238 is taken by rb-48). No ADR.
+
+**DEFERRED — hidden dependency, needs supervisor re-serialization:**
+`R-17r-e-B1` — the spec's claims 2+3 (`070-wave3.ron:17`, `071-wave3-derived.ron:36`) cannot be
+fixed inside this slice's `touches:`. `evals/content-version.eval.mjs:31-40` hashes the RAW BYTES of
+`game-core/content/**` against `evals/baselines/content-hash.json` (v21) + `server-module/src/lib.rs:79`
+`CONTENT_VERSION = 21`. **A successor slice must declare those two files in `touches:`**; it then
+re-runs `node memory/projects/17r-e.claim-truth.mjs all` and B1 flips to 4/4. Corrected facts are
+already recorded in the residual and the plan memo (Electric resists Electric AND Water;
+three species carry `ability: Some(3)`).
+
+**Other residuals registered (all outside `touches:`):**
+- `R-17r-e-E3` — **highest value.** `client/src/ui/focusTrap.ts:58-62` still carries the retracted
+  claim as a LIVE prescription ("S4 must close-before-open"), refuted by `focusTrap.ts:150`. An
+  implementer reading that file would act on a false instruction. Found by `desync-guard`.
+- `R-17r-e-VIEWHDR` — this fix *created* staleness: `battleView.ts:29-30`, `boxView.ts:29-30`,
+  `raisingView.ts:30-31`, `evolutionView.ts:40-41` and `ARCHITECTURE.md:1908` describe contract (a)
+  in the present tense. Tense-only; substance still agrees.
+- `R-17r-e-UPDATEFLAG` — `evals/content-version.eval.mjs:109` advertises a `--update` flag it does
+  not implement. Blocks nothing here but traps whoever picks up `R-17r-e-B1`.
+
+**Suggested next slice:** fold `R-17r-e-E3` + `R-17r-e-VIEWHDR` into one comment-truth follow-up
+with `touches:` = `client/src/ui/focusTrap.ts`, `battleView.ts`, `boxView.ts`, `raisingView.ts`,
+`evolutionView.ts` — it is the same defect family and the five files are disjoint from `overlayA11y.ts`.
+Keep any `overlayA11y.ts` edit line-count neutral if that file is ever re-opened.
+
+## 2026-09-05T09:43:45Z — 17r-e merged: overlayA11y/evals comment-truth micro-sweep
+PR#431 (mdrewt/monster-realm) squash-merged to master@1d8d2dd. Retracted false 'share ONE root' claim in client/src/ui/overlayA11y.ts:51-54 (each view has its own root; pinned by S4-CROSS-VIEW-DISTINCT-ROOTS). Dropped 5 stale EXPECTED-RED qualifiers from evals/playtest-report.eval.mjs now that the identity-contract tightening has landed. Comment/detail-string only, zero behavior change. Gates 6/7 met, B1 (2 .ron comment falsehoods, content-hash coupled) DEFERRED to backlog as R-17r-e-B1 + a related R-17r-e-UPDATEFLAG residual (content-version.eval.mjs advertises an unimplemented --update flag) — both status:unpromoted, target:backlog. E6 (full just ci) hit a re-verify timeout in mr-gates verify; adjudicated as met on the strength of the live PR's own green ci+e2e checks. Worktree/branch cleaned, master CI green post-merge. 17r-d remains in-flight (leader 1012259, live).
+## 2026-09-05T09:20:48Z — 17r-e — CI-watch delegated (PR#431)
+Reconciled 17r-e.done event: PR #431 (feat/17r-e-comment-truth) open, mergeStateStatus UNSTABLE = CI (ci+e2e) still IN_PROGRESS. Delegated to mr-ci-watch (detached) rather than polling. 17r-d chain still live (leader pid 1012259, ~72min elapsed) — untouched this tick. No mutating action taken beyond the watcher spawn.
+
 ## 2026-09-05T08:04:04Z — 08:00Z tick — removed rb-49 as substantively blocked; fan-out launched 17r-d + 17r-e
 Gate-0/1: no live locks/mutex, HOLD-NONE queued_events=0, no active-session collision (only wrapper/codegraph writes <6min). Both repos in sync with origin (harness main 0ed602f, proj master 0ed602f-equivalent), remotes correct, master CI green (rb-48 PR#430). Gate-3: mr-gates residuals list --unclaimed showed nothing past t1_promote_days=3 (oldest 2.02d, the 17r-c OBS48-* MED cluster) -- residual aging did not outrank the queue fast path this tick. queue[] held rb-49 (R-m22-s3b-X18). Re-verifying it live per the fast-path rule surfaced the SAME invalidity a prior tick (04:something Z, handoff line ~3222) already found for its sibling rb-45: rb-49's own deferred-reason text states it needs the supervisor's ADR-0224/0225 ruling on the PRV1-7 crate-wide DEL-06 enforcement mechanism (syn-based check vs reviewer-checklist) before it is buildable -- substantively blocked pending an open architectural decision even without literal blocked: text. Treated identically: queue-removed rb-49 rather than launching blind (mr-record queue-remove --slice rb-49), and fell through to the full PLAN Sec.9 derivation since queue[] was then empty. This is now the SECOND residual stalled on the same unresolved ADR-0224/0225 mechanism choice (rb-45 previously, now rb-49) -- flagging for a future tick or Drew to consider whether this now warrants an mr-ask-drew, per the batch-policy note already left at handoff line ~3228. Full derivation: M-loop-infrastructure/M-stdb-2x-module-sdk (COMPLETE)/M-postgate-fifteenth-review-residuals chain remains blocked:wave-2/3/4-exit (2026-08-22 operator directive, time-gated). 16r-a/c/d/e/f/g/h all verified merged (16r-b remains SERIAL-REQUIRED against the still-blocked 15r scanner-migration family -- skipped). 17r-a/17r-b/17r-c verified merged. Of 17r's remaining slices (17r-d/17r-e/17r-f, ROI order in spec Sec.2), 17r-f is after:[17r-b] (satisfied, unblocked) but 17r-d and 17r-e are the ROI-first pair and are pairwise disjoint from each other, from 17r-f, and from everything in flight (after: [] each). mr-disjoint 17r-d vs 17r-e: SAFE, disjoint, no shared registry/enum axis (harness spec-doc fix vs project comment/RON-comment sweep) -- no partition needed. Both LIGHT/LOW severity, no schema/reducer/netcode/security/M20/M25 touch, fresh (not resume) -> tier=routine, opus@high. free -g showed 17G free, ample for N=2. Reserved no ADR for either (pure doc/comment-truth fixes, same class as the m22 hygiene-only precedents). 17r-d touches only specs/monster-realm-v2/M23-accessibility.spec.md (harness repo) -- rewords the ADR-0206 Amendment A1 self-open exemption into Sec.2.3/Sec.8.4/A11Y-19, which the shipped code (main.ts:1151-1348 toggle-close exemption at all 12 hotkey guard sites) already implements but the spec text still contradicts (SHALL NOT open or toggle). mr-spawn flagged DIRTY-TREE-ADVISORY (1 uncommitted tracked change, memory/projects/mr-state.json -- my own queue-remove edit from this tick, harmless: the harness-repo worktree branches from origin/main and the slice never touches that file) -- confirmed intended, proceeded. LAUNCHED cleanly: leader=1012259, claude_pid=1012262, rid=mr-spawn-20260905T080300Z-1012179, repo=harness, pr_repo=mdrewt/claude-harness. GATES-SEEDED criteria=2. 17r-e touches client/src/ui/overlayA11y.ts + game-core/content/species/070-wave3.ron + 071-wave3-derived.ron + evals/playtest-report.eval.mjs (project repo) -- four independently-verified comment-truth corrections (four-distinct-roots claim, Electric's Water-weakness omission, Tempestrix's non-unique Regeneration-pivot claim, and stale EXPECTED-RED playtest-report.eval.mjs qualifiers whose tightening already landed and verified GREEN). LAUNCHED cleanly: leader=1012462, claude_pid=1012465, rid=mr-spawn-20260905T080307Z-1012396, repo=project, pr_repo=mdrewt/monster-realm. GATES-SEEDED criteria=1. Two ledger LAUNCHED rows recorded. Governor NORMAL (d7=$582.32/2783 eff., fable_d7=$421.67/2298, fable_ok=true -- unaffected, both launches are opus-tier). No BLOCKERs raised this tick (deferred the ADR-0224/0225 mr-ask-drew consideration per batch policy -- non-blocked fan-out work was available and took priority). No rate-limit event. Delegating both to the normal wrapper poll cycle; next tick reconciles from live PR/git state for both.
 ## 2026-09-05T07:24:06Z — rb-48 merged: PRV1-14 export_bundle TTL reaper (PR#430, ADR-0238)

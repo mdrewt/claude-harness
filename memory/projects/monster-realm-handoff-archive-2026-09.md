@@ -746,3 +746,10 @@ that point on: no new scope, and the only remaining fan-out was the single manda
 handoff) were written directly. `CHANGELOG.md` untouched — git-cliff generates it from the squash
 commit.
 
+## 2026-09-04T10:19:36Z — rb-43 launched (composite after rb-42 merge)
+Composite launch per doctrine: re-derived eligibility fresh after rb-42's merge completed fully (worktree/branch cleaned, ledger+handoff+state recorded), re-ran the active-session probe (no resident IDE pid, no third-party writes in last 6 min — the only recent writes were my own rb-42 recording). queue[] fast-path: rb-43 (X11-adr-readme-next-free, source rb-26) re-verified live -- spec heading present, not blocked, no existing PR/branch -- launched opus@high/routine, queue entry removed. Target: prove docs/adr/README.md's stale hand-maintained next-free-ADR-number line via an ordinary Rust/TS test (ADR-0224, no new eval script).
+
+
+
+## 2026-09-04T12:23:59Z — Native tick mr-sup-native-20260904T122330Z-3488264 (12:23Z) — rb-43 CI-watch delegated
+rb-43 run finished (rc=0, attempts=1, opus, $54.99 recorded via reconcile row). PR #424 open: 11/11 gates met per ledger, mergeStateStatus=UNSTABLE, checks ci+e2e IN_PROGRESS. Delegated to mr-ci-watch (detached, setsid) for resume via event tick — supervisor owns the merge, never sat polling CI. Governor NORMAL (d7=$257.01/$2783 weekly). No launch this tick (pending merge takes priority).
