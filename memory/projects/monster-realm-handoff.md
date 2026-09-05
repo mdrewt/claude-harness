@@ -2,6 +2,67 @@
 
 ---
 
+## 2026-09-05T15:5xZ — rb-52 PR#435 OPEN — PRV1-3/PRV1-4 privacy surface: the 17th overlay wires all three reducers + the distinct terminal notice (ADR-0231 Amendment A2, closes R-m22-s8-X10); local `just ci` GREEN (CI-EXIT=0); ledger 1/1 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/435 (branch `feat/rb-52-privacy-surface`,
+worktree `.claude/worktrees/rb-52`, forked from origin/master@1406816 — master CI verified green;
+HEAD f065ea7, 9 commits, all pushed). `gh pr merge` NOT run.
+
+Ledger: **1/1 met, 0 deferred, 0 unmet** (`seed:86ccd8bbf4ebe110`). **Run `mr-gates verify --slice
+rb-52` FROM the worktree** — the E1 CHECK is cwd-relative and FAILs from the harness root
+(observed again this run). EXPECT is `Tests  299 passed (299)`.
+
+WHAT LANDED: `client/src/ui/privacyView.ts` is the SEVENTEENTH `OverlayId` (`GUARD_ONLY`, in
+`BATTLE_FORCE_HIDE`), reached from a labelled "Privacy & Account Data" button in the Account &
+Sign-in overlay. `main.ts`'s `applyPrivacy` drives `privacyStep` and executes its three effects
+through `conn.reducers`, so `deleteAccount`/`cancelAccountDeletion`/`requestDataExport` finally
+have client call sites. Copy (incl. M22 §9's verbatim pseudonymization sentence and PRV1-4's
+distinct terminal notice) is pure, in `ui/privacyBanner.ts`.
+
+FOUR DESIGN CALLS rb-53 SHOULD KNOW:
+1. The shell is **constructed at runtime**, NOT static `index.html` markup —
+   `evals/overlay-live-region-custody.eval.mjs` pins `EXPECTED_ARIA_MODAL_SHELLS = 11` EXACTLY,
+   and that eval is outside `client/**`. A static shell parks the slice.
+2. The surface is opened from the claim overlay, NOT a menu leaf — a leaf needs a `helpModel`
+   CONTROLS glyph, set-equality gated against **`docs/PLAYTEST.md`** (outside touches).
+   **Any slice that wants a menu leaf MUST put `docs/PLAYTEST.md` in its `touches:`.**
+3. `privacyView` IS in `BATTLE_FORCE_HIDE`, and `PrivacyView.hide()` calls `onDismissed` so the
+   force-hide disarms the delete confirmation (the handle thunk is byte-pinned and cannot carry it).
+4. `evals/dom-shell-coverage-exclusion.eval.mjs`, `client/vite.config.ts` and `client/index.html`
+   were pre-authorised and NOT needed — the view ships fully unit-covered instead.
+
+ORCHESTRATION: planner (stalled at ~11 min, stopped — the plan was written by the orchestrator
+instead); reviewer + red-team on the PLAN, both of which found slice-parking defects BEFORE any
+code (the static-shell STOP, a false `BATTLE_FORCE_HIDE` premise, and a terminal notice that would
+have rendered nothing on open); a separate `tester` wrote all 45 new teeth; reviewer + verifier on
+the impl — the **verifier REJECTed** and all its findings are closed. `desync-guard` /
+`reducer-security-auditor` NOT spawned (zero server-module/game-core/prediction diff, rb-51
+precedent; `/tmp/mr_warn_rb-52` was set). Disclosed in the PR body.
+
+**21 mutants, 21 CAUGHT** (two rounds — 6 of the second round had SURVIVED the pre-merge lenses).
+TRAP RE-CONFIRMED: `git checkout -- <file>` in a mutant register reverts UNCOMMITTED fixes. It ate
+six production edits mid-run this time; commit before every register.
+
+`just ci` hit the known `account-e2e` S9 contention flake on 2 of 4 runs (empty stderr + WS reset,
+no strays, load 0.8). `just eval` passed it standalone; the final full run is CI-EXIT=0.
+
+RESIDUALS REGISTERED: `R-rb-52-MENULEAF` (top-level leaf + documented hotkey; needs
+`docs/PLAYTEST.md`), `R-rb-52-GRACEANNOUNCE` (rb-51 A1-D4's one-shot AT announcement, re-deferred
+once — do not lose it a second time), `R-rb-52-CLAIMBTNS` (**measured**: claimView's five original
+buttons ship blank and `display:none` while a programmatic `.click()` still fires them, and
+`#claim-signin-btn` is its own `initialFocusSelector`), `R-rb-52-A11YTIER` — all → backlog.
+
+touches-delta: `docs/adr/0231-*.md` (Amendment A2; DIGEST byte-unchanged), `ARCHITECTURE.md`.
+No hidden dependencies touched. boyscout-delta: none claimed.
+
+NEXT TICK (supervisor): poll PR 435 `ci`; `mr-gates verify --slice rb-52` FROM the worktree;
+`mr-audit`; squash-merge as ONE Conventional Commit; `mr-gates residuals close --slice rb-52 --pr
+435` (closes R-m22-s8-X10); promote the four backlog residuals; reconcile ADR/ARCHITECTURE;
+re-index codegraph + cbm post-merge; then rb-53 (its `touches:` must include
+`evals/monster-privacy.eval.mjs` for `EXPECTED_SUBSCRIPTIONS`).
+
+---
+
 ## 2026-09-05T13:5xZ — rb-51 PR#432 OPEN — PRV1-1 ticking deletion-grace countdown (pure `ui/privacyBanner.ts` + `main.ts` frame-tick HUD reading `deletion_grace_ms_default()`; closes R-m22-s8-X9); local `just ci` GREEN; ledger 1/1 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
 **TERMINAL STATE: PR open + local full `just ci` green (CI-EXIT=0) + remote CI running.**
 PR https://github.com/mdrewt/monster-realm/pull/432 (branch `feat/rb-51-privacy-countdown-view`,
@@ -3293,6 +3354,13 @@ Promoting them is supervisor-only work outside any slice's `touches:`. Independe
 **Code-graph refresh deliberately skipped:** `main` is unchanged (nothing merged yet) and indexing the
 ephemeral worktree path is forbidden. No project code was touched, so no re-index is owed.
 
+## 2026-09-05T16:38:52Z — rb-52 merged (PR#435) — 16:38Z
+Merged feat/rb-52-privacy-surface (766ab1c), the 17th overlay (privacyView) wiring PRV1-3/PRV1-4 (delete/cancel/export reducers + terminal notice) per residual R-m22-s8-X10 / ADR-0231 Amendment A2. gates verify CLEAN (E1 1/1, spotcheck re-read adversarially, agrees). mr-audit: orchestration CLEAN (planner/red-team/researcher/reviewer/tester/verifier), gating_advisory FLAGGED on the mechanical removed/modified-assert tripwire — read the diff: all removals are the 16->17 overlay-count update paired with re-additions at the corrected count (+252/-38 expect() calls net; large legitimate new test file main.privacyWiring.test.ts, 919 lines), no real assertion weakening. Adjudicated safe to merge. Residual R-m22-s8-X10 closed against PR#435. Worktree+branch cleaned, master fast-forwarded to 766ab1c. Master CI still in_progress at tick end (queued right after merge) — not yet independently reverified green; next tick should confirm. queue[] still holds rb-53 (promoted residual R-m22-s8-X11) as the next fast-path candidate.
+## 2026-09-05T16:26:44Z — rb-52 e2e red — rerun (suspect flake, diff untouched)
+PR #435 (rb-52, feat/rb-52-privacy-surface) came back UNSTABLE: ci=pass, e2e=fail. Failure is a Playwright two-window golden-flow test — pvp-accept-btn click intercepted by #help-hint, element detach/retry loop, timeout. Checked git diff origin/master...feat/rb-52-privacy-surface: rb-52 only ADDS privacyView as a 17th GUARD_ONLY overlay (overlayRegistry.ts additive registration + force-hide entry) and touches privacy-surface UI/tests — zero touches to help-hint, pvp-accept-btn, or any PvP overlay code. No plausible causal link between this slice's diff and the failing assertion. Reran the failed e2e job (gh run rerun 33976339433 --failed, now queued) rather than treating it as a caused regression, and delegated the wait to mr-ci-watch (PR #435, slice rb-52) so this resolves on the next event tick instead of blind-relaunching a fix pass. If the rerun is also red, next tick must treat it as a real (possibly pre-existing) e2e flake needing its own investigation/fix, not attribute it to rb-52.
+## 2026-09-05T16:16:31Z — 2026-09-05T16:16:31Z — PR#435 (rb-52) e2e red, reran as suspected flake
+Native tick mr-sup-native-20260905T161407Z-1715805 (16:14Z). rb-52 (PRV1-3/PRV1-4 privacy surface) run finished cleanly (opus, 1 attempt, $103.71, PR#435 opened, local gate green: lint/vitest/biome all pass). Live check: PR#435 mergeStateStatus=UNSTABLE — ci job passed, e2e job FAILED on client/e2e/dialogue.spec.ts:385 (M13.5c-5, advance_dialogue rejected walked_away 8x), a test file NOT in rb-52's diff. Diff review: no code path from the new privacyView overlay / overlayRegistry.ts changes / main.ts wiring into dialogue's advance path (no dialogueView touches, no shared input-guard changes beyond an Escape-key branch gated on privacyView.visible). Master's last 5 e2e runs on this same suite are all green. Adjudicated as likely environment flake in the real-spacetime e2e run, not a regression -- reran the failed job (gh run rerun 33976339433 --failed) rather than merging blind or spawning a fresh investigation pass. Delegated the wait to mr-ci-watch (pid 1718615, detached). No merge, no launch this tick. Governor NORMAL (d7=$810.96/$2783 effective, fable_ok=true).
+
 ## 2026-09-05T14:02:13Z — rb-51 MERGED PR#432 — supervisor merge
 Squash-merged to master@1406816 (mergeStateStatus CLEAN, ci+e2e checks pass on PR branch, gh pr merge --squash --delete-branch). mr-audit: orchestration CLEAN (planner/red-team/reviewer/tester); acceptance CLEAN 1/1 (re-run from correct --repo path after an initial invocation mis-resolved repo=project as a literal relative path); gating_advisory FLAGGED on 2 modified asserts — adjudicated as message-string-only edits (failure-message text updated to point at rb-52 as the new render owner; .toBe(...) values unchanged), not a weakening. Worktree + local branch cleaned. Residual R-m22-s8-X9 closed via mr-gates residuals close --slice rb-51 --pr 432. Master post-merge CI (14068164) still in_progress at record time — not re-verified green this tick; next tick should confirm. Composite launch follows: rb-52 next off queue[].
 ## 2026-09-05T12:02:56Z — 12:00Z tick — launched rb-51 (fast-path queue)
@@ -3397,10 +3465,3 @@ TERMINAL: PR https://github.com/mdrewt/monster-realm/pull/427 squash-merged to m
 ## 2026-09-04T16:51:33Z — 18r-b PR#427 open — CI-watch delegated
 Native tick mr-sup-native-20260904T165051Z-3877451 (16:50Z, done-event 18r-b.done.md). 18r-b run finished rc=0, 1 attempt: fixed two stale citations (ADR-0231 main.ts landmark, mr_load_driver.rs:80 function-name-only per rb-36 doctrine), appended ARCHITECTURE.md rb-39/ADR-0234 entry, confirmed X1 account-e2e S9 failure was rig-teardown contention (empty stderr, re-ran serially clean). Ledger 4/4 met, seed unchanged. Opened PR#427 (mdrewt/monster-realm). Live re-check: state OPEN, mergeStateStatus UNSTABLE, checks ci+e2e IN_PROGRESS, session_leader 3564930 already dead (done=true). No merge action taken — CI still running. Delegated CI-wait to mr-ci-watch (detached, resumes via event tick on conclusion). No other live locks/mutex; governor NORMAL (d7 $318.82/$2783 effective).
 
-## 2026-09-04T16:28:15Z — 18r-a merged (PR#426)
-Native tick mr-sup-native-20260904T162641Z-3796135 (16:26Z, CI event). Gate-0: 18r-b live (leader 3564930, alive, no .done) — left running, not touched. 18r-a: leader dead, .done EXIT=0, PR#426 CLEAN/MERGEABLE, checks ci+e2e both pass. mr-audit: policy CLEAN (no mandatory read), orchestration CLEAN (9 calls, 7 roles incl reviewer/red-team/verifier), gating-test CLEAN (no removed asserts/skips), acceptance ledger 1/1 met, spotcheck B1 (PRIVACY-BUSY-GUARD) independently re-ran and agreed (teeth=5/5 mutants=6/6 tests=29 pass). Squash-merged 0bbd2e1, branch slice/18r-a deleted, worktree removed, local master fast-forwarded. mr-gates residuals close: 0 (none open for this slice). Master CI re-run on 0bbd2e1 still in_progress at tick end (pre-merge PR checks were green; not re-polled further this tick per one-action-per-tick). Ledger cost_usd unknown (no result event in log) — flagged COST-UNKNOWN, not blocking. Chain mutex released. No launch this tick (already at fan-out with 18r-b live; nothing else selected).
-
-## 2026-09-04T16:18:27Z — 18r-a — PR#426 e2e flake, rerun + delegated
-Gate-0: locks showed 18r-a done=true (leader 3564599 dead, PR#426 open UNSTABLE) and 18r-b leader 3564930 alive (routine slice, untouched). Verified PR#426 live: ci job SUCCESS, e2e job FAILURE — 1 test: wallet-balance.spec.ts:911 (11r-e/ADR-0169 shop-gold-privacy) precondition 'A starts quest_001 via elder_oak dialogue' timed out after 5 attempts. Checked PR diff (`gh pr diff 426 --name-only`): ARCHITECTURE.md, client/src/ui/privacyModel.ts, privacyModel.test.ts only — zero overlap with quest/dialogue/wallet code. Checked master's last 15 CI runs: 14 success + 1 cancelled, no persistent flake pattern for this test, but the isolated unrelated failure + already-built-in 5-attempt retry in the test itself points to environmental e2e flake (real-spacetime two-window test), not a regression from this diff. Reran via `gh run rerun 33892726320 --failed`. Delegated CI-wait: `setsid bash mr-ci-watch 426 18r-a &` (pid 3778167), resumes via event tick on completion — did NOT sit polling. Took no mutating action on 18r-b (leader 3564930 alive, elapsed ~68min at check time, unrelated touches: sim-harness/mr_load_driver.rs, docs/adr/0231, ARCHITECTURE.md, AGENTS.md) — left it running.
-
-NEXT TICK: on mr-ci-watch's event, if e2e now green: cd worktree, `mr-gates verify --slice 18r-a`, squash-merge PR#426, delete branch+worktree. If e2e fails AGAIN on the SAME test with the SAME symptom, escalate: no longer treat as flake — investigate whether it's a genuinely pre-existing flake unrelated to any recent slice (check quest/dialogue/npc.rs history) or a real CI-infra regression; do not rerun a third time blindly.
