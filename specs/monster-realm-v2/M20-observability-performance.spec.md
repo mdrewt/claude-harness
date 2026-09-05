@@ -2,7 +2,7 @@
 
 **Status:** design sketch → **elaborated at build time** (heavy ceremony, 2026-08-08); **server-tracing +
 backend-stack calls reconsidered same day** (2026-08-08, see the amendment note below and D14–D18) · **Phase
-D** · **Decision:** ADR-0029 (amended 2026-08-08) + ADR-0180 (amended 2026-08-08)
+D** · **Decision:** ADR-0029 (amended 2026-08-08) + ADR-0180 (amended 2026-08-08, 2026-09-03)
 
 > Provisional sketch promoted to build-ready spec via the harness heavy-ceremony pipeline (investigation →
 > 6-way independent ideation, each adversarially reviewed → judge synthesis → a second, independent
@@ -263,7 +263,9 @@ bullet below says otherwise.
   durations, with no new outbound-HTTP surface and no new in-module timing mechanism at all — so the beta
   API's risk (pinned upstream docs call Procedures "currently in beta," their API "may change in upcoming
   SpacetimeDB releases," and advise preferring reducers "unless you need" a procedure) buys nothing D15
-  doesn't already cover. ADR-0180's amendment names the exact falsifier that would flip this.
+  doesn't already cover. ADR-0180's amendment names the exact falsifier that would flip this, and its later
+  `17r-c` amendment (2026-09-03) makes this rejection the standing DEFAULT rather than a
+  prohibition — see OBS-48.
 - **D15 — Server-side causal spans, with real durations, are reconstructed from the log stream — no
   procedure, no new table, no new credential.** `observability.rs`'s `mr_log` envelope (D6) gains three
   optional, bounded fields: `cause` (the call's natural key — `zone_id`/`battle_id`/`trade_id`, already
@@ -548,9 +550,19 @@ conditions referenced below live in ADR-0180's dated amendment, not in this spec
 - **OBS-47** — IF a future milestone un-cuts S3 (per D2, as amended by D18a) THEN the read path SHALL be a
   `#[view]`-based owner-scoped projection (mirroring `my_wallet`/`my_conversation`), not
   `client_visibility_filter`-based RLS, unless a subsequent SpacetimeDB release documents RLS as stable.
-- **OBS-48** — THE M20 v1 deployment SHALL NOT enable `features = ["unstable"]` in any workspace
-  `Cargo.toml`, and SHALL NOT define a `#[spacetimedb::procedure]` anywhere in `server-module/src` (D14) —
-  outbound-HTTP-based export is deferred behind ADR-0180's amendment's falsifier trigger, not built now.
+- **OBS-48** *(reworded per Drew's answered ruling — issue
+  https://github.com/mdrewt/monster-realm/issues/342, consumed and closed by review 17 — mirroring
+  ADR-0180's `17r-c` amendment, which makes OBS-48 **require-justification** rather than a blanket forbid;
+  the prior blanket-forbid wording of this criterion is retracted)* — IF any workspace `Cargo.toml` enables
+  `features = ["unstable"]`, or any file under `server-module/src` defines a `#[spacetimedb::procedure]`,
+  THEN a committed justification entry in `UNSTABLE_JUSTIFICATIONS`
+  (`evals/observability-log-wrapper.eval.mjs`, check A9) SHALL name the exact site, resolve to a real ADR,
+  cite the issue, state the occurrence count, and carry written reasoning. An unjustified use still fails
+  CI. *(D14's verdict stands as the standing DEFAULT, not a prohibition: nothing in the workspace enables
+  the `unstable` feature today, no `server-module/src` file defines a Procedure today, D15's
+  log-reconstructed spans remain the reason neither is needed, and outbound-HTTP-based export remains
+  deferred behind ADR-0180's amendment's falsifier trigger — but a future use that carries its
+  justification entry is permitted, not forbidden.)*
 - **OBS-49** — THE SYSTEM SHALL NOT add a new table to `schema.rs` for server-side trace reconstruction
   (D15); the `cause`/`sched`/`phase` fields SHALL be additive to the existing `mr_log` envelope only.
 - **OBS-50** *(added this finalization pass — closes a gap a review found: no enumerated list existed to
