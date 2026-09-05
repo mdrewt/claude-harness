@@ -4,13 +4,13 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "1dec6f0"
+  "sha": "48c32a2"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-05T07:19:32Z",
+ "last_tick_utc": "2026-09-05T11:02:55Z",
  "live_watchers": [],
  "master": {
-  "ci": "pending",
+  "ci": "success",
   "nightly": "success",
   "sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75"
  },
@@ -27,45 +27,36 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "10:00Z tick: merged 17r-d (PR#97, be454a1); reconciled uncommitted 17r-d/17r-e catch-up state (handoff/mr-state/usage-daily/handoff-archive + 3 untracked 17r-e files) into 43eacf8, fixed stale adr_next_free (238->239, per DIGEST.md) and stale inflight[17r-d]. OPEN RISK: master e2e on 1d8d2dd (17r-e merge) failed once (quest_001/elder_oak precondition, wallet-balance.spec.ts) -- diff touches only overlayA11y.ts comments/playtest-report.eval.mjs/ARCHITECTURE.md, zero dialogue/quest overlap, so treated as e2e flake and reran (gh run 33958737688) -- still in_progress at tick end, NOT yet confirmed green. NEXT TICK FIRST: re-verify that rerun live; if red again on the same symptom, escalate per the 18r-a 2026-09-04T16:18:27Z precedent instead of rerunning a third time. Residuals R-m22-s8-X9/X10/X11 (privacy UI: PRV1-1/3/4/11-13, real game defects) remain past t1_promote_days=3d unpromoted -- promote+queue before any new PLAN Sec.9 launch.",
- "open_chore_prs": [
-  {
-   "pr": 96,
-   "repo": "mdrewt/claude-harness",
-   "branch": "chore/residual-promote-20260905T072518Z",
-   "purpose": "promote R-m22-s7-X8 -> rb-50",
-   "merge_mode": "squash --auto",
-   "opened_utc": "2026-09-05T07:25:20Z"
-  }
- ],
+ "notes": "11:00Z tick: reaped stale 17r-d lock (already merged by 10:00Z tick). Verified rb-47 (PR#429)/rb-48 (PR#430) both MERGED live (handoff prose calling them OPEN was stale; mr-state inflight/awaiting_merge=[] was correct). master@1d8d2dd CI confirmed green (ci+e2e success; the 10:00Z tick note about an in-progress e2e rerun resolved green). Promoted R-m22-s8-X9/X10/X11 (privacy UI, past t1_promote_days=3, real game defects) -> rb-51/rb-52/rb-53 in M-residual-backlog.spec.md, queued. Doc-only chore PR#98 (harness) merged directly (auto-merge unavailable on claude-harness repo -- no branch protection configured there; merged --squash after confirming mergeStateStatus=CLEAN, zero required checks) -- harness main now 48c32a2. Also found+cleared a stale open_chore_prs entry for PR#96 which had already merged at 07:25:29Z. NEXT TICK: queue fast-path should launch rb-51 (re-verify live first, as always).",
+ "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
   {
-   "slice": "rb-51",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "added_by": "n/a",
+   "added_utc": "2026-09-05T11:02:11Z",
+   "derived_from_master_sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75",
    "reason": "promoted residual R-m22-s8-X9",
-   "added_utc": "2026-09-05T11:02:11Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75"
+   "slice": "rb-51",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-52",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "added_by": "n/a",
+   "added_utc": "2026-09-05T11:02:11Z",
+   "derived_from_master_sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75",
    "reason": "promoted residual R-m22-s8-X10",
-   "added_utc": "2026-09-05T11:02:11Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75"
+   "slice": "rb-52",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-53",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m22-s8-X11",
-   "added_utc": "2026-09-05T11:02:11Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75"
+   "added_utc": "2026-09-05T11:02:11Z",
+   "derived_from_master_sha": "1d8d2dd82c3efeee38dd5547992cf16b66294a75",
+   "reason": "promoted residual R-m22-s8-X11",
+   "slice": "rb-53",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": "wrapper",
