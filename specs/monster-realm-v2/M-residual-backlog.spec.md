@@ -26,6 +26,30 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-53 — [PRV1-11/12/13 live transport + download] WHEN request_data_export completes THE CLIENT SH (from m22-s8 X11, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s8 · residual: R-m22-s8-X11
+
+Deferred with reason: the export transport needs `'SELECT * FROM my_export_bundle'` in `client/src/net/connection.ts`, whose subscription set is exact-set pinned by `evals/monster-privacy.eval.mjs:1292-1319` (`EXPECTED_SUBSCRIPTIONS`, check `[S/set]`) — a file OUTSIDE this slice`s declared `touches: client/**`. That eval invites the edit by name ("a deliberate eval edit … in the PR that privacy-reviews it"), so this is
+
+EARS: [PRV1-11/12/13 live transport + download] WHEN request_data_export completes THE CLIENT SHALL read my_export_bundle from a live subscription, assemble it via assembleExportBundle, and offer the artifact as a downloadable file
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-52 — [PRV1-3/PRV1-4 UI surface] WHEN the player opens the privacy surface THE CLIENT SHALL expo (from m22-s8 X10, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s8 · residual: R-m22-s8-X10
+
+Deferred with reason: same overlay fan-out as X9; the reducer call sites live in `client/src/main.ts`, which this slice does not touch (grep confirms ZERO occurrences of deleteAccount/cancelAccountDeletion/requestDataExport in client/src outside module_bindings today, so no half-reachable state ships). The decision core is gated HERE by X2/X3/X4. Successor slice id: m22-s8b.
+
+EARS: [PRV1-3/PRV1-4 UI surface] WHEN the player opens the privacy surface THE CLIENT SHALL expose reachable delete/cancel controls wired to conn.reducers and render the distinct terminal notice once terminal_at_ms is Some
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-51 — [PRV1-1 UI surface] WHEN the deletion grace window is live THE PLAYER SHALL see a ticking  (from m22-s8 X9, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s8 · residual: R-m22-s8-X9
+
+Deferred with reason: the live countdown needs `client/src/ui/privacyView.ts` + a `main.ts` frame tick + the `deletion_grace_ms_default()` wasm read (`client/src/main.ts` is the repo`s SOLE importer of `client-wasm/pkg`). One new `client/src/ui/*View.ts` is mechanically forced into ~17 files by OR-MANIFEST-COMPLETE (`client/src/ui/overlayRegistry.test.ts:184`, an exact readdir-derived set) plus the menu/a11y/index.html
+
+EARS: [PRV1-1 UI surface] WHEN the deletion grace window is live THE PLAYER SHALL see a ticking countdown to the reaper fire in a rendered surface (DOM shell + main.ts frame tick + the deletion_grace_ms_default() wasm read)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-50 — [mechanical CI enforcement of PRV1-17/PRV1-20] WHEN a future edit adds a log line naming a (from m22-s7 X8, deferred 2026-09-02)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s7 · residual: R-m22-s7-X8
