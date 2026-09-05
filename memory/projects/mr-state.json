@@ -1,19 +1,12 @@
 {
- "adr_next_free": 238,
+ "adr_next_free": 239,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "1dec6f0"
  },
- "inflight": [
-  {
-   "slice": "17r-d",
-   "run_id": "mr-spawn-20260905T080300Z-1012179",
-   "leader_pid": 1012259,
-   "repo": "harness"
-  }
- ],
+ "inflight": [],
  "last_tick_utc": "2026-09-05T07:19:32Z",
  "live_watchers": [],
  "master": {
@@ -34,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "17r-e merged PR#431 (1d8d2dd); master CI confirmation delegated to background monitor task bne7kos1s. 17r-d still inflight. Residuals R-m22-s8-X9/X10/X11 (privacy UI: PRV1-1/3/4/11-13, real game defects) crossed t1_promote_days=3d unpromoted \u2014 next tick should promote+queue before any new PLAN \u00a79 launch.",
+ "notes": "10:00Z tick: merged 17r-d (PR#97, be454a1); reconciled uncommitted 17r-d/17r-e catch-up state (handoff/mr-state/usage-daily/handoff-archive + 3 untracked 17r-e files) into 43eacf8, fixed stale adr_next_free (238->239, per DIGEST.md) and stale inflight[17r-d]. OPEN RISK: master e2e on 1d8d2dd (17r-e merge) failed once (quest_001/elder_oak precondition, wallet-balance.spec.ts) -- diff touches only overlayA11y.ts comments/playtest-report.eval.mjs/ARCHITECTURE.md, zero dialogue/quest overlap, so treated as e2e flake and reran (gh run 33958737688) -- still in_progress at tick end, NOT yet confirmed green. NEXT TICK FIRST: re-verify that rerun live; if red again on the same symptom, escalate per the 18r-a 2026-09-04T16:18:27Z precedent instead of rerunning a third time. Residuals R-m22-s8-X9/X10/X11 (privacy UI: PRV1-1/3/4/11-13, real game defects) remain past t1_promote_days=3d unpromoted -- promote+queue before any new PLAN Sec.9 launch.",
  "open_chore_prs": [
   {
    "pr": 96,
