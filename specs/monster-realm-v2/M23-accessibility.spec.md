@@ -194,16 +194,26 @@ reasons, and the second is the important one:
   fire** — `client/src/main.ts:1029` states it outright: *"Only renameView/tradeProposeView
   stopPropagation their focusables; the other eight overlays' buttons/selects bubble straight here"*
   (independently confirmed: `stopPropagation` appears in only those two view files). That is a latent
-  bug and the gate fixes it. For a sighted player who never Tabs, `activeElement` is `<body>` and
-  behaviour is byte-identical.
+  bug and the gate fixes it. **Corrected by ADR-0206 Amendment A1:** the compatibility claim this
+  paragraph originally made — that a sighted player who never Tabs keeps `activeElement` on `<body>`,
+  leaving behaviour unchanged — holds only until an overlay opens. S3/S4's deferred `openOverlayA11y`
+  focus then moves focus INSIDE the overlay it opened, so "focus inside the overlay" is the universal
+  post-open state rather than a click-only edge case.
 - *Safety for store-driven closes.* When a focused element becomes `display:none` — exactly what
   `client/src/ui/dialogueView.ts:24`'s `render(null)` does to a focused choice `<button>` — the browser
   blurs it to `<body>`. Without the `document.body` disjunct, `worldHasFocus()` would return false
   **forever** and every hotkey would be dead after any dialogue naturally ends. Pinned by A11Y-35 so
   no future edit can silently drop it.
 
-**Accepted behaviour change (§8.4):** `B` no longer toggles boxView *closed* while focus is inside
-boxView. `Escape` still does, and `closeOverlayA11y` returns focus to the canvas, so the loop closes.
+**Accepted behaviour change (§8.4) — AMENDED by ADR-0206 Amendment A1.** At all twelve open branches
+the shipped guard is, schematically (the concrete verdict local differs per branch),
+`verdict.kind === 'allow' && (<selfView>?.visible || worldHasFocus())`:
+`worldHasFocus()` gates only cross-overlay OPEN transitions, and pressing an overlay's own key while
+it is already open is a toggle-CLOSE, exempt from the gate. `B` therefore still closes boxView —
+subject, as before, to the listener's earlier unconditional returns (`sessionGateBlocks()`, `e.repeat`)
+and to the registry verdict, which is independent of this gate: a `GUARD_ONLY` overlay visible
+underneath still denies the press. `Escape` still closes it too, and the frame-loop close edge returns
+focus to the canvas when the close left focus inside the overlay (ADR-0206 D4), so the loop closes.
 
 ### 2.4 Live regions — the `replaceChildren` tension dissolved, not traded off
 
@@ -572,7 +582,7 @@ Prefix `A11Y-n`. Each maps to exactly one oracle, annotated `[COMPILE]`/`[SCAN]`
 
 **S5 / S6 — the focus gate and the two click-only sites**
 
-- **A11Y-19** [E2E] WHEN a single-letter overlay hotkey is pressed while `document.activeElement` is inside an open overlay THE SYSTEM SHALL NOT open or toggle any overlay.
+- **A11Y-19** [E2E] WHEN a single-letter hotkey for an overlay OTHER than the one already open is pressed while `document.activeElement` is inside that open overlay THE SYSTEM SHALL NOT open the pressed overlay AND SHALL NOT close the overlay already open (ADR-0206 Amendment A1: the world-focus gate applies to cross-overlay OPEN transitions only, so the already-open overlay's OWN hotkey is an exempt same-key toggle-close).
 - **A11Y-20** [E2E] WHEN a single-letter overlay hotkey is pressed while `document.activeElement` is `<body>` or the canvas region THE SYSTEM SHALL open the same overlay it opened before this milestone.
 - **A11Y-21** [UNIT] WHEN `sessionGateBlocks()` is true THE SYSTEM SHALL return before evaluating `worldHasFocus()`, preserving the existing session-gate-first ordering pin.
 - **A11Y-35** [UNIT] WHEN a focused element inside an overlay is hidden by a store-driven `render(null)` and the browser blurs it to `<body>` THE SYSTEM SHALL report `worldHasFocus()` as true, so hotkeys remain live.
@@ -641,9 +651,12 @@ DOM overlay), these could go stale with only the cross-reference to catch it.
    disproportionate pre-launch; a conformance claim published on (a) alone is a legal exposure, not just
    an engineering one.
 4. **Accepted behaviour change: `B` no longer toggles boxView closed while focus is inside boxView.
-   [DEFAULTS, does not block]** Escape still closes it and focus returns to the canvas. **Recommended
-   default: accept.** Overturn condition: a playtest shows sighted players relying on same-key-to-close
-   after clicking a button.
+   [OVERTURNED by ADR-0206 Amendment A1, does not block]** Its overturn condition was met mechanically
+   rather than by playtest: S3/S4's deferred focus makes "focus inside the overlay" the universal
+   post-open state, and three merged feature tests already encoded keyboard-only same-key-to-close (see
+   ADR-0206 Amendment A1 for the evidence). **Resolution:** the world-focus gate applies to cross-overlay
+   OPEN transitions only, and the pressed overlay's own toggle-CLOSE is exempt from it via a
+   `<selfView>?.visible` disjunct (§2.3). The original recommendation (accept) is superseded.
 5. **A manual reduced-motion / high-contrast override toggle. [DEFAULTS, does not block]** M23 ships
    OS-media-query-only (§2.9). If the operator wants a manual toggle it is `localStorage` behind the
    `client/src/net/authToken.ts:51` injected-host seam plus a 17th `OverlayId` with the ADR-0139 fan-out
