@@ -6,11 +6,14 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "48c32a2"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-05T17:00:11Z",
+ "inflight": [
+  {"slice": "17r-f", "repo": "project", "leader": 1952527, "claude_pid": 1952530, "rid": "mr-spawn-20260905T190506Z-1952468", "tier": "routine", "model": "opus"},
+  {"slice": "18r-c", "repo": "harness", "leader": 1952999, "claude_pid": 1953002, "rid": "mr-spawn-20260905T190513Z-1952859", "tier": "routine", "model": "opus"}
+ ],
+ "last_tick_utc": "2026-09-05T19:00:08Z",
  "live_watchers": [],
  "master": {
-  "ci": "in_progress",
+  "ci": "success",
   "nightly": "success",
   "sha": "4bfa5aac3d8296518e1477276be3bd1c9db9cc47"
  },
@@ -27,7 +30,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "rb-53 (PR#436) merged 18:51Z. adr_next_free unchanged (239) -- rb-53 used no new ADR. Next-work derivation: residuals unclaimed all unpromoted, none past t1_promote_days=3 (oldest 2.47d); queue[] empty -> next tick must do the full PLAN Sec9 derivation (first unbuilt milestone in order) per ADR-0224 work-selection-scope doctrine, since eval-tooling rb-* residuals no longer dominate gate 3.",
+ "notes": "19:00Z tick: recovered+committed the 18:51Z merge tick's orphaned state/handoff writes (rb-53/PR#436, verified against live gh/git before committing as d0e6f4a) -- both repos confirmed in sync with origin. Full PLAN Sec9 derivation (queue[] empty, no residual past t1=3d): M-postgate-fifteenth-review-residuals remains blocked:wave-2/3/4-exit + 2 open W0-Q decisions, skipped. 18r-a/18r-b/17r-d/17r-e all already merged. Launched the remaining unblocked frontier: 17r-f (project, after:[17r-b] satisfied) + 18r-c (harness, doc-only) -- mr-disjoint SAFE, both routine/opus@high, no ADR reserved (adr_next_free unchanged at 239).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -50,6 +53,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260905T183700Z-1938503",
- "updated_utc": "2026-09-05T18:38:25Z"
+ "updated_by": "mr-sup-native-20260905T190008Z-1948946",
+ "updated_utc": "2026-09-05T19:05:30Z"
 }
