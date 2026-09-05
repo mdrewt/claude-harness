@@ -2,6 +2,159 @@
 
 ---
 
+## 2026-09-05T~16:4xZ — 17r-f PR#437 OPEN — frame-loop errors reach pushError/F9, tagged + consecutive-deduped, re-arm intact (ADR-0130 Amendment 17r-f); local `just ci` GREEN (CI-EXIT=0); ledger 1/1 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/437 (branch `feat/17r-f-frame-catch-pusherror`,
+worktree `.claude/worktrees/17r-f`, forked from origin/master@4bfa5aa — master `CI` verified green;
+6 commits, all pushed). `gh pr merge` NOT run.
+
+Ledger: **1/1 met, 0 deferred, 0 unmet** (`seed:e0e33f1d559319b7`). **Run `mr-gates verify --slice
+17r-f` FROM the worktree** — the B1 CHECK is `npm --prefix client run test -- --run
+src/main.frameErrorWiring.test.ts src/main.wiring.test.ts` and is cwd-relative. EXPECT is
+`Tests  210 passed (210)`. A fresh clone needs `cd client && npm ci` + `just wasm`.
+
+WHAT LANDED: the rAF frame catch keeps its `console.error` and now also builds
+`frame: <normalizeError(...).message>` (inside a local try/catch — see below) and calls
+`pushError('uncaught', ...)` only when that message differs from the previous frame error. A
+COMPLETING frame clears the memo, so the collapse is genuinely consecutive. The
+`finally { requestAnimationFrame(frame) }` re-arm (ADR-0074, `12.5c-4`) is untouched.
+
+**THE REVIEW CHANGED THE DESIGN — read this before any future frame/observability slice.**
+The plan shipped a bare unthrottled `pushError`. `reviewer` + `red-team` ran on the PLAN in
+parallel before any code and BOTH rejected it. ADR-0172 D1 accepts the undecayed 16-breadcrumb
+movement cap *explicitly* because "the remaining 48 slots are reserved for the crash records the
+bundle exists to carry". A bare call is a 60 Hz producer into that same 64-slot ring — MEASURED
+100% of the ring in ~1.07 s, after which a genuine pre-crash record is provably gone. That would
+have made the F9 bundle STRICTLY WORSE than console-only whenever the frame throw is a symptom
+rather than the root cause.
+
+FIVE THINGS THE NEXT SLICE SHOULD KNOW:
+1. **`ErrorSource` was transcribed TWICE** — the definition (`ui/errorRing.ts:14`) and, until this
+   slice, inline in `pushError`'s signature. A new source variant needs BOTH, one of them outside
+   any main.ts-scoped slice's touches. This slice removed the duplication (boyscout).
+2. **`normalizeError` is NOT total despite its docstring.** `errorRing.ts:33-34` reads
+   `raw.message` and `:44` reads `message.length` OUTSIDE its own guard; an Error whose `message`
+   is undefined/null/a Symbol, a revoked Proxy, or a throwing getter all throw. Every caller
+   except the frame catch is shielded by `pushError`'s try/catch. Registered as
+   `R-17r-f-B1-NORMALIZE-TOTAL`; the class fix belongs in `errorRing.ts` (outside touches).
+3. **A forward-slicing source pin leaves its PREFIX unexamined.** The first artifact's tooth
+   sliced forward from the frame log, so `if (document.getElementById('app') !== null) return;`
+   above it was MEASURED passing all 209 tests while making the feature a browser no-op. Any
+   region pin anchored mid-block must fence BOTH sides. The runtime tier could not see it because
+   the harness boots without `#app` (`R-17r-f-B1-HARNESS-NOAPP`).
+4. **`client/src/main.ts` sits ~200 chars from the comment-mass collapse guard** (`stripped >
+   raw/2`, ~9 sites). Exceeding it reds ~30 unrelated whole-file teeth at once with a misleading
+   "block-comment strip ate the file" message. This slice IMPROVED the margin (~171 -> 240) by
+   moving its rationale into the ADR. Budget ~2 comment lines per hunk in this file.
+5. **`git checkout -- <file>` inside a mutant loop destroys UNCOMMITTED impl work** — it bit twice
+   this run (the comment trim, then the whole S1/S2/S3 hunk, silently contaminating 4 register
+   rows). Commit before every mutation register.
+
+ORCHESTRATION: `planner` (opus); `reviewer` + `red-team` on the PLAN **in parallel before any
+code** — both found design-changing defects; a separate `tester` (opus) wrote all the teeth
+(**blocked from executing by the `guard-tester-bash.mjs` hook**, so its mutant register was
+DERIVED — the orchestrator measured it instead); `verifier` (opus) APPROVEd after an independent
+weakening audit + 6 mutants of its own choosing; artifact-tier `red-team` found the S1 blocker.
+`desync-guard`/`reducer-security-auditor` NOT spawned (zero server-module/game-core/prediction
+diff — rb-51/52/53 precedent). `doc-keeper` NOT spawned: the orchestrator wrote the ADR amendment
+and the one-clause ARCHITECTURE edit directly, to stay near the slice budget. Disclosed in the PR.
+
+**18 mutants, 18 CAUGHT.** FIVE survived the first artifact and forced a second round: the S1
+prefix bypass (2 shapes), the ever-seen-vs-consecutive pair (adding AND removing the reset both
+survived 209 tests), and an object-identity dedupe that survived all four runtime arms because
+B1b re-threw ONE Error instance.
+
+RESIDUALS REGISTERED (all -> backlog): `R-17r-f-B1-NORMALIZE-TOTAL` (read this one),
+`R-17r-f-B1-DEDUPE-BOUND` (the 1-deep memo is NOT a cap — 7 rotating `a11yCopy` keys fill 64/64,
+and that throw is the amendment's own motivating example), `R-17r-f-B1-MSG-COLLAPSE`,
+`R-17r-f-B1-HARNESS-NOAPP`.
+
+touches-delta: `client/src/main.frameErrorWiring.test.ts` (sibling test file),
+`docs/adr/0130-client-observability.md` (amendment appended, DIGEST byte-unchanged, no new number
+reserved), `ARCHITECTURE.md:1314`. No hidden dependency touched.
+boyscout-delta: `main.ts:101,~909` — `pushError(source: ErrorSource)` replaces an inline union
+transcription. 2 lines, 1 hunk.
+
+**MASTER NIGHTLY IS RED, unrelated and pre-existing:** `changelog-freshness` (explicitly
+out-of-scope per 17r spec section 5 — the nightly job + ADR-0203 own that class) and `a11y-e2e`
+(`read ECONNRESET`, infra flake). The required `CI` workflow is green on master.
+
+NEXT TICK (supervisor): poll PR 437; `mr-gates verify --slice 17r-f` FROM the worktree; `mr-audit`;
+squash-merge as ONE Conventional Commit; `mr-gates residuals close --slice 17r-f --pr 437`;
+promote the four backlog residuals; **re-index codegraph + cbm on the MAIN checkout post-merge**
+(deliberately NOT done here — the main checkout is still at master and worktrees must never be
+indexed).
+
+---
+
+
+## 2026-09-05T~19:5xZ — 18r-c PR#99 OPEN (harness) — M20 OBS-48 reworded to require-justification; ledger 2/2 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local gate green.** PR https://github.com/mdrewt/claude-harness/pull/99
+(branch `slice/18r-c`, worktree `.claude/worktrees/18r-c`, rebased onto origin/main@98d6083, HEAD
+`3700fac`, 1 commit, pushed). MERGEABLE/CLEAN. **No remote CI on this repo** — `gh pr checks` reports
+none, so "PR open + local gate green" IS terminal. `gh pr merge` NOT run.
+
+WHAT SHIPPED — spec-text ONLY, **+17/-5 across exactly the ONE declared `touches:` file**
+(`specs/monster-realm-v2/M20-observability-performance.spec.md`), **zero touches-delta**, **no new ADR**
+(supervisor assigned `None`; ADR-0180's 2026-09-03 amendment is the record and is not the harness's to
+mint). 3 hunks: (1) OBS-48 rewritten from the blanket forbid into a single EARS require-justification
+criterion mirroring ADR-0180:1109-1111 verbatim (five entry properties + "An unjustified use still fails
+CI."), citing issue #342 and the `17r-c` amendment, preserving D14's verdict as the standing DEFAULT and
+the outbound-HTTP falsifier deferral; (2) boyscout `:5` header amendment-date list; (3) boyscout `:266`
+D14 forward pointer made specific — deliberately a POINTER, not a second restatement (one lens argued to
+skip it for drift risk, the other that a reader stopping at D14 gets a materially wrong picture).
+
+LEDGER: **2/2 met, 0 deferred, 0 unmet** — `Acceptance: 2/2 met, 0 deferred, 0 unmet — 18r-c
+seed:b5c2e7c93cee229c` (seed unchanged, no SEED-DRIFT, no criterion deleted). Gate probe lives at
+`memory/projects/gates/18r-c.spec-amend-probe.mjs` (gitignored dir, 17r-d precedent — hence zero
+touches-delta). Both CHECKs are absolute-path and cwd-independent and keep working post-merge (resolver
+order: slice worktree -> cwd -> main checkout).
+
+>>> SUPERVISOR ACTION NEEDED, NOT A 18r-c REGRESSION: `mr-selfcheck` printed **SELFCHECK-OK** at
+implementation time and then flipped to `SELFCHECK-FAIL residual-unpromoted` **mid-session by the clock**.
+The 6 offenders are the entire `R-m23-s8-postmerge*` cluster (`-border`/`-fallback`/`-tint`/`-title`/
+`-tsdup`), all aged **exactly 3.0d** — the same cluster the 10:00Z tick recorded at 2.96d. They crossed
+`t1=3d` while this slice ran. 18r-c's own residuals are 0.0d and are definitionally excluded from a
+"past t1=3d" check, and `mr-selfcheck` reads global supervisor state, not the branch — the result is
+identical with or without this diff. NOT fixed here on purpose: promoting residuals is supervisor-only
+work explicitly outside any slice's `touches:`. Needs a promote pass. <<<
+
+GATE: `just ci` (worktree) CI-EXIT=0 — run as the cheap script-lint regression check, NOT as the gate
+(harness `just ci` only runs `scripts/tests/*` and lints `scripts/`, so it cannot fail on a spec-only
+slice). No `mr-*` tool touched or added, so no extra `--selftest` owed.
+
+PROOF-OF-TEETH: RED-first proven by REAL EXECUTION before implementing (B1 failed 4 assertions, B2 failed
+9, matching the tester's independently predicted ids). `--gate teeth` runs the full set against the
+pre-fix `origin/main` text and asserts it FAILS, then **13 in-memory mutants**, each required to fail a
+SPECIFICALLY NAMED assertion id. The forbid detector was **redesigned twice** under adversarial review: a
+verb-denylist regex had zero false positives but red-team reinstated a full-strength forbid FIVE ways that
+all evaded it. Landed design segments the doc on markdown block boundaries (list items, headings, ordered
+items, TABLE ROWS, blockquotes) and flags any segment containing a forbid clause anywhere AND a target
+token anywhere — no sentence windowing, no verb allowlist. The one benign hit (pre-existing
+`**m20e — evals tail**` segment) is allow-listed by fingerprint with EQUALITY BOTH WAYS.
+
+RESIDUALS REGISTERED (2, both -> backlog): **R-18r-c-B2** (`M-stdb-2x-module-sdk.spec.md:207-213` still
+calls it "M20 OBS-48's prohibition" and frames the #342 re-adjudication as pending — confirmed the ONLY
+remaining stale reference outside M20) and **R-18r-c-B1** (M20's header amendment-date list is now true
+but still non-exhaustive: ADR-0180 also has 2026-08-09 x3 and 2026-08-21 amendments). A THIRD disclosed
+residual could NOT be registered: the ruling date is inconsistent corpus-wide (ADR-0180 says 2026-08-28;
+`security-threat-model.md:62` and `PLAN.md:796` say 2026-08-23) — this slice SIDESTEPPED it by omitting
+the date from OBS-48 rather than importing one version. **Tool limitation worth fixing:** `mr-gates
+residuals add` keys ids on (slice, gate), so a slice cannot register more residuals than it has gates.
+No `DEFER:` lines.
+
+LENSES: planner · plan reviewer + plan red-team + `/simplify` · tester (authored the probe RED-first, TWO
+adversarial hardening rounds; never touched `specs/` — its Bash guard cannot execute outside the worktree,
+so the orchestrator ran every measurement) · impl reviewer (no blockers, no majors) · impl red-team (3
+gate bypasses verified by construction, all closed and mutant-proofed as M11/M12/M13) · **verifier PASS**
+(re-ran every gate independently; confirmed `EXPECTED_OBS48_BLOCK` is a hardcoded literal, not derived
+from the file under test — the tautology check) · doc-keeper. `reducer-security-auditor`/`desync-guard`
+NOT run: no server-module, game-core, wasm-bindgen, client or netcode surface.
+Plan memo + probe: `memory/projects/gates/18r-c.plan.md`, `.../18r-c.spec-amend-probe.mjs`.
+
+NEXT TICK: `mr-gates verify --slice 18r-c`, squash-merge PR#99, delete branch + worktree
+`.claude/worktrees/18r-c`. Then run the residual promote pass that `mr-selfcheck` is alarming on.
+
 ## 2026-09-05T~14:2xZ — rb-53 PR#436 OPEN — PRV1-11/12/13 live export transport: `my_export_bundle` joins the subscribe array, assembles on the batch edge, ships as a downloadable file (ADR-0231 Amendment A3, closes R-m22-s8-X11); local `just ci` GREEN (CI-EXIT=0); ledger 1/1 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
 **TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
 PR https://github.com/mdrewt/monster-realm/pull/436 (branch `feat/rb-53-export-transport`,
