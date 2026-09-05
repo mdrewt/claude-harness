@@ -3194,6 +3194,65 @@ with `touches:` = `client/src/ui/focusTrap.ts`, `battleView.ts`, `boxView.ts`, `
 `evolutionView.ts` — it is the same defect family and the five files are disjoint from `overlayA11y.ts`.
 Keep any `overlayA11y.ts` edit line-count neutral if that file is ever re-opened.
 
+## 2026-09-05T09:5xZ — 17r-d complete (PR open, verifier PASS)
+
+M23 spec amended to match shipped code per **ADR-0206 Amendment A1** (the ADR's own *Ripples*
+paragraph delegated this edit to the harness side; it was tracked nowhere). Four sites in
+`specs/monster-realm-v2/M23-accessibility.spec.md`: §2.3's compatibility claim (which A1's Root-cause
+paragraph names FALSE verbatim), §2.3's accepted-behaviour-change sentence, §8 item 4
+(`[DEFAULTS…]` → `[OVERTURNED by ADR-0206 Amendment A1, does not block]`), and A11Y-19.
+
+**Three plan-phase lenses forced four corrections before a line was written**, each verified against
+source, not accepted on assertion: (1) "restores toggle-close for all twelve" was an over-claim —
+`canOpen` denies over any visible `GUARD_ONLY` blocker *before* self-visibility matters
+(`overlayRegistry.ts:305-336`), and `dialogueView` is `GUARD_ONLY` and renders unconditionally, so
+box+dialogue+`B` does nothing; (2) "after clicking a button" was false as evidence — all three cited
+merged tests are keyboard-only; (3) **the naive A11Y-19 rewrite silently dropped an invariant** — the
+original "SHALL NOT open **or toggle** any overlay" also banned an unrelated hotkey force-*closing*
+the open overlay (`main.ts:1159` "modals are GUARDED, NEVER DISMISSED"); both `SHALL NOT` halves are
+retained, so the criterion is now strictly stronger than before on the close side and correctly
+narrowed on the open side; (4) the `closeOverlayA11y` clause was dropped rather than restated — all 16
+call sites pass `fallbackFocus = null`, so the canvas branch is dead; the real return is the
+frame-loop close edge (ADR-0206 **D4**, `main.ts:2802`), cited instead. Two further prose falsehoods
+were caught by the implementation lenses and fixed ("subject only to the registry verdict" ignored
+`sessionGateBlocks()`/`e.repeat`; the focus-return read as unconditional).
+
+**Gate:** `memory/projects/mr-selfcheck` + harness `just ci` exit 0 + `mr-gates check` **2/2 met**.
+Acceptance proven by `memory/projects/gates/17r-d.spec-amend-probe.mjs` (gitignored dir, rb-6/rb-7
+precedent — never lands in the repo tree), authored by a `tester`, never by the implementer.
+**The `verifier` FAILED it twice on gate robustness and both holes were closed** — see the progress
+memo for the three rounds; the short version is that a doc gate built on token presence, then on
+substring pins, is defeatable by vocabulary-correct prose, and the fix is whitespace-collapsed
+**equality** against hardcoded literals plus a structural anchor→end-of-region tail pin. `teeth` now
+runs six mutants of the live text and asserts each FAILS.
+
+**touches-delta:** `memory/projects/monster-realm-17r-d-progress.md` (mandated park/progress memo),
+`memory/projects/monster-realm-handoff.md` (this entry). No `boyscout-delta:` — a dense,
+heavily cross-referenced spec; every candidate was either not stale or a different disjunct.
+No ADR authored (supervisor assigned `None`; this slice cites an existing ADR, it does not create one).
+`CHANGELOG.md` untouched — git-cliff generates it from the squash commit.
+
+**FIVE RESIDUALS FILED (unpromoted, target backlog):** `R-17r-d-B2` (no A11Y-* id asserts the
+self toggle-close SUCCESS half post-A1 — only unit-tier `S5T-GATE-SAMEKEY-CLOSE`),
+`R-17r-d-B2-E2EWEAK` (`e2e/pvp.spec.ts:115-138`, A11Y-19's nominal [E2E] oracle, never asserts the box
+is still open — a force-close bug passes it), `R-17r-d-B2-A11Y16DEAD` (A11Y-16 is proven only by
+`overlayA11y.test.ts:264` calling `closeOverlayA11y` with a synthetic non-null `fallbackFocus`; all 16
+production sites pass `null`), `R-17r-d-B2-A1BDRIFT` (Amendment A1b is unreflected in M23),
+`R-17r-d-B2-GATESCOPE` (accepted limitation: the probe cannot see a contradiction inserted earlier in
+§2.3 without pinning the whole section).
+
+**SUPERVISOR ACTION — not a 17r-d defect.** `mr-selfcheck` flipped to
+`SELFCHECK-FAIL residual-unpromoted: R-m22-s8-X9/X10/X11` during this session (it printed
+`SELFCHECK-OK` at slice start and aged past `t1=3d`). All three are `source_slice: m22-s8`,
+`owner: supervisor`, `target: backlog`, `promoted_slice: null` — the promote step stalled.
+Promoting them is supervisor-only work outside any slice's `touches:`. Independently confirmed by the
+`verifier`. Harness `just ci` is green; the repo CI is not red.
+
+**Code-graph refresh deliberately skipped:** `main` is unchanged (nothing merged yet) and indexing the
+ephemeral worktree path is forbidden. No project code was touched, so no re-index is owed.
+
+## 2026-09-05T10:08:53Z — 17r-d merged (PR#97) — 08:00Z tick + 17r-d/17r-e catch-up state reconciled
+Native tick mr-sup-native-20260905T100009Z-1330027 (10:00Z, cron). Gate-0: 17r-d lock showed leader 1012259 dead + .done, PR#97 open MERGEABLE/CLEAN, harness ledger 2/2 met. IMPORTANT FINDING FIRST: project master was CI-RED on the tick's own live check (e2e job on 1d8d2dd, the 17r-e merge commit) — quest_001/elder_oak dialogue precondition timed out in wallet-balance.spec.ts. Diffed 1d8d2dd: touches only overlayA11y.ts comments + playtest-report.eval.mjs + ARCHITECTURE.md, zero overlap with dialogue/quest/npc code — concluded e2e flake, not a regression, and triggered gh run rerun --failed rather than reverting. Did not sit blocking on the rerun (still in_progress at tick end); this is the tick's open risk, not yet closed green. Proceeded with 17r-d (separate harness-repo CI universe, unaffected): mr-gates verify CLEAN (2/2), mr-audit CLEAN across orchestration/gating/acceptance (fixed my own --repo argument, which needs a filesystem path not a repo name), read the M23-accessibility.spec.md diff directly (small, matches its stated ADR-0206 Amendment A1 scope) — squash-merged PR#97 (be454a1), deleted branch+worktree. Harness main was REPO-OUT-OF-SYNC (local 592e145 behind origin's own be454a1 merge, plus 4 files of uncommitted supervisor state — handoff/mr-state/usage-daily/handoff-archive plus 3 untracked 17r-e gate-runner/plan files — left over from the 08:00Z/09:20Z/09:36Z/09:43Z ticks that were never committed, same recurring catch-up pattern as prior ticks e.g. 13:00Z 2026-09-04): stashed the uncommitted supervisor state, ff-only merged to be454a1, popped the stash, resolved one real conflict in monster-realm-handoff.md (the stashed side contributed nothing at that hunk — pure context-overlap artifact, no data lost), committed (43eacf8) and pushed. Also caught and fixed two mr-state.json staleness bugs while reconciling: adr_next_free was 238 (stale; DIGEST.md's own measured next-free is 0239, rb-48 already took 0238) and inflight[] still listed 17r-d as running after its merge — both corrected. Ledger: LAUNCHED/FINISHED rows for 17r-d pre-existed; I mistakenly wrote a MERGED row with an explicit --cost that duplicated the FINISHED row's 4.0109 — caught it immediately and appended a CORRECTION(-24.01) reversal per ADR-0011 (never edit, append the negation). Governor NORMAL (d7=$632.59/$2783 eff., fable_d7=$421.67/$2298, fable_ok=true). No new launch this tick (merge was the one mutating action; fan-out/next-pick deferred to next tick given the still-open master-CI-rerun risk). NEXT TICK: FIRST re-verify the monster-realm e2e rerun on 1d8d2dd live (gh run view 33958737688) — if green, this was confirmed flake, close the loop in handoff; if it fails again on the SAME quest_001/elder_oak symptom, escalate per the 18r-a 2026-09-04T16:18:27Z precedent (stop treating as flake, investigate for real regression/CI-infra issue, do not rerun a third time blindly). No BLOCKERs raised. No rate-limit event.
 ## 2026-09-05T09:43:45Z — 17r-e merged: overlayA11y/evals comment-truth micro-sweep
 PR#431 (mdrewt/monster-realm) squash-merged to master@1d8d2dd. Retracted false 'share ONE root' claim in client/src/ui/overlayA11y.ts:51-54 (each view has its own root; pinned by S4-CROSS-VIEW-DISTINCT-ROOTS). Dropped 5 stale EXPECTED-RED qualifiers from evals/playtest-report.eval.mjs now that the identity-contract tightening has landed. Comment/detail-string only, zero behavior change. Gates 6/7 met, B1 (2 .ron comment falsehoods, content-hash coupled) DEFERRED to backlog as R-17r-e-B1 + a related R-17r-e-UPDATEFLAG residual (content-version.eval.mjs advertises an unimplemented --update flag) — both status:unpromoted, target:backlog. E6 (full just ci) hit a re-verify timeout in mr-gates verify; adjudicated as met on the strength of the live PR's own green ci+e2e checks. Worktree/branch cleaned, master CI green post-merge. 17r-d remains in-flight (leader 1012259, live).
 ## 2026-09-05T09:20:48Z — 17r-e — CI-watch delegated (PR#431)
@@ -3297,70 +3356,5 @@ NEXT TICK: on mr-ci-watch's event, if e2e now green: cd worktree, `mr-gates veri
 Native tick mr-sup-native-20260904T150010Z-3561512 (15:00Z, cron). Gate-0: no live locks/mutex, HOLD-NONE queued_events=0. Verified live: rb-42 (#423) and rb-43 (#424) already merged prior ticks (12:41Z/10:16Z) — the stale handoff top entry claiming rb-42 'OPEN' predates its own merge; git log/gh confirm MERGED, master CI green (e630386). mr-gates residuals list: 43 open rows, none unpromoted past t1=3d (oldest unpromoted ~2.98d), none past t2=14d — no promote action this tick. queue[] empty. Fell through to full PLAN §9 derivation (rb-* eval-tooling chain genuinely dry per operator directive): next unbuilt, unblocked milestone is M-postgate-eighteenth-review-residuals (18r-a/b/c, spec dated 2026-09-04, zero commits). mr-disjoint SAFE + no shared axis for {18r-a, 18r-b} -> launched both (N=2 default fan-out, both project-repo/mdrewt-monster-realm, opus@high, routine tier). 18r-a: privacyModel.ts busy-guard silently spends an armed delete confirmation on a no-op in-flight path (MED state-machine bug, client/src/ui/privacyModel.ts+test). 18r-b: 4-site citation/pointer drift sweep (ADR-0231 main.ts cite, mr_load_driver.rs on_disconnect cite, ARCHITECTURE.md stale ADR-next-free pointer, AGENTS.md pin-count miscount) — doc/comment-only. 18r-c (harness-repo M20 spec OBS-48 reword per issue #342) NOT launched this tick — different repo, deferred to next fast-path pick. NEXT: watch 18r-a/18r-b to completion, audit+merge each, then launch 18r-c.
 ## 2026-09-04T14:03:52Z — 14:00Z tick — rb-44 moot, resolved not built (PR#92)
 Native tick mr-sup-native-20260904T140010Z-3547983 (14:00Z, cron). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE queued_events=0, no active-session collision (no writes <6min either repo beyond wrapper/codegraph, no growing resident claude pid). Both repos fetched clean and in sync (harness main a8e28f7, proj master e630386); only untracked proj .codegraph/ (left alone). No open PRs either repo, no wip/parked branches, master+nightly CI green. Gate-3: mr-gates residuals list --unclaimed showed 37 open, oldest 2.94d -- under t1_promote_days=3, so residual aging did not outrank the queue fast path. queue[] held one entry: rb-44 (R-rb-34-X5, promoted by the 13:00Z tick). Re-verifying it live (per the fast-path rule) turned up a real finding instead of a launch: rb-44's own DEFER text said BLOCKED ON S3b / FOLD into the slice landing R-m22-s3-X13, do NOT queue separately -- but the SAME prior tick had already dispositioned R-m22-s3-X13 itself as wontfix/resolved-not-declined (13:02:29Z), citing that m22-s3b (PR#408) delivered the whole S3b cascade before rb-44 was ever promoted (13:03:02Z). Read the shipped code directly: ranking.rs:260-276 (player_with_deleted_name/profile_with_deleted_name) already write game_core::TOMBSTONE_DISPLAY_NAME by symbol through owning-module helpers taking no name parameter -- exactly X5's requirement -- and ranking_tests.rs's PRV1-6c/m22s3b_* suite (~L2317-2600) already executes the required per-table value-equality + never-delete + wrong-tombstone-name + split-binding pins; anonymize_display_names never calls tombstoned_profile so the second-writer collision X5 guarded against never materialized (S3b built fully separate helpers). Concluded rb-44 was moot before the prior tick ever queued it -- a case of the promote step firing on an already-superseded residual. Closed via mr-gates residuals close --slice rb-44 --force --reason (no ledger existed to prove delivery since nothing was ever built, so --force was the honest escape, same pattern as the 2026-09-01 rb-27 precedent). queue-removed rb-44 (queue[] now empty). Annotated the spec section RESOLVED inline (hygiene, same as the rb-33 09-01 06:00Z precedent) and shipped as doc-only chore PR mdrewt/claude-harness#92 (chore/rb-44-resolved-20260904T140010Z); verified mergeStateStatus=CLEAN/mergeable=MERGEABLE (no branch protection, no CI checks configured for this doc-only path), merged directly with gh pr merge --squash --delete-branch (mergedAt 14:03:24Z), ff'd main to c1edce6, deleted the stale local tracking branch (expected under squash-merge). This was the tick's one mutating action (correcting a stale queue entry after reading the actual shipped source, matching the doctrine's 'invalid -> queue-remove and fall through' rule except the invalidity was only discoverable by reading code, not the mechanical spec-heading/blocked checks). No slice launched or built this tick. Governor NORMAL (d7=$259.79/2783 eff., fable_d7=$172.86/2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down after this single action; next tick falls through to full PLAN Sec.9 derivation since queue[] is empty and no residual is past t1_promote_days=3.
-## 2026-09-04T13:04:51Z — 13:00Z tick — catch-up commit + 8 stale m22-s3 residuals wontfix'd + promoted rb-44
-Native tick mr-sup-native-20260904T130012Z-3534192 (13:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no active-session collision (only .codegraph daemon writes in last 6min). Found the 12:44Z tick's own merge-record (handoff+archive+mr-state.json+untracked rb-43 plan memo) written but never committed to the harness repo -- same recurring catch-up pattern as prior ticks; committed it (04d93de). Verified live: project master e630386 == origin, CI green (rb-43 fix run + prior all success), zero open PRs either repo, mr-state inflight/awaiting_merge empty. Gate 3: mr-gates residuals list --unclaimed showed 46 open, 8 past t1_promote_days=3 (R-m22-s3-X11..X18, disclosed 2026-09-01T09:18:43Z, age 3.15d). Investigated rather than blind-promoting: PR#408 (m22-s3b, merged prior to this session) explicitly states its body delivered 'residuals R-m22-s3-X11..X16+X18 built here; X17 re-homed as this ledger's X18 DEFER' -- verified live in server-module/src that resolve_all_live_interactions (lib.rs:244), erase_character_rows (lib.rs:257), anonymize_display_names (ranking.rs:286), anonymize_battles+disarm_pvp_deadlines (battle.rs/pvp.rs), terminal_at_ms stamping (accounts.rs:373), and PRV1-8(b) fresh-arm (accounts.rs:556-562) all exist and are tested (battle_tests.rs:6156 PRV1-19). All 8 dispositioned wontfix (only legal non-open disposition; reason records 'resolved-not-declined, delivered by PR#408' since promoted_slice was never set so 'close --slice' can't match) -- these were stale residuals, not fix-later debt. Next-oldest was R-rb-34-X5 (age 3.02d): read its full DEFER text (gates/rb-34.gates.md X5) -- unlike the m22-s3 batch this is a genuinely OPEN name-write value-provenance gap (ranking.rs second-writer pin + per-table value-equality tests + literal-forgery battery + crate-wide naming census), not resolved by s3b's plain existence. Promoted -> rb-44 in M-residual-backlog.spec.md, queued via mr-record queue-add. Shipped as doc-only chore PR mdrewt/claude-harness#91 (chore/residual-promote-20260904T130410Z), squash-merged (a67fbc2). Harness main was REPO-OUT-OF-SYNC on merge (local had the 04d93de catch-up commit predating PR#91's merge base); reconciled with a non-conflicting git merge (docs-only, no code overlap, 1dec6f0) and pushed. No slice launched this tick (promote+doc-PR was the one mutating action; residual-aging rule outranks queue/PLAN-derivation, so this correctly did not fall through). Governor NORMAL (d7=$258.28/$2783 eff., fable_d7=$172.86/$2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down after this single action; next tick's fast path re-verifies rb-44 live and launches it.
 ## 2026-09-04T12:42:26Z — rb-43 merged (PR#424) — ADR next-free single-sourced into DIGEST.md
 PR#424 squash-merged e630386 (from 7bb551f). rb-43 fixed the promoted residual R-rb-26-X11-adr-readme-next-free: docs/adr/README.md's hand-maintained 'Next free number' line (51 stale) is retired; scripts/adr-digest.mjs now derives it (max(id)+1, zero-padded) and renders it into the already drift-gated docs/adr/DIGEST.md. ARCHITECTURE.md:848 repointed at DIGEST.md for the next-free claim; docs/adr/0060's pointer to README is kept true by README's replacement wording. ADR-0104 amended in-place (no new ADR minted, no header field added — self-amendment). mr-audit orchestration verdict CLEAN (no mandatory read, routine tier). Acceptance ledger reported FLAGGED (X10/X11 EVIDENCE-MISMATCH) — adjudicated: both are a citation-path resolver artifact (gates file cited the full projects/monster-realm/.claude/worktrees/rb-43/... path while mr-gates already resolves from that cwd, producing a double-nested lookup); manually confirmed both citations resolve at the correct path and match their claims verbatim. 11/11 gates met. Residual closed via mr-gates residuals close --slice rb-43 --pr 424. Master CI queued on e630386 at merge time (doc/tooling-only diff, low risk) — next tick re-verifies live.
-## 2026-09-04T12:23:59Z — Native tick mr-sup-native-20260904T122330Z-3488264 (12:23Z) — rb-43 CI-watch delegated
-rb-43 run finished (rc=0, attempts=1, opus, $54.99 recorded via reconcile row). PR #424 open: 11/11 gates met per ledger, mergeStateStatus=UNSTABLE, checks ci+e2e IN_PROGRESS. Delegated to mr-ci-watch (detached, setsid) for resume via event tick — supervisor owns the merge, never sat polling CI. Governor NORMAL (d7=$257.01/$2783 weekly). No launch this tick (pending merge takes priority).
-## 2026-09-04T10:19:36Z — rb-43 launched (composite after rb-42 merge)
-Composite launch per doctrine: re-derived eligibility fresh after rb-42's merge completed fully (worktree/branch cleaned, ledger+handoff+state recorded), re-ran the active-session probe (no resident IDE pid, no third-party writes in last 6 min — the only recent writes were my own rb-42 recording). queue[] fast-path: rb-43 (X11-adr-readme-next-free, source rb-26) re-verified live -- spec heading present, not blocked, no existing PR/branch -- launched opus@high/routine, queue entry removed. Target: prove docs/adr/README.md's stale hand-maintained next-free-ADR-number line via an ordinary Rust/TS test (ADR-0224, no new eval script).
-
-
-
-## 2026-09-05T09:5xZ — 17r-d complete (PR open, verifier PASS)
-
-M23 spec amended to match shipped code per **ADR-0206 Amendment A1** (the ADR's own *Ripples*
-paragraph delegated this edit to the harness side; it was tracked nowhere). Four sites in
-`specs/monster-realm-v2/M23-accessibility.spec.md`: §2.3's compatibility claim (which A1's Root-cause
-paragraph names FALSE verbatim), §2.3's accepted-behaviour-change sentence, §8 item 4
-(`[DEFAULTS…]` → `[OVERTURNED by ADR-0206 Amendment A1, does not block]`), and A11Y-19.
-
-**Three plan-phase lenses forced four corrections before a line was written**, each verified against
-source, not accepted on assertion: (1) "restores toggle-close for all twelve" was an over-claim —
-`canOpen` denies over any visible `GUARD_ONLY` blocker *before* self-visibility matters
-(`overlayRegistry.ts:305-336`), and `dialogueView` is `GUARD_ONLY` and renders unconditionally, so
-box+dialogue+`B` does nothing; (2) "after clicking a button" was false as evidence — all three cited
-merged tests are keyboard-only; (3) **the naive A11Y-19 rewrite silently dropped an invariant** — the
-original "SHALL NOT open **or toggle** any overlay" also banned an unrelated hotkey force-*closing*
-the open overlay (`main.ts:1159` "modals are GUARDED, NEVER DISMISSED"); both `SHALL NOT` halves are
-retained, so the criterion is now strictly stronger than before on the close side and correctly
-narrowed on the open side; (4) the `closeOverlayA11y` clause was dropped rather than restated — all 16
-call sites pass `fallbackFocus = null`, so the canvas branch is dead; the real return is the
-frame-loop close edge (ADR-0206 **D4**, `main.ts:2802`), cited instead. Two further prose falsehoods
-were caught by the implementation lenses and fixed ("subject only to the registry verdict" ignored
-`sessionGateBlocks()`/`e.repeat`; the focus-return read as unconditional).
-
-**Gate:** `memory/projects/mr-selfcheck` + harness `just ci` exit 0 + `mr-gates check` **2/2 met**.
-Acceptance proven by `memory/projects/gates/17r-d.spec-amend-probe.mjs` (gitignored dir, rb-6/rb-7
-precedent — never lands in the repo tree), authored by a `tester`, never by the implementer.
-**The `verifier` FAILED it twice on gate robustness and both holes were closed** — see the progress
-memo for the three rounds; the short version is that a doc gate built on token presence, then on
-substring pins, is defeatable by vocabulary-correct prose, and the fix is whitespace-collapsed
-**equality** against hardcoded literals plus a structural anchor→end-of-region tail pin. `teeth` now
-runs six mutants of the live text and asserts each FAILS.
-
-**touches-delta:** `memory/projects/monster-realm-17r-d-progress.md` (mandated park/progress memo),
-`memory/projects/monster-realm-handoff.md` (this entry). No `boyscout-delta:` — a dense,
-heavily cross-referenced spec; every candidate was either not stale or a different disjunct.
-No ADR authored (supervisor assigned `None`; this slice cites an existing ADR, it does not create one).
-`CHANGELOG.md` untouched — git-cliff generates it from the squash commit.
-
-**FIVE RESIDUALS FILED (unpromoted, target backlog):** `R-17r-d-B2` (no A11Y-* id asserts the
-self toggle-close SUCCESS half post-A1 — only unit-tier `S5T-GATE-SAMEKEY-CLOSE`),
-`R-17r-d-B2-E2EWEAK` (`e2e/pvp.spec.ts:115-138`, A11Y-19's nominal [E2E] oracle, never asserts the box
-is still open — a force-close bug passes it), `R-17r-d-B2-A11Y16DEAD` (A11Y-16 is proven only by
-`overlayA11y.test.ts:264` calling `closeOverlayA11y` with a synthetic non-null `fallbackFocus`; all 16
-production sites pass `null`), `R-17r-d-B2-A1BDRIFT` (Amendment A1b is unreflected in M23),
-`R-17r-d-B2-GATESCOPE` (accepted limitation: the probe cannot see a contradiction inserted earlier in
-§2.3 without pinning the whole section).
-
-**SUPERVISOR ACTION — not a 17r-d defect.** `mr-selfcheck` flipped to
-`SELFCHECK-FAIL residual-unpromoted: R-m22-s8-X9/X10/X11` during this session (it printed
-`SELFCHECK-OK` at slice start and aged past `t1=3d`). All three are `source_slice: m22-s8`,
-`owner: supervisor`, `target: backlog`, `promoted_slice: null` — the promote step stalled.
-Promoting them is supervisor-only work outside any slice's `touches:`. Independently confirmed by the
-`verifier`. Harness `just ci` is green; the repo CI is not red.
-
-**Code-graph refresh deliberately skipped:** `main` is unchanged (nothing merged yet) and indexing the
-ephemeral worktree path is forbidden. No project code was touched, so no re-index is owed.
