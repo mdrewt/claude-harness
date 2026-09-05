@@ -3259,3 +3259,60 @@ rb-43 run finished (rc=0, attempts=1, opus, $54.99 recorded via reconcile row). 
 Composite launch per doctrine: re-derived eligibility fresh after rb-42's merge completed fully (worktree/branch cleaned, ledger+handoff+state recorded), re-ran the active-session probe (no resident IDE pid, no third-party writes in last 6 min — the only recent writes were my own rb-42 recording). queue[] fast-path: rb-43 (X11-adr-readme-next-free, source rb-26) re-verified live -- spec heading present, not blocked, no existing PR/branch -- launched opus@high/routine, queue entry removed. Target: prove docs/adr/README.md's stale hand-maintained next-free-ADR-number line via an ordinary Rust/TS test (ADR-0224, no new eval script).
 
 
+
+## 2026-09-05T09:5xZ — 17r-d complete (PR open, verifier PASS)
+
+M23 spec amended to match shipped code per **ADR-0206 Amendment A1** (the ADR's own *Ripples*
+paragraph delegated this edit to the harness side; it was tracked nowhere). Four sites in
+`specs/monster-realm-v2/M23-accessibility.spec.md`: §2.3's compatibility claim (which A1's Root-cause
+paragraph names FALSE verbatim), §2.3's accepted-behaviour-change sentence, §8 item 4
+(`[DEFAULTS…]` → `[OVERTURNED by ADR-0206 Amendment A1, does not block]`), and A11Y-19.
+
+**Three plan-phase lenses forced four corrections before a line was written**, each verified against
+source, not accepted on assertion: (1) "restores toggle-close for all twelve" was an over-claim —
+`canOpen` denies over any visible `GUARD_ONLY` blocker *before* self-visibility matters
+(`overlayRegistry.ts:305-336`), and `dialogueView` is `GUARD_ONLY` and renders unconditionally, so
+box+dialogue+`B` does nothing; (2) "after clicking a button" was false as evidence — all three cited
+merged tests are keyboard-only; (3) **the naive A11Y-19 rewrite silently dropped an invariant** — the
+original "SHALL NOT open **or toggle** any overlay" also banned an unrelated hotkey force-*closing*
+the open overlay (`main.ts:1159` "modals are GUARDED, NEVER DISMISSED"); both `SHALL NOT` halves are
+retained, so the criterion is now strictly stronger than before on the close side and correctly
+narrowed on the open side; (4) the `closeOverlayA11y` clause was dropped rather than restated — all 16
+call sites pass `fallbackFocus = null`, so the canvas branch is dead; the real return is the
+frame-loop close edge (ADR-0206 **D4**, `main.ts:2802`), cited instead. Two further prose falsehoods
+were caught by the implementation lenses and fixed ("subject only to the registry verdict" ignored
+`sessionGateBlocks()`/`e.repeat`; the focus-return read as unconditional).
+
+**Gate:** `memory/projects/mr-selfcheck` + harness `just ci` exit 0 + `mr-gates check` **2/2 met**.
+Acceptance proven by `memory/projects/gates/17r-d.spec-amend-probe.mjs` (gitignored dir, rb-6/rb-7
+precedent — never lands in the repo tree), authored by a `tester`, never by the implementer.
+**The `verifier` FAILED it twice on gate robustness and both holes were closed** — see the progress
+memo for the three rounds; the short version is that a doc gate built on token presence, then on
+substring pins, is defeatable by vocabulary-correct prose, and the fix is whitespace-collapsed
+**equality** against hardcoded literals plus a structural anchor→end-of-region tail pin. `teeth` now
+runs six mutants of the live text and asserts each FAILS.
+
+**touches-delta:** `memory/projects/monster-realm-17r-d-progress.md` (mandated park/progress memo),
+`memory/projects/monster-realm-handoff.md` (this entry). No `boyscout-delta:` — a dense,
+heavily cross-referenced spec; every candidate was either not stale or a different disjunct.
+No ADR authored (supervisor assigned `None`; this slice cites an existing ADR, it does not create one).
+`CHANGELOG.md` untouched — git-cliff generates it from the squash commit.
+
+**FIVE RESIDUALS FILED (unpromoted, target backlog):** `R-17r-d-B2` (no A11Y-* id asserts the
+self toggle-close SUCCESS half post-A1 — only unit-tier `S5T-GATE-SAMEKEY-CLOSE`),
+`R-17r-d-B2-E2EWEAK` (`e2e/pvp.spec.ts:115-138`, A11Y-19's nominal [E2E] oracle, never asserts the box
+is still open — a force-close bug passes it), `R-17r-d-B2-A11Y16DEAD` (A11Y-16 is proven only by
+`overlayA11y.test.ts:264` calling `closeOverlayA11y` with a synthetic non-null `fallbackFocus`; all 16
+production sites pass `null`), `R-17r-d-B2-A1BDRIFT` (Amendment A1b is unreflected in M23),
+`R-17r-d-B2-GATESCOPE` (accepted limitation: the probe cannot see a contradiction inserted earlier in
+§2.3 without pinning the whole section).
+
+**SUPERVISOR ACTION — not a 17r-d defect.** `mr-selfcheck` flipped to
+`SELFCHECK-FAIL residual-unpromoted: R-m22-s8-X9/X10/X11` during this session (it printed
+`SELFCHECK-OK` at slice start and aged past `t1=3d`). All three are `source_slice: m22-s8`,
+`owner: supervisor`, `target: backlog`, `promoted_slice: null` — the promote step stalled.
+Promoting them is supervisor-only work outside any slice's `touches:`. Independently confirmed by the
+`verifier`. Harness `just ci` is green; the repo CI is not red.
+
+**Code-graph refresh deliberately skipped:** `main` is unchanged (nothing merged yet) and indexing the
+ephemeral worktree path is forbidden. No project code was touched, so no re-index is owed.

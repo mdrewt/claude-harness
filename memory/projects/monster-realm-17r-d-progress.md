@@ -76,14 +76,45 @@ No `mr-*` tool touched or added. Acceptance ledger gates B1/B2 are proven by
 `memory/projects/gates/17r-d.spec-amend-probe.mjs` (gitignored dir — never lands in the repo tree),
 written by a **`tester`** agent, not by the implementer.
 
-## Status
+## Status — COMPLETE (PR open, gate green, ledger 2/2)
 
-- [x] Worktree + branch created from `origin/main` (592e145)
-- [x] Plan converged; ledger `CHECK:`/`EXPECT:` filled; `mr-gates lint` → LINT-CLEAN
-- [ ] Probe written (tester, RED against pre-amendment text)
-- [ ] Spec edits applied (green)
-- [ ] Impl lenses + verifier
-- [ ] `mr-selfcheck` + `just ci` + `mr-gates check`
-- [ ] PR open
+- [x] Worktree + branch from `origin/main` (592e145)
+- [x] Plan converged (planner + reviewer + red-team + /simplify); ledger CHECK/EXPECT filled; LINT-CLEAN
+- [x] Probe written by a `tester` (never the implementer) and captured RED: B1 6 fails, B2 7 fails, teeth PASS
+- [x] Four spec edits applied; probe green
+- [x] Implementation lenses (reviewer + red-team) — 2 prose falsehoods found and fixed
+- [x] `verifier` PASS after 3 gate-hardening rounds (it FAILED twice on gate robustness; both closed)
+- [x] `mr-selfcheck`, harness `just ci` exit 0, `mr-gates check` 2/2 met
+- [x] 5 residuals filed to `backlog`
+- [x] PR open
 
-**Exact next step:** spawn the `tester` to author `17r-d.spec-amend-probe.mjs` and capture it RED.
+## Gate hardening — the part worth remembering
+
+The acceptance probe went through three adversarial rounds. Each `FAIL` was a real, demonstrated
+cheat against a *doc* gate, and the fixes generalise:
+
+1. **Token presence is not semantics.** The first probe required the words `cross-overlay OPEN`,
+   `toggle-close` and `exempt` in each region. A sentence saying `toggle-close is NOT exempt`
+   contains all three and passed. Fixed by dropping `is not gated`/`never gated` from the allowed
+   vocabulary (they are lexically indistinguishable from a negation) and adding a polarity guard.
+2. **Substring pins are append-tolerant.** Even with exact-substring pins, appending
+   `… Caveat: treat the exemption as aspirational, not guaranteed runtime behaviour.` to the
+   A11Y-19 line kept every pin matching. Fixed by replacing `includes` with whitespace-collapsed
+   **equality** against hardcoded literals — a criterion line and a claim paragraph are bounded
+   artifacts, so byte-pinning them whole is the right shape for a doc gate.
+3. **Equality on a paragraph does not protect its region.** A contradicting `Addendum:` sentence
+   dropped in *after* the pinned paragraph's blank line but before `### 2.4` still passed. Fixed
+   structurally, not with more keywords: `B2:§2.3:exact-tail` pins anchor→end-of-region, so nothing
+   may follow the claim inside §2.3.
+
+**Accepted limitation (`R-17r-d-B2-GATESCOPE`):** contradicting prose inserted *earlier* in §2.3,
+before the pinned compat-correction block, is undetectable without byte-pinning the whole ~60-line
+section — brittle against every legitimate future edit. Deliberate stop; not chased.
+
+## Not a 17r-d defect: `mr-selfcheck` flipped to FAIL mid-session
+
+`SELFCHECK-FAIL residual-unpromoted: 3 residual(s) unpromoted past t1=3d — R-m22-s8-X9/X10/X11`.
+All three carry `"source_slice": "m22-s8"`, `"owner": "supervisor"`, `"target": "backlog"`,
+`"promoted_slice": null`. It printed `SELFCHECK-OK` earlier in this same session and aged over the
+threshold since. Promoting a `backlog` residual into a spec section is supervisor-only work outside
+this slice's `touches:`. Independently confirmed by the `verifier`. **Supervisor action needed.**
