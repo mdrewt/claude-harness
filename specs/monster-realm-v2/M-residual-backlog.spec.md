@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-50 — [mechanical CI enforcement of PRV1-17/PRV1-20] WHEN a future edit adds a log line naming a (from m22-s7 X8, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s7 · residual: R-m22-s7-X8
+
+Deferred with reason: the spec's named vehicle (evals/account-privacy.eval.mjs seed-set extension) is both outside this slice's declared touches AND retired as a category by ADR-0224. The correct replacement is an in-crate #[test] in server-module/src/accounts_tests.rs asserting the reject-reason constants reachable from the three reducers are &'static str and that the cascade body contains no log call — which requires
+
+EARS: [mechanical CI enforcement of PRV1-17/PRV1-20] WHEN a future edit adds a log line naming a player-authored or pre-tombstone field to any deletion-path reducer THE SYSTEM SHALL fail CI. The property is true today (X6/X7); nothing enforces it mechanically.
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-49 — [PRV1-7 crate-wide enforcement, [DEL-06]] WHEN a reducer writes any manifest-classified ta (from m22-s3b X18, deferred 2026-09-01)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s3b · residual: R-m22-s3b-X18
