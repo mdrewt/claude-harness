@@ -7,7 +7,7 @@
   "sha": "48c32a2"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-05T19:00:08Z",
+ "last_tick_utc": "2026-09-05T22:00:07Z",
  "live_watchers": [],
  "master": {
   "ci": "in_progress",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "20:55Z tick: merged 17r-f (PR#437, squash+delete-branch), local master ff to 9fc5223 (in_progress CI at record time), worktree/branch cleaned. mr-audit CLEAN (orchestration/gating/acceptance 1/1). Next tick: reverify master CI green before further launches; residual backlog stands at 80 open (6 unpromoted past t1) -- unrelated to this slice, pre-existing.",
+ "notes": "22:00Z tick: recovered uncommitted 20:55Z tick record (17r-f/PR#437 merge) and committed+pushed (5796652). Promoted oldest t1-aged residual R-m23-s8-postmerge -> rb-54 via doc-only chore PR#100 (squash-merged, 3e2705d). queue[] now holds rb-54 for next tick fast path. 5 sibling m23-s8-postmerge-* residuals + others remain past t1, deferred to future ticks (one promote/tick). No feature launch this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -35,12 +35,12 @@
  "parked": [],
  "queue": [
   {
-   "slice": "rb-54",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s8-postmerge",
-   "added_utc": "2026-09-05T22:01:36Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "9fc5223"
+   "added_utc": "2026-09-05T22:01:36Z",
+   "derived_from_master_sha": "9fc5223",
+   "reason": "promoted residual R-m23-s8-postmerge",
+   "slice": "rb-54",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -59,6 +59,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260905T205338Z-2170775",
- "updated_utc": "2026-09-05T20:55:32Z"
+ "updated_by": "mr-sup-native-20260905T220007Z-2183467",
+ "updated_utc": "2026-09-05T22:02:50Z"
 }
