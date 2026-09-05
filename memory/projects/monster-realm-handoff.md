@@ -2,6 +2,84 @@
 
 ---
 
+## 2026-09-05T~14:2xZ — rb-53 PR#436 OPEN — PRV1-11/12/13 live export transport: `my_export_bundle` joins the subscribe array, assembles on the batch edge, ships as a downloadable file (ADR-0231 Amendment A3, closes R-m22-s8-X11); local `just ci` GREEN (CI-EXIT=0); ledger 1/1 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/436 (branch `feat/rb-53-export-transport`,
+worktree `.claude/worktrees/rb-53`, forked from origin/master@766ab1c — master CI verified green;
+HEAD `1994eaf`, 5 commits, all pushed). `gh pr merge` NOT run. `ci` + `e2e` both pending at exit.
+
+Ledger: **1/1 met, 0 deferred, 0 unmet** (`seed:2488083c3b488e2d`). **Run `mr-gates verify --slice
+rb-53` FROM the worktree** — the E1 CHECK is `npm --prefix client run test -- --run <8 files>` and
+is cwd-relative. EXPECT is `Tests  823 passed (823)`. A fresh clone needs `cd client && npm ci`
+(with `$HOME/.asdf/shims` FIRST on PATH — a bare `npm ci` picks node 18 and dies EBADENGINE, which
+is how this run lost a cycle) plus `just wasm`.
+
+WHAT LANDED: `'SELECT * FROM my_export_bundle'` in the ONE `.subscribe([...])` array + the mirrored
+`EXPECTED_SUBSCRIPTIONS` line (the sanctioned eval edit, allowlist only, no new clause);
+`conn.db.my_export_bundle` wired as a PK-less **Vec-VIEW** — schedule-only onInsert/onDelete, NO
+onUpdate, whole-set `store.reconcileExportChunksFromView` in the flush closure; `exportChunkRowToStore`
++ `ownExportChunks` (client-side owner filter) in `net/`; `exportBundleFilename` + three VM fields in
+the pure `ui/privacyBanner.ts`; `#privacy-download-btn` + `#privacy-export-status` in `privacyView.ts`;
+and ONE `store.onBatchApplied` listener in `main.ts` holding the sole `assembleExportBundle(` call site
+plus `downloadExportBundle()`.
+
+FIVE DESIGN CALLS THE NEXT PRIVACY SLICE SHOULD KNOW:
+1. **`my_export_bundle` is a Vec-VIEW, not an Option-view.** The repo has TWO precedents for each
+   shape and they point opposite ways. `my_account`/`my_wallet` are single-row Option slots wired
+   per-row with NO onDelete; `my_monster_pub`/`my_battle` are PK-less Vec views rebuilt wholesale
+   from the post-burst SDK cache. The plan originally copied the FIRST pair; the plan-phase reviewer
+   caught it. Any future `Vec`-returning view takes the `reconcile*FromView` route.
+2. **A control whose enablement is driven by INCOMING SERVER DATA must never be `display:none`.**
+   It can flip while focused; focus then falls to `<body>`, outside the overlay root, so
+   `focusTrap`'s capture listener never fires and Tab walks the page behind an `aria-modal` dialog
+   Chromium does not make AT-inert (`overlayRegistry.ts:275-279` records the same hazard for the
+   open-time anchor). happy-dom does NOT blur, so no unit test in `client/**` can observe it — the
+   red-team PoC'd it with a browser-accurate model.
+3. **Do NOT copy `downloadBugBundle`'s catch.** It `console.log`s its whole payload, which is safe
+   only because `KeyStoreSnapshot` is a no-PII allowlist. `evals/client-no-pii-logs.eval.mjs`'s ban
+   list is credential-shaped and would NOT catch an artifact leak.
+4. **`client/tsconfig.json:15` excludes `**/*.test.ts`.** A "required parameter, so a forgotten call
+   site is a typecheck failure" argument is FALSE for anything with spec call sites — there were 28.
+   Optional-with-a-behavioural-tooth is the honest shape.
+5. `mr-gates residuals add` derives the residual id from `--gate`, so four adds with `--gate E1`
+   collapse to ONE and the last three print RESIDUAL-EXISTS. Pass distinct suffixed gate labels
+   (`E1-SUBE2E`, `E1-RETRY`, …) — the existing `R-17r-e-UPDATEFLAG` shape.
+
+ORCHESTRATION: `planner` (opus); `reviewer` + `red-team` on the PLAN **in parallel, before any
+code** — both found design-changing defects (calls 1-4 above plus the object-URL leak on throw and
+three cut ceremony exports); a separate `tester` (opus) wrote all the teeth; `verifier` (opus)
+APPROVEd after an independent weakening audit + its own 17-mutant register. `/tmp/mr_warn_rb-53`
+appeared after the first green increment, so `/simplify` and a second artifact-tier `red-team` were
+folded into the orchestrator's pass; `desync-guard`/`reducer-security-auditor` NOT spawned (zero
+server-module/game-core/prediction diff). Disclosed in the PR body.
+
+**17 mutants, 15 CAUGHT.** M5 was a REAL gap and is now closed: the A3-D8 tooth was a bare
+`includes('finally')` presence needle whose own comment claimed it caught the F9 copy-paste — moving
+`revokeObjectURL` back into the `try` survived all 3111 tests. The needle is now POSITIONAL and M5
+re-measures CAUGHT. M12 is an equivalent mutant (adjudicated, no action).
+
+RESIDUALS REGISTERED: `R-rb-53-E1` (a11y announcement on incomplete->complete), **`R-rb-53-E1-SUBE2E`
+(read this one — nothing in `just ci` proves the subscription literal is subscribable; the red-team
+PoC'd that `my_export_bundel` spelled identically in `connection.ts` AND the eval passes every gate.
+The new `W-RB53-SUBSCRIBE-ROSTER` tooth cross-checks against the generated `tablesSchema` roster and
+catches a misspelling but not a real-but-wrong table; the real net is the cloud `just e2e` job.
+`evals/account-e2e.eval.mjs` is NOT a mitigation — it opens its own subscription and never reads
+`connection.ts`)**, `R-rb-53-E1-RETRY`, `R-rb-53-E1-RETENTION` — all -> backlog.
+
+touches-delta: `docs/adr/0231-*.md` (Amendment A3; DIGEST byte-unchanged), `ARCHITECTURE.md`, and the
+sibling test files. No hidden dependency touched — the three pre-identified STOPs (a new `*View.ts`,
+a static `aria-modal` shell, a `vite.config.ts` coverage.exclude entry) were all avoided.
+boyscout-delta: `privacyView.ts:23-24` (header named the wrong focus anchor) + `ADR-0231:386` (a
+citation that was wrong pre-slice). 3 lines, 2 hunks.
+
+NEXT TICK (supervisor): poll PR 436 `ci` + `e2e`; `mr-gates verify --slice rb-53` FROM the worktree;
+`mr-audit`; squash-merge as ONE Conventional Commit; `mr-gates residuals close --slice rb-53 --pr 436`
+(closes R-m22-s8-X11); promote the four backlog residuals; reconcile ADR/ARCHITECTURE;
+**re-index codegraph + cbm on the MAIN checkout post-merge** (deliberately NOT done here — the main
+checkout is still at master and worktrees must never be indexed).
+
+---
+
 ## 2026-09-05T15:5xZ — rb-52 PR#435 OPEN — PRV1-3/PRV1-4 privacy surface: the 17th overlay wires all three reducers + the distinct terminal notice (ADR-0231 Amendment A2, closes R-m22-s8-X10); local `just ci` GREEN (CI-EXIT=0); ledger 1/1 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
 **TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
 PR https://github.com/mdrewt/monster-realm/pull/435 (branch `feat/rb-52-privacy-surface`,
@@ -3354,6 +3432,8 @@ Promoting them is supervisor-only work outside any slice's `touches:`. Independe
 **Code-graph refresh deliberately skipped:** `main` is unchanged (nothing merged yet) and indexing the
 ephemeral worktree path is forbidden. No project code was touched, so no re-index is owed.
 
+## 2026-09-05T18:38:05Z — 18:37Z tick — rb-53 CI-wait delegated (PR#436)
+rb-53 finished (rc=0, opus, 1 attempt, $60.80). PR #436 opened (feat/rb-53-export-transport), registered 4 residuals (R-rb-53-E1, -E1-SUBE2E, -E1-RETRY, -E1-RETENTION). Local just-ci green; remote ci+e2e still pending (mergeStateStatus=UNSTABLE). Delegated CI-wait to mr-ci-watch 436 rb-53 (detached). Reaped stale rb-53 per-run lock (leader 1733535 dead). Chain mutex taken for this action, left held under this tick's own pid (native-20260905T183700Z-1938503) — releases naturally next tick once this process exits and the heartbeat goes stale. No merge/launch this tick. Governor NORMAL (d7=$875.06/2783 eff., fable_d7=$421.67/2298).
 ## 2026-09-05T17:02:33Z — rb-53 launched (fast-path queue) — 17:02Z
 Native tick mr-sup-native-20260905T170011Z-1731782 (17:00Z, cron). Gate-0: recovered a genuinely uncommitted 16:38Z tick record (rb-52 merge PR#435, residual R-m22-s8-X10 close, mr-state.json/handoff) sitting in the harness working tree with no live lock/pid holding it -- re-verified live (PR#435 MERGED to 766ab1c, master post-merge ci+e2e both SUCCESS via gh) and committed it as ca619e2, plus a stray memory/projects/monster-realm-rb-52-plan.md written by that run. No live per-run locks/chain mutex, no resident IDE session, no unexplained recent writes -- probe clean. Fast path: queue[] held rb-53 (promoted residual R-m22-s8-X11, live transport+download for the privacy export bundle) -- re-verified live: spec section intact in M-residual-backlog.spec.md, not blocked:, no existing PR/branch/worktree for rb-53. Launched (opus/high/routine; touches widened to client/**, evals/monster-privacy.eval.mjs per rb-52's landed note re: EXPECTED_SUBSCRIPTIONS) via mr-spawn -- LAUNCHED, leader=1733535, gates seeded (1 criterion, seed 2488083c3b488e2d). queue-removed rb-53; queue[] now empty. Governor NORMAL (d7=$813.21/$2783 effective, fable_d7=$421.67/$2298, fable_ok=true).
 ## 2026-09-05T16:38:52Z — rb-52 merged (PR#435) — 16:38Z
@@ -3461,6 +3541,3 @@ No merge this tick (nothing awaiting-merge). No BLOCKER raised for the ADR-0224 
 Native tick mr-sup-native-20260904T200003Z-3954028 (20:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE, no live rooted-run pid, no .done/pending events. Both repos in sync (harness main=15ad105->e514024 after this tick's merge; project master=4b4ab4b, .codegraph/ untracked/ignored, no other strays). Probe: no resident IDE claude pid, no non-supervisor writes in either repo in the last 6 min; handoff/ledger mtimes match their last recorded content. Gate 3: mr-gates residuals list --unclaimed surfaced alarm residual-unpromoted past t1=3d, oldest R-m22-s4-X17 (age 3.12d, PRV1-14 export TTL reaper deferred from m22-s4, target slice S4b: a scheduled(...) table is automigration-frozen per ADR-0221 so table+reducer must ship atomically, forcing schema.rs/evals touches out of m22-s4's declared scope). Classified per work-selection-scope: a real feature-slice defect (deferred implementation work), not an eval-script-correctness residual, so it proceeds to promote rather than wontfix-disposition. Promoted via mr-gates residuals promote -> rb-48 in specs/monster-realm-v2/M-residual-backlog.spec.md, queued via mr-record queue-add. Shipped as doc-only chore PR#94 (chore/residual-promote-20260904T200003Z, mdrewt/claude-harness) touching only the spec file + mr-state.json queue[]; squash-merged immediately (no required checks fired), local main fast-forwarded e514024, remote+local branch deleted. No feature-slice launch this tick (the promote is the tick's one action per doctrine; rb-48 launches off the fast path next tick). Governor NORMAL (d7=$321.95/2783, fable_d7=$172.86/2298, fable_ok=true). No merge of project work, no BLOCKER, no rate-limit event. Standing down.
 ## 2026-09-04T19:02:45Z — 19:00Z tick — promoted 3 stale m22-s5 residuals (rb-45/46/47), no launch
 Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no active human session. No inflight/awaiting_merge/parked work; queue[] was empty at gate-0. master CI green (4b4ab4b), remotes match. mr-gates residuals list --unclaimed found 3 past t1_promote_days=3 (age 3.15d): R-m22-s5-X11/X12/X13 (all deferred from m22-s5's PRV1 deletion-gate work — PRV1-7 crate-wide enforcement mechanism, remaining sec4.7 opening reducers in battle.rs/economy.rs, and PRV1-9 confederate role-swap completeness). Classified per the 2026-09-01 work-selection-scope directive: all three are real security/privacy defects (deletion-gated identity commitment races), not eval-tooling-only, so promoted normally (not wontfix'd) -> rb-45, rb-46, rb-47 in M-residual-backlog.spec.md. Queued all three (rb-45 first) for next-tick fast-path launch. Shipped as doc-only chore PR#93 on claude-harness; repo auto-merge unavailable (branch protection not configured for this branch, same gap noted in the rb-43 tick) so merged directly (squash+delete-branch) since mergeStateStatus=CLEAN. Harness main fast-forwarded to 2d3f727. No other action taken this tick.
-## 2026-09-04T18:06:55Z — 18r-b MERGED — PR#427 squash-merged; citation/pointer truth micro-sweep
-TERMINAL: PR https://github.com/mdrewt/monster-realm/pull/427 squash-merged to master (0bbd2e1 -> 4b4ab4b). mr-gates verify: CLEAN, 4/4 met, 0 deferred (seed 158cbbca07b06c66 unchanged, spotcheck X1 agrees). mr-audit: orchestration_audit CLEAN, gating_test_audit CLEAN, mandatory_read=false (routine tier, no policy-mandated read). PR body Acceptance: line matched mr-gates render --format pr byte-for-byte. Worktree .claude/worktrees/18r-b removed, branch feat/18r-b-citation-truth-sweep deleted local+remote. residuals close --slice 18r-b --pr 427: 0 closed (correct -- no DEFER targeted this slice; its 8 disclosed residuals, e.g. R-18r-b-NOGATE/R-18r-b-DISCONNECTSELF/R-18r-b-ADR0232MECH, were registered directly during the build and remain open/backlog-targeted, unaffected by this call). Post-merge master CI (4b4ab4b) was IN_PROGRESS at record time; pre-merge PR checks (ci+e2e) both SUCCESS on the identical squashed diff, so this is not treated as a live risk. Base moved under this PR while it sat open (18r-a/PR#426 merged first, e630386->0bbd2e1) but mergeStateStatus stayed CLEAN/MERGEABLE throughout -- no rebase needed. Note: this slice's own PR/build ledger cost row was already written by the earlier 16:51Z done-event tick; this MERGED row correctly carries cost_usd=null per the no-double-count rule (mr-record's own COST-UNKNOWN annotation), not a defect. NEXT TICK: residual aging alarm -- 4 residuals (R-m22-s5-X11/X12/X13, R-m22-s4-X17) are past t1=3d unpromoted and now outrank new PLAN section 9 work per gate-3 aging rules; oldest is R-m22-s5-X11 (disclosed 2026-09-01T15:26:06Z, MED, PRV1-7 crate-wide privacy-manifest enforcement -- a real game-defect class, not eval-tooling, so it should be promoted via mr-gates residuals promote, not wontfix'd). Also note: 51 open residuals total against an observe-only cap of 12 -- informational only this slice, not yet a policy trip.
-
