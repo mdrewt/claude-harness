@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-49 — [PRV1-7 crate-wide enforcement, [DEL-06]] WHEN a reducer writes any manifest-classified ta (from m22-s3b X18, deferred 2026-09-01)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m22-s3b · residual: R-m22-s3b-X18
+
+Deferred with reason: the [DEL-06] enforcement MECHANISM needs the supervisor's ADR-0224 ruling (no new eval scanners; syn-based check vs reviewer-checklist are the candidates, per ADR-0225); its natural home is the M22 S6 evals slice once ruled. The S5 gate call sites already landed (PR #406), and this slice added the set_profile_name call site; join_game (movement.rs, out of touches) is named in ADR-0228 as the known
+
+EARS: [PRV1-7 crate-wide enforcement, [DEL-06]] WHEN a reducer writes any manifest-classified table outside STATE_TRANSITION_OWNERS THE SYSTEM SHALL require a preceding should_reject_for_deletion guard call, mechanically enforced.
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-48 — X17 (from m22-s4 X17, deferred 2026-09-01)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m22-s4 · residual: R-m22-s4-X17
