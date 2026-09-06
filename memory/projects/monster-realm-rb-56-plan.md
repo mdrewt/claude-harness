@@ -72,3 +72,34 @@ harness self-test from the wrong cwd).
   for the label shape (already stale pre-slice; out of touches).
 - `battleView.test.ts:1621` fixture uses `affinity: 'Grass'`, not a real Rust `Affinity` variant
   (`Plant`). Pre-existing; perturbing it would disturb the documented ux4 H-fixture asymmetry.
+
+---
+
+## Run notes (terminal state, 2026-09-06)
+
+**PR #441 open** — https://github.com/mdrewt/monster-realm/pull/441 — local `just ci` green
+(`CI-EXIT=0`, 3121 client tests, 99 evals), acceptance ledger **3/3 met, 0 deferred**.
+
+**DISCLOSURE — one erroneous commit on harness `main`:** a leftover `cd` to the harness root meant
+commit `c73bf01` ("test(rb-56): kill two verifier-measured survivors …") was made and pushed to
+`mdrewt/claude-harness` `main` instead of the slice worktree. Its CONTENT is harmless and belongs
+there — it added only `memory/projects/monster-realm-rb-56-plan.md` (this file) and the pre-existing
+stray `memory/projects/monster-realm-rb-55-plan.md` the 07:00Z tick had noted as untracked. But its
+SUBJECT LINE misdescribes it as a project test change. **Not amended deliberately:** it is already
+pushed, and force-pushing harness `main` could clobber a concurrent supervisor tick. Recommend the
+supervisor either leave it (content is correct) or amend at a quiet moment. The intended worktree
+commit was made afterwards as `ee49307`. The gates ledger and mutant register were unaffected —
+`memory/projects/gates/` is gitignored, so the supervisor reads them from disk.
+
+**What the lens fan-out actually bought (all three findings were MEASURED, not speculative):**
+1. `reviewer` + `/simplify` independently killed the `<span data-testid>` badge design in favour of a
+   plain label append — which also dissolved the red-team's top finding rather than guarding it.
+2. `desync-guard` measured M10: the original `'Grass'`/`'Normal'` fixture let an affinity→token map
+   with a `?? skill.affinity` passthrough pass, leaving the slice's central claim ungated.
+3. `verifier` measured M11/M12 (aria-hidden child, aria-label override) — a defect class neither the
+   red-team nor I probed. **Asking the verifier for mutants of its own choosing paid for itself again.**
+
+**Follow-ups registered:** `R-rb-56-FOLLOWUP-ACC`, `R-rb-56-FOLLOWUP-VMEQ`, `R-rb-56-FOLLOWUP-STALEDOC`.
+
+**ADR 240 was unusable** (taken by rb-55, merged b08ed51). 0241 left unclaimed — no ADR written, on
+the concurring advice of `reviewer` and `/simplify`. Supervisor may wish to return 240/241 to the pool.
