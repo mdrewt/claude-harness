@@ -26,6 +26,38 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-63 — A11Y-27's RENDERER arm SHALL be honoured end to end in a real browser — the OS (from rb-38 E1, deferred 2026-09-03)
+`touches: client/playwright.config.ts, client/e2e/a11y.spec.ts, client/e2e/reduced-motion.spec.ts, evals/ci-gate-wiring.eval.mjs, .github/workflows/nightly.yml, justfile`
+`after:` — · source: rb-38 · residual: R-rb-38-E1
+
+Deferred with reason: HIDDEN DEPENDENCY (a touches-set scoping outcome, not slice sizing).
+
+EARS: A11Y-27's RENDERER arm SHALL be honoured end to end in a real browser — the OS
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-62 — overlayA11yWiring.test.ts:289-296 carries the stale main.ts:1574 citation plus a meta-cita (from rb-36 R-rb36-WIRINGCITE, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-36 · residual: R-rb-36-R-rb36-WIRINGCITE
+
+Deferred with reason: Same citation-drift class as rb-36. client/src/ui/overlayA11yWiring.test.ts is outside rb-36's declared touches: set. Prose-only comment, no assertion, CI-neutral. Its line 294 says the other two sites are 'flagged, not touched' — rb-36 touched them, so that sentence is now false. Fix: retarget to the M12d store.onBatchApplied listener landmark, same treatment as rb-36.
+
+EARS: overlayA11yWiring.test.ts:289-296 carries the stale main.ts:1574 citation plus a meta-citation that rb-36's own edit falsifies
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-61 — main.a11yFocus.test.ts:782 carries the same stale main.ts:1574 citation (from rb-36 R-rb36-FOCUSCITE, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-36 · residual: R-rb-36-R-rb36-FOCUSCITE
+
+Deferred with reason: Same citation-drift class as rb-36; client/src/main.a11yFocus.test.ts is outside rb-36's declared touches: set. Rationale comment inside a test body, not an assertion; CI-neutral. Fix: same landmark treatment.
+
+EARS: main.a11yFocus.test.ts:782 carries the same stale main.ts:1574 citation
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-60 — docs/adr/0206:194 carries the same stale main.ts:1574 citation (from rb-36 R-rb36-ADR0206CITE, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-36 · residual: R-rb-36-R-rb36-ADR0206CITE
+
+Deferred with reason: Same citation-drift class as rb-36. docs/adr/** is admitted to a slice only for its own reserved ADR number and rb-36 had none reserved, so this existing ADR was outside the admitted set. ADR body prose; the adr-digest gate is header-only so CI cannot see it. Fix: same landmark treatment. Sweep all three R-rb36-* together.
+
+EARS: docs/adr/0206:194 carries the same stale main.ts:1574 citation
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-59 — battle card borders (#844/#484 red/green pair) are the same colour-only defect class one s (from m23-s8 postmerge-border, deferred 2026-09-02)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s8 · residual: R-m23-s8-postmerge-border
