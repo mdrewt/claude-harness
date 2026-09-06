@@ -823,3 +823,45 @@ Native tick mr-sup-native-20260905T021646Z-522964. rb-47 run finished (EXIT=0, 1
 
 ## 2026-09-05T02:38:01Z — rb-47 merged (PR#429, c136a8d) — stamp-aware trade-accept deletion gate
 Merged rb-47 (ADR-0237): respond_trade now refuses an ACCEPTING response to an offer created at or after the caller's own deletion request (accounts::opened_commitment_is_refused / refuses_commitment_opened_at + guards::require_commitment_predates_deletion, caller-only, below the decline block, before the status write). Offers predating the request stay completable (PRV1-10). Closes residual R-m22-s5-X13. mr-audit: hard-tier mandatory-read (policy, not a defect) — read the diff myself: bypass-ban array growth 5->7 in guards_tests.rs/native_host_tests.rs generic table_keyed<K> refactor are net-new protections, no weakened assertions. mr-gates verify: CLEAN, 7/7 met on independent re-run (X4 CI-GREEN spotcheck fresh). Squash-merged, branch+worktree cleaned, master fast-forwarded to c136a8d. master CI re-triggered post-merge and was still in_progress at tick-end (corrected an over-eager ledger row that said green prematurely — see CORRECTION row) — next tick should re-verify live before trusting it. Two new unpromoted residuals disclosed by this slice (R-rb-47-CANCELLAUNDER, R-rb-47-PREDATING, both MED, by-design-admit/spec-change class per ADR-0237 D7 Consequences) join the 58 open / 1 past-t1-unpromoted backlog already tracked.
+## 2026-09-05T03:02:38Z — 03:00Z tick — reconciled prior tick's uncommitted rb-47-merge state; promoted residual R-m22-s3b-X18 -> rb-49
+Prior native tick (02:31-02:38Z) merged rb-47 (PR#429, c136a8d) and wrote mr-state.json/handoff updates but never committed them to the harness repo -- found the diff sitting in the working tree at this tick's gate-0. Re-verified live before trusting it: PR#429 MERGED, master fast-forwarded to c136a8d, master CI for c136a8d now completed/success (was in_progress at handoff time), R-m22-s5-X13 closed. All checked out; committed the harness-repo state files this tick to close the gap. Gate-3: residuals list --unclaimed showed R-m22-s3b-X18 at 3.23d, past t1_promote_days=3, outranking queue[] (rb-48). Classified as a real game-defect class (PRV1-7 crate-wide deletion-gate enforcement mechanism, not eval-tooling-only) per the 2026-09-01 scanner-gate-retirement doctrine -- promoted -> rb-49 in M-residual-backlog.spec.md, queued via mr-record queue-add. Shipped as doc-only chore PR#95, repo automerge -- merged 0b0507e. This was the tick's ONE action. No slice launched or merged this tick. queue[] now: rb-48, rb-49.
+
+
+## 2026-09-05T04:02:06Z — 04:00Z tick — launched rb-48 (m22-s4 residual, PRV1-14 export TTL reaper)
+Gate-0: no live locks/mutex, HOLD-NONE queued_events=0, no rooted-run pid, no active-session collision. rb-47 (PR#429, respond_trade deletion-race fix) confirmed already merged+reconciled by the prior 03:00Z tick (master=c136a8d matches origin); cleared the stale /tmp/mr_pass_rb-47.done flag. queue[0]=rb-48 re-verified live (no prior commits touching rb-48, spec section still present in M-residual-backlog.spec.md, no blocked:/after: deps) -> launched via mr-spawn as the fast-path action. rb-48 = PRV1-14 export TTL reaper: export_bundle chunks only purge today via the deletion-cascade path (privacy.rs purge_export_bundles), with no standalone time-based expiry for orphaned/unclaimed chunks. Declared touches: server-module/src/privacy.rs, server-module/src/schema.rs, server-module/src/accounts_tests.rs, evals/baselines/table-schemas.json. Schema-touching (scheduled table, automigration-frozen per ADR-0221) -> HARD tier, fable@xhigh, budget.fable_ok=true (d7=348.1 vs guard 2068.2). ADR reserved: 238. queue now holds only rb-49 (R-m22-s3b-X18, still needs the ADR-0224/0225 supervisor ruling on the DEL-06 enforcement mechanism before it's launchable -- left queued for a future tick). Governor NORMAL (d7=504.63/2783).
+
+## 2026-09-05T05:42:25Z — rb-48 PARKED at attempt-3 exhaustion — regression diagnosed, no PR (SUPERVISOR/next-run: apply the 2-line+allowlist fix and resume)
+Native tick mr-sup-native-20260905T053954Z-766282 (05:39Z). EVENT: rb-48's 3rd wrapper attempt
+finished EXIT=0 but its own .err showed the background mutant-register task hit the 600s
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS ceiling and was killed before the final commit — worktree left
+dirty, no PR ever opened. Verified live: branch feat/rb-48-export-bundle-ttl-reaper pushed, worktree
+.claude/worktrees/rb-48 had 4 uncommitted files (ADR-0238 draft, accounts_tests.rs, lib.rs,
+privacy_tests.rs) — the tester's ledger E-gate filter fix (29 filters converted to anchored regexes)
+and a stale-prose sweep, both real progress, not noise.
+
+Per doctrine ("3 wrapper attempts without PR or documented park -> investigate sizing, don't
+relaunch a 4th identical pass"): squashed the dirty tree into checkpoint commit 5cc0e09 (pushed)
+rather than lose it, then ran the full suite to see what state it actually landed in. Found and
+diagnosed (NOT fixed — supervisor never implements) a live regression on that commit: lib.rs's
+sync_content() lost its `crate::privacy::ensure_export_bundle_reaper(ctx)` call (init still has it,
+line 175) sometime during attempt 3's edits, which gate E4 requires from both call sites. With just
+that, the suite is also red on `accounts_tests::m22s6_not_owned_identity_exceptions_are_frozen` —
+read only the first ~30 lines of that test, hypothesis is the NotOwned frozen-exceptions allowlist
+needs `export_bundle_reaper_schedule` added (same class as the already-listed
+account_deletion_reaper_schedule) but this needs the full test body read before editing, not guessed.
+
+This is NOT a rate-limit park (no park-counter bump — the slice made real progress on all 3
+attempts; this is a sizing/pacing signal, not a stuck slice) and NOT a no-progress park either.
+Mutant register (/tmp/rb-48/mutants.py) was at 38/42 when killed — resume from there, don't restart.
+Full diagnosis + exact 4-step resume plan in memory/projects/monster-realm-rb-48-progress.md (new
+"PARKED 2026-09-05T05:39Z" section, appended, not overwritten). Released the stale per-run lock via
+`mr-unlock stale` (session_leader 594815 was already dead). No PR to merge, no CI to check. rb-49
+remains queued (unstarted, from the 03:00Z tick) for a future tick's fast path once rb-48 either
+resumes or a decision is made to reprioritize.
+
+Governor NORMAL (d7=$579.01/2783 eff., fable_d7=$421.67/2298, fable_ok=true). No BLOCKERs, no
+rate-limit event, no mr-hold change (HOLD-NONE, unchanged). This was the tick's one mutating action
+(checkpoint-commit + diagnose + park-record); no launch this tick since rb-48 is not eligible to
+relaunch until a human or a future tick applies the diagnosed fix, and launching a fresh rb-49 in
+the same tick as parking rb-48 is not the merge->launch composite this doctrine allows.
+

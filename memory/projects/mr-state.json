@@ -6,23 +6,13 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "48c32a2"
  },
- "inflight": [
-  {
-   "slice": "rb-54",
-   "leader_pid": 2209717,
-   "model": "opus",
-   "effort": "high",
-   "tier": "routine",
-   "repo": "project",
-   "started_utc": "2026-09-06T00:01:59Z"
-  }
- ],
- "last_tick_utc": "2026-09-06T00:00:10Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-06T03:00:10Z",
  "live_watchers": [],
  "master": {
+  "sha": "75e971988aa5605a9f68f60a07e36625d885365c",
   "ci": "success",
-  "nightly": "success",
-  "sha": "f4cd5a7"
+  "nightly": "success"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -37,13 +27,22 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "00:00Z tick: recovered 23:00Z tick's uncommitted state/handoff write (verified PR#438 merged, master f4cd5a7 CI green) and committed it (c44fe44) -- same recurring uncommitted-tick-record gap as 5796652/3e2705d. Latest scheduled Nightly (11:08Z 2026-09-05) still shows failure but that predates the changelog fix; not a new red, no action taken -- next nightly run validates it. queue[] head rb-54 re-verified live and launched (opus@high, routine tier, adr=239); queue-remove'd. mr-gates seeded 0 criteria for rb-54 (thin spec section) -- noted, not blocking. Still open: 5 sibling m23-s8-postmerge-* residuals + others past t1_promote_days, one promote/tick per doctrine. 73 pre-existing handoff entries with unparseable headers remain pinned live (pre-existing, out of scope). Stray orphaned docker/promtool process (pid 1289093) still unaddressed host cruft.",
+ "notes": "03:00Z tick: found the 02:00Z merge tick's mr-state.json/handoff writes sitting uncommitted (rb-54 merged as PR#439, master ff'd to 75e9719 -- verified live: mergedAt 2026-09-06T02:04:29Z, master CI ci+e2e both success) -- committed as catch-up, same recurring uncommitted-tick-record gap. Gate-3: residuals list --unclaimed showed 8 past t1_promote_days=3 (oldest tied at 3.29d: 5x R-m23-s8-postmerge-*, all real a11y/render/dedup defects, none eval-tooling-only) -- outranks empty queue[]/new PLAN work. Promoted R-m23-s8-postmerge-tsdup -> rb-55, queued via mr-record queue-add. Shipped as doc-only chore PR (chore/residual-promote-20260906T030000Z). This was the tick's one action; no slice launched or merged.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-55",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m23-s8-postmerge-tsdup (t1_promote_days aging, 3.29d)",
+   "added_utc": "2026-09-06T03:01:58Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "75e971988aa5605a9f68f60a07e36625d885365c"
+  }
+ ],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
@@ -60,6 +59,7 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260906T000010Z-2207802",
- "updated_utc": "2026-09-06T00:03:30Z"
+ "updated_by": "mr-sup-native-20260906T030010Z-2482480",
+ "updated_utc": "2026-09-06T03:03:00Z"
 }
+
