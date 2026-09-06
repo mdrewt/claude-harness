@@ -65,6 +65,14 @@
    "added_utc": "2026-09-06T05:53:29Z",
    "added_by": "n/a",
    "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634"
+  },
+  {
+   "slice": "rb-60",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-36-R-rb36-ADR0206CITE",
+   "added_utc": "2026-09-06T07:02:35Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634"
   }
  ],
  "rate_limit_armed_by": "wrapper",
