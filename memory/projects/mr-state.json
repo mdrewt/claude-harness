@@ -4,15 +4,28 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "5dc533f"
+  "sha": "4e327e6"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-06T15:00:14Z",
+ "inflight": [
+  {
+   "claude_pid": 3588975,
+   "effort": "high",
+   "launched_utc": "2026-09-06T16:01:49Z",
+   "leader_pid": 3588972,
+   "model": "opus",
+   "pr_repo": "mdrewt/monster-realm",
+   "repo": "project",
+   "run_id": "mr-spawn-20260906T160149Z-3588913",
+   "slice": "rb-59",
+   "tier": "routine"
+  }
+ ],
+ "last_tick_utc": "2026-09-06T16:00:10Z",
  "live_watchers": [],
  "master": {
-  "sha": "5dc533f",
   "ci": "success",
-  "nightly": "success"
+  "nightly": "success",
+  "sha": "1e0df19"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +40,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-06T15:00Z tick: found+committed orphaned 14:15Z tick record (rb-58 merge, a6944ea), no active human session. Gate-3: R-rb-39-PRIVACY-LOCAL-PORT past t1_promote_days=3 (3.13d) -> outranked queue/new work; classified as real security-test-integrity defect (not eval-tooling-scanner-correctness) per Work-selection scope; promoted -> rb-64, queue-added, shipped doc-only chore PR#104, merged directly (repo auto-merge unavailable -- branch protection not configured for auto-merge; PR was CLEAN/MERGEABLE with zero required checks) -> 5dc533f. No launch/merge of a build slice this tick (promote was the one mutating action). queue[] now rb-59, rb-60, rb-64 (re-read fresh before this write). Budget NORMAL (d7=$1174.32/$2783=42%). Next tick: re-verify rb-59 (queue head) live and launch off fast path if still valid.",
+ "notes": "2026-09-06T16:00Z tick: found+committed orphaned 15:00Z tick handoff write (handoff.md/handoff-archive-2026-09.md for rb-64/PR#104, content already merged/verified) -> 4e327e6, no active human session. Gate-3: 59 open unpromoted residuals, none past t1_promote_days=3 (oldest R-rb-40-* 2.58d) -> did not outrank queue[]. queue[] head rb-59 re-verified live (spec heading present M-residual-backlog.spec.md:69, no blocked:, source m23-s8 merged, not already merged) -> LAUNCHED (leader=3588972 claude_pid=3588975 rid=mr-spawn-20260906T160149Z-3588913, opus@high routine, battle-card-border colour-only defect fix client/src/ui/battleView.ts). queue-removed rb-59; queue[] now rb-60, rb-64. No merge this tick (no open PRs). Budget NORMAL (d7=$1175.11/2783=42.2%). Next tick: reconcile rb-59 from live PR/git state.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -35,28 +48,20 @@
  "parked": [],
  "queue": [
   {
-   "slice": "rb-59",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s8-postmerge-border",
-   "added_utc": "2026-09-06T05:53:29Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634"
-  },
-  {
-   "slice": "rb-60",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-36-R-rb36-ADR0206CITE",
    "added_utc": "2026-09-06T07:02:35Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634"
+   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634",
+   "reason": "promoted residual R-rb-36-R-rb36-ADR0206CITE",
+   "slice": "rb-60",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-64",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-39-PRIVACY-LOCAL-PORT",
-   "added_utc": "2026-09-06T15:01:40Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "1e0df19"
+   "added_utc": "2026-09-06T15:01:40Z",
+   "derived_from_master_sha": "1e0df19",
+   "reason": "promoted residual R-rb-39-PRIVACY-LOCAL-PORT",
+   "slice": "rb-64",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -75,6 +80,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260906T150014Z-3574624",
- "updated_utc": "2026-09-06T15:03:33Z"
+ "updated_by": "mr-sup-native-20260906T160010Z-3587085",
+ "updated_utc": "2026-09-06T16:02:33Z"
 }
