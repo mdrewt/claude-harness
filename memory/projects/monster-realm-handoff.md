@@ -2,6 +2,94 @@
 
 ---
 
+## 2026-09-05T~22:0xZ — rb-54 PR#439 OPEN — enum-roster totality proved at content-sync time from the SpacetimeType derive (ADR-0239); local `just ci` GREEN (CI-EXIT=0); ledger 3/3 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/439 (branch `feat/rb-54-content-load-validation`,
+worktree `.claude/worktrees/rb-54`, forked from origin/master@f4cd5a7 — master CI verified green;
+5 commits, all pushed, tree clean). `gh pr merge` NOT run. Main checkout left on `master`.
+
+Ledger: **3/3 met, 0 deferred, 0 unmet** (`seed:e3b0c44298fc1c14`). NOTE: mr-gates seeded **0**
+criteria for this slice (the spec section's EARS line carries no literal `SHALL`), so E1/E2/E3 were
+authored from the spec's single EARS criterion + the DoD. E1/E3 flip via `mr-gates check` **run from
+the worktree** (cwd-relative); E2 is MANUAL with an absolute `path:line` citation at
+`memory/projects/gates/rb-54.mutant-register.md:75`.
+
+WHAT LANDED: `server-module/src/content.rs` gains a production sibling validator —
+`EnumRosterTypespace` (never-interning `TypespaceBuilder`), `reflected_variant_names<T: SpacetimeType>`
+(the derive-generated variant list), `check_roster_is_total<T>(enum_name, roster)` (reflects from `T`
+INTERNALLY; `roster.len() == reflected.len()` + pairwise distinct), `validate_enum_rosters()` — called
+as the FIRST statement of `sync_content_inner`, ABOVE the `content_version` early return. **Zero new
+dependencies**: server-module already enables game-core's `spacetimedb` feature, which is the whole
+reason this was buildable inside `touches:` (`ron`/`serde` are not deps and `Cargo.toml` was out of
+scope).
+
+**THE REVIEW CHANGED THE DESIGN TWICE. Read this before any future validator slice.**
+- PLAN phase: `red-team` measured **8 CI-clean bypasses** of the planned design. The `_with`
+  injectable seam was DELETED (it made `reflected` and the roster type-independent, enabling a
+  `zip`/truncate no-op and a wrong-type reflection); `/simplify` proved key-injectivity redundant —
+  a collapsed key fn already errors at `game-core/src/content.rs:1786` — and it was cut.
+- ARTIFACT phase: `red-team` measured **3 MORE** bypasses that all 10 shipped teeth survived *with a
+  real unrostered 6th variant present*, because **only the trivial function was body-pinned**. See
+  the new memory card `body-pin-only-the-trivial-frame-leaves-logic-forgeable`. Closed by 4 teeth.
+
+FIVE THINGS THE NEXT SLICE SHOULD KNOW:
+1. **`StatusKind` and `StatusEffect` reflect to BYTE-IDENTICAL name lists.** Any oracle that can be
+   pointed at the wrong one of the pair is undetectable by every name-comparing fixture. The
+   discriminating test is a deliberately MISMATCHED label/type pair.
+2. **Adding a `StatusKind` variant forces FOUR `E0004` arms, not one** — `ability.rs:57`,
+   `resolve.rs:177`, `content.rs:820`, `content.rs:1658`. The note at `game-core/src/content.rs:7490`
+   says "the one match arm" and is STALE; ADR-0239 records the correction. Anything citing that note
+   inherits the error.
+3. **`cargo fmt -p monster-realm-module` rewrites `content_tests.rs` at HEAD** — the file was not
+   rustfmt-clean before this slice. Expect a whitespace hunk; verify it is whitespace-only with
+   `diff <(tr -d '[:space:]' <a) <(tr -d '[:space:]' <b)` before committing.
+4. **`account-e2e` reds under ANY concurrency** (global spacetime lock, no `--data-dir`). The first
+   `just ci` failed exactly there while an artifact red-team was probing in a `/tmp` worktree;
+   the serial re-run was clean, 99/99. Do not run review lenses that touch cargo/spacetime
+   concurrently with the pre-PR gate.
+5. **`m13_5c_strip_rust_comments` is STRING-BLIND.** A `/*` in a string plus a `*/` in a trailing
+   comment blanks an attribute line — MEASURED hiding a `#[cfg(not(target_arch = "wasm32"))]` on the
+   call while the stripped scan stayed clean. Any prefix pin needs a RAW-source clause too.
+
+ORCHESTRATION: `planner` (opus); `reviewer` + `red-team` + `/simplify` on the PLAN in parallel before
+any code (all three changed the design); a separate `tester` (opus) in a `/tmp` sandbox worktree (the
+write guard blocks `.claude/`; its Bash is execution-blocked, so the ORCHESTRATOR ran the RED proof —
+7x E0425, the documented convention for that file); a separate implementer agent, forbidden from
+editing the gating tests; `reviewer` + `red-team` on the artifact in parallel.
+`reducer-security-auditor`/`desync-guard` NOT spawned (no reducer signature, schema, netcode or
+game-rule change — rb-51/52/53 precedent). `doc-keeper` NOT spawned: `/tmp/mr_warn_rb-54` (landing
+pattern) appeared when the artifact red-team reported, so the orchestrator wrote the 4 closure teeth,
+the ADR corrections and the ARCHITECTURE paragraph directly. Disclosed in the PR.
+
+**22 mutants, 22 CAUGHT, 0 survived** (`memory/projects/gates/rb-54.mutant-register.md`), tree
+sha256-verified restored after every chunk. **END-TO-END PROOF at the file tail:** with
+`StatusKind::Frostbite` genuinely added in an isolated clone and the roster left at 5,
+`content_parses_and_validates` (i.e. `validate_content`) STILL PASSES while
+`rb54_shipped_rosters_are_total` fails naming the missing variant — the defect and the fix, both
+demonstrated.
+
+**HONEST BOUND recorded in ADR-0239, not buried:** the predicate is data-independent and the host
+suite evaluates the same function, so any CI-green artifact necessarily has
+`validate_enum_rosters() == Ok(())` in the shipped wasm — the reducer wiring cannot fire in a
+CI-green build. A new variant ALREADY reddened two pre-existing detectors (`m23s8_totality_*` and
+`evals/spacetime-type-snapshot.eval.mjs`). The value added is a third detector inside the module plus
+a sync-time failure with an actionable message. An earlier draft's "unpublishable" claim was
+overstated (init runs only at DB creation) and is corrected.
+
+RESIDUALS REGISTERED (all -> backlog): `R-rb-54-STATUSEFFECT-PAIR` (the StatusKind/StatusEffect
+set-equality invariant is still CI-only; different kernel, and the fieldless-`PartialEq` contract does
+not hold for a payload-carrying enum), `R-rb-54-TOOTHH-WHITESPACE` (tooth H's compaction strips
+whitespace INSIDE string literals, so the pinned label args are not truly pinned — measured,
+cosmetic), `R-rb-54-CITEDRIFT` (the +6-line insert staledates six `content.rs:NNN` citations outside
+`touches:`; none is a gate).
+
+touches-delta: `docs/adr/0239-rb54-enum-roster-totality-at-content-sync-time.md` (new, assigned
+number), `docs/adr/DIGEST.md` (regen), `ARCHITECTURE.md` (one appended paragraph, ADR next-free =
+0240). No hidden dependency touched. boyscout-delta: none.
+
+Local gate: `just ci` **CI-EXIT=0** (`/tmp/rb54-ci2.log`) — 2238 Rust tests, 3118 client tests,
+99/99 evals, clippy `-D warnings`, fmt, security, wasm, observability 8/8.
+
 ## 2026-09-05T~16:4xZ — 17r-f PR#437 OPEN — frame-loop errors reach pushError/F9, tagged + consecutive-deduped, re-arm intact (ADR-0130 Amendment 17r-f); local `just ci` GREEN (CI-EXIT=0); ledger 1/1 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
 **TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
 PR https://github.com/mdrewt/monster-realm/pull/437 (branch `feat/17r-f-frame-catch-pusherror`,
