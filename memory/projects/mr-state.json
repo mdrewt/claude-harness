@@ -36,14 +36,6 @@
  "queue": [
   {
    "added_by": "n/a",
-   "added_utc": "2026-09-06T07:02:35Z",
-   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634",
-   "reason": "promoted residual R-rb-36-R-rb36-ADR0206CITE",
-   "slice": "rb-60",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
-  {
-   "added_by": "n/a",
    "added_utc": "2026-09-06T15:01:40Z",
    "derived_from_master_sha": "1e0df19",
    "reason": "promoted residual R-rb-39-PRIVACY-LOCAL-PORT",
