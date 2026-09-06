@@ -1,5 +1,5 @@
 {
- "adr_next_free": 239,
+ "adr_next_free": 240,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
@@ -10,8 +10,8 @@
  "last_tick_utc": "2026-09-06T03:00:10Z",
  "live_watchers": [],
  "master": {
-  "sha": "75e971988aa5605a9f68f60a07e36625d885365c",
-  "ci": "success",
+  "sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634",
+  "ci": "pending-post-merge-push-run",
   "nightly": "success"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "03:00Z tick: found the 02:00Z merge tick's mr-state.json/handoff writes sitting uncommitted (rb-54 merged as PR#439, master ff'd to 75e9719 -- verified live: mergedAt 2026-09-06T02:04:29Z, master CI ci+e2e both success) -- committed as catch-up, same recurring uncommitted-tick-record gap. Gate-3: residuals list --unclaimed showed 8 past t1_promote_days=3 (oldest tied at 3.29d: 5x R-m23-s8-postmerge-*, all real a11y/render/dedup defects, none eval-tooling-only) -- outranks empty queue[]/new PLAN work. Promoted R-m23-s8-postmerge-tsdup -> rb-55, queued via mr-record queue-add. Shipped as doc-only chore PR (chore/residual-promote-20260906T030000Z). This was the tick's one action; no slice launched or merged.",
+ "notes": "2026-09-06T05:42Z tick (ci-triggered on rb-55 green): merged PR#440 (rb-55, squash, b08ed51) after re-verifying mr-gates (CLEAN 4/4 -- first read FLAGGED was a supervisor-shell PATH gap missing ~/.cargo/bin, not real) and mr-audit (CLEAN -- gating_advisory tripwire was 'it.skip' inside a warning comment, adjudicated false positive). Residual R-rb-55-X1-derivation closed to backlog. No launch this tick -- queue was empty; next tick does full PLAN section-9/residuals-aging derivation.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -35,12 +35,36 @@
  "parked": [],
  "queue": [
   {
-   "slice": "rb-55",
+   "slice": "rb-56",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s8-postmerge-tsdup (t1_promote_days aging, 3.29d)",
-   "added_utc": "2026-09-06T03:01:58Z",
+   "reason": "promoted residual R-m23-s8-postmerge-title",
+   "added_utc": "2026-09-06T05:53:29Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "75e971988aa5605a9f68f60a07e36625d885365c"
+   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634"
+  },
+  {
+   "slice": "rb-57",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m23-s8-postmerge-tint",
+   "added_utc": "2026-09-06T05:53:29Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634"
+  },
+  {
+   "slice": "rb-58",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m23-s8-postmerge-fallback",
+   "added_utc": "2026-09-06T05:53:29Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634"
+  },
+  {
+   "slice": "rb-59",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-m23-s8-postmerge-border",
+   "added_utc": "2026-09-06T05:53:29Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -59,7 +83,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260906T030010Z-2482480",
- "updated_utc": "2026-09-06T03:03:00Z"
+ "updated_by": "mr-sup-native-20260906T054248Z-2756125",
+ "updated_utc": "2026-09-06T05:52:00Z"
 }
-
