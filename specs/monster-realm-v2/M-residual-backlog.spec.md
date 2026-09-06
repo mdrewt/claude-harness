@@ -26,6 +26,38 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-59 — battle card borders (#844/#484 red/green pair) are the same colour-only defect class one s (from m23-s8 postmerge-border, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s8 · residual: R-m23-s8-postmerge-border
+
+Deferred with reason: S8 did not survey this area; S9 should not read it as cleared
+
+EARS: battle card borders (#844/#484 red/green pair) are the same colour-only defect class one screenful away from S8's fix
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-58 — client fallback token has only 2 chars of entropy after its '?' prefix (from m23-s8 postmerge-fallback, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s8 · residual: R-m23-s8-postmerge-fallback
+
+Deferred with reason: found during review, low severity, not core to A11Y-29
+
+EARS: client fallback token has only 2 chars of entropy after its '?' prefix
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-57 — canvas sprite ACTION_TINT (client/src/render/placeholderAssets.ts:15) still colour-only, n (from m23-s8 postmerge-tint, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s8 · residual: R-m23-s8-postmerge-tint
+
+Deferred with reason: declared out of scope by spec section 8.2 default (a); tracked art residual per X10
+
+EARS: canvas sprite ACTION_TINT (client/src/render/placeholderAssets.ts:15) still colour-only, no DOM representation
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-56 — skill affinity exposed only via btn.title (battleView.ts:308), not a persistent visible cu (from m23-s8 postmerge-title, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s8 · residual: R-m23-s8-postmerge-title
+
+Deferred with reason: found during review, out of S8's declared scope
+
+EARS: skill affinity exposed only via btn.title (battleView.ts:308), not a persistent visible cue
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-55 — the five status a11y tokens are duplicated between game-core content.rs and client battleM (from m23-s8 postmerge-tsdup, deferred 2026-09-02)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s8 · residual: R-m23-s8-postmerge-tsdup
