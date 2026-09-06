@@ -811,3 +811,9 @@ Resume memo rewritten at memory/projects/monster-realm-rb-47-progress.md (the on
 
 Relaunching rb-47 now (fable@xhigh, hard tier — schema/reducer + security surface) since the five_hour window reset already passed. mr-state.json's stale inflight entry for the dead session_leader 66596 removed; queue unchanged (rb-48).
 
+## 2026-09-04T23:16:15Z — rb-46 CI-watch delegated
+Native tick mr-sup-native-20260904T231605Z-15148-694: PR#428 (rb-46, ADR-0236, closes R-m22-s5-X12) open, mergeStateStatus=UNSTABLE (ci+e2e IN_PROGRESS at 23:16Z). No live chain mutex/session at gate-0; stale per-run lock for rb-46 (session_leader dead, .done present) reconciled. Delegated CI-wait to mr-ci-watch (detached pid 15212); merge happens on the resuming event tick. No launch this tick (single action rule).
+
+
+
+

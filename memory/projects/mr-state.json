@@ -7,12 +7,12 @@
   "sha": "48c32a2"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-05T22:00:07Z",
+ "last_tick_utc": "2026-09-05T23:00:08Z",
  "live_watchers": [],
  "master": {
   "ci": "in_progress",
   "nightly": "success",
-  "sha": "9fc5223"
+  "sha": "f4cd5a7"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "22:00Z tick: recovered uncommitted 20:55Z tick record (17r-f/PR#437 merge) and committed+pushed (5796652). Promoted oldest t1-aged residual R-m23-s8-postmerge -> rb-54 via doc-only chore PR#100 (squash-merged, 3e2705d). queue[] now holds rb-54 for next tick fast path. 5 sibling m23-s8-postmerge-* residuals + others remain past t1, deferred to future ticks (one promote/tick). No feature launch this tick.",
+ "notes": "23:00Z tick: master push CI green (9fc5223) but Nightly (11:08Z run) was red on changelog-freshness (CHANGELOG.md 50 entries/7.5d stale) -- treated as a master-red signal outranking queued rb-54 per gate 3. Fixed via `just changelog` (git-cliff 2.13.1 pinned; needed $HOME/.cargo/bin prepended to PATH) + doc-only chore PR#438, squash+auto-merged, local master ff-only advanced 9fc5223->f4cd5a7. queue[] untouched (rb-54 still head, still valid) -- next tick's fast path should launch it. Noted but not acted: stray ~12.5h-old orphaned docker/promtool process (pid 1289093) referencing the already-merged-and-deleted 17r-e worktree -- holds no lock, blocks nothing, host cruft for a human to clear. mr-record handoff also flagged 73 pre-existing handoff entries with unparseable headers (pinned live, not archived) -- pre-existing, out of scope for this tick's one action.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -59,6 +59,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260905T220007Z-2183467",
- "updated_utc": "2026-09-05T22:02:50Z"
+ "updated_by": "mr-sup-native-20260905T230008Z-2196410",
+ "updated_utc": "2026-09-05T23:02:52Z"
 }
