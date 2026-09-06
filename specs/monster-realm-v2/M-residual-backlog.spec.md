@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-55 — the five status a11y tokens are duplicated between game-core content.rs and client battleM (from m23-s8 postmerge-tsdup, deferred 2026-09-02)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m23-s8 · residual: R-m23-s8-postmerge-tsdup
+
+Deferred with reason: dedup deferred, not core to A11Y-29 acceptance
+
+EARS: the five status a11y tokens are duplicated between game-core content.rs and client battleModel.ts
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-54 — content-pipeline validation runs at CI time, not content-sync time — a new enum variant fa (from m23-s8 postmerge, deferred 2026-09-02)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m23-s8 · residual: R-m23-s8-postmerge
