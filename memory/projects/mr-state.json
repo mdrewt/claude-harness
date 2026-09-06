@@ -4,14 +4,24 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "48c32a2"
+  "sha": "293974f"
  },
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "rb-56",
+   "run_id": "mr-spawn-20260906T080332Z-2843626",
+   "leader_pid": 2843705,
+   "model": "opus",
+   "tier": "routine",
+   "repo": "project",
+   "launched_utc": "2026-09-06T08:03:46Z"
+  }
+ ],
  "last_tick_utc": "2026-09-06T03:00:10Z",
  "live_watchers": [],
  "master": {
   "sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634",
-  "ci": "pending-post-merge-push-run",
+  "ci": "success",
   "nightly": "success"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,21 +37,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-06T05:42Z tick (ci-triggered on rb-55 green): merged PR#440 (rb-55, squash, b08ed51) after re-verifying mr-gates (CLEAN 4/4 -- first read FLAGGED was a supervisor-shell PATH gap missing ~/.cargo/bin, not real) and mr-audit (CLEAN -- gating_advisory tripwire was 'it.skip' inside a warning comment, adjudicated false positive). Residual R-rb-55-X1-derivation closed to backlog. No launch this tick -- queue was empty; next tick does full PLAN section-9/residuals-aging derivation.",
+ "notes": "2026-09-06T08:00Z tick: reconciled orphaned 07:03Z uncommitted state (committed 293974f, pushed), reaped stray 21h-hung 17r-e promtool docker process, dispositioned 4 aged OBS-48 scanner-script residuals wontfix (ADR-0224, all MED), launched rb-56 (queue head, routine tier opus@high ADR-240) after queue-remove. rb-57/58/59/rb-60 remain queued.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "slice": "rb-56",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-m23-s8-postmerge-title",
-   "added_utc": "2026-09-06T05:53:29Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "b08ed51efdaa56d740cbe35de68caadbdca3b634"
-  },
   {
    "slice": "rb-57",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
@@ -91,6 +93,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260906T054248Z-2756125",
- "updated_utc": "2026-09-06T05:52:00Z"
+ "updated_by": "mr-sup-native-20260906T080011Z-2840623",
+ "updated_utc": "2026-09-06T08:04:30Z"
 }
