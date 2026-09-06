@@ -6,26 +6,13 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "4e327e6"
  },
- "inflight": [
-  {
-   "claude_pid": 3588975,
-   "effort": "high",
-   "launched_utc": "2026-09-06T16:01:49Z",
-   "leader_pid": 3588972,
-   "model": "opus",
-   "pr_repo": "mdrewt/monster-realm",
-   "repo": "project",
-   "run_id": "mr-spawn-20260906T160149Z-3588913",
-   "slice": "rb-59",
-   "tier": "routine"
-  }
- ],
- "last_tick_utc": "2026-09-06T16:00:10Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-06T19:00:12Z",
  "live_watchers": [],
  "master": {
   "ci": "success",
   "nightly": "success",
-  "sha": "1e0df19"
+  "sha": "292627e"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -40,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-06T16:00Z tick: found+committed orphaned 15:00Z tick handoff write (handoff.md/handoff-archive-2026-09.md for rb-64/PR#104, content already merged/verified) -> 4e327e6, no active human session. Gate-3: 59 open unpromoted residuals, none past t1_promote_days=3 (oldest R-rb-40-* 2.58d) -> did not outrank queue[]. queue[] head rb-59 re-verified live (spec heading present M-residual-backlog.spec.md:69, no blocked:, source m23-s8 merged, not already merged) -> LAUNCHED (leader=3588972 claude_pid=3588975 rid=mr-spawn-20260906T160149Z-3588913, opus@high routine, battle-card-border colour-only defect fix client/src/ui/battleView.ts). queue-removed rb-59; queue[] now rb-60, rb-64. No merge this tick (no open PRs). Budget NORMAL (d7=$1175.11/2783=42.2%). Next tick: reconcile rb-59 from live PR/git state.",
+ "notes": "2026-09-06T19:00Z tick: reconciled an ORPHANED MERGE. Gate-0: rb-59 lock showed leader 3588972 dead + .done present -> live-chain check failed (not a standdown case: PR needed reconciling). Live ground truth: PR#444 (feat/rb-59-battle-card-role-cue) state=MERGED mergedAt=2026-09-06T18:30:21Z -> 292627e, already HEAD of origin/master, worktree+branch already cleaned, source residual R-m23-s8-postmerge-border already closed_by_pr=444 -- all done by a prior chain-owner (mr-sup-native-20260906T182308Z-3809436, owner.json action='merge rb-59 PR#444') that ended before writing ledger/handoff/state or releasing its mutex. This tick: mr-audit --slice rb-59 --base 1e0df19 --head 292627e -> orchestration CLEAN, gating_advisory CLEAN, policy no-mandatory-read; mr-branch-audit clean (0/0); mr-gates verify FLAGGED on X1/X5 EVIDENCE-MISMATCH, adjudicated as a tick-ordering artifact (both CHECKs assert cwd is the slice's own worktree, which the merge tick had already legitimately removed before this re-verify ran; recorded evidence was captured live pre-cleanup) -- not a forged gate, ledger stands at 5/6 met + X6 deferred:backlog. Wrote the missing ledger 'merged(PR#444->292627e)' row (cost NOT re-derived; wrapper-reconcile already captured cost_usd=52.2947 at 18:07:56Z), a handoff entry, released the stale chain mutex (owner dead) + reaped the stale rb-59 per-run lock (session_leader dead). master{sha,ci} advanced 1e0df19->292627e/success. queue[] unchanged (rb-60, rb-64) -- did not launch this tick (reconciliation-only; two untracked/uncommitted memory files from the merged run -- monster-realm-rb-59-plan.md, handoff.md pre-merge draft entry -- left as-is for the operator to review/commit, not authored by this tick). Budget NORMAL (d7=$1229.21/2783=44.2%). Next tick: fast-path queue[] head rb-60.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -80,6 +67,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260906T160010Z-3587085",
- "updated_utc": "2026-09-06T16:02:33Z"
+ "updated_by": "mr-sup-native-20260906T190012Z-3858303",
+ "updated_utc": "2026-09-06T19:04:00Z"
 }

@@ -2,6 +2,92 @@
 
 ---
 
+## 2026-09-06T~18:2xZ — rb-59 PR#444 OPEN — battle card roles cued by border STYLE, not hue; local `just ci` GREEN (CI-EXIT=0); ledger 5/6 met, 1 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/444 (branch `feat/rb-59-battle-card-role-cue`,
+worktree `.claude/worktrees/rb-59`, forked from origin/master@1e0df19 — master CI verified green;
+5 commits, all pushed, tree clean). `gh pr merge` NOT run. Main checkout left on `master`.
+
+Ledger: **5/6 met, 0 unmet, 1 deferred** (`seed:e3b0c44298fc1c14`). mr-gates seeded **0** criteria
+again (the spec section's EARS line carries no literal `SHALL`), so X1-X6 were authored from the
+spec's criterion + the DoD, same as rb-54/rb-58. X4 is MANUAL (flip by hand — `check` skips it).
+
+WHAT LANDED: two declarations in `client/src/ui/battleView.ts`. Opponent card
+`1px solid #844` -> `2px dashed #b66`; player card `1px solid #484` -> `2px solid #484`. Border
+STYLE is the hue-free channel. `#844` HAD to move: it measures **2.34:1** against its own
+`#2a1a1a` card background, under the WCAG 1.4.11 3:1 floor, so `dashed #844` would have shipped a
+cue nobody can see. `#b66` is 4.13:1. No ADR (rb-56 precedent), no ARCHITECTURE edit.
+
+**SIX THINGS THE NEXT SLICE SHOULD KNOW.**
+1. **The format hook reformatted an unrelated pre-existing block TWICE** (the ux4 H3 `it.each` in
+   `battleView.test.ts`), producing 55 deletions the repo's PINNED biome then REJECTS. Both times
+   the fix was to restore `git show origin/master:<file>` and re-append only the new block. Check
+   `git diff --numstat origin/master` after EVERY test-file edit round, not just at the end.
+2. **A count-based ledger CHECK is forgeable — MEASURED.** Four `it('rb59 stub')` cases plus a
+   reverted production file printed a byte-identical green line. Fix: `rb-59.oracle.cjs`, which
+   esbuild-bundles the SHIPPED `.ts`, evaluates it under happy-dom with the seam stubbed, and
+   reads the rendered DOM. It never opens the test file and reds on the pre-slice code. **This
+   pattern is reusable for any client-TS slice** and is the right answer to "the CHECK proves the
+   tests ran, not that the feature exists".
+3. **`border-image` is invisible to every `border-*-{style,width,color}` read AND to a
+   property-NAME roster**, because the `border` shorthand DECLARES the six `border-image-*`
+   longhands and never writes them. Measured in Chromium: it repaints the border as one uniform
+   ring while `borderTopStyle` still reads `dashed` and the contrast clause still measures 4.13:1.
+4. **`2px double` and `2px solid` are BYTE-IDENTICAL screenshots in Chromium** (sha256
+   `48e6b33b585b791c`), and `groove`/`ridge`/`inset`/`outset` repaint two of four sides at 1.744:1
+   while the DECLARED colour still reads at 4.13:1. A border-style deny-list is not enough —
+   use an ALLOW-list of `{solid, dashed, dotted}`.
+5. **happy-dom expands the `border` shorthand** into all four `border*Style` longhands +
+   `borderTopWidth`; `border:0 dashed` reads `0px`, `hidden` reads `hidden`, an invalid style token
+   drops the WHOLE declaration to `''`. But a DETACHED element still reads inline styles fine, so
+   "detached reads empty" is FALSE for inline style. Write the width refusal `!(w > 0)`, never
+   `w <= 0` — `border:thin dashed` gives `NaN` and `NaN <= 0` is `false`, i.e. fails OPEN.
+6. **`account-e2e` red twice with empty stderr + a WS reset**, once with NOTHING concurrent —
+   so it is not purely a contention flake. Both times a plain re-run was green. Budget for one
+   free re-run of `just ci` before treating an S9 failure as a regression.
+
+**THE REVIEW CHANGED THE SLICE THREE TIMES.** (a) PLAN: `reviewer` found a BLOCKER — the planned
+PvP header rename reds the REQUIRED `e2e` job via a `${name}: ` prefix parse in two `client/e2e/**`
+specs outside `touches:`. Cut to a DEFER. (b) TESTS: `red-team` measured **13** wrong impls at
+60/60 green against the first draft. (c) ARTIFACT: a second `red-team` measured **10 MORE** after
+two lenses had passed it. Register is **40 rows, 38 CAUGHT, 2 CONTROLS HELD GREEN, 0 SURVIVED**.
+
+**THE DEFER'S ORIGINAL REASON WAS FALSE AND IS CORRECTED IN THE LEDGER.** `pvp-side-b.spec.ts:361`
+uses Playwright SUBSTRING matching, so a prefix does NOT red it; only
+`monster-privacy.spec.ts:432`'s `startsWith` breaks. And a **trailing ` (Opponent)` suffix was
+MEASURED in real Chromium to satisfy BOTH specs with no e2e edit** — the deferred half WAS landable
+inside `touches:`. It was not taken because a parenthetical is a weaker AT announcement than a
+leading role word, and because `/tmp/mr_warn_rb-59` had put the slice in its landing phase. Do not
+repeat the "ANY prefix reds CI" claim.
+
+**DOC-TRUTH STRANDING CREATED BY THIS SLICE:** `docs/adr/0233:186-188` says in the present tense
+that the borders "still use" the red/green pair and cites `battleView.ts:109`/`:116` — all three
+facts false on merge. That paragraph joins the ALREADY-QUEUED 0233 §Residuals debt from rb-55
+(`:179-182`), rb-56 (`:183-185`, still present-tense) and rb-58 (`:195-198`). **One successor
+should rewrite `docs/adr/0233:179-190` in full** rather than four slices each amending a paragraph.
+
+ORCHESTRATION: `planner` (opus); `reviewer` + `red-team` on the PLAN in parallel before any code
+(the reviewer's blocker removed a criterion); a separate `tester` (opus) — its Bash is guard-blocked,
+so the ORCHESTRATOR ran every RED proof and every diff check; one `red-team` on the TESTS before
+implementation; a separate implementer forbidden from the test file (verified: `fbe64ac` touches
+only `battleView.ts`); `reviewer` + `red-team` on the artifact in parallel; `verifier` last —
+PASS, and it found a surviving mutant of its own (a flatten deferred `setTimeout(..., 20)`, beyond
+the single macrotask tick the persistence case drains) now recorded as a disclosed limit.
+`reducer-security-auditor`/`desync-guard` NOT spawned (no reducer, schema, netcode or game-rule
+change — rb-51/52/53/54 precedent). `doc-keeper` NOT spawned: the warn flag landed before the doc
+phase and there is no ADR/ARCHITECTURE/CHANGELOG edit in this slice.
+
+touches-delta: NONE in the project repo — the diff is exactly the two declared files. Harness-side
+artifacts: `memory/projects/gates/rb-59.{gates.md,mutant-register.md,oracle.cjs}`,
+`memory/projects/monster-realm-rb-59-plan.md`. boyscout-delta: the two bare positional comments
+`// Opponent card (top)` / `// Player card (bottom)` folded into the rationale block (2 lines).
+
+Local gate: `just ci` **CI-EXIT=0** (`/tmp/rb59-ci4.log`, run on the FINAL tree after the verifier's
+edits) — 2238 Rust tests, 3142 client tests, 99/99 evals, clippy `-D warnings`, fmt, security, wasm,
+observability.
+
+---
+
 ## 2026-09-05T~22:0xZ — rb-54 PR#439 OPEN — enum-roster totality proved at content-sync time from the SpacetimeType derive (ADR-0239); local `just ci` GREEN (CI-EXIT=0); ledger 3/3 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
 **TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
 PR https://github.com/mdrewt/monster-realm/pull/439 (branch `feat/rb-54-content-load-validation`,
@@ -3673,6 +3759,34 @@ Promoting them is supervisor-only work outside any slice's `touches:`. Independe
 **Code-graph refresh deliberately skipped:** `main` is unchanged (nothing merged yet) and indexing the
 ephemeral worktree path is forbidden. No project code was touched, so no re-index is owed.
 
+## 2026-09-06T19:02:33Z — rb-59 PR#444 MERGED -> 292627e (reconciled from orphaned 18:23Z merge)
+Reconciled at the 19:00Z native tick. Live ground truth: PR https://github.com/mdrewt/monster-realm/pull/444
+state=MERGED mergedAt=2026-09-06T18:30:21Z mergeCommit=292627e; master log confirms
+292627e feat(rb-59) is HEAD; master CI success; worktree/branch already cleaned (git worktree list
+shows only the main checkout, no feat/rb-59-* local branch). Chain-owner lock owner.json still named
+"mr-sup-native-20260906T182308Z-3809436" / action "merge rb-59 PR#444" with a stale heartbeat -- that
+tick did the merge + cleanup then ended without writing the ledger/handoff/state records or releasing
+the mutex (no rb-59 ledger "merged" row existed before this tick; mr-state.json still listed rb-59
+inflight at leader 3588972, already dead).
+
+Verification run this tick: mr-audit --slice rb-59 --base 1e0df19 --head 292627e --tier routine ->
+orchestration CLEAN (9 agent calls: claude/planner/red-team/reviewer/tester/verifier, opus),
+gating_advisory CLEAN (no removed asserts/skips/suppressions), policy "CLEAN - no policy-mandated
+read". mr-branch-audit: 0 post-merge commits, 0 stale branches. mr-gates verify --slice rb-59:
+FLAGGED (EVIDENCE-MISMATCH on X1/X5) -- read and adjudicated as a tick-ordering artifact, not fraud:
+both CHECKs assert they are running inside the slice's own worktree (X5 literally regexes the cwd
+for /rb-59/), and that worktree was legitimately removed by the 18:23Z merge tick BEFORE this tick's
+re-verify ran. The recorded evidence (rb59-X1 total=60 rb59=4/60; rb59-X5:CI-GREEN) was captured
+live during the run itself, pre-cleanup -- this is the known cost of verifying after cleanup rather
+than before merge, not a forged gate. X2/X3 spotcheck/reverify agree with recorded evidence. Ledger:
+5/6 met, X6 deferred to backlog (PvP opponent-header screen-reader half, e2e hidden dependency --
+full reasoning in memory/projects/monster-realm-rb-59-plan.md and the previous handoff entry above).
+
+Ledger row appended (outcome merged(PR#444->292627e); cost NOT re-derived, already captured by the
+wrapper-reconcile FINISHED row at 18:07:56Z, cost_usd=52.2947). Releasing the stale chain-owner mutex
+and the rb-59 per-run lock next; mr-gates residuals close --slice rb-59 --pr 444 --force (X6 DEFERred
+onward, so the plain close would refuse). mr-state.json to be rewritten: rb-59 removed from inflight,
+master{sha,ci} advanced to 292627e/success.
 ## 2026-09-06T16:02:16Z — 16:00Z tick — orphaned handoff recovery + launched rb-59
 Native tick mr-sup-native-20260906T160010Z-3587085 (16:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no live rooted-run pid, no .done/pending events -> fast-path did not apply. FOUND orphaned uncommitted handoff writes from the 15:00Z tick (mr-sup-native-20260906T150014Z-3574624): its mr-state.json commit (d73e777) landed but the accompanying monster-realm-handoff.md/handoff-archive-2026-09.md edits (rb-64/PR#104 promote entry) were left uncommitted in the working tree -- verified content matched already-merged ground truth (5dc533f/d73e777/PR#104 all confirmed via git log), no active human session (no resident IDE claude pid, no non-housekeeping writes in last 6min), committed directly (4e327e6) and pushed. Re-verified live: master@1e0df19 CI green (ci/e2e both success), no open PRs either repo, inflight[]/awaiting_merge[] empty. Gate-3: mr-gates residuals list --unclaimed showed 59 open unpromoted residuals, oldest R-rb-40-* at 2.58d -- none past t1_promote_days=3, so residuals did not outrank queue[]. queue[] head = rb-59 (added 2026-09-06T05:53:29Z, promoted residual R-m23-s8-postmerge-border) -- re-verified live: spec heading present at M-residual-backlog.spec.md:69, no blocked:, source m23-s8 already merged (b5302aa/#413), rb-59 not already merged (checked gh pr list --search + git log --all --grep, no hit). Derived touches from source-slice diff + live grep: client/src/ui/battleView.ts:109/116/343 carry the same colour-only #844/#484 red/green border defect class m23-s8's A11Y-29 SSOT already fixed elsewhere in this file -- LOW/MED severity, no schema/reducer/netcode/security/M20/M25 touch -> tier=routine, opus@high. No ADR reserved (bugfix within an already-ADR-0233-covered surface, same class as rb-56/rb-57/rb-58 siblings). free -g showed 37G free, ample. LAUNCHED cleanly via mr-spawn: leader=3588972 claude_pid=3588975 rid=mr-spawn-20260906T160149Z-3588913 repo=project pr_repo=mdrewt/monster-realm (gate-seed criteria=0 -- the residual-backlog entry format has no explicit SHALL bullets to seed from; noting for gate-3 read at merge time, not a launch blocker). queue-removed rb-59. One ledger LAUNCHED row recorded. Governor NORMAL (d7=$1175.11/2783=42.2% eff., fable_d7=$421.67/2298, fable_ok=true -- unaffected, opus-tier launch). No BLOCKERs, no rate-limit event. queue[] now: rb-60, rb-64. Single mutating action this tick was the launch (handoff-recovery commit treated as record-recovery, not the tick's mutating action, consistent with prior-tick precedent).
 ## 2026-09-06T15:03:20Z — 15:00Z tick — orphaned-state commit + residual promote (rb-64)
@@ -3773,5 +3887,3 @@ Native tick mr-sup-native-20260905T230008Z-2196410 (23:00Z, cron). Gate-0/1: no 
 Native tick mr-sup-native-20260905T220007Z-2183467 (22:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no live rooted-run pid, no .done/pending events. FOUND: the 20:55Z merge tick (17r-f/PR#437) had written its mr-state.json/handoff/handoff-archive updates to disk but the process ended before commit -- verified against live ground truth (PR#437 state=MERGED via gh, origin/master HEAD=9fc5223 via git fetch, master CI success for 9fc5223) and committed+pushed as-is (5796652), matching the recurring 08:00Z/09:20Z/09:36Z/09:43Z-tick gap noted in the last tick's recent_blockers. Gate-1: both repos fetched clean, no open PRs, no active human session (no resident IDE pid, no non-supervisor writes <6min, handoff/ledger mtimes matched). Took chain-owner mutex. Gate-3: queue[] empty; mr-gates residuals list --unclaimed showed 71 open, 6 past t1_promote_days=3 (all m23-s8-postmerge* variants, disclosed 2026-09-02T20:02Z). Classified per work-selection-scope: all 6 are real game-defect residuals (content-pipeline validation timing, colour-only a11y cues, token dedup, fallback entropy) -- none is eval-tooling-only, so none dispositions wontfix. Promoted the oldest (R-m23-s8-postmerge, disclosed_at 20:02:17Z, ahead of its 5 siblings at 20:02:30Z) via mr-gates residuals promote -> rb-54 in M-residual-backlog.spec.md, then mr-record queue-add. Shipped as doc-only chore PR#100 (chore/residual-promote-20260905T220007Z, mdrewt/claude-harness), touching only the spec file + mr-state.json queue[]; squash-merged immediately (no required checks fired), local main fast-forwarded to 3e2705d, remote+local branch deleted. Left 5 sibling m23-s8-postmerge-* residuals and R-rb-36-*/R-rb-38-E1/etc for future ticks (one promote per tick per doctrine). No feature-slice launch this tick (the promote is the tick's one action; rb-54 launches off the fast path next tick). Governor NORMAL (d7=$946.88/2783 eff., fable_d7=$421.67/2298, fable_ok=true). No merge of project work, no BLOCKER, no rate-limit event. Standing down.
 ## 2026-09-05T20:55:22Z — 17r-f merged (PR#437) — frame-loop pushError wiring
 Merged 9fc5223: frame()'s catch in main.ts now calls pushError (previously console.error only), keeping finally{requestAnimationFrame(frame)} re-arm intact. New main.frameErrorWiring.test.ts (forced-throw case) + main.wiring.test.ts additions. mr-audit CLEAN across orchestration/gating_advisory/acceptance (1/1 gate met, spotcheck agrees); ARCHITECTURE.md + docs/adr/0130-client-observability.md updated (ADR amendment, no new ADR number). Worktree+branch cleaned, local master ff'd to 9fc5223. Master CI for the merge commit was in_progress at record time — re-verify next tick. 18r-c (M20 OBS-48 doc reword, PR#99) remains merged from prior tick; both slices from the 19:00Z launch batch are now closed.
-## 2026-09-05T20:46:30Z — 20:45Z tick — 17r-f e2e chronic flake, reran + delegated CI-wait
-Gate-0: no live per-run locks, no chain mutex, HOLD-NONE (queued_events=1, oldest_event_age_h=0.1). No .done files. Gate-1: monster-realm fetched clean; no active human session (no resident IDE claude pid, no non-.git/node_modules/target writes in either repo in the last 6 min, handoff/ledger/state mtimes all ~15-19min stale vs now). Took chain-owner mutex. Gate-3 event: 17r-f.ci.md reported PR#437 (feat/17r-f-frame-catch-pusherror) e2e=fail, ci=pass, mergeStateStatus=UNSTABLE. Read the full failed-job log (run 33990035009) past the truncated WARNING-spam tail: single failure among 77 e2e tests -- e2e/ranked-forfeit.spec.ts:265 m17c RL-18 "ranked forfeit flow ... zero-sum profile assertion", 120s timeout, 75 passed/1 skipped/1 failed. Read PR#437's diff/body: touches ONLY client/src/main.ts (frame() catch now tags/dedupes/pushes to the F9 error ring per ADR-0130 amendment), main.wiring.test.ts, a new main.frameErrorWiring.test.ts, docs/adr/0130 amendment, ARCHITECTURE.md -- zero overlap with PvP/ranked/disconnect code. Cross-checked memory: this exact test (client/e2e/ranked-forfeit.spec.ts:265, RL-18) has flaked on master/PR CI at least 7 prior times now (11r-i, m20e, 14r-a, m22-s1, rb-16, plus two September recurrences on m22-s5 and m22-s3b's own runs) -- every prior occurrence was diff-disjoint from PvP/ranked code and resolved by a plain job rerun, never a real regression, never a revert or fix-forward. Classified this as the same chronic infra flake, not a regression signature from 17r-f's change. Action taken (the tick's one mutating action): `gh run rerun 33990035009 --repo mdrewt/monster-realm --failed` (exit 0). Delegated the CI wait: `setsid bash mr-ci-watch 437 17r-f` (detached, disowned, pid 2168180) -- resumes via event tick rather than polling. No merge attempted (checks not yet green post-rerun). No launch attempted (fan-out already at cap consideration deferred; single mutating action discipline). Governor NORMAL (d7=$945.34/2783=34.0% eff., fable_d7=$421.67/2298, fable_ok=true). queue[] empty, park_counters unchanged ({14r-e: 1}). No BLOCKER raised. Released chain-owner mutex at tick end.
