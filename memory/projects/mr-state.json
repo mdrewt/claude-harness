@@ -7,12 +7,12 @@
   "sha": "0a187ba"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-07T13:00:11Z",
+ "last_tick_utc": "2026-09-07T16:44:00Z",
  "live_watchers": [],
  "master": {
-  "ci": "success",
+  "ci": "in_progress-pending-reverify",
   "nightly": "success",
-  "sha": "3d2c1857d55de0bacba15bcffae4bb65ac6bf0b8"
+  "sha": "42b6663d8c82fea70e0991c987d2ada0189c6351"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,22 +27,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "13:00Z tick (cron): committed orphaned rb-66 merge record from the 12:17Z tick (verified against live ground truth first) -- 5b82836. Promoted R-rb-40-ADR0220 -> rb-67 (ADR-0220 D2 stale purge_export_bundles signature), age 3.46d at promotion, past t1_promote_days=3; doc-only chore PR#107 merged to harness main (0a187ba); queued via mr-record queue-add. R-rb-40-ADR0230 remains unpromoted (one-action-per-tick discipline; next tick's natural pick).",
+ "notes": "rb-67 merged: PR#451 squash-merged to 42b6663 (closes R-rb-40-ADR0220); mr-gates verify CLEAN 6/6, mr-audit orchestration+gating CLEAN; residual closed; worktree/branches cleaned. Post-merge master CI run still in_progress at tick end -- next tick must re-verify green from live ground truth before trusting it. Residual backlog is large (89 open, cap 12 observe-only, 14 unpromoted past t1=3d) but not actioned this tick (one mutating action already spent on the merge) -- next tick's Pick-work gate should classify+promote/wontfix the oldest aged residuals per Work-selection scope before falling through to new PLAN section-9 work.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "slice": "rb-67",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-40-ADR0220 (t1_promote_days aging, ADR-0220 D2 stale purge_export_bundles signature)",
-   "added_utc": "2026-09-07T13:02:06Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "3d2c1857d55de0bacba15bcffae4bb65ac6bf0b8"
-  }
- ],
+ "queue": [],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
@@ -59,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260907T130011Z-1140106",
- "updated_utc": "2026-09-07T13:03:00Z"
+ "updated_by": "mr-sup-native-20260907T163727Z-1427936",
+ "updated_utc": "2026-09-07T16:44:00Z"
 }

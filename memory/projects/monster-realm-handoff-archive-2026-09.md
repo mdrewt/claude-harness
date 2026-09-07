@@ -1182,3 +1182,8 @@ and the rb-59 per-run lock next; mr-gates residuals close --slice rb-59 --pr 444
 onward, so the plain close would refuse). mr-state.json to be rewritten: rb-59 removed from inflight,
 master{sha,ci} advanced to 292627e/success.
 
+## 2026-09-06T20:02:01Z — 20:00Z tick — launched rb-60
+Native tick mr-sup-native-20260906T200011Z-3870707 (20:00Z, cron). Gate-0/1/2: no live locks/mutex, HOLD-NONE queued_events=0, no active-session collision. master CI green (rb-59 merge, PR#444, sha 292627e), harness ahead by 1 unpushed commit (fe23e67 - pushed this tick). Residuals: 66 unclaimed, all MED, max age 2.75d - none past t1=3d/t2=14d, no promotion needed. queue[] fast-path: rb-60 (docs/adr/0206:194 stale main.ts:1574 citation, source rb-36/rb-18 citation-drift chain) verified live-valid (heading exists, no after: deps, not merged) -> launched opus@high/routine tier via mr-spawn (leader pid 3872468). queue-remove'd rb-60; rb-64 remains queued next.
+
+## 2026-09-06T20:32:25Z — 20:31Z tick — rb-60 PR#445 open, CI-watch delegated
+rb-60 finished (opus, 1 attempt, gates 2/2 met). PR https://github.com/mdrewt/monster-realm/pull/445 opened (fix(rb-60): retarget ADR-0206 citation). CI checks (ci,e2e) pending at tick time — delegated to mr-ci-watch, resumes via event tick. No new launch this tick (governor NORMAL but one slice already in flight awaiting merge).
