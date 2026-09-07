@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-69 — X9-harness-spec-false-premise (from rb-42 X9-harness-spec-false-premise, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-42 · residual: R-rb-42-X9-harness-spec-false-premise
+
+Deferred with reason: `specs/monster-realm-v2/M-residual-backlog.spec.md`
+
+EARS: X9-harness-spec-false-premise
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-68 — ADR-0230's PRV1-17 evidence sentence ('accounts.rs has zero log::/mr_log calls') is false  (from rb-40 ADR0230, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-40 · residual: R-rb-40-ADR0230
