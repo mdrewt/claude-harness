@@ -7,12 +7,12 @@
   "sha": "0a187ba"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-07T18:46:03Z",
+ "last_tick_utc": "2026-09-07T23:36:04Z",
  "live_watchers": [],
  "master": {
-  "ci": "success",
-  "nightly": "success",
-  "sha": "b1b4ff6b5d87057d228a442c62c9f34c706ccde0"
+  "sha": "7d8d2900b5970430cabbe3b537407bb29b82f619",
+  "ci": "in_progress (post-rb-68-merge; re-verify next tick)",
+  "nightly": "success"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "native tick 19:00Z: reaped stale rb-9 lock (already merged prior tick); promoted R-rb-40-ADR0230->rb-68 via PR#108 (chore/residual-promote-20260907T190141Z), queue-added rb-68 for next tick fast-path launch.",
+ "notes": "native tick 23:36Z: merged rb-68 (PR#453, closed R-rb-40-ADR0230, disclosed 3 residuals). Gate-3 aging surfaced 20 unpromoted residuals past t1=3d, none eval-tooling-only; promoted oldest (R-rb-42-X9-harness-spec-false-premise, 3.56d) -> rb-69 via doc-only chore PR#109 (auto-merged), queue-added rb-69 for next-tick fast-path launch. master CI for 7d8d290 still in_progress at record time -- re-verify next tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -35,10 +35,10 @@
  "parked": [],
  "queue": [
   {
-   "slice": "rb-68",
+   "slice": "rb-69",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-40-ADR0230",
-   "added_utc": "2026-09-07T19:01:31Z",
+   "reason": "promoted residual R-rb-42-X9-harness-spec-false-premise",
+   "added_utc": "2026-09-07T23:42:46Z",
    "added_by": "n/a",
    "derived_from_master_sha": "b1b4ff6b5d87057d228a442c62c9f34c706ccde0"
   }
@@ -59,6 +59,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260907T184603Z-1675947",
- "updated_utc": "2026-09-07T18:57:00Z"
+ "updated_by": "mr-sup-native-20260907T233604Z-2099993",
+ "updated_utc": "2026-09-07T23:43:19Z"
 }
