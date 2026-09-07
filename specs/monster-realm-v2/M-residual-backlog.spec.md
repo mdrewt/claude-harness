@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-65 — The deletion cascade and request_data_export discard the purge count; cascade-wide erasure (from rb-40 CASCADE, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-40 · residual: R-rb-40-CASCADE
+
+Deferred with reason: purge_export_bundles now returns the purged chunk count (rb-40, ADR-0235) but the m22-s3b deletion-cascade site (accounts.rs account_deletion_reaper) and request_data_export's purge-before-write (privacy.rs) discard it. Cascade-wide observability is its own design: thirteen delegated erase_*/anonymize_* steps want ONE line, not thirteen, it touches every owning module, and PRV1-20 bars any line at
+
+EARS: The deletion cascade and request_data_export discard the purge count; cascade-wide erasure observability is undesigned
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-64 — privacy_tests.rs local write-attribution copy still uses the weaker rb22p ;-boundary rule (from rb-39 PRIVACY-LOCAL-PORT, deferred 2026-09-03)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-39 · residual: R-rb-39-PRIVACY-LOCAL-PORT
