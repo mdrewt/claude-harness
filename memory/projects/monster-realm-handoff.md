@@ -2,6 +2,76 @@
 
 ---
 
+## 2026-09-07T~14:3xZ — rb-9 PR#452 OPEN — A11Y-12 enforced by a computed-cascade differential oracle, not by matching '#' (ADR-0244, closes R-m23-s2-X3); local `just ci` GREEN (CI-EXIT=0); ledger 6/6 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/452 (branch `feat/rb-9-a11y-shell-reachability`,
+worktree `.claude/worktrees/rb-9`, forked from origin/master@42b6663 — master CI verified green;
+9 commits, all pushed, tree clean). `gh pr merge` NOT run. Main checkout left on `master`.
+
+Ledger **6/6 met, 0 unmet, 0 deferred** (`seed:e3b0c44298fc1c14`). mr-gates seeded **0** criteria
+(the spec's EARS line carries no literal `SHALL`), so X1-X6 were authored from the spec criterion +
+the DoD, per the rb-54/rb-58/rb-61 precedent. Run `mr-gates check --slice rb-9` FROM the worktree.
+Artifacts: `memory/projects/gates/rb-9.{gates.md,oracle.cjs}`, `memory/projects/monster-realm-rb-9-plan.md`.
+
+WHAT LANDED: `client/src/indexShellCascade.test.ts` (new, 825 lines, RB9-G1..G4) — a sheet-absent vs
+sheet-present differential over FULLY ENUMERATED `getComputedStyle`, targets `html`/`body`/5 pinned
+ids/6 child-payload ids, two render states, minus a frozen 31-entry `.sr-only` allowance compared by
+full entry string INCLUDING VALUE. Plus: three measured-false claims retracted in `indexShell.test.ts`,
+its A6b arm now PINS the parser-gap coverage, and the eval's `T-REAL2` claim NARROWED (not deleted).
+`styles.css` and `index.html` untouched.
+
+**SIX THINGS THE NEXT SLICE SHOULD KNOW:**
+1. **`git add -A` on a fresh worktree can commit an e2e harness's constant patches.** This branch's
+   FIRST checkpoint swept up `EXPORT_CHUNK_ROWS` 500->2, `DELETION_GRACE_MS_DEFAULT` 604_800_000->15000,
+   and the SECURITY constants `ALLOWED_ISSUERS`/`ALLOWED_AUDIENCE` repointed at a loopback issuer — two
+   files outside `touches:`. `git status` reads CLEAN after the commit, so it surfaced ~2h later as a
+   Rust failure in an untouched crate. **Verify with `git diff origin/master HEAD --stat`, never
+   `git status`.** New memory card `git-add-all-sweeps-e2e-constant-patches`.
+2. **happy-dom is NOT a CSS-complete engine, and the gap is silent.** It DROPS `@layer` (named+anon),
+   `@scope(`, CSS nesting `&`, `[attr i]`, `@container`, `@media (prefers-contrast)`,
+   `@media (scripting)`, `@media (prefers-color-scheme: dark)` — each hides a pinned id in Chromium with
+   `AX=IGNORED` while any computed-style oracle reports ZERO. Two are true for the DEFAULT user.
+   Blindness is **whitespace-sensitive**: `@scope(body)` dropped, `@scope (body)` parsed.
+3. **`display` is NOT inherited — an ancestor-rule roster hole.** `html{display:none}` produces zero
+   offenders against a leaf-id roster while hiding everything. Probe `html`/`body` explicitly. Missed by
+   BOTH the planner and the `/simplify` lens; caught by the orchestrator's own spike.
+4. **A gate that false-REDs a planned sibling is its own defect.** `:root{--x:1px}` registered as an
+   offender until custom properties were skipped — M23 S9 ships `:root` tokens into this exact file.
+   Skipping costs nothing: a `var()` consumer attack still moves the CONSUMER's longhand.
+5. **The union of two oracles can have a hole neither has alone.** Verifier FAIL: a parse-gap at-rule
+   wrapping an INDIRECT selector escapes both (`@layer{body > button{visibility:hidden}}` blanks
+   `#help-hint`; `@layer{body > div:last-of-type{display:none}}` drops `#a11y-live` from the AX tree) —
+   measured `cascade=0 shape=0`, confirmed in Chromium. Never write "X subsumes Y" without measuring it.
+6. **ADR-0224's delete-on-touch rule can be WRONG to follow literally.** Deleting the eval's `T-REAL2`
+   would have dropped the nightly tier's ONLY executing A11Y-12 check, because `just a11y-e2e` runs eight
+   NAMED spec files and neither vitest file is among them. Narrow, don't delete, and say why in the ADR.
+
+RESIDUALS REGISTERED (all -> backlog): `R-rb-9-X3` (the union hole, item 5 — honest fix is a Playwright
+real-browser assertion), `R-rb-9-X4` (occlusion/clipping, PIXEL-PROVEN blank in Chromium at 213 crop
+bytes vs a 2496-byte control while every computed property is byte-identical — outside ANY
+computed-style oracle), `R-rb-9-X5` (the nightly `a11y-e2e` roster does not run the new spec; fixing it
+needs `justfile`, which is byte-pinned in lockstep by `evals/ci-gate-wiring.eval.mjs:984`),
+`R-rb-9-X1` (no CI-side suspension gate covers the new spec; deliberately NOT closed with a
+`SHELL_DELEGATIONS` entry, which is the meta-check pattern ADR-0224's amendment retires).
+
+touches-delta: `client/src/indexShellCascade.test.ts` (new, the deliverable), `docs/adr/0244-*.md`,
+`docs/adr/DIGEST.md` (regen), `ARCHITECTURE.md` (one appended record; **ADR next-free = 0245**).
+boyscout-delta: none.
+
+ORCHESTRATION: `planner` (opus); `reviewer` + `red-team` + `/simplify` on the PLAN in parallel — all
+three changed it, and red-team's finding REVERSED the plan's headline deletion; a separate `tester`
+authored the gating tests + `rb-9.oracle.cjs` (it correctly REFUSED to run them — a hook blocks the
+tester from executing tests, which is the split-ownership boundary working); a different agent
+implemented; `verifier` returned **FAIL** on doc truth (three measured-false claims in the slice's own
+prose), fix was prose-only and re-verified. `reducer-security-auditor`/`desync-guard` NOT spawned (no
+reducer, schema, netcode or game-rule change).
+
+Local gate: `just ci` **CI-EXIT=0** (`/tmp/rb9-ci-final.log`) — 2260 Rust tests, 108 client test files /
+3146 tests, **99/99 evals**, clippy `-D warnings`, fmt, security, wasm, client-typecheck,
+observability 8/8. X2 bite proof: **9/9 mutants killed** on the REAL `styles.css`, restore clean.
+
+---
+
 ## 2026-09-07T~02:5xZ — rb-61 PR#448 OPEN — main.a11yFocus.test.ts's drifted citation AND its fabricated `render(null)` call retargeted onto the M12d listener (closes R-rb36-FOCUSCITE); local `just ci` GREEN (CI-EXIT=0); ledger 2/2 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
 **TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
 PR https://github.com/mdrewt/monster-realm/pull/448 (branch `feat/rb-61-focus-citation`, worktree
@@ -3852,6 +3922,22 @@ touches-delta: `ARCHITECTURE.md` (slice record). boyscout-delta: `docs/adr/0220-
 
 NEXT TICK: poll PR#451 checks (`ci` + `e2e`); on green `mr-gates verify --slice rb-67` from the worktree, squash-merge, delete branch + worktree, close residual `R-rb-40-ADR0220`, promote the three new residuals, re-index the code graphs on the canonical checkout.
 
+## 2026-09-07T18:55:30Z — rb-9 merged (PR#452) — A11Y-12 shell reachability, cascade differential oracle
+Native tick mr-sup-native-20260907T184603Z-1675947 (18:46Z, cron). Gate-0: rb-9's per-run lock showed session_leader dead + .done present (rb-9.done.md event, rc=0, attempts=2, opus). PR #452 (feat/rb-9-a11y-shell-reachability) was open with mergeStateStatus CLEAN, mergeable, PR-level CI green (ci+e2e SUCCESS). Verified live: git remotes match declared repo, diff --name-only vs master ⊆ declared touches + doc set (ARCHITECTURE.md, docs/adr/0244-*, docs/adr/DIGEST.md). mr-gates verify --slice rb-9: CLEAN, 6/6 met/reverified (X1-X6), spotcheck on X2 (mutation roster) did not refute. mr-audit: orchestration CLEAN (6 agent roles incl planner/red-team/reviewer/tester/verifier), gating_advisory CLEAN (no deleted tests/removed asserts/skips), acceptance CLEAN 6/6. The audit's disposition-scan findings block is corpus-scoped (harness specs/ tree missing-disposition markers) and pre-existing/unrelated to this diff — not a rb-9 defect. Merged via gh pr merge --squash --delete-branch (b1b4ff6). Closed residual R-m23-s2-X3 via mr-gates residuals close --slice rb-9 --pr 452 (1 closed). Cleaned up worktree .claude/worktrees/rb-9 and local branch feat/rb-9-a11y-shell-reachability; local master fast-forwarded 42b6663->b1b4ff6. Master post-merge CI (run on b1b4ff6) was still status=in_progress at tick-record time — pre-merge PR-level checks (ci, e2e) were both SUCCESS on the same commit content, so this is a low-risk pending re-verification, not a red flag; a background poller (/tmp/rb9-postmerge-ci.log) is tracking it informally but is NOT a substitute for the next tick's live gh run list re-check. No new work launched this tick (deferred composite merge->launch until master CI on b1b4ff6 is confirmed green) — 91 unclaimed residuals remain (was 92 before this tick's close), queue[] empty, no parked slices. Governor NORMAL (d7=691.66/783 effective, fable_ok=true).
+## 2026-09-07T17:03:33Z — rb-9 launched (t2-stale residual R-m23-s2-X3)
+Native tick mr-sup-native-20260907T170035Z-1482932-27140 (17:00Z, cron). Gate-0/1: no live locks/mutex, HOLD-NONE, no active-session collision, master CI green (42b6663, rb-67 PR#451). No queue[] entries, no inflight/awaiting_merge, no open PRs.
+
+Gate 3 pick-work: mr-gates residuals list surfaced 76 unclaimed residuals. Alarm residual-stale flagged R-m23-s2-X3 past t2=14d (age 14.1d) — outranks everything per aging doctrine. It was already promoted 2026-08-29 to spec section rb-9 (M-residual-backlog.spec.md) but never actually launched — no PR, no ledger row exists for rb-9 anywhere. Classified per Work-selection-scope: this is a real accessibility defect (CSS selector techniques defeat the #help-overlay/#help-hint/#a11y-live A11Y-12 contract in Chromium, not merely an eval-script blind spot), so it is promotable/launchable, not wontfix.
+
+Also discovered mr-state.json's adr_next_free=243 is stale — docs/adr/0243-cascade-and-export-purge-observable.md (rb-65) already exists, so the counter should be 244. Correcting it in this tick's state write and reserving ADR-0244 for rb-9.
+
+Action taken: launched rb-9 (tier=routine; reason=no HARD-tier touches — a11y CSS/test slice, no schema/reducer/netcode/security/RLS/M20/M25 surface, first attempt). model=opus effort=high. touches: client/src/styles.css, client/index.html, client/src/indexShell.test.ts, evals/a11y-static-shell.eval.mjs (inherited+reviewed from source slice m23-s2 + the A11Y-12 eval it targets). Brief instructs porting the invariant into a real happy-dom/vitest test per ADR-0224 rather than patching the eval regex further, then narrowing/deleting the redundant eval check in the same slice. Reserved ADR-0244.
+
+mr-spawn required one correction: initial vars.json was missing the required `tier` field (BRIEF-RENDER-FAILED on first attempt) — added tier=routine, re-ran, LAUNCHED cleanly (leader=1485461, claude_pid=1485464, detached own-session confirmed via ps).
+
+gates seed: GATES-SEEDED rb-9 criteria=0 (spec section has no explicit numbered SHALL/EARS ids beyond the single inline EARS line — advisory, not a refusal).
+
+No merges, no parks this tick. Budget NORMAL (d7=$1632.04/$2783 weekly, fable_ok=true). Releasing chain mutex at tick end.
 ## 2026-09-07T16:44:08Z — rb-67 merged: ADR-0220 stale purge_export_bundles signature
 PR#451 (feat/rb-67-adr0220-signature) squash-merged to monster-realm master as 42b6663 (closes R-rb-40-ADR0220). Fix: retargeted ADR-0220's stale purge_export_bundles signature onto declaration-shaped citations, gated by a new ADR-to-source correspondence tooth (server-module/src/privacy_tests.rs, 1133 lines added). mr-gates verify CLEAN 6/6 (0 unmet/deferred); mr-audit orchestration CLEAN (10 agent calls: desync-guard/planner/red-team/reducer-security-auditor/reviewer/tester/verifier across opus-5+sonnet-5) and gating-test-integrity CLEAN (no removed asserts/skips/suppressions). Residual R-rb-40-ADR0220 closed via mr-gates residuals close. Worktree + local/remote branch cleaned up. Master fast-forwarded 3d2c185->42b6663; post-merge CI run in-progress at tick end (not yet confirmed green — next tick should re-verify). Residual backlog remains large (89 open, cap 12, 14 unpromoted past t1) per gates alarms; not actioned this tick (one mutating action per tick already spent on the merge).
 ## 2026-09-07T16:25:12Z — rb-67: PR#451 open, CI delegated
@@ -3920,19 +4006,3 @@ Native tick mr-sup-native-20260907T010012Z-172260 (01:00Z, cron). Gate-0: no liv
 ## 2026-09-07T00:08:51Z — rb-64 merged: privacy_tests.rs write-attribution ported to ADR-0234 rooted-chain walk
 PR#446 squash-merged (0064f191, master fast-forwarded). Closes residual R-rb-39-PRIVACY-LOCAL-PORT: privacy_tests.rs's local rb22p_write_targets rewritten from string-sentinel poison markers to a typed Vec<Result<String, WriteAttrFault>>, verbatim-equivalent to ADR-0234's write_target_accessors/rooted_chain_accessor (accounts_tests.rs). Closes the same-statement-foreign-write gap measured at rb-39 (F4 RED-before). 9 new rb64p_ tests (RED-before/GREEN-after measured), 18/18 mutants killed, just ci-fast 859/859. Audit: orchestration CLEAN (8 roles incl reducer-security-auditor+verifier); gating_advisory tripped its mechanical tripwire (2 modified asserts) but on read this is a strict strengthening (adds UfcsSpelling refusal case) not a weakening -- adjudicated CLEAN. mr-gates verify 5/5 CLEAN. 4 new MED residuals recorded (unpromoted, in mr-residuals.jsonl): R-rb-64-ADR0234-STALE (ADR-0234/0226 bodies describe the pre-port rule, present tense), R-rb-64-XFILE-NARRATION (stale cross-file line citations), R-rb-64-SHARED-PAREN-LESS (shared helper missing privacy.rs's two new total bans), R-rb-64-SPLIT-BINDING-PRIVACY (guest-claim-integrity eval's split-binding clause scans accounts.rs only, privacy.rs ungated). Worktree/branch cleaned (local + remote). No ADR minted (adr_next_free stays 243).
 
-## 2026-09-06T23:43:24Z — 23:41Z tick — master CI red (flake, re-run triggered); rb-64 PR#446 pending
-Native tick mr-sup-native-20260906T234155Z-122761 (23:41Z, cron, src=done rid=rb-64.done).
-
-Gate 0: rb-64 per-run lock present but leader 4060425 not alive, .done present (EXIT=0 ATTEMPTS=1 model=fable) -- chain finished, not live. No chain-owner mutex held. mr-hold status: HOLD-NONE, queued_events=1.
-
-rb-64 (privacy_tests.rs write-attribution port, closes R-rb-39-PRIVACY-LOCAL-PORT) opened PR#446 (feat/rb-64-privacy-write-attribution-port, head c9e6e98) with mr-gates render 5/5 met, 0 deferred, cost $71.37 (fable@xhigh). Worktree cleaned. mergeStateStatus=UNSTABLE, mergeable=MERGEABLE, checks pending at record time -- did NOT merge this tick (see below, master CI red took priority; also checks weren't green yet).
-
-Gate 3: master (f687d25) CI came back FAILURE on run 34059292123 (`fix(rb-60): retarget ADR-0206's drifted main.ts citations...`, PR#445, merged prior tick). Per doctrine, master-red outranks all other work this tick. Investigated: PR#445's diff is doc-only (ARCHITECTURE.md +2/-0, docs/adr/0206-*.md +16/-14) -- no code or test files touched. The failure is a single e2e test: e2e/wallet-balance.spec.ts:911 "11r-e (ADR-0169) ... precondition (a)" -- quest_001 never started via elder_oak dialogue after 5 attempts, in an unrelated area (dialogue/quest system, nothing to do with ADR-0206 citation text). This is the first failure in the visible run window (rb-54..rb-59 and Nightly all green just before); textbook flake signature (unrelated file, doc-only diff, single test, no prior recurrence visible). Action taken: `gh run rerun 34059292123 --failed` to get an independent re-run before treating this as a real regression -- did not revert or edit anything, since there's nothing in the diff to revert that could plausibly cause this.
-
-This is the tick's ONE mutating action. Did not also merge rb-64 (PR#446 checks weren't green/its mergeStateStatus was UNSTABLE, and master-red takes precedence structurally regardless).
-
-NEXT TICK: re-verify master CI live (job 34059292123 rerun, or whatever run is now HEAD-of-branch for f687d25) is green before trusting `master.ci`. If green, confirm rb-64/PR#446 checks are green and its mergeStateStatus is clean, then proceed to `mr-gates verify --slice rb-64` + `mr-audit` (tier=hard, mandatory read) before merging. If the rerun ALSO fails on the same quest_001 assertion, escalate: stop treating it as a flake, bisect against rb-59/rb-58 instead (last two slices before the failure appeared), since two independent runs failing removes the "1st-observed-failure" flake heuristic's cover.
-
-Budget: NORMAL, d7=$1337.82/2783=48.1%, fable_d7=$493.04, fable_ok=true. No blockers raised. rate_limit: no trip.
-## 2026-09-06T20:53:50Z — 20:46Z tick — merged rb-60 (PR#445), composite-launched rb-64
-Native tick mr-sup-native-20260906T204617Z-4018869 (20:46Z, ci-forced). Gate-0: no live locks/mutex, HOLD-NONE queued_events=1 (rb-60.ci.md, green). Re-verified PR#445 (rb-60) live: mergeStateStatus=CLEAN, ci+e2e pass. mr-gates verify: CLEAN 2/2 met, seed match. mr-audit: policy=CLEAN (no policy-mandated read, doc-only tier=routine), acceptance CLEAN, disposition findings are pre-existing corpus-wide (not this diff). Squash-merged PR#445 (feat/rb-60-adr0206-citation -> master, f687d25); removed worktree .claude/worktrees/rb-60, deleted local+remote branch, ff-only synced master. Master CI re-triggered post-merge (in_progress at record time; identical commit already passed as PR checks pre-merge, low risk). Ledger cost for rb-60 came back COST-UNKNOWN from mr-record --from-log; corrected via a CORRECTION(merged) row with total_cost_usd=16.9029 read directly from the single result event in /tmp/mr_pass_rb-60.log. Composite action: queue[0] was rb-64 (promoted residual R-rb-39-PRIVACY-LOCAL-PORT, privacy_tests.rs local write-attribution helper still on the weaker rb22p ;-boundary rule vs rb-39/ADR-0234's hardened shared write_target_accessors). Re-verified live: spec section exists, not blocked:, no after: deps, no existing PR/branch. Classified as a real security/privacy-test-correctness fix, not an eval-tooling-only residual (ADR-0224 scope), so it proceeds normally rather than wontfix. tier=hard (touches privacy_tests.rs, security-adjacent) -> launched fable@xhigh via mr-spawn; GATES-SEEDED (0 criteria — inherited touches, spec text has no numbered SHALL yet); LAUNCHED, detachment+model verified live (session_leader 4060425, claude_pid 4060428, cmd shows --model fable --effort xhigh). queue-removed rb-64 after launch. Two findings surfaced by the rb-60 run's own summary, NOT actioned this tick (recording for triage): (1) ADR-0206 has systemic citation rot — 4/4 other spot-checked citations (ADR lines 17,19,48,93) drifted ~250-280 lines, same class as rb-18/rb-36/rb-60; candidate for a dedicated mass-recitation slice. (2) rb-59 (PR#444) merged with no ARCHITECTURE.md entry — the file's slice-record run currently skips from rb-58 to rb-60. Budget: d7_usd 1248.36/2783 (44.9%), fable_d7 421.67, state NORMAL, fable_ok true — no governor constraint hit. Residual count remains high (81 open, cap 12, observe-only per current doctrine phase) — not actioned, consistent with ADR-0224 aging-based promotion (rb-64 was the oldest queued item, not a fresh promotion this tick).

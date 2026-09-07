@@ -1,5 +1,5 @@
 {
- "adr_next_free": 243,
+ "adr_next_free": 244,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
@@ -7,12 +7,12 @@
   "sha": "0a187ba"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-07T16:44:00Z",
+ "last_tick_utc": "2026-09-07T18:46:03Z",
  "live_watchers": [],
  "master": {
   "ci": "in_progress-pending-reverify",
   "nightly": "success",
-  "sha": "42b6663d8c82fea70e0991c987d2ada0189c6351"
+  "sha": "b1b4ff6b5d87057d228a442c62c9f34c706ccde0"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "rb-67 merged: PR#451 squash-merged to 42b6663 (closes R-rb-40-ADR0220); mr-gates verify CLEAN 6/6, mr-audit orchestration+gating CLEAN; residual closed; worktree/branches cleaned. Post-merge master CI run still in_progress at tick end -- next tick must re-verify green from live ground truth before trusting it. Residual backlog is large (89 open, cap 12 observe-only, 14 unpromoted past t1=3d) but not actioned this tick (one mutating action already spent on the merge) -- next tick's Pick-work gate should classify+promote/wontfix the oldest aged residuals per Work-selection scope before falling through to new PLAN section-9 work.",
+ "notes": "rb-9 (residual R-m23-s2-X3, A11Y-12 shell reachability) MERGED this tick: PR#452 squash-merged to b1b4ff6, mr-audit CLEAN (orch/gating/acceptance 6/6), mr-gates verify CLEAN 6/6, residual R-m23-s2-X3 closed via mr-gates residuals close. Worktree+branch cleaned, local master ff'd 42b6663->b1b4ff6. NOT re-verified: post-merge master CI on b1b4ff6 was still status=in_progress at record time (pre-merge PR-level ci+e2e checks were both SUCCESS on identical commit content, so low risk) -- next tick MUST re-check `gh run list --repo mdrewt/monster-realm --branch master --limit 1` live before trusting master.ci here or launching new work off this sha. No composite merge->launch this tick pending that reverify. 91 unclaimed residuals remain (92 before this tick's close).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -50,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260907T163727Z-1427936",
- "updated_utc": "2026-09-07T16:44:00Z"
+ "updated_by": "mr-sup-native-20260907T184603Z-1675947",
+ "updated_utc": "2026-09-07T18:57:00Z"
 }
