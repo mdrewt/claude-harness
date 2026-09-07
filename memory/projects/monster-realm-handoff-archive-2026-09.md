@@ -923,3 +923,149 @@ Gate-0: no live per-run locks, no chain mutex, HOLD-NONE (queued_events=1, oldes
 ## 2026-09-05T20:55:22Z — 17r-f merged (PR#437) — frame-loop pushError wiring
 Merged 9fc5223: frame()'s catch in main.ts now calls pushError (previously console.error only), keeping finally{requestAnimationFrame(frame)} re-arm intact. New main.frameErrorWiring.test.ts (forced-throw case) + main.wiring.test.ts additions. mr-audit CLEAN across orchestration/gating_advisory/acceptance (1/1 gate met, spotcheck agrees); ARCHITECTURE.md + docs/adr/0130-client-observability.md updated (ADR amendment, no new ADR number). Worktree+branch cleaned, local master ff'd to 9fc5223. Master CI for the merge commit was in_progress at record time — re-verify next tick. 18r-c (M20 OBS-48 doc reword, PR#99) remains merged from prior tick; both slices from the 19:00Z launch batch are now closed.
 
+## 2026-09-05T22:02:42Z — 22:00Z tick — recovered 20:55Z tick record + promoted rb-54
+Native tick mr-sup-native-20260905T220007Z-2183467 (22:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no live rooted-run pid, no .done/pending events. FOUND: the 20:55Z merge tick (17r-f/PR#437) had written its mr-state.json/handoff/handoff-archive updates to disk but the process ended before commit -- verified against live ground truth (PR#437 state=MERGED via gh, origin/master HEAD=9fc5223 via git fetch, master CI success for 9fc5223) and committed+pushed as-is (5796652), matching the recurring 08:00Z/09:20Z/09:36Z/09:43Z-tick gap noted in the last tick's recent_blockers. Gate-1: both repos fetched clean, no open PRs, no active human session (no resident IDE pid, no non-supervisor writes <6min, handoff/ledger mtimes matched). Took chain-owner mutex. Gate-3: queue[] empty; mr-gates residuals list --unclaimed showed 71 open, 6 past t1_promote_days=3 (all m23-s8-postmerge* variants, disclosed 2026-09-02T20:02Z). Classified per work-selection-scope: all 6 are real game-defect residuals (content-pipeline validation timing, colour-only a11y cues, token dedup, fallback entropy) -- none is eval-tooling-only, so none dispositions wontfix. Promoted the oldest (R-m23-s8-postmerge, disclosed_at 20:02:17Z, ahead of its 5 siblings at 20:02:30Z) via mr-gates residuals promote -> rb-54 in M-residual-backlog.spec.md, then mr-record queue-add. Shipped as doc-only chore PR#100 (chore/residual-promote-20260905T220007Z, mdrewt/claude-harness), touching only the spec file + mr-state.json queue[]; squash-merged immediately (no required checks fired), local main fast-forwarded to 3e2705d, remote+local branch deleted. Left 5 sibling m23-s8-postmerge-* residuals and R-rb-36-*/R-rb-38-E1/etc for future ticks (one promote per tick per doctrine). No feature-slice launch this tick (the promote is the tick's one action; rb-54 launches off the fast path next tick). Governor NORMAL (d7=$946.88/2783 eff., fable_d7=$421.67/2298, fable_ok=true). No merge of project work, no BLOCKER, no rate-limit event. Standing down.
+
+## 2026-09-05T23:02:30Z — chore-changelog-refresh: nightly changelog-freshness fix (PR#438)
+Native tick mr-sup-native-20260905T230008Z-2196410 (23:00Z, cron). Gate-0/1: no live locks/mutex, HOLD-NONE queued_events=0, no active-session collision. Both repos synced with origin. Push CI on master (9fc5223) green (ci+e2e success), but latest Nightly run (11:08Z) failed on changelog-freshness: CHANGELOG.md 50 entries / 7.5d behind. Treated as a master-red signal outranking the queued rb-54 residual per gate 3. Fix: ran `just changelog` (git-cliff 2.13.1, pinned — required prepending $HOME/.cargo/bin to PATH, cargo/git-cliff were installed via asdf-managed rustup shims but not on the Bash tool's default PATH). Diff was a pure append of merged-PR entries. Opened chore/changelog-refresh-20260905T2300Z, PR#438, squash+auto-merged per doc-only-chore-PR doctrine, local master ff-only advanced to f4cd5a7. Deleted local+remote branch. NOTED, NOT ACTED: a stray orphaned docker/promtool process (pid 1289093, ~12.5h old) referencing the already-merged-and-deleted 17r-e worktree is still running on the host; it holds no lock and blocks nothing, but is host cruft worth a manual look. queue[] still holds rb-54 (untouched this tick) — next tick's fast path should pick it up.
+## 2026-09-06 — rb-60: ADR-0206 citation retarget — TERMINAL (PR#445 open, local gate green)
+
+**State: PR #445 open on mdrewt/monster-realm, local `just ci` GREEN on the final tree, remote CI
+running. Supervisor owns the merge — `gh pr merge` was NOT run.**
+Branch `feat/rb-60-adr0206-citation`, worktree `.claude/worktrees/rb-60` (4 wip commits, all pushed).
+Ledger: **2/2 met, 0 deferred, 0 unmet** (`rb-60 seed:e3b0c44298fc1c14`); evidence
+`rb60-ORACLE PASS ... hedge=4/4 visibleIds=400-402` and `rb60-X2:CI-GREEN`, both re-executable.
+
+Closed R-rb36-ADR0206CITE. Two files: the ADR paragraph (core + one boyscout citation) and one
+appended `ARCHITECTURE.md` record. `main.ts`/`overlayRegistry.ts` were read, never modified.
+
+**Owed at merge:** the code-graph refresh. Deliberately skipped — `master` is unchanged (292627e)
+and indexing the ephemeral worktree path is forbidden. Both graphs were confirmed fresh at 292627e
+at slice start; `codegraph sync` re-run clean.
+
+**Two findings declared for the supervisor, both real work not done here:**
+1. **ADR-0206 has systemic citation rot.** A 4-of-4 spot check of its other ~35 `main.ts:NNN`
+   citations found ALL FOUR drifted ~250-280 lines (ADR lines 17, 19, 48, 93). This slice fixed the
+   two the residual named; a mass recitation is its own slice, far past a boyscout cap. Worth
+   promoting: the same class has now produced rb-18 → rb-36 → rb-60, three slices deep.
+2. **rb-59 (#444) merged with no `ARCHITECTURE.md` entry.** Noticed while appending rb-60's; the
+   file runs rb-58 → rb-60 with rb-59 missing.
+
+**Process lessons worth carrying (all measured this slice, not speculation):**
+- **Red-teaming the artifact found what red-teaming the plan could not.** The plan red-team,
+  the reviewer, and a 20-row mutant register ALL passed a gate that the artifact red-team then broke
+  three ways in one pass. The bypass class: the gate checked that a cited line RANGE *contained* the
+  right tokens, never that it was the landmark's *extent* — so both endpoints stayed forgeable. Run
+  both lenses; they are not substitutes.
+- **`mr-gates check` flips the box but records nothing without an `EVIDENCE: pending` placeholder**
+  (already in memory as [[mr-gates-evidence-placeholder]] — I hit it anyway because I hand-authored
+  the ledger from rb-59's, which had its placeholders consumed). Cost one full `just ci` re-run.
+  Second re-run went to a stale `EXPECT` after the oracle's output string changed during hardening:
+  **any edit to a gate's output line must be re-matched against its EXPECT before spending a CI run.**
+- **Killing an in-flight CI needs a per-PID `/proc/<pid>/cwd` check.** A `pgrep -f "just ci"` here
+  returned a process whose cwd was the MAIN checkout — a sibling. Killing by pattern would have
+  taken it out.
+- **New memory card:** [[per-site-marker-gate-needs-a-bounded-window]] — a gate requiring the same
+  marker at each of several nearby sites must bound its window at a delimiter, not a character
+  count; sibling sites are each other's decoys.
+
+
+## 2026-09-06 — rb-55 COMPLETE (terminal state: PR open + local `just ci` green + remote CI running)
+
+**PR:** https://github.com/mdrewt/monster-realm/pull/440 · branch `feat/rb-55-status-token-dedupe`
+· worktree `projects/monster-realm/.claude/worktrees/rb-55` (left in place for the supervisor)
+**Acceptance:** 4/4 gates met with evidence, 1 DEFER registered (`X1-derivation -> backlog`).
+**Local gate:** `just ci` CI-EXIT=0 — 2238 Rust tests, 3119 client tests / 106 files, 99 evals
+(0 FAIL), clippy `-D warnings` + biome + fmt clean, observability 8/8. Log `/tmp/rb55-ci.log`.
+
+**What shipped:** one `describe`/one `it` in `client/src/ui/battleModel.test.ts` correlating
+`statusBadge()`'s RETURN to the `A11Y_TOKENS` const parsed out of `game-core/src/content.rs`, plus a
+comment truth pass in both files, ADR-0240, DIGEST regen, one ARCHITECTURE.md paragraph. **Production
+logic unchanged in both languages.**
+
+### THREE ITEMS NEEDING SUPERVISOR ACTION
+
+1. **ADR number collision — assigned 239 was TAKEN by rb-54** (merged in 75e9719). This slice used
+   **0240**. The launch-time assignment raced a merge again (same as ADR-225 previously). Worth
+   making the assigner read `docs/adr/` at launch rather than trusting the ledger.
+2. **`docs/adr/0233-a11y-colour-independence-token-ssot.md:179-182` keeps a now-FALSE sentence** —
+   "nothing correlates the two tables. A mechanical link would be a text scan (retired by
+   ADR-0224)". Both halves are false on delivery. ADR-0240 states the correction, but 0233 has no
+   back-link and this slice's `touches:` granted one NEW ADR only. **Unowned — needs a slice or a
+   widened grant.**
+3. **The DEFER needs materialising into a spec section:** `X1-derivation -> backlog`. rb-55 closed
+   the CORRELATION half of R-m23-s8-TSDUP; the DERIVATION half (client labels derived from shipped
+   data, not a second hand-maintained `switch`) needs an a11y-token table in
+   `server-module/src/schema.rs` + `content.rs`, a `spacetime generate` bindings regen, and a new
+   entry in the client subscription set in `client/src/net/connection.ts` — exact-set-pinned by
+   `EXPECTED_SUBSCRIPTIONS` in `evals/monster-privacy.eval.mjs`. Seed the successor's `touches:`
+   with all four.
+
+### Two declared gaps (registered, not papered over)
+
+- `battleView.ts:290` (`statusEl.textContent = card.status`) is unguarded. `battleView.ts` was IN
+  `touches:` but is pinned as source text by `evals/reduced-motion-hp-bar.eval.mjs`, so it was
+  deliberately left unedited. Nothing asserts `statusEl.textContent === card.status`.
+- The gate is a one-hunk deletion with no CI signal (no manifest lists client spec files). The
+  `include_str!` existence pin that would close it was REJECTED as the meta-check ADR-0224:133-141
+  retires — and because it would invert the core/shell layering `desync-guard` just blessed.
+
+### Process notes worth carrying forward
+
+- **`mr-gates check` run from the harness root wrote a FALSE GREEN.** X4's `just ci` CHECK
+  (`cwd: process.cwd()`) ran the HARNESS self-test, exited 0, and the box flipped with
+  `rb55-X4:CI-GREEN` evidence on a slice whose project CI had not run. Reset by hand and re-run from
+  the worktree. **Run `mr-gates check` from the slice worktree, always.** Memory updated.
+- **The artifact red-team earned its keep:** it measured FOUR bypasses that kept the entire gate set
+  green, two of which were anchors `/simplify` had cut from the plan as speculative. Measured attack
+  beats speculative false-RED — but note `/simplify` was right about the biggest thing (cutting a
+  data-table refactor that was pure motion). Run both; let measurement arbitrate.
+- **The verifier caught what six lenses missed:** an unticked MANUAL gate and a mutant tally that was
+  wrong and self-inconsistent across three files (including ARCHITECTURE.md). Ask it for mutants of
+  its own choosing — it added a coordinated both-sides rename that confirmed the Rust pin still bites.
+
+**Code-graph refresh deliberately skipped:** `master` is unchanged (nothing merged yet) and indexing
+the ephemeral worktree path is forbidden. Owed at merge, not now.
+
+
+## 2026-09-06 — rb-64: privacy_tests.rs write-attribution port onto ADR-0234 — TERMINAL (PR#446 open, local gate green)
+
+**State: PR #446 open on mdrewt/monster-realm (`feat/rb-64-privacy-write-attribution-port`, worktree
+`.claude/worktrees/rb-64`, 7 wip commits, all pushed; head c9e6e98), local `just ci` GREEN on the final commit,
+remote CI running. Supervisor owns the merge — `gh pr merge` was NOT run.**
+Ledger: **5/5 met, 0 deferred, 0 unmet** (`rb-64 seed:e3b0c44298fc1c14`); X1 `9 tests run: 9 passed`, X2 `6/6`,
+X3 `CIFAST_EXIT=0`, X4 MANUAL → `rb-64.red-before.md:14`, X5 `rb64-X5:CI-GREEN` (re-run after the last doc commit).
+
+Closed R-rb-39-PRIVACY-LOCAL-PORT. Two files: `server-module/src/privacy_tests.rs` (the declared touches: the walk
+port, nine `rb64p_` tests, caller re-binding, doc truth) and one `ARCHITECTURE.md` record. No ADR minted (none
+reserved; ADR-0234 already records the decision). Durable memos beside the ledger: `rb-64.plan.md`,
+`rb-64.red-before.md`, `rb-64.mutant-register.md` (18/18 killed), `rb-64.lens-measurements.md` (auditor +
+red-team outputs persisted verbatim after the verifier could not trace two ARCHITECTURE claims).
+
+**Residuals registered (4, all `backlog`, all outside touches):** `R-rb-64-ADR0234-STALE` (ADR-0234 four spans + the
+in-file-macro bullet measured false; ADR-0226:171), `R-rb-64-XFILE-NARRATION` (accounts_tests.rs:13712-13714 present
+tense, :14478 drifted citation, docs/plans/m22-s4-plan.md:260, +99..+804 citation drift in ADR-0226:24 /
+ADR-0238:115 / m22-s4-plan.md), `R-rb-64-SHARED-PAREN-LESS` (the shared helper has the same paren-less-verb /
+in-file-macro blind spot; port T9's two total bans), `R-rb-64-SPLIT-BINDING-PRIVACY` (the eval's split-binding
+clause scans accounts.rs only).
+
+**Findings for the supervisor:** auditor N1 — export cooldown is per identity and anonymous identities are free
+(pre-existing DoS knob); auditor N2 — the reducer-security-auditor checklist's `ctx.identity()` token is the
+deprecated 2.8.1 spelling (module is correct). Code-graph refresh owed at merge (master unchanged at f687d25).
+
+**Process lessons (all measured this slice; memory cards written):**
+- **The artifact red-team found two BLOCKER classes the plan red-team, three reviewers and a 14-cheat harness all
+  missed:** (1) every fixture census was length-1 Err or all-Ok, so drop-once-non-empty / cap-at-5 cheats passed
+  everything — [[census-shape-blind-spot-in-attribution-fixtures]]; (2) two verb spellings with no `verb(` token
+  (fn-item binding, in-file macro metavariable) produce NO census entry in either walk and passed 858/858 + 99/99 —
+  [[paren-less-verb-spelling-escapes-verb-needles]]. Plan-stage and artifact-stage red-teams found disjoint sets again.
+- **A tester sandbox detached from origin/master, not the slice HEAD, produced a whole-slice diff;** `patch` skipped all
+  13 hunks as already-applied and a `cp` over the sandbox destroyed the tester's round — recovered only because the
+  patch file was saved. [[sandbox-diff-base-must-be-the-slice-head]].
+- **The verifier rejected on prose whose measurements lived only in subagent transcripts.** Persist lens outputs
+  (probe source + deciding line) beside the ledger BEFORE the doc-keeper cites them; the doc-keeper cannot cite what
+  is not on disk, and the verifier is right to refuse it.
+- **A `just ci` CHECK needs `mr-gates check --timeout 2400` and a detached run + until-loop poll** (policy default
+  120 s; the Bash tool caps at 10 min). Re-run X5 after ANY post-check commit, even a one-line doc edit: reset the
+  box + `EVIDENCE: pending` by hand, never regex the block.
+
