@@ -3847,3 +3847,37 @@ Native tick mr-sup-native-20260906T030010Z-2482480 (03:00Z, cron). Gate-0: no li
 Native tick mr-sup-native-20260906T020011Z-2445973 (02:00Z, cron). Gate-0: no live locks/mutex, HOLD-NONE, rb-54 .done EXIT=0 already recorded, PR#439 CI green (event rb-54.ci.md), mergeStateStatus CLEAN/MERGEABLE. Verified live: base f4cd5a7, head 1678e31, diff = server-module/src/content.rs + content_tests.rs + ARCHITECTURE.md + docs/adr/0239-*.md + DIGEST.md — within declared touches + doc set, no structural-set files. mr-audit initially reported acceptance FLAGGED with an E1 EVIDENCE-MISMATCH ("cargo: not found") — root-caused to MY shell's PATH lacking ~/.cargo/bin (asdf shims only), not a real regression; re-ran mr-gates verify with PATH corrected and got 3/3 met, 0 unmet, evidence_drift only (timing, harmless). orchestration/gating_advisory both CLEAN. Merged PR#439 squash+delete-branch (gh reported branch-delete failure only because the local worktree at .claude/worktrees/rb-54 still referenced it — removed worktree + force-deleted local branch, ff-only'd master to 75e9719). Residual R-m23-s8-postmerge closed via mr-gates residuals close --pr 439. master CI run for 75e9719 still in_progress at time of this tick; not watched further this tick (queue empty, no in-flight slices, mutex released). NEXT TICK: verify master CI green for 75e9719 first before any composite launch; queue[] is empty and awaiting_merge[] should be cleared for rb-54 — pick next work per PLAN §9 / residual aging (8 residuals unpromoted past t1=3d per this audit's residual_alarms: R-m23-s8-postmerge-tsdup/title/tint +5 more — these outrank new PLAN work per gate 3 aging rule, classify each per Work-selection scope before promoting).
 ## 2026-09-06T01:49:46Z — rb-54 PR#439 CI pending — delegated to mr-ci-watch
 Native tick 2026-09-06T01:49Z: rb-54 rooted run finished (exit=0, 1 attempt, opus$49.99). PR#439 (feat/rb-54-content-load-validation) open, mergeable=MERGEABLE, mergeStateStatus=UNSTABLE (ci+e2e checks still pending). Harness acceptance ledger 3/3 gates met. No code/audit action needed yet — delegated CI-wait to mr-ci-watch (pid 2443071, detached). Next tick / event resumes the merge once checks resolve. No new slice launched this tick.
+
+## 2026-09-06 — rb-62 COMPLETE (PR #447 open, local gate green, remote CI running)
+
+**Slice rb-62** — retarget `client/src/ui/overlayA11yWiring.test.ts:287-295`'s drifted M12d
+citation, close residual R-rb36-WIRINGCITE. Branch `feat/rb-62-wiring-citation`, worktree
+`.claude/worktrees/rb-62`. **PR https://github.com/mdrewt/monster-realm/pull/447.**
+Terminal state per the brief: PR open + local `just ci` green + remote CI running.
+`gh pr merge` NOT run — supervisor owns the merge.
+
+- **Ledger 2/2 met, 0 deferred, 0 unmet** (`rb-62 seed:e3b0c44298fc1c14`). X1 = the inverted-direction
+  oracle `memory/projects/gates/rb-62.oracle.cjs`; X2 = full `just ci`.
+- Full `just ci` green **twice** (before and after the doc entry): nextest 2247/2247 passed 0 skipped,
+  vitest 3142 passed / 107 files, 99 evals PASS, CI-EXIT=0 both runs. Logs `/tmp/rb62-ci.log`,
+  `/tmp/rb62-ci2.log`.
+- Diff: 2 files, 6 insertions / 10 deletions. `overlayA11yWiring.test.ts` (declared touches:) —
+  every changed line is a `//` comment, 123/123 tests identical before and after.
+  `ARCHITECTURE.md` — rb-62 slice-log entry + 1 boyscout line at `:1997`.
+- Oracle: RED pre-fix, GREEN post-fix, **23/23 mutant register caught, 4/4 controls green.**
+- **BRIEF PREMISE WAS HALF STALE** — rb-37 (#415) had already boy-scouted this comment and its
+  ARCHITECTURE entry (`:2202`) already claimed to close R-rb36-WIRINGCITE. It fixed the false
+  meta-citation but kept a dated `:1627-1641` hint, which rb-52 (#435, +193 lines to main.ts) then
+  drifted. rb-62 closes the ledger row and the second-order drift.
+- **DEVIATION FROM THE BRIEF, deliberate and documented in the PR body:** the brief said "correct the
+  now-false meta-citation sentence"; rb-62 **DELETED** it instead. The residual exists because a
+  cross-file meta-claim went stale, and rb-37 had already rewritten it once before it drifted again —
+  a third rewrite re-arms the same trap. Archaeology now lives only in ARCHITECTURE.md's slice log.
+- **NEW RESIDUAL registered — R-rb-62-R-rb62-DIALOGUEVIEWCITE (target: backlog):** the same drifted
+  `:1627-1641` hint is still live at `client/src/ui/dialogueView.ts:17` and
+  `client/src/ui/dialogueView.test.ts:243`, `:290`, `:374` — four sites, grep-confirmed exhaustive.
+  Both files outside rb-62's touches:. The rb-62 oracle generalises by changing its `SPEC` constant.
+- Sibling rb-61 ran concurrently on `client/src/main.a11yFocus.test.ts` (file-disjoint). Both append
+  ARCHITECTURE.md records at EOF — **supervisor may need to reconcile that hunk at merge.**
+- Code graphs: main checkout untouched by this slice, `codegraph status` = up to date. No re-index
+  needed until the merge lands.
