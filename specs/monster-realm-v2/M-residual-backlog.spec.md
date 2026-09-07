@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-68 — ADR-0230's PRV1-17 evidence sentence ('accounts.rs has zero log::/mr_log calls') is false  (from rb-40 ADR0230, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-40 · residual: R-rb-40-ADR0230
+
+Deferred with reason: ADR-0230:114-117 records 'server-module/src/accounts.rs contains zero log::/mr_log calls of its own (measured)' as PRV1-17's evidence chain. Since rb-40 (ADR-0235) accounts.rs carries exactly one observability::mr_log call, inside complete_guest_claim, pinned at 1 file-wide by rb40 [emit/count-in-file]. PRV1-17 itself still holds (its SHALL names delete_account, cancel_account_deletion and the rea
+
+EARS: ADR-0230's PRV1-17 evidence sentence ('accounts.rs has zero log::/mr_log calls') is false since rb-40
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-67 — ADR-0220 Decision 2 still spells the pre-rb-40 purge_export_bundles signature (from rb-40 ADR0220, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-40 · residual: R-rb-40-ADR0220
