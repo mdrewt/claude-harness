@@ -6,25 +6,13 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "aa30580"
  },
- "inflight": [
-  {
-   "slice": "rb-66",
-   "leader_pid": 936939,
-   "claude_pid": 936942,
-   "rid": "mr-spawn-20260907T100245Z-936886",
-   "repo": "project",
-   "model": "opus",
-   "effort": "high",
-   "tier": "routine",
-   "started_utc": "2026-09-07T10:02:45Z"
-  }
- ],
- "last_tick_utc": "2026-09-07T10:00:07Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-07T12:17:30Z",
  "live_watchers": [],
  "master": {
-  "sha": "28f2c289b98c218874d258204349646de3d2ec74",
   "ci": "success",
-  "nightly": "success"
+  "nightly": "success",
+  "sha": "3d2c1857d55de0bacba15bcffae4bb65ac6bf0b8"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -39,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "10:00Z tick: found local harness main diverged from origin/main (unpushed 09:00Z tick-record commit b72ebb9 vs origin's independently-merged PR#106/45a72e1) -- both touched disjoint files, merged clean (aa30580) and pushed. queue[] head rb-66 re-verified live-valid and launched (opus@high, routine tier; ops/observability/grafana+rules+checks). R-rb-40-ADR0220/ADR0230 (both 3.33d, past t1_promote_days=3) remain unpromoted -- queue was served first per established precedent; next tick's natural promote pick once queue[] is empty again.",
+ "notes": "12:17Z tick (cron): merged rb-66 (PR#450, mdrewt/monster-realm master 3d2c185). mr-audit CLEAN (orchestration/gating_advisory/acceptance all CLEAN, 7/7 gates met) after fixing a bad --repo arg (must be a filesystem path, not 'owner/repo'). Closed R-rb-40-DASH residual. queue[] empty. Did NOT chain composite launch: gate-3's top pick (R-rb-40-ADR0220 / R-rb-40-ADR0230, both ~3.4d old, past t1=3d promote-aging) is unpromoted, and promote-a-residual is its own listed action, not part of the merge-then-LAUNCH composite -- next tick should promote one via gate 3.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -62,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260907T100007Z-934351",
- "updated_utc": "2026-09-07T10:03:30Z"
+ "updated_by": "mr-sup-native-20260907T121730Z-1116577",
+ "updated_utc": "2026-09-07T12:23:00Z"
 }
