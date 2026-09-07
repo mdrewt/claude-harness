@@ -2,6 +2,73 @@
 
 ---
 
+## 2026-09-07T~02:5xZ — rb-61 PR#448 OPEN — main.a11yFocus.test.ts's drifted citation AND its fabricated `render(null)` call retargeted onto the M12d listener (closes R-rb36-FOCUSCITE); local `just ci` GREEN (CI-EXIT=0); ledger 2/2 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/448 (branch `feat/rb-61-focus-citation`, worktree
+`.claude/worktrees/rb-61`, **rebased onto origin/master@84274d6** after rb-62 merged mid-slice;
+2 commits, pushed, tree clean). `gh pr merge` NOT run. Main checkout left on `master`.
+
+Ledger **2/2 met, 0 deferred, 0 unmet** (`seed:e3b0c44298fc1c14`). mr-gates seeded **0** criteria
+(the spec's EARS line carries no literal `SHALL`), so X1/X2 were authored from the spec criterion +
+the DoD, per the rb-54/rb-60 precedent. Run `mr-gates check --slice rb-61` FROM the worktree (cwd-relative).
+Artifacts: `memory/projects/gates/rb-61.{gates.md,oracle.cjs}`, `memory/projects/monster-realm-rb-61-plan.md`.
+
+WHAT LANDED: one declared file, `client/src/main.a11yFocus.test.ts`, +5/-3, comment-only.
+**The defect was TWO defects, not the one rb-36 disclosed:** `main.ts:1574` had drifted onto an
+unrelated `tradeProposeView` Escape branch, AND the call it quoted — `dialogueView?.render(null)` —
+**exists nowhere in the repo.** A fabricated call spelling that no line-number repair would catch.
+Retargeted onto the M12d `store.onBatchApplied` listener (`:1837-1887` today) with the real
+`dialogueView?.render(dialogueVm)`. This closes the LAST of rb-36's three (rb-60 #445, rb-62 #447).
+
+**FIVE THINGS THE NEXT SLICE SHOULD KNOW:**
+1. **A sibling's merged oracle is a list of bypasses yours shares.** The `verifier` returned **FAIL**:
+   rb-61's T1 banned two literal spellings of `main.ts:1574`, and `main.ts's line 1574` sailed through.
+   **rb-62 measured and fixed that exact bypass one PR earlier** ("an abort-construct blacklist is
+   unclosable by enumeration" → ban the DIGITS). Read a same-family sibling's oracle + ARCHITECTURE
+   record BEFORE your gate ships. New memory card `sibling-oracle-lesson-must-be-ported`.
+2. **An orphaned `spacetimedb-standalone` outlives its deleted worktree.** Three gate reds (one exit
+   137/OOM, two exit 1) were rb-62's stranded process, reparented to init, starving `account-e2e`.
+   Tell: `readlink /proc/<pid>/cwd` ends in `(deleted)` and ppid==1. Kill BY PID, never `pkill`.
+   New memory card `orphaned-spacetime-survives-worktree-deletion`.
+3. **The APPEND class beats every content tooth.** Red-team measured that arbitrary prose appended
+   into the audited span — including a trailing "CORRECTION: the above paragraph is WRONG" retraction —
+   passed with every tooth still reading the correct text above it. A span FLOOR is not enough; a
+   span-length CEILING is what closes it (11 lines today, ceiling 12).
+4. **A prose-gate oracle gates CITATIONS, not CLAIMS — say so, do not let a PASS overstate.** Three
+   mutants (inline self-contradiction, fabricated cause, unrelated causal disclaimer) print a
+   byte-identical PASS. Structural: hardcoding the narrative re-copies the drifting fact, and an
+   `expect(` is ADR-0224-forbidden here. Recorded in the oracle header, ARCHITECTURE and the PR.
+5. **`doc-keeper` drafts still need a diff fact-check.** Its ARCHITECTURE draft carried FOUR false or
+   garbled claims (it credited `/simplify` with the span ceiling, mis-cited principles for ADR-0163 D8,
+   mis-attributed the T2 fix, and re-disclosed a residual rb-62 already owned). Draft discarded and
+   rewritten by hand. Confirms `doc-keeper-drafts-need-diff-factcheck`.
+
+ORCHESTRATION: `planner` (opus); `reviewer` + `red-team` + `/simplify` on the PLAN in parallel (all
+three changed it — red-team's finding was blocking: the planned span-walk direction collected ZERO
+lines, so the gate could never have gone green); a separate `tester` authored + hardened
+`rb-61.oracle.cjs` (harness-side, ADR-0224); a separate implementer, forbidden from touching the
+oracle; `reviewer` + `red-team` on the artifact in parallel; `verifier` (returned FAIL once, fix
+routed back to the tester, re-verified). `reducer-security-auditor`/`desync-guard` NOT spawned (no
+reducer, schema, netcode or game-rule change — rb-51/52/53/54/60 precedent). Orchestrator independently
+re-ran the FULL 12-mutant battery after every gate edit rather than trusting subagent reports.
+
+RESIDUALS REGISTERED (both -> backlog): `R-rb-61-OVERLAYA11YCITE` (six sites in the same file cite
+`ui/overlayA11y.ts:111` for the deferred-focus macrotask; real is `:134-136`; six NON-CONTIGUOUS hunks
+vs the <=3-hunk boy-scout cap, so deferred WHOLE per ADR-0163 D8 / ADR-0164 D7 — partial de-drift
+leaves the file self-contradictory), `R-rb-61-MENUVIEWPREMISE` (`:316`/`:570-571` assert
+`MenuView.show()` never calls `openOverlayA11y`; m23-s6 falsified it at `ui/menuView.ts:135`, but
+`ARCHITECTURE.md:2125` records that dead premise as an accepted residual assigned to **S10**, so
+fixing it here would falsify that record and pre-empt S10).
+
+touches-delta: `ARCHITECTURE.md` (one appended record; ADR next-free carried forward unchanged at
+**0243**, no ADR minted). boyscout-delta: none.
+
+Local gate: `just ci` **CI-EXIT=0** (`/tmp/rb61-ci-final.log`, run on the FINAL rebased tree) —
+2247 Rust tests, 107 client test files / 3142 tests, **99/99 evals**, clippy `-D warnings`, fmt,
+security, wasm, client-typecheck, observability 8/8.
+
+---
+
 ## 2026-09-06T~18:2xZ — rb-59 PR#444 OPEN — battle card roles cued by border STYLE, not hue; local `just ci` GREEN (CI-EXIT=0); ledger 5/6 met, 1 deferred (SUPERVISOR OWNS THE MERGE)
 **TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
 PR https://github.com/mdrewt/monster-realm/pull/444 (branch `feat/rb-59-battle-card-role-cue`,
@@ -3759,6 +3826,13 @@ Promoting them is supervisor-only work outside any slice's `touches:`. Independe
 **Code-graph refresh deliberately skipped:** `main` is unchanged (nothing merged yet) and indexing the
 ephemeral worktree path is forbidden. No project code was touched, so no re-index is owed.
 
+## 2026-09-07T02:52:43Z — rb-61 merged (PR#448) — main.a11yFocus.test.ts citation repaired
+Native tick mr-sup-native-20260907T024715Z-493111 (02:47Z, cron ci-forced). Event: rb-61.ci.md reported PR#448 all checks green. Re-verified live: gh pr view 448 CLEAN/MERGEABLE, both checks (ci, e2e) SUCCESS. Took chain mutex. mr-audit --slice rb-61 --tier routine: policy CLEAN (no mandatory read), orchestration CLEAN, gating_advisory CLEAN, acceptance CLEAN (2/2 met, X2 spotcheck agreed rb61-X2:CI-GREEN). Merged via gh pr merge --squash --delete-branch -> bd04eb3 (#448). Closes residual R-rb-36-R-rb36-FOCUSCITE. Fast-forwarded local project checkout to origin/master, removed the rb-61 worktree + local branch, remote head/base branches auto-deleted. mr-gates residuals close --slice rb-61 --pr 448 succeeded. A post-cleanup mr-gates verify on rb-61 shows FLAGGED/EVIDENCE-MISMATCH on gate X2 (WRONG-TREE) -- this is an artifact of the worktree already being removed by cleanup, not a defect; the pre-cleanup mr-audit run already captured X2 agreeing CI-GREEN and is the authoritative evidence. Ledger cost reconciliation: the merge row's --from-log scan missed this log's compact (no-space) '"type":"result"' JSON and recorded COST-UNKNOWN; appended a cost-reconciled row with the manually-confirmed total_cost_usd=27.5215 (sum both rows for true slice cost) -- worth a look at mr-record's result-event regex if this recurs. master CI on bd04eb3 was still in_progress at tick end (started ~02:51Z); not re-polled further to respect the no-sleep-loop rule -- next tick/event should confirm green. No new work launched this tick (single action = the merge); residual_alarms from mr-gates note 85 open residuals incl. 6 past t1=3d unpromoted -- a future tick's gate-3 pass should work the aging queue per doctrine. Governor state NORMAL (d7=$1384.52/$2783 weekly, fable_ok=true).
+## 2026-09-07T02:34:17Z — rb-61 PR#448 open — CI-watch delegated
+Native tick mr-sup-native-20260907T023335Z-490200 (02:33Z, event: rb-61.done.md). rb-61 run finished rc=0, attempts=1, model=opus, cost $27.52 (ledger FINISHED row already recorded by wrapper). Local worktree just ci was CI-EXIT=0 on the rebased tree (99 evals, 2247 Rust, 3142 client tests) before push; gates ledger 2/2 met, 0 deferred. Opened PR#448 (feat/rb-61-focus-citation -> master). Re-verified LIVE: gh pr view 448 shows mergeStateStatus=UNSTABLE, mergeable=MERGEABLE, remote GH Actions checks (ci, e2e) still IN_PROGRESS (started 02:30:45Z) — this is the remote CI run, separate from the worktree's local just ci. Delegated the wait to mr-ci-watch (pid 491339, detached) rather than polling. No merge action taken this tick. Governor NORMAL (d7=$1384.11/$2783 eff). No blockers. Next: mr-ci-watch fires an event tick on conclusion; that tick re-verifies live and merges if green (squash + delete-branch) or triages if red.
+
+## 2026-09-07T02:02:40Z — rb-62 MERGED (PR #447)
+Squash-merged PR#447 (rb-62: overlayA11yWiring citation retarget, closes R-rb-36-WIRINGCITE). mr-gates verify FLAGGED on X2 (local just-ci re-run killed exit137 while rb-61 built concurrently on the same box); adjudicated as resource contention, not evidence tampering -- remote GitHub CI (ci,e2e) both green on the merged head SHA, and X1's content oracle spotcheck fully agreed. master fast-forwarded 0064f19->84274d6, CI in progress. Worktree/branch cleaned. rb-61 still live (session_leader 174692, ~55min in).
 ## 2026-09-07T01:03:08Z — 01:00Z tick — committed orphaned rb-64 record, launched rb-61+rb-62
 Native tick mr-sup-native-20260907T010012Z-172260 (01:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no live rooted-run pid, no .done files, no open PRs (either repo). FOUND: harness working tree had uncommitted mr-state.json/handoff/handoff-archive changes plus an untracked monster-realm-rb-60-plan.md, left by the 23:41Z/00:08Z ticks (rb-64 merge) which ended before committing -- the recurring uncommitted-tick-record gap. Verified against live ground truth: PR#446 (rb-64) MERGED at 0064f191, master CI green (run 34068682157, ci+e2e success), no open PRs -- committed the orphaned write as-is (737713a), matching the established recovery pattern. Gate-1/2: both repos fetched clean and in sync (harness main == origin, project master == origin). Gate-3: mr-gates residuals list --unclaimed showed 70 open, all MED, max age 2.96d -- none past t1_promote_days=3, no promotion needed this tick. queue[] empty (drained by the committed orphaned write). Derived from M-residual-backlog.spec.md directly (rb-60/rb-64 already merged; rb-61/rb-62/rb-63 remain): rb-63 needs real-browser Playwright e2e wiring (HIDDEN DEPENDENCY, touches evals/ci-gate-wiring.eval.mjs -- larger scope, deferred for a dedicated tick); rb-61 and rb-62 are the same citation-drift class as rb-60 (prose-only test-comment/doc fixes retargeting the stale main.ts:1574 citation onto the M12d store.onBatchApplied listener landmark), file-disjoint per mr-disjoint (SAFE, no shared axis) and neither touches the structural set. free -g showed 36G free. Launched BOTH in parallel (opus@high, routine tier; N=2 within default fan-out): rb-61 (leader 174692, main.a11yFocus.test.ts:782) and rb-62 (leader 175032, overlayA11yWiring.test.ts:289-296, also fixes rb-36's now-false 'flagged, not touched' meta-citation). Both detachment+model verified live (own session leaders, ppid=1; per-run locks written). mr-spawn's first attempt for both hit BRIEF-RENDER-FAILED because the vars.json omitted the required 'tier' field -- added tier=routine and retried successfully; noting for next tick's vars.json template. Budget NORMAL (d7=$1339.80/2783=48.1%, fable_d7=$493.04/2298, fable_ok=true). No merge this tick (nothing awaiting one), no BLOCKER, no rate-limit trip.
 ## 2026-09-07T00:08:51Z — rb-64 merged: privacy_tests.rs write-attribution ported to ADR-0234 rooted-chain walk
@@ -3841,43 +3915,7 @@ PR#440 (feat/rb-55-status-token-dedupe) opened by rb-55 run, CI/e2e still pendin
 ## 2026-09-06T04:02:01Z — rb-55 launched (client badge-token dedup)
 Native tick mr-sup-native-20260906T040009Z-2495252 (04:00Z, cron). Gate-0: no live locks/mutex, HOLD-NONE queued_events=0, no active-session collision. Both repos in sync (harness main e947005, proj master 75e9719); master CI green (rb-54 merged prior tick). No in-flight worktrees/PRs. queue[] fast-path: rb-55 head re-verified live -- M-residual-backlog.spec.md section exists, non-blocked, no unmet after: deps, and the underlying duplication is confirmed still present (game-core/src/content.rs A11Y_TOKENS/status_token_key is the SSOT per its own doc-comment; client/src/ui/battleModel.ts:57-69 has its own hardcoded PSN/BRN/PAR/SLP/FRZ switch, with a comment at line 81 acknowledging the Rust SSOT). Classified as a real code-duplication defect (not eval-tooling-only), so launched rather than dispositioned wontfix. Launched rb-55 (opus@high, routine tier -- no schema/reducer/netcode/security/M20/M25 surface) via mr-spawn: leader pid 2497004, run_id mr-spawn-20260906T040136Z-2496945, pr_repo mdrewt/monster-realm, base master. Pre-allocated ADR-239 (not yet confirmed needed by the slice). Ledger row + queue-remove recorded. NEXT TICK: resume/watch rb-55; if it opens a PR with checks running, delegate to mr-ci-watch and exit.
 
-## 2026-09-06T03:02:39Z — 03:00Z tick — reconciled prior tick's uncommitted rb-54-merge state; promoted residual R-m23-s8-postmerge-tsdup -> rb-55
-Native tick mr-sup-native-20260906T030010Z-2482480 (03:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no live rooted-run pid; found the 02:00Z merge tick's mr-state.json/handoff/handoff-archive writes sitting uncommitted in the harness working tree (rb-54 PR#439 merged + closed R-m23-s8-postmerge, master ff'd to 75e9719). Re-verified live before trusting it: gh pr view 439 state=MERGED mergedAt=2026-09-06T02:04:29Z, no rb-54 branch remains, master CI for 75e9719 both ci+e2e completed/success (mr-state had stale in_progress). Corrected mr-state.json (master.ci->success, cleared stale 01:49Z notes) and committed the harness-repo state files this tick to close the gap -- same recurring uncommitted-tick-record pattern (5796652/3e2705d/c44fe44). Gate-3: mr-gates residuals list --unclaimed showed 8 residuals past t1_promote_days=3 (oldest tied at 3.29d: R-m23-s8-postmerge-border/fallback/tint/title/tsdup, all source_slice m23-s8, all real a11y/render/data-dedup defects per the 2026-09-01 ADR-0224 work-selection-scope classification -- none are eval-tooling-scanner-correctness findings) -- outranks the empty queue[] and new PLAN Sec.9 work per the aging rule. Promoted R-m23-s8-postmerge-tsdup (status a11y tokens duplicated between game-core content.rs and client battleModel.ts) -> rb-55 in M-residual-backlog.spec.md, queued via mr-record queue-add. Shipped as doc-only chore PR (chore/residual-promote-20260906T030000Z), merged directly (no branch protection in this repo). This was the tick's ONE mutating action; no slice launched or merged. queue[] now: rb-55. The other 4 m23-s8 siblings (border/fallback/tint/title) and 3 rb-36 residuals (3.19d) remain unpromoted for a future tick's one-per-tick promotion. Governor NORMAL (d7=$1000.90/2783 eff., fable_d7=$421.67/2298, fable_ok=true). No BLOCKERs, no rate-limit event.
-## 2026-09-06T02:05:13Z — rb-54 merged — PR#439 (enum-roster totality at content-sync time)
-Native tick mr-sup-native-20260906T020011Z-2445973 (02:00Z, cron). Gate-0: no live locks/mutex, HOLD-NONE, rb-54 .done EXIT=0 already recorded, PR#439 CI green (event rb-54.ci.md), mergeStateStatus CLEAN/MERGEABLE. Verified live: base f4cd5a7, head 1678e31, diff = server-module/src/content.rs + content_tests.rs + ARCHITECTURE.md + docs/adr/0239-*.md + DIGEST.md — within declared touches + doc set, no structural-set files. mr-audit initially reported acceptance FLAGGED with an E1 EVIDENCE-MISMATCH ("cargo: not found") — root-caused to MY shell's PATH lacking ~/.cargo/bin (asdf shims only), not a real regression; re-ran mr-gates verify with PATH corrected and got 3/3 met, 0 unmet, evidence_drift only (timing, harmless). orchestration/gating_advisory both CLEAN. Merged PR#439 squash+delete-branch (gh reported branch-delete failure only because the local worktree at .claude/worktrees/rb-54 still referenced it — removed worktree + force-deleted local branch, ff-only'd master to 75e9719). Residual R-m23-s8-postmerge closed via mr-gates residuals close --pr 439. master CI run for 75e9719 still in_progress at time of this tick; not watched further this tick (queue empty, no in-flight slices, mutex released). NEXT TICK: verify master CI green for 75e9719 first before any composite launch; queue[] is empty and awaiting_merge[] should be cleared for rb-54 — pick next work per PLAN §9 / residual aging (8 residuals unpromoted past t1=3d per this audit's residual_alarms: R-m23-s8-postmerge-tsdup/title/tint +5 more — these outrank new PLAN work per gate 3 aging rule, classify each per Work-selection scope before promoting).
 ## 2026-09-06T01:49:46Z — rb-54 PR#439 CI pending — delegated to mr-ci-watch
 Native tick 2026-09-06T01:49Z: rb-54 rooted run finished (exit=0, 1 attempt, opus$49.99). PR#439 (feat/rb-54-content-load-validation) open, mergeable=MERGEABLE, mergeStateStatus=UNSTABLE (ci+e2e checks still pending). Harness acceptance ledger 3/3 gates met. No code/audit action needed yet — delegated CI-wait to mr-ci-watch (pid 2443071, detached). Next tick / event resumes the merge once checks resolve. No new slice launched this tick.
 
-## 2026-09-06 — rb-62 COMPLETE (PR #447 open, local gate green, remote CI running)
 
-**Slice rb-62** — retarget `client/src/ui/overlayA11yWiring.test.ts:287-295`'s drifted M12d
-citation, close residual R-rb36-WIRINGCITE. Branch `feat/rb-62-wiring-citation`, worktree
-`.claude/worktrees/rb-62`. **PR https://github.com/mdrewt/monster-realm/pull/447.**
-Terminal state per the brief: PR open + local `just ci` green + remote CI running.
-`gh pr merge` NOT run — supervisor owns the merge.
-
-- **Ledger 2/2 met, 0 deferred, 0 unmet** (`rb-62 seed:e3b0c44298fc1c14`). X1 = the inverted-direction
-  oracle `memory/projects/gates/rb-62.oracle.cjs`; X2 = full `just ci`.
-- Full `just ci` green **twice** (before and after the doc entry): nextest 2247/2247 passed 0 skipped,
-  vitest 3142 passed / 107 files, 99 evals PASS, CI-EXIT=0 both runs. Logs `/tmp/rb62-ci.log`,
-  `/tmp/rb62-ci2.log`.
-- Diff: 2 files, 6 insertions / 10 deletions. `overlayA11yWiring.test.ts` (declared touches:) —
-  every changed line is a `//` comment, 123/123 tests identical before and after.
-  `ARCHITECTURE.md` — rb-62 slice-log entry + 1 boyscout line at `:1997`.
-- Oracle: RED pre-fix, GREEN post-fix, **23/23 mutant register caught, 4/4 controls green.**
-- **BRIEF PREMISE WAS HALF STALE** — rb-37 (#415) had already boy-scouted this comment and its
-  ARCHITECTURE entry (`:2202`) already claimed to close R-rb36-WIRINGCITE. It fixed the false
-  meta-citation but kept a dated `:1627-1641` hint, which rb-52 (#435, +193 lines to main.ts) then
-  drifted. rb-62 closes the ledger row and the second-order drift.
-- **DEVIATION FROM THE BRIEF, deliberate and documented in the PR body:** the brief said "correct the
-  now-false meta-citation sentence"; rb-62 **DELETED** it instead. The residual exists because a
-  cross-file meta-claim went stale, and rb-37 had already rewritten it once before it drifted again —
-  a third rewrite re-arms the same trap. Archaeology now lives only in ARCHITECTURE.md's slice log.
-- **NEW RESIDUAL registered — R-rb-62-R-rb62-DIALOGUEVIEWCITE (target: backlog):** the same drifted
-  `:1627-1641` hint is still live at `client/src/ui/dialogueView.ts:17` and
-  `client/src/ui/dialogueView.test.ts:243`, `:290`, `:374` — four sites, grep-confirmed exhaustive.
-  Both files outside rb-62's touches:. The rb-62 oracle generalises by changing its `SPEC` constant.
-- Sibling rb-61 ran concurrently on `client/src/main.a11yFocus.test.ts` (file-disjoint). Both append
-  ARCHITECTURE.md records at EOF — **supervisor may need to reconcile that hunk at merge.**
-- Code graphs: main checkout untouched by this slice, `codegraph status` = up to date. No re-index
-  needed until the merge lands.
