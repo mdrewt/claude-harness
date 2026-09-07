@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-67 — ADR-0220 Decision 2 still spells the pre-rb-40 purge_export_bundles signature (from rb-40 ADR0220, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-40 · residual: R-rb-40-ADR0220
+
+Deferred with reason: ADR-0220 Decision 2 spells purge_export_bundles(ctx: &ReducerContext, owner: Identity) with no return type and cites privacy.rs:33-44; since rb-40 (ADR-0235) the helper returns usize and lives at privacy.rs ~:59-80. ADR-0235 uses Extends (not Amends) because an Amends marker forces a reciprocal Amended-by edit inside 0220, outside the reserved-number allowance. Prose-only and CI-neutral (the diges
+
+EARS: ADR-0220 Decision 2 still spells the pre-rb-40 purge_export_bundles signature
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-66 — No Grafana panel or alert consumes evt=guest_claim_export_purge (from rb-40 DASH, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-40 · residual: R-rb-40-DASH
