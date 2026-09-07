@@ -1153,3 +1153,32 @@ Merged feat/rb-58-fallback-token-entropy (PR#443, squash -> 1e0df19) onto master
 ## 2026-09-06T16:02:16Z — 16:00Z tick — orphaned handoff recovery + launched rb-59
 Native tick mr-sup-native-20260906T160010Z-3587085 (16:00Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no live rooted-run pid, no .done/pending events -> fast-path did not apply. FOUND orphaned uncommitted handoff writes from the 15:00Z tick (mr-sup-native-20260906T150014Z-3574624): its mr-state.json commit (d73e777) landed but the accompanying monster-realm-handoff.md/handoff-archive-2026-09.md edits (rb-64/PR#104 promote entry) were left uncommitted in the working tree -- verified content matched already-merged ground truth (5dc533f/d73e777/PR#104 all confirmed via git log), no active human session (no resident IDE claude pid, no non-housekeeping writes in last 6min), committed directly (4e327e6) and pushed. Re-verified live: master@1e0df19 CI green (ci/e2e both success), no open PRs either repo, inflight[]/awaiting_merge[] empty. Gate-3: mr-gates residuals list --unclaimed showed 59 open unpromoted residuals, oldest R-rb-40-* at 2.58d -- none past t1_promote_days=3, so residuals did not outrank queue[]. queue[] head = rb-59 (added 2026-09-06T05:53:29Z, promoted residual R-m23-s8-postmerge-border) -- re-verified live: spec heading present at M-residual-backlog.spec.md:69, no blocked:, source m23-s8 already merged (b5302aa/#413), rb-59 not already merged (checked gh pr list --search + git log --all --grep, no hit). Derived touches from source-slice diff + live grep: client/src/ui/battleView.ts:109/116/343 carry the same colour-only #844/#484 red/green border defect class m23-s8's A11Y-29 SSOT already fixed elsewhere in this file -- LOW/MED severity, no schema/reducer/netcode/security/M20/M25 touch -> tier=routine, opus@high. No ADR reserved (bugfix within an already-ADR-0233-covered surface, same class as rb-56/rb-57/rb-58 siblings). free -g showed 37G free, ample. LAUNCHED cleanly via mr-spawn: leader=3588972 claude_pid=3588975 rid=mr-spawn-20260906T160149Z-3588913 repo=project pr_repo=mdrewt/monster-realm (gate-seed criteria=0 -- the residual-backlog entry format has no explicit SHALL bullets to seed from; noting for gate-3 read at merge time, not a launch blocker). queue-removed rb-59. One ledger LAUNCHED row recorded. Governor NORMAL (d7=$1175.11/2783=42.2% eff., fable_d7=$421.67/2298, fable_ok=true -- unaffected, opus-tier launch). No BLOCKERs, no rate-limit event. queue[] now: rb-60, rb-64. Single mutating action this tick was the launch (handoff-recovery commit treated as record-recovery, not the tick's mutating action, consistent with prior-tick precedent).
 
+## 2026-09-06T19:02:33Z — rb-59 PR#444 MERGED -> 292627e (reconciled from orphaned 18:23Z merge)
+Reconciled at the 19:00Z native tick. Live ground truth: PR https://github.com/mdrewt/monster-realm/pull/444
+state=MERGED mergedAt=2026-09-06T18:30:21Z mergeCommit=292627e; master log confirms
+292627e feat(rb-59) is HEAD; master CI success; worktree/branch already cleaned (git worktree list
+shows only the main checkout, no feat/rb-59-* local branch). Chain-owner lock owner.json still named
+"mr-sup-native-20260906T182308Z-3809436" / action "merge rb-59 PR#444" with a stale heartbeat -- that
+tick did the merge + cleanup then ended without writing the ledger/handoff/state records or releasing
+the mutex (no rb-59 ledger "merged" row existed before this tick; mr-state.json still listed rb-59
+inflight at leader 3588972, already dead).
+
+Verification run this tick: mr-audit --slice rb-59 --base 1e0df19 --head 292627e --tier routine ->
+orchestration CLEAN (9 agent calls: claude/planner/red-team/reviewer/tester/verifier, opus),
+gating_advisory CLEAN (no removed asserts/skips/suppressions), policy "CLEAN - no policy-mandated
+read". mr-branch-audit: 0 post-merge commits, 0 stale branches. mr-gates verify --slice rb-59:
+FLAGGED (EVIDENCE-MISMATCH on X1/X5) -- read and adjudicated as a tick-ordering artifact, not fraud:
+both CHECKs assert they are running inside the slice's own worktree (X5 literally regexes the cwd
+for /rb-59/), and that worktree was legitimately removed by the 18:23Z merge tick BEFORE this tick's
+re-verify ran. The recorded evidence (rb59-X1 total=60 rb59=4/60; rb59-X5:CI-GREEN) was captured
+live during the run itself, pre-cleanup -- this is the known cost of verifying after cleanup rather
+than before merge, not a forged gate. X2/X3 spotcheck/reverify agree with recorded evidence. Ledger:
+5/6 met, X6 deferred to backlog (PvP opponent-header screen-reader half, e2e hidden dependency --
+full reasoning in memory/projects/monster-realm-rb-59-plan.md and the previous handoff entry above).
+
+Ledger row appended (outcome merged(PR#444->292627e); cost NOT re-derived, already captured by the
+wrapper-reconcile FINISHED row at 18:07:56Z, cost_usd=52.2947). Releasing the stale chain-owner mutex
+and the rb-59 per-run lock next; mr-gates residuals close --slice rb-59 --pr 444 --force (X6 DEFERred
+onward, so the plain close would refuse). mr-state.json to be rewritten: rb-59 removed from inflight,
+master{sha,ci} advanced to 292627e/success.
+
