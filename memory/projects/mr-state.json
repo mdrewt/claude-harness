@@ -6,12 +6,15 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "4e327e6"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-06T23:41:55Z",
+ "inflight": [
+  {"slice": "rb-61", "session_leader": 174692, "model": "opus", "effort": "high", "tier": "routine", "started_utc": "2026-09-07T01:02:41Z"},
+  {"slice": "rb-62", "session_leader": 175032, "model": "opus", "effort": "high", "tier": "routine", "started_utc": "2026-09-07T01:02:47Z"}
+ ],
+ "last_tick_utc": "2026-09-07T01:00:12Z",
  "live_watchers": [],
  "master": {
-  "ci": "in_progress-at-record-time",
-  "ci_detail": "post rb-64/PR#446 merge (0064f191): run in_progress at 00:08Z tick record time, not yet confirmed green or red -- NEXT TICK must re-check live before trusting.",
+  "ci": "success",
+  "ci_detail": "confirmed live 01:00Z tick: run 34068682157 for 0064f191 (rb-64/PR#446) completed/success; no open PRs.",
   "nightly": "success",
   "sha": "0064f191fd1e31931faa6f6b9a628a56e2042ea2"
  },
@@ -28,7 +31,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "rb-64 merged PR#446 (0064f191) at 00:05Z; residual R-rb-39-PRIVACY-LOCAL-PORT closed; 4 new MED residuals recorded (unpromoted, max age <3d, under t1_promote_days); queue empty; no launch this tick (rigor over composite-launch throughput per operator DoD priority) -- next tick does full PLAN Sec9 derivation fresh.",
+ "notes": "01:00Z tick: committed the 23:41Z/00:08Z ticks' orphaned mr-state.json/handoff/handoff-archive writes (rb-64/PR#446, verified live: MERGED 0064f191, master CI success, no open PRs) -- 737713a. Residuals: 70 unclaimed, all MED, max age 2.96d, none past t1=3d, no promotion. queue[] empty. Derived from M-residual-backlog.spec.md: rb-61 (main.a11yFocus.test.ts:782 stale citation) and rb-62 (overlayA11yWiring.test.ts:289-296 stale citation + false meta-citation) launched in parallel -- mr-disjoint SAFE, no shared axis, opus@high routine tier. rb-63 (Playwright e2e wiring, HIDDEN DEPENDENCY, touches evals/ci-gate-wiring.eval.mjs) deferred as larger scope for a dedicated tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -51,6 +54,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260906T234155Z-122761",
- "updated_utc": "2026-09-06T23:47:00Z"
+ "updated_by": "mr-sup-native-20260907T010012Z-172260",
+ "updated_utc": "2026-09-07T01:03:30Z"
 }
