@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-66 — No Grafana panel or alert consumes evt=guest_claim_export_purge (from rb-40 DASH, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-40 · residual: R-rb-40-DASH
+
+Deferred with reason: rb-40 emits {evt:guest_claim_export_purge, guest:<hex>, chunks:N} once per successful guest claim via observability::mr_log. ops/observability/** is outside rb-40's touches, so no dashboard panel, recording rule or alert consumes the event; it is queryable in Loki under the bounded {reducer, evt} label set (config.alloy stage.labels), which is the shipped consumption path. Follow-up: a Grafana sta
+
+EARS: No Grafana panel or alert consumes evt=guest_claim_export_purge
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-65 — The deletion cascade and request_data_export discard the purge count; cascade-wide erasure (from rb-40 CASCADE, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-40 · residual: R-rb-40-CASCADE
