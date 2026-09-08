@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-73 — Disconnect side effects are client-triggerable on demand by any identity token holder (from 18r-b DISCONNECTSELF, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 18r-b · residual: R-18r-b-DISCONNECTSELF
+
+Deferred with reason: reducer-security-auditor observation while verifying the driver comment. One HTTP reducer call opens and closes an ephemeral connection, firing client_disconnected and force-resolving that identity live trades, PvP battle as a forfeit, and wild battle, without dropping its WebSocket. Strictly self-directed so not privilege escalation, but it is a token-leak amplifier and means disconnect is not a 
+
+EARS: Disconnect side effects are client-triggerable on demand by any identity token holder
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-72 — ADR-0232 at 47-50 misattributes the disconnect row deletes to resolve_all_live_interaction (from 18r-b ADR0232MECH, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 18r-b · residual: R-18r-b-ADR0232MECH
