@@ -427,3 +427,232 @@ test('the noise-filter fixtures never diverge between the harness and _base', as
     );
   }
 });
+
+// ---------------------------------------------------------------------------
+// rb-69 — `### rb-27` must retract its false deferral premise in place
+// ---------------------------------------------------------------------------
+// `M-residual-backlog.spec.md`'s `### rb-27` still reads as launchable work while
+// its stated reason ("no ADR number was reserved") has been false since
+// 2026-09-01, when R-rb-3-X9 was closed as moot. The shape enforced here is NOT
+// invented for this slice: `### rb-44` was repaired in place on 2026-09-04 with a
+// retitled heading plus a `RESOLVED <date> (mr-gates residuals close --slice
+// <id> --force):` paragraph appended below `Tests:`, and this copies that live
+// precedent. rb-44 itself is deliberately NOT named in any assertion below — a
+// future slice re-titling it must not RED harness CI.
+//
+// The premise line is left VERBATIM on purpose: it is a mechanical copy of the
+// residual row's `reason` and the spec's own §1 says promotion is a copy, not
+// spec authoring. Quoted testimony gets marked, never silently rewritten.
+//
+// HONEST LIMIT: this oracle cannot verify that ADR-0208 exists. That ADR lives in
+// `projects/`, a separate repo these tests are forbidden to read. What is verified
+// is document<->document correspondence: rb-27's retraction says exactly what the
+// tracked harness-side adjudication in `memory/projects/monster-realm-handoff*.md`
+// says. That is not ground truth, and is not claimed to be.
+
+const RB27_SPEC = path.join(HARNESS, 'specs', 'monster-realm-v2', 'M-residual-backlog.spec.md');
+const RB27_MEMORY = path.join(HARNESS, 'memory', 'projects');
+
+// The false premise. Pinned FILE-scoped, never repo-scoped: the archived handoff
+// and rb-69's own plan both quote it verbatim, so a repo-wide count is a false-RED.
+const RB27_PREMISE = 'no ADR number was reserved for rb-3';
+const RB27_DEFERRED_LINE = `Deferred with reason: ${RB27_PREMISE} (the supervisor-assigned slot is empty)`;
+
+// `\b` would still match `rb-27-x`, and a bare prefix would collide with `rb-2`.
+const RB27_HEADING = /^### rb-27(?![\w.-])/gm;
+// The heading's TITLE SLOT — immediately after the em dash (U+2014), immediately
+// before ` (from `. Not a bare `includes('RESOLVED')`: the same file carries
+// `NO_BG_UNRESOLVED`, and `UNRESOLVED` contains `RESOLVED`.
+const RB27_HEADING_MARKER = /^### rb-27 — RESOLVED, do not build \(from /;
+// The `rb-27` here is the literal slice id, so copying another section's
+// retraction paragraph into rb-27 does not satisfy it.
+const RB27_RETRACTION =
+  /^RESOLVED (\d{4}-\d{2}-\d{2}) \(mr-gates residuals close --slice rb-27 --force\):/gm;
+// The tracked adjudication, matched by shape and never by line number:
+// "rb-27 (R-rb-3-X9) SHOULD NOT BE BUILT AS SPEC'D.** Its substance is already in ADR-0208 D2".
+const RB27_ADJUDICATION = /rb-27[^\n]{0,200}?already in ADR-(\d{4}) D2/g;
+
+// FROZEN. Free text is not gateable; frozen text is. A needle-based oracle was
+// PROVEN to go green on an INVERTED retraction that carries every pinned token
+// while affirming the false premise, on a fabricated date, and on a six-word stub.
+// These fragments are the retraction's own hard-wrapped lines; joining them with a
+// single space is exactly what whitespace-collapsing the paragraph produces.
+const RB27_FROZEN = [
+  'RESOLVED 2026-09-01 (mr-gates residuals close --slice rb-27 --force): the deferral premise',
+  "recorded above is false and is kept only as the residual row's verbatim reason. ADR-0208",
+  "Decision 2, headed `(rb-3)`, already records this section's subject in full — the in-process",
+  "`Object.prototype` write-hygiene pattern — and rb-26's own review (R-rb-26-X8-rb-3-x9-fg72c,",
+  '2026-09-01) independently confirmed the substance is already recorded there. R-rb-3-X9 was',
+  'closed as moot the same day; no implementation work remains, and building this section would',
+  'duplicate that decision. Do not re-launch this section as a slice; it names no remaining work.',
+].join(' ');
+
+// The window ends at the next level-1..3 heading of ANY kind, not just the next
+// `### rb-`: an unparsed `### Addendum` inside the section would otherwise let a
+// retraction planted below it count as in-window while `mr-gates`' own
+// `NEXT_HEAD = ^### ` truncates there.
+async function rb27Section() {
+  const text = await readFile(RB27_SPEC, 'utf8');
+  const heads = [...text.matchAll(RB27_HEADING)];
+  assert.equal(
+    heads.length,
+    1,
+    `M-residual-backlog.spec.md must carry exactly one '### rb-27' section (found ${heads.length})`,
+  );
+  const start = heads[0].index;
+  const from = text.slice(start);
+  const nl = from.indexOf('\n');
+  assert.ok(nl > 0, "the '### rb-27' heading line is unterminated");
+  const rest = from.slice(nl + 1);
+  const next = /^#{1,3} /m.exec(rest);
+  const body = next ? rest.slice(0, next.index) : rest;
+  assert.ok(body.length > 0, "the '### rb-27' section body is empty");
+  return {
+    text,
+    heading: from.slice(0, nl),
+    body,
+    bodyStart: start + nl + 1,
+    bodyEnd: start + nl + 1 + body.length,
+  };
+}
+
+const rb27Retraction = (body) => [...body.matchAll(RB27_RETRACTION)];
+
+test('rb-27 retracts its false deferral premise in place', async () => {
+  const { text, heading, body, bodyStart, bodyEnd } = await rb27Section();
+
+  const premiseCount = text.split(RB27_PREMISE).length - 1;
+  assert.equal(
+    premiseCount,
+    1,
+    `the false premise must appear exactly once in M-residual-backlog.spec.md (found ${premiseCount}) — a second copy is a second thing to mislead a reader`,
+  );
+
+  assert.match(
+    heading,
+    RB27_HEADING_MARKER,
+    `rb-27's heading must carry the 'RESOLVED, do not build' marker in its title slot (the scanning reader's and mr-gates.find_section's first surface); got: ${heading}`,
+  );
+
+  assert.ok(
+    body.includes(RB27_DEFERRED_LINE),
+    "the historical 'Deferred with reason:' line must be preserved verbatim — it is a mechanical copy of the residual row's reason, marked rather than rewritten",
+  );
+
+  const inWindow = rb27Retraction(body);
+  assert.equal(
+    inWindow.length,
+    1,
+    `rb-27's section must carry exactly one 'RESOLVED <date> (mr-gates residuals close --slice rb-27 --force):' paragraph (found ${inWindow.length}) — a second, contradicting paragraph is not a second record`,
+  );
+
+  const fileWide = [...text.matchAll(RB27_RETRACTION)];
+  assert.equal(
+    fileWide.length,
+    1,
+    `rb-27's retraction must appear exactly once file-wide (found ${fileWide.length}) — a copy parked in a neighbouring section annotates the wrong slice`,
+  );
+  assert.ok(
+    fileWide[0].index >= bodyStart && fileWide[0].index < bodyEnd,
+    "rb-27's retraction must sit inside rb-27's own section window",
+  );
+
+  const premiseAt = body.indexOf(RB27_PREMISE);
+  assert.ok(premiseAt >= 0, "the premise line must be inside rb-27's own section window");
+  assert.ok(
+    inWindow[0].index > premiseAt,
+    `the retraction must sit BELOW the premise it retracts (retraction at ${inWindow[0].index}, premise at ${premiseAt}) — presence alone does not gate reading order`,
+  );
+});
+
+test('rb-27 retraction text is frozen and matches the tracked adjudication', async () => {
+  const { body } = await rb27Section();
+  const hits = rb27Retraction(body);
+  assert.equal(
+    hits.length,
+    1,
+    `expected exactly one rb-27 retraction paragraph to freeze, found ${hits.length}`,
+  );
+
+  const tail = body.slice(hits[0].index);
+  const blank = tail.search(/\n[ \t]*\n/);
+  const paragraph = (blank === -1 ? tail : tail.slice(0, blank)).trim();
+  assert.ok(
+    paragraph.length > 200,
+    `the retraction paragraph is ${paragraph.length} chars — too short to be a real record (a six-word stub satisfies every needle)`,
+  );
+
+  assert.equal(
+    paragraph.split(/\s+/).join(' '),
+    RB27_FROZEN,
+    'the rb-27 retraction paragraph must match the frozen text character for character (line-wrapping is free, wording is not)',
+  );
+
+  // Cross-document correspondence: the ADR id in the retraction must come from the
+  // tracked adjudication, not from this test's own literal. Read as a UNION over
+  // every handoff document so a monthly archive rotation cannot make it vacuous.
+  const docs = readdirSync(RB27_MEMORY)
+    .filter((n) => n.startsWith('monster-realm-handoff') && n.endsWith('.md'))
+    .sort();
+  assert.ok(docs.length > 0, `no monster-realm-handoff*.md documents found in ${RB27_MEMORY}`);
+  const found = [];
+  for (const d of docs) {
+    const doc = await readFile(path.join(RB27_MEMORY, d), 'utf8');
+    for (const m of doc.matchAll(RB27_ADJUDICATION)) found.push({ doc: d, adr: m[1] });
+  }
+  assert.ok(
+    found.length > 0,
+    `no tracked rb-27 adjudication sentence ('… already in ADR-nnnn D2') found across ${docs.length} handoff document(s): ${docs.join(', ')}`,
+  );
+  const adrs = [...new Set(found.map((f) => f.adr))];
+  assert.equal(
+    adrs.length,
+    1,
+    `the tracked handoff documents disagree on rb-27's ADR id: ${JSON.stringify(found)}`,
+  );
+
+  const cited = [...new Set([...paragraph.matchAll(/ADR-\d{4}/g)].map((m) => m[0]))].sort();
+  assert.deepEqual(
+    cited,
+    [`ADR-${adrs[0]}`],
+    `rb-27's retraction must cite exactly the ADR the tracked adjudication names: ${JSON.stringify(found)}`,
+  );
+});
+
+test('the rb-27 annotation is inert and cannot inject a phantom gate', async () => {
+  const { body } = await rb27Section();
+
+  assert.ok(
+    !body.includes('```'),
+    "rb-27's section must contain no code fence — a fenced 'retraction' is invisible to a reader while its raw bytes still satisfy any regex",
+  );
+  assert.ok(
+    !body.includes('<!--'),
+    "rb-27's section must contain no HTML comment — a commented-out 'retraction' is invisible to a reader while its raw bytes still satisfy any regex",
+  );
+  assert.doesNotMatch(
+    body,
+    /\bSHALL\b/,
+    "rb-27's section must contain no SHALL — mr-gates.extract_criteria would seed it as a live acceptance criterion",
+  );
+  assert.doesNotMatch(
+    body,
+    /^\s*[-*+]\s+/m,
+    "rb-27's section must contain no bullet line — mr-gates.extract_criteria harvests bulleted lines",
+  );
+
+  const hits = rb27Retraction(body);
+  assert.equal(
+    hits.length,
+    1,
+    `expected exactly one rb-27 retraction paragraph to check for inertness, found ${hits.length}`,
+  );
+  // Scoped BELOW the retraction: the section legitimately carries `touches:`,
+  // `EARS:` and `Tests:` lines above it, which are the promotion template's own.
+  const below = body.slice(hits[0].index);
+  assert.doesNotMatch(
+    below,
+    /^(### |touches:|EARS:|Tests:)/m,
+    "no line at or below rb-27's retraction may open a new section or a promotion-template field (mr-gates would absorb it into _ears_span or seed a phantom gate)",
+  );
+});
