@@ -101,8 +101,8 @@ Teeth, in order of what each buys:
 - **No roster-drift guard** (asserting every `scripts/tests/*.test.mjs` is in `justfile:5`). It was
   circular — only needed because of the new-file choice — and red-team measured it forgeable four
   ways anyway (a `#` comment on the recipe line, a `-` line prefix that swallows the failure, a
-  `.check.mjs` rename). The underlying gap is real; registered as a residual
-  at slice close (see the ledger's `DEFER:` line) instead of smuggled in (`standards/principles.md`: cleanups larger
+  `.check.mjs` rename). The underlying gap is real; registered as
+  `R-rb-69-X9-test-roster-glob` (target `backlog`) instead of smuggled in (`standards/principles.md`: cleanups larger
   than the current change are flagged, never ridden along).
 - **No ADR.** With the class rule cut there is no new repo-wide mechanism — one pinned assertion in
   an existing invariants suite. No number is reserved, and `just adr-gate` runs
@@ -178,3 +178,29 @@ that defeats the slice's entire purpose, M11 is the frozen pin's own classic byp
 - **R2** `just lint` shells `npx --yes @biomejs/biome@2` (network). Run `just format` first; biome
   config is single-quote / semicolons / width 100 (`templates/_base/biome.json`).
 - **R3** headings use U+2014; verify regexes by bytes, not by eye.
+
+## 11. Post-implementation review outcome (recorded after the fact, not predicted)
+
+The three implementation lenses changed the shipped artifact materially. Recording it because the
+plan above was written before them and would otherwise read as if it had been right all along.
+
+1. **The retraction shipped a NEW overstated claim, and the red-team caught it.** The first version
+   said the premise "is false". It is not: ADR-0208 is **rb-4's** reserved number (`**Slice:** rb-4
+   … also records the rb-2 / rb-3 decisions both sibling ledgers deferred to this ADR`), every
+   `R-rb-3-X9` row still carries `"adr": null`, and the supervisor's own adjudication word was
+   "moot" — the archive says "that gap is closed", never "the premise is false". In a slice whose
+   entire charter is removing a false claim, that was the most important finding of the run.
+   Reworded to state the precise thing.
+2. **A paragraph-only freeze was not enough.** Nine reader-visible "un-retractions" were PROVEN
+   green against it (A1–A10). The section is now frozen whole, which is also the simpler rule:
+   rb-27 is closed and should never change again.
+3. **Two of the gate's own pins were main-breakers.** A file-wide premise count and a singleton
+   handoff-ADR set would each have red `main` on ordinary, correct future writes by the supervisor
+   tooling — the first self-detonatingly, since a residual filed about this very phrase would trip
+   it on promotion. Both fixed, both pinned GREEN by regressions B1/B2.
+4. **One CHECK would not have reproduced.** X7 lacked the `cd` every other CHECK carries; the
+   supervisor re-executing it from the main checkout would have read the unfixed file and recorded
+   a spurious FAIL. Fixed and re-verified from a different cwd.
+
+`/simplify` found nothing to cut and said so plainly; its one actionable point — that the 12-mutant
+matrix understated its own coverage — is addressed by the 25-row matrix that shipped.

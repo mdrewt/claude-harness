@@ -502,7 +502,7 @@ const RB27_SECTION_FROZEN = [
   'RESOLVED 2026-09-01 (mr-gates residuals close --slice rb-27 --force): the deferral premise',
   'recorded above is MOOT, and is kept verbatim because it is a mechanical copy of the residual',
   "row's own reason. The reservation it names never happened and never needed to: rb-3's decision",
-  'was recorded inside rb-4\'s ADR-0208, whose Decision 2 is headed `(rb-3)` and documents the',
+  "was recorded inside rb-4's ADR-0208, whose Decision 2 is headed `(rb-3)` and documents the",
   "in-process `Object.prototype` write-hygiene pattern in full. rb-26's own review",
   '(R-rb-26-X8-rb-3-x9-fg72c, 2026-09-01) independently confirmed that, and R-rb-3-X9 was closed as',
   'moot the same day. Do not re-launch this section as a slice; it names no remaining work.',
