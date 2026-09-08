@@ -190,7 +190,7 @@ else if (MODE === 'g8') {
     { id: 'M5', files: { [PLAN]: plan.replace(/AGENTS\.md:/g, '../../AGENTS.md:') },
       filter: 'rb71_m85c_cites', label: '[cite/count]' },
     // M6 — a decoy second citation pasted at EOF.
-    { id: 'M6', files: { [PLAN]: `${plan}${NL}<!-- decoy AGENTS.md:${ai + 1} -->${NL}` },
+    { id: 'M6', files: { [PLAN]: `${plan}${NL}Housekeeping: see AGENTS.md:${ai + 1} for the Done line.${NL}` },
       filter: 'rb71_m85c_cites', label: '[cite/count]' },
     // M7 — the landmark bullet deleted from AGENTS.md.
     { id: 'M7', files: withAgents(dropAnchor()),
@@ -209,8 +209,8 @@ else if (MODE === 'g8') {
     { id: 'M11',
       files: {
         [PLAN]: plan.replace(
-          '**Doc reconciliation',
-          '**Doc reconciliation (both FALSELY claim it today)',
+          'what `just ci` enforces',
+          'what `just ci` includes: coverage + mutation, and enforces',
         ),
       },
       filter: 'rb71_m85c_bullet', label: '[claim/stale-tense]' },
@@ -247,7 +247,12 @@ else if (MODE === 'g8') {
     // CHEAT-D — the stale present-tense claim kept, but spelled with a SYNONYM
     // so a literal `FALSELY claim` needle never fires.
     { id: 'CHEAT-D',
-      files: { [PLAN]: plan.replace('claimed, before M8.5c,', 'incorrectly assert today') },
+      files: {
+        [PLAN]: plan.replace(
+          'were both corrected in M8.5c to state exactly what `just ci` enforces',
+          'both incorrectly assert that `just ci` includes coverage + mutation rather than what it enforces',
+        ),
+      },
       filter: 'rb71_m85c_bullet', label: '[claim/stale-tense]' },
   ];
 
@@ -256,6 +261,15 @@ else if (MODE === 'g8') {
   for (const m of mutants) {
     if (m.files === null) {
       survivors.push(`${m.id}:UNAPPLIABLE`);
+      continue;
+    }
+    // A no-op "mutation" proves nothing either way. It must never be scored as a
+    // kill, and reporting it as SURVIVED would libel a working oracle -- MEASURED
+    // on the first g8 run, where three probes were stale against a redesigned
+    // oracle and read as holes that did not exist.
+    const noop = Object.entries(m.files).every(([f, c]) => read(f) === c);
+    if (noop) {
+      survivors.push(`${m.id}:UNAPPLIED`);
       continue;
     }
     const r = probe({ files: m.files, filter: m.filter, label: m.label });
