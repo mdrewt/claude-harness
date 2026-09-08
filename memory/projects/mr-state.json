@@ -7,11 +7,11 @@
   "sha": "0a187ba"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-07T23:36:04Z",
+ "last_tick_utc": "2026-09-08T01:35:00Z",
  "live_watchers": [],
  "master": {
-  "sha": "7d8d2900b5970430cabbe3b537407bb29b82f619",
-  "ci": "in_progress (post-rb-68-merge; re-verify next tick)",
+  "sha": "5bb16bb941fd7b9d82ad60b42f6d082fad8dfa5c",
+  "ci": "success",
   "nightly": "success"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -33,16 +33,7 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "slice": "rb-69",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-42-X9-harness-spec-false-premise",
-   "added_utc": "2026-09-07T23:42:46Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "b1b4ff6b5d87057d228a442c62c9f34c706ccde0"
-  }
- ],
+ "queue": [],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
