@@ -21,9 +21,13 @@ Baseline `just ci` on `main@bf0c4bf` = **CI-EXIT=0** (adr-lint 12/0/0, research-
 
     Deferred with reason: no ADR number was reserved for rb-3 (the supervisor-assigned slot is empty)
 
-False on both halves since 2026-09-01: project `docs/adr/0208-…md` Decision 2, headed `(rb-3)`,
-records the design; and `R-rb-3-X9` was adjudicated **closed** (`--force`) that day. The section
-nonetheless still reads as launchable work. Harm on record —
+MOOT since 2026-09-01, though not literally false — a distinction the post-implementation
+red-team forced, and the correction matters. ADR-0208 is **rb-4's** reserved number (`**Slice:**
+rb-4 … also records the rb-2 / rb-3 decisions`), and every `R-rb-3-X9` row still carries
+`"adr": null`, so the reservation the premise names genuinely never happened. What is stale is the
+IMPLICATION that work remains: rb-3's decision was recorded inside rb-4's ADR anyway, `R-rb-3-X9`
+was adjudicated **closed** (`--force`) that day, and the supervisor's own word was "moot", never
+"false". The section nonetheless still reads as launchable work. Harm on record —
 `memory/projects/monster-realm-handoff.md:3642`: "will send rb-27's agent to mint a duplicate —
 **fix the spec or close rb-27 before launching it.**"
 
@@ -47,7 +51,7 @@ every section). Killed by the plan lenses, on measurements, not taste:
 - It creates false-RED landmines on `main`: `mr-gates:1341` builds each promoted heading from a
   free-text residual title, so a future residual titled `… RESOLVED …` REDs harness CI through
   nobody's fault (red-team F1, proven); `UNRESOLVED` contains `RESOLVED`
-  (`M-residual-backlog.spec.md:497`) so a naive body predicate REDs on rb-14 (reviewer B2).
+  (inside `### rb-14`; cite the section, not the line — the retraction shifts every later line) so a naive body predicate REDs on rb-14 (reviewer B2).
 - It lets a future agent **silently kill a live backlog item** by symmetrically marking it
   (red-team X9, proven GREEN).
 - A class rule enforced repo-wide over a generated file with **no generator for the shape it
@@ -97,8 +101,8 @@ Teeth, in order of what each buys:
 - **No roster-drift guard** (asserting every `scripts/tests/*.test.mjs` is in `justfile:5`). It was
   circular — only needed because of the new-file choice — and red-team measured it forgeable four
   ways anyway (a `#` comment on the recipe line, a `-` line prefix that swallows the failure, a
-  `.check.mjs` rename). The underlying gap is real; registered as residual
-  `R-rb-69-test-roster-glob` instead of smuggled in (`standards/principles.md`: cleanups larger
+  `.check.mjs` rename). The underlying gap is real; registered as a residual
+  at slice close (see the ledger's `DEFER:` line) instead of smuggled in (`standards/principles.md`: cleanups larger
   than the current change are flagged, never ridden along).
 - **No ADR.** With the class rule cut there is no new repo-wide mechanism — one pinned assertion in
   an existing invariants suite. No number is reserved, and `just adr-gate` runs
