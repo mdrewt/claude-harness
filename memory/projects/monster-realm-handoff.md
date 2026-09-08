@@ -2,6 +2,95 @@
 
 ---
 
+## 2026-09-08T~2?:??Z — rb-72 PR#456 OPEN — ADR-0232 D2's disconnect mechanism retargeted onto `on_disconnect`, gated by an EXECUTED presence-row pin whose two red-team-measured bypasses are closed (closes R-18r-b-ADR0232MECH); local `just ci` GREEN (CI-EXIT=0); ledger 6/6 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
+**TERMINAL STATE: PR open + local full `just ci` green + remote CI running.**
+PR https://github.com/mdrewt/monster-realm/pull/456 (branch `feat/rb-72-adr0232-d2-disconnect-mechanism`,
+worktree `.claude/worktrees/rb-72`, forked from `origin/master@c68bcfd` — master CI verified green;
+5 commits, all pushed, tree clean). `gh pr merge` NOT run. Main checkout left on `master`.
+
+**SUPERVISOR MERGE INSTRUCTION (mechanical).**
+```
+gh pr merge 456 --repo mdrewt/monster-realm --squash
+mr-gates residuals close --slice rb-72 --pr 456
+```
+Repo is `project` (both declared touches paths are project-side; `mr-repo-of` agrees). Remote CI
+(`ci` + `e2e`) was PENDING at hand-off — delegate the wait to `mr-ci-watch`. The post-merge
+`residuals close` is what retires `R-18r-b-ADR0232MECH`; the two NEW residuals
+(`R-rb-72-DEPTH2CROSSFILE`, `R-rb-72-UFCSALIAS`) are `-> backlog` and should be promoted into spec
+sections, not closed.
+
+Ledger **6/6 met, 0 unmet, 0 deferred** (`seed:e3b0c44298fc1c14`). mr-gates seeded **0** criteria, so
+X1-X6 were authored in the PLAN phase per the rb-9/54/58/61/71 precedent. **Run `mr-gates check
+--slice rb-72` FROM THE WORKTREE** — it is cwd-relative and reported a bogus 3/6 from the harness root.
+Artifacts: `memory/projects/gates/rb-72.{gates.md}`, `memory/projects/rb-72.gates.mjs` (modes x3/x4/x5).
+
+WHAT LANDED (3 files): `docs/adr/0232-*.md` D2 — lines 48-49 replaced by exactly two lines
+reattributing the presence-row deletes to `on_disconnect`, plus a "Mechanism correction (rb-72)"
+paragraph appended BELOW line 51; `server-module/src/accounts_tests.rs` — one new test
+`rb72_resolve_all_live_interactions_leaves_presence_rows` (+326 lines, pure EOF append, 12 assertions,
+nothing removed); `ARCHITECTURE.md` — the rb-72 slice entry (touches-delta, declared in the PR body).
+
+**SIX THINGS THE NEXT SLICE SHOULD KNOW:**
+1. **A behavioural pin over the native host is NOT automatically stronger than the source scan it
+   replaces.** The plan's Leg A (execute the dispatcher, assert the rows survive) was MEASURED green
+   against a presence delete inside `pvp::cancel_challenges_on_disconnect`'s loop — 876/876, clippy and
+   fmt clean — because the fixture leaves `battle_challenge` unregistered so the loop never runs, and
+   seeding it is impossible (the callee's non-empty path deletes rows, and every write syscall in
+   `native_host_tests.rs` is `unmodelled()` = process abort). The unreachable branch is the whole
+   attack surface. New card `native-host-unreachable-branch-is-the-attack-surface`.
+2. **`include_str!` sees BOTH cfg halves; the test binary compiles one.** A
+   `#[cfg(test)]`/`#[cfg(not(test))]` declaration twin placed FIRST satisfies
+   `extract_squashed_fn_body`'s first-occurrence `find` while the published wasm runs the other half —
+   it defeated x3/x4/x5 outright and survived the full suite except for an UNRELATED ADR-0230 test that
+   happens to cite all four callee declarations by name. Any body-extraction pin needs a
+   declaration-uniqueness clause beside it.
+3. **A mutant that does not COMPILE scored as KILLED.** The gate runner's first four mutants omitted the
+   block-scoped `use crate::schema::{character, player};` that `pvp.rs`/`trading.rs`/`battle.rs` need,
+   died at `E0599`, and the suite printed a fully green `4/4 KILLED` while the gating test had never run
+   against a mutant. Runners must report `INVALID` distinctly. (rb-71 hit the same class; it recurs.)
+4. **Do NOT run `mr-gates check` while `just ci` is live in the same worktree.** X4/X5 patch
+   `pvp.rs`/`lib.rs`/etc., and CI failed on `knowledge-bundle-conformance` — a file this slice never
+   touched — because the OKF bundle stamps `resource: <file>#L<line>` and read the tree mid-mutant.
+   `git status` is clean afterwards, so nothing points back at the cause, and the prescribed remedy
+   (`just knowledge`) would have COMMITTED a corrupt bundle. New card
+   `mutant-runner-vs-live-ci-contention`.
+5. **`account-e2e` flaked twice with `S9-seed-ready`, not `S9-cancel-done`.** Same signature (empty
+   stderr tail + `WebSocket protocol error: Connection reset without closing handshake`), and `pgrep`
+   was clean both times because the loser of the race is already dead. The SAME tree was green
+   (CI-EXIT=0) on the run in between. Match on the signature, not the milestone name; card updated.
+6. **The line-51 invariant is now mechanically checked for the first time.** `mr_load_driver.rs:6067`
+   asserts in prose that `docs/adr/0232-*.md:51` carries its `:76-89` citation. That file is outside
+   `touches:`, so the edit was shaped to preserve line 51 — and gate X3 RE-DERIVES the number from the
+   driver's own claim rather than hardcoding 51, so a future drift REDs instead of rotting.
+
+RESIDUALS REGISTERED: `R-rb-72-DEPTH2CROSSFILE` (-> backlog; a presence-delete helper defined OUTSIDE
+`trading.rs`/`pvp.rs`/`battle.rs` and called from a callee evades Leg B — a real fix needs a
+reachability walk, not a text scan) and `R-rb-72-UFCSALIAS` (-> backlog; a UFCS or aliased accessor
+spelling matches none of the needles; `write_target_accessors`' receiver-chain resolver is the
+precedent to port). A `reducer-security-auditor` independently confirmed BOTH gaps are empty in the
+live tree today.
+
+touches-delta: `ARCHITECTURE.md` only (standard doc output). boyscout-delta: **none**.
+No new ADR (supervisor assigned `n/a`); ADR-0232 corrected in place, header block byte-identical so
+`DIGEST.md` needs no regen; `docs/adr/README.md` untouched; `CHANGELOG.md` not hand-edited.
+
+ORCHESTRATION: `planner` (opus); `reviewer` + `red-team` + `/simplify` on the PLAN in parallel — all
+three changed it materially (reviewer PROVED the planned prose moved the citation off line 51;
+red-team MEASURED the callee-delegated bypass that forced Leg B into existence; `/simplify` cut a
+cargo-culted stranger fixture and collapsed four ambient-`just ci` gates into one). A separate `tester`
+authored the gating test (its Bash is hook-blocked, so it delivered an unexecuted snippet that the
+orchestrator spliced and verified — its assertions were never weakened). A different agent implemented
+the ADR prose. `reviewer` + `red-team` + `reducer-security-auditor` in parallel on the implementation;
+the reviewer found a FALSE claim in the test's own doc comment and the red-team measured two more green
+bypasses — all three fixed and the two bypasses promoted to permanent gate mutants M8/M9.
+`desync-guard` NOT spawned — no game-core, netcode or client change.
+
+Local gate: `just ci` **CI-EXIT=0** (`/tmp/rb72-ci4.log`). Proof of teeth: **9 mutants, 9 killed**
+(x4 6/6 incl. both red-team bypasses; x5 3/3 host-wall + two fixture-vacuity). X3 measured RED before
+the ADR edit, GREEN after.
+
+---
+
 ## 2026-09-08T~0?:??Z — rb-69 PR#110 OPEN **ON THE HARNESS REPO** — `### rb-27`'s moot deferral premise retracted in place, gated by a frozen-section + cross-document ADR oracle (closes R-rb-42-X9-harness-spec-false-premise); local `just ci` GREEN (CI-EXIT=0); ledger 8/8 met, 0 deferred (SUPERVISOR OWNS THE MERGE)
 **TERMINAL STATE: PR open + local full `just ci` green. This repo has NO remote CI to wait on.**
 PR https://github.com/mdrewt/claude-harness/pull/110 (branch `feat/rb-69-backlog-false-premise`,
@@ -4026,6 +4115,10 @@ Slice rb-68 (residual R-rb-40-ADR0230) reached the loop's terminal state. **Supe
 - Registered 3 follow-up residuals: R-rb-68-ADR0230CITES, R-rb-68-HOMOGLYPH, R-rb-68-CITESHAPE-PORT.
 - ADR next-free remains **0245** (rb-68 minted no ADR).
 
+## 2026-09-08T13:33:49Z — rb-72 merged (PR#456) — ADR-0232 D2 mechanism correction
+Native tick mr-sup-native-20260908T132927Z-3124539 (13:29Z, cron). Gate-0: rb-72 per-run lock showed session_leader 2937613 dead + .done EXIT=0 ATTEMPTS=1; live re-verify found PR#456 CLEAN/mergeable with both checks (ci, e2e) green (the situation bundle's snapshot showed them still pending — re-checked live before acting, per doctrine). mr-gates verify initially reported FLAGGED/EVIDENCE-MISMATCH on X1/X2/X6 purely from a shell missing the asdf/cargo PATH prefix (`cargo: not found`) — re-ran with PATH exported, verdict flipped to CLEAN 6/6 met, 0 unmet, 0 deferred (seed match, no drift). Read rb-72.gates.mjs directly to try to refute the X4/X5 spotcheck: it's a real mutation-testing harness that injects the red-team's measured bypass mutants (depth-2 helper defined beside the callee, cfg(test)/cfg(not(test)) declaration twin) and requires KILLED verdicts, restoring the mutant on every exit path — no vacuity found. mr-audit: policy CLEAN (no mandatory read), orchestration CLEAN (9 agent calls: claude/planner/red-team/reducer-security-auditor/reviewer/tester across opus+sonnet), gating_advisory CLEAN. Merged PR#456 via `gh pr merge --squash --delete-branch`. Fast-forwarded local master c68bcfd->9434dfb; removed the rb-72 worktree+branch. master CI (ci.yml on 9434dfb) was still in_progress at merge time — not yet independently reverified green this tick, next tick (or event) should confirm. Closed residual R-18r-b-ADR0232MECH against PR#456. Did NOT compose a merge->launch this tick: queue[] is empty, and the 84 unclaimed residuals include none past t2_stale (the two flagged stale ids, R-m23-s10-X16 and R-m22-s2-S3-CANCEL-TERMINAL, are already promoted/claimed, not in the unpromoted set) — properly deriving the next PLAN §9 pick or adjudicating the 27 t1-stale unpromoted residuals (per Work-selection scope's eval-tooling-vs-real-defect classification) is real judgment work better done as its own tick's primary action than rushed onto the tail of this one. Standing down clean; no BLOCKER.
+## 2026-09-08T12:02:31Z — rb-72 launched (opus@high, routine, project repo)
+Native tick mr-sup-native-20260908T120009Z-2935619 (12:00Z, cron). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE queued_events=0, no resident-human-session signal (no recent writes in either repo, no growing IDE claude pid). master=c68bcfd CI success, harness main=aa323b2 (matches local git log HEAD), no open PRs either repo, mr-state.json inflight/awaiting_merge/parked all empty. Fast path: queue[] held rb-72 (promoted last tick from R-18r-b-ADR0232MECH). Re-verified live: ### rb-72 heading present in specs/monster-realm-v2/M-residual-backlog.spec.md, non-blocked, after: empty, not already merged. Resolved the placeholder touches: ("inherit from source slice -- REVIEW") myself before spawning, per the rb-69 misroute lesson -- read ADR-0232 (docs/adr/0232-m22-s9-...md) and confirmed live in server-module/src/lib.rs that resolve_all_live_interactions (line 246) only calls the trading/pvp/battle cancel-on-disconnect helpers, never deletes player/character rows; those deletes are in on_disconnect (line 266) directly, after calling resolve_all_live_interactions. So the residual's finding holds: ADR-0232 D2 misattributes the mechanism (conclusion about rejecting HTTP-driver still correct). Resolved touches -> docs/adr/0232-*.md + server-module/src/accounts_tests.rs (proof-of-teeth test pinning resolve_all_live_interactions does not delete player/character rows). tier=routine (doc correction + a pinning test, no schema/reducer/netcode/security-surface change, not M20/M25, not a resume). Launched via mr-spawn (leader=2937613, claude_pid=2937616, opus@high, repo=project, pr_repo=mdrewt/monster-realm). queue-removed rb-72. Budget NORMAL ($1958.02/$2783 7d, fable_ok=true). No other action this tick.
 ## 2026-09-08T11:03:17Z — 11:02Z tick — reconciled interrupted 09:41Z tick + promoted rb-72 (#113)
 Gate-0 fast-path found no live locks/pids/.done, but the harness worktree had uncommitted memory writes (mr-state.json/handoff/ledger) from the 09:41Z native tick, which had merged rb-71 (PR#455 -> master@c68bcfd, CI green run 34212029295) but exited before committing its own paper trail -- same failure mode as the documented 04:54Z/06:00Z incident. Committed that leftover state as f59dea2 after re-verifying master CI live.
 
@@ -4166,10 +4259,3 @@ Native tick mr-sup-native-20260907T130011Z-1140106 (13:00Z, cron). Gate-0: no li
 Native tick mr-sup-native-20260907T121730Z-1116577 (12:17Z, cron). Gate-0: rb-66's per-run lock showed session_leader dead + .done EXIT=0; PR#450 was CLEAN/mergeable with both checks green (event rb-66.ci.md confirmed). Re-verified live: gh pr view CLEAN, git diff base..head 6 files all within declared touches (ops/observability/**) plus ARCHITECTURE.md (doc set, doesn't count). mr-audit initially mis-invoked with --repo as a github slug (mdrewt/monster-realm) instead of a filesystem path -- gating_advisory came back AUDIT-ERROR (repo not a dir); rerun with the absolute worktree path and --head origin/<branch> gave orchestration=CLEAN, gating_advisory=CLEAN, acceptance=CLEAN (7/7 met, 0 unmet, 0 deferred). Squash-merged + branch deleted; local master fast-forwarded to 3d2c185; merged worktree removed. mr-gates residuals close --slice rb-66 --pr 450 -> closed R-rb-40-DASH (1). Ledger row recorded (cost COST-UNKNOWN by design -- wrapper's own reconcile row already carries this run's spend). queue[] is empty (rb-65 mentioned in an earlier tick's blocker note has since merged). Gate-3 fresh derivation: master CI green, nothing open/parked, oldest unclaimed residuals are R-rb-40-ADR0220 and R-rb-40-ADR0230 (disclosed 2026-09-04T02:00:52Z, ~3.4d old, past the t1=3d promote-aging threshold per the acceptance advisory's residual-unpromoted alarm) -- both look like real game-defect classes (ADR-0220 purge_export_bundles decision-2 shape, ADR-0230 accounts.rs missing log calls), not eval-tooling-only, so they are NOT wontfix candidates and should be promoted next. Did not chain a composite this tick: the doctrine's composite allowance is specifically merge-then-LAUNCH of an eligible slice, not merge-then-promote-a-residual (promotion is its own listed action) -- so this tick stops at the merge and leaves the promote for the next tick's Pick-work step. No BLOCKERs. 87->86 open residuals (over the observe-only cap of 12, informational only in slice 1).
 ## 2026-09-07T12:05:02Z — rb-66 PR#450 opened, CI-watch delegated
 Native tick mr-sup-native-20260907T120453Z-1114784-4873 (12:04Z, cron/forced). rb-66 (Grafana panel + recording rule for evt=guest_claim_export_purge, closes residual R-rb-40-DASH) finished cleanly (EXIT=0, 1 attempt, opus/high): ledger 7/7 gates met, full `just ci` green locally, PR https://github.com/mdrewt/monster-realm/pull/450 opened against master, MERGEABLE/UNSTABLE (remote ci+e2e still IN_PROGRESS at tick time). Delegated CI-wait for PR #450 to mr-ci-watch (detached, pid 1114792); resumes via event tick on completion — no merge attempted this tick. No other live locks/chains; mutex released after this record.
-## 2026-09-07T10:03:05Z — 10:00Z tick — reconciled diverged main + launched rb-66 (composite)
-Native tick mr-sup-native-20260907T100007Z-934351 (10:00Z, cron). Gate-0: FOUND local harness main diverged from origin/main -- local had an unpushed 09:00Z tick-record commit (b72ebb9: memory/projects/monster-realm-handoff.md + archive + mr-state.json only) while origin/main had independently advanced via the merged doc-only chore PR#106 (45a72e1: specs/monster-realm-v2/M-residual-backlog.spec.md only, promoting R-rb-40-DASH -> rb-66). Verified the two commits touch fully disjoint files (confirmed via git show --stat on both) before reconciling -- merged origin/main into local main (ort strategy, zero conflicts, aa30580) and pushed. This is a push-race variant of the recurring 'orphaned uncommitted tick record' pattern (see prior 07:00Z/08:00Z/15:00Z/16:00Z entries) except this time the record WAS committed locally, just never pushed, while a separate PR-based action landed on origin in between -- same root cause (tick ends without a final push), different symptom (divergence instead of a clean ff). Gate-1/2: no resident IDE pid, no non-housekeeping writes in the 6min probe window either repo, took the chain-owner mutex cleanly. Gate-3: mr-gates residuals list --unclaimed showed 72 open; two (R-rb-40-ADR0220, R-rb-40-ADR0230, both 3.33d) past t1_promote_days=3 -- per established fast-path precedent (2026-09-01T03:00Z tick), a non-empty queue[] (rb-66, already promoted+verified live-valid: spec heading present at M-residual-backlog.spec.md, no blocked:/after: deps outstanding, source rb-40 merged, no existing rb-66 branch/PR) is served ahead of promoting yet another residual in the same tick -- the aged pair will surface again next tick once queue[] empties. Derived touches for rb-66 from the residual's own deferred-reason prose (ops/observability/grafana/**, ops/observability/rules/**, ops/observability/checks/** -- confirmed these paths exist in the project tree) -- no schema/reducer/netcode/security/M20/M25 surface, no prior attempt -> tier=routine, opus@high. No ADR pre-reserved (dashboard/alert wiring, not a design decision). LAUNCHED cleanly via mr-spawn: leader=936939 claude_pid=936942 rid=mr-spawn-20260907T100245Z-936886 repo=project pr_repo=mdrewt/monster-realm. queue-removed rb-66 (queue[] now empty). Governor NORMAL (d7=$1523.37/$2783 eff.=54.7%, fable_d7=$598.46/$2298 allowance, fable_ok=true). No BLOCKERs, no rate-limit event. Composite action this tick: reconcile-push (record-recovery, not the mutating action) + launch (the tick's one action).
-## 2026-09-07T09:02:03Z — 09:00Z tick — promoted R-rb-40-DASH to rb-66
-Native tick mr-sup-native-20260907T090010Z-921856 (09:00Z, cron). Gate-0: no live locks/chain mutex, HOLD-NONE queued_events=0, rb-65 already merged+recorded+ledgered by the 07:00Z/08:00Z ticks (PR#449, 28f2c28) -- confirmed live (no open PRs, no rb-65 branch, master matches situation bundle). Residuals: 3 unclaimed past t1_promote_days=3d (ADR0220/ADR0230/DASH, all real defects per Work-selection scope classification -- none are eval-tooling-scanner-correctness). Promoted R-rb-40-DASH -> rb-66 (Grafana panel for evt=guest_claim_export_purge) into specs/monster-realm-v2/M-residual-backlog.spec.md, queued (mr-record queue-add), shipped as doc-only chore PR#106 (chore/residual-promote-20260907T090010Z, --squash --auto). ADR0220/ADR0230 remain unpromoted for a future tick (one-action-per-tick discipline). No launch this tick (promote counts as the tick's one action). Budget NORMAL ($1522.36/$2783 7d).
-## 2026-09-07T06:47:21Z — rb-65: PR#449 open, CI-watch delegated
-Native tick mr-sup-native-20260907T064652Z-844419 (event: rb-65.done.md). rb-65 run finished rc=0, cost $105.42, PR https://github.com/mdrewt/monster-realm/pull/449 opened by the run itself (feat/rb-65-cascade-erasure-observability). Remote CI (ci, e2e) still pending at tick time — mergeStateStatus UNSTABLE. Delegated CI-wait for PR #449 to mr-ci-watch (detached pid 845585); resumes via event tick. No mutating action taken this tick besides the delegation.
-

@@ -7,11 +7,11 @@
   "ci": "no-remote-ci-local-gate-green"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-08T11:00:09Z",
+ "last_tick_utc": "2026-09-08T12:00:09Z",
  "live_watchers": [],
  "master": {
-  "sha": "c68bcfd",
-  "ci": "success",
+  "sha": "9434dfb",
+  "ci": "in_progress",
   "nightly": "success"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,22 +27,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "native tick 11:00Z: gate-0 found no live locks/pids/.done, but the harness worktree had uncommitted memory writes left by the 09:41Z tick (which merged rb-71/PR#455 -> master@c68bcfd, CI now confirmed success on run 34212029295, but exited before committing its own ledger/handoff/state paper trail -- same failure class as the documented 04:54Z/06:00Z incident). Committed that leftover state (f59dea2), re-verifying master CI live first. Gate-3: no open/parked slices, queue[] was empty, master green. mr-gates residuals list --unclaimed: 28 past t1=3d (R-m23-s10-X16 past t2=14d is already promoted/blocked on a pending palette ruling, not unclaimed so doesn't apply here); oldest tier was 5 residuals tied at disclosed_at=2026-09-04T16:03:43Z from source slice 18r-b. Picked R-18r-b-ADR0232MECH (alphabetically first) -- a real doc-correctness/security finding (ADR-0232 misattributes disconnect-row deletes), not eval-tooling-only, so it proceeds per the 2026-09-01 Work-selection scope directive. Promoted -> rb-72, shipped as doc-only chore PR#113 (squash+auto, merged immediately). GitHub's squash bundled my unpushed f59dea2 into PR#113's squash commit (5c534e9) since it was an ancestor of the PR branch -- verified 5c534e9's tree is a strict superset of f59dea2 (only the rb-72 addition), so nothing lost/duplicated; reconciled the resulting local/origin divergence with a content-only merge commit (aa323b2, guard-bash blocks hard reset) and pushed. queue-added rb-72 so next tick's fast path launches it directly. No slice launched this tick.",
+ "notes": "rb-72 merged PR#456 13:33Z; master ff'd to 9434dfb (CI in_progress at record time, not yet reverified green).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "slice": "rb-72",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-18r-b-ADR0232MECH",
-   "added_utc": "2026-09-08T11:03:07Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "c68bcfd"
-  }
- ],
+ "queue": [],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
@@ -59,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260908T110009Z-2920313",
- "updated_utc": "2026-09-08T11:06:00Z"
+ "updated_by": "mr-sup-native-20260908T120009Z-2935619",
+ "updated_utc": "2026-09-08T12:03:00Z"
 }
