@@ -3,15 +3,15 @@
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
-  "sha": "aa323b2",
+  "sha": "55b8d9b",
   "ci": "no-remote-ci-local-gate-green"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-08T12:00:09Z",
+ "last_tick_utc": "2026-09-08T14:00:12Z",
  "live_watchers": [],
  "master": {
   "sha": "9434dfb",
-  "ci": "in_progress",
+  "ci": "success",
   "nightly": "success"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,13 +27,22 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "rb-72 merged PR#456 13:33Z; master ff'd to 9434dfb (CI in_progress at record time, not yet reverified green).",
+ "notes": "14:00Z tick: reconciled 12:00Z-13:33Z tick chain's uncommitted paper trail (rb-72 launch/PR#456-open/merge; a3ad164) after live-reverifying PR#456 MERGED + master CI success on 9434dfb. Promoted R-18r-b-DISCONNECTSELF (real security finding, self-triggerable disconnect side effects) -> rb-73 via doc-only chore PR#114, queued for next tick's fast path.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-73",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-18r-b-DISCONNECTSELF",
+   "added_utc": "2026-09-08T14:02:58Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "9434dfb"
+  }
+ ],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
@@ -50,6 +59,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260908T120009Z-2935619",
- "updated_utc": "2026-09-08T12:03:00Z"
+ "updated_by": "mr-sup-native-20260908T140012Z-3174646",
+ "updated_utc": "2026-09-08T14:04:00Z"
 }
