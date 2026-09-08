@@ -27,7 +27,7 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
 ### rb-69 — X9-harness-spec-false-premise (from rb-42 X9-harness-spec-false-premise, deferred 2026-09-04)
-`touches: (inherit from source slice — REVIEW)`
+`touches: specs/monster-realm-v2/M-residual-backlog.spec.md, scripts/tests/invariants.test.mjs, memory/projects/monster-realm-rb-69-plan.md`
 `after:` — · source: rb-42 · residual: R-rb-42-X9-harness-spec-false-premise
 
 Deferred with reason: `specs/monster-realm-v2/M-residual-backlog.spec.md`
@@ -386,7 +386,7 @@ Deferred with reason: PRE-EXISTING and outside touches: `evals/battle-schema-sna
 
 EARS: WHEN `Object.prototype` carries a table name THE schema-drift eval SHALL still report
 Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
-### rb-27 — WHEN a slice records a new gate-hygiene pattern (an in-process Object.prototype write with (from rb-3 X9, deferred 2026-08-28)
+### rb-27 — RESOLVED, do not build (from rb-3 X9, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-3 · residual: R-rb-3-X9
 
@@ -394,6 +394,14 @@ Deferred with reason: no ADR number was reserved for rb-3 (the supervisor-assign
 
 EARS: WHEN a slice records a new gate-hygiene pattern (an in-process Object.prototype write with
 Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
+
+RESOLVED 2026-09-01 (mr-gates residuals close --slice rb-27 --force): the deferral premise
+recorded above is MOOT, and is kept verbatim because it is a mechanical copy of the residual
+row's own reason. The reservation it names never happened and never needed to: rb-3's decision
+was recorded inside rb-4's ADR-0208, whose Decision 2 is headed `(rb-3)` and documents the
+in-process `Object.prototype` write-hygiene pattern in full. rb-26's own review
+(R-rb-26-X8-rb-3-x9-fg72c, 2026-09-01) independently confirmed that, and R-rb-3-X9 was closed as
+moot the same day. Do not re-launch this section as a slice; it names no remaining work.
 ### rb-26 — WHEN the classifier no longer infers policy from typeof THE four consumers that STATE (from rb-2 X9, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-2 · residual: R-rb-2-X9
