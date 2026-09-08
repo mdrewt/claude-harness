@@ -4,15 +4,15 @@
   "consecutive_standdowns": 0,
   "harness_main": {
     "ci": "no-remote-ci-local-gate-green",
-    "sha": "bc4268d"
+    "sha": "7cf7d1e"
   },
   "inflight": [],
-  "last_tick_utc": "2026-09-08T06:00:15Z",
+  "last_tick_utc": "2026-09-08T07:03:00Z",
   "live_watchers": [],
   "master": {
-    "sha": "92882d0",
     "ci": "success",
-    "nightly": "success"
+    "nightly": "success",
+    "sha": "92882d0"
   },
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "native_supervisor": {
@@ -33,7 +33,16 @@
     "14r-e": 1
   },
   "parked": [],
-  "queue": [],
+  "queue": [
+    {
+      "added_by": "n/a",
+      "added_utc": "2026-09-08T07:02:40Z",
+      "derived_from_master_sha": "92882d0",
+      "reason": "promoted residual R-18r-b-B1",
+      "slice": "rb-71",
+      "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+    }
+  ],
   "rate_limit_armed_by": "wrapper",
   "rate_limit_resets_at": null,
   "resource_locations": {

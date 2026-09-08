@@ -4147,3 +4147,12 @@ Gate-3: mr-gates residuals list --unclaimed showed 73 open, oldest cluster (6 ro
 
 This was the tick's ONE action (promote+ship). rb-65 sits in queue[] for the next tick's fast-path launch. 72 unclaimed residuals remain (67 untouched + the 2 flagged-for-classification eval-tooling ones + ADR0220/ADR0230/DASH still unpromoted). Governor NORMAL (d7=$1413.08/2783 eff., fable_d7=$493.04/2298, fable_ok=true). No BLOCKERs, no rate-limit event. Standing down after the single promote+ship action.
 
+
+## 2026-09-08T07:03:09Z — 07:02Z tick record — promoted rb-71 (PR#112)
+Native tick mr-sup-native-20260908T070125Z-2664909-29432 (07:01Z, cron). Gate-0: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no active-session collision. Gate-1: pushed harness main's unpushed 06:00Z tick-record commit (fab8596) to origin before proceeding (was 1 commit ahead per REPO-OUT-OF-SYNC gotcha). Gate-2: master CI green (92882d0), no open PRs, inflight/awaiting_merge/queue all empty at gate-3 entry, park_counters unchanged ({14r-e: 1}).
+
+Gate-3 pick-work: 82 unclaimed residuals; 20 past t1_promote_days=3 (none past t2_stale_days=14). Oldest by disclosed_at: R-18r-b-B1 (2026-09-04T16:03:22Z, MED, source 18r-b) -- a one-line doc-citation defect (docs/m8.5c-plan.md:85 cites AGENTS.md:8, actually AGENTS.md:7). Classified per ADR-0224 work-selection scope: real doc-defect class, not eval-tooling-scanner-only -- promotable, not wontfix-able.
+
+Action: `mr-gates residuals promote --id R-18r-b-B1` -> rb-71 appended to specs/monster-realm-v2/M-residual-backlog.spec.md (HARNESS-level spec corpus). Shipped as doc-only chore PR#112 (chore/residual-promote-20260908T070217Z) against mdrewt/claude-harness, `--squash --auto` (merged immediately, green). `mr-record queue-add --slice rb-71` so the next tick launches it off the fast path. Synced harness main to the merge (7cf7d1e), deleted the merged branch locally+remote.
+
+No merge/launch this tick (queue was empty at entry; residual-promote was the one action). Remaining 19 other past-t1 residuals (18r-b x7, rb-46 x5, rb-47 x3, rb-48 x4) still unclaimed for future ticks in disclosed_at order.
