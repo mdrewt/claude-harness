@@ -16,8 +16,9 @@
 // hazard in this corpus; a non-empty status makes the gate print a FAIL token.
 //
 // LABEL CONTRACT (the shipped Rust collectors must emit these verbatim):
-//   [cite/count] [cite/line-mismatch] [anchor/missing] [anchor/not-unique]
-//   [anchor/doc-missing] [doc/empty] [claim/stale-tense] [claim/premature-past]
+//   [cite/count] [cite/line-mismatch] [cite/out-of-block] [anchor/missing]
+//   [anchor/not-unique] [anchor/doc-missing] [block/not-unique] [doc/empty]
+//   [claim/stale-tense] [claim/premature-past]
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -49,9 +50,17 @@ function nextest(filter) {
   return { status: r.status, out: String(r.stdout) + String(r.stderr) };
 }
 
-function treeDirty() {
+// Restoration check. The target worktree is ALWAYS dirty before the merge (the
+// shipped test append is uncommitted), so comparing against the empty string
+// cries wolf on every legitimate run and trains the reader to ignore the one
+// time it matters. Baseline the status at startup and compare against THAT.
+function gitStatus() {
   const r = spawnSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' });
-  return String(r.stdout).trim() !== '';
+  return String(r.stdout).trim();
+}
+const BASELINE_STATUS = gitStatus();
+function treeDirty() {
+  return gitStatus() !== BASELINE_STATUS;
 }
 
 // Apply `mutate` (a map of path -> new content), run `filter`, restore, and
@@ -118,13 +127,19 @@ if (MODE === 'g3') {
 // control never ran) and the control test MUST fail.
 else if (MODE === 'g4') {
   const driver = read(DRIVER);
-  const MARK = '// RB71-GUT-POINT';
-  if (driver.indexOf(MARK) === -1) {
-    console.log('RB71-G4 NO GUT MARKER');
+  // MEASURED HAZARD: the marker text also appears inside the module's own
+  // docblock, which QUOTES it while explaining the pin. A bare substring
+  // `.replace()` therefore mutated the COMMENT, left the collector intact, and
+  // reported a false "not killed". Anchor on a WHOLE LINE that is nothing but
+  // indentation plus the marker, which only the real splice point satisfies.
+  const MARK = /^([ \t]*)\/\/ RB71-GUT-POINT[ \t]*$/m;
+  const hits = driver.split(NL).filter((l) => MARK.test(l)).length;
+  if (hits !== 1) {
+    console.log(`RB71-G4 GUT MARKER NOT UNIQUE (${hits} whole-line hits)`);
     process.exit(1);
   }
   const r = probe({
-    files: { [DRIVER]: driver.replace(MARK, 'return found;') },
+    files: { [DRIVER]: driver.replace(MARK, '$1return found;') },
     filter: 'rb71_citation_oracle_control',
     label: null,
   });
@@ -146,6 +161,8 @@ else if (MODE === 'g8') {
     console.log('RB71-G8 NO LIVE ANCHOR');
     process.exit(1);
   }
+  const citedMatch = plan.match(/AGENTS\.md:([0-9]+)/);
+  const CITED = citedMatch ? citedMatch[1] : String(ai + 1);
   const aLines = agents.split(NL);
   const anchorLine = aLines[ai];
 
@@ -203,6 +220,35 @@ else if (MODE === 'g8') {
     // M14 — the anchor file is gutted: the oracle must fail LOUD, never pass.
     { id: 'M14', files: { [AGENTS]: '' },
       filter: 'rb71_m85c_cites', label: null },
+    // ---- The four GREEN CHEATS the artifact red-team MEASURED against the
+    // first draft of the oracle. Each turned all three tests green while the
+    // real defect stood. They are permanent teeth now, not one-off probes.
+    // CHEAT-A — a clean DECOY `**Doc reconciliation` landmark planted earlier in
+    // the doc; the first-match block extraction then judged the decoy.
+    { id: 'CHEAT-A',
+      files: { [PLAN]: plan.replace(
+        '## Sanctioned touch-set expansions',
+        `- **Doc reconciliation** (draft aside): the \`**Done =**\` bullet is at \`AGENTS.md:${ai + 1}\`.${NL}${NL}## Sanctioned touch-set expansions`,
+      ) },
+      filter: 'rb71_m85c_cites', label: '[block/not-unique]' },
+    // CHEAT-B — the citation hidden inside an HTML comment: invisible to a
+    // reader, plain bytes to a naive census.
+    { id: 'CHEAT-B',
+      files: { [PLAN]: plan.replace(
+        `\`AGENTS.md:${CITED}\``,
+        `<!-- AGENTS.md:${ai + 1} -->`,
+      ) },
+      filter: 'rb71_m85c_cites', label: '[cite/count]' },
+    // CHEAT-C — the citation moved OUT of the Doc-reconciliation block entirely
+    // (the whole-file census vs block-scoped check asymmetry).
+    { id: 'CHEAT-C',
+      files: { [PLAN]: `${plan.replace(`\`AGENTS.md:${CITED}\``, 'AGENTS.md')}${NL}<!-- housekeeping ref AGENTS.md:${ai + 1} -->${NL}` },
+      filter: 'rb71_m85c_cites', label: '[cite/count]' },
+    // CHEAT-D — the stale present-tense claim kept, but spelled with a SYNONYM
+    // so a literal `FALSELY claim` needle never fires.
+    { id: 'CHEAT-D',
+      files: { [PLAN]: plan.replace('claimed, before M8.5c,', 'incorrectly assert today') },
+      filter: 'rb71_m85c_bullet', label: '[claim/stale-tense]' },
   ];
 
   const survivors = [];
