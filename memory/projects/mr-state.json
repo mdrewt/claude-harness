@@ -7,7 +7,7 @@
   "sha": "0a187ba"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-08T01:35:00Z",
+ "last_tick_utc": "2026-09-08T01:37:30Z",
  "live_watchers": [],
  "master": {
   "sha": "5bb16bb941fd7b9d82ad60b42f6d082fad8dfa5c",
@@ -33,7 +33,16 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-70",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-42-X10-extends-vocabulary-unmodelled",
+   "added_utc": "2026-09-08T01:36:13Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "5bb16bb941fd7b9d82ad60b42f6d082fad8dfa5c"
+  }
+ ],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": null,
  "resource_locations": {
