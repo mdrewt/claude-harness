@@ -189,3 +189,38 @@ landmark form at `docs/adr/0231-*.md:142-143`; any other driver edit risks the A
 | R4 | clippy `-D warnings` on the new module | no `assertions_on_constants`, no `needless_range_loop` |
 | R5 | Wrong home for a docs test | disclosed as R-rb71-TESTHOME |
 | R6 | T2's presence leg is a needle | disclosed in the docblock; the derived conditional is the load-bearing half |
+
+---
+
+## 11. Plan-review deltas (reviewer + red-team + /simplify, applied)
+
+**Not a finding.** The reviewer's "BLOCKER B1" (a leftover `rb71_probe_tests` module in the
+worktree) was a TORN READ of the red-team's in-flight experiment #7, which ran concurrently and
+restored the file. Re-verified after both lenses closed: `git status` empty, `git diff origin/master
+HEAD` empty, driver at 6053 lines, zero `rb71` symbols in the tree.
+
+| # | Lens | Finding | Applied |
+|---|---|---|---|
+| D1 | red-team HIGH #1 | Only 4 of the 14 planned mutants were mechanically gated. A "leg-C-only" oracle passes all 7 original gates while blind to M4-M12/M14. | **New gate G8** — a 10-mutant label matrix, each asserted BY ITS OWN LABEL. |
+| D2 | both, HIGH | G2's re-derivation regex had no preceding-char guard and MEASURABLY false-passed `../../AGENTS.md:9` (the real harness file) — zero backstop for the exact class it reinforces. | G2 regex now carries a negative lookbehind `(?<![A-Za-z0-9/._~-])`. |
+| D3 | red-team MED #3 | G3/G4 restored the tree once at the end, no `try/finally`; a SIGKILL leaves a mutant — including in production source — in the tree. | G3/G4/G8 moved into `memory/projects/rb-71.gates.mjs` (the 18r-b precedent): every mutation in `try/finally`, and each mode re-asserts `git status --porcelain` is EMPTY after restoring. |
+| D4 | red-team MED #4 | G4 read "non-zero exit" as KILLED — but a COMPILE error from the gut substitution also exits non-zero, masking that the control assertions never ran. Also coupled to an unstated variable name. | The runner rejects `error[E`/`could not compile` explicitly. **PINNED:** the collector's local accumulator MUST be named `found`, and `// RB71-GUT-POINT` must sit after `let mut found: Vec<String> = Vec::new();` and before any push, so the substitution type-checks. |
+| D5 | red-team LOW #5 | Leg B's guard excluded alphanumeric/`/`/`.` but not `_`, `-`, `~`, or markdown link text. | Guard widened to `[A-Za-z0-9/._~-]` in BOTH the Rust leg B and G2. |
+| D6 | reviewer M2 | "rb-70's D-C is this situation verbatim" is imprecise — rb-70 had NO number assigned; rb-71 has one assigned that is already taken and merged. | Re-worded: the REMEDY generalizes from rb-70's D-C; the root cause differs. |
+| D7 | reviewer m1 | Seam B (the tense correction) is additive beyond the ledger's literal criterion. | **Kept, and disclosed.** /simplify judged it load-bearing, not scope creep: fixing only the number makes the citation resolve CORRECTLY to a bullet the very same sentence then describes FALSELY — strictly worse than the status quo. Now gated by G8/M11+M12 so it is not an unpinned prose change. |
+| D8 | reviewer m2 | "the parenthetical immediately following the first `just ci`" is loose — the live text has "green and meaningful" between the token and the paren. | Restated: the FIRST parenthesised group on the anchor line, at or after the `just ci` token. |
+| D9 | red-team #10 | R4's clippy risk named `assertions_on_constants`, which cannot fire (M15 forces the number to be derived at runtime). | Real default-level risks for hand-rolled `.lines()`/`.chars()` parsing: `needless_range_loop`, `manual_strip`, `comparison_chain`. |
+
+**Independently CONFIRMED by both lenses (no action):** every fact F1-F9; that
+`cargo nextest run --workspace` really does execute a `#[cfg(test)]` module appended at EOF of a
+`src/bin/*.rs` target (red-team #7 measured it RED with a canary); that the promoted residual's `:7`
+is wrong and `:9` is right (red-team #8 walked `git log -p --follow`); that nextest exits 4 with
+"no tests to run" on a zero-match `-E` filter, so G1 cannot pass with the tests deleted (red-team
+#6); that ADR-0244 is really taken and 0245 really free; and that an EOF append cannot shift
+ADR-0232's cited `:76-89` (red-team #9).
+
+**/simplify verdict: no structural cut.** Zero new dependencies (`sim-harness` depends only on
+`game-core`; std-only parsing), so no dependency ADR is owed. The nearest in-tree precedent for this
+exact problem shape, `server-module/src/privacy_tests.rs` `rb67p_adr_violations` +
+`rb67p_adr0220_citation_oracle_control`, spans ~900 lines; rb-71's ~250-line design is smaller than
+its precedent, and the red-team's headline finding was that the gates were too FEW.
