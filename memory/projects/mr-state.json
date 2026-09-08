@@ -3,16 +3,16 @@
   "awaiting_merge": [],
   "consecutive_standdowns": 0,
   "harness_main": {
-    "ci": "no-remote-ci-local-gate-green",
-    "sha": "7cf7d1e"
+    "sha": "39791c0",
+    "ci": "no-remote-ci-local-gate-green"
   },
   "inflight": [],
-  "last_tick_utc": "2026-09-08T07:03:00Z",
+  "last_tick_utc": "2026-09-08T09:41:25Z",
   "live_watchers": [],
   "master": {
-    "ci": "success",
-    "nightly": "success",
-    "sha": "92882d0"
+    "sha": "c68bcfd",
+    "ci": "in_progress",
+    "nightly": "success"
   },
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "native_supervisor": {
@@ -27,22 +27,13 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "native tick 06:00Z: reconciled an incomplete prior tick -- the 04:54Z tick merged rb-70 (PR#454, closed R-rb-42-X10, disclosed R-rb-70-R1..R6) and exited rc=0 without writing the ledger MERGED row/handoff entry/this file/releasing the mutex. Backfilled all from live ground truth (gh, mr-gates verify/residuals). Gate-3: oldest unclaimed residuals (R-rb-43-DUPID/CHANGELOGCITE/COLLECTORSHAPES/HEADINGID, 3.75d, all scripts/adr-digest.mjs scanner-correctness) classified eval-tooling-only per the 2026-09-01 operator directive and dispositioned wontfix instead of promoted -- breaking the self-referential rb-* spiral rather than extending it. No new slice launched. queue[] empty; next tick falls through to full PLAN section-9 derivation.",
+  "notes": "native tick 09:41Z: rb-71 run finished (.done EXIT=0), PR#455 CLEAN/green both checks. mr-gates verify initially FLAGGED on G1/G3/G8 due to supervisor-shell PATH missing cargo/asdf -- re-ran with PATH fixed, all matched recorded evidence. Lone remaining mismatch G5 (local just ci rerun) was an unrelated flaky account-e2e WebSocket-reset, not in the diff; remote PR CI green + spotcheck agreed. mr-audit orchestration=CLEAN mandatory_read=False. Merged PR#455 squash -> master@c68bcfd, ff'd main checkout, removed worktree+branch. mr-gates residuals close --slice rb-71 --pr 455 -> closed 1. 2 residuals disclosed by rb-71 remain open/unpromoted for aging. Master CI on c68bcfd (run 34212029295) still in_progress at tick end -- verify next tick before any new launch.",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
   },
   "parked": [],
-  "queue": [
-    {
-      "added_by": "n/a",
-      "added_utc": "2026-09-08T07:02:40Z",
-      "derived_from_master_sha": "92882d0",
-      "reason": "promoted residual R-18r-b-B1",
-      "slice": "rb-71",
-      "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-    }
-  ],
+  "queue": [],
   "rate_limit_armed_by": "wrapper",
   "rate_limit_resets_at": null,
   "resource_locations": {
@@ -59,6 +50,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260908T060015Z-2641933",
-  "updated_utc": "2026-09-08T06:07:00Z"
+  "updated_by": "mr-sup-native-20260908T094125Z-2852367",
+  "updated_utc": "2026-09-08T09:52:00Z"
 }
