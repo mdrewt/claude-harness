@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-70 — X10-extends-vocabulary-unmodelled (from rb-42 X10-extends-vocabulary-unmodelled, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-42 · residual: R-rb-42-X10-extends-vocabulary-unmodelled
+
+Deferred with reason: `scripts/adr-digest.mjs` gives
+
+EARS: X10-extends-vocabulary-unmodelled
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-69 — X9-harness-spec-false-premise (from rb-42 X9-harness-spec-false-premise, deferred 2026-09-04)
 `touches: specs/monster-realm-v2/M-residual-backlog.spec.md, scripts/tests/invariants.test.mjs, memory/projects/monster-realm-rb-69-plan.md`
 `after:` — · source: rb-42 · residual: R-rb-42-X9-harness-spec-false-premise
