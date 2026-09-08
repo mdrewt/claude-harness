@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-72 — ADR-0232 at 47-50 misattributes the disconnect row deletes to resolve_all_live_interaction (from 18r-b ADR0232MECH, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 18r-b · residual: R-18r-b-ADR0232MECH
+
+Deferred with reason: reducer-security-auditor finding. The resolver bundle performs no row write itself, per its own doc comment; the player and character deletes live in the on_disconnect body. Harmless to that ADR conclusion, wrong about the mechanism. ADR-0232 is outside 18r-b touches.
+
+EARS: ADR-0232 at 47-50 misattributes the disconnect row deletes to resolve_all_live_interactions
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-71 — docs/m8.5c-plan.md:85 cites AGENTS.md:8 for a bullet that lives at AGENTS.md:7 (from 18r-b B1, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 18r-b · residual: R-18r-b-B1
