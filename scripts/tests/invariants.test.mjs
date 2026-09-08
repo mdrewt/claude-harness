@@ -429,7 +429,7 @@ test('the noise-filter fixtures never diverge between the harness and _base', as
 });
 
 // ---------------------------------------------------------------------------
-// rb-69 — `### rb-27` must retract its false deferral premise in place
+// rb-69 — `### rb-27` must retract its moot deferral premise in place
 // ---------------------------------------------------------------------------
 // `M-residual-backlog.spec.md`'s `### rb-27` still read as launchable work while
 // the reason it gave had been overtaken on 2026-09-01, when R-rb-3-X9 was closed
@@ -464,6 +464,10 @@ test('the noise-filter fixtures never diverge between the harness and _base', as
 
 const RB27_SPEC = path.join(HARNESS, 'specs', 'monster-realm-v2', 'M-residual-backlog.spec.md');
 const RB27_MEMORY = path.join(HARNESS, 'memory', 'projects');
+// The generated region: `mr-gates residuals promote` appends at the marker, and
+// the hand-written prose sections resume at `## 3.`.
+const RB27_REGION_START = '<!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->';
+const RB27_REGION_END = '## 3. How an entry gets worked';
 
 // The premise. Counted inside rb-27's OWN window, never file-wide: this spec is
 // append-only generator output and `mr-gates residuals promote` copies a
@@ -510,12 +514,19 @@ const RB27_SECTION_FROZEN = [
 
 const rb27Collapse = (s) => s.trim().split(/\s+/).join(' ');
 
-// Two windows, on purpose. The FROZEN window ends at the next level-1..3 heading
-// of any kind, so an unparsed `### Addendum` cannot let planted text count as
-// in-window. The INERT window ends only at `^### `, matching `mr-gates`' own
-// `NEXT_HEAD` — it is the WIDER of the two, and it is the one a phantom-gate
-// scan must run over, because text after a `## ` line is still inside the
-// section `mr-gates.extract_criteria` harvests.
+// ONE window, ending at `^### ` — exactly `mr-gates`' own `NEXT_HEAD`, so the
+// text this freezes is precisely the text `section_of('rb-27')` returns.
+//
+// An earlier draft used a NARROWER window ending at any `^#{1,3} ` heading,
+// reasoning that an unparsed `### Addendum` must not let planted text count as
+// in-window. For a FREEZE that reasoning is inverted, and the verifier proved
+// it: ending the window early does not exclude planted text from scrutiny, it
+// EXEMPTS it. A single `## Addendum` line after the retraction terminated the
+// narrow window while `mr-gates.section_of` still returned the text below it as
+// part of rb-27 — a green gate over a section both the tooling and a scrolling
+// reader saw as re-opened. Widening the freeze to `mr-gates`' own boundary
+// closes that; the promoted-region heading census in the first test closes the
+// `### Addendum` variant, which terminates both windows.
 async function rb27Section() {
   const text = await readFile(RB27_SPEC, 'utf8');
   const heads = [...text.matchAll(RB27_HEADING)];
@@ -529,16 +540,13 @@ async function rb27Section() {
   const nl = from.indexOf('\n');
   assert.ok(nl > 0, "the '### rb-27' heading line is unterminated");
   const rest = from.slice(nl + 1);
-  const narrow = /^#{1,3} /m.exec(rest);
-  const wide = /^### /m.exec(rest);
-  const body = narrow ? rest.slice(0, narrow.index) : rest;
-  const inertBody = wide ? rest.slice(0, wide.index) : rest;
+  const next = /^### /m.exec(rest);
+  const body = next ? rest.slice(0, next.index) : rest;
   assert.ok(body.length > 0, "the '### rb-27' section body is empty");
   return {
     text,
     heading: from.slice(0, nl),
     body,
-    inertBody,
     bodyStart: start + nl + 1,
     bodyEnd: start + nl + 1 + body.length,
   };
@@ -546,8 +554,30 @@ async function rb27Section() {
 
 const rb27Retraction = (body) => [...body.matchAll(RB27_RETRACTION)];
 
-test('rb-27 retracts its false deferral premise in place', async () => {
+test('rb-27 retracts its moot deferral premise in place', async () => {
   const { text, heading, body, bodyStart, bodyEnd } = await rb27Section();
+
+  // The generated region may contain nothing but `### rb-N` sections. Without
+  // this, a planted `## Addendum` or `### Addendum` heading anywhere between
+  // rb-27 and the next section carries reader-visible prose that no other pin
+  // reaches — the verifier proved exactly that against an earlier draft.
+  const regionStart = text.indexOf(RB27_REGION_START);
+  const regionEnd = text.indexOf(RB27_REGION_END);
+  assert.ok(regionStart >= 0, `missing the promoted-sections marker: ${RB27_REGION_START}`);
+  assert.ok(
+    regionEnd > regionStart,
+    `missing the promoted-sections terminator: ${RB27_REGION_END}`,
+  );
+  const regionHeads = [...text.slice(regionStart, regionEnd).matchAll(/^#{1,6} .*$/gm)].map(
+    (m) => m[0],
+  );
+  assert.ok(regionHeads.length >= 60, `promoted region has only ${regionHeads.length} headings`);
+  const strays = regionHeads.filter((h) => !/^### rb-\d+ — /.test(h));
+  assert.deepEqual(
+    strays,
+    [],
+    'the promoted-sections region may contain only `### rb-N — …` headings; a stray heading splits a section and parks prose no pin reaches',
+  );
 
   const mentions = [...text.matchAll(RB27_ANY_HEADING)].map((m) => m[0]);
   assert.equal(
@@ -655,33 +685,33 @@ test('rb-27 retraction text is frozen and matches the tracked adjudication', asy
 });
 
 test('the rb-27 annotation is inert and cannot inject a phantom gate', async () => {
-  const { inertBody } = await rb27Section();
+  const { body } = await rb27Section();
 
   assert.ok(
-    !inertBody.includes('```'),
+    !body.includes('```'),
     "rb-27's section must contain no code fence — a fenced 'retraction' is invisible to a reader while its raw bytes still satisfy any regex",
   );
   assert.ok(
-    !inertBody.includes('<!--'),
+    !body.includes('<!--'),
     "rb-27's section must contain no HTML comment — a commented-out 'retraction' is invisible to a reader while its raw bytes still satisfy any regex",
   );
   assert.doesNotMatch(
-    inertBody,
+    body,
     /^\s*</m,
     "rb-27's section must open no raw HTML block — `<details>` renders collapsed and `<div hidden>` renders not at all, while the bytes still satisfy every regex",
   );
   assert.doesNotMatch(
-    inertBody,
+    body,
     /\bSHALL\b/,
     "rb-27's section must contain no SHALL — mr-gates.extract_criteria would seed it as a live acceptance criterion",
   );
   assert.doesNotMatch(
-    inertBody,
+    body,
     /^\s*[-*+]\s+/m,
     "rb-27's section must contain no bullet line — mr-gates.extract_criteria harvests bulleted lines",
   );
 
-  const hits = rb27Retraction(inertBody);
+  const hits = rb27Retraction(body);
   assert.equal(
     hits.length,
     1,
@@ -689,7 +719,7 @@ test('the rb-27 annotation is inert and cannot inject a phantom gate', async () 
   );
   // Scoped BELOW the retraction: the section legitimately carries `touches:`,
   // `EARS:` and `Tests:` lines above it, which are the promotion template's own.
-  const below = inertBody.slice(hits[0].index);
+  const below = body.slice(hits[0].index);
   assert.doesNotMatch(
     below,
     /^(touches:|EARS:|Tests:)/m,

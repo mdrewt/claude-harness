@@ -202,5 +202,30 @@ plan above was written before them and would otherwise read as if it had been ri
    supervisor re-executing it from the main checkout would have read the unfixed file and recorded
    a spurious FAIL. Fixed and re-verified from a different cwd.
 
-`/simplify` found nothing to cut and said so plainly; its one actionable point — that the 12-mutant
-matrix understated its own coverage — is addressed by the 25-row matrix that shipped.
+`/simplify` found nothing to cut and said so plainly; its one actionable point — that the mutation
+matrix understated its own coverage — is addressed by the 27-mutant matrix that shipped.
+
+## 12. The verifier returned FAIL, and it was right twice
+
+Recorded because a run that only reports its passes is not evidence of anything.
+
+1. **A mutant of the verifier's own invention SURVIVED.** One `## Addendum` line planted after the
+   retraction terminated the then-narrow `^#{1,3} ` freeze window, so an un-retraction below it
+   ("the retraction above was entered in error … rb-27 is live work again") was GREEN — while
+   `mr-gates.section_of('rb-27')` still returned that prose as part of rb-27. A green gate over a
+   section both the tooling and a scrolling reader saw as re-opened: the exact harm this slice
+   exists to remove. The comment defending that window had its reasoning INVERTED for a freeze —
+   ending a window early does not exclude planted text from scrutiny, it exempts it. Fixed two
+   ways: the freeze now runs to `mr-gates`' own `^### ` boundary, and the generated region is
+   asserted to contain only `### rb-N — …` headings, which also kills the `### Addendum` and
+   `#### ` variants (V1/V2/V3, all RED).
+2. **The ledger's own anti-vacuity claim was FALSE, on a toolchain difference.** I measured
+   "a zero-match `--test-name-pattern` prints `# pass 0`" on node **v18.19.1**; the CHECKs actually
+   run under the asdf shim, node **v24.13.1**, where a zero-match run prints `ok 1 - <FILENAME>`
+   and `# pass 1`. The verifier proved the consequence by deleting all three gating tests and
+   watching X1–X4 still match their EXPECT. Every pattern-scoped EXPECT now pins the
+   `ok 1 - <exact test name>` line, re-measured against a copy with the tests renamed away
+   (0 hits, and node still exits 0 — which is the whole point).
+
+Lesson worth keeping beyond this slice: **measure the runner you will actually be run by.** Both
+node versions are on this machine and `node --version` differs by which PATH export ran first.
