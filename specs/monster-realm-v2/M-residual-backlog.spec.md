@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-71 — docs/m8.5c-plan.md:85 cites AGENTS.md:8 for a bullet that lives at AGENTS.md:7 (from 18r-b B1, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 18r-b · residual: R-18r-b-B1
+
+Deferred with reason: Same defect class as 18r-b item 4, found while measuring it. Outside this slice declared touches set, so not fixed here. One-line doc fix.
+
+EARS: docs/m8.5c-plan.md:85 cites AGENTS.md:8 for a bullet that lives at AGENTS.md:7
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-70 — X10-extends-vocabulary-unmodelled (from rb-42 X10-extends-vocabulary-unmodelled, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-42 · residual: R-rb-42-X10-extends-vocabulary-unmodelled
