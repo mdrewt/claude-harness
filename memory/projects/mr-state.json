@@ -4,10 +4,10 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "55b8d9b"
+  "sha": "bd09a26"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-11T04:00:09Z",
+ "last_tick_utc": "2026-09-11T05:00:08Z",
  "live_watchers": [],
  "master": {
   "ci": "success",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "04:00Z tick: reconciled the 02:43Z-02:57Z merge tick's uncommitted harness paper trail (handoff entries for rb-73 PLAN/OPEN/MERGED + mr-state.json + rb-73 plan/progress memos) -- same failure class as the 09:41Z/11:00Z/14:00Z incidents (real live-verified work done, commit skipped). Live-reverified before committing: PR#457 state=MERGED (mergedAt 02:54:53Z, mergeCommit c0d102e), local project master already at c0d102e, gh run list shows conclusion=success for c0d102e, residual R-18r-b-DISCONNECTSELF status=closed/closed_by_pr=457 in mr-residuals.jsonl, ledger already carries the FINISHED/CI-WATCH-DELEGATED/merged rows. Reaped the stale rb-73 per-run lock (session_leader 39037 dead) via mr-unlock stale. Corrected master.ci from a stale 'in_progress' placeholder to 'success'. No open PRs either repo, mr-state.json inflight/awaiting_merge/queue empty, park_counters unchanged. This was the tick's ONE action (commit + push the reconcile); no new slice launched.",
+ "notes": "05:00Z tick: no live locks/.done/active-human-session at gate0-2; both repos synced clean. Gate3: master CI green, no open/parked PRs, queue[] empty at start; residuals unclaimed=87, all >t1_promote_days=3 (max 6.54d, none >t2=14) so residual work outranked new PLAN Sec.9 work. Oldest tier (6.54d, source 18r-b, disclosed 2026-09-04T16:03:43Z): R-18r-b-NOGATE dispositioned wontfix (own remediation was a new eval-shaped scanner, retired per ADR-0224); R-18r-b-LIBRSCITES + R-18r-b-LOGORDER (real doc-citation-accuracy findings) promoted -> rb-74/rb-75 in M-residual-backlog.spec.md, queued via mr-record queue-add. Shipped as doc-only chore PR#115, squash-merged bd09a26 to harness main, branch deleted local+remote. This was the tick's ONE action (promote); no slice launched -- next tick launches rb-74 off the fast-path queue. Budget NORMAL (d7=$81.77/$2783). Noted but out-of-scope: mr-record handoff flagged 83 pre-existing handoff entries with unparseable headers, pinned live never archived -- standing issue, not touched this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -35,20 +35,20 @@
  "parked": [],
  "queue": [
   {
-   "slice": "rb-74",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-18r-b-LIBRSCITES",
-   "added_utc": "2026-09-11T05:02:32Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "c0d102e"
+   "added_utc": "2026-09-11T05:02:32Z",
+   "derived_from_master_sha": "c0d102e",
+   "reason": "promoted residual R-18r-b-LIBRSCITES",
+   "slice": "rb-74",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-75",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-18r-b-LOGORDER",
-   "added_utc": "2026-09-11T05:02:32Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "c0d102e"
+   "added_utc": "2026-09-11T05:02:32Z",
+   "derived_from_master_sha": "c0d102e",
+   "reason": "promoted residual R-18r-b-LOGORDER",
+   "slice": "rb-75",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": "wrapper",
