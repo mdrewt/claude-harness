@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-79 — [m22-s5 pin hardening — NOT rb-46] WHEN a #[cfg(test)]/#[cfg(debug_assertions)] attribute  (from rb-46 TRADINGCFG, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-46 · residual: R-rb-46-TRADINGCFG
+
+Deferred with reason: rb-46's plan red-team measured that a #[cfg(test)] on trading.rs:252's gate statement passes every m22-s5 pin (m22s5_assert_deletion_gate_pinned / m22s5_gate_precedes_first_write_in_every_gated_reducer carry no cfg clause; the census bans only cfg_attr) while the wasm ships ungated; pvp.rs's two sites are incidentally covered by ranking-security's body-wide #[cfg ban. trading_tests.rs is outside r
+
+EARS: [m22-s5 pin hardening — NOT rb-46] WHEN a #[cfg(test)]/#[cfg(debug_assertions)] attribute or a non-statement-boundary predecessor precedes the propose_trade deletion-gate statement THE SYSTEM SHALL fail the trading_tests pin (the rb-46 statement-boundary + #[/cfg!( + early-exit clauses ported to trading_tests.rs)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-78 — [reviewer-checklist class, ADR-0224] WHEN a macro_rules! that expands to a conditional ear (from rb-46 MACRORET, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-46 · residual: R-rb-46-MACRORET
