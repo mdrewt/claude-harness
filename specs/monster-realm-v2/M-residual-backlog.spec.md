@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-77 — [reviewer-checklist class, ADR-0224] WHEN lib.rs selects the guards module by #[cfg(target (from rb-46 LIBRSMOD, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-46 · residual: R-rb-46-LIBRSMOD
+
+Deferred with reason: rb-46 artifact red-team PoC X4 (executed): #[cfg(not(target_arch = wasm32))] mod guards; + #[cfg(target_arch = wasm32)] #[path = guards_wasm.rs] mod guards; in lib.rs leaves all 8 rb46 tests and the m22-s5 byte-for-byte guards.rs pin green; lib.rs is outside rb-46's touches and the edit is visible in the touches-delta audit, so it is a supervisor/reviewer checklist item, not a scanner (ADR-0224)
+
+EARS: [reviewer-checklist class, ADR-0224] WHEN lib.rs selects the guards module by #[cfg(target_arch)] (a wasm-only guards twin) THE SYSTEM SHALL be caught at review — every pin on the real guards.rs stays green while the wasm build swaps the wrapper
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-76 — [grass-path wild encounter — NOT rb-46] WHEN movement_tick → begin_encounter opens a wild  (from rb-46 GRASSPATH, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-46 · residual: R-rb-46-GRASSPATH
