@@ -26,6 +26,22 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-75 — ARCHITECTURE.md per-slice ADR next-free notes are non-monotonic and some were back-edited (from 18r-b LOGORDER, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 18r-b · residual: R-18r-b-LOGORDER
+
+Deferred with reason: Red-team MEASURED two entries rewritten by a later unrelated slice: M15a added in PR 165 and rewritten next day by PR 168; ux2 added in PR 255 and rewritten by PR 273. Also non-monotonic adjacent pairs at 1502 vs 1722, 1868 vs 1870, 2146 vs 2148. 18r-b CUT its planned explanatory clause because no true general rule over the class survived measurement.
+
+EARS: ARCHITECTURE.md per-slice ADR next-free notes are non-monotonic and some were back-edited
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-74 — Unmeasured stale server-module/src/lib.rs line citations across at least 9 doc sites (from 18r-b LIBRSCITES, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 18r-b · residual: R-18r-b-LIBRSCITES
+
+Deferred with reason: m22-s3b extracted resolve_all_live_interactions and shifted on_disconnect, so ranges cited before that merge are suspect. Candidates NOT measured by 18r-b: docs/adr/0230 at 132 and 135, docs/adr/0221 at 94, docs/adr/0054 at 37 and 238, docs/m8.7b-plan.md at 7 and 54, docs/m8.7d-plan.md at 19, docs/specs/nh2-plan.md at 73, docs/adr/0148 at 188. Most live under docs/adr so closing the class needs a 
+
+EARS: Unmeasured stale server-module/src/lib.rs line citations across at least 9 doc sites
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-73 — Disconnect side effects are client-triggerable on demand by any identity token holder (from 18r-b DISCONNECTSELF, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 18r-b · residual: R-18r-b-DISCONNECTSELF
