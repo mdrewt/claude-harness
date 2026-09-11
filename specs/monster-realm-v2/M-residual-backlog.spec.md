@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-76 — [grass-path wild encounter — NOT rb-46] WHEN movement_tick → begin_encounter opens a wild  (from rb-46 GRASSPATH, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-46 · residual: R-rb-46-GRASSPATH
+
+Deferred with reason: movement.rs is outside rb-46's touches; the caller there is the scheduler (ctx.sender() = database identity) so the caller-only wrapper is structurally wrong and an identity-parameterised gate is exactly what ADR-0227 D2 made unwritable; joined to the [DEL-06]/S6 enforcement residual (ARCHITECTURE.md:524-526) for the PRV1-7 crate-wide slice (ADR-0236 D-d)
+
+EARS: [grass-path wild encounter — NOT rb-46] WHEN movement_tick → begin_encounter opens a wild battle for a walker whose account is mid-grace or terminal THE SYSTEM SHALL decide (design) whether that is a §4.7 new commitment and, if so, refuse it via an identity-parameterised seam
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-75 — ARCHITECTURE.md per-slice ADR next-free notes are non-monotonic and some were back-edited (from 18r-b LOGORDER, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 18r-b · residual: R-18r-b-LOGORDER
