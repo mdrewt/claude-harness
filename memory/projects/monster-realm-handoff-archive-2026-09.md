@@ -1356,3 +1356,46 @@ Merged `gh pr merge 110 --repo mdrewt/claude-harness --squash --delete-branch` -
 ## 2026-09-08T02:02:27Z — rb-70 launched (PR pending)
 Native tick mr-sup-native-20260908T020028Z-2305445-18349 (02:00Z, cron). Gate 0/1: no live per-run locks/chain mutex, HOLD-NONE queued_events=0, no resident IDE claude pid, no unexplained file writes in the last 6 min (only wrapper's own tick artifacts + codegraph daemon noise) -> no active-session collision. Took the chain mutex. Synced both repos (no drift), master CI green (7d8d290, rb-68's fix landed), no open PRs on either repo, inflight/awaiting_merge empty. queue[] held rb-70 (promoted residual R-rb-42-X10-extends-vocabulary-unmodelled by the 01:36Z tick). Re-verified live: M-residual-backlog.spec.md ### rb-70 section exists, non-blocked, no outstanding after: deps, source rb-42 merged (PR#423, 2026-09-04). The queued spec text and residuals-jsonl reason were both truncated mid-sentence ("scripts/adr-digest.mjs gives") -- recovered the full deferral text from rb-42's PR#423 body before writing the brief: X10 = model an Extends/Extended-by relationship in scripts/adr-digest.mjs (currently unmodelled), which is what would give rb-42's gates X2/X3 real automated teeth instead of MANUAL: path:line citations; needs ~15 reciprocal docs/adr/** header edits plus baseline/ratchet/fixture-teeth updates in the two existing eval files (evals/adr-digest.eval.mjs, evals/adr-backlink-integrity.eval.mjs) -- ADR-0224 in force: no new evals/*.eval.mjs, extend the existing two only, prefer porting the check into scripts/adr-digest.test.mjs as an ordinary node --test where possible. Launched rb-70 (opus@high, tier=routine, repo=project, leader pid 2306839) via mr-spawn. Dequeued via mr-record queue-remove. Budget NORMAL (d7=$1831.30/$2783, fable_d7=$598.46, fable_ok=true).
 
+## 2026-09-08T05:20Z — rb-70 TERMINAL (PR open, local gate green, remote CI running)
+
+**PR https://github.com/mdrewt/monster-realm/pull/454** · branch `feat/rb-70-adr-extends-vocabulary`
+@ `a0a78dd` · worktree `.claude/worktrees/rb-70` · base `7d8d290`. **Supervisor owns the merge**
+(`gh pr merge` not run). Remote `ci` + `e2e` pending at hand-off.
+
+**Closes R-rb-42-X10-extends-vocabulary-unmodelled.** `scripts/adr-digest.mjs` now models
+`**Extends:**`/`**Extended-by:**`: dangling checks on both (fields OPTIONAL) + REVERSE-only
+reciprocity, corpus-wide, no era window, no tolerance set. `validateBacklinks()` byte-identical.
+
+**FORWARD reciprocity deliberately NOT shipped — `wontfix`, recorded in the ADR-0104
+`## Amendment (rb-70)`.** It would make every future `**Extends:** ADR-NNNN` a hidden-dependency
+STOP, reversing a convention written in five places; the corpus contradicts the invariant 41
+times; and every era-scoped variant is vacuous (5/5 feature-deleting mutants CI-clean after the
+in-era repairs). **Do not "finish" rb-70 by adding it in a later slice** without re-reading that
+amendment — it is a decision, not an omission.
+
+**Gate:** full `just ci` green three times (last on the final tree, `CI-EXIT=0`): 99/99 evals,
+108 test files / 3146 client tests, 2263 Rust tests, `adr-digest test suite: 9 test(s) passed`,
+benchmarks in budget, `validate.mjs 8/8`. Ledger **8/8 met, 0 unmet**, 1 documented DEFER.
+
+**touches-delta:** `justfile` (4 literals, pass-count pin 6 -> 9 — the block's own comment
+instructs it); `docs/adr/0104` (amendment), `docs/adr/0238` (corrected a claim this slice
+falsifies), `ARCHITECTURE.md`. **No ADR number minted** (none reserved; next-free still 0245).
+
+**verifier returned FAIL first, then PASS.** It caught two measured-false shipped claims: a
+`ADR_DIR.includes('/tmp/')` guard that was 9/9 green with the rule DEAD in production while three
+artifacts claimed that class closed, and a `docs/adr/0238` sentence false for one of the two legs.
+Both fixed and re-verified. **Lesson worth carrying: a test that proves production liveness by
+running from a COPY can always be fingerprinted** — see residuals R5/R6.
+
+**Residuals registered (6):** R1 duplicate 4-digit ADR filename prefixes shadow each other in
+`collectAdrIds`; R2 an unclosed fence in a header preamble erases every relation obligation below
+it; R3 `validateBacklinks`' reverse loop survives a single-extender mutant that disables it for the
+11 multi-id `**Amended-by:**` ADRs; R4 two accurate `adr-digest.mjs` line citations drifted by this
+slice's +84 lines (`changelog-freshness.mjs:23` is outside touches); R5/R6 the copy-vs-checkout
+discriminator class (a `statSync(ADR_DIR).mtimeMs` guard is still 9/9 green and dead in production).
+R1-R3 are all pre-existing and shared with the `Amends` leg.
+
+**Code-graph refresh:** not run — the change is unmerged, so the canonical checkout is still at
+`7d8d290` and `detect_changes` reported no source drift. Refresh after the squash-merge.
+
+

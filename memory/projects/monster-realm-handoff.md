@@ -4195,6 +4195,11 @@ Slice rb-68 (residual R-rb-40-ADR0230) reached the loop's terminal state. **Supe
 - Registered 3 follow-up residuals: R-rb-68-ADR0230CITES, R-rb-68-HOMOGLYPH, R-rb-68-CITESHAPE-PORT.
 - ADR next-free remains **0245** (rb-68 minted no ADR).
 
+## 2026-09-11T12:02:36Z — 2026-09-11T12:02Z — rb-75 merged (PR#459); post-merge master CI flaky e2e, rerun in flight
+rb-75 (PR#459, ARCHITECTURE.md ADR next-free bracket annotations + sim-harness oracle test, closes R-18r-b-LOGORDER) was already squash-merged to master (8b90b69) by a prior tick's mr-ci-watch delegation before this tick started. This tick found master CI run 34592967110 (post-merge push) reporting FAILURE, but re-verified live: the only failing test is client/e2e/monster-privacy.spec.ts:394 (pvp-accept-btn click intercepted by the #help-hint launcher button, classic DOM-detach/retry flake) — unrelated to rb-75's diff, which touches only ARCHITECTURE.md and sim-harness/src/bin/mr_load_driver.rs. The identical commit's PR-time checks (run 34591181011) passed both ci and e2e cleanly. Triggered `gh run rerun 34592967110 --failed` to confirm flakiness rather than treat as a real regression or revert. **Next tick: check run 34592967110's rerun result** — success confirms flake (no further action, proceed with normal gate-3 work selection); a second failure on the SAME test would upgrade this to a real investigation (bisect against rb-74/rb-73, since those merges' own post-merge CI ran green). No new slice launched this tick pending that verdict, per gate-3's master-CI-red-outranks-everything rule. Governor NORMAL (d7=$173.06 of $2783 weekly).
+## 2026-09-11T10:52:17Z — rb-75 reconcile: PR#459 CI-watch delegated
+rb-75 run finished (EXIT=0, 1 attempt, opus). PR#459 (feat/rb-75-archlog-nextfree-notes -> master) open, mergeable, checks ci/e2e IN_PROGRESS at reconcile. Acceptance ledger 6/6 met per PR render. Delegated CI-wait to mr-ci-watch (pid 1042165, detached); resumes via event tick to complete the squash-merge.
+
 ## 2026-09-11T09:04:15Z — 09:00Z tick — committed 08:11Z tick's dangling paper trail, launched rb-75 off fast-path queue
 Gate0: no live locks/.done/active-human-session. Found the 08:11Z tick's mr-state.json/handoff writes (rb-74 merge, PR#458, efcc4570) sitting uncommitted in the harness working tree along with rb-74's leftover plan/gates.mjs artifacts -- committed them as 624bc91 to preserve the paper trail before proceeding. Gate2: both repos fetched clean, harness main 1 commit ahead of origin (expected -- mr-sup chore commits are not routinely pushed), project master == origin/master @ efcc457, CI success. Gate3: no open PRs either repo, no parked slices; residuals unclaimed=88 all unpromoted (max age 6.68d, none past t2=14d) -- left for a future promote tick (batched one per tick, not this one); queue[] had rb-75 (promoted residual R-18r-b-LOGORDER) ready -- re-verified its M-residual-backlog.spec.md section live (non-blocked, no unmet after:), launched it via mr-spawn (opus@high, tier=routine -- doc-citation-accuracy class, no HARD-tier surface touched) mirroring rb-74's precedent tier/model. This was the tick's ONE action (launch). Budget NORMAL (d7=$138.05/$2783, fable_ok=true).
 ## 2026-09-11T08:30:43Z — rb-74 merged (PR#458)
@@ -4379,45 +4384,3 @@ No merge/launch this tick (queue was empty at entry; residual-promote was the on
 
 ## 2026-09-08T06:03:58Z — rb-70 MERGED (PR#454) — late record; 4 rb-43 adr-digest residuals dispositioned wontfix
 Backfilling bookkeeping the 04:54Z tick (mr-sup-native-20260908T045400Z-2618062) left incomplete: it merged PR https://github.com/mdrewt/monster-realm/pull/454 (squash 92882d0, mergedAt 04:55:27Z) and closed R-rb-42-X10-extends-vocabulary-unmodelled, but exited (rc=0) before writing the ledger MERGED row, this handoff entry, mr-state.json, or releasing the chain mutex (heartbeat stuck at 04:54:18Z, action="merge rb-70"). Verified live: gh pr view 454 state=MERGED; mr-gates verify --slice rb-70 -> CLEAN 8/8 met, 0 deferred, seed_drift=false; G8-forward-extends-reciprocity dispositioned wontfix in-slice (ADR-0224 precedent, forward Extends reciprocity deliberately not shipped, see the residual row for the 3 measured reasons). rb-70 disclosed 6 new residuals (R-rb-70-R1..R6), all scoped to scripts/adr-digest.mjs's own scanner correctness (duplicate/shadowed ADR ids, unclosed-fence erasure, reverse-Amends mutant survival, stale line citations, copy-vs-checkout discriminators) -- continuing the exact self-referential rb-* eval-tooling pattern the 2026-09-01 operator directive (Work-selection scope, ADR-0224) names as retired; none yet t1-eligible (disclosed today), left unpromoted for now.\n\nSeparately, gate-3 aging surfaced the tied-oldest unclaimed residuals (t1=3d) as R-rb-43-DUPID/CHANGELOGCITE/COLLECTORSHAPES/HEADINGID (3.75d, disclosed 2026-09-04T12:06Z) -- all four are also scripts/adr-digest.mjs scanner-correctness findings (ADR-id uniqueness, a stale changelog-freshness.mjs citation, collectAdrIds filename-filter gaps, filename-vs-heading id mismatch), i.e. the identical eval-tooling-only class the directive retires. Classified per Work-selection scope and dispositioned wontfix (MED severity, no mr-ask-drew needed) rather than promoted into another rb-N slice -- this is the intended effect of the 2026-09-01 directive: stop feeding the self-referential spiral. Reconciled mr-state.json (rb-70 removed from inflight, master sha/ci updated to 92882d0/green) and released the stale chain mutex via mr-unlock. No new slice launched this tick (spent on reconciliation + residual triage); next tick falls through to queue[] empty -> full PLAN §9 derivation.
-## 2026-09-08T05:20Z — rb-70 TERMINAL (PR open, local gate green, remote CI running)
-
-**PR https://github.com/mdrewt/monster-realm/pull/454** · branch `feat/rb-70-adr-extends-vocabulary`
-@ `a0a78dd` · worktree `.claude/worktrees/rb-70` · base `7d8d290`. **Supervisor owns the merge**
-(`gh pr merge` not run). Remote `ci` + `e2e` pending at hand-off.
-
-**Closes R-rb-42-X10-extends-vocabulary-unmodelled.** `scripts/adr-digest.mjs` now models
-`**Extends:**`/`**Extended-by:**`: dangling checks on both (fields OPTIONAL) + REVERSE-only
-reciprocity, corpus-wide, no era window, no tolerance set. `validateBacklinks()` byte-identical.
-
-**FORWARD reciprocity deliberately NOT shipped — `wontfix`, recorded in the ADR-0104
-`## Amendment (rb-70)`.** It would make every future `**Extends:** ADR-NNNN` a hidden-dependency
-STOP, reversing a convention written in five places; the corpus contradicts the invariant 41
-times; and every era-scoped variant is vacuous (5/5 feature-deleting mutants CI-clean after the
-in-era repairs). **Do not "finish" rb-70 by adding it in a later slice** without re-reading that
-amendment — it is a decision, not an omission.
-
-**Gate:** full `just ci` green three times (last on the final tree, `CI-EXIT=0`): 99/99 evals,
-108 test files / 3146 client tests, 2263 Rust tests, `adr-digest test suite: 9 test(s) passed`,
-benchmarks in budget, `validate.mjs 8/8`. Ledger **8/8 met, 0 unmet**, 1 documented DEFER.
-
-**touches-delta:** `justfile` (4 literals, pass-count pin 6 -> 9 — the block's own comment
-instructs it); `docs/adr/0104` (amendment), `docs/adr/0238` (corrected a claim this slice
-falsifies), `ARCHITECTURE.md`. **No ADR number minted** (none reserved; next-free still 0245).
-
-**verifier returned FAIL first, then PASS.** It caught two measured-false shipped claims: a
-`ADR_DIR.includes('/tmp/')` guard that was 9/9 green with the rule DEAD in production while three
-artifacts claimed that class closed, and a `docs/adr/0238` sentence false for one of the two legs.
-Both fixed and re-verified. **Lesson worth carrying: a test that proves production liveness by
-running from a COPY can always be fingerprinted** — see residuals R5/R6.
-
-**Residuals registered (6):** R1 duplicate 4-digit ADR filename prefixes shadow each other in
-`collectAdrIds`; R2 an unclosed fence in a header preamble erases every relation obligation below
-it; R3 `validateBacklinks`' reverse loop survives a single-extender mutant that disables it for the
-11 multi-id `**Amended-by:**` ADRs; R4 two accurate `adr-digest.mjs` line citations drifted by this
-slice's +84 lines (`changelog-freshness.mjs:23` is outside touches); R5/R6 the copy-vs-checkout
-discriminator class (a `statSync(ADR_DIR).mtimeMs` guard is still 9/9 green and dead in production).
-R1-R3 are all pre-existing and shared with the `Amends` leg.
-
-**Code-graph refresh:** not run — the change is unmerged, so the canonical checkout is still at
-`7d8d290` and `detect_changes` reported no source drift. Refresh after the squash-merge.
-

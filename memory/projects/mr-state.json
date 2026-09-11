@@ -6,24 +6,13 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "bd09a26"
  },
- "inflight": [
-  {
-   "slice": "rb-75",
-   "run_id": "mr-spawn-20260911T090359Z-861748",
-   "session_leader": 861807,
-   "model": "opus",
-   "effort": "high",
-   "tier": "routine",
-   "repo": "project",
-   "started_utc": "2026-09-11T09:04:03Z"
-  }
- ],
- "last_tick_utc": "2026-09-11T09:00:12Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-11T12:00:15Z",
  "live_watchers": [],
  "master": {
-  "ci": "success",
+  "ci": "pending",
   "nightly": "success",
-  "sha": "efcc457"
+  "sha": "8b90b69"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -38,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "09:00Z tick: gate0 found no live locks/.done/active-human-session, but the 08:11Z tick's own mr-state.json/handoff writes (rb-74 merge, PR#458, efcc4570) plus rb-74's leftover plan/gates.mjs artifacts were sitting uncommitted in the harness working tree -- committed them (624bc91) to close out that tick's paper trail before doing anything else. Gate2: both repos fetched clean; harness main 1 commit ahead of origin (expected, mr-sup chore commits are not routinely pushed); project master == origin/master @ efcc457, CI success (confirmed live via gh pr checks / master_ci_latest). Gate3: no open PRs either repo, nothing parked; residuals unclaimed=88, all status:unpromoted, max age 6.68d (none past t2_stale_days=14) -- left for a future dedicated promote tick, not this one; queue[] had rb-75 (already-promoted residual R-18r-b-LOGORDER) ready -- re-verified its M-residual-backlog.spec.md section live (present, non-blocked, no unmet after:, not already merged), then launched it via mr-spawn: opus@high, tier=routine (doc-citation-accuracy class -- ARCHITECTURE.md ADR-next-free notes non-monotonic/back-edited; no schema/reducer/netcode/security surface), mirroring rb-74's precedent. This was the tick's ONE action (launch). Budget NORMAL (d7=$138.05/$2783, fable_ok=true).",
+ "notes": "12:00Z tick: rb-75 lock's session_leader 861807 dead + .done EXIT=0 ATTEMPTS=1; live re-verify found PR#459 already MERGED (8b90b69, mergedAt 11:13:21Z) by the 10:52Z tick's mr-ci-watch delegation (pid 1042165, since exited) -- but that merge left the ledger row (outcome=merged), residual close, and mr-state reconciliation undone, so this tick completed them: mr-gates verify CLEAN 6/6 met 0 unmet (initial run FLAGGED X6 on cargo-not-found -- this shell's PATH, not a real defect, reverified with ~/.cargo/bin on PATH); mr-audit policy=CLEAN mandatory_read=false, orchestration CLEAN, gating_advisory CLEAN; residual R-18r-b-LOGORDER closed via mr-gates residuals close --slice rb-75 --pr 459. Post-merge master CI run 34592967110 came back FAILURE, but the only failing test (client/e2e/monster-privacy.spec.ts:394, pvp-accept-btn intercepted by #help-hint, DOM-detach/retry pattern) is unrelated to rb-75's diff (ARCHITECTURE.md + sim-harness/src/bin/mr_load_driver.rs only; the identical commit passed both ci+e2e on the PR's own pre-merge checks, run 34591181011) -- treated as a flake, not a regression; triggered `gh run rerun 34592967110 --failed` to confirm, verdict PENDING next tick. No new launch this tick (gate-3 master-CI-red-outranks-everything, pending the rerun's result). Budget NORMAL (d7=$173.06/$2783, fable_ok=true).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -61,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260911T090011Z-859285",
- "updated_utc": "2026-09-11T09:06:00Z"
+ "updated_by": "mr-sup-native-20260911T120015Z-1116359",
+ "updated_utc": "2026-09-11T12:06:00Z"
 }
