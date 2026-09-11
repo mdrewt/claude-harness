@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-78 — [reviewer-checklist class, ADR-0224] WHEN a macro_rules! that expands to a conditional ear (from rb-46 MACRORET, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-46 · residual: R-rb-46-MACRORET
+
+Deferred with reason: rb-46's artifact red-team closed the depth-0 early-return twin (sender-keyed or cfg-const-keyed) with a prefix count(return)==count(return Err(e);) clause; a macro expanding to the return is the disclosed remainder — a scanner is barred by ADR-0224, so this is a reducer-security-auditor checklist item until the PRV1-7 crate-wide mechanism decides otherwise
+
+EARS: [reviewer-checklist class, ADR-0224] WHEN a macro_rules! that expands to a conditional early return is placed above a deletion-gate call site THE SYSTEM SHALL be caught at review (no textual return, so the rb-46 early-exit clause cannot see it)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-77 — [reviewer-checklist class, ADR-0224] WHEN lib.rs selects the guards module by #[cfg(target (from rb-46 LIBRSMOD, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-46 · residual: R-rb-46-LIBRSMOD
