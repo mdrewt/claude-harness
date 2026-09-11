@@ -47,6 +47,14 @@
    "reason": "promoted residual R-rb-46-LIBRSMOD",
    "slice": "rb-77",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+  },
+  {
+   "slice": "rb-78",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-46-MACRORET",
+   "added_utc": "2026-09-11T15:01:41Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "8b90b69"
   }
  ],
  "rate_limit_armed_by": "wrapper",
