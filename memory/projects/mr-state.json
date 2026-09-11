@@ -1,18 +1,39 @@
 {
- "adr_next_free": 246,
+ "adr_next_free": 247,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "bd09a26"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-11T17:00:06Z",
+ "inflight": [
+  {
+   "adr": 246,
+   "claude_pid": 1227381,
+   "effort": "xhigh",
+   "model": "fable",
+   "repo": "project",
+   "run_id": "mr-spawn-20260911T180201Z-1227325",
+   "session_leader": 1227378,
+   "slice": "rb-76",
+   "started_utc": "2026-09-11T18:02:01Z",
+   "tier": "hard",
+   "touches": [
+    "server-module/src/movement.rs",
+    "server-module/src/movement_tests.rs",
+    "server-module/src/battle.rs",
+    "server-module/src/battle_tests.rs",
+    "server-module/src/guards.rs",
+    "server-module/src/guards_tests.rs"
+   ]
+  }
+ ],
+ "last_tick_utc": "2026-09-11T18:02:50Z",
  "live_watchers": [],
  "master": {
-  "sha": "8b90b69",
   "ci": "green",
-  "nightly": "in_progress"
+  "nightly": "in_progress",
+  "sha": "8b90b69"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,19 +48,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "17:00Z tick: recovered 16:00Z tick's stranded record first (abrupt kill after PR#119 merged, before its own commit -- committed+pushed as 33d9366). No live chain, no hold, no active human session, master CI green at 8b90b69. Gate-3 residual aging: 2 residuals past t2_stale_days=14 outranked the queue[] fast path (rb-76..79 all still valid, deferred to next tick). R-m23-s10-X16/rb-14 (17.4d) confirmed genuinely still blocked -- its S8/S9 remediation targets remain gated on two never-escalated operator rulings in M23-accessibility.spec.md section 8 (colourblind palette redesign, canvas sprite-tint art-direction call; both HAVE documented recommended defaults but were never applied nor raised via mr-ask-drew despite the spec naming that as the escalation path) -- left as-is per 2026-08-30 tick's same judgment, flagged again for a future tick to either apply the decision-default or open mr-ask-drew. R-m22-s2-S3-CANCEL-TERMINAL/rb-21 (17.2d) was OBSOLETE: verified live that m22-s3 (PR#404, merged 2026-09-01, ADR-0225) independently added the exact guard (accounts.rs:918 account_has_terminal_marker check, real if/reject not a debug_assert) plus test coverage (m22s3_nd_cancel_terminal_guard etc.) -- rb-21 itself was never built. Closed via `mr-gates residuals close --slice rb-21 --pr 404 --force --reason ...`. This was the tick's one mutating action; no slice launched (queue[] fast path deferred to next tick). Budget NORMAL (d7=$177.72/$2783, fable_ok=true).",
+ "notes": "18:00Z tick: no live chain, no hold, no active human session, master CI green at 8b90b69. Queue fast-path: took first entry rb-76 (oldest unclaimed residual was 6.8d, under t2_stale_days=14, so it did not outrank the non-empty queue[]). Re-verified rb-76 live (spec heading present, after: empty, no branch/PR/ledger row), launched fable@xhigh HARD tier (server-module reducer + PRV1-7 deletion-gate security surface), pre-allocated ADR-0246. queue-removed rb-76 (queue now rb-77,78,79). This was the tick's one mutating action. Budget NORMAL (d7=$179.34/$2783, fable_ok=true).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "mr-sup-native-20260911T130013Z-1153326",
-   "reason": "promoted residual R-rb-46-GRASSPATH",
-   "slice": "rb-76",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-09-11T14:01:52Z",
@@ -49,20 +64,20 @@
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-78",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-46-MACRORET",
-   "added_utc": "2026-09-11T15:01:41Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "8b90b69"
+   "added_utc": "2026-09-11T15:01:41Z",
+   "derived_from_master_sha": "8b90b69",
+   "reason": "promoted residual R-rb-46-MACRORET",
+   "slice": "rb-78",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-79",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-46-TRADINGCFG",
-   "added_utc": "2026-09-11T16:02:21Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "8b90b69"
+   "added_utc": "2026-09-11T16:02:21Z",
+   "derived_from_master_sha": "8b90b69",
+   "reason": "promoted residual R-rb-46-TRADINGCFG",
+   "slice": "rb-79",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -81,6 +96,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260911T170006Z-1208997",
- "updated_utc": "2026-09-11T17:04:00Z"
+ "updated_by": "mr-sup-native-20260911T180008Z-1225287-1225823",
+ "updated_utc": "2026-09-11T18:02:50Z"
 }
