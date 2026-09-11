@@ -10,7 +10,7 @@
  "last_tick_utc": "2026-09-11T12:00:15Z",
  "live_watchers": [],
  "master": {
-  "ci": "pending",
+  "ci": "success",
   "nightly": "success",
   "sha": "8b90b69"
  },
@@ -27,13 +27,20 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "12:00Z tick: rb-75 lock's session_leader 861807 dead + .done EXIT=0 ATTEMPTS=1; live re-verify found PR#459 already MERGED (8b90b69, mergedAt 11:13:21Z) by the 10:52Z tick's mr-ci-watch delegation (pid 1042165, since exited) -- but that merge left the ledger row (outcome=merged), residual close, and mr-state reconciliation undone, so this tick completed them: mr-gates verify CLEAN 6/6 met 0 unmet (initial run FLAGGED X6 on cargo-not-found -- this shell's PATH, not a real defect, reverified with ~/.cargo/bin on PATH); mr-audit policy=CLEAN mandatory_read=false, orchestration CLEAN, gating_advisory CLEAN; residual R-18r-b-LOGORDER closed via mr-gates residuals close --slice rb-75 --pr 459. Post-merge master CI run 34592967110 came back FAILURE, but the only failing test (client/e2e/monster-privacy.spec.ts:394, pvp-accept-btn intercepted by #help-hint, DOM-detach/retry pattern) is unrelated to rb-75's diff (ARCHITECTURE.md + sim-harness/src/bin/mr_load_driver.rs only; the identical commit passed both ci+e2e on the PR's own pre-merge checks, run 34591181011) -- treated as a flake, not a regression; triggered `gh run rerun 34592967110 --failed` to confirm, verdict PENDING next tick. No new launch this tick (gate-3 master-CI-red-outranks-everything, pending the rerun's result). Budget NORMAL (d7=$173.06/$2783, fable_ok=true).",
+ "notes": "13:00Z tick: reconciled rb-75 (post-merge CI rerun confirmed flake, master green at 8b90b69; cleaned stale lock/worktree/branch). Gate-3: dispositioned wontfix 2 scanner-only residuals (R-18r-b-I2BACKTICKSTYLE, R-18r-b-I2SAMEPARA, gate armI2 token-matching correctness), promoted R-rb-46-GRASSPATH -> rb-76 (real deletion-grace enforcement gap) via chore PR#116, queued rb-76 for next tick fast-path. No slice launched this tick (promote+cleanup was the action). Budget NORMAL (d7=$174.35/$2783, fable_ok=true).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-76",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-46-GRASSPATH",
+   "added_by": "mr-sup-native-20260911T130013Z-1153326"
+  }
+ ],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": "2026-09-11T00:00:00Z",
  "resource_locations": {
