@@ -7,12 +7,12 @@
   "sha": "bd09a26"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-11T14:00:11Z",
+ "last_tick_utc": "2026-09-11T16:00:07Z",
  "live_watchers": [],
  "master": {
-  "ci": "success",
-  "nightly": "in_progress",
-  "sha": "8b90b69"
+  "sha": "8b90b69",
+  "ci": "green",
+  "nightly": "in_progress"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "14:00Z tick: no live chain, no hold, no active human session, master CI green at 8b90b69. Gate-3 residual aging found 77 unpromoted residuals past t1_promote_days=3 (none past t2=14d), outranking the queue fast path. Promoted oldest real-defect residual R-rb-46-LIBRSMOD -> rb-77 (lib.rs cfg(target_arch) guards-module-swap security finding) via chore PR#117 (squash-merged). queue-added rb-77 (queue now: rb-76, rb-77). No slice launched -- promote+doc-PR was the action. Flagged, not acted on: stray docker container (loki -verify-config) from rb-75's validate.mjs still running 3+h against a removed worktree path; handoff-rotate WARNed 83 unparseable-header entries pinned live. Budget NORMAL (d7=$175.32/$2783, fable_ok=true).",
+ "notes": "16:00Z tick: no live chain, no hold, no active human session, master CI green at 8b90b69. Gate-3 residual aging found 76 unpromoted residuals past t1_promote_days=3 (none past t2=14d), outranking the queue fast path. Promoted oldest real-defect residual R-rb-46-TRADINGCFG -> rb-79 (m22-s5 cfg(test) gate-bypass hardening finding) via chore PR#119 (squash-merged). queue-added rb-79 (queue now: rb-76, rb-77, rb-78, rb-79). No slice launched. Flagged, not acted on: stray docker container (loki -verify-config, PID 1107716) from rb-75 still running against a removed worktree path. Budget NORMAL (d7=$176.88/$2783, fable_ok=true).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -55,6 +55,14 @@
    "added_utc": "2026-09-11T15:01:41Z",
    "added_by": "n/a",
    "derived_from_master_sha": "8b90b69"
+  },
+  {
+   "slice": "rb-79",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-46-TRADINGCFG",
+   "added_utc": "2026-09-11T16:02:21Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "8b90b69"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -73,6 +81,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260911T140011Z-1167184",
- "updated_utc": "2026-09-11T14:02:30Z"
+ "updated_by": "mr-sup-native-20260911T160007Z-1194397",
+ "updated_utc": "2026-09-11T16:02:21Z"
 }
