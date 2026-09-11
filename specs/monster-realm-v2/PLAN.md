@@ -689,6 +689,23 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   blanket forbid — the opposite of Drew's #342 require-justification ruling; harness doc-only).
   All three pairwise disjoint (mr-disjoint SAFE on 18r-a/18r-b). Zero new decision issues. No
   new game-design surface.
+- **M-postgate-nineteenth-review-residuals** (`M-postgate-nineteenth-review-residuals.spec.md`) —
+  **NEW, queued 2026-09-11; inserted after `M-postgate-eighteenth-review-residuals`**, per the
+  weekly-review insertion convention. Verified nineteenth multi-lens review findings @ `9434dfb`
+  (8 lenses, 0 contradictions, 2 independent verifiers, 4 claims checked / 4 confirmed / 0
+  dropped). The `1e738fd..9434dfb` delta (rb-40..rb-72 incl. the M22 privacy completion surface
+  rb-46/47/48/51/52/53, a11y rb-9/rb-56..59, 18r-a/b, 17r-e/f) is structurally clean — the
+  security/privacy lens returned an explicit "no findings" on the whole deletion-gate + reaper
+  surface, schema strictly additive, no test weakened anywhere in the delta, closure claims
+  spot-verified genuine, dependency delta empty, M8.9 boundaries hold. What remains: **19r-a**
+  the delete-confirm control presents as live while another privacy request is in flight and the
+  click is silently swallowed (view-model gate missing on `confirmPrompt`; model layer correct
+  and pinned — MED), **19r-b** the two rb-65 audit events (`account_deletion_cascade`,
+  `data_export`) have no recording rule/panel and the ADR-0243 disclosure pins the gap to a
+  residual rb-66 closed for a different event (disclosed-but-untracked, MED), **19r-c** the
+  ADR-0238/ARCHITECTURE.md "last statement" claim false since rb-65 (LOW), **19r-d** unthrottled
+  per-frame recompute of the countdown label (LOW). All four pairwise disjoint by construction.
+  Zero new decision issues. No new game-design surface.
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
