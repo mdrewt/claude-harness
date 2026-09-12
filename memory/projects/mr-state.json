@@ -33,7 +33,16 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-81",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-47-ROSTER-PVP",
+   "added_utc": "2026-09-12T12:01:50Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "1850d358c59adfc3fe33ed774f7133a5360d3b52"
+  }
+ ],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": "2026-09-11T00:00:00Z",
  "resource_locations": {

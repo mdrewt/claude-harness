@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-81 — [census shape gap — NOT rb-47] WHEN a reducer file other than trading.rs gains a new #[spa (from rb-47 ROSTER-PVP, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-47 · residual: R-rb-47-ROSTER-PVP
+
+Deferred with reason: rb-47 artifact red-team A4: a byte-identical ungated twin reducer (respond_trade_v1) passed every existing census (m22-s5 gated-set + already-open list constrain only the names they enumerate) and evals/trade-reducer-security (hard-coded name list). rb-47 added rb47_trading_reducer_roster_is_closed for trading.rs only; pvp.rs / battle.rs / economy.rs / ranking.rs keep the enumerating shape. Candid
+
+EARS: [census shape gap — NOT rb-47] WHEN a reducer file other than trading.rs gains a new #[spacetimedb::reducer] THE SYSTEM SHALL fail a closed-roster test naming the file (today only trading.rs has one)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-80 — [§4.7 trigger-predicate completeness — NOT rb-46] WHEN raising::heal_party, npc::advance_d (from rb-46 ERASEWRITERS, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-46 · residual: R-rb-46-ERASEWRITERS
