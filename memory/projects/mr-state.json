@@ -6,13 +6,25 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "bd09a26"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-12T17:00:11Z",
+ "inflight": [
+  {
+   "claude_pid": 3239311,
+   "effort": "medium",
+   "launched_utc": "2026-09-12T20:01:54Z",
+   "leader_pid": 3239308,
+   "model": "opus",
+   "repo": "project",
+   "run_id": "mr-spawn-20260912T200154Z-3239249",
+   "slice": "rb-82",
+   "tier": "content"
+  }
+ ],
+ "last_tick_utc": "2026-09-12T20:00:07Z",
  "live_watchers": [],
  "master": {
-  "sha": "54e9e0d874f0ffb52072c5b775273d2ec8c86c6f",
   "ci": "green",
-  "nightly": "failure(changelog-freshness stale 27/6.5d)"
+  "nightly": "fixed-changelog-freshness-pending-next-run",
+  "sha": "5281871"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +39,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "17:04Z tick: committed the 16:09Z tick's uncommitted rb-81 merge record (no re-derivation). Gate-3: promoted R-17r-e-B1 -> rb-82 (doc-only chore PR#123, queued). R-rb-47-CANCELLAUNDER/PREDATING (7.63d, oldest) still pending an operator scoping decision. R-17r-e-UPDATEFLAG left for a wontfix disposition (eval-tooling-only). Risk carried forward: Nightly changelog-freshness still red on master (CHANGELOG.md stale). No slice launched/merged/parked. Governor NORMAL.",
+ "notes": "2026-09-12T20:00Z tick: fast-pathed queue[] rb-82 (17r-e residual B1, two .ron comment factual corrections + mandatory-on-touch migration of the matching content-version.eval.mjs check into an ordinary Rust test per ADR-0224). Launched opus@medium content-tier, project repo. rb-83 left queued pending likely operator scoping decision (its deferred-reason text implies a policy/spec change is needed to close it).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -35,20 +47,12 @@
  "parked": [],
  "queue": [
   {
-   "slice": "rb-82",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-17r-e-B1",
-   "added_utc": "2026-09-12T17:03:03Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "54e9e0d874f0ffb52072c5b775273d2ec8c86c6f"
-  },
-  {
-   "slice": "rb-83",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-47-CANCELLAUNDER",
    "added_utc": "2026-09-12T18:02:13Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "54e9e0d874f0ffb52072c5b775273d2ec8c86c6f"
+   "derived_from_master_sha": "54e9e0d874f0ffb52072c5b775273d2ec8c86c6f",
+   "reason": "promoted residual R-rb-47-CANCELLAUNDER",
+   "slice": "rb-83",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -67,6 +71,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260912T170011Z-3198448",
- "updated_utc": "2026-09-12T17:04:30Z"
+ "updated_by": "native-20260912T200007Z-3237579",
+ "updated_utc": "2026-09-12T20:02:35Z"
 }
