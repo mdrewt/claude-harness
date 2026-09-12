@@ -1,39 +1,18 @@
 {
- "adr_next_free": 247,
+ "adr_next_free": 248,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "bd09a26"
  },
- "inflight": [
-  {
-   "adr": 246,
-   "claude_pid": 1227381,
-   "effort": "xhigh",
-   "model": "fable",
-   "repo": "project",
-   "run_id": "mr-spawn-20260911T180201Z-1227325",
-   "session_leader": 1227378,
-   "slice": "rb-76",
-   "started_utc": "2026-09-11T18:02:01Z",
-   "tier": "hard",
-   "touches": [
-    "server-module/src/movement.rs",
-    "server-module/src/movement_tests.rs",
-    "server-module/src/battle.rs",
-    "server-module/src/battle_tests.rs",
-    "server-module/src/guards.rs",
-    "server-module/src/guards_tests.rs"
-   ]
-  }
- ],
- "last_tick_utc": "2026-09-11T18:02:50Z",
+ "inflight": [],
+ "last_tick_utc": "2026-09-11T23:22:00Z",
  "live_watchers": [],
  "master": {
-  "ci": "green",
+  "ci": "in_progress-post-merge (checks green pre-merge on PR#461)",
   "nightly": "in_progress",
-  "sha": "8b90b69"
+  "sha": "79e3432"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -48,21 +27,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "18:00Z tick: no live chain, no hold, no active human session, master CI green at 8b90b69. Queue fast-path: took first entry rb-76 (oldest unclaimed residual was 6.8d, under t2_stale_days=14, so it did not outrank the non-empty queue[]). Re-verified rb-76 live (spec heading present, after: empty, no branch/PR/ledger row), launched fable@xhigh HARD tier (server-module reducer + PRV1-7 deletion-gate security surface), pre-allocated ADR-0246. queue-removed rb-76 (queue now rb-77,78,79). This was the tick's one mutating action. Budget NORMAL (d7=$179.34/$2783, fable_ok=true).",
+ "notes": "23:22Z native tick (event: rb-77.done). Re-verified PR#461 live: CI green (ci+e2e pass), mergeStateStatus CLEAN, mr-gates verify 6/6 CLEAN (spotcheck agrees), mr-audit hard-tier mandatory diff read performed (lib.rs/guards.rs 2-line comment + guards_tests.rs +870-line ordinary #[test] proof-of-teeth per residual's own EARS -- not a new evals/*.eval.mjs, ADR-0224 compliant; orchestration CLEAN 11 agent calls incl reviewer/red-team/verifier; gating_advisory CLEAN, test-only diff). Diff \u2286 declared touches. Squash-merged PR#461 (79e3432), cleaned worktree+branch, fast-forwarded local master, closed residual R-rb-46-LIBRSMOD. Master CI on 79e3432 still in_progress at tick end (not polled further -- identical checks already green pre-merge); no sit-and-poll per doctrine. Did NOT compose merge->launch this tick (conservative -- queue[0]=rb-78 remains valid/unblocked for the next fast-path tick). Per-run lock reaped (session_leader dead). No mutex was held (none contending).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-11T14:01:52Z",
-   "derived_from_master_sha": "8b90b69",
-   "reason": "promoted residual R-rb-46-LIBRSMOD",
-   "slice": "rb-77",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-09-11T15:01:41Z",
@@ -96,6 +67,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260911T180008Z-1225287-1225823",
- "updated_utc": "2026-09-11T18:02:50Z"
+ "updated_by": "mr-sup-native-20260911T232200Z-1763934",
+ "updated_utc": "2026-09-11T23:32:00Z"
 }
