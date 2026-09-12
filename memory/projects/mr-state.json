@@ -41,6 +41,14 @@
    "added_utc": "2026-09-12T17:03:03Z",
    "added_by": "n/a",
    "derived_from_master_sha": "54e9e0d874f0ffb52072c5b775273d2ec8c86c6f"
+  },
+  {
+   "slice": "rb-83",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-47-CANCELLAUNDER",
+   "added_utc": "2026-09-12T18:02:13Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "54e9e0d874f0ffb52072c5b775273d2ec8c86c6f"
   }
  ],
  "rate_limit_armed_by": "wrapper",
