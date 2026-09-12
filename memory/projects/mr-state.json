@@ -1,17 +1,14 @@
 {
  "adr_next_free": 248,
- "awaiting_merge": [],
- "consecutive_standdowns": 0,
- "harness_main": {
-  "ci": "no-remote-ci-local-gate-green",
-  "sha": "bd09a26"
- },
- "inflight": [
+ "awaiting_merge": [
   {
    "adr": 248,
+   "ci_watch_pid": 2061405,
    "claude_pid": 1825182,
    "effort": "xhigh",
    "model": "fable",
+   "pr": 462,
+   "pr_status": "open-ci-pending",
    "repo": "project",
    "run_id": "mr-spawn-20260912T000238Z-1825095",
    "session_leader": 1825179,
@@ -24,7 +21,13 @@
    ]
   }
  ],
- "last_tick_utc": "2026-09-12T00:00:08Z",
+ "consecutive_standdowns": 0,
+ "harness_main": {
+  "ci": "no-remote-ci-local-gate-green",
+  "sha": "bd09a26"
+ },
+ "inflight": [],
+ "last_tick_utc": "2026-09-12T02:24:59Z",
  "live_watchers": [],
  "master": {
   "ci": "green",
@@ -44,7 +47,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "00:00Z native tick. Gate-0/1: no live locks/mutex/done files, HOLD-NONE, no active human session. Found the 23:22Z-23:33Z tick sequence (rb-77 merge) had left its own handoff/mr-state.json/plan-progress paper trail uncommitted in the harness repo -- re-verified live (PR#461 MERGED, mergeCommit 79e3432, checks ci+e2e success) and committed it (2c73815). Gate-3: master CI green at 79e3432, no open PRs either repo. residuals list --unclaimed: oldest 6.6d, under t2_stale_days=14, so queue[] fast-path applied. Took queue[0]=rb-78 (promoted R-rb-46-MACRORET), re-verified live (spec heading present, after: empty, no branch/PR/ledger row beyond promotion), resolved placeholder touches myself to server-module/src/guards.rs + guards_tests.rs (same family as rb-76/rb-77's guards.rs deletion-gate work). HARD tier (deletion-gate security surface) -> fable@xhigh (fable_ok=true, d7=$369.81/$2783 NORMAL). Pre-allocated ADR-0248. Launched via mr-spawn: LAUNCHED leader=1825179 claude_pid=1825182. queue-removed rb-78 (queue now rb-79 only). No BLOCKERs, no parks.",
+ "notes": "02:24Z native tick (src=done, rid=native-20260912T022459Z-2059836). Gate0: no live per-run lock (rb-78 leader 1825179 dead, done=true) -> not a live chain, proceeded. Gate2: no chain mutex present, no active human session, HOLD-NONE queued_events=1. Gate3: master CI green 79e3432, PR #462 (rb-78) OPEN with ci+e2e checks pending, mergeStateStatus=UNSTABLE, mergeable=MERGEABLE -- the run itself already opened the PR and wrote its own terminal handoff entry. Per doctrine (PR open + checks running -> mr-ci-watch, record, EXIT), spawned mr-ci-watch 462 rb-78 detached (pid 2061405) instead of merging off the situation bundle. Moved rb-78 inflight->awaiting_merge. queue[] untouched (rb-79 still queued, re-read fresh at write time). No launch, no merge, no BLOCKERs, no parks this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -76,6 +79,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260912T000008Z-1823031",
- "updated_utc": "2026-09-12T00:05:00Z"
+ "updated_by": "mr-sup-native-20260912T022546Z-2061316",
+ "updated_utc": "2026-09-12T02:26:40Z"
 }

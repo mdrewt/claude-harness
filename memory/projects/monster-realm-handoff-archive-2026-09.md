@@ -1490,3 +1490,69 @@ Native tick mr-sup-native-20260908T140012Z-3174646 (14:00Z, cron). Gate-0: no li
 ## 2026-09-08T15:02:17Z — 15:00Z tick — launched rb-73
 Native tick mr-sup-native-20260908T150041Z-3189780-7422 (15:00Z, cron). Gate-0: no live locks/mutex/done files, HOLD-NONE, no active human session (no resident IDE pid, no recent writes in either repo). master CI green (last completed run success). No open PRs, no in-flight/awaiting_merge slices in mr-state.json. queue[] fast-path: rb-73 (promoted R-18r-b-DISCONNECTSELF, added 14:02:58Z) verified live -- spec section exists, non-blocked, not already merged/branched, deps satisfied (source 18r-b already merged). Classified per work-selection-scope doctrine: this is a REAL security/game-defect residual (disconnect side effects client-triggerable on demand via HTTP-ephemeral-connection self-trigger, session-token-leak amplifier), not an eval-tooling-only finding -- proceeds normally, not wontfix. touches inherited from source slice as '(REVIEW)'; re-derived real scope as server-module/src/lib.rs (on_disconnect/resolve_all_live_interactions) since the actual fix is reducer code, not the docs-only touches of source slice 18r-b. HARD tier (server-module reducers + security surface) -> fable@xhigh (fable_ok=true, d7 budget $2002.42/$2783 NORMAL). ADR-0244 pre-allocated. Launched via mr-spawn: LAUNCHED leader=3190995 claude_pid=3190998. queue-remove pending after this entry. No BLOCKERs, no parks.
 
+## 2026-09-11 — rb-74 PR #458 OPEN (local `just ci` green, 10/10 gates) — awaiting supervisor merge
+
+Slice rb-74 (residual R-18r-b-LIBRSCITES). Branch `feat/rb-74-librs-citations`, worktree
+`.claude/worktrees/rb-74`, base origin/master@c0d102e. **Terminal state: PR open + local gate green
++ remote CI running. `gh pr merge` NOT run (supervisor-owned).**
+
+THREE SUPERVISOR-FACING FINDINGS. (1) **Three of the ten sites the residual named were not defects.**
+`docs/adr/0230` at the lines 18r-b recorded was ALREADY retargeted by rb-68 one PR earlier and is
+already gated by rb-68's own oracle (`accounts_tests.rs:16716-19981`) — rb-74 ships zero edits and
+zero teeth there. `docs/specs/nh2-plan.md:73` and `docs/adr/0148:188` are ACCURATE (the cited
+`sim-harness/src/lib.rs:222-226` really contains the assertion, at 223-225). (2) **The roster is 15
+tokens, not 9** — measuring the declared touches found 15 stale tokens; ~7 more dangle in docs
+OUTSIDE touches and are registered as residuals, not absorbed. (3) **ADR-0245, merged one commit
+earlier, already carries four stale lib.rs pins** (`:53` and `:69` point at the wrong functions
+entirely). rb-74 appended its test mod at EOF of `lib.rs` specifically so as not to shift them
+further.
+
+DIFF: 7 files — `docs/adr/0054` (+8/-6), `docs/adr/0221` (+2/-1), `docs/m8.7b-plan.md` (+4/-3),
+`docs/m8.7d-plan.md` (+3/-2), `ARCHITECTURE.md` (+2, appended), `server-module/src/lib.rs` (+8, pure
+EOF append), NEW `server-module/src/rb74_citation_tests.rs`. No citation NUMBER changed anywhere —
+proved by an identical removed-vs-added `lib.rs:N` multiset.
+
+GATES: 10/10 met, 0 deferred (`Acceptance: 10/10 met, 0 deferred, 0 unmet — rb-74
+seed:e3b0c44298fc1c14`, no SEED-DRIFT). **`mr-gates check` needs `--timeout 2400`; the 120s default
+SKIPs G9 (`just ci`).** Harness-side gate script `memory/projects/rb-74.gates.mjs` with modes
+`census | historical | redbefore | mutants | shalie | diffset`. 15/15 mutants killed by label, 2/2
+controls green, tree restored. CI evidence log `memory/projects/gates/rb-74.ci-evidence.log`
+(`CI-EXIT 0`, 2283 Rust / 3147 client / 99 evals / 8 observability).
+
+ORCHESTRATION: planner · reviewer x2 (plan + artifact) · red-team x2 (plan + artifact) · /simplify
+(applied inline by the orchestrator: cut a duplicate ADR-0230 leg, cut per-doc byte floors, replaced
+a markdown-paragraph window parser with a contiguous composed literal) · tester x2 (separate agent,
+sandboxed at /tmp/rb-74-sandbox — the tester is hook-blocked from writing under `.claude/` AND its
+Bash guard forbids cargo, so the orchestrator compiles and runs its file for it) · specialist x2
+(doc-only, never touched the gating test) · reducer-security-auditor (CLEAN) · verifier (PASS).
+`desync-guard` was NOT run: zero game-core, client, wasm or rule surface. The two implementer edits
+to the gating test (a clippy fix and a doc-comment reword) are self-disclosed and the verifier
+confirmed both semantically inert.
+
+THE ARTIFACT RED-TEAM EARNED ITS COST AGAIN: it MEASURED four CI-clean bypasses of the first oracle
+that the plan red-team did not find — a subject swap that left every anchor resolving while the
+document asserted a falsehood, an empty CONFIRM set that made a whole leg vacuous, two unenumerated
+spellings of the `[rb-74:` namespace, and an attribute-sigil check that accepted any `#[...]`. All
+four are closed and are now permanent mutants. It also caught a CORRECTNESS bug, not just a gate
+hole: three statement-level anchors resolved file-wide, and one occurs 14x in the module, so an
+ordinary new scheduler-only reducer in `movement.rs` would have RED a markdown-citation test.
+
+NEW MEMORY CARD — `glob-in-doc-comment-opens-block-comment`: writing `` `server-module/src/*.rs` ``
+in a Rust doc comment plants an unclosed `/*`, and the evals that concatenate the module's sources
+and strip comments then swallow every file sorting after it. Measured: `spacetime-type-snapshot`
+reported 4 schema types as removed and `recruit-reducer-security` reported 2 reducers as
+unimplemented, all six untouched. `nextest`, `clippy -D warnings` and `fmt --check` were all clean —
+only the full `just ci` caught it. `src/**/*.rs` is SAFE (the `/*` self-closes), which is what makes
+the single-star form invisible to review.
+
+NEXT: supervisor polls PR #458 checks, re-executes the 10 CHECKs (G9 with `--timeout 2400`),
+squash-merges, deletes branch + worktree `.claude/worktrees/rb-74`, refreshes the code graphs on the
+canonical checkout, and ages the 4 new residuals (their ids carry a doubled `R-rb-74-` prefix —
+`mr-gates residuals add` prefixes the slice id to the gate id; that is the literal ledger id, not a
+typo).
+
+# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-09.md, monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
+
+---
+
+

@@ -4210,6 +4210,11 @@ Slice rb-68 (residual R-rb-40-ADR0230) reached the loop's terminal state. **Supe
 - Registered 3 follow-up residuals: R-rb-68-ADR0230CITES, R-rb-68-HOMOGLYPH, R-rb-68-CITESHAPE-PORT.
 - ADR next-free remains **0245** (rb-68 minted no ADR).
 
+## 2026-09-12T02:2xZ — rb-78 run record (fable@xhigh, HARD) — TERMINAL: PR #462 open, local gate green, remote CI running
+Slice rb-78 (residual R-rb-46-MACRORET, ADR-0248). Worktree `.claude/worktrees/rb-78`, branch `rb-78` @ 173f4a1 (5 wip commits, all pushed), PR https://github.com/mdrewt/monster-realm/pull/462 on `mdrewt/monster-realm`. Ledger `memory/projects/gates/rb-78.gates.md`: 6/6 met (E1 + X1-X5), 0 deferred; `mr-gates check` ran E1-X4 from the worktree (X4 = full `just ci` → rb78-X4:CI-GREEN) and a standalone `just ci` confirmed end to end (2296 workspace tests, 108 client files / 3147 tests, 99 evals PASS, observability validate 8/8, CI-EXIT=0). X5 = 13/13 KILLED, 0 INVALID, controls green (`rb-78.mutants.py`, record `rb-78.red-before.md` §3). Delivered: one pure verdict + live test + 23-row matrix in guards_tests.rs (5184-6748), a seven-line review-stop note in guards.rs:96-102, ADR-0248 (Extends ADR-0236, reciprocal line added), ARCHITECTURE.md rb-78 paragraph, DIGEST regen. Pre-slice materiality: the literal macro PoC measured CI-clean at 79e3432 (900/900, fmt, clippy). Lenses: planner → plan reviewer + plan red-team → tester (opus, RED) → test reviewer + artifact red-team → specialist → reducer-security-auditor PASS + desync-guard PASS → final reviewer + delta reviewer + /simplify → verifier APPROVE → doc-keeper (opus). Residuals REGISTERED (3, all → backlog): R-rb-78-PLAINRETURN (MEASURED: plain if-return above pvp.rs:818/1004 and ranking.rs:152 is CI-clean; not rb-78's class, deferred under ADR-0224 one-class-per-slice + ADR-0248 D6), R-rb-78-NESTEDMOD (mod declared inside a rostered file escapes every lib.rs-derived census), R-rb-78-PROCMACRO (checklist class). NOT registered: R-rb-78-GLOBMACRO (closed by the glob-import clause). NEXT STEP (supervisor): mr-ci-watch PR #462 → squash-merge → `mr-gates residuals close --slice rb-78 --pr 462` (closes R-rb-46-MACRORET) → refresh code graphs on the main checkout (unchanged at 79e3432 during this run; nothing to re-index yet). `/tmp/mr_warn_rb-78` appeared during docs close; honoured (no new fan-outs after it). No BLOCKERs, no parks.
+
+## 2026-09-12T02:26:26Z — 2026-09-12T02:26Z — rb-78 CI-watch delegated
+Native tick reconciled the rb-78 EVENT (run finished fable EXIT=0, PR #462 already opened by the run per its own terminal report). Live-verified: gh pr checks 462 shows ci+e2e both pending, mergeStateStatus=UNSTABLE, mergeable=MERGEABLE. master CI green at 79e3432, no live chain-owner, per-run lock leader (1825179) dead with done=true. Per doctrine (PR open, checks still running -> mr-ci-watch, record, EXIT), spawned `setsid bash mr-ci-watch 462 rb-78` detached (pid 2061405); it will fire a pending-event tick to finish the squash-merge + `mr-gates residuals close --slice rb-78 --pr 462` + code-graph refresh once checks conclude. No merge, no launch this tick. governor=NORMAL (d7=$442.68/$2783).
 ## 2026-09-12T00:02:58Z — 2026-09-12T00:02:58Z — 00:00Z native tick — reconciled rb-77 tick + launched rb-78
 Native tick rid=mr-sup-native-20260912T000008Z-1823031 (00:00Z, cron). Gate-0/1: no live per-run locks, no chain mutex, HOLD-NONE, no active human session (no resident IDE pid; recent writes in harness were only wrapper bookkeeping — codegraph daemon, situation cache, heartbeat/tick-alive/tick-log; none in project). Found the harness worktree carrying uncommitted paper trail from the 23:22Z-23:33Z tick sequence that merged rb-77 (PR#461, 79e3432) but exited before committing its own handoff/mr-state.json/plan-progress files -- same failure class as the 2026-09-08T14:00Z incident. Re-verified live before committing: gh pr view 461 state=MERGED mergeCommit=79e3432, checks ci+e2e both success, project master local HEAD already at 79e3432. Committed the leftover state (2c73815). Gate-3: master CI green (79e3432, ci+e2e success), no open PRs either repo. mr-gates residuals list --unclaimed: oldest 6.6d, under t2_stale_days=14, so did not outrank the non-empty queue[]. Queue fast-path: took first entry rb-78 (promoted R-rb-46-MACRORET). Re-verified rb-78 live: spec heading present in specs/monster-realm-v2/M-residual-backlog.spec.md, after: empty, no existing branch/PR/ledger row beyond the promotion row. Resolved the placeholder touches: myself (server-module/src/guards.rs + guards_tests.rs -- same family as rb-76/rb-77's guards.rs deletion-gate work; the residual is about a macro_rules!-expanded early return evading rb-46's textual scanner). HARD tier (server-module reducer/deletion-gate security surface) -> fable@xhigh (fable_ok=true, d7=$369.81/$2783 NORMAL). ADR-0248 pre-allocated. Launched via mr-spawn: LAUNCHED leader=1825179 claude_pid=1825182. queue-removed rb-78 (queue now rb-79 only). No BLOCKERs, no parks.
 ## 2026-09-11T23:32:01Z — rb-77 MERGED — PR#461 (79e3432)
@@ -4339,68 +4344,3 @@ an ordinary Rust #[test] per ADR-0224.
 No other action taken this tick: no other locks/PRs open, master CI green (9434dfb, in sync with
 origin), no residuals past aging thresholds needing promotion this tick, queue[] empty, no active
 human session detected, budget governor NORMAL, fable_ok=true.
-## 2026-09-11 — rb-74 PR #458 OPEN (local `just ci` green, 10/10 gates) — awaiting supervisor merge
-
-Slice rb-74 (residual R-18r-b-LIBRSCITES). Branch `feat/rb-74-librs-citations`, worktree
-`.claude/worktrees/rb-74`, base origin/master@c0d102e. **Terminal state: PR open + local gate green
-+ remote CI running. `gh pr merge` NOT run (supervisor-owned).**
-
-THREE SUPERVISOR-FACING FINDINGS. (1) **Three of the ten sites the residual named were not defects.**
-`docs/adr/0230` at the lines 18r-b recorded was ALREADY retargeted by rb-68 one PR earlier and is
-already gated by rb-68's own oracle (`accounts_tests.rs:16716-19981`) — rb-74 ships zero edits and
-zero teeth there. `docs/specs/nh2-plan.md:73` and `docs/adr/0148:188` are ACCURATE (the cited
-`sim-harness/src/lib.rs:222-226` really contains the assertion, at 223-225). (2) **The roster is 15
-tokens, not 9** — measuring the declared touches found 15 stale tokens; ~7 more dangle in docs
-OUTSIDE touches and are registered as residuals, not absorbed. (3) **ADR-0245, merged one commit
-earlier, already carries four stale lib.rs pins** (`:53` and `:69` point at the wrong functions
-entirely). rb-74 appended its test mod at EOF of `lib.rs` specifically so as not to shift them
-further.
-
-DIFF: 7 files — `docs/adr/0054` (+8/-6), `docs/adr/0221` (+2/-1), `docs/m8.7b-plan.md` (+4/-3),
-`docs/m8.7d-plan.md` (+3/-2), `ARCHITECTURE.md` (+2, appended), `server-module/src/lib.rs` (+8, pure
-EOF append), NEW `server-module/src/rb74_citation_tests.rs`. No citation NUMBER changed anywhere —
-proved by an identical removed-vs-added `lib.rs:N` multiset.
-
-GATES: 10/10 met, 0 deferred (`Acceptance: 10/10 met, 0 deferred, 0 unmet — rb-74
-seed:e3b0c44298fc1c14`, no SEED-DRIFT). **`mr-gates check` needs `--timeout 2400`; the 120s default
-SKIPs G9 (`just ci`).** Harness-side gate script `memory/projects/rb-74.gates.mjs` with modes
-`census | historical | redbefore | mutants | shalie | diffset`. 15/15 mutants killed by label, 2/2
-controls green, tree restored. CI evidence log `memory/projects/gates/rb-74.ci-evidence.log`
-(`CI-EXIT 0`, 2283 Rust / 3147 client / 99 evals / 8 observability).
-
-ORCHESTRATION: planner · reviewer x2 (plan + artifact) · red-team x2 (plan + artifact) · /simplify
-(applied inline by the orchestrator: cut a duplicate ADR-0230 leg, cut per-doc byte floors, replaced
-a markdown-paragraph window parser with a contiguous composed literal) · tester x2 (separate agent,
-sandboxed at /tmp/rb-74-sandbox — the tester is hook-blocked from writing under `.claude/` AND its
-Bash guard forbids cargo, so the orchestrator compiles and runs its file for it) · specialist x2
-(doc-only, never touched the gating test) · reducer-security-auditor (CLEAN) · verifier (PASS).
-`desync-guard` was NOT run: zero game-core, client, wasm or rule surface. The two implementer edits
-to the gating test (a clippy fix and a doc-comment reword) are self-disclosed and the verifier
-confirmed both semantically inert.
-
-THE ARTIFACT RED-TEAM EARNED ITS COST AGAIN: it MEASURED four CI-clean bypasses of the first oracle
-that the plan red-team did not find — a subject swap that left every anchor resolving while the
-document asserted a falsehood, an empty CONFIRM set that made a whole leg vacuous, two unenumerated
-spellings of the `[rb-74:` namespace, and an attribute-sigil check that accepted any `#[...]`. All
-four are closed and are now permanent mutants. It also caught a CORRECTNESS bug, not just a gate
-hole: three statement-level anchors resolved file-wide, and one occurs 14x in the module, so an
-ordinary new scheduler-only reducer in `movement.rs` would have RED a markdown-citation test.
-
-NEW MEMORY CARD — `glob-in-doc-comment-opens-block-comment`: writing `` `server-module/src/*.rs` ``
-in a Rust doc comment plants an unclosed `/*`, and the evals that concatenate the module's sources
-and strip comments then swallow every file sorting after it. Measured: `spacetime-type-snapshot`
-reported 4 schema types as removed and `recruit-reducer-security` reported 2 reducers as
-unimplemented, all six untouched. `nextest`, `clippy -D warnings` and `fmt --check` were all clean —
-only the full `just ci` caught it. `src/**/*.rs` is SAFE (the `/*` self-closes), which is what makes
-the single-star form invisible to review.
-
-NEXT: supervisor polls PR #458 checks, re-executes the 10 CHECKs (G9 with `--timeout 2400`),
-squash-merges, deletes branch + worktree `.claude/worktrees/rb-74`, refreshes the code graphs on the
-canonical checkout, and ages the 4 new residuals (their ids carry a doubled `R-rb-74-` prefix —
-`mr-gates residuals add` prefixes the slice id to the gate id; that is the literal ledger id, not a
-typo).
-
-# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-09.md, monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
-
----
-
