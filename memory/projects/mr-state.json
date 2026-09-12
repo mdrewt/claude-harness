@@ -10,8 +10,8 @@
  "last_tick_utc": "2026-09-12T06:00:11Z",
  "live_watchers": [],
  "master": {
-  "sha": "1850d358c59adfc3fe33ed774f7133a5360d3b52",
-  "ci": "success",
+  "sha": "1850d35",
+  "ci": "green",
   "nightly": "in_progress"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "11:11Z tick: reconciled prior tick's uncommitted rb-80 postmerge writes (master 1850d35 live-verified success, superseding the stale rb-80-postmerge.ci.md SHA-polled CI-watch event); reaped stale rb-80 lock. Gate-3 t2-stale residuals resolved: R-m23-s10-X16/rb-14 (18d) stays BLOCKED (pre-existing, S8/S9 gated on unresolved palette/art-direction rulings); R-rb-4-X12/rb-31 (15d) dispositioned wontfix per ADR-0224 (scanner-script-correctness-only scope) and spec section marked WONTFIX. No launch, no merge this tick.",
+ "notes": "12:02Z tick: gate-3 aging pick promoted R-rb-47-ROSTER-PVP (7.4d, oldest unclaimed past t1) -> rb-81 via doc-only chore PR#122 (squash-merged, main now a28fc77); R-rb-47-CANCELLAUNDER/PREDATING (tied-oldest, same source slice) left unpromoted -- classified as by-design-admit spec-change questions needing a scoping decision, not simple bugs, and not eval-tooling-only either, so neither force-promoted nor wontfix'd this tick. No eval-scanner-only residuals promoted (106 unclaimed total, all MED, none past t2=14d stale). No slice launched -- rb-81 queued for next tick's fast path. No merge/park/blocker.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
