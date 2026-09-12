@@ -1,38 +1,34 @@
 {
- "adr_next_free": 248,
- "awaiting_merge": [
-  {
-   "adr": 248,
-   "ci_watch_pid": 2061405,
-   "claude_pid": 1825182,
-   "effort": "xhigh",
-   "model": "fable",
-   "pr": 462,
-   "pr_status": "open-ci-pending",
-   "repo": "project",
-   "run_id": "mr-spawn-20260912T000238Z-1825095",
-   "session_leader": 1825179,
-   "slice": "rb-78",
-   "started_utc": "2026-09-12T00:02:43Z",
-   "tier": "hard",
-   "touches": [
-    "server-module/src/guards.rs",
-    "server-module/src/guards_tests.rs"
-   ]
-  }
- ],
+ "adr_next_free": 249,
+ "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "bd09a26"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-12T02:24:59Z",
+ "inflight": [
+  {
+   "adr_reserved": "249",
+   "claude_pid": 2121241,
+   "effort": "xhigh",
+   "leader": 2121238,
+   "model": "fable",
+   "run_id": "mr-spawn-20260912T030213Z-2121185",
+   "slice": "rb-79",
+   "started_utc": "2026-09-12T03:02:13Z",
+   "tier": "hard",
+   "touches": [
+    "server-module/src/trading.rs",
+    "server-module/src/trading_tests.rs"
+   ]
+  }
+ ],
+ "last_tick_utc": "2026-09-12T03:02:58Z",
  "live_watchers": [],
  "master": {
-  "ci": "green",
+  "ci": "success",
   "nightly": "in_progress",
-  "sha": "79e3432"
+  "sha": "be3ff53b531e216062546ab1ebaf31e56c97c6b7"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -47,22 +43,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "02:24Z native tick (src=done, rid=native-20260912T022459Z-2059836). Gate0: no live per-run lock (rb-78 leader 1825179 dead, done=true) -> not a live chain, proceeded. Gate2: no chain mutex present, no active human session, HOLD-NONE queued_events=1. Gate3: master CI green 79e3432, PR #462 (rb-78) OPEN with ci+e2e checks pending, mergeStateStatus=UNSTABLE, mergeable=MERGEABLE -- the run itself already opened the PR and wrote its own terminal handoff entry. Per doctrine (PR open + checks running -> mr-ci-watch, record, EXIT), spawned mr-ci-watch 462 rb-78 detached (pid 2061405) instead of merging off the situation bundle. Moved rb-78 inflight->awaiting_merge. queue[] untouched (rb-79 still queued, re-read fresh at write time). No launch, no merge, no BLOCKERs, no parks this tick.",
+ "notes": "03:00Z native tick (src=cron, rid=native-20260912T030010Z-2119617). Gate0: no live per-run locks (rb-78 leader 1825179 dead, done=true), no live chain-owner mutex. Verified live: PR#462 (rb-78) already squash-merged to master@be3ff53, fully recorded in the 02:50:07Z handoff entry + ledger by the prior tick -- nothing left to merge. Reconciled leftover artifacts: mr-unlock stale reaped the dead rb-78 per-run lock; removed the merged worktree .claude/worktrees/rb-78 + local branch rb-78; cleaned /tmp/mr_pass_rb-78.*. master CI reconfirmed live (be3ff53, conclusion=success). Gate3: no residuals past aging thresholds this tick; queue[] had rb-79 (promoted residual R-rb-46-TRADINGCFG, added 2026-09-11T16:02:21Z) -- re-verified live (no PR/lock existed, spec section non-blocked, after: none) and launched it fresh (HARD tier: touches server-module/src/trading.rs+trading_tests.rs -> fable@xhigh; ADR-0249 reserved). queue-removed on launch. Budget NORMAL (d7=$444.67/$2783, fable_ok=true). No BLOCKERs, no parks.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-11T16:02:21Z",
-   "derived_from_master_sha": "8b90b69",
-   "reason": "promoted residual R-rb-46-TRADINGCFG",
-   "slice": "rb-79",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  }
- ],
+ "queue": [],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": "2026-09-11T00:00:00Z",
  "resource_locations": {
@@ -79,6 +66,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260912T022546Z-2061316",
- "updated_utc": "2026-09-12T02:26:40Z"
+ "updated_by": "mr-sup-native-20260912T030010Z-2119617",
+ "updated_utc": "2026-09-12T03:02:58Z"
 }

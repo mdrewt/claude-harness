@@ -4344,3 +4344,39 @@ an ordinary Rust #[test] per ADR-0224.
 No other action taken this tick: no other locks/PRs open, master CI green (9434dfb, in sync with
 origin), no residuals past aging thresholds needing promotion this tick, queue[] empty, no active
 human session detected, budget governor NORMAL, fable_ok=true.
+
+## 2026-09-12T02:50:07Z — rb-78 merged (PR#462) — macro-expansion-above-gate closed
+Merged rb-78 (fable@xhigh, hard-tier) squash to master@be3ff53. ADR-0248: no macro may expand above the three deletion-gate wrapper calls (residual R-rb-46-MACRORET), closing a class of bypass the rb-46 textual early-return census couldn't see. Mutation sweep 13/13 killed, 0 invalid; acceptance ledger 6/6 CLEAN.
+
+Hard-tier mandatory_read surfaced gating_advisory FLAGGED (suppressions_added=1) — read the diff: the flagged `#[allow(clippy::too_many_arguments)]` is a string literal inside a synthetic test-fixture source string (`rb78_fx_clean`), fed through the scanner grammar under test, not a real suppression on production code. No test weakening; adjudicated CLEAN.
+
+Three new residuals registered to backlog: R-rb-78-PLAINRETURN, R-rb-78-NESTEDMOD, R-rb-78-PROCMACRO (documented out-of-class bypasses in ADR-0248). Residual R-rb-46-MACRORET closed against PR#462.
+
+Master post-merge CI (run 34668573628) was in_progress at this tick's close — not polled synchronously (doctrine: don't sit polling CI); next tick/event confirms green.
+
+No new slice launched this tick — merge was the one mutating action.
+
+## 2026-09-12T03:02:43Z — rb-79 launched (fable@xhigh, HARD) — m22-s5 pin hardening on trading.rs
+Reconciled stray rb-78 artifacts left over from the prior merge tick: session_leader 1825179 was
+dead, .done showed EXIT=0, and PR#462 was already squash-merged to master@be3ff53 (fully recorded
+in the 02:50:07Z handoff entry + ledger). Ran `mr-unlock stale` (reaped the dead per-run lock),
+removed the merged worktree `.claude/worktrees/rb-78` + local branch `rb-78`, cleaned
+/tmp/mr_pass_rb-78.*.
+
+Picked rb-79 off queue[] (added 2026-09-11T16:02:21Z, promoted residual R-rb-46-TRADINGCFG) and
+re-verified live before launch: no open PR or lock existed for rb-79, no human activity in the
+last 6 minutes, master CI green and in sync with origin (be3ff53), budget governor NORMAL
+(d7=$444.67/$2783, fable_ok=true).
+
+Target: [m22-s5 pin hardening — NOT rb-46] a #[cfg(test)]/#[cfg(debug_assertions)] attribute (or
+non-statement-boundary predecessor) above the propose_trade deletion-gate statement in
+`server-module/src/trading.rs:252` passes every existing m22-s5 pin (the census bans only
+cfg_attr) while shipping ungated to wasm. Port the rb-46 statement-boundary + #[cfg!( + early-exit
+clauses onto `trading_tests.rs`. HARD tier (server-module reducer surface) → fable@xhigh.
+ADR-0249 reserved. touches: server-module/src/trading.rs, server-module/src/trading_tests.rs.
+
+Run: mr-spawn-20260912T030213Z-2121185, leader=2121238, claude_pid=2121241. Gates seeded
+(criteria=1, seed=249f81df645cd27f).
+
+No other action this tick (merge→cleanup→launch composite counted as the one mutating action per
+doctrine — cleanup completes the already-recorded rb-78 merge, launch is the new work).
