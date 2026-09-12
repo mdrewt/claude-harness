@@ -1,5 +1,5 @@
 {
- "adr_next_free": 250,
+ "adr_next_free": 251,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
@@ -10,9 +10,9 @@
  "last_tick_utc": "2026-09-12T06:00:11Z",
  "live_watchers": [],
  "master": {
+  "sha": "1850d358c59adfc3fe33ed774f7133a5360d3b52",
   "ci": "success",
-  "nightly": "in_progress",
-  "sha": "322f474a89720f5a217322604f340404c0526505"
+  "nightly": "in_progress"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,22 +27,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "06:00Z native tick (src=cron, rid=native-20260912T060011Z-2457709). Gate0: rb-79 per-run lock (leader 2121238) dead, done=true -> not live; the prior 05:42Z tick had fully reconciled rb-79 (merged, residual closed) but left its handoff/mr-state writes uncommitted. Reaped stale lock via mr-unlock stale. No live chain mutex; acquired it. Gate1: both repos fetched clean; no human-activity probe trip; master re-verified live GREEN at 322f474 (gh run list, superseding the stale in_progress note this file carried). Gate3: no open PRs; mr-gates residuals list --unclaimed: 98 open, 74 past t1_promote_days=3, 0 past t2_stale_days=14 -- oldest R-rb-46-ERASEWRITERS (7.3d, MED, source rb-46: heal_party/advance_dialogue/taming grant paths write ERASE-policy tables without rb-46's deletion-gate coverage). Classified per ADR-0224 as a real security/privacy defect, not eval-tooling -> promoted (mr-gates residuals promote) -> rb-80 in M-residual-backlog.spec.md, queued via mr-record queue-add. Shipped as doc-only chore PR#120, squash-merged. GIT RECONCILIATION: found local main 4 commits ahead of origin/main (unpushed 17:00Z-03:00Z tick records) -- PR#120's squash absorbed their file content into one origin commit (content-verified identical, no data loss, only individual commit messages flattened); merged origin/main back into local main (no conflicts) and pushed both directions in sync. No slice launched this tick. Budget NORMAL (d7=$505.89/2783 eff., fable_d7=$394.74/2298, fable_ok=true). No BLOCKERs, no rate-limit event. queue[] holds rb-80 for next tick's fast path.",
+ "notes": "11:11Z tick: reconciled prior tick's uncommitted rb-80 postmerge writes (master 1850d35 live-verified success, superseding the stale rb-80-postmerge.ci.md SHA-polled CI-watch event); reaped stale rb-80 lock. Gate-3 t2-stale residuals resolved: R-m23-s10-X16/rb-14 (18d) stays BLOCKED (pre-existing, S8/S9 gated on unresolved palette/art-direction rulings); R-rb-4-X12/rb-31 (15d) dispositioned wontfix per ADR-0224 (scanner-script-correctness-only scope) and spec section marked WONTFIX. No launch, no merge this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "slice": "rb-80",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-46-ERASEWRITERS",
-   "added_utc": "2026-09-12T06:01:52Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "322f474a89720f5a217322604f340404c0526505"
-  }
- ],
+ "queue": [],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": "2026-09-11T00:00:00Z",
  "resource_locations": {
@@ -59,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260912T060011Z-2457709",
- "updated_utc": "2026-09-12T06:03:30Z"
+ "updated_by": "native-20260912T111145Z-2810712",
+ "updated_utc": "2026-09-12T11:15:41Z"
 }
