@@ -442,9 +442,18 @@ Deferred with reason: Not closable in-process, and the only in-process fix (runn
 
 EARS: WHEN an eval ends the harness process by a route that never emits `'exit'`
 Tests: proof-of-teeth — this criterion's own gate must RED before the fix and pass after (ADR-0010).
-### rb-31 — WHEN an alias of Identity is declared OUTSIDE the scanned input set (`game-core` carries a (from rb-4 X12, deferred 2026-08-28)
+### rb-31 — WONTFIX (scanner-script scope retired) — WHEN an alias of Identity is declared OUTSIDE the scanned input set (`game-core` carries a (from rb-4 X12, deferred 2026-08-28)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-4 · residual: R-rb-4-X12
+
+**Status: WONTFIX, dispositioned 2026-09-12T11:11Z.** This residual's entire scope is
+`evals/*.eval.mjs` identity-alias-scanner coverage outside its own scanned input set — exactly
+the scanner-script-correctness category ADR-0224 (operator directive 2026-09-01) retired: "a
+residual whose entire scope is an eval script's own scanner correctness is NOT a promotable
+class anymore." No new eval/scanner patch will be written to chase this gap. If the adjacent
+identity-alias code is next touched, port the underlying invariant into an ordinary Rust/TS
+test in that module instead. Nothing to build; left in place per doctrine as the disposition
+record, not an open item.
 
 Deferred with reason: aliases declared outside the scanned input set (game-core's optional spacetimedb
 
