@@ -6,19 +6,7 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "bd09a26"
  },
- "inflight": [
-  {
-   "claude_pid": 3239311,
-   "effort": "medium",
-   "launched_utc": "2026-09-12T20:01:54Z",
-   "leader_pid": 3239308,
-   "model": "opus",
-   "repo": "project",
-   "run_id": "mr-spawn-20260912T200154Z-3239249",
-   "slice": "rb-82",
-   "tier": "content"
-  }
- ],
+ "inflight": [],
  "last_tick_utc": "2026-09-12T20:00:07Z",
  "live_watchers": [],
  "master": {
@@ -39,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-12T20:00Z tick: fast-pathed queue[] rb-82 (17r-e residual B1, two .ron comment factual corrections + mandatory-on-touch migration of the matching content-version.eval.mjs check into an ordinary Rust test per ADR-0224). Launched opus@medium content-tier, project repo. rb-83 left queued pending likely operator scoping decision (its deferred-reason text implies a policy/spec change is needed to close it).",
+ "notes": "2026-09-12T21:00Z tick: reconciled rb-82's interrupted 20:38Z merge tick (PR#468 confirmed MERGED live at 2941e94, ledger MERGED row and residual R-17r-e-B1 close already present from that tick; only the chain-owner mutex/per-run lock release, mr-state.json inflight cleanup, and the handoff entry were left undone -- reaped via mr-unlock, cleared here). Also dispositioned R-rb-47-PREDATING wontfix (MED, self-authorized): by-design-admit under rb-47 ADR-0237, TTL-bounded, no exploitable capability gained; sibling R-rb-47-CANCELLAUNDER stays promoted (rb-83, queued) pending the same operator scoping call. No new slice launched/merged this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
