@@ -6,11 +6,28 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "bd09a26"
  },
- "inflight": [],
- "last_tick_utc": "2026-09-11T23:22:00Z",
+ "inflight": [
+  {
+   "adr": 248,
+   "claude_pid": 1825182,
+   "effort": "xhigh",
+   "model": "fable",
+   "repo": "project",
+   "run_id": "mr-spawn-20260912T000238Z-1825095",
+   "session_leader": 1825179,
+   "slice": "rb-78",
+   "started_utc": "2026-09-12T00:02:43Z",
+   "tier": "hard",
+   "touches": [
+    "server-module/src/guards.rs",
+    "server-module/src/guards_tests.rs"
+   ]
+  }
+ ],
+ "last_tick_utc": "2026-09-12T00:00:08Z",
  "live_watchers": [],
  "master": {
-  "ci": "in_progress-post-merge (checks green pre-merge on PR#461)",
+  "ci": "green",
   "nightly": "in_progress",
   "sha": "79e3432"
  },
@@ -27,21 +44,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "23:22Z native tick (event: rb-77.done). Re-verified PR#461 live: CI green (ci+e2e pass), mergeStateStatus CLEAN, mr-gates verify 6/6 CLEAN (spotcheck agrees), mr-audit hard-tier mandatory diff read performed (lib.rs/guards.rs 2-line comment + guards_tests.rs +870-line ordinary #[test] proof-of-teeth per residual's own EARS -- not a new evals/*.eval.mjs, ADR-0224 compliant; orchestration CLEAN 11 agent calls incl reviewer/red-team/verifier; gating_advisory CLEAN, test-only diff). Diff \u2286 declared touches. Squash-merged PR#461 (79e3432), cleaned worktree+branch, fast-forwarded local master, closed residual R-rb-46-LIBRSMOD. Master CI on 79e3432 still in_progress at tick end (not polled further -- identical checks already green pre-merge); no sit-and-poll per doctrine. Did NOT compose merge->launch this tick (conservative -- queue[0]=rb-78 remains valid/unblocked for the next fast-path tick). Per-run lock reaped (session_leader dead). No mutex was held (none contending).",
+ "notes": "00:00Z native tick. Gate-0/1: no live locks/mutex/done files, HOLD-NONE, no active human session. Found the 23:22Z-23:33Z tick sequence (rb-77 merge) had left its own handoff/mr-state.json/plan-progress paper trail uncommitted in the harness repo -- re-verified live (PR#461 MERGED, mergeCommit 79e3432, checks ci+e2e success) and committed it (2c73815). Gate-3: master CI green at 79e3432, no open PRs either repo. residuals list --unclaimed: oldest 6.6d, under t2_stale_days=14, so queue[] fast-path applied. Took queue[0]=rb-78 (promoted R-rb-46-MACRORET), re-verified live (spec heading present, after: empty, no branch/PR/ledger row beyond promotion), resolved placeholder touches myself to server-module/src/guards.rs + guards_tests.rs (same family as rb-76/rb-77's guards.rs deletion-gate work). HARD tier (deletion-gate security surface) -> fable@xhigh (fable_ok=true, d7=$369.81/$2783 NORMAL). Pre-allocated ADR-0248. Launched via mr-spawn: LAUNCHED leader=1825179 claude_pid=1825182. queue-removed rb-78 (queue now rb-79 only). No BLOCKERs, no parks.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-11T15:01:41Z",
-   "derived_from_master_sha": "8b90b69",
-   "reason": "promoted residual R-rb-46-MACRORET",
-   "slice": "rb-78",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-09-11T16:02:21Z",
@@ -67,6 +76,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260911T232200Z-1763934",
- "updated_utc": "2026-09-11T23:32:00Z"
+ "updated_by": "mr-sup-native-20260912T000008Z-1823031",
+ "updated_utc": "2026-09-12T00:05:00Z"
 }
