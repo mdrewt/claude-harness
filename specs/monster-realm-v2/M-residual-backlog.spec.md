@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-82 — 17r-e claims 2+3: the two .ron comment falsehoods stay unfixed (content-hash coupling) (from 17r-e B1, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 17r-e · residual: R-17r-e-B1
+
+Deferred with reason: 070-wave3.ron:17 ('Electric resists nothing but its own mirror' — type_chart.ron:9 Electric->Electric 0.5x AND :25 Water->Electric 0.5x, so it resists BOTH) and 071-wave3-derived.ron:36 ('Tempestrix owns the Regeneration pivot' — THREE species carry ability: Some(3): 000-core.ron:24 Sproutlet, 020-playtest-wave1.ron:64 Stoneward, 051-wave2-derived.ron:39 Tempestrix). evals/content-version.eval.mjs
+
+EARS: 17r-e claims 2+3: the two .ron comment falsehoods stay unfixed (content-hash coupling)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-81 — [census shape gap — NOT rb-47] WHEN a reducer file other than trading.rs gains a new #[spa (from rb-47 ROSTER-PVP, deferred 2026-09-05)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-47 · residual: R-rb-47-ROSTER-PVP

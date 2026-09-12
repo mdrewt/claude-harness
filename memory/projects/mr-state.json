@@ -33,7 +33,16 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [],
+ "queue": [
+  {
+   "slice": "rb-82",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-17r-e-B1",
+   "added_utc": "2026-09-12T17:03:03Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "54e9e0d874f0ffb52072c5b775273d2ec8c86c6f"
+  }
+ ],
  "rate_limit_armed_by": "wrapper",
  "rate_limit_resets_at": "2026-09-11T00:00:00Z",
  "resource_locations": {
