@@ -7,11 +7,11 @@
   "sha": "bd09a26"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-12T06:00:11Z",
+ "last_tick_utc": "2026-09-12T17:00:11Z",
  "live_watchers": [],
  "master": {
   "sha": "54e9e0d874f0ffb52072c5b775273d2ec8c86c6f",
-  "ci": "queued-expected-green",
+  "ci": "green",
   "nightly": "failure(changelog-freshness stale 27/6.5d)"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-12T16:xxZ native tick: merged rb-81 (PR#466, 54e9e0d). No launch (residual backlog needs triage; Nightly changelog-freshness red on master; governor NORMAL).",
+ "notes": "17:04Z tick: committed the 16:09Z tick's uncommitted rb-81 merge record (no re-derivation). Gate-3: promoted R-17r-e-B1 -> rb-82 (doc-only chore PR#123, queued). R-rb-47-CANCELLAUNDER/PREDATING (7.63d, oldest) still pending an operator scoping decision. R-17r-e-UPDATEFLAG left for a wontfix disposition (eval-tooling-only). Risk carried forward: Nightly changelog-freshness still red on master (CHANGELOG.md stale). No slice launched/merged/parked. Governor NORMAL.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -59,6 +59,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260912T111145Z-2810712",
- "updated_utc": "2026-09-12T11:15:41Z"
+ "updated_by": "native-20260912T170011Z-3198448",
+ "updated_utc": "2026-09-12T17:04:30Z"
 }
