@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-83 — [by-design admit — spec-change class] WHEN a deletion-gated identity cancels its deletion, (from rb-47 CANCELLAUNDER, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-47 · residual: R-rb-47-CANCELLAUNDER
+
+Deferred with reason: rb-47 ADR-0237 D7/Consequences: Flow B — cancel_account_deletion clears the stamp and status, so the stamp-conditioned gate correctly admits; the re-request stamps a fresh t_req and restarts the full grace period. Only a policy that binds a re-request to the ORIGINAL deadline would close it — spec change.
+
+EARS: [by-design admit — spec-change class] WHEN a deletion-gated identity cancels its deletion, accepts a pending offer, lets the initiator confirm, and re-requests deletion THE SYSTEM currently admits the swap (it is trading while Active)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-82 — 17r-e claims 2+3: the two .ron comment falsehoods stay unfixed (content-hash coupling) (from 17r-e B1, deferred 2026-09-05)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 17r-e · residual: R-17r-e-B1
