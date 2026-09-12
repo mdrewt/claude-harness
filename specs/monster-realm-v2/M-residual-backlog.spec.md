@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-80 — [§4.7 trigger-predicate completeness — NOT rb-46] WHEN raising::heal_party, npc::advance_d (from rb-46 ERASEWRITERS, deferred 2026-09-04)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-46 · residual: R-rb-46-ERASEWRITERS
+
+Deferred with reason: reducer-security-auditor finding on rb-46: the §4.7 trigger predicate (every reducer writing an ERASE/ANONYMIZE/JOIN_ONLY table) also selects heal_party (raising.rs ~:300, spend_currency + consume), advance_dialogue (npc.rs ~:324, grant_item/grant_currency at quest turn-in) and taming.rs ~:295 grant_item; none is gated and all three files are outside rb-46's declared touches; §4.7 names only shop 
+
+EARS: [§4.7 trigger-predicate completeness — NOT rb-46] WHEN raising::heal_party, npc::advance_dialogue (quest turn-in grants) or the taming recruit grant_item path writes an ERASE-policy table (player_wallet/inventory) for a mid-grace or terminal caller THE SYSTEM SHALL refuse before the write (or the PRV1-7 mechanism SHALL classify each deliberately)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-79 — [m22-s5 pin hardening — NOT rb-46] WHEN a #[cfg(test)]/#[cfg(debug_assertions)] attribute  (from rb-46 TRADINGCFG, deferred 2026-09-04)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-46 · residual: R-rb-46-TRADINGCFG

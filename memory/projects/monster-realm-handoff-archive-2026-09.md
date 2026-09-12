@@ -1429,3 +1429,130 @@ No slice launched this tick (the promote+doc-PR was the one action). Next tick: 
 
 ## 2026-09-08T13:33:49Z — rb-72 merged (PR#456) — ADR-0232 D2 mechanism correction
 Native tick mr-sup-native-20260908T132927Z-3124539 (13:29Z, cron). Gate-0: rb-72 per-run lock showed session_leader 2937613 dead + .done EXIT=0 ATTEMPTS=1; live re-verify found PR#456 CLEAN/mergeable with both checks (ci, e2e) green (the situation bundle's snapshot showed them still pending — re-checked live before acting, per doctrine). mr-gates verify initially reported FLAGGED/EVIDENCE-MISMATCH on X1/X2/X6 purely from a shell missing the asdf/cargo PATH prefix (`cargo: not found`) — re-ran with PATH exported, verdict flipped to CLEAN 6/6 met, 0 unmet, 0 deferred (seed match, no drift). Read rb-72.gates.mjs directly to try to refute the X4/X5 spotcheck: it's a real mutation-testing harness that injects the red-team's measured bypass mutants (depth-2 helper defined beside the callee, cfg(test)/cfg(not(test)) declaration twin) and requires KILLED verdicts, restoring the mutant on every exit path — no vacuity found. mr-audit: policy CLEAN (no mandatory read), orchestration CLEAN (9 agent calls: claude/planner/red-team/reducer-security-auditor/reviewer/tester across opus+sonnet), gating_advisory CLEAN. Merged PR#456 via `gh pr merge --squash --delete-branch`. Fast-forwarded local master c68bcfd->9434dfb; removed the rb-72 worktree+branch. master CI (ci.yml on 9434dfb) was still in_progress at merge time — not yet independently reverified green this tick, next tick (or event) should confirm. Closed residual R-18r-b-ADR0232MECH against PR#456. Did NOT compose a merge->launch this tick: queue[] is empty, and the 84 unclaimed residuals include none past t2_stale (the two flagged stale ids, R-m23-s10-X16 and R-m22-s2-S3-CANCEL-TERMINAL, are already promoted/claimed, not in the unpromoted set) — properly deriving the next PLAN §9 pick or adjudicating the 27 t1-stale unpromoted residuals (per Work-selection scope's eval-tooling-vs-real-defect classification) is real judgment work better done as its own tick's primary action than rushed onto the tail of this one. Standing down clean; no BLOCKER.
+## 2026-09-08T12:02:31Z — rb-72 launched (opus@high, routine, project repo)
+Native tick mr-sup-native-20260908T120009Z-2935619 (12:00Z, cron). Gate-0: no live per-run locks, no chain mutex, HOLD-NONE queued_events=0, no resident-human-session signal (no recent writes in either repo, no growing IDE claude pid). master=c68bcfd CI success, harness main=aa323b2 (matches local git log HEAD), no open PRs either repo, mr-state.json inflight/awaiting_merge/parked all empty. Fast path: queue[] held rb-72 (promoted last tick from R-18r-b-ADR0232MECH). Re-verified live: ### rb-72 heading present in specs/monster-realm-v2/M-residual-backlog.spec.md, non-blocked, after: empty, not already merged. Resolved the placeholder touches: ("inherit from source slice -- REVIEW") myself before spawning, per the rb-69 misroute lesson -- read ADR-0232 (docs/adr/0232-m22-s9-...md) and confirmed live in server-module/src/lib.rs that resolve_all_live_interactions (line 246) only calls the trading/pvp/battle cancel-on-disconnect helpers, never deletes player/character rows; those deletes are in on_disconnect (line 266) directly, after calling resolve_all_live_interactions. So the residual's finding holds: ADR-0232 D2 misattributes the mechanism (conclusion about rejecting HTTP-driver still correct). Resolved touches -> docs/adr/0232-*.md + server-module/src/accounts_tests.rs (proof-of-teeth test pinning resolve_all_live_interactions does not delete player/character rows). tier=routine (doc correction + a pinning test, no schema/reducer/netcode/security-surface change, not M20/M25, not a resume). Launched via mr-spawn (leader=2937613, claude_pid=2937616, opus@high, repo=project, pr_repo=mdrewt/monster-realm). queue-removed rb-72. Budget NORMAL ($1958.02/$2783 7d, fable_ok=true). No other action this tick.
+
+
+## 2026-09-11 — rb-76 PR #460 OPEN (local `just ci` green, 1/1 gates met) — awaiting supervisor merge
+
+Slice rb-76 (residual R-rb-46-GRASSPATH; ADR-0246). Branch `feat/rb-76-grasspath-deletion-gate`, worktree
+`.claude/worktrees/rb-76`, base origin/master@8b90b69, head 2f43cd2. **Terminal state: PR open + local
+full `just ci` green + remote CI running. `gh pr merge` NOT run (supervisor-owned).**
+
+WHAT SHIPPED: `guards::require_subject_not_deleting(ctx, subject)` — the deletion-gate family's first
+identity-parameterised member, NON-logging, fused delegation to `accounts::is_pending_deletion`, contained
+by a crate-wide BARE-name census (roster derived from lib.rs incl. the crate root; accounts/schema scanned;
+only guards exempt; `include!` banned per module; `src/*.rs` filesystem superset check; every `#[path` in
+lib.rs must target a `*tests` module); ONE call in `battle::begin_encounter` after the pure caps, before the
+first DB read; `movement_tick` skips `REJECT_DELETION_GATED` above the pinned limiter filter (routine,
+unlogged, like a fainted party). Design decision D1: a scheduler-opened wild encounter IS a §4.7 commitment.
+
+THREE SUPERVISOR-FACING FINDINGS. (1) `ctx.database_identity()` is an UNSTUBBED host syscall in
+native_host_tests — MEASURED: any executed test reaching it makes the whole lib-test binary fail to link
+(`undefined symbol: identity`); the planned runtime "scheduler-or-self" scope predicate was dropped for it
+(memory card `native-host-database-identity-is-unstubbed`). (2) The artifact red-team MEASURED three
+CI-green bypasses of the first tests (a `#[cfg(test)]` on the movement skip; an `include!`d fragment hiding
+a target-keyed consumer from the lib.rs-derived roster; an alias re-export of `is_pending_deletion` under a
+`>= 2` floor) — all closed with new clauses and re-measured killed; the include!/filesystem hole is a CLASS
+no other census in the crate covers (accounts_tests' mod census is blind to it too). (3) A pre-existing
+`just ci` from the already-deleted rb-75 worktree had been stuck 7h40m in the docker observability
+validator (cwd "(deleted)"); killed by PID per the orphan doctrine before running this slice's gate.
+
+DIFF: 15 files — guards.rs (+41), battle.rs (+5), movement.rs (+12), guards_tests.rs (+~1060),
+battle_tests.rs (+~700), movement_tests.rs (+~300), docs/adr/0246 (new), docs/adr/0236 (Extended-by +
+dated amendment), DIGEST.md + docs/knowledge/** (generated), ARCHITECTURE.md (deletion paragraph + guards
+row). `require_not_deleting` byte-identical; all production diffs additive-only.
+
+GATES: 1/1 met (E1: `cargo nextest … -E 'test(/rb76_/)'` → 6 tests run: 6 passed). RED at HEAD recorded
+(5 assertion-red + 1 compile-red, wip 29818de). Mutant register 38/38 killed (runner
+memory/projects/gates/rb-76.mutants.py; record rb-76.mutants-run.md + rb-76.red-before.md; verifier
+reproduced 3 register + 4 own). Full `just ci` evidence: memory/projects/gates/rb-76.ci-evidence.log
+(CI-EXIT 0; 2292 Rust / 3147 client / 99 evals).
+
+ORCHESTRATION: planner · plan reviewer + plan red-team + /simplify (orchestrator) · Task-0 link probe ·
+tester (opus; hook-blocked from `.claude/` and its Bash cannot run cargo — delivered append fragments +
+an OLD/NEW rider patch under /tmp, spliced and RED-proved by the orchestrator) · specialist (opus; staged
+under /tmp, applied after RED; never edited tests) · artifact reviewer · artifact red-team (executed in a
+scratch copy) · reducer-security-auditor (PASS) · desync-guard (PASS; the ctx.random() draw-ordering pin
+is its hardening) · verifier (PASS). `/tmp/mr_warn_rb-76` was raised mid-slice: no further fan-out; the
+verifier ran as the single remaining required gate; doc-keeper work done by the orchestrator.
+
+RESIDUALS REGISTERED (backlog): R-rb-76-REASONSPLIT, R-rb-76-RB47PROSE, R-rb-76-CHALLENGERGRACE.
+
+NEXT: supervisor polls PR #460 checks, re-executes E1 (from the worktree, cargo on PATH), squash-merges,
+deletes branch + worktree `.claude/worktrees/rb-76` (+ review clone /tmp/rb76-review-5ade6e9, scratch
+/tmp/rb76-*), closes R-rb-46-GRASSPATH against the PR, refreshes the code graphs on the canonical
+checkout (unchanged by this slice until merge), ages the 3 new residuals.
+
+## 2026-09-08T14:03:39Z — 14:00Z tick — reconciled interrupted rb-72 chain + promoted rb-73 (#114)
+Native tick mr-sup-native-20260908T140012Z-3174646 (14:00Z, cron). Gate-0: no live per-run locks/pids/.done, HOLD-NONE. Found the harness worktree carrying uncommitted memory writes from the 12:02Z-13:33Z tick sequence (rb-72 launch, PR#456-open handoff entry, and the 13:29Z merge tick's ledger/handoff/mr-state.json rows), plus the untracked memory/projects/rb-72.gates.mjs acceptance-gate runner referenced by that merge's own handoff entry -- same failure class as the documented 09:41Z/11:00Z incidents (a tick does real live-verified work but exits before committing the harness repo's own paper trail). Live-reverified before committing: PR#456 state=MERGED (mergedAt 13:32:31Z, mergeCommit 9434dfb), local project master already ff'd to 9434dfb, gh pr checks 456 both ci+e2e pass, master CI run on 9434dfb conclusion=success. Committed the leftover state (a3ad164) and pushed. Gate-3: no open PRs either repo, mr-state.json parked/queue/inflight/awaiting_merge all empty, master green. mr-gates residuals list --unclaimed: 0 past t2=14d; 27 past t1=3d, oldest tier 4-way tied at disclosed_at=2026-09-04T16:03:43Z (all source_slice 18r-b, same batch rb-72 came from). Classified per Work-selection scope: R-18r-b-DISCONNECTSELF (alphabetically first, also the most load-bearing -- a real security finding, self-triggerable disconnect side effects via one HTTP reducer call) is not eval-tooling-only, so promoted -> rb-73. (R-18r-b-NOGATE in the same tied batch proposes a new generic citation-scanner eval and looks headed for a wontfix under ADR-0224/eval-tooling-retirement -- left for the tick that next reaches this tier to classify properly rather than rushing it onto this one's tail.) Shipped as doc-only chore PR#114 (squash+auto, merged immediately), ff'd local main, queue-added rb-73 so next tick's fast path launches it directly. No slice launched this tick (the reconcile + promote were the two actions).
+
+## 2026-09-08T15:02:17Z — 15:00Z tick — launched rb-73
+Native tick mr-sup-native-20260908T150041Z-3189780-7422 (15:00Z, cron). Gate-0: no live locks/mutex/done files, HOLD-NONE, no active human session (no resident IDE pid, no recent writes in either repo). master CI green (last completed run success). No open PRs, no in-flight/awaiting_merge slices in mr-state.json. queue[] fast-path: rb-73 (promoted R-18r-b-DISCONNECTSELF, added 14:02:58Z) verified live -- spec section exists, non-blocked, not already merged/branched, deps satisfied (source 18r-b already merged). Classified per work-selection-scope doctrine: this is a REAL security/game-defect residual (disconnect side effects client-triggerable on demand via HTTP-ephemeral-connection self-trigger, session-token-leak amplifier), not an eval-tooling-only finding -- proceeds normally, not wontfix. touches inherited from source slice as '(REVIEW)'; re-derived real scope as server-module/src/lib.rs (on_disconnect/resolve_all_live_interactions) since the actual fix is reducer code, not the docs-only touches of source slice 18r-b. HARD tier (server-module reducers + security surface) -> fable@xhigh (fable_ok=true, d7 budget $2002.42/$2783 NORMAL). ADR-0244 pre-allocated. Launched via mr-spawn: LAUNCHED leader=3190995 claude_pid=3190998. queue-remove pending after this entry. No BLOCKERs, no parks.
+
+## 2026-09-11 — rb-74 PR #458 OPEN (local `just ci` green, 10/10 gates) — awaiting supervisor merge
+
+Slice rb-74 (residual R-18r-b-LIBRSCITES). Branch `feat/rb-74-librs-citations`, worktree
+`.claude/worktrees/rb-74`, base origin/master@c0d102e. **Terminal state: PR open + local gate green
++ remote CI running. `gh pr merge` NOT run (supervisor-owned).**
+
+THREE SUPERVISOR-FACING FINDINGS. (1) **Three of the ten sites the residual named were not defects.**
+`docs/adr/0230` at the lines 18r-b recorded was ALREADY retargeted by rb-68 one PR earlier and is
+already gated by rb-68's own oracle (`accounts_tests.rs:16716-19981`) — rb-74 ships zero edits and
+zero teeth there. `docs/specs/nh2-plan.md:73` and `docs/adr/0148:188` are ACCURATE (the cited
+`sim-harness/src/lib.rs:222-226` really contains the assertion, at 223-225). (2) **The roster is 15
+tokens, not 9** — measuring the declared touches found 15 stale tokens; ~7 more dangle in docs
+OUTSIDE touches and are registered as residuals, not absorbed. (3) **ADR-0245, merged one commit
+earlier, already carries four stale lib.rs pins** (`:53` and `:69` point at the wrong functions
+entirely). rb-74 appended its test mod at EOF of `lib.rs` specifically so as not to shift them
+further.
+
+DIFF: 7 files — `docs/adr/0054` (+8/-6), `docs/adr/0221` (+2/-1), `docs/m8.7b-plan.md` (+4/-3),
+`docs/m8.7d-plan.md` (+3/-2), `ARCHITECTURE.md` (+2, appended), `server-module/src/lib.rs` (+8, pure
+EOF append), NEW `server-module/src/rb74_citation_tests.rs`. No citation NUMBER changed anywhere —
+proved by an identical removed-vs-added `lib.rs:N` multiset.
+
+GATES: 10/10 met, 0 deferred (`Acceptance: 10/10 met, 0 deferred, 0 unmet — rb-74
+seed:e3b0c44298fc1c14`, no SEED-DRIFT). **`mr-gates check` needs `--timeout 2400`; the 120s default
+SKIPs G9 (`just ci`).** Harness-side gate script `memory/projects/rb-74.gates.mjs` with modes
+`census | historical | redbefore | mutants | shalie | diffset`. 15/15 mutants killed by label, 2/2
+controls green, tree restored. CI evidence log `memory/projects/gates/rb-74.ci-evidence.log`
+(`CI-EXIT 0`, 2283 Rust / 3147 client / 99 evals / 8 observability).
+
+ORCHESTRATION: planner · reviewer x2 (plan + artifact) · red-team x2 (plan + artifact) · /simplify
+(applied inline by the orchestrator: cut a duplicate ADR-0230 leg, cut per-doc byte floors, replaced
+a markdown-paragraph window parser with a contiguous composed literal) · tester x2 (separate agent,
+sandboxed at /tmp/rb-74-sandbox — the tester is hook-blocked from writing under `.claude/` AND its
+Bash guard forbids cargo, so the orchestrator compiles and runs its file for it) · specialist x2
+(doc-only, never touched the gating test) · reducer-security-auditor (CLEAN) · verifier (PASS).
+`desync-guard` was NOT run: zero game-core, client, wasm or rule surface. The two implementer edits
+to the gating test (a clippy fix and a doc-comment reword) are self-disclosed and the verifier
+confirmed both semantically inert.
+
+THE ARTIFACT RED-TEAM EARNED ITS COST AGAIN: it MEASURED four CI-clean bypasses of the first oracle
+that the plan red-team did not find — a subject swap that left every anchor resolving while the
+document asserted a falsehood, an empty CONFIRM set that made a whole leg vacuous, two unenumerated
+spellings of the `[rb-74:` namespace, and an attribute-sigil check that accepted any `#[...]`. All
+four are closed and are now permanent mutants. It also caught a CORRECTNESS bug, not just a gate
+hole: three statement-level anchors resolved file-wide, and one occurs 14x in the module, so an
+ordinary new scheduler-only reducer in `movement.rs` would have RED a markdown-citation test.
+
+NEW MEMORY CARD — `glob-in-doc-comment-opens-block-comment`: writing `` `server-module/src/*.rs` ``
+in a Rust doc comment plants an unclosed `/*`, and the evals that concatenate the module's sources
+and strip comments then swallow every file sorting after it. Measured: `spacetime-type-snapshot`
+reported 4 schema types as removed and `recruit-reducer-security` reported 2 reducers as
+unimplemented, all six untouched. `nextest`, `clippy -D warnings` and `fmt --check` were all clean —
+only the full `just ci` caught it. `src/**/*.rs` is SAFE (the `/*` self-closes), which is what makes
+the single-star form invisible to review.
+
+NEXT: supervisor polls PR #458 checks, re-executes the 10 CHECKs (G9 with `--timeout 2400`),
+squash-merges, deletes branch + worktree `.claude/worktrees/rb-74`, refreshes the code graphs on the
+canonical checkout, and ages the 4 new residuals (their ids carry a doubled `R-rb-74-` prefix —
+`mr-gates residuals add` prefixes the slice id to the gate id; that is the literal ledger id, not a
+typo).
+
+# monster-realm v2 — supervisor handoff (rolling; older entries in monster-realm-handoff-archive-2026-09.md, monster-realm-handoff-archive-2026-08.md, monster-realm-handoff-archive-2026-07.md)
+
+---
+
+
