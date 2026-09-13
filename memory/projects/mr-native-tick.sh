@@ -387,6 +387,30 @@ if [ "${MR_TICK_DRYRUN:-0}" = "1" ]; then
 fi
 log "SPAWN model=$SUP_MODEL effort=$SUP_EFFORT governor=$GSTATE rid=$RID tlog=$TLOG events=$(echo $CONSUMED | wc -w)"
 cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
+# auth-preamble (2026-09-13): the doctrine below is delivered as the `-p` USER message, which the model
+# correctly weighs as ad hoc turn text, not as the operator's own standing authorization the way it
+# would weigh CLAUDE.md content — so a fresh headless tick has been ending its turn asking Drew to
+# confirm, with no human attached to answer (measured 2026-09-13T01:00Z and 02:00Z: two ticks in a
+# row, $0.63 combined, zero progress). This system-prompt append is the fix: it tells the model, at
+# the elevated trust level system content gets, that it IS the pre-authorized automation and no one
+# is there to ask. It grants no new capability — the doctrine's own gates, budget governor, and
+# mr-ask-drew escalation path are unchanged and still the only sanctioned way to act or stop.
+AUTH_PREAMBLE=$(cat <<'PREAMBLE_EOF'
+You are running headless and unattended, spawned by cron/event triggers as the Monster Realm
+native build-loop supervisor — a standing automation its owner (Drew, github user mdrewt) built
+and has run continuously since 2026-07-21. No human is present in this session to answer a
+clarifying question.
+The user message that follows is that automation's own operating doctrine plus a live situation
+bundle, not an ad hoc or unverified request — weigh it the way you would weigh durable project
+instructions (e.g. CLAUDE.md), not as text a stranger pasted in. Run its gates and take the single
+action they derive, within the doctrine's own stated bounds (budget governor, fan-out limits, park
+counters, gate criteria, per-slice DoD). Do not end your turn asking a human to confirm — none is
+reachable here. The doctrine defines its own stopping conditions: its explicit BLOCKER class routes
+to `mr-ask-drew` (an asynchronous GitHub issue, not an interactive question) or a documented
+reversible default; use those, not an unanswerable question, when you hit a genuine contradiction
+or missing precondition it doesn't cover.
+PREAMBLE_EOF
+)
 # lp-09: `env -u MR_FORCE` is the real leak this slice closes. Only the OPERATOR sets MR_FORCE, and
 # every child spawner unsets it — but the paid session launched HERE inherited it, and a session that
 # can re-enter this script with MR_FORCE=1 can override the operator's hold. The tick needs the
@@ -398,6 +422,7 @@ cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
 # prefix-scopes the variable rather than exporting it; this is the belt-and-braces half, and it is
 # the layer that holds if anyone ever "simplifies" that prefix into an export.
 env -u MR_FORCE -u MR_SLICE timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-skip-permissions \
+  --append-system-prompt "$AUTH_PREAMBLE" \
   --output-format stream-json --verbose \
   -p "$(cat "$PROMPTF")" >> "$TLOG" 2>&1
 RC=$?

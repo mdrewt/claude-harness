@@ -7,12 +7,12 @@
   "sha": "bd09a26"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-12T20:00:07Z",
+ "last_tick_utc": "2026-09-13T01:58:18Z",
  "live_watchers": [],
  "master": {
+  "sha": "fedd13f17e90e7df1777930cd5422139df894175",
   "ci": "green",
-  "nightly": "fixed-changelog-freshness-pending-next-run",
-  "sha": "5281871"
+  "nightly": "fixed-changelog-freshness-pending-next-run"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-12T21:00Z tick: reconciled rb-82's interrupted 20:38Z merge tick (PR#468 confirmed MERGED live at 2941e94, ledger MERGED row and residual R-17r-e-B1 close already present from that tick; only the chain-owner mutex/per-run lock release, mr-state.json inflight cleanup, and the handoff entry were left undone -- reaped via mr-unlock, cleared here). Also dispositioned R-rb-47-PREDATING wontfix (MED, self-authorized): by-design-admit under rb-47 ADR-0237, TTL-bounded, no exploitable capability gained; sibling R-rb-47-CANCELLAUNDER stays promoted (rb-83, queued) pending the same operator scoping call. No new slice launched/merged this tick.",
+ "notes": "2026-09-13T01:58:18Z native tick: reconciled interrupted rb-83 merge bookkeeping (the 00:34Z tick's merge was already fully live -- PR#470 merged, master CI green at fedd13f -- it just crashed before committing its own handoff/mr-state.json/decision-file bookkeeping to the harness repo). Corrected the stale live_watchers (cleared finished mr-ci-watch) and master.ci (in_progress -> green). No new slice launched/merged this tick. NEXT: residual-aging backlog (122 open, 69 unpromoted >3d, 3 stale >14d) outranks new PLAN \u00a79 work per doctrine gate 3 \u2014 triage oldest-first next tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -35,12 +35,28 @@
  "parked": [],
  "queue": [
   {
+   "slice": "rb-84",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-48-SLOCLASS",
+   "added_utc": "2026-09-13T02:01:19Z",
    "added_by": "n/a",
-   "added_utc": "2026-09-12T18:02:13Z",
-   "derived_from_master_sha": "54e9e0d874f0ffb52072c5b775273d2ec8c86c6f",
-   "reason": "promoted residual R-rb-47-CANCELLAUNDER",
-   "slice": "rb-83",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
+  },
+  {
+   "slice": "rb-85",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-48-SCANCOST",
+   "added_utc": "2026-09-13T02:01:19Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
+  },
+  {
+   "slice": "rb-86",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-48-PARTIALREAP",
+   "added_utc": "2026-09-13T02:01:19Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -59,6 +75,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260912T200007Z-3237579",
- "updated_utc": "2026-09-12T20:02:35Z"
+ "updated_by": "mr-sup-native-20260913T015818Z-3697034-8622",
+ "updated_utc": "2026-09-13T01:58:18Z"
 }
