@@ -26,6 +26,22 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-88 — focusTrap.ts:58-62 still carries the retracted close-before-open instruction as a LIVE pre (from 17r-e E3, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 17r-e · residual: R-17r-e-E3
+
+Deferred with reason: desync-guard MEDIUM. client/src/ui/focusTrap.ts:58-62 independently repeats the falsehood 17r-e retracted: 'overlayA11y.ts keys its record by OverlayId, not by root, so an S4 wiring that opens the next id BEFORE closing the previous one installs TWO capture listeners on ONE node ... S4 must close-before-open.' Refuted by focusTrap.ts:150 itself (installTrap attaches to the passed root, and the fou
+
+EARS: focusTrap.ts:58-62 still carries the retracted close-before-open instruction as a LIVE prescription
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-87 — export_bundle_reaper emits no observation on a tick (privacy.rs bans logging; no owning ca (from rb-48 OBS, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-48 · residual: R-rb-48-OBS
+
+Deferred with reason: ADR-0238 D6/R-rb-48-OBS: privacy.rs header contract bans logging in-module and no other module owns the scheduled reducer's calling context; needs a crate-level decision (observability.rs hook or lifting the ban for scheduled reducers)
+
+EARS: export_bundle_reaper emits no observation on a tick (privacy.rs bans logging; no owning caller module) — abort loops and backlogs are invisible
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-86 — global 256/tick cap can leave a bundle k-of-N deleted for up to an hour; client assembler  (from rb-48 PARTIALREAP, deferred 2026-09-05)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-48 · residual: R-rb-48-PARTIALREAP
