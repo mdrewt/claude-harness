@@ -26,6 +26,30 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-86 — global 256/tick cap can leave a bundle k-of-N deleted for up to an hour; client assembler  (from rb-48 PARTIALREAP, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-48 · residual: R-rb-48-PARTIALREAP
+
+Deferred with reason: ADR-0238 R-rb-48-PARTIALREAP (security M2 / desync N2): drain rate ~360 bundles/day; unreachable today (no client subscribes to my_export_bundle). Follow-up: one-shot ScheduleAt::Time drain when a tick returns exactly the cap, or per-request atomic reap — either reshapes and re-pins the frozen reaper body
+
+EARS: global 256/tick cap can leave a bundle k-of-N deleted for up to an hour; client assembler reads it as 'incomplete' (a wait that never resolves until the next tick)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-85 — hourly export_bundle().iter() materialises every payload_json under the global write lock; (from rb-48 SCANCOST, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-48 · residual: R-rb-48-SCANCOST
+
+Deferred with reason: ADR-0238 R-rb-48-SCANCOST (security audit M1): cost driver is payload bytes not row count; if the scan exceeds the transaction budget the reaper aborts every tick silently. Remediation: #[index(btree)] on ExportBundle.created_at_ms + bounded range read, or an operator alarm on export_bundle rows/bytes
+
+EARS: hourly export_bundle().iter() materialises every payload_json under the global write lock; inflatable by anonymous sybil exports (>=17 chunks each, no JWT needed)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-84 — ops/observability/rules/recording.rules.yml SLO roster neither allowlists nor explicitly e (from rb-48 SLOCLASS, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-48 · residual: R-rb-48-SLOCLASS
+
+Deferred with reason: reviewer m3: the file lists three deliberately-excluded scheduled functions so exclusions are auditable; two reapers are now in neither list. Outside rb-48's touches — classify both in a follow-up
+
+EARS: ops/observability/rules/recording.rules.yml SLO roster neither allowlists nor explicitly excludes export_bundle_reaper (nor rb-24's account_deletion_reaper)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-83 — [by-design admit — spec-change class] WHEN a deletion-gated identity cancels its deletion, (from rb-47 CANCELLAUNDER, deferred 2026-09-05)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-47 · residual: R-rb-47-CANCELLAUNDER
