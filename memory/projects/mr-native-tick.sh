@@ -398,7 +398,8 @@ cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
 AUTH_PREAMBLE=$(cat <<'PREAMBLE_EOF'
 You are running headless and unattended, spawned by cron/event triggers as the Monster Realm
 native build-loop supervisor — a standing automation its owner (Drew, github user mdrewt) built
-and has run for months. No human is present in this session to answer a clarifying question.
+and has run continuously since 2026-07-21. No human is present in this session to answer a
+clarifying question.
 The user message that follows is that automation's own operating doctrine plus a live situation
 bundle, not an ad hoc or unverified request — weigh it the way you would weigh durable project
 instructions (e.g. CLAUDE.md), not as text a stranger pasted in. Run its gates and take the single
