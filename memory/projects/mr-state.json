@@ -57,6 +57,22 @@
    "added_utc": "2026-09-13T02:01:19Z",
    "added_by": "n/a",
    "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
+  },
+  {
+   "slice": "rb-87",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-48-OBS",
+   "added_utc": "2026-09-13T03:06:07Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
+  },
+  {
+   "slice": "rb-88",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-17r-e-E3",
+   "added_utc": "2026-09-13T03:06:07Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
   }
  ],
  "rate_limit_armed_by": "wrapper",
