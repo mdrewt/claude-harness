@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-89 — Five present-tense citations of overlayA11y.ts contract (a) go stale the moment 17r-e land (from 17r-e VIEWHDR, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 17r-e · residual: R-17r-e-VIEWHDR
+
+Deferred with reason: red-team MEDIUM + desync-guard NIT. battleView.ts:29-30, boxView.ts:29-30, raisingView.ts:30-31, evolutionView.ts:40-41 each say overlayA11y.ts's contract (a) 'says the four #app-mounted views share ONE root'; ARCHITECTURE.md:1908 (the m23-s1 block) says the same. After 17r-e's retraction contract (a) says the opposite, so all five are false present-tense claims about the CURRENT content of overla
+
+EARS: Five present-tense citations of overlayA11y.ts contract (a) go stale the moment 17r-e lands
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-88 — focusTrap.ts:58-62 still carries the retracted close-before-open instruction as a LIVE pre (from 17r-e E3, deferred 2026-09-05)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 17r-e · residual: R-17r-e-E3
