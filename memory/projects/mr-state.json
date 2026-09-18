@@ -4,7 +4,7 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "5f13c37"
+  "sha": "ae4008c"
  },
  "inflight": [],
  "last_tick_utc": "2026-09-18T00:00:53Z",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "02:00Z native tick rid=native-20260918T020008Z-38849: no live/parked/awaiting work, master green at 91e813f. Gate-3 residuals list --unclaimed showed a large aging-backlog (40+ MED unpromoted rows, mostly meta doc/citation/oracle findings from the 17r-d/17r-f/18r-c/rb-52..67+ review chain), all past t1_promote_days=3, outranking queue[] fast path and new PLAN work this tick per the aging rule. Classified+promoted the oldest (R-17r-d-B2, real A11Y ledger-coverage gap, not eval-tooling-scanner scope) -> rb-90, queue-added, shipped chore/residual-promote-20260918T020153Z PR#126 squash-auto-merged, harness main FF'd to 5f13c37. No slice launched/merged this tick. queue[] now rb-86,87,88,89,90 (5, at the cache cap) untouched otherwise. handoff-rotate WARNed on 4 unparseable-header entries pinned live -- needs a manual look, not urgent. Next tick should consider: (a) launch off queue[] fast path now that one promote action is done, or (b) continue the aging-backlog classification pass -- worth deliberately triaging the 40+ backlog into real-defect (promote) vs review-of-review meta (wontfix per Drew's 2026-09-01 anti-recursion directive) rather than one-by-one.",
+ "notes": "residual-backlog classify-and-disposition pass (Drew-requested, out-of-band, not a cron tick): processed all 105 unclaimed residuals -- 89 wontfix (mr-gates residuals disposition, individual reasons, ledger-only) + 16 promoted to backlog slices rb-91..rb-106 (mr-gates residuals promote), shipped as one doc-only chore/residual-triage-pass-20260918T023035Z PR#127 squash-auto-merged, harness main FF'd to ae4008c. mr-gates residuals list --unclaimed now returns 0. queue[] untouched (still rb-86..90 at the 5-entry cap); rb-91..106 are durable in M-residual-backlog.spec.md, pick up via gate 3 full derivation once queue drains. Full (non-unclaimed) residuals list still alarms on 9 OLDER already-promoted rows past t2_stale_days=14d (oldest R-m23-s10-X16 24d, R-rb-10-X7/X6 19d) -- out of this pass's scope (those aren't unclaimed), but worth gate-3 aging priority soon.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -91,6 +91,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260918T020008Z-38849",
- "updated_utc": "2026-09-18T02:02:49Z"
+ "updated_by": "mr-sup-native-20260918T020008Z-38849-triage",
+ "updated_utc": "2026-09-18T02:31:58Z"
 }
