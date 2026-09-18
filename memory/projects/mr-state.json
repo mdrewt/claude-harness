@@ -4,15 +4,15 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "a9f3f18"
+  "sha": "55977af"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-18T13:00:12Z",
+ "last_tick_utc": "2026-09-18T16:22:00Z",
  "live_watchers": [],
  "master": {
-  "ci": "pending-post-merge-confirmation",
-  "nightly": "fixed-changelog-freshness-pending-next-run",
-  "sha": "db95397"
+  "sha": "c8321bb",
+  "ci": "success",
+  "nightly": "fixed-changelog-freshness-pending-next-run"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,30 +27,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "13:02Z tick: launched rb-88 (queue fast-path, promoted residual R-17r-e-E3) opus@high routine tier; leader=1298065. Noted but did not act on: residual-stale alarm's 9 older residuals are already promoted/targeted (not fresh unclaimed work), rb-58/rb-60 confirmed merged in git log with their residual rows never closed via mr-gates residuals close -- reconcile in a future tick, not this one. No merge/park this tick. No BLOCKERs. | 2026-09-18T14:11Z merged rb-88 PR#476 db95397; master CI post-merge unconfirmed at tick-end (pre-merge PR checks both SUCCESS); queue rb-89/rb-90 untouched",
+ "notes": "16:22Z native tick: rb-90 merged (PR#128, 55977af, harness repo) -- doc-only A11Y-37 acceptance criterion, closes R-17r-d-B2; mr-gates verify CLEAN, mr-audit orchestration FLAGGED (no subagent-call evidence) adjudicated as doc-only-exempt after direct diff read (2 files, no code/tests). rb-89 (PR#477, project repo) was already merged by a prior tick (c8321bb, CI green) -- its watcher/inflight entries are stale and cleared this tick. No slices in flight; nothing launched (single merge action this tick; queue empty, no eligible fast-path/residual work re-derived).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-18T01:03:23Z",
-   "derived_from_master_sha": "91e813f63d6d66d752e7f518a5cbf054fe97e4ac",
-   "reason": "promoted residual R-17r-e-VIEWHDR",
-   "slice": "rb-89",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-18T02:01:47Z",
-   "derived_from_master_sha": "91e813f63d6d66d752e7f518a5cbf054fe97e4ac",
-   "reason": "promoted residual R-17r-d-B2",
-   "slice": "rb-90",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  }
- ],
+ "queue": [],
  "rate_limit_armed_by": null,
  "rate_limit_resets_at": null,
  "resource_locations": {
@@ -67,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260918T130012Z-1296651",
- "updated_utc": "2026-09-18T13:02:55Z"
+ "updated_by": "mr-sup-native-20260918T162047Z-1666226",
+ "updated_utc": "2026-09-18T16:22:00Z"
 }
