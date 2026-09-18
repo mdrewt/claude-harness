@@ -26,6 +26,134 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-106 — pvp accept_challenge is blanket-gated with no stamp-aware sibling: a deletion-gated target (from rb-83 CHALLENGELAUNDER, deferred 2026-09-12)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-83 · residual: R-rb-83-CHALLENGELAUNDER
+
+Deferred with reason: rb-83 closed the trade_offer half with a cancel-time sweep (ADR-0252); pvp.rs is outside rb-83 touches and needs its own sweep or a stamp-aware accept gate (ADR-0252 Consequences)
+
+EARS: pvp accept_challenge is blanket-gated with no stamp-aware sibling: a deletion-gated target can cancel, accept a post-request challenge while momentarily Active, and re-request (the CANCELLAUNDER shape for battle_challenge; bounded by the 2-minute CHALLENGE_TTL_MS)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-105 — accept_challenge still opens a NEW battle row naming a mid-grace CHALLENGER (A challenges  (from rb-76 CHALLENGERGRACE, deferred 2026-09-11)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-76 · residual: R-rb-76-CHALLENGERGRACE
+
+Deferred with reason: ADR-0246 consequences + reducer-security-auditor + artifact red-team confirmed real: no cascade cancels outstanding battle_challenge rows at request time so the window is the full grace period; a naive challenger-state gate inside accept_challenge WOULD be an ADR-0227 D4 third-party oracle (B learns A's lifecycle state), so the non-oracle shape (disarm/consume the requester's outbound Pending chal
+
+EARS: accept_challenge still opens a NEW battle row naming a mid-grace CHALLENGER (A challenges while Active, A requests deletion, B accepts -> start_pvp_battle inserts Ongoing battle with player_identity = A)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-104 — No reaper covers wild battle rows; a held second connection stalls a wild battle (from rb-73 WILD-HOLD, deferred 2026-09-11)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-73 · residual: R-rb-73-WILD-HOLD
+
+Deferred with reason: battle.rs:1451-1453 says no scheduled reaper covers the wild battle/battle_wild row class; resolve_wild_battle_on_disconnect is the only resolver. PRE-EXISTING (never disconnect + never move stalls it identically today); ADR-0245's last-connection-out gate only changes the mechanism. A wild-battle idle reaper is its own slice.
+
+EARS: No reaper covers wild battle rows; a held second connection stalls a wild battle
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-103 — Stolen-token holder can suppress a victim's disconnect cleanup by holding a live WS as the (from rb-73 TOKEN-WEDGE, deferred 2026-09-11)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-73 · residual: R-rb-73-TOKEN-WEDGE
+
+Deferred with reason: Directional inverse of R-18r-b-DISCONNECTSELF: with last-connection-out gating (ADR-0245), a token holder who keeps a live socket open as the victim makes the victim's own disconnects skip cleanup. Trades/challenges fall to TTL reapers, PvP to the 60 s pvp_deadline_reaper; wild battles and player/character/player_conversation presence rows have no independent backstop while that socket lives (30 s
+
+EARS: Stolen-token holder can suppress a victim's disconnect cleanup by holding a live WS as the victim
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-102 — A client_disconnected transaction abort strands a player_session row that no launch replay (from rb-73 ABORT-PHANTOM, deferred 2026-09-11)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-73 · residual: R-rb-73-ABORT-PHANTOM
+
+Deferred with reason: reducer-security-auditor M-1 on ADR-0245: if on_disconnect's transaction aborts after its own-row delete (host energy/datastore failure; no reachable panic in the four resolvers or presence deletes today), the delete rolls back while the host still removes the st_client row, so the phantom keeps has_live_session true for that identity and every later disconnect skips cleanup. Durable and identity-
+
+EARS: A client_disconnected transaction abort strands a player_session row that no launch replay drains
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-101 — DR runbook §9 documents row and backup retention caveats but not the operational log that  (from rb-65 RUNBOOK-LOGCAVEAT, deferred 2026-09-07)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-65 · residual: R-rb-65-RUNBOOK-LOGCAVEAT
+
+Deferred with reason: docs/observability-dr-runbook.md §9/§9.1 (G24 exact-body-checked by evals/account-e2e.eval.mjs, outside rb-65's touches) names the non-purged Identity in 'multi-user or historical rows' and host backups/snapshots/WAL, but says nothing about the operational log: since rb-65 / ADR-0243 the deletion cascade emits one INFO line naming the erased identity (subject hex, no PII) that lives in Loki (reten
+
+EARS: DR runbook §9 documents row and backup retention caveats but not the operational log that now names an erased subject
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-100 — [the screen-reader half of the same defect] WHEN a battle is PvP AND an opponent player na (from rb-59 X6, deferred 2026-09-06)
+`touches: client/src/ui/battleView.ts, client/src/ui/battleView.test.ts`
+`after:` — · source: rb-59 · residual: R-rb-59-X6
+
+Deferred with reason: the PvP opponent-card header is the SCREEN-READER half of
+
+EARS: [the screen-reader half of the same defect] WHEN a battle is PvP AND an opponent player name is available THE BATTLEVIEW SHALL name the opponent card's ROLE in its header text rather than rendering the rival's bare player name, so that the card's role reaches assistive technology and not only sighted users. TODAY `client/src/ui/battleView.ts:261` renders `${vm.pvpOpponentName}` alone, which is why
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-99 — [the SECOND, separable arm of the EARS line — "no DOM representation"] WHEN a sprite's act (from rb-57 X4, deferred 2026-09-06)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-57 · residual: R-rb-57-X4
+
+Deferred with reason: a DOM/assistive-tech representation of sprite action needs client/src/render/characterView.ts (the Sprite; PixiJS v8 AccessibilitySystem reads sprite.accessible/accessibleTitle/accessibleType, natural home is CharacterView.update() on animation-key change), client/src/render/world.ts (enables the accessibility system on the Application and owns the CharacterView lifecycle), and client/e2e/golden.s
+
+EARS: [the SECOND, separable arm of the EARS line — "no DOM representation"] WHEN a sprite's action changes THE CLIENT SHALL expose that action to assistive technology as a DOM/accessibility-tree representation (not merely as a baked-in visual glyph), so a screen-reader user perceives the action state.
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-98 — Skill ACCURACY is still hover-only in btn.title on the battle skill buttons (from rb-56 FOLLOWUP-ACC, deferred 2026-09-06)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-56 · residual: R-rb-56-FOLLOWUP-ACC
+
+Deferred with reason: rb-56 moved the skill AFFINITY out of the hover-only btn.title into the visible button label, but narrowed the title to 'Acc <n>%' — so accuracy is now the ONLY thing left in the tooltip and is still invisible to no-hover, touch and screen-reader users. Same defect class as rb-56's own criterion, deliberately not widened into this slice. Fix is the same shape (append to the visible label) but need
+
+EARS: Skill ACCURACY is still hover-only in btn.title on the battle skill buttons
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-97 — normalizeError is not total: unguarded .message / .length throw out of callers (from 17r-f B1-NORMALIZE-TOTAL, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 17r-f · residual: R-17r-f-B1-NORMALIZE-TOTAL
+
+Deferred with reason: MEASURED: client/src/ui/errorRing.ts:33-34 reads raw.message and :44 reads message.length OUTSIDE its own try/catch, so an Error whose message is undefined/null/a Symbol, a revoked Proxy, or a throwing message getter all throw — contradicting the function's own 'TOTAL, never throws' docstring. Every caller except the 17r-f frame catch is shielded by pushError's try/catch, so 17r-f guards locally; 
+
+EARS: normalizeError is not total: unguarded .message / .length throw out of callers
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-96 — distinct frame faults collapse: identical .message, and double truncation at ERROR_MSG_MAX (from 17r-f B1-MSG-COLLAPSE, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 17r-f · residual: R-17r-f-B1-MSG-COLLAPSE
+
+Deferred with reason: TWO measured collapse paths now that a dedupe exists. (a) normalizeError keeps only .message, discarding .name and .stack, so two V8 TypeErrors with site-independent text ('Cannot read properties of undefined (reading x)') from different call sites in the frame body record once. (b) Ordering is truncate(512) -> prefix 'frame: ' -> push -> normalize again -> truncate(512), so a tagged frame error k
+
+EARS: distinct frame faults collapse: identical .message, and double truncation at ERROR_MSG_MAX_LEN
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-95 — frame-error dedupe is a 1-deep exact-string memo, not a cap; interpolated messages defeat  (from 17r-f B1-DEDUPE-BOUND, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 17r-f · residual: R-17r-f-B1-DEDUPE-BOUND
+
+Deferred with reason: MEASURED: 200 frames throwing a11yCopy's "no entry for key '${key}'" over 7 rotating keys fill 64/64 ring slots, i.e. the full ADR-0172 D1 eviction the dedupe is justified as preventing — and that throw (client/src/ui/a11yCopy.ts:93, reached from the frame body via announcementsFor/t('a11y.world.region')) is the amendment's own motivating example. The honest fix is a bounded set or an ADR-0172-sty
+
+EARS: frame-error dedupe is a 1-deep exact-string memo, not a cap; interpolated messages defeat it
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-94 — a11y one-shot announcement on the export incomplete->complete edge (from rb-53 E1, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-53 · residual: R-rb-53-E1
+
+Deferred with reason: Needs a ui/a11yCopy.ts catalog entry and the live-region custody surface, both outside rb-53's touches. ADR-0231 A3 defers it by name; sibling of R-rb-52-GRACEANNOUNCE.
+
+EARS: a11y one-shot announcement on the export incomplete->complete edge
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-93 — Promote the privacy surface to a top-level menu leaf + documented hotkey (from rb-52 MENULEAF, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-52 · residual: R-rb-52-MENULEAF
+
+Deferred with reason: rb-52 reaches the privacy surface from a button in the Account & Sign-in overlay, not a menu leaf (ADR-0231 A2-D5). The better-discoverability version needs client/src/ui/menuModel.ts (a MenuLeafId + system leaf), client/src/ui/helpModel.ts (a CONTROLS glyph) AND docs/PLAYTEST.md, whose Controls table is bidirectionally set-equality gated against CONTROLS by ui/playtestControlsDoc.test.ts. docs/PL
+
+EARS: Promote the privacy surface to a top-level menu leaf + documented hotkey
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-92 — One-shot AT announcement on the active->grace deletion edge (from rb-52 GRACEANNOUNCE, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-52 · residual: R-rb-52-GRACEANNOUNCE
+
+Deferred with reason: rb-51 ADR-0231 A1-D4's named follow-up, re-deferred once: not part of rb-52's E1 (delete/cancel controls + terminal notice) and it is an M23 a11y rule about rb-51's HUD banner, not this overlay. Needs client/src/ui/announcements.ts plus the a11yCopy entry it implies.
+
+EARS: One-shot AT announcement on the active->grace deletion edge
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-91 — claimView's five original buttons ship blank and display:none (from rb-52 CLAIMBTNS, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-52 · residual: R-rb-52-CLAIMBTNS
+
+Deferred with reason: MEASURED with the real ClaimView under happy-dom during rb-52's plan red-team: ensureElement creates every node display:none and claimView.render() never un-hides or labels the five buttons, so they ship invisible while a programmatic .click() still fires them. #claim-signin-btn is also claimView's initialFocusSelector, so opening the claim overlay focuses a display:none node (a silent no-op in a 
+
+EARS: claimView's five original buttons ship blank and display:none
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-90 — [M23 A11Y ledger gap] WHEN the pressed overlay is already open and focus is inside it THE  (from 17r-d B2, deferred 2026-09-05)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 17r-d · residual: R-17r-d-B2
