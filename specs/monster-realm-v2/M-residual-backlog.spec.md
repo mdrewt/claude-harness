@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-90 — [M23 A11Y ledger gap] WHEN the pressed overlay is already open and focus is inside it THE  (from 17r-d B2, deferred 2026-09-05)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 17r-d · residual: R-17r-d-B2
+
+Deferred with reason: Post-A1 the self toggle-close SUCCESS half is covered only at the unit tier (main.a11yFocus.test.ts:587 S5T-GATE-SAMEKEY-CLOSE, :652 S5T-GATE-REOPEN-AFTER-SAMEKEY-CLOSE). A11Y-19's old 'or toggle' clause was the only acceptance-tier mention and it necessarily inverted in this slice. Adding a new A11Y-* id is scope creep for a doc-only wording-alignment slice; the M23 owner should mint one.
+
+EARS: [M23 A11Y ledger gap] WHEN the pressed overlay is already open and focus is inside it THE SYSTEM SHALL close it on the same key — no A11Y-* acceptance criterion asserts this post-ADR-0206-A1
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-89 — Five present-tense citations of overlayA11y.ts contract (a) go stale the moment 17r-e land (from 17r-e VIEWHDR, deferred 2026-09-05)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 17r-e · residual: R-17r-e-VIEWHDR
