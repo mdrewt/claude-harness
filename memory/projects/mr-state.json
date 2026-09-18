@@ -6,25 +6,12 @@
     "sha": "a9f3f18",
     "ci": "no-remote-ci-local-gate-green"
   },
-  "inflight": [
-    {
-      "slice": "rb-85",
-      "run_id": "mr-spawn-20260918T030408Z-64477",
-      "session_leader": 64536,
-      "claude_pid": 64539,
-      "model": "fable",
-      "effort": "xhigh",
-      "tier": "hard",
-      "repo": "project",
-      "started_utc": "2026-09-18T03:04:12Z",
-      "resumed_after_rate_limit_park": true
-    }
-  ],
-  "last_tick_utc": "2026-09-18T03:04:30Z",
+  "inflight": [],
+  "last_tick_utc": "2026-09-18T06:00:12Z",
   "live_watchers": [],
   "master": {
-    "sha": "91e813f63d6d66d752e7f518a5cbf054fe97e4ac",
-    "ci": "green",
+    "sha": "3fe6ebc",
+    "ci": "rerun-triggered-pending-verify (run 35310888755 failed on 1 unrelated flaky e2e test, ranked-forfeit.spec.ts RL-18 timeout; rb-85 diff is docs/ADR/privacy.rs/schema.rs only; same job failed on plain Nightly 2026-09-12 w/ zero code changes then passed since -- reran failed job via gh run rerun --failed, not a revert)",
     "nightly": "fixed-changelog-freshness-pending-next-run"
   },
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -40,7 +27,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "2026-09-18T03:00Z native tick: found rb-85 genuinely parked (rate-limit, 2026-09-13) but not reflected in this file's parked[] -- ground truth (worktree+branch) over breadcrumbs. Resumed it per the open/parked-before-new-work gate rather than launching rb-86 off queue[] (queue untouched, still rb-86..90 at cap). rate_limit_resets_at cleared (was 2026-09-18T00:00:00Z, now past and consumed). See handoff entry 2026-09-18T~03:04Z for full detail.",
+  "notes": "2026-09-18T06:00Z native tick rid=native-20260918T060012Z-463939: no live locks/mutex/hold; picked up master.ci=in_progress-post-merge-verify-pending from the 05:22Z tick's rb-85 merge (PR#473). Live gh run view: 35310888755 conclusion=failure, exactly 1 test -- client/e2e/ranked-forfeit.spec.ts:265 (m17c RL-18), 120s timeout, 75 passed/1 skipped otherwise. Triaged before assuming regression: rb-85's diff (gh pr diff 473 --name-only) touches only docs/ADR/knowledge pages + server-module/src/{privacy.rs,privacy_tests.rs,schema.rs,accounts_tests.rs} -- zero overlap with pvp/battle/ranked/forfeit code. Same e2e job failed identically on plain Nightly 2026-09-12T11:29Z (databaseId 34691192932) with no code changes, then green every Nightly since -- pre-existing flake precedent, not something this merge introduced. Local per-run 'just ci' on rb-85's branch was clean pre-merge (3147 tests, eval PASS 99). Action: 'gh run rerun 35310888755 --failed' to re-run just the failed job rather than reverting a clean unrelated merge. No per-PR watcher exists for a post-merge master run (mr-ci-watch takes pr+slice) so not spawning one; next tick (or the rerun's own completion) re-verifies master CI live -- do not trust this note past that point. Governor NORMAL (d7=$73.52/$2783 eff., fable_d7=$67.06/$2298 allowance, fable_ok=true). No slice launched/parked/merged this tick -- one CI-repair action only.",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
@@ -104,6 +91,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260918T020008Z-38849-triage",
-  "updated_utc": "2026-09-18T02:31:58Z"
+  "updated_by": "native-20260918T060012Z-463939",
+  "updated_utc": "2026-09-18T06:03:00Z"
 }
