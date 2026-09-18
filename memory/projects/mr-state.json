@@ -6,22 +6,11 @@
     "ci": "no-remote-ci-local-gate-green",
     "sha": "bd09a26"
   },
-  "inflight": [
-    {
-      "slice": "rb-84",
-      "run_id": "mr-spawn-20260913T040221Z-3763233",
-      "session_leader": 3763316,
-      "started_utc": "2026-09-13T04:02:25Z",
-      "model": "opus",
-      "effort": "high",
-      "tier": "routine",
-      "repo": "project"
-    }
-  ],
-  "last_tick_utc": "2026-09-13T04:02:40Z",
+  "inflight": [],
+  "last_tick_utc": "2026-09-18T00:00:53Z",
   "live_watchers": [],
   "master": {
-    "sha": "fedd13f17e90e7df1777930cd5422139df894175",
+    "sha": "91e813f63d6d66d752e7f518a5cbf054fe97e4ac",
     "ci": "green",
     "nightly": "fixed-changelog-freshness-pending-next-run"
   },
@@ -38,21 +27,13 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "2026-09-13T01:58:18Z native tick: reconciled interrupted rb-83 merge bookkeeping (the 00:34Z tick's merge was already fully live -- PR#470 merged, master CI green at fedd13f -- it just crashed before committing its own handoff/mr-state.json/decision-file bookkeeping to the harness repo). Corrected the stale live_watchers (cleared finished mr-ci-watch) and master.ci (in_progress -> green). No new slice launched/merged this tick. NEXT: residual-aging backlog (122 open, 69 unpromoted >3d, 3 stale >14d) outranks new PLAN \u00a79 work per doctrine gate 3 \u2014 triage oldest-first next tick.",
+  "notes": "00:00Z native tick rid=native-20260918T000053Z-11537: reaped stale rb-84 per-run lock (session_leader 3763316 dead; rb-84 was already fully merged 2026-09-13T06:04:52Z PR#471, just never cleaned up -- had been re-triggering false wrapper-reconcile CRASHED rows since). Committed 4 files of orphaned bookkeeping from the 09-13T~09:56Z rb-85-park tick that crashed before its own commit (same failure class as the rb-83 case). Classified R-17r-e-UPDATEFLAG (oldest unclaimed residual, 12.6d) as eval-tooling-only scope (ADR-0224) -> dispositioned wontfix rather than promoted. No slice launched/merged this tick -- master already green, no open/parked work, queue (rb-86/87/88) untouched.",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
   },
   "parked": [],
   "queue": [
-    {
-      "slice": "rb-85",
-      "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-      "reason": "promoted residual R-rb-48-SCANCOST",
-      "added_utc": "2026-09-13T02:01:19Z",
-      "added_by": "n/a",
-      "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
-    },
     {
       "slice": "rb-86",
       "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
@@ -79,7 +60,7 @@
     }
   ],
   "rate_limit_armed_by": "wrapper",
-  "rate_limit_resets_at": "2026-09-11T00:00:00Z",
+  "rate_limit_resets_at": "2026-09-18T00:00:00Z",
   "resource_locations": {
     "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
     "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
@@ -94,6 +75,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260913T040005Z-3761005",
-  "updated_utc": "2026-09-13T04:02:40Z"
+  "updated_by": "mr-sup-native-20260918T000053Z-11537",
+  "updated_utc": "2026-09-18T00:04:00Z"
 }
