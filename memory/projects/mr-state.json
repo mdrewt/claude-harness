@@ -4,15 +4,15 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "bd09a26"
+  "sha": "5f13c37"
  },
  "inflight": [],
  "last_tick_utc": "2026-09-18T00:00:53Z",
  "live_watchers": [],
  "master": {
-  "sha": "91e813f63d6d66d752e7f518a5cbf054fe97e4ac",
   "ci": "green",
-  "nightly": "fixed-changelog-freshness-pending-next-run"
+  "nightly": "fixed-changelog-freshness-pending-next-run",
+  "sha": "91e813f63d6d66d752e7f518a5cbf054fe97e4ac"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "00:00Z native tick rid=native-20260918T000053Z-11537: reaped stale rb-84 per-run lock (session_leader 3763316 dead; rb-84 was already fully merged 2026-09-13T06:04:52Z PR#471, just never cleaned up -- had been re-triggering false wrapper-reconcile CRASHED rows since). Committed 4 files of orphaned bookkeeping from the 09-13T~09:56Z rb-85-park tick that crashed before its own commit (same failure class as the rb-83 case). Classified R-17r-e-UPDATEFLAG (oldest unclaimed residual, 12.6d) as eval-tooling-only scope (ADR-0224) -> dispositioned wontfix rather than promoted. No slice launched/merged this tick -- master already green, no open/parked work, queue (rb-86/87/88) untouched.",
+ "notes": "02:00Z native tick rid=native-20260918T020008Z-38849: no live/parked/awaiting work, master green at 91e813f. Gate-3 residuals list --unclaimed showed a large aging-backlog (40+ MED unpromoted rows, mostly meta doc/citation/oracle findings from the 17r-d/17r-f/18r-c/rb-52..67+ review chain), all past t1_promote_days=3, outranking queue[] fast path and new PLAN work this tick per the aging rule. Classified+promoted the oldest (R-17r-d-B2, real A11Y ledger-coverage gap, not eval-tooling-scanner scope) -> rb-90, queue-added, shipped chore/residual-promote-20260918T020153Z PR#126 squash-auto-merged, harness main FF'd to 5f13c37. No slice launched/merged this tick. queue[] now rb-86,87,88,89,90 (5, at the cache cap) untouched otherwise. handoff-rotate WARNed on 4 unparseable-header entries pinned live -- needs a manual look, not urgent. Next tick should consider: (a) launch off queue[] fast path now that one promote action is done, or (b) continue the aging-backlog classification pass -- worth deliberately triaging the 40+ backlog into real-defect (promote) vs review-of-review meta (wontfix per Drew's 2026-09-01 anti-recursion directive) rather than one-by-one.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -35,36 +35,44 @@
  "parked": [],
  "queue": [
   {
-   "slice": "rb-86",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-48-PARTIALREAP",
+   "added_by": "n/a",
    "added_utc": "2026-09-13T02:01:19Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
+   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175",
+   "reason": "promoted residual R-rb-48-PARTIALREAP",
+   "slice": "rb-86",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-87",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "added_by": "n/a",
+   "added_utc": "2026-09-13T03:06:07Z",
+   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175",
    "reason": "promoted residual R-rb-48-OBS",
-   "added_utc": "2026-09-13T03:06:07Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
+   "slice": "rb-87",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-88",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "added_by": "n/a",
+   "added_utc": "2026-09-13T03:06:07Z",
+   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175",
    "reason": "promoted residual R-17r-e-E3",
-   "added_utc": "2026-09-13T03:06:07Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "fedd13f17e90e7df1777930cd5422139df894175"
+   "slice": "rb-88",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-89",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-17r-e-VIEWHDR",
-   "added_utc": "2026-09-18T01:03:23Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "91e813f63d6d66d752e7f518a5cbf054fe97e4ac"
+   "added_utc": "2026-09-18T01:03:23Z",
+   "derived_from_master_sha": "91e813f63d6d66d752e7f518a5cbf054fe97e4ac",
+   "reason": "promoted residual R-17r-e-VIEWHDR",
+   "slice": "rb-89",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+  },
+  {
+   "added_by": "n/a",
+   "added_utc": "2026-09-18T02:01:47Z",
+   "derived_from_master_sha": "91e813f63d6d66d752e7f518a5cbf054fe97e4ac",
+   "reason": "promoted residual R-17r-d-B2",
+   "slice": "rb-90",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": "wrapper",
@@ -83,6 +91,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260918T000053Z-11537",
- "updated_utc": "2026-09-18T00:04:00Z"
+ "updated_by": "mr-sup-native-20260918T020008Z-38849",
+ "updated_utc": "2026-09-18T02:02:49Z"
 }
