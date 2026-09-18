@@ -706,6 +706,23 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   ADR-0238/ARCHITECTURE.md "last statement" claim false since rb-65 (LOW), **19r-d** unthrottled
   per-frame recompute of the countdown label (LOW). All four pairwise disjoint by construction.
   Zero new decision issues. No new game-design surface.
+- **M-postgate-twentieth-review-residuals** (`M-postgate-twentieth-review-residuals.spec.md`) —
+  **NEW, queued 2026-09-18; inserted after `M-postgate-nineteenth-review-residuals`**, per the
+  weekly-review insertion convention. Verified twentieth multi-lens review findings @ `4ba39b5`
+  (8 lenses, 0 contradictions, 3 independent verifiers, 9 claims checked / 8 confirmed / 1
+  dropped as already-tracked in M25 S4). Determinism/netcode, test integrity, observability/ops
+  and dependency hygiene all explicitly clean this cycle. What remains: **20r-a** in-flight
+  guards for server-bound client actions — the PvE battle buttons, train, evolve, and pvp
+  lifecycle lack the guard the PvP path in the same file already implements; a held Enter runs
+  two full wild-battle turns (`submit_attack`) or spends two bait (`attempt_recruit`) from one
+  intent (HIGH), **20r-b** the ADR-0175 essence SSOT promotion whose EG5 trigger fired without
+  it, leaving unsatisfiable essence thresholds (> soft cap 999) unvalidatable (MED), **20r-c**
+  the ADR-0173 `quest_defs_load_error` rate-limiter follow-up that exists only as a dangling
+  "11r-j" mention no spec ever created (LOW), **20r-d** the post-evolve notification whose
+  complete §6 server design lost its home when the uxd milestones completed without it —
+  auto-evolution changes a party monster's species with zero client signal (MED, after 20r-a).
+  20r-a/b/c pairwise disjoint by `touches:`. One decision issue, non-blocking:
+  mdrewt/monster-realm#479 (rev20-trade-raising-reset — supervisor: record-and-ignore).
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
