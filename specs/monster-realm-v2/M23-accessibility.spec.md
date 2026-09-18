@@ -582,7 +582,8 @@ Prefix `A11Y-n`. Each maps to exactly one oracle, annotated `[COMPILE]`/`[SCAN]`
 
 **S5 / S6 — the focus gate and the two click-only sites**
 
-- **A11Y-19** [E2E] WHEN a single-letter hotkey for an overlay OTHER than the one already open is pressed while `document.activeElement` is inside that open overlay THE SYSTEM SHALL NOT open the pressed overlay AND SHALL NOT close the overlay already open (ADR-0206 Amendment A1: the world-focus gate applies to cross-overlay OPEN transitions only, so the already-open overlay's OWN hotkey is an exempt same-key toggle-close).
+- **A11Y-19** [E2E] WHEN a single-letter hotkey for an overlay OTHER than the one already open is pressed while `document.activeElement` is inside that open overlay THE SYSTEM SHALL NOT open the pressed overlay AND SHALL NOT close the overlay already open (ADR-0206 Amendment A1: the world-focus gate applies to cross-overlay OPEN transitions only, so the already-open overlay's OWN hotkey is an exempt same-key toggle-close — the SUCCESS half of that exemption is asserted by A11Y-37).
+- **A11Y-37** [UNIT] WHEN an overlay's OWN single-letter hotkey is pressed while that overlay is already open and `document.activeElement` is inside it THE SYSTEM SHALL close that overlay, returning focus to the world so that a subsequent press of a DIFFERENT overlay's hotkey opens normally (ADR-0206 Amendment A1: the same-key toggle-CLOSE is exempt from the world-focus gate; A11Y-19 states only the cross-overlay OPEN half). Proof-of-teeth is the existing `client/src/main.a11yFocus.test.ts` pair `S5T-GATE-SAMEKEY-CLOSE` (×6, one per hotkey-opened overlay) and `S5T-GATE-REOPEN-AFTER-SAMEKEY-CLOSE` — cited by name, not duplicated (rb-90 closes residual R-17r-d-B2).
 - **A11Y-20** [E2E] WHEN a single-letter overlay hotkey is pressed while `document.activeElement` is `<body>` or the canvas region THE SYSTEM SHALL open the same overlay it opened before this milestone.
 - **A11Y-21** [UNIT] WHEN `sessionGateBlocks()` is true THE SYSTEM SHALL return before evaluating `worldHasFocus()`, preserving the existing session-gate-first ordering pin.
 - **A11Y-35** [UNIT] WHEN a focused element inside an overlay is hidden by a store-driven `render(null)` and the browser blurs it to `<body>` THE SYSTEM SHALL report `worldHasFocus()` as true, so hotkeys remain live.
@@ -656,7 +657,8 @@ DOM overlay), these could go stale with only the cross-reference to catch it.
    post-open state, and three merged feature tests already encoded keyboard-only same-key-to-close (see
    ADR-0206 Amendment A1 for the evidence). **Resolution:** the world-focus gate applies to cross-overlay
    OPEN transitions only, and the pressed overlay's own toggle-CLOSE is exempt from it via a
-   `<selfView>?.visible` disjunct (§2.3). The original recommendation (accept) is superseded.
+   `<selfView>?.visible` disjunct (§2.3); the SUCCESS half is pinned at the acceptance tier by A11Y-37.
+   The original recommendation (accept) is superseded.
 5. **A manual reduced-motion / high-contrast override toggle. [DEFAULTS, does not block]** M23 ships
    OS-media-query-only (§2.9). If the operator wants a manual toggle it is `localStorage` behind the
    `client/src/net/authToken.ts:51` injected-host seam plus a 17th `OverlayId` with the ADR-0139 fan-out
