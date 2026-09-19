@@ -1,12 +1,25 @@
 {
- "adr_next_free": 255,
+ "adr_next_free": 256,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "55977af"
  },
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "m24-s0",
+   "run_id": "mr-spawn-20260919T140543Z-1323410",
+   "session_leader": 1323465,
+   "claude_pid": 1323468,
+   "model": "opus",
+   "effort": "high",
+   "tier": "routine",
+   "repo": "project",
+   "started_utc": "2026-09-19T14:05:47Z",
+   "adr": "0255"
+  }
+ ],
  "last_tick_utc": "2026-09-19T05:00:08Z",
  "live_watchers": [],
  "master": {
@@ -27,7 +40,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-19T08:57Z tick: took over stale chain-mutex (prior tick native-20260919T081136Z-909697, heartbeat 08:11:56Z, dead pid 909697) that had completed merging PR#482 (20r-c) but crashed before finishing bookkeeping. Reconciled from live gh/git: PR#482 MERGED 08:12:30Z at 86313ea, branch+worktree already gone, mr-gates verify CLEAN 2/2. Wrote ledger MERGED row + handoff entry, residuals close (0), released mutex+20r-c per-run lock via mr-unlock. Also consumed decision event rev20-trade-raising-reset: issue #479 answered by Drew (partial-preservation discount \u2014 keep level/species/IVs/essence, reset Trust/Quality-Time to 0), closed issue with <!--mr-system--> comment, recorded in decisions-log.md, archived pending-events file. Non-blocking per spec \u00a74 \u2014 becomes its own slice in a later PLAN \u00a79 cycle. No new launch this tick (bookkeeping + event consumption only).",
+ "notes": "2026-09-19T14:00Z tick: verified 20r-d fully merged/recorded by prior ticks (stale .done exhaust only). Corrected 13:00Z tick's erroneous handoff framing: M23 (S0-S11 + all residual hardening) is fully CLOSED, confirmed via git log --all -- #472's answer was sign-off paperwork for already-shipped work (#413), not a trigger to build 'S8'. Committed prior tick's decision-consumption bookkeeping (handoff+2 decision transcripts), excluding the pre-existing flagged .claude/settings.json stray (untouched, per precedent since 2026-09-13). Residuals: 24 unclaimed, all MED, oldest 1.37d, below aging thresholds. queue[] empty, no open PRs, no parked/inflight prior to this tick. PLAN \u00a79 derivation with M23 actually closed: next unbuilt milestone is M24 (zero prior commits). Launched m24-s0 (sink elimination, routine tier, ADR-0255 reserved, adr_next_free bumped 255->256) -- leader=1323465 claude_pid=1323468. mr-gates seeded 0 criteria (M24 spec has no discrete ### slice headings, same gap hit by m23-s8's queue-add attempt) -- acceptance for this slice will rely on manual/audit review, not the ledger mechanism; flagged for awareness, not a launch blocker.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
