@@ -716,6 +716,15 @@ tier-(e) list is signed off by a human at the playtest gate, separately and visi
 - **I18N-4** [b] WHEN the scan completes, THE SYSTEM SHALL confirm it read all 19 in-scope files and that each was non-empty, and SHALL fail loudly if any named target file is absent or unreadable.
 - **I18N-5** [c] WHEN `ShopView.render` receives a `no-shop` view-model, THE SYSTEM SHALL produce the empty-state row as an element built by `createElement` with its text set via `textContent`.
 
+> **As built (m24-s0, 2026-09-19, ADR-0255 — doctrine note, non-normative).** ADR-0224 (2026-09-01,
+> after this ceremony) retires new `evals/*.eval.mjs` files, so the I18N-1..4 scanner named above ships as
+> the co-located vitest test `client/src/ui/i18n-no-html-sink.test.ts` (same matcher vocabulary, whole
+> non-test `client/src/**/*.ts` scope, `stripComments` imported from `dom-shell-coverage-exclusion`).
+> Live population at build time was **13** sites, not 14 — `dialogueView.ts:30` had already been converted
+> by m23-s3. I18N-4's "all 19 in-scope files" is S2's extraction-lint scope; the S0 test's anti-vacuity is
+> a named file roster (the 5 S0 views, `main.ts`, one canary per other `client/src` subdirectory).
+> Escalation §8-1 was resolved inline: nothing selects the empty-state `<li>` structurally.
+
 **S1 — the i18n module**
 - **I18N-6** [a] WHEN any `catalog.<locale>.ts` omits a key present in `MessageId`, THE SYSTEM SHALL fail `client-typecheck`.
 - **I18N-7** [a] WHEN a `tf()` call passes a parameter object that does not match `MessageParams[K]`, THE SYSTEM SHALL fail `client-typecheck`.
