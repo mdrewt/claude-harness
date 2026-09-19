@@ -1,5 +1,5 @@
 {
- "adr_next_free": 254,
+ "adr_next_free": 255,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
@@ -10,8 +10,8 @@
  "last_tick_utc": "2026-09-19T05:00:08Z",
  "live_watchers": [],
  "master": {
-  "sha": "86313ea",
-  "ci": "success",
+  "sha": "227e852b00708e125536831a324c1479653a37cd",
+  "ci": "in_progress-at-record-time-was-green-on-pr-branch",
   "nightly": "fixed-changelog-freshness-pending-next-run"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
