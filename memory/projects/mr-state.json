@@ -7,11 +7,19 @@
   "sha": "55977af"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-19T15:24:02Z",
- "live_watchers": [],
+ "last_tick_utc": "2026-09-19T16:00:06Z",
+ "live_watchers": [
+  {
+   "kind": "mr-decision-watch",
+   "pid": 1464246,
+   "issue": 485,
+   "slug": "m24-adr0033-amendment",
+   "repo": "mdrewt/monster-realm"
+  }
+ ],
  "master": {
   "sha": "0bbb0fcb18325cf7ac68ae7f798c5698c8ce8039",
-  "ci": "in_progress-at-record-time (PR#484's own pre-merge ci/e2e both passed ~8min; post-merge master-branch run still running at tick end -- next tick re-verifies live)",
+  "ci": "success (ci+e2e both completed success at 0bbb0fc, re-verified live 16:00Z tick)",
   "nightly": "fixed-changelog-freshness-pending-next-run"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,7 +35,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-19T15:24Z tick: reconciled the m24-s0 EVENT (run finished rc=0, PR#484 opened by the run). Re-verified live: gh pr checks 484 ci+e2e both PASS, mergeStateStatus CLEAN. mr-audit: orchestration CLEAN (planner/red-team/reviewer/tester/verifier, 8 calls), gating_advisory CLEAN (no removed asserts/skips/suppressions). mr-gates verify: 6/6 met, 0 unmet, 0 deferred; acceptance block showed FLAGGED only due to SPEC-SECTION-NOT-FOUND (seed_live null) -- read the spec diff, confirmed it's a non-normative as-built addendum after I18N-5 with no criterion text changed; mr-gates reseed confirmed seed unchanged (added=0). Squash-merged PR#484 -> master@0bbb0fc, deleted branch, removed worktree, local checkout ff'd to 0bbb0fc. mr-gates residuals close: 0 (none targeted this slice). Ledger MERGED row + handoff entry recorded (handoff auto-rotated 3 old entries to archive; pre-existing WARN about 9 unparseable-header entries pinned live, unrelated to this tick, flagged not fixed). Residual backlog unchanged by this action: mr-audit surfaced 47 open / 12 stale past t2 (oldest 21d) as ADVISORY info on the acceptance block -- this is pre-existing debt, not this slice's scope; next tick's gate-3 derivation should weigh it (aging rule: residuals past t2_stale_days outrank new PLAN section-9 work) before picking new work. Post-merge master-branch CI run had not completed by tick end (~150s polled, in_progress) after the PR's own pre-merge checks both passed in ~8min -- did not sit polling further per doctrine; next tick re-verifies live. No new slice launched this tick (one mutating action = the merge; a composite merge->launch requires re-deriving eligibility fresh, and the outstanding residual-aging question above should be resolved by a full gate-3 read before opening a new slot, not rushed in the same tick as this merge).",
+ "notes": "2026-09-19T16:00Z tick: fast-path standdown check found no live chain (no locks, no open PR) but a dirty working tree -- the 15:24Z tick had squash-merged PR#484 (m24-s0, ADR-0255) to master@0bbb0fc live and written correct mr-state.json/handoff/spec content, but exited before committing to git (same interrupted-tick shape as the 12:00Z/14:00Z ticks). Re-verified live: gh pr view 484 MERGED, mergeCommit=0bbb0fc; master CI ci+e2e both success at 0bbb0fc. Committed the pending records (commit 4818fe1) plus 5 untracked *-plan.md scratch files (kept per standing precedent), excluding .claude/settings.json (pre-existing flagged stray since 2026-09-13). Gate 3: residuals re-checked -- 21 unclaimed, all MED, oldest 1.46d, both under t1=3d/t2=14d aging thresholds, none outrank new work (down from the 47 the 15:24Z note cited -- some were closed/promoted by intervening ticks). queue[] empty. PLAN section-9: M24 is the sole next unbuilt milestone (M20/M21/M22/M23 CLOSED); M25 explicitly still blocked:playtest-gate per its own spec text (2026-08-08 override only exempted M20/M21). M24 S1 (i18n module) is hard-blocked on an ADR-0033 amendment (spec section 8 item 4) that gates the entire remaining dependency spine (S2-S8) -- the six-part amendment text was already drafted by the 2026-08-23 ceremony's judge synthesis, so this is a formalize-the-decision escalation, not a fresh design question. Opened mr-ask-drew issue #485 (https://github.com/mdrewt/monster-realm/issues/485, --blocking), recommending writing the drafted amendment into ADR-0033 verbatim. .blocked-on-human armed, mr-decision-watch spawned (pid 1464246). No new merge/launch this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -50,6 +58,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260919T152402Z-1449230",
- "updated_utc": "2026-09-19T15:29:40Z"
+ "updated_by": "native-20260919T160006Z-1461813",
+ "updated_utc": "2026-09-19T16:05:00Z"
 }
