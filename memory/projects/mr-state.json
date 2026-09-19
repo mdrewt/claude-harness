@@ -10,7 +10,7 @@
  "last_tick_utc": "2026-09-19T05:00:08Z",
  "live_watchers": [],
  "master": {
-  "sha": "acc8acf",
+  "sha": "86313ea",
   "ci": "success",
   "nightly": "fixed-changelog-freshness-pending-next-run"
  },
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "05:00Z native tick: finished interrupted 04:00Z tick bookkeeping (mr-state.json/handoff were written by that tick's mr-record calls but never committed). Live-reverified before committing: gh run list --branch master shows acc8acf (20r-b, PR#481) CI conclusion=success (databaseId 35420051825) -- master.ci corrected from the 04:00Z tick's optimistic in_progress placeholder to success. Both 20r-a (PR#480) and 20r-b (PR#481) confirmed merged, audited CLEAN, gates CLEAN, no open PRs, no live locks/mutex, mr-hold HOLD-NONE. Residuals R-20r-a-FOCUS/R-20r-a-CARE-GEN/R-20r-b-B1 all fresh (<0.1d), well under aging thresholds -- none outrank queue[] (empty). Decision issue #479 (rev20-trade-raising-reset) remains OPEN, standing aside per the 2026-09-18T22:53:20Z entry -- not blocking, not touched. Pre-existing uncommitted .claude/settings.json stray (broad Bash(git:*) allow + removed Read(**/.env*) deny) reconfirmed and left untouched again (not mine, security-relevant, flagged repeatedly since ~22:02Z, needs Drew's eyes). Two harmless untracked plan-doc exhausts (m23-s9, rb-89, plus a new one for 20r-b) from already-merged slices left as-is. Committing this bookkeeping was the one mutating action this tick; no new launch (avoids compounding with the just-finished merge reconciliation in one step). No BLOCKER.",
+ "notes": "2026-09-19T08:57Z tick: took over stale chain-mutex (prior tick native-20260919T081136Z-909697, heartbeat 08:11:56Z, dead pid 909697) that had completed merging PR#482 (20r-c) but crashed before finishing bookkeeping. Reconciled from live gh/git: PR#482 MERGED 08:12:30Z at 86313ea, branch+worktree already gone, mr-gates verify CLEAN 2/2. Wrote ledger MERGED row + handoff entry, residuals close (0), released mutex+20r-c per-run lock via mr-unlock. Also consumed decision event rev20-trade-raising-reset: issue #479 answered by Drew (partial-preservation discount \u2014 keep level/species/IVs/essence, reset Trust/Quality-Time to 0), closed issue with <!--mr-system--> comment, recorded in decisions-log.md, archived pending-events file. Non-blocking per spec \u00a74 \u2014 becomes its own slice in a later PLAN \u00a79 cycle. No new launch this tick (bookkeeping + event consumption only).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -50,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260919T050008Z-683730",
- "updated_utc": "2026-09-19T05:00:30Z"
+ "updated_by": "native-20260919T085514Z-921854",
+ "updated_utc": "2026-09-19T08:57:36Z"
 }
