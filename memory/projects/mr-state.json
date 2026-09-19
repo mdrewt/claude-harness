@@ -7,7 +7,7 @@
     "sha": "55977af"
   },
   "inflight": [],
-  "last_tick_utc": "2026-09-18T21:00:08Z",
+  "last_tick_utc": "2026-09-19T01:00:41Z",
   "live_watchers": [],
   "master": {
     "ci": "success",
@@ -27,7 +27,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "21:00Z native tick: gate-2 chain-owner mutex was stale (heartbeat 19:58:12Z, ~62min old, run_id mr-sup-native-20260918T195748Z-132173-132814, action='merge PR#478 m23-s9') with no live rooted-run pid and no .done awaiting an unstarted merge -- took over. PR#478 had in fact been merged on GitHub (19:59:03Z, squash+delete-branch, merge commit 4ba39b5) but local master was still one commit behind (c8321bb) and the merge's ledger/handoff/state bookkeeping + worktree/branch cleanup + mutex release were never finished -- the prior tick crashed mid-bookkeeping. Reconciled: git fetch + ff-only to 4ba39b5, removed .claude/worktrees/m23-s9, deleted feat/m23-s9-evolution-contrast (-D; squash-merge branches are never git-ancestors of master per the 2026-08-16 measurement rule), ran mr-audit (orchestration CLEAN, gating_advisory CLEAN, acceptance advisory FLAGGED only on expected SPEC-SECTION-NOT-FOUND with 7/7 gates met/0 deferred, spotcheck agrees), mr-gates residuals close (0 emitted), wrote the ledger merge row + handoff entry, cleared the stale mr-ci-watch live_watchers entry (PR merged, nothing left to watch). Also corrected adr_next_free 251->254 (docs/adr/ highest used was already 0253 -- the counter had drifted 3 behind live ground truth). No new launch this tick: this was the takeover+reconciliation action alone (merge->launch composite requires the merge to complete fully during THIS tick, which it did not -- it completed in the prior, crashed tick).",
+  "notes": "01:00Z native tick: no live locks/pids/.done, mr-hold HOLD-NONE, both repos synced (harness main@90825d1==origin, project master@4ba39b5==origin), no active human session, governor NORMAL. Pre-existing uncommitted harness strays reconfirmed and left untouched: .claude/settings.json diff (adds Bash(git:*), removes Read(**/.env*) deny entries -- security-relevant, flagged by the 22:02Z tick already, needs Drew's eyes, not authored by any slice) and two harmless untracked plan-doc exhausts from already-merged slices (m23-s9, rb-89). Gate 3: master green, no open PRs, nothing parked/inflight, queue[] empty. 01:00:40Z selfcheck flagged residual-stale (9 past t2=14d) and residual-over-cap (40 open, cap 12). Pulled full residuals list sorted by age: oldest was R-m23-s10-X16 (24.7d, promoted_slice=rb-14) -- its entire scope is minting evals/contrast-ratio.eval.mjs, a NEW eval-script gate banned outright by ADR-0224, and its cited criteria (A11Y-30/31) are already satisfied as ordinary vitest DOM oracles by m23-s9 (merged today, PR#478) per S8 precedent. Classified per Work-selection-scope doctrine and dispositioned wontfix (mr-gates residuals disposition, MED severity, loop-authorized) rather than launching rb-14 to build a retired vehicle for an already-covered invariant. Ledger + handoff rows written. No merge/launch/promote this tick -- disposition was the one mutating action. Next-oldest residuals (R-rb-10-X7/X6, ~20.4d) look like genuine reduced-motion HP-bar game defects, not eval-tooling -- next tick should verify and likely launch/promote for real, not disposition.",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
@@ -50,6 +50,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260918T210008Z-141924",
-  "updated_utc": "2026-09-18T21:02:00Z"
+  "updated_by": "mr-sup-native-20260919T010041Z-197978",
+  "updated_utc": "2026-09-19T01:03:30Z"
 }
