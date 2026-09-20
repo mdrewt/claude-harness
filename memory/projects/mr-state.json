@@ -1,14 +1,35 @@
 {
-  "adr_next_free": 258,
-  "awaiting_merge": [],
+  "adr_next_free": 259,
+  "awaiting_merge": [
+    {
+      "slice": "rb-45",
+      "pr": 488,
+      "pr_repo": "mdrewt/monster-realm",
+      "state": "open-ci-running",
+      "model": "fable",
+      "effort": "xhigh",
+      "adr_reserved": 258,
+      "closes_also": [
+        "rb-49"
+      ]
+    }
+  ],
   "consecutive_standdowns": 0,
   "harness_main": {
     "ci": "no-remote-ci-local-gate-green",
     "sha": "55977af"
   },
   "inflight": [],
-  "last_tick_utc": "2026-09-20T04:20:44Z",
-  "live_watchers": [],
+  "last_tick_utc": "2026-09-20T09:17:49Z",
+  "live_watchers": [
+    {
+      "type": "mr-ci-watch",
+      "slice": "rb-45",
+      "pr": 488,
+      "pid": 2185413,
+      "started_utc": "2026-09-20T09:18:33Z"
+    }
+  ],
   "master": {
     "ci": "success (m24-s2@637cbde confirmed via gh run list 2026-09-20T05:00Z, run 35488881129)",
     "nightly": "fixed-changelog-freshness-pending-next-run",
@@ -27,7 +48,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "2026-09-20T05:00Z tick: gate0 found the 04:18Z tick had completed its merge (PR#487/m24-s2) and written mr-state.json+handoff live-content correctly, but was killed before its own chore(mr-sup) git commit -- harness working tree carried uncommitted mr-state.json/handoff/handoff-archive/spec-file edits plus an untracked plan file. No locks/done-files/inflight sessions live (mutex was free, no per-run lock). Re-verified live: PR#487 state=MERGED@637cbde, gh run list confirms master CI success on that exact commit (run 35488881129). Finished the interrupted tick directly per the No-.done/SIGKILL gotcha: reconciled master.ci to the confirmed-live value, committed the pending harness-repo bookkeeping (spec M24 S2 row update + S5.2 as-built note, monster-realm-m24-s2-plan.md, handoff/handoff-archive, mr-state.json itself) as a chore(mr-sup) commit. Deliberately EXCLUDED .claude/settings.json from this commit -- that diff (blanket Bash(git:*) allow + removal of Read(**/.env*) deny) was already flagged as an unattributed stray in the 2026-09-19T09:02:46Z handoff entry (not mine, weakens a security guardrail); leaving it uncommitted and untouched for Drew, per the stray-edit constraint. Did not attempt a merge-then-launch composite: no merge completed THIS tick (the merge itself was already done and recorded by the 04:18Z tick), so per doctrine this bookkeeping-finish is the tick's one action; next tick does a fresh gate-3 derivation. Budget NORMAL (d7=$822.75/$2783, fable_ok=true). No BLOCKERs.",
+  "notes": "09:17Z tick: rb-45 run finished rc=0 (1 attempt, fable/xhigh). PR#488 open (privacy manifest write-gate, ADR-0258, closes rb-49); mergeStateStatus=UNSTABLE, ci+e2e both IN_PROGRESS at reconcile (not failing). No mutex/live sessions found. Delegated CI-wait to mr-ci-watch (pid 2185413); merge deferred to event tick (supervisor-owned squash-merge + mr-audit + mr-gates verify). adr_next_free unchanged (259).",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
