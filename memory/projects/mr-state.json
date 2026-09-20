@@ -7,12 +7,12 @@
   "sha": "55977af"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-20T18:36:15Z",
+ "last_tick_utc": "2026-09-20T19:00:04Z",
  "live_watchers": [],
  "master": {
-  "sha": "0af0b0f",
-  "ci": "in_progress-post-merge-pending-reverify",
-  "nightly": "fixed-changelog-freshness-pending-next-run"
+  "ci": "green (0af0b0f, run 35529653123, live-reverified)",
+  "nightly": "fixed-changelog-freshness-pending-next-run",
+  "sha": "0af0b0f"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-20T18:38Z native tick: merged m24-s5 (PR#492, i18n batch C/tail, squash->0af0b0f). M24 (internationalization) milestone FULLY DELIVERED (s2/s3/s4/s5 all merged). mr-audit orchestration=CLEAN, gating_advisory=CLEAN; acceptance ledger 10/10 met (FLAGGED verdict is advisory-only: SPEC-SECTION-NOT-FOUND, spotcheck X5 agrees). 0 residuals to close. adr_next_free stays 262 (261 consumed by this slice). Master CI still in_progress on 0af0b0f at tick end (identical tree passed ci+e2e as PR checks pre-merge) -- next tick must re-verify live before any composite launch. Next PLAN section-9 item needs a fresh gate-3 derivation since M24 is now closed.",
+ "notes": "2026-09-20T19:00Z native tick: found the 18:38Z tick's harness-side bookkeeping commit missing (SIGKILL/interruption after the merge recorded to working-tree files but before the chore commit). Live-verified PR#492 MERGED->0af0b0f, project HEAD==origin/master, master CI green, worktree/branch already clean -- no code action needed. Committed+pushed the harness-side records (36431b8, main synced 9714c33->36431b8). M24 (i18n) fully delivered S1-S5. No new launch this tick (bookkeeping-recovery tick, per established precedent); next tick does a fresh gate-3 derivation -- S6 (boot wiring) is next on the S1->S6->S7 branch.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -50,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260920T183635Z-2828064-2760",
- "updated_utc": "2026-09-20T18:38:58Z"
+ "updated_by": "mr-sup-native-20260920T190004Z-2840244",
+ "updated_utc": "2026-09-20T19:01:00Z"
 }
