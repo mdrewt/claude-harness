@@ -1,0 +1,71 @@
+=== tradeProposeView: sinks=7 failing=1
+pass textContent@L141: []
+pass replaceChildren@L161: []
+FAIL textContent@L164: ["Select a player…"]
+pass textContent@L169: []
+pass replaceChildren@L174: []
+pass textContent@L200: []
+pass textContent@L236: []
+=== dialogueView: sinks=5 failing=1
+pass textContent@L57: []
+pass textContent@L58: []
+pass replaceChildren@L59: []
+pass textContent@L62: []
+FAIL textContent@L72: ["Shop"]
+=== claimView: sinks=6 failing=1
+FAIL textContent@L92: ["Privacy & Account Data"]
+pass textContent@L108: []
+pass textContent@L109: []
+pass textContent@L110: []
+pass textContent@L112: []
+pass textContent@L114: []
+=== sessionView: sinks=4 failing=0
+pass textContent@L55: []
+pass textContent@L56: []
+pass textContent@L57: []
+pass textContent@L59: []
+=== renameView: sinks=4 failing=0
+pass textContent@L115: []
+pass textContent@L133: []
+pass textContent@L139: []
+pass textContent@L150: []
+=== menuView: sinks=4 failing=0
+pass textContent@L147: []
+pass textContent@L148: []
+pass textContent@L180: []
+pass replaceChildren@L183: []
+=== leaderboardView: sinks=4 failing=2
+FAIL textContent@L58: ["No ranked players yet"]
+pass replaceChildren@L59: []
+FAIL textContent@L67: [" (W","/L"]
+pass replaceChildren@L70: []
+=== helpView: sinks=4 failing=0
+pass textContent@L69: []
+pass replaceChildren@L72: []
+pass textContent@L76: []
+pass replaceChildren@L79: []
+=== errorOverlayView: sinks=4 failing=2
+FAIL textContent@L35: ["F8 dismiss · F9 bug report"]
+pass textContent@L76: []
+pass replaceChildren@L79: []
+FAIL textContent@L80: ["F8 dismiss · F9 bug report"]
+=== questLogView: sinks=2 failing=1
+pass replaceChildren@L42: []
+FAIL textContent@L45: [" (step "]
+=== healView: sinks=2 failing=1
+pass replaceChildren@L43: []
+FAIL textContent@L47: ["Heal here ("]
+=== privacyView: sinks=7 failing=1
+FAIL textContent@L143: ["Privacy & Account Data"]
+pass textContent@L145: []
+pass textContent@L160: []
+pass textContent@L167: []
+pass textContent@L176: []
+pass textContent@L180: []
+pass textContent@L189: []
+=== evolutionNotice: sinks=2 failing=1
+FAIL textContent@L166: ["OK"]
+pass textContent@L194: []
+TOTAL sinks=55 failing=11
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
