@@ -498,11 +498,11 @@ the `t()`/`tf()` split (§2.4) · the ICU round-trip format (§2.6) · the corre
 |---|---|---|---|
 | **S0** | Sink elimination: 3 markup sites → `createElement`+`textContent`; 11 `innerHTML=''` clears → `replaceChildren()`; `evals/i18n-no-html-sink.eval.mjs` **(new)** | `client/src/ui/shopView.ts`, `client/src/ui/tradeView.ts`, `client/src/ui/questLogView.ts`, `client/src/ui/healView.ts`, `client/src/ui/dialogueView.ts`, `evals/i18n-no-html-sink.eval.mjs` **(new)** | — |
 | **S1** | i18n module, types only, zero call-site migration: `messageIds.ts` **(new)**, `resolver.ts` **(new)**, `plural.ts` **(new)**, `locale.ts` **(new)**, `catalog.en.ts` **(new)** seeded with `chrome.*` keys only; unit tests | `client/src/ui/i18n/` **(new dir)** | — |
-| **S2** | Extraction lint: `evals/i18n-hardcoded-strings.eval.mjs` **(new)** with the §2.2 default-fail rule, the 19-file scope, `SINK_FLOOR = 169`, `HARDCODED_CEILING` seeded at the S0-measured count; **fixtures run in Phase 0 before any real file is read** | `evals/i18n-hardcoded-strings.eval.mjs` **(new)**, `evals/baselines/i18n-hardcoded.json` **(new)** | S0, S1 |
-| **S3** | Migration batch A — the two densest views (**43** sinks: 26 + 17, E7) | `client/src/ui/battleView.ts`, `client/src/ui/pvpView.ts`, `client/src/ui/i18n/messageIds.ts`, `client/src/ui/i18n/catalog.en.ts` | S2 |
-| **S4** | Migration batch B — the mid-density views (**77** sinks: 13+17+15+16+16, E7) | `client/src/ui/evolutionView.ts`, `raisingView.ts`, `boxView.ts`, `tradeView.ts`, `shopView.ts`, `client/src/ui/i18n/messageIds.ts`, `client/src/ui/i18n/catalog.en.ts` | S2, S3 |
-| **S5** | Migration batch C — the tail (**45** sinks, E7) incl. the `<bdi>` wrap at `leaderboardView.ts:57` + `client/index.html` static strings | `client/src/ui/tradeProposeView.ts`, `dialogueView.ts`, `claimView.ts`, `sessionView.ts`, `renameView.ts`, `menuView.ts`, `leaderboardView.ts`, `helpView.ts`, `errorOverlayView.ts`, `questLogView.ts`, `healView.ts`, `client/index.html`, `client/src/ui/i18n/messageIds.ts`, `client/src/ui/i18n/catalog.en.ts` | S2, S4 |
-| **S6** | Boot wiring: `negotiateLocale` call, `lang`/`dir` flip in `main.ts`; `evals/i18n-catalog-shape.eval.mjs` **(new)** incl. the 47-char width budget | `client/src/main.ts`, `evals/i18n-catalog-shape.eval.mjs` **(new)** | S1 |
+| **S2** | Extraction lint with the §2.2 default-fail rule, the 19-file present-or-fail roster over a whole-non-test-tree scan, `SINK_FLOOR = 169`, `HARDCODED_CEILING` seeded at the S2-measured count (**81** failing of 182 sinks) and pinned exactly (shrink-only made mechanical); **fixtures run in Phase 0 before any real file is read**. **Vehicle substituted per ADR-0224 (operator directive 2026-09-01; ADR-0257): a co-located vitest test, not an eval** | `client/src/ui/i18n/hardcodedStrings.ts` **(new)**, `client/src/ui/i18n/hardcodedStrings.test.ts` **(new)**, `client/src/ui/i18n/__fixtures__/i18n-hardcoded.json` **(new)** | S0, S1 |
+| **S3** | Migration batch A — the two densest views (**43** sinks: 26 + 17, E7) | `client/src/ui/battleView.ts`, `client/src/ui/pvpView.ts`, `client/src/ui/i18n/messageIds.ts`, `client/src/ui/i18n/catalog.en.ts`, `client/src/ui/i18n/__fixtures__/i18n-hardcoded.json` | S2 |
+| **S4** | Migration batch B — the mid-density views (**77** sinks: 13+17+15+16+16, E7) | `client/src/ui/evolutionView.ts`, `raisingView.ts`, `boxView.ts`, `tradeView.ts`, `shopView.ts`, `client/src/ui/i18n/messageIds.ts`, `client/src/ui/i18n/catalog.en.ts`, `client/src/ui/i18n/__fixtures__/i18n-hardcoded.json` | S2, S3 |
+| **S5** | Migration batch C — the tail (**45** sinks, E7) incl. the `<bdi>` wrap at `leaderboardView.ts:57` + `client/index.html` static strings | `client/src/ui/tradeProposeView.ts`, `dialogueView.ts`, `claimView.ts`, `sessionView.ts`, `renameView.ts`, `menuView.ts`, `leaderboardView.ts`, `helpView.ts`, `errorOverlayView.ts`, `questLogView.ts`, `healView.ts`, `privacyView.ts`, `evolutionNotice.ts` (post-spec files inside S2's whole-tree scan, ADR-0257 D7), `client/index.html`, `client/src/ui/i18n/messageIds.ts`, `client/src/ui/i18n/catalog.en.ts`, `client/src/ui/i18n/__fixtures__/i18n-hardcoded.json` | S2, S4 |
+| **S6** | Boot wiring: `negotiateLocale` call, `lang`/`dir` flip in `main.ts`; `evals/i18n-catalog-shape.eval.mjs` **(new)** incl. the 47-char width budget | `client/src/main.ts`, `evals/i18n-catalog-shape.eval.mjs` **(new)**, `client/src/ui/i18n/__fixtures__/i18n-hardcoded.json` | S1 |
 | **S7** | **Proof slice** — a second locale (`fr`) authored end-to-end; `evals/i18n-catalog-parity.eval.mjs` **(new)** | `client/src/ui/i18n/catalog.fr.ts` **(new)**, `evals/i18n-catalog-parity.eval.mjs` **(new)** | S3, S4, S5, S6 |
 | **S8** | ICU round-trip: `scripts/catalog-export.mjs` **(new)**, `scripts/catalog-import.mjs` **(new)**; nightly completion baseline | `scripts/catalog-export.mjs` **(new)**, `scripts/catalog-import.mjs` **(new)**, `evals/baselines/i18n-locale-completion.json` **(new)**, `justfile` | S7 |
 
@@ -550,7 +550,7 @@ known, nonzero, non-full count**, the "expected RED at HEAD" idiom `ci-gate-wiri
 documents for its own anchor. A gate that is green the moment it is written, over a corpus it has not yet
 been used to fix, has not been shown to see the tree. The measured count at S2 is recorded in the spec and
 each of S3/S4/S5 ratchets `HARDCODED_CEILING` down by its own migrated count (43 → 77 → 45, with `main.ts`'s remaining 4 migrated in S6; 43+77+45+4 = 169 exactly, so the arithmetic closes); S6's landing takes it to 0 and
-the ceiling becomes a permanent 0-ratchet.
+the ceiling becomes a permanent 0-ratchet. *[As built, ADR-0257: under the vitest vehicle the gate cannot be RED at merge, so the "sees the tree" proof is the exact `failing === HARDCODED_CEILING` pin; measured at S2 = **81** failing of 182 sinks across the whole non-test `client/src` tree (the 19-file E7 count is 79; `privacyView.ts:145` and `evolutionNotice.ts:209` add two — S5 owns them).]*
 
 **Cross-slice contracts named, each with the test that proves it after integration:**
 `MessageId` union ↔ `catalog.en.ts` keys (tier (a), plus `[I18N-PARITY-02]`) · `catalog.en.ts` ↔
@@ -588,14 +588,24 @@ BAD fixture (1). A second attack — a scanner pointed at an empty or mistyped g
 is killed by `[I18N-HTML-03]`'s **file-count** floor and by a hard fail if any of the 19 named target files is missing
 (the `SCAN_TARGETS` idiom at `client-no-pii-logs.eval.mjs:857-867`).
 
-### 5.2 `evals/i18n-hardcoded-strings.eval.mjs` (new) — closes F2
+### 5.2 `evals/i18n-hardcoded-strings.eval.mjs` (new) — closes F2 — **delivered as `client/src/ui/i18n/hardcodedStrings.test.ts` (ADR-0224 / ADR-0257)**
+
+> **As built (m24-s2, 2026-09-20, ADR-0257 — doctrine note, non-normative).** ADR-0224 retires new
+> `evals/*.eval.mjs` files, so this gate ships as the co-located vitest test
+> `client/src/ui/i18n/hardcodedStrings.test.ts` over the pure typed scanner `hardcodedStrings.ts`
+> (a minimal typed port of `stringMask`; `stripComments` imported from the single owner). Semantics are
+> the table below unchanged, with one deliberate strengthening: **every** literal inside a sink RHS at any
+> paren/`${}` depth contributes segments (only `t(`/`tf(` call spans are inert), which also catches
+> `replaceChildren(emptyRow('…'))` and `${c ? 'A' : 'B'}`. Scope is the whole non-test `client/src` tree;
+> the 19 files are the present-or-fail roster. HC-04's baseline is
+> `client/src/ui/i18n/__fixtures__/i18n-hardcoded.json` (plain data), pinned exactly (`===`) as well as `≤`.
 
 | Tag | Check |
 |---|---|
 | `[I18N-HC-01]` | For every sink RHS in the 19-file scope, every static segment is CLEAN per §2.2's `NON_TRANSLATABLE_CHARS` closed set, **or** the RHS is a `t(`/`tf(` call, a bare identifier/property access, or a numeric/boolean literal |
 | `[I18N-HC-02]` | `setAttribute`'s **first** argument is allowlisted (`aria-label`, `aria-live`, `aria-describedby`, `title`, `alt`) **before** any RHS examination; `.id =`, `.className =`, `.style.cssText =`, `.dataset.*`, `addEventListener(` are structurally absent from the sink vocabulary |
 | `[I18N-HC-03]` | `SINK_FLOOR = 169` (E5) — fewer sinks seen than that is a scanner failure, not a clean tree |
-| `[I18N-HC-04]` | Count of failing sinks ≤ `HARDCODED_CEILING` from `evals/baselines/i18n-hardcoded.json`, monotonically shrink-only, git-append-only |
+| `[I18N-HC-04]` | Count of failing sinks ≤ `HARDCODED_CEILING` from `evals/baselines/i18n-hardcoded.json` (as built: `client/src/ui/i18n/__fixtures__/i18n-hardcoded.json`, pinned `===`), monotonically shrink-only, git-append-only |
 | `[I18N-HC-05]` | All 19 target files present; a missing file is a hard fail, never a skip |
 
 **BAD fixtures (must FAIL), all drawn from real lines:** (1) `` lvSpan.textContent = `Lv${card.level}` ``
