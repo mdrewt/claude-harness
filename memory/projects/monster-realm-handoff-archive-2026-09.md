@@ -1839,3 +1839,47 @@ Gate 3 (pick work): PLAN §9 derivation for the M20-M25 spine found the whole ch
 **Net: S8 is now unblocked**, which also unblocks S9 (after: S8). Tried `mr-record queue-add --slice m23-s8` to fast-path the next tick -- REFUSED ("no '### m23-s8' heading -- refusing to queue a pointer to nothing"): M23-accessibility.spec.md doesn't structure S0-S11 as discrete `### slice` sections (unlike M-residual-backlog.spec.md's rb-* entries), so the mechanical queue-add heading check doesn't apply here. Not forcing it -- next tick's normal PLAN §9 derivation should pick up M23 S8 directly from this handoff entry + the two closed issues instead of the queue fast-path. Follow-up owed, non-blocking: file a tracked art ticket for the ACTION_TINT non-colour cue (spec §8 item 2 option b, deferred, NOT part of S8's build).
 
 No slice launched/merged/parked this tick -- the action was decision-consumption + issue-closing (doctrine's close-the-loop rule; an open issue whose answer sits unconsumed is a lie to Drew's issue list). No ledger row written (no slice/cost outcome this tick; wrapper owns SUPERVISOR tick rows). mr-state.json unchanged (no inflight/queue/park_counter/adr_next_free deltas). Untracked strays noted, left untouched per doctrine: memory/projects/monster-realm-{20r-b,20r-c,m23-s9,rb-89}-plan.md (leftover park-plan files from already-merged/queued slices, harmless clutter) and the pre-existing .claude/settings.json diff (flagged by a prior tick 2026-09-13, still uncommitted, still not mine to touch).
+## 2026-09-19T11:55Z — 20r-d: RED tests committed (cde4a3d, pushed); implementers running
+Tester (opus, sandbox /tmp/20r-d-sandbox → patch applied) delivered 12 s20rd_* Rust tests + 44 client 20r-d tests; RED proof run by the orchestrator: Rust target compile-red with 22 errors ALL naming a missing seam (ack_prefix / EvolutionRevealRow / PendingEvolutionNotice / ack_evolution_notices), client 21 tagged failures + evolutionNotice.test.ts whole-file red (module missing), zero collateral. Now running in parallel: test reviewer (read-only), SERVER implementer (schema/evolution/accounts + forced censuses + evals + S9 organic seed + just gen/knowledge), CLIENT implementer (connection/store/rowConvert/ui/evolutionNotice.ts/main.ts). Resume point if parked here: `git status` in the worktree shows the implementers' uncommitted work; commit by explicit path, re-run `cargo nextest run -p monster-realm-module` + the five client vitest files, then continue with the artifact lenses (reviewer ∥ red-team ∥ reducer-security-auditor ∥ desync-guard ∥ simplify) → verifier → full `just ci` → `mr-gates check --slice 20r-d --timeout 1800` → doc-keeper → PR.
+## 2026-09-19T14:05:23Z — 14:00Z tick — M23 S8/S9 framing correction; M24 S0 launch
+Gate 0-2 clean: no live locks/mutex, no resident human session, mr-hold HOLD-NONE, both repos synced
+(project master@227e852, harness main ahead 4 unpushed chore commits from prior ticks). Governor NORMAL
+(d7=$723.25/2783=26%, fable_ok=true). Re-verified 20r-d already fully merged+recorded by the 11:44Z/12:00Z
+ticks (PR#483, e6cfadf) -- the /tmp/mr_pass_20r-d.done file is stale exhaust, not new work.
+
+Gate 3 correction (important): the 13:00Z tick's handoff entry said "M23 S8 is now unblocked... launch
+it next tick" after consuming decision #472. Live re-derivation of PLAN §9 found this framing WRONG --
+git log shows ALL of M23 (S0-S11: PR#361,363,364,365,366,367,368,369,370,371,+S8=PR#413,S9=PR#478) plus
+every named residual hardening slice (rb-9..rb-20, rb-54, rb-55) already MERGED, most of them well before
+issue #472 was even opened (2026-09-17). #413 (m23-s8, authored directly by Drew 2026-09-02, "CB-safe
+default HP palette") already shipped what §8 item 1's recommended default asked for; #472's answer was
+sign-off paperwork catching up to already-shipped code, not a trigger for new work. Closing #472 was
+still the right call (doctrine's close-the-loop rule), but "S8 unblocked, build it" was never a valid
+next action -- M23 is fully CLOSED. Correcting the record so no future tick relaunches already-shipped
+work under the m23-s8 name.
+
+Residuals: mr-gates residuals list --unclaimed --json returned 24 rows, all MED severity, oldest age
+1.37d -- all below aging thresholds (t1/t2), none outrank PLAN §9. queue[] empty. No open PRs, no
+parked/inflight slices.
+
+PLAN §9 full derivation with M23 actually closed: next unbuilt milestone is M24 Internationalization
+(M24-internationalization.spec.md, ADR-0033 design authority, ceremony complete 2026-08-23). Zero M24
+commits exist anywhere in project history -- confirmed via git log --all. S0 (sink elimination: 3
+innerHTML markup sites -> createElement/textContent, 11 innerHTML='' -> replaceChildren(), touches
+shopView/tradeView/questLogView/healView/dialogueView.ts) has after:[] and its only escalation item
+(#8.1: "confirm the three <li> sites have no downstream dependency on real markup") is explicitly
+self-described in the spec as "a verification, not a design question... changes nothing architecturally"
+-- the runner resolves it inline (grep shopView.test.ts before merging), not a Drew decision. S1's ADR-
+0033 amendment is a hard BLOCKER but only on S1, not S0. No M24 decision issue currently open on github
+(verified via gh issue list --search M24). Spec-vs-doctrine conflict: S0's own touches list a NEW
+evals/i18n-no-html-sink.eval.mjs, which ADR-0224 (2026-09-01, postdates this spec's 2026-08-23 ceremony)
+now bans outright -- adapting per Work-selection-scope doctrine: same invariant as an ordinary vitest
+test (client/src/ui/i18n-no-html-sink.test.ts) co-located with source, not a new evals/*.eval.mjs file.
+Routine tier (UI-only, no schema/reducer/netcode/security/M20/M25 surface). ADR reserved: 0255
+(adr_next_free). Launching m24-s0.
+
+Stray notes carried forward unchanged (not mine, not touched): uncommitted .claude/settings.json diff
+(adds blanket Bash(git:*) allow, removes Read(**/.env*) from the deny list -- flagged repeatedly since
+2026-09-13, still not committed or reverted, for Drew's awareness) and 4 harmless untracked leftover
+plan-scratch files for already-merged/closed slices (20r-b/20r-c/rb-89-plan.md kept; m23-s9-plan.md and
+this tick's legitimate decision-answer/plan artifacts committed this tick).
