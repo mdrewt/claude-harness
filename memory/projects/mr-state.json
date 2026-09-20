@@ -1,5 +1,5 @@
 {
- "adr_next_free": 262,
+ "adr_next_free": 263,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
@@ -7,12 +7,12 @@
   "sha": "55977af"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-20T19:00:04Z",
+ "last_tick_utc": "2026-09-20T21:30:03Z",
  "live_watchers": [],
  "master": {
-  "ci": "green (0af0b0f, run 35529653123, live-reverified)",
+  "ci": "in_progress at record time (m24-s6 merge commit 72e638d; PR#493 pre-merge checks ci+e2e both green)",
   "nightly": "fixed-changelog-freshness-pending-next-run",
-  "sha": "0af0b0f"
+  "sha": "72e638d1f0c01643b350fad23dcb29ca24b788bd"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-20T19:00Z native tick: found the 18:38Z tick's harness-side bookkeeping commit missing (SIGKILL/interruption after the merge recorded to working-tree files but before the chore commit). Live-verified PR#492 MERGED->0af0b0f, project HEAD==origin/master, master CI green, worktree/branch already clean -- no code action needed. Committed+pushed the harness-side records (36431b8, main synced 9714c33->36431b8). M24 (i18n) fully delivered S1-S5. No new launch this tick (bookkeeping-recovery tick, per established precedent); next tick does a fresh gate-3 derivation -- S6 (boot wiring) is next on the S1->S6->S7 branch.",
+ "notes": "2026-09-20T21:51Z native tick: merged m24-s6 (PR#493, 72e638d) after live re-verify (pre-merge PR checks ci+e2e green, mergeStateStatus CLEAN, per-run lock leader dead / .done EXIT=0). mr-gates verify: 11/11 met, 0 unmet, 0 deferred, spotcheck agrees; advisory verdict FLAGGED only on SPEC-SECTION-NOT-FOUND (non-evidence reason), judged non-blocking. mr-audit: orchestration=CLEAN, gating=CLEAN, acceptance FLAGGED(advisory)/non-blocking as above; audit disposition findings were all corpus-wide pre-existing missing-disposition markers unrelated to this diff. Local master ff-only to 72e638d, worktree+branch cleaned, residuals close: 0 (slice had none). Master CI still in_progress at record time -- verify green next tick before any further action off this sha. No relaunch this tick (deferring next-slice selection to the tick that confirms master CI green).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -50,6 +50,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260920T190004Z-2840244",
- "updated_utc": "2026-09-20T19:01:00Z"
+ "updated_by": "mr-sup-native-20260920T214754Z-3026683",
+ "updated_utc": "2026-09-20T21:51:53Z"
 }
