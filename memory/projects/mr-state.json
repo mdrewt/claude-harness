@@ -1,30 +1,18 @@
 {
-  "adr_next_free": 260,
+  "adr_next_free": 261,
   "awaiting_merge": [],
   "consecutive_standdowns": 0,
   "harness_main": {
     "ci": "no-remote-ci-local-gate-green",
     "sha": "55977af"
   },
-  "inflight": [
-    {
-      "slice": "m24-s4",
-      "run_id": "mr-spawn-20260920T150207Z-2472586",
-      "session_leader": 2472646,
-      "claude_pid": 2472649,
-      "model": "opus",
-      "effort": "high",
-      "tier": "routine",
-      "repo": "project",
-      "started_utc": "2026-09-20T15:02:12Z"
-    }
-  ],
-  "last_tick_utc": "2026-09-20T13:00:07Z",
+  "inflight": [],
+  "last_tick_utc": "2026-09-20T16:36:04Z",
   "live_watchers": [],
   "master": {
-    "ci": "success",
+    "ci": "in_progress-at-record-time (10d4109; last completed run on prior sha was success)",
     "nightly": "fixed-changelog-freshness-pending-next-run",
-    "sha": "8e71e5d"
+    "sha": "10d4109"
   },
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "native_supervisor": {
@@ -39,7 +27,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "2026-09-20T15:02Z native tick: m24-s3 (PR#489) reconciled as already-merged by prior tick; launched m24-s4 (i18n batch B) solo, ADR-260 reserved.",
+  "notes": "2026-09-20T16:36Z native tick: merged m24-s4 (PR#490, i18n batch B, squash->10d4109); adr_next_free 260->261; found+stashed (not committed) an undeclared security-weakening .claude/settings.json diff (Read(**/.env*) deny removed) predating this tick -- 4th such labeled stash now on main, recurring stray-tree pattern worth a durable memory note. S5 is next in the M24 serial i18n spine (S3->S4->S5).",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
@@ -62,6 +50,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260920T130007Z-2424283",
-  "updated_utc": "2026-09-20T13:05:03Z"
+  "updated_by": "mr-sup-native-20260920T163604Z-2639819",
+  "updated_utc": "2026-09-20T16:39:00Z"
 }
