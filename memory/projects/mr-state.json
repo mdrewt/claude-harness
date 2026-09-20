@@ -1,13 +1,30 @@
 {
-  "adr_next_free": 257,
+  "adr_next_free": 258,
   "awaiting_merge": [],
   "consecutive_standdowns": 0,
   "harness_main": {
     "ci": "no-remote-ci-local-gate-green",
     "sha": "55977af"
   },
-  "inflight": [],
-  "last_tick_utc": "2026-09-19T23:03:19Z",
+  "inflight": [
+    {
+      "slice": "m24-s2",
+      "run_id": "mr-spawn-20260920T030254Z-1753785",
+      "session_leader": 1753844,
+      "model": "opus",
+      "effort": "high",
+      "tier": "routine",
+      "repo": "project",
+      "pr_repo": "mdrewt/monster-realm",
+      "started_utc": "2026-09-20T03:02:58Z",
+      "adr_reserved": "257",
+      "touches": [
+        "client/src/ui/i18n/",
+        "client/src/ui/i18n/__fixtures__/i18n-hardcoded.json"
+      ]
+    }
+  ],
+  "last_tick_utc": "2026-09-20T03:03:00Z",
   "live_watchers": [],
   "master": {
     "ci": "success (ci+e2e both completed success at 66041fc PR#486 pre-merge; post-merge master CI run in_progress at record time, same commit)",
@@ -27,7 +44,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "2026-09-20T01:39Z tick: merged m24-s1 (PR#486, 66041fc, ADR-0256 i18n module foundation). Took over stale chain mutex (prior owner pid 1708770 dead, heartbeat ~12.6min old, PR still open at takeover). Acceptance 10/10 met; X10 manual-gate citation-format lint adjudicated (substance verified live); gating_advisory suppressions_added=1 adjudicated benign (comment text match, not real suppression). Residuals close: 0 (none targeted this slice). Worktree/branch cleaned; local master ff'd to origin.",
+  "notes": "2026-09-20T03:00Z tick: gate0 found stale m24-s1 lock/.done (already merged PR#486 at 66041fc, already reconciled by the 01:39Z tick) -- reaped via `mr-unlock stale`, no new action needed there. Gate3: master green, no open/parked, queue empty, residuals all under aging thresholds (oldest 1.92d < t1=3d) so PLAN S9 derivation applied: M24 S2 next (after: S0,S1 both merged). Spec S2 specs a NEW evals/i18n-hardcoded-strings.eval.mjs -- conflicts with the 2026-09-01 ADR-0224 scanner-script retirement. Treated as a reversible vehicle-substitution default (doctrine already prescribes: use an ordinary vitest test instead), NOT a BLOCKER -- launched m24-s2 (opus@high, routine, ADR-257 pre-allocated) with target_desc instructing the vitest substitution and a spec-text update in the same slice. decision-defaulted:M24-S2-lint-vehicle=vitest-test-per-ADR-0224. gates seed came back SPEC-SECTION-NOT-FOUND (table-row slice, not a ### heading) -- m24-s2 ledger is NO-LEDGER, not a failure, until seeded. Budget NORMAL ($785.43/$2783 d7). No fan-out candidate (S3 depends on S2).",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
