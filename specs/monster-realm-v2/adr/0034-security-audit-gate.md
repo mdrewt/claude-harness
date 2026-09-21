@@ -33,7 +33,7 @@ consolidated threat model and a real audit before launch.
 
 ## Amendment — 2026-09-21 (M25 ceremony corrections; DECISION issue #496)
 
-**Trigger:** M25 slice S0 is hard-blocked on this. The 2026-08-24 M25 ceremony (investigation → 6-way
+**Trigger:** M25 slice S0 was hard-blocked on this. The 2026-08-24 M25 ceremony (investigation → 6-way
 ideation → judge synthesis → adversarial review, `M25-security-audit.spec.md` §1.1/§8-1) found two clauses of
 this ADR false against the live tree — its Decision-outcome RLS consequence, and its Context premise naming
 "untrusted chat". Amending an accepted ADR is not a spec author's call, so the ceremony drafted the amendment
@@ -54,14 +54,15 @@ and escalated it via `mr-ask-drew` issue #496; the operator accepted the drafted
    reducer structurally cannot return row data). The two channels are **coupled**: closing a leak in one can
    open a leak in the other, so a visibility transition on a table re-triages every reducer branch predicating
    on it. Channel 1's *declaration* is already gated enumeratively (ADR-0199: a declared `visibility` per
-   table, with a `T-VIS-ANCHORS` set-equality tooth pinning every table name in both sets), so **M25's job is
-   to audit completeness of the private-table-plus-scoped-view migration across every stakes-classified table
-   — via a mandatory `visibility_note` — and to gate channel 2, the genuinely ungated half; never to verify
-   RLS.**
+   table, with a `T-VIS-ANCHORS` set-equality tooth pinning every table name in both sets), so **M25's
+   channel-1 job is completeness of that *declaration* across the stakes-classified tables — one
+   applicability amendment making a `visibility_note` mandatory on the standing-public tables that carry
+   named confidentiality stakes — while its real work is gating channel 2, the genuinely ungated half; never
+   to verify RLS.**
 2. **"Untrusted chat" is struck from the Context premise.** There is no chat system in monster-realm (M19 is
    a post-gate sketch; M22, M24 and M25 each had to make this same correction). The real untrusted-input
    (UGC) surface is **`set_profile_name`** (ADR-0132, `server-module/src/ranking.rs`): it validates through
-   `guards::validate_name` — reject, never clamp: NFC-normalize and trim, then refuse anything but
+   `guards::validate_name` — reject, never clamp: trim and NFC-normalize, then refuse anything but
    alphanumerics and spaces, or longer than `MAX_NAME_LEN` (24) — is gated by `require_not_deleting`, and
    writes only `player.name`, which every client sink renders as text (`textContent`, never markup; M24
    deleted the client's HTML-parsing sinks, ADR-0255) and the leaderboard row additionally isolates in a

@@ -26,12 +26,12 @@ forged. This threat model **consolidates** those into one surface view and names
 | **Trading** | dupe / theft / trade an in-use asset | dual-consent escrow, atomic re-verified swap, `reject_if_in_*` guard family (M15, ADR-0024) |
 | **PvP** | read opponent's pick; rage-quit voids loss; double-submit | secret picks in a **private** `battle_action` table (confirmed no `public` accessor), turn-deadline reaper, forfeit-not-delete, serialized double-submit guard (M16, ADR-0025) |
 | **Ranked** | self-report a win; double-count rating | server applies rating once from the authoritative outcome; module-write-only profile (M17, ADR-0026) |
-| **User-generated text** (`set_profile_name`, ADR-0132) | markup / bidi-control / length abuse of a player-chosen display name shown to other players | server-side `validate_name` (`server-module/src/guards.rs`) **rejects, never clamps**: NFC-normalize and trim, then refuse anything but alphanumerics and spaces (so markup and bidi control characters never reach the table) or longer than `MAX_NAME_LEN` (24); `set_profile_name` (`server-module/src/ranking.rs`) is gated by `require_not_deleting` and writes **only** `player.name`; every client sink renders the name as text (`textContent`, never `innerHTML` — M24 deleted the client's HTML-parsing sinks, ADR-0255), and the leaderboard row additionally isolates it in a `<bdi>` built with `document.createElement('bdi')` + `textContent` (I18N-20, ADR-0261 D3). **There is no chat system** (M19 is a post-gate sketch) — a future chat/social milestone must add its own row here before shipping; this strike does not pre-judge it |
+| **User-generated text** (`set_profile_name`, ADR-0132) | markup / bidi-control / length abuse of a player-chosen display name shown to other players | server-side `validate_name` (`server-module/src/guards.rs`) **rejects, never clamps**: trim and NFC-normalize, then refuse anything but alphanumerics and spaces (so markup and bidi control characters never reach the table) or longer than `MAX_NAME_LEN` (24); `set_profile_name` (`server-module/src/ranking.rs`) is gated by `require_not_deleting` and writes **only** `player.name`; every client sink renders the name as text (`textContent`, never `innerHTML` — M24 deleted the client's HTML-parsing sinks, ADR-0255), and the leaderboard row additionally isolates it in a `<bdi>` built with `document.createElement('bdi')` + `textContent` (I18N-20, ADR-0261 D3). **There is no chat system** (M19 is a post-gate sketch) — a future chat/social milestone must add its own row here before shipping; this strike does not pre-judge it |
 | **Privacy (confidentiality)** | hidden genes/picks/rows leak | stakes-classified: **private table + owner/participant-scoped `#[view]`** is the standing mechanism for anything with real stakes (ADR-0015's intent, proven by ADR-0194 `monster_pub` + ADR-0198 `battle`); RLS is **not** a live option (see §4) |
-| **Reducer rejection payloads** (channel 2) | an `Err(String)` distinguishes a predicate over a **private** table (information disclosure) — e.g. `build_cards` in `server-module/src/trading.rs` returns `"monster {mid} not found"` vs `"monster {mid} not owned by caller"` over the private `monster` table for any caller probing any id, and the `"target is already in an ongoing battle"` branch in `server-module/src/pvp.rs` reveals a predicate over the private `battle` table (M25 spec §2.1) | the **§2.1 severity rule** — an `Err` string is an oracle **iff** the predicate it reveals is not already readable from a `public` table — plus the **coupling invariant**: closing a read-side visibility gap on table T converts every reducer branch predicating on T into a new write-side oracle, so a visibility transition re-triages those branches in the same PR. M25 S2 adds the `[oracle-coupling-01..03]` checks (spec §2.3; `evals/reducer-oracle-coupling.eval.mjs` + `evals/baselines/oracle-coupling.json` as specified) |
+| **Reducer rejection payloads** (channel 2) | an `Err(String)` distinguishes a predicate over a **private** table (information disclosure) — e.g. `build_cards` in `server-module/src/trading.rs` returns two distinct rejection strings over the private `monster` table for any caller probing any id (literals and verdict in §4), and the `"target is already in an ongoing battle"` branch in `server-module/src/pvp.rs` reveals a predicate over the private `battle` table (M25 spec §2.1) | the **§2.1 severity rule** — an `Err` string is an oracle **iff** the predicate it reveals is not already readable from a `public` table — plus the **coupling invariant**: closing a read-side visibility gap on table T converts every reducer branch predicating on T into a new write-side oracle, so a visibility transition re-triages those branches in the same PR. M25 S2 adds the `[oracle-coupling-01..03]` checks (spec §2.3; `evals/reducer-oracle-coupling.eval.mjs` + `evals/baselines/oracle-coupling.json` as specified) |
 | **Auth / accounts** | account takeover; guest-claim steal; PII leak | delegate to OIDC (no in-game passwords); atomic one-time guest-claim; email hashed/private (M21, ADR-0030) |
 | **Data / privacy** | incomplete deletion retains PII; export of another's data | registry-driven deletion-completeness eval; owner-scoped export (M22, ADR-0031) |
-| **Platform / DoS** | reducer flood / bot abuse | per-action limits where they exist — among them the move-queue cap (`MOVE_QUEUE_CAP`, M2, `server-module/src/movement.rs`), the heal and essence-training cooldowns (`HEAL_COOLDOWN_MS`, `ESSENCE_TRAIN_COOLDOWN_MS`, `server-module/src/raising.rs`), the 60 s data-export cooldown (`EXPORT_REQUEST_COOLDOWN_MS`, M22, `server-module/src/privacy.rs`), and the one-pending-challenge-per-identity guards plus the `CHALLENGE_TTL_MS` reaper that bounds outstanding challenge state (ADR-0126) — plus infra rate-limiting (ops). There is **no general per-identity reducer-call limiter in-module** (`movement::RateLimiter`, ADR-0170 D4, bounds *log emission*, not calls); global limiting stays an ops concern |
+| **Platform / DoS** | reducer flood / bot abuse | per-action limits where they exist — among them the move-queue cap (`MOVE_QUEUE_CAP`, M2, enforced in `server-module/src/movement.rs`), the heal and essence-training cooldowns (`HEAL_COOLDOWN_MS`, `ESSENCE_TRAIN_COOLDOWN_MS`, `server-module/src/raising.rs`), the 60 s data-export cooldown (`EXPORT_REQUEST_COOLDOWN_MS`, M22, `server-module/src/privacy.rs`), and the one-pending-challenge-per-identity guards plus the `CHALLENGE_TTL_MS` reaper that bounds outstanding challenge state (ADR-0126) — plus infra rate-limiting (ops). There is **no general per-identity reducer-call limiter in-module** (`movement::RateLimiter`, ADR-0170 D4, bounds *log emission*, not calls); global limiting stays an ops concern |
 | **Supply chain** | secret leak / malicious dep / SAST hole | gitleaks + Semgrep + SCA + SBOM + Renovate (M0, ADR-0009) |
 | **Determinism** | desync exploited / float divergence | integer-only rules + determinism gate + parity evals (M0–M3) |
 
@@ -58,8 +58,8 @@ covers.
 - **Channel 1 — one applicability amendment, not a new taxonomy** (spec §2.2, slice S1): ADR-0199's D5
   `visibility_note` becomes **mandatory** on the standing-public tables that carry named confidentiality
   stakes — `inventory`, `player_quest`, `trade_offer`, `battle_challenge` — each note citing an ADR
-  (`/ADR-\d{4}/`, SEC-2). Nothing can force such a declaration to be *true*; that residual is why the sign-off
-  exists.
+  (`/ADR-\d{4}/`, SEC-2). Nothing can force such a declaration to be *true*; that residual is why M25 ends
+  in a human sign-off (spec §2.7, slices S5–S6).
 - **Channel 2 — the oracle-coupling gate** (spec §2.3, slice S2): one baseline entry per **branch** rather
   than per reducer (`build_cards` is a bare `fn`, so it has no reducer-level tag slot at all).
   `[oracle-coupling-01]` **fails until a human re-triages** every entry whose table's declared visibility
@@ -76,8 +76,9 @@ covers.
   whose `Open-Critical-Count` line must *equal* the count computed from the ledger and which fails while that
   count is non-zero.
 - A **disclosure/response path** (`SECURITY.md`: coordinated-disclosure prose plus the decided rollback
-  default) and a **re-audit cadence** — a 90-day human/semantic re-audit, plus the mechanized version
-  tripwire recorded in §4 (spec §2.8, slice S7). Only structure, totality and freshness are gateable.
+  default, spec §2.7/§9-4, slice S5) and a **re-audit cadence** — a 90-day human/semantic re-audit, plus the
+  mechanized version tripwire recorded in §4 (spec §2.8, slice S7). Only structure, totality and freshness
+  are gateable.
 
 ## 4. Known accepted risks (documented, not hidden)
 - **RLS (`client_visibility_filter`) is confirmed unenforced**, not merely experimental — `ADR-0197` FF3/
@@ -91,11 +92,11 @@ covers.
   this:** the 2026-08-23 general unstable/beta-feature policy ruling (`mdrewt/monster-realm#342`) softened a
   *different*, overstated "avoid all unstable APIs" stance in M20's original OBS-48 criterion to "require
   justification, not blanket avoidance" — that ruling does not extend to RLS specifically, which stays inert
-  on its own evidence (unimplemented, not merely under-justified). **The re-check obligation is mechanized
-  by M25 S7, not left as prose:** S7 adds a nightly `evals/rls-stabilization-tripwire.eval.mjs` (spec §2.8)
-  that diffs the pinned SpacetimeDB version against `docs/security/last-verified-spacetime-version.txt` and
-  **fails with an artifact** on divergence, so ADR-0200's `notify` job opens an issue. OBS-47 becomes a gate
-  with a trigger, not a reminder.
+  on its own evidence (unimplemented, not merely under-justified). **The re-check obligation will be
+  mechanized by M25 S7, not left as prose:** S7 adds a nightly `evals/rls-stabilization-tripwire.eval.mjs`
+  (spec §2.8) that diffs the pinned SpacetimeDB version against
+  `docs/security/last-verified-spacetime-version.txt` and **fails with an artifact** on divergence, so
+  ADR-0200's `notify` job opens an issue. OBS-47 becomes a gate with a trigger, not a reminder.
 - **Residual 1 — `trade_offer`, a SPLIT verdict** (spec §2.4). **(a) The oracle half is in scope (S3):**
   `build_cards` in `server-module/src/trading.rs` returns `"monster {mid} not found"` vs
   `"monster {mid} not owned by caller"` for **any** caller probing **any** `monster_id` over the **private**
@@ -124,12 +125,12 @@ covers.
   S4).
 - **Public-table composition** (spec §3 cut 6 / §9-2). `character` + `player` + `profile` + `inventory` +
   `player_quest`, cross-joined across all players, enables stalking, sniping and market inference. **No
-  mechanism available today closes it** — RLS is unenforced, and its `Filter::Sql` form could not express
-  per-id membership in a `Vec<u64>` column even if it were (the `inventory` doc comment in
-  `server-module/src/schema.rs`) — and each individual disclosure is already accepted (ADR-0117 D6 for
-  `trade_offer`'s currency lower bound; that same `inventory` comment for world-readable counts). Accepted
-  deliberately: to be recorded as an `accepted-risk` row in `findings.json` with a **named owner** (M25 S5),
-  not dropped.
+  mechanism available today closes it without deleting the gameplay reads these tables exist for** — RLS is
+  unenforced, and (per the `inventory` doc comment in `server-module/src/schema.rs`) its `Filter::Sql` form
+  could not express per-id membership in a `Vec<u64>` column even if it were — and each individual
+  disclosure is already accepted (ADR-0117 D6 for `trade_offer`'s currency lower bound; that same `inventory`
+  comment for world-readable counts). Accepted deliberately: to be recorded as an `accepted-risk` row in
+  `findings.json` with a **named owner** (M25 S5), not dropped.
 - **A second identity issuer can silently invalidate a sign-off** (spec §7-5). `Identity = f(iss, sub)`, so a
   Steam-linked player is a **different** identity than their OIDC one absent an explicit linking mechanism.
   Any future auth protocol therefore changes the subject of every identity-scoped guard: an M25 sign-off is
