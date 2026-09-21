@@ -11,7 +11,7 @@
   "live_watchers": [],
   "master": {
     "sha": "3937c588a711610800d96c41c0751776a38ed7a4",
-    "ci": "in_progress",
+    "ci": "success",
     "nightly": "fixed-changelog-freshness-pending-next-run"
   },
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,7 +27,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "2026-09-21T04:34Z native tick (rid=native-20260921T043455Z-3439251, EVENT src=ci m24-s8.ci.md all-green): re-verified live -- gh pr view 495 CLEAN/MERGEABLE, ci+e2e both SUCCESS, per-run lock leader 3226878 dead + .done EXIT=0, no chain-owner mutex, HOLD-NONE, no resident IDE pid. Took chain-owner mutex, ran mr-gates verify --slice m24-s8 (with asdf PATH exported -- first pass under bare PATH false-flagged X9/X10 as EVIDENCE-MISMATCH purely from missing cargo/wasm32-target on PATH, not a real defect; corrected pass: 12/13 met, 1 deferred (X13->backlog, documented hidden-dependency rationale), 0 unmet, evidence_drift only on X6/X8 informational). mr-audit orchestration=CLEAN (8 agent calls, full role set incl. tester+verifier+red-team+reviewer); its gating_advisory/acceptance sub-calls errored on repo-path/cwd resolution (not a real finding) -- substituted a direct git diff --stat read: diff subset-of declared touches (catalog-export.mjs, catalog-import.mjs, evals/baselines/i18n-locale-completion.json, justfile) plus allowed doc-set extras (ARCHITECTURE.md, docs/adr/DIGEST.md, new ADR-0264 doc); no test deletions/weakening. Squash-merged PR#495 (feat/m24-s8-icu-round-trip -> 3937c58), --delete-branch handled the remote; local branch delete initially blocked by its own worktree, worktree removed then local branch -D cleaned. master fast-forwarded 436aa74->3937c58 locally. mr-gates residuals close --slice m24-s8 --pr 495: 0 residuals (none emitted). Ledger row appended ($79.2646 via mr-cost-watch price, model=claude-opus-5, attempts=1, orch=CLEAN, gating=CLEAN). Handoff entry recorded via mr-record handoff (auto-rotated 1 old entry to the 2026-09 archive; pre-existing WARN about 9 unparseable-header entries pinned live is a known data-quality gap, not introduced this tick, left for a dedicated slice). Did NOT compose a launch this tick: master CI on the merge commit (3937c58) was still in_progress at tick end (gh run list showed status=in_progress, conclusion empty) -- launching a new slice on top of an unconfirmed master would violate 'verify master CI green post-merge... before any new launch'; deferring eligibility re-derivation + launch to the next tick, which re-verifies master CI live first. Governor NORMAL (d7=$1361.09/$2783, eff=$1361.09, 48.9%; fable_ok=true, fable_d7=$640.34/$2068.20 guard). No BLOCKERs, no rate-limit event.",
+  "notes": "2026-09-21T05:00Z tick: M24 CLOSED (m24-s8/PR#495 final slice, prior tick). M25 next in PLAN order; S0 hard-BLOCKED on operator ADR-0034 amendment decision \u2014 mr-ask-drew issue #496 (monster-realm), --blocking, mr-decision-watch spawned. No launch/merge this tick.",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
