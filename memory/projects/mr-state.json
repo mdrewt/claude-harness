@@ -4,10 +4,10 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "a323ce5"
+  "sha": "b3341d8"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-21T08:17:22Z",
+ "last_tick_utc": "2026-09-21T10:00:04Z",
  "live_watchers": [],
  "master": {
   "ci": "success",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-21T09:02Z: gate-0-2 clean, no live chain (stale m24-s6 .done reconciled -- PR#493 verified live MERGED, master already at m24-s8/PR#495, M24 fully closed). Gate 3: R-rb-85-EXPORTADMIT/MODCENSUS crossed t1_promote_days=3 (3.17d) -- promoted to rb-107/rb-108 (M-residual-backlog.spec.md), queued, shipped as doc-only chore PR#131 squash-merged to harness main @a323ce5. This tick's ONE action = promote; no rooted run launched. Next tick fast-path: queue has rb-107 then rb-108.",
+ "notes": "2026-09-21T10:03Z: reconciled uncommitted 09:00Z-tick bookkeeping (handoff/archive/usage-daily) direct to main (8e71d0e). Gate 3: 5 residuals (R-rb-85-X9, R-rb-86-READCAP-NAME/SAMEMS/TICKBOUND/X9) crossed t1_promote_days=3 -- classified all real game/security defects (not eval-tooling), promoted to rb-109..rb-113, queued rb-109/110/111 (queue[] hit its 5-cap; rb-112/113 promoted-but-unqueued), shipped PR#132 (chore/residual-promote-20260921T100548Z), squash-merged clean to main @b3341d8. This tick ONE action = promote (gate-3 aging outranks queue-launch of already-queued rb-107/rb-108 and PLAN Sec.9). Next tick fast-path: queue has rb-107, rb-108, rb-109, rb-110, rb-111 in that order -- rb-107 (request_data_export sybil admission control) was live-verified launch-ready this tick (HARD tier, fable@xhigh, budget.fable_ok=true) but did not run this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -51,28 +51,28 @@
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-109",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "added_by": "n/a",
+   "added_utc": "2026-09-21T10:03:09Z",
+   "derived_from_master_sha": "3937c588a711610800d96c41c0751776a38ed7a4",
    "reason": "promoted residual R-rb-85-X9",
-   "added_utc": "2026-09-21T10:03:09Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "3937c588a711610800d96c41c0751776a38ed7a4"
+   "slice": "rb-109",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-110",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "added_by": "n/a",
+   "added_utc": "2026-09-21T10:03:09Z",
+   "derived_from_master_sha": "3937c588a711610800d96c41c0751776a38ed7a4",
    "reason": "promoted residual R-rb-86-READCAP-NAME",
-   "added_utc": "2026-09-21T10:03:09Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "3937c588a711610800d96c41c0751776a38ed7a4"
+   "slice": "rb-110",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-111",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-86-SAMEMS",
-   "added_utc": "2026-09-21T10:03:09Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "3937c588a711610800d96c41c0751776a38ed7a4"
+   "added_utc": "2026-09-21T10:03:09Z",
+   "derived_from_master_sha": "3937c588a711610800d96c41c0751776a38ed7a4",
+   "reason": "promoted residual R-rb-86-SAMEMS",
+   "slice": "rb-111",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": null,
@@ -91,6 +91,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260921T090008Z-3675370",
- "updated_utc": "2026-09-21T09:03:00Z"
+ "updated_by": "mr-sup-native-20260921T100004Z-3690563",
+ "updated_utc": "2026-09-21T10:04:10Z"
 }
