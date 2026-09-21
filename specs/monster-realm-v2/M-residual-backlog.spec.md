@@ -26,6 +26,46 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-113 — [the execution proof] WHEN an oversized synthetic export_bundle population (several owners (from rb-86 X9, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-86 · residual: R-rb-86-X9
+
+Deferred with reason: the same mechanism rb-85 recorded as R-rb-85-X9 (unpromoted, harness residual log): datastore_index_scan_range_bsatn is still undefined in server-module/src/native_host_tests.rs (a test path reaching the helper link-fails the WHOLE lib-test binary) and datastore_delete_by_index_scan_point_bsatn aborts there (native_host_tests.rs:452-458). Modelling the range scan (ordered by key) and the index-poi
+
+EARS: [the execution proof] WHEN an oversized synthetic export_bundle population (several owners x ragged chunk counts, total > EXPORT_REAP_MAX_DELETE_PER_TICK) is seeded into the in-memory native host and one reaper tick executes THE SYSTEM SHALL delete whole bundles only — every owner's surviving row count is 0 or its full pre-tick count — RED on the pre-slice chunk-id delete body, GREEN on the whole-
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-112 — export_bundle_reaper write set is bounded in stamps, not rows (from rb-86 TICKBOUND, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-86 · residual: R-rb-86-TICKBOUND
+
+Deferred with reason: rb-86 deletes whole bundles per creation stamp (EXPORT_REAP_MAX_STAMPS_PER_TICK = 16), so rb-85's 256-row DELETE cap is gone: rows per stamp are unbounded (a bundle can run to hundreds of chunks at EXPORT_CHUNK_ROWS) and sixteen large bundles are more rows than one tick used to delete. If a tick ever exceeds the transaction budget it aborts and retries the identical head-of-range work every hour, 
+
+EARS: export_bundle_reaper write set is bounded in stamps, not rows
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-111 — same-millisecond export bursts form one reaper delete unit (from rb-86 SAMEMS, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-86 · residual: R-rb-86-SAMEMS
+
+Deferred with reason: rb-86 keys the whole-bundle delete on created_at_ms; every bundle committed inside the same millisecond shares a stamp and is reaped in one index-point delete. request_data_export is cheap for a low-state anonymous identity and the host serialises reducers at millisecond granularity, so N same-millisecond exports expire as one unit seven days later — the per-tick write set is 16 stamps x (bundles 
+
+EARS: same-millisecond export bursts form one reaper delete unit
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-110 — EXPORT_REAP_MAX_DELETE_PER_TICK is now a misnomer for the read window (from rb-86 READCAP-NAME, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-86 · residual: R-rb-86-READCAP-NAME
+
+Deferred with reason: Since rb-86 the constant bounds only the rows the reaper DECODES per tick (the btree range read's .take); the write bound is EXPORT_REAP_MAX_STAMPS_PER_TICK. The name was kept because it is pinned in ~10 privacy_tests.rs clauses (rb48_reap_interval_and_batch_cap_pinned, the rb85 take-adjacent/body pins) and quoted in ADR-0238/ADR-0231/ARCHITECTURE.md; a rename is a crate-visible refactor with its 
+
+EARS: EXPORT_REAP_MAX_DELETE_PER_TICK is now a misnomer for the read window
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-109 — [the spec's execution proof] WHEN an oversized synthetic export_bundle population (many ow (from rb-85 X9, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-85 · residual: R-rb-85-X9
+
+Deferred with reason: a RED/GREEN test that EXECUTES the bounded read + delete over an oversized population needs server-module/src/native_host_tests.rs (outside rb-85's declared touches) to model datastore_index_scan_range_bsatn over the existing row store ordered by key (ascending) and datastore_delete_by_index_scan_point_bsatn; today the range syscall is undefined in the native host (a test reaching it fails the WHO
+
+EARS: [the spec's execution proof] WHEN an oversized synthetic export_bundle population (many owners × ≥17 chunks × large payload_json) is seeded into the in-memory native host and one reaper tick executes THE SYSTEM SHALL complete without abort, materialise no more than EXPORT_REAP_MAX_DELETE_PER_TICK rows, and delete exactly the expired ones — RED on the pre-slice `.iter()` body, GREEN on the bounded 
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-108 — m22_declared_mod_names skips any mod whose name ends in tests without a cfg(test) check, s (from rb-85 MODCENSUS, deferred 2026-09-18)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-85 · residual: R-rb-85-MODCENSUS
