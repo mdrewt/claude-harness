@@ -4,10 +4,10 @@
   "consecutive_standdowns": 0,
   "harness_main": {
     "ci": "no-remote-ci-local-gate-green",
-    "sha": "55977af"
+    "sha": "05a9f8e"
   },
   "inflight": [],
-  "last_tick_utc": "2026-09-21T04:38:57Z",
+  "last_tick_utc": "2026-09-21T08:17:22Z",
   "live_watchers": [],
   "master": {
     "sha": "3937c588a711610800d96c41c0751776a38ed7a4",
@@ -27,7 +27,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "2026-09-21T05:00Z tick: M24 CLOSED (m24-s8/PR#495 final slice, prior tick). M25 next in PLAN order; S0 hard-BLOCKED on operator ADR-0034 amendment decision \u2014 mr-ask-drew issue #496 (monster-realm), --blocking, mr-decision-watch spawned. No launch/merge this tick.",
+  "notes": "2026-09-21T08:20Z: m25-s0 merged \u2014 PR#130 squash-merged to harness main @05a9f8e (ADR-0034 dated amendment per decision #496 + security-threat-model \u00a77 corrections). Acceptance 11/12 met, X12 deferred wontfix (pre-existing mr-selfcheck registry debt). Audits CLEAN; supervisor completed the mandatory hard-tier diff read. Worktree/branch/stale lock cleaned. M25 continues past S0.",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
@@ -50,6 +50,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260921T043455Z-3439251",
-  "updated_utc": "2026-09-21T04:38:57Z"
+  "updated_by": "native-20260921T081722Z-3655396",
+  "updated_utc": "2026-09-21T08:20:09Z"
 }
