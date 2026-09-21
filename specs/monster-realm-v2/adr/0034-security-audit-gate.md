@@ -30,3 +30,49 @@ consolidated threat model and a real audit before launch.
   the pinned version (ADR-0015's defense-in-depth caveat is resolved or data moves to private tables); launch
   is blocked on open criticals; a disclosure/IR path + re-audit cadence are defined; an external pen-test is
   recommended and prepared for.
+
+## Amendment — 2026-09-21 (M25 ceremony corrections; DECISION issue #496)
+
+**Trigger:** M25 slice S0 was hard-blocked on this. The 2026-08-24 M25 ceremony (investigation → 6-way
+ideation → judge synthesis → adversarial review, `M25-security-audit.spec.md` §1.1/§8-1) found two clauses of
+this ADR false against the live tree — its Decision-outcome RLS consequence, and its Context premise naming
+"untrusted chat". Amending an accepted ADR is not a spec author's call, so the ceremony drafted the amendment
+and escalated it via `mr-ask-drew` issue #496; the operator accepted the drafted recommendation on
+2026-09-21. The text above is left byte-identical: this section supersedes, it does not rewrite history.
+
+**Two corrections (supersede the corresponding clauses above; all other clauses stand):**
+
+1. **The RLS-verification consequence → the two-channel model.** "RLS enforcement is *verified* at M25 on the
+   pinned version (ADR-0015's defense-in-depth caveat is resolved or data moves to private tables)" rests on
+   a dead premise: `client_visibility_filter` is confirmed **unenforced** at the pinned 2.8.1 toolchain
+   (ADR-0197 FF3 — `unstable`-gated, carrying the crate's own "RLS filters are currently unimplemented, and
+   are not enforced", byte-identical at 1.12.0 and 2.8.1), and the "data moves to private tables" disjunct
+   already happened twice (ADR-0194 `monster_pub`, ADR-0198 `battle`). Replaced by: **everything a hostile
+   client can observe arrives on exactly two channels** — (1) subscription over `public` tables and the
+   `#[view]`s, and (2) the `Err(String)` payload of a rejected reducer call (every production reducer returns
+   `Result<(), String>` except the two lifecycle hooks `init` and `on_disconnect`, which return `()`; a
+   reducer structurally cannot return row data). The two channels are **coupled**: closing a leak in one can
+   open a leak in the other, so a visibility transition on a table re-triages every reducer branch predicating
+   on it. Channel 1's *declaration* is already gated enumeratively (ADR-0199: a declared `visibility` per
+   table, with a `T-VIS-ANCHORS` set-equality tooth pinning every table name in both sets), so **M25's
+   channel-1 job is completeness of that *declaration* across the stakes-classified tables — one
+   applicability amendment making a `visibility_note` mandatory on the standing-public tables that carry
+   named confidentiality stakes — while its real work is gating channel 2, the genuinely ungated half; never
+   to verify RLS.**
+2. **"Untrusted chat" is struck from the Context premise.** There is no chat system in monster-realm (M19 is
+   a post-gate sketch; M22, M24 and M25 each had to make this same correction). The real untrusted-input
+   (UGC) surface is **`set_profile_name`** (ADR-0132, `server-module/src/ranking.rs`): it validates through
+   `guards::validate_name` — reject, never clamp: trim and NFC-normalize, then refuse anything but
+   alphanumerics and spaces, or longer than `MAX_NAME_LEN` (24) — is gated by `require_not_deleting`, and
+   writes only `player.name`, which every client sink renders as text (`textContent`, never markup; M24
+   deleted the client's HTML-parsing sinks, ADR-0255) and the leaderboard row additionally isolates in a
+   `<bdi>` (M24 I18N-20; ADR-0261 D3). Should a chat system land in a future milestone, it must bring its own
+   threat-model row and its own decision at that time; this strike removes a claim about a feature that does
+   not exist, it does not pre-judge one.
+
+Full corrections trail and evidence: `M25-security-audit.spec.md` §1.1 (items 3 and 6), §2.1 (the two-channel
+table and the channel-2 severity rule), §7 (the paired threat-model corrections), §8-1 (the drafted
+recommendation the operator accepted). The same dead RLS premise also colours the parenthetical in the first
+Considered-alternatives bullet above ("with RLS-leak verification on the pinned version as the headline
+check"); because issue #496 authorized exactly the two clauses above, that parenthetical is recorded as a
+known residual for a follow-up decision, not superseded here.
