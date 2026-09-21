@@ -26,6 +26,22 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-108 — m22_declared_mod_names skips any mod whose name ends in tests without a cfg(test) check, s (from rb-85 MODCENSUS, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-85 · residual: R-rb-85-MODCENSUS
+
+Deferred with reason: MEASURED by the rb-85 round-5 red-team re-probe: a NON-cfg(test) production module declared as pub(crate) mod reach_privacy_tests; (via #[path]) was invisible to accounts_tests.rs data_lifecycle_manifest_totality_bidirectional because m22_declared_mod_names (~accounts_tests.rs:3600) drops every name ending in tests on the suffix alone. rb-85 closed its own vector (the #[path] escape ban keeps such
+
+EARS: m22_declared_mod_names skips any mod whose name ends in tests without a cfg(test) check, so a production module named *tests escapes the M22 manifest totality census
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-107 — No global admission control on request_data_export: unlimited anonymous identities x >=17  (from rb-85 EXPORTADMIT, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-85 · residual: R-rb-85-EXPORTADMIT
+
+Deferred with reason: rb-85 bounds the reaper's READ (btree range, .take(256)) but not the WRITE side of the sybil vector: join_game needs no JWT, so unlimited anonymous identities can each request an export (>=17 chunks, up to EXPORT_CHUNK_ROWS payload bytes) and storage grows without bound at ~361 bundles/day beyond the 256/h drain; the failure mode became bounded drain + unbounded growth. Needs a global/anonymous ad
+
+EARS: No global admission control on request_data_export: unlimited anonymous identities x >=17 chunks outgrow the fixed 256/h reaper drain
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-106 — pvp accept_challenge is blanket-gated with no stamp-aware sibling: a deletion-gated target (from rb-83 CHALLENGELAUNDER, deferred 2026-09-12)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-83 · residual: R-rb-83-CHALLENGELAUNDER
