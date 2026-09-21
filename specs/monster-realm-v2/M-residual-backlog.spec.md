@@ -26,6 +26,54 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-119 — [the operator alarm half — R-rb-85-X10, targeted to rb-87] WHEN the hourly export_bundle_r (from rb-87 X10, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-87 · residual: R-rb-87-X10
+
+Deferred with reason: the alarm consumes the line this slice creates and cannot precede it; its files (ops/observability/rules/recording.rules.yml, ops/observability/grafana/provisioning/alerting/*, ops/observability/checks/stack-config-checks*.mjs, evals/observability-stack-config.eval.mjs) are a distinct file family outside the inherited touches with their own rb-66/rb-84 test surface (a new rule or panel forces stac
+
+EARS: [the operator alarm half — R-rb-85-X10, targeted to rb-87] WHEN the hourly export_bundle_reap line is absent for longer than two intervals, or a tick reports read at EXPORT_REAP_MAX_DELETE_PER_TICK or planned at EXPORT_REAP_MAX_STAMPS_PER_TICK for consecutive ticks, THE SYSTEM SHALL raise an operator alarm (Grafana unified alerting over the Loki/Prometheus feed), and export_bundle row/byte growth 
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-118 — [the execution proof] WHEN an expired synthetic export_bundle population is seeded into th (from rb-87 X9, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-87 · residual: R-rb-87-X9
+
+Deferred with reason: the same mechanism rb-85 and rb-86 recorded as R-rb-85-X9 (unpromoted, harness residual log): datastore_index_scan_range_bsatn is still undefined in server-module/src/native_host_tests.rs (a test path reaching the helper link-fails the WHOLE lib-test binary), datastore_delete_by_index_scan_point_bsatn aborts there, ctx.database_identity() is unstubbed, and no capturing log sink exists in the nativ
+
+EARS: [the execution proof] WHEN an expired synthetic export_bundle population is seeded into the in-memory native host, one reaper tick executes under a capturing log sink, and the host log is read back THE SYSTEM SHALL contain exactly one `{"evt":"export_bundle_reap",…}` line whose read/planned/reaped counts equal the population's expired rows / stamps / deleted rows — RED on the pre-slice silent body
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-117 — docs/observability-dr-runbook.md §9 export section does not name the new evt=export_bundle (from rb-87 RUNBOOKEVT, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-87 · residual: R-rb-87-RUNBOOKEVT
+
+Deferred with reason: rb-87 plan §7: the runbook makes no observability claim about the reaper so nothing there is FALSE, but an operator reading §9.4 has no pointer to the hourly beat, its absence = abort-loop meaning, or the consecutive-tick backlog hint; evals/account-e2e.eval.mjs G24 pins §9's body, so the edit is a small runbook+eval slice
+
+EARS: docs/observability-dr-runbook.md §9 export section does not name the new evt=export_bundle_reap beat or its dead-man semantics (G24 exact-body-checked, outside rb-87's touches)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-116 — No test anywhere proves an observability::mr_log line is DELIVERED: an early return inside (from rb-87 MRLOGDELIVERY, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-87 · residual: R-rb-87-MRLOGDELIVERY
+
+Deferred with reason: MEASURED by the rb-87 tests red-team (sandbox /tmp/rb-87-rt2):  as mr_log's first statement -> 969/969 green. rb-87's oracles compose through build_log_line, never through mr_log; the G7 census counts log::info! SITES, not reachability; observability.rs is outside rb-87's touches. The dead-man design (absence of the hourly export_bundle_reap beat = abort loop) therefore rests on the heartbeat pipe
+
+EARS: No test anywhere proves an observability::mr_log line is DELIVERED: an early return inside mr_log silences every line crate-wide (the reaper beat, data_export, the heartbeat) and the 969-test server-module suite still passes
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-115 — export_bundle_reap's read/planned counts are a necessary-not-sufficient backlog HINT; the  (from rb-87 BACKLOGAMBIG, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-87 · residual: R-rb-87-BACKLOGAMBIG
+
+Deferred with reason: rb-87 plan reviewer M2 + ADR-0238 rb-87 amendment: planned==16 may be exactly-sixteen rather than truncated, read==256 may still have drained everything (whole-stamp deletes take tails, reaped can exceed read), and a saturated stamp cap can show read far below 256; exposing the pre-truncation count reshapes the equality-pinned rb-86 seam (plan_export_reap_stamps) and is its own slice; until then t
+
+EARS: export_bundle_reap's read/planned counts are a necessary-not-sufficient backlog HINT; the exact signal (the window's distinct-stamp count BEFORE truncate(max_stamps)) is swallowed inside rb-86's frozen plan_export_reap_stamps
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-114 — ADR-0243 D10 sentence 'The same identifier census holds privacy.rs at one' is superseded b (from rb-87 ADR0243D10, deferred 2026-09-18)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-87 · residual: R-rb-87-ADR0243D10
+
+Deferred with reason: rb-87 plan §7/§9: the ADR-0238 rb-87 amendment records the supersession; a one-paragraph dated amendment on ADR-0243 (plus no header change — Amends: is not used) needs the supervisor to widen touches; a stale sentence in a decision record, not a code defect
+
+EARS: ADR-0243 D10 sentence 'The same identifier census holds privacy.rs at one' is superseded by rb-87 (two emissions, attributed per body) and ADR-0243 is outside rb-87's touches
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-113 — [the execution proof] WHEN an oversized synthetic export_bundle population (several owners (from rb-86 X9, deferred 2026-09-18)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-86 · residual: R-rb-86-X9
