@@ -6,13 +6,23 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "b3341d8"
  },
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "rb-107",
+   "model": "fable",
+   "effort": "xhigh",
+   "tier": "hard",
+   "started_utc": "2026-09-21T11:01:53Z",
+   "leader_pid": 3708319,
+   "claude_pid": 3708322
+  }
+ ],
  "last_tick_utc": "2026-09-21T10:00:04Z",
  "live_watchers": [],
  "master": {
   "ci": "success",
   "nightly": "fixed-changelog-freshness-pending-next-run",
-  "sha": "3937c588a711610800d96c41c0751776a38ed7a4"
+  "sha": "3937c58"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,21 +37,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "2026-09-21T10:03Z: reconciled uncommitted 09:00Z-tick bookkeeping (handoff/archive/usage-daily) direct to main (8e71d0e). Gate 3: 5 residuals (R-rb-85-X9, R-rb-86-READCAP-NAME/SAMEMS/TICKBOUND/X9) crossed t1_promote_days=3 -- classified all real game/security defects (not eval-tooling), promoted to rb-109..rb-113, queued rb-109/110/111 (queue[] hit its 5-cap; rb-112/113 promoted-but-unqueued), shipped PR#132 (chore/residual-promote-20260921T100548Z), squash-merged clean to main @b3341d8. This tick ONE action = promote (gate-3 aging outranks queue-launch of already-queued rb-107/rb-108 and PLAN Sec.9). Next tick fast-path: queue has rb-107, rb-108, rb-109, rb-110, rb-111 in that order -- rb-107 (request_data_export sybil admission control) was live-verified launch-ready this tick (HARD tier, fable@xhigh, budget.fable_ok=true) but did not run this tick.",
+ "notes": "2026-09-21T11:00Z tick: launched rb-107 (queue fast-path, fable@xhigh/hard). queue-removed rb-107.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-21T09:01:25Z",
-   "derived_from_master_sha": "3937c588a711610800d96c41c0751776a38ed7a4",
-   "reason": "promoted residual R-rb-85-EXPORTADMIT",
-   "slice": "rb-107",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-09-21T09:01:25Z",
