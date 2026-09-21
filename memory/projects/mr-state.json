@@ -1,6 +1,15 @@
 {
-  "adr_next_free": 264,
-  "awaiting_merge": [],
+  "adr_next_free": 265,
+  "awaiting_merge": [
+    {
+      "slice": "m24-s8",
+      "pr": 495,
+      "pr_repo": "mdrewt/monster-realm",
+      "head_sha": "ef1fe67",
+      "adr_reserved": 264,
+      "gates": "12/13 met, 1 deferred (X13), 0 unmet, lint-clean"
+    }
+  ],
   "consecutive_standdowns": 0,
   "harness_main": {
     "ci": "no-remote-ci-local-gate-green",
@@ -8,11 +17,18 @@
   },
   "inflight": [],
   "last_tick_utc": "2026-09-21T00:23:54Z",
-  "live_watchers": [],
+  "live_watchers": [
+    {
+      "kind": "mr-ci-watch",
+      "pr": 495,
+      "slice": "m24-s8",
+      "spawned_utc": "2026-09-21T04:22:xx-approx"
+    }
+  ],
   "master": {
-    "ci": "in_progress (run 35547646652, push-triggered by m24-s7 merge commit; prior m24-s6 run green)",
-    "nightly": "fixed-changelog-freshness-pending-next-run",
-    "sha": "436aa74f31968639a1c2935cb44026f3895f4b6a"
+    "sha": "436aa74f31968639a1c2935cb44026f3895f4b6a",
+    "ci": "success",
+    "nightly": "fixed-changelog-freshness-pending-next-run"
   },
   "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
   "native_supervisor": {
@@ -27,7 +43,7 @@
     "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
     "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
   },
-  "notes": "2026-09-21T00:23:54Z native tick: m24-s7 EVENT (ci green, PR#494 CLEAN) consumed. Re-verified live: no live per-run lock owner, no chain-owner mutex, no resident IDE pid, mr-hold HOLD-NONE. Took chain-owner mutex, ran mr-gates verify (12/12 met, spotcheck X3 held), mr-audit (orchestration CLEAN; policy CLEAN, mandatory_read=false; gating_advisory FLAGGED on resolver.test.ts's widened CATALOGS-keys assertion -- read diff, confirmed strengthened not weakened, adjudicated benign). Squash-merged PR#494 -> master@436aa74 (base 72e638d), deleted branch (remote already gone), removed worktree. mr-gates residuals close: 0 to close. Ledger MERGED row + handoff entry written. Master CI (run 35547646652) still in_progress at tick end -- not polled further this tick; next tick re-verifies live before any composite launch. No composite launch attempted this tick (single mutating action = the merge). Governor NORMAL (d7=$1278.72/$2783 eff.). Residual backlog alarms noted (18 stale>14d, 49 open vs cap 12) -- advisory-only, not this slice's scope; will surface at gate-3 aging.",
+  "notes": "2026-09-21T04:21Z native tick (EVENT src=done, m24-s8.done.md): re-verified live -- per-run lock leader 3226878 confirmed dead, no chain-owner mutex, HOLD-NONE, no resident IDE pid. m24-s8 run finished rc=0 (opus, 1 attempt, $79.07 per wrapper reconcile row already in ledger), opened PR#495 (mdrewt/monster-realm feat/m24-s8-icu-round-trip @ ef1fe67), local `just ci` green (99/99 evals, 8/8 observability), ledger 12/13 gates met + 1 deferred (X13, D9 decision-default: icu-shim-earned-with-no-named-vendor=YES-BUILD-IT), lint-clean. Live gh pr view 495: OPEN, mergeStateStatus UNSTABLE, mergeable MERGEABLE, both ci+e2e checks still IN_PROGRESS (started 04:19:28Z) -- NOT complete, so did not merge this tick. Delegated CI-wait to mr-ci-watch (detached setsid, pid recorded in /tmp/mr_ciwatch_m24-s8.out) per doctrine; resumes via event tick when CI finishes. Sole mutating action this tick = the delegation; mutex released after. Also found and committed uncommitted mr-state.json/handoff diffs left over from the 02:02Z launch tick (never committed to git) plus the untracked monster-realm-m24-s8-plan.md memory card written during planning -- folded into this tick's bookkeeping commit, no content altered. Governor NORMAL (d7=$1360.24/$2783 eff., 49%; fable_ok=true). No BLOCKERs, no rate-limit event, no launch (a merge did not complete this tick, so no composite launch applies).",
   "open_chore_prs": [],
   "park_counters": {
     "14r-e": 1
@@ -40,7 +56,7 @@
     "_comment": "Added 2026-07-21 after a tick spent discovery time here. The task 'Facts' say 'specs/monster-realm-v2/PLAN.md section-9' WITHOUT an absolute anchor; that path does NOT exist under the project repo. Use these absolute locations.",
     "adr_two_locations": "Per project AGENTS.md: implementation ADRs 0035+ -> /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/; design ADRs 0002-0034 -> /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/adr/. OFFSET trap: harness adr/0055-0057 == project 0056/0057/0080 (same topics, different numbers). A bare 'ADR-0055' means the PROJECT docs/adr/0055 unless prefixed 'harness adr/'. ADR next-free seed = /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/adr/README.md.",
     "found_easily": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects template + launch script + AGENTS.md two-location note were all accurate; only the harness-vs-project spec path lacked an absolute anchor in the task.",
-    "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation.",
+    "gh_cli_path": "gh is NOT on the default PATH in this native env — it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation.",
     "milestone_c5_spec": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-c.5-pregate-review-residuals.spec.md (ptc5a..ptc5g; its section-3 holds Decisions A-E, all RESOLVED 2026-07-20 per PLAN section-9 ~L307).",
     "milestone_d_spec": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M-playtest-d-content-pack.spec.md (pt-d1..pt-d3).",
     "per_slice_touches_and_EARS": "In the milestone spec file (e.g. M-playtest-c.5-pregate-review-residuals.spec.md), NOT in PLAN.md. PLAN section-9 is only a one-line-per-slice SUMMARY + the resolved-decisions status line. To get a slice's declared touches:/EARS/decision-hooks, open its M*.spec.md.",
@@ -50,6 +66,6 @@
     "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
   },
   "schema_version": 2,
-  "updated_by": "mr-sup-native-20260921T002354Z-3198216",
-  "updated_utc": "2026-09-21T00:27:00Z"
+  "updated_by": "mr-sup-native-20260921T042100Z-3434523",
+  "updated_utc": "2026-09-21T04:24:00Z"
 }
