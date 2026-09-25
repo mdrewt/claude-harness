@@ -7,11 +7,11 @@
   "sha": "cf2e986"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-25T10:08:01Z",
+ "last_tick_utc": "2026-09-25T14:00:08Z",
  "live_watchers": [],
  "master": {
   "sha": "9ed396e",
-  "ci": "in_progress",
+  "ci": "success",
   "nightly": "failure(changelog-freshness; issue #499)"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "10:08Z tick: reset passed (was armed until 2026-09-25T00:00Z after the 2026-09-21T22:18Z org weekly rate-limit trip). rb-110 attempt1 confirmed crashed with ZERO code written (killed mid-plan-review by the rejection; worktree clean, no commits). Reaped stale per-run lock (session_leader 361102 dead) via mr-unlock stale. master CI green @2f5ae9d; Nightly red at same sha is pre-existing issue #499 (changelog-freshness), not actioned. mr-gates residuals: 22 unpromoted (all <7d, real defects) + 32 already-promoted, several (rb-58/60/81 at least) confirmed merged via git log but never residual-closed -- bookkeeping gap noted for a future tick, not actioned this tick. Relaunched rb-110 (attempt 2, fable@xhigh, hard tier, ADR-0267) with the surviving plan file as resume context; leader 9241 confirmed detached+fable.",
+ "notes": "14:00Z tick: reconciled stray uncommitted rb-110-merge bookkeeping left by the 13:28Z tick (committed directly to harness main, 53f42d4, pushed) -- same pattern as the 2026-09-21T09:00Z precedent. Gate 3: residuals alarms (residual-unpromoted 22>t1, residual-stale 22>t2, residual-over-cap 58/cap-12) -- t2-stale oldest (R-rb-10-X7/X6, 26.92d) both refused promote as ALREADY-PROMOTED (status:targeted, no further action available). Fell through to t1-promote tier: oldest unpromoted R-20r-a-CARE-GEN (6.44d) classified as a real client concurrency defect (not eval-tooling-only) -> promoted to rb-120, queued, shipped as doc-only chore PR#135, squash-merged clean @60c8d56. This tick's ONE action = promote; no rooted run launched. residual-over-cap (58 open vs cap 12) is a standing signal for a future tick, not actioned further here.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -83,6 +83,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260925T100801Z-2442",
- "updated_utc": "2026-09-25T10:12:00Z"
+ "updated_by": "mr-sup-native-20260925T140008Z-384571",
+ "updated_utc": "2026-09-25T14:05:00Z"
 }
