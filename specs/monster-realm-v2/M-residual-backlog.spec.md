@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-121 — Settle-released locks drop keyboard focus to <body> on the no-batch paths (rejection / fro (from 20r-a FOCUS, deferred 2026-09-19)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 20r-a · residual: R-20r-a-FOCUS
+
+Deferred with reason: 20r-a disables the clicked button synchronously; on a SUCCESSFUL action the next batch's replaceChildren already dropped focus on master, but on rejection/short-circuit master kept focus on the button and 20r-a now loses it (red-team Part 3). Fix: in each .finally release, if the view is visible and document.activeElement is body/outside root, focus the first re-enabled live button or the registry
+
+EARS: Settle-released locks drop keyboard focus to <body> on the no-batch paths (rejection / frozen-link / dead-handle) for Train, Evolve and pvp lifecycle; overlay focus trap goes inert until a click
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-120 — Shipped Care lock (raisingView.ts careBtn listener) keeps the membership-keyed release and (from 20r-a CARE-GEN, deferred 2026-09-19)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 20r-a · residual: R-20r-a-CARE-GEN

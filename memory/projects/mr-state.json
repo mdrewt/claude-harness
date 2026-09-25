@@ -65,6 +65,14 @@
    "added_utc": "2026-09-25T14:02:25Z",
    "added_by": "n/a",
    "derived_from_master_sha": "9ed396e"
+  },
+  {
+   "slice": "rb-121",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-20r-a-FOCUS",
+   "added_utc": "2026-09-25T15:01:09Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "9ed396e"
   }
  ],
  "rate_limit_armed_by": null,
