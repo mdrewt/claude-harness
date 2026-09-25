@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-120 — Shipped Care lock (raisingView.ts careBtn listener) keeps the membership-keyed release and (from 20r-a CARE-GEN, deferred 2026-09-19)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 20r-a · residual: R-20r-a-CARE-GEN
+
+Deferred with reason: Byte-pinned block (C4/C6 in raisingView.test.ts; keyboard-operable-rows eval cites its lines in prose) so 20r-a left it untouched and shipped the fixed shape beside it for Train (Map<bigint, object> generation token + new Promise((resolve) => resolve(cb()))). Port that shape to Care and re-pin C4/C6; ADR-0159 D1 amendment recommended in the same slice.
+
+EARS: Shipped Care lock (raisingView.ts careBtn listener) keeps the membership-keyed release and the Promise.resolve(cb()) shape: a stale Care settle across hide()/reopen re-enables the live Care button while a second care is in flight, and a sync throw strands the lock until hide()
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-119 — [the operator alarm half — R-rb-85-X10, targeted to rb-87] WHEN the hourly export_bundle_r (from rb-87 X10, deferred 2026-09-18)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-87 · residual: R-rb-87-X10
