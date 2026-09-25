@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-124 — ADR-0173:293-301 still advertises the quest_defs_load_error limiter as an OPEN named follo (from 20r-c ADR0173-BODY, deferred 2026-09-19)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 20r-c · residual: R-20r-c-ADR0173-BODY
+
+Deferred with reason: 20r-c shipped QUEST_DEFS_LOAD_ERR_LIMITER (npc.rs) but may not edit docs/adr/0173-*.md (reserved-number rule). Add a dated '## Amendment' paragraph to the ADR body stating the follow-up is executed by 20r-c (PR ref), body-only (DIGEST is header-derived, no ratchet moves). ARCHITECTURE.md:1945 already carries the discharge; the ADR is the only stale SSOT.
+
+EARS: ADR-0173:293-301 still advertises the quest_defs_load_error limiter as an OPEN named follow-up after 20r-c discharged it (body annotation is a supervisor-owned docs/adr edit)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-123 — movement.rs RateLimiter::check has no source pin: a #[cfg(not(test))] twin of check return (from 20r-c CHECK-TWIN, deferred 2026-09-19)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 20r-c · residual: R-20r-c-CHECK-TWIN
