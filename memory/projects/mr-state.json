@@ -9,15 +9,15 @@
  "inflight": [
   {
    "slice": "rb-110",
-   "run_id": "mr-spawn-20260921T220226Z-361049",
-   "session_leader": 361102,
+   "run_id": "mr-spawn-20260925T101130Z-9182",
+   "session_leader": 9241,
    "model": "fable",
    "effort": "xhigh",
    "tier": "hard",
-   "started_utc": "2026-09-21T22:02:30Z"
+   "started_utc": "2026-09-25T10:11:34Z"
   }
  ],
- "last_tick_utc": "2026-09-21T20:59:08Z",
+ "last_tick_utc": "2026-09-25T10:08:01Z",
  "live_watchers": [],
  "master": {
   "sha": "2f5ae9d",
@@ -37,7 +37,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "22:00Z tick: launched rb-110 (fable@xhigh, hard tier, ADR-267 pre-allocated). Nightly changelog-freshness red (issue #499, recurring) -- not master-CI-red, not actioned. Stray orphaned test process (pid 221114) from already-merged rb-109 worktree noted, not cleaned (no lock held, no memory pressure).",
+ "notes": "10:08Z tick: reset passed (was armed until 2026-09-25T00:00Z after the 2026-09-21T22:18Z org weekly rate-limit trip). rb-110 attempt1 confirmed crashed with ZERO code written (killed mid-plan-review by the rejection; worktree clean, no commits). Reaped stale per-run lock (session_leader 361102 dead) via mr-unlock stale. master CI green @2f5ae9d; Nightly red at same sha is pre-existing issue #499 (changelog-freshness), not actioned. mr-gates residuals: 22 unpromoted (all <7d, real defects) + 32 already-promoted, several (rb-58/60/81 at least) confirmed merged via git log but never residual-closed -- bookkeeping gap noted for a future tick, not actioned this tick. Relaunched rb-110 (attempt 2, fable@xhigh, hard tier, ADR-0267) with the surviving plan file as resume context; leader 9241 confirmed detached+fable.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -85,6 +85,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260921T205908Z-332742",
- "updated_utc": "2026-09-21T21:02:00Z"
+ "updated_by": "mr-sup-native-20260925T100801Z-2442",
+ "updated_utc": "2026-09-25T10:12:00Z"
 }
