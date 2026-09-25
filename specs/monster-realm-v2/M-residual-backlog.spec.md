@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-122 — raising_tests.rs:2167 RETUNE note 'the only pin of ESSENCE_SOFT_CAP value' is stale — game (from 20r-b B1, deferred 2026-09-19)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 20r-b · residual: R-20r-b-B1
+
+Deferred with reason: 20r-b's own gate byte-pins battle_tests.rs/raising_tests.rs unmodified (EARS: existing reward/clamp tests stay green unmodified), so the wording fix cannot ride this slice; comment-only, no behaviour
+
+EARS: raising_tests.rs:2167 RETUNE note 'the only pin of ESSENCE_SOFT_CAP value' is stale — game-core now pins 999/1000 boundaries too; reword to point at the currency.rs/content.rs RETUNE markers
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-121 — Settle-released locks drop keyboard focus to <body> on the no-batch paths (rejection / fro (from 20r-a FOCUS, deferred 2026-09-19)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 20r-a · residual: R-20r-a-FOCUS
