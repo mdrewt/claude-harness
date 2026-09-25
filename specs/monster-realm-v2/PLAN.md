@@ -723,6 +723,27 @@ rest stays post-gate provisional pending a cleaner second playtest read):**
   auto-evolution changes a party monster's species with zero client signal (MED, after 20r-a).
   20r-a/b/c pairwise disjoint by `touches:`. One decision issue, non-blocking:
   mdrewt/monster-realm#479 (rev20-trade-raising-reset — supervisor: record-and-ignore).
+- **M-postgate-twentyfirst-review-residuals** (`M-postgate-twentyfirst-review-residuals.spec.md`) —
+  **NEW, queued 2026-09-25; inserted after `M-postgate-twentieth-review-residuals`**, per the
+  weekly-review insertion convention. Verified twenty-first multi-lens review findings @
+  `2f5ae9d` (9 lenses, 0 contradictions, 3 independent verifiers, all reported claims
+  CONFIRMED). Server security/authz, schema/migration safety, and spec-vs-code completeness
+  explicitly clean this cycle. What remains: **21r-a** taming.rs's two battle write-backs still
+  bare `?` — the one settlement caller without ADR-0185 D1 log-and-commit; a write-back fault
+  wedges the battle row `Ongoing` and rolls back a successful recruit (fifteenth-review
+  S-taming-settle, disclosed-HIGH, never queued) (MED), **21r-b** 19 raw-English player-facing
+  strings (shop/trade/rename/propose feedback + the session-expiry overlay) bypass the i18n
+  catalog through sinks the ADR-0257 scanner cannot see — French players get mixed English
+  (HIGH), **21r-c** i18n gate teeth: indirect-sink scanner coverage + the ADR-0264 X13 nightly
+  `i18n-completion-check` wiring that is tracked nowhere (MED, after 21r-b), **21r-d** changelog
+  regeneration — nightly red 5 straight days on changelog-freshness alone (MED), **21r-e** the
+  answered DECISION #479 trade-time raising reset (keep level/species/IVs/essence; zero
+  Trust/Quality-Time), implementation untracked since 2026-09-19 (MED), **21r-f** sim-harness
+  cannot represent the no-player-row battle-lock/warp asymmetry movement.rs warns must never
+  unify (MED), **21r-g** predictor `#lastAuthQueueLen` rebuild seeding (self-disclosed nh3
+  residual, LOW, after 21r-b), **21r-h** ARCHITECTURE.md manifest-count + QUEST_DEFS drift
+  (LOW). One decision issue, non-blocking: mdrewt/claude-harness#134
+  (rev21-nightly-changelog-red — supervisor: record-and-ignore).
 - **M-postgate-overlay-registry** — **SUBSUMED + RETIRED 2026-07-25** by `M-postgate-ux-design` §uxd3, which
   delivers the registry substrate (`overlayRegistry.ts` + a pure `canOpen` modality reducer) together with the
   main-menu IA this parked slice was corroborating (unify the ~15 open-coded overlay-guard sites). Do NOT
