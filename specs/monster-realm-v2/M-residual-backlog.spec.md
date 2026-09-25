@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-123 — movement.rs RateLimiter::check has no source pin: a #[cfg(not(test))] twin of check return (from 20r-c CHECK-TWIN, deferred 2026-09-19)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 20r-c · residual: R-20r-c-CHECK-TWIN
+
+Deferred with reason: Measured on 20r-c (2026-09-19): a cfg(not(test)) twin of crate::movement::RateLimiter::check that always returns Some(suppressed) keeps 978 tests + clippy + observability-log-wrapper green while every limiter (ENCOUNTER_TABLE_ERR, BEGIN_ENCOUNTER_ERR, LEAD_LEVEL_ERR, UNRECOGNIZED_ISSUER, QUEST_DEF_MISSING, QUEST_DEFS_LOAD_ERR) emits unbounded in production. movement.rs is outside 20r-c's touches; 
+
+EARS: movement.rs RateLimiter::check has no source pin: a #[cfg(not(test))] twin of check returning Some(..) defangs all limiters in the shipped wasm CI-clean (red-team N7b)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-122 — raising_tests.rs:2167 RETUNE note 'the only pin of ESSENCE_SOFT_CAP value' is stale — game (from 20r-b B1, deferred 2026-09-19)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 20r-b · residual: R-20r-b-B1

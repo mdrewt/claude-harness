@@ -7,11 +7,11 @@
   "sha": "cf2e986"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-25T19:37:17Z",
+ "last_tick_utc": "2026-09-25T21:00:09Z",
  "live_watchers": [],
  "master": {
   "sha": "a08475f",
-  "ci": "pending",
+  "ci": "success",
   "nightly": "failure(changelog-freshness; issue #499)"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "19:37Z tick: EVENT rb-111.ci.md (PR#506 checks green). Live re-verified: mergeStateStatus=CLEAN/MERGEABLE, ci+e2e SUCCESS. mr-gates verify --slice rb-111: CLEAN 7/7. mr-audit: orchestration CLEAN (7 roles incl tester/reviewer/red-team/verifier/reducer-security-auditor/desync-guard/planner, tier=hard fable/xhigh); gating_advisory FLAGGED on skip_markers_added=1 -- adjudicated as a mechanical false positive (prose word 'skip/skipped/skipping' in comments+assertion messages, no real #[ignore]/.skip(/.only(/xit( added, removed_or_modified_asserts=0, suppressions_added=0). Squash-merged PR#506 -> master a08475f (base 9ed396e), branch+worktree deleted, mr-ci-watch pid 662277 already exited (its job done). Closed 1 residual (R-rb-86-SAMEMS) via mr-gates residuals close --pr 506. Ledger row + handoff entry recorded. Master post-merge CI still in_progress at tick end (PR's own checks were both green pre-merge) -- next tick should re-verify live before trusting green. Queue unchanged (rb-114, rb-115, rb-120, rb-121 -- 4 entries, fast-path for next tick). No composite launch this tick: stopped after merge+record given the residual backlog (64 open; 20 unpromoted past t1, 22 stale past t2, over cap) needs a careful gate-3 classification pass (Work-selection scope: real-game-defect vs eval-tooling wontfix) rather than a rushed pick. Budget NORMAL (d7=$199.59, fable_d7=$193.30, fable_ok=true).",
+ "notes": "21:00Z tick: gate 0 clean (no locks/mutex/done files, HOLD-NONE). Both repos synced live (harness main, project master a08475f CI success, Nightly still failure(changelog-freshness; issue #499) not gating). Found prior 20:00Z tick's own handoff.md append uncommitted (b0b8862 committed mr-state.json+spec but not handoff.md) -- folded into this tick's commit, not a human stray. Gate 3: residuals list --unclaimed = 27 open, none past t2_stale_days=14, two tied at 6.56d past t1_promote_days=3 (identical disclosed_at=2026-09-19T07:35:24Z): R-20r-c-ADR0173-BODY (one-paragraph supervisor-owned ADR body annotation, not slice-shaped) and R-20r-c-CHECK-TWIN (#[cfg(not(test))] twin of movement::RateLimiter::check unconditionally returns Some(suppressed), defanging every rate limiter in shipped wasm while CI-green -- real buildable defect). Both real-game-defect (neither eval-tooling wontfix-eligible); picked CHECK-TWIN as this tick's single promote action -> rb-123 in M-residual-backlog.spec.md. queue-add SKIPPED: queue[] already at cap(5) with none launched yet this session -- mr-record queue-add refuses at cap by design rather than evicting; rb-123 left promoted-but-unqueued for a future tick with headroom. Ledger row + handoff entry recorded. No slice launched this tick (promote-only). Budget NORMAL (d7=$201.35, fable_d7=$193.30, fable_ok=true). Residual backlog still large -- next tick should prefer launching from queue (rb-114 oldest) once past any newly-surfaced t1/t2-aged residual.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -91,6 +91,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260925T193717Z-665014",
- "updated_utc": "2026-09-25T19:41:00Z"
+ "updated_by": "native-20260925T210009Z-702954",
+ "updated_utc": "2026-09-25T21:03:00Z"
 }
