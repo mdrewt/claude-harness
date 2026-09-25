@@ -57,6 +57,14 @@
    "reason": "promoted residual R-rb-87-BACKLOGAMBIG",
    "slice": "rb-115",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+  },
+  {
+   "slice": "rb-120",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-20r-a-CARE-GEN",
+   "added_utc": "2026-09-25T14:02:25Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "9ed396e"
   }
  ],
  "rate_limit_armed_by": null,
