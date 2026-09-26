@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-130 — hardcodedStrings.ts exemptCallOpenAt does not reject '#' before t/tf — this.#t('raw Englis (from m24-s4 RT1, deferred 2026-09-20)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m24-s4 · residual: R-m24-s4-RT1
+
+Deferred with reason: shared S2 scanner infra outside m24-s4 touches: (client/src/ui/i18n/hardcodedStrings.ts:416-426); closed for S4 only by the per-view exhaustive spy pins; fix = one before==='#' reject + a fixture in hardcodedStrings.test.ts
+
+EARS: hardcodedStrings.ts exemptCallOpenAt does not reject '#' before t/tf — this.#t('raw English') scans as an exempt resolver call (red-team PoC: sinks 1, failing 0)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-129 — [PRV1-6 post-terminal] WHEN the deletion cascade cannot forfeit a still-Ongoing PvP battle (from rb-45 ONGOING-BATTLE, deferred 2026-09-20)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-45 · residual: R-rb-45-ONGOING-BATTLE
