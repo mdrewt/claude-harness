@@ -7,11 +7,11 @@
   "sha": "cf2e986"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-25T23:00:02Z",
+ "last_tick_utc": "2026-09-26T01:00:02Z",
  "live_watchers": [],
  "master": {
-  "sha": "584cce2",
-  "ci": "in_progress(doc-only rb-114 merge 584cce2; expected trivial pass, same shape as rb-124)",
+  "sha": "584cce25ac4ff6d3a36544690d83d07c70e5c892",
+  "ci": "success",
   "nightly": "failure(changelog-freshness; issue #499)"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "23:00Z tick: gate 0/1 clean (no locks/mutex, HOLD-NONE, both repos synced pre-tick, no open PRs; mr-decision-watch for rev21-nightly-changelog-red still live/unrelated). Gate 3 fast path: queue[0]=rb-114 (promoted residual R-rb-87-ADR0243D10, deferred 2026-09-18 from rb-87) re-verified live -- spec heading present, non-blocked, source rb-87 already merged. Residual's own reason text names it a stale ADR-0243 D10 sentence superseded by ADR-0238's rb-87 amendment -- doc-only, not slice-shaped work, same class as rb-124 the prior tick. Handled directly (no rooted run): appended dated Amendment (rb-114) paragraph to docs/adr/0243-cascade-and-export-purge-observable.md. Shipped as doc-only chore PR#508, squash-merged -> 584cce2, ff'd master, deleted branch. mr-gates residuals close --slice rb-114 --pr 508 --force (never a rooted-run slice, no ledger seeded, honest-escape path). queue-remove rb-114 (mr-record, fresh re-read -- queue now rb-115/120/121/122). Ledger+handoff recorded. Master CI (584cce2) in_progress at record time -- doc-only diff, next tick/event re-verifies before any new launch. Budget NORMAL (d7=$203.75/2783, fable_ok=true). Next fast-path candidate is rb-115 (R-rb-87-BACKLOGAMBIG) -- read it this tick and it is NOT doc-only (export_bundle_reap count semantics reshaping rb-86's frozen plan_export_reap_stamps seam, its own reason text says 'until then... is its own slice') -- a future tick should route it to a rooted run via normal mr-spawn, not repeat this direct-edit pattern. No BLOCKERs. Single composite action this tick (merge only); no second slice launched.",
+ "notes": "01:00Z tick 2026-09-26: promoted R-20r-d-B1-ack -> rb-126 (residual aging, oldest unpromoted past t1); doc-only chore PR#138 merged to harness main (8a060b2), ff pulled. queue-add skipped: queue[] at 5-entry cap, all 5 existing entries (rb-115/120/121/122/125) live-reverified valid/unconsumed -- none evicted, none stale. rb-126 not yet queued; will surface via normal residual/PLAN derivation once queue drains. Risk flagged: launch throughput trailing promotion throughput (5 promoted rb-* slices queued since 2026-09-21, none launched yet) -- not a BLOCKER, noted for a future tick/Drew. Budget NORMAL (d7=$205.84/2783, fable_ok=true). No rooted run this tick.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
