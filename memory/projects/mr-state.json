@@ -1,12 +1,25 @@
 {
- "adr_next_free": 273,
+ "adr_next_free": 274,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "03d4eb5"
  },
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "rb-128",
+   "run_id": "mr-spawn-20260926T174823Z-1901171",
+   "leader_pid": 1901267,
+   "claude_pid": 1901270,
+   "model": "fable",
+   "effort": "xhigh",
+   "tier": "hard",
+   "repo": "project",
+   "adr_reserved": "0273",
+   "started_utc": "2026-09-26T17:48:23Z"
+  }
+ ],
  "last_tick_utc": "2026-09-26T15:00:09Z",
  "live_watchers": [],
  "master": {
@@ -34,14 +47,6 @@
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-26T07:02:14Z",
-   "derived_from_master_sha": "16fe2143fee731d3b8f24c567c05aa3982b4f604",
-   "reason": "promoted residual R-rb-45-DRAIN",
-   "slice": "rb-128",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-09-26T12:08:51Z",
