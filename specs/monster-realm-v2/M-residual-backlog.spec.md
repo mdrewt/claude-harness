@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-126 — Count-based ack_evolution_notices is not strictly at-least-once across two sessions (from 20r-d B1-ack, deferred 2026-09-19)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 20r-d · residual: R-20r-d-B1-ack
+
+Deferred with reason: ack drains a server-side PREFIX by count (spec-mandated count: u32): with two tabs, tab B's stale head can drain an entry tab B never showed (window = one batch latency; the cache-reconcile idiom narrows but cannot close it). Later fix: ack keyed by (monster_id, evolved_at_ms) or a monotonic seq — an additive reducer parameter, no schema change.
+
+EARS: Count-based ack_evolution_notices is not strictly at-least-once across two sessions
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-125 — Evolution cutscene / registry overlay reveal with AT announcement (ADR-0254 residual 1+3) (from 20r-d B1, deferred 2026-09-19)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 20r-d · residual: R-20r-d-B1
