@@ -4,13 +4,13 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "410ae5d"
+  "sha": "03d4eb5"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-26T14:00:08Z",
+ "last_tick_utc": "2026-09-26T15:00:09Z",
  "live_watchers": [],
  "master": {
-  "ci": "green(83b7f19, rb-122 merge confirmed success via live master_ci_latest)",
+  "ci": "green(83b7f19, ci success confirmed live via gh run list)",
   "nightly": "in_progress",
   "sha": "83b7f19"
  },
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "14:03Z: recovered the 13:47Z tick's uncommitted harness bookkeeping first (rb-122/PR#512 merge records were complete but never git-committed before that session ended) -- re-verified against live ground truth then committed (4035a1a), pushed clean. Gates 0-2 clean this tick: no locks/mutex, HOLD-NONE (mr-decision-watch pid 54759 for issue #134 still live unattended), no open PRs, no resident IDE session, both repos synced. Gate 3: mr-gates residuals list --unclaimed showed 23 unpromoted, none past t2_stale_days=14d, oldest past t1_promote_days=3d = R-m24-s4-RT1 (5.9d, hardcodedStrings.ts exemptCallOpenAt false-negative on '#'-prefixed private accessors, real i18n-lint defect not an evals/*.eval.mjs scanner) -- outranks queue[]/PLAN section-9. Promoted -> rb-130 in M-residual-backlog.spec.md, queue-added (queue now 4/5: rb-125, rb-128, rb-129, rb-130). Shipped as doc-only chore PR#142, squash-auto-merged clean within the tick (572215a); harness main ff-only synced, branch deleted local+remote. No slice launched this tick (promote is gate 3's own action). Budget NORMAL (d7=$330.27 of $2783 weekly, fable_ok=true). No BLOCKERs. Pre-existing WARN: 12 handoff entries with unparseable headers pinned live (noted again, out of one-action scope -- flagged for a future doc-hygiene slice, not actioned). Next tick: queue[] fast path -- rb-125 is oldest but needs deliberate touches/tier derivation (20r-d source has a ~17-file *View.ts roster fan-out per its own deferred-reason note) before launch; re-verify all 4 queue entries live before picking.",
+ "notes": "15:00Z tick: found the chain-owner mutex stale (owner run mr-sup-native-20260926T140008Z-1669663, pid 1669663 dead, heartbeat 14:01:41Z, ~59min past TTL) and the same 14:03Z tick's handoff.md/archive append uncommitted on harness main (mr-state.json had landed via f73fd54) -- recovered both: mr-unlock mutex released the dead owner, this tick re-acquired it; handoff content re-verified against live ground truth then committed (597502d), pushed clean. Gates 1-2 clean: both repos synced (harness main 03d4eb5, project master 83b7f19), master CI green, no open PRs, no resident IDE session, no parked/wip branches. Gate 3: mr-gates residuals list --unclaimed: 22 open, none past t2_stale_days=14, oldest past t1_promote_days=3 = R-m24-s8-X13 (5.44d, nightly workflow missing i18n-completion-check job + policy-doc row -- real CI/ops wiring defect, not an eval-tooling-only residual) -- outranked queue[]/PLAN sec.9. Promoted -> rb-131 in M-residual-backlog.spec.md, queue-added (queue now at cap, 5/5: rb-125, rb-128, rb-129, rb-130, rb-131 -- none launched yet this session). Shipped as doc-only chore PR#143 (chore/residual-promote-20260926T150443Z), squash-auto-merged clean (03d4eb5); harness main ff-only synced, branch deleted local+remote. No rooted slice launched this tick (mutex-recovery + promote-only is this tick's single mutating-action-class). Budget NORMAL (d7=$331.41/$2783=11.9%, fable_d7=$267.33/$2298, fable_ok=true). No BLOCKERs, no rate-limit event. Pre-existing WARN (unchanged, out of scope this tick): 12 handoff entries with unparseable ISO8601 headers pinned live. Next tick: queue[] at cap and non-empty -- fast path should re-verify rb-125 (oldest, needs deliberate touches/tier derivation per earlier note -- source 20r-d has a ~17-file *View.ts roster fan-out) live and launch it, or fall through to the next-valid entry.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -65,6 +65,14 @@
    "reason": "promoted residual R-m24-s4-RT1",
    "slice": "rb-130",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+  },
+  {
+   "added_by": "n/a",
+   "added_utc": "2026-09-26T15:06:34Z",
+   "derived_from_master_sha": "83b7f19",
+   "reason": "promoted residual R-m24-s8-X13",
+   "slice": "rb-131",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": null,
@@ -83,6 +91,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260926T140008Z-1669663",
- "updated_utc": "2026-09-26T14:05:00Z"
+ "updated_by": "mr-sup-native-20260926T150154Z-1687320-8352",
+ "updated_utc": "2026-09-26T15:07:32Z"
 }
