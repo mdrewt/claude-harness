@@ -6,13 +6,30 @@
   "ci": "no-remote-ci-local-gate-green",
   "sha": "410ae5d"
  },
- "inflight": [],
+ "inflight": [
+  {
+   "adr": 269,
+   "claude_pid": 801702,
+   "effort": "xhigh",
+   "model": "fable",
+   "repo": "project",
+   "run_id": "mr-spawn-20260926T030325Z-801640",
+   "session_leader": 801699,
+   "slice": "rb-115",
+   "started_utc": "2026-09-26T03:03:25Z",
+   "tier": "hard",
+   "touches": [
+    "server-module/src/privacy.rs",
+    "server-module/src/privacy_tests.rs"
+   ]
+  }
+ ],
  "last_tick_utc": "2026-09-26T02:00:05Z",
  "live_watchers": [],
  "master": {
-  "sha": "584cce25ac4ff6d3a36544690d83d07c70e5c892",
   "ci": "success",
-  "nightly": "failure(changelog-freshness; issue #499)"
+  "nightly": "failure(changelog-freshness; issue #499)",
+  "sha": "584cce25ac4ff6d3a36544690d83d07c70e5c892"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +44,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "02:00Z tick 2026-09-26: found+reconciled a stale uncommitted handoff/archive write left by the 01:00Z tick (only mr-state.json had landed in 79f14a5) -- committed+pushed as c160dae before proceeding, matching the 2026-09-21T17:04Z precedent for the same failure mode. Then promoted R-20r-d-B1-cap -> rb-127 (residual aging, oldest unpromoted past t1, the B1-cap twin of last tick's B1-ack); doc-only chore PR#139 merged to harness main (457f9fc), ff pulled. queue-add refused: queue[] at 5-entry cap, all 5 existing entries (rb-115/120/121/122/125) live-reverified valid/unconsumed -- none evicted, none stale. rb-127 not yet queued; will surface via normal residual/PLAN derivation once queue drains. t2-stale alarm noted (23 residuals >14d, oldest R-rb-10-X7/X6 27d) but those are already status=promoted/targeted, not actionable via unclaimed-promote. Risk flagged again (3rd consecutive tick): launch throughput trailing promotion throughput (5 promoted rb-* slices queued since 2026-09-21, none launched yet) -- not a BLOCKER, noted for a future tick/Drew to consider raising queue cap or prioritizing a launch tick. Budget NORMAL (d7=$206.81/2783=7.4%, fable_ok=true). No rooted run this tick.",
+ "notes": "03:00Z tick 2026-09-26: gates 0-2 clean (no locks/mutex/hold, no human activity, master green @584cce2, no open PRs, no .done). Gate 3: master not red, nothing open/parked (14r-e stale/terminal). Unclaimed-residual aging (14 past t1, 23 past t2) literally outranks queue[], but queue[] was already 5-cap-full and the prior 3 ticks (00:00Z/01:00Z/02:00Z) each promoted ANOTHER residual into a full queue while launching nothing -- their own notes flagged this as a growing risk. Reversible decision-default: launched queue[0] (rb-115) this tick instead of adding a 6th unlaunched promotion (which couldn't even queue-add -- cap full). rb-115 touches: was '(inherit from source slice -- REVIEW)' in spec; traced the rb-115->rb-87->rb-48 chain by reading server-module/src/privacy.rs directly -- real touches = privacy.rs + privacy_tests.rs (same file rb-111 just merged in). HARD tier -> fable@xhigh, ADR-0269 pre-allocated, adr_next_free left at 269 pending this slice's PR (bump on merge, not now). queue-removed rb-115 (4 entries remain: rb-120/121/122/125). GATES-SEEDED criteria=0 for rb-115 (spec EARS not parseable by the seeder) -- flag for merge-time attention, not a launch blocker. Budget NORMAL (d7=$207.94/2783=7.5%, fable_ok=true, inflight was 0 before this launch). Housekeeping note (not acted on, out of scope for a single-action tick): handoff-rotate WARNed 11 entries with no parseable ISO8601 header, pinned live -- worth a dedicated look.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -36,43 +53,35 @@
  "queue": [
   {
    "added_by": "n/a",
-   "added_utc": "2026-09-21T17:02:04Z",
-   "derived_from_master_sha": "786c222",
-   "reason": "promoted residual R-rb-87-BACKLOGAMBIG",
-   "slice": "rb-115",
+   "added_utc": "2026-09-25T14:02:25Z",
+   "derived_from_master_sha": "9ed396e",
+   "reason": "promoted residual R-20r-a-CARE-GEN",
+   "slice": "rb-120",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-120",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-20r-a-CARE-GEN",
-   "added_utc": "2026-09-25T14:02:25Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "9ed396e"
-  },
-  {
-   "slice": "rb-121",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-20r-a-FOCUS",
    "added_utc": "2026-09-25T15:01:09Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "9ed396e"
+   "derived_from_master_sha": "9ed396e",
+   "reason": "promoted residual R-20r-a-FOCUS",
+   "slice": "rb-121",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-122",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-20r-b-B1",
+   "added_by": "n/a",
    "added_utc": "2026-09-25T20:01:09Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "a08475f"
+   "derived_from_master_sha": "a08475f",
+   "reason": "promoted residual R-20r-b-B1",
+   "slice": "rb-122",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   },
   {
-   "slice": "rb-125",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-20r-d-B1",
-   "added_utc": "2026-09-26T00:01:08Z",
    "added_by": "n/a",
-   "derived_from_master_sha": "584cce2"
+   "added_utc": "2026-09-26T00:01:08Z",
+   "derived_from_master_sha": "584cce2",
+   "reason": "promoted residual R-20r-d-B1",
+   "slice": "rb-125",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
  "rate_limit_armed_by": null,
@@ -91,6 +100,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260926T020005Z-781828",
- "updated_utc": "2026-09-26T02:06:00Z"
+ "updated_by": "native-20260926T030006Z-798994",
+ "updated_utc": "2026-09-26T03:05:00Z"
 }
