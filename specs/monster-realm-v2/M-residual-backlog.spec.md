@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-127 — pending_evolution_notice.entries is uncapped (self-inflicted growth only) (from 20r-d B1-cap, deferred 2026-09-19)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 20r-d · residual: R-20r-d-B1-cap
+
+Deferred with reason: One 24-byte entry per evolution for a player who never acks; self-inflicted only (write_back_battle_results iterates the player's own party, a victim's row cannot be grown) and bounded by owned monsters x the tier cap. A cap must drop-NEWEST (dropping the front is the silent loss the spec forbids); an overflow marker tail-appends to the TABLE (EvolutionRevealRow is frozen at publish, ADR-0174 D8).
+
+EARS: pending_evolution_notice.entries is uncapped (self-inflicted growth only)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-126 — Count-based ack_evolution_notices is not strictly at-least-once across two sessions (from 20r-d B1-ack, deferred 2026-09-19)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 20r-d · residual: R-20r-d-B1-ack
