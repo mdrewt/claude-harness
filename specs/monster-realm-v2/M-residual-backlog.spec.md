@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-131 — [§5.5 nightly wiring — `i18n-completion-check` reported nightly] WHEN the nightly workflow (from m24-s8 X13, deferred 2026-09-21)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: m24-s8 · residual: R-m24-s8-X13
+
+Deferred with reason: `.github/workflows/nightly.yml` and `docs/nightly-red-response-policy.md` are outside this slice's touches (hidden dependency); the wiring is the 3-place edit `evals/nightly-smoke-wiring.eval.mjs` gates (a `#` preamble citing the policy doc + job `i18n-completion` running `just i18n-completion-check`, a policy-doc row, a `notify.needs` entry). The recipe it will call ships here (X6).
+
+EARS: [§5.5 nightly wiring — `i18n-completion-check` reported nightly] WHEN the nightly workflow runs THE SYSTEM SHALL execute `just i18n-completion-check` as its own job with a policy-doc row.
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-130 — hardcodedStrings.ts exemptCallOpenAt does not reject '#' before t/tf — this.#t('raw Englis (from m24-s4 RT1, deferred 2026-09-20)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m24-s4 · residual: R-m24-s4-RT1
