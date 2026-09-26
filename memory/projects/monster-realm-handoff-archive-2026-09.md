@@ -2207,3 +2207,15 @@ DECISION CONFLICT RESOLVED IN-SLICE: ADR-0250 D5 (dismiss_dialogue OPEN) / D6 (a
 SUPERVISOR FOLLOW-UPS (outside touches): (1) ADR-0250 `Extended-by: 0273` / dated note that D5–D7 are superseded by the spec; (2) docs/adr/README.md index row for 0273; (3) close R-rb-45-DRAIN in the residual ledger + amend M-residual-backlog.spec.md#rb-128 (doc-only chore PR); (4) three new residuals registered for promotion: R-rb-128-E1 (JOINGRACE — client: on_disconnect deletes player/character on last connection out, so a mid-grace reload has no avatar; client never re-joins after cancel; claim-UI joinGame has no .catch), R-rb-128-X1 (HELDKEY — mid-grace held movement key = per-round-trip snap-back + one log_reject each), R-rb-128-X2 (REASONSCOPE — REJECT_DELETION_GATED text). Note: `mr-gates residuals add` derives the id as R-<slice>-<gate>, so the 2nd/3rd residual needed --gate X1/X2.
 Gotchas hit: fresh worktree `just ci` fails at `lint` (client/node_modules/.bin/biome not found) until `npm ci --prefix client`; nextest `test(/^name/)` matches the MODULE-QUALIFIED id (guards_tests ids are `guards::guards_tests::…`, privacy_enforcement_tests ids are crate-root) — use `test(=module::name)`; doc-keeper draft needed a fact-check (said "partial", "client changed").
 
+## 2026-09-26 — rb-122: PR #512 open, local `just ci` green (CI-EXIT=0, verifier re-run 2471/2471), ledger 2/2, remote CI running (soft-cap RETUNE note → game-core pins; closes R-20r-b-B1)
+
+Terminal state: https://github.com/mdrewt/monster-realm/pull/512. The supervisor owns the merge. The diff is `server-module/src/raising_tests.rs` only: the note reword, a 2-line boyscout comment, and 4 `rb122_` tests (2 RED on 23da96e). The red-team found 2 survivors of the proximity-window design, and the tester hardened it to a whole-word ban. Gate probe: `memory/projects/gates/rb-122.gates.mjs` x1/x2. No ADR (assigned None).
+
+Follow-ups:
+- (a) supervisor-owned ADR-0175:251-252 still narrates R-20r-b-B1 as open and needs a "closed by rb-122" amendment;
+- (b) two optional /simplify NITs in the PR body;
+- (c) `/tmp/rb122-rt*` (~1.1 GB, red-team scratch) needs manual `rm -rf`, which the guard hook blocked.
+
+Also this run: an orphaned rb-121 `just ci` (worktree deleted, hung 2 h in observability-validate on an unhealthy mr-caddy-validate container). I killed it by PID and ran `docker rm -f` on the container.
+
+

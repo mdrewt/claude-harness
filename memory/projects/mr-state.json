@@ -1,34 +1,18 @@
 {
  "adr_next_free": 274,
- "awaiting_merge": [
-  {
-   "slice": "rb-128",
-   "run_id": "mr-spawn-20260926T174823Z-1901171",
-   "leader_pid": 1901267,
-   "claude_pid": 1901270,
-   "model": "fable",
-   "effort": "xhigh",
-   "tier": "hard",
-   "repo": "project",
-   "adr_reserved": "0273",
-   "started_utc": "2026-09-26T17:48:23Z",
-   "pr": 515,
-   "ci_watch_pid": 2115838,
-   "status": "PR-open-CI-running"
-  }
- ],
+ "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "03d4eb5"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-26T15:00:09Z",
+ "last_tick_utc": "2026-09-26T19:47:42Z",
  "live_watchers": [],
  "master": {
   "ci": "pending",
   "nightly": "in_progress",
-  "sha": "540c92d"
+  "sha": "013d0b8"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -43,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "16:00Z tick: gates 0-2 clean (no locks/mutex, HOLD-NONE, both repos synced, master CI green, no open PRs, no resident session). Gate 3: aged-past-t1 residuals (rb-107/108/109 sets) exist but queue-add was at cap (5/5) -- drained queue instead per prior tick's own breadcrumb: re-verified rb-125 (queue head) live, derived concrete touches (client-UI-only, no schema/netcode/security -- ROUTINE tier) via a research subagent against ADR-0162/ADR-0254, pre-allocated ADR-0272, launched opus@high. queue-removed rb-125 (now 4/5). No merge, no BLOCKERs, no rate-limit event. Next tick: rb-128 is queue head; once queue drains below cap, promote the oldest unclaimed past-t1 residual (currently rb-107 set, ~5.08d, real project defects not eval-tooling-only).",
+ "notes": "19:47Z tick rid=native-20260926T194742Z-2118054: rb-128 (PR #515) merged to master (013d0b8) -- 13 class-(iv) reducers gated per ADR-0273, closing the KNOWN-GAP roster in privacy_enforcement_tests.rs. mr-audit FLAGGED on gating_advisory (roster-size tripwire, adjudicated legitimate -- matches declared scope) and initially on acceptance (cargo not on tick PATH -- fixed by prepending ~/.cargo/bin; re-verify CLEAN). Residual closed. Branch+worktree cleaned. Did NOT composite-launch: master CI still in_progress ~10min post-merge at record time, not polled to completion (avoiding a CI poll loop) -- next tick should re-verify master CI live, then take queue head rb-129 (promoted residual R-rb-45-ONGOING-BATTLE) if green.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -91,6 +75,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260926T150154Z-1687320-8352",
- "updated_utc": "2026-09-26T15:07:32Z"
+ "updated_by": "mr-sup-native-20260926T194742Z-2118054",
+ "updated_utc": "2026-09-26T19:58:18Z"
 }
