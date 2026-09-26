@@ -2,6 +2,29 @@
 
 ---
 
+## 2026-09-26T~17:40Z — rb-125: PR #514 open, local gate green, ledger 6/8 met + 2 DEFER (evolution banner AT announcement + focus; partial R-20r-d-B1)
+
+**TERMINAL STATE:** branch `fix/rb-125-evolution-notice-overlay`, worktree `.claude/worktrees/rb-125`, HEAD `7b4e83e`, pushed. PR https://github.com/mdrewt/monster-realm/pull/514 is open; remote ci/e2e were pending at open. The supervisor owns the merge.
+- Local `just ci`: CI-EXIT=0, 2471 Rust, 3446 client, 99 evals.
+- Verifier: PASS. The acceptance probe is `memory/projects/gates/rb-125.gates.mjs` x1-x6 (independent oracle over the real banner).
+- ADR-0272 (assigned number).
+
+**What shipped.** `ui/evolutionNotice.ts` gains injected `{announce, returnFocus}` sinks and `render({key,label}|null)`. It announces once per `evolutionNoticeKey`, locks with `aria-disabled` instead of `disabled`, and returns focus only on the visible→hidden edge when focus was inside. `main.ts` wires the sinks to the `LiveRegion` singleton with `performance.now()` and to `worldCanvasEl?.focus()`.
+
+**Deferred to backlog.** X7 is the cutscene; X8 is the 18th OverlayId with a passive tier plus the `*View.ts` rename. Adding the 18th id and the rename measured 39 red tests in 12 files, at least 6 of them outside touches. **The follow-up slice's `touches:` MUST include:**
+- `overlayA11yWiring{,.concurrency}.test.ts`
+- `announcements{,.test}.ts`
+- `i18n/catalogParity.test.ts` and `i18n/hardcodedStrings.test.ts`
+- `i18n/catalog.{en,fr}.ts` and `messageIds.ts`
+- `evals/overlay-a11y-manifest`, `evals/overlay-live-region-custody` and `evals/reduced-motion-purity`
+- a back-link in `docs/adr/0254`
+
+**Residual registered.** R-rb-125-CHROMIUM-FOCUS: happy-dom never blurs, so focus retention and return need a browser-tier check.
+
+**Follow-up flag (not changed).** The reviewer's MINOR: the pre-existing 20r-d `e.repeat` keydown guard on OK prevents every repeated key, not only Enter/Space.
+
+**Code-graph refresh (step 10)** is due post-merge on the canonical checkout.
+
 ## 2026-09-26T~04:45Z — rb-120: PR #510 open, local gate green, ledger 5/5 (Care lock generation-token port; closes R-20r-a-CARE-GEN)
 
 **TERMINAL STATE: branch `fix/rb-120-care-lock-generation`, worktree `.claude/worktrees/rb-120`, HEAD `33074b1` pushed (5 wip commits: plan a302dfe → RED tests 3d1a5ae → GREEN 69e2537 → simplify 4f2a874 → review fixes + docs 33074b1), base master `16fe214`. PR https://github.com/mdrewt/monster-realm/pull/510 — remote ci + e2e running; supervisor owns the merge.** Full `just ci` green twice (mr-gates X5 + verifier: client 132 files / 3386 tests, nextest 2467/2467, 99/99 evals). Ledger `rb-120.gates.md` 5/5 met, 0 deferred (X1-X3 via probe `gates/rb-120.gates.mjs x1|x2|x3`, which writes a temporary independent oracle spec under client/src/ui/ and removes it; X4 MANUAL → ADR-0159:279; X5 just ci).
