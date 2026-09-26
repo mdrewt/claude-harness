@@ -7,10 +7,10 @@
   "sha": "03d4eb5"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-26T19:47:42Z",
+ "last_tick_utc": "2026-09-26T20:00:08Z",
  "live_watchers": [],
  "master": {
-  "ci": "pending",
+  "ci": "red-rerun-triggered(run=36267366743)",
   "nightly": "in_progress",
   "sha": "013d0b8"
  },
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "19:47Z tick rid=native-20260926T194742Z-2118054: rb-128 (PR #515) merged to master (013d0b8) -- 13 class-(iv) reducers gated per ADR-0273, closing the KNOWN-GAP roster in privacy_enforcement_tests.rs. mr-audit FLAGGED on gating_advisory (roster-size tripwire, adjudicated legitimate -- matches declared scope) and initially on acceptance (cargo not on tick PATH -- fixed by prepending ~/.cargo/bin; re-verify CLEAN). Residual closed. Branch+worktree cleaned. Did NOT composite-launch: master CI still in_progress ~10min post-merge at record time, not polled to completion (avoiding a CI poll loop) -- next tick should re-verify master CI live, then take queue head rb-129 (promoted residual R-rb-45-ONGOING-BATTLE) if green.",
+ "notes": "20:00Z tick rid=native-20260926T200008Z-2127489: recovered prior tick's uncommitted mr-state/handoff/archive writes into harness main (ca108b2, pushed), reaped dead rb-128 lock. Live-verified rb-128's post-merge master CI (run 36267366743, 013d0b8) had gone RED: ci job passed, e2e job failed 2 tests (pvp-side-b.spec.ts:276, monster-privacy.spec.ts:350), both the same 'side B battle overlay never renders post-accept' symptom carrying a STALE in-source 'RED TODAY' comment from the original 2026-07-31 PR (112242c) that predates 8+ subsequent green runs. rb-128's actual diff (guards.rs deletion-gate inserts across 7 reducer files) has no code linkage to the accept_challenge/pvp.rs/battleView.ts/monster_pub path -- classified flake-suspect, NOT an immediate revert. Triggered `gh run rerun 36267366743 --failed` rather than a fix/revert slice, pending clean-rerun evidence. Did not promote/launch anything else this tick (master-CI-red investigation took gate-3 priority over the aged R-rb-107-* residuals, still oldest-unclaimed at 5.25d). Next tick: re-check run 36267366743 live -- clean rerun confirms flake (fall through to residual promotion / queue rb-129); a repeat of the same 2 failures means a real regression needing a fix/revert slice against rb-128's guard inserts before any other gate-3 work.",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -75,6 +75,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "mr-sup-native-20260926T194742Z-2118054",
- "updated_utc": "2026-09-26T19:58:18Z"
+ "updated_by": "native-20260926T200008Z-2127489",
+ "updated_utc": "2026-09-26T20:11:00Z"
 }
