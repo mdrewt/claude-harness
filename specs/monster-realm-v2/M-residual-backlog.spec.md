@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-128 — [PRV1-7 roster drain] WHEN a class-(iv) KNOWN-GAP reducer (join_game, evolve, care, train, (from rb-45 DRAIN, deferred 2026-09-20)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-45 · residual: R-rb-45-DRAIN
+
+Deferred with reason: rb-45 shipped the [DEL-06] mechanism (ADR-0258) with an exactly-pinned DELIBERATE_EXEMPTIONS roster in server-module/src/privacy_enforcement_tests.rs; the 13 class-(iv) entries are spec section 4.7 gate targets no slice has gated (each is a reducer-file edit outside rb-45 touches + a security-semantics change needing its own reject test, the rb-46 shape). Drain = add crate::guards::require_not_del
+
+EARS: [PRV1-7 roster drain] WHEN a class-(iv) KNOWN-GAP reducer (join_game, evolve, care, train, essence_train, consume_crystalized_essence, attempt_recruit, set_nickname, set_party_slot, enqueue_move, set_move, clear_queue, dismiss_dialogue) is called by a deletion-gated account THE SYSTEM SHALL reject before any write
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-127 — pending_evolution_notice.entries is uncapped (self-inflicted growth only) (from 20r-d B1-cap, deferred 2026-09-19)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 20r-d · residual: R-20r-d-B1-cap
