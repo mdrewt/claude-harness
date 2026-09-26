@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-129 — [PRV1-6 post-terminal] WHEN the deletion cascade cannot forfeit a still-Ongoing PvP battle (from rb-45 ONGOING-BATTLE, deferred 2026-09-20)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-45 · residual: R-rb-45-ONGOING-BATTLE
+
+Deferred with reason: Security audit of rb-45 (ADR-0258): battle::anonymize_battles skips Ongoing rows (battle.rs ~1583) and pvp::forfeit_on_disconnect log-and-continues on an apply_pvp_forfeit Err (pvp.rs ~679-684), so on that error path an Ongoing PvP battle survives the cascade owned by an erased identity; submit_pvp_action (a roster class-(i) reducer) then reaches economy::grant_currency's insert-if-absent arm and 
+
+EARS: [PRV1-6 post-terminal] WHEN the deletion cascade cannot forfeit a still-Ongoing PvP battle (pvp::forfeit_on_disconnect log-and-continue arm) THE SYSTEM SHALL force that battle terminal (or delete it) rather than let an erased identity settle it later
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-128 — [PRV1-7 roster drain] WHEN a class-(iv) KNOWN-GAP reducer (join_game, evolve, care, train, (from rb-45 DRAIN, deferred 2026-09-20)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-45 · residual: R-rb-45-DRAIN
