@@ -1,12 +1,23 @@
 {
- "adr_next_free": 269,
+ "adr_next_free": 271,
  "awaiting_merge": [],
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
   "sha": "410ae5d"
  },
- "inflight": [],
+ "inflight": [
+  {
+   "slice": "rb-120",
+   "session_leader": 1109377,
+   "claude_pid": 1109380,
+   "model": "opus",
+   "effort": "high",
+   "tier": "routine",
+   "repo": "project",
+   "started_utc": "2026-09-26T08:02:15Z"
+  }
+ ],
  "last_tick_utc": "2026-09-26T07:00:10Z",
  "live_watchers": [],
  "master": {
@@ -27,21 +38,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "07:00Z tick: reconciled prior tick's uncommitted rb-115 merge record (PR#509, master@16fe214); re-verified LIVE master CI green (both ci+e2e checks pass on PR#509's run, gh run list confirms 3 latest master runs success). Gate 0-2 clean (no live locks/mutex/hold/human-activity). Gate 3: nothing open/parked; residuals aging outranked queue -- 14+ unpromoted residuals past t1_promote_days=3 (none past t2_stale_days=14). Classified oldest tied pair (R-rb-45-DRAIN/R-rb-45-ONGOING-BATTLE, both disclosed 2026-09-20T08:26:08Z, age 5.94d) as real security/game defects (deletion-gated-account write bypass / PvP battle survives erased identity), not eval-tooling-only -- promoted R-rb-45-DRAIN -> rb-128 via doc-only chore PR, queue-added (queue now at 5-cap). R-rb-45-ONGOING-BATTLE left unpromoted for a future tick (queue was full). No launch this tick (one action = promote+queue-add per gate 3 ordering: residual promotion outranks queue fast-path and new PLAN work).",
+ "notes": "08:00Z tick: reaped stale rb-115 per-run lock (session_leader dead, merge already reconciled by 07:00Z tick, PR#509 merged, ADR-0269 on disk). Gate 0-2 clean. Gate 3: residuals past t1_promote_days=3 exist (oldest 5.65d) but queue[] was at 5-cap (rb-120/121/122/125/128) so drained the fast path instead of promoting a new residual -- re-verified rb-120 live (valid, unblocked, unmerged), derived actual touches from its residual reason text (raisingView.ts/test.ts + ADR-0159 amendment), tier=routine, pre-allocated ADR-0270 (corrected stale adr_next_free 269->270, now 271). Launched cleanly, queue-removed rb-120 (4 entries remain). No BLOCKER, governor NORMAL (d7=$285.84/2783).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-25T14:02:25Z",
-   "derived_from_master_sha": "9ed396e",
-   "reason": "promoted residual R-20r-a-CARE-GEN",
-   "slice": "rb-120",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-09-25T15:01:09Z",
@@ -91,6 +94,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260926T070010Z-1089972",
- "updated_utc": "2026-09-26T07:04:00Z"
+ "updated_by": "mr-sup-native-20260926T080006Z-1107452",
+ "updated_utc": "2026-09-26T08:02:56Z"
 }
