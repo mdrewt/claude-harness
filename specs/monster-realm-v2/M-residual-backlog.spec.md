@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-125 — Evolution cutscene / registry overlay reveal with AT announcement (ADR-0254 residual 1+3) (from 20r-d B1, deferred 2026-09-19)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: 20r-d · residual: R-20r-d-B1
+
+Deferred with reason: 20r-d ships the spec-sanctioned minimal PASSIVE banner (not an ADR-0162 registry overlay): no cutscene/transformation sequence and no AT announcement (ui/liveRegion.ts is the sole announcement owner and its custody seam is tied to overlay open/close). Promotion to a registry overlay delivers cutscene + announcement + focus handling together; costs the ~17-file *View.ts roster fan-out (overlayRegis
+
+EARS: Evolution cutscene / registry overlay reveal with AT announcement (ADR-0254 residual 1+3)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-124 — ADR-0173:293-301 still advertises the quest_defs_load_error limiter as an OPEN named follo (from 20r-c ADR0173-BODY, deferred 2026-09-19)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: 20r-c · residual: R-20r-c-ADR0173-BODY
