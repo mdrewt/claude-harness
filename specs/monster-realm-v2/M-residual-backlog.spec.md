@@ -26,6 +26,22 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-136 — real-cascade oracle for reduced-motion HP bar runs at ledger-time only, not CI-time (from rb-10 X6, deferred 2026-08-29)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-10 · residual: R-rb-10-X6
+
+Deferred with reason: PR#387: just ci has no step that exercises the real-Chromium cascade probe; nothing in the CI gate would catch a future regression here
+
+EARS: real-cascade oracle for reduced-motion HP bar runs at ledger-time only, not CI-time
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
+### rb-135 — reduced-motion HP-bar transition is latent (rendered node recreated every render) (from rb-10 X7, deferred 2026-08-29)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-10 · residual: R-rb-10-X7
+
+Deferred with reason: PR#387 D7/ADR-0213: happy-dom+real-Chromium probe show 0 animations either way because replaceChildren() discards the previous fill node before any transition can interpolate; not a regression, but the guard cannot fire until a future slice reuses the node
+
+EARS: reduced-motion HP-bar transition is latent (rendered node recreated every render)
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-134 — A capped export reject skips the TTL reaper self-arm (from rb-107 ARMSKIP, deferred 2026-09-21)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-107 · residual: R-rb-107-ARMSKIP

@@ -1293,7 +1293,14 @@ def cmd_residuals(a, sub):
     if sub == "list":
         opens = open_residuals(rows)
         if a.get("unclaimed"):
-            opens = [r for r in opens if not r.get("promoted_slice")]
+            # "claimed" means an ACTUAL build slice owns it (status:promoted, promoted_slice is a
+            # real generated rb-N id). `promoted_slice` is truthy but NOT a claim for status:targeted
+            # rows: residual_upsert() reuses that same field to stash a free-text fold-in-place
+            # recommendation when --target is neither `backlog` nor a disposition. Filtering on
+            # truthiness alone hid those rows from every aging-preemption pick forever (confirmed:
+            # R-rb-10-X7/X6 sat 28.7d, past both t1 and t2, invisible here the whole time) while
+            # `promote --id` ALSO refused them as "ALREADY-PROMOTED" on the same wrong signal.
+            opens = [r for r in opens if r.get("status") != "promoted"]
         if a.get("json"):
             print(json.dumps({"open": opens,
                               "alarms": ["%s: %s" % (k, v) for k, v in residual_alarms(rows)]},
@@ -1326,7 +1333,7 @@ def cmd_residuals(a, sub):
         r = folded.get(rid)
         if not r:
             return die("no residual %r" % rid)
-        if r.get("promoted_slice"):
+        if r.get("status") == "promoted":
             print("ALREADY-PROMOTED %s -> %s" % (rid, r["promoted_slice"]))
             return 0
         full = os.path.join(specs, spec_name)
@@ -1420,7 +1427,18 @@ def cmd_residuals(a, sub):
         for k in ("slice", "gate", "title", "target", "reason"):
             if not a.get(k):
                 return die("add requires --slice --gate --title --target --reason")
-        rid = residual_upsert(a["slice"], a["gate"], a["title"], a["target"], a["reason"],
+        target = a["target"]
+        if target not in ("backlog",) + LEGAL_DISPOSITIONS:
+            specs = a.get("_specs") or SPECS
+            if find_section(target, specs)[1] is None:
+                return die("--target %r is not `backlog`, %s, or an existing spec section name "
+                           "(the same rule cmd_lint's DEFER-target check already enforces, the "
+                           "14r-c-2 class). A free-text recommendation here creates status:targeted "
+                           "with no real claim on it — invisible to `residuals list --unclaimed` "
+                           "and refused by `residuals promote` (both key off status==promoted). Use "
+                           "`backlog` and put the recommendation in --reason instead."
+                           % (target, "/".join(LEGAL_DISPOSITIONS)))
+        rid = residual_upsert(a["slice"], a["gate"], a["title"], target, a["reason"],
                               {"Repo": a.get("domain", "project")}, path)
         print("RESIDUAL-ADDED %s" % rid if rid else "RESIDUAL-EXISTS")
         return 0
