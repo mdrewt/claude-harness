@@ -12,7 +12,7 @@
  "master": {
   "ci": "green",
   "nightly": "flake-suspect (changelog-freshness job failed on run 36240783375; re-ran node scripts/changelog-freshness.mjs --check locally against current master efb6c40, exits 0 clean; not actionable)",
-  "sha": "efb6c40"
+  "sha": "5544518"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,7 +27,7 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "00:00Z tick rid=native-20260927T000012Z-2603682: gate0/1 clean (no live locks/mutex, HOLD-NONE, no human session). Pushed harness main (was ahead-1 with prior tick's unpushed record commit 1876cbd). Project master verified green (run 36280359897); Nightly's changelog-freshness failure (run 36240783375) reproduced clean locally against current master -- flake-suspect, not actionable. Gate 3: no master-CI-red, nothing open/parked. mr-gates residuals list --unclaimed: 28 open, all MED/real-defect (none eval-tooling), 9 past t1_promote_days=3 (rb-107 x5, rb-108 x2, rb-109 x2). Promoted oldest by disclosed_at, R-rb-107-LOCKOUT -> rb-132, via doc-only chore PR#144 (squash-merged, branch deleted), queued rb-132. 8 more past-t1 residuals remain for future ticks (one promote per tick). No launches this tick (nothing eligible ranked above the aging gate). Governor NORMAL (d7=89.02/2783, fable_d7=96.74/2298, fable_ok=true).",
+ "notes": "01:00Z tick rid=mr-sup-native-20260927T010013Z-2620017: gate0/1 clean (no live locks/mutex, HOLD-NONE, no human session). Project master CI green (rb-129 run, verified via gh run list). Gate 3: no master-CI-red, nothing open/parked, nothing inflight/.done. mr-gates residuals list --unclaimed: 27 open, all MED/real-defect (none eval-tooling), 9 past t1_promote_days=3 (rb-107 REJECTWALK just promoted -> rb-133; ARMSKIP/BYTEBOUND/CAPOBS remain; rb-108 x2, rb-109 x3). Promoted oldest by disclosed_at, R-rb-107-REJECTWALK -> rb-133, via doc-only chore PR#145 (squash-merged, branch deleted, harness main fast-forwarded to 5544518). queue[] now has 4 entries (rb-130, rb-131, rb-132, rb-133) awaiting the aging backlog to clear before a launch tick fires -- continuing the 00:00Z-tick precedent that past-t1 promotion outranks queue launches. No launches this tick. Governor NORMAL (d7=490.14/2783, fable_d7=396.74/2298, fable_ok=true).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
@@ -56,6 +56,14 @@
    "derived_from_master_sha": "efb6c40",
    "reason": "promoted residual R-rb-107-LOCKOUT",
    "slice": "rb-132",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+  },
+  {
+   "added_by": "n/a",
+   "added_utc": "2026-09-27T01:02:48Z",
+   "derived_from_master_sha": "efb6c40",
+   "reason": "promoted residual R-rb-107-REJECTWALK",
+   "slice": "rb-133",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
   }
  ],
