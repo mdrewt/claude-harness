@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-133 — The exact admission gate rejects only after the manifest walk for callers whose bundle exc (from rb-107 REJECTWALK, deferred 2026-09-21)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-107 · residual: R-rb-107-REJECTWALK
+
+Deferred with reason: The exact gate rejects only in the band live in (cap - total, cap - EXPORT_MIN_BUNDLE_ROWS], i.e. only for callers whose bundle exceeds the minimum, and only AFTER the manifest walk (which includes the two unindexed own-row scans in rows_playtest_event and rows_battle_action); such a caller writes nothing, so the 60 s cooldown - whose state is the caller's own written rows - engages only within 60
+
+EARS: The exact admission gate rejects only after the manifest walk for callers whose bundle exceeds the minimum
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-132 — Anonymous-share export lockout is sustainable by a JWT-less sybil (from rb-107 LOCKOUT, deferred 2026-09-21)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-107 · residual: R-rb-107-LOCKOUT
