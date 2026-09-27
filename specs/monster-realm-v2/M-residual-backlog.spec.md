@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-134 — A capped export reject skips the TTL reaper self-arm (from rb-107 ARMSKIP, deferred 2026-09-21)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-107 · residual: R-rb-107-ARMSKIP
+
+Deferred with reason: A capped reject returns before ensure_export_bundle_reaper(ctx) and its Err rolls back any arm in the same transaction, so while the store sits at the cap no write path re-arms the TTL singleton; the invariant 'a chunk exists implies the singleton is armed' survives literally (the chunks that exist were armed when written), but the self-healing reading does not - only init/sync_content can restore
+
+EARS: A capped export reject skips the TTL reaper self-arm
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-133 — The exact admission gate rejects only after the manifest walk for callers whose bundle exc (from rb-107 REJECTWALK, deferred 2026-09-21)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: rb-107 · residual: R-rb-107-REJECTWALK
