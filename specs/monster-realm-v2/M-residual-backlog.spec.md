@@ -26,6 +26,14 @@ is closed when its criterion passes a gate in the slice that picks it up.)*
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
+### rb-132 — Anonymous-share export lockout is sustainable by a JWT-less sybil (from rb-107 LOCKOUT, deferred 2026-09-21)
+`touches: (inherit from source slice — REVIEW)`
+`after:` — · source: rb-107 · residual: R-rb-107-LOCKOUT
+
+Deferred with reason: rb-107's anonymous tier caps JWT-less callers at EXPORT_ANON_LIVE_ROW_CAP (21 504 rows, about 1 264 minimum bundles), so a sybil sustaining ~181 join_game+request_data_export pairs per day (one per ~478 s) keeps every anonymous export rejected indefinitely; account holders keep 21 504 rows of headroom no JWT-less identity can take, but anonymous portability has no per-identity fairness without aut
+
+EARS: Anonymous-share export lockout is sustainable by a JWT-less sybil
+Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).
 ### rb-131 — [§5.5 nightly wiring — `i18n-completion-check` reported nightly] WHEN the nightly workflow (from m24-s8 X13, deferred 2026-09-21)
 `touches: (inherit from source slice — REVIEW)`
 `after:` — · source: m24-s8 · residual: R-m24-s8-X13
