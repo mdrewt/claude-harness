@@ -4,15 +4,15 @@
  "consecutive_standdowns": 0,
  "harness_main": {
   "ci": "no-remote-ci-local-gate-green",
-  "sha": "20960f2"
+  "sha": "ccad204"
  },
  "inflight": [],
- "last_tick_utc": "2026-09-27T00:00:12Z",
+ "last_tick_utc": "2026-09-27T03:00:06Z",
  "live_watchers": [],
  "master": {
-  "ci": "green",
+  "ci": "pending (post-merge run in_progress at record time; re-verify next tick)",
   "nightly": "flake-suspect (changelog-freshness job failed on run 36240783375; re-ran node scripts/changelog-freshness.mjs --check locally against current master efb6c40, exits 0 clean; not actionable)",
-  "sha": "5544518"
+  "sha": "6a550e5"
  },
  "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
  "native_supervisor": {
@@ -27,21 +27,13 @@
   "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
   "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
  },
- "notes": "01:00Z tick rid=mr-sup-native-20260927T010013Z-2620017: gate0/1 clean (no live locks/mutex, HOLD-NONE, no human session). Project master CI green (rb-129 run, verified via gh run list). Gate 3: no master-CI-red, nothing open/parked, nothing inflight/.done. mr-gates residuals list --unclaimed: 27 open, all MED/real-defect (none eval-tooling), 9 past t1_promote_days=3 (rb-107 REJECTWALK just promoted -> rb-133; ARMSKIP/BYTEBOUND/CAPOBS remain; rb-108 x2, rb-109 x3). Promoted oldest by disclosed_at, R-rb-107-REJECTWALK -> rb-133, via doc-only chore PR#145 (squash-merged, branch deleted, harness main fast-forwarded to 5544518). queue[] now has 4 entries (rb-130, rb-131, rb-132, rb-133) awaiting the aging backlog to clear before a launch tick fires -- continuing the 00:00Z-tick precedent that past-t1 promotion outranks queue launches. No launches this tick. Governor NORMAL (d7=490.14/2783, fable_d7=396.74/2298, fable_ok=true).",
+ "notes": "03:00Z tick rid=native-20260927T030006Z-2772575: mr-ci-watch EVENT (rb-130.ci.md) reported PR#517 green. Re-verified live: gates verify CLEAN (X1 spotcheck agrees), mr-audit orchestration/gating/acceptance all CLEAN. Squash-merged PR#517 -> master@6a550e5 (post-merge CI still in_progress at record time). Closed residual R-m24-s4-RT1 via mr-gates residuals close. Worktree/branch/lock cleaned. Gate 3 aging check: oldest unclaimed residual past t1=3d was R-rb-107-ARMSKIP (5.5d) -- outranks new PLAN work, so promoted it -> rb-134 (doc-only chore PR#146, squash-merged, harness main ff'd to ccad204) instead of launching fresh PLAN §9 work. queue[] now has 4 entries (rb-131..rb-134); no launch this tick -- two more past-t1 unpromoted residuals remain (R-rb-107-BYTEBOUND, R-rb-107-CAPOBS) for a future tick. Governor NORMAL (d7=500.99+12.46/2783, fable_ok=true).",
  "open_chore_prs": [],
  "park_counters": {
   "14r-e": 1
  },
  "parked": [],
  "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-26T14:02:47Z",
-   "derived_from_master_sha": "83b7f19",
-   "reason": "promoted residual R-m24-s4-RT1",
-   "slice": "rb-130",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
   {
    "added_by": "n/a",
    "added_utc": "2026-09-26T15:06:34Z",
@@ -65,6 +57,14 @@
    "reason": "promoted residual R-rb-107-REJECTWALK",
    "slice": "rb-133",
    "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
+  },
+  {
+   "slice": "rb-134",
+   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
+   "reason": "promoted residual R-rb-107-ARMSKIP",
+   "added_utc": "2026-09-27T03:03:11Z",
+   "added_by": "n/a",
+   "derived_from_master_sha": "5544518"
   }
  ],
  "rate_limit_armed_by": null,
@@ -83,6 +83,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 2,
- "updated_by": "native-20260927T000012Z-2603682",
- "updated_utc": "2026-09-27T00:05:00Z"
+ "updated_by": "native-20260927T030006Z-2772575",
+ "updated_utc": "2026-09-27T03:03:11Z"
 }
