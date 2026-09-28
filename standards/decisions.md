@@ -24,8 +24,8 @@ a matter of routine is doing it wrong.
 <Why — the constraint or trade-off that forced this choice.>
 <What it rules out — the tempting alternative a maintainer should not re-try, and why.>
 ```
-10–25 lines each. Untitled numbering, statuses, date fields, and "Confirmation
-gate" ceremony are deliberately absent — if a decision needs enforcement, the
+10–25 lines each. Numbering, statuses, date fields, and "Confirmation gate"
+ceremony are deliberately absent — if a decision needs enforcement, the
 enforcement is an ordinary test or lint (see `testing-tdd.md`), and the entry
 simply mentions it in prose.
 
@@ -33,7 +33,9 @@ simply mentions it in prose.
 - **Supersede in place.** When a decision changes, rewrite its entry to the
   current state (git history is the archive). Never chain "Amends:" /
   "Superseded-by:" entries.
-- Every claim in an entry is re-derivable from the code it describes; a claim
-  that can't be verified gets dropped, not carried.
+- **Factual claims** about the code are re-derivable from it; one that can't
+  be verified gets dropped, not carried. **Rationale** (the "why") is by
+  nature not in the code — it is judged for plausibility against the stated
+  constraint, never stripped for being unverifiable.
 - The `/decision` command drafts entries; the reviewer checks new entries meet
   the bar above (and flags routine minting).

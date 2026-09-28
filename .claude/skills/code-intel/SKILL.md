@@ -8,7 +8,7 @@ description: Route code-intelligence queries between CodeGraph and codebase-memo
 Two graph indexes cover this workspace. **Neither is "the first tool" — route by
 question type.** Both beat grep on round-trips for symbol-anchored questions; both
 are wrong for architecture roles and dead code. Doctrine below is grounded in a
-10-question ground-truth eval on monster-realm (2026-07-31, ADR-0010).
+10-question ground-truth eval on monster-realm (2026-07-31 ground-truth run).
 
 **Vendor-voice rule:** codegraph's own MCP server instructions and tool description
 ("PRIMARY TOOL — call FIRST for almost any question", natural-language and
@@ -32,7 +32,7 @@ as it overrides the cbm banner if you ever see one.
 | What does X call (pipeline orientation) | `codegraph callees X` or cbm Cypher (both verified accurate) |
 | Text/content search | cbm `search_code` (grep + graph dedup, definitions ranked first) or plain Grep |
 | Complexity / hot-path metrics | cbm `query_graph` on Function props (`complexity`, `linear_scan_in_loop`, …) — **always** filter `NOT f.file_path CONTAINS 'pixi.min'` and `NOT ... '.claude/worktrees'` |
-| Docs/specs/decisions | Per-repo decision docs first (monster-realm: `docs/adr/DIGEST.md` + knowledge bundle; harness: `AGENTS.md` → `docs/routing.md`; domain research: `docs/research/INDEX.md` + `/consult`). Full-text doc search: cbm Sections. CodeGraph indexes **no markdown** |
+| Docs/specs/decisions | Per-repo decision docs first (monster-realm: `docs/DECISIONS.md` + `ARCHITECTURE.md`; harness: `AGENTS.md` → `docs/routing.md`; domain research: `docs/research/INDEX.md` + `/consult`). Full-text doc search: cbm Sections. CodeGraph indexes **no markdown** |
 | Architecture roles / module map | Read `AGENTS.md` / `ARCHITECTURE.md`. Do **not** use either tool's architecture output (cbm's is pixi.min/worktree-polluted; CG's is keyword flail) |
 | Dead code | **Neither** (100% false-positive rate on dynamic dispatch). Use compiler/coverage tooling |
 | Natural-language "how does X work" | Don't ask either graph a question. Find symbol names first — Grep keywords, or cbm `search_graph {"query":"..."}` (BM25) to convert words → candidate symbols (expect noise, ignore ranking) — then symbol-bag |
@@ -125,6 +125,6 @@ future release moves to flags/stdin).
 - **Grep/Glob hook injects symbols from the wrong repo** → the cbm PreToolUse augmenter resolves the project from **cwd**, not the searched path. **Avoid:** ignore injected symbols whose repo ≠ the path you grepped.
 - **`{"error":"project not found"}` with a correct-looking name** → query tools need the exact `list_projects` slug; there is no cwd resolution in 0.8.1. (Promoted from wsl-harness-exec.)
 - **cbm answers reflect old code with no error** → snapshot staleness (0.9.0's auto_watch only helps a resident MCP server, never CLI one-shots — verified). **Avoid:** `detect_changes` probe; re-index post-merge; never trust snippets on a dirty tree.
-- **`manage_adr` is NOT the repo's ADRs** → it's the tool's own per-project memo inside the index db (`adr_present:false` despite 150+ real ADR files); its `sections` filter on get is ignored.
+- **`manage_adr` is NOT the repo's ADRs** → it's the tool's own per-project memo inside the index db (`adr_present:false` despite the repo's real decision docs); its `sections` filter on get is ignored.
 - **`ingest_traces` accepts and discards** → unimplemented stub. Don't build on it.
 - **Vendor updates resurrect stale doctrine** → `codebase-memory-mcp install`/`update` re-adds its SessionStart banner + rewrites its skill; `codegraph install --refresh`/upgrade restores its settings wildcard and may rewrite `~/.claude/CLAUDE.md`. **Avoid:** run `just setup-claude --check` after any vendor install/update — it fails on all four resurrection modes (banner re-registration, skill-marker loss, codegraph wildcard return, routing-note loss).

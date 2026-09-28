@@ -12,11 +12,13 @@ Graphs answer from the canonical checkout's last index — for review clones or
 worktree diffs, fall back to Read/Grep. Flag: correctness bugs, missing edge cases, security
 issues (injection, authz, secrets, unsafe deps), SSOT violations, premature
 abstraction / unjustified complexity, and least-surprise violations. When a
-dependency or cross-cutting pattern was added, check `docs/DECISIONS.md` got
-an entry meeting the bar in `~/.claude/harness/standards/decisions.md` — and
-flag the inverse too: an entry minted for something routine or code-evident
-(decision-log inflation is a finding, not diligence). Verify new-entry claims
-against the code in the diff. If the slice's worktree has an
+dependency or cross-cutting pattern was added, judge it against the two-part
+bar in `~/.claude/harness/standards/decisions.md`: flag a missing
+`docs/DECISIONS.md` entry only when the bar is actually met, and flag the
+inverse too — an entry minted for something routine or code-evident
+(decision-log inflation is a finding, not diligence). Check a new entry's
+factual claims against the code in the diff; rationale is judged for
+plausibility, not re-derivation. If the slice's worktree has an
 `implementation-notes.md`, review each "Deviations" entry: is the conservative
 choice justified, and is its blast radius covered by a test or spec note?
 Output findings grouped by severity (blocker / major / minor) with file:line

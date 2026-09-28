@@ -10,10 +10,10 @@ hallucinated/typosquatted deps).
   store for real values.
 
 ## Static & dependency analysis
-- **SAST**: Semgrep on every PR.
+- **SAST**: Semgrep when the project's threat model warrants it.
 - **SCA**: dependency scanning + pinned lockfiles; dependency review on PRs;
   reject hallucinated/typosquatted packages.
-- **SBOM + licenses**: Trivy/Syft generate an SBOM; license check (all projects
+- **SBOM + licenses**: Trivy/Syft generate an SBOM where the threat model warrants; license check (all projects
   are published open source).
 
 ## Dependency freshness

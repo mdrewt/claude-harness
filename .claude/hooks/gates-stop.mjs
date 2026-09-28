@@ -21,7 +21,7 @@
 //   * Stop hooks DO fire in headless `claude -p`.
 //   * Hooks DO inherit the parent process environment, which is how MR_SLICE reaches us.
 //   * `stop_hook_active` flips true on every stop AFTER a block. It is recorded here and
-//     DELIBERATELY NOT branched on: bailing on it (as check-docs-updated.mjs does) would permit
+//     DELIBERATELY NOT branched on: bailing on it (as a soft reminder hook would) would permit
 //     exactly one block per session once this is armed, which is nearly worthless.
 //   * Multiple Stop hooks all fire, and a hook that throws does not suppress the others or wedge
 //     the session — so the worst case for a defect in this file is "no instrument", not
