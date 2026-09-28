@@ -27,9 +27,9 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
 1. **21r follow-ups** (`M-postgate-twentyfirst-review-residuals.spec.md`, triaged 2026-09-28,
-   build-ready, 3 disjoint slices): 21r-a taming write-back softlock (MED) · 21r-b uncatalogued
-   UI strings (HIGH — breaks the recorded no-hard-coded-strings decision) · 21r-e answered
-   decision #479 (trade-time Trust/QT reset) + the two adjudicated DECISIONS gap entries.
+   in progress): 21r-a (taming softlock, MED) and 21r-b (uncatalogued UI strings, HIGH) MERGED
+   2026-09-28 as the revision program's rehearsal slices; **21r-e remains** — answered decision
+   #479 (trade-time Trust/QT reset) + the two adjudicated DECISIONS gap entries.
 2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S1 rewrites two e2e tests that currently
    assert the trade-oracle leak as intended behavior, and S2 changes a frozen schema; the

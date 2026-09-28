@@ -1,6 +1,6 @@
 # M-postgate-twentyfirst-review-residuals — verified twenty-first-review findings
 
-**Status:** build-ready · 3 slices (21r-a, 21r-b, 21r-e), none started, no gate ledgers ·
+**Status:** in progress · 21r-a MERGED (PR #528) · 21r-b MERGED (PR #527) · 21r-e remaining ·
 **Triaged:** 2026-09-28 (harness-revision Phase 3) against monster-realm master `4f36de2`
 (post-de-bloat); every premise below re-verified at that SHA. Doctrine: `standards/testing-tdd.md`.
 **Provenance:** twenty-first weekly review of master @ `2f5ae9d` (2026-09-25; 9 lenses, 3 verifiers,
