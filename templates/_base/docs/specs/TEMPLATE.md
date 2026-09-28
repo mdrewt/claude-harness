@@ -1,26 +1,28 @@
-# Spec: <feature name>
+# Spec: <id> — <title>
+**Status:** draft · **Owner:** · **Stack:** · **Project:** · **Depends on:**
 
-**Status:** draft · **Owner:** · **Date:** YYYY-MM-DD
+<!-- Canonical skeleton: standards/spec-driven.md. Heading tokens are the
+contract (numbering optional). Omit empty sections — never fill with filler. -->
 
-## 1. Problem / intent
+## Problem / intent
 What are we building and why? Who is it for? What does success look like?
 
-## 2. Scope
-- In scope:
-- Out of scope (non-goals):
-
-## 3. Acceptance criteria (EARS)
-> Each becomes a test/eval case. Use the EARS keywords.
+## Acceptance criteria (EARS)
+> Each becomes a test case. Enforceable exclusions go here as negative EARS.
 - WHEN <trigger/condition> THE SYSTEM SHALL <observable behavior>
 - WHILE <state> THE SYSTEM SHALL <behavior>
 - IF <error condition> THEN THE SYSTEM SHALL <handling>
 
-## 4. Plan (high level)
-Approach, key components, data model, contracts at boundaries.
+## Touches
+Declared path-set (files/dirs this change may edit) — used for fan-out eligibility.
 
-## 5. Tasks (small vertical slices)
-- [ ] <task 1 — one mergeable behavior>
-- [ ] <task 2>
+## Non-goals
+Optional — untestable scope fences only.
 
-## 6. Risks / decisions
-Anything needing an ADR (new dependency, pattern, technology choice)?
+## Notes
+Weight/sizing, investigation guidance (falsifiable hypotheses, not prescribed
+implementation), research slugs.
+
+## Delivered / Parked
+Written at slice close, with evidence. Every parked item ends with
+`parked → <queued spec id | wontfix>`.

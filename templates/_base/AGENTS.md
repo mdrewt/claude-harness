@@ -3,11 +3,11 @@
 Project-specific rules. Inherits the workspace `AGENTS.md` and `standards/`.
 
 - **Stack:** {{STACK}}
-- **Run:** `just setup` · `just test` · `just lint` · `just typecheck` · `just eval` · `just security` · `just ci`
-- **Done =** `just ci` green and meaningful (coverage + mutation + security clean), ADR present for new deps/patterns.
+- **Run:** `just setup` · `just test` · `just lint` · `just typecheck` · `just security` · `just ci`
+- **Done =** `just ci` green, honestly: no test weakened or quarantined to pass, deletions adjudicated, new behavior covered by a test watched failing first (`standards/testing-tdd.md`).
 
 ## Notes
-- Spec lives in `docs/specs/`; ADRs in `docs/adr/`.
+- Spec lives in `docs/specs/`; decisions in `docs/DECISIONS.md`.
 - Tests are authored from acceptance criteria; the implementer doesn't grade its own tests.
 
 ## Principle tiers & inversions (this project)
@@ -16,4 +16,5 @@ Inherits `standards/principles.md`. Declare deviations here, one line of rationa
 - Demoted / skipped: (none yet)
 - Inverted: (none yet — e.g. "Postel inverted: reject out-of-contract input, don't clamp")
 
-Record non-obvious calls as ADRs.
+Add a `docs/DECISIONS.md` entry only when a call constrains future work and its
+why is not evident from the code (`standards/decisions.md`); most changes record nothing.

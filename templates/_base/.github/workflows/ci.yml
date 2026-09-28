@@ -24,14 +24,13 @@ jobs:
       - run: just setup
       - run: just lint
       - run: just typecheck
-      - run: just test            # vitest with coverage thresholds (standards/testing-tdd.md)
-      - run: just eval
-      - name: Mutation tests (meaningful-test gate)
-        run: just mutate
+      - run: just test            # coverage collected as a report, never a threshold (standards/testing-tdd.md)
+      # Mutation testing runs out of band (nightly / pre-merge on sensitive modules), not in PR CI.
       - run: just build
       - name: SCA (npm audit)
         run: npm audit --audit-level=high
-      - name: SAST (Semgrep)
-        run: pipx run semgrep scan --config auto --error
-      - name: SBOM
-        uses: anchore/sbom-action@v0
+      # SAST + SBOM: enable per threat model — standards/ci-cd.md
+      # - name: SAST (Semgrep)
+      #   run: pipx run semgrep scan --config auto --error
+      # - name: SBOM
+      #   uses: anchore/sbom-action@v0

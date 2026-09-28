@@ -4,5 +4,5 @@
     "strict": true, "noUncheckedIndexedAccess": true, "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true, "skipLibCheck": true, "noEmit": true
   },
-  "include": ["src", "evals"]
+  "include": ["src"]
 }

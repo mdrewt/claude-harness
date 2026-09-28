@@ -11,9 +11,6 @@ typecheck:
 test:
     cargo test
 
-eval:
-    cargo test --test architecture
-
 # check-secrets is the local gate; SCA (cargo audit) is advisory locally and the
 # authoritative gate in CI (see .github/workflows/ci.yml).
 security:
@@ -26,4 +23,4 @@ mutate:
 changelog:
     git cliff -o CHANGELOG.md
 
-ci: lint typecheck test eval security
+ci: lint typecheck test security

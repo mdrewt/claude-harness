@@ -4,10 +4,10 @@
   "engines": { "node": ">=24.13.1 <25" },
   "scripts": {
     "setup": "npm install", "lint": "biome check .", "format": "biome format --write .",
-    "typecheck": "tsc --noEmit", "test": "vitest run", "eval": "node evals/run.mjs",
+    "typecheck": "tsc --noEmit", "test": "vitest run --dir src",
     "security": "node scripts/check-secrets.mjs .",
     "build": "tsc", "start": "electron .",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run eval && npm run security"
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run security"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",

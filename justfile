@@ -2,10 +2,12 @@ set windows-shell := ["cmd.exe", "/c"]
 # Harness self-management (dogfoods the standard the projects follow).
 
 test:
-    node --test scripts/tests/harness.test.mjs scripts/tests/invariants.test.mjs scripts/tests/adr-lint.test.mjs .claude/hooks/quiet/quiet.test.mjs
+    node --test scripts/tests/harness.test.mjs scripts/tests/invariants.test.mjs .claude/hooks/quiet/quiet.test.mjs
 
-# Full harness gate (dogfoods what projects do): lint its own scripts, then test.
-ci: lint test research-gate adr-gate
+# Full harness gate: lint scripts, run tests, gate the research library, and prove the
+# supervisor tooling's own wiring (mr-selfcheck runs each mr-* tool's selftest) — so a
+# memory/projects change can actually fail CI.
+ci: lint test research-gate selfcheck
 
 doctor:
     node scripts/doctor.mjs
@@ -70,15 +72,9 @@ research-gate:
     node scripts/research-index.mjs docs/research --check
     node scripts/research-lint.mjs docs/research --shared
 
-# Lint an ADR corpus (structure, status enum, supersede links, Confirmation teeth).
-#   just adr-lint docs/adr                          # non-strict (missing Confirmation = WARN)
-#   just adr-lint docs/adr --strict-confirmation    # accepted ADRs must name a real gate
-adr-lint *ARGS:
-    node scripts/adr-lint.mjs {{ARGS}}
-
-# Gate the harness's own ADR corpus (strict — backfilled 2026-07-27). Part of `just ci`.
-adr-gate:
-    node scripts/adr-lint.mjs docs/adr --strict-confirmation
+# Supervisor-tooling wiring + selftests (SELFCHECK-OK expected; NOTEs are reports).
+selfcheck:
+    memory/projects/mr-selfcheck
 
 # Reproducible ~/.claude wiring: link the harness's shared skills + global agents
 # (expert, review-lens) and a `harness` anchor into ~/.claude so they're discoverable

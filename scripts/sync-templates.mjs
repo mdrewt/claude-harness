@@ -29,8 +29,7 @@ const MANAGED = [
   'CODE_OF_CONDUCT.md',
   'scripts/check-secrets.mjs',
   'scripts/check-commit-msg.mjs',
-  'evals/run.mjs',
-  // The Bash noise filter (ADR-0012). Listed file-by-file because MANAGED is a flat
+  // The Bash noise filter (docs/DECISIONS.md "Noisy Bash output"). Listed file-by-file because MANAGED is a flat
   // path list, and synced so a fix to the rule tables reaches every scaffolded
   // project instead of rotting into divergent copies the way guard-bash.mjs did
   // (24483 B in the harness vs 1349 B in _base when this was written).

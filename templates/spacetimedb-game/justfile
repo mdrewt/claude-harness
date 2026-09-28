@@ -13,9 +13,6 @@ typecheck:
 test:
     cargo test --manifest-path server/Cargo.toml
 
-eval:
-    @echo "eval: integration requires a running instance (spacetime start) — see README"
-
 security:
     node scripts/check-secrets.mjs .
 
@@ -31,4 +28,4 @@ publish:
 changelog:
     git cliff -o CHANGELOG.md
 
-ci: lint typecheck test eval security
+ci: lint typecheck test security

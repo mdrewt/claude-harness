@@ -59,11 +59,12 @@ source scripts/bootstrap-sandbox.sh   # installs `just`, adds it to PATH
 No-op on the Windows host, where `just` is already installed.
 
 ## Notes
-- `just ci` = lint, typecheck, test, eval, security. CI adds gitleaks + Semgrep
-  + SBOM via GitHub Actions (each project's `.github/workflows/ci.yml`).
+- `just ci` = lint, typecheck, test, security. CI adds gitleaks + dependency
+  review via GitHub Actions (each project's `.github/workflows/ci.yml`); SAST
+  (Semgrep) + SBOM are opt-in per threat model.
 - All 7 stacks are built: `rust-lib`, `python-service`, `node-ts-app`,
   `react-web`, `electron-desktop`, `pixijs-game`, `spacetimedb-game`. Each ships
-  a sample module, tests, a stack-appropriate eval, and `just` recipes.
+  a sample module, tests, and `just` recipes.
 - Keep projects current with shared config via `just sync` (reports drift;
   `just sync --apply` updates managed files without touching your source).
 - Verify the harness itself anytime with `just test`.

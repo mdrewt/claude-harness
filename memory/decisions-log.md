@@ -1,5 +1,10 @@
 # Cross-project decisions log
 
+> Record-column paths under `docs/adr/` are pre-2026-09 history — recover any file via git
+> (`git show 'pre-revision-2026-09:<path>'` in the owning repo). Live decisions: this repo's
+> `docs/DECISIONS.md` and the game repo's `docs/DECISIONS.md`.
+
+
 Append-only summary of notable decisions (one line each) with a pointer to the
 full ADR in the project repo.
 

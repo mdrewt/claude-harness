@@ -24,12 +24,12 @@ jobs:
       - run: just lint
       - run: just typecheck
       - run: just test
-      - run: just eval
       - name: SCA (cargo audit)
         run: |
           cargo install cargo-audit --locked
           cargo audit
-      - name: SAST (Semgrep)
-        run: pipx run semgrep scan --config auto --error
-      - name: SBOM
-        uses: anchore/sbom-action@v0
+      # SAST + SBOM: enable per threat model — standards/ci-cd.md
+      # - name: SAST (Semgrep)
+      #   run: pipx run semgrep scan --config auto --error
+      # - name: SBOM
+      #   uses: anchore/sbom-action@v0
