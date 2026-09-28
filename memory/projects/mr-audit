@@ -118,17 +118,42 @@ def audit_gating(a, out):
                 if parts[0].startswith("D"): g["deleted_test_files"].append(parts[-1])
         r2=subprocess.run(["git","-C",repo,"diff",f"{base}..{head}","--","*test*","*spec*","evals",":(glob)**/*_tests.rs",":(glob)**/*.test.ts"],capture_output=True,text=True,timeout=120)
         if r2.returncode!=0: raise RuntimeError("git diff content failed: "+r2.stderr[:120])
+        # removed_checks: a NAMED list of removed / de-wired checks for the supervisor to adjudicate
+        # one by one under standards/testing-tdd.md "Deleting a check is legitimate". A removal is a
+        # reviewable event, never an automatic block: the list names what went; the adjudicator asks
+        # for the named reason and the named surviving check.
+        removed=[{"kind":"deleted-test-file","file":p,"line":""} for p in g["deleted_test_files"]]
+        cur=""; in_hdr=False
         for ln in r2.stdout.splitlines():
-            if ln.startswith("-") and not ln.startswith("---") and re.search(r"assert|expect\(|\.toBe|\.toEqual|panic!|prop_assert", ln): g["removed_or_modified_asserts"]+=1
-            if ln.startswith("+") and not ln.startswith("+++"):
-                if re.search(r"\.skip\b|\.only\b|\bxit\(|\bxdescribe\(|#\[ignore\]|todo!\(", ln): g["skip_markers_added"]+=1
+            if ln.startswith("diff --git "):
+                in_hdr=True; continue
+            if in_hdr:
+                if ln.startswith("@@"): in_hdr=False
+                elif ln.startswith("+++ ") or ln.startswith("--- "):
+                    p=ln[4:]
+                    if p!="/dev/null": cur=p[2:] if p[:2] in ("a/","b/") else p
+                continue
+            if ln.startswith("-") and re.search(r"assert|expect\(|\.toBe|\.toEqual|panic!|prop_assert", ln):
+                g["removed_or_modified_asserts"]+=1
+                removed.append({"kind":"removed-assertion","file":cur,"line":ln[1:].strip()[:160]})
+            if ln.startswith("+"):
+                if re.search(r"\.skip\b|\.only\b|\bxit\(|\bxdescribe\(|#\[ignore\]|todo!\(", ln):
+                    g["skip_markers_added"]+=1
+                    removed.append({"kind":"skip-marker","file":cur,"line":ln[1:].strip()[:160]})
                 if re.search(r"nosemgrep|eslint-disable|@ts-ignore|@ts-expect-error|#\[allow\(", ln): g["suppressions_added"]+=1
+        g["removed_checks"]=removed[:50]
+        if len(removed)>50: g["removed_checks_truncated"]=len(removed)-50
         # lp-04 D3: the `if tier == "hard": verdict = FLAGGED` branch that stood here is DELETED.
         # It fired on 100% of hard-tier slices regardless of evidence, so it carried no
         # information and made the detector unreadable next to the policy verdict. The read
         # obligation it was standing in for now lives in the top-level `mandatory_read`.
-        if g["deleted_test_files"] or g["skip_markers_added"] or g["suppressions_added"] or g["removed_or_modified_asserts"]>0:
-            g["verdict"]="FLAGGED"; g["reason"]="mechanical tripwire (see counters); LLM must read the diff"
+        if removed:
+            g["verdict"]="FLAGGED"
+            g["reason"]=("removed/de-wired checks listed in removed_checks: supervisor adjudicates each "
+                         "under standards/testing-tdd.md 'Deleting a check is legitimate' (named reason "
+                         "+ named surviving check); FLAGGED for adjudication, never a BLOCKER by itself")
+        elif g["suppressions_added"]:
+            g["verdict"]="FLAGGED"; g["reason"]="suppressions added (see counters); LLM must read the diff"
         else:
             g["verdict"]="CLEAN"
         # Pre-filtered evidence: embed the TEST-FILE diff hunks whenever a read is owed (no new git
@@ -917,6 +942,13 @@ def _st_g_battery(chk, tmp, L):
                   "the raw name-status line, tab and all, truncated at 160")
         chk.check("G2/removed_or_modified_asserts", 0, _st_get(b, "removed_or_modified_asserts"),
                   "the deleted file carries no assert-shaped lines — 0, not 'some'")
+        chk.check("G2/removed_checks",
+                  [{"kind": "deleted-test-file", "file": "tests/alpha_test.py", "line": ""}],
+                  _st_get(b, "removed_checks"),
+                  "the deletion is NAMED for adjudication under the deletion rule")
+        chk.check("G2/reason-is-adjudication", True,
+                  "never a BLOCKER" in str(_st_get(b, "reason")),
+                  "a removed check is FLAGGED for adjudication, not an automatic block")
         chk.check("G2/mandatory_read", True, _st_get(out, "mandatory_read"))
         _st_g_common(chk, "G2", b)
 
@@ -927,6 +959,11 @@ def _st_g_battery(chk, tmp, L):
         chk.check("G3/suppressions_added", 0, _st_get(b, "suppressions_added"),
                   "a skip line must not also register as a suppression")
         chk.check("G3/verdict", "FLAGGED", _st_get(b, "verdict"))
+        chk.check("G3/removed_checks",
+                  [{"kind": "skip-marker", "file": "tests/beta_test.py", "line": 'it.skip("one", () => {});'},
+                   {"kind": "skip-marker", "file": "tests/beta_test.py", "line": 'it.skip("two", () => {});'},
+                   {"kind": "skip-marker", "file": "tests/beta_test.py", "line": "#[ignore]"}],
+                  _st_get(b, "removed_checks"))
         _st_g_common(chk, "G3", b)
 
         out, b = run("G4", shas[3], shas[4])
@@ -935,6 +972,10 @@ def _st_g_battery(chk, tmp, L):
                   "exactly the two assert lines this commit deletes")
         chk.check("G4/skip_markers_added", 0, _st_get(b, "skip_markers_added"))
         chk.check("G4/verdict", "FLAGGED", _st_get(b, "verdict"))
+        chk.check("G4/removed_checks",
+                  [{"kind": "removed-assertion", "file": "tests/gamma_test.py", "line": "assert y == 2"},
+                   {"kind": "removed-assertion", "file": "tests/gamma_test.py", "line": "assert z == 3"}],
+                  _st_get(b, "removed_checks"))
         _st_g_common(chk, "G4", b)
 
         out, b = run("G5", shas[4], shas[5])
@@ -942,6 +983,8 @@ def _st_g_battery(chk, tmp, L):
                   "@ts-expect-error and eslint-disable, one each")
         chk.check("G5/skip_markers_added", 0, _st_get(b, "skip_markers_added"))
         chk.check("G5/verdict", "FLAGGED", _st_get(b, "verdict"))
+        chk.check("G5/removed_checks-empty", [], _st_get(b, "removed_checks"),
+                  "a suppression is not a removed check; it flags via its counter alone")
         _st_g_common(chk, "G5", b)
 
         # ---- G6/G6b/G6c: unusable advisory inputs -> mandatory read (AM4) -------------------
@@ -1538,7 +1581,26 @@ def _st_a_battery(chk, tmp):
                    out3["acceptance"]["status"]}))
 
 
+_ST_GIT_SCRUB = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                 "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+                 "GIT_CEILING_DIRECTORIES")
+
+
 def selftest():
+    """Scrubs repo-redirecting GIT_* vars for the WHOLE run, then restores them.
+
+    Belt-and-braces over _st_git_env: an inherited GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE beats
+    `git -C <tmp>`, and the 2026-08-20 incident wrote the fixture identity (`git config user.*`)
+    into the real harness repo that way. The G battery already runs under an allowlist env; this
+    covers every other battery's subprocesses too, whatever they grow into."""
+    saved = {k: os.environ.pop(k) for k in _ST_GIT_SCRUB if k in os.environ}
+    try:
+        return _selftest()
+    finally:
+        os.environ.update(saved)
+
+
+def _selftest():
     """The lp-04 gating battery. rc 0 = pass, 1 = fail. Prints AUDIT-SELFTEST-OK <n> on pass."""
     chk = _StChk()
     before = _st_tmp_artifacts()
