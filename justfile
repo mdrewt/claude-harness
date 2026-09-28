@@ -72,9 +72,11 @@ research-gate:
     node scripts/research-index.mjs docs/research --check
     node scripts/research-lint.mjs docs/research --shared
 
-# Supervisor-tooling wiring + selftests (SELFCHECK-OK expected; NOTEs are reports).
+# Supervisor-tooling wiring + selftests. mr-selfcheck itself always exits 0 (its callers parse
+# markers), so the GATE is the SELFCHECK-OK marker: a FAIL line means no marker, and this recipe
+# — and `just ci` with it — goes red. NOTEs are reports, never failures.
 selfcheck:
-    memory/projects/mr-selfcheck
+    memory/projects/mr-selfcheck | tee /dev/stderr | grep -qx SELFCHECK-OK
 
 # Reproducible ~/.claude wiring: link the harness's shared skills + global agents
 # (expert, review-lens) and a `harness` anchor into ~/.claude so they're discoverable

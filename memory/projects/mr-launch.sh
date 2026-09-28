@@ -9,7 +9,7 @@
 # Caller MUST launch detached: setsid bash mr-launch.sh <slice> [model] [effort] & disown
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
-unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true   # operator-forced-ness must NOT propagate to event ticks (pause semantics)
+unset MR_FORCE MR_TICK_DRYRUN MR_OPERATOR_RUN MR_EVENT_SRC 2>/dev/null || true   # operator-forced-ness and its token must NOT propagate to rooted runs or event ticks (pause semantics; fire_event re-sets MR_EVENT_SRC explicitly)
 # lp-gates: MR_SLICE binds a session to its acceptance ledger for the Stop hook. It is
 # PREFIX-SCOPED on each `claude` invocation below and deliberately NOT exported at script scope:
 # fire_event() spawns mr-native-tick.sh with this wrapper's environment, so a script-scope export

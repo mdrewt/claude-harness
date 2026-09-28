@@ -254,7 +254,7 @@ test('every node stack justfile defines a `build` recipe', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Bash noise filter (ADR-0012)
+// Bash noise filter (docs/DECISIONS.md "Noisy Bash output")
 // ---------------------------------------------------------------------------
 // The hook ships in three places: the harness's own .claude/, templates/_base (so a
 // generated project keeps the behaviour when opened standalone), and — via

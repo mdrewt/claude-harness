@@ -845,11 +845,11 @@ status(){ emit "$1" "$2"; exit "${3:-0}"; }
 fail_evidence(){ printf 'kind=%s seen=%s log_tail=%s err_tail=%s' "${LAST_FAIL_KIND:-?}" "${LAST_SEEN_MODEL:-none}" "$(tail -n 5 "/tmp/mr_pass_$S.log" 2>/dev/null | tr '\n' ' ' | head -c 200)" "$(tail -n 5 "/tmp/mr_pass_$S.err" 2>/dev/null | tr '\n' ' ' | head -c 200)"; }
 [ -r "$V" ] || status FAIL "vars.json missing: $V" 1
 # lp-09: no launch while ANY hold is present — EXCEPT an explicit operator run
-# (mr-supervisor-run => MR_EVENT_SRC=manual): the operator invoked that cycle deliberately, and
+# (MR_OPERATOR_RUN=1, set only by the tick for src=manual+MR_FORCE=1): deliberate operator cycle;
 # the hold itself is never cleared. All other provenances (cron, events, hand-runs) still refuse
 # here, which is where the money is actually committed.
 if [ -f "$MEM/.native-supervisor-disabled" ]; then
-  if [ "${MR_EVENT_SRC:-}" = "manual" ]; then
+  if [ "${MR_OPERATOR_RUN:-}" = "1" ]; then
     echo "NOTE hold present — proceeding to launch (explicit operator run; hold stays set)" >&2
   else
     status HOLD-PRESENT "$("$MEM/mr-hold" status 2>/dev/null || echo 'hold present') — refusing to launch"
@@ -994,10 +994,9 @@ for ent in r.stdout.split(b'\0'):
     except OSError:
         continue" "$SYNCDIR" "$MEM" 2>/dev/null) \
   || WRITES="$SYNCDIR (probe helper failed — failing closed)"
-# Explicit operator runs (mr-supervisor-run => MR_EVENT_SRC=manual, which the tick passes
-# through) are attended by definition: the probe warns instead of aborting. This is an
+# Explicit operator runs (the tick converts mr-supervisor-run's src=manual + MR_FORCE=1 into MR_OPERATOR_RUN=1 for its decision session only) are attended by definition: the probe warns instead of aborting. This is an
 # anti-collision device, not a security boundary (guard-bash is the boundary).
-if [ "${MR_EVENT_SRC:-}" = "manual" ]; then
+if [ "${MR_OPERATOR_RUN:-}" = "1" ]; then
   [ -n "$IDE" ] && echo "NOTE probe: resident IDE claude session — proceeding (operator run)" >&2
   [ -n "$WRITES" ] && echo "NOTE probe: recent human writes — proceeding (operator run): $WRITES" >&2
 else

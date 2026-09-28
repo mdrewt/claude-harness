@@ -106,7 +106,7 @@ CATEGORIES = ("gameplay", "security-privacy", "data-integrity", "netcode-determi
 SEVERITIES = ("LOW", "MED", "HIGH", "CRITICAL")
 SWEEPABLE_SEVERITIES = ("LOW", "MED")
 PROJ = HARNESS + "/projects/monster-realm"
-LEGACY_BACKLOG_SPEC = "M-residual-backlog.spec.md"   # read-only here: id allocation only
+LEGACY_BACKLOG_SPEC = "archive/M-residual-backlog.spec.md"   # read-only here: id allocation only
 APPARATUS_MSG = ("findings about the checking apparatus aren't tracked -- record it as `wontfix` "
                  "(standards/testing-tdd.md)")
 # Subject is the checking apparatus itself: an eval script, a scanner, a gate script, a
@@ -138,7 +138,7 @@ class Defer(tuple):
 # ("parse the de-facto convention, not the documented one").
 # ---------------------------------------------------------------------------------------------
 NEXT_HEAD = re.compile(r"^### ", re.M)
-EARS_START = re.compile(r"^EARS:", re.M)
+EARS_START = re.compile(r"^(?:[-*]\s+)?EARS:", re.M)
 EARS_END = re.compile(r"^(Tests?:|Falsification:|Proof-of-teeth:|#{1,4} |\s*$)", re.M)
 BULLET = re.compile(r"^(\s*)[-*+]\s+(.*)$")
 IDLEAD = re.compile(r"^\*\*([A-Za-z0-9][A-Za-z0-9.-]{1,39}?):?\*\*:?\s*")
@@ -2267,7 +2267,7 @@ def selftest():
                           "  EVIDENCE: result: 72 passed\n")
         buf = _io.StringIO()
         with contextlib.redirect_stdout(buf):
-            cmd_verify({"slice": "fx-w", "_specs": specs, "_gates_dir": gdir, "_residuals": resid,
+            cmd_verify({"slice": "fx-w", "_specs": specs, "_gates_dir": gdir, "_residuals": resid, "_acceptance_log": os.path.join(root, "acc-w.jsonl"),
                         "_no_guard": True, "cwd": root, "repo": root, "budget": "20"})
         vw = json.loads(buf.getvalue())
         chk.eq("W3-drift-is-not-fraud", [], vw["evidence_mismatch"],
@@ -2280,7 +2280,7 @@ def selftest():
                           "  EVIDENCE: result: 1 passed\n")
         buf = _io.StringIO()
         with contextlib.redirect_stdout(buf):
-            cmd_verify({"slice": "fx-w", "_specs": specs, "_gates_dir": gdir, "_residuals": resid,
+            cmd_verify({"slice": "fx-w", "_specs": specs, "_gates_dir": gdir, "_residuals": resid, "_acceptance_log": os.path.join(root, "acc-w.jsonl"),
                         "_no_guard": True, "cwd": root, "repo": root, "budget": "20"})
         vf = json.loads(buf.getvalue())
         chk.eq("W5-fraud-still-caught", 1, len(vf["evidence_mismatch"]),
@@ -2290,7 +2290,7 @@ def selftest():
         # W7: an absent ledger is an absent measurement, not a failed one.
         buf = _io.StringIO()
         with contextlib.redirect_stdout(buf):
-            cmd_verify({"slice": "fx-never-seeded", "_specs": specs, "_gates_dir": gdir,
+            cmd_verify({"slice": "fx-never-seeded", "_specs": specs, "_gates_dir": gdir, "_acceptance_log": os.path.join(root, "acc-w.jsonl"),
                         "_residuals": resid, "_no_guard": True, "cwd": root, "repo": root})
         chk.eq("W7-no-ledger-verdict", "NO-LEDGER", json.loads(buf.getvalue())["verdict"],
                "calling every pre-lp-gates slice FLAGGED would cry wolf through the whole "

@@ -1,5 +1,8 @@
 # Netcode quality review (M0–M3 + ADRs)
 
+> Historical note (2026-09): written 2026-06-24; check-vehicle references (e.g. the M3
+> "no-rule-in-wrapper eval") describe retired machinery — the smoothness CONTRACT itself stands.
+
 **Date:** 2026-06-24 · **Scope:** the client↔server movement path across M0–M3 and ADRs 0003/0007/0011/0012.
 **Trigger:** v1 (`pokemon-mmo`) shipped a correct-but-*unsmooth* overworld — desync, stuttering, skipping
 ahead, and rubberbanding degraded the feel. This review traces each symptom to its root cause in a

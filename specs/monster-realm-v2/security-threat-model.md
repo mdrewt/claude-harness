@@ -1,4 +1,10 @@
-# Security threat model (cross-cutting)
+# Security threat model
+
+> **2026-09 status:** §0-§2 below are refreshed; **§3-§5 describe the RETIRED pre-revision audit
+> ceremony** (visibility_note, ADR-0199, account/monster-privacy evals, findings.json,
+> release-gate.yml — all deleted). Until M25 S3 rewrites them, `M25-security-audit.spec.md` is
+> the source of truth for the audit mechanics; this file remains the threat CATALOG. The
+> `propose_trade` wallet/inventory oracles are tracked as M25 S1. (cross-cutting)
 
 **Date:** 2026-06-24 · **Revised:** 2026-09-21 (M25 S0) · **Decision:** ADR-0034 (as amended 2026-09-21) ·
 **Scope:** the whole v2 system (M0–M25). **Status:** the SSOT for the security posture — mirrors
@@ -8,7 +14,7 @@
 ## 0. Posture recap (already designed in)
 
 Security is not a bolt-on: every reducer takes identity from `ctx.sender`, accepts **intent only**,
-**rejects (never clamps)**, and re-validates ownership/legality (the M0 reducer-security-auditor eval);
+**rejects (never clamps)**, and re-validates ownership/legality (the M0 reducer-security-auditor agent review);
 confidentiality is **stakes-classified, private-table-plus-scoped-view** (ADR-0015's original intent,
 delivered in practice via ADR-0194/ADR-0198 — see §4, `client_visibility_filter` RLS is **confirmed
 unenforced** at the pinned 2.8.1 toolchain, not a live mechanism); supply chain is gated (gitleaks/Semgrep/
@@ -32,7 +38,7 @@ forged. This threat model **consolidates** those into one surface view and names
 | **Auth / accounts** | account takeover; guest-claim steal; PII leak | delegate to OIDC (no in-game passwords); atomic one-time guest-claim; email hashed/private (M21, ADR-0030) |
 | **Data / privacy** | incomplete deletion retains PII; export of another's data | registry-driven deletion-completeness eval; owner-scoped export (M22, ADR-0031) |
 | **Platform / DoS** | reducer flood / bot abuse | per-action limits where they exist — among them the move-queue cap (`MOVE_QUEUE_CAP`, M2, enforced in `server-module/src/movement.rs`), the heal and essence-training cooldowns (`HEAL_COOLDOWN_MS`, `ESSENCE_TRAIN_COOLDOWN_MS`, `server-module/src/raising.rs`), the 60 s data-export cooldown (`EXPORT_REQUEST_COOLDOWN_MS`, M22, `server-module/src/privacy.rs`), and the one-pending-challenge-per-identity guards plus the `CHALLENGE_TTL_MS` reaper that bounds outstanding challenge state (ADR-0126) — plus infra rate-limiting (ops). There is **no general per-identity reducer-call limiter in-module** (`movement::RateLimiter`, ADR-0170 D4, bounds *log emission*, not calls); global limiting stays an ops concern |
-| **Supply chain** | secret leak / malicious dep / SAST hole | gitleaks + Semgrep + SCA + SBOM + Renovate (M0, ADR-0009) |
+| **Supply chain** | secret leak / malicious dep / SAST hole | gitleaks + dependency review/SCA (SAST/SBOM per this model when warranted) + Renovate (M0, ADR-0009) |
 | **Determinism** | desync exploited / float divergence | integer-only rules + determinism gate + parity evals (M0–M3) |
 
 ## 2. Standing controls (mechanical, always-on)

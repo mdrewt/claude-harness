@@ -102,7 +102,7 @@ default repo, process questions with `--repo mdrewt/claude-harness`. Never pass 
 1. Header: local date/time, pinned SHA, the 3 lenses, counts by severity (HIGH/CRITICAL first).
 2. The ≤5 findings: title, category/severity, `path:line @ SHA`, short evidence, residual id.
 3. Decision issue links, if any.
-4. **Stale residuals (visibility only):** open MED/LOW rows from `mr-gates residuals list`, oldest
+4. **Stale residuals (visibility only):** run `memory/projects/mr-gates residuals sweep --dry-run` first and include its obsolete-candidates in the report (only the supervisor may `--apply`); then open MED/LOW rows from `mr-gates residuals list`, oldest
    first, one line each (id, age, title). Do not promote, re-prioritize, or re-report them.
 5. One line on dropped candidates (count + why).
 

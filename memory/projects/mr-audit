@@ -2,7 +2,7 @@
 # mr-audit — mechanical pre-merge audits. rc=0 for every AUDIT run; verdicts in JSON
 # (stdout + /tmp/mr_audit_<slice>.json).  `--selftest` is a SEPARATE mode and DOES exit 1 on failure.
 #
-# TWO HALVES, deliberately different kinds of claim (lp-04, ADR-0011 amendment 2026-08-20):
+# TWO HALVES, deliberately different kinds of claim (lp-04; cost-accounting decision, docs/DECISIONS.md):
 #   POLICY   — `orchestration` (+ top-level `mandatory_read` / `read_reason`).  A real verdict.
 #              Verdicts: CLEAN | CLEAN-doc-exempt | FLAGGED | AUDIT-ERROR (treat AUDIT-ERROR as FLAGGED).
 #   ADVISORY — `gating_advisory` and `disposition`.  EVIDENCE for an LLM diff read, NEVER a merge
@@ -30,7 +30,7 @@ ACCEPTANCE_CONTRACT = (ADVISORY_CONTRACT + " SLICE-SCOPED: an independent re-run
                        "not a failed one, and do not count) -- all-10 or 0-of-10 carries no "
                        "information (lp-04).")
 DISPOSITION_CONTRACT = (ADVISORY_CONTRACT + " CORPUS-SCOPED: findings are about the harness specs/ "
-                        "tree, not about the audited base..head diff.")
+                        "tree, not about the audited base...head diff.")
 
 
 def parse_args(argv):
@@ -108,7 +108,7 @@ def audit_gating(a, out):
        "skip_markers_added":0,"suppressions_added":0}
     repo=a.get("repo"); base=a.get("base"); head=a.get("head")
     if repo and base and head and os.path.isdir(repo):
-        r=subprocess.run(["git","-C",repo,"diff","--name-status",f"{base}..{head}"],capture_output=True,text=True,timeout=60)
+        r=subprocess.run(["git","-C",repo,"diff","--name-status",f"{base}...{head}"],capture_output=True,text=True,timeout=60)
         if r.returncode!=0: raise RuntimeError("git diff name-status failed: "+r.stderr[:120])
         testpat=re.compile(r"(test|spec|evals/|_tests\.rs|\.test\.)", re.I)
         for ln in r.stdout.splitlines():
@@ -116,7 +116,7 @@ def audit_gating(a, out):
             if len(parts)>=2 and testpat.search(parts[-1]):
                 g["changed_test_files"].append(ln[:160])
                 if parts[0].startswith("D"): g["deleted_test_files"].append(parts[-1])
-        r2=subprocess.run(["git","-C",repo,"diff",f"{base}..{head}","--","*test*","*spec*","evals",":(glob)**/*_tests.rs",":(glob)**/*.test.ts"],capture_output=True,text=True,timeout=120)
+        r2=subprocess.run(["git","-C",repo,"diff",f"{base}...{head}","--","*test*","*spec*","evals",":(glob)**/*_tests.rs",":(glob)**/*.test.ts"],capture_output=True,text=True,timeout=120)
         if r2.returncode!=0: raise RuntimeError("git diff content failed: "+r2.stderr[:120])
         # removed_checks: a NAMED list of removed / de-wired checks for the supervisor to adjudicate
         # one by one under standards/testing-tdd.md "Deleting a check is legitimate". A removal is a
@@ -207,7 +207,7 @@ def audit_acceptance(a, out, tool=None):
         out["acceptance"] = acc
         return
     # Fold a SUMMARY, not the whole payload: this lands in a supervisor prompt, and evidence is
-    # capped by the same doctrine that caps gate evidence (ADR-0012).
+    # capped by the same doctrine that caps gate evidence (the noise-filter decision).
     for k in ("verdict", "seeded", "total", "met", "unmet", "deferred", "seed_drift",
               "unmet_ids", "acceptance_line", "residuals_emitted", "residuals_open",
               "residual_alarms", "reasons", "verify_seconds"):
@@ -220,7 +220,7 @@ def audit_acceptance(a, out, tool=None):
     acc["status"] = v.get("verdict", "AUDIT-ERROR")
     out["acceptance"] = acc
 
-# --- disposition markers (docs/workflow-loops.md:32-39; ADR-0011 amendment 2026-08-20 D4/D5) -----
+# --- disposition markers (docs/workflow-loops.md §Disposition markers) -----
 # `parked -> <queued spec id | wontfix>`.  The grammar, the location, the rule and the owner
 # ("marker presence is audited supervisor-side (the mr-audit layer)") were already specified; this
 # implements them and invents nothing.
@@ -282,7 +282,7 @@ def scan_dispositions(specs_root):
          "findings": [], "unreadable": []}
     files = []
     for root, dirs, names in os.walk(specs_root):
-        # ADRs are decisions with their own Amendment/Confirmation lifecycle (ADR-0009), not
+        # decision records have their own lifecycle (standards/decisions.md), not
         # work-item closures.  Auditing them as specs was a measured false-positive source.
         dirs[:] = sorted(n for n in dirs if n not in ("adr", "archive"))
         for n in sorted(names):

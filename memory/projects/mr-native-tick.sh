@@ -237,7 +237,7 @@ except Exception: print('')" 2>/dev/null)
   if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then LIVE=1; LIVE_SLICES="$LIVE_SLICES $SLICE($PID)"; LIVE_BARE="$LIVE_BARE $SLICE"; fi
   [ -f "/tmp/mr_pass_${SLICE}.done" ] && DONE_WAIT=1
 done
-PENDING=$(ls -A "$MEM/pending-events" 2>/dev/null | grep -v "^archive$" | head -1)   # archive/ lives inside this dir — excluding it restores the FREE fastpath (bug 2026-07-26: every live-chain standdown was a paid spawn since first archival)
+PENDING=$(ls -A "$MEM/pending-events" 2>/dev/null | grep -v "^archive$" | grep -v "^\." | head -1)   # dotfiles never count: a stray rename must not defeat the FREE fastpath forever   # archive/ lives inside this dir — excluding it restores the FREE fastpath (bug 2026-07-26: every live-chain standdown was a paid spawn since first archival)
 # WATCHER liveness — keyed on a LIVE per-slice lock, NOT on vars.json. Nothing anywhere deletes
 # vars.json (decision runs rm the .done and leave it), so the old predicate fired for every
 # long-merged slice forever: 199/199 fires in the 48h to 2026-08-01 were false, and 3 of the 5
@@ -326,7 +326,7 @@ WRITES=$(find "$HARNESS" "$PROJ" -type f \
   -not -path "$HARNESS/memory/*" -mmin -6 2>/dev/null | head -1)
 # (worktrees are AGENT-owned by design — sibling fan-out writes are not human activity; retro 2026-07-24)
 # DELIBERATE DIVERGENCE from mr-spawn:35, which additionally excludes '*/.codegraph/*' (added
-# 2026-07-31, commit 8082e5c). Reviewed 2026-08-01 (ADR-0011) and kept: this is the LAST gate
+# 2026-07-31, commit 8082e5c). Reviewed 2026-08-01 (cost-accounting decision; docs/DECISIONS.md) and kept: this is the LAST gate
 # before an unattended $60-400 run starts, and codegraph daemon writes are the only remaining
 # accidental backstop for human edits made INSIDE a worktree (excluded above). The measured cost
 # of the false trips is $0 — a standdown exits before any spawn, pending events requeue, and the
@@ -429,7 +429,11 @@ PREAMBLE_EOF
 # finished slice's MR_SLICE and bind itself to that slice's acceptance ledger. mr-launch.sh already
 # prefix-scopes the variable rather than exporting it; this is the belt-and-braces half, and it is
 # the layer that holds if anyone ever "simplifies" that prefix into an export.
-env -u MR_FORCE -u MR_SLICE timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-skip-permissions \
+# H2 (2026-09 review): MR_EVENT_SRC must not reach the decision session or its children — it
+# became a spawn-level bypass credential. The tick alone converts (src=manual AND MR_FORCE=1)
+# into MR_OPERATOR_RUN=1 for THIS invocation; mr-launch.sh unsets it for rooted runs.
+OPTOK=(); [ "${OPRUN:-0}" = "1" ] && OPTOK=(MR_OPERATOR_RUN=1)
+env -u MR_FORCE -u MR_SLICE -u MR_EVENT_SRC "${OPTOK[@]}" timeout 5400 claude --model "$SUP_MODEL" --effort "$SUP_EFFORT" --dangerously-skip-permissions \
   --append-system-prompt "$AUTH_PREAMBLE" \
   --output-format stream-json --verbose \
   -p "$(cat "$PROMPTF")" >> "$TLOG" 2>&1

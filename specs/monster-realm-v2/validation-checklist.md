@@ -37,7 +37,7 @@ artifact form of the recommended **validation spike**. Pair it with the **fun-va
 | # | Assumption | Used by | Verify |
 |---|---|---|---|
 | 13 | **OIDC / identity-from-token** mechanism on the pinned version | M21, ADR-0030 | A real account yields a stable `Identity` across devices |
-| 14 | **OTel → Datadog** integration (the harness plugin) | M20, ADR-0029 | Exporters emit; dashboards render |
+| 14 | **OTel → the self-hosted Grafana/Loki/Prometheus/Alloy stack (ops/observability/)** integration (the harness plugin) | M20, ADR-0029 | Exporters emit; dashboards render |
 | 15 | **PixiJS HD-2D path** (`pixi-lights` normal maps + `pixi-filters`) at the target resolution/perf | ADR-0004 | An HD-2D lighting prototype (the art-cost + look spike) |
 | 16 | **Per-zone tick + subscription cost** holds at target concurrency | M2/M11/M20 | The sim-harness load test against the budget |
 

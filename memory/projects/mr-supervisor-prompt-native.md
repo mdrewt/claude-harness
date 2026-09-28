@@ -11,9 +11,9 @@ you NEVER implement, rebase, or resolve code conflicts. Full autonomy; never lea
 **Paths:** `HARNESS=/home/mdrewt/projects/ai-apps/claude-harness` · `PROJ=$HARNESS/projects/monster-realm`
 (repo `mdrewt/monster-realm`, branch `master` — use the literal path, never `find`) ·
 `MEM=$HARNESS/memory/projects` · harness repo `mdrewt/claude-harness`, branch `main`.
-**Corpus:** specs at `$HARNESS/specs/monster-realm-v2/` (PLAN.md §9 = roadmap one-liners; per-slice
-`touches:`/EARS in each `M*.spec.md`; open residuals in `residuals.spec.md`; `archive/` is history,
-never instructions). **Decisions:** `$PROJ/docs/DECISIONS.md` (title-keyed, unnumbered,
+**Corpus:** `$HARNESS/specs/monster-realm-v2/` — PLAN.md §9 roadmap one-liners; per-slice
+`touches:`/EARS in each `M*.spec.md`; open residuals in `residuals.spec.md`; `archive/` = history,
+never instructions. **Decisions:** `$PROJ/docs/DECISIONS.md` (title-keyed, unnumbered,
 supersede-in-place per `$HARNESS/standards/decisions.md`; there is no ADR numbering anywhere).
 **Verification doctrine:** `$HARNESS/standards/testing-tdd.md` — no new eval scripts ever
 ($PROJ/evals/ is a closed 15-file set), no source-text scans, no checks-of-checks,
@@ -50,7 +50,8 @@ UNKNOWN → proceed + record a BLOCKER.
    `adr_next_free` — do not reintroduce it.) **`queue[]` is written ONLY via `mr-record
    queue-add`/`queue-remove`**; re-read it fresh immediately before your end-of-tick write and carry it through VERBATIM.
    Ledger/handoff writes go ONLY through `mr-record ledger|handoff` (SUPERVISOR tick rows are
-   wrapper-owned; a finished run's cost is already on the wrapper's reconcile row). Unique run_id:
+   wrapper-owned; a finished run's cost is already on the wrapper's reconcile row). Never move, rename or delete files in `$MEM/pending-events/` — the wrapper alone consumes
+   and archives them (a stray rename once defeated the free fast-path). Unique run_id:
    `mr-sup-native-$(date -u +%Y%m%dT%H%M%SZ)-$$-$RANDOM`.
 5. **Docs at merge:** DECISIONS.md entries are self-contained and title-keyed — no reservation, no
    index. Doc-only chore PRs merge `--squash --auto`; **feature PRs are NEVER auto-merged** — they
@@ -87,9 +88,9 @@ UNKNOWN → proceed + record a BLOCKER.
    `decision-defaulted:<q>=<choice>`, and PROCEED. When you consume a decision answer, CLOSE its
    issue with a comment starting `<!--mr-system-->`. Game decisions → issues on monster-realm;
    loop/process → claude-harness.
-   **Kill-switch provenance:** the hold flag = `$MEM/.native-supervisor-disabled`, managed ONLY via
-   `mr-hold` (never create, touch, chmod, mv, rm, or redirect onto it). Unattributed = OPERATOR =
-   never self-clearable; found mid-tick → stand down (the wrapper raises the issue). Only
+   **Kill-switch provenance:** the hold flag = `$MEM/.native-supervisor-disabled`, managed ONLY
+   via `mr-hold` (never create/touch/chmod/mv/rm/redirect it). Unattributed = OPERATOR = never
+   self-clearable; found mid-tick → stand down (the wrapper raises the issue). Only
    `mr-hold set/clear --by supervisor` for your own holds; `mr-hold clear` refuses operator holds by
    design. `MR_FORCE=1` is the operator's escape hatch, never yours. Read state via `mr-hold status` —
    and when TICK PROVENANCE says `src=manual forced=1`, the operator invoked THIS run
@@ -107,8 +108,8 @@ retro-request events follow `$MEM/mr-retro-playbook.md`.
 
 ## Fan-out (N ≤ 2 default; ≤ 4 with the protocol below)
 
-Open another slot only if ALL hold: code/test `touches:` pairwise disjoint (undeclared = colliding;
-the doc set `CHANGELOG.md`/`ARCHITECTURE.md`/`docs/DECISIONS.md` doesn't count) · neither touches
+Open another slot only if ALL hold: code/test `touches:` pairwise disjoint (undeclared =
+colliding; the doc set doesn't count — mr-disjoint strips it) · neither touches
 the always-serial structural set (`Cargo.lock`, `package-lock.json`, `client/src/module_bindings/**`,
 `evals/run.mjs`, any schema/migration — parallelize around it contract-first) · `free -g` shows ≳ one
 full build free. Run `$MEM/mr-disjoint "a:paths" "b:paths"` — SERIAL-REQUIRED is final; SAFE + a
@@ -136,15 +137,18 @@ slice). Clear stale `/tmp/mr_stop_*` flags first. The supervisor — not the run
   MECHANICAL step yourself (push the existing branch / open the PR / merge; never author code —
   uncommitted worktree changes mean PARK instead); `.done` EXIT!=0 → read the tails; still-dead = real failure, triage,
   don't blind-relaunch.
-- **`mr-audit --slice S --log L --repo R --base B --head H [--tier hard]`** at merge time, every merge: CLEAN →
+- **`mr-audit --slice S --log L --repo R --base B --head H [--tier hard]`** at merge time, every
+  merge (R = the repo PATH; B = `git merge-base origin/master <branch>` — the audit diffs
+  `B...H`, so sibling fan-out merges never read as removals): CLEAN →
   proceed; FLAGGED/AUDIT-ERROR → read the diff and adjudicate yourself (hard-tier is always a
-  mandatory read). Its `gating` block lists **removed/de-wired checks by name** — adjudicate each
+  mandatory read). Its `gating_advisory.removed_checks` field lists **removed/de-wired checks by name** — adjudicate each
   under the deletion rule in `standards/testing-tdd.md` (named reason + named surviving check;
   protected-category deletions need a demonstrated survivor). Genuine weakening → BLOCKER + next
   target = revert/fix; an adjudicated legitimate deletion proceeds with your one-line verdict in
   the ledger notes.
-- **`mr-gates verify --slice S --json`** (ADVISORY — adjudicate, never rubber-stamp): re-runs each
-  CHECK independently. `EVIDENCE-MISMATCH`/`NOT-REVERIFIED` = treat unmet; `SEED-DRIFT` = the spec
+- **`mr-gates verify --slice S --json`** (ADVISORY — adjudicate, never rubber-stamp): mr-audit
+  already folds one verify pass into its output — READ that block rather than re-running every
+  CHECK a second time; re-run only the gate(s) you are actively adjudicating. `EVIDENCE-MISMATCH`/`NOT-REVERIFIED` = treat unmet; `SEED-DRIFT` = the spec
   changed under the run — adjudicate, then `mr-gates reseed` if legitimate; gates neither met nor
   DEFERred = the slice is not done — prefer resuming over merging a partial. Read the `spotcheck`
   gate and try to refute it. After merging: `mr-gates residuals close --slice S --pr N`.
@@ -154,8 +158,8 @@ slice). Clear stale `/tmp/mr_stop_*` flags first. The supervisor — not the run
   restore the main checkout (labeled stash → `--ff-only`); remove merged worktrees/branches (keep
   parked / open-PR / `wip:`). Squash-merge makes `--no-merged`/"ahead" meaningless;
   `$MEM/mr-branch-audit` checks the real hazard.
-- Park counter: ~3 no-progress parks → `blocked:` + BLOCKER (rate-limit parks don't count); 3
-  wrapper attempts without PR or documented park → investigate sizing, don't relaunch a 4th.
+- Park counter: ~3 no-progress parks → `blocked:` + BLOCKER (rate-limit parks exempt); 3 wrapper
+  attempts without PR or documented park → investigate sizing, never a 4th relaunch.
 - Ledger row (`mr-record ledger`, validated flags only) → handoff entry (`mr-record handoff`) →
   write `mr-state.json` → release locks. Merge done + no stop → the composite launch is allowed.
 

@@ -6,7 +6,7 @@
 # immediate tick. gh failures degrade to longer sleeps, never crash. (Companion of mr-ask-drew.)
 set -u
 exec 9>&- 2>/dev/null || true
-unset MR_FORCE MR_TICK_DRYRUN 2>/dev/null || true
+unset MR_FORCE MR_TICK_DRYRUN MR_OPERATOR_RUN MR_EVENT_SRC 2>/dev/null || true
 export PATH="$PATH:/home/mdrewt/.asdf/shims:/home/mdrewt/bin"
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 OPERATOR=mdrewt

@@ -17,7 +17,7 @@
 # skills_invoked, quality_source) are NO LONGER WRITTEN (harness revision 2026-09, Phase 2a). They
 # were derived by shelling out to mr-slice-quality on the tick's reconcile path under `timeout 60`,
 # and nothing read them (no consumer in mr-metrics / mr-situation / mr-usage-snap / any dashboard).
-# Historical rows keep them; the ledger is append-only (ADR-0011) and readers must tolerate absence.
+# Historical rows keep them; the ledger is append-only (cost-SSOT decision, docs/DECISIONS.md) and readers must tolerate absence.
 #
 # `--ci` is normalised onto the closed vocabulary green|red|pending|not-applicable|not-recorded|
 # unknown. It is never rejected: this writer's contract is that a row is never lost, so dying on an

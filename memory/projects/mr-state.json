@@ -1,28 +1,26 @@
 {
-  "awaiting_merge": [],
-  "consecutive_standdowns": 0,
-  "inflight": [],
-  "master": {
-    "sha": "3d9c1dce241125bfd2a3746a78d01f08818aeeae",
-    "ci": "pending",
-    "nightly": "flake-suspect (changelog-freshness job failed on run 36240783375; re-ran node scripts/changelog-freshness.mjs --check locally against current master efb6c40, exits 0 clean; not actionable)"
-  },
-  "notes": "21r-a merged PR#528 (3d9c1dce) 2026-09-28T11:46Z, squash-delete; gates verify CLEAN 1/1; mr-audit gating_advisory FLAGGED was a base-drift false positive (21r-a forked pre-21r-b at 4f36de2, two-dot diff misattributed 21r-b i18n work as removed) -- adjudicated benign via three-dot diff + PR mergeStateStatus=CLEAN, both confirming only taming.rs/taming_tests.rs landed; worktree+branch cleaned; post-merge master CI 36416276991-successor in-progress at tick end.",
-  "park_counters": {
-    "14r-e": 1
-  },
-  "queue": [],
-  "rate_limit_resets_at": null,
-  "resource_locations": {
-    "_comment": "Current truth as of the 2026-09 harness revision (source: docs/revision-2026-09/facts-sheet.md, re-derived from the live repo). Use these absolute locations.",
-    "decision_log": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/DECISIONS.md -- the ONLY decision record: unnumbered, title-keyed entries, supersede-in-place. There is no docs/adr/ and no ADR numbering. A slice adds or rewrites an entry only when /home/mdrewt/projects/ai-apps/claude-harness/standards/decisions.md's bar is met (most slices: none).",
-    "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation.",
-    "per_slice_touches_and_EARS": "In the slice's milestone /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M*.spec.md, NOT in PLAN.md. PLAN.md section-9 is only a one-line-per-slice summary + resolved-decisions status.",
-    "project_repo": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm  (literal path; never find-discover it). Primary branch master.",
-    "spec_corpus_authoritative": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/  (HARNESS level, NOT under the project repo). Contains PLAN.md (section-9 one-liners) and per-milestone M*.spec.md files.",
-    "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
-  },
-  "schema_version": 3,
-  "updated_by": "mr-sup-native-20260928T114658Z-562578-12151",
-  "updated_utc": "2026-09-28T11:47:28Z"
+ "awaiting_merge": [],
+ "consecutive_standdowns": 0,
+ "inflight": [],
+ "master": {
+  "sha": "3d9c1dce241125bfd2a3746a78d01f08818aeeae",
+  "ci": "pending",
+  "nightly": "flake-suspect (changelog-freshness job failed on run 36240783375; re-ran node scripts/changelog-freshness.mjs --check locally against current master efb6c40, exits 0 clean; not actionable)"
+ },
+ "notes": "21r-a merged PR#528 (3d9c1dce) 2026-09-28T11:46Z, squash-delete; gates verify CLEAN 1/1; mr-audit gating_advisory FLAGGED was a base-drift false positive (21r-a forked pre-21r-b at 4f36de2, two-dot diff misattributed 21r-b i18n work as removed) -- adjudicated benign via three-dot diff + PR mergeStateStatus=CLEAN, both confirming only taming.rs/taming_tests.rs landed; worktree+branch cleaned; post-merge master CI 36416276991-successor in-progress at tick end.",
+ "park_counters": {},
+ "queue": [],
+ "rate_limit_resets_at": null,
+ "resource_locations": {
+  "_comment": "Current truth as of the 2026-09 harness revision (source: docs/revision-2026-09/facts-sheet.md, re-derived from the live repo). Use these absolute locations.",
+  "decision_log": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/docs/DECISIONS.md -- the ONLY decision record: unnumbered, title-keyed entries, supersede-in-place. There is no docs/adr/ and no ADR numbering. A slice adds or rewrites an entry only when /home/mdrewt/projects/ai-apps/claude-harness/standards/decisions.md's bar is met (most slices: none).",
+  "gh_cli_path": "gh is NOT on the default PATH in this native env \u2014 it's an asdf shim; use `bash -lc '...'` (login shell) to get asdf's PATH resolution, not a raw non-login bash invocation.",
+  "per_slice_touches_and_EARS": "In the slice's milestone /home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/M*.spec.md, NOT in PLAN.md. PLAN.md section-9 is only a one-line-per-slice summary + resolved-decisions status.",
+  "project_repo": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm  (literal path; never find-discover it). Primary branch master.",
+  "spec_corpus_authoritative": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/  (HARNESS level, NOT under the project repo). Contains PLAN.md (section-9 one-liners) and per-milestone M*.spec.md files.",
+  "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
+ },
+ "schema_version": 3,
+ "updated_by": "mr-sup-native-20260928T114658Z-562578-12151",
+ "updated_utc": "2026-09-28T11:47:28Z"
 }
