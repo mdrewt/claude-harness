@@ -1,0 +1,4 @@
+SELFCHECK-FAIL residual-unpromoted: 6 residual(s) unpromoted past t1=3d (the promote step stalled) — oldest: R-rb-107-CAPOBS(7d), R-rb-107-BYTEBOUND(7d), R-rb-108-STALEPROSE(7d) +3 more
+SELFCHECK-FAIL residual-stale: 24 residual(s) open past t2=14d — oldest: R-rb-10-X7(30d), R-rb-10-X6(30d), R-m22-s3b-X18(26d) +21 more
+SELFCHECK-NOTE residual-over-cap: 60 open residuals (cap 12, observe-only in slice 1)
+mr-selfcheck rc=0

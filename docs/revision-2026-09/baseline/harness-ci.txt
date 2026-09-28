@@ -1,0 +1,177 @@
+npx --yes @biomejs/biome@2 check --config-path templates/_base scripts
+Checked 17 files in 14ms. No fixes applied.
+node --test scripts/tests/harness.test.mjs scripts/tests/invariants.test.mjs scripts/tests/adr-lint.test.mjs .claude/hooks/quiet/quiet.test.mjs
+✔ signal preserved: a panicking Rust test under nextest (5.479072ms)
+✔ signal preserved: a failing node:test assertion (0.618361ms)
+✔ signal preserved: a failing vitest deep-equal (0.459457ms)
+✔ signal preserved: clippy denying warnings (0.459664ms)
+✔ a failing run is barely filtered at all (0.215405ms)
+✔ a green nextest sweep collapses to the scope line and the verdict (0.430333ms)
+✔ a green eval run is replaced by a SYNTHESISED summary (0.515536ms)
+✔ biome keeps every diagnostic location and drops only the rendering (0.392453ms)
+✔ node:test withholds pass lines but never the parsed counts (0.456811ms)
+✔ a green vitest run is not made worse (0.242117ms)
+✔ a targeted run keeps its passing lines; the same sweep withholds them (0.804543ms)
+✔ scope detection (0.255189ms)
+✔ stripAnsi removes CSI colour and OSC hyperlink sequences (0.159894ms)
+✔ a carriage-return progress redraw collapses to its final frame (0.177299ms)
+✔ rewritable shapes: one simple command, optionally cd- or env-prefixed (0.123758ms)
+✔ anything the hook cannot read literally is left completely alone (0.053703ms)
+✔ a recognised noisy command becomes a single quiet-run invocation (20.222826ms)
+✔ the original command survives the round trip byte-for-byte (19.409679ms)
+✔ tool_input fields other than command are preserved (23.309541ms)
+✔ NOFILTER=1 declines the rewrite (18.943626ms)
+✔ an already-wrapped command is never wrapped twice (45.369301ms)
+✔ ordinary commands are never touched (125.738025ms)
+✔ non-Bash tools and malformed input never block a tool call (113.42989ms)
+✔ CLAUDE_QUIET_BASH=0 is a global off switch (19.209922ms)
+✔ the wrapper refuses any command matching no profile (anti-laundering) (29.152317ms)
+✔ the wrapper propagates the child exit code and filters real output (56.4631ms)
+✔ unmatched lines are always kept (fail open) (0.217988ms)
+✔ verbose does NOT resurrect the pass wall (0.421136ms)
+✔ a small withheld block is replayed verbatim rather than summarised away (0.116891ms)
+✔ the search profile only caps — it removes no content (0.927672ms)
+✔ grep in counting/listing mode is left alone entirely (0.206784ms)
+✔ every registered profile is well formed (0.24686ms)
+✔ the `just` composite inherits every tool group it can encounter (0.168614ms)
+✔ no rule may drop a line that names a source location (0.442933ms)
+✔ the source-location guard does not exempt the search cap (0.281645ms)
+✔ watch and interactive commands are never wrapped (0.09999ms)
+✔ a test filter that matched nothing is never mistaken for a green run (0.165015ms)
+✔ withheld routine lines are NOT replayed after a failure verdict (0.10295ms)
+✔ dependency-graph changes are never treated as build progress (0.135882ms)
+✔ biome prose rules do not eat other tools failure glyphs in the just composite (0.316313ms)
+✔ commands that add a dependency or set arbitrary cargo config are not wrapped (0.24838ms)
+✔ the escape hatch works after a cd prefix (64.549722ms)
+✔ the search profile really removes nothing — including blank and -- separators (0.313648ms)
+✔ a very long command still produces complete, parseable hook JSON (37.042174ms)
+✔ no source file carries a NUL byte (0.330011ms)
+✔ the search profile preserves a carriage return inside match content (0.144846ms)
+✔ progress-bar redraws still collapse everywhere else (0.095957ms)
+✔ the wrapper keeps no cross-run state (0.09459ms)
+✔ a command that prints nothing is left byte-identical (57.317325ms)
+✔ a backslash-escaped quote cannot launder a second shell operation (0.210122ms)
+✔ an env-assignment value cannot hide a shell operator (0.055062ms)
+✔ unterminated quoting is treated as unreadable (0.047151ms)
+✔ the source-location guard is linear, not quadratic (1.022121ms)
+✔ the source-location guard does not steal the matched rule count (0.328247ms)
+✔ scope is decided from the command body, not the raw string (0.117926ms)
+✔ the raw log is byte-exact, including non-UTF-8 bytes (61.43521ms)
+✔ a fatal signal is reported with its own number, not always SIGTERM (0.189665ms)
+✔ concurrent runs of the same command do not share a raw-log filename (0.155781ms)
+✔ the withheld notice never promises a log that does not exist (0.269684ms)
+adr-lint: 1 ADRs · 0 FAIL · 0 WARN
+adr-lint: 1 ADRs · 0 FAIL · 0 WARN · strict-confirmation:on
+FAIL 0002-bad-one.md: superseded by 0099: no matching NNNN-*.md in /tmp/adrlint-Zc4pI0/docs/adr
+FAIL 0002-bad-one.md: Confirmation names nonexistent path `scripts/missing-gate.mjs` (false-green)
+FAIL 0003-worse-one.md: status 'pending' not one of proposed/accepted/rejected/deprecated | 'superseded by NNNN'
+adr-lint: 3 ADRs · 3 FAIL · 0 WARN
+adr-lint: 2 ADRs · 0 FAIL · 0 WARN
+FAIL 0001-choose-a-thing.md: title number 0009 != filename number 0001
+FAIL 0001-duplicate.md: duplicate ADR number 0001 (also 0001-choose-a-thing.md)
+adr-lint: 2 ADRs · 2 FAIL · 0 WARN
+FAIL 12-malformed-name.md: filename is not NNNN-slug.md (malformed ADRs escape the gate)
+adr-lint: 1 ADRs · 1 FAIL · 0 WARN
+adr-lint: 1 ADRs · 0 FAIL · 0 WARN
+FAIL 0001-choose-a-thing.md: accepted ADR whose Confirmation is still `proposed — ...` (strict)
+adr-lint: 1 ADRs · 1 FAIL · 0 WARN · strict-confirmation:on
+WARN 0001-choose-a-thing.md: no ## Confirmation content (which gate enforces this decision?)
+FAIL 0001-choose-a-thing.md: accepted ADR missing/empty ## Confirmation (strict)
+adr-lint: 1 ADRs · 0 FAIL · 1 WARN
+adr-lint: 1 ADRs · 1 FAIL · 0 WARN · strict-confirmation:on
+adr-lint: 1 ADRs · 0 FAIL · 0 WARN
+FAIL 0001-choose-a-thing.md: accepted ADR Confirmation names no checkable gate (backticked repo path or `just <recipe>`) nor the literal `unenforced — review-only` (strict)
+adr-lint: 1 ADRs · 1 FAIL · 0 WARN · strict-confirmation:on
+adr-lint: 1 ADRs · 0 FAIL · 0 WARN
+adr-lint: 1 ADRs · 0 FAIL · 0 WARN · strict-confirmation:on
+FAIL 0001-choose-a-thing.md: Confirmation names nonexistent path `scripts/not-there.mjs` (false-green)
+adr-lint: 1 ADRs · 1 FAIL · 0 WARN
+adr-lint: 1 ADRs · 0 FAIL · 0 WARN · strict-confirmation:on
+adr-lint: 1 ADRs · 0 FAIL · 0 WARN · strict-confirmation:on
+adr-lint: 2 ADRs · 0 FAIL · 0 WARN · strict-confirmation:on
+adr-lint: 1 ADRs · 0 FAIL · 0 WARN · strict-confirmation:on
+✔ adr-lint passes a clean corpus (strict and non-strict) (3.518015ms)
+✔ adr-lint bites: bad status enum, dangling supersede, dangling Confirmation path (2.028763ms)
+✔ supersede resolution is numeric and tolerates ADR- prefix + case (1.875998ms)
+✔ adr-lint bites: title/filename number mismatch, duplicate numbers, malformed filename (3.623341ms)
+✔ strict mode: accepted ADR with Confirmation still `proposed` FAILs strict, passes non-strict (1.966357ms)
+✔ strict mode: accepted ADR with NO Confirmation FAILs strict, only WARNs non-strict (1.807067ms)
+✔ strict mode: junk-prose Confirmation with no checkable gate FAILs (no laundering) (1.885825ms)
+✔ path heuristic: commands, globs, ~-anchors, absolute paths, prose slashes skipped; dangling repo paths bite (4.139733ms)
+✔ unenforced escape hatch: literal passes strict, with em-dash or plain hyphen (3.400061ms)
+✔ non-accepted statuses do not demand Confirmation; empty section WARNs like missing (1.895437ms)
+✔ fenced code blocks are ignored when parsing status/sections (2.142244ms)
+✔ harness wiring: adr-gate is part of just ci (a deleted gate line must not stay green) (0.2186ms)
+secret: possible AWS access key id in leak.txt
+check-secrets: 1 potential secret(s) found.
+✔ check-secrets flags a planted secret and passes a clean tree (68.559447ms)
+✔ new-project scaffolds a stack, substitutes tokens, and commits (313.000207ms)
+Unknown stack "no-such-stack". Available: electron-desktop, node-ts-app, pixijs-game, python-service, react-web, rust-lib, spacetimedb-game
+Name must be kebab-case.
+✔ new-project rejects an unknown stack and a bad name (258.439213ms)
+✔ every stack template generates cleanly with no leftover tokens (1109.561135ms)
+✔ workspace-review runs and reports (200.853778ms)
+✔ all justfiles use valid recipe syntax (no header-level ";", no tabs, bodies present) (3.340302ms)
+✔ doctor self-check passes (stack parity, security baseline, docs match reality) (3488.659922ms)
+✔ every generated project ignores .env (no secret-leak regression) (1175.687491ms)
+✔ no stack justfile ships an unoverridden placeholder recipe (2.387223ms)
+✔ biome.json is single-sourced in _base (no per-stack duplication/drift) (0.230192ms)
+✔ every node stack lints with Biome (real gate, not a no-op) (1.43769ms)
+✔ sync-templates MANAGED files all exist in _base (0.787245ms)
+✔ every stack runs the portable secret scanner in `just security` (3.462277ms)
+✔ README documents every stack (0.67866ms)
+✔ generated projects ship the PostToolUse auto-format hook (0.531529ms)
+✔ generated projects ship the PreToolUse destructive-command guard hook (0.669093ms)
+✔ lefthook commit-msg validation is portable (Node, not grep) (1.435387ms)
+✔ every template CI workflow runs the gitleaks secret scan (1.193171ms)
+✔ every stack justfile defines a `mutate` recipe (2.173284ms)
+✔ node stacks wire StrykerJS consistently (config + script + deps together) (1.449363ms)
+✔ node coverage gates are real (provider dep + thresholds) where enabled (2.238003ms)
+✔ python stack enforces a coverage floor (0.717153ms)
+✔ every stack CI runs a real SCA gate (1.981243ms)
+✔ _base CI runs the mutation and build gates (0.50857ms)
+✔ every node stack justfile defines a `build` recipe (1.730028ms)
+✔ stack evals/run.mjs never diverges from _base (managed file) (1.168024ms)
+✔ every *.eval.mjs default-exports a function (1.381306ms)
+✔ generated projects ship the Bash noise-filter hook (0.676968ms)
+✔ the noise-filter hook never diverges between the harness and _base (2.906026ms)
+✔ the noise filter rewrites to a single operator-free command, and only for noisy commands (102.739343ms)
+✔ the settings files that govern real sessions wire the noise filter (1.044788ms)
+✔ the noise-filter fixtures never diverge between the harness and _base (5.100685ms)
+✔ rb-27 retracts its moot deferral premise in place (1.115447ms)
+✔ rb-27 retraction text is frozen and matches the tracked adjudication (12.738983ms)
+✔ the rb-27 annotation is inert and cannot inject a phantom gate (1.135147ms)
+ℹ tests 106
+ℹ suites 0
+ℹ pass 106
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5484.861378
+node scripts/research-index.mjs docs/research --check
+in sync
+node scripts/research-lint.mjs docs/research --shared
+WARN accessibility-interactive-apps.md: abstract 231 chars > 120 (index truncates)
+WARN authentication-and-identity.md: abstract 143 chars > 120 (index truncates)
+WARN deterministic-simulation-architecture.md: abstract 234 chars > 120 (index truncates)
+WARN game-content-pipelines.md: abstract 291 chars > 120 (index truncates)
+WARN internationalization-localization.md: abstract 227 chars > 120 (index truncates)
+WARN matchmaking-and-rating-systems.md: abstract 184 chars > 120 (index truncates)
+WARN monster-taming-mechanics.md: abstract 318 chars > 120 (index truncates)
+WARN netcode-authoritative-multiplayer.md: abstract 219 chars > 120 (index truncates)
+WARN observability-performance-realtime.md: abstract 183 chars > 120 (index truncates)
+WARN online-game-security-anticheat.md: abstract 216 chars > 120 (index truncates)
+WARN pixijs-2d-rendering.md: abstract 200 chars > 120 (index truncates)
+WARN pixijs-2d-rendering.md: milestone-looking tokens (review for project leakage; false positives OK): M3
+WARN rust-for-systems-and-games.md: abstract 195 chars > 120 (index truncates)
+WARN schema-evolution-and-migrations.md: abstract 199 chars > 120 (index truncates)
+WARN social-systems-and-moderation.md: abstract 199 chars > 120 (index truncates)
+WARN state-sync-interest-management.md: abstract 147 chars > 120 (index truncates)
+WARN top-down-2d-art.md: abstract 294 chars > 120 (index truncates)
+WARN virtual-economy-design.md: abstract 202 chars > 120 (index truncates)
+WARN webassembly-and-wasm-pack.md: abstract 176 chars > 120 (index truncates)
+research-lint: 19 docs · 0 FAIL · 19 WARN · purity:on
+node scripts/adr-lint.mjs docs/adr --strict-confirmation
+adr-lint: 12 ADRs · 0 FAIL · 0 WARN · strict-confirmation:on
+just ci rc=0
