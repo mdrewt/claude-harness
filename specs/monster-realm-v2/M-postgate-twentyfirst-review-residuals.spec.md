@@ -71,7 +71,7 @@ after: []
   player sees raw English on every shop/trade/rename/propose feedback line and on the
   session-expiry overlay; the strings never reach the resolver, so its throw-on-miss never fires.
 - EARS: ALL 15 messages SHALL move into catalog.en.ts + catalog.fr.ts under keys in the existing
-  namespaces (the three disconnected copies collapsed onto one key — `chrome.status.disconnected`
+  namespaces (the disconnected copies (three known at triage; a fourth, claimModel.ts, surfaced in the 2026-09-28 review) collapsed onto one key — `chrome.status.disconnected`
   or a parameterless sibling if `{where}` does not fit the call sites); EVERY listed call site
   SHALL consume `t()`/`tf()`. English output SHALL be byte-identical. Existing tests stay green
   unmodified except where they assert the moved literals (sessionModel/careAction tests updated to
@@ -105,10 +105,23 @@ after: []
   column — content stays locale-agnostic; localization lives in the client catalog layer
   (fold into the i18n-adjacent entry).
 
+### 21r-b2 — finish the uncatalogued-strings class (claimModel + privacyBanner)
+category: ux-a11y · severity: HIGH · size: LIGHT-MOD
+touches: client/src/ui/claimModel.ts, client/src/ui/claimModel.test.ts, client/src/ui/privacyBanner.ts, client/src/ui/privacyBanner.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/net/sessionModel.ts
+after: []
+- Found by the 2026-09-28 pre-merge review: 21r-b (PR #527) fixed the three copies its triage
+  named, but the class is wider. `claimModel.ts:93` carries a fourth
+  `'disconnected — try again'` copy plus ~10 raw overlay strings (:96, :320-353) that reach the
+  DOM via `claimView.ts` `.textContent`; `privacyBanner.ts:31-33, 131-159` carries ~15 raw
+  strings and imports no i18n at all. Both break DECISIONS.md "no hard-coded UI strings".
+- EARS: WHEN any claim-overlay or privacy-surface text renders THE CLIENT SHALL source it from
+  the typed catalog (en+fr), with no raw string literals reaching the DOM; the two stale
+  AUTH-46/47 process-comment stragglers in sessionModel.ts are removed in passing.
+
 ## Sequencing & fan-out
 
-21r-a (server taming), 21r-b (client i18n) and 21r-e (game-core raising + server trading +
-DECISIONS.md) are pairwise disjoint by `touches:`; all three may run in parallel.
+21r-b2 (client i18n surfaces) and 21r-e (game-core raising + server trading + DECISIONS.md) are
+disjoint by `touches:` and may run in parallel. (21r-a and 21r-b merged 2026-09-28.)
 
 ## Explicitly NOT in scope (parked = tracked; next review's exclusion set inherits these)
 

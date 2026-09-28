@@ -6,7 +6,7 @@ picture and `WORKSPACE-PLAN.md` for the rationale.
 
 ## Before you commit
 - `just doctor` — confirm host tools are present.
-- `just ci` — runs the harness gate (lint its own scripts + the guard tests).
+- `just ci` — runs the harness gate (script lint + guard tests + research gate + supervisor selfcheck).
 - Optional: `lefthook install` once, so `just lint`/`just test`/secret-scan run on
   every commit automatically.
 

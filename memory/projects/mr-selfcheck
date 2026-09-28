@@ -33,7 +33,7 @@ $TOOLS
 EOF
 /usr/bin/python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$MEM/mr-feedback" 2>/dev/null || { echo "SELFCHECK-FAIL py: mr-feedback"; BAD=1; }
 "$MEM/mr-feedback" selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-feedback selftest"; BAD=1; }
-# ADR-0011 Confirmation: the cost SSOT must keep reconstructing per-invocation spend from the
+# Cost-SSOT decision (docs/DECISIONS.md): the cost SSOT must keep reconstructing per-invocation spend from the
 # cumulative total_cost_usd field. Its fixtures include the real uxd2 shape (naive $423.65 ->
 # true $165.65) and the escalation case a pure value-decrease split would undercount.
 "$MEM/mr-cost-sum" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-sum selftest"; BAD=1; }
@@ -51,6 +51,8 @@ EOF
 "$MEM/mr-unlock" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-unlock selftest"; BAD=1; }
 # cost caps + rate-limit arming: the wrapper-side money/limit safety pair.
 "$MEM/mr-cost-watch" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-watch selftest"; BAD=1; }
+# launch machinery: brief rendering, placeholder integrity, repo routing, probe behavior.
+"$MEM/mr-spawn" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-spawn selftest"; BAD=1; }
 # lp-04: mr-audit's policy/detector split + the disposition sweep.
 #
 # The one-line house form — `"$MEM/mr-audit" --selftest >/dev/null 2>&1 || BAD=1` — is DELIBERATELY
@@ -353,7 +355,7 @@ PYGUARD
 # python heredocs embedded in bash wrappers. `bash -n` above cannot see inside them, yet that is
 # where most of the real logic lives (mr-record's cost path, mr-native-tick's reconcile/gate-2/
 # rate-limit-arming). Without this, a python syntax error in any of them ships silently and only
-# surfaces at 03:00 from cron. Added with ADR-0011, whose own edits live in two of these blocks.
+# surfaces at 03:00 from cron. Added with the cost-SSOT work; its edits live in two of these blocks.
 /usr/bin/python3 - "$MEM" <<'PYHD' || BAD=1
 import ast, re, sys, os
 mem = sys.argv[1]; bad = 0
@@ -408,9 +410,9 @@ sys.exit(bad)
 PYHD
 # Template<->spawn placeholder contract: mr-spawn substitutes <CAP_USD>; a brief with no cap
 # is a real wiring break (not a prose pin).
-grep -qF 'BUDGET: $<CAP_USD>' "$MEM/mr-brief-template.md" || { echo "SELFCHECK-FAIL E1/E3 brief-template A1: 'BUDGET: \$<CAP_USD>' anchor missing (mr-brief-template.md is missing, moved, or the <CAP_USD> placeholder was dropped) -- restore the literal 'BUDGET: \$<CAP_USD>' text so mr-spawn:263 has a placeholder to substitute, and so A2-A4 below check the real file"; BAD=1; }
+grep -qF 'BUDGET: $<CAP_USD>' "$MEM/mr-brief-template.md" || { echo "SELFCHECK-FAIL E1/E3 brief-template A1: 'BUDGET: \$<CAP_USD>' anchor missing (mr-brief-template.md is missing, moved, or the <CAP_USD> placeholder was dropped) -- restore the literal 'BUDGET: \$<CAP_USD>' text so mr-spawn:263 has a placeholder to substitute, and so the placeholder contract check below check the real file"; BAD=1; }
 # lp-11a ADOPTION (2026-08-22). Two checks, and the SECOND is the one that matters.
-#   B1 runs the wrapper's proof-of-teeth fixture (ADR-0010: run it, do not merely commit it) --
+#   B1 runs the wrapper's selftest fixture (run it, do not merely commit it) --
 #      21 assertions, incl. the two defects that adoption exposed: fail-OPEN when mr-hold is
 #      unavailable (a disable that creates no hold), and a symlink-invoked wrapper resolving MEM to
 #      ~/.local/bin so `$MEM/mr-hold` does not exist. Both were RED before 2026-08-22.
@@ -419,13 +421,20 @@ grep -qF 'BUDGET: $<CAP_USD>' "$MEM/mr-brief-template.md" || { echo "SELFCHECK-F
 #      symlink was never created, ~/.local/bin kept the bare `touch`, and TWO repo-side comments
 #      asserted the routing was live while every operator pause still escalated (issues #34/#35).
 #      A commit cannot perform an out-of-repo symlink -- so the repo must at least NOTICE.
+# Adoption checks compare against ~/.local/bin and ~/.claude, which only the CANONICAL main
+# checkout owns. In a worktree or fresh clone they would always FAIL and make SELFCHECK-OK
+# unreachable (measured 2026-09-28) — so outside the canon they downgrade to NOTEs.
+IS_CANON=0; [ "$(readlink -f "$MEM" 2>/dev/null)" = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects" ] && IS_CANON=1
 "$MEM/supervisor-disable-teeth.sh" >/dev/null 2>&1 || { echo "SELFCHECK-FAIL B1 supervisor-disable proof-of-teeth: supervisor-disable-teeth.sh did not report TEETH-ALL-OK -- run it directly for the failing case"; BAD=1; }
-[ "$(readlink -f "$HOME/.local/bin/mr-supervisor-disable" 2>/dev/null)" = "$(readlink -f "$MEM/mr-supervisor-disable" 2>/dev/null)" ] || { echo "SELFCHECK-FAIL B2 adoption drift: ~/.local/bin/mr-supervisor-disable does not resolve to \$MEM/mr-supervisor-disable, so the operator's pause is NOT the tracked provenance-recording wrapper (this is exactly the 2026-08-17..22 gap). Fix: ln -sf \"$MEM/mr-supervisor-disable\" \"$HOME/.local/bin/mr-supervisor-disable\""; BAD=1; }
+if [ "$IS_CANON" = "1" ]; then
+  [ "$(readlink -f "$HOME/.local/bin/mr-supervisor-disable" 2>/dev/null)" = "$(readlink -f "$MEM/mr-supervisor-disable" 2>/dev/null)" ] || { echo "SELFCHECK-FAIL B2 adoption drift: ~/.local/bin/mr-supervisor-disable does not resolve to \$MEM/mr-supervisor-disable, so the operator's pause is NOT the tracked provenance-recording wrapper (this is exactly the 2026-08-17..22 gap). Fix: ln -sf \"$MEM/mr-supervisor-disable\" \"$HOME/.local/bin/mr-supervisor-disable\""; BAD=1; }
+else
+  echo "SELFCHECK-NOTE B2 skipped (not the canonical checkout — adoption is operator-side state)"
+fi
 # lp-06: mr-backup + the stray-handoff rule
 #   EARS-1 (a recoverable copy of the ledger/handoff outside the working tree) and EARS-2 (an
 #   untracked handoff-shaped file outside memory/projects/ must red). Placed AFTER the lp-brief-cost
-#   block and its teeth invocation on purpose: lp-brief-cost-teeth.sh extracts that block with the
-#   sed range /^# lp-brief-cost:/,/^grep -F .Definition of done/, and a block landing inside that
+#   block and its teeth invocation on purpose: the retired lp-brief-cost teeth once extracted that block by sed range, and a block landing inside it
 #   window would silently change what its teeth measure.
 #
 #   PREDICATE DRIFT, recorded so no reader is misled: the spec's motivating artifact -- an untracked
@@ -440,7 +449,7 @@ grep -qF 'BUDGET: $<CAP_USD>' "$MEM/mr-brief-template.md" || { echo "SELFCHECK-F
 #   containing a .git -- registered worktrees AND a bare `mkdir X && git init X` -- since
 #   `git ls-files --others` reports such a directory as ONE opaque entry and does not recurse (that
 #   checkout's own mr-selfcheck covers it); and handoff content in a file with no "handoff" in its
-#   name, out of a name-based predicate's reach. Gating fixtures: lp-06-teeth.sh (S0-S8/B0-B6/W1-W7).
+#   name, out of a name-based predicate's reach. The lp-06 teeth script is retired; its live W2-W4 guards moved into this file.
 /usr/bin/python3 - "$MEM" <<'PYLP06' || BAD=1
 import os, re, subprocess, sys, tempfile
 
@@ -635,7 +644,7 @@ else:
     # Anchored on the literal CALL expressions, never on the substring `mr-backup`: mr-record's
     # rationale comments (and _backup_bin()'s own path construction) keep that substring alive even
     # after both call lines are deleted, so a bare substring check is satisfiable by PROSE -- proven
-    # by red-team and pinned by lp-06-teeth.sh W9.
+    # by red-team (the retired lp-06 teeth once pinned it).
     missing = [c for c in ("_backup(LEDGER)", "_backup(HANDOFF)") if c not in record_text]
     if missing:
         fail("backup-wiring", "%s no longer contains the call expression(s) %s -- the backup trigger "
@@ -729,7 +738,7 @@ def _is_spawner(path):
     return False
 
 
-MR_FORCE_DEREF_RE = re.compile(r"\$MR_FORCE\b|\$\{MR_FORCE")
+MR_FORCE_DEREF_RE = re.compile(r"\$MR_FORCE\b|\$\{MR_FORCE|\$\{?MR_OPERATOR_RUN")
 
 
 def _dereferences_mr_force(path):
@@ -739,7 +748,7 @@ def _dereferences_mr_force(path):
     return False
 
 
-UNSET_ANCHOR = "unset MR_FORCE MR_TICK_DRYRUN"
+UNSET_ANCHOR = "unset MR_FORCE MR_TICK_DRYRUN MR_OPERATOR_RUN MR_EVENT_SRC"
 
 # =============================================================================================
 # A2 — sole-consumer cardinality. Computed FIRST because A1's exemption is DERIVED from it
@@ -756,9 +765,11 @@ if not all_mr_files:
 # blind spot it creates is a non-spawner that would have to dereference the variable for no reason.
 consumers = [n for n in all_mr_files
              if n != "mr-selfcheck" and _dereferences_mr_force(os.path.join(MEM, n))]
-if all_mr_files and set(consumers) != {"mr-native-tick.sh"}:
+# Sanctioned pair (2026-09 revision): the tick derefs MR_FORCE and mints MR_OPERATOR_RUN for
+# its own decision session; mr-spawn checks ONLY the minted token. Anything else is an escape hatch.
+if all_mr_files and set(consumers) != {"mr-native-tick.sh", "mr-spawn"}:
     fail("A2-sole-consumer-cardinality",
-         "expected exactly {mr-native-tick.sh} to dereference $MR_FORCE, got %s" % (sorted(consumers),))
+         "expected exactly {mr-native-tick.sh, mr-spawn} to dereference MR_FORCE/MR_OPERATOR_RUN, got %s" % (sorted(consumers),))
 exempt = set(consumers)  # derived exemption for A1 — never a hardcoded name
 
 # =============================================================================================
@@ -1214,7 +1225,7 @@ def sha(path):
 
 real_state_before, real_handoff_before = sha(REAL_STATE), sha(REAL_HANDOFF)
 
-TMP = tempfile.mkdtemp(prefix="mr-selfcheck-qh-")
+TMP = tempfile.mkdtemp(prefix="mr-selfcheck-qh-")  # removed at block end
 STATE = os.path.join(TMP, "mr-state.json")
 HANDOFF = os.path.join(TMP, "monster-realm-handoff.md")
 
@@ -1371,6 +1382,7 @@ if sha(REAL_STATE) != real_state_before:
 if sha(REAL_HANDOFF) != real_handoff_before:
     fail("lp-queue-corpus-pollution", "the REAL monster-realm-handoff.md changed during this selftest")
 
+import shutil as _sh; _sh.rmtree(TMP, ignore_errors=True)
 sys.exit(bad)
 PYQH
 
@@ -2041,31 +2053,9 @@ else:
     if r.returncode != 0 or "GATES-STOP-SELFTEST-OK" not in r.stdout:
         fail("gates-hook-selftest", (r.stdout + r.stderr).strip()[-200:])
 
-# --- G2: ADOPTION-DRIFT. lp-11a shipped a tracked tool with `ln -sf` instructions that were never
-# run: every operator pause read `attributed:false` for five days and opened a decision issue each
-# time. The lesson was not "write better instructions", it was "check that adoption happened".
-# gates-stop.mjs lives in the harness but is registered in the USER settings, which is outside
-# version control -- exactly the same shape. So assert the registration, by absolute path.
-try:
-    with open(USER_SETTINGS) as fh:
-        us = json.load(fh)
-except Exception as e:
-    fail("gates-hook-adoption", "cannot read %s (%s)" % (USER_SETTINGS, type(e).__name__))
-else:
-    cmds = [h.get("command", "")
-            for entry in (us.get("hooks", {}).get("Stop") or [])
-            for h in (entry.get("hooks") or [])]
-    hits = [c for c in cmds if "gates-stop.mjs" in c]
-    if not hits:
-        fail("gates-hook-adoption",
-             "gates-stop.mjs is NOT registered as a Stop hook in %s. Hooks are not inherited "
-             "across the ancestor walk (probed on 2.1.240), so without this the instrument is "
-             "blind to every project-rooted slice run -- which is most of them." % USER_SETTINGS)
-    elif not any(HOOK in c for c in hits):
-        fail("gates-hook-adoption",
-             "registered, but not at the harness path %s (found %r) -- a stale copy will drift, "
-             "which is exactly how the two guard-bash.mjs copies diverged" % (HOOK, hits[:1]))
-
+# (gates-hook-adoption check removed 2026-09: the gates-stop instrument is retired; the
+#  operator deletes its user-settings registration per the revision checklist — a check that
+#  demands the retired hook stay registered would fight that.)
 # --- G3: constants have ONE definition. lp-11b's whole defect was two 7-day literals in two
 # files. mr-selfcheck therefore READS the policy from the tool instead of restating it.
 POLICY = {}
@@ -2079,7 +2069,7 @@ for k in ("graveyard_window_days",):
     if not isinstance(POLICY.get(k), int):
         fail("gates-policy-shape", "missing or non-int %s" % k)
 
-# --- G4: the drain actually drains. These are the ADR-0010 falsification metrics for this
+# --- G4: the drain actually drains. These are the falsification metrics for this
 # mechanism: a sink whose rows never reach a terminal state is a graveyard, and this corpus has
 # already built one (mr-feedback: 189 rows, 0 ever terminal).
 try:

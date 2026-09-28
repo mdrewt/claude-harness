@@ -44,7 +44,7 @@ playtest-wipe publish security setup smoke-republish test typecheck wasm`
   cap 34, smoke-republish, perf-budget.
 
 ## Docs tree (12 files, current-state)
-Root: `README.md`, `ARCHITECTURE.md` (~450 lines), `AGENTS.md` (48 lines), `CONTRIBUTING.md`,
+Root: `README.md`, `ARCHITECTURE.md` (484 lines), `AGENTS.md` (45 lines), `CONTRIBUTING.md`,
 `CHANGELOG.md` (generated), `CODE_OF_CONDUCT.md`. `docs/`: `DECISIONS.md`, `PLAYTEST.md`,
 `runbooks/{playtest-ops,observability-dr,spacetimedb-upgrade}.md`, plus `docs/debloat/` (the
 de-bloat audit trail — keep) and `docs/research/SEED-DOMAINS.md` (pending user relocation).
@@ -58,9 +58,9 @@ nextest 1,954 · vitest 3,130 (client tests ARE typechecked now) · Playwright 9
 1 permanent skip) in 24 files · warm `just ci` ≈ 87 s. Native-host reducer tests live in
 `server-module/src/native_host_tests.rs`. Milestone-named test files no longer exist (feature
 files). Process vocabulary was purged from production source and docs outside `docs/debloat/`,
-with a handful of known comment stragglers (client/src/net/sessionModel.ts "AUTH-46/47", 
+with a handful of known comment stragglers (client/src/ui/sessionModel.ts "AUTH-46/47", 
 client/src/render/motionPreference.ts "A11Y-28", species/070-wave3.ron "slice rw3c") — cosmetic;
-21r-b's touches cover the first file and can carry the cleanup.
+the 21r-b2 slice carries the cleanup (PR #527 did not).
 
 ## Frozen surfaces (unchanged by the de-bloat)
 `client/src/module_bindings/` generated only (`just gen`); schema/reducer signatures frozen by

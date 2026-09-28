@@ -10,7 +10,7 @@ profiling, and load testing. Mirrors `netcode-quality-review.md` (which secures 
 The pre-existing specs had **scattered logging + reserved seams + open-ended "later" deferrals** — not a
 plan: structured error logs in M0/M2, an OTel/metrics seam deferred "until load exists," no benchmark suite
 or perf budgets, and load testing punted from M5 with no home. For a multiplayer server that is a real risk
-(`standards/observability.md`: realtime backends "need a lot"; `standards/evals.md`: a benchmark gate is
+(`standards/observability.md`: realtime backends "need a lot"; `standards/testing-tdd.md`: a benchmark check is
 expected). This plan makes observability + performance a **designed-in, mechanically-enforced** property —
 like determinism, security, and netcode smoothness — rather than a post-hoc bolt-on.
 
@@ -33,7 +33,7 @@ capstone). That is how the harness already handles determinism/security/smoothne
   structured logs for free, with zero module code; real OTel now applies **client-side only**. The exporter
   sink is the self-hosted stack in §4, not Datadog. See ADR-0180 §D1/D6 and `M20-observability-performance.spec.md`.
 - **Benchmark harness + perf-budget eval gating CI** — `game-core` hot-path micro-benchmarks (criterion) with
-  committed budgets; a **regression > threshold fails CI** (the `evals.md` benchmark gate) — always on, from
+  committed budgets; a **regression > threshold fails CI** (the `evals.md` benchmark check) — always on, from
   day one, on the pure rules where it's cheap and deterministic.
 - **Health / readiness** signal for the module + the client.
 

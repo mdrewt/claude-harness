@@ -92,7 +92,7 @@ sanctioned `mr-hold clear`. No local secret closes that — an adversary with th
 too. The guard therefore blocks the Bash *write* verbs against the flag as well (`>`/`tee`/`sed -i`/
 `chmod`/`truncate`/`cp`/`ln`/`unlink`), which reduces forgery to paths a session cannot take
 casually. The residual (the `Write`/`Edit` tools have no PreToolUse matcher) is a real gap recorded
-in ADR-0002 and needs a `.claude/settings.json` change, which is outside this tool's remit.
+in the guard-hook decision (docs/DECISIONS.md) and needs a `.claude/settings.json` change, which is outside this tool's remit.
 
 QUEUE VISIBILITY (spec item (d)). The hold sits ABOVE the event queue: `mr-native-tick.sh` requeues
 into `pending-events/` correctly, but nothing drained it and nothing surfaced how deep it was — one

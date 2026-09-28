@@ -11,11 +11,13 @@ export DJ_ARGS=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv
 import json, os, fnmatch
 argv=json.loads(os.environ["DJ_ARGS"])
 STRUCTURAL=["Cargo.lock","package-lock.json","client/src/module_bindings/*","evals/run.mjs","*schema*","*migration*"]
+# Doc set: supervisor-reconciled at merge (union/append), so overlap here never forces serial.
+DOC_SET={"CHANGELOG.md","ARCHITECTURE.md","docs/DECISIONS.md"}
 slices={}
 for a in argv:
     if ":" not in a: continue
     name,paths=a.split(":",1)
-    slices[name]=[p.strip() for p in paths.split(",") if p.strip()]
+    slices[name]=[p.strip() for p in paths.split(",") if p.strip() and p.strip() not in DOC_SET]
 out={"slices":list(slices),"pairs":[],"structural_hits":{},"verdict":"SAFE"}
 def hits_structural(p):
     return any(fnmatch.fnmatch(p,pat) or pat.strip("*") in p for pat in STRUCTURAL)

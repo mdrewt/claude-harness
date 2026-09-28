@@ -8,13 +8,13 @@ Each carries an owner action or a path-stability constraint.
 | User crontab (`0 * * * *`, `@reboot`, daily `mr-usage-snap`) | `memory/projects/mr-native-tick.sh`, `memory/projects/mr-usage-snap` | **Paths must not move.** No crontab change needed. |
 | `~/.local/bin/mr-supervisor-{enable,run,status,chat}` (real scripts, not in git) | `$MEM/mr-native-tick.sh`, `$MEM/.native-supervisor-disabled`, `$MEM` logs/state | **Paths must not move.** |
 | `~/.local/bin/mr-supervisor-disable` (symlink) | → `memory/projects/mr-supervisor-disable` | Keep the file at that path. |
-| `~/.claude/settings.json:47-52` Stop hook | `.claude/hooks/gates-stop.mjs` | **Operator action (Checkpoint 2): remove the hook entry BEFORE the file is deleted** in Phase 2a. |
+| `~/.claude/settings.json:47-52` Stop hook | `.claude/hooks/gates-stop.mjs` | **Resolved as KEEP-until-operator-acts:** the file stays in-repo (edited, observe-only) so live sessions never reference a missing hook; the operator removes the settings entry post-merge, then the file can be deleted. |
 | Cowork/DC fallback task (Windows, daily 09:00) | `memory/projects/mr-supervisor-prompt-native.md` (executes it via DC bridge when heartbeat >2h stale) | **Retired per user decision — operator deletes the Cowork task (Checkpoint 2 checklist).** Prompt rewrite drops dual-caller adaptations. |
 | Cowork weekly-review stub | `memory/projects/mr-weekly-review-prompt.md` | Stays weekly (user decision); operator repoints/re-pastes the stub after the Phase-4 rewrite if the stub embeds text. |
 | `just setup-claude` global links | `standards/`, `.claude/agents`, skills → linked into `~/.claude` for ALL projects | Doctrine changes propagate everywhere; sibling projects (gate-node-ts, gate-python, gate-react, gate-rust, pokemon-mmo, realm-generator{,-tauri}, virtual-table-top, hg-engine, monster-scraper, roms) pick up template changes at next `just sync`. |
 | guard-bash hook (`.claude/hooks/guard-bash.mjs`) | protects the kill-switch flag; blocks `mr-supervisor-enable` from agents | Keep behavior intact through every phase. |
 
-Baseline environment facts:
+Baseline environment facts (pre-revision values; several superseded during the program — queue is now empty, adr_next_free removed):
 - Supervisor hold: OPERATOR, set 2026-09-28T07:08Z — stays until user runs `mr-supervisor-enable`.
 - `mr-state.json`: `inflight=[] awaiting_merge=[] parked=[]`, `queue=[rb-133..136]`, `adr_next_free=275`, `park_counters={14r-e:1}`.
 - Tick gate 3 (human-activity probe, `mr-native-tick.sh:319-351`) stands down on ANY resident IDE

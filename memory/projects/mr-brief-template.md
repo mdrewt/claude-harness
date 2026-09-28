@@ -11,11 +11,11 @@ Cap ~40 lines / ≤3 hunks; excess becomes a follow-up flag, never a blocker. Ga
 
 <TIER_BLOCK><REPO_BLOCK>
 
-**Checkpoint + stop flags:** commit and immediately `git push` a `wip:` checkpoint at every phase boundary (after the plan, after tests, after each green increment, before long waits). Between phases and while waiting, check `/tmp/mr_stop_<SLICE>` and `/tmp/mr_stop_all`: if either exists, finish the current atomic step, commit + push `wip(<SLICE>): checkpoint — rate-limit stop`, update `memory/projects/monster-realm-handoff.md` with the exact resume point, and exit cleanly.
+**Checkpoint + stop flags:** commit and immediately `git push` a `wip:` checkpoint at every phase boundary (after the plan, after tests, after each green increment, before long waits). Between phases and while waiting, check `/tmp/mr_stop_<SLICE>` and `/tmp/mr_stop_all`: if either exists, finish the current atomic step, commit + push `wip(<SLICE>): checkpoint — rate-limit stop`, record the exact resume point via `/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-record handoff --title "<SLICE> parked" --body "..."` (never edit the handoff file directly), and exit cleanly.
 
 **Test-first, gated:** run the build-loop per-slice procedure; a `tester` (never the implementer) writes the gating tests from the EARS criteria and watches them fail on the real defect, the implementer never edits them, and every non-doc slice needs a tester invocation (the supervisor audits it).<SKILLS_BLOCK>
 
-**Acceptance ledger** `memory/projects/gates/<SLICE>.gates.md` (seeded by the supervisor from the spec; you do not choose or delete criteria): in the PLAN phase give each gate a `CHECK:` that is a real test-runner invocation of named in-repo tests or an `mr-*` tool, plus an `EXPECT:` that only matches on success; run `mr-gates check --slice <SLICE>` after each green increment (never flip a box by hand — the supervisor re-executes every CHECK).
+**Acceptance ledger** `/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/gates/<SLICE>.gates.md` (seeded by the supervisor from the spec; you do not choose or delete criteria): in the PLAN phase give each gate a `CHECK:` that is a real test-runner invocation of named in-repo tests or an `mr-*` tool, plus an `EXPECT:` that only matches on success; run `/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-gates check --slice <SLICE>` after each green increment (never flip a box by hand — the supervisor re-executes every CHECK).
 `DEFER: <gate-id> -> <slice id | backlog | wontfix> [category/SEVERITY] — <reason>` is the only other legal exit; deferring more than half is a sizing failure.
 Put `mr-gates render --slice <SLICE> --format pr` output in the PR body.
 
@@ -23,7 +23,7 @@ Put `mr-gates render --slice <SLICE> --format pr` output in the PR body.
 
 **Merge is supervisor-owned:** get this slice's gate green locally, open the PR on `<PR_REPO>`, then STOP. `gh pr merge` is FORBIDDEN to you. After ~4–5 red→fix cycles without local green, PARK (commit + push, leave the PR open, document the blocker).
 
-**Valid stopping points (exhaustive):** (1) PR open + local gate green + every acceptance gate met with evidence or DEFERred; (2) a stop-flag park (checkpoint pushed, handoff updated); (3) a PARK after the bounded fix cycles (progress pushed, blocker in the handoff). On any park, write `mr-gates render --slice <SLICE> --format park` to `memory/projects/monster-realm-<SLICE>-progress.md`. A mid-slice progress summary is a failure, not a stop — keep working.
+**Valid stopping points (exhaustive):** (1) PR open + local gate green + every acceptance gate met with evidence or DEFERred; (2) a stop-flag park (checkpoint pushed, handoff updated); (3) a PARK after the bounded fix cycles (progress pushed, blocker in the handoff). On any park, write `/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-gates render --slice <SLICE> --format park` to `/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/monster-realm-<SLICE>-progress.md`. A mid-slice progress summary is a failure, not a stop — keep working.
 
 End with: slice · merged|parked|blocked|stopped · PR URL · CI · what changed · decisions (usually none) · risks.
 

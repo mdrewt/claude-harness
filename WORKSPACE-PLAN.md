@@ -45,7 +45,7 @@ It is itself version-controlled (see §2) so every change to the plan is diffabl
 Three layers, each with a clear job:
 
 - **Harness** (this workspace root): durable, shared, slow-changing. Standards, templates, skills, subagents, memory index. Version-controlled.
-- **Project** (`projects/<name>/`): an independent repo with its own `AGENTS.md`, specs, ADRs, tests, CI, and devcontainer.
+- **Project** (`projects/<name>/`): an independent repo with its own `AGENTS.md`, specs, `docs/DECISIONS.md`, tests, CI, and devcontainer.
 - **Session**: the live agent run. Kept lean on purpose — pulls only what it needs from the harness and project, isolates research/exploration into subagents, and compacts often.
 
 The guiding principle against context rot: **filter information before it reaches the model**, don't dump everything into always-on context.
@@ -142,7 +142,7 @@ Everything here is generated or tool-prompted so nothing depends on remembering 
 - **Decision log.** Each project has one `docs/DECISIONS.md` (`standards/decisions.md`). The `/decision` command (via the `doc-keeper` subagent) records a decision **only when it constrains future work and isn't evident from the code** — most changes record nothing. New dependencies and cross-cutting patterns usually meet the bar. (The old ADR-per-decision rule was meant as an over-engineering guardrail; in practice mandatory recording inflated 240 micro-ADRs in one project — the bar, not the ceremony, is the guardrail.)
 - **Changelog.** Generated from Conventional Commits — never hand-maintained.
 - **API docs.** Generated from types/contracts per language (rustdoc, TypeDoc, Sphinx/pdoc).
-- **Decisions log + memory cards.** `memory/decisions-log.md` and `memory/projects/<name>.md` updated by the `doc-keeper` subagent at task close.
+- **Decisions log + memory cards.** `memory/decisions-log.md` and `memory/projects/<name>.md` updated by the `doc-keeper` when something durable changed.
 - **Drift detection.** The daily review (§9) flags decisions discussed but not recorded, and standards that have diverged from code.
 
 ---
@@ -328,7 +328,7 @@ Each failure mode maps to a concrete control already in this plan.
 4. Build `templates/_base/` + the first stack templates (full DX suite per §18); build the `new-project` generator.
 5. Wire MCPs: **Context7** (connected); local **Postgres** per-project via `.mcp.json`; confirm engineering-plugin connectors (GitHub, Datadog, etc.).
 6. Register the daily review scheduled task (07:00, usage-gated).
-7. **Verification:** generate a throwaway project from a template, run its lint/test/eval/security CI locally in the sandbox end-to-end, confirm the ADR/changelog/memory automation fires, then delete it.
+7. **Verification:** generate a throwaway project from a template, run its `just ci` locally in the sandbox end-to-end, then delete it.
 8. Push the harness repo to a private remote (backup).
 
 ---
@@ -393,5 +393,5 @@ The subagents (planner, researcher, tester, reviewer, verifier, doc-keeper, judg
 
 ### Install — software (DX layer)
 - **Spec Kit** (Specify CLI) — SDD front end.
-- **Security:** gitleaks, Semgrep, Trivy/Syft — wired into CI + lefthook.
+- **Security:** gitleaks wired into CI + lefthook; Semgrep and Trivy/Syft installed for on-demand use per threat model.
 - 

@@ -20,16 +20,20 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 - Per-slice `touches:` + EARS criteria live in each milestone's `M*.spec.md`, never here.
 - §9 lines are one-line summaries + status only.
 - Verification doctrine: `standards/testing-tdd.md` (harness-wide SSOT). No eval-script gates,
-  no coverage/mutation thresholds, no proof-of-teeth ceremony — those retirements are permanent.
-- The standing residual file is `residuals.spec.md` (open items only; 25 at last triage,
-  0 HIGH/CRITICAL). Residuals fill idle capacity; they never preempt this roadmap.
+  no coverage/mutation thresholds (except the grandfathered nightly mutation config: game-core
+  zero-miss and the server cap — that project decision stands), no proof-of-teeth ceremony.
+- The standing residual file is `residuals.spec.md` (open items only; 29 as of 2026-09-28 —
+  the 25 triage survivors plus 4 LOW rows the 21r-a run disclosed; 0 HIGH/CRITICAL). Residuals
+  fill idle capacity and never preempt this roadmap; triage-carried rows are scheduled by hand
+  (mr-gates promote is closed to follow-up chains).
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
 1. **21r follow-ups** (`M-postgate-twentyfirst-review-residuals.spec.md`, triaged 2026-09-28,
    in progress): 21r-a (taming softlock, MED) and 21r-b (uncatalogued UI strings, HIGH) MERGED
-   2026-09-28 as the revision program's rehearsal slices; **21r-e remains** — answered decision
-   #479 (trade-time Trust/QT reset) + the two adjudicated DECISIONS gap entries.
+   2026-09-28 as the revision program's rehearsal slices; **remaining: 21r-b2** (the wider
+   uncatalogued-strings class: claimModel + privacyBanner, found in review) **and 21r-e** —
+   answered decision #479 (trade-time Trust/QT reset) + the two adjudicated DECISIONS gap entries.
 2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S1 rewrites two e2e tests that currently
    assert the trade-oracle leak as intended behavior, and S2 changes a frozen schema; the
@@ -63,8 +67,9 @@ against the CURRENT game repo (never against archived specs).
 - **RLS remains unenforced at SpacetimeDB 2.8.1** — privacy is enforced by the private-table +
   owner-scoped-view pattern (DECISIONS.md "Table privacy"); the RLS re-open triggers recorded in
   `security-threat-model.md` and `validation-checklist.md` still do not fire.
-- Frozen surfaces: schema/reducer signatures and `client/src/module_bindings/` per the game
-  repo's CONTRIBUTING.md — conductor-grade sign-off + publish-over-data proof to change.
+- Frozen surfaces: `client/src/module_bindings/` is generated-only (game repo AGENTS.md) and
+  schema changes are additive-only (DECISIONS.md "Schema changes are additive"); any schema
+  change needs bindings regen + a publish-over-data proof (docs/debloat/REPORT.md §maintainer).
 - Toolchain: SpacetimeDB 2.8.1 CLI/host + 2.8.1 module crate; 2.x syntax
   (`#[table(accessor = x)]`, `ctx.sender()`); upgrade runbook in the game repo's
   `docs/runbooks/spacetimedb-upgrade.md`.
