@@ -32,40 +32,7 @@
   "14r-e": 1
  },
  "parked": [],
- "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-27T01:02:48Z",
-   "derived_from_master_sha": "efb6c40",
-   "reason": "promoted residual R-rb-107-REJECTWALK",
-   "slice": "rb-133",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-09-27T03:03:11Z",
-   "derived_from_master_sha": "5544518",
-   "reason": "promoted residual R-rb-107-ARMSKIP",
-   "slice": "rb-134",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md"
-  },
-  {
-   "slice": "rb-135",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-10-X7 (28.7d, unstuck by the mr-gates status:targeted fix)",
-   "added_utc": "2026-09-27T09:09:50Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "950c083ced310ca43d3cef3b7552b49a3f848568"
-  },
-  {
-   "slice": "rb-136",
-   "spec_file": "specs/monster-realm-v2/M-residual-backlog.spec.md",
-   "reason": "promoted residual R-rb-10-X6 (28.7d, unstuck by the mr-gates status:targeted fix)",
-   "added_utc": "2026-09-27T09:09:50Z",
-   "added_by": "n/a",
-   "derived_from_master_sha": "950c083ced310ca43d3cef3b7552b49a3f848568"
-  }
- ],
+ "queue": [],
  "rate_limit_armed_by": null,
  "rate_limit_resets_at": null,
  "resource_locations": {
