@@ -23,15 +23,15 @@ without touching `resolve_turn`. Must **degrade gracefully** if an ally drops.
 organize raids.
 
 ## Risks / decisions
-Ally drop hangs/crashes → degrade path + reaper + one-ally proof-of-teeth. `resolve_turn` regressed → separate
+Ally drop hangs/crashes → degrade path + reaper + a one-ally regression test. `resolve_turn` regressed → separate
 rule + regression fixture. Raid abandon → fails the team, no rating (raids unranked).
 
 ## Recency check (2026-08-23, review pass — not a ceremony; M18 stays `blocked:playtest-gate`)
 
 This sketch predates `15r-sec-a` (ADR-0198, merged 2026-08-16), which made the `battle` table **private**
 and gated the sole client read path through `my_battle` — a **two-identity**-scoped `#[view]`
-(`player_identity` OR `opponent_identity` matching `ctx.sender()`; see
-`docs/adr/0198-participant-scoped-battle-view.md` D2, project root). A raid battle has **three** real
+(`player_identity` OR `opponent_identity` matching `ctx.sender()`; see the game repo's
+`docs/DECISIONS.md` "Table privacy" and "Battle lifecycle and PvP"). A raid battle has **three** real
 participants — two allies + the AI boss — and this sketch's "shared raid `battle` where `opponent_identity`
 is the ally" framing was written when `battle` was still public and any subscriber could read any row. That
 premise no longer holds: with `battle` private, whichever ally is neither `player_identity` nor
