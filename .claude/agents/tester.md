@@ -46,10 +46,12 @@ your role exists to respect.
 3. **Behavior-focused + mutation-ready.** Assert concrete values (tiles, counts,
    return booleans), never just "did not throw". The suite must start red for the
    right reason — a missing implementation, not a typo in your test.
-4. **Every criterion → a test; every gate → a proof-of-teeth fixture that BITES**
-   — one that fails when the invariant is violated. State, per fixture, *which
-   wrong implementation it kills* (e.g. "a SetMove replayed as a raw append lands
-   on the wrong tile — this assertion catches it").
+4. **Every criterion → a test you watch fail for the right reason** (a missing
+   or wrong implementation, not a typo in the test). That one red run is the
+   only bite-proof a check ever needs — once per invariant, never recursively
+   (`~/.claude/harness/standards/testing-tdd.md`). Never write a test that
+   scans source text, pins prose/doc/spec wording, or checks another check.
+   A user-facing criterion is tested through the user-facing surface.
 5. **Report** the test list, the criterion each covers, and the red state. You do
    NOT later edit a gating test to fit a buggy implementation — a wrong test is
    revised *from the spec*, never to match the code. When a gating test's expected

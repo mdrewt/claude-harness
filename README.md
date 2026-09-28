@@ -29,8 +29,8 @@ The root folder is its own git repo. Every project you create lives under
 ## What you get
 
 - **A project generator.** One command scaffolds a new repo from a stack
-  template: source + tests, a CI workflow, a devcontainer, a living eval
-  harness, ADR folder, license, lint/format config, git hooks, and an
+  template: source + tests, a CI workflow, a devcontainer, a decision log
+  (`docs/DECISIONS.md`), license, lint/format config, git hooks, and an
   `AGENTS.md` — all wired together.
 - **Seven working stacks** (Rust, Python, Node/TS, React, Electron, PixiJS,
   SpacetimeDB), each with a real, runnable `just ci` gate.
@@ -87,7 +87,7 @@ just new my-app node-ts-app
 cd projects/my-app
 just setup
 
-# 4. Run the full local gate (lint, typecheck, test, eval, security)
+# 4. Run the full local gate (lint, typecheck, test, security)
 just ci
 ```
 
@@ -109,10 +109,9 @@ language. Run them from the project root.
 | `just lint` | lint **and** format-check (fails on either) |
 | `just typecheck` | static type check |
 | `just test` | run the test suite |
-| `just eval` | run the project's living eval harness (architecture invariants, etc.) |
 | `just security` | local secret scan (+ dependency audit where available) |
-| `just ci` | the full local gate: lint → typecheck → test → eval → security |
-| `just mutate` | mutation tests (verifies the tests are meaningful) |
+| `just ci` | the full local gate: lint → typecheck → test → security |
+| `just mutate` | mutation report (audits whether the tests are meaningful) |
 | `just changelog` | regenerate `CHANGELOG.md` from Conventional Commits |
 | `just format` | auto-fix formatting (the writing counterpart to `just lint`) |
 
@@ -157,7 +156,7 @@ SpacetimeDB version's docs. Full integration testing needs a running instance
   repo. `.gitignore` is *merged* (not overwritten) so shared ignores like `.env`
   always survive.
 - **Single-sourced config.** Shared config (Biome, Renovate, lefthook, CI, the
-  secret scanner, eval runner) lives once in `_base` and flows into every
+  secret scanner) lives once in `_base` and flows into every
   project. `just sync` propagates later improvements to projects already created.
 - **Guard tests.** `scripts/tests/` encodes the harness's own invariants
   (no silent no-op gates, `.env` always ignored, config not duplicated, lint is a
@@ -183,9 +182,10 @@ cd projects/<name> && just setup
 implement in an isolated worktree → review + verify gates → refactor. The
 implementer never grades its own tests. Merge only when `just ci` is green.
 
-**Record a decision** — adding a dependency or a design pattern? `/adr` writes
-the Architecture Decision Record automatically. Explore tradeoffs first with
-`/brainstorm` or `/debate`; the options become the ADR's "considered alternatives".
+**Record a decision** — adding a dependency or a design pattern? `/decision`
+writes the `docs/DECISIONS.md` entry when it meets the bar in
+`standards/decisions.md` (most changes don't need one). Explore tradeoffs first
+with `/brainstorm` or `/debate`; the options feed the entry's rationale.
 
 **Escalate deliberately** — most work stays cheap; reach for `/compete` (best-of-N
 on an objectively scorable task), `/redteam` (before shipping anything
@@ -194,7 +194,7 @@ the extra tokens. Use `/deep-research` to explore without bloating the main
 session.
 
 **Slash-command reference**: `/new-project` · `/spec` · `/loop` · `/review` ·
-`/simplify` · `/adr` · `/audit` · `/deep-research` · `/brainstorm` · `/debate` ·
+`/simplify` · `/decision` · `/audit` · `/deep-research` · `/brainstorm` · `/debate` ·
 `/compete` · `/redteam` · `/ultraplan`.
 
 ---

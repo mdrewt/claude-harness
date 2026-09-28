@@ -1,6 +1,6 @@
 # Agentic Coding Workspace — Plan
 
-**Owner:** Drew · **Status:** v2.2 — built (v0.1 harness in place) · **Last updated:** 2026-06-23
+**Owner:** Drew · **Status:** v2.3 — built; verification/decision doctrine revised 2026-09 (see `docs/revision-2026-09/diagnosis.md`) · **Last updated:** 2026-09-28
 
 > **Implementation status (v0.1):** Harness, `coding-harness` plugin (8 subagents,
 > 13 commands, 4 skills, guard hook), full `standards/` + `docs/`, all **7 stack
@@ -33,8 +33,8 @@ It is itself version-controlled (see §2) so every change to the plan is diffabl
 3. **Review cadence:** daily ~07:00, only if session usage is below 50%.
 4. **SDD front end:** GitHub Spec Kit (Spec → Plan → Tasks → Implement).
 5. **Harness is its own git repo** (workspace root), with `projects/` git-ignored.
-6. **Default CI security stack:** gitleaks + Semgrep + Trivy/Syft (SBOM) + Renovate.
-7. **ADR format:** MADR. **Commits:** Conventional Commits + SemVer.
+6. **Default CI security stack:** gitleaks + dependency review + Renovate always; SAST (Semgrep) and SBOM (Trivy/Syft) when the project's threat model warrants.
+7. **Decision records:** one `docs/DECISIONS.md` per project (`standards/decisions.md`). **Commits:** Conventional Commits + SemVer.
 8. **Packaging:** bespoke agents/skills/commands ship as a personal **`coding-harness` plugin** (versioned, portable, one-click install).
 9. **Toolchain:** the **full recommended DX/software suite** (§18) is standardized into `_base` templates.
 
@@ -67,29 +67,28 @@ Claude_Projects/                  ← git repo (the "harness"); projects/ git-ig
 │   ├── settings.json             ← shared permissions (allow/deny lists), hook wiring
 │   ├── agents/                   ← subagents: planner, researcher, tester, reviewer, verifier,
 │   │                               doc-keeper, judge, red-team
-│   ├── commands/                 ← /new-project, /spec, /plan, /loop, /review, /simplify, /adr, /audit,
+│   ├── commands/                 ← /new-project, /spec, /plan, /loop, /review, /simplify, /decision, /audit,
 │   │                               /deep-research, /ultraplan (wrapper),
 │   │                               /brainstorm, /debate, /compete, /redteam
-│   ├── skills/                   ← changelog, context-hygiene, security, spec-kit (scaffolding=/new-project; ADRs=doc-keeper)
+│   ├── skills/                   ← changelog, context-hygiene, security, spec-kit (scaffolding=/new-project; decisions=doc-keeper)
 │   └── hooks/                    ← Claude Code event hooks (PreToolUse / Stop gates)
 ├── standards/                    ← SINGLE SOURCE OF TRUTH for engineering standards
 │   ├── principles.md             ← SOLID-where-appropriate, least surprise, SSOT, YAGNI
 │   ├── spec-driven.md            ← how we use Spec Kit + EARS acceptance criteria
-│   ├── testing-tdd.md            ← red/green/refactor, test ownership, property-based testing
-│   ├── evals.md                  ← the living eval harness; what to gate on
+│   ├── testing-tdd.md            ← THE verification doctrine: what counts as a check, what earns one, legitimate deletion
 │   ├── ci-cd.md                  ← pipeline stages, required checks, branch protection
 │   ├── contracts.md              ← per-language contract idioms (types, zod, pydantic/icontract)
 │   ├── security.md               ← secrets, SAST/SCA, SBOM, prompt-injection, finance rules
 │   ├── observability.md          ← structured logging, tracing, metrics (Datadog-ready)
-│   ├── adr-process.md            ← MADR format, when an ADR is required
+│   ├── decisions.md              ← the decision log: when an entry is warranted, format, supersede-in-place
 │   ├── git.md                    ← Conventional Commits, SemVer, branch/worktree conventions
 │   ├── language/                 ← rust.md, python.md, node-ts.md, react.md
 │   └── domain/                   ← web-app.md, microservice.md, desktop.md, game.md,
 │                                   finance.md, arduino.md, realtime-chat.md, library.md
 ├── templates/
 │   ├── _base/                    ← shared: .editorconfig, .gitignore, LICENSE, PR template,
-│   │                               CI workflow, devcontainer, ADR dir, AGENTS.md template,
-│   │                               Renovate config, lefthook (git hooks), eval scaffold
+│   │                               CI workflow, devcontainer, docs/DECISIONS.md, AGENTS.md template,
+│   │                               Renovate config, lefthook (git hooks)
 │   └── <stack>/                  ← rust-lib, python-service, node-ts-app, react-web,
 │                                   electron-desktop, pixijs-game, spacetimedb-game, ...
 ├── scripts/                      ← new-project, sync-templates (drift), workspace-review + tests/ (Node)
@@ -116,12 +115,12 @@ Claude_Projects/                  ← git repo (the "harness"); projects/ git-ig
 Context rot is the progressive degradation of output quality as the window fills with accumulated noise. Controls:
 
 - **AGENTS.md is thin and command-first.** Exact commands, explicit "done" criteria, pointers to `standards/` — not the full text of every rule. `CLAUDE.md` just points here. Agents read the nearest file in the tree, so each project ships its own `AGENTS.md` and overrides cleanly.
-- **Rules as on-demand skills.** Anything that matters only sometimes (release checklist, ADR writing) is a skill, not always-on context.
+- **Rules as on-demand skills.** Anything that matters only sometimes (release checklist, decision writing) is a skill, not always-on context.
 - **Subagents isolate context.** Research, exploration, and large-output work run in their own context windows and return only clean summaries. This is the single biggest lever against rot.
 - **Memory index is small and authoritative.** Agents read `memory/index.md` (a map) and pull only the relevant project card — never the whole memory store.
 - **Compaction discipline.** Compact at task boundaries; start a fresh context per task rather than letting one session sprawl (long-horizon drift is a known failure mode).
 - **Upgrade path:** if the markdown memory store outgrows itself, swap in a graph/managed memory backend (Mem0 / Cognee / Supermemory MCP) without changing the index contract. Deferred until justified.
-- **Knowledge contract.** Durable agent-readable knowledge (research libraries, generated schema bundles) follows `standards/knowledge-format.md` (ADR-0008) — an OKF-aligned, generated-from-source, drift-gated markdown convention. It is the portable *index contract* a future memory backend (above) would consume unchanged.
+- **Knowledge contract.** Durable agent-readable knowledge (the research libraries) follows `standards/knowledge-format.md` — a lint-checked markdown convention. It is the portable *index contract* a future memory backend (above) would consume unchanged.
 
 ---
 
@@ -132,7 +131,7 @@ Spec is the primary artifact; code is a regenerable output. This is the main def
 - **Tooling:** GitHub Spec Kit, which supports Claude Code natively. Flow: **Spec → Plan → Tasks → Implement**.
 - **Acceptance criteria** use EARS notation: `WHEN <condition> THE SYSTEM SHALL <behavior>` — clear, testable, and a natural source for test cases.
 - **Where it lives:** `specs/` at workspace level for greenfield bootstrapping; `docs/specs/` inside each project thereafter.
-- **Tie-in:** the spec feeds the `/loop` (§7); tasks become small vertical slices; acceptance criteria become eval/test cases.
+- **Tie-in:** the spec feeds the `/loop` (§7); tasks become small vertical slices; acceptance criteria become test cases.
 
 ---
 
@@ -140,7 +139,7 @@ Spec is the primary artifact; code is a regenerable output. This is the main def
 
 Everything here is generated or tool-prompted so nothing depends on remembering to update it.
 
-- **ADRs (MADR).** Each project has `docs/adr/`. The `/adr` command (via the `doc-keeper` subagent) detects an architectural decision made in conversation and writes the ADR automatically. An ADR is **required** before adding a new dependency or design pattern (this doubles as an over-engineering guardrail).
+- **Decision log.** Each project has one `docs/DECISIONS.md` (`standards/decisions.md`). The `/decision` command (via the `doc-keeper` subagent) records a decision **only when it constrains future work and isn't evident from the code** — most changes record nothing. New dependencies and cross-cutting patterns usually meet the bar. (The old ADR-per-decision rule was meant as an over-engineering guardrail; in practice mandatory recording inflated 240 micro-ADRs in one project — the bar, not the ceremony, is the guardrail.)
 - **Changelog.** Generated from Conventional Commits — never hand-maintained.
 - **API docs.** Generated from types/contracts per language (rustdoc, TypeDoc, Sphinx/pdoc).
 - **Decisions log + memory cards.** `memory/decisions-log.md` and `memory/projects/<name>.md` updated by the `doc-keeper` subagent at task close.
@@ -151,12 +150,12 @@ Everything here is generated or tool-prompted so nothing depends on remembering 
 ## 6. Testability, robustness, correctness
 
 - **TDD.** Red → green → refactor. **Test ownership is split:** the implementer subagent does not write or edit the tests that gate its own work in the same loop — the `tester`/`verifier` roles do. Prevents tests-fitted-to-bugs and reward hacking.
-- **Living eval harness** (`evals/` per project). Beyond unit tests, a small suite asserting that changes preserve the boundaries that matter (architecture invariants, contract conformance), not merely that code compiles. This is the gate that makes higher autonomy safe — you can only safely automate a loop you can evaluate.
-- **Mutation testing** so "tests pass" is meaningful (e.g., `cargo-mutants`, `mutmut`, StrykerJS).
+- **Checks that execute behavior** (`standards/testing-tdd.md`). Boundaries that matter (architecture invariants, generated-artifact contracts) are protected by ordinary tests, compile-time structure, and machine-contract diffs — never by scanning source text. Higher autonomy is made safe by a test suite that runs the product, plus review; a parallel "eval" gate tier is not maintained (one project's grew to 99 scanner scripts asserting text, under which real bugs shipped).
+- **Mutation testing as a report** so "tests pass" can be audited (e.g., `cargo-mutants`, `mutmut`, StrykerJS) — read for gaps, never wired as a score gate.
 - **Property-based testing** for logic-heavy code (proptest, Hypothesis, fast-check).
 - **Determinism** for games/realtime: seedable RNG, injectable clocks, deterministic simulation in tests, flaky-test quarantine instead of silent re-runs.
 - **Contracts** at boundaries: Rust's type system + `assert!`/`debug_assert!`; TS `zod` at IO edges; Python `pydantic` + `icontract` for pre/postconditions. Documented in `standards/contracts.md`.
-- **CI/CD** (GitHub Actions) with required checks and branch protection — green CI must mean something (coverage + mutation thresholds, not just build).
+- **CI/CD** (GitHub Actions) with required checks and branch protection — green CI must mean something: nothing weakened or quarantined to pass, deletions adjudicated (`standards/testing-tdd.md`; thresholds and ratchets are explicitly not the mechanism).
 
 ---
 
@@ -164,7 +163,7 @@ Everything here is generated or tool-prompted so nothing depends on remembering 
 
 Documented in `docs/workflow-loops.md`; invoked via `/loop`.
 
-- **Loops, not prompts.** A fixed structure runs each cycle with an **evaluable success metric** (tests + evals + lint clean). Per Karpathy: a loop you cannot evaluate cannot be safely automated — hence the eval harness is a prerequisite, not an add-on.
+- **Loops, not prompts.** A fixed structure runs each cycle with an **evaluable success metric** (tests + lint clean, honestly green). Per Karpathy: a loop you cannot evaluate cannot be safely automated — hence a real, behavior-executing test suite is a prerequisite, not an add-on.
 - **PRERRR:** Plan → Refine → Execute → Review → Refactor → Repeat, with explicit **review gates** between Execute and Refactor (the `reviewer`/`verifier` subagents).
 - **Spec-first entry:** the loop starts from a Spec Kit task, not a freeform prompt.
 - **Parallelism via git worktrees.** Claude Code's native worktree isolation (`isolation: worktree` in subagent frontmatter) lets specialist agents work without colliding. Roles: **coordinator** (decomposes), **specialist** (implements in an isolated worktree), **verifier** (gates merge). Merges are sequential.
@@ -177,8 +176,8 @@ Documented in `docs/workflow-loops.md`; invoked via `/loop`.
 | researcher | exploration/codebase Q&A; protects main context | Sonnet | worktree/none |
 | tester | writes tests from acceptance criteria (TDD) | Sonnet | worktree |
 | reviewer | code review: correctness, security, smells, over-engineering | Sonnet | — |
-| verifier | runs tests/evals/security gates; approves merge | Sonnet | worktree |
-| doc-keeper | ADRs, changelog, memory cards | Haiku | — |
+| verifier | runs tests/security gates; approves merge | Sonnet | worktree |
+| doc-keeper | decision entries (when the bar is met), memory cards | Haiku | — |
 | judge / synthesizer | scores competing outputs, picks or merges the best | Opus | — |
 | red-team | adversarial: attacks code for bugs / security / edge cases | Sonnet | worktree |
 
@@ -192,8 +191,8 @@ The coordinator picks a collaboration pattern **per task**, based on value, risk
 |---|---|---|---|
 | Solo (default) | one agent | 1× | routine, reversible, low-stakes |
 | Generator–Critic | produce → self-critique → revise | ~1.5–2× | any non-trivial code; cheap quality bump |
-| Proposer–Verifier | implementer + independent test/eval gate | ~2× | correctness-critical (the standard `/loop`) |
-| Brainstorm (divergent→convergent) | N agents propose different *approaches*; synthesizer converges | ~2–3× | architecture/design forks → feeds ADR "alternatives" |
+| Proposer–Verifier | implementer + independent test gate | ~2× | correctness-critical (the standard `/loop`) |
+| Brainstorm (divergent→convergent) | N agents propose different *approaches*; synthesizer converges | ~2–3× | architecture/design forks → feeds the decision entry's rationale |
 | Debate | agents argue opposing options; judge arbitrates | ~2.5× | decisions with real tradeoffs, no objective metric |
 | Best-of-N / tournament | N independent solutions; objective judge picks/merges | ~N×+ | high-value, well-specified, **objectively scorable** tasks |
 | Red-team / adversarial | blue builds, red attacks (security, edge cases, fuzz) | ~2× | security-sensitive (finance!), parsers, untrusted input, protocols |
@@ -201,7 +200,7 @@ The coordinator picks a collaboration pattern **per task**, based on value, risk
 **Selection policy (the dynamic decision rule):**
 
 - Objective evaluator exists *and* task is high-value → **Best-of-N**.
-- Design fork with tradeoffs, no metric → **Brainstorm** or **Debate**; record the result as an ADR (competing options become the "Considered alternatives" — free design documentation).
+- Design fork with tradeoffs, no metric → **Brainstorm** or **Debate**; record the result in `docs/DECISIONS.md` when it meets the bar (the competing options become the entry's rationale — free design documentation).
 - Robustness/security is the dominant risk → **Red-team**.
 - Non-trivial but routine → **Solo + Generator-Critic**.
 - Low-value / reversible / cheap-to-redo → **Solo**, never escalate.
@@ -253,7 +252,7 @@ Max effort / `ultracode` / `ultrathink` raise quality by spending *more* tokens;
 
 A scheduled task that runs each morning **only if session usage is below 50%**, kept lightweight, and bails early if it detects it's running hot.
 
-It checks for: stale standards vs. code, decisions discussed but not recorded as ADRs, projects missing CI/tests/devcontainer, an out-of-date `memory/index.md`, dependency/security alerts, and skill/plugin staleness or conflicts. Output is a short report of suggested improvements — never silent auto-edits to project code.
+It checks for: stale standards vs. code, decisions discussed but not recorded in `docs/DECISIONS.md`, projects missing CI/tests/devcontainer, an out-of-date `memory/index.md`, dependency/security alerts, and skill/plugin staleness or conflicts. Output is a short report of suggested improvements — never silent auto-edits to project code.
 
 > Honest caveat: an agent cannot perfectly self-measure its usage budget, so the 50% guard is approximate. The task is designed to be cheap and to skip rather than risk overrun.
 
@@ -302,19 +301,20 @@ This is the concrete defense against "works on my machine" across many stacks.
 
 Each failure mode maps to a concrete control already in this plan.
 
-- **Reward hacking / eval-gaming** (deleting failing tests, always-pass assertions) → split test ownership; living eval harness; mutation testing.
+- **Reward hacking / test-gaming** (deleting failing tests, always-pass assertions) → split test ownership; the honest-CI + adjudicated-deletion rules (`standards/testing-tdd.md`); mutation reports.
 - **Spec/doc drift** (SSOT violated) → generate docs from source; spec as primary artifact; daily drift check.
 - **Context rot from a bloated CLAUDE.md** → thin AGENTS.md; on-demand skills; subagent isolation; compaction.
 - **Destructive/runaway actions** → permission allow/deny lists; branch protection; no autonomous money movement; `/rewind` for checkpoint rollback.
 - **Supply-chain & secrets leaks** → gitleaks + SCA + lockfiles + dependency review.
 - **Prompt injection via untrusted content** → fetched content is data, not instructions; least-privilege MCP.
-- **Over-engineering / premature abstraction** → YAGNI rule; reviewer flags complexity; ADR required for new deps/patterns.
+- **Over-engineering / premature abstraction** → YAGNI rule; reviewer flags complexity; a decision entry (with its bar) for new deps/patterns.
+- **Process becoming the product** (checks that check checks; docs written for parsers; ceremony per slice) → the protected-categories bar, "when unsure, don't add a check", current-state docs, and no per-task doc duties — see `docs/revision-2026-09/diagnosis.md` for the measured failure this guards against.
 - **Big-bang PRs & long-horizon drift** → spec-driven small slices; fresh context per task; verifier gate.
 - **Flaky non-determinism** → seedable RNG, injectable clocks, deterministic sims, quarantine.
 - **"Works on my machine"** → devcontainer + Compose + pinned toolchains.
 - **Skill/plugin sprawl** → curated set; daily staleness/conflict audit.
 - **Hidden coupling between "separate" repos** → share code only as versioned published libraries, never by reaching across project folders.
-- **"Ultra-everything"** (max effort / `ultracode` / `ultrathink` on trivial tasks) → wastes tokens and invites over-engineering → default to the lowest effort that clears the eval gate; escalate deliberately at gates only.
+- **"Ultra-everything"** (max effort / `ultracode` / `ultrathink` on trivial tasks) → wastes tokens and invites over-engineering → default to the lowest effort that clears CI; escalate deliberately at gates only.
 - **Runaway fan-out / recursive subagents** (the ~15× multi-agent cost compounding another ~10×) → per-run budget caps + circuit breakers; orchestration depth = 1; cap N at 2–3.
 - **Multi-agent on the wrong task** (shared mutable context / tight interdependencies) → it underperforms a single agent; reserve fan-out for parallel, independent exploration with a clear evaluator.
 
@@ -359,20 +359,20 @@ Each failure mode maps to a concrete control already in this plan.
 
 A new project:
 
-1. `/new-project <name> <stack>` → generator scaffolds the repo from a template (devcontainer, CI, lefthook, ADR dir, eval scaffold, `AGENTS.md`), inits git, adds it under `projects/`.
+1. `/new-project <name> <stack>` → generator scaffolds the repo from a template (devcontainer, CI, lefthook, `docs/DECISIONS.md`, `AGENTS.md`), inits git, adds it under `projects/`.
 2. `/spec` → write the spec with Spec Kit (Spec → Plan → Tasks). Acceptance criteria in EARS notation.
 3. Open the devcontainer so you and agents share one environment.
 
 A new feature (the loop):
 
 1. `/loop <task>` starts from a Spec Kit task (not a freeform prompt).
-2. `planner` decomposes; `tester` writes failing tests from acceptance criteria; specialist implements in an isolated worktree; `verifier` runs tests + evals + security gates; `reviewer` checks correctness/smells/over-engineering.
-3. On a design decision, `/adr` records it automatically; changelog and memory cards update at task close.
-4. Merge only when CI is green **and meaningful** (coverage + mutation thresholds, security clean).
+2. `planner` decomposes; `tester` writes failing tests from acceptance criteria; specialist implements in an isolated worktree; `verifier` runs tests + security gates; `reviewer` checks correctness/smells/over-engineering.
+3. On a design decision that meets the bar, `/decision` records it; memory cards update at task close (the changelog is generated from commits on demand).
+4. Merge only when CI is green **honestly** (`standards/testing-tdd.md`: nothing weakened or quarantined to pass, security clean).
 
 **Escalate effort deliberately, not by default:** routine work stays at low/medium effort; use `/effort high` for features; reach for `ultracode` or `/ultraplan` only for architecture-level or multi-file tasks; use `/deep-research` to explore an unfamiliar area without bloating your main context.
 
-**Bring in multiple agents when the stakes justify it (§7):** `/brainstorm` or `/debate` at a hard design fork (the options auto-fill the ADR), `/compete` for a high-value task with an objective scorer, `/redteam` before shipping anything security-sensitive. The coordinator will also select these automatically under `ultracode` — the cost guardrails keep it from running away.
+**Bring in multiple agents when the stakes justify it (§7):** `/brainstorm` or `/debate` at a hard design fork (the options feed the decision entry), `/compete` for a high-value task with an objective scorer, `/redteam` before shipping anything security-sensitive. The coordinator will also select these automatically under `ultracode` — the cost guardrails keep it from running away.
 
 Each morning the daily review reports drift and suggestions — you skim it, nothing auto-edits your code.
 
@@ -383,7 +383,7 @@ Each morning the daily review reports drift and suggestions — you skim it, not
 The plan's growth (multi-agent patterns, SDD, security gates, worktrees) justifies expanding capabilities in three buckets. **Create** = bespoke, built with the harness. **Install (MCP)** = connectors. **Install (software)** = the local DX layer.
 
 ### Create (bespoke — no off-the-shelf equivalent)
-The subagents (planner, researcher, tester, reviewer, verifier, doc-keeper, judge, red-team) and the skills/commands (`new-project`, `adr-writer`, `changelog`, `context-hygiene`, `security`, Spec Kit wrapper, `/loop`, `/brainstorm`, `/debate`, `/compete`, `/redteam`, `/deep-research`, `/ultraplan`) are specific to this workflow. **Bundle them into a personal `coding-harness` plugin** so they're version-controlled and one-click installable on any machine — directly serving portability and the daily-review improvement loop. The plugin lives in the harness repo and is installed locally; updating it updates every project's available agents and commands at once.
+The subagents (planner, researcher, tester, reviewer, verifier, doc-keeper, judge, red-team) and the skills/commands (`new-project`, `/decision`, `changelog`, `context-hygiene`, `security`, Spec Kit wrapper, `/loop`, `/brainstorm`, `/debate`, `/compete`, `/redteam`, `/deep-research`, `/ultraplan`) are specific to this workflow. **Bundle them into a personal `coding-harness` plugin** so they're version-controlled and one-click installable on any machine — directly serving portability and the daily-review improvement loop. The plugin lives in the harness repo and is installed locally; updating it updates every project's available agents and commands at once.
 
 ### Install — MCPs
 - **Context7** *(recommended now)* — up-to-date library/API docs on demand; cuts hallucinated/outdated APIs across Rust/Python/TS/React/etc. High value, low cost.

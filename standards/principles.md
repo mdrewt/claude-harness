@@ -5,7 +5,7 @@
 > apply — matters as much as applying them. Don't cargo-cult "all best practices";
 > several conflict. Each project declares its own tiers/inversions in its
 > `AGENTS.md` (or `ARCHITECTURE.md`) with one-line rationale, and records
-> non-obvious calls as ADRs.
+> decisions that meet the bar in `standards/decisions.md`.
 
 ## Tier 1 — non-negotiable (default everywhere)
 - **Single source of truth (SSOT).**
@@ -13,7 +13,14 @@
 - **Make illegal states unrepresentable** / parse-don't-validate; validate at boundaries.
 - **Lightweight design-by-contract** — pre/postconditions on critical functions.
 - **Errors are values; fail loud, fail early.**
-- **Mechanical enforcement over discipline** — wire a check; never rely on remembering.
+- **Mechanize what protects users and data; judge the rest.** Wire a check for
+  the protected categories in `testing-tdd.md` (domain correctness, data
+  security/privacy, data integrity, determinism) rather than relying on
+  remembering — but a check that exists to enforce *process* is bloat, and a
+  rule that would need a scanner to enforce is better left to review. (The
+  old absolute form of this rule — "wire a check; never rely on remembering" —
+  measurably drove a 10:1 checking:production ratio; see
+  `docs/revision-2026-09/diagnosis.md`.)
 - **DRY — but NOT across marshaling/serialization boundaries.** Duplicated data
   *shapes* across a Rust↔TS or service boundary are often correct; coupling them is worse.
 - **YAGNI with named exceptions** — state the exceptions explicitly so they aren't
@@ -57,15 +64,29 @@ Wire each rule to a tool so it never depends on someone remembering:
 |---------|-------------|
 | Format / lint / style | formatter + linter in `just lint` (pre-commit via lefthook) |
 | Types / illegal states | compiler / `tsc` / mypy + contracts (`contracts.md`) |
-| Architecture invariants | the eval harness (`evals.md`) |
-| Determinism | seedable RNG / injected clocks + determinism evals |
-| Secrets / SAST / deps | gitleaks + Semgrep + SCA in CI (`security.md`) |
+| Architecture invariants | dependency lints / compile-time structure (`testing-tdd.md`) |
+| Determinism | seedable RNG / injected clocks + determinism tests |
+| Secrets / deps | gitleaks + dependency audit in CI; SAST/SBOM per the project's threat model (`security.md`) |
 | Over-engineering / DRY / YAGNI | `/simplify` + the `reviewer` |
 | Incremental code health (Boy Scout) | the `reviewer` + the per-task `/review` pass, scoped to the diff's blast radius |
-| Correctness / smells | `/review` + tests + mutation testing |
+| Correctness / smells | `/review` + tests + mutation reports |
 | Blast radius of shared changes | impact analysis before edit (below) |
 
 **Every task's definition-of-done includes a `/simplify` and a `/review` pass.**
+
+## Documentation
+- Docs describe **current state** and are rewritten in place. Appending is not
+  updating; git history is the archive. A doc whose claims can't be re-derived
+  from the code it describes gets corrected or cut.
+- `ARCHITECTURE.md` changes only when the structure it describes changes.
+  Decision records follow `standards/decisions.md`. The changelog is generated
+  from Conventional Commits, on demand. **No per-task doc duties** belong in
+  any definition of done — routine work does not mint decision entries,
+  architecture edits, or memory ceremony.
+- **Process metadata stays out of the artifact.** Task/slice IDs, decision
+  numbers, reviewer narration, and workflow vocabulary never appear in
+  production code (comments, identifiers, strings) or current-state docs —
+  they live in commits, PRs, and the work-tracking files that own them.
 
 ## Impact analysis before changing shared signatures
 Before changing a signature/type used across a boundary or by multiple modules,
@@ -82,7 +103,8 @@ silently desync.
 - Premature abstraction; speculative generality.
 - Duplicated *sources of truth* (≠ duplicated shapes across a boundary, which is fine).
 - Public surface larger than the spec requires.
-- Comments that restate code instead of explaining *why*.
+- Comments that restate code instead of explaining *why*; comments or docs
+  written for a tool to parse rather than a human to read.
 - A touched file left *worse* than found — a new smell, dead code, or changed
   behavior without a test — when a bounded in-blast-radius fix was available (Boy
   Scout violation). Note the inverse is also a red flag: an unbounded drive-by

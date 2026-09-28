@@ -2,7 +2,8 @@
 
 The new skill is designing loops, not writing prompts. A loop runs a fixed
 structure each cycle with an **evaluable success metric** — you can only safely
-automate a loop you can evaluate, which is why the eval harness is a prerequisite.
+automate a loop you can evaluate, which is why a real, behavior-executing test
+suite (`standards/testing-tdd.md`) is a prerequisite.
 
 ## PRERRR (the default build loop) — `/loop`
 **Plan → Refine → Execute → Review → Refactor → Repeat**, entered from a Spec
@@ -23,11 +24,13 @@ Refactor.
    `implementation-notes.md`; a Deviation with no matching test, spec note, or
    ADR is a finding.
 5. **Refactor** — improve with tests green.
-6. **Repeat** — next slice; `doc-keeper` records ADR/changelog/memory at close,
+6. **Repeat** — next slice; `doc-keeper` updates memory at close (and
+   `docs/DECISIONS.md` only when the bar in `standards/decisions.md` is met),
    folding Deviations into the memory card with an explicit disposition each
-   (`promoted → <path>` to a skill's Gotchas / knowledge concept / ADR, or
-   `local-only` — see the doc-keeper's promotion rules; the notes file itself is
-   worktree scratch and never merges). Missing dispositions are an audit finding.
+   (`promoted → <path>` to a skill's Gotchas / a DECISIONS entry / an
+   ARCHITECTURE section that actually changed, or `local-only`; the notes file
+   itself is worktree scratch and never merges). Missing dispositions are an
+   audit finding.
 
 ## Disposition markers (single grammar — usage sites reference this section)
 - **Work items** (spec closure, `standards/spec-driven.md`): every PARKED item
@@ -43,8 +46,9 @@ Specialists run in separate worktrees so they never collide; merges are
 sequential and verifier-gated. Subagents never spawn subagents (depth = 1).
 
 ## Success metric per cycle
-`just ci` green **and meaningful** (coverage + mutation + security). If the
-metric can't be evaluated cheaply, don't automate the loop — add an eval first.
+`just ci` green, **honestly** (`standards/testing-tdd.md`: nothing weakened or
+quarantined to pass). If the metric can't be evaluated cheaply, don't automate
+the loop — add a real test first.
 
 ## When to escalate to multi-agent patterns
 See `WORKSPACE-PLAN.md` §7 and the selection policy. Default solo; escalate only
