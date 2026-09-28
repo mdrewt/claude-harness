@@ -17,4 +17,4 @@ to represent and violations fail loudly.
 - Validate at the boundary, trust within the core.
 - A public function's contract (inputs, outputs, errors, invariants) is part of
   its doc and is the basis for its property tests.
-- Breaking a published contract is a SemVer major + an ADR.
+- Breaking a published contract is a SemVer major + a `docs/DECISIONS.md` entry.

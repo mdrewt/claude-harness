@@ -1,6 +1,6 @@
 ---
 name: verifier
-description: Runs the gates and approves or rejects a merge. Use after implementation to run tests, evals, and security checks and give a pass/fail verdict.
+description: Runs the gates and approves or rejects a merge. Use after implementation to run the project's CI gate and security checks and give a pass/fail verdict.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -15,9 +15,16 @@ For a cheap pre-gate blast-radius sanity check in graph-indexed repos, the
 incomplete by default.
 
 ## Gating-test integrity: is the behavior still protected?
-Diff every gating test between the RED checkpoint and the green tip and judge
-each change by ONE question — **"is the behavior still protected?"** — per the
-deletion rule in `standards/testing-tdd.md`:
+Diff the **whole check inventory** against the merge-base — not just this
+slice's gating tests: all test files, the `just ci` recipe, CI workflows,
+runner configs/include globs, and cfg gates. A check can stop running with no
+test file changing (dropped recipe step, narrowed glob, `#[cfg]`); list every
+removed or de-wired check by name — a list to adjudicate, never a count.
+Then judge each change by ONE question — **"is the behavior still
+protected?"** — per the deletion rule in `standards/testing-tdd.md` (naming
+the survivor; non-deleter adjudication + a demonstrated survivor for
+protected categories; adjudicate corrections against the spec as of the RED
+checkpoint):
 - **WEAKENING → FAIL:** an expected value loosened or retargeted to match
   whatever the implementation happens to produce; a test silently
   `skip`/`.only`/`#[ignore]`'d to pass; a deletion that leaves a
@@ -36,8 +43,10 @@ verdict in the PASS/FAIL evidence.
 
 ## Deviations log
 Read the slice's `implementation-notes.md` if present (see
-`docs/workflow-loops.md`; absence just means no deviations were logged). Every
-entry under "Deviations" must be accounted for by a test, spec note, or ADR — an
-unaccounted deviation is a finding in your PASS/FAIL evidence. If the file is
+`docs/workflow-loops.md`; absence just means no deviations were logged). A
+Deviation is accounted for by its log line; it needs a test only when it
+touches a protected-category behavior, and a decision entry only when it
+meets `standards/decisions.md`'s bar. An unlogged deviation the diff plainly
+shows is the finding. If the file is
 absent but the diff plainly deviates from the plan, flag that too. The notes
 file is worktree scratch — it appearing in the merged diff is itself a finding.

@@ -31,7 +31,7 @@
   **Bounded, not unbounded** — improve what you are already editing; do *not* reformat
   untouched code or widen the diff with drive-by rewrites (that fights minimal-diff
   review and inflates blast radius). Cleanups larger than the current change get
-  **flagged separately** (a follow-up slice / issue / ADR), never smuggled inline. For
+  **flagged separately** (a follow-up slice / issue / decision entry), never smuggled inline. For
   long-lived code this is the compounding default that keeps the codebase cheap to
   change — the build-loop's "every milestone leaves the code easier to change" is this
   rule applied per slice.
@@ -55,16 +55,16 @@
 
 ## Declaring tiers & inversions per project
 A project's `AGENTS.md` lists any Tier-1 promotions, Tier-2 demotions, and inverted
-principles, each with one line of rationale. Non-obvious or contested calls get an ADR.
+principles, each with one line of rationale. Non-obvious or contested calls get a `docs/DECISIONS.md` entry when they meet the `decisions.md` bar.
 
 ## Mechanical enforcement map (principle → enforcer)
-Wire each rule to a tool so it never depends on someone remembering:
+Where a concern maps to a protected category, a tool enforces it; the rest is judged in review:
 
 | Concern | Enforced by |
 |---------|-------------|
 | Format / lint / style | formatter + linter in `just lint` (pre-commit via lefthook) |
 | Types / illegal states | compiler / `tsc` / mypy + contracts (`contracts.md`) |
-| Architecture invariants | dependency lints / compile-time structure (`testing-tdd.md`) |
+| Architecture invariants | dependency lints / compile-time structure (testing-tdd.md §What counts as a check) |
 | Determinism | seedable RNG / injected clocks + determinism tests |
 | Secrets / deps | gitleaks + dependency audit in CI; SAST/SBOM per the project's threat model (`security.md`) |
 | Over-engineering / DRY / YAGNI | `/simplify` + the `reviewer` |

@@ -6,10 +6,10 @@ Correct model routing alone saves ~60–80% vs. all-Opus.
 > **Generation-staleness note (2026-07):** the tier table, the savings figure,
 > and the effort policy below were calibrated on the 4.x generation. The 5-gen
 > lineup (Opus 5 / Fable 5) shifts quality and price per tier — re-derive the
-> boundaries from current pricing + this harness's own eval gates before
+> boundaries from current pricing + this harness's own measured results before
 > trusting these numbers, and re-check each agent's pinned `model:` tier in
 > `.claude/agents/` (under-tiering hurts most at verifier/judge; over-tiering
-> wastes most at doc-keeper). See `docs/context-engineering-5gen-review.md`.
+> wastes most at doc-keeper). See `docs/archive/context-engineering-5gen-review.md`.
 
 ## Model
 | Tier   | Use for |

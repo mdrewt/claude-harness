@@ -1,7 +1,7 @@
 {
   "name": "coding-harness",
   "version": "0.1.0",
-  "description": "Personal agentic-coding harness: spec-driven workflow, multi-agent patterns, ADR/eval/security automation. See WORKSPACE-PLAN.md.",
+  "description": "Personal agentic-coding harness: spec-driven workflow, multi-agent patterns, decision-log/security automation. See WORKSPACE-PLAN.md.",
   "author": "Drew",
   "components": {
     "agents": "./.claude/agents",

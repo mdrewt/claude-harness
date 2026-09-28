@@ -19,27 +19,22 @@ Refactor.
    deviation from the plan, pick the conservative option, log it under a
    **Deviations** heading, and keep going.
 4. **Review** — `reviewer` (correctness/smells/over-engineering) + `verifier`
-   (tests, evals, security) gate the change; blast-radius checks use both code
-   graphs (`code-intel` skill), never a single graph. Both read the slice's
-   `implementation-notes.md`; a Deviation with no matching test, spec note, or
-   ADR is a finding.
+   (the project's CI gate + security) gate the change; blast-radius checks use
+   both code graphs (`code-intel` skill), never a single graph. Both read the
+   slice's `implementation-notes.md`; a Deviation needs a test only when it
+   touches a protected-category behavior, a decision entry only when it meets
+   the bar — otherwise its log line accounts for it.
 5. **Refactor** — improve with tests green.
-6. **Repeat** — next slice; `doc-keeper` updates memory at close (and
-   `docs/DECISIONS.md` only when the bar in `standards/decisions.md` is met),
-   folding Deviations into the memory card with an explicit disposition each
-   (`promoted → <path>` to a skill's Gotchas / a DECISIONS entry / an
-   ARCHITECTURE section that actually changed, or `local-only`; the notes file
-   itself is worktree scratch and never merges). Missing dispositions are an
-   audit finding.
+6. **Repeat** — next slice; `doc-keeper` records a `docs/DECISIONS.md` entry
+   only when the bar in `standards/decisions.md` is met, and updates memory
+   only when something durable changed (the notes file itself is worktree
+   scratch and never merges).
 
-## Disposition markers (single grammar — usage sites reference this section)
-- **Work items** (spec closure, `standards/spec-driven.md`): every PARKED item
-  ends `parked → <queued spec id | wontfix>`.
-- **Knowledge** (close-out, doc-keeper): every folded Deviation / durable
-  discovery ends `promoted → <path>` or `local-only`.
-Marker **presence** is audited supervisor-side (the mr-audit layer), not by the
-pre-merge verifier — markers are written at close, after the verifier has run.
-Marker **quality** (right home, merged-not-duplicated) is reviewer duty.
+## Disposition markers (work items)
+Spec closure (`standards/spec-driven.md`): every PARKED item ends
+`parked → <queued spec id | wontfix>`, so carry-overs never go unsized.
+Durable-knowledge routing is the doc-keeper's judgment call
+(`.claude/agents/doc-keeper.md`), not an audited grammar.
 
 ## Parallelism
 Specialists run in separate worktrees so they never collide; merges are
@@ -55,9 +50,9 @@ See `WORKSPACE-PLAN.md` §7 and the selection policy. Default solo; escalate onl
 when (high value OR high risk OR hard to reverse) AND a cheap evaluator exists.
 
 ## Definition of done (every task)
-Beyond green+meaningful CI, each task closes with a **`/simplify`** pass (strip
-over-engineering) and a **`/review`** pass (correctness/security/smells). These
-are part of the mechanical-enforcement map in `standards/principles.md`.
+The DoD is `standards/testing-tdd.md`'s (honest CI), plus a **`/simplify`**
+pass (strip over-engineering) and a **`/review`** pass
+(correctness/security/smells) per `standards/principles.md`.
 
 ## Merge title discipline
 Squash-merge titles drive `git cliff` CHANGELOG generation. **Do not use `wip(…):`

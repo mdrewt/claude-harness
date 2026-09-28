@@ -20,9 +20,9 @@ modules) and produces a report to read, not a score to gate (`testing-tdd.md`).
 ## Branch protection
 - PRs required; no direct pushes to `main`.
 - All required checks must pass, plus an approving review: a human, or — in a
-  supervised autonomous loop — the supervisor's audited merge (its `mr-audit` +
-  acceptance-ledger adjudication IS the approval; doc-only PRs may auto-merge
-  on green).
+  supervised autonomous loop — the supervisor's audited merge (doc-only PRs
+  may auto-merge on green). Which audits constitute that approval is the
+  loop's own documented process, not this standard's.
 - Linear history; squash-merge with a Conventional Commit title.
 
 ## Releases
