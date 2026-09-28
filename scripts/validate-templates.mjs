@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // validate-templates.mjs — scaffold each stack template and run its REAL gates
 // (the per-stack `just setup` + `just ci`: real npm/cargo/uv installs, lint,
-// typecheck, tests, evals). Catches the class of bug the STRUCTURAL invariants
+// typecheck, tests). Catches the class of bug the STRUCTURAL invariants
 // tests miss — a template that generates but doesn't actually pass its own gates
 // (e.g. a shipped hook that fails the project's Biome style, or a missing
 // `@types/*` that breaks `tsc`). Both were real, found by hand; this automates it.
@@ -25,7 +25,7 @@ function run(cmd, cwd) {
 
 const results = [];
 for (const stack of stacks) {
-  const name = `_validate-${stack}`;
+  const name = `validate-tmp-${stack}`; // must pass new-project's kebab-case check
   const dest = path.join(ROOT, 'projects', name);
   rmSync(dest, { recursive: true, force: true });
   let status = 'ok';

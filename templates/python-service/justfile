@@ -9,10 +9,7 @@ typecheck:
     uv run mypy src
 
 test:
-    uv run pytest -q --cov=src/app --cov-report=term-missing --cov-fail-under=80
-
-eval:
-    uv run python evals/run.py
+    uv run pytest -q --cov=src/app --cov-report=term-missing
 
 # check-secrets is the local gate; SCA (pip-audit) is advisory locally and the
 # authoritative gate in CI (see .github/workflows/ci.yml).
@@ -26,4 +23,4 @@ mutate:
 changelog:
     git cliff -o CHANGELOG.md
 
-ci: lint typecheck test eval security
+ci: lint typecheck test security

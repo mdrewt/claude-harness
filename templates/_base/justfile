@@ -1,8 +1,8 @@
 set windows-shell := ["cmd.exe", "/c"]
 # Standard command vocabulary (same across every stack = least surprise).
-# Stack templates MUST override setup/lint/typecheck/test/mutate. These bodies
-# FAIL LOUD on purpose: if one runs, a stack template is missing its justfile or
-# a recipe — that's a bug to fix in the template, never a silent no-op gate.
+# Stack templates MUST override setup/lint/typecheck/test. Those bodies FAIL LOUD
+# on purpose: if one runs, a stack template is missing its justfile or a recipe —
+# that's a bug to fix in the template, never a silent no-op gate.
 
 setup:
     @echo "ERROR: 'setup' was not overridden by the stack template" && exit 1
@@ -16,11 +16,11 @@ lint:
 typecheck:
     @echo "ERROR: 'typecheck' was not overridden by the stack template" && exit 1
 
+# Mutation testing is a REPORT, run out of band — never part of `ci`, never a
+# gated score (standards/testing-tdd.md, standards/ci-cd.md). Stacks override
+# this with their mutation tool.
 mutate:
-    @echo "ERROR: 'mutate' was not overridden by the stack template" && exit 1
-
-eval:
-    node evals/run.mjs
+    @echo "mutate: no mutation tool configured for this stack (report-only)"
 
 security:
     node scripts/check-secrets.mjs .
@@ -28,4 +28,4 @@ security:
 changelog:
     git cliff -o CHANGELOG.md
 
-ci: lint typecheck test eval security
+ci: lint typecheck test security

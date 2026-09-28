@@ -17,10 +17,9 @@ try {
 } catch {}
 for (const p of projects) {
   const base = path.join(projDir, p);
-  for (const must of ['justfile', 'AGENTS.md', '.github/workflows/ci.yml', 'evals']) {
+  for (const must of ['justfile', 'AGENTS.md', '.github/workflows/ci.yml', 'docs/DECISIONS.md']) {
     if (!existsSync(path.join(base, must))) findings.push(`${p}: missing ${must}`);
   }
-  if (!existsSync(path.join(base, 'docs/adr'))) findings.push(`${p}: no docs/adr/`);
 }
 if (!existsSync(path.join(ROOT, 'memory/index.md'))) findings.push('memory/index.md missing');
 console.log(`Workspace review — ${projects.length} project(s).`);

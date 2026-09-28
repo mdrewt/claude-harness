@@ -5,8 +5,8 @@
 ## Quickstart
 ```
 just setup   # install deps
-just ci      # lint, typecheck, test, eval, security
+just ci      # lint, typecheck, test, security
 ```
 
 Open in the devcontainer for a reproducible environment.
-Spec: `docs/specs/`. Decisions: `docs/adr/`.
+Spec: `docs/specs/`. Decisions: `docs/DECISIONS.md`.

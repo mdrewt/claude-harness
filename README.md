@@ -66,7 +66,7 @@ It reports which tools are present and which are missing (with install hints).
 | **cargo / rustup** | per-stack | `rust-lib`, `spacetimedb-game` |
 | **uv** | per-stack | `python-service` |
 | **spacetime** | per-stack | `spacetimedb-game` |
-| gitleaks, semgrep | optional | local secret/SAST scanning (CI runs them regardless) |
+| gitleaks, semgrep | optional | local secret/SAST scanning (CI runs gitleaks; SAST per threat model) |
 
 Windows install hints are in `SETUP.md`. After installing, run `just doctor`
 again — it should report "required tools present".
@@ -116,7 +116,8 @@ language. Run them from the project root.
 | `just format` | auto-fix formatting (the writing counterpart to `just lint`) |
 
 A change is **done** when `just ci` passes. CI on GitHub Actions runs the same
-gate plus gitleaks, Semgrep, and an SBOM.
+gate plus gitleaks and dependency review; SAST (Semgrep) and an SBOM ship
+commented out, to enable per the project's threat model.
 
 ---
 
@@ -265,7 +266,7 @@ tools are optional; the recipe degrades gracefully (prints a hint, doesn't fail)
 Install them if you want local dependency auditing
 (`cargo install cargo-audit`, `uv tool install pip-audit`).
 
-**gitleaks / semgrep missing.** Optional locally — CI runs them. Install via
+**gitleaks / semgrep missing.** Optional locally — CI runs gitleaks (SAST is per threat model). Install via
 `winget install Gitleaks.Gitleaks` and `pipx install semgrep` for local scans.
 
 **Biome prints "the recommended field has been deprecated".** Harmless

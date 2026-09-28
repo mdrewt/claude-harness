@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-17 · **Status:** awaiting Drew's decisions (fill the `DECISION` blocks) · **Author:** weekly review agent (web-researched, gate-reviewed)
 **Purpose:** a decision-support survey of how the 10 pinned inspiration games implement (or omit) each gameplay-mechanic category, compared against monster-realm's **current** (M0–M17 built) and **planned** (M18+ sketches, playtest replan) state. After Drew fills the decision blocks, this file is handed to a coding agent to plan milestones and update the corpus.
-**monster-realm sources:** `game-design.md` (esp. §5–§9, §12), `PLAN.md`, milestone specs M6–M19 + `playtest-replan-2026-07.md`, project `docs/adr/` + `ARCHITECTURE.md`, and the reviewed implementation @ `9a74e2a`.
+**monster-realm sources:** `game-design.md` (esp. §5–§9, §12), `PLAN.md`, milestone specs M6–M19 + `playtest-replan-2026-07.md`, project `docs/adr/` + `ARCHITECTURE.md`, and the reviewed implementation @ `9a74e2a` (paths as of that commit; the ADR corpora have since been distilled into the two `docs/DECISIONS.md` files).
 
 ## How to read this document
 

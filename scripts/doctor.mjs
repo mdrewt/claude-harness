@@ -42,7 +42,7 @@ const TOOLS = [
     name: 'semgrep',
     cmd: 'semgrep --version',
     required: false,
-    hint: 'pipx install semgrep — local SAST (CI runs it via pipx)',
+    hint: 'pipx install semgrep — optional local SAST; enable per threat model (standards/ci-cd.md)',
   },
 ];
 

@@ -11,9 +11,6 @@ typecheck:
 test:
     npm run test
 
-eval:
-    npm run eval
-
 security:
     npm run security
 
@@ -23,8 +20,9 @@ build:
 start:
     npm run start
 
-# No pure-logic modules to mutate yet (Electron runtime glue; security posture is
-# gated by the eval + security.test). Add logic + tests, then wire StrykerJS here.
+# No pure-logic modules to mutate yet (Electron runtime glue; the window security
+# posture is covered by src/security.test.ts). Add logic + tests, then wire StrykerJS
+# here — mutation is a report run out of band, never part of `ci`.
 mutate:
     @echo "mutate: no pure-logic modules to mutate yet (see justfile comment)"
 

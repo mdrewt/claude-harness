@@ -12,7 +12,7 @@ class Cents(BaseModel):
     @classmethod
     def _must_be_int(cls, v: int) -> int:
         if not isinstance(v, int) or isinstance(v, bool):
-            raise ValueError("Cents must be an integer (minor units)")
+            raise TypeError("Cents must be an integer (minor units)")
         return v
 
 

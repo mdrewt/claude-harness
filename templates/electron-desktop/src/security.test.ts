@@ -1,11 +1,17 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { secureWindowOptions } from './window-options';
 
-// Security invariants encoded as a test (defense-in-depth alongside the eval).
-describe('electron security', () => {
-  const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-  it('keeps contextIsolation on and nodeIntegration off', () => {
-    expect(main).toMatch(/contextIsolation:\s*true/);
-    expect(main).toMatch(/nodeIntegration:\s*false/);
+// Executes the options builder main.ts passes to `new BrowserWindow(...)`.
+describe('electron window security', () => {
+  const prefs = secureWindowOptions('/preload.js').webPreferences;
+
+  it('keeps contextIsolation on, nodeIntegration off, and the sandbox on', () => {
+    expect(prefs?.contextIsolation).toBe(true);
+    expect(prefs?.nodeIntegration).toBe(false);
+    expect(prefs?.sandbox).toBe(true);
+  });
+
+  it('loads the given preload script', () => {
+    expect(prefs?.preload).toBe('/preload.js');
   });
 });

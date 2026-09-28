@@ -12,10 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "build": "tsc -p tsconfig.build.json",
-    "eval": "node evals/run.mjs",
     "security": "node scripts/check-secrets.mjs .",
     "mutate": "stryker run",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run eval && npm run security"
+    "ci": "npm run lint && npm run typecheck && npm run test && npm run security"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",

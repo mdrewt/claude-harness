@@ -149,7 +149,7 @@ test('all justfiles use valid recipe syntax (no header-level ";", no tabs, bodie
   }
 });
 
-test('doctor self-check passes (stack parity, security baseline, docs match reality)', () => {
+test('doctor runs and reports tool presence', () => {
   const r = run(path.join(HARNESS, 'scripts', 'doctor.mjs'), [], HARNESS);
   assert.equal(r.code, 0, r.out);
 });

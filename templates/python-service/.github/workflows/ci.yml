@@ -22,11 +22,11 @@ jobs:
       - run: just setup
       - run: just lint
       - run: just typecheck
-      - run: just test            # pytest with --cov-fail-under (standards/testing-tdd.md)
-      - run: just eval
+      - run: just test            # coverage collected as a report, never a threshold (standards/testing-tdd.md)
       - name: SCA (pip-audit)
         run: uv run pip-audit
-      - name: SAST (Semgrep)
-        run: pipx run semgrep scan --config auto --error
-      - name: SBOM
-        uses: anchore/sbom-action@v0
+      # SAST + SBOM: enable per threat model — standards/ci-cd.md
+      # - name: SAST (Semgrep)
+      #   run: pipx run semgrep scan --config auto --error
+      # - name: SBOM
+      #   uses: anchore/sbom-action@v0

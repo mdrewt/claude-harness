@@ -8,7 +8,7 @@ import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const HARNESS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const tpl = (...p) => path.join(HARNESS, 'templates', ...p);
@@ -119,15 +119,6 @@ test('every stack runs the portable secret scanner in `just security`', async ()
   }
 });
 
-// Docs-drift guard: the README must name every real stack (the just stacks bug
-// slipped through because nothing exercised it; this catches silent doc drift).
-test('README documents every stack', async () => {
-  const readme = await readFile(path.join(HARNESS, 'README.md'), 'utf8');
-  for (const s of STACKS) {
-    assert.ok(readme.includes(s), `README.md must mention the '${s}' stack`);
-  }
-});
-
 // Auto-format hook guard: generated projects must ship the PostToolUse formatter so
 // the agent's edits are auto-formatted/linted immediately (Biome/Ruff/rustfmt) instead
 // of failing late at `just ci` — and so it can't be silently dropped.
@@ -196,7 +187,7 @@ test('every template CI workflow runs the gitleaks secret scan', async () => {
   }
 });
 
-// --- Enforcement added in the review follow-up (mutation, SCA, coverage, build) ---
+// --- Enforcement added in the review follow-up (mutation recipe, SCA, build) ---
 
 // Resolve the CI workflow a generated project of this stack actually uses: its own
 // if it overrides one, otherwise the inherited _base workflow.
@@ -205,9 +196,9 @@ const ciFor = (s) => {
   return existsSync(own) ? own : tpl('_base', '.github', 'workflows', 'ci.yml');
 };
 
-// Standard contract (standards/testing-tdd.md + _base/justfile): EVERY stack must
-// define a `mutate` recipe. The _base comment claimed this but nothing enforced it
-// and 3 stacks shipped none.
+// Standard vocabulary (_base/justfile): EVERY stack defines a `mutate` recipe so
+// the out-of-band mutation REPORT (standards/testing-tdd.md) is one command away.
+// It is a report tool, never part of `ci` and never a gated score.
 test('every stack justfile defines a `mutate` recipe', async () => {
   for (const s of STACKS) {
     const jf = await readFile(tpl(s, 'justfile'), 'utf8');
@@ -232,36 +223,6 @@ test('node stacks wire StrykerJS consistently (config + script + deps together)'
   }
 });
 
-// Coverage gate (standards/testing-tdd.md DoD): where a node stack runs vitest with
-// --coverage, the coverage provider dep AND numeric thresholds must be present, so
-// the gate is real rather than a coverage report with no floor.
-test('node coverage gates are real (provider dep + thresholds) where enabled', async () => {
-  for (const s of NODE_STACKS) {
-    const pkg = JSON.parse(await readFile(tpl(s, 'package.json'), 'utf8'));
-    if (!/--coverage/.test(pkg.scripts?.test ?? '')) continue;
-    assert.ok(
-      pkg.devDependencies?.['@vitest/coverage-v8'],
-      `${s}: test runs --coverage but @vitest/coverage-v8 is not a devDependency`,
-    );
-    const cfgPath = ['vite.config.ts', 'vitest.config.ts']
-      .map((f) => tpl(s, f))
-      .find((p) => existsSync(p));
-    assert.ok(cfgPath, `${s}: --coverage enabled but no vite/vitest config found`);
-    const cfg = await readFile(cfgPath, 'utf8');
-    assert.match(cfg, /coverage/, `${s}: config has no coverage block`);
-    assert.match(cfg, /thresholds/, `${s}: coverage block sets no thresholds (no real gate)`);
-  }
-});
-
-// Coverage floor for the python stack: pytest must enforce --cov-fail-under and ship pytest-cov.
-test('python stack enforces a coverage floor', async () => {
-  if (!STACKS.includes('python-service')) return;
-  const jf = await readFile(tpl('python-service', 'justfile'), 'utf8');
-  assert.match(jf, /--cov-fail-under/, 'python `just test` must enforce --cov-fail-under');
-  const pyproject = await readFile(tpl('python-service', 'pyproject.toml'), 'utf8');
-  assert.match(pyproject, /pytest-cov/, 'python dev deps must include pytest-cov');
-});
-
 // SCA gate (standards/security.md + ci-cd.md §7): every stack's effective CI workflow
 // must run a real dependency-vulnerability scan. This was entirely absent before —
 // audits lived only in `just security`, which CI never invoked.
@@ -276,11 +237,10 @@ test('every stack CI runs a real SCA gate', async () => {
   }
 });
 
-// Mutation + build gates must actually run in the node CI pipeline (ci-cd.md §6/§8),
-// not merely exist as recipes.
-test('_base CI runs the mutation and build gates', async () => {
+// The build gate must actually run in the node CI pipeline (ci-cd.md §7), not merely
+// exist as a recipe. (Mutation runs out of band — it is deliberately NOT in PR CI.)
+test('_base CI runs the build gate', async () => {
   const yml = await readFile(tpl('_base', '.github', 'workflows', 'ci.yml'), 'utf8');
-  assert.match(yml, /just mutate/, '_base CI must run `just mutate`');
   assert.match(yml, /just build/, '_base CI must run `just build`');
 });
 
@@ -290,39 +250,6 @@ test('every node stack justfile defines a `build` recipe', async () => {
   for (const s of NODE_STACKS) {
     const jf = await readFile(tpl(s, 'justfile'), 'utf8');
     assert.match(jf, /(^|\n)build:/, `${s}: justfile missing 'build' recipe`);
-  }
-});
-
-// Clobber regression guard (the sync-templates bug): evals/run.mjs is a MANAGED file,
-// so any stack that ships one MUST keep it byte-identical to _base — otherwise
-// `just sync --apply` would silently overwrite stack-specific eval logic. Real
-// per-stack eval logic lives in discovered *.eval.mjs modules instead.
-test('stack evals/run.mjs never diverges from _base (managed file)', async () => {
-  const base = await readFile(tpl('_base', 'evals', 'run.mjs'), 'utf8');
-  for (const s of STACKS) {
-    const p = tpl(s, 'evals', 'run.mjs');
-    if (!existsSync(p)) continue;
-    assert.equal(
-      await readFile(p, 'utf8'),
-      base,
-      `${s}: evals/run.mjs diverges from _base (sync would clobber it)`,
-    );
-  }
-});
-
-// Discovered eval modules must default-export a function (the run.mjs contract).
-test('every *.eval.mjs default-exports a function', async () => {
-  for (const s of STACKS) {
-    const evalDir = tpl(s, 'evals');
-    if (!existsSync(evalDir)) continue;
-    for (const f of readdirSync(evalDir).filter((n) => n.endsWith('.eval.mjs'))) {
-      const mod = await import(pathToFileURL(path.join(evalDir, f)).href);
-      assert.equal(
-        typeof mod.default,
-        'function',
-        `${s}/evals/${f}: must default-export a function`,
-      );
-    }
   }
 });
 

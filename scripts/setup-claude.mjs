@@ -79,7 +79,7 @@ for (const name of GLOBAL_HOOKS) {
   });
 }
 
-// The Bash noise filter (ADR-0012) is linked as a DIRECTORY: quiet-bash.mjs imports
+// The Bash noise filter (docs/DECISIONS.md "Noisy Bash output") is linked as a DIRECTORY: quiet-bash.mjs imports
 // quiet-lib.mjs and quiet-profiles.mjs as siblings, so the whole folder has to
 // travel together. It is wired at the user level as well as per project because the
 // supervisor loop `cd`s into projects/monster-realm before launching, and a
@@ -180,7 +180,7 @@ for (const rel of RESOURCES) {
   }
 }
 
-// Vendor-doctrine drift (ADR-0010): a codebase-memory-mcp install/update re-registers
+// Vendor-doctrine drift (docs/DECISIONS.md "Code intelligence"): a codebase-memory-mcp install/update re-registers
 // its "ALWAYS FIRST" SessionStart banner and restores its stale skill — both were
 // deliberately retired in favor of the code-intel skill. Catch the resurrection.
 try {
@@ -188,13 +188,13 @@ try {
   if (settings.includes('cbm-session-reminder')) {
     failures++;
     console.log(
-      '  VENDOR-DRIFT ~/.claude/settings.json registers cbm-session-reminder — retired by ADR-0010; remove the SessionStart entries (a cbm install/update re-adds them)',
+      '  VENDOR-DRIFT ~/.claude/settings.json registers cbm-session-reminder — retired per docs/DECISIONS.md "Code intelligence"; remove the SessionStart entries (a cbm install/update re-adds them)',
     );
   }
   if (settings.includes('mcp__codegraph__*')) {
     failures++;
     console.log(
-      '  VENDOR-DRIFT ~/.claude/settings.json has the mcp__codegraph__* wildcard back — a codegraph install/upgrade restored it; re-enumerate codegraph_explore (ADR-0010)',
+      '  VENDOR-DRIFT ~/.claude/settings.json has the mcp__codegraph__* wildcard back — a codegraph install/upgrade restored it; re-enumerate codegraph_explore (docs/DECISIONS.md "Code intelligence")',
     );
   }
 } catch {}
@@ -206,7 +206,7 @@ try {
   ) {
     failures++;
     console.log(
-      '  VENDOR-DRIFT ~/.claude/skills/codebase-memory/SKILL.md exists without its supersession marker — a cbm install/update restored stale vendor content; delete it or re-stub (see ADR-0010)',
+      '  VENDOR-DRIFT ~/.claude/skills/codebase-memory/SKILL.md exists without its supersession marker — a cbm install/update restored stale vendor content; delete it or re-stub (see docs/DECISIONS.md "Code intelligence")',
     );
   }
 } catch {}
@@ -217,7 +217,7 @@ try {
   if (noteAt === -1 || (fenceAt !== -1 && noteAt > fenceAt)) {
     failures++;
     console.log(
-      '  VENDOR-DRIFT ~/.claude/CLAUDE.md routing note missing or below the CODEGRAPH fence — a codegraph install/upgrade likely rewrote the file; restore the note above the fence (ADR-0010)',
+      '  VENDOR-DRIFT ~/.claude/CLAUDE.md routing note missing or below the CODEGRAPH fence — a codegraph install/upgrade likely rewrote the file; restore the note above the fence (docs/DECISIONS.md "Code intelligence")',
     );
   }
 } catch {}

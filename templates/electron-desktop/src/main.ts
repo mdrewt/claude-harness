@@ -1,18 +1,9 @@
 import path from 'node:path';
 import { app, BrowserWindow } from 'electron';
+import { secureWindowOptions } from './window-options';
 
-// Secure-by-default window. See standards/domain/desktop.md.
 function createWindow(): void {
-  const win = new BrowserWindow({
-    width: 1024,
-    height: 768,
-    webPreferences: {
-      contextIsolation: true, // REQUIRED: isolate preload from renderer
-      nodeIntegration: false, // REQUIRED: no Node in the renderer
-      sandbox: true,
-      preload: path.join(__dirname, 'preload.js'),
-    },
-  });
+  const win = new BrowserWindow(secureWindowOptions(path.join(__dirname, 'preload.js')));
   win.loadFile(path.join(__dirname, '../src/renderer/index.html'));
 }
 

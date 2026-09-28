@@ -19,12 +19,12 @@ picture and `WORKSPACE-PLAN.md` for the rationale.
 ## Adding or changing a stack
 1. Create `templates/<stack>/` with at least: a `justfile` (start it with
    `set windows-shell := ["cmd.exe", "/c"]` and override `setup`/`lint`/
-   `typecheck`/`test`), sample source + tests, and a stack-appropriate `eval`.
+   `typecheck`/`test`) and sample source + tests.
 2. Reuse shared config from `templates/_base/` (don't duplicate `biome.json`,
    CI, etc. — they're single-sourced and synced).
 3. Run `just test` — the guard tests enforce the harness invariants (no silent
-   no-op gates, `.env` always ignored, lint is a real linter, README documents
-   every stack, …). Fix whatever they flag.
+   no-op gates, `.env` always ignored, lint is a real linter, …). Fix whatever
+   they flag.
 4. Generate a throwaway project and run its `just ci` to confirm it's green, then
    delete it.
 

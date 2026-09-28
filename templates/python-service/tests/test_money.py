@@ -1,10 +1,12 @@
 import pytest
-from hypothesis import given, strategies as st
-from app.money import Cents, total, fmt
+from hypothesis import given
+from hypothesis import strategies as st
+
+from app.money import Cents, fmt, total
 
 
 def test_rejects_non_integer():
-    with pytest.raises(Exception):
+    with pytest.raises((TypeError, ValueError)):
         Cents(value=1.5)  # type: ignore[arg-type]
 
 
