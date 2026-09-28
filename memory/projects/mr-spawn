@@ -844,11 +844,16 @@ emit(){ SLICE="$S" ST="$1" DET="$2" /usr/bin/python3 -c "import json,os;print(js
 status(){ emit "$1" "$2"; exit "${3:-0}"; }
 fail_evidence(){ printf 'kind=%s seen=%s log_tail=%s err_tail=%s' "${LAST_FAIL_KIND:-?}" "${LAST_SEEN_MODEL:-none}" "$(tail -n 5 "/tmp/mr_pass_$S.log" 2>/dev/null | tr '\n' ' ' | head -c 200)" "$(tail -n 5 "/tmp/mr_pass_$S.err" 2>/dev/null | tr '\n' ' ' | head -c 200)"; }
 [ -r "$V" ] || status FAIL "vars.json missing: $V" 1
-# lp-09: no launch while ANY hold is present, regardless of provenance. The tick gates itself at
-# gate -1, but a spawn can also be reached from an event tick or a hand-run; this is the launch-level
-# refusal, which is where the money is actually committed.
+# lp-09: no launch while ANY hold is present — EXCEPT an explicit operator run
+# (mr-supervisor-run => MR_EVENT_SRC=manual): the operator invoked that cycle deliberately, and
+# the hold itself is never cleared. All other provenances (cron, events, hand-runs) still refuse
+# here, which is where the money is actually committed.
 if [ -f "$MEM/.native-supervisor-disabled" ]; then
-  status HOLD-PRESENT "$("$MEM/mr-hold" status 2>/dev/null || echo 'hold present') — refusing to launch"
+  if [ "${MR_EVENT_SRC:-}" = "manual" ]; then
+    echo "NOTE hold present — proceeding to launch (explicit operator run; hold stays set)" >&2
+  else
+    status HOLD-PRESENT "$("$MEM/mr-hold" status 2>/dev/null || echo 'hold present') — refusing to launch"
+  fi
 fi
 # lp-00 repo routing — cheapest gate first, before the probe and before any launch cost.
 # mr-repo-of is the SSOT (mr-launch.sh reads the same verdict via the lock), so the rule cannot

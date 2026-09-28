@@ -1,39 +1,17 @@
 {
  "awaiting_merge": [],
- "consecutive_standdowns": 1,
- "harness_main": {
-  "ci": "no-remote-ci-local-gate-green",
-  "sha": "ccad204"
- },
+ "consecutive_standdowns": 0,
  "inflight": [],
- "last_tick_utc": "2026-09-27T05:07:12Z",
- "live_watchers": [],
  "master": {
-  "ci": "in_progress-unconfirmed",
+  "ci": "red",
   "nightly": "flake-suspect (changelog-freshness job failed on run 36240783375; re-ran node scripts/changelog-freshness.mjs --check locally against current master efb6c40, exits 0 clean; not actionable)",
-  "sha": "950c083ced310ca43d3cef3b7552b49a3f848568"
+  "sha": "4f36de2f46cd57550e2a05f67a50e7f3737cba66"
  },
- "model_directive": "ALIASES per Model & effort routing (2026-07-24): routine=opus@high, HARD=fable@xhigh (budget-guarded), content=opus@medium. opus alias now resolves to claude-opus-5.",
- "native_supervisor": {
-  "active_since": "2026-07-21T16:10:57Z",
-  "cost_ssot": "mr-cost-sum (ADR-0011) -- total_cost_usd is CUMULATIVE; never sum result events",
-  "cron": "0 * * * * + @reboot",
-  "decision_model": "sonnet",
-  "fallback": "Cowork/DC task daily; stands down while heartbeat <2h old",
-  "gate_log": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.log",
-  "heartbeat": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.native-supervisor-heartbeat",
-  "kill_switch": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/.native-supervisor-disabled",
-  "prompt": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-supervisor-prompt-native.md",
-  "tick_script": "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-native-tick.sh"
- },
- "notes": "2026-09-27T09:00Z tick (native-20260927T090009Z-3359326): STANDDOWN at gate 2 (active-session probe) -- resident `claude --resume 378535a1-c9a7-44d6-9bbf-1347cc19bead` (pid 3352894) attached to pts/14 under a VS Code integrated-terminal shell, started 2026-09-27T08:52:48Z (~8min before this tick), i.e. new-this-tick per gate-2 criterion (a). Treated as an active human session in this same repo; took no chain-owner mutex, no merge/launch/park. Prior note preserved below.\n--- prior note ---\n2026-09-27T08:3x tick: merged rb-132 (PR#519, ADR-0275). master CI on 950c083 in_progress at handoff, not yet confirmed by this tick.",
- "open_chore_prs": [],
+ "notes": "2026-09-28T10:01Z forced tick (rid=native-20260928T100153Z-219917): master CI red (run 36387861066, e2e job, intermittent quest_001-start flake in client/e2e/wallet-balance.spec.ts:911 -- alternates fail/success across last 4 master runs, NOT caused by HEAD docs-only commit 4f36de2). Attempted launch of hard-tier ci-fix-20260928T100153Z via mr-spawn; refused HOLD-PRESENT (operator hold by=operator at=2026-09-28T07:08:25Z, MR_FORCE never propagates into launches per lp-09). No mutating action taken; hold left untouched. Full detail in handoff '2026-09-28T10:01Z forced tick: master CI red, launch refused by operator hold'. Next actionable step once operator runs mr-supervisor-enable: launch ci-fix for this target (vars were at /tmp/mr_pass_ci-fix-20260928T100153Z.vars.json, ephemeral).",
  "park_counters": {
   "14r-e": 1
  },
- "parked": [],
  "queue": [],
- "rate_limit_armed_by": null,
  "rate_limit_resets_at": null,
  "resource_locations": {
   "_comment": "Current truth as of the 2026-09 harness revision (source: docs/revision-2026-09/facts-sheet.md, re-derived from the live repo). Use these absolute locations.",
@@ -44,7 +22,7 @@
   "spec_corpus_authoritative": "/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/  (HARNESS level, NOT under the project repo). Contains PLAN.md (section-9 one-liners) and per-milestone M*.spec.md files.",
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
- "schema_version": 2,
- "updated_by": "mr-sup-native-20260927T090009Z-3359326",
- "updated_utc": "2026-09-27T09:00:55Z"
+ "schema_version": 3,
+ "updated_by": "mr-sup-native-20260928T100153Z-219917",
+ "updated_utc": "2026-09-28T10:05:27Z"
 }
