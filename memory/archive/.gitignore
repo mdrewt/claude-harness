@@ -1,0 +1,2 @@
+# Untracked-exhaust bundles are local-only recovery copies (no git history); never commit them.
+*.tar.gz

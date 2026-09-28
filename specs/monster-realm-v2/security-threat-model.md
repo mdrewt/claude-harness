@@ -36,10 +36,10 @@ forged. This threat model **consolidates** those into one surface view and names
 | **Determinism** | desync exploited / float divergence | integer-only rules + determinism gate + parity evals (M0–M3) |
 
 ## 2. Standing controls (mechanical, always-on)
-- **reducer-security-auditor eval** (identity/intent/reject/ownership/no-panic) on every reducer.
-- **privacy evals + proof-of-teeth** per owner-private table; the **deletion-completeness eval** (M22).
-- **supply-chain gates** (gitleaks/Semgrep/SCA/SBOM) in CI.
-- **no-PII logs** (ADR-0029's design intent, delivered as `mr_log`/observability discipline in `ADR-0180`)
+- **reducer-security-auditor agent review** (identity/intent/reject/ownership/no-panic) on every reducer change.
+- **native-host privacy tests** per owner-private table + the **client-surface-privacy** machine-contract eval (bindings-derived allowlist); the **deletion-completeness census test** (M22).
+- **supply-chain gates** (gitleaks + dependency review/SCA) in CI; SAST/SBOM per this threat model when warranted.
+- **no-PII logs** (ADR-0029's design intent, delivered as `mr_log`/observability discipline; DECISIONS.md "Observability")
   as a privacy check.
 
 ## 3. What M25 (the audit) adds beyond the standing controls

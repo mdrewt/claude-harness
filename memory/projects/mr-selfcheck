@@ -1234,14 +1234,16 @@ def reset_state():
     with open(STATE, "w") as f:
         json.dump({"schema_version": 2, "master": {"sha": "fixture0"}, "queue": []}, f)
 
-# A real, stable heading to point --spec-file at (already merged, will not move).
-REAL_SPEC = "specs/monster-realm-v2/M-loop-infrastructure.spec.md"
+# A real, stable heading to point --spec-file at. Archived spec = frozen parse DATA (never
+# instructions); the 2026-09 revision moved done specs under archive/, which is exactly why the
+# headings can never move again.
+REAL_SPEC = "specs/monster-realm-v2/archive/M-loop-infrastructure.spec.md"
 REAL_HEADINGS = ["lp-06", "lp-07", "lp-10", "lp-11", "lp-11b", "lp-git-workflow"]
 # A real DIGIT-LEADING heading -- the entire review-residuals convention is digit-first
 # (15r-sec-a, 13r-c-2, 15r-a2, ...), which a letter-first-only SLICE_ID_RE rejected in an
 # earlier revision (caught at post-implementation review; queue-add --slice 15r-sec-a died).
 # This fixture pins the regression so a future edit can't silently reintroduce it.
-DIGIT_SPEC = "specs/monster-realm-v2/M-postgate-fifteenth-review-residuals.spec.md"
+DIGIT_SPEC = "specs/monster-realm-v2/archive/M-postgate-fifteenth-review-residuals.spec.md"
 DIGIT_HEADING = "15r-sec-a"
 
 # --- queue-add: validation ---

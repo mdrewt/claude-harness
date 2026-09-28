@@ -135,7 +135,7 @@ original item PARKs (§8) — it does not close.
    (with where they landed) and REJECTED (with why) — this is the evidence base for the operator's
    open 6-vs-4 brainstormer calibration question (2026-07-27); a synthesis without the table is
    incomplete.
-4. EXECUTION: per action type (§4) — code, or specs/milestones/ADRs for DRAFT/REDESIGN.
+4. EXECUTION: per action type (§4) — code, or specs/milestones/`docs/DECISIONS.md` entries for DRAFT/REDESIGN.
 5. REVIEW: adversarial pass for quality/standards/correctness PLUS the distinct complaint-repro
    verification (I-5): does the thing Drew reported actually not happen anymore?
 6. FINALIZATION: definition-of-done cleanup — wiring, configs, docs/specs/context truth, deps,
@@ -148,7 +148,7 @@ Budget-pressure degradation order (I-6): shed brainstormers 6→4, then their re
 §6.5 review or the complaint-repro check. (Basis: subagent invocations ≈ $1-5 sonnet / $5-15 opus —
 a full ceremony fits the ~$60 process share; recalibrate from §8 per-item cost data.)
 
-## §7 RESEARCH (ADR-0007 machinery; keeps this doctrine lean)
+## §7 RESEARCH (the research-library machinery; keeps this doctrine lean)
 Research what the §4 actions actually need — via `expert` over `<project>/docs/research/INDEX.md`
 (≤3 docs); missing domain → `researcher` persist-mode (`/research-domain`), paid once, cached.
 Research docs carry dates; treat agentic-coding and fast-moving-dependency advice as perishable —
