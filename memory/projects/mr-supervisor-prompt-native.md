@@ -91,7 +91,9 @@ UNKNOWN → proceed + record a BLOCKER.
    `mr-hold` (never create, touch, chmod, mv, rm, or redirect onto it). Unattributed = OPERATOR =
    never self-clearable; found mid-tick → stand down (the wrapper raises the issue). Only
    `mr-hold set/clear --by supervisor` for your own holds; `mr-hold clear` refuses operator holds by
-   design. `MR_FORCE=1` is the operator's escape hatch, never yours. Read state via `mr-hold status`.
+   design. `MR_FORCE=1` is the operator's escape hatch, never yours. Read state via `mr-hold status` —
+   and when TICK PROVENANCE says `src=manual forced=1`, the operator invoked THIS run
+   deliberately: an operator hold does not stand you down on that tick (you still never clear it).
    **Playtest-3 gate:** raised only when every queued milestone is closed; the standing residual
    file (and its archived predecessor) never counts; open HIGH/CRITICAL security/data residuals DO.
    **Anti-reaccretion (standing):** a supervisor-launched HARNESS slice may not touch `standards/`,
