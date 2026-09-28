@@ -4,6 +4,7 @@
 #   price LOGFILE                    (one-shot: per-model-priced sum of a pass log; fixture tests)
 #   telemetry LOGFILE GATE NSLICES [OUTFILE]
 #                                    (one-shot: rate-limit telemetry reader; appends JSONL rows)
+#   --selftest                       (arming block + cost-cap rungs + price fixture; rc 1 on failure)
 #
 # ---------------------------------------------------------------------------------------------
 # `telemetry` (lp-01) — the utilization SSOT.
@@ -497,6 +498,103 @@ raise SystemExit(0)
 PYTEL
 }
 
+# Cost-cap rung for one sample: OK < 80% <= WARN < 100% <= STOP < 125% <= HARD; ERR on garbage.
+# Pinned by `--selftest` at every boundary (the watch loop acts on this word, nothing else).
+over_level(){ /usr/bin/python3 -c "c=float('$1');p=float('$2');print('HARD' if c>=1.25*p else 'STOP' if c>=p else 'WARN' if c>=0.8*p else 'OK')" 2>/dev/null || echo ERR; }
+
+# --selftest: protects (1) the tick's live rate-limit ARMING block (mr-native-tick.sh `<<'PYRL'`,
+# extracted by content marker and EXECUTED against fixture logs/state — never re-implemented) and
+# (2) cost-cap behaviour: the over_level rungs and the price_log sum they are compared against.
+# Absorbed from the retired mr-telemetry-selftest (T3) in the 2026-09 harness revision.
+selftest(){
+  local tick; tick="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/mr-native-tick.sh"
+  local n=0 bad=0 got case_
+  for case_ in "79.99 100 OK" "80 100 WARN" "99.99 100 WARN" "100 100 STOP" "124.99 100 STOP" \
+               "125 100 HARD" "0 100 OK" "abc 100 ERR"; do
+    set -- $case_; got=$(over_level "$1" "$2"); n=$((n+1))
+    [ "$got" = "$3" ] || { echo "COSTWATCH-SELFTEST-FAIL cap/over_level($1,$2): want $3 got $got"; bad=$((bad+1)); }
+  done
+  local out; out=$(/usr/bin/python3 - "$tick" "$0" <<'PYST'
+import json, os, re, subprocess, sys, tempfile, time
+tick, me = sys.argv[1], sys.argv[2]
+n = bad = 0
+def check(cond, cid, why):
+    global n, bad
+    n += 1
+    if not cond:
+        bad += 1; print("COSTWATCH-SELFTEST-FAIL %s: %s" % (cid, why))
+try:
+    src = open(tick, errors="replace").read()
+except Exception as e:
+    src = ""; check(False, "arm/tick-readable", "%s: %s" % (tick, e))
+om = re.search(r"^[^\n]*python3[^\n]*<<[']PYRL['][^\n]*$", src, re.M)
+cm = re.search(r"^PYRL\s*$", src[om.end() + 1:], re.M) if om else None
+check(bool(om and cm), "arm/extract", "could not locate the <<'PYRL' arming block by content marker")
+with tempfile.TemporaryDirectory(prefix="mr-cost-watch-selftest-") as T:
+    if om and cm:
+        body = src[om.end() + 1: om.end() + 1 + cm.start()]
+        script = os.path.join(T, "pyrl.py"); open(script, "w").write(body)
+        def arm(lines, name):
+            log = os.path.join(T, name + ".log"); st = os.path.join(T, name + ".json")
+            open(log, "w").write("".join(json.dumps(l) + "\n" for l in lines))
+            json.dump({"foo": "bar"}, open(st, "w"))
+            before = open(st, "rb").read()
+            r = subprocess.run([sys.executable, script, log, st], capture_output=True, text=True, timeout=10)
+            return r.stdout.strip(), before, open(st, "rb").read()
+        def ev(status, resets, rtype="five_hour"):
+            ri = {"status": status, "rateLimitType": rtype}
+            if resets is not None: ri["resetsAt"] = resets
+            return {"type": "rate_limit_event", "rate_limit_info": ri, "uuid": "u", "session_id": "s"}
+        now = int(time.time())
+        o, b, a = arm([ev("allowed_warning", now + 6 * 86400, "seven_day"), ev("allowed", None)], "warn")
+        check(o == "NONE", "arm/allowed_warning-arms-nothing", "a widened arming predicate: got %r" % o)
+        check(a == b, "arm/allowed_warning-state-untouched", "state changed when nothing armed")
+        o, b, a = arm([ev("rejected", now + 3600)], "armed")
+        try: d = json.loads(a)
+        except Exception: d = {}
+        check(o.startswith("ARMED"), "arm/rejected-future-arms", "a narrowed arming predicate: got %r" % o)
+        check(d.get("rate_limit_armed_by") == "wrapper" and bool(d.get("rate_limit_resets_at"))
+              and d.get("foo") == "bar", "arm/state-written", "state after ARMED: %r" % d)
+        # Earliest FIRST in the log, so a last-wins mutant arms the 6-day one and reds here.
+        o, _, a = arm([ev("rejected", now + 7200), ev("rejected", now + 6 * 86400, "seven_day")], "earliest")
+        want = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now + 7200))
+        try: got = json.loads(a).get("rate_limit_resets_at")
+        except Exception: got = None
+        check(o.startswith("ARMED") and got == want, "arm/earliest-rejection-wins",
+              "a 6-day seven_day rejection must not beat a 2h five_hour one: out=%r resets_at=%r" % (o, got))
+        o, _, _ = arm([ev("rejected", now - 3600)], "past")
+        check(o.startswith("SKIPPED past("), "arm/past-skipped", "got %r" % o)
+        o, _, _ = arm([ev("rejected", now + 30 * 86400)], "implausible")
+        check(o.startswith("SKIPPED implausible("), "arm/implausible-skipped", "got %r" % o)
+    # price_log: the number the cap is compared against. Oracle = the config's own per-MTok rates.
+    plog = os.path.join(T, "price.log")
+    open(plog, "w").write(
+        json.dumps({"message": {"model": "claude-opus-x", "usage": {"output_tokens": 1000000}}}) + "\n"
+        + json.dumps({"message": {"model": "claude-haiku-x", "usage": {"output_tokens": 1000000,
+                                                                        "input_tokens": 1000000}}}) + "\n"
+        + json.dumps({"message": {"model": "claude-opus-x", "usage": {"input_tokens": 5000000}}}) + "\n"
+        + "not json \"usage\"\n")
+    r = subprocess.run(["bash", me, "price", plog, "raw"], capture_output=True, text=True, timeout=30)
+    try:
+        cfg = json.load(open(os.path.join(os.path.dirname(os.path.abspath(me)), "mr-budget-config.json")))
+        P = cfg["pricing_per_mtok"]
+        exp = P["opus"]["out"] + P["haiku"]["out"] + P["haiku"]["in"]
+        check(abs(float(r.stdout.strip()) - exp) < 1e-3, "cap/price-raw",
+              "want %.4f (opus out + haiku out+in; zero-output event and junk ignored) got %r"
+              % (exp, r.stdout.strip()))
+    except Exception as e:
+        check(False, "cap/price-raw", "%s: %s stdout=%r" % (type(e).__name__, e, r.stdout))
+print("PY-COUNTS %d %d" % (n, bad))
+PYST
+)
+  printf '%s\n' "$out" | grep -v '^PY-COUNTS '
+  set -- $(printf '%s\n' "$out" | sed -n 's/^PY-COUNTS //p')
+  n=$((n + ${1:-0})); bad=$((bad + ${2:-1}))
+  [ "$bad" -eq 0 ] && { echo "COSTWATCH-SELFTEST-OK $n"; return 0; }
+  echo "COSTWATCH-SELFTEST-FAILED $bad/$n"; return 1
+}
+if [ "${1:-}" = "--selftest" ] || [ "${1:-}" = "selftest" ]; then selftest; exit $?; fi
+
 if [ "${1:-}" = "price" ]; then price_log "${2:?logfile}" "${3:-cal}"; exit 0; fi
 # The inline `exit 0` is LOAD-BEARING and is separately gated: without it this dispatch falls
 # through into the `watch` path below, which was PROVEN to create a bogus
@@ -546,7 +644,7 @@ while :; do
   [ "$STALL" -eq 6 ] && log "LOG-STALL log not growing for 2min while pass live — enforcement suspended (blind watcher, review F-A)"
   COST=$(price_log "$L" raw)   # threshold on RAW (overcount fires early = safe direction); factor is for reporting/calibration only
   case "$COST" in ''|*[!0-9.]*) log "PRICE-ERR '$COST'"; sleep 20; continue;; esac
-  OVER=$(/usr/bin/python3 -c "c=$COST;p=$CAP;print('HARD' if c>=1.25*p else 'STOP' if c>=p else 'WARN' if c>=0.8*p else 'OK')" 2>/dev/null || echo ERR)
+  OVER=$(over_level "$COST" "$CAP")
   case "$OVER" in
     ERR) log "OVER-ERR cost=$COST cap=$CAP";;
     WARN) [ "$WARNED" = 0 ] && { touch "$WARN"; log "WARN 80% (raw \$$COST/\$$CAP) — landing-pattern flag set"; WARNED=1; };;

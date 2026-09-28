@@ -1,6 +1,6 @@
 #!/bin/bash
 # mr-spawn <slice> [--dry] — build brief + lock + detached launch + asserts, from /tmp/mr_pass_<slice>.vars.json
-# vars.json: {slice, model, effort, adr, touches, target_desc, resume_block, tier}
+# vars.json: {slice, model, effort, touches, target_desc, resume_block, tier}
 # Kills a failed first attempt BY RECORDED PID before its single retry. Prints one status JSON line.
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
@@ -228,7 +228,7 @@ def t6_end_to_end(selfdir):
         vars_json = os.path.join(tmpdir, "vars.json")
         with open(vars_json, "w") as f:
             json.dump({
-                "slice": "lp-skills-t6-fixture", "model": "sonnet", "effort": "high", "adr": "",
+                "slice": "lp-skills-t6-fixture", "model": "sonnet", "effort": "high",
                 "touches": "server-module/src/x.rs", "target_desc": "t6 fixture",
                 "resume_block": "", "tier": "routine",
             }, f)
@@ -258,7 +258,7 @@ def t6_end_to_end(selfdir):
         if "Must-apply skills" not in written:
             print("SKILLS-SELFTEST-FAIL t6-missing-header: rendered brief has no skills header")
             bad = 1
-        placeholders = ["<SLICE>", "<ADR_NUM>", "<TOUCHES>", "<TARGET_DESC>", "<RESUME_BLOCK>",
+        placeholders = ["<SLICE>", "<TOUCHES>", "<TARGET_DESC>", "<RESUME_BLOCK>",
                          "<TIER_BLOCK>", "<REPO_BLOCK>", "<PR_REPO>", "<BASE_BRANCH>",
                          "<WT_ROOT>", "<CAP_USD>", "<SKILLS_BLOCK>"]
         leftover = [p for p in placeholders if p in written]
@@ -404,7 +404,7 @@ def t9_live_path_wired(selfdir):
 def t10_hostile_values(selfdir):
     """Regression pin (post-implementation red-team, reproduced against this worktree): the
     render substitutes placeholders as a SEQUENTIAL chain of `tpl.replace(k, val)` calls, so a
-    later `.replace()` re-scans text a PRIOR substitution's VALUE inserted. `<SLICE>`/`<ADR_NUM>`
+    later `.replace()` re-scans text a PRIOR substitution's VALUE inserted. `<SLICE>`/`<TOUCHES>`
     go first; a freeform field (`touches`/`target_desc`/`resume_block` -- all planner-authored
     prose, and this corpus writes literal `<SLICE>`-shaped tokens constantly) that happens to
     contain one of those tokens carries it through untouched, and the NEW leftover-placeholder
@@ -427,7 +427,7 @@ def t10_hostile_values(selfdir):
     tmpdir = tempfile.mkdtemp(prefix="mr-skills-t10-")
     try:
         base = {
-            "slice": "lp-skills-t10-fixture", "model": "sonnet", "effort": "high", "adr": "42",
+            "slice": "lp-skills-t10-fixture", "model": "sonnet", "effort": "high",
             "touches": "server-module/src/x.rs", "target_desc": "baseline",
             "resume_block": "", "tier": "routine",
         }
@@ -457,12 +457,12 @@ def t10_hostile_values(selfdir):
             return r, written
 
         # (a)+(b): one hostile field at a time, each carrying a token substituted EARLIER in the
-        # chain -- both <SLICE> and <ADR_NUM> are covered across the three freeform fields.
+        # chain -- both <SLICE> and <TOUCHES> are covered across the three freeform fields.
         cases = [
             ("touches", {"touches": "server-module/src/x.rs <SLICE> extra"},
              "server-module/src/x.rs <SLICE> extra", "<SLICE>"),
-            ("target_desc", {"target_desc": "implements <ADR_NUM> pattern"},
-             "server-module/src/x.rs", "<ADR_NUM>"),
+            ("target_desc", {"target_desc": "implements <TOUCHES> pattern"},
+             "server-module/src/x.rs", "<TOUCHES>"),
             ("resume_block", {"resume_block": "resuming after <SLICE> merged"},
              "server-module/src/x.rs", "<SLICE>"),
         ]
@@ -793,7 +793,7 @@ repo_block=("REPO: **harness** (`mdrewt/claude-harness`). Worktree from `origin/
 if "<SKILLS_BLOCK>" not in tpl:
     raise SystemExit("brief template is missing the <SKILLS_BLOCK> placeholder: %s" % sys.argv[1])
 _subbed=[]
-for k,val in [("<SLICE>",v["slice"]),("<ADR_NUM>",str(v.get("adr",""))),("<TOUCHES>",touches_str),
+for k,val in [("<SLICE>",v["slice"]),("<TOUCHES>",touches_str),
               ("<TARGET_DESC>",str(v.get("target_desc",""))),("<RESUME_BLOCK>",str(rb)),("<TIER_BLOCK>",tier_block),
               ("<REPO_BLOCK>",repo_block),("<PR_REPO>",os.environ["PR_REPO"]),
               ("<BASE_BRANCH>",os.environ["BASE_BRANCH"]),("<WT_ROOT>",os.environ["WT_ROOT"]),
@@ -1080,7 +1080,7 @@ lock={"run_id":os.environ["RID"],"slice":os.environ["S"],
  "session_leader":int(os.environ["LEADER"]),"claude_pid":int(os.environ.get("CPID") or 0),
  "started_utc":datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
  "brief":os.environ["B"],"done_flag":"/tmp/mr_pass_%s.done"%os.environ["S"],
- "adr_reserved":str(v.get("adr","")),"touches":touches,
+ "touches":touches,
  "model":os.environ["MODEL"],"effort":os.environ["EFFORT"],"tier":v.get("tier","routine"),
  "repo":os.environ["REPO"],"pr_repo":os.environ["PR_REPO"],"base_branch":os.environ["BASE_BRANCH"]}
 open(os.environ["MEM"]+"/.harness-runner."+os.environ["S"]+".lock","w").write(json.dumps(lock,indent=1))

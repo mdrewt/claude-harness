@@ -64,9 +64,9 @@ PYCHK
   grep -q "^ESCALATED" "$RLOG" 2>/dev/null && MDL="escalated:${MDL}-to-fable"
   # lp-02: `--ci not-applicable` because this is a PRE-MERGE row — "master CI after this slice" is
   # not yet a defined property, and leaving it empty is 65.8% of the measured master_ci_after hole.
-  # `timeout 60` because this write now derives the slice-size columns via mr-slice-quality: the
-  # heartbeats at :21/:25 are already fresh and the flock is ~180 lines below, so a stall here
-  # leaves the loop looking alive while nothing progresses. Precedent: the handoff write below.
+  # `timeout 60` guards the reconcile write: the heartbeats at :21/:25 are already fresh and the
+  # flock is ~180 lines below, so a stall here leaves the loop looking alive while nothing
+  # progresses. Precedent: the handoff write below.
   timeout 60 "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
     --ci not-applicable \
     --model "$MDL" --from-log "$RLOG" --notes "mechanical backfill by tick v3 reconcile" >> "$LOG" 2>&1 && touch "$DF.recorded"
@@ -332,8 +332,16 @@ WRITES=$(find "$HARNESS" "$PROJ" -type f \
 # of the false trips is $0 — a standdown exits before any spawn, pending events requeue, and the
 # worst observed case was 15 min of merge latency. Do not "unify" these two lists by widening
 # this one; if they are ever unified, unify toward the stricter list.
-if [ -n "$IDE" ]; then log "STANDDOWN human-ide-session"; exit 0; fi
-if [ -n "$WRITES" ]; then
+# Explicit operator runs (mr-supervisor-run => src=manual + MR_FORCE=1) are not "human collision"
+# — the human IS the caller. Warn and proceed instead of silently standing down (pre-2026-09 the
+# operator's own open IDE made every manual run a no-op).
+OPRUN=0; [ "$SRC" = "manual" ] && [ "${MR_FORCE:-0}" = "1" ] && OPRUN=1
+if [ -n "$IDE" ]; then
+  if [ "$OPRUN" = "1" ]; then log "NOTE human-ide-session present — proceeding (explicit operator run)"; else log "STANDDOWN human-ide-session"; exit 0; fi
+fi
+if [ -n "$WRITES" ] && [ "$OPRUN" = "1" ]; then
+  log "NOTE recent-writes present — proceeding (explicit operator run): $WRITES"
+elif [ -n "$WRITES" ]; then
   log "STANDDOWN recent-writes: $WRITES"
   # retry marker is keyed on EVENT identity, not on $SRC: two slices finishing inside the same
   # 7-minute window both carry SRC=done, so the old per-source key silently dropped the second
@@ -472,6 +480,12 @@ if [ "$RC" -eq 0 ]; then
   for EV in $CONSUMED; do [ -f "$EV" ] && mv "$EV" "$MEM/pending-events/archive/$(date -u +%s).$(basename "$EV")" 2>/dev/null; done
   MR_RECORD_WRAPPER=1 "$MEM/mr-record" ledger --run_id "$RID" --slice SUPERVISOR --outcome "tick-ok src=$SRC" \
     ${COST:+--cost "$COST"} --model "$TICKMODEL" --notes "governor=$GSTATE" >> "$LOG" 2>&1 || true
+  # Sync supervisor state commits to origin so local main never drifts ahead (the old
+  # REPO-OUT-OF-SYNC refusal class). Only from main, only fast-forward pushes, never fatal.
+  BR=$(git -C "$HARNESS" rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [ "$BR" = "main" ] && [ -n "$(git -C "$HARNESS" log --oneline origin/main..main 2>/dev/null | head -1)" ]; then
+    if git -C "$HARNESS" push origin main >> "$LOG" 2>&1; then log "PUSH origin/main synced"; else log "NOTE push-failed — main stays ahead (non-fatal)"; fi
+  fi
 else
   REASON=$(grep -m1 -iE 'not logged in|please run /login|invalid api key|api key|authentication|unauthorized|forbidden' "$TLOG" 2>/dev/null | tr -d '\r' | head -c 200)
   [ -z "$REASON" ] && REASON=$(tail -n 3 "$TLOG" 2>/dev/null | tr '\r\n' '  ' | head -c 200)

@@ -7,7 +7,7 @@
 #   wrapper and never the live one.
 #
 # COPIES THE REAL WRAPPER into a fixture dir rather than reconstructing its logic, so this harness
-# cannot drift from what ships (same rule as lp-brief-cost-teeth.sh). The wrapper is self-locating
+# cannot drift from what ships (same rule as the retired lp-brief-cost teeth script). The wrapper is self-locating
 # via `readlink -f "$0"`, so dropping it into a sandbox next to a STUB `mr-hold` isolates it
 # completely: no env override exists, and none should — mr-hold rejected `MR_SELFCHECK_MEM` for the
 # same reason (an override is a surface for greening production vacuously).

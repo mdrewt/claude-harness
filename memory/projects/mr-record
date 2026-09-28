@@ -13,15 +13,11 @@
 #               gate-0 snapshot) rather than touch it directly, since a mid-tick queue-add/-remove call
 #               can have changed it after that snapshot was taken.
 #
-# lp-02 — SLICE-SIZE DENOMINATOR. When a row CLOSES a slice (MERGED/FINISHED/CRASHED/PARKED, and
-# never SUPERVISOR or CORRECTION*), this writer attaches six measured columns plus quality_source:
-# files_changed, prod_lines_added, prod_lines_deleted, test_lines_added, ears_criteria_count,
-# skills_invoked. They are DERIVED here, at write time, from live ground truth — never backfilled
-# by a later pass over historical rows (the ledger is append-only, ADR-0011). Non-closing rows omit
-# the keys entirely: the schema already carries 259 distinct keys over 749 rows, and emitting six
-# nulls on every `tick-ok` row would make that worse while destroying the reader's row-selection
-# rule. Measurement lives in `mr-slice-quality` (which has a real fixture battery); this file only
-# calls it, bounded, and NEVER lets a derivation failure become a lost row.
+# lp-02 slice-size columns (files_changed, prod_lines_*, test_lines_added, ears_criteria_count,
+# skills_invoked, quality_source) are NO LONGER WRITTEN (harness revision 2026-09, Phase 2a). They
+# were derived by shelling out to mr-slice-quality on the tick's reconcile path under `timeout 60`,
+# and nothing read them (no consumer in mr-metrics / mr-situation / mr-usage-snap / any dashboard).
+# Historical rows keep them; the ledger is append-only (ADR-0011) and readers must tolerate absence.
 #
 # `--ci` is normalised onto the closed vocabulary green|red|pending|not-applicable|not-recorded|
 # unknown. It is never rejected: this writer's contract is that a row is never lost, so dying on an
@@ -31,11 +27,9 @@
 #   --cycles / remote_red_fix_cycles — sums 27 over all 749 rows, 0 over the post-cutover rows,
 #   last nonzero 2026-07-20. Dead. Nothing requests it; do not add new call sites.
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
-# lp-02 helper resolution, tier 2. MEM (and therefore the LEDGER) stays hardcoded on purpose: the
-# ledger is a machine SINGLETON and a self-locating MEM would let a worktree copy fork the
-# append-only SSOT. Only the HELPER is resolved beside the copy actually being run, so a slice's
-# own gate exercises its own mr-slice-quality instead of silently degrading against the main
-# checkout's (which is what made an earlier design's dogfood read as a clean pass).
+# MEM (and therefore the LEDGER) stays hardcoded on purpose: the ledger is a machine SINGLETON and
+# a self-locating MEM would let a worktree copy fork the append-only SSOT. Only the mr-backup
+# HELPER is resolved beside the copy actually being run (MEM_SELF, see _backup_bin).
 MEM_SELF="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 SUB="${1:?usage: mr-record ledger|handoff|queue-add|queue-remove ...}"; shift
 export MEM MEM_SELF SUB
@@ -81,9 +75,9 @@ ts=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 # the real backup root -- one rule, in one place, instead of a guard here that can drift out of
 # agreement with it.
 def _backup_bin():
-    """Mirrors lp02_quality_bin's tier order: explicit MR_BACKUP_BIN, then the copy beside the
-    mr-record actually being run, then the hardcoded MEM; None => skip silently. It differs on one
-    point deliberately: an explicit MR_BACKUP_BIN is returned WITHOUT an os.path.exists() screen, so
+    """Tier order: explicit MR_BACKUP_BIN, then the copy beside the
+    mr-record actually being run, then the hardcoded MEM; None => skip silently. Deliberately, an
+    explicit MR_BACKUP_BIN is returned WITHOUT an os.path.exists() screen, so
     a fixture that points at a missing binary exercises the real failure path (a caught
     FileNotFoundError plus one WARN line) instead of being indistinguishable from `no helper here`."""
     env=os.environ.get("MR_BACKUP_BIN")
@@ -107,9 +101,7 @@ def _backup(path):
     mr-backup's own error lines land in the tick log verbatim. That is strictly better diagnostics
     than a truncated WARN string, and with no pipe there is nothing to buffer, so the bound is real.
 
-    DELIBERATELY NO start_new_session=True, which is where this diverges from lp02_quality_bin: that
-    helper shells out to git and therefore genuinely needs a process-GROUP kill to avoid orphaned
-    grandchildren. mr-backup spawns nothing, and keeping the child in mr-record's OWN process group
+    DELIBERATELY NO start_new_session=True: mr-backup spawns nothing, and keeping the child in mr-record's OWN process group
     is what lets the cron `timeout 60` wrapper's group signal reach it -- red-team proved a
     start_new_session=True child SURVIVES its parent being SIGTERM'd by timeout, which would leave
     an orphaned copier once per tick, forever. 10s, not longer: the tick's worst case is already
@@ -261,8 +253,8 @@ if SUB=="handoff":
     # lp-06: snapshot via mr-backup only AFTER the flock is released AND the `with` block has exited.
     # Never inside: _rotate_handoff still holds the lock there, so a snapshot taken inside would
     # either read a half-rotated file or contend with the rotation it is trying to preserve.
-    # lp-06-teeth.sh pins this ordering BY LINE NUMBER (W6) so a refactor that "helpfully" moves the
-    # call up into the lock reds instead of silently corrupting a backup.
+    # Keep it here: moving the call up into the lock would silently corrupt a backup. (The old
+    # line-number pin, lp-06-teeth.sh W6, was retired in the 2026-09 revision; this comment is the guard.)
     _backup(HANDOFF)
     print("handoff-appended: "+title); sys.exit(0)
 
@@ -412,10 +404,8 @@ if cost in (None,"","null"):
 else:
     try: cost=float(cost)
     except ValueError: die("cost not a number")
-# ================================ lp-02: slice-size denominator ================================
+# ================================ lp-02: --ci normalisation =====================================
 CI_VOCAB=("green","red","pending","not-applicable","not-recorded","unknown")
-CI_COLUMNS=("files_changed","prod_lines_added","prod_lines_deleted","test_lines_added",
-            "ears_criteria_count","skills_invoked")
 _RED=re.compile(r"\bred\b|\bfail(?:ed|ure|ing|s)?\b|\bbroken\b")
 _HEDGE=re.compile(r"\bunverified\b|\bexpected\b|\bassumed\b|\bpresumed\b|\bflak(?:e|ed|y|es)\b"
                   r"|\bcancel(?:led|ed|s)?\b|\bunmerged\b|\bstood\s+down\b|\bpre-merge\b"
@@ -430,10 +420,7 @@ _NA_MARK=" \x00na\x00 "
 def lp02_normalize_ci(raw):
     """Map an arbitrary --ci onto CI_VOCAB. Returns (value, raw_note_or_None). Never raises.
 
-    ACCEPTED DUPLICATION of mr-slice-quality.normalize_ci, and deliberate: the row must carry a
-    vocabulary value even when the helper is missing, hung or unrunnable, so --ci cannot depend on
-    an external process. Both copies are tested — the reference by mr-slice-quality's own fixture
-    battery, this one by mr-selfcheck's lp02-ci-normalised / lp02-parked-measured fixtures.
+    Inline on purpose: --ci must never depend on an external process.
     Evaluation is over the WHOLE string: a head-token rule mismapped 21 real rows to `green`,
     headed by 'GREEN (CI wf); Nightly RED (mutation job, ...)' — compound verdicts are HOW reds get
     written here."""
@@ -453,88 +440,13 @@ def lp02_normalize_ci(raw):
     return ("unknown",note)
 
 def lp02_is_closing(sl,oc):
-    """Does this row CLOSE a slice? Inline copy of mr-slice-quality.is_closing (4 lines; shelling
-    out to classify a row would add a subprocess and a failure mode per write). Both are tested."""
+    """Does this row CLOSE a slice? (A closing row with no --ci records `not-recorded`.)"""
     if sl=="SUPERVISOR": return False
     if not isinstance(oc,str): return False
     h=oc.strip().upper()
     if h.startswith("CORRECTION"): return False     # accounting reversal, not a close
     return h.startswith(("MERGED","FINISHED","CRASHED","PARKED"))
 
-def lp02_quality_bin():
-    """Tier 1 an explicit MR_QUALITY_BIN, tier 2 the copy beside the mr-record being run, tier 3
-    the hardcoded MEM. An explicit override is AUTHORITATIVE: if it is set but unusable we return
-    None rather than silently falling through to another helper, because a fallback there would
-    make a fixture that points at a broken helper quietly measure the real one — the difference
-    between testing degradation and testing nothing."""
-    env=os.environ.get("MR_QUALITY_BIN")
-    if env:
-        return env if os.path.exists(env) else None
-    for c in (os.path.join(os.environ.get("MEM_SELF") or MEM,"mr-slice-quality"),
-              MEM+"/mr-slice-quality"):
-        if os.path.exists(c): return c
-    return None
-
-def lp02_derive(sl):
-    """Measure the slice via the helper. BOUNDED and TOTAL: any failure yields all-null columns,
-    never an exception and never a lost row. The tick bumps both heartbeats BEFORE the reconcile
-    and takes its flock ~180 lines later, so an unbounded stall here would leave the loop looking
-    alive while nothing progresses — the '~2 days undetected' failure the README records."""
-    blank=dict((c,None) for c in CI_COLUMNS); blank["quality_source"]="unavailable"
-    blank["reason"]="helper-unavailable"
-    qb=lp02_quality_bin()
-    if not qb: return blank
-    try:
-        p=subprocess.Popen([sys.executable,qb,"derive",sl],stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,text=True,start_new_session=True)
-        try:
-            out,_e=p.communicate(timeout=20)
-        except subprocess.TimeoutExpired:
-            # Kill the PROCESS GROUP: killing only the direct child leaves an orphaned git
-            # grandchild holding .git state, once per tick, forever.
-            try: os.killpg(os.getpgid(p.pid),9)
-            except Exception:
-                try: p.kill()
-                except Exception: pass
-            p.communicate(timeout=10)
-            blank["reason"]="helper-timeout"; return blank
-        if p.returncode!=0: return blank
-        d=json.loads(out)
-        if not isinstance(d,dict): return blank
-        # COERCE, never copy verbatim. The ledger is append-only and a bad row can never be
-        # removed, so a helper that returned a string (or a float, or a dict) for a COUNT column
-        # would permanently corrupt the SSOT and break every arithmetic reader downstream. Anything
-        # that is not a non-negative integer becomes None — the honest "unmeasurable" value.
-        def _count(v):
-            if isinstance(v,bool) or not isinstance(v,int) or v<0: return None
-            return v
-        row=dict((c,_count(d.get(c))) for c in CI_COLUMNS)
-        q=d.get("quality_source")
-        row["quality_source"]=q if q in ("derived","replayed","partial","unavailable") else "unavailable"
-        row["reason"]=str(d.get("reason") or "")
-        return row
-    except Exception as exc:
-        blank["reason"]="helper-error-"+type(exc).__name__
-        return blank
-
-def lp02_replay(sl):
-    """The worktree is deleted BEFORE the MERGED row is written, so a later closing row can never
-    re-measure. Replay the slice's most recent measured row FROM THE LEDGER — the durable SSOT, not
-    a /tmp sidecar (which slice-name reuse across park->relaunch would silently make wrong)."""
-    try:
-        rows=open(LEDGER).readlines()[-400:]
-    except Exception:
-        return None
-    for l in reversed(rows):
-        try: d=json.loads(l)
-        except Exception: continue
-        if d.get("slice")!=sl: continue
-        if d.get("quality_source") not in ("derived","replayed"): continue
-        if all(c in d for c in CI_COLUMNS):
-            return dict((c,d.get(c)) for c in CI_COLUMNS)
-    return None
-
-lp02_cols={}
 closing=lp02_is_closing(slice_,outcome)
 raw_ci=a.get("ci")
 if raw_ci is None:
@@ -544,25 +456,12 @@ else:
     ci_value,ci_note=lp02_normalize_ci(raw_ci)
 if ci_note:
     notes=(notes+" | " if notes else "")+"CI-RAW: "+ci_note
-if closing:
-    q=lp02_derive(slice_)
-    if q.get("quality_source")=="unavailable":
-        # Only an UNAVAILABLE row is worth replaying: `partial` already carries measured
-        # ears/skills and an honest verdict about the dirty tree.
-        rep=lp02_replay(slice_)
-        if rep is not None:
-            q=dict(rep); q["quality_source"]="replayed"; q["reason"]=""
-    reason=q.pop("reason","")
-    lp02_cols=q
-    if lp02_cols.get("quality_source")!="derived" and reason:
-        notes=(notes+" | " if notes else "")+"QUALITY(%s): %s"%(lp02_cols["quality_source"],reason)
 # ============================================ end lp-02 ========================================
 row={"ts":ts,"run_id":a.get("run_id","n/a"),"slice":slice_,"outcome":outcome,"cost_usd":cost,
      "model":model or "n/a","attempts":int(a.get("attempts") or 0),
      "orchestration_audit":a.get("orch",""),"gating_test_audit":a.get("gating",""),
      "remote_red_fix_cycles":int(a.get("cycles") or 0),"consecutive_standdowns":int(a.get("standdowns") or 0),
      "master_ci_after":ci_value,"notes":notes}
-row.update(lp02_cols)
 line=json.dumps(row)
 json.loads(line)  # verify parse
 if not row["ts"]: die("empty ts")

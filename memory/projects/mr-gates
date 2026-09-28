@@ -14,8 +14,13 @@ __doc__ = """mr-gates — the per-slice ACCEPTANCE LEDGER and the residual sink 
     mr-gates verify    --slice S [--json] [--budget N]  # SUPERVISOR-side independent re-run
     mr-gates render    --slice S --format pr|park|handoff
     mr-gates reseed    --slice S --reason TEXT        # supervisor-only; clears SEED-DRIFT
-    mr-gates residuals list [--unclaimed] [--json] | add | promote --id R --spec-file F
-                            | close --slice S [--pr N] | disposition --id R --as wontfix --reason T
+    mr-gates residuals list [--unclaimed] [--json]      # oldest first; age is a label only
+                            | add --slice S --gate G --title T --target X --reason R
+                                  [--category C --severity V]
+                            | promote --id R [--category C --severity V] [--spec-file F]
+                            | close --slice S [--pr N]   # also deletes its residuals.spec.md section
+                            | disposition --id R --as wontfix --reason T
+                            | sweep --dry-run|--apply    # MED/LOW, >30d, cited paths gone -> obsolete
                             | policy [--json]
     mr-gates --selftest
 
@@ -32,10 +37,17 @@ Two outputs, one mechanism:
      and captured EVIDENCE, seeded FROM THE SPEC (not authored by the graded party) and re-executed
      independently by the supervisor before merge.
   2. DRAIN — the only legal way to close a gate you did not meet is a `DEFER:` line with a
-     RESOLVABLE target, which emits a residual row that is promoted into a real spec section, aged
-     into the launch queue, and closed only when its criterion passes a gate in a later slice.
+     RESOLVABLE target, which emits a residual row that is promoted into a real spec section
+     (specs/monster-realm-v2/residuals.spec.md, open items only) and closed only when its
+     criterion passes a gate in a later slice.
 
-TWO ROOTS (mr-slice-quality's rule): the GATE is self-locating, the SUBJECT is a machine singleton.
+ADMISSION RULES (standards/testing-tdd.md): a DEFER that becomes a tracked residual carries
+`[category/SEVERITY]` (`DEFER: E2 -> backlog [gameplay/MED] — why`); a DEFER whose subject is the
+checking apparatus is recordable only as `wontfix`; a slice promoted from a residual may DEFER only
+to `wontfix` or an existing roadmap slice (follow-ups may not spawn follow-ups). Age never
+outranks roadmap work; stale MED/LOW rows whose cited files are gone are retired by `sweep`.
+
+TWO ROOTS (the retired slice-quality tool's rule): the GATE is self-locating, the SUBJECT is a machine singleton.
 `MEM` here is HARDCODED, copying mr-record:33-37 — a self-locating MEM would let a copy running in
 a worktree fork the append-only residual SSOT. Pure functions take explicit paths so `--selftest`
 can drive them over temp dirs; there is deliberately NO env override on any gate input
@@ -61,21 +73,18 @@ SPECS = HARNESS + "/specs/monster-realm-v2"
 GATES_DIR = MEM + "/gates"
 RESIDUALS = MEM + "/mr-residuals.jsonl"
 GUARD = HARNESS + "/.claude/hooks/guard-bash.mjs"
-BACKLOG_SPEC = "M-residual-backlog.spec.md"
+BACKLOG_SPEC = "residuals.spec.md"
 
 # ---------------------------------------------------------------------------------------------
 # Drain policy. ONE definition (lp-11b's lesson: two literals in two files IS the defect).
 # mr-selfcheck reads these via `mr-gates residuals policy --json` rather than re-declaring them.
 # ---------------------------------------------------------------------------------------------
 POLICY = {
-    # An unpromoted residual older than this is a stalled promote step. Baseline latency was
-    # 13.1 days; 3 days targets ~4x. Also the age at which a promoted residual becomes
-    # queue-add eligible, which is what guarantees pickup.
-    "t1_promote_days": 3,
-    # Any open residual older than this is a rot alarm.
-    "t2_stale_days": 14,
-    # emitted>0 and closed==0 across this window ⇒ the sink is a graveyard (ADR-0010 falsification).
+    # emitted>0 and closed==0 across this window ⇒ the sink is a graveyard.
     "graveyard_window_days": 28,
+    # `residuals sweep`: a MED/LOW row open longer than this whose cited paths are all gone is
+    # dispositioned `obsolete` (append-only).
+    "sweep_age_days": 30,
     # Observe-only in slice 1; the launch-blocking cordon is slice 2 (R13: measure first).
     "open_cap": 12,
     # >this share of a slice's seeded E* gates DEFERred ⇒ FLAGGED regardless of the rest.
@@ -90,6 +99,37 @@ POLICY = {
 
 SEVERITY_OPERATOR_ONLY = ("HIGH", "CRITICAL")
 LEGAL_DISPOSITIONS = ("wontfix",)
+# A DEFER that becomes a tracked residual must name one of these (the protected categories of
+# standards/testing-tdd.md "What earns a check", plus content and loop operations).
+CATEGORIES = ("gameplay", "security-privacy", "data-integrity", "netcode-determinism",
+              "ux-a11y", "content", "loop-ops")
+SEVERITIES = ("LOW", "MED", "HIGH", "CRITICAL")
+SWEEPABLE_SEVERITIES = ("LOW", "MED")
+PROJ = HARNESS + "/projects/monster-realm"
+LEGACY_BACKLOG_SPEC = "M-residual-backlog.spec.md"   # read-only here: id allocation only
+APPARATUS_MSG = ("findings about the checking apparatus aren't tracked -- record it as `wontfix` "
+                 "(standards/testing-tdd.md)")
+# Subject is the checking apparatus itself: an eval script, a scanner, a gate script, a
+# test-of-a-test. Such a DEFER is recordable only as wontfix.
+APPARATUS = re.compile(
+    r"(?:^|[\s`(/])evals?/|\.eval\.(?:mjs|js|ts)\b|\bscanners?\b|\bgate[- ]scripts?\b"
+    r"|\bmr-gates\b|\bself-?tests?\b|\btests?[- ]of[- ](?:the[- ])?tests?\b|\bmeta-?tests?\b"
+    r"|\bsource[- ]scan|\bbite[- ]proof", re.I)
+
+
+def is_apparatus(text):
+    return bool(APPARATUS.search(text or ""))
+
+
+class Defer(tuple):
+    """(target, reason) -- still a 2-tuple for every existing unpack -- plus the DEFER line's
+    optional `[category/SEVERITY]` tag as attributes."""
+
+    def __new__(cls, target, reason, category=None, severity=None):
+        t = tuple.__new__(cls, (target, reason))
+        t.category = (category or "").lower() or None
+        t.severity = (severity or "").upper() or None
+        return t
 
 # ---------------------------------------------------------------------------------------------
 # Criterion extraction — TWO SHAPES, both live in the corpus right now.
@@ -114,7 +154,7 @@ def _norm(s):
 
 
 def head_re(slice_id):
-    # Anchored (mr-slice-quality:490): an unanchored search for `lp-02` matches `lp-02b` first.
+    # Anchored (the retired slice-quality tool:490): an unanchored search for `lp-02` matches `lp-02b` first.
     return re.compile(r"^### %s(?![\w.-])" % re.escape(slice_id), re.M)
 
 
@@ -188,7 +228,7 @@ def extract_touches(sec):
 
 def extract_criteria(sec):
     """-> [{'id','title','shape'}] . One gate per SHALL-bearing SENTENCE (not per SHALL
-    occurrence: mr-slice-quality:481 counts occurrences and the corpus has sentences with three).
+    occurrence: the retired slice-quality tool:481 counts occurrences and the corpus has sentences with three).
     EARS paragraph first, then SHALL-bearing bullets OUTSIDE it — a union, not a fallback, so a
     section carrying both shapes loses nothing."""
     out, seen = [], set()
@@ -242,7 +282,8 @@ def shall_uncaptured(sec, criteria):
 # ---------------------------------------------------------------------------------------------
 GATE_LINE = re.compile(r"^- \[( |x|X)\] (\S+):\s*(.*)$")
 ATTR_LINE = re.compile(r"^\s+(CHECK|EXPECT|EVIDENCE|MANUAL):\s?(.*)$")
-DEFER_LINE = re.compile(r"^(?:DEFER|ABANDON):\s+(\S+?)\s*(?:->|→)\s*(\S+)\s+(?:—|--)\s+(.+)$")
+DEFER_LINE = re.compile(r"^(?:DEFER|ABANDON):\s+(\S+?)\s*(?:->|→)\s*(\S+)"
+                        r"(?:\s+\[([A-Za-z-]*)(?:/([A-Za-z]*))?\])?\s+(?:—|--)\s+(.+)$")
 # ABANDON with no target is unlazy's shape; accepted and normalised to wontfix, reason still required.
 ABANDON_BARE = re.compile(r"^ABANDON:\s+(\S+?)\s+(?:—|--)?\s*(.+)$")
 HDR = re.compile(r"^([A-Za-z][A-Za-z ]*):\s*(.*)$")
@@ -290,11 +331,12 @@ def parse_gates(text):
         if line.startswith("DEFER:") or line.startswith("ABANDON:"):
             m = DEFER_LINE.match(line)
             if m:
-                defers[m.group(1)] = (m.group(2), m.group(3).strip())
+                defers[m.group(1)] = Defer(m.group(2), m.group(5).strip(), m.group(3),
+                                           m.group(4))
             else:
                 m2 = ABANDON_BARE.match(line)
                 if m2:
-                    defers[m2.group(1)] = ("wontfix", m2.group(2).strip())
+                    defers[m2.group(1)] = Defer("wontfix", m2.group(2).strip())
                 else:
                     errs.append("line %d: unparseable DEFER (want "
                                 "`DEFER: <gate> -> <target> — <reason>`): %s" % (i + 1, line[:80]))
@@ -429,9 +471,93 @@ def is_runner(cmd):
     return base in RUNNER_HEADS or base.startswith("mr-")
 
 
-def lint_gates(gates, defers, specs_dir=None):
+SCRIPT_EXT = re.compile(r"\.(?:mjs|cjs|js|ts|py|sh)$")
+SHELL_SPLIT = re.compile(r"[\s;&|()<>'\"=]+")
+# `$VAR/…` / `${VAR}/…` prefixes that resolve INSIDE the target repo. Anything else ($MEM, $HOME,
+# $HARNESS, an unknown variable) is treated as outside it.
+PROJ_VARS = ("PROJ",)
+
+
+def adhoc_script_paths(cmd):
+    """Script paths a CHECK would execute from OUTSIDE the target repo's tree. The sanctioned
+    `mr-*` tools in MEM stay allowed; everything else outside PROJ is an ad-hoc probe (the
+    `$MEM/<slice>.gates.mjs` pattern), which no reviewer of the repo can see or re-run."""
+    toks = [t for t in SHELL_SPLIT.split(cmd or "") if t]
+    head = command_head(cmd)
+    bad = []
+    for t in toks:
+        if not (SCRIPT_EXT.search(t) or t == head):
+            continue
+        if "/" not in t and not t.startswith("~"):
+            continue  # a bare runner name (`cargo`, `node`) or a same-dir file name
+        base = os.path.basename(t)
+        v = re.match(r"^\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/", t)
+        if v:
+            if v.group(1) in PROJ_VARS and ".." not in t.split("/"):
+                continue
+            if v.group(1) == "MEM" and base.startswith("mr-") and t.count("/") == 1:
+                continue
+            bad.append(t)
+        elif t.startswith("~"):
+            bad.append(t)
+        elif ".." in t.split("/"):
+            bad.append(t)
+        elif os.path.isabs(t):
+            norm = os.path.normpath(t)
+            if norm == PROJ or norm.startswith(PROJ + "/"):
+                continue
+            if os.path.dirname(norm) == MEM and base.startswith("mr-"):
+                continue
+            bad.append(t)
+    return bad
+
+
+def followup_slices(rows):
+    """Slice ids that were themselves materialised from a residual (promoted). `promoted_slice`
+    alone is NOT the signal: status:targeted rows reuse it for a named roadmap target."""
+    out = set()
+    for r in fold_residuals(rows).values():
+        if r.get("promoted_at") and r.get("promoted_slice"):
+            out.add(r["promoted_slice"])
+    return out
+
+
+def is_followup_slice(slice_id, rows):
+    return bool(slice_id) and (slice_id.startswith("rb-") or slice_id in followup_slices(rows))
+
+
+def defer_policy_findings(slice_id, gid, target, reason, title, category, severity, rows):
+    """The DEFER -> residual admission rules. -> [message] (each one a BLOCK)."""
+    out = []
+    if target in LEGAL_DISPOSITIONS:
+        return out
+    if is_apparatus("%s %s" % (title or "", reason or "")):
+        out.append("DEFER subject is the checking apparatus: " + APPARATUS_MSG)
+    if category not in CATEGORIES or severity not in SEVERITIES:
+        out.append("DEFER to %r needs a `[category/SEVERITY]` tag after the target, category in "
+                   "{%s}, severity in {%s} -- e.g. `DEFER: %s -> backlog [gameplay/MED] — why`"
+                   % (target, ", ".join(CATEGORIES), "|".join(SEVERITIES), gid))
+    if is_followup_slice(slice_id, rows):
+        if target == "backlog":
+            out.append("follow-ups may not spawn follow-ups: %s was promoted from a residual, so "
+                       "it may DEFER only to `wontfix` or an existing roadmap slice" % slice_id)
+        elif is_followup_slice(target, rows):
+            out.append("follow-ups may not spawn follow-ups: %s may not DEFER into another "
+                       "residual slice (%s)" % (slice_id, target))
+    return out
+
+
+def lint_gates(gates, defers, specs_dir=None, slice_id=None, residuals_path=None):
     """-> [ (severity, gate_id, message) ]"""
     out = []
+    # The follow-up rule needs the registry; without a slice id there is nothing to look up.
+    rows = residual_rows(residuals_path) if slice_id else []
+    for gid, d in defers.items():
+        gtitle = next((g.title for g in gates if g.id == gid), "")
+        for msg in defer_policy_findings(slice_id, gid, d[0], d[1], gtitle,
+                                         getattr(d, "category", None),
+                                         getattr(d, "severity", None), rows):
+            out.append(("BLOCK", gid, msg))
     for g in gates:
         # SEEDED = anything init wrote, i.e. anything that is not a run-authored X* gate. Matching
         # on an id PREFIX was the defect: seeded ids are frequently the spec's own (`ptc5a-1`).
@@ -443,6 +569,12 @@ def lint_gates(gates, defers, specs_dir=None):
                             "seeded gate CHECK must invoke a gate runner (%s) or be MANUAL: with a "
                             "citation; got head %r" % ("|".join(sorted(RUNNER_HEADS)) + "|mr-*",
                                                        command_head(c))))
+            adhoc = adhoc_script_paths(c) if seeded else []
+            if adhoc:
+                out.append(("BLOCK", g.id,
+                            "seeded CHECK executes a script outside the target repo's tree (%s): "
+                            "port the invariant to an ordinary test in the repo "
+                            "(standards/testing-tdd.md)" % ", ".join(adhoc[:3])))
             if re.search(r"\|\|", c) or re.search(r";\s*true\s*$", c):
                 out.append(("BLOCK", g.id, "CHECK cannot fail: trailing `||` / `; true`"))
             if not g.expect:
@@ -552,7 +684,7 @@ def resolve_citation(evidence, root):
 # Command execution (guard-routed)
 # ---------------------------------------------------------------------------------------------
 def guard_allows(cmd, guard=None):
-    """Route a CHECK string through guard-bash.mjs before executing it. ADR-0012 commitment 3:
+    """Route a CHECK string through guard-bash.mjs before executing it. Guard commitment:
     a python subprocess never reaches PreToolUse, so verify would otherwise execute run-authored
     shell unguarded inside the supervisor tick. FAILS CLOSED — if the guard cannot be consulted,
     the command is not run."""
@@ -716,22 +848,10 @@ def residual_alarms(rows, now=None):
     alarms = []
     folded = fold_residuals(rows)
     opens = open_residuals(rows, now)
-
-    def _agg(name, picks, why):
-        if not picks:
-            return
-        picks = sorted(picks, key=lambda r: -(r.get("age_days") or 0))
-        named = ", ".join("%s(%.0fd)" % (r["id"], r.get("age_days") or 0) for r in picks[:3])
-        more = "" if len(picks) <= 3 else " +%d more" % (len(picks) - 3)
-        alarms.append((name, "%d residual(s) %s — oldest: %s%s" % (len(picks), why, named, more)))
-
-    _agg("residual-unpromoted",
-         [r for r in opens if r.get("status") == "unpromoted"
-          and (r.get("age_days") or 0) > POLICY["t1_promote_days"]],
-         "unpromoted past t1=%dd (the promote step stalled)" % POLICY["t1_promote_days"])
-    _agg("residual-stale",
-         [r for r in opens if (r.get("age_days") or 0) > POLICY["t2_stale_days"]],
-         "open past t2=%dd" % POLICY["t2_stale_days"])
+    # AGING IS DEMOTED: there is deliberately no "unpromoted past t1" / "stale past t2" alarm any
+    # more. Age is a LABEL on `residuals list`, never pressure: an age alarm outranking roadmap
+    # work is what turned every DEFER into a self-referential follow-up slice. Stale MED/LOW rows
+    # are retired by `residuals sweep`, not escalated.
     # The window is a MATURITY test, not a filter: "nothing has closed yet" is only evidence of
     # a graveyard once something has had time to close. The first version fired on day 0 (one fresh
     # row, nothing closed) and went SILENT on day 40 (the oldest row aged out of the window) —
@@ -778,8 +898,11 @@ def build_gates_text(slice_id, spec_file, criteria, scope, repo, uncaptured, see
     L.append("     real gate runner (cargo/just/npm/npx/pnpm/node/vitest/pytest or an mr-* tool),")
     L.append("     or be declared MANUAL: with a resolvable `path:line` citation as EVIDENCE.")
     L.append("     Not met? The ONLY legal exit is a DEFER line with a resolvable target:")
-    L.append("       DEFER: <gate> -> <existing slice id | backlog | wontfix> — <reason>")
-    L.append("     `backlog` is materialised into a real spec section by the supervisor. -->")
+    L.append("       DEFER: <gate> -> <existing slice id | backlog> [<category>/<SEVERITY>] — <reason>")
+    L.append("       DEFER: <gate> -> wontfix — <reason>")
+    L.append("     category: %s; SEVERITY: %s." % ("|".join(CATEGORIES), "|".join(SEVERITIES)))
+    L.append("     Findings about the checking apparatus are wontfix only; a slice promoted from a")
+    L.append("     residual may not DEFER to `backlog`. -->")
     for c in criteria:
         L.append("")
         L.append("- [ ] %s: %s" % (c["id"], c["title"]))
@@ -958,9 +1081,20 @@ def cmd_check(a):
         atomic_write(path, "\n".join(lines))
     _h, gates2, defers2, _e = parse_gates(read_gates_file(path))
     met, unmet, deferred = classify(gates2, defers2)
-    print("%s: %d/%d met, %d deferred, %d unmet" %
-          (a["slice"], len(met), len(gates2), len(deferred), len(unmet)))
-    return 0 if not unmet else 1
+    # A DEFER the admission rules refuse is not a legal exit: report it and fail the run.
+    rows = residual_rows(a.get("_residuals"))
+    refused = 0
+    for gid, d in sorted(defers2.items()):
+        gtitle = next((g.title for g in gates2 if g.id == gid), "")
+        for msg in defer_policy_findings(a["slice"], gid, d[0], d[1], gtitle,
+                                         getattr(d, "category", None),
+                                         getattr(d, "severity", None), rows):
+            print("  DEFER-REFUSED %s: %s" % (gid, msg))
+            refused += 1
+    print("%s: %d/%d met, %d deferred, %d unmet%s" %
+          (a["slice"], len(met), len(gates2), len(deferred), len(unmet),
+           ", %d DEFER(s) refused" % refused if refused else ""))
+    return 0 if not unmet and not refused else 1
 
 
 def acceptance_line(slice_id, header, gates, defers):
@@ -1018,7 +1152,8 @@ def cmd_lint(a):
     if parsed is None:
         return die("no gates file for %s" % a["slice"])
     _h, gates, defers, errs = parsed
-    findings = lint_gates(gates, defers) + [("BLOCK", "-", e) for e in errs]
+    findings = lint_gates(gates, defers, a.get("_specs"), a["slice"], a.get("_residuals")) \
+        + [("BLOCK", "-", e) for e in errs]
     if a.get("json"):
         print(json.dumps([{"severity": s, "gate": g, "message": m} for s, g, m in findings],
                          indent=1))
@@ -1155,7 +1290,8 @@ def cmd_verify(a):
     out["manual"] = manual
 
     # 5. Lint.
-    findings = lint_gates(gates, defers) + [("BLOCK", "-", e) for e in errs]
+    findings = lint_gates(gates, defers, a.get("_specs"), slice_id, a.get("_residuals")) \
+        + [("BLOCK", "-", e) for e in errs]
     out["lint"] = [{"severity": s, "gate": g, "message": m} for s, g, m in findings]
 
     # 6. Adversarial spot-check of ONE passing gate.
@@ -1171,14 +1307,25 @@ def cmd_verify(a):
                             "read_this": "re-read this gate adversarially and try to refute it"}
 
     # 7. Residual emission for every DEFER (idempotent).
-    emitted = []
-    for gid, (target, reason) in sorted(defers.items()):
+    # A DEFER refused by the admission rules (lint BLOCK above) emits NOTHING: an untagged,
+    # apparatus-subject or recursive DEFER never becomes a tracked residual.
+    emitted, refused = [], []
+    rows = residual_rows(a.get("_residuals"))
+    for gid, d in sorted(defers.items()):
+        target, reason = d
         gtitle = next((g.title for g in gates if g.id == gid), gid)
+        if defer_policy_findings(slice_id, gid, target, reason, gtitle,
+                                 getattr(d, "category", None), getattr(d, "severity", None),
+                                 rows):
+            refused.append(gid)
+            continue
         rid = residual_upsert(slice_id, gid, gtitle, target, reason, header,
-                              a.get("_residuals"))
+                              a.get("_residuals"), category=getattr(d, "category", None),
+                              severity=getattr(d, "severity", None))
         if rid:
             emitted.append(rid)
     out["residuals_emitted"] = emitted
+    out["residuals_refused"] = refused
     rows = residual_rows(a.get("_residuals"))
     out["residuals_open"] = len(open_residuals(rows))
     out["residual_alarms"] = ["%s: %s" % (k, v) for k, v in residual_alarms(rows)]
@@ -1239,7 +1386,8 @@ def _emit_verify(out, a):
 # ---------------------------------------------------------------------------------------------
 # residuals — the SINK plus its DRAIN
 # ---------------------------------------------------------------------------------------------
-def residual_upsert(source_slice, gate_id, title, target, reason, header, path=None):
+def residual_upsert(source_slice, gate_id, title, target, reason, header, path=None,
+                    category=None, severity=None):
     rid = residual_id(source_slice, gate_id)
     folded = fold_residuals(residual_rows(path))
     if rid in folded:
@@ -1250,7 +1398,9 @@ def residual_upsert(source_slice, gate_id, title, target, reason, header, path=N
         "slice_id": None,                 # allocated at promote
         "title": title[:400], "owner": "supervisor",
         "touches": [t.strip() for t in touches.split(",") if t.strip()],
-        "severity": "MED", "domain": header.get("Repo", "project") if header else "project",
+        "category": category or None,
+        "severity": (severity or "MED").upper(),
+        "domain": header.get("Repo", "project") if header else "project",
         "disclosed_at": utc_now(), "adr": None,
         "status": "unpromoted" if target == "backlog" else
                   ("dispositioned" if target in LEGAL_DISPOSITIONS else "targeted"),
@@ -1264,24 +1414,137 @@ def residual_upsert(source_slice, gate_id, title, target, reason, header, path=N
     return rid
 
 
-def next_backlog_id(spec_text):
+RB_ID = re.compile(r"^rb-(\d+)$")
+
+
+def next_backlog_id(spec_text, rows=None):
+    """Next free rb-N. Closed sections are DELETED from the backlog file, so the file alone would
+    reissue ids; the caller passes every text that has ever held rb-N headings (the current file
+    and the read-only legacy one) and the registry rows, and the max across all of them wins."""
     n = 0
     for m in re.finditer(r"^### rb-(\d+)\b", spec_text, re.M):
         n = max(n, int(m.group(1)))
+    for r in rows or []:
+        for k in ("promoted_slice", "slice_id"):
+            m = RB_ID.match(str(r.get(k) or ""))
+            if m:
+                n = max(n, int(m.group(1)))
     return "rb-%d" % (n + 1)
 
 
-BACKLOG_HEADER = """# M-residual-backlog — the standing drain for deferred acceptance criteria
+PROMOTE_MARKER = "<!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->"
+BACKLOG_HEADER = """# Residuals — open follow-ups only
 
-Generated. Each section below is one criterion a slice DEFERred, promoted here by
-`mr-gates residuals promote` so it becomes a real, launchable work item instead of a prose bullet
-nothing consumes (postmortem RF-3; mean disclosure->remediation latency was 13.1 days).
+Open residuals only — a closed item's section is deleted; git history is the record;
+categories/severity per standards/testing-tdd.md protected categories.
 
-The criterion text is verbatim from the spec section it was deferred from — promotion is a
-mechanical copy, not spec authoring.
+Each section is written by `mr-gates residuals promote` from a DEFER that carried a
+`[category/SEVERITY]` tag, and removed by `mr-gates residuals close` (or `residuals sweep
+--apply`). Findings about the checking apparatus are never tracked here, and a slice promoted
+from a residual may not spawn another one.
 
-## 2. Slices
-"""
+""" + PROMOTE_MARKER + "\n"
+
+SECTION_END = re.compile(r"^#{1,3} ", re.M)
+
+
+def delete_section(full, slice_id):
+    """Remove the `### <slice_id>` section (up to the next heading of level 1-3) from `full`.
+    -> True if a section was removed. Open-items-only file: git history is the record."""
+    text = read_gates_file(full)
+    if text is None:
+        return False
+    m = head_re(slice_id).search(text)
+    if not m:
+        return False
+    e = SECTION_END.search(text, m.end())
+    stop = e.start() if e else len(text)
+    body = text[:m.start()].rstrip("\n") + "\n" + ("\n" + text[stop:] if e else "")
+    atomic_write(full, body)
+    return True
+
+
+PATHLIKE = re.compile(r"[\w.~*{}-]*(?:/[\w.*{}-]+)+/?|[\w.-]+\.(?:rs|ts|tsx|mjs|cjs|js|md|toml|"
+                      r"json|jsonl|ron|ya?ml|py|sh|css|html)\b")
+FILE_EXT = re.compile(r"\.(?:rs|ts|tsx|mjs|cjs|js|md|toml|json|jsonl|ron|ya?ml|py|sh|css|html|"
+                      r"lock|sql|txt|wasm)$")
+
+
+def cited_paths(row, roots=()):
+    """Repo paths a residual cites: its touches: list, plus path-like tokens in title/reason, with
+    backticks, `:line` and `#frag` suffixes stripped. A prose token counts only when it has a
+    slash AND a file extension, so `and/or`, `PRV1-17/PRV1-20` or `game-core/client-wasm-exposed`
+    never reads as a vanished file."""
+    out = []
+
+    def _clean(t):
+        t = t.strip().strip("`'\"()[],;")
+        t = re.sub(r"#.*$", "", t)
+        t = re.sub(r":\d+(?:-\d+)?$", "", t)
+        return t.rstrip(".,;")
+
+    for t in row.get("touches") or []:
+        t = _clean(t)
+        if t and not re.search(r"\s", t) and not t.startswith(("$", "~")) and t not in out:
+            out.append(t)
+    for t in PATHLIKE.findall("%s %s" % (row.get("title") or "", row.get("reason") or "")):
+        t = _clean(t)
+        if not t or "://" in t or t.startswith(("~", "$")) or "/" not in t or t in out:
+            continue  # a bare file name (`main.ts`) is unresolvable, so it never counts
+        if FILE_EXT.search(t.rstrip("/").split("/")[-1]):
+            out.append(t)
+    return out
+
+
+def tracked_files(root):
+    """`git ls-files` of a root (empty when it is not a repo). Lets a prose citation that is
+    relative to a subdirectory (`ui/a11yCopy.ts` for client/src/ui/a11yCopy.ts) still count as
+    present -- the sweep must never obsolete a row whose file merely moved up a level in prose."""
+    try:
+        r = subprocess.run(["git", "-C", root, "ls-files"], capture_output=True, text=True,
+                           timeout=60)
+        return r.stdout.splitlines() if r.returncode == 0 else []
+    except Exception:
+        return []
+
+
+def path_exists_under(p, roots, tracked=None):
+    import glob as _glob
+    for root in roots:
+        full = p if os.path.isabs(p) else os.path.join(root, p)
+        if any(ch in full for ch in "*?["):
+            if _glob.glob(full, recursive=True):
+                return True
+        elif os.path.exists(full.rstrip("/") or "/"):
+            return True
+    if tracked and not os.path.isabs(p):
+        q = p.strip("/")
+        suf, pre = "/" + q, q + "/"
+        for f in tracked:
+            if f == q or f.endswith(suf) or f.startswith(pre) or ("/" + pre) in "/" + f:
+                return True
+    return False
+
+
+def sweep_candidates(rows, roots, now=None):
+    """-> [(row, missing_paths)]: open MED/LOW rows older than sweep_age_days that cite at least
+    one path and whose cited paths ALL no longer exist under any of `roots`. Conservative: a path
+    present in any root, or a row citing nothing, is never swept."""
+    out, tracked = [], None
+    for r in open_residuals(rows, now):
+        if (r.get("severity") or "MED").upper() not in SWEEPABLE_SEVERITIES:
+            continue
+        if (r.get("age_days") or 0) <= POLICY["sweep_age_days"]:
+            continue
+        paths = cited_paths(r, roots)
+        if not paths:
+            continue
+        if tracked is None:
+            tracked = [f for root in roots for f in tracked_files(root)]
+        if any(path_exists_under(p, roots, tracked) for p in paths):
+            continue
+        out.append((r, paths))
+    return out
 
 
 def cmd_residuals(a, sub):
@@ -1301,14 +1564,17 @@ def cmd_residuals(a, sub):
             # R-rb-10-X7/X6 sat 28.7d, past both t1 and t2, invisible here the whole time) while
             # `promote --id` ALSO refused them as "ALREADY-PROMOTED" on the same wrong signal.
             opens = [r for r in opens if r.get("status") != "promoted"]
+        # Oldest disclosure first. Age is a LABEL only -- nothing here outranks roadmap work.
+        opens = sorted(opens, key=lambda r: (r.get("disclosed_at") or "", r.get("id") or ""))
         if a.get("json"):
             print(json.dumps({"open": opens,
                               "alarms": ["%s: %s" % (k, v) for k, v in residual_alarms(rows)]},
                              indent=1))
         else:
             for r in opens:
-                print("  %-28s %-11s age=%5.1fd  %s -> %s" %
+                print("  %-28s %-11s age=%5.1fd  %-19s %-4s %s -> %s" %
                       (r["id"], r.get("status"), r.get("age_days") or -1,
+                       r.get("category") or "(uncategorised)", r.get("severity") or "?",
                        (r.get("title") or "")[:60], r.get("target")))
             for k, v in residual_alarms(rows):
                 print("  ALARM %s: %s" % (k, v))
@@ -1336,11 +1602,25 @@ def cmd_residuals(a, sub):
         if r.get("status") == "promoted":
             print("ALREADY-PROMOTED %s -> %s" % (rid, r["promoted_slice"]))
             return 0
+        if is_apparatus("%s %s" % (r.get("title") or "", r.get("reason") or "")):
+            return die("%s: %s -- use `residuals disposition --id %s --as wontfix`"
+                       % (rid, APPARATUS_MSG, rid))
+        if is_followup_slice(r.get("source_slice"), rows):
+            return die("%s came from %s, itself promoted from a residual: follow-ups may not "
+                       "spawn follow-ups (disposition it wontfix, or fold it into an existing "
+                       "roadmap slice)" % (rid, r.get("source_slice")))
+        cat = (a.get("category") or r.get("category") or "").lower()
+        sev = (a.get("severity") or (r.get("severity") if r.get("category") else "") or "").upper()
+        if cat not in CATEGORIES or sev not in SEVERITIES:
+            return die("%s carries no valid category/severity; pass --category {%s} and "
+                       "--severity {%s} to promote it" % (rid, "|".join(CATEGORIES),
+                                                          "|".join(SEVERITIES)))
         full = os.path.join(specs, spec_name)
         text = read_gates_file(full)
         if text is None:
             text = BACKLOG_HEADER
-        new_id = next_backlog_id(text)
+        legacy = read_gates_file(os.path.join(specs, LEGACY_BACKLOG_SPEC)) or ""
+        new_id = next_backlog_id(text + "\n" + legacy, rows)
         touches = ", ".join(r.get("touches") or []) or "(inherit from source slice — REVIEW)"
         sect = [
             "",
@@ -1349,14 +1629,16 @@ def cmd_residuals(a, sub):
                 (r.get("disclosed_at") or "")[:10]),
             "`touches: %s`" % touches,
             "`after:` — · source: %s · residual: %s" % (r.get("source_slice"), rid),
+            "`category: %s · severity: %s`" % (cat, sev),
             "",
             "Deferred with reason: %s" % r.get("reason"),
             "",
             "EARS: %s" % r.get("title"),
-            "Tests: proof-of-teeth — an ordinary Rust/TS test for this criterion must RED before "
-            "the fix and pass after (ADR-0224; supersedes ADR-0010 — no new evals/*.eval.mjs).",
+            "Tests: an ordinary test for this criterion must fail before the fix and pass after; "
+            "scanner-script gates are retired; port the invariant to an ordinary test "
+            "(standards/testing-tdd.md).",
         ]
-        MARKER = "<!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->"
+        MARKER = PROMOTE_MARKER
         block = "\n".join(sect) + "\n"
         if MARKER in text:
             head, _sep, tail = text.partition(MARKER)
@@ -1365,7 +1647,7 @@ def cmd_residuals(a, sub):
             body = text.rstrip("\n") + "\n" + block
         atomic_write(full, body)
         residual_append(dict(r, status="promoted", slice_id=new_id, promoted_slice=new_id,
-                             promoted_at=utc_now()), path)
+                             promoted_at=utc_now(), category=cat, severity=sev), path)
         print("PROMOTED %s -> %s in %s (queue it with: mr-record queue-add --slice %s "
               "--spec-file specs/monster-realm-v2/%s --reason 'promoted residual %s')"
               % (rid, new_id, spec_name, new_id, spec_name, rid))
@@ -1404,7 +1686,13 @@ def cmd_residuals(a, sub):
                                      closed_forced_reason=a.get("reason") if forced else None),
                                 path)
                 n += 1
-        print("RESIDUALS-CLOSED %d for slice %s%s" % (n, sl, " (FORCED)" if forced else ""))
+        # Open-items-only backlog: the closed item's section goes; git history is the record.
+        # Only the CURRENT backlog file is edited -- the legacy one is read-only here.
+        removed = delete_section(os.path.join(a.get("_specs") or SPECS, BACKLOG_SPEC), sl) \
+            if n else False
+        print("RESIDUALS-CLOSED %d for slice %s%s%s" % (
+            n, sl, " (FORCED)" if forced else "",
+            " section-deleted:%s" % BACKLOG_SPEC if removed else ""))
         return 0
     if sub == "disposition":
         rid, how = a.get("id"), a.get("as")
@@ -1438,9 +1726,37 @@ def cmd_residuals(a, sub):
                            "and refused by `residuals promote` (both key off status==promoted). Use "
                            "`backlog` and put the recommendation in --reason instead."
                            % (target, "/".join(LEGAL_DISPOSITIONS)))
+        cat = (a.get("category") or "").lower() or None
+        sev = (a.get("severity") or "").upper() or None
+        refused = defer_policy_findings(a["slice"], a["gate"], target, a["reason"], a["title"],
+                                        cat, sev, rows)
+        if refused:
+            return die("; ".join(refused))
         rid = residual_upsert(a["slice"], a["gate"], a["title"], target, a["reason"],
-                              {"Repo": a.get("domain", "project")}, path)
+                              {"Repo": a.get("domain", "project")}, path,
+                              category=cat, severity=sev)
         print("RESIDUAL-ADDED %s" % rid if rid else "RESIDUAL-EXISTS")
+        return 0
+    if sub == "sweep":
+        dry, apply_ = bool(a.get("dry_run")), bool(a.get("apply"))
+        if dry == apply_:
+            return die("sweep requires exactly one of --dry-run | --apply")
+        roots = a.get("_roots") or (PROJ, HARNESS)
+        cands = sweep_candidates(rows, roots, a.get("_now"))
+        for r, paths in cands:
+            why = ("auto-sweep: %s open %.0fd (> %dd) and every cited path is gone from the "
+                   "target repo: %s" % ((r.get("severity") or "MED").upper(), r.get("age_days") or 0,
+                                        POLICY["sweep_age_days"], ", ".join(paths[:4])))
+            print("  %s %s  %s" % ("WOULD-OBSOLETE" if dry else "OBSOLETED", r["id"], why))
+            if apply_:
+                row = {k: v for k, v in r.items() if k != "age_days"}
+                residual_append(dict(row, status="dispositioned", disposition="obsolete",
+                                     disposition_reason=why[:400], dispositioned_at=utc_now()),
+                                path)
+                if r.get("promoted_slice") and r.get("status") == "promoted":
+                    delete_section(os.path.join(a.get("_specs") or SPECS, BACKLOG_SPEC),
+                                   r["promoted_slice"])
+        print("RESIDUALS-SWEEP %s %d candidate(s)" % ("DRY-RUN" if dry else "APPLIED", len(cands)))
         return 0
     return die("unknown residuals subcommand %r" % sub)
 
@@ -1451,8 +1767,8 @@ def cmd_residuals(a, sub):
 FLAGS = {"slice", "scope", "repo", "json", "timeout", "format", "reason", "budget", "cwd",
          "force",
          "id", "spec-file", "as", "pr", "unclaimed", "severity", "title", "touches", "gate",
-         "target", "source-slice", "domain"}
-VALUELESS = {"json", "unclaimed", "force"}
+         "target", "source-slice", "domain", "category", "dry-run", "apply"}
+VALUELESS = {"json", "unclaimed", "force", "dry-run", "apply"}
 
 
 def parse_args(argv):
@@ -1490,7 +1806,7 @@ def main(argv):
     if sub == "residuals":
         if not rest or rest[0].startswith("--"):
             return die("residuals needs a subcommand "
-                       "(list|add|promote|close|disposition|policy)")
+                       "(list|add|promote|close|disposition|sweep|policy)")
         rsub, rest = rest[0], rest[1:]
     a, err = parse_args(rest)
     if err:
@@ -1538,7 +1854,7 @@ Prose that mentions shall in lowercase and should not count.
 
 EARS: WHEN a slice PR opens, THE SYSTEM SHALL append one residual record per named follow-up.
 `mr-ready` SHALL surface unclaimed records. No record SHALL block a merge.
-Tests: proof-of-teeth — three synthetic records (ADR-0010).
+Tests: three synthetic records.
 
 ### fx-ab — a decoy whose id extends fx-a
 EARS: THE DECOY SHALL NOT be matched by an anchored lookup for fx-a.
@@ -1683,9 +1999,9 @@ def selftest():
         # SPECIFIC finding, and assert no OTHER rule fired — a fixture that can green on a
         # neighbouring rule is not a test of the rule it names.
         mass = L("- [ ] E1: a\n\n- [ ] E2: b\n\n- [ ] E3: c\n\n"
-                 "DEFER: E1 -> backlog — first reason, long enough to pass the reason rule\n"
-                 "DEFER: E2 -> backlog — second reason, long enough to pass the reason rule\n"
-                 "DEFER: E3 -> backlog — third reason, long enough to pass the reason rule\n")
+                 "DEFER: E1 -> backlog [gameplay/MED] — first reason, long enough to pass\n"
+                 "DEFER: E2 -> backlog [gameplay/MED] — second reason, long enough to pass\n"
+                 "DEFER: E3 -> backlog [gameplay/MED] — third reason, long enough to pass\n")
         chk.ok("F11-mass-defer",
                any(s == "BLOCK" and "sizing failure" in m for s, _g, m in mass),
                ">50%% of seeded gates deferred must FLAG regardless of the rest")
@@ -1798,7 +2114,8 @@ def selftest():
         chk.ok("J0-header-carries-touches", "mr-gates" in hdr_real.get("Touches", ""),
                "init must record the slice's declared touches: in the ledger header")
         rid = residual_upsert("fx-a", "E2", "the client SHALL show a panel", "backlog",
-                              "no time in this slice", hdr_real, resid)
+                              "no time in this slice", hdr_real, resid, category="ux-a11y",
+                              severity="MED")
         chk.eq("J1-id", "R-fx-a-E2", rid)
         chk.eq("J2-idempotent", None,
                residual_upsert("fx-a", "E2", "t", "backlog", "r", {}, resid),
@@ -1850,11 +2167,12 @@ def selftest():
 
         # --- K. drain policy alarms -----------------------------------------------------------
         old = utc_now()
-        past = time.time() + POLICY["t2_stale_days"] * 86400 + 3600
+        past = time.time() + 14 * 86400 + 3600  # far past the retired staleness threshold — age raises no alarm at any magnitude
         rows = [{"id": "R-x-E1", "status": "unpromoted", "disclosed_at": old, "title": "t"}]
         names = {k for k, _v in residual_alarms(rows, now=past)}
-        chk.ok("K1-stale", "residual-stale" in names)
-        chk.ok("K2-unpromoted", "residual-unpromoted" in names)
+        # Aging is DEMOTED: an old open row raises no alarm (age is a label, never pressure).
+        chk.ok("K1-no-stale-alarm", "residual-stale" not in names)
+        chk.ok("K2-no-unpromoted-alarm", "residual-unpromoted" not in names)
         # The graveyard alarm is a MATURITY test: "nothing has closed" is only evidence once
         # something has had time to close. K4b pins the direction that was backwards in the first
         # build — it fired on day 0 and went silent once the oldest row aged past the window.
@@ -1879,18 +2197,19 @@ def selftest():
                    [{"id": "R-z-E1", "status": "targeted", "disclosed_at": old}],
                    now=time.time() + 400 * 86400)},
                "the oldest rows are the WORST case; the window is maturity, never a filter")
-        # K6: alarms AGGREGATE. A migrated mr-feedback backlog is 189 rows; one alarm line per row
-        # would make mr-selfcheck unreadable, which is how a gate becomes decorative and then gets
-        # switched off (lp-registry's explicit warning about seeding 304 dispositionless items).
-        many = [{"id": "R-m-%d" % i, "status": "unpromoted", "disclosed_at": old, "title": "t"}
-                for i in range(189)]
-        agg = residual_alarms(many, now=past)
-        chk.eq("K6-one-line-per-class", 1,
-               len([1 for k, _v in agg if k == "residual-stale"]),
-               "189 stale rows must produce ONE aggregated line, not 189")
-        chk.ok("K7-aggregate-names-oldest",
-               any("+186 more" in v for k, v in agg if k == "residual-stale"),
-               "the aggregate must still name specimens and the true count, or it is unactionable")
+        # K6: `list` orders oldest disclosure first and labels age; nothing is ranked by it.
+        lr = os.path.join(root, "list-order.jsonl")
+        for rid_, when in (("R-new-E1", "2026-09-20T00:00:00Z"), ("R-old-E1", "2026-08-01T00:00:00Z")):
+            residual_append({"id": rid_, "status": "unpromoted", "disclosed_at": when,
+                             "title": "t", "category": "gameplay", "severity": "MED"}, lr)
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cmd_residuals({"_residuals": lr, "json": True}, "list")
+        chk.eq("K6-list-oldest-first", ["R-old-E1", "R-new-E1"],
+               [r["id"] for r in json.loads(buf.getvalue())["open"]])
+        chk.eq("K7-list-no-age-alarm", [],
+               [x for x in json.loads(buf.getvalue())["alarms"]
+                if x.startswith(("residual-stale", "residual-unpromoted"))])
         chk.eq("K5-policy-single-source", POLICY, json.loads(json.dumps(POLICY)))
 
         # --- V. cmd_verify verdicts (end to end, capturing the emitted JSON) ---------------
@@ -2056,7 +2375,8 @@ def selftest():
         atomic_write(bl, "# hdr\n\n<!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->\n\n"
                          "## 5. Explicitly NOT in scope\n- nothing\n")
         rid2 = residual_upsert("t-1", "E9", "THE SYSTEM SHALL land above the marker", "backlog",
-                               "fixture reason here", {"Repo": "harness"}, resid)
+                               "fixture reason here", {"Repo": "harness"}, resid,
+                               category="gameplay", severity="LOW")
         cmd_residuals({"id": rid2, "_residuals": resid, "_specs": specs}, "promote")
         bt = read_gates_file(bl)
         chk.ok("T5-promote-respects-marker",
@@ -2072,6 +2392,145 @@ def selftest():
         chk.ok("T6-acceptance-logged", rows and rows[-1]["slice"] == "t-2" and
                rows[-1]["verdict"] == "FLAGGED",
                "the pre-registered 1-to-4-of-10 band needs the first ten verdicts on disk")
+
+        # --- N. residual admission + drain redesign: one red and one green per rule ------------
+        def has(f, needle):
+            return any(x[0] == "BLOCK" and needle in x[2] for x in f)
+
+        def LS(body, slice_id, rp):
+            _h, gs, ds, _e = parse_gates(body)
+            return lint_gates(gs, ds, specs_dir=specs, slice_id=slice_id, residuals_path=rp)
+
+        empty = os.path.join(root, "empty.jsonl")
+        # N1 category/severity tag required for a tracked DEFER
+        chk.ok("N1-untagged-defer-blocks",
+               has(L("- [ ] E1: a\n\nDEFER: E1 -> backlog — a real reason here\n", sd=specs),
+                   "[category/SEVERITY]"))
+        chk.ok("N1b-tagged-defer-ok",
+               not has(L("- [ ] E1: a\n\nDEFER: E1 -> backlog [gameplay/MED] — a real reason\n",
+                         sd=specs), "[category/SEVERITY]"))
+        # N2 apparatus-subject DEFER is wontfix-only
+        app = "the evals/foo.eval.mjs scanner misses a shape"
+        chk.ok("N2-apparatus-blocks",
+               has(L("- [ ] E1: a\n\nDEFER: E1 -> backlog [loop-ops/LOW] — %s\n" % app, sd=specs),
+                   "checking apparatus"))
+        chk.ok("N2b-apparatus-wontfix-ok",
+               not blocked(L("- [ ] E1: a\n\n" + "- [ ] E2: b\n  CHECK: cargo test\n  EXPECT: /1 passed/\n\n" +
+                             "DEFER: E1 -> wontfix — %s\n" % app, sd=specs)),
+               "a second live gate keeps the defer ratio at the cap, so ONLY this rule can fire")
+        # N3 no recursion: a follow-up slice may not DEFER to backlog
+        tag = ("- [ ] E1: a\n\n- [ ] E2: b\n  CHECK: cargo test\n  EXPECT: /1 passed/\n\n"
+               "DEFER: E1 -> %s — a real reason here\n")
+        chk.ok("N3-followup-backlog-blocks",
+               has(LS(tag % "backlog [gameplay/MED]", "rb-5", empty), "follow-ups may not"))
+        chk.ok("N3b-followup-wontfix-ok", not blocked(LS(tag % "wontfix", "rb-5", empty)))
+        reg = os.path.join(root, "reg.jsonl")
+        residual_append({"id": "R-q-E1", "status": "promoted", "promoted_slice": "zz-9",
+                         "promoted_at": "2026-09-01T00:00:00Z"}, reg)
+        residual_append({"id": "R-q-E2", "status": "targeted", "promoted_slice": "zz-10"}, reg)
+        chk.ok("N3c-registry-followup-blocks",
+               has(LS(tag % "backlog [gameplay/MED]", "zz-9", reg), "follow-ups may not"))
+        chk.ok("N3d-targeted-is-not-followup",
+               not has(LS(tag % "backlog [gameplay/MED]", "zz-10", reg), "follow-ups may not"),
+               "status:targeted rows reuse promoted_slice for a named target; not a promotion")
+        # N4 verify emits no residual for a refused DEFER, and does for an admitted one
+        nres = os.path.join(root, "n-verify.jsonl")
+        atomic_write(gates_path("fx-n", gdir),
+                     "# Gates: fx-n\nSeed: s\n\n- [ ] E1: a\n\n- [ ] E2: b\n\n"
+                     "- [x] X1: c\n  CHECK: echo fixture-ok\n  EXPECT: /fixture-ok/\n"
+                     "  EVIDENCE: fixture-ok\n\n"
+                     "DEFER: E1 -> backlog — untagged, so it must not become a residual\n"
+                     "DEFER: E2 -> backlog [data-integrity/MED] — tagged and admitted\n")
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cmd_verify({"slice": "fx-n", "_specs": specs, "_gates_dir": gdir,
+                        "_residuals": nres, "_no_guard": True, "cwd": root, "repo": root,
+                        "budget": "20", "_acceptance_log": os.path.join(root, "acc-n.jsonl")})
+        vn2 = json.loads(buf.getvalue())
+        chk.eq("N4-refused-not-emitted", ["E1"], vn2["residuals_refused"])
+        nrow = fold_residuals(residual_rows(nres)).get("R-fx-n-E2") or {}
+        chk.eq("N4b-admitted-carries-tag", ("data-integrity", "MED"),
+               (nrow.get("category"), nrow.get("severity")))
+        # N5 sweep: old MED row whose cited paths are gone -> obsolete; present path -> kept
+        sroot = os.path.join(root, "proj")
+        os.makedirs(os.path.join(sroot, "client"))
+        open(os.path.join(sroot, "client", "here.ts"), "w").close()
+        srows = os.path.join(root, "sweep.jsonl")
+        old_ts = "2026-01-01T00:00:00Z"
+        residual_append({"id": "R-s-GONE", "status": "unpromoted", "severity": "MED",
+                         "disclosed_at": old_ts, "touches": ["client/gone.ts:12"],
+                         "title": "see `client/also-gone.ts#L3`"}, srows)
+        residual_append({"id": "R-s-HERE", "status": "unpromoted", "severity": "MED",
+                         "disclosed_at": old_ts, "touches": ["client/here.ts"], "title": "t"},
+                        srows)
+        residual_append({"id": "R-s-HIGH", "status": "unpromoted", "severity": "HIGH",
+                         "disclosed_at": old_ts, "touches": ["client/gone.ts"], "title": "t"},
+                        srows)
+        residual_append({"id": "R-s-PROSE", "status": "unpromoted", "severity": "LOW",
+                         "disclosed_at": old_ts, "touches": [], "title": "and/or PRV1-17/PRV1-20"},
+                        srows)
+        cands = [r["id"] for r, _p in sweep_candidates(residual_rows(srows), (sroot,))]
+        chk.eq("N5-sweep-picks-gone-paths", ["R-s-GONE"], cands)
+        young = [{"id": "R-s-YOUNG", "status": "unpromoted", "severity": "MED",
+                  "disclosed_at": utc_now(), "touches": ["client/gone.ts"]}]
+        chk.eq("N5b-sweep-spares-young", [], sweep_candidates(young, (sroot,)))
+        before_bytes = open(srows, "rb").read()
+        with contextlib.redirect_stdout(_io.StringIO()):
+            cmd_residuals({"_residuals": srows, "dry_run": True, "_roots": (sroot,)}, "sweep")
+        chk.eq("N5c-dry-run-writes-nothing", before_bytes, open(srows, "rb").read())
+        with contextlib.redirect_stdout(_io.StringIO()):
+            cmd_residuals({"_residuals": srows, "apply": True, "_roots": (sroot,)}, "sweep")
+        sw = fold_residuals(residual_rows(srows))
+        chk.eq("N5d-apply-appends-obsolete", ("dispositioned", "obsolete"),
+               (sw["R-s-GONE"].get("status"), sw["R-s-GONE"].get("disposition")))
+        chk.ok("N5e-append-only", open(srows, "rb").read().startswith(before_bytes))
+        # N6 promote: new target file, id continues past the legacy file, no ADR in the text,
+        # and close deletes only the closed item's section
+        nspecs = os.path.join(root, "nspecs")
+        os.makedirs(nspecs)
+        atomic_write(os.path.join(nspecs, LEGACY_BACKLOG_SPEC), "# old\n\n### rb-40 — old\n")
+        atomic_write(os.path.join(nspecs, BACKLOG_SPEC), BACKLOG_HEADER)
+        pres = os.path.join(root, "promote.jsonl")
+        ra = residual_upsert("fx-p", "E1", "THE SYSTEM SHALL keep A", "backlog", "reason a",
+                             {}, pres, category="gameplay", severity="MED")
+        rb_ = residual_upsert("fx-p", "E2", "THE SYSTEM SHALL keep B", "backlog", "reason b",
+                              {}, pres, category="gameplay", severity="LOW")
+        with contextlib.redirect_stdout(_io.StringIO()):
+            cmd_residuals({"id": ra, "_residuals": pres, "_specs": nspecs}, "promote")
+            cmd_residuals({"id": rb_, "_residuals": pres, "_specs": nspecs}, "promote")
+        pf = fold_residuals(residual_rows(pres))
+        ida, idb = pf[ra]["promoted_slice"], pf[rb_]["promoted_slice"]
+        chk.eq("N6-id-continues-past-legacy", ("rb-41", "rb-42"), (ida, idb))
+        ptxt = read_gates_file(os.path.join(nspecs, BACKLOG_SPEC))
+        chk.ok("N6b-no-adr-in-template", "ADR" not in ptxt and "standards/testing-tdd.md" in ptxt)
+        atomic_write(gates_path(ida, gdir), "# Gates: %s\nSeed: s\n\n- [x] E1: t\n"
+                                            "  EVIDENCE: 3 passed\n" % ida)
+        with contextlib.redirect_stdout(_io.StringIO()):
+            cmd_residuals({"slice": ida, "_residuals": pres, "_gates_dir": gdir,
+                           "_specs": nspecs}, "close")
+        ptxt = read_gates_file(os.path.join(nspecs, BACKLOG_SPEC))
+        chk.ok("N6c-close-deletes-section", not re.search(r"^### %s\b" % ida, ptxt, re.M))
+        chk.ok("N6d-close-keeps-others", re.search(r"^### %s\b" % idb, ptxt, re.M)
+               and PROMOTE_MARKER in ptxt)
+        chk.ok("N6e-legacy-untouched",
+               read_gates_file(os.path.join(nspecs, LEGACY_BACKLOG_SPEC)) == "# old\n\n### rb-40 — old\n")
+        chk.eq("N6f-uncategorised-promote-refused", 2,
+               cmd_residuals({"id": "R-q-E2", "_residuals": reg, "_specs": nspecs}, "promote"))
+        # N7 seeded CHECK may not execute ad-hoc scripts outside the target repo
+        for bad in ("node $MEM/17r-a.gates.mjs b1", "node ${HOME}/probe.mjs",
+                    "node /home/x/memory/projects/rb-1.mjs", "node ../../memory/projects/x.mjs",
+                    "python3 ~/probe.py", "node $HARNESS/scripts/x.mjs"):
+            chk.ok("N7-adhoc-script-blocks[%s]" % bad.split()[1][:14],
+                   has(L("- [ ] E1: t\n  CHECK: %s\n  EXPECT: /ok/\n" % bad), "outside the target"))
+        for good in ("mr-selfcheck", "$MEM/mr-selfcheck", "node scripts/check.mjs",
+                     "node $PROJ/scripts/x.mjs", "PATH=$HOME/.asdf/bin:$PATH cargo test",
+                     "node %s/scripts/x.mjs" % PROJ):
+            chk.ok("N7b-in-repo-ok[%s]" % good[:14],
+                   not has(L("- [ ] E1: t\n  CHECK: %s\n  EXPECT: /ok/\n" % good),
+                           "outside the target"))
+        chk.ok("N7c-extra-gate-exempt",
+               not has(L("- [ ] X1: t\n  CHECK: node $MEM/x.mjs\n  EXPECT: /ok/\n"),
+                       "outside the target"))
 
         # --- L. render determinism ------------------------------------------------------------
         _h, gr, dr, _e = parse_gates(read_gates_file(gp))
