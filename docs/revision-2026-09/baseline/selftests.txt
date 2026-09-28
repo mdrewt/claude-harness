@@ -1,0 +1,16 @@
+mr-gates rc=0
+mr-audit rc=0
+mr-spawn rc=0
+mr-record (no selftest subcommand exists)
+mr-feedback rc=0
+mr-hold rc=0
+mr-unlock rc=0
+mr-repo-of rc=0
+mr-disjoint rc=0
+mr-cost-watch (no selftest subcommand exists)
+mr-cost-sum rc=0
+mr-branch-audit rc=0
+mr-backup rc=0
+mr-content-scope rc=0
+mr-slice-quality rc=0
+mr-telemetry-selftest rc=0
