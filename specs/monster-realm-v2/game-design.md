@@ -1,9 +1,16 @@
 # Game Design Document — Monster Realm (v2)
 
 **Date:** 2026-06-24 · **Status:** the SSOT for *design intent* — what the game **is** and why it should be
-**good**, complementing the 26 engineering specs (M0–M25) which secure how it **works**. Non-commercial,
-open-source (per the harness). This doc is opinionated on purpose: it makes starting calls (clearly marked as
-tunable) so the engineering has a real target instead of "TBD". It is the layer the corpus was missing.
+**good**, complementing the engineering specs which secure how it **works**. Non-commercial, open-source
+(per the harness). This doc is opinionated on purpose: it makes starting calls (clearly marked as tunable)
+so the engineering has a real target instead of "TBD".
+
+> **2026-09 amendments (playtest-driven; details in `archive/M-evolution-essence-redesign.spec.md` and the
+> game repo's `docs/DECISIONS.md`):** **Fusion was removed** — replaced by essence-catalyst branching
+> evolution (Drew's r1 playtest call). **The Bond stat was retired** with that redesign. The two economy
+> gaps (heal locations charge nothing; PvP side-B reward) are deliberate pre-release conveniences, not
+> design targets. Where this doc's prose below mentions fusion or bond, read it as the historical intent
+> those amendments replaced.
 
 > **Why this exists.** The spec corpus is excellent engineering, but a perfectly-engineered game with thin or
 > unbalanced content is not "better than v1 in every way." The biggest *unvalidated* risk is not technical —

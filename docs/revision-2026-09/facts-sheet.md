@@ -57,8 +57,10 @@ de-bloat audit trail — keep) and `docs/research/SEED-DOMAINS.md` (pending user
 nextest 1,954 · vitest 3,130 (client tests ARE typechecked now) · Playwright 90 listed (89 run +
 1 permanent skip) in 24 files · warm `just ci` ≈ 87 s. Native-host reducer tests live in
 `server-module/src/native_host_tests.rs`. Milestone-named test files no longer exist (feature
-files). Zero process vocabulary (rb-NN / ADR-NNNN / milestone tags) in production source or docs
-outside `docs/debloat/`.
+files). Process vocabulary was purged from production source and docs outside `docs/debloat/`,
+with a handful of known comment stragglers (client/src/net/sessionModel.ts "AUTH-46/47", 
+client/src/render/motionPreference.ts "A11Y-28", species/070-wave3.ron "slice rw3c") — cosmetic;
+21r-b's touches cover the first file and can carry the cleanup.
 
 ## Frozen surfaces (unchanged by the de-bloat)
 `client/src/module_bindings/` generated only (`just gen`); schema/reducer signatures frozen by
