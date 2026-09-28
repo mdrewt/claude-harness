@@ -989,8 +989,16 @@ for ent in r.stdout.split(b'\0'):
     except OSError:
         continue" "$SYNCDIR" "$MEM" 2>/dev/null) \
   || WRITES="$SYNCDIR (probe helper failed — failing closed)"
-[ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
-[ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
+# Explicit operator runs (mr-supervisor-run => MR_EVENT_SRC=manual, which the tick passes
+# through) are attended by definition: the probe warns instead of aborting. This is an
+# anti-collision device, not a security boundary (guard-bash is the boundary).
+if [ "${MR_EVENT_SRC:-}" = "manual" ]; then
+  [ -n "$IDE" ] && echo "NOTE probe: resident IDE claude session — proceeding (operator run)" >&2
+  [ -n "$WRITES" ] && echo "NOTE probe: recent human writes — proceeding (operator run): $WRITES" >&2
+else
+  [ -n "$IDE" ] && status PROBE-TRIPPED "resident IDE claude session"
+  [ -n "$WRITES" ] && status PROBE-TRIPPED "recent human writes: $WRITES"
+fi
 # build brief — ONE render path (build_brief, above), shared with --render-brief so the selftest
 # exercises the same bytes this line writes.
 build_brief "$TOUCHES_RAW" "$MEM/mr-brief-template.md" "$B" || exit 1

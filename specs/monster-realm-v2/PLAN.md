@@ -26,27 +26,34 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
-   S0 done). Ordinary colocated tests + a human sign-off checklist; **launch is gated on its
-   completion** (design ADR-0034's intent, carried forward).
-2. **M-postgate-client-coverage** (spec to be authored when reached): extract the inline
+1. **21r follow-ups** (`M-postgate-twentyfirst-review-residuals.spec.md`, triaged 2026-09-28,
+   build-ready, 3 disjoint slices): 21r-a taming write-back softlock (MED) · 21r-b uncatalogued
+   UI strings (HIGH — breaks the recorded no-hard-coded-strings decision) · 21r-e answered
+   decision #479 (trade-time Trust/QT reset) + the two adjudicated DECISIONS gap entries.
+2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
+   S0 done) — `blocked:checkpoint-2-ratification`: S1 rewrites two e2e tests that currently
+   assert the trade-oracle leak as intended behavior, and S2 changes a frozen schema; the
+   operator ratifies both at the harness-revision Checkpoint 2, which lifts this block.
+   Ordinary colocated tests + a human sign-off checklist; **launch is gated on its completion**
+   (design ADR-0034's intent, carried forward).
+3. **M-postgate-client-coverage** (spec to be authored when reached): extract the inline
    decision logic in `main.ts` / `battleView.ts` / `boxView.ts` into tested pure `*Model.ts`
    cores. The old coverage-denominator framing is retired; the goal is testable cores, judged
    by review, not a percentage.
-3. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle —
+4. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle —
    notably rb-128-E1 (avatar lost on reload during deletion grace), R-rb-73-ABORT-PHANTOM
    (phantom session wedge), R-rb-132-WALLETSYBIL (guest-export sybil DoS),
    R-rb-52-GRACEANNOUNCE and R-rb-56-FOLLOWUP-ACC (a11y announcements).
-4. **⛩ Playtest-3 gate** — raised when everything above is closed (the standing residual file
+5. **⛩ Playtest-3 gate** — raised when everything above is closed (the standing residual file
    never blocks it; open HIGH/CRITICAL security/data residuals do). Drew plays; findings become
    milestones or residuals.
-5. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
+6. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
    provisional: build only after the playtest-3 read confirms it's the right next content.
-6. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
+7. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
    provisional, after M18. M23's social a11y retrofit scope un-defers with it.
-7. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
+8. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
 
-Milestone specs for 5–7 are sketches: elaborate via `milestone-loop-prompt.md` when reached,
+Milestone specs for 6–8 are sketches: elaborate via `milestone-loop-prompt.md` when reached,
 against the CURRENT game repo (never against archived specs).
 
 ## Gates and constraints (live)
