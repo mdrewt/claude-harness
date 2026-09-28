@@ -16,9 +16,11 @@ the full rationale and `standards/` for the engineering rules.
    change does not also write/edit the tests that gate it in the same loop.
 3. **Single source of truth.** Don't duplicate facts. Generate docs from source
    (changelog from commits, API docs from types). Update `standards/`, not copies.
-4. **Record decisions.** Any new dependency or design pattern requires an ADR
-   (`/adr`). Design forks are explored with `/brainstorm` or `/debate` and the
-   options become the ADR's "Considered alternatives".
+4. **Record decisions that meet the bar.** A decision that constrains future
+   work AND isn't evident from the code gets a `docs/DECISIONS.md` entry
+   (`/decision`, per `standards/decisions.md`); most changes make none. Design
+   forks are explored with `/brainstorm` or `/debate` and feed the entry's
+   rationale.
 5. **Right-size the effort.** Default to the cheapest model/effort that clears
    the eval gate; escalate deliberately at high-leverage gates only (see
    `docs/routing.md`).
@@ -37,22 +39,24 @@ the full rationale and `standards/` for the engineering rules.
 | Run tests         | `just test`        |
 | Lint + format     | `just lint`        |
 | Type-check        | `just typecheck`   |
-| Run eval harness  | `just eval`        |
 | Security scan     | `just security`    |
 | Full CI locally   | `just ci`          |
 | Mutation tests    | `just mutate`      |
 
 ## "Done" criteria for any change
-- `just ci` passes (lint, typecheck, tests, eval, security) — green **and**
-  meaningful (coverage + mutation thresholds met, secrets/SAST clean).
-- An ADR exists if a dependency or pattern was added.
-- Changelog/`memory` updated by the doc-keeper at task close (automatic).
+- `just ci` passes **honestly** (`standards/testing-tdd.md`: nothing weakened
+  or quarantined to pass; check deletions adjudicated; new behavior covered
+  by a test watched failing first).
+- A `docs/DECISIONS.md` entry exists **iff** the change made a decision
+  meeting `standards/decisions.md`'s bar (most changes don't).
+- `memory` updated by the doc-keeper at task close; the changelog is
+  generated from Conventional Commits on demand, never hand-edited.
 
 ## Workflow entry points (Claude Code commands)
 - `/new-project <name> <stack>` — scaffold a new project repo.
 - `/spec` — author/refine a spec (Spec Kit: Spec → Plan → Tasks).
 - `/loop <task>` — the PRERRR build loop from a spec task.
-- `/review` · `/simplify` · `/adr` · `/audit` — review, de-complexify, record a decision, audit.
+- `/review` · `/simplify` · `/decision` · `/audit` — review, de-complexify, record a decision, audit.
 - `/deep-research <q>` — isolated research; returns a summary only (throwaway).
 - `/research-domain <topic>` — isolated deep dive PERSISTED to `<project>/docs/research/`.
 - `/consult <q>` — advice from the `expert` subagent over that research library.

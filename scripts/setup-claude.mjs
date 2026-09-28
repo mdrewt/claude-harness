@@ -46,7 +46,7 @@ const RESOURCES = [
   'harness/standards/testing-tdd.md',
   'harness/standards/git.md',
   'harness/standards/spec-driven.md',
-  'harness/standards/adr-process.md',
+  'harness/standards/decisions.md',
   'harness/docs/research/INDEX.md',
   'harness/docs/context-hygiene.md',
   'harness/docs/routing.md',

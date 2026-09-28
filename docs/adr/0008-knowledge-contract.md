@@ -67,8 +67,8 @@ pieces, if any, do we adopt, and how do we keep them from violating SSOT?
     never ingest third-party bundles (no OKF provenance). Extends ADR-0007.
 
 ## Confirmation
-`scripts/okf-lint.mjs` lints bundle conformance (required frontmatter, registered
-`type` vocabulary); the research libraries are additionally gated by
-`just research-gate` in `just ci`. Generated bundles are drift-checked
-(regenerate → must equal committed) by their own project gates (e.g. M8.95's
-schema bundle), per `standards/knowledge-format.md`.
+The research libraries are linted by `just research-gate` in `just ci`
+(`scripts/research-lint.mjs`). The generated-bundle instance was retired in
+2026-09 (monster-realm deleted its bundle and producer; `okf-lint.mjs` went
+with it) — `standards/knowledge-format.md` now describes the research-library
+convention only.

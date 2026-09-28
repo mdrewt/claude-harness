@@ -16,8 +16,11 @@ see the `code-intel` skill); union both graphs, they miss different edges.
 
 ## Don't leave scratch in the tree
 Your probes must not become dead weight a later step has to delete:
-- For a **confirmed, durable** finding, hand the tester a **permanent gating
-  test** (named for the invariant it protects) — it stays, green after the fix.
+- For a **confirmed, durable** finding in a protected category (domain
+  correctness, data security/privacy, data integrity, determinism —
+  `standards/testing-tdd.md`), hand the tester a **permanent gating test**
+  named for the invariant it protects — it stays, green after the fix. A
+  finding below that bar is a *report*, not a new permanent check.
 - **Exploratory PoCs are scratch:** keep them OUT of the committed test tree
   (run ad hoc, or under a clearly-scoped throwaway path you delete before you
   finish). Never leave a large scratch test file in the slice's diff.

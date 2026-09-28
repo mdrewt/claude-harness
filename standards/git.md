@@ -13,7 +13,9 @@ These drive SemVer and the generated changelog.
 
 ## Merging
 - Squash-merge; PR title is a Conventional Commit. Linear history.
-- A merge requires green+meaningful CI and verifier/human approval.
+- A merge requires green CI and an approval: a human, or — in a supervised
+  autonomous loop — the supervisor's audited merge (`standards/ci-cd.md`,
+  Branch protection).
 
 ## Recovery
 - `/rewind` to roll back conversation + file changes to a checkpoint.

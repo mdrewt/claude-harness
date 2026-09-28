@@ -6,16 +6,23 @@ GitHub Actions, one pipeline per project repo.
 1. **Setup** — pinned toolchain (devcontainer/mise), cached deps.
 2. **Lint + format check** — fail on drift.
 3. **Typecheck.**
-4. **Unit + integration tests** — services via Compose; coverage threshold.
-5. **Eval harness** (`just eval`).
-6. **Mutation tests** on changed lines — minimum score.
-7. **Security** — gitleaks, Semgrep (SAST), dependency review/SCA, SBOM.
-8. **Build** — artifacts / container.
+4. **Unit + integration tests** — services via Compose. Coverage is collected
+   as a **report, never a gated threshold** (`testing-tdd.md`).
+5. **Project checks** — machine-contract suites where the project has them
+   (bindings drift, schema snapshots); no standalone eval tier for new work.
+6. **Security** — gitleaks + dependency review/SCA always; SAST and SBOM when
+   the project's threat model warrants them, not by default.
+7. **Build** — artifacts / container.
+
+Mutation testing runs **out of band** (nightly or pre-merge on sensitive
+modules) and produces a report to read, not a score to gate (`testing-tdd.md`).
 
 ## Branch protection
 - PRs required; no direct pushes to `main`.
-- All required checks must pass; at least one approving review (the `verifier`
-  / human).
+- All required checks must pass, plus an approving review: a human, or — in a
+  supervised autonomous loop — the supervisor's audited merge (its `mr-audit` +
+  acceptance-ledger adjudication IS the approval; doc-only PRs may auto-merge
+  on green).
 - Linear history; squash-merge with a Conventional Commit title.
 
 ## Releases

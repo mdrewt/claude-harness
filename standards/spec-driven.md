@@ -12,7 +12,7 @@ Flow: **Spec → Plan → Tasks → Implement** (`/spec`).
 - Per project thereafter: `docs/specs/` inside the project repo.
 
 ## Acceptance criteria — EARS notation
-Write testable criteria using EARS so each becomes a test/eval case:
+Write testable criteria using EARS so each becomes a test case:
 
 ```
 WHEN <trigger/condition> THE SYSTEM SHALL <observable behavior>
