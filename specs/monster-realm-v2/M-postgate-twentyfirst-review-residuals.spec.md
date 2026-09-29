@@ -115,8 +115,8 @@ after: []
   (fold into the "Content is data" entry).
 
 ### 21r-b2 — finish the uncatalogued-strings class (claimModel + privacyBanner)
-category: ux-a11y · severity: HIGH · size: LIGHT-MOD
-touches: client/src/ui/claimModel.ts, client/src/ui/claimModel.test.ts, client/src/ui/privacyBanner.ts, client/src/ui/privacyBanner.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/net/sessionModel.ts
+category: ux-a11y · severity: HIGH · size: MOD
+touches: client/src/ui/claimModel.ts, client/src/ui/claimModel.test.ts, client/src/ui/privacyBanner.ts, client/src/ui/privacyBanner.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/sessionModel.ts, client/src/ui/privacyView.test.ts, client/src/main.privacyWiring.test.ts
 after: []
 - Found by the 2026-09-28 pre-merge review: 21r-b (PR #527) fixed the three copies its triage
   named, but the class is wider. `claimModel.ts:93` carries a fourth
@@ -125,7 +125,13 @@ after: []
   strings and imports no i18n at all. Both break DECISIONS.md "no hard-coded UI strings".
 - EARS: WHEN any claim-overlay or privacy-surface text renders THE CLIENT SHALL source it from
   the typed catalog (en+fr), with no raw string literals reaching the DOM; the two stale
-  AUTH-46/47 process-comment stragglers in sessionModel.ts are removed in passing.
+  AUTH-46/47 process-comment stragglers in sessionModel.ts are removed in passing (`client/src/ui/sessionModel.ts:3` and `:15`).
+- Scope notes (park of run 2026-09-29, PR #530): `Catalog` is a total mapped type over the `MessageId`
+  union, so ~33 new keys need `messageIds.ts` (plus `MessageParams` for the countdown/chunk-count
+  lines). Copy constants in `privacyBanner.ts` must become resolve-at-render (a module-load `t()`
+  freezes the boot locale), which changes what `privacyView.test.ts` and `main.privacyWiring.test.ts`
+  consume. `evals/account-e2e.eval.mjs` `PIN_PSEUDONYMIZATION` pins en wording via
+  `privacyBanner.test.ts`; keep that pin on the en catalog only.
 
 ## Sequencing & fan-out
 
