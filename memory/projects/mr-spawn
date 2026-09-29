@@ -787,7 +787,7 @@ repo_block=("REPO: **harness** (`mdrewt/claude-harness`). Worktree from `origin/
  "There is no remote CI on this repo and no branch protection, so 'PR open + local gate green' IS the terminal state; the supervisor merges.\n"
  if repo=="harness" else
  "REPO: **project** (`mdrewt/monster-realm`). Worktree from `origin/master`; PR on the project repo.\n"
- "GATE: the full `just ci` (the exact gate remote runs — incl. Semgrep/security) green locally before opening the PR.\n")
+ "GATE: the full `just ci` (the local gate; remote CI additionally runs gitleaks, cargo-audit and the e2e job) green locally before opening the PR.\n")
 # lp-skills: fail LOUD if the template lost the anchor. Silently rendering a brief with no
 # skills block is the invisible under-fire this slice exists to remove.
 if "<SKILLS_BLOCK>" not in tpl:
