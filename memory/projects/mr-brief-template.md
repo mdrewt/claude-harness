@@ -5,6 +5,8 @@ Build exactly ONE mergeable Monster Realm v2 slice — `<SLICE>` (<TARGET_DESC>)
 Cap ~40 lines / ≤3 hunks; excess becomes a follow-up flag, never a blocker. Gating tests and interface-freeze slices are exempt from cleanup.
 **If `master` CI is red, fix/revert it to green instead and stop** — this overrides scope and Boy Scout.
 
+**Facts (skip the lookup churn):** the spec corpus is `/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/` — specs live in the harness repo, never under the project. `ADR-NNNN` tokens in code comments are historical; live decisions are `docs/DECISIONS.md` only (`docs/adr/` does not exist — never search for it). Scratch/PoC files go in a `mktemp -d` sandbox: recursive deletes inside the repo are guard-blocked by design.
+
 **Worktree:** resume a parked worktree/branch named in the handoff; else `git worktree add` a fresh one at `<WT_ROOT>/<SLICE>` from the latest `origin/<BASE_BRANCH>`, leaving the main checkout on that branch. NEVER run mutating git (`stash`, `checkout`, `commit`, `reset`, `clean`, …) against the main checkout — read-only commands only there.
 
 <RESUME_BLOCK>

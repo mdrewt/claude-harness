@@ -121,6 +121,11 @@ if (process.argv[2] === "--selftest") {
       // fail-safe direction for a spend control.
       at("rm\\s+[^\\n;&|]*\\.native-supervisor-disabled"),
       at("mv\\s+[^\\n;&|]*\\.native-supervisor-disabled"),
+      // Supervisor lock hygiene routes ONLY through mr-unlock (it refuses live owners and never
+      // recursive-deletes). A hand rm/mv of a chain or per-run lock was observed once (2026-09-28
+      // rehearsal) despite the prompt rule — make it structural, same shape as the flag above.
+      at("rm\\s+[^\\n;&|]*\\.harness-runner"),
+      at("mv\\s+[^\\n;&|]*\\.harness-runner"),
       at("mr-supervisor-enable\\b"),
       // SYMMETRIC WITH ENABLE (lp-11a review). `mr-supervisor-disable` is the OPERATOR's pause, and
       // it now routes through `mr-hold set --by operator` — which nothing restricts by caller. So a
@@ -218,6 +223,8 @@ function runSelftest() {
   check("pin: nested time sudo rm -rf", "time sudo rm -rf /tmp/x", true);
   check("pin: timeout 5 rm -rf", "timeout 5 rm -rf /tmp/x", true);
   check("pin: sudo rm <kill switch>", "sudo rm /p/.native-supervisor-disabled", true);
+  check("pin: rm <supervisor lock>", "rm -f /p/memory/projects/.harness-runner.21r-x.lock", true);
+  check("pin: mv <chain mutex>", "mv /p/memory/projects/.harness-runner.lock.d /tmp/", true);
   check("pin: env X=1 rm <kill switch>", "env X=1 rm /p/.native-supervisor-disabled", true);
   check("pin: time mv <kill switch>", "time mv /p/.native-supervisor-disabled /tmp/", true);
   check("pin: sudo touch <kill switch>", "sudo touch /p/.native-supervisor-disabled", true);
