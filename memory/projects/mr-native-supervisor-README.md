@@ -28,6 +28,7 @@ Events (slice done/crash, CI, rate-limit reset) fire extra ticks; cron is the sa
   Emergency stop: `mr-supervisor-disable`, then `touch /tmp/mr_stop_all` for live runs.
 
 ## Do-not-remove list (each guards a measured failure)
-`mr-hold` provenance (an unattributed flag wedges the loop) · `mr-unlock` (the only sanctioned
-lock reaper) · the guard-bash hook (blocks destructive commands incl. the flag file) ·
-`supervisor-disable-teeth.sh` (kill-switch selftest) · the tick's flock + chain mutex pair.
+`mr-hold` provenance (an unattributed flag wedges the loop) · `mr-lock`/`mr-unlock` (the only
+sanctioned chain-mutex take/heartbeat/reap pair — they agree on one `owner.json` schema so a tick
+never hand-rolls the lock file) · the guard-bash hook (blocks destructive commands incl. the flag
+file) · `supervisor-disable-teeth.sh` (kill-switch selftest) · the tick's flock + chain mutex pair.

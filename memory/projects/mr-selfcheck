@@ -49,6 +49,11 @@ EOF
 # guard blocks that (rightly), and a headless tick that hits a block stops to ask a human who is not
 # there. Its must-never-regress property is that a LIVE owner is refused.
 "$MEM/mr-unlock" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-unlock selftest"; BAD=1; }
+# the take-side companion to mr-unlock (2026-09-29): a tick once hand-rolled the mutex take with a
+# filename/schema neither mr-unlock's pid_of() nor the wrapper's gate-4 freshness stat recognized,
+# wedging the mutex for every later tick. Must-never-regress property is that owner.json's shape
+# stays the one those two readers already hard-code.
+"$MEM/mr-lock" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-lock selftest"; BAD=1; }
 # cost caps + rate-limit arming: the wrapper-side money/limit safety pair.
 "$MEM/mr-cost-watch" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-watch selftest"; BAD=1; }
 # launch machinery: brief rendering, placeholder integrity, repo routing, probe behavior.

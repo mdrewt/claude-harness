@@ -1,0 +1,165 @@
+#!/bin/bash
+# mr-lock — take/heartbeat the chain-owner action-mutex, the take-side companion to mr-unlock
+# (which only releases/reaps). Same directory, same schema mr-unlock's pid_of() and
+# mr-native-tick.sh's gate 4 already hard-code: $MEM/.harness-runner.lock.d/owner.json, a JSON
+# object with a `pid` field (mr-unlock also accepts `session_leader`, kept here for symmetry).
+#
+#   mr-lock take --run_id R --pid P     # mkdir-atomic; on success writes owner.json={pid:P,
+#                                        # run_id:R}. Refuses (LOCK-TAKE-REFUSED) if a live owner
+#                                        # already holds it — never steals. If the dir exists but
+#                                        # its owner looks dead, reports LOCK-TAKE-STALE and tells
+#                                        # the caller to run `mr-unlock mutex` first (this tool
+#                                        # never reaps — same non-destructive split as mr-unlock's
+#                                        # own release-vs-reap separation).
+#   mr-lock heartbeat --run_id R        # rewrites owner.json's mtime (TTL refresh, read by
+#                                        # mr-native-tick.sh gate 4 via `stat -c %Y owner.json`)
+#                                        # while still mutating. Refuses (HEARTBEAT-REFUSED) if the
+#                                        # held lock's run_id differs from R — never heartbeats a
+#                                        # lock this caller doesn't own.
+#   mr-lock --selftest
+#
+# WHY THIS EXISTS. 2026-09-29T04:09Z, a native tick took the mutex by hand: `mkdir
+# .harness-runner.lock.d` (fine) then `echo "$RUN_ID" > .../owner` and `date ... >
+# .../heartbeat` — plausible-looking filenames that match NEITHER of the two things already
+# reading this directory (mr-unlock's pid_of() opens "$D/owner.json"; the wrapper's gate 4 stats
+# the same path for TTL freshness). Both silently read this as an empty/absent lock. When the
+# tick tried to release at end-of-tick, `mr-unlock mutex` correctly refused
+# (UNLOCK-MUTEX-FAILED — unexpected content, by design, per its own selftest fixture #4) and the
+# tick's fallback `rm -f owner heartbeat` was correctly guard-blocked (guard-bash.mjs's
+# `.harness-runner` rule, added ONE DAY earlier for this exact failure class). The guard did its
+# job; the doctrine prose ("heartbeat while mutating") just never named the file, so every tick
+# that takes the mutex was reinventing the schema from scratch. Same root fix mr-unlock itself
+# was built for (lp-11a): stop hand-rolling a format three other readers already agree on: one
+# tool owns it, selftested, and the doctrine just names the verb.
+set -u
+MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+MUTEX="$MEM/.harness-runner.lock.d"
+RC=0
+
+# Same contract as mr-unlock's pid_of(): "" on absent/garbage, callers treat "" as DEAD.
+pid_of() {
+  /usr/bin/python3 -c "
+import json,sys
+try:
+    d=json.load(open(sys.argv[1]))
+except Exception:
+    print(''); sys.exit(0)
+v=d.get('session_leader') or d.get('pid') or ''
+print(str(v).strip())" "$1" 2>/dev/null
+}
+
+run_id_of() {
+  /usr/bin/python3 -c "
+import json,sys
+try:
+    d=json.load(open(sys.argv[1]))
+except Exception:
+    print(''); sys.exit(0)
+print(str(d.get('run_id') or '').strip())" "$1" 2>/dev/null
+}
+
+alive() { [ -n "${1:-}" ] && kill -0 "$1" 2>/dev/null; }
+
+write_owner() {  # $1=file $2=pid $3=run_id
+  /usr/bin/python3 -c "
+import json,sys
+json.dump({'pid': int(sys.argv[2]), 'run_id': sys.argv[3]}, open(sys.argv[1], 'w'))" \
+    "$1" "$2" "$3"
+}
+
+take_mutex() {  # $1=dir $2=pid $3=run_id
+  local D="$1" PID="$2" RID="$3"
+  if [ -z "$PID" ] || ! [[ "$PID" =~ ^[0-9]+$ ]]; then
+    echo "LOCK-TAKE-BADPID '$PID' is not a positive integer pid"; return 1
+  fi
+  if [ -z "$RID" ]; then
+    echo "LOCK-TAKE-BADARGS run_id is required"; return 1
+  fi
+  if mkdir "$D" 2>/dev/null; then
+    write_owner "$D/owner.json" "$PID" "$RID"
+    echo "LOCK-TAKEN $D pid=$PID run_id=$RID"
+    return 0
+  fi
+  local OWNER; OWNER=$(pid_of "$D/owner.json")
+  if alive "$OWNER"; then
+    echo "LOCK-TAKE-REFUSED $D owner pid $OWNER is ALIVE — not stealing a held mutex"
+  else
+    echo "LOCK-TAKE-STALE $D exists, owner pid '${OWNER:-none}' looks DEAD — run \`mr-unlock mutex\` first, then retake (never reaped by this tool)"
+  fi
+  return 1
+}
+
+heartbeat_mutex() {  # $1=dir $2=run_id
+  local D="$1" RID="$2"
+  [ -d "$D" ] || { echo "HEARTBEAT-MUTEX-ABSENT $D"; return 1; }
+  local CUR; CUR=$(run_id_of "$D/owner.json")
+  if [ "$CUR" != "$RID" ]; then
+    echo "HEARTBEAT-REFUSED $D held run_id='$CUR' != '$RID' — not heartbeating a lock this caller doesn't own"
+    return 1
+  fi
+  local PID; PID=$(pid_of "$D/owner.json")
+  write_owner "$D/owner.json" "$PID" "$RID"
+  echo "HEARTBEAT-OK $D run_id=$RID"
+}
+
+selftest() {
+  local T BAD=0 OUT
+  T=$(mktemp -d)
+  ck() { if [ "$2" = "$3" ]; then :; else echo "LOCK-SELFTEST-FAIL $1 (got '$2' want '$3')"; BAD=1; fi; }
+
+  # 1. fresh take succeeds, owner.json lands with the RIGHT schema (readable by mr-unlock's own
+  # pid_of()/mr-unlock as-is — this is the whole point).
+  OUT=$(take_mutex "$T/m1" "$$" "rid-1" | cut -d' ' -f1); ck "fresh-take" "$OUT" "LOCK-TAKEN"
+  [ -f "$T/m1/owner.json" ] || { echo "LOCK-SELFTEST-FAIL owner.json missing after take"; BAD=1; }
+  OUT=$(pid_of "$T/m1/owner.json"); ck "pid_of-reads-schema" "$OUT" "$$"
+
+  # 2. taking an already-live mutex is refused, never stolen.
+  OUT=$(take_mutex "$T/m1" "$$" "rid-2" | cut -d' ' -f1); ck "live-take-refused" "$OUT" "LOCK-TAKE-REFUSED"
+  OUT=$(run_id_of "$T/m1/owner.json"); ck "live-take-does-not-overwrite" "$OUT" "rid-1"
+
+  # 3. a dead-owner directory is reported STALE, not silently taken over or reaped.
+  mkdir -p "$T/m2"; echo '{"pid": 999999, "run_id": "old"}' > "$T/m2/owner.json"
+  OUT=$(take_mutex "$T/m2" "$$" "rid-3" | cut -d' ' -f1); ck "stale-take-reported" "$OUT" "LOCK-TAKE-STALE"
+  OUT=$(run_id_of "$T/m2/owner.json"); ck "stale-take-does-not-touch-dir" "$OUT" "old"
+
+  # 4. heartbeat on the owning run_id refreshes mtime and keeps the pid.
+  heartbeat_mutex "$T/m1" "rid-1" >/dev/null
+  OUT=$(pid_of "$T/m1/owner.json"); ck "heartbeat-keeps-pid" "$OUT" "$$"
+  OUT=$(run_id_of "$T/m1/owner.json"); ck "heartbeat-keeps-run_id" "$OUT" "rid-1"
+
+  # 5. heartbeat with the WRONG run_id is refused — never masks someone else's takeover.
+  OUT=$(heartbeat_mutex "$T/m1" "someone-else" | cut -d' ' -f1); ck "heartbeat-foreign-refused" "$OUT" "HEARTBEAT-REFUSED"
+
+  # 6. heartbeat on an absent mutex is a clean failure, not a crash.
+  OUT=$(heartbeat_mutex "$T/nope" "rid-x" | cut -d' ' -f1); ck "heartbeat-absent" "$OUT" "HEARTBEAT-MUTEX-ABSENT"
+
+  # 7. bad args refuse loud rather than writing a malformed owner.json.
+  OUT=$(take_mutex "$T/m3" "" "rid-y" | cut -d' ' -f1); ck "take-badpid-refused" "$OUT" "LOCK-TAKE-BADPID"
+  [ -d "$T/m3" ] && { echo "LOCK-SELFTEST-FAIL badpid take still created the dir"; BAD=1; }
+  OUT=$(take_mutex "$T/m4" "$$" "" | cut -d' ' -f1); ck "take-badargs-refused" "$OUT" "LOCK-TAKE-BADARGS"
+  [ -d "$T/m4" ] && { echo "LOCK-SELFTEST-FAIL badargs take still created the dir"; BAD=1; }
+
+  rm -rf "$T"
+  [ "$BAD" = 0 ] && echo "LOCK-SELFTEST-OK 12 fixtures"
+  return $BAD
+}
+
+RUN_ID=""
+PID=""
+shift_flags() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --run_id) RUN_ID="${2:-}"; shift 2 ;;
+      --pid) PID="${2:-}"; shift 2 ;;
+      *) echo "LOCK-BADFLAG unknown flag $1 (allowed: --run_id --pid)"; exit 2 ;;
+    esac
+  done
+}
+
+case "${1:-}" in
+  take)       shift; shift_flags "$@"; take_mutex "$MUTEX" "$PID" "$RUN_ID" || RC=1 ;;
+  heartbeat)  shift; shift_flags "$@"; heartbeat_mutex "$MUTEX" "$RUN_ID" || RC=1 ;;
+  --selftest) selftest || RC=1 ;;
+  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; RC=2 ;;
+esac
+exit $RC

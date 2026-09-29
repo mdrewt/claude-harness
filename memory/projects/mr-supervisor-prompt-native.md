@@ -39,11 +39,14 @@ UNKNOWN → proceed + record a BLOCKER.
    completes FULLY, re-deriving eligibility fresh.
 2. **Liveness = the detached run's `session_leader` pid**, never your own shell pid. Ground truth =
    live `gh pr list`/`gh pr checks`, `git`, `ps`, `.done` files.
-3. **Chain-owner mutex** `$MEM/.harness-runner.lock.d` (mkdir-atomic, TTL ≈10 min, heartbeat while
-   mutating). Fresh heartbeat naming a live pid or in-progress merge → exit. Takeover needs ALL of:
-   stale heartbeat, no live rooted-run pid, no un-merged `.done`. Release/reap ONLY via
-   `$MEM/mr-unlock` (`mutex|stale|all`) — it refuses live owners and never recursive-deletes; if it
-   reports UNLOCK-MUTEX-FAILED, report and stop — never escalate to `rm -rf`.
+3. **Chain-owner mutex** `$MEM/.harness-runner.lock.d` (TTL ≈10 min). Fresh heartbeat naming a live
+   pid or in-progress merge → exit. Takeover needs ALL of: stale heartbeat, no live rooted-run pid,
+   no un-merged `.done`. Take/heartbeat ONLY via `$MEM/mr-lock take --run_id "$RUN_ID" --pid P`
+   (`P` = the `mr-native-tick.sh` pid from your `ps` probe) / `mr-lock heartbeat --run_id
+   "$RUN_ID"` — never hand-write the lock file; its schema must match what `mr-unlock` and the
+   wrapper's gate-4 already read. Release/reap ONLY via `$MEM/mr-unlock` (`mutex|stale|all`) — it
+   refuses live owners and never recursive-deletes; if it reports UNLOCK-MUTEX-FAILED, report and
+   stop — never escalate to `rm -rf`.
 4. **State:** `mr-state.json` — first read, last write of every tick, atomic (temp+mv). Schema v3:
    `master{sha,ci,nightly}` · `inflight[]` · `awaiting_merge[]` · `queue[]` · `park_counters{}` ·
    `consecutive_standdowns` · `rate_limit_resets_at` · `resource_locations{}` · `notes`. (No
@@ -59,14 +62,19 @@ UNKNOWN → proceed + record a BLOCKER.
 6. **Environment:** WSL bash; no `jq` — `/usr/bin/python3` for all JSON; freshness via
    `find -mmin` + `date -u`; advance repos with `git merge --ff-only origin/<branch>` (never
    `git pull`); labeled-stash pre-existing strays, never commit or discard them.
+7. **Tool flags:** each `$MEM/mr-*` tool documents its exact flags in its own header comment —
+   read that before a first-in-tick call rather than guessing a spelling; flags are validated
+   strictly on purpose (data quality), so a wrong guess just burns a round trip. Two
+   easy misses: `mr-gates reseed` needs `--reason`; loop/process issues need
+   `mr-ask-drew --repo mdrewt/claude-harness` (default repo is monster-realm).
 
 ## Gates (in order; stop at the first stop)
 
 1. **Reset-time:** recorded rate-limit `resetsAt` still future → exit.
 2. **Sync + probe + lock:** `git fetch --all --prune` both repos; stand down on human activity
    (resident IDE claude pid new/growing; non-repo-artifact writes in ~6 min; handoff/ledger mtime
-   ahead of its recorded ts — idle-open ≥45 min with zero writes is NOT active). Take the mutex.
-   An open or parked slice (incl. `wip:` branches) is resumed before any NEW work (gate 3's master-red rule still outranks it).
+   ahead of its recorded ts — idle-open ≥45 min with zero writes is NOT active). Take the mutex
+   (`mr-lock take`, see step 3). An open or parked slice (incl. `wip:` branches) is resumed before any NEW work (gate 3's master-red rule still outranks it).
 3. **Pick work (ONE line):** `master` CI red → launch a hard-tier `ci-fix-<utc>` rooted run (revert-first; touches/target from the failing area — YOU never edit code). Else resume open/parked. Else a
    **HIGH/CRITICAL residual in security-privacy or data-integrity** (`mr-gates residuals list
    --unclaimed --json`, oldest first) — the only residual class that outranks the roadmap; an
@@ -186,5 +194,7 @@ audits · BLOCKERs · risks. Append ONE line to `$MEM/mr-native-tick.log`:
 - `--ff-only` fails on local changes → labeled stash; never commit/discard human strays.
 - Wrong checkout → the canonical path literally, never `find`; worktree missing →
   `git worktree list` first (`git -C <missing> … | wc -l` fake-reads 0).
+- Waiting on CI: `gh run watch <id> --exit-status` (foreground `sleep` >~100s times out the tool and
+  strands the command in the background).
 - SIGHUP EXIT=129 → always `setsid` + assert detachment. Multiple heredocs + command substitution
   in one shell input mangle → one heredoc per input; timestamps inside python.
