@@ -25,9 +25,11 @@ Your probes must not become dead weight a later step has to delete:
   `standards/testing-tdd.md`), hand the tester a **permanent gating test**
   named for the invariant it protects — it stays, green after the fix. A
   finding below that bar is a *report*, not a new permanent check.
-- **Exploratory PoCs are scratch:** keep them OUT of the committed test tree
-  (run ad hoc, or under a clearly-scoped throwaway path you delete before you
-  finish). Never leave a large scratch test file in the slice's diff.
+- **Exploratory PoCs are scratch:** keep them OUT of the committed test tree.
+  Put scratch in a `mktemp -d` sandbox — recursive deletes inside the repo are
+  guard-blocked by design, so an in-tree scratch dir costs a blocked `rm -rf`
+  plus file-by-file cleanup; a tmpdir needs none. Never leave a large scratch
+  test file in the slice's diff.
 - **Never ship compile/lint-breaking code** — no unused imports/vars, nothing
   that fails `tsc`/`clippy`/the lint gate. If a probe can't compile cleanly it's
   scratch: remove it. Your deliverable is the *ranked findings* (+ any promoted
