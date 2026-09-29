@@ -30,6 +30,7 @@ all claims CONFIRMED).
 ## Slices
 
 ### 21r-a — taming.rs write-backs: log-and-commit instead of bare `?`
+**DONE — merged 2026-09-28 (PR #528); kept for the record. Not launchable.**
 category: correctness (softlock) · severity: MED · size: LIGHT
 touches: server-module/src/taming.rs, server-module/src/taming_tests.rs
 after: []
@@ -51,6 +52,7 @@ after: []
   leaving `Ongoing` and the recruited monster surviving when a write-back invariant check fails.
 
 ### 21r-b — route the uncatalogued player-facing strings through the i18n catalog
+**DONE — merged 2026-09-28 (PR #527); kept for the record. Not launchable.**
 category: product defect (i18n; violates the recorded "no hard-coded UI strings" decision,
 docs/DECISIONS.md:441) · severity: HIGH · size: LIGHT-MODERATE
 touches: client/src/main.ts, client/src/ui/sessionModel.ts, client/src/ui/sessionModel.test.ts, client/src/ui/careAction.ts, client/src/ui/careAction.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts
@@ -88,14 +90,21 @@ after: []
   halved). Nothing implements it: `confirm_trade`'s transfer loop (trading.rs:686-715) changes
   only `owner_identity` and `party_slot`. The fields in question are the monster row's
   `trust_favorable_count`, `trust_unfavorable_count`, `trust_favorable_battle_day_epoch`,
-  `quality_time_ticks_total`, `quality_time_accum_ms`, `quality_time_window_ms`
-  (server-module/src/schema.rs:270-286); tiers derive via `game_core::trust_tier_of` /
+  `quality_time_ticks_total`, `quality_time_accum_ms`, `quality_time_window_ms`, **and
+  `quality_time_window_start_ms`** (server-module/src/schema.rs:270-293 — the window anchor MUST
+  also reset to 0, the documented fresh-monster state, or the new owner's first QT tick is
+  credited with time that ran under the old trainer via `apply_quality_time_credit`,
+  raising.rs:481-531); tiers derive via `game_core::trust_tier_of` /
   `quality_time_tier_of` (game-core/src/evolution/eligibility.rs:175/:202). No schema change.
-- EARS: WHEN a trade executes, EACH transferred monster's Trust and Quality-Time state SHALL be
-  reset to 0 while level, species, IVs and essence pools transfer unchanged; the reset rule SHALL
-  live once in game-core (one function; `confirm_trade` consumes it). Red-first tests SHALL pin the
-  reset fields and the preserved fields on a traded monster, plus a property test that no other
-  monster field changes. docs/DECISIONS.md SHALL gain (or extend the economy entry with) the
+- EARS: WHEN a trade executes, EACH transferred monster's Trust and Quality-Time state (all
+  SEVEN bond fields above) SHALL be reset to 0 while level, species, IVs and essence pools
+  transfer unchanged; the reset rule SHALL live once in game-core (`confirm_trade` consumes it).
+  Shape: the four window/epoch columns have no `MonsterInstance` counterpart, so add a small
+  game-core `TrainerBond { 7 fields }` value with one `reset_bond_on_trade(&mut TrainerBond)`
+  (taking state, so the zero-miss mutation gate can kill a no-op body); the server copies the
+  columns through it. No wasm export — the rule is server-only. Red-first tests SHALL pin the
+  reset fields and the preserved fields on a traded monster (incl. the `monster_pub` tiers),
+  plus a property test that no NON-BOND monster field changes. docs/DECISIONS.md SHALL gain a NEW short entry (do not extend the ~20-line Economy entry) with the
   decision and its why — Trust/Quality-Time measure the bond with the current trainer; essence is
   the monster's own — linking the issue URL rather than restating the question.
 - Same DECISIONS.md edit also lands the two adjudicated gap entries from the 2026-09 triage
@@ -103,7 +112,7 @@ after: []
   `movement_tick` — the client never predicts a zone crossing, and an NPC never leaves its home
   zone (fold into "Bounded client prediction"); (2) content row tables never carry a `locale`
   column — content stays locale-agnostic; localization lives in the client catalog layer
-  (fold into the i18n-adjacent entry).
+  (fold into the "Content is data" entry).
 
 ### 21r-b2 — finish the uncatalogued-strings class (claimModel + privacyBanner)
 category: ux-a11y · severity: HIGH · size: LIGHT-MOD

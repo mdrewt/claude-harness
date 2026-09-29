@@ -21,12 +21,12 @@ Work in an isolated worktree at `.claude/worktrees/<slice>`. Route model/effort 
 1. **Verify scope** — re-read the spec and the actually-delivered code it builds on; confirm `touches:`. An edit outside it is a hidden dependency: stop and surface it.
 2. **Plan** — `planner`: functional-core/imperative-shell split, boundary contracts, additive data model, anti-patterns to avoid. Fill the acceptance ledger's CHECK/EXPECT here.
 3. **Review the plan** — `reviewer` + `red-team` + `/simplify`; iterate until tight; checkpoint it.
-4. **Red tests** — `tester` (never the implementer) writes behavior tests from the EARS criteria and watches each fail on the real defect.
+4. **Red tests** — `tester` (never the implementer) writes behavior tests from the EARS criteria; the ORCHESTRATOR runs them to prove each fails on the real defect (the tester's own Bash is static-check-only by hook).
 5. **Implement** — `specialist` makes them pass without editing the gating tests; a wrong test goes back to the tester.
 6. **Targeted fix loop** — iterate on `just ci-fast <crate>` or per-crate clippy/nextest/vitest; never the full `just ci` to inspect one failure.
 7. **Full lens batch** — `reviewer`, `/simplify`, `red-team`, `reducer-security-auditor`, `desync-guard`, then `verifier` (asserts no gating test was weakened, skipped or deleted without adjudication); close every finding.
 8. **Full gate once** — one full `just ci` green, then `mr-gates check --slice <slice>`: every gate met with evidence or DEFERred.
-9. **Close** — `doc-keeper`: a `docs/DECISIONS.md` entry only when `standards/decisions.md`'s bar is met; memory only when durable. Fix the spec if the build revealed a gap.
+9. **Close** — `doc-keeper`, editing ONLY files inside the declared `touches:`: a `docs/DECISIONS.md` entry only when `standards/decisions.md`'s bar is met (a spec that names DECISIONS.md in `touches:` mandates its edits); memory only when durable. Fix the spec if the build revealed a gap.
 10. **STOP** at PR open + local green. The supervisor owns CI-watch and merge.
 
 ## Invariants (rationale: the game repo's `docs/DECISIONS.md`)
