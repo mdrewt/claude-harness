@@ -1,11 +1,11 @@
 # Monster Realm v2 — Plan
 
-> **Status (2026-09-28):** the game is BUILT through its launch-adjacent milestones. Phases A–D
+> **Status (2026-09-30):** the game is BUILT through its launch-adjacent milestones. Phases A–D
 > (M0–M17.5, the playtest replan, and M20–M24) are closed; the 2026-07-25 playtest gate returned
 > CONDITIONAL PASS and its hardening milestones are closed; the 2026-09 de-bloat program halved
-> the repo and fixed nine player-visible bugs. What remains is the M25 security sign-off, two
-> post-gate-provisional content milestones (M18/M19), client-coverage hardening, and open
-> residual fill-work. History: every closed milestone's spec is verbatim in `archive/`
+> the repo and fixed nine player-visible bugs. What remains is the M25 security sign-off,
+> client-coverage hardening (specced), two post-gate-provisional content milestones (M18/M19),
+> and open residual fill-work. History: every closed milestone's spec is verbatim in `archive/`
 > (one-line index in §Done); this file describes only what is true and open today.
 
 ## What this is
@@ -29,35 +29,31 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **21r follow-ups** (`M-postgate-twentyfirst-review-residuals.spec.md`, triaged 2026-09-28,
-   in progress): 21r-a (taming softlock, MED) and 21r-b (uncatalogued UI strings, HIGH) MERGED
-   2026-09-28 as the revision program's rehearsal slices; **remaining: 21r-b2** (the wider
-   uncatalogued-strings class: claimModel + privacyBanner, found in review) **and 21r-e** —
-   answered decision #479 (trade-time Trust/QT reset) + the two adjudicated DECISIONS gap entries.
-2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
+1. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S1 rewrites two e2e tests that currently
    assert the trade-oracle leak as intended behavior, and S2 changes a frozen schema; the
    operator ratifies both at the harness-revision Checkpoint 2, which lifts this block.
    Ordinary colocated tests + a human sign-off checklist; **launch is gated on its completion**
    (design ADR-0034's intent, carried forward).
-3. **M-postgate-client-coverage** (spec to be authored when reached): extract the inline
-   decision logic in `main.ts` / `battleView.ts` / `boxView.ts` into tested pure `*Model.ts`
-   cores. The old coverage-denominator framing is retired; the goal is testable cores, judged
-   by review, not a percentage.
-4. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle —
+2. **M-postgate-client-coverage** (`M-postgate-client-coverage.spec.md`, specced 2026-09-30,
+   build-ready): extract the inline decision logic in `main.ts` / `battleView.ts` / `boxView.ts`
+   into tested pure `*Model.ts` cores — 8 slices (pgcc-a ∥ pgcc-b, then the main.ts chain
+   b→f→c→d→e→g→h); pgcc-f also fixes an uncatalogued care string and a false-success feedback
+   shape. Judged by review, not a coverage percentage.
+3. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle —
    notably rb-128-E1 (avatar lost on reload during deletion grace), R-rb-73-ABORT-PHANTOM
    (phantom session wedge), R-rb-132-WALLETSYBIL (guest-export sybil DoS),
    R-rb-52-GRACEANNOUNCE and R-rb-56-FOLLOWUP-ACC (a11y announcements).
-5. **⛩ Playtest-3 gate** — raised when everything above is closed (the standing residual file
+4. **⛩ Playtest-3 gate** — raised when everything above is closed (the standing residual file
    never blocks it; open HIGH/CRITICAL security/data residuals do). Drew plays; findings become
    milestones or residuals.
-6. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
+5. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
    provisional: build only after the playtest-3 read confirms it's the right next content.
-7. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
+6. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
    provisional, after M18. M23's social a11y retrofit scope un-defers with it.
-8. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
+7. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
 
-Milestone specs for 6–8 are sketches: elaborate via `milestone-loop-prompt.md` when reached,
+Milestone specs for 5–7 are sketches: elaborate via `milestone-loop-prompt.md` when reached,
 against the CURRENT game repo (never against archived specs).
 
 ## Gates and constraints (live)
@@ -95,6 +91,9 @@ pre-gate residuals, content pack) → **playtest gate 2026-07-25: CONDITIONAL PA
 Platform & compliance (Phase D, greenlit by the 2026-08-08 operator override): **M20**
 observability/performance · **M21** accounts/auth (b-3 Steam remains open above) · **M22**
 privacy/deletion/export · **M23** accessibility · **M24** i18n (en/fr) · **M25 S0**.
+Postgate review follow-ups: **M-postgate-twentyfirst-review-residuals** (21r-a #528, 21r-b
+#527, 21r-e #532, 21r-b2 #530 — merged 2026-09-28..30; spec file still live in this directory,
+pending its move to `archive/`).
 Infra: **M-infra-a** CI caching · **M-stdb-2x** module-SDK 2.8.1 · **M-infra-d** ADR digest and
 **M8.95** knowledge bundle (both later retired by the de-bloat) · **M-loop-infrastructure**
 (supervisor tooling; superseded by the 2026-09 harness revision).
