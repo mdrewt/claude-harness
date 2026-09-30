@@ -77,3 +77,14 @@ your role exists to respect.
   `~/.claude/skills/vitest-fast-check/SKILL.md` (full gotcha list) before debugging.
 - Use the project's framework + `~/.claude/harness/standards/testing-tdd.md`; scope the runner away
   from other test types (e.g. Playwright e2e specs the unit runner would grab).
+- **Non-ASCII expectations (U+00A0, ’, …):** build them from NAMED constants
+  (`const NBSP = String.fromCharCode(0x00a0)`; `String.fromCodePoint` for astral
+  characters), never a pasted invisible character (an NBSP is indistinguishable
+  from a space on a Read) and never a `\uXXXX` escape typed into an Edit/Write
+  parameter (it may arrive decoded or doubled). After writing, Grep the file for
+  a stray `\\u[0-9a-f]{4}` to catch a doubled escape.
+- **`node --check` is JS-only and unreliable on `.ts`/`.tsx` BOTH ways** (it passes
+  an unbalanced file that starts with an `import`, and fails any type annotation):
+  never run it on TypeScript. Read the file back instead and report "not
+  syntax-checked; needs the orchestrator's first vitest run" rather than claiming
+  a check you could not make.

@@ -117,8 +117,15 @@ APPARATUS = re.compile(
     r"|\bsource[- ]scan|\bbite[- ]proof", re.I)
 
 
+def apparatus_token(text):
+    """The apparatus-shaped token a DEFER title/reason carries, or "" -- named in the BLOCK so the
+    author can tell a cited path from a real apparatus subject without reading this regex."""
+    m = APPARATUS.search(text or "")
+    return m.group(0).lstrip(" \t`(/") if m else ""
+
+
 def is_apparatus(text):
-    return bool(APPARATUS.search(text or ""))
+    return bool(apparatus_token(text))
 
 
 class Defer(tuple):
@@ -531,8 +538,11 @@ def defer_policy_findings(slice_id, gid, target, reason, title, category, severi
     out = []
     if target in LEGAL_DISPOSITIONS:
         return out
-    if is_apparatus("%s %s" % (title or "", reason or "")):
-        out.append("DEFER subject is the checking apparatus: " + APPARATUS_MSG)
+    tok = apparatus_token("%s %s" % (title or "", reason or ""))
+    if tok:
+        out.append("DEFER subject is the checking apparatus (matched %r -- if the finding is not "
+                   "about the apparatus, name the constant or behaviour instead of that path): "
+                   % tok + APPARATUS_MSG)
     if category not in CATEGORIES or severity not in SEVERITIES:
         out.append("DEFER to %r needs a `[category/SEVERITY]` tag after the target, category in "
                    "{%s}, severity in {%s} -- e.g. `DEFER: %s -> backlog [gameplay/MED] — why`"
@@ -970,6 +980,7 @@ def cmd_reseed(a):
     spec_file, sec = find_section(slice_id, a.get("_specs"))
     criteria = extract_criteria(sec) if sec else []
     seed = seed_hash(criteria)
+    touches = extract_touches(sec) if sec else []
     header, gates, _d, _e = parse_gates(text)
     old = header.get("Seed", "?")
     lines = text.split("\n")
@@ -982,6 +993,24 @@ def cmd_reseed(a):
         # header rather than reporting a success that changed nothing.
         at = 1 if lines and lines[0].startswith("# Gates:") else 0
         lines.insert(at, "Seed: %s" % seed)
+    # The header's `Touches:` mirrors the spec's touches: line (init copies it; residual_upsert
+    # copies it into every residual row). A spec amendment that moved or added files left it
+    # stale until now -- refresh it HEADER-ONLY (before the first gate line) from the same
+    # extractor init uses; a spec yielding no touches leaves the line alone.
+    touches_state = "unchanged(spec-empty)"
+    if touches:
+        hdr_end = next((i for i, ln in enumerate(lines) if GATE_LINE.match(ln)), len(lines))
+        tline = "Touches: %s" % ", ".join(touches)
+        ti = next((i for i in range(hdr_end) if lines[i].startswith("Touches:")), None)
+        if ti is not None:
+            touches_state = "unchanged" if lines[ti] == tline else "refreshed"
+            lines[ti] = tline
+        else:
+            # after Criteria: (init's order), else after Seed:, else right under the title
+            at = next((i for key in ("Criteria:", "Seed:")
+                       for i in range(hdr_end) if lines[i].startswith(key)), None)
+            lines.insert((at + 1) if at is not None else 1, tline)
+            touches_state = "inserted"
     have = {g.id for g in gates}
     add = []
     for c in criteria:
@@ -990,9 +1019,10 @@ def cmd_reseed(a):
                     "  EVIDENCE: pending"]
     body = "\n".join(lines).rstrip("\n") + ("\n" + "\n".join(add) if add else "") + "\n"
     atomic_write(path, body)
-    stoplog(slice_id, "RESEED %s -> %s added=%d reason=%s" % (old, seed, len(add), a["reason"]),
-            a.get("_gates_dir"))
-    print("GATES-RESEEDED %s %s -> %s added=%d" % (slice_id, old, seed, len(add)))
+    stoplog(slice_id, "RESEED %s -> %s added=%d touches=%s reason=%s"
+            % (old, seed, len(add), touches_state, a["reason"]), a.get("_gates_dir"))
+    print("GATES-RESEEDED %s %s -> %s added=%d touches=%s"
+          % (slice_id, old, seed, len(add), touches_state))
     return 0
 
 
@@ -2370,6 +2400,35 @@ def selftest():
                bool(parse_gates(read_gates_file(tp))[0].get("Seed")),
                "the documented repair must repair the case it exists for")
 
+        # R: reseed refreshes the header Touches: from the spec, header-only, evidence untouched.
+        rs_spec = os.path.join(specs, "M-rs.spec.md")
+        atomic_write(rs_spec, "## 2. Slices\n\n### rs-1 — reseed fixture\n`touches: a/x.rs, b/y.ts`\n\n"
+                              "EARS: THE SYSTEM SHALL do one thing.\n")
+        cmd_init({"slice": "rs-1", "_specs": specs, "_gates_dir": gdir, "scope": "fixture"})
+        rp = gates_path("rs-1", gdir)
+        atomic_write(rp, read_gates_file(rp).replace("  EVIDENCE: pending",
+                     "  EVIDENCE: fixture-ran\nTouches: body-line-must-stay\n", 1))
+        atomic_write(rs_spec, read_gates_file(rs_spec).replace("a/x.rs, b/y.ts", "a/x.rs, `c/z.mjs`"))
+        cmd_reseed({"slice": "rs-1", "_specs": specs, "_gates_dir": gdir, "reason": "fixture"})
+        rt = read_gates_file(rp)
+        chk.eq("R1-reseed-refreshes-touches", "a/x.rs, c/z.mjs", parse_gates(rt)[0].get("Touches"),
+               "the header must follow the amended spec, backticks stripped")
+        chk.ok("R2-body-touches-line-untouched", "Touches: body-line-must-stay" in rt,
+               "only the HEADER line is rewritten")
+        chk.ok("R3-evidence-untouched", "EVIDENCE: fixture-ran" in rt)
+        cmd_reseed({"slice": "rs-1", "_specs": specs, "_gates_dir": gdir, "reason": "fixture"})
+        chk.eq("R4-reseed-idempotent", rt, read_gates_file(rp))
+        atomic_write(rp, "\n".join(l for l in rt.split("\n") if not l.startswith("Touches: a/")))
+        cmd_reseed({"slice": "rs-1", "_specs": specs, "_gates_dir": gdir, "reason": "fixture"})
+        chk.eq("R5-reseed-inserts-absent-touches", "a/x.rs, c/z.mjs",
+               parse_gates(read_gates_file(rp))[0].get("Touches"),
+               "an absent header line is inserted where parse_gates reads it back")
+        atomic_write(rs_spec, read_gates_file(rs_spec).replace("`touches: a/x.rs, `c/z.mjs`\n", ""))
+        cmd_reseed({"slice": "rs-1", "_specs": specs, "_gates_dir": gdir, "reason": "fixture"})
+        chk.eq("R6-spec-without-touches-keeps-line", "a/x.rs, c/z.mjs",
+               parse_gates(read_gates_file(rp))[0].get("Touches"),
+               "a spec that no longer declares touches must not blank the header")
+
         # T5: promote appended at EOF, past the file's own append marker.
         bl = os.path.join(specs, BACKLOG_SPEC)
         atomic_write(bl, "# hdr\n\n<!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->\n\n"
@@ -2414,6 +2473,10 @@ def selftest():
         chk.ok("N2-apparatus-blocks",
                has(L("- [ ] E1: a\n\nDEFER: E1 -> backlog [loop-ops/LOW] — %s\n" % app, sd=specs),
                    "checking apparatus"))
+        chk.ok("N2c-apparatus-names-token",
+               has(L("- [ ] E1: a\n\nDEFER: E1 -> backlog [loop-ops/LOW] — %s\n" % app, sd=specs),
+                   "matched 'evals/'"),
+               "the BLOCK must name the token that fired, or the author reads the regex source")
         chk.ok("N2b-apparatus-wontfix-ok",
                not blocked(L("- [ ] E1: a\n\n" + "- [ ] E2: b\n  CHECK: cargo test\n  EXPECT: /1 passed/\n\n" +
                              "DEFER: E1 -> wontfix — %s\n" % app, sd=specs)),
