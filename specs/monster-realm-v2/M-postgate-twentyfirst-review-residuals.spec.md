@@ -132,6 +132,17 @@ after: []
   freezes the boot locale), which changes what `privacyView.test.ts` and `main.privacyWiring.test.ts`
   consume. `evals/account-e2e.eval.mjs` `PIN_PSEUDONYMIZATION` pins en wording via
   `privacyBanner.test.ts`; keep that pin on the en catalog only.
+- Build notes (run 2026-09-30, PR #530): the 45 keys landed under the existing `claim.*` / `privacy.*`
+  namespaces (roster 133 → 178); `catalog.test.ts` and `catalogParity.test.ts` grew under `touches-delta:`
+  as the catalogs' sibling roster tests (the 21r-b precedent). ONE privacy-surface string stays raw by
+  necessity: `PRIVACY_PSEUDONYMIZATION_DISCLOSURE` is painted by `privacyView.ts:150` in the constructor
+  and pinned raw by `privacyView.i18n.test.ts:279` (both outside `touches:`), and `Catalog` totality would
+  force a French rendering of a sentence M22 §9 mandates verbatim in UI copy — cataloguing it needs a
+  DECISIONS.md ruling first. Registered as an mr-gates residual (ux-a11y/LOW, backlog); the en pin
+  (`PIN_PSEUDONYMIZATION`) is unchanged. New fr text has no byte-identity constraint, so the two export
+  chunk sentences are count-after-label ("fragments livrés : 2 sur 5") rather than mirroring en's
+  "1 chunks" plural defect, and "claim code" is rendered "code de transfert" ("réclamation" reads as
+  *complaint*).
 
 ## Sequencing & fan-out
 
