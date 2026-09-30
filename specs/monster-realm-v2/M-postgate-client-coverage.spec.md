@@ -175,7 +175,9 @@ after: []
   line only after the reducer promise resolves. It shows `reduceErrorMessage(err, where)` on a
   rejection or a synchronous throw, including a throw while building the call's arguments (e.g.
   `new Identity(args.targetIdentity)` for trade-propose). The returned promise always settles,
-  because views hold in-flight locks on it.
+  because views hold in-flight locks on it. Named intentional test change: `careAction.test.ts`
+  call sites may be updated to pass care's message and `where` (`'care'`); no assertion is removed
+  or weakened, and its `'Cared!'` assertions keep holding under `en`.
 
 - **A2:** IF `live()` yields no connection while `linkFrozen()` is false, THEN THE SYSTEM SHALL
   report disconnected and never success. Red: a booted-app test in `main.feedbackAction.test.ts`
@@ -215,8 +217,8 @@ after: [pgcc-a]
   longer matches that order.
 
 - **B1:** Before the extraction, THE SYSTEM SHALL have a booted-app characterization suite,
-  `main.keydown.test.ts`. It pins today's observable keydown behaviour, is green on today's code,
-  and stays unmodified through the extraction. It pins seven behaviours:
+  `main.keydown.test.ts`. It pins today's observable keydown behaviour, is green on today's code
+  (except the B5 case, which lands with its fix), and stays unmodified through the extraction. It pins seven behaviours:
   - (i) each hotkey's open, close or swallow outcome and its `defaultPrevented`, over at least four
     states: nothing visible, self visible, a denying overlay visible, and world-unfocused;
   - (ii) B/I/E switching, which force-hides a visible sibling and refreshes the opened view;
@@ -224,7 +226,8 @@ after: [pgcc-a]
   - (iv) the identity requirement for O/M/T, and its absence for C;
   - (v) code-before-key precedence: `code: 'KeyM', key: '?'` routes to M, not help;
   - (vi) Escape order: for each adjacent pair in the stack, with both visible, Escape closes the
-    higher-priority one first;
+    higher-priority one first (where no player path co-opens a pair, the test may show both views
+    directly through their handles);
   - (vii) Escape with nothing closable is not `defaultPrevented` by the Escape stage.
 
 - **B2:** WHEN given `{code, key, visibleIds, worldFocused, joined}`, a pure `routeHotkey` SHALL
@@ -262,7 +265,9 @@ after: [pgcc-a]
 - **B5:** WHEN Escape is pressed with `claimView` the top closable visible overlay, THE SYSTEM
   SHALL close it and `preventDefault` (defect 5). Red: this `main.keydown.test.ts` case fails today,
   because claim stays open. It is the one characterization case that is red by design, and it
-  lands with the fix.
+  lands with the fix. The close reuses claim's existing `hide()` path (the one `C` toggles), so it
+  inherits `claimView.ts`'s recorded residual that `hide()` leaves `claimModel` treating the
+  overlay as open, and a reconnect re-render may reopen it. That behaviour is accepted as is.
 
 - Boy Scout (in scope, main.ts): correct the stale `main.wiring.test.ts` citations (≈199, ≈1310;
   that suite no longer exists) and the ≈1591 order comment.
@@ -318,8 +323,9 @@ after: [pgcc-b]
 
 - **C3:** WHEN given `(state, event)`, a pure shop-open step SHALL return the next
   `{dismissPending, pendingShopId}` plus effects (`sendDismiss`, `openShop(id)`, or none). It
-  handles five events: escape-in-dialogue, shop-clicked(id), dismiss-rejected(path),
-  batch(conversationPresent, anyOverlayVisible), and reconnect. Its rules:
+  handles six events: escape-in-dialogue, shop-clicked(id), dismiss-rejected(path),
+  dismiss-not-sent(path) (no reducer promise came back), batch(conversationPresent,
+  anyOverlayVisible), and reconnect. Its rules:
   - It never sends a dismiss while one is pending.
   - Escape cancels a pending shop-open.
   - Rollback is per-path, exactly as today. A shop-click rejection nulls `pendingShopId`; an
@@ -328,6 +334,9 @@ after: [pgcc-b]
   - The first no-conversation batch clears `dismissPending` and consumes `pendingShopId`. It emits
     `openShop` only if no overlay is visible; otherwise the open is dropped, never retained.
   - Reconnect clears both.
+  - `dismissPending` is set only once a reducer promise exists. `dismiss-not-sent` leaves it unset
+    and keeps `pendingShopId`, which matches today's frozen-link path, where the shop intent
+    survives the short-circuit.
 
 - **C4:** IF a dismiss send produces no reducer call (a frozen link, or `live()` yields no
   connection), THEN THE SYSTEM SHALL leave `dismissPending` unset (defect 4). Red:
