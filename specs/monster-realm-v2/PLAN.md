@@ -37,9 +37,10 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    (design ADR-0034's intent, carried forward).
 2. **M-postgate-client-coverage** (`M-postgate-client-coverage.spec.md`, specced 2026-09-30,
    build-ready): extract the inline decision logic in `main.ts` / `battleView.ts` / `boxView.ts`
-   into tested pure `*Model.ts` cores — 8 slices (pgcc-a ∥ pgcc-b, then the main.ts chain
-   b→f→c→d→e→g→h); pgcc-f also fixes an uncatalogued care string and a false-success feedback
-   shape. Judged by review, not a coverage percentage.
+   into tested pure `*Model.ts` cores — 4 slices, one serialized main.ts chain
+   (pgcc-a → b → c → d); they also fix five named client defects (uncatalogued care string,
+   false-success feedback shape, stuck dialogue-dismiss lock, claimView ignoring Escape, lax
+   item-selection parse). Judged by review, not a coverage percentage.
 3. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle —
    notably rb-128-E1 (avatar lost on reload during deletion grace), R-rb-73-ABORT-PHANTOM
    (phantom session wedge), R-rb-132-WALLETSYBIL (guest-export sybil DoS),
