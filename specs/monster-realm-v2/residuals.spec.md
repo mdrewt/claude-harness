@@ -30,7 +30,7 @@ touches: client/src/ui/privacyBanner.ts, client/src/ui/liveRegion.ts, client/src
 When a data export finishes assembling (incomplete to complete), screen-reader users get no announcement. The status label in client/src/ui/privacyBanner.ts just updates in place. Add a one-shot announcement on that edge through the single live region in client/src/ui/liveRegion.ts.
 
 ### rb-98 — R-rb-56-FOLLOWUP-ACC
-category: ux-a11y · severity: MED · status: promoted
+category: ux-a11y · severity: MED · status: promoted · **absorbed by M-postgate-console-controls (battle skill grid shows accuracy) — do not build separately**
 EARS: WHEN a battle skill button renders THE CLIENT SHALL include accuracy in the visible and accessible label, appended after the existing text.
 touches: client/src/ui/battleView.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/battleModel.test.ts
 
@@ -142,7 +142,7 @@ touches: server-module/src/privacy.rs
 The export stamp is now+k where k counts consecutive milliseconds already holding some other owner's live bundle (privacy.rs:1216). The stamp is readable by its owner, so it leaks up to 4 bits of anonymous third-party export timing. Negligible on its own; fix by scoping the probe to the owner, or accept and document it.
 
 ### R-rb-121-DEFER-FOCUS-RECHECK — R-rb-121-DEFER-FOCUS-RECHECK
-category: ux-a11y · severity: LOW · status: carried by triage — schedule by hand (promote is closed to follow-up chains)
+category: ux-a11y · severity: LOW · status: carried by triage — **absorbed by M-postgate-console-controls (main-menu/frame focus slice) — do not build separately**
 EARS: WHEN the deferred overlay focus callback fires THE CLIENT SHALL skip the move when document.activeElement is a connected element inside the overlay root.
 touches: client/src/ui/overlayA11y.ts, client/src/ui/overlayA11y.test.ts
 
