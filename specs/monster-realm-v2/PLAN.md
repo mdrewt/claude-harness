@@ -1,11 +1,12 @@
 # Monster Realm v2 — Plan
 
-> **Status (2026-09-30):** the game is BUILT through its launch-adjacent milestones. Phases A–D
+> **Status (2026-10-01):** the game is BUILT through its launch-adjacent milestones. Phases A–D
 > (M0–M17.5, the playtest replan, and M20–M24) are closed; the 2026-07-25 playtest gate returned
 > CONDITIONAL PASS and its hardening milestones are closed; the 2026-09 de-bloat program halved
-> the repo and fixed nine player-visible bugs. What remains is the M25 security sign-off,
-> client-coverage hardening (specced), two post-gate-provisional content milestones (M18/M19),
-> and open residual fill-work. History: every closed milestone's spec is verbatim in `archive/`
+> the repo and fixed nine player-visible bugs. What remains is the console-controls redesign
+> (operator directive 2026-10-01, front of the queue), the M25 security sign-off, client-coverage
+> hardening, controller support before launch, two post-gate-provisional content milestones
+> (M18/M19), and open residual fill-work. History: every closed milestone's spec is verbatim in `archive/`
 > (one-line index in §Done); this file describes only what is true and open today.
 
 ## What this is
@@ -22,44 +23,62 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 - Verification doctrine: `standards/testing-tdd.md` (harness-wide SSOT). No eval-script gates,
   no coverage/mutation thresholds (except the grandfathered nightly mutation config: game-core
   zero-miss and the server cap — that project decision stands), no proof-of-teeth ceremony.
-- The standing residual file is `residuals.spec.md` (open items only; 29 as of 2026-09-28 —
-  the 25 triage survivors plus 4 LOW rows the 21r-a run disclosed; 0 HIGH/CRITICAL). Residuals
+- The standing residual file is `residuals.spec.md` (open items only; 29 sections as of
+  2026-10-01 — the 25 triage survivors plus 4 LOW rows the 21r-a run disclosed; 0 HIGH/CRITICAL
+  in the file. The HIGH S-overlay-anchor item lived only in an archived catalogue and is now
+  scheduled in the console-controls milestone). Residuals
   fill idle capacity and never preempt this roadmap; triage-carried rows are scheduled by hand
   (mr-gates promote is closed to follow-up chains).
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
+1. **M-postgate-console-controls** (`M-postgate-console-controls.spec.md`, design
+   `console-controls-design.md`, specced 2026-10-01 from the operator's directive
+   `operator-feedback-2026-10-01-controls.md`): the client's PRIMARY interface becomes a virtual
+   D-pad + A/B/X/Y/LB/RB/Start/Select with contextual meanings, one context stack (B back one level,
+   Start opens the main menu and closes everything), D-pad navigation of every screen, remappable
+   per-browser bindings, game-screen pointer = A/B, one overlay frame over the game screen (closes
+   the orphaned S-overlay-anchor HIGH and the bottom-of-page panels), and the validated UI bug
+   cleanup. Letter hotkeys stay as optional accelerators. Moved to the front: nothing critical or
+   unblocked is ahead of it (master green; M25 is blocked and server-side). Supersedes the
+   uxd2/uxd3 reading of playtest feedback r2-023 and the DECISIONS entry "Client UI: one overlay
+   registry, keyboard first".
+2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S1 rewrites two e2e tests that currently
    assert the trade-oracle leak as intended behavior, and S2 changes a frozen schema; the
-   operator ratifies both at the harness-revision Checkpoint 2, which lifts this block.
-   Ordinary colocated tests + a human sign-off checklist; **launch is gated on its completion**
+   operator ratifies both at the harness-revision Checkpoint 2, which lifts this block. Once
+   unblocked its server-side slices may run alongside item 1 (file overlap is limited to the
+   trade-propose copy; sequence per the controls spec). **Launch is gated on its completion**
    (design ADR-0034's intent, carried forward).
-2. **M-postgate-client-coverage** (`M-postgate-client-coverage.spec.md`, specced 2026-09-30,
-   build-ready): extract the inline decision logic in `main.ts` / `battleView.ts` / `boxView.ts`
-   into tested pure `*Model.ts` cores — 4 slices, one serialized main.ts chain
-   (pgcc-a → b → c → d); they also fix five named client defects (uncatalogued care string,
-   false-success feedback shape, stuck dialogue-dismiss lock, claimView ignoring Escape, lax
-   item-selection parse). Judged by review, not a coverage percentage.
-3. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle —
-   notably rb-128-E1 (avatar lost on reload during deletion grace), R-rb-73-ABORT-PHANTOM
-   (phantom session wedge), R-rb-132-WALLETSYBIL (guest-export sybil DoS),
-   R-rb-52-GRACEANNOUNCE and R-rb-56-FOLLOWUP-ACC (a11y announcements).
-4. **⛩ Playtest-3 gate** — raised when everything above is closed (the standing residual file
+3. **M-postgate-client-coverage** (`M-postgate-client-coverage.spec.md`, re-scoped 2026-10-01):
+   after item 1, extract the remaining inline decision logic in `main.ts` into tested pure cores —
+   pgcc-a (feedback core + the uncatalogued care string), pgcc-c (battle event-emit latches),
+   pgcc-d (battle/pvp/box decisions). pgcc-b is superseded by item 1.
+4. **Residual fill-work** (`residuals.spec.md`, 29 open sections plus 3 unpromoted ledger rows as
+   of 2026-10-01): MED items first when a fan-out slot is idle — notably rb-128-E1 (avatar lost on
+   reload during deletion grace), R-rb-73-ABORT-PHANTOM (phantom session wedge),
+   R-rb-132-WALLETSYBIL (guest-export sybil DoS) and R-rb-52-GRACEANNOUNCE. R-rb-56-FOLLOWUP-ACC
+   and R-rb-121-DEFER-FOCUS-RECHECK are absorbed by item 1.
+5. **⛩ Playtest-3 gate** — raised when everything above is closed (the standing residual file
    never blocks it; open HIGH/CRITICAL security/data residuals do). Drew plays; findings become
    milestones or residuals.
-5. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
+6. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support as one more input source on
+   item 1's virtual-button layer. **Must land before launch** (operator, 2026-10-01).
+7. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
    provisional: build only after the playtest-3 read confirms it's the right next content.
-6. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
-   provisional, after M18. M23's social a11y retrofit scope un-defers with it.
-7. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
+8. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
+   provisional, after M18. M23's social a11y retrofit scope un-defers with it; chat input uses
+   item 1's typing mode.
+9. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
+   Steam Input maps onto item 1's virtual buttons.
 
-Milestone specs for 5–7 are sketches: elaborate via `milestone-loop-prompt.md` when reached,
+Milestone specs for 6–9 are sketches: elaborate via `milestone-loop-prompt.md` when reached,
 against the CURRENT game repo (never against archived specs).
 
 ## Gates and constraints (live)
 
-- **Launch** is gated on M25 completion (human sign-off checklist, operator-approved).
+- **Launch** is gated on M25 completion (human sign-off checklist, operator-approved) and on
+  M-gamepad (operator, 2026-10-01).
 - **Playtest-3** timing per the supervisor doctrine (`memory/projects/mr-supervisor-prompt-native.md`).
 - **RLS remains unenforced at SpacetimeDB 2.8.1** — privacy is enforced by the private-table +
   owner-scoped-view pattern (DECISIONS.md "Table privacy"); the RLS re-open triggers recorded in

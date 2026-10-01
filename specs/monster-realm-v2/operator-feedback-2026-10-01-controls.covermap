@@ -1,0 +1,63 @@
+# covermap: specs/monster-realm-v2/operator-feedback-2026-10-01-controls.md -> episode op-2026-10-01-controls (doctrine v1.5)
+# P-numbers are `mr-feedback covermap extract` units (blank-line blocks).
+# P1 = title (L1)  P2 = channel/context line (L3-5, session-written)  P3 = Message 1 (L7-8)
+# P4-P9 = Message 2 paragraphs (L10-36; P9 includes the 15-bullet task list L22-36)  P10 = operator answers (L38-44)
+# P1/P2 are no-op: neither carries an operator claim (title; session-authored channel/context metadata).
+P1	no-op:title-line-no-operator-claim
+P2	no-op:session-authored-channel-and-context-metadata-no-operator-claim
+P3	op-2026-10-01-controls-001
+P3	op-2026-10-01-controls-002
+P3	op-2026-10-01-controls-003
+P3	op-2026-10-01-controls-004
+P3	op-2026-10-01-controls-005
+P3	op-2026-10-01-controls-006
+P3	op-2026-10-01-controls-007
+P3	op-2026-10-01-controls-008
+P3	op-2026-10-01-controls-009
+P4	op-2026-10-01-controls-010
+P5	op-2026-10-01-controls-011
+P5	op-2026-10-01-controls-012
+P5	op-2026-10-01-controls-013
+P6	op-2026-10-01-controls-014
+P6	op-2026-10-01-controls-015
+P6	op-2026-10-01-controls-016
+P6	op-2026-10-01-controls-017
+P6	op-2026-10-01-controls-018
+P6	op-2026-10-01-controls-019
+P7	op-2026-10-01-controls-020
+P7	op-2026-10-01-controls-021
+P7	op-2026-10-01-controls-022
+P7	op-2026-10-01-controls-023
+P7	op-2026-10-01-controls-024
+P7	op-2026-10-01-controls-025
+P8	op-2026-10-01-controls-026
+P8	op-2026-10-01-controls-027
+P8	op-2026-10-01-controls-028
+P8	op-2026-10-01-controls-029
+P8	op-2026-10-01-controls-030
+P8	op-2026-10-01-controls-031
+P8	op-2026-10-01-controls-032
+P9	op-2026-10-01-controls-033
+P9	op-2026-10-01-controls-034
+P9	op-2026-10-01-controls-035
+P9	op-2026-10-01-controls-036
+P9	op-2026-10-01-controls-037
+P9	op-2026-10-01-controls-038
+P9	op-2026-10-01-controls-039
+P9	op-2026-10-01-controls-040
+P9	op-2026-10-01-controls-041
+P9	op-2026-10-01-controls-042
+P9	op-2026-10-01-controls-043
+P9	op-2026-10-01-controls-044
+P9	op-2026-10-01-controls-045
+P9	op-2026-10-01-controls-046
+P9	op-2026-10-01-controls-047
+P9	op-2026-10-01-controls-048
+P9	op-2026-10-01-controls-049
+P9	op-2026-10-01-controls-050
+P10	op-2026-10-01-controls-051
+P10	op-2026-10-01-controls-052
+P10	op-2026-10-01-controls-053
+P10	op-2026-10-01-controls-054
+P10	op-2026-10-01-controls-055
+P10	op-2026-10-01-controls-056

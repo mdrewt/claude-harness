@@ -1,18 +1,18 @@
 # Spec: M-postgate-client-coverage — extract the client shell's inline decision logic into tested pure cores
 
-**Status:** specced 2026-09-30 · build-ready · **Project:** monster-realm (client only) ·
+**Status:** specced 2026-09-30 · **re-scoped 2026-10-01** by the operator's controls redesign
+(`M-postgate-console-controls.spec.md`, which runs FIRST — PLAN §9) · build after it, re-verifying
+every Evidence bullet at build time · **Project:** monster-realm (client only) ·
 **Surveyed against:** monster-realm master `efd3f3a0` (symbols cited below; line numbers are
 `@efd3f3a0` and will drift, so treat the symbol as the anchor) · **Depends on:** nothing open ·
-**Doctrine:** `standards/testing-tdd.md` (verification SSOT), PLAN §9 item 2.
+**Doctrine:** `standards/testing-tdd.md` (verification SSOT).
 
 ## Problem / intent
 
 `client/src/main.ts` is about 3.3k lines and has **no exports**. It still holds branching
 decisions about what to do given the current game state, for example:
-- which overlay a key opens or closes, and which overlay Escape dismisses first;
 - when a battle start or end is emitted to the event ring;
 - what feedback a reducer call produces;
-- when a deferred shop-open fires.
 
 Because main.ts exports nothing, the only way to test these decisions is to boot the whole app.
 That is what the 11 `main.*.test.ts` suites do: they `vi.mock` the wasm package and
@@ -37,52 +37,35 @@ effect, no DOM, no SDK). The shell keeps the effects and executes the core's ver
 - A one-line guard is not worth a slice (`testing-tdd.md`: "when genuinely unsure, don't add
   it"). The small items are listed as Boy Scout backlog, not dropped.
 
-**Behaviour is preserved except where a slice names a defect.** The survey and review found five
-real defects. Each slice that fixes one has a red test that fails **on the defect** in today's
-code.
+**Re-scope (2026-10-01).** The operator redirected the client's input model to console-style
+virtual buttons (`operator-feedback-2026-10-01-controls.md`; design `console-controls-design.md`).
+That milestone replaces the keydown ladder, the Escape stack, the overlay registry's open/close
+routing, the dialogue/shop-open flow and the battle screen's `<select>`s. So this milestone keeps
+only the extractions the redesign does not touch:
+- **pgcc-b (hotkey table + Escape order) is SUPERSEDED** — it would have pinned the hotkey-primary
+  model as tested behaviour. Its claimView-Escape defect is fixed by the controls milestone (B pops
+  every frame).
+- **pgcc-c's dialogue-dismiss / deferred shop-open step (old C3/C4)** and **pgcc-d's Escape
+  terminal-dismiss latch (old D3) and `<select>` parse (old D5)** are absorbed by the controls
+  milestone (server frames reconciled from the store; battle outcome Continue; selects become nav
+  lists). See that spec's coverage table.
 
-| # | Defect | Slice |
-|---|---|---|
-| 1 | Uncatalogued care string | pgcc-a |
-| 2 | False-success feedback shape | pgcc-a |
-| 3 | Divergent item-selection parse | pgcc-d |
-| 4 | Stuck dialogue-dismiss lock | pgcc-c |
-| 5 | claimView ignores Escape | pgcc-b |
-
-1. **Uncatalogued care string.** `performCare`'s success line `'Cared!'` (`ui/careAction.ts`
-   `CARED_MESSAGE`) reaches players (via `raisingView.showFeedback`) as raw English. This is the
-   uncatalogued-string class 21r-b fixed, and it violates DECISIONS.md "no hard-coded UI strings".
-2. **False-success feedback shape.** Eight inline feedback sites do
-   `await conn.live()?.reducers.X(…)`: shop buy/sell, trade accept/reject/confirm/cancel, rename,
-   and trade-propose. If `live()` is `undefined` while `linkFrozen()` is false, `await undefined`
-   falls through to the **success** line for a call that never happened. `performCare` documents
-   exactly this hazard and closes it by construction.
-   - It is plausibly reachable. `connection.ts` `attemptBuild` sets `current = undefined` on
-     session-expired / auth-unreachable without touching the link state, and `linkFrozen` checks
-     only the link.
-   - End-to-end reachability is unproven. The fix therefore removes the shape instead of trusting
-     the invariant.
-3. **Divergent item-selection parse.** battleView parses its two item selectors differently.
-   - Bait uses `Number(raw)`, so a non-empty non-numeric value dispatches `onRecruit(NaN)`.
-   - Cure uses `parseInt`, so `'12abc'` dispatches `12`.
-   - Both violate reject-don't-clamp. The option values are generated, so this is hygiene, not an
-     exploit.
-4. **Stuck dialogue-dismiss lock.** Both dialogue-dismiss send paths (the Escape branch and the
-   shop-button click) set `dismissPending = true` inside the send lambda, then return
-   `conn?.live()?.reducers.dismissDialogue(…)`.
-   - When `live()` is `undefined` (defect 2's condition), no promise comes back, no `.catch`
-     runs, and `dismissPending` stays true while the conversation is still open.
-   - Escape is then a dead button until the next reconnect.
-5. **claimView ignores Escape.** The a11y SSOT `OVERLAY_A11Y` (`ui/overlayRegistry.ts`) marks
-   `claimView` `dismissible: true`, where `dismissible` means "Escape closes it" (M23 §2.1).
-   - No Escape branch closes it: main.ts's 15-branch stack omits it, and neither
-     `overlayA11y.ts`, `focusTrap.ts` nor `claimView.ts` handles Escape.
-   - It is the only dismissible overlay with no Escape path. `menuView` is closed by the
-     `menuKeyInput` intercept.
+**Behaviour is preserved except where a slice names a defect.** Validated at `efd3f3a0`:
+1. **Uncatalogued care string (CONFIRMED, LOW).** `performCare`'s success line `'Cared!'`
+   (`ui/careAction.ts` `CARED_MESSAGE`) reaches players (via `raisingView.showFeedback`) as raw
+   English — the uncatalogued-string class 21r-b fixed; it violates DECISIONS.md "no hard-coded UI
+   strings". Red: resolving it under `fr` returns English today.
+2. **False-success feedback shape (latent; reachability REFUTED).** Eight inline feedback sites do
+   `await conn.live()?.reducers.X(…)`; `await undefined` would fall through to the success line.
+   Validation traced every path: `current` is cleared only inside `attemptBuild`
+   (`net/connection.ts`), which runs only while the link is already non-connected, so
+   `live() === undefined` implies `linkFrozen()` and the frozen gate fires first. This is a code
+   shape, not a reachable bug: routing the sites through the one core removes it by construction,
+   with no dedicated red test (`testing-tdd.md`: no theoretical edge cases).
 
 ## Scope
 
-**In:** the four slices below.
+**In:** the three slices below (pgcc-a, pgcc-c, pgcc-d; pgcc-b superseded).
 
 **Named deferrals (declared, not dropped):**
 - **Leave inline, by design (wontfix for this milestone).** These are on the netcode smoothness
@@ -120,23 +103,16 @@ code.
     - the `onError`-`link` / `onClaimResult` mappings;
     - the bound heal/shop VM selection (≈1911-1946);
     - the heal-party target (≈2520-2525).
-  - **battleView presentation predicates:** opponent label, pvp status, skill/swap visibility, and
-    the HP colour band. `battleView.test.ts` already covers these through the DOM (≈5.9k lines,
-    including the palette-contrast cases), so a `battleControls` aggregate would be a
-    single-caller abstraction.
-  - **Shop click id parse:** the shop-button `Number(dataset.shopId)` parse (≈2107), where `''`
-    becomes `0`. It is defect 3's class, but is guarded today by the rendered `data-shop-id`.
-- **Operator flag (behaviour question; pgcc-b preserves current behaviour).** `KeyT` (interact)
-  is gated on `!anyOverlayVisible() && identity !== ''`, while every other hotkey uses the
-  registry verdict (`canOpen`). It is a residual candidate if the operator deems it a defect.
+- **Moved to the controls milestone:** the keydown preamble/hotkeys/Escape stack, the KeyT gate
+  question (T is retired there), the dialogue/shop-open step, the battle Escape latch and the
+  item `<select>` parse.
 
 ## Acceptance criteria (EARS)
 
 These criteria apply to every slice, and the tester encodes them per slice:
 - **Pure core.** The extracted core has no DOM, no SDK, no module state, and no clock. Its inputs
   and outputs are plain data, and it is tested by ordinary colocated vitest (`xModel.test.ts`).
-  Use table cases; use fast-check only where the input space is genuinely combinatorial (the
-  hotkey deny-precedence).
+  Use table cases; use fast-check only where the input space is genuinely combinatorial.
 - **No forbidden check shapes.** No eval, no source-text scan, no coverage threshold, and no
   check asserting that a call site exists (`testing-tdd.md`). Review verifies that the shell calls
   the core. Booted-app tests (the existing `main.*.test.ts` harness) verify the combined
@@ -147,23 +123,24 @@ These criteria apply to every slice, and the tester encodes them per slice:
   pre-existing boot test that exercised a moved decision SHALL stay, because it now guards the
   wiring. Deletion follows only `testing-tdd.md`'s rule, and must name the surviving test.
 - **What "red" means.** For a behaviour-preserving extraction, red is a failing import or
-  assertion against the core that does not exist yet. For defects 1–5, red is a test that fails
+  assertion against the core that does not exist yet. For defect 1, red is a test that fails
   **on the defect** in today's code.
 
 ## Slices
 
 Each criterion is an id-led bullet (`**A1:**` …), and `mr-gates init` seeds one gate per id
-(verified: 19 gates, 0 uncaptured SHALLs). Sub-bullets and the paragraphs that follow belong to
+(re-verified after the re-scope: 0 uncaptured SHALLs). Sub-bullets and the paragraphs that follow belong to
 the criterion above them. Evidence bullets carry no criteria.
 
-### pgcc-a — one feedback-action core for reducer calls with visible feedback (defects 1 + 2)
-category: i18n defect + false-success hazard · severity: HIGH (i18n class, per 21r-b) · size: LIGHT-MODERATE
-touches: client/src/main.ts, client/src/main.feedbackAction.test.ts, client/src/ui/careAction.ts, client/src/ui/careAction.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts
-after: []
-- Evidence @efd3f3a0: `ui/careAction.ts` `performCare` is already the right core (call →
+### pgcc-a — one feedback-action core for reducer calls with visible feedback (defect 1; latent shape 2)
+category: i18n defect + latent false-success shape · severity: LOW · size: LIGHT-MODERATE
+touches: client/src/main.ts, client/src/ui/careAction.ts, client/src/ui/careAction.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts
+after: [ctl-final]
+- Evidence @efd3f3a0 (re-verify after the controls milestone, which moves these sites into screen
+  adapters): `ui/careAction.ts` `performCare` is already the right core (call →
   frozen-`undefined` → disconnected; sync throw → error arm; settle → exactly one message), but its
   success line is uncatalogued (defect 1). main.ts has eight near-identical inline copies without
-  its `undefined` guard (defect 2): shop `onBuy`/`onSell` ≈2634-2662, trade
+  its `undefined` guard (latent shape 2): shop `onBuy`/`onSell` ≈2634-2662, trade
   `onAccept`/`onReject`/`onConfirm`/`onCancel` ≈2668-2715, rename `onSubmit` ≈2822-2835, and
   tradePropose `onSubmit` ≈2845-2868.
 
@@ -179,12 +156,6 @@ after: []
   call sites may be updated to pass care's message and `where` (`'care'`); no assertion is removed
   or weakened, and its `'Cared!'` assertions keep holding under `en`.
 
-- **A2:** IF `live()` yields no connection while `linkFrozen()` is false, THEN THE SYSTEM SHALL
-  report disconnected and never success. Red: a booted-app test in `main.feedbackAction.test.ts`
-  fails today, because it reports "purchased" for a call that was never made. The test uses the
-  existing `main.*` mock harness, mocks `linkFrozen() === false` and `live() === undefined`, and
-  clicks Buy in an open shop.
-
 - **A3:** THE SYSTEM SHALL resolve the care success line through the i18n catalog under a new key,
   with English bytes `Cared!` unchanged plus a French entry. The existing `catalogParity`,
   `catalogShape` and `hardcodedStrings` suites stay green. Red: resolving care success under the
@@ -194,90 +165,14 @@ after: []
   today: its "paint only while the overlay is visible" behaviour (the `showFeedback` closure may own
   that check), its `where` tag, and its existing success key. `main.feedbackI18n` passes unmodified.
 
-### pgcc-b — hotkey routing table + Escape priority → hotkeyModel (defect 5)
-category: testability (input routing) + a11y contract defect · severity: MED · size: MODERATE
-touches: client/src/main.ts, client/src/main.keydown.test.ts, client/src/ui/hotkeyModel.ts, client/src/ui/hotkeyModel.test.ts
+### pgcc-b — SUPERSEDED (2026-10-01)
+Not launchable. Superseded by `M-postgate-console-controls.spec.md`: the hotkey-primary model it
+would have pinned is replaced by virtual buttons, one context stack and a generated hint bar.
+
+### pgcc-c — battle-start/end + ranked-delta event-emit latches → battleEmitModel
+category: testability (latches repeatedly re-fixed: 16r-f, 17r-b) · severity: MED · size: LIGHT-MODERATE
+touches: client/src/main.ts, client/src/ui/battleEmitModel.ts, client/src/ui/battleEmitModel.test.ts
 after: [pgcc-a]
-- Evidence @efd3f3a0, hotkeys: the `window` keydown listener (main.ts ≈1306-1708) holds 13
-  hand-copied hotkey branches (≈1348-1566).
-  - B/I/E (the hide-switch trio) apply `verdict.forceHide` through `overlayHandles`, then
-    `toggle()`, then call `refreshBox/Raising/Evolution()` only if the view is visible after.
-  - Q/U/P/L close with `hide()` or open through `openQuestLog/Trade/Pvp/Leaderboard`.
-  - N/O/?/M/C call `held.clear()` on open only. O and M also require `identity !== ''`. C has no
-    identity guard.
-  - T (interact) is gated on `!anyOverlayVisible() && identity !== ''`.
-  - Every overlay key repeats `verdict.kind==='allow' && (self.visible || worldHasFocus())`.
-  - Every hotkey calls `preventDefault()`, gated or not.
-  - `e.code` branches are tested before `e.key === '?'`.
-  - The menu click front door (≈2139-2143) repeats M's guard, minus the world-focus clause.
-- Evidence @efd3f3a0, Escape: a 15-branch Escape stack (≈1571-1684) runs, in order: rename,
-  tradePropose, help, battle, box, raising, evolution, dialogue, questLog, heal, shop, trade, pvp,
-  leaderboard, privacy. It calls `preventDefault()` only when a branch closes something; otherwise
-  it falls through to overlay suppression and movement. Its "Escape priority" comment (≈1591) no
-  longer matches that order.
-
-- **B1:** Before the extraction, THE SYSTEM SHALL have a booted-app characterization suite,
-  `main.keydown.test.ts`. It pins today's observable keydown behaviour, is green on today's code
-  (except the B5 case, which lands with its fix), and stays unmodified through the extraction. It pins seven behaviours:
-  - (i) each hotkey's open, close or swallow outcome and its `defaultPrevented`, over at least four
-    states: nothing visible, self visible, a denying overlay visible, and world-unfocused;
-  - (ii) B/I/E switching, which force-hides a visible sibling and refreshes the opened view;
-  - (iii) `held.clear()` on open, and not on close, for N/O/?/M/C;
-  - (iv) the identity requirement for O/M/T, and its absence for C;
-  - (v) code-before-key precedence: `code: 'KeyM', key: '?'` routes to M, not help;
-  - (vi) Escape order: for each adjacent pair in the stack, with both visible, Escape closes the
-    higher-priority one first (where no player path co-opens a pair, the test may show both views
-    directly through their handles);
-  - (vii) Escape with nothing closable is not `defaultPrevented` by the Escape stage.
-
-- **B2:** WHEN given `{code, key, visibleIds, worldFocused, joined}`, a pure `routeHotkey` SHALL
-  return exactly one decision as data. The decision is either `unhandled` (not a hotkey) or a
-  verdict carrying `preventDefault` plus one action: `none` (gated), `close(id)`,
-  `toggle(id, forceHide)` (hide-switch trio), `open(id, clearHeld)`, or `interact`. The shell maps
-  the id to its existing opener or refresher. The routing table is data (one row per key), not
-  per-key branches.
-
-- **B3:** WHEN `routeHotkey` decides a key, THE SYSTEM SHALL reproduce that key's current guard
-  exactly. That guard is made of six parts:
-  - the `canOpen` verdict;
-  - the self-visible-or-world-focused clause;
-  - the per-key `joined` requirement;
-  - the per-key `clearHeld`;
-  - T's `anyOverlayVisible` gate (preserved; see the operator flag);
-  - `forceHide`, taken verbatim from `canOpen`.
-
-  Table cases pin three situations: with battle visible, every overlay key is denied; with box
-  visible, Q is denied; with box visible, I is allowed with `forceHide = [boxView]`. A fast-check
-  property shows that no `open`/`toggle` is returned for an id whose `canOpen` verdict denies
-  (self exempt). The menu click front door uses the same core with its current guard (verdict and
-  joined, no world-focus clause).
-
-- **B4:** WHEN Escape is pressed, a pure `escapeTarget(visibleIds)` SHALL return the first visible
-  id in ONE exported ordered list, or `null`. The list is today's 15 entries in today's order,
-  followed by `claimView`. A test shows that the list equals exactly the ids whose
-  `OVERLAY_A11Y[id].dismissible` is true, minus `menuView` (closed by the `menuKeyInput`
-  intercept); these are domain data, not source text. Per-id side effects stay in the shell, keyed
-  by the returned id:
-  - battle's terminal-dismiss latch and the `lastBattleVM` reset;
-  - the heal and shop unbind;
-  - dialogue's pending-shop cancel and dismiss send.
-
-- **B5:** WHEN Escape is pressed with `claimView` the top closable visible overlay, THE SYSTEM
-  SHALL close it and `preventDefault` (defect 5). Red: this `main.keydown.test.ts` case fails today,
-  because claim stays open. It is the one characterization case that is red by design, and it
-  lands with the fix. The close reuses claim's existing `hide()` path (the one `C` toggles), so it
-  inherits `claimView.ts`'s recorded residual that `hide()` leaves `claimModel` treating the
-  overlay as open, and a reconnect re-render may reopen it. That behaviour is accepted as is.
-
-- Boy Scout (in scope, main.ts): correct the stale `main.wiring.test.ts` citations (≈199, ≈1310;
-  that suite no longer exists) and the ≈1591 order comment.
-
-### pgcc-c — event-emit latches + dialogue-dismiss/shop-open step → battleEmitModel, shopOpenModel (defect 4)
-category: testability (latches repeatedly re-fixed: 16r-f, 17r-b; dead-button history) · severity: MED · size: MODERATE
-touches: client/src/main.ts, client/src/main.dialogueDismiss.test.ts, client/src/ui/battleEmitModel.ts, client/src/ui/battleEmitModel.test.ts, client/src/ui/shopOpenModel.ts, client/src/ui/shopOpenModel.test.ts
-after: [pgcc-b]
-- Why one slice: both are arm/reset/reconnect state machines, and both edit the same
-  `resetPredictionState` and reconnect region (≈1001, ≈3002-3060).
 - Evidence @efd3f3a0, battle and ranked listeners (main.ts):
   - The battle-emit listener (≈2004-2040) is a state machine over `activeBattleId`,
     `battleReseedPending`, `reseedPrevBattleId` and `hydratedSinceReconnect`. It returns early on
@@ -289,15 +184,6 @@ after: [pgcc-b]
     from `switchZone`, which does not arm a reseed.
   - The ranked listener (≈2046-2068) returns early when there is no profile.
   - Both are tested only through boot (`main.battle-reseed.test.ts`, about 20 cases).
-- Evidence @efd3f3a0, dialogue and shop (main.ts):
-  - Escape-in-dialogue (≈1617-1645) nulls `pendingShopId` up front, then sends `dismissDialogue`
-    only if `!dismissPending`. Its rejection resets `dismissPending`.
-  - The shop-button click (≈2105-2125) records `pendingShopId` (last intent wins) and sends under
-    the same guard. Its rejection resets `dismissPending` and also nulls `pendingShopId`.
-  - The dialogue batch listener (≈1861-1886) acts on a no-conversation batch. It clears
-    `dismissPending` and consumes-and-clears `pendingShopId`, opening the shop only if no overlay is
-    visible at that moment. Otherwise the open is dropped.
-  - Reconnect clears both (≈3031, ≈3055-3057).
 
 - **C1:** WHEN given the latch state and `{hydrated, latest}` (the latest player-battle summary or
   `undefined`), a pure battle-emit step SHALL return the next state and at most one emit. The emit
@@ -321,51 +207,23 @@ after: [pgcc-b]
   `battleId` is the latest battle's id only if `isPvpBattle`, and `''` otherwise. The shell keeps
   the no-profile and `identity === ''` early returns.
 
-- **C3:** WHEN given `(state, event)`, a pure shop-open step SHALL return the next
-  `{dismissPending, pendingShopId}` plus effects (`sendDismiss`, `openShop(id)`, or none). It
-  handles six events: escape-in-dialogue, shop-clicked(id), dismiss-rejected(path),
-  dismiss-not-sent(path) (no reducer promise came back), batch(conversationPresent,
-  anyOverlayVisible), and reconnect. Its rules:
-  - It never sends a dismiss while one is pending.
-  - Escape cancels a pending shop-open.
-  - Rollback is per-path, exactly as today. A shop-click rejection nulls `pendingShopId`; an
-    Escape-path rejection leaves it. So if an Escape dismiss is pending, Shop is then clicked, and
-    the Escape dismiss is rejected, the click's intent survives.
-  - The first no-conversation batch clears `dismissPending` and consumes `pendingShopId`. It emits
-    `openShop` only if no overlay is visible; otherwise the open is dropped, never retained.
-  - Reconnect clears both.
-  - `dismissPending` is set only once a reducer promise exists. `dismiss-not-sent` leaves it unset
-    and keeps `pendingShopId`, which matches today's frozen-link path, where the shop intent
-    survives the short-circuit.
+- **C5:** WHEN the latches are extracted, THE SYSTEM SHALL keep `main.battle-reseed.test.ts`
+  passing unmodified.
 
-- **C4:** IF a dismiss send produces no reducer call (a frozen link, or `live()` yields no
-  connection), THEN THE SYSTEM SHALL leave `dismissPending` unset (defect 4). Red:
-  `main.dialogueDismiss.test.ts` fails today, because the second Escape sends nothing. The test
-  uses the booted mock harness in three steps: press Escape in an open dialogue with
-  `live() === undefined` and the link not frozen; let `live()` recover; press Escape again and
-  expect a `dismissDialogue` send.
-
-- **C5:** WHEN the latches and the shop-open step are extracted, THE SYSTEM SHALL keep
-  `main.battle-reseed.test.ts` and `main.feedbackI18n` (the greet-then-shop round trip) passing
-  unmodified.
-
-### pgcc-d — battle/pvp/box decisions → battleModel, boxModel (defect 3; vite.config follow-ups)
-category: testability + input hygiene · severity: MED · size: MODERATE
-touches: client/src/main.ts, client/src/ui/battleModel.ts, client/src/ui/battleModel.test.ts, client/src/ui/battleView.ts, client/src/ui/battleView.test.ts, client/src/ui/boxModel.ts, client/src/ui/boxModel.test.ts, client/src/ui/boxView.ts, client/vite.config.ts
+### pgcc-d — battle/pvp/box decisions → battleModel, boxModel
+category: testability · severity: MED · size: LIGHT-MODERATE
+touches: client/src/main.ts, client/src/ui/battleModel.ts, client/src/ui/battleModel.test.ts, client/src/ui/boxModel.ts, client/src/ui/boxModel.test.ts, client/src/ui/boxView.ts
 after: [pgcc-c]
-- Evidence @efd3f3a0 (main.ts):
+- Evidence @efd3f3a0 (main.ts; re-verify after the controls milestone, whose battle and Monsters
+  adapters may already host these — extract only what is still inline):
   - `refreshBattle` (≈1783-1807) builds the bait-item list (inventory × defs, dropping missing defs)
     and the cure-item list (`cureStatus !== null`). It clears `pvpPendingTurnNumber` when
     `turn > pending || outcome !== 'Ongoing'` (the forfeit edge).
   - `onPvpAttack` / `onPvpSwap` (≈2558-2589) are near-duplicates. Each records the pending turn from
     the latest battle and restores it on rejection.
-  - The Escape terminal-dismiss latch (≈1593-1598) is
-    `latest && outcome !== 'Ongoing' ? dismissedBattleId = id : keep`.
   - `boxView.onSetPartySlot` (≈2498-2513) routes the `-1` "To Party" literal (from `boxView.ts`
     `#renderCard`) to `nextFreePartySlot`, or shows `chrome.status.partyFull` when the party is
     full.
-  - In `battleView.ts`, the `#renderRecruit` and `#renderCureItems` click handlers use the two
-    divergent selection parses (defect 3).
 
 - **D1:** WHEN given store rows, pure builders SHALL return the bait-item and cure-item lists. A
   missing item def drops that entry and never throws.
@@ -376,54 +234,28 @@ after: [pgcc-c]
   turn is pending. The attack and swap pending-turn capture is one rule, and a rejected submit
   restores the prior pending value.
 
-- **D3:** WHEN Escape closes the battle overlay, a pure rule SHALL return the battle id to dismiss
-  permanently if and only if the latest battle is terminal. Otherwise it keeps the current dismissed
-  id, so an `Ongoing` battle re-shows on the next batch.
-
 - **D4:** WHEN given `(requestedSlot, ownMonsters, partySize)`, a pure resolver SHALL return
   `send(slot)` for an explicit slot or the box sentinel. For the next-free sentinel it returns
   `send(firstFreeSlot)`, or `partyFull` when no slot is free. The next-free sentinel is one exported
-  named constant, used by both boxView and the resolver. Its value stays `-1`, because
+  named constant, used by both the box/Monsters view and the resolver. Its value stays `-1`, because
   `boxView.test.ts` asserts the `-1` emission. `main.partyFull` passes unmodified.
-
-- **D5:** WHEN given a raw `<select>` value, ONE pure selection parser SHALL classify it (defect 3).
-  - It returns `none` for `''`.
-  - It returns `item(id)` for a canonical decimal `u32` string: `0` or `[1-9][0-9]*`, with value
-    ≤ 4294967295 (the item-id wire type, per the bindings' `__t.u32()`).
-  - It returns `invalid` for anything else, e.g. `'12abc'`, `'007'`, `'-1'`, `' 3'`, `'1e2'`,
-    `'NaN'`, `'4294967296'`.
-
-  On `invalid`, neither Recruit nor Use-Item dispatches. On `none`, Recruit dispatches a bare
-  attempt (`baitItemId` undefined) and Use-Item dispatches nothing, both as today.
-
-  Red: two `battleView.test.ts` cases fail today:
-  - Recruit with `'abc'`, which passes `NaN` today;
-  - Use-Item with `'12abc'`, which dispatches `12` today.
-
-  Each case appends an `<option>` carrying the bad value to the rendered selector and selects it.
-  This is required because a real `<select>` ignores `.value` for a non-existent option.
-
-- `vite.config.ts` (a comment edit only; the exclude list is unchanged): rewrite the
-  coverage-exclude "KNOWN FOLLOW-UP" comment. Three of its four items now live in `battleModel` /
-  `boxModel`; boxView's nickname guard stays inline (Boy Scout backlog).
 
 ## Build order and fan-out
 
-- Every slice touches `client/src/main.ts`, the hot shared shell, so the milestone is **one
-  serialized chain: a → b → c → d**.
-- The order follows value. `a` goes first because it carries the HIGH i18n defect and the
-  false-success shape. `b` is the riskiest rewire and lands on a quiet shell. `c` and `d` follow.
+- This milestone runs AFTER `M-postgate-console-controls` (PLAN §9): that milestone rewrites the
+  input and overlay plumbing these slices sit next to, and serializing on `main.ts` the other way
+  round would make it rebase over three extractions mid-flight.
+- All three slices touch `client/src/main.ts`, so they serialize: **a → c → d**.
 - No slice touches `game-core`, `server-module`, `client/src/module_bindings/`, or any schema.
-  The milestone is client-only, with no `just gen`.
 
 ## Post-integration verification
 
 After pgcc-d merges, on master:
 1. The full `just ci` is green, including `client-typecheck`, `client-test` and
    `client-verify-build`.
-2. `just e2e` is green. These specs drive the refactored hotkey, Escape, battle, shop, trade and
-   feedback paths through the real UI: `golden`, `recruit`, `encounter-battle`, `pvp*`,
-   `shop-npc`, `trade*`, `rename`, `dialogue`, `a11y` and `movement-input`. No new e2e is needed,
+2. `just e2e` is green. These specs drive the refactored battle, shop, trade, rename and feedback
+   paths through the real UI: `golden`, `recruit`, `encounter-battle`, `pvp*`, `shop-npc`,
+   `trade*`, `rename` and `ranked-forfeit`. No new e2e is needed,
    because every touched flow already has one and unit and booted tests carry the criteria.
 3. `git diff <milestone-base>..master -- client/src/module_bindings server-module game-core` is
    empty, so the milestone stayed client-only.
@@ -434,13 +266,9 @@ After pgcc-d merges, on master:
 - **What the next milestone consumes:** nothing new. This milestone only lowers the cost of
   changing the client. The Boy Scout backlog above rides along with whichever later slice next
   edits that code.
-- **Decisions:** none expected. The work is refactors plus five defect fixes under existing
-  decisions: "no hard-coded UI strings", reject-don't-clamp, and the M23 a11y contract's
-  `dismissible`. A hotkey behaviour change beyond defect 5 is out of scope and goes to the
-  operator (the `KeyT` flag).
-- **Risk:** pgcc-b rewires every hotkey. The characterization suite lands first and stays
-  unmodified, and it is the guard. Existing boot tests alone cover the Escape order and gated
-  `preventDefault` too thinly (red-team finding at spec review).
+- **Decisions:** none expected (refactors plus one i18n fix under "no hard-coded UI strings").
+- **vite.config.ts "KNOWN FOLLOW-UP" comment:** rewritten by the controls milestone's final
+  cleanup slice, which retires most of the items it names.
 - **Spec review (2026-09-30):** reviewer, red-team and `/simplify` lenses ran on the draft.
   - Simplify cut 8 slices to 4: the presentation predicates, the nickname guard and the privacy
     gates moved to the Boy Scout backlog, and the two reconnect-region state machines merged.
@@ -448,3 +276,8 @@ After pgcc-d merges, on master:
     consume-and-drop, and added the per-path rollback, the latch arm/reset rules, and defect 4.
   - Reviewer added the menu click front door and the `u32` parse bounds.
   - Defect 5 was found while checking a red-team note against `OVERLAY_A11Y`.
+- **Re-scope (2026-10-01):** after the operator's controls directive, pgcc-b was superseded and the
+  Escape/dialogue/shop-open/select-parse criteria (old C3, C4, D3, D5) moved to
+  `M-postgate-console-controls`. Bug validation refuted the reachability of old defects 2 and 4
+  (`live() === undefined` implies `linkFrozen()`), so they are recorded as latent shapes without
+  red tests; old defect 5 (claimView Escape) is fixed by that milestone's B/Start semantics.
