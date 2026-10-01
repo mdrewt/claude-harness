@@ -33,7 +33,7 @@ The button set is closed: `Up Down Left Right A B X Y LB RB Start Select`.
 | **List / grid / tabbed screen** | Move (grid is 2-D) | Act, or open the item's action sheet | Back one level | A secondary action, only where the hint bar lists one (Monsters: quick Move) | Info | Previous/next tab | Close all → base | Help |
 | **Action sheet / picker** | Move | Do it | Back; the cursor stays on the source item | — | Info | — | Close all | Help |
 | **Yes/No** | Move | Choose | *Alt:* No | — | — | — | Close all (= No) | Help |
-| **Quantity / number row** | ±1 | Confirm, or start typing | Back | — | — | ±10 | Close all | Help |
+| **Quantity / number row** | ±1 | Confirm, or start typing | Back | — | — | — | Close all | Help |
 | **Dialogue** | Choices | Finish the typewriter / advance / choose | *Alt:* finish the typewriter; on a choice or leaf node, end the talk (`dismissDialogue`) | — | — | — | End the talk + close all | Help |
 | **Battle (base)** | Cursor | Choose | Sub-list → commands; nothing at the root | — | Skill/foe info | Tabs where present | **Main menu** over the battle (§4) | Help |
 | **Battle outcome** | — | Continue | *Alt:* Continue | — | — | — | Continue | Help |
@@ -54,7 +54,7 @@ Matching rules:
 |---|---|---|---|
 | D-pad | W A S D | Arrows | Operator's choice; arrows are the standard alternate |
 | A | Enter | NumpadEnter | Operator |
-| B | Backspace | none (§14 Q2) | Operator |
+| B | Backspace | none (§14 default 2) | Operator |
 | X | Space | — | Operator (Jump) |
 | Y | **F** | — | On the home row beside D, so it can be pressed while walking. Cassette Beasts uses F for a UI action |
 | LB / RB | Q / E | PageUp / PageDown | Operator; PageUp/PageDown is the RPG Maker tab alias |
@@ -84,7 +84,7 @@ Accelerator rules: pressed on its own top screen, an accelerator acts as Start (
 
 ## 4. Contexts, the focus stack, Start/B semantics and interrupts
 
-**The stack** (`ui/contextStack.ts`, pure): `Frame = world | battle(id) | screen(id, nav) | prompt(id, nav) | textEntry(owner)`; `world` and `battle` are **bases**. The session gate sits outside the stack and outranks it. A total `SCREEN_POLICY: Record<FrameId, {owner: player|server, onBattle: drop|suspend, battleSafe, armMs}>` replaces `OVERLAY_TIERS`, `BATTLE_FORCE_HIDE` and `NEVER_FORCE_HIDE`; an omission is a compile error.
+**The stack** (`ui/contextStack.ts`, pure): `Frame = world | battle(id) | screen(id, nav) | prompt(id, nav) | textEntry(owner)`; `world` and `battle` are **bases**. The session gate sits outside the stack and outranks it. A total `SCREEN_POLICY: Record<FrameId, {owner: player|server, onBattle: drop|suspend, battleSafe}>` replaces `OVERLAY_TIERS`, `BATTLE_FORCE_HIDE` and `NEVER_FORCE_HIDE`; an omission is a compile error.
 
 **Transitions** (`contextStep(stack, edge) → {stack, commands}`):
 - **Start above a base** pops to it (battle if in battle, else world). Popping a server-owned dialogue emits `dismissDialogue`; the client never closes it.
@@ -107,11 +107,11 @@ Accelerator rules: pressed on its own top screen, an accelerator acts as Start (
 - `held.press` is keyed on virtual-button edges; the `held.isHeld` dedupe (`main.ts:1694`) stays; `e.repeat` stays ignored (`main.ts:1312`). Virtual buttons are refcounted across keys (fixes `main.ts:1711`, where releasing ArrowUp stops a held W). `keyup`/`blur` stay ungated; `blur` and `visibilitychange:hidden` call `releaseAll`.
 - `movementEnabled(stack, sessionGate)` replaces **every** `anyOverlayVisible()` use — `main.ts:1114` (divergence snap), `:3211` (frame loop), `:3270` (`overlayUp`) — and folds in the session gate (`main.ts:455-461`).
 
-**Interrupt guard.** Only frames the player did not directly cause carry `armMs` = 250 (battle start; a request screen opened by Y while its banner is fresh): A and X are ignored, B and Start work, the title is announced on `#a11y-live`. Priority: session > battle > dialogue > notice > menus. No global mash-guard; destructive actions default to No.
+**Interrupts.** Priority: session > battle > dialogue > notice > menus. A server-caused frame announces its title on `#a11y-live`. There is no arm delay and no global mash-guard; destructive actions default to No.
 
 **Typing mode** (rename, nickname, trade amounts): forms are lists of rows; A on a text row starts typing ("Typing — [Enter] Done [Esc] Stop typing"). The field owns every key except Escape (stop typing, keep text; a second Escape is Start) and Enter (commit). Rename opens already typing. The nickname edit leaves `window.prompt()` (`ui/boxView.ts:278`). Views drop `stopPropagation` (B5). The shape suits M19 chat.
 
-**After a battle** the player lands in the world. Drafts, such as a half-built trade proposal, survive in their models.
+**After a battle** the player lands in the world.
 
 ## 5. Main menu information architecture and navigation shapes
 
@@ -124,18 +124,18 @@ The **main menu** is a framed vertical list in a right-hand side panel, about �
 | 3 | **Journal** | A list; A or Y opens the detail | questLog |
 | 4 | **Social** | Tabs **Players**, **Trades** (Accept / Decline / Confirm / Cancel), **Challenges** (Accept / Decline / Cancel), **Rankings** (read-only). A badge shows when something is waiting | trade, pvp (respond), leaderboard |
 | 5 | **Profile** | A list: Name (typing), Account & sign-in, Privacy & data (deletion keeps its two-step confirm) | rename, claim, privacy |
-| 6 | **Options** | A list: Controls (§9), How to play | help |
+| 6 | **Options** | A list: Controls (§9), How to play, Report a problem (F9's twin) | help |
 | 7 | **Close** | For mouse and touch | — |
 
 Monsters merges three screens: players think in nouns, not in which screen holds a verb.
 
-**Social › Players** is a plain list (decided; c3 S4): name, zone name, "In battle" badge, and a **Nearby** badge (same zone, ≤ `NEARBY_TILES` = 12 Manhattan — a `socialModel` presentation constant, not a game rule; nothing is gated on it). A on a row shows "Walk up to {name} and press A"; there is no remote action. Data comes from the already-public `character` subscription (`net/connection.ts:793`), so nothing new is disclosed, and Help's "nearby player" claim (B15) becomes true. The 8-way compass and distance text are deferred (§17): zone + Nearby is enough to find a friend, and the compass adds eight strings and a direction rule nobody asked for.
+**Social › Players** is a plain list (decided; c3 S4; kept as the only in-game way to find someone to walk up to): name, zone name, and a **Nearby** badge (same zone, ≤ `NEARBY_TILES` = 12 Manhattan — a `socialModel` presentation constant, not a game rule; nothing is gated on it). A on a row shows "Walk up to {name} and press A"; there is no remote action. Data comes from the already-public `character` subscription (`net/connection.ts:793`), so nothing new is disclosed, and Help's "nearby player" claim (B15) becomes true. There is no "In battle" badge: the `character` row carries no battle state and battles are private. The 8-way compass and distance text are deferred (§17): zone + Nearby is enough to find a friend, and the compass adds eight strings and a direction rule nobody asked for.
 
 **Screens outside the menu:**
 - **Dialogue:** bottom box, name plate, typewriter text, ▼; choices form a wrapping list. Picking Shop ends the talk and opens **Shop**.
 - **Shop:** tabs Buy | Sell (opens on Buy) → quantity row → Yes/No (Buy Yes, Sell No). Y shows the description (new slot, "—" when empty). Balance in the title; feedback "✓ Bought 2 Bait (−40g)".
 - **Heal:** A on the healer → "Heal party for N?" (Yes) at the *bound* location (fixes B13). Box's Heal Party button goes.
-- **Trade-propose wizard**, from the face-to-face picker with the target pre-filled: Offer (A toggles ✓) → Coins → Ask → Review. LB/RB page, B steps back, the draft survives Start.
+- **Trade-propose wizard**, from the face-to-face picker with the target pre-filled: Offer (A toggles ✓) → Coins → Ask → Review. LB/RB page, B steps back. Start abandons the draft.
 - **Battle:** Fight / Recruit / Swap / Bag / Run, reset to Fight each turn. Fight is a 2-column skill grid with affinity, power, accuracy (R-rb-56). Recruit → bait list ("No bait" first) → Yes; Swap → bench; Bag → cures → target. Run disabled in PvP with a reason; "Waiting for {name}…" greys the list. `<select>`s become lists (B10). Outcome "▼": A or B continues.
 - **Help** (Select): tabs This screen | All controls | Goals, generated from the hint-bar table.
 - **Session:** system modal; Retry default; Continue as guest → confirm (No). B/Start inert, and the hint says so. Rendered inside the frame (B1/B3).
@@ -159,6 +159,8 @@ Monsters merges three screens: players think in nouns, not in which screen holds
 
 `⌫ ⌫ ⌫` also exits level by level. B at the menu root closes the menu.
 
+**Battle variant:** mid-turn, `Esc` opens the menu over the battle; `Enter` opens Monsters (read-only actions disabled); `Esc` returns to the battle screen with the command list intact and the stack equal to `[battle]` (e2e in `battle-dpad.spec.ts`, ctl-8j).
+
 **Press counts for common tasks** (c3 S2). These assume a fresh nav memory, with the menu cursor on Monsters and Social on Players.
 
 | Task | D-pad path | Presses | Accelerator | Presses |
@@ -174,9 +176,7 @@ Monsters merges three screens: players think in nouns, not in which screen holds
 | A battle turn | Enter, Enter (Fight is reset, the skill remembered) | 2 | — | — |
 | Rename | Esc, W, W, W, Enter, Enter | 6 | N | 1 |
 
-**Tests on the pure models:**
-- Every common-task row is checked with D-pad presses ≤ accelerator presses + 4. Rename is rare, so it is held only to the next bound.
-- Every accelerator target is reachable from the world in **≤ 7** D-pad/A presses. This is a property over the menu tree and nav, and the worst case today is Social › Challenges at 7.
+**Tests on the pure models:** every accelerator target (and Options › Report a problem, the F9 twin) is reachable from the world in **≤ 7** D-pad/A presses. This is a property over the menu tree and nav, and the worst case today is Social › Challenges at 7. The common-task table above is design guidance (principle 7), not a tested bound.
 
 ## 6. Navigation core rules (`ui/nav.ts`, pure)
 
@@ -184,7 +184,7 @@ Monsters merges three screens: players think in nouns, not in which screen holds
 - **Wrap:** a fresh D-pad press **wraps** (lists top↔bottom, grids within row/column, tabs). Held auto-repeat is synthesized in the router `tick` on an injected clock (350 ms, then 100 ms) and **clamps** at the ends.
 - **Disabled items** stay greyed but reachable; A prints the reason on the feedback line.
 - **Memory** (session-scoped `NavMemory`): menu and screens remember entry, tab and item per tab; Social opens on the oldest waiting request's tab while a badge is pending (§4); Shop opens on Buy; battle root = Fight each turn; skills = last per monster per battle; Yes/No = declared default; pickers = last choice.
-- **Active indicator:** ▶ in the gutter, inverted band, 2 px frame (thick on grid cells); ▶ bobs unless reduced motion; never colour alone (B18).
+- **Active indicator:** styling guidance, not a criterion: ▶ in the gutter (a CSS pseudo-element), inverted band, 2 px frame (thick on grid cells); never colour alone (B18). The tested contract is the `is-active` class plus `aria-selected`.
 - **ARIA** follows `menuView` (`ui/menuView.ts:150-205`): the nav container is the **single tab stop** with `aria-activedescendant`, so DOM focus never roves and re-renders cannot drop it (R-rb-121 class). Roles `listbox/option`, `grid/gridcell`, `tablist/tab`; stable ids `{frame}-{tab}-{key}`; `aria-selected`/`aria-disabled`; the container persists and rows diff. Active-descendant changes are **not** mirrored into `#a11y-live` (no double speech, W1).
 
 ## 7. World interaction
@@ -236,53 +236,54 @@ Implementation:
 
 **Options › Controls:** tabs Buttons (12 rows) | Shortcuts (clickable), each row with Primary and Alt slots.
 - **A captures** ("Press a key for Confirm (A)…"). Any key is accepted, Escape/Enter/Backspace included; reserved keys are refused with a reason.
-- **Cancel by keyboard:** press the key the slot already holds (for an empty slot, the key in the row's other slot) — capture ends unchanged. Otherwise the Cancel chip, right-click, or 10 s idle.
-- **X clears** a slot, **Y resets** a row; "Reset all" asks Yes/No (default No), reachable by mouse.
-- **Conflicts swap** ("Swapped: F is now Info, K is now Confirm"). **Protected buttons** (D-pad, A, B, Start) always keep a key; a change that would empty one, swaps included, is refused. Capture uses real presses, so lock-out is impossible.
+- **Cancel by keyboard:** press the key the slot already holds (for an empty slot, the key in the row's other slot) — capture ends unchanged. Otherwise the Cancel chip or right-click. No idle timeout.
+- "Reset all" asks Yes/No (default No), reachable by mouse. There is no per-slot clear or per-row reset.
+- **Conflicts swap** ("Swapped: F is now Info, K is now Confirm") across one namespace shared by buttons and accelerators. **Protected buttons** (D-pad, A, B, Start) always keep a key; a change that would empty one, swaps included, is refused. Capture uses real presses, so lock-out is impossible.
 
-**Storage:** `input/bindingStore.ts` behind `BindingSource {load, save}`; `localStorage['mr.controls'] = {v:1, updatedAt, devices:{keyboard:{buttons, accels}}}`, try/catch on every access; total `parseBindings(raw: unknown)` falls back per entry, an unknown `v` gives defaults plus a notice; saves are immediate. A `pad` device and an account source (merged by `updatedAt`) add later without reshaping.
+**Storage:** `input/bindingStore.ts` with plain `loadBindings(storage)` / `saveBindings(storage, b)` over an injected `Storage`; `localStorage['mr.controls'] = {v:1, buttons, accels}`, try/catch on every access; total `parseBindings(raw: unknown)` falls back per entry, an unknown `v` gives defaults; saves are immediate. M-gamepad decides how a `pad` entry joins; account sync is deferred (§17).
 
-**Glyphs:** a **synchronous** `glyph(code)` (N5) reads a cache filled from `navigator.keyboard.getLayoutMap()` (async, Chromium-only; called at boot and on focus), else the `e.key` learned per code or recorded at capture, else the catalog key name (AZERTY `KeyW` reads "Z"). The key-name table is a typed `Record<KeyCode, PlainMessageId>` with no template-literal keys, so `t()`'s pinned signature (SHAPE-05) holds.
+**Glyphs:** a **synchronous** `glyph(code)` (N5) reads the `e.key` learned per code or recorded at capture, else the catalog key name (AZERTY `KeyW` reads "Z" once pressed). `getLayoutMap()` is deferred (§17). The key-name table is a typed `Record<KeyCode, () => string>` of thunks over literal ids, so `t()`'s pinned signature (SHAPE-05) and the catalog-parity gates hold.
 
-**Hint bar:** pure `hintBar(stack, bindings)` drives the bottom of `#game-screen` in every context. World: `[Esc] Menu [R] Help`, plus `[Enter] Talk` with a target, plus `[F] View [⌫] Dismiss` with a notice and no target. Chips are button-colour badge + live keycap + verb. The **Start chip replaces the `#help-hint` launcher** and carries the Social badge. A meaningless key (retired T, Space in a menu) pulses the bar and the live region names the right key.
+**Hint bar:** pure `hintBar(stack, bindings)` drives the bottom of `#game-screen` in every context. World: `[Esc] Menu [R] Help`, plus `[Enter] Talk` with a target, plus `[F] View [⌫] Dismiss` with a notice and no target. Chips are button-colour badge + live keycap + verb. The **Start chip replaces the `#help-hint` launcher** and carries the Social badge. Notices are exactly two kinds: a pending incoming request and the pending error.
 
-**Help** is generated from the context table, bindings and catalog; `CONTROLS` and the English literals in `MENU_TREE` are deleted with their importers (B11). **The welcome card** shows once (same storage seam), closes with A, B, Start or a click, and is repeated in Help › Controls.
+**Help** is generated from the context table, bindings and catalog; `CONTROLS` and the English literals in `MENU_TREE` are deleted with their importers (B11). Options also carries **Report a problem**, the menu twin of F9. A first-run welcome card is deferred (§17).
 
 ## 10. Overlay frame and presentation
 
 **`#game-screen`** wraps the canvas mount, the frame layer and the hint bar. Today `render/world.ts:72` appends the canvas to `#app` (`:66-67` only read `cssW`/`cssH`), and `#app` also parents the JS-built **battleView, boxView, raisingView, evolutionView**, self-styled `position:fixed; inset:0` at z 100/110. The page never scrolls (`overflow: hidden; 100dvh`).
 
-**Every overlay becomes a class-styled `.mr-frame` inside `#game-screen`** (`styles.css` bans `#id` selectors, A11Y-12), closing S-overlay-anchor (HIGH, orphaned), B3 and r2-006/008/013/060/091. Inventory = the 17 `OverlayId` members (`ui/overlayRegistry.ts:34-57`) plus non-members: `battleView` → battle base; `boxView`/`raisingView`/`evolutionView` → Monsters; `dialogueView` → dialogue (server-owned); `questLogView` → Journal; `healView` → heal prompt; `shopView` → Shop; `tradeView`/`pvpView`/`leaderboardView` → Social tabs; `renameView` → Profile › Name; `tradeProposeView` → wizard; `helpView` → Help; `menuView` → `mainMenu`; `claimView` → Profile › Account (+ claim-on-failure); `privacyView` → Profile › Privacy; non-members `sessionView` → session gate, error panel → toast; new: welcome, Controls.
+**Every overlay becomes a class-styled `.mr-frame` inside `#game-screen`** (`styles.css` bans `#id` selectors, A11Y-12), closing S-overlay-anchor (HIGH, orphaned), B3 and r2-006/008/013/060/091. Inventory = the 17 `OverlayId` members (`ui/overlayRegistry.ts:34-57`) plus non-members: `battleView` → battle base; `boxView`/`raisingView`/`evolutionView` → Monsters; `dialogueView` → dialogue (server-owned); `questLogView` → Journal; `healView` → heal prompt; `shopView` → Shop; `tradeView`/`pvpView`/`leaderboardView` → Social tabs; `renameView` → Profile › Name; `tradeProposeView` → wizard; `helpView` → Help; `menuView` → `mainMenu`; `claimView` → Profile › Account (+ claim-on-failure); `privacyView` → Profile › Privacy; non-members `sessionView` → session gate, error panel → toast; new: Controls (`controlsView`, a new `OverlayId`). Bag reuses the `raisingView` root.
 
 **Legacy root ids are a frozen seam:** each keeps its id and testids as the root of its frame or tab panel, `display:none` exactly when not shown (§16).
 
-**`ui/frameView.ts`, one chrome:** title bar (title, breadcrumb, tab strip with LB/RB glyphs); internally scrolling body; one feedback line (✓, !, spinner; never claims undelivered success, pgcc-a B7); the hint bar; an original 9-slice pixel border in the storybook palette. Sizes: side panel, full, bottom box, small (prompt or sheet, anchored by its source). uxd1's FILL viewport is unchanged; a set-ratio box is deferred (§17).
+**`ui/frame.ts`, one chrome:** title bar (title, breadcrumb, tab strip with LB/RB glyphs); internally scrolling body; one feedback line (✓, !, spinner; never claims undelivered success, pgcc-a B7); the hint bar. Styling guidance, not a criterion: an original 9-slice pixel border in the storybook palette. Sizes: side panel, full, bottom box, small (prompt or sheet, anchored by its source). uxd1's FILL viewport is unchanged; a set-ratio box is deferred (§17).
 
 ## 11. Accessibility and i18n
 
 - **M23 is adapted, not discarded.** Frames keep `role="dialog"`, labels and `aria-modal` via `OVERLAY_A11Y` (`dismissible` now means "B pops it"); `focusTrap` owns Tab.
 - **Stacked modal frames (W1):** on push, the frame below becomes `inert` + `aria-hidden` and its trap is suspended; the pop restores both. A single pop returns focus to the parent frame's nav container; a multi-level pop to a base restores focus once, to the canvas.
 - **`#a11y-live`** stays a `<body>` child in `index.html` (A11Y-10). `adoptLiveRegion` (`ui/liveRegion.ts:121-138`, via `overlayA11y.ts:131`) re-adopts it into the **top** frame on every push and pop and returns it to `<body>` at a base. It announces titles ("Enter to choose, Backspace to go back" for the first three), feedback, interrupts, remaps and banners.
-- **Motor:** no required holds; two slots per button; WCAG 2.1.4 met (every accelerator rebindable or unbindable); auto-repeat clamps. **Reduced motion** disables the bob, slides and typewriter. The canvas stays `role="application"`; a manual NVDA pass runs before Playtest-3.
-- **i18n:** every new string is an en/fr catalog id and `t()` throws on a missing one — verbs, titles, tabs, reasons, help rows, "Nearby", key names ("Entrée", "Espace", "Échap"). Button letters stay symbols.
+- **Motor:** no required holds; two slots per button; WCAG 2.1.4 met (every accelerator rebindable or unbindable); auto-repeat clamps. **Reduced motion** disables slides and the typewriter. The canvas stays `role="application"`; a manual NVDA pass runs before Playtest-3.
+- **i18n:** every new string is an en/fr catalog id and `t()` throws on a missing one — verbs, titles, tabs, reasons, help rows, "Nearby", key names ("Entrée", "Espace", "Échap"). Ids reach `t()` only as literals; table-driven text is stored as thunks (`() => t('lit.id')`), so the DYNAMIC-KEY and DEAD-KEY gates hold. Glyph marks and button letters come from CSS on `data-` attributes or catalog glyph ids, never TS literals in a DOM sink (`hardcodedStrings` ceiling 0).
+- **File names:** a new `ui/*View.ts` file must be a new `OverlayId` with an `OVERLAY_A11Y` entry (OR-MANIFEST-COMPLETE); helpers are `navRender.ts`, `frame.ts`, `hintBar.ts`.
 
 ## 12. Architecture, modules and controller readiness
 
-**Pipeline:** sources emit `PhysicalInput` (`{src:'key', code} | {src:'pad', button}`) → the pure **router** resolves them through ONE binding table into `VButton`/`Accel` edges → the pure **contextStack** routes each edge to the top `ScreenAdapter.onButton(vm, nav, btn) → Command | consumed | unhandled` → `main.ts` runs an exhaustive `dispatch(command)` plus `applyStack(prev, next)` (`show`/`hide`, `open`/`closeOverlayA11y`).
+**Pipeline:** sources map physical input through ONE binding table into source-agnostic `{button, down}` edges (`VButton`/`Accel`) → the pure **router** → the pure **contextStack** routes each edge to the top `ScreenAdapter.onButton(vm, nav, btn) → Command | consumed | unhandled` → `main.ts` runs an exhaustive `dispatch(command)` plus `applyStack(prev, next)` (`show`/`hide`, `open`/`closeOverlayA11y`).
 
-**New modules:** `input/` (`buttons`, `bindings`, `bindingStore`, `router`, `keyboardSource`, `pointerSource`, `longPress`, `glyphs`); `ui/` (`nav`, `navView`, `contextStack` + `SCREEN_POLICY` + `reconcile`, `frameView`, `hintBarModel`, `controlsModel`/`controlsView`, `socialModel`, `screens/*`); game-core `interact_candidates`; client-wasm `interact_candidates_coded`. **The server module is unchanged.** Unchanged: `heldKeys`, `predictor`, `focusTrap`, `overlayA11y`. Shrinks: `overlayRegistry` keeps only `OverlayId` and `OVERLAY_A11Y`; `main.ts` loses the key ladder (`:1306-1708`), `KEY_DIR`, `targetOwnsKey`, `worldHasFocus`, the probe/handle tables, `activateMenuLeaf` and the Escape stack.
+**New modules:** `input/` (`buttons`, `bindings`, `bindingStore`, `router`, `keyboardSource`, `pointerSource`, `longPress`, `glyphs`); `ui/` (`nav`, `navRender`, `contextStack` + `SCREEN_POLICY` + `reconcile`, `frame`, `hintBarModel`/`hintBar`, `noticeModel`, `controlsModel`/`controlsView`, `socialModel`, `monstersModel`, `bagModel`, `screens/*` with one `legacyAdapter` and a total `SCREEN_ADAPTERS` record); game-core `interact_candidates`; client-wasm `interact_candidates_coded`. **The server module is unchanged.** Unchanged: `heldKeys`, `predictor`, `focusTrap`, `overlayA11y`. Shrinks: `overlayRegistry` keeps only `OverlayId` and `OVERLAY_A11Y`; `main.ts` loses the key ladder (`:1306-1708`), `KEY_DIR`, `targetOwnsKey`, `worldHasFocus`, the probe/handle tables, `activateMenuLeaf` and the Escape stack.
 
 **Tests** (testing-tdd.md: colocated, one e2e per flow, no source-text scans). Vitest + fast-check over the pure cores: bindings invariants; router refcount/repeat/ownership (Jump fires once; Space on a focused chip is not consumed); nav reconcile; the required flow; dialogue suspend and silent drop; reconcile idempotence; press-count bounds (§5); interact-rule cases (§7). Ownership and key-name tests feed events and assert outcomes, never grep keymaps. New e2e: `menu-flow`, `remap`, `pointer`, D-pad-only battle, `respond-request` (Y, Enter), movement (hold W → Start → close gives no step; Ctrl+P not prevented). A `pressButton`/`pressAccel` helper reads `DEFAULT_BINDINGS`.
 
-**Controller readiness.** The Gamepad milestone only adds `gamepadSource` (poll, edges, disconnect → `releaseAll`), a pure `stickToDpad` (deadzone, hysteresis), `pad` defaults on the W3C standard map (0 A, 1 B, 2 X, 3 Y, 4/5 LB/RB, 8 Select, 9 Start, 12–15 D-pad; triggers and stick clicks → accelerators) and a pad glyph family chosen by `lastSource`. Nothing else changes; Steam Input (M21b-3) maps onto the same buttons.
+**Controller readiness.** `M-gamepad.spec.md` owns the pad design (W3C map, `stickToDpad`, pad glyphs). Because the router consumes only `{button, down}` edges (tested with a fake non-keyboard source, CTL1.5), a pad is one more source; nothing else changes. Steam Input (M21b-3) maps onto the same buttons.
 
 **Migration constraints for the slice plan:**
 1. **Strangler:** every slice merges green and playable.
-2. **One owner per key at every boundary.** The first router slice owns only the D-pad and Space. Q/E→LB/RB, Q→J and E→V land in **one** slice. Each legacy letter retires with its replacement (T with the live-glyph chip).
+2. **One owner per key at every boundary.** The first router slice owns only the D-pad and Space. Until the accelerator slice, LB/RB come only from PageUp/PageDown. Q/E→LB/RB, Q→J and E→V land in **one** slice (ctl-11a). Each legacy letter retires with its replacement (T with the live-glyph chip).
 3. **Stack before screens:** `contextStack` + `reconcile` land behind the existing show/hide before the Escape-ladder swap; order stack → nav/menu → Start/B routing.
-4. **Frame anchoring before per-screen D-pad.** Re-parenting the `#app` children under `#game-screen` is its own slice, keeping render-loop and e2e-hook continuity (W5). Adapters start in legacy DOM-button mode, then convert in parallel slices with disjoint touches. Never combine the stack swap with screen work.
+4. **Frame anchoring before per-screen D-pad.** Anchoring (ctl-7a) and re-parenting the `#app` children under `#game-screen` (ctl-7b) keep render-loop and e2e-hook continuity (W5). Adapters start in legacy DOM-button mode, then convert in a serial chain ordered by consumers (they all append to the catalogs). Never combine the stack swap with screen work.
 5. **Replace first, delete second** (testing-tdd.md:90-109); survivors are named in §16.
-6. **Sequencing:** `main.ts` serializes the router, stack-swap and interact slices; pgcc-a may go first; **pgcc-b is superseded** before harness PR #149 merges; pgcc-c C3/C4 and pgcc-d D3/D5 are re-keyed here; M25 S1 is sequenced against the wizard slice only (no `trading.rs` collision without a guard).
+6. **Sequencing:** pgcc-a runs FIRST (`after: []`), before ctl-1; its feedback core is what the screen adapters later call. `main.ts` then serializes the router, stack-swap and interact slices. pgcc-c runs `after: [pgcc-a, ctl-15]` and pgcc-d `after: [pgcc-c]`; pgcc-d owns the `vite.config.ts` "KNOWN FOLLOW-UP" comment rewrite. **pgcc-b is superseded**; pgcc-c C3/C4 and pgcc-d D3/D5 are re-keyed here; M25 S1 is sequenced against the wizard and face-to-face slices only (no `trading.rs` collision without a guard).
 
 ## 13. Decisions overturned or amended (`docs/DECISIONS.md` titles)
 
@@ -290,9 +291,10 @@ Only entries that meet the bar are recorded (c4 N1).
 
 | Entry | Action | Why |
 |---|---|---|
-| **"Client UI: one overlay registry, keyboard first"** | **Superseded in place** by **"Client UI: virtual buttons, one context stack, one overlay frame"**. **Drops:** hotkeys as primary, the `M` discovery menu, the `CONTROLS` SSOT, `T`, overlay tiers. **Keeps:** pure models/thin views, guard-never-dismiss (server frames reconciled; dialogue never closed client-side), `OVERLAY_A11Y`, `A11Y_TOKENS`, no WAAPI, the total catalog. **Folds in the bindings:** per-browser localStorage v1, protected buttons, a pad device and account sync addable later. This reverses M23's remap cut (`specs/monster-realm-v2/archive/M23-accessibility.spec.md:335`) | The operator inverts primacy; r2-023 was mis-dispositioned |
-| **"Held keys: commit threshold and warp continuity"** | **Amended:** virtual D-pad refcount; `held.clear()` on every frame push (replaces "text-input overlays clear…"); a held direction does **not** resume after a frame closes (reverses the `main.ts:3204` behaviour); router-synthesized menu repeat; OS repeat still drives nothing | No ghost walks or stale hold stamps |
+| **"Client UI: one overlay registry, keyboard first"** | **Superseded in place** by **"Client UI: virtual buttons, one context stack, one overlay frame"**. **Drops:** hotkeys as primary, a hotkey-only discovery menu (`M` stays a Start alias), the `CONTROLS` SSOT, `T`, overlay tiers. **Carries forward** the old Why (dialogue desync, testable pure models, total catalog) and Rules-out (colour alone, WAAPI, hard-coded strings, key/`en` fallback). **Keeps:** pure models/thin views, guard-never-dismiss (server frames reconciled; dialogue never closed client-side), `OVERLAY_A11Y`, `A11Y_TOKENS`, no WAAPI, the total catalog. **Folds in the bindings:** per-browser localStorage v1, protected buttons; a pad source (M-gamepad) and account sync addable later. This reverses M23's remap cut (`specs/monster-realm-v2/archive/M23-accessibility.spec.md:335`) | The operator inverts primacy; r2-023 was mis-dispositioned |
+| **"Held keys: commit threshold and warp continuity"** | **Rewritten in place** (no chained "Amended" block): virtual D-pad refcount; `held.clear()` on every frame push (replaces "text-input overlays clear…"); a held direction does **not** resume after a frame closes (reverses the `main.ts:3204` behaviour); router-synthesized menu repeat; OS repeat still drives nothing | No ghost walks or stale hold stamps |
 | **New: "Interaction target: the tile in front, then your own tile"** | One game-core rule. No range tier, even though `talk` accepts up to `TALK_RANGE` = 2. The server range is a latency margin, not a reach | Not code-evident: the narrower client rule looks like a mismatch someone would "fix". The reason is operator intent (r2-024) |
+| **"Integer pixel scaling"** | **Corrected in place (substantive):** integer *device* scale; the CSS stage scale is fractional (`render/viewport.ts`); Rules-out becomes "Fractional device scales" | The entry misstates the shipped renderer (C7) |
 
 "Bounded client prediction" is unchanged. No entry for face-to-face trading (UI routing, code-evident); the server guard is a deferral.
 
@@ -303,11 +305,11 @@ Only entries that meet the bar are recorded (c4 N1).
 - Put the milestone ahead of Playtest-3 in PLAN §9, and add a Gamepad placeholder.
 - File B1–B18 as cleanup.
 
-## 14. Open questions for the operator
+## 14. Defaults adopted (operator may override)
 
-1. **Start in battle opens the main menu**, read-only, with the PvP timer running. This follows the brief's "returning … to the battle screen". *Default: yes.* The alternative is that Start does nothing in battle, as in Pokémon.
-2. **A second default key for B?** Backspace is unconventional on PC. *Default: none*; the hint bar always shows `⌫`. Never Escape (it is Start) and never keyboard X.
-3. **Merge Box/Raising/Evolution into Monsters with one action sheet.** *Default: merge.* The alternative is Party | Storage | Evolve tabs.
+1. **Start in battle opens the main menu**, read-only, with the PvP timer running. This follows the brief's "returning … to the battle screen". *Adopted: yes.* The alternative is that Start does nothing in battle, as in Pokémon. *Last safe override point:* before ctl-6c (ctl-6b already leaves Start inert on an ongoing battle).
+2. **A second default key for B?** Backspace is unconventional on PC. *Adopted: none*; the hint bar always shows `⌫`. Never Escape (it is Start) and never keyboard X. *Last safe override point:* before ctl-12.
+3. **Merge Box/Raising/Evolution into Monsters with one action sheet.** *Adopted: merge.* The alternative is Party | Storage | Evolve tabs. *Last safe override point:* before ctl-5 (the menu IA).
 
 (The v1 server-guard question is answered.)
 
@@ -343,9 +345,11 @@ Enumerated so the slice plan names a replacement before deleting anything. Sites
 | `Shift+Slash` (help) | a11y:264 | `pressButton('Select')` (Shift+Slash still resolves; the assertion on help contents changes) |
 | `KeyM` (menu) | a11y:272, a11y:301 | Still opens the menu (Start alias). Assertions on the uxd3 menu tree change to the main-menu entries |
 
-**Escape now means Start**, so at the world base it **opens** the menu (and in battle, the menu over the battle). Prophylactic "dismiss any stale overlay" presses would leave a menu open — rename:220, pvp-side-b:202, trade-propose:208, and those in pvp, ranked-forfeit, monster-privacy, recruit, encounter-battle, evolution, dialogue, a11y, trade, wallet-balance; each is audited and replaced by a shared `closeAll()` helper that presses Start only when `__game().stack` (new, additive) is above the base. In-battle Escape presses (encounter-battle:305/311, recruit:296 on) are checked against Q1.
+**Escape now means Start**, so at the world base it **opens** the menu (and in battle, the menu over the battle). Prophylactic "dismiss any stale overlay" presses would leave a menu open — rename:220, pvp-side-b:202, trade-propose:208, and those in pvp, ranked-forfeit, monster-privacy, recruit, encounter-battle, evolution, dialogue, a11y, trade, wallet-balance; each is audited and replaced by a shared `closeAll()` helper that presses Start only when `__game().stack` (new, additive) is above the base. In-battle Escape presses (encounter-battle:305/311, recruit:296 on) are checked against §14 default 1.
 
-**Unaffected:** hook-driven `proposeTrade`/`challengePvp` in trade-full, trade-propose, trade-interlock, trade-zz-negative, trade.spec, pvp-full, pvp-side-b, pvp.spec, ranked-forfeit, monster-privacy, wallet-balance and `evals/account-e2e.eval.mjs:1761,1805,1807` — no server guard, so no positioning; `pvp_tests.rs`/`trading_tests.rs` fixtures untouched (c4 B-1 moot). `KeyB`/`KeyI` presses (movement-input:503,568; recruit; evolution; encounter-battle) — accelerators kept.
+**UI-driven sites that do change** (corrected 2026-10-01): pvp-side-b:313, ranked-forfeit:287 and monster-privacy:467 click `pvp-challenge-player-btn` (removed with remote initiation, ctl-10b) and their B side waits for `pvp-accept-btn` through the auto-show (pvp-side-b:334, ranked-forfeit:313, monster-privacy:484; removed by the banner rule, ctl-13); they move to face-to-face positioning or the `__mrPvp` hook, and Y→Enter. recruit's `healViaBox` (≈270-415, 781-787, 861-862) clicks Box "Heal Party" and moves to the bound healer when that button goes (ctl-10a). shop-npc:350 asserts the prompt glyph "T". `elder_oak` wanders (`wander_radius: 2`), so A-facing e2e helpers re-face and retry. evolution:193 (KeyI → raising Care) moves to the Monsters sheet (ctl-8c). The mutual-exclusivity cases (pvp.spec:108/136/161, trade.spec:119, 190-205) are rewritten when accelerators replace the open screen (ctl-11a).
+
+**Unaffected:** genuinely hook-driven `proposeTrade`/`challengePvp` calls in trade-full, trade-propose, trade-interlock, trade-zz-negative, trade.spec, pvp-full, pvp.spec, wallet-balance and `evals/account-e2e.eval.mjs:1761,1805,1807` — no server guard, so no positioning; `pvp_tests.rs`/`trading_tests.rs` fixtures untouched (c4 B-1 moot). `KeyB` presses (movement-input:503,568; recruit; evolution; encounter-battle) — the accelerator is kept.
 
 **Frozen seams:**
 - **Overlay root ids, `data-testid`s and the `display:none` visibility contract** (c4 counts 161 `#id` selector refs across 10 e2e files). Legacy roots survive as frame or tab-panel roots (§10).
@@ -360,14 +364,16 @@ Enumerated so the slice plan names a replacement before deleting anything. Sites
 
 | Deferred | Target |
 |---|---|
-| Gamepad support (§12 readiness list); Steam Input | **M-gamepad**, a pre-release placeholder added to PLAN §9 by this milestone; Steam Input in M21b-3 |
-| Server proximity guard on `propose_trade`/`challenge_pvp` | `residuals.spec.md`, revisit after Playtest-3 or with M25. Carries c4 B-1's requirements: pure game-core `within_interact_range`; character via `p.entity_id` as in `talk`; placed after joined/`require_not_deleting`/counterparty-joined checks; fixtures seed co-located characters; one uniform error (no zone oracle); lands after the client face-to-face UI |
-| Players compass and distance text | With the guard, or if Playtest-3 shows that finding friends is hard (`residuals.spec.md`) |
-| Touch walking, swipes and gestures | `residuals.spec.md`, for a future mobile/touch milestone |
-| Account sync of bindings | The M21b account/platform follow-on (additive `BindingSource`) |
-| Set-ratio game box (r2-010/047-050) | `residuals.spec.md` presentation backlog |
-| Signs and objects as interactables (r2-026) | A content milestone (backlog). The plug point is a new `interact_candidates` entity kind |
-| Walk speed / hold-to-run (r2-088/090) | Backlog. Hold-B or a binding is free for it |
+| Gamepad support; Steam Input | **M-gamepad** (`M-gamepad.spec.md`, PLAN §9); Steam Input in M21b-3 |
+| Server proximity guard on `propose_trade`/`challenge_pvp` | → residual R-ctl-PROXGUARD (backlog [security-privacy/LOW]). Carries c4 B-1's requirements: pure game-core `within_interact_range`; character via `p.entity_id` as in `talk`; placed after joined/`require_not_deleting`/counterparty-joined checks; fixtures seed co-located characters; one uniform error (no zone oracle); lands after the client face-to-face UI |
+| Players compass and distance text | → residual R-ctl-COMPASS (backlog [ux-a11y/LOW]) |
+| Touch walking, swipes and gestures | → residual R-ctl-TOUCHWALK (backlog [ux-a11y/LOW]) |
+| Account sync of bindings | → residual R-ctl-BINDSYNC (backlog [ux-a11y/LOW]), target the M21b account/platform follow-on |
+| Set-ratio game box (r2-010/047-050) | → residual R-ctl-SETRATIO (backlog [ux-a11y/LOW]) |
+| Signs and objects as interactables (r2-026) | → residual R-ctl-OBJINTERACT (backlog [content/LOW]). The plug point is a new `interact_candidates` entity kind |
+| Walk speed / hold-to-run (r2-088/090) | → residual R-ctl-RUN (backlog [gameplay/LOW]). A hold is free for it |
+| First-run welcome card | → residual R-ctl-WELCOME (backlog [ux-a11y/LOW]) |
+| `getLayoutMap()` keycap glyphs | → residual R-ctl-LAYOUTMAP (backlog [ux-a11y/LOW]) |
 | Counter-style reach (a facing ray beyond one tile) | Backlog, only if content needs it. The §7 content test guards today's maps |
 | PixiJS `AccessibilitySystem` | Stays dormant per M23 until a canvas-interactive feature exists |
 
@@ -377,3 +383,4 @@ Enumerated so the slice plan names a replacement before deleting anything. Sites
 - **c3:** world Y opens the top notice + Social opens on the oldest waiting tab (§2, §4; M3); world-B lock dropped (§2, §15; S1); press-count table + bounds, adapted to +4 for common tasks and ≤7 for every accelerator (§5; S2); Feed confirm removed (§5; S3); pointer edge cases + capture keyboard cancel (§8, §9; S5); Start in a battle sub-list (§4; N1); V → Party (§3; N2); key-vs-button names (§3; N3); principle 7.
 - **c4:** §16 migration list (B-2); `#help-hint` → Start chip, live-region re-adoption, index.html/test contracts (§8–§11, §16; B-3); stacked-frame inert/focus/no double speech (§11; W1); silent suspended-dialogue drop (§4; W2); `movementEnabled` at all sites + gate, Ctrl/Alt/Meta marked new (§3, §4; W3); Slash alias/AZERTY (§3; W4); `#app` re-parenting slice (§10, §12; W5); dev hooks frozen (§16; W6); behavioural tests, typed key-name Record (§9, §12; W7); decisions minimized (§13; N1); no bindings regen (§16; N2); JSON wasm export (§7; N3); ranked/TTL (§7; N4); sync glyph cache (§9; N5); citations fixed (`world.ts:72`, `boxView.ts:278`, overlay inventory by `OverlayId`, M23:335 verified); c4 risks 2–6 folded in.
 - **New:** §16, §17.
+- **Spec review (2026-10-01):** §14 defaults adopted with override points; Players keeps a minimal list, no "In battle" badge; cuts: `armMs`, wizard draft persistence, shop ±10, the ▶ bob, `BindingSource`, `getLayoutMap`, remap idle timeout and X-clear/Y-reset, the dead-key pulse, and the welcome card (now a §17 residual, as is `getLayoutMap`); notices narrowed to a pending request and the pending error; storage `{v:1, buttons, accels}`; router takes `{button, down}` edges and the pad map lives only in M-gamepad; i18n thunk and file-naming rules (§11); battle variant of the flow (§5); F9 twin in Options; §16 corrected for the UI-driven pvp sites; pgcc-a first, pgcc-c/d after ctl-15 (§12).

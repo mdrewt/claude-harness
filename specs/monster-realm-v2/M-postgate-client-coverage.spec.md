@@ -1,10 +1,12 @@
 # Spec: M-postgate-client-coverage — extract the client shell's inline decision logic into tested pure cores
 
 **Status:** specced 2026-09-30 · **re-scoped 2026-10-01** by the operator's controls redesign
-(`M-postgate-console-controls.spec.md`, which runs FIRST — PLAN §9) · build after it, re-verifying
-every Evidence bullet at build time · **Project:** monster-realm (client only) ·
+(`M-postgate-console-controls.spec.md`, PLAN §9 item 1) · build-ready: pgcc-a runs FIRST, before the
+controls milestone's ctl-1; pgcc-c and pgcc-d run after its ctl-15, re-verifying every Evidence
+bullet at build time · **Project:** monster-realm (client only) ·
 **Surveyed against:** monster-realm master `efd3f3a0` (symbols cited below; line numbers are
-`@efd3f3a0` and will drift, so treat the symbol as the anchor) · **Depends on:** nothing open ·
+`@efd3f3a0` and will drift, so treat the symbol as the anchor) · **Depends on:** pgcc-a nothing;
+pgcc-c and pgcc-d on `M-postgate-console-controls` ctl-15 ·
 **Doctrine:** `standards/testing-tdd.md` (verification SSOT).
 
 ## Problem / intent
@@ -49,6 +51,8 @@ only the extractions the redesign does not touch:
   terminal-dismiss latch (old D3) and `<select>` parse (old D5)** are absorbed by the controls
   milestone (server frames reconciled from the store; battle outcome Continue; selects become nav
   lists). See that spec's coverage table.
+- **Order:** pgcc-a runs first, before the controls milestone; pgcc-c and pgcc-d run after its
+  ctl-15.
 
 **Behaviour is preserved except where a slice names a defect.** Validated at `efd3f3a0`:
 1. **Uncatalogued care string (CONFIRMED, LOW).** `performCare`'s success line `'Cared!'`
@@ -75,10 +79,6 @@ only the extractions the redesign does not touch:
   - `reconcileFromStore`, `sendIntent`, and `switchZone` (its guard already lives in
     `zoneSyncGuard`).
   - The frame loop's camera hold and fractional-motion latch.
-  - The keydown **preamble**: the session gate, `e.repeat`, the hidden-subtree focus heal, F8/F9,
-    the `menuKeyInput` intercept, `KEY_DIR` / `targetOwnsKey` / `suppressNativeMovementDefault`
-    movement, and the held-key re-issue gate `outstandingSteps === 0 && !anyOverlayVisible()`
-    (main.ts ≈1114, ≈3211).
 - **backlog [ux-a11y/LOW], Boy Scout only.** A slice that is already editing the surrounding code
   may extract these opportunistically. They never become slices of their own.
   - **Privacy and claim:**
@@ -90,22 +90,19 @@ only the extractions the redesign does not touch:
   - **Box:** boxView's nickname-changed guard.
   - **PvP:**
     - the own-party-ids filter, copied twice (≈2723, ≈2734);
-    - the pvp `forceVisible` rule (≈1978-1981);
-    - the pvp opponent-name lookup (≈1809-1813);
-    - `menuAvailability` (≈763-786).
+    - the pvp opponent-name lookup (≈1809-1813).
   - **UI helpers:**
     - the a11y close-edge announce (frame ≈3144-3151);
-    - the interact-prompt memo key (≈3286-3300);
     - `projectKeyStore` (≈2390-2406);
     - the `MOVE_REJECT_PREFIX` error-overlay filter (≈931);
-    - the reconnect hide list (≈3002-3080);
     - the five copies of `hasLiveConnection`;
-    - the `onError`-`link` / `onClaimResult` mappings;
-    - the bound heal/shop VM selection (≈1911-1946);
-    - the heal-party target (≈2520-2525).
-- **Moved to the controls milestone:** the keydown preamble/hotkeys/Escape stack, the KeyT gate
-  question (T is retired there), the dialogue/shop-open step, the battle Escape latch and the
-  item `<select>` parse.
+    - the `onError`-`link` / `onClaimResult` mappings.
+- **Moved to the controls milestone:** the keydown preamble, hotkeys and Escape stack (ctl-1,
+  ctl-6b, ctl-11b); the held-key re-issue gate (`movementEnabled`, ctl-2); the KeyT gate question
+  (T is retired, ctl-10a); the dialogue/shop-open step (ctl-3); the battle Escape latch (ctl-6b);
+  the item `<select>` parse (ctl-8j); the pvp `forceVisible` auto-show (ctl-13); `menuAvailability`
+  (ctl-5); the interact-prompt memo key (ctl-10a); the reconnect hide list (ctl-3 `reconcile`);
+  the bound heal/shop VM selection (ctl-8a); the heal-party target (deleted in ctl-10a).
 
 ## Acceptance criteria (EARS)
 
@@ -128,16 +125,17 @@ These criteria apply to every slice, and the tester encodes them per slice:
 
 ## Slices
 
-Each criterion is an id-led bullet (`**A1:**` …), and `mr-gates init` seeds one gate per id
-(re-verified after the re-scope: 0 uncaptured SHALLs). Sub-bullets and the paragraphs that follow belong to
+Each criterion is an id-led bullet (`**A1:**` …), and `mr-gates init` seeds one gate per id.
+Sub-bullets and the paragraphs that follow belong to
 the criterion above them. Evidence bullets carry no criteria.
 
 ### pgcc-a — one feedback-action core for reducer calls with visible feedback (defect 1; latent shape 2)
 category: i18n defect + latent false-success shape · severity: LOW · size: LIGHT-MODERATE
 touches: client/src/main.ts, client/src/ui/careAction.ts, client/src/ui/careAction.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts
-after: [ctl-final]
-- Evidence @efd3f3a0 (re-verify after the controls milestone, which moves these sites into screen
-  adapters): `ui/careAction.ts` `performCare` is already the right core (call →
+after: []
+- Order: runs FIRST, before the controls milestone's ctl-1 (which is `after: [pgcc-a]`). The core it
+  generalises is what that milestone's screen adapters later call for feedback.
+- Evidence @efd3f3a0 (re-verify at build time): `ui/careAction.ts` `performCare` is already the right core (call →
   frozen-`undefined` → disconnected; sync throw → error arm; settle → exactly one message), but its
   success line is uncatalogued (defect 1). main.ts has eight near-identical inline copies without
   its `undefined` guard (latent shape 2): shop `onBuy`/`onSell` ≈2634-2662, trade
@@ -172,7 +170,7 @@ would have pinned is replaced by virtual buttons, one context stack and a genera
 ### pgcc-c — battle-start/end + ranked-delta event-emit latches → battleEmitModel
 category: testability (latches repeatedly re-fixed: 16r-f, 17r-b) · severity: MED · size: LIGHT-MODERATE
 touches: client/src/main.ts, client/src/ui/battleEmitModel.ts, client/src/ui/battleEmitModel.test.ts
-after: [pgcc-a]
+after: [pgcc-a, ctl-15]
 - Evidence @efd3f3a0, battle and ranked listeners (main.ts):
   - The battle-emit listener (≈2004-2040) is a state machine over `activeBattleId`,
     `battleReseedPending`, `reseedPrevBattleId` and `hydratedSinceReconnect`. It returns early on
@@ -212,7 +210,7 @@ after: [pgcc-a]
 
 ### pgcc-d — battle/pvp/box decisions → battleModel, boxModel
 category: testability · severity: MED · size: LIGHT-MODERATE
-touches: client/src/main.ts, client/src/ui/battleModel.ts, client/src/ui/battleModel.test.ts, client/src/ui/boxModel.ts, client/src/ui/boxModel.test.ts, client/src/ui/boxView.ts
+touches: client/src/main.ts, client/src/ui/battleModel.ts, client/src/ui/battleModel.test.ts, client/src/ui/boxModel.ts, client/src/ui/boxModel.test.ts, client/src/ui/boxView.ts, client/vite.config.ts
 after: [pgcc-c]
 - Evidence @efd3f3a0 (main.ts; re-verify after the controls milestone, whose battle and Monsters
   adapters may already host these — extract only what is still inline):
@@ -224,6 +222,9 @@ after: [pgcc-c]
   - `boxView.onSetPartySlot` (≈2498-2513) routes the `-1` "To Party" literal (from `boxView.ts`
     `#renderCard`) to `nextFreePartySlot`, or shows `chrome.status.partyFull` when the party is
     full.
+- Task: rewrite the `client/vite.config.ts` "KNOWN FOLLOW-UP" coverage-exclude comment to name only
+  what is still inline after this slice (the Escape latch and the bait-id parse are gone with the
+  controls milestone). This slice owns that rewrite because it runs last.
 
 - **D1:** WHEN given store rows, pure builders SHALL return the bait-item and cure-item lists. A
   missing item def drops that entry and never throws.
@@ -242,10 +243,13 @@ after: [pgcc-c]
 
 ## Build order and fan-out
 
-- This milestone runs AFTER `M-postgate-console-controls` (PLAN §9): that milestone rewrites the
-  input and overlay plumbing these slices sit next to, and serializing on `main.ts` the other way
-  round would make it rebase over three extractions mid-flight.
-- All three slices touch `client/src/main.ts`, so they serialize: **a → c → d**.
+- **pgcc-a runs first** (`after: []`), before `M-postgate-console-controls` ctl-1. It is small,
+  touches `main.ts` and `careAction.ts`, and its feedback core is what the controls milestone's
+  screen adapters call later.
+- **pgcc-c and pgcc-d run after the controls milestone's ctl-15** (`pgcc-c after: [pgcc-a, ctl-15]`,
+  `pgcc-d after: [pgcc-c]`): that milestone rewrites the input and overlay plumbing they sit next to,
+  so they re-ground against the new code instead of making it rebase over two extractions mid-flight.
+- All three slices touch `client/src/main.ts`, so they serialize: **a → (controls milestone) → c → d**.
 - No slice touches `game-core`, `server-module`, `client/src/module_bindings/`, or any schema.
 
 ## Post-integration verification
@@ -267,8 +271,7 @@ After pgcc-d merges, on master:
   changing the client. The Boy Scout backlog above rides along with whichever later slice next
   edits that code.
 - **Decisions:** none expected (refactors plus one i18n fix under "no hard-coded UI strings").
-- **vite.config.ts "KNOWN FOLLOW-UP" comment:** rewritten by the controls milestone's final
-  cleanup slice, which retires most of the items it names.
+- **vite.config.ts "KNOWN FOLLOW-UP" comment:** rewritten by pgcc-d, which runs last.
 - **Spec review (2026-09-30):** reviewer, red-team and `/simplify` lenses ran on the draft.
   - Simplify cut 8 slices to 4: the presentation predicates, the nickname guard and the privacy
     gates moved to the Boy Scout backlog, and the two reconnect-region state machines merged.

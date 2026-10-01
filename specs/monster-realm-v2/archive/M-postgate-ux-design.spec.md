@@ -1,6 +1,7 @@
 # Spec: M-postgate-ux-design — the three larger deferred UX design questions (responsive viewport · shop-via-NPC interaction · unified overlay IA / main menu)
 
 **Status:** **DESIGNED** 2026-07-25 (converged via a brainstorm→debate→judge→synthesize multi-agent pass, Drew-directed) · **implementation post-gate provisional** (built after a cleaner second playtest read, same as the rest of Phase D — this spec delivers the *designs*, it does not unblock the *build* ahead of the gate) · **Owner:** Drew · **Decision:** ADR reserved at build time, per slice
+**Delivery note (2026-10-01):** uxd1 (responsive viewport), uxd2 (contextual `T` interact) and uxd3 (overlay registry + `M` menu) were built (PLAN §Done). The operator's 2026-10-01 directive found uxd2/uxd3 read playtest item r2-2026-07-26-023 too narrowly (a single interact key and a hotkey-discovery menu, not a contextual button scheme); both are superseded by `M-postgate-console-controls.spec.md`.
 **Stack:** spacetimedb-game · **Project:** monster-realm · **Depends on:** M-playtest-a/b/c/c.5/d CLOSED; playtest gate run 2026-07-25.
 **Spawned by:** `playtest-gate-decision-2026-07-25.md` §8 (the three "real but larger, separate design questions … each deserves its own sizing pass" that were deliberately NOT bundled into the two hardening milestones). This is that sizing pass.
 

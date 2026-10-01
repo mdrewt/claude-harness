@@ -2,8 +2,8 @@
 
 Run in the harness root; spec artifacts live in `specs/monster-realm-v2/`. This loop AUTHORS
 SPECS — it writes no game code. As of the 2026-09 revision, M0–M25(S0) are built; this loop's
-remaining work is elaborating the post-gate sketches (M18, M19), authoring
-M-postgate-client-coverage when reached, and any future milestone the operator adds to PLAN §9.
+remaining work is elaborating the sketches (M-gamepad, M18, M19) and any future milestone the
+operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-coverage are specced.
 
 ## Grounding — read before each milestone, fresh
 
@@ -84,9 +84,15 @@ keep moving — flagged, so they can object.
 - **M19 guilds/chat/social** (sketch; design ADR-0028): no precedent — extra care on the forks
   (chat model, moderation hooks, untrusted-content discipline, guild membership/roles; M23's
   social a11y retrofit un-defers with it). Post-gate provisional.
-- **M-postgate-client-coverage**: extract inline decision logic from `main.ts` /
-  `battleView.ts` / `boxView.ts` into pure, tested `*Model.ts` cores. The measure of done is
-  reviewable testable cores, not a coverage number.
+- **Controls model (all client milestones):** the client's primary interface is the virtual
+  D-pad + A/B/X/Y/LB/RB/Start/Select defined by `console-controls-design.md` (operator directive
+  `operator-feedback-2026-10-01-controls.md`). Any new screen is a frame on the context stack,
+  navigable by D-pad + buttons; never add a mandatory single-purpose hotkey (accelerators are
+  optional and remappable).
+- **M-gamepad** (sketch): controller support as one more input source on the virtual-button
+  layer; must land before launch. Elaborate after M-postgate-console-controls merges.
+- **M-postgate-client-coverage**: specced and re-scoped 2026-10-01 (pgcc-b superseded by the
+  controls milestone).
 
 End condition: PLAN §9 lists no unspecced milestone the operator has greenlit. Summarize what
 was produced and every flag awaiting the operator.

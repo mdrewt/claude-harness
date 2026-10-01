@@ -40,7 +40,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    per-browser bindings, game-screen pointer = A/B, one overlay frame over the game screen (closes
    the orphaned S-overlay-anchor HIGH and the bottom-of-page panels), and the validated UI bug
    cleanup. Letter hotkeys stay as optional accelerators. Moved to the front: nothing critical or
-   unblocked is ahead of it (master green; M25 is blocked and server-side). Supersedes the
+   unblocked is ahead of it (master green; M25 is blocked and server-side). **pgcc-a (item 3) runs
+   first**, before its ctl-1; pgcc-c/pgcc-d follow its ctl-15. Supersedes the
    uxd2/uxd3 reading of playtest feedback r2-023 and the DECISIONS entry "Client UI: one overlay
    registry, keyboard first".
 2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
@@ -51,9 +52,11 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    trade-propose copy; sequence per the controls spec). **Launch is gated on its completion**
    (design ADR-0034's intent, carried forward).
 3. **M-postgate-client-coverage** (`M-postgate-client-coverage.spec.md`, re-scoped 2026-10-01):
-   after item 1, extract the remaining inline decision logic in `main.ts` into tested pure cores —
-   pgcc-a (feedback core + the uncatalogued care string), pgcc-c (battle event-emit latches),
-   pgcc-d (battle/pvp/box decisions). pgcc-b is superseded by item 1.
+   extract the remaining inline decision logic in `main.ts` into tested pure cores. **pgcc-a**
+   (feedback core + the uncatalogued care string) runs FIRST, before item 1's ctl-1; **pgcc-c**
+   (battle event-emit latches) runs after item 1's ctl-15, then **pgcc-d** (battle/pvp/box
+   decisions; owns the `vite.config.ts` "KNOWN FOLLOW-UP" comment rewrite). pgcc-b is superseded by
+   item 1.
 4. **Residual fill-work** (`residuals.spec.md`, 29 open sections plus 3 unpromoted ledger rows as
    of 2026-10-01): MED items first when a fan-out slot is idle — notably rb-128-E1 (avatar lost on
    reload during deletion grace), R-rb-73-ABORT-PHANTOM (phantom session wedge),
@@ -112,8 +115,7 @@ Platform & compliance (Phase D, greenlit by the 2026-08-08 operator override): *
 observability/performance · **M21** accounts/auth (b-3 Steam remains open above) · **M22**
 privacy/deletion/export · **M23** accessibility · **M24** i18n (en/fr) · **M25 S0**.
 Postgate review follow-ups: **M-postgate-twentyfirst-review-residuals** (21r-a #528, 21r-b
-#527, 21r-e #532, 21r-b2 #530 — merged 2026-09-28..30; spec file still live in this directory,
-pending its move to `archive/`).
+#527, 21r-e #532, 21r-b2 #530 — merged 2026-09-28..30).
 Infra: **M-infra-a** CI caching · **M-stdb-2x** module-SDK 2.8.1 · **M-infra-d** ADR digest and
 **M8.95** knowledge bundle (both later retired by the de-bloat) · **M-loop-infrastructure**
 (supervisor tooling; superseded by the 2026-09 harness revision).

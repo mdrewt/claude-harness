@@ -22,8 +22,9 @@ chat is user content rendered to *other* users.
 
 ## Key design + boundary
 **Chat = untrusted user content** — the security posture *is* the design: server-validate + **escape on
-render** + rate-limit + RLS-scope + moderate (`AGENTS.md` "untrusted by default" applied to *player* content).
-Final Phase-C milestone.
+render** + rate-limit + private-table/scoped-view visibility (not RLS — see Recency check) + moderate (`AGENTS.md` "untrusted by default" applied to *player* content).
+Final Phase-C milestone. Chat input uses the console-controls typing mode (`console-controls-design.md`
+§4); the chat screen is a frame on its context stack.
 
 ## Risks / decisions
 XSS/markup → escape on render (inert text) + fixture. Spam → rate limit. Harassment → block + report + mute/
