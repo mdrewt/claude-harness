@@ -38,7 +38,7 @@ The recorded decision "Client UI: one overlay registry, keyboard first" (game `d
 
 **In:** the input pipeline (virtual buttons, one binding table, the pure router, keyboard and pointer sources); the context stack with `SCREEN_POLICY` and `reconcile`, the nav core, frame chrome and main-menu IA; every per-screen D-pad adapter (design §5, §10); the "in front, then own tile" rule with its wasm export, world A/Y and face-to-face trade/challenge; Options › Controls remapping, the generated hint bar and Help, request banners and the error toast; the DECISIONS.md changes and the ARCHITECTURE.md UI rewrite; every CONFIRMED bug in the coverage table, including the NEW-2 server guards.
 
-**Named deferrals** (declared, not dropped). Each is a residual row in `residuals.spec.md` unless it names a milestone:
+**Named deferrals** (declared, not dropped). Each `R-ctl-*` is a row in the residual registry (`memory/projects/mr-residuals.jsonl`, unpromoted, target backlog), not a `residuals.spec.md` section; the others name a milestone:
 
 | Deferred | Target |
 |---|---|
@@ -162,7 +162,7 @@ after: [ctl-1]
 - Evidence: `anyOverlayVisible()` gates movement at main.ts ≈1114 (divergence snap), ≈3211 (frame-loop re-issue), ≈3270 (`overlayUp`) and in the ladder (≈1686). The session gate is a separate check (≈455-461).
 - Evidence: B17. Escape on an `Ongoing` battle hides `battleView` (≈1592-1600). Until the next batch, movement is live mid-battle, the server rejects the steps, and the character rubber-bands back.
 - Evidence: B14. Of the hotkey open paths, only N/O/?/M/C call `held.clear()`.
-- Intent (design §4, migration rule 3): the stack lands *behind* the legacy show/hide paths and mirrors them. No key routing changes in this slice.
+- Intent (design §4, migration rule 3): the stack lands *behind* the legacy show/hide paths and mirrors them. No key routing changes in this slice. The base is derived on the same `store.onBatchApplied` hook: `battle` whenever the latest own battle row is `Ongoing`, else `world`. Full server reconcile is ctl-3.
 - Tasks: replace `movement-input.spec.ts` test C (walk resumes on close) with the hold-through-menu test, which holds W, opens the menu (M), closes it and expects no step until W is pressed again. The replacement keeps an anti-vacuity arm (pressing W again does walk), so it cannot pass on a dead world. Test C is deleted by name; this deliberately reverses the behaviour documented at main.ts ≈3204.
 
 - **CTL2.1:** THE SYSTEM SHALL represent UI state as a pure stack of frames over a `world` or `battle` base, with a pure `contextStep(stack, edge) → {stack, commands}`.
@@ -171,6 +171,7 @@ after: [ctl-1]
 
 - **CTL2.2:** WHEN any legacy overlay opens or closes through its existing path, THE SYSTEM SHALL push or pop the matching frame, so that `__game().stack` reports the live frames.
   - The `stack` field is additive. Every existing overlay behaviour is unchanged.
+  - `__game().stack` lists frames base-first, base included; "above the base" means length > 1 everywhere in this spec.
 
 - **CTL2.3:** THE SYSTEM SHALL gate movement through one pure `movementEnabled(stack, sessionGate)`, which replaces every `anyOverlayVisible()` movement use: the ≈1114 snap, the ≈3211 re-issue, the ≈3270 `overlayUp`, and the ladder suppression.
   - The gate is false whenever the stack holds a `battle` base, even while `battleView` is hidden.
@@ -231,8 +232,8 @@ after: []
 - **CTL4.1:** THE SYSTEM SHALL model navigation as pure layouts `list(items) | grid(items, cols) | tabs([{key, layout}])` over `NavItem = {key, enabled, reason?}`, storing the active item by **key**.
   - When content changes, `navReconcile` keeps the key, or else moves to the nearest index. This is a fast-check property.
 
-- **CTL4.2:** WHEN a fresh D-pad edge arrives, THE SYSTEM SHALL wrap at the ends, and WHEN a repeat-flagged edge arrives, THE SYSTEM SHALL clamp at the ends.
-  - Lists wrap top↔bottom, grids wrap within the row or column, and tabs wrap.
+- **CTL4.2:** WHEN a fresh D-pad or LB/RB edge arrives, THE SYSTEM SHALL wrap at the ends, and WHEN a repeat-flagged edge arrives, THE SYSTEM SHALL clamp at the ends.
+  - Lists wrap top↔bottom, grids wrap within the row or column, and tabs wrap (RB on the last tab goes to the first; LB on the first goes to the last).
 
 - **CTL4.3:** WHEN A is pressed on a disabled item, THE SYSTEM SHALL return that item's reason and perform no action.
   - Disabled items stay reachable.
@@ -247,7 +248,6 @@ after: []
 
 - **CTL4.6:** THE SYSTEM SHALL render frame chrome through one `frame.ts`: a title bar (title, breadcrumb, tab strip with LB/RB slots), an internally scrolling body, one feedback line and a hint-bar slot, in the sizes side panel, full, bottom box and small.
   - The feedback line shows success only after the caller reports resolution.
-  - `.mr-frame` sets `color` and `background` from `:root` tokens (contrast is tested in ctl-7a).
 
 ### ctl-6a — e2e helpers and migration of prophylactic Escape presses (test-only)
 category: test infrastructure · severity: MED · size: MODERATE
@@ -257,15 +257,12 @@ after: [ctl-3]
 - Notes: `controls.ts` imports only pure modules (`client/src/input/bindings.ts`), so it loads under Playwright without Vite.
 - New files: `client/e2e/controls.ts`.
 - Tasks:
+  - `pressButton(page, button)` and `pressAccel(page, accel)` press the first key bound in `DEFAULT_BINDINGS`; ctl-12 extends them to the live table.
+  - `closeAll(page)` presses the first Start key only while `__game().stack` has length > 1, and returns once it is at the base.
   - Replace every prophylactic Escape in the listed specs with `closeAll()`, including rename ≈220, pvp-side-b ≈202, trade-propose ≈208 and `recruit.spec.ts` `healViaBox`'s Escape+KeyB retry.
   - Leave Escape presses that act on a battle's terminal outcome (encounter-battle ≈305) as `pressButton('Start')`; Start continues a terminal outcome from ctl-6b on, as Escape does today.
 
-- **CTL6A.1:** WHEN an e2e calls `closeAll(page)`, THE SYSTEM SHALL press the first key bound to Start only while `__game().stack` is above its base, and return once the stack is at its base.
-  - It fails loudly after a bounded number of presses, naming the stuck frame.
-  - It never presses at a base, so it opens no menu.
-
-- **CTL6A.2:** WHEN an e2e calls `pressButton(page, button)` or `pressAccel(page, accel)`, THE SYSTEM SHALL press the first key bound to it in the page's live bindings.
-  - Live bindings are `localStorage['mr.controls']` parsed by the product's `parseBindings` when present (ctl-12), else `DEFAULT_BINDINGS`.
+- **CTL6A.1:** IF `closeAll(page)` cannot bring `__game().stack` to length 1 within a bounded number of Start presses, THEN THE SYSTEM SHALL fail the test with a message naming the stuck top frame.
 
 ### ctl-5 — the main menu on the nav core: A pushes the child above the menu, B returns to it
 category: ux-a11y (the operator's flow) · severity: HIGH · size: HEAVY
@@ -276,13 +273,18 @@ after: [ctl-4, ctl-6a]
 - Evidence: the `MENU_TREE` titles, `'Menu'` and the back hints are English literals (B11, menu part).
 - Evidence: R-rb-121. The `setTimeout(0)` focus callback in `overlayA11y.ts` ≈134 does not re-check `document.activeElement`, so a click inside a frame in the same macrotask is pulled to the initial anchor.
 - Intent (design §5): entries are Monsters, Bag, Journal, Social, Profile, Options and Close. Until the ctl-8 slices land, each entry's child is the legacy overlay or a small sub-list: Monsters → box; Bag → raising; Journal → quest log; Social → Trades / Challenges / Rankings; Profile → Name / Account / Privacy; Options → How to play (legacy help).
-- Seam until ctl-6b: M and the `#help-hint` click still open the menu; Escape still closes the top legacy overlay through the Escape stack; the legacy menu intercept (main.ts ≈1340) is keyed on "the menu is the top frame", not on `menuView.visible`, so keys reach a child pushed above the menu.
+- Seam until ctl-6b:
+  - M and the `#help-hint` click still open the menu; Escape still closes the top legacy overlay through the Escape stack.
+  - The legacy intercept's `menuKeyInput` handling (main.ts ≈1340) is deleted here; the router drives the menu frame through `mainMenuScreen`.
+  - B (Backspace) with a legacy child above the menu: the router pops that non-menu top frame through the CTL3.3 hide path, until ctl-6b's `legacyAdapter` takes over.
+  - `canOpen` and the overlay tiers treat the menu as non-exclusive, so a child may open over it.
 - New files: `screens/types.ts`, `screens/mainMenuScreen.ts` and its test.
 - Tasks:
   - Rewrite "Held keys: commit threshold and warp continuity" in place in `docs/DECISIONS.md` with draft 2 (§"Decision drafts"); no appended "Amended" block.
   - C7: correct "Integer pixel scaling" in place. This is substantive, not wording: the Decision becomes "integer device scale; the CSS stage scale is fractional" (`render/viewport.ts` ≈13-17), and the Rules-out line "Fractional stage scales" becomes "Fractional device scales".
   - Rewrite `menuModel.test.ts` for the new tree. Delete MM-KEYGLYPH-FROM-HELP-SSOT by name (survivor in the milestone table).
   - Retarget the `a11y.spec.ts` KeyM assertions (≈272, ≈301) to the new entries, and re-measure and re-baseline `PASSES_FLOOR_MENU` and `INCOMPLETE_CEILING_MENU` by name.
+  - The `a11y.spec.ts` keyboard-pass test (≈332-369) asserts `menu-option-categories-*` ids and ArrowLeft back-out; retarget it to the new menu's nav ids and B back-out (named intentional change). Its Tab-to-`#help-hint` step is ctl-7a's.
 
 - **CTL5.1:** WHEN the main menu opens, THE SYSTEM SHALL show the design §5 entries as a wrapping nav list in a right-hand side panel, with every title and description from the catalog in `en` and `fr`.
   - Red: under `fr`, today's menu titles render in English.
@@ -377,6 +379,7 @@ after: [ctl-6c]
   - `chrome.helpHint` is deleted together with its pins in `catalog.test.ts`, `catalogShape.test.ts`, `resolver.test.ts`, `i18nTypes.compile.test.ts` and `catalogParity.test.ts`'s `DEAD_KEY_EXEMPT` (named intentional changes). The chips use new ids.
   - Correct the `index.html` header comment that cites the deleted `main.wiring.test.ts` (B16).
   - Re-measure and re-baseline `a11y.spec.ts` `PASSES_FLOOR_WORLD` and `INCOMPLETE_CEILING_WORLD` by name.
+  - The `a11y.spec.ts` keyboard-pass test (≈332-369) Tabs to `#help-hint`; retarget it to Tab to the Start chip (named intentional change).
 
 - **CTL7A.1:** THE SYSTEM SHALL wrap the canvas mount, a frame layer and a hint-bar slot in `#game-screen`, and the page SHALL never scroll.
   - With any frame open, `document.scrollingElement.scrollHeight` ≤ `innerHeight`.
@@ -388,8 +391,9 @@ after: [ctl-6c]
 - **CTL7A.3:** WHEN any frame shows text, THE SYSTEM SHALL render it in the frame colour token at a contrast ratio of at least 4.5:1 against the frame background.
   - An `a11y.spec.ts` e2e reads computed styles, because `toBeVisible` cannot catch this.
   - Red: NEW-1. Today dialogue text measures about 1.1:1.
+  - The same e2e checks that the main menu's active row differs from an inactive sibling in a non-colour computed property (`::before` content from a `data-` attribute, or an outline/border width ≥ 2px) (B18).
 
-- **CTL7A.4:** WHEN the world base is shown, THE SYSTEM SHALL show a Start chip (opens the main menu) and a Select chip (Help) in the hint-bar slot, with verbs from the catalog, and `#help-hint` SHALL no longer exist.
+- **CTL7A.4:** WHEN the world base is shown, THE SYSTEM SHALL show a Start chip (opens the main menu) and a Select chip (Help) in the hint-bar slot, with verbs from the catalog, and `document.getElementById('help-hint')` SHALL return null.
   - Clicking a chip presses its button; opening the menu clears held keys (CTL2.4).
   - The chips are static until ctl-13 makes the bar live.
 
@@ -405,7 +409,7 @@ after: [ctl-7a]
 
 ### ctl-8a — Dialogue, Shop and Heal on the D-pad
 category: ux-a11y + gameplay defect B13 · severity: MED · size: HEAVY
-touches: client/src/ui/screens/dialogueScreen.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/healScreen.ts, client/src/ui/screens/index.ts, client/src/ui/dialogueView.ts, client/src/ui/dialogueView.test.ts, client/src/ui/dialogueModel.ts, client/src/ui/dialogueModel.test.ts, client/src/ui/shopView.ts, client/src/ui/shopView.test.ts, client/src/ui/shopModel.ts, client/src/ui/shopModel.test.ts, client/src/ui/healView.ts, client/src/ui/healView.test.ts, client/src/ui/healModel.ts, client/src/ui/healModel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/dialogue.spec.ts, client/e2e/shop-npc.spec.ts
+touches: client/src/ui/screens/dialogueScreen.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/healScreen.ts, client/src/ui/screens/index.ts, client/src/ui/dialogueView.ts, client/src/ui/dialogueView.test.ts, client/src/ui/dialogueModel.ts, client/src/ui/dialogueModel.test.ts, client/src/ui/shopView.ts, client/src/ui/shopView.test.ts, client/src/ui/shopModel.ts, client/src/ui/shopModel.test.ts, client/src/ui/healView.ts, client/src/ui/healView.test.ts, client/src/ui/healModel.ts, client/src/ui/healModel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/dialogue.spec.ts, client/e2e/shop-npc.spec.ts, client/e2e/wallet-balance.spec.ts
 after: [ctl-7b]
 - Evidence:
   - The dialogue has no continue or close control, and leaf nodes have 0 choices (r2-008/009/060/061).
@@ -413,6 +417,7 @@ after: [ctl-7b]
   - `healView` is a display-only cost list (`ui/healView.ts` ≈40-55); the real heal is Box → Heal Party with `locations[0]` (B13).
   - The bound heal view model carries the bound `locationId` (`buildHealViewModelForLocation`).
 - Notes: the views keep `data-choice-idx` and `data-shop-id`, because the `main.ts` document click delegate stays until ctl-15. The Box Heal Party button stays until ctl-10a, which migrates its e2e user.
+- Tasks: `#shop-balance`, `#shop-for-sale button[data-item-id]` and `#dialogue-choices` keep their ids and first-paint semantics (used by `wallet-balance.spec.ts`); the spec passes unmodified.
 
 - **CTL8A.1:** WHEN a conversation is shown, THE SYSTEM SHALL render a bottom-box frame whose choices form a wrapping nav list, where A finishes the text reveal, then advances, then chooses, and B finishes the reveal and, on a choice or leaf node, ends the talk through `dismissDialogue`.
   - Under reduced motion the text appears at once.
@@ -434,7 +439,7 @@ category: ux-a11y (screen conversion) · severity: MED · size: MODERATE
 touches: client/src/ui/screens/monstersScreen.ts, client/src/ui/screens/index.ts, client/src/ui/monstersModel.ts, client/src/ui/monstersModel.test.ts, client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/boxModel.ts, client/src/ui/boxModel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts
 after: [ctl-8a]
 - Evidence: box is a hide-switch overlay operated only by Tab and the mouse; the nickname edit uses `window.prompt()` (`ui/boxView.ts:278`).
-- Intent (design §5, default 3 in design §14): the box root becomes the Monsters frame (Party and Storage panels plus the sheet). LB/RB are PageUp/PageDown until ctl-11a.
+- Intent (design §5, default 3 in design §14): the box root becomes the Monsters frame (Party and Storage panels plus the sheet). LB/RB are PageUp/PageDown until ctl-11a. Box's Heal Party control stays in the Monsters frame until ctl-10a removes it.
 - New files: `monstersScreen.ts`, `monstersModel.ts` and its test.
 
 - **CTL8B.1:** WHEN Monsters opens, THE SYSTEM SHALL show tabs Party (a list of up to 6) and Storage (a grid), switched by LB/RB, with per-tab cursor memory.
@@ -471,7 +476,7 @@ category: ux-a11y (screen conversion) · severity: MED · size: MODERATE
 touches: client/src/ui/screens/socialScreen.ts, client/src/ui/screens/index.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/tradeModel.ts, client/src/ui/tradeModel.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/pvpModel.ts, client/src/ui/pvpModel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/trade.spec.ts, client/e2e/pvp.spec.ts
 after: [ctl-8c]
 - Evidence: trade, pvp and leaderboard are three separate overlays.
-- Intent (design §5): Social is the place to *respond* to requests. Initiation stays on pvpView's per-player Challenge buttons and O until ctl-10b replaces them. Players and Rankings show placeholders and the legacy leaderboard root until ctl-8g.
+- Intent (design §5): Social is the place to *respond* to requests. Initiation stays on pvpView's per-player Challenge buttons and O until ctl-10b replaces them. Players and Rankings show placeholders and the legacy leaderboard root until ctl-8g. `pvp-accept-btn` and `pvp-challenge-player-btn` stay directly clickable DOM until ctl-13 and ctl-10b respectively.
 - New files: `socialScreen.ts`, `socialModel.ts` and its test.
 
 - **CTL8D.1:** WHEN Social opens, THE SYSTEM SHALL show tabs Players, Trades, Challenges and Rankings, opening on the tab of the oldest waiting request with the cursor on it, or else on the remembered tab.
@@ -503,7 +508,8 @@ after: [ctl-8e]
 - Intent (design §5 rows 2-3): the raising root (inventory only since ctl-8c) becomes the Bag frame. It keeps its `OverlayId`, so no new `*View.ts` file appears. questLog is a display-only list today.
 - New files: `bagScreen.ts`, `journalScreen.ts`, `bagModel.ts` and its test.
 
-- **CTL8F.1:** WHEN Bag opens, THE SYSTEM SHALL show pocket tabs derived from item-definition data, with no hard-coded item ids, each holding a nav list of owned items with quantities, switched by LB/RB.
+- **CTL8F.1:** WHEN Bag opens, THE SYSTEM SHALL show pocket tabs derived from item-definition data, each holding a nav list of owned items with quantities, switched by LB/RB.
+  - Test: a fixture item definition in a pocket no shipped item uses yields its own tab, so no item id or pocket is hard-coded.
 
 - **CTL8F.2:** WHEN A is pressed on an item, THE SYSTEM SHALL offer Feed (→ a monster picker, no confirm) or Info as the item allows, and after a Feed SHALL close the picker with the cursor back on the item.
   - Use is disabled with the catalogued reason "Use items from the battle Bag command" where it does not apply.
@@ -533,6 +539,7 @@ after: [ctl-8g]
   - B2: `claimView` creates its title and body hidden, and `render()` never shows them (`ui/claimView.ts` ≈69-77, ≈135-149). `accounts.spec.ts` uses `toHaveText`, which ignores visibility.
   - B3: claim and privacy append themselves to `<body>`.
   - B5: the `#rename-submit` keydown only calls `stopPropagation` (`ui/renameView.ts` ≈89-91).
+- Notes: claim and privacy fall back to `document.body` when `#game-screen` is absent (shell-less boots).
 - Tasks: `monster-privacy.spec.ts` drives the privacy flow through Profile › Privacy (named survivor).
 
 - **CTL8H.1:** WHEN Profile opens, THE SYSTEM SHALL show a nav list Name, Account & sign-in, Privacy & data, with each child rendered as a `.mr-frame` inside `#game-screen`.
@@ -579,7 +586,7 @@ after: [ctl-8i]
 - **CTL8J.2:** WHEN a battle is played with the D-pad, A and B only, THE SYSTEM SHALL complete it to an outcome, and A or B SHALL continue from the outcome.
   - `battle-dpad.spec.ts` is the D-pad-only battle e2e.
 
-- **CTL8J.3:** WHEN Start is pressed mid-turn, then A opens Monsters, then Start is pressed again, THE SYSTEM SHALL return to the battle screen with the command list intact and `__game().stack` equal to `[battle]`.
+- **CTL8J.3:** WHEN Start is pressed mid-turn, then A opens Monsters, then Start is pressed again, THE SYSTEM SHALL return to the battle screen with the command list intact and `__game().stack` equal to `[battle]` (length 1).
   - A second case in `battle-dpad.spec.ts` (design §5, battle variant of the flow).
 
 ### ctl-8k — the session gate as an in-frame system modal (B1)
@@ -639,13 +646,15 @@ after: [ctl-8e, ctl-9]
   - Migrate `recruit.spec.ts`'s `healViaBox` callers to the bound healer: walk to a walkable 4-neighbour of the bound heal location facing it (dev positioning via `__game` where available, else scripted steps), `pressButton('A')`, then Yes. `heal_party` is zone-scoped.
   - KeyT sites (dialogue ≈188, shop-npc ≈293 and ≈370, wallet-balance ≈350) become `pressButton('A')` through a `controls.ts` helper that re-faces the NPC and retries while it wanders. `shop-npc.spec.ts` ≈350's prompt glyph assertion "T" becomes the A keycap.
   - `CONTROLS` drops the T row and gains A interaction; `helpModel.test.ts`'s pinned key set drops T (named).
+  - `nearestInteractable` shrinks to a marshalling adapter with no TypeScript rule.
+  - The world chip memoises `interact_candidates_coded` on (position, facing, batch); it is never called per frame.
   - The eleven `main.*.test.ts` files in `touches:` mock the wasm package with a factory that lacks the new export; add an `interact_candidates_coded` stub to each (named fixture change), and have the client read the export lazily, not at module top level.
 
 - **CTL10A.1:** WHEN A is pressed at the world base, THE SYSTEM SHALL act on the candidates returned by the wasm `interact_candidates_coded`.
   - With one candidate that has a default action, A runs it: NPC → talk; healer → the bound heal frame.
-  - With several candidates, or a player, A opens a picker of entity × action (for example "Rival — Trade").
+  - With several candidates, A opens a picker of entity × action (for example "Rival — Trade" from ctl-10b).
   - With none, A does nothing and shows no toast.
-  - `nearestInteractable` shrinks to a marshalling adapter with no TypeScript rule.
+  - Until ctl-10b a player candidate has no default action and no picker entries, so the picker lists only Talk/Shop/Heal entries and a lone player is a no-op.
   - Red: r2-024. With an NPC directly behind the character, pressing T today starts a talk.
 
 - **CTL10A.2:** WHEN Y is pressed at the world base with a candidate, THE SYSTEM SHALL open the primary candidate's full action sheet (Talk, Shop, Heal, Trade, Challenge, as applicable).
@@ -693,6 +702,7 @@ after: [ctl-10b, ctl-8k]
   - Over a battle, the CTL6C.3 battle-safe policy applies to the pushed path.
 
 - **CTL11A.3:** WHEN Q or E (or PageUp or PageDown) is pressed on a tabbed screen, THE SYSTEM SHALL switch to the previous or next tab (LB/RB), and WHEN pressed in the world, THE SYSTEM SHALL do nothing.
+  - RB on the last tab wraps to the first; LB on the first wraps to the last.
 
 ### ctl-11b — the legacy ladder deleted; reachability; the keyboard menu-flow e2e
 category: input architecture · severity: MED · size: MODERATE
@@ -705,7 +715,8 @@ after: [ctl-11a]
   - Rewrite the S5T-GATE world-focus cases in `main.a11yFocus.test.ts` as `router.test.ts` ownership cases (named survivors).
   - B16: the `focusTrap.ts` line-1 comment says "16"; correct it to the `OverlayId` count.
 
-- **CTL11B.1:** WHEN any key event arrives, THE SYSTEM SHALL resolve it through the router alone, and WHEN focus is outside `#game-screen` and not on `<body>`, THE SYSTEM SHALL leave the event to the browser.
+- **CTL11B.1:** WHEN a key not bound in the binding table is pressed at the world base, THE SYSTEM SHALL fire no handler and leave the event unprevented, and WHEN focus is outside `#game-screen` and not on `<body>`, THE SYSTEM SHALL leave every key event to the browser.
+  - Note: `errorOverlayView` and `sessionView` still append to `<body>` until ctl-13 and ctl-8k; that is safe because they take no focus trap.
 
 - **CTL11B.2:** WHEN press counts are computed over the pure menu, nav and stack models, every accelerator target SHALL be reachable from the world in at most 7 D-pad/A presses.
   - Fast-check and table tests in `reachability.test.ts`.
@@ -731,6 +742,9 @@ after: [ctl-11b]
   - Buttons and accelerators share one key namespace.
   - "Reset all" asks Yes/No, defaulting to No.
 
+- **CTL12.7:** WHEN Clear is chosen on an accelerator row, THE SYSTEM SHALL unbind both of its slots, so that accelerator key does nothing until rebound.
+  - Button rows offer no Clear (protected buttons can never be emptied), which keeps WCAG 2.1.4 met: every accelerator is remappable or removable.
+
 - **CTL12.4:** WHEN bindings change, THE SYSTEM SHALL save them immediately to `localStorage['mr.controls']` as `{v:1, buttons, accels}` through plain `saveBindings(storage, b)`, and load them at boot through `loadBindings(storage)`.
   - `storage` is injected; every access is wrapped in try/catch, so unavailable storage gives in-memory defaults.
   - A total `parseBindings(raw: unknown)` falls back entry by entry; an unknown `v` gives the defaults.
@@ -739,7 +753,7 @@ after: [ctl-11b]
   - AZERTY `KeyW` reads "Z" once the key has been pressed.
 
 - **CTL12.6:** WHEN a player remaps A to K and reloads the page, THE SYSTEM SHALL confirm with K and no longer with Enter, and every hint SHALL show the new keycap.
-  - `remap.spec.ts` is the flow's e2e; `pressButton` reads the live table (CTL6A.2).
+  - `remap.spec.ts` is the flow's e2e; this slice extends `controls.ts`'s `pressButton` to read the live table (`localStorage['mr.controls']` through `parseBindings`, else `DEFAULT_BINDINGS`).
 
 ### ctl-13 — the live hint bar, request banners, the error toast, world Y/B on notices
 category: ux-a11y (discoverability, B12) · severity: MED · size: MODERATE
@@ -758,7 +772,7 @@ after: [ctl-12]
 - **CTL13.2:** WHEN an incoming trade or challenge arrives, THE SYSTEM SHALL show a non-modal banner and badges on the Social entry and the Start chip, and SHALL NOT move focus or open a frame.
   - Red: today an incoming challenge auto-opens the PvP overlay.
 
-- **CTL13.3:** WHEN Y is pressed at the world base with no target and a request pending, THE SYSTEM SHALL open that request's screen (Accept / Decline / View), and WHEN B is pressed at the world base, THE SYSTEM SHALL dismiss the top notice.
+- **CTL13.3:** WHEN Y is pressed at the world base with no target and a request pending, THE SYSTEM SHALL open that request's action sheet (Accept / Decline / View) with Accept active, so Y then Enter accepts, and WHEN B is pressed at the world base, THE SYSTEM SHALL dismiss the top notice.
   - The error overlay becomes a toast, dismissed by world B or F8.
 
 - **CTL13.4:** WHEN player B proposes a trade to player A, THE SYSTEM SHALL let A respond with Y then Enter from the world, with no letter hotkey.
@@ -793,7 +807,7 @@ after: [ctl-14]
 - Tasks: `ARCHITECTURE.md` § Client › UI describes the shipped pipeline (keyboard and pointer sources → router and binding table → context stack with `SCREEN_POLICY` and `reconcile` → screen adapters → `dispatch`/`applyStack`; frames inside `#game-screen`; the generated hint bar and Help; `interact_candidates`) and no longer mentions `M` as the menu, `CONTROLS` or `T`.
 
 - **CTL15.1:** WHEN the canvas is left-clicked or tapped at the world base, THE SYSTEM SHALL press A, passing no coordinates.
-  - A click elsewhere at the world base does nothing. Red: today a canvas click does nothing.
+  - A click elsewhere at the world base, other than on a hint-bar chip, does nothing. Red: today a canvas click does nothing.
 
 - **CTL15.2:** WHILE frames are open, a click or tap on a `[data-nav-key]` in the **top** frame SHALL make that item active and then press A.
   - A click on a tab-strip tab switches the tab.
@@ -850,7 +864,7 @@ ctl-4 (any time before ctl-5) ────────────┴→ ctl-5 �
 ctl-16 (any time; server-only)
 ```
 
-- **Parallel lanes:** ctl-4 alongside pgcc-a and ctl-1..3; ctl-9 and ctl-16 at any time.
+- **Parallel lanes:** ctl-4 alongside pgcc-a and ctl-1..3; ctl-9 and ctl-16 at any time. `docs/DECISIONS.md` is touched by ctl-5, ctl-9, ctl-10b and ctl-14 (different entries); the overlap check will serialize ctl-9 against whichever of those is in flight.
 - **ctl-8 chain, consumer order:** Dialogue/Shop/Heal, Monsters I, Monsters II, Social I and the wizard first, because ctl-10a/10b consume them. Bag/Journal, Social II, Profile, Battle I, Battle II and Session follow; ctl-11a needs every screen. ctl-10a/10b may interleave with 8f–8k; they share only the append-only catalogs and `screens/index.ts`, so the supervisor's overlap check may serialize them, and either order is correct.
 
 ## Bug coverage (every CONFIRMED item → its fixing slice)
@@ -874,7 +888,7 @@ ctl-16 (any time; server-only)
 | B15 "nearby" copy false (= C3) | LOW | ctl-10b (CONTROLS rows), ctl-14 (generated help) |
 | B16 drift: F8, dead test refs, 16 vs 17, g/h presses | LOW | ctl-1 (main.ts citations), ctl-7a (`index.html` citation), ctl-11a (g/h), ctl-11b (focusTrap comment), ctl-14 (F8 in Help, PLAYTEST.md) |
 | B17 Escape hides an Ongoing battle | MED | ctl-2 (movement gate), ctl-3 (frames drop on battle), ctl-6b/6c (Start never hides a battle), ctl-16 (server) |
-| B18 menu affordances | LOW | ctl-4 (indicator), ctl-5 (Right no longer enters) |
+| B18 menu affordances | LOW | ctl-4 (indicator), ctl-7a (CTL7A.3 non-colour mark), ctl-5 (Right no longer enters) |
 | main.ts:1711 ArrowUp/W release | LOW | ctl-1 (CTL1.2) |
 | NEW-1 black-on-near-black text | HIGH | ctl-7a (CTL7A.3), ctl-7b (CTL7B.1) |
 | NEW-2 no in-battle guard on talk/advance/buy/sell | MED | ctl-16 |
@@ -999,3 +1013,4 @@ After ctl-15 (and ctl-16) merge, on master:
   - Bag as a new `OverlayId`: the probe and handle records stay `main.ts`-owned until ctl-11b, which a screen slice cannot touch; Bag reuses the raising root (ctl-8c → ctl-8f).
   - The "+4 over the accelerator" press-count test: dropped; only the ≤ 7 reachability bound is a criterion.
   - pgcc-a after ctl-15, and deferring Players: overruled (pgcc-a first; a minimal Players list kept).
+- Final verification round (2026-10-01): a tested non-colour active mark (CTL7A.3); LB/RB edges wrap tabs (CTL4.2, CTL11A.3); deferrals live in the residual registry; a Clear action for accelerator rows only (CTL12.7) keeps accelerators removable; the chip carve-out in CTL15.1; the a11y keyboard-pass test retargeted (ctl-5, ctl-7a); candidate memoisation (ctl-10a); the ctl-5 menu seam and the ctl-2 base derivation made explicit; `__game().stack` is base-inclusive; wallet-balance ids frozen (ctl-8a); Y lands on Accept (CTL13.3); a lone player is a no-op until ctl-10b; the e2e helper and `nearestInteractable` shapes moved to Tasks; absences rephrased as behaviour (CTL7A.4, CTL11B.1); the CTL8F.1 novel-pocket fixture.

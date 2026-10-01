@@ -2,6 +2,8 @@
 
 Grounded at monster-realm master `efd3f3a0` (client paths relative to `client/src/`). Base: design-v1, plus the binding operator answers of 2026-10-01 (trade/challenge face-to-face in the UI only; A targets the tile in front, then the own tile), every c3 MUST-FIX/SHOULD/NIT and every c4 BLOCKER/WARNING/NIT. Code claims were re-checked at `efd3f3a0`. Changes are listed at the end.
 
+Genre research behind the conventions (keyboard defaults, button roles, menu UX, rebinding, pointer/a11y guidance in comparable games): shared library doc `docs/research/console-style-game-controls.md`.
+
 ## 1. Intent and principles
 
 The primary interface is a virtual D-pad plus a few contextual buttons, as on a GBA or DS. Letter hotkeys are optional accelerators. The required flow must feel natural: menu → submenu → pick → back out → another submenu → world.
@@ -63,7 +65,7 @@ Matching rules:
 
 `Slash` is the *physical* key (W4): on AZERTY it reads `!`/`:`, so Help never prints "?" and shows the learned keycap (§9). The r2-016 fix survives because Shift is ignored.
 
-**Accelerators** are optional, remappable and unbindable. Each one opens its canonical menu path (§4), so B lands in the parent screen.
+**Accelerators** are optional and remappable; an accelerator can be unbound with its row's Clear action (Options › Controls). Each one opens its canonical menu path (§4), so B lands in the parent screen.
 
 | Key | Opens | vs today |
 |---|---|---|
@@ -181,10 +183,10 @@ Monsters merges three screens: players think in nouns, not in which screen holds
 ## 6. Navigation core rules (`ui/nav.ts`, pure)
 
 - **Layouts:** `list(items) | grid(items, cols) | tabs([{key, layout}])`, `NavItem = {key, enabled, reason?}`. State stores the active **key**, never an index; on content change `navReconcile` keeps the key, else the nearest index (property test).
-- **Wrap:** a fresh D-pad press **wraps** (lists top↔bottom, grids within row/column, tabs). Held auto-repeat is synthesized in the router `tick` on an injected clock (350 ms, then 100 ms) and **clamps** at the ends.
+- **Wrap:** a fresh D-pad or LB/RB press **wraps** (lists top↔bottom, grids within row/column, tabs: RB on the last tab goes to the first, LB on the first to the last). Held auto-repeat is synthesized in the router `tick` on an injected clock (350 ms, then 100 ms) and **clamps** at the ends.
 - **Disabled items** stay greyed but reachable; A prints the reason on the feedback line.
 - **Memory** (session-scoped `NavMemory`): menu and screens remember entry, tab and item per tab; Social opens on the oldest waiting request's tab while a badge is pending (§4); Shop opens on Buy; battle root = Fight each turn; skills = last per monster per battle; Yes/No = declared default; pickers = last choice.
-- **Active indicator:** styling guidance, not a criterion: ▶ in the gutter (a CSS pseudo-element), inverted band, 2 px frame (thick on grid cells); never colour alone (B18). The tested contract is the `is-active` class plus `aria-selected`.
+- **Active indicator:** exact styling is guidance; a non-colour visible mark is tested (CTL7A.3): ▶ in the gutter (a CSS pseudo-element), inverted band, 2 px frame (thick on grid cells); never colour alone (B18). The tested contract is the `is-active` class plus `aria-selected`.
 - **ARIA** follows `menuView` (`ui/menuView.ts:150-205`): the nav container is the **single tab stop** with `aria-activedescendant`, so DOM focus never roves and re-renders cannot drop it (R-rb-121 class). Roles `listbox/option`, `grid/gridcell`, `tablist/tab`; stable ids `{frame}-{tab}-{key}`; `aria-selected`/`aria-disabled`; the container persists and rows diff. Active-descendant changes are **not** mirrored into `#a11y-live` (no double speech, W1).
 
 ## 7. World interaction
@@ -197,7 +199,7 @@ Monsters merges three screens: players think in nouns, not in which screen holds
 
 **Nothing else is a candidate** — no nearest-within-range, no facing ray. Same zone only. Within the tile: kind (NPC < heal < player), then id. The rule reads the **authoritative** pose, as today.
 
-**Export.** client-wasm adds `interact_candidates_coded(own_x: i32, own_y: i32, facing: u8, zone: u32, entities_json: &str) -> Result<String, String>` beside `talk_range()` (`client-wasm/src/lib.rs:235`), following `apply_move_coded`'s flat-primitive convention (`world.rs:409`): entities in as JSON `[{kind, x, y, zone, id}]` with `id` a decimal string; out a JSON array of input indices; no BigInt or `Vec` crosses. `nearestInteractable` shrinks to a marshalling adapter (no TS rule); its literal `keyGlyph: 'T'` (`interactModel.ts:135,166`) becomes a live-binding lookup in the T-retirement slice.
+**Export.** client-wasm adds `interact_candidates_coded(own_x: i32, own_y: i32, facing: u8, zone: u32, entities: JsValue) -> Result<JsValue, JsValue>` beside `talk_range()` (`client-wasm/src/lib.rs:235`): entities `[{kind, x, y, zone, id}]` deserialized with `serde_wasm_bindgen` (as `evolution_eligibility` does; client-wasm has no `serde_json`), `id` a decimal string compared numerically; out an array of input indices; no BigInt crosses (`M-postgate-console-controls.spec.md` CTL9.3). `nearestInteractable` shrinks to a marshalling adapter (no TS rule); its literal `keyGlyph: 'T'` (`interactModel.ts:135,166`) becomes a live-binding lookup in the T-retirement slice.
 
 **Server acceptance.** Every target the rule offers is accepted: for `talk` the faced tile is distance 1 and the own tile 0, both ≤ `TALK_RANGE`, same zone by construction — and an NPC wandering one tile before the reducer runs is still ≤ 2; `heal_party` checks zone only; players have no server check. Tests: game-core — an NPC directly behind you, or two tiles ahead, is **not** a candidate; "characters overlap" pins the own-tile tier; a content test asserts every heal location and NPC home has a walkable 4-neighbour, so nothing becomes unreachable when the range tier goes.
 
@@ -237,7 +239,7 @@ Implementation:
 **Options › Controls:** tabs Buttons (12 rows) | Shortcuts (clickable), each row with Primary and Alt slots.
 - **A captures** ("Press a key for Confirm (A)…"). Any key is accepted, Escape/Enter/Backspace included; reserved keys are refused with a reason.
 - **Cancel by keyboard:** press the key the slot already holds (for an empty slot, the key in the row's other slot) — capture ends unchanged. Otherwise the Cancel chip or right-click. No idle timeout.
-- "Reset all" asks Yes/No (default No), reachable by mouse. There is no per-slot clear or per-row reset.
+- "Reset all" asks Yes/No (default No), reachable by mouse. **Clear** exists on accelerator rows only (it unbinds the accelerator); button rows have no clear, and there is no per-row reset.
 - **Conflicts swap** ("Swapped: F is now Info, K is now Confirm") across one namespace shared by buttons and accelerators. **Protected buttons** (D-pad, A, B, Start) always keep a key; a change that would empty one, swaps included, is refused. Capture uses real presses, so lock-out is impossible.
 
 **Storage:** `input/bindingStore.ts` with plain `loadBindings(storage)` / `saveBindings(storage, b)` over an injected `Storage`; `localStorage['mr.controls'] = {v:1, buttons, accels}`, try/catch on every access; total `parseBindings(raw: unknown)` falls back per entry, an unknown `v` gives defaults; saves are immediate. M-gamepad decides how a `pad` entry joins; account sync is deferred (§17).
@@ -263,7 +265,7 @@ Implementation:
 - **M23 is adapted, not discarded.** Frames keep `role="dialog"`, labels and `aria-modal` via `OVERLAY_A11Y` (`dismissible` now means "B pops it"); `focusTrap` owns Tab.
 - **Stacked modal frames (W1):** on push, the frame below becomes `inert` + `aria-hidden` and its trap is suspended; the pop restores both. A single pop returns focus to the parent frame's nav container; a multi-level pop to a base restores focus once, to the canvas.
 - **`#a11y-live`** stays a `<body>` child in `index.html` (A11Y-10). `adoptLiveRegion` (`ui/liveRegion.ts:121-138`, via `overlayA11y.ts:131`) re-adopts it into the **top** frame on every push and pop and returns it to `<body>` at a base. It announces titles ("Enter to choose, Backspace to go back" for the first three), feedback, interrupts, remaps and banners.
-- **Motor:** no required holds; two slots per button; WCAG 2.1.4 met (every accelerator rebindable or unbindable); auto-repeat clamps. **Reduced motion** disables slides and the typewriter. The canvas stays `role="application"`; a manual NVDA pass runs before Playtest-3.
+- **Motor:** no required holds; two slots per button; WCAG 2.1.4 met (every accelerator rebindable, or unbindable via Clear); auto-repeat clamps. **Reduced motion** disables slides and the typewriter. The canvas stays `role="application"`; a manual NVDA pass runs before Playtest-3.
 - **i18n:** every new string is an en/fr catalog id and `t()` throws on a missing one — verbs, titles, tabs, reasons, help rows, "Nearby", key names ("Entrée", "Espace", "Échap"). Ids reach `t()` only as literals; table-driven text is stored as thunks (`() => t('lit.id')`), so the DYNAMIC-KEY and DEAD-KEY gates hold. Glyph marks and button letters come from CSS on `data-` attributes or catalog glyph ids, never TS literals in a DOM sink (`hardcodedStrings` ceiling 0).
 - **File names:** a new `ui/*View.ts` file must be a new `OverlayId` with an `OVERLAY_A11Y` entry (OR-MANIFEST-COMPLETE); helpers are `navRender.ts`, `frame.ts`, `hintBar.ts`.
 
@@ -361,6 +363,8 @@ Enumerated so the slice plan names a replacement before deleting anything. Sites
 **Build:** client-wasm build and any wasm `.d.ts` baseline are refreshed; no SpacetimeDB bindings regeneration (no schema or reducer change).
 
 ## 17. Named deferrals
+
+Each `R-ctl-*` is a row in the residual registry (`memory/projects/mr-residuals.jsonl`, unpromoted, target backlog), not a `residuals.spec.md` section.
 
 | Deferred | Target |
 |---|---|
