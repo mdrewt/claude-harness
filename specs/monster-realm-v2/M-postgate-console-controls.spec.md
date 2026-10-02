@@ -499,50 +499,66 @@ after: [ctl-7b]
 
 ### ctl-7d — the screen-context seam: bound ids, reduced motion, shop quantity and pick, batch observation
 category: ux-a11y (structural seam) · severity: MED · size: MODERATE
-touches: client/src/ui/screens/types.ts, client/src/ui/screens/index.ts, client/src/ui/screens/index.test.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/ui/shopModel.ts, client/src/ui/shopModel.test.ts, client/src/main.ts, client/src/main.screenContext.test.ts, client/src/main.dispatch.test.ts, client/src/main.dialogueDismiss.test.ts, client/src/main.feedbackI18n.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts
+touches: client/src/ui/screens/types.ts, client/src/ui/screens/index.ts, client/src/ui/screens/index.test.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/ui/shopModel.ts, client/src/ui/shopModel.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.dialogueDismiss.test.ts, client/src/main.feedbackI18n.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/i18n/catalogParity.test.ts
 after: [ctl-7c]
 - Evidence @04a07833 (the ctl-7c build note above, re-surveyed):
-  - `main.ts` keeps `boundShopId` / `boundHealLocationId` as module `let`s (set by `openPendingShop`, the T heal branch, and cleared on reconnect). `screenCtx` exposes only `store`, `identity`, `bindings` and `now`.
-  - `Command` has `buy { shopId, itemId }` and `sell { itemId }`; `dispatch` sends `qty: SHOP_QTY` (`= 1`) and reports the fixed `shop.feedback.purchased` / `shop.feedback.sold` lines.
+  - `main.ts` keeps `boundShopId` / `boundHealLocationId` as module `let`s. `openPendingShop` and the T heal branch set them, and a reconnect clears them. A close leaves them set. `screenCtx` exposes only `store`, `identity`, `bindings` and `now`.
+  - `Command` has `buy { shopId, itemId }` and `sell { itemId }`; `dispatch` sends `qty: SHOP_QTY` (`= 1`) and reports the fixed `shop.feedback.purchased` / `shop.feedback.sold` lines through `performCare`, whose `successMessage` is resolved before the send.
   - `stepShopOpen({ kind: 'shopPicked', shopId })` is reachable only from the document click delegate's `[data-shop-id]` branch. `COMMAND_BATTLE_POLICY` (`ui/contextStack.ts`) is total over `Command['kind']`, so a new arm needs a row there.
-  - `motionPreference` (`render/motionPreference.ts`, the one `matchMedia` reader, A11Y-28) is read only by the render loop.
+  - `motionPreference` (`render/motionPreference.ts`, the one `matchMedia` reader, A11Y-28) is read only by the render loop. It follows the query's `change` event.
+  - Every view's batch listener in `main.ts` is registered before the final `store.onBatchApplied(() => syncStack())`, and nothing is registered after it.
   - **Found by this slice's dry-run (not in the ctl-7c note):**
     - `ScreenHost` runs adapter code only on a button step. A conversation's node is replaced by a server batch while its frame stays open, and nothing steps then, so a dialogue adapter cannot learn when the new text started to reveal. Its first A after a finished reveal would be a dead press (the CTL8A.1 reveal).
-    - The shop's success line is chosen inside `dispatch`, so ctl-8a cannot make it name a quantity without touching `main.ts` (CTL8A.2's "✓ Bought 2 Bait (−40g)").
+    - The shop's success line is chosen inside `dispatch`, so ctl-8a cannot make it name a quantity without touching `main.ts` (CTL8A.2's "Bought 2 Bait (−40g)").
 - Intent: give adapters what ctl-8a needs, so ctl-8a–8k keep their promise never to touch `main.ts`. No screen is converted, and every `SCREEN_ADAPTERS` entry stays the legacy adapter.
 - Notes:
-  - A booted-`main.ts` test reaches the seam through a stand-in adapter substituted for one `SCREEN_ADAPTERS` entry (a `vi.mock` of `ui/screens/index`). That is the path a ctl-8 screen takes, so no new dev hook is needed. `main.screenContext.test.ts` is NEW (a sibling test of `main.ts`).
-  - The pure feedback formatter lives in `shopModel.ts`, beside the view-model rows it reads.
+  - The booted-`main.ts` Reds live in `main.dispatch.test.ts`. Its `vi.mock` of `ui/screens/index` and `swapAdapter` already put a stand-in adapter on one `SCREEN_ADAPTERS` entry, which is the path a ctl-8 screen takes, so no new dev hook or boot harness is needed.
+  - The feedback formatter in `shopModel.ts` is pure and returns data (`{ qty, name?, gold? }`). `main.ts` passes it to `tf` with literal ids, so `shopModel.ts` stays free of i18n (`catalogParity`'s resolver-import roster is unchanged; ids stay literals at the call site).
   - Residuals R-ctl-7c-BOUNDIDS, -SHOPQTY, -SHOPPICK and -REDUCEDMOTION are delivered here. Their registry rows stay targeted at ctl-8a, because `mr-gates` has no retarget. The supervisor closes them when ctl-7d merges (`residuals close --slice ctl-8a --force --reason "delivered by ctl-7d"`) or with ctl-8a. R-ctl-7c-HEALGUARDTEST stays in the backlog.
 - Tasks:
-  - Delete `SHOP_QTY`. The legacy shop view's buttons send `qty: 1`.
-  - The click delegate's `[data-shop-id]` branch dispatches `pickShop`, so the click and A share one path.
-  - Named intentional test changes: the pinned feedback ids in `main.feedbackI18n.test.ts`; the `buy` / `sell` rows and the battle case's literal refuse list in `main.dispatch.test.ts`. If the old `shop.feedback.purchased` / `.sold` ids become unused, they are deleted from both catalogs and `messageIds.ts` (`catalogParity` DEAD-KEY).
+  - `main.ts`:
+    - add the three `screenCtx` getters;
+    - call `screenHost.observe(contextStack, screenCtx)` inside the final batch listener, right after `syncStack()`;
+    - add the `pickShop` case;
+    - check the quantity and build the feedback in the `buy` / `sell` cases;
+    - delete `SHOP_QTY`, so the legacy shop view's buttons send `qty: 1`;
+    - make the click delegate's `[data-shop-id]` branch dispatch `pickShop`, so the click and A share one path.
+  - Delete `shop.feedback.purchased` / `.sold` from both catalogs and `messageIds.ts` (they become unused; `catalogParity` DEAD-KEY).
+  - Named intentional test changes:
+    - `main.feedbackI18n.test.ts`: the pinned feedback ids.
+    - `main.dispatch.test.ts`: the `buy` / `sell` rows, the ShopView `onBuy` / `onSell` feedback-id pins, and the battle case's literal refuse list.
+    - `contextStack.test.ts`: the `buy` literal and the policy counts.
+    - `catalog.test.ts`: `EXPECTED_KEYS`.
+    - `catalogParity.test.ts`: the `main.ts` literal-key list and its count.
 
 - **CTL7D.1:** THE SYSTEM SHALL give adapters the bound shop and the bound heal location as two read-only `ScreenContext` values, `shopId: number | null` and `healLocationId: number | null`, read live at each call.
-  - They report the shop the greet-then-shop open bound and the heal location T bound. Shop id 0 and location id 0 are reported as 0, not as null. After a reconnect both read null.
-  - Red: `main.screenContext.test.ts`. A stand-in adapter for `shopView` / `healView` records what its `viewModel(ctx)` saw on a button press after a real open.
+  - They report the shop the greet-then-shop open bound and the heal location T bound. Shop id 0 and location id 0 are reported as 0, not as null. After a reconnect both read null. After a close they keep their last value (every open rebinds).
+  - Red: a stand-in adapter for `shopView` / `healView` records what its `viewModel(ctx)` saw on a button press after a real open.
 - **CTL7D.2:** THE SYSTEM SHALL give adapters the OS reduced-motion preference as a read-only `ScreenContext.reduceMotion: boolean`, read live from `main.ts`'s one `motionPreference`.
   - No second `matchMedia` read (A11Y-28).
-  - Red: `main.screenContext.test.ts`. A stubbed `matchMedia` that changes between two presses; the stand-in adapter sees both values.
+  - Red: a stubbed `matchMedia` fires `change` between two presses, and the stand-in adapter sees both values.
 - **CTL7D.3:** THE SYSTEM SHALL carry a quantity on `buy { shopId, itemId, qty }` and `sell { itemId, qty }`, and `dispatch` SHALL send that `qty` to the reducer. WHEN `qty` is not an integer from 1 to 4294967295 (the reducer's `u32`), `dispatch` SHALL send nothing.
-  - Reject, don't clamp: 0, −1, 1.5, `NaN` and 2^32 each produce no reducer call.
-  - Red: `main.dispatch.test.ts`. A `qty` of 3 reaches `buy` and `sell` verbatim, and each invalid value sends nothing.
+  - Reject, don't clamp. For 0, −1, 1.5, `NaN` and 2^32, the check runs before `performCare`: there is no reducer call and no shop line, and a `console.error` names the command. An invalid quantity is an adapter bug, not player input.
+  - Red: a `qty` of 3 reaches `buy` and `sell` verbatim, and each invalid value sends nothing.
 - **CTL7D.4:** WHEN a `buy` or `sell` succeeds, THE SYSTEM SHALL show a catalogued line in the shop that names the quantity, the item and the gold moved (for example "Bought 2 Bait (−40g)" / "Sold 3 Berry (+30g)"), in every locale.
-  - The item name and unit price come from the shop's view-model rows (`forSale[].buyPrice`, `forSaleByPlayer[].sellPrice`). WHEN the item has no row, the line still names the quantity.
-  - The formatter is pure (`shopModel.ts`) and table-tested. A booted test pins that the line reaches `#shop-feedback` in `en` and `fr`.
+  - The values are read from the store when the command is sent, not when it settles: the item name and `sellPrice` from the item-definition row, and the buy price from the shop-item row for the command's `shopId`. A sell-all removes the inventory row before the line shows.
+  - WHEN the row is missing, the line names the quantity only. Any glyph follows the milestone's glyph rule.
+  - The formatter is table-tested in `shopModel.test.ts`. A booted test pins the line in `#shop-feedback` under `en` and `fr`.
 - **CTL7D.5:** THE SYSTEM SHALL add `pickShop { shopId: number }` to the `Command` union, which `dispatch` SHALL run as `stepShopOpen({ kind: 'shopPicked', shopId })`, and `COMMAND_BATTLE_POLICY` SHALL classify it `refuse`.
   - Dispatched with a conversation open, it sends one `dismiss_dialogue`. The shop opens on the first batch with no conversation, as the click does today.
+  - Intentional: a Shop click over a dialogue suspended by a battle is now refused with the battle reason, where it used to send a dismiss. No test pins the old behaviour.
   - Red: `main.dispatch.test.ts` (or `main.dialogueDismiss.test.ts`) pins dismiss-then-open through the command. `contextStack.test.ts` pins that it is refused at a battle base.
 - **CTL7D.6:** WHEN a store batch has been applied, THE SYSTEM SHALL call the optional `ScreenAdapter.observe(vm, state, now)` once for every open screen or prompt frame whose adapter defines it, and keep the state it returns.
-  - It runs after the batch's `syncStack`. A frame this batch pushed therefore starts from `init(vm)`, as does any frame with no kept state.
-  - WHEN the returned state is a different object from the kept one, the host paints that frame once, through the same paint-error path a step uses. When the state is the same object, it does not paint.
+  - The host API is `ScreenHost.observe(stack, ctx)`. It walks every screen or prompt frame in the stack from the bottom up, not only the top one. Each call gets `vm = adapter.viewModel(ctx)`, `now = ctx.now()`, and the kept state, or `init(vm)` when there is none.
+  - `main.ts` calls it inside the final batch listener, right after `syncStack()`. A frame this batch pushed therefore starts from `init`, and the view renders of the batch have already run.
+  - WHEN the returned state is a different object from the kept one, the host paints that frame once. When it is the same object, the host does not paint.
+  - A throw from `viewModel`, `observe` or `paint` goes to the paint-error path. That frame keeps its previous state, and the remaining frames are still observed.
   - Adapters without `observe` (legacy, main menu) are not called, and their state is untouched.
-  - Red: `screens/index.test.ts` pins threading, init-on-first-observe, paint-only-on-change and skipping adapters without `observe`. `main.screenContext.test.ts` pins that a batch reaches a stand-in's `observe`.
+  - Red: `screens/index.test.ts` pins threading, init-on-first-observe, paint-only-on-change, the throw case and skipping adapters without `observe`. `main.dispatch.test.ts` pins that a batch reaches a stand-in's `observe`.
 
 ### ctl-8a — Dialogue, Shop and Heal on the D-pad
 category: ux-a11y + gameplay defect B13 · severity: MED · size: HEAVY
-touches: client/src/ui/screens/dialogueScreen.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/healScreen.ts, client/src/ui/screens/index.ts, client/src/ui/dialogueView.ts, client/src/ui/dialogueView.test.ts, client/src/ui/dialogueModel.ts, client/src/ui/dialogueModel.test.ts, client/src/ui/shopView.ts, client/src/ui/shopView.test.ts, client/src/ui/shopModel.ts, client/src/ui/shopModel.test.ts, client/src/ui/healView.ts, client/src/ui/healView.test.ts, client/src/ui/healModel.ts, client/src/ui/healModel.test.ts, client/src/ui/screens/dialogueScreen.test.ts, client/src/ui/screens/shopScreen.test.ts, client/src/ui/screens/healScreen.test.ts, client/src/ui/screens/index.test.ts, client/src/styles.css, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/dialogue.spec.ts, client/e2e/shop-npc.spec.ts, client/e2e/wallet-balance.spec.ts
+touches: client/src/ui/screens/dialogueScreen.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/healScreen.ts, client/src/ui/screens/index.ts, client/src/ui/dialogueView.ts, client/src/ui/dialogueView.test.ts, client/src/ui/dialogueModel.ts, client/src/ui/dialogueModel.test.ts, client/src/ui/shopView.ts, client/src/ui/shopView.test.ts, client/src/ui/shopModel.ts, client/src/ui/shopModel.test.ts, client/src/ui/healView.ts, client/src/ui/healView.test.ts, client/src/ui/healModel.ts, client/src/ui/healModel.test.ts, client/src/ui/screens/dialogueScreen.test.ts, client/src/ui/screens/shopScreen.test.ts, client/src/ui/screens/healScreen.test.ts, client/src/ui/screens/index.test.ts, client/src/ui/dialogueView.i18n.test.ts, client/src/ui/healView.i18n.test.ts, client/src/styles.css, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/dialogue.spec.ts, client/e2e/shop-npc.spec.ts, client/e2e/wallet-balance.spec.ts
 after: [ctl-7d]
 - Evidence:
   - The dialogue has no continue or close control, and leaf nodes have 0 choices (r2-008/009/060/061).
@@ -553,13 +569,21 @@ after: [ctl-7d]
 - Tasks: `#shop-balance`, `#shop-for-sale button[data-item-id]` and `#dialogue-choices` keep their ids and first-paint semantics (used by `wallet-balance.spec.ts`); the spec passes unmodified.
 - Seam map (ctl-7d dry-run against the seam at 04a07833 plus ctl-7d; nothing here touches `main.ts`):
   - **CTL8A.1.** `dialogueScreen.viewModel(ctx)` builds `buildDialogueViewModel(ctx.store.ownConversation(ctx.identity), <npcs by entity id from ctx.store.allNpcs()>, DIALOGUE_TREES)` (import `ui/dialogueContent`) and carries `ctx.reduceMotion`.
-    - The state is keyed on the node. `observe` re-keys it when a batch replaces the node and records `now` as the reveal start, so A knows whether the reveal is still running.
+    - The state is keyed on the node. `observe` re-keys it when a batch replaces the node and records `now` as the reveal start. `onButton` has no clock, so `viewModel(ctx)` also carries `ctx.now()`, and A compares the two to know whether the reveal is still running.
+    - A frame re-pushed while still shown (Start over an open dialogue: the server keeps the row and `syncStack` pushes it again) starts over from `init`. Its `observe` stamps a new reveal start, and the paint that follows restarts the view's reveal, so view and state agree.
+    - While a battle suspends the dialogue (`SCREEN_POLICY` `suspend`), it stays the top frame and takes the D-pad. The adapter answers `unhandled` while `ctx.store` shows the player in an ongoing battle, so A does not raise a battle refusal on every press.
     - A on a choice → `advanceDialogue { choiceIdx }`; A on the greet-then-shop choice (`shopAction`) → `pickShop { shopId }`; A on a leaf, and B → `dismissDialogue`. The adapter answers Start as the legacy adapter does today.
     - The reveal itself is a class-driven animation in `styles.css`, so `styles.css` is in `touches:`. The bottom box is a class rule as well, because roots stay free of inline styles (A11Y-12). Under reduced motion there is no animation, and the state starts revealed.
+    - `indexShell.smoke.test.ts` fails any `.mr-shell--*` rule that sets an inset or `overflow`. The bottom box therefore anchors an inner frame by flex alignment inside the shell, never with a `.mr-shell--bottom { bottom: 0 }`.
+    - `dialogueView.i18n.test.ts` DV-01 pins the `#dialogue-choices` button texts. DV-02 walks the whole overlay for the text `render()` writes. New text is either a catalog id that those tests accept or is written by `paint`; either way they change as sibling tests.
   - **CTL8A.2.** `shopScreen.viewModel(ctx)` builds `buildShopViewModelForShop(ctx.shopId, …)`. A null `ctx.shopId` gives the no-shop view model.
     - Confirm Yes → `buy { shopId, itemId, qty }` / `sell { itemId, qty }`. The feedback line is ctl-7d's (CTL7D.4), so this slice adds no feedback ids.
     - Buy | Sell switch on LB/RB, which reach the adapter from PageUp/PageDown only until ctl-11a (CTL6B.6). Y (KeyF) reaches it, and the descriptions come from `StoreItemRow.description`.
+    - **DOM shape pinned outside `touches:`.** `main.feedbackCore.test.ts` and `main.feedbackI18n.test.ts` click `#shop-for-sale button` and `#shop-inventory button` after a bare batch, with no step and no paint. `wallet-balance.spec.ts` needs `#shop-for-sale li` / `button[data-item-id]` at first paint. So both lists stay in the DOM from `render(vm)`, and the tabs only show and hide them and move the cursor. They never build only the active tab's rows.
+    - An A-driven buy has no in-flight lock: `ShopView`'s pending lock guards only its own buttons, and `applyRouterEffect` drops `dispatch`'s promise. This is accepted, because the server is the authority. The confirm step makes a double send unlikely, and a lock would need `ScreenContext` and `main.ts` work.
   - **CTL8A.3.** `healScreen.viewModel(ctx)` builds `buildHealViewModelForLocation(ctx.healLocationId, ctx.store.healLocations(), ctx.store.itemDefs())` when the id is not null. Yes → `healParty { locationId }`.
+    - `healView.i18n.test.ts` HL-01 / HL-02 pin `#heal-list` to its "Heal here (…)" rows. The question, Yes / No and the disabled reason therefore sit outside `#heal-list`.
+  - **Known limit (not a ctl-8a criterion).** Initial focus goes to the static manifest anchors in `overlayRegistry.ts` (`#dialogue-npc-name`, `#shop-title`, `#heal-list`), and `overlayA11yWiring.test.ts` pins that. Focus therefore never reaches the nav container, and screen readers do not announce cursor moves. Moving the anchors is `overlayRegistry.ts` work for a slice that touches it (ctl-11b or ctl-12).
   - **CTL8A.4.** T keeps its legacy open paths in `main.ts`. Swapping the three `SCREEN_ADAPTERS` entries converts the frames they open, and `screens/index.test.ts` (`CTL6B-1-ADAPTERS-TOTAL`, `CTL7C-1-NAV-CAPABLE`) is updated as a sibling test.
 
 - **CTL8A.1:** WHEN a conversation is shown, THE SYSTEM SHALL render a bottom-box frame whose choices form a wrapping nav list, where A finishes the text reveal, then advances, then chooses, and B finishes the reveal and, on a choice or leaf node, ends the talk through `dismissDialogue`.
