@@ -114,7 +114,7 @@ These rules apply to every slice. The tester encodes them per slice.
 - **Smoothness contract preserved.**
   - The D-pad feeds the existing `step()` and `held` seam. `HOLD_COMMIT_MS` and the re-issue mechanism are unchanged; only the gate they consult becomes `movementEnabled` (ctl-2).
   - `main.boot` BOOT-MOVE / 14R-E and `movement-input.spec.ts` keep passing, except the named test-C replacement.
-- **`main.ts` is a serialization point.** The `main.ts` chain is pgcc-a → ctl-1 → 2 → 3 → 5 → 6b → 6c → 7a → 7b → 10a → 10b → 11a → 11b → 12 → 13 → 14 → 15 → pgcc-c → pgcc-d. ctl-4, ctl-6a, ctl-8a–8k, ctl-9 and ctl-16 never touch it.
+- **`main.ts` is a serialization point.** The `main.ts` chain is pgcc-a → ctl-1 → 2 → 3 → 5 → 6b → 6c → 7a → 7b → 7c → 10a → 10b → 11a → 11b → 12 → 13 → 14 → 15 → pgcc-c → pgcc-d. ctl-4, ctl-6a, ctl-8a–8k, ctl-9 and ctl-16 never touch it (ctl-7c is the seam that makes this true).
 - **The ctl-8 screens are a serial chain.** Every screen slice appends to the catalogs, `messageIds.ts` and `client/src/ui/screens/index.ts`, and the i18n gates read those files as text, so they run one at a time in consumer order (see "Build order"). A screen slice changes only its own `screens/<name>Screen.ts`, its model/view files, its `screens/index.ts` entry, the catalogs and its e2e. If it needs a new `Command` arm or other `main.ts` wiring, that is a hidden dependency: stop and surface it, as the build loop requires.
 
 ## Slices
@@ -131,6 +131,7 @@ after: [pgcc-a]
 - Notes: the binding table is complete from this slice (LB/RB = Q/E with PageUp/PageDown aliases), but the router consumes LB/RB only from PageUp/PageDown until ctl-11a (CTL6B.6). Sources map physical input to virtual buttons through the one table; the router sees only `{button, down}` edges, so M-gamepad adds a source without touching the router.
 - New files: everything under `client/src/input/`, `client/src/main.input.test.ts`.
 - Tasks: correct the stale `main.wiring.test.ts` citations at main.ts ≈199 and ≈1309 (part of B16). Add the W/ArrowUp refcount case and a Ctrl+P not-prevented case to `movement-input.spec.ts`.
+- Build note (ctl-1, 2026-10-01): the e2e refcount case drives the KeyD/ArrowRight pair (the suite's measured world is the y=1 east/west corridor); W/ArrowUp is driven in `main.input.test.ts` and `router.test.ts`. The keyboard source answers a non-repeat keydown on a still-recorded code (a lost keyup, e.g. macOS under Cmd) with `[up, down]`, so the key is never dead. The chord return sits right after the session gate, which stays first.
 
 - **CTL1.1:** WHEN a key event arrives, THE SYSTEM SHALL resolve it by `e.code` through one binding table (`DEFAULT_BINDINGS`) into `{button, down}` edges, and the router SHALL consume D-pad and X edges with today's movement semantics.
   - The table holds the full design §3 default keymap and aliases. Shift and letter case are ignored.
@@ -164,6 +165,16 @@ after: [ctl-1]
 - Evidence: B14. Of the hotkey open paths, only N/O/?/M/C call `held.clear()`.
 - Intent (design §4, migration rule 3): the stack lands *behind* the legacy show/hide paths and mirrors them. No key routing changes in this slice. The base is derived on the same `store.onBatchApplied` hook: `battle` whenever the latest own battle row is `Ongoing`, else `world`. Full server reconcile is ctl-3.
 - Tasks: replace `movement-input.spec.ts` test C (walk resumes on close) with the hold-through-menu test, which holds W, opens the menu (M), closes it and expects no step until W is pressed again. The replacement keeps an anti-vacuity arm (pressing W again does walk), so it cannot pass on a dead world. Test C is deleted by name; this deliberately reverses the behaviour documented at main.ts ≈3204.
+- Build note (ctl-2, 2026-10-01):
+  - **The e2e uses the box, not the menu.** The e2e holds ArrowRight in the y=1 corridor and opens the box (KeyB), not the menu. M already called `held.clear()` on master, so an M-only test could not fail on the defect; KeyB never cleared held. The menu, I, E, Q, L, U and P openers and a server-opened dialogue are covered in `main.input.test.ts`.
+  - **The stack mirrors; nothing pushes onto it directly.** `syncStack()` in main.ts mirrors the visible overlays (`mirrorEdges`) and derives the base inside the sync from `store.ongoingBattle` (any Ongoing own row, either role, agreeing with the server guard and `__game().ongoingBattle`). It does not use "latest row is Ongoing" from a separate listener, so listener order cannot matter.
+  - **Where it syncs.** It syncs on every `movementGate()` read, at the top and tail of each keydown, at the top of each frame and in the last batch listener. `__game().stack` only reads it.
+  - **A base change also clears held.** A change of base kind (world↔battle) clears held too, so a hold never outlives a battle.
+  - **KeyT uses the movement gate too.** The KeyT interact guard moved to `movementGate()` along with the prompt's `overlayUp`, so the prompt never advertises a target T refuses.
+  - **`nav` is not on the frames yet.** `screen`/`prompt` carry no `nav` yet; it arrives with ctl-4/ctl-5. `SCREEN_POLICY` values other than dialogue are provisional.
+  - **Residuals.**
+    - A batch that both pulls the player back and server-opens an overlay still lets that batch's reconcile re-issue send one step, because the overlay is shown by a later listener. This is unchanged from master; ctl-3's store-derived reconcile closes it.
+    - Stale citations outside `touches:`: `main.a11yFocus.test.ts:526` names the deleted test C, and `ui/claimView.ts:3` says `anyOverlayVisible()` guards movement.
 
 - **CTL2.1:** THE SYSTEM SHALL represent UI state as a pure stack of frames over a `world` or `battle` base, with a pure `contextStep(stack, edge) → {stack, commands}`.
   - The frame union is `world | battle(id) | screen(id, nav) | prompt(id, nav) | textEntry(owner)`.
@@ -195,6 +206,14 @@ after: [ctl-2]
 - Notes: reconnect keeps `resetPredictionState`; `main.battle-reseed.test.ts` and `main.feedbackI18n.test.ts` already guard it.
 - New files: `shopOpenModel.ts`, `shopOpenModel.test.ts`, `main.dialogueDismiss.test.ts`.
 - Tasks: delete `BATTLE_FORCE_HIDE`, `NEVER_FORCE_HIDE` and `hideAllExceptPlan`; the `overlayRegistry.test.ts` force-hide exactness cases become `SCREEN_POLICY` reconcile cases in `contextStack.test.ts` first.
+- Build note (ctl-3, 2026-10-01):
+  - **Reconcile only pops.** `reconcile(stack, {ongoingBattleId, outcomeShown, conversation})` derives the base and pops; it never pushes. The dialogue frame and the terminal-outcome frame are still pushed by the mirror of their store-rendered views, so a null view model (a missing NPC row, a corrupt battle team) can never strand a frame and kill movement. "Push the dialogue frame" (CTL3.4) is therefore the mirror's job until ctl-6b's `applyStack` owns show/hide.
+  - **Batch-only, level-triggered.** Reconcile runs on every batch (the first UI listener, before the battle and dialogue listeners, so a close never follows a show and steals focus), as base → mirror → reconcile. Frame, keydown and `movementGate` syncs stay base + mirror. Like master's per-batch force-hide, an overlay opened over an Escape-hidden Ongoing battle closes on the next batch; ctl-6c's `battleSafe` refines that.
+  - **The terminal outcome drops too.** `outcomeShown` is `decideBattleOverlay`'s answer for a terminal row, read without committing it. It only decides drops and never pushes or pops the `battleView` frame, so a zone switch cannot pop an unseen outcome.
+  - **`canOpen('battleView', …)` now denies.** `overlayRegistry.ts` must stay import-free, so it cannot read `SCREEN_POLICY`, and nothing in production asked it about a battle.
+  - **The deferred shop open is stricter than written.** It is dropped unless the stack is a bare world base (a battle base or an outcome frame blocks it as well as a player frame), via the pure `blocksPlayerOpen`.
+  - **Deferred to ctl-6b.** The CTL3.4 sub-bullet "popping a dialogue frame emits `dismissDialogue`" is a *player* pop (Start), which has no producer before ctl-6b. A reconcile pop is server-caused and emits nothing.
+  - **Residuals.** The ctl-2 residual (a batch that pulls the player back and server-opens an overlay can still re-issue one step) stays open, because the dialogue frame is still pushed by the view mirror. Outside `touches:`, stale comment citations of the deleted symbols remain in `privacyView.ts:22`, `dialogueView.ts:24`, `menuView.test.ts`, `main.privacyWiring.test.ts`, `tradeProposeView.test.ts`, `leaderboardView.test.ts`, `renameView.test.ts`, `privacyView.test.ts` and `helpView.test.ts`.
 
 - **CTL3.1:** THE SYSTEM SHALL reconcile server state into the stack on every `store.onBatchApplied` through a pure, idempotent `reconcile(stack, serverView) → {stack, commands}`.
   - Property: `reconcile(reconcile(s, v), v)` equals `reconcile(s, v)`.
@@ -228,6 +247,14 @@ after: []
 - Evidence: B18. The uxd3 menu marks the selected row with bold weight only (`ui/menuView.ts` ≈183).
 - Notes: the ▶ gutter mark, inverted band, 2 px frame and 9-slice border are styling guidance (design §6, §10), not criteria.
 - New files: all six source files above.
+- Build note (ctl-4, 2026-10-01):
+  - **What a consumer calls.** `nav.ts`: `list`/`grid`/`tabs` (validated: no duplicate or whitespace keys, `cols` an integer ≥ 1, tab keys `tab`/`root` reserved, no `{tab}-{key}` or `tab-{tab}` id clash across tabs), `navInit(layout, remembered?)`, `navStep(layout, state, {button, repeat})` → `moved | none | ignored | activate | disabled{reason}`, `navReconcile(prev, next, state)`, `navFocus(layout, state, {tab?, item?})` for declared defaults (Shop→Buy, Fight, Yes/No), and `rememberNav`/`recallNav` over an immutable `NavMemory` map that the session (ctl-5) holds. `navRender.ts`: `renderNav(container, layout, state, {frame, fill, labelledBy?})` and `renderTabs`. `frame.ts`: `createFrame(doc, {id, size})`, `setFrameTitle`, `renderFrameTabs`, and the pure `feedbackStep` with a thin `renderFeedback`.
+  - **Behaviour beyond the criteria.** A with `repeat` set does nothing. Zero tabs and empty lists are legal. `tabs([])` and empty tabs are legal for Bag pockets. Per-tab memory never stores null. A vanished remembered tab lands on the first tab's remembered item. The same state object comes back when nothing changed.
+  - **Ids.** Frame ids must be non-empty with no whitespace or `-`, so `{frame}-{tab}-{key}` ids cannot collide across frames. Non-tab layouts use the tab segment `root`.
+  - **Feedback tokens.** Tokens must be unique per action. A late resolution of a superseded, cleared or info-interrupted action is ignored.
+  - **Rendering.** The kit resets item classes every render, and `fill` owns only an item's children, which are never focusable. The active item is scrolled into view (`block: nearest`) when it changes while attached.
+  - **The kit writes no text.** Glyphs (▶ › ✓ ! … LB/RB) are CSS pseudo-elements with empty alternative text. The feedback line is not a live region.
+  - **Residual R-ctl-4-X1.** Three render-hygiene mutants survive the unit tier.
 
 - **CTL4.1:** THE SYSTEM SHALL model navigation as pure layouts `list(items) | grid(items, cols) | tabs([{key, layout}])` over `NavItem = {key, enabled, reason?}`, storing the active item by **key**.
   - When content changes, `navReconcile` keeps the key, or else moves to the nearest index. This is a fast-check property.
@@ -324,6 +351,13 @@ after: [ctl-5]
 - Tasks:
   - Delete the 15-branch Escape stack and `activateMenuLeaf`'s hide-first path.
   - `main.a11yFocus.test.ts` and `main.privacyWiring.test.ts` change only where they press Escape (named intentional change).
+- Build note (ctl-6b, 2026-10-01):
+  - **Escape is routed in the capture phase; nothing else is.** `renameView.ts`/`tradeProposeView.ts` are outside `touches:`, so instead of the views dropping `stopPropagation`, main.ts registers its key handler twice: capture phase for `Escape` only, bubble phase for every other code. The views' `stopPropagation` therefore still shields their fields and submit buttons from the letter ladder (a focused `#rename-submit` + N does not toggle-close and wipe the draft). A composing Escape (IME) is stopped before the views' own Escape→hide and is not prevented. Residual R-ctl-6b-CTL6B.1 (→ ctl-14 DECISIONS).
+  - **Typing mode** is the DOM-focused text field (text-like `INPUT`, `TEXTAREA`, contentEditable — not `SELECT`/checkbox): Escape moves focus to the frame's first enabled non-text control (else `<body>`, residual R-ctl-6b-CTL6B.5 → ctl-8h) and keeps the text; Enter stays the view's own and commits through `dispatch`. `textEntry` frames have the pure rules (Start pops it, A commits through the owner's adapter) but no producer yet.
+  - **The stack stays the mirror.** `applyStack(prev, next)` only closes what `next` drops (top first, so privacy's dismiss flush still finds the claim shown), then `syncStack()` re-mirrors; a dismissed dialogue stays on the stack until the server row goes. Start on an Ongoing battle base is swallowed (B17); on a terminal outcome it continues via the pure `continuedBattleId`.
+  - **Every view callback runs through `dispatch(command)`** (31 reducer arms + 4 stack arms), pinned row-by-row in `main.dispatch.test.ts`.
+  - **Intentional test changes beyond the two named files:** `main.menu.test.ts` (CTL5-2-MAIN-ESCAPE-RETURNS, the Profile › Account case), `main.input.test.ts` (CTL2-3-BOOT-B17, CTL3-2-BOOT-OUTCOME-SAME-BATCH), `router.test.ts` (CTL5-2-ROUTER-B-POPS-COVERED, no `pop` router effect any more), and `main.a11yFocus.test.ts`'s `?` presses (now `code: 'Slash'`; `e.key` is retired). Spec gap: a slice that changes a key's meaning should list every booted `main.*.test.ts` sibling that presses it.
+  - **Unchanged by design:** Start/Select at the world keep the `worldHasFocus()` guard (as KeyM/`?` had); `?` on non-US layouts no longer opens help, and the player-facing help text still names `?`/Escape (residual R-ctl-6b-CTL6B.4 → ctl-14). `activateMenuLeaf` was already deleted by ctl-5.
 
 - **CTL6B.1:** THE SYSTEM SHALL route each virtual-button edge to the top frame's `ScreenAdapter.onButton(vm, nav, btn) → Command | consumed | unhandled`, and `main.ts` SHALL run an exhaustive `dispatch(command)` plus `applyStack(prev, next)`.
   - The `Command` union covers every reducer action a screen issues today: care, train, evolve, set nickname, set party slot, buy, sell, trade respond/confirm/cancel, challenge accept/decline/cancel, propose trade, challenge, set profile name, the battle actions, heal party, advance dialogue and dismiss dialogue, plus the claim and privacy actions. A missing arm fails `client-typecheck` (`never` check).
@@ -355,6 +389,16 @@ touches: client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, clie
 after: [ctl-6b]
 - Intent (design §4; default 1 in design §14): Start on an ongoing battle opens the main menu over it, read-only. Reducer guards stay the authority (`is_in_ongoing_battle`, `reject_if_in_battle`).
 - Notes: the in-battle "Start → menu → Monsters → Start → battle" e2e lands in ctl-8j's `battle-dpad.spec.ts`, once Monsters is a real screen.
+- Build note (ctl-6c, 2026-10-01):
+  - **Start opens the menu only at the bare battle base.** The pure `battleButton(stack, btn, outcomeAgeMs)` in `contextStack.ts` is asked before the top frame's adapter. With a conversation suspended over the battle (`[battle, dialogueView]`) Start is still CTL6B.2's pop-to-base and dismisses it.
+  - **Frames opened over a battle are stamped.** A screen frame first mirrored while the base is (and already was) a battle carries `overBattle: <battleId>`. `reconcile` keeps a stamped `battleSafe` frame while that same battle is the base and drops it when the battle ends, vanishes or is replaced. A frame opened at the world still drops when a battle arrives (CTL3.2). A link drop hides every stamped frame, so a re-delivered battle row is the bare battle base again.
+  - **CTL6C.2 as built differs from the criterion text ("exactly as Start does").** B and Start continue at once, as ctl-6b left them (B pops the outcome frame, Start pops to the base). A pops only the outcome frame, and only once the outcome has been up 400 ms (`OUTCOME_CONTINUE_GRACE_MS`), so an Enter mashed through the battle's last turn cannot skip the result; a held A never continues. A conversation suspended under the outcome survives A and B (Start dismisses it). The hint reads "Press Enter or Esc to continue".
+  - **CTL6C.3.** `COMMAND_BATTLE_POLICY` is a total `Record` over the `Command` kinds (12 safe: the stack moves, the battle's own actions, `dismissDialogue`; 24 refused). `dispatch` refuses with `menu.disabled.inBattle` on the status line and the live region; the line is cleared when the base is the world again. Talk and Bag Use have no `Command` arm yet: talk is stopped by the movement gate, Bag Use by the disabled Bag row (`menu.disabled.battleBag`). The total `Record` makes ctl-10a and ctl-8f classify their new arms.
+  - **Layering (supervisor decision option-a).** `client/index.html` gives `#menu-overlay` and `#help-overlay` z-index 120, above the battle root's 110. Journal and Rankings are `battleSafe` but stay **disabled** over a battle (`HIDDEN_UNDER_BATTLE` in `mainMenuScreen.ts`): their shells are in the page flow, under the battle. Over a battle only Options › How to play and Close are enabled.
+  - **Obligations for ctl-7a / ctl-7b.** Keep the menu and help painting above the battle (the e2e below guards it). Once the Journal and Rankings shells paint above the battle, empty `HIDDEN_UNDER_BATTLE` and flip its pins; that needs `mainMenuScreen.ts`, `mainMenuScreen.test.ts` and `main.controls.test.ts` in that slice's `touches:` (R-ctl-6c-JOURNALRANKINGS).
+  - **The layering e2e lifts `inert`.** `encounter-battle.spec.ts` E0 hit-tests with `elementFromPoint`. The a11y layer marks the suspended battle root `inert`, and Chromium leaves inert subtrees out of hit-testing, so a plain probe passed on the unfixed build while the battle painted over the menu. E0 lifts `inert` inside one `evaluate` and also pins the z-index order.
+  - **touches-delta.** By the supervisor decision: `client/index.html`, `client/e2e/encounter-battle.spec.ts`. Sibling tests of declared files: `main.controls.test.ts`, `main.input.test.ts` (CTL2-3-BOOT-B17 and one stack shape), `main.dispatch.test.ts`, `catalog.test.ts`, `catalogParity.test.ts`.
+  - **Residuals.** R-ctl-6c-PVPTIMER (the CTL6C.1 sub-bullet: the timer keeps running but the menu header does not repeat it, → ctl-8j), -MONSTERSRO (Monsters is disabled, not read-only, → ctl-8b), -SELECTINERT (→ ctl-8j), -JOURNALRANKINGS (→ ctl-7b), -MENUCOPY (→ ctl-8j), -REFUSALSURFACE (→ ctl-13), -STALETEXT (the shadowed `baseButton` battle arm in `screens/index.ts`, → ctl-8i).
 
 - **CTL6C.1:** WHEN Start is pressed on an `Ongoing` battle base, THE SYSTEM SHALL keep the battle shown and open the main menu over it, and WHEN that menu closes, THE SYSTEM SHALL return to the battle.
   - In PvP the turn timer keeps running and shows in the menu header.
@@ -396,6 +440,11 @@ after: [ctl-6c]
 - **CTL7A.4:** WHEN the world base is shown, THE SYSTEM SHALL show a Start chip (opens the main menu) and a Select chip (Help) in the hint-bar slot, with verbs from the catalog, and `document.getElementById('help-hint')` SHALL return null.
   - Clicking a chip presses its button; opening the menu clears held keys (CTL2.4).
   - The chips are static until ctl-13 makes the bar live.
+- Build note (ctl-7a, 2026-10-02):
+  - W-ONE-CORNER-AFFORDANCE no longer existed (its file, `main.wiring.test.ts`, was deleted), so there was nothing to rewrite. Six more `main.*.test.ts` files (controls, dialogueDismiss, dispatch, input, menu, feedbackCore) carried the same `body.children > 5` fixture check and were updated as sibling tests of `main.ts`.
+  - `#game-screen` is `position: relative` at `100dvh` with `overflow: hidden`, never `fixed`, because a fixed box makes a stacking context that would sink the menu and help under the body-level banners. The nine shells and help are `.mr-frame.mr-shell`. `#menu-overlay` is `.mr-shell` only, because its visible frame is the `ui/frame.ts` one inside it. `.mr-shell--top` (menu, help) is `position: fixed`, because the ctl-6c E0 e2e pins all three layering roots as fixed.
+  - The chips draw the button name with `::before` and speak it too, so the accessible name is "Start Menu" / "Select Help" (label in name). Both chips honour the session gate. Select has no identity guard, like `?`. `#status` moved into `#game-screen` as `.mr-status`.
+  - The contrast e2e measures the menu, help and the rename shell. Extending it to every frame is R-ctl-7a-CTL7A.3, targeted at ctl-7b.
 
 ### ctl-7b — re-parenting battle, box, raising and evolution under `#game-screen`
 category: ux-a11y (S-overlay-anchor) · severity: HIGH · size: MODERATE
@@ -406,11 +455,39 @@ after: [ctl-7a]
 
 - **CTL7B.1:** WHEN battle, box, raising or evolution is shown, THE SYSTEM SHALL render it as a class-styled `.mr-frame` inside `#game-screen`, within the viewport, with its text at a contrast ratio of at least 4.5:1.
   - Their ids, testids and inline-style-free root contract (A11Y-12) hold; `reduced-motion.spec.ts` and `movement-input.spec.ts` keep passing.
+- Build note (ctl-7b, 2026-10-02):
+  - The four roots stay mounted in `#app`, which ctl-7a already put inside `#game-screen`. Moving them to `#frame-layer` would break `pvp.spec.ts` and `trade.spec.ts`, which detect the open box as `#app > div` with inline `display:flex`. `main.ts` is unchanged.
+  - Box, raising and evolution are `.mr-frame.mr-shell`. Battle is `.mr-frame.mr-shell.mr-shell--top.mr-shell--battle`: `--top` gives the `position:fixed` that encounter-battle E0 pins, and the new `.mr-shell--battle { z-index: 110 }` follows `--top` so the battle sits under the menu and help (120) and above the other shells (100). Each root's inline style is only the `display` toggle and centring (battle: `justify-content: safe center`, so a tall battle scrolls from its title).
+  - Evolution keeps `background-color: var(--mr-evo-backdrop)` and `color: var(--mr-evo-fg)` inline, because those tokens are what `prefers-contrast: more` re-colours. It is therefore the one frame whose background is translucent (0.8 black). The Chromium e2e measures it at 4.5:1 or better against both a white and a black canvas.
+  - The `opacity:0.4` empty states in box and raising became `color:#aaa` (7:1).
+  - Folded in R-ci-fix-20261002T0901Z-RAISINGVIEWREBUILD. `RaisingView.refresh` re-renders each list only when a JSON key over the locale and the view-model changes (the pvpView shape). `hide()` forgets the keys.
+  - The contrast e2e (`a11y.spec.ts` CTL7B-E2E-*) measures box, raising and evolution from real keypresses. Battle is measured through a fixture `BattleView` mounted in the real `#app`, because a grass-encounter walk is too slow for this spec; E0 still covers real-battle layering. The axe floors are unchanged.
+
+### ctl-7c — the screen-nav seam: D-pad delivery, shell-hosted adapter state, `healParty { locationId }`
+category: ux-a11y (structural seam) · severity: MED · size: MODERATE
+touches: client/src/input/router.ts, client/src/input/router.test.ts, client/src/ui/screens/types.ts, client/src/ui/screens/index.ts, client/src/ui/screens/index.test.ts, client/src/ui/screens/legacyAdapter.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/main.ts, client/src/main.controls.test.ts, client/src/main.input.test.ts, client/src/main.dispatch.test.ts
+after: [ctl-7b]
+- Evidence (ctl-8a parked at verify-scope, 2026-10-02, draft PR mdrewt/monster-realm#551): ctl-6b built the adapter seam only far enough for the main menu. Every other D-pad screen (ctl-8a–8k) hits three gaps that a `main.ts`-free slice cannot close.
+  - `router.ts` hands a D-pad edge to `nav` only while the main menu is the uncovered nav frame (`main.ts` `routeCtx` sets `nav` from `menuPlace()`). A dialogue, shop or heal frame on top gets no Up/Down/Left/Right.
+  - `screens/index.ts` always passes `nav = undefined` to `onButton`, and frames carry no `nav`. `ScreenAdapter.onButton` returns only a `ScreenResult`, so reveal progress, cursor, tab, quantity and confirm state have no home (module state is forbidden by the milestone rules). The main menu is hosted by hand in `main.ts` (`menuState`, `applyMenuStep`, `renderMenu`).
+  - The `Command` arm is `{ kind: 'healParty' }`; `dispatch` resolves `healTargetLocationId(store.healLocations())`, which is `locations[0]` (B13).
+- Intent: one generic seam, so ctl-8a–8k stay inside their declared `touches:` and keep their promise never to touch `main.ts`. No screen is converted here.
+- Notes: the main menu keeps working unchanged (it becomes the first user of the generic path or stays on its hand-hosted path; either is fine if its tests keep passing). The Box Heal Party button stays location-less until ctl-10a.
+
+- **CTL7C.1:** WHEN the top frame is a screen or prompt frame that has a nav-capable adapter, THE SYSTEM SHALL deliver D-pad edges to that frame (not only to the main menu), with the router's existing repeat rules.
+  - A frame with no nav-capable adapter (every legacy frame) keeps today's behaviour: D-pad goes to the world when it is active, otherwise it is swallowed.
+  - Red: `router.test.ts` pins a non-menu nav frame receiving Up/Down.
+- **CTL7C.2:** THE SYSTEM SHALL host per-frame adapter state in the shell: `onButton(vm, state, btn)` returns `{ state, result }`, `main.ts` keeps one state per `FrameId`, resets it when the frame opens, and repaints the top frame's view after each step.
+  - Legacy and existing adapters (`legacyAdapter`, main menu) keep their behaviour through a pass-through state.
+  - Red: `index.test.ts` pins state threading, reset-on-open and one repaint per step.
+- **CTL7C.3:** THE SYSTEM SHALL add `healParty { locationId?: number }` to the `Command` union. WHEN `locationId` is present `dispatch` SHALL send that id; WHEN absent it SHALL keep today's Box behaviour.
+  - Red: `main.dispatch.test.ts` pins both arms, and the exhaustive `Command` row table stays total.
+- Build order note: ctl-8a–8k follow this slice.
 
 ### ctl-8a — Dialogue, Shop and Heal on the D-pad
 category: ux-a11y + gameplay defect B13 · severity: MED · size: HEAVY
 touches: client/src/ui/screens/dialogueScreen.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/healScreen.ts, client/src/ui/screens/index.ts, client/src/ui/dialogueView.ts, client/src/ui/dialogueView.test.ts, client/src/ui/dialogueModel.ts, client/src/ui/dialogueModel.test.ts, client/src/ui/shopView.ts, client/src/ui/shopView.test.ts, client/src/ui/shopModel.ts, client/src/ui/shopModel.test.ts, client/src/ui/healView.ts, client/src/ui/healView.test.ts, client/src/ui/healModel.ts, client/src/ui/healModel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/dialogue.spec.ts, client/e2e/shop-npc.spec.ts, client/e2e/wallet-balance.spec.ts
-after: [ctl-7b]
+after: [ctl-7c]
 - Evidence:
   - The dialogue has no continue or close control, and leaf nodes have 0 choices (r2-008/009/060/061).
   - Shop items have no descriptions (r1 PlaytestReport :85).
@@ -856,7 +933,7 @@ after: []
 
 ```
 pgcc-a ─→ ctl-1 → ctl-2 → ctl-3 → ctl-6a ─┐
-ctl-4 (any time before ctl-5) ────────────┴→ ctl-5 → ctl-6b → ctl-6c → ctl-7a → ctl-7b
+ctl-4 (any time before ctl-5) ────────────┴→ ctl-5 → ctl-6b → ctl-6c → ctl-7a → ctl-7b → ctl-7c
   → ctl-8a → 8b → 8c → 8d → 8e ─┬→ ctl-10a → ctl-10b ─────────────┐
            ctl-9 (any time) ────┘                                 │
                                 └→ 8f → 8g → 8h → 8i → 8j → 8k ───┴→ ctl-11a → ctl-11b
