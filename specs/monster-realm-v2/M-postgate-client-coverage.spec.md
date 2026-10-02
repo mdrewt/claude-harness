@@ -153,6 +153,17 @@ after: []
   because views hold in-flight locks on it. Named intentional test change: `careAction.test.ts`
   call sites may be updated to pass care's message and `where` (`'care'`); no assertion is removed
   or weakened, and its `'Cared!'` assertions keep holding under `en`.
+  - *Build-time amendment (pgcc-a, 2026-10-01):* the i18n census forces two more named test
+    changes. Every `t()` key must be a literal at its call site (`catalogParity` PARITY-02), so the
+    core takes the already-resolved success **string**, and main.ts keeps the `i18nT('<key>')`
+    literals. Two consequences follow. First, PARITY-02's exact main.ts literal-key set loses
+    `chrome.feedback.disconnected`, because only the core resolves it now. Second, that set gains
+    the care key, because main.ts's care adapter resolves it. A3's new key also adds one row to
+    `catalog.test.ts`'s exact `EXPECTED_PLAIN` roster. Both edits are corrections that keep the
+    exact-set shape; neither loosens a set. The slice also added the booted wiring suite
+    `client/src/main.feedbackCore.test.ts`. It pins each of the nine sites' `where` tag, frozen
+    line, held in-flight lock and hidden-overlay no-paint, plus the care line under `fr`, because
+    red-team found those wiring mutants survived the core-only tests.
 
 - **A3:** THE SYSTEM SHALL resolve the care success line through the i18n catalog under a new key,
   with English bytes `Cared!` unchanged plus a French entry. The existing `catalogParity`,
