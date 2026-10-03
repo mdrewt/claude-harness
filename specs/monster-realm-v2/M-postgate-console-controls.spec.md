@@ -669,13 +669,40 @@ after: [ctl-8b]
 - **CTL8C.3:** WHEN the legacy KeyI or KeyE is pressed (until ctl-11a), THE SYSTEM SHALL open the panel holding the raising root or the evolution root respectively.
   - `evolution.spec.ts`'s KeyE case (≈170) keeps passing; `evo-ready-note` and `evo-choice` testids survive in the Evolve list.
 
+### ctl-8s — the Social seam: cross-open screen memory, one `openSocial(tab)` path, one Social frame
+category: ux-a11y (structural seam) · severity: MED · size: MODERATE
+touches: client/src/ui/screens/types.ts, client/src/ui/screens/index.ts, client/src/ui/screens/index.test.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/leaderboardView.ts, client/src/ui/leaderboardView.test.ts
+after: [ctl-8c]
+- Evidence (ctl-8d park, 2026-10-03, PR mdrewt/monster-realm#556, no code written):
+  - `main.ts` calls `screenHost.opened(frame)` on every push edge and `ScreenHost.opened` deletes the frame's state. `init(vm)` sees only a view model built from `ScreenContext`, so no adapter can remember a tab between opens. Only the main menu's `menuState.memory` survives, hosted by hand in `main.ts`. ctl-8b hit the same gap (R-ctl-8b-CTL8B.4).
+  - U, P and L and the menu leaves `menu.social.trades/challenges/rankings` open three separate frames through `openTrade`, `openPvp` and `openLeaderboard`. Each has its own probe and handle entries and batch listener, and pvpView's listener auto-shows its frame on an incoming challenge. No `Command` arm switches the shown frame, and `ScreenContext` binds no requested tab.
+  - Workarounds inside ctl-8d's old touches fail: re-parenting the pvp root under the trade root breaks pvpView's `#visible` flag (its `forceVisible` is false whenever another overlay shows), and per-view chrome duplicates every panel and cannot switch tabs across frames.
+- Intent: give ctl-8d what it needs so ctl-8d keeps its promise never to touch `main.ts`. No Social UI is built here; the Social frame renders the three legacy roots as panels, and `SCREEN_ADAPTERS` keeps the legacy adapter for it until ctl-8d.
+- Notes:
+  - Design is the run's call within the EARS below; its dry-run records the chosen shape in a build note.
+  - ctl-8d consumes this seam unchanged. ctl-8g (Players, Rankings) and ctl-11a (hotkey retirement) build on it.
+  - Anti-vacuity: each Red names the legacy behaviour it replaces.
+
+- **CTL8S.1:** THE SYSTEM SHALL let a screen adapter keep its state across closes of its frame within a session, through the host (not module state), so `init` can seat a reopened frame from the remembered state.
+  - Adapters opt in; every existing adapter keeps today's reset-on-open. A reconnect or identity change clears the memory.
+  - Red: a stand-in adapter that opts in sees its previous state on the second open and a reset one does not.
+- **CTL8S.2:** THE SYSTEM SHALL bind a requested Social tab (`players | trades | challenges | rankings | null`) as a read-only `ScreenContext` value set by the open path, read live like `shopId`.
+  - A plain open (the menu's Social entry) binds `null`.
+  - Red: a stand-in adapter reads the tab each open path bound.
+- **CTL8S.3:** THE SYSTEM SHALL route U, P, L and the three `menu.social.*` leaves through one `openSocial(tab)` path in `main.ts`, which opens ONE Social frame with the trade, pvp and leaderboard roots hosted as panels of it, one shown at a time.
+  - The roots' DOM ids and testids, handles and probe entries are unchanged, so existing e2e selectors still resolve.
+  - pvp's auto-show on an incoming challenge opens Social on Challenges (`openSocial('challenges')`) and still works with no overlay open and not over a battle.
+  - A panel nested in the Social frame renders (pvpView's visibility is no longer decided by "another overlay is showing").
+  - Red: today U, P and L open three frames, so `__game().stack` shows three different ids; after, it shows one Social id for all three.
+
 ### ctl-8d — Social I: tabs, and responding to trades and challenges
 category: ux-a11y (screen conversion) · severity: MED · size: MODERATE
 touches: client/src/ui/screens/socialScreen.ts, client/src/ui/screens/index.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/tradeModel.ts, client/src/ui/tradeModel.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/pvpModel.ts, client/src/ui/pvpModel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/trade.spec.ts, client/e2e/pvp.spec.ts
-after: [ctl-8c]
+after: [ctl-8s]
 - Evidence: trade, pvp and leaderboard are three separate overlays.
 - Intent (design §5): Social is the place to *respond* to requests. Initiation stays on pvpView's per-player Challenge buttons and O until ctl-10b replaces them. Players and Rankings show placeholders and the legacy leaderboard root until ctl-8g. `pvp-accept-btn` and `pvp-challenge-player-btn` stay directly clickable DOM until ctl-13 and ctl-10b respectively.
 - New files: `socialScreen.ts`, `socialModel.ts` and its test.
+- Build note (park, 2026-10-03): the first attempt parked with no code (draft PR monster-realm#556, branch `ctl-8d`, empty wip). "Remembered tab", the open-on-request rule and the one-Social-frame over three roots need `main.ts` and the host, so they moved to ctl-8s, which this slice is now `after`. Resume by rebasing `ctl-8d` on master once ctl-8s merges. CTL8D.2 needs only existing `Command` arms (`respondTrade`, `confirmTrade`, `cancelTrade`, `acceptChallenge`, `declineChallenge`, `cancelChallenge`).
 
 - **CTL8D.1:** WHEN Social opens, THE SYSTEM SHALL show tabs Players, Trades, Challenges and Rankings, opening on the tab of the oldest waiting request with the cursor on it, or else on the remembered tab.
 
