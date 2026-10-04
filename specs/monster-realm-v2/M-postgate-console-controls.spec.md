@@ -995,6 +995,14 @@ touches: client/src/input/router.ts, client/src/input/router.test.ts, client/src
 after: [ctl-10b, ctl-8k]
 - Evidence: Q opens Journal and E opens Evolution today, colliding with the operator's bumpers (migration rule 2: Q/E → LB/RB, Q → J and E → V land in **one** slice).
 - Build note (park, 2026-10-04; draft PR monster-realm#567, branch `ctl-11a` @ 35b6fe83): gates 3/3 met in-touches but `just ci` is red on 11 boot tests outside `touches:` that pin the retired ladder (stack shapes, KeyQ/KeyI/N/C/U/P/L), plus e2e that pin KeyE and close-returns-to-menu. Re-serialized with widened touches (supervisor): the four `screens/*.boot.test.ts`, `screens/index.test.ts` (delete `routedBindings`), the `main.*.test.ts` siblings, `menuView.ts`/`.test.ts` (`setCovered` visibility guard, replaces the main.ts workaround), and the audited e2e specs. Resume by migrating those tests as named intentional changes (verifier audits for weakened assertions), then the in-touches e2e tasks, lens batch, full `just ci`.
+- Build note (ctl-11a as built, 2026-10-04, PR monster-realm#567):
+  - **Seam.** `bindings.ts` `accelForCode`; `router.ts` `ACCEL_PATHS` + `accelDecision` (`denied | start | open`); `contextStack.ts` `acceleratorsDenied`; `main.ts` `runAccel` / `openAccelPath` pop to the base, open the menu and `mainMenuPick` each path entry, so the stack after an accelerator is `[base, menuView, leaf]`. The letter-key arms of the keydown ladder, `SOCIAL_HOTKEYS` and `routedBindings` are deleted here (ctl-11b still owns `KEY_DIR`, `targetOwnsKey`, `worldHasFocus`, the probe and handle tables, `canOpen`, `OVERLAY_TIERS`).
+  - **Own screen = Start is frame-keyed:** B and V share Monsters; U, P and L share Social (so P over Trades closes Social; an auto-shown incoming-challenge Social closes on U/P/L).
+  - **Before join** accelerators are inert except C, which opens the claim view alone (the retired KeyC branch did; a failed first sign-in shows it before join).
+  - **Deny at runtime:** a server-owned top frame and the session gate deny; a focused text field keeps its letters through `ownership` (no `textEntry` frame is ever pushed). No production code pushes a `prompt` frame, so a screen's own Yes/No confirm does not deny (R-ctl-11a-CTL11A.2-PROMPT → ctl-13). A trade-wizard or Name draft is replaced with no confirm (R-ctl-11a-DRAFTLOSS → backlog).
+  - **Residuals closed here:** R-ctl-8b-CTL8B.4 (the menu's Monsters entry opens on Party, B on Storage, V on Party — by one synthesized LB to the adapter, R-ctl-11a-MONSTERSTAB), R-ctl-8f-CTL8F.1 (the Bag is seated at its open), R-ctl-8g-CTL8G.1-UCLOSE, R-ctl-8j-SELECTINERT for the Select key (the chip: R-ctl-11a-SELECTCHIP → ctl-15). Not closable in touches: R-ctl-8b-CTL8B.2 (re-homed as R-ctl-11a-XQUICKMOVE → backlog).
+  - **Found, not built:** Help copy still names Q and E (`helpModel.ts`, R-ctl-11a-HELPCOPY → ctl-14); `evolutionView` has no show path (R-ctl-11a-EVODEAD → ctl-11b); the pop guard in `openAccelPath` is unpinned (R-ctl-11a-POPGUARD → ctl-11b).
+  - **Named intentional test changes:** the 41 `main.*.test.ts` siblings and 11 `screens/*.boot.test.ts` tests moved to the new stack shapes, J and V; `CTL6B-6-ROUTED-BINDINGS` deleted with `routedBindings`; e2e `CTL7B-E2E-EVOLUTION` deleted (the overlay has no opener); the pvp and trade mutual-exclusivity e2e rewritten as replace; trade's vacuous `g`/`h` presses deleted.
 - Tasks:
   - KeyQ (dialogue ≈397, wallet-balance ≈657 and ≈925, trade ≈200) → `pressAccel('J')`. KeyE (evolution ≈170) → `pressAccel('V')`, then the monster sheet → Evolve.
   - Rewrite the mutual-exclusivity e2e (`pvp.spec.ts` ≈108, ≈136, ≈161; `trade.spec.ts` ≈119, ≈190-205) to assert that an accelerator replaces the open screen (named intentional change; survivors in the milestone table).
@@ -1030,6 +1038,13 @@ after: [ctl-11a]
 
 - **CTL11B.3:** WHEN the operator's required flow (design §5, press by press) is played with the keyboard only, THE SYSTEM SHALL produce the documented result at every step, and the final W SHALL walk.
   - `menu-flow.spec.ts` is the flow's e2e.
+- **As built (ctl-11b):**
+  - The rule is `outsideGameScreen(target, screen)` in `router.ts`, also the first check of `ownership(target, e, screen)`. `onKeyDown` returns on it before anything else, the session gate and F8/F9 included. `worldHasFocus` is deleted. `KEY_DIR` and `targetOwnsKey` were already gone (ctl-11a).
+  - The note above was stale: `sessionView` already mounts in `#frame-layer`, and `errorOverlayView` has no focusable child. The real body-level focusable was the evolution notice's OK button. main.ts now creates `#evolution-notice` inside `#game-screen` before the banner adopts it (`CTL11B-1-PIN-EVO-NOTICE`).
+  - **Not built (premise false):** the probe and handle tables are not legacy-only. `syncStack` mirrors overlays through `visibleIds(overlayProbes)`, and the stack's `close` commands hide through `overlayHandles`. Deleting them, `canOpen`, `OVERLAY_TIERS` and `overlayVerdict` (now dead on Start and Select) is a stack-as-truth refactor (R-ctl-11b-LEGACYGATES → ctl-13). `evolutionView`'s dead batch refresh is deleted; the id and module stay (R-ctl-11b-EVODEADREST → ctl-13).
+  - The e2e plays one monster: owner SQL cannot write the monster table's enum column (R-ctl-11b-E2ESECONDMONSTER). There is no "Menu › Bag" breadcrumb, and the sheet's Move is five Downs. A setup walk puts open ground north of the player so the final W walks.
+  - Options › Report a problem does not exist yet (ctl-14). The reachability search bounds every leaf it finds, so the row is covered once it lands.
+  - Residuals: R-ctl-11a-POPGUARD closed (`POPGUARD-CLOSE-SURFACES-FRAME`). R-ctl-11a-EVODEAD partly closed (EVODEADREST). R-ctl-8f-CTL8F.2: CTL6C-3 now presses Care on the Monsters sheet; the PGCCA-A4 care rows assert the raising view's own feedback and stay. The card strip needs `raisingView.ts` (R-ctl-11b-RAISINGCARDS).
 
 ### ctl-12 — remapping: Options › Controls, binding store, glyphs
 category: accessibility (WCAG 2.1.4) + operator intent · severity: MED · size: HEAVY
@@ -1061,11 +1076,28 @@ after: [ctl-11b]
 
 - **CTL12.6:** WHEN a player remaps A to K and reloads the page, THE SYSTEM SHALL confirm with K and no longer with Enter, and every hint SHALL show the new keycap.
   - `remap.spec.ts` is the flow's e2e; this slice extends `controls.ts`'s `pressButton` to read the live table (`localStorage['mr.controls']` through `parseBindings`, else `DEFAULT_BINDINGS`).
+- **Build note (2026-10-04, ctl-12 PR):** shipped the core only: `bindingStore.ts`, `glyphs.ts`, `controlsModel.ts` (capture, swap, protected, Clear, feedback lines), the saved table loaded at boot in `main.ts` (keyboard source, accelerators incl. F8/F9, the A keycap through `glyph`), and every keydown teaching the glyph. CTL12.1 and CTL12.6 are DEFERred: a new `controlsView` OverlayId needs a `SCREEN_POLICY` row in `ui/contextStack.ts` (total `Record<FrameId>`) and the Options › Controls leaf in `ui/menuModel.ts`, both missing from `touches:` (also likely `overlayA11yWiring.test.ts`, `indexShell.smoke.test.ts`, `main.menu.test.ts`, `screens/mainMenuScreen.ts`). The follow-up view slice also owns: `remap.spec.ts` and the live-table `pressButton`; `renameView.ts`'s `ROUTED_ON_SUBMIT` built from `DEFAULT_BINDINGS`; the capture-phase literal `Escape` route in `main.ts`; live rebinding without reload (`KeyboardSource` takes its table at construction); a capture view calling `learnKey` for the captured press.
+
+### ctl-12b — Options › Controls view: the capture screen, live rebinding, the remap e2e
+category: accessibility (WCAG 2.1.4) + operator intent · severity: MED · size: MODERATE
+touches: client/src/ui/controlsView.ts, client/src/ui/controlsView.test.ts, client/src/ui/overlayRegistry.ts, client/src/ui/overlayRegistry.test.ts, client/src/ui/overlayA11yWiring.test.ts, client/src/ui/indexShell.smoke.test.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/ui/menuModel.ts, client/src/ui/menuModel.test.ts, client/src/ui/screens/optionsScreen.ts, client/src/ui/screens/mainMenuScreen.ts, client/src/ui/screens/index.ts, client/src/ui/screens/index.test.ts, client/src/ui/renameView.ts, client/src/ui/renameView.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/main.ts, client/src/main.menu.test.ts, client/src/main.remap.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/remap.spec.ts, client/e2e/controls.ts
+after: [ctl-12]
+- Evidence (ctl-12 build note, 2026-10-04, PR mdrewt/monster-realm#569): the core (`bindingStore.ts`, `glyphs.ts`, `controlsModel.ts`, the saved table at boot) shipped; CTL12.1 and CTL12.6 were DEFERred because the new `controlsView` `OverlayId` needs a `SCREEN_POLICY` row in `contextStack.ts` (a total `Record<FrameId>`) and the Options › Controls leaf in `menuModel.ts`, neither in ctl-12's `touches:`.
+- Intent: build only the view and its wiring on top of the shipped pure model; no new pure rules. `controlsView` is a new `OverlayId` with an `OVERLAY_A11Y` entry (file-naming rule).
+- Also owned here (from the ctl-12 build note): `remap.spec.ts` and the live-table `pressButton` / `pressAccel` in `e2e/controls.ts`; `renameView.ts`'s `ROUTED_ON_SUBMIT` built from the live table instead of `DEFAULT_BINDINGS`; the capture-phase literal `Escape` route in `main.ts` (capture must accept Escape); live rebinding without a reload (`KeyboardSource` takes its table at construction); the capture view calling `learnKey` for the captured press.
+- New files: `controlsView.ts`, `controlsView.test.ts`, `client/e2e/remap.spec.ts`.
+- Anti-vacuity: each Red names the legacy behaviour it replaces (no Controls screen; a saved table that only applies after reload).
+
+- **CTL12B.1:** WHEN Options › Controls opens, THE SYSTEM SHALL show tabs Buttons (12 rows) and Shortcuts, each row with a Primary and an Alt slot, where A on a slot starts capture ("Press a key for {button}\u2026"). (Moved from CTL12.1.)
+  - Rows, labels, prompts and outcomes come from the shipped `controlsModel.ts`; the view only paints and routes. Button rows offer no Clear; accelerator rows do. "Reset all" asks Yes/No, defaulting to No.
+
+- **CTL12B.2:** WHEN a player remaps A to K and reloads the page, THE SYSTEM SHALL confirm with K and no longer with Enter, and every hint SHALL show the new keycap; a remap SHALL also take effect without a reload. (Moved from CTL12.6.)
+  - `remap.spec.ts` is the flow's e2e; `controls.ts`'s `pressButton` reads the live table (`localStorage['mr.controls']` through `parseBindings`, else `DEFAULT_BINDINGS`).
 
 ### ctl-13 — the live hint bar, request banners, the error toast, world Y/B on notices
 category: ux-a11y (discoverability, B12) · severity: MED · size: MODERATE
 touches: client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/ui/hintBar.ts, client/src/ui/hintBar.test.ts, client/src/ui/noticeModel.ts, client/src/ui/noticeModel.test.ts, client/src/ui/errorOverlayModel.ts, client/src/ui/errorOverlayModel.test.ts, client/src/ui/errorOverlayView.ts, client/src/ui/errorOverlayView.test.ts, client/src/ui/screens/worldScreen.ts, client/src/ui/menuModel.ts, client/src/ui/menuModel.test.ts, client/src/main.ts, client/src/ui/evolutionNotice.ts, client/src/ui/evolutionNotice.test.ts, client/src/ui/overlayRegistry.ts, client/src/ui/screens/index.ts, client/src/ui/contextStack.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/respond-request.spec.ts, client/e2e/pvp.spec.ts, client/e2e/pvp-side-b.spec.ts, client/e2e/ranked-forfeit.spec.ts, client/e2e/monster-privacy.spec.ts
-after: [ctl-12]
+after: [ctl-12b]
 - Evidence: pvpView auto-shows on an incoming challenge when nothing else is open (main.ts ≈1971-1981).
 - Evidence: the error overlay closes only with F8 (B12).
 - Notes: notices are exactly two kinds: a pending incoming request and the pending error.
@@ -1170,7 +1202,7 @@ ctl-4 (any time before ctl-5) ────────────┴→ ctl-5 �
   → ctl-8a → 8b → 8c → 8d → 8e ─┬→ ctl-10a → ctl-10b ─────────────┐
            ctl-9 (any time) ────┘                                 │
                                 └→ 8f → 8g → 8h → 8i → 8j → 8k ───┴→ ctl-11a → ctl-11b
-  → ctl-12 → ctl-13 → ctl-14 → ctl-15 → pgcc-c → pgcc-d
+  → ctl-12 → ctl-12b → ctl-13 → ctl-14 → ctl-15 → pgcc-c → pgcc-d
 ctl-16 (any time; server-only)
 ```
 
