@@ -74,9 +74,13 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    (adjudicated per file in the spec body), and de-ratchet the i18n tree scan to one plain
    zero-failing-sinks assertion with a tightened `SINK_FLOOR` (the tree scan itself is kept).
    One slice (ttd-1), ordered before item 7's roster-pin rewrite.
-7. **M-stack-ownership** (spec pending on the corrective-wave branch) — pin down who owns the
-   context stack (frames, overlay registry, screen adapters' claims on it) before any second
-   input source maps onto it; a **named design input of M-gamepad** and ordered before it.
+7. **M-stack-ownership** (`M-stack-ownership.spec.md`, specced 2026-10-15 — corrective C2b):
+   the context stack becomes the owner of player-opened frames. Two serialized slices (both
+   touch `main.ts`; no fan-out): so-1 routes the reconnect block's ten direct hides through the
+   stack while the unconditional view-state resets survive; so-2 (atomic-or-reverted, and gated
+   on an `mr-ask-drew` operator answer BEFORE merge) inverts to push-then-show `openFrame` with
+   frame-level dedup and Social-panel routing, shrinks the mirror to the server-owned trio and
+   rewrites the roster pins once. A **named design input of M-gamepad** and ordered before it.
 8. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support as one more input source on
    item 1's virtual-button layer, consuming item 7's stack-ownership design.
    **Must land before launch** (operator, 2026-10-01).
