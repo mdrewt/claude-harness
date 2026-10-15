@@ -7,6 +7,11 @@
 #               ENTRY_RE/rotate_handoff block below for the algorithm.
 #   queue-add   --slice S --spec-file F --reason "..." [--run_id R]
 #   queue-remove --slice S
+#   gates-rotate [--dry-run]
+#               Archives gates/<slice>.gates.md files whose slice is MERGED, holds no open
+#               promoted residual, and has sat untouched >30d — move-never-delete into
+#               gates/archive/ with an INDEX.md recovery line. Also hooked on every MERGED
+#               closing `ledger` row (the merge-time close point); see the gates-rotate block.
 #               (lp-queue) mr-state.json's `queue[]` fast-path-hint pointers — see the queue block
 #               below. These are the SOLE writers of the `queue` key: a tick's own end-of-tick
 #               mr-state.json write must re-read `queue` fresh immediately before writing (never its
@@ -31,7 +36,7 @@ MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 # a self-locating MEM would let a worktree copy fork the append-only SSOT. Only the mr-backup
 # HELPER is resolved beside the copy actually being run (MEM_SELF, see _backup_bin).
 MEM_SELF="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-SUB="${1:?usage: mr-record ledger|handoff|queue-add|queue-remove ...}"; shift
+SUB="${1:?usage: mr-record ledger|handoff|queue-add|queue-remove|gates-rotate ...}"; shift
 export MEM MEM_SELF SUB
 ARGS_JSON=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
 export ARGS_JSON
@@ -49,6 +54,107 @@ STATE=os.environ.get("MR_RECORD_STATE") or (MEM+"/mr-state.json")
 # queue[] pointers must validate against the REAL spec corpus, not a worktree-local fork of it.
 HARNESS="/home/mdrewt/projects/ai-apps/claude-harness"
 def die(m): print("ERROR: "+m); sys.exit(1)
+
+# ========================= gates-rotate: retire old, delivered gates ledgers ======================
+# Copies the lp-handoff-rotate pattern below: flock'd, idempotent, MOVE-NEVER-DELETE, and every
+# move leaves a recovery line in gates/archive/INDEX.md. A gates/<slice>.gates.md rotates ONLY when
+# ALL THREE hold: (1) the slice has a MERGED row in the usage ledger (the loop's own merge-time
+# record — the local SSOT for "its PR is merged"), (2) NO open residual row names it as
+# promoted_slice (an open promoted residual still points at its source ledger), and (3) the file's
+# mtime is >30d, so nothing recent moves however old the merge is. Standalone:
+# `mr-record gates-rotate [--dry-run]`. Also hooked where a MERGED closing `ledger` row lands (the
+# merge-time close point), where it is TOTAL like _backup: no failure may cost the row just written.
+GATES_DIR=os.environ.get("MR_RECORD_GATES_DIR") or (MEM+"/gates")
+RESIDUALS=os.environ.get("MR_RECORD_RESIDUALS") or (MEM+"/mr-residuals.jsonl")
+GATES_ROTATE_AGE_DAYS=30
+
+def _merged_slices(ledger_path):
+    out=set()
+    try:
+        for l in open(ledger_path, errors="replace"):
+            try: d=json.loads(l)
+            except Exception: continue
+            if str(d.get("outcome") or "").upper().startswith("MERGED") and d.get("slice"):
+                out.add(d["slice"])
+    except OSError: pass
+    return out
+
+def _open_promoted_slices(residuals_path):
+    folded={}
+    try:
+        for l in open(residuals_path, errors="replace"):
+            try: d=json.loads(l)
+            except Exception: continue
+            if d.get("id"): folded[d["id"]]=d     # append-only sink: the LAST row for an id wins
+    except OSError: pass
+    return {r.get("promoted_slice") for r in folded.values()
+            if r.get("promoted_slice") and r.get("status") not in ("closed","dispositioned")}
+
+def gates_rotate(dry):
+    import time as _t, shutil
+    if not os.path.isdir(GATES_DIR):
+        print("GATES-ROTATE no gates dir at "+GATES_DIR); return 0
+    merged=_merged_slices(LEDGER)
+    held=_open_promoted_slices(RESIDUALS)
+    cutoff=_t.time()-GATES_ROTATE_AGE_DAYS*86400
+    arc=os.path.join(GATES_DIR,"archive")
+    n=0
+    # flock, self-releasing on crash, same rationale as the handoff rotation: two racing callers
+    # (a standalone invocation vs the merge-time hook) must never interleave a copy with an unlink.
+    with open(os.path.join(GATES_DIR,".rotate.lock"),"a+") as lf:
+        fcntl.flock(lf,fcntl.LOCK_EX)
+        try:
+            for name in sorted(os.listdir(GATES_DIR)):
+                if not name.endswith(".gates.md"): continue
+                sl=name[:-len(".gates.md")]
+                src=os.path.join(GATES_DIR,name)
+                try: mt=os.path.getmtime(src)
+                except OSError: continue
+                if sl not in merged or sl in held or mt>cutoff: continue
+                age=int((_t.time()-mt)//86400)
+                if dry:
+                    print("WOULD-ROTATE %s (merged, no open promoted residual, idle %dd)"%(name,age))
+                    n+=1; continue
+                dst=os.path.join(arc,name)
+                if os.path.exists(dst):
+                    if open(dst,"rb").read()!=open(src,"rb").read():
+                        print("WARN gates-rotate: archive/%s already exists with DIFFERENT content "
+                              "-- skipped (never overwritten, never deleted)"%name)
+                        continue
+                    # a prior rotation crashed between copy and unlink; the archived copy is
+                    # byte-identical, so just finish the move below (idempotent retry).
+                else:
+                    os.makedirs(arc,exist_ok=True)
+                    tmp=dst+f".tmp.{os.getpid()}"
+                    shutil.copyfile(src,tmp); os.replace(tmp,dst)   # atomic landing, lp-handoff shape
+                idx=os.path.join(arc,"INDEX.md")
+                marker="rotated %s ->"%name
+                have_idx=os.path.exists(idx)
+                if not (have_idx and marker in open(idx,errors="replace").read()):
+                    if not have_idx:
+                        with open(idx,"w") as f:
+                            f.write("# gates/archive INDEX — append-only recovery log "
+                                    "(mr-record gates-rotate)\n\n")
+                    with open(idx,"a") as f:
+                        f.write("- %s rotated %s -> gates/archive/%s (slice merged, no open promoted "
+                                "residual, idle %dd; recover: cp memory/projects/gates/archive/%s "
+                                "memory/projects/gates/%s)\n"
+                                %(datetime.datetime.now(datetime.timezone.utc)
+                                  .strftime("%Y-%m-%dT%H:%M:%SZ"),name,name,age,name,name))
+                os.unlink(src)   # only after the byte-verified copy + INDEX pointer are durable
+                print("ROTATED %s -> archive/%s"%(name,name)); n+=1
+        finally:
+            fcntl.flock(lf,fcntl.LOCK_UN)
+    print("GATES-ROTATE %s %d file(s)"%("DRY-RUN" if dry else "APPLIED",n))
+    return 0
+
+if SUB=="gates-rotate":
+    # Parsed here, ahead of the generic flag loop: --dry-run is valueless, which that loop rejects.
+    bad=[x for x in argv if x!="--dry-run"]
+    if bad: die("gates-rotate takes only --dry-run, got: "+" ".join(bad))
+    sys.exit(gates_rotate("--dry-run" in argv))
+# ====================================== end gates-rotate =========================================
+
 a={}; i=0
 while i<len(argv):
     k=argv[i]
@@ -470,4 +576,13 @@ print("ledger-appended: "+line[:160])
 # lp-06: the row is appended, the handle is closed and the append is REPORTED before mr-backup is
 # named -- see the trigger's header for why that ordering is the row-never-lost proof.
 _backup(LEDGER)
+# gates-rotate hook: the merge-time close point. A MERGED closing row is when old, delivered gates
+# ledgers get swept (the just-merged slice's own file is fresh and stays; the >30d mtime screen is
+# what the sweep keys on). TOTAL like _backup: nothing here may cost the row just written. Fixture
+# guard: a fixture ledger (MR_RECORD_LEDGER) must never judge the REAL gates dir, so the hook only
+# runs when the gates dir is canonical-with-canonical-ledger or explicitly overridden alongside it.
+if closing and outcome.strip().upper().startswith("MERGED") \
+        and not (os.environ.get("MR_RECORD_LEDGER") and not os.environ.get("MR_RECORD_GATES_DIR")):
+    try: gates_rotate(False)
+    except Exception as exc: sys.stderr.write("WARN gates-rotate: %s: %s\n"%(type(exc).__name__,exc))
 PY

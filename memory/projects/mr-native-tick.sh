@@ -200,6 +200,22 @@ if [ ! -f "$MEM/.selfcheck-last" ] || [ $(( $(date +%s) - $(stat -c %Y "$MEM/.se
   touch "$MEM/.selfcheck-last"
 fi
 
+# MONTHLY ARCHIVE ROLLUP (wrapper-owned housekeeping; 30d marker gate, same shape as the selfcheck
+# gate above). pending-events/archive/ accretes one consumed event file per merge forever; roll the
+# loose .md files into one dated tar so the dir stays listable. Every step is `|| true`:
+# housekeeping must NEVER fail the tick. tar's --remove-files deletes a member only after it is in
+# the archive, so an interrupted rollup loses nothing — the bytes live on in the tar either way.
+ARCH="$MEM/pending-events/archive"
+if [ -d "$ARCH" ] && { [ ! -f "$ARCH/.last-rollup" ] || [ $(( $(date +%s) - $(stat -c %Y "$ARCH/.last-rollup" 2>/dev/null || echo 0) )) -gt 2592000 ]; }; then
+  ROLLN=$(find "$ARCH" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l) || true
+  if [ "${ROLLN:-0}" -gt 0 ]; then
+    ROLLUP="$ARCH/rollup-$(date -u +%Y%m%dT%H%MZ).tar.gz"
+    ( cd "$ARCH" && find . -maxdepth 1 -name "*.md" -print0 | tar --null -T - -czf "$ROLLUP" --remove-files ) >> "$LOG" 2>&1 || true
+    log "ARCHIVE-ROLLUP $ROLLN file(s) -> $(basename "$ROLLUP")" || true
+  fi
+  touch "$ARCH/.last-rollup" 2>/dev/null || true
+fi
+
 if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ]; then
   WAKE=$(grep -m1 -oE "wake_file=[^ ]+" "$MEM/.blocked-on-human" 2>/dev/null | cut -d= -f2)
   MAGE=$(( $(date +%s) - $(stat -c %Y "$MEM/.blocked-on-human" 2>/dev/null || echo 0) ))
