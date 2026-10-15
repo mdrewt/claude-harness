@@ -63,10 +63,7 @@ UNKNOWN → proceed + record a BLOCKER.
    `find -mmin` + `date -u`; advance repos with `git merge --ff-only origin/<branch>` (never
    `git pull`); labeled-stash pre-existing strays, never commit or discard them.
 7. **Tool flags:** each `$MEM/mr-*` tool documents its exact flags in its own header comment —
-   read that before a first-in-tick call rather than guessing a spelling; flags are validated
-   strictly on purpose (data quality), so a wrong guess just burns a round trip. Two
-   easy misses: `mr-gates reseed` needs `--reason`; loop/process issues need
-   `mr-ask-drew --repo mdrewt/claude-harness` (default repo is monster-realm).
+   read it before a first-in-tick call.
 
 ## Gates (in order; stop at the first stop)
 
@@ -74,7 +71,7 @@ UNKNOWN → proceed + record a BLOCKER.
 2. **Sync + probe + lock:** `git fetch --all --prune` both repos; stand down on human activity
    (resident IDE claude pid new/growing; non-repo-artifact writes in ~6 min; handoff/ledger mtime
    ahead of its recorded ts — idle-open ≥45 min with zero writes is NOT active). Take the mutex
-   (`mr-lock take`, see step 3). An open or parked slice (incl. `wip:` branches) is resumed before any NEW work (gate 3's master-red rule still outranks it).
+   (`mr-lock take`, see step 3). An open or parked slice (incl. `wip:` branches) is resumed before any NEW work (gate 3's master-red rule still outranks it). A PR the supervisor did not launch is operator work — leave it alone.
 3. **Pick work (ONE line):** `master` CI red → launch a hard-tier `ci-fix-<utc>` rooted run (revert-first; touches/target from the failing area — YOU never edit code). Else resume open/parked. Else a
    **HIGH/CRITICAL residual in security-privacy or data-integrity** (`mr-gates residuals list
    --unclaimed --json`, oldest first) — the only residual class that outranks the roadmap; an
