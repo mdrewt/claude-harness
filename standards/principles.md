@@ -85,8 +85,9 @@ Where a concern maps to a protected category, a tool enforces it; the rest is ju
   architecture edits, or memory ceremony.
 - **Process metadata stays out of the artifact.** Task/slice IDs, decision
   numbers, reviewer narration, and workflow vocabulary never appear in
-  production code (comments, identifiers, strings) or current-state docs —
-  they live in commits, PRs, and the work-tracking files that own them.
+  production code and tests (comments, identifiers, strings — test names
+  included) or current-state docs — they live in commits, PRs, and the
+  work-tracking files that own them.
 
 ## Impact analysis before changing shared signatures
 Before changing a signature/type used across a boundary or by multiple modules,
