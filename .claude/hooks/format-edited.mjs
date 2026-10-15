@@ -54,7 +54,7 @@ process.stdin.on('end', () => {
       if (up === dir) break;
       dir = up;
     }
-    if (cfgDir) run(NPX, ['--yes', '@biomejs/biome@2', 'check', '--write', file], cfgDir);
+    if (cfgDir) run(NPX, ['--yes', '@biomejs/biome@2.5.1', 'check', '--write', file], cfgDir);
     // else: no biome config in this project yet -> skip rather than use surprise defaults
   } else if (ext === '.py') {
     if (has('ruff')) {
