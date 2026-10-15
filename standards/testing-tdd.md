@@ -115,6 +115,10 @@ code (proptest, Hypothesis, fast-check). **Determinism**: seedable RNG,
 injected clocks; no wall-clock or unseeded randomness in tests; flaky tests
 are quarantined loudly, not silently retried.
 
+**Test names lead with the behavior they prove**; a slice/criterion tag may
+appear only as a trailing token, and only while a live ledger CHECK selects
+on it.
+
 **Coverage and mutation scores are reports, not gates.** Run them to find
 gaps worth judging (an uncovered privacy branch matters; an uncovered log
 line doesn't); never wire a threshold, floor, or ratchet — a gated number
