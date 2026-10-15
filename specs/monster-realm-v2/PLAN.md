@@ -1,6 +1,6 @@
 # Monster Realm v2 — Plan
 
-> **Status (2026-10-01):** the game is BUILT through its launch-adjacent milestones. Phases A–D
+> **Status (2026-10-15):** the game is BUILT through its launch-adjacent milestones. Phases A–D
 > (M0–M17.5, the playtest replan, and M20–M24) are closed; the 2026-07-25 playtest gate returned
 > CONDITIONAL PASS and its hardening milestones are closed; the 2026-09 de-bloat program halved
 > the repo and fixed nine player-visible bugs. What remains is the console-controls redesign
@@ -24,9 +24,12 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
   no coverage/mutation thresholds (except the grandfathered nightly mutation config: game-core
   zero-miss and the server cap — that project decision stands), no proof-of-teeth ceremony.
 - The standing residual file is `residuals.spec.md` (open items only; 29 sections as of
-  2026-10-01 — the 25 triage survivors plus 4 LOW rows the 21r-a run disclosed; 0 HIGH/CRITICAL
-  in the file. The HIGH S-overlay-anchor item lived only in an archived catalogue and is now
-  scheduled in the console-controls milestone). Residuals
+  2026-10-15 — the 25 triage survivors plus 4 LOW rows the 21r-a run disclosed; 0 HIGH/CRITICAL
+  among its sections, but ONE HIGH ledger row is open:
+  R-ci-fix-20261002T0901Z-RAISINGVIEWREBUILD (ux-a11y; verified fixed by ctl-7b GAME #550,
+  operator disposition pending — decision issue monster-realm#580). The HIGH S-overlay-anchor
+  item lived only in an archived catalogue and was delivered by the console-controls slices
+  ctl-7a/ctl-7b, GAME #549/#550). Residuals
   fill idle capacity and never preempt this roadmap; triage-carried rows are scheduled by hand
   (mr-gates promote is closed to follow-up chains).
 
@@ -65,17 +68,21 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 5. **⛩ Playtest-3 gate** — raised when everything above is closed (the standing residual file
    never blocks it; open HIGH/CRITICAL security/data residuals do). Drew plays; findings become
    milestones or residuals.
-6. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support as one more input source on
-   item 1's virtual-button layer. **Must land before launch** (operator, 2026-10-01).
-7. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
+6. **M-stack-ownership** (spec pending on the corrective-wave branch) — pin down who owns the
+   context stack (frames, overlay registry, screen adapters' claims on it) before any second
+   input source maps onto it; a **named design input of M-gamepad** and ordered before it.
+7. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support as one more input source on
+   item 1's virtual-button layer, consuming item 6's stack-ownership design.
+   **Must land before launch** (operator, 2026-10-01).
+8. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
    provisional: build only after the playtest-3 read confirms it's the right next content.
-8. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
+9. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
    provisional, after M18. M23's social a11y retrofit scope un-defers with it; chat input uses
    item 1's typing mode.
-9. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
+10. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
    Steam Input maps onto item 1's virtual buttons.
 
-Milestone specs for 6–9 are sketches: elaborate via `milestone-loop-prompt.md` when reached,
+Milestone specs for 6–10 are sketches or pending: elaborate via `milestone-loop-prompt.md` when reached,
 against the CURRENT game repo (never against archived specs).
 
 ## Gates and constraints (live)
@@ -116,6 +123,8 @@ observability/performance · **M21** accounts/auth (b-3 Steam remains open above
 privacy/deletion/export · **M23** accessibility · **M24** i18n (en/fr) · **M25 S0**.
 Postgate review follow-ups: **M-postgate-twentyfirst-review-residuals** (21r-a #528, 21r-b
 #527, 21r-e #532, 21r-b2 #530 — merged 2026-09-28..30).
+Pre-playtest polish: **M-pre-playtest-polish** (polish-1, GAME #579 — built, merged 2026-10-05;
+P1/P2/P4/P5 shipped, P3/P6 closed by re-measure; its six folded residuals dispositioned fixed).
 Infra: **M-infra-a** CI caching · **M-stdb-2x** module-SDK 2.8.1 · **M-infra-d** ADR digest and
 **M8.95** knowledge bundle (both later retired by the de-bloat) · **M-loop-infrastructure**
 (supervisor tooling; superseded by the 2026-09 harness revision).
