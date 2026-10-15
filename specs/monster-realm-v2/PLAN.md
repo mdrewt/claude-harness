@@ -5,7 +5,8 @@
 > CONDITIONAL PASS and its hardening milestones are closed; the 2026-09 de-bloat program halved
 > the repo and fixed nine player-visible bugs. What remains is the console-controls redesign
 > (operator directive 2026-10-01, front of the queue), the M25 security sign-off, client-coverage
-> hardening, controller support before launch, two post-gate-provisional content milestones
+> hardening, the two 2026-10-15 corrective milestones (M-test-truth, M-stack-ownership),
+> controller support before launch, two post-gate-provisional content milestones
 > (M18/M19), and open residual fill-work. History: every closed milestone's spec is verbatim in `archive/`
 > (one-line index in §Done); this file describes only what is true and open today.
 
@@ -68,21 +69,26 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 5. **⛩ Playtest-3 gate** — raised when everything above is closed (the standing residual file
    never blocks it; open HIGH/CRITICAL security/data residuals do). Drew plays; findings become
    milestones or residuals.
-6. **M-stack-ownership** (spec pending on the corrective-wave branch) — pin down who owns the
+6. **M-test-truth** (`M-test-truth.spec.md`, specced 2026-10-15 — corrective C3b): retire the 17
+   per-file `scanSource` blocks whose surfaces the sentinel runtime pairs already guard
+   (adjudicated per file in the spec body), and de-ratchet the i18n tree scan to one plain
+   zero-failing-sinks assertion with a tightened `SINK_FLOOR` (the tree scan itself is kept).
+   One slice (ttd-1), ordered before item 7's roster-pin rewrite.
+7. **M-stack-ownership** (spec pending on the corrective-wave branch) — pin down who owns the
    context stack (frames, overlay registry, screen adapters' claims on it) before any second
    input source maps onto it; a **named design input of M-gamepad** and ordered before it.
-7. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support as one more input source on
-   item 1's virtual-button layer, consuming item 6's stack-ownership design.
+8. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support as one more input source on
+   item 1's virtual-button layer, consuming item 7's stack-ownership design.
    **Must land before launch** (operator, 2026-10-01).
-8. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
+9. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — post-gate
    provisional: build only after the playtest-3 read confirms it's the right next content.
-9. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
+10. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — post-gate
    provisional, after M18. M23's social a11y retrofit scope un-defers with it; chat input uses
    item 1's typing mode.
-10. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
+11. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
    Steam Input maps onto item 1's virtual buttons.
 
-Milestone specs for 6–10 are sketches or pending: elaborate via `milestone-loop-prompt.md` when reached,
+Milestone specs for 8–11 are sketches or pending: elaborate via `milestone-loop-prompt.md` when reached,
 against the CURRENT game repo (never against archived specs).
 
 ## Gates and constraints (live)
