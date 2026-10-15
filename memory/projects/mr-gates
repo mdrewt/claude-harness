@@ -19,7 +19,8 @@ __doc__ = """mr-gates — the per-slice ACCEPTANCE LEDGER and the residual sink 
                                   [--category C --severity V]
                             | promote --id R [--category C --severity V] [--spec-file F]
                             | close --slice S [--pr N]   # also deletes its residuals.spec.md section
-                            | disposition --id R --as wontfix --reason T
+                            | disposition --id R --as wontfix|fixed --reason T
+                                  # fixed: MED/LOW only, needs a PR ref (--pr or #N in --reason)
                             | sweep --dry-run|--apply    # MED/LOW, >30d, cited paths gone -> obsolete
                             | policy [--json]
     mr-gates --selftest
@@ -99,6 +100,13 @@ POLICY = {
 
 SEVERITY_OPERATOR_ONLY = ("HIGH", "CRITICAL")
 LEGAL_DISPOSITIONS = ("wontfix",)
+# `residuals disposition --as` accepts these. `fixed` records that a later PR demonstrably
+# shipped the finding: it additionally requires a PR reference (--pr, or a `#N` / pull-request
+# URL inside --reason). MED/LOW stay self-serve; HIGH/CRITICAL stay operator-only via the same
+# SEVERITY_OPERATOR_ONLY wall every disposition passes. DEFER targets and `add --target` stay
+# LEGAL_DISPOSITIONS only — a brand-new DEFER cannot be born `fixed`.
+DISPOSITIONS = LEGAL_DISPOSITIONS + ("fixed",)
+PR_REF = re.compile(r"#\d+\b|\bgithub\.com/\S+/pull/\d+", re.I)
 # A DEFER that becomes a tracked residual must name one of these (the protected categories of
 # standards/testing-tdd.md "What earns a check", plus content and loop operations).
 CATEGORIES = ("gameplay", "security-privacy", "data-integrity", "netcode-determinism",
@@ -1726,10 +1734,17 @@ def cmd_residuals(a, sub):
         return 0
     if sub == "disposition":
         rid, how = a.get("id"), a.get("as")
-        if not rid or how not in LEGAL_DISPOSITIONS:
-            return die("disposition requires --id and --as %s" % "|".join(LEGAL_DISPOSITIONS))
+        if not rid or how not in DISPOSITIONS:
+            return die("disposition requires --id and --as %s" % "|".join(DISPOSITIONS))
         if not a.get("reason"):
             return die("disposition requires --reason")
+        pr_ref = None
+        if how == "fixed":
+            m = PR_REF.search(a["reason"])
+            pr_ref = a.get("pr") or (m.group(0) if m else None)
+            if not pr_ref:
+                return die("disposition --as fixed requires a PR reference: --pr N, or a "
+                           "`#N` / pull-request URL inside --reason")
         folded = fold_residuals(rows)
         r = folded.get(rid)
         if not r:
@@ -1737,8 +1752,10 @@ def cmd_residuals(a, sub):
         if (r.get("severity") or "MED").upper() in SEVERITY_OPERATOR_ONLY:
             return die("severity %s cannot be dispositioned by the loop — open an operator "
                        "decision with mr-ask-drew first" % r.get("severity"))
+        extra = {"fixed_by_pr": pr_ref} if how == "fixed" else {}
         residual_append(dict(r, status="dispositioned", disposition=how,
-                             disposition_reason=a["reason"], dispositioned_at=utc_now()), path)
+                             disposition_reason=a["reason"], dispositioned_at=utc_now(),
+                             **extra), path)
         print("DISPOSITIONED %s as %s" % (rid, how))
         return 0
     if sub == "add":
@@ -2194,6 +2211,28 @@ def selftest():
         cmd_residuals({"slice": newid, "_residuals": resid, "pr": "999", "_gates_dir": gdir},
                       "close")
         chk.eq("J10d-closed-when-proved", 0, len(open_residuals(residual_rows(resid))))
+        # J11: `fixed` disposition — needs a PR reference, closes the row append-only, and the
+        # operator-only severity wall holds for it exactly as it does for wontfix.
+        fr = os.path.join(root, "fixed.jsonl")
+        residual_append({"id": "R-fxd-MED", "status": "unpromoted", "severity": "MED",
+                         "title": "t", "disclosed_at": utc_now()}, fr)
+        residual_append({"id": "R-fxd-HIGH", "status": "unpromoted", "severity": "HIGH",
+                         "title": "t", "disclosed_at": utc_now()}, fr)
+        chk.eq("J11-fixed-needs-pr-ref", 2,
+               cmd_residuals({"id": "R-fxd-MED", "_residuals": fr, "as": "fixed",
+                              "reason": "shipped, no reference"}, "disposition"),
+               "`fixed` without --pr and without a #N/pull URL in --reason must refuse")
+        chk.eq("J11b-fixed-applies", 0,
+               cmd_residuals({"id": "R-fxd-MED", "_residuals": fr, "as": "fixed",
+                              "reason": "shipped in polish-1, GAME #579"}, "disposition"))
+        frow = fold_residuals(residual_rows(fr))["R-fxd-MED"]
+        chk.eq("J11c-fixed-row", ("dispositioned", "fixed", "#579"),
+               (frow.get("status"), frow.get("disposition"), frow.get("fixed_by_pr")))
+        chk.eq("J11d-fixed-closes", 1, len(open_residuals(residual_rows(fr))),
+               "the MED row is retired; only the HIGH row stays open")
+        chk.eq("J11e-high-stays-operator-only", 2,
+               cmd_residuals({"id": "R-fxd-HIGH", "_residuals": fr, "as": "fixed", "pr": "579",
+                              "reason": "shipped"}, "disposition"))
 
         # --- K. drain policy alarms -----------------------------------------------------------
         old = utc_now()
