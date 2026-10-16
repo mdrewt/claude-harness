@@ -130,7 +130,7 @@ after: [ttd-1]
 
 ### so-2 — openFrame: push-then-show for player-opened frames; the mirror shrinks to the server trio
 category: ui-architecture (stack ownership; M-gamepad design input) · severity: MED · size: HEAVY
-touches: client/src/main.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/ui/overlayRegistry.ts, client/src/ui/overlayRegistry.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/ui/screens/types.ts, client/src/ui/screens/index.ts, client/src/ui/screens/index.test.ts, client/src/ui/screens/mainMenuScreen.ts, client/src/ui/screens/mainMenuScreen.test.ts, client/src/main.input.test.ts, client/src/main.controls.test.ts, client/src/main.dispatch.test.ts, client/src/main.menu.test.ts, client/src/main.social.test.ts, client/src/main.accel.test.ts, client/src/main.a11yFocus.test.ts, client/src/main.reconnectStack.test.ts, docs/DECISIONS.md
+touches: client/src/main.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/ui/battlePolicy.ts, client/src/ui/overlayRegistry.ts, client/src/ui/overlayRegistry.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/ui/screens/types.ts, client/src/ui/screens/index.ts, client/src/ui/screens/index.test.ts, client/src/ui/screens/mainMenuScreen.ts, client/src/ui/screens/mainMenuScreen.test.ts, client/src/main.input.test.ts, client/src/main.controls.test.ts, client/src/main.dispatch.test.ts, client/src/main.menu.test.ts, client/src/main.social.test.ts, client/src/main.accel.test.ts, client/src/main.a11yFocus.test.ts, client/src/main.reconnectStack.test.ts, docs/DECISIONS.md
 after: [so-1]
 
 - ATOMIC-OR-REVERTED (see Risks): one PR, whole or not at all.
@@ -181,8 +181,10 @@ after: [so-1]
 - **SO2.8:** WHEN so-2 lands, THE protected behaviors SHALL remain pinned and green: polish-1
   P3's covered-but-stacked rule (a covered menu frame still counts as shown;
   `menuView.setCovered` hides paint only — main.ts ≈637, ui/menuView.ts ≈108–111), B17
-  battle-never-hidden, the 400 ms outcome-continue grace (`OUTCOME_CONTINUE_GRACE_MS`,
-  contextStack.ts ≈301, and `outcomeShownAtMs` tracking), `overBattle` stamping and its
+  battle-never-hidden, the 400 ms outcome-continue grace (`OUTCOME_CONTINUE_GRACE_MS` — it and
+  the rest of the battle-policy group live in `ui/battlePolicy.ts` since the C2a extraction,
+  GAME PR #582; its assertions stay in contextStack.test.ts — and `outcomeShownAtMs`
+  tracking), `overBattle` stamping and its
   drop-on-a-different-battle rule, and so-1's reconnect clearing
   (`main.reconnectStack.test.ts` green unmodified).
 
