@@ -193,6 +193,9 @@ after: [pgcc-a, ctl-15]
     from `switchZone`, which does not arm a reseed.
   - The ranked listener (≈2046-2068) returns early when there is no profile.
   - Both are tested only through boot (`main.battle-reseed.test.ts`, about 20 cases).
+    *Corrected at build (pgcc-c):* only the battle listener is; no test exercised the ranked
+    listener at any level. pgcc-c pins `rankedStep` purely; the main.ts ranked wiring stays
+    boot-uncovered (residual `R-pgcc-c-RANKEDWIRING`).
 
 - **C1:** WHEN given the latch state and `{hydrated, latest}` (the latest player-battle summary or
   `undefined`), a pure battle-emit step SHALL return the next state and at most one emit. The emit
