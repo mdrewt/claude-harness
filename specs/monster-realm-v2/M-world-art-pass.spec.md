@@ -49,11 +49,15 @@ pixel-fidelity model (research §3: A strict integer grid — the current render
 vs B free-camera nearest-filtered). Exit: style guide committed; a mixel lint (every asset
 at the base grid).
 
-**blocked: pt3-econ-world** — that open decision issue includes whether the locked POC art
+**DECIDED 2026-10-24 (#587 `pt3-econ-world` D5, recommendation accepted):** the locked POC art
 direction (¾ oblique · 32 px/tile · "warm vibrant storybook", memory
-`monster-realm-art-direction`) is re-based for the 2D-HD bar or kept and lit. S0 may draft
-on the POC defaults but SHALL NOT merge the style guide before the operator's answer is
-recorded (`memory/projects/decisions/`).
+`monster-realm-art-direction`) is KEPT as the base; 2D-HD is pursued as a lighting/
+post-processing stack over it (the staged S0→S2 plan below). The operator added: "Consider
+whether there are any PixiJS-compatible libraries that would be genuinely useful" — S2's
+`pixi-filters` USE verdict (`docs/research/pixijs-ecosystem-ui-and-assets.md`) is the vetted
+answer; re-scan that doc's verdict table at S2 elaboration for anything newly useful, and adopt
+nothing outside its USE verdicts without a fresh vet. S0 is unblocked
+(`memory/projects/decisions/issue-587.answer.md` is the recorded answer).
 
 ### S1 — readable terrain kit (fixes "water indistinguishable from grass")
 
@@ -151,8 +155,8 @@ research §6). AI output is permitted for ideation only — nothing it produced 
 
 ## Open decisions (pending)
 
-- **pt3-econ-world** (blocks S0 merge): re-base vs keep the locked ¾/32px/storybook POC art
-  direction for the 2D-HD bar.
+- ~~pt3-econ-world re-base question~~ — ANSWERED 2026-10-24 (#587 D5): keep ¾/32px/storybook,
+  2D-HD as a post stack. S0 unblocked.
 - Pixel-fidelity model A vs B (S0 call; interacts with the scaling-methodology decision).
 - Native art resolution arithmetic (e.g. 640×360 integer-scales to 720p/1080p/1440p/4K) vs
   the current TARGET_VISIBLE_TILES-driven viewport — S0 call.

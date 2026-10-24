@@ -123,6 +123,13 @@ monetization), but a player economy still needs balancing.
 - **Sinks (out):** shop purchases, **town healing cost**, **fusion (consumes two monsters — a hard monster
   sink)**, evolution items, and (later) cosmetic/QoL sinks. Design for sinks ≥ faucets (mild deflation) so
   currency keeps meaning.
+  > **Note (2026-10-24, operator ruling — pt3-econ-world D4, monster-realm #587):** fusion was removed
+  > 2026-08-02 (essence redesign), so the economy currently has **no monster sink** — recruiting is pure
+  > supply. The operator accepted this gap deliberately: "Currently, there's no need for a monster sink."
+  > A replacement (e.g. release-for-essence) is future M-econ-onboarding decision material; until then,
+  > read tuning numbers (and the eo-4 worksheet) with this gap in mind. Related ruling (same batch, D1):
+  > successful recruiting pays **nothing** by design — the monster is the reward — so currency faucets
+  > lean on battle KO wins and **stronger quest rewards**, not the recruit loop.
 - **Trading's role:** the value of *rare individuals* (good-IV/Nature) drives player-to-player trade; scarcity
   comes from the IV/EV/nature roll, not artificial caps. Escrow (M15) prevents dupes; the rarity is real.
 - **Anti-inflation & integrity levers:** metered faucets; fusion/healing as monster/currency sinks;

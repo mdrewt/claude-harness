@@ -6,8 +6,11 @@
 `blocked: so-2` (M-stack-ownership) — this milestone rewrites the same roster-pin files
 (`mainMenuScreen.ts`/`menuModel.ts` pins, router `EXPECTED_PATHS`), and SO2.7 requires those
 pins rewritten "exactly ONCE" against so-2's final shape, so M-ui-foundation runs strictly
-AFTER so-2 merges (wf-1, docs-only, may start earlier) · **Decision gate:**
-`pt3-ui-policy` (mr-ask-drew batch; see Open decisions).
+AFTER so-2 merges (wf-1, docs-only, may start earlier) · **Decision gate: ANSWERED 2026-10-24**
+— monster-realm #586 (`pt3-ui-policy`); verbatim answers at
+`memory/projects/decisions/issue-586.answer.md` (SSOT). See "Decisions — ANSWERED" below:
+scaling = hybrid single-scale authority; mini-menu design DELEGATED (wireframe-driven best
+judgment); IA flatten = all three; battle "Bag"→"Items"; footer = collapse-when-empty.
 
 **Feedback items:** pt3-2026-10-030, -031, -038, -039, -040, -045, -046, -047, -049, -053,
 -055, -058, -060, -079, -086, -089, -094, -097, -109, -110, -111, -113, -114, -164, -169,
@@ -58,13 +61,16 @@ feedback; everything here is content/styling/layout INSIDE that system.
 
 ## Scope (sketch)
 
-1. **Wireframes first** (wf-1, the milestone's first slice — operator directive 013/014/015):
-   wireframe diagrams comparing CURRENT vs PROPOSED layout per screen (main menu, Monsters,
-   Inventory, Journal, Social, Profile, Options/Controls, Help), annotated with per-element
-   sizing behavior (grows-vertically / grows-horizontally / scales-with-resolution / fixed —
-   directive 014) and contrasted with genre conventions from
-   `docs/research/retro-rpg-menu-ui-design.md` (015). Delivered through the `pt3-ui-policy`
-   decision issue so the operator rules on them BEFORE build slices start.
+1. **Wireframes first** (wf-1, the milestone's first slice — operator directive 013/014/015,
+   reaffirmed in #586 D2: "Use (good) generated wireframes in your process and compare them to
+   the UI of other games to help find the best design"): wireframe diagrams comparing CURRENT vs
+   PROPOSED layout per screen (main menu, Monsters, Inventory, Journal, Social, Profile,
+   Options/Controls, Help), annotated with per-element sizing behavior (grows-vertically /
+   grows-horizontally / scales-with-resolution / fixed — directive 014) and contrasted with genre
+   conventions from `docs/research/retro-rpg-menu-ui-design.md` (015). Per #586 D2 the design
+   call is DELEGATED — no second operator gate; wireframes are our design instrument, and the
+   wireframe-vs-shipped comparison still attaches to the closing PR (post-integration
+   verification) so the operator can audit the delivered layout.
 2. **One TabBar component** consumed by box/help/bag/controls (menuView already conforms):
    uniform fixed height (sized from the tallest label, never from tab contents — 038),
    horizontal labels, top-anchored above the panel body, LB/RB glyph chips at both ends
@@ -76,7 +82,9 @@ feedback; everything here is content/styling/layout INSIDE that system.
    (retro-rpg-menu-ui-design.md §4: Gen 3 action menus are corner-anchored, same frame,
    size derived from option count, never frameless) — with an explicit Back/Close row as
    the LAST entry (049; close-at-bottom rule), B unchanged. Final placement (corner sheet
-   vs the operator's in-slot-buttons + detail-page alternative, 053) pends `pt3-ui-policy`.
+   vs the operator's in-slot-buttons + detail-page alternative, 053) is DELEGATED (#586 D2):
+   design via wf-1 wireframes + genre comparison, best judgment; code stays modular/
+   shareable/reusable so menus remain consistent (the operator's stated bar).
 4. **A four-channel feedback policy** — blocking text box / persistent hint line /
    anchored toast / modal dialog (research doc §5 decision rule) — replacing the
    layout-shifting care-flash presentation (058). Each message kind is classified to
@@ -96,17 +104,26 @@ feedback; everything here is content/styling/layout INSIDE that system.
    gains wheel support (040 — it has none today); a position cue (end arrows or thin
    scrollbar) shows when content overflows.
 7. **A text-size setting** (031): user-preference step(s) honoring the pixel-grid rule
-   (integer multiples only — research doc §6); mechanism pends `pt3-ui-policy`.
-8. **Single-scale-authority scaling policy** (164; absorbs R-ctl-SETRATIO): ONE computed
+   (integer multiples only — research doc §6); mechanism is an elaboration-time design call
+   under the decided hybrid scaling policy (#586 D1 locked the scale authority; D2's
+   delegation covers presentation judgment).
+8. **Single-scale-authority scaling policy — DECIDED (#586 D1, hybrid):** ONE computed
    scale, derived in device pixels, drives the world canvas AND a CSS custom property the
-   overlay chrome consumes — ending the snapped-canvas/fluid-DOM split. The exact policy
-   (continuous vs integer+letterbox vs hybrid) pends `pt3-ui-policy`; see Open decisions.
-9. **Menu IA restructure** (pends `pt3-ui-policy` AND the recorded so-2/SO2.0 answer, same
-   decision surface): Social opens the 4-tab screen directly on a default tab instead of a
-   3-item picker aliasing one screen (079); Profile's three sparse screens collapse to one
-   combined screen (097); Options' two leaves (How to play, Controls) promote to main-menu
-   entries (109/111). Folds R-ctl-14-CTL14.2 (the owed Report-a-problem leaf) since it
-   edits the same `MENU_ENTRIES`/`mainMenuScreen` pins.
+   overlay chrome consumes — ending the snapped-canvas/fluid-DOM split. The WORLD keeps
+   INTEGER scaling (crisp pixel art) with margins/letterbox absorbing the remainder; the UI
+   layer scales CONTINUOUSLY from the same number and gains the text-size setting. (The
+   operator explicitly re-affirmed the integer-world choice knowing the tradeoff — "Thank
+   you for reminding me about how integer scaling would affect the art." Supersedes the
+   parked R-ctl-SETRATIO direction by resolving it.)
+9. **Menu IA restructure — DECIDED (#586 D3, all three at once):** Social opens the 4-tab
+   screen directly on a default/remembered tab instead of a 3-item picker aliasing one
+   screen (079); Profile's three sparse screens collapse to one combined screen with
+   Name/Account/Privacy sections (097); Options' two leaves (How to Play, Controls) promote
+   to main-menu entries and the Options sub-list dies (109/111). Main menu becomes:
+   Monsters, Inventory, Journal, Social, Profile, How to Play, Controls, Close. Folds
+   R-ctl-14-CTL14.2 (the owed Report-a-problem leaf) since it edits the same
+   `MENU_ENTRIES`/`mainMenuScreen` pins. (so-2's SO2.0 design-presentation gate still runs
+   at its own build time; the Social-direct-open answer it needed is now on record.)
 10. **Help rework** (110/113/114): drop the All Controls tab (generated from the same
     `controlsModel` rows the Controls screen renders — pure duplication); rename
     'This Screen' → 'Introduction' with real game-blurb catalog content (113); 'Goals' →
@@ -192,12 +209,12 @@ parallel-safe (docs-only). Realistic shape:
   scroll-into-view, pointerSource wheel, position cue).
 - **uif-5 — Help rework** (tab roster change, Introduction content, encyclopedia + prompt
   frame OverlayId; folds HELPA11Y/STALECMT).
-- **uif-6 — menu IA restructure** (`blocked: pt3-ui-policy`; also requires the so-2 SO2.0
-  answer on Social routing): Social direct-open, Profile combined screen, Options leaves
-  promoted, Report-a-problem leaf (CTL14.2).
-- **uif-7 — scale authority + text-size setting** (`blocked: pt3-ui-policy`):
-  viewport.ts-derived scale exported as the single authority + CSS custom property;
-  settings surface.
+- **uif-6 — menu IA restructure** (UNBLOCKED — #586 D3; so-2's SO2.0 gate runs in its own
+  milestone): Social direct-open, Profile combined screen, Options leaves promoted,
+  Report-a-problem leaf (CTL14.2).
+- **uif-7 — scale authority + text-size setting** (UNBLOCKED — #586 D1, hybrid):
+  viewport.ts-derived integer world scale exported as the single authority + CSS custom
+  property the continuously-scaling UI consumes; settings surface.
 - **uif-8 — row-card + empty-state components** (Journal empty state as first consumer;
   Trades-tab migration deferred to the trade-redesign milestone).
 
@@ -223,31 +240,29 @@ parallel-safe (docs-only). Realistic shape:
 - **UIF.6:** THE menu chrome SHALL take spacing, borders, type sizes and state colors
   from the named token set only (no per-screen literals), with disabled/non-selectable
   items rendered at reduced contrast.
-- **UIF.7:** WHEN the window resizes, ONE computed scale (policy per the `pt3-ui-policy`
-  answer) SHALL drive both the world canvas and the overlay chrome via a CSS custom
-  property — no second scale derivation.
+- **UIF.7:** WHEN the window resizes, ONE computed scale SHALL drive both the world canvas
+  (integer-scaled, margins absorb the remainder) and the overlay chrome (continuous, via a
+  CSS custom property) — no second scale derivation (#586 D1 hybrid policy).
 - **UIF.8:** Regression floor: hint-bar generation, reachability sets, axe/liveRegion/
   focus-trap gates, B17 battle-never-hidden and the so-1/so-2 reconnect+openFrame suites
   stay green; roster pins change at most once, with named counts.
 
-## Open decisions (pending `pt3-ui-policy`)
+## Decisions — ANSWERED 2026-10-24 (#586 `pt3-ui-policy`; answer file is SSOT)
 
-1. **Scaling policy** (164; R-ctl-SETRATIO): (a) continuous responsive scaling (smooth,
-   blurs/shimmers pixel art — conflicts with the operator's own Octopath/Sea-of-Stars
-   crispness bar), (b) integer world scale + letterbox with UI absorbing the remainder
-   (the parked r2 set-ratio direction), (c) integer world scale + UI scale derived from it
-   (equal, or an integer multiple/divisor — research doc §9's coherent designs). The July
-   r2 "scaling factor applied to everything" ruling and the new "smoothly growing" ask
-   must be reconciled by the operator, not silently.
-2. **ContextSheet placement** (047/053): corner-anchored sheet (genre default) vs in-slot
-   buttons + a dedicated monster-detail page (operator's alternative; he notes the
-   grid-vs-list D-pad tension in Storage himself). Wireframes present both.
-3. **Menu IA batch** (079/097/109/111): confirm the Social direct-open default tab, the
-   combined Profile screen, and the Options promotion — raised in the same batch as (or
-   explicitly alongside) so-2's SO2.0 answer, since Social routing is designed there.
-4. **Text-size mechanism** (031): user-preference integer steps (x1/x2 per the 200%
-   accessibility floor) vs screen-size-driven auto-scaling, and where it surfaces
-   (Options screen placement interacts with decision 3).
+1. **Scaling policy:** hybrid single-scale authority (recommendation accepted) — integer
+   world + continuously-scaled UI from the one number; see scope item 8.
+2. **Mini-menu/ContextSheet:** DELEGATED — "Use your best judgment to design a good
+   solution," wireframe-driven, compared against other games' UI; "keep the code modular,
+   shareable, and reusable so the menus stay consistent with each other." See scope items
+   1 and 3.
+3. **Menu IA:** all three proposals adopted at once; see scope item 9.
+4. **Battle "Bag" rename:** "Rename 'bag' to either 'items' or 'inventory' as appropriate"
+   — the battle command becomes **"Items"** (keeps the Inventory terminology family;
+   in-battle "Items" ≠ the menu screen "Inventory"). Lands in M-pt3-quickfix's qf-10
+   terminology slice (QF10.5 is unblocked); the tactical battle UI inherits "Items".
+5. **Empty footer:** collapse the reserved feedback line when empty (visible only when it
+   has something to say), never delete it (recommendation accepted) — scope item 4 stands
+   as written.
 
 ## Notes
 

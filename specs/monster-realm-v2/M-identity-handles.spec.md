@@ -3,10 +3,17 @@
 **Status:** sketch, 2026-10-24 (Playtest-3 feedback episode). Elaborate with
 `milestone-loop-prompt.md` when PLAN §9 reaches it, against the CURRENT game repo ·
 **Project:** monster-realm (server + client) · **Feeds:** `M19-social.spec.md` (friend requests
-and chat need this identity primitive — M19's sketch is reshaped to consume it, not re-derive it).
+and chat need this identity primitive — M19's sketch is reshaped to consume it, not re-derive it)
+· **Decisions ANSWERED 2026-10-24** — monster-realm #588 (`pt3-identity-accounts`), all four
+recommendations accepted verbatim (`memory/projects/decisions/issue-588.answer.md`): minted
+numeric discriminator carried through the account-claim re-key; Players tab = name +
+discriminator + lead-monster level + "nearby" marker; Sign-In hidden while no issuer is
+configured (labeled "Sign in / create account with <provider>" once one is); M19 moves ahead of
+M18. All formerly-pending rows below are resolved in place.
 **Feedback items:** pt3-2026-10-087, pt3-2026-10-088, pt3-2026-10-099.
-**Absorbs (conditional):** R-ctl-8g-CTL8G.1 (zone name in the Players tab — only if the pending
-decision picks zone as the extra Players-tab info; its hidden-dependency note still binds).
+**Absorbs (conditional — NOT activated):** R-ctl-8g-CTL8G.1 (zone name in the Players tab) does
+NOT absorb here: #588 D2 picked lead-monster level, not zone. The residual stays open where it
+lives.
 
 ## Problem / intent
 
@@ -76,18 +83,18 @@ on the same identity/account surfaces.
   dialogue for immersion. The suffix join is a typed i18n catalog string with a slot (en+fr),
   never string concatenation in view code; the Players-tab rendering stays inside the shipped
   nav-adapter model (no mouse-only element).
-- **Players tab extra info.** The row gains the suffix; whether it ALSO gains level and/or zone
-  pends the decision batch below. Zone would reopen R-ctl-8g-CTL8G.1, whose hidden-dependency
-  note still binds: `zone_def` is not subscribed, the store holds no zone map, and the
-  subscription set is eval-pinned — that cost is known, not a surprise.
+- **Players tab extra info — DECIDED (#588 D2):** name + discriminator + the LEVEL of the
+  player's lead monster + the "nearby" marker. Zone was NOT picked, so R-ctl-8g-CTL8G.1's
+  conditional absorption does NOT activate (that residual stays where it lives; its
+  hidden-dependency note is moot here). Lead-monster level is new subscribed surface — elaborate
+  its data path against the owner-scoped view model (the LEAD monster's level is the owner's
+  public-enough signal the operator chose; keep it out of any private-table read path).
 - **`#<hex8>` fallback retired or re-based.** The empty-name fallback can become the
   discriminator itself (stable, unlike hex8 which changes on claim) — decide at elaboration.
-- **Account-screen honesty (item 099).** The UI never says registration happens at the identity
-  provider, and with the fail-closed `ALLOWED_ISSUERS` placeholder the Sign In button is a dead
-  affordance. In scope: say so and/or hide/disable Sign In when no issuer is configured. Whether
-  this milestone instead WIRES a real issuer is a scope question that pends the same decision
-  batch; either way auth stays pluggable per client build (standing ruling,
-  `feedback-auth-modularity`; Steam/native deferred per M21b-2).
+- **Account-screen honesty (item 099) — DECIDED (#588 D3): UI-only fix.** HIDE Sign In while no
+  issuer is configured; when one is, label it "Sign in / create account with <provider>". Wiring
+  a real OIDC issuer stays its own future milestone; auth stays pluggable per client build
+  (standing ruling, `feedback-auth-modularity`; Steam/native deferred per M21b-2).
 
 ## Non-goals
 
@@ -129,24 +136,27 @@ on the same identity/account surfaces.
 - **IDH-display:** WHEN two online players share a name, THE Players tab (and trade/challenge
   request surfaces) SHALL render each with the low-contrast suffix so the rows are
   distinguishable; battle, name-tag and NPC-dialogue surfaces SHALL NOT render it.
-- **IDH-auth-ui:** WHEN no OIDC issuer is configured, THE Account screen SHALL NOT present a
-  dead Sign In affordance (exact shape — hide, disable-with-reason, or copy — pends the
-  decision).
+- **IDH-auth-ui:** WHEN no OIDC issuer is configured, THE Account screen SHALL NOT render the
+  Sign In affordance at all; WHEN one is configured, THE affordance SHALL be labelled
+  "Sign in / create account with <provider>" (i18n-slotted) — #588 D3.
 - **IDH-i18n:** every new string ships in en+fr through the typed catalog with its roster pins
   updated.
 
-## Open decisions (pending pt3-identity-accounts)
+## Decisions — ANSWERED 2026-10-24 (#588 `pt3-identity-accounts`; answer file is SSOT)
 
-- **Suffix format and placement:** digit count/zero-padding/glyph (e.g. `#0042`), and what else
-  the Players tab row shows (level? zone? — zone reopens R-ctl-8g-CTL8G.1's known hidden
-  dependency). Item 088 is a suggestion ("One option…"), so the operator confirms the
-  mechanism itself here too.
-- **Account-screen scope:** wire a real OIDC issuer now (scope jump; pluggability ruling
-  binds) vs the UI-only honesty fix while `ALLOWED_ISSUERS` stays fail-closed.
-- **Storage shape** (new `player_handle` table vs appended column on a re-keyed table) is an
-  elaboration-time design call INSIDE the constraints above, not an operator decision — listed
-  here only because the sketch leans new-table and the slice should confirm against current
-  schema.
+- **Suffix format and mechanism — DECIDED (D1):** a minted numeric discriminator (e.g.
+  `Drew#4821`), assigned at first join, never changing, carried through the account-claim
+  re-key; shown low-contrast in Social/trade/chat lists, omitted in battles, nametags and NPC
+  dialogue. (The mechanism itself — not just the format — is confirmed.) Exact digit
+  count/zero-padding: elaboration detail.
+- **Players-tab info — DECIDED (D2):** name + discriminator + lead-monster level + "nearby".
+- **Account-screen scope — DECIDED (D3):** UI-only honesty fix now (hide; provider-labelled when
+  configured); issuer wiring is a future milestone.
+- **Roadmap — DECIDED (D4):** M19 moves ahead of M18; M18 re-sketches after the tactical P2
+  (PLAN §9 updated).
+- **Storage shape** (new `player_handle` table vs appended column on a re-keyed table) remains an
+  elaboration-time design call INSIDE the constraints above — the sketch leans new-table; the
+  slice confirms against current schema.
 
 ## Notes (sequencing / fan-out)
 

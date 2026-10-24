@@ -3,9 +3,13 @@
 **Status:** sketch, 2026-10-24 (Playtest-3 feedback processing). Elaborate with
 `milestone-loop-prompt.md` when PLAN §9 reaches it, against the CURRENT game repo ·
 **Project:** monster-realm (game-core + server-module + client) · **Source:** operator directive,
-`playtest-feedback-2026-10.md` L237–250 · **Decision gate:** the `pt3-trade-scope` decision batch
-(rows marked *pending pt3-trade-scope* below) must be ANSWERED before the marked rows are
-elaborated — write `blocked:pt3-trade-scope` on any slice that cannot proceed without them.
+`playtest-feedback-2026-10.md` L237–250 · **Decision gate: ANSWERED 2026-10-24** — monster-realm
+#585 (`pt3-trade-scope`); verbatim answers at `memory/projects/decisions/issue-585.answer.md`
+(SSOT). All five recommendations accepted, with two operator ADDITIONS: (i) simple extra
+soft-lock checks beyond the no-empty-side rule — "a solution that prevents 90% of potential
+cases with 0 false positives is better than … 95% … but constantly frustrates players"; (ii)
+only ONE active trade per PAIR of players at a time. The former *pending* rows below are
+resolved in place and marked **DECIDED**.
 Anchors below cite symbols; line numbers are fact-check orientation (2026-10-24) only.
 
 **Feedback items:** pt3-2026-10-080, pt3-2026-10-081, pt3-2026-10-082, pt3-2026-10-083,
@@ -47,15 +51,16 @@ cards (the existing `build_cards` pattern), nothing else.
   at the END only (DECISIONS.md "Schema changes are additive"; the client's exhaustive
   literal-union + satisfies-never arm, ADR-0114, turns new variants into compile errors by
   design). Bindings regen + publish-over-data proof required either way.
-- **Initiation:** face-to-face entry point per the standing ruling (controls 2026-10-01:
-  "Face-to-face in the UI only"; DECISIONS.md "trade/challenge range") — the world-interaction
-  path ctl-10b built, retargeted at `create_trade_session`. *Pending pt3-trade-scope:* whether
-  initiation stays face-to-face-only or the Social›Players tab may also initiate; if face-to-face
-  is kept/extended, this milestone activates the server-side proximity guard per
-  R-ctl-PROXGUARD's recorded recipe (pure game-core `within_interact_range`; characters via
-  `p.entity_id` as talk does; placed after joined/require_not_deleting/counterparty-joined
-  checks; ONE uniform error string — no zone oracle; co-located fixtures in
-  pvp_tests/trading_tests).
+- **Initiation — DECIDED (#585 D3):** face-to-face ONLY; the Social›Trades tab is where you
+  EDIT/confirm/cancel already-open sessions, never where you initiate. The world-interaction
+  path ctl-10b built is retargeted at `create_trade_session`, and this milestone ACTIVATES the
+  server-side proximity guard per R-ctl-PROXGUARD's recorded recipe (pure game-core
+  `within_interact_range`; characters via `p.entity_id` as talk does; placed after
+  joined/require_not_deleting/counterparty-joined checks; ONE uniform error string — no zone
+  oracle; co-located fixtures in pvp_tests/trading_tests). ADDITION (same answer): at most ONE
+  active session per PAIR of players — "no spamming the same person with a dozen different
+  requests/offers"; a second create against the same counterparty is rejected naming the open
+  session.
 - **No-oracle invariant (closes 2026-10-16-F1):** no session reducer takes counterparty asset
   arguments, and no error string is derived from another player's private state. Each side's
   edits are validated against the EDITOR's own holdings only.
@@ -77,14 +82,21 @@ New rules the operator ruled (L244–247), encoded once in game-core and enforce
   `write_back_party_hp` on flee and the ADR-0138 disconnect-GC path, which persists damaged HP);
   with battle entry still rejected for escrowed monsters the HP trigger is mostly
   belt-and-braces, but it is a ruling — encode it.
-- **No confirm while a side is empty** (soft-lock guard, L247). *Pending pt3-trade-scope:*
-  whether a currency- or items-only side counts as non-empty, and whether one-sided gifts
-  (legal today: "n == 0 is legal" in trading rules) survive at all.
-- **Concurrency note:** today's cap is one active trade per PLAYER (`has_active_trade`), strictly
-  stronger than the ruled per-monster rule; the plural "each active trade … its own row" (086)
-  implies multiple concurrent sessions per player. Default design: per-monster exclusivity is the
-  binding rule and the per-player cap relaxes — but this multiplies the escrow surface, so it is
-  named in the pt3-trade-scope batch rather than assumed.
+- **No confirm while a side is empty — DECIDED (#585 D1/D2):** monsters, items AND currency are
+  tradable on both sides (D1), so "non-empty" = at least one asset of any class; an
+  items-or-currency-only side counts. One-sided gifts DIE (D2 — the rule is enforced exactly;
+  gifting, if ever wanted, is a separate explicit future feature).
+- **Additional simple soft-lock checks (operator ADDITION, #585 D2):** the empty-side rule alone
+  doesn't stop value-losing trades like "your only monster for a single gold coin." Add a SMALL
+  set of simple, zero-false-positive guards — the named case: WHEN executing would leave a player
+  with zero monsters (their last monster goes out and no monster comes in), reject. Keep the set
+  minimal ("prevents 90% of potential cases with 0 false positives" beats a frustrating 95%);
+  anything cleverer (value heuristics, confirmation friction) is explicitly NOT wanted.
+  Elaboration picks the final guard list under that bar.
+- **Concurrency — DECIDED (#585 D3 addition):** one active session per PAIR of players; a player
+  may hold multiple sessions concurrently only with DISTINCT counterparties. Per-monster
+  exclusivity stays the binding asset rule; today's one-per-player `has_active_trade` cap relaxes
+  to the per-pair cap. (086's "each active trade … its own row" renders per-pair rows.)
 
 ### Client (after so-2 lands — see Sequencing)
 
@@ -140,33 +152,27 @@ Any elaboration MUST keep these working; each is an existing invariant with test
    session plausibly refreshes its TTL on activity).
 5. **Bond reset on trade stands** (`reset_bond_on_trade`; essence/IVs/EVs transfer unchanged).
 6. **Escrow stays guard-in-place, never asset movement** — with the two ruled inversions
-   (party-leave, HP-drop) and the *pending* escrow-window decision below.
+   (party-leave, HP-drop) and lock-at-confirm (DECIDED, #585 D5).
 
-## Open decisions (pending pt3-trade-scope — raise as ONE decision batch, do not invent answers)
+## Decisions — ANSWERED 2026-10-24 (#585 `pt3-trade-scope`; answer file is SSOT)
 
-1. **Tradable asset scope:** monsters only, or monsters + items + currency? The schema and
-   headroom primitives (ADR-0113/0124) already support all three; the operator's complaint (085)
-   is that the UI implied more than the rules delivered — either direction resolves it.
-2. **Empty-side rule vs one-sided gifts:** does an items/currency-only side count as non-empty;
-   do gifts survive the no-empty-side-confirm rule?
-3. **Initiation locus:** face-to-face only (standing ruling; PROXGUARD activates here) vs
-   Players-tab initiation (would amend the ruling — flag explicitly, never drift silently).
-4. **Arrival slot semantics:** the in-party eligibility rule inverts today's arrive-boxed
-   behavior (the swap clears `party_slot` precisely because the receiver's party may be full).
-   Does a traded monster arrive in-party (new reject class: receiver party headroom at execute)
-   or arrive boxed (then state why in-party-to-OFFER is still coherent)?
-5. **Escrow window:** lock-at-offer vs lock-at-confirm. The r2 wallet-wedge lesson ("currency is
-   in an active trade" blocking shop buys) says long-lived editable sessions + lock-at-offer
-   wedge wallets; lock-at-confirm narrows the window but admits confirm-time invalidation. The
-   execute-time netted check (checklist #2) backstops either choice.
-6. **Per-player concurrency cap:** relax one-trade-per-player to per-monster exclusivity
-   (implied by 086's plural rows), or keep the player cap and render the one row?
+1. **Tradable asset scope:** monsters + items + currency, both sides (recommendation accepted).
+2. **Empty-side rule / gifts:** rule enforced exactly; one-sided gifts die. ADDITION: a small set
+   of simple zero-false-positive soft-lock guards (last-monster rule; see Eligibility).
+3. **Initiation locus:** face-to-face only; Trades tab = edit/confirm/cancel. PROXGUARD
+   activates. ADDITION: one active session per pair of players.
+4. **Arrival slot:** received monster goes to the FIRST OPEN PARTY SLOT, else to Storage; the
+   outgoing monster's slot is freed by the swap (recommendation accepted). Receiver party
+   headroom is therefore NOT a reject class — Storage is the overflow.
+5. **Escrow window:** lock-at-confirm — while editing, nothing is locked; execute-time netted
+   re-validation (preservation checklist #2) catches changes (recommendation accepted).
 
 ## Slices (provisional — final slicing at elaboration; serial rule→reducer spine, client tail)
 
 - **ts-1 — game-core session rules** (pure, deterministic, integer): session state machine,
-  eligibility predicates (in-party, ≥1 HP, per-monster exclusivity), confirm-reset-on-edit rule,
-  empty-side confirm gate, execute validation.
+  eligibility predicates (in-party, ≥1 HP, per-monster exclusivity, per-pair session cap),
+  confirm-reset-on-edit rule, empty-side confirm gate + the simple soft-lock guards (last-monster
+  rule), execute validation, arrival-slot rule (first open party slot else Storage).
   touches: game-core/src/trading/ (new module + rules.rs, types.rs)
 - **ts-2 — server spine**: `trade_session` table + `my_trade_session` view + reducers
   (create/edit/confirm/cancel/execute), guard widening (`reject_if_monster_in_trade` over both
@@ -174,8 +180,9 @@ Any elaboration MUST keep these working; each is an existing invariant with test
   (decision-dependent). Bindings regen; publish-over-data proof.
   touches: server-module/src/ (schema.rs, trading.rs or a new trading_session.rs per the M8.9
   domain-module rule, guards.rs, monster_mgmt.rs, movement.rs, battle.rs), client/src/module_bindings/ (generated)
-- **ts-3 — client overlay + Trades tab** (after so-2; `blocked:pt3-trade-scope` rows resolved
-  first): session overlay rebuild, wizard retirement, per-trade rows, banners, i18n en+fr.
+- **ts-3 — client overlay + Trades tab** (after so-2; the former decision rows are resolved):
+  session overlay rebuild (asset pickers for monsters, items AND currency per D1), wizard
+  retirement, per-trade rows (one per pair), banners, i18n en+fr.
   touches: client/src/ui/ (tradeModel, tradeView, tradeProposeModel/View retirement,
   socialModel/View, i18n/), client/src/main.ts (openFrame call sites per so-2's shape)
 - **ts-4 — evals/e2e**: two-context session e2e on the M16.5d `__mrTrade` hook pattern
@@ -197,8 +204,10 @@ Any elaboration MUST keep these working; each is an existing invariant with test
 - **TS-A4:** THE session reducers SHALL accept no argument naming another player's assets, and
   SHALL return no error derived from another player's private state (closes the
   2026-10-16-F1 read oracle; a regression test probes for distinguishable errors).
-- **TS-A5:** WHILE either side of a session is empty (per the pt3-trade-scope emptiness
-  definition), THE SERVER SHALL reject confirm from every participant.
+- **TS-A5:** WHILE either side of a session is empty (no monster, item, or currency on it — #585
+  D1/D2), THE SERVER SHALL reject confirm from every participant; and WHEN execution would leave
+  a participant with zero monsters (last monster out, none in), THE SERVER SHALL reject the
+  execute (the simple soft-lock guard — zero false positives, by design).
 - **TS-A6:** WHEN the trade executes, bond SHALL reset on every traded monster and
   essence/IVs/EVs SHALL transfer unchanged (existing rule, re-proven on the new path).
 

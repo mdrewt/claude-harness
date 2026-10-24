@@ -4,9 +4,10 @@
 server-module + client + content) · **Priority:** the operator's top priority — "I would like to
 overhaul this UI and the related battle system more than anything else" (feedback :423) —
 scheduled immediately after the quickfix wave ("immediately after any bug fixes and low-hanging
-fruit", :492). · **blocked: pt3-battle-scope · blocked: pt3-battle-design** — P1+ do not start,
-and the P0 ideation does not run, until BOTH decision issues are answered by the operator
-(answers land at `memory/projects/decisions/issue-<n>.answer.md`).
+fruit", :492). · **DECISIONS ANSWERED 2026-10-24** — both gating batches are answered (monster-realm
+#583 `pt3-battle-scope`, #584 `pt3-battle-design`; verbatim answers at
+`memory/projects/decisions/issue-583.answer.md` / `issue-584.answer.md`). The P0 ceremony is
+UNBLOCKED; the rulings below are BINDING and the answer files are their SSOT.
 
 **Feedback items:** pt3-2026-10-018, pt3-2026-10-121, pt3-2026-10-122, pt3-2026-10-126,
 pt3-2026-10-127, pt3-2026-10-128, pt3-2026-10-129, pt3-2026-10-130, pt3-2026-10-131,
@@ -67,6 +68,82 @@ checks matter and are reflected honestly rather than papered over:
   per-unit initiative queue with a per-turn cap (Wakfu's 30 s) and simultaneous
   plan-commit-resolve (Frozen Synapse) are the alternatives. Never allow recruiting in PvP.
 
+## Operator rulings 2026-10-24 (#583 + #584 — BINDING; answer files are SSOT)
+
+**Scope & sequencing (#583, pt3-battle-scope):**
+
+- **D1 — M14 depth carry-over (recommendation accepted):** carry the DATA and rules forward but
+  re-enable gradually — the tactical core ships with types/stats/status only; abilities and
+  weather re-enable in later phases once the grid core is fun.
+- **D2 — cutover is BIG-BANG (alternative A):** wild battles AND PvP/ranked convert to tactical
+  in ONE cutover — there is no player-facing phase where tactical wild coexists with 1v1 PvP.
+  P1/P2 below remain internal BUILD phases, but nothing ships to players until both are done.
+  PLUS a new operator-designed mechanic — the **per-monster action queue + idle-only turn clock**
+  (full text in D583.2 of the answer file; design section below). The ceremony must integrate it
+  "so everything feels like one coherent battle system."
+- **D3 — hard replacement (recommendation accepted):** at cutover the 1v1 system is GONE (no
+  parallel modes, no toggle); the schema stays additive (new tables/columns, old ones retired
+  from use, never reordered).
+- **D4 — M-gamepad ordering (recommendation accepted):** M-gamepad runs AFTER the tactical battle
+  UI stabilizes (battle is the biggest new input surface).
+- **D5 — next playtest is STRICT §10 (alternative A):** ONE gate after every coverage milestone
+  closes. No interim playtest. (PLAN §9 gate note updated accordingly.)
+
+**Design parameters (#584, pt3-battle-design):**
+
+- **Inspiration set (preamble):** ALL SIX games are valid sources — FFTA, Triangle Strategy,
+  Sword of Convallaria AND Pokemon Conquest, Devil Survivor, Brigandine. A source "doesn't have
+  to perfectly match up… to be a good source of inspiration." DIRECTED RESEARCH: find out what
+  players liked and disliked about each of the six, take the best concepts from each, and use
+  that to "plan, design, and build a new cohesive battle system that is both fun, rewarding, and
+  unique." This research is a ceremony input (§7 persist-mode).
+- **D1 — tuned AP accepted** (costs tuned so a typical turn resolves as move + one attack), PLUS
+  directed research: what people like/dislike about AP battle systems vs simpler move+act systems
+  like FFTA; design/implementation specifics are delegated to our best judgment informed by it.
+- **D2 — round-based speed order accepted** (every unit acts once per round, ordered by speed —
+  "very close to what I originally intended"). A visible turn-order bar follows.
+- **D3 — recruit percentage SHOWN on the preview** (accepted; "transparency beats superstition"
+  endorsed as a principle). Failure still consumes the turn.
+- **D4 — forecast & undo accepted, but INTEGRATED with the action queue:** the forecast panel and
+  free pre-commit move-undo must be designed together with queue submit/cancel semantics (an
+  undo inside a queued-but-unsubmitted plan is cheap; a submitted queue is cancel-and-clear).
+- **D5 — PvP clock = per-UNIT 30 s cap with AFK auto-pass, then forfeit** (hybrid of the
+  recommendation and alternative A), replacing the 60 s secret-pick deadline — combined with the
+  idle-only clock semantics of D583.2 (the cap counts only while the battle is idle waiting on
+  that player; it resets on submit; animation/resolution time never counts against either player).
+
+**Cross-batch ruling that lands here (#587 D1):** successful recruiting pays NOTHING (alternative
+A) — no currency, no XP, no essence; the monster is the reward. This closes this spec's former
+recruit-yield open question; the GDD §7 note records the faucet consequence (quest faucets
+compensate, owned by M-econ-onboarding).
+
+## Action queue + idle-only clock (operator design input, D583.2 — ceremony integrates)
+
+The operator's own mechanic, quoted semantics (answer file is SSOT):
+
+- A player may queue up each of their monsters' NEXT turn's worth of actions at any time —
+  during the opponent's turn, while animations play, or during other events.
+- Submitting a queue marks it **ready**. A queued plan begins executing, in order, as soon as
+  BOTH hold: the queue is ready AND it is that monster's turn.
+- The player can **cancel/clear** a monster's queue at any time before that monster's turn.
+- Any INVALID actions still in a submitted queue when the monster's turn starts are **wasted**
+  (the exact waste semantics — skip vs consume — are ceremony territory; "wasted" is the
+  operator's word).
+- The turn clock **counts only while the battle is idle on the player's turn** and **resets the
+  moment they submit a monster's actions**; time spent on animations or other non-instantaneous
+  resolution never counts against either player. With instant resolution this is nearly
+  invisible; it exists so future animations don't eat clock.
+- Intent: skilled players spend very little clock; monsters begin acting as soon as possible.
+  The ceremony must fit this seamlessly with the other tactical mechanics (AP economy,
+  round-based speed order, forecast/undo) so it reads as ONE coherent system.
+
+Design implications the ceremony must resolve (not pre-decided): queue validation timing
+(client preview vs server at execution), how a queue interacts with reaction/interrupt-free
+round order (queue ≠ simultaneous resolution — execution still happens on the monster's turn),
+secret-ness of a submitted queue in PvP (no client read path for the opponent, like
+`battle_action` today), and the forecast's data source for actions queued against a future
+board state (forecasts are necessarily provisional — surface that honestly in the UI).
+
 ## Binding constraints (prior rulings; these bind the ceremony and every phase)
 
 Reproduced from the prior-ruling scan so no brainstormer re-litigates them:
@@ -114,44 +191,39 @@ multiple units.
 
 ## Scope (sketch) — phases
 
-### P0 — design ceremony (doctrine §6; blocked)
+### P0 — design ceremony (doctrine §6; UNBLOCKED 2026-10-24)
 
 INVESTIGATION is already done: the Playtest-3 fact-check scans (gameplay, menus/UI,
 netcode/trading root causes with file:line evidence) plus the prior-ruling scan above ARE the §6
 step-1 artifact — do not re-run it. What remains:
 
+- RESEARCH PRE-STEP (operator-directed, #584 preamble + D1): persist-mode research on (a) player
+  reception of each of the six inspiration games — what worked, what players disliked — and
+  (b) player sentiment on AP battle systems vs simpler move+act systems. Lands in
+  `docs/research/` per §7; a ceremony input alongside `tactical-rpg-combat-design.md`.
 - IDEATION: 6 brainstormers (1 unbiased, 1 + the investigation context, 2 with unique lenses —
   suggested: a Conquest/Devil-Survivor monsters-as-units lens and a pacing/match-length lens —
-  2 + research context from `tactical-rpg-combat-design.md`), each refined against its own
-  adversarial reviewer.
+  2 + research context from `tactical-rpg-combat-design.md` + the reception research), each
+  refined against its own adversarial reviewer. Every brainstormer receives the Operator rulings
+  section above as FIXED constraints (no re-litigating AP-vs-move+act, turn order, the queue
+  mechanic's existence, big-bang cutover, or shown recruit odds — the open surface is how to make
+  them cohere).
 - SYNTHESIS: the `judge` agent synthesizes the plan WITH the attribution table (adopted/rejected
   per brainstormer), refined by its own adversarial reviewer. The synthesis's output is the
-  elaborated P1 spec (slices, `touches:`, full EARS) replacing this sketch's P1 section.
+  DESIGN document — `M-battle-tactics-design.md` (mechanics with integer numbers, data model,
+  turn/queue state machine, phase plan, risks, attribution table) — which BINDS elaboration.
+  Line-level slicing, `touches:` and full EARS are still drafted at ELABORATION against the
+  then-current game repo (the quickfix wave and so-2 move battle/UI files before this milestone
+  builds; slicing against today's tree would rot).
 
-The ceremony runs ONLY after the operator answers the two decision batches. Do not invent
-answers; the issues as filed are SSOT for their exact wording:
-
-- **blocked: pt3-battle-scope** — scope/sequencing decisions, expected to cover at least:
-  (a) which shipped M14 depth systems carry into tactical combat — StatusEffect/BattleStatusStore
-  (ADR-0092/0093), passive abilities incl. entry/KO-switch (ADR-0094/0100), weather/field-state
-  (ADR-0095), cure items (ADR-0096/0105) — port, defer, or retire each; (b) ordering vs M-gamepad
-  (PLAN §9 item 8, "before launch") — either order works ONLY if the new battle UI stays on the
-  virtual-button/nav-adapter seam; (c) M18/M19 re-sequencing (M18 re-sketches after P2, M19 may
-  move ahead of M18); (d) rollout/gate timing — doctrine §10 holds the next playtest gate until
-  coverage milestones close, but items -136/-185 imply an incremental battle rollout.
-- **blocked: pt3-battle-design** — core design decisions, expected to cover at least:
-  (a) action economy: the directed AP pool (items -142…-145) vs the anchors' move+act+side-resource
-  spine, presented with the research premise check above (if AP: fixed heavy cost tiers,
-  per-turn/per-target caps, cooldowns); (b) turn-order family: per-unit clocks vs round-based
-  speed order vs side-alternating phases; (c) grid metric and movement allowance (Manhattan/4-way
-  default per research); (d) P2 PvP clock model: how the secret-action + 60 s deadline-reaper
-  pattern maps onto multi-unit turns (per-unit cap vs banked side clock vs simultaneous
-  plan-commit-resolve) and forfeit semantics.
-
-### P1 — tactical core for WILD battles
+### P1 — tactical core for WILD battles (BUILD phase — does not ship alone; see D583.2)
 
 The minimal fun core, per the operator's "start simple" (:406). Everything below is sketch-level;
-the ceremony owns the final shape.
+the ceremony owns the final shape. **Cutover note (D583.2/D583.3):** P1 is an internal build
+phase — the player-facing cutover is ONE big-bang release after P2, at which point the 1v1
+system (wild AND PvP) is hard-replaced. "Start simple, add gradually" now governs the DEPTH
+re-enable sequence (D583.1: types/stats/status first; abilities/weather in later phases) and the
+build order, not a staged player rollout.
 
 - **Battle maps as content:** tile battlefields are RON files under `game-core/content/`
   (CONTENT_VERSION-pinned, validated like zone maps), with terrain types on tiles (the move-cost
@@ -196,11 +268,13 @@ the ceremony owns the final shape.
   participant-scoped views, additive-only; regenerate bindings; the typed client unions keep
   their satisfies-never exhaustiveness pattern.
 
-### P2 — PvP tactical
+### P2 — PvP tactical (BUILD phase — ships together with P1 at the big-bang cutover)
 
-- Rethink the secret-action + deadline-reaper pattern for multi-unit turns per the
-  pt3-battle-design clock decision; keep actions secret rows with no client read path; per-turn
-  clock with AFK auto-pass → forfeit; explicit forfeit semantics and disconnect auto-resolve.
+- Clock model DECIDED (D584.5 + D583.2): per-UNIT 30 s cap, counting only while the battle is
+  idle waiting on that player (reset on submit; animation/resolution time never counts), AFK
+  auto-pass, then forfeit — replaces the 60 s secret-pick deadline reaper. Submitted action
+  queues stay secret rows with no client read path; explicit forfeit semantics and disconnect
+  auto-resolve carry over.
 - Ranked mapping: how a tactical win/loss feeds the M17 ladder (expected: unchanged rating
   machinery, new outcome source).
 - No recruiting in PvP (standing ruling + research consensus).
@@ -271,14 +345,18 @@ columns on map tiles) — deferred features, not foreclosed ones.
 - **BT6:** THE tactical HUD SHALL carry forward per-unit info boxes (name/level/HP/type) and
   health bars, with every string from the typed i18n catalog (en+fr) and every element
   D-pad-reachable.
+- **BT7:** WHEN a player submits a monster's action queue, THE SYSTEM SHALL execute it in order
+  at that monster's turn, SHALL allow cancel/clear at any time before that turn, SHALL treat
+  invalid remaining actions per the ceremony's waste rule, and SHALL count clock time only while
+  the battle is idle on that player's turn (reset on submit; resolution/animation time never
+  counts against either player) — D583.2 semantics, proven in both PvE and PvP.
 
-## Open questions
+## Open questions (ceremony territory — the former decision blockers are ANSWERED above)
 
-- Everything under the two `blocked:` markers (SSOT: the filed decision issues).
-- Recruit yield: today a successful recruit grants no XP, no currency, no essence — and recruiting
-  was the operator's dominant playstyle this playtest. Does the tactical recruit stay yield-free
-  (monster only), or does the economy milestone add a yield? (Touches the no-recruit-XP ruling —
-  raise, don't assume.)
+- ~~Recruit yield~~ — ANSWERED (#587 D1): recruit stays yield-free; the monster is the reward.
+- Action-queue semantics the ceremony must settle: waste rule for invalid queued actions,
+  PvP queue secrecy mechanics, provisional-forecast presentation, queue-vs-undo interaction
+  (see the Action queue section's "Design implications").
 - Deployment UX: pre-battle placement phase (Wakfu-style) vs fixed spawn tiles per map.
 - Which per-species identity levers ship in P1 content (shape/reach/movement type per species vs
   stats-only start) — the research warns stats-only + type chart plays shallow.

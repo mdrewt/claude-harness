@@ -6,8 +6,12 @@ monster-realm (game-core + server-module + content; client only via regenerated 
 quickfix-owned display) · **Risk class:** promoted HEAVY — economy balance (GDD §7's sinks ≥ faucets
 model is the invariant; this milestone edits the faucets) · **Depends on:** `M-pt3-quickfix`
 (reward-visibility UI: grant toast + wallet display — tune a VISIBLE economy, not an invisible one)
-· **Blocked (partially):** decision batch `pt3-econ-world` (starter-kit contents, recruit yields,
-heal-cost timing); slice eo-2 is unblocked and can land first.
+· **Decisions ANSWERED 2026-10-24** — monster-realm #587 (`pt3-econ-world`); verbatim answers at
+`memory/projects/decisions/issue-587.answer.md` (SSOT). D1: recruit pays NOTHING (alternative A —
+the monster is the reward; quest faucets compensate, see eo-3/eo-4). D2: starter kit accepted
+(~200g + 2–3 basic items, once-only). D3: healing stays free until eo-4 tunes faucets+sinks
+together. D4: no monster sink needed now (GDD §7 note recorded). D5: art direction stays
+¾/32px/storybook with 2D-HD as a post stack (lands in M-world-art-pass). All slices unblocked.
 
 **Feedback items:** pt3-2026-10-064, pt3-2026-10-157 · cross-link: pt3-2026-10-145 (the flat
 in-battle item AP cost belongs to `M-battle-tactics`; the item PRICE balancing that rule leans on
@@ -54,13 +58,16 @@ making rewards VISIBLE (toast + wallet display); this milestone owns the BALANCE
 ## Scope (sketch)
 
 - **eo-1** starter kit at join — a real once-only game rule (ADR-0091 GrantItem pattern), contents
-  pending `pt3-econ-world`; fixes the rejoin re-grant trap for the starter monster AND the kit.
+  DECIDED (#587 D2: ~200g + 2–3 basic items — a heal item and a bait); fixes the rejoin re-grant
+  trap for the starter monster AND the kit.
 - **eo-2** close the practice-battle faucet (R-weekly-review-2026-10-09-F1) — unblocked, land first.
-- **eo-3** recruit yields — the recruit loop currently pays nothing; what (if anything) it should
-  pay is an operator decision, pending `pt3-econ-world`.
+- **eo-3** recruit yields — DECIDED (#587 D1): NO payout; no build. The faucet consequence moves to
+  eo-4: quest rewards become the compensating faucet for recruit-heavy playstyles.
 - **eo-4** faucet/sink tuning pass — sizes starter kit vs shop prices vs KO/quest rewards vs sinks;
-  includes the heal-location cost-timing decision and the item-price ↔ AP-cost coupling
-  (pt3-2026-10-145). Runs LAST, on a visible economy.
+  owns introducing the heal cost WHEN this pass tunes faucets+sinks together (#587 D3 — free until
+  then) and the item-price ↔ AP-cost coupling (pt3-2026-10-145); must tune quest faucets strong
+  enough that a recruit-dominant player still earns (D1 consequence). Runs LAST, on a visible
+  economy.
 
 ## Non-goals
 
@@ -103,7 +110,9 @@ making rewards VISIBLE (toast + wallet display); this milestone owns the BALANCE
 category: economy/onboarding · severity: MED · size: MODERATE
 touches (provisional): game-core (starter-kit rule + content), server-module/src/movement.rs
 (join_game), server-module/src/schema.rs (additive claimed marker), game-core/content/
-blocked: pt3-econ-world (kit contents: items, money, or both; amounts; soulbound or tradeable)
+DECIDED (#587 D2): both money and items, small — ~200g + 2–3 basic items (a heal item and a
+bait), once per player. Soulbound-vs-tradeable was not addressed in the answer: an
+elaboration-time call (the GDD's anti-farm soulbind lever is available; eo-1 picks and records it).
 
 Design that is FIXED regardless of the pending decision:
 
@@ -141,17 +150,16 @@ touches (provisional): game-core (battle-reward gating rule + tests), server-mod
 The residual's own note says "must close when faucets get tuned"; it is an exploit today, so it
 lands FIRST and the tuning pass assumes it closed.
 
-### eo-3 — recruit yields (blocked: pt3-econ-world)
-category: economy/gameplay · severity: MED · size: SMALL-MODERATE once decided
-touches (provisional): game-core (yield rule), server-module/src/taming.rs, content if data-driven
+### eo-3 — recruit yields: DECIDED, NO BUILD (#587 D1 — alternative A)
+category: economy/gameplay · severity: — · size: ZERO (ruling recorded; no code)
 
-Today a successful recruit yields the monster and nothing else. Options to put to the operator —
-NOT decided here: (a) currency on recruit (a game-core BST-based integer formula, sized against the
-KO reward); (b) essence at the steeper essence divisor; (c) party XP — this amends the standing
-no-recruit-XP ruling and must be named as such; (d) nothing — the monster IS the reward, and the
-tuning pass compensates elsewhere. Whatever is chosen rides the deterministic game-core formula
-shape and the existing grant primitives, and `M-battle-tactics`' AP-recruit rule (full turn of AP,
-bait helps, adjacency) is unaffected.
+The operator chose "no payout": a successful recruit yields the monster and nothing else — no
+currency, no XP, no essence. This REAFFIRMS the standing no-recruit-XP ruling and extends it to
+currency/essence; `M-battle-tactics`' tactical recruit inherits it (its former open question is
+closed). The consequence is owned by eo-4: with the recruit loop deliberately unpaid, quest
+faucets must carry recruit-dominant playstyles (the operator accepted this coupling in the issue's
+alternative text). The GDD §7 note (2026-10-24) records both this and the accepted
+no-monster-sink gap.
 
 ### eo-4 — faucet/sink tuning pass (last; after eo-1..3 decisions and M-pt3-quickfix visibility)
 category: economy-balance · severity: HIGH leverage, LOW code risk · size: MODERATE (mostly data)
@@ -164,10 +172,10 @@ after: [eo-1, eo-2, eo-3]
   worksheet (gold-per-session per loop — KO grind, recruit loop post-eo-3, quest line — vs the
   cheapest/median sink) checked in next to the content change; tuned values land as content/const
   changes with a CONTENT_VERSION bump; NO new mechanics.
-- Heal-location cost timing — pending `pt3-econ-world`: charge now (the GDD names town healing a
-  sink; the implementation plan's S-heal-locations already queued `cost_currency` + a zone-1 heal
-  point) vs keep the documented free pre-release convenience. The RON already carries
-  `cost_item_id`/`cost_qty` fields, so "charge" is a content + `heal_party` change, not a redesign.
+- Heal-location cost timing — DECIDED (#587 D3): healing stays FREE until this pass tunes
+  faucets+sinks together; eo-4 owns introducing the cost as part of the one tuning pass. The RON
+  already carries `cost_item_id`/`cost_qty` fields, so "charge" is a content + `heal_party`
+  change, not a redesign.
 - Item price ↔ AP coupling (pt3-2026-10-145): the operator ruled the flat in-battle item AP cost is
   "balanced by the price of the item (in the game's currency) and by using up the item permanently".
   `M-battle-tactics` owns the AP side; THIS pass owns pricing items so that rule holds. If
@@ -177,25 +185,22 @@ after: [eo-1, eo-2, eo-3]
   faucet existed — do not tune against an economy the player cannot see; `M-pt3-quickfix`'s wallet
   display + grant toast land first.
 
-## Open decisions (pending pt3-econ-world)
+## Decisions — ANSWERED 2026-10-24 (#587 `pt3-econ-world`; answer file is SSOT)
 
-1. Starter-kit contents: items, money, or both; amounts; soulbound (GDD anti-farm lever) or
-   tradeable.
-2. Recruit yields: options (a)–(d) in eo-3; option (c) is explicitly an amendment to the standing
-   no-recruit-XP ruling.
-3. Heal-location cost timing: start charging (GDD sink) vs keep the free pre-release convenience.
-
-Flagged, not solved — the lost fusion monster sink: GDD §7 still lists fusion as the economy's hard
-monster sink, but fusion was removed 2026-08-02. The economy currently has NO monster sink
-(recruiting is pure supply). A replacement sink (or the decision to accept monster inflation until
-M20 metrics exist) belongs in the decision batch but is NOT owned by this milestone; eo-4's
-worksheet records the gap so the tuning numbers are read with it in mind.
+1. Starter-kit contents: both, small — ~200g + 2–3 basic items (heal + bait), once-only
+   (recommendation accepted). Soulbound-vs-tradeable: unaddressed → eo-1 elaboration call.
+2. Recruit yields: NO payout (alternative A). See eo-3.
+3. Heal-location cost timing: free until eo-4 tunes faucets+sinks together (recommendation
+   accepted).
+4. Monster sink: gap ACCEPTED — "Currently, there's no need for a monster sink"; noted in GDD §7
+   (2026-10-24 note). eo-4's worksheet still records the gap so tuning numbers are read with it
+   in mind; a replacement sink is future decision material, not this milestone's.
 
 ## Sequencing / integration notes
 
-- eo-2 is independent and unblocked — it can merge before the decision batch returns. eo-1 and eo-3
-  build once `pt3-econ-world` answers; eo-4 runs last, `after:` all three and after
-  `M-pt3-quickfix`'s visibility slices.
+- eo-2 is independent — land it first. eo-1 is fully decided and buildable; eo-3 is a recorded
+  ruling with no build. eo-4 runs last, `after:` eo-1/eo-2 and after `M-pt3-quickfix`'s
+  visibility slices.
 - Fan-out shape (per the M18 fan-out note): a game-core rule slice gates its server-module reducer
   slice; content data is parallel; the client is untouched except regenerated bindings and whatever
   display `M-pt3-quickfix` already owns. Post-integration: full `just ci` green, bindings-drift 0,

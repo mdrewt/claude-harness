@@ -103,7 +103,9 @@ LEGAL_DISPOSITIONS = ("wontfix",)
 # `residuals disposition --as` accepts these. `fixed` records that a later PR demonstrably
 # shipped the finding: it additionally requires a PR reference (--pr, or a `#N` / pull-request
 # URL inside --reason). MED/LOW stay self-serve; HIGH/CRITICAL stay operator-only via the same
-# SEVERITY_OPERATOR_ONLY wall every disposition passes. DEFER targets and `add --target` stay
+# SEVERITY_OPERATOR_ONLY wall every disposition passes — the loop may record one ONLY by citing
+# the authorizing answered/closed mr-ask-drew decision issue via --operator-issue N (recorded on
+# the row as operator_issue; the issue is the evidence). DEFER targets and `add --target` stay
 # LEGAL_DISPOSITIONS only — a brand-new DEFER cannot be born `fixed`.
 DISPOSITIONS = LEGAL_DISPOSITIONS + ("fixed",)
 PR_REF = re.compile(r"#\d+\b|\bgithub\.com/\S+/pull/\d+", re.I)
@@ -1749,10 +1751,15 @@ def cmd_residuals(a, sub):
         r = folded.get(rid)
         if not r:
             return die("no residual %r" % rid)
+        op_issue = str(a.get("operator_issue") or "").strip()
         if (r.get("severity") or "MED").upper() in SEVERITY_OPERATOR_ONLY:
-            return die("severity %s cannot be dispositioned by the loop — open an operator "
-                       "decision with mr-ask-drew first" % r.get("severity"))
+            if not op_issue.isdigit():
+                return die("severity %s cannot be dispositioned by the loop — open an operator "
+                           "decision with mr-ask-drew first, then cite its answered/closed issue "
+                           "with --operator-issue N" % r.get("severity"))
         extra = {"fixed_by_pr": pr_ref} if how == "fixed" else {}
+        if op_issue.isdigit():
+            extra["operator_issue"] = int(op_issue)
         residual_append(dict(r, status="dispositioned", disposition=how,
                              disposition_reason=a["reason"], dispositioned_at=utc_now(),
                              **extra), path)
@@ -1814,7 +1821,7 @@ def cmd_residuals(a, sub):
 FLAGS = {"slice", "scope", "repo", "json", "timeout", "format", "reason", "budget", "cwd",
          "force",
          "id", "spec-file", "as", "pr", "unclaimed", "severity", "title", "touches", "gate",
-         "target", "source-slice", "domain", "category", "dry-run", "apply"}
+         "target", "source-slice", "domain", "category", "dry-run", "apply", "operator-issue"}
 VALUELESS = {"json", "unclaimed", "force", "dry-run", "apply"}
 
 
@@ -2233,6 +2240,15 @@ def selftest():
         chk.eq("J11e-high-stays-operator-only", 2,
                cmd_residuals({"id": "R-fxd-HIGH", "_residuals": fr, "as": "fixed", "pr": "579",
                               "reason": "shipped"}, "disposition"))
+        # J11f: a HIGH disposition that CITES the authorizing operator decision issue is legal
+        # and the issue number is recorded on the row (the lp-gates wall stays; the operator's
+        # answer becomes consumable instead of a dead end).
+        chk.eq("J11f-high-with-operator-issue", 0,
+               cmd_residuals({"id": "R-fxd-HIGH", "_residuals": fr, "as": "fixed", "pr": "579",
+                              "reason": "shipped", "operator_issue": "580"}, "disposition"))
+        hrow = fold_residuals(residual_rows(fr))["R-fxd-HIGH"]
+        chk.eq("J11g-operator-issue-recorded", ("dispositioned", 580),
+               (hrow.get("status"), hrow.get("operator_issue")))
 
         # --- K. drain policy alarms -----------------------------------------------------------
         old = utc_now()

@@ -85,10 +85,12 @@ Controls accelerator, a zone-transition cue, rankings presentation, and reward v
 - Byte-pinned test updates are values-only: key ids (`box.*`, `raising.*`) keep their legacy
   names; renames change catalog VALUES, never ids, unless a slice says otherwise.
 
-## Open decisions (pending `pt3-ui-policy`)
+## Open decisions — RESOLVED 2026-10-24
 
-- The battle **"Bag" command label** rename (`battle.command.bag`) pends the `pt3-ui-policy`
-  decision issue. qf-10 ships every other rename and leaves this key untouched (QF10.5).
+- The battle **"Bag" command label** rename is DECIDED (#586 `pt3-ui-policy` D4,
+  `memory/projects/decisions/issue-586.answer.md`): the battle command renders **"Items"**
+  (value-only change on `battle.command.bag`, en+fr; the key id keeps its legacy name per
+  this spec's rename rule). qf-10 now ships it with the other renames (QF10.5).
 
 ## Sequencing & fan-out
 
@@ -347,9 +349,9 @@ Feedback items: pt3-2026-10-041, -042, -043, -044, -063, -112
 - **QF10.4:** THE byte-pinned tests SHALL be updated to the new literals as values-only
   changes: catalog key ids (`box.*`, `raising.*`) keep their legacy names, and the stale
   boxView comments claiming e2e resolves by English title are corrected.
-- **QF10.5:** blocked: pending `pt3-ui-policy` — THE battle "Bag" command label
-  (`battle.command.bag`) SHALL NOT be renamed in this slice; it ships with the decision's
-  answer.
+- **QF10.5:** (unblocked 2026-10-24 — #586 D4) THE battle "Bag" command label
+  (`battle.command.bag`) SHALL render as "Items" (en; fr equivalent), as a values-only
+  catalog change with the key id unchanged.
 
 ### qf-11 — tab-strip CSS: uniform fixed-height horizontal labels
 category: ux layout defect · severity: LOW · size: FEATHER

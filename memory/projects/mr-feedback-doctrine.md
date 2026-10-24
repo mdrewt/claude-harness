@@ -1,4 +1,4 @@
-# mr-feedback-doctrine — operator feedback handling (v1.6 ACTIVE 2026-10-24)
+# mr-feedback-doctrine — operator feedback handling (v1.7 ACTIVE 2026-10-24)
 Binds: the native loop whenever it processes operator feedback artifacts (playtest gates lifting,
 feedback/notes files, decision-issue answers) or fleshes out milestone skeletons into specs.
 §1 INVARIANTS bind everywhere in REDUCED form: outside the loop (casual/Cowork), I-1 means RELAY
@@ -115,7 +115,11 @@ original item PARKs (§8) — it does not close.
   balance — size never demotes risk): full §6 ceremony. Cap = the SPEND-ALERT threshold (SSOT:
   `mr-budget-config.json`; $150 at ratification, hard-tier p90 evidence),
   process (non-implementation) share ≤40% (~$60).
-- FLOOR at every weight: one independent verification (I-5). Cap hit → park + notify (I-6).
+- FLOOR at every weight: one independent verification (I-5). Cap hit → park + notify (I-6); where
+  QUALITY is at stake, the default escalation is an ask-to-continue TOP-UP (explicit headroom via the
+  notify/decision channel), not descope-to-fit — caps stay circuit-breakers, numbers unchanged
+  (operator ruling 2026-10-24, harness #160; "quality of the final result takes priority over the
+  quantity of work required"). Weekly credits remain the real constraint; overage is still a regression.
 - ENFORCEMENT (mechanical since 2026-07-27, `mr-cost-watch`): 80% warn-flag and 100% stop-flag are
   ADVISORY mid-attempt (cooperative, brief-driven); only the 125% hard ceiling (grace → TERM →
   KILL → bounded wrap pass for WIP+handoff) is mechanical. Cost-cap parks count against the slice;
@@ -268,6 +272,10 @@ must make (vs. scripts) are legitimate — scripts enforce state, models interpr
 substitutes for the other.
 
 ## Changelog
+- v1.7 (2026-10-24): operator answered harness #160 (both recommendations accepted): §5 caps numerically
+  unchanged; cap-hit default escalation where quality is at stake = ask-to-continue top-up, not
+  descope-to-fit. The v1.6 decision-batching encoding (1–5 related decisions per issue, partial answers
+  legal) is operator-confirmed and no longer provisional.
 - v1.6 (2026-10-24): §9 decision issues are batched 1–5 RELATED decisions per issue with separately
   numbered, separately answerable entries (operator directive, playtest-feedback-2026-10.md L7 —
   ledger pt3-2026-10-009); partial-answer semantics defined. Pending §12 question to operator:

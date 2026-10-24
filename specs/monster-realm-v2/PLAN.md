@@ -5,11 +5,14 @@
 > client-coverage milestones are merged. **Playtest-3 returned PASS WITH CHANGES**
 > (`playtest-feedback-2026-10.md`, episode pt3-2026-10: 186 ledger items, dispositioned
 > 2026-10-24) and reshaped this queue: a quickfix wave first, then the tactical-combat overhaul
-> (the operator's top priority), then the remaining feedback milestones. Open operator decision
-> batches: monster-realm issues `pt3-battle-scope`, `pt3-battle-design`, `pt3-trade-scope`,
-> `pt3-ui-policy`, `pt3-econ-world`, `pt3-identity-accounts` (+ `pt3-process-quality` in the
-> harness repo). Also open: the two 2026-10-15 corrective milestones (queued first), the M25
-> security sign-off (blocked), controller support before launch, and residual fill-work.
+> (the operator's top priority), then the remaining feedback milestones. **All seven Playtest-3
+> decision batches were ANSWERED 2026-10-24** (monster-realm #583–#588 + harness #160; verbatim
+> answers under `memory/projects/decisions/`, rulings folded into each spec): battle cutover is
+> BIG-BANG (wild+PvP at once) with the operator's new action-queue/idle-clock mechanic; next
+> playtest = ONE strict §10 gate after everything; recruit pays nothing; trade/UI/econ/identity
+> recommendations accepted with small additions. Still open: the two 2026-10-15 corrective
+> milestones (queued first), the M25 security sign-off (blocked), controller support before
+> launch, and residual fill-work.
 > History: every closed milestone's spec is verbatim in `archive/` (one-line index in §Done);
 > this file describes only what is true and open today.
 
@@ -31,7 +34,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
   2026-10-15 — the 25 triage survivors plus 4 LOW rows the 21r-a run disclosed; 0 HIGH/CRITICAL
   among its sections, but ONE HIGH ledger row is open:
   R-ci-fix-20261002T0901Z-RAISINGVIEWREBUILD (ux-a11y; verified fixed by ctl-7b GAME #550,
-  operator disposition pending — decision issue monster-realm#580). The HIGH S-overlay-anchor
+  operator ACCEPTED the fixed disposition 2026-10-24 by closing issue monster-realm#580 without
+  comment — row closable in the acceptance ledger). The HIGH S-overlay-anchor
   item lived only in an archived catalogue and was delivered by the console-controls slices
   ctl-7a/ctl-7b, GAME #549/#550). Residuals
   fill idle capacity and never preempt this roadmap; triage-carried rows are scheduled by hand
@@ -52,7 +56,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    frame-level dedup and Social-panel routing, shrinks the mirror to the server-owned trio and
    rewrites the roster pins once. A **named design input of M-gamepad** and of item 5's menu-IA
    work, and ordered before both. The pt3 menu-IA flatten (Social direct-open, Profile combine)
-   folds into so-2's existing `mr-ask-drew` gate via issue `pt3-ui-policy`.
+   is now ANSWERED (#586 D3, 2026-10-24); so-2's own SO2.0 design-presentation gate still runs
+   at build time with that answer on record.
 3. **M-pt3-quickfix** (`M-pt3-quickfix.spec.md`, specced 2026-10-24 from episode pt3-2026-10):
    the playtest's bug-fix + low-hanging-fruit wave — focus-ring styling, care feedback routing +
    cooldown surfacing, journal chrome/empty state, NPC conversation pinning + wander cadence,
@@ -60,40 +65,48 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    mouse-only duplicate removal, raising→Inventory split with stats-in-Summary, terminology
    sweep, tab-strip CSS, profile polish, zone-transition cue, reward visibility. Runs after so-2
    (shared `main.ts` surface); slices are FEATHER/LIGHT and fan-out friendly.
-4. **M-battle-tactics** (`M-battle-tactics.spec.md`, specced 2026-10-24 — the operator's TOP
-   priority, "immediately after any bug fixes and low-hanging fruit"): combat overhaul to
-   tile-grid tactical battles (1–3 monsters per side, costed move/attack/item/recruit actions,
-   range/origin/target/AoE attack data). P0 design ceremony is
-   `blocked:pt3-battle-scope,pt3-battle-design` (operator decision issues); P1 = tactical wild
-   battles; P2 = PvP/ranked conversion; P3 = operator-deferred future features (obstacles,
-   elevation, line/cone AoE). Battle presentation (sprites/background/animation placeholders)
-   lands inside it; placeholder assets come from item 6.
+4. **M-battle-tactics** (`M-battle-tactics.spec.md`, specced 2026-10-24; rulings folded
+   2026-10-24 — the operator's TOP priority, "immediately after any bug fixes and low-hanging
+   fruit"): combat overhaul to tile-grid tactical battles (1–3 monsters per side, tuned-AP
+   move/attack/item/recruit actions, range/origin/target/AoE attack data, round-based speed
+   order, the operator's action-queue + idle-clock mechanic). P0 design ceremony is UNBLOCKED
+   (#583/#584 answered; reception-research pre-step directed); P1 = tactical wild battles and
+   P2 = PvP/ranked conversion are BUILD phases behind ONE big-bang cutover (#583 D2/D3 — the
+   1v1 system is hard-replaced when both are done); P3 = operator-deferred future features
+   (obstacles, elevation, line/cone AoE). Battle presentation (sprites/background/animation
+   placeholders) lands inside it; placeholder assets come from item 6.
 5. **M-ui-foundation** (`M-ui-foundation.spec.md`, specced 2026-10-24): the shared menu
    design-language milestone — one tab-bar component, bordered context sheet, four-channel
    feedback policy, wheel + pseudo-scroll, text-size setting, single-scale-authority scaling,
    menu-IA restructure, Help rework (Introduction + encyclopedia), spacing tokens. Wireframes
-   first (operator directive). Scaling/IA/mini-menu forks are `blocked:pt3-ui-policy`; builds
-   after so-2 and is ordered after item 4's P1 so the tactical battle UI lands on the final
-   component system rather than being rebuilt.
+   first (operator directive, reaffirmed #586 D2). Decisions ANSWERED (#586): hybrid scaling,
+   IA flatten all-three, mini-menu design delegated (wireframe-driven), battle Bag→"Items",
+   footer collapse-when-empty. Builds after so-2 and is ordered after item 4's P1 so the
+   tactical battle UI lands on the final component system rather than being rebuilt.
 6. **M-world-art-pass** (`M-world-art-pass.spec.md`, specced 2026-10-24): staged placeholder
    upgrade (style guide → terrain kit → look-dev lighting scene per
    `docs/research/hd2d-modern-retro-art-direction.md`), real water art + heal-location landmark,
    distinct zone-1 art, larger authored maps, battle placeholder sprites (feeds item 4 P1).
-   Content-heavy and file-disjoint from items 4–5: fills idle fan-out capacity throughout; art
-   direction re-base question is `blocked:pt3-econ-world` (D5) for its S0 only.
+   Content-heavy and file-disjoint from items 4–5: fills idle fan-out capacity throughout; the
+   art-direction question is ANSWERED (#587 D5: keep ¾/32px/storybook, 2D-HD as a post stack) —
+   S0 unblocked.
 7. **M-trade-sessions** (`M-trade-sessions.spec.md`, specced 2026-10-24): multi-stage trade
    redesign (blank session → per-side edits → confirm-with-reset → atomic execute), new
    eligibility rules, absorbs residuals R-weekly-review-2026-10-02-F5 / 2026-10-16-F1 /
-   R-ctl-PROXGUARD. Scope rules `blocked:pt3-trade-scope`.
+   R-ctl-PROXGUARD. Scope rules ANSWERED (#585: all three asset classes tradable, no gifts +
+   simple soft-lock guards, face-to-face initiation + one session per pair, arrive-in-party-else-
+   Storage, lock-at-confirm).
 8. **M-netcode-presence** (`M-netcode-presence.spec.md`, specced 2026-10-24): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched) and tap-to-turn facing (never cancel-on-keyup — ADR-0148).
 9. **M-econ-onboarding** (`M-econ-onboarding.spec.md`, specced 2026-10-24): starter kit,
-   recruit yields, faucet/sink tuning (fixes the uncapped practice-battle faucet), heal-cost
-   timing. `blocked:pt3-econ-world`.
+   faucet/sink tuning (fixes the uncapped practice-battle faucet), heal-cost timing. Decisions
+   ANSWERED (#587): kit = ~200g + 2–3 items once-only; recruit pays NOTHING (quest faucets
+   compensate in eo-4); healing free until eo-4; monster-sink gap accepted (GDD §7 note).
 10. **M-identity-handles** (`M-identity-handles.spec.md`, specced 2026-10-24): minted name
-   discriminator (survives the M22 re-key cascade), Players-tab info, Sign-In/registration UI
-   truth. `blocked:pt3-identity-accounts`. Feeds M19.
+   discriminator (survives the M22 re-key cascade), Players-tab info (name + discriminator +
+   lead-monster level + nearby), Sign-In hidden until an issuer exists. All four decisions
+   ANSWERED (#588, recommendations accepted). Feeds M19.
 11. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S1 rewrites two e2e tests that currently
    assert the trade-oracle leak as intended behavior, and S2 changes a frozen schema; the
@@ -103,11 +116,11 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    **Launch is gated on its completion** (design ADR-0034's intent, carried forward).
 12. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
    layer, consuming item 2's stack-ownership design. **Must land before launch** (operator,
-   2026-10-01). Ordered after item 4's P1 battle UI per recommendation in `pt3-battle-scope`
-   (D4) — flips earlier if the operator says so.
+   2026-10-01). Ordered after item 4's tactical battle UI stabilizes — operator-CONFIRMED
+   (#583 D4, 2026-10-24).
 13. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — absorbs the
-   discriminator surfaces from item 10; recommended AHEAD of M18 (issue `pt3-identity-accounts`
-   D4). M23's social a11y retrofit scope un-defers with it.
+   discriminator surfaces from item 10; ordered AHEAD of M18 — operator-CONFIRMED (#588 D4,
+   2026-10-24). M23's social a11y retrofit scope un-defers with it.
 14. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — the playtest-3
    read did NOT confirm it as next content; its 1v1 "additive resolve_coop_turn" premise dies
    with the tactical overhaul. Re-sketch AFTER item 4's P2 (tactical sides natively support
@@ -123,16 +136,15 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 Milestone specs for items 4–14 are sketches or ceremony-pending where marked: elaborate via
 `milestone-loop-prompt.md` when reached, against the CURRENT game repo (never against archived
-specs). ⛩ **Playtest-4 gate** timing is an open operator decision (`pt3-battle-scope` D5):
-recommended as an interim gate after items 3 + 4-P1, with the full §10 coverage gate after the
-rest.
+specs). ⛩ **Playtest-4 gate** is DECIDED (#583 D5, 2026-10-24 — strict §10, alternative A):
+ONE gate after every coverage milestone closes. No interim playtest.
 
 ## Gates and constraints (live)
 
 - **Launch** is gated on M25 completion (human sign-off checklist, operator-approved) and on
   M-gamepad (operator, 2026-10-01).
-- **Playtest-3** completed (PASS WITH CHANGES, 2026-10). **Playtest-4** timing is an open
-  operator decision (`pt3-battle-scope` D5; recommended interim gate after §9 items 3 + 4-P1).
+- **Playtest-3** completed (PASS WITH CHANGES, 2026-10). **Playtest-4** = strict §10: ONE gate
+  after all coverage milestones close (operator ruling 2026-10-24, #583 D5 — no interim gate).
 - **RLS remains unenforced at SpacetimeDB 2.8.1** — privacy is enforced by the private-table +
   owner-scoped-view pattern (DECISIONS.md "Table privacy"); the RLS re-open triggers recorded in
   `security-threat-model.md` and `validation-checklist.md` still do not fire.
