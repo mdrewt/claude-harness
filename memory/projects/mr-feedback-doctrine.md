@@ -1,4 +1,4 @@
-# mr-feedback-doctrine — operator feedback handling (v1.5 ACTIVE 2026-07-27)
+# mr-feedback-doctrine — operator feedback handling (v1.6 ACTIVE 2026-10-24)
 Binds: the native loop whenever it processes operator feedback artifacts (playtest gates lifting,
 feedback/notes files, decision-issue answers) or fleshes out milestone skeletons into specs.
 §1 INVARIANTS bind everywhere in REDUCED form: outside the loop (casual/Cowork), I-1 means RELAY
@@ -214,9 +214,13 @@ STATES & TRANSITIONS (this table is the authority; `mr-feedback` implements exac
   processing run stands down ONLY when nothing further can proceed without an answer. First
   disposition every item resolvable without Drew (reversible calls take documented defaults +
   `decision-defaulted:` records), advance all planning/spec work independent of open questions,
-  THEN raise every remaining question as its OWN self-contained issue — descriptive title (the
-  title ALONE must say what is being decided; "see body" is a defect), one issue per decision, one
-  batch at the end. The blocker lists every open decision issue; each answer's event tick resumes
+  THEN raise the remaining questions as decision issues, GROUPED INTO BATCHES OF 1–5 RELATED
+  decisions per issue (operator directive 2026-10, playtest-feedback-2026-10.md L7; supersedes the
+  v1.1 one-issue-per-decision rule) — descriptive title (the title ALONE must say what is being
+  decided; "see body" is a defect), each decision in the batch separately numbered and separately
+  answerable, unrelated decisions never share an issue, one batch-set at the end. A partial answer
+  (some numbered decisions answered, others not) resumes what it unblocked; the unanswered
+  remainder stays open on the same issue. The blocker lists every open decision issue; each answer's event tick resumes
   whatever that answer unblocked. NEVER close an unanswered decision issue (close = acceptance) —
   edit or comment-supersede instead.
 - NON-BLOCKING: batched into the DISPOSITION BRIEF — the pre-playtest gate artifact (I-4): Fixed
@@ -264,6 +268,10 @@ must make (vs. scripts) are legitimate — scripts enforce state, models interpr
 substitutes for the other.
 
 ## Changelog
+- v1.6 (2026-10-24): §9 decision issues are batched 1–5 RELATED decisions per issue with separately
+  numbered, separately answerable entries (operator directive, playtest-feedback-2026-10.md L7 —
+  ledger pt3-2026-10-009); partial-answer semantics defined. Pending §12 question to operator:
+  whether "quality over quantity of work" (pt3-2026-10-005) adjusts §5 caps (issue pt3-process-quality).
 - v1.5 (2026-07-27): mechanical cap enforcement (mr-cost-watch; honest 80/100 advisory vs 125
   mechanical), wrap-pass shutdown semantics (operator design), respawn gate, escalation headroom,
   stream-factor calibration (0.80, fixture battle-0hp $69.93 vs $69.89).
