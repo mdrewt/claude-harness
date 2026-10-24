@@ -7,7 +7,7 @@
   "nightly": "green",
   "sha": "2721cd3e"
  },
- "notes": "Playtest-3 feedback CONSUMED 2026-10-24 (episode pt3-2026-10, 186 items, verdict PASS WITH CHANGES; brief specs/monster-realm-v2/playtest-feedback-2026-10.brief.md). Queue reshaped in PLAN SS9: ttd-1/so-1/so-2 (unchanged, below) then M-pt3-quickfix then M-battle-tactics (ceremony blocked:pt3-battle-scope,pt3-battle-design) then the pt3 milestones. 7 decision issues open: MR#583-#588 + harness#160 (watchers live). 74 prior items SHIPPED-VERIFIED, 14 recurred, 49 held. Operator hold (.native-supervisor-disabled) REMAINS - operator lifts it. master untouched by this episode (harness-side only).",
+ "notes": "Playtest-3 episode pt3-2026-10 COMPLETE 2026-10-24: all 7 decision batches ANSWERED by operator and consumed same-day (MR#583-#588 + harness#160; answers under decisions/; issues closed with incorporation comments; brief #589 closed). Rulings folded into specs/PLAN/doctrine v1.7/GDD (470703e); reception research docs/research/tactical-combat-player-reception.md (cc9af88); M-battle-tactics P0 SS6 ceremony DONE - M-battle-tactics-design.md BINDS elaboration (77d3d32). Playtest-4 = strict SS10 single gate (#583 D5). #580 close-without-comment processed: RAISINGVIEWREBUILD residual closed (--operator-issue 580). OPERATOR HOLD LIFTED (hold file absent 2026-10-24): loop resumes at queue head ttd-1 -> so-1 -> so-2 -> M-pt3-quickfix -> M-battle-tactics (P0 done; elaborate P1 at reach).",
  "park_counters": {
   "ctl-12b": 0,
   "ctl-13": 0,
@@ -51,6 +51,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 3,
- "updated_by": "pt3-feedback-processing-20261024",
- "updated_utc": "2026-10-24T14:25:13Z"
+ "updated_by": "pt3-decision-consumption-2026-10-24",
+ "updated_utc": "2026-10-24T19:49:35Z"
 }
