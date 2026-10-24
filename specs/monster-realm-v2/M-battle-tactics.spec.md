@@ -191,30 +191,27 @@ multiple units.
 
 ## Scope (sketch) — phases
 
-### P0 — design ceremony (doctrine §6; UNBLOCKED 2026-10-24)
+### P0 — design ceremony: **DONE 2026-10-24** (doctrine §6)
 
-INVESTIGATION is already done: the Playtest-3 fact-check scans (gameplay, menus/UI,
-netcode/trading root causes with file:line evidence) plus the prior-ruling scan above ARE the §6
-step-1 artifact — do not re-run it. What remains:
+The full ceremony ran 2026-10-24: reception-research pre-step persisted as
+`docs/research/tactical-combat-player-reception.md` (operator-directed, #584); 6 lensed
+brainstormers (unbiased / investigation / monsters-as-units / pacing / design-research /
+reception-research), each refined against its own adversarial critic; `judge` synthesis with
+the required attribution table; independent adversarial review (2 BLOCKER + 5 MAJOR findings,
+all dispositioned); judge-final revision.
 
-- RESEARCH PRE-STEP (operator-directed, #584 preamble + D1): persist-mode research on (a) player
-  reception of each of the six inspiration games — what worked, what players disliked — and
-  (b) player sentiment on AP battle systems vs simpler move+act systems. Lands in
-  `docs/research/` per §7; a ceremony input alongside `tactical-rpg-combat-design.md`.
-- IDEATION: 6 brainstormers (1 unbiased, 1 + the investigation context, 2 with unique lenses —
-  suggested: a Conquest/Devil-Survivor monsters-as-units lens and a pacing/match-length lens —
-  2 + research context from `tactical-rpg-combat-design.md` + the reception research), each
-  refined against its own adversarial reviewer. Every brainstormer receives the Operator rulings
-  section above as FIXED constraints (no re-litigating AP-vs-move+act, turn order, the queue
-  mechanic's existence, big-bang cutover, or shown recruit odds — the open surface is how to make
-  them cohere).
-- SYNTHESIS: the `judge` agent synthesizes the plan WITH the attribution table (adopted/rejected
-  per brainstormer), refined by its own adversarial reviewer. The synthesis's output is the
-  DESIGN document — `M-battle-tactics-design.md` (mechanics with integer numbers, data model,
-  turn/queue state machine, phase plan, risks, attribution table) — which BINDS elaboration.
-  Line-level slicing, `touches:` and full EARS are still drafted at ELABORATION against the
-  then-current game repo (the quickfix wave and so-2 move battle/UI files before this milestone
-  builds; slicing against today's tree would rot).
+**Output (BINDS elaboration): [`M-battle-tactics-design.md`](M-battle-tactics-design.md)** —
+core rules with integer numbers (6-pip AP, strides, Light 2/Heavy 4/item 3/recruit 6, Exert),
+queue + idle-clock state machine (literal reset-on-submit per D583.2; halt-don't-waste pop
+validation), round flow, grid/terrain/deployment, species identity levers, wild AI, tactical
+recruit, PvP clock/secrecy/forfeit, rewards, data model, battle UI, match-length arithmetic,
+build-phase plan, risks, attribution table (§13), pre-committed criteria (§14). Its §12 lists
+the operator options where the LITERAL ruling was adopted as default — surfaced on the closed
+decision issues; elaboration proceeds on the defaults.
+
+Line-level slicing, `touches:` and full EARS are still drafted at ELABORATION against the
+then-current game repo (the quickfix wave and so-2 move battle/UI files before this milestone
+builds; slicing against today's tree would rot).
 
 ### P1 — tactical core for WILD battles (BUILD phase — does not ship alone; see D583.2)
 

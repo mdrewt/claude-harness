@@ -69,8 +69,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    2026-10-24 — the operator's TOP priority, "immediately after any bug fixes and low-hanging
    fruit"): combat overhaul to tile-grid tactical battles (1–3 monsters per side, tuned-AP
    move/attack/item/recruit actions, range/origin/target/AoE attack data, round-based speed
-   order, the operator's action-queue + idle-clock mechanic). P0 design ceremony is UNBLOCKED
-   (#583/#584 answered; reception-research pre-step directed); P1 = tactical wild battles and
+   order, the operator's action-queue + idle-clock mechanic). P0 design ceremony is DONE
+   (2026-10-24; `M-battle-tactics-design.md` binds elaboration); P1 = tactical wild battles and
    P2 = PvP/ranked conversion are BUILD phases behind ONE big-bang cutover (#583 D2/D3 — the
    1v1 system is hard-replaced when both are done); P3 = operator-deferred future features
    (obstacles, elevation, line/cone AoE). Battle presentation (sprites/background/animation
