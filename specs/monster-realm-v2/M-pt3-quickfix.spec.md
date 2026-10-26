@@ -164,7 +164,7 @@ Feedback items: pt3-2026-10-048
 
 ### qf-3 — care cooldown surfaced to the owner
 category: ux + server (owner-scoped data) · severity: MED · size: LIGHT
-touches: server-module/src/schema.rs, server-module/src/marshal.rs, server-module/src/raising.rs, server-module/src/raising_tests.rs, server-module/src/privacy_tests.rs, client/src/net/store.ts, client/src/net/store.test.ts, client/src/ui/boxModel.ts, client/src/ui/boxModel.test.ts, client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/screens/monstersScreen.ts, client/src/ui/screens/monstersScreen.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, server-module/src/privacy.rs, server-module/src/marshal_tests.rs, client-wasm/src/lib.rs, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/ui/monstersModel.ts, client/src/ui/monstersModel.test.ts, evals/baselines/table-schemas.json, client/src/main.accel.test.ts, client/src/main.controls.test.ts, client/src/main.dispatch.test.ts, client/src/main.feedbackCore.test.ts, client/src/main.input.test.ts, client/src/main.partyFull.test.ts, client/src/ui/bagModel.test.ts, client/src/ui/evolutionModel.test.ts, client/src/ui/evolutionModel.parity.test.ts, client/src/ui/raisingModel.test.ts, client/src/ui/tradeProposeModel.test.ts, client/src/ui/screens/bagScreen.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/screens/tradeProposeScreen.boot.test.ts, client/src/ui/screens/types.ts, client/src/main.ts, client/src/ui/i18n/catalog.test.ts
+touches: server-module/src/schema.rs, server-module/src/marshal.rs, server-module/src/raising.rs, server-module/src/raising_tests.rs, server-module/src/privacy_tests.rs, client/src/net/store.ts, client/src/net/store.test.ts, client/src/ui/boxModel.ts, client/src/ui/boxModel.test.ts, client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/screens/monstersScreen.ts, client/src/ui/screens/monstersScreen.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, server-module/src/privacy.rs, server-module/src/marshal_tests.rs, client-wasm/src/lib.rs, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/ui/monstersModel.ts, client/src/ui/monstersModel.test.ts, evals/baselines/table-schemas.json, client/src/main.accel.test.ts, client/src/main.controls.test.ts, client/src/main.dispatch.test.ts, client/src/main.feedbackCore.test.ts, client/src/main.input.test.ts, client/src/main.partyFull.test.ts, client/src/ui/bagModel.test.ts, client/src/ui/evolutionModel.test.ts, client/src/ui/evolutionModel.parity.test.ts, client/src/ui/raisingModel.test.ts, client/src/ui/tradeProposeModel.test.ts, client/src/ui/screens/bagScreen.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/screens/tradeProposeScreen.boot.test.ts, client/src/ui/screens/types.ts, client/src/main.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/screens/index.test.ts, client/test-util/mainBootHarness.ts, server-module/src/content_tests.rs
 after: [qf-2]
 Feedback items: pt3-2026-10-065, -066
 - Touches widened again (supervisor, 2026-10-26, from the qf-3 resume-1 MEASURED park): `ScreenContext.now` is
@@ -202,6 +202,21 @@ Feedback items: pt3-2026-10-065, -066
   including a remaining-cooldown hint (catalogued en+fr).
 - **QF3.4:** WHEN the cooldown has elapsed, THE sheet SHALL render Care enabled, and a failed
   attempt SHALL NOT reset the cooldown (server pin: reject-never-burns stays green).
+- Build note (qf-3, 2026-10-26, increment #1 of 2): the server column, its verbatim copy in
+  `pub_from_monster`, the GDPR export row, the `care_remaining_ms` client-wasm export (0 ⟺
+  `game_core::is_cooldown_ready`; else the remaining ms clamped to `1..=CARE_COOLDOWN_MS`, so a
+  skewed client clock reads one full cooldown, never more) and `StoreMonsterPub.lastCareAtMs`
+  landed first; the sheet half (QF3.3 + QF3.4's client leg) follows once `touches:` includes
+  `client/src/ui/screens/index.test.ts` (its untyped Monsters fixture drives the real screen and
+  needs `lastCareAtMs: 0n` + a `wallNowMs`; measured 2026-10-25). Known, accepted: live
+  `monster_pub` rows written BEFORE this column read anchor 0 until their next rewrite (care, train,
+  evolve, a tier crossing, or the next `CONTENT_VERSION` resync — qf-15's bump backfills them all); a
+  monster cared shortly before the deploy shows Care READY until then and the press is rejected by
+  the server's own check on the private row (fail-open, at most one cooldown). Readiness on the
+  client is the wall clock vs the server anchor: a clock AHEAD enables Care early (the server's
+  rejection line speaks); a clock BEHIND keeps it disabled for the skew (bounded, self-clearing). A
+  traded monster carries the previous owner's anchor (the cooldown survives the trade, as before;
+  the instant is now owner-visible — LOW).
 
 ### qf-4 — journal chrome + list-style sweep
 category: ux polish (empty-state + UA list markers) · severity: LOW · size: FEATHER
