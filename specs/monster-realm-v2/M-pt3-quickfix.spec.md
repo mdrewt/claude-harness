@@ -152,12 +152,29 @@ Feedback items: pt3-2026-10-048
 - **QF2.3:** WHILE the Raising/Inventory screen still invokes care (until qf-9), ITS feedback
   SHALL keep painting on its own line — the hidden-view no-op guard stays; only the sink
   SELECTION becomes invoking-surface-aware.
+- Build note (qf-2, 2026-10-25): no catalog key for the care cooldown exists, so QF2.2's
+  "catalogued … existing keys" is met by performCare's existing rejection line
+  (`reduceErrorMessage(err, 'care')` = `care: care cooldown not yet elapsed`, the server reason
+  passed through, untranslated under fr) — the same line the Raising screen shows. The catalogued
+  en+fr cooldown hint is qf-3's (QF3.3). The sink is chosen at the SEND (the router's screen
+  command with the Monsters frame on top) and bound to that open; the next routed button ends the
+  line, a store batch does not. A Monsters-sheet train REJECTION paints on the sheet line too (its
+  success stays the screen's "Fed" line); one that settles after the frame was left falls back to
+  the status line.
 
 ### qf-3 — care cooldown surfaced to the owner
 category: ux + server (owner-scoped data) · severity: MED · size: LIGHT
-touches: server-module/src/schema.rs, server-module/src/marshal.rs, server-module/src/raising.rs, server-module/src/raising_tests.rs, server-module/src/privacy_tests.rs, client/src/net/store.ts, client/src/net/store.test.ts, client/src/ui/boxModel.ts, client/src/ui/boxModel.test.ts, client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/screens/monstersScreen.ts, client/src/ui/screens/monstersScreen.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts
+touches: server-module/src/schema.rs, server-module/src/marshal.rs, server-module/src/raising.rs, server-module/src/raising_tests.rs, server-module/src/privacy_tests.rs, client/src/net/store.ts, client/src/net/store.test.ts, client/src/ui/boxModel.ts, client/src/ui/boxModel.test.ts, client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/screens/monstersScreen.ts, client/src/ui/screens/monstersScreen.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, server-module/src/privacy.rs, server-module/src/marshal_tests.rs, client-wasm/src/lib.rs, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/ui/monstersModel.ts, client/src/ui/monstersModel.test.ts, evals/baselines/table-schemas.json, client/src/main.accel.test.ts, client/src/main.controls.test.ts, client/src/main.dispatch.test.ts, client/src/main.feedbackCore.test.ts, client/src/main.input.test.ts, client/src/main.partyFull.test.ts, client/src/ui/bagModel.test.ts, client/src/ui/evolutionModel.test.ts, client/src/ui/evolutionModel.parity.test.ts, client/src/ui/raisingModel.test.ts, client/src/ui/tradeProposeModel.test.ts, client/src/ui/screens/bagScreen.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/screens/tradeProposeScreen.boot.test.ts
 after: [qf-2]
 Feedback items: pt3-2026-10-065, -066
+- Touches widened (supervisor, 2026-10-26, from the qf-3 park memo's MEASURED hidden-dependency STOP): the new
+  column must cross `privacy.rs` (DECISIONS "Schema changes are additive" — export-or-omit in the serializer),
+  `rowConvert.ts` (the only my_monster_pub→StoreMonsterPub path), `monstersModel.ts` (`sheetLayout` hardcodes
+  Care enabled) and the 14 `StoreMonsterPub` fixture files (field-add, no assertion change — qf-2
+  dispatch.test.ts precedent); `table-schemas.json` rides the schema-snapshot `--write` regen.
+  decision-defaulted:qf3-fork=B — mirror `last_care_at_ms` verbatim on `monster_pub` and export the cooldown
+  from `client-wasm/src/lib.rs` over `game_core::is_cooldown_ready` (AGENTS.md invariant 5, SSOT); no stored
+  derived `care_ready_at_ms`. Reversible.
 
 - Evidence: `CARE_COOLDOWN_MS` = 6 h (game-core raising/rules.rs:79); `last_care_at_ms` lives
   only in the private `monster` table; `monster_pub` has no care field, so the client cannot
