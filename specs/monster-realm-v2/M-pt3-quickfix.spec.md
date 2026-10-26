@@ -217,6 +217,21 @@ Feedback items: pt3-2026-10-065, -066
   rejection line speaks); a clock BEHIND keeps it disabled for the skew (bounded, self-clearing). A
   traded monster carries the previous owner's anchor (the cooldown survives the trade, as before;
   the instant is now owner-visible — LOW).
+- Build note (qf-3, 2026-10-26, increment #2 of 2 — the sheet half): `ScreenContext.wallNowMs`
+  (`Date.now()` in main.ts) is the client's wall clock; the Monsters screen maps every own monster to
+  `care_remaining_ms(lastCareAtMs, wallNow)` on each view-model build and hands the map to the model
+  (`MonstersVm.careRemainingMs`, 0n = ready; a monster with no entry reads READY). A cooling Care is
+  the Feed pattern exactly: `sheetLayout(canFeed, canEvolve, canCare)` disables the row, the view
+  appends the catalogued hint `box.sheet.careCooldown` (en `Ready in {hours}h {minutes}m`, fr
+  `Prêt dans {hours} h {minutes} min`, rounded UP to the minute so a disabled row never reads 0h 0m)
+  and A is consumed with nothing sent. Because no batch or button moves the wall clock, main.ts
+  re-observes the open Monsters frame once a second (the host's same-object contract keeps a still
+  readiness paint-free), so a cooldown that elapses while the player idles flips the row enabled
+  within a second. CTL4.3's "speaks its reason" is met the way Feed meets it — the reason is the row's
+  trailing text, read with the row by AT; there is no live-region announcement on A (residual
+  `R-qf-3-QF3.3-announce`, ux-a11y/LOW, sibling of `R-qf-2-SHEETLINEPARITY`). The content-resync leg
+  of QF3.2 is now pinned by a native-host test that seeds pre-column pubs (anchor 0) and proves the
+  re-derive pass backfills the anchor from the monster row (residual `R-qf-3-QF3.2-resync` closed).
 
 ### qf-4 — journal chrome + list-style sweep
 category: ux polish (empty-state + UA list markers) · severity: LOW · size: FEATHER
@@ -238,6 +253,14 @@ Feedback items: pt3-2026-10-068, -090
   `#help-controls`/`#help-goals`, `#heal-list`) SHALL NOT paint UA list markers
   (`list-style: none` sweep), with a boot-level test or snapshot pinning the class/rule.
 
+- Build note (qf-4, 2026-10-26): `client/src/ui/i18n/catalog.test.ts` (exact en key roster) is
+  edited as the sibling test of the catalogs (touches-delta). The title key is `journal.title`,
+  not `chrome.journal.title`, because `resolver.test.ts` pins the exact plain `chrome.*` roster.
+  The title and empty state are built at runtime because `indexShell.smoke.test.ts` pins the
+  static inner-id roster. The sweep is the class `.mr-nav-list` on all nine static `<ul>`s;
+  styles.css bans `#id` selectors. The runtime `#help-screen` list is left to qf-11
+  (`R-qf-4-HELPSCREENUL`).
+
 ### qf-5 — NPC conversation pinning + wander cadence
 category: gameplay (server movement; game-core rules) · severity: MED · size: LIGHT
 touches: game-core/src/npc/rules.rs, game-core/src/npc/rules_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs
@@ -249,6 +272,10 @@ Feedback items: pt3-2026-10-070, -071
   decisions/s, ~4 tiles/s, and the wander block never reads `player_conversation`, so the elder
   wanders out of TALK_RANGE(2) mid-dialogue. The permissive-range ruling (DECISIONS.md "latency
   margin") stays as backstop; this fixes the cause.
+- Build note (qf-5, 2026-10-26): "active" = the row's owner is joined, in the NPC's zone and
+  within TALK_RANGE of it (game-core `in_talk_range`) — a row left by a player who walked off
+  must not freeze the NPC for everyone (security lens). Cadence: `npc_step_due` /
+  `NPC_STEP_TICKS = 5`, phase offset by NPC entity id.
 
 - **QF5.1:** WHILE an active `player_conversation` row references an NPC, THE server SHALL NOT
   move that NPC (the wander step for it is skipped each tick).
@@ -315,7 +342,7 @@ Feedback items: pt3-2026-10-119, -132, -133 (and the already-built contextual-su
 
 ### qf-8 — mouse-only duplicate removal
 category: ux-a11y doctrine defect ("no mouse-only element") · severity: MED · size: LIGHT
-touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/evolutionView.ts, client/src/ui/evolutionView.test.ts, client/src/ui/reachability.test.ts, client/e2e/trade.spec.ts, client/e2e/pvp.spec.ts, client/e2e/pvp-side-b.spec.ts, client/e2e/evolution.spec.ts, client/e2e/recruit.spec.ts
+touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/evolutionView.ts, client/src/ui/evolutionView.test.ts, client/src/ui/reachability.test.ts, client/e2e/trade.spec.ts, client/e2e/pvp.spec.ts, client/e2e/pvp-side-b.spec.ts, client/e2e/evolution.spec.ts, client/e2e/recruit.spec.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/styles.css, client/src/main.partyFull.test.ts, client/src/main.controls.test.ts, client/src/main.feedbackI18n.test.ts, client/src/main.feedbackCore.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/e2e/monster-privacy.spec.ts, client/e2e/ranked-forfeit.spec.ts
 after: [qf-7, qf-9]
 Feedback items: pt3-2026-10-050, -051, -052, -062, -093
 
@@ -337,6 +364,15 @@ Feedback items: pt3-2026-10-050, -051, -052, -062, -093
   touched views (regression teeth for the whole set, including qf-7's and qf-9's deletions).
 - **QF8.3:** WHEN an e2e previously drove a deleted button, IT SHALL be migrated to the nav
   path in this slice — never deleted for convenience.
+- **Build note (qf-8, 2026-10-26):** the `touches:` above is short for every deletion. qf-8 shipped
+  only the sweep scaffold (`reachability.test.ts`: raising Care/Train row, Evolve pointer route, e2e
+  reference scan); QF8.1/QF8.2 are DEFERred. A follow-up needs, in addition: evo-choice →
+  `client/src/ui/i18n/{catalog.en,catalog.fr,messageIds}.ts` (PARITY-04 DEAD-KEY on
+  `evolution.card.choosePrompt`/`evolution.choice.evolve`) + `client/src/styles.css`
+  (`--mr-evo-button`); To Box/To Party → `client/src/main.partyFull.test.ts` and the `box.hint` copy;
+  trade rows → `client/src/main.{controls,feedbackI18n,feedbackCore}.test.ts`; PvP →
+  `client/src/ui/screens/socialScreen.boot.test.ts`, `client/e2e/{monster-privacy,ranked-forfeit}.spec.ts`;
+  QF8.2's Flee row needs qf-7b (QF7.1) first.
 
 ### qf-9 — raising screen becomes Inventory; full stats move to the Monsters Summary
 category: ux restructure (absorbs R-ctl-11b-RAISINGCARDS) · severity: MED · size: LIGHT
