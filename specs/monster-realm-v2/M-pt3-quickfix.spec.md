@@ -319,7 +319,7 @@ Feedback items: pt3-2026-10-069, -072, -073, -074
 
 ### qf-7 — battle legacy-control retirement
 category: ux defect (strangler-rule violation vs CTL8I.1/CTL8J.1) · severity: MED · size: LIGHT
-touches: client/src/ui/battleView.ts, client/src/ui/battleView.test.ts, client/e2e/encounter-battle.spec.ts
+touches: client/src/ui/battleView.ts, client/src/ui/battleView.test.ts, client/e2e/encounter-battle.spec.ts, client/src/ui/screens/battleScreen.boot.test.ts, client/src/ui/reachability.test.ts, client/e2e/recruit.spec.ts, client/e2e/trade-interlock.spec.ts, client/e2e/my-battle-privacy.spec.ts, client/e2e/pvp-side-b.spec.ts, client/e2e/monster-privacy.spec.ts, client/e2e/battle-dpad.spec.ts
 after: [so-2]
 Feedback items: pt3-2026-10-119, -132, -133 (and the already-built contextual-submenu half of -126)
 
@@ -339,6 +339,14 @@ Feedback items: pt3-2026-10-119, -132, -133 (and the already-built contextual-su
 - **QF7.4:** WHEN qf-7 lands, THE battle-safety pins SHALL stay green unmodified (B17
   battle-never-hidden, outcome grace, disabled-command reasons), and any e2e that drove a
   retired button migrates to the command-list path in this slice.
+- **Build note (qf-7, 2026-10-29):** qf-7 shipped QF7.2 only (PR #601; `#open` command state in battleView).
+  QF7.1/QF7.3 are DEFERred to qf-7b with the touches widened above for the measured hidden
+  dependencies: legacy-Flee text clicks (`recruit.spec.ts` x4, `trade-interlock.spec.ts:681`),
+  skill-grid-before-Fight (`battleScreen.boot.test.ts:347`; `recruit.spec.ts:792`,
+  `my-battle-privacy.spec.ts:484`, `pvp-side-b.spec.ts:330-397`, `monster-privacy.spec.ts:474-477`),
+  bait-before-Recruit (`recruit.spec.ts:584-608`). qf-7b also adds the battle Flee row to
+  `reachability.test.ts`'s `QF8_RETIRED` sweep (closes QF8.2). Extend `#open`; e2e migrate to the
+  command-list path (QF7.4), never deleted.
 
 ### qf-8 — mouse-only duplicate removal
 category: ux-a11y doctrine defect ("no mouse-only element") · severity: MED · size: LIGHT
