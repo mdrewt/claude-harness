@@ -365,6 +365,28 @@ Feedback items: pt3-2026-10-132, -133 (Flee and skills/bait halves)
   completing QF8.2's seven-row coverage.
 - **QF7B.4:** THE battle-safety pins (B17 battle-never-hidden, outcome grace, disabled-command
   reasons) SHALL stay green unmodified; no e2e is deleted for convenience.
+- **Build note (qf-7b, 2026-10-30):** qf-7b shipped QF7B.2 + QF7B.4 (`#open` now gates the skills
+  grid on Fight and the bait list on Recruit; every e2e that clicked the legacy Flee by text, or a
+  skill / bait straight off battle open, drives the command list now). QF7B.1 and QF7B.3 are DEFERred
+  again on a hidden dependency the qf-7 note did not see: deleting the Flee button leaves
+  `battle.action.flee` with zero requesters, and `catalogParity.test.ts` PARITY-04 (DEAD-KEY, exemption
+  roster pinned `[]`) reds `just ci`. The follow-up (qf-7c) needs touches += `client/src/ui/i18n/messageIds.ts`,
+  `client/src/ui/i18n/catalog.en.ts`, `client/src/ui/i18n/catalog.fr.ts`, `client/src/ui/i18n/catalog.test.ts`
+  (its byte-identical roster, pinned at exactly 362 keys at ≈:1474/:1563/:2619/:2713) — plus battleView.ts,
+  battleView.test.ts (the m24s3 roster at ≈:5482/:5664/:5899 names the key) and reachability.test.ts for
+  the `QF8_RETIRED` Flee row. No e2e work remains for it. Not in the spec and left as-is: the Bag cure
+  list still renders at rest (residual R-qf-7b-CURELIST, LOW).
+- **As built (qf-7c, 2026-10-30):** qf-7c shipped QF7B.1 + QF7B.3 (QF8.2's seventh row). The legacy Flee
+  block in `battleView.ts` `#renderActions` is deleted (the command list's Run is the only flee; `onFlee` and
+  `#actionsEl` stay); `battle.action.flee` is retired from `messageIds.ts` / `catalog.en.ts` / `catalog.fr.ts`
+  (361 keys; PARITY-01/04 green with exemption roster `[]`) and `catalog.test.ts`'s roster pins moved 362 → 361;
+  `battleView.test.ts` gained `[QF7B-1-NO-FLEE-ANY-STATE]` (whole-document label scan + fresh-mount-per-element
+  pokes: Run is the only element whose press reaches `onFlee`) and `[QF7B-1-NO-FLEE-STATE-MATRIX]` (a 55-corner
+  static scan), with 24 tests restated through Run; `reachability.test.ts`'s `QF8_RETIRED` gained the battle row
+  (`[QF8-2-BATTLE-RETIRED]` / `[QF8-2-BATTLE-NATIVE]`: S1 a practice battle where Run is the only live command,
+  S2 a wild battle under the flee lock, both from the real model). QF7B.4 pins stayed byte-identical. The Bag
+  cure list is untouched (R-qf-7b-CURELIST stays open). Out of touches, noted only: `client/e2e/a11y.spec.ts:1032`
+  still says "two skills, Flee and a Swap" in a fixture comment.
 
 ### qf-8 — mouse-only duplicate removal
 category: ux-a11y doctrine defect ("no mouse-only element") · severity: MED · size: LIGHT
@@ -484,6 +506,16 @@ Feedback items: pt3-2026-10-037, -060, -115, -116
   active-tab indicator and the nav-tab roles stay as shipped (CSS-only reshaping plus class
   attachment; no new tab component — that is the chrome milestone).
 
+- Build note (qf-11, 2026-10-30): the fix is declarations on existing selectors only (the
+  battleView frame-selector roster forbids new ones): `.mr-frame-tabstrip` is `flex: 0 1 auto`
+  plus `max-width: 100%` (a nowrap strip in raisingView's `align-items:center` root scrolls
+  instead of overflowing), and `.mr-nav-tab` is `white-space: nowrap`. Side effect, accepted: in
+  the `createFrame` titlebar row the strip no longer fills the row, so the RB hint sits right
+  after the last tab instead of at the far edge. `boxView.ts` needed no edit (it already carried
+  the class). The runtime `#help-screen` list gained `mr-nav-list` (closes `R-qf-4-HELPSCREENUL`).
+  The oracles are sheet scans plus happy-dom computed style, so there is no pixel-geometry test;
+  a Chromium strip-height test is deferred (`R-qf-11-GEOMETRY`).
+
 ### qf-12 — footer + chrome: collapse the empty feedback line, drop the dead hints div
 category: ux polish · severity: LOW · size: FEATHER
 touches: client/src/ui/frame.ts, client/src/ui/frame.test.ts, client/src/styles.css
@@ -528,7 +560,7 @@ Feedback items: pt3-2026-10-098, -100, -101, -102, -103, -104
 
 ### qf-14 — Controls accelerator
 category: ux (one accel row) · severity: LOW · size: FEATHER
-touches: client/src/input/bindings.ts, client/src/input/bindings.test.ts, client/src/main.ts, client/src/ui/reachability.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts
+touches: client/src/input/bindings.ts, client/src/input/bindings.test.ts, client/src/main.ts, client/src/ui/reachability.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/input/buttons.ts, client/src/input/router.ts, client/src/ui/controlsModel.ts, client/src/input/router.test.ts, client/src/ui/helpModel.test.ts, client/src/main.help.test.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/screens/optionsScreen.test.ts, client/src/main.accel.test.ts, client/src/ui/controlsModel.test.ts
 after: [qf-13]
 Feedback items: pt3-2026-10-117
 
@@ -543,6 +575,13 @@ Feedback items: pt3-2026-10-117
 - **QF14.3:** THE reachability pin SHALL be updated by hand as a literal manifest change, with
   the intentional count change named in the test comment (the `15 -> 16 with controlsView`
   model).
+
+- **Build note (qf-14 park, 2026-10-30, measured):** the accel roster is the closed tuple `ACCELS`
+  in `client/src/input/buttons.ts`; `router.ts` ACCEL_PATHS and `controlsModel.ts` ACCEL_LABELS are
+  exhaustive Records over it, so touches are widened to those three plus the five count/roster pin
+  tests that go red intentionally (router, helpModel, main.help, catalog, optionsScreen) and two
+  proof tests (main.accel, controlsModel). Default key: **KeyY** (measured least-collision; K/G/H/T/O/Z/X
+  are test keys or retired). Probe: `memory/projects/monster-realm-qf-14-probe.patch`.
 
 ### qf-15 — zone transition cue + warp tile relocation
 category: ux + content (silent warp) · severity: LOW · size: FEATHER
