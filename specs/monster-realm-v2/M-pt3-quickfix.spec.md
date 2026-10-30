@@ -585,7 +585,7 @@ Feedback items: pt3-2026-10-117
 
 ### qf-15 — zone transition cue + warp tile relocation
 category: ux + content (silent warp) · severity: LOW · size: FEATHER
-touches: game-core/content/zone_maps/000-core.ron, client/src/main.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/net/store.ts, client/src/net/store.test.ts
+touches: game-core/content/zone_maps/000-core.ron, game-core/src/world.rs, sim-harness/src/world.rs, server-module/src/lib.rs, evals/baselines/content-hash.json, client/e2e/shop-npc.spec.ts, client/e2e/wallet-balance.spec.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/main.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/net/store.ts, client/src/net/store.test.ts
 after: [qf-14]
 Feedback items: pt3-2026-10-156, -163
 
@@ -604,6 +604,16 @@ Feedback items: pt3-2026-10-156, -163
   CONTENT_VERSION bump, `validate_content` green.
 - **QF15.3:** WHEN qf-15 lands, NPCs SHALL still skip warps (the existing server pin stays
   green).
+- **Build note (qf-15, 2026-10-30):** the first run parked at verify-scope on measured hidden
+  dependencies (nothing built). QF15.2: candidate tile zone 0 (1,5) <-> zone 1 (1,5) (floor in both,
+  Manhattan 4 from elder_oak (5,5), not shopkeeper (8,1), not heal tile (8,3)); the RON edit reds 3
+  `game-core/src/world.rs` tests (pin (5,5)), 2 `sim-harness/src/world.rs` tests, the content-version
+  eval (`server-module/src/lib.rs` CONTENT_VERSION 23 -> 24 + `evals/baselines/content-hash.json` regen),
+  and the hard-coded walks in `client/e2e/shop-npc.spec.ts` and `wallet-balance.spec.ts`. QF15.1: the
+  client has no zone-name source; `zone_def` (public, bindings already generated) is unsubscribed —
+  route is subscribe `zone_def` in `client/src/net/connection.ts` (+ `connection.runtime.test.ts`) feeding
+  a store upsert, optional `rowConvert.ts` converter; additive, no server/schema/bindings change.
+  Touches widened accordingly. Memo: `memory/projects/monster-realm-qf-15-progress.md`.
 
 ### qf-16 — rankings presentation: display-only rows
 category: ux polish (read-only list treatment) · severity: LOW · size: FEATHER
