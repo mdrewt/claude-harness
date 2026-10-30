@@ -76,3 +76,5 @@
 {"date": "2026-10-21", "window_start": "2026-10-20T09:35", "cowork_est_usd": 0, "native_ledger_usd": 0.0, "models": {}, "note": "fable priced at opus rates = lower bound"}
 {"date": "2026-10-23", "window_start": "2026-10-22T09:35", "cowork_est_usd": 0, "native_ledger_usd": 0.0, "models": {}, "note": "fable priced at opus rates = lower bound"}
 {"date": "2026-10-24", "window_start": "2026-10-23T09:35", "cowork_est_usd": 0, "native_ledger_usd": 0.0, "models": {}, "note": "fable priced at opus rates = lower bound"}
+{"date": "2026-10-25", "window_start": "2026-10-24T09:35", "cowork_est_usd": 0, "native_ledger_usd": 50.24, "models": {}, "note": "fable priced at opus rates = lower bound"}
+{"date": "2026-10-26", "window_start": "2026-10-25T09:35", "cowork_est_usd": 0, "native_ledger_usd": 91.05, "models": {}, "note": "fable priced at opus rates = lower bound"}

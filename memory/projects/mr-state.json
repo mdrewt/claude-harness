@@ -1,45 +1,28 @@
 {
  "awaiting_merge": [],
- "consecutive_standdowns": 70,
+ "consecutive_standdowns": 0,
  "inflight": [],
  "master": {
-  "ci": "green",
-  "nightly": "green",
-  "sha": "2721cd3e"
+  "sha": "b55806da",
+  "ci": "in_progress",
+  "nightly": "in_progress"
  },
- "notes": "Playtest-3 episode pt3-2026-10 COMPLETE 2026-10-24: all 7 decision batches ANSWERED by operator and consumed same-day (MR#583-#588 + harness#160; answers under decisions/; issues closed with incorporation comments; brief #589 closed). Rulings folded into specs/PLAN/doctrine v1.7/GDD (470703e); reception research docs/research/tactical-combat-player-reception.md (cc9af88); M-battle-tactics P0 SS6 ceremony DONE - M-battle-tactics-design.md BINDS elaboration (77d3d32). Playtest-4 = strict SS10 single gate (#583 D5). #580 close-without-comment processed: RAISINGVIEWREBUILD residual closed (--operator-issue 580). OPERATOR HOLD LIFTED (hold file absent 2026-10-24): loop resumes at queue head ttd-1 -> so-1 -> so-2 -> M-pt3-quickfix -> M-battle-tactics (P0 done; elaborate P1 at reach).",
+ "notes": "2026-10-30 qf-8 MERGED (#604); master CI verifying; QF8.2 needs qf-7b",
  "park_counters": {
   "ctl-12b": 0,
   "ctl-13": 0,
   "ctl-14": 0,
-  "ctl-15": 0
+  "ctl-15": 0,
+  "qf-1": 0,
+  "qf-2": 0,
+  "qf-3": 0,
+  "qf-4": 0,
+  "qf-5": 0,
+  "qf-6": 0,
+  "qf-7": 0,
+  "qf-9": 0
  },
- "queue": [
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-10-16T16:00:58Z",
-   "derived_from_master_sha": "2721cd3e",
-   "reason": "corrective C3b: adjudicated retirement of the 17 per-file source scans (judged plan, PR #159)",
-   "slice": "ttd-1",
-   "spec_file": "specs/monster-realm-v2/M-test-truth.spec.md"
-  },
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-10-16T16:00:58Z",
-   "derived_from_master_sha": "2721cd3e",
-   "reason": "corrective C2b slice 1: stack-owns-close for the reconnect block (after ttd-1)",
-   "slice": "so-1",
-   "spec_file": "specs/monster-realm-v2/M-stack-ownership.spec.md"
-  },
-  {
-   "added_by": "n/a",
-   "added_utc": "2026-10-16T16:00:58Z",
-   "derived_from_master_sha": "2721cd3e",
-   "reason": "corrective C2b slice 2: ownership inversion; mr-ask-drew gate required before merge (after so-1)",
-   "slice": "so-2",
-   "spec_file": "specs/monster-realm-v2/M-stack-ownership.spec.md"
-  }
- ],
+ "queue": [],
  "rate_limit_resets_at": null,
  "resource_locations": {
   "_comment": "Current truth as of the 2026-09 harness revision (source: docs/revision-2026-09/facts-sheet.md, re-derived from the live repo). Use these absolute locations.",
@@ -51,6 +34,6 @@
   "supervisor_stores": "All at /home/mdrewt/projects/ai-apps/claude-harness/memory/projects (== /home/mdrewt/projects/ai-apps/claude-harness/memory/projects): mr-state.json, monster-realm-handoff.md, monster-realm-usage-ledger.jsonl, mr-brief-template.md, mr-launch.sh, supervisor-archive-full-prompt-2026-07-02.md. These were exactly where the task said."
  },
  "schema_version": 3,
- "updated_by": "pt3-decision-consumption-2026-10-24",
- "updated_utc": "2026-10-24T19:49:35Z"
+ "updated_by": "mr-sup-native-20261030T012117Z-154819-26506",
+ "updated_utc": "2026-10-30T01:23:51Z"
 }

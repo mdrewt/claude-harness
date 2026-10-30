@@ -342,3 +342,206 @@ SUPERVISOR NOTES
 
 ## 2026-10-03T23:21:40Z — ctl-10a PR open (#565)
 ctl-10a PR https://github.com/mdrewt/monster-realm/pull/565 (branch ctl-10a; worktree projects/monster-realm/.claude/worktrees/ctl-10a). Local just ci green (CI-EXIT=0: nextest 2004/2004, 15 evals, client 3879/3879, observability). mr-gates 4/4 met, 0 deferred. e2e run locally serially: dialogue+shop-npc+wallet-balance 17 passed; recruit 3 passed (heal path not forced). Built: A/Y act on wasm interact_candidates_coded (memo per batch/identity/zone/predicted tile+facing, lazy guarded export), picker + Y sheet as ScreenHost world state, T retired, chip [keycap] verb — name / Choose…, Box Heal Party removed (healParty without location refused). Lenses: plan reviewer+red-team; code reviewer + red-team (4 bypasses closed by tester round 2, each mutant proved killed); verifier PASS. Testers: 3 parallel (unit, boot, e2e) + 1 follow-up round. Residuals: R-ctl-10a-BOXCB, -HEALTARGET, -DOCS, -TALKRANGE (LOW, backlog), -SHEETA11Y (MED -> ctl-13). SUPERVISOR TODO: (1) the harness spec M-postgate-console-controls.spec.md has an UNCOMMITTED ctl-10a build note (main checkout); (2) doc-keeper should write the decision entry and clear the stale prose (R-ctl-10a-DOCS) after merge; (3) account-e2e S9 sql-json contention flake hit twice in one local run, passed on rerun + pristine master. Scratch left: /tmp/tmp.TqJK3dbRTi, /tmp/tmp.mRzvtOsHwh (master sandbox worktree, detached — remove via git worktree remove), red-team /tmp/tmp.GNNCzcKuVd, /tmp/tmp.mKJy8piOMg. Budget warn flag fired mid-slice; converged, no new scope.
+## 2026-10-03T21:17:47Z — ctl-8k merged (#564); master CI pending, ctl-9 next
+Merged ctl-8k c0c7b3b6 after CLEAN audit. Master run 37154474622 was in_progress; next tick must verify green LIVE before launching ctl-9. Stale mutex (dead owner 421076) reaped. 3 residuals (MODALA11Y, LOCALESTALE, CTL8K.1) already recorded by run -> ctl-13.
+
+
+
+## 2026-10-03T22:01:01Z — sup tick mr-sup-native-20261003T220037Z-544021-1471: launched ctl-10a
+master c0c7b3b6 green (ctl-8k #564 merged). ctl-9/16/8d/8e already merged. Launched ctl-10a (opus@high, leader 544374). Next after merge: ctl-10b.
+
+## 2026-10-03T23:47:38Z — ctl-10a merged; ctl-10b launched
+ctl-10a PR#565 audited (CLEAN; removed T/heal-button assertions adjudicated as spec-mandated migrations with surviving A-based controls) and squash-merged as 5b16acd5; master CI green. Worktree/branch removed. Launched ctl-10b (opus@high, routine, client-only; leader 693190) — next after it: ctl-11a. Uncommitted ctl-10a build note remains in M-postgate-console-controls.spec.md (harness stray, left as-is).
+
+
+## 2026-10-03T23:50:04Z — ctl-10b parked
+ctl-10b PARKED at verify-scope: hidden-dependency STOP, no code. Branch ctl-10b @ 19827bac (empty wip on master 5b16acd5), no PR, no DEFER. Three REQUIRED files sit outside the seeded touches: (1) client/src/ui/interactModel.ts (+interactModel.test.ts): InteractAction is a closed talk|shop|heal union and marshalInteract hard-codes player actions to [] (WorldPort.run and interactChip are typed on it), so no Trade/Challenge row can reach the picker. (2) client/src/ui/screens/tradeProposeScreen.ts (+test): viewModel hard-codes targetSupplied:false, so the wizard can't open pre-filled; needs a ctx value like CTL8S.2's socialTab (likely screens/types.ts too, plus any ScreenContext-literal test sites if the field is required). (3) client/e2e/pvp.spec.ts:262 clicks pvp-challenge-player-btn, which CTL10B.2 removes. main.*.test.ts KeyO users are main.ts siblings (allowed). No sibling is in flight. Plan + design sketch + planned gate tags: memory/projects/monster-realm-ctl-10b-plan.md; park memo: monster-realm-ctl-10b-progress.md. Resume: widen touches, then PLAN. Cost so far is small (verify-scope only).
+
+## 2026-10-04T00:22:33Z — ctl-10b PR open
+ctl-10b PR mdrewt/monster-realm#566 OPEN, branch ctl-10b @ 0c0091fd; local just ci green at ae12940f (CI-EXIT=0, 3890 client tests, all evals PASS); mr-gates 2/2 met. Resumed from the hidden-dependency park under a DISCLOSED scope widening (rb-73 precedent, no sibling in flight): interactModel.ts(+test), screens/tradeProposeScreen.ts(+test, +boot test), screens/types.ts (optional ScreenContext.proposeTarget), e2e/pvp.spec.ts — listed in the PR's SCOPE WIDENING + touches-delta; supervisor may reject. DECISIONS entry 'Interaction target: the tile in front, then your own tile' landed. Residuals: R-ctl-10b-PVPCB, R-ctl-10b-PVPPLAYERS (->ctl-8g), R-ctl-10b-DOCS (PLAYTEST.md). Only the 5 migrated e2e specs were run locally (18/18); remote e2e job covers the rest. mr_warn_ctl-10b was set during review; lens set was reviewer+verifier-audit and red-team (desync-guard/reducer-auditor skipped: no game-core/wasm/server change). Red-team sandbox left at the path in /tmp/rt_sb_path.
+
+## 2026-10-04T00:42:26Z — ctl-10b merged d8931b9a
+Merged PR#566 after audit CLEAN + gates 2/2. Worktree/branch removed. master CI run 37165640557 in progress at record time — next tick must confirm green before launching ctl-11a (next per notes).
+
+
+## 2026-10-04T01:01:15Z — ctl-11a launched (supervisor mr-sup-native-20261004T010034Z-825479-6037)
+Master d8931b9a CI green (ctl-10b merged). Stale mutex (dead 817670) reaped. Launched ctl-11a opus@high leader=826031. Next after merge: ctl-11b, then ctl-12. No open PRs, no parked slices; HIGH/CRIT residuals none.
+
+## 2026-10-04T01:04:29Z — ctl-11a parked
+ctl-11a PARKED at the verify-scope step: HIDDEN DEPENDENCY. The declared `touches:` cannot hold the slice. No code was written, no PR was opened, and branch `ctl-11a` = origin/master d8931b9a (pushed). The worktree is at projects/monster-realm/.claude/worktrees/ctl-11a. The ledger is untouched (3/3 pending, 0 DEFER). Progress: $MEM/monster-realm-ctl-11a-progress.md.
+
+Why. Each gate, as specced, changes behaviour that is pinned by specced tests outside touches (and not siblings of a declared code file):
+- CTL11A.1 puts the menu frame under the opened screen ("pop to base, push the canonical menu path, cursor on the leaf"), so the stack after an accelerator becomes [world, menuView, <screen>]. That breaks:
+  - client/src/ui/screens/bagScreen.boot.test.ts CTL8F-4-BOOT-KEYI (asserts the stack is exactly ['world','raisingView'] after KeyI).
+  - client/src/ui/screens/profileScreen.boot.test.ts CTL8H-5-N-OPENS-NAME-TYPING and CTL8H-5-C-OPENS-ACCOUNT (assert ['world','renameView'] and ['world','claimView']).
+  - client/src/ui/screens/socialScreen.boot.test.ts CTL8D-3-BOOT-HOTKEYS, CTL8D-1, CTL8D-2 and CTL8G-* (U/P/L, then "Start closed Social" → [WORLD_FRAME]). Likely; it depends on the Start semantics chosen.
+- CTL11A.3 (Q/E become LB/RB, so Q and E do nothing at the world) breaks:
+  - client/src/ui/screens/journalScreen.boot.test.ts CTL8F-4-BOOT-KEYQ (KeyQ opens the journal).
+  - client/src/ui/screens/index.test.ts ≈546-578 and ≈2426. They import `routedBindings`, which the slice retires, and assert that KeyQ/KeyE produce no edge.
+- Remote e2e outside touches:
+  - client/e2e/a11y.spec.ts ≈854-1001 (KeyE opens and closes evolution; the KeyB/KeyI/KeyN toggles now return to the menu, not the world).
+  - client/e2e/movement-input.spec.ts ≈510, ≈576 and ≈731-750 (KeyB/KeyP, then walking).
+  - rename.spec.ts ≈222, accounts.spec.ts ≈126-191, monster-privacy.spec.ts ≈233 and ≈694, pvp-side-b.spec.ts ≈205 and encounter-battle.spec.ts ≈555. These press N/C/U/B; whatever runs after the close now lands on the menu, not the world. Each needs an audit.
+  - controls.spec.ts ≈143 (keysSeen) is probably fine.
+- Residuals routed here also need out-of-touches files:
+  - R-ctl-8b-CTL8B.2 (X quick Move) needs client/src/ui/screens/monstersScreen.ts. No screen handles 'X' today; the router change alone delivers nothing.
+  - R-ctl-8b-CTL8B.4, together with V → Monsters › Party, needs a tab-open seam in monstersScreen.ts plus screens/types.ts (ScreenContext). monstersScreen init is hard-wired to 'storage'. The alternative is a synthesized RB in main.ts, which is a hack.
+  - R-ctl-8f-CTL8F.1 (Bag paints before the first batch) can be fixed in main.ts (screenHost.seat at the raising open). But that contradicts bagScreen.boot.test.ts CTL8F-4-BOOT-KEYI, which asserts the bag parts are hidden before the first paint.
+- Sibling tests (main.*.test.ts, ~130 Key* presses across a11yFocus/controls/input/dispatch/social/feedback*/privacyWiring/partyFull) are inside the sibling allowance but are a large rewrite.
+
+Proposed re-serialization: widen ctl-11a touches by
+- the 5 screens/*.test.ts files above (bagScreen.boot, profileScreen.boot, socialScreen.boot, journalScreen.boot, index.test);
+- client/e2e/a11y.spec.ts, movement-input.spec.ts, rename.spec.ts, accounts.spec.ts, monster-privacy.spec.ts, pvp-side-b.spec.ts and encounter-battle.spec.ts;
+- monstersScreen.ts, monstersScreen.test.ts and screens/types.ts, for V→Party and the X quick Move.
+
+Or split the slice:
+- ctl-11a1: J and V are added; CTL11A.2 deny + router accelerator table; B/I/U/P/L/N/C move to the canonical path, together with the boot-test and e2e rewrites.
+- ctl-11a2: Q/E → LB/RB with journalScreen.boot, index.test and a11y.spec.
+
+The slice is size LARGE, not MODERATE. Budget spent ≈ $10, scoping only.
+Design notes for the resumer:
+- mainMenuPick(state, key) already gives "cursor on the leaf" from main.ts (pick the group, then pick the leaf).
+- Tabbed screens already handle LB/RB, and nav.ts already wraps fresh LB/RB edges. So CTL11A.3 is mostly deleting routedBindings plus the KeyQ/KeyE ladder arms.
+- The CTL11A.2 deny predicate fits in contextStack.ts (top is server-owned / textEntry / prompt). The session gate is already the first check in onKeyDown.
+
+## 2026-10-04T01:42:01Z — ctl-11a parked (draft PR #567)
+ctl-11a PARKED again, now with progress. Draft PR mdrewt/monster-realm#567; branch ctl-11a @ 35b6fe83 is pushed; the worktree is .claude/worktrees/ctl-11a.
+
+Done:
+- tester red tests: 17 gating tests across bindings/router/contextStack/main.accel. The orchestrator proved them red.
+- Implementation inside touches: accelDecision/ACCEL_PATHS in router.ts, acceleratorsDenied in contextStack.ts, accelForCode in bindings.ts, and main.ts runAccel/openAccelPath. The ladder is deleted; DEFAULT_BINDINGS makes Q/E LB/RB.
+- tester migrated 41 sibling main.*.test.ts tests as named intentional changes.
+- A pre-existing menuView.setCovered focus bug is worked around in main.ts closeFrame and bite-proofed.
+- mr-gates: 3/3 met.
+
+BLOCKER (measured; it confirms the earlier entry): full client vitest has 11 red tests, all outside touches:
+- bagScreen.boot ×1
+- journalScreen.boot ×1
+- profileScreen.boot ×4
+- socialScreen.boot ×5
+
+They pin the retired stack shapes and KeyQ, so `just ci` cannot go green inside touches. Re-serialize ctl-11a with touches widened by:
+- the 4 screens/*.boot.test.ts files and screens/index.test.ts;
+- e2e/a11y.spec.ts, movement-input, rename, accounts, monster-privacy, pvp-side-b and encounter-battle .spec.ts;
+- optionally monstersScreen.ts/.test.ts, screens/types.ts and ui/menuView.ts, for the residuals.
+
+The resume steps are in $MEM/monster-realm-ctl-11a-progress.md. Spend is roughly $40 of the $60.
+
+## 2026-10-04T02:00:31Z — ctl-11a touches widened (harness #155)
+Supervisor widened ctl-11a touches (boot tests, main.*.test siblings, menuView, screens/index.test, audited e2e). Next tick: resume ctl-11a (hard tier: resume-after-park) from monster-realm-ctl-11a-progress.md; branch ctl-11a@35b6fe83, draft PR #567. Mutex released.
+
+## 2026-10-04T03:01:16Z — tick mr-sup-native-20261004T030055Z-901233-24351: ctl-11a resumed
+Took stale chain mutex (owner 889511 dead). Launched ctl-11a resume fable@xhigh (leader 901466) on branch ctl-11a / draft PR monster-realm#567 with widened touches per spec. Next tick: verify pass, mr-audit (hard-tier mandatory read), merge if gates met and CI green.
+
+## 2026-10-04T04:15:35Z — ctl-11a PR ready (#567)
+ctl-11a resumed after the touches widening and finished: PR mdrewt/monster-realm#567 is READY (not draft), branch ctl-11a @ a2eb9039 (pushed). Supersedes the park memo in monster-realm-ctl-11a-progress.md.
+
+Gate: local just ci on a2eb9039 exit 0 (nextest 2004; client vitest 172 files / 3917 tests; evals; observability 8 checks). mr-gates: 3/3 met, 0 deferred, lint clean.
+E2E (local, in-memory spacetime + dev_reducers module): full suite on a2eb9039 116 passed, 1 skipped (recruit R4, skipped on master). One earlier run had controls.spec 'closeAll pops to base' fail on its 4500 ms wall-clock bound (fake page, files unchanged by this PR); 3/3 in isolation and green in the full re-run.
+
+Done this run: 11 boot tests + screens/index.test migrated (tester); 11 e2e specs migrated (tester; movement-input audited, unchanged); routedBindings deleted; menuView.setCovered visibility guard (main.ts workaround removed); Bag seated at open (closes R-ctl-8f-CTL8F.1); menu Monsters opens on Party, B Storage, V Party (closes R-ctl-8b-CTL8B.4); Select key opens Help at a bare battle base (R-ctl-8j-SELECTINERT, key path); U closes Social on Players (R-ctl-8g-CTL8G.1-UCLOSE).
+Lenses: verifier PASS (test-change audit); reviewer 0 blocker/major; red-team found C inert before join (regression) — fixed, pinned by CTL11A-PREJOIN-CLAIM. Four red-team-authored tests were ported into main.accel.test.ts by the orchestrator (budget warn flag was set; no extra tester spawn) — supervisor may want to adjudicate that.
+
+Residuals added: R-ctl-11a-HELPCOPY -> ctl-14 (MED, helpModel.ts still says Q/E), -CTL11A.2-PROMPT -> ctl-13 (no production prompt frames, so in-screen confirms do not deny), -DRAFTLOSS -> backlog, -SELECTCHIP -> ctl-15, -XQUICKMOVE -> backlog (re-homes R-ctl-8b-CTL8B.2), -MONSTERSTAB -> backlog, -EVODEAD -> ctl-11b, -POPGUARD -> ctl-11b.
+Spec: as-built note added under ### ctl-11a in M-postgate-console-controls.spec.md (harness working tree, uncommitted). ctl-11b's task 'delete the keydown ladder' is partly done here (the letter-key arms); it still owns KEY_DIR, targetOwnsKey, worldHasFocus, the probe/handle tables, canOpen, OVERLAY_TIERS.
+Scratch left: red-team worktree /tmp/ctl-11a-rt.G0oieN/wt (git worktree remove it) with PoCs in /tmp/ctl-11a-rt.G0oieN/poc; /tmp/ctl-11a-stdb.* (stopped server data dir). The e2e spacetime server was stopped by PID. Merge is supervisor-owned.
+
+## 2026-10-04T05:28:41Z — ctl-11b PR open (#568)
+ctl-11b PR mdrewt/monster-realm#568 OPEN, branch ctl-11b @ eadce621; local just ci green at b1a7cc62 (CI-EXIT=0, 3930 client tests, no eval FAIL; eadce621 is one test-comment edit, file re-run 38/38). mr-gates 3/3 met (CTL11B.3 e2e run locally on an in-memory spacetime, since stopped by pid; a stale default-dir spacetime.pid from dead pid 1039499 was removed). Shipped: outsideGameScreen ownership rule + onKeyDown first-statement return, worldHasFocus deleted, #evolution-notice mounted inside #game-screen (lens-found regression), dead refreshEvolution deleted, reachability.test.ts, e2e/menu-flow.spec.ts, POPGUARD pin, CTL6C-3 via the Monsters sheet, focusTrap count. Deferred (spec premise false — probes/handles feed syncStack): R-ctl-11b-LEGACYGATES and -EVODEADREST -> ctl-13; new backlog LOW: -STALENARRATION, -E2ESECONDMONSTER, -RAISINGCARDS (carries the CTL8F.2/RAISINGSTRIP remainder; PGCCA-A4 care rows kept as survivors). Closable at merge: R-ctl-11a-POPGUARD; partly: R-ctl-11a-EVODEAD, R-ctl-8f-CTL8F.2, R-ctl-8c-CTL8C.1-RAISINGSTRIP (remainders re-homed). Spec as-built note added under ### ctl-11b (harness working tree, uncommitted). Lenses: reviewer, red-team, verifier PASS; desync/reducer auditors skipped (client-only). mr_warn_ctl-11b appeared before the verifier; converged. Scratch: red-team sandbox worktree /tmp/tmp.1zYvynQ5Bc/wt (git worktree remove it), PoCs /tmp/rt11b; /tmp/ctl11b-stdb.* (stopped server dir).
+## 2026-10-04T04:40:13Z — ctl-11a merged (#567)
+ctl-11a merged 8341d648 after audited diff read; master CI green. Residuals closed (5). Next: ctl-11b (legacy ladder deleted, reachability, keyboard menu-flow e2e) per spec.
+
+
+
+## 2026-10-04T05:48:08Z — ctl-11b MERGED 2bb14ddc
+ctl-11b audited and merged (PR#568). Spec deletion task partially deferred per run note; 3/3 gates met. Master CI on 2bb14ddc in progress at merge; next tick: confirm green, launch ctl-12 (remapping) per M-postgate-console-controls spec.
+
+## 2026-10-04T06:01:13Z — SUPERVISOR mr-sup-native-20261004T060041Z-1263640-27744: launched ctl-12
+master 2bb14ddc CI green; reaped stale mutex (owner 1257310 dead); launched ctl-12 (opus@high, leader 1264106). Next: audit+merge when .done lands, then ctl-13.
+## 2026-10-04T06:42:22Z — ctl-12 PR open (#569) — core shipped; view deferred on a hidden dependency
+ctl-12 PR https://github.com/mdrewt/monster-realm/pull/569 (branch ctl-12, worktree .claude/worktrees/ctl-12), just ci green locally (CI-EXIT=0), gates 5/7 met + 2 DEFERred (CTL12.1, CTL12.6). HIDDEN DEPENDENCY (needs re-serialization as a view slice, suggested ctl-12b): a new controlsView OverlayId requires client/src/ui/contextStack.ts (SCREEN_POLICY is a total Record<FrameId>) and client/src/ui/menuModel.ts (MenuTarget + the Options > Controls leaf), likely also client/src/ui/overlayA11yWiring.test.ts, client/src/indexShell.smoke.test.ts, client/src/main.menu.test.ts, client/src/ui/screens/mainMenuScreen.ts — none in ctl-12 touches. ctl-12b scope: controlsView.ts(+test), optionsScreen.ts, screens/index.ts, overlayRegistry.ts (OVERLAY_TIERS/OVERLAY_A11Y; move the static initial-focus anchor), the files above, main.ts (probe/handle entries, save on change via saveBindings, a KeyboardSource setter for live rebinding, capture view calling learnKey), e2e/remap.spec.ts + e2e/controls.ts live-table pressButton, client/src/ui/renameView.ts ROUTED_ON_SUBMIT (built from DEFAULT_BINDINGS), the capture-phase literal Escape route in main.ts. Pure core to wire: ui/controlsModel.ts (controlsRows, slots, rowLabel, capturePrompt, captureKey, clearAccel, outcomeText), input/bindingStore.ts, input/glyphs.ts. Spec build note added to M-postgate-console-controls.spec.md ### ctl-12 (uncommitted in harness). Throwaway dirs left: /tmp/ctl-12-rt.xCzr (detached review worktree), /tmp/rt12 (red-team PoCs).
+## 2026-10-04T08:05:07Z — ctl-12b parked — hidden dependency at PLAN (a11yCopy + 3 count-pinned tests)
+ctl-12b PARKED at PLAN, no PR, no commits (branch ctl-12b = origin/master 6d7d0a8c; worktree .claude/worktrees/ctl-12b kept with client/node_modules + client-wasm/pkg ready). Measured by prototyping the spec-mandated controlsView OverlayId (all total tables + a stub view + an Options>Controls leaf) and running tsc + full vitest: 4 files OUTSIDE touches red — client/src/ui/a11yCopy.ts (A11YCOPY-OVERLAY-NAMESPACE-EXACT set-equality needs 'a11y.overlay.controlsView.title'; a code file), client/src/ui/a11yCopy.test.ts, client/src/ui/announcements.test.ts, client/src/ui/overlayA11y.test.ts (toBe(17) anti-vacuity pins). Also fix in the spec: touches path client/src/ui/indexShell.smoke.test.ts is wrong (real: client/src/indexShell.smoke.test.ts); list client/src/main.dispatch.test.ts (CTL7C-2-BOOT-VIEWS) and client/src/ui/screens/mainMenuScreen.test.ts explicitly. Consider also client/src/ui/screens/types.ts if the resume wants capture/rebind as Command arms (the plan routes them shell-side in main.ts instead). No in-scope increment closes a gate without the overlay (CTL12B.2's no-reload half needs the view), so a partial would DEFER 2/2. Resume: widen touches, then restart at PLAN from monster-realm-ctl-12b-plan.md (failure table + design + CHECK candidates). Progress memo: monster-realm-ctl-12b-progress.md. Prototype reverted; no scratch dirs left.
+## 2026-10-04T07:11:39Z — SUPERVISOR mr-sup-native-20261004T065949Z-1372798-27105: ctl-12 merged, ctl-12b spec inserted
+ctl-12 PR#569 merged (6d7d0a8c), master CI green. Harness PR#156 merged: new ctl-12b (Options > Controls view, live rebinding, remap e2e; CTL12.1/CTL12.6 moved), ctl-13 now after ctl-12b. Next tick: launch ctl-12b (touches in spec; main.ts+router => hard tier fable@xhigh recommended; mr-gates seed will be needed for new slice). Lock/worktree for ctl-12 cleaned.
+
+## 2026-10-04T08:06:03Z — ctl-12b park — branch pushed
+ctl-12b park checkpoint pushed: origin/ctl-12b @ 4e78dfe6 (empty wip commit on master 6d7d0a8c recording the hidden dependency). No PR. Blocker + resume per the previous ctl-12b entry, monster-realm-ctl-12b-plan.md and monster-realm-ctl-12b-progress.md.
+## 2026-10-04T08:06:38Z — ctl-12b parked — draft PR #570
+ctl-12b park record is draft PR mdrewt/monster-realm#570 (branch ctl-12b @ 4e78dfe6, empty wip commit; never merge). Blocker: controlsView OverlayId needs client/src/ui/a11yCopy.ts + a11yCopy.test.ts + announcements.test.ts + overlayA11y.test.ts outside touches; fix the indexShell.smoke path; name main.dispatch.test.ts + screens/mainMenuScreen.test.ts. Resume at PLAN from monster-realm-ctl-12b-plan.md after widening touches.
+## 2026-10-04T08:23:50Z — 2026-10-04T08:23:50Z — ctl-12b parked, spec re-serialized (#157)
+ctl-12b parked (no code). Harness PR #157 merged: touches widened (a11yCopy.ts + 5 tests), indexShell path fixed. Next tick: resume ctl-12b hard-tier on branch ctl-12b (draft PR #570 to be superseded/closed), per memory/projects/monster-realm-ctl-12b-plan.md. ctl-13 after.
+## 2026-10-04T09:01:20Z — ctl-12b resumed (hard tier)
+2026-10-04T09:01:20Z Stale mutex (dead 1435358) reaped; harness main ff'd to b0ee7ba (#157). Launched ctl-12b fable@xhigh leader=1444794 with widened touches + park memo. Draft PR#570 to be superseded by run's real PR. Next: audit+merge on .done, then ctl-13.
+
+## 2026-10-04T08:01:03Z — 2026-10-04T08:01Z sup tick: launched ctl-12b
+ctl-12 already merged (#569), master CI green. Reaped stale mutex + dead run locks, launched ctl-12b opus@high (leader 1386808). Next: on .done, mr-audit + merge ctl-12b, then ctl-13.
+
+
+## 2026-10-04T12:59:56Z — ctl-13 PR open
+ctl-13 PR https://github.com/mdrewt/monster-realm/pull/572 (branch ctl-13 @ 6e6c61e5; worktree projects/monster-realm/.claude/worktrees/ctl-13). Local just ci green on 0fb5a5ce (CI-EXIT=0; later commit is a test-title rename, file re-run 7/7). mr-gates 4/5 met, CTL13.5 DEFERRED -> backlog (new OverlayId forces a11yCopy + count-pinned tests outside touches). Full local Playwright 120 passed / 1 pre-existing skip. Shipped: noticeModel (requests + error notices, request sheet), worldButton Y/B on notices, ScreenHost request seam, live hintBar model+view, banner + Start/Social badges, PvP auto-show deleted, error toast (lists errors since last dismissal), answered-request suppression (red-team double-answer). New residuals: R-ctl-13-CHIPCSS, -AXEDISABLED (-> ctl-15), -REANNOUNCE, -SHEETCHIPS, -ANSWERFAIL, -HINTCOST (backlog LOW). The 18 residuals previously routed to ctl-13 were NOT folded (still recorded; supervisor to re-home). Lenses: plan reviewer+red-team, artifact reviewer, red-team (49 mutants), verifier APPROVE; reducer/desync auditors n/a (client only). SUPERVISOR TODO: harness spec M-postgate-console-controls.spec.md has an UNCOMMITTED ctl-13 as-built note; plan at memory/projects/monster-realm-ctl-13-plan.md. Budget warn flag fired before the artifact lenses; converged, no new scope. Scratch left: /tmp/ctl-13-rt.nPZn/wt (detached review worktree — git worktree remove it), /tmp/ctl13-mut, /tmp/ctl-13-stdb.* (servers stopped by pid).
+## 2026-10-04T14:04:58Z — ctl-14 PR OPEN (#573)
+ctl-14 PR OPEN: https://github.com/mdrewt/monster-realm/pull/573 (branch ctl-14 @ 0c8840d9; worktree .claude/worktrees/ctl-14). Local just ci green (nextest 2004, vitest 4072, evals, observability 8/8); mr-gates 1/2 met + CTL14.2 DEFERRED -> backlog on a HIDDEN DEPENDENCY: Options › Report a problem needs client/src/ui/menuModel.ts + screens/mainMenuScreen.ts (+ menuModel.test.ts, mainMenuScreen.test.ts, reachability.test.ts row) — supervisor should re-serialize a follow-up slice with those in touches:. Shipped: generated Help (helpModel buildHelpViewModel(chips,bindings), new screens/helpScreen.ts nav adapter, tabbed helpView), Select chip toggles Help, DECISIONS Client UI superseded in place (tightened vs code), PLAYTEST controls -> in-game Help, a11y PASSES_FLOOR_HELP 19->23. touches-delta: main.help.test.ts, screens/helpScreen.test.ts, screens/index.test.ts, i18n/catalog.test.ts, i18n/catalogParity.test.ts. Residuals closed by the PR: R-ctl-6b-CTL6B.4, R-ctl-11a-HELPCOPY, R-ctl-6b-CTL6B.1; new: R-ctl-14-STALECMT, R-ctl-14-HELPA11Y (LOW backlog). Spec build note added under §ctl-14 (harness spec, uncommitted). Known unrelated flake: controls.spec.ts:99 wall-clock bound (1/4 local runs). Sandbox left: /tmp/tmp.MM3JD4sIzc (red-team). Merge is supervisor-owned.
+## 2026-10-04T11:02:13Z — ctl-12b merged (PR#571, 17ac40f5)
+Supervisor audited+merged ctl-12b (hard tier). Master CI run 37197202756 in progress at record time; next tick must verify green before launching ctl-13 (gate 3 master-red rule applies if red). Worktree/branch removed.
+
+
+
+## 2026-10-04T12:01:00Z — ctl-13 launched (opus@high)
+ctl-12b merged (PR#571, 17ac40f5), master CI green live. Reaped stale ctl-12b lock and mutex. Launched ctl-13 (hint bar, request banners, error toast, world Y/B) leader 1598130. Next: audit+merge on .done, then ctl-14.
+
+## 2026-10-04T13:26:12Z — ctl-13 merged, ctl-14 launched
+ctl-13 PR#572 squash-merged (5418a2a2), master CI green. Launched ctl-14 opus@high (leader 1751253). Next: audit+merge ctl-14 on .done, then ctl-15.
+
+## 2026-10-04T15:42:36Z — ctl-15 PR open — local green, 6/6 gates
+ctl-15 (pointer and touch: one dispatcher on #game-screen) is built: PR https://github.com/mdrewt/monster-realm/pull/574, branch ctl-15 @ fa2f4342 (wip commits; squash on merge), worktree projects/monster-realm/.claude/worktrees/ctl-15. Local just ci green (CI-EXIT=0, client 4114 tests), full local Playwright 117 passed / 1 pre-existing skip, mr-gates check 6/6 met, 0 deferred. Shipped: input/pointerSource.ts (seek = D-pad presses with probe+undo, elimination, tie refused), input/longPress.ts, main.ts pointerPress/pointerTop, document click delegate deleted, chips clickable, styles (touch-action, ring, hover, chip parts; .mr-frame-tabstrip min-height fix found by the mouse e2e), ARCHITECTURE UI rewrite, e2e/pointer.spec.ts (deviation: A chip at the picker, single-row tie). touches-delta: main.controls/dialogueDismiss/dispatch/hintBar/input tests (main.ts siblings). Lenses: plan reviewer(+red-team brief), artifact reviewer, red-team (75 mutants, 2 HIGH defects fixed), verifier APPROVE; reducer/desync n/a. New residuals (backlog LOW): R-ctl-15-DRIVEN, -FOCUSSEAM, -LAUNCHERATTR, -KEYHOLD, -SHEETTOP. Closes R-ctl-11a-SELECTCHIP, R-ctl-12b-ROWCLICK, R-ctl-8b-CTL8B.3, R-ctl-13-CHIPCSS; R-ctl-13-AXEDISABLED NOT closed (a11y.spec outside touches) — re-home. SUPERVISOR TODO: harness spec has an UNCOMMITTED ctl-15 as-built note; plan at memory/projects/monster-realm-ctl-15-plan.md. /tmp/mr_warn_ctl-15 fired during the artifact lenses; converged with one tester resume + verifier. Scratch left: /tmp/ctl-15-rt.XlrS/wt (detached red-team worktree — git worktree remove it), /tmp/ctl-15-stdb.* (servers stopped), logs /tmp/ctl-15-*.log. Stale default spacetime.pid files (dead pids) were cleared twice.
+## 2026-10-04T14:31:00Z — ctl-14 merged; ctl-15 launched
+ctl-14 PR#573 merged (83aabd4e), master CI green live, audit CLEAN. Stale mutex reaped. Launched ctl-15 opus@high (leader 1877148). Next: audit+merge ctl-15 on .done; then pgcc-c.
+
+
+
+## 2026-10-04T15:44:18Z — sup tick: ctl-15 PR#574 CI pending, delegated to mr-ci-watch
+ctl-15 run finished rc=0, PR#574 open, ci+e2e IN_PROGRESS. Stale mutex (dead 1870934) reaped. Next: audit+merge on CI-done event, then pgcc-c.
+
+## 2026-10-04T16:04:41Z — ctl-15 merged; pgcc-c launched
+ctl-15 (PR#574) merged 5c2f47ea, master CI green. Stale mutex (dead 2097303) reaped. Launched pgcc-c opus@high (leader 2105415). Next: audit+merge pgcc-c on .done, then pgcc-d (shares main.ts, serial).
+
+
+## 2026-10-04T17:55:50Z — 2026-10-04T17:55:50Z — pgcc-d merged; milestones 1+3 closed; R-rb-128-E1 launched
+pgcc-d PR#576 merged 11bdcf9c (audit CLEAN, master CI+e2e green). M-postgate-console-controls and M-postgate-client-coverage both complete; post-integration verification met (just ci/e2e green on master via CI, bindings/server/game-core diff empty). Roadmap now: item 2 M25 blocked (checkpoint-2); item 4 residual fill -> launched R-rb-128-E1 opus@high (leader 2332731). Next: audit+merge on .done, then next MED fill (R-rb-73-ABORT-PHANTOM, R-rb-132-WALLETSYBIL, R-rb-52-GRACEANNOUNCE) or raise Playtest-3 gate (item 5) when fill is exhausted/not worthwhile. Open: feedback ledger op-2026-10-01-controls-001..040+ still CLASSIFIED/undisposed (issue claude-harness#150 answered 'Investigate'); needs a dedicated disposition tick. HIGH ux-a11y residual R-ci-fix-...-RAISINGVIEWREBUILD unpromoted (not in outranking class).
+
+## 2026-10-04T17:04:24Z — pgcc-c merged; pgcc-d launched
+pgcc-c PR#575 merged (156d5b9c), audit CLEAN, master CI green after rerun of known dialogue 13.5c-5 e2e flake (second recurrence in a day -- if it recurs again treat as ci-fix). Launched pgcc-d opus@high routine (leader 2192671). Next: audit+merge pgcc-d on .done; then milestone post-integration verification (just ci + just e2e on master).
+
+
+## 2026-10-04T18:14:55Z — R-rb-128-E1 PR open
+R-rb-128-E1 PR #577 open (branch R-rb-128-E1, worktree .claude/worktrees/R-rb-128-E1). Local just ci green (4288 client tests, evals PASS, obs 8/0); mr-gates 1/1 met. Rejoin on my_account PendingDeletion->Active via pure shouldRejoinAfterAccountChange + ingestAccount (current-build-only, guard before upsert); Connection.join() replaces main.ts applyClaim's uncaught joinGame. touches-delta: main.dispatch.test.ts + six main.*.test.ts stubs (join member). New residual R-R-rb-128-E1-CLAIMCODERETAINED [gameplay/MED] (claim code not cleared on claim success; static, unrun). Residual section line refs in residuals.spec.md are stale — close it on merge. Awaiting supervisor audit/merge.
+## 2026-10-04T18:45:08Z — R-rb-128-E1 merged; milestones closed; roadmap at item 4/5
+R-rb-128-E1 PR#577 merged 830bf6dc (mr-audit CLEAN, gate E1 1/1 spotcheck agrees, master CI green live). Stale mutex reaped (dead 2324894). Residual row R-rb-128-E1 retired via disposition wontfix (reason says FIXED; only retire verb) — its residuals.spec.md section (line ~158) still needs dropping in a doc chore. New MED residual R-R-rb-128-E1-CLAIMCODERETAINED. Remaining unclaimed MED/LOW fill is security-privacy server (BYTEBOUND, WALLETSYBIL=schema-frozen) or LOW — not worth a hard-tier launch. NEXT TICK: (1) dedicated feedback-disposition tick for op-2026-10-01-controls-* (all shipped by ctl-*; issue claude-harness#150 answered Investigate); (2) then raise Playtest-3 gate via mr-ask-drew --blocking (items 1+3 closed, M25 blocked on checkpoint-2, no HIGH/CRITICAL security/data residual open).
+
+## 2026-10-04T19:01:41Z — 2026-10-04T19:01Z sup tick mr-sup-native-20261004T190037Z-2429628-31734: controls feedback dispositioned, Playtest-3 gate raised
+Stale mutex (dead 2419230) reaped. Dispositioned 56 op-2026-10-01-controls items CLASSIFIED->DISPOSED (REDESIGN/HEAVY x41, DRAFT/FEATHER x15; mr-feedback check OK). All queued milestones closed, master 830bf6dc CI+Nightly green, no HIGH/CRITICAL security/data residual -> raised Playtest-3 gate issue #578 (blocking). Loop idle until answered.
+
+
+## 2026-10-05T22:13:35Z — 2026-10-05T22:13:34Z polish-1 launched
+Operator asked for MED/LOW polish before Playtest-3. Authored M-pre-playtest-polish spec (harness PR #158 merged 7e8d5de; P1-P6 folding 6 residuals). First spawn raced the merge (no spec section) -> killed by recorded pids, reseeded gates (6), relaunched polish-1 opus@high leader 2652943. Playtest-3 gate #578 still pending. Next: audit+merge polish-1 on .done.
+
+## 2026-10-05T22:47:25Z — polish-1 PR open
+polish-1 PR #579 open (branch polish-1, worktree .claude/worktrees/polish-1, head 4d6ac935). Local just ci green (CI-EXIT=0; 2004 nextest, 4390 vitest, evals PASS; one prior run red only on account-e2e S9 sql-json flake, passed alone). mr-gates 6/6 met. Re-measure: P1/P2/P4/P5 reproduced and fixed; P3 (MENUPVPHIDDEN) already fixed by ctl-13, closed on existing main.dispatch.test.ts CTL8S-3-BOOT-NESTED-RENDERS; P6 (LOCALESTALE) not reproducible (no runtime locale switch), closed on sessionView.test.ts CTL8K-1-LOCALE. touches-delta: client/src/main.menu.test.ts. New LOW residuals: R-polish-1-MENUREASONANNOUNCE, R-polish-1-CLAIMRESULTCATCHREENTRY. Folded residuals (6) await supervisor disposition. Red-team sandbox worktree left at /tmp/tmp.K8cs8aa9FA/wt (registered in git worktree list). Awaiting supervisor audit/merge.
+
+## 2026-10-05T23:06:51Z — polish-1 merged
+polish-1 PR#579 merged as 2721cd3e after audit CLEAN; worktree/branch removed; master CI pending. Nightly 2026-10-05 mutation-server red w/o failing step - watch next nightly. Next: playtest-3 gate #578 pending operator; queue empty.
+## 2026-10-09T00:52:18Z — Weekly review 2026-10-09 @ 2721cd3e: 3 residuals (2 MED, 1 LOW), harness #134 consumed
+Weekly review 2026-10-09, pinned SHA 2721cd3e (master tip, CI green). Lenses: server authority/privacy, netcode determinism, UI critical flows/a11y (all sonnet, independently verified; no lens contradictions, no adjudication needed).
+
+Findings entered (3 of max 5):
+- R-weekly-review-2026-10-09-F1 (data-integrity, MED): practice self-battles are an uncapped, scriptable currency/XP faucet — grant_currency on SideAWins not practice-gated (battle.rs:1285-1288 @ 2721cd3e); battle_tests.rs:3405-3433 pins practice-pays-currency, so the fix must update that pin or add a cap.
+- R-weekly-review-2026-10-09-F2 (gameplay, MED): pointer click on a dialogue choice bypasses the dialogue adapter's reveal + resend guards (main.ts:3468 → dispatch direct); double-click silently takes branch N of the next, unseen node (advance_dialogue has no node identity, npc.rs:364).
+- R-weekly-review-2026-10-09-F3 (ux-a11y, LOW): a PvP accept landing mid-dialogue leaves battle D-pad/A dead until B/Start while the 60 s turn deadline runs (pvp.rs:964 no conversation guard; dialogueScreen.ts:141 unhandled while inBattle).
+
+Dropped candidates: 2 — advance_dialogue walked-away delete rolled back by its own Err (already tracked as R-ci-fix-20261002T0501Z-WALKEDAWAYROLLBACK); netcode lens returned clean (predictor seq/epoch, held keys, movement_tick, interpolation, rule-drift and determinism sweeps all clean at this SHA).
+
+Decision issues: none opened. Consumed and closed harness #134 (rev21-nightly-changelog-red, answered by operator): reds were changelog-freshness daily 2026-09-20..26, self-resolved 09-27. ACTION FOR SUPERVISOR per the operator's answer: mr-situation:49 probes only the latest master run (-L1), so a red scheduled Nightly stays invisible whenever a later run is green — add a dedicated `gh run list -w Nightly -L1 --json conclusion` probe to mr-situation and trigger docs/nightly-red-response-policy.md on failure (this review writes no tracked files, so the change is left to the supervisor/operator).
+
+Residual sweep --dry-run: 0 obsolete candidates. Registry adds succeeded (3). Cleanup: review clone /home/mdrewt/mr-review/2026-10-09-2721cd3e removed; no writes to $PROJ or the harness git state.
+

@@ -109,6 +109,12 @@ after: [ttd-1]
   path), replacing the ten independent per-view hide calls with one stack-driven sweep.
   - Red: `main.reconnectStack.test.ts` — open frames (menu, a Social panel, shop), fire
     `onReconnect`, assert each view's hide path ran and the stack is at its base.
+  - As built (so-1): "closeable" is the total `RECONNECT_CLOSES` table (ui/contextStack.ts) —
+    exactly the frames the ten legacy hides closed (menu, rename, trade-propose, shop, Social,
+    the outcome frame, raising, evolution) — plus any frame stamped `overBattle`. Help, box,
+    quest log, heal, claim, privacy and controls opened at the world SURVIVE a reconnect, as
+    CTL6C-1's world arm pinned before so-1; flipping a row is a deliberate later call (so-2 /
+    M-gamepad), not a default.
 - **SO1.2:** WHEN the connection reconnects, THE CLIENT SHALL run every view-state reset
   UNCONDITIONALLY, regardless of stack contents or visibility — named protected set: the
   trade-propose `#pending` lock clear, shopView's and tradeView's double-spend locks, renameView's
@@ -141,6 +147,16 @@ after: [so-1]
   ≈721–734) and `EXPECTED_PATHS` (router.test.ts ≈1505).
 - If a fix needs a file outside `touches:`, that is a hidden-dependency STOP — do not widen.
 
+- As built (so-2): `openFrame` (main.ts) pushes via the pure `openEdge` (stamped `overBattle` over a
+  battle base) then shows; the shell mirror is `mirrorServerEdges` (`MIRRORED_IDS` = battleView,
+  dialogueView) while the general `mirrorEdges` survives for `ui/reachability.test.ts` (outside
+  touches — a follow-up can move it to `openEdge`); a player view that closes itself is popped by
+  `hiddenPops` in `syncStack` (pop-only); the claim lifecycle routes through `openFrame` (Risks
+  default); `evolutionView` has no open path, so it is never a frame; the router's `EXPECTED_PATHS`
+  is unchanged (no path changed shape). Spec conflict resolved by default: two PRECONDITION lines of
+  `main.reconnectStack.test.ts` (SO1-1-BOOT-CLICK-OPENED-RENAME, SO1-1-BOOT-SURVIVE-CLAIM-PENDING)
+  pinned the mirror lag push-then-show removes and were flipped; every post-reconnect assertion is
+  unmodified. Operator decision: mdrewt/monster-realm#592.
 - **SO2.0:** BEFORE so-2 merges, THE BUILD SHALL have the operator's answer recorded through
   `mr-ask-drew` (slug `so-2`) on the final openFrame design — dedup, Social routing, the shrunk
   mirror, the table split — with the gate's evidence citing the decision answer file

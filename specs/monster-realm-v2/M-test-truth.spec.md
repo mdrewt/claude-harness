@@ -114,7 +114,12 @@ after: []
   whole-tree total falls below `SINK_FLOOR` — which is why the floor tightens from 169 to
   measured-minus-margin (TT2); a sub-margin per-file blindness is accepted residual risk, carried
   by the runtime pairs (behavior, not source text) and by I18N-17's per-target
-  present-and-non-empty assertions, which stay.
+  present-and-non-empty assertions, which stay. Build note (ttd-1, 2026-10-24): 8 of the 17 views
+  hold ≤10 sinks (privacyView 7, questLogView 6, dialogueView/healView/helpView/renameView 5,
+  errorOverlayView 3, evolutionNotice 2), so each can go fully dark under the margin; "non-empty"
+  is file bytes, not sink visibility; and `privacyView.ts`/`evolutionNotice.ts` are not
+  SCAN_TARGETS (I18N-17 asserts only that the walk contains them). For those, the runtime pair
+  is the only carrier, and it checks only the sinks it renders.
 - De-ratchet evidence: `__fixtures__/i18n-hardcoded.json` holds `{"HARDCODED_CEILING": 0}`; the
   migration finished, so I18N-18's "never raise" ratchet and I18N-18x's exact-equality +
   `CEILING_AT_S2` cap now encode a plain "zero failing sinks" behind three indirections. The

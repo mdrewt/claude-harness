@@ -373,6 +373,16 @@ Feedback items: pt3-2026-10-050, -051, -052, -062, -093
   trade rows → `client/src/main.{controls,feedbackI18n,feedbackCore}.test.ts`; PvP →
   `client/src/ui/screens/socialScreen.boot.test.ts`, `client/e2e/{monster-privacy,ranked-forfeit}.spec.ts`;
   QF8.2's Flee row needs qf-7b (QF7.1) first.
+- **As built (qf-8 resumed, 2026-10-29):** the widened `touches:` above landed QF8.1 (all four
+  deletions; `box.hint` keeps its id with a new value naming the Move row; 11 catalog ids and
+  `--mr-evo-button` retired) and QF8.3 (the three PvP e2e specs answer through the Social sheet;
+  ranked-forfeit's focus witness now holds the open sheet). QF8.2 stays DEFERred for the battle
+  Flee row alone (qf-7b): six of the seven rows are in `reachability.test.ts`'s `QF8_RETIRED`
+  sweep, hardened round-2 with a listener / shadow-root watch, model-built states and a
+  normalised label match after a red-team measured 19 CI-clean bypasses of the first version.
+  Sibling test files `catalog.test.ts`, `catalogParity.test.ts` and the `hardcodedStrings.{ts,test.ts}`
+  pair were edited beyond the list above (`touches-delta:` in the PR). The views keep their
+  now-unread callback interfaces because `main.ts` (out of touches) still constructs them.
 
 ### qf-9 — raising screen becomes Inventory; full stats move to the Monsters Summary
 category: ux restructure (absorbs R-ctl-11b-RAISINGCARDS) · severity: MED · size: LIGHT

@@ -1005,3 +1005,20 @@
 {"ev": "set", "id": "pt3-2026-10-009", "note": "All 7 decision batches ANSWERED by operator 2026-10-24 (MR#583-#588 + harness#160; answers under decisions/issue-N.answer.md). Batching encoding confirmed (#160 D2). Rulings folded into M-battle-tactics/M-trade-sessions/M-ui-foundation/M-econ-onboarding/M-identity-handles/M-world-art-pass/M-pt3-quickfix specs + PLAN SS9 + doctrine v1.7 + GDD SS7 note, same-day.", "ts": "2026-10-24T18:38:38Z"}
 {"ev": "set", "id": "pt3-2026-10-005", "note": "Operator answered harness#160 D1 2026-10-24: caps unchanged; cap-hit default escalation where quality at stake = ask-to-continue top-up, not descope. Doctrine SS5 amended, v1.7.", "ts": "2026-10-24T18:38:38Z"}
 {"ev": "set", "id": "pt3-2026-10-010", "note": "Decision-retrieval mechanism PROVEN 2026-10-24: all 7 watcher-captured answers landed in decisions/*.answer.md and were consumed same-day; #580 (expired watcher) caught by direct issue sweep \u2014 close-without-comment processed as acceptance.", "ts": "2026-10-24T18:38:38Z"}
+{"ev": "set", "id": "pt3-2026-10-068", "state": "IN-WORK", "ts": "2026-10-26T08:01:49Z"}
+{"ev": "set", "id": "pt3-2026-10-090", "state": "IN-WORK", "ts": "2026-10-26T08:01:49Z"}
+{"ev": "set", "id": "pt3-2026-10-070", "state": "IN-WORK", "ts": "2026-10-26T08:01:59Z"}
+{"ev": "set", "id": "pt3-2026-10-071", "state": "IN-WORK", "ts": "2026-10-26T08:01:59Z"}
+{"ev": "set", "id": "pt3-2026-10-069", "state": "IN-WORK", "ts": "2026-10-26T10:01:11Z"}
+{"ev": "set", "id": "pt3-2026-10-072", "state": "IN-WORK", "ts": "2026-10-26T10:01:11Z"}
+{"ev": "set", "id": "pt3-2026-10-073", "state": "IN-WORK", "ts": "2026-10-26T10:01:11Z"}
+{"ev": "set", "id": "pt3-2026-10-074", "state": "IN-WORK", "ts": "2026-10-26T10:01:11Z"}
+{"ev": "set", "id": "pt3-2026-10-054", "state": "IN-WORK", "ts": "2026-10-26T15:00:43Z"}
+{"ev": "set", "id": "pt3-2026-10-061", "state": "IN-WORK", "ts": "2026-10-26T15:00:43Z"}
+{"ev": "set", "id": "pt3-2026-10-132", "state": "IN-WORK", "ts": "2026-10-26T15:00:52Z"}
+{"ev": "set", "id": "pt3-2026-10-133", "state": "IN-WORK", "ts": "2026-10-26T15:00:52Z"}
+{"ev": "set", "id": "pt3-2026-10-050", "state": "IN-WORK", "ts": "2026-10-26T20:01:30Z"}
+{"ev": "set", "id": "pt3-2026-10-051", "state": "IN-WORK", "ts": "2026-10-26T20:01:30Z"}
+{"ev": "set", "id": "pt3-2026-10-052", "state": "IN-WORK", "ts": "2026-10-26T20:01:30Z"}
+{"ev": "set", "id": "pt3-2026-10-062", "state": "IN-WORK", "ts": "2026-10-26T20:01:30Z"}
+{"ev": "set", "id": "pt3-2026-10-093", "state": "IN-WORK", "ts": "2026-10-26T20:01:30Z"}

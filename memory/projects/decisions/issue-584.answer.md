@@ -1,0 +1,20 @@
+# DECISION ANSWER — issue 584 (OPEN)
+
+## Question (issue title)
+DECISION(pt3-battle-design): Tactical battle design: AP vs move+act, turn order, recruit %, undo/forecast, PvP clock (5
+
+## Operator response(s)
+
+### 2026-10-24T17:36:51Z
+Your suggestions of using `Pokemon Conquest`, `Devil Survivor`, and `Brigandine` as additional sources of inspiration are valid. However, something doesn't have to perfectly match up with what we're building to be a good source of inspiration, it can always inform other design decisions that don't directly conflict or even suggest a hybrid approach that no one else has tried. So continuing to use `FFTA`, `Triangle Strategy`, and `Sword of Convallaria` as inspiration sources is also valid. Take the best concepts from each of the six games and research what people thought about all of them. Find out what worked well and what people didn't like. Then use that information to help plan, design, and build a new cohesive battle system that is both fun, rewarding, and unique.
+
+- Decision 1: I accept your recommendation to use a tuned AP system. Additionally, do some research on what people like and dislike about AP battle systems and compare it to what people like and dislike about simpler battle systems like FFTA. Use this information and your best judgment regarding design and implementation specifics.
+- Decision 2:  I accept your recommendation of using a round-based speed order (every unit acts once per round, ordered by speed). It is very close to what I originally intended.
+- Decision 3: I like your recommendation and how you borrowed standard conventions. I also like the "transparency beats superstition" principle.
+- Decision 4: This relates to something I already talked about in a previous issue. It was Decision #2 in issue #583. I will pose the entire text of that issue's Decision 2 below for context.
+```
+Decision 2: I want alternative A, big-bang both at once. Additionally, I like the idea of a per-turn clock and want to speed up/streamline the combat even further by allowing players to queue up each of their monsters' next turn's worth of actions. However, the per-turn clock should not start counting down until the battle is idle on the player's turn and should reset the moment they submit a monster's actions. For battles with instant turn resolution, this won't make much difference. But if combat animations are added in the future (movement animations, attack animations, etc.), the time the animations (or other non-instantaneous actions) take to play and resolve won't count against either player. The per-monster action queue lets players plan out a monster's next actions during their opponent's turn, while other animations are playing, or in the middle of some other kind of event. The actions in a monster's queue begin playing out as soon as two conditions are met. The player marks the queue as "ready" (submitting it), and it is the monster's turn. This allows skilled players to use very little clock time each turn, with their monsters beginning to act (in order) as soon as possible. Additionally, players should be able to cancel and clear a monster's queue at any time before that monster's turn in case they change their mind about a queue of actions they submitted. Any invalid actions still in a submitted queue when a monster starts their turn are wasted. Try to fit this mechanic in with the other tactical mechanics (including the ones inspired by "Final Fantasy Tactics Advance", "Sword of Convallaria", and other games) as seamlessly as possible so everything feels like one coherent battle system.
+```
+So your "Forecast and Undo" conventions relate to my suggestion of a "per-monster action queue" that can be submitted or canceled/cleared prior to the monster's turn. Think about how this would work and try to integrate it into your solution. 
+
+- Decision 5: A combination of your recommendation and alternative A. A per-unit 30s cap with AFK auto-pass, then forfeit — replaces the current 60s secret-pick deadline. This also relates to some things I talked about in the decision above, so use that to inform your design.
