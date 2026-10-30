@@ -348,6 +348,24 @@ Feedback items: pt3-2026-10-119, -132, -133 (and the already-built contextual-su
   `reachability.test.ts`'s `QF8_RETIRED` sweep (closes QF8.2). Extend `#open`; e2e migrate to the
   command-list path (QF7.4), never deleted.
 
+
+### qf-7b — battle legacy-control retirement, remainder (QF7.1 + QF7.3 + QF8.2 Flee row)
+category: ux defect (strangler-rule violation vs CTL8I.1/CTL8J.1) · severity: MED · size: LIGHT
+touches: client/src/ui/battleView.ts, client/src/ui/battleView.test.ts, client/e2e/encounter-battle.spec.ts, client/src/ui/screens/battleScreen.boot.test.ts, client/src/ui/reachability.test.ts, client/e2e/recruit.spec.ts, client/e2e/trade-interlock.spec.ts, client/e2e/my-battle-privacy.spec.ts, client/e2e/pvp-side-b.spec.ts, client/e2e/monster-privacy.spec.ts, client/e2e/battle-dpad.spec.ts
+after: [so-2, qf-7]
+Feedback items: pt3-2026-10-132, -133 (Flee and skills/bait halves)
+
+- **QF7B.1:** THE legacy Flee button SHALL NOT render — the command list's Run is the only flee
+  affordance; every e2e that clicked it by text migrates to the command-list path.
+- **QF7B.2:** THE skills/move list SHALL render only after Fight is selected, and THE bait list
+  only after Recruit is selected (extending the `#open` command state from qf-7), with
+  `battleScreen.boot.test.ts` and the e2e that clicked a skill/bait straight off battle open
+  migrated to press the command first.
+- **QF7B.3:** THE battle Flee row SHALL join `reachability.test.ts`'s `QF8_RETIRED` sweep,
+  completing QF8.2's seven-row coverage.
+- **QF7B.4:** THE battle-safety pins (B17 battle-never-hidden, outcome grace, disabled-command
+  reasons) SHALL stay green unmodified; no e2e is deleted for convenience.
+
 ### qf-8 — mouse-only duplicate removal
 category: ux-a11y doctrine defect ("no mouse-only element") · severity: MED · size: LIGHT
 touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/evolutionView.ts, client/src/ui/evolutionView.test.ts, client/src/ui/reachability.test.ts, client/e2e/trade.spec.ts, client/e2e/pvp.spec.ts, client/e2e/pvp-side-b.spec.ts, client/e2e/evolution.spec.ts, client/e2e/recruit.spec.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/styles.css, client/src/main.partyFull.test.ts, client/src/main.controls.test.ts, client/src/main.feedbackI18n.test.ts, client/src/main.feedbackCore.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/e2e/monster-privacy.spec.ts, client/e2e/ranked-forfeit.spec.ts
