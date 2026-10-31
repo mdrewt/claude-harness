@@ -66,15 +66,19 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    sweep, tab-strip CSS, profile polish, zone-transition cue, reward visibility. Runs after so-2
    (shared `main.ts` surface); slices are FEATHER/LIGHT and fan-out friendly.
 4. **M-battle-tactics** (`M-battle-tactics.spec.md`, specced 2026-10-24; rulings folded
-   2026-10-24 — the operator's TOP priority, "immediately after any bug fixes and low-hanging
-   fruit"): combat overhaul to tile-grid tactical battles (1–3 monsters per side, tuned-AP
-   move/attack/item/recruit actions, range/origin/target/AoE attack data, round-based speed
-   order, the operator's action-queue + idle-clock mechanic). P0 design ceremony is DONE
-   (2026-10-24; `M-battle-tactics-design.md` binds elaboration); P1 = tactical wild battles and
-   P2 = PvP/ranked conversion are BUILD phases behind ONE big-bang cutover (#583 D2/D3 — the
-   1v1 system is hard-replaced when both are done); P3 = operator-deferred future features
-   (obstacles, elevation, line/cone AoE). Battle presentation (sprites/background/animation
-   placeholders) lands inside it; placeholder assets come from item 6.
+   2026-10-24; **elaborated 2026-10-30 — build-ready, 17 slices** — the operator's TOP priority,
+   "immediately after any bug fixes and low-hanging fruit"): combat overhaul to tile-grid
+   tactical battles (1–3 monsters per side, tuned-AP move/attack/item/recruit actions,
+   range/origin/target/AoE attack data, round-based speed order, the operator's action-queue +
+   idle-clock mechanic). P0 design ceremony is DONE (2026-10-24; `M-battle-tactics-design.md`
+   binds); P1 = tactical wild core, slices bt-1…bt-13 (serial game-core→server spine bt-1…bt-8,
+   then client chain bt-10→bt-11→bt-12 ‖ settlement bt-9→telemetry bt-13); P2 = PvP + cutover,
+   slices bt-14…bt-17 (PvP server/client, the live-path flip with e2e migration, then the 1v1
+   purge) — BUILD phases behind ONE big-bang cutover (#583 D2/D3 — nothing is player-reachable
+   before bt-16; the 1v1 system is hard-replaced at bt-17); P3 = operator-deferred future
+   features (obstacles, elevation, line/cone AoE; hold-gesture inputs → M-gamepad). Battle
+   presentation (sprites/background placeholders) lands inside it (bt-10); placeholder assets
+   come from item 6. First slice to launch: `bt-1`.
 5. **M-ui-foundation** (`M-ui-foundation.spec.md`, specced 2026-10-24): the shared menu
    design-language milestone — one tab-bar component, bordered context sheet, four-channel
    feedback policy, wheel + pseudo-scroll, text-size setting, single-scale-authority scaling,
