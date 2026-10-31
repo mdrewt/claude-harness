@@ -745,9 +745,10 @@ rosters; the disconnect resolver added to `resolve_all_live_interactions` uses i
   deploy window, the 300 s inactivity window and the round cap 30 this makes every wild phase
   time-bounded and closes R-rb-73-WILD-HOLD (rb-104).
 
-- **BT8.6:** WHEN a battle finishes, THE reducer SHALL persist outcome and HP through the existing
-  write-back primitive (`write_back_party_hp`), and `battle_gc` SHALL delete the battle's event,
-  unit, queue, clock, secret and wild-unit rows 24 h after finish while `battle_summary` survives.
+- **BT8.6:** WHEN a battle finishes, THE reducer SHALL write the outcome on the anchor `battle` row
+  and persist damaged HP through the existing write-back primitive (`write_back_party_hp`), and
+  `battle_gc` SHALL delete the battle's event, unit, queue, clock, secret and wild-unit rows 24 h
+  after finish while `battle_summary` survives.
 
 - **BT8.7:** WHEN the §2.2 worst-case round (6 units, 8×8, Diamond(2) AoEs, 3-action plans, AI
   plans for every wild) runs as one transaction in a native-host test, IT SHALL complete within the
