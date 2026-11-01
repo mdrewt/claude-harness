@@ -1153,9 +1153,82 @@ continuation: the probe id `u32::MAX` is reserved; a status is shown as null whe
 already KOs; `tactics_disengage` takes an optional start tile for chained Moves; the overlay query
 should omit `aim` for the stable sets so an aim change does not recompute danger/intents.
 
+**Build note (bt-11, increment B, 2026-11-01, measured):** (1) **Shipped:** the hierarchical command
+menu (`tactics/commandModel.ts`, codes only; every row predicate is a `TacticsRules` call), the
+client-local draft (`tactics/draft.ts`: push/pop, `costEntries` with the disengage tax judged at each
+Move's CHAINED start tile, the ONE `applyPlan` walk, the binding-shaped `toWire`), the pre-queue
+(same menu, `rules.freshBudget()` basis, Submit row + Start, a confirmed Clear plan row →
+`cancel_queue`, the "Too late — already acting" notice on `AlreadyActing`), the controller map
+(`battleScreen.ts`: X → danger, LB/RB → cycle, Start → start; `battleButton(…, tactical)` leaves Start
+to the adapter; `hintBar(…, battle)` grows B undo/back, X, LB, RB, Start end turn/guard/submit), the
+Command arms `submitQueue`/`cancelQueue` (policy safe; `contextStack.test.ts` literals 14/25/39),
+one more wasm export `tactics_recruit_targets(board, unit, budget)` (the Recruit targets = the
+execution gate's own Recruit chain per candidate, headroom answered true; the party-full predicate is
+the VM's `partyFull`), `ForecastOut.type_factor` (the chart multiplier over 10, reduced), 28
+`tactics.*` + 7 `chrome.chip.*` keys (catalog 425 → 460). (2) **Hidden dependency (recorded, not
+widened):** `client/src/input/router.ts:255` swallows X before any screen adapter is asked, so the X →
+danger binding is unreachable from a key until `router.ts` + `router.test.ts` route X to `ctx.screen`
+at a nav screen (R-bt-11-ROUTERX → bt-12 or a widened bt-11); the dock's Danger button is the working
+pointer twin meanwhile. (3) **Deviations:** the Item row is greyed "Not available yet" (the server
+refuses Item entries in P1, R-bt-11-ITEMROW); LB/RB cycle own units in EVERY mode (§9.2's "any time"
+wins over §9.3's "LB/RB cycle targets in aim"; the D-pad cycles targets); the type line will print
+the wasm-exported factor (×2 / ×1/2) rather than a catalog literal; a status is listed without a
+percent (P1 `applies_status` has no chance). (4) **Not wired in main.ts (BT12.1):** `TacticsBattle`
+is still not constructed — a hidden second `battle-title` root under `#app` would collide with the e2e
+and main.*.test.ts `querySelector` chains — so main.ts gains only the two dispatch arms; bt-12 passes
+`battleButton`'s `tactical` flag and the hint's `battle` arg from the live shell. (5) **Increment C
+DEFERred to the same slice id** on the budget warn flag: BT11.3's pips/badges/`only N held`
+(`tactics/queueStrip.ts`), BT11.4 (the forecast panel over `forecastVM`), BT11.5
+(`tactics/provisionalBoard.ts` + the Projected style). The plan's REV 4 §R4.5/§R4.6/§R4.8 + REV 5
+A31–A33/A38 are the continuation's contract; the shell already computes a per-unit cost board and a
+`Planning` frame the panel and the projection plug into. (6) Residuals registered: R-bt-11-ROUTERX
+(MED → bt-12), R-bt-11-ITEMROW (LOW), R-bt-11-PRACTICEKIND (LOW → bt-12), R-bt-11-PARTYFULL (LOW →
+bt-12). (7) **One more pin file the measured touches missed:** `client/src/ui/i18n/resolver.test.ts`
+snapshots the exact table of every plain `chrome.*` value (25 → 32 with the seven `chrome.chip.*` hint
+verbs), so it reds on any new `chrome.*` key — edited as a named intentional change and declared under
+the PR's `touches-delta:`; bt-12/bt-15 (more hint verbs) should list it in `touches:`.
+
+**Build note (bt-11, increment C, 2026-11-01, measured):** (1) **Shipped (BT11.3 / BT11.4 / BT11.5
+closed):** the strip model `tactics/queueStrip.ts` (`stripVM`: a chip's cost is the rules' plan of the
+steps up to it on the CURRENT board, tax included; ✓ firm / ~ provisional / ✗ stale judged step by step
+on the board the unit will ACT on, and once stale every later chip is stale; `~ only N held` from the bait
+counts over every own unit's plan), the forecast panel (`forecastVM` over `tactics_forecast` /
+`tactics_recruit_odds`: hit %, min–max, the type factor the wasm now exports, STAB, flank, Guard, the
+full / hollow skull, First Stand, the status, the recruit % with its four line items as the rules give
+them and the live bait selector), the projection `tactics/provisionalBoard.ts` (`project`: own plans in
+initiative order, each wild's `ai::plan` in PvE asked of the board as it stands at its turn, enemies
+frozen in PvP, a KO'd unit acts no more, an asleep wild skips) and the Projected style (a dashed wrapper
+with the i18n label, a tilde node before every number, "if X is still at C4" in A1 notation, "assumes
+enemies hold" in PvP, `—` for a PvP enemy that acts first). `draft.ts` exports `applyAction`, the ONE step
+`applyPlan`, the strip and the projection all fold. 26 `tactics.*` keys (catalog 460 → 486). (2) **Board
+policy, decided in review:** a chip's LEGALITY is judged on the projection up to the unit's turn (the same
+board the menu offered the aim on), its COST on the live board; the danger overlay and the intent chips are
+computed on the live board with every own plan applied and every enemy HELD — the literal "full projection"
+reading of the plan (wilds already moved) produced the turn-after-next, so a wild's chip is its plan given
+this player's plans and danger is where enemies can strike on their upcoming turn; the planning unit keeps
+its LIVE row on its aim board (an enemy plan that would KO it must not grey its menu). (3) **Three increment-B
+defects found by the reviews and fixed here:** the in-flight submit key never re-armed after "Clear plan" or
+when a READY row landed, so a re-plan in the same turn was silently swallowed (game-core replaces a unit's
+plan on resubmit) — it now re-arms on both; every input op is atomic (a rules throw while entering an aim
+restores the pre-op state, the frame stays byte-identical); and `applyPlan` judged flank on the board the
+earlier hits of an AoE had already changed, where game-core judges it on the pre-attack board for every
+target (resolve.rs) — fixed in `applyAction`, covered by game-core's own pin; a client-side draft test
+with an AoE that KOs a flanker mid-hit-set is left to the tester (disclosed). (4) **Disclosed, not fixed:** the strip
+empties between a pre-queue Start and the READY row's arrival; the `—` line has no accessible name beyond
+the dash; the ✓ / ~ / ✗ and skull glyphs are CSS `::before` (no runner proves they draw); the forecast is not
+announced to assistive technology while aiming (R-bt-11-FORECASTANNOUNCE, LOW → bt-12). (5) **Process:**
+the plan (REV 6) was reviewed by reviewer + red-team (seven MAJORs folded in as REV 6.1/6.2 before the
+tester); `/tmp/mr_warn_bt-11` rose after green, so the implementation got ONE combined review lens
+(correctness + rule-home: one MAJOR — the flank board — and five MINORs, all applied except an optional
+overlay-reuse perf item) instead of the four-lens fan-out and no separate verifier — the full `just ci`
+and `mr-gates check` ran. `docs/DECISIONS.md` (outside the touches) still says intent chips are computed
+"on the shared provisional board"; under (2) that board is the live rows with own plans applied and the
+enemies held — a one-clause correction for the supervisor or bt-12. `TacticsBattle` is still not constructed by main.ts (BT12.1); R-bt-11-ROUTERX
+stays with bt-12.
+
 ### bt-12 — client: subscriptions + store ingest, deploy confirm + formation editor, results, screen wiring, wild e2e
 category: ux + critical user flow · severity: HIGH · size: HEAVY
-touches: client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/net/connection.runtime.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/tactics/deployPanel.ts, client/src/tactics/deployPanel.test.ts, client/src/tactics/results.ts, client/src/tactics/results.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/contextStack.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.battle-reseed.test.ts, client/src/ui/reachability.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/tactics-wild.spec.ts, client/e2e/controls.ts, scripts/verify-build-hooks.mjs, scripts/verify-build-hooks.test.mjs, client/src/styles.css, client/src/tactics/strings.ts, client/src/tactics/strings.test.ts
+touches: client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/net/connection.runtime.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/tactics/deployPanel.ts, client/src/tactics/deployPanel.test.ts, client/src/tactics/results.ts, client/src/tactics/results.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/contextStack.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.battle-reseed.test.ts, client/src/ui/reachability.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/tactics-wild.spec.ts, client/e2e/controls.ts, scripts/verify-build-hooks.mjs, scripts/verify-build-hooks.test.mjs, client/src/styles.css, client/src/tactics/strings.ts, client/src/tactics/strings.test.ts, server-module/src/tactics.rs, server-module/src/tactics_tests.rs, client-wasm/src/lib.rs, client-wasm/src/tactics_tests.rs, client/src/tactics/wasm.ts, client/src/tactics/wasm.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/main.help.test.ts
 after: [bt-11]
 Split seam: subscriptions + ingest + deploy ‖ results + wiring + e2e. Design: §3.3 (deployment UX, remembered formation), §9.3 (results), §8.1 (views), §11 T9/T10.
 Measured: `connection.ts` holds one `subscribe([...])` list of 23 `SELECT * FROM` strings pinned at
@@ -1196,6 +1269,66 @@ dev_start_tactical_wild` via `execSync` (dev reducers are not page-callable), cl
 
 - **BT12.6:** WHEN the new panels mount, EVERY string SHALL come from the typed catalog (en+fr) and
   THE reachability sweep SHALL cover every new panel and row.
+
+**Build note (bt-12, increment A, 2026-11-01, measured):** (1) **Split + DEFERs (3 of 6, the legal
+maximum):** A meets BT12.3, BT12.4 and BT12.6 and ships the ingest / deploy / results halves of BT12.1 and
+BT12.2; BT12.1 (the Active-phase owner), BT12.2 (three clauses) and BT12.5 (the wild e2e) are DEFERred to
+the same slice id's continuation on FOUR hidden dependencies outside the touches, recorded as residuals:
+R-bt-12-TACTICSEXPORTS (MED — `TacticsBattleVM.surgeStartRound` / `wildRoundCap` are game-core tuning and
+`nextInitiative` is `initiative::order` + `priority_for_round`; no wasm export carries them, copying is banned,
+so main.ts cannot build an honest Active-phase VM: client-wasm `lib.rs` + `tactics_tests.rs` + `tactics/wasm.ts`
++ `wasm.test.ts` need a `tactics_tuning()` (incl. `MAX_PACK`) and a next-round initiative export),
+R-bt-12-WILDCOMPOSITION (HIGH — `start_wild_tactical` seats only wild 0 in the anchor's `side_b`, `battle_unit`
+rows exist only after `materialize` and `battle_wild_unit` has no view, so the client cannot show the pack
+during Deploying), R-bt-12-DEPLOYDEADLINE (MED — the Deploying deadline lives only in the private
+`tactical_deadline_sched` row; the side-A clock starts with `window_open_ms` / `deadline_ms` None, so the
+"Still there?" countdown has no client-visible source in Deploying) and R-bt-11-ROUTERX (X never reaches a
+screen adapter at a non-world base: "X opens the editor" is reachable by the Edit formation row, D-pad + A and
+the pointer twin until `router.ts` routes it). The supervisor is asked to widen the continuation's touches by
+those files or re-home BT12.2's composition / countdown clauses to bt-14. (2) **Shipped:** the seven views
+subscribed (`connection.ts`: 23 → 30 queries; `onInsert` / `onDelete` → the one batcher, no `onUpdate`, no
+per-row write; seven reconciles each in its OWN try BEFORE `flushBatch()`, so a throwing converter is contained
+to its view and `refreshBattle` reads the phase in the same batch), seven converters + `queuedActionToRule`
+(the exact inverse of `draft.ts toWire`) with `HANDLED_ENUM_VARIANTS` 10 → 21 keys (an unknown payload-carrying
+tag — `TurnState`, `QueuedAction`, `ActionTarget` — DROPS that one row with one `console.warn`, never a throw;
+a malformed row still propagates to the per-view guard), seven authoritative store maps (`deepRowEq`, dirty
+only on a real change; `my_formation` is an Option-view slot; `reset()` clears all seven; units carry the ONE
+bt-11 `unitRowOf` join as `row`), `tactics/deployPanel.ts` (pure `resolveFormation` / `deployVM` / `picksOf`
++ the `DeployPanel` shell: confirm screen, editor, a TOKEN lock released on settle, hide() or a new battle,
+pointer twins), `tactics/results.ts` (pure `resultsVM` folding `Awards` / `RecruitResult` over the RAW anchor's
+side + the `ResultsPanel`, built once, compute-then-write), `battlePolicy.ts` (`battleRenderer`,
+`hideOtherBattleViews`, `shouldAutoContinue`, `structurallyEqual`; `deployUnits: 'safe'`, 15/25/40), the
+`deployUnits` Command arm, and the main.ts wiring: `refreshBattle` routes by phase (Deploying → the deploy panel,
+Finished → the results panel, Active → the 1v1 view as on master until the continuation), the three
+`battleView` table rows go through one set of battle-frame helpers, the panels are built LAZILY on the first
+batch that routes to them (a second `battle-title` root under `#app` would collide with every legacy selector),
+a renderer SWITCH under a frame over the battle base first pops to the base (the three roots share one overlay
+a11y record), the results auto-advance runs from the frame pump on `outcomeShownAtMs` + `CAPS.resultsMs` once per
+shown edge (a frame over the outcome pauses and restarts it), `battleButton`'s `tactical` flag and the hint
+bar's `battle` arg are true only while the deploy EDITOR is open. 18 `tactics.*` keys (114 → 132; catalog 486 →
+504; the results title reuses `battle.outcome.*`). (3) **Deviations, disclosed:** `resolveFormation` is a TS
+mirror of `server-module/src/tactics.rs::resolve_formation` (server glue, not game-core; the server validates
+every pick but not that A sent the resolved default, so the mirror IS the pack≥2 default rule until the export
+lands — R-bt-8-FORMATIONRULE stays targeted, a `docs/DECISIONS.md` exception is requested of the supervisor);
+at the CONFIRM screen Start opens the main menu (CTL6C.1) rather than sending — Escape is Start's key and the
+spec binds Start only in the editor; currency is per PLAYER (one `+N gold` line summing every `Awards` line) since
+the server writes 0 on every per-monster line; the editor's hint chips reuse the shell's (R-bt-12-DEPLOYHINT,
+LOW); monsters in the player's open trade are still offered (R-bt-12-TRADEDEPLOY, LOW). (4) **Tests:** 45
+BT12 tags over 10 files, 42 of the first 43 RED on the API freeze (the `deployUnits: 'safe'` row shipped with the freeze: the
+total policy table is a typecheck error without it); named pin moves 23 → 30, 10 → 21, 14/25/39 → 15/25/40,
+114 → 132, 486 → 504, and SO2-6-SHAPE drops its `battleView` value clause (a grandfathered source scan; the
+runtime survivors are BOOT-FRAME-OWNER and BOOT-DEPLOY). The tester corrected ONE case from the code: Help cannot
+open over the outcome frame (`battleView` is EXCLUSIVE_TOP in the overlay registry), so the covered-outcome
+countdown case uses a server conversation. The implementation lens found two MAJORs, fixed and gated by two
+round-3 tests watched RED on the pre-fix commit: a renderer switch under frames over the battle base popped
+EVERY upper frame and would have ended a suspended server conversation (now `popPlayerFramesOverBattle`
+keeps the dialogue frame), and the deploy cursor moved with no focus move (silent to assistive technology;
+the listbox is focused on every cursor paint). Not taken: a `visibilitychange` re-stamp of the results
+countdown (a tab hidden across the whole cap pops on return — R-bt-12-HIDDENTAB, LOW). (5) **Process:** plan reviewed by reviewer + red-team (5 + 5
+MAJORs folded in as REV 2 / REV 2b before the tester); `/tmp/mr_warn_bt-12` rose after RED, so the
+implementation got ONE combined lens and no separate verifier (the orchestrator ran the full `just ci`, the
+test-diff audit and `mr-gates check`). X2 (the shipped golden e2e against a live local server) proves the seven
+subscriptions apply for real: one bad entry would error the whole batch and hang every session.
 
 ### bt-13 — pacing simulation gate + H1/H2 continuity proof (after bt-9, beside the client chain)
 category: gameplay (pacing) + loop-ops (telemetry) · severity: MED · size: LIGHT
