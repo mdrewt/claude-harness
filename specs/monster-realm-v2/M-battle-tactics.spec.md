@@ -501,6 +501,23 @@ assumption on BSATN types; append-only variants) and re-baseline `spacetime-type
   `AutoPass`, `StoodGround`, `Status`, `Surge`, `KO`, `RecruitResult`, `Awards` — and a halted
   plan's discarded tail SHALL never appear in any event.
 
+Build note (bt-3, 2026-10-31, measured): the machine is `tactics::queue::TacticalBattle` with
+the inputs `start` / `advance(AdvancePin{battle_id, round})` / `submit_queue(sender: Side, …)` /
+`cancel_queue(sender, unit)` / `expire(now, unit, window_seq)` / `conclude(outcome, how)`; a hook
+trait `queue::Hooks` is the seam later slices use (the planner — bt-4, inventory — bt-8, recruit
+headroom and Item/Recruit/Flee resolution — bt-5/bt-9), because none of their `touches:` includes
+`queue.rs`; hooks see the state with `seed`/`action_seq` zeroed and may emit only
+`RecruitResult`/`Awards`/`Status`. The SpacetimeType derive accepts only unit or one-field
+variants, so every payload variant wraps a struct (`Move(MoveAction)`, `Executed(ExecutedEvent)`);
+`EventPayload` adds `Moved`, `ItemUsed`, `TurnEnded`, `RoundEnded`, `BattleStarted`, `BattleEnd`
+after the design's list. `BattleEndHow` (bt-2, out of touches) has no Forfeit/Fled/AutoFlee, so
+the storage `EndHow` carries them and `queue.rs` sets the outcome itself (residual → bt-14).
+Persisted fields design §8.1 lacks: `battle_tactical.pending_pad_ms`,
+`battle_tactical.attack_damage_dealt`, `battle_unit.budget_last`; `battle_clock` is keyed by
+side (Practice: one player, both sides, strikes per side) — residual → bt-7. A submit landing
+after its deadline but before the fire commits is accepted (the fire is then `StaleWindow`).
+Turn-skip (`status_blocks_turn`) is a third restated carried rule, pinned, retired with bt-17.
+
 ### bt-4 — game-core `tactics::ai` (seed-free stances) + `tactics::encounter` (packs, clamp, per-wild seeds, map pick)
 category: gameplay (wild AI + encounter generation) · severity: MED · size: MODERATE
 touches: game-core/src/lib.rs, game-core/src/tactics/mod.rs, game-core/src/tactics/ai.rs, game-core/src/tactics/ai_tests.rs, game-core/src/tactics/encounter.rs, game-core/src/tactics/encounter_tests.rs, game-core/src/tactics/golden.rs, game-core/src/tactics/golden_tests.rs, game-core/tests/fixtures/tactics_golden.json, client/src/tactics/golden.parity.test.ts, client-wasm/src/lib.rs, docs/DECISIONS.md
@@ -544,6 +561,27 @@ rules take `PackWeights` and `BattleMapPool` parameters (content joins them in b
 - **BT4.8:** WHEN the sampled frozen boards of the golden fixture are planned, THE wasm `ai::plan`
   SHALL return byte-identical plans to the native one (intent-chip parity joins the bt-1 harness).
 
+Build note (bt-4, 2026-10-31, measured): `ai::plan(state, unit, stance, spawn, &TacticsTuning)` —
+the stance (`battler.stance`, bt-6) and the spawn tile (`spawn_b[slot]`) are not in `TacticalState`, and
+every rule reads the tuning, so the shell's `Hooks::plan_ai` impl passes them; the signature still carries
+no RNG or seed (the compile shape). The planner costs from `TurnBudget::fresh` (the intent chip sees idle
+budgets), costs the trailing `EndTurn`, and derives the candidate set from the economy (`plan_cost`), which
+at the design tuning IS "Heavy after ≤ 1 stride, else Light after ≤ 2 strides" and demotes the taxed
+cases the literal reading would halt at pop; it prefers the tier before the tile (a Heavy after one stride
+beats a stationary Light), emits the minimal stride count, breaks every tile tie by `(primary, path cost,
+y, x)` (the own tile costs 0: a move needs a strict improvement), never self-hits, ignores a later kit
+entry repeating an earlier `skill_id`, and a Skittish wild with no in-band tile in reach approaches (no
+Heavy in kit → band 2). "Distance" is Manhattan: an approach no reachable tile improves stays put. The
+Territorial leash (2), the Skittish band pad (2) and the Exhausted factor (4) are consts in `ai.rs`, not
+`TacticsTuning` fields (residual → bt-6). `encounter`: `roll_pack_size` = `encounter_seed % 1000` against the
+cumulative per-mille thresholds, `wild_seed(i)` = `splitmix64(encounter_seed ^ i) as u32`, `pick_map_index`
+= `encounter_seed % pool_len` in u64, `spawn_tiles` = `spawn_b[..pack]`, `generate_encounter(weights,
+pool_len, seed, conscious)` → `{map_index, seeds}`; `conscious_party_count == 0` is an error; species/level
+per slot are untouched (bt-9 must not re-run the trigger gate per slot). BT4.8 joined the golden harness as
+`GoldenCase::AiPlan {rows, units, seed, action_seq, unit, stance, spawn}` (20 cases; the state passed as
+given — the planner's blindness, not the runner's); no `client-wasm` change (serde dispatch); the direct
+`tactics_ai_plan` export is bt-11's.
+
 ### bt-5 — game-core `tactics::recruit` + `tactics::rewards` (rules only; server glue is bt-9)
 category: gameplay (recruit + reward rules) · severity: HIGH · size: MODERATE
 touches: game-core/src/lib.rs, game-core/src/tactics/mod.rs, game-core/src/tactics/recruit.rs, game-core/src/tactics/recruit_tests.rs, game-core/src/tactics/rewards.rs, game-core/src/tactics/rewards_tests.rs
@@ -562,7 +600,8 @@ Measured: carried `recruit_chance(max_hp, current_hp, base_rate, bait_bonus) -> 
 - **BT5.2:** WHEN recruit odds are computed, THE rule SHALL call the carried `recruit_chance(max_hp,
   hp, base_rate = 80, bait_bonus)` unchanged, quantize `pct = permille / 10`, succeed iff
   `roll % 100 < pct`, and expose line items that always sum — base ⌊80/10⌋ = 8, bait ⌊b/10⌋,
-  weakened = pct − 8 − bait — so a wild at 20 % HP with bait 150 ‰ shows 8 + 15 + 40 = 63 %.
+  weakened = pct − 8 − bait — so a wild at 20 % HP with bait 150 ‰ shows 8 + 15 + 40 = 63 %. (Built: the bait line
+  is `min(⌊b/10⌋, pct − 8)` — it only bites at the 1000 ‰ cap, so the lines still sum; bait > 1000 ‰ is rejected.)
 
 - **BT5.3:** WHEN headroom is absent at execution (injected `check_headroom` result), THE Recruit
   entry SHALL be invalid — halt-and-return, nothing charged — and the same predicate SHALL be
@@ -583,8 +622,9 @@ Measured: carried `recruit_chance(max_hp, current_hp, base_rate, bait_bonus) -> 
   in-battle ledger: XP (wild battles: 50 % to the killer and 50 % split evenly over the other
   deployed allies conscious at that moment, integer division with the remainder to the killer, 100 %
   when alone; PvP: none), essence (carried `essence_battle_reward(bst)`, 100 % to the killer in
-  every battle kind), currency (wild: carried `battle_currency_reward(bst)` to the player; PvP:
-  none); a recruit success SHALL never fire the hook.
+  every rewarded battle kind — Wild and Pvp; Practice pays nothing, design §6.1), currency (wild: carried `battle_currency_reward(bst)` to the player; PvP:
+  none); a recruit success SHALL never fire the hook. (Built: a same-side KO and a wild's kill pay
+  nothing; a level outside `Level`'s range skips the XP only; a KO is credited at most once.)
 
 - **BT5.7:** WHEN the ledger is paid, EACH monster's share SHALL be paid only if it is conscious at
   battle end (fainted shares forfeited, not redistributed; benched members receive nothing) and
@@ -647,6 +687,31 @@ power lengthens the 1v1 fights those specs still drive before cutover.
   be cached by `LazyLock` accessors in `content_cache.rs`, and the frozen skills golden SHALL be
   updated to the retuned values (values only — ids and names unchanged).
 
+**Build note (bt-6, measured):** (1) **Heavies → 70, not 65.** The BT6.5 lint is unsatisfiable at
+Heavy 65 / Light 20: at L8–9 (`2L/5+2 = 5`) `dmg_ref` is 8 vs 4, and `8 > 2·4` fails; 70 is the
+smallest Heavy power that holds at every level 5..=100 (computed). Fire Fang (2) 65→70, Razor Leaf
+(6) 55→70, Thunder Fang (41) 65→70, Radiant Lance (43) stays 70 — inside BT6.1's "65–75" band;
+BT6.1's "Razor Leaf 55 → 65" is superseded by the lint. (2) **BT6.2's kit ⊆ `learnable_skill_ids`
+is DEFERRED** — a hidden dependency on `game-core/content/species/*.ron` (outside touches): species
+2, 6, 7, 8, 9, 20, 21, 22, 23, 30 learn only Lights and/or weather setters, and no Water, Dark,
+Earth or Wind Heavy exists. They ship provisional kits (an existing Heavy, all lints green) and a
+test pins that exact off-learnable set; the follow-up adds species Heavies, flips the pin to ∅ and
+adds the subset check to `build_kits`. (3) RON writes the fixed-size `kit` pair as a tuple
+`(light, heavy)`. (4) R-bt-3-TUNINGVALID's floors land as `TacticsContentError::TuningFloor` in
+`tactics/content.rs` (`tuning.rs` is outside touches); R-bt-4-TUNINGCONSTS: the ai/encounter
+consts stay where they are (BT6.4 enumerates only the `TacticsTuning` constants).
+
+**Build note (ci-fix-20261031T1900, 2026-10-31, measured):** the `MAX_ATTACKS = 30` widening above guarded
+the wrong budget. `encounter-battle.spec.ts` attacks with the FIRST skill cell (Ember, now 20) on a starter
+whose SQL level seed leaves its level-5 creation stats in place (attack 8–12, HP 19–21); against the seeded
+defense 250 the wild's Heavy lands the floor 1 per turn, so the fight is an HP race, not an attack count.
+Enumerating all 2^32 encounter seeds through the real roll/derive/damage path: P(win | fought non-Water
+wild) = 79.4 % on the natural roll (species 1: 69.1 %) — master red on ~21 % of runs after the retune (CI run
+41227281094). Fix, e2e-side as this note intends: seed `stat_attack = 100` the way `battle-dpad.spec.ts`
+already seeds all six stats → ≤ 4 Ember hits against the toughest draw (Lv7 Flameling, def 15, HP 25),
+P(win) = 100 %, plus a read-back assertion of the seeded row. Content, lints and CONTENT_VERSION untouched;
+BT6.1/BT6.5 forbid the content revert (Light 40 would need Heavy ≥ 113 at L5).
+
 ### bt-7 — server schema: the tactical tables, participant/owner views, manifest + cascade, bindings, privacy proofs
 category: security-privacy + data-integrity (schema) · severity: CRITICAL · size: MODERATE
 touches: server-module/src/schema.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/native_host_tests.rs, client/src/module_bindings/, evals/baselines/table-schemas.json, evals/baselines/spacetime-types.json, evals/baselines/client-visible-tables.json, evals/account-e2e.eval.mjs, docs/DECISIONS.md, ARCHITECTURE.md
@@ -697,6 +762,45 @@ in the owning module (pvp.rs idiom) and land with their reducers in bt-8.
 - **BT7.5:** WHEN the structural baselines are regenerated, `battle-schema-snapshot` and
   `spacetime-type-snapshot` SHALL be re-baselined additively (every pre-existing table and type
   byte-identical), `bindings-drift` SHALL be 0, and the publish-over-data proof SHALL pass.
+
+**Build note (bt-7, 2026-10-31, measured):** (1) **Tables with no Identity column are
+`ViaJoin("battle")`, not `Erase`** — `battle_tactical`, `battle_secret`, `battle_wild_unit` and
+`battle_event`; the manifest's typed rule (`m22s6_owner_keyed_tables_are_erase_or_anonymize`) requires an
+Identity column on every Erase/Anonymize table, and these rows hang off the anchor by `battle_id`. The
+five identity-bearing tables are Erase (`battle_unit`, `battle_queue`, `battle_deploy`, `battle_clock`,
+`player_formation`) and `battle_summary` is Anonymize with `player_identity` + `opponent_identity`
+columns mirroring `battle`. (2) **Keys decided at first publish** (a later PK/unique change is
+automigration-forbidden): `battle_unit.unit_id` is a global `auto_inc` u32, so `battle_queue`'s
+"unique (battle_id, unit_id)" is PK `unit_id`; `battle_deploy`, `battle_clock`, `battle_wild_unit` and
+`battle_event` carry synthetic `auto_inc` keys (their natural keys are pairs); `player_formation` is
+keyed by the owner identity. (3) `battle_unit.owner` is `Option<Identity>` as designed and carries no
+index (sum types are not indexable); the cascade collects battle ids from every row that still names
+the identity (the reaper's first step can delete an ongoing wild anchor first) and sweeps the whole
+battle's rows by `battle_id`. (4) game-core's `MoveClass`, `Side`, `ai::Stance` and `economy::Entry`
+are not wire types, so schema.rs carries `SpacetimeType` twins (`SideRow`, `MoveClassRow`, `StanceRow`,
+`BudgetLastEntry` + `BudgetMoveSpend`); `max_hp` is not stored (it is `stats.hp`); `battle_deploy`
+carries `side` (one owner stages both sides of a Practice battle); `battle_summary` carries BT9.5's
+`unit_turns_prequeued`, `unit_turns_live`, `halted_plans`, `se_kos_after_r1` now (bt-9 has no
+schema.rs in touches); R-bt-3-PERSIST's columns land as `battle_tactical.{pending_pad_ms,
+attack_damage_dealt_a, attack_damage_dealt_b}` and `battle_unit.{slot, budget_last}`. (5) The three
+cascade and claim-flow helpers (`has_formation`, `rekey_formation`, `erase_tactical_rows`) live in
+schema.rs (the module that declares the tables; `accounts.rs` writes only its own). (6) The
+`account-e2e` vacuity allowlist grows from 3 to 10 with seven `(until bt-8)` rows: the tactical tables
+have no organic writer until bt-8's reducers and their columns are not DML-expressible;
+`battle_secret` and `battle_wild_unit` are SQL-seeded under the subject's terminal battle so their
+sweep is proven live. (7) **bt-8's `touches:` must widen** to `server-module/src/schema.rs` (manifest
+entries for its three scheduled tables, `ViaJoin("battle")`), `server-module/src/accounts_tests.rs`
+(the rosters), and `evals/account-e2e.eval.mjs` (the transcription + retiring the `(until bt-8)`
+rows); `accounts.rs` too if the helpers re-home into `tactics.rs`. (8) **Review findings carried as residuals** (reducer-security-auditor, bt-7): `battle_summary`
+and `player_formation` are personal data kept out of the export bundle by BT7.4 — the DECISIONS
+rationale no longer claims the summary holds no personal data; widening the export is the spec
+owner's call (R-bt-7-SUMMARYEXPORT); `QueueVoided` events reach both sides, so the opponent learns a
+READY plan existed on a KO'd unit — design §2.3 approves the event, §6.3 reads otherwise
+(R-bt-7-QUEUEVOIDED); bt-8's disconnect / forced-terminal paths must sweep tactical rows by
+`battle_id` whenever they end or delete a `battle` row, since the reaper's 6a step can delete an
+ongoing wild anchor before `erase_tactical_rows` runs (R-bt-7-BT8ORPHANS). The cascade test gained
+two anchor-only battles (one per anchor role) after both review lenses measured the `battle` anchor
+lookups as untested.
 
 ### bt-8 — server `tactics.rs`: wild engine reducers, turn chain, clock scheduling, dev start, disconnect GC, GC
 category: gameplay + security-privacy (reducers) · severity: CRITICAL · size: HEAVY
@@ -756,6 +860,50 @@ rosters; the disconnect resolver added to `resolve_all_live_interactions` uses i
   recorded in this slice's build note; if the host's reducer limit is exceeded, THE fallback is
   one unit-turn per transaction (design §12-F(g)) recorded as a build-note decision.
 
+**Build note (bt-8, 2026-11-01, measured):** (1) **`mod tactics;` sits between `schema` and `taming`**, not
+"between taming and trading": rustfmt's `reorder_modules` sorts the declarations and the census
+`EXPECTED_MODULES` pins declaration order. (2) **`dev_start_tactical_wild(player: Identity, pack: Option<u8>)`**
+takes the subject and a forced pack: `spacetime call` runs as the publisher, never the browser identity, so the
+e2e seeding bt-12 describes needs a third-party start; allowed for the caller itself or the module owner; the
+caller is gated by `require_not_deleting`, the subject by `require_subject_not_deleting` inside
+`start_wild_tactical`; `Some(n)` must be `1..=3` and `≤` the conscious party (reject). (3) **The battle seed is
+`splitmix64(encounter_seed ^ BATTLE_SEED_SALT)`**, never the encounter seed: `resolve::draw` and
+`encounter::wild_seed` are the same mixer, so roll `i` would equal wild `i`'s individuality seed. (4) **Per-wild
+species/level come from ONE `resolve_encounter` call** over the zone table with `encounter_rate` made total (the
+grass trigger already happened upstream) with the roll seed `splitmix64(wild_seed(seed, i) ^ SPAWN_ROLL_SALT) >> 32`
+— `resolve_encounter` and `roll_individuality` share one splitmix32 mixer, so rolling from the individuality seed
+itself would tie a wild's level band to its IVs (verifier F6); `individuality_seed = wild_seed(seed, i)` for rolled and
+forced packs alike. (5) **`Item` and `Recruit` entries are refused at submit** (`"submit_queue: items and recruit are not
+available until bt-9"`) and in `Hooks::validate_delegated` (`NotAllowed`): design §8.3 names no game-core home
+for item range / Ally filter / cure match (R-bt-8-ITEMRULE → bt-9) and the recruit glue is BT9.2; the reward
+ledger and `battle_summary` are bt-9's. (6) **A wild `deploy_units` never writes a `battle_deploy` staging row**
+(it materialises directly; staging is PvP's secret deploy, bt-14), so the e2e's `battle_deploy` vacuity row is
+permanent. (7) **The Deploying window rides `tactical_deadline_sched` as `(battle_id, unit_id 0, window_seq 0)`**
+— frozen once shipped; a deadline row is armed at the clock's own `deadline_ms` (`t0 + pad + budget`) and a
+premature fire re-arms there; an advance row is armed only when a step ends in `Advancing` AND moved the
+boundary (a pre-queue or cancel during `Advancing` arms nothing). (8) **`battle_gc` also deletes
+`battle_tactical` when the anchor row is already gone** (the legacy prior-terminal sweep deletes terminal
+anchors; R-bt-8-TACTICALSWEEP → bt-9); otherwise the BT8.6 roster holds (`battle_tactical`, `battle_summary`,
+the anchor survive). (9) **The anchor mirrors the units' HP on every write**, so a legacy `flee` on a tactical
+anchor persists the current tactical HP (no disconnect-to-heal) — the legacy 1v1 reducers still accept a
+tactical anchor until bt-16 (R-bt-8-LEGACYREDUCERS). (10) **BT8.7 measured the SHIPPED worst case**: the
+largest AoE in content is Diamond radius 1 (skill 6; a Diamond(2) kit does not exist and the kit join refuses an
+unknown skill) — 3 player units with the Heavy-6 kits vs a forced pack of 3 on an 8×8 map, every player unit
+pre-queued with a 3-entry plan, one `tactical_advance` transaction: `TurnEnded == 6`, executed + moved ==
+authored entries, ≤ 18 resolved actions, one `RoundEnded`; **0.029 s** on the pinned host under
+`cargo nextest` (native, warm content cache — NOT the wasm reducer limit, which no local gate measures). The
+chain rule stands; the §12-F(g) one-unit-turn fallback was not needed. (11) **The account-e2e `(until bt-8)`
+vacuity rows were re-tagged `(until bt-16)`, not retired**: the e2e module is built without `dev_reducers`, so no
+reducer can seed a tactical battle there (an owner-run `spacetime call dev_start_tactical_wild <A>` would, but only
+on a dev build sequenced into the exact-order S9 roster); the three schedule tables join the allowlist (cap 10 → 13;
+`tactical_advance_sched` is permanently unobservable — zero-delay) — R-bt-8-E2EVACUITY → bt-16. (12) **Measured
+census constraints for bt-9/bt-14** (`privacy_enforcement_tests.rs`): the gate must be spelled
+`crate::guards::require_*` at depth 0 in the reducer body (a gate inside a helper reads as UNGATED), `use … as`
+rename bindings are refused, and an impl-block fn whose signature names `ReducerContext` is refused (a `Hooks`
+impl may hold `ctx` in a struct field but must be built by a free fn). (13) Content for the shell is the
+game-core embedded registry parsed once per process (`validate_tactics_content`, `TypeChart::new(load_type_chart())`,
+`load_encounters`); native tests seed no `species_row` / `skill_row` / `type_relation_row`.
+
 ### bt-9 — server `tactics_settle.rs`: rewards funnel, `battle_summary`, recruit/flee execution glue, the R-21r-a trio, H1/H2 continuity
 category: gameplay + data-integrity (settlement) · severity: HIGH · size: MODERATE
 touches: server-module/src/lib.rs, server-module/src/tactics_settle.rs, server-module/src/tactics_settle_tests.rs, server-module/src/tactics.rs, server-module/src/privacy_enforcement_tests.rs, server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/taming.rs, ARCHITECTURE.md
@@ -801,6 +949,56 @@ with the same fields; the script itself is unchanged.
 - **BT9.7:** WHEN a tactical recruit attempt resolves, THE server SHALL write a `playtest_event`
   kind-1 row with the same `hp_permille`, `bait_item_id` and `success` semantics as today's
   `record_recruit_event`, so the H1/H2 proxies keep reporting across the cutover.
+
+**Build note (bt-9, 2026-11-01, measured):** (1) **Nothing in game-core calls
+`rewards::on_unit_defeated`** (`rewards.rs` says "the shell calls it after the KO sweep"); the shell sees the
+board only between transactions, so the ledger is a FOLD of the persisted transcript at finish
+(`tactics_settle::ledger_of`): each `Ko` is credited to the attacker of the LAST opposite-side hit on the victim
+(any `hit`, a status-only one included; a never-hit victim earns nobody anything) against the board as it stood
+at that moment — the final board with the units not yet fallen restored (`board_at`), exact while consciousness
+is monotone (no heal/revive item) and `sweep_kos` emits KOs in `(side, slot)` order; `rewards::pay` then pays only
+the units conscious at the end, on every terminal path alike. The fold and the attribution are the shell's —
+residual R-bt-9-LEDGERHOME (→ the game-core slice that also takes R-bt-8-ITEMRULE). (2) **Payout runs through the
+1v1 funnel's own per-monster credit** (`battle::credit_monster`, extracted) over the WHOLE conscious party,
+benched members included: the ledger supplies the XP/essence shares ("conscious deployed" in BT9.1 is the
+ledger's rule) and the carried win-only credits (daily trust-favorable, Quality Time, the evolution check) keep
+the legacy party scope — but need a wild actually DEFEATED: a recruit-only win pays none of them (BT9.1 "a
+recruit success SHALL pay nothing"; a KO-then-recruit win does). (3) **`Awards` lines** are appended after
+`BattleEnd` with the final round: one per credited monster in ascending unit order (`essence` summed over pools),
+plus ONE line with `unit 0` (`CURRENCY_AWARD_UNIT`; unit ids are `auto_inc` from 1) carrying the player's
+currency; the amounts are the ledger's (pre-cap: a pool at `ESSENCE_SOFT_CAP` or a wallet at `MAX_BALANCE` keeps
+less). bt-12 renders them as-is and never recomputes a killer or a split in TS. (4) **No monster-storage
+headroom rule exists**: the only `check_headroom` is the trade item/currency headroom; recruits go to the box
+(uncapped, as the 1v1 path), so `Hooks::recruit_headroom` stays "the unit has an owner" — BT9.2's
+`check_headroom` clause names a rule that does not exist (R-bt-9-RECRUITHEADROOM, spec-owner decision).
+(5) **Close kinds**: `finish` takes `Close::{Settled, Deploying, LegacyEnded, Fallback}` and is idempotent against
+the STORED row; `Settled` pays + penalises iff the HP write-back succeeded, `Deploying` neither, `LegacyEnded`
+neither (that reducer's funnel ran), `Fallback` penalises only; every kind sweeps the player's prior terminal
+anchors (`sweep_prior_terminals(keep = the finishing battle)` — the anchor is already terminal in the store when
+the tactical finish sweeps, the 1v1 callers' is not) and takes each swept anchor's tactical rows with it
+(R-bt-8-TACTICALSWEEP, both funnels). (6) **`battle_summary` is one row per battle, inserted at the Active start**
+(`outcome == Ongoing` marks an unfinished one), accumulated by every `store` step (`step_delta`: live turn =
+the waiting unit's, bucket = windows opened; pre-queued = any other player `TurnEnded`; a `BattleEnd` that cuts
+the waiting turn counts it; `halted_plans` = pre-queued player halts; hits/misses from `TargetHit`s of both
+sides; `se_kos_after_r1` = both sides, round > 1, SuperEffective, target at full HP at step start with no
+earlier damage that step) and finalised at finish (a Deploying close gets its zero row then; a swept
+legacy-ended battle is finalised with `wall_ms 0`); `weaken_first` is the battle's FIRST attempt below 500 ‰
+(`WEAKEN_FIRST_PERMILLE`, the script's default). Residual R-bt-9-SUMMARYDENOM → bt-14 (the §12-F(c) denominator
+column, a TTL, the `Ongoing` leftovers). (7) **Recruit glue**: the bait's content row (`recruit_bonus > 0`),
+the wild's `battle_wild_unit` seed row, its content species and `Level::new` are all resolved in
+`validate_delegated` — BEFORE the executor's `take_item` — so a miss halts the entry (`ItemNotHeld` /
+`TargetGone`) with nothing debited and no draw (R-21r-a-CONTENTLOAD at the tactical site); the roll is
+`recruit::resolve_recruit` (private stream); the H1/H2 `playtest_event` row carries the PRE-roll `hp_permille`;
+a success rebuilds through `taming::insert_recruited` (the 1v1 primitive, now shared). `Item` entries stay
+refused at submit and at pop (R-bt-8-ITEMRULE: no game-core home; game-core is outside this slice's touches —
+re-target ask, together with R-bt-4-GATEPREDICATES which needs `queue.rs`). (8) **The 1v1 reducers
+`submit_attack`, `swap_active`, `use_battle_item`, `flee` and `attempt_recruit` refuse a tactical anchor**
+(`battle::reject_if_tactical_anchor`, after the owner check): one anchor, one payout path — this delivers
+R-bt-8-LEGACYREDUCERS (→ bt-16) two slices early. (9) The faint penalty helper (`apply_faint_penalties`) and the
+credit helper refuse a monster whose owner changed (the write-back's abort contract at every site). (10) The
+PvP opponent-arm sweep now takes a third party's terminal PvP battle's tactical rows too (pre-existing anchor
+deletion; relevant once bt-14 ships tactical PvP). (11) Legacy test fixtures that run the 1v1 funnel past a
+prior terminal anchor must register the tactical tables' indexes (`bn_register_tactical_tables`).
 
 ### bt-10 — client: tactical board, HUD keep-signals, overlays, turn-order bar, event ticker, presentation constitution
 category: ux (battle presentation; items -121/-122/-126…-131) · severity: HIGH · size: HEAVY
@@ -851,9 +1049,28 @@ background is CSS-authored.
 - **BT10.6:** WHEN the board is navigated, THE tile cursor SHALL remember its position per unit, and
   every new element SHALL be D-pad-reachable with every string from the typed catalog (en+fr).
 
+**Build note (bt-10, 2026-11-01, measured):** (1) **BT10.4 DEFERred → bt-11**: `client-wasm/src/lib.rs`
+exports only `tactics_golden`, so "computed by the wasm exports" cannot hold yet; bt-10 ships the overlay
+LAYER (`tactics/boardModel.ts` `OverlaySets` port → fixed layer order, reach1 over reach2, de-duplicated
+danger union behind `TacticsBattle.toggleDanger()`, AoE on the caster tile, intent chips, shield pips) and
+bt-11 must build `OverlaySets` from `tactics_targets`/`tactics_path`/`tactics_ai_plan` and re-close the
+clause (R-bt-10-OVERLAYWASM). (2) **No key-table change**: `ui/screens/index.test.ts:3648-3650` (+`:3732`)
+pins X/Y/LB/RB `unhandled` at a bare battle base and is outside the touches, so `battleScreen.ts` is
+unchanged; the shell exposes `toggleDanger()` / `cycleUnit(±1)` and BT11.6 binds them — bt-11's touches
+must add `index.test.ts` (R-bt-10-INDEXTESTPIN). (3) **No main.ts wiring**: `TacticsBattle` is a
+constructed shell nobody constructs until BT12.1; it reuses the `battleView` overlay id, so bt-12 must keep
+it and the legacy `BattleView` mutually exclusive (R-bt-10-OVERLAYIDREUSE). (4) **Caps mirror the Rust
+SSOT** `game-core/src/tactics/events.rs` `presentation_cap_ms`: zero-cap events (Missed, Ko, Status, Awards,
+…) JOIN the preceding beat (RoundEnded is the upkeep batch header), so Σ beat ms = the server pad;
+`presentation.test.ts` parses events.rs to pin parity. (5) The server emits standalone `Missed`/`Ko`
+events, so the Executed ticker line carries hits only. (6) The ticker is a visible, focusable list — no
+live region (A11Y-05b); AT announcement is bt-12's (R-bt-10-TICKERANNOUNCE). (7) +60 `tactics.*` keys
+(365 → 425); `tactics/strings.ts` joins the PARITY-02 roster; `tactics/strings.test.ts` (sibling) adds the
+tactics-local hard-coded-string / sink / live-region scans the tree-wide I18N-17 roster does not cover.
+
 ### bt-11 — client: hierarchical command menu, live draft, queue strip + badges, forecast panel, provisional board, wasm exports
 category: ux + netcode-determinism (forecast parity) · severity: HIGH · size: HEAVY
-touches: client/src/tactics/commandModel.ts, client/src/tactics/commandModel.test.ts, client/src/tactics/draft.ts, client/src/tactics/draft.test.ts, client/src/tactics/queueStrip.ts, client/src/tactics/queueStrip.test.ts, client/src/tactics/forecast.ts, client/src/tactics/forecast.test.ts, client/src/tactics/provisionalBoard.ts, client/src/tactics/provisionalBoard.test.ts, client/src/tactics/wasm.ts, client/src/tactics/wasm.test.ts, client/src/tactics/forecast.parity.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client-wasm/src/lib.rs, client/src/ui/screens/battleScreen.ts, client/src/ui/screens/battleScreen.test.ts, client/src/ui/screens/battleScreen.boot.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/contextStack.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/main.help.test.ts, client/test-util/mainBootHarness.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/src/styles.css
+touches: client/src/tactics/commandModel.ts, client/src/tactics/commandModel.test.ts, client/src/tactics/draft.ts, client/src/tactics/draft.test.ts, client/src/tactics/queueStrip.ts, client/src/tactics/queueStrip.test.ts, client/src/tactics/forecast.ts, client/src/tactics/forecast.test.ts, client/src/tactics/provisionalBoard.ts, client/src/tactics/provisionalBoard.test.ts, client/src/tactics/wasm.ts, client/src/tactics/wasm.test.ts, client/src/tactics/forecast.parity.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client-wasm/src/lib.rs, client-wasm/src/tactics_tests.rs, client/src/ui/screens/battleScreen.ts, client/src/ui/screens/battleScreen.test.ts, client/src/ui/screens/battleScreen.boot.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/contextStack.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/main.help.test.ts, client/test-util/mainBootHarness.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/src/styles.css, client/src/tactics/strings.ts, client/src/tactics/strings.test.ts, client/src/ui/screens/index.test.ts
 after: [bt-10]
 Split seam: menu + live draft ‖ queue strip + forecast + provisional board. Design: §9.2 (controller map), §9.3 (flows, forecast tiers, provisional board), §2.3 (DRAFT →
 READY), §4.2 (intent chips). Delivers item -133's floating-menu intent natively. Measured: reducer
@@ -904,9 +1121,41 @@ main.ts imports one); no hold edge exists in the router, so cancel-and-clear is 
 - **BT11.7:** WHEN the forecast, highlights and intent chips are computed, THEY SHALL call the wasm
   exports of bt-1/bt-4 and a vitest SHALL assert the forecast output equals the golden fixture.
 
+**Build note (bt-11, increment A, 2026-11-01, measured — PARKED on hidden dependencies):** (1) **Two
+hidden dependencies outside the touches block BT11.1–BT11.6.** Every string-bearing criterion
+(BT11.1–BT11.5) needs `client/src/tactics/strings.ts` + `strings.test.ts` (bt-10 made it the ONE
+tactics resolver importer; `ui/i18n/catalogParity.test.ts` PARITY-02 pins the exact importer roster and
+PARITY-04 DEAD-KEY forbids a catalog key with no literal requester; `strings.test.ts` pins exactly 60
+`tactics.*` keys and bans text sinks in any other tactics module), so no in-touches module can add a
+string. BT11.6 needs `ui/screens/index.test.ts` (R-bt-10-INDEXTESTPIN; X/Y/LB/RB pinned `unhandled` at
+a bare battle base) and a tactical/legacy discriminator for the hint chips that only bt-12's store
+ingest provides. The continuation needs those three files added to `touches:` (bt-12 has the same
+`strings.ts` gap for BT12.6). (2) **Increment A ships the rules port** (BT11.7 + bt-10's deferred
+BT10.4): 13 `client-wasm` exports (`tactics_map`, `tactics_fresh_budget`, `tactics_unit`,
+`tactics_targets`, `tactics_path`, `tactics_disengage`, `tactics_flank`, `tactics_forecast`,
+`tactics_recruit_odds`, `tactics_ai_plan`, `tactics_is_exhausted`, `tactics_plan`, `tactics_overlays`),
+the typed port `client/src/tactics/wasm.ts` (`bindTacticsRules(pkg)` by dependency injection — main.ts
+hands in the pkg namespace it already imports, so the `client_wasm.js` test mocks need no new names;
+`overlaySets()` feeds bt-10's `OverlaySets`; `unitRowOf()` maps the `my_battle_units` row), and the pure
+`forecast.ts` view-model. (3) **No new golden kind** (game-core is outside the touches): forecast parity
+is proven against the fixture's existing `Pipeline` cases (variance 85 = min, 100 = max) plus a seeded
+fast-check differential against `tactics_golden`; every other export is compared with `tactics_golden`
+on the same scenarios. (4) **Rule-home facts:** reach bands call the real execution gate
+(`queue::validate_at_pop` with an inert `Hooks`); range/aoe/danger use a probe-unit sweep over
+`geometry::target_set` (a conscious opposing probe on each empty tile; the aim is the standing tile for
+a Caster-origin skill) so Caster-origin Bursts and empty area tiles need no shape logic in the shell;
+the only restated predicates are STAB (`combat/damage.rs:69`) and the status preconditions
+(`resolve.rs:675`), both differentially tested (R-bt-11-RULEHOME asks game-core for helpers). (5) The
+client composes `TacticalState` field by field from `battle_unit` rows (never `TacticalState::new`,
+which refuses fainted units), joined by a copy of the server's `unit_of_row` (R-bt-11-SHAREDJOIN).
+(6) `tactics_overlays` on an 8×8 3v3 board measures 1.2 ms per call. (7) Design flags for the
+continuation: the probe id `u32::MAX` is reserved; a status is shown as null when the minimum roll
+already KOs; `tactics_disengage` takes an optional start tile for chained Moves; the overlay query
+should omit `aim` for the stable sets so an aim change does not recompute danger/intents.
+
 ### bt-12 — client: subscriptions + store ingest, deploy confirm + formation editor, results, screen wiring, wild e2e
 category: ux + critical user flow · severity: HIGH · size: HEAVY
-touches: client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/net/connection.runtime.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/tactics/deployPanel.ts, client/src/tactics/deployPanel.test.ts, client/src/tactics/results.ts, client/src/tactics/results.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/contextStack.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.battle-reseed.test.ts, client/src/ui/reachability.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/tactics-wild.spec.ts, client/e2e/controls.ts, scripts/verify-build-hooks.mjs, scripts/verify-build-hooks.test.mjs, client/src/styles.css
+touches: client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/net/connection.runtime.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/tactics/deployPanel.ts, client/src/tactics/deployPanel.test.ts, client/src/tactics/results.ts, client/src/tactics/results.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/contextStack.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.battle-reseed.test.ts, client/src/ui/reachability.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/tactics-wild.spec.ts, client/e2e/controls.ts, scripts/verify-build-hooks.mjs, scripts/verify-build-hooks.test.mjs, client/src/styles.css, client/src/tactics/strings.ts, client/src/tactics/strings.test.ts
 after: [bt-11]
 Split seam: subscriptions + ingest + deploy ‖ results + wiring + e2e. Design: §3.3 (deployment UX, remembered formation), §9.3 (results), §8.1 (views), §11 T9/T10.
 Measured: `connection.ts` holds one `subscribe([...])` list of 23 `SELECT * FROM` strings pinned at
@@ -966,6 +1215,40 @@ test files, so no new script test is added.
   `playtest_event` kind-1 row SHALL carry `hp_permille`, `bait_item_id` and `success` exactly as the
   1v1 path writes them, so `scripts/playtest-report.mjs` computes weaken-first, recatch and success
   rates without modification.
+
+**Build note (bt-13, 2026-11-01, measured):** (1) **Test-only slice** — `game-core/tests/tactics_pacing.rs`
+(7 `_bt13_1` tests) + 8 `_bt13_2` tests appended to `server-module/src/tactics_settle_tests.rs`;
+`playtest_tests.rs` untouched (the 2/3 → 666 floor pin already exists). (2) **Reference fight =
+a controlled experiment**: species 10 (Umbrafang, Aggressive, Nimble, kit Toxic Sting Light r1–2 +
+Fire Fang Heavy melee) on both sides at **L19, HP 57**, neutral genes; the ONLY overrides are unit and
+skill `affinity`, chosen so every hit is neutral on the real chart; the wild side is no-STAB in both
+mixes, the player side no-STAB / STAB on both skills. Player policy = `ai::plan(Aggressive)` (the bt-4
+planner is side-agnostic) + a recruit override (adjacent wild < 250‰ → `Recruit{bait: Lure Berry 150‰}`;
+Heavy → Light below 50% HP). Maps: id 1 (7×7, opposing spawns 4 apart) and id 4 (8×8 — closest
+opposing spawns are **6**, not the design's 5). 32 seeds per cell; median = `sorted[N/2]`.
+(3) **Measured (median / p90 / max rounds · median unit-turns · player wins of 32):**
+
+| Cell | no-STAB | STAB | bound |
+|---|---|---|---|
+| wild 1v1 7×7 | 4 / 5 / 5 · 7 · 12 | 3 / 4 / 4 · 5 · 28 | ≤ 7 |
+| wild 1v1 recruit 7×7 | 4 / 5 / 5 · 7 · 8 (16 attempts, 8 succeeded) | 4 / 4 / 5 · 7 · 25 (36 attempts, 25 succeeded) | ≤ 8 |
+| wild 3v3 8×8 | 6 / 7 / 7 · 20 · 10 | 5 / 6 / 7 · 17 · 25 | ≤ 7 |
+
+Wild fights run **~2 rounds shorter than design §10's ≈ 6 / ≈ 4** in the 1v1 cells (3v3 lands on the
+design). Unit-turn medians (7 / 5 for 1v1, 20 / 17 for 3v3) sit under §10's 12 / 8 and 31 / 21, so the time
+budgets carry margin. The symmetric no-STAB fight is a near coin-flip (12/32). (4) **The bound has slack:**
+halving all damage moves the no-STAB medians to exactly the bound (1v1 7, 3v3 7). An exact per-cell
+**golden snapshot** (Σ rounds, Σ unit-turns, wins, Σ final HP per side, recruit attempts/successes) is
+the change detector. A rule or tuning change that moves pacing must re-record it with `--no-capture`
+and update this note. Bite-proofs: 26 of 30 wrong-impl mutants RED. The survivors are Guard-ignored and
+First-Stand-off (the reference fights never grant Guard or reach a one-hit KO; pinned by their own
+suites), plus two server mutants unreachable in PvE. Record: `memory/projects/gates/bt-13.red-before.md`.
+(5) **BT13.2:** the tactical row equals the SHIPPED 1v1 `attempt_recruit` row field for field
+(identity, kind 1, species, hp_permille 666, bait 1|0, success), against literals, for success and
+failure × bait / no bait. The 1v1 outcome is steered by a clock probe, the tactical one by `force_recruit`.
+The test set also covers whole-table row counts (no duplicate, pre-queued pop writes one) and a
+second-wild species. A bait-odds window test catches a server that rolls at no-bait odds while
+recording the bait.
 
 ## Slices — P2 (PvP tactical, flip, purge)
 
