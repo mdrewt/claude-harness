@@ -4,6 +4,9 @@
 #   mr-unlock mutex          # release .harness-runner.lock.d (only if its owner pid is dead)
 #   mr-unlock stale          # reap .harness-runner.<slice>.lock whose session_leader is dead
 #   mr-unlock all            # both
+#   mr-unlock own PID        # release the mutex IFF its owner.json pid == PID. The one case where
+#                            # a LIVE owner may be released: PID is the caller itself (the tick
+#                            # wrapper dropping its own hold on exit). Any other owner is refused.
 #   mr-unlock --selftest
 #
 # WHY THIS EXISTS. On 2026-08-17T08:00Z a tick tried its ordinary post-merge cleanup:
@@ -66,6 +69,31 @@ release_mutex() {
   return 1
 }
 
+# Self-release. `mr-supervisor-prompt-native.md` has the LLM tick take the mutex under the WRAPPER's
+# pid (the long-lived `mr-native-tick.sh`), so by the time the tick tries `mr-unlock mutex` that
+# owner is alive — correctly refused — and nothing else ever released it: every tick left a mutex
+# behind for gate 4 to stand later ticks down on for up to its 600s TTL (observed 2026-11-06, an
+# 8100s-stale mutex on the next forced tick). The wrapper therefore releases ITS OWN hold on exit,
+# through this entry point. Ownership is by pid equality with the caller-asserted PID, so a mutex
+# held by anyone else (a live concurrent tick) is still refused, never stolen.
+release_own() {
+  local ME="${1:-}" D="${2:-$MUTEX}"
+  case "$ME" in ''|*[!0-9]*) echo "UNLOCK-OWN-USAGE need a numeric pid"; return 2;; esac
+  [ -d "$D" ] || { echo "UNLOCK-MUTEX-ABSENT $D"; return 0; }
+  local OWNER; OWNER=$(pid_of "$D/owner.json")
+  if [ "$OWNER" != "$ME" ]; then
+    echo "UNLOCK-OWN-REFUSED owner '${OWNER:-none}' is not pid $ME — not releasing another holder's mutex"
+    return 1
+  fi
+  rm -f "$D/owner.json" "$D/pid" 2>/dev/null
+  if rmdir "$D" 2>/dev/null; then
+    echo "UNLOCK-MUTEX-RELEASED $D (own hold, pid $ME)"
+    return 0
+  fi
+  echo "UNLOCK-MUTEX-FAILED $D still holds: $(ls -A "$D" 2>/dev/null | tr '\n' ' ')"
+  return 1
+}
+
 reap_stale() {
   local D="${1:-$MEM}" n=0
   for LK in "$D"/.harness-runner.*.lock; do
@@ -124,6 +152,18 @@ selftest() {
   OUT=$(release_mutex "$T/m3" | head -1 | cut -d' ' -f1); ck "surprise-content-fails-loud" "$OUT" "UNLOCK-MUTEX-FAILED"
   [ -f "$T/m3/surprise" ] || { echo "UNLOCK-SELFTEST-FAIL surprise file was deleted"; BAD=1; }
 
+  # 4b. own-release: the caller's own (live) hold is released; someone else's live hold is not;
+  # a non-numeric pid is a usage error and touches nothing.
+  mkdir -p "$T/o1"; echo "{\"pid\": $$}" > "$T/o1/owner.json"
+  OUT=$(release_own "$$" "$T/o1" | head -1 | cut -d' ' -f1); ck "own-release" "$OUT" "UNLOCK-MUTEX-RELEASED"
+  [ -d "$T/o1" ] && { echo "UNLOCK-SELFTEST-FAIL own mutex dir still exists"; BAD=1; }
+  mkdir -p "$T/o2"; echo "{\"pid\": $$}" > "$T/o2/owner.json"
+  OUT=$(release_own "1" "$T/o2" | head -1 | cut -d' ' -f1); ck "own-release-other-refused" "$OUT" "UNLOCK-OWN-REFUSED"
+  [ -d "$T/o2" ] || { echo "UNLOCK-SELFTEST-FAIL another holder's mutex was destroyed"; BAD=1; }
+  OUT=$(release_own "x; rm" "$T/o2" | head -1 | cut -d' ' -f1); ck "own-release-bad-pid" "$OUT" "UNLOCK-OWN-USAGE"
+  [ -d "$T/o2" ] || { echo "UNLOCK-SELFTEST-FAIL bad pid destroyed a mutex"; BAD=1; }
+  rm -f "$T/o2/owner.json"; rmdir "$T/o2" 2>/dev/null
+
   # 5. stale reap removes dead, keeps live
   echo '{"session_leader": 999999}' > "$T/.harness-runner.deadslice.lock"
   echo "{\"session_leader\": $$}"   > "$T/.harness-runner.liveslice.lock"
@@ -161,15 +201,16 @@ selftest() {
 
   rm -f "$T"/.harness-runner.*.lock 2>/dev/null
   rmdir "$T" 2>/dev/null
-  [ "$BAD" = 0 ] && echo "UNLOCK-SELFTEST-OK 13 fixtures"
+  [ "$BAD" = 0 ] && echo "UNLOCK-SELFTEST-OK 16 fixtures"
   return $BAD
 }
 
 case "${1:-}" in
   mutex)      release_mutex || RC=1 ;;
   stale)      reap_stale ;;
+  own)        release_own "${2:-}" || RC=$? ;;
   all)        release_mutex || RC=1; reap_stale ;;
   --selftest) selftest || RC=1 ;;
-  *) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; RC=2 ;;
+  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; RC=2 ;;
 esac
 exit $RC
