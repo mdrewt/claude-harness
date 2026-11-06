@@ -72,7 +72,7 @@ release_mutex() {
 # Self-release. `mr-supervisor-prompt-native.md` has the LLM tick take the mutex under the WRAPPER's
 # pid (the long-lived `mr-native-tick.sh`), so by the time the tick tries `mr-unlock mutex` that
 # owner is alive — correctly refused — and nothing else ever released it: every tick left a mutex
-# behind for gate 4 to stand later ticks down on for up to its 600s TTL (observed 2026-11-06, a
+# behind for gate 4 to stand later ticks down on for up to its 600s TTL (observed 2026-11-06, an
 # 8100s-stale mutex on the next forced tick). The wrapper therefore releases ITS OWN hold on exit,
 # through this entry point. Ownership is by pid equality with the caller-asserted PID, so a mutex
 # held by anyone else (a live concurrent tick) is still refused, never stolen.
@@ -211,6 +211,6 @@ case "${1:-}" in
   own)        release_own "${2:-}" || RC=$? ;;
   all)        release_mutex || RC=1; reap_stale ;;
   --selftest) selftest || RC=1 ;;
-  *) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; RC=2 ;;
+  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; RC=2 ;;
 esac
 exit $RC
