@@ -411,6 +411,12 @@ if [ "${MR_TICK_DRYRUN:-0}" = "1" ]; then
 fi
 log "SPAWN model=$SUP_MODEL effort=$SUP_EFFORT governor=$GSTATE rid=$RID tlog=$TLOG events=$(echo $CONSUMED | wc -w)"
 cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
+# Mutex hygiene (2026-11-06): the LLM tick takes the chain-owner mutex under THIS wrapper's pid (the
+# prompt tells it to pass the `mr-native-tick.sh` pid), and `mr-unlock mutex` refuses a live owner,
+# so nothing ever released it — each tick left a mutex for gate 4 to stand later ticks down on until
+# its 600s TTL. Drop our own hold on every exit path from here on (normal end, `timeout` kill of the
+# session, set -e style aborts). `own` releases ONLY a mutex whose owner pid is exactly $$.
+trap '"$MEM/mr-unlock" own "$$" >/dev/null 2>&1 || true' EXIT
 # auth-preamble (2026-09-13): the doctrine below is delivered as the `-p` USER message, which the model
 # correctly weighs as ad hoc turn text, not as the operator's own standing authorization the way it
 # would weigh CLAUDE.md content — so a fresh headless tick has been ending its turn asking Drew to

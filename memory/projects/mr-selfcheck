@@ -2133,8 +2133,11 @@ except OSError:
     names = []
 for n in names:
     m = re.match(r"^\.(.+)\.stopstate\.json$", n)
-    if m and not os.path.exists(os.path.join(GATES, "%s.gates.md" % m.group(1))):
-        fail("gates-orphan-stopstate", "%s has no gates file" % n)
+    # A gates file moved to gates/archive/ by `mr-record gates-rotate` (the merge-time hook) is not
+    # a deletion: its stop-state stays live beside it, so archived counts as present.
+    if m and not any(os.path.exists(os.path.join(d, "%s.gates.md" % m.group(1)))
+                     for d in (GATES, os.path.join(GATES, "archive"))):
+        fail("gates-orphan-stopstate", "%s has no gates file (live or archived)" % n)
 
 sys.exit(bad)
 PYGATES

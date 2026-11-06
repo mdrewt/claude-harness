@@ -46,7 +46,9 @@ UNKNOWN → proceed + record a BLOCKER.
    "$RUN_ID"` — never hand-write the lock file; its schema must match what `mr-unlock` and the
    wrapper's gate-4 already read. Release/reap ONLY via `$MEM/mr-unlock` (`mutex|stale|all`) — it
    refuses live owners and never recursive-deletes; if it reports UNLOCK-MUTEX-FAILED, report and
-   stop — never escalate to `rm -rf`.
+   stop — never escalate to `rm -rf`. The mutex is held under the WRAPPER's pid, so your own
+   `mr-unlock mutex` is expected to print UNLOCK-MUTEX-REFUSED at end of tick: that is fine, the
+   wrapper releases its own hold on exit (`mr-unlock own`); do not work around the refusal.
 4. **State:** `mr-state.json` — first read, last write of every tick, atomic (temp+mv). Schema v3:
    `master{sha,ci,nightly}` · `inflight[]` · `awaiting_merge[]` · `queue[]` · `park_counters{}` ·
    `consecutive_standdowns` · `rate_limit_resets_at` · `resource_locations{}` · `notes`. (No
