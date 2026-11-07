@@ -79,14 +79,17 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    features (obstacles, elevation, line/cone AoE; hold-gesture inputs → M-gamepad). Battle
    presentation (sprites/background placeholders) lands inside it (bt-10); placeholder assets
    come from item 6. First slice to launch: `bt-1`.
-5. **M-ui-foundation** (`M-ui-foundation.spec.md`, specced 2026-10-24): the shared menu
-   design-language milestone — one tab-bar component, bordered context sheet, four-channel
-   feedback policy, wheel + pseudo-scroll, text-size setting, single-scale-authority scaling,
-   menu-IA restructure, Help rework (Introduction + encyclopedia), spacing tokens. Wireframes
-   first (operator directive, reaffirmed #586 D2). Decisions ANSWERED (#586): hybrid scaling,
-   IA flatten all-three, mini-menu design delegated (wireframe-driven), battle Bag→"Items",
-   footer collapse-when-empty. Builds after so-2 and is ordered after item 4's P1 so the
-   tactical battle UI lands on the final component system rather than being rebuilt.
+5. **M-ui-foundation** (`M-ui-foundation.spec.md`, specced 2026-10-24; **elaborated 2026-11-07 —
+   build-ready, 21 slices**): the shared menu design language. Wireframes first (`wf-1`, docs-only,
+   operator directive reaffirmed #586 D2, no second gate); then the kit spine `uif-1`…`uif-5` (tokens,
+   single scale authority, TabBar + ContextSheet + EmptyState + RowCard, four-channel feedback, pointer
+   close-then-route + wheel), screen adoption `uif-6`…`uif-13` (Monsters, Inventory, Social, small
+   screens, the tactical UI that shipped first, world sheets, Controls + text-size setting), How to Play
+   rework `uif-14`, labels + menu IA `uif-15a/b`, the Profile combine `uif-16a/b`, and the integrated
+   proof `uif-17`.
+   Decisions ANSWERED (#586): hybrid scaling, IA flatten all-three, mini-menu design delegated
+   (wireframe-driven), battle "Items", footer collapse-when-empty. Client-only. First slice to launch:
+   `wf-1`.
 6. **M-world-art-pass** (`M-world-art-pass.spec.md`, specced 2026-10-24): staged placeholder
    upgrade (style guide → terrain kit → look-dev lighting scene per
    `docs/research/hd2d-modern-retro-art-direction.md`), real water art + heal-location landmark,
@@ -133,7 +136,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    notably rb-128-E1 (avatar lost on reload during deletion grace), R-rb-73-ABORT-PHANTOM,
    R-rb-132-WALLETSYBIL and R-rb-52-GRACEANNOUNCE. Rows absorbed by pt3 milestones are marked
    in each spec (quickfix: WALKEDAWAYROLLBACK, R-ctl-11b-RAISINGCARDS; trade: F5, 2026-10-16-F1,
-   PROXGUARD; ui-foundation: R-ctl-14-*, R-ctl-11a-MONSTERSTAB, 2026-10-02-F3, R-ctl-SETRATIO;
+   PROXGUARD; ui-foundation: see its Residual map, incl. R-ctl-14-*, R-ctl-11a-MONSTERSTAB, R-qf-10-*, R-ctl-SETRATIO;
    econ: 2026-10-09-F1).
 16. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
    Steam Input maps onto the virtual buttons.
