@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 2772" width="1920" height="2772"><title>Main menu: three window sizes</title><rect width="1920" height="2772" fill="#111827"/>
+<text x="0" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="28" font-weight="bold" fill="#e5e7eb">Main menu: PROPOSED at three window sizes</text>
+<rect x="900" y="15" width="18" height="18" fill="#2f7d4f"/><text x="909" y="29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">V</text><text x="924" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16" fill="#e5e7eb">grows-vertically</text><rect x="1110" y="15" width="18" height="18" fill="#2b6cb0"/><text x="1119" y="29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">H</text><text x="1134" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16" fill="#e5e7eb">grows-horizontally</text><rect x="1340" y="15" width="18" height="18" fill="#8a5a12"/><text x="1349" y="29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">S</text><text x="1364" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16" fill="#e5e7eb">scales-with-resolution</text><rect x="1610" y="15" width="18" height="18" fill="#6b7280"/><text x="1619" y="29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">F</text><text x="1634" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16" fill="#e5e7eb">fixed</text>
+<text x="0" y="88" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="22" font-weight="bold" fill="#86efac">960x540 CSS, dpr 1 (960x540 device): uiScale 0.875, world deviceScale 2, tile 64.0 CSS px, body text 12.25 px</text>
+<svg x="0" y="104" width="960" height="540" viewBox="0 0 960 540" data-panel="proposed" data-window="960x540@1"><rect x="0" y="0" width="960" height="540" fill="#10141a"/><line x1="64" y1="0" x2="64" y2="540" stroke="#222b36" stroke-width="1"/><line x1="128" y1="0" x2="128" y2="540" stroke="#222b36" stroke-width="1"/><line x1="192" y1="0" x2="192" y2="540" stroke="#222b36" stroke-width="1"/><line x1="256" y1="0" x2="256" y2="540" stroke="#222b36" stroke-width="1"/><line x1="320" y1="0" x2="320" y2="540" stroke="#222b36" stroke-width="1"/><line x1="384" y1="0" x2="384" y2="540" stroke="#222b36" stroke-width="1"/><line x1="448" y1="0" x2="448" y2="540" stroke="#222b36" stroke-width="1"/><line x1="512" y1="0" x2="512" y2="540" stroke="#222b36" stroke-width="1"/><line x1="576" y1="0" x2="576" y2="540" stroke="#222b36" stroke-width="1"/><line x1="640" y1="0" x2="640" y2="540" stroke="#222b36" stroke-width="1"/><line x1="704" y1="0" x2="704" y2="540" stroke="#222b36" stroke-width="1"/><line x1="768" y1="0" x2="768" y2="540" stroke="#222b36" stroke-width="1"/><line x1="832" y1="0" x2="832" y2="540" stroke="#222b36" stroke-width="1"/><line x1="896" y1="0" x2="896" y2="540" stroke="#222b36" stroke-width="1"/><line x1="0" y1="64" x2="960" y2="64" stroke="#222b36" stroke-width="1"/><line x1="0" y1="128" x2="960" y2="128" stroke="#222b36" stroke-width="1"/><line x1="0" y1="192" x2="960" y2="192" stroke="#222b36" stroke-width="1"/><line x1="0" y1="256" x2="960" y2="256" stroke="#222b36" stroke-width="1"/><line x1="0" y1="320" x2="960" y2="320" stroke="#222b36" stroke-width="1"/><line x1="0" y1="384" x2="960" y2="384" stroke="#222b36" stroke-width="1"/><line x1="0" y1="448" x2="960" y2="448" stroke="#222b36" stroke-width="1"/><line x1="0" y1="512" x2="960" y2="512" stroke="#222b36" stroke-width="1"/><g class="el" data-el="Menu frame" data-sizing="grows-horizontally">
+<rect x="646.36" y="7" width="306.64" height="491" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="2"/>
+<rect x="918" y="8" width="16" height="16" fill="#2b6cb0"/><text x="926" y="20" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Menu" data-sizing="scales-with-resolution">
+<rect x="648.11" y="8.75" width="303.14" height="35" fill="none"/>
+<text x="655.11" y="32.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="17.5" font-weight="bold" fill="#e0e0e0">Menu</text>
+<rect x="934.25" y="9.75" width="16" height="16" fill="#8a5a12"/><text x="942.25" y="21.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="separator" data-sizing="fixed">
+<rect x="648.11" y="43.75" width="303.14" height="2" fill="#6b6b82"/>
+<rect x="934.25" y="36.75" width="16" height="16" fill="#6b7280"/><text x="942.25" y="48.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">F</text></g>
+<g class="el" data-el="Monsters" data-sizing="scales-with-resolution">
+<rect x="655.11" y="52.75" width="289.14" height="23.1" fill="#e0e0e0" stroke="#1e1e2e" stroke-width="1"/>
+<text x="662.11" y="68.47" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#1e1e2e">Monsters</text>
+<rect x="927.25" y="53.75" width="16" height="16" fill="#8a5a12"/><text x="935.25" y="65.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Inventory" data-sizing="scales-with-resolution">
+<rect x="655.11" y="75.85" width="289.14" height="23.1" fill="none"/>
+<text x="662.11" y="91.57" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Inventory</text>
+<rect x="927.25" y="76.85" width="16" height="16" fill="#8a5a12"/><text x="935.25" y="88.85" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Journal" data-sizing="scales-with-resolution">
+<rect x="655.11" y="98.95" width="289.14" height="23.1" fill="none"/>
+<text x="662.11" y="114.67" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Journal</text>
+<rect x="927.25" y="99.95" width="16" height="16" fill="#8a5a12"/><text x="935.25" y="111.95" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Social (New)" data-sizing="scales-with-resolution">
+<rect x="655.11" y="122.05" width="289.14" height="23.1" fill="none"/>
+<text x="662.11" y="137.76" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Social (New)</text>
+<rect x="927.25" y="123.05" width="16" height="16" fill="#8a5a12"/><text x="935.25" y="135.05" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Profile" data-sizing="scales-with-resolution">
+<rect x="655.11" y="145.15" width="289.14" height="23.1" fill="none"/>
+<text x="662.11" y="160.86" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Profile</text>
+<rect x="927.25" y="146.15" width="16" height="16" fill="#8a5a12"/><text x="935.25" y="158.15" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="How to Play" data-sizing="scales-with-resolution">
+<rect x="655.11" y="168.25" width="289.14" height="23.1" fill="none"/>
+<text x="662.11" y="183.96" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">How to Play</text>
+<rect x="927.25" y="169.25" width="16" height="16" fill="#8a5a12"/><text x="935.25" y="181.25" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Controls" data-sizing="scales-with-resolution">
+<rect x="655.11" y="191.35" width="289.14" height="23.1" fill="none"/>
+<text x="662.11" y="207.06" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Controls</text>
+<rect x="927.25" y="192.35" width="16" height="16" fill="#8a5a12"/><text x="935.25" y="204.35" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Close" data-sizing="scales-with-resolution">
+<rect x="655.11" y="214.45" width="289.14" height="23.1" fill="none"/>
+<text x="662.11" y="230.16" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Close</text>
+<rect x="927.25" y="215.45" width="16" height="16" fill="#8a5a12"/><text x="935.25" y="227.45" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="See your party and stored monsters." data-sizing="scales-with-resolution">
+<rect x="646.36" y="473.5" width="306.64" height="24.5" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="653.36" y="489.32" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">See your party and stored monsters.</text>
+<rect x="936" y="474.5" width="16" height="16" fill="#8a5a12"/><text x="944" y="486.5" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Hint bar" data-sizing="scales-with-resolution">
+<rect x="0" y="505" width="960" height="35" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="925" y="506" width="16" height="16" fill="#8a5a12"/><text x="933" y="518" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="A OK" data-sizing="scales-with-resolution">
+<rect x="7" y="512" width="54.6" height="21" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="14" y="526.07" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">A OK</text>
+<rect x="44.6" y="513" width="16" height="16" fill="#8a5a12"/><text x="52.6" y="525" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="B Back" data-sizing="scales-with-resolution">
+<rect x="68.6" y="512" width="71.4" height="21" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="75.6" y="526.07" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">B Back</text>
+<rect x="123" y="513" width="16" height="16" fill="#8a5a12"/><text x="131" y="525" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Start Close" data-sizing="scales-with-resolution">
+<rect x="147" y="512" width="113.4" height="21" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="154" y="526.07" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">Start Close</text>
+<rect x="243.4" y="513" width="16" height="16" fill="#8a5a12"/><text x="251.4" y="525" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Select Help" data-sizing="scales-with-resolution">
+<rect x="267.4" y="512" width="113.4" height="21" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="274.4" y="526.07" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">Select Help</text>
+<rect x="363.8" y="513" width="16" height="16" fill="#8a5a12"/><text x="371.8" y="525" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g></svg>
+<text x="0" y="704" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="22" font-weight="bold" fill="#86efac">1536x864 CSS, dpr 1.25 (1920x1080 device): uiScale 1.200, world deviceScale 3, tile 76.8 CSS px, body text 16.80 px</text>
+<svg x="0" y="720" width="1536" height="864" viewBox="0 0 1536 864" data-panel="proposed" data-window="1536x864@1.25"><rect x="0" y="0" width="1536" height="864" fill="#10141a"/><line x1="76.8" y1="0" x2="76.8" y2="864" stroke="#222b36" stroke-width="1"/><line x1="153.6" y1="0" x2="153.6" y2="864" stroke="#222b36" stroke-width="1"/><line x1="230.4" y1="0" x2="230.4" y2="864" stroke="#222b36" stroke-width="1"/><line x1="307.2" y1="0" x2="307.2" y2="864" stroke="#222b36" stroke-width="1"/><line x1="384" y1="0" x2="384" y2="864" stroke="#222b36" stroke-width="1"/><line x1="460.8" y1="0" x2="460.8" y2="864" stroke="#222b36" stroke-width="1"/><line x1="537.6" y1="0" x2="537.6" y2="864" stroke="#222b36" stroke-width="1"/><line x1="614.4" y1="0" x2="614.4" y2="864" stroke="#222b36" stroke-width="1"/><line x1="691.2" y1="0" x2="691.2" y2="864" stroke="#222b36" stroke-width="1"/><line x1="768" y1="0" x2="768" y2="864" stroke="#222b36" stroke-width="1"/><line x1="844.8" y1="0" x2="844.8" y2="864" stroke="#222b36" stroke-width="1"/><line x1="921.6" y1="0" x2="921.6" y2="864" stroke="#222b36" stroke-width="1"/><line x1="998.4" y1="0" x2="998.4" y2="864" stroke="#222b36" stroke-width="1"/><line x1="1075.2" y1="0" x2="1075.2" y2="864" stroke="#222b36" stroke-width="1"/><line x1="1152" y1="0" x2="1152" y2="864" stroke="#222b36" stroke-width="1"/><line x1="1228.8" y1="0" x2="1228.8" y2="864" stroke="#222b36" stroke-width="1"/><line x1="1305.6" y1="0" x2="1305.6" y2="864" stroke="#222b36" stroke-width="1"/><line x1="1382.4" y1="0" x2="1382.4" y2="864" stroke="#222b36" stroke-width="1"/><line x1="1459.2" y1="0" x2="1459.2" y2="864" stroke="#222b36" stroke-width="1"/><line x1="1536" y1="0" x2="1536" y2="864" stroke="#222b36" stroke-width="1"/><line x1="0" y1="76.8" x2="1536" y2="76.8" stroke="#222b36" stroke-width="1"/><line x1="0" y1="153.6" x2="1536" y2="153.6" stroke="#222b36" stroke-width="1"/><line x1="0" y1="230.4" x2="1536" y2="230.4" stroke="#222b36" stroke-width="1"/><line x1="0" y1="307.2" x2="1536" y2="307.2" stroke="#222b36" stroke-width="1"/><line x1="0" y1="384" x2="1536" y2="384" stroke="#222b36" stroke-width="1"/><line x1="0" y1="460.8" x2="1536" y2="460.8" stroke="#222b36" stroke-width="1"/><line x1="0" y1="537.6" x2="1536" y2="537.6" stroke="#222b36" stroke-width="1"/><line x1="0" y1="614.4" x2="1536" y2="614.4" stroke="#222b36" stroke-width="1"/><line x1="0" y1="691.2" x2="1536" y2="691.2" stroke="#222b36" stroke-width="1"/><line x1="0" y1="768" x2="1536" y2="768" stroke="#222b36" stroke-width="1"/><line x1="0" y1="844.8" x2="1536" y2="844.8" stroke="#222b36" stroke-width="1"/><g class="el" data-el="Menu frame" data-sizing="grows-horizontally">
+<rect x="1032.58" y="9.6" width="493.82" height="796.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="2"/>
+<rect x="1491.4" y="10.6" width="16" height="16" fill="#2b6cb0"/><text x="1499.4" y="22.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Menu" data-sizing="scales-with-resolution">
+<rect x="1034.98" y="12" width="489.02" height="48" fill="none"/>
+<text x="1044.58" y="44.16" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="24" font-weight="bold" fill="#e0e0e0">Menu</text>
+<rect x="1507" y="13" width="16" height="16" fill="#8a5a12"/><text x="1515" y="25" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="separator" data-sizing="fixed">
+<rect x="1034.98" y="60" width="489.02" height="2" fill="#6b6b82"/>
+<rect x="1507" y="53" width="16" height="16" fill="#6b7280"/><text x="1515" y="65" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">F</text></g>
+<g class="el" data-el="Monsters" data-sizing="scales-with-resolution">
+<rect x="1044.58" y="71.6" width="469.82" height="31.68" fill="#e0e0e0" stroke="#1e1e2e" stroke-width="1"/>
+<text x="1054.18" y="93.15" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#1e1e2e">Monsters</text>
+<rect x="1497.4" y="72.6" width="16" height="16" fill="#8a5a12"/><text x="1505.4" y="84.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Inventory" data-sizing="scales-with-resolution">
+<rect x="1044.58" y="103.28" width="469.82" height="31.68" fill="none"/>
+<text x="1054.18" y="124.83" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Inventory</text>
+<rect x="1497.4" y="104.28" width="16" height="16" fill="#8a5a12"/><text x="1505.4" y="116.28" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Journal" data-sizing="scales-with-resolution">
+<rect x="1044.58" y="134.96" width="469.82" height="31.68" fill="none"/>
+<text x="1054.18" y="156.51" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Journal</text>
+<rect x="1497.4" y="135.96" width="16" height="16" fill="#8a5a12"/><text x="1505.4" y="147.96" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Social (New)" data-sizing="scales-with-resolution">
+<rect x="1044.58" y="166.64" width="469.82" height="31.68" fill="none"/>
+<text x="1054.18" y="188.19" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Social (New)</text>
+<rect x="1497.4" y="167.64" width="16" height="16" fill="#8a5a12"/><text x="1505.4" y="179.64" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Profile" data-sizing="scales-with-resolution">
+<rect x="1044.58" y="198.32" width="469.82" height="31.68" fill="none"/>
+<text x="1054.18" y="219.87" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Profile</text>
+<rect x="1497.4" y="199.32" width="16" height="16" fill="#8a5a12"/><text x="1505.4" y="211.32" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="How to Play" data-sizing="scales-with-resolution">
+<rect x="1044.58" y="230" width="469.82" height="31.68" fill="none"/>
+<text x="1054.18" y="251.55" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">How to Play</text>
+<rect x="1497.4" y="231" width="16" height="16" fill="#8a5a12"/><text x="1505.4" y="243" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Controls" data-sizing="scales-with-resolution">
+<rect x="1044.58" y="261.68" width="469.82" height="31.68" fill="none"/>
+<text x="1054.18" y="283.23" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Controls</text>
+<rect x="1497.4" y="262.68" width="16" height="16" fill="#8a5a12"/><text x="1505.4" y="274.68" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Close" data-sizing="scales-with-resolution">
+<rect x="1044.58" y="293.36" width="469.82" height="31.68" fill="none"/>
+<text x="1054.18" y="314.91" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Close</text>
+<rect x="1497.4" y="294.36" width="16" height="16" fill="#8a5a12"/><text x="1505.4" y="306.36" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="See your party and stored monsters." data-sizing="scales-with-resolution">
+<rect x="1032.58" y="772.8" width="493.82" height="33.6" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="1042.18" y="794.5" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">See your party and stored monsters.</text>
+<rect x="1509.4" y="773.8" width="16" height="16" fill="#8a5a12"/><text x="1517.4" y="785.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Hint bar" data-sizing="scales-with-resolution">
+<rect x="0" y="816" width="1536" height="48" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="1501" y="817" width="16" height="16" fill="#8a5a12"/><text x="1509" y="829" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="A OK" data-sizing="scales-with-resolution">
+<rect x="9.6" y="825.6" width="74.88" height="28.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="19.2" y="844.9" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">A OK</text>
+<rect x="67.48" y="826.6" width="16" height="16" fill="#8a5a12"/><text x="75.48" y="838.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="B Back" data-sizing="scales-with-resolution">
+<rect x="94.08" y="825.6" width="97.92" height="28.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="103.68" y="844.9" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">B Back</text>
+<rect x="175" y="826.6" width="16" height="16" fill="#8a5a12"/><text x="183" y="838.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Start Close" data-sizing="scales-with-resolution">
+<rect x="201.6" y="825.6" width="155.52" height="28.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="211.2" y="844.9" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">Start Close</text>
+<rect x="340.12" y="826.6" width="16" height="16" fill="#8a5a12"/><text x="348.12" y="838.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Select Help" data-sizing="scales-with-resolution">
+<rect x="366.72" y="825.6" width="155.52" height="28.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="376.32" y="844.9" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">Select Help</text>
+<rect x="505.24" y="826.6" width="16" height="16" fill="#8a5a12"/><text x="513.24" y="838.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g></svg>
+<text x="0" y="1644" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="22" font-weight="bold" fill="#86efac">1920x1080 CSS, dpr 1 (1920x1080 device): uiScale 1.500, world deviceScale 3, tile 96.0 CSS px, body text 21.00 px</text>
+<svg x="0" y="1660" width="1920" height="1080" viewBox="0 0 1920 1080" data-panel="proposed" data-window="1920x1080@1"><rect x="0" y="0" width="1920" height="1080" fill="#10141a"/><line x1="96" y1="0" x2="96" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="192" y1="0" x2="192" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="288" y1="0" x2="288" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="384" y1="0" x2="384" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="480" y1="0" x2="480" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="576" y1="0" x2="576" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="672" y1="0" x2="672" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="768" y1="0" x2="768" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="864" y1="0" x2="864" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="960" y1="0" x2="960" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="1056" y1="0" x2="1056" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="1152" y1="0" x2="1152" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="1248" y1="0" x2="1248" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="1344" y1="0" x2="1344" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="1440" y1="0" x2="1440" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="1536" y1="0" x2="1536" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="1632" y1="0" x2="1632" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="1728" y1="0" x2="1728" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="1824" y1="0" x2="1824" y2="1080" stroke="#222b36" stroke-width="1"/><line x1="0" y1="96" x2="1920" y2="96" stroke="#222b36" stroke-width="1"/><line x1="0" y1="192" x2="1920" y2="192" stroke="#222b36" stroke-width="1"/><line x1="0" y1="288" x2="1920" y2="288" stroke="#222b36" stroke-width="1"/><line x1="0" y1="384" x2="1920" y2="384" stroke="#222b36" stroke-width="1"/><line x1="0" y1="480" x2="1920" y2="480" stroke="#222b36" stroke-width="1"/><line x1="0" y1="576" x2="1920" y2="576" stroke="#222b36" stroke-width="1"/><line x1="0" y1="672" x2="1920" y2="672" stroke="#222b36" stroke-width="1"/><line x1="0" y1="768" x2="1920" y2="768" stroke="#222b36" stroke-width="1"/><line x1="0" y1="864" x2="1920" y2="864" stroke="#222b36" stroke-width="1"/><line x1="0" y1="960" x2="1920" y2="960" stroke="#222b36" stroke-width="1"/><line x1="0" y1="1056" x2="1920" y2="1056" stroke="#222b36" stroke-width="1"/><g class="el" data-el="Menu frame" data-sizing="grows-horizontally">
+<rect x="1290.72" y="12" width="617.28" height="996" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="2"/>
+<rect x="1873" y="13" width="16" height="16" fill="#2b6cb0"/><text x="1881" y="25" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Menu" data-sizing="scales-with-resolution">
+<rect x="1293.72" y="15" width="611.28" height="60" fill="none"/>
+<text x="1305.72" y="55.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="30" font-weight="bold" fill="#e0e0e0">Menu</text>
+<rect x="1888" y="16" width="16" height="16" fill="#8a5a12"/><text x="1896" y="28" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="separator" data-sizing="fixed">
+<rect x="1293.72" y="75" width="611.28" height="2" fill="#6b6b82"/>
+<rect x="1888" y="68" width="16" height="16" fill="#6b7280"/><text x="1896" y="80" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">F</text></g>
+<g class="el" data-el="Monsters" data-sizing="scales-with-resolution">
+<rect x="1305.72" y="89" width="587.28" height="39.6" fill="#e0e0e0" stroke="#1e1e2e" stroke-width="1"/>
+<text x="1317.72" y="115.94" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#1e1e2e">Monsters</text>
+<rect x="1876" y="90" width="16" height="16" fill="#8a5a12"/><text x="1884" y="102" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Inventory" data-sizing="scales-with-resolution">
+<rect x="1305.72" y="128.6" width="587.28" height="39.6" fill="none"/>
+<text x="1317.72" y="155.54" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Inventory</text>
+<rect x="1876" y="129.6" width="16" height="16" fill="#8a5a12"/><text x="1884" y="141.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Journal" data-sizing="scales-with-resolution">
+<rect x="1305.72" y="168.2" width="587.28" height="39.6" fill="none"/>
+<text x="1317.72" y="195.14" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Journal</text>
+<rect x="1876" y="169.2" width="16" height="16" fill="#8a5a12"/><text x="1884" y="181.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Social (New)" data-sizing="scales-with-resolution">
+<rect x="1305.72" y="207.8" width="587.28" height="39.6" fill="none"/>
+<text x="1317.72" y="234.74" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Social (New)</text>
+<rect x="1876" y="208.8" width="16" height="16" fill="#8a5a12"/><text x="1884" y="220.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Profile" data-sizing="scales-with-resolution">
+<rect x="1305.72" y="247.4" width="587.28" height="39.6" fill="none"/>
+<text x="1317.72" y="274.34" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Profile</text>
+<rect x="1876" y="248.4" width="16" height="16" fill="#8a5a12"/><text x="1884" y="260.4" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="How to Play" data-sizing="scales-with-resolution">
+<rect x="1305.72" y="287" width="587.28" height="39.6" fill="none"/>
+<text x="1317.72" y="313.94" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">How to Play</text>
+<rect x="1876" y="288" width="16" height="16" fill="#8a5a12"/><text x="1884" y="300" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Controls" data-sizing="scales-with-resolution">
+<rect x="1305.72" y="326.6" width="587.28" height="39.6" fill="none"/>
+<text x="1317.72" y="353.54" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Controls</text>
+<rect x="1876" y="327.6" width="16" height="16" fill="#8a5a12"/><text x="1884" y="339.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Close" data-sizing="scales-with-resolution">
+<rect x="1305.72" y="366.2" width="587.28" height="39.6" fill="none"/>
+<text x="1317.72" y="393.14" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Close</text>
+<rect x="1876" y="367.2" width="16" height="16" fill="#8a5a12"/><text x="1884" y="379.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="See your party and stored monsters." data-sizing="scales-with-resolution">
+<rect x="1290.72" y="966" width="617.28" height="42" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="1302.72" y="993.12" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">See your party and stored monsters.</text>
+<rect x="1891" y="967" width="16" height="16" fill="#8a5a12"/><text x="1899" y="979" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Hint bar" data-sizing="scales-with-resolution">
+<rect x="0" y="1020" width="1920" height="60" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="1885" y="1021" width="16" height="16" fill="#8a5a12"/><text x="1893" y="1033" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="A OK" data-sizing="scales-with-resolution">
+<rect x="12" y="1032" width="93.6" height="36" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="24" y="1056.12" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">A OK</text>
+<rect x="88.6" y="1033" width="16" height="16" fill="#8a5a12"/><text x="96.6" y="1045" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="B Back" data-sizing="scales-with-resolution">
+<rect x="117.6" y="1032" width="122.4" height="36" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="129.6" y="1056.12" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">B Back</text>
+<rect x="223" y="1033" width="16" height="16" fill="#8a5a12"/><text x="231" y="1045" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Start Close" data-sizing="scales-with-resolution">
+<rect x="252" y="1032" width="194.4" height="36" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="264" y="1056.12" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">Start Close</text>
+<rect x="429.4" y="1033" width="16" height="16" fill="#8a5a12"/><text x="437.4" y="1045" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Select Help" data-sizing="scales-with-resolution">
+<rect x="458.4" y="1032" width="194.4" height="36" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="470.4" y="1056.12" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">Select Help</text>
+<rect x="635.8" y="1033" width="16" height="16" fill="#8a5a12"/><text x="643.8" y="1045" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g></svg>
+</svg>
