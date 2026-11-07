@@ -1,7 +1,7 @@
 # Spec: M-ui-foundation — the shared menu design language
 
 **Status:** elaborated 2026-11-07 from the 2026-10-24 sketch · **build-ready: 21 slices** — `wf-1`
-(wireframes, docs-only, harness repo) then `uif-1`…`uif-17` with split ids `uif-4b`, `uif-15a/b`, `uif-16a/b` (client) · **Project:** monster-realm
+(wireframes, docs-only, harness repo) then `uif-1`…`uif-17` with split ids `uif-4b`, `uif-15a/b`, `uif-16a/b` (client) · **wf-1 verdicts, token table and channel table:** [`M-ui-foundation-wireframes.md`](M-ui-foundation-wireframes.md); its amendments are tagged `WF1-A<n>` below · **Project:** monster-realm
 (client-only; no game-core, server or binding change) · **Measured against** monster-realm `master`
 `d90c32c9` (bt-17 increment B, #672) with so-2, M-pt3-quickfix and M-battle-tactics bt-1…bt-17 merged.
 **Anchors are symbols, not lines.** · **Doctrine:** `standards/testing-tdd.md` — every criterion is an
@@ -191,8 +191,8 @@ function at the same event, so the movement and render smoothness surface does n
 
 **Tokens (`uif-1`).** `--mr-space-{1..4}`, `--mr-font-{title,header,body,small}` + weights,
 `--mr-content-max`, `--mr-panel-bg` (the darker tab/section value, 173), `--mr-separator`,
-`--mr-text-muted`, `--mr-text-disabled`, `--mr-state-{ok,warn,error}`, `--mr-focus`. wf-1's token table
-sets the values; contrast is measured (body ≥ 4.5:1, state indicators and disabled text ≥ 3:1).
+`--mr-text-muted`, `--mr-text-disabled`, `--mr-state-{ok,warn,error}`, `--mr-focus`, and (WF1-A4) the px tokens `--mr-border-width` and
+`--mr-border-thin`. wf-1's token table sets the values; contrast is measured (body ≥ 4.5:1, state indicators and disabled text ≥ 3:1).
 
 **Frame anatomy (`uif-1` declares, screens adopt).** Top to bottom: title bar → TabBar → body (grows,
 scrolls) → feedback strip (overlay, non-shifting) → the world's hint bar below. Every tab, row, cue and
@@ -215,7 +215,7 @@ the standard frame family, sized by option count, optional title, rows from `ren
 Back/Close row supplied by the caller. A sub-list (Feed…, Evolve…) replaces its rows rather than
 stacking. Sheets are adapter phases, not stack frames (measured: `monstersScreen`, `bagScreen`,
 `socialScreen` and `ScreenHost` already hold them that way), so "closes through the stack" means B
-through the adapter. Placement is wf-1's verdict; the default is corner-anchored on the side away from
+through the adapter. Placement per wf-1's verdict (WF1-A1): corner-anchored on the side away from
 the selected slot, with the anchor computed by a small pure function.
 
 ## Acceptance — integrated whole (proven end-to-end at `uif-17`)
@@ -336,7 +336,7 @@ is also read by these view tests: `claimView.test.ts` and `renameView.test.ts` p
 `font-weight` and nothing else, which the type scale must rewrite with the change named; `boxView.test.ts`,
 `raisingView.test.ts`, `controlsView.test.ts`, `helpView.test.ts`, `leaderboardView.test.ts` read it, and
 `evolutionView.test.ts` pins `:root` token scopes and bans `!important`, element and `#id` selectors sheet-wide.
-Every px shorthand in the chrome moves to rem tokens here, so `uif-2`'s root scale reaches it: `.mr-shell`,
+Every px shorthand in the chrome moves to rem tokens here, except border widths, which become the px tokens (WF1-A4: a rem border lands on fractional device pixels), so `uif-2`'s root scale reaches it: `.mr-shell`,
 `.mr-frame--bottom`, `.mr-frame--prompt`, `.mr-frame--banner`, `.mr-status` (including its `bottom` offset),
 `.mr-chip`, `.mr-hint-bar`, `.mr-notice-banner`. `.tactics-*` is `uif-11`'s. `a11y.spec.ts` checks frames at
 640×240, so the short-window behavior must hold. The e2e helper `uiKit.ts` (computed-style and geometry
@@ -418,12 +418,13 @@ generalizing qf-16's Rankings cue, `.mr-card`, `.mr-empty`), whose first Chromiu
   for a layout with no tabs.
 
 - **UIF3.3:** THE `createContextSheet` primitive SHALL render one bordered `[data-context-sheet]` in the standard
-  frame family, sized by its row count, with an optional title, and SHALL offer a confirm variant holding a
+  frame family, sized by its row count, at a width of min(18rem, 45% of the frame body) (WF1-A2), with an optional title, and SHALL offer a confirm variant holding a
   question and its choices, using `renderNav` for rows and writing only caller text.
 
-- **UIF3.4:** THE pure anchor function SHALL choose the sheet corner on the side away from a given slot rectangle
-  within a frame rectangle per wf-1's verdict, and the sheet SHALL never cover that slot for any slot position
-  (property test).
+- **UIF3.4:** THE pure anchor function SHALL choose the corner horizontally away from a given slot's center within the frame body, the
+  bottom corner first with the sheet growing upward and resting above the feedback strip, then the top corner when the bottom one would touch the slot, and
+  otherwise SHALL cap the sheet's height to the taller free band and let it scroll (WF1-A1), and the sheet SHALL never cover a slot that leaves room for it
+  on either axis (property test; wf-1's `anchorSheet` is the reference rule).
 
 - **UIF3.5:** THE `createEmptyState` primitive SHALL take a reason and an optional cue and next step (research §8), and
   THE `createRowCard` primitive SHALL render one visually separated row per entry, both writing only caller text.
@@ -480,7 +481,8 @@ inherit them. The static lines `#shop-feedback`, `#trade-feedback`, `#pvp-challe
 sit in `index.html` and are pinned by `indexShell.smoke.test.ts`, `main.feedbackCore.test.ts`, `main.feedbackI18n.test.ts`,
 `main.input.test.ts` and `main.reconnectStack.test.ts`; `rename-feedback` is read by `monster-privacy.spec.ts` and `pvp-side-b.spec.ts`, and
 `controls-feedback` by `remap.spec.ts`. A line whose kinds all move to toast retires with its roster row, named; a line that keeps a hint
-kind stays. The pgcc-a B7 rule (never claim undelivered success) and qf-2's care routing stand. Monsters and Inventory success lines are
+kind stays. `pvpView.showFeedback` has no caller, so nine sinks are live, not ten: it retires here with `#pvp-challenge-feedback`'s fate decided by its kinds (WF1-A5). Also measured for `uif-4`:
+`.mr-status` (z-index 45) paints under `.mr-shell` (100), and `tradeFeedback` paints only while `tradeView` shows, so a world-sheet answer has no visible result today; the toast closes both. The pgcc-a B7 rule (never claim undelivered success) and qf-2's care routing stand. Monsters and Inventory success lines are
 painted by their views and move in `uif-7` and `uif-8`.
 
 - **UIF4B.1:** WHEN a shop, trade, challenge, rename, trade-propose or controls action settles, THE message SHALL use its `feedbackPolicy`
@@ -560,6 +562,9 @@ and the catalog roster.
 
 - **UIF6.7:** WHEN a tab is selected and a row is focused in Chromium, THE selected tab SHALL differ from unselected tabs in at
   least two computed properties and from the focused row in fill, so tabs no longer read as menu items (060, 169).
+
+- **UIF6.8:** WHEN the Party tab shows, ITS six slots SHALL render as a 2-column, 3-row grid with no slot wider than half the panel, all six visible at 1280×720, and
+  the D-pad SHALL move the cursor per that layout with no loop (102; WF1-A3, the precondition of the sheet verdict).
 
 ### uif-7 — Monsters: sheet, Back/Close, Summary page, outcomes
 category: ux-a11y · severity: MED · size: MODERATE
@@ -646,7 +651,7 @@ after: [uif-7]
 Feedback items: pt3-2026-10-030, -055, -094
 Measured: `shop-tabs` strip plus `qty` and `confirm` phases in `shopScreen.ts`; Journal's `#quest-log-empty` and `#quest-log-title` from qf-4, with
 `indexShell`'s static roster kept and `journal.empty` as one sentence, so EmptyState takes it as the reason. The dialogue box is the blocking text-box
-channel and stays as shipped (`dialogueView` is not touched). Views are built in `main.ts` with constructor callbacks, so kit parts are imported, never
+channel and stays as shipped (`dialogueView` is not touched). The trade-propose step header takes the TabBar's slot and geometry by class but stays an `ol` with `aria-current="step"`, which e2e pins (WF1-A6). Views are built in `main.ts` with constructor callbacks, so kit parts are imported, never
 injected: a new constructor dependency is a STOP. No catalog, `main.ts`, `styles.css` or feedback edit.
 
 - **UIF10.1:** WHEN Shop shows, ITS tabs SHALL render through the TabBar and its Buy/Sell confirm SHALL use the ContextSheet confirm
@@ -668,7 +673,7 @@ after: [uif-8]
 Feedback items: pt3-2026-10-131, -170, -173
 Measured: `.tactics-*` has 12 `font-size` px literals and its own menu-row, chip and forecast colors. `boardRender.ts` uses fractional
 grid tracks with `aspect-ratio`, so the board already fits its box. Roots carry `.mr-frame .mr-shell .mr-shell--top .mr-shell--battle`,
-and `styles.test.ts` pins that layer. `tactics.menu.item` reads "Item" (the key is unchanged; only values move). `R-bt-17-HPFILLINLINE`
+and `styles.test.ts` pins that layer. The shared row height (`UIF11.3`) grows the open dock from 156 px to about 176 px at ×1, and the board gives up that height: a named cost (WF1-A7). `tactics.menu.item` reads "Item" (the key is unchanged; only values move). `R-bt-17-HPFILLINLINE`
 stays open. Tactical flow and copy otherwise stand.
 
 - **UIF11.1:** WHEN the window grows in Chromium, THE tactical board, HUD, menu, ticker and forecast SHALL grow with `--mr-ui-scale`

@@ -7,8 +7,8 @@ const ROW = 1.65; // body line (0.875rem x 1.6) + space-1 padding: measured 26.4
 const chipsDefault = ['A OK', 'B Back', 'Start Close', 'Select Help'];
 
 function hint(chips = chipsDefault) {
-  const kids = chips.map((c) => box(c, 'S', { w: 0.6 * c.length + 1.5, h: 1.5, style: 'chip' }));
-  return box('Hint bar', 'S', { h: 2.5, style: 'panel', hideText: true, dir: 'row', gap: 0.5, pad: 0.5, children: kids });
+  const kids = chips.map((c) => box(c, 'S', { w: 0.6 * c.length + 1.5, h: 1.425, style: 'chip' }));
+  return { dir: 'col', h: 2.5, children: [{ h: 0.575, spacer: true }, box('Hint bar', 'S', { h: 1.925, style: 'panel', hideText: true, dir: 'row', gap: 0.5, pad: 0.25, children: kids })] };
 }
 
 const rows = (labels, o = {}) => labels.map((l, i) => box(l, 'S', {
@@ -98,13 +98,14 @@ export const SCREENS = {
       worldBack: true, dir: 'col', children: [
         { dir: 'row', grow: 1, children: [
           { grow: 1 },
-          { dir: 'col', pct: 33.4, pad: 0.5, children: [box('Menu frame', 'H', {
+          { dir: 'col', pct: 32, children: [{ h: 1.25, spacer: true }, box('Menu frame', 'H', {
             style: 'frame', hideText: true, grow: 1, dir: 'col', pad: 0.125, children: [
               box('Menu', 'S', { h: 2.5, style: 'title' }), sep(),
               { dir: 'col', grow: 1, pad: 0.5, children: rows(['Monsters', 'Inventory', 'Journal', 'Social (New)', 'Profile', 'How to Play', 'Controls', 'Close'], { focus: 0 }) },
               box('See your party and stored monsters.', 'S', { style: 'strip', abs: { corner: 'bc', inset: 0, w: 'fill', h: 1.75 } }),
             ],
-          })] },
+          }), { h: 0.75, spacer: true }] },
+          { w: 1.5, spacer: true },
         ] },
         hint(),
       ],
@@ -316,12 +317,11 @@ export const SCREENS = {
     build: () => ({
       worldBack: true, dir: 'col', children: [
         { dir: 'col', grow: 1, children: [
-          box('Player wants to trade (banner)', 'S', { style: 'chip', abs: { corner: 'tc', inset: 0.5, w: 22, h: 1.75 } }),
           box('World picker: anchored to the tile, as shipped', 'S', { style: 'sheet', hideText: true, dir: 'col', pad: 0.25, abs: { corner: 'tl', inset: 7, w: 16, h: 6 }, children: rows(['Trade: Player', 'Challenge: Player', 'Close'], { focus: 0 }) }),
-          box('Request sheet: low centre, as shipped', 'S', { style: 'sheet', hideText: true, dir: 'col', pad: 0.25, abs: { corner: 'bc', inset: 1, w: 16, h: 7.5 }, children: rows(['Accept', 'Decline', 'View', 'Close'], { focus: 0 }) }),
+          box('Request sheet: low centre, as shipped', 'S', { style: 'sheet', hideText: true, dir: 'col', pad: 0.25, abs: { corner: 'bc', inset: 1, bottom: 11, w: 16, h: 7.5 }, children: rows(['Accept', 'Decline', 'View', 'Close'], { focus: 0 }) }),
           box('Entering Verdant Hollow (toast)', 'S', { style: 'toast', abs: { corner: 'tr', inset: 0.5, w: 18, h: 2.25 } }),
         ] },
-        hint(['A OK', 'B Back', 'Start Close', 'Select Help']),
+        hint(['Player wants to trade', 'A OK', 'B Back', 'Start Close', 'Select Help']),
       ],
     }),
   },
@@ -344,15 +344,15 @@ export const SCREENS = {
       style: 'frame', hideText: true, grow: 1, dir: 'col', pad: 0.125, children: [
         { dir: 'row', h: 2, gap: 0.25, children: [box('Round 2', 'S', { w: 6.5, style: 'title', fs: 0.875 }), ...['Flameling', 'Tidalin', 'Flameling', 'Tidalin'].map((n, i) => box(n, 'S', { w: 7.5, h: 1.5, style: i === 0 ? 'tabsel' : 'tab', fs: 0.75 }))] },
         box('Board', 'V', { grow: 1, style: 'board', topText: true, grid: { cols: 7, rows: 7 } }),
-        box('Ticker (last lines of the capped list)', 'S', { h: 3.75, style: 'panel', fs: 0.75, topText: true }),
-        { dir: 'row', h: 9.75, gap: 0.5, pad: 0.25, children: [
-          { dir: 'col', w: 7.5, gap: 0.125, children: ['Danger overlay', 'Previous unit', 'Next unit'].map((l) => box(l, 'S', { h: 1.4, style: 'chip', fs: 0.7 })) },
+        box('Ticker (last lines of the capped list)', 'S', { h: 3.75, style: 'hud', topText: true }),
+        { dir: 'row', h: 11, gap: 0.5, pad: 0.25, children: [
+          { dir: 'col', w: 8.5, gap: 0.125, children: ['Danger overlay', 'Previous unit', 'Next unit'].map((l) => box(l, 'S', { h: 1.4, style: 'chip', fs: 0.7 })) },
           box('Command menu', 'S', { w: 12, style: 'sheet', hideText: true, dir: 'col', pad: 0.125, children: rows(['Move', 'Skills', 'Items', 'Recruit', 'Flee', 'Guard'], { focus: 1 }) }),
           box('Forecast: vs Tidalin, Hit 95%, 4-6 damage, Type +1/2', 'S', { w: 34, style: 'hud', topText: true }),
         ] },
         box('Flameling Lv5 HP 297/300 Fire, AP pips', 'S', { style: 'hud', abs: { corner: 'tl', inset: 0.5, top: 2.5, w: 20, h: 3 } }),
         box('Tidalin Lv4 HP 18/18 Water', 'S', { style: 'hud', abs: { corner: 'tr', inset: 0.5, top: 2.5, w: 14, h: 3 } }),
-        box("Flameling's turn", 'S', { style: 'chip', center: true, abs: { corner: 'bc', inset: 0, bottom: 14.5, w: 10, h: 1.9 } }),
+        box("Flameling's turn", 'S', { style: 'chip', center: true, abs: { corner: 'bc', inset: 0, bottom: 15.75, w: 10, h: 1.9 } }),
       ],
     }), ['A OK', 'B Back', 'X Danger', 'LB Previous unit', 'RB Next unit', 'Start Guard', 'Select Help']),
   },

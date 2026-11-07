@@ -29,14 +29,14 @@ async function snap(p: Page, name: string, note = ''): Promise<void> {
       const inView = r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0;
       const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => (n.textContent ?? '').trim()).filter(Boolean).join(' ');
       const bf = getComputedStyle(el, '::before').content;
-      const bfText = bf && bf !== 'none' && bf !== 'normal' ? bf.replace(/^"|"$/g, '').trim() : '';
+      const bfText = bf && bf !== 'none' && bf !== 'normal' ? bf.replace(/^"([^"]*)".*$/, '$1').trim() : '';
       const bg = cs.backgroundColor;
       const hasPaint = (bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') || parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0 || parseFloat(cs.borderLeftWidth) > 0;
       const he = el as HTMLElement;
       if (inView && el.tagName !== 'HTML' && el.tagName !== 'BODY') {
         const cx = Math.min(innerWidth - 1, Math.max(0, r.x + r.width / 2)); const cy = Math.min(innerHeight - 1, Math.max(0, r.y + r.height / 2));
         const top = document.elementFromPoint(cx, cy);
-        const occ = top !== null && top !== el && !el.contains(top) && !top.contains(el);
+        const occ = cs.pointerEvents !== 'none' && top !== null && top !== el && !el.contains(top) && !top.contains(el);
         out.push({ occ: occ || undefined, off: r.y >= innerHeight || r.x >= innerWidth || undefined,
           t: el.tagName.toLowerCase(), id: el.id || undefined, cls: he.className && typeof he.className === 'string' ? he.className : undefined,
           role: el.getAttribute('role') || undefined, tid: el.getAttribute('data-testid') || undefined,

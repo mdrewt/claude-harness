@@ -163,6 +163,7 @@ export function wf15(input) {
     if (k.channel === 'toast' && k.action && !k.persists) bad.push(`${k.kind}: action-required toast names no persistent state`);
   }
   for (const c of CHANNELS) if (!KINDS.some((k) => k.channel === c)) bad.push(`channel ${c} carries nothing`);
+  if (!input.doc.includes(`${contrast('#55556a', '#e0e0e0').toFixed(2)}:1 on \`#e0e0e0\``)) bad.push('the focused-disabled row ratio in the document is wrong');
   if (fillRegions(input.doc) !== input.doc) bad.push('generated tables in the document are stale (node build.mjs)');
   for (const k of KINDS) if (!input.doc.includes(`| \`${k.kind}\` |`)) bad.push(`${k.kind}: not in the document's table`);
   for (const t of ['--mr-space-1', '--mr-font-title', '--mr-panel-bg', '--mr-separator', '--mr-text-muted', '--mr-text-disabled', '--mr-state-ok', '--mr-state-warn', '--mr-state-error', '--mr-focus', '--mr-content-max', 'UI_SCALE_MIN', 'UI_SCALE_MAX']) if (!input.doc.includes(t)) bad.push(`${t}: not published`);
@@ -212,6 +213,8 @@ const GATES = { 'WF1.1': wf11, 'WF1.2': wf12, 'WF1.3': wf13, 'WF1.4': wf14, 'WF1
 function selftest() {
   const base = live();
   const fails = [];
+  // A damaged input proves nothing unless the undamaged one passes first.
+  for (const [name, gate] of Object.entries(GATES)) { const r = gate(base); if (r.bad.length) fails.push(`${name} fails on the live inputs: ${r.bad[0]}`); }
   const expectFail = (name, gate, damaged) => { if (gate({ ...base, ...damaged }).bad.length === 0) fails.push(`${name}: the check passed damaged input`); };
   expectFail('missing diagram', wf11, { svg: (n) => (n === 'journal' ? null : base.svg(n)) });
   expectFail('stale diagram', wf11, { svg: (n) => (n === 'journal' ? `${base.svg(n)} ` : base.svg(n)) });

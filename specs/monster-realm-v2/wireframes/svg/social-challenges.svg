@@ -28,7 +28,8 @@
 <rect x="331.6" y="693.2" width="114.3" height="22.8" fill="rgb(30, 30, 46)" stroke="rgb(224, 224, 224)" stroke-width="1"/>
 <text x="339.6" y="708.68" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="rgb(224, 224, 224)">Select</text>
 <text x="396" y="708.28" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="rgb(224, 224, 224)">R</text>
-<text x="408" y="708.28" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="rgb(224, 224, 224)">Help</text></svg>
+<text x="408" y="708.28" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="rgb(224, 224, 224)">Help</text>
+<text x="932.8" y="715.4" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10" fill="rgb(102, 102, 119)">monster-realm · d90c32c9 · 2026-11-07T16:13:40.058Z · dev</text></svg>
 <svg x="1340" y="110" width="1280" height="720" viewBox="0 0 1280 720" data-panel="proposed" data-window="1280x720@1"><rect width="1280" height="720" fill="#000"/><g class="el" data-el="Social frame" data-sizing="grows-vertically">
 <rect x="8" y="8" width="1264" height="664" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="2"/>
 <rect x="1237" y="9" width="16" height="16" fill="#2f7d4f"/><text x="1245" y="21" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">V</text></g>
@@ -75,22 +76,22 @@
 <text x="30" y="180.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#e0e0e0">Other player: 2 vs 2 (RowCard)</text>
 <rect x="1241" y="165" width="16" height="16" fill="#2b6cb0"/><text x="1249" y="177" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
 <g class="el" data-el="Hint bar" data-sizing="scales-with-resolution">
-<rect x="0" y="680" width="1280" height="40" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
-<rect x="1245" y="681" width="16" height="16" fill="#8a5a12"/><text x="1253" y="693" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<rect x="0" y="689.2" width="1280" height="30.8" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="1245" y="690.2" width="16" height="16" fill="#8a5a12"/><text x="1253" y="702.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
 <g class="el" data-el="A OK" data-sizing="scales-with-resolution">
-<rect x="8" y="688" width="62.4" height="24" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
-<text x="16" y="704.08" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#e0e0e0">A OK</text>
-<rect x="53.4" y="689" width="16" height="16" fill="#8a5a12"/><text x="61.4" y="701" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<rect x="4" y="693.2" width="62.4" height="22.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="12" y="708.68" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#e0e0e0">A OK</text>
+<rect x="49.4" y="694.2" width="16" height="16" fill="#8a5a12"/><text x="57.4" y="706.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
 <g class="el" data-el="B Back" data-sizing="scales-with-resolution">
-<rect x="78.4" y="688" width="81.6" height="24" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
-<text x="86.4" y="704.08" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#e0e0e0">B Back</text>
-<rect x="143" y="689" width="16" height="16" fill="#8a5a12"/><text x="151" y="701" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<rect x="74.4" y="693.2" width="81.6" height="22.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="82.4" y="708.68" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#e0e0e0">B Back</text>
+<rect x="139" y="694.2" width="16" height="16" fill="#8a5a12"/><text x="147" y="706.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
 <g class="el" data-el="Start Close" data-sizing="scales-with-resolution">
-<rect x="168" y="688" width="129.6" height="24" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
-<text x="176" y="704.08" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#e0e0e0">Start Close</text>
-<rect x="280.6" y="689" width="16" height="16" fill="#8a5a12"/><text x="288.6" y="701" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<rect x="164" y="693.2" width="129.6" height="22.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="172" y="708.68" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#e0e0e0">Start Close</text>
+<rect x="276.6" y="694.2" width="16" height="16" fill="#8a5a12"/><text x="284.6" y="706.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
 <g class="el" data-el="Select Help" data-sizing="scales-with-resolution">
-<rect x="305.6" y="688" width="129.6" height="24" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
-<text x="313.6" y="704.08" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#e0e0e0">Select Help</text>
-<rect x="418.2" y="689" width="16" height="16" fill="#8a5a12"/><text x="426.2" y="701" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g></svg>
+<rect x="301.6" y="693.2" width="129.6" height="22.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="309.6" y="708.68" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#e0e0e0">Select Help</text>
+<rect x="414.2" y="694.2" width="16" height="16" fill="#8a5a12"/><text x="422.2" y="706.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g></svg>
 </svg>
