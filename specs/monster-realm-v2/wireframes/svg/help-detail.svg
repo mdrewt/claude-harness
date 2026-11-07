@@ -82,7 +82,7 @@
 <rect x="22" y="205.6" width="1236" height="26.4" fill="none"/>
 <text x="30" y="223.56" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#e0e0e0">Status effects</text>
 <rect x="1241" y="206.6" width="16" height="16" fill="#8a5a12"/><text x="1249" y="218.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
-<g class="el" data-el="Detail panel (modal in frame)" data-sizing="scales-with-resolution">
+<g class="el" data-el="ContextSheet: detail variant" data-sizing="scales-with-resolution">
 <rect x="320" y="251" width="640" height="256" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="2"/>
 <rect x="925" y="252" width="16" height="16" fill="#8a5a12"/><text x="933" y="264" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
 <g class="el" data-el="Recruit and bait" data-sizing="scales-with-resolution">

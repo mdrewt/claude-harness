@@ -14,6 +14,20 @@ import { REQUIRED_SCREENS, SCREENS, THREE_SIZE_SCREENS, WINDOW_SIZES } from './s
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SHA = 'd90c32c9';
+// Which frame each capture must show, independent of screens.mjs: a wrong or junk capture fails here.
+const TOP = {
+  'main-menu': 'menuView', 'main-menu-profile': 'menuView', 'main-menu-options': 'menuView', 'monsters-party-two': 'boxView', 'monsters-storage-filled': 'boxView',
+  'monsters-sheet': 'boxView', 'monsters-summary': 'boxView', 'inventory-food': 'raisingView', 'inventory-sheet': 'raisingView', 'inventory-picker': 'raisingView', 'inventory-pocket-2': 'raisingView',
+  journal: 'questLogView', 'social-players': 'social', 'social-trades': 'social', 'social-trades-sheet': 'social', 'social-challenges': 'social', 'social-rankings': 'social',
+  'profile-name': 'renameView', 'profile-account': 'claimView', 'profile-privacy': 'privacyView', 'help-screen': 'helpView', 'help-goals': 'helpView',
+  'controls-buttons': 'controlsView', 'controls-shortcuts': 'controlsView', 'shop-buy': 'shopView', 'shop-qty': 'shopView', 'shop-confirm': 'shopView', 'shop-sell': 'shopView',
+  heal: 'healView', dialogue: 'dialogueView', 'tradepropose-offer': 'tradeProposeView', 'tradepropose-coins': 'tradeProposeView', 'tradepropose-review': 'tradeProposeView', 'tradepropose-confirm': 'tradeProposeView',
+  'world-picker': 'world', 'world-challenge-confirm': 'world', 'world-request-banner': 'world', 'world-request-sheet': 'world',
+  'tactics-deploy': 'battle', 'tactics-deploy-editor': 'battle', 'tactics-forecast': 'battle', 'tactics-menu': 'battle', 'tactics-results': 'battleView',
+};
+const stackTop = (c) => { const t = c.stack[c.stack.length - 1]; return t.id ?? t.owner ?? t.kind; };
+// The literal window set WF1.2 requires, independent of screens.mjs.
+const REQUIRED_WINDOWS = ['960x540@1', '1536x864@1.25', '1920x1080@1'];
 const live = () => ({
   doc: readFileSync(join(HERE, '..', 'M-ui-foundation-wireframes.md'), 'utf8'),
   spec: readFileSync(join(HERE, '..', 'M-ui-foundation.spec.md'), 'utf8'),
@@ -44,7 +58,9 @@ export function wf11(input) {
       if (c === null) { bad.push(`${id}: capture ${n} missing`); continue; }
       if (c.sha !== SHA) bad.push(`${id}: capture ${n} is not from ${SHA}`);
       if (c.viewport.width !== 1280 || c.viewport.height !== 720) bad.push(`${id}: capture ${n} is not 1280x720`);
-      if (c.els.length === 0) bad.push(`${id}: capture ${n} is empty`);
+      if (c.els.length < 5) bad.push(`${id}: capture ${n} holds ${c.els.length} elements`);
+      if (TOP[n] === undefined) bad.push(`${id}: capture ${n} has no expected frame`);
+      else if (stackTop(c) !== TOP[n]) bad.push(`${id}: capture ${n} shows ${stackTop(c)}, expected ${TOP[n]}`);
       if (!input.shipped(n)) bad.push(`${id}: shipped screenshot ${n} missing`);
     }
     if (!(input.doc.includes(`](wireframes/svg/${id}.svg)`))) bad.push(`${id}: the document does not link its diagram`);
@@ -68,15 +84,15 @@ export function wf12(input) {
     if (groups.length === 0) bad.push(`${id}: no annotated elements`);
   };
   for (const id of REQUIRED_SCREENS) { const svg = input.svg(id); if (svg === null) bad.push(`${id}: missing`); else each(id, svg); }
-  if (WINDOW_SIZES.length !== 3) bad.push('three window sizes required');
-  if (!WINDOW_SIZES.some((w) => !Number.isInteger(w.dpr))) bad.push('no fractional devicePixelRatio');
+  const drawn = WINDOW_SIZES.map((w) => `${w.w}x${w.h}@${w.dpr}`);
+  if (drawn.join() !== REQUIRED_WINDOWS.join()) bad.push(`window set is ${drawn.join()}`);
   for (const req of ['main-menu', 'monsters-party', 'tactics-board']) if (!THREE_SIZE_SCREENS.includes(req)) bad.push(`${req}: not in the three-size set`);
   for (const id of THREE_SIZE_SCREENS) {
     const svg = input.svg(`${id}-sizes`);
     if (svg === null) { bad.push(`${id}: no three-size sheet`); continue; }
     if (svg !== sizesSvg(id)) bad.push(`${id}: three-size sheet stale`);
     each(`${id}-sizes`, svg);
-    for (const w of WINDOW_SIZES) if (!svg.includes(`data-window="${w.w}x${w.h}@${w.dpr}"`)) bad.push(`${id}: not drawn at ${w.w}x${w.h}@${w.dpr}`);
+    for (const w of REQUIRED_WINDOWS) if (!svg.includes(`data-window="${w}"`)) bad.push(`${id}: not drawn at ${w}`);
     if (!input.doc.includes(`](wireframes/svg/${id}-sizes.svg)`)) bad.push(`${id}: the document does not link its size sheet`);
   }
   for (const id of REQUIRED_SCREENS) for (const w of WINDOW_SIZES) {
@@ -96,10 +112,10 @@ export function wf13(input) {
     const named = genre ? CONTRACTS.filter((c) => genre[1].includes(c)) : [];
     if (named.length === 0) bad.push(`${id}: names no genre convention`);
     named.forEach((n) => seen.add(n));
-    const adopted = /^\*\*Adopted:\*\*\s*(\S.*)$/m.exec(s);
-    const rejected = /^\*\*Rejected:\*\*\s*(\S.*)$/m.exec(s);
-    if (!adopted) bad.push(`${id}: no Adopted line`);
-    if (!rejected) bad.push(`${id}: no Rejected line`);
+    const adopted = /^\*\*Adopted:\*\*[ \t]*(\S.*)$/m.exec(s);
+    const rejected = /^\*\*Rejected:\*\*[ \t]*(\S.*)$/m.exec(s);
+    if (!adopted || adopted[1].length < 20) bad.push(`${id}: no Adopted line`);
+    if (!rejected || rejected[1].length < 20) bad.push(`${id}: no Rejected line`);
     else if (!/\b(because|since|so that|would|cannot|needs)\b/.test(rejected[1])) bad.push(`${id}: Rejected line gives no reason`);
   }
   for (const c of CONTRACTS) if (!seen.has(c)) bad.push(`no screen contrasts with the ${c}`);
@@ -122,8 +138,8 @@ export function wf14(input) {
   ]) {
     const s = heading(input.doc, h);
     if (!s) { bad.push(`no "${h}" section`); continue; }
-    if (!/^\*\*Verdict:\*\*\s*\S/m.test(s)) bad.push(`${h}: no verdict line`);
-    if (!/^\*\*Reason:\*\*\s*\S/m.test(s)) bad.push(`${h}: no reason line`);
+    if (!/^\*\*Verdict:\*\*[ \t]*\S.{20}/m.test(s)) bad.push(`${h}: no verdict line`);
+    if (!/^\*\*Reason:\*\*[ \t]*\S.{20}/m.test(s)) bad.push(`${h}: no reason line`);
     for (const m of must) if (!s.includes(m)) bad.push(`${h}: does not address ${m}`);
   }
   return { bad, ok: '3 verdicts with reasons, sheet placement across all three options' };
@@ -176,7 +192,8 @@ export function wf16(input) {
   const am = heading(input.doc, 'Amendments made in this diff');
   const ids = [...am.matchAll(/^- \*\*(WF1-A\d+)\*\*/gm)].map((m) => m[1]);
   if (ids.length === 0) bad.push('the document declares no amendment list');
-  for (const id of ids) if (!input.spec.includes(id)) bad.push(`${id}: declared but absent from M-ui-foundation.spec.md`);
+  const specText = input.spec.replace(/<!--[\s\S]*?-->/g, '');
+  for (const id of ids) if (!specText.includes(id)) bad.push(`${id}: declared but absent from M-ui-foundation.spec.md`);
   for (const m of input.spec.matchAll(/WF1-A\d+/g)) if (!ids.includes(m[0])) bad.push(`${m[0]}: in the spec but not declared`);
   const sec = /^### uif-1 [^\n]*\n[\s\S]*?^after: \[([^\]]*)\]/m.exec(input.spec);
   if (!sec || !sec[1].includes('wf-1')) bad.push('uif-1 is not after wf-1');
@@ -201,6 +218,7 @@ export function anchorProperty() {
           const a = anchorSheet(body, slot.rect, { w: sw, h: sh }, 0.75 * rem).rect;
           const hit = a.x < slot.rect.x + slot.rect.w && slot.rect.x < a.x + a.w && a.y < slot.rect.y + slot.rect.h && slot.rect.y < a.y + a.h;
           if (hit) bad.push(`${id} ${w.w}x${w.h} x${step}: sheet covers ${slot.label}`);
+          if (a.h <= 0 || a.y < body.y || a.x < body.x || a.y + a.h > body.y + body.h + 0.01 || a.x + a.w > body.x + body.w + 0.01) bad.push(`${id} ${w.w}x${w.h} x${step}: sheet leaves the body at ${slot.label}`);
         }
       }
     }
@@ -231,8 +249,20 @@ function selftest() {
   expectFail('amendment absent from spec', wf16, { spec: base.spec.replaceAll('WF1-A1', 'WF1-XX') });
   expectFail('uif-1 not after wf-1', wf16, { spec: base.spec.replace('after: [wf-1]', 'after: []') });
   if (anchorProperty().bad.length !== 0) fails.push(`anchor property: ${anchorProperty().bad[0]}`);
-  const covered = anchorSheet({ x: 0, y: 0, w: 100, h: 100 }, { x: 0, y: 0, w: 100, h: 90 }, { w: 40, h: 40 }, 2).rect;
-  if (covered.y + covered.h > 100) fails.push('anchor: capped sheet leaves the area');
+  const inside = (name, slot, sheet) => {
+    const a = anchorSheet({ x: 0, y: 0, w: 100, h: 100 }, slot, sheet, 4).rect;
+    if (a.h <= 0 || a.y < 0 || a.x < 0 || a.y + a.h > 100 || a.x + a.w > 100) fails.push(`anchor ${name}: left the area ${JSON.stringify(a)}`);
+  };
+  inside('sheet taller than the area', { x: 0, y: 40, w: 10, h: 20 }, { w: 30, h: 120 });
+  inside('sheet wider than the area', { x: 0, y: 40, w: 10, h: 20 }, { w: 200, h: 40 });
+  inside('slot fills the area', { x: 0, y: 0, w: 100, h: 100 }, { w: 30, h: 50 });
+  inside('slot leaves a sliver', { x: 0, y: 5, w: 100, h: 90 }, { w: 30, h: 50 });
+  expectFail('empty Adopted line', wf13, { doc: base.doc.replace(/^\*\*Adopted:\*\*.*$/m, '**Adopted:**') });
+  expectFail('empty Reason line', wf14, { doc: base.doc.replace(/^\*\*Reason:\*\*.*$/m, '**Reason:**') });
+  expectFail('one-word Rejected', wf13, { doc: base.doc.replace(/^\*\*Rejected:\*\*.*$/m, '**Rejected:** would') });
+  expectFail('capture of the wrong frame', wf11, { capture: (n) => (n === 'journal' ? { ...base.capture(n), stack: [{ kind: 'world' }] } : base.capture(n)) });
+  expectFail('junk capture', wf11, { capture: (n) => (n === 'heal' ? { ...base.capture(n), els: [{}] } : base.capture(n)) });
+  expectFail('amendment only in a comment', wf16, { spec: base.spec.replaceAll('WF1-A1', '<!-- WF1-A1 -->') });
   return fails;
 }
 

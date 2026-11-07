@@ -13,11 +13,12 @@ function hint(chips = chipsDefault) {
 
 const rows = (labels, o = {}) => labels.map((l, i) => box(l, 'S', {
   h: ROW,
-  style: i === (o.focus ?? -1) ? 'focus' : (o.disabled ?? []).includes(i) ? 'disabled' : 'row',
+  style: i === (o.focus ?? -1) ? 'focus' : 'row',
 }));
 
 function tabBar(tabs, sel) {
   const strip = tabs.map((t, i) => box(t, 'S', { w: 7.5, style: i === sel ? 'tabsel' : 'tab', center: true, h: 2 }));
+  // Tabs share the strip evenly up to 7.5rem each, and the strip keeps qf-11's horizontal scroll at extremes.
   return {
     dir: 'row', h: 2, gap: 0.25,
     children: [box('LB', 'S', { w: 3.25, style: 'chip', h: 2 }), { dir: 'row', grow: 1, gap: 0.25, children: strip }, box('RB', 'S', { w: 3.25, style: 'chip', h: 2 })],
@@ -30,7 +31,7 @@ const sep = () => box('separator', 'F', { hpx: 2, style: 'sep', hideText: true }
 function frame(title, o = {}) {
   const kids = [box(title, 'S', { h: 2.5, style: 'title' }), sep()];
   if (o.tabs) kids.push({ dir: 'col', h: 2.25, pad: 0.125, children: [tabBar(o.tabs, o.sel ?? 0)] });
-  const shellBody = box(o.bodyLabel ?? 'Body', 'V', { grow: 1, style: o.tabs ? 'panel' : 'frame', hideText: true, maxW: CONTENT_MAX_REM, dir: 'col', pad: 0.75, gap: o.bodyGap ?? 0, children: [...(o.body ?? []), ...(o.sheet ? [o.sheet] : [])], ...(o.scrolls ? { scrolls: true } : {}) });
+  const shellBody = box('Body', 'V', { grow: 1, style: o.tabs ? 'panel' : 'frame', hideText: true, maxW: CONTENT_MAX_REM, dir: 'col', pad: 0.75, gap: o.bodyGap ?? 0, children: [...(o.body ?? []), ...(o.sheet ? [o.sheet] : [])], ...(o.scrolls ? { scrolls: true } : {}) });
   kids.push(shellBody);
   const overlays = [];
   if (o.strip) overlays.push(box(o.strip, 'S', { style: 'strip', abs: { corner: 'bc', inset: 0, w: 'fill', h: 1.75 } }));
@@ -39,15 +40,15 @@ function frame(title, o = {}) {
 }
 
 /** A ContextSheet: bordered, sized by row count, last row Back/Close, corner-anchored (WF1.4). */
-export function sheet(title, labels, o = {}) {
+function sheet(title, labels) {
   const n = labels.length;
   const h = (title ? 2 : 0) + n * ROW + 0.75;
   const kids = [];
   if (title) kids.push(box(title, 'S', { h: 1.9, style: 'header' }));
-  kids.push(...rows(labels, { focus: o.focus ?? 0, disabled: o.disabled }));
+  kids.push(...rows(labels, { focus: 0 }));
   return box('ContextSheet', 'S', {
     style: 'sheet', hideText: true, dir: 'col', pad: 0.25, children: kids,
-    abs: { corner: o.corner ?? 'br', inset: 0.75, bottom: 2.25, w: SHEET_WIDTH_REM, h },
+    abs: { corner: 'br', inset: 0.75, bottom: 2.25, w: SHEET_WIDTH_REM, h },
   });
 }
 
@@ -141,7 +142,6 @@ export const SCREENS = {
           box('ATK 9 DEF 250 SPD 11 SP.ATK 12 SP.DEF 250', 'H', { grow: 1, style: 'card', topText: true }),
           box('Ability, skills, essence, nature', 'H', { grow: 1, style: 'card', topText: true }),
         ] },
-        box('Back', 'S', { h: ROW, style: 'focus' }),
       ],
     })),
   },
@@ -168,7 +168,7 @@ export const SCREENS = {
   'social-players': {
     title: 'Social: Players',
     current: ['social-players'],
-    build: () => shell(frame('Social', { tabs: SOCIAL, sel: 0, scrolls: true, body: rows(['Player Nearby'], { focus: 0 }), strip: 'Walk up to Player and press A' })),
+    build: () => shell(frame('Social', { tabs: SOCIAL, sel: 0, scrolls: true, body: [...rows(['Player Nearby'], { focus: 0 }), box('Walk up to Player and press A', 'S', { h: ROW, style: 'muted' })] })),
   },
   'social-trades': {
     title: 'Social: Trades',
@@ -239,7 +239,7 @@ export const SCREENS = {
     build: () => shell(frame('How to Play', {
       tabs: ['Introduction', 'Encyclopedia'], sel: 1, scrolls: true,
       body: rows(['Party and Storage', 'Recruit and bait', 'Evolution and essence', 'Affinity', 'Status effects'], { focus: 1 }),
-      sheet: box('Detail panel (modal in frame)', 'S', {
+      sheet: box('ContextSheet: detail variant', 'S', {
         style: 'sheet', hideText: true, dir: 'col', pad: 0.5, gap: 0.25,
         abs: { corner: 'cc', inset: 0, w: 40, h: 16 },
         children: [box('Recruit and bait', 'S', { h: 2, style: 'header' }), box('Definition, then related mechanics', 'V', { grow: 1, style: 'text', topText: true }), box('Back', 'S', { h: ROW, style: 'focus' })],
@@ -253,6 +253,7 @@ export const SCREENS = {
       tabs: ['Buttons', 'Shortcuts', 'Display'], sel: 0, scrolls: true,
       body: rows(['Up: W   (alt) ArrowUp', 'Down: S   (alt) ArrowDown', 'Left: A   (alt) ArrowLeft', 'Right: D   (alt) ArrowRight', 'Confirm (A): Enter', 'Back (B): Backspace', 'Jump (X): Space', 'Info (Y): F', 'Previous tab (LB): Q', 'Next tab (RB): E', 'Menu (Start): Esc', 'Help (Select): R', 'Reset all'], { focus: 0 }),
       strip: 'Press a key for Up…',
+      toast: 'Saved.',
     })),
   },
   'controls-shortcuts': {
@@ -277,9 +278,8 @@ export const SCREENS = {
     current: ['shop-buy', 'shop-qty', 'shop-confirm', 'shop-sell'],
     build: () => shell(frame('Pebble Town Shop · Gold 5000', {
       tabs: ['Buy', 'Sell'], sel: 0, scrolls: true,
-      body: rows(['Lure Berry 200g', 'Power Root 300g', 'Antidote 150g', 'Tidewell Shard 500g', 'Emberheart Cinder 500g'], { focus: 0 }),
-      sheet: sheet('Buy 1 Lure Berry for 200 gold?', ['Quantity: 1  (Left/Right)', 'Yes', 'No']),
-      toast: 'Bought 1 Lure Berry (-200g)',
+      body: rows(['Lure Berry 200g [Buy]', 'Power Root 300g [Buy]', 'Antidote 150g [Buy]', 'Tidewell Shard 500g [Buy]', 'Emberheart Cinder 500g [Buy]'], { focus: 0 }),
+      sheet: sheet('Buy how many Lure Berry?', ['Quantity: 1  (Left/Right)', 'Back']),
     })),
   },
   heal: {
@@ -317,8 +317,8 @@ export const SCREENS = {
     build: () => ({
       worldBack: true, dir: 'col', children: [
         { dir: 'col', grow: 1, children: [
-          box('World picker: anchored to the tile, as shipped', 'S', { style: 'sheet', hideText: true, dir: 'col', pad: 0.25, abs: { corner: 'tl', inset: 7, w: 16, h: 6 }, children: rows(['Trade: Player', 'Challenge: Player', 'Close'], { focus: 0 }) }),
-          box('Request sheet: low centre, as shipped', 'S', { style: 'sheet', hideText: true, dir: 'col', pad: 0.25, abs: { corner: 'bc', inset: 1, bottom: 11, w: 16, h: 7.5 }, children: rows(['Accept', 'Decline', 'View', 'Close'], { focus: 0 }) }),
+          box('World picker: anchored to the tile, as shipped', 'S', { style: 'sheet', hideText: true, dir: 'col', pad: 0.25, abs: { corner: 'tl', inset: 7, w: 18, h: 6 }, children: rows(['Trade: Player', 'Challenge: Player', 'Close'], { focus: 0 }) }),
+          box('Request sheet: low centre, as shipped', 'S', { style: 'sheet', hideText: true, dir: 'col', pad: 0.25, abs: { corner: 'bc', inset: 1, bottom: 11, w: 18, h: 7.5 }, children: rows(['Accept', 'Decline', 'View', 'Close'], { focus: 0 }) }),
           box('Entering Verdant Hollow (toast)', 'S', { style: 'toast', abs: { corner: 'tr', inset: 0.5, w: 18, h: 2.25 } }),
         ] },
         hint(['Player wants to trade', 'A OK', 'B Back', 'Start Close', 'Select Help']),

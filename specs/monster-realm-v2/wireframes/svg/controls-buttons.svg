@@ -143,6 +143,10 @@
 <rect x="8" y="644" width="1264" height="28" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
 <text x="16" y="662.08" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" fill="#e0e0e0">Press a key for Up…</text>
 <rect x="1255" y="645" width="16" height="16" fill="#8a5a12"/><text x="1263" y="657" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Saved." data-sizing="scales-with-resolution">
+<rect x="972" y="56" width="288" height="36" fill="#181826" stroke="#34d399" stroke-width="2"/>
+<text x="980" y="78.76" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#34d399">Saved.</text>
+<rect x="1243" y="57" width="16" height="16" fill="#8a5a12"/><text x="1251" y="69" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
 <g class="el" data-el="Hint bar" data-sizing="scales-with-resolution">
 <rect x="0" y="689.2" width="1280" height="30.8" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
 <rect x="1245" y="690.2" width="16" height="16" fill="#8a5a12"/><text x="1253" y="702.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>

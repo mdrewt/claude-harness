@@ -17,7 +17,7 @@ export const UI_SCALE_MIN = 0.875;
 export const UI_SCALE_MAX = 3;
 const TILE_PX = 32;
 const TARGET_VISIBLE_TILES = 11;
-export const UI_REFERENCE_CSS_PX = 720;
+const UI_REFERENCE_CSS_PX = 720;
 export function scaleOf(cssW, cssH, dpr) {
   const shorter = Math.min(cssW, cssH);
   const continuous = (shorter * dpr) / (TILE_PX * TARGET_VISIBLE_TILES);
@@ -50,7 +50,7 @@ export const FONT = {
 export const CONTENT_MAX_REM = 80;
 
 const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-export function luminance(hex) {
+function luminance(hex) {
   const n = Number.parseInt(hex.slice(1), 16);
   return 0.2126 * lin(((n >> 16) & 255) / 255) + 0.7152 * lin(((n >> 8) & 255) / 255) + 0.0722 * lin((n & 255) / 255);
 }
@@ -78,39 +78,40 @@ export const CONTRAST_PAIRS = [
 // ---- box solver ----------------------------------------------------------------------------
 // A node is an ELEMENT when it has a `label`; it must then carry exactly one `size` key (V|H|S|F).
 // Unlabelled nodes are layout helpers: invisible and unannotated.
-// Lengths are rem unless `px: true`. In a col: h (rem) or grow; width follows the parent, or w/maxW
+// Lengths are rem (`hpx`: a height in CSS px). In a col: h (rem) or grow; width follows the parent, or w/maxW
 // centered. In a row: w (rem), pct (of the parent) or grow; height follows the parent or h.
 // `abs: {corner, inset, w, h}` overlays the parent; painted after the flow.
 export const box = (label, size, o = {}) => ({ label, size, ...o });
-export const col = (children, o = {}) => ({ dir: 'col', children, ...o });
-export const row = (children, o = {}) => ({ dir: 'row', children, ...o });
-export const gap = (h = 0.5) => ({ h, spacer: true });
-export const gapx = (w = 0.5) => ({ w, spacer: true });
 
 function len(v, rem) { return v * rem; }
 const hOf = (k, rem) => (k.hpx !== undefined ? k.hpx : len(k.h ?? 0, rem));
 
 /** The ContextSheet anchor (WF1.4, UIF3.4): horizontally away from the slot, bottom corner first,
  *  growing upward; a slot with no horizontal clearance flips the corner vertically; if neither corner
- *  is clear the sheet caps to the taller free band and scrolls. Pure. */
-export function anchorSheet(area, slot, sheet, inset) {
+ *  is clear the sheet caps to the taller free band and scrolls. The result always stays inside the
+ *  area with a positive height; a sheet taller than the area scrolls. Pure. */
+export function anchorSheet(area, slot, sheet, inset, minH = 4 * inset) {
   const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   const side = slot.x + slot.w / 2 < area.x + area.w / 2 ? 'r' : 'l';
-  const place = (v, h = sheet.h) => ({
-    x: side === 'r' ? area.x + area.w - sheet.w - inset : area.x + inset,
+  const w = Math.min(sheet.w, area.w - 2 * inset);
+  const maxH = area.h - 2 * inset;
+  const h0 = Math.min(sheet.h, maxH);
+  const place = (v, h) => ({
+    x: side === 'r' ? area.x + area.w - w - inset : area.x + inset,
     y: v === 't' ? area.y + inset : area.y + area.h - h - inset,
-    w: sheet.w,
+    w,
     h,
   });
-  const bottom = place('b');
-  if (!hit(bottom, slot)) return { corner: `b${side}`, rect: bottom, scrolls: false };
-  const top = place('t');
-  if (!hit(top, slot)) return { corner: `t${side}`, rect: top, scrolls: false };
+  const clipped = h0 < sheet.h;
+  const bottom = place('b', h0);
+  if (!hit(bottom, slot)) return { corner: `b${side}`, rect: bottom, scrolls: clipped };
+  const top = place('t', h0);
+  if (!hit(top, slot)) return { corner: `t${side}`, rect: top, scrolls: clipped };
   const above = slot.y - area.y;
   const below = area.y + area.h - (slot.y + slot.h);
   const v = above >= below ? 't' : 'b';
-  const capped = place(v, Math.max(above, below) - 2 * inset);
-  return { corner: `${v}${side}`, rect: capped, scrolls: true };
+  const h = Math.min(maxH, Math.max(minH, Math.max(above, below) - 2 * inset));
+  return { corner: `${v}${side}`, rect: place(v, h), scrolls: true };
 }
 export const SHEET_WIDTH_REM = 18;
 export const SHEET_WIDTH_MAX_FRACTION = 0.45;
@@ -134,7 +135,7 @@ export function solve(node, rect, rem, out = [], issues = []) {
       const h = k.grow ? (Math.max(0, free) * k.grow) / grow : hOf(k, rem);
       let w = k.w !== undefined ? len(k.w, rem) : inner.w;
       if (k.maxW !== undefined) w = Math.min(w, len(k.maxW, rem));
-      const x = k.alignStart ? inner.x : inner.x + (inner.w - w) / 2;
+      const x = inner.x + (inner.w - w) / 2;
       if (!k.spacer) solve(k, { x, y, w, h }, rem, out, issues);
       y += h + g;
     }
@@ -168,7 +169,7 @@ export function solve(node, rect, rem, out = [], issues = []) {
 }
 
 // ---- SVG -----------------------------------------------------------------------------------
-export const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const fmt = (n) => String(Math.round(n * 100) / 100);
 const MONO = 'ui-monospace,Menlo,Consolas,monospace';
 
@@ -180,7 +181,6 @@ const STYLE = {
   header: { fill: 'none', fs: 1, bold: true, color: '#e0e0e0' },
   text: { fill: 'none', fs: 0.875, color: '#e0e0e0' },
   muted: { fill: 'none', fs: 0.875, color: '#b4b4c2' },
-  small: { fill: 'none', fs: 0.75, color: '#b4b4c2' },
   row: { fill: 'none', fs: 0.875, color: '#e0e0e0' },
   focus: { fill: '#e0e0e0', fs: 0.875, color: '#1e1e2e', stroke: '#1e1e2e', sw: 1 },
   disabled: { fill: 'none', fs: 0.875, color: '#8a8a9a' },
@@ -191,7 +191,6 @@ const STYLE = {
   strip: { fill: '#181826', fs: 0.75, color: '#e0e0e0', stroke: '#6b6b82', sw: 1 },
   toast: { fill: '#181826', fs: 0.875, color: '#34d399', stroke: '#34d399', sw: 2 },
   sep: { fill: '#6b6b82' },
-  world: { fill: '#10141a', stroke: '#2a3340', sw: 1, fs: 0.875, color: '#7f8ea3' },
   board: { fill: '#20402c', stroke: '#6b6b82', sw: 1, fs: 0.875, color: '#d7e8db' },
   thumb: { fill: '#6b6b82' },
   hud: { fill: '#181826', stroke: '#6b6b82', sw: 1, fs: 0.75, color: '#e0e0e0' },
@@ -240,7 +239,7 @@ const px = (s) => Number.parseFloat(s) || 0;
 const padLeft = (p) => { const a = String(p ?? '').trim().split(/\s+/).map(px); return a.length === 4 ? a[3] : a.length >= 2 ? a[1] : a[0] ?? 0; };
 
 /** CURRENT: draws measured rects, in DOM order, with measured colors, text and font sizes. */
-export function drawCurrent(capture, opts = {}) {
+export function drawCurrent(capture) {
   const parts = [];
   const { width: W, height: H } = capture.viewport;
   parts.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="#000"/>`);
@@ -271,11 +270,10 @@ export function drawCurrent(capture, opts = {}) {
   return parts.join('\n');
 }
 
-export const LEGEND = Object.entries(SIZING);
 export function legend(x, y) {
   const parts = [];
   let cx = x;
-  for (const [code, name] of LEGEND) {
+  for (const [code, name] of Object.entries(SIZING)) {
     parts.push(`<rect x="${cx}" y="${y - 15}" width="18" height="18" fill="${SIZING_COLOR[code]}"/><text x="${cx + 9}" y="${y - 1}" font-family="${MONO}" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">${code}</text><text x="${cx + 24}" y="${y}" font-family="${MONO}" font-size="16" fill="#e5e7eb">${name}</text>`);
     cx += 24 + name.length * 10 + 26;
   }

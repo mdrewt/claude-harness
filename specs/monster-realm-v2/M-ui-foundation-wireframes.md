@@ -94,15 +94,17 @@ Inventory's title appears twice. Nothing grows with the window: at 1920×1080 Mo
 The Party becomes a 2×3 grid so every slot leaves the opposite half free. Bottom edge rests above the feedback strip. Width is
 min(18rem, 45% of the body).
 
-**Reason:** it is the one option that stays the same on every screen, every window and every text size, at the price of a tiny pure function. The
-operator's complaint (047) is a sheet wedged between tabs and panels with no border; the handheld precedent (research §4) answers it with one
-frame family, one corner, size from option count, grow away from the anchor.
+**Reason:** it follows one rule on every screen, window and text size, at the price of a tiny pure function, and for the grids it lands in one of only two places, the two bottom
+corners. The operator's complaint (047) is a sheet wedged between tabs and panels with no border; the handheld precedent (research §4) answers it with one frame family, a corner, size from option count, grow
+away from the anchor. Research's own claim that a corner avoids flip logic holds only for a truly fixed corner, which cannot satisfy "does not cover the selected slot", so this rule pays for one choice of side and,
+for full-width rows only, one vertical flip.
 
 | Option | Party | Storage grid | Inventory, Social rows | 640×240, or text ×2 | Code | Outcome |
 |---|---|---|---|---|---|---|
-| **corner-anchored** | Clear: opposite half | Clear: opposite half | Flips vertically when a full-width row is under it, then caps and scrolls | Caps to the free band and scrolls | One pure function | **Chosen** |
-| **beside-the-slot** | Needs a side gutter | Next to a right-edge tile it must flip; a mid-grid tile has no side free without covering neighbors | Same flip logic | Clamp and flip stack up; the sheet jumps with each slot | Clamp and flip logic per research §4 | Rejected: position moves under the cursor, and a D-pad player loses the one stable place to look |
-| **in-slot-buttons + detail page (053)** | Works, per 053 itself | Fails, per 053 itself: all four directions are taken, so left/right cannot select a button | No slot-sized target | Buttons do not fit a 98 px slot at ×2 | Two interaction models | Rejected for the buttons, because the operator's own note says it breaks on the grid, and two models is the inconsistency 094 objects to. **Its detail page is adopted** as the Summary page |
+| **fixed single corner** (the pure Gen 3 form) | Covers a bottom-right slot | Covers a bottom-right tile | Covers the last rows | Scrolls | None | Rejected: it covers the selected slot for some slots, which is the one thing the sheet must not do |
+| **corner-anchored** (one of the two bottom corners; a top corner only over a full-width row) | Clear: opposite half | Clear: opposite half | Flips vertically when a full-width row is under it, then caps and scrolls | Caps to the free band and scrolls | One pure function | **Chosen** |
+| **beside-the-slot** | Needs a side gutter | Next to a right-edge tile it must flip; a mid-grid tile has no side free without covering neighbors | Same flip logic | Clamp and flip stack up; the sheet jumps with each slot | Clamp and flip logic per research §4 | Rejected: the position changes with every slot rather than between two places, so a D-pad player has no stable place to look, and it still needs the flip logic |
+| **in-slot-buttons + detail page (053)** | Works on today's list, per 053 itself; the 2×3 grid below would remove that too | Fails, per 053 itself: all four directions are taken, so left/right cannot select a button | No slot-sized target | Buttons do not fit a 98 px slot at ×2 | Two interaction models | Rejected for the buttons, because the operator's own note says it breaks on the grid, and two models is the inconsistency 094 objects to. **Its detail page is adopted** as the Summary page |
 
 The anchor rule (`anchorSheet` in `wireframes/lib.mjs`, proven by `check.mjs` over every proposed slot at five window sizes and three text steps):
 horizontally away from the slot's center; try the bottom corner; if it would touch the slot, try the top corner; if neither clears, cap the sheet's
@@ -187,6 +189,8 @@ is the shipped `.mr-nav-item.is-disabled` color. The `.is-active.is-disabled` ro
 color would have no contrast against that fill. **Selected tab:** panel-colored fill joined to the panel, bold weight, 2 px `--mr-frame-border` outline (three cues), never the inverted fill, so "which tab" and
 "which row" can both be true (060, 169; research §7).
 
+**Roles:** a card or panel fills with `--mr-panel-bg` and a `--mr-border-thin` `--mr-separator` border, replacing the shipped `#1a1a2e`/`#444` card literals. A sheet or frame fills with `--mr-frame-bg` and a `--mr-border-width` `--mr-frame-border` border. A chip fills with `--mr-frame-bg` and a thin `--mr-frame-border` border. A toast fills with `--mr-panel-bg` and a border in its state color. The feedback strip fills with `--mr-panel-bg` under a `--mr-separator` top rule. The scroll cue's thumb is `--mr-separator`.
+
 **Geometry at 1280×720 (for `UIF1.5`):**
 
 | Part | Rect or size | Token |
@@ -195,9 +199,10 @@ color would have no contrast against that fill. **Selected tab:** panel-colored 
 | Side frame (`.mr-frame--side`) | 849.5, 20, 406.5×648 (shipped, unchanged) | 33% wide, inset `--mr-space-3` |
 | Hint bar | 0, 689.2, 1280×30.8 (shipped, unchanged) | 1.925rem, padding `--mr-space-1` `--mr-space-2`, gap `--mr-space-2` |
 | Title bar | 2.5rem | `--mr-font-title`, padding `--mr-space-1` `--mr-space-2` |
-| TabBar | 2rem row, chips 3.25rem, tabs 7.5rem | `--mr-font-body`, gap `--mr-space-1` |
+| TabBar | 2rem row, chips 3.25rem, tabs share the strip evenly up to 7.5rem each, qf-11's `overflow-x: auto` kept for extreme text steps | `--mr-font-body`, gap `--mr-space-1` |
 | Nav row | 1.65rem, measured 26.4 px | `--mr-font-body`, shipped `.mr-nav-item` padding |
 | Feedback strip | 1.75rem overlay, zero layout height | `--mr-font-small` |
+| Toast | top-right of the screen, below the title bar's line, 18rem wide | `--mr-font-body`, inset `--mr-space-3` |
 
 ### Scale
 
@@ -240,6 +245,7 @@ as shipped but restyled. `UIF4.1`'s `MessageKind` union takes these names; `UIF4
 | `trade-request` | Hint line | `.mr-notice-banner` (`requestLine`) | yes | the notice banner and the Start-chip badge |
 | `challenge-request` | Hint line | `.mr-notice-banner` (`requestLine`) | yes | the notice banner and the Start-chip badge |
 | `deletion-countdown` | Hint line | `#privacy-countdown` | no |  |
+| `privacy-notice` | Hint line | privacyView `#notice` | no |  |
 | `world-disconnect` | Hint line | `statusEl` (`onError`) | no |  |
 | `connect-failure` | Hint line | `statusEl` (`onError`) | no |  |
 | `content-stale` | Hint line | `statusEl` (`reportError`) | yes | the world hint line until reload |
@@ -271,14 +277,14 @@ as shipped but restyled. `UIF4.1`'s `MessageKind` union takes these names; `UIF4
 | `controls-cancelled` | Toast | controlsView `showFeedback` | no |  |
 | `controls-save-failed` | Toast | controlsView `showFeedback` | no |  |
 | `pvp-rejected` | Toast | `statusEl` (`sendGuarded`) | no |  |
-| `link-down-send` | Toast | `sendGuarded` to `statusEl` / `OutcomeLine` | yes | the `world-disconnect` hint line while the link is down |
-| `link-down-view` | Toast | `performCare`; `#session-feedback`; `#claim-feedback` | yes | the `world-disconnect` hint line while the link is down |
-| `privacy-busy` | Toast | `statusEl` (`reportError`) | yes | the other overlay stays on screen (moot after `uif-16b`) |
+| `link-down-send` | Toast | `sendGuarded` to `statusEl` / `OutcomeLine` | yes | the `world-disconnect` hint line, on the frame strip while a frame is open |
+| `link-down-view` | Toast | `performCare`; `#session-feedback`; `#claim-feedback` | yes | the `world-disconnect` hint line, on the frame strip while a frame is open |
+| `privacy-busy` | Toast | `statusEl` (`reportError`) | yes | the other overlay stays on screen; the kind retires in `uif-16b` |
 | `zone-cue` | Toast | `showNotice` to `statusEl` | no |  |
 | `dialogue-ended` | Toast | `showNotice` to `statusEl` | no |  |
 | `quest-complete` | Toast | `showNotice` to `statusEl` | no |  |
 | `world-send-rejected` | Toast | `statusEl` (`sendGuarded`) | no |  |
-| `battle-refused` | Toast | `refusedInBattle` | no |  |
+| `battle-refused` | Toast | `refusedInBattle` (held in `statusEl` until the battle ends today; timed after) | no |  |
 | `queue-too-late` | Toast | `showNotice` to `statusEl` | no |  |
 | `battle-command-rejected` | Toast | `statusEl` (`sendGuarded`) | yes | the command menu, re-armed for the same turn |
 | `evolution-reveal` | Modal | evolutionNotice banner (stays as shipped: named deferral) | yes | the banner until acknowledged |
@@ -296,6 +302,8 @@ as shipped but restyled. `UIF4.1`'s `MessageKind` union takes these names; `UIF4
 In-battle HUD, not policy kinds (screen content, stays as shipped under `uif-11`): `ticker-action`, `ticker-status`, `ticker-plan-halted`, `ticker-recruit`, `ticker-awards`, `ticker-flow`, `command-greyed-reason`, `still-there`, `deploy-sending`, `results-rewards`.
 <!-- generated:channels:end -->
 
+**One strip, one message:** a frame has one hint line, so kinds resolve by precedence: an action-required hint, then a persistent state (`world-disconnect`, `connect-failure`), then a disabled reason, then a Y-description. `deletion-countdown` keeps its own `#privacy-countdown` line and the requests their banner, so neither competes for the strip.
+
 **Measured along the way, each a reason for the table:** `pvpView.showFeedback` has no caller, so nine sinks are live, not ten, and PvP failures reach only `statusEl`. `.mr-status` paints at z-index 45 under `.mr-shell`'s 100, so a `statusEl` rejection
 from inside a frame (`party-full`, `nickname-rejected`, `evolve-rejected`) can land under the frame; the toast's "above frames" (`UIF4.2`) is what fixes it. `tradeFeedback` paints only while `tradeView` shows, so an answer sent from the world sheet shows no result; the toast fixes that too.
 
@@ -307,11 +315,14 @@ Each verdict that differs from a spec default, or that the spec left open, amend
 
 - **WF1-A1** (`UIF3.4`): the anchor's rule and domain. "Never cover that slot for any slot position" is unsatisfiable for a slot wider than the free width and taller than the free height, so the property now states horizontal-away, bottom-then-top, and the cap.
 - **WF1-A2** (`UIF3.3`): the sheet's width rule, min(18rem, 45% of the body).
-- **WF1-A3** (`UIF6.8`, new): the Party renders as a 2-column, 3-row grid and the D-pad moves per the layout (102), the precondition of the sheet verdict.
+- **WF1-A3** (`UIF6.8`, new; `uif-6` touches): the Party renders as a 2-column, 3-row grid and the D-pad moves per the layout (102), the precondition of the sheet verdict. `monstersModel.ts`, its test and `reachability.test.ts` join `uif-6`, which runs serially before `uif-7`.
 - **WF1-A4** (`uif-1` Measured; the tokens paragraph): border widths are px tokens, the one exception to "every px shorthand moves to rem", and the token list gains them.
 - **WF1-A5** (`uif-4b` Measured): `pvpView.showFeedback` is dead and retires here; `statusEl` under frames and the dropped world-sheet answer are recorded for `uif-4`.
 - **WF1-A6** (`uif-10` Measured): the trade-propose step header takes the TabBar's slot and geometry but stays an `ol` with `aria-current="step"`, which e2e pins.
-- **WF1-A7** (`uif-11` Measured): the command menu's rows move to the 1.65rem nav-row height under `UIF11.3`, so the open dock grows from 156 px to about 176 px at ×1 and the board gives up that height, a named cost of one row treatment.
+- **WF1-A7** (`uif-11` Measured; `UIF11.6`, new): the command menu's rows move to the 1.65rem nav-row height under `UIF11.3`, so the open dock grows from 156 px to about 176 px at ×1 and the board gives up that height, a named cost of one row treatment. At doubled text the board keeps 30% of the frame, the ticker shrinking first.
+- **WF1-A8** (`UIF3.3`; `uif-14` Measured): a detail variant of the ContextSheet for the Encyclopedia entry, so `uif-5`'s pointer rule and `[data-context-sheet]` reach it.
+- **WF1-A9** (`UIF4.5`): a persistent hint kind follows the top: on the open frame's strip, else on the world line, under the precedence below the channel table.
+- **WF1-A10** (`uif-16b` touches and Measured): `privacy-busy` retires from `feedbackPolicy` when Profile becomes one dialog.
 
 **Launch order:** `uif-1` stays `after: [wf-1]`, and every other `uif-*` chains from it, so no `uif-*` slice launches before this merges.
 
@@ -335,9 +346,9 @@ The five named contracts from `docs/research/retro-rpg-menu-ui-design.md`: **tab
 [Three window sizes](wireframes/svg/monsters-party-sizes.svg) · shipped: [Party, two monsters](wireframes/shipped/monsters-party-two.jpg), [1920×1080](wireframes/shipped/monsters-party-1920.jpg)
 
 **Measured:** content is a 600 px centered column at x 340 (x 660 at 1920×1080); title 21 px, tabs at y 71.6, an in-panel "Party" heading at y 94 repeating the selected tab; six 98 px slots overflow, so the sixth is cut off at the frame's foot at 1280×720.
-**Genre:** tab-bar contract (LB/RB chips, two or more cues); list and grid contract (grid moves to the tile in that direction, clamp, no loop). Coromon's Squad and Storage use a list and a grid of cards.
+**Genre:** tab-bar contract (LB/RB chips, two or more cues); list and grid contract (grid moves to the tile in that direction, clamp, no loop). Coromon has a Squad dropdown and a storage grid.
 **Adopted:** tabs through the TabBar; a 2×3 grid that grows to the free space up to the content maximum (038, 045), all six slots visible; heading dropped (`R-qf-10-QF10.2`).
-**Rejected:** a one-column list, because a full-width row leaves the sheet no horizontal clearance, and the operator's 053 observed a list only as today's layout. The Gen 3 "big first card" is rejected because it needs a second card size for no gain.
+**Rejected:** a one-column list, because six full-width rows fit only by scrolling or shrinking, and a full-width row forces the sheet to flip between top and bottom as the cursor moves, against a stable bottom corner here. The grid costs 053's left/right idea on Party, as the verdict's table states. The Gen 3 "big first card" is rejected because it needs a second card size for no gain.
 
 ### monsters-storage
 
@@ -387,7 +398,7 @@ Shipped: [empty](wireframes/shipped/journal.jpg)
 **Measured:** title 14 px bold at x 26 where Monsters' is 21 px centered; one sentence of copy (qf-4).
 **Genre:** empty states (NN/g's status, cue, pathway; a journal stays useful most when empty); list and grid contract when it has rows.
 **Adopted:** the anatomy and EmptyState, with the existing copy as its reason (`UIF10.2`).
-**Rejected:** a focusable next-step row, because no row can act on it (the next step is walking to a villager), so the frame's B and hint bar stay the focus target. Tabs for active and done quests are rejected since nothing ships a done list.
+**Rejected:** a focusable next-step row, because no row can act on it (the next step is walking to a villager); focus stays on the shipped `#quest-log-list` anchor, styled per the M23 rule. Tabs for active and done quests are rejected since nothing ships a done list.
 
 ### social-players
 
@@ -395,8 +406,8 @@ Shipped: [empty](wireframes/shipped/journal.jpg)
 Shipped: [Players](wireframes/shipped/social-players.jpg)
 
 **Measured:** no title; tabs at y 22, left-aligned, the only frame that opens on tabs; the Players hint sits as body text.
-**Genre:** tab-bar contract (MMO social menus use four tabs); message channels (a hint belongs on the line, not in the panel).
-**Adopted:** one title, one TabBar across all four panels with one geometry (`UIF9.1`); the hint on the strip.
+**Genre:** tab-bar contract (MMO social menus use four tabs); list and grid contract (a default cursor on the safe row).
+**Adopted:** one title, one TabBar across all four panels with one geometry (`UIF9.1`); the walk-up hint stays in the panel as a muted line, since it is static instruction, not a message.
 **Rejected:** a row sheet on Players, because the shipped action is to walk up to the player, which is what its hint says; a sheet here would offer nothing.
 
 ### social-trades
@@ -457,7 +468,7 @@ Shipped: [Goals](wireframes/shipped/help-goals.jpg)
 **Measured:** three static lines indented to x 66, no cursor.
 **Genre:** list and grid contract (XAG 112 asks for a second route into bestiaries and logs; a remembered cursor; a position cue).
 **Adopted:** one long list, cursor remembered per tab (`UIF14.4`).
-**Rejected:** category tabs inside the tab, because a nested tab strip would break the one-strip rule and 16 entries do not need it. A search field is rejected since it needs a text-entry frame for a short list.
+**Rejected:** category tabs inside the tab, because a nested tab strip would break the one-strip rule and the 13 named terms do not need it. A search field is rejected since it needs a text-entry frame for a short list.
 
 ### help-detail
 
@@ -466,7 +477,7 @@ Not shipped; nearest is [Goals](wireframes/shipped/help-goals.jpg).
 
 **Measured:** nothing to measure: no entry detail exists.
 **Genre:** context-menu contract (same frame family, returns to its row); message channels (the operator's 114 asks for "a modal or a dialog box above the menu").
-**Adopted:** a modal panel in the frame, B returning to the same entry, a click outside closing it through the kit's pointer rule; centered, not corner-anchored, because it holds prose rather than actions.
+**Adopted:** a modal panel in the frame (the ContextSheet's detail variant, WF1-A8), B returning to the same entry, a click outside closing it through the kit's pointer rule; centered, not corner-anchored, because it holds prose rather than actions.
 **Rejected:** a new `OverlayId`, because each costs about 25 pins for identical behavior; a full page is rejected since 114 asks for the list to stay visible behind it.
 
 ### controls-buttons
@@ -506,7 +517,7 @@ Shipped: [Buy](wireframes/shipped/shop-buy.jpg), [quantity](wireframes/shipped/s
 
 **Measured:** title 14 px in a 60 px title bar with the balance beside it; tabs at y 82.4; every row carries a native 39×21 Buy button beside a row that A already activates; the quantity and confirm prompts stack in flow under the list at y 307.
 **Genre:** context-menu contract (Bag's quantity box sits in the same corner); message channels (results as a toast near the source); list and grid contract (a reviewer faults a shop with no way to judge an item, so rows keep price and detail).
-**Adopted:** the frame, TabBar, the confirm variant with the shipped default, quantity kept as Left/Right on its row (`UIF10.4`), the result as a toast.
+**Adopted:** the frame, TabBar, two phases as shipped: quantity (drawn, Left/Right on its row, `UIF10.4`), then the confirm variant replacing those rows with the shipped defaults (Buy Yes, Sell No, `UIF10.1`); the result as a toast after the sheet closes.
 **Rejected:** removing the per-row Buy button in this milestone, because `shopView` renders it for the pointer path and `uif-10` scopes kit adoption, not a pointer rethink; dropping the confirm is rejected since a spend has no undo, and NN/g keeps confirms for exactly such consequences.
 
 ### heal
@@ -564,10 +575,10 @@ Shipped: [confirm](wireframes/shipped/tactics-deploy.jpg), [editor](wireframes/s
 [![Tactical board](wireframes/svg/tactics-board.svg)](wireframes/svg/tactics-board.svg)
 [Three window sizes](wireframes/svg/tactics-board-sizes.svg) · shipped: [forecast](wireframes/shipped/tactics-forecast.jpg), [command menu](wireframes/shipped/tactics-menu.jpg), [board](wireframes/shipped/tactics-board.jpg), [skills](wireframes/shipped/tactics-skills.jpg), [1920×1080](wireframes/shipped/tactics-board-1920.jpg)
 
-**Measured:** the board already fills its box through fractional tracks, but chips stay 14 px, the dock 78 px, and the ticker 12 px at 1920×1080; the open dock grows to 156 px and pushes the ticker up; 13 px command rows with their own colors; the item command reads "Item".
+**Measured:** the board already fills its box through fractional tracks, but turn chips stay 12 px, the dock 78 px, and the ticker 12 px at 1920×1080; the open dock grows to 156 px and pushes the ticker up; 13 px command rows with their own colors; the item command reads "Item".
 **Genre:** list and grid contract (the same cursor and disabled treatment as `.mr-nav-item`); message channels (the ticker is a capped log; rejected orders are toasts); research §9's one-scale rule.
 **Adopted:** every chrome length on the one scale, so the board keeps its share at any window (131); the shared row treatment; "Items" (#586 D4).
-**Rejected:** a battle-only scale path, because M-battle-tactics rules out a fork, and moving the HUD or command menu, because the design doc binds them. The grown dock is a named cost (WF1-A7).
+**Rejected:** a battle-only scale path, because M-battle-tactics rules out a fork, and moving the HUD or command menu, because the design doc binds them. The grown dock is a named cost, with the board's floor at doubled text (WF1-A7).
 
 ### tactics-results
 

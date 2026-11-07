@@ -85,17 +85,13 @@
 <text x="30" y="156.76" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#e0e0e0">HP 282/300 meter</text>
 <rect x="1241" y="141" width="16" height="16" fill="#2b6cb0"/><text x="1249" y="153" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
 <g class="el" data-el="ATK 9 DEF 250 SPD 11 SP.ATK 12 SP.DEF 250" data-sizing="grows-horizontally">
-<rect x="22" y="172" width="614" height="451.6" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="22" y="172" width="614" height="486" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
 <text x="30" y="188.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#e0e0e0">ATK 9 DEF 250 SPD 11 SP.ATK 12 SP.DEF 250</text>
 <rect x="619" y="173" width="16" height="16" fill="#2b6cb0"/><text x="627" y="185" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
 <g class="el" data-el="Ability, skills, essence, nature" data-sizing="grows-horizontally">
-<rect x="644" y="172" width="614" height="451.6" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="644" y="172" width="614" height="486" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
 <text x="652" y="188.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#e0e0e0">Ability, skills, essence, nature</text>
 <rect x="1241" y="173" width="16" height="16" fill="#2b6cb0"/><text x="1249" y="185" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
-<g class="el" data-el="Back" data-sizing="scales-with-resolution">
-<rect x="22" y="631.6" width="1236" height="26.4" fill="#e0e0e0" stroke="#1e1e2e" stroke-width="1"/>
-<text x="30" y="649.56" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#1e1e2e">Back</text>
-<rect x="1241" y="632.6" width="16" height="16" fill="#8a5a12"/><text x="1249" y="644.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
 <g class="el" data-el="Hint bar" data-sizing="scales-with-resolution">
 <rect x="0" y="689.2" width="1280" height="30.8" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
 <rect x="1245" y="690.2" width="16" height="16" fill="#8a5a12"/><text x="1253" y="702.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>

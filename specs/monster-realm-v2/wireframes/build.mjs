@@ -12,7 +12,7 @@ import { SCREENS, THREE_SIZE_SCREENS, WINDOW_SIZES } from './screens.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const W = 1280; const H = 720; const GUT = 60; const TOP = 110;
 
-export function readCapture(name) { return JSON.parse(readFileSync(join(HERE, 'current', `${name}.json`), 'utf8')); }
+function readCapture(name) { return JSON.parse(readFileSync(join(HERE, 'current', `${name}.json`), 'utf8')); }
 
 function importCapture(dir) {
   mkdirSync(join(HERE, 'current'), { recursive: true });
@@ -90,9 +90,9 @@ export function sizesSvg(id) {
 }
 
 // ---- generated doc regions: the tables cannot drift from the numbers the drawings use ----------
-export const DOC = join(HERE, '..', 'M-ui-foundation-wireframes.md');
+const DOC = join(HERE, '..', 'M-ui-foundation-wireframes.md');
 const ratio = (n) => `${n.toFixed(2)}:1`;
-export function tokenTable() {
+function tokenTable() {
   const L = ['| Token | Value | `prefers-contrast: more` |', '|---|---|---|'];
   for (const name of Object.keys(TOKENS.base)) L.push(`| \`${name}\` | \`${TOKENS.base[name]}\` | \`${TOKENS.more[name]}\` |`);
   L.push('', '| Pair | Floor | Measured | Measured (`more`) |', '|---|---|---|---|');
@@ -103,7 +103,7 @@ export function tokenTable() {
   for (const [n, f] of Object.entries(FONT)) L.push(`| \`${n}\` | ${f.rem} | ${f.rem * REM_BASE} | ${f.weight} | ${f.lh} |`);
   return L.join('\n');
 }
-export function scaleTable() {
+function scaleTable() {
   const L = [`\`UI_SCALE_MIN\` = ${UI_SCALE_MIN}, \`UI_SCALE_MAX\` = ${UI_SCALE_MAX}, reference ${720} CSS px on the shorter axis. \`--mr-content-max\` = ${CONTENT_MAX_REM}rem. Sheet width = min(${SHEET_WIDTH_REM}rem, ${SHEET_WIDTH_MAX_FRACTION * 100}% of the body).`, '', '| Window (css, dpr) | continuous | deviceScale | uiScale | Body text | 1rem | Content width |', '|---|---|---|---|---|---|---|'];
   for (const [w, h, d] of [[640, 240, 1], [960, 540, 1], [1280, 720, 1], [1536, 864, 1.25], [1920, 1080, 1], [2560, 1440, 1], [3440, 1440, 1], [3840, 2160, 1]]) {
     const s = scaleOf(w, h, d);
@@ -115,13 +115,13 @@ export function scaleTable() {
   return L.join('\n');
 }
 const CH_NAME = { hint: 'Hint line', toast: 'Toast', modal: 'Modal', 'text-box': 'Blocking text box' };
-export function channelTable() {
+function channelTable() {
   const L = ['| Kind | Channel | Sink at d90c32c9 | Player must act | Also carried by |', '|---|---|---|---|---|'];
   for (const r of KINDS) L.push(`| \`${r.kind}\` | ${CH_NAME[r.channel]} | ${r.sink} | ${r.action ? 'yes' : 'no'} | ${r.persists || ''} |`);
   L.push('', `In-battle HUD, not policy kinds (screen content, stays as shipped under \`uif-11\`): ${BATTLE_HUD.map((b) => `\`${b}\``).join(', ')}.`);
   return L.join('\n');
 }
-export function measuredTable() {
+function measuredTable() {
   const L = ['| Capture | Frame (x, y, w×h) | Title (font, x) | Tab strip (x, y, w×h) | First row or card (x, w) | Scrolls |', '|---|---|---|---|---|---|'];
   const seen = new Set();
   for (const s of Object.values(SCREENS)) for (const n of s.current) {
@@ -142,7 +142,7 @@ export function measuredTable() {
   }
   return L.join('\n');
 }
-export const REGIONS = { tokens: tokenTable, scale: scaleTable, channels: channelTable, measured: measuredTable };
+const REGIONS = { tokens: tokenTable, scale: scaleTable, channels: channelTable, measured: measuredTable };
 export function fillRegions(doc) {
   let out = doc;
   for (const [k, fn] of Object.entries(REGIONS)) {
