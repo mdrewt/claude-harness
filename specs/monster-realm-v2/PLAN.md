@@ -136,7 +136,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    notably rb-128-E1 (avatar lost on reload during deletion grace), R-rb-73-ABORT-PHANTOM,
    R-rb-132-WALLETSYBIL and R-rb-52-GRACEANNOUNCE. Rows absorbed by pt3 milestones are marked
    in each spec (quickfix: WALKEDAWAYROLLBACK, R-ctl-11b-RAISINGCARDS; trade: F5, 2026-10-16-F1,
-   PROXGUARD; ui-foundation: R-ctl-14-*, R-ctl-11a-MONSTERSTAB, 2026-10-02-F3, R-ctl-SETRATIO;
+   PROXGUARD; ui-foundation: see its Residual map, incl. R-ctl-14-*, R-ctl-11a-MONSTERSTAB, R-qf-10-*, R-ctl-SETRATIO;
    econ: 2026-10-09-F1).
 16. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
    Steam Input maps onto the virtual buttons.
