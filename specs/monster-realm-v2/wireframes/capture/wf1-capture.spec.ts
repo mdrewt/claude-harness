@@ -1,4 +1,12 @@
-// wf-1 capture: sandbox only (never committed to the game repo). Drives the REAL client at master.
+// wf-1 capture: drives the REAL client at master and records CURRENT. It lives in the harness and is never
+// committed to the game repo. To re-measure (uif-17's as-shipped section):
+//   1. `git worktree add --detach <dir> <sha>` of monster-realm; symlink client/node_modules; `wasm-pack build client-wasm --target bundler`;
+//      `cargo build -p monster-realm-module --release --target wasm32-unknown-unknown --features dev_reducers`.
+//   2. `spacetime start --listen-addr 127.0.0.1:3597 --in-memory --non-interactive`; `spacetime publish -s http://127.0.0.1:3597 --bin-path <wasm> --delete-data -y wf1`;
+//      `spacetime call -s http://127.0.0.1:3597 wf1 sync_content`.
+//   3. Copy this file to client/e2e/ and wf1.config.ts to client/; `WF1_OUT=<out> STDB_SERVER=http://127.0.0.1:3597 VITE_STDB_DB=wf1 VITE_STDB_URI=ws://127.0.0.1:3597
+//      MR_E2E_PORT=5597 npx playwright test -c wf1.config.ts`; then `node build.mjs --import <out> && node build.mjs`.
+// Update the `sha` literal in snap() to the commit measured.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, expect, type Page, test } from '@playwright/test';

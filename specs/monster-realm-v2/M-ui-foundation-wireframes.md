@@ -42,33 +42,33 @@ Inventory's title appears twice. Nothing grows with the window: at 1920×1080 Mo
 | Capture | Frame (x, y, w×h) | Title (font, x) | Tab strip (x, y, w×h) | First row or card (x, w) | Scrolls |
 |---|---|---|---|---|---|
 | `main-menu` | 849.5, 20, 406.5×648 | 14px bold, x 859.5 | none | x 891.5, w 362.5 | no |
-| `monsters-party-two` | 8, 8, 1264×672 | 21px bold, x 589.4 | none | x 571.4, w 58.2 | yes |
-| `monsters-storage-filled` | 8, 8, 1264×672 | 21px bold, x 589.4 | none | x 633.6, w 75 | no |
-| `monsters-sheet` | 8, 8, 1264×672 | 21px bold, x 589.4 | none | x 571.4, w 58.2 | yes |
-| `monsters-summary` | 8, 8, 1264×672 | 21px bold, x 589.4 | none | x 571.4, w 58.2 | yes |
-| `inventory-food` | 8, 8, 1264×672 | 21px bold, x 583.1 | none | x 567.2, w 49.7 | no |
-| `inventory-sheet` | 8, 8, 1264×672 | 21px bold, x 583.1 | none | x 567.2, w 49.7 | no |
-| `inventory-picker` | 8, 8, 1264×672 | 21px bold, x 583.1 | none | x 567.2, w 49.7 | no |
-| `inventory-pocket-2` | 8, 8, 1264×672 | 21px bold, x 583.1 | none | x 620.9, w 83.4 | no |
+| `monsters-party-two` | 8, 8, 1264×672 | 21px bold, x 589.4 | 571.4, 71.6, 137×22.4 | x 340, w 600 | yes |
+| `monsters-storage-filled` | 8, 8, 1264×672 | 21px bold, x 589.4 | 571.4, 71.6, 137×22.4 | x 340, w 194.7 | no |
+| `monsters-sheet` | 8, 8, 1264×672 | 21px bold, x 589.4 | 571.4, 71.6, 137×22.4 | x 340, w 600 | yes |
+| `monsters-summary` | 8, 8, 1264×672 | 21px bold, x 589.4 | 571.4, 71.6, 137×22.4 | x 340, w 600 | yes |
+| `inventory-food` | 8, 8, 1264×672 | 21px bold, x 583.1 | 513.5, 105.8, 253×22.4 | x 562.8, w 154.4 | no |
+| `inventory-sheet` | 8, 8, 1264×672 | 21px bold, x 583.1 | 513.5, 105.8, 253×22.4 | x 562.8, w 154.4 | no |
+| `inventory-picker` | 8, 8, 1264×672 | 21px bold, x 583.1 | 513.5, 105.8, 253×22.4 | x 562.8, w 154.4 | no |
+| `inventory-pocket-2` | 8, 8, 1264×672 | 21px bold, x 583.1 | 513.5, 105.8, 253×22.4 | x 632, w 16 | no |
 | `journal` | 8, 8, 1264×672 | 14px bold, x 26 | none |  | no |
-| `social-players` | 8, 8, 1264×672 | 14px normal, x 26 | none | x 26, w 75 | no |
-| `social-trades` | 8, 8, 1264×672 | 14px normal, x 26 | none | x 105, w 66.6 | no |
-| `social-trades-sheet` | 8, 8, 1264×672 | 14px normal, x 26 | none | x 105, w 66.6 | no |
-| `social-challenges` | 8, 8, 1264×672 | 14px normal, x 26 | none | x 175.6, w 100.3 | no |
-| `social-rankings` | 8, 8, 1264×672 | 14px normal, x 26 | none | x 279.9, w 83.4 | no |
+| `social-players` | 8, 8, 1264×672 |  | 26, 22, 337×22.4 | x 26, w 1228 | no |
+| `social-trades` | 8, 8, 1264×672 |  | 26, 22, 337×22.4 | x 26, w 1228 | no |
+| `social-trades-sheet` | 8, 8, 1264×672 |  | 26, 22, 337×22.4 | x 26, w 1228 | no |
+| `social-challenges` | 8, 8, 1264×672 |  | 26, 22, 337×22.4 |  | no |
+| `social-rankings` | 8, 8, 1264×672 |  | 26, 22, 337×22.4 |  | no |
 | `main-menu-profile` | 849.5, 20, 406.5×648 | 14px bold, x 859.5 | none | x 891.5, w 362.5 | no |
 | `profile-name` | 8, 8, 1264×672 | 14px bold, x 34 | none | x 26, w 1228 | no |
 | `profile-account` | 8, 8, 1264×672 | 14px bold, x 34 | none | x 26, w 56.8 | no |
 | `profile-privacy` | 8, 8, 1264×672 | 21px bold, x 26 | none | x 26, w 50.1 | no |
-| `help-screen` | 8, 8, 1264×672 | 14px normal, x 26 | none | x 26, w 108.7 | no |
-| `help-goals` | 8, 8, 1264×672 | 14px normal, x 26 | none | x 259.9, w 58.2 | no |
-| `controls-buttons` | 8, 8, 1264×672 | 21px bold, x 26 | none | x 26, w 75 | no |
-| `controls-shortcuts` | 8, 8, 1264×672 | 21px bold, x 26 | none | x 105, w 91.9 | no |
+| `help-screen` | 8, 8, 1264×672 | 14px normal, x 26 | 26, 44.4, 292×22.4 |  | no |
+| `help-goals` | 8, 8, 1264×672 | 14px normal, x 26 | 26, 44.4, 292×22.4 |  | no |
+| `controls-buttons` | 8, 8, 1264×672 | 21px bold, x 26 | 26, 90.4, 171×22.4 | x 26, w 614 | no |
+| `controls-shortcuts` | 8, 8, 1264×672 | 21px bold, x 26 | 26, 90.4, 171×22.4 | x 26, w 409.3 | no |
 | `main-menu-options` | 849.5, 20, 406.5×648 | 14px bold, x 859.5 | none | x 891.5, w 362.5 | no |
-| `shop-buy` | 8, 8, 1264×672 | 14px normal, x 34 | none | x 26, w 41.3 | no |
-| `shop-qty` | 8, 8, 1264×672 | 14px normal, x 34 | none | x 26, w 41.3 | no |
-| `shop-confirm` | 8, 8, 1264×672 | 14px normal, x 34 | none | x 26, w 41.3 | no |
-| `shop-sell` | 8, 8, 1264×672 | 14px normal, x 34 | none | x 71.3, w 49.7 | no |
+| `shop-buy` | 8, 8, 1264×672 | 14px normal, x 34 | 26, 82.4, 95×22.4 | x 66, w 1188 | no |
+| `shop-qty` | 8, 8, 1264×672 | 14px normal, x 34 | 26, 82.4, 95×22.4 | x 66, w 1188 | no |
+| `shop-confirm` | 8, 8, 1264×672 | 14px normal, x 34 | 26, 82.4, 95×22.4 | x 66, w 1188 | no |
+| `shop-sell` | 8, 8, 1264×672 | 14px normal, x 34 | 26, 82.4, 95×22.4 | x 66, w 1188 | no |
 | `heal` | 8, 8, 1264×672 | 14px normal, x 66 | none | x 26, w 1228 | no |
 | `dialogue` | 8, 8, 1264×672 | 14px normal, x 28 | none | x 10, w 1260 | no |
 | `tradepropose-offer` | 8, 8, 1264×672 | 14px normal, x 66 | none | x 26, w 1228 | no |

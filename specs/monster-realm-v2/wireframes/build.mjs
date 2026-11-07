@@ -131,9 +131,12 @@ export function measuredTable() {
     const has = (e, t) => (e.cls ?? '').split(/\s+/).includes(t);
     const fr = c.els.find((e) => has(e, 'mr-frame') && e.w > 200 && !has(e, 'mr-frame--prompt'));
     const body = fr ? c.els.filter((e) => e.x >= fr.x && e.y >= fr.y && e.x + e.w <= fr.x + fr.w + 1 && e.y + e.h <= fr.y + fr.h + 1 && e !== fr) : [];
-    const title = body.find((e) => e.text && e.w > 1);
-    const strip = c.els.find((e) => e.role === 'tablist') ?? c.els.find((e) => (e.cls ?? '').includes('tabstrip'));
-    const first = body.find((e) => (e.cls ?? '').includes('mr-nav-item') || (e.cls ?? '').includes('is-active') || e.role === 'option' || (e.bd ?? '').startsWith('1px') || (e.bd ?? '').startsWith('2px')) ;
+    const isTab = (e) => e.role === 'tab' || /-tab-/.test(e.id ?? '') || (e.cls ?? '').includes('mr-nav-tab');
+    const firstText = body.find((e) => e.text && e.w > 1);
+    const title = firstText && !isTab(firstText) ? firstText : undefined;
+    const tabs = body.filter(isTab);
+    const strip = tabs.length ? { x: Math.min(...tabs.map((e) => e.x)), y: tabs[0].y, w: Math.round(Math.max(...tabs.map((e) => e.x + e.w)) - Math.min(...tabs.map((e) => e.x))), h: tabs[0].h } : undefined;
+    const first = body.find((e) => !isTab(e) && ((e.cls ?? '').includes('mr-nav-item') || e.role === 'option' || (e.bd ?? '').startsWith('1px') || (e.bd ?? '').startsWith('2px')));
     const scrolls = c.els.some((e) => e.scrolls);
     L.push(`| \`${n}\` | ${fr ? `${fr.x}, ${fr.y}, ${fr.w}×${fr.h}` : 'none'} | ${title ? `${title.fs} ${Number(title.fw) >= 600 ? 'bold' : 'normal'}, x ${title.x}` : ''} | ${strip ? `${strip.x}, ${strip.y}, ${strip.w}×${strip.h}` : 'none'} | ${first ? `x ${first.x}, w ${first.w}` : ''} | ${scrolls ? 'yes' : 'no'} |`);
   }
