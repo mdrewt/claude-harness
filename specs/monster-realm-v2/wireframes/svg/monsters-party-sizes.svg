@@ -1,0 +1,223 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 2772" width="1920" height="2772"><title>Monsters: Party: three window sizes</title><rect width="1920" height="2772" fill="#111827"/>
+<text x="0" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="28" font-weight="bold" fill="#e5e7eb">Monsters: Party: PROPOSED at three window sizes</text>
+<rect x="900" y="15" width="18" height="18" fill="#2f7d4f"/><text x="909" y="29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">V</text><text x="924" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16" fill="#e5e7eb">grows-vertically</text><rect x="1110" y="15" width="18" height="18" fill="#2b6cb0"/><text x="1119" y="29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">H</text><text x="1134" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16" fill="#e5e7eb">grows-horizontally</text><rect x="1340" y="15" width="18" height="18" fill="#8a5a12"/><text x="1349" y="29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">S</text><text x="1364" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16" fill="#e5e7eb">scales-with-resolution</text><rect x="1610" y="15" width="18" height="18" fill="#6b7280"/><text x="1619" y="29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13" font-weight="bold" fill="#fff" text-anchor="middle">F</text><text x="1634" y="30" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16" fill="#e5e7eb">fixed</text>
+<text x="0" y="88" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="22" font-weight="bold" fill="#86efac">960x540 CSS, dpr 1 (960x540 device): uiScale 0.875, world deviceScale 2, tile 64.0 CSS px, body text 12.25 px</text>
+<svg x="0" y="104" width="960" height="540" viewBox="0 0 960 540" data-panel="proposed" data-window="960x540@1"><rect width="960" height="540" fill="#000"/><g class="el" data-el="Monsters frame" data-sizing="grows-vertically">
+<rect x="7" y="7" width="946" height="491" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="2"/>
+<rect x="918" y="8" width="16" height="16" fill="#2f7d4f"/><text x="926" y="20" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">V</text></g>
+<g class="el" data-el="Monsters" data-sizing="scales-with-resolution">
+<rect x="8.75" y="8.75" width="942.5" height="35" fill="none"/>
+<text x="15.75" y="32.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="17.5" font-weight="bold" fill="#e0e0e0">Monsters</text>
+<rect x="934.25" y="9.75" width="16" height="16" fill="#8a5a12"/><text x="942.25" y="21.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="separator" data-sizing="fixed">
+<rect x="8.75" y="43.75" width="942.5" height="2" fill="#6b6b82"/>
+<rect x="934.25" y="36.75" width="16" height="16" fill="#6b7280"/><text x="942.25" y="48.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">F</text></g>
+<g class="el" data-el="LB" data-sizing="scales-with-resolution">
+<rect x="10.5" y="47.5" width="45.5" height="28" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="17.5" y="65.07" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">LB</text>
+<rect x="39" y="48.5" width="16" height="16" fill="#8a5a12"/><text x="47" y="60.5" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Party" data-sizing="scales-with-resolution">
+<rect x="59.5" y="47.5" width="105" height="28" fill="#181826" stroke="#e0e0e0" stroke-width="2"/>
+<text x="112" y="65.67" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" font-weight="bold" fill="#e0e0e0" text-anchor="middle">Party</text>
+<rect x="147.5" y="48.5" width="16" height="16" fill="#8a5a12"/><text x="155.5" y="60.5" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Storage" data-sizing="scales-with-resolution">
+<rect x="168" y="47.5" width="105" height="28" fill="none" stroke="#6b6b82" stroke-width="1"/>
+<text x="220.5" y="65.67" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#b4b4c2" text-anchor="middle">Storage</text>
+<rect x="256" y="48.5" width="16" height="16" fill="#8a5a12"/><text x="264" y="60.5" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="RB" data-sizing="scales-with-resolution">
+<rect x="904" y="47.5" width="45.5" height="28" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="911" y="65.07" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">RB</text>
+<rect x="932.5" y="48.5" width="16" height="16" fill="#8a5a12"/><text x="940.5" y="60.5" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Body" data-sizing="grows-vertically">
+<rect x="8.75" y="77.25" width="942.5" height="419" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="916.25" y="78.25" width="16" height="16" fill="#2f7d4f"/><text x="924.25" y="90.25" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">V</text></g>
+<g class="el" data-el="Flameling Lv5 HP 282/300" data-sizing="grows-horizontally">
+<rect x="19.25" y="87.75" width="457.25" height="128" fill="#181826" stroke="#e0e0e0" stroke-width="2"/>
+<text x="26.25" y="102.45" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" font-weight="bold" fill="#e0e0e0">Flameling Lv5 HP 282/300</text>
+<rect x="459.5" y="88.75" width="16" height="16" fill="#2b6cb0"/><text x="467.5" y="100.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Tidalin Lv4 HP 120/120" data-sizing="grows-horizontally">
+<rect x="483.5" y="87.75" width="457.25" height="128" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="490.5" y="102.45" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Tidalin Lv4 HP 120/120</text>
+<rect x="923.75" y="88.75" width="16" height="16" fill="#2b6cb0"/><text x="931.75" y="100.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 3 (empty)" data-sizing="grows-horizontally">
+<rect x="19.25" y="222.75" width="457.25" height="128" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="26.25" y="237.45" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Slot 3 (empty)</text>
+<rect x="459.5" y="223.75" width="16" height="16" fill="#2b6cb0"/><text x="467.5" y="235.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 4 (empty)" data-sizing="grows-horizontally">
+<rect x="483.5" y="222.75" width="457.25" height="128" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="490.5" y="237.45" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Slot 4 (empty)</text>
+<rect x="923.75" y="223.75" width="16" height="16" fill="#2b6cb0"/><text x="931.75" y="235.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 5 (empty)" data-sizing="grows-horizontally">
+<rect x="19.25" y="357.75" width="457.25" height="128" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="26.25" y="372.45" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Slot 5 (empty)</text>
+<rect x="459.5" y="358.75" width="16" height="16" fill="#2b6cb0"/><text x="467.5" y="370.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 6 (empty)" data-sizing="grows-horizontally">
+<rect x="483.5" y="357.75" width="457.25" height="128" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="490.5" y="372.45" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.25" fill="#e0e0e0">Slot 6 (empty)</text>
+<rect x="923.75" y="358.75" width="16" height="16" fill="#2b6cb0"/><text x="931.75" y="370.75" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Hint bar" data-sizing="scales-with-resolution">
+<rect x="0" y="513.05" width="960" height="26.95" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="925" y="514.05" width="16" height="16" fill="#8a5a12"/><text x="933" y="526.05" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="A OK" data-sizing="scales-with-resolution">
+<rect x="3.5" y="516.55" width="54.6" height="19.95" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="10.5" y="530.1" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">A OK</text>
+<rect x="41.1" y="517.55" width="16" height="16" fill="#8a5a12"/><text x="49.1" y="529.55" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="B Back" data-sizing="scales-with-resolution">
+<rect x="65.1" y="516.55" width="71.4" height="19.95" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="72.1" y="530.1" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">B Back</text>
+<rect x="119.5" y="517.55" width="16" height="16" fill="#8a5a12"/><text x="127.5" y="529.55" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Start Close" data-sizing="scales-with-resolution">
+<rect x="143.5" y="516.55" width="113.4" height="19.95" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="150.5" y="530.1" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">Start Close</text>
+<rect x="239.9" y="517.55" width="16" height="16" fill="#8a5a12"/><text x="247.9" y="529.55" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Select Help" data-sizing="scales-with-resolution">
+<rect x="263.9" y="516.55" width="113.4" height="19.95" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="270.9" y="530.1" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="10.5" fill="#e0e0e0">Select Help</text>
+<rect x="360.3" y="517.55" width="16" height="16" fill="#8a5a12"/><text x="368.3" y="529.55" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g></svg>
+<text x="0" y="704" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="22" font-weight="bold" fill="#86efac">1536x864 CSS, dpr 1.25 (1920x1080 device): uiScale 1.200, world deviceScale 3, tile 76.8 CSS px, body text 16.80 px</text>
+<svg x="0" y="720" width="1536" height="864" viewBox="0 0 1536 864" data-panel="proposed" data-window="1536x864@1.25"><rect width="1536" height="864" fill="#000"/><g class="el" data-el="Monsters frame" data-sizing="grows-vertically">
+<rect x="9.6" y="9.6" width="1516.8" height="796.8" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="2"/>
+<rect x="1491.4" y="10.6" width="16" height="16" fill="#2f7d4f"/><text x="1499.4" y="22.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">V</text></g>
+<g class="el" data-el="Monsters" data-sizing="scales-with-resolution">
+<rect x="12" y="12" width="1512" height="48" fill="none"/>
+<text x="21.6" y="44.16" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="24" font-weight="bold" fill="#e0e0e0">Monsters</text>
+<rect x="1507" y="13" width="16" height="16" fill="#8a5a12"/><text x="1515" y="25" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="separator" data-sizing="fixed">
+<rect x="12" y="60" width="1512" height="2" fill="#6b6b82"/>
+<rect x="1507" y="53" width="16" height="16" fill="#6b7280"/><text x="1515" y="65" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">F</text></g>
+<g class="el" data-el="LB" data-sizing="scales-with-resolution">
+<rect x="14.4" y="64.4" width="62.4" height="38.4" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="24" y="88.5" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">LB</text>
+<rect x="59.8" y="65.4" width="16" height="16" fill="#8a5a12"/><text x="67.8" y="77.4" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Party" data-sizing="scales-with-resolution">
+<rect x="81.6" y="64.4" width="144" height="38.4" fill="#181826" stroke="#e0e0e0" stroke-width="2"/>
+<text x="153.6" y="89.31" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" font-weight="bold" fill="#e0e0e0" text-anchor="middle">Party</text>
+<rect x="208.6" y="65.4" width="16" height="16" fill="#8a5a12"/><text x="216.6" y="77.4" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Storage" data-sizing="scales-with-resolution">
+<rect x="230.4" y="64.4" width="144" height="38.4" fill="none" stroke="#6b6b82" stroke-width="1"/>
+<text x="302.4" y="89.31" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#b4b4c2" text-anchor="middle">Storage</text>
+<rect x="357.4" y="65.4" width="16" height="16" fill="#8a5a12"/><text x="365.4" y="77.4" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="RB" data-sizing="scales-with-resolution">
+<rect x="1459.2" y="64.4" width="62.4" height="38.4" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="1468.8" y="88.5" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">RB</text>
+<rect x="1504.6" y="65.4" width="16" height="16" fill="#8a5a12"/><text x="1512.6" y="77.4" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Body" data-sizing="grows-vertically">
+<rect x="12" y="105.2" width="1512" height="698.8" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="1489" y="106.2" width="16" height="16" fill="#2f7d4f"/><text x="1497" y="118.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">V</text></g>
+<g class="el" data-el="Flameling Lv5 HP 282/300" data-sizing="grows-horizontally">
+<rect x="26.4" y="119.6" width="736.8" height="216.93" fill="#181826" stroke="#e0e0e0" stroke-width="2"/>
+<text x="36" y="139.76" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" font-weight="bold" fill="#e0e0e0">Flameling Lv5 HP 282/300</text>
+<rect x="746.2" y="120.6" width="16" height="16" fill="#2b6cb0"/><text x="754.2" y="132.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Tidalin Lv4 HP 120/120" data-sizing="grows-horizontally">
+<rect x="772.8" y="119.6" width="736.8" height="216.93" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="782.4" y="139.76" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Tidalin Lv4 HP 120/120</text>
+<rect x="1492.6" y="120.6" width="16" height="16" fill="#2b6cb0"/><text x="1500.6" y="132.6" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 3 (empty)" data-sizing="grows-horizontally">
+<rect x="26.4" y="346.13" width="736.8" height="216.93" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="36" y="366.29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Slot 3 (empty)</text>
+<rect x="746.2" y="347.13" width="16" height="16" fill="#2b6cb0"/><text x="754.2" y="359.13" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 4 (empty)" data-sizing="grows-horizontally">
+<rect x="772.8" y="346.13" width="736.8" height="216.93" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="782.4" y="366.29" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Slot 4 (empty)</text>
+<rect x="1492.6" y="347.13" width="16" height="16" fill="#2b6cb0"/><text x="1500.6" y="359.13" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 5 (empty)" data-sizing="grows-horizontally">
+<rect x="26.4" y="572.67" width="736.8" height="216.93" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="36" y="592.83" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Slot 5 (empty)</text>
+<rect x="746.2" y="573.67" width="16" height="16" fill="#2b6cb0"/><text x="754.2" y="585.67" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 6 (empty)" data-sizing="grows-horizontally">
+<rect x="772.8" y="572.67" width="736.8" height="216.93" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="782.4" y="592.83" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="16.8" fill="#e0e0e0">Slot 6 (empty)</text>
+<rect x="1492.6" y="573.67" width="16" height="16" fill="#2b6cb0"/><text x="1500.6" y="585.67" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Hint bar" data-sizing="scales-with-resolution">
+<rect x="0" y="827.04" width="1536" height="36.96" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="1501" y="828.04" width="16" height="16" fill="#8a5a12"/><text x="1509" y="840.04" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="A OK" data-sizing="scales-with-resolution">
+<rect x="4.8" y="831.84" width="74.88" height="27.36" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="14.4" y="850.42" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">A OK</text>
+<rect x="62.68" y="832.84" width="16" height="16" fill="#8a5a12"/><text x="70.68" y="844.84" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="B Back" data-sizing="scales-with-resolution">
+<rect x="89.28" y="831.84" width="97.92" height="27.36" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="98.88" y="850.42" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">B Back</text>
+<rect x="170.2" y="832.84" width="16" height="16" fill="#8a5a12"/><text x="178.2" y="844.84" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Start Close" data-sizing="scales-with-resolution">
+<rect x="196.8" y="831.84" width="155.52" height="27.36" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="206.4" y="850.42" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">Start Close</text>
+<rect x="335.32" y="832.84" width="16" height="16" fill="#8a5a12"/><text x="343.32" y="844.84" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Select Help" data-sizing="scales-with-resolution">
+<rect x="361.92" y="831.84" width="155.52" height="27.36" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="371.52" y="850.42" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14.4" fill="#e0e0e0">Select Help</text>
+<rect x="500.44" y="832.84" width="16" height="16" fill="#8a5a12"/><text x="508.44" y="844.84" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g></svg>
+<text x="0" y="1644" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="22" font-weight="bold" fill="#86efac">1920x1080 CSS, dpr 1 (1920x1080 device): uiScale 1.500, world deviceScale 3, tile 96.0 CSS px, body text 21.00 px</text>
+<svg x="0" y="1660" width="1920" height="1080" viewBox="0 0 1920 1080" data-panel="proposed" data-window="1920x1080@1"><rect width="1920" height="1080" fill="#000"/><g class="el" data-el="Monsters frame" data-sizing="grows-vertically">
+<rect x="12" y="12" width="1896" height="996" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="2"/>
+<rect x="1873" y="13" width="16" height="16" fill="#2f7d4f"/><text x="1881" y="25" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">V</text></g>
+<g class="el" data-el="Monsters" data-sizing="scales-with-resolution">
+<rect x="15" y="15" width="1890" height="60" fill="none"/>
+<text x="27" y="55.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="30" font-weight="bold" fill="#e0e0e0">Monsters</text>
+<rect x="1888" y="16" width="16" height="16" fill="#8a5a12"/><text x="1896" y="28" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="separator" data-sizing="fixed">
+<rect x="15" y="75" width="1890" height="2" fill="#6b6b82"/>
+<rect x="1888" y="68" width="16" height="16" fill="#6b7280"/><text x="1896" y="80" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">F</text></g>
+<g class="el" data-el="LB" data-sizing="scales-with-resolution">
+<rect x="18" y="80" width="78" height="48" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="30" y="110.12" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">LB</text>
+<rect x="79" y="81" width="16" height="16" fill="#8a5a12"/><text x="87" y="93" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Party" data-sizing="scales-with-resolution">
+<rect x="102" y="80" width="180" height="48" fill="#181826" stroke="#e0e0e0" stroke-width="2"/>
+<text x="192" y="111.14" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" font-weight="bold" fill="#e0e0e0" text-anchor="middle">Party</text>
+<rect x="265" y="81" width="16" height="16" fill="#8a5a12"/><text x="273" y="93" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Storage" data-sizing="scales-with-resolution">
+<rect x="288" y="80" width="180" height="48" fill="none" stroke="#6b6b82" stroke-width="1"/>
+<text x="378" y="111.14" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#b4b4c2" text-anchor="middle">Storage</text>
+<rect x="451" y="81" width="16" height="16" fill="#8a5a12"/><text x="459" y="93" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="RB" data-sizing="scales-with-resolution">
+<rect x="1824" y="80" width="78" height="48" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="1836" y="110.12" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">RB</text>
+<rect x="1885" y="81" width="16" height="16" fill="#8a5a12"/><text x="1893" y="93" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Body" data-sizing="grows-vertically">
+<rect x="15" y="131" width="1890" height="874" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="1870" y="132" width="16" height="16" fill="#2f7d4f"/><text x="1878" y="144" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">V</text></g>
+<g class="el" data-el="Flameling Lv5 HP 282/300" data-sizing="grows-horizontally">
+<rect x="33" y="149" width="921" height="271.33" fill="#181826" stroke="#e0e0e0" stroke-width="2"/>
+<text x="45" y="174.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" font-weight="bold" fill="#e0e0e0">Flameling Lv5 HP 282/300</text>
+<rect x="937" y="150" width="16" height="16" fill="#2b6cb0"/><text x="945" y="162" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Tidalin Lv4 HP 120/120" data-sizing="grows-horizontally">
+<rect x="966" y="149" width="921" height="271.33" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="978" y="174.2" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Tidalin Lv4 HP 120/120</text>
+<rect x="1870" y="150" width="16" height="16" fill="#2b6cb0"/><text x="1878" y="162" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 3 (empty)" data-sizing="grows-horizontally">
+<rect x="33" y="432.33" width="921" height="271.33" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="45" y="457.53" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Slot 3 (empty)</text>
+<rect x="937" y="433.33" width="16" height="16" fill="#2b6cb0"/><text x="945" y="445.33" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 4 (empty)" data-sizing="grows-horizontally">
+<rect x="966" y="432.33" width="921" height="271.33" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="978" y="457.53" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Slot 4 (empty)</text>
+<rect x="1870" y="433.33" width="16" height="16" fill="#2b6cb0"/><text x="1878" y="445.33" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 5 (empty)" data-sizing="grows-horizontally">
+<rect x="33" y="715.67" width="921" height="271.33" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="45" y="740.87" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Slot 5 (empty)</text>
+<rect x="937" y="716.67" width="16" height="16" fill="#2b6cb0"/><text x="945" y="728.67" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Slot 6 (empty)" data-sizing="grows-horizontally">
+<rect x="966" y="715.67" width="921" height="271.33" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<text x="978" y="740.87" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="21" fill="#e0e0e0">Slot 6 (empty)</text>
+<rect x="1870" y="716.67" width="16" height="16" fill="#2b6cb0"/><text x="1878" y="728.67" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">H</text></g>
+<g class="el" data-el="Hint bar" data-sizing="scales-with-resolution">
+<rect x="0" y="1033.8" width="1920" height="46.2" fill="#181826" stroke="#6b6b82" stroke-width="1"/>
+<rect x="1885" y="1034.8" width="16" height="16" fill="#8a5a12"/><text x="1893" y="1046.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="A OK" data-sizing="scales-with-resolution">
+<rect x="6" y="1039.8" width="93.6" height="34.2" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="18" y="1063.02" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">A OK</text>
+<rect x="82.6" y="1040.8" width="16" height="16" fill="#8a5a12"/><text x="90.6" y="1052.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="B Back" data-sizing="scales-with-resolution">
+<rect x="111.6" y="1039.8" width="122.4" height="34.2" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="123.6" y="1063.02" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">B Back</text>
+<rect x="217" y="1040.8" width="16" height="16" fill="#8a5a12"/><text x="225" y="1052.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Start Close" data-sizing="scales-with-resolution">
+<rect x="246" y="1039.8" width="194.4" height="34.2" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="258" y="1063.02" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">Start Close</text>
+<rect x="423.4" y="1040.8" width="16" height="16" fill="#8a5a12"/><text x="431.4" y="1052.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g>
+<g class="el" data-el="Select Help" data-sizing="scales-with-resolution">
+<rect x="452.4" y="1039.8" width="194.4" height="34.2" fill="#1e1e2e" stroke="#e0e0e0" stroke-width="1"/>
+<text x="464.4" y="1063.02" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="18" fill="#e0e0e0">Select Help</text>
+<rect x="629.8" y="1040.8" width="16" height="16" fill="#8a5a12"/><text x="637.8" y="1052.8" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">S</text></g></svg>
+</svg>
