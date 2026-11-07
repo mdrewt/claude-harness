@@ -1330,6 +1330,68 @@ implementation got ONE combined lens and no separate verifier (the orchestrator 
 test-diff audit and `mr-gates check`). X2 (the shipped golden e2e against a live local server) proves the seven
 subscriptions apply for real: one bad entry would error the whole batch and hang every session.
 
+**Build note (bt-12, increment B, 2026-11-05, measured; the continuation on the same slice id):** (1) **Met:**
+BT12.1 (the tactical shell owns the Active frame), BT12.2 (the composition list, the deploy countdown, X
+from a key, the deploy hint chips, the open-trade exclusion) and BT12.5 (the wild e2e), with BT12.3, BT12.4
+and BT12.6 re-run green on the new HEAD; the eight residuals the increment A note named are resolved by this
+PR (R-bt-12-TACTICSEXPORTS, -WILDCOMPOSITION, -DEPLOYDEADLINE, -DEPLOYHINT, -TRADEDEPLOY, R-bt-11-ROUTERX,
+-PRACTICEKIND, -PARTYFULL). (2) **Shipped:** client-wasm `tactics_tuning()` (surge start, wild round cap,
+`MAX_PACK`) and `tactics_next_initiative(board, thisRoundPriority)` (= `order(contenders,
+priority_for_round(this, 2))`, EXPORT_NAMES 14 → 16); the server's `start_wild_tactical` seats EVERY wild in
+the anchor's `side_b` (wild 0 the lead) and writes the Deploying deadline into the side-A clock at the
+instant the deploy window row is armed (`deploy_deadline_ms` = game-core's `deploy_budget_ms(Wild)`; the
+pack-1 path keeps `None`; `clock_of_row` never loads a deadline without an open window); the router sends X
+to a nav-capable SCREEN (consumed whatever it answers; the world jump, the menu and a covered frame are
+unchanged); `hintBar` deploy chips (`HintDeploy`: confirm = A Deploy / X Edit formation / Start menu /
+Select help; edit = A Assign / B Back / LB RB / Start Submit / Select help, +5 `chrome.chip.*` keys);
+`stillThereSeconds` (the last `STILL_THERE_LEAD_MS` = 60 s before the server's deadline, 1..60, pumped on
+the WALL clock from the frame loop with one live-region announcement per deadline, Wild only); the deploy
+panel's `tactics-deploy-wilds` list before the formation, its countdown node kept last across repaints and
+its mode-aware `hint()`; `TacticsBattle.setCountdown` / `reset` / `release`; `shellKind` / `activeUnitOf` /
+`statusTagOf`; main.ts `refreshTacticsShell` (a per-battle event watermark keyed by the bigint id, a first
+sighting feeds the whole transcript while HIDDEN then shows, later batches show then feed; an identical
+VM paints nothing; a render throw leaves the watermark unmoved; an ingest throw feeds event by event; a
+visible shell whose batch fails to build keeps the frame), `tacticalOwnsStart` / `battleHint` /
+`activeBattleView` over four views on the one overlay id, the `submitQueue` arm's rejection release, the
+slot count `min(max_pack, spawn_a)`, the `__mrTactics` read-only DEV hook (fingerprinted, bare name
+included), the wild e2e (`tactics-wild.spec.ts` + `controls.ts` helpers: virtual buttons only, owner SQL
+seeding, forecast-gated attacks, bounded restarts; 2 tests, ~13 s). Catalog 504 → 511, `tactics.*` 132 →
+134. (3) **A measured defect fixed outside the plan:** the bt-11 shell guarded `#send` once per turn KEY
+and re-armed only on a READY row, but game-core executes a live plan at once and leaves the unit Waiting
+with its remaining budget when the plan does not end the turn — so a live attack locked End Turn / Flee
+for the rest of the turn (the e2e's unit sat Waiting at ap 2 until the window expired → AutoFlee). The
+in-flight entry now snapshots the unit's own row budget at send and `#reconcile` re-arms when that budget
+moves on the same key (`[BT12-5-SHELL-LIVE-REARM]`, tester round 3, RED on the old guard). (4)
+**Deviations, disclosed:** the countdown lead is 60 s before the DEADLINE (the spec's "240 s into" holds
+exactly for the 300 s window and tracks any other length); the BT12.5 pack ≥ 2 deploy confirm is the
+SECOND battle's (the party at join is one monster; battle 1's recruit is moved into party slot 1 by owner
+SQL — plan-b F2); the anchor's `side_b` now carries every wild's stats during Deploying, so a Deploying
+close (Fled, nothing persisted) shows the pack's stats at no cost — the composition list itself shows
+species and level only; `resolveFormation` stays a TS mirror (R-bt-8-FORMATIONRULE reads closed in the
+residual sink but the copy remains — the supervisor should reconcile); `TacticsBattleVM.partyFull` is
+honestly `false` (a tactical recruit lands in the box; the server never refuses one for a full party).
+(5) **Tests:** 25 new tags + 2 client-wasm host tests + 5 server tests + 1 node:test case, all RED on the
+API-freeze stubs (memory/projects/gates/bt-12.red-before-b.md) and GREEN after; named pin moves: catalog
+504 → 511 (catalog.test.ts, resolver.test.ts — the pin file the bt-11 note foresaw, listed under
+`touches-delta:`), 132 → 134, EXPORT_NAMES 14 → 16, the pack-2 clock pin `(0, None, Some(T0 +
+pve_deploy_ms))`, FRAME-OWNER / PACK1-NO-PANEL read the shell at Active, router "D-pad and X never ask the
+screen" drops X. The BT12.5 CHECK rebuilds the pkg and the dev-reducers module wasm, runs the spec with the
+JSON reporter and pins both titles passed once (a `just ci` run rebuilds the module WITHOUT dev_reducers at
+the same artifact path — the CHECK's own rebuild is what keeps it honest). (6) **Lenses:** reviewer,
+red-team, reducer-security-auditor and desync-guard, 2 MAJOR + 6 MINOR + 4 MED fixed in-tree (the deploy
+panel's repaint detached the adopted live region — every announcement silent while it showed — so it now
+paints into an inner body and never rebuilds its root; the shell
+countdown's positioning; per-event ingest fallback; the map cache; the e2e observer root and vacuous
+oracle; `deploy_budget_ms` from game-core; `clock_of_row`), eight recorded as residuals (R-bt-12-SEEDENTROPY
+MED → bt-16, -HALTEDPLAN MED → bt-14, -ADVANCINGACTIVE, -VMFIXTURES → bt-14, -DEPLOYCAP, -INITPARITY,
+-SHELLKIND, -RESULTSDRAIN → backlog); `/tmp/mr_warn_bt-12` rose after the lenses, so no separate verifier
+(the orchestrator ran `mr-gates check` with the full `just ci` as X1 and both browser gates). Follow-up
+flags (outside the touches): the three-hook rosters at `justfile:72` (and its `scripts node suites` door
+floor 18 → 19), `ARCHITECTURE.md:463`, `docs/runbooks/playtest-ops.md:73`, `client/src/net/buildInfo.ts:6`;
+"the router still swallows X" at `client/src/ui/screens/battleScreen.ts:55-57`; the one-wild `side_b` comment
+at `client/src/ui/battleModel.ts:274`; the clock-row doc at `server-module/src/schema.rs:1148` (a Deploying
+row carries a deadline with no open window).
+
 ### bt-13 — pacing simulation gate + H1/H2 continuity proof (after bt-9, beside the client chain)
 category: gameplay (pacing) + loop-ops (telemetry) · severity: MED · size: LIGHT
 touches: game-core/tests/tactics_pacing.rs, server-module/src/tactics_settle_tests.rs, server-module/src/playtest_tests.rs
@@ -1433,6 +1495,49 @@ stays the single funnel (`ranking::apply_pvp_rating` unchanged); the dev reducer
   SHALL use the PvP ruleset with no rating and no rewards, and Recruit and Flee SHALL be rejected at
   the submit gate.
 
+**Build note (bt-14, 2026-11-06, measured):** (1) **Met:** BT14.1–BT14.6, 6/6 gates; 40 gating tests
+(42 with `dev_reducers`) plus three updated existing tests, red on the API freeze (65bb5080), green at
+cf0cd5c2; three bite-proof mutants (unchanged-row rewrite, the 1v1 write-back on a tactical anchor, a
+forfeit mapped to the forfeiter) all killed. (2) **Shape:** `start_pvp_tactical(challenger, party_a, opponent,
+party_b, format, seed)` opens Deploying with TWO `battle_clock` rows (both on the 45 s deadline), TWO owner-only
+`battle_deploy` rows (empty, unlocked) and ONE deploy window row; `deploy_units` in a PvP battle stages the
+sender's row — exactly `pvp_deploy_count(format, conscious of its OWN list)` picks, validated against its own list
+only — and the SECOND lock copies both stagings into `battle_unit` rows and starts the battle in that one
+transaction; the deploy expiry auto-fills every unlocked side (remembered formation, else slot order, capped at
+the format) or cancels unrated (`Fled`) when a side has nothing to field; a premature deploy fire re-arms (PvP
+ruleset only). `load`/`store` carry both clocks and **`store` writes only rows that changed** (an unchanged
+`update` is a subscription event the opponent receives; the native host now counts write syscalls per table,
+`Fixture::writes_to`, so the two-identity test pins ZERO participant-visible writes on a pre-queue, re-submit and
+cancel). A PvP-ruleset `finish` commits through `pvp::settle_pvp_battle(ctx, battle, SideAWriteBack::HpOnly)`
+(its only `apply_pvp_rating` caller; the 1v1 callers pass `Legacy1v1`; returns `Ok(both HP write-backs ok)` as the
+settlement's `hp_ok`); `pay_ledger` pays both sides (essence only; Practice's ledger is empty). `forfeit`
+reducer (Active only; Deploying is "battle is not active" — the 45 s window ends it; Practice forfeits side A);
+`resolve_tactical_on_disconnect` forfeits PvP/Practice anchors in either role (Deploying cancels unrated) and
+`forfeit_on_disconnect` skips tactical anchors; the legacy `submit_pvp_action` refuses a tactical anchor (the
+plan lens's CRITICAL catch — a 1v1 pick would have settled the battle). **Practice = one party split into two
+DISJOINT side lists** (`start_pvp_tactical` refuses an overlap; the dev reducer splits in slot order, A =
+`ceil(n/2)`); `dev_start_tactical_pvp(challenger, opponent, format?)`: a non-owner may start only its own
+Practice, the module owner pairs two players; it joins `FORBIDDEN_REDUCERS`. `battle_challenge.format` =
+`min(pick, 3)` (the server has no ranked flag — "ranked fixed at 3" is the client's pick, bt-15) and is
+exported by the privacy serializer. (3) **Residual folds:** R-bt-9-SUMMARYDENOM partially — `battle_summary`
+gains `kos_after_r1` (both sides, rounds > 1) and `end_how: Option<EndHow>` (the adjudication reason,
+`Forfeit`, …), and an anchor-less finish finalises its row `Fled`; the TTL half stays open. R-bt-3-ENDHOW
+(`game-core/src/tactics/{outcome,queue}.rs`) and R-bt-12-HALTEDPLAN / -ADVANCINGACTIVE / -VMFIXTURES (client
+files) are outside the touches → re-target asks in the handoff (the client three → bt-15). (4) **Lenses:**
+planner, reviewer, red-team on the plan (REV 2: disjoint Practice lists, write-only-changed rows, dev-reducer
+consent, funnel mode instead of a DB probe, `except` threaded into `materialize`); reviewer, red-team,
+reducer-security-auditor, desync-guard on the artifact: HIGH staging-probe oracle (a foreign monster's refusal
+text depended on the opponent's lock) fixed by reading only the side's own list + one tester probe test; the
+guard order in `submit_pvp_action` (participation first); `fallback_close` sweeps unit rows of a Deploying
+battle. New residuals: R-bt-14-ROSTERREVEAL (the `my_battle` anchor shows the opponent's roster from Deploying;
+→ bt-17), R-bt-14-FORMATRULE (`pvp_deploy_count`/`challenge_format`/`PVP_FORMAT_MAX` belong in game-core + a
+wasm export before bt-15's panel re-derives them; → bt-15, needs game-core/client-wasm touches),
+R-bt-14-ESSENCECOLLUSION (feed-KO essence between cooperating accounts; → bt-16). (5) **Accepted / decided:** the
+`QueueVoided` reveal and the late-submit-beats-the-fire ruling stand; `hp_ok` couples both sides' write-backs
+(no rewards on a failed write-back, the wild rule carried). (6) **Docs:** "Tactical battle privacy is
+structural" amended in place (reveal-by-copy, two clock rows, write-only-changed, the forfeit reducer, the
+funnel mode, the accepted reveals) — now ~45 lines, past the 10–25 bar; a split is a doc-chore candidate.
+
 ### bt-15 — PvP client: party-size pick, secret deploy panel, clock ring + strike pips, forfeit confirm, Surge badge, results rating, two-context secrecy e2e
 category: ux + security-privacy (client surface) · severity: HIGH · size: HEAVY
 touches: client/src/tactics/deployPanel.ts, client/src/tactics/deployPanel.test.ts, client/src/tactics/clock.ts, client/src/tactics/clock.test.ts, client/src/tactics/results.ts, client/src/tactics/results.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client/src/tactics/commandModel.ts, client/src/tactics/commandModel.test.ts, client/src/ui/actionSheetModel.ts, client/src/ui/actionSheetModel.test.ts, client/src/ui/screens/worldScreen.ts, client/src/ui/screens/worldScreen.test.ts, client/src/ui/pvpModel.ts, client/src/ui/pvpModel.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/contextStack.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.pvpPending.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/tactics-pvp.spec.ts, client/e2e/controls.ts, scripts/verify-build-hooks.mjs, scripts/verify-build-hooks.test.mjs, client/src/styles.css
@@ -1463,6 +1568,73 @@ re-declared in the spec file; there is no 60 s-deadline or forfeit UI today.
 - **BT15.5:** WHEN the PvP panels mount, EVERY string SHALL come from the typed catalog (en+fr) and
   every element SHALL be D-pad-reachable.
 
+**Build note (bt-15 increment A, 2026-11-06, measured):** (1) **Met:** BT15.1, BT15.4, BT15.5 (for the shipped
+surfaces); BT15.2 and BT15.3 DEFERred to a bt-15 continuation on a HIDDEN DEPENDENCY: the declared `touches:`
+omit `client/src/tactics/strings.ts` (+ `strings.test.ts`) — the ONE resolver importer for the tactics panels
+(BT10-6-SCAN-LIVE; the exact `tactics.*` roster; `menuRowLabel`'s exhaustive switch) — so no new panel string, no
+forfeit row and no results line can land without it; the pick needed `client/src/ui/screens/index.ts` (the
+`WorldPort` seam: an optional `challengeSizes?()` member) and the honest lock needed `client/src/net/store.ts`
+(a `battleDeploys` getter), both shipped under `touches-delta:`; the continuation's touches should add
+strings.ts, strings.test.ts, hintBarModel.ts/resolver.test.ts (if new hint verbs), turnBar.ts/hud.ts (the ring on
+the chip; player names for the strike pips), wasm.ts (R-bt-12-ADVANCINGACTIVE) and, for R-bt-14-FORMATRULE,
+game-core/client-wasm/server. (2) **Shape:** the Challenge confirm is the party-size pick — rows `N vs N` for
+N in `[min(3, eligible)…1]` (eligible = party-slotted ∧ conscious ∧ untraded, slot order; the largest first =
+the default) then No; the chosen size is re-validated against the LIVE sizes at A; a confirmed pick leaves as a
+sized `challenge` Command and the dispatch sends the first N eligible ids read at send time (nothing when fewer
+are eligible). The PvP deploy panel is a `pvp` `DeployInput` variant with NO roster field (the anchor's side B is
+the opponent's party), `pvpDeployCount(format, conscious)` slots (a disclosed TS mirror under
+R-bt-14-FORMATRULE), Deploy / Confirm disabled while a slot is empty, every row disabled once the server's own
+`battle_deploy.locked` row arrives (never a promise latch: `sendGuarded` resolves on a refusal), and the 45 s
+deploy countdown through `countdownDeadline` (Wild always; Pvp / Practice while the panel shows; interim
+"Still there?" wording, not announced). (3) **Secrecy e2e** `client/e2e/tactics-pvp.spec.ts` (two browsers,
+`dev_start_tactical_pvp` as the owner): the pick's `format`, B's SDK cache holding only its own unlocked deploy
+row and zero queue rows (a row-callback probe counts zero deliveries) while A is locked / pre-queued, no roster
+list, A's nickname never in B's page, B's turn bar byte-identical across A's pre-queue, both lock BEFORE Active
+and ≥ 5 s before the deadline, four AFK auto-passes forfeit (exactly 4 `AutoPass` on B's unit, 0 strikes on A),
+the server refuses `battle_deploy` / `battle_queue` / `battle_secret` subscriptions (`my_battle_deploy` as the
+control), and closing B's browser forfeits within 20 s with 0 `AutoPass`. GREEN 4/4 locally; remote CI's e2e job
+re-runs it. (4) **Interpretations:** no ranked / casual toggle exists client-side ("ranked always 3" is the
+default row, not an enforced state); until bt-16 flips accept, a picked challenge opens a LEGACY 1v1 battle with
+N vs the accepter's full party (the spec orders the pick before the flip); the pick chooses HOW MANY, not WHICH;
+`consciousPartyIds`' `hp > 0` is a disclosed CLIENT rule narrower than `challenge_pvp`'s acceptance set.
+(5) **Lenses:** planner, reviewer, red-team (plan); reviewer, red-team, desync-guard (artifact — HIGH fixed: Practice
+staged side B from side A's list); reducer-security-auditor not run (no server change). New residuals
+R-bt-15-FALLTHROUGH (→ bt-17), R-bt-15-PRACTICESTAGE (→ bt-16). The three R-bt-12 residuals re-targeted to
+bt-15 by bt-14 read `closed` in the sink although unfixed.
+
+**Build note (bt-15 increment B, 2026-11-06, measured):** (1) **Met:** BT15.2 and BT15.3 (the two gates DEFERred by
+increment A), 9 + 10 tagged vitest tests red on f40af724 (the missing `tactics/clock.ts`, `setClock`/`onForfeit`,
+the `forfeit` row, `ResultsVM.rating`/`endHow`, `ratingChange`, 13 `tactics.*` keys), green at ddd1214c; the two-browser
+e2e grows to 5 (T2 gains the ring / strip / strike-pip oracles with the turn-bar byte-identity compare normalised on a
+ring-stripped clone; T5 `BT15-3-E2E-FORFEIT` drives the menu row → the confirm (opens on "Keep fighting") → Yes →
+Finished with the forfeit reason and a rating line on both pages). (2) **Shape:** `tactics/clock.ts` — pure `clockVM`
+(the ring is the WAITING unit's side's clock row with an OPEN window: `fraction = (deadline − now)/(deadline − open)`
+rounded to 2 decimals, so "refill on every accepted submit" is the server re-opening the window, no client rule; amber
+≤ 10 s / red ≤ 5 s are display thresholds; one strike row per clock row, side A then B, `autopassCount` clamped to
+`STRIKES_MAX`) + DOM `renderClock` (one `span.tactics-clock-ring[role=img][data-band][data-fraction]` on the chip,
+`--clock-fraction` for the conic gradient; a `div.tactics-players` strip under the bar with `span.tactics-strikes`
+of 4 pips); `TacticsBattle.setClock` memoises the VM (an equal VM writes nothing) and `#reapplyClock` re-paints the
+ring after every turn-bar render only onto the chip that is still CURRENT; main.ts's `pumpClock` runs on the wall
+clock beside `pumpStillThere`, keyed on `turnState.kind === 'Waiting'` (never the Advancing gap). Forfeit: a pvp-only
+LAST root row (`MenuRowId 'forfeit'`, never greyed) → the `forfeit` menu level (`forfeitYes` / `forfeitNo`, cursor
+on No) → `deps.onForfeit` → Command `{kind:'forfeit'}` (battle-safe) → `reducers.forfeit({battleId})`. Results:
+`endHow` from the LAST `BattleEnd` event (the four Adjudicated* + Forfeit print a line; SideEmpty / FixedOrder /
+RoundCap / Fled / AutoFlee none) leads the list; the rating line closes it — `ratingChange()` (ui/battlePolicy.ts) is
+non-null only for kind Pvp + a decisive outcome + the baseline this client took at the battle's first non-Finished
+sighting (`before: null` = no profile row yet, the server creates it lazily at the first settle → "Rating N"); the
+result is frozen at the first Finished build. The Surge badge was already shipped (bt-10); a shell wiring test pins it
+under BT15-3. (3) **Disclosed:** `STRIKES_MAX = 4` mirrors `TacticsTuning.autopass_forfeit` (client-wasm's
+`TacticsTuningOut` does not export it; R-bt-15-STRIKESMAX → backlog, LOW); `Date.now()` vs server epoch deadlines is
+unsynced (the BT12.2 countdown's precedent; R-bt-15-CLOCKSKEW → backlog, LOW); the ring sits on the turn-bar CHIP (the
+bar is the portrait strip); Practice shows one name on both strip rows; a reload after the finish shows no rating line;
+a second Yes on a finished battle is a reported refusal (no latch); the forfeit row needs an own conscious unit's menu
+(live or pre-queue). (4) **Lenses:** reviewer + red-team on the plan (REV 3 → §8 fold: the lazily-created profile row,
+unrated `Fled` ends, the frozen after, the STRIKES_MAX disclosure, the Waiting gate); reviewer + red-team + desync-guard
+(PASS) on the artifact: 22 hand-applied mutants, 17 killed by the tester's suite, 1 survivor (a baseline taken at a
+first-seen-Finished battle) closed by a tester-added boot case, 4 equivalent; reducer-security-auditor not run (no
+server change). R-bt-14-FORMATRULE stays out of scope by the brief (game-core / client-wasm) and reads `closed` by
+#661 in the sink although unfixed — a bookkeeping ask, as do the three R-bt-12 rows closed by #660.
+
 ### bt-16 — cutover flip: encounter + challenge-accept paths start tactical battles; dev start reducers deleted; every 1v1 e2e migrated
 category: gameplay (hard replacement — D583.3, step 1) · severity: CRITICAL · size: HEAVY
 touches: server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/pvp.rs, server-module/src/pvp_tests.rs, server-module/src/tactics.rs, server-module/src/tactics_tests.rs, server-module/src/lib.rs, server-module/src/privacy_enforcement_tests.rs, scripts/verify-release-reducers.mjs, scripts/verify-release-reducers.test.mjs, evals/account-e2e.eval.mjs, client/e2e/encounter-battle.spec.ts, client/e2e/battle-dpad.spec.ts, client/e2e/recruit.spec.ts, client/e2e/my-battle-privacy.spec.ts, client/e2e/pvp.spec.ts, client/e2e/pvp-side-b.spec.ts, client/e2e/pvp-full.spec.ts, client/e2e/ranked-forfeit.spec.ts, client/e2e/monster-privacy.spec.ts, client/e2e/trade-interlock.spec.ts, client/e2e/tactics-wild.spec.ts, client/e2e/tactics-pvp.spec.ts, client/e2e/controls.ts, client/src/main.ts, scripts/verify-build-hooks.mjs, scripts/verify-build-hooks.test.mjs, ARCHITECTURE.md, docs/DECISIONS.md
@@ -1491,9 +1663,34 @@ pin the `battle_wild` writer and are retargeted; the `__mrPvp` hook is re-finger
   `account-e2e` live scenario SHALL observe a tactical wild anchor row through `my_battle`, and no
   1v1 battle SHALL be startable from any live path.
 
+**Build note (bt-16, 2026-11-06, measured):** (1) **Shape:** `movement_tick`'s trigger roll (`resolve_encounter` on the zone's
+`encounter` row — rate + bands unchanged) now calls `tactics::start_wild_tactical(ctx, player, encounter_seed, battle_seed, None)` with
+two separate `ctx.random()` draws (the secret roll stream no longer derives from the recoverable encounter seed — folds
+R-bt-8/R-bt-12-SEEDENTROPY); a late refusal inside the pack-1 auto-deploy undoes the writer's own inserts (`undo_wild_start`) because
+the tick swallows the `Err`. `accept_challenge` guard 6 is `tactics::start_pvp_tactical(.., challenge.format, seed)` — format 0 (a
+pre-bt-14 row) is refused, the 60 s `pvp_deadline_schedule` is never armed, and a challenger-side deletion gate is reported as
+"challenge is no longer available" (the acceptor already passed its own gate; the bare reason would disclose a third party's state).
+The two `dev_start_tactical_*` reducers are deleted; `FORBIDDEN_REDUCERS` is exactly `start_wild_battle` + `grant_bait`. (2) **Kept
+compiled, disclosed:** `pvp::start_pvp_battle` / `build_pvp_team` behind `cfg_attr(not(test), allow(dead_code))` because
+`trading_tests.rs:2790` (outside the touches) calls the former as its escrow-matrix accept site; `battle::begin_encounter` is dead in
+the default build (a `cargo build` warning only — `just lint` runs `--all-features`, where `start_wild_battle` keeps it live).
+(3) **HIDDEN DEPENDENCY (recorded, not widened):** `battle.rs:58 start_battle` is client-callable and still opens a 1v1 self-battle by
+raw reducer call, so BT16.3's "no 1v1 battle startable from any live path" holds for the two player-reachable paths only →
+R-bt-16-STARTBATTLE (bt-17 / a 6-line reject). (4) **E2E:** every 1v1 spec migrated by virtual buttons through shared `controls.ts`
+helpers (`awaitTacticalActive`, `fightToOutcome`, `attackByButtons`, `recruitByButtons`, `fleeByButtons`, `acceptChallengeByButtons`,
+`startPvpByButtons`); retired checks name their survivors in the specs. Two contract changes surfaced: Start over the tactical shell is
+End Turn (`tacticalOwnsStart`), so the ctl-6c "Start opens the menu over a battle" round trips (encounter-battle E0, battle-dpad 3x)
+open the menu by its accelerator; the anchor's HP mirror covers only units with a `monster_id`, so an "anchor row changed mid-battle"
+oracle must take a hit on an own monster (my-battle-privacy (v)); Skittish wilds kite, so adjacency steps re-hunt with a bound
+(battle-dpad 2-A). `account-e2e`: battle1 deploys both sides by SDK before D disconnects (a Deploying cancel is unrated — no `profile`
+row), the S9 wild anchor is checked through `my_tactical_battle` (`kind: Wild`), the hand seeds of `battle_secret` / `battle_wild_unit`
+are gone (organic), the vacuity allowlist drops the five now-organic tactical tables and gains `battle_wild` (cap 13 → 9). The CI e2e
+job's `dev_reducers` build step is inert (nothing calls a dev reducer). (5) **Re-target asks:** R-bt-14-ESSENCECOLLUSION is LIVE from
+this flip (tactics_settle.rs, outside the touches); R-bt-15-PRACTICESTAGE is moot (no Practice entry point remains).
+
 ### bt-17 — cutover purge: 1v1 reducers, screens, models and the 60 s reaper deleted; old tables retired in place; combined end-to-end proof
 category: gameplay (hard replacement — D583.3, step 2) · severity: CRITICAL · size: HEAVY
-touches: server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/taming.rs, server-module/src/taming_tests.rs, server-module/src/pvp.rs, server-module/src/pvp_tests.rs, server-module/src/lib.rs, server-module/src/privacy_enforcement_tests.rs, server-module/src/monster_mgmt_tests.rs, game-core/src/combat/status_tests.rs, evals/baselines/client-callable-reducers.json, client/src/module_bindings/, client/src/ui/battleView.ts, client/src/ui/battleView.test.ts, client/src/ui/battleModel.ts, client/src/ui/battleModel.test.ts, client/src/ui/screens/battleScreen.ts, client/src/ui/screens/battleScreen.test.ts, client/src/ui/screens/battleScreen.boot.test.ts, client/src/ui/i18n/hardcodedStrings.ts, client/src/ui/i18n/hardcodedStrings.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/i18n/catalogParity.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.claimCode.test.ts, client/src/main.pvpPending.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.battleRewards.test.ts, client/src/main.accel.test.ts, client/src/main.controls.test.ts, client/src/main.input.test.ts, client/src/ui/boxView.test.ts, client/src/ui/overlayA11yWiring.test.ts, client/src/ui/reachability.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/contextStack.test.ts, client/e2e/a11y.spec.ts, client/vite.config.ts, client/src/styles.css, ARCHITECTURE.md, docs/DECISIONS.md
+touches: server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/taming.rs, server-module/src/taming_tests.rs, server-module/src/pvp.rs, server-module/src/pvp_tests.rs, server-module/src/lib.rs, server-module/src/privacy_enforcement_tests.rs, server-module/src/monster_mgmt_tests.rs, game-core/src/combat/status_tests.rs, evals/baselines/client-callable-reducers.json, client/src/module_bindings/, client/src/ui/battleView.ts, client/src/ui/battleView.test.ts, client/src/ui/battleModel.ts, client/src/ui/battleModel.test.ts, client/src/ui/screens/battleScreen.ts, client/src/ui/screens/battleScreen.test.ts, client/src/ui/screens/battleScreen.boot.test.ts, client/src/ui/i18n/hardcodedStrings.ts, client/src/ui/i18n/hardcodedStrings.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/i18n/catalogParity.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.claimCode.test.ts, client/src/main.pvpPending.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.battleRewards.test.ts, client/src/main.accel.test.ts, client/src/main.controls.test.ts, client/src/main.input.test.ts, client/src/ui/boxView.test.ts, client/src/ui/overlayA11yWiring.test.ts, client/src/ui/reachability.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/contextStack.test.ts, client/e2e/a11y.spec.ts, client/vite.config.ts, client/src/styles.css, ARCHITECTURE.md, docs/DECISIONS.md, server-module/src/trading_tests.rs, server-module/src/guards.rs, server-module/src/guards_tests.rs, server-module/src/movement_tests.rs, server-module/src/tactics_tests.rs, server-module/src/tactics_settle_tests.rs, game-core/src/combat/battle_0hp_tests.rs, game-core/src/combat/types.rs
 after: [bt-16]
 Structural — serial; split seam: CLIENT purge first, then server purge + bindings. Design: §11 T12. Measured: the client purge goes FIRST (the 1v1 `dispatch` arms and `BattleView`
 stop referencing `submitAttack`/`swapActive`/`flee`/`attemptRecruit`/`useBattleItem`/
@@ -1523,6 +1720,47 @@ stale coverage exclusion.
   SHALL be 0, the schema snapshot SHALL show the retired tables intact, `just e2e` SHALL be green
   including the tactical wild and PvP flows, and THE combined BT1–BT7 criteria SHALL be proven
   end-to-end on master before the strict §10 playtest gate (D583.5) is raised.
+
+**Build note (bt-17 increment A, 2026-11-07, measured):** (1) **Sizing:** the reducer FUNCTIONS cannot be deleted inside the
+touches — `trading_tests.rs:2782-2794,2966-2969` (the escrow matrix asserts the EXACT escrow error on its `start_battle` rows, so a
+reject is out too), `guards_tests.rs:1714`, `tactics_tests.rs:3230-3259,3333,6057` and `tactics_settle_tests.rs:4118` call them
+directly; recorded as a hidden dependency before the build. Increment A therefore DE-ATTRIBUTES the seven client-callable 1v1
+reducers (`#[spacetimedb::reducer]` dropped; `pub(crate)` bodies kept behind `cfg_attr(not(test), allow(dead_code))` — an allowed
+item seeds liveness for its callees, so `clippy --all-features --all-targets -D warnings` stays clean with no helper edits), deletes
+the dev-only `start_wild_battle`, regenerates the bindings (−7 reducer files; `index.ts` + `types/reducers.ts` rewritten — `spacetime
+generate` asks before deleting stale files, pass `-y`) and trims `client-callable-reducers.json` −7; R-bt-16-STARTBATTLE closes here.
+Increment B (continuation, touches widened with the four test files) deletes the bodies + `begin_encounter`, retargets the matrices
+(R-bt-16-TRADINGMATRIX), `status_tests.rs:5618`, R-bt-2-m14-restated, R-bt-14-ROSTERREVEAL and resolves any still-Ongoing 1v1 anchor
+(R-bt-17-LEGACYANCHORS: a pre-publish SQL check is owed first). BT17.1 is DEFERred to that continuation with the honest state. (2)
+**Client:** `ui/battleView.ts` deleted; `ui/battleModel.ts` is slim (`isPvpBattle`, `BaitItem`, `buildBaitItems`,
+`decideBattleOverlay` + types, `CursorDir` — four out-of-touches importers keep it alive); `ui/screens/battleScreen.ts` STAYS (it is
+the battle-base adapter the tactical shell and the deploy panel implement — the spec's "screen adapter deleted" predates bt-10's
+one-frame elaboration); the seven 1v1 `Command` kinds and policy rows are gone; `battleRenderer(undefined)` → `'none'` and
+`renderableBattle` (anchor + tactical row) is shared by `reconcileStack` and `refreshBattle`: a row-less Ongoing anchor builds
+nothing (a shown owner stays, the stack keeps the battle base, Start opens the menu), a row-less TERMINAL anchor is dismissed in the
+same batch (R-bt-15-FALLTHROUGH closed); the qf-17 payout machinery and the PvP pending state leave main.ts (the results panel shows
+XP/essence/gold; `ownMonsterName` falls back on an EMPTY species name too); 31 of the 35 `battle.*` keys were dead (`battle.title`
+and `battle.outcome.*` survive, read by the tactical views) — 525 → 494, not 511 → 480 as sketched; `SCAN_TARGETS` 19 → 18 and
+`SINK_FLOOR` RE-MEASURED UP (277 sinks: the tactical views added more than the deleted view carried) and pinned at 275. (3) **Hidden
+dependencies, client (two test files + one found at green):** `catalogShape.test.ts:526` (roster entry → `ui/pvpView.ts`),
+`store.test.ts:4542-4615` (two downstream-tooth tests deleted; survivors `T-OWNP-SWAP`/`T-OWNP-OUTCOME` + a new accepter boot case),
+`overlayRegistry.test.ts` (the manifest `*View.ts` census: `battleView` is an id with no file — exempted BY NAME, membership-guarded);
+`client/src/styles.test.ts` is NEW (the two stylesheet-wide CTL7B guards moved there verbatim from battleView.test.ts). (4)
+**Deletions:** the ledger `memory/projects/monster-realm-bt-17-deletions.md` names a survivor by title or "subject deleted" for every
+`it`; the verifier measured two over-claims (the results panel's name fallback — closed by a tester round-3 test red on the mutant;
+the tactical HP fill's inline-transition guard — R-bt-17-HPFILLINLINE, its test belongs outside the touches); residual
+R-bt-17-HPCUE (no non-colour HP cue on the tactical bar). (5) **a11y e2e:** the four eager roots are three (the tactical roots are
+lazy); the CTL7B battle fixture mounts the deploy and results panels; at 640×360 the nine-row results panel FITS, so the non-vacuity
+short viewport is 640×240. (6) **Lenses:** reviewer + red-team on the plan (REV 3; a compile probe of the de-attribution settled the
+dead-code question); reviewer, verifier (FAIL → fixed → the two survivors added/recorded), reducer-security-auditor (PASS; M1 =
+R-bt-17-LEGACYANCHORS, M2 = the re-wiring window the continuation's body deletion closes) on the artifact; desync-guard not run (no
+game-core or rules change); artifact red-team not run (the warn flag rose mid-slice; the plan red-team's 14 attacks were folded). (7) **Gates:** BT17.2 met (1138/1138 over the 25 survivor files), BT17.3 met on the FOURTH verbatim
+`just e2e` run (130 passed + the pre-existing recruit R4 fixme skipped) — runs 1–3 were each red on one pre-existing flake class in a
+spec this slice does not touch (movement-input's "recenter within 12 steps"; the 16-own-turn fight stall on battle-dpad B and
+encounter-battle E2, traces under R-bt-17-FIGHTSTALL); `mr-gates lint` BLOCKs a second DEFER (67% > the 50% cap), so a flaky CHECK
+has to be re-run, never deferred, once BT17.1 is deferred. PR mdrewt/monster-realm#671.
+
+**Continuation touches (2026-11-07, supervisor, measured):** increment B widened by the hidden dependencies increment A recorded plus a fresh `begin_encounter` reference census — `trading_tests.rs`, `guards.rs` + `guards_tests.rs` (the `rb76_..._begin_encounter_..._contained_crate_wide` containment pin), `movement_tests.rs`, `tactics_tests.rs`, `tactics_settle_tests.rs`, `game-core/src/combat/{battle_0hp_tests,types}.rs`.
 
 ## Post-integration verification
 
