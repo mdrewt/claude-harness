@@ -1,7 +1,7 @@
 # Spec: M-ui-foundation — the shared menu design language
 
-**Status:** elaborated 2026-11-07 from the 2026-10-24 sketch · **build-ready: 18 slices** — `wf-1`
-(wireframes, docs-only, harness repo) then `uif-1`…`uif-17` (client) · **Project:** monster-realm
+**Status:** elaborated 2026-11-07 from the 2026-10-24 sketch · **build-ready: 21 slices** — `wf-1`
+(wireframes, docs-only, harness repo) then `uif-1`…`uif-17` with split ids `uif-4b`, `uif-15a/b`, `uif-16a/b` (client) · **Project:** monster-realm
 (client-only; no game-core, server or binding change) · **Measured against** monster-realm `master`
 `d90c32c9` (bt-17 increment B, #672) with so-2, M-pt3-quickfix and M-battle-tactics bt-1…bt-17 merged.
 **Anchors are symbols, not lines.** · **Doctrine:** `standards/testing-tdd.md` — every criterion is an
@@ -18,8 +18,8 @@ directive -013, -014, -015. Each slice names the items it closes.
 **Absorbed residuals (each named in exactly one slice's criteria — see Residual map):**
 R-ctl-14-CTL14.2, R-ctl-14-HELPA11Y, R-ctl-14-STALECMT → `uif-14` · R-ctl-11a-MONSTERSTAB,
 R-qf-10-QF10.2, R-qf-11-GEOMETRY → `uif-6` · R-ctl-SETRATIO → `uif-2` · R-qf-12-QF12.3 → `uif-3` ·
-R-qf-2-SHEETLINEPARITY → `uif-4` · R-ctl-13-SHEETCHIPS → `uif-12` · R-qf-10-QF10.1 → `uif-15` ·
-R-ctl-8h-CTL8H.1 → `uif-16`. R-weekly-review-2026-10-02-F3 is dispositioned fixed (GAME #579) and
+R-qf-2-SHEETLINEPARITY → `uif-4` · R-ctl-13-SHEETCHIPS → `uif-12` · R-qf-10-QF10.1 → `uif-15a` ·
+R-ctl-8h-CTL8H.1 → `uif-16b`. R-weekly-review-2026-10-02-F3 is dispositioned fixed (GAME #579) and
 is a PRESERVED behavior: `uif-4`'s rework must keep the liveRegion wiring that fix added.
 
 ## Problem / intent
@@ -72,7 +72,7 @@ stands.
 | Focus ring designed; anchors kept | qf-1 | One token-driven style (`uif-1`) |
 | `list-style` sweep; Journal title + empty state | qf-4 | Journal moves onto EmptyState (`uif-10`) |
 | Empty frame line collapses (#586 D5) | qf-12 | Non-shifting presentation (`uif-4`); dead `hintSlot` (`uif-3`) |
-| Close at bottom on Privacy; Account column | qf-13 | Profile combine (`uif-16`) |
+| Close at bottom on Privacy; Account column | qf-13 | Profile combine (`uif-16a/b`) |
 | Rankings read-only rows + scroll shadow | qf-16 | Shadow cue generalized (`uif-3`) |
 | Battle "Bag" → "Items" (legacy UI) | qf-10 | Tactical label still reads "Item" (`uif-11`, #586 D4) |
 | `openFrame` push-then-show; mirror shrunk | so-2 | Sheets and frames open through it, unchanged |
@@ -89,7 +89,7 @@ stands.
    starting point.
 3. **D3 — Menu IA: all three at once.** Social opens the 4-tab screen directly; Profile becomes ONE
    combined screen; How to Play and Controls move up. Main menu: Monsters, Inventory, Journal, Social,
-   Profile, How to Play, Controls, Close. → `uif-15`, `uif-16`.
+   Profile, How to Play, Controls, Close. → `uif-15b`, `uif-16a/b`.
 4. **D4 — Battle command: "Items".** Shipped for the 1v1 UI; the tactical command still reads
    "Item". → `uif-11`.
 5. **D5 — Empty footer: collapse when empty, never delete.** → `uif-4` keeps the collapse and removes
@@ -140,7 +140,7 @@ battle screens; the menu IA flatten; the Help rework; the Profile combine.
 - **Controls model:** every new surface is D-pad + buttons on the context stack. No mandatory
   single-purpose hotkey. Pointer only presses virtual buttons (`input/pointerSource.ts` header).
 - **`input/router.ts` and `input/bindings.ts` semantics do not change** (M-gamepad consumes them).
-  The one permitted edit is `ACCEL_PATHS` data in `uif-15`/`uif-16`. Anything else is a
+  The one permitted edit is `ACCEL_PATHS` data in `uif-15b`/`uif-16b`. Anything else is a
   hidden-dependency STOP.
 - **All new strings** land in the typed catalog, en AND fr; `t()` throws on a missing key.
 - **M23 a11y is preserved:** focus traps, initial-focus anchors, liveRegion announcements (F3 fix
@@ -156,7 +156,7 @@ battle screens; the menu IA flatten; the Help rework; the Profile combine.
   named outside that family (`.mr-sheet`, `.mr-toast`, `.mr-empty`, `.mr-card`, `.mr-scroll`; the
   `.mr-dock` precedent).
 - **New file naming:** `ui/*View.ts` forces an `OverlayId` (`OR-MANIFEST-COMPLETE`), so kit modules
-  are `ui/tabBar.ts`, `ui/contextSheet.ts`, `ui/toast.ts` and so on. The sole exception is `uif-16`.
+  are `ui/tabBar.ts`, `ui/contextSheet.ts`, `ui/toast.ts` and so on. The sole exception is `uif-16b`.
   Kit modules write only caller text (the `frame.ts` rule) and do not import the resolver, so
   `PARITY-02`'s exact resolver roster does not grow from the kit.
 - **Roster pins** (`CTL2-1-POLICY`, `CTL3-2-DROP-EXACT`, `EXPECTED_PATHS`, `OR-MANIFEST-COMPLETE`,
@@ -198,7 +198,7 @@ sets the values; contrast is measured (body ≥ 4.5:1, state indicators and disa
 scrolls) → feedback strip (overlay, non-shifting) → the world's hint bar below. Every tab, row, cue and
 message is a kit part in one of those slots.
 
-**Channels (`uif-4`, research §5).**
+**Channels (`uif-4`, `uif-4b`, research §5).**
 
 | Channel | Form | Carries | Announced |
 |---|---|---|---|
@@ -247,19 +247,19 @@ the selected slot, with the anchor computed by a small pure function.
 disjointness is impossible: the design answer is to order every slice that touches them. **The kit
 spine is serial; the screen slices own their view files.** A view is edited by exactly one slice once
 the kit exists, which is also what keeps pin churn to one edit per row. (Monsters and Profile are the
-exceptions by size; each is split or serial on purpose.)
+exceptions by size; each is split and serial on purpose.)
 
 ```
-wf-1 → uif-1 → uif-2 → uif-3 → uif-4 → uif-5 → uif-6 → uif-7 ─┬→ uif-8 → uif-11 ─┬→ uif-12 → uif-13 → uif-14 → uif-15 → uif-16 → uif-17
-                                                             ├→ uif-9 ──────────┤
-                                                             └→ uif-10 ─────────┘
+wf-1 → uif-1 → uif-2 → uif-3 → uif-4 → uif-4b → uif-5 → uif-6 → uif-7 ─┬→ uif-8 → uif-11 ─┬→ uif-12 → uif-13 → uif-14
+                                                                      ├→ uif-9 ──────────┤      ↓
+                                                                      └→ uif-10 ─────────┘   uif-15a → uif-15b → uif-16a → uif-16b → uif-17
 ```
 
-- **Kit spine** `uif-1`…`uif-5`: tokens, scale, primitives, channels, pointer. Later slices add no kit CSS.
+- **Kit spine** `uif-1`…`uif-5`: tokens, scale, primitives, every feedback sink (the one seam, restyled once), pointer. Screen slices add no kit CSS and no feedback routing, which is what makes the fan-out real.
 - **Fan-out window:** `uif-9` (Social) and `uif-10` (small screens) use the kit only: no `styles.css`,
   `main.ts` or catalog edits. They run beside `uif-8` → `uif-11` and each other, with pairwise-disjoint
   code, test and e2e touches (verified with `mr-disjoint` over every concurrency-eligible pair).
-- **Roster spine** `uif-12`…`uif-16`: `main.ts`, catalogs and roster pins, strictly serial.
+- **Roster spine** `uif-12`…`uif-16b`: `main.ts`, catalogs and roster pins, strictly serial.
 - **Build notes:** a file outside a slice's `touches:` is a STOP + build note, never a silent widen. Each
   slice's "Measured:" paragraph is the first hidden-dependency checklist.
 
@@ -277,8 +277,8 @@ wf-1 → uif-1 → uif-2 → uif-3 → uif-4 → uif-5 → uif-6 → uif-7 ─�
 | R-ctl-14-CTL14.2 | uif-14 | Fixed, re-homed to How to Play |
 | R-ctl-14-HELPA11Y | uif-14 | Fixed; the keyless-row half goes with the tab |
 | R-ctl-14-STALECMT | uif-14 | Fixed |
-| R-qf-10-QF10.1 | uif-15 | Fixed (labels and the help title) |
-| R-ctl-8h-CTL8H.1 | uif-16 | Moot; closed by the Profile combine |
+| R-qf-10-QF10.1 | uif-15a | Fixed (labels and the help title) |
+| R-ctl-8h-CTL8H.1 | uif-16b | Moot; closed by the Profile combine |
 | R-weekly-review-2026-10-02-F3 | uif-4 | Preserved, not reopened |
 
 ## Slices
@@ -290,7 +290,8 @@ after: []
 Feedback items: pt3-2026-10-013, -014, -015, -053, -094
 Repo: harness, docs-only. Per #586 D2 this is a design instrument with no operator gate; the
 wireframe-vs-shipped comparison attaches to the closing PR so the operator can audit the result. The
-diagrams are original schematics: boxes and labels, no art or assets copied from any game.
+diagrams are original schematics: boxes and labels, no art or assets copied from any game. These are
+doc criteria, verified by a reviewer lens against the document, not by product tests.
 Measured: `docs/research/retro-rpg-menu-ui-design.md` §1–§9 supply the genre facts and sources.
 `client/e2e/` already drives every screen by accelerator, so CURRENT geometry can be read from the real
 client at master (1280×720) rather than from memory.
@@ -326,24 +327,28 @@ client at master (1280×720) rather than from memory.
 
 ### uif-1 — tokens and token-driven chrome
 category: ux-a11y · severity: MED · size: MODERATE
-touches: client/src/styles.css, client/src/styles.test.ts, client/src/indexShell.smoke.test.ts, client/e2e/uiKit.ts, client/e2e/ui-chrome.spec.ts, docs/DECISIONS.md
+touches: client/src/styles.css, client/src/styles.test.ts, client/src/indexShell.smoke.test.ts, client/src/ui/claimView.test.ts, client/src/ui/renameView.test.ts, client/src/ui/boxView.test.ts, client/src/ui/raisingView.test.ts, client/src/ui/controlsView.test.ts, client/src/ui/helpView.test.ts, client/src/ui/leaderboardView.test.ts, client/src/ui/evolutionView.test.ts, client/e2e/uiKit.ts, client/e2e/ui-chrome.spec.ts, docs/DECISIONS.md
 after: [wf-1]
 Feedback items: pt3-2026-10-030, -055, -089, -094, -170, -171, -173, -175
 Measured: `indexShell.smoke.test.ts` recomputes contrast from the `:root` tokens, and `styles.test.ts`
-`CTL7B-1-FRAME-CSS-ROSTER` pins selectors (declarations on existing selectors are free). The evolution
-overlay's test bans `!important`, element and `#id` selectors sheet-wide. `.mr-frame--prompt`,
-`.mr-status`, `.mr-chip`, `.mr-notice-banner` and `.mr-shell` hold the `font:` px shorthands; `.tactics-*`
-is `uif-11`'s. `a11y.spec.ts` checks frames at 640×240, so the short-window behavior must hold. The e2e
-helper `uiKit.ts` (computed-style and geometry assertions) is created here and imported, never edited,
-by later slices. Decision entry: the token set and frame anatomy as the kit's visual contract.
+`CTL7B-1-FRAME-CSS-ROSTER` pins selectors (declarations on existing selectors are free). The real `styles.css`
+is also read by these view tests: `claimView.test.ts` and `renameView.test.ts` pin `.mr-frame-title` as declaring
+`font-weight` and nothing else, which the type scale must rewrite with the change named; `boxView.test.ts`,
+`raisingView.test.ts`, `controlsView.test.ts`, `helpView.test.ts`, `leaderboardView.test.ts` read it, and
+`evolutionView.test.ts` pins `:root` token scopes and bans `!important`, element and `#id` selectors sheet-wide.
+Every px shorthand in the chrome moves to rem tokens here, so `uif-2`'s root scale reaches it: `.mr-shell`,
+`.mr-frame--bottom`, `.mr-frame--prompt`, `.mr-frame--banner`, `.mr-status` (including its `bottom` offset),
+`.mr-chip`, `.mr-hint-bar`, `.mr-notice-banner`. `.tactics-*` is `uif-11`'s. `a11y.spec.ts` checks frames at
+640×240, so the short-window behavior must hold. The e2e helper `uiKit.ts` (computed-style and geometry
+assertions) is created here; spine slices may append to it, `uif-9` and `uif-10` use it unchanged. Decision
+entry: the token set and frame anatomy as the kit's visual contract.
 
-- **UIF1.1:** THE stylesheet SHALL declare the token set of wf-1's table on `:root`, and the
-  `prefers-contrast: more` block SHALL remain the last rule and override the new color tokens to its
-  higher tier.
+- **UIF1.1:** WHILE a menu screen is open in Chromium, THE computed padding, gap, border, font size and
+  text color of its title bar, nav rows, hint chips and status line SHALL equal the resolved token values of
+  wf-1's table, sampled through `uiKit.ts` on the main menu and one tabbed screen.
 
-- **UIF1.2:** WHILE a menu screen is open in Chromium, THE computed padding, gap, border, font size and
-  text color of its title bar, nav rows, hint chips and status line SHALL equal the resolved token values,
-  sampled through `uiKit.ts` on the main menu and one tabbed screen.
+- **UIF1.2:** WHEN `prefers-contrast: more` is emulated in Chromium, THE sampled text and state colors SHALL
+  resolve to the higher tier, with the block still overriding the new tokens.
 
 - **UIF1.3:** WHEN a nav row is disabled, THE row SHALL render in `--mr-text-disabled` at a measured
   contrast of at least 3:1, and a read-only or non-selectable row SHALL be visually distinct from an
@@ -352,9 +357,8 @@ by later slices. Decision entry: the token set and frame anatomy as the kit's vi
 - **UIF1.4:** THE chrome type SHALL render a distinct hierarchy of title, section header, body and small
   text, with each level differing from the next in size or weight, measured in Chromium.
 
-- **UIF1.5:** WHEN the chrome moves to rem tokens at the default root size, THE menu frame, hint bar and
-  shell insets SHALL keep their shipped geometry within 1 CSS px at 1280×720, so this slice alone is
-  visually neutral apart from the color and type values wf-1 changes on purpose.
+- **UIF1.5:** WHEN the tokens apply at 1280×720, THE menu frame, hint bar and shell insets SHALL match the
+  geometry wf-1's table states for them within 1 CSS px.
 
 - **UIF1.6:** THE existing frame and shell suites (`CTL7B-1-FRAME-CSS-ROSTER`, the qf-1 focus policy, the
   a11y short-window check) SHALL stay green, with any roster change named in a test comment.
@@ -378,8 +382,8 @@ move. Decision entry: hybrid scale authority (#586 D1).
   and `UI_SCALE_MAX`, independent of devicePixelRatio, with no integer snapping.
 
 - **UIF2.3:** WHEN the window resizes or its devicePixelRatio changes, THE resize seam SHALL call the renderer
-  as today and SHALL write `--mr-ui-scale` on `documentElement` from the same `viewportScale` result, read
-  once per event at fire time, with no second scale formula anywhere in the client (#586 D1).
+  as today and SHALL write `--mr-ui-scale` on `documentElement` from one `viewportScale` result, read once per
+  event at fire time (#586 D1), shown by a seam test over fakes.
 
 - **UIF2.4:** WHEN the window grows in Chromium, THE main menu's title font size SHALL grow in proportion to
   `--mr-ui-scale` between sizes while the world stage scale stays an integer `deviceScale` over dpr, at
@@ -388,9 +392,8 @@ move. Decision entry: hybrid scale authority (#586 D1).
 - **UIF2.5:** THE world SHALL keep integer scaling with the visible tile count and the map margin absorbing
   the remainder, and R-ctl-SETRATIO SHALL close as superseded, with no fixed-ratio letterbox box added.
 
-- **UIF2.6:** WHILE no preference is stored and no resize has fired, THE `:root` font size SHALL resolve from a
-  scale of 1, so a boot before the first resize paints readable chrome with no flash of unscaled layout
-  beyond the first frame.
+- **UIF2.6:** WHILE no resize has fired, THE `:root` font size SHALL resolve from a scale of 1, so a boot before
+  the first resize paints readable chrome.
 
 ### uif-3 — kit primitives: TabBar, ContextSheet, scroll cue, EmptyState, RowCard
 category: ux-a11y · severity: MED · size: MODERATE
@@ -402,8 +405,9 @@ literal including it, and `frame.test.ts` pins it (the residual's hidden depende
 `createFrame` mounts tabs inside the titlebar row; the anatomy moves them below it, and `menuView` has no
 tabs so nothing visible moves. `renderTabs` and `navRender.ts` stay as they are. Pointer tab clicks key on
 `[role="tab"][data-nav-tab]`, and e2e keys on strip ids (`#social-tabs`, `#monsters-tab-party`), so the
-TabBar keeps caller-supplied strip ids. Consumers arrive in `uif-6`…`uif-16`, so this slice is unit-tested
-over happy-dom and has no fixture page in product code; its CSS gets its first Chromium proof in `uif-6`.
+TabBar keeps caller-supplied strip ids. Consumers arrive in `uif-6`…`uif-16b`, so this slice is unit-tested
+over happy-dom and has no fixture page in product code. It also adds the kit's CSS (tabs, `.mr-sheet`, `.mr-scroll`
+generalizing qf-16's Rankings cue, `.mr-card`, `.mr-empty`), whose first Chromium proof is `uif-6`.
 
 - **UIF3.1:** THE `createTabBar` primitive SHALL render an LB chip, a `role="tablist"` strip with a
   caller-supplied id and an RB chip in one horizontal row, the chips hidden from assistive technology
@@ -421,27 +425,27 @@ over happy-dom and has no fixture page in product code; its CSS gets its first C
   within a frame rectangle per wf-1's verdict, and the sheet SHALL never cover that slot for any slot position
   (property test).
 
-- **UIF3.5:** THE stylesheet SHALL provide `.mr-scroll` with a hidden scrollbar and a position cue only at an edge
-  with more content, generalizing the Rankings shadows of qf-16, plus the tab, sheet, card and empty-state
-  classes, using tokens only, and Rankings SHALL keep its shipped behavior on the shared rule.
+- **UIF3.5:** THE `createEmptyState` primitive SHALL take a reason and an optional cue and next step (research §8), and
+  THE `createRowCard` primitive SHALL render one visually separated row per entry, both writing only caller text.
 
-- **UIF3.6:** THE `createEmptyState` primitive SHALL take a reason, a cue and a next step, and THE `createRowCard`
-  primitive SHALL render one visually separated row per entry, both writing only caller text.
-
-- **UIF3.7:** WHEN the kit lands, THE dead frame hint slot SHALL be gone from `FrameChrome`, `createFrame` and the
+- **UIF3.6:** WHEN the kit lands, THE dead frame hint slot SHALL be gone from `FrameChrome`, `createFrame` and the
   `menuView` re-find, closing R-qf-12-QF12.3, with the main menu's visible frame unchanged.
 
-### uif-4 — four channels: policy, toast, non-shifting hint line
+### uif-4 — four channels: policy, toast, non-shifting hint line, world sinks
 category: ux-a11y · severity: MED · size: MODERATE
-touches: client/src/ui/feedbackPolicy.ts, client/src/ui/feedbackPolicy.test.ts, client/src/ui/toast.ts, client/src/ui/toast.test.ts, client/src/ui/frame.ts, client/src/ui/frame.test.ts, client/src/main.ts, client/src/main.feedbackCore.test.ts, client/src/main.feedbackI18n.test.ts, client/src/main.dispatch.test.ts, client/src/main.partyFull.test.ts, client/src/styles.css, client/src/styles.test.ts, client/e2e/dialogue.spec.ts, client/e2e/wallet-balance.spec.ts, client/e2e/ui-chrome.spec.ts, docs/DECISIONS.md
+touches: client/src/ui/feedbackPolicy.ts, client/src/ui/feedbackPolicy.test.ts, client/src/ui/toast.ts, client/src/ui/toast.test.ts, client/src/ui/frame.ts, client/src/ui/frame.test.ts, client/src/main.ts, client/src/main.boot.test.ts, client/src/main.zoneCue.test.ts, client/src/main.dialogueEnded.test.ts, client/src/main.input.test.ts, client/src/main.controls.test.ts, client/src/main.dispatch.test.ts, client/src/main.partyFull.test.ts, client/src/styles.css, client/src/styles.test.ts, client/e2e/dialogue.spec.ts, client/e2e/wallet-balance.spec.ts, client/e2e/ui-chrome.spec.ts, docs/DECISIONS.md
 after: [uif-3]
 Feedback items: pt3-2026-10-058, -153
-Measured: `main.ts` sinks are the `statusEl` writes, the `shopFeedback` and
-`tradeFeedback` closures, and `OutcomeLine` for Monsters (qf-2). `.mr-frame-feedback` is an in-flow strip and
-`hidden` when empty (qf-12), so showing it reflows the body. `frame.ts`'s `feedbackAnnouncement` is
-the announcement seam; `announceNow` wraps the live region. `#status` is pinned by `dialogue.spec.ts` (3)
-and `wallet-balance.spec.ts` (1). This slice owns the seam and the world-level and `main.ts` sinks; each
-view's own line moves in its screen slice. Decision entry: the four-channel table.
+Measured: `main.ts` sinks are the `statusEl` writes and `OutcomeLine` for Monsters (qf-2). `#status` text is pinned by
+`main.boot.test.ts`, `main.zoneCue.test.ts` (status writes mirror to `#a11y-live`), `main.dialogueEnded.test.ts`,
+`main.input.test.ts`, `main.controls.test.ts`, `dialogue.spec.ts` (3) and `wallet-balance.spec.ts` (1). `frame.ts`'s
+`feedbackAnnouncement` is the announcement seam; `announceNow` wraps the live region. **Hint-line trap:**
+`.mr-frame-feedback` is an in-flow strip, `hidden` when empty (qf-12), so showing it reflows the body. Plain absolute
+positioning fails: `.mr-frame` has no `position`, so non-shell frames anchor to the screen, and `.mr-shell` is
+`overflow:auto`, so a strip scrolls away at 640×240. Use a zero-layout-height sticky strip or an equivalent that
+survives shell scrolling. `frame.test.ts`'s qf-12 block pins the rule's declarations and class name, so rewrite it with
+the change named; the selector roster forbids new `.mr-frame-feedback…` selectors. `boxView` and `raisingView` reuse the
+class, so they inherit the fix. Decision entry: the four-channel table.
 
 - **UIF4.1:** THE `feedbackPolicy` table SHALL be total over a `MessageKind` union naming every measured message
   kind and SHALL assign each to exactly one of hint line, toast, modal and blocking text box, with the
@@ -452,8 +456,8 @@ view's own line moves in its screen slice. Decision entry: the four-channel tabl
   live region exactly once, with the F3 announcement path (R-weekly-review-2026-10-02-F3) still green.
 
 - **UIF4.3:** WHEN the hint line goes from empty to showing text in Chromium, THE frame body's bounding box SHALL
-  not change by any amount and the last list row SHALL stay reachable above the strip via scroll padding,
-  while an empty line stays collapsed (#586 D5).
+  not change by any amount at 1280×720 and at 640×240, THE strip SHALL stay visible while the shell scrolls, and the
+  last list row SHALL stay reachable above it, while an empty line stays collapsed (#586 D5).
 
 - **UIF4.4:** WHEN a Monsters sheet evolve, nickname or party-slot action is rejected or the party is full, THE
   message SHALL reach the player through the toast channel while a frame is open, closing
@@ -462,43 +466,70 @@ view's own line moves in its screen slice. Decision entry: the four-channel tabl
 - **UIF4.5:** WHEN a world-level rejection or disconnect message fires, THE message SHALL use its policy channel, and
   a late settle after its frame closed SHALL paint nothing stale (the existing per-sink guard, kept).
 
-- **UIF4.6:** THE policy table SHALL mark each kind `mustAct` or not, and no `mustAct` kind SHALL map to toast unless
-  it is backed by persistent on-screen state named in its row, so a toast is never the sole carrier of an action
-  the player must take (typecheck plus a table unit test).
+- **UIF4.6:** THE policy's unit test SHALL hold a literal list of the action-required kinds and assert none of them
+  maps to toast unless its row names the persistent on-screen state that also carries it.
+
+### uif-4b — every per-view line through the one seam
+category: ux-a11y · severity: MED · size: MODERATE
+touches: client/src/main.ts, client/src/main.feedbackCore.test.ts, client/src/main.feedbackI18n.test.ts, client/src/main.input.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.dispatch.test.ts, client/src/main.remap.test.ts, client/src/ui/careAction.ts, client/src/ui/careAction.test.ts, client/src/ui/shopView.ts, client/src/ui/shopView.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/renameView.ts, client/src/ui/renameView.test.ts, client/src/ui/renameView.i18n.test.ts, client/src/ui/tradeProposeView.ts, client/src/ui/tradeProposeView.test.ts, client/src/ui/tradeProposeView.i18n.test.ts, client/src/ui/controlsView.ts, client/src/ui/controlsView.test.ts, client/src/indexShell.smoke.test.ts, client/index.html, client/e2e/trade.spec.ts, client/e2e/pvp.spec.ts, client/e2e/pvp-side-b.spec.ts, client/e2e/remap.spec.ts, client/e2e/rename.spec.ts, client/e2e/monster-privacy.spec.ts, client/e2e/ui-feedback.spec.ts
+after: [uif-4]
+Feedback items: pt3-2026-10-058, -089
+Measured: the closures `shopFeedback` and `tradeFeedback` plus the `tradeProposeView`, `renameView` and `controlsView` sinks live in
+`main.ts`, and the sketch binds "restyle once at the seam, no per-view channel forks", so they all move here and the screen slices
+inherit them. The static lines `#shop-feedback`, `#trade-feedback`, `#pvp-challenge-feedback`, `#tradepropose-feedback` and `#rename-feedback`
+sit in `index.html` and are pinned by `indexShell.smoke.test.ts`, `main.feedbackCore.test.ts`, `main.feedbackI18n.test.ts`,
+`main.input.test.ts` and `main.reconnectStack.test.ts`; `rename-feedback` is read by `monster-privacy.spec.ts` and `pvp-side-b.spec.ts`, and
+`controls-feedback` by `remap.spec.ts`. A line whose kinds all move to toast retires with its roster row, named; a line that keeps a hint
+kind stays. The pgcc-a B7 rule (never claim undelivered success) and qf-2's care routing stand. Monsters and Inventory success lines are
+painted by their views and move in `uif-7` and `uif-8`.
+
+- **UIF4B.1:** WHEN a shop, trade, challenge, rename, trade-propose or controls action settles, THE message SHALL use its `feedbackPolicy`
+  channel through the one seam, with no view choosing its own channel.
+
+- **UIF4B.2:** WHEN one of those messages shows in Chromium, THE owning frame's body SHALL not move by any amount (058).
+
+- **UIF4B.3:** WHEN a message fires after its overlay closed, IT SHALL paint nothing stale, as the per-sink guards pin today.
+
+- **UIF4B.4:** WHEN a toast-channel message fires, IT SHALL be announced via the live region once, and hint-kind lines SHALL keep their
+  one-announcement-per-change rule.
+
+- **UIF4B.5:** WHEN this slice lands, EVERY message kind in the policy table SHALL be reachable from a named sink, and a retired static line
+  SHALL be gone from `index.html` and `indexShell`'s roster with the change named.
 
 ### uif-5 — pointer: close-then-route and the wheel
 category: ux-a11y · severity: MED · size: LIGHT
-touches: client/src/input/pointerSource.ts, client/src/input/pointerSource.test.ts
-after: [uif-4]
+touches: client/src/input/pointerSource.ts, client/src/input/pointerSource.test.ts, client/src/ui/reachability.test.ts, client/src/ui/menuView.test.ts
+after: [uif-4b]
 Feedback items: pt3-2026-10-040, -046
-Measured: `PointerSource.#onClick` routes chips, then native and `[data-pointer-own]`, then by `deps.top()`. It only
-presses virtual buttons, and `press` is synchronous through the router, so the DOM after B is fresh. World sheets
-report `top() === 'other'`. There is no wheel listener. The grid and list seek logic stands. `CTL15.2` lives in
-`pointerSource.test.ts`. A click on the canvas routed after a world-sheet close would press A and reopen the same
-sheet, which is why that case closes only. This slice is unit-tested over happy-dom; the real-browser proof lands
-with the first consumer (`uif-7`).
+Measured: `PointerSource.#onClick` handles dialogue choices, chips and native controls, then `deps.top()`; all those branches return early,
+and a native control's own handler fires before the bubble reaches `#game-screen`, so the close step belongs in the capture phase beside
+`#swallowClick`. `press` is synchronous through the router, and `renderNav` reuses nodes by key, so the target survives the close. World sheets
+report `top() === 'other'`, whose branch ignores clicks; routing inside a `[data-context-sheet]` happens before the `top()` switch, which is what
+lets `uif-12`'s rows work without another pointer edit. There is no wheel listener today, and `preventDefault` needs `{ passive: false }`.
+Help's Introduction and Journal text have no nav rows, so the wheel keeps native scrolling there. `CTL15.2` lives in `pointerSource.test.ts`;
+`reachability.test.ts` and `menuView.test.ts` drive the real source. A canvas click routed after a world-sheet close would press A and reopen
+the same sheet, hence close-only. This slice is unit-tested over happy-dom; the real-browser proof lands with the first consumer (`uif-7`).
 
-- **UIF5.1:** WHEN a click or tap lands outside an open `[data-context-sheet]` while a frame is on top, THE source
-  SHALL press B until no sheet shows (bounded by a small depth) and SHALL then route the same event as if no sheet
-  had been open, and the `CTL15.2` pin SHALL be rewritten to encode this rule with the change named (046).
+- **UIF5.1:** WHEN a click or tap lands outside an open `[data-context-sheet]` while a frame is on top, THE source SHALL press B in the capture
+  phase until no sheet shows (bounded by a small depth) and SHALL then let the same event route as if no sheet had been open, a native
+  control keeping its native click, and the `CTL15.2` pin SHALL be rewritten to encode this rule with the change named (046).
 
-- **UIF5.2:** WHEN a click lands inside an open sheet, THE source SHALL route it to the sheet's row exactly as a
-  top-frame row today; a hint chip SHALL press its own button with no extra close; a native control outside the
-  sheet SHALL close the sheet and keep its native click.
+- **UIF5.2:** WHEN a click lands inside an open sheet, THE source SHALL route it to the sheet's row through the existing seek, for a frame's sheet
+  and for a world sheet alike, and a hint chip SHALL press its own button with no extra close.
 
-- **UIF5.3:** WHEN a click lands on the world canvas while a world sheet shows, THE source SHALL close the sheet and
+- **UIF5.3:** WHEN a click lands anywhere but a hint chip or inside the sheet while a world sheet shows, THE source SHALL close the sheet and
   SHALL NOT press A, so the same sheet cannot immediately reopen.
 
-- **UIF5.4:** WHEN a wheel event lands on the game screen while a frame is on top, THE source SHALL prevent the
-  native scroll and SHALL press Up or Down once per notch through a pure accumulator handling line and pixel delta
-  modes, and SHALL press nothing at the bare world or while capture or typing owns input (040).
+- **UIF5.4:** WHEN a wheel event lands on a frame's nav rows while that frame is on top, THE source SHALL prevent the native scroll and SHALL press Up
+  or Down once per notch through a pure accumulator handling line and pixel delta modes; over a region with no nav rows it SHALL leave native
+  scrolling alone, and it SHALL press nothing at the bare world or while capture or typing owns input (040).
 
-- **UIF5.5:** THE source SHALL keep game logic free of coordinates: the wheel and close paths SHALL press only virtual
-  buttons, and right-click, long-press and the seek probe SHALL behave as pinned by the existing suite.
+- **UIF5.5:** THE wheel and close paths SHALL press through `deps.press` only, and right-click, long-press and the seek probe SHALL behave as the existing
+  suite pins them.
 
 ### uif-6 — Monsters: layout, growth, pseudo-scroll, bound tab
 category: ux-a11y · severity: MED · size: MODERATE
-touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/screens/monstersScreen.ts, client/src/ui/screens/monstersScreen.test.ts, client/src/ui/screens/types.ts, client/src/main.ts, client/src/main.accel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/ui-monsters.spec.ts
+touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/screens/monstersScreen.ts, client/src/ui/screens/monstersScreen.test.ts, client/src/ui/screens/types.ts, client/src/main.ts, client/src/main.accel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/uiKit.ts, client/e2e/ui-monsters.spec.ts
 after: [uif-5]
 Feedback items: pt3-2026-10-038, -039, -045, -060, -169
 Measured: `openMenuTarget` synthesizes an LB after opening because `boxView`'s `OPENING` paint is on Storage;
@@ -522,7 +553,7 @@ and the catalog roster.
   the cursor in view, the wheel SHALL move the cursor, and the position cue SHALL show (039, 040).
 
 - **UIF6.5:** WHEN this slice lands, THE in-panel Party and Storage headings SHALL be gone, closing R-qf-10-QF10.2, with
-  panel spacing from tokens and no inline `cssText` left on the non-sheet parts.
+  the panel's computed spacing and colors equal to the tokens, measured in Chromium.
 
 - **UIF6.6:** WHEN Storage holds no monsters, THE panel SHALL show EmptyState with reason, cue and next step, in en and
   fr, with the frame and tabs kept.
@@ -532,13 +563,13 @@ and the catalog roster.
 
 ### uif-7 — Monsters: sheet, Back/Close, Summary page, outcomes
 category: ux-a11y · severity: MED · size: MODERATE
-touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/monstersModel.ts, client/src/ui/monstersModel.test.ts, client/src/ui/screens/monstersScreen.ts, client/src/ui/screens/monstersScreen.test.ts, client/src/main.controls.test.ts, client/src/main.feedbackCore.test.ts, client/src/main.partyFull.test.ts, client/src/ui/reachability.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/ui-monsters.spec.ts, client/e2e/menu-flow.spec.ts, client/e2e/pointer.spec.ts, client/e2e/evolution.spec.ts, docs/DECISIONS.md
+touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/monstersModel.ts, client/src/ui/monstersModel.test.ts, client/src/ui/screens/monstersScreen.ts, client/src/ui/screens/monstersScreen.test.ts, client/src/main.controls.test.ts, client/src/main.feedbackCore.test.ts, client/src/main.partyFull.test.ts, client/src/ui/reachability.test.ts, client/src/ui/screens/index.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/uiKit.ts, client/e2e/ui-monsters.spec.ts, client/e2e/menu-flow.spec.ts, client/e2e/pointer.spec.ts, client/e2e/evolution.spec.ts, docs/DECISIONS.md
 after: [uif-6]
 Feedback items: pt3-2026-10-046, -047, -049, -053, -058, -104
 Measured: `SHEET_ACTIONS`/`sheetLayout` are in `monstersModel.ts`; `sheetOf` keeps the sheet painted under sub-lists, so
 it changes to one sheet at a time. `#monsters-sheet-name` is pinned by `main.partyFull.test.ts`, `reachability.test.ts`,
 `pointer.spec.ts` and `menu-flow.spec.ts`, and stays. A Close row changes the Up wrap target from Move, so
-`menu-flow.spec.ts` Up steps and any wrap test are the known churn. Summary today is a pane under the sheet. `kit.sheet.close`
+`menu-flow.spec.ts` Up steps and `screens/index.test.ts` `CTL8B-4-HOST-FLOW` are known churn. Summary today is a pane under the sheet. `kit.sheet.close`
 and `kit.sheet.back` land here and are reused by later slices with no further catalog edit. Decision entry: the sheet verdict.
 
 - **UIF7.1:** WHEN A opens a monster's sheet, THE sheet SHALL render as the ContextSheet per wf-1's placement verdict
@@ -556,7 +587,7 @@ and `kit.sheet.back` land here and are reused by later slices with no further ca
 - **UIF7.5:** WHEN a click lands outside the open sheet in Chromium, THE sheet SHALL close and the click SHALL land on its
   target, proven for another slot and for a tab (046).
 
-- **UIF7.6:** WHEN care, feed or move resolves, THE outcome SHALL appear through the toast channel with no layout shift (058),
+- **UIF7.6:** WHEN a feed or move succeeds, THE view's success line SHALL appear through the toast channel with no layout shift (058),
   never claiming success before the batch shows it, as pgcc-a B7 pins.
 
 ### uif-8 — Inventory
@@ -574,23 +605,25 @@ the menu cursor on `bag`; the nav key stays.
 - **UIF8.2:** WHEN A opens an item's sheet or the Feed picker, IT SHALL render as the ContextSheet with a last Close or Back row
   whose A acts like B.
 
-- **UIF8.3:** WHEN a feed resolves or a battle-only item is refused, THE message SHALL use its policy channel with no layout
+- **UIF8.3:** WHEN a feed succeeds or a battle-only item is refused, THE view's line SHALL use its policy channel with no layout
   shift, and the raising feedback gate SHALL stay green.
 
 - **UIF8.4:** WHEN a pocket is empty, THE panel SHALL show EmptyState with reason, cue and next step, in en and fr.
 
-- **UIF8.5:** WHEN this slice lands, `raisingView` SHALL carry no inline spacing, border or color literal, and its computed
-  spacing SHALL match Monsters' at the same window size, measured in Chromium through `uiKit.ts`.
+- **UIF8.5:** WHEN Inventory shows at the size Monsters was measured, ITS computed spacing, borders and colors SHALL match Monsters',
+  through `uiKit.ts` in Chromium.
 
 ### uif-9 — Social: tabs, sheets, row cards, spacing
 category: ux-a11y · severity: MED · size: MODERATE
-touches: client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/leaderboardView.ts, client/src/ui/leaderboardView.test.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/screens/socialScreen.ts, client/src/ui/screens/socialScreen.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/e2e/ui-social.spec.ts, client/e2e/trade.spec.ts, client/e2e/pvp.spec.ts
+touches: client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/leaderboardView.ts, client/src/ui/leaderboardView.test.ts, client/src/ui/leaderboardView.i18n.test.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/screens/socialScreen.ts, client/src/ui/screens/socialScreen.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/reachability.test.ts, client/e2e/ui-social.spec.ts
 after: [uif-7]
 Feedback items: pt3-2026-10-086, -089, -169, -172
-Measured: `socialPart(chrome, 'social-tabs', 'div')` is the shared chrome hosted by whichever panel shows; e2e pins
-`#social-tabs` and `#pvp-challenge-overlay #social-tabs`, which stay. The sheet's `confirm` phase holds Yes/No on No.
-`trade-feedback` and `pvp-challenge-feedback` are the view lines. `ranked-forfeit.spec.ts` and `pvp-side-b.spec.ts` drive the
-sheet through `controls.ts`, unchanged by an appended row. No catalog, `main.ts` or `styles.css` edit: `kit.sheet.back` exists.
+Measured: `socialPart(chrome, 'social-tabs', 'div')` is the shared chrome hosted by whichever panel shows; e2e pins `#social-tabs` and
+`#pvp-challenge-overlay #social-tabs`, which stay. `#social-sheet` and `social-prompt` are pinned by `socialScreen.boot.test.ts` and
+`reachability.test.ts`, which also pins exact sheet rows, so appending Back rewrites those with the change named. `ranked-forfeit.spec.ts` and
+`pvp-side-b.spec.ts` drive the sheet through `controls.ts`, unchanged by an appended row. Rankings' cue moves to the shared `.mr-scroll` rule from
+`uif-3`. No catalog, `main.ts`, `styles.css` or feedback edit: `kit.sheet.back` exists and `uif-4b` moved the sinks. If a correct build needs one of
+those, that is a STOP: it would break this slice's fan-out.
 
 - **UIF9.1:** WHEN Social shows, ITS tabs SHALL render through the one TabBar held by the shared chrome, top-anchored on all four
   panels with the same geometry, the Players-to-Rankings panel switch moving nothing above the body.
@@ -603,20 +636,21 @@ sheet through `controls.ts`, unchanged by an appended row. No catalog, `main.ts`
 - **UIF9.4:** THE Challenges tab SHALL list each challenge as a RowCard with visible separation, and the Trades tab's migration
   SHALL remain deferred to M-trade-sessions `ts-3`, which rebuilds that tab (086).
 
-- **UIF9.5:** WHEN a trade or challenge action settles, THE message SHALL use its policy channel with no layout shift, and a
-  trade or challenge request SHALL stay a banner and world sheet, never a frame.
+- **UIF9.5:** WHILE Rankings overflows, ITS position cue and read-only treatment SHALL behave as qf-16 pinned them on the shared rule, and a trade
+  or challenge request SHALL stay a banner and world sheet, never a frame.
 
 ### uif-10 — Shop, Heal, Journal, Trade propose
 category: ux-a11y · severity: LOW · size: MODERATE
-touches: client/src/ui/shopView.ts, client/src/ui/shopView.test.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/shopScreen.test.ts, client/src/ui/healView.ts, client/src/ui/healView.test.ts, client/src/ui/questLogView.ts, client/src/ui/questLogView.test.ts, client/src/ui/questLogView.i18n.test.ts, client/src/ui/tradeProposeView.ts, client/src/ui/tradeProposeView.test.ts, client/src/ui/tradeProposeView.i18n.test.ts, client/e2e/ui-screens.spec.ts, client/e2e/trade-propose.spec.ts
+touches: client/src/ui/shopView.ts, client/src/ui/shopView.test.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/shopScreen.test.ts, client/src/ui/healView.ts, client/src/ui/healView.test.ts, client/src/ui/healView.i18n.test.ts, client/src/ui/questLogView.ts, client/src/ui/questLogView.test.ts, client/src/ui/questLogView.i18n.test.ts, client/src/ui/tradeProposeView.ts, client/src/ui/tradeProposeView.test.ts, client/src/ui/tradeProposeView.i18n.test.ts, client/e2e/ui-screens.spec.ts
 after: [uif-7]
 Feedback items: pt3-2026-10-030, -055, -094
-Measured: `shop-tabs` strip plus `qty` and `confirm` phases in `shopScreen.ts`; `shop-feedback`, `tradepropose-feedback`; Journal's
-`#quest-log-empty` and `#quest-log-title` from qf-4, with `indexShell`'s static roster kept. The dialogue box is the blocking
-text-box channel and is left as shipped (`dialogueView` is not touched). Reuses existing catalog keys and `kit.sheet.*`.
+Measured: `shop-tabs` strip plus `qty` and `confirm` phases in `shopScreen.ts`; Journal's `#quest-log-empty` and `#quest-log-title` from qf-4, with
+`indexShell`'s static roster kept and `journal.empty` as one sentence, so EmptyState takes it as the reason. The dialogue box is the blocking text-box
+channel and stays as shipped (`dialogueView` is not touched). Views are built in `main.ts` with constructor callbacks, so kit parts are imported, never
+injected: a new constructor dependency is a STOP. No catalog, `main.ts`, `styles.css` or feedback edit.
 
-- **UIF10.1:** WHEN Shop shows, ITS tabs SHALL render through the TabBar, its Buy/Sell confirm SHALL use the ContextSheet confirm
-  variant with the shipped default, and its outcomes SHALL use their policy channel with no layout shift.
+- **UIF10.1:** WHEN Shop shows, ITS tabs SHALL render through the TabBar and its Buy/Sell confirm SHALL use the ContextSheet confirm
+  variant with the shipped default.
 
 - **UIF10.2:** WHEN the Journal has no quests, THE screen SHALL render through EmptyState using the existing copy, with the title kept
   (the first EmptyState consumer the sketch names).
@@ -624,8 +658,8 @@ text-box channel and is left as shipped (`dialogueView` is not touched). Reuses 
 - **UIF10.3:** THE Shop, Heal, Journal and Trade-propose screens SHALL match the frame anatomy and token spacing through `uiKit.ts`, with
   their lists growing and scrolling per the kit.
 
-- **UIF10.4:** WHEN the trade-propose wizard reports a refusal, THE message SHALL use its policy channel, with no change to what the
-  wizard sends.
+- **UIF10.4:** WHEN the kit is adopted on these screens, THE trade-propose wizard SHALL send what it sends today, Shop's quantity row SHALL keep its
+  Left/Right clamping, and axe SHALL stay clean on all four.
 
 ### uif-11 — Tactical screens on the kit; "Items"
 category: ux-a11y · severity: MED · size: MODERATE
@@ -680,17 +714,17 @@ Measured: `main.ts`'s frame tick renders `#interact-sheet` via `renderNav` under
 
 ### uif-13 — Controls on the kit; the text-size setting
 category: ux-a11y · severity: MED · size: MODERATE
-touches: client/src/ui/displayPrefs.ts, client/src/ui/displayPrefs.test.ts, client/src/ui/controlsView.ts, client/src/ui/controlsView.test.ts, client/src/ui/screens/optionsScreen.ts, client/src/ui/screens/optionsScreen.test.ts, client/src/main.ts, client/src/main.remap.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/styles.css, client/e2e/remap.spec.ts, client/e2e/ui-controls.spec.ts
+touches: client/src/ui/displayPrefs.ts, client/src/ui/displayPrefs.test.ts, client/src/ui/controlsView.ts, client/src/ui/controlsView.test.ts, client/src/ui/screens/optionsScreen.ts, client/src/ui/screens/optionsScreen.test.ts, client/src/main.ts, client/src/main.remap.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/remap.spec.ts, client/e2e/ui-controls.spec.ts
 after: [uif-12]
 Feedback items: pt3-2026-10-031, -094, -169
 Measured: `CONTROLS_LAYOUT` is `tabs([...])` in `optionsScreen.ts`, and `controlsModel.CONTROLS_TABS` drives only binding rows, so
 Display is added at the screen layer and `controlsModel` stays. `bindingStore.ts` is the persistence precedent: a total
-parse-don't-validate read and a throw-safe `localStorage` accessor. `controls-feedback` is pinned by `remap.spec.ts`. The Reset-all
+parse-don't-validate read and a throw-safe `localStorage` accessor. The Reset-all
 confirm uses `confirmLayout`. Controls is disabled over a battle (`SCREEN_POLICY`), so text size is not changed mid-battle. Options
-dies in `uif-15` per #586 D3, so Display lives here.
+dies in `uif-15b` per #586 D3, so Display lives here.
 
-- **UIF13.1:** WHEN Controls shows, ITS tabs SHALL render through the TabBar, the Reset-all prompt SHALL use the ContextSheet confirm
-  variant with its shipped default of No, and a capture or Clear outcome SHALL use its policy channel.
+- **UIF13.1:** WHEN Controls shows, ITS tabs SHALL render through the TabBar, and the Reset-all prompt SHALL use the ContextSheet confirm
+  variant with its shipped default of No.
 
 - **UIF13.2:** WHEN the player opens Controls, THE screen SHALL offer a Display tab with text-size steps Normal, Large and Extra large
   (×1, ×1.5, ×2) navigable by D-pad and A (#586 D1), each label in en and fr.
@@ -709,8 +743,9 @@ category: ux-a11y · severity: MED · size: MODERATE
 touches: client/src/ui/helpModel.ts, client/src/ui/helpModel.test.ts, client/src/ui/helpView.ts, client/src/ui/helpView.test.ts, client/src/ui/helpView.i18n.test.ts, client/src/ui/screens/helpScreen.ts, client/src/ui/screens/helpScreen.test.ts, client/src/ui/screens/types.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/ui/a11yCopy.ts, client/src/ui/a11yCopy.test.ts, client/src/ui/questLogView.test.ts, client/src/ui/reachability.test.ts, client/src/ui/menuModel.test.ts, client/src/ui/claimView.ts, client/src/main.ts, client/src/main.help.test.ts, client/src/main.chips.test.ts, client/src/main.dispatch.test.ts, client/src/main.input.test.ts, client/src/indexShell.smoke.test.ts, client/index.html, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/a11y.spec.ts, client/e2e/ui-help.spec.ts, ARCHITECTURE.md
 after: [uif-13]
 Feedback items: pt3-2026-10-110, -113, -114
-Measured: `HELP_TABS` are `screen`, `controls` and `goals`; the All controls rows and `help.note.keysVsButtons` retire with the tab
-(DEAD-KEY). `#help-controls` and `#help-goals` are static, pinned by `indexShell.smoke.test.ts`'s inner-id roster. `helpScreen` has one
+Measured: `HELP_TABS` are `screen`, `controls` and `goals`. Disposition: `screen` becomes Introduction (its hint-chip rows retire; the hint bar
+already shows them), `controls` retires with `help.note.keysVsButtons` (DEAD-KEY), and `goals` becomes Encyclopedia, with the three `help.goal.*` lines
+retired into entries. `#help-controls` and `#help-goals` are static, pinned by `indexShell.smoke.test.ts`'s inner-id roster, and rewrite once. `helpScreen` has one
 item per tab and acts on nothing today; a phase state is new. A new `Command` arm reaches `dispatch`'s exhaustive switch, and F9's
 bundle path in `main.ts` is the action. `R-ctl-14-STALECMT`'s named comment sites have drifted but are grep-findable: `claimView.ts`,
 `a11yCopy.ts`, `menuModel.test.ts`, `main.chips.test.ts`, `index.html`, `reachability.test.ts`, `ARCHITECTURE.md`. Encyclopedia entries are
@@ -736,102 +771,121 @@ the sketch; each new id costs about 25 pins, and an in-frame modal gives the sam
 - **UIF14.6:** WHEN a tab changes or a detail opens, THE change SHALL be announced via the live region, closing R-ctl-14-HELPA11Y, with
   keyless-row rendering moot now its tab is gone.
 
-- **UIF14.7:** WHEN this slice lands, R-ctl-14-STALECMT SHALL be closed by comment corrections at its named sites, with the generated-from-
-  bindings hint machinery untouched and axe on How to Play still clean.
+- **UIF14.7:** WHEN this slice lands, axe on How to Play SHALL stay clean, the hint bar's generated chips SHALL be unchanged, and R-ctl-14-STALECMT
+  SHALL be closed by comment corrections at its named sites (review-attested, no test).
 
-### uif-15 — Menu IA: Social opens directly, Options dies, labels land
-category: ux-a11y · severity: MED · size: HEAVY
-touches: client/src/ui/menuModel.ts, client/src/ui/menuModel.test.ts, client/src/ui/screens/mainMenuScreen.ts, client/src/ui/screens/mainMenuScreen.test.ts, client/src/ui/menuView.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/main.ts, client/src/main.menu.test.ts, client/src/main.accel.test.ts, client/src/main.notices.test.ts, client/src/main.controls.test.ts, client/src/main.hintBar.test.ts, client/src/main.help.test.ts, client/src/main.dispatch.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.remap.test.ts, client/src/ui/contextStack.test.ts, client/src/ui/reachability.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/raisingView.ts, client/src/ui/controlsModel.ts, client/src/ui/a11yCopy.ts, client/src/ui/a11yCopy.test.ts, client/src/ui/frame.test.ts, client/src/ui/helpView.i18n.test.ts, client/src/ui/evolutionNotice.i18n.test.ts, client/src/ui/dialogueView.i18n.test.ts, client/src/ui/boxView.test.ts, client/src/ui/leaderboardView.i18n.test.ts, client/src/ui/privacyView.i18n.test.ts, client/src/ui/tradeView.test.ts, client/src/ui/errorOverlayView.i18n.test.ts, client/src/ui/evolutionView.test.ts, client/src/ui/shopView.test.ts, client/src/ui/tradeProposeView.i18n.test.ts, client/src/ui/claimView.i18n.test.ts, client/src/ui/raisingView.test.ts, client/src/ui/pvpView.test.ts, client/src/ui/renameView.i18n.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/i18n/resolver.test.ts, client/e2e/a11y.spec.ts, client/e2e/menu-flow.spec.ts, client/e2e/remap.spec.ts, client/e2e/battle-dpad.spec.ts, client/e2e/encounter-battle.spec.ts, client/e2e/ui-menu.spec.ts, docs/PLAYTEST.md
+### uif-15a — Labels: Inventory, How to Play
+category: content · severity: LOW · size: MODERATE
+touches: client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/i18n/resolver.test.ts, client/src/ui/a11yCopy.ts, client/src/ui/a11yCopy.test.ts, client/src/ui/menuModel.test.ts, client/src/ui/menuView.test.ts, client/src/ui/screens/mainMenuScreen.test.ts, client/src/main.accel.test.ts, client/src/main.controls.test.ts, client/src/main.notices.test.ts, client/src/ui/helpView.i18n.test.ts, client/src/ui/evolutionNotice.i18n.test.ts, client/src/ui/dialogueView.i18n.test.ts, client/src/ui/boxView.test.ts, client/src/ui/leaderboardView.i18n.test.ts, client/src/ui/privacyView.i18n.test.ts, client/src/ui/tradeView.test.ts, client/src/ui/errorOverlayView.i18n.test.ts, client/src/ui/evolutionView.test.ts, client/src/ui/shopView.test.ts, client/src/ui/tradeProposeView.i18n.test.ts, client/src/ui/claimView.i18n.test.ts, client/src/ui/raisingView.test.ts, client/src/ui/pvpView.test.ts, client/src/ui/renameView.i18n.test.ts, client/e2e/a11y.spec.ts
 after: [uif-14]
+Feedback items: pt3-2026-10-025
+Measured: this is R-qf-10-QF10.1's pin set, values only: "Controls & Goals" in the listed `*View` tests and `resolver.test.ts`, "Bag" in `menuView`, `menuModel`,
+`mainMenuScreen`, `helpView.i18n`, `main.accel`, `main.controls`, `main.notices`. Catalog keys (`menu.bag.*`, `controls.accel.bag`) keep their ids, so nav keys
+and e2e `bag` stay. The sketch's "not terminology renames" assumed qf-10 landed these; it did not, and #586 D3's ruled menu names them. Scope is exactly this
+one wording set; a further rename stays out.
+
+- **UIF15A.1:** WHEN the main menu shows, THE entries SHALL read Monsters, Inventory, Journal, Social, Profile, Options, Close in en with their fr equivalents, until
+  `uif-15b` moves the last group, closing R-qf-10-QF10.1 together with the next two criteria.
+
+- **UIF15A.2:** THE help frame's title and a11y label SHALL read How to Play in en and its fr equivalent.
+
+- **UIF15A.3:** WHEN the Inventory entry is disabled over a battle, THE reason SHALL point at the battle's Items command (#586 D4), and no player-facing "Bag" SHALL remain
+  in the menu, the shortcuts row or the party-full line.
+
+### uif-15b — Menu IA: Social opens directly, Options dies
+category: ux-a11y · severity: MED · size: MODERATE
+touches: client/src/ui/menuModel.ts, client/src/ui/menuModel.test.ts, client/src/ui/screens/mainMenuScreen.ts, client/src/ui/screens/mainMenuScreen.test.ts, client/src/ui/menuView.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/main.ts, client/src/main.menu.test.ts, client/src/main.accel.test.ts, client/src/main.social.test.ts, client/src/main.notices.test.ts, client/src/main.controls.test.ts, client/src/main.hintBar.test.ts, client/src/main.help.test.ts, client/src/main.dispatch.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.remap.test.ts, client/src/ui/contextStack.test.ts, client/src/ui/reachability.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/a11y.spec.ts, client/e2e/menu-flow.spec.ts, client/e2e/remap.spec.ts, client/e2e/battle-dpad.spec.ts, client/e2e/encounter-battle.spec.ts, client/e2e/ui-menu.spec.ts, docs/PLAYTEST.md
+after: [uif-15a]
 Feedback items: pt3-2026-10-025, -079, -102, -104, -109, -111
-Measured: `MenuTarget` is `Extract<OverlayId, …>` and must admit `social`; `battleReason` reads `SCREEN_POLICY[row.target]`, and
-`social` is not battleSafe, so Social stays disabled over a battle. `socialScreen.init` already opens on requested, oldest-waiting,
-remembered or Players, and `boundSocialTab` already carries a requested tab. `ACCEL_PATHS` U, P, L and Y are data rows; `AccelPath.tab`
-widens to include the Social tabs (data only, semantics untouched). `EXPECTED_PATHS` (`router.test.ts`) rewrites those four rows once.
-`e2e` uses `menu-root-social`, `menuSocial-root-` and `menuTo(page, 'options')`. The label half is R-qf-10-QF10.1's measured pin set
-("Controls & Goals" in the listed `*View` tests + `resolver.test.ts`; "Bag" in `menuView`, `menuModel`, `mainMenuScreen`, `frame`, `helpView.i18n`,
-`main.accel`, `main.controls`, `main.notices`). Catalog keys (`menu.bag.*`) keep their ids, so nav keys and e2e `bag` stay; values change. This
-slice leaves the Profile group for `uif-16`, which removes the last sub-list. Size is mechanical, not logical; a builder may land the labels as
-increment A and the IA as increment B.
+Measured: `MenuTarget` is `Extract<OverlayId, …>` and must admit `social`; `battleReason` reads `SCREEN_POLICY[row.target]`, and `social` is not battleSafe, so Social
+stays disabled over a battle. `socialScreen.init` already opens on requested, oldest-waiting, remembered or Players, and `boundSocialTab` already carries a requested tab.
+`ACCEL_PATHS` U, P, L and Y are data rows, but `AccelPath.tab` is typed `MonstersTab` and `main.ts`'s `applyMenuStep`/`openMenuTarget` consume it as the Monsters tab, so
+carrying a Social tab is a `main.ts` edit (router stays data only). `EXPECTED_PATHS` (`router.test.ts`) rewrites those four rows once. `main.social.test.ts`'s `openSocialLeaf`
+walks the sub-list. E2e uses `menu-root-social`, `menuSocial-root-` and `menuTo(page, 'options')`. Retiring `menu.social.{trades,challenges,rankings}.*` and `menu.options.*` hits
+DEAD-KEY and the roster. `hintBarModel` and `optionsScreen` name no group, so they stay. This slice leaves the Profile group for `uif-16b`.
 
-- **UIF15.1:** WHEN Social is chosen from the main menu, THE client SHALL open the 4-tab Social frame directly on its default or
-  remembered tab with no sub-list (#586 D3, 079), and over a battle the entry SHALL stay disabled with its reason.
+- **UIF15B.1:** WHEN Social is chosen from the main menu, THE client SHALL open the 4-tab Social frame directly on its default or remembered tab with no sub-list (#586 D3,
+  079), and over a battle the entry SHALL stay disabled with its reason.
 
-- **UIF15.2:** THE main menu SHALL list How to Play and Controls at the root, the Options sub-list and its frame id SHALL be gone
-  (#586 D3, 109, 111), and Close SHALL stay the last entry (025, 104).
+- **UIF15B.2:** THE main menu SHALL list How to Play and Controls at the root, the Options sub-list and its menu level SHALL be gone (#586 D3, 109, 111), and Close SHALL stay the
+  last entry (025, 104).
 
-- **UIF15.3:** WHEN an accelerator U, P, L or Y fires, THE same frame and tab SHALL open as before through the new path, with
-  `EXPECTED_PATHS` rewritten once and its row changes named in a comment.
+- **UIF15B.3:** WHEN an accelerator U, P, L or Y fires, THE same frame and tab SHALL open as before through the new path, with `EXPECTED_PATHS` rewritten once and its row changes
+  named in a comment.
 
-- **UIF15.4:** WHEN the labels land, THE entries SHALL read Monsters, Inventory, Journal, Social, Profile, How to Play, Controls, Close in
-  en with their fr equivalents, the help title and a11y label SHALL read How to Play, and the disabled reason SHALL name "Items",
-  closing R-qf-10-QF10.1.
+- **UIF15B.4:** WHEN reachability is computed, EVERY accelerator target SHALL be within the existing 7-press bound over the REAL `mainMenuStep`, with the design-table counts
+  updated once and named.
 
-- **UIF15.5:** WHEN reachability is computed, EVERY accelerator target SHALL be within the existing 7-press bound over the REAL
-  `mainMenuStep`, with the design-table counts updated once and named.
+- **UIF15B.5:** WHEN the player backs out of any screen opened from the root, THE menu SHALL show again with its cursor on that entry, and the required flow (menu → screen →
+  back → another screen → world) SHALL pass in Chromium in `ui-menu.spec.ts`.
 
-- **UIF15.6:** WHEN the player backs out of any screen opened from the root, THE menu SHALL show again with its cursor on that entry,
-  and the required flow (menu → screen → back → another screen → world) SHALL pass in Chromium in `ui-menu.spec.ts`.
+### uif-16a — Profile: sections behind one seam, no visible change
+category: ux-a11y · severity: LOW · size: MODERATE
+touches: client/src/ui/renameView.ts, client/src/ui/renameView.test.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/privacyView.ts, client/src/ui/privacyView.test.ts, client/src/ui/screens/profileScreen.ts, client/src/ui/screens/profileScreen.test.ts, client/src/ui/screens/profileScreen.boot.test.ts
+after: [uif-15b]
+Feedback items: pt3-2026-10-097
+Measured: each of the three views owns its overlay root, calls `openOverlayA11y` on it and exposes rows through `applyRowOp`. This slice separates "a section" (root, rows, render) from
+"an overlay" (a11y, show, hide), still wired as three overlays, so `uif-16b` is a roster swap and a section reuse, and a budget overrun parks with green code. Element ids hold.
 
-### uif-16 — Profile: one combined screen
+- **UIF16A.1:** THE rename, claim and privacy views SHALL each expose their section root and shown, enabled rows through one shared section interface, with all existing view and boot suites
+  green and no visible change.
+
+- **UIF16A.2:** THE profile adapter SHALL walk rows through that interface, with the row-is-DOM-focus model, the Up/Down clamp and every confirm default unchanged.
+
+### uif-16b — Profile: one combined screen
 category: ux-a11y · severity: MED · size: HEAVY
-touches: client/src/ui/profileView.ts, client/src/ui/profileView.test.ts, client/src/ui/renameView.ts, client/src/ui/renameView.test.ts, client/src/ui/renameView.i18n.test.ts, client/src/ui/renameModel.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/claimView.i18n.test.ts, client/src/ui/privacyView.ts, client/src/ui/privacyView.test.ts, client/src/ui/privacyView.i18n.test.ts, client/src/ui/overlayRegistry.ts, client/src/ui/overlayRegistry.test.ts, client/src/ui/overlayA11y.test.ts, client/src/ui/overlayA11yWiring.test.ts, client/src/ui/a11yCopy.ts, client/src/ui/a11yCopy.test.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/ui/hintBarModel.test.ts, client/src/ui/screens/profileScreen.ts, client/src/ui/screens/profileScreen.test.ts, client/src/ui/screens/profileScreen.boot.test.ts, client/src/ui/screens/index.ts, client/src/ui/screens/index.test.ts, client/src/ui/screens/legacyAdapter.test.ts, client/src/ui/menuModel.ts, client/src/ui/menuModel.test.ts, client/src/ui/screens/mainMenuScreen.ts, client/src/ui/screens/mainMenuScreen.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/main.ts, client/src/main.controls.test.ts, client/src/main.menu.test.ts, client/src/main.input.test.ts, client/src/main.a11yFocus.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.dispatch.test.ts, client/src/main.remap.test.ts, client/src/main.accel.test.ts, client/src/main.notices.test.ts, client/src/indexShell.smoke.test.ts, client/index.html, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/i18n/catalogParity.test.ts, client/e2e/controls.spec.ts, client/e2e/rename.spec.ts, client/e2e/accounts.spec.ts, client/e2e/a11y.spec.ts, client/e2e/ui-profile.spec.ts, docs/DECISIONS.md
-after: [uif-15]
+touches: client/src/ui/profileView.ts, client/src/ui/profileView.test.ts, client/src/ui/renameView.ts, client/src/ui/renameView.test.ts, client/src/ui/renameView.i18n.test.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/claimView.i18n.test.ts, client/src/ui/privacyView.ts, client/src/ui/privacyView.test.ts, client/src/ui/privacyView.i18n.test.ts, client/src/ui/overlayRegistry.ts, client/src/ui/overlayRegistry.test.ts, client/src/ui/overlayA11y.test.ts, client/src/ui/overlayA11yWiring.test.ts, client/src/ui/a11yCopy.ts, client/src/ui/a11yCopy.test.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/ui/hintBarModel.test.ts, client/src/ui/screens/profileScreen.ts, client/src/ui/screens/profileScreen.test.ts, client/src/ui/screens/profileScreen.boot.test.ts, client/src/ui/screens/index.ts, client/src/ui/screens/index.test.ts, client/src/ui/screens/legacyAdapter.test.ts, client/src/ui/menuModel.ts, client/src/ui/menuModel.test.ts, client/src/ui/screens/mainMenuScreen.ts, client/src/ui/screens/mainMenuScreen.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/main.ts, client/src/main.controls.test.ts, client/src/main.menu.test.ts, client/src/main.input.test.ts, client/src/main.a11yFocus.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.dispatch.test.ts, client/src/main.remap.test.ts, client/src/main.accel.test.ts, client/src/main.notices.test.ts, client/src/main.privacyWiring.test.ts, client/src/main.claimCode.test.ts, client/src/indexShell.smoke.test.ts, client/index.html, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/i18n/catalogParity.test.ts, client/e2e/controls.spec.ts, client/e2e/rename.spec.ts, client/e2e/accounts.spec.ts, client/e2e/a11y.spec.ts, client/e2e/ui-profile.spec.ts, docs/DECISIONS.md
+after: [uif-16a]
 Feedback items: pt3-2026-10-097, -102
-Measured: `renameView`, `claimView` and `privacyView` are three `OverlayId`s; 33 files name them. Each view calls `openOverlayA11y` on its own
-root, and two open traps cannot coexist, so the Social frame's one-panel-at-a-time trick does not make visible sections. The one honest shape:
-a new single `profileView` overlay owns the dialog, focus trap, title and `initialFocusSelector`; the three classes keep their files, reducers,
-phases and element ids (`#claim-overlay`, `rename-*`, `privacy-*`, so e2e selectors hold) but become sections with no a11y of their own.
-`OR-MANIFEST-COMPLETE` gets the three names as a named exclusion rather than renames (`SCAN_TARGETS` and the resolver roster keep their rows).
-`OVERLAY_IDS` 18 → 16; `SCREEN_POLICY`, `RECONNECT_CLOSES`, `OVERLAY_TIERS`, `OVERLAY_A11Y`, `SCREEN_ADAPTERS`, `PLAYER_FRAMES`, `CTL3-2-DROP-EXACT` and
-`CONSTRUCTED` all rewrite once with named counts. Claim auto-opens at boot and on sign-in failure (`openClaim` paths in `main.ts`), so those paths
-open Profile on the Account section. `rowsScreen`'s row-is-DOM-focus model extends to one list across sections. `ACCEL_PATHS` N and C become Profile rows.
-Decision entry: Profile's one-dialog shape.
+Measured: `renameView`, `claimView` and `privacyView` are three `OverlayId`s; 34 files name them. Two open traps cannot coexist, so the Social frame's one-panel-at-a-time trick does not
+make visible sections. The one honest shape: a new single `profileView` overlay owns the dialog, focus trap, title and `initialFocusSelector`; the three classes keep their files, reducers,
+phases and element ids (`#claim-overlay`, `rename-*`, `privacy-*`, so e2e selectors hold) as sections with no a11y of their own. `OR-MANIFEST-COMPLETE` gets the three names as a named
+exclusion rather than renames (`SCAN_TARGETS` and the resolver roster keep their rows, plus `profileView`). `OVERLAY_IDS` 18 → 16; `SCREEN_POLICY`, `RECONNECT_CLOSES`, `OVERLAY_TIERS`,
+`OVERLAY_A11Y`, `SCREEN_ADAPTERS`, `PLAYER_FRAMES`, `CTL3-2-DROP-EXACT` and `CONSTRUCTED` all rewrite once with named counts. `main.privacyWiring.test.ts` reads `OVERLAY_A11Y.claimView`/`.privacyView`
+and pins "the account overlay must be CLOSED once the privacy surface is up", which this design supersedes: rewrite to "one dialog, one trap" with the change named. `main.claimCode.test.ts` mocks
+the views. Claim auto-opens at boot and on sign-in failure (`openClaim` paths), so those open Profile on the Account section. `openPrivacy`'s hide-claim verdict goes away. `ClaimPhase` has no
+hidden state, so an already-settled account section needs a resting presentation from `claimModel`'s existing phases. `ACCEL_PATHS` N and C become Profile rows. Decision entry: Profile's one-dialog shape.
 
-- **UIF16.1:** WHEN Profile is chosen from the main menu, THE client SHALL open ONE full screen showing Name, Account and Privacy sections
-  together (#586 D3, 097), with section headers and separators from tokens and no sub-list; the last menu sub-list and `MenuLevel`'s groups SHALL be gone.
+- **UIF16B.1:** WHEN Profile is chosen from the main menu, THE client SHALL open ONE full screen showing Name, Account and Privacy sections together (#586 D3, 097), with section headers and
+  separators from tokens and no sub-list, and the last menu sub-list SHALL be gone.
 
-- **UIF16.2:** WHILE Profile shows, THE D-pad SHALL walk one column of rows across all three sections in visual order, the axis matching the
-  layout (102), with Close at the bottom (104) and B popping the frame.
+- **UIF16B.2:** WHILE Profile shows, THE D-pad SHALL walk one column of rows across all three sections in visual order, the axis matching the layout (102), with Close at the bottom (104) and B
+  popping the frame.
 
-- **UIF16.3:** THE combined screen SHALL be one dialog with one focus trap, one title and one valid initial-focus anchor in every claim and privacy
-  phase, axe-clean in Chromium.
+- **UIF16B.3:** THE combined screen SHALL be one dialog with one focus trap, one title and one valid initial-focus anchor in every claim and privacy phase, axe-clean in Chromium.
 
-- **UIF16.4:** WHEN a name is saved, a claim action is taken, or a privacy two-step confirm runs, THE same commands SHALL fire with the same
-  guards as today: Yes/No defaults kept, privacy disarmed on close, the rename input typing rule unchanged, the account-e2e eval green.
+- **UIF16B.4:** WHEN a name is saved, a claim action is taken, or a privacy two-step confirm runs, THE same commands SHALL fire with the same guards as today: Yes/No defaults kept, privacy disarmed on
+  close, the rename input typing rule unchanged, the `account-e2e` eval green.
 
-- **UIF16.5:** WHEN the claim prompt auto-opens or sign-in fails, THE client SHALL open Profile focused on the Account section, and an accelerator N
-  or C SHALL open Profile on its section, with `EXPECTED_PATHS` rewritten once.
+- **UIF16B.5:** WHEN the claim prompt auto-opens or sign-in fails, THE client SHALL open Profile focused on the Account section, and an accelerator N or C SHALL open Profile on its section, with
+  `EXPECTED_PATHS` rewritten once.
 
-- **UIF16.6:** WHEN a reconnect or a battle arrives with Profile open, THE frame SHALL close or stay per one `SCREEN_POLICY` row chosen from today's
-  strictest of the three, with `RECONNECT_CLOSES` matching (rename's `true` wins, so a reconnect closes it).
+- **UIF16B.6:** WHEN a reconnect or a battle arrives with Profile open, THE frame SHALL close or stay per one `SCREEN_POLICY` row chosen from today's strictest of the three, with
+  `RECONNECT_CLOSES` matching (rename's `true` wins, so a reconnect closes it).
 
-- **UIF16.7:** WHEN this slice lands, R-ctl-8h-CTL8H.1 SHALL close as moot, every overlay roster SHALL carry `profileView` with 16 ids, and each count
-  change SHALL be named in a test comment.
+- **UIF16B.7:** WHEN this slice lands, R-ctl-8h-CTL8H.1 SHALL close as moot, every overlay roster SHALL carry `profileView` with 16 ids, and each count change SHALL be named in a test comment.
 
 ### uif-17 — The integrated whole
 category: ux-a11y · severity: MED · size: LIGHT
 touches: client/e2e/ui-whole.spec.ts, ARCHITECTURE.md, docs/PLAYTEST.md, docs/DECISIONS.md
-after: [uif-16]
+after: [uif-16b]
 Feedback items: pt3-2026-10-094, -153, -175
-Measured: an e2e of the combined flow only, reusing `uiKit.ts`; there is no product code in this slice. The wireframe-vs-shipped comparison goes in the
-PR body with screenshots from this run (harness-side `M-ui-foundation-wireframes.md` gets its As-shipped section as the supervisor's doc chore, since a
-slice routes to one repo). A discrepancy found here is fixed in a follow-up slice, not widened into this one.
+Measured: an e2e of the combined flow only, reusing `uiKit.ts`; there is no product code in this slice. The wireframe-vs-shipped comparison goes in the PR body with screenshots from this run
+(harness-side `M-ui-foundation-wireframes.md` gets its As-shipped section as the supervisor's doc chore, since a slice routes to one repo). Per-screen proofs stay with their slices; this walk proves
+they still hold together. A failure here reds this slice and parks it with a follow-up slice specified; a cosmetic difference that fails nothing is recorded in the PR.
 
-- **UIF17.1:** WHEN the player walks menu → every screen → back → world by D-pad, then by pointer, in Chromium at three window sizes including
-  devicePixelRatio 1.25, EVERY screen SHALL satisfy the frame anatomy, TabBar and token assertions of UIF.1 and UIF.6, with a focused row always visible.
+- **UIF17.1:** WHEN the player walks menu → every screen → back → world by D-pad in Chromium at 1280×720, EVERY screen SHALL satisfy the frame anatomy, TabBar and token assertions of UIF.1 and
+  UIF.6, with a focused row always visible.
 
-- **UIF17.2:** WHEN that walk opens each mini-menu, THE sheet SHALL satisfy UIF.2 and UIF.3, and each screen's message SHALL satisfy UIF.4 with no
-  measured layout shift.
+- **UIF17.2:** WHEN that walk opens each mini-menu, THE sheet SHALL satisfy UIF.2 and UIF.3, and a message on each screen SHALL satisfy UIF.4 with no measured layout shift.
 
-- **UIF17.3:** WHEN the window resizes during the walk, THE world SHALL hold an integer `deviceScale` and the chrome SHALL track `--mr-ui-scale`
-  continuously, for both a menu and a tactical battle (UIF.5, UIF.7).
+- **UIF17.3:** WHEN the window resizes across three sizes including devicePixelRatio 1.25, THE world SHALL hold an integer `deviceScale` and the chrome SHALL track `--mr-ui-scale` continuously, for
+  both a menu and a tactical battle (UIF.5, UIF.7).
 
-- **UIF17.4:** THE control hints SHALL remain at the bottom of the screen on every screen, generated as shipped (153), with reachability, axe, liveRegion,
-  focus-trap, B17 and the so-1/so-2 suites green (UIF.8).
+- **UIF17.4:** THE control hints SHALL remain at the bottom of the screen on every screen, generated as shipped (153), with reachability, axe, liveRegion, focus-trap, B17 and the so-1/so-2 suites
+  green (UIF.8).
 
-- **UIF17.5:** THE closing PR SHALL attach the wireframe-vs-shipped comparison for each wf-1 screen and SHALL update `ARCHITECTURE.md`'s Client section and
-  `docs/PLAYTEST.md` to the delivered menus.
+- **UIF17.5:** THE closing PR SHALL attach the wireframe-vs-shipped comparison for each wf-1 screen and SHALL update `ARCHITECTURE.md`'s Client section and `docs/PLAYTEST.md` to the delivered menus.
 
 ## Post-integration verification
 
@@ -868,21 +922,22 @@ The milestone is done when the merged whole, not each slice, satisfies UIF.1–U
 - **Sheet phases, not stack frames (`uif-3`, `uif-5`):** the sketch said "pops the sheet through the stack"; sheets are adapter phases, so close is B through the adapter. It stays inside the
   one-context-stack model because the only thing pointer does is press B.
 - **World-canvas click (`uif-5`):** closes only. Routing it would press A and reopen the same sheet; the operator's expectation allows this ("assuming it is appropriate to do so").
-- **Profile as one dialog, not tabs (`uif-16`, D3):** tabs would be far cheaper (the Social precedent) but keep three sparse pages, the operator's actual complaint. HEAVY, and the milestone's largest risk.
-- **Terminology (`uif-15`):** the sketch's non-goal assumed qf-10 landed the labels. It did not (R-qf-10-QF10.1), and D3's ruled menu names them, so the labels land here. Further renames stay out.
+- **Profile as one dialog, not tabs (`uif-16a/b`, D3):** tabs would be far cheaper (the Social precedent) but keep three sparse pages, the operator's actual complaint. HEAVY, and the milestone's largest risk.
+- **Terminology (`uif-15a`):** the sketch's non-goal assumed qf-10 landed the labels. It did not (R-qf-10-QF10.1), and D3's ruled menu names them, so the labels land here. Further renames stay out.
 - **Order inverted against the old PLAN line:** the tactical UI shipped first, so `uif-11` migrates it.
 
 **Risks:**
 
-- **Pin churn in `uif-15` and `uif-16`.** Both are HEAVY by file count. Mitigation: mechanical edits, named counts, increments allowed. If `uif-16` runs past its budget, the disciplined retreat is to park with its model
-  and section components green; do not ship tabs as a substitute without an operator ruling.
+- **Pin churn in `uif-15a` and `uif-16b`.** Both are wide by file count. Mitigation: mechanical edits, named counts, `uif-16a` landing the section seam first. If `uif-16b` runs past its budget, the disciplined retreat is to park with `uif-16a` merged;
+  do not ship tabs as a substitute without an operator ruling.
 - **Kit CSS proven late.** `uif-3`'s CSS has no real consumer until `uif-6`, by design (no fixture page in product code). Happy-dom cannot lay out; `uif-6` carries the first Chromium geometry proof.
+- **Interim scale mismatch.** Between `uif-2` and `uif-11` menus scale and the tactical screens do not. Internal order only; the milestone ships whole before the Playtest-4 gate.
 - **Hidden dependencies.** Earlier waves parked on unmeasured ones. Every "Measured:" paragraph is grep-derived at `d90c32c9`; expect a few more, and handle each as STOP + build note.
-- **Serial spine cost.** Most of the milestone is serial because `styles.css`, `main.ts` and the catalogs are shared. Fan-out is limited to `uif-9` and `uif-10` beside `uif-8`/`uif-11`.
+- **Serial spine cost.** Most of the milestone is serial because `styles.css`, `main.ts` and the catalogs are shared. Fan-out is limited to `uif-9` and `uif-10` beside `uif-8`/`uif-11`, and is only real because `uif-4b` takes every shared sink first.
 - **Text size at ×2 on small windows** relies on pseudo-scroll; `UIF13.5` is the guard.
 
 **Forks a build slice records in `docs/DECISIONS.md` (the spec names them; it mints no records):** token set and frame anatomy (`uif-1`), hybrid scale authority (`uif-2`), four-channel policy (`uif-4`),
-sheet placement (`uif-7`), Profile's one-dialog shape (`uif-16`).
+sheet placement (`uif-7`), Profile's one-dialog shape (`uif-16b`).
 
 ## Notes
 

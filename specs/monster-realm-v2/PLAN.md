@@ -80,12 +80,13 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    presentation (sprites/background placeholders) lands inside it (bt-10); placeholder assets
    come from item 6. First slice to launch: `bt-1`.
 5. **M-ui-foundation** (`M-ui-foundation.spec.md`, specced 2026-10-24; **elaborated 2026-11-07 —
-   build-ready, 18 slices**): the shared menu design language. Wireframes first (`wf-1`, docs-only,
+   build-ready, 21 slices**): the shared menu design language. Wireframes first (`wf-1`, docs-only,
    operator directive reaffirmed #586 D2, no second gate); then the kit spine `uif-1`…`uif-5` (tokens,
    single scale authority, TabBar + ContextSheet + EmptyState + RowCard, four-channel feedback, pointer
    close-then-route + wheel), screen adoption `uif-6`…`uif-13` (Monsters, Inventory, Social, small
    screens, the tactical UI that shipped first, world sheets, Controls + text-size setting), How to Play
-   rework `uif-14`, menu IA `uif-15` and the Profile combine `uif-16`, and the integrated proof `uif-17`.
+   rework `uif-14`, labels + menu IA `uif-15a/b`, the Profile combine `uif-16a/b`, and the integrated
+   proof `uif-17`.
    Decisions ANSWERED (#586): hybrid scaling, IA flatten all-three, mini-menu design delegated
    (wireframe-driven), battle "Items", footer collapse-when-empty. Client-only. First slice to launch:
    `wf-1`.
