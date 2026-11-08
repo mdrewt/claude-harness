@@ -585,7 +585,7 @@ Feedback items: pt3-2026-10-117
 
 ### qf-15 — zone transition cue + warp tile relocation
 category: ux + content (silent warp) · severity: LOW · size: FEATHER
-touches: game-core/content/zone_maps/000-core.ron, game-core/src/world.rs, sim-harness/src/world.rs, server-module/src/lib.rs, evals/baselines/content-hash.json, client/e2e/shop-npc.spec.ts, client/e2e/wallet-balance.spec.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/main.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/net/store.ts, client/src/net/store.test.ts
+touches: game-core/content/zone_maps/000-core.ron, game-core/src/world.rs, sim-harness/src/world.rs, server-module/src/lib.rs, evals/baselines/content-hash.json, client/e2e/shop-npc.spec.ts, client/e2e/wallet-balance.spec.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/main.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/ui/i18n/catalogParity.test.ts, sim-harness/src/lib.rs
 after: [qf-14]
 Feedback items: pt3-2026-10-156, -163
 
@@ -614,6 +614,10 @@ Feedback items: pt3-2026-10-156, -163
   route is subscribe `zone_def` in `client/src/net/connection.ts` (+ `connection.runtime.test.ts`) feeding
   a store upsert, optional `rowConvert.ts` converter; additive, no server/schema/bindings change.
   Touches widened accordingly. Memo: `memory/projects/monster-realm-qf-15-progress.md`.
+  Plan-review addendum (run 2, 2026-10-30): two consumers the red-measurement missed because they stay
+  GREEN — `client/src/ui/i18n/catalogParity.test.ts` exact-pins the literal i18n keys `main.ts` resolves
+  (reds on the new `tf` call), and `sim-harness/src/lib.rs` `warp_scenario()` walks to (5,5) and would
+  silently stop crossing any warp (the convergence eval loses its warp case). Both added to touches.
 
 ### qf-16 — rankings presentation: display-only rows
 category: ux polish (read-only list treatment) · severity: LOW · size: FEATHER
@@ -643,6 +647,10 @@ Feedback items: pt3-2026-10-157 (visibility half), -074 (battle-win half; quest 
   the owner-scoped `my_wallet` view since ADR-0154, but no shop surface shows it — "the
   operator never noticed owning 50 gold". The faucet REDESIGN (recruit payouts, starter kit)
   is the economy milestone, not here.
+  Build note (qf-17, 2026-10-30): the shop readout `#shop-balance` has shipped since ux2-V-a /
+  11r-e (`shopView.ts`, `wallet-balance.spec.ts`), so QF17.3 was verified and tagged, not built;
+  the payout channel chosen is the client-side batch delta of `my_wallet` / `my_monster_pub`
+  (main.ts, the qf-6 quest-ack precedent) — no battle-row column, no bindings churn.
 
 - **QF17.1:** WHEN a battle ends in a KO win, THE CLIENT SHALL show the currency payout amount
   in the outcome feedback (catalogued en+fr); any server data needed for the amount arrives

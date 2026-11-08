@@ -342,6 +342,7 @@ Every px shorthand in the chrome moves to rem tokens here, except border widths,
 640×240, so the short-window behavior must hold. The e2e helper `uiKit.ts` (computed-style and geometry
 assertions) is created here; spine slices may append to it, `uif-9` and `uif-10` use it unchanged. Decision
 entry: the token set and frame anatomy as the kit's visual contract.
+Measured at build: `[role="listbox"]:focus` keeps `#cc5500`, because `overlayA11yWiring.test.ts` `QF1-2-LISTBOX-GRID-RING` requires 3:1 on the active row's fill and `--mr-focus` measures about 1:1 there; `--mr-focus` rings `.mr-chip`. `.mr-frame-feedback` keeps its literal padding and 2px border until `uif-4`, whose `touches:` holds `frame.test.ts`. No production element wears `.mr-section-header` yet, and tabbed screens have no `.mr-frame-title` until they adopt the frame.
 
 - **UIF1.1:** WHILE a menu screen is open in Chromium, THE computed padding, gap, border, font size and
   text color of its title bar, nav rows, hint chips and status line SHALL equal the resolved token values of
@@ -373,6 +374,7 @@ renderer init; `render/world.ts` `resize(cssW, cssH, dpr)` already calls `viewpo
 untouched (smoothness contract). `resizeWiring.test.ts` pins the 3-arg renderer call, which stays. The
 `viewportScale` fields are all derived and `viewport.test.ts` pins them; `deviceScale` values must not
 move. Decision entry: hybrid scale authority (#586 D1).
+Measured at build: the root rule is `:root[style*="--mr-ui-scale"] { font-size: calc(100% * var(--mr-ui-scale)); }`, keyed on the seam's write, because happy-dom reads `NaNpx` for rem through any `calc()` root font-size and `frame.test.ts` loads the real sheet without the seam. Before the first write it does not match, which is how UIF2.6 holds; `uif-13` multiplies its text step into this rule. A devicePixelRatio change with no size change fires no `resize` in Chromium, so UIF2.3 holds for events that fire `resize`; the rest is R-uif-2-DPRONLY (a `matchMedia` fix collides with the sole-caller rule in `render/motionPreference.ts`).
 
 - **UIF2.1:** THE pure `viewportScale` SHALL additionally return `continuous` and `uiScale` per the formula
   above, and for every (cssW, cssH, dpr) the returned `deviceScale`, `stageScale` and `effective*` SHALL
@@ -447,6 +449,12 @@ positioning fails: `.mr-frame` has no `position`, so non-shell frames anchor to 
 survives shell scrolling. `frame.test.ts`'s qf-12 block pins the rule's declarations and class name, so rewrite it with
 the change named; the selector roster forbids new `.mr-frame-feedback…` selectors. `boxView` and `raisingView` reuse the
 class, so they inherit the fix. Decision entry: the four-channel table.
+**Built (uif-4):** the strip is sticky (`bottom: -2rem`) with `height: 2rem` cancelled by `margin-bottom: -2rem`, landing in a 2rem
+bottom reserve on `.mr-frame` and, through `--mr-strip-reserve`, on shells that are frames; the plain menu shell keeps wf-1's
+geometry. A persistent hint paints on the main menu's strip while the menu is on top, else on `#status`, raised above every shell
+(z 125, the toast 130): frames whose strip is view-owned carry it there until their strips join the seam (R-uif-4-STRIPHOSTS → uif-4b).
+raisingView's `#bag-status` never collapses when empty (R-uif-4-BAGSTATUS-EMPTY → uif-8); a repeated identical toast is not
+re-announced, a pre-existing `LiveRegion` dedup (R-uif-4-REPEATSAY).
 
 - **UIF4.1:** THE `feedbackPolicy` table SHALL be total over a `MessageKind` union naming every measured message
   kind and SHALL assign each to exactly one of hint line, toast, modal and blocking text box, with the
@@ -619,6 +627,13 @@ the menu cursor on `bag`; the nav key stays.
 - **UIF8.5:** WHEN Inventory shows at the size Monsters was measured, ITS computed spacing, borders and colors SHALL match Monsters',
   through `uiKit.ts` in Chromium.
 
+**Built (uif-8):** the frame mirrors boxView's anatomy (header row, TabBar `#bag-tabs`, `#bag-panel` with Monsters' panel style,
+one ContextSheet `#bag-sheet`, frame `bagsheet`: actions + Close, picker + Back, Info as the detail variant + Back). `#bag-picker`,
+`#bag-picker-title`, `#bag-info` are retired. `#bag-panel` carries a token floor (about four rows) that boxView lacks: the ui-chrome
+UIF4.3 640x240 probe counts clipped rows, so the shell scrolls before the panel would clip. `#bag-status` collapses when empty (closes
+R-uif-4-BAGSTATUS-EMPTY). New ids `bag.empty.cue` / `bag.empty.next`. Hidden dependencies: `hardcodedStrings.ts` SINK_FLOOR 260 → 255
+(touches-delta, flagged); UIF8.3's toast half needs `main.ts` `route()` (DEFERred, as UIF7.6).
+
 ### uif-9 — Social: tabs, sheets, row cards, spacing
 category: ux-a11y · severity: MED · size: MODERATE
 touches: client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/pvpView.ts, client/src/ui/pvpView.test.ts, client/src/ui/leaderboardView.ts, client/src/ui/leaderboardView.test.ts, client/src/ui/leaderboardView.i18n.test.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/screens/socialScreen.ts, client/src/ui/screens/socialScreen.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/reachability.test.ts, client/e2e/ui-social.spec.ts
@@ -645,6 +660,17 @@ those, that is a STOP: it would break this slice's fan-out.
 - **UIF9.5:** WHILE Rankings overflows, ITS position cue and read-only treatment SHALL behave as qf-16 pinned them on the shared rule, and a trade
   or challenge request SHALL stay a banner and world sheet, never a frame.
 
+**Built (uif-9):** UIF9.1, UIF9.3, UIF9.4, UIF9.5. The shared chrome's first child is the kit TabBar
+(`#social-tabs` kept, LB/RB chips, `is-selected`). Measured in Chromium at 1280x720: the root padding
+and the strip rect were already equal on all four panels. Two things differed. Rankings'
+`ul#leaderboard-list` kept the UA margin and 40px padding-left (rows at x=66 vs x=26), so any Rankings
+paint now zeroes them inline and adds `.mr-scroll`. The non-cursor Challenges row had no
+`.mr-nav-item` padding, so a shown challenge container is now always a nav row. Each challenge is
+one RowCard carrying the `pvp-*-label` testid. Proof: `e2e/ui-social.spec.ts`, a fixture page with
+real modules, real CSS and a fake store (the uif-8 UIF8.1 precedent). **UIF9.2 deferred** (hidden
+dependency): `e2e/pvp.spec.ts:317` pins the challenge sheet's rows to exactly Accept, Decline, so the
+Back row needs that file in touches. The sheet and the prompt are unchanged.
+
 ### uif-10 — Shop, Heal, Journal, Trade propose
 category: ux-a11y · severity: LOW · size: MODERATE
 touches: client/src/ui/shopView.ts, client/src/ui/shopView.test.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/shopScreen.test.ts, client/src/ui/healView.ts, client/src/ui/healView.test.ts, client/src/ui/healView.i18n.test.ts, client/src/ui/questLogView.ts, client/src/ui/questLogView.test.ts, client/src/ui/questLogView.i18n.test.ts, client/src/ui/tradeProposeView.ts, client/src/ui/tradeProposeView.test.ts, client/src/ui/tradeProposeView.i18n.test.ts, client/e2e/ui-screens.spec.ts
@@ -666,6 +692,16 @@ injected: a new constructor dependency is a STOP. No catalog, `main.ts`, `styles
 
 - **UIF10.4:** WHEN the kit is adopted on these screens, THE trade-propose wizard SHALL send what it sends today, Shop's quantity row SHALL keep its
   Left/Right clamping, and axe SHALL stay clean on all four.
+
+**Built (uif-10):** all four gates. Shop: kit TabBar (strip `#shop-tabs`) after the title bar, then `#shop-body.mr-frame-body`
+(flex column: the two `.mr-scroll` lists, description, quantity row, sheet); the confirm is the one ContextSheet `#shop-confirm`
+(confirm variant, frame `shopConfirm`), replacing the quantity row and anchored off the cursor row; as a top-frame sheet it now
+closes on an outside click (UIF5.1). Journal: `#quest-log-empty` is a kit EmptyState (reason only); the root stays
+`display:block` (wallet-balance.spec, trade.spec pin it), so title bar, list, empty and detail sit in an inner flex column
+`#quest-log-frame`. Heal: list reset only (no title bar). Trade propose: the step `ol` carries the TabBar classes and is the
+first child; monsters are block rows in a `.mr-scroll` list. axe (scoped to each root, `client/e2e/ui-screens.spec.ts`) found
+real Trade-propose violations, fixed in the view: aria-labels from the step keys, 1.5rem input height. Measured gap: Heal and
+Trade propose have no title string in the catalog (`a11y.overlay.*` is English-only) → `R-uif-10-TITLES`.
 
 ### uif-11 — Tactical screens on the kit; "Items"
 category: ux-a11y · severity: MED · size: MODERATE
@@ -697,7 +733,7 @@ stays open. Tactical flow and copy otherwise stand.
 
 ### uif-12 — World sheets
 category: ux-a11y · severity: LOW · size: MODERATE
-touches: client/src/ui/actionSheetModel.ts, client/src/ui/actionSheetModel.test.ts, client/src/ui/noticeModel.ts, client/src/ui/noticeModel.test.ts, client/src/ui/screens/worldScreen.ts, client/src/ui/screens/worldScreen.test.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/main.ts, client/src/main.hintBar.test.ts, client/src/main.notices.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/styles.css, client/e2e/controls.ts, client/e2e/ui-world-sheets.spec.ts
+touches: client/src/ui/actionSheetModel.ts, client/src/ui/actionSheetModel.test.ts, client/src/ui/noticeModel.ts, client/src/ui/noticeModel.test.ts, client/src/ui/screens/worldScreen.ts, client/src/ui/screens/worldScreen.test.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/main.ts, client/src/main.hintBar.test.ts, client/src/main.notices.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/styles.css, client/e2e/controls.ts, client/e2e/ui-world-sheets.spec.ts, client/src/ui/i18n/hardcodedStrings.ts, client/src/ui/i18n/hardcodedStrings.test.ts, client/src/ui/screens/index.test.ts, client/src/main.input.test.ts, client/e2e/respond-request.spec.ts
 after: [uif-9, uif-10, uif-11]
 Feedback items: pt3-2026-10-025, -049, -104
 Measured: `main.ts`'s frame tick renders `#interact-sheet` via `renderNav` under `.mr-frame--prompt`, which has
@@ -705,6 +741,7 @@ Measured: `main.ts`'s frame tick renders `#interact-sheet` via `renderNav` under
 `requestSheetLayout` hold the rows; the challenge confirm already ends in `no`. `readPickRows` (`e2e/controls.ts`) is used by
 `tactics-pvp`, `trade-propose`, `pvp-side-b`, `ranked-forfeit`, so the helper filters the Close row and those specs stay.
 `CTL13-1-MODEL-WORLD` pins the hint chips. These are not frames (DECISIONS "server-owned frames"): they stay world sheets.
+Continuation touches widened per measured hidden dependencies (first run parked at `slice/uif-12`, UIF12.1/.3/.4/.5 built and green): `hardcodedStrings.ts` SINK_FLOOR 255 -> 250 with its exact pin in `hardcodedStrings.test.ts` (request heading and Challenge question moved into the kit's ContextSheet heading, text not removed; uif-4b/uif-8 precedent); `screens/index.test.ts` CTL10A-1-HOST-SHEET flips to Select = Help with the sheet closing first (the branch's chosen option (a); name it in a DECISIONS entry reversing ctl-10a's "Select is the sheet's"); UIF12.2's Close row is a `[role=option]` row, so `main.input.test.ts` CTL10A-* row-count pins and `e2e/respond-request.spec.ts:227,313` fold in and UIF12.2 is no longer DEFERred. Resume from the park memo `monster-realm-uif-12-progress.md`.
 
 - **UIF12.1:** WHEN a world picker, action sheet or request sheet shows, IT SHALL paint in the ContextSheet family with
   `[data-context-sheet]`, and its rows SHALL accept pointer clicks, staying anchored as shipped.
