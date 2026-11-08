@@ -1762,6 +1762,41 @@ has to be re-run, never deferred, once BT17.1 is deferred. PR mdrewt/monster-rea
 
 **Continuation touches (2026-11-07, supervisor, measured):** increment B widened by the hidden dependencies increment A recorded plus a fresh `begin_encounter` reference census — `trading_tests.rs`, `guards.rs` + `guards_tests.rs` (the `rb76_..._begin_encounter_..._contained_crate_wide` containment pin), `movement_tests.rs`, `tactics_tests.rs`, `tactics_settle_tests.rs`, `game-core/src/combat/{battle_0hp_tests,types}.rs`.
 
+**Build note (bt-17 increment B, 2026-11-07, measured):** (1) **Purge:** the Rust bodies of the seven de-attributed 1v1 reducers,
+`begin_encounter`, the 60 s secret-pick deadline arming (`pvp::schedule_deadline` ← `resolve_pvp_turn_if_ready`), `build_pvp_team`,
+`start_pvp_battle`, `battle::reject_if_tactical_anchor`, `guards::require_pvp_participant`, `PVP_TURN_DEADLINE_MS` and
+`content_cache::cached_type_chart` are deleted; the reducer set is unchanged (54), `just gen` produces no diff, the schema diff is empty.
+BT17.1 MET (A's DEFER line removed); its CHECK keeps the one census test (`no_reducer_writes_a_retired_1v1_table_bt17_1`, EXPECT pinned to
+exactly 1 passed) — the deletion half is compiler-proven (`-D warnings` dead_code, no allow attribute on any 1v1 item). (2) **Hidden
+dependency (recorded before the build, proceeded under A's precedent):** TEN 1v1 marshaling helpers in `marshal.rs` / `content_cache.rs`
+(outside the touches) go dead in every non-test build once the bodies leave — kept `#[cfg(test)]` (with their imports) for their
+tests, so a production re-use is a compile error (residual R-bt-17-MARSHALTESTONLY owes the deletion with survivors). Method: run `clippy --all-targets` on the tester's tree BEFORE
+deleting — its dead-code list is exactly the set with no remaining test caller (a lib-only probe under-reports). (3) **Tests (BT17.2):**
+no new source-scan test (REV 1's two census tests were dropped at plan review: a hand-source parse is a forbidden shape, and one was
+unsatisfiable — `disarm_pvp_deadlines` legitimately deletes from `pvp_deadline_schedule`); nine REPLACEMENT tests were written first and
+watched red on 19 hand-applied mutants (six-state deletion gate on both tactical starts — the status-only gate was a measured survivor —,
+wild seeds live only in `battle_wild_unit` under the returned id, a recruit success whose party write-back fails still commits once and
+pays nothing, PvP start escrow on either side, a terminal PvP anchor admits a new wild start; acceptor-side party ownership on the live accept; the Deploying-pack start-time escrow
+guard; disconnect auto-flee pays nothing; a pre-queued recruit is owned by the player); 22 1v1 tests deleted with named survivors
+(ledger `memory/projects/monster-realm-bt-17b-deletions.md`, verifier-adjudicated APPROVE), the trading escrow matrix's four 1v1 rows and
+two item rows deleted (R-bt-16-TRADINGMATRIX: the live sites are covered in their own suites), the BT13 parity tests keep the tactical
+half against the pinned 1v1 literals, `dw_insert_sites` targets `taming::insert_recruited`, the source-scan
+`rt_m14e_use_battle_item_ownership_guard` and its text helpers deleted. Module suite 850 (all features) / 848 (default), game-core 1797,
+client 4658 (BT17.2 CHECK 1138/1138). (4) **R-bt-17-LEGACYANCHORS:** pre-publish SQL check run FIRST on every stored local DB
+(`monster-realm`, `-playtest`, `-smoke`, `-m135h`): 0 Ongoing anchors (none has `battle_tactical`; `maincloud` has no database); no
+connect-time sweep (`resolve_wild_battle_on_disconnect` has no tactical-row exclusion — a reconnect sweep would be new predicate code with a
+live-tactical-wipe failure mode for a population measured at zero; a session-bound anchor still resolves at its disconnect). (5)
+**Re-target asks:** R-bt-2-m14-restated (`game-core/src/tactics/upkeep.rs`, `combat/{status,resolve}.rs`) and R-bt-14-ROSTERREVEAL
+(`tactics::start_pvp_tactical` + the client's anchor readers) need files outside the touches — both were closed at #671's merge but are
+NOT done. New: R-bt-17-UNDOWILDSTART (data-integrity/LOW: `undo_wild_start` leaves unit/event/queue rows on a late `?`). Apparatus:
+the privacy census compares idents without `unraw()` (an `r#` accessor is invisible) — flagged, not tracked (policy). (6) **Lenses:**
+plan reviewer + red-team (REV 2); artifact reviewer (3 MAJOR fixed), reducer-security-auditor PASS, red-team (no survivor introduced by B — every one also survives on
+master; holes in T2/T4 and two overstated ledger survivors folded in a third tester round from its PoC tests: acceptor-side party
+ownership on the live accept, the Deploying-pack start-time escrow guard, disconnect auto-flee pays nothing, a pre-queued recruit is
+owned by the player; the helpers' `allow(dead_code)` became `cfg(test)` on its advice), verifier APPROVE;
+desync-guard N/A (no rule change). Scoped `cargo mutants` report on battle.rs / taming.rs / pvp.rs / guards.rs: 213 mutants: 205 caught, 1 missed, 7 unviable; the one survivor (`settle_pvp_battle`'s `Ok(side_a_ok && side_b_ok)` → `||`) is MISSED on master 64f66cca too (pre-existing; R-bt-17-PVPHPOK, gameplay/LOW → backlog).
+(7) **Gates:** BT17.3 MET on the FIRST verbatim `just e2e` run (130 passed, 12.8 m; the recruit R4 fixme skipped as before) — no R-bt-17-FIGHTSTALL or movement-input recenter flake this time; BT17.1 1 test run: 1 passed; BT17.2 1138/1138; full `just ci` green on the PR head (two detached runs wedged on the observability-validate `docker run --rm` client for `alloy fmt` — the container had exited with its output printed; killing the client PID let the run record 8/8 PASS and CI-EXIT=0, and a standalone `just observability-validate` passed in 6 s; `ops/` is untouched by this slice). PR mdrewt/monster-realm#672 (branch slice/bt-17 @ 4ab9809b)..
+
 ## Post-integration verification
 
 After bt-17 merges, on master (the integrated whole, not per-slice green):
