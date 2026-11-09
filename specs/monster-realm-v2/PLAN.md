@@ -90,13 +90,17 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    Decisions ANSWERED (#586): hybrid scaling, IA flatten all-three, mini-menu design delegated
    (wireframe-driven), battle "Items", footer collapse-when-empty. Client-only. First slice to launch:
    `wf-1`.
-6. **M-world-art-pass** (`M-world-art-pass.spec.md`, specced 2026-10-24): staged placeholder
-   upgrade (style guide → terrain kit → look-dev lighting scene per
-   `docs/research/hd2d-modern-retro-art-direction.md`), real water art + heal-location landmark,
-   distinct zone-1 art, larger authored maps, battle placeholder sprites (feeds item 4 P1).
-   Content-heavy and file-disjoint from items 4–5: fills idle fan-out capacity throughout; the
-   art-direction question is ANSWERED (#587 D5: keep ¾/32px/storybook, 2D-HD as a post stack) —
-   S0 unblocked.
+6. **M-world-art-pass** (`M-world-art-pass.spec.md`, specced 2026-10-24; **elaborated 2026-11-09 —
+   build-ready, 11 slices**): staged placeholder upgrade per `docs/research/hd2d-modern-retro-art-direction.md`.
+   S0 `wap-0` locks the style guide + a provenance art registry (no ai-placeholder asset ships); S1 adds the
+   ten-class terrain grammar in game-core `wap-1`, the terrain-kit atlas with animated water + shore band `wap-2`,
+   the battle placeholder set (missing sheets, registry URLs, integer art scale, backdrop) `wap-3`, the terrain
+   renderer `wap-4` and hero atlas `wap-5`; S3 draws heal landmarks + warp markers from data `wap-6` and grows
+   both zones (distinct coastal Tideglass Cove `wap-7`; Verdant Hollow with a non-grass healer `wap-8`); S2 is
+   the `pixi-filters` post stack + fixture look-dev scene `wap-9`; `wap-10` proves the integrated flow. After
+   `wap-0`, `wap-1`/`wap-2`/`wap-3` fan out, then the content chain runs beside the render chain. No table,
+   reducer or binding change. Art direction ANSWERED (#587 D5: keep ¾/32px/storybook, 2D-HD as a post stack).
+   First slice to launch: `wap-0`.
 7. **M-trade-sessions** (`M-trade-sessions.spec.md`, specced 2026-10-24): multi-stage trade
    redesign (blank session → per-side edits → confirm-with-reset → atomic execute), new
    eligibility rules, absorbs residuals R-weekly-review-2026-10-02-F5 / 2026-10-16-F1 /
