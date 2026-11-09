@@ -253,15 +253,16 @@ exceptions by size; each is split and serial on purpose.)
 ```
 wf-1 → uif-1 → uif-2 → uif-3 → uif-4 → uif-4b → uif-5 → uif-6 → uif-7 ─┬→ uif-8 → uif-11 ─┬→ uif-12 → uif-13 → uif-14
                                                                       ├→ uif-9 ──────────┤      ↓
-                                                                      └→ uif-10 ─────────┘   uif-15a → uif-15b → uif-14b → uif-15c → uif-16a → uif-16b → uif-17
+                                                                      └→ uif-10 ─────────┘   uif-15a → uif-15b → uif-14b → uif-16a → uif-16b → uif-15c → uif-17
 ```
 
 - **Kit spine** `uif-1`…`uif-5`: tokens, scale, primitives, every feedback sink (the one seam, restyled once), pointer. Screen slices add no kit CSS and no feedback routing, which is what makes the fan-out real.
 - **Fan-out window:** `uif-9` (Social) and `uif-10` (small screens) use the kit only: no `styles.css`,
   `main.ts` or catalog edits. They run beside `uif-8` → `uif-11` and each other, with pairwise-disjoint
   code, test and e2e touches (verified with `mr-disjoint` over every concurrency-eligible pair).
-- **Roster spine** `uif-12`…`uif-16b`: `main.ts`, catalogs and roster pins, strictly serial. The continuations `uif-14b` and `uif-15c` sit on it
-  after `uif-15b` (both touch `main.ts`, the catalogs and shared roster pins), and `uif-16a` follows them because `uif-14b` keeps `claimView.ts`.
+- **Roster spine** `uif-12`…`uif-16b`: `main.ts`, catalogs and roster pins, strictly serial. The continuations sit on it: `uif-14b` right after `uif-15b`
+  (`main.ts`, catalogs, roster pins; `uif-16a` follows it because `uif-14b` keeps `claimView.ts`), and `uif-15c` after `uif-16b`, because the
+  #586 D3 root measured over the 7-press bound while Profile is still a sub-list (see `uif-15c`).
 - **Build notes:** a file outside a slice's `touches:` is a STOP + build note, never a silent widen. Each
   slice's "Measured:" paragraph is the first hidden-dependency checklist.
 
@@ -922,7 +923,7 @@ STALECMT comment sites stay in the set from `uif-14` and need no edit.
 ### uif-15c — Menu IA: Options dies (continuation of uif-15b)
 category: ux-a11y · severity: MED · size: MODERATE
 touches: client/src/ui/menuModel.ts, client/src/ui/menuModel.test.ts, client/src/ui/screens/mainMenuScreen.ts, client/src/ui/screens/mainMenuScreen.test.ts, client/src/ui/menuView.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/main.ts, client/src/main.menu.test.ts, client/src/main.accel.test.ts, client/src/main.social.test.ts, client/src/main.notices.test.ts, client/src/main.controls.test.ts, client/src/main.hintBar.test.ts, client/src/main.help.test.ts, client/src/main.dispatch.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.remap.test.ts, client/src/ui/contextStack.test.ts, client/src/ui/reachability.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/a11y.spec.ts, client/e2e/menu-flow.spec.ts, client/e2e/remap.spec.ts, client/e2e/battle-dpad.spec.ts, client/e2e/encounter-battle.spec.ts, client/e2e/ui-menu.spec.ts, docs/PLAYTEST.md, client/e2e/ui-controls.spec.ts, client/e2e/ui-feedback.spec.ts, client/e2e/ui-chrome.spec.ts
-after: [uif-14b]
+after: [uif-16b]
 Feedback items: pt3-2026-10-025, -104, -109, -111
 Measured (monster-realm master `dd4e7c7d`, a grep census of `menu.options.`, `menuOptions`, `menu-root-options`, `menuTo(page, 'options')`,
 `MENU_ROOT_KEYS` and the Y path, comment lines excluded; every hit is in these touches): the touches are `uif-15b`'s set plus the three e2e specs its build
@@ -932,10 +933,18 @@ note named. `ui-controls.spec.ts` (`openControls`) and `ui-feedback.spec.ts` wal
 `{ menu: ['options', 'controls'], frame: 'controlsView' }` (`router.ts`). In `reachability.test.ts`, `QF14-3-REACH-MANIFEST` pins that path, the leaf
 `options/controls` and 6 presses, and `CTL11B-2`'s anti-vacuity asserts that an `options/` leaf exists; both rewrite once. Six keys retire or re-home
 (`menu.options.{title,desc}`, `menu.options.help.*`, `menu.options.controls.*`, in `menuModel.ts`, `mainMenuScreen.ts`, the catalogs and their pins in
-`main.accel`, `main.controls`, `main.notices`, `main.remap`, `catalog.test.ts`). The catalog roster is 531 when this slice starts (`uif-14b`'s +1). The root
-list grows from 7 entries to 8 (Monsters, Inventory, Journal, Social, Profile, How to Play, Controls, Close). Comment-only "Options > Controls" mentions outside
+`main.accel`, `main.controls`, `main.notices`, `main.remap`, `catalog.test.ts`). The catalog roster at this slice's start is whatever `uif-16b` leaves (530 at `dd4e7c7d`, +1 from
+`uif-14b`, then `uif-16b`'s own change). The root list grows from 7 entries to 8 (Monsters, Inventory, Journal, Social, Profile, How to Play, Controls, Close). Comment-only "Options > Controls" mentions outside
 the set (`input/bindings.test.ts`, `input/pointerSource.ts`, `indexShell.smoke.test.ts`, `e2e/controls.ts`) go stale but fail nothing. They are left for a
 later Boy Scout pass rather than widened in. `docs/DECISIONS.md`'s "Options › Report a" is a historical record and stays.
+
+Reach, measured (uif-cont-spec, a scratch copy of `client/` at `dd4e7c7d` with the D3 root applied to `menuModel.ts` and `ACCEL_PATHS.Y`, run through
+`reachability.test.ts`'s own `searchMenu`/`pressesTo` over 4,001 real `mainMenuStep` walks): while Profile is still a group, the fresh cursor already
+breaks the bound (C 8, the Profile › Account and › Privacy leaves 8, N 7), so this slice runs after `uif-16b`. With Profile as one leaf (N and C counted to
+that leaf), every fresh count is within 7 (Y 4, N 6, C 6). From a remembered cursor, P (Social › Challenges) is still 8: on an 8-entry ring a cursor left on Close sits 4 moves
+from Social both ways. With the one further rule that a menu left on Close reopens on its first entry, the worst case over every walk is 7 (P 7, B 7, the
+rest 6 or less), so the bound stays 7. That rule lives in `mainMenuScreen.ts`'s `openMainMenu`; no test outside these touches pins a cursor remembered on
+Close. If the operator objects to the rule, the fallback is a named bound of 8 for the remembered-cursor property only, with a DECISIONS entry.
 
 - **UIF15C.1:** THE main menu SHALL list How to Play and Controls at the root, the Options sub-list and its menu level SHALL be gone (#586 D3, 109, 111), and
   Close SHALL stay the last entry (025, 104), completing UIF15B.2.
@@ -943,8 +952,9 @@ later Boy Scout pass rather than widened in. `docs/DECISIONS.md`'s "Options › 
 - **UIF15C.2:** WHEN the accelerator Y fires, THE Controls frame SHALL open as before through its root path, with `EXPECTED_PATHS`' Y row rewritten once and
   its change named in a comment.
 
-- **UIF15C.3:** WHEN reachability is computed over the real `mainMenuStep`, Y SHALL reach Controls within the 7-press bound, with the `QF14-3-REACH-MANIFEST`
-  count and the `CTL11B-2` Options-leaf anti-vacuity each changed once and named.
+- **UIF15C.3:** WHEN reachability is computed over the real `mainMenuStep`, EVERY accelerator target and leaf SHALL stay within the 7-press bound from the fresh
+  cursor and from any remembered cursor, with a menu left on Close reopening on its first entry, and the `QF14-3-REACH-MANIFEST` count (Y 6 → 4) and the
+  `CTL11B-2` Options-leaf anti-vacuity each changed once and named.
 
 - **UIF15C.4:** WHEN the root list takes its #586 D3 shape, EVERY e2e that walked Start → Options SHALL walk the root entry instead, and `ui-chrome.spec.ts`'s
   `MENU_ROOT_KEYS` SHALL drop `options` and name the two root entries, each changed once; no e2e SHALL be deleted for convenience.
@@ -955,7 +965,7 @@ later Boy Scout pass rather than widened in. `docs/DECISIONS.md`'s "Options › 
 ### uif-16a — Profile: sections behind one seam, no visible change
 category: ux-a11y · severity: LOW · size: MODERATE
 touches: client/src/ui/renameView.ts, client/src/ui/renameView.test.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/privacyView.ts, client/src/ui/privacyView.test.ts, client/src/ui/screens/profileScreen.ts, client/src/ui/screens/profileScreen.test.ts, client/src/ui/screens/profileScreen.boot.test.ts
-after: [uif-15c]
+after: [uif-14b]
 Feedback items: pt3-2026-10-097
 Measured: each of the three views owns its overlay root, calls `openOverlayA11y` on it and exposes rows through `applyRowOp`. This slice separates "a section" (root, rows, render) from
 "an overlay" (a11y, show, hide), still wired as three overlays, so `uif-16b` is a roster swap and a section reuse, and a budget overrun parks with green code. Element ids hold.
@@ -986,7 +996,7 @@ the views. Claim auto-opens at boot and on sign-in failure (`openClaim` paths), 
 hidden state, so an already-settled account section needs a resting presentation from `claimModel`'s existing phases. `ACCEL_PATHS` N and C become Profile rows. The `privacy-busy` message kind becomes unreachable and retires from `feedbackPolicy` here with the change named (WF1-A10). Decision entry: Profile's one-dialog shape.
 
 - **UIF16B.1:** WHEN Profile is chosen from the main menu, THE client SHALL open ONE full screen showing Name, Account and Privacy sections together (#586 D3, 097), with section headers and
-  separators from tokens and no sub-list, and the last menu sub-list SHALL be gone.
+  separators from tokens and no sub-list, and the Profile sub-list SHALL be gone (Options' goes in `uif-15c`, which follows).
 
 - **UIF16B.2:** WHILE Profile shows, THE D-pad SHALL walk one column of rows across all three sections in visual order, the axis matching the layout (102), with Close at the bottom (104) and B
   popping the frame.
@@ -1007,7 +1017,7 @@ hidden state, so an already-settled account section needs a resting presentation
 ### uif-17 — The integrated whole
 category: ux-a11y · severity: MED · size: LIGHT
 touches: client/e2e/ui-whole.spec.ts, ARCHITECTURE.md, docs/PLAYTEST.md, docs/DECISIONS.md
-after: [uif-16b]
+after: [uif-15c]
 Feedback items: pt3-2026-10-094, -153, -175
 Measured: an e2e of the combined flow only, reusing `uiKit.ts`; there is no product code in this slice. The wireframe-vs-shipped comparison goes in the PR body with screenshots from this run
 (harness-side `M-ui-foundation-wireframes.md` gets its As-shipped section as the supervisor's doc chore, since a slice routes to one repo). Per-screen proofs stay with their slices; this walk proves
@@ -1063,6 +1073,8 @@ The milestone is done when the merged whole, not each slice, satisfies UIF.1–U
 - **World-canvas click (`uif-5`):** closes only. Routing it would press A and reopen the same sheet; the operator's expectation allows this ("assuming it is appropriate to do so").
 - **Profile as one dialog, not tabs (`uif-16a/b`, D3):** tabs would be far cheaper (the Social precedent) but keep three sparse pages, the operator's actual complaint. HEAVY, and the milestone's largest risk.
 - **Terminology (`uif-15a`):** the sketch's non-goal assumed qf-10 landed the labels. It did not (R-qf-10-QF10.1), and D3's ruled menu names them, so the labels land here. Further renames stay out.
+- **Close is not remembered (`uif-15c`, D3):** a menu left on Close reopens on its first entry. Measured, it is the one rule that keeps D3's 8-entry
+  root inside the 7-press bound from a remembered cursor (P would read 8). The fallback is a named bound of 8 for that property only.
 - **Order inverted against the old PLAN line:** the tactical UI shipped first, so `uif-11` migrates it.
 
 **Risks:**
