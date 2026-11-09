@@ -1,7 +1,8 @@
 # Spec: M-ui-foundation — the shared menu design language
 
-**Status:** elaborated 2026-11-07 from the 2026-10-24 sketch · **build-ready: 21 slices** — `wf-1`
-(wireframes, docs-only, harness repo) then `uif-1`…`uif-17` with split ids `uif-4b`, `uif-15a/b`, `uif-16a/b` (client) · **wf-1 verdicts, token table and channel table:** [`M-ui-foundation-wireframes.md`](M-ui-foundation-wireframes.md); its amendments are tagged `WF1-A<n>` below · **Project:** monster-realm
+**Status:** elaborated 2026-11-07 from the 2026-10-24 sketch · **build-ready: 23 slices** — `wf-1`
+(wireframes, docs-only, harness repo) then `uif-1`…`uif-17` with split ids `uif-4b`, `uif-15a/b`, `uif-16a/b` (client), plus the
+continuations `uif-14b` and `uif-15c` (added 2026-11-09, measured at `dd4e7c7d`, for the criteria `uif-14` and `uif-15b` deferred) · **wf-1 verdicts, token table and channel table:** [`M-ui-foundation-wireframes.md`](M-ui-foundation-wireframes.md); its amendments are tagged `WF1-A<n>` below · **Project:** monster-realm
 (client-only; no game-core, server or binding change) · **Measured against** monster-realm `master`
 `d90c32c9` (bt-17 increment B, #672) with so-2, M-pt3-quickfix and M-battle-tactics bt-1…bt-17 merged.
 **Anchors are symbols, not lines.** · **Doctrine:** `standards/testing-tdd.md` — every criterion is an
@@ -16,7 +17,7 @@ reopened.
 directive -013, -014, -015. Each slice names the items it closes.
 
 **Absorbed residuals (each named in exactly one slice's criteria — see Residual map):**
-R-ctl-14-CTL14.2, R-ctl-14-HELPA11Y, R-ctl-14-STALECMT → `uif-14` · R-ctl-11a-MONSTERSTAB,
+R-ctl-14-HELPA11Y, R-ctl-14-STALECMT → `uif-14` · R-ctl-14-CTL14.2 → `uif-14b` · R-ctl-11a-MONSTERSTAB,
 R-qf-10-QF10.2, R-qf-11-GEOMETRY → `uif-6` · R-ctl-SETRATIO → `uif-2` · R-qf-12-QF12.3 → `uif-3` ·
 R-qf-2-SHEETLINEPARITY → `uif-4` · R-ctl-13-SHEETCHIPS → `uif-12` · R-qf-10-QF10.1 → `uif-15a` ·
 R-ctl-8h-CTL8H.1 → `uif-16b`. R-weekly-review-2026-10-02-F3 is dispositioned fixed (GAME #579) and
@@ -252,14 +253,15 @@ exceptions by size; each is split and serial on purpose.)
 ```
 wf-1 → uif-1 → uif-2 → uif-3 → uif-4 → uif-4b → uif-5 → uif-6 → uif-7 ─┬→ uif-8 → uif-11 ─┬→ uif-12 → uif-13 → uif-14
                                                                       ├→ uif-9 ──────────┤      ↓
-                                                                      └→ uif-10 ─────────┘   uif-15a → uif-15b → uif-16a → uif-16b → uif-17
+                                                                      └→ uif-10 ─────────┘   uif-15a → uif-15b → uif-14b → uif-15c → uif-16a → uif-16b → uif-17
 ```
 
 - **Kit spine** `uif-1`…`uif-5`: tokens, scale, primitives, every feedback sink (the one seam, restyled once), pointer. Screen slices add no kit CSS and no feedback routing, which is what makes the fan-out real.
 - **Fan-out window:** `uif-9` (Social) and `uif-10` (small screens) use the kit only: no `styles.css`,
   `main.ts` or catalog edits. They run beside `uif-8` → `uif-11` and each other, with pairwise-disjoint
   code, test and e2e touches (verified with `mr-disjoint` over every concurrency-eligible pair).
-- **Roster spine** `uif-12`…`uif-16b`: `main.ts`, catalogs and roster pins, strictly serial.
+- **Roster spine** `uif-12`…`uif-16b`: `main.ts`, catalogs and roster pins, strictly serial. The continuations `uif-14b` and `uif-15c` sit on it
+  after `uif-15b` (both touch `main.ts`, the catalogs and shared roster pins), and `uif-16a` follows them because `uif-14b` keeps `claimView.ts`.
 - **Build notes:** a file outside a slice's `touches:` is a STOP + build note, never a silent widen. Each
   slice's "Measured:" paragraph is the first hidden-dependency checklist.
 
@@ -274,7 +276,7 @@ wf-1 → uif-1 → uif-2 → uif-3 → uif-4 → uif-4b → uif-5 → uif-6 → 
 | R-qf-10-QF10.2 | uif-6 | Fixed (in-panel headings dropped) |
 | R-qf-11-GEOMETRY | uif-6 | Fixed by the Chromium geometry test on real Monsters |
 | R-ctl-13-SHEETCHIPS | uif-12 | Fixed (hint chips match the open sheet) |
-| R-ctl-14-CTL14.2 | uif-14 | Fixed, re-homed to How to Play |
+| R-ctl-14-CTL14.2 | uif-14b | Fixed, re-homed to How to Play's Report a problem row (deferred out of `uif-14`) |
 | R-ctl-14-HELPA11Y | uif-14 | Fixed; the keyless-row half goes with the tab |
 | R-ctl-14-STALECMT | uif-14 | Fixed |
 | R-qf-10-QF10.1 | uif-15a | Fixed (labels and the help title) |
@@ -814,7 +816,7 @@ the sketch; each new id costs about 25 pins, and an in-frame modal gives the sam
   spoilers (113), in en and fr, then a Report a problem row.
 
 - **UIF14.3:** WHEN Report a problem is chosen by A or pointer, THE client SHALL assemble and save the bug bundle exactly as F9 does,
-  closing R-ctl-14-CTL14.2 re-homed here because #586 D3's main menu has no slot for it.
+  re-homed here because #586 D3's main menu has no slot for it (deferred with UIF14.2's row; `uif-14b` owns it and the F9-twin residual).
 
 - **UIF14.4:** THE Encyclopedia tab SHALL list every special in-game term and mechanic, covering at least party and Storage, recruit
   and bait, evolution and essence, affinity, status effects, tactical AP, initiative, the action queue, the idle clock, stances, Guard,
@@ -832,7 +834,7 @@ the sketch; each new id costs about 25 pins, and an in-frame modal gives the sam
 Build note (uif-14, 2026-11-08): UIF14.2's Report a problem row and UIF14.3 were DEFERRED on a hidden dependency the Measured
 note missed: a `reportProblem` `Command` arm must also be classified in `client/src/ui/battlePolicy.ts` (`COMMAND_BATTLE_POLICY`, a
 total `Record` over the kinds) and `client/src/ui/battlePolicy.test.ts` pins the 34-kind roster. The follow-up's touches need both,
-plus `screens/types.ts`, `main.ts`, the help files, `help.intro.report` and `e2e/ui-help.spec.ts`. Also measured: the detail sheet is
+plus `screens/types.ts`, `main.ts`, the help files, `help.intro.report` and `e2e/ui-help.spec.ts` (specified as `uif-14b`). Also measured: the detail sheet is
 absolute inside the scrolling `#help-overlay`, so `helpView` moves its centring box onto the visible part (×2 text scrolls the frame).
 
 ### uif-15a — Labels: Inventory, How to Play
@@ -885,16 +887,84 @@ Build note (uif-15b, 2026-11-09): shipped Social as a root leaf (UIF15B.1/.3/.4/
 dies) was DEFERRED on a hidden dependency the Measured note missed: `e2e/ui-controls.spec.ts` (`openControls`) and `e2e/ui-feedback.spec.ts` both walk
 Start → Options → A → Down → Controls, and `e2e/ui-chrome.spec.ts` pins `MENU_ROOT_KEYS` with `options` (its `seatMenuCursorOnMonsters` comment also names the
 gone `menuSocial` level). The follow-up's touches need those three specs plus this slice's set. It also needs the Y row of `EXPECTED_PATHS` and the
-`QF14-3-REACH-MANIFEST` count (Y: 6 via Options), each changed once and named. Social's reach counts, computed over the real Social tab layout from Players:
+`QF14-3-REACH-MANIFEST` count (Y: 6 via Options), each changed once and named (specified as `uif-15c`). Social's reach counts, computed over the real Social tab layout from Players:
 U 6, P 7, L 6.
+
+### uif-14b — How to Play: the Report a problem row (continuation of uif-14)
+category: ux-a11y · severity: MED · size: LIGHT
+touches: client/src/ui/helpModel.ts, client/src/ui/helpModel.test.ts, client/src/ui/helpView.ts, client/src/ui/helpView.test.ts, client/src/ui/helpView.i18n.test.ts, client/src/ui/screens/helpScreen.ts, client/src/ui/screens/helpScreen.test.ts, client/src/ui/screens/types.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/ui/a11yCopy.ts, client/src/ui/a11yCopy.test.ts, client/src/ui/questLogView.test.ts, client/src/ui/reachability.test.ts, client/src/ui/menuModel.test.ts, client/src/ui/claimView.ts, client/src/main.ts, client/src/main.help.test.ts, client/src/main.chips.test.ts, client/src/main.dispatch.test.ts, client/src/main.input.test.ts, client/src/indexShell.smoke.test.ts, client/index.html, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/a11y.spec.ts, client/e2e/ui-help.spec.ts, ARCHITECTURE.md, client/src/ui/battlePolicy.ts, client/src/ui/battlePolicy.test.ts, client/src/ui/contextStack.test.ts
+after: [uif-15b]
+Feedback items: pt3-2026-10-113
+Measured (monster-realm master `dd4e7c7d`, a grep census of `COMMAND_BATTLE_POLICY`, `COMMAND_KINDS`, `battleSafeCommand(`, `help.intro.` and
+`downloadBugBundle(`, comment lines excluded; every hit is in these touches): the touches are `uif-14`'s set plus the two files its build note named and one
+it missed. `battlePolicy.ts`'s `COMMAND_BATTLE_POLICY` is a total `Record<ScreenCommand['kind'], …>`, and `battlePolicy.test.ts` [BT17-1] pins `COMMAND_KINDS`
+at 34 with compile-level `_total`/`_sound` halves. The miss is `contextStack.test.ts`: its battle-policy case transcribes its own SAFE (9) and REFUSE (25)
+lists over the 34 kinds under a named-count comment ladder, so it changes too. `main.dispatch.test.ts`'s cross-check (`policySafe` against the driven rows,
+`safeNoViewCallback` and `stackMoves`) must place the new kind on the safe side; it is already in the set. F9 calls `downloadBugBundle()` early in the key
+handler "so they work under any overlay", and help opens over a battle, so the new arm is battle-safe for parity: 10 safe, 25 refused, 35 kinds. The arm goes
+in `screens/types.ts`'s `Command`, and `dispatch`'s exhaustive switch in `main.ts` gets a case that calls `downloadBugBundle()`. `help.intro.report` is one new
+key (catalog roster 530 → 531 at `dd4e7c7d`). `helpView.ts` is already on PARITY-02's resolver roster and `main.ts` does not render the row, so
+`catalogParity.test.ts` holds. `helpModel.test.ts`, `helpView.i18n.test.ts` and `main.help.test.ts` name the `help.intro.*` ids. `claimView.ts` and the other
+STALECMT comment sites stay in the set from `uif-14` and need no edit.
+
+- **UIF14B.1:** THE Introduction tab SHALL end its book-jacket paragraphs with a Report a problem row (`help.intro.report`, en and fr) that the D-pad reaches
+  and the hint bar labels through its generated chips, completing UIF14.2.
+
+- **UIF14B.2:** WHEN Report a problem is chosen by A or pointer, THE client SHALL dispatch one `reportProblem` command whose `dispatch` arm assembles and saves
+  the bug bundle exactly as F9 does through `downloadBugBundle`, completing UIF14.3 and closing R-ctl-14-CTL14.2.
+
+- **UIF14B.3:** THE `reportProblem` kind SHALL be classified once in `COMMAND_BATTLE_POLICY` as battle-safe (F9's parity), with `battlePolicy.test.ts`'s roster
+  34 → 35, `contextStack.test.ts`'s SAFE list 9 → 10 (35 kinds) and `main.dispatch.test.ts`'s cross-check each changed once with the count named.
+
+- **UIF14B.4:** WHEN this slice lands, axe on How to Play SHALL stay clean in Chromium, and `ui-help.spec.ts` SHALL choose the row by A and by click and observe
+  one saved bundle download each time.
+
+### uif-15c — Menu IA: Options dies (continuation of uif-15b)
+category: ux-a11y · severity: MED · size: MODERATE
+touches: client/src/ui/menuModel.ts, client/src/ui/menuModel.test.ts, client/src/ui/screens/mainMenuScreen.ts, client/src/ui/screens/mainMenuScreen.test.ts, client/src/ui/menuView.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/main.ts, client/src/main.menu.test.ts, client/src/main.accel.test.ts, client/src/main.social.test.ts, client/src/main.notices.test.ts, client/src/main.controls.test.ts, client/src/main.hintBar.test.ts, client/src/main.help.test.ts, client/src/main.dispatch.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.remap.test.ts, client/src/ui/contextStack.test.ts, client/src/ui/reachability.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/a11y.spec.ts, client/e2e/menu-flow.spec.ts, client/e2e/remap.spec.ts, client/e2e/battle-dpad.spec.ts, client/e2e/encounter-battle.spec.ts, client/e2e/ui-menu.spec.ts, docs/PLAYTEST.md, client/e2e/ui-controls.spec.ts, client/e2e/ui-feedback.spec.ts, client/e2e/ui-chrome.spec.ts
+after: [uif-14b]
+Feedback items: pt3-2026-10-025, -104, -109, -111
+Measured (monster-realm master `dd4e7c7d`, a grep census of `menu.options.`, `menuOptions`, `menu-root-options`, `menuTo(page, 'options')`,
+`MENU_ROOT_KEYS` and the Y path, comment lines excluded; every hit is in these touches): the touches are `uif-15b`'s set plus the three e2e specs its build
+note named. `ui-controls.spec.ts` (`openControls`) and `ui-feedback.spec.ts` walk Start → Options → A → Down → Controls. `ui-chrome.spec.ts` pins
+`MENU_ROOT_KEYS` with `options`, and its `seatMenuCursorOnMonsters` comment names the gone `menuSocial` level. `remap.spec.ts`, `battle-dpad.spec.ts`
+("Options > How to play") and `encounter-battle.spec.ts` walk Options as well and are already in the set. `ACCEL_PATHS.Y` is
+`{ menu: ['options', 'controls'], frame: 'controlsView' }` (`router.ts`). In `reachability.test.ts`, `QF14-3-REACH-MANIFEST` pins that path, the leaf
+`options/controls` and 6 presses, and `CTL11B-2`'s anti-vacuity asserts that an `options/` leaf exists; both rewrite once. Six keys retire or re-home
+(`menu.options.{title,desc}`, `menu.options.help.*`, `menu.options.controls.*`, in `menuModel.ts`, `mainMenuScreen.ts`, the catalogs and their pins in
+`main.accel`, `main.controls`, `main.notices`, `main.remap`, `catalog.test.ts`). The catalog roster is 531 when this slice starts (`uif-14b`'s +1). The root
+list grows from 7 entries to 8 (Monsters, Inventory, Journal, Social, Profile, How to Play, Controls, Close). Comment-only "Options > Controls" mentions outside
+the set (`input/bindings.test.ts`, `input/pointerSource.ts`, `indexShell.smoke.test.ts`, `e2e/controls.ts`) go stale but fail nothing. They are left for a
+later Boy Scout pass rather than widened in. `docs/DECISIONS.md`'s "Options › Report a" is a historical record and stays.
+
+- **UIF15C.1:** THE main menu SHALL list How to Play and Controls at the root, the Options sub-list and its menu level SHALL be gone (#586 D3, 109, 111), and
+  Close SHALL stay the last entry (025, 104), completing UIF15B.2.
+
+- **UIF15C.2:** WHEN the accelerator Y fires, THE Controls frame SHALL open as before through its root path, with `EXPECTED_PATHS`' Y row rewritten once and
+  its change named in a comment.
+
+- **UIF15C.3:** WHEN reachability is computed over the real `mainMenuStep`, Y SHALL reach Controls within the 7-press bound, with the `QF14-3-REACH-MANIFEST`
+  count and the `CTL11B-2` Options-leaf anti-vacuity each changed once and named.
+
+- **UIF15C.4:** WHEN the root list takes its #586 D3 shape, EVERY e2e that walked Start → Options SHALL walk the root entry instead, and `ui-chrome.spec.ts`'s
+  `MENU_ROOT_KEYS` SHALL drop `options` and name the two root entries, each changed once; no e2e SHALL be deleted for convenience.
+
+- **UIF15C.5:** WHEN `menu.options.*` retires, THE catalog roster count and DEAD-KEY SHALL change once with the count named, and `docs/PLAYTEST.md`'s
+  "Options ›" paths SHALL name the root entries.
 
 ### uif-16a — Profile: sections behind one seam, no visible change
 category: ux-a11y · severity: LOW · size: MODERATE
 touches: client/src/ui/renameView.ts, client/src/ui/renameView.test.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/privacyView.ts, client/src/ui/privacyView.test.ts, client/src/ui/screens/profileScreen.ts, client/src/ui/screens/profileScreen.test.ts, client/src/ui/screens/profileScreen.boot.test.ts
-after: [uif-15b]
+after: [uif-15c]
 Feedback items: pt3-2026-10-097
 Measured: each of the three views owns its overlay root, calls `openOverlayA11y` on it and exposes rows through `applyRowOp`. This slice separates "a section" (root, rows, render) from
 "an overlay" (a11y, show, hide), still wired as three overlays, so `uif-16b` is a roster swap and a section reuse, and a budget overrun parks with green code. Element ids hold.
+Measured again at `dd4e7c7d` (uif-cont-spec, a grep census of the importers of the three views and of `profileScreen`): the seam's home is `profileScreen.ts`,
+which already holds `RowsView`, `RowOp`, `rowStep` and `reseatRow`. The three views and their tests import `RowOp` from it. Outside these touches,
+`main.ts` constructs the three views, and `screens/index.ts` registers `nameScreen`, `accountScreen` and `privacyScreen`, pinned by identity in
+`screens/index.test.ts` CTL8H-3-ADAPTERS-REGISTERED. `sessionView.ts` imports `reseatRow`. `overlayA11yWiring.test.ts`, `renameView.i18n.test.ts`,
+`claimView.i18n.test.ts` and `privacyView.i18n.test.ts` construct the views. The compile-unchanged guard follows: the constructors, the three adapter exports
+and `reseatRow`/`rowStep`/`RowOp` must hold, and the section interface is additive. A change to any of them is a hidden dependency (STOP + build note).
 
 - **UIF16A.1:** THE rename, claim and privacy views SHALL each expose their section root and shown, enabled rows through one shared section interface, with all existing view and boot suites
   green and no visible change.
@@ -986,7 +1056,7 @@ The milestone is done when the merged whole, not each slice, satisfies UIF.1–U
   No fixed-ratio box is added and R-ctl-SETRATIO closes as superseded. A fixed-ratio box would change how much world each window shows and belongs to a later ask.
 - **Text-size steps (`uif-13`, D1):** ×1, ×1.5, ×2 on vector monospace. ×1.5 breaks the sketch's "integer multiples" wording, which only ever matters for a pixel font, and none ships.
   Home is Controls › Display, because D3 kills Options and rules the main-menu list.
-- **Report a problem (`uif-14`, D3):** in How to Play's Introduction. D3's ruled main menu has no slot, and the sketch's "same `MENU_ENTRIES` edit" no longer fits.
+- **Report a problem (`uif-14`, built in `uif-14b`, D3):** in How to Play's Introduction. D3's ruled main menu has no slot, and the sketch's "same `MENU_ENTRIES` edit" no longer fits.
 - **Encyclopedia detail (`uif-14`, sketch said new `OverlayId`):** an in-frame modal phase. Same player behavior, about 25 fewer pin edits, and it matches how sheets work.
 - **Sheet phases, not stack frames (`uif-3`, `uif-5`):** the sketch said "pops the sheet through the stack"; sheets are adapter phases, so close is B through the adapter. It stays inside the
   one-context-stack model because the only thing pointer does is press B.
