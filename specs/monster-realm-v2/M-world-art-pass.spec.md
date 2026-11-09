@@ -1,8 +1,8 @@
 # Spec: M-world-art-pass — 2D-HD-ready placeholders and a readable, larger world
 
 **Status:** elaborated 2026-11-09 from the 2026-10-24 sketch · **build-ready: 11 slices** — `wap-0`…`wap-10`
-(stage S0 lock → S1 terrain kit, battle placeholders, characters → S3 world content ‖ client render chain → S2 post
-stack → integrated whole) · **Project:** monster-realm (game-core terrain grammar + content RON, client render + art
+(research stages: S0 `wap-0` → S1 `wap-1`…`wap-5` → S3 `wap-6`…`wap-8` → S2 `wap-9` → the integrated whole `wap-10`;
+the build order is the Sequencing section's two chains, not the stage numbers) · **Project:** monster-realm (game-core terrain grammar + content RON, client render + art
 assets; **no table, reducer or binding change**) · **Measured against** monster-realm `master` `a60796e6` (uif-17,
 #699) with M-ui-foundation uif-1…uif-17 and M-battle-tactics bt-1…bt-17 merged. **Anchors are symbols, not lines.** ·
 **Doctrine:** `standards/testing-tdd.md` — every criterion is an ordinary colocated test or one Chromium e2e per flow;
@@ -98,9 +98,9 @@ The sketch's other open questions are closed by measurement, not by a new ruling
   backdrop); the terrain renderer (`wap-4`); the hero/character atlas (`wap-5`).
 - **S3:** heal landmark + warp markers drawn from data (`wap-6`); a distinct, larger Tideglass Cove (`wap-7`); a larger
   Verdant Hollow whose healer tile no longer starts encounters (`wap-8`).
-- **S2 (`wap-9`):** the post stack (ambient lightmap, emissive, AdvancedBloom, Godray, ColorMap LUT time-of-day
-  keyframes, vignette) over the world layer only, each pass toggleable, deterministic, reduced-motion-safe, with a
-  fixture-page look-dev scene.
+- **S2 (`wap-9`):** the post stack (ambient lightmap with vignette falloff, AdvancedBloom, Godray, ColorMap LUT
+  time-of-day keyframes) over the world layer only, each pass toggleable, deterministic, reduced-motion-safe, with a
+  fixture-page look-dev smoke scene.
 - **Integrated whole (`wap-10`):** the operator flow e2e through the real UI and the closing docs.
 
 **Named deferrals (declared, not dropped)**
@@ -108,9 +108,9 @@ The sketch's other open questions are closed by measurement, not by a new ruling
 | Deferred | Target | Why |
 |---|---|---|
 | Final art | backlog — a final-art milestone, unscheduled (artist hire) | This milestone delivers swap-stable placeholders |
-| Release gate that every registry row is `final` (`releaseBlockers` wired into the launch build) | backlog — launch checklist beside M25 sign-off | Wiring it now fails every build; the pure function and its tests land in `wap-0` |
-| Normal-map / deferred lighting for hero and props (research rung 4), occluder shadows | backlog | Only if the `wap-9` lightmap alone demonstrably looks flat |
-| Live time-of-day cycle in the game | backlog | Needs a world-clock design; `wap-9` ships keyframes, the game uses `day` |
+| Release gate that every registry row is `final` (a query over the registry wired into the launch build) | backlog — launch checklist beside M25 sign-off | Wiring it now fails every build, and a query with no caller is speculative; the registry's `provenance` field is all it needs |
+| Normal-map / deferred lighting for hero and props (research rung 4), the emissive layer, occluder shadows | backlog | Only if the `wap-9` lightmap alone demonstrably looks flat; no slice authors emissive masks, so an emissive pass would have no input |
+| Live time-of-day cycle in the game; the dawn and interior LUT keyframes | backlog | Needs a world-clock design (and interiors); `wap-9` ships day / dusk / night to prove the mechanism, the game uses `day` |
 | A player-facing graphics/quality setting (per-pass toggles in Controls) | backlog | A UI-kit screen change; `wap-9`'s toggles are code config |
 | Per-zone battle backdrops; a Pixi battle board | backlog | One backdrop asset suffices; the DOM board stays (M-battle-tactics non-goal) |
 | NPC / remote-player sprite variety | backlog | `RenderEntity` carries no entity kind; adding it touches `main.ts` and the predictor feed |
@@ -145,17 +145,26 @@ The sketch's other open questions are closed by measurement, not by a new ruling
 3. **Additive** — `TileKind` variants are tail-appended; `zone_map()`'s JS payload only gains fields (`terrain`,
    `landmarks`); every existing field name (`zone_id`, `width`, `height`, `walkable`, `grass`, `warps`) stays, because
    `client/e2e/controls.ts` `safeTile` and ~36 main-boot test fixtures read them.
-4. **Pure core / imperative shell** — decision logic lives in new pure, unit-tested modules under `client/src/render/`;
-   Pixi calls stay inside `world.ts` and `characterView.ts`, which are already coverage-excluded. No slice adds a file
-   to `client/vite.config.ts`'s coverage `exclude` list (it is exact-set-guarded by the dom-shell-coverage-exclusion
-   eval).
+4. **Pure core / imperative shell** — decision logic (layout, fallback choice, chunk lifetime, pass planning,
+   frame selection) lives in new pure, unit-tested modules under `client/src/render/` that take injected factories and
+   clocks; Pixi calls stay inside `world.ts` and `characterView.ts`, which are already coverage-excluded. No slice adds
+   a file to `client/vite.config.ts`'s coverage `exclude` list. What only the Pixi shell does is proven once, through
+   the real UI, by `wap-10`'s e2e reading `describeArt()`.
 5. **The `WorldRenderer` surface the mocks assume** (`init`, `setMap`, `render`, `resize`, `screenFor`, `clear`,
    `destroy`, `viewCount`) stays; any new method main.ts calls is invoked optionally (`renderer?.x?.()`), because 36
    test files replace `./render/world` with a mock lacking it.
 6. **Determinism render-side** — time enters render code only as an injected `nowMs`; variant choice is an integer hash
    of (zone, x, y); no `Math.random`, no wall-clock read in shaders, filters or animation.
-7. **Smoothness contract** — the slide clock, interpolation buffer and reconcile are untouched; per-frame work added by
-   this milestone is texture swaps on animated tiles only when their frame index changes.
+7. **Smoothness contract** — the slide clock, interpolation buffer and reconcile are untouched. Per-frame CPU work
+   added by the terrain and decor layers is texture swaps on animated tiles only when their frame index changes; the
+   `wap-9` filter chain adds a per-frame GPU cost that is measured and recorded, not hidden.
+7a. **Pixel fidelity under the new layers** — every atlas, chunk and LUT texture samples `nearest`, chunk textures render
+    at the device scale, and filters run at the world's device scale, so a 32 px tile edge stays a hard step at every
+    integer scale (DECISIONS "Integer pixel scaling").
+7b. **No new test reads hand-authored text** — no slice adds an assertion that reads `styles.css`, a RON file, a doc or
+    a manifest. Where a slice must change an existing CSS-text assertion (`boardRender.test.ts` BT10-1-CSS-LAYOUT,
+    `styles.test.ts`'s uif-11 art allowlist), it replaces that assertion by a behavior check (a pure test or a
+    computed-style check inside an existing e2e flow), replacement-first, with the deletion named in the PR.
 8. **Reduced motion** — every animation this milestone adds (water, warp pulse, godray time) holds a static frame WHILE
    `reduceMotion` is set; the bit arrives by injection from `motionPreference.ts`.
 9. **Never colour alone** — water reads by value, texture, motion and edge; the warp marker and the landmark read by
@@ -164,7 +173,10 @@ The sketch's other open questions are closed by measurement, not by a new ruling
     provenance tag). License ladder: CC0 > CC-BY > share-alike > EULA > AI-generated. In this milestone only
     `CC0-1.0`, `CC-BY-4.0`/`CC-BY-3.0` (with an attribution string) and `project-original` (this repo's own generators)
     are accepted. The tag `ai-placeholder` (image-model output) is forbidden in a committed row: AI output is for
-    ideation only and nothing it produced ships. Atlas keys are stable ids, so final art is a file swap.
+    ideation only and nothing it produced ships. The row type makes these rules unrepresentable where it can (the
+    provenance and license unions omit `ai-placeholder`, share-alike and EULA; a CC-BY row requires its attribution
+    string); the runtime validator covers what types cannot (duplicates, dimensions, files). Atlas keys are stable ids,
+    so final art is a file swap.
 
 ## The style guide (what `wap-0` commits)
 
@@ -173,20 +185,25 @@ monster frames); fidelity model A (integer grid, citing the two DECISIONS entrie
 `wap-9` lightmap and the normal maps); the master palette ramps (the generators' ramp table is the source) and one
 **value band per terrain class**; outline policy; frame budgets (water 4 frames, warp pulse 2–4, walk 2 steps + mid);
 naming and atlas-key rules (`<pack>/<class>_<variant>` style, stable); "no baked cast shadows, small contact AO only";
-the provenance fields and ladder; and the terrain class table:
+the provenance fields and ladder; and the terrain class table below. **Code owns the table:** `TileKind` in
+`game-core/src/types.rs` (`wap-1`) is the single definition of glyph, Tiled GID, walkability and encounter flag; the
+style guide and the zone-map RON header cite it for review and are never parsed.
 
-| Class | Glyph | Walkable | Encounter | Notes |
-|---|---|---|---|---|
-| ground (short grass) | `.` | yes | no | the existing floor glyph, now drawn as outdoor ground |
-| tall grass | `~` | yes | yes | the only encounter class (`is_grass`) |
-| path | `=` | yes | no | |
-| sand | `:` | yes | no | |
-| shallow water | `w` | no | no | its own value band; animated; shore band at land edges |
-| deep water | `W` | no | no | darker band than shallow; animated |
-| rock | `^` | no | no | |
-| tree | `T` | no | no | |
-| bush | `*` | no | no | |
-| wall | `#` | no | no | the existing wall glyph |
+| Class | `TileKind` (wire name) | Glyph | Tiled GID | Walkable | Encounter | Notes |
+|---|---|---|---|---|---|---|
+| ground (short grass) | `Floor` | `.` | 1 | yes | no | the existing floor glyph, now drawn as outdoor ground |
+| tall grass | `TallGrass` | `~` | 2 | yes | yes | the only encounter class (`is_grass`) |
+| path | `Path` | `=` | 3 | yes | no | |
+| sand | `Sand` | `:` | 4 | yes | no | |
+| shallow water | `ShallowWater` | `w` | 5 | no | no | its own value band; animated; the shore band where it meets land |
+| deep water | `DeepWater` | `W` | 6 | no | no | darker band than shallow; animated; borders only water (content rule) |
+| rock | `Rock` | `^` | 7 | no | no | |
+| tree | `Tree` | `T` | 8 | no | no | |
+| bush | `Bush` | `*` | 9 | no | no | |
+| wall | `Wall` | `#` | 0 | no | no | the existing wall glyph |
+
+`Floor`, `TallGrass` and `Wall` keep today's variants, glyphs and GIDs (0 wall, 1 floor, 2 grass); the seven new
+variants are tail-appended in the table's order (`Path` … `Bush`).
 
 Readability pairs (adjacent classes that must separate by value, `wap-2`): ground–tall grass, ground–path,
 ground–sand, path–sand, sand–shallow water, shallow–deep water, ground–shallow water, tall grass–shallow water,
@@ -209,7 +226,7 @@ ground–rock, ground–tree, ground–bush, tall grass–bush, ground–wall, p
   landmark → take the marked warp → arrive somewhere that looks different" SHALL hold through the real UI.
 
 - **WAP.6:** WHEN a battle shows a unit, ITS sprite SHALL resolve through the art registry with no request for a
-  missing file, at an integer multiple of the 32 px frame, over a palette-coordinated backdrop.
+  missing file, at an integer device-pixel multiple of the 32 px frame, over a palette-coordinated backdrop.
 
 - **WAP.7:** WHILE the post stack runs, IT SHALL filter the world layer only, each pass individually toggleable,
   deterministic for an injected time, frozen under reduced motion, and disabled cleanly where filters are unsupported.
@@ -233,8 +250,9 @@ wap-0 ─┬─ wap-1 ─┬────────────── wap-4 ─
   the **render chain** (`wap-4` → `wap-5` → `wap-6`, serial because all three edit `world.ts`) and beside `wap-3`.
 - `wap-9` adds `pixi-filters` (a `client/package-lock.json` change — a structural surface), so it is ordered after
   every other build slice; `wap-10` closes.
-- Each asset slice owns its own registry pack file (`client/src/render/art/packs/*.ts`, created empty by `wap-0`), so
-  asset slices never collide on the registry.
+- Each asset slice owns its own registry pack file (`client/src/render/art/packs/*.ts`). `wap-0` creates all six and
+  the aggregator in `registry.ts` once, because `wap-3` (battle) and `wap-6` (landmarks) can run concurrently and would
+  otherwise both edit the aggregator.
 
 ## Residual map
 
@@ -249,43 +267,48 @@ wap-0 ─┬─ wap-1 ─┬────────────── wap-4 ─
 
 ### wap-0 — Lock: the style guide and the art registry
 category: content · severity: MED · size: MODERATE
-touches: docs/art/style-guide.md, docs/DECISIONS.md, client/art-src/README.md, client/src/render/art/registry.ts, client/src/render/art/registry.test.ts, client/src/render/art/packs/characters.ts, client/src/render/art/packs/monsters.ts, client/src/render/art/packs/terrain.ts, client/src/render/art/packs/landmarks.ts, client/src/render/art/packs/battle.ts, client/src/render/art/packs/grade.ts
+touches: docs/art/style-guide.md, docs/DECISIONS.md, client/art-src/README.md, client/src/render/art/registry.ts, client/src/render/art/registry.test.ts, client/src/render/art/packs/characters.ts, client/src/render/art/packs/monsters.ts, client/src/render/art/packs/terrain.ts, client/src/render/art/packs/landmarks.ts, client/src/render/art/packs/battle.ts, client/src/render/art/packs/grade.ts, client/test-util/pngDecode.ts
 after: []
 Feedback items: pt3-2026-10-021, -022, -155, -166
 Measured: no provenance, credits or asset-license file exists anywhere in the game repo (only the root `LICENSE`);
 `.gitattributes` marks `*.png binary` (no LFS). The only reader of `client/public/assets/` is the grandfathered
 `evals/monster-spritesheet-format.eval.mjs` (monster sheets only). The served set today: `hero{,-normal}.{png,json}`,
-`tileset-edge-of-town{,-normal}.{png,json}`, `palette.png`, and 17 `monster-*` sheets, 13 of them with `-normal` maps
-(the eval's `NO_NORMAL_MAP` exempts wave-1 ids 7–10). All were produced by this repo's own stdlib generators. The pack
-files `terrain.ts`, `landmarks.ts`, `battle.ts`, `grade.ts` start as empty row arrays so later slices fill them without
-touching `registry.ts`. The registry is product code (later slices resolve atlas keys through it), so its test exercises
-the function over the real rows; it reads PNG headers (generated artifacts), never the text of a hand-authored file.
+`tileset-edge-of-town{,-normal}.{png,json}`, `palette.png` (82×210, no frames), and 17 `monster-*` sheets, 13 with
+`-normal` maps (the eval's `NO_NORMAL_MAP` exempts wave-1 ids 7–10). All were produced by this repo's own stdlib
+generators. Rows: hero → `characters.ts`; monster sheets → `monsters.ts` (keyed by species name, so Flameling's row
+names `monster-emberkit.png`); the edge-of-town tileset and `palette.png` → `terrain.ts`. `landmarks.ts`, `battle.ts`
+and `grade.ts` start as empty arrays and `registry.ts` aggregates all six once (see Sequencing). Row kinds: `sprite`,
+`tile`, `normal` (frame rules apply), `palette` and `lut` (no frames; exempt from the frame-grid rule). The registry is
+product code (later slices resolve atlas keys through it), so its test runs the validator over the real rows. It reads
+PNG headers of generated files and lists the served directory. That is allowed: the artifacts are generator output, and
+the listing is the provenance boundary itself, not a count. No file count is ever asserted. `client/test-util/pngDecode.ts`
+(Node `zlib` inflate, no new dependency) lands here so `wap-2` and `wap-3`, which run concurrently, share it without
+both creating it.
 
 - **WAP0.1:** THE game repo SHALL carry `docs/art/style-guide.md` recording the base (¾ oblique, 32 px tile, storybook
   palette, #587 D5), fidelity model A citing the two scaling decisions, light direction, palette ramps with one value
   band per terrain class, outline policy, frame budgets, atlas-key rules, the no-baked-cast-shadow rule, the provenance
-  fields and ladder, and the ten-class terrain table and readability pairs exactly as this spec states them (verified
-  by review with a path:line citation).
+  fields and ladder, and this spec's terrain class table and readability pairs, citing `TileKind` as their owner
+  (verified by review with a path:line citation).
 
-- **WAP0.2:** WHEN `validateArtRegistry` receives a row lacking a source, license or provenance tag, a license outside
-  the accepted set, a CC-BY row without an attribution string, the `ai-placeholder` tag, a duplicate atlas key or file,
-  or a sprite/tile frame whose width or height is not a whole multiple of 16 px or whose atlas scale is not 1, IT SHALL
-  reject the registry and name the offending row.
+- **WAP0.2:** THE registry row type SHALL make an `ai-placeholder` tag, a share-alike or EULA license, a missing
+  source / license / provenance, and a CC-BY row without an attribution string unrepresentable, each proven by a
+  `@ts-expect-error` fixture in the colocated test.
 
-- **WAP0.3:** WHEN `validateArtRegistry` runs over the real aggregated registry, IT SHALL accept it, and every row's file
-  SHALL exist under `client/public/assets/` with PNG header dimensions equal to the row's declared sheet size, and every
-  PNG served under `client/public/assets/` SHALL be named by exactly one row.
+- **WAP0.3:** WHEN `validateArtRegistry` receives a duplicate atlas key or file, a `sprite` / `tile` / `normal` frame
+  whose width or height is not a whole multiple of 16 px, or an atlas whose scale is not 1, IT SHALL reject the registry
+  and name the offending row.
 
-- **WAP0.4:** WHEN `releaseBlockers` receives a registry, IT SHALL return exactly the rows whose provenance is not
-  `final`, so the deferred launch gate has one tested query to call.
+- **WAP0.4:** WHEN `validateArtRegistry` runs over the real aggregated registry, IT SHALL accept it, every row's file
+  SHALL exist under `client/public/assets/` with PNG header dimensions equal to the row's declared sheet size, and
+  every PNG served under `client/public/assets/` SHALL be named by exactly one row.
 
 - **WAP0.5:** THE existing served assets SHALL be registered with provenance `placeholder-procedural`, license
-  `project-original` and the generator path as source, and `client/art-src/README.md` SHALL point generator users at
-  the registry as the place every new output is recorded.
+  `project-original` and the generator path as source, and `client/art-src/README.md` SHALL tell generator users that
+  every new output gets its registry row in the same change.
 
 - **WAP0.6:** THE game repo's `docs/DECISIONS.md` SHALL gain one entry recording that every served asset carries a
-  registry provenance row, that image-model output never ships, and that `pixi-filters` is the adopted post-processing
-  library under the ecosystem USE verdict (verified by review with a path:line citation).
+  registry provenance row and that image-model output never ships (verified by review with a path:line citation).
 
 ### wap-1 — Terrain grammar: ten classes, one grid, a richer zone payload
 category: gameplay · severity: MED · size: MODERATE
@@ -294,52 +317,61 @@ after: [wap-0]
 Feedback items: pt3-2026-10-161, -162
 Measured: `TileKind { Floor, Wall, TallGrass }` (`types.rs`) derives `SpacetimeType` behind the `spacetimedb` feature, so
 new variants are tail-appended and `evals/baselines/spacetime-types.json` gains them (spacetime-type-snapshot eval);
-`TileKind` is in no table and no binding. `TileKind::from_char` rejects unknown glyphs and `is_walkable` is an exhaustive
-match. `build_grid` (`world.rs`) keeps only `walkable` and `grass`, so `TileMap` gains a `terrain` layer. `TileMap` is
-`Serialize`-only; `client-wasm` `zone_map()` serializes it with `serde_wasm_bindgen`, so a new field appears in the JS
-payload with no other change. Negative glyph tests use `'Z'` (`grass_encounter_tests.rs`) and `'X'` (`types.rs`): the
-new glyphs avoid both. `tiled_import.rs` maps GIDs 0/1/2 only and `.cargo/mutants.toml` pins `tiled_import.rs:<line>`
-regexes that go stale if lines move. `game_core::content::load_heal_locations` exists, so the wasm payload can carry
-landmarks from compiled content with no store or `main.ts` change. **No byte under `game-core/content/` changes in this
-slice** (the RON header's glyph documentation moves with `wap-7`'s bump), so `CONTENT_VERSION` stays 25.
+`TileKind` is in no table and no binding. `TileKind::from_char` rejects unknown glyphs and `is_walkable` is the only
+exhaustive match (`world.rs` uses `matches!`; nothing in server-module, sim-harness or client-wasm matches on it).
+`build_grid` (`world.rs`) keeps only `walkable` and `grass`, so `TileMap` gains a `terrain` layer. `TileMap` is
+`Serialize`-only and `client-wasm` `zone_map()` serializes it with `serde_wasm_bindgen`; `landmarks` has no home in
+`TileMap`, and `#[serde(flatten)]` would make `serde_wasm_bindgen` emit a JS `Map` (breaking `raw.walkable`), so the
+payload is a concrete DTO struct in `client-wasm` with explicit fields. `zone_map_ok` returns `UNDEFINED` on native
+targets, so the DTO is tested natively through `serde_json`. `game_core::load_heal_locations` is re-exported with no
+feature flag. Negative glyph tests use `'Z'` and `'X'`; the proptest draws only from `.#~`. `tiled_import.rs` maps GIDs
+0/1/2 in one `match`; the `.cargo/mutants.toml` line regexes sit above it and go stale only if imports at the top move.
+No byte under `game-core/content/` changes here (the RON header legend moves with `wap-7`'s bump), so `CONTENT_VERSION`
+stays 25. The 36 main-boot test fixtures return `zone_map` literals without the new fields; that is why both are
+optional on the client.
 
-- **WAP1.1:** WHEN a zone-map row contains one of the ten class glyphs, `game-core` SHALL build that tile with the style
-  guide's class, walkability and encounter flag, and an unknown glyph SHALL remain a load error naming the glyph and
-  its tile.
+- **WAP1.1:** WHEN a zone-map row contains one of the ten class glyphs, `game-core` SHALL build that tile with the class
+  table's `TileKind`, walkability and encounter flag, and an unknown glyph SHALL remain a load error naming the glyph
+  and its tile.
 
 - **WAP1.2:** WHEN a mover steps from a walkable tile onto each class, THE shared movement rule SHALL move onto ground,
   tall grass, path and sand and SHALL bump on shallow water, deep water, rock, tree, bush and wall, and only tall grass
   SHALL report `is_grass`, proven over a fixture map containing all ten glyphs.
 
-- **WAP1.3:** WHEN `zone_map(zone_id)` is called, THE wasm payload SHALL add a row-major `terrain` list parallel to
-  `walkable` naming each tile's class and a `landmarks` list with one `{ kind: 'heal', x, y }` per compiled
+- **WAP1.3:** WHEN `validate_zone_maps` checks a map in which a deep-water tile has a non-water 4- or 8-neighbour, IT
+  SHALL reject the map naming the tile, so the shore band is only ever shallow water's.
+
+- **WAP1.4:** WHEN `zone_map(zone_id)` is called, THE payload SHALL add a row-major `terrain` list parallel to `walkable`
+  holding each tile's `TileKind` wire name and a `landmarks` list with one `{ kind: 'heal', x, y }` per compiled
   heal_locations row of that zone, while every existing field keeps its name and value.
 
-- **WAP1.4:** WHEN `TileMap.fromRaw` parses a payload, IT SHALL expose `terrainAt(x, y)` and `landmarks`; a payload
-  without `terrain` SHALL derive wall / tall grass / ground from `walkable` and `grass`, a payload without `landmarks`
-  SHALL have none, and a ragged `terrain` list or an unknown class name SHALL throw.
+- **WAP1.5:** WHEN `TileMap.fromRaw` parses a payload, IT SHALL expose `terrainAt(x, y)` and `landmarks`; a payload
+  without `terrain` SHALL report no terrain (the renderer then takes its flat fallback; no client-side derivation from
+  `walkable`/`grass`), a payload without `landmarks` SHALL have none, and a ragged `terrain` list or a name outside the
+  ten wire names SHALL throw.
 
-- **WAP1.5:** WHEN `tiled_import` reads a Tiled layer, IT SHALL map the style guide's GID table for all ten classes and
+- **WAP1.6:** WHEN `tiled_import` reads a Tiled layer, IT SHALL map the class table's GIDs 0–9 through `TileKind` and
   SHALL still reject an unmapped GID.
 
 ### wap-2 — The terrain kit: ten classes, variants, animated water, shore band
 category: content · severity: MED · size: MODERATE
-touches: client/art-src/generate_art.py, client/art-src/README.md, client/art-src/preview/terrain-kit@6x.png, client/art-src/preview/terrain-kit-normal@6x.png, client/public/assets/terrain-kit.png, client/public/assets/terrain-kit.json, client/public/assets/terrain-kit-normal.png, client/public/assets/terrain-kit-normal.json, client/src/render/art/packs/terrain.ts, client/src/render/art/terrainKit.test.ts, client/test-util/pngDecode.ts, docs/art/style-guide.md
+touches: client/art-src/generate_art.py, client/art-src/README.md, client/art-src/preview/terrain-kit@6x.png, client/art-src/preview/terrain-kit-normal@6x.png, client/public/assets/terrain-kit.png, client/public/assets/terrain-kit.json, client/public/assets/terrain-kit-normal.png, client/public/assets/terrain-kit-normal.json, client/src/render/art/packs/terrain.ts, client/src/render/art/terrainKit.test.ts, docs/art/style-guide.md
 after: [wap-0]
 Feedback items: pt3-2026-10-161, -155
 Measured: `generate_art.py` already carries the master-palette ramp table and emits grass, tall grass, path autotiles,
 bush, rock, tree canopy/trunk, wall and two water frames (`water_c`, `water_c2`, no inner corners) into
-`tileset-edge-of-town`; the kit is a NEW atlas so the POC tileset stays untouched (no consumer reads it; it keeps its
-`wap-0` row). Node's `zlib` can inflate PNG IDAT, so the luminance test decodes the generated atlas with a small
-test-util helper and needs no new dependency. The pack's rows declare, per class, its variant frame keys, its
-animation frame keys (water) and the shore-band keys — the data `wap-4` lays out.
+`tileset-edge-of-town`; the kit is a NEW atlas, so the POC tileset stays untouched (no consumer reads it; it keeps its
+`wap-0` row). The luminance test decodes the generated atlas with `wap-0`'s `pngDecode` helper. The pack's rows
+declare, per class, its variant frame keys, its animation frame keys (water) and the shore-band keys — the data `wap-4`
+lays out.
 
 - **WAP2.1:** THE terrain kit atlas SHALL hold, at scale 1 and 32×32 per frame, at least three variant frames for each of
   the ten classes, four pairwise-distinct animation frames for each water class, and shore-band frames for the four
   edges, four outer corners and four inner corners where shallow water meets land.
 
 - **WAP2.2:** WHEN the kit atlas is decoded, EVERY readability pair SHALL differ in mean relative luminance (Rec. 709) of
-  its base frames by at least 0.06, and the measured value of each pair SHALL be recorded in the style guide.
+  its base frames by at least 0.06; the measured values are reported in the style guide for review, never asserted
+  against it.
 
 - **WAP2.3:** WHEN a 4×4-tile patch of shallow water and one of ground are each box-downsampled to 16×16 px, THE two
   thumbnails SHALL still differ in mean luminance by at least 0.06 and the water thumbnail's mean blue SHALL exceed its
@@ -350,34 +382,40 @@ animation frame keys (water) and the shore-band keys — the data `wap-4` lays o
 
 ### wap-3 — Battle placeholders: every species, registry URLs, integer art scale, a backdrop
 category: content · severity: MED · size: MODERATE
-touches: client/art-src/generate_monsters.py, client/art-src/generate_backdrop.py, client/art-src/preview/monster-tidecrag@6x.png, client/art-src/preview/monster-tidecrag-normal@6x.png, client/art-src/preview/monster-tidecrag-lit@6x.png, client/art-src/preview/monster-cindershade@6x.png, client/art-src/preview/monster-cindershade-normal@6x.png, client/art-src/preview/monster-cindershade-lit@6x.png, client/public/assets/monster-tidecrag.png, client/public/assets/monster-tidecrag.json, client/public/assets/monster-tidecrag-normal.png, client/public/assets/monster-tidecrag-normal.json, client/public/assets/monster-cindershade.png, client/public/assets/monster-cindershade.json, client/public/assets/monster-cindershade-normal.png, client/public/assets/monster-cindershade-normal.json, client/public/assets/battle-backdrop.png, client/src/render/art/packs/monsters.ts, client/src/render/art/packs/battle.ts, client/src/tactics/boardModel.ts, client/src/tactics/boardModel.test.ts, client/src/tactics/boardRender.ts, client/src/tactics/boardRender.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client/src/styles.css, client/src/styles.test.ts, evals/monster-spritesheet-format.eval.mjs
+touches: client/art-src/generate_monsters.py, client/art-src/generate_backdrop.py, client/art-src/preview/monster-tidecrag@6x.png, client/art-src/preview/monster-tidecrag-normal@6x.png, client/art-src/preview/monster-tidecrag-lit@6x.png, client/art-src/preview/monster-cindershade@6x.png, client/art-src/preview/monster-cindershade-normal@6x.png, client/art-src/preview/monster-cindershade-lit@6x.png, client/public/assets/monster-tidecrag.png, client/public/assets/monster-tidecrag.json, client/public/assets/monster-tidecrag-normal.png, client/public/assets/monster-tidecrag-normal.json, client/public/assets/monster-cindershade.png, client/public/assets/monster-cindershade.json, client/public/assets/monster-cindershade-normal.png, client/public/assets/monster-cindershade-normal.json, client/public/assets/battle-backdrop.png, client/src/render/art/packs/monsters.ts, client/src/render/art/packs/battle.ts, client/src/render/resizeWiring.ts, client/src/render/resizeWiring.test.ts, client/src/tactics/boardModel.ts, client/src/tactics/boardModel.test.ts, client/src/tactics/boardRender.ts, client/src/tactics/boardRender.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client/src/styles.css, client/src/styles.test.ts, client/e2e/tactics-wild.spec.ts, evals/monster-spritesheet-format.eval.mjs
 after: [wap-0]
 Feedback items: pt3-2026-10-155, -166
 Measured: `boardRender.ts` and `tacticsBattle.ts` (ghost sprite) build `url("assets/monster-${slug}.png")` from
 `boardModel.spriteSlug(name)`, which lower-cases any alphabetic name with no existence check, so Flameling requests
-`monster-flameling.png` (its sheet is `monster-emberkit.png`; only the eval's `SLUG_OVERRIDES` knows) and Tidecrag (30)
-and Cindershade (31) request sheets that do not exist (the eval's `NO_SHEET_YET`). `boardRender.test.ts`
-BT10-1-RENDER-SPRITE pins the URL form for synthetic slugs, and BT10-1-CSS-LAYOUT reads `styles.css`: `.tactics-bg` needs a
-hex-colour `background` brighter than the dock, `.tactics-sprite` is pinned at 64 px / `background-size 192px 256px` /
-`image-rendering: pixelated`. `styles.test.ts`'s uif-11 allowlist (`ART_EXACT` has `.tactics-bg`, `ART_PREFIX` has
-`.tactics-sprite`) is where art rules may keep px. The eval requires every non-exempt species to have
-`monster-<slug>.{png,json}` + `-normal.{png,json}` in the 96×128 / 12-frame format. These tests change here with the
-change named; the grandfathered eval is maintained in place (its exemption set shrinks), never imitated.
+`monster-flameling.png` (its sheet is `monster-emberkit.png`, emitted by `generate_art.py` — `wap-2`'s file, which is why
+the fix is a registry lookup rather than a rename) and Tidecrag (30) and Cindershade (31) request sheets that do not
+exist (the eval's `NO_SHEET_YET`). The eval keeps its own `SLUG_OVERRIDES` fixture: it is grandfathered and maintained
+in place, its exemption set shrinking here. `generate_monsters.py` needs `PLAN_TABLE` rows AND `PALETTES` entries for
+the two species (`build_species_sheet` fails without a palette). The integer world scale lives only in
+`render/viewport.ts` (`viewportScale().deviceScale` / `stageScale`); the DOM receives only the continuous
+`--mr-ui-scale` (`resizeWiring.ts`), and `styles.test.ts` UIF11.1 forbids tactics rules from reading `--mr-ui-scale` or
+using `zoom` / `scale()`. So `resizeWiring` also publishes `--mr-world-scale` (the stage scale: CSS px per art pixel),
+and the sprite, HP bar and base mark size as `32px × var(--mr-world-scale)` multiples, which is an integer number of
+device pixels per art pixel by construction. `boardRender.test.ts` BT10-1-CSS-LAYOUT reads `styles.css` (sprite 64 px,
+`.tactics-bg` hex brighter than the dock); per Constraint 7b those text assertions are replaced, not edited, by the
+`resizeWiring` test and computed-style checks inside the existing `tactics-wild.spec.ts` flow. If UIF11.1's scan also
+blocks the new variable, its allowlist is narrowed with the change named, never widened into a new scan.
 
 - **WAP3.1:** THE Tidecrag and Cindershade sheets and normal maps SHALL ship in the shipped monster format from
   `generate_monsters.py`'s plan table, and the spritesheet eval SHALL pass with no species exempt from having a sheet.
 
 - **WAP3.2:** WHEN the board or a ghost renders a unit, ITS sprite URL SHALL come from the art registry's monster row for
-  that species — Flameling resolving to its emberkit sheet — and a species with no row SHALL render the
+  that species name — Flameling resolving to its emberkit sheet — and a species with no row SHALL render the
   `tactics-sprite--none` treatment and request no file.
 
-- **WAP3.3:** WHEN the board lays out at any viewport, THE unit sprite, its HP bar and its base mark SHALL size from one
-  integer art multiple of the 32 px frame derived from the single scale authority, never a fixed 64 px, closing
+- **WAP3.3:** WHEN the window resizes, `resizeWiring` SHALL publish `--mr-world-scale` equal to the viewport stage scale
+  beside `--mr-ui-scale`, and in the battle flow the unit sprite, its HP bar and its base mark SHALL measure a whole
+  number of device pixels per art pixel at 1280×720 DPR 1 and at a fractional DPR, never a fixed 64 px, closing
   R-uif-11-SPRITESCALE.
 
-- **WAP3.4:** THE battlefield SHALL paint a palette-coordinated placeholder backdrop image registered in
-  `packs/battle.ts` over the retained hex fallback colour, and the board's backdrop-brighter-than-dock check SHALL keep
-  passing.
+- **WAP3.4:** WHEN a battle opens, THE battlefield SHALL paint the registered `battle-backdrop.png` (a `packs/battle.ts`
+  row) over a retained hex fallback colour with the image request succeeding, and the decoded backdrop's mean relative
+  luminance SHALL sit within the style guide's battlefield band (default 0.15–0.40) so the tile overlays stay legible.
 
 ### wap-4 — The terrain renderer: kit sprites, variants, shore band, animated water
 category: ux-a11y · severity: MED · size: HEAVY
@@ -385,51 +423,59 @@ touches: client/src/render/world.ts, client/src/render/terrainLayout.ts, client/
 after: [wap-1, wap-2]
 Feedback items: pt3-2026-10-161, -155
 Measured: `#drawMap` builds one `Graphics` of rects and is rebuilt on `setMap` (destroying the old children). `world.ts`
-loads no asset today; `Assets` loading and sprite/`cacheAsTexture` calls stay in it (coverage-excluded). `render()` is
-called per frame from `main.ts` with `(entities, lastCamX, lastCamY)`; the injected `nowMs` and `reduceMotion` reach it
-as one added optional argument from main.ts, which already holds the `MotionPreference` (the resolver's
-`ResolveInput.reduceMotion` comes from it). `main.reducedMotionWiring.test.ts` uses `worldRendererNoCanvasMock()`, so it
-can observe the argument. `main.dispatch.test.ts` reads main.ts text: if that scan pins the `renderer?.render(` call
-shape, it is a hidden dependency (STOP). New render constants (water frame period, chunk size) live in `config.ts`
-beside `TILE_PX`; `camera.test.ts` / `viewport.test.ts` import config but none of the new names.
+loads no asset today; `Assets` loading and sprite / `cacheAsTexture` calls stay in it (coverage-excluded) and take
+their decisions from `terrainLayout.ts`, which gets injected texture factories and destroyers so chunk lifetime is
+testable with fakes (the `placeholderAssets.test.ts` fake-renderer precedent). `render()` is called per frame from
+`main.ts` with `(entities, lastCamX, lastCamY)`; the injected `nowMs` and `reduceMotion` reach it as one added optional
+argument from main.ts, which already holds the `MotionPreference`. No test pins the `renderer?.render(` argument shape
+(`main.dispatch.test.ts` scans only `movementGate` / `worldBaseLive`). `mainBootHarness.ts`'s
+`worldRendererNoCanvasMock()` records nothing, so `main.reducedMotionWiring.test.ts` observes the argument through its
+own inline mock. New render constants (water frame period, chunk size) live in `config.ts` beside `TILE_PX`; it is
+imported only by named imports. Today's `appInitOptions` sets `antialias: false` but nothing sets texture sampling, and
+`cacheAsTexture` defaults to linear filtering, so Constraint 7a is a real criterion here.
 
-- **WAP4.1:** WHEN a map is drawn, `layoutTerrain` SHALL return exactly one kit frame key for every in-bounds tile chosen
-  by its terrain class, and the renderer SHALL draw those frames with no flat-colour terrain rect, falling back to the
-  flat draw only when the kit fails to load, logged once.
+- **WAP4.1:** WHEN a map with terrain is laid out, `layoutTerrain` SHALL return exactly one kit frame key for every
+  in-bounds tile chosen by its terrain class, and WHEN the kit is absent or the payload has no terrain IT SHALL return the
+  flat-fallback plan with a single warning record.
 
 - **WAP4.2:** WHEN a tile's variant is chosen, IT SHALL be a pure integer hash of (zone, x, y), identical across redraws
   and sessions, and a 10×10 field of one class SHALL show at least two variants.
 
-- **WAP4.3:** WHEN a water tile borders land, IT SHALL draw the shore-band frame its 8-neighbour mask selects, and every
-  one of the 256 masks SHALL map to a defined frame.
+- **WAP4.3:** WHEN a shallow-water tile borders land, IT SHALL draw the shore-band frame its 8-neighbour mask selects, and
+  every one of the 256 masks SHALL map to a defined frame.
 
-- **WAP4.4:** WHEN frames advance, THE water animation frame SHALL be a pure function of the injected `nowMs` at the style
-  guide's period, and WHILE reduced motion is set IT SHALL hold frame 0.
+- **WAP4.4:** WHEN frames advance, THE water animation frame SHALL be a pure function of the injected `nowMs` at the
+  configured period, and WHILE reduced motion is set IT SHALL hold frame 0.
 
-- **WAP4.5:** WHEN static terrain is drawn, IT SHALL be cached as texture chunks that tile the map exactly with the
-  animated water on a separate layer, and `setMap` and `destroy` SHALL release every chunk texture they created.
+- **WAP4.5:** WHEN the chunk planner covers a map, ITS chunks SHALL tile the map exactly with animated water excluded,
+  and WHEN `setMap` or `destroy` runs, THE chunk cache SHALL destroy every texture it created, counted through the
+  injected factory and destroyer.
+
+- **WAP4.6:** WHEN the chunk cache creates a texture, IT SHALL request `nearest` sampling at the device scale, and the
+  atlas textures SHALL be loaded with `nearest` sampling.
 
 ### wap-5 — Characters: the hero atlas behind the AssetProvider seam
 category: ux-a11y · severity: LOW · size: LIGHT
 touches: client/src/render/world.ts, client/src/render/atlasAssets.ts, client/src/render/atlasAssets.test.ts, client/src/render/characterView.ts, client/src/render/art/packs/characters.ts
 after: [wap-4]
 Feedback items: pt3-2026-10-155
-Measured: `hero.json` holds `hero_{down,up,right,left}_{idle,stepA,mid,stepB,jump}` (32×32, 160×128 sheet) keyed for the
-`AssetProvider` `(action, facing)` seam; `PlaceholderAssets` (and `placeholderAssets.test.ts`, which pins its non-colour
-glyph cue) stays as the load-failure fallback, unchanged. Every entity (own, remote, NPC) shares one provider today, so
-all wear the hero sprite — no regression, since all are identical squares now; variety is a named deferral. The walk
-cycle is chosen from the fractional tile position `CharacterView.update` already receives, so it follows the slide
-clock with no second clock.
+Measured: `hero.json` holds `hero_{down,up,right,left}_{idle,stepA,mid,stepB,jump}` (five poses × four facings, 32×32,
+160×128 sheet). `AssetProvider.texture(action, facing)` has no phase, and `CharacterView.update` swaps the texture only
+when its `animKey(action, facing)` changes, so the walk cycle needs an OPTIONAL third `phase` argument (`PlaceholderAssets`
+still satisfies the interface unchanged; its test and its non-colour glyph cue stay as the load-failure fallback) and a
+phase-aware swap key in `characterView.ts`. The phase comes from the fractional tile position `update` already receives,
+so it follows the slide clock with no second clock. Every entity (own, remote, NPC) shares one provider today and
+`ACTION_TINT` encodes action, not identity, so there is no own-versus-other cue to lose; variety is a named deferral.
 
-- **WAP5.1:** WHEN `AtlasAssets` is asked for any (action, facing), IT SHALL return the mapped hero frame, the mapping
-  being total over both enums so a new member is a compile error, and the three actions SHALL map to three distinct
-  poses in every facing.
+- **WAP5.1:** WHEN `AtlasAssets` is asked for any (action, facing, phase), IT SHALL return a hero frame from a mapping
+  total over both enums (a new member is a compile error), with Idle → idle, Walking → the step poses, Jumping → jump,
+  so the three actions use disjoint frames in every facing.
 
-- **WAP5.2:** WHILE a character walks, ITS frame SHALL alternate the step poses by the fractional position within the
-  current step, so the cycle is a pure function of the slide-clock position.
+- **WAP5.2:** WHILE a character walks, ITS phase SHALL come from the fractional position within the current step, so
+  the step pose alternates as a pure function of the slide-clock position.
 
-- **WAP5.3:** WHEN the hero atlas fails to load, THE renderer SHALL fall back to `PlaceholderAssets`, and teardown SHALL
-  release the provider's textures either way.
+- **WAP5.3:** WHEN `createCharacterAssets` receives no hero atlas, IT SHALL return the `PlaceholderAssets` provider, and
+  WHEN either provider is destroyed IT SHALL release every texture it created.
 
 ### wap-6 — Landmarks and warp markers, drawn from data
 category: ux-a11y · severity: MED · size: MODERATE
@@ -439,13 +485,15 @@ Feedback items: pt3-2026-10-160, -156
 Measured: `TileMap.isWarp` already exists client-side (from `warps`), and `wap-1` adds `TileMap.landmarks`. Actors sort
 by `zIndexForEntity(y)` (`render/zorder.ts`) in a `sortableChildren` container, so a landmark taller than one tile joins
 that container with its own tile-row z-index. The sign is a pictogram drawn into the sprite: no catalog key is added
-(the catalogs are pinned at 524 keys per locale), and the interact chip keeps naming the healer.
+(the catalogs are pinned at 524 keys per locale), and the interact chip keeps naming the healer. The landmark and the
+marker carry bright highlight pixels, which is what `wap-9`'s bloom pass acts on.
 
-- **WAP6.1:** WHEN a map with landmarks is drawn, `layoutDecor` SHALL place the heal-landmark sprite at each landmark's
-  tile and at no other, and a map without landmarks SHALL place none.
+- **WAP6.1:** WHEN a map with landmarks is laid out, `layoutDecor` SHALL place the heal-landmark sprite at each
+  landmark's tile and at no other, and a map without landmarks SHALL place none.
 
-- **WAP6.2:** WHEN a map with warps is drawn, `layoutDecor` SHALL place a warp marker on every warp source tile, the
-  marker distinct from every terrain frame by shape, and ITS pulse SHALL hold a static frame WHILE reduced motion is set.
+- **WAP6.2:** WHEN a map with warps is laid out, `layoutDecor` SHALL place a warp marker on every warp source tile, the
+  marker distinct from every terrain frame by shape, and ITS pulse frame SHALL be a pure function of the injected
+  `nowMs` held at frame 0 WHILE reduced motion is set.
 
 - **WAP6.3:** WHEN a character stands on the row above a landmark, THE landmark SHALL draw in front of it, and on the row
   below, behind it, by the shared row z-order.
@@ -460,14 +508,14 @@ Measured: zone 1 has no code-constant twin (zone 0's `ZONE_0_ROWS` is `wap-8`'s)
 check 8, `warps_avoid_npc_homes_and_the_heal_tile`); `tideglass_shopkeeper` home (8,1), radius 0, with (7,1) its shop
 post (`shop-npc.spec.ts`, `wallet-balance.spec.ts`, `ui-world-sheets.spec.ts`); the e2e routes walk column x=1
 (y=1..5), row 1 (x=1..7), row 5 (x=1..6) and column x=6 (y=1..5) as written for the identical layouts;
-`sim-harness/src/world.rs` assumes column x=1 floor for y=1..5 in both maps. The zone registry bound is 40×28
-(`validate_zone_maps` check 4, upper bound only). The disciplined default keeps those anchor tiles walkable and
-grass-free so the routes stay valid; the "byte-identical" comments in those files are corrected. The RON header gains
-the ten-glyph legend here (inside this slice's one bump).
+`sim-harness/src/world.rs` assumes column x=1 floor for y=1..5 in both maps. No test asserts a `CONTENT_VERSION` literal
+(only the eval does). The zone registry bound is 40×28 (`validate_zone_maps` check 4, upper bound only). The disciplined
+default keeps those anchor tiles walkable and grass-free so the routes stay valid; the listed e2e and sim files are
+re-run, edited only if a route breaks, and their "byte-identical" comments corrected. The RON header gains the
+ten-glyph legend here, inside this slice's one bump.
 
 - **WAP7.1:** THE Tideglass Cove rows SHALL differ from Verdant Hollow's, measure at least 24×16 and at most the 40×28
-  registry bound, and use at least six terrain classes with shallow plus deep water covering at least 15% and sand at
-  least 10% of the tiles.
+  registry bound, contain shallow water, deep water, sand and rock, and have water on at least 10% of the tiles.
 
 - **WAP7.2:** WHEN reachability is computed from the landing tile (1,5), EVERY walkable zone-1 tile SHALL be reachable, the
   shop post (7,1) and the return warp included, and at least eight tall-grass tiles SHALL be reachable so encounters
@@ -482,7 +530,7 @@ the ten-glyph legend here (inside this slice's one bump).
 
 ### wap-8 — Verdant Hollow: a larger starting zone and a healer that is not grass
 category: content · severity: MED · size: HEAVY
-touches: game-core/content/zone_maps/000-core.ron, game-core/src/world.rs, game-core/src/content.rs, game-core/src/npc/rules_tests.rs, game-core/src/npc/rules.rs, game-core/tests/interact_reachability.rs, server-module/src/lib.rs, evals/baselines/content-hash.json, server-module/src/npc_tests.rs, server-module/src/movement_tests.rs, sim-harness/src/world.rs, sim-harness/src/lib.rs, sim-harness/src/bin/mr_load_driver.rs, sim-harness/src/bin/movement_vectors.rs, client-wasm/src/lib.rs, client/e2e/dialogue.spec.ts, client/e2e/recruit.spec.ts, client/e2e/remap.spec.ts, client/e2e/ui-world-sheets.spec.ts, client/e2e/menu-flow.spec.ts, client/e2e/pointer.spec.ts, client/e2e/wallet-balance.spec.ts, client/e2e/movement-input.spec.ts, client/e2e/zoneSync.spec.ts, client/e2e/shop-npc.spec.ts
+touches: game-core/content/zone_maps/000-core.ron, game-core/src/world.rs, game-core/src/content.rs, game-core/src/grass_encounter_tests.rs, game-core/src/npc/rules_tests.rs, game-core/src/npc/rules.rs, game-core/tests/interact_reachability.rs, game-core/benches/budgets.rs, game-core/benches/budget_check_tests.rs, server-module/src/lib.rs, evals/baselines/content-hash.json, server-module/src/npc_tests.rs, server-module/src/movement_tests.rs, sim-harness/src/world.rs, sim-harness/src/lib.rs, sim-harness/src/bin/mr_load_driver.rs, sim-harness/src/bin/movement_vectors.rs, client-wasm/src/lib.rs, client/e2e/dialogue.spec.ts, client/e2e/recruit.spec.ts, client/e2e/remap.spec.ts, client/e2e/ui-world-sheets.spec.ts, client/e2e/menu-flow.spec.ts, client/e2e/pointer.spec.ts, client/e2e/wallet-balance.spec.ts, client/e2e/movement-input.spec.ts, client/e2e/zoneSync.spec.ts, client/e2e/shop-npc.spec.ts
 after: [wap-7]
 Feedback items: pt3-2026-10-162, -160
 Measured: zone 0 lives twice — the RON and `ZONE_0_ROWS` / `zone_0()` in `world.rs`, held equal by
@@ -490,19 +538,23 @@ Measured: zone 0 lives twice — the RON and `ZONE_0_ROWS` / `zone_0()` in `worl
 default and `movement_vectors` (the movement-parity eval: (1,1) East moves, (1,1) North bumps, (3,3) Jump East blocked by
 (4,3), (8,5) South bumps, (2,2) West moves). Pinned anchors: spawn (1,1); corridor row 1 x=1..8 walkable and grass-free
 (`movement-input`, `zoneSync`, sim-harness east steps); (0,1) and (9,1) walls and (1,2) floor / (2,2) grass
-(`mr_load_driver`); `elder_oak` home (5,5) radius 2; posts (6,2), (6,3), (7,3); warp (1,5) and the S×4 route from (1,1)
-to it; row 5 floor x=1..6. The disciplined default keeps the original 10×7 block byte-identical except two tiles —
-an opening in its south wall at (3,6) (outside the elder's wander disc and no pinned coordinate) and the heal tile
-(8,3) becoming path — and grows the zone south and east of it, padding rows 0–6 beyond x=9 with blocked terrain so
-(9,1) stays a wall. `game-core/src/content.rs`'s `zone_0_placeholder_map_fits_within_its_registry_dimensions` holds
-the 32×24 bound; `grass_encounter_tests.rs` (edited by `wap-1`) scans `zone_0()` grass and is rechecked here.
+(`mr_load_driver`); `elder_oak` home (5,5) radius 2 (Manhattan, `npc/rules.rs`); posts (6,2), (6,3), (7,3); warp (1,5)
+and the S×4 route from (1,1) to it; row 5 floor x=1..6. The disciplined default keeps the original 10×7 block
+byte-identical except two tiles — an opening in its south wall at (3,6) (Manhattan 3 from the elder's home, so outside
+the disc; no test pins it or row 6) and the heal tile (8,3) becoming path — and grows the zone south and east of it,
+padding rows 0–6 beyond x=9 with blocked terrain so (9,1) stays a wall. `content.rs`'s
+`zone_0_placeholder_map_fits_within_its_registry_dimensions` holds the 32×24 bound; `grass_encounter_tests.rs` scans
+`zone_0()` grass and loses (8,3). `game-core/benches/budgets.rs` caps `map_for` at 3000 ns (measured 134.5 ns on 10×7);
+a 32×24 map with the third per-tile layer costs roughly 16× that, so the ceiling is re-measured and re-set here with the
+number named. The e2e files are re-run and edited only if a route breaks.
 
 - **WAP8.1:** THE Verdant Hollow map SHALL measure at least 24×16 and at most the 32×24 registry bound, keep its original
-  10×7 block identical except the (3,6) opening and the (8,3) heal tile, and use at least six terrain classes, including
-  path, tree, bush, rock and shallow water.
+  10×7 block identical except the (3,6) opening and the (8,3) heal tile, and contain path, tree, bush, rock and shallow
+  water.
 
-- **WAP8.2:** WHEN a player steps onto the heal tile (8,3), THE move SHALL NOT start a wild encounter, and the heal tile
-  SHALL keep a walkable approach at (7,3).
+- **WAP8.2:** WHEN the shipped content loads, EVERY heal_locations tile SHALL be a walkable, non-tall-grass tile with a
+  walkable approach, so stepping onto a healer never starts a wild encounter, and the zone-0 healer at (8,3) SHALL keep
+  its approach at (7,3).
 
 - **WAP8.3:** WHEN reachability is computed from the spawn (1,1), EVERY walkable zone-0 tile SHALL be reachable, the heal
   tile, the elder's home and the warp included.
@@ -510,41 +562,47 @@ the 32×24 bound; `grass_encounter_tests.rs` (edited by `wap-1`) scans `zone_0()
 - **WAP8.4:** THE movement vectors and the movement-parity check SHALL pass unchanged, `ZONE_0_ROWS` SHALL equal the
   authored rows, and `CONTENT_VERSION` SHALL be bumped exactly once more with the content-hash baseline regenerated.
 
-- **WAP8.5:** THE e2e routes and sim-harness scenarios that walk zone 0 SHALL pass with their routes unchanged or
-  rewritten in this slice with the change named.
+- **WAP8.5:** THE e2e routes, the sim-harness scenarios and the `map_for` perf budget SHALL pass on the grown map, with
+  any route or ceiling change made in this slice and named.
 
 ### wap-9 — The post stack and the look-dev scene
 category: ux-a11y · severity: MED · size: HEAVY
-touches: client/package.json, client/package-lock.json, client/src/render/postStack.ts, client/src/render/postStack.test.ts, client/src/render/world.ts, client/art-src/generate_luts.py, client/public/assets/lut-dawn.png, client/public/assets/lut-day.png, client/public/assets/lut-dusk.png, client/public/assets/lut-night.png, client/public/assets/lut-interior.png, client/src/render/art/packs/grade.ts, client/e2e/lookdev.spec.ts, docs/art/style-guide.md
+touches: client/package.json, client/package-lock.json, client/src/render/postStack.ts, client/src/render/postStack.test.ts, client/src/render/world.ts, client/art-src/generate_luts.py, client/public/assets/lut-day.png, client/public/assets/lut-dusk.png, client/public/assets/lut-night.png, client/src/render/art/packs/grade.ts, client/e2e/lookdev.spec.ts, docs/art/style-guide.md, docs/DECISIONS.md
 after: [wap-3, wap-6, wap-8]
 Feedback items: pt3-2026-10-021, -022, -166
-Measured: `pixi.js` is `^8.19.0` (lock 8.19.0) and `pixi-filters` is absent; there is no bundle-size budget and no npm
-licence gate, and CI runs `npm ci`, so the lock must be committed. `client/package.json` carries an `allowScripts`
-block a dependency with install scripts would hit (`pixi-filters` has none). The look-dev scene is a fixture-page e2e
-on the uif-8 UIF8.1 precedent (`ui-social.spec.ts`: the real `index.html` and stylesheet on the Vite dev server,
-`main.ts` route-aborted, page-side `import('/src/render/world.ts')`), so no dev page ships. No e2e screenshot baselines
-exist in the repo; this slice compares frames rendered in the same run instead of committing baselines. The DOM UI is
-not in the Pixi stage, so "UI is never filtered" reduces to filters attaching to the world containers only.
+Measured: `pixi.js` is `^8.19.0` (lock 8.19.0) and `pixi-filters` is absent (its 6.x peer is `pixi.js >=8.0.0-0`; the
+builder confirms the exact version's WebGL/WebGPU programs for the four passes). There is no bundle-size budget; CI runs
+`npm ci` (commit the lock) and a best-effort `dependency-review-action`; `client/.npmrc` sets `min-release-age = 7`, so
+pick a version older than a week; `allowScripts` needs no change (`pixi-filters` has no install scripts). A new
+dependency meets the decision bar (`standards/decisions.md`), so the `pixi-filters` adoption entry lands here, where the
+lock changes. The look-dev scene is ONE fixture-page smoke e2e on the uif-8 UIF8.1 precedent (`ui-social.spec.ts`: the
+real `index.html` and stylesheet on the Vite dev server, `main.ts` route-aborted, page-side
+`import('/src/render/world.ts')`), collected by the default Playwright project; per-pass behavior is unit-tested through
+the pure plan, and no screenshot baseline is committed. The DOM UI is not in the Pixi stage, so "UI is never filtered"
+reduces to filters attaching to the world containers only.
 
-- **WAP9.1:** WHEN `planPostStack` receives a configuration, an injected `nowMs`, the reduced-motion bit and a keyframe,
-  IT SHALL return the ordered enabled passes (ambient lightmap with vignette falloff, emissive, AdvancedBloom, Godray,
-  ColorMap LUT) targeting the world layer only, omitting each disabled pass rather than zeroing it.
+- **WAP9.1:** WHEN `planPostStack` receives a configuration, an injected `nowMs`, the reduced-motion bit, a keyframe and
+  the device scale, IT SHALL return the ordered enabled passes (ambient lightmap with vignette falloff, AdvancedBloom,
+  Godray, ColorMap LUT) targeting the world layer only at the device scale with `nearest` LUT sampling, omitting each
+  disabled pass rather than zeroing it.
 
 - **WAP9.2:** WHEN a pass animates, ITS time uniform SHALL be the injected `nowMs`, and WHILE reduced motion is set IT
   SHALL be held at 0.
 
-- **WAP9.3:** THE five keyframe LUTs (dawn, day, dusk, night, interior) SHALL be generated by `generate_luts.py` and
-  registered in `packs/grade.ts`, keyframe selection SHALL be pure, and the live game SHALL use `day`.
+- **WAP9.3:** THE three keyframe LUTs (day, dusk, night) SHALL be generated by `generate_luts.py` and registered in
+  `packs/grade.ts`, keyframe selection SHALL be pure, and the live game SHALL use `day`.
 
-- **WAP9.4:** WHEN a filter cannot be constructed or the renderer lacks filter support, THE world SHALL render with the
-  stack disabled and one structured warning, never a blank or thrown frame.
+- **WAP9.4:** WHEN `planPostStack` is told filters are unsupported or a pass failed to construct, IT SHALL return an
+  empty plan with one warning record, so the world renders with the stack disabled and never a blank or thrown frame.
 
 - **WAP9.5:** WHEN the look-dev fixture renders its deterministic map of all ten classes plus a landmark and a warp at
-  1280×720 and DPR 1, toggling any one pass SHALL change the canvas pixels, two renders with identical injected time and
-  toggles SHALL be pixel-identical, and each keyframe SHALL render a distinct frame.
+  1280×720 and DPR 1, THE stack-on frame SHALL differ from the stack-off frame, two renders with identical injected time
+  and toggles SHALL be pixel-identical, the day and night keyframes SHALL render different frames, and a tile edge SHALL
+  stay a one-pixel hard step with the stack on.
 
-- **WAP9.6:** THE style guide SHALL record the measured frame time per pass from the look-dev run as the budget table,
-  a measurement and not a gate (verified by review with a path:line citation).
+- **WAP9.6:** THE style guide SHALL report the measured frame time per pass from the look-dev run as the budget table,
+  and `docs/DECISIONS.md` SHALL record the `pixi-filters` adoption, world-layer-only filtering and injected-time
+  determinism (both verified by review with a path:line citation).
 
 ### wap-10 — The integrated whole
 category: ux-a11y · severity: MED · size: MODERATE
@@ -552,20 +610,24 @@ touches: client/e2e/world-art.spec.ts, client/e2e/controls.ts, client/src/main.t
 after: [wap-9]
 Feedback items: pt3-2026-10-021, -022, -155, -160, -161, -162, -166
 Measured: `window.__game` is assigned DEV-only in `main.ts` and exposes no renderer state, so the flow e2e needs one
-DEV-only `art` field reading an optional `WorldRenderer.describeArt()` (kit loaded, landmark and warp-marker tiles with
-their screen rects via `screenFor`, active post passes, the drawn zone's terrain histogram). `scripts/verify-build-hooks.mjs`
-already proves DEV hooks are stripped from `client/dist`. `controls.ts`'s `safeTile` and BFS read the live `walkable` /
-`grass` payload and stay valid. `config.ts`'s `TARGET_VISIBLE_TILES` comment cites the 10×7 zone and is corrected
-here (comment only; values unchanged).
+DEV-only `art` field in that snapshot reading an optional `WorldRenderer.describeArt()` (kit or fallback, the drawn
+frame key per tile, landmark and warp-marker tiles with their screen rects via `screenFor`, the active post passes and
+keyframe, the drawn zone's terrain histogram). The `art` field is stripped with the DEV block, which
+`scripts/verify-build-hooks.mjs` already proves for `__game`; `describeArt` itself is a read-only method that stays in
+the bundle like `screenFor`. `controls.ts`'s `safeTile` and BFS read the live `walkable` / `grass` payload and stay
+valid. `config.ts`'s `TARGET_VISIBLE_TILES` comment cites the 10×7 zone and is corrected here (comment only; values
+unchanged). This e2e is also where the shell-only behaviors (kit drawn rather than fallback, nearest sampling visible
+as hard tile edges, decor actually on screen) are proven through the real UI.
 
-- **WAP10.1:** WHEN a player spawns in Verdant Hollow and walks by D-pad to the heal post, THE rendered world SHALL
-  report the heal landmark at (8,3) and the canvas pixels inside its screen rect SHALL differ from a ground tile's.
+- **WAP10.1:** WHEN a player spawns in Verdant Hollow and walks by D-pad to the heal post, THE rendered world SHALL report
+  the terrain kit drawn with no fallback, the heal landmark at (8,3), and canvas pixels inside the landmark's screen
+  rect that differ from a ground tile's.
 
 - **WAP10.2:** WHEN the player then walks to the warp, THE marker SHALL be reported on (1,5) before the step, and after
-  the zone change the drawn terrain histogram SHALL differ from Verdant Hollow's with water at least 15% of the tiles.
+  the zone change the drawn terrain histogram SHALL differ from Verdant Hollow's with water on at least 10% of the tiles.
 
-- **WAP10.3:** WHILE that flow runs, THE world SHALL report the terrain kit loaded and the post stack active at the
-  `day` keyframe, and the production build SHALL carry no `art` hook.
+- **WAP10.3:** WHILE that flow runs, THE world SHALL report the post stack active at the `day` keyframe, and the
+  production build SHALL carry no `__game` hook (the existing verify-build-hooks gate, re-run).
 
 - **WAP10.4:** THE game repo's `ARCHITECTURE.md` render section SHALL describe the terrain grammar, the art registry,
   the render layers and the post stack as built (verified by review with a path:line citation).
@@ -582,8 +644,8 @@ The milestone is done when the merged whole, not each slice, satisfies WAP.1–W
    `tactics-wild.spec.ts`, `tactics-pvp.spec.ts`, `shop-npc.spec.ts`, `wallet-balance.spec.ts`, `recruit.spec.ts`,
    `movement-input.spec.ts`, `zoneSync.spec.ts` and `a11y.spec.ts`; the movement-parity eval and the sim-harness load
    driver green on the grown maps.
-3. The registry test over the final shipped set is green: every served asset provenanced, no ai-placeholder row,
-   `releaseBlockers` listing exactly the placeholder rows the deferred launch gate will need replaced.
+3. The registry test over the final shipped set is green: every served asset provenanced, no ai-placeholder row;
+   the rows still tagged `placeholder-*` are the list the deferred launch gate will need replaced.
 4. One manual pass at three window sizes (incl. a fractional devicePixelRatio) with the post stack on and off and with
    reduced motion on, confirming WAP.1–WAP.7 by eye, with before/after captures of both zones and the battle board
    attached to the closing PR so the operator can judge the placeholder upgrade.
@@ -594,7 +656,7 @@ The milestone is done when the merged whole, not each slice, satisfies WAP.1–W
 
 ## What the next milestones consume
 
-- **The final-art milestone (unscheduled):** the registry's stable atlas keys and `releaseBlockers`; art is a file swap
+- **The final-art milestone (unscheduled):** the registry's stable atlas keys and provenance tags; art is a file swap
   plus a row change from `placeholder-*` to `final`.
 - **Map, story, cutscene and shader work (unblocked per pt3-166):** the ten-class grammar, the Tiled import path, the
   decor layer, the post stack and its keyframes.
@@ -623,9 +685,20 @@ The milestone is done when the merged whole, not each slice, satisfies WAP.1–W
 7. **Pictographic sign, no text.** This avoids canvas text and the 524-key catalog pins; text signage is deferred.
 8. **No frame-time gate.** Budgets are measured and recorded (`wap-9`); asserting them on software-GL CI would be
    flaky.
-9. **`main.ts` is touched twice** (`wap-4`: the injected time and motion argument; `wap-10`: the DEV `art` field), and
-   `main.dispatch.test.ts` reads main.ts text. Each builder measures that scan first; a pin on the edited lines is a STOP.
-10. **The luminance floor is a default** (ΔY ≥ 0.06). `wap-2` tunes it upward on the first decoded atlas and records
-    the measurements; lowering it is a spec change.
-11. **Touches are grep-measured, not build-proven.** A file outside a slice's `touches:` is a STOP plus a build note,
+9. **`main.ts` is touched twice** (`wap-4`: the injected time and motion argument; `wap-10`: the DEV `art` field).
+   Measured clean: no test pins the `renderer?.render(` call shape, and `main.dispatch.test.ts`'s text scan covers
+   `movementGate` / `worldBaseLive` only. A new scan landing before those slices is a STOP.
+10. **The luminance floor is a default** (ΔY ≥ 0.06), and so are the coastal-identity figure (water ≥ 10% of
+    Tideglass Cove) and the battlefield band (0.15–0.40). They are domain values read through the loader or the decoded
+    artifact, not pins on prose; `wap-2`/`wap-3`/`wap-7` may tighten them after measuring, and loosening one is a spec
+    change.
+11. **Flameling's sheet is resolved through the registry, not renamed.** Renaming `monster-emberkit.*` would need
+    `generate_art.py`, which `wap-2` edits concurrently; the registry row is the client's single source, and the
+    grandfathered spritesheet eval keeps its own `SLUG_OVERRIDES` fixture until that eval is next replaced.
+12. **Battle art scale is published as a second CSS variable** (`--mr-world-scale`, from the same `viewportScale` call
+    as `--mr-ui-scale`), so the DOM board can size art in whole device pixels without reading the continuous chrome
+    scale that UIF11.1 forbids. One pure function still drives both (#586 D1 holds).
+13. **Two CSS-text assertions are retired by replacement** (`wap-3`, Constraint 7b). The repo's testing standard
+    forbids reading hand-authored files; the replacements are behavior checks, and the PR names each deletion.
+14. **Touches are grep-measured, not build-proven.** A file outside a slice's `touches:` is a STOP plus a build note,
     never a silent widen.
