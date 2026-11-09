@@ -733,15 +733,16 @@ stays open. Tactical flow and copy otherwise stand.
 
 ### uif-12 — World sheets
 category: ux-a11y · severity: LOW · size: MODERATE
-touches: client/src/ui/actionSheetModel.ts, client/src/ui/actionSheetModel.test.ts, client/src/ui/noticeModel.ts, client/src/ui/noticeModel.test.ts, client/src/ui/screens/worldScreen.ts, client/src/ui/screens/worldScreen.test.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/main.ts, client/src/main.hintBar.test.ts, client/src/main.notices.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/styles.css, client/e2e/controls.ts, client/e2e/ui-world-sheets.spec.ts, client/src/ui/i18n/hardcodedStrings.ts, client/src/ui/i18n/hardcodedStrings.test.ts, client/src/ui/screens/index.test.ts, client/src/main.input.test.ts, client/e2e/respond-request.spec.ts
+touches: client/src/ui/actionSheetModel.ts, client/src/ui/actionSheetModel.test.ts, client/src/ui/noticeModel.ts, client/src/ui/noticeModel.test.ts, client/src/ui/screens/worldScreen.ts, client/src/ui/screens/worldScreen.test.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/main.ts, client/src/main.hintBar.test.ts, client/src/main.notices.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/styles.css, client/e2e/controls.ts, client/e2e/ui-world-sheets.spec.ts, client/src/ui/i18n/hardcodedStrings.ts, client/src/ui/i18n/hardcodedStrings.test.ts, client/src/ui/screens/index.test.ts, client/src/main.input.test.ts, client/e2e/respond-request.spec.ts, client/src/ui/i18n/catalogParity.test.ts
 after: [uif-9, uif-10, uif-11]
 Feedback items: pt3-2026-10-025, -049, -104
 Measured: `main.ts`'s frame tick renders `#interact-sheet` via `renderNav` under `.mr-frame--prompt`, which has
 `pointer-events: none` and follows the anchor tile; the request sheet sits low and centred. `sheetLayout`, `challengeLayout`,
-`requestSheetLayout` hold the rows; the challenge confirm already ends in `no`. `readPickRows` (`e2e/controls.ts`) is used by
-`tactics-pvp`, `trade-propose`, `pvp-side-b`, `ranked-forfeit`, so the helper filters the Close row and those specs stay.
+`requestSheetLayout` hold the rows; the challenge confirm already ends in `no`. `openFaceToFace` (`e2e/controls.ts`, used by
+`tactics-pvp`, `trade-propose`, `pvp-side-b`, `ranked-forfeit`) seeks the picker row by its text and reads the Challenge pick,
+which keeps `No` last, so no helper filters the Close row; `readPickRows` had no caller and was removed.
 `CTL13-1-MODEL-WORLD` pins the hint chips. These are not frames (DECISIONS "server-owned frames"): they stay world sheets.
-Continuation touches widened per measured hidden dependencies (first run parked at `slice/uif-12`, UIF12.1/.3/.4/.5 built and green): `hardcodedStrings.ts` SINK_FLOOR 255 -> 250 with its exact pin in `hardcodedStrings.test.ts` (request heading and Challenge question moved into the kit's ContextSheet heading, text not removed; uif-4b/uif-8 precedent); `screens/index.test.ts` CTL10A-1-HOST-SHEET flips to Select = Help with the sheet closing first (the branch's chosen option (a); name it in a DECISIONS entry reversing ctl-10a's "Select is the sheet's"); UIF12.2's Close row is a `[role=option]` row, so `main.input.test.ts` CTL10A-* row-count pins and `e2e/respond-request.spec.ts:227,313` fold in and UIF12.2 is no longer DEFERred. Resume from the park memo `monster-realm-uif-12-progress.md`.
+Continuation touches widened per measured hidden dependencies (first run parked at `slice/uif-12`, UIF12.1/.3/.4/.5 built and green): `hardcodedStrings.ts` SINK_FLOOR 255 -> 250 with its exact pin in `hardcodedStrings.test.ts` (request heading and Challenge question moved into the kit's ContextSheet heading, text not removed; uif-4b/uif-8 precedent); `screens/index.test.ts` CTL10A-1-HOST-SHEET flips to Select = Help with the sheet closing first (the branch's chosen option (a); name it in a DECISIONS entry reversing ctl-10a's "Select is the sheet's"); UIF12.2's Close row is a `[role=option]` row, so `main.input.test.ts` CTL10A-* row-count pins and `e2e/respond-request.spec.ts:227,313` fold in and UIF12.2 is no longer DEFERred; the Close label is a new `main.ts`-bound catalog key, so `catalogParity.test.ts`'s exact main.ts key roster (a sibling test of the i18n catalogs) gains `kit.sheet.close`. Resume from the park memo `monster-realm-uif-12-progress.md`.
 
 - **UIF12.1:** WHEN a world picker, action sheet or request sheet shows, IT SHALL paint in the ContextSheet family with
   `[data-context-sheet]`, and its rows SHALL accept pointer clicks, staying anchored as shipped.
@@ -784,6 +785,14 @@ dies in `uif-15b` per #586 D3, so Display lives here.
 - **UIF13.5:** WHEN Extra large is on at 1280×720 in Chromium, EVERY main-menu entry and the Monsters tabs SHALL stay reachable and
   visible through the kit's scroll, and a screen SHALL NOT clip a focused row.
 
+Built (uif-13): `ui/displayPrefs.ts` stores `{"v":1,"textStep":…}` and writes `--mr-text-step` ('1', '1.5', '2') at main.ts import. The root rule
+in `styles.css` gained the factor `* var(--mr-text-step, 1)`. That file was outside `touches:`; it was taken as a flagged touches-delta, with the
+DECISIONS entry "One viewport number…" amended. "Before the first frame" means the first frame the scaled chrome shows: Pixi's ticker runs
+frames before `installResizeHandler` writes `--mr-ui-scale`, and until that write the uif-2 rule leaves the root at 100%. The e2e therefore asserts
+the step is in place at the scale's first write. The confirm rows are `controls-root-yes` / `controls-root-no`, the kit's tab-less id scheme.
+UIF13.5 was measured on the main menu, the Monsters tabs and Controls (Buttons grid, Display rows) at ×2 and 1280×720, and no other CSS was
+needed. `textStep` / `onTextStep` are optional handlers (the `onOutcome` precedent), so `overlayA11yWiring.test.ts`'s rig compiles unchanged.
+
 ### uif-14 — How to Play: Introduction, Encyclopedia, Report a problem
 category: ux-a11y · severity: MED · size: MODERATE
 touches: client/src/ui/helpModel.ts, client/src/ui/helpModel.test.ts, client/src/ui/helpView.ts, client/src/ui/helpView.test.ts, client/src/ui/helpView.i18n.test.ts, client/src/ui/screens/helpScreen.ts, client/src/ui/screens/helpScreen.test.ts, client/src/ui/screens/types.ts, client/src/ui/hintBarModel.ts, client/src/ui/hintBarModel.test.ts, client/src/ui/a11yCopy.ts, client/src/ui/a11yCopy.test.ts, client/src/ui/questLogView.test.ts, client/src/ui/reachability.test.ts, client/src/ui/menuModel.test.ts, client/src/ui/claimView.ts, client/src/main.ts, client/src/main.help.test.ts, client/src/main.chips.test.ts, client/src/main.dispatch.test.ts, client/src/main.input.test.ts, client/src/indexShell.smoke.test.ts, client/index.html, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/a11y.spec.ts, client/e2e/ui-help.spec.ts, ARCHITECTURE.md
@@ -819,6 +828,12 @@ the sketch; each new id costs about 25 pins, and an in-frame modal gives the sam
 
 - **UIF14.7:** WHEN this slice lands, axe on How to Play SHALL stay clean, the hint bar's generated chips SHALL be unchanged, and R-ctl-14-STALECMT
   SHALL be closed by comment corrections at its named sites (review-attested, no test).
+
+Build note (uif-14, 2026-11-08): UIF14.2's Report a problem row and UIF14.3 were DEFERRED on a hidden dependency the Measured
+note missed: a `reportProblem` `Command` arm must also be classified in `client/src/ui/battlePolicy.ts` (`COMMAND_BATTLE_POLICY`, a
+total `Record` over the kinds) and `client/src/ui/battlePolicy.test.ts` pins the 34-kind roster. The follow-up's touches need both,
+plus `screens/types.ts`, `main.ts`, the help files, `help.intro.report` and `e2e/ui-help.spec.ts`. Also measured: the detail sheet is
+absolute inside the scrolling `#help-overlay`, so `helpView` moves its centring box onto the visible part (×2 text scrolls the frame).
 
 ### uif-15a — Labels: Inventory, How to Play
 category: content · severity: LOW · size: MODERATE
@@ -864,6 +879,14 @@ DEAD-KEY and the roster. `hintBarModel` and `optionsScreen` name no group, so th
 
 - **UIF15B.5:** WHEN the player backs out of any screen opened from the root, THE menu SHALL show again with its cursor on that entry, and the required flow (menu → screen →
   back → another screen → world) SHALL pass in Chromium in `ui-menu.spec.ts`.
+
+Build note (uif-15b, 2026-11-09): shipped Social as a root leaf (UIF15B.1/.3/.4/.5). The root list stays at 7 entries. U/P/L carry their Social tab in
+`ACCEL_PATHS` data (`AccelPath.tab` widened to `MonstersTab | SocialTab`, `accelDecision` unchanged), and the catalog roster went 536 → 530. UIF15B.2 (Options
+dies) was DEFERRED on a hidden dependency the Measured note missed: `e2e/ui-controls.spec.ts` (`openControls`) and `e2e/ui-feedback.spec.ts` both walk
+Start → Options → A → Down → Controls, and `e2e/ui-chrome.spec.ts` pins `MENU_ROOT_KEYS` with `options` (its `seatMenuCursorOnMonsters` comment also names the
+gone `menuSocial` level). The follow-up's touches need those three specs plus this slice's set. It also needs the Y row of `EXPECTED_PATHS` and the
+`QF14-3-REACH-MANIFEST` count (Y: 6 via Options), each changed once and named. Social's reach counts, computed over the real Social tab layout from Players:
+U 6, P 7, L 6.
 
 ### uif-16a — Profile: sections behind one seam, no visible change
 category: ux-a11y · severity: LOW · size: MODERATE
