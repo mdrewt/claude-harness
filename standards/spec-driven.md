@@ -106,6 +106,35 @@ default branch identifies it. How it is verified is `testing-tdd.md`
 - **The Boy Scout bound** (`principles.md`) limits incidental cleanup, never
   the declared move.
 
+**A design slice answers a design question before code moves.** When refactor
+slices depend on an internal-design choice nobody has recorded, that choice is
+itself a slice the loop builds: which module owns shared mutable state, where
+a large file's seams fall, what an extracted module exposes, which way a
+dependency points, which of several near-duplicates survives, the order of a
+migration. It is never escalated for sign-off, because it stays reversible
+until the first slice built on it merges. It is for a question several slices
+depend on or where sound designs differ; a choice that affects one small move
+is one line in that slice's spec section.
+
+A design slice is marked `type: design · tier: hard`. It changes no code, so it
+has no red run, no tester and `moved-tests: none`. Its `touches:` are
+`docs/DECISIONS.md` and one plan file, `docs/refactors/<topic>.md`. It reads
+the affected code in full and has a `judge` score at least two alternatives.
+It records the choice and what it rules out in `DECISIONS.md`, and in the plan
+file the target module map, who owns what, and the extraction slices still to
+make, in order, each named by the symbols it moves. Its PR title is
+`docs(design): <slice id> — <question>`, and the PR body carries `decided:`
+rows, `question -> choice (over: alternative)`. Its gate is the repository's
+own; whoever merges reads the plan against the code. Slices that depend on it
+list it in `after:`. Each extraction slice deletes its own line from the plan
+file and brings `ARCHITECTURE.md` in line with the structure it leaves; the
+slice that makes the last extraction deletes the plan file.
+
+**What still goes to the operator:** a change to persisted data, the schema or
+the wire format; to gameplay or anything a player sees; to the security or
+privacy posture; to a cost ceiling; or anything git cannot undo. A refactor
+slice is blocked only by an `after:` slice or by one of those.
+
 **An extraction too large for one slice** runs expand → migrate → contract as
 consecutive refactor slices. The spec names the final contract slice, which
 deletes the old export or binding so the compiler proves the migration
