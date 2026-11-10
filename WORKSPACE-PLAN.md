@@ -1,6 +1,6 @@
 # Agentic Coding Workspace — Plan
 
-**Owner:** Drew · **Status:** v2.3 — built; verification/decision doctrine revised 2026-09 (see `docs/revision-2026-09/diagnosis.md`) · **Last updated:** 2026-09-28
+**Owner:** Drew · **Status:** v2.3 — built · **Last updated:** 2026-09-28
 
 > **Implementation status (v0.1):** Harness, `coding-harness` plugin (8 subagents,
 > 13 commands, 4 skills, guard hook), full `standards/` + `docs/`, all **7 stack
@@ -94,7 +94,6 @@ Claude_Projects/                  ← git repo (the "harness"); projects/ git-ig
 ├── scripts/                      ← new-project, sync-templates (drift), workspace-review + tests/ (Node)
 ├── memory/
 │   ├── index.md                  ← map of all projects + pointers (small, always-current)
-│   ├── decisions-log.md          ← cross-project decisions
 │   └── projects/<name>.md        ← per-project memory cards
 ├── docs/
 │   ├── workflow-loops.md         ← the loops, operationalized (see §7)
@@ -142,7 +141,7 @@ Everything here is generated or tool-prompted so nothing depends on remembering 
 - **Decision log.** Each project has one `docs/DECISIONS.md` (`standards/decisions.md`). The `/decision` command (via the `doc-keeper` subagent) records a decision **only when it constrains future work and isn't evident from the code** — most changes record nothing. New dependencies and cross-cutting patterns usually meet the bar. (The old ADR-per-decision rule was meant as an over-engineering guardrail; in practice mandatory recording inflated 240 micro-ADRs in one project — the bar, not the ceremony, is the guardrail.)
 - **Changelog.** Generated from Conventional Commits — never hand-maintained.
 - **API docs.** Generated from types/contracts per language (rustdoc, TypeDoc, Sphinx/pdoc).
-- **Decisions log + memory cards.** `memory/decisions-log.md` and `memory/projects/<name>.md` updated by the `doc-keeper` when something durable changed.
+- **Decisions + memory cards.** Each repo's `docs/DECISIONS.md` and `memory/projects/<name>.md`, updated by the `doc-keeper` when something durable changed.
 - **Drift detection.** The daily review (§9) flags decisions discussed but not recorded, and standards that have diverged from code.
 
 ---
@@ -308,7 +307,7 @@ Each failure mode maps to a concrete control already in this plan.
 - **Supply-chain & secrets leaks** → gitleaks + SCA + lockfiles + dependency review.
 - **Prompt injection via untrusted content** → fetched content is data, not instructions; least-privilege MCP.
 - **Over-engineering / premature abstraction** → YAGNI rule; reviewer flags complexity; a decision entry (with its bar) for new deps/patterns.
-- **Process becoming the product** (checks that check checks; docs written for parsers; ceremony per slice) → the protected-categories bar, "when unsure, don't add a check", current-state docs, and no per-task doc duties — see `docs/revision-2026-09/diagnosis.md` for the measured failure this guards against.
+- **Process becoming the product** (checks that check checks; docs written for parsers; ceremony per slice) → the protected-categories bar, "when unsure, don't add a check", current-state docs, and no per-task doc duties.
 - **Big-bang PRs & long-horizon drift** → spec-driven small slices; fresh context per task; verifier gate.
 - **Flaky non-determinism** → seedable RNG, injectable clocks, deterministic sims, quarantine.
 - **"Works on my machine"** → devcontainer + Compose + pinned toolchains.

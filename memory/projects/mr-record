@@ -52,7 +52,8 @@ HANDOFF=os.environ.get("MR_RECORD_HANDOFF") or (MEM+"/monster-realm-handoff.md")
 STATE=os.environ.get("MR_RECORD_STATE") or (MEM+"/mr-state.json")
 # lp-queue: same hardcoding rationale as MEM (:24-29) — mr-state.json is a machine SINGLETON and
 # queue[] pointers must validate against the REAL spec corpus, not a worktree-local fork of it.
-HARNESS="/home/mdrewt/projects/ai-apps/claude-harness"
+# MR_RECORD_HARNESS exists for fixtures only (mr-selfcheck points it at a tempdir spec).
+HARNESS=os.environ.get("MR_RECORD_HARNESS") or "/home/mdrewt/projects/ai-apps/claude-harness"
 def die(m): print("ERROR: "+m); sys.exit(1)
 
 # ========================= gates-rotate: retire old, delivered gates ledgers ======================

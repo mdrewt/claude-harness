@@ -11,5 +11,5 @@ _(none yet — created via `/new-project`)_
 
 ## Pointers
 - Standards (SSOT): `standards/`
-- Decisions across projects: `memory/decisions-log.md`
+- Decisions: each repo's `docs/DECISIONS.md` (this repo's for the harness and the loop)
 - Design rationale: `WORKSPACE-PLAN.md`

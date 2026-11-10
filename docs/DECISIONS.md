@@ -2,7 +2,7 @@
 
 Per `standards/decisions.md`: the choices that constrain this workspace today and aren't
 re-derivable from the code in minutes. The full pre-2026-09 ADR corpus lives in git history
-(`git log -- docs/adr`); its retired process is documented in `docs/revision-2026-09/`.
+(`git log -- docs/adr`).
 
 ## Generated projects ship guard + format hooks
 Every template carries the PreToolUse destructive-command guard and the PostToolUse
@@ -50,3 +50,24 @@ and `NOFILTER=1` bypasses. Post-hoc result truncation loses exactly the failure 
 matter (measured), while command rewriting keeps the complete output recoverable.
 Rules out: `| tail -N` habits on gate commands, and filtering that touches piped/complex
 commands (they're left alone by design).
+
+## Loop tool paths under `memory/projects/` are an external interface
+The user crontab, the operator's `~/.local/bin/mr-supervisor-*` commands and the Stop hook in
+`~/.claude/settings.json` call `memory/projects/mr-native-tick.sh`, `mr-usage-snap`,
+`mr-supervisor-disable`, the `.native-supervisor-disabled` flag and
+`.claude/hooks/gates-stop.mjs` by absolute path, so those files keep those paths.
+The callers live outside git: a change that moves or renames one cannot update them, and no
+check fails — the loop just stops ticking, or every live session references a missing hook.
+Rules out: relocating the `mr-*` tools (to `scripts/`, say) or deleting `gates-stop.mjs` as a
+repo-only change. The operator repoints the outside caller first.
+
+## A report-only scan lists history-style comments a diff adds
+`memory/projects/mr-comment-scan` reads the lines a slice's commits add and lists comments and
+doc lines carrying a work-tracking id or history wording. The slice brief runs it before the PR;
+a finding is reworded or answered in the PR body. It never fails a build and is not a merge gate.
+The documentation rule in `standards/principles.md` is judged by the reviewer, but an agent under
+pressure skips prose rules, and the commonest violations (a slice id, "used to") are mechanical
+to spot. Scanning added lines only keeps the existing corpus from flagging every diff.
+Rules out: promoting it to a failing gate, scanning whole files, or an inline suppression marker
+(a comment written for the tool to parse). This is the one sanctioned source-text scan; it does
+not license others (`standards/testing-tdd.md`).

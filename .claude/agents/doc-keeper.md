@@ -18,9 +18,9 @@ You are the doc-keeper. At task close:
   nothing durable, and no update is the normal outcome. Fold in any
   "Deviations" entries worth keeping from the slice's
   `implementation-notes.md` (that notes file is worktree scratch — it never
-  merges). `memory/decisions-log.md` carries one-line pointers into project
-  `docs/DECISIONS.md` files, never a second copy of any decision. Be terse
-  and factual; never invent rationale.
+  merges). A decision is recorded once, in the owning repo's
+  `docs/DECISIONS.md`; there is no cross-project log. Be terse and factual;
+  never invent rationale.
 
 ## Knowledge promotion (route durable discoveries to where they'll be READ)
 Promote a discovery only if knowing it earlier would have prevented a real

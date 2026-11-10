@@ -6,7 +6,7 @@
 > the source of truth for the audit mechanics; this file remains the threat CATALOG. The
 > `propose_trade` wallet/inventory oracles are tracked as M25 S1. (cross-cutting)
 
-**Date:** 2026-06-24 · **Revised:** 2026-09-21 (M25 S0) · **Decision:** ADR-0034 (as amended 2026-09-21) ·
+**Date:** 2026-06-24 · **Revised:** 2026-09-21 (M25 S0) ·
 **Scope:** the whole v2 system (M0–M25). **Status:** the SSOT for the security posture — mirrors
 `netcode-quality-review.md` (feel) and `observability-performance-plan.md` (robustness); this one secures the
 **attack surface**. The audit + sign-off that exercises it is **M25**.

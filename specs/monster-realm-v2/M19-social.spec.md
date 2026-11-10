@@ -1,9 +1,9 @@
 # Sketch: M19 — Guilds, chat & social
 
-**Status:** design sketch (provisional; **post-gate** — demoted by `playtest-replan-2026-07.md`, do not build before the playtest gate) · **Phase C** · **Decision:** ADR-0028 · No v1 precedent (security-led).
+**Status:** design sketch (provisional; order and preconditions in `PLAN.md` §9) · **Phase C** · No v1 precedent (security-led).
 
 > Provisional sketch — EARS criteria + tasks deferred to build time. The defining concern (untrusted user
-> content) is captured here + in the ADR + the threat model.
+> content) is captured here + in the threat model.
 
 ## Problem / intent
 The community layer — **chat**, **guilds**, **friends/block** — all server-authoritative, with **untrusted

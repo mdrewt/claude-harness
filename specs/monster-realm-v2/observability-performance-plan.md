@@ -31,7 +31,7 @@ capstone). That is how the harness already handles determinism/security/smoothne
   (2026-08-08 observability ceremony, ADR-0180):** this item was never built, and its model (module code
   emitting spans/metrics) is superseded — the SpacetimeDB host already supplies RED/table/health metrics and
   structured logs for free, with zero module code; real OTel now applies **client-side only**. The exporter
-  sink is the self-hosted stack in §4, not Datadog. See ADR-0180 §D1/D6 and `M20-observability-performance.spec.md`.
+  sink is the self-hosted stack in §4, not Datadog. See the game repo's `docs/DECISIONS.md` "Observability: the module never times itself or calls out".
 - **Benchmark harness + perf-budget eval gating CI** — `game-core` hot-path micro-benchmarks (criterion) with
   committed budgets; a **regression > threshold fails CI** (the `evals.md` benchmark check) — always on, from
   day one, on the pure rules where it's cheap and deterministic.
@@ -48,7 +48,7 @@ capstone). That is how the harness already handles determinism/security/smoothne
 ### Layer 3 — the M20 capstone (Phase D — production readiness)
 Production monitoring (log aggregation, health/readiness, and — **correction, 2026-08-08 observability
 ceremony, ADR-0180:** the dashboard/alert sink is a self-hosted OSS stack, not OTel→Datadog; see §4 and
-`M20-observability-performance.spec.md`), **full-system load testing** (the sim-harness scaled to target
+the game repo's `docs/DECISIONS.md` "Observability: the module never times itself or calls out"), **full-system load testing** (the sim-harness scaled to target
 concurrency across all systems), **profiling** the named hot paths under load, the **measured
 performance-tuning pass** (finally execute the "scaling path" against data), and ops reporting / SLO
 baselines.
@@ -125,8 +125,7 @@ adr/0180-observability-stack-selection.md`).
 - **M0** builds Layer 1 (the substrate + the CI benchmark/perf-budget gate). *(refined)* — **correction
   (2026-08-08 ceremony, ADR-0180):** live verification found the benchmark/perf-budget gate and the
   OTel-seam item were never actually built (`Cargo.toml` names `criterion`/`opentelemetry` only in
-  comments; no `benches/` dir exists). M20 retrofits this directly now — see §4 and
-  `M20-observability-performance.spec.md`.
+  comments; no `benches/` dir exists). M20 retrofitted this directly — see §4.
 - **The loop's cross-cutting invariants** carry Layer 2 (every milestone instruments + benchmarks + load-
   tests what it adds). *(refined)*
 - **M2** adds the per-zone-tick benchmark + a concurrency/load test (the canonical server hot path). *(refined)*

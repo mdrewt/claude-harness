@@ -19,8 +19,7 @@
   remembering — but a check that exists to enforce *process* is bloat, and a
   rule that would need a scanner to enforce is better left to review. (The
   old absolute form of this rule — "wire a check; never rely on remembering" —
-  measurably drove a 10:1 checking:production ratio; see
-  `docs/revision-2026-09/diagnosis.md`.)
+  measurably drove a 10:1 checking:production ratio.)
 - **DRY — but NOT across marshaling/serialization boundaries.** Duplicated data
   *shapes* across a Rust↔TS or service boundary are often correct; coupling them is worse.
 - **YAGNI with named exceptions** — state the exceptions explicitly so they aren't
@@ -78,6 +77,22 @@ Where a concern maps to a protected category, a tool enforces it; the rest is ju
 - Docs describe **current state** and are rewritten in place. Appending is not
   updating; git history is the archive. A doc whose claims can't be re-derived
   from the code it describes gets corrected or cut.
+- **A record stays only while a current reader or tool needs it.** The test is
+  need, not whether it was accurate when written: a correct account of a past
+  state is still noise to every agent that reads or searches it. Specs exist
+  for open and future milestones; when a milestone closes, its lasting
+  decisions go to `DECISIONS.md` and the spec and its per-slice plans, briefs
+  and reports are deleted. No `archive/` folders, dated post-mortems kept "for
+  reference", or backup copies in the tree. Before deleting, check for live
+  citations: a file a script or current doc names as the home of a contract is
+  current, so correct it instead.
+- **Comments and docs state what the code does now and why.** Not what it used
+  to do, what it replaced, or how a bug was found: "was", "used to", "before
+  this", "no longer" and dates are the tell. A past failure belongs in a
+  comment only as the present-tense reason a guard exists ("a fixed sleep reads
+  a stale column on a slow runner"), never as a story. History lives in commit
+  messages, PR descriptions, the generated changelog and the rolling
+  operational logs (handoff, ledgers), which are history by purpose.
 - `ARCHITECTURE.md` changes only when the structure it describes changes.
   Decision records follow `standards/decisions.md`. The changelog is generated
   from Conventional Commits, on demand. **No per-task doc duties** belong in
@@ -106,6 +121,9 @@ silently desync.
 - Public surface larger than the spec requires.
 - Comments that restate code instead of explaining *why*; comments or docs
   written for a tool to parse rather than a human to read.
+- Comments or docs added by the diff that narrate change — what the code used
+  to do, a slice or decision id, a date — instead of stating current behaviour
+  and its reason.
 - A touched file left *worse* than found — a new smell, dead code, or changed
   behavior without a test — when a bounded in-blast-radius fix was available (Boy
   Scout violation). Note the inverse is also a red flag: an unbounded drive-by

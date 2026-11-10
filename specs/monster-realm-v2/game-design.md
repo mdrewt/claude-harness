@@ -5,8 +5,7 @@
 (per the harness). This doc is opinionated on purpose: it makes starting calls (clearly marked as tunable)
 so the engineering has a real target instead of "TBD".
 
-> **2026-09 amendments (playtest-driven; details in `archive/M-evolution-essence-redesign.spec.md` and the
-> game repo's `docs/DECISIONS.md`):** **Fusion was removed** — replaced by essence-catalyst branching
+> **2026-09 amendments (playtest-driven; details in the game repo's `docs/DECISIONS.md`):** **Fusion was removed** — replaced by essence-catalyst branching
 > evolution (Drew's r1 playtest call). **The Bond stat was retired** with that redesign. The two economy
 > gaps (heal locations charge nothing; PvP side-B reward) are deliberate pre-release conveniences, not
 > design targets. Where this doc's prose below mentions fusion or bond, read it as the historical intent

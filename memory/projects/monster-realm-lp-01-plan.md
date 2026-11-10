@@ -1,9 +1,9 @@
 # lp-01 — final plan (adjudicated after planner + reviewer + red-team + /simplify)
 
 Branch `feat/lp-01-rate-limit-telemetry`, worktree `.claude/worktrees/lp-01`, base `origin/main@2cd448c`.
-Spec: `specs/monster-realm-v2/M-loop-infrastructure.spec.md:141-167`. Gate: `mr-selfcheck` → `SELFCHECK-OK`
-plus `--selftest` of every tool touched/added. No ADR (spec §6: loop-infra slices record decisions in the
-`mr-*` doctrine file + one line in `memory/decisions-log.md`).
+Gate: `mr-selfcheck` → `SELFCHECK-OK`
+plus `--selftest` of every tool touched/added. No ADR (loop-infra slices record decisions in the
+`mr-*` doctrine file).
 
 ## Measured ground truth (re-derived at slice head; spec line numbers had drifted one slice)
 
@@ -30,7 +30,7 @@ plus `--selftest` of every tool touched/added. No ADR (spec §6: loop-infra slic
   PRODUCTION `MEM` — the out-path is a **safety seam**, not test scaffolding.
 - **D2 · Persist EVERY window (five_hour + seven_day + typeless), with `rateLimitType` as a column.**
   Reviewer BLOCKER: the planner's premise ("`overageStatus` only ever appears on five_hour") is FALSE —
-  `mr-postmortem-2026-08-15-evidence.json:2753` records a `seven_day` row carrying `overageStatus`. The
+  the 2026-08-15 post-mortem measured a `seven_day` row carrying `overageStatus`. The
   premise is struck; the decision stands on the surviving argument: lp-12/lp-13 are blocked on one full
   reset cycle of this output, so widening later restarts that week, and a type filter is more code than no
   filter. A superset satisfies the EARS `WHEN…SHALL` a fortiori. Flagged in the PR as a spec-amendment
@@ -103,7 +103,6 @@ plus `--selftest` of every tool touched/added. No ADR (spec §6: loop-infra slic
 | `memory/projects/mr-telemetry-selftest` | declared (new) | the tests |
 | `memory/projects/mr-selfcheck` | **touches-delta** | one `--selftest` wiring line + rationale comment |
 | `memory/projects/.gitignore` | **touches-delta** | one line: the runtime telemetry file |
-| `memory/decisions-log.md` | **touches-delta** | one row — mandated by spec §6 for loop-infra slices |
 
 Out file: `$MEM/mr-rate-limit-telemetry.jsonl` (untracked). Reviewer argued for tracking it (the sibling
 `mr-usage-daily.jsonl` is tracked, durability matters for a cost SSOT). REJECTED with the tradeoff

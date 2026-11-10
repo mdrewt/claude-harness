@@ -1,12 +1,11 @@
 # Spec: M25 — Security audit & launch sign-off
 **Status:** respecced 2026-09-28 against monster-realm @ `4f36de2` (post-de-bloat) · S0 done, S1–S5 open ·
 **Owner:** Drew (sign-off) · **Stack:** spacetimedb-game · **Project:** monster-realm · **Depends on:**
-M21, M22 (closed) · **Supersedes:** `archive/M25-security-audit-2026-08.spec.md` (ceremony record kept there)
+M21, M22 (closed) · **Supersedes:** the 2026-08 ceremony spec (git history)
 
 ## Problem / intent
 Launch is gated on a **human security sign-off**: nothing else audits the whole surface, triages findings,
-or refuses launch with an open critical (ADR-0034 as amended 2026-09-21, archived at
-`archive/adr/0034-security-audit-gate.md`). Per-system controls live in ordinary tests and CI; M25 fixes
+or refuses launch with an open critical. Per-system controls live in ordinary tests and CI; M25 fixes
 the known leaks, runs one audit pass, and ends with an operator walking a checklist and signing.
 
 **The frame (kept from the 2026-08 ceremony):** a hostile client can observe only two channels. (1)
@@ -16,7 +15,7 @@ channel-2 outcome is an *oracle* only if the predicate it reveals is not already
 **Coupling:** making a table private turns every reducer branch that tests a predicate over *another
 player's* rows in that table into a new oracle. Closing a channel-1 leak can open a channel-2 one.
 
-**Corrections to the archived spec** (re-derived from the live repo):
+**Corrections to the 2026-08 spec** (re-derived from the live repo):
 1. **RLS is a dead premise.** `client_visibility_filter` is unenforced at 2.8.1
    (`docs/runbooks/spacetimedb-upgrade.md` §Standing facts). **There is no chat**: the only user-generated
    text is `set_profile_name` → `guards::validate_name`. (Both were already fixed in S0.)
@@ -37,7 +36,7 @@ player's* rows in that table into a new oracle. Closing a channel-1 leak can ope
    `build_cards`.
 5. **The dormant `battle_challenge` branch stays dormant.** The payload split (S2) keeps
    `{challenge_id, challenger, target, status}` public, so "target already has a pending incoming
-   challenge" (`pvp.rs`) still reveals nothing new. The archive's "must resolve in the same PR" rule is moot.
+   challenge" (`pvp.rs`) still reveals nothing new. The 2026-08 spec's "must resolve in the same PR" rule is moot.
 6. **The claim flow now works end to end** (3942d49, d6fd5cc). The account-e2e driver used to hide the fact
    that the browser never called `start_guest_claim`. Evidence: `client/e2e/accounts.spec.ts` A1–A3.
 
@@ -46,10 +45,9 @@ Grouped by slice. Each slice carries its own `touches:`. Spine: **S1 ‖ S2** (d
 pvp/schema/client) → **S3** (after S2: both touch `schema.rs`) → **S4** (audit) → **S5** (sign-off,
 terminal). A finding fixed during S4 becomes its own small slice with its own ordinary test.
 
-### S0 — Threat-model consolidation + ADR-0034 amendment · **DONE** (pre-revision, 2026-09-21)
+### S0 — Threat-model consolidation · **DONE** (pre-revision, 2026-09-21)
 Evidence: `security-threat-model.md` header "Revised 2026-09-21 (M25 S0)" (two-channel STRIDE row, chat
-struck, residuals and accepted risks added). `archive/adr/0034-security-audit-gate.md` §Amendment, which
-the operator accepted via issue #496. Its §2–§3 still describe the deleted gate machinery. S3 fixes that.
+struck, residuals and accepted risks added). The operator accepted the launch-gate amendment via issue #496. The threat model's §2–§4 still cite the deleted gate machinery; S3 fixes that.
 
 ### S1 — Close the trade-proposal oracles
 **Acceptance criteria (EARS)** — native-host tests in `server-module/src/trading_tests.rs`. Each one runs
@@ -86,7 +84,7 @@ the UI's error copy changes), `client/e2e/trade-zz-negative.spec.ts`.
   tester rewrites them from this spec: they move to the respond/confirm step. That is a protected-category
   change, adjudicated by the human ratification of this spec, because the old behaviour is the leak.
 
-### S2 — `battle_challenge` payload split (the archive's residual 2, still valid)
+### S2 — `battle_challenge` payload split (the 2026-08 spec's residual 2, still valid)
 `challenger_party_ids` is public on every pending challenge. The client never reads it (only
 `net/rowConvert.ts` copies it), and the server reads it at accept (`pvp.rs`). A flat participant-scoped
 view would break `buildPvpChallengeViewModel`'s busy-set (`client/src/ui/pvpModel.ts`), which legitimately
@@ -123,7 +121,7 @@ Docs only. There are no criteria to test, and no test pins any of this prose.
   identified transactions, and publish what was reversed.
 - `docs/runbooks/spacetimedb-upgrade.md`: add a Procedure step. On each bump, re-check whether RLS is
   enforced. If it is, re-open the "Table privacy" decision. Otherwise update the Standing-facts version.
-  This replaces the archive's nightly tripwire eval.
+  No nightly tripwire eval does this.
 - The stale `trade_offer` doc comment in `schema.rs` still calls `inventory` "world-readable". Correct it.
 - Harness side: `specs/monster-realm-v2/security-threat-model.md` §2–§4 still cite the deleted machinery
   (reducer-security-auditor eval, per-table privacy evals, Semgrep/SBOM, oracle-coupling gate,
@@ -179,7 +177,7 @@ Each item is ticked **met**, or given a finding with a disposition. Then the ope
   `validate_name_nfc_normalizes` pass. Names reach the DOM only as text.
 - [ ] Accepted exposures are consciously accepted, each with an owner:
   - `trade_offer` is visible to all players before consent: the offered amounts and cards. This is the
-    archive's residual 1(b). A fix would need a private staging row, which is a redesign.
+    2026-08 spec's residual 1(b). A fix would need a private staging row, which is a redesign.
   - Public-table composition (`character` + `player` + `profile` + `player_quest` + `trade_offer`).
   - The S2 outcome, if S2 was demoted.
 
@@ -227,7 +225,7 @@ certification · per-severity SLAs or a disclosure inbox (zero live players; rev
 moderation (there is no chat) · localising server `Err` strings · any script that re-checks sign-off content.
 
 ## Notes
-**Dropped from the archive, and why.** These violate `standards/testing-tdd.md`'s forbidden shapes, or
+**Dropped from the 2026-08 spec, and why.** These violate `standards/testing-tdd.md`'s forbidden shapes, or
 their subject was deleted:
 - the `visibility_note` amendment (a documentation-existence check over deleted ADR-0199 machinery);
 - `reducer-oracle-coupling.eval.mjs` and its `Err(` census (source-text scanning; a new eval). It is
@@ -239,7 +237,7 @@ their subject was deleted:
 - criteria asserting other gates exist or bite (old SEC-14/15/22/28), and the M-error-codes seam
   (it existed only because of `err_literal` pins).
 
-**Kept:** the ADR-0034 intent (a human-signed launch gate, with open criticals blocking), the two-channel
+**Kept:** the launch-gate intent (a human-signed launch gate, with open criticals blocking), the two-channel
 frame, the severity rule, the coupling rule, both residual splits (trade_offer: the oracle half becomes S1,
 and the visibility half is accepted in S5 §B; battle_challenge: S2), the CVSS-lite idea (reduced to S4's
 three-tier default), `SECURITY.md`, and the rollback default. **Relied on as-is, never extended:**

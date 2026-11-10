@@ -56,6 +56,8 @@ EOF
 "$MEM/mr-lock" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-lock selftest"; BAD=1; }
 # cost caps + rate-limit arming: the wrapper-side money/limit safety pair.
 "$MEM/mr-cost-watch" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-watch selftest"; BAD=1; }
+# the slice brief's comment check: what it flags, and above all what it must leave alone.
+"$MEM/mr-comment-scan" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-comment-scan selftest"; BAD=1; }
 # launch machinery: brief rendering, placeholder integrity, repo routing, probe behavior.
 "$MEM/mr-spawn" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-spawn selftest"; BAD=1; }
 # lp-04: mr-audit's policy/detector split + the disposition sweep.
@@ -75,9 +77,9 @@ EOF
 #       every in-file assertion would still pass. This is the half that sees that;
 #   (c) neither the probe nor the selftest may leave a /tmp/mr_audit_*.json behind.
 #
-# Tester-authored, TDD RED PHASE — do not edit these to fit a buggy implementation; a wrong
-# expectation is corrected FROM THE SPEC (M-loop-infrastructure.spec.md:224-253 and the binding
-# amendments in memory/projects/monster-realm-lp-04-plan.md), never retargeted to match the code.
+# Do not edit these to fit a buggy implementation: the contract they encode is
+# memory/projects/monster-realm-lp-04-plan.md (AM1-AM17), and a wrong expectation is corrected
+# from that plan, never retargeted to match the code.
 /usr/bin/python3 - "$MEM" <<'PYAUDIT' || BAD=1
 import json
 import os
@@ -193,8 +195,8 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-lp04-") as TMP:
             fail("lp04-probe-flagged",
                  "a log with zero Agent calls must be FLAGGED; got %r. This is the assertion a "
                  "marker-printing stub cannot satisfy" % (got,))
-        # AM3: the key was renamed, the VOCABULARY was not. mr-supervisor-prompt-native.md:39,
-        # :122-123 and mr-record's gating_test_audit column both key on the FLAGGED token.
+        # AM3: the key was renamed, the VOCABULARY was not. mr-supervisor-prompt-native.md
+        # ("After a pass", the mr-audit bullet) and mr-record's gating_test_audit column both key on the FLAGGED token.
         if "gating_advisory" not in obj:
             fail("lp04-probe-key", "top-level `gating_advisory` is missing (AM3)")
         if "gating" in obj:
@@ -666,9 +668,8 @@ if listing(ROOT) != ROOT_BEFORE:
 
 sys.exit(bad)
 PYLP06
-# lp-09: kill-switch provenance derived assertions (A1-A8). Tester-authored, TDD RED PHASE —
-# do not edit these to fit a buggy implementation; a wrong expectation is corrected FROM THE
-# SPEC (M-loop-infrastructure.spec.md, slice lp-09), never retargeted to match the code.
+# lp-09: kill-switch provenance derived assertions (A1-A8). These assertions are the contract:
+# do not edit them to fit a buggy implementation or retarget them to match the code.
 /usr/bin/python3 - "$MEM" <<'PYENV' || BAD=1
 import os
 import re
@@ -1199,8 +1200,8 @@ mr_record_backup_teeth "$MEM" || BAD=1
 # lp-queue / lp-handoff-rotate — behavioural fixtures against the REAL mr-record, same isolation
 # discipline as the lp-02 block above: MR_RECORD_STATE and MR_RECORD_HANDOFF are redirected into a
 # tempdir and this block REFUSES to run if either would resolve under $MEM, so no fixture can ever
-# reach the real corpus. Tester-authored, TDD RED PHASE (M-loop-infrastructure.spec.md
-# §lp-queue/§lp-handoff-rotate) — a wrong expectation is corrected FROM THE SPEC, never retargeted.
+# reach the real corpus. These assertions are the contract for `mr-record queue-*` and handoff
+# rotation: do not retarget one to fit an implementation.
 #
 # Regression coverage for the two design-review findings that would otherwise ship silently broken:
 # (1) mid-tick queue-add/-remove must be independently durable (not clobbered by a later free-hand
@@ -1239,7 +1240,8 @@ def rec(sub, args, timeout=30):
     e = dict(os.environ)
     e["MR_RECORD_STATE"] = STATE
     e["MR_RECORD_HANDOFF"] = HANDOFF
-    for key in ("MR_RECORD_STATE", "MR_RECORD_HANDOFF"):
+    e["MR_RECORD_HARNESS"] = TMP
+    for key in ("MR_RECORD_STATE", "MR_RECORD_HANDOFF", "MR_RECORD_HARNESS"):
         if not e[key].startswith(TMP):
             raise RuntimeError("REFUSED: %s=%r is outside the tempdir" % (key, e[key]))
     r = subprocess.run(["bash", RECORD, sub] + list(args), env=e, capture_output=True,
@@ -1250,17 +1252,19 @@ def reset_state():
     with open(STATE, "w") as f:
         json.dump({"schema_version": 2, "master": {"sha": "fixture0"}, "queue": []}, f)
 
-# A real, stable heading to point --spec-file at. Archived spec = frozen parse DATA (never
-# instructions); the 2026-09 revision moved done specs under archive/, which is exactly why the
-# headings can never move again.
-REAL_SPEC = "specs/monster-realm-v2/archive/M-loop-infrastructure.spec.md"
+# The spec --spec-file points at is a fixture under the tempdir (MR_RECORD_HARNESS), so the
+# block never depends on which specs the real corpus holds: specs are deleted when their
+# milestone closes.
+REAL_SPEC = "specs/queue-fixture.spec.md"
 REAL_HEADINGS = ["lp-06", "lp-07", "lp-10", "lp-11", "lp-11b", "lp-git-workflow"]
-# A real DIGIT-LEADING heading -- the entire review-residuals convention is digit-first
-# (15r-sec-a, 13r-c-2, 15r-a2, ...), which a letter-first-only SLICE_ID_RE rejected in an
-# earlier revision (caught at post-implementation review; queue-add --slice 15r-sec-a died).
-# This fixture pins the regression so a future edit can't silently reintroduce it.
-DIGIT_SPEC = "specs/monster-realm-v2/archive/M-postgate-fifteenth-review-residuals.spec.md"
+# A DIGIT-LEADING heading -- the review-residuals convention is digit-first (15r-sec-a,
+# 13r-c-2, 15r-a2, ...), so a letter-first-only SLICE_ID_RE would reject most real slice ids.
+DIGIT_SPEC = REAL_SPEC
 DIGIT_HEADING = "15r-sec-a"
+os.makedirs(os.path.join(TMP, "specs"))
+with open(os.path.join(TMP, REAL_SPEC), "w") as f:
+    f.write("# Fixture spec\n\n" + "".join(
+        "### %s — fixture slice\n\nbody\n\n" % h for h in REAL_HEADINGS + [DIGIT_HEADING]))
 
 # --- queue-add: validation ---
 reset_state()
@@ -1464,9 +1468,8 @@ PYTG
 # measured 803 warm-ups / 0 invocations across two generations). `mr-ollama` itself is retained
 # for manual/experimental use, so this must prove the tick is quiet WITHOUT breaking the tool.
 #
-# The spec (M-loop-infrastructure.spec.md:305-334) binds the tooth to BEHAVIOUR, not the log
-# string, and says so explicitly: "a preflight that still runs but stops logging that phrase
-# would pass a grep-only check". So the primary leg RUNS the tick's startup region under
+# The tooth is bound to BEHAVIOUR, not the log string: a preflight that still runs but stops
+# logging that phrase would pass a grep-only check. So the primary leg RUNS the tick's startup region under
 # recording PATH shims and asserts the union of witnessed argv contains no `11434` and no
 # `ollama` command; the phrase grep is kept only as a cheap secondary, and is run against the
 # SOURCE (mr-native-tick.log carries 803 historical matches and rotates at 1 MB).
@@ -1482,16 +1485,15 @@ PYTG
 #       the real cron-liveness markers are mtime-checked for containment;
 #   (c) STATIC over the WHOLE file (whole-line comments stripped only — inline `#` stripping
 #       would mangle `${SL#mr_pass_}`) — the only leg that sees a preflight RELOCATED below the
-#       extraction anchor, which is precisely the "just move it lower" alternative the spec
-#       rejects at :313-314;
+#       extraction anchor, which is precisely the rejected "just move it lower"
+#       alternative;
 #   (d) EARS-2: mr-ollama stays invocable and its consumers still degrade on
 #       OLLAMA-UNAVAILABLE. Runs under the shims with its OWN unasserted witness, because
 #       mr-ollama's pick_model() curls localhost:11434/api/ps BEFORE its MR_NO_OLLAMA exit —
 #       un-shimmed, this gate would itself do the thing the slice forbids.
 #
-# Tester-authored, TDD RED PHASE — do not edit these to fit a buggy implementation; a wrong
-# expectation is corrected FROM THE SPEC (M-loop-infrastructure.spec.md:305-334), never
-# retargeted to match the code.
+# These assertions are the contract: do not edit them to fit a buggy implementation or
+# retarget them to match the code.
 /usr/bin/python3 - "$MEM" <<'PYOLL' || BAD=1
 import os
 import re
