@@ -73,15 +73,16 @@ UNKNOWN → proceed + record a BLOCKER.
    ahead of its recorded ts — idle-open ≥45 min with zero writes is NOT active). Take the mutex
    (step 3). A PR the supervisor did not launch is operator work — leave it alone.
 3. **Pick work (ONE line):** `master` CI red → launch a hard-tier `ci-fix-<utc>` rooted run
-   (revert-first; touches/target from the failing area — YOU never edit code). Else resume
+   (revert-first; touches/target from the failing area). Else resume
    open/parked (incl. `wip:` branches). Else a
    **HIGH/CRITICAL residual in security-privacy or data-integrity** (`mr-gates residuals list
    --unclaimed --json`, oldest first); an
    `unpromoted` one is promoted first (`mr-gates residuals promote` → section in `residuals.spec.md`
    → `mr-record queue-add`; ship as a doc-only chore PR; that is the tick's action). Else the
-   **structural share**: no `refactor(…)` among the last 10 slice-id subjects on `origin/master`
-   and `structure.spec.md` has an unbuilt non-`blocked:` slice → launch it if its quiet window is
-   clear, else next rung (never author one to fill the share). Else a valid
+   **structural share**: none of the last 10 `<type>(<scope>): <slice> — …` subjects on `$PROJ`
+   `origin/master` is a `refactor(` and `structure.spec.md` has an unbuilt non-`blocked:` slice →
+   launch the first whose quiet window is clear, else next rung (never author one to fill it).
+   Else a valid
    `queue[]` head (re-verify live; remove if stale). Else the **first unfinished non-`blocked:`
    item in PLAN §9 order** — launch its first unbuilt slice per that milestone's own spec; a
    milestone with no spec gets one authored first (milestone-loop-prompt.md, a doc-only chore PR =
@@ -129,7 +130,7 @@ DECISIONS.md unions by title; CHANGELOG regenerates via git cliff).
 **Quiet window:** a `type: refactor` slice launches at its spec'd `tier:`, one at a time, only
 when nothing in flight, open or parked overlaps its `touches:` (judge globs yourself); nothing
 overlapping launches until it merges or goes `blocked:`; it merges first. Parked on a missed pin
-or file → widen its spec `touches:`, relaunch at that tier (not hard).
+or file → widen its spec `touches:`, relaunch at its `tier:` (no resume→hard).
 
 ## Launch
 
@@ -150,12 +151,12 @@ around (push the harness before spawning a harness slice).
 - **`mr-audit --slice S --log L --repo R --base B --head H [--tier hard]`** at every merge (R =
   the repo PATH; B = `git merge-base origin/master <branch>`, so sibling fan-out merges never
   read as removals): CLEAN → proceed; FLAGGED/AUDIT-ERROR → read the diff and adjudicate yourself
-  (hard-tier is always a mandatory read). `gating_advisory.removed_checks` names each **removed or
+  (hard-tier: always read). `gating_advisory.removed_checks` names each **removed or
   de-wired check** — adjudicate under the deletion rule in `standards/testing-tdd.md` (named
   reason + named surviving check; protected categories need a demonstrated survivor). A
   `type: refactor` PR: audit `--tier hard`, read the test diff — no assertion edited, no mock
-  added, each `moved-tests:` survivor present at head; retitle to `refactor(<scope>): <slice> — …`
-  if needed. Genuine
+  added, each `moved-tests:` survivor present at head; merge with
+  `--subject 'refactor(<scope>): <slice> — … (#N)'`. Genuine
   weakening → BLOCKER + next target = revert/fix; a legitimate deletion proceeds with your
   one-line verdict in the ledger notes.
 - **`mr-gates verify --slice S --json`** (ADVISORY — adjudicate, never rubber-stamp): mr-audit
@@ -200,7 +201,6 @@ audits · BLOCKERs · risks. Append ONE line to `$MEM/mr-native-tick.log`:
 
 - Racing ticks → mutex only. Orchestration depth = 1.
 - Worktree missing → `git worktree list` first (`git -C <missing> … | wc -l` fake-reads 0).
-- Waiting on CI: `gh run watch <id> --exit-status` (a foreground `sleep` >~100s times out and
-  strands the command).
+- Waiting on CI: `gh run watch <id> --exit-status` (a foreground `sleep` >~100s strands it).
 - SIGHUP EXIT=129 → always `setsid` + assert detachment. Multiple heredocs + command substitution
   in one shell input mangle → one heredoc per input; timestamps inside python.

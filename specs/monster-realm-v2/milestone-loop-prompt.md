@@ -36,8 +36,10 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
      responsibilities (`client/src/main.ts` is the standing case) receives wiring only: an import
      and a registration call.
    - When two or more slices would add to one production file, slice 1 is a `type: refactor`
-     slice (`standards/spec-driven.md` §Refactor slices) that creates the module they land in and
-     names the slices that depend on it; those slices list the new module in `touches:`. It
+     slice (`standards/spec-driven.md` §Refactor slices) that moves the existing code they extend
+     into the module they land in and names the slices that depend on it; those slices list the
+     new module in `touches:`. Where nothing existing moves, the first feature slice creates the
+     module. It
      relocates no shared mutable state unless the spec records which module owns it — an
      architectural fork that is the operator's (`mr-ask-drew`).
    - A slice either moves code or changes an interface, never both. Mark each

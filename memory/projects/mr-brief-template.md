@@ -1,7 +1,7 @@
 Build exactly ONE mergeable Monster Realm v2 slice — `<SLICE>` (<TARGET_DESC>) — then stop. Follow `specs/monster-realm-v2/build-loop-prompt.md`, the project `AGENTS.md`, and `~/.claude/harness/standards/` (`testing-tdd.md` is the verification SSOT). Right-size: if planning shows the slice is large, ship the smallest coherent increment and DEFER the rest.
 
 **Scope:** your diff ⊆ the declared `touches:` — <TOUCHES> — plus sibling test files of declared code files, plus a `docs/DECISIONS.md` entry ONLY when `standards/decisions.md`'s bar is met (usually none; a spec naming it in `touches:` mandates it). List every file beyond the literal declared set under a `touches-delta:` PR-body heading. A file outside that set that the task REQUIRES is a hidden dependency: stop, record it in the handoff, let the supervisor re-serialize.
-**Boy Scout (within `touches:` only):** bounded in-file cleanups (file-local names, dead code, comment accuracy), ≤ ~40 lines / 3 hunks, attributed under `boyscout-delta:` (`file:lines — why`); excess is a follow-up flag, never a blocker; gating tests and interface-freeze slices are exempt.
+**Boy Scout (within `touches:` only):** bounded in-file cleanups (file-local names, dead code, comment accuracy), ≤ ~40 lines / 3 hunks, attributed under `boyscout-delta:` (`file:lines — why`); excess is a follow-up flag, never a blocker; no cleanup in gating tests or interface-freeze slices.
 **`type: refactor` slice:** `standards/spec-driven.md` §Refactor slices binds (PR title `refactor(<scope>): <SLICE> — …`; `moved-tests:` rows; whole or parked, no DEFER to backlog); the Boy Scout cap never limits the declared move.
 **If `master` CI is red, fix/revert it to green instead and stop** — this overrides scope and Boy Scout.
 

@@ -6,14 +6,15 @@ changes that leave behaviour unchanged. Every section is a `type: refactor` slic
 deleted and never counts toward a playtest gate, and an empty `## Slices` means nothing is open.
 
 - **Scheduled by** the supervisor's structural share: the first unbuilt, non-`blocked:` section
-  whose quiet window is clear. When no earlier PLAN §9 item has a launchable slice, sections
-  launch in file order.
+  whose `after:` slices are built and whose quiet window is clear. When no earlier PLAN §9 item
+  has a launchable slice, sections launch in file order.
 - **Written by** a milestone spec author's structure pass (`milestone-loop-prompt.md`, at most
-  three sections per spec PR) or the operator. Never by a build run or the supervisor, and never
-  to fill the share. Structural findings are not residuals.
-- **Built** means the game repo's `origin/master` carries a subject
-  `refactor(<scope>): <slice id> — …` that no later `Revert` subject undoes. A built section is
-  deleted by the next doc-only PR that edits this file. Ids are never reused.
+  three sections per spec PR) or the operator. Never by a build run, never by the supervisor
+  outside that structure pass, and never to fill the share. Structural findings are not
+  residuals.
+- **Built** means the game repo's `origin/master` carries a subject naming `<slice id> —`,
+  whatever its type, that no later revert undoes. A built section is deleted by the next
+  doc-only PR that edits this file. Ids are never reused.
 - **Section shape:** heading `### st-<n> — <title>`; then the lines
   `type: refactor · tier: routine` (a move) or `type: refactor · tier: hard` (an interface or
   ownership change), `touches:`, `after: [...]`, and `blocked: <reason>` while an operator
@@ -46,6 +47,8 @@ scans every e2e file for retired control ids, and the moved bodies name none. Co
 ten specs themselves.
 
 - **ST1.1:** WHEN the ten listed specs run against a live module THEY SHALL pass with every
-  assertion unedited, each taking its moved helper from `client/e2e/stdb.ts`.
-- **ST1.2:** WHEN the client is type-checked THE e2e tree SHALL compile with each of the ten
-  listed specs importing its SQL helper from `./stdb`.
+  assertion unedited.
+- **ST1.2:** WHEN the client is type-checked and linted THE e2e tree SHALL pass.
+
+Confirmed in the diff at merge, not by a criterion: each of the ten specs imports its helper from
+`./stdb` and its local copy is gone.
