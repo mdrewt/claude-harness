@@ -31,7 +31,9 @@ for i in range(len(names)):
         inter=set()
         for pa in slices[a]:
             for pb in slices[b]:
-                if pa==pb or fnmatch.fnmatch(pa,pb) or fnmatch.fnmatch(pb,pa): inter.add(pa)
+                # A directory token (trailing slash) overlaps every path under it.
+                under=(pa.endswith("/") and pb.startswith(pa)) or (pb.endswith("/") and pa.startswith(pb))
+                if pa==pb or under or fnmatch.fnmatch(pa,pb) or fnmatch.fnmatch(pb,pa): inter.add(pa)
         out["pairs"].append({"pair":[a,b],"overlap":sorted(inter),"disjoint":not inter})
 if out["structural_hits"]: out["verdict"]="SERIAL-REQUIRED(structural)"
 elif any(not p["disjoint"] for p in out["pairs"]): out["verdict"]="SERIAL-REQUIRED(overlap)"

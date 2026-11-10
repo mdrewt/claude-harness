@@ -30,7 +30,8 @@
   **Bounded, not unbounded** — improve what you are already editing; do *not* reformat
   untouched code or widen the diff with drive-by rewrites (that fights minimal-diff
   review and inflates blast radius). Cleanups larger than the current change get
-  **flagged separately** (a follow-up slice / issue / decision entry), never smuggled inline. For
+  **flagged separately** (a refactor slice per `spec-driven.md` §Refactor slices, an issue, or a
+  decision entry), never smuggled inline. For
   long-lived code this is the compounding default that keeps the codebase cheap to
   change — the build-loop's "every milestone leaves the code easier to change" is this
   rule applied per slice.

@@ -30,6 +30,35 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
    preview) · Tasks as small vertical slices (`M{N}a/b/…`), **each with an explicit `touches:`
    path-set** along natural module boundaries so disjoint slices can fan out; slice order follows
    the real dependency chain (rule → reducer → client), not just file-disjointness · Risks/decisions.
+   **Structure pass** — do it before slicing; you and step 3's lenses judge it, never a script:
+   - Read in full every production file two or more slices would touch.
+   - New logic and state go in a named module. A file that already holds several
+     responsibilities (`client/src/main.ts` is the standing case) receives wiring only: an import
+     and a registration call.
+   - When two or more slices would add to one production file, slice 1 is a `type: refactor`
+     slice (`standards/spec-driven.md` §Refactor slices) that moves the existing code they extend
+     into the module they land in and names the slices that depend on it; those slices list the
+     new module in `touches:`. Where nothing existing moves, the first feature slice creates the
+     module. It
+     relocates no shared mutable state unless the spec records which module owns it — an
+     architectural fork that is the operator's (`mr-ask-drew`).
+   - A slice either moves code or changes an interface, never both. Mark each
+     `type: refactor · tier: routine` (a move) or `type: refactor · tier: hard` (an interface or
+     ownership change, or a move of code that writes state its old file keeps) beside `touches:`.
+   - For every slice that moves code, grep for the pins: tests that read the moved source as
+     text and assert on the moved lines (`readFileSync`, `include_str!`), `.cargo/mutants.toml`
+     entries naming a moved function, and e2e helpers. List each in `touches:` and name it in the
+     spec with its disposition per `standards/testing-tdd.md` §Behavior-preserving changes:
+     replace, re-point, or delete with its named survivor. A mutants entry is re-keyed in that
+     slice without the file name (`:\\d+:<col>: replace … in <function>`).
+   - A refactor slice's `touches:` names its source and destination files literally and test
+     families as globs with a literal directory prefix (`client/src/main.*.test.ts`), never a
+     bare directory, which hides what the slice needs.
+   - Before a slice adds a test or e2e helper, grep for its name; if two definitions exist, the
+     slice imports or extends the shared util (`client/test-util/`, `client/e2e/controls.ts`).
+   - Structural work the read finds outside this milestone's scope goes to `structure.spec.md`:
+     at most three `type: refactor` sections in this same PR, each anchored on exported symbols
+     and naming the tests that already cover the moved behaviour. Never a residual row.
 3. **Review lenses**: reviewer + red-team + `/simplify` on the draft, against `standards/` and
    the M{N}→M{N+1} boundary. Apply real findings; note what changed.
 4. **Document.** A `docs/DECISIONS.md` entry in the game repo is the BUILD slice's job, not the
@@ -47,6 +76,9 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
 - Tasks sliced with `touches:`; a **post-integration verification plan** (full `just ci` green,
   `bindings-drift` clean, the combined behavior satisfies the EARS end-to-end — not merely each
   slice green alone).
+- Every slice adding to a production file that two or more slices touch names its destination
+  module, or gives one line on why no seam exists yet; every slice that moves code is
+  `type: refactor` with its tier, pins and measured `touches:`.
 - Risks/decisions recorded; PLAN §9 line updated; no contradictions left in live files.
 
 ## Cross-cutting invariants (apply where the milestone adds the thing)

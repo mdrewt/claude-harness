@@ -108,6 +108,35 @@ source text, pins prose, or is superseded — under these conditions:
 Deleting the only protection of a protected-category behavior fails
 verification. Deletions are reviewable events, never silent ones.
 
+## Behavior-preserving changes
+A refactor slice (`spec-driven.md` §Refactor slices) has no defect to fail on.
+Its proof is that the existing checks keep passing while the code moves under
+them.
+- **The red run is the seam.** A test reaches the moved behavior through its
+  destination module and fails until the move lands: an existing test
+  re-pointed there, or one the tester adds. A test that only asserts the
+  symbol exists proves nothing.
+- **The whole gate passes with every assertion as it was**, across the diff,
+  not only in the suites the spec names. No module mock is added or widened: a
+  mock of the destination module is the moved code not running.
+- **Test edits are the tester's**, limited to import paths, existing mock
+  paths and the pins the spec names. A test file may be renamed whole; test
+  bodies are not cut from one file into another in the same change.
+- **A pin** is a check that names the moved code by where it lives: it reads
+  the source file as text, or keys on its path. Pins fall under §Deleting a
+  check. One that is the only protection of a protected behavior is replaced
+  by an executing test first, or, where no executing test can carry it yet,
+  re-pointed with its assertions unchanged. Any other is deleted with its
+  reason and named survivor. None is left reading the old location.
+- **Characterization only where a check is earned.** Moved behavior in a
+  protected category that no test reaches at any level gets the tester's
+  characterization tests before the first production edit. Each is watched
+  failing once against a deliberate local break that is never committed, then
+  committed green. Other untested moved code is proved by the type checker
+  and the named suites.
+- **A move of test scaffolding** (helpers, fixtures) is the tester's edit end
+  to end; its proof is the affected suites passing with assertions unedited.
+
 ## The pyramid and techniques
 Many fast unit tests (pure logic, contracts) · fewer integration tests · few
 e2e tests on critical user paths. **Property-based testing** for logic-heavy
