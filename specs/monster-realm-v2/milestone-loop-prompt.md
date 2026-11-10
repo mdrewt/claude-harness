@@ -40,8 +40,10 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
      into the module they land in and names the slices that depend on it; those slices list the
      new module in `touches:`. Where nothing existing moves, the first feature slice creates the
      module. It
-     relocates no shared mutable state unless the spec records which module owns it — an
-     architectural fork that is the operator's (`mr-ask-drew`).
+     relocates no shared mutable state unless the game's `ARCHITECTURE.md` names its owner. Where
+     it does not, a design slice decides it first (`standards/spec-driven.md` §Refactor slices):
+     add one to `structure.spec.md` and list it in `after:`. This is the loop's decision to make,
+     not an operator question.
    - A slice either moves code or changes an interface, never both. Mark each
      `type: refactor · tier: routine` (a move) or `type: refactor · tier: hard` (an interface or
      ownership change, or a move of code that writes state its old file keeps) beside `touches:`.
@@ -58,7 +60,9 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
      slice imports or extends the shared util (`client/test-util/`, `client/e2e/controls.ts`).
    - Structural work the read finds outside this milestone's scope goes to `structure.spec.md`:
      at most three `type: refactor` sections in this same PR, each anchored on exported symbols
-     and naming the tests that already cover the moved behaviour. Never a residual row.
+     and naming the tests that already cover the moved behaviour. Never a residual row. When the
+     game's `ARCHITECTURE.md` records an extraction order with slices not yet sectioned there,
+     those come first.
 3. **Review lenses**: reviewer + red-team + `/simplify` on the draft, against `standards/` and
    the M{N}→M{N+1} boundary. Apply real findings; note what changed.
 4. **Document.** A `docs/DECISIONS.md` entry in the game repo is the BUILD slice's job, not the

@@ -81,7 +81,7 @@ UNKNOWN → proceed + record a BLOCKER.
    → `mr-record queue-add`; ship as a doc-only chore PR; that is the tick's action). Else the
    **structural share**: none of the last 10 `<type>(<scope>): <slice> — …` subjects on `$PROJ`
    `origin/master` is a `refactor(` and `structure.spec.md` has an unbuilt non-`blocked:` slice →
-   launch the first whose quiet window is clear, else next rung (never author one to fill it).
+   launch the first whose quiet window is clear, else next rung (author only from a merged design slice).
    Else a valid
    `queue[]` head (re-verify live; remove if stale). Else the **first unfinished non-`blocked:`
    item in PLAN §9 order** — launch its first unbuilt slice per that milestone's own spec; a

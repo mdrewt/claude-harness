@@ -148,7 +148,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 17. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
    (`standards/spec-driven.md` §Refactor slices). The supervisor's structural share schedules it
    ahead of this position; when no earlier item has a launchable slice, its slices launch in
-   file order. An empty file is a finished item.
+   file order. Design slices there decide module ownership; that is not an operator decision.
+   An empty file is a finished item.
 
 Milestone specs for items 4–14 are sketches or ceremony-pending where marked: elaborate via
 `milestone-loop-prompt.md` when reached, against the CURRENT game repo. ⛩ **Playtest-4 gate** is DECIDED (#583 D5, 2026-10-24 — strict §10, alternative A):

@@ -106,6 +106,19 @@ default branch identifies it. How it is verified is `testing-tdd.md`
 - **The Boy Scout bound** (`principles.md`) limits incidental cleanup, never
   the declared move.
 
+**A design slice decides ownership before code moves.** When a move depends on
+which module should own shared mutable state, or on where a large file's seams
+fall, that decision is itself a `type: refactor · tier: hard` slice, built by
+the loop like any other and never escalated for sign-off. It changes no code:
+its `touches:` are the repository's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
+It reads the module in full, weighs at least two decompositions against each
+other, and records the module map, the owner of each piece of shared mutable
+state, and the order of the extraction slices that follow, each named by the
+symbols it moves. Its gate is the repository's own; whoever merges reads the
+two documents against the code. Slices that relocate that state list it in
+`after:`. A refactor slice that changes the module map updates
+`ARCHITECTURE.md` in the same slice.
+
 **An extraction too large for one slice** runs expand → migrate → contract as
 consecutive refactor slices. The spec names the final contract slice, which
 deletes the old export or binding so the compiler proves the migration
