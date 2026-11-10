@@ -33,7 +33,7 @@ into the residual registry. Drew reads the one-page report in the task's chat.
   before fanning out.
 - Graph tools are permitted (routing: `code-intel` skill) but index the live checkout: confirm
   every cited `path:line` in the pinned clone; never run `index_repository`/`detect_changes`.
-  Lenses and verifiers run on **sonnet**.
+  Lenses and verifiers run on **sonnet** (pass the model explicitly; the `verifier` agent declares opus).
 
 ## Phase 0 — Orient, check courtesy, snapshot
 

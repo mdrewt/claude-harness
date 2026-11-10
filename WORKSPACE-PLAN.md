@@ -174,9 +174,9 @@ Documented in `docs/workflow-loops.md`; invoked via `/loop`.
 | planner | architecture, task decomposition from spec | Opus | — |
 | researcher | exploration/codebase Q&A; protects main context | Sonnet | worktree/none |
 | tester | writes tests from acceptance criteria (TDD) | Sonnet | worktree |
-| reviewer | code review: correctness, security, smells, over-engineering | Sonnet | — |
-| verifier | runs tests/security gates; approves merge | Sonnet | worktree |
-| doc-keeper | decision entries (when the bar is met), memory cards | Haiku | — |
+| reviewer | code review: correctness, security, smells, over-engineering | Opus | — |
+| verifier | runs tests/security gates; approves merge | Opus | worktree |
+| doc-keeper | decision entries (when the bar is met), memory cards | Sonnet | — |
 | judge / synthesizer | scores competing outputs, picks or merges the best | Opus | — |
 | red-team | adversarial: attacks code for bugs / security / edge cases | Sonnet | worktree |
 
@@ -218,13 +218,13 @@ The coordinator picks a collaboration pattern **per task**, based on value, risk
 
 ## 8. Model, effort & orchestration routing
 
-`docs/routing.md`. Two independent dials — *which model* and *how much effort/orchestration* — are the biggest quality-vs-cost levers. Correct model routing alone saves ~60–80% vs. all-Opus.
+`docs/routing.md`. Two independent dials — *which model* and *how much effort/orchestration* — are the biggest quality-vs-cost levers.
 
 ### Model
-- **Haiku:** test scaffolding, docs, changelog, lint-level review.
-- **Sonnet:** feature implementation, bug fixes, standard refactors, code review (most volume).
-- **Opus:** architecture, multi-file refactors, complex debugging, unfamiliar code.
-- **Heuristics:** human-in-the-loop downgrades one tier; an autonomous loop upgrades one tier; hard latency needs force Haiku.
+- **Sonnet:** the high-volume subagent work: tests from criteria, adversarial probing, research.
+- **Opus:** implementation, review and verification verdicts, loop decisions, planning, judging.
+- **Fable:** hard-tier implementation.
+- **Heuristic:** human-in-the-loop work can drop a tier.
 
 ### Effort & thinking
 - Claude Code exposes a persistent `/effort` setting (low / medium / high / max) plus a session-only `ultracode` level. On 4.6-class models, thinking is **adaptive** — the model scales reasoning depth to the task — so the old `ultrathink` keyword is **legacy**; prefer `/effort` as the canonical dial.
@@ -239,7 +239,7 @@ The coordinator picks a collaboration pattern **per task**, based on value, risk
 Max effort / `ultracode` / `ultrathink` raise quality by spending *more* tokens; they are not themselves efficient. Efficiency comes from spending them **selectively** plus isolation:
 1. **Effort routing** — cheap by default; escalate only at high-leverage gates (planning, architecture, debugging, security).
 2. **Subagent isolation** — the single biggest lever: heavy research/exploration runs in throwaway contexts and returns a clean summary, so noise never persists.
-3. **Model routing** — Haiku/Sonnet for the bulk.
+3. **Model routing** — the cheaper tier for high-volume subagent work (`docs/routing.md`).
 4. **Cloud offload** — `ultraplan` keeps the local context lean.
 5. **Compaction discipline** — `/compact`, `/clear`, and `/btw` for side questions.
 
