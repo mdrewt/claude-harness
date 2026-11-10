@@ -44,29 +44,14 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M-test-truth** (`M-test-truth.spec.md`, specced 2026-10-15 — corrective C3b): retire the 17
-   per-file `scanSource` blocks whose surfaces the sentinel runtime pairs already guard
-   (adjudicated per file in the spec body), and de-ratchet the i18n tree scan to one plain
-   zero-failing-sinks assertion with a tightened `SINK_FLOOR` (the tree scan itself is kept).
-   One slice (ttd-1), ordered before item 2's roster-pin rewrite.
-2. **M-stack-ownership** (`M-stack-ownership.spec.md`, specced 2026-10-15 — corrective C2b):
-   the context stack becomes the owner of player-opened frames. Two serialized slices (both
-   touch `main.ts`; no fan-out): so-1 routes the reconnect block's ten direct hides through the
-   stack while the unconditional view-state resets survive; so-2 (atomic-or-reverted, and gated
-   on an `mr-ask-drew` operator answer BEFORE merge) inverts to push-then-show `openFrame` with
-   frame-level dedup and Social-panel routing, shrinks the mirror to the server-owned trio and
-   rewrites the roster pins once. A **named design input of M-gamepad** and of item 5's menu-IA
-   work, and ordered before both. The pt3 menu-IA flatten (Social direct-open, Profile combine)
-   is now ANSWERED (#586 D3, 2026-10-24); so-2's own SO2.0 design-presentation gate still runs
-   at build time with that answer on record.
-3. **M-pt3-quickfix** (`M-pt3-quickfix.spec.md`, specced 2026-10-24 from episode pt3-2026-10):
+1. **M-pt3-quickfix** (`M-pt3-quickfix.spec.md`, specced 2026-10-24 from episode pt3-2026-10):
    the playtest's bug-fix + low-hanging-fruit wave — focus-ring styling, care feedback routing +
    cooldown surfacing, journal chrome/empty state, NPC conversation pinning + wander cadence,
    `advance_dialogue` rollback + quest-acceptance visibility, battle legacy-control retirement,
    mouse-only duplicate removal, raising→Inventory split with stats-in-Summary, terminology
-   sweep, tab-strip CSS, profile polish, zone-transition cue, reward visibility. Runs after so-2
-   (shared `main.ts` surface); slices are FEATHER/LIGHT and fan-out friendly.
-4. **M-battle-tactics** (`M-battle-tactics.spec.md`, specced 2026-10-24; rulings folded
+   sweep, tab-strip CSS, profile polish, zone-transition cue, reward visibility. Slices are
+   FEATHER/LIGHT and fan-out friendly.
+2. **M-battle-tactics** (`M-battle-tactics.spec.md`, specced 2026-10-24; rulings folded
    2026-10-24; **elaborated 2026-10-30 — build-ready, 17 slices** — the operator's TOP priority,
    "immediately after any bug fixes and low-hanging fruit"): combat overhaul to tile-grid
    tactical battles (1–3 monsters per side, tuned-AP move/attack/item/recruit actions,
@@ -79,8 +64,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    before bt-16; the 1v1 system is hard-replaced at bt-17); P3 = operator-deferred future
    features (obstacles, elevation, line/cone AoE; hold-gesture inputs → M-gamepad). Battle
    presentation (sprites/background placeholders) lands inside it (bt-10); placeholder assets
-   come from item 6. First slice to launch: `bt-1`.
-5. **M-ui-foundation** (`M-ui-foundation.spec.md`, specced 2026-10-24; **elaborated 2026-11-07 —
+   come from item 4. First slice to launch: `bt-1`.
+3. **M-ui-foundation** (`M-ui-foundation.spec.md`, specced 2026-10-24; **elaborated 2026-11-07 —
    build-ready, 21 slices**): the shared menu design language. Wireframes first (`wf-1`, docs-only,
    operator directive reaffirmed #586 D2, no second gate); then the kit spine `uif-1`…`uif-5` (tokens,
    single scale authority, TabBar + ContextSheet + EmptyState + RowCard, four-channel feedback, pointer
@@ -91,7 +76,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    Decisions ANSWERED (#586): hybrid scaling, IA flatten all-three, mini-menu design delegated
    (wireframe-driven), battle "Items", footer collapse-when-empty. Client-only. First slice to launch:
    `wf-1`.
-6. **M-world-art-pass** (`M-world-art-pass.spec.md`, specced 2026-10-24; **elaborated 2026-11-09 —
+4. **M-world-art-pass** (`M-world-art-pass.spec.md`, specced 2026-10-24; **elaborated 2026-11-09 —
    build-ready, 11 slices**): staged placeholder upgrade per `docs/research/hd2d-modern-retro-art-direction.md`.
    S0 `wap-0` locks the style guide + a provenance art registry (no ai-placeholder asset ships); S1 adds the
    ten-class terrain grammar in game-core `wap-1`, the terrain-kit atlas with animated water + shore band `wap-2`,
@@ -102,50 +87,50 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    `wap-0`, `wap-1`/`wap-2`/`wap-3` fan out, then the content chain runs beside the render chain. No table,
    reducer or binding change. Art direction ANSWERED (#587 D5: keep ¾/32px/storybook, 2D-HD as a post stack).
    First slice to launch: `wap-0`.
-7. **M-trade-sessions** (`M-trade-sessions.spec.md`, specced 2026-10-24): multi-stage trade
+5. **M-trade-sessions** (`M-trade-sessions.spec.md`, specced 2026-10-24): multi-stage trade
    redesign (blank session → per-side edits → confirm-with-reset → atomic execute), new
    eligibility rules, absorbs residuals R-weekly-review-2026-10-02-F5 / 2026-10-16-F1 /
    R-ctl-PROXGUARD. Scope rules ANSWERED (#585: all three asset classes tradable, no gifts +
    simple soft-lock guards, face-to-face initiation + one session per pair, arrive-in-party-else-
    Storage, lock-at-confirm).
-8. **M-netcode-presence** (`M-netcode-presence.spec.md`, specced 2026-10-24): remote-player
+6. **M-netcode-presence** (`M-netcode-presence.spec.md`, specced 2026-10-24): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched) and tap-to-turn facing (never cancel-on-keyup — ADR-0148).
-9. **M-econ-onboarding** (`M-econ-onboarding.spec.md`, specced 2026-10-24): starter kit,
+7. **M-econ-onboarding** (`M-econ-onboarding.spec.md`, specced 2026-10-24): starter kit,
    faucet/sink tuning (fixes the uncapped practice-battle faucet), heal-cost timing. Decisions
    ANSWERED (#587): kit = ~200g + 2–3 items once-only; recruit pays NOTHING (quest faucets
    compensate in eo-4); healing free until eo-4; monster-sink gap accepted (GDD §7 note).
-10. **M-identity-handles** (`M-identity-handles.spec.md`, specced 2026-10-24): minted name
+8. **M-identity-handles** (`M-identity-handles.spec.md`, specced 2026-10-24): minted name
    discriminator (survives the M22 re-key cascade), Players-tab info (name + discriminator +
    lead-monster level + nearby), Sign-In hidden until an issuer exists. All four decisions
    ANSWERED (#588, recommendations accepted). Feeds M19.
-11. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
+9. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S1 rewrites two e2e tests that currently
    assert the trade-oracle leak as intended behavior, and S2 changes a frozen schema; the
    operator ratifies both at the harness-revision Checkpoint 2, which lifts this block. Its
-   server-side slices may run alongside items 3–10 where files are disjoint (note: item 7
+   server-side slices may run alongside items 1–8 where files are disjoint (note: item 5
    rebuilds the trade surface S1 touches — re-check S1's test targets when both are live).
    **Launch is gated on its completion.**
-12. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
-   layer, consuming item 2's stack-ownership design. **Must land before launch** (operator,
-   2026-10-01). Ordered after item 4's tactical battle UI stabilizes — operator-CONFIRMED
+10. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
+   layer, consuming the context-stack ownership design. **Must land before launch** (operator,
+   2026-10-01). Ordered after item 2's tactical battle UI stabilizes — operator-CONFIRMED
    (#583 D4, 2026-10-24).
-13. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — absorbs the
-   discriminator surfaces from item 10; ordered AHEAD of M18 — operator-CONFIRMED (#588 D4,
+11. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — absorbs the
+   discriminator surfaces from item 8; ordered AHEAD of M18 — operator-CONFIRMED (#588 D4,
    2026-10-24). M23's social a11y retrofit scope un-defers with it.
-14. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — the playtest-3
+12. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — the playtest-3
    read did NOT confirm it as next content; its 1v1 "additive resolve_coop_turn" premise dies
-   with the tactical overhaul. Re-sketch AFTER item 4's P2 (tactical sides natively support
+   with the tactical overhaul. Re-sketch AFTER item 2's P2 (tactical sides natively support
    allies).
-15. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle —
+13. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle —
    notably rb-128-E1 (avatar lost on reload during deletion grace), R-rb-73-ABORT-PHANTOM,
    R-rb-132-WALLETSYBIL and R-rb-52-GRACEANNOUNCE. Rows absorbed by pt3 milestones are marked
    in each spec (quickfix: WALKEDAWAYROLLBACK, R-ctl-11b-RAISINGCARDS; trade: F5, 2026-10-16-F1,
    PROXGUARD; ui-foundation: see its Residual map, incl. R-ctl-14-*, R-ctl-11a-MONSTERSTAB, R-qf-10-*, R-ctl-SETRATIO;
    econ: 2026-10-09-F1).
-16. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
+14. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
    Steam Input maps onto the virtual buttons.
-17. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
+15. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
    (`standards/spec-driven.md` §Refactor slices). The supervisor's structural share schedules it
    ahead of this position; when no earlier item has a launchable slice, its slices launch in
    file order. Its `type: design` slices decide internal-design questions; those are not operator
@@ -153,7 +138,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    `docs/refactors/` lists an extraction still to make. With no section open and a plan file
    listing extractions, the tick's action is to section the next three.
 
-Milestone specs for items 4–14 are sketches or ceremony-pending where marked: elaborate via
+Milestone specs for items 2–12 are sketches or ceremony-pending where marked: elaborate via
 `milestone-loop-prompt.md` when reached, against the CURRENT game repo. ⛩ **Playtest-4 gate** is DECIDED (#583 D5, 2026-10-24 — strict §10, alternative A):
 ONE gate after every coverage milestone closes. No interim playtest.
 
@@ -185,11 +170,13 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
   world · **M12** NPCs/dialogue/quests · **M13** economy · **M14** deeper battle · **M15**
   trading · **M16** PvP · **M17** ranked ladder.
 - Platform & compliance: **M20** observability/performance · **M21** accounts/auth (Steam login
-  is §9 item 16) · **M22** privacy/deletion/export · **M23** accessibility · **M24** i18n
+  is §9 item 14) · **M22** privacy/deletion/export · **M23** accessibility · **M24** i18n
   (en/fr) · **M25 S0** threat-model consolidation.
 - Client: **M-postgate-console-controls** (`ctl-*`; the virtual-button controls, design SSOT
   `console-controls-design.md`) · **M-postgate-client-coverage** (`pgcc-*`) ·
   **M-pre-playtest-polish**.
+- Corrective: **M-test-truth** (`ttd-1`; one whole-tree i18n scan replaces the per-file
+  scans) · **M-stack-ownership** (`so-*`; the context stack owns player-opened frames).
 - Follow-up rounds: an `N.5` milestone, an "Nth review residuals" milestone and an `NNr-*`
   slice id each name a review follow-up to the numbered work; **M-playtest-a…d** prepared the
   2026-07 playtest and the other **M-postgate-\*** / **M-evolution-essence-\*** milestones
