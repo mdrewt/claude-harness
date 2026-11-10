@@ -47,7 +47,7 @@ terminal). A finding fixed during S4 becomes its own small slice with its own or
 
 ### S0 — Threat-model consolidation · **DONE** (pre-revision, 2026-09-21)
 Evidence: `security-threat-model.md` header "Revised 2026-09-21 (M25 S0)" (two-channel STRIDE row, chat
-struck, residuals and accepted risks added), which the operator accepted via issue #496. Its §2–§3 still describe the deleted gate machinery. S3 fixes that.
+struck, residuals and accepted risks added). The operator accepted the launch-gate amendment via issue #496. The threat model's §2–§4 still cite the deleted gate machinery; S3 fixes that.
 
 ### S1 — Close the trade-proposal oracles
 **Acceptance criteria (EARS)** — native-host tests in `server-module/src/trading_tests.rs`. Each one runs

@@ -123,7 +123,7 @@ silently desync.
   written for a tool to parse rather than a human to read.
 - Comments or docs added by the diff that narrate change — what the code used
   to do, a slice or decision id, a date — instead of stating current behaviour
-  and its reason. `mr-comment-scan` lists candidates; the judgement is yours.
+  and its reason.
 - A touched file left *worse* than found — a new smell, dead code, or changed
   behavior without a test — when a bounded in-blast-radius fix was available (Boy
   Scout violation). Note the inverse is also a red flag: an unbounded drive-by

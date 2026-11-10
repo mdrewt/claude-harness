@@ -10,8 +10,10 @@ current behaviour (standards/principles.md, Documentation).
     mr-comment-scan --selftest                       fixtures; rc=0 pass, rc=1 fail
 
 Defaults: H = HEAD; B = the repo's default remote branch (origin/master, else origin/main).
-rc is 0 for every scan; the verdict is the last output line, `COMMENT-SCAN CLEAN` or
-`COMMENT-SCAN FLAGGED <n>`. Each finding is `path:line: [kind] tell: text`.
+The verdict is the last output line: `COMMENT-SCAN CLEAN` or `COMMENT-SCAN FLAGGED <n>` (rc 0;
+findings are a report, not a failure), or `COMMENT-SCAN ERROR ...` (rc 1) when the diff cannot be
+read. It scans COMMITTED work (`B...H`): run it after committing. Each finding is
+`path:line: [kind] tell: text`.
 
 Two kinds of tell:
   id       a slice, milestone, decision or finding identifier (`wap-8`, `M13.5c`, `ADR-0187`,
@@ -61,6 +63,7 @@ ID_ALLOW = re.compile(
     r"float|utc|gmt|ascii|unicode|win|cjk|gb|big|koi|euc|jis|oauth|pkcs|fips|nist|ieee|ansi|"
     r"cve|cwe|wcag|aria|dpi|ppi|hz|khz|fps|ms|px|rem|em|pt|step|phase|tier|level|layer|zone|"
     r"node|python|rust|pixi|vite|react|chrome|firefox|safari|edge|ios|android|linux|ubuntu|"
+    r"gpt|amd|mid|day|week|year|mt|sub|pre|post|non|top|max|min|"
     r"windows|macos|top|page|line|col|row|item|slot|tile|frame|round|turn|wave|rank|grade)$"
 )
 
@@ -97,7 +100,7 @@ HISTORY_PATTERNS = [
     )
 ]
 
-HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
 
 def classify(path):
@@ -152,17 +155,21 @@ def scan_diff(diff_text):
     """Findings for a unified diff: [(path, line_no, kind, tell, text)]."""
     findings = []
     path, kind, line_no = None, None, 0
+    # Lines still owed by the current hunk. Inside a hunk, an added line whose text starts with
+    # `++ ` looks exactly like a `+++ ` file header, so headers are only read between hunks.
+    old_left = new_left = 0
     for raw in diff_text.splitlines():
-        if raw.startswith("+++ "):
-            target = raw[4:].strip()
-            path = None if target == "/dev/null" else re.sub(r"^b/", "", target)
-            kind = classify(path) if path else None
-            continue
-        if raw.startswith("--- "):
-            continue
-        m = HUNK.match(raw)
-        if m:
-            line_no = int(m.group(1))
+        if old_left <= 0 and new_left <= 0:
+            if raw.startswith("+++ "):
+                target = raw[4:].strip()
+                path = None if target == "/dev/null" else re.sub(r"^b/", "", target)
+                kind = classify(path) if path else None
+                continue
+            m = HUNK.match(raw)
+            if m:
+                old_left = int(m.group(1) or 1)
+                line_no = int(m.group(2))
+                new_left = int(m.group(3) or 1)
             continue
         if raw.startswith("+"):
             if kind:
@@ -171,8 +178,13 @@ def scan_diff(diff_text):
                     for tell_kind, tell in tells(text):
                         findings.append((path, line_no, tell_kind, tell, text.strip()))
             line_no += 1
+            new_left -= 1
+        elif raw.startswith("-"):
+            old_left -= 1
         elif raw.startswith(" "):
             line_no += 1
+            old_left -= 1
+            new_left -= 1
     return findings
 
 
@@ -191,15 +203,17 @@ def scan_repo(repo, base, head):
     base = base or default_base(repo)
     if base is None:
         print("COMMENT-SCAN ERROR no base ref (pass --base)")
-        return 0
+        return 1
     diff = subprocess.run(
-        ["git", "-C", repo, "diff", "--no-color", "-U0", f"{base}...{head}"],
+        ["git", "-C", repo, "-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff",
+         "--src-prefix=a/", "--dst-prefix=b/", "-U0", f"{base}...{head}"],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if diff.returncode != 0:
         print(f"COMMENT-SCAN ERROR git diff failed: {diff.stderr.strip()[:200]}")
-        return 0
+        return 1
     findings = scan_diff(diff.stdout)
     for path, line_no, kind, tell, text in findings:
         print(f"{path}:{line_no}: [{kind}] {tell}: {text[:160]}")
@@ -239,7 +253,7 @@ def selftest():
          [("history", "Formerly")]),
         # negatives
         ("technical tokens are not slice ids",
-         kinds("a.ts", "// utf-8, sha-256, es-2022, webgl-2, tier-1, x86-64"), []),
+         kinds("a.ts", "// utf-8, sha-256, es-2022, webgl-2, tier-1, x86-64, gpt-4, mid-2026"), []),
         ("a hyphenated ratio is not a slice id", kinds("a.ts", "// a 1-in-5 stay, 2-of-3 votes"), []),
         ("code is not scanned", kinds("a.ts", "const usedTo = 'used to'; call(wap - 8);"), []),
         ("string literal is not scanned", kinds("a.ts", "throw new Error('no longer valid');"), []),
@@ -267,6 +281,20 @@ def selftest():
     got = [(f[0], f[1], f[3]) for f in scan_diff(mixed)]
     if got != [("a.ts", 7, "wap-9")]:
         bad.append(("removed/context ignored, numbering", got, [("a.ts", 7, "wap-9")]))
+
+    # An added line whose text starts with "++ " is content, not a file header.
+    plusplus = (
+        "--- a/docs/x.md\n+++ b/docs/x.md\n@@ -1,0 +1,2 @@\n+++ a list marker\n+This used to work.\n"
+    )
+    got = [(f[0], f[1], f[3]) for f in scan_diff(plusplus)]
+    if got != [("docs/x.md", 2, "used to")]:
+        bad.append(("'++ ' content line", got, [("docs/x.md", 2, "used to")]))
+
+    # A second file after a hunk is still picked up.
+    two = diff("a.ts", ["// wap-8"]) + diff("b.rs", ["// qf-5"], start=3)
+    got = [(f[0], f[1], f[3]) for f in scan_diff(two)]
+    if got != [("a.ts", 10, "wap-8"), ("b.rs", 3, "qf-5")]:
+        bad.append(("two files", got, [("a.ts", 10, "wap-8"), ("b.rs", 3, "qf-5")]))
 
     # A deleted file contributes nothing.
     deleted = "--- a/a.ts\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-// wap-8\n"

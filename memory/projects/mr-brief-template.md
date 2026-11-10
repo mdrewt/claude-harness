@@ -21,7 +21,7 @@ Cap ~40 lines / ≤3 hunks; excess becomes a follow-up flag, never a blocker. Ga
 `DEFER: <gate-id> -> <slice id | backlog | wontfix> [category/SEVERITY] — <reason>` is the only other legal exit; deferring more than half is a sizing failure.
 Put `mr-gates render --slice <SLICE> --format pr` output in the PR body.
 
-**Definition of done:** this slice's gate (see REPO above) green, honestly, per `testing-tdd.md` · review lenses closed · comments and docs you add or touch state current behaviour, never its history (`$MEM/mr-comment-scan --repo <WT_ROOT>/<SLICE>` before the PR: CLEAN, or each finding answered under `comment-scan:` in the PR body) · a `docs/DECISIONS.md` entry only when the bar is met · spec reflects reality. **Budget is bounded by the weekly plan allowance — prefer lenses that catch distinct defect classes over redundant re-runs; never trade a review lens for cost (D3).**
+**Definition of done:** this slice's gate (see REPO above) green, honestly, per `testing-tdd.md` · review lenses closed · comments and docs you add or touch state current behaviour, never its history (after committing, `$MEM/mr-comment-scan --repo <WT_ROOT>/<SLICE>`: CLEAN, or each finding answered under `comment-scan:` in the PR body) · a `docs/DECISIONS.md` entry only when the bar is met · spec reflects reality. **Budget is bounded by the weekly plan allowance — prefer lenses that catch distinct defect classes over redundant re-runs; never trade a review lens for cost (D3).**
 
 **Merge is supervisor-owned:** get this slice's gate green locally, open the PR on `<PR_REPO>`, then STOP. `gh pr merge` is FORBIDDEN to you. After ~4–5 red→fix cycles without local green, PARK (commit + push, leave the PR open, document the blocker).
 

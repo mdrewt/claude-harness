@@ -38,7 +38,7 @@ UNKNOWN → proceed + record a BLOCKER.
 1. **One step per tick:** reconcile from live ground truth → at most ONE mutating action ∈
    {merge a finished slice · launch eligible slice(s) · resume a parked slice · promote a residual ·
    stand down · finish} → record → exit. One composite allowed: merge→launch after the merge
-   completes FULLY, re-deriving eligibility fresh.
+   completes FULLY with no stop flag, re-deriving eligibility fresh.
 2. **Liveness = the detached run's `session_leader` pid**, never your own shell pid. Ground truth =
    live `gh pr list`/`gh pr checks`, `git`, `ps`, `.done` files.
 3. **Chain-owner mutex** `$MEM/.harness-runner.lock.d` (TTL ≈10 min). Fresh heartbeat naming a live
@@ -166,10 +166,11 @@ fix, not work around (push the harness before spawning a harness slice). Clear s
   restore the main checkout (labeled stash → `--ff-only`); remove merged worktrees/branches (keep
   parked / open-PR / `wip:`). Squash-merge makes `--no-merged`/"ahead" meaningless;
   `$MEM/mr-branch-audit` checks the real hazard.
-- Sandbox worktrees the finished slice left under `/tmp`: `git worktree remove --force <path>`
-  each, then `git worktree prune` — never bare `rm`, never a live run's.
-- Milestone's last slice merged → doc-only chore PR: lasting decisions into `docs/DECISIONS.md`,
-  then delete its spec and `$MEM/monster-realm-<slice>-*` files; update PLAN §9/§Built.
+- Sandbox worktrees the finished run NAMED in its report: `git worktree remove --force <path>`,
+  then `git worktree prune` — never bare `rm`, never one it did not name.
+- Milestone's last slice merged → a LATER tick's action, doc-only PRs: lasting decisions into the
+  owning repo's `docs/DECISIONS.md`; delete its spec and its uncited `$MEM/monster-realm-<slice>-*`
+  files; update PLAN §9/§Built.
 - Park counter: ~3 no-progress parks → `blocked:` + BLOCKER (rate-limit parks exempt); 3 wrapper
   attempts without PR or documented park → investigate sizing, never a 4th relaunch.
 - Ledger row (`mr-record ledger`, validated flags only) → handoff entry (`mr-record handoff`) →
