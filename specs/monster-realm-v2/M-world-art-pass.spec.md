@@ -323,7 +323,11 @@ exhaustive match (`world.rs` uses `matches!`; nothing in server-module, sim-harn
 `Serialize`-only and `client-wasm` `zone_map()` serializes it with `serde_wasm_bindgen`; `landmarks` has no home in
 `TileMap`, and `#[serde(flatten)]` would make `serde_wasm_bindgen` emit a JS `Map` (breaking `raw.walkable`), so the
 payload is a concrete DTO struct in `client-wasm` with explicit fields. `zone_map_ok` returns `UNDEFINED` on native
-targets, so the DTO is tested natively through `serde_json`. `game_core::load_heal_locations` is re-exported with no
+targets, so the DTO is tested natively by asserting its struct fields (`serde_json` is not a `client-wasm`
+dependency and its `Cargo.toml` is outside this slice's `touches:`), the `TileKind` wire names through `ron` in
+game-core, and the real JS shape once by a vitest that loads the built pkg; a `terrain_kinds()` test-hook export
+(`TileKind::ALL`) pins the client's `TERRAIN_KINDS` roster to game-core (built: `wap-1`, 2026-11-09). The deep-water
+rule treats an off-map neighbour as no neighbour (a sea may run off the edge). `game_core::load_heal_locations` is re-exported with no
 feature flag. Negative glyph tests use `'Z'` and `'X'`; the proptest draws only from `.#~`. `tiled_import.rs` maps GIDs
 0/1/2 in one `match`; the `.cargo/mutants.toml` line regexes sit above it and go stale only if imports at the top move.
 No byte under `game-core/content/` changes here (the RON header legend moves with `wap-7`'s bump), so `CONTENT_VERSION`
