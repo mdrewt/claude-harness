@@ -62,8 +62,8 @@ def force_read(out, reason):
 
 
 # AM18 (red-team KILL-1, adjudicated 2026-08-20).  The read obligation has to be expressed in the
-# vocabulary the ONLY consumer keys on.  mr-supervisor-prompt-native.md:39/:122 says "CLEAN ->
-# proceed. FLAGGED or AUDIT-ERROR -> YOU read the diff"; the string `mandatory_read` appears
+# vocabulary the ONLY consumer keys on.  mr-supervisor-prompt-native.md ("After a pass",
+# the mr-audit bullet) says "CLEAN -> proceed. FLAGGED or AUDIT-ERROR -> YOU read the diff"; the string `mandatory_read` appears
 # nowhere in it.  Deleting the hard-tier FLAGGED (D3) without emitting the token somewhere the
 # supervisor still trips over would not have RECLASSIFIED the mandatory read, it would have
 # DELETED it -- the slice's own anti-pattern A6.  So the POLICY half, and only the policy half,
@@ -74,8 +74,8 @@ POLICY_CLEAN = "CLEAN - no policy-mandated read"
 
 def audit_orchestration(a, out):
     # ---------------------------------------------------------------------------------------
-    # FROZEN (spec M-loop-infrastructure.spec.md:248 — "lp-04 SHALL NOT change :22-38's
-    # semantics").  This body is the pre-lp-04 :22-38 BYTE-IDENTICAL modulo indentation; the
+    # FROZEN (memory/projects/monster-realm-lp-04-plan.md: the policy/detector split must not
+    # change the orchestration audit's semantics).  This body is the pre-lp-04 :22-38 BYTE-IDENTICAL modulo indentation; the
     # freeze is therefore provable by `git diff -w` rather than only by the fixtures this PR
     # authored.  Do not "clean it up": the substring role predicates, the line-count (not
     # occurrence-count) agent tally, the `== "1"` doc-only test and the `os.path.exists` (not
@@ -386,8 +386,7 @@ def emit(out, artifact_dir="/tmp"):
 # TESTER-AUTHORED, TDD RED PHASE. The implementer MUST NOT edit anything below this line to
 # fit a buggy implementation; a wrong expectation is corrected FROM THE SPEC/PLAN by the tester.
 #
-# Frozen contract (memory/projects/monster-realm-lp-04-plan.md AM1-AM17; spec
-# M-loop-infrastructure.spec.md:224-253). Every name below must be defined ABOVE this section:
+# Frozen contract (memory/projects/monster-realm-lp-04-plan.md AM1-AM17). Every name below must be defined ABOVE this section:
 #   parse_args(argv) -> dict                 today's :9-13 loop, verbatim
 #   mandatory_read_init(a) -> (bool, [str])  from --tier ALONE
 #   audit_orchestration(a, out) -> None      sets out["orchestration"]
@@ -1202,8 +1201,7 @@ def _st_d_battery(chk, tmp):
               "only the keeper's `pt-keep-1` is id-shaped; `wontfix` has no hyphen and is skipped")
 
     # ---- D3 (PROOF OF TEETH): a disposition naming an id that exists nowhere REDs ------------
-    # The id is BACKTICKED and followed by `:**`, exactly as the corpus writes it
-    # (M-playtest-c-ux-completion.spec.md:38). A bare unpunctuated id would pass an
+    # The id is BACKTICKED and followed by `:**`, exactly as specs write a slice marker. A bare unpunctuated id would pass an
     # implementation whose tokenizer never strips punctuation — which is precisely how the
     # rejected draft's orphan half would have shipped structurally inert while reporting green.
     chk.check("D3/fixture-integrity", True,

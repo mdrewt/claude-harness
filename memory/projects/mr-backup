@@ -14,7 +14,7 @@ __doc__ = """mr-backup -- recoverable copies of the loop's gitignored singletons
     mr-backup restore --file <basename> --to <dir>
     mr-backup --selftest
 
-WHY THIS EXISTS (EARS-1, M-loop-infrastructure.spec.md:356-377). The usage ledger is gitignored
+WHY THIS EXISTS. The usage ledger is gitignored
 (root .gitignore:37), so git is NOT its backup and it had no recoverable copy at all since
 2026-07-24. The handoff is tracked, but `_rotate_handoff` is a whole-file read-modify-write that can
 run between commits. Everything else the loop writes (both handoff archives, mr-state.json) is

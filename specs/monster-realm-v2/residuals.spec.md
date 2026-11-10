@@ -153,7 +153,7 @@ category: ux-a11y · severity: LOW · status: carried by triage — schedule by 
 EARS: WHEN an evolution reveal shows THE CLIENT SHALL play a reduced-motion-aware transformation sequence before the reveal sentence (the minimal banner stays the accepted default until scheduled).
 touches: client/src/ui/evolutionNotice.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts
 
-When an evolution reveal is shown (client/src/ui/evolutionNotice.ts banner), the client should play a reduced-motion-aware transformation sequence before the reveal sentence, with new catalog.en/fr copy. Spec'd feature polish (M-evolution-essence-graph.spec.md:148); the minimal banner is the accepted default for now.
+When an evolution reveal is shown (client/src/ui/evolutionNotice.ts banner), the client should play a reduced-motion-aware transformation sequence before the reveal sentence, with new catalog.en/fr copy. Feature polish; the minimal banner is the accepted default for now.
 
 ### R-rb-128-E1 — R-rb-128-E1
 category: gameplay · severity: MED · status: carried by triage — schedule by hand (promote is closed to follow-up chains)

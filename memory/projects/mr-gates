@@ -116,7 +116,6 @@ CATEGORIES = ("gameplay", "security-privacy", "data-integrity", "netcode-determi
 SEVERITIES = ("LOW", "MED", "HIGH", "CRITICAL")
 SWEEPABLE_SEVERITIES = ("LOW", "MED")
 PROJ = HARNESS + "/projects/monster-realm"
-LEGACY_BACKLOG_SPEC = "archive/M-residual-backlog.spec.md"   # read-only here: id allocation only
 APPARATUS_MSG = ("findings about the checking apparatus aren't tracked -- record it as `wontfix` "
                  "(standards/testing-tdd.md)")
 # Subject is the checking apparatus itself: an eval script, a scanner, a gate script, a
@@ -1459,8 +1458,7 @@ RB_ID = re.compile(r"^rb-(\d+)$")
 
 def next_backlog_id(spec_text, rows=None):
     """Next free rb-N. Closed sections are DELETED from the backlog file, so the file alone would
-    reissue ids; the caller passes every text that has ever held rb-N headings (the current file
-    and the read-only legacy one) and the registry rows, and the max across all of them wins."""
+    reissue ids; the registry rows keep every id ever promoted, and the max across both wins."""
     n = 0
     for m in re.finditer(r"^### rb-(\d+)\b", spec_text, re.M):
         n = max(n, int(m.group(1)))
@@ -1659,8 +1657,7 @@ def cmd_residuals(a, sub):
         text = read_gates_file(full)
         if text is None:
             text = BACKLOG_HEADER
-        legacy = read_gates_file(os.path.join(specs, LEGACY_BACKLOG_SPEC)) or ""
-        new_id = next_backlog_id(text + "\n" + legacy, rows)
+        new_id = next_backlog_id(text, rows)
         touches = ", ".join(r.get("touches") or []) or "(inherit from source slice — REVIEW)"
         sect = [
             "",
@@ -1727,7 +1724,6 @@ def cmd_residuals(a, sub):
                                 path)
                 n += 1
         # Open-items-only backlog: the closed item's section goes; git history is the record.
-        # Only the CURRENT backlog file is edited -- the legacy one is read-only here.
         removed = delete_section(os.path.join(a.get("_specs") or SPECS, BACKLOG_SPEC), sl) \
             if n else False
         print("RESIDUALS-CLOSED %d for slice %s%s%s" % (
@@ -2602,13 +2598,14 @@ def selftest():
         chk.eq("N5d-apply-appends-obsolete", ("dispositioned", "obsolete"),
                (sw["R-s-GONE"].get("status"), sw["R-s-GONE"].get("disposition")))
         chk.ok("N5e-append-only", open(srows, "rb").read().startswith(before_bytes))
-        # N6 promote: new target file, id continues past the legacy file, no ADR in the text,
-        # and close deletes only the closed item's section
+        # N6 promote: new target file, id continues past a closed item whose section is gone
+        # (only the registry still holds its rb-N), no ADR in the text, and close deletes only
+        # the closed item's section
         nspecs = os.path.join(root, "nspecs")
         os.makedirs(nspecs)
-        atomic_write(os.path.join(nspecs, LEGACY_BACKLOG_SPEC), "# old\n\n### rb-40 — old\n")
         atomic_write(os.path.join(nspecs, BACKLOG_SPEC), BACKLOG_HEADER)
         pres = os.path.join(root, "promote.jsonl")
+        residual_append({"id": "R-fx-old-E1", "status": "closed", "promoted_slice": "rb-40"}, pres)
         ra = residual_upsert("fx-p", "E1", "THE SYSTEM SHALL keep A", "backlog", "reason a",
                              {}, pres, category="gameplay", severity="MED")
         rb_ = residual_upsert("fx-p", "E2", "THE SYSTEM SHALL keep B", "backlog", "reason b",
@@ -2618,7 +2615,7 @@ def selftest():
             cmd_residuals({"id": rb_, "_residuals": pres, "_specs": nspecs}, "promote")
         pf = fold_residuals(residual_rows(pres))
         ida, idb = pf[ra]["promoted_slice"], pf[rb_]["promoted_slice"]
-        chk.eq("N6-id-continues-past-legacy", ("rb-41", "rb-42"), (ida, idb))
+        chk.eq("N6-id-continues-past-closed", ("rb-41", "rb-42"), (ida, idb))
         ptxt = read_gates_file(os.path.join(nspecs, BACKLOG_SPEC))
         chk.ok("N6b-no-adr-in-template", "ADR" not in ptxt and "standards/testing-tdd.md" in ptxt)
         atomic_write(gates_path(ida, gdir), "# Gates: %s\nSeed: s\n\n- [x] E1: t\n"
@@ -2630,8 +2627,6 @@ def selftest():
         chk.ok("N6c-close-deletes-section", not re.search(r"^### %s\b" % ida, ptxt, re.M))
         chk.ok("N6d-close-keeps-others", re.search(r"^### %s\b" % idb, ptxt, re.M)
                and PROMOTE_MARKER in ptxt)
-        chk.ok("N6e-legacy-untouched",
-               read_gates_file(os.path.join(nspecs, LEGACY_BACKLOG_SPEC)) == "# old\n\n### rb-40 — old\n")
         chk.eq("N6f-uncategorised-promote-refused", 2,
                cmd_residuals({"id": "R-q-E2", "_residuals": reg, "_specs": nspecs}, "promote"))
         # N7 seeded CHECK may not execute ad-hoc scripts outside the target repo

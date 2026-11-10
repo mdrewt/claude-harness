@@ -4,7 +4,7 @@ The build-phase companion to `milestone-loop-prompt.md` (which *specs*). Run in 
 
 ## Mission
 
-Build the specced slices of the **current** roadmap (`PLAN.md` §9, first unfinished item wins) against the **current** game repo at `projects/monster-realm` — never from `archive/` specs. Work test-first, one mergeable slice at a time, leaving the code easier to change. The spec is the source of truth: to deviate, change the spec first. Don't pause to ask; take the disciplined default, flag residual risk in the PR, and proceed.
+Build the specced slices of the **current** roadmap (`PLAN.md` §9, first unfinished item wins) against the **current** game repo at `projects/monster-realm`. Work test-first, one mergeable slice at a time, leaving the code easier to change. The spec is the source of truth: to deviate, change the spec first. Don't pause to ask; take the disciplined default, flag residual risk in the PR, and proceed.
 
 ## Grounding (re-read fresh each slice)
 

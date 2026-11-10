@@ -1,0 +1,293 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD. `bash <this file>` would otherwise run the python source as shell
+# and execute any backticked prose in it. Python reads this line as a no-op string; sh/bash
+# re-execs the file under python3 before reaching any other line. mr-selfcheck enforces it.
+"""mr-comment-scan — list comments and docs a diff ADDS that narrate change instead of stating
+current behaviour (standards/principles.md, Documentation).
+
+    mr-comment-scan --repo R [--base B] [--head H]   scan the lines added by `git diff B...H`
+    mr-comment-scan --selftest                       fixtures; rc=0 pass, rc=1 fail
+
+Defaults: H = HEAD; B = the repo's default remote branch (origin/master, else origin/main).
+rc is 0 for every scan; the verdict is the last output line, `COMMENT-SCAN CLEAN` or
+`COMMENT-SCAN FLAGGED <n>`. Each finding is `path:line: [kind] tell: text`.
+
+Two kinds of tell:
+  id       a slice, milestone, decision or finding identifier (`wap-8`, `M13.5c`, `ADR-0187`,
+           `RT-SZ-01`). Work-tracking names belong in commits and PRs, not in the artifact.
+  history  wording that describes what the code did before (`used to`, `no longer`, `before this`).
+
+Scope, and why it is narrow:
+  * ADDED lines only. The corpus predates the rule; scanning whole files would flag every diff.
+  * Comments in code files, and every added line of a current-state doc (`docs/`, `README`,
+    `AGENTS.md`, `ARCHITECTURE.md`). Code and string literals are not scanned.
+  * Test names are not scanned: acceptance gates select tests by name.
+  * Generated files, changelogs, lockfiles, specs and the loop's own logs are skipped: they are
+    generated, or history is their purpose.
+
+A finding is a prompt to reword, not proof of a fault: `no longer` can describe current behaviour
+("the socket is no longer writable after close"). The author fixes it or says why it stands; there
+is no inline suppression marker, because a comment written for this tool to parse is its own smell.
+
+Shebang is `/usr/bin/python3` on purpose: `#!/usr/bin/env python3` exits 126 in unpinned cwds under
+asdf.
+"""
+import re
+import subprocess
+import sys
+
+SLASH_COMMENT_EXT = {
+    "ts", "tsx", "js", "jsx", "mjs", "cjs", "rs", "ron", "css", "scss", "c", "h", "cpp", "go",
+    "java", "kt", "swift",
+}
+HASH_COMMENT_EXT = {"py", "sh", "bash", "toml", "yml", "yaml", "rb", "mk"}
+HASH_COMMENT_NAMES = {"justfile", "Justfile", "Makefile", "Dockerfile"}
+DOC_NAMES = {"README.md", "AGENTS.md", "ARCHITECTURE.md", "CLAUDE.md"}
+
+SKIP_PATH = re.compile(
+    r"(^|/)(module_bindings|node_modules|target|dist|pkg|vendor)/"
+    r"|(^|/)CHANGELOG\.md$"
+    r"|(^|/)(package-lock\.json|Cargo\.lock)$"
+    r"|(^|/)specs/"
+    r"|(^|/)memory/"
+    r"|\.(snap|lock|min\.js|map)$"
+)
+
+# Tokens shaped like a slice id that are ordinary technical names.
+ID_ALLOW = re.compile(
+    r"^(utf|utf8|sha|md|iso|rfc|es|ecma|base|x86|arm|aarch|ipv|tls|ssl|http|h|mp|cp|latin|bcp|"
+    r"webgl|webgpu|opengl|gl|vp|av|p|ed|x|rs|hs|ps|aes|rsa|crc|adler|fnv|wasm|i|u|f|uint|int|"
+    r"float|utc|gmt|ascii|unicode|win|cjk|gb|big|koi|euc|jis|oauth|pkcs|fips|nist|ieee|ansi|"
+    r"cve|cwe|wcag|aria|dpi|ppi|hz|khz|fps|ms|px|rem|em|pt|step|phase|tier|level|layer|zone|"
+    r"node|python|rust|pixi|vite|react|chrome|firefox|safari|edge|ios|android|linux|ubuntu|"
+    r"windows|macos|top|page|line|col|row|item|slot|tile|frame|round|turn|wave|rank|grade)$"
+)
+
+ID_PATTERNS = [
+    # slice ids: wap-8, uif-16b, ctl-10a, 21r-a
+    (re.compile(r"(?<![\w-])([a-z]{2,5})-(\d{1,3}[a-z]?\d?)\b"), "slice"),
+    (re.compile(r"\b\d{1,2}r-[a-z]\d?\b"), None),
+    # milestone ids: M13.5c, M8c, M21b-2 (a bare "M5" is too short to be worth the noise)
+    (re.compile(r"\bM\d{1,2}(?:\.\d+[a-z]?|[a-z](?:-\d+)?)\b"), None),
+    (re.compile(r"\bADR-\d+\b"), None),
+    # finding ids: RT-SZ-01, R-21r-a-B1
+    (re.compile(r"\bRT-[A-Z0-9]+-\d+\b"), None),
+    (re.compile(r"\bR-[0-9a-z]+-[0-9a-z]+-[A-Z0-9]+\b"), None),
+]
+
+HISTORY_PATTERNS = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\bused to\b",
+        r"\bno longer\b",
+        r"\bpreviously\b",
+        r"\bformerly\b",
+        r"\bbefore this\b",
+        r"\bprior to this\b",
+        r"\breds? at master\b",
+        r"\bat master\b",
+        r"\bretired\b",
+        r"\bthe old\b",
+        r"\bthis replaced\b",
+        r"\breplac(?:es|ed|ing) the (?:old|previous|former)\b",
+        r"\bwas (?:changed|moved|removed|renamed|added|fixed|rewritten|split|merged)\b",
+        r"\bsince the (?:fix|refactor|rewrite|change|migration)\b",
+        r"\bregress(?:ed|ion) from\b",
+    )
+]
+
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+def classify(path):
+    """'slash' | 'hash' | 'doc' | None (not scanned)."""
+    if SKIP_PATH.search(path):
+        return None
+    name = path.rsplit("/", 1)[-1]
+    ext = name.rsplit(".", 1)[-1] if "." in name else ""
+    if name in DOC_NAMES or (ext == "md" and (path.startswith("docs/") or "/docs/" in path)):
+        return "doc"
+    if ext in SLASH_COMMENT_EXT:
+        return "slash"
+    if ext in HASH_COMMENT_EXT or name in HASH_COMMENT_NAMES:
+        return "hash"
+    return None
+
+
+def comment_text(kind, line):
+    """The human-readable part of an added line: the whole line for a doc, the comment for code,
+    None when the line carries no comment."""
+    if kind == "doc":
+        return line
+    stripped = line.lstrip()
+    if kind == "slash":
+        if stripped.startswith(("//", "/*", "*")):
+            return stripped
+        m = re.search(r"(?<![:'\"`])\s//\s?(.*)$", line)  # trailing comment, not a URL scheme
+        return m.group(1) if m else None
+    # hash-comment languages
+    if stripped.startswith("#") and not stripped.startswith("#!"):
+        return stripped
+    m = re.search(r"\s#\s(.*)$", line)
+    return m.group(1) if m else None
+
+
+def tells(text):
+    """[(kind, matched_text)] for one comment or doc line."""
+    found = []
+    for pattern, family in ID_PATTERNS:
+        for m in pattern.finditer(text):
+            if family == "slice" and ID_ALLOW.match(m.group(1)):
+                continue
+            found.append(("id", m.group(0)))
+    for pattern in HISTORY_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            found.append(("history", m.group(0)))
+    return found
+
+
+def scan_diff(diff_text):
+    """Findings for a unified diff: [(path, line_no, kind, tell, text)]."""
+    findings = []
+    path, kind, line_no = None, None, 0
+    for raw in diff_text.splitlines():
+        if raw.startswith("+++ "):
+            target = raw[4:].strip()
+            path = None if target == "/dev/null" else re.sub(r"^b/", "", target)
+            kind = classify(path) if path else None
+            continue
+        if raw.startswith("--- "):
+            continue
+        m = HUNK.match(raw)
+        if m:
+            line_no = int(m.group(1))
+            continue
+        if raw.startswith("+"):
+            if kind:
+                text = comment_text(kind, raw[1:])
+                if text:
+                    for tell_kind, tell in tells(text):
+                        findings.append((path, line_no, tell_kind, tell, text.strip()))
+            line_no += 1
+        elif raw.startswith(" "):
+            line_no += 1
+    return findings
+
+
+def default_base(repo):
+    for ref in ("origin/master", "origin/main"):
+        ok = subprocess.run(
+            ["git", "-C", repo, "rev-parse", "--verify", "--quiet", ref],
+            capture_output=True,
+        )
+        if ok.returncode == 0:
+            return ref
+    return None
+
+
+def scan_repo(repo, base, head):
+    base = base or default_base(repo)
+    if base is None:
+        print("COMMENT-SCAN ERROR no base ref (pass --base)")
+        return 0
+    diff = subprocess.run(
+        ["git", "-C", repo, "diff", "--no-color", "-U0", f"{base}...{head}"],
+        capture_output=True,
+        text=True,
+    )
+    if diff.returncode != 0:
+        print(f"COMMENT-SCAN ERROR git diff failed: {diff.stderr.strip()[:200]}")
+        return 0
+    findings = scan_diff(diff.stdout)
+    for path, line_no, kind, tell, text in findings:
+        print(f"{path}:{line_no}: [{kind}] {tell}: {text[:160]}")
+    print(f"COMMENT-SCAN FLAGGED {len(findings)}" if findings else "COMMENT-SCAN CLEAN")
+    return 0
+
+
+def selftest():
+    def diff(path, added, start=10):
+        body = "".join(f"+{line}\n" for line in added)
+        return f"--- a/{path}\n+++ b/{path}\n@@ -{start},0 +{start},{len(added)} @@\n{body}"
+
+    def kinds(path, *added):
+        return [(f[2], f[3]) for f in scan_diff(diff(path, list(added)))]
+
+    cases = [
+        # (name, got, want)
+        ("slice id in a ts comment", kinds("client/src/a.ts", "// wap-8: grows the zone"),
+         [("id", "wap-8")]),
+        ("milestone id in a rust doc comment", kinds("game-core/src/a.rs", "/// M13.5c lifecycle"),
+         [("id", "M13.5c")]),
+        ("decision and finding ids", kinds("a.rs", "// see ADR-0187 and RT-SZ-01"),
+         [("id", "ADR-0187"), ("id", "RT-SZ-01")]),
+        ("review-round slice id", kinds("a.ts", "// closes the 21r-a softlock"),
+         [("id", "21r-a")]),
+        ("history wording", kinds("a.ts", "// The plugin used to rewrite it"),
+         [("history", "used to")]),
+        ("history wording, block comment body", kinds("a.ts", " * Before this, terrain was blank"),
+         [("history", "Before this")]),
+        ("trailing comment", kinds("a.ts", "const x = 1; // no longer cached"),
+         [("history", "no longer")]),
+        ("hash comment in python", kinds("tools/a.py", "# previously a list"),
+         [("history", "previously")]),
+        ("current-state doc line", kinds("docs/DECISIONS.md", "The cache was removed in qf-5."),
+         [("id", "qf-5"), ("history", "was removed")]),
+        ("AGENTS.md is a doc", kinds("AGENTS.md", "Formerly a single crate."),
+         [("history", "Formerly")]),
+        # negatives
+        ("technical tokens are not slice ids",
+         kinds("a.ts", "// utf-8, sha-256, es-2022, webgl-2, tier-1, x86-64"), []),
+        ("a hyphenated ratio is not a slice id", kinds("a.ts", "// a 1-in-5 stay, 2-of-3 votes"), []),
+        ("code is not scanned", kinds("a.ts", "const usedTo = 'used to'; call(wap - 8);"), []),
+        ("string literal is not scanned", kinds("a.ts", "throw new Error('no longer valid');"), []),
+        ("a URL is not a trailing comment", kinds("a.ts", "const u = 'https://x.dev/wap-8';"), []),
+        ("rust attribute is not a comment", kinds("a.rs", "#[derive(Debug)] struct Qf5;"), []),
+        ("present-tense reason passes",
+         kinds("a.ts", "// A fixed sleep reads a stale column on a slow runner."), []),
+        ("generated bindings skipped",
+         kinds("client/src/module_bindings/a.ts", "// used to be wap-8"), []),
+        ("changelog skipped", kinds("CHANGELOG.md", "wap-8 used to"), []),
+        ("specs skipped", kinds("specs/monster-realm-v2/M-x.spec.md", "### wap-8"), []),
+        ("loop logs skipped", kinds("memory/projects/handoff.md", "wap-8 merged; was fixed"), []),
+        ("markdown outside docs skipped", kinds("notes/x.md", "used to"), []),
+        ("unknown extension skipped", kinds("a.bin", "// used to"), []),
+        ("test title is not scanned",
+         kinds("a.test.ts", "  it('UIF2.6 keeps the root at 16px', () => {"), []),
+    ]
+    bad = [(n, g, w) for n, g, w in cases if g != w]
+
+    # Removed and context lines are ignored, and line numbers follow the new file.
+    mixed = (
+        "--- a/a.ts\n+++ b/a.ts\n@@ -5,3 +5,4 @@\n"
+        " // context mentions wap-8\n-// removed line used to\n+const a = 1;\n+// wap-9 here\n"
+    )
+    got = [(f[0], f[1], f[3]) for f in scan_diff(mixed)]
+    if got != [("a.ts", 7, "wap-9")]:
+        bad.append(("removed/context ignored, numbering", got, [("a.ts", 7, "wap-9")]))
+
+    # A deleted file contributes nothing.
+    deleted = "--- a/a.ts\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-// wap-8\n"
+    if scan_diff(deleted):
+        bad.append(("deleted file", scan_diff(deleted), []))
+
+    for name, got, want in bad:
+        print(f"SELFTEST-FAIL {name}: got {got!r}, want {want!r}")
+    print("SELFTEST-OK" if not bad else f"SELFTEST-FAILED {len(bad)}")
+    return 1 if bad else 0
+
+
+def main(argv):
+    if len(argv) >= 2 and argv[1] == "--selftest":
+        return selftest()
+    args = dict(zip(argv[1::2], argv[2::2]))
+    if "--repo" not in args or len(argv) % 2 == 0 or set(args) - {"--repo", "--base", "--head"}:
+        print("usage: mr-comment-scan --repo R [--base B] [--head H] | --selftest", file=sys.stderr)
+        return 2
+    return scan_repo(args["--repo"], args.get("--base"), args.get("--head", "HEAD"))
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

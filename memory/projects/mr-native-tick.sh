@@ -296,10 +296,11 @@ NLIVE=$(echo "$LIVE_BARE" | wc -w)
 for LS in $LIVE_BARE; do
   TEL=$("$MEM/mr-cost-watch" telemetry "/tmp/mr_pass_$LS.log" live-standdown "$NLIVE" 2>/dev/null)
   # SILENT IN THE STEADY STATE. This site fires once per live slice on EVERY tick, and the
-  # supervisor reads `tail -5` of this log first (mr-supervisor-prompt-native.md:66). This exact
-  # file already paid for that lesson once — see :252-256, where 3 of those 5 lines were watcher
-  # spam. Only `OK rows=0 ...` is suppressed: anything else (new rows, any ERR, or no output at
-  # all) is by definition news and is always logged.
+  # tail of this log is what a supervisor or operator reads first. This exact file already paid
+  # for that lesson once — see the COSTWATCH-watcher comment above (`lock-exists =>
+  # watcher-was-started`), where 3 of the last 5 lines were watcher spam. Only `OK rows=0 ...` is
+  # suppressed: anything else (new rows, any ERR, or no output at all) is by definition news
+  # and is always logged.
   case "$TEL" in
     "OK rows=0 "*) : ;;
     *) log "RATE-LIMIT-TELEMETRY slice=$LS ${TEL:-no-output}" ;;

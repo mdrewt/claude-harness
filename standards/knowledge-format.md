@@ -40,5 +40,4 @@ surface.
 This began as a superset of Google's OKF, with a second instance — generated,
 drift-gated schema bundles — that monster-realm has since retired along with
 its producer; nothing generates bundles today, and reviving that machinery
-would need a fresh decision entry. Background: the pre-2026-09 ADR corpus in git history and
-`docs/archive/OKF-research-and-impact-analysis.md`.
+would need a fresh decision entry. Background: the pre-2026-09 ADR corpus in git history.

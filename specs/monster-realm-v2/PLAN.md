@@ -13,8 +13,9 @@
 > recommendations accepted with small additions. Still open: the two 2026-10-15 corrective
 > milestones (queued first), the M25 security sign-off (blocked), controller support before
 > launch, and residual fill-work.
-> History: every closed milestone's spec is verbatim in `archive/` (one-line index in §Done);
-> this file describes only what is true and open today.
+> This file describes only what is true and open today. A closed milestone's spec is deleted once
+> its lasting decisions are recorded (the game repo's `docs/DECISIONS.md`; the harness's for loop
+> tooling); git history holds the rest. §Built names what the closed milestone ids refer to.
 
 ## What this is
 
@@ -124,15 +125,15 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    operator ratifies both at the harness-revision Checkpoint 2, which lifts this block. Its
    server-side slices may run alongside items 3–10 where files are disjoint (note: item 7
    rebuilds the trade surface S1 touches — re-check S1's test targets when both are live).
-   **Launch is gated on its completion** (design ADR-0034's intent, carried forward).
+   **Launch is gated on its completion.**
 12. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
    layer, consuming item 2's stack-ownership design. **Must land before launch** (operator,
    2026-10-01). Ordered after item 4's tactical battle UI stabilizes — operator-CONFIRMED
    (#583 D4, 2026-10-24).
-13. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch; design ADR-0028) — absorbs the
+13. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — absorbs the
    discriminator surfaces from item 10; ordered AHEAD of M18 — operator-CONFIRMED (#588 D4,
    2026-10-24). M23's social a11y retrofit scope un-defers with it.
-14. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch; design ADR-0027) — the playtest-3
+14. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — the playtest-3
    read did NOT confirm it as next content; its 1v1 "additive resolve_coop_turn" premise dies
    with the tactical overhaul. Re-sketch AFTER item 4's P2 (tactical sides natively support
    allies).
@@ -146,8 +147,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    Steam Input maps onto the virtual buttons.
 
 Milestone specs for items 4–14 are sketches or ceremony-pending where marked: elaborate via
-`milestone-loop-prompt.md` when reached, against the CURRENT game repo (never against archived
-specs). ⛩ **Playtest-4 gate** is DECIDED (#583 D5, 2026-10-24 — strict §10, alternative A):
+`milestone-loop-prompt.md` when reached, against the CURRENT game repo. ⛩ **Playtest-4 gate** is DECIDED (#583 D5, 2026-10-24 — strict §10, alternative A):
 ONE gate after every coverage milestone closes. No interim playtest.
 
 ## Gates and constraints (live)
@@ -166,40 +166,29 @@ ONE gate after every coverage milestone closes. No interim playtest.
   (`#[table(accessor = x)]`, `ctx.sender()`); upgrade runbook in the game repo's
   `docs/runbooks/spacetimedb-upgrade.md`.
 
-## §Done (chronological; every spec verbatim in `archive/`)
+## §Built (what the closed milestone ids name)
 
-Foundations & core loop: **M0** foundation · **M1** movement · **M2** server module ·
-**M3** client prediction · **M4** frontend · **M5** integration/e2e · **M6** monsters &
-individuality · **M7** battles · **M8** encounters/recruit · **M8.9** server-module
-modularization · **M9** raising · **M10** evolution (fusion later replaced) · **M11** authored
-world · **M12** NPCs/dialogue/quests · **M13** economy · **M14** deeper battle · **M15** trading ·
-**M16** PvP · **M17** ranked ladder.
-Review-residual rounds (an artifact of the retired weekly-review machine): M8.5–M8.8, M10.5,
-M12.5, M13.5, M14.5, M16.5, M17.5, and the postgate 11th–20th rounds.
-Playtest replan (2026-07): **M-playtest-a/b/c/c.5/d** (deployment, observability, UX completion,
-pre-gate residuals, content pack) → **playtest gate 2026-07-25: CONDITIONAL PASS**
-(`archive/playtest-gate-decision-2026-07-25.md`) → **M-postgate-netcode-hardening** ·
-**M-postgate-ux-hardening** · **M-postgate-ux-design** · **M-postgate-movement-investigation** ·
-**M-postgate-feel-polish** · **M-postgate-dev-observability** · **M-postgate-battle-0hp-fix** ·
-**M-postgate-evolution-fusion-hardening** · **M-evolution-essence-graph** +
-**M-evolution-essence-redesign** (fusion → catalyst evolution; Bond retired) ·
-**M-postgate-roster-wave-3**.
-Platform & compliance (Phase D, greenlit by the 2026-08-08 operator override): **M20**
-observability/performance · **M21** accounts/auth (b-3 Steam remains open above) · **M22**
-privacy/deletion/export · **M23** accessibility · **M24** i18n (en/fr) · **M25 S0**.
-Postgate review follow-ups: **M-postgate-twentyfirst-review-residuals** (21r-a #528, 21r-b
-#527, 21r-e #532, 21r-b2 #530 — merged 2026-09-28..30).
-Console controls (operator directive 2026-10-01): **M-postgate-console-controls** (ctl-1..ctl-16
-+ pgcc-c/d, monster-realm PRs #542–#577; design SSOT `console-controls-design.md`) ·
-**M-postgate-client-coverage** (pgcc-a #535, pgcc-c/d) → **⛩ Playtest-3 gate** raised via
-decision issue monster-realm#578, acked 2026-10-15 → **played 2026-10** → verdict **PASS WITH
-CHANGES** (`playtest-feedback-2026-10.md`; episode pt3-2026-10, 186 items dispositioned
-2026-10-24; queue reshaped above).
-Pre-playtest polish: **M-pre-playtest-polish** (polish-1, GAME #579 — built, merged 2026-10-05;
-P1/P2/P4/P5 shipped, P3/P6 closed by re-measure; its six folded residuals dispositioned fixed).
-Infra: **M-infra-a** CI caching · **M-stdb-2x** module-SDK 2.8.1 · **M-infra-d** ADR digest and
-**M8.95** knowledge bundle (both later retired by the de-bloat) · **M-loop-infrastructure**
-(supervisor tooling; superseded by the 2026-09 harness revision).
+Open specs and code comments name closed milestones by id. The record of a closed milestone is
+the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
+
+- Core loop: **M0** foundation · **M1** movement · **M2** server module · **M3** client
+  prediction · **M4** frontend · **M5** integration/e2e · **M6** monsters & individuality ·
+  **M7** battles · **M8** encounters/recruit · **M8.9** server-module modularization · **M9**
+  raising · **M10** evolution (fusion since replaced by catalyst evolution) · **M11** authored
+  world · **M12** NPCs/dialogue/quests · **M13** economy · **M14** deeper battle · **M15**
+  trading · **M16** PvP · **M17** ranked ladder.
+- Platform & compliance: **M20** observability/performance · **M21** accounts/auth (Steam login
+  is §9 item 16) · **M22** privacy/deletion/export · **M23** accessibility · **M24** i18n
+  (en/fr) · **M25 S0** threat-model consolidation.
+- Client: **M-postgate-console-controls** (`ctl-*`; the virtual-button controls, design SSOT
+  `console-controls-design.md`) · **M-postgate-client-coverage** (`pgcc-*`) ·
+  **M-pre-playtest-polish**.
+- Follow-up rounds: an `N.5` milestone, an "Nth review residuals" milestone and an `NNr-*`
+  slice id each name a review follow-up to the numbered work; **M-playtest-a…d** prepared the
+  2026-07 playtest and the other **M-postgate-\*** / **M-evolution-essence-\*** milestones
+  acted on it.
+- Infra: **M-infra-a** CI caching · **M-stdb-2x** module SDK 2.8.1 · **M-loop-infrastructure**
+  (the supervisor tooling, `memory/projects/mr-*`).
 
 ## Risks (live)
 

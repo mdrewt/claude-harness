@@ -1,7 +1,6 @@
 # lp-04 — adjudicated plan (BINDING)
 
 Slice: `lp-04` — `mr-audit` policy/detector split, plus the disposition check.
-Spec: `specs/monster-realm-v2/M-loop-infrastructure.spec.md:224-253`.
 Branch `feat/lp-04-audit-policy-detector-split`, worktree `.claude/worktrees/lp-04`, base `25111d5`.
 
 Planner produced a draft; three independent lenses (`reviewer`, `red-team`, `/simplify`) attacked
@@ -20,7 +19,7 @@ pre-merge mandatory diff read rather than reclassifying it. It would also break 
 `gating_test_audit` ledger column (filled from the supervisor's free-text `--gating`), the same
 death `remote_red_fix_cycles` already suffered, and it invents a THIRD vocabulary against 446 rows
 of history and against `mr-audit:3`'s own "treat AUDIT-ERROR as FLAGGED" convention — which
-`M-loop-infrastructure.spec.md:235` explicitly requires any new rule to carry.
+any new rule is required to carry.
 
 **F2 (`/simplify`, CUT-1; corroborated by `reviewer` M1).** The draft's bash->python whole-file
 rewrite is not earning its keep. Its three stated benefits are refuted: `mr-selfcheck`'s PYHD block
@@ -53,7 +52,7 @@ signature, not a clean corpus. `/simplify` found the signal that does all the wo
 splitting a joined item on `**` and testing only the odd (inside-bold) segments reproduces exactly
 4 findings with 0 false positives, and correctly rejects all five prose decoys with no section
 scoping at all. `red-team` separately confirmed **two genuine live orphans** the draft could not
-see: `pt-c1b2` and `pt-c2c` (`M-playtest-c-ux-completion.spec.md:38,:42`), each occurring exactly
+see: `pt-c1b2` and `pt-c2c`, each occurring exactly
 once in all of `specs/` — at its own marker.
 
 ## Binding amendments
@@ -95,7 +94,7 @@ required in the ADR and the PR:** the red-team measured the SURVIVING tripwire r
 **12/40 (30%)** of the last 40 first-parent monster-realm commits, so "<=2 FLAGGED of the next 5
 hard-tier slices" passes with p~=0.84 for this change alone and is weakly discriminating. Do not
 claim more than was done. The corpus's own recorded design for the retune (per-file NET assert
-delta; `mr-implementation-plan-2026-08-15-evidence.json` step S1, measured 30% -> 2.5%) with its
+delta, measured 30% -> 2.5% in the 2026-08-15 implementation plan's step S1) with its
 retrospective 44-range replay falsification is **parked -> lp-04d**; it is a distinct, separately
 measurable change and folding it in here would make neither half's falsification readable.
 
@@ -205,9 +204,6 @@ fixture from different `base..head` commit pairs. Record the measured runtime de
 - Making either advisory half enforcing — **parked -> wontfix** (permanent spec constraint).
 - Checking that the LEFT column ids of an orphan-closure TABLE exist — **parked -> wontfix**,
   refuted: an orphan-closure table is by construction full of ids that exist nowhere.
-- The spec's own `M-loop-infrastructure.spec.md` closure/Tests lines — NOT edited here. That file is
-  shared by every concurrent `lp-*` sibling; the closure text is handed to the supervisor in the PR
-  body and the handoff instead (declared WARN, supervisor reconciles at milestone close).
 
 ## Named anti-patterns to avoid
 

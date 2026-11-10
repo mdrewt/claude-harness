@@ -332,11 +332,11 @@ function runSelftest() {
   // mr-hold's own provenance fail-safe (absent/garbage provenance defaults to OPERATOR and
   // is never auto-cleared) — it is not a sandbox. These are an honest record of the gap,
   // not oversights; do not "fix" them without first checking the fix doesn't just move the
-  // hole (e.g. narrowing the glob case still leaves other globs; see the KNOWN-GAP list in
-  // M-loop-infrastructure.spec.md's lp-09 section).
+  // hole (e.g. narrowing the glob case still leaves other globs). The KNOWN-GAP checks below
+  // are the list.
   check("KNOWN-GAP: rm /p/.native* (glob defeats the literal-name match)", "rm /p/.native*", false);
-  // Indirection the adjacency pattern structurally cannot see through. Each is pinned so the
-  // ADR's gap list and the code can never quietly disagree about what is actually covered.
+  // Indirection the adjacency pattern structurally cannot see through. Each is pinned so a
+  // change in what the guard covers shows up as a failing check.
   // --- ANCHOR-POSITION regressions. These were ALL allowed before the anchor was widened to
   // tolerate leading whitespace and a newline separator: `^` without the `m` flag is string-start
   // only, so an ordinary two-line Bash call slipped every flag rule. Found by two independent

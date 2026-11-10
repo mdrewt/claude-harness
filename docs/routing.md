@@ -9,7 +9,7 @@ Correct model routing alone saves ~60–80% vs. all-Opus.
 > boundaries from current pricing + this harness's own measured results before
 > trusting these numbers, and re-check each agent's pinned `model:` tier in
 > `.claude/agents/` (under-tiering hurts most at verifier/judge; over-tiering
-> wastes most at doc-keeper). See `docs/archive/context-engineering-5gen-review.md`.
+> wastes most at doc-keeper).
 
 ## Model
 | Tier   | Use for |

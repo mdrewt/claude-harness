@@ -352,13 +352,10 @@ def selftest():
         check("set with no --by is rejected", cmd_set([]) == 2)
 
         # ------------------------------------------------------------------------------
-        # lp-09: queue_stats(qdir=None) — NOT YET IMPLEMENTED (nor is the QUEUE_DIR global,
-        # nor the `mr-hold queue` presenter, nor status --json's new keys). Every fixture
-        # below is written against that not-yet-existing contract per
-        # M-loop-infrastructure.spec.md's lp-09 EARS-4 ("WHEN events are queued behind a
-        # hold, THE SYSTEM SHALL report the backlog depth every tick") and closes the
-        # concrete incident it names: one done-event sat 83.9h unprocessed with nothing
-        # surfacing it.
+        # lp-09: queue_stats(qdir=None), the `mr-hold queue` presenter and status --json's
+        # queue keys. The contract: WHEN events are queued behind a hold, THE SYSTEM SHALL
+        # report the backlog depth every tick -- otherwise a done-event can sit unprocessed
+        # for days (one sat 83.9h) with nothing surfacing it.
         def _qs(qdir):
             """Call queue_stats defensively. Pre-implementation the name does not exist at
             all; post-implementation it must NEVER raise (stat-only contract, fixture 7).

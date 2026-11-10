@@ -1050,7 +1050,7 @@ after: [ctl-11a]
 category: accessibility (WCAG 2.1.4) + operator intent · severity: MED · size: HEAVY
 touches: client/src/input/bindingStore.ts, client/src/input/bindingStore.test.ts, client/src/input/glyphs.ts, client/src/input/glyphs.test.ts, client/src/input/bindings.ts, client/src/input/bindings.test.ts, client/src/input/router.ts, client/src/input/router.test.ts, client/src/ui/controlsModel.ts, client/src/ui/controlsModel.test.ts, client/src/ui/controlsView.ts, client/src/ui/controlsView.test.ts, client/src/ui/overlayRegistry.ts, client/src/ui/overlayRegistry.test.ts, client/src/ui/screens/optionsScreen.ts, client/src/ui/screens/index.ts, client/src/main.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/e2e/remap.spec.ts, client/e2e/controls.ts
 after: [ctl-11b]
-- Evidence: M23 cut remapping because `main.ts` was a literal `e.code` ladder (`specs/monster-realm-v2/archive/M23-accessibility.spec.md:335`). The ladder is gone after ctl-11b.
+- Evidence: M23 cut remapping because `main.ts` was a literal `e.code` ladder. The ladder is gone after ctl-11b.
 - Intent: design §9. `controlsView` is a new `OverlayId` with an `OVERLAY_A11Y` entry (file-naming rule).
 - New files: `bindingStore.ts`, `glyphs.ts`, `controlsModel.ts`, `controlsView.ts`, `optionsScreen.ts`, their tests, `client/e2e/remap.spec.ts`.
 

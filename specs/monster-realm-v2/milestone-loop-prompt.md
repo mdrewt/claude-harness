@@ -9,12 +9,11 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
 
 - `PLAN.md` — the roadmap (§9) and live constraints. Authoritative for order and scope.
 - **The game repo itself** (`projects/monster-realm/`): `ARCHITECTURE.md` and `docs/DECISIONS.md`
-  are the current-state truth. **Never design against an archived spec** — the code moved on.
+  are the current-state truth. Closed milestones have no spec: design against the code.
 - `standards/` (principles, spec-driven, **testing-tdd — the verification SSOT**, decisions,
   security, contracts, observability, domain/game) and `docs/routing.md` for effort.
 - `game-design.md` (design intent; fusion → catalyst evolution, Bond retired),
   `netcode-quality-review.md` (the smoothness contract), `security-threat-model.md`.
-- Archived specs and design ADRs (`archive/`, `archive/adr/`) are historical reference only.
 
 ## Per-milestone procedure
 
@@ -77,11 +76,11 @@ keep moving — flagged, so they can object.
 
 ## Milestone notes
 
-- **M18 co-op raids** (sketch; design ADR-0027 in `archive/adr/`): two allies vs an AI boss via
+- **M18 co-op raids** (sketch): two allies vs an AI boss via
   an additive `resolve_coop_turn`; both-submit; shared XP; `is_raid` additive on the battle row;
   degrade gracefully to one ally. v1 precedent exists (the v1 tutorial's raid chapter is fair
   reference); post-gate provisional — spec only after the playtest-3 read.
-- **M19 guilds/chat/social** (sketch; design ADR-0028): no precedent — extra care on the forks
+- **M19 guilds/chat/social** (sketch): no precedent — extra care on the forks
   (chat model, moderation hooks, untrusted-content discipline, guild membership/roles; M23's
   social a11y retrofit un-defers with it). Post-gate provisional.
 - **Controls model (all client milestones):** the client's primary interface is the virtual
