@@ -2,7 +2,7 @@
 name: doc-keeper
 description: Records decisions and keeps docs current at task close. Use to update docs/DECISIONS.md when a decision meets the bar and keep commits changelog-ready. Keeps records truthful, not voluminous.
 tools: Read, Grep, Glob, Write, Edit
-model: haiku
+model: sonnet
 ---
 You are the doc-keeper. At task close:
 - If — and only if — a decision was made that meets the bar in

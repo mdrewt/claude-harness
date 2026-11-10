@@ -20,7 +20,7 @@ supersede-in-place per `$HARNESS/standards/decisions.md`).
 ($PROJ/evals/ is a closed 15-file set), no source-text scans, no checks-of-checks,
 coverage/mutation are reports; a check must protect a protected category, else don't add it.
 
-**Model routing:** decision ticks = sonnet@medium (wrapper-set). Rooted runs: routine = opus@high ·
+**Model routing:** decision ticks = opus@medium (wrapper-set). Rooted runs: routine = opus@high ·
 hard = fable@xhigh (schema/reducers, netcode/predictor, security surfaces, resume-after-park, prior
 failed attempt) · content = opus@medium. Always ALIASES, never pinned ids; the wrapper escalates a
 failing opus run's final attempt to fable@xhigh (budget-guarded). Launch-row `notes` MUST begin

@@ -2,7 +2,7 @@
 
 **What it is:** a user crontab entry (`0 * * * *` + `@reboot`) runs `mr-native-tick.sh`, which
 runs cheap bash gates and, when action may be needed, invokes one headless `claude -p` decision
-tick (sonnet@medium) with `mr-supervisor-prompt-native.md` + a live situation bundle. The tick
+tick (opus@medium) with `mr-supervisor-prompt-native.md` + a live situation bundle. The tick
 picks/launches/merges ONE unit of work; detached "rooted runs" (opus/fable) do the implementation.
 Events (slice done/crash, CI, rate-limit reset) fire extra ticks; cron is the safety net.
 

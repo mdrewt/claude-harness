@@ -1,25 +1,24 @@
 # Model, effort & orchestration routing
 
 Two independent dials — *which model* and *how much effort/orchestration*.
-Correct model routing alone saves ~60–80% vs. all-Opus.
 
-> **Generation-staleness note (2026-07):** the tier table, the savings figure,
-> and the effort policy below were calibrated on the 4.x generation. The 5-gen
-> lineup (Opus 5 / Fable 5) shifts quality and price per tier — re-derive the
-> boundaries from current pricing + this harness's own measured results before
-> trusting these numbers, and re-check each agent's pinned `model:` tier in
-> `.claude/agents/` (under-tiering hurts most at verifier/judge; over-tiering
-> wastes most at doc-keeper).
+> **Basis (measured on this harness, 60 build runs):** build runs are about 95% of spend and
+> the supervisor's decision ticks about 5%. Inside a run, subagents on Sonnet are about 15% of
+> its cost: tester 50% of subagent tokens, reviewer 20%, red-team 17%, verifier 5%, everything
+> else under 3% each. Sonnet to Opus multiplies a role's cost by 1.67, Opus to Fable by 1.5.
 
 ## Model
 | Tier   | Use for |
 |--------|---------|
-| Haiku  | test scaffolding, docs, changelog, lint-level review |
-| Sonnet | features, bug fixes, standard refactors, code review (most volume) |
-| Opus   | architecture, multi-file refactors, complex debugging, unfamiliar code |
+| Sonnet | high-volume subagent work: tests from criteria, adversarial probing, research |
+| Opus   | implementation, review, verification verdicts, loop decisions, planning, judging |
+| Fable  | hard-tier implementation; netcode and security audits |
 
-Heuristics: human-in-the-loop downgrades one tier; an autonomous loop upgrades
-one tier; hard latency forces Haiku. Switch mid-session with `/model`.
+Rule: raise a role's tier when its tokens are few and its output gates what merges or what gets
+built next (reviewer, verifier, the supervisor tick, the security and desync auditors). Keep the
+cheaper tier where volume is high and another role checks the output (tester, red-team). Each
+agent's tier is its `model:` line in `.claude/agents/`; the supervisor tick's is `SUP_MODEL` in
+`mr-native-tick.sh`. Human-in-the-loop work can drop a tier. Switch mid-session with `/model`.
 
 ## Effort (`/effort`)
 - Persistent levels: low / medium / high / max. Session-only: `ultracode`.

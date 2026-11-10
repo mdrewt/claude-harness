@@ -1,7 +1,7 @@
 #!/bin/bash
 # mr-native-tick.sh v3 — NATIVE supervisor tick for Monster Realm v2 (cron watchdog + event-driven).
 # Usage: mr-native-tick.sh [event-payload-file]   Env: MR_EVENT_SRC(cron|done|ci|crash|reset|manual)
-#        SUP_MODEL(sonnet) SUP_EFFORT(medium) MR_TICK_DRYRUN=1 MR_FORCE=1 MR_NO_TOAST=1
+#        SUP_MODEL(opus) SUP_EFFORT(medium) MR_TICK_DRYRUN=1 MR_FORCE=1 MR_NO_TOAST=1
 set -u
 HARNESS=/home/mdrewt/projects/ai-apps/claude-harness
 PROJ=$HARNESS/projects/monster-realm
@@ -9,7 +9,7 @@ MEM=$HARNESS/memory/projects
 export HOME=/home/mdrewt
 export PATH=/home/mdrewt/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/mdrewt/.asdf/shims:/home/mdrewt/bin
 LOG=$MEM/mr-native-tick.log
-SUP_MODEL=${SUP_MODEL:-sonnet}
+SUP_MODEL=${SUP_MODEL:-opus}
 SUP_EFFORT=${SUP_EFFORT:-medium}
 SRC=${MR_EVENT_SRC:-cron}
 EVFILE="${1:-}"

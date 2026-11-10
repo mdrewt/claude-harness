@@ -174,9 +174,9 @@ Documented in `docs/workflow-loops.md`; invoked via `/loop`.
 | planner | architecture, task decomposition from spec | Opus | — |
 | researcher | exploration/codebase Q&A; protects main context | Sonnet | worktree/none |
 | tester | writes tests from acceptance criteria (TDD) | Sonnet | worktree |
-| reviewer | code review: correctness, security, smells, over-engineering | Sonnet | — |
-| verifier | runs tests/security gates; approves merge | Sonnet | worktree |
-| doc-keeper | decision entries (when the bar is met), memory cards | Haiku | — |
+| reviewer | code review: correctness, security, smells, over-engineering | Opus | — |
+| verifier | runs tests/security gates; approves merge | Opus | worktree |
+| doc-keeper | decision entries (when the bar is met), memory cards | Sonnet | — |
 | judge / synthesizer | scores competing outputs, picks or merges the best | Opus | — |
 | red-team | adversarial: attacks code for bugs / security / edge cases | Sonnet | worktree |
 
@@ -218,12 +218,12 @@ The coordinator picks a collaboration pattern **per task**, based on value, risk
 
 ## 8. Model, effort & orchestration routing
 
-`docs/routing.md`. Two independent dials — *which model* and *how much effort/orchestration* — are the biggest quality-vs-cost levers. Correct model routing alone saves ~60–80% vs. all-Opus.
+`docs/routing.md`. Two independent dials — *which model* and *how much effort/orchestration* — are the biggest quality-vs-cost levers.
 
 ### Model
-- **Haiku:** test scaffolding, docs, changelog, lint-level review.
-- **Sonnet:** feature implementation, bug fixes, standard refactors, code review (most volume).
-- **Opus:** architecture, multi-file refactors, complex debugging, unfamiliar code.
+- **Sonnet:** the high-volume subagent work: tests from criteria, adversarial probing, research.
+- **Opus:** implementation, review and verification verdicts, loop decisions, planning, judging.
+- **Fable:** hard-tier implementation; netcode and security audits.
 - **Heuristics:** human-in-the-loop downgrades one tier; an autonomous loop upgrades one tier; hard latency needs force Haiku.
 
 ### Effort & thinking
