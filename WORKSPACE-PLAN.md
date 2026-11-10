@@ -223,8 +223,8 @@ The coordinator picks a collaboration pattern **per task**, based on value, risk
 ### Model
 - **Sonnet:** the high-volume subagent work: tests from criteria, adversarial probing, research.
 - **Opus:** implementation, review and verification verdicts, loop decisions, planning, judging.
-- **Fable:** hard-tier implementation; netcode and security audits.
-- **Heuristics:** human-in-the-loop downgrades one tier; an autonomous loop upgrades one tier; hard latency needs force Haiku.
+- **Fable:** hard-tier implementation.
+- **Heuristic:** human-in-the-loop work can drop a tier.
 
 ### Effort & thinking
 - Claude Code exposes a persistent `/effort` setting (low / medium / high / max) plus a session-only `ultracode` level. On 4.6-class models, thinking is **adaptive** — the model scales reasoning depth to the task — so the old `ultrathink` keyword is **legacy**; prefer `/effort` as the canonical dial.
@@ -239,7 +239,7 @@ The coordinator picks a collaboration pattern **per task**, based on value, risk
 Max effort / `ultracode` / `ultrathink` raise quality by spending *more* tokens; they are not themselves efficient. Efficiency comes from spending them **selectively** plus isolation:
 1. **Effort routing** — cheap by default; escalate only at high-leverage gates (planning, architecture, debugging, security).
 2. **Subagent isolation** — the single biggest lever: heavy research/exploration runs in throwaway contexts and returns a clean summary, so noise never persists.
-3. **Model routing** — Haiku/Sonnet for the bulk.
+3. **Model routing** — the cheaper tier for high-volume subagent work (`docs/routing.md`).
 4. **Cloud offload** — `ultraplan` keeps the local context lean.
 5. **Compaction discipline** — `/compact`, `/clear`, and `/btw` for side questions.
 

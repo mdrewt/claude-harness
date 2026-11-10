@@ -2,23 +2,24 @@
 
 Two independent dials — *which model* and *how much effort/orchestration*.
 
-> **Basis (measured on this harness, 60 build runs):** build runs are about 95% of spend and
-> the supervisor's decision ticks about 5%. Inside a run, subagents on Sonnet are about 15% of
-> its cost: tester 50% of subagent tokens, reviewer 20%, red-team 17%, verifier 5%, everything
-> else under 3% each. Sonnet to Opus multiplies a role's cost by 1.67, Opus to Fable by 1.5.
-
 ## Model
 | Tier   | Use for |
 |--------|---------|
-| Sonnet | high-volume subagent work: tests from criteria, adversarial probing, research |
-| Opus   | implementation, review, verification verdicts, loop decisions, planning, judging |
-| Fable  | hard-tier implementation; netcode and security audits |
+| Sonnet | high-volume subagent work: tests from criteria on routine slices, adversarial probing, research |
+| Opus   | implementation, review, verification verdicts, loop decisions, planning, judging, audits; the tester on hard-tier slices |
+| Fable  | hard-tier implementation |
 
-Rule: raise a role's tier when its tokens are few and its output gates what merges or what gets
-built next (reviewer, verifier, the supervisor tick, the security and desync auditors). Keep the
-cheaper tier where volume is high and another role checks the output (tester, red-team). Each
-agent's tier is its `model:` line in `.claude/agents/`; the supervisor tick's is `SUP_MODEL` in
-`mr-native-tick.sh`. Human-in-the-loop work can drop a tier. Switch mid-session with `/model`.
+Rule: raise a role's tier when its billed cost is small and its output gates what merges or what
+gets built next (reviewer, verifier, the supervisor tick). Keep the cheaper tier where volume is
+high and another role checks the output (the routine-tier tester, red-team). Each agent's tier is
+its `model:` line in `.claude/agents/`; the supervisor tick's is `SUP_MODEL` in
+`mr-native-tick.sh`; a slice's tier block in `mr-spawn` can override per slice. Human-in-the-loop
+work can drop a tier. Switch mid-session with `/model`.
+
+Re-measure before changing a tier. Price each assistant message in the `/tmp/mr_pass_*.log`
+stream by its own `usage` and `model`, attribute it to a role through `parent_tool_use_id`, and
+read the supervisor's share from the usage ledger. The CLI's `modelUsage.costUSD` gives the real
+price ratio between tiers; the fable price in `mr-budget-config.json` is an estimate.
 
 ## Effort (`/effort`)
 - Persistent levels: low / medium / high / max. Session-only: `ultracode`.
@@ -39,8 +40,7 @@ Fan out the **independent, read-only** analyses concurrently (up to N = 2–3,
 depth = 1): the plan/test/impl **review lenses** (`reviewer` + `red-team`), the
 **domain auditors**, and `researcher` lookups. Keep the **ordered gates serial** —
 tests precede implementation, merges are sequential and verifier-gated, and no two
-specialists touch the same files. Triage complexity first, then route (an
-autonomous loop bumps one tier): solo/light for a simple slice, full multi-agent
+specialists touch the same files. Triage complexity first, then route: solo/light for a simple slice, full multi-agent
 + `ultracode` for a gnarly/security one.
 
 ## Token-efficiency
