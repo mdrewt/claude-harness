@@ -150,7 +150,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    ahead of this position; when no earlier item has a launchable slice, its slices launch in
    file order. Its `type: design` slices decide internal-design questions; those are not operator
    decisions. An empty file is a finished item once no plan file under the game's
-   `docs/refactors/` lists an extraction still to make.
+   `docs/refactors/` lists an extraction still to make. With no section open and a plan file
+   listing extractions, the tick's action is to section the next three.
 
 Milestone specs for items 4–14 are sketches or ceremony-pending where marked: elaborate via
 `milestone-loop-prompt.md` when reached, against the CURRENT game repo. ⛩ **Playtest-4 gate** is DECIDED (#583 D5, 2026-10-24 — strict §10, alternative A):

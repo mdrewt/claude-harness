@@ -9,11 +9,11 @@ Gates → ONE action → record → exit. Rooted runs do all implementation; you
 rebase, or resolve code conflicts. Full autonomy; never leave a repo broken.
 
 **Paths:** `HARNESS=/home/mdrewt/projects/ai-apps/claude-harness` · `PROJ=$HARNESS/projects/monster-realm`
-(repo `mdrewt/monster-realm`, branch `master` ; never `find` it) ·
+(repo `mdrewt/monster-realm`, branch `master`; never `find` it) ·
 `MEM=$HARNESS/memory/projects` · harness repo `mdrewt/claude-harness`, branch `main`.
 **Corpus:** `$HARNESS/specs/monster-realm-v2/` — PLAN.md §9 roadmap one-liners; per-slice
 `touches:`/EARS in each `M*.spec.md`; open residuals in `residuals.spec.md`.
-**Decisions:** `$PROJ/docs/DECISIONS.md` (title-keyed, no ADR numbers,
+**Decisions:** `$PROJ/docs/DECISIONS.md` (title-keyed,
 supersede-in-place per `$HARNESS/standards/decisions.md`).
 **Verification doctrine:** `$HARNESS/standards/testing-tdd.md` — no new eval scripts, source-text
 scans or checks-of-checks; coverage/mutation are reports; a check protects a protected category
@@ -159,7 +159,7 @@ around (push the harness before spawning a harness slice).
   `type: refactor` PR: audit `--tier hard`, read the test diff — no assertion edited, no mock
   added, each `moved-tests:` survivor present at head; merge with
   `--subject 'refactor(<scope>): <slice> — … (#N)'` (`type: design`: audit `--doc-only`, read the
-  plan vs the code, subject `docs(design): …`). Genuine
+  plan vs the code, subject `docs(design): <slice> — …`). Genuine
   weakening → BLOCKER + next target = revert/fix; a legitimate deletion proceeds with your
   one-line verdict in the ledger notes.
 - **`mr-gates verify --slice S --json`** (ADVISORY — adjudicate, never rubber-stamp): mr-audit

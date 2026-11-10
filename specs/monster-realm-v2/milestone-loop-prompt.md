@@ -109,9 +109,10 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
 
 ## When to ask the operator
 
-Only at a genuine fork that is theirs (scope/ambition, contested design, gameplay feel with no
+Only at a genuine fork that is theirs (scope/ambition, contested game design, gameplay feel with no
 disciplined default). Otherwise pick the disciplined default, state it in Risks/decisions, and
-keep moving — flagged, so they can object.
+keep moving — flagged, so they can object. Internal code design is never theirs (step 2, structure
+pass).
 
 ## Milestone notes
 

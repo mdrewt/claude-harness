@@ -12,7 +12,9 @@ deleted and never counts toward a playtest gate, and an empty `## Slices` means 
 - **Written by** a milestone spec author's structure pass (`milestone-loop-prompt.md`, at most
   three sections per spec PR), by the supervisor from a merged design slice (the next three
   extractions a plan file under the game's `docs/refactors/` lists, written per that structure
-  pass as a doc-only PR), or by the operator. Never by a build run, and never invented to fill the
+  pass as a doc-only PR), by the supervisor when a parked slice or a spec author names an
+  internal-design choice nobody has recorded (one `type: design` section, doc-only PR; the
+  parked slice gains it in `after:`), or by the operator. Never by a build run, and never invented to fill the
   share. Structural findings are not
   residuals.
 - **Built** means the game repo's `origin/master` carries a subject naming `<slice id> —`,
@@ -25,7 +27,10 @@ deleted and never counts toward a playtest gate, and an empty `## Slices` means 
   disposition, the tests that already cover the moved behaviour, and id-led `SHALL` criteria
   whose checks are test-runner invocations.
 - **`touches:`** names the source and destination files literally and test families as globs
-  with a literal directory prefix (`client/src/main.*.test.ts`), never a bare directory.
+  with a literal directory prefix (`client/src/main.*.test.ts`), never a bare directory. An
+  extraction sectioned from a plan file also lists that plan file and `ARCHITECTURE.md`, and its
+  confirm-at-merge line includes "its plan line is gone". A new section takes the id one above
+  the highest `st-<n>` in this file or in a game-repo subject.
 - **Design before dependence.** A slice that depends on an internal-design choice nobody has
   recorded lists, in `after:`, the `type: design` slice that makes it. The loop builds that
   slice itself. `blocked:` is only for the operator decisions `standards/spec-driven.md`
@@ -49,7 +54,8 @@ that boot it; the code graphs (`code-intel` skill) answer what reads each bindin
 `judge` score at least two decompositions on what each costs in moved state, test re-pointing
 and import cycles. The result conforms to the `docs/DECISIONS.md` entries "Context stack
 ownership" and "Client UI: virtual buttons, one context stack, one overlay frame", or
-supersedes them in place.
+supersedes in place only what they say about which module owns what; what a player sees or
+presses is not this slice's to change.
 
 `docs/refactors/client-shell.md` records:
 
@@ -57,7 +63,7 @@ supersedes them in place.
 - an owner for every module-level mutable binding in `client/src/main.ts`, grouped (context
   stack and overlays, session and claim, prediction and input, per-feature view state, DEV
   hooks), and how other modules reach it;
-- the extractions still to make, in order, one line each: the exported symbols it moves and
+- the extractions still to make, in order, one line each: the symbols it moves and
   whether it is a plain move or changes ownership.
 
 `docs/DECISIONS.md` gets one entry for the decomposition chosen and the one it rules out.

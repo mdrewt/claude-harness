@@ -92,7 +92,7 @@ $MEM/mr-gates residuals add --slice weekly-review-<UTC-date> --gate F<n> \
 
 A refusal means the finding was out of bounds: drop it and say so. Only the supervisor promotes.
 
-**Decisions** that are genuinely Drew's (irreversible, architectural, security posture): open
+**Decisions** that are genuinely Drew's (irreversible, security posture, gameplay or player-visible; internal design is never his — it is a `type: design` slice, `standards/spec-driven.md` §Refactor slices): open
 at most 3 issues via `$MEM/mr-ask-drew rev-<UTC-date>-<slug> --question … --recommend … --alts …
 --context "Consumer: weekly review. Supervisor: record-and-ignore."` — game impact on the
 default repo, process questions with `--repo mdrewt/claude-harness`. Never pass `--blocking`.
