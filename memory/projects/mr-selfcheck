@@ -56,6 +56,12 @@ EOF
 "$MEM/mr-lock" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-lock selftest"; BAD=1; }
 # cost caps + rate-limit arming: the wrapper-side money/limit safety pair.
 "$MEM/mr-cost-watch" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-watch selftest"; BAD=1; }
+# fan-out disjointness: a directory token must overlap a file under it, a glob must overlap its
+# matches, and unrelated files must stay parallel.
+DJ() { "$MEM/mr-disjoint" "$@" 2>/dev/null | /usr/bin/python3 -c 'import json,sys;print(json.load(sys.stdin)["verdict"])' 2>/dev/null; }
+[ "$(DJ 'a:game-core/src/' 'b:game-core/src/world.rs')" = "SERIAL-REQUIRED(overlap)" ] || { echo "SELFCHECK-FAIL mr-disjoint: directory token vs file under it"; BAD=1; }
+[ "$(DJ 'a:client/src/main.*.test.ts' 'b:client/src/main.hintBar.test.ts')" = "SERIAL-REQUIRED(overlap)" ] || { echo "SELFCHECK-FAIL mr-disjoint: glob vs match"; BAD=1; }
+[ "$(DJ 'a:client/src/ui/a.ts' 'b:client/src/ui2/a.ts')" = "SAFE" ] || { echo "SELFCHECK-FAIL mr-disjoint: unrelated files"; BAD=1; }
 # the slice brief's comment check: what it flags, and above all what it must leave alone.
 "$MEM/mr-comment-scan" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-comment-scan selftest"; BAD=1; }
 # launch machinery: brief rendering, placeholder integrity, repo routing, probe behavior.

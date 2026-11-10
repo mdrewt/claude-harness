@@ -52,6 +52,63 @@ optional. Omit empty sections — never fill with filler.
 
 ## Rules
 - No implementation task starts without an accepted spec + acceptance criteria.
-- Tasks are small vertical slices (one mergeable behavior each).
+- Tasks are small slices: a feature slice is one mergeable behavior; a refactor
+  slice is one mergeable structural change with behavior unchanged (§Refactor
+  slices).
 - Acceptance criteria are the source for the `tester` subagent's tests.
 - Changing intent means changing the spec first, then regenerating code.
+
+## Refactor slices
+A refactor slice changes where code lives or how modules reach each other, and
+nothing a user or a caller can observe. Its spec section carries, beside
+`touches:`, the line `type: refactor · tier: routine` (a move) or
+`type: refactor · tier: hard` (an interface or ownership change); `tier:` is
+the routing tier its launcher uses. Its PR title is
+`refactor(<scope>): <slice id> — <what moved>`, so the squash subject on the
+default branch identifies it. How it is verified is `testing-tdd.md`
+§Behavior-preserving changes.
+
+- **Behavior unchanged.** No production logic, public signature, or
+  side-effect registration order changes, and no asserted expected value
+  changes. A defect found on the way is reported in the PR, never fixed in the
+  slice; one in a protected category is recorded as a tracked follow-up before
+  the merge.
+- **Move or interface, never both.** A move relocates existing code to a named
+  module and deletes it from the old one. A moved body changes only in how it
+  reaches its former same-file neighbours: an import, or one explicit
+  parameter object. A routine move never relocates code that writes a mutable
+  binding the old file keeps, and never hands such a binding over as a copied
+  value. That move, like changing an existing interface or deciding which
+  module owns shared mutable state, is a `tier: hard` slice whose spec records
+  the decision.
+- **`touches:` is measured, not estimated.** Before the spec is accepted,
+  search for everything that reads the moved code and list: the source and
+  destination files by name; test families as globs that keep a literal
+  directory prefix, never a bare directory; every pin with its disposition;
+  affected e2e helpers; and any config keyed on the moved file's path (a
+  mutation-test exclusion is re-keyed in the same slice). A file the move
+  needs that the list misses is a hidden-dependency stop.
+- **Criteria are id-led SHALL bullets whose checks are test-runner
+  invocations**: the test that reaches the moved behavior through its
+  destination module, the suites that already cover it, and the full e2e run
+  when the slice moves boot wiring or debug hooks that only e2e exercises. A
+  source-text read or a line count is never a criterion.
+- **`moved-tests:` in the PR body**, one row per re-pointed, renamed, replaced
+  or deleted test: `old path :: test name -> surviving path :: test name`, or
+  `none`. The rows are claims; whoever merges confirms each survivor exists.
+- **Whole or parked.** A refactor slice fits one run and one squash commit. A
+  criterion it cannot meet is a park with the reason, never a deferral into
+  the backlog. A default branch left red by its merge is reverted, not fixed
+  forward.
+- **One at a time, in a quiet window.** It launches only when no open work
+  overlaps its `touches:`; nothing overlapping starts until it merges; it
+  merges before its siblings.
+- **The Boy Scout bound** (`principles.md`) limits incidental cleanup, never
+  the declared move.
+
+**An extraction too large for one slice** runs expand → migrate → contract as
+consecutive refactor slices. The spec names the final contract slice, which
+deletes the old export or binding so the compiler proves the migration
+complete; the chain stays open until it merges. Only an expand slice may leave
+the old definition in place. While the chain is open, every new slice touching
+the module uses the new seam, and its spec section says so.

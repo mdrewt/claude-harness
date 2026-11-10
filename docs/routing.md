@@ -26,7 +26,8 @@ price ratio between tiers; the fable price in `mr-budget-config.json` is an esti
 - Since the 4.6 generation, thinking is **adaptive** — `ultrathink` is legacy;
   prefer `/effort`.
 - Policy: default low/medium; **high** for features/reviews; **max / ultracode**
-  for architecture, multi-file refactors, gnarly debugging, security.
+  for architecture, interface and ownership changes, gnarly debugging, security. A
+  `type: refactor` move slice runs at the tier its spec states.
 
 ## Orchestration
 - **`ultracode`** — max effort + dynamic multi-step workflow with auto subagents.
