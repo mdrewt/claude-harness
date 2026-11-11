@@ -1,7 +1,7 @@
 # Spec: M-trade-sessions — multi-stage trade sessions
 
 **Status:** elaborated 2026-11-10 against monster-realm `master` @ `efefab5d` (M-stack-ownership
-so-2, M-ui-foundation, M-battle-tactics and M-world-art-pass all merged) · 7 slices, head `ts-0a` ·
+so-2, M-ui-foundation, M-battle-tactics and M-world-art-pass all merged) · 7 slices, head `ts-0a`, closed by the `ts-6` residual sweep ·
 **Project:** monster-realm (game-core + server-module + client) · **Source:** operator directive,
 `playtest-feedback-2026-10.md` L237–250 · **Decisions:** monster-realm #585 (`pt3-trade-scope`)
 ANSWERED 2026-10-24; `memory/projects/decisions/issue-585.answer.md` is the SSOT and is folded
@@ -371,6 +371,9 @@ Each is proven by a named slice criterion; the slice criteria below are what `mr
 
 ## Post-integration verification (the integrated whole, after ts-5)
 
+The trade work is verified here after ts-5; the milestone itself closes only when the ts-6 sweep's
+last batch merges (see ts-6a).
+
 - Full `just ci` green on `master`; `just gen` produces no diff (`bindings-drift` 0); `just eval`
   green incl. the schema, type and client-surface snapshots; `just smoke-republish` over a DB that
   holds live `trade_offer` rows and an open `trade_session`.
@@ -405,7 +408,8 @@ Each is proven by a named slice criterion; the slice criteria below are what `mr
 
 ## Slices
 
-Order: ts-0a ‖ ts-0b ‖ ts-1 → ts-2 → ts-3 → ts-4 → ts-5. Concurrency-eligible pairs (the seed
+Order: ts-0a ‖ ts-0b ‖ ts-1 → ts-2 → ts-3 → ts-4 → ts-5 → ts-6a → the `ts-6b-K` batches ts-6a
+writes. The milestone closes on the last `ts-6b-K` batch, not on ts-5. Concurrency-eligible pairs (the seed
 trio) are file-disjoint per `mr-disjoint`; only ts-2 touches structural surfaces (schema, bindings),
 and it has no concurrent partner. Serially ordered slices may reopen a file their ancestor touched;
 each such reopen is named in the later slice.
@@ -718,3 +722,279 @@ reach `Ok` (co-located fixture); and `account-e2e.eval.mjs` `S9-challenge2-pendi
   (`ts5_challenge_*` in `pvp_tests.rs` with co-located and distant fixtures).
 - **ts-5.2:** THE existing PvP and challenge callers SHALL pass with their challengers in range
   (`cargo nextest run -p server-module pvp_tests trading_tests`, `just eval`, `just e2e`).
+
+### ts-6a — residual sweep, part 1: triage every open residual and section the fix batches
+type: design · tier: hard
+category: residuals/triage · severity: MED · size: HEAVY
+touches: specs/monster-realm-v2/M-trade-sessions.spec.md, specs/monster-realm-v2/residuals.spec.md
+after: [ts-5]
+
+Operator directive (2026-11-10, restated 2026-11-11): one sweep over every open residual, closing
+the current milestone, with the goal of improving the game overall, not of emptying a list. This
+slice is the investigation half. It reads the game repo at `origin/master` (read-only) and writes
+only this spec and `residuals.spec.md`.
+
+**Scope.** Every row in the snapshot below, plus every residual opened after it and still open at
+launch (`mr-gates residuals list --json`, `open[]`), except a row a live, unbuilt slice of another
+milestone names as its closing slice. The three rows this milestone's §Residual map assigns to
+ts-4/ts-5 are excluded from the snapshot; if one is still open at launch, it is triaged like any
+other row.
+
+**Per residual**, in category order (security-privacy and data-integrity first):
+1. Read its ledger row (`reason`, `source_slice`, `touches`) and, where it has one, its
+   `residuals.spec.md` section.
+2. Reproduce or refute against current `master`: find the code it names (symbol, not line), and
+   check whether later work (the tactical cutover, M-ui-foundation, M-world-art-pass,
+   M-stack-ownership, this milestone) already fixed it or removed the surface. A claim of "fixed"
+   names the PR/commit and the test that now covers it. A claim of "obsolete" names the design
+   change and the decision entry (game `docs/DECISIONS.md` title) that retired the surface.
+3. Assign exactly one verdict:
+   - `resolved-fixed`: already fixed; evidence = PR/commit + covering test.
+   - `resolved-obsolete`: the surface or premise is gone; evidence = decision title or PR.
+   - `fix`: still real and worth fixing; record root cause, the change, the test that will prove it
+     (per `standards/testing-tdd.md` — behaviour tests, no source-text scans), and its touches.
+   - `wontfix`: real but not worth fixing; record why (cost vs value for the game). Every MED
+     `wontfix` carries a one-line player-facing impact statement.
+   - `ask`: a fix that would change a recorded decision, a schema in a way that needs operator
+     ratification, or a security/privacy trade-off — raise via `mr-ask-drew` and treat as
+     `wontfix` until answered (reversible choices take the documented default instead).
+4. Re-grade severity/category where the evidence says the ledger is wrong; give the 24
+   uncategorised rows a category.
+
+Also dedupe: rows that describe one defect collapse onto one `fix` (the others `resolved-fixed`
+by that batch, evidence = the batch id).
+
+**Output (this slice's PR).**
+- A `#### Triage table (ts-6a)` subsection under this slice: one row per residual —
+  `id | sev | category | verdict | evidence or root cause | batch` — sorted by batch, then id.
+- Fix batches appended below as slices `ts-6b-1` … `ts-6b-N` in this spec, each a normal slice
+  section (`type: feature` or `type: refactor` · `tier:` per the model-routing rule · category ·
+  severity · size · `touches:` · `after:` · the residual ids it closes · one id-led EARS criterion
+  per residual (`**ts-6b-K.n:**`) naming its proving test). Batch rules:
+  - at most ~10 residuals and one coherent area per batch (a module, a screen, a reducer family),
+    so each batch is one reviewable PR of at most MODERATE size;
+  - order: security-privacy and data-integrity first, then netcode, gameplay, content, ux-a11y,
+    loop-ops; within that, MED before LOW;
+  - any batch touching a table, schema, migration or bindings is `tier: hard`, runs alone, and
+    says so; batches that are file-disjoint per `mr-disjoint` may share an `after:` so fan-out can
+    run them in parallel;
+  - the last batch's `after:` names every other batch, and its final criterion is the sweep's
+    closing check (below).
+- `residuals.spec.md`: sections of rows triaged `resolved-*` or `wontfix` are removed; rows routed
+  to a batch point at their batch id.
+
+- **ts-6a.1:** THE triage table SHALL list every residual in scope exactly once, with one of the
+  five verdicts, and every `resolved-*` row SHALL carry a PR, commit or decision-title reference
+  that resolves in the game repo (the supervisor re-checks a sample of at least ten, including
+  every MED, before merge).
+- **ts-6a.2:** EVERY `fix` row SHALL be assigned to exactly one `ts-6b-K` batch section, and every
+  batch section SHALL carry `touches:`, `after:`, a tier and one EARS criterion per residual.
+- **ts-6a.3:** NO residual SHALL be dispositioned by this slice's run; the supervisor applies the
+  verdicts at merge (`mr-gates residuals disposition --as fixed|wontfix --reason "<evidence>"`;
+  `fixed` cites the PR the evidence names). HIGH/CRITICAL rows, if any appear, go to `mr-ask-drew`.
+
+**At merge (supervisor).** Apply the `resolved-*` and `wontfix` dispositions; `ask` rows go out as
+issues; then the fix batches are this milestone's next unbuilt slices.
+
+#### Fix-batch contract (part 2 of the sweep: every `ts-6b-K` inherits this)
+
+The fix loop. ts-6a writes it out as `ts-6b-1` … `ts-6b-N`; the supervisor launches them as the
+milestone's next unbuilt slices in order (fan-out where ts-6a marked batches disjoint). This
+section is the contract every batch inherits:
+
+- Each residual is fixed test-first: a failing behaviour test that shows the defect, then the
+  fix, then the test green (`standards/testing-tdd.md`). Fix the root cause the triage recorded,
+  not the symptom; if the investigation shows the triage was wrong, say so in the PR and fix what
+  is actually wrong.
+- Improve the game, not the ledger: where a residual's best fix is a small redesign of the
+  surrounding code (a dead path removed, a duplicated rule given one home), do that within the
+  batch's touches; a larger refactor is recorded as a `type: refactor` slice in
+  `structure.spec.md` by the supervisor, not done in-batch.
+- A residual that proves bigger than its batch can absorb is not deferred to new backlog: it is
+  either finished in the batch (widen touches with the supervisor's park→widen→relaunch rule) or
+  recorded `wontfix` with the reason, per the DEFER rule.
+- Each batch PR lists the residual ids it closes; at merge the supervisor runs
+  `mr-gates residuals disposition --id <R> --as fixed --pr <N>` for each.
+
+- The last batch carries the sweep's closing criterion, written by ts-6a as its final id-led
+  EARS bullet: when it merges, no residual from the triage table is still open in
+  `mr-gates residuals list --json` (each closed as fixed with a PR or wontfix with a reason), and
+  `just ci` and `just e2e` are green on `master`. That merge closes the milestone.
+
+#### Residual snapshot (2026-11-11, 160 open rows; the ts-4/ts-5 three excluded)
+
+**security-privacy** (5):
+- `R-weekly-review-2026-10-02-F2` MED — buy/sell/heal_party enforce no server-side proximity (talk does)
+- `R-qf-6-PLAYERQUESTPUBLIC` MED — player_quest is a public table: other players' completed quests are reconstructible f…
+- `R-bt-7-SUMMARYEXPORT` MED — battle_summary and player_formation are personal data excluded from the export bundle
+- `R-bt-7-GUESTTACTICAL` LOW — guest-claim leaves terminal tactical rows and battle_summary under the retired guest…
+- `R-bt-7-QUEUEVOIDED` LOW — QueueVoided events reveal to the opponent that a READY plan existed on a KO'd unit
+
+**data-integrity** (8):
+- `R-weekly-review-2026-10-09-F1` MED — Practice self-battles are an uncapped currency/XP faucet (grant_currency not practice…
+- `R-weekly-review-2026-10-16-F2` MED — Guest claim orphans the guest's last terminal battle row — never exported, never anon…
+- `R-21r-a-TERMINALSWEEP` LOW — Recruit success never sweeps the player's prior terminal battle rows
+- `R-ctl-7d-CTL7D.3` LOW — buy, sell and pickShop send shop and item ids the reducer u32 cannot carry
+- `R-weekly-review-2026-10-16-F3` LOW — Quest and dialogue rewards silently clamp at stack/balance caps; one-time reward over…
+- `R-bt-8-CASCADESCHED` LOW — Cascade deletes of the three tactical schedule tables are not exercised by the cascad…
+- `R-weekly-review-2026-11-06-F5` LOW — KO reward ledger credits friendly-fire kills to the last enemy hitter
+- `R-bt-17-UNDOWILDSTART` LOW — undo_wild_start leaves battle_unit/event/queue rows when a late step of start_wild_ta…
+
+**netcode-determinism** (10):
+- `R-weekly-review-2026-10-02-F1` MED — Pre-battle move queue survives the battle and self-executes afterwards
+- `R-weekly-review-2026-10-23-F2` MED — Reconnect backoff never climbs on connect-then-drop-before-applied: clients retry a r…
+- `R-21r-e-E2` LOW — Two comments still call NPC zone crossings deferred work (M12c) after DECISIONS.md ru…
+- `R-bt-9-LEDGERHOME` LOW — Reward-ledger fold and killer attribution live in the server shell, not game-core rew…
+- `R-bt-11-RULEHOME` LOW — Two rule predicates restated in client-wasm: STAB (combat/damage.rs:69) and the statu…
+- `R-bt-11-SHAREDJOIN` LOW — The battle_unit row -> TacticalUnit / TacticalState join exists three times (server-m…
+- `R-bt-12-DEPLOYCAP` LOW — the deploy slot cap min(MAX_PACK, spawn_a.len()) lives in three places
+- `R-bt-12-INITPARITY` LOW — no test compares the client's next-round initiative forecast with the server's upkeep…
+- `R-bt-12-SHELLKIND` LOW — shellKind and the countdown's kind === 'Wild' restate game-core's BattleKind::uses_pv…
+- `R-bt-15-STRIKESMAX` LOW — STRIKES_MAX (the strike-pip count) mirrors game-core TacticsTuning.autopass_forfeit i…
+
+**gameplay** (33):
+- `R-ctl-12-CTL12.1` MED — WHEN Options › Controls opens, THE SYSTEM shall show tabs Buttons (12 rows) and Short…
+- `R-ctl-12-CTL12.6` MED — WHEN a player remaps A to K and reloads the page, THE SYSTEM shall confirm with K and…
+- `R-ctl-13-CTL13.5` MED — WHEN an evolution notice arrives, THE SYSTEM shall show it as a prompt that A dismiss…
+- `R-weekly-review-2026-10-09-F2` MED — Pointer click on a dialogue choice bypasses adapter guards; double-click advances two…
+- `R-weekly-review-2026-10-23-F1` MED — join_game re-grants a starter whenever the identity owns zero monsters: trade-away +…
+- `R-qf-9-TRAINDOUBLEFEED` MED — No client in-flight lock on Train: a fast double Feed from the Monsters sheet or Bag…
+- `R-qf-7-QF7.1` MED — THE legacy Flee button shall NOT render — the command list's Run is the only flee aff…
+- `R-qf-7-QF7.3` MED — THE skills/move list shall render only after Fight is selected, and THE bait list onl…
+- `R-qf-8-QF8.1` MED — THE four remaining mouse-only duplicates — `To Box`/`To Party` cards, trade-row actio…
+- `R-qf-8-QF8.2` MED — A reachability-style sweep shall assert that none of the seven enumerated duplicates…
+- `R-qf-7b-QF7B.1` MED — THE legacy Flee button shall NOT render — the command list's Run is the only flee aff…
+- `R-qf-7b-QF7B.3` MED — THE battle Flee row shall join `reachability.test.ts`'s `QF8_RETIRED` sweep, completi…
+- `R-weekly-review-2026-11-06-F2` MED — Flank damage bonus applies to friendly-fire targets
+- `R-uif-7-UIF7.6` MED — WHEN a feed or move succeeds, THE view's success line shall appear through the toast…
+- `R-uif-8-UIF8.3` MED — WHEN a feed succeeds or a battle-only item is refused, THE view's line shall use its…
+- `R-uif-9-UIF9.2` MED — WHEN A opens a row's sheet, IT shall render as the ContextSheet with a last Back row,…
+- `R-21r-a-FAINTPENALTY` LOW — Recruit success skips the wild-battle faint trust penalty
+- `R-21r-a-CONTENTLOAD` LOW — attempt_recruit loads content after consuming bait and rolling
+- `R-ctl-RUN` LOW — Walk speed / hold-to-run (playtest r2-088/090)
+- `R-ctl-7d-CTL7D.4` LOW — sell answers a quantity above the owned count with an escrow message
+- `R-ctl-10a-HEALTARGET` LOW — healModel.healTargetLocationId is dead; healParty.locationId still optional
+- `R-qf-6-QF6.4` LOW — quest ack: exact server-side acknowledgement channel (merged-flush amount, lost ack o…
+- `R-qf-7b-CURELIST` LOW — Battle Bag cure list renders at rest (ungated by Bag) while skills, bait and bench ar…
+- `R-qf-17-E2E-PAYOUT` LOW — Live-server e2e assertion on the KO-win payout lines
+- `R-bt-4-TERRITORIALTILE` LOW — Territorial attack-tile key covered only with melee kits (verifier survivor A)
+- `R-bt-10-APPIPSMIRROR` LOW — AP_PIPS=6 mirrors Tuning::ap_turn
+- `R-bt-9-RECRUITHEADROOM` LOW — No monster-storage headroom rule exists; recruit headroom is 'the unit has an owner'
+- `R-ci-fix-20261101T0505-ID0-ROWS` LOW — shopOpenModel STEP-TABLE covers shop id 0 at only 2 of its truthiness sites
+- `R-bt-11-ITEMROW` LOW — Command menu Item row is greyed 'Not available yet' while the server refuses Item ent…
+- `R-weekly-review-2026-11-06-F4` LOW — Locally declined tactical submit keeps the unit locked and discards the draft
+- `R-bt-17-PVPHPOK` LOW — settle_pvp_battle's hp_ok conjunction has no killing test (pre-existing nightly survi…
+- `R-bt-17-SETTLEFAILPATHS` LOW — settlement failure paths lack killing tests: faint penalty on a failed write-back, cr…
+- `R-uif-6-UIF6.8` LOW — WHEN the Party tab shows, ITS six slots shall render as a 2-column, 3-row grid with n…
+
+**content** (5):
+- `R-bt-6-BT6.2` MED — WHEN tactical species data loads, EVERY species id shall have exactly one `tactics_sp…
+- `R-ctl-OBJINTERACT` LOW — Signs and objects as interactables (playtest r2-026)
+- `R-qf-13-QF13.3` LOW — THE Privacy screen's Close option shall sit at the BOTTOM of its list, and the overla…
+- `R-qf-13-QF13.4` LOW — THE redundant Privacy door on the Account screen shall be removed — Privacy stays rea…
+- `R-wap-3-roster-registry-rows` LOW — No test ties every roster species to a monsters/<name> sprite registry row
+
+**ux-a11y** (57):
+- `R-21r-e-E1` MED — Trade UI does not announce the irreversible Trust/Quality-Time reset on confirm
+- `R-ci-fix-20261002T0901Z-VIEWREBUILD` MED — Other overlay views may rebuild unchanged controls on every store batch
+- `R-ci-fix-20261002T0901Z-HELPHINTCOVERSACCEPT` MED — The help-hint launcher covers the centre of the PvP Accept button
+- `R-ctl-7b-CTL7A3REST` MED — Frame contrast e2e still skips 8 of the 9 index.html shells, the interact prompt and…
+- `R-weekly-review-2026-11-06-F1` MED — Tactical battle UI announces nothing to assistive technology
+- `R-weekly-review-2026-11-06-F3` MED — Still-there countdown compares the server deadline to the raw local clock
+- `R-bt-17-HPCUE` MED — tactical HP bar has no non-colour severity cue
+- `R-21r-b2-E1` LOW — Privacy pseudonymization disclosure stays raw English under fr (privacyView.ts paints…
+- `R-ctl-BINDSYNC` LOW — Account sync of control bindings across devices
+- `R-ctl-COMPASS` LOW — Social Players list: distance/compass direction to other players
+- `R-ctl-LAYOUTMAP` LOW — Keyboard-layout-aware keycap glyphs via navigator.keyboard.getLayoutMap
+- `R-ctl-TOUCHWALK` LOW — Touch walking and gestures (swipes) on the game screen
+- `R-ctl-WELCOME` LOW — First-run controls welcome card
+- `R-ctl-4-X1` LOW — ctl-4 navRender re-render hygiene: 3 test-blind mutants
+- `R-weekly-review-2026-10-02-F4` LOW — Overlay aria-labels and open announcements stay English under the fr locale
+- `R-ctl-7a-CTL7A.1` LOW — F9 error overlay is an in-flow body child, so the page scrolls while it shows
+- `R-ctl-7a-EVONOTICEUNDERSHELL` LOW — Evolution-notice banner (z 60) now paints under an open shell (z 100)
+- `R-ctl-8a-CTL8A.2` LOW — Shop cursor re-seats on the first row, not the neighbour, when its row vanishes
+- `R-ctl-8g-CTL8G.1` LOW — Players rows show no zone name
+- `R-ctl-8g-CTL8G.1-DEADPATH` LOW — Stale Players-on-trade-root code and comments
+- `R-ctl-8j-MASHRECRUIT` LOW — Mashing A after a settled recruit can reopen the confirm before the turn refresh
+- `R-ctl-10a-BOXCB` LOW — BoxViewCallbacks.onHealParty is an unread optional member
+- `R-ctl-10a-DOCS` LOW — Stale KeyT / nearest-interactable / talk-range prose outside touches
+- `R-ctl-10b-DOCS` LOW — docs/PLAYTEST.md section 3 still documents T, O and P-challenges
+- `R-ctl-10b-PVPCB` LOW — PvpViewCallbacks.onChallenge optional and unread
+- `R-ctl-10b-PVPPLAYERS` LOW — pvpModel computes unread challengeablePlayers + a duplicate Pending-busy set
+- `R-ctl-11a-DRAFTLOSS` LOW — An accelerator discards a trade-wizard or Name draft with no confirm
+- `R-ctl-11a-XQUICKMOVE` LOW — X quick Move still never reaches the Monsters screen
+- `R-ctl-11b-E2ESECONDMONSTER` LOW — menu-flow e2e plays one monster: the picker Down and a pre-stored monster are not exe…
+- `R-ctl-11b-STALENARRATION` LOW — Comments still narrate the deleted worldHasFocus
+- `R-ctl-12b-PROSEHINTS` LOW — Battle prose hints name literal keys (Enter, Esc, B) and go stale after a remap
+- `R-ctl-13-ANSWERFAIL` LOW — A server-rejected answer leaves the request hidden from the world until reconnect
+- `R-ctl-13-HINTCOST` LOW — Frame loop builds the notice input twice per frame
+- `R-ctl-13-REANNOUNCE` LOW — A second request with the same line is not voiced
+- `R-ctl-15-DRIVEN` LOW — A click on the only row of a list beside another single-row list does nothing
+- `R-ctl-15-FOCUSSEAM` LOW — Pointer seeks and hover press real D-pad buttons, so a screen's button side effects run
+- `R-ctl-15-KEYHOLD` LOW — A pointer press's up edge can end a keyboard hold of the same button
+- `R-ctl-15-LAUNCHERATTR` LOW — Vestigial data-menu-launcher / data-help-launcher markup and stale delegate comments
+- `R-ctl-15-SHEETTOP` LOW — pointerTop's open-world-sheet branch has no boot test
+- `R-pgcc-d-monstersScreen-sentinel` LOW — monstersScreen.ts still emits the -1 next-free-slot literal instead of NEXT_FREE_PART…
+- `R-polish-1-CLAIMRESULTCATCHREENTRY` LOW — connection.ts onClaimResult .then(ok).catch(!ok) re-enters as a reject if the ok hand…
+- `R-polish-1-MENUREASONANNOUNCE` LOW — No runtime test that a battle-disabled menu entry's reason is announced
+- `R-weekly-review-2026-10-09-F3` LOW — PvP accept mid-dialogue leaves battle D-pad/A dead until B/Start while the turn timer…
+- `R-weekly-review-2026-10-23-F3` LOW — releaseAnswered after a rejected trade/challenge answer leaves the menu badge stale a…
+- `R-qf-1-X1` LOW — qf-1 focus-ring policy has no real-browser tooth
+- `R-qf-3-QF3.3-announce` LOW — A on a cooling Care (and on a disabled Feed) is silent beyond the row's accessible name
+- `R-bt-12-RESULTSDRAIN` LOW — the results panel can take the frame while the shell's playback still drains
+- `R-bt-15-CLOCKSKEW` LOW — The clock ring and the Still-there countdown compare server epoch deadlines against t…
+- `R-bt-17-HPFILLINLINE` LOW — tactical HP fill inline-transition guard is untested
+- `R-uif-1-WHITEBAND` LOW — White band on the world canvas under a full menu frame
+- `R-uif-2-DPRONLY` LOW — A devicePixelRatio change with no size change fires no resize, so the world keeps a s…
+- `R-uif-4-REPEATSAY` LOW — A repeated identical toast is not re-announced
+- `R-uif-10-CURRENCYLABELS` LOW — Trade-propose currency inputs named by step keys Coins/Ask
+- `R-uif-10-SHOPFOCUS` LOW — Shop tab switch strands focus on a hidden Buy/Sell button
+- `R-uif-10-TITLES` LOW — Heal and Trade-propose have no title bar
+- `R-ci-fix-20261109T0400-LATEFOCUS-SCROLL` LOW — An overlay's deferred initial focus scrolls an already-navigated frame back to its top
+- `R-uif-17-KITPOLISH` LOW — Menu kit polish left after M-ui-foundation (proposed uif-18)
+
+**loop-ops** (18):
+- `R-ci-fix-20261002T0501Z-DIALOGUESPECCLICK` MED — dialogue.spec.ts 13.5c-5 swallows a 5 s pointer click on a rebuilt button
+- `R-bt-17-FIGHTSTALL` MED — e2e fightToOutcome stalls 16 own turns against a kiting wild
+- `R-21r-a-WBALERT` LOW — No alert or dashboard consumes *_writeback_err events
+- `R-ci-fix-20261002T0501Z-E2EARTIFACTS` LOW — CI e2e job keeps no Playwright artifacts on failure
+- `R-ci-fix-20261002T0901Z-PVPSPECCLICKS` LOW — Two e2e specs click PvP Accept with no timeout
+- `R-ctl-7a-CTL7A.4` LOW — Stale #help-hint / one-corner references outside ctl-7a touches
+- `R-ctl-7a-MOVEFLAKE` LOW — movement-input.spec B/C intermittent on the ctl-7a branch (1 of 6 on a fresh db; mast…
+- `R-ctl-7c-HEALGUARDTEST` LOW — The healParty send guard (sendGuarded: frozen link, rejection report) has no test on…
+- `R-ctl-10a-TALKRANGE` LOW — talk_range wasm export has no client consumer
+- `R-pgcc-c-RANKEDWIRING` LOW — ranked-delta listener wiring in main.ts has no boot-level test
+- `R-pgcc-c-RESEEDDOCBLOCK` LOW — main.battle-reseed.test.ts comments cite removed main.ts latch code
+- `R-qf-6-QF6.1` LOW — wallet-balance.spec.ts comments still say a rejected advance leaves the overlay open
+- `R-qf-9-RAISINGVESTIGES` LOW — Retire RaisingView's ignored ctor param and raisingModel's unread monsters half
+- `R-qf-9-STALERAISINGREFS` LOW — Comments in evolutionView.ts and pvpView.ts still cite raisingView's deleted onCare/C…
+- `R-ci-fix-20261101T0505-CTXSTACK-FLOOR` LOW — contextStack.test.ts:1986 unseeded fast-check floor (keptStamped > 50) flakes about 1…
+- `R-bt-11-DOCROT` LOW — ARCHITECTURE.md client-wasm export list and golden.rs 'BT11.7 follows' doc are stale…
+- `R-ci-fix-20261107T0300-tactics-wild-bait-budget` LOW — tactics-wild.spec.ts seeds 9 baits against an 80-attempt recruit loop (same exhaustio…
+- `R-bt-17-MARSHALTESTONLY` LOW — ten 1v1 marshaling helpers stay compiled test-only after the body purge
+
+**uncategorised (the oldest rows; the triage assigns a category)** (24):
+- `R-rb-52-GRACEANNOUNCE` MED — One-shot AT announcement on the active->grace deletion edge
+- `R-rb-53-E1` MED — a11y one-shot announcement on the export incomplete->complete edge
+- `R-rb-56-FOLLOWUP-ACC` MED — Skill ACCURACY is still hover-only in btn.title on the battle skill buttons
+- `R-rb-57-X4` MED — [the SECOND, separable arm of the EARS line — "no DOM representation"] WHEN a sprite'…
+- `R-rb-59-X6` MED — [the screen-reader half of the same defect] WHEN a battle is PvP AND an opponent play…
+- `R-rb-65-RUNBOOK-LOGCAVEAT` MED — DR runbook §9 documents row and backup retention caveats but not the operational log…
+- `R-rb-73-ABORT-PHANTOM` MED — A client_disconnected transaction abort strands a player_session row that no launch r…
+- `R-rb-73-TOKEN-WEDGE` MED — Stolen-token holder can suppress a victim's disconnect cleanup by holding a live WS a…
+- `R-rb-73-WILD-HOLD` MED — No reaper covers wild battle rows; a held second connection stalls a wild battle
+- `R-rb-76-CHALLENGERGRACE` MED — accept_challenge still opens a NEW battle row naming a mid-grace CHALLENGER (A challe…
+- `R-rb-83-CHALLENGELAUNDER` MED — pvp accept_challenge is blanket-gated with no stamp-aware sibling: a deletion-gated t…
+- `R-rb-86-TICKBOUND` MED — export_bundle_reaper write set is bounded in stamps, not rows
+- `R-20r-d-B1-ack` MED — Count-based ack_evolution_notices is not strictly at-least-once across two sessions
+- `R-20r-d-B1-cap` MED — pending_evolution_notice.entries is uncapped (self-inflicted growth only)
+- `R-rb-107-REJECTWALK` MED — The exact admission gate rejects only after the manifest walk for callers whose bundl…
+- `R-rb-107-BYTEBOUND` MED — The export admission cap bounds rows, not bytes
+- `R-rb-111-CONTENTION` MED — contention refusal under a ≥1 bundle/ms multi-identity burst (untiered 16 ms stamp wi…
+- `R-rb-111-STAMPORACLE` MED — the minted stamp a caller reads back is a ≤4-bit anonymous third-party timing channel
+- `R-rb-121-DEFER-FOCUS-RECHECK` MED — openOverlayA11y deferred focus does not re-check activeElement at fire time
+- `R-rb-125-X7` MED — [CUTSCENE] WHEN an evolution reveal is shown THE SYSTEM shall play a cutscene/transfo…
+- `R-rb-128-X1` MED — R-rb-128-HELDKEY: a connected mid-grace player holding a movement key gets one predic…
+- `R-rb-128-X2` MED — R-rb-128-REASONSCOPE: REJECT_DELETION_GATED text names only new trades/battles/challe…
+- `R-rb-132-NEWCOMERSHED` MED — (MED) Never-credited guests are shed at 10 735 live export_bundle rows (rb-107 admitt…
+- `R-rb-132-WALLETSYBIL` MED — (HIGH) Newcomer export tier: the wallet-row signal is cheap and permanent — quest_001…
