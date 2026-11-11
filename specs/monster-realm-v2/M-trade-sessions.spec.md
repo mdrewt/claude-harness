@@ -451,7 +451,9 @@ Feedback items: pt3-2026-10-082
 Interface change, behaviour unchanged: adds `reject_if_monster_locked(ctx, owner, monster_id)`,
 `escrowed_item_qty_of(ctx, owner, item_id)`, `escrowed_currency_of(ctx, owner)` and
 `escrowed_monster_ids_of(ctx, owner)` in `guards.rs`, each building today's initiator ∪
-counterparty `trade_offer` iterator and calling the existing pure predicate. Every call site
+counterparty `trade_offer` iterator and calling a pure predicate: the three existing ones, plus
+`escrowed_monster_ids`, which is `movement.rs`'s inline collect moved into `guards.rs` (the
+monster-id case had no predicate to call). Every call site
 calls the wrapper instead: `monster_mgmt.rs` `set_nickname` (1), `pvp.rs` (1), `raising.rs`
 (4 guard, 3 escrow), `tactics.rs` (4 guard, 1 escrow), `evolution.rs` (1), `economy.rs` (2 escrow)
 and `movement.rs`'s Quality-Time accrual skip in `enqueue_move` (it collects the caller's escrowed
@@ -482,6 +484,14 @@ re-exports the session API so the server imports `game_core::trading::…` (no `
 `rules.rs` gains only `MAX_TRADE_ITEMS_PER_SIDE` (64, the value of today's private server
 constant). Not client-predicted, so no wasm export and no parity test.
 
+Build note (ts-1): the session types ship as plain structs. A cfg-gated `SpacetimeType` derive in
+`game-core/src` reds `spacetime-type-snapshot` until `evals/baselines/spacetime-types.json` is
+regenerated, and that baseline is in ts-2's `touches:`, not ts-1's. ts-2 adds the derive on
+`TradeSessionOffer` (and on `MonsterSnapshot` if it stores it nested) with the regen, so it also needs
+`game-core/src/trading/session.rs` in its `touches:`. Additions to the function list above:
+`check_offer_size`, `reset_confirms` (the edit and drift transition) and `check_session_open`
+(self-trade, per-pair and per-opener limits); `TRADE_SESSION_TTL_MS` is 1 h.
+
 - **ts-1.1:** THE eligibility rule SHALL accept an offer side only when every monster is owned by
   the offerer, in the party, has `current_hp >= 1`, is in no other active session and in no ongoing
   battle, no monster id or item id repeats, every item quantity is positive and every item id is
@@ -508,7 +518,7 @@ constant). Not client-predicted, so no wasm export and no parity test.
 ### ts-2 — server spine: table, view, reducers, lock-at-confirm, auto-cancel
 type: feature · tier: hard
 category: trade/server-authority · severity: HIGH · size: HEAVY
-touches: server-module/src/trading_session.rs, server-module/src/trading_session_tests.rs, server-module/src/schema.rs, server-module/src/guards.rs, server-module/src/guards_tests.rs, server-module/src/monster_mgmt.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/lib.rs, server-module/src/lifecycle_tests.rs, server-module/src/privacy.rs, server-module/src/privacy_tests.rs, server-module/src/privacy_enforcement_tests.rs, client/src/module_bindings/*, evals/baselines/table-schemas.json, evals/baselines/spacetime-types.json, evals/baselines/client-visible-tables.json, evals/baselines/client-callable-reducers.json, docs/DECISIONS.md, ARCHITECTURE.md
+touches: server-module/src/trading_session.rs, game-core/src/trading/session.rs, server-module/src/trading_session_tests.rs, server-module/src/schema.rs, server-module/src/guards.rs, server-module/src/guards_tests.rs, server-module/src/monster_mgmt.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/lib.rs, server-module/src/lifecycle_tests.rs, server-module/src/privacy.rs, server-module/src/privacy_tests.rs, server-module/src/privacy_enforcement_tests.rs, client/src/module_bindings/*, evals/baselines/table-schemas.json, evals/baselines/spacetime-types.json, evals/baselines/client-visible-tables.json, evals/baselines/client-callable-reducers.json, docs/DECISIONS.md, ARCHITECTURE.md
 after: [ts-0a, ts-0b, ts-1]
 Feedback items: pt3-2026-10-080, pt3-2026-10-081, pt3-2026-10-082, pt3-2026-10-083, pt3-2026-10-084
 
@@ -586,6 +596,29 @@ target" (the server now enforces range for trades) and "Trading resets the bond"
   readable only through `my_trade_session` by their two participants and snapshots by no client
   (`privacy_enforcement_tests.rs`), and `just eval` SHALL pass over the regenerated bindings and
   baselines.
+
+Build note (ts-2): eleven criteria are met; ts-2.11 is DEFERRED to ts-6a for its export clause only.
+Its three deletion clauses ship and are tested (`ts2_deletion_*`). Making `trade_session` an 18th
+exportable table moves `EXPORT_MIN_BUNDLE_ROWS` 17 → 18, and the export reaper's bound tests
+(`privacy_tests.rs` rb111, rb115, the m22s4 exporter floor; two `accounts_tests.rs` export rosters) are
+sized against 17 — rb111 needs a 256-row window to touch exactly 16 minimum bundles so the 16-stamp
+cap binds, and at 18 it touches 15. Re-deriving those bounds is its own change, so `trade_session` is
+classified `Erase`, `exportable: false` and `privacy.rs` / `privacy_tests.rs` are untouched.
+Other deviations from the text above: the protocol has FOUR client reducers plus the scheduler
+reaper (five reducers in all; "five reducers plus the reaper" above is a count slip, E1 has no execute
+reducer); the snapshot table stores the 43 `MonsterSnapshot` columns FLAT (the derive lands on
+`TradeSessionOffer` only), so a later `monster` column is one more `#[default]` column there;
+`apply_swap` also runs the auto-cancel hook, so a legacy `confirm_trade` that moves a session-listed
+monster deletes that session; a confirm that finds an offered monster with no snapshot row treats it
+as drift; a reaper fire on a not-yet-stale session re-arms its schedule row; the guest claim deletes
+the sessions of BOTH identities; every failure after the execute verdict returns one fixed string.
+`server-module/src/native_host_tests.rs` (the test host's table and view registry, `lib.rs`'s test
+module) is a touches-delta: a new table is invisible to the generated-module tests until registered
+there. Accepted and recorded, not changed: E3's drift reset tells a confirming caller that an offered
+monster changed in a column the card does not show; inbound sessions per player are uncapped (E5), so
+the lock wrappers scan one row per live session naming the owner; `apply_swap` debits one unit per
+write (`inventory.rs`); the confirm stamp gate keys on `created_at_ms` although terms can change
+after it; `raising.rs` consumes a heal-location cost item without an escrow read (no content has one).
 ### ts-3 — client: session editor, one row per session, banner, face-to-face open
 type: feature · tier: hard
 category: trade/client-ux · severity: HIGH · size: HEAVY
@@ -645,10 +678,41 @@ to answer from the banner. Face-to-face setup uses `openFaceToFace` from `client
   the received monster sits in the first open party slot, plus one cancel case and one auto-cancel
   case (`just e2e`).
 
+Build note (ts-3): all eight criteria are met. Deviations from the text above, each forced by a file
+outside `touches:` and each recorded, not silently taken:
+- **The legacy single-offer Trades block stays.** `client/e2e/ui-social.spec.ts` (its page-evaluated
+  fixture calls `new TradeView({…})`, `buildTradeViewModel(offers, …)`, `buildSocialVm(null, offers, …)` and
+  pins `#trade-status` as the trade cursor row) and `client/e2e/monster-privacy.spec.ts` (13r-e-2 opens
+  Social on a legacy `trade_offer` and asserts its cards render) are outside ts-3's `touches:`, so the
+  sentence "the hook-only legacy specs are untouched and stay green" and the sentences that delete
+  `shownTradeOffer` and replace the legacy Command kinds could not both hold. ts-3 is ADDITIVE on
+  Social › Trades: the legacy row and its sheet are unchanged, one session row per session is listed
+  after it (`#trade-sessions`), `respondTrade` / `confirmTrade` / `cancelTrade` stay and only
+  `proposeTrade` goes with the wizard. Residual `R-ts-3-LEGACYBLOCK` → ts-4, whose `touches:` need those
+  two e2e specs plus `socialModel` / `socialScreen` / `tradeModel` / `tradeView` / `screens/types` /
+  `battlePolicy` and the catalogs for it.
+- **The editor mounts on the wizard's static shell.** `client/index.html` and
+  `client/src/indexShell.smoke.test.ts` are outside `touches:`, and the smoke test requires every
+  non-constructed overlay's focus anchor to be a static native control of index.html. `TradeSessionView`
+  takes `#tradepropose-overlay` as its dialog root, removes the shell's other static children and keeps
+  its static `#tradepropose-submit` button as an always-enabled Close control and the registry anchor
+  (`QF1-1-SCOPE-NATIVE-ANCHORS` is therefore the pure rename the Strangler paragraph describes). The
+  first paint after an open puts focus on the picker listbox. Renaming the static shell is a follow-up.
+- **The eligibility marks are a display projection in TypeScript** (`tradeSessionModel.ts`), because
+  `client-wasm` is outside `touches:` and exports no session rule; it never gates a send. A wasm export
+  of `check_offered_monster` is a follow-up.
+- The world request sheet keeps Accept / Decline / View (`worldScreen.ts` is outside `touches:`): for a
+  trade session Accept opens its editor and Decline cancels the session.
+- `client/src/net/connection.runtime.test.ts` is a touches-delta (it pins the subscription count, now 31).
+- Accepted and recorded: every revision change raises the "offer changed" notice, the player's own
+  Update included (ts-3.3 as written); one "Trade closed." notice covers execute, cancel and auto-cancel
+  (E8); the pickers clamp to raw holdings, not net of the player's other confirmed sessions, and the
+  per-side item-line cap is not shown (the server refuses both with its reason).
+
 ### ts-4 — retire the legacy propose path; move the hook specs onto sessions
 type: feature · tier: hard
 category: trade/security-privacy · severity: HIGH · size: MODERATE
-touches: server-module/src/trading.rs, server-module/src/trading_tests.rs, server-module/src/tactics_tests.rs, server-module/src/privacy_enforcement_tests.rs, .cargo/mutants.toml, evals/account-e2e.eval.mjs, client/src/main.ts, client/src/main.*.test.ts, client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/e2e/trade-full.spec.ts, client/e2e/trade-interlock.spec.ts, client/e2e/trade-zz-negative.spec.ts, client/e2e/monster-privacy.spec.ts, docs/DECISIONS.md, ARCHITECTURE.md
+touches: server-module/src/trading.rs, server-module/src/trading_tests.rs, server-module/src/tactics_tests.rs, server-module/src/privacy_enforcement_tests.rs, .cargo/mutants.toml, evals/account-e2e.eval.mjs, client/src/main.ts, client/src/main.*.test.ts, client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/e2e/trade-full.spec.ts, client/e2e/trade-interlock.spec.ts, client/e2e/trade-zz-negative.spec.ts, client/e2e/monster-privacy.spec.ts, client/e2e/ui-social.spec.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/screens/socialScreen.ts, client/src/ui/screens/socialScreen.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/tradeModel.ts, client/src/ui/tradeModel.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/screens/types.ts, client/src/ui/battlePolicy.ts, client/src/ui/battlePolicy.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalogParity.test.ts, client/src/ui/i18n/hardcodedStrings.ts, docs/DECISIONS.md, ARCHITECTURE.md
 after: [ts-3]
 Feedback items: pt3-2026-10-080
 
@@ -675,7 +739,12 @@ conversion (`HANDLED_ENUM_VARIANTS` entry, T4-5/T4-6) are removed. e2e: `trade-f
 (conservation), `trade-interlock.spec.ts` (battle↔trade) and `monster-privacy.spec.ts`'s trade-hook
 cases move onto the session hook; `trade-zz-negative.spec.ts` cases `1b` and `3b` — the M25 S1
 overlap — are rewritten once, as session no-oracle cases (adjudication: #585 + feedback
-L237–243). Decision entries: "Economy" drops "a trade offer from the client can only request
+L237–243). Social › Trades loses the legacy single-offer block ts-3 left in place
+(R-ts-3-LEGACYBLOCK): the `trade_offer` row and its sheet, `shownTradeOffer`, `buildTradeViewModel`'s
+legacy path, `tradeActions` and the `respondTrade` / `confirmTrade` / `cancelTrade` Command kinds go,
+`ui-social.spec.ts`'s page-evaluated fixture moves onto session rows, and their catalog ids go with
+them. Two `main.ts` wirings ts-3's verifier mutants survived get one boot test each
+(R-ts-3-WIRINGTESTS). Decision entries: "Economy" drops "a trade offer from the client can only request
 currency"; "Table privacy" keeps `trade_offer` public with a drain-only note.
 
 - **ts-4.1:** WHEN `propose_trade`, `respond_trade` or `confirm_trade` is called with any arguments,
@@ -696,6 +765,14 @@ currency"; "Table privacy" keeps `trade_offer` public with a drain-only note.
 - **ts-4.5:** `trade-full.spec.ts`, `trade-interlock.spec.ts` and `monster-privacy.spec.ts` SHALL
   pass on the session hook, the interlock spec asserting that a confirmed side's monster cannot
   enter battle and an unconfirmed one can (`just e2e`).
+- **ts-4.6:** THE Social › Trades screen SHALL list only session rows: no legacy `trade_offer` row,
+  sheet or `respondTrade` / `confirmTrade` / `cancelTrade` Command remains, and `ui-social.spec.ts`
+  SHALL pass on session rows (closes R-ts-3-LEGACYBLOCK; `socialModel.test.ts`, `tradeView.test.ts`,
+  `just e2e`).
+- **ts-4.7:** WHEN a monster is on a confirmed session side, THE client SHALL not offer it to a
+  challenge or a deploy, and WHEN the identity changes, THE client SHALL clear the opened-session set
+  so an incoming session raises its banner (closes R-ts-3-WIRINGTESTS; one boot test each in the
+  `main.*.test.ts` suites, each failing with its wiring removed).
 
 ### ts-5 — server proximity guard on `challenge_pvp`
 type: feature · tier: hard
