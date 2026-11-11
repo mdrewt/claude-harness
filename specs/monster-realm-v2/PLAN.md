@@ -44,12 +44,12 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M-trade-sessions** (`M-trade-sessions.spec.md`, specced 2026-10-24): multi-stage trade
-   redesign (blank session → per-side edits → confirm-with-reset → atomic execute), new
-   eligibility rules, absorbs residuals R-weekly-review-2026-10-02-F5 / 2026-10-16-F1 /
-   R-ctl-PROXGUARD. Scope rules ANSWERED (#585: all three asset classes tradable, no gifts +
-   simple soft-lock guards, face-to-face initiation + one session per pair, arrive-in-party-else-
-   Storage, lock-at-confirm).
+1. **M-trade-sessions** (`M-trade-sessions.spec.md`, elaborated 2026-11-10 — 7 slices, head `ts-0a`):
+   multi-stage trade sessions (blank session face to face → per-side edits → confirm with reset →
+   atomic execute), lock-at-confirm escrow, auto-cancel, the propose path retired; absorbs residuals
+   R-weekly-review-2026-10-02-F5 / 2026-10-16-F1 (ts-4) and R-ctl-PROXGUARD (ts-5). Scope rules
+   ANSWERED (#585: all three asset classes tradable, no gifts + simple soft-lock guards, face-to-face
+   initiation + one session per pair, arrive-in-party-else-Storage, lock-at-confirm).
 2. **M-netcode-presence** (`M-netcode-presence.spec.md`, specced 2026-10-24): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched) and tap-to-turn facing (never cancel-on-keyup — ADR-0148).
@@ -65,8 +65,9 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    S0 done) — `blocked:checkpoint-2-ratification`: S1 rewrites two e2e tests that currently
    assert the trade-oracle leak as intended behavior, and S2 changes a frozen schema; the
    operator ratifies both at the harness-revision Checkpoint 2, which lifts this block. Its
-   server-side slices may run alongside items 1–4 where files are disjoint (note: item 1
-   rebuilds the trade surface S1 touches — re-check S1's test targets when both are live).
+   server-side slices may run alongside items 1–4 where files are disjoint (note: item 1's
+   ts-4 stubs `propose_trade` and rewrites S1's two oracle e2e cases once, as session no-oracle
+   cases — S1 is then left with nothing to change in those files).
    **Launch is gated on its completion.**
 6. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
    layer, consuming the context-stack ownership design, plus the hold/long-press edges the
