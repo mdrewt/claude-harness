@@ -2,8 +2,8 @@
 
 **Status:** the design instrument for `uif-1`…`uif-17`. Per monster-realm #586 D2 (delegated, no operator gate) these are
 best-judgment verdicts; the operator audits them through the comparison attached to the wf-1 PR and, at the end, to
-`uif-17`'s PR. **Measured against** monster-realm `master` `d90c32c9`. **Bound by** the #586 answers in
-[`M-ui-foundation.spec.md`](M-ui-foundation.spec.md); nothing here reopens them.
+`uif-17`'s PR. **Measured against** monster-realm `master` `d90c32c9`. **Bound by** the #586 answers (the built
+rulings are in the game repo's `docs/DECISIONS.md`); nothing here reopens them.
 
 **Feedback items:** pt3-2026-10-013 (wireframe it), -014 (what grows, what scales, what stays), -015 (compare with the current design
 and with similar games), -053 (the in-slot-buttons idea), -094 (every menu subtly different).
@@ -28,8 +28,7 @@ and with similar games), -053 (the in-slot-buttons idea), -094 (every menu subtl
 | S | scales-with-resolution | Sized in rem, so it tracks `--mr-ui-scale` and the text-size step (titles, tabs, rows, chips, sheets) |
 | F | fixed | Stays in CSS px at every size (2 px separators and borders) |
 
-**Regenerate:** `node specs/monster-realm-v2/wireframes/build.mjs`. **Verify:** `node specs/monster-realm-v2/wireframes/check.mjs WF1.1` … `WF1.6` and
-`--selftest`. **Re-measure** (for `uif-17`'s as-shipped section): copy `capture/` into a client checkout's `e2e/` per its header, run it, then
+**Regenerate:** `node specs/monster-realm-v2/wireframes/build.mjs`. **Re-measure** (for `uif-17`'s as-shipped section): copy `capture/` into a client checkout's `e2e/` per its header, run it, then
 `build.mjs --import <dir>`.
 
 ## What the measurement shows
@@ -106,7 +105,7 @@ for full-width rows only, one vertical flip.
 | **beside-the-slot** | Needs a side gutter | Next to a right-edge tile it must flip; a mid-grid tile has no side free without covering neighbors | Same flip logic | Clamp and flip stack up; the sheet jumps with each slot | Clamp and flip logic per research §4 | Rejected: the position changes with every slot rather than between two places, so a D-pad player has no stable place to look, and it still needs the flip logic |
 | **in-slot-buttons + detail page (053)** | Works on today's list, per 053 itself; the 2×3 grid below would remove that too | Fails, per 053 itself: all four directions are taken, so left/right cannot select a button | No slot-sized target | Buttons do not fit a 98 px slot at ×2 | Two interaction models | Rejected for the buttons, because the operator's own note says it breaks on the grid, and two models is the inconsistency 094 objects to. **Its detail page is adopted** as the Summary page |
 
-The anchor rule (`anchorSheet` in `wireframes/lib.mjs`, proven by `check.mjs` over every proposed slot at five window sizes and three text steps):
+The anchor rule (`anchorSheet` in `wireframes/lib.mjs`):
 horizontally away from the slot's center; try the bottom corner; if it would touch the slot, try the top corner; if neither clears, cap the sheet's
 height to the taller free band and scroll it. Clicking outside closes then routes (`uif-5`), so a sheet covering other slots costs one click, not two
 (046). No dim, because 046 expects the rest of the screen to stay live; a dim layer would have to block it (research §4, fake modals).
@@ -221,7 +220,7 @@ color would have no contrast against that fill. **Selected tab:** panel-colored 
 | 3840×2160, 1 | 6.14 | 6 | 3.000 | 42.00 px | 48.0 px | 3788 px |
 <!-- generated:scale:end -->
 
-**Checked against the spec's table:** `check.mjs WF1.5` parses the six rows of the scale table in `M-ui-foundation.spec.md` and recomputes `continuous`, `deviceScale`, `uiScale` and body size from the formula; all six match. The floor
+**The scale table** rows recompute from the formula in `wireframes/lib.mjs` (`continuous`, `deviceScale`, `uiScale` and body size). The floor
 of 0.875 holds body at 12.25 px, which at a 960×540 window is proportionally larger than the research's PC floor of 18 px at 1080p; the 3.00 ceiling is reached exactly at 2160 px. **The 80rem content maximum** is just above a
 16:9 window's own width in rem (about 78.8rem at every size, because rem tracks the shorter axis), so it never gutters a 16:9 or narrower window and only caps ultrawide. Prose columns (Introduction, Encyclopedia detail) cap at `80ch`
 (research §6) without a token.
@@ -311,7 +310,7 @@ from inside a frame (`party-full`, `nickname-rejected`, `evolve-rejected`) can l
 
 ### Amendments made in this diff
 
-Each verdict that differs from a spec default, or that the spec left open, amended in `M-ui-foundation.spec.md` here. The Summary and Profile verdicts confirm their defaults and change nothing.
+Each verdict that differs from a spec default, or that the spec left open; the built slices carry them. The Summary and Profile verdicts confirm their defaults and change nothing.
 
 - **WF1-A1** (`UIF3.4`): the anchor's rule and domain. "Never cover that slot for any slot position" is unsatisfiable for a slot wider than the free width and taller than the free height, so the property now states horizontal-away, bottom-then-top, and the cap.
 - **WF1-A2** (`UIF3.3`): the sheet's width rule, min(18rem, 45% of the body).
