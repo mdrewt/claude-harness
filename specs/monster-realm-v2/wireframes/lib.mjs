@@ -1,6 +1,6 @@
 // lib.mjs — the wf-1 wireframe kit: token values, the scale formula, a small box solver and the SVG
 // writer. Zero dependencies; every PROPOSED diagram is computed from these numbers, so the token
-// table in M-ui-foundation-wireframes.md and the drawings cannot drift apart (check.mjs compares them).
+// table in M-ui-foundation-wireframes.md and the drawings cannot drift apart.
 // Original schematics only: boxes and labels, nothing copied from any game.
 
 // ---- sizing vocabulary (WF1.2, operator item 014) ------------------------------------------
@@ -12,7 +12,7 @@ export const SIZING = {
 };
 const SIZING_COLOR = { V: '#2f7d4f', H: '#2b6cb0', S: '#8a5a12', F: '#6b7280' };
 
-// ---- the scale formula, verbatim from M-ui-foundation.spec.md "Shape of the kit" ----------
+// ---- the scale formula, as the game ships it (docs/DECISIONS.md, "One viewport number…") ----------
 export const UI_SCALE_MIN = 0.875;
 export const UI_SCALE_MAX = 3;
 const TILE_PX = 32;
