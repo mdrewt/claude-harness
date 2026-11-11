@@ -44,12 +44,16 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M-trade-sessions** (`M-trade-sessions.spec.md`, elaborated 2026-11-10 — 7 slices, head `ts-0a`):
+1. **M-trade-sessions** (`M-trade-sessions.spec.md`, elaborated 2026-11-10 — 7 slices, head `ts-0a`, then the `ts-6`
+   residual sweep):
    multi-stage trade sessions (blank session face to face → per-side edits → confirm with reset →
    atomic execute), lock-at-confirm escrow, auto-cancel, the propose path retired; absorbs residuals
    R-weekly-review-2026-10-02-F5 / 2026-10-16-F1 (ts-4) and R-ctl-PROXGUARD (ts-5). Scope rules
    ANSWERED (#585: all three asset classes tradable, no gifts + simple soft-lock guards, face-to-face
-   initiation + one session per pair, arrive-in-party-else-Storage, lock-at-confirm).
+   initiation + one session per pair, arrive-in-party-else-Storage, lock-at-confirm). Closes with
+   the operator-directed residual sweep (2026-11-11): `ts-6a` triages every open residual
+   (resolved / obsolete / fix / wontfix) and sections the `ts-6b-K` fix batches, which close the
+   milestone.
 2. **M-netcode-presence** (`M-netcode-presence.spec.md`, specced 2026-10-24): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched) and tap-to-turn facing (never cancel-on-keyup — ADR-0148).
@@ -93,7 +97,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    notably rb-128-E1 (avatar lost on reload during deletion grace), R-rb-73-ABORT-PHANTOM,
    R-rb-132-WALLETSYBIL and R-rb-52-GRACEANNOUNCE. Rows absorbed by pt3 milestones are marked
    in each spec (trade: F5, 2026-10-16-F1,
-   PROXGUARD; econ: 2026-10-09-F1).
+   PROXGUARD; econ: 2026-10-09-F1). While item 1's `ts-6` sweep is open it owns every row in its
+   triage table; fill-work covers only residuals opened after it.
 11. **M21b-3 Steam login** — flagged, never scoped; needs an operator decision before any spec.
    Steam Input maps onto the virtual buttons.
 12. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
