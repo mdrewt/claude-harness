@@ -2,20 +2,26 @@
 task. The Cowork scheduled task "generate-improvement-plan" is a thin stub
 (C:\Users\mdrewt\Claude\Scheduled\generate-improvement-plan\SKILL.md) that loads and executes
 THIS file. Make review-process changes HERE (git-tracked), not in the stub.
-Rewritten 2026-09-28 (harness revision): bounded output, residual-registry intake only. -->
+Rewritten 2026-09-28 (harness revision): bounded output, residual-registry intake only.
+Amended 2026-11-11 (operator directive): verified findings are now also SCHEDULED — one
+front-of-roadmap milestone per run, shipped as a doc-only auto-merge PR (Phase 3c). -->
 
 # WEEKLY REVIEW — monster-realm defect hunt
 
 ## Goal and hard limits
 
-Find real product defects in **monster-realm** that the build loop missed, and enter them
-into the residual registry. Drew reads the one-page report in the task's chat.
+Find real product defects in **monster-realm** that the build loop missed, enter them into
+the residual registry, and schedule their fixes as a milestone at the front of the harness
+roadmap so the hourly supervisor builds them next. Drew reads the one-page report in the
+task's chat.
 
 - **At most 5 findings per run.** Each MUST name a protected-category defect
   (`standards/testing-tdd.md` "What earns a check": gameplay, security-privacy,
   data-integrity, netcode-determinism, ux-a11y critical flows, content) with a
   `path:line @ <SHA>` citation.
-- **Never** create milestone or spec files, edit `PLAN.md`, or edit `residuals.spec.md` by hand.
+- Tracked writes are EXACTLY the Phase 3c scheduling PR: one new `M-weekly-review-*.spec.md`,
+  the matching `PLAN.md` §9 insertion, and any "Absorbs residuals" lines added to queued specs.
+  **Never** edit `residuals.spec.md` by hand, never write to the game repo, no other tracked file.
 - **Never** propose checks, tests, gates, evals, or scanners whose subject is the checking
   apparatus (testing-tdd forbids it; `mr-gates` refuses them anyway).
 - **Never** spawn or schedule follow-up review generations. One run, one report.
@@ -79,18 +85,57 @@ minimal failing-test sketch. Drop anything unverified. Rank survivors by severit
 player impact and keep **at most 5**; genuine contradictions between lenses go to one fresh
 **opus** adjudicator running `$HARNESS/.claude/agents/judge.md`'s bias protocol.
 
-## Phase 3 — Enter findings into the registry
+## Phase 3 — Enter findings into the registry, then schedule them
 
-For each kept finding (n = 1..5):
+**3a — Route and group.** Before filing, decide where each kept finding's FIX will land:
+
+- **Absorbed:** the fix falls in a surface a queued §9 milestone already rebuilds or owns
+  (that spec's scope/`touches:` cover it). It joins that spec's "Absorbs residuals" list
+  (edited in the 3c PR) and its `--target` below is that milestone's absorbing slice id
+  (the milestone name if not yet elaborated). Never double-schedule an absorbed finding.
+- **Scheduled:** every other finding goes into THIS run's milestone
+  `M-weekly-review-<UTC-date>`, grouped into 1–3 slices `wr<YYMMDD>-a..c` by surface, with
+  pairwise-disjoint `touches:` where possible so the loop can fan out.
+
+**3b — Registry intake.** For each kept finding (n = 1..5):
 
 ```
 $MEM/mr-gates residuals add --slice weekly-review-<UTC-date> --gate F<n> \
-  --title "<one line>" --target backlog --reason "<path:line @ SHA — defect + proposed fix>" \
+  --title "<one line>" --target <its 3a slice id> --reason "<path:line @ SHA — defect + proposed fix>" \
   --category <gameplay|security-privacy|data-integrity|netcode-determinism|ux-a11y|content> \
   --severity <LOW|MED|HIGH|CRITICAL>
 ```
 
 A refusal means the finding was out of bounds: drop it and say so. Only the supervisor promotes.
+
+**3c — Schedule in the harness plan (doc-only auto-merge PR).** Zero kept findings → skip 3c
+entirely; every finding absorbed → skip the new spec but still PR the "Absorbs" edits.
+
+1. Author `$HARNESS/specs/monster-realm-v2/M-weekly-review-<UTC-date>.spec.md` in the house
+   spec shape, sketch+ level: a Status header ("authored by the weekly review, pinned @ <SHA>;
+   elaborate via `milestone-loop-prompt.md` when reached if gates ceremony is still needed"),
+   `Depends on:`, a 2–3 line Problem/intent, then one section per slice carrying category ·
+   severity · size, each finding's EARS line(s), `touches:`, its residual id, the
+   `path:line @ <SHA>` evidence and the proposed fix. Finding detail lives here and in the
+   registry — never in PLAN.md.
+2. Insert the milestone into `PLAN.md` §9 as the FIRST item — a one-line summary + status
+   naming the spec file and the filed residual ids — renumbering the list and fixing any
+   intra-§9 "item N" cross-references the renumbering breaks. Exception: when the milestone's
+   remaining slices genuinely depend on a queued item, place it immediately AFTER that
+   dependency and say why in both the §9 line and the spec header. Front placement is what
+   makes the hourly supervisor build it next under its own "first unfinished non-`blocked:`
+   item" rule; the supervisor's CI-fix / resume / HIGH-residual / structural priorities still
+   rightly run first.
+3. Ship it the way the loop ships docs: branch `wr-sched-<UTC-date>` off `origin/main` of the
+   HARNESS repo; commit with EXPLICIT paths only (the new spec, `PLAN.md`, any "Absorbs"
+   edits — never `git add -A`); push; `gh pr create` (subject
+   `docs(spec): weekly-review-<UTC-date> — schedule <k> findings as M-weekly-review-<UTC-date>`);
+   `gh pr merge --squash --auto` (doc-only chore PRs auto-merge by loop convention). On a
+   conflict (a supervisor doc PR landed first) rebase onto `origin/main`, re-apply, re-push.
+   Confirm the merge, or report checks red and leave the PR open — never force. Restore the
+   harness checkout to `main` straight after pushing (the loop's own state files may be dirty
+   there; never stash, add or clean them) and drop the local `wr-sched-*` branch once the merge
+   lands. The review touches nothing else tracked in either repo and leaves every other PR alone.
 
 **Decisions** that are genuinely Drew's (irreversible, security posture, gameplay or player-visible; internal design is never his — it is a `type: design` slice, `standards/spec-driven.md` §Refactor slices): open
 at most 3 issues via `$MEM/mr-ask-drew rev-<UTC-date>-<slug> --question … --recommend … --alts …
@@ -101,17 +146,20 @@ default repo, process questions with `--repo mdrewt/claude-harness`. Never pass 
 
 1. Header: local date/time, pinned SHA, the 3 lenses, counts by severity (HIGH/CRITICAL first).
 2. The ≤5 findings: title, category/severity, `path:line @ SHA`, short evidence, residual id.
-3. Decision issue links, if any.
+3. The scheduled milestone: name, slice ids (and any absorbed-into targets), §9 position, and
+   the Phase 3c PR link (merged, or auto-merge pending). Decision issue links, if any.
 4. **Stale residuals (visibility only):** run `memory/projects/mr-gates residuals sweep --dry-run` first and include its obsolete-candidates in the report (only the supervisor may `--apply`); then open MED/LOW rows from `mr-gates residuals list`, oldest
    first, one line each (id, age, title). Do not promote, re-prioritize, or re-report them.
 5. One line on dropped candidates (count + why).
 
 Then append a short handoff entry via `$MEM/mr-record handoff --title "<title>" --body-file <f>`
-(residual ids, issue numbers, cleanup confirmation). No git commits: this review writes no
-tracked files.
+(residual ids, milestone + slice ids, scheduling-PR number, issue numbers, cleanup
+confirmation). The Phase 3c scheduling PR is this review's ONLY tracked write: commit nothing
+else, in either repo.
 
 ## Phase 5 — Clean up (every exit path, including aborts)
 
 `case "$RUN_DIR" in /home/mdrewt/mr-review/*) rm -rf -- "$RUN_DIR";; esac` — the guard is
-mandatory. Never touch the runner's git state (no worktree prune/remove, branch deletion, gc,
-reset, or checkout in `$PROJ` or the harness). Verify `$RUN_DIR` is gone and report any failure.
+mandatory. Never touch the runner's git state (no worktree prune/remove, gc, reset; no branch
+or checkout work in `$PROJ`, and none in the harness beyond Phase 3c's own `wr-sched-*` branch,
+which ends checked back out on `main`). Verify `$RUN_DIR` is gone and report any failure.
