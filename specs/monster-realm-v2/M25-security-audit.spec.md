@@ -4,6 +4,11 @@
 M21, M22 (closed) · **Supersedes:** the 2026-08 ceremony spec (git history)
 
 ## Problem / intent
+**Scope by way of play (`game-design.md` §14, `security-threat-model.md` §6):** this sign-off is for the
+**official server**, the one world where we are the operator and fairness is guaranteed. "Launch" below
+means opening that server. Early access (single-player worlds and friends hosting) is gated on
+`M-local-play.spec.md`, not on this audit; a private world's host is trusted by its players.
+
 Launch is gated on a **human security sign-off**: nothing else audits the whole surface, triages findings,
 or refuses launch with an open critical. Per-system controls live in ordinary tests and CI; M25 fixes
 the known leaks, runs one audit pass, and ends with an operator walking a checklist and signing.

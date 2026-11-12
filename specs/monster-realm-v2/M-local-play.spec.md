@@ -14,7 +14,14 @@ same module and the same client run as a local and a privately hosted game, with
 ## Scope (sketch)
 
 - **LP0 Feasibility (first; `type: design`).** Confirm that SpacetimeDB's licence permits shipping
-  its server inside the game and in a standalone package, and record the answer. Choose the desktop
+  its server inside the game and in a standalone package, and record the answer. The licence
+  (Business Source License 1.1, read 2026-11-12 at 2.16.0) grants redistribution, and grants
+  production use "provided your application or service uses the Licensed Work with no more than one
+  SpacetimeDB instance in production" and is not a "Database Service" (a commercial offering where
+  third parties create tables whose schemas they control). One instance per player's machine is not
+  plainly inside that grant, and a moddable server whose mods add tables may touch the second
+  clause: get the licensor's answer in writing before any packaging work. It converts to AGPL v3
+  with a linking exception on 2031-11-10. Choose the desktop
   shell. Measure a one-player world on a modest machine: memory, idle CPU (every zone ticks at 5 Hz
   whether or not anyone is in it), start-up to playable, and disk growth per hour of play (the commit
   log grows ~6 MB per hour of one player walking and is not compacted). Set the budgets the later
@@ -33,7 +40,11 @@ same module and the same client run as a local and a privately hosted game, with
 - **LP5 Open to friends.** A running single-player world accepts other players and can be closed
   again; joiners get their own characters in that world. Joining is by address or invite link.
 - **LP6 Private-server access.** A private server confirms each joiner holds a valid account with the
-  identity provider, then applies the host's rule: allowlist, password, or open.
+  identity provider, then applies the host's rule: allowlist, password, or open. SpacetimeDB derives
+  an identity from a token's issuer and subject, so the same account is the same identity on every
+  server; the token a private host receives must therefore be useless against the official server
+  (audience-scoped, and the official server must reject other audiences). Prove that with a test
+  before a private server ever sees a real account token.
 - **LP7 Standalone server package.** The server runs by itself for an always-on host, installed
   outside the Steam store, with the same access rule and a documented way to back up and upgrade.
 - **LP8 Unattended upgrade.** A world saved by an older build opens in a newer one: schema and
