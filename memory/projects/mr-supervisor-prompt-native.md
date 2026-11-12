@@ -48,8 +48,8 @@ UNKNOWN → proceed + record a BLOCKER.
    (`mutex|stale|all`); on UNLOCK-MUTEX-FAILED report and stop — never `rm -rf`. The WRAPPER's
    pid holds the mutex, so your end-of-tick `mr-unlock mutex` is expected to be REFUSED.
 4. **State:** `mr-state.json` — first read, last write of every tick, atomic (temp+mv). Schema v3:
-   `master{sha,ci,nightly}` · `inflight[]` · `awaiting_merge[]` · `queue[]` · `park_counters{}` ·
-   `consecutive_standdowns` · `rate_limit_resets_at` · `resource_locations{}` · `notes`.
+   `master{sha,ci,nightly}`, `inflight[]`, `awaiting_merge[]`, `queue[]`, `park_counters{}`,
+   `consecutive_standdowns`, `rate_limit_resets_at`, `resource_locations{}`, `notes`.
    **`queue[]` is written ONLY via `mr-record queue-add`/`queue-remove`**; re-read it fresh
    immediately before your end-of-tick write and carry it through VERBATIM. Ledger/handoff
    writes go ONLY through `mr-record ledger|handoff` (SUPERVISOR tick rows and a finished run's
@@ -62,8 +62,8 @@ UNKNOWN → proceed + record a BLOCKER.
 6. **Environment:** WSL bash; no `jq` — `/usr/bin/python3` for all JSON; freshness via
    `find -mmin` + `date -u`; advance repos with `git merge --ff-only origin/<branch>` (never
    `git pull`); labeled-stash pre-existing strays, never commit or discard them.
-7. **Tool flags:** each `$MEM/mr-*` tool documents its exact flags in its own header comment —
-   read it before a first-in-tick call.
+7. **Tool flags:** each `$MEM/mr-*` tool's header comment documents its exact flags — read it
+   before a first-in-tick call.
 
 ## Gates (in order; stop at the first stop)
 
@@ -186,8 +186,7 @@ around (push the harness before spawning a harness slice).
   files; update PLAN §9/§Built.
 - Park counter: ~3 no-progress parks → `blocked:` + BLOCKER (rate-limit parks exempt); 3 wrapper
   attempts without PR or documented park → investigate sizing, never a 4th relaunch.
-- Ledger row (`mr-record ledger`, validated flags only) → handoff entry (`mr-record handoff`) →
-  write `mr-state.json` → release locks.
+- Ledger row → handoff entry → write `mr-state.json` → release locks.
 
 ## Rate-limit watch (on every poll of a live run)
 
@@ -201,12 +200,13 @@ counter bump); never merge a stopped/`wip:` branch.
 
 ## Output
 
-End with: timestamp · run_id · governor · slice(s) + outcomes · PR link(s) · `master` CI after ·
-audits · BLOCKERs · risks. Append ONE line to `$MEM/mr-native-tick.log`:
-`<utc> <run_id> DECISION <outcome-summary>`.
+End with: timestamp, run_id, governor, slice(s) + outcomes, PR link(s), `master` CI after, audits,
+BLOCKERs, risks. Append ONE line to `$MEM/mr-native-tick.log`:
+`<utc> <run_id> DECISION <summary>[ held=<slice>:<why>,…]` — one per ready candidate not
+launched; `<why>` = overlap|structural|after|cap|pacing|memory|quiet|other:<word>.
 
 ## Gotchas
 
-- Racing ticks → mutex only. Orchestration depth = 1.
+- Orchestration depth = 1.
 - Worktree missing → `git worktree list` first (`git -C <missing> … | wc -l` fake-reads 0).
 - SIGHUP EXIT=129 → always `setsid` + assert detachment. One heredoc per shell input; timestamps inside python.

@@ -35,8 +35,55 @@ exempt from that floor only).
 
 ## Health signals (all in `memory/projects/`)
 `.native-supervisor-heartbeat` (fresh = ticks running) · `.native-supervisor-last-success` /
-`-last-failure` · `mr-native-tick.log` (one DECISION/SKIP line per tick) · `mr-state.json`
+`-last-failure` · `mr-native-tick.log` (one DECISION/SKIP line per tick; grammar below) · `mr-state.json`
 (inflight/queue/notes) · budget: `mr-cost-watch`/`mr-usage-snap`, config in `mr-budget-config.json`.
+
+## Record grammar
+**Tick log** (`mr-native-tick.log`). The wrapper writes `<utc> pid=<n> src=<cron|done|ci|crash|
+reset|manual|decision> <VERB> …`; a decision session appends one line of its own:
+
+    <utc> <run_id> DECISION <summary>[ held=<slice>:<why>[,<slice>:<why>…]]
+
+`held=` is present when the tick launched or held while another candidate was ready and not
+launched; it names each such candidate with one reason from a closed set, so parallelism lost to
+a rule can be counted apart from parallelism lost to judgment:
+
+| `<why>` | The candidate was not launched because |
+|---|---|
+| `overlap` | its code/test `touches:` collide with work in flight (or are undeclared) |
+| `structural` | it touches its always-serial structural set or a table/schema/migration |
+| `after` | a slice it must follow is not merged |
+| `cap` | the fan-out slot limit is reached |
+| `pacing` | budget margin or the staggered-launch rule |
+| `memory` | `free -g` shows less than one full build free |
+| `quiet` | a refactor's quiet window covers it |
+| `other:<word>` | none of the above; the word names the judgment |
+
+After the session ends the wrapper reads that line and logs `HELD rid=<rid> n=<count> <field>`,
+or `HELD rid=<rid> invalid=<field>` when the field is outside the grammar. `grep -a ' HELD '`
+is the count; `grep -a ' held='` the raw decisions.
+
+**Usage ledger** (`monster-realm-usage-ledger.jsonl`, append-only). Rows that carry cost:
+- **Build session** — exactly one per session that ended (first launch, relaunch, resume, park,
+  crash, kill, rate-limit stop), written by `mr-record ledger --from-log <pass log>` from the
+  tick's reconcile or, for a session relaunched before a tick saw it end, from `mr-spawn`.
+  `run_id` = `run-<slice>-<launch stamp>` (the `TS=` of the log's `ATTEMPT=1` line), so a slice
+  with three sessions has three rows; `outcome` = `FINISHED(EXIT=<rc> ATTEMPTS=<n>)` or
+  `CRASHED(…)`; `cost_usd` = that session's own spend, read by `mr-cost-sum` as the larger of
+  two sources: the sum of each result event's own usage in the pass log (the CLI's
+  `total_cost_usd` is cumulative and carries across `--resume`), and the `cost-state` record
+  the CLI leaves in the session transcript, which exists even for a session killed or
+  rate-limited before any result event. `attempts` = invocations in the log; `notes` carries
+  `session=<CLI session id>`, and says so when the figure came from the transcript.
+  `cost_usd: null` always comes with `COST-UNKNOWN (<reason>)` in `notes` — neither source
+  reports a cost, or the log is gone. `COST-PARTIAL (…)` marks a lower bound: an attempt was
+  killed before its first result and the transcript adds nothing.
+- **Supervisor tick** — `slice: SUPERVISOR`, `run_id` = the wrapper's `native-<utc>-<pid>`, one
+  per decision session that exited 0.
+- `CORRECTION` — a signed reversal of an earlier row.
+
+Every other row (`LAUNCHED`, `MERGED`, `PARKED`, CI waits) records an event and carries no cost.
+A slice's spend is the sum of its build-session rows.
 
 ## Slice scope (`touches:`)
 A slice edits the files its spec's `touches:` declares; a run that measures a further file it

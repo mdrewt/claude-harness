@@ -33,10 +33,235 @@ $TOOLS
 EOF
 /usr/bin/python3 -c "import ast,sys;ast.parse(open(sys.argv[1]).read())" "$MEM/mr-feedback" 2>/dev/null || { echo "SELFCHECK-FAIL py: mr-feedback"; BAD=1; }
 "$MEM/mr-feedback" selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-feedback selftest"; BAD=1; }
-# Cost-SSOT decision (docs/DECISIONS.md): the cost SSOT must keep reconstructing per-invocation spend from the
-# cumulative total_cost_usd field. Its fixtures include the real uxd2 shape (naive $423.65 ->
-# true $165.65) and the escalation case a pure value-decrease split would undercount.
+# Cost-SSOT decision (docs/DECISIONS.md): the cost SSOT must keep reporting a run's own spend from
+# a counter that is cumulative. Its fixtures are real log shapes: a `--resume` attempt whose
+# counter carries the previous attempt's total, a relaunch, a killed session, and the older
+# counter-restart shape (uxd2, naive $423.65 -> true $165.65).
 "$MEM/mr-cost-sum" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-sum selftest"; BAD=1; }
+# run-cost: every ended build session leaves exactly one ledger cost row, carrying that session's
+# own spend. Driven through the REAL writer (mr-record) and the REAL reconcile block of
+# mr-native-tick.sh (extracted by content, with its /tmp/mr_* paths and MEM pointed at a sandbox)
+# over the real pass-log and transcript excerpts in fixtures/run-cost/. The ledger is a fixture
+# file, and nothing this block writes may reach the live one.
+/usr/bin/python3 - "$MEM" <<'PYRUNCOST' || BAD=1
+import json, os, re, shutil, subprocess, sys, tempfile
+
+MEM = sys.argv[1]
+FIX = os.path.join(MEM, "fixtures", "run-cost")
+REAL_LEDGER = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/monster-realm-usage-ledger.jsonl"
+bad = 0
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL run-cost-%s" % name) + (": " + detail if detail else ""))
+
+def real_size():
+    try:
+        return os.path.getsize(REAL_LEDGER)
+    except OSError:
+        return 0
+
+real_before = real_size()
+SB = tempfile.mkdtemp(prefix="mr-selfcheck-runcost-")
+try:
+    sb_mem = os.path.join(SB, "mem")
+    sb_tmp = os.path.join(SB, "tmp")
+    os.makedirs(os.path.join(sb_mem, "pending-events"))
+    os.makedirs(sb_tmp)
+    for name in ("mr-record", "mr-cost-sum", "mr-budget-config.json"):
+        shutil.copy2(os.path.join(MEM, name), os.path.join(sb_mem, name))
+    LEDGER = os.path.join(SB, "ledger.jsonl")
+    env = dict(os.environ)
+    env.update({"MR_RECORD_LEDGER": LEDGER, "MR_RECORD_HANDOFF": os.path.join(SB, "handoff.md"),
+                "MR_RECORD_STATE": os.path.join(SB, "state.json")})
+    env.pop("MR_BACKUP_ROOT", None)
+    # Session transcripts come from the fixtures too, never from this machine's ~/.claude.
+    env["MR_COST_TRANSCRIPTS"] = os.path.join(FIX, "transcripts")
+    no_transcripts = dict(env, MR_COST_TRANSCRIPTS=os.path.join(SB, "no-transcripts"))
+
+    def rows():
+        try:
+            return [json.loads(l) for l in open(LEDGER) if l.strip()]
+        except OSError:
+            return []
+
+    def record(slice_, outcome, log, e=None):
+        r = subprocess.run(["bash", os.path.join(sb_mem, "mr-record"), "ledger", "--slice", slice_,
+                            "--outcome", outcome, "--ci", "not-applicable", "--from-log", log],
+                           env=e or env, capture_output=True, text=True, timeout=60)
+        return r.returncode, r.stdout
+
+    def fx(name):
+        return os.path.join(FIX, name)
+
+    # ---- the writer -----------------------------------------------------------------------
+    # Two wrapper attempts on one carried counter: the row is the session's spend ($84.4058),
+    # not the two per-attempt totals added up ($144.1202).
+    rc, out = record("ts-3", "FINISHED(EXIT=0 ATTEMPTS=2)", fx("resume-cumulative.stream"))
+    got = rows()
+    if rc != 0 or len(got) != 1 or got[0].get("cost_usd") != 84.4058 \
+            or got[0].get("run_id") != "run-ts-3-20261111T123016Z" or got[0].get("attempts") != 2:
+        fail("resume-own-spend", "rc=%r rows=%r" % (rc, got))
+    # The same session offered again writes nothing.
+    rc, out = record("ts-3", "CRASHED(no-done at relaunch)", fx("resume-cumulative.stream"))
+    if rc != 0 or "ledger-skip:" not in out or len(rows()) != 1:
+        fail("same-session-once", "rc=%r out=%r rows=%d" % (rc, out.strip()[:120], len(rows())))
+    # Killed before any result event: the transcript's cost-state still has the spend, and the
+    # row says that is where the figure came from.
+    rc, out = record("bt-7", "FINISHED(EXIT=143 ATTEMPTS=1)", fx("killed-no-result.stream"))
+    got = [r for r in rows() if r.get("slice") == "bt-7"]
+    if len(got) != 1 or got[0].get("cost_usd") != 64.3031 \
+            or "transcript's cost-state (log: no result event)" not in got[0].get("notes", ""):
+        fail("killed-cost-from-transcript", "rows=%r" % (got,))
+    # The same kill with no cost-state either (SIGKILL, reboot): a row with no cost that says why.
+    rc, out = record("bt-7x", "FINISHED(EXIT=137 ATTEMPTS=1)", fx("killed-no-result.stream"), no_transcripts)
+    got = [r for r in rows() if r.get("slice") == "bt-7x"]
+    if len(got) != 1 or got[0].get("cost_usd") is not None \
+            or "COST-UNKNOWN (no result event in the log and no cost-state" not in got[0].get("notes", ""):
+        fail("killed-is-unknown-with-reason", "rows=%r" % (got,))
+    # No log at all: still a row, still a reason.
+    rc, out = record("gone", "CRASHED(no-done, dead leader 1)", os.path.join(SB, "absent.log"))
+    got = [r for r in rows() if r.get("slice") == "gone"]
+    if len(got) != 1 or got[0].get("cost_usd") is not None \
+            or "COST-UNKNOWN (pass log missing" not in got[0].get("notes", ""):
+        fail("missing-log-is-unknown-with-reason", "rows=%r" % (got,))
+    # A row without --from-log is not a cost row and does not claim an unknown cost.
+    r = subprocess.run(["bash", os.path.join(sb_mem, "mr-record"), "ledger", "--run_id", "x",
+                        "--slice", "ts-3", "--outcome", "MERGED"], env=env, capture_output=True,
+                       text=True, timeout=60)
+    got = [r_ for r_ in rows() if r_.get("run_id") == "x"]
+    if len(got) != 1 or "COST-UNKNOWN" in got[0].get("notes", ""):
+        fail("plain-row-claims-no-cost", "rows=%r" % (got,))
+
+    # ---- the tick's reconcile block ------------------------------------------------------
+    tick_src = open(os.path.join(MEM, "mr-native-tick.sh")).read()
+    m0 = re.search(r"^# RECONCILE\b", tick_src, re.M)
+    m1 = re.search(r"^# gate -1\b", tick_src, re.M)
+    block = tick_src[m0.start():m1.start()] if (m0 and m1 and m0.start() < m1.start()) else ""
+    if block.count("mr-record") < 2 or "/tmp/mr_pass_" not in block:
+        fail("reconcile-anchor", "could not extract the reconcile block between `# RECONCILE` "
+             "and `# gate -1` in mr-native-tick.sh")
+    else:
+        script = os.path.join(SB, "reconcile.sh")
+        with open(script, "w") as f:
+            f.write("set -u\nMEM=%s\nLOG=%s\nlog(){ echo \"$*\" >> \"$LOG\"; }\n"
+                    % (sb_mem, os.path.join(SB, "tick.log")))
+            f.write(block.replace("/tmp/mr_", sb_tmp + "/mr_"))
+        open(LEDGER, "w").close()
+
+        def reconcile():
+            subprocess.run(["bash", script], env=env, capture_output=True, text=True, timeout=120)
+
+        def session(slice_, fixture, done):
+            for suffix in (".done", ".done.recorded"):
+                try:
+                    os.unlink(os.path.join(sb_tmp, "mr_pass_%s%s" % (slice_, suffix)))
+                except OSError:
+                    pass
+            shutil.copy2(fx(fixture), os.path.join(sb_tmp, "mr_pass_%s.log" % slice_))
+            if done:
+                with open(os.path.join(sb_tmp, "mr_pass_%s.done" % slice_), "w") as f:
+                    f.write(done)
+
+        def costs(slice_):
+            return [r.get("cost_usd") for r in rows() if r.get("slice") == slice_]
+
+        session("ts-4", "relaunch-first.stream", "EXIT=0 ATTEMPTS=3\n")
+        reconcile()
+        if costs("ts-4") != [55.1519]:
+            fail("reconcile-first-session", "want [55.1519], got %r" % (costs("ts-4"),))
+        # The slice is relaunched minutes later and that session ends too: its own row.
+        session("ts-4", "relaunch-second.stream", "EXIT=0 ATTEMPTS=1\n")
+        reconcile()
+        if costs("ts-4") != [55.1519, 57.5416]:
+            fail("reconcile-relaunch-has-its-own-row", "want [55.1519, 57.5416], got %r" % (costs("ts-4"),))
+        # A lost .recorded marker, or a second tick, does not write the session again.
+        os.unlink(os.path.join(sb_tmp, "mr_pass_ts-4.done.recorded"))
+        reconcile()
+        reconcile()
+        if costs("ts-4") != [55.1519, 57.5416]:
+            fail("reconcile-exactly-once", "got %r" % (costs("ts-4"),))
+        # A killed session: dead leader, no .done.
+        dead = subprocess.Popen(["true"])
+        dead.wait()
+        session("bt-7", "killed-no-result.stream", None)
+        with open(os.path.join(sb_mem, ".harness-runner.bt-7.lock"), "w") as f:
+            json.dump({"session_leader": dead.pid, "started_utc": "2026-10-31T21:00:30Z"}, f)
+        reconcile()
+        reconcile()
+        got = [r for r in rows() if r.get("slice") == "bt-7"]
+        if len(got) != 1 or got[0].get("cost_usd") != 64.3031 \
+                or not got[0].get("outcome", "").startswith("CRASHED"):
+            fail("reconcile-killed-session", "rows=%r" % (got,))
+        ids = [r.get("run_id") for r in rows()]
+        if len(ids) != len(set(ids)):
+            fail("reconcile-run-id-unique", "run_ids=%r" % (ids,))
+
+    # ---- mr-spawn's relaunch step --------------------------------------------------------
+    # A session that ended and is relaunched before any tick reconciled it: mr-spawn records it
+    # before removing its flags and rotating its log.
+    spawn_src = open(os.path.join(MEM, "mr-spawn")).read()
+    s0 = spawn_src.find("\nif [ -s \"/tmp/mr_pass_$S.log\" ] && [ ! -e \"/tmp/mr_pass_$S.done.recorded\" ]; then\n")
+    s1 = spawn_src.find("\nrm -f \"/tmp/mr_pass_$S.done\" \"/tmp/mr_pass_$S.done.recorded\"\n")
+    if s0 < 0 or s1 < s0 or "mr-record" not in spawn_src[s0:s1]:
+        fail("spawn-anchor", "could not extract mr-spawn's outgoing-session cost-row step")
+    else:
+        step = os.path.join(SB, "spawn-step.sh")
+        with open(step, "w") as f:
+            f.write("set -u\nMEM=%s\nS=\"$1\"\nemit(){ echo \"$1 $2\"; }\n" % sb_mem)
+            f.write(spawn_src[s0:s1].replace("/tmp/mr_", sb_tmp + "/mr_") + "\n")
+        open(LEDGER, "w").close()
+        for slice_, fixture, done, want_outcome, want_cost in (
+                ("uif-2", "single-attempt.stream", "EXIT=0 ATTEMPTS=1\n", "FINISHED(EXIT=0 ATTEMPTS=1)", 28.2911),
+                ("uif-3", "resume-zero-turn.stream", None, "CRASHED(no-done at relaunch)", 82.7775)):
+            shutil.copy2(fx(fixture), os.path.join(sb_tmp, "mr_pass_%s.log" % slice_))
+            if done:
+                with open(os.path.join(sb_tmp, "mr_pass_%s.done" % slice_), "w") as f:
+                    f.write(done)
+            for _ in range(2):
+                r = subprocess.run(["bash", step, slice_], env=env, capture_output=True, text=True, timeout=60)
+            got = [(r_.get("outcome"), r_.get("cost_usd")) for r_ in rows() if r_.get("slice") == slice_]
+            if got != [(want_outcome, want_cost)] or r.stdout.strip():
+                fail("spawn-records-outgoing-session", "%s: want one %r row, got %r (stdout %r)"
+                     % (slice_, (want_outcome, want_cost), got, r.stdout.strip()[:120]))
+finally:
+    shutil.rmtree(SB, ignore_errors=True)
+# The live ledger is appended to by the running loop, so compare content, not bytes: nothing
+# appended while this block ran may be one of its fixture rows.
+try:
+    with open(REAL_LEDGER, "rb") as f:
+        f.seek(real_before)
+        grown = f.read().decode("utf-8", "replace")
+except OSError:
+    grown = ""
+if any(mark in grown for mark in ('"slice": "gone"', "run-ts-3-20261111T123016Z", "run-ts-4-20261111T2",
+                                  "run-bt-7-20261031T210038Z")):
+    fail("live-ledger-touched", "a fixture row reached the live usage ledger")
+sys.exit(bad)
+PYRUNCOST
+# held-field: the tick's reader of the DECISION line's `held=` field, extracted by content and run
+# on real DECISION lines with the field appended as the prompt specifies it.
+HF=$(sed -n '/^held_field(){$/,/^}$/p' "$MEM/mr-native-tick.sh")
+if [ -z "$HF" ]; then
+  echo "SELFCHECK-FAIL held-field: could not extract held_field() from mr-native-tick.sh"; BAD=1
+else
+  hf(){ bash -c "$HF"$'\n''held_field "$1"' _ "$1"; }
+  D="2026-11-01T08:01:12Z mr-sup-native-20261101T080042Z-444666-25734 DECISION launched bt-11 (fable hard) + bt-13 (opus); master green"
+  while IFS='|' read -r NAME LINE WANT; do
+    GOT=$(hf "$LINE")
+    [ "$GOT" = "$WANT" ] || { echo "SELFCHECK-FAIL held-field $NAME: want '$WANT' got '$GOT'"; BAD=1; }
+  done <<EOF
+none|$D|
+one|$D held=bt-14:after|n=1 bt-14:after
+several|$D held=bt-14:after,uif-3:overlap,st-2:other:spec-gap|n=3 bt-14:after,uif-3:overlap,st-2:other:spec-gap
+every-reason|$D held=a:overlap,b:structural,c:after,d:cap,e:pacing,f:memory,g:quiet|n=7 a:overlap,b:structural,c:after,d:cap,e:pacing,f:memory,g:quiet
+unknown-reason|$D held=bt-14:judgment|invalid=bt-14:judgment
+no-reason|$D held=bt-14|invalid=bt-14
+bare-other|$D held=bt-14:other:|invalid=bt-14:other:
+spaced-list|$D held=bt-14:after, uif-3:overlap|invalid=bt-14:after,
+EOF
+fi
 # lp-00: repo routing is the SSOT both mr-spawn and mr-launch.sh read. Its register carries the real
 # declared touches of live slices, so a classification regression reds HERE rather than at spawn —
 # where the cost is a slice launched into the wrong repo's main checkout.

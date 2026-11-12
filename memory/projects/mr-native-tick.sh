@@ -15,6 +15,21 @@ SRC=${MR_EVENT_SRC:-cron}
 EVFILE="${1:-}"
 TS(){ date -u +%Y-%m-%dT%H:%M:%SZ; }
 log(){ echo "$(TS) pid=$$ src=$SRC $*" >> "$LOG"; }
+# held_field LINE — reads the `held=` field of a session's DECISION line: the candidates that were
+# ready and not launched, each with the reason. Prints `n=<count> <field>` for a well-formed field,
+# `invalid=<field>` for a malformed one, and nothing when the line carries none. Grammar:
+# held=<slice>:<why>[,<slice>:<why>...], <why> one of overlap|structural|after|cap|pacing|memory|
+# quiet|other:<word>. The closed set is what lets parallelism lost to a rule be counted apart from
+# parallelism lost to judgment, so a field outside it is reported instead of passed through.
+held_field(){
+  local f id='[A-Za-z0-9][A-Za-z0-9._-]*' why='(overlap|structural|after|cap|pacing|memory|quiet|other:[A-Za-z0-9_-]+)'
+  case "$1" in *" held="*) f=${1##* held=}; f=${f%% *} ;; *) return 0 ;; esac
+  if printf '%s' "$f" | grep -qE "^$id:$why(,$id:$why)*$"; then
+    printf 'n=%s %s' "$(printf '%s' "$f" | tr ',' '\n' | grep -c .)" "$f"
+  else
+    printf 'invalid=%s' "$f"
+  fi
+}
 if [ -f "$LOG" ] && [ "$(stat -c %s "$LOG")" -gt 1000000 ]; then mv "$LOG" "$LOG.1"; fi
 
 # tick-alive marker — always bumped when the tick body runs (pure cron/loop liveness)
@@ -29,47 +44,22 @@ if [ "${_hb_fail:-0}" -le "${_hb_ok:-0}" ]; then date -u +%s > "$MEM/.native-sup
 # and the local stack are deliberately RETAINED for manual/experimental use — its consumers still degrade
 # on OLLAMA-UNAVAILABLE. Rollback: restore from git history if a real per-tick consumer ever appears.)
 
-# RECONCILE (accounting; runs even when disabled/over-budget): backfill ledger for finished runs
+# RECONCILE (accounting; runs even when disabled/over-budget): one cost row per ended build session.
+# `mr-record ledger --from-log` owns the row: it names the session by the launch stamp in its pass
+# log, reads the session's own spend, and skips a session that already has its row. So nothing here
+# reasons about whether a row exists: a relaunch or resume of the same slice is a different session
+# and gets its own row, and offering a session twice is harmless. `.done.recorded` only saves the
+# call on later ticks; mr-spawn removes it with `.done` when it relaunches the slice.
 for DF in /tmp/mr_pass_*.done; do
   [ -e "$DF" ] || continue
   [ -e "$DF.recorded" ] && continue
   SL=$(basename "$DF"); SL=${SL#mr_pass_}; SL=${SL%.done}
-  # age cap: never blind-backfill ancient done files
-  DAGE=$(( $(date +%s) - $(stat -c %Y "$DF" 2>/dev/null || echo 0) ))
-  [ "$DAGE" -gt 604800 ] && { touch "$DF.recorded"; continue; }
-  # skip if the ledger already carries a cost-bearing row for this slice near/after the done time
-  ALREADY=$(DF="$DF" SL="$SL" /usr/bin/python3 - <<'PYCHK'
-import json, os, datetime
-sl=os.environ["SL"]; dm=os.path.getmtime(os.environ["DF"])
-hit="NO"
-try:
-    for l in open("/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/monster-realm-usage-ledger.jsonl"):
-        try: d=json.loads(l)
-        except Exception: continue
-        if d.get("slice")!=sl or not d.get("cost_usd"): continue
-        # reversal rows are accounting, not evidence that a run was recorded — without this a
-        # CORRECTION row would make any rerun of the same slice within 12h look already-backfilled
-        # and its real cost would be silently dropped (2026-08-01 cost-correction pass)
-        if str(d.get("outcome","")).upper().startswith("CORRECTION"): continue
-        try: e=datetime.datetime.strptime(str(d.get("ts",""))[:19],"%Y-%m-%dT%H:%M:%S").timestamp()
-        except Exception: continue
-        if e >= dm - 12*3600: hit="YES"; break
-except Exception: hit="ERR"
-print(hit)
-PYCHK
-)
-  [ "$ALREADY" = "YES" ] && { touch "$DF.recorded"; continue; }
   RLOG="/tmp/mr_pass_$SL.log"
-  MDL=$(/usr/bin/python3 -c "import json;print(json.load(open('$MEM/.harness-runner.$SL.lock')).get('model','n/a'))" 2>/dev/null || echo "n/a")
-  grep -q "^ESCALATED" "$RLOG" 2>/dev/null && MDL="escalated:${MDL}-to-fable"
-  # lp-02: `--ci not-applicable` because this is a PRE-MERGE row — "master CI after this slice" is
-  # not yet a defined property, and leaving it empty is 65.8% of the measured master_ci_after hole.
-  # `timeout 60` guards the reconcile write: the heartbeats at :21/:25 are already fresh and the
-  # flock is ~180 lines below, so a stall here leaves the loop looking alive while nothing
-  # progresses. Precedent: the handoff write below.
-  timeout 60 "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
-    --ci not-applicable \
-    --model "$MDL" --from-log "$RLOG" --notes "mechanical backfill by tick v3 reconcile" >> "$LOG" 2>&1 && touch "$DF.recorded"
+  # `--ci not-applicable`: this is a PRE-MERGE row, where "master CI after this slice" is not a
+  # defined property. `timeout 60` bounds the write: the heartbeats above are already fresh and
+  # the flock is far below, so a stall here leaves the loop looking alive while nothing progresses.
+  timeout 60 "$MEM/mr-record" ledger --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
+    --ci not-applicable --from-log "$RLOG" --notes "tick reconcile" >> "$LOG" 2>&1 && touch "$DF.recorded"
   # P3 durability (2026-07-26): persist the run census into the pending done-event so forensics survive /tmp loss
   EVF="$MEM/pending-events/$SL.done.md"
   if [ -f "$EVF" ] && [ -f "$RLOG" ]; then
@@ -79,9 +69,8 @@ PYCHK
       echo "cost: recorded in the ledger FINISHED row"
     } >> "$EVF" 2>/dev/null || true
   fi
-  # single-run spend alert (visibility only, never a gate): flag unusually expensive runs same-hour
-  # cost via the mr-cost-sum SSOT — total_cost_usd is CUMULATIVE per accumulation run, so the
-  # naive sum this replaced overcounted multi-attempt runs (uxd2 $423.65 vs a true $165.65)
+  # single-run spend alert (visibility only, never a gate): flag unusually expensive runs same-hour.
+  # Cost via the mr-cost-sum SSOT, the same figure the ledger row carries.
   RCOST=$("$MEM/mr-cost-sum" "$RLOG" 2>/dev/null)
   # "-" is a legitimate COST-UNKNOWN (no result events). EMPTY means the helper itself failed
   # (missing, non-executable, truncated) — degrade LOUDLY, because silently substituting 0 would
@@ -95,7 +84,9 @@ PYCHK
   fi
 done
 
-# RECONCILE part 2: dead-pid locks with no .done (SIGKILL/reboot class) -> CRASHED row, cost unknown
+# RECONCILE part 2: dead-pid locks with no .done (SIGKILL/reboot class) -> CRASHED row. The same
+# writer, so a killed session's row carries whatever its log does report and says why the rest is
+# unknown. The mark saves the call on later ticks while the dead lock stays on disk.
 for LK in "$MEM"/.harness-runner.*.lock; do
   [ -e "$LK" ] || continue
   SL=$(basename "$LK"); SL=${SL#.harness-runner.}; SL=${SL%.lock}
@@ -105,10 +96,8 @@ for LK in "$MEM"/.harness-runner.*.lock; do
   SUTC=$(/usr/bin/python3 -c "import json;print(json.load(open('$LK')).get('started_utc','x'))" 2>/dev/null | tr -dc 'A-Za-z0-9')
   MARK="/tmp/mr_crash_rec_${SL}_${SUTC}"
   [ -e "$MARK" ] && continue
-  # lp-02: same pre-merge `--ci not-applicable` and same `timeout 60` bound as the FINISHED write.
-  timeout 60 "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "CRASHED(no-done, dead leader $PIDL)" \
-    --ci not-applicable \
-    --from-log "/tmp/mr_pass_$SL.log" --notes "dead-pid lock reconcile; verify true spend" >> "$LOG" 2>&1 && touch "$MARK"
+  timeout 60 "$MEM/mr-record" ledger --slice "$SL" --outcome "CRASHED(no-done, dead leader $PIDL)" \
+    --ci not-applicable --from-log "/tmp/mr_pass_$SL.log" --notes "dead-pid lock reconcile" >> "$LOG" 2>&1 && touch "$MARK"
 done
 
 # gate -1: kill-switch (MR_FORCE=1 overrides the pause for on-demand manual runs)
@@ -411,6 +400,7 @@ if [ "${MR_TICK_DRYRUN:-0}" = "1" ]; then
   echo "DECISION-NEEDED (dryrun) prompt=$PROMPTF"; exit 0
 fi
 log "SPAWN model=$SUP_MODEL effort=$SUP_EFFORT governor=$GSTATE rid=$RID tlog=$TLOG events=$(echo $CONSUMED | wc -w)"
+LOGPOS=$(stat -c %s "$LOG" 2>/dev/null || echo 0)   # the session's own DECISION line lands after this offset
 cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
 # Mutex hygiene (2026-11-06): the LLM tick takes the chain-owner mutex under THIS wrapper's pid (the
 # prompt tells it to pass the `mr-native-tick.sh` pid), and `mr-unlock mutex` refuses a live owner,
@@ -472,6 +462,10 @@ TICKMODEL=${TICKMODEL:--}
 [ "$COST" = "-" ] && COST=""
 [ "$TICKMODEL" = "-" ] && TICKMODEL="$SUP_MODEL"
 log "SPAWN-DONE rc=$RC cost=${COST:-unknown} model=$TICKMODEL rid=$RID"
+# One HELD line per tick whose DECISION names held candidates (or names them malformed), keyed by
+# this wrapper's rid so it joins to the SPAWN lines around it.
+HELD=$(held_field "$(tail -c "+$((LOGPOS+1))" "$LOG" 2>/dev/null | grep -a ' DECISION ' | tail -n 1)")
+[ -n "$HELD" ] && log "HELD rid=$RID $HELD"
 CEN=$(grep -o '"subagent_type":"[a-z-]*"' "$TLOG" 2>/dev/null | sort | uniq -c | awk '{printf "%s=%s ",$2,$1}' | tr -d '"' | sed 's/subagent_type=//g; s/subagent_type://g')
 # NOTE: `grep -c` prints 0 AND exits 1 on no match, so the old `|| echo 0` appended a SECOND
 # line and CEN2 became the two-line string "0\n0" — log() echoes it unquoted-expanded, which put
