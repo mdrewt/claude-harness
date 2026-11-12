@@ -20,6 +20,11 @@ lands here).
 currency/XP faucet), R-weekly-review-2026-10-23-F1 (join_game re-grants a starter whenever the
 identity owns zero monsters — trade-away + rejoin mints starters and rerolls hidden IVs).
 
+
+> **Balance stance (operator, 2026-11-12; GDD §7 and §14):** the economy is not a major aspect of
+> the game. Tune items, prices and rewards as for a single-player game (Pokémon-style), with
+> exceptions only where the official server's shared economy needs one; every number here must feel
+> fair to one player with nobody to trade with.
 ## Problem / intent — ground truth (fact-checked 2026-10-24 against code + the playtest-3 DB)
 
 Evidence anchors are file + symbol as of 2026-10-24; symbols, not line numbers.

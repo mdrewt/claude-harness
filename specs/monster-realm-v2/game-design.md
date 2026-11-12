@@ -119,6 +119,12 @@ identity/role; the systems are generic, the content is specific.
 
 ## 7. Economy design (the missing model)
 
+> **Operator, 2026-11-12:** the economy is not a major aspect of the game. Items, prices and rewards
+> are balanced as in a single-player game (Pokémon-style), with exceptions where a multiplayer world
+> needs one. Read the faucet/sink model below as the guard for the official server's shared economy,
+> not as the game's centre: a single-player world has no other players to trade with and must still
+> feel fairly paced (§14).
+
 A trading MMO economy needs an explicit faucet/sink model or it inflates. Non-commercial (no first-party
 monetization), but a player economy still needs balancing.
 - **Faucets (in):** battle/quest currency rewards, selling items/monsters, encounter drops. Keep faucets
@@ -343,3 +349,8 @@ consent); and it must hold at the official server's population.
 - Who answers for player data on a private server (export, deletion), and what the client tells a player
   before they join one.
 - Which desktop shell.
+- Whether the game is sold. This doc calls it non-commercial and open-source; a Steam early-access
+  release usually carries a price, and the SpacetimeDB licence terms differ for a commercial product.
+- How large a friends server is expected to get (a handful, or a community of fifty).
+- "Controller support before launch" (operator, 2026-10-01) is read as before early access, since the
+  Steam build is where controllers matter most; confirm.

@@ -33,5 +33,9 @@ is built before early access; until then the game is written so that adding it i
 
 ## Notes
 
+- The game repo's decision "Content is data compiled into game-core" holds until this milestone: the
+  content files are embedded at build time behind one loader per registry. Moddable worlds need those
+  loaders to accept content at run time; that decision is reopened here, not before.
+
 - `validation-checklist.md` and the content gates assume one official content set; they stay
   authoritative for the official build and gain a per-world notion when this milestone is designed.

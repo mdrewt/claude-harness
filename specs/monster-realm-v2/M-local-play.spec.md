@@ -20,7 +20,8 @@ same module and the same client run as a local and a privately hosted game, with
   SpacetimeDB instance in production" and is not a "Database Service" (a commercial offering where
   third parties create tables whose schemas they control). One instance per player's machine is not
   plainly inside that grant, and a moddable server whose mods add tables may touch the second
-  clause: get the licensor's answer in writing before any packaging work. It converts to AGPL v3
+  clause. The operator is negotiating a usage licence with the licensor directly (2026-11-12);
+  packaging work waits on its terms, and LP0 records them. The public licence converts to AGPL v3
   with a linking exception on 2031-11-10. Choose the desktop
   shell. Measure a one-player world on a modest machine: memory, idle CPU (every zone ticks at 5 Hz
   whether or not anyone is in it), start-up to playable, and disk growth per hour of play (the commit
@@ -40,11 +41,9 @@ same module and the same client run as a local and a privately hosted game, with
 - **LP5 Open to friends.** A running single-player world accepts other players and can be closed
   again; joiners get their own characters in that world. Joining is by address or invite link.
 - **LP6 Private-server access.** A private server confirms each joiner holds a valid account with the
-  identity provider, then applies the host's rule: allowlist, password, or open. SpacetimeDB derives
-  an identity from a token's issuer and subject, so the same account is the same identity on every
-  server; the token a private host receives must therefore be useless against the official server
-  (audience-scoped, and the official server must reject other audiences). Prove that with a test
-  before a private server ever sees a real account token.
+  identity provider, then applies the host's rule: allowlist, password, or open. A token a private
+  host receives must be useless against the official server; prove that with a test before a private
+  server ever sees a real account token. Design in "Sign-in design" below.
 - **LP7 Standalone server package.** The server runs by itself for an always-on host, installed
   outside the Steam store, with the same access rule and a documented way to back up and upgrade.
 - **LP8 Unattended upgrade.** A world saved by an older build opens in a newer one: schema and
@@ -55,6 +54,34 @@ same module and the same client run as a local and a privately hosted game, with
   exception. Multiplayer-only screens show a clear empty state in a one-player world.
 - **LP10 No telemetry by default.** A single-player or private world sends nothing to our
   observability stack unless the player opts in; the official server's client keeps its telemetry.
+
+## Sign-in design (proposed 2026-11-12; LP0 verifies it against SpacetimeDB's auth, the operator is open to alternatives)
+
+The protocol stays **OpenID Connect** — OAuth 2.0 authorization code with PKCE, tokens as signed
+JWTs. It is what SpacetimeDB consumes (an identity is derived from a token's issuer and subject) and
+what the account issuer already speaks. SAML is not a fit: it is browser-redirect XML for workplace
+single sign-on, SpacetimeDB does not accept it, and it has no good desktop or offline flow.
+
+The isolation comes from **who issues the token a server accepts**, not from a new protocol:
+
+- **Official server:** accepts only tokens from the account issuer, addressed to it (`aud`), as today.
+- **Private server and single-player world:** each world's server is its own issuer. To join, the
+  client asks the account issuer for a short-lived **attestation** — "this account is valid" —
+  addressed to that one server and bound to a nonce the server chose. The server checks it, applies
+  the host's access rule, and then issues its **own** token for that world. The player's identity in
+  that world is derived from the world's issuer, so it is a different identity from the official
+  one by construction, and nothing the host ever holds is a login anywhere else.
+- **Offline single-player** falls out of the same shape: the attestation is needed once, when the
+  world is bound to the account; afterwards the local server issues its own tokens with no
+  connection.
+- The attestation is signed under an issuer name the official server does not trust, so even a
+  server that ignores `aud` cannot be fooled by a replayed one. `aud` and the nonce are the second
+  and third locks.
+
+To verify in LP0: which token claims a module can read at connect, whether a standalone server can
+be given its own signing key per world, and whether the account issuer can mint an attestation as a
+second token type. Fallback if a world cannot be its own issuer: audience-scoped tokens from the
+account issuer, with the official server rejecting any other audience.
 
 ## Decisions the operator owns (ask at elaboration; reversible defaults in brackets)
 
@@ -74,3 +101,5 @@ same module and the same client run as a local and a privately hosted game, with
 - The privacy model (private tables behind owner-scoped views) still keeps one player's data from
   another player's client in every world. It does not keep it from the host, who owns the database.
 - `M21b-3 Steam login` (PLAN §9) is the Steam build's sign-in protocol and is consumed here.
+- **Groundwork that runs ahead of the rest (PLAN §9 item 2):** LP0, LP1 and LP10. They are small,
+  they unblock everything else here, and LP1 and LP10 are true of the official server too.
