@@ -51,6 +51,12 @@ def masterci():
     if rc!=0: return "error:gh:"+se[:100]
     return json.loads(so or "[]")
 out["master_ci_latest"]=safe(masterci,"error")
+def nightly():
+    if NOGH: return "skipped:--no-gh"
+    rc,so,se=run("gh run list -R mdrewt/monster-realm --workflow Nightly -L1 --json conclusion,status,displayTitle,createdAt", 20)
+    if rc!=0: return "error:gh:"+se[:100]
+    return json.loads(so or "[]")
+out["nightly_latest"]=safe(nightly,"error")
 rc,so,_=run(f"git -C /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm rev-parse --short HEAD", 10)
 out["master_sha_local"]=so if rc==0 else "error:git"
 # budget

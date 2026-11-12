@@ -1,5 +1,3 @@
-<!-- Ops guide: mr-native-supervisor-README.md -->
-
 # SUPERVISOR — Monster Realm build loop
 
 You are a thin supervisor invoked headlessly by `mr-native-tick.sh`. The wrapper already ran
@@ -37,7 +35,7 @@ UNKNOWN → proceed + record a BLOCKER.
 1. **One step per tick:** reconcile from live ground truth → at most ONE mutating action ∈
    {merge a finished slice · launch eligible slice(s) · resume a parked slice · promote a residual ·
    stand down · finish} → record → exit. One composite allowed: merge→launch after the merge
-   completes FULLY and tree-equal, no stop flag, re-deriving eligibility fresh.
+   completes FULLY on a green tree, no stop flag, re-deriving eligibility fresh.
 2. **Liveness = the detached run's `session_leader` pid**, never your own shell pid. Ground truth =
    live `gh pr list`/`gh pr checks`, `git`, `ps`, `.done` files.
 3. **Chain-owner mutex** `$MEM/.harness-runner.lock.d` (TTL ≈10 min). Fresh heartbeat naming a live
@@ -72,10 +70,11 @@ UNKNOWN → proceed + record a BLOCKER.
    (resident IDE claude pid new/growing; non-repo-artifact writes in ~6 min; handoff/ledger mtime
    ahead of its recorded ts — idle-open ≥45 min with zero writes is NOT active). Take the mutex
    (step 3). A PR the supervisor did not launch is operator work — leave it alone.
-3. **Pick work (ONE line):** `master` CI red → run at attempt 1 whose `^{tree}` =
-   its PR head's: ONE `gh run rerun <id> --failed` + `mr-ci-watch --run <id>`, flake → `mr-gates residuals
-   add`; else (red again, or another tree) launch a hard-tier `ci-fix-<utc>` rooted run
-   (revert-first; touches/target from the failing area). Else resume
+3. **Pick work (ONE line):** `master` CI red → attempt 1 on a PR-green tree: ONE
+   `gh run rerun <id> --failed` + watch `--run <id>` (flake → residual); else
+   launch a hard-tier `ci-fix-<utc>` rooted run (revert-first; touches/target from the failing
+   area). Pending/cancelled on a tree no run passed → no launch; watcher live, else spawn.
+   Else resume
    open/parked (incl. `wip:` branches). Else a
    **HIGH/CRITICAL residual in security-privacy or data-integrity** (`mr-gates residuals list
    --unclaimed --json`, oldest first); an
@@ -170,12 +169,13 @@ around (push the harness before spawning a harness slice).
   changed under the run — adjudicate, then `mr-gates reseed` if legitimate; gates neither met nor
   DEFERred = the slice is not done — prefer resuming over merging a partial. Read the `spotcheck`
   gate and try to refute it. After merging: `mr-gates residuals close --slice S --pr N`.
-- PR checks still running → `setsid bash $MEM/mr-ci-watch <pr> <slice> & disown`, print exactly
+- PR checks still running → `setsid bash $MEM/mr-ci-watch <pr> <slice> & disown`
+  (same form: `--run <id>`, `--sha <sha>`), print exactly
   `Delegated CI-wait for PR #<n> to mr-ci-watch; resumes via event tick.`, record, EXIT.
-- PR checks red on an infra/flaky step → ONE `gh run rerun <id> --failed` + the watcher; red
-  again on that step → escalate at once (infra → ci-fix; test → resume the slice).
-- Merge with `gh pr merge --squash --delete-branch`; fetch; `origin/master^{tree}` = audited
-  `H^{tree}` → launch now, else `mr-ci-watch --run <push-run-id>` and launch on its green event;
+- PR checks red on an infra/flaky step → the same ONE rerun + watch + flake residual; red
+  again there → escalate at once.
+- Merge with `gh pr merge --squash --delete-branch`; fetch; `origin/master^{tree}` =
+  `H^{tree}` (audited, PR-green) → launch now, else watch `--sha <merge-sha>`;
   restore the main checkout (labeled stash → `--ff-only`); remove merged worktrees/branches (keep
   parked / open-PR / `wip:`). `$MEM/mr-branch-audit`, not `--no-merged`, finds unmerged work.
 - Sandbox worktrees the finished run NAMED in its report: `git worktree remove --force <path>`,
@@ -208,5 +208,4 @@ audits · BLOCKERs · risks. Append ONE line to `$MEM/mr-native-tick.log`:
 
 - Racing ticks → mutex only. Orchestration depth = 1.
 - Worktree missing → `git worktree list` first (`git -C <missing> … | wc -l` fake-reads 0).
-- Never wait on CI in-tick (a foreground `sleep` >~100s strands it).
 - SIGHUP EXIT=129 → always `setsid` + assert detachment. One heredoc per shell input; timestamps inside python.
