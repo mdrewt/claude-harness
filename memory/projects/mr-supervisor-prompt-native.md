@@ -75,9 +75,9 @@ UNKNOWN → proceed + record a BLOCKER.
 3. **Pick work (ONE line):** `master` CI red (or cancelled, none newer) → attempt 1 on a
    PR-green tree (`headSha^{tree}` = `pull/<n>/head^{tree}`, n from the squash subject): ONE
    `gh run rerun <id> --failed` + `mr-ci-watch --run <id>` (flake → residual); else launch a
-   hard-tier `ci-fix-<utc>` rooted run (revert-first; touches/target from the failing area);
-   Nightly red at `master` HEAD → ci-fix too. Pending, tree not PR-green → no launch; watcher
-   live, else spawn. Else resume open/parked (incl. `wip:` branches). Else a
+   hard-tier `ci-fix-<utc>` rooted run (revert-first; touches/target from the failing area).
+   Pending, tree not PR-green → no launch; watcher live, else spawn. Else resume open/parked
+   (incl. `wip:` branches). Else a
    **HIGH/CRITICAL residual in security-privacy or data-integrity** (`mr-gates residuals list
    --unclaimed --json`, oldest first); an
    `unpromoted` one is promoted first (`mr-gates residuals promote` → section in `residuals.spec.md`
