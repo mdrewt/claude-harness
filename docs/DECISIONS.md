@@ -41,7 +41,8 @@ is reconstructed by `mr-cost-sum` (the single implementation) from each result e
 or the session transcript's `cost-state` when that reports more.
 Each build session gets exactly one ledger cost row, keyed by the launch stamp in its pass log
 (`mr-record ledger --from-log`), and the usage ledger is append-only — a wrong figure is
-corrected by appending a signed negative `CORRECTION` row, never by rewriting. Budget governance
+corrected by appending a signed `CORRECTION` row, never by rewriting; spend a session makes after
+its row is written goes in the same way, as a `CORRECTION(late spend)` row under its run_id. Budget governance
 is only as good as the ledger: summing result events or per-attempt totals double-counts a
 resumed run, and judging "already recorded" from the slice name and a time window drops the row
 of every relaunch.

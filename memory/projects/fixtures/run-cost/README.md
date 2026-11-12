@@ -15,4 +15,4 @@ session transcript, whole.
 | `relaunch-first.stream` | ts-4, first session | three attempts on one carried counter |
 | `relaunch-second.stream` | ts-4, relaunch | a new session of the same slice 17 minutes later |
 | `killed-no-result.stream` | bt-7 | killed (EXIT=143) before any result event; transcript cost-state $64.30 |
-| `rate-limit-stop.stream` | bt-12, second session | stopped by a 429 at $28.84; the session was resumed outside the wrapper, transcript cost-state $53.36 |
+| `rate-limit-stop.stream` | bt-12, second session | stopped by a 429 at $28.84; the session was resumed outside the wrapper, transcript cost-state $53.36. The transcript's first `cost-state` record is the session as it stood at the stop, which is what the late-spend cases of `mr-selfcheck` record first |

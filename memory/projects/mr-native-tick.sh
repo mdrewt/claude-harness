@@ -15,14 +15,18 @@ SRC=${MR_EVENT_SRC:-cron}
 EVFILE="${1:-}"
 TS(){ date -u +%Y-%m-%dT%H:%M:%SZ; }
 log(){ echo "$(TS) pid=$$ src=$SRC $*" >> "$LOG"; }
-# held_field LINE — reads the `held=` field of a session's DECISION line: the candidates that were
+# held_field LINES — reads the `held=` field of a session's DECISION line: the candidates that were
 # ready and not launched, each with the reason. Prints `n=<count> <field>` for a well-formed field,
-# `invalid=<field>` for a malformed one, and nothing when the line carries none. Grammar:
+# `invalid=<field>` for a malformed one, and nothing when the line carries none. A session writes
+# ONE DECISION line; given several, only one could be read and the held entries on the others
+# would go uncounted, so that prints `invalid=decision-lines:<n>`. Grammar:
 # held=<slice>:<why>[,<slice>:<why>...], <why> one of overlap|structural|after|cap|pacing|memory|
 # quiet|other:<word>. The closed set is what lets parallelism lost to a rule be counted apart from
 # parallelism lost to judgment, so a field outside it is reported instead of passed through.
 held_field(){
-  local f id='[A-Za-z0-9][A-Za-z0-9._-]*' why='(overlap|structural|after|cap|pacing|memory|quiet|other:[A-Za-z0-9_-]+)'
+  local f n id='[A-Za-z0-9][A-Za-z0-9._-]*' why='(overlap|structural|after|cap|pacing|memory|quiet|other:[A-Za-z0-9_-]+)'
+  n=$(printf '%s\n' "$1" | grep -c .)
+  if [ "$n" -gt 1 ]; then printf 'invalid=decision-lines:%s' "$n"; return 0; fi
   case "$1" in *" held="*) f=${1##* held=}; f=${f%% *} ;; *) return 0 ;; esac
   if printf '%s' "$f" | grep -qE "^$id:$why(,$id:$why)*$"; then
     printf 'n=%s %s' "$(printf '%s' "$f" | tr ',' '\n' | grep -c .)" "$f"
@@ -464,7 +468,7 @@ TICKMODEL=${TICKMODEL:--}
 log "SPAWN-DONE rc=$RC cost=${COST:-unknown} model=$TICKMODEL rid=$RID"
 # One HELD line per tick whose DECISION names held candidates (or names them malformed), keyed by
 # this wrapper's rid so it joins to the SPAWN lines around it.
-HELD=$(held_field "$(tail -c "+$((LOGPOS+1))" "$LOG" 2>/dev/null | grep -a ' DECISION ' | tail -n 1)")
+HELD=$(held_field "$(tail -c "+$((LOGPOS+1))" "$LOG" 2>/dev/null | grep -a ' DECISION ')")
 [ -n "$HELD" ] && log "HELD rid=$RID $HELD"
 CEN=$(grep -o '"subagent_type":"[a-z-]*"' "$TLOG" 2>/dev/null | sort | uniq -c | awk '{printf "%s=%s ",$2,$1}' | tr -d '"' | sed 's/subagent_type=//g; s/subagent_type://g')
 # NOTE: `grep -c` prints 0 AND exits 1 on no match, so the old `|| echo 0` appended a SECOND

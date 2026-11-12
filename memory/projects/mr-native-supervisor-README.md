@@ -59,9 +59,12 @@ a rule can be counted apart from parallelism lost to judgment:
 | `quiet` | a refactor's quiet window covers it |
 | `other:<word>` | none of the above; the word names the judgment |
 
-After the session ends the wrapper reads that line and logs `HELD rid=<rid> n=<count> <field>`,
-or `HELD rid=<rid> invalid=<field>` when the field is outside the grammar. `grep -a ' HELD '`
-is the count; `grep -a ' held='` the raw decisions.
+The session writes one DECISION line, and `held=` on it lists every held candidate. After the
+session ends the wrapper reads that line and logs `HELD rid=<rid> n=<count> <field>`, or
+`HELD rid=<rid> invalid=<field>` when the field is outside the grammar, or
+`HELD rid=<rid> invalid=decision-lines:<n>` when the session wrote more than one DECISION line
+(entries spread over several lines cannot be counted). `grep -a ' HELD '` is the count;
+`grep -a ' held='` the raw decisions.
 
 **Usage ledger** (`monster-realm-usage-ledger.jsonl`, append-only). Rows that carry cost:
 - **Build session** — exactly one per session that ended (first launch, relaunch, resume, park,
@@ -80,10 +83,17 @@ is the count; `grep -a ' held='` the raw decisions.
   killed before its first result and the transcript adds nothing.
 - **Supervisor tick** — `slice: SUPERVISOR`, `run_id` = the wrapper's `native-<utc>-<pid>`, one
   per decision session that exited 0.
+- `CORRECTION(late spend)` — what a build session spent after its row was written (a session
+  resumed outside the wrapper after a crash or a rate-limit stop keeps its CLI session id, and
+  only its transcript sees the spend). Same `run_id` and `session=<id>` as the session's row;
+  `cost_usd` = the transcript's `cost-state` total minus what the slice's rows already carry
+  for that session. `mr-record` writes it when the session is offered again and when the
+  slice's `MERGED` row is written, so the rows of a `run_id` sum to the session's spend. Spend
+  on a slice that is never merged and never offered again stays unrecorded.
 - `CORRECTION` — a signed reversal of an earlier row.
 
 Every other row (`LAUNCHED`, `MERGED`, `PARKED`, CI waits) records an event and carries no cost.
-A slice's spend is the sum of its build-session rows.
+A slice's spend is the sum of its build-session and `CORRECTION` rows.
 
 ## Slice scope (`touches:`)
 A slice edits the files its spec's `touches:` declares; a run that measures a further file it

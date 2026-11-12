@@ -133,6 +133,47 @@ try:
     got = [r_ for r_ in rows() if r_.get("run_id") == "x"]
     if len(got) != 1 or "COST-UNKNOWN" in got[0].get("notes", ""):
         fail("plain-row-claims-no-cost", "rows=%r" % (got,))
+    # Spend after the row is written. bt-12 stopped on a rate limit at $28.8414 and its row was
+    # written then; the session was resumed outside the wrapper and its transcript reached
+    # $53.3614. The transcript as it stood at the stop is the fixture's first cost-state record.
+    SID = "b4935a17-6de2-4273-aad7-439574365dbf"
+    full = open(os.path.join(FIX, "transcripts", "monster-realm", SID + ".jsonl")).read().splitlines(True)
+    at_stop = dict(env, MR_COST_TRANSCRIPTS=os.path.join(SB, "at-stop"))
+    os.makedirs(os.path.join(SB, "at-stop", "monster-realm"))
+    with open(os.path.join(SB, "at-stop", "monster-realm", SID + ".jsonl"), "w") as f:
+        f.write(full[0])
+
+    def late(slice_):
+        return [(r_.get("run_id"), r_.get("outcome"), r_.get("cost_usd")) for r_ in rows() if r_.get("slice") == slice_]
+
+    def merged(slice_, e):
+        return subprocess.run(["bash", os.path.join(sb_mem, "mr-record"), "ledger", "--run_id", "tick",
+                               "--slice", slice_, "--outcome", "MERGED PR#1"], env=e, capture_output=True,
+                              text=True, timeout=60)
+    RID = "run-%s-20261101T200032Z"
+    STOP = "CRASHED(rate-limit stop)"
+    # Offered again after the resume: the difference goes in under the same run_id, once.
+    record("bt-12", STOP, fx("rate-limit-stop.stream"), at_stop)
+    record("bt-12", STOP, fx("rate-limit-stop.stream"), at_stop)
+    if len(full) != 2 or late("bt-12") != [(RID % "bt-12", STOP, 28.8414)]:
+        fail("late-spend-none-yet", "rows=%r" % (late("bt-12"),))
+    for _ in range(2):
+        rc, out = record("bt-12", STOP, fx("rate-limit-stop.stream"))
+    want = [(RID % "bt-12", STOP, 28.8414), (RID % "bt-12", "CORRECTION(late spend)", 24.52)]
+    if late("bt-12") != want or "ledger-skip:" not in out:
+        fail("late-spend-on-reoffer", "want %r got %r" % (want, late("bt-12")))
+    # Never offered again: the slice's MERGED row reads the session's transcript once more.
+    record("bt-12m", STOP, fx("rate-limit-stop.stream"), at_stop)
+    merged("bt-12m", at_stop)
+    if [x[2] for x in late("bt-12m")] != [28.8414, None]:
+        fail("late-spend-merge-nothing-new", "rows=%r" % (late("bt-12m"),))
+    merged("bt-12m", env)
+    merged("bt-12m", env)
+    got = late("bt-12m")
+    if [x[2] for x in got] != [28.8414, None, None, 24.52, None] \
+            or got[3][:2] != (RID % "bt-12m", "CORRECTION(late spend)") \
+            or round(sum(x[2] or 0 for x in got), 4) != 53.3614:
+        fail("late-spend-at-merge", "rows=%r" % (got,))
 
     # ---- the tick's reconcile block ------------------------------------------------------
     tick_src = open(os.path.join(MEM, "mr-native-tick.sh")).read()
@@ -261,6 +302,9 @@ no-reason|$D held=bt-14|invalid=bt-14
 bare-other|$D held=bt-14:other:|invalid=bt-14:other:
 spaced-list|$D held=bt-14:after, uif-3:overlap|invalid=bt-14:after,
 EOF
+  # One DECISION line per held candidate instead of one line carrying the list.
+  GOT=$(hf "$D held=bt-14:after"$'\n'"$D held=uif-3:overlap")
+  [ "$GOT" = "invalid=decision-lines:2" ] || { echo "SELFCHECK-FAIL held-field two-lines: got '$GOT'"; BAD=1; }
 fi
 # lp-00: repo routing is the SSOT both mr-spawn and mr-launch.sh read. Its register carries the real
 # declared touches of live slices, so a classification regression reds HERE rather than at spawn —

@@ -56,6 +56,9 @@ CONTRACT
                                   cost        the larger of the two, 4dp; null when neither
                                               source reports a cost
                                   source      "log" | "transcript" | null — which one set it
+  mr-cost-sum --session <id> -> the cost-state total of that CLI session's transcript to 4dp,
+                                or "-". ALWAYS exits 0. What a session has spent by now,
+                                for a caller that holds its id and no log.
   mr-cost-sum --selftest     -> exit 0 pass, 1 fail.
 
   * no result event and no cost-state, unreadable or missing file -> "-" / cost null
@@ -403,6 +406,10 @@ if __name__ == "__main__":
         sys.exit(selftest())
     if len(sys.argv) == 3 and sys.argv[1] == "--run":
         sys.exit(emit_run(sys.argv[2]))
+    if len(sys.argv) == 3 and sys.argv[1] == "--session":
+        _now = transcript_cost(sys.argv[2])
+        sys.stdout.write("-\n" if _now is None else "%.4f\n" % _now)
+        sys.exit(0)
     if len(sys.argv) != 2:
         sys.stdout.write("-\n")
         sys.exit(0)

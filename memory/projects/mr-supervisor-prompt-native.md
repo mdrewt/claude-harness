@@ -200,10 +200,10 @@ counter bump); never merge a stopped/`wip:` branch.
 
 ## Output
 
-End with: timestamp, run_id, governor, slice(s) + outcomes, PR link(s), `master` CI after, audits,
+End with: timestamp, run_id, governor, slices + outcomes, PR links, `master` CI after, audits,
 BLOCKERs, risks. Append ONE line to `$MEM/mr-native-tick.log`:
-`<utc> <run_id> DECISION <summary>[ held=<slice>:<why>,…]` — one per ready candidate not
-launched; `<why>` = overlap|structural|after|cap|pacing|memory|quiet|other:<word>.
+`<utc> <run_id> DECISION <summary>[ held=<slice>:<why>,…]`: `held=` lists ready
+candidates not launched; `<why>` = overlap|structural|after|cap|pacing|memory|quiet|other:<word>.
 
 ## Gotchas
 
