@@ -311,7 +311,8 @@ fi
 # credit-stop: a rate-limit rejection stops slices, and the first tick after the reset resumes
 # them. Driven through the REAL mr-interrupted, the REAL wrapper logic of mr-native-tick.sh
 # (extracted by content: the CREDIT STOP block, the human gate, the live-chain fast path, the
-# credit gate, the governor/resume block and the TICK PROVENANCE line), the REAL mr-situation,
+# credit gate, the governor/resume block, the TICK PROVENANCE line, the dry-run exit and the
+# after-session ignored-offer block), the REAL mr-situation,
 # mr-reset-watch and mr-launch.sh with their paths pointed at a sandbox, and stubs for what
 # spends money or reaches the network or the operator (claude, gh, mr-ask-drew), and its own spec
 # corpus. Nothing here reads or writes the live MEM.
@@ -373,9 +374,11 @@ pieces = {
     "credit-gate": line_with(tick_src, 'log "STANDDOWN credit-stop '),
     "governor": between(tick_src, "\n# situation bundle + governor", "\n# assemble prompt"),
     "provenance": line_with(tick_src, "## TICK PROVENANCE"),
+    "dry-run": between(tick_src, '\nif [ "${MR_TICK_DRYRUN:-0}" = "1" ]; then', '\nlog "SPAWN model='),
+    "after-session": between(tick_src, "\n# CREDIT-STOP OFFER NOT TAKEN", "\n# One HELD line per tick"),
 }
 for name, text in pieces.items():
-    if "mr-" not in text and "STANDDOWN" not in text and "PROVENANCE" not in text:
+    if "mr-" not in text and "STANDDOWN" not in text and "PROVENANCE" not in text and "DRYRUN" not in text:
         fail("anchor", "could not extract the %s piece of mr-native-tick.sh" % name)
         sys.exit(bad)
 
@@ -422,7 +425,12 @@ class Box:
                 'LIVE=${LIVE:-0}; DONE_WAIT=0; PENDING=""; LIVE_SLICES=" other(1)"',
                 pieces["fast-path"], pieces["credit-gate"], pieces["governor"],
                 'RID=rid; PROMPTF=%s/prompt.md; : > "$PROMPTF"' % self.root, pieces["provenance"],
-                'echo "REACHED-SESSION governor=$GSTATE resume_first=$RESUME_FIRST"', ""]
+                'echo "REACHED-SESSION governor=$GSTATE resume_first=$RESUME_FIRST"',
+                # RUN_SESSION=1 goes on as the wrapper does: the dry-run exit, then the decision
+                # session (SESSION, a shell command standing in for claude; its exit code is RC),
+                # then the wrapper's after-session block.
+                '[ "${RUN_SESSION:-0}" = 1 ] || exit 0', 'SUP_EFFORT=high; CONSUMED=""; TLOG=/dev/null',
+                pieces["dry-run"], '( eval "${SESSION:-true}" ); RC=$?', pieces["after-session"], ""]
         with open(os.path.join(self.root, "tick.sh"), "w") as f:
             f.write("\n".join(tick).replace("/tmp/mr_", self.tmp + "/mr_"))
 
@@ -1093,6 +1101,101 @@ try:
     box.slice("s-ms", "routine", "opus", "high", log=rejected(resets=RESET * 1000), written=STOPPED)
     if "resets=%d " % RESET not in box.tool(STOPPED, "scan"):
         fail("millisecond-reset", box.tool(STOPPED, "list"))
+finally:
+    box.close()
+
+# ---- an offer a decision session ran past is counted; one no session saw is not ------------------
+def counts(box, now):
+    return dict((e["slice"], (e["state"], e["failed"], e["ignored"])) for e in json.loads(box.tool(now, "list") or "[]"))
+
+
+# Three sessions that exit 0 without launching the offered slice cap it, with one operator issue
+# that says so.
+box = Box()
+try:
+    box.slice("s-a", "routine", "opus", "high", log=rejected(), written=RESET + 100)
+    T = RESET + 130
+    for n in (1, 2, 3):
+        out, log = box.tick(T + n * 3600, RUN_SESSION="1")
+        want = ("due", 0, n) if n < 3 else ("capped", 0, 3)
+        if "resume_first=s-a\n" not in out or counts(box, T + n * 3600) != {"s-a": want} \
+                or "CREDIT-RESUME-IGNORED s-a n=%d%s rid=" % (n, " capped" if n == 3 else "") not in log \
+                or len(box.asks()) != (1 if n == 3 else 0):
+            fail("ignored-offer-counted", "tick %d: stdout=%r log=%r list=%r asks=%r"
+                 % (n, out, log, counts(box, T + n * 3600), box.asks()))
+    later = [box.tick(T + h * 3600, RUN_SESSION="1")[0].strip() + "|" + box.tool(T + h * 3600, "gate")
+             for h in (4, 5, 30)]
+    asks = box.asks()
+    if set(later) != {"REACHED-SESSION governor=NORMAL resume_first=|CLEAR"} or len(asks) != 1 \
+            or not asks[0].startswith("credit-resume-s-a --repo mdrewt/claude-harness ") \
+            or "3 decision sessions ran with its resume offered and none acted on the offer" not in asks[0] \
+            or "resumes of it failed" in asks[0]:
+        fail("ignored-offer-caps-one-blocker", "later=%r asks=%r" % (later, asks))
+finally:
+    box.close()
+
+# A tick that ends before a decision session — the operator hold, the governor's HARD-STOP, a dry
+# run — or whose session fails records nothing, however often; the three sessions after them are
+# the three that cap.
+box = Box()
+try:
+    box.slice("s-a", "routine", "opus", "high", log=rejected(), written=RESET + 100)
+    T = RESET + 130
+    box.tool(T, "scan")
+    seen = []
+    open(os.path.join(box.mem, ".native-supervisor-disabled"), "w").close()
+    seen += [box.tick(T + 60 * n, RUN_SESSION="1") for n in range(1, 5)]
+    os.unlink(os.path.join(box.mem, ".native-supervisor-disabled"))
+    week(3, 1)
+    hard = [box.tick(T + 300 + 60 * n, RUN_SESSION="1") for n in range(1, 5)]
+    week(7.01, 1)
+    dry = [box.tick(T + 600 + 60 * n, RUN_SESSION="1", MR_TICK_DRYRUN="1") for n in range(1, 5)]
+    died = [box.tick(T + 900 + 60 * n, RUN_SESSION="1", SESSION="exit 1") for n in range(1, 5)]
+    if any("STANDDOWN budget-hard-stop" not in log for _o, log in hard) \
+            or any("resume_first=s-a\n" not in out or "DECISION-NEEDED (dryrun)" not in out for out, _l in dry) \
+            or any("resume_first=s-a\n" not in out for out, _l in died):
+        fail("standdown-setup", "hard=%r dry=%r died=%r" % (hard, dry, died))
+    if any("CREDIT-RESUME-IGNORED" in log for _o, log in seen + hard + dry + died) \
+            or counts(box, T + 1200) != {"s-a": ("due", 0, 0)} or box.asks():
+        fail("standdown-records-nothing", "list=%r asks=%r logs=%r"
+             % (counts(box, T + 1200), box.asks(), [l for _o, l in seen + hard + dry + died]))
+    for n in (1, 2, 3):
+        box.tick(T + 1200 + n * 3600, RUN_SESSION="1")
+        if counts(box, T + 1200 + n * 3600) != {"s-a": ("due", 0, n) if n < 3 else ("capped", 0, 3)}:
+            fail("standdown-then-three-sessions", "session %d: list=%r" % (n, counts(box, T + 1200 + n * 3600)))
+    if len(box.asks()) != 1:
+        fail("standdown-then-one-blocker", "asks=%r" % (box.asks(),))
+finally:
+    box.close()
+
+# A launch on the second tick takes the slice off the record: no cap, no issue. A failed resume
+# counted during the session is not also an ignored offer, and the two counts stay apart.
+box = Box()
+try:
+    box.slice("s-a", "routine", "opus", "high", log=rejected(), written=RESET + 100)
+    box.slice("s-b", "routine", "opus", "high", log=rejected(), written=RESET + 100)
+    T = RESET + 130
+    out, log = box.tick(T, RUN_SESSION="1")
+    if "CREDIT-RESUME-IGNORED s-a n=1 s-b n=1 rid=" not in log \
+            or counts(box, T) != {"s-a": ("due", 0, 1), "s-b": ("due", 0, 1)}:
+        fail("launch-setup", "log=%r list=%r" % (log, counts(box, T)))
+    out, log = box.tick(T + 3600, RUN_SESSION="1",
+                        SESSION='"$MEM/mr-interrupted" drop s-a; "$MEM/mr-interrupted" failed s-b FAIL')
+    if "resume_first=s-a,s-b\n" not in out or "CREDIT-RESUME-IGNORED" in log \
+            or counts(box, T + 3600) != {"s-b": ("waiting", 1, 1)}:
+        fail("launch-or-failure-not-ignored", "stdout=%r log=%r list=%r" % (out, log, counts(box, T + 3600)))
+    quiet = [box.tick(T + 3600 + 600 * n, RUN_SESSION="1") for n in (1, 2, 3, 4)]
+    if any("CREDIT-RESUME-IGNORED" in log for _o, log in quiet) or box.asks() \
+            or counts(box, T + 7000) != {"s-b": ("waiting", 1, 1)}:
+        fail("launch-leaves-no-cap", "list=%r asks=%r" % (counts(box, T + 7000), box.asks()))
+    # s-b is due again an hour after its failed resume: two more ignored offers reach the cap of
+    # three with the failed count untouched.
+    for n in (2, 3):
+        box.tick(T + n * 3600 + 60, RUN_SESSION="1")
+    asks = box.asks()
+    if counts(box, T + 4 * 3600) != {"s-b": ("capped", 1, 3)} or len(asks) != 1 \
+            or not asks[0].startswith("credit-resume-s-b ") or "did not act on the offer" not in asks[0]:
+        fail("ignored-and-failed-independent", "list=%r asks=%r" % (counts(box, T + 4 * 3600), asks))
 finally:
     box.close()
 

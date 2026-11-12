@@ -37,8 +37,8 @@ models. A one-model stop records, flags and gates only slices running that model
                                supervisor's; omitted = any model) waits for its reset; `HELD`
                                under an operator hold; else `CLEAR`.
   mr-interrupted list          JSON array for the situation bundle: slice, cause, limit, scope,
-                               stopped_utc, resets_at_utc, state, due, failed, tier, model,
-                               effort, resume_session. `state` is waiting | live | due |
+                               stopped_utc, resets_at_utc, state, due, failed, ignored, tier,
+                               model, effort, resume_session. `state` is waiting | live | due |
                                unverified | capped; `due` is true for `due` alone.
   mr-interrupted vars --due | <slice>
                                Writes /tmp/mr_pass_<slice>.vars.json for a resume: the vars the
@@ -52,6 +52,11 @@ models. A one-model stop records, flags and gates only slices running that model
   mr-interrupted failed <slice> [<status>]
                                mr-spawn reports that it refused to launch an offered slice for
                                a reason that does not clear by itself. Counts one failed resume.
+  mr-interrupted ignored <slice,...>
+                               The wrapper reports that a decision session ran to its end with
+                               these slices offered. Counts one ignored offer for each that is
+                               still offered and `due`; prints `IGNORED <slice> n=<k>[ capped] ...`
+                               or `NOOP`.
   mr-interrupted drop <slice>  Removes the slice's record. mr-spawn calls it once the slice is
                                launched again.
 
@@ -69,13 +74,20 @@ and `launch-check` all ask that one question, so a slice is never offered into a
 RESUME ATTEMPTS. A resume fails in two cases only: the slice was launched again and the vendor
 refused it again (a new terminal rejection, within an hour of the launch or with a reset no
 later than the one already waited for), or mr-spawn refused the launch for a reason that does
-not clear by itself (`failed`; mr-spawn's `status()` lists the refusals that are exempt). An
-offer nothing acted on — a hold, a stand-down or a dry run ended the tick, or the session did
-not call mr-spawn — is no attempt: the slice stays `due` and the next tick offers it again. A
+not clear by itself (`failed`; mr-spawn's `status()` lists the refusals that are exempt). A
 failed resume waits an hour (a refusal that names a strictly later reset waits for that reset).
 After 2 failed resumes the slice is `capped`: it is no longer offered, no longer counts for
 `gate`, and one operator issue is opened through mr-ask-drew. A refusal after more than an hour
-of work that names a later reset is a new stop and starts the count again.
+of work that names a later reset is a new stop and starts both counts again.
+
+IGNORED OFFERS. An offer that no session saw — a hold, a stand-down or a dry run ended the tick
+before one started — counts for nothing: the slice stays `due` and the next tick offers it again.
+An offer a session did see is different, because every such tick is paid for: when a decision
+session exits 0 and an offered slice is still offered and `due` (not launched, not dropped, no
+failed resume counted), the wrapper reports it (`ignored`) and that is one ignored offer. The
+count is separate from the failed resumes and neither resets the other. After 3 ignored offers
+the slice is `capped` the same way, and the operator issue says the session did not act on the
+offer.
 
 RESET TIME. The EARLIEST among the rejections the session ended on: a low guess costs one
 resume that is refused and recorded again with the later reset; a high guess costs idle days.
@@ -110,6 +122,7 @@ MAX_AHEAD = 14 * 86400   # a reset further out than any real window is a bad val
 MAX_AGE = 14 * 86400     # a stop older than this is no longer resumed
 BACKOFF = 3600           # the wait when no usable reset time is known, and after a failed resume
 MAX_FAILED = 2
+MAX_IGNORED = 3          # offers a decision session ran past before the slice is capped
 MODELS = ("fable", "opus", "sonnet", "haiku")
 GENERAL_WINDOWS = ("five_hour", "seven_day")
 PR_REPOS = {"harness": "mdrewt/claude-harness", "project": "mdrewt/monster-realm"}
@@ -553,7 +566,10 @@ def current(lookups=False):
     t = now()
 
     def run(state):
-        return [(dict(e, failed=int((state["resumes"].get(e.get("slice")) or {}).get("failed") or 0)), w)
+        def count(e, what):
+            return int((state["resumes"].get(e.get("slice")) or {}).get(what) or 0)
+
+        return [(dict(e, failed=count(e, "failed"), ignored=count(e, "ignored")), w)
                 for e, w in settle(state, t, lookups)]
 
     return locked(run)
@@ -566,16 +582,24 @@ def raise_blockers():
     ask = os.path.join(MEM, "mr-ask-drew")
     for e in [e for e in load()["entries"] if e.get("capped") and not e.get("blocker")]:
         name = e["slice"]
+        if e.get("capped_by") == "ignored":
+            why = "%d decision sessions ran with its resume offered and none acted on the offer" % MAX_IGNORED
+            root = ("A credit-stop resume no session acts on is offered to %d sessions; the loop no longer "
+                    "offers this slice." % MAX_IGNORED)
+            last = "the session did not act on the offer"
+        else:
+            why = "%d resumes of it failed" % MAX_FAILED
+            root = "A credit-stop resume is offered %d times; the loop no longer offers this slice." % MAX_FAILED
+            last = e.get("last_failure") or "refused again"
         try:
             r = subprocess.run(
                 [ask, "credit-resume-" + name, "--repo", PR_REPOS["harness"],
-                 "--question", "Slice %s was stopped by a usage limit (%s) and %d resumes of it failed. "
-                 "Relaunch it by hand, or drop it (mr-interrupted drop %s)?" % (name, e.get("limit"), MAX_FAILED, name),
-                 "--root", "A credit-stop resume is offered %d times; the loop no longer offers this slice."
-                 % MAX_FAILED,
+                 "--question", "Slice %s was stopped by a usage limit (%s) and %s. "
+                 "Relaunch it by hand, or drop it (mr-interrupted drop %s)?" % (name, e.get("limit"), why, name),
+                 "--root", root,
                  "--context", "stopped %s; last reset waited for %s; tier=%s model=%s; session=%s; last failure: %s"
                  % (e.get("stopped_utc"), e.get("resets_at_utc"), e.get("tier"), e.get("model"),
-                    e.get("resume_session"), e.get("last_failure") or "refused again")],
+                    e.get("resume_session"), last)],
                 capture_output=True, text=True, timeout=40)
             ok = "ASK-DREW-OK" in r.stdout
         except Exception:
@@ -608,7 +632,7 @@ def cmd_gate(model):
 
 def cmd_list():
     keep = ("slice", "cause", "limit", "scope", "stopped_utc", "resets_at_utc", "tier", "model", "effort",
-            "resume_session", "failed")
+            "resume_session", "failed", "ignored")
     print(json.dumps([dict({k: e.get(k) for k in keep}, state=w, due=w == "due") for e, w in current()]))
     return 0
 
@@ -690,6 +714,34 @@ def cmd_failed(name, status):
     return 0
 
 
+def cmd_ignored(names):
+    if not os.path.exists(STATE):
+        print("NOOP")
+        return 0
+    t = now()
+
+    def run(state):
+        out = []
+        for e, w in settle(state, t, False):
+            name = e.get("slice")
+            if name not in names or w != "due" or e.get("offered_at") is None:
+                continue
+            rec = state["resumes"].setdefault(name, {})
+            rec["ignored"] = int(rec.get("ignored") or 0) + 1
+            del e["offered_at"]
+            if rec["ignored"] >= MAX_IGNORED:
+                e["capped"] = True
+                e["capped_by"] = "ignored"
+            out.append("%s n=%d%s" % (name, rec["ignored"], " capped" if e.get("capped") else ""))
+        return out
+
+    out = locked(run)
+    say("IGNORED " + " ".join(out) if out else "NOOP")
+    if out and not held():
+        raise_blockers()
+    return 0
+
+
 def cmd_drop(name):
     if not os.path.exists(STATE):
         print("DROPPED 0")
@@ -729,10 +781,13 @@ def main(argv):
         return cmd_launch_check(argv[1], argv[2])
     if len(argv) in (2, 3) and argv[0] == "failed" and re.fullmatch(_NAME, argv[1]):
         return cmd_failed(argv[1], argv[2] if len(argv) == 3 else "")
+    if len(argv) == 2 and argv[0] == "ignored" and re.fullmatch(r"%s(,%s)*" % (_NAME, _NAME), argv[1]):
+        return cmd_ignored(argv[1].split(","))
     if len(argv) == 2 and argv[0] == "drop" and re.fullmatch(_NAME, argv[1]):
         return cmd_drop(argv[1])
     sys.stderr.write("usage: mr-interrupted scan | gate [--model M] | list | vars --due|<slice> | "
-                     "launch-check <slice> <model> | failed <slice> [<status>] | drop <slice>\n")
+                     "launch-check <slice> <model> | failed <slice> [<status>] | ignored <slice,...> | "
+                     "drop <slice>\n")
     return 2
 
 

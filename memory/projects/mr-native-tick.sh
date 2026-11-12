@@ -505,6 +505,17 @@ TICKMODEL=${TICKMODEL:--}
 [ "$COST" = "-" ] && COST=""
 [ "$TICKMODEL" = "-" ] && TICKMODEL="$SUP_MODEL"
 log "SPAWN-DONE rc=$RC cost=${COST:-unknown} model=$TICKMODEL rid=$RID"
+# CREDIT-STOP OFFER NOT TAKEN: this line is reached only after a decision session was started —
+# every stand-down above (hold, human activity, live chain, rate limit, credit stop, chain mutex,
+# HARD-STOP) and the dry run exit before it — and RC=0 says the session ran to its end instead
+# of being refused, timed out or logged out. A slice named in this tick's resume_first that is
+# still offered and due after such a session (not launched, not dropped, no failed resume
+# counted) was paid for and passed over; `mr-interrupted ignored` counts that, and caps the slice
+# when it keeps happening, so it cannot make every hourly tick a paid session.
+if [ "$RC" -eq 0 ] && [ -n "$RESUME_FIRST" ]; then
+  IGN=$(timeout 60 "$MEM/mr-interrupted" ignored "$RESUME_FIRST" 2>/dev/null)
+  case "$IGN" in "IGNORED "*) log "CREDIT-RESUME-$IGN rid=$RID" ;; esac
+fi
 # One HELD line per tick whose DECISION names held candidates (or names them malformed), keyed by
 # this wrapper's rid so it joins to the SPAWN lines around it.
 HELD=$(held_field "$(tail -c "+$((LOGPOS+1))" "$LOG" 2>/dev/null | grep -a ' DECISION ')")

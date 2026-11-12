@@ -150,13 +150,21 @@ does not clear by itself: `FAIL`, `REPO-MIXED`, `REPO-EXTERNAL`, `REPO-UNRESOLVE
 `REPO-OUT-OF-SYNC`, `COSTPARK-GATE`, or a brief that does not render. `HOLD-PRESENT`,
 `PROBE-TRIPPED`, `ALREADY-RUNNING`, `CREDIT-STOPPED` and a `--dry` probe never count: each
 clears by itself, and each also keeps the slice from being `due` or stands the tick down before
-a session is paid for. An offer nothing acted on — a hold, a stand-down or a dry run ended the
-tick, or the session did not call `mr-spawn` — is no attempt: the slice stays `due` and the
-next tick offers it again. A failed resume waits an hour (or for the strictly later reset the
+a session is paid for. A failed resume waits an hour (or for the strictly later reset the
 refusal names). After 2 failed resumes the slice is `capped`: never offered again, no longer
 `DUE` for the gate, no reset watcher, and `mr-interrupted` opens one
 `DECISION(credit-resume-<slice>)` issue through `mr-ask-drew`. `mr-interrupted drop <slice>`
 clears it by hand.
+
+**Ignored offers.** An offer no session saw — a hold, a stand-down or a dry run ended the tick
+before a decision session started — counts for nothing: the slice stays `due` and the next tick
+offers it again. An offer a session did see is counted, because each such tick is paid for.
+After a decision session that exited 0, the wrapper calls `mr-interrupted ignored <slices>` with
+that tick's `resume_first`; each named slice that is still offered and `due` (not launched, not
+dropped, no failed resume counted) gets one ignored offer and a `CREDIT-RESUME-IGNORED` line in
+the tick log. Ignored offers and failed resumes are separate counts and neither resets the
+other. After 3 ignored offers the slice is `capped` exactly as above, and the one
+`DECISION(credit-resume-<slice>)` issue says the session did not act on the offer.
 
 The tick's own session being refused arms `rate_limit_resets_at` in `mr-state.json` and a reset
 watcher. The budget governor's HARD-STOP is separate: it is this loop's dollar estimate
