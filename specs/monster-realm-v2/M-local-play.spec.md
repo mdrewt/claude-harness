@@ -95,6 +95,9 @@ account issuer, with the official server rejecting any other audience.
 ## Notes
 
 - Private worlds run the official rules until `M-modding`; a host controls only who may join.
+- **Idle rule (operator, 2026-11-12):** a zone with no player in it does not update, or updates as
+  little as possible; a world with nobody connected does nothing at all. `M-scale-readiness` SR10
+  builds the zone part; LP0 measures what is left.
 - Costs that matter more on a player's machine than on ours, found on 2026-11-12: empty-zone ticks,
   commit-log growth, `battle_summary` never reaped (`M-scale-readiness` SR7), the device-resolution
   terrain bake (SR8).

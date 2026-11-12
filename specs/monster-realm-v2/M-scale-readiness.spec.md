@@ -38,7 +38,8 @@ tested at this size — SR9 exists to replace these with measurements):
   at 1,000 movers across zones before its design is fixed; taking the ack from the reducer call's
   result instead of a view is the fallback.
 - **100 zone ticks at 5 Hz** is 500 scheduled calls a second: about 3% of the thread with every
-  zone empty, plus about 2% for 1,000 movers. Fine.
+  zone empty, plus about 2% for 1,000 movers. Affordable on the official server, and removed by
+  SR10 because the same code runs on a player's laptop.
 - **Budgets for SR9's load run:** 1,000 clients spread over 100 zones with one zone at 50; tick p95
   under `STEP_MS`, input round-trip p95 under 50 ms, download per client under 20 KB/s, reducer
   thread under 50%.
@@ -101,6 +102,15 @@ tested at this size — SR9 exists to replace these with measurements):
   share by reducer (`spacetime_txn_elapsed_time_sec`) joins the dashboard. The host's
   `spacetime_num_bytes_sent_to_clients_total` counts each delta once, not once per subscriber, so it
   cannot stand in for this.
+
+- **SR10 A zone with no player in it does no work** (operator, 2026-11-12: such zones "should
+  either not update or keep updates to a minimum"). Every zone's `movement_tick` fires at 5 Hz
+  whether or not anyone is there (~58 µs per empty tick: ~3% of the reducer thread for 100 empty
+  zones, and constant wake-ups and commit-log writes on a player's own machine). A zone's tick is
+  armed when a player's character enters it (join, warp, reconnect) and disarms itself on the first
+  tick that finds none; NPCs in an empty zone hold still. Anything that must still advance with
+  nobody present (a timer a returning player would notice) is computed from elapsed time on
+  re-arm, not ticked. Builds after SR1, which rewrites the same reducer.
 
 ## Watch items (graph in the load run; no slice unless a budget is breached)
 
