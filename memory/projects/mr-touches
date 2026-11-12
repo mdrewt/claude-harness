@@ -4,13 +4,15 @@
 # source as shell and EXECUTE any backticked prose in it as commands (postmortem in mr-hold's
 # header). Python reads this line as a no-op string; sh/bash re-execs the file under python3 before
 # reaching any other line. Statically enforced for every python mr-* tool by mr-selfcheck.
-__doc__ = """mr-touches — a running slice widens its own `touches:` when no live sibling claims the file.
+__doc__ = """mr-touches — a running slice widens its own `touches:` when no unmerged sibling claims the file.
 
     mr-touches widen --slice S --why "<measured need>" PATH [PATH...]
         rc=0  TOUCHES-WIDENED S +<n> ...   every PATH is now in S's set (recorded, or already there)
         rc=1  TOUCHES-REFUSED S <path> — <reason>   one line per refused PATH; NOTHING is recorded
         rc=2  usage error
     mr-touches list --slice S        -> the widened paths, comma-joined (empty line when none)
+    mr-touches scope --slice S --repo PATH --base REF --head REF
+        -> JSON: which files of the base...head diff sit outside S's set (mr-audit's scope block)
     mr-touches --selftest            -> fixtures over a temp dir; rc=0 pass, rc=1 fail
 
 WHY THIS EXISTS. A slice's `touches:` is written at spec time, but the files a change forces are
@@ -20,27 +22,42 @@ field. A run that measures such a file parks, and the supervisor's only answer i
 to the spec and relaunch — one parked session plus one cold relaunch per miss. `touches:` protects
 two things, and neither needs that round trip:
 
-  1. FILE-DISJOINT FAN-OUT. A file may be edited by one live slice at a time. `widen` asks
-     mr-disjoint (the overlap SSOT) whether any live sibling's set — declared or widened — covers
-     the requested path, and refuses when one does. A structural path (mr-disjoint's always-serial
-     set) is granted only while no sibling is live. Every grant is a row mr-disjoint reads back, so
-     a sibling launched later is checked against the widened set, not just the spec's.
+  1. FILE-DISJOINT FAN-OUT. A file may be edited by one unmerged slice at a time. `widen` asks
+     mr-disjoint (the overlap SSOT) whether any CLAIMANT's set covers the requested path, and
+     refuses when one does. A structural path (mr-disjoint's always-serial set) is granted only
+     while no other slice is unmerged. Every grant is a row mr-disjoint reads back, so a sibling
+     launched later is checked against the widened set, not just the spec's.
   2. SCOPE CONTROL. Every grant carries the run's stated reason and is printed by
-     `mr-gates render --format pr|park`, so the PR body shows whoever merges exactly which files
-     the run added and why. Paths that need operator approval are never grantable.
+     `mr-gates render --format pr|park`. `scope` lists every changed file outside declared +
+     widened + sibling tests + the doc set, and mr-audit turns a non-empty list into a mandatory
+     diff read, so an edit made without a grant is as visible as one made with it. The files that
+     define a slice's own gate or steer the loop (NOT_GRANTABLE) are never grantable: they are
+     in a set only when the spec declares them.
 
-A REFUSED request is a hidden dependency in the old sense: the run parks and the supervisor
-re-serializes. `type: refactor` slices do not call this tool; their `touches:` is a measured
-contract (standards/spec-driven.md §Refactor slices) and a miss there is a spec defect.
+A REFUSED request is a hidden dependency: the run parks and the supervisor re-serializes.
+`type: refactor` slices do not call this tool; their `touches:` is a measured contract
+(standards/spec-driven.md §Refactor slices) and a miss there is a spec defect.
+
+PATHS ARE CANONICAL. A request is refused unless it is the one repo-relative spelling of a file
+(`os.path.normpath(p) == p`, no `projects/monster-realm/` prefix); mr-disjoint canonicalises
+every declared path the same way, so no second spelling of a claimed file reads as unclaimed.
+
+CLAIMANT = any other slice of this repo whose work is not merged:
+  - a `$MEM/.harness-runner.<slice>.lock` (written by mr-spawn at launch, carrying the declared
+    touches and repo) whose `session_leader` pid is alive;
+  - a slice listed in `$MEM/mr-state.json` `inflight[]` or `awaiting_merge[]` — its builder may
+    have exited, but its PR is still to merge;
+  - every open PR of the repo that is not this slice's own (`gh pr list`): a parked slice, a
+    CI wait, an operator's branch. Its claim is the files the PR changes.
+A claimant's set is its lock's declared touches, its widened record and its open PR's files. A
+claimant with none of them is undeclared, which collides with everything (the fan-out rule). A
+lock with a dead leader that is in neither list and has no open PR is merged or abandoned work
+and claims nothing. When the open PRs cannot be listed the request is refused: no verdict is
+not a grant.
 
 RECORD FORMAT. `$MEM/gates/<slice>.widened.jsonl`, append-only, one JSON object per granted path:
 `{"ts","slice","path","why"}`. Readers: this tool, mr-disjoint (unions the paths into the named
 slice's set) and mr-gates render (prints path + why).
-
-LIVE SIBLING = another slice's `$MEM/.harness-runner.<slice>.lock` (written by mr-spawn at launch,
-carrying its declared touches and repo) whose `session_leader` pid is alive and whose repo is this
-slice's. A lock whose leader is dead belongs to a finished, parked or crashed run and claims
-nothing here; the supervisor's own mr-disjoint call covers a slice it is about to resume.
 
 TWO ROOTS, as in mr-gates: the code is self-locating (it runs the mr-disjoint and mr-repo-of
 beside it), the SUBJECT is the machine singleton — `MEM` is hardcoded so a copy run from a slice
@@ -61,15 +78,31 @@ MEM = HARNESS + "/memory/projects"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 SLICE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-# Supervisor doctrine (Anti-reaccretion) puts these behind operator approval; a run cannot grant
-# them to itself.
-OPERATOR_GATED = (
-    "standards/",
-    ".claude/",
-    "memory/projects/mr-supervisor-prompt-native.md",
-    "memory/projects/mr-brief-template.md",
-    "specs/monster-realm-v2/build-loop-prompt.md",
+PROJECT_PREFIX = "projects/monster-realm/"
+PR_REPO = {"harness": "mdrewt/claude-harness", "project": "mdrewt/monster-realm"}
+DOC_SET = ("CHANGELOG.md", "ARCHITECTURE.md", "docs/DECISIONS.md")
+# A run cannot grant itself the files that decide whether it passes or that steer the loop: the
+# doctrine and tooling (operator-approved under the supervisor's Anti-reaccretion rule), the
+# spec corpus, and each repo's CI, hook, task-runner and test-runner configuration. One of these
+# is in a slice's set only when its spec declares it.
+NOT_GRANTABLE = (
+    "standards/", ".claude/", "memory/", "specs/",
+    ".github/", ".cargo/", ".config/",
+    "justfile", "lefthook.yml", "AGENTS.md", "CLAUDE.md",
+    "rust-toolchain.toml", "clippy.toml", "biome.json", "evals/run.mjs",
 )
+NOT_GRANTABLE_NAME = re.compile(r"^(vite|vitest|playwright)\.config\.[a-z]+$")
+TEST_NAME = re.compile(r"(_tests?\.rs|\.(test|spec)\.[a-z]+)$")
+
+
+def canon(p):
+    """The one spelling mr-disjoint compares: no `projects/monster-realm/` prefix, no `//`, `/./`."""
+    p = str(p).strip()
+    tail = "/" if p.endswith("/") else ""
+    p = os.path.normpath(p)
+    if p.startswith(PROJECT_PREFIX):
+        p = p[len(PROJECT_PREFIX):]
+    return p + tail
 
 
 def record_path(mem, slice_id):
@@ -111,7 +144,7 @@ def read_lock(mem, slice_id):
     t = d.get("touches") or []
     if not isinstance(t, list):
         t = [x.strip() for x in str(t).split(",")]
-    d["touches"] = [str(x).strip() for x in t if str(x).strip()]
+    d["touches"] = [canon(x) for x in t if str(x).strip()]
     return d
 
 
@@ -131,33 +164,167 @@ def pid_alive(pid):
     return True
 
 
-def live_siblings(mem, slice_id, repo):
-    """{sibling: declared touches} for every other slice with a live leader in the same repo."""
+def unmerged_in_state(mem):
+    """{slice: entry} for mr-state.json's inflight[] and awaiting_merge[]. None = unreadable."""
+    try:
+        with open(os.path.join(mem, "mr-state.json")) as f:
+            d = json.load(f)
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError):
+        return None
     out = {}
+    for key in ("inflight", "awaiting_merge"):
+        for e in (d.get(key) or []) if isinstance(d, dict) else []:
+            if isinstance(e, str):
+                e = {"slice": e}
+            if isinstance(e, dict) and e.get("slice"):
+                out.setdefault(str(e["slice"]), e)
+    return out
+
+
+def gh_open_prs(pr_repo):
+    """[{number, headRefName, files:[{path}]}] for every open PR of `pr_repo`. None = no answer."""
+    for gh in ("gh", os.path.expanduser("~/.asdf/shims/gh")):
+        try:
+            r = subprocess.run([gh, "pr", "list", "-R", pr_repo, "--state", "open", "-L", "100",
+                                "--json", "number,headRefName,files"],
+                               capture_output=True, text=True, timeout=60)
+        except FileNotFoundError:
+            continue
+        except (OSError, subprocess.SubprocessError):
+            return None
+        try:
+            v = json.loads(r.stdout) if r.returncode == 0 else None
+        except ValueError:
+            v = None
+        return v if isinstance(v, list) else None
+    return None
+
+
+def branch_names(head, slice_id):
+    """True when branch `head` is slice_id's: `slice/<id>`, `<id>`, `<id>-park-…`."""
+    return any(t == slice_id or t.startswith(slice_id + "-") for t in str(head).split("/"))
+
+
+def cwd_branch():
+    try:
+        r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True,
+                           text=True, timeout=10)
+        return r.stdout.strip() if r.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def claimants(mem, slice_id, repo, prs, own_branch=""):
+    """({claimant: paths}, slice-claimant names, [claimants with no known set]) — see CLAIMANT.
+
+    A claimant named by its slice id is one mr-disjoint also unions the widened record into."""
+    locks = {}
     try:
         names = sorted(os.listdir(mem))
     except OSError:
-        return out
+        names = []
     for n in names:
         m = re.match(r"^\.harness-runner\.(.+)\.lock$", n)
-        if not m or m.group(1) == slice_id:
+        if m and m.group(1) != slice_id:
+            lock = read_lock(mem, m.group(1))
+            if lock is not None and not (lock.get("repo") and repo and lock["repo"] != repo):
+                locks[m.group(1)] = lock
+    out, undeclared = {}, []
+    for name, lock in locks.items():
+        if pid_alive(lock.get("session_leader")):
+            out[name] = list(lock["touches"])
+    for name, e in (unmerged_in_state(mem) or {}).items():
+        if name == slice_id or name in out:
             continue
-        lock = read_lock(mem, m.group(1))
-        if lock is None or not pid_alive(lock.get("session_leader")):
+        lock = locks.get(name)
+        if lock is None and (read_lock(mem, name) is not None
+                             or (e.get("repo") and repo and e["repo"] != repo)):
+            continue  # the other repo's slice
+        t = e.get("touches") if isinstance(e.get("touches"), list) else []
+        out[name] = list(lock["touches"]) if lock else [canon(x) for x in t if str(x).strip()]
+    slices = set(out)
+    for pr in prs:
+        head = str(pr.get("headRefName") or "")
+        if branch_names(head, slice_id) or (own_branch and head == own_branch):
             continue
-        if lock.get("repo") and repo and lock["repo"] != repo:
-            continue
-        out[m.group(1)] = lock["touches"]
-    return out
+        files = [canon(f.get("path")) for f in pr.get("files") or []
+                 if isinstance(f, dict) and f.get("path")]
+        owner = [n for n in locks if branch_names(head, n)]
+        if owner:
+            # The longest id is the branch's slice (`qf-7b-…` is qf-7b's, not qf-7's).
+            name = max(owner, key=len)
+            slices.add(name)
+            out[name] = out.get(name, list(locks[name]["touches"])) + files
+        else:
+            out["pr-%s" % pr.get("number")] = files
+    for name in sorted(out):
+        out[name] = list(dict.fromkeys(out[name]))
+        if not out[name] and not widened_paths(mem, name):
+            undeclared.append(name)
+    return out, slices, undeclared
 
 
 def covered(path, declared):
     """True when `path` already sits inside the set: a literal, a glob match, or under a dir token."""
     import fnmatch
     for d in declared:
-        if path == d or (d.endswith("/") and path.startswith(d)) or fnmatch.fnmatch(path, d):
+        if path == d or path.startswith(d.rstrip("/") + "/") or fnmatch.fnmatch(path, d):
             return True
     return False
+
+
+def not_grantable(path):
+    return (any(path == g or path.startswith(g) for g in NOT_GRANTABLE)
+            or bool(NOT_GRANTABLE_NAME.match(os.path.basename(path))))
+
+
+def sibling_test(path, declared):
+    """A test file beside a declared code file and named after it: `pvp.rs` -> `pvp_tests.rs`,
+    `main.ts` -> `main.help.test.ts`."""
+    if not TEST_NAME.search(path):
+        return False
+    d, name = os.path.split(path)
+    for c in declared:
+        cd, cn = os.path.split(c)
+        stem = cn.split(".")[0]
+        if cd == d and stem and re.match(re.escape(stem) + r"([._-]|$)", name):
+            return True
+    return False
+
+
+def outside_scope(changed, declared, widened):
+    """The changed files no rule puts in the slice's set (the brief's Scope line, mechanically)."""
+    have = [canon(p) for p in list(declared) + list(widened)]
+    return [p for p in changed
+            if not (covered(p, have) or p in DOC_SET or sibling_test(p, have))]
+
+
+def scope(mem, slice_id, repo_path, base, head):
+    """mr-audit's scope block: the base...head diff against declared + widened touches."""
+    lock = read_lock(mem, slice_id)
+    rows = read_rows(mem, slice_id)
+    v = {"slice": slice_id, "widened": [{"path": r["path"], "why": r.get("why", "")} for r in rows]}
+    if lock is None or not lock["touches"]:
+        v.update(verdict="NO-TOUCHES", reason="no launch lock with declared touches")
+        return v
+    try:
+        r = subprocess.run(["git", "-C", repo_path, "diff", "--name-only", "--no-renames",
+                            "%s...%s" % (base, head)], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as e:
+        v.update(verdict="AUDIT-ERROR", reason=str(e)[:160])
+        return v
+    if r.returncode != 0:
+        v.update(verdict="AUDIT-ERROR", reason="git diff failed: " + r.stderr.strip()[:120])
+        return v
+    changed = [ln for ln in r.stdout.splitlines() if ln]
+    out = outside_scope(changed, lock["touches"], [x["path"] for x in rows])
+    v.update(verdict="OUT-OF-SCOPE" if out else "IN-SCOPE", changed=len(changed),
+             outside=out[:40])
+    if len(out) > 40:
+        v["outside_truncated"] = len(out) - 40
+    return v
 
 
 def shape_error(path):
@@ -168,9 +335,10 @@ def shape_error(path):
         return "must be repo-relative"
     if path.endswith("/") or re.search(r"[*?\[\]]", path):
         return "literal files only (no glob, no directory)"
-    for g in OPERATOR_GATED:
-        if path == g or path.startswith(g):
-            return "needs operator approval (mr-ask-drew), never self-granted"
+    if os.path.normpath(path) != path or path.startswith(PROJECT_PREFIX):
+        return "not the canonical repo-relative spelling (write %s)" % canon(path)
+    if not_grantable(path):
+        return "gate or loop-control file: never self-granted, the spec declares it"
     return None
 
 
@@ -183,8 +351,8 @@ def repo_of(paths):
         return "ROUTE-ERROR"
 
 
-def sibling_conflicts(mem, slice_id, paths, siblings):
-    """{path: reason} from mr-disjoint over the request and each live sibling. None = no verdict."""
+def sibling_conflicts(mem, slice_id, paths, siblings, slices):
+    """{path: reason} from mr-disjoint over the request and each claimant. None = no verdict."""
     args = ["%s:%s" % (slice_id + ".widen", ",".join(paths))]
     args += ["%s:%s" % (n, ",".join(t)) for n, t in sorted(siblings.items())]
     env = dict(os.environ, MR_WIDEN_DIR=os.path.join(mem, "gates"), MR_DISJOINT_NO_GRAPH="1")
@@ -198,8 +366,8 @@ def sibling_conflicts(mem, slice_id, paths, siblings):
         return None
     me = slice_id + ".widen"
     bad = {}
-    for p in structural.get(me, []):
-        bad[p] = "structural file while %s is live" % ", ".join(sorted(siblings))
+    for p in structural.get(me, []) if slices else []:
+        bad[p] = "structural file while %s is unmerged" % ", ".join(sorted(slices))
     for pr in pairs:
         if me not in pr["pair"] or pr["disjoint"]:
             continue
@@ -207,11 +375,13 @@ def sibling_conflicts(mem, slice_id, paths, siblings):
         # mr-disjoint reports the first-named slice's side of each overlap, and the request is
         # always first, so these are the requested paths themselves.
         for p in pr["overlap"]:
-            bad.setdefault(p, "claimed by live slice %s" % other)
+            bad.setdefault(p, "claimed by unmerged %s" % other)
     return bad
 
 
-def widen(mem, slice_id, why, paths, out=None):
+def widen(mem, slice_id, why, paths, out=None, open_prs=gh_open_prs, own_branch=""):
+    """`open_prs` is a FUNCTION PARAMETER, not an env override: the CLI never passes it, and the
+    selftest uses it to stand in for `gh`."""
     out = out if out is not None else sys.stdout
 
     def say(s):
@@ -250,9 +420,17 @@ def widen(mem, slice_id, why, paths, out=None):
             if got != repo:
                 return refuse([(p, "outside this slice's repo (%s, with these paths: %s)"
                                 % (repo, got)) for p in new])
-            siblings = live_siblings(mem, slice_id, repo)
+            if unmerged_in_state(mem) is None:
+                return refuse([(p, "mr-state.json is unreadable: no verdict") for p in new])
+            prs = open_prs(lock.get("pr_repo") or PR_REPO.get(repo, ""))
+            if prs is None:
+                return refuse([(p, "cannot list open PRs (gh): no verdict") for p in new])
+            siblings, slices, undeclared = claimants(mem, slice_id, repo, prs, own_branch)
+            if undeclared:
+                return refuse([(p, "unmerged %s declares no touches (undeclared = colliding)"
+                                % ", ".join(undeclared)) for p in new])
             if siblings:
-                conflicts = sibling_conflicts(mem, slice_id, new, siblings)
+                conflicts = sibling_conflicts(mem, slice_id, new, siblings, slices)
                 if conflicts is None:
                     return refuse([(p, "mr-disjoint gave no verdict") for p in new])
                 if conflicts:
@@ -291,10 +469,16 @@ def selftest():
             json.dump({"slice": slice_id, "session_leader": leader, "touches": touches,
                        "repo": repo}, f)
 
-    def run(mem, slice_id, why, paths):
+    prs = []  # what the stand-in `gh` reports as open; fixtures mutate it
+
+    def run(mem, slice_id, why, paths, open_prs=None):
         buf = io.StringIO()
-        rc = widen(mem, slice_id, why, paths, out=buf)
+        rc = widen(mem, slice_id, why, paths, out=buf, open_prs=open_prs or (lambda repo: prs))
         return rc, buf.getvalue()
+
+    def put_state(mem, **lists):
+        with open(os.path.join(mem, "mr-state.json"), "w") as f:
+            json.dump(lists, f)
 
     with tempfile.TemporaryDirectory(prefix="mr-touches-selftest-") as mem:
         put_lock(mem, "a-1", ["client/src/input/bindings.ts", "client/src/main.*.test.ts"], alive)
@@ -319,24 +503,44 @@ def selftest():
         put_lock(mem, "b-1", ["client/src/ui/strings.ts", "game-core/src/"], alive)
         rc, o = run(mem, "a-1", "needs it", ["client/src/ui/strings.ts", "client/src/ui/free.ts"])
         ok("T3-sibling-declared-refused", rc == 1 and
-           "TOUCHES-REFUSED a-1 client/src/ui/strings.ts — claimed by live slice b-1" in o, o)
+           "TOUCHES-REFUSED a-1 client/src/ui/strings.ts — claimed by unmerged b-1" in o, o)
         ok("T3-all-or-nothing", len(read_rows(mem, "a-1")) == 3 and "free.ts" not in o, o)
         rc, o = run(mem, "a-1", "needs it", ["game-core/src/world.rs"])
-        ok("T4-sibling-dir-token-refused", rc == 1 and "claimed by live slice b-1" in o, o)
+        ok("T4-sibling-dir-token-refused", rc == 1 and "claimed by unmerged b-1" in o, o)
 
         # The sibling's WIDENED file is a claim too (both directions go through the record).
         rc, o = run(mem, "b-1", "pin", ["client/src/ui/shared.test.ts"])
         ok("T5-sibling-widens", rc == 0, o)
         rc, o = run(mem, "a-1", "pin", ["client/src/ui/shared.test.ts"])
-        ok("T5-sibling-widened-refused", rc == 1 and "claimed by live slice b-1" in o, o)
+        ok("T5-sibling-widened-refused", rc == 1 and "claimed by unmerged b-1" in o, o)
         rc, o = run(mem, "b-1", "pin", ["client/src/input/buttons.ts"])
-        ok("T5-own-widened-claims-against-sibling", rc == 1 and "claimed by live slice a-1" in o, o)
+        ok("T5-own-widened-claims-against-sibling", rc == 1 and "claimed by unmerged a-1" in o, o)
 
         # Unclaimed plain file beside a live sibling: granted. Structural file: refused.
         rc, o = run(mem, "a-1", "pin", ["client/src/ui/free.ts"])
         ok("T6-unclaimed-granted-beside-sibling", rc == 0 and "+1" in o, o)
         rc, o = run(mem, "a-1", "schema baseline", ["evals/baselines/content-schema.json"])
-        ok("T7-structural-refused-beside-sibling", rc == 1 and "structural file while b-1" in o, o)
+        ok("T7-structural-refused-beside-sibling", rc == 1 and "structural file while b-1 is unmerged" in o, o)
+
+        # One file has one spelling. Every other spelling of a sibling's claim is refused before
+        # the overlap check can miss it, and the refusal names the spelling to use.
+        for name, p in [("T7a-double-slash", "client//src/ui/strings.ts"),
+                        ("T7a-dot-segment", "client/./src/ui/strings.ts"),
+                        ("T7a-dot-under-dir-token", "game-core/./src/world.rs"),
+                        ("T7a-leading-dot", "./client/src/ui/strings.ts"),
+                        ("T7a-project-prefix", "projects/monster-realm/client/src/ui/strings.ts")]:
+            before = len(read_rows(mem, "a-1"))
+            rc, o = run(mem, "a-1", "needs it", [p])
+            ok(name, rc == 1 and "canonical" in o and "(write %s)" % canon(p) in o
+               and len(read_rows(mem, "a-1")) == before, o)
+        # A sibling whose lock spells its claim another way still holds the file.
+        put_lock(mem, "b-1", ["projects/monster-realm/client/src/ui/strings.ts",
+                              "game-core//src/", "client/./src/net"], alive)
+        for name, p in [("T7b-sibling-prefixed", "client/src/ui/strings.ts"),
+                        ("T7b-sibling-double-slash-dir", "game-core/src/world.rs"),
+                        ("T7b-sibling-bare-dir", "client/src/net/store.ts")]:
+            rc, o = run(mem, "a-1", "needs it", [p])
+            ok(name, rc == 1 and "claimed by unmerged b-1" in o, o)
 
         # A dead leader's lock claims nothing; a live slice in the other repo claims nothing.
         put_lock(mem, "b-1", ["client/src/ui/strings.ts"], dead)
@@ -350,14 +554,26 @@ def selftest():
             ("T9-dir", "client/src/ui/", "literal files only"),
             ("T9-absolute", "/etc/passwd", "repo-relative"),
             ("T9-dotdot", "client/../x.ts", "repo-relative"),
-            ("T9-operator-gated", "standards/spec-driven.md", "operator approval"),
-            ("T9-other-repo", "memory/projects/mr-gates", "outside this slice's repo"),
-        ]:
+            ("T9-other-repo", "docs/research/notes.md", "outside this slice's repo"),
+        ] + [("T9-not-grantable:" + p, p, "never self-granted") for p in (
+            "standards/spec-driven.md", ".github/workflows/ci.yml", "justfile", "lefthook.yml",
+            "AGENTS.md", "client/vitest.config.ts", "client/playwright.config.ts", "evals/run.mjs",
+            ".cargo/mutants.toml", "rust-toolchain.toml")]:
             before = len(read_rows(mem, "a-1"))
             rc, o = run(mem, "a-1", "x", [p])
             ok(name, rc == 1 and frag in o and len(read_rows(mem, "a-1")) == before, o)
-        rc, o = run(mem, "h-1", "x", ["memory/projects/mr-brief-template.md"])
-        ok("T9-operator-gated-harness", rc == 1 and "operator approval" in o, o)
+        for p in ("memory/projects/mr-brief-template.md", "memory/projects/mr-audit",
+                  "memory/projects/mr-touches", "memory/projects/mr-state.json",
+                  "memory/projects/.native-supervisor-disabled", "justfile",
+                  "specs/monster-realm-v2/M-trade-sessions.spec.md"):
+            rc, o = run(mem, "h-1", "x", [p])
+            ok("T9-not-grantable-harness:" + p, rc == 1 and "never self-granted" in o
+               and not read_rows(mem, "h-1"), o)
+        for p in ("memory/projects/./mr-brief-template.md",
+                  "memory//projects/mr-supervisor-prompt-native.md"):
+            rc, o = run(mem, "h-1", "x", [p])
+            ok("T9-not-grantable-other-spelling:" + p, rc == 1 and "canonical" in o
+               and not read_rows(mem, "h-1"), o)
 
         rc, o = run(mem, "never-launched", "x", ["client/a.ts"])
         ok("T10-no-lock-refused", rc == 1 and "no launch lock" in o, o)
@@ -388,6 +604,142 @@ def selftest():
         run(mem, "l-1", "x", ["client/b.ts", "client/c.ts"])
         ok("T12-list", ", ".join(widened_paths(mem, "l-1")) == "client/b.ts, client/c.ts")
 
+    # CLAIMANTS: unmerged work claims its files whether or not its builder is still running.
+    with tempfile.TemporaryDirectory(prefix="mr-touches-selftest-") as mem:
+        put_lock(mem, "a-1", ["client/a.ts"], alive)
+        put_lock(mem, "w-1", ["client/src/pin.test.ts", "server-module/src/x.rs"], dead)
+        os.makedirs(os.path.join(mem, "gates"))
+        with open(record_path(mem, "w-1"), "w") as f:
+            f.write(json.dumps({"path": "client/src/w-widened.test.ts", "why": "pin"}) + "\n")
+
+        def refused(name, paths, frag, **kw):
+            before = len(read_rows(mem, "a-1"))
+            rc, o = run(mem, "a-1", "pin 361 -> 362", paths, **kw)
+            ok(name, rc == 1 and frag in o and len(read_rows(mem, "a-1")) == before, o)
+
+        # A dead-leader slice that is awaiting merge holds its declared and widened files, and
+        # keeps the structural set serial.
+        put_state(mem, inflight=[], awaiting_merge=[{"slice": "w-1", "pr": 5, "repo": "project"}])
+        refused("T13-awaiting-merge-declared", ["client/src/pin.test.ts"],
+                "claimed by unmerged w-1")
+        refused("T13-awaiting-merge-widened", ["client/src/w-widened.test.ts"],
+                "claimed by unmerged w-1")
+        refused("T13-awaiting-merge-structural", ["evals/baselines/table-schemas.json"],
+                "structural file while w-1 is unmerged")
+        rc, o = run(mem, "a-1", "pin", ["client/src/free.test.ts"])
+        ok("T13-unclaimed-granted-beside-awaiting-merge", rc == 0 and "+1" in o, o)
+        put_state(mem, inflight=["w-1"], awaiting_merge=[])
+        refused("T13-inflight-dead-leader", ["client/src/pin.test.ts"], "claimed by unmerged w-1")
+
+        # An unmerged slice with no known set collides with everything; the other repo's does not.
+        put_state(mem, inflight=[{"slice": "u-1", "repo": "project"}], awaiting_merge=[])
+        refused("T13-undeclared-collides", ["client/src/any.ts"],
+                "unmerged u-1 declares no touches")
+        put_state(mem, inflight=[{"slice": "u-1", "repo": "project",
+                                  "touches": ["projects/monster-realm/client/src/u.ts"]}])
+        refused("T13-state-entry-touches", ["client/src/u.ts"], "claimed by unmerged u-1")
+        put_state(mem, inflight=[{"slice": "hh-1", "repo": "harness"}])
+        rc, o = run(mem, "a-1", "pin", ["client/src/any.ts"])
+        ok("T13-other-repo-state-entry-claims-nothing", rc == 0 and "+1" in o, o)
+        with open(os.path.join(mem, "mr-state.json"), "w") as f:
+            f.write("{ not json")
+        refused("T13-unreadable-state-no-verdict", ["client/src/z.ts"], "no verdict")
+
+        # A dead-leader lock in neither list and without an open PR is merged work.
+        put_state(mem, inflight=[], awaiting_merge=[])
+        rc, o = run(mem, "a-1", "pin", ["server-module/src/x.rs"])
+        ok("T13-merged-lock-claims-nothing", rc == 0 and "+1" in o, o)
+
+        # An open PR claims the files it changes; a slice's open PR also keeps its lock's set.
+        prs[:] = [{"number": 7, "headRefName": "slice/w-1",
+                   "files": [{"path": "client/src/in-pr.ts"}]},
+                  {"number": 9, "headRefName": "renovate/serde",
+                   "files": [{"path": "Cargo.lock"}]},
+                  {"number": 11, "headRefName": "slice/a-1",
+                   "files": [{"path": "client/src/own.ts"}]}]
+        refused("T14-open-pr-file", ["client/src/in-pr.ts"], "claimed by unmerged w-1")
+        refused("T14-open-pr-slice-declared", ["client/src/pin.test.ts"],
+                "claimed by unmerged w-1")
+        refused("T14-open-pr-slice-structural", ["evals/baselines/content-schema.json"],
+                "structural file while w-1 is unmerged")
+        rc, o = run(mem, "a-1", "pin", ["client/src/own.ts"])
+        ok("T14-own-pr-is-not-a-claim", rc == 0 and "+1" in o, o)
+        prs[:] = [prs[1]]
+        refused("T14-foreign-pr-file", ["Cargo.lock"], "claimed by unmerged pr-9")
+        rc, o = run(mem, "a-1", "baseline", ["evals/baselines/content-schema.json"])
+        ok("T14-foreign-pr-leaves-structural-grantable", rc == 0 and "+1" in o, o)
+        refused("T14-gh-down-no-verdict", ["client/src/q.ts"], "cannot list open PRs",
+                open_prs=lambda repo: None)
+        prs[:] = []
+        ok("T14-branch-names", branch_names("slice/qf-7b", "qf-7b")
+           and branch_names("qf-8-park-20261026", "qf-8")
+           and not branch_names("slice/qf-7b", "qf-7") and not branch_names("slice/uif-12", "uif-1"))
+
+    # SCOPE: the changed files outside declared + widened + sibling tests + the doc set.
+    declared = ["server-module/src/pvp.rs", "client/src/main.ts", "client/src/tactics/",
+                "projects/monster-realm/client/e2e/pvp*.spec.ts"]
+    got = outside_scope(
+        ["server-module/src/pvp.rs", "server-module/src/pvp_tests.rs", "client/src/main.ts",
+         "client/src/main.help.test.ts", "client/src/tactics/draft.ts", "client/e2e/pvp-full.spec.ts",
+         "docs/DECISIONS.md", "CHANGELOG.md", "client/src/ui/widened.test.ts",
+         "client/src/mainMenu.test.ts", "server-module/src/trading_tests.rs", "justfile",
+         "client/src/ui/strings.ts"],
+        declared, ["client/src/ui/widened.test.ts"])
+    ok("T15-outside-scope", got == ["client/src/mainMenu.test.ts",
+                                    "server-module/src/trading_tests.rs", "justfile",
+                                    "client/src/ui/strings.ts"], str(got))
+    with tempfile.TemporaryDirectory(prefix="mr-touches-selftest-") as mem:
+        repo = os.path.join(mem, "repo")
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+        def git(*args):
+            subprocess.run(["git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@t",
+                            "-c", "commit.gpgsign=false"] + list(args),
+                           check=True, capture_output=True, env=env, timeout=60)
+
+        def commit(files, msg):
+            for rel in files:
+                q = os.path.join(repo, rel)
+                os.makedirs(os.path.dirname(q), exist_ok=True)
+                with open(q, "a") as f:
+                    f.write(msg + "\n")
+            git("add", "-A")
+            git("commit", "-q", "-m", msg)
+
+        os.makedirs(repo)
+        git("init", "-q", "-b", "base")
+        commit(["src/a.rs"], "base")
+        git("checkout", "-q", "-b", "work")
+        commit(["src/a.rs", "src/a_tests.rs", "src/b.rs", "src/c.rs"], "work")
+        v = scope(mem, "s-1", repo, "base", "work")
+        ok("T16-no-lock-is-no-measurement", v["verdict"] == "NO-TOUCHES", json.dumps(v))
+        put_lock(mem, "s-1", ["src/a.rs"], dead)
+        os.makedirs(os.path.join(mem, "gates"))
+        with open(record_path(mem, "s-1"), "w") as f:
+            f.write(json.dumps({"path": "src/b.rs", "why": "compile error E0004"}) + "\n")
+        v = scope(mem, "s-1", repo, "base", "work")
+        ok("T16-out-of-scope", v["verdict"] == "OUT-OF-SCOPE" and v["outside"] == ["src/c.rs"]
+           and v["changed"] == 4 and v["widened"] == [{"path": "src/b.rs",
+                                                       "why": "compile error E0004"}], json.dumps(v))
+        put_lock(mem, "s-1", ["src/a.rs", "src/c.rs"], dead)
+        v = scope(mem, "s-1", repo, "base", "work")
+        ok("T16-in-scope", v["verdict"] == "IN-SCOPE" and v["outside"] == [], json.dumps(v))
+        v = scope(mem, "s-1", repo, "base", "no-such-ref")
+        ok("T16-bad-ref-is-an-error", v["verdict"] == "AUDIT-ERROR", json.dumps(v))
+
+    # Every file the eight measured parks needed is grantable: none is refused on shape.
+    for p in ("server-module/src/privacy.rs", "client-wasm/src/lib.rs",
+              "evals/baselines/table-schemas.json", "client/src/main.accel.test.ts",
+              "client/test-util/mainBootHarness.ts", "client/src/styles.css",
+              "client/e2e/ranked-forfeit.spec.ts", "client/src/input/buttons.ts",
+              "client/src/ui/controlsModel.ts", "game-core/src/world.rs", "sim-harness/src/world.rs",
+              "evals/baselines/content-hash.json", "client/src/net/connection.ts",
+              "client/src/tactics/strings.ts", "client/src/ui/screens/index.test.ts",
+              "client/src/ui/i18n/hardcodedStrings.ts", "client/src/ui/menuView.test.ts",
+              "client/src/ui/i18n/resolver.test.ts", "server-module/src/trading_session.rs",
+              "game-core/src/combat/battle_core_tests.rs"):
+        ok("T17-measured-park-file-grantable:" + p, shape_error(p) is None, str(shape_error(p)))
+
     if fails:
         for f in fails:
             print("TOUCHES-SELFTEST-FAIL %s" % f)
@@ -400,19 +752,16 @@ def main(argv):
     if len(argv) >= 2 and argv[1] == "--selftest":
         return selftest()
     usage = ("usage: mr-touches widen --slice S --why \"<measured need>\" PATH [PATH...]"
-             " | list --slice S | --selftest")
-    if len(argv) < 2 or argv[1] not in ("widen", "list"):
+             " | list --slice S | scope --slice S --repo PATH --base REF --head REF | --selftest")
+    if len(argv) < 2 or argv[1] not in ("widen", "list", "scope"):
         print(usage, file=sys.stderr)
         return 2
-    slice_id, why, paths = None, None, []
+    opt, paths = {}, []
     rest = argv[2:]
     i = 0
     while i < len(rest):
-        if rest[i] in ("--slice", "--why") and i + 1 < len(rest):
-            if rest[i] == "--slice":
-                slice_id = rest[i + 1]
-            else:
-                why = rest[i + 1]
+        if rest[i] in ("--slice", "--why", "--repo", "--base", "--head") and i + 1 < len(rest):
+            opt[rest[i][2:]] = rest[i + 1]
             i += 2
         elif rest[i].startswith("--"):
             print(usage, file=sys.stderr)
@@ -420,13 +769,20 @@ def main(argv):
         else:
             paths.append(rest[i])
             i += 1
+    slice_id = opt.get("slice")
     if not SLICE_RE.match(slice_id or ""):
         print(usage, file=sys.stderr)
         return 2
     if argv[1] == "list":
         print(", ".join(widened_paths(MEM, slice_id)))
         return 0
-    return widen(MEM, slice_id, why, paths)
+    if argv[1] == "scope":
+        if not all(opt.get(k) for k in ("repo", "base", "head")):
+            print(usage, file=sys.stderr)
+            return 2
+        print(json.dumps(scope(MEM, slice_id, opt["repo"], opt["base"], opt["head"]), indent=1))
+        return 0
+    return widen(MEM, slice_id, opt.get("why"), paths, own_branch=cwd_branch())
 
 
 if __name__ == "__main__":

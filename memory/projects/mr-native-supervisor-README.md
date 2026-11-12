@@ -23,10 +23,15 @@ fires only when it does not pass.
 
 ## Slice scope (`touches:`)
 A slice edits the files its spec's `touches:` declares. A run that measures a further file it needs
-(a red pin, a compile error) calls `mr-touches widen`: granted when no live sibling slice holds the
-file, refused otherwise (the run parks; the supervisor widens the spec and relaunches). Grants live
-in `gates/<slice>.widened.jsonl`; `mr-disjoint` adds them to the slice's set and
-`mr-gates render` prints them in the PR body and the park memo for the merge audit.
+(a probe, a red test, a compile error, a named pin the change moves) calls `mr-touches widen`.
+The grant is refused when unmerged work holds the file — a live sibling, a slice in
+`mr-state.json` `inflight`/`awaiting_merge`, or any other open PR — and for the files that define
+the gate or steer the loop (CI, hooks, `justfile`, `AGENTS.md`, runner configs, `memory/`,
+`specs/`, `standards/`), which only a spec declares. A refused run parks; the supervisor widens
+the spec and relaunches. Grants live in `gates/<slice>.widened.jsonl`; `mr-disjoint` adds them to
+the slice's set, `mr-gates render` prints them in the PR body and the park memo, and `mr-audit`'s
+`scope` block lists them and forces the diff read when the PR changes a file outside declared +
+widened touches, sibling tests and the doc set.
 
 ## Verification & rollback
 - Dry-run a tick: `MR_TICK_DRYRUN=1 MR_FORCE=1 bash memory/projects/mr-native-tick.sh`

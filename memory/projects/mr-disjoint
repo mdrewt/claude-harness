@@ -7,6 +7,8 @@
 # are never inputs here (D6 doctrine) — plus the files each NAMED slice's run has widened into
 # (mr-touches' record, gates/<slice>.widened.jsonl): name each argument by its slice id so a
 # sibling is checked against the set the run really holds. `widened` in the output lists them.
+# Every path is compared in one canonical spelling (`//`, `/./` and the `projects/monster-realm/`
+# prefix removed), and a directory overlaps the files under it with or without its slash.
 # MR_WIDEN_DIR points the record read at another gates dir (selftests); MR_DISJOINT_NO_GRAPH=1
 # skips the advisory coupling annotation (mr-touches needs only the verdict).
 set -u
@@ -27,12 +29,19 @@ def widened(name):
             if p and p not in got: got.append(p)
     except OSError: pass
     return got
+def canon(p):
+    # One spelling per file, so two spellings of it can never read as disjoint: the
+    # `projects/monster-realm/` prefix mr-repo-of accepts is dropped, `//` and `/./` collapse.
+    p=p.strip(); tail="/" if p.endswith("/") else ""
+    p=os.path.normpath(p)
+    if p.startswith("projects/monster-realm/"): p=p[len("projects/monster-realm/"):]
+    return p+tail
 slices={}; grown={}
 for a in argv:
     if ":" not in a: continue
     name,paths=a.split(":",1)
-    declared=[p.strip() for p in paths.split(",") if p.strip()]
-    extra=[p for p in widened(name) if p not in declared]
+    declared=list(dict.fromkeys(canon(p) for p in paths.split(",") if p.strip()))
+    extra=[p for p in map(canon,widened(name)) if p not in declared]
     if extra: grown[name]=extra
     slices[name]=[p for p in declared+extra if p not in DOC_SET]
 out={"slices":list(slices),"pairs":[],"structural_hits":{},"verdict":"SAFE"}
@@ -49,8 +58,8 @@ for i in range(len(names)):
         inter=set()
         for pa in slices[a]:
             for pb in slices[b]:
-                # A directory token (trailing slash) overlaps every path under it.
-                under=(pa.endswith("/") and pb.startswith(pa)) or (pb.endswith("/") and pa.startswith(pb))
+                # A directory token overlaps every path under it, with or without its slash.
+                under=pb.startswith(pa.rstrip("/")+"/") or pa.startswith(pb.rstrip("/")+"/")
                 if pa==pb or under or fnmatch.fnmatch(pa,pb) or fnmatch.fnmatch(pb,pa): inter.add(pa)
         out["pairs"].append({"pair":[a,b],"overlap":sorted(inter),"disjoint":not inter})
 if out["structural_hits"]: out["verdict"]="SERIAL-REQUIRED(structural)"

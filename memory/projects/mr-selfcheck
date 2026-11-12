@@ -62,8 +62,11 @@ DJ() { "$MEM/mr-disjoint" "$@" 2>/dev/null | /usr/bin/python3 -c 'import json,sy
 [ "$(DJ 'a:game-core/src/' 'b:game-core/src/world.rs')" = "SERIAL-REQUIRED(overlap)" ] || { echo "SELFCHECK-FAIL mr-disjoint: directory token vs file under it"; BAD=1; }
 [ "$(DJ 'a:client/src/main.*.test.ts' 'b:client/src/main.hintBar.test.ts')" = "SERIAL-REQUIRED(overlap)" ] || { echo "SELFCHECK-FAIL mr-disjoint: glob vs match"; BAD=1; }
 [ "$(DJ 'a:client/src/ui/a.ts' 'b:client/src/ui2/a.ts')" = "SAFE" ] || { echo "SELFCHECK-FAIL mr-disjoint: unrelated files"; BAD=1; }
-# in-run touches widening: a file a live sibling holds (declared or widened) must be refused, a
-# structural file must be refused beside any live sibling, and mr-disjoint must read the record.
+# in-run touches widening: a file unmerged work holds (declared, widened or in an open PR) must be
+# refused in every spelling, a structural file must be refused beside any unmerged slice, gate and
+# loop-control files are never granted, and mr-disjoint must read the record.
+[ "$(DJ 'a:client//src/./ui/a.ts' 'b:projects/monster-realm/client/src/ui/a.ts')" = "SERIAL-REQUIRED(overlap)" ] || { echo "SELFCHECK-FAIL mr-disjoint: two spellings of one file"; BAD=1; }
+[ "$(DJ 'a:game-core/src' 'b:game-core/src/world.rs')" = "SERIAL-REQUIRED(overlap)" ] || { echo "SELFCHECK-FAIL mr-disjoint: bare directory vs file under it"; BAD=1; }
 "$MEM/mr-touches" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-touches selftest"; BAD=1; }
 # the slice brief's comment check: what it flags, and above all what it must leave alone.
 "$MEM/mr-comment-scan" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-comment-scan selftest"; BAD=1; }
