@@ -39,16 +39,11 @@ exempt from that floor only).
 (inflight/queue/notes) · budget: `mr-cost-watch`/`mr-usage-snap`, config in `mr-budget-config.json`.
 
 ## Slice scope (`touches:`)
-A slice edits the files its spec's `touches:` declares. A run that measures a further file it needs
-(a probe, a red test, a compile error, a named pin the change moves) calls `mr-touches widen`.
-The grant is refused when unmerged work holds the file — a live sibling, a slice in
-`mr-state.json` `inflight`/`awaiting_merge`, or any other open PR — and for the files that define
-the gate or steer the loop (CI, hooks, `justfile`, `AGENTS.md`, runner configs, `memory/`,
-`specs/`, `standards/`), which only a spec declares. A refused run parks; the supervisor widens
-the spec and relaunches. Grants live in `gates/<slice>.widened.jsonl`; `mr-disjoint` adds them to
-the slice's set, `mr-gates render` prints them in the PR body and the park memo, and `mr-audit`'s
-`scope` block lists them and forces the diff read when the PR changes a file outside declared +
-widened touches, sibling tests and the doc set.
+A slice edits the files its spec's `touches:` declares; a run that measures a further file it
+needs adds it with `mr-touches widen`, which refuses a file other unmerged work holds and the
+files that define the gate or steer the loop. Grants live in `gates/<slice>.widened.jsonl` and are
+read by `mr-disjoint`, `mr-gates render` and `mr-audit`'s `scope` block. The rules are in the
+`mr-touches` header.
 
 ## Verification & rollback
 - Dry-run a tick: `MR_TICK_DRYRUN=1 MR_FORCE=1 bash memory/projects/mr-native-tick.sh`

@@ -32,6 +32,8 @@ def widened(name):
 def canon(p):
     # One spelling per file, so two spellings of it can never read as disjoint: the
     # `projects/monster-realm/` prefix mr-repo-of accepts is dropped, `//` and `/./` collapse.
+    # mr-touches holds a second copy of this function and of DOC_SET; its selftest (T23) fails
+    # when either differs.
     p=p.strip(); tail="/" if p.endswith("/") else ""
     p=os.path.normpath(p)
     if p.startswith("projects/monster-realm/"): p=p[len("projects/monster-realm/"):]
