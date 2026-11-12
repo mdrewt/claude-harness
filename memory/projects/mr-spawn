@@ -843,9 +843,13 @@ esac
 S="${1:?usage: mr-spawn <slice> [--dry]}"; DRY="${2:-}"
 V="/tmp/mr_pass_$S.vars.json"; B="/tmp/mr_pass_$S.md"
 emit(){ SLICE="$S" ST="$1" DET="$2" /usr/bin/python3 -c "import json,os;print(json.dumps({'slice':os.environ['SLICE'],'status':os.environ['ST'],'detail':' '.join(os.environ['DET'].split())[:600]}))"; }
-# A slice mr-interrupted offered for a credit-stop resume and this run did not launch is one failed
-# resume: the tool counts it, so a slice that cannot be launched stops being offered. The statuses
-# listed are not failures of the slice (nothing was attempted, or the launch is on its way).
+# A refusal to launch a slice mr-interrupted offered for a credit-stop resume is one failed resume
+# when its cause does not clear by itself: the tool counts it, so a slice that cannot be launched
+# stops being offered. Counted: FAIL, REPO-MIXED, REPO-EXTERNAL, REPO-UNRESOLVED,
+# REPO-OUT-OF-SYNC, COSTPARK-GATE, a brief that does not render. Exempt (listed below): the
+# launch happened or was a dry probe; the operator hold; a human at work; the slice already
+# running; a credit stop still waiting. Each exempt cause also keeps the slice from being `due`
+# or stands the tick down before a session is paid for, so none of them recurs as a paid tick.
 status(){
   emit "$1" "$2"
   case "$1" in LAUNCHED|DRY|HOLD-PRESENT|PROBE-TRIPPED|ALREADY-RUNNING|CREDIT-STOPPED) : ;;
@@ -1023,7 +1027,10 @@ else
 fi
 # build brief — ONE render path (build_brief, above), shared with --render-brief so the selftest
 # exercises the same bytes this line writes.
-build_brief "$TOUCHES_RAW" "$MEM/mr-brief-template.md" "$B" || exit 1
+build_brief "$TOUCHES_RAW" "$MEM/mr-brief-template.md" "$B" || {
+  [ "$DRY" = "--dry" ] || timeout 60 "$MEM/mr-interrupted" failed "$S" BRIEF-RENDER >/dev/null 2>&1
+  exit 1
+}
 MODEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('model','opus'))")
 EFFORT=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('effort','high'))")
 if [ "$DRY" = "--dry" ]; then status DRY "brief built; model=$MODEL effort=$EFFORT; no launch"; fi

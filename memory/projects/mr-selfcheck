@@ -587,7 +587,7 @@ try:
             or box.vars("s-a").get("target_desc") != "build s-a":
         fail("resume-same-session", "vars: %r" % (box.vars("s-a"),))
     bundle = box.bundle(RESET + 130)
-    if offered(bundle.get("interrupted") or []) != [w + ("offered",) for w in WANT] \
+    if offered(bundle.get("interrupted") or []) != [w + ("due",) for w in WANT] \
             or (bundle.get("master_ci_latest") or [{}])[0].get("conclusion") != "failure":
         fail("bundle-offers-interrupted", "bundle: %r" % ({k: bundle.get(k) for k in ("interrupted", "master_ci_latest")},))
     # The per-launch budget check reads its figures from the bundle: the caps mr-spawn applies.
@@ -876,7 +876,7 @@ try:
     sibling = box.slice("s-b", "content", "opus", "medium", live=True)
     box.tool(STOPPED, "scan")
     out, log = box.tick(RESET + 130, SRC="reset")
-    if "resume_first=s-a\n" not in out or box.states(RESET + 130) != {"s-a": "offered", "s-b": "live"} \
+    if "resume_first=s-a\n" not in out or box.states(RESET + 130) != {"s-a": "due", "s-b": "live"} \
             or "resume_session" in box.vars("s-b"):
         fail("live-slice-not-offered", "stdout=%r list=%r" % (out, box.states(RESET + 130)))
     sibling.kill()
@@ -928,7 +928,8 @@ try:
         scan = box.tool(T + 400, "scan")
         gate = box.tool(T + 400, "gate")
         if n == 1:
-            if "resets=%d " % (T + 400 + 3600) not in scan or gate != "BLOCKED_UNTIL_" + time.strftime(
+            if "resets=%d " % (T + 400 + 3600) not in scan or not scan.endswith(" watch=%d" % (T + 400 + 3600)) \
+                    or gate != "BLOCKED_UNTIL_" + time.strftime(
                     "%Y-%m-%dT%H:%M:%SZ", time.gmtime(T + 400 + 3600)) or box.tool(T + 400, "vars", "--due") != "":
                 fail("re-refusal-waits", "scan=%r gate=%r" % (scan, gate))
             T = T + 400 + 3600
@@ -939,6 +940,9 @@ try:
                      for h in range(0, 48, 5)]
             if box.states(T + 400) != {"s-a": "capped"} or set(later) != {"CLEAR|"}:
                 fail("capped-after-two", "list=%r later=%r" % (box.states(T + 400), later))
+            # Capped as it was recorded: nothing will be resumed at that reset, so no reset tick.
+            if not scan.startswith("STOP new=s-a ") or "watch=" in scan:
+                fail("capped-arms-no-reset-tick", "scan=%r" % scan)
     box.tool(T + 9000, "scan")
     asks = box.asks()
     if len(asks) != 1 or not asks[0].startswith("credit-resume-s-a --repo mdrewt/claude-harness ") or "--blocking" in asks[0]:
@@ -972,7 +976,8 @@ try:
 finally:
     box.close()
 
-# mr-spawn not launching an offered slice, and an offer nobody answers, are failed resumes too.
+# mr-spawn refusing an offered slice for a reason that does not clear by itself is a failed
+# resume too; an offer nothing acted on is not.
 def spawn_exit(box):
     """mr-spawn's real exit path (emit + status) on the sandbox: spawn_says(now, slice, status)."""
     spawn = open(os.path.join(MEM, "mr-spawn")).read()
@@ -987,11 +992,11 @@ def spawn_exit(box):
 
 
 # The refusal is reported as mr-spawn exits; a probe trip, or a launch nobody offered, is not the
-# slice failing.
+# slice failing. A brief that does not render is reported where mr-spawn gives up on it.
 box = Box()
 try:
     spawn_says = spawn_exit(box)
-    for name in ("s-a", "s-b", "s-c"):
+    for name in ("s-a", "s-b", "s-c", "s-d"):
         box.slice(name, "routine", "opus", "high", log=rejected(), written=RESET + 100)
     box.tool(RESET + 130, "scan")
     running = box.slice("s-c", "routine", "opus", "high", log=rejected(), written=RESET + 100, live=True)
@@ -1002,13 +1007,25 @@ try:
     spawn_says(RESET + 170, "s-a", "REPO-OUT-OF-SYNC")
     spawn_says(RESET + 170, "s-b", "PROBE-TRIPPED")
     spawn_says(RESET + 170, "s-c", "FAIL")
-    listing = dict((e["slice"], (e["state"], e["failed"])) for e in json.loads(box.tool(RESET + 180, "list")))
-    if listing != {"s-a": ("waiting", 1), "s-b": ("offered", 0), "s-c": ("due", 0)}:
-        fail("spawn-refusal-counted", "list=%r" % (listing,))
+    spawn = open(os.path.join(MEM, "mr-spawn")).read()
+    render = between(spawn, '\nbuild_brief "$TOUCHES_RAW"', "\nMODEL=")
+    if "mr-interrupted" not in render:
+        fail("anchor", "could not extract mr-spawn's brief-render refusal")
+    with open(os.path.join(box.root, "spawn-brief.sh"), "w") as f:
+        f.write('MEM=%s\nS=s-d\nB=/dev/null\nTOUCHES_RAW=x\nDRY="${1:-}"\nbuild_brief(){ return 1; }\n%s\n' % (box.mem, render))
+    for arg in ("--dry", ""):
+        subprocess.run(["bash", os.path.join(box.root, "spawn-brief.sh"), arg], env=box.env(RESET + 170),
+                       capture_output=True, text=True, timeout=60)
+        listing = dict((e["slice"], (e["state"], e["failed"])) for e in json.loads(box.tool(RESET + 180, "list")))
+        want = {"s-a": ("waiting", 1), "s-b": ("due", 0), "s-c": ("due", 0), "s-d": ("due", 0) if arg else ("waiting", 1)}
+        if listing != want:
+            fail("spawn-refusal-counted", "after brief failure %r: list=%r" % (arg, listing))
 finally:
     box.close()
 
-# Over two days of hourly ticks a slice that cannot be launched is offered twice, then never.
+# Over two days of hourly ticks a slice mr-spawn cannot launch is offered twice, then never. A
+# slice whose offers nothing acts on (a hold, a stand-down, a dry run, a session that never
+# calls mr-spawn) has not been tried: it stays due and uncounted however long that lasts.
 box = Box()
 try:
     spawn_says = spawn_exit(box)
@@ -1026,10 +1043,36 @@ try:
             offers[name] += 1
             if name == "s-a":
                 spawn_says(t + 60, "s-a", "REPO-OUT-OF-SYNC")    # s-b: the session never calls mr-spawn
-    if offers != {"s-a": 2, "s-b": 2} or sessions > 4 or box.states(RESET + 49 * 3600) != {"s-a": "capped", "s-b": "capped"}:
+    if offers["s-a"] != 2 or box.states(RESET + 49 * 3600).get("s-a") != "capped":
         fail("unlaunchable-offered-twice", "offers=%r sessions=%r list=%r" % (offers, sessions, box.states(RESET + 49 * 3600)))
-    if sorted(a.split()[0] for a in box.asks()) != ["credit-resume-s-a", "credit-resume-s-b"]:
-        fail("unlaunchable-one-blocker-each", "mr-ask-drew calls: %r" % (box.asks(),))
+    listing = dict((e["slice"], (e["state"], e["failed"])) for e in json.loads(box.tool(RESET + 49 * 3600, "list")))
+    if offers["s-b"] != 48 or sessions != 48 or listing.get("s-b") != ("due", 0) \
+            or box.tool(RESET + 49 * 3600, "gate") != "DUE n=1":
+        fail("unacted-offer-not-counted", "offers=%r sessions=%r list=%r" % (offers, sessions, listing))
+    if [a.split()[0] for a in box.asks()] != ["credit-resume-s-a"]:
+        fail("unlaunchable-one-blocker", "mr-ask-drew calls: %r" % (box.asks(),))
+finally:
+    box.close()
+
+# A slice whose reset has passed waits while another stop that covers its model still does:
+# `gate`, `vars --due` and `launch-check` give the one answer, so no tick is paid for a launch
+# mr-spawn would refuse. A stop on another model holds nothing back.
+box = Box()
+try:
+    box.slice("s-a", "routine", "opus", "high", log=rejected(), written=RESET - 1000)
+    box.slice("s-b", "routine", "opus", "high", log=rejected(resets=RESET + 86400), written=RESET - 1000)
+    box.slice("s-f", "hard", "fable", "xhigh", log=rejected("seven_day_fable", RESET + 2 * 86400, "fable"), written=RESET - 1000)
+    box.tool(RESET - 900, "scan")
+    T = RESET + 130
+    got = (box.tool(T, "gate", "--model", "opus"), box.tool(T, "vars", "--due"), box.tool(T, "launch-check", "s-a", "opus")[:7],
+           box.states(T))
+    until = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(RESET + 86400))
+    if got != ("BLOCKED_UNTIL_" + until, "", "REFUSE ", {"s-a": "waiting", "s-b": "waiting", "s-f": "waiting"}):
+        fail("later-stop-holds-due-slice", "gate, offer, launch-check, list: %r" % (got,))
+    T = RESET + 86400 + 130
+    got = (box.tool(T, "gate", "--model", "opus"), box.tool(T, "launch-check", "s-a", "opus"), box.tool(T, "vars", "--due"))
+    if got != ("DUE n=2", "OK", "s-a,s-b") or box.states(T).get("s-f") != "waiting":
+        fail("other-model-stop-holds-nothing", "gate, launch-check, offer: %r list=%r" % (got, box.states(T)))
 finally:
     box.close()
 
@@ -1074,8 +1117,27 @@ try:
     os.unlink(os.path.join(box.mem, ".native-supervisor-disabled"))
     box.prs([("feat/s-m", "MERGED")])
     out, log = box.tick(RESET + 200, SRC="cron")
-    if "resume_first=s-a\n" not in out or box.states(RESET + 200) != {"s-a": "offered"}:
-        fail("hold-lifted-rules-apply", "stdout=%r list=%r" % (out, box.states(RESET + 200)))
+    if "resume_first=s-a\n" not in out or box.states(RESET + 200) != {"s-a": "due"} or box.watched():
+        fail("hold-lifted-rules-apply", "stdout=%r list=%r watch=%r" % (out, box.states(RESET + 200), box.watched()))
+finally:
+    box.close()
+
+# Hold lifted while a slice recorded under it still waits on its reset: the first tick without
+# the hold arms the reset tick the hold withheld, once, and stands down like any waiting tick.
+box = Box()
+try:
+    hold = os.path.join(box.mem, ".native-supervisor-disabled")
+    open(hold, "w").close()
+    box.slice("s-a", "routine", "opus", "high", log=rejected())
+    box.tick(STOPPED, SRC="crash")
+    box.tick(STOPPED + 1800)
+    held_watch = box.watched()
+    os.unlink(hold)
+    out, log = box.tick(STOPPED + 3600)
+    box.tick(STOPPED + 7200)
+    if held_watch or box.watched() != [str(RESET)] or "CREDIT-STOP-WATCH watch=%d " % RESET not in log \
+            or "REACHED-SESSION" in out or "STANDDOWN credit-stop BLOCKED_UNTIL_2026-11-06T00:00:00Z" not in log:
+        fail("hold-lifted-arms-reset-tick", "held=%r watch=%r stdout=%r log=%r" % (held_watch, box.watched(), out, log))
 finally:
     box.close()
 

@@ -113,7 +113,8 @@ stopped. Every tick, before any gate, the wrapper runs `mr-interrupted scan`:
   days ahead is not a reset time: the slice waits one hour instead.
 - **Under the operator hold** the scan only records the rejected slices: no stop flag, no
   watcher, nothing offered (`gate` prints `HELD`). Once the hold is lifted the recorded slices
-  meet the rules below like any other.
+  meet the rules below like any other, and the first scan that finds one still waiting on its
+  reset starts the watcher then (`CREDIT-STOP-WATCH watch=<epoch>` in the tick log).
 - That tick still runs its decision session, which parks the stopped slices (`wip:` checkpoint,
   memo, `PARKED`). Later ticks log `STANDDOWN credit-stop BLOCKED_UNTIL_<utc>` while a stop that
   covers the supervisor's own model (`SUP_MODEL`) waits; a stop on another model does not stand
@@ -132,19 +133,28 @@ stopped. Every tick, before any gate, the wrapper runs `mr-interrupted scan`:
   `RESUME-FALLBACK`/`RESUME-FAILED` line in the pass log says so), whose resume block points at
   the `wip:` checkpoint. `mr-spawn` removes the record once the slice is launched.
 
-**When a slice is offered.** Its reset has passed, its session_leader is dead (a slice still
-running is `live` and skipped; `mr-spawn` itself refuses a slice whose lock names a live leader:
-`ALREADY-RUNNING`), and a lookup finds something to resume. The lookup removes the slice when
+**When a slice is offered.** Its reset has passed, no other recorded stop that covers its model
+is still waiting for a reset (`gate`, `vars --due` and `mr-spawn`'s `launch-check` ask the same
+question, so a slice is never offered into a `CREDIT-STOPPED` refusal), its session_leader is
+dead (a slice still running is `live` and skipped; `mr-spawn` itself refuses a slice whose
+lock names a live leader: `ALREADY-RUNNING`), and a lookup finds something to resume. The lookup removes the slice when
 its PR is merged or open (`gh pr list`), its spec section carries `blocked:`, or the section it
 had when it stopped is gone; a slice also leaves 14 days after its stop. A slice that
 checkpointed on the stop flag and exited 0 stays: that is the stop working. A lookup that fails
 keeps the slice and offers nothing (`unverified`) until it succeeds.
 
-**Resume attempts.** A resume fails when `mr-spawn` does not launch the offered slice, when the
-offer is unanswered after 90 minutes, or when the resumed session is refused again within an
-hour or with a reset no later than the one already waited for. A failed resume waits an hour
-(or for the strictly later reset the refusal names). After 2 failed resumes the slice is
-`capped`: never offered again, no longer `DUE` for the gate, and `mr-interrupted` opens one
+**Resume attempts.** A resume fails in two cases only. The slice was launched again and the
+vendor refused it again: a new terminal rejection within an hour of the launch or with a reset
+no later than the one already waited for. Or `mr-spawn` refused the launch for a reason that
+does not clear by itself: `FAIL`, `REPO-MIXED`, `REPO-EXTERNAL`, `REPO-UNRESOLVED`,
+`REPO-OUT-OF-SYNC`, `COSTPARK-GATE`, or a brief that does not render. `HOLD-PRESENT`,
+`PROBE-TRIPPED`, `ALREADY-RUNNING`, `CREDIT-STOPPED` and a `--dry` probe never count: each
+clears by itself, and each also keeps the slice from being `due` or stands the tick down before
+a session is paid for. An offer nothing acted on — a hold, a stand-down or a dry run ended the
+tick, or the session did not call `mr-spawn` — is no attempt: the slice stays `due` and the
+next tick offers it again. A failed resume waits an hour (or for the strictly later reset the
+refusal names). After 2 failed resumes the slice is `capped`: never offered again, no longer
+`DUE` for the gate, no reset watcher, and `mr-interrupted` opens one
 `DECISION(credit-resume-<slice>)` issue through `mr-ask-drew`. `mr-interrupted drop <slice>`
 clears it by hand.
 

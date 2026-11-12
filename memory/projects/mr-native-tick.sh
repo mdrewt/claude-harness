@@ -57,16 +57,18 @@ if [ "${_hb_fail:-0}" -le "${_hb_ok:-0}" ]; then date -u +%s > "$MEM/.native-sup
 # for the supervisor's own model — a stop that covers only another model does not stand the tick
 # down), the situation bundle carries it as `interrupted[]`, and the first tick after the reset
 # resumes from it. Under the operator hold the tool itself only records (`HELD ...`): it sets no
-# flag, asks for no watcher and offers nothing, so this block does nothing either.
+# flag, asks for no watcher and offers nothing, so this block does nothing either; the first scan
+# without the hold asks for the watcher such a slice still needs (`WATCH watch=`).
 CS=$(timeout 60 "$MEM/mr-interrupted" scan 2>/dev/null)
 CGATE=$(timeout 60 "$MEM/mr-interrupted" gate --model "$SUP_MODEL" 2>/dev/null)
 CS_NEW=0
 case "$CS" in
   "STOP "*)
-    CS_NEW=1; log "CREDIT-$CS gate=${CGATE:-none}"
-    case "$CS" in *" watch="*) CSW=${CS##* watch=}; setsid /bin/bash "$MEM/mr-reset-watch" "${CSW%% *}" >/dev/null 2>&1 & ;; esac ;;
+    CS_NEW=1; log "CREDIT-$CS gate=${CGATE:-none}" ;;
+  "WATCH "*) log "CREDIT-STOP-$CS (recorded under the operator hold; reset tick armed)" ;;
   "HELD "*) log "CREDIT-STOP-RECORDED ${CS#HELD } (operator hold: no stop flag, no reset tick)" ;;
 esac
+case "$CS" in *" watch="*) CSW=${CS##* watch=}; setsid /bin/bash "$MEM/mr-reset-watch" "${CSW%% *}" >/dev/null 2>&1 & ;; esac
 
 # RECONCILE (accounting; runs even when disabled/over-budget): one cost row per ended build session.
 # `mr-record ledger --from-log` owns the row: it names the session by the launch stamp in its pass
