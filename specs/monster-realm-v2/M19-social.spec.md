@@ -4,6 +4,9 @@
 
 > Provisional sketch — EARS criteria + tasks deferred to build time. The defining concern (untrusted user
 > content) is captured here + in the threat model.
+>
+> **Ways to play (`game-design.md` §14):** chat, guilds and friends exist per world. On a private
+> server the host is the moderator; our moderation and reporting duties cover the official server.
 
 ## Problem / intent
 The community layer — **chat**, **guilds**, **friends/block** — all server-authoritative, with **untrusted

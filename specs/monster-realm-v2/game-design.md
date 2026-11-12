@@ -26,19 +26,23 @@ yours — and that knowledge, care, and fair competition matter more than reflex
    is genuinely different from anyone else's — and gets more so as you raise it. *(M6/M9/M10, ADR-0016.)*
 2. **A fair, authoritative world.** The server is the only truth; you can't be cheated, and your investment
    (a perfect-IV monster, a hard-won rating) is safe. Trust is what makes individuals *valuable*.
-   *(server-authority spine; M15/M16 economy & PvP integrity; M25 security.)*
+   *(server-authority spine; M15/M16 economy & PvP integrity; M25 security.)* The guarantee is made by
+   whoever runs the world: by us on the official server, by the host on a private one (§14).
 3. **Knowledge & mastery, not twitch.** Turn-based battles are a legible affinity puzzle; how you *raise* a
    monster shapes its destiny. Skill = understanding, not APM. *(M7/M14 battles; M9 raising.)*
 4. **A living social fabric.** Trading, PvP, raids, and guilds make unique individuals matter to *other*
-   players — the long-term engine. *(M15–M19.)*
+   players — the long-term engine. *(M15–M19.)* It is there wherever more than one player shares a
+   world, and never a requirement: the game is complete for one player (§14).
 
 **What it is NOT** (scope guardrails): not an action/twitch game; not idle/afk-farmable; not pay-to-win
-(non-commercial); not a single-player-only game (the social layer is the point).
+(non-commercial); not online-only and not single-player-only — one game played three ways (§14): alone, with
+friends on a private server, or on the official server.
 
 ## 2. Player & fantasy
 
 **Target:** players who love collection + mastery + light competition (the tamer/RPG audience), comfortable
-with turn-based depth; play in short, meaningful sessions across web/desktop.
+with turn-based depth; play in short, meaningful sessions across web/desktop. Most are expected to play
+alone or with a few friends; the official server is the third way in, not the default (§14).
 **Core fantasy:** *"This team is mine — I found these individuals, I raised them my way, and I can prove it by
 battling, trading, and climbing with them."*
 
@@ -146,7 +150,8 @@ Individuals are valuable *because* they're unique (collection), provable (PvP/la
 (economy) — the three reinforce each other and are the long-term retention engine. Friendly vs ranked PvP
 serves both casual and competitive players; guilds provide identity/belonging + organize raids (M16–M19).
 Retention beats per loop: visible growth (session), mastery/status (ladder), collection (long-term),
-belonging (guild).
+belonging (guild). All of it runs in any world with more than one player; the ranked ladder carries
+status only where the rules are guaranteed, which is the official server (§14).
 
 ## 9. The MVP / early-access slice (the missing prioritization)
 
@@ -158,10 +163,11 @@ belonging (guild).
   including **M9 (raise) + M10 (evolve/fuse)** makes it the full **single-player loop** and tests H2 properly —
   so the **target MVP is M0–M10 (Phase A) + a subset of the starting content: ~16 forms + ~6 affinities +
   ~12 skills + the hub + 1 zone** (about half the §5 scope — the minimum to test the full single-player loop).
-- **Early access = + multiplayer core (M15 trade + M16 PvP)** once the loop is proven fun, on a small live
-  world, to test **H3** (do individuals feel valuable enough to trade/compete?). The big world (M11–M14) and
-  the social depth (M17–M19) follow demand.
-- **Launch = + Phase D readiness (M20–M25)**, gated on the M25 security sign-off.
+- **Early access = the Steam build: single-player worlds and friends hosting** (§14), with the multiplayer
+  core (trade, PvP) playable on a private server. It tests **H3** (do individuals feel valuable enough to
+  trade/compete?) among friends first.
+- **The official server opens after early access**, gated on the M25 security sign-off and the
+  scale-readiness work. **Official release = + modding** (§14).
 
 This gives a **playable, testable game at the end of Phase A** — the natural decision point — instead of a
 multi-year march to a launch that's never been played.
@@ -175,8 +181,8 @@ multi-year march to a launch that's never been played.
 - **Content volume** for a satisfying launch (is the lean ~32-form / 2-zone starting scope enough to be
   compelling, or does it need to grow before launch? how much world/story is "enough"?).
 - **Battle depth timing** — does the 1v1 core need M14 depth to be fun, or is it fun first?
-- **How social-required is it?** (a great single-player loop lowers the multiplayer-criticality and de-risks
-  early access.)
+- **How social-required is it?** Decided (operator, 2026-11-12): not required. The game is complete for one
+  player and early access ships solo and friends play first (§14). What remains open is the list in §14.
 
 ## 11. How this doc relates to the corpus
 
@@ -250,3 +256,90 @@ look** à la *Octopath Traveler*. Consistent with the PixiJS 2D renderer (ADR-00
   dimensions, animation specs, a few mockups) is a near-term art-production deliverable**, and an
   **HD-2D lighting prototype** is the natural spike to confirm the look + cost before committing.
 
+## 14. Ways to play & distribution (operator, 2026-11-12)
+
+Monster Realm is one game played three ways, in the manner of Minecraft or Palworld. Most players are
+expected to play alone or with a few friends. Development still leads with the official-server case,
+because a design that holds for a thousand players holds for one and the reverse is not true.
+
+| | Single-player world | Private server | Official server |
+|---|---|---|---|
+| Who runs the server | the player's own machine, started by the game | a player or community, on their own machine or host | us; there is exactly one |
+| Who plays | one player | whoever has the address and passes the host's access rule | anyone with an account |
+| Expected size | 1 | a handful of friends, up to a community | ~600 concurrent on average, ~1,000 at peak; ~100 zones at 8–12 players each, ~50 in the busiest few |
+| Rules | official rules | official rules through early access; host-moddable from the official release | official rules, always |
+| Trust | the player owns the data | the host owns the data and is trusted by its players | server-authoritative and audited (M25); the only world where fairness is guaranteed |
+
+**One game, one codebase.** The same server module, the same rules crate and the same client run in all
+three. No mode has its own rule set, content set or client. A mode is a deployment: where the server runs
+and who may connect.
+
+**Account and characters.** A player has one account with the identity provider. A character belongs to
+one world: the same account has a separate character, monsters, items and progress in each world it
+plays in. Nothing moves between worlds — the official server accepts nothing from outside, and that
+isolation is what keeps its economy and ladder meaningful.
+
+**A single-player world can be opened to friends, and closed again.** It is the same save served to
+more people, not a transfer: friends who join get their own characters in that world.
+
+**Login.**
+- *Single-player:* the player signs in once to bind the world to their account; after that the world
+  runs with no connection.
+- *Private server:* the identity provider confirms that each joiner holds a valid account. The player
+  must have the server's address (given by a friend or found online). The host may add an allowlist, a
+  password, or neither.
+- *Official server:* the account login.
+
+**Joining a private world** is by address or invite link. There is no server browser. Making the server
+reachable is the host's job.
+
+**Distribution.**
+- The Steam download installs the client and the server together. Choosing a single-player world starts
+  the built-in server and connects the client to it; joining a world hosted elsewhere connects the same
+  client to that server instead.
+- The client is a web app in a desktop shell (in the manner of Electron or Tauri). A plain browser,
+  given the right address or URL, is also a full client for any of the three ways to play.
+- The server can be installed and run by itself for an always-on private host. That package is
+  distributed outside the Steam store.
+- **Client code is shared, not forked.** Every shell (browser, desktop, any later one) imports the same
+  client modules. A shell adds only what is specific to it: starting and stopping a local server, window
+  and platform integration, its sign-in protocol. Shell-specific game code is a defect.
+
+**Playing alone is a complete game (soft rule, with named exceptions).** Nothing a solo player needs to
+progress or complete the collection may require another player: an evolution, a species or an item must
+not be locked behind trading or PvP. Content built for groups is the exception and stays attemptable
+alone — a raid is designed for a party and a lone player may still try it. Where the world wants a
+trade or a PvP-style battle to be available to everyone, it is an NPC who offers it, and that NPC exists
+in every world, not only in single-player ones.
+
+**Rules and modding.**
+- Through early access every world runs the official rules; a host's only controls are who may join.
+- By the official release a private world is fully moddable, to the degree modern Minecraft is: content
+  and behaviour, not only settings. The official server never runs mods.
+- Modding is built after the early-access release, not before. Until then the code is written so that
+  adding it is easy: content stays data the server loads (species, skills, items, maps, quests, tuning),
+  rules read that data and never name a specific content id, and the seams where a mod would attach
+  (content loading, rule hooks, client asset and text lookup) stay single and explicit.
+
+**Release order.**
+1. *Early access:* the Steam build with single-player worlds and friends hosting.
+2. *The official server* opens after that.
+3. *Official release:* modding for private worlds.
+
+**What this asks of every feature.** A feature is designed against all three: it must work with one
+player and nobody else online; it must not assume we operate the server (no fixed server address, no
+upgrade step a person performs by hand, no telemetry that leaves the machine without the player's
+consent); and it must hold at the official server's population.
+
+**Open questions (to settle when the local-play milestone is elaborated).**
+- Whether SpacetimeDB's licence permits shipping its server inside the game and in the standalone
+  package.
+- Resource budgets for a single-player world and a friends server (proposed starting points, not yet
+  agreed: one player on a modest laptop; about eight friends on one host).
+- How a world bound by one sign-in keeps proving its owner while offline, and what a private server does
+  when the identity provider cannot be reached.
+- Version matching between a client and a private server on a different build, and unattended upgrade
+  of worlds we never see.
+- Who answers for player data on a private server (export, deletion), and what the client tells a player
+  before they join one.
+- Which desktop shell.

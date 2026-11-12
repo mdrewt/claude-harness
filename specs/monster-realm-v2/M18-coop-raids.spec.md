@@ -3,6 +3,9 @@
 **Status:** design sketch (provisional; order and preconditions in `PLAN.md` §9) · **Phase C** · **Mirrors:** v1 M11.4.
 
 > Provisional sketch — EARS criteria + tasks deferred to build time.
+>
+> **Solo rule (`game-design.md` §14):** a raid is designed for a party and stays attemptable by one
+> player. Nothing a solo player needs to progress or complete the collection may be raid-only.
 
 ## Problem / intent
 Two allies vs an AI boss — like PvP, pure orchestration over the existing battle: a new **additive**
