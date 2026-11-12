@@ -21,6 +21,13 @@ fires only when it does not pass.
 `-last-failure` · `mr-native-tick.log` (one DECISION/SKIP line per tick) · `mr-state.json`
 (inflight/queue/notes) · budget: `mr-cost-watch`/`mr-usage-snap`, config in `mr-budget-config.json`.
 
+## Slice scope (`touches:`)
+A slice edits the files its spec's `touches:` declares. A run that measures a further file it needs
+(a red pin, a compile error) calls `mr-touches widen`: granted when no live sibling slice holds the
+file, refused otherwise (the run parks; the supervisor widens the spec and relaunches). Grants live
+in `gates/<slice>.widened.jsonl`; `mr-disjoint` adds them to the slice's set and
+`mr-gates render` prints them in the PR body and the park memo for the merge audit.
+
 ## Verification & rollback
 - Dry-run a tick: `MR_TICK_DRYRUN=1 MR_FORCE=1 bash memory/projects/mr-native-tick.sh`
   (assembles the prompt, spawns nothing).

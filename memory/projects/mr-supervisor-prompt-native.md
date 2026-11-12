@@ -123,12 +123,12 @@ retro-request events follow `$MEM/mr-retro-playbook.md`.
 ## Fan-out (N ≤ 2 default; ≤ 4 with the protocol below)
 
 Open another slot only if ALL hold: code/test `touches:` pairwise disjoint (undeclared =
-colliding; mr-disjoint strips the doc set) · neither touches mr-disjoint's always-serial
-structural set or any table/schema/migration (parallelize around it contract-first) · `free -g`
-shows ≳ one full build free.
-Run `$MEM/mr-disjoint "a:paths" "b:paths"` — SERIAL-REQUIRED is final; SAFE + a shared
-registry/enum/id axis → pre-assign the choice space per sibling in target_desc; your judgment may
-downgrade toward serial, never upgrade. **N≥3:** partitioning mandatory (pre-assign ranges), stagger
+colliding; mr-disjoint strips the doc set, adds widened files) · neither touches its
+always-serial structural set or any table/schema/migration (parallelize around it
+contract-first) · `free -g` shows ≳ one full build free.
+Run `$MEM/mr-disjoint "<slice>:paths" …` — SERIAL-REQUIRED is final; SAFE + a shared
+registry/enum/id axis → pre-assign the choice space per sibling in target_desc; judgment may
+only downgrade toward serial. **N≥3:** partitioning mandatory (pre-assign ranges), stagger
 launches across ticks, memory rule per slot, stay ≳$150 clear of SOFT-PAUSE. Merges stay serial
 and audited; conflicting PRs park, EXCEPT a conflict set ⊆ doc set (resolve: union/append;
 DECISIONS.md unions by title; CHANGELOG regenerates via git cliff).

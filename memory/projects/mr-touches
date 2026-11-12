@@ -1,0 +1,433 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands (postmortem in mr-hold's
+# header). Python reads this line as a no-op string; sh/bash re-execs the file under python3 before
+# reaching any other line. Statically enforced for every python mr-* tool by mr-selfcheck.
+__doc__ = """mr-touches — a running slice widens its own `touches:` when no live sibling claims the file.
+
+    mr-touches widen --slice S --why "<measured need>" PATH [PATH...]
+        rc=0  TOUCHES-WIDENED S +<n> ...   every PATH is now in S's set (recorded, or already there)
+        rc=1  TOUCHES-REFUSED S <path> — <reason>   one line per refused PATH; NOTHING is recorded
+        rc=2  usage error
+    mr-touches list --slice S        -> the widened paths, comma-joined (empty line when none)
+    mr-touches --selftest            -> fixtures over a temp dir; rc=0 pass, rc=1 fail
+
+WHY THIS EXISTS. A slice's `touches:` is written at spec time, but the files a change forces are
+only measurable at build time: the count and roster pins that go red once a row is added, the
+exhaustive table typed off the tuple the slice extends, the subscription chain behind a new store
+field. A run that measures such a file parks, and the supervisor's only answer is to add the file
+to the spec and relaunch — one parked session plus one cold relaunch per miss. `touches:` protects
+two things, and neither needs that round trip:
+
+  1. FILE-DISJOINT FAN-OUT. A file may be edited by one live slice at a time. `widen` asks
+     mr-disjoint (the overlap SSOT) whether any live sibling's set — declared or widened — covers
+     the requested path, and refuses when one does. A structural path (mr-disjoint's always-serial
+     set) is granted only while no sibling is live. Every grant is a row mr-disjoint reads back, so
+     a sibling launched later is checked against the widened set, not just the spec's.
+  2. SCOPE CONTROL. Every grant carries the run's stated reason and is printed by
+     `mr-gates render --format pr|park`, so the PR body shows whoever merges exactly which files
+     the run added and why. Paths that need operator approval are never grantable.
+
+A REFUSED request is a hidden dependency in the old sense: the run parks and the supervisor
+re-serializes. `type: refactor` slices do not call this tool; their `touches:` is a measured
+contract (standards/spec-driven.md §Refactor slices) and a miss there is a spec defect.
+
+RECORD FORMAT. `$MEM/gates/<slice>.widened.jsonl`, append-only, one JSON object per granted path:
+`{"ts","slice","path","why"}`. Readers: this tool, mr-disjoint (unions the paths into the named
+slice's set) and mr-gates render (prints path + why).
+
+LIVE SIBLING = another slice's `$MEM/.harness-runner.<slice>.lock` (written by mr-spawn at launch,
+carrying its declared touches and repo) whose `session_leader` pid is alive and whose repo is this
+slice's. A lock whose leader is dead belongs to a finished, parked or crashed run and claims
+nothing here; the supervisor's own mr-disjoint call covers a slice it is about to resume.
+
+TWO ROOTS, as in mr-gates: the code is self-locating (it runs the mr-disjoint and mr-repo-of
+beside it), the SUBJECT is the machine singleton — `MEM` is hardcoded so a copy run from a slice
+worktree still reads the one real set of locks and records. `--selftest` passes an explicit dir.
+"""
+
+import datetime
+import fcntl
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
+MEM = HARNESS + "/memory/projects"
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+SLICE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# Supervisor doctrine (Anti-reaccretion) puts these behind operator approval; a run cannot grant
+# them to itself.
+OPERATOR_GATED = (
+    "standards/",
+    ".claude/",
+    "memory/projects/mr-supervisor-prompt-native.md",
+    "memory/projects/mr-brief-template.md",
+    "specs/monster-realm-v2/build-loop-prompt.md",
+)
+
+
+def record_path(mem, slice_id):
+    return os.path.join(mem, "gates", "%s.widened.jsonl" % slice_id)
+
+
+def read_rows(mem, slice_id):
+    rows = []
+    try:
+        with open(record_path(mem, slice_id), errors="replace") as f:
+            for line in f:
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(d, dict) and d.get("path"):
+                    rows.append(d)
+    except OSError:
+        pass
+    return rows
+
+
+def widened_paths(mem, slice_id):
+    out = []
+    for r in read_rows(mem, slice_id):
+        if r["path"] not in out:
+            out.append(r["path"])
+    return out
+
+
+def read_lock(mem, slice_id):
+    try:
+        with open(os.path.join(mem, ".harness-runner.%s.lock" % slice_id)) as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(d, dict):
+        return None
+    t = d.get("touches") or []
+    if not isinstance(t, list):
+        t = [x.strip() for x in str(t).split(",")]
+    d["touches"] = [str(x).strip() for x in t if str(x).strip()]
+    return d
+
+
+def pid_alive(pid):
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def live_siblings(mem, slice_id, repo):
+    """{sibling: declared touches} for every other slice with a live leader in the same repo."""
+    out = {}
+    try:
+        names = sorted(os.listdir(mem))
+    except OSError:
+        return out
+    for n in names:
+        m = re.match(r"^\.harness-runner\.(.+)\.lock$", n)
+        if not m or m.group(1) == slice_id:
+            continue
+        lock = read_lock(mem, m.group(1))
+        if lock is None or not pid_alive(lock.get("session_leader")):
+            continue
+        if lock.get("repo") and repo and lock["repo"] != repo:
+            continue
+        out[m.group(1)] = lock["touches"]
+    return out
+
+
+def covered(path, declared):
+    """True when `path` already sits inside the set: a literal, a glob match, or under a dir token."""
+    import fnmatch
+    for d in declared:
+        if path == d or (d.endswith("/") and path.startswith(d)) or fnmatch.fnmatch(path, d):
+            return True
+    return False
+
+
+def shape_error(path):
+    """A widen names literal files: a glob or a directory would be a blanket, not a measured need."""
+    if not path or path != path.strip() or re.search(r"[\s,:]", path):
+        return "not a single clean path"
+    if path.startswith("/") or ".." in path.split("/"):
+        return "must be repo-relative"
+    if path.endswith("/") or re.search(r"[*?\[\]]", path):
+        return "literal files only (no glob, no directory)"
+    for g in OPERATOR_GATED:
+        if path == g or path.startswith(g):
+            return "needs operator approval (mr-ask-drew), never self-granted"
+    return None
+
+
+def repo_of(paths):
+    try:
+        r = subprocess.run([os.path.join(HERE, "mr-repo-of"), ", ".join(paths)],
+                           capture_output=True, text=True, timeout=30)
+        return r.stdout.strip() or "ROUTE-ERROR"
+    except (OSError, subprocess.SubprocessError):
+        return "ROUTE-ERROR"
+
+
+def sibling_conflicts(mem, slice_id, paths, siblings):
+    """{path: reason} from mr-disjoint over the request and each live sibling. None = no verdict."""
+    args = ["%s:%s" % (slice_id + ".widen", ",".join(paths))]
+    args += ["%s:%s" % (n, ",".join(t)) for n, t in sorted(siblings.items())]
+    env = dict(os.environ, MR_WIDEN_DIR=os.path.join(mem, "gates"), MR_DISJOINT_NO_GRAPH="1")
+    try:
+        r = subprocess.run([os.path.join(HERE, "mr-disjoint")] + args, capture_output=True,
+                           text=True, timeout=60, env=env)
+        v = json.loads(r.stdout)
+        pairs = v["pairs"]
+        structural = v["structural_hits"]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return None
+    me = slice_id + ".widen"
+    bad = {}
+    for p in structural.get(me, []):
+        bad[p] = "structural file while %s is live" % ", ".join(sorted(siblings))
+    for pr in pairs:
+        if me not in pr["pair"] or pr["disjoint"]:
+            continue
+        other = [n for n in pr["pair"] if n != me][0]
+        # mr-disjoint reports the first-named slice's side of each overlap, and the request is
+        # always first, so these are the requested paths themselves.
+        for p in pr["overlap"]:
+            bad.setdefault(p, "claimed by live slice %s" % other)
+    return bad
+
+
+def widen(mem, slice_id, why, paths, out=None):
+    out = out if out is not None else sys.stdout
+
+    def say(s):
+        out.write(s + "\n")
+
+    def refuse(reasons):
+        for p, why_not in reasons:
+            say("TOUCHES-REFUSED %s %s — %s" % (slice_id, p, why_not))
+        return 1
+
+    if not SLICE_RE.match(slice_id or ""):
+        say("usage: bad --slice %r" % slice_id)
+        return 2
+    why = " ".join((why or "").split())
+    paths = list(dict.fromkeys(paths))
+    if not why or not paths:
+        say("usage: mr-touches widen --slice S --why \"<measured need>\" PATH [PATH...]")
+        return 2
+    lock = read_lock(mem, slice_id)
+    if lock is None:
+        return refuse([(p, "no launch lock for %s (only a launched run widens)" % slice_id)
+                       for p in paths])
+    bad = [(p, e) for p in paths for e in [shape_error(p)] if e]
+    if bad:
+        return refuse(bad)
+    os.makedirs(os.path.join(mem, "gates"), exist_ok=True)
+    # One flock around read-siblings -> decide -> append: two runs widening at once are decided
+    # one after the other, so the second sees the first's rows.
+    with open(os.path.join(mem, "gates", ".widen.lock"), "a+") as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        have = lock["touches"] + widened_paths(mem, slice_id)
+        new = [p for p in paths if not covered(p, have)]
+        if new:
+            repo = lock.get("repo") or repo_of(lock["touches"])
+            got = repo_of(lock["touches"] + new)
+            if got != repo:
+                return refuse([(p, "outside this slice's repo (%s, with these paths: %s)"
+                                % (repo, got)) for p in new])
+            siblings = live_siblings(mem, slice_id, repo)
+            if siblings:
+                conflicts = sibling_conflicts(mem, slice_id, new, siblings)
+                if conflicts is None:
+                    return refuse([(p, "mr-disjoint gave no verdict") for p in new])
+                if conflicts:
+                    return refuse(sorted(conflicts.items()))
+            ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            with open(record_path(mem, slice_id), "a") as f:
+                for p in new:
+                    f.write(json.dumps({"ts": ts, "slice": slice_id, "path": p, "why": why}) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+    say("TOUCHES-WIDENED %s +%d%s%s" % (
+        slice_id, len(new), (" " + ", ".join(new)) if new else "",
+        " (already in the set: %d)" % (len(paths) - len(new)) if len(new) != len(paths) else ""))
+    return 0
+
+
+# ---------------------------------------------------------------------------------------------
+# selftest
+# ---------------------------------------------------------------------------------------------
+def selftest():
+    import io
+    fails = []
+    n = [0]
+
+    def ok(name, cond, detail=""):
+        n[0] += 1
+        if not cond:
+            fails.append("%s %s" % (name, detail))
+
+    child = subprocess.Popen(["/bin/true"])
+    child.wait()
+    dead, alive = child.pid, os.getpid()
+
+    def put_lock(mem, slice_id, touches, leader, repo="project"):
+        with open(os.path.join(mem, ".harness-runner.%s.lock" % slice_id), "w") as f:
+            json.dump({"slice": slice_id, "session_leader": leader, "touches": touches,
+                       "repo": repo}, f)
+
+    def run(mem, slice_id, why, paths):
+        buf = io.StringIO()
+        rc = widen(mem, slice_id, why, paths, out=buf)
+        return rc, buf.getvalue()
+
+    with tempfile.TemporaryDirectory(prefix="mr-touches-selftest-") as mem:
+        put_lock(mem, "a-1", ["client/src/input/bindings.ts", "client/src/main.*.test.ts"], alive)
+
+        # A lone run: every measured file is granted, pins and structural alike.
+        rc, o = run(mem, "a-1", "ACCELS tuple + 5 count pins red in vitest",
+                    ["client/src/input/buttons.ts", "client/src/input/router.test.ts",
+                     "evals/baselines/table-schemas.json"])
+        ok("T1-lone-run-granted", rc == 0 and "TOUCHES-WIDENED a-1 +3" in o, o)
+        ok("T1-recorded", widened_paths(mem, "a-1") == [
+            "client/src/input/buttons.ts", "client/src/input/router.test.ts",
+            "evals/baselines/table-schemas.json"], str(widened_paths(mem, "a-1")))
+        ok("T1-why-recorded", all(r["why"].startswith("ACCELS") for r in read_rows(mem, "a-1")))
+
+        # Already declared (glob) or already widened: granted, no second row.
+        rc, o = run(mem, "a-1", "again", ["client/src/main.help.test.ts",
+                                          "client/src/input/buttons.ts"])
+        ok("T2-covered-is-noop", rc == 0 and "+0" in o and len(read_rows(mem, "a-1")) == 3, o)
+
+        # A live sibling's DECLARED file is refused, and the refusal records nothing — not even
+        # the unclaimed path asked for in the same call.
+        put_lock(mem, "b-1", ["client/src/ui/strings.ts", "game-core/src/"], alive)
+        rc, o = run(mem, "a-1", "needs it", ["client/src/ui/strings.ts", "client/src/ui/free.ts"])
+        ok("T3-sibling-declared-refused", rc == 1 and
+           "TOUCHES-REFUSED a-1 client/src/ui/strings.ts — claimed by live slice b-1" in o, o)
+        ok("T3-all-or-nothing", len(read_rows(mem, "a-1")) == 3 and "free.ts" not in o, o)
+        rc, o = run(mem, "a-1", "needs it", ["game-core/src/world.rs"])
+        ok("T4-sibling-dir-token-refused", rc == 1 and "claimed by live slice b-1" in o, o)
+
+        # The sibling's WIDENED file is a claim too (both directions go through the record).
+        rc, o = run(mem, "b-1", "pin", ["client/src/ui/shared.test.ts"])
+        ok("T5-sibling-widens", rc == 0, o)
+        rc, o = run(mem, "a-1", "pin", ["client/src/ui/shared.test.ts"])
+        ok("T5-sibling-widened-refused", rc == 1 and "claimed by live slice b-1" in o, o)
+        rc, o = run(mem, "b-1", "pin", ["client/src/input/buttons.ts"])
+        ok("T5-own-widened-claims-against-sibling", rc == 1 and "claimed by live slice a-1" in o, o)
+
+        # Unclaimed plain file beside a live sibling: granted. Structural file: refused.
+        rc, o = run(mem, "a-1", "pin", ["client/src/ui/free.ts"])
+        ok("T6-unclaimed-granted-beside-sibling", rc == 0 and "+1" in o, o)
+        rc, o = run(mem, "a-1", "schema baseline", ["evals/baselines/content-schema.json"])
+        ok("T7-structural-refused-beside-sibling", rc == 1 and "structural file while b-1" in o, o)
+
+        # A dead leader's lock claims nothing; a live slice in the other repo claims nothing.
+        put_lock(mem, "b-1", ["client/src/ui/strings.ts"], dead)
+        put_lock(mem, "h-1", ["docs/notes.md"], alive, repo="harness")
+        rc, o = run(mem, "a-1", "needs it", ["client/src/ui/strings.ts", "docs/notes.md"])
+        ok("T8-dead-and-other-repo-claim-nothing", rc == 0 and "+2" in o, o)
+
+        # Shape, repo and approval refusals.
+        for name, p, frag in [
+            ("T9-glob", "client/src/ui/*.test.ts", "literal files only"),
+            ("T9-dir", "client/src/ui/", "literal files only"),
+            ("T9-absolute", "/etc/passwd", "repo-relative"),
+            ("T9-dotdot", "client/../x.ts", "repo-relative"),
+            ("T9-operator-gated", "standards/spec-driven.md", "operator approval"),
+            ("T9-other-repo", "memory/projects/mr-gates", "outside this slice's repo"),
+        ]:
+            before = len(read_rows(mem, "a-1"))
+            rc, o = run(mem, "a-1", "x", [p])
+            ok(name, rc == 1 and frag in o and len(read_rows(mem, "a-1")) == before, o)
+        rc, o = run(mem, "h-1", "x", ["memory/projects/mr-brief-template.md"])
+        ok("T9-operator-gated-harness", rc == 1 and "operator approval" in o, o)
+
+        rc, o = run(mem, "never-launched", "x", ["client/a.ts"])
+        ok("T10-no-lock-refused", rc == 1 and "no launch lock" in o, o)
+        rc, o = run(mem, "a-1", "  ", ["client/a.ts"])
+        ok("T10-why-required", rc == 2, o)
+        rc, o = run(mem, "../a", "x", ["client/a.ts"])
+        ok("T10-bad-slice", rc == 2, o)
+
+        # mr-disjoint reads the record: a slice the supervisor names carries its widened files
+        # into the fan-out verdict, and an unrecorded slice is unchanged.
+        def dj(*args):
+            r = subprocess.run([os.path.join(HERE, "mr-disjoint")] + list(args),
+                               capture_output=True, text=True, timeout=60,
+                               env=dict(os.environ, MR_WIDEN_DIR=os.path.join(mem, "gates"),
+                                        MR_DISJOINT_NO_GRAPH="1"))
+            return json.loads(r.stdout)
+        v = dj("a-1:client/src/input/bindings.ts", "c-1:client/src/ui/free.ts")
+        ok("T11-disjoint-unions-widened", v["verdict"] == "SERIAL-REQUIRED(structural)" and
+           v["pairs"][0]["overlap"] == ["client/src/ui/free.ts"] and
+           "client/src/ui/free.ts" in v.get("widened", {}).get("a-1", []), json.dumps(v))
+        v = dj("x-1:client/src/input/bindings.ts", "c-1:client/src/ui/free.ts")
+        ok("T11-disjoint-unrecorded-unchanged", v["verdict"] == "SAFE" and "widened" not in v,
+           json.dumps(v))
+
+    # `list` is what a shell caller reads.
+    with tempfile.TemporaryDirectory(prefix="mr-touches-selftest-") as mem:
+        put_lock(mem, "l-1", ["client/a.ts"], alive)
+        run(mem, "l-1", "x", ["client/b.ts", "client/c.ts"])
+        ok("T12-list", ", ".join(widened_paths(mem, "l-1")) == "client/b.ts, client/c.ts")
+
+    if fails:
+        for f in fails:
+            print("TOUCHES-SELFTEST-FAIL %s" % f)
+        return 1
+    print("TOUCHES-SELFTEST-OK %d checks" % n[0])
+    return 0
+
+
+def main(argv):
+    if len(argv) >= 2 and argv[1] == "--selftest":
+        return selftest()
+    usage = ("usage: mr-touches widen --slice S --why \"<measured need>\" PATH [PATH...]"
+             " | list --slice S | --selftest")
+    if len(argv) < 2 or argv[1] not in ("widen", "list"):
+        print(usage, file=sys.stderr)
+        return 2
+    slice_id, why, paths = None, None, []
+    rest = argv[2:]
+    i = 0
+    while i < len(rest):
+        if rest[i] in ("--slice", "--why") and i + 1 < len(rest):
+            if rest[i] == "--slice":
+                slice_id = rest[i + 1]
+            else:
+                why = rest[i + 1]
+            i += 2
+        elif rest[i].startswith("--"):
+            print(usage, file=sys.stderr)
+            return 2
+        else:
+            paths.append(rest[i])
+            i += 1
+    if not SLICE_RE.match(slice_id or ""):
+        print(usage, file=sys.stderr)
+        return 2
+    if argv[1] == "list":
+        print(", ".join(widened_paths(MEM, slice_id)))
+        return 0
+    return widen(MEM, slice_id, why, paths)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

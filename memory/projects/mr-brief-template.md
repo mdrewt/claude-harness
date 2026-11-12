@@ -1,11 +1,11 @@
 Build exactly ONE mergeable Monster Realm v2 slice — `<SLICE>` (<TARGET_DESC>) — then stop. Follow `specs/monster-realm-v2/build-loop-prompt.md`, the project `AGENTS.md`, and `~/.claude/harness/standards/` (`testing-tdd.md` is the verification SSOT). Right-size: if planning shows the slice is large, ship the smallest coherent increment and DEFER the rest.
 
-**Scope:** your diff ⊆ the declared `touches:` — <TOUCHES> — plus sibling test files of declared code files, plus a `docs/DECISIONS.md` entry ONLY when `standards/decisions.md`'s bar is met (usually none; a spec naming it in `touches:` mandates it). List every file beyond the literal declared set under a `touches-delta:` PR-body heading. A file outside that set that the task REQUIRES is a hidden dependency: stop, record it in the handoff, let the supervisor re-serialize.
+**Scope:** your diff ⊆ the declared `touches:` — <TOUCHES> — plus sibling tests of declared code files, plus a `docs/DECISIONS.md` entry ONLY when `standards/decisions.md`'s bar is met (a spec naming it in `touches:` mandates it). List files beyond the declared set under a PR-body `touches-delta:` heading. A file outside it that a red test or compile error REQUIRES: `$MEM/mr-touches widen --slice <SLICE> --why "<proof>" <path>…`; REFUSED = hidden dependency: stop, record it in the handoff.
 **Boy Scout (within `touches:` only):** bounded in-file cleanups (file-local names, dead code, comment accuracy), ≤ ~40 lines / 3 hunks, attributed under `boyscout-delta:` (`file:lines — why`); excess is a follow-up flag, never a blocker; no cleanup in gating tests or interface-freeze slices.
-**`type: refactor` slice:** `standards/spec-driven.md` §Refactor slices binds (PR title `refactor(<scope>): <SLICE> — …`; `moved-tests:` rows; whole or parked, no DEFER to backlog); the Boy Scout cap never limits the declared move.
+**`type: refactor` slice:** `standards/spec-driven.md` §Refactor slices binds (PR title `refactor(<scope>): <SLICE> — …`; `moved-tests:` rows; whole or parked, no DEFER, no `mr-touches`); the Boy Scout cap never limits the declared move.
 **If `master` CI is red, fix/revert it to green instead and stop** — this overrides scope and Boy Scout.
 
-**Facts:** the spec corpus is `/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/`. Decisions live in `docs/DECISIONS.md` only; an `ADR-NNNN` in a comment names nothing. `$MEM` = `/home/mdrewt/projects/ai-apps/claude-harness/memory/projects`. `mr-* --help` is unsupported; flags are in each tool's header comment. Scratch/PoC files go in a `mktemp -d` sandbox: recursive deletes are guard-blocked in EVERY spelling — leave it, name it in the report, never retry.
+**Facts:** the spec corpus is `/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/`. Decisions live in `docs/DECISIONS.md` only; an `ADR-NNNN` in a comment names nothing. `$MEM` = `/home/mdrewt/projects/ai-apps/claude-harness/memory/projects`. `mr-*` flags: each tool's header comment (no `--help`). Scratch/PoC files go in a `mktemp -d` sandbox: recursive deletes are guard-blocked in EVERY spelling — leave it, name it in the report, never retry.
 
 **Worktree:** resume a parked worktree/branch named in the handoff; else `git worktree add` a fresh one at `<WT_ROOT>/<SLICE>` from the latest `origin/<BASE_BRANCH>`, leaving the main checkout on that branch. NEVER run mutating git (`stash`, `checkout`, `commit`, `reset`, `clean`, …) against the main checkout. Cwd resets between tool calls: run repo commands and `mr-gates check` as `cd <WT_ROOT>/<SLICE> && …`; `git worktree add` runs from the main checkout.
 
@@ -29,7 +29,7 @@ Put `mr-gates render --slice <SLICE> --format pr` output in the PR body.
 
 End with: slice · merged|parked|blocked|stopped · PR URL · CI · what changed · decisions · risks.
 
-**Foreground-only execution:** run every subagent, build, and test in the foreground; never end a turn with work in flight. For long waits, poll within the turn or checkpoint and exit at a valid stopping point. A subagent you resume (SendMessage) runs in the background: `rm -f /tmp/<SLICE>-<role>.done` first, have it create that file last, poll it with a bounded wait (≤10 min); never poll mtimes.
+**Foreground only:** run every subagent, build, and test in the foreground; never end a turn with work in flight. For long waits, poll within the turn or checkpoint and exit at a valid stopping point. A subagent you resume (SendMessage) runs in the background: `rm -f /tmp/<SLICE>-<role>.done` first, have it create that file last, poll it with a bounded wait (≤10 min); never poll mtimes.
 
 The PR description MUST include `Items: <feedback-ledger ids, or none>`.
 

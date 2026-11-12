@@ -30,6 +30,10 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
    preview) · Tasks as small vertical slices (`M{N}a/b/…`), **each with an explicit `touches:`
    path-set** along natural module boundaries so disjoint slices can fan out; slice order follows
    the real dependency chain (rule → reducer → client), not just file-disjointness · Risks/decisions.
+   A feature slice's `touches:` lists the files its design names and every file a sibling slice
+   also edits, because fan-out reads it. The pins and callers that only a red test or a compile
+   error reveals are added by the build itself (`memory/projects/mr-touches widen`), so the list
+   carries no guesses.
    **Structure pass** — do it before slicing; you and step 3's lenses judge it, never a script:
    - Read in full every production file two or more slices would touch.
    - New logic and state go in a named module. A file that already holds several
