@@ -158,3 +158,35 @@ channel, which M25 S2 will gate for the first time via `[oracle-coupling-*]` —
 becomes *computed* from a findings ledger rather than asserted (S5–S6). The semantic ceiling is stated, not
 hidden: a false `visibility_note`, an under-triaged branch, or a mis-scored severity remains possible and
 undetectable.
+
+## 6. Trust by way of play (operator, 2026-11-12; `game-design.md` §14)
+
+The game runs as a single-player world, a private server, or the one official server. Everything
+above describes the **official server**: we operate it, clients are untrusted, and the M25 sign-off is
+about it alone. The other two change who is trusted, not the code.
+
+| | Who operates the database | Trusted | Untrusted |
+|---|---|---|---|
+| Single-player world | the player | the player | nobody else is present |
+| Private server | the host | the host, by every player who joins | the other players' clients |
+| Official server | us | us | every client |
+
+- **The host can read and change everything in their world.** Private tables behind owner-scoped
+  views keep one player's data from another player's client in every world. They do not keep it from
+  whoever owns the database. This is accepted and stated to players, not mitigated.
+- **Worlds are isolated.** A character, monster, item or rating exists in one world. The official
+  server imports nothing, so nothing forged in a private world can reach its economy or ladder. Any
+  future transfer feature re-opens the M25 sign-off.
+- **The account is shared; the world is not.** A private server learns that a joiner holds a valid
+  account and which one. It must never receive a credential that works against the official server or
+  the identity provider itself: a token is scoped to the server it was issued for.
+- **A private server's access rule is the host's** (allowlist, password, or open to any valid
+  account). Its strength is the host's responsibility; the default for a newly opened world should not
+  be open to the internet.
+- **The reducer discipline stays on everywhere** (identity from `ctx.sender`, intent only, reject
+  never clamp): on a private server it protects players from each other, and it keeps one code path.
+- **Mods** (private worlds only, from the official release) are code or data from a stranger running
+  on the host's and the players' machines; `M-modding.spec.md` owns that threat model. The official
+  server never runs them.
+- **Player data on a private server** (export, deletion) is answered by its host, not by us; what the
+  client tells a player before joining one is an open question in `game-design.md` §14.

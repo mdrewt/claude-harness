@@ -60,9 +60,9 @@ benchmark and/or a runtime metric + budget:
 
 | Hot path | Where | Budget / signal |
 |---|---|---|
-| `game-core` rules (`apply_move`, `derive_stats`, `resolve_turn`, recruit/encounter, evolution) | M1/M6/M7/M8/M10 | criterion micro-bench; regression-gated |
+| `game-core` rules (`apply_move`, `derive_stats`, `resolve_turn`, recruit/encounter, evolution, the tactical planner `tactics::plan`) | M1/M6/M7/M8/M10, M-battle-tactics | criterion micro-bench; regression-gated |
 | Per-zone **movement tick** | M2/M11 | tick duration < `STEP_MS`; scales O(chars-in-zone); exceeding it = split-the-zone signal |
-| **Subscription fan-out** (per-zone) | M2/M11 | update size/rate bounded by zone population; metric + budget |
+| **Subscription fan-out** (per-zone) | M2/M11 | update size/rate bounded by zone population; metric + budget. The host's `spacetime_num_bytes_sent_to_clients_total` counts a delta once, not once per subscriber, so the load driver's bytes received per client is the signal (`M-scale-readiness.spec.md` SR9) |
 | **wasm marshaling boundary** (`apply_move`, `zone_map`) | M3 | per-call cost bench; batch only if profiled |
 | Client **per-frame** (render + interpolation + drain) | M4 | 60 fps (< 16 ms/frame); fps + frame-time metric |
 | **Battle resolution** (PvE/PvP/raid) | M7/M16/M18 | per-turn resolve bench; concurrent-battles metric |
@@ -131,6 +131,15 @@ adr/0180-observability-stack-selection.md`).
 - **M2** adds the per-zone-tick benchmark + a concurrency/load test (the canonical server hot path). *(refined)*
 - **M5** points its load-test deferral at M20 + the per-milestone invariant. *(refined)*
 - **M20** (new, Phase D) consolidates the production stack + comprehensive load/profiling/tuning. *(new)*
+
+## 5a. Scope by way of play (operator, 2026-11-12; `game-design.md` §14)
+
+This plan instruments the **official server** and the clients connected to it. A single-player world
+or a private server is a player's or a host's own machine: its client sends nothing to our stack
+unless the player opts in, and the server's own `/v1/metrics` stays local to whoever runs it. The
+perf budgets apply everywhere, at different sizes — the official server's population target is in
+`M-scale-readiness.spec.md`; a single-player world's footprint (memory, idle CPU, disk growth) is
+budgeted in `M-local-play.spec.md`.
 
 ## 6. Net effect
 Observability and performance stop being deferred-without-a-plan and become a **gated, designed-in property**:
