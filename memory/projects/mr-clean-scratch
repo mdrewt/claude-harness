@@ -8,7 +8,7 @@ USAGE = """mr-clean-scratch — remove scratch directories and stale git worktre
 
     mr-clean-scratch PATH...            dry run: print each target, its size and the action
     mr-clean-scratch --apply PATH...    perform it
-    mr-clean-scratch --stale [--apply]  sweep the allowlisted roots for candidates
+    mr-clean-scratch --stale            list sweep candidates under the allowlisted roots
     mr-clean-scratch --selftest
 
 The Bash guard hook blocks every recursive rm by text match, and a headless session that hits a
@@ -30,15 +30,18 @@ reachable from a remote-tracking branch or the default branch, or its branch has
 head contains it. Squash merges put no branch commit on the default branch, so ancestry alone
 cannot answer that last question; the PR state does, as in mr-branch-audit.
 
-DELETION never follows a symlink and never leaves the target's filesystem. Nothing is removed while
-a live process has its cwd inside the target.
+DELETION reaches the target from the tmp root one directory fd at a time, each opened without
+following a symlink, and never leaves the target's filesystem. Nothing is removed while a live
+process has its cwd inside the target.
 
-AGE FLOOR. --stale skips anything modified in the last 60 minutes. A path named as an argument is
-exempt from the floor and from nothing else.
+THE SWEEP ONLY LISTS. --stale prints what is removable and skips anything modified in the last 60
+minutes; it is refused together with --apply, because the roots are shared with other live
+sessions and a deletion must name its path. A named path is exempt from the age floor and from
+nothing else.
 
 OUTPUT. One line per target: WOULD-REMOVE / REMOVED / PARTIAL / SKIP / REFUSED / ABSENT. Exit 1 when
 a named target was not removable, 2 on a usage or environment error. Every deletion is appended to
-mr-clean-scratch.log beside this tool's live copy.
+mr-clean-scratch.log beside this tool's live copy. Control characters in a path are printed escaped.
 """
 import contextlib
 import io
@@ -100,28 +103,27 @@ class Cfg:
         self.log = HARNESS + "/memory/projects/mr-clean-scratch.log"
         self.pr_merged = gh_pr_merged
         self.now = time.time
+        self.before_delete = lambda real: None  # selftest seam: the instant before deletion
 
 
 def worktrees(cfg):
     """Every registered worktree of both repos. A repo that cannot be listed aborts the run:
-    without the list, a worktree would be mistaken for a plain directory."""
+    without the list, a worktree would be mistaken for a plain directory. Read NUL-delimited: a
+    path may hold a newline, and a truncated path would be judged as a plain directory."""
     out = []
     for repo, default in cfg.repos:
         if not os.path.isdir(repo):
             continue
-        r = git(repo, "worktree", "list", "--porcelain")
+        r = git(repo, "worktree", "list", "--porcelain", "-z")
         if r.returncode != 0:
             raise RuntimeError("cannot list worktrees of %s: %s" % (repo, r.stderr.strip()))
         first = True
-        for block in r.stdout.strip().split("\n\n"):
-            w = {"repo": repo, "default": default, "main": first, "branch": None,
-                 "head": None, "locked": False}
-            for line in block.splitlines():
+        for block in r.stdout.split("\0\0"):
+            w = {"repo": repo, "default": default, "main": first, "branch": None, "locked": False}
+            for line in block.split("\0"):
                 key, _, val = line.partition(" ")
                 if key == "worktree":
                     w["path"] = os.path.realpath(val)
-                elif key == "HEAD":
-                    w["head"] = val
                 elif key == "branch":
                     w["branch"] = val.replace("refs/heads/", "", 1)
                 elif key == "locked":
@@ -195,7 +197,8 @@ def live_cwd(real):
 
 
 def measure(root):
-    """-> (bytes on disk, newest mtime, crosses a filesystem). Symlinks are never followed."""
+    """-> (bytes on disk, newest mtime, crosses a filesystem, (dev, inode) of the target).
+    Symlinks are never followed."""
     st = os.lstat(root)
     total, newest, foreign = st.st_blocks * 512, st.st_mtime, False
     stack = [root] if stat.S_ISDIR(st.st_mode) else []
@@ -217,7 +220,7 @@ def measure(root):
                 newest = max(newest, s.st_mtime)
                 if stat.S_ISDIR(s.st_mode):
                     stack.append(e.path)
-    return total, newest, foreign
+    return total, newest, foreign, (st.st_dev, st.st_ino)
 
 
 def _rm_entry(pfd, name, dev, shown, left):
@@ -251,14 +254,26 @@ def _rm_entry(pfd, name, dev, shown, left):
         left.append("%s (%s)" % (shown, e.strerror))
 
 
-def rm_tree(path, dev=None):
-    """Delete `path` entry by entry through directory fds opened O_NOFOLLOW, staying on device
-    `dev` (default: the target's own). Returns what could not be removed."""
+def rm_tree(root, path, ident=None, dev=None):
+    """Delete `path`, which lies below `root`. Each directory from `root` down to the target's
+    parent is opened relative to the one above it with O_NOFOLLOW, and deletion descends the same
+    way, so no symlink is followed at any depth even if a directory is swapped meanwhile. Stays on
+    device `dev` (default: the target's own). Raises OSError when the way down is no longer the
+    directories that were judged, or the target is not the (dev, inode) `ident`; returns what could
+    not be removed."""
     left = []
-    parent, name = os.path.split(path)
-    pfd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    *mid, name = os.path.relpath(path, root).split("/")
+    pfd = os.open(root, flags)
     try:
-        _rm_entry(pfd, name, os.lstat(name, dir_fd=pfd).st_dev if dev is None else dev, path, left)
+        for part in mid:
+            fd = os.open(part, flags, dir_fd=pfd)
+            os.close(pfd)
+            pfd = fd
+        st = os.lstat(name, dir_fd=pfd)
+        if ident is not None and (st.st_dev, st.st_ino) != ident:
+            raise OSError("target was replaced")
+        _rm_entry(pfd, name, st.st_dev if dev is None else dev, path, left)
     finally:
         os.close(pfd)
     return left
@@ -268,13 +283,16 @@ def wt_blocker(w, cfg):
     """Why this worktree must be kept, or None."""
     if w["locked"]:
         return "worktree is locked"
-    st = git(w["path"], "--no-optional-locks", "status", "--porcelain")
+    # --untracked-files is explicit: status.showUntrackedFiles=no would hide unsaved files.
+    st = git(w["path"], "--no-optional-locks", "status", "--porcelain", "--untracked-files=all")
     if st.returncode != 0:
         return "git status failed: %s" % st.stderr.strip()[:120]
     if st.stdout.strip():
         return "uncommitted or untracked changes (%d paths)" % len(st.stdout.splitlines())
-    sha, repo = w["head"], w["repo"]
-    if not sha:
+    # HEAD is read now, after the status: a commit made since the worktree list was taken is judged.
+    head = git(w["path"], "rev-parse", "--verify", "HEAD")
+    sha, repo = head.stdout.strip(), w["repo"]
+    if head.returncode != 0 or not sha:
         return "no HEAD"
     if git(repo, "for-each-ref", "--count=1", "--contains", sha, "refs/remotes").stdout.strip():
         return None
@@ -293,15 +311,20 @@ def human(n):
         n /= 1024.0
 
 
+def q(text):
+    """`text` for one output or log line: control characters escaped, so a path cannot forge a line."""
+    return text if text.isprintable() else text.encode("unicode_escape").decode("ascii")
+
+
 def process(arg, explicit, cfg, wts, apply):
     """Judge one target and, with apply, remove it. -> 'removed' | 'kept' | 'absent'."""
     kind, real, detail = classify(arg, cfg, wts)
     if kind == "absent":
-        print("ABSENT %s" % real)
+        print("ABSENT %s" % q(real))
         return "absent"
 
     def keep(why, word="SKIP"):
-        print("%s %s — %s" % (word, real, why))
+        print("%s %s — %s" % (word, q(real), q(why)))
         return "kept"
 
     if kind == "refuse":
@@ -309,7 +332,7 @@ def process(arg, explicit, cfg, wts, apply):
     pid = live_cwd(real)
     if pid:
         return keep("process %d has its cwd inside" % pid)
-    size, newest, foreign = measure(real)
+    size, newest, foreign, ident = measure(real)
     age = cfg.now() - newest
     if not explicit and age < AGE_FLOOR_S:
         return keep("modified %d min ago (name it as an argument to remove it anyway)" % (age // 60))
@@ -321,9 +344,10 @@ def process(arg, explicit, cfg, wts, apply):
         if why:
             return keep(why)
     if not apply:
-        print("WOULD-REMOVE %s %s %s" % (label, human(size), real))
+        print("WOULD-REMOVE %s %s %s" % (label, human(size), q(real)))
         return "removed"
     with open(cfg.log, "a") as log:  # opened first: no audit line, no deletion
+        cfg.before_delete(real)
         if kind == "worktree":
             r = git(detail["repo"], "worktree", "remove", real)
             if r.returncode != 0:
@@ -335,16 +359,17 @@ def process(arg, explicit, cfg, wts, apply):
                     os.rmdir(parent)  # the emptied sandbox dir; a non-empty one stays
             left = []
         else:
-            if os.path.realpath(real) != real:
-                return keep("changed under us")
-            left = rm_tree(real)
+            try:
+                left = rm_tree(cfg.tmp, real, ident)
+            except OSError as e:
+                return keep("changed since it was judged (%s)" % (e.strerror or e))
         word = "PARTIAL" if left else "REMOVED"
         log.write("%s pid=%d %s %s bytes=%d %s\n" % (
-            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), os.getpid(), word, label, size, real))
+            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), os.getpid(), word, label, size, q(real)))
     if left:
-        print("PARTIAL %s %s — %d entries left, first: %s" % (label, real, len(left), left[0]))
+        print("PARTIAL %s %s — %d entries left, first: %s" % (label, q(real), len(left), q(left[0])))
         return "kept"
-    print("REMOVED %s %s %s" % (label, human(size), real))
+    print("REMOVED %s %s %s" % (label, human(size), q(real)))
     return "removed"
 
 
@@ -383,6 +408,9 @@ def run(argv, cfg):
     if any(p.startswith("-") for p in paths) or not (paths or stale):
         print(USAGE)
         return 2
+    if apply and stale:
+        print("CLEAN-SCRATCH-ABORT --stale only lists; name the paths to remove with --apply")
+        return 2
     try:
         wts = worktrees(cfg)
     except (RuntimeError, OSError, subprocess.TimeoutExpired) as e:
@@ -398,13 +426,13 @@ def run(argv, cfg):
             named = {os.path.normpath(os.path.abspath(p)) for p in paths}
             for p in stale_candidates(cfg, wts):
                 if p not in named:
-                    removed += process(p, False, cfg, wts, apply) == "removed"
+                    removed += process(p, False, cfg, wts, False) == "removed"
     except OSError as e:
         print("CLEAN-SCRATCH-ABORT %s" % e)
         return 2
     print("CLEAN-SCRATCH %s: %d target(s)%s" % (
         "applied" if apply else "dry-run", removed,
-        " removed" if apply else " would be removed — add --apply to do it"))
+        " removed" if apply else " would be removed — name the paths with --apply to do it"))
     return rc
 
 
@@ -549,7 +577,7 @@ def selftest():
         check("symlink targets untouched", os.path.isfile(os.path.join(victim, "precious")))
         check("deletion logged", open(cfg.log).read().count(" REMOVED tree ") == 1)
         xdev = mk("tmp", "mr-a", "xdev", "sub", file="f")
-        left = rm_tree(os.path.dirname(xdev), dev=-1)
+        left = rm_tree(cfg.tmp, os.path.dirname(xdev), dev=-1)
         check("another filesystem is not entered", left and os.path.isfile(os.path.join(xdev, "f")))
         rc, out = go("--apply", os.path.join(base, "tmp", "mr-a", "nope"))
         check("absent target is not an error", rc == 0 and "ABSENT" in out)
@@ -633,6 +661,77 @@ def selftest():
         rc, out = go("--apply", sand2)
         check("non-empty sandbox dir stays", rc == 0 and not registered(sand2)
               and os.path.isfile(os.path.join(os.path.dirname(sand2), "run.log")))
+
+        # ---- a worktree is judged at decision time, by its real path ----
+        late = wt(os.path.join(wts_root, "late"), "--detach", "origin/master")
+        listed = worktrees(cfg)
+        commit(late, "late-work")  # after the list was read, as another process would
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            got = process(late, True, cfg, listed, True)
+        check("a commit made after the worktree list was read is kept",
+              got == "kept" and "on no remote-tracking branch" in buf.getvalue() and registered(late)
+              and os.path.isfile(os.path.join(late, "late-work")))
+        hidden = wt(os.path.join(wts_root, "hidden"), "--detach", "origin/master")
+        mk("tmp", "mr-wts", "hidden", file="new-file")
+        g(game, "config", "status.showUntrackedFiles", "no")
+        try:
+            rc, out = go("--apply", hidden)
+        finally:
+            g(game, "config", "--unset", "status.showUntrackedFiles")
+        check("status.showUntrackedFiles=no hides no untracked file",
+              rc == 1 and "uncommitted" in out and os.path.isfile(os.path.join(hidden, "new-file")))
+        nl = wt(os.path.join(cfg.tmp, "mr-n", "a\nb"), "--detach", "origin/master")
+        with open(os.path.join(nl, "unsaved"), "w") as fh:
+            fh.write("work")
+        check("a worktree path holding a newline is listed whole", registered(nl))
+        rc, out = go("--apply", nl)
+        check("a newline-path worktree with unsaved work is kept",
+              rc == 1 and "uncommitted" in out and os.path.isfile(os.path.join(nl, "unsaved")))
+        check("a newline in a path is printed escaped", "a\\nb" in out and len(out.splitlines()) == 2)
+        nltree = mk("tmp", "mr-n2", "x\n2026-01-01T00:00:00Z pid=1 REMOVED tree bytes=1 /forged", file="f")
+        before = len(open(cfg.log).read().splitlines())
+        rc, out = go("--apply", nltree)
+        check("a newline-path tree adds exactly one log line",
+              rc == 0 and not os.path.exists(nltree)
+              and len(open(cfg.log).read().splitlines()) == before + 1)
+
+        # ---- rule 2: a directory swapped between judgement and deletion ----
+        swapv = mk("home", "v", "mid", "tgt", file="precious")
+        tgt = mk("tmp", "mr-x", "mid", "tgt", file="junk")
+        mrx = os.path.join(cfg.tmp, "mr-x")
+
+        def swap_ancestor(real):
+            os.rename(mrx, mrx + ".aside")
+            os.symlink(os.path.join(cfg.home, "v"), mrx)
+        cfg.before_delete = swap_ancestor
+        try:
+            rc, out = go("--apply", tgt)
+        finally:
+            cfg.before_delete = lambda real: None
+        check("an ancestor swapped for a symlink after judgement deletes nothing",
+              rc == 1 and "changed since it was judged" in out and "REMOVED" not in out
+              and os.path.isfile(os.path.join(swapv, "precious"))
+              and os.path.isfile(os.path.join(mrx + ".aside", "mid", "tgt", "junk")))
+        try:  # the fd walk alone, without the identity check, refuses the symlinked ancestor
+            walked = rm_tree(cfg.tmp, tgt)
+        except OSError:
+            walked = None
+        check("the walk down to a target follows no symlink",
+              walked is None and os.path.isfile(os.path.join(swapv, "precious")))
+        os.unlink(mrx)
+        tgt2 = mk("tmp", "mr-y", "tgt", file="junk")
+
+        def swap_target(real):
+            os.rename(real, real + ".aside")
+            mk("tmp", "mr-y", "tgt", file="newer-work")
+        cfg.before_delete = swap_target
+        try:
+            rc, out = go("--apply", tgt2)
+        finally:
+            cfg.before_delete = lambda real: None
+        check("a target replaced after judgement is kept",
+              rc == 1 and "target was replaced" in out and os.path.isfile(os.path.join(tgt2, "newer-work")))
         check("pr_covers: exact head", pr_covers([{"headRefOid": "a"}], "a", lambda a, b: False))
         check("pr_covers: head descends from HEAD", pr_covers([{"headRefOid": "b"}], "a", lambda a, b: True))
         check("pr_covers: unrelated head", not pr_covers([{"headRefOid": "b"}], "a", lambda a, b: False))
@@ -659,15 +758,21 @@ def selftest():
               not re.search(r"WOULD-REMOVE \S+ \S+ (%s|%s|%s|%s)(/|$)" % tuple(
                   re.escape(p) for p in (os.path.join(cfg.tmp, "other"), harness, game, cfg.home)),
                   out, re.M))
-        rc, out = go("--stale", "--apply")
-        check("sweep applies to old candidates only",
-              not os.path.exists(old) and not os.path.exists(oldpad) and not registered(oldwt)
-              and os.path.isdir(fresh) and os.path.isdir(newpad) and registered(dirty)
-              and registered(detached) and os.path.isdir(harness) and os.path.isfile(os.path.join(victim, "precious")))
+        logged = open(cfg.log).read()
+        for argv in (("--stale", "--apply"), ("--apply", "--stale", fresh)):
+            rc, out = go(*argv)
+            check("sweep with %s deletes nothing" % " ".join(argv[:2]),
+                  rc == 2 and "CLEAN-SCRATCH-ABORT --stale only lists" in out and os.path.isdir(old)
+                  and os.path.isdir(oldpad) and registered(oldwt) and os.path.isdir(fresh)
+                  and open(cfg.log).read() == logged)
+        rc, out = go("--apply", old, oldpad, oldwt)
+        check("sweep candidates are removed once named",
+              rc == 0 and not os.path.exists(old) and not os.path.exists(oldpad) and not registered(oldwt)
+              and os.path.isdir(newpad))
         rc, out = go("--apply", fresh)
         check("a named fresh path is removed", rc == 0 and not os.path.exists(fresh))
         logged = open(cfg.log).read()
-        check("every deletion is logged", logged.count(" REMOVED ") >= 12 and old in logged and sand in logged)
+        check("every deletion is logged", logged.count(" REMOVED ") >= 13 and old in logged and sand in logged)
         check("usage error on no target", go()[0] == 2 and go("--bogus")[0] == 2
               and "mr-clean-scratch --apply PATH" in go()[1])
 
@@ -677,7 +782,7 @@ def selftest():
         for w in worktrees(cfg):
             if not w["main"]:
                 git(w["repo"], "worktree", "remove", "--force", w["path"])
-        rm_tree(base)
+        rm_tree(os.path.dirname(base), base)
     check("selftest leaves nothing behind", not os.path.exists(base))
     if fails:
         return 1

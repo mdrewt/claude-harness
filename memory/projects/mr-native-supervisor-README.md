@@ -19,8 +19,9 @@ fires only when it does not pass.
 ## Scratch cleanup (`memory/projects/mr-clean-scratch`)
 The guard hook blocks every recursive `rm`, so agents remove scratch through this tool; its
 safety is in code. `mr-clean-scratch PATH...` is a dry run (target, size, action); `--apply`
-performs it; `--stale` sweeps for candidates untouched for 60 minutes (a named path is exempt
-from that floor only).
+performs it; `--stale` lists candidates untouched for 60 minutes and is refused with `--apply`,
+since the roots hold other live sessions' files — a deletion names its path (a named path is
+exempt from that floor only).
 - Removable: `/tmp/claude-<uid>/**/scratchpad/*`, `/tmp/mr-*/`, `/tmp/tmp.*/`, and registered
   worktrees of either repo under `/tmp/<name>.<random>/`. Refused: anything else, any path
   through a symlink, main checkouts, the repo checkouts, `$HOME`, and paths naming the hold

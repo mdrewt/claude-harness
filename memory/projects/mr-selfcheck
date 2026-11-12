@@ -58,7 +58,7 @@ EOF
 # outside the allowlisted scratch roots, through a symlink, in a checkout, or a worktree holding
 # unsaved work. The marker's count is parsed so a battery gutted to a bare OK still fails here.
 CS_N=$("$MEM/mr-clean-scratch" --selftest 2>/dev/null | sed -n 's/^CLEAN-SCRATCH-SELFTEST-OK \([0-9][0-9]*\)$/\1/p')
-[ "${CS_N:-0}" -ge 64 ] || { echo "SELFCHECK-FAIL mr-clean-scratch selftest (fixtures run: ${CS_N:-none}, floor 64)"; BAD=1; }
+[ "${CS_N:-0}" -ge 75 ] || { echo "SELFCHECK-FAIL mr-clean-scratch selftest (fixtures run: ${CS_N:-none}, floor 75)"; BAD=1; }
 # cost caps + rate-limit arming: the wrapper-side money/limit safety pair.
 "$MEM/mr-cost-watch" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-watch selftest"; BAD=1; }
 # fan-out disjointness: a directory token must overlap a file under it, a glob must overlap its
