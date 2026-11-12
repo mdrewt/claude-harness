@@ -104,13 +104,26 @@ tested at this size — SR9 exists to replace these with measurements):
   cannot stand in for this.
 
 - **SR10 A zone with no player in it does no work** (operator, 2026-11-12: such zones "should
-  either not update or keep updates to a minimum"). Every zone's `movement_tick` fires at 5 Hz
-  whether or not anyone is there (~58 µs per empty tick: ~3% of the reducer thread for 100 empty
-  zones, and constant wake-ups and commit-log writes on a player's own machine). A zone's tick is
-  armed when a player's character enters it (join, warp, reconnect) and disarms itself on the first
-  tick that finds none; NPCs in an empty zone hold still. Anything that must still advance with
-  nobody present (a timer a returning player would notice) is computed from elapsed time on
-  re-arm, not ticked. Builds after SR1, which rewrites the same reducer.
+  either not update or keep updates to a minimum", and a reset to defaults is acceptable). Every
+  zone's `movement_tick` fires at 5 Hz whether or not anyone is there (~58 µs per empty tick: ~3%
+  of the reducer thread for 100 empty zones, and constant wake-ups and commit-log writes on a
+  player's own machine). The policy, by kind of state:
+  - **Ambient state** — anything the world does by itself that no player caused and none would
+    miss: an NPC's wander position and facing today. It is frozen while the zone is empty and
+    **reset to its authored default as the zone empties**: the tick that finds no player's character
+    in the zone puts each NPC back on its home tile and disarms the zone's schedule. One code path
+    covers leave, warp, disconnect and timeout; nobody is subscribed, so the reset is delivered to no
+    one; and the next player to enter always finds the zone in a known good state with nothing to
+    wait for. Entering only arms the tick (join, warp, reconnect).
+  - **Player-caused state** — anything a player did and expects to still be true (a quest step, an
+    item taken, a shop purchase). Never reset, and it needs no tick.
+  - **Time-driven state** — anything that should have moved on while nobody watched (a respawn, a
+    restock, a growth timer). Stored as a time or deadline and computed from elapsed time when it is
+    next read, never advanced by a tick. The rule that keeps this true: **no state may depend on a
+    tick having run.**
+  A world with nobody connected schedules nothing recurring at all (the 60 s `mr_heartbeat` included;
+  per-entity deadlines such as reapers stay, since they fire once and only when something is owed).
+  Builds after SR1, which rewrites the same reducer.
 
 ## Watch items (graph in the load run; no slice unless a budget is breached)
 
