@@ -4,7 +4,8 @@
 runs cheap bash gates and, when action may be needed, invokes one headless `claude -p` decision
 tick (opus@medium) with `mr-supervisor-prompt-native.md` + a live situation bundle. The tick
 picks/launches/merges ONE unit of work; detached "rooted runs" (opus/fable) do the implementation.
-Events (slice done/crash, CI, rate-limit reset) fire extra ticks; cron is the safety net.
+Events (slice done/crash, PR checks or a watched `master` run concluding, rate-limit reset) fire
+extra ticks; cron is the safety net.
 
 ## Controls (all on PATH)
 - `mr-supervisor-disable` — pause (writes the provenance-attributed hold flag). Agents cannot run it.

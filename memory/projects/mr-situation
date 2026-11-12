@@ -45,8 +45,9 @@ def ghpr():
     return json.loads(so or "[]")
 out["open_prs"]=safe(ghpr,"error")
 def masterci():
+    # --workflow CI: Nightly runs also carry headBranch=master and are not the master CI result.
     if NOGH: return "skipped:--no-gh"
-    rc,so,se=run("gh run list -R mdrewt/monster-realm -b master -L1 --json conclusion,status,displayTitle", 20)
+    rc,so,se=run("gh run list -R mdrewt/monster-realm -b master --workflow CI -L1 --json conclusion,status,displayTitle", 20)
     if rc!=0: return "error:gh:"+se[:100]
     return json.loads(so or "[]")
 out["master_ci_latest"]=safe(masterci,"error")
