@@ -51,21 +51,29 @@ Rules out: hand-summing costs at call sites, deciding a session is recorded from
 and a time window, and editing ledger rows in place.
 
 ## A credit stop is recorded by the tick wrapper and resumed before any other work
-When a build session's pass log ends on a `rejected` rate-limit event, `mr-interrupted` records
-the stopped slices (tier, model, effort, CLI session, launch vars, reset time) before any gate
-of the tick; the first tick after the reset writes their launch vars back and its one action is
-to relaunch all of them, at the tier they were stopped at, on the stopped CLI session when its
-transcript is still on disk. Fan-out launches every ready candidate that passes a named rule
-(overlap, structural, `after:`, 4 in flight, memory, quiet window, the governor's thresholds);
-spending the weekly credit early is not one of them.
+When a build session ends on a `rejected` rate-limit event, `mr-interrupted` records the stopped
+slices (tier, model, effort, CLI session, launch vars, reset time, and whether the limit covers
+one model or all) before any gate of the tick; the first tick after the reset writes their
+launch vars back and its one action is to relaunch all of them, at the tier they were stopped
+at, on the stopped CLI session when its transcript is still on disk. The tool, not the prompt,
+decides each case: a slice leaves the record only when it is launched again or a lookup shows
+nothing to resume (PR merged or open, `blocked:`, spec section gone, 14 days old); a slice still
+running is skipped and `mr-spawn` refuses a second launch of it; a resume that fails twice is
+capped and raised to the operator once; a one-model limit stops and gates only that model; and
+under the operator hold the scan records and does nothing else. Fan-out launches every ready
+candidate that passes a named rule (overlap, structural, `after:`, 4 in flight, memory, quiet
+window, the governor's thresholds); spending the weekly credit early is not one of them.
 A stop is not a failure, so nothing about the slice is re-decided: the work costs the same
 credit whenever it runs, an interrupted run's context and uncommitted step are the most
 expensive things to rebuild, and a decision session that has to infer what was stopped — or
 that never runs because a hold, the budget stand-down or its own refused session ended the tick
-first — leaves the work parked until someone notices.
+first — leaves the work parked until someone notices. A lookup that cannot answer keeps the
+slice and launches nothing, because a wrong resume spends a session and a wrong drop loses work.
 Rules out: escalating a credit-stop resume to the hard tier, ranking it behind other picks,
-holding a ready slice to spread spend over the week, and moving the detection or the reset
-arithmetic back into the supervisor prompt.
+holding a ready slice to spread spend over the week, moving the detection, the leaving rules or
+the reset arithmetic back into the supervisor prompt, dropping a slice because its wrapper
+exited 0, offering a resume without bound, and touching a stop flag or starting a watcher under
+an operator hold.
 
 ## Noisy Bash output is filtered by rewriting the command, not the result
 The quiet hook rewrites recognized noisy commands to a tee-to-log wrapper that withholds pass

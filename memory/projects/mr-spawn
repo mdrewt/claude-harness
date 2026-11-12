@@ -843,7 +843,16 @@ esac
 S="${1:?usage: mr-spawn <slice> [--dry]}"; DRY="${2:-}"
 V="/tmp/mr_pass_$S.vars.json"; B="/tmp/mr_pass_$S.md"
 emit(){ SLICE="$S" ST="$1" DET="$2" /usr/bin/python3 -c "import json,os;print(json.dumps({'slice':os.environ['SLICE'],'status':os.environ['ST'],'detail':' '.join(os.environ['DET'].split())[:600]}))"; }
-status(){ emit "$1" "$2"; exit "${3:-0}"; }
+# A slice mr-interrupted offered for a credit-stop resume and this run did not launch is one failed
+# resume: the tool counts it, so a slice that cannot be launched stops being offered. The statuses
+# listed are not failures of the slice (nothing was attempted, or the launch is on its way).
+status(){
+  emit "$1" "$2"
+  case "$1" in LAUNCHED|DRY|HOLD-PRESENT|PROBE-TRIPPED|ALREADY-RUNNING|CREDIT-STOPPED) : ;;
+    *) timeout 60 "$MEM/mr-interrupted" failed "$S" "$1" >/dev/null 2>&1 || true ;;
+  esac
+  exit "${3:-0}"
+}
 fail_evidence(){ printf 'kind=%s seen=%s log_tail=%s err_tail=%s' "${LAST_FAIL_KIND:-?}" "${LAST_SEEN_MODEL:-none}" "$(tail -n 5 "/tmp/mr_pass_$S.log" 2>/dev/null | tr '\n' ' ' | head -c 200)" "$(tail -n 5 "/tmp/mr_pass_$S.err" 2>/dev/null | tr '\n' ' ' | head -c 200)"; }
 [ -r "$V" ] || status FAIL "vars.json missing: $V" 1
 # lp-09: no launch while ANY hold is present — EXCEPT an explicit operator run
@@ -856,6 +865,13 @@ if [ -f "$MEM/.native-supervisor-disabled" ]; then
   else
     status HOLD-PRESENT "$("$MEM/mr-hold" status 2>/dev/null || echo 'hold present') — refusing to launch"
   fi
+fi
+# ALREADY RUNNING: a lock that names a live session_leader is a run of this slice in progress. A
+# second launch would put two sessions in one worktree and rotate the first one's log from under
+# it. A relaunch finds the leader dead; the in-run retry below happens before any lock is written.
+LIVE_LEADER=$(/usr/bin/python3 -c "import json,sys;print(int(json.load(open(sys.argv[1])).get('session_leader') or 0) or '')" "$MEM/.harness-runner.$S.lock" 2>/dev/null)
+if [ -n "$LIVE_LEADER" ] && kill -0 "$LIVE_LEADER" 2>/dev/null; then
+  status ALREADY-RUNNING "slice $S is running: its lock names live session_leader pid $LIVE_LEADER — refusing a second launch" 1
 fi
 # lp-00 repo routing — cheapest gate first, before the probe and before any launch cost.
 # mr-repo-of is the SSOT (mr-launch.sh reads the same verdict via the lock), so the rule cannot
@@ -1011,6 +1027,11 @@ build_brief "$TOUCHES_RAW" "$MEM/mr-brief-template.md" "$B" || exit 1
 MODEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('model','opus'))")
 EFFORT=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('effort','high'))")
 if [ "$DRY" = "--dry" ]; then status DRY "brief built; model=$MODEL effort=$EFFORT; no launch"; fi
+# CREDIT STOPPED: while a recorded credit stop that covers this model waits for its reset, the API
+# refuses the session's first call, so the launch is refused here instead. A tool that cannot
+# answer does not hold the launch.
+CSCHK=$(timeout 30 "$MEM/mr-interrupted" launch-check "$S" "$MODEL" 2>/dev/null)
+case "$CSCHK" in "REFUSE "*) status CREDIT-STOPPED "${CSCHK#REFUSE } — refusing to launch $S on $MODEL" 1 ;; esac
 # Stop-flag clearing sits BELOW the --dry exit (lp-gates final review). `/tmp/mr_stop_all` is the
 # GLOBAL cooperative stop -- mr-launch.sh checks it before every spawn and every run polls it --
 # so clearing it from a dry probe silently disarmed the operator's all-slice stop.
@@ -1120,7 +1141,7 @@ for IT in $ITEMS; do
   FR=$("$MEM/mr-feedback" set "$IT" --state IN-WORK 2>&1)
   case "$FR" in FEEDBACK-SET*) :;; *) emit ITEMS-FLIP-FAIL "$IT: $FR";; esac   # emit only — status() exits
 done
-# The slice runs again, so it is no longer an interrupted one (advisory: a stale record only makes
-# the next tick look at a slice that is live).
+# The slice runs again, so it leaves mr-interrupted's record (advisory: a record left behind is
+# skipped while this leader is alive).
 "$MEM/mr-interrupted" drop "$S" >/dev/null 2>&1 || true
 status LAUNCHED "leader=$LEADER claude_pid=${CPID:-?} model=$MODEL effort=$EFFORT tier=${TIER:-?} repo=$REPO pr_repo=$PR_REPO brief_bytes=$(stat -c %s "$B" 2>/dev/null || echo ?) rid=$RID"

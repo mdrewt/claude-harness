@@ -48,20 +48,24 @@ if [ "${_hb_fail:-0}" -le "${_hb_ok:-0}" ]; then date -u +%s > "$MEM/.native-sup
 # and the local stack are deliberately RETAINED for manual/experimental use — its consumers still degrade
 # on OLLAMA-UNAVAILABLE. Rollback: restore from git history if a real per-tick consumer ever appears.)
 
-# CREDIT STOP (runs even when disabled/over-budget): a build session whose pass log ends on a
-# `rejected` rate_limit_event has had its credit refused until the event's resetsAt — the short
-# window or the weekly cap alike. `mr-interrupted scan` records that slice and every slice live
-# beside it (tier, model, effort, CLI session, launch vars) and trips the cooperative stop flags;
-# this block arms the reset tick. It sits above every gate because the record has to exist
-# whichever gate ends this tick: the gates below read it (CGATE), the situation bundle carries it
-# as `interrupted[]`, and the first tick after the reset resumes from it.
+# CREDIT STOP (runs on every tick, above every gate): a build session that ended on a `rejected`
+# rate_limit_event has had its credit refused until the event's resetsAt — the short window or the
+# weekly cap alike. `mr-interrupted scan` records that slice and every live slice on a model the
+# rejection covers (tier, model, effort, CLI session, launch vars) and sets their cooperative stop
+# flags; this block arms the reset tick it asks for (`watch=`). It sits above every gate because
+# the record has to exist whichever gate ends this tick: the gates below read it (CGATE, asked
+# for the supervisor's own model — a stop that covers only another model does not stand the tick
+# down), the situation bundle carries it as `interrupted[]`, and the first tick after the reset
+# resumes from it. Under the operator hold the tool itself only records (`HELD ...`): it sets no
+# flag, asks for no watcher and offers nothing, so this block does nothing either.
 CS=$(timeout 60 "$MEM/mr-interrupted" scan 2>/dev/null)
-CGATE=$(timeout 60 "$MEM/mr-interrupted" gate 2>/dev/null)
+CGATE=$(timeout 60 "$MEM/mr-interrupted" gate --model "$SUP_MODEL" 2>/dev/null)
 CS_NEW=0
 case "$CS" in
   "STOP "*)
     CS_NEW=1; log "CREDIT-$CS gate=${CGATE:-none}"
-    case "$CGATE" in BLOCKED_UNTIL_*) setsid /bin/bash "$MEM/mr-reset-watch" "${CGATE#BLOCKED_UNTIL_}" >/dev/null 2>&1 & ;; esac ;;
+    case "$CS" in *" watch="*) CSW=${CS##* watch=}; setsid /bin/bash "$MEM/mr-reset-watch" "${CSW%% *}" >/dev/null 2>&1 & ;; esac ;;
+  "HELD "*) log "CREDIT-STOP-RECORDED ${CS#HELD } (operator hold: no stop flag, no reset tick)" ;;
 esac
 
 # RECONCILE (accounting; runs even when disabled/over-budget): one cost row per ended build session.
@@ -342,9 +346,9 @@ except Exception as e:
 PY
 )
 case "$RLGATE" in BLOCKED_UNTIL_*) log "STANDDOWN rate-limit $RLGATE"; exit 0;; esac
-# The same gate for a credit stop mr-interrupted recorded: no decision session until a recorded
-# slice's reset has passed. The tick that records the stop goes on (CS_NEW), so one session parks
-# the stopped slices while their state is fresh.
+# The same gate for a credit stop mr-interrupted recorded: no decision session while a stop that
+# covers the supervisor's model waits for its reset. The tick that records the stop goes on
+# (CS_NEW), so one session parks the stopped slices while their state is fresh.
 if [ "$CS_NEW" = 0 ]; then case "$CGATE" in BLOCKED_UNTIL_*) log "STANDDOWN credit-stop $CGATE"; exit 0;; esac; fi
 
 # gate 3: human-activity probe

@@ -25,9 +25,9 @@ content = opus@medium. Always ALIASES, never pinned ids; the wrapper escalates a
 run's final attempt to fable@xhigh (budget-guarded). Launch-row `notes` MUST begin
 `tier=<...>; reason=<...>`.
 
-**Budget governor** (situation bundle vs `mr-budget-config.json`): NORMAL → proceed · SOFT-PAUSE
-(>90%) → no new launches (resumes/merges/parks/records fine) · HARD-STOP (>97%) → the wrapper
-stands down · UNKNOWN → proceed + record a BLOCKER.
+**Budget governor** (bundle `budget`): NORMAL → proceed · SOFT-PAUSE (>90%) → launch only
+`resume_first` slices (merges/parks/records fine) · HARD-STOP (>97%) → the wrapper stands down ·
+UNKNOWN → proceed + record a BLOCKER.
 
 ## Execution model
 
@@ -69,7 +69,7 @@ stands down · UNKNOWN → proceed + record a BLOCKER.
 
 1. **Credit-stop resume:** TICK PROVENANCE `resume_first=<slices>` → their vars are written (own
    tier and session, never escalated): after gate 2, `mr-spawn` ALL — this tick's action, ahead
-   of Pick work and a red `master`. Merged or PR-open → `$MEM/mr-interrupted drop <slice>`.
+   of Pick work and a red `master`. The tool counts a refusal: no retry.
 2. **Sync + probe + lock:** `git fetch --all --prune` both repos; stand down on human activity
    (resident IDE claude pid new/growing; non-repo-artifact writes in ~6 min; handoff/ledger mtime
    ahead of its recorded ts — idle-open ≥45 min with zero writes is NOT active). Take the mutex
@@ -128,8 +128,8 @@ Launch EVERY ready candidate passing ALL of: code/test `touches:` pairwise disjo
 (undeclared = colliding; mr-disjoint strips the doc set, adds widened files) · outside its
 always-serial structural set and any table/schema/migration (parallelize around it
 contract-first) · `after:` merged · `free -g` ≳ one full build free per launch · quiet window ·
-governor NORMAL with `effective_usd` + the launches' tier caps under SOFT-PAUSE (a run started
-past it is cut off mid-way). Only these rules hold a ready candidate; `held=` names the rule.
+`effective_usd` + the launches' `tier_caps_usd` ≤ `soft_pause_usd` (a run started past it is
+cut off mid-way; UNKNOWN: skip). Only these rules hold a ready candidate; `held=` names the rule.
 Run `$MEM/mr-disjoint "<slice>:paths" …` — SERIAL-REQUIRED is final; SAFE + a shared
 registry/enum/id axis → pre-assign each sibling's range in target_desc (a duplicate id wastes a
 merge). Merges stay serial and audited; conflicting PRs park, EXCEPT a conflict set ⊆ doc set
@@ -192,10 +192,11 @@ around (push the harness before spawning a harness slice).
 
 ## Credit stop
 
-`interrupted[]` not `due` (a `rejected` rate limit; the wrapper set the stop flags and armed the
-reset tick) → launch nothing; per slice: live ~10 min after `stopped_utc` → kill RECORDED pids
-only (`kill -TERM`, then `-KILL`; never `pkill -f`); uncommitted work → labeled `wip:` commit +
-push; park memo; PARKED (no counter bump). Never merge a stopped/`wip:` branch.
+`interrupted[]` = slices a `rejected` rate limit stopped; `mr-interrupted` alone decides when
+each is offered or dropped. `waiting` → launch nothing on a model its `scope` covers (`all` =
+every; `mr-spawn` refuses it); slice not `live`: uncommitted work → labeled `wip:` commit +
+push; park memo; PARKED (no counter bump). `capped` → operator issue open; leave it. Never
+merge a stopped/`wip:` branch.
 
 ## Output
 

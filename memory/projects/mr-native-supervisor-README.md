@@ -97,30 +97,56 @@ Every other row (`LAUNCHED`, `MERGED`, `PARKED`, CI waits) records an event and 
 A slice's spend is the sum of its build-session and `CORRECTION` rows.
 
 ## Credit stops (`mr-interrupted`)
-A build session whose pass log ends on a `rate_limit_event` with `status: rejected` has had its
-credit refused until that event's `resetsAt` — the short window and the weekly cap arrive the
-same way. Every tick, before any gate (so also while held or over budget), the wrapper runs
-`mr-interrupted scan`:
+A build session that ended on a `rate_limit_event` with `status: rejected` has had its credit
+refused until that event's `resetsAt` — the short window and the weekly cap arrive the same
+way. "Ended on" means nothing but the CLI's own limit message and error result follows the
+rejection in that invocation; a session that went on working, or that was on overage, is not
+stopped. Every tick, before any gate, the wrapper runs `mr-interrupted scan`:
 - It records the slice in `mr-interrupted.json` (untracked): tier, model, effort, CLI session id,
-  launch vars, reset time. While the reset is ahead it records every other live slice too (they
-  draw on the same credit) and sets `/tmp/mr_stop_all` + `/tmp/mr_stop_<slice>`, so runs
-  checkpoint and stop. The wrapper logs `CREDIT-STOP new=<slices> resets=<epoch> limit=<type>`
-  and starts `mr-reset-watch`.
+  launch vars, reset time, and the rejection's **scope** — one model when the limit type or the
+  CLI's limit message names it and no general window is rejected, otherwise all models. While
+  the reset is ahead it also records every live slice on a model the stop covers and sets
+  `/tmp/mr_stop_<slice>` for each (`/tmp/mr_stop_all` too when it covers all models), so runs
+  checkpoint and stop. The wrapper logs `CREDIT-STOP new=<slices> resets=<epoch> limit=<type>
+  scope=<all|model>` and starts `mr-reset-watch`. Slices on other models carry on.
+- A `resetsAt` that is missing, non-positive, more than an hour before the stop or more than 14
+  days ahead is not a reset time: the slice waits one hour instead.
+- **Under the operator hold** the scan only records the rejected slices: no stop flag, no
+  watcher, nothing offered (`gate` prints `HELD`). Once the hold is lifted the recorded slices
+  meet the rules below like any other.
 - That tick still runs its decision session, which parks the stopped slices (`wip:` checkpoint,
-  memo, `PARKED`). Later ticks log `STANDDOWN credit-stop BLOCKED_UNTIL_<utc>` until a reset passes.
+  memo, `PARKED`). Later ticks log `STANDDOWN credit-stop BLOCKED_UNTIL_<utc>` while a stop that
+  covers the supervisor's own model (`SUP_MODEL`) waits; a stop on another model does not stand
+  the tick down, and `mr-spawn` refuses (`CREDIT-STOPPED`) any launch on the stopped model until
+  the reset.
 - The first tick after the reset — the watcher's `src=reset` tick, or cron's next one if the
   watcher died; the gate compares the recorded time with the clock — writes each due slice's
   launch vars back (`mr-interrupted vars --due`) and names them as `resume_first=` in the
-  prompt's TICK PROVENANCE; the bundle lists them as `interrupted[]`. The session's one action
-  is `mr-spawn` for all of them, ahead of everything else including a red `master`. A due
-  resume also passes the live-chain fast path and the `.blocked-on-human` gate; the operator
-  hold and HARD-STOP still stop it.
+  prompt's TICK PROVENANCE; the bundle lists them as `interrupted[]` with a `state`. The
+  session's one action is `mr-spawn` for all of them, ahead of everything else including a red
+  `master`. A due resume also passes the live-chain fast path and the `.blocked-on-human` gate;
+  the operator hold and HARD-STOP still stop it.
 - The resume runs at the tier, model and effort the slice was stopped at, and `mr-launch.sh`
   continues the stopped CLI session (`--resume <id>`) when its transcript is on disk; otherwise,
-  or when the CLI cannot resume it, it starts a new session from the brief, whose resume block
-  points at the `wip:` checkpoint. `mr-spawn` removes the record once the slice is launched.
-- A resume refused again (the log's earliest reset was not the last one) is recorded again
-  with the later reset.
+  or when the CLI cannot resume it, it starts a new session from the brief (one
+  `RESUME-FALLBACK`/`RESUME-FAILED` line in the pass log says so), whose resume block points at
+  the `wip:` checkpoint. `mr-spawn` removes the record once the slice is launched.
+
+**When a slice is offered.** Its reset has passed, its session_leader is dead (a slice still
+running is `live` and skipped; `mr-spawn` itself refuses a slice whose lock names a live leader:
+`ALREADY-RUNNING`), and a lookup finds something to resume. The lookup removes the slice when
+its PR is merged or open (`gh pr list`), its spec section carries `blocked:`, or the section it
+had when it stopped is gone; a slice also leaves 14 days after its stop. A slice that
+checkpointed on the stop flag and exited 0 stays: that is the stop working. A lookup that fails
+keeps the slice and offers nothing (`unverified`) until it succeeds.
+
+**Resume attempts.** A resume fails when `mr-spawn` does not launch the offered slice, when the
+offer is unanswered after 90 minutes, or when the resumed session is refused again within an
+hour or with a reset no later than the one already waited for. A failed resume waits an hour
+(or for the strictly later reset the refusal names). After 2 failed resumes the slice is
+`capped`: never offered again, no longer `DUE` for the gate, and `mr-interrupted` opens one
+`DECISION(credit-resume-<slice>)` issue through `mr-ask-drew`. `mr-interrupted drop <slice>`
+clears it by hand.
 
 The tick's own session being refused arms `rate_limit_resets_at` in `mr-state.json` and a reset
 watcher. The budget governor's HARD-STOP is separate: it is this loop's dollar estimate

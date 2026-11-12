@@ -313,7 +313,8 @@ fi
 # (extracted by content: the CREDIT STOP block, the human gate, the live-chain fast path, the
 # credit gate, the governor/resume block and the TICK PROVENANCE line), the REAL mr-situation,
 # mr-reset-watch and mr-launch.sh with their paths pointed at a sandbox, and stubs for what
-# spends money or reaches the network (claude, gh). Nothing here reads or writes the live MEM.
+# spends money or reaches the network or the operator (claude, gh, mr-ask-drew), and its own spec
+# corpus. Nothing here reads or writes the live MEM.
 /usr/bin/python3 - "$MEM" <<'PYCREDIT' || BAD=1
 import json, os, re, shutil, subprocess, sys, tempfile, time
 
@@ -325,6 +326,27 @@ SID = "b4935a17-6de2-4273-aad7-439574365dbf"
 RESET = 1793923200                      # the fixture's resetsAt: 2026-11-06T00:00:00Z
 STOPPED = RESET - 356000                # the tick that found the stop, 99 h earlier
 bad = 0
+
+
+def rejected(limit="seven_day", resets=RESET, model=None, stamp=None, **info):
+    """The recorded stream with its rejection rewritten. `model` None = a limit on every model
+    (the general window itself rejected, a message that names no model); the recorded stream
+    itself is the one-model shape: only the overage window rejected, "your Fable limit"."""
+    lines = REJECTED.splitlines()
+    ev = json.loads(lines[2])
+    ri = ev["rate_limit_info"]
+    ri["resetsAt"] = resets
+    ri["rateLimitType"] = limit
+    if model is None:
+        ri["unifiedWindows"] = {limit: {"utilization": 1, "resetsAt": resets, "status": "rejected"}}
+        lines[3] = lines[3].replace("your Fable limit", "your usage limit")
+    else:
+        lines[3] = lines[3].replace("your Fable limit", "your %s limit" % model.capitalize())
+    ri.update(info)
+    lines[2] = json.dumps(ev, separators=(",", ":"))
+    if stamp:
+        lines[0] = re.sub(r"TS=\S+", "TS=" + stamp, lines[0])
+    return "\n".join(lines) + "\n"
 
 
 def fail(name, detail=""):
@@ -367,7 +389,16 @@ class Box:
         self.tmp = os.path.join(self.root, "tmp")
         os.makedirs(os.path.join(self.mem, "pending-events"))
         os.makedirs(self.tmp)
+        self.specs = os.path.join(self.root, "specs")
+        self.bin = os.path.join(self.root, "stubs")
+        os.makedirs(self.specs)
+        os.makedirs(self.bin)
         self.procs = []
+        # gh: answers `pr list` from prs.json, or fails while gh-down exists.
+        with open(os.path.join(self.bin, "gh"), "w") as f:
+            f.write('#!/bin/bash\n[ -e "%s/gh-down" ] && exit 1\ncat "%s/prs.json"\n' % (self.root, self.root))
+        os.chmod(os.path.join(self.bin, "gh"), 0o755)
+        self.prs([])
         shutil.copy2(os.path.join(MEM, "mr-interrupted"), self.mem)
         shutil.copy2(os.path.join(MEM, "mr-budget-config.json"), self.mem)
         open(os.path.join(self.mem, "monster-realm-usage-ledger.jsonl"), "w").close()
@@ -384,7 +415,8 @@ class Box:
                     "d['master_ci_latest']=[{'conclusion':'failure','status':'completed'}]\n"
                     'print(json.dumps(d))"\n' % self.mem)
         self.script("mr-reset-watch", 'echo "$1" >> "%s/watch.log"\n' % self.root)
-        tick = ["set -u", "MEM=%s" % self.mem, "LOG=%s/tick.log" % self.root, 'SRC=${SRC:-cron}', 'EVFILE=""',
+        self.script("mr-ask-drew", 'echo "$*" >> "%s/asks.log"\necho "ASK-DREW-OK issue=1 url=x blocking=0"\n' % self.root)
+        tick = ["set -u", "MEM=%s" % self.mem, "SUP_MODEL=${SUP_MODEL:-opus}", "LOG=%s/tick.log" % self.root, 'SRC=${SRC:-cron}', 'EVFILE=""',
                 'TS(){ date -u +%Y-%m-%dT%H:%M:%SZ; }', 'log(){ echo "src=$SRC $*" >> "$LOG"; }',
                 pieces["credit-stop"], pieces["human-gate"],
                 'LIVE=${LIVE:-0}; DONE_WAIT=0; PENDING=""; LIVE_SLICES=" other(1)"',
@@ -401,7 +433,8 @@ class Box:
         os.chmod(path, 0o755)
 
     def env(self, now, **extra):
-        e = dict(os.environ, MR_INTERRUPTED_TMP=self.tmp, MR_INTERRUPTED_NOW=str(now))
+        e = dict(os.environ, MR_INTERRUPTED_TMP=self.tmp, MR_INTERRUPTED_NOW=str(now),
+                 MR_INTERRUPTED_SPECS=self.specs, PATH=self.bin + ":" + os.environ.get("PATH", ""))
         e.pop("MR_FORCE", None)
         e.update(extra)
         return e
@@ -421,7 +454,31 @@ class Box:
                            capture_output=True, text=True, timeout=60)
         return r.stdout.strip()
 
-    def slice(self, name, tier, model, effort, log=None, live=False):
+    def prs(self, rows):
+        with open(os.path.join(self.root, "prs.json"), "w") as f:
+            json.dump([{"headRefName": h, "state": st} for h, st in rows], f)
+
+    def spec(self, name, body="touches: client/src/x.ts\n"):
+        """Give the slice a spec section (body None removes it)."""
+        path = os.path.join(self.specs, "M-%s.spec.md" % name)
+        if body is None:
+            os.unlink(path)
+            return
+        with open(path, "w") as f:
+            f.write("# Milestone\n\n### %s — a slice\n%s\n### %s-next — another\n" % (name, body, name))
+
+    def asks(self):
+        try:
+            return open(os.path.join(self.root, "asks.log")).read().splitlines()
+        except OSError:
+            return []
+
+    def states(self, now):
+        return dict((e["slice"], e["state"]) for e in json.loads(self.tool(now, "list") or "[]"))
+
+    def slice(self, name, tier, model, effort, log=None, live=False, written=STOPPED - 60, spec=True):
+        if spec:
+            self.spec(name)
         if live:
             p = subprocess.Popen(["sleep", "600"])
         else:
@@ -441,7 +498,17 @@ class Box:
                     "ATTEMPT=1 MODEL=%s EFFORT=%s TS=2026-11-01T20:00:40Z\n"
                     '{"type":"system","subtype":"init","session_id":"11111111-2222-3333-4444-555555555555"}\n'
                     % (model, effort))
+        # The log's mtime is when the session stopped; fixing it keeps the fixture off the real clock.
+        os.utime(os.path.join(self.tmp, "mr_pass_%s.log" % name), (written, written))
         return p
+
+    def bundle(self, now):
+        r = subprocess.run(["bash", os.path.join(self.mem, "mr-situation")], env=self.env(now),
+                           capture_output=True, text=True, timeout=60)
+        try:
+            return json.loads(r.stdout)
+        except ValueError:
+            return {}
 
     def vars(self, name):
         try:
@@ -467,7 +534,7 @@ class Box:
 
 
 def offered(listing):
-    return sorted((e["slice"], e["tier"], e["model"], e["effort"], e["due"]) for e in listing)
+    return sorted((e["slice"], e["tier"], e["model"], e["effort"], e["state"]) for e in listing)
 
 
 WANT = [("s-a", "routine", "opus", "high"), ("s-b", "content", "opus", "medium")]
@@ -475,7 +542,7 @@ WANT = [("s-a", "routine", "opus", "high"), ("s-b", "content", "opus", "medium")
 # ---- two running slices stopped by one rejection; the reset tick resumes both -----------------
 box = Box()
 try:
-    box.slice("s-a", "routine", "opus", "high", log=REJECTED)            # its session was refused
+    box.slice("s-a", "routine", "opus", "high", log=rejected())          # its session was refused
     sibling = box.slice("s-b", "content", "opus", "medium", live=True)   # still running beside it
     out, log = box.tick(STOPPED, SRC="crash")
     state = box.tool(STOPPED, "list")
@@ -483,13 +550,13 @@ try:
         listing = json.loads(state)
     except ValueError:
         listing = []
-    if "CREDIT-STOP new=s-a,s-b resets=%d limit=seven_day_overage_included" % RESET not in log:
+    if "CREDIT-STOP new=s-a,s-b resets=%d limit=seven_day scope=all" % RESET not in log:
         fail("stop-recorded", "tick log: %r" % log)
-    if offered(listing) != [w + (False,) for w in WANT]:
+    if offered(listing) != [w + ("waiting",) for w in WANT]:
         fail("stop-records-tier", "list: %r" % (state,))
     if box.flags() != ["mr_stop_all", "mr_stop_s-a", "mr_stop_s-b"]:
         fail("stop-flags", "flags: %r" % (box.flags(),))
-    if box.watched() != ["2026-11-06T00:00:00Z"]:
+    if box.watched() != [str(RESET)]:
         fail("stop-arms-reset-tick", "mr-reset-watch calls: %r" % (box.watched(),))
     # The tick that finds the stop still reaches its session (it parks the slices) and resumes nothing.
     if out.strip() != "REACHED-SESSION governor=NORMAL resume_first=":
@@ -502,6 +569,9 @@ try:
         fail("waits-for-reset", "stdout=%r log=%r" % (out, log))
     if box.tool(RESET - 1, "gate") != "BLOCKED_UNTIL_2026-11-06T00:00:00Z":
         fail("gate-before-reset", box.tool(RESET - 1, "gate"))
+    seen = box.bundle(RESET + 130).get("interrupted") or []
+    if offered(seen) != [w + ("due",) for w in WANT] or [e["due"] for e in seen] != [True, True]:
+        fail("bundle-lists-due", "interrupted: %r" % (seen,))
     # The reset tick, with master CI red in the same bundle: both slices, at the tier, model and
     # effort they were stopped at, on the stopped session where there is one.
     out, log = box.tick(RESET + 130, SRC="reset")
@@ -516,15 +586,16 @@ try:
     if box.vars("s-a").get("resume_session") != SID or "CREDIT-STOP RESUME" not in box.vars("s-a").get("resume_block", "") \
             or box.vars("s-a").get("target_desc") != "build s-a":
         fail("resume-same-session", "vars: %r" % (box.vars("s-a"),))
-    r = subprocess.run(["bash", os.path.join(box.mem, "mr-situation")], env=box.env(RESET + 130),
-                       capture_output=True, text=True, timeout=60)
-    try:
-        bundle = json.loads(r.stdout)
-    except ValueError:
-        bundle = {}
-    if offered(bundle.get("interrupted") or []) != [w + (True,) for w in WANT] \
+    bundle = box.bundle(RESET + 130)
+    if offered(bundle.get("interrupted") or []) != [w + ("offered",) for w in WANT] \
             or (bundle.get("master_ci_latest") or [{}])[0].get("conclusion") != "failure":
         fail("bundle-offers-interrupted", "bundle: %r" % ({k: bundle.get(k) for k in ("interrupted", "master_ci_latest")},))
+    # The per-launch budget check reads its figures from the bundle: the caps mr-spawn applies.
+    caps = json.load(open(os.path.join(box.mem, "mr-budget-config.json")))
+    b = bundle.get("budget") or {}
+    if b.get("tier_caps_usd") != caps["slice_caps_usd"] \
+            or b.get("soft_pause_usd") != round(caps["soft_pause_frac"] * caps["weekly_limit_usd"], 2):
+        fail("bundle-carries-tier-caps", "budget: %r" % (b,))
     # A slice that is launched again leaves the record, and its stopped log does not put it back.
     box.tool(RESET + 200, "drop", "s-a")
     box.tool(RESET + 200, "scan")
@@ -536,7 +607,7 @@ finally:
 # ---- the short window, and a watcher that died ------------------------------------------------
 box = Box()
 try:
-    short = REJECTED.replace(str(RESET), str(STOPPED + 7200)).replace("seven_day_overage_included", "five_hour")
+    short = rejected("five_hour", STOPPED + 7200)
     box.slice("s-a", "routine", "opus", "high", log=short)
     sibling = box.slice("s-b", "content", "opus", "medium", live=True)
     box.slice("s-c", "hard", "fable", "xhigh", log=REJECTED.replace('"status":"rejected","resetsAt"', '"status":"allowed_warning","resetsAt"'))
@@ -714,15 +785,361 @@ try:
             or "--model opus --effort high" not in calls[0] or "RESUME=%s PRIOR=28.8414 TS=" % SID not in log:
         fail("launch-resumes-session", "claude calls=%r log=%r" % (calls, log[:300]))
     calls, log = launch_once(SID, False, False)
-    if len(calls) != 1 or "--resume" in calls[0] or "THE BRIEF" not in calls[0] or "RESUME=" in log:
+    if len(calls) != 1 or "--resume" in calls[0] or "THE BRIEF" not in calls[0] or "RESUME=" in log \
+            or "RESUME-FALLBACK no transcript on disk for session %s" % SID not in log:
         fail("launch-falls-back-no-transcript", "claude calls=%r log=%r" % (calls, log[:300]))
     calls, log = launch_once(SID, True, True)
     if len(calls) != 2 or "--resume" not in calls[0] or "--resume" in calls[1] or "THE BRIEF" not in calls[1] \
             or "RESUME-FAILED" not in log:
         fail("launch-falls-back-refused", "claude calls=%r log=%r" % (calls, log[:300]))
     calls, log = launch_once("", True, False)
-    if len(calls) != 1 or "--resume" in calls[0] or "THE BRIEF" not in calls[0]:
-        fail("launch-plain", "claude calls=%r" % (calls,))
+    if len(calls) != 1 or "--resume" in calls[0] or "THE BRIEF" not in calls[0] or "RESUME-FALLBACK" in log:
+        fail("launch-plain", "claude calls=%r log=%r" % (calls, log[:300]))
+finally:
+    box.close()
+# ---- what takes a slice off the record --------------------------------------------------------
+# A slice stopped beside a rejected one checkpoints on the stop flag and its wrapper exits 0:
+# that is the stop working, and the slice is resumed. A slice leaves only when a lookup shows
+# there is nothing to resume; a lookup that fails keeps it and offers nothing.
+box = Box()
+try:
+    box.slice("s-a", "routine", "opus", "high", log=rejected())
+    sibling = box.slice("s-b", "content", "opus", "medium", live=True)
+    box.tool(STOPPED, "scan")
+    sibling.kill()
+    sibling.wait()
+    with open(os.path.join(box.tmp, "mr_pass_s-b.done"), "w") as f:
+        f.write("EXIT=0 ATTEMPTS=1\n")
+    if box.tool(RESET + 130, "gate") != "DUE n=2" or box.states(RESET + 130) != {"s-a": "due", "s-b": "due"}:
+        fail("checkpointed-sibling-resumed", "gate=%r list=%r" % (box.tool(RESET + 130, "gate"), box.states(RESET + 130)))
+    # gh cannot answer: both stay, neither is offered; when it answers again they are due.
+    open(os.path.join(box.root, "gh-down"), "w").close()
+    if box.tool(RESET + 130, "gate") != "CLEAR" or box.tool(RESET + 130, "vars", "--due") != "" \
+            or box.states(RESET + 130) != {"s-a": "unverified", "s-b": "unverified"}:
+        fail("lookup-failure-keeps-and-holds", "gate=%r list=%r" % (box.tool(RESET + 130, "gate"), box.states(RESET + 130)))
+    os.unlink(os.path.join(box.root, "gh-down"))
+    # s-a's PR merged while it waited; a slice whose id only shares a prefix is not it.
+    box.prs([("feat/s-a-thing", "MERGED"), ("feat/s-bb", "OPEN"), ("feat/s-b", "CLOSED")])
+    if box.tool(RESET + 130, "gate") != "DUE n=1" or box.states(RESET + 130) != {"s-b": "due"}:
+        fail("merged-leaves", "gate=%r list=%r" % (box.tool(RESET + 130, "gate"), box.states(RESET + 130)))
+    box.prs([("feat/s-b", "OPEN")])
+    if box.tool(RESET + 130, "gate") != "CLEAR" or box.states(RESET + 130) != {}:
+        fail("open-pr-leaves", "gate=%r list=%r" % (box.tool(RESET + 130, "gate"), box.states(RESET + 130)))
+    box.tool(RESET + 130, "scan")
+    if box.states(RESET + 130) != {}:
+        fail("left-stays-left", "list=%r" % (box.states(RESET + 130),))
+finally:
+    box.close()
+
+box = Box()
+try:
+    for name in ("s-blk", "s-gone", "s-nospec", "s-old"):
+        box.slice(name, "routine", "opus", "high", log=rejected(), spec=name != "s-nospec")
+    box.tool(STOPPED, "scan")
+    box.spec("s-blk", "touches: a.ts\nblocked: operator decision on the wire format\n")
+    box.spec("s-gone", None)
+    if box.tool(RESET + 130, "gate") != "DUE n=2" or box.states(RESET + 130) != {"s-nospec": "due", "s-old": "due"}:
+        fail("blocked-and-spec-gone-leave", "gate=%r list=%r" % (box.tool(RESET + 130, "gate"), box.states(RESET + 130)))
+    # The spec corpus unreadable: nothing is offered, nothing is dropped.
+    e = box.env(RESET + 130, MR_INTERRUPTED_SPECS=os.path.join(box.root, "absent"))
+    r = subprocess.run([os.path.join(box.mem, "mr-interrupted"), "gate"], env=e, capture_output=True, text=True, timeout=60)
+    if r.stdout.strip() != "CLEAR" or sorted(box.states(RESET + 130)) != ["s-nospec", "s-old"]:
+        fail("spec-lookup-failure-holds", "gate=%r list=%r" % (r.stdout, box.states(RESET + 130)))
+    # 14 days after the stop nothing is resumed any more.
+    if box.tool(STOPPED + 14 * 86400 + 60, "gate") != "CLEAR" or box.states(STOPPED + 14 * 86400 + 60) != {}:
+        fail("fourteen-days-leave", "list=%r" % (box.states(STOPPED + 14 * 86400 + 60),))
+finally:
+    box.close()
+
+# A dead lock whose log ends on a rejection from days ago, the slice long merged: the first scan
+# after this tool is deployed must not hand it to a session, and a log older than 14 days is
+# not recorded at all.
+box = Box()
+try:
+    NOW = RESET + 6 * 86400
+    box.slice("s-old", "hard", "fable", "xhigh", log=REJECTED, written=STOPPED)
+    box.slice("s-ancient", "hard", "fable", "xhigh", log=REJECTED, written=NOW - 15 * 86400)
+    running = box.slice("s-live", "routine", "opus", "high", live=True)
+    box.prs([("feat/s-old", "MERGED")])
+    out, log = box.tick(NOW)
+    if "CREDIT-STOP new=s-old resets=%d" % RESET not in log or "watch=" in log or box.flags() or box.watched() \
+            or out.strip() != "REACHED-SESSION governor=NORMAL resume_first=" or box.states(NOW) != {} \
+            or running.poll() is not None:
+        fail("old-dead-log-not-resumed", "stdout=%r log=%r flags=%r list=%r" % (out, log, box.flags(), box.states(NOW)))
+finally:
+    box.close()
+
+# ---- a slice still running when the reset passes ----------------------------------------------
+box = Box()
+try:
+    box.slice("s-a", "routine", "opus", "high", log=rejected())
+    sibling = box.slice("s-b", "content", "opus", "medium", live=True)
+    box.tool(STOPPED, "scan")
+    out, log = box.tick(RESET + 130, SRC="reset")
+    if "resume_first=s-a\n" not in out or box.states(RESET + 130) != {"s-a": "offered", "s-b": "live"} \
+            or "resume_session" in box.vars("s-b"):
+        fail("live-slice-not-offered", "stdout=%r list=%r" % (out, box.states(RESET + 130)))
+    sibling.kill()
+    sibling.wait()
+    if box.states(RESET + 200).get("s-b") != "due":
+        fail("live-slice-kept", "list=%r" % (box.states(RESET + 200),))
+
+    # mr-spawn refuses a slice whose lock names a live leader, and nothing else.
+    spawn = open(os.path.join(MEM, "mr-spawn")).read()
+    parts = [line_with(spawn, "emit(){ SLICE="), between(spawn, "\nstatus(){", "\n}\n") + "\n}",
+             between(spawn, "\n# ALREADY RUNNING", "\n# lp-00 repo routing"),
+             'MODEL="$2"', between(spawn, "\n# CREDIT STOPPED", "\n# Stop-flag clearing"), "echo PASSED"]
+    if any(not x.strip() for x in parts) or "ALREADY-RUNNING" not in parts[2] or "launch-check" not in parts[4]:
+        fail("anchor", "could not extract mr-spawn's refusal blocks")
+    with open(os.path.join(box.root, "spawn-gates.sh"), "w") as f:
+        f.write("MEM=%s\nS=\"$1\"\n%s\n" % (box.mem, "\n".join(parts)))
+
+    def spawn_gates(now, name, model):
+        r = subprocess.run(["bash", os.path.join(box.root, "spawn-gates.sh"), name, model], env=box.env(now),
+                           capture_output=True, text=True, timeout=60)
+        return r.returncode, r.stdout.strip()
+
+    live = box.slice("s-run", "routine", "opus", "high", live=True)
+    rc, out = spawn_gates(RESET + 200, "s-run", "opus")
+    if rc == 0 or '"status": "ALREADY-RUNNING"' not in out or str(live.pid) not in out or "PASSED" in out:
+        fail("spawn-refuses-live-slice", "rc=%r out=%r" % (rc, out))
+    live.kill()
+    live.wait()
+    got = [spawn_gates(RESET + 200, n, "opus") for n in ("s-run", "s-never-launched")]
+    if got != [(0, "PASSED"), (0, "PASSED")]:
+        fail("spawn-relaunches-dead-slice", "%r" % (got,))
+finally:
+    box.close()
+
+# ---- resume attempts are counted, and a slice that cannot be resumed stops being offered --------
+# Refused again with the reset it already waited for: an hour's wait, never due at once; the
+# second failed resume caps the slice and opens ONE operator issue.
+box = Box()
+try:
+    box.slice("s-a", "hard", "fable", "xhigh", log=REJECTED, written=RESET + 100)
+    box.tool(RESET + 130, "scan")
+    if box.tool(RESET + 130, "vars", "--due") != "s-a":
+        fail("attempts-setup", box.tool(RESET + 130, "list"))
+    T = RESET + 130
+    for n in (1, 2):
+        box.tool(T + 10, "drop", "s-a")                 # mr-spawn launched it
+        box.slice("s-a", "hard", "fable", "xhigh", log=rejected("seven_day_overage_included", RESET, "fable",
+                  stamp="2026-11-06T0%d:03:00Z" % n), written=T + 300)
+        scan = box.tool(T + 400, "scan")
+        gate = box.tool(T + 400, "gate")
+        if n == 1:
+            if "resets=%d " % (T + 400 + 3600) not in scan or gate != "BLOCKED_UNTIL_" + time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(T + 400 + 3600)) or box.tool(T + 400, "vars", "--due") != "":
+                fail("re-refusal-waits", "scan=%r gate=%r" % (scan, gate))
+            T = T + 400 + 3600
+            if box.tool(T + 1, "gate") != "DUE n=1" or box.tool(T + 1, "vars", "--due") != "s-a":
+                fail("re-refusal-second-offer", "gate=%r list=%r" % (box.tool(T + 1, "gate"), box.tool(T + 1, "list")))
+        else:
+            later = [box.tool(T + 400 + h * 3600, "gate") + "|" + box.tool(T + 400 + h * 3600, "vars", "--due")
+                     for h in range(0, 48, 5)]
+            if box.states(T + 400) != {"s-a": "capped"} or set(later) != {"CLEAR|"}:
+                fail("capped-after-two", "list=%r later=%r" % (box.states(T + 400), later))
+    box.tool(T + 9000, "scan")
+    asks = box.asks()
+    if len(asks) != 1 or not asks[0].startswith("credit-resume-s-a --repo mdrewt/claude-harness ") or "--blocking" in asks[0]:
+        fail("capped-one-blocker", "mr-ask-drew calls: %r" % (asks,))
+finally:
+    box.close()
+
+# A refusal that names a strictly later reset waits for that reset; one after an hour of work
+# is a new stop and does not count.
+box = Box()
+try:
+    box.slice("s-a", "routine", "opus", "high", log=rejected(), written=RESET + 100)
+    box.tool(RESET + 130, "scan")
+    box.tool(RESET + 130, "vars", "--due")
+    box.tool(RESET + 140, "drop", "s-a")
+    box.slice("s-a", "routine", "opus", "high", log=rejected("five_hour", RESET + 18000, stamp="2026-11-06T00:03:00Z"),
+              written=RESET + 600)
+    scan = box.tool(RESET + 700, "scan")
+    listing = json.loads(box.tool(RESET + 700, "list"))
+    if "resets=%d " % (RESET + 18000) not in scan or [(e["state"], e["failed"]) for e in listing] != [("waiting", 1)] \
+            or box.tool(RESET + 18001, "gate") != "DUE n=1":
+        fail("later-reset-waited-for", "scan=%r list=%r" % (scan, listing))
+    box.tool(RESET + 18001, "vars", "--due")
+    box.tool(RESET + 18010, "drop", "s-a")
+    box.slice("s-a", "routine", "opus", "high", log=rejected("seven_day", RESET + 7 * 86400, stamp="2026-11-06T05:03:00Z"),
+              written=RESET + 18010 + 7200)
+    box.tool(RESET + 18010 + 7300, "scan")
+    listing = json.loads(box.tool(RESET + 18010 + 7300, "list"))
+    if [(e["state"], e["failed"]) for e in listing] != [("waiting", 0)] or box.asks():
+        fail("new-stop-after-work-not-counted", "list=%r asks=%r" % (listing, box.asks()))
+finally:
+    box.close()
+
+# mr-spawn not launching an offered slice, and an offer nobody answers, are failed resumes too.
+def spawn_exit(box):
+    """mr-spawn's real exit path (emit + status) on the sandbox: spawn_says(now, slice, status)."""
+    spawn = open(os.path.join(MEM, "mr-spawn")).read()
+    with open(os.path.join(box.root, "spawn-status.sh"), "w") as f:
+        f.write("MEM=%s\nS=\"$1\"\n%s\n%s\n}\nstatus \"$2\" detail 1\n"
+                % (box.mem, line_with(spawn, "emit(){ SLICE="), between(spawn, "\nstatus(){", "\n}\n")))
+
+    def spawn_says(now, name, status):
+        subprocess.run(["bash", os.path.join(box.root, "spawn-status.sh"), name, status], env=box.env(now),
+                       capture_output=True, text=True, timeout=60)
+    return spawn_says
+
+
+# The refusal is reported as mr-spawn exits; a probe trip, or a launch nobody offered, is not the
+# slice failing.
+box = Box()
+try:
+    spawn_says = spawn_exit(box)
+    for name in ("s-a", "s-b", "s-c"):
+        box.slice(name, "routine", "opus", "high", log=rejected(), written=RESET + 100)
+    box.tool(RESET + 130, "scan")
+    running = box.slice("s-c", "routine", "opus", "high", log=rejected(), written=RESET + 100, live=True)
+    box.tool(RESET + 160, "vars", "--due")                      # s-c is running: not offered
+    running.kill()
+    running.wait()
+    box.tool(RESET + 165, "vars", "s-c")
+    spawn_says(RESET + 170, "s-a", "REPO-OUT-OF-SYNC")
+    spawn_says(RESET + 170, "s-b", "PROBE-TRIPPED")
+    spawn_says(RESET + 170, "s-c", "FAIL")
+    listing = dict((e["slice"], (e["state"], e["failed"])) for e in json.loads(box.tool(RESET + 180, "list")))
+    if listing != {"s-a": ("waiting", 1), "s-b": ("offered", 0), "s-c": ("due", 0)}:
+        fail("spawn-refusal-counted", "list=%r" % (listing,))
+finally:
+    box.close()
+
+# Over two days of hourly ticks a slice that cannot be launched is offered twice, then never.
+box = Box()
+try:
+    spawn_says = spawn_exit(box)
+    for name in ("s-a", "s-b"):
+        box.slice(name, "routine", "opus", "high", log=rejected(), written=RESET + 100)
+    box.tool(RESET + 130, "scan")
+    offers = {"s-a": 0, "s-b": 0}
+    sessions = 0
+    for h in range(48):
+        t = RESET + 200 + h * 3600
+        if not box.tool(t, "gate").startswith("DUE "):
+            continue
+        sessions += 1
+        for name in [n for n in box.tool(t, "vars", "--due").split(",") if n]:
+            offers[name] += 1
+            if name == "s-a":
+                spawn_says(t + 60, "s-a", "REPO-OUT-OF-SYNC")    # s-b: the session never calls mr-spawn
+    if offers != {"s-a": 2, "s-b": 2} or sessions > 4 or box.states(RESET + 49 * 3600) != {"s-a": "capped", "s-b": "capped"}:
+        fail("unlaunchable-offered-twice", "offers=%r sessions=%r list=%r" % (offers, sessions, box.states(RESET + 49 * 3600)))
+    if sorted(a.split()[0] for a in box.asks()) != ["credit-resume-s-a", "credit-resume-s-b"]:
+        fail("unlaunchable-one-blocker-each", "mr-ask-drew calls: %r" % (box.asks(),))
+finally:
+    box.close()
+
+# A resetsAt that is not a reset time (non-positive, not a number, absent, an hour or more before
+# the stop, beyond any window) is an unknown reset: an hour's wait, not an instant resume.
+box = Box()
+try:
+    for i, value in enumerate((0, -5, "soon", None, STOPPED - 7200, STOPPED + 40 * 86400)):
+        name = "s-%d" % i
+        box.slice(name, "routine", "opus", "high", log=rejected(resets=value), written=STOPPED)
+        scan = box.tool(STOPPED, "scan")
+        gate = box.tool(STOPPED + 3599, "gate")
+        if "STOP new=%s resets=%d " % (name, STOPPED + 3600) not in scan or not gate.startswith("BLOCKED_UNTIL_") \
+                or box.tool(STOPPED + 3601, "gate") != "DUE n=1":
+            fail("invalid-reset-backs-off", "resetsAt=%r scan=%r gate=%r" % (value, scan, gate))
+        box.tool(STOPPED + 3601, "drop", name)
+    # Epoch milliseconds are a reset time.
+    box.slice("s-ms", "routine", "opus", "high", log=rejected(resets=RESET * 1000), written=STOPPED)
+    if "resets=%d " % RESET not in box.tool(STOPPED, "scan"):
+        fail("millisecond-reset", box.tool(STOPPED, "list"))
+finally:
+    box.close()
+
+# ---- under the operator hold the scan records and does nothing else -----------------------------
+box = Box()
+try:
+    open(os.path.join(box.mem, ".native-supervisor-disabled"), "w").close()
+    box.slice("s-a", "routine", "opus", "high", log=rejected())
+    sibling = box.slice("s-b", "content", "opus", "medium", live=True)
+    box.slice("s-m", "routine", "opus", "high", log=rejected())
+    out, log = box.tick(STOPPED, SRC="crash")
+    record = json.load(open(os.path.join(box.mem, "mr-interrupted.json")))
+    if box.flags() or box.watched() or sorted(e["slice"] for e in record["entries"]) != ["s-a", "s-m"] \
+            or "CREDIT-STOP-RECORDED new=s-a,s-m" not in log or sibling.poll() is not None:
+        fail("hold-records-only", "flags=%r watch=%r log=%r" % (box.flags(), box.watched(), log))
+    # Past the reset, still held: nothing is offered, by the wrapper or by the tool.
+    out, log = box.tick(RESET + 130, SRC="reset")
+    if out.strip() != "REACHED-SESSION governor=NORMAL resume_first=" or box.tool(RESET + 130, "gate") != "HELD" \
+            or box.tool(RESET + 130, "vars", "--due") != "" or box.flags() or box.watched() or box.asks():
+        fail("hold-offers-nothing", "stdout=%r gate=%r" % (out, box.tool(RESET + 130, "gate")))
+    # Hold lifted: the recorded slices meet the same rules — the merged one is not resumed.
+    os.unlink(os.path.join(box.mem, ".native-supervisor-disabled"))
+    box.prs([("feat/s-m", "MERGED")])
+    out, log = box.tick(RESET + 200, SRC="cron")
+    if "resume_first=s-a\n" not in out or box.states(RESET + 200) != {"s-a": "offered"}:
+        fail("hold-lifted-rules-apply", "stdout=%r list=%r" % (out, box.states(RESET + 200)))
+finally:
+    box.close()
+
+# ---- only a session that ended on the rejection is stopped ----------------------------------------
+box = Box()
+try:
+    head = REJECTED.splitlines()
+    work = '{"type":"assistant","message":{"model":"claude-opus-4-8","content":[]},"session_id":"%s"}' % SID
+    # The session went on working after the rejection (30 lines, as the tail of a live log).
+    box.slice("s-on", "routine", "opus", "high", log="\n".join(head[:3] + [work] * 30) + "\n", live=True)
+    # ... or finished: a successful result after the rejection.
+    box.slice("s-fin", "routine", "opus", "high",
+              log="\n".join(head[:3] + ['{"type":"result","subtype":"success","is_error":false,"session_id":"%s"}' % SID]) + "\n")
+    # A session on overage is being served.
+    box.slice("s-over", "routine", "opus", "high", log=rejected(isUsingOverage=True))
+    healthy = box.slice("s-b", "content", "opus", "medium", live=True)
+    out, log = box.tick(STOPPED)
+    if "CREDIT-STOP" in log or box.flags() or box.watched() or box.tool(STOPPED, "list") != "[]":
+        fail("working-session-not-stopped", "log=%r flags=%r list=%r" % (log, box.flags(), box.tool(STOPPED, "list")))
+    # The same rejection as the last thing the session did is a stop.
+    box.slice("s-on", "routine", "opus", "high", log=rejected())
+    if not box.tool(STOPPED, "scan").startswith("STOP new=s-on,s-b "):
+        fail("terminal-rejection-stops", box.tool(STOPPED, "list"))
+finally:
+    box.close()
+
+# ---- a limit on one model stops and gates that model only -----------------------------------------
+box = Box()
+try:
+    box.slice("s-a", "hard", "fable", "xhigh", log=REJECTED)                 # "your Fable limit"
+    opus = box.slice("s-b", "content", "opus", "medium", live=True)
+    fable = box.slice("s-c", "hard", "fable", "xhigh", live=True)
+    out, log = box.tick(STOPPED, SRC="crash")
+    if "CREDIT-STOP new=s-a,s-c resets=%d limit=seven_day_overage_included scope=fable" % RESET not in log \
+            or box.flags() != ["mr_stop_s-a", "mr_stop_s-c"] or box.watched() != [str(RESET)]:
+        fail("one-model-stop", "log=%r flags=%r watch=%r" % (log, box.flags(), box.watched()))
+    # The supervisor (opus) is not covered: its ticks go on. A fable supervisor would stand down.
+    out, log = box.tick(STOPPED + 3600)
+    if "REACHED-SESSION" not in out or "STANDDOWN" in log:
+        fail("one-model-stop-tick-goes-on", "stdout=%r log=%r" % (out, log))
+    out, log = box.tick(STOPPED + 3600, SUP_MODEL="fable")
+    if "REACHED-SESSION" in out or "STANDDOWN credit-stop BLOCKED_UNTIL_2026-11-06T00:00:00Z" not in log:
+        fail("one-model-stop-covers-own-model", "stdout=%r log=%r" % (out, log))
+    # New launches: mr-spawn refuses the stopped model until the reset, and launches the others.
+    spawn = open(os.path.join(MEM, "mr-spawn")).read()
+    with open(os.path.join(box.root, "spawn-credit.sh"), "w") as f:
+        f.write("MEM=%s\nS=\"$1\"\nMODEL=\"$2\"\n%s\n%s\n}\n%s\necho PASSED\n"
+                % (box.mem, line_with(spawn, "emit(){ SLICE="), between(spawn, "\nstatus(){", "\n}\n"),
+                   between(spawn, "\n# CREDIT STOPPED", "\n# Stop-flag clearing")))
+    got = []
+    for now, model in ((STOPPED + 60, "opus"), (STOPPED + 60, "fable"), (RESET + 1, "fable")):
+        r = subprocess.run(["bash", os.path.join(box.root, "spawn-credit.sh"), "s-new", model], env=box.env(now),
+                           capture_output=True, text=True, timeout=60)
+        got.append((r.returncode, "CREDIT-STOPPED" in r.stdout, "PASSED" in r.stdout))
+    if got != [(0, False, True), (1, True, False), (0, False, True)]:
+        fail("one-model-stop-gates-launches", "opus, fable, fable after reset: %r" % (got,))
+    # The model can also be named by the limit type; a rejection that names none covers all.
+    for name, text, want in (("s-t", rejected("seven_day_opus", model="fable"), "opus"),
+                             ("s-u", rejected("seven_day_overage_included", model=None), "all"),
+                             ("s-v", rejected("seven_day_overage_included", model="fable", unifiedWindows=None), "all")):
+        box.slice(name, "routine", "opus", "high", log=text)
+        scan = box.tool(STOPPED + 120, "scan")
+        if "new=%s" % name not in scan or " scope=%s " % want not in scan + " ":
+            fail("scope-of-%s" % name, "want %s: %r" % (want, scan))
 finally:
     box.close()
 sys.exit(bad)

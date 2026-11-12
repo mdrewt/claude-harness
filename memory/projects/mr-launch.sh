@@ -8,7 +8,8 @@
 # terminal_pr_open · transient auto-resume · .done = "EXIT=<rc> ATTEMPTS=<n>".
 # [resume-session] = the CLI session id of this slice's session that a credit stop interrupted: the
 # first attempt continues that session (its context holds the work in progress) when its transcript
-# is on disk, and falls back to a new session from the brief when it is not or the CLI cannot resume it.
+# is on disk, and falls back to a new session from the brief when it is not or the CLI cannot resume
+# it; the fallback is one line in the pass log (RESUME-FALLBACK / RESUME-FAILED).
 # Caller MUST launch detached: setsid bash mr-launch.sh <slice> [model] [effort] & disown
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
@@ -105,9 +106,11 @@ A=1
 # Credit-stop resume. The CLI resumes a session from its transcript, filed under the run directory's
 # project slug. PRIOR is what the session had spent before this launch: mr-cost-sum subtracts it from
 # the transcript's session total, so this launch's cost row carries only its own spend.
-RSID="${5:-}"
-case "$RSID" in *[!0-9a-fA-F-]*) RSID="" ;; esac
-[ -n "$RSID" ] && [ ! -s "$HOME/.claude/projects/$(printf '%s' "$RUNDIR" | sed 's/[^A-Za-z0-9]/-/g')/$RSID.jsonl" ] && RSID=""
+RSID="${5:-}"; RSID_WHY=""
+case "$RSID" in *[!0-9a-fA-F-]*) RSID=""; RSID_WHY="the session id given is not a CLI session id" ;; esac
+if [ -n "$RSID" ] && [ ! -s "$HOME/.claude/projects/$(printf '%s' "$RUNDIR" | sed 's/[^A-Za-z0-9]/-/g')/$RSID.jsonl" ]; then
+  RSID_WHY="no transcript on disk for session $RSID"; RSID=""
+fi
 if [ -n "$RSID" ]; then
   PRIOR=$("$MEM/mr-cost-sum" --session "$RSID" 2>/dev/null); case "$PRIOR" in ''|-) PRIOR=0 ;; esac
   echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$PRREPO RESUME=$RSID PRIOR=$PRIOR TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
@@ -124,6 +127,7 @@ if [ -n "$RSID" ]; then
 fi
 if [ -z "$RSID" ]; then
 echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$PRREPO TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+[ -n "$RSID_WHY" ] && echo "RESUME-FALLBACK $RSID_WHY — this is a new session from the brief TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
 ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
   --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>"$E"
 RC=$?
