@@ -23,26 +23,22 @@ alone. Single-player and private worlds are budgeted in `M-local-play.spec.md`.
   about 1,000 at peak.
 - Revisit if the game outgrows it. Today only a few developers are connected at once.
 
-What the target implies, from the per-call costs measured on 2026-11-12 (extrapolated, not load
-tested at this size — SR9 exists to replace these with measurements):
+What the target implies, from measurements on 2026-11-12 (one zone, up to 100 walkers; larger
+figures are extrapolated — SR9 exists to replace them with measurements):
 
-- **Zone scoping (SR5) is the first fix, not the last.** With `character` and `player` subscribed
-  world-wide, each client receives every one of 1,000 players' updates; row deliveries grow with
-  the world population squared, five times past the largest level measured (200). Scoped to a zone,
-  a client sees 10 players on average and 50 at peak.
-- **Inside a peak zone the intent broadcast (SR1) is the remaining cost:** 55 KB/s download per
-  client at 50 movers before the fix, about 5 KB/s after.
-- **The reducer thread is one writer for the whole world.** 1,000 players all walking is 5,000
-  `enqueue_move` calls a second at ~70 µs each: about 35% of the thread in the worst case. SR1's
-  owner view doubled reducer-thread time in the prototype, so at this target SR1 must be measured
-  at 1,000 movers across zones before its design is fixed; taking the ack from the reducer call's
-  result instead of a view is the fallback.
-- **100 zone ticks at 5 Hz** is 500 scheduled calls a second: about 3% of the thread with every
-  zone empty, plus about 2% for 1,000 movers. Affordable on the official server, and removed by
-  SR10 because the same code runs on a player's laptop.
+- **A client's download follows the walkers in its subscription scope:** about 0.85 KB/s plus
+  0.077 KB/s per walker (8.55 KB/s at 100, 4.71 at 50, 2.39 at 20). World-wide that is about
+  78 KB/s per client at 1,000 players; scoped to a zone (SR5) it is about 5 KB/s in a zone of 50
+  and 2 KB/s in a zone of 10. The 20 KB/s budget is reached near 220 walkers in one scope.
+- **Every session starts in zone 0** and the character is deleted on the last disconnect, so the
+  spawn zone, not a 50-player zone, is the real peak: about 170 players there if a 30-minute session
+  spends 5 minutes in it, about 330 at 10 minutes (over budget). SR11.
+- **The reducer thread is one writer for the whole world.** Counting transaction and broadcast time,
+  1,000 players all walking is 55–60% of it; at a 30% walking share about 22%. SR2 removes the part
+  that grows with monsters owned.
 - **Budgets for SR9's load run:** 1,000 clients spread over 100 zones with one zone at 50; tick p95
   under `STEP_MS`, input round-trip p95 under 50 ms, download per client under 20 KB/s, reducer
-  thread under 50%.
+  thread under 50% at a 30% walking share.
 
 ## Decisions still open (ask at elaboration; reversible defaults in brackets)
 
@@ -53,18 +49,8 @@ tested at this size — SR9 exists to replace these with measurements):
 - **`battle_summary` retention:** what the per-battle telemetry is for and how long it is kept.
   [default: keep the newest N rows, N from the account count]
 
-## Scope (sketch) — one slice per item; build SR9 and SR5 first, then by value per size
+## Scope (sketch) — one slice per item; SR5 and SR9 first, then by value per size
 
-- **SR1 Movement intent is owner-only.** `enqueue_move`, `set_move` and `clear_queue` write
-  `character.move_queue` and (through `guards::authorize_move`) `player.last_input_seq`, both public
-  rows every client subscribes, though only the sender reads them. Row deliveries grow with
-  players squared: measured 64 KB/s download per client at 100 movers. Move the queue and the ack to
-  a private table behind an owner-scoped view (the `my_wallet` pattern); `movement_tick` drains from
-  it. Measured with a prototype at 100 movers: download per client 64 → 9 KB/s, input round-trip
-  p95 29 → 10 ms, server CPU −33%. The view re-evaluation doubles reducer-thread time (to ~10% of a
-  core at 100 movers) and grows the commit log 27%. Touches schema, movement, guards, `join_game`,
-  `on_disconnect`, the erase/export paths, client reconciliation, bindings, sim-harness. The netcode
-  evals and movement e2e specs are the gate.
 - **SR2 Party lookup by index.** `battle::lead_party_ids` filters `monster` by owner and then drops
   Storage rows, on every accepted move input. Measured linear: ~3k fuel and 0.4 µs per owned monster
   (0.4 ms per input at 1,000 owned). Add a `(owner_identity, party_slot)` btree index and read the
@@ -80,10 +66,15 @@ tested at this size — SR9 exists to replace these with measurements):
   is open (measured ~18 µs per row per batch). Step 1, client only: re-render only when a profile row
   changed, and render top K plus the caller's row. Step 2: serve a bounded top-K view or table kept
   at ranked settle plus an owner-scoped `my_profile` view, and drop the whole-table subscription.
-- **SR5 Zone-scoped world subscriptions.** `character` and `player` are subscribed with no zone
-  filter, so every client receives every player in the world. Scope them to the caller's zone,
-  re-subscribing on a zone change; the interact-chip
-  marshalling (`interactModel.marshalInteract`) then stops walking other zones' entities.
+- **SR5 `character` is subscribed per zone.** The client subscribes `SELECT * FROM character` with
+  no filter, so it receives every walker in the world. It subscribes its own character by
+  `entity_id` and each wanted zone by `zone_id` instead: its own zone, the destination of any warp
+  within 4 tiles (so a warp shows the destination on its first frame), and a zone it just left for
+  5 s more. `player` stays world-wide: nothing writes it per move, so it costs about 0.1–0.2 KB/s
+  per client at 1,000 players, and the Players tab, trade and challenge targeting and rankings keep
+  working unchanged. Client-only: no schema change and no publish, so a new client works against
+  any server. Scope `player` too only if it measures above 1 KB/s per client or the target passes
+  about 5,000 concurrent.
 - **SR6 Owner views reconcile only when dirty.** The client rebuilds every owner-scoped view from
   the SDK cache on every store batch, so cost per second is batch rate × monsters owned. Set a dirty
   flag in each view's own row handlers and on snapshot, reconnect and `store.reset()`; reconcile only
@@ -97,33 +88,20 @@ tested at this size — SR9 exists to replace these with measurements):
   resolution 1 and let the integer stage scale upsample with nearest sampling; re-check the
   screenshot baselines. Camera-windowed baking waits for zones near 100×100.
 - **SR9 The load tool sees fan-out.** `mr_load_driver` reports `rx_bytes_per_client_per_s` per level
-  and subscribes `character` and `player` as the client does; the nightly runs it for a few seconds
+  and subscribes as the client does (its own character, its zone, and `player`). A load-only build
+  (about 100 small generated zones and a `dev_reducers` placement reducer, never shipped) lets it
+  spread 1,000 clients over 100 zones; the nightly runs it for a few seconds
   at 20 clients and fails when no move is accepted. A recording rule and panel for reducer-thread
   share by reducer (`spacetime_txn_elapsed_time_sec`) joins the dashboard. The host's
   `spacetime_num_bytes_sent_to_clients_total` counts each delta once, not once per subscriber, so it
   cannot stand in for this.
 
-- **SR10 A zone with no player in it does no work** (operator, 2026-11-12: such zones "should
-  either not update or keep updates to a minimum", and a reset to defaults is acceptable). Every
-  zone's `movement_tick` fires at 5 Hz whether or not anyone is there (~58 µs per empty tick: ~3%
-  of the reducer thread for 100 empty zones, and constant wake-ups and commit-log writes on a
-  player's own machine). The policy, by kind of state:
-  - **Ambient state** — anything the world does by itself that no player caused and none would
-    miss: an NPC's wander position and facing today. It is frozen while the zone is empty and
-    **reset to its authored default as the zone empties**: the tick that finds no player's character
-    in the zone puts each NPC back on its home tile and disarms the zone's schedule. One code path
-    covers leave, warp, disconnect and timeout; nobody is subscribed, so the reset is delivered to no
-    one; and the next player to enter always finds the zone in a known good state with nothing to
-    wait for. Entering only arms the tick (join, warp, reconnect).
-  - **Player-caused state** — anything a player did and expects to still be true (a quest step, an
-    item taken, a shop purchase). Never reset, and it needs no tick.
-  - **Time-driven state** — anything that should have moved on while nobody watched (a respawn, a
-    restock, a growth timer). Stored as a time or deadline and computed from elapsed time when it is
-    next read, never advanced by a tick. The rule that keeps this true: **no state may depend on a
-    tick having run.**
-  A world with nobody connected schedules nothing recurring at all (the 60 s `mr_heartbeat` included;
-  per-entity deadlines such as reapers stay, since they fire once and only when something is owed).
-  Builds after SR1, which rewrites the same reducer.
+- **SR11 A session resumes where it left off.** `join_game` spawns every session in zone 0, which
+  makes the spawn zone the peak (see the population target) and, in a single-player world, sends
+  the player back to the start each time they open the game. Keep the character's zone and tile
+  across a disconnect (or restore them at join) so a returning player appears where they left.
+  A gameplay change: the operator decides the rule (last position, last heal point, or spread
+  spawns) at elaboration. [default: last position]
 
 ## Watch items (graph in the load run; no slice unless a budget is breached)
 
@@ -132,7 +110,11 @@ tested at this size — SR9 exists to replace these with measurements):
 - Monsters screen Storage grid: unvirtualised, visible hitch near 1,000 stored monsters.
 - `client-wasm` `overlays_of` recomputes every result per call and is called up to four times per
   derive (~1 ms each, event-driven).
-- Commit log growth: ~168 KB/s at 100 continuous movers.
+- Commit log growth: ~140 KB/s at 100 continuous movers.
+- An empty world still runs three recurring jobs: the 60 s `mr_heartbeat` (the
+  `mr-alloy-ingest-stalled` alert's dead-man's switch; it writes nothing) and the `playtest_reaper`
+  (300 s) and `export_bundle_reaper` (hourly) intervals. Stopping the heartbeat needs that alert
+  reworked first.
 - `battle_challenge` is public and subscribed whole; rows are bounded per online player and reaped.
 - The post stack on software or integrated GPUs, unmeasured on real hardware; it is off in
   production builds.
@@ -148,5 +130,8 @@ frame), build, bundle and startup.
 
 - Evidence and reproduction scripts were session artefacts; each slice re-measures its own before
   and after with SR9's tool, which is why SR9 may run first even though it is listed last.
-- SR1 and SR3 change table visibility; coordinate with `M25-security-audit.spec.md` S2 (frozen
+- SR3 changes a table's visibility; coordinate with `M25-security-audit.spec.md` S2 (frozen
   schema) at elaboration.
+- Built: movement intent is a private table and the tick publishes the queue and the ack with the
+  position (game #743, #744), and a zone ticks only while a player is in it (game #745). Their
+  rules are the game repo's `docs/DECISIONS.md` entries on movement intent and empty zones.
