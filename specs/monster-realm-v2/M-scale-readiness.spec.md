@@ -38,7 +38,8 @@ tested at this size — SR9 exists to replace these with measurements):
   at 1,000 movers across zones before its design is fixed; taking the ack from the reducer call's
   result instead of a view is the fallback.
 - **100 zone ticks at 5 Hz** is 500 scheduled calls a second: about 3% of the thread with every
-  zone empty, plus about 2% for 1,000 movers. Fine.
+  zone empty, plus about 2% for 1,000 movers. Affordable on the official server, and removed by
+  SR10 because the same code runs on a player's laptop.
 - **Budgets for SR9's load run:** 1,000 clients spread over 100 zones with one zone at 50; tick p95
   under `STEP_MS`, input round-trip p95 under 50 ms, download per client under 20 KB/s, reducer
   thread under 50%.
@@ -101,6 +102,28 @@ tested at this size — SR9 exists to replace these with measurements):
   share by reducer (`spacetime_txn_elapsed_time_sec`) joins the dashboard. The host's
   `spacetime_num_bytes_sent_to_clients_total` counts each delta once, not once per subscriber, so it
   cannot stand in for this.
+
+- **SR10 A zone with no player in it does no work** (operator, 2026-11-12: such zones "should
+  either not update or keep updates to a minimum", and a reset to defaults is acceptable). Every
+  zone's `movement_tick` fires at 5 Hz whether or not anyone is there (~58 µs per empty tick: ~3%
+  of the reducer thread for 100 empty zones, and constant wake-ups and commit-log writes on a
+  player's own machine). The policy, by kind of state:
+  - **Ambient state** — anything the world does by itself that no player caused and none would
+    miss: an NPC's wander position and facing today. It is frozen while the zone is empty and
+    **reset to its authored default as the zone empties**: the tick that finds no player's character
+    in the zone puts each NPC back on its home tile and disarms the zone's schedule. One code path
+    covers leave, warp, disconnect and timeout; nobody is subscribed, so the reset is delivered to no
+    one; and the next player to enter always finds the zone in a known good state with nothing to
+    wait for. Entering only arms the tick (join, warp, reconnect).
+  - **Player-caused state** — anything a player did and expects to still be true (a quest step, an
+    item taken, a shop purchase). Never reset, and it needs no tick.
+  - **Time-driven state** — anything that should have moved on while nobody watched (a respawn, a
+    restock, a growth timer). Stored as a time or deadline and computed from elapsed time when it is
+    next read, never advanced by a tick. The rule that keeps this true: **no state may depend on a
+    tick having run.**
+  A world with nobody connected schedules nothing recurring at all (the 60 s `mr_heartbeat` included;
+  per-entity deadlines such as reapers stay, since they fire once and only when something is owed).
+  Builds after SR1, which rewrites the same reducer.
 
 ## Watch items (graph in the load run; no slice unless a budget is breached)
 

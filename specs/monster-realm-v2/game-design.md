@@ -333,7 +333,9 @@ in every world, not only in single-player ones.
 3. *Official release:* modding for private worlds.
 
 **What this asks of every feature.** A feature is designed against all three: it must work with one
-player and nobody else online; it must not assume we operate the server (no fixed server address, no
+player and nobody else online; it must cost nothing where no player is (a zone with nobody in it does
+not update: what the world does by itself resets to its authored default as the zone empties, what a
+player did stays, and anything timed is worked out from elapsed time when next looked at); it must not assume we operate the server (no fixed server address, no
 upgrade step a person performs by hand, no telemetry that leaves the machine without the player's
 consent); and it must hold at the official server's population.
 
