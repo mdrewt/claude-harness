@@ -5,137 +5,254 @@
 # 2026-08-17 kill-switch wedge happened (full postmortem in mr-hold's header). Python reads this
 # line as a no-op string; sh/bash re-execs the file under python3 before reaching any other line.
 # Statically enforced for every python mr-* tool by mr-selfcheck.
-"""mr-cost-sum — SSOT for deriving a run's true USD cost from a stream-json log.
+"""mr-cost-sum — SSOT for deriving a run's own USD spend from a stream-json log.
 
-WHY THIS EXISTS
----------------
-`total_cost_usd` on a `"type":"result"` stream-json event is CUMULATIVE for the emitting
-session's current accumulation run — it is NOT the cost of that one invocation. Summing it
-across every result event in a pass log therefore multiplies the true spend.
+WHAT A LOG REPORTS
+------------------
+`total_cost_usd` on a `"type":"result"` event is CUMULATIVE, never the cost of that one
+invocation, and how far back it reaches depends on the CLI: a `--resume` invocation carries the
+resumed session's counter forward (ts-3: attempt 1 ends at $59.71, attempt 2 ends at $84.41 —
+the run cost $84.41, not $144.12) unless another session in the same project directory ran in
+between, in which case it restarts from zero. One invocation also emits several result events
+that repeat the same total. So neither summing result events nor summing per-attempt maxima
+gives the spend.
 
-Measured on 2026-08-01 against the 11 surviving /tmp/mr_pass_*.log files:
-    uxd2  naive $423.6470  ->  true $165.6512   (2.56x overcount)
-    uxd3  naive $ 66.4075  ->  true $ 47.5320   (1.40x)
-    the other 9 (single result event)            (1.00x — unchanged)
-Cross-check: mr-cost-watch's independent token-priced calibration for uxd2 was $155.21,
-within 6.7% of $165.65 and nowhere near $423.65.
+Each result event also carries `model_usage_since_last_result`: per-model usage since the
+previous result of the same invocation, with its own `costUSD`. That is the event's own spend
+and is right whether or not the counter was carried. A run's cost is the sum of it over every
+result event in the log.
 
-Before this helper existed the buggy loop was copy-pasted in three places (mr-record,
-and twice in mr-native-tick.sh). That triplication is why the bug survived; this file is
-the single implementation and all three call it.
+A result event without that field (CLI builds that predate it) falls back to the cumulative
+counter: its spend is the rise since the previous result, and the whole value when the counter
+restarted — at a marker line mr-launch.sh writes before each invocation (those builds restart
+the counter on `--resume`, and an escalated final attempt legitimately costs more than the one
+before it, so a decrease alone would miss it) or when the value drops.
 
-SEGMENTATION
-------------
-A "segment" is one accumulation run. Its cost is the MAX value seen inside it (the last
-cumulative reading; max is used so an out-of-order or truncated tail cannot lose spend).
-Total = sum of segment maxima. A new segment opens on either:
+The log is not the only witness. On exit the CLI appends a `cost-state` record to the session's
+transcript (`~/.claude/projects/<cwd>/<session_id>.jsonl`) whose `totalCostUSD` is the session
+counter. It is written even when the invocation is killed or stopped by a rate limit before it
+could emit a result event (bt-7: no result event, cost-state $64.30). Both sources can only
+miss spend, never invent it, so a run's cost is the larger of the two.
 
-  1. an ATTEMPT / ESCALATED / COST-CAP-WRAP marker line written by mr-launch.sh
-     (lines 84, 114, 123, 137) — the AUTHORITATIVE invocation boundary; or
-  2. the value decreasing (counter reset) — the fallback for logs with no markers,
-     e.g. the supervisor's own /tmp/mr_native_tick_*.log.
+A launch that continues an earlier session (mr-launch.sh's credit-stop resume) shares that
+session's counter with the launch before it. Its ATTEMPT=1 marker carries `RESUME=<session id>
+PRIOR=<the counter at launch>`, and the transcript figure for that launch is the session total
+minus PRIOR — the earlier launch has its own cost row.
 
-Rule 1 is required, not cosmetic: mr-launch.sh:110-115 escalates the final attempt to
-fable@xhigh with a +$60 cap top-up, so "attempt N costs MORE than attempt N-1" is a
-DESIGNED outcome. Under rule 2 alone the earlier attempt's spend would be swallowed —
-an undercount, which is the unsafe direction for a budget governor.
-
-NOT USED, and why:
-  session_id  — useless here. `mr-launch.sh:124` resumes with --resume, so all 8 uxd2
-                result events across 3 separate claude invocations share one session_id.
-  modelUsage  — uxd2 events 1-4 all report the session-FINAL breakdown ($152.69) while
-                total_cost_usd is still climbing; summing it overcounts worse than naive.
-  "subtype":"init" — not 1:1 with invocations (uxd2 attempt 1 emits 4).
-  uuid / num_turns / duration_ms — carry no boundary information.
+NOT USED: `modelUsage` (cumulative like the total), `"subtype":"init"` (not 1:1 with
+invocations).
 
 CONTRACT
 --------
-  mr-cost-sum <logfile>    -> total to 4dp on stdout, or "-" when no cost is derivable.
-                              ALWAYS exits 0. Output is always /^([0-9]+\\.[0-9]{4}|-)$/
-                              so callers may interpolate it into a shell or python literal.
-  mr-cost-sum --selftest   -> exit 0 pass, 1 fail.
+  mr-cost-sum <logfile>      -> total to 4dp on stdout, or "-" when no cost is derivable.
+                                ALWAYS exits 0. Output is always /^([0-9]+\\.[0-9]{4}|-)$/
+                                so callers may interpolate it into a shell or python literal.
+  mr-cost-sum --run <logfile> -> one JSON object describing the build session the log holds.
+                                ALWAYS exits 0:
+                                  launch      UTC stamp of the ATTEMPT=1 marker, compact
+                                              (20261111T123016Z), or null
+                                  session_id  the CLI session id, or null
+                                  model       MODEL= of the first attempt, or null
+                                  escalated   an ESCALATED marker is present
+                                  attempts    invocations started (ATTEMPT / COST-CAP-WRAP)
+                                  unpriced    invocations that ended without a result event
+                                  log_cost    spend the log's result events report, or null
+                                  transcript_cost  the transcript's cost-state, or null; less
+                                              session_prior for a resumed session
+                                  session_prior    PRIOR of a launch that resumed this session
+                                              (what it had spent before), else 0
+                                  cost        the larger of the two, 4dp; null when neither
+                                              source reports a cost
+                                  source      "log" | "transcript" | null — which one set it
+  mr-cost-sum --session <id> -> the cost-state total of that CLI session's transcript to 4dp,
+                                or "-". ALWAYS exits 0. What a session has spent by now,
+                                for a caller that holds its id and no log.
+  mr-cost-sum --selftest     -> exit 0 pass, 1 fail.
 
-  * zero result events, unreadable file, missing file  -> "-"
-  * >=1 result event whose costs sum to zero           -> "0.0000"  (NOT "-", so a genuine
-                                                          $0 run is distinguishable from an
-                                                          absent one, matching prior behaviour)
-  * result events with total_cost_usd absent/null are skipped WITHOUT opening a segment.
+  * no result event and no cost-state, unreadable or missing file -> "-" / cost null
+  * >=1 result event whose spend sums to zero          -> "0.0000"  (a genuine $0 run is
+                                                          distinguishable from an absent one)
+  * result events with total_cost_usd absent/null/non-finite/negative are skipped.
 
-Callers MUST treat "-" as COST-UNKNOWN. Never let "-" reach float().
+Callers MUST treat "-" as COST-UNKNOWN. Never let "-" reach float(). An invocation killed
+before its first result event contributes nothing to the log's figure, so `unpriced > 0` with
+`source: "log"` means the cost is a lower bound.
+
+MR_COST_TRANSCRIPTS names the transcript root (default ~/.claude/projects); fixtures point it
+at their own excerpts.
 """
+
+import glob
 
 import json
 import math
 import os
+import re
 import sys
 
-# Invocation-boundary markers written by mr-launch.sh at the start of each attempt.
-_MARKERS = ("ATTEMPT=", "ESCALAT", "COST-CAP-WRAP start")
+# Lines mr-launch.sh writes before an invocation. The first two start one; ESCALATED precedes
+# the ATTEMPT line of the invocation it describes.
+_INVOKE = ("ATTEMPT=", "COST-CAP-WRAP start")
+_BOUNDARY = _INVOKE + ("ESCALAT",)
+_SID = re.compile(r'"session_id":"([^"]+)"')
+
+
+def _finite(val):
+    """A usable non-negative USD figure, or None. json.loads accepts bare NaN/Infinity and
+    float() accepts "Infinity"; a NaN in the ledger makes every governor comparison in
+    mr-situation false, which would disable SOFT-PAUSE and HARD-STOP without a trace."""
+    if val is None or isinstance(val, bool):
+        return None
+    try:
+        val = float(val)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(val) or val < 0:
+        return None
+    return val
+
+
+def _own_spend(event):
+    """The event's own spend from model_usage_since_last_result, or None when the field is
+    absent or unusable."""
+    since = event.get("model_usage_since_last_result")
+    if not isinstance(since, dict):
+        return None
+    own = 0.0
+    for usage in since.values():
+        cost = _finite(usage.get("costUSD") if isinstance(usage, dict) else None)
+        if cost is None:
+            return None
+        own += cost
+    return own
+
+
+def transcript_cost(session_id, root=None):
+    """The session counter from the transcript's cost-state records, or None. The counter is
+    restored on `--resume`, so the last record is the session total; a drop means it restarted
+    and the earlier run is added."""
+    if not session_id or not re.fullmatch(r"[0-9a-fA-F-]{8,64}", session_id):
+        return None
+    root = root or os.environ.get("MR_COST_TRANSCRIPTS") or os.path.expanduser("~/.claude/projects")
+    total, prev = 0.0, None
+    for path in glob.glob(os.path.join(glob.escape(root), "*", session_id + ".jsonl")):
+        try:
+            with open(path, errors="replace") as fh:
+                for line in fh:
+                    if "cost-state" not in line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except Exception:
+                        continue
+                    if not isinstance(rec, dict) or rec.get("type") != "cost-state":
+                        continue
+                    val = _finite(rec.get("totalCostUSD"))
+                    if val is None:
+                        continue
+                    if prev is not None and val < prev:
+                        total += prev
+                    prev = val
+        except Exception:
+            continue
+    if prev is None or not math.isfinite(total + prev):
+        return None
+    return round(total + prev, 4)
+
+
+def run_of_log(path, transcripts=None):
+    """Describe the build session a log holds. Never raises; see the module contract."""
+    run = {"launch": None, "session_id": None, "model": None, "escalated": False,
+           "attempts": 0, "unpriced": 0, "log_cost": None, "transcript_cost": None,
+           "session_prior": 0, "cost": None, "source": None}
+    resumed = None       # (session id, PRIOR) from the launch marker of a credit-stop resume
+    total = 0.0
+    saw = False
+    prev = None          # last cumulative reading of the counter run in progress
+    restart = True       # the next reading without its own spend starts a new counter run
+    open_unpriced = False
+    try:
+        fh = open(path, errors="replace")
+    except Exception:
+        return run
+    with fh:
+        for line in fh:
+            if line.startswith(_BOUNDARY):
+                restart = True
+                if line.startswith("ESCALATED"):
+                    run["escalated"] = True
+                if line.startswith(_INVOKE):
+                    run["attempts"] += 1
+                    run["unpriced"] += open_unpriced
+                    open_unpriced = True
+                    if run["attempts"] == 1 and line.startswith("ATTEMPT="):
+                        fields = dict(f.split("=", 1) for f in line.split() if "=" in f)
+                        run["model"] = fields.get("MODEL") or None
+                        stamp = re.sub(r"[^0-9TZ]", "", fields.get("TS", ""))
+                        run["launch"] = stamp if re.fullmatch(r"\d{8}T\d{6}Z", stamp) else None
+                        if fields.get("RESUME"):
+                            resumed = (fields["RESUME"], _finite(fields.get("PRIOR")))
+                            if resumed[1]:
+                                # a result without its own usage is read against the carried counter
+                                prev, restart = resumed[1], False
+                continue
+            if run["session_id"] is None:
+                m = _SID.search(line)
+                if m:
+                    run["session_id"] = m.group(1)
+            if '"type":"result"' not in line:
+                continue
+            try:
+                event = json.loads(line)
+            except Exception:
+                continue
+            if not isinstance(event, dict) or event.get("type") != "result":
+                continue
+            val = _finite(event.get("total_cost_usd"))
+            if val is None:
+                continue
+            own = _own_spend(event)
+            if own is None:
+                own = val if (restart or prev is None or val < prev) else val - prev
+            total += own
+            prev = val
+            restart = False
+            saw = True
+            open_unpriced = False
+    run["unpriced"] += open_unpriced
+    # Per-event values are screened, so a non-finite total can only be float overflow across
+    # events. Report unknown rather than a token no caller can parse.
+    if saw and math.isfinite(total):
+        run["log_cost"] = round(total, 4)
+    run["transcript_cost"] = transcript_cost(run["session_id"], transcripts)
+    # Only when the log's session IS the resumed one: after a failed resume the log holds a new
+    # session, whose counter started at zero.
+    if resumed and resumed[1] and resumed[0] == run["session_id"]:
+        run["session_prior"] = resumed[1]
+        if run["transcript_cost"] is not None:
+            run["transcript_cost"] = round(max(0.0, run["transcript_cost"] - resumed[1]), 4)
+    known = [(c, s) for c, s in ((run["log_cost"], "log"), (run["transcript_cost"], "transcript"))
+             if c is not None]
+    if known:
+        # max() keeps the first of equals, so the log is named when the two agree.
+        run["cost"], run["source"] = max(known, key=lambda cs: cs[0])
+    return run
 
 
 def cost_of_log(path):
     """Return (total_float, saw_result_event). Never raises."""
-    total = 0.0
-    seg = 0.0
-    prev = -1.0
-    seg_open = False
-    saw = False
-    try:
-        fh = open(path, errors="replace")
-    except Exception:
-        return 0.0, False
-    with fh:
-        for line in fh:
-            # 1. explicit invocation boundary -> close the current segment
-            if line.startswith(_MARKERS):
-                if seg_open:
-                    total += seg
-                    seg = 0.0
-                    prev = -1.0
-                    seg_open = False
-                continue
-            if '"type":"result"' not in line:
-                continue
-            try:
-                val = json.loads(line).get("total_cost_usd")
-            except Exception:
-                continue
-            if val is None:
-                continue
-            try:
-                val = float(val)
-            except (TypeError, ValueError):
-                continue
-            # Reject non-finite and negative readings WITHOUT opening a segment. json.loads
-            # accepts bare NaN/Infinity and float() accepts "Infinity", so a single such event
-            # would otherwise reach %.4f as "nan"/"inf", break the output contract, and land in
-            # the append-only ledger. A NaN there makes EVERY governor comparison in
-            # mr-situation false — SOFT-PAUSE and HARD-STOP would be silently disabled forever.
-            if not math.isfinite(val) or val < 0:
-                continue
-            saw = True
-            if not seg_open:
-                seg, prev, seg_open = val, val, True
-            elif val < prev:
-                # 2. counter reset -> new accumulation run
-                total += seg
-                seg, prev = val, val
-            else:
-                seg = max(seg, val)
-                prev = val
-    if seg_open:
-        total += seg
-    return total, saw
+    cost = run_of_log(path)["cost"]
+    return (0.0, False) if cost is None else (cost, True)
 
 
 def emit(path):
     total, saw = cost_of_log(path)
-    # Final backstop for the output contract: per-event values are already screened, so the only
-    # way here is float overflow across segments. Emit "-" (COST-UNKNOWN) rather than a token no
-    # caller can parse — never fabricate a number, and never emit one that breaks the regex.
-    if saw and not math.isfinite(total):
-        saw = False
     sys.stdout.write("%.4f\n" % total if saw else "-\n")
+    return 0
+
+
+def emit_run(path):
+    sys.stdout.write(json.dumps(run_of_log(path)) + "\n")
     return 0
 
 
@@ -154,7 +271,8 @@ ATTEMPT=3
 """
 
 _CASES = [
-    # (name, log body, expected stdout)
+    # (name, log body, expected stdout). These bodies have no model_usage_since_last_result, so
+    # they exercise the cumulative-counter fallback.
     ("uxd2-real-shape", _UXD2, "165.6512"),
     ("single-event-identity",
      '{"type":"result","total_cost_usd":111.62030490}\n', "111.6203"),
@@ -166,8 +284,8 @@ _CASES = [
     ("decrease-splits-without-markers",
      '{"type":"result","total_cost_usd":5.0}\n'
      '{"type":"result","total_cost_usd":2.0}\n', "7.0000"),
-    # The case pure value-decrease gets WRONG: an escalated attempt costing more than the
-    # previous one. Without the ATTEMPT marker this would report 25.0000 and lose $10.
+    # An escalated attempt costing more than the one before it: a decrease-only split reports
+    # 25.0000 and loses $10; the ATTEMPT marker is what restarts the counter.
     ("escalation-attempt-costs-more",
      'ATTEMPT=1\n{"type":"result","total_cost_usd":10.0}\n'
      'ATTEMPT=2\n{"type":"result","total_cost_usd":25.0}\n', "35.0000"),
@@ -231,16 +349,109 @@ def selftest():
     if saw:
         print("FAIL missing-file want=- got=%.4f" % total)
         bad += 1
+    bad += _selftest_real_shapes()
     if bad:
         print("mr-cost-sum SELFTEST FAIL (%d)" % bad)
         return 1
-    print("mr-cost-sum SELFTEST OK (%d cases)" % (len(_CASES) + 1))
+    print("mr-cost-sum SELFTEST OK (%d cases)" % (len(_CASES) + 1 + 2 * len(_REAL) + 5))
     return 0
+
+
+# Excerpts of real pass logs and session transcripts (fixtures/run-cost/README.md): marker lines
+# verbatim, events cut down to the fields a cost reader could use. Each expectation is the
+# session's own spend.
+#   (file, cost, source, log_cost, attempts, unpriced, launch, model)
+_REAL = [
+    ("single-attempt.stream", 28.2911, "log", 28.2911, 1, 0, "20261112T004332Z", "fable"),
+    # attempt 2 resumes and its counter carries attempt 1's $59.71: per-attempt maxima sum to
+    # 144.1202. The transcript's cost-state agrees with the log to the cent.
+    ("resume-cumulative.stream", 84.4058, "log", 84.4058, 2, 0, "20261111T123016Z", "fable"),
+    # attempt 2 opens with a zero-turn result repeating the carried $57.68: maxima sum to 140.4572
+    ("resume-zero-turn.stream", 82.7775, "log", 82.7775, 2, 0, "20261101T000045Z", "fable"),
+    # one slice, two sessions: three resumed attempts, then a relaunch 17 minutes after they ended
+    ("relaunch-first.stream", 55.1519, "log", 55.1519, 3, 0, "20261111T200159Z", "fable"),
+    ("relaunch-second.stream", 57.5416, "log", 57.5416, 1, 0, "20261111T221456Z", "fable"),
+    # killed (EXIT=143) before any result event; the transcript's cost-state has the spend
+    ("killed-no-result.stream", 64.3031, "transcript", None, 1, 1, "20261031T210038Z", "fable"),
+    # stopped by a rate limit (429) at $28.84, then resumed outside the wrapper: the log never
+    # sees the later $24.52, the transcript does
+    ("rate-limit-stop.stream", 53.3614, "transcript", 28.8414, 1, 0, "20261101T200032Z", "fable"),
+]
+
+
+def _selftest_real_shapes():
+    import tempfile
+    bad = 0
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "run-cost")
+    transcripts = os.path.join(here, "transcripts")
+    empty = tempfile.mkdtemp(prefix="mr-cost-sum-selftest-")
+    try:
+        for name, cost, source, log_cost, attempts, unpriced, launch, model in _REAL:
+            got = run_of_log(os.path.join(here, name), transcripts)
+            want = {"cost": cost, "source": source, "log_cost": log_cost, "attempts": attempts,
+                    "unpriced": unpriced, "launch": launch, "model": model}
+            diff = {k: (v, got.get(k)) for k, v in want.items() if got.get(k) != v}
+            if diff or not got.get("session_id"):
+                print("FAIL %-32s (want, got) %r session_id=%r" % (name, diff, got.get("session_id")))
+                bad += 1
+            # With no transcript the log stands alone.
+            alone = run_of_log(os.path.join(here, name), empty)
+            if alone["cost"] != log_cost or alone["source"] != ("log" if log_cost is not None else None):
+                print("FAIL %-32s without a transcript: %r" % (name, alone))
+                bad += 1
+        # A priced attempt followed by one killed before its first result, and no transcript:
+        # the cost stands as a lower bound and the open invocation is counted. Composed from
+        # two of the excerpts above.
+        first = open(os.path.join(here, "single-attempt.stream")).read()
+        killed = open(os.path.join(here, "killed-no-result.stream")).read().split("\n", 1)[1]
+        p = os.path.join(empty, "priced-then-killed")
+        with open(p, "w") as f:
+            f.write(first + "ATTEMPT=2 MODEL=fable EFFORT=xhigh TS=2026-11-12T02:10:00Z\n" + killed)
+        got = run_of_log(p, empty)
+        os.unlink(p)
+        if (got["cost"], got["source"], got["attempts"], got["unpriced"]) != (28.2911, "log", 2, 1):
+            print("FAIL priced-then-killed got=%r" % (got,))
+            bad += 1
+        # A launch that resumes the rate-limit-stopped session ($28.8414 at the stop, $53.3614
+        # in its transcript now): the launch's own spend is the difference, from either source.
+        sid = "b4935a17-6de2-4273-aad7-439574365dbf"
+        marker = "ATTEMPT=1 MODEL=fable EFFORT=xhigh REPO=project RESUME=%s PRIOR=28.8414 TS=2026-11-06T01:25:22Z\n" % sid
+        init = '{"type":"system","subtype":"init","session_id":"%s","model":"claude-fable-5-1"}\n' % sid
+        result = '{"type":"result","session_id":"%s","total_cost_usd":53.3614}\n' % sid
+        p = os.path.join(empty, "resumed-session")
+        for body, want in ((init, (24.52, "transcript", None)), (init + result, (24.52, "log", 24.52))):
+            with open(p, "w") as f:
+                f.write(marker + body)
+            got = run_of_log(p, transcripts)
+            if (got["cost"], got["source"], got["log_cost"]) != want or got["session_prior"] != 28.8414:
+                print("FAIL resumed-session want=%r got=%r" % (want, got))
+                bad += 1
+        # The resume failed and the log holds a new session: nothing is subtracted from it.
+        with open(p, "w") as f:
+            f.write(marker + open(os.path.join(here, "single-attempt.stream")).read())
+        got = run_of_log(p, transcripts)
+        os.unlink(p)
+        if got["cost"] != 28.2911 or got["session_prior"] != 0:
+            print("FAIL resume-fell-back got=%r" % (got,))
+            bad += 1
+        missing = run_of_log("/nonexistent/mr-cost-sum/definitely-not-here", empty)
+        if missing["cost"] is not None or missing["attempts"] or missing["launch"]:
+            print("FAIL missing-file-run got=%r" % (missing,))
+            bad += 1
+    finally:
+        os.rmdir(empty)
+    return bad
 
 
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
         sys.exit(selftest())
+    if len(sys.argv) == 3 and sys.argv[1] == "--run":
+        sys.exit(emit_run(sys.argv[2]))
+    if len(sys.argv) == 3 and sys.argv[1] == "--session":
+        _now = transcript_cost(sys.argv[2])
+        sys.stdout.write("-\n" if _now is None else "%.4f\n" % _now)
+        sys.exit(0)
     if len(sys.argv) != 2:
         sys.stdout.write("-\n")
         sys.exit(0)

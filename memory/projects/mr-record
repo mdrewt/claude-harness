@@ -1,7 +1,13 @@
 #!/bin/bash
 # mr-record — validated writes to ledger/handoff/queue. Subcommands:
-#   ledger      --run_id X --slice S --outcome O [--cost N|--from-log LOG] [--model M] [--attempts N]
+#   ledger      --run_id X --slice S --outcome O [--cost N] [--model M] [--attempts N]
 #               [--orch A] [--gating G] [--ci V] [--notes "..."]   (ts auto-UTC; refuses empty slice/outcome; validates JSON)
+#   ledger      --slice S --outcome O --from-log LOG [--model M] [--ci V] [--notes "..."]
+#               The cost row of ONE build session: run_id `run-<slice>-<launch stamp>`, cost,
+#               attempts and model are read from its pass log, and a session that already has
+#               its row is skipped (`ledger-skip:`, rc 0); spend it made after that row goes
+#               in as a `CORRECTION(late spend)` row, here and when the slice's MERGED row is
+#               written. See the --from-log block and top_up below.
 #   handoff     --title T (--body "..." | --body-file F)
 #               Auto-rotates the live file once it exceeds ~40KB (lp-handoff-rotate) — see the
 #               ENTRY_RE/rotate_handoff block below for the algorithm.
@@ -453,61 +459,119 @@ if model and not re.match(r"^(claude-(opus|sonnet|haiku|fable)[-a-z0-9.]*|opus|s
     die("model fails validation: "+model)
 cost=a.get("cost")
 notes=a.get("notes","")
-# C1 guard: if a wrapper-reconcile row already captured this slice's cost (<48h), refuse to double-count
-def wrapper_cost_exists(sl):
-    import time as _t
+# ================================ session cost rows (--from-log) =================================
+# `--from-log LOG` makes this row THE cost row of the build session whose pass log LOG is. The
+# row's run_id is derived from the log (the launch stamp mr-launch.sh writes on its ATTEMPT=1
+# line), so it names the session rather than the caller: a slice that is relaunched or resumed
+# gets one row per session, and the same session offered twice (the tick's reconcile, mr-spawn
+# at relaunch, a retry after a timeout) is written once. Cost, attempts and model come from
+# mr-cost-sum, which reports the session's own spend from a counter that is cumulative across
+# `--resume`, and falls back on the session transcript when the log reports less.
+run_log=a.get("from-log")
+run=None
+# The helper beside the copy being run, so a worktree's mr-record reads with its own reader.
+# Invoked via sys.executable so a lost exec bit, ENOEXEC or an asdf shim cannot take out a
+# cron-critical path.
+helper=next((c for c in (os.path.join(os.environ.get("MEM_SELF") or MEM,"mr-cost-sum"), MEM+"/mr-cost-sum")
+             if os.path.exists(c)), MEM+"/mr-cost-sum")
+_SESSION=re.compile(r"\bsession=([0-9a-fA-F-]{8,64})")
+def top_up(fresh=None):
+    """Append the spend a session of this slice made after its cost row was written. A session
+    resumed outside the wrapper (after a crash or a rate-limit stop) keeps spending on the same
+    CLI session id, and only its transcript sees it. For each session id named by this slice's
+    rows, the amount by which the session's cost exceeds what those rows already carry goes in
+    as one `CORRECTION(late spend)` row under the session's run_id, so the rows of a run_id sum
+    to the session's spend and a repeat adds nothing. `fresh` maps session id -> cost just read
+    and limits the pass to those sessions; without it every session of the slice is read from
+    its transcript. Returns the rows appended. Never raises."""
+    added=[]
     try:
-        rows=open(LEDGER).readlines()[-300:]
-        for l in rows:
-            try: d=json.loads(l)
-            except Exception: continue
-            if d.get("slice")==sl and d.get("run_id")=="wrapper-reconcile" and d.get("cost_usd"):
-                e=datetime.datetime.strptime(str(d.get("ts",""))[:19],"%Y-%m-%dT%H:%M:%S").timestamp()
-                if _t.time()-e < 48*3600: return True
-    except Exception: pass
-    return False
-if a.get("from-log") and a.get("run_id")!="wrapper-reconcile" and wrapper_cost_exists(slice_):
-    a.pop("from-log",None)
-    if cost not in (None,"","null"):
-        notes=(notes+" | " if notes else "")+"cost omitted: already captured by wrapper-reconcile row"
-        cost=None
-if (cost in (None,"","null")) and a.get("from-log") and os.path.exists(a["from-log"]):
-    # Cost comes from the mr-cost-sum SSOT. `total_cost_usd` is CUMULATIVE for the emitting
-    # session's accumulation run, so the naive sum this replaced overcounted every multi-attempt
-    # run (uxd2 recorded $423.65 against a true $165.65) and inflated the governor's d7 by 37%.
-    # Invoked via sys.executable rather than the shebang so exec-bit / ENOEXEC / asdf-shim
-    # breakage cannot take out a cron-critical path.
-    out=None
+        with open(LEDGER,"a+") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            f.seek(0)
+            have={}; rid={}
+            for l in f:
+                if "session=" not in l: continue
+                try: d=json.loads(l)
+                except Exception: continue
+                if not isinstance(d,dict) or d.get("slice")!=slice_: continue
+                m=_SESSION.search(str(d.get("notes") or ""))
+                if not m or (fresh is not None and m.group(1) not in fresh): continue
+                try: c=float(d.get("cost_usd") or 0)
+                except (TypeError,ValueError): c=0.0
+                have[m.group(1)]=have.get(m.group(1),0.0)+c
+                rid.setdefault(m.group(1), d.get("run_id","n/a"))
+            for sid in have:
+                now=(fresh or {}).get(sid)
+                if now is None:
+                    try:
+                        r=subprocess.run([sys.executable, helper, "--session", sid], capture_output=True, text=True, timeout=30)
+                        now=float(r.stdout.strip())
+                    except Exception: continue
+                delta=round(float(now)-have[sid],4)
+                if not delta>=0.005: continue      # also false for NaN
+                extra={"ts":ts,"run_id":rid[sid],"slice":slice_,"outcome":"CORRECTION(late spend)","cost_usd":delta,
+                       "model":"n/a","attempts":0,"orchestration_audit":"","gating_test_audit":"",
+                       "remote_red_fix_cycles":0,"consecutive_standdowns":0,"master_ci_after":"",
+                       "notes":"session=%s | spent after the session's cost row was written; the session total is $%.4f"%(sid,float(now))}
+                f.write(json.dumps(extra)+"\n")
+                added.append(extra)
+    except Exception as exc:
+        sys.stderr.write("WARN top-up: %s: %s\n"%(type(exc).__name__,exc))
+    for extra in added: print("ledger-topup: %s +$%.4f"%(extra["run_id"],extra["cost_usd"]))
+    return added
+if run_log:
+    if a.get("run_id"): die("--from-log derives the session's run_id from the log; drop --run_id")
+    if cost not in (None,"","null"): die("--from-log reads the cost from the log; drop --cost")
     try:
-        r=subprocess.run([sys.executable, MEM+"/mr-cost-sum", a["from-log"]],
-                         capture_output=True, text=True, timeout=60)
-        if r.returncode==0: out=r.stdout.strip()
-    except Exception: out=None
-    if out and out!="-":
-        try: cost=round(float(out),4)
-        except ValueError: out=None
-    # NOTE the empty-string case is deliberately grouped with None: a truncated/zero-byte helper
-    # exits 0 with NO stdout, and treating that as "-" would record COST-UNKNOWN, which
-    # mr-situation counts as $0 and would let the loop overspend unseen. Only a literal "-"
-    # (helper ran and found no result events) means genuine COST-UNKNOWN.
-    if out is None or out=="":
-        # Helper unavailable/unusable -> fall back to the naive sum, which OVERCOUNTS. That is
-        # deliberately the safe direction: an overcount trips SOFT-PAUSE early, whereas leaving
-        # cost None counts as $0 in mr-situation:81 and would let the loop overspend unseen.
-        # ("-" is NOT this case — it means zero result events, i.e. genuine COST-UNKNOWN.)
+        r=subprocess.run([sys.executable, helper, "--run", run_log], capture_output=True, text=True, timeout=60)
+        run=json.loads(r.stdout) if r.returncode==0 else None
+        if not isinstance(run,dict) or "cost" not in run: run=None
+    except Exception: run=None
+    stamp=(run or {}).get("launch")
+    # No stamp (the log is gone, was never written, or the helper is unusable): the session cannot
+    # be told from another, so the row gets an id of its own and is always written.
+    a["run_id"]="run-%s-%s"%(slice_, stamp or "unstamped-"+re.sub(r"[-:]","",ts))
+    def why(text): return (notes+" | " if notes else "")+text
+    if run is None and os.path.exists(run_log):
+        # Helper unavailable -> the naive sum of result events, which OVERCOUNTS a multi-result
+        # run. That is the safe direction: an overcount trips SOFT-PAUSE early, whereas an
+        # unknown cost counts as $0 in mr-situation and would let the loop overspend unseen.
         tot=0.0; found=False
-        for line in open(a["from-log"], errors="replace"):
+        for line in open(run_log, errors="replace"):
             if '"type":"result"' in line:
                 try:
-                    o=json.loads(line); c=o.get("total_cost_usd")
+                    c=json.loads(line).get("total_cost_usd")
                     if c is not None: tot+=float(c); found=True
                 except Exception: pass
         if found:
             cost=round(tot,4)
-            notes=(notes+" | " if notes else "")+"COST-FALLBACK-NAIVE (mr-cost-sum unavailable; may overcount multi-attempt runs)"
+            notes=why("COST-FALLBACK-NAIVE (mr-cost-sum unavailable; overcounts a run with several result events)")
+        else:
+            notes=why("COST-UNKNOWN (mr-cost-sum unavailable and the log holds no result event)")
+    elif run is None or not os.path.exists(run_log):
+        notes=why("COST-UNKNOWN (pass log missing: %s)"%run_log)
+    else:
+        n,k=int(run.get("attempts") or 0),int(run.get("unpriced") or 0)
+        if run.get("cost") is not None:
+            cost=run["cost"]
+            if run.get("source")=="transcript":
+                lc=run.get("log_cost")
+                notes=why("cost from the session transcript's cost-state (log: %s)"%("no result event" if lc is None else "$%.4f"%lc))
+            elif k: notes=why("COST-PARTIAL (%d of %d attempts ended without a result event and the transcript adds nothing; cost is a lower bound)"%(k,n))
+        else:
+            notes=why("COST-UNKNOWN (no result event in the log and no cost-state in the session transcript; %d of %d attempts ended before reporting)"%(k,n))
+        if not a.get("attempts"): a["attempts"]=n
+        if not model and run.get("model"):
+            m=str(run["model"])
+            model="escalated:%s-to-fable"%m if run.get("escalated") else m
+            if not re.match(r"^(opus|sonnet|haiku|fable|escalated:(opus|sonnet|haiku|fable)-to-fable)$", model): model=""
+        if run.get("session_id"): notes=why("session=%s"%run["session_id"])
 if cost in (None,"","null"):
     cost=None
-    notes=(notes+" | " if notes else "")+"COST-UNKNOWN (no result event; true spend unrecorded)"
+    # A SUPERVISOR row is the tick's own cost row, so a missing cost there is a gap worth naming.
+    # Every other row without --from-log carries no cost by design and says nothing about it.
+    if slice_=="SUPERVISOR": notes=(notes+" | " if notes else "")+"COST-UNKNOWN (the tick's log holds no result event)"
 else:
     try: cost=float(cost)
     except ValueError: die("cost not a number")
@@ -572,8 +636,32 @@ row={"ts":ts,"run_id":a.get("run_id","n/a"),"slice":slice_,"outcome":outcome,"co
 line=json.dumps(row)
 json.loads(line)  # verify parse
 if not row["ts"]: die("empty ts")
-with open(LEDGER,"a") as f: f.write(line+"\n")
+recorded=False
+with open(LEDGER,"a+") as f:
+    if run_log:
+        # Check and append under one lock: two ticks reconcile concurrently, and mr-spawn records
+        # the outgoing session of a relaunch while a tick may be doing the same.
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        for l in f:
+            if row["run_id"] not in l: continue
+            try: d=json.loads(l)
+            except Exception: continue
+            if d.get("run_id")==row["run_id"] and d.get("slice")==slice_: recorded=True; break
+    if not recorded: f.write(line+"\n")
+if recorded:
+    # The session has its row; what it has spent since goes in beside it.
+    sid=(run or {}).get("session_id")
+    # top_up compares a session TOTAL with the session's rows; a launch that resumed the session
+    # reports its own share, so what the session had spent before that launch is added back.
+    late=top_up({sid: float(cost)+float((run or {}).get("session_prior") or 0)}) if sid and cost is not None else []
+    print("ledger-skip: %s already has its cost row"%row["run_id"])
+    if late: _backup(LEDGER)
+    sys.exit(0)
 print("ledger-appended: "+line[:160])
+# A MERGED row closes the slice, so it is the last point at which a session's late spend is read:
+# every session of the slice is compared with its transcript once more.
+if closing and outcome.strip().upper().startswith("MERGED"): top_up()
 # lp-06: the row is appended, the handle is closed and the append is REPORTED before mr-backup is
 # named -- see the trigger's header for why that ordering is the row-never-lost proof.
 _backup(LEDGER)

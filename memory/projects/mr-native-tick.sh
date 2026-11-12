@@ -15,6 +15,25 @@ SRC=${MR_EVENT_SRC:-cron}
 EVFILE="${1:-}"
 TS(){ date -u +%Y-%m-%dT%H:%M:%SZ; }
 log(){ echo "$(TS) pid=$$ src=$SRC $*" >> "$LOG"; }
+# held_field LINES — reads the `held=` field of a session's DECISION line: the candidates that were
+# ready and not launched, each with the reason. Prints `n=<count> <field>` for a well-formed field,
+# `invalid=<field>` for a malformed one, and nothing when the line carries none. A session writes
+# ONE DECISION line; given several, only one could be read and the held entries on the others
+# would go uncounted, so that prints `invalid=decision-lines:<n>`. Grammar:
+# held=<slice>:<why>[,<slice>:<why>...], <why> one of overlap|structural|after|cap|budget|memory|
+# quiet — the rules that may hold a ready candidate. A hold names its rule, so a missing reason or
+# one outside the set (a judgment) prints as invalid instead of being counted as a rule.
+held_field(){
+  local f n id='[A-Za-z0-9][A-Za-z0-9._-]*' why='(overlap|structural|after|cap|budget|memory|quiet)'
+  n=$(printf '%s\n' "$1" | grep -c .)
+  if [ "$n" -gt 1 ]; then printf 'invalid=decision-lines:%s' "$n"; return 0; fi
+  case "$1" in *" held="*) f=${1##* held=}; f=${f%% *} ;; *) return 0 ;; esac
+  if printf '%s' "$f" | grep -qE "^$id:$why(,$id:$why)*$"; then
+    printf 'n=%s %s' "$(printf '%s' "$f" | tr ',' '\n' | grep -c .)" "$f"
+  else
+    printf 'invalid=%s' "$f"
+  fi
+}
 if [ -f "$LOG" ] && [ "$(stat -c %s "$LOG")" -gt 1000000 ]; then mv "$LOG" "$LOG.1"; fi
 
 # tick-alive marker — always bumped when the tick body runs (pure cron/loop liveness)
@@ -29,47 +48,44 @@ if [ "${_hb_fail:-0}" -le "${_hb_ok:-0}" ]; then date -u +%s > "$MEM/.native-sup
 # and the local stack are deliberately RETAINED for manual/experimental use — its consumers still degrade
 # on OLLAMA-UNAVAILABLE. Rollback: restore from git history if a real per-tick consumer ever appears.)
 
-# RECONCILE (accounting; runs even when disabled/over-budget): backfill ledger for finished runs
+# CREDIT STOP (runs on every tick, above every gate): a build session that ended on a `rejected`
+# rate_limit_event has had its credit refused until the event's resetsAt — the short window or the
+# weekly cap alike. `mr-interrupted scan` records that slice and every live slice on a model the
+# rejection covers (tier, model, effort, CLI session, launch vars) and sets their cooperative stop
+# flags; this block arms the reset tick it asks for (`watch=`). It sits above every gate because
+# the record has to exist whichever gate ends this tick: the gates below read it (CGATE, asked
+# for the supervisor's own model — a stop that covers only another model does not stand the tick
+# down), the situation bundle carries it as `interrupted[]`, and the first tick after the reset
+# resumes from it. Under the operator hold the tool itself only records (`HELD ...`): it sets no
+# flag, asks for no watcher and offers nothing, so this block does nothing either; the first scan
+# without the hold asks for the watcher such a slice still needs (`WATCH watch=`).
+CS=$(timeout 60 "$MEM/mr-interrupted" scan 2>/dev/null)
+CGATE=$(timeout 60 "$MEM/mr-interrupted" gate --model "$SUP_MODEL" 2>/dev/null)
+CS_NEW=0
+case "$CS" in
+  "STOP "*)
+    CS_NEW=1; log "CREDIT-$CS gate=${CGATE:-none}" ;;
+  "WATCH "*) log "CREDIT-STOP-$CS (recorded under the operator hold; reset tick armed)" ;;
+  "HELD "*) log "CREDIT-STOP-RECORDED ${CS#HELD } (operator hold: no stop flag, no reset tick)" ;;
+esac
+case "$CS" in *" watch="*) CSW=${CS##* watch=}; setsid /bin/bash "$MEM/mr-reset-watch" "${CSW%% *}" >/dev/null 2>&1 & ;; esac
+
+# RECONCILE (accounting; runs even when disabled/over-budget): one cost row per ended build session.
+# `mr-record ledger --from-log` owns the row: it names the session by the launch stamp in its pass
+# log, reads the session's own spend, and skips a session that already has its row. So nothing here
+# reasons about whether a row exists: a relaunch or resume of the same slice is a different session
+# and gets its own row, and offering a session twice is harmless. `.done.recorded` only saves the
+# call on later ticks; mr-spawn removes it with `.done` when it relaunches the slice.
 for DF in /tmp/mr_pass_*.done; do
   [ -e "$DF" ] || continue
   [ -e "$DF.recorded" ] && continue
   SL=$(basename "$DF"); SL=${SL#mr_pass_}; SL=${SL%.done}
-  # age cap: never blind-backfill ancient done files
-  DAGE=$(( $(date +%s) - $(stat -c %Y "$DF" 2>/dev/null || echo 0) ))
-  [ "$DAGE" -gt 604800 ] && { touch "$DF.recorded"; continue; }
-  # skip if the ledger already carries a cost-bearing row for this slice near/after the done time
-  ALREADY=$(DF="$DF" SL="$SL" /usr/bin/python3 - <<'PYCHK'
-import json, os, datetime
-sl=os.environ["SL"]; dm=os.path.getmtime(os.environ["DF"])
-hit="NO"
-try:
-    for l in open("/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/monster-realm-usage-ledger.jsonl"):
-        try: d=json.loads(l)
-        except Exception: continue
-        if d.get("slice")!=sl or not d.get("cost_usd"): continue
-        # reversal rows are accounting, not evidence that a run was recorded — without this a
-        # CORRECTION row would make any rerun of the same slice within 12h look already-backfilled
-        # and its real cost would be silently dropped (2026-08-01 cost-correction pass)
-        if str(d.get("outcome","")).upper().startswith("CORRECTION"): continue
-        try: e=datetime.datetime.strptime(str(d.get("ts",""))[:19],"%Y-%m-%dT%H:%M:%S").timestamp()
-        except Exception: continue
-        if e >= dm - 12*3600: hit="YES"; break
-except Exception: hit="ERR"
-print(hit)
-PYCHK
-)
-  [ "$ALREADY" = "YES" ] && { touch "$DF.recorded"; continue; }
   RLOG="/tmp/mr_pass_$SL.log"
-  MDL=$(/usr/bin/python3 -c "import json;print(json.load(open('$MEM/.harness-runner.$SL.lock')).get('model','n/a'))" 2>/dev/null || echo "n/a")
-  grep -q "^ESCALATED" "$RLOG" 2>/dev/null && MDL="escalated:${MDL}-to-fable"
-  # lp-02: `--ci not-applicable` because this is a PRE-MERGE row — "master CI after this slice" is
-  # not yet a defined property, and leaving it empty is 65.8% of the measured master_ci_after hole.
-  # `timeout 60` guards the reconcile write: the heartbeats at :21/:25 are already fresh and the
-  # flock is ~180 lines below, so a stall here leaves the loop looking alive while nothing
-  # progresses. Precedent: the handoff write below.
-  timeout 60 "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
-    --ci not-applicable \
-    --model "$MDL" --from-log "$RLOG" --notes "mechanical backfill by tick v3 reconcile" >> "$LOG" 2>&1 && touch "$DF.recorded"
+  # `--ci not-applicable`: this is a PRE-MERGE row, where "master CI after this slice" is not a
+  # defined property. `timeout 60` bounds the write: the heartbeats above are already fresh and
+  # the flock is far below, so a stall here leaves the loop looking alive while nothing progresses.
+  timeout 60 "$MEM/mr-record" ledger --slice "$SL" --outcome "FINISHED($(cat "$DF" 2>/dev/null | head -c 40))" \
+    --ci not-applicable --from-log "$RLOG" --notes "tick reconcile" >> "$LOG" 2>&1 && touch "$DF.recorded"
   # P3 durability (2026-07-26): persist the run census into the pending done-event so forensics survive /tmp loss
   EVF="$MEM/pending-events/$SL.done.md"
   if [ -f "$EVF" ] && [ -f "$RLOG" ]; then
@@ -79,9 +95,8 @@ PYCHK
       echo "cost: recorded in the ledger FINISHED row"
     } >> "$EVF" 2>/dev/null || true
   fi
-  # single-run spend alert (visibility only, never a gate): flag unusually expensive runs same-hour
-  # cost via the mr-cost-sum SSOT — total_cost_usd is CUMULATIVE per accumulation run, so the
-  # naive sum this replaced overcounted multi-attempt runs (uxd2 $423.65 vs a true $165.65)
+  # single-run spend alert (visibility only, never a gate): flag unusually expensive runs same-hour.
+  # Cost via the mr-cost-sum SSOT, the same figure the ledger row carries.
   RCOST=$("$MEM/mr-cost-sum" "$RLOG" 2>/dev/null)
   # "-" is a legitimate COST-UNKNOWN (no result events). EMPTY means the helper itself failed
   # (missing, non-executable, truncated) — degrade LOUDLY, because silently substituting 0 would
@@ -95,7 +110,9 @@ PYCHK
   fi
 done
 
-# RECONCILE part 2: dead-pid locks with no .done (SIGKILL/reboot class) -> CRASHED row, cost unknown
+# RECONCILE part 2: dead-pid locks with no .done (SIGKILL/reboot class) -> CRASHED row. The same
+# writer, so a killed session's row carries whatever its log does report and says why the rest is
+# unknown. The mark saves the call on later ticks while the dead lock stays on disk.
 for LK in "$MEM"/.harness-runner.*.lock; do
   [ -e "$LK" ] || continue
   SL=$(basename "$LK"); SL=${SL#.harness-runner.}; SL=${SL%.lock}
@@ -105,10 +122,8 @@ for LK in "$MEM"/.harness-runner.*.lock; do
   SUTC=$(/usr/bin/python3 -c "import json;print(json.load(open('$LK')).get('started_utc','x'))" 2>/dev/null | tr -dc 'A-Za-z0-9')
   MARK="/tmp/mr_crash_rec_${SL}_${SUTC}"
   [ -e "$MARK" ] && continue
-  # lp-02: same pre-merge `--ci not-applicable` and same `timeout 60` bound as the FINISHED write.
-  timeout 60 "$MEM/mr-record" ledger --run_id "wrapper-reconcile" --slice "$SL" --outcome "CRASHED(no-done, dead leader $PIDL)" \
-    --ci not-applicable \
-    --from-log "/tmp/mr_pass_$SL.log" --notes "dead-pid lock reconcile; verify true spend" >> "$LOG" 2>&1 && touch "$MARK"
+  timeout 60 "$MEM/mr-record" ledger --slice "$SL" --outcome "CRASHED(no-done, dead leader $PIDL)" \
+    --ci not-applicable --from-log "/tmp/mr_pass_$SL.log" --notes "dead-pid lock reconcile" >> "$LOG" 2>&1 && touch "$MARK"
 done
 
 # gate -1: kill-switch (MR_FORCE=1 overrides the pause for on-demand manual runs)
@@ -216,7 +231,8 @@ if [ -d "$ARCH" ] && { [ ! -f "$ARCH/.last-rollup" ] || [ $(( $(date +%s) - $(st
   touch "$ARCH/.last-rollup" 2>/dev/null || true
 fi
 
-if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ]; then
+# A due credit-stop resume (CGATE) is not what the marker waits on, so it passes like an event tick.
+if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ] && [ "${CGATE#DUE }" = "${CGATE:-}" ]; then
   WAKE=$(grep -m1 -oE "wake_file=[^ ]+" "$MEM/.blocked-on-human" 2>/dev/null | cut -d= -f2)
   MAGE=$(( $(date +%s) - $(stat -c %Y "$MEM/.blocked-on-human" 2>/dev/null || echo 0) ))
   if [ -n "$WAKE" ] && [ -e "$WAKE" ]; then
@@ -306,7 +322,7 @@ for LS in $LIVE_BARE; do
     *) log "RATE-LIMIT-TELEMETRY slice=$LS ${TEL:-no-output}" ;;
   esac
 done
-if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ] && [ -z "$PENDING" ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
+if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ] && [ -z "$PENDING" ] && [ "${CGATE#DUE }" = "${CGATE:-}" ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
 
 # gate 2: rate-limit reset-time from mr-state.json
 # (ACCEPTED DUPLICATION: mr-situation also surfaces rate_limit_resets_at as data; THIS gate is the sole
@@ -332,6 +348,10 @@ except Exception as e:
 PY
 )
 case "$RLGATE" in BLOCKED_UNTIL_*) log "STANDDOWN rate-limit $RLGATE"; exit 0;; esac
+# The same gate for a credit stop mr-interrupted recorded: no decision session while a stop that
+# covers the supervisor's model waits for its reset. The tick that records the stop goes on
+# (CS_NEW), so one session parks the stopped slices while their state is fresh.
+if [ "$CS_NEW" = 0 ]; then case "$CGATE" in BLOCKED_UNTIL_*) log "STANDDOWN credit-stop $CGATE"; exit 0;; esac; fi
 
 # gate 3: human-activity probe
 IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
@@ -388,13 +408,26 @@ SIT=$("$MEM/mr-situation" 2>/dev/null || echo '{"error":"situation-unavailable"}
 GSTATE=$(echo "$SIT" | /usr/bin/python3 -c "import json,sys
 try: print(json.load(sys.stdin).get('budget',{}).get('state','UNKNOWN'))
 except Exception: print('UNKNOWN')")
-if [ "$GSTATE" = "HARD-STOP" ]; then log "STANDDOWN budget-hard-stop (>97% of weekly); pending events retained"; exit 0; fi
+# HARD-STOP stops decision sessions, not runs: a live run finishes and its event waits here. The
+# figure falls back under the threshold when the weekly window rolls over, so a reset tick is armed
+# for that moment (one watcher per time; re-armed here every tick if it died).
+if [ "$GSTATE" = "HARD-STOP" ]; then
+  WEND=$(echo "$SIT" | /usr/bin/python3 -c "import json,sys
+try: print(json.load(sys.stdin).get('budget',{}).get('window_end_utc') or '')
+except Exception: print('')")
+  [ -n "$WEND" ] && { setsid /bin/bash "$MEM/mr-reset-watch" "$WEND" >/dev/null 2>&1 & }
+  log "STANDDOWN budget-hard-stop (>97% of weekly; window ends ${WEND:-unknown}); pending events retained"; exit 0
+fi
+# CREDIT-STOP RESUME: every recorded slice whose reset has passed gets its launch vars written
+# back (same tier, model, effort and CLI session) before the session starts, and the session is
+# told their names: resuming them is this tick's action, and all it has left to do is mr-spawn.
+RESUME_FIRST=$(timeout 60 "$MEM/mr-interrupted" vars --due 2>/dev/null)
 
 # assemble prompt (SSOT + situation + pending events + event arg)
 RID="native-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 PROMPTF="/tmp/mr_tick_prompt_$RID.md"
 cat "$MEM/mr-supervisor-prompt-native.md" > "$PROMPTF"
-{ echo; echo "## TICK PROVENANCE"; echo "src=$SRC forced=${MR_FORCE:-0} invoked_at=$(TS) rid=$RID"; } >> "$PROMPTF"
+{ echo; echo "## TICK PROVENANCE"; echo "src=$SRC forced=${MR_FORCE:-0} invoked_at=$(TS) rid=$RID${RESUME_FIRST:+ resume_first=$RESUME_FIRST}"; } >> "$PROMPTF"
 { echo; echo "## LIVE SITUATION (HINTS-ONLY — mechanically generated; re-verify anything you are about to mutate; governor state: $GSTATE$([ "$GSTATE" = UNKNOWN ] && echo ' — BUDGET UNCOMPUTABLE, flag this as a BLOCKER in your records'))"; echo '```json'; echo "$SIT"; echo '```'; } >> "$PROMPTF"
 CONSUMED=""
 for EV in "$MEM"/pending-events/*.md; do
@@ -411,6 +444,7 @@ if [ "${MR_TICK_DRYRUN:-0}" = "1" ]; then
   echo "DECISION-NEEDED (dryrun) prompt=$PROMPTF"; exit 0
 fi
 log "SPAWN model=$SUP_MODEL effort=$SUP_EFFORT governor=$GSTATE rid=$RID tlog=$TLOG events=$(echo $CONSUMED | wc -w)"
+LOGPOS=$(stat -c %s "$LOG" 2>/dev/null || echo 0)   # the session's own DECISION line lands after this offset
 cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
 # Mutex hygiene (2026-11-06): the LLM tick takes the chain-owner mutex under THIS wrapper's pid (the
 # prompt tells it to pass the `mr-native-tick.sh` pid), and `mr-unlock mutex` refuses a live owner,
@@ -461,9 +495,8 @@ env -u MR_FORCE -u MR_SLICE -u MR_EVENT_SRC "${OPTOK[@]}" timeout 5400 claude --
   --output-format stream-json --verbose \
   -p "$(cat "$PROMPTF")" >> "$TLOG" 2>&1
 RC=$?
-# cost via the mr-cost-sum SSOT (third and last copy of the old naive sum — see mr-cost-sum's
-# header). A tick is a single `claude -p` invocation so this site was never miscounted in
-# practice; it calls the helper so the buggy loop exists nowhere in the tree.
+# The tick's own spend, read by mr-cost-sum like every other cost in the ledger: a log's
+# `total_cost_usd` is cumulative and repeats across result events, so no call site adds it up.
 COST=$("$MEM/mr-cost-sum" "$TLOG" 2>/dev/null)
 [ -z "$COST" ] && log "COST-HELPER-FAILED mr-cost-sum produced no output for tick $RID — SUPERVISOR row will record COST-UNKNOWN"
 COST=${COST:--}
@@ -472,6 +505,24 @@ TICKMODEL=${TICKMODEL:--}
 [ "$COST" = "-" ] && COST=""
 [ "$TICKMODEL" = "-" ] && TICKMODEL="$SUP_MODEL"
 log "SPAWN-DONE rc=$RC cost=${COST:-unknown} model=$TICKMODEL rid=$RID"
+# CREDIT-STOP OFFER NOT TAKEN: this line is reached only after a decision session was started —
+# every wrapper stand-down above (hold, live chain, rate limit, credit stop, chain mutex,
+# HARD-STOP) and the dry run exit before it — and RC=0 says the session ran to its end instead
+# of being refused, timed out or logged out. A session that itself stood down (its DECISION line
+# opens with a stand-down: human activity, a racing tick, a live run) passed nothing over, so it is not counted. A
+# slice named in this tick's resume_first that is still offered and due after any other session
+# (not launched, not dropped, no failed resume counted) was paid for and passed over;
+# `mr-interrupted ignored` counts that, and caps the slice when it keeps happening, so it cannot
+# make every hourly tick a paid session.
+DECLINES=$(tail -c "+$((LOGPOS+1))" "$LOG" 2>/dev/null | grep -a ' DECISION ')
+if [ "$RC" -eq 0 ] && [ -n "$RESUME_FIRST" ] && ! printf '%s\n' "$DECLINES" | grep -qiE ' DECISION stand-?down'; then
+  IGN=$(timeout 60 "$MEM/mr-interrupted" ignored "$RESUME_FIRST" 2>/dev/null)
+  case "$IGN" in "IGNORED "*) log "CREDIT-RESUME-$IGN rid=$RID" ;; esac
+fi
+# One HELD line per tick whose DECISION names held candidates (or names them malformed), keyed by
+# this wrapper's rid so it joins to the SPAWN lines around it.
+HELD=$(held_field "$DECLINES")
+[ -n "$HELD" ] && log "HELD rid=$RID $HELD"
 CEN=$(grep -o '"subagent_type":"[a-z-]*"' "$TLOG" 2>/dev/null | sort | uniq -c | awk '{printf "%s=%s ",$2,$1}' | tr -d '"' | sed 's/subagent_type=//g; s/subagent_type://g')
 # NOTE: `grep -c` prints 0 AND exits 1 on no match, so the old `|| echo 0` appended a SECOND
 # line and CEN2 became the two-line string "0\n0" — log() echoes it unquoted-expanded, which put
@@ -584,7 +635,8 @@ print("ARMED %s" % iso)
 PYRL
 )
   case "$ARMED" in
-    ARMED*)   log "RATE-LIMIT-GATE $ARMED — gate 2 will stand down (free) until then" ;;
+    ARMED*)   log "RATE-LIMIT-GATE $ARMED — gate 2 will stand down (free) until then"
+              setsid /bin/bash "$MEM/mr-reset-watch" "${ARMED#ARMED }" >/dev/null 2>&1 & ;;
     SKIPPED*) log "RATE-LIMIT-GATE-SKIPPED $ARMED" ;;
   esac
   if [ "${MR_NO_TOAST:-0}" != "1" ] && echo "$REASON" | grep -qiE "not logged in|/login"; then

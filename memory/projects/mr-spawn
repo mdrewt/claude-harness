@@ -1,6 +1,8 @@
 #!/bin/bash
 # mr-spawn <slice> [--dry] — build brief + lock + detached launch + asserts, from /tmp/mr_pass_<slice>.vars.json
-# vars.json: {slice, model, effort, touches, target_desc, resume_block, tier}
+# vars.json: {slice, model, effort, touches, target_desc, resume_block, tier[, resume_session]}
+# resume_session (a CLI session id; mr-interrupted writes it for a slice a credit stop interrupted)
+# makes the launcher continue that session instead of starting a new one from the brief.
 # Kills a failed first attempt BY RECORDED PID before its single retry. Prints one status JSON line.
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
@@ -841,7 +843,20 @@ esac
 S="${1:?usage: mr-spawn <slice> [--dry]}"; DRY="${2:-}"
 V="/tmp/mr_pass_$S.vars.json"; B="/tmp/mr_pass_$S.md"
 emit(){ SLICE="$S" ST="$1" DET="$2" /usr/bin/python3 -c "import json,os;print(json.dumps({'slice':os.environ['SLICE'],'status':os.environ['ST'],'detail':' '.join(os.environ['DET'].split())[:600]}))"; }
-status(){ emit "$1" "$2"; exit "${3:-0}"; }
+# A refusal to launch a slice mr-interrupted offered for a credit-stop resume is one failed resume
+# when its cause does not clear by itself: the tool counts it, so a slice that cannot be launched
+# stops being offered. Counted: FAIL, REPO-MIXED, REPO-EXTERNAL, REPO-UNRESOLVED,
+# REPO-OUT-OF-SYNC, COSTPARK-GATE, a brief that does not render. Exempt (listed below): the
+# launch happened or was a dry probe; the operator hold; a human at work; the slice already
+# running; a credit stop still waiting. Each exempt cause also keeps the slice from being `due`
+# or stands the tick down before a session is paid for, so none of them recurs as a paid tick.
+status(){
+  emit "$1" "$2"
+  case "$1" in LAUNCHED|DRY|HOLD-PRESENT|PROBE-TRIPPED|ALREADY-RUNNING|CREDIT-STOPPED) : ;;
+    *) timeout 60 "$MEM/mr-interrupted" failed "$S" "$1" >/dev/null 2>&1 || true ;;
+  esac
+  exit "${3:-0}"
+}
 fail_evidence(){ printf 'kind=%s seen=%s log_tail=%s err_tail=%s' "${LAST_FAIL_KIND:-?}" "${LAST_SEEN_MODEL:-none}" "$(tail -n 5 "/tmp/mr_pass_$S.log" 2>/dev/null | tr '\n' ' ' | head -c 200)" "$(tail -n 5 "/tmp/mr_pass_$S.err" 2>/dev/null | tr '\n' ' ' | head -c 200)"; }
 [ -r "$V" ] || status FAIL "vars.json missing: $V" 1
 # lp-09: no launch while ANY hold is present — EXCEPT an explicit operator run
@@ -854,6 +869,13 @@ if [ -f "$MEM/.native-supervisor-disabled" ]; then
   else
     status HOLD-PRESENT "$("$MEM/mr-hold" status 2>/dev/null || echo 'hold present') — refusing to launch"
   fi
+fi
+# ALREADY RUNNING: a lock that names a live session_leader is a run of this slice in progress. A
+# second launch would put two sessions in one worktree and rotate the first one's log from under
+# it. A relaunch finds the leader dead; the in-run retry below happens before any lock is written.
+LIVE_LEADER=$(/usr/bin/python3 -c "import json,sys;print(int(json.load(open(sys.argv[1])).get('session_leader') or 0) or '')" "$MEM/.harness-runner.$S.lock" 2>/dev/null)
+if [ -n "$LIVE_LEADER" ] && kill -0 "$LIVE_LEADER" 2>/dev/null; then
+  status ALREADY-RUNNING "slice $S is running: its lock names live session_leader pid $LIVE_LEADER — refusing a second launch" 1
 fi
 # lp-00 repo routing — cheapest gate first, before the probe and before any launch cost.
 # mr-repo-of is the SSOT (mr-launch.sh reads the same verdict via the lock), so the rule cannot
@@ -1005,10 +1027,18 @@ else
 fi
 # build brief — ONE render path (build_brief, above), shared with --render-brief so the selftest
 # exercises the same bytes this line writes.
-build_brief "$TOUCHES_RAW" "$MEM/mr-brief-template.md" "$B" || exit 1
+build_brief "$TOUCHES_RAW" "$MEM/mr-brief-template.md" "$B" || {
+  [ "$DRY" = "--dry" ] || timeout 60 "$MEM/mr-interrupted" failed "$S" BRIEF-RENDER >/dev/null 2>&1
+  exit 1
+}
 MODEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('model','opus'))")
 EFFORT=$(/usr/bin/python3 -c "import json;print(json.load(open('$V')).get('effort','high'))")
 if [ "$DRY" = "--dry" ]; then status DRY "brief built; model=$MODEL effort=$EFFORT; no launch"; fi
+# CREDIT STOPPED: while a recorded credit stop that covers this model waits for its reset, the API
+# refuses the session's first call, so the launch is refused here instead. A tool that cannot
+# answer does not hold the launch.
+CSCHK=$(timeout 30 "$MEM/mr-interrupted" launch-check "$S" "$MODEL" 2>/dev/null)
+case "$CSCHK" in "REFUSE "*) status CREDIT-STOPPED "${CSCHK#REFUSE } — refusing to launch $S on $MODEL" 1 ;; esac
 # Stop-flag clearing sits BELOW the --dry exit (lp-gates final review). `/tmp/mr_stop_all` is the
 # GLOBAL cooperative stop -- mr-launch.sh checks it before every spawn and every run polls it --
 # so clearing it from a dry probe silently disarmed the operator's all-slice stop.
@@ -1024,6 +1054,16 @@ rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
 # RESUMED slice's stale lock on disk with its `.done` deleted and no new run started — which is
 # exactly RECONCILE part 2's "dead-pid lock with no .done" predicate, injecting a phantom CRASHED
 # row into the ledger the budget governor reads.
+# The outgoing session's cost row is written BEFORE its flags go and its log is rotated: past
+# this point the tick's reconcile can no longer see that session. mr-record writes one row per
+# session, so this is a no-op for a session the tick already recorded (`.done.recorded` skips even
+# the call). Advisory on failure, like the gates seed below: accounting must not refuse a launch.
+if [ -s "/tmp/mr_pass_$S.log" ] && [ ! -e "/tmp/mr_pass_$S.done.recorded" ]; then
+  if [ -f "/tmp/mr_pass_$S.done" ]; then PREV_OUT="FINISHED($(head -c 40 "/tmp/mr_pass_$S.done"))"; else PREV_OUT="CRASHED(no-done at relaunch)"; fi
+  timeout 60 "$MEM/mr-record" ledger --slice "$S" --outcome "$PREV_OUT" --ci not-applicable \
+    --from-log "/tmp/mr_pass_$S.log" --notes "recorded at relaunch" >/dev/null 2>&1 \
+    || emit COST-ROW-FAILED "previous session of $S has no ledger cost row; its log is kept as /tmp/mr_pass_$S.log.prev-*"
+fi
 rm -f "/tmp/mr_pass_$S.done" "/tmp/mr_pass_$S.done.recorded"
 # A resume's log/err are append-only (mr-launch.sh:103-104 uses >>), so a stale prior attempt's
 # log survives underneath the new one. attempt_launch()'s model-class assert greps with -m1 (first
@@ -1047,8 +1087,9 @@ else
   emit GATES-SEED-SKIPPED "mr-gates missing or not executable at $MEM/mr-gates"
 fi
 RID="mr-spawn-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+RSID=$(/usr/bin/python3 -c "import json,re,sys;r=str(json.load(open(sys.argv[1])).get('resume_session') or '');print(r if re.fullmatch(r'[0-9a-fA-F-]{8,64}',r) else '')" "$V" 2>/dev/null)
 attempt_launch(){
-  setsid bash "$MEM/mr-launch.sh" "$S" "$MODEL" "$EFFORT" "$REPO" >/dev/null 2>&1 & LEADER=$!
+  setsid bash "$MEM/mr-launch.sh" "$S" "$MODEL" "$EFFORT" "$REPO" "$RSID" >/dev/null 2>&1 & LEADER=$!
   LAST_SEEN_MODEL=""
   disown 2>/dev/null || true
   sleep 4
@@ -1082,7 +1123,7 @@ if ! attempt_launch; then
   if ! attempt_launch; then kill_attempt; status FAIL "launch asserts failed twice — $(fail_evidence)" 1; fi
 fi
 CPID=$(pgrep -P "$LEADER" 2>/dev/null | head -1)
-export S V MEM RID LEADER CPID MODEL EFFORT B REPO PR_REPO BASE_BRANCH
+export S V MEM RID LEADER CPID MODEL EFFORT B REPO PR_REPO BASE_BRANCH RSID
 if ! /usr/bin/python3 - <<'PYLOCK'
 import json, os, datetime
 v=json.load(open(os.environ["V"]))
@@ -1094,7 +1135,8 @@ lock={"run_id":os.environ["RID"],"slice":os.environ["S"],
  "brief":os.environ["B"],"done_flag":"/tmp/mr_pass_%s.done"%os.environ["S"],
  "touches":touches,
  "model":os.environ["MODEL"],"effort":os.environ["EFFORT"],"tier":v.get("tier","routine"),
- "repo":os.environ["REPO"],"pr_repo":os.environ["PR_REPO"],"base_branch":os.environ["BASE_BRANCH"]}
+ "repo":os.environ["REPO"],"pr_repo":os.environ["PR_REPO"],"base_branch":os.environ["BASE_BRANCH"],
+ "resume_session":os.environ.get("RSID") or None}
 open(os.environ["MEM"]+"/.harness-runner."+os.environ["S"]+".lock","w").write(json.dumps(lock,indent=1))
 PYLOCK
 then kill_attempt; status FAIL "lock write failed after launch (attempt killed)" 1; fi
@@ -1106,4 +1148,7 @@ for IT in $ITEMS; do
   FR=$("$MEM/mr-feedback" set "$IT" --state IN-WORK 2>&1)
   case "$FR" in FEEDBACK-SET*) :;; *) emit ITEMS-FLIP-FAIL "$IT: $FR";; esac   # emit only — status() exits
 done
+# The slice runs again, so it leaves mr-interrupted's record (advisory: a record left behind is
+# skipped while this leader is alive).
+"$MEM/mr-interrupted" drop "$S" >/dev/null 2>&1 || true
 status LAUNCHED "leader=$LEADER claude_pid=${CPID:-?} model=$MODEL effort=$EFFORT tier=${TIER:-?} repo=$REPO pr_repo=$PR_REPO brief_bytes=$(stat -c %s "$B" 2>/dev/null || echo ?) rid=$RID"

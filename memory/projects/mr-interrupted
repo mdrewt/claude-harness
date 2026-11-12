@@ -1,0 +1,799 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD: `bash <this file>` re-execs under python3 before reaching any
+# other line (mr-hold's header has the reason). Statically enforced by mr-selfcheck.
+"""mr-interrupted — the slices a credit stop interrupted, and when they can run again.
+
+A credit stop is a `rate_limit_event` with `status == "rejected"` that is the terminal state of
+a build session: nothing but the CLI's own limit message and error result follows it in the
+session's invocation, and the session was not drawing on overage (`isUsingOverage`). The
+session's next API call is refused until `resetsAt`, whether the refused window is the short
+one or the weekly cap. Which slices were stopped, at what tier and on which CLI session is a
+fact on disk at that moment, so it is recorded here by the tick wrapper instead of being
+inferred by a decision session days later.
+
+SCOPE. A rejection covers one model or all of them. It covers one model when `rateLimitType`
+names it, or when the CLI's limit message names it ("You've reached your Fable limit") and
+neither general window (`five_hour`, `seven_day`) is itself rejected; anything else covers all
+models. A one-model stop records, flags and gates only slices running that model.
+
+  mr-interrupted scan          Called by mr-native-tick.sh before its gates, on every tick. For
+                               each runner lock whose session ended on a rejection it records the
+                               slice; when the reset is still ahead it also records every other
+                               live slice on a model the stop covers and sets their cooperative
+                               stop flags (`mr_stop_all` too when the stop covers all models), so
+                               each run checkpoints instead of dying mid-step. Prints
+                               `STOP new=<slice,...> resets=<epoch> limit=<type> scope=<all|model>`
+                               (+ ` watch=<epoch>` when a reset tick should be armed), else `NONE`.
+                               Under an operator hold it only records the rejected slices —
+                               no flag, no watcher — and prints `HELD new=<slice,...>`; the
+                               first scan without the hold that finds such a slice still
+                               waiting on its reset asks for the watcher then (`WATCH
+                               watch=<epoch>` when it records nothing new). A slice that is
+                               capped as it is recorded asks for no watcher.
+  mr-interrupted gate [--model M]
+                               `DUE n=<k>` when k slices can be resumed now; else
+                               `BLOCKED_UNTIL_<utc>` while a stop covering model M (the
+                               supervisor's; omitted = any model) waits for its reset; `HELD`
+                               under an operator hold; else `CLEAR`.
+  mr-interrupted list          JSON array for the situation bundle: slice, cause, limit, scope,
+                               stopped_utc, resets_at_utc, state, due, failed, ignored, tier,
+                               model, effort, resume_session. `state` is waiting | live | due |
+                               unverified | capped; `due` is true for `due` alone.
+  mr-interrupted vars --due | <slice>
+                               Writes /tmp/mr_pass_<slice>.vars.json for a resume: the vars the
+                               slice was launched with, at the tier/model/effort it was running
+                               at, with `resume_session` naming the stopped CLI session. `--due`
+                               marks each slice it writes as offered. Prints the slices written,
+                               comma-joined; nothing under an operator hold.
+  mr-interrupted launch-check <slice> <model>
+                               mr-spawn's question before a launch: `REFUSE ...` while a stop
+                               covering <model> waits for its reset, else `OK`.
+  mr-interrupted failed <slice> [<status>]
+                               mr-spawn reports that it refused to launch an offered slice for
+                               a reason that does not clear by itself. Counts one failed resume.
+  mr-interrupted ignored <slice,...>
+                               The wrapper reports that a decision session ran to its end with
+                               these slices offered. Counts one ignored offer for each that is
+                               still offered and `due`; prints `IGNORED <slice> n=<k>[ capped] ...`
+                               or `NOOP`.
+  mr-interrupted drop <slice>  Removes the slice's record. mr-spawn calls it once the slice is
+                               launched again.
+
+WHEN A SLICE LEAVES THE RECORD. Only when it is launched again (`drop`), or when a lookup made
+as its reset passes shows there is nothing to resume: its PR is merged or open (`gh pr list`,
+the branch match mr-launch.sh uses), its spec section carries `blocked:`, the section it had
+when it stopped is gone, or it stopped more than 14 days ago. A lookup that fails keeps the
+slice and does not offer it (`unverified`); the next tick asks again. A slice whose
+session_leader is alive is never offered (`live`): it is still running.
+
+WAITING. A slice waits while its own reset is ahead, and while any other uncapped entry whose
+reset is ahead covers its model (`stops()`): the launch would be refused. `gate`, `vars --due`
+and `launch-check` all ask that one question, so a slice is never offered into a refusal.
+
+RESUME ATTEMPTS. A resume fails in two cases only: the slice was launched again and the vendor
+refused it again (a new terminal rejection, within an hour of the launch or with a reset no
+later than the one already waited for), or mr-spawn refused the launch for a reason that does
+not clear by itself (`failed`; mr-spawn's `status()` lists the refusals that are exempt). A
+failed resume waits an hour (a refusal that names a strictly later reset waits for that reset).
+After 2 failed resumes the slice is `capped`: it is no longer offered, no longer counts for
+`gate`, and one operator issue is opened through mr-ask-drew. A refusal after more than an hour
+of work that names a later reset is a new stop and starts both counts again.
+
+IGNORED OFFERS. An offer that no session saw — a hold, a stand-down or a dry run ended the tick
+before one started — counts for nothing: the slice stays `due` and the next tick offers it again.
+An offer a session did see is different, because every such tick is paid for: when a decision
+session exits 0 and an offered slice is still offered and `due` (not launched, not dropped, no
+failed resume counted), the wrapper reports it (`ignored`) and that is one ignored offer. The
+count is separate from the failed resumes and neither resets the other. After 3 ignored offers
+the slice is `capped` the same way, and the operator issue says the session did not act on the
+offer.
+
+RESET TIME. The EARLIEST among the rejections the session ended on: a low guess costs one
+resume that is refused and recorded again with the later reset; a high guess costs idle days.
+A `resetsAt` that is missing, not a positive number, more than an hour before the stop or more
+than 14 days ahead is not a reset time, and the slice waits an hour instead.
+
+The record is `mr-interrupted.json` beside this file, so a copy run from a worktree or a
+fixture directory never touches the live loop's record. Each entry is keyed by slice, the
+session's launch stamp and the logged reset time; a dropped key is remembered, because the
+stopped session's log stays on disk and the next scan would record it again.
+
+Fixtures: MR_INTERRUPTED_TMP replaces /tmp, MR_INTERRUPTED_NOW the clock (epoch seconds) and
+MR_INTERRUPTED_SPECS the spec corpus directory. Always exits 0 except on a usage error (2).
+"""
+import datetime
+import fcntl
+import glob
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+MEM = os.path.dirname(os.path.realpath(__file__))
+TMP = os.environ.get("MR_INTERRUPTED_TMP") or "/tmp"
+SPECS = os.environ.get("MR_INTERRUPTED_SPECS") or os.path.join(MEM, "..", "..", "specs", "monster-realm-v2")
+STATE = os.path.join(MEM, "mr-interrupted.json")
+HOLD = os.path.join(MEM, ".native-supervisor-disabled")
+TAIL_BYTES = 4 << 20
+MAX_AHEAD = 14 * 86400   # a reset further out than any real window is a bad value
+MAX_AGE = 14 * 86400     # a stop older than this is no longer resumed
+BACKOFF = 3600           # the wait when no usable reset time is known, and after a failed resume
+MAX_FAILED = 2
+MAX_IGNORED = 3          # offers a decision session ran past before the slice is capped
+MODELS = ("fable", "opus", "sonnet", "haiku")
+GENERAL_WINDOWS = ("five_hour", "seven_day")
+PR_REPOS = {"harness": "mdrewt/claude-harness", "project": "mdrewt/monster-realm"}
+_SID = re.compile(r'"session_id":"([0-9a-fA-F-]{8,64})"')
+_INVOKE = ("ATTEMPT=", "COST-CAP-WRAP start")
+_LIMIT_MSG = re.compile(r"reached your (\w+) limit", re.I)
+_BLOCKED = re.compile(r"(^###[^\n]*blocked:|^[\s>*`-]*blocked:\s*\S|`blocked:\s*[\w<])", re.M | re.I)
+_NEXT_HEAD = re.compile(r"^### ", re.M)
+
+
+def now():
+    try:
+        return float(os.environ["MR_INTERRUPTED_NOW"])
+    except (KeyError, ValueError):
+        return time.time()
+
+
+def utc(epoch):
+    return datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def held():
+    return os.path.exists(HOLD)
+
+
+def family(model):
+    m = str(model or "").lower()
+    return next((k for k in MODELS if k in m), m)
+
+
+def covers(scope, model):
+    return scope in (None, "", "all") or scope == family(model)
+
+
+def stops(entries, t, model=None):
+    """The uncapped entries whose reset is still ahead and whose stop covers `model` (None = any
+    model). The one answer to "would a launch on this model be refused now?"."""
+    return [e for e in entries if not e.get("capped") and float(e.get("resets_at") or 0) > t
+            and (model is None or covers(e.get("scope"), model))]
+
+
+def load():
+    try:
+        with open(STATE) as f:
+            d = json.load(f)
+        if isinstance(d, dict) and isinstance(d.get("entries"), list) and isinstance(d.get("dropped"), list):
+            if not isinstance(d.get("resumes"), dict):
+                d["resumes"] = {}
+            return d
+    except Exception:
+        pass
+    return {"entries": [], "dropped": [], "resumes": {}}
+
+
+def locked(fn):
+    """Run fn(state) under an exclusive lock; a changed state is written back atomically."""
+    with open(STATE + ".lock", "a+") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        state = load()
+        before = json.dumps(state, sort_keys=True)
+        out = fn(state)
+        if json.dumps(state, sort_keys=True) != before:
+            tmp = "%s.tmp.%d" % (STATE, os.getpid())
+            with open(tmp, "w") as f:
+                json.dump(state, f, indent=1)
+                f.write("\n")
+            os.replace(tmp, STATE)
+        return out
+
+
+def scope_of(info, message):
+    """`all`, or the one model a rejection covers (SCOPE in the header)."""
+    typ = str(info.get("rateLimitType") or "").lower()
+    for m in MODELS:
+        if re.search(r"(^|_)%s($|_)" % m, typ):
+            return m
+    windows = info.get("unifiedWindows")
+    named = _LIMIT_MSG.search(message or "")
+    if typ in GENERAL_WINDOWS or not named or named.group(1).lower() not in MODELS or not isinstance(windows, dict):
+        return "all"
+    for w in GENERAL_WINDOWS:
+        if isinstance(windows.get(w), dict) and windows[w].get("status") == "rejected":
+            return "all"
+    return named.group(1).lower()
+
+
+def read_log(slice_):
+    """(launch stamp, session id, [(resetsAt as logged, limit, scope)], log mtime, ended) for a
+    slice's pass log. The list is the rejections that are the terminal state of the log's last
+    invocation: it is empty for a session that went on working after one or that was on
+    overage. `ended` says the invocation wrote its result event after them.
+    Only the head (the launch marker) and the last TAIL_BYTES are read: a pass log runs to
+    hundreds of megabytes and this is called for every lock on every tick."""
+    stamp, sid = None, None
+    try:
+        with open(os.path.join(TMP, "mr_pass_%s.log" % slice_), "rb") as fh:
+            mtime = os.fstat(fh.fileno()).st_mtime
+            m = re.search(r"^ATTEMPT=1\b.*\bTS=(\S+)", fh.read(4096).decode("utf-8", "replace"), re.M)
+            stamp = re.sub(r"[^0-9TZ]", "", m.group(1)) if m else None
+            fh.seek(0, os.SEEK_END)
+            fh.seek(max(0, fh.tell() - TAIL_BYTES))
+            lines = fh.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        return None, None, [], None, False
+    rejected, message, ended = [], "", False
+    for line in lines:
+        if line.startswith(_INVOKE):
+            rejected, message, ended = [], "", False
+            continue
+        m = _SID.search(line)
+        if m:
+            sid = m.group(1)
+        if line.startswith('{"type":"rate_limit_event"'):
+            try:
+                info = json.loads(line).get("rate_limit_info")
+            except Exception:
+                continue
+            if isinstance(info, dict) and info.get("status") == "rejected" and info.get("isUsingOverage") is not True:
+                rejected.append(info)
+            continue
+        if not rejected:
+            continue
+        if line.startswith('{"type":"assistant"'):
+            if '"model":"<synthetic>"' in line[:300]:
+                message = line[:2000]       # the CLI's own limit message, not work
+            else:
+                rejected, message, ended = [], "", False
+        elif line.startswith('{"type":"user"'):
+            rejected, message, ended = [], "", False
+        elif line.startswith('{"type":"result"'):
+            if '"is_error":false' in line[:400]:
+                rejected, message, ended = [], "", False
+            else:
+                ended = True
+    out = [(info.get("resetsAt"), str(info.get("rateLimitType") or "unknown")[:60], scope_of(info, message))
+           for info in rejected]
+    return stamp, sid, out, mtime, ended
+
+
+def reset_time(raw, stopped, t):
+    """A logged resetsAt as epoch seconds, or None when it is not a usable reset time."""
+    if isinstance(raw, bool):
+        return None
+    try:
+        at = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if at != at:
+        return None
+    if at > 1e11:
+        at /= 1000.0     # epoch milliseconds
+    if at <= 0 or at < stopped - 3600 or at > t + MAX_AHEAD:
+        return None
+    return int(at)
+
+
+def leader_alive(lock):
+    try:
+        os.kill(int(lock.get("session_leader")), 0)
+        return True
+    except Exception:
+        return False
+
+
+def slices():
+    """Every slice with a runner lock: (slice, lock dict, leader alive, .done text)."""
+    out = []
+    for path in sorted(glob.glob(os.path.join(MEM, ".harness-runner.*.lock"))):
+        name = os.path.basename(path)[len(".harness-runner."):-len(".lock")]
+        try:
+            with open(path) as f:
+                lock = json.load(f)
+            if not isinstance(lock, dict):
+                continue
+        except Exception:
+            continue
+        try:
+            with open(os.path.join(TMP, "mr_pass_%s.done" % name)) as f:
+                done = f.read().strip()
+        except OSError:
+            done = None
+        out.append((name, lock, leader_alive(lock), done))
+    return out
+
+
+def slice_live(name):
+    try:
+        with open(os.path.join(MEM, ".harness-runner.%s.lock" % name)) as f:
+            lock = json.load(f)
+        return isinstance(lock, dict) and leader_alive(lock)
+    except Exception:
+        return False
+
+
+def spec_section(name):
+    """The slice's `### <slice>` section in the spec corpus: its text, "" when no spec has one,
+    None when the corpus cannot be read."""
+    head = re.compile(r"^### %s(?![\w.-])" % re.escape(name), re.M)
+    try:
+        names = sorted(n for n in os.listdir(SPECS) if n.endswith(".spec.md"))
+    except OSError:
+        return None
+    for n in names:
+        try:
+            with open(os.path.join(SPECS, n), errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            return None
+        m = head.search(text)
+        if m:
+            nxt = _NEXT_HEAD.search(text, m.end())
+            return text[m.start(): nxt.start() if nxt else len(text)]
+    return ""
+
+
+def entry(name, lock, stamp, sid, raw, at, limit, scope, cause, stopped):
+    try:
+        with open(os.path.join(TMP, "mr_pass_%s.vars.json" % name)) as f:
+            launched = json.load(f)
+        if not isinstance(launched, dict):
+            launched = None
+    except Exception:
+        launched = None
+    sec = spec_section(name)
+    if at is None:
+        at = int(stopped + BACKOFF)
+    repo = lock.get("repo")
+    return {"key": "%s|%s|%s" % (name, stamp or lock.get("started_utc") or "?", str(raw)[:24]),
+            "slice": name, "cause": cause, "limit": limit, "scope": scope,
+            "stopped": int(stopped), "stopped_utc": utc(stopped),
+            "resets_at": at, "resets_at_utc": utc(at),
+            "tier": lock.get("tier") or "routine", "model": lock.get("model") or "opus",
+            "effort": lock.get("effort") or "high", "repo": repo,
+            "pr_repo": lock.get("pr_repo") or PR_REPOS.get(repo or "project", PR_REPOS["project"]),
+            "had_spec": None if sec is None else bool(sec),
+            "touches": lock.get("touches"), "resume_session": sid, "vars": launched}
+
+
+def say(line):
+    """The verdict goes out before anything slow (the operator issue) can run into the caller's
+    timeout."""
+    sys.stdout.write(line + "\n")
+    sys.stdout.flush()
+
+
+def touch(name):
+    try:
+        open(os.path.join(TMP, name), "a").close()
+    except OSError:
+        pass
+
+
+def record_failure(state, e, t, wait_until=None):
+    """One failed resume of e's slice: it waits, and at MAX_FAILED it is capped."""
+    rec = state["resumes"].setdefault(e["slice"], {})
+    rec["failed"] = int(rec.get("failed") or 0) + 1
+    rec["at"] = int(t)
+    e.pop("offered_at", None)
+    e["not_before"] = int(wait_until or t + BACKOFF)
+    if rec["failed"] >= MAX_FAILED:
+        e["capped"] = True
+
+
+def cmd_scan():
+    t = now()
+    found = slices()
+    hold = held()
+
+    def run(state):
+        known = set(e.get("key") for e in state["entries"]) | set(state["dropped"])
+        new = []
+        for name, lock, alive, done in found:
+            stamp, sid, rejected, mtime, ended = read_log(name)
+            if not rejected:
+                continue
+            # A live session with no result event yet may still be mid-step; one that has
+            # written nothing for two minutes after the rejection is not.
+            if alive and not ended and time.time() - mtime < 120:
+                continue
+            stopped = min(mtime, t)
+            if t - stopped > MAX_AGE:
+                continue
+            valid = [(reset_time(raw, stopped, t), raw, limit) for raw, limit, _s in rejected]
+            valid = [x for x in valid if x[0] is not None]
+            at, raw, limit = min(valid, key=lambda x: x[0]) if valid else (None, rejected[0][0], rejected[0][1])
+            scopes = set(s for _r, _l, s in rejected)
+            scope = scopes.pop() if len(scopes) == 1 else "all"
+            e = entry(name, lock, stamp, sid, raw, at, limit, scope, "rate-limit", stopped)
+            if e["key"] in known:
+                continue
+            known.add(e["key"])
+            rec = state["resumes"].get(name)
+            if rec and "left_at" in rec:
+                # Refused again after a resume.
+                later = at is not None and at > int(rec.get("waited_for") or 0)
+                if later and stopped - int(rec["left_at"]) > 3600:
+                    del state["resumes"][name]      # an hour of work, then a later window: a new stop
+                else:
+                    if not later:
+                        e["resets_at"] = int(t + BACKOFF)
+                        e["resets_at_utc"] = utc(e["resets_at"])
+                    record_failure(state, e, t, wait_until=e["resets_at"])
+                    rec.pop("left_at", None)
+            new.append(e)
+        ahead = [e for e in new if e["resets_at"] > t]
+        if ahead and not hold:
+            ahead.sort(key=lambda e: (e["scope"] != "all", e["resets_at"]))
+            for name, lock, alive, done in found:
+                if not alive or done is not None or any(e["slice"] == name for e in new):
+                    continue
+                first = next((e for e in ahead if covers(e["scope"], lock.get("model") or "opus")), None)
+                if first is None:
+                    continue
+                stamp, sid = read_log(name)[:2]
+                e = entry(name, lock, stamp, sid, first["resets_at"], first["resets_at"], first["limit"],
+                          first["scope"], "stopped-with:" + first["slice"], t)
+                if e["key"] not in known:
+                    known.add(e["key"])
+                    new.append(e)
+            if any(e["scope"] == "all" for e in ahead):
+                touch("mr_stop_all")
+            for e in new:
+                if e["resets_at"] > t:
+                    touch("mr_stop_" + e["slice"])
+        fresh = set(e["slice"] for e in new)
+        state["entries"] = [e for e in state["entries"] if e.get("slice") not in fresh] + new
+        if hold:
+            for e in new:
+                e["watch_owed"] = True      # no watcher under the hold; the scan after it starts one
+            return new, None
+        # The reset tick to arm: the earliest reset still ahead among the entries this scan
+        # recorded and those recorded under a hold. A capped entry is never resumed, so it
+        # gets none. An owed entry with a later reset stays owed for the next scan.
+        arm = [e["resets_at"] for e in stops(state["entries"], t)
+               if e.get("watch_owed") or any(e is n for n in new)]
+        watch = min(arm) if arm else None
+        for e in state["entries"]:
+            if e.get("watch_owed") and not (watch is not None and e["resets_at"] > watch and not e.get("capped")):
+                del e["watch_owed"]
+        return new, watch
+
+    new, watch = locked(run) if found or os.path.exists(STATE) else ([], None)
+    names = ",".join(e["slice"] for e in new)
+    armed = "" if watch is None else " watch=%d" % watch
+    if not new:
+        say("WATCH" + armed if armed else "NONE")
+    elif hold:
+        say("HELD new=%s" % names)
+    else:
+        first = min([e for e in new if e["resets_at"] > t] or new, key=lambda e: e["resets_at"])
+        say("STOP new=%s resets=%d limit=%s scope=%s%s" % (
+            names, first["resets_at"], first["limit"], first["scope"], armed))
+    if not hold:
+        raise_blockers()
+    return 0
+
+
+_PRS = {}
+
+
+def pr_heads(repo):
+    """(head branch, state) of the repo's recent PRs, or None when gh cannot say."""
+    if repo not in _PRS:
+        env = dict(os.environ, PATH=os.environ.get("PATH", "") + ":/home/mdrewt/.asdf/shims:/home/mdrewt/bin")
+        try:
+            r = subprocess.run(["gh", "pr", "list", "-R", repo, "--state", "all", "-L", "60", "--json",
+                                "headRefName,state"], capture_output=True, text=True, timeout=15, env=env)
+            rows = json.loads(r.stdout) if r.returncode == 0 else None
+            _PRS[repo] = None if rows is None else [(str(x.get("headRefName")), x.get("state")) for x in rows]
+        except Exception:
+            _PRS[repo] = None
+    return _PRS[repo]
+
+
+def nothing_to_resume(e):
+    """Why the slice has nothing left to resume (a word), "" when it has, None when a lookup
+    failed and the question is open."""
+    name = e["slice"]
+    sec = spec_section(name)
+    if sec is None:
+        return None
+    if sec and _BLOCKED.search(sec):
+        return "blocked"
+    if not sec and e.get("had_spec"):
+        return "spec-gone"
+    prs = pr_heads(e.get("pr_repo") or PR_REPOS["project"])
+    if prs is None:
+        return None
+    branch = re.compile(r"(^|/|-|_)%s([-_]|$)" % re.escape(name), re.I)
+    for head, state in prs:
+        if state in ("OPEN", "MERGED") and branch.search(head):
+            return "pr-" + state.lower()
+    return ""
+
+
+def settle(state, t, lookups):
+    """Apply the leaving and waiting rules; returns [(entry, state word)]. With `lookups`, an
+    entry whose time has come is checked against gh and the spec corpus."""
+    out = []
+
+    def leave(e):
+        state["entries"].remove(e)
+        state["dropped"] = (state["dropped"] + [e.get("key")])[-200:]
+        state["resumes"].pop(e.get("slice"), None)
+
+    for e in list(state["entries"]):
+        if t - float(e.get("stopped") or t) > MAX_AGE:
+            leave(e)
+            continue
+        if e.get("capped"):
+            out.append((e, "capped"))
+            continue
+        if float(e.get("resets_at") or 0) > t or float(e.get("not_before") or 0) > t \
+                or stops(state["entries"], t, e.get("model")):
+            out.append((e, "waiting"))
+            continue
+        if slice_live(e.get("slice")):
+            out.append((e, "live"))
+            continue
+        if not lookups:
+            out.append((e, "unverified" if e.get("unverified") else "due"))
+            continue
+        why = nothing_to_resume(e)
+        if why is None:
+            e["unverified"] = True
+            out.append((e, "unverified"))
+        elif why:
+            leave(e)
+        else:
+            e.pop("unverified", None)
+            out.append((e, "due"))
+    for name in [n for n, rec in state["resumes"].items()
+                 if t - float(rec.get("left_at") or rec.get("at") or t) > MAX_AGE]:
+        del state["resumes"][name]
+    return out
+
+
+def current(lookups=False):
+    if not os.path.exists(STATE):
+        return []
+    t = now()
+
+    def run(state):
+        def count(e, what):
+            return int((state["resumes"].get(e.get("slice")) or {}).get(what) or 0)
+
+        return [(dict(e, failed=count(e, "failed"), ignored=count(e, "ignored")), w)
+                for e, w in settle(state, t, lookups)]
+
+    return locked(run)
+
+
+def raise_blockers():
+    """One operator issue per capped slice, through the loop's own channel (mr-ask-drew)."""
+    if not os.path.exists(STATE):
+        return
+    ask = os.path.join(MEM, "mr-ask-drew")
+    for e in [e for e in load()["entries"] if e.get("capped") and not e.get("blocker")]:
+        name = e["slice"]
+        if e.get("capped_by") == "ignored":
+            why = "%d decision sessions ran with its resume offered and none acted on the offer" % MAX_IGNORED
+            root = ("A credit-stop resume no session acts on is offered to %d sessions; the loop no longer "
+                    "offers this slice." % MAX_IGNORED)
+            last = "the session did not act on the offer"
+        else:
+            why = "%d resumes of it failed" % MAX_FAILED
+            root = "A credit-stop resume is offered %d times; the loop no longer offers this slice." % MAX_FAILED
+            last = e.get("last_failure") or "refused again"
+        try:
+            r = subprocess.run(
+                [ask, "credit-resume-" + name, "--repo", PR_REPOS["harness"],
+                 "--question", "Slice %s was stopped by a usage limit (%s) and %s. "
+                 "Relaunch it by hand, or drop it (mr-interrupted drop %s)?" % (name, e.get("limit"), why, name),
+                 "--root", root,
+                 "--context", "stopped %s; last reset waited for %s; tier=%s model=%s; session=%s; last failure: %s"
+                 % (e.get("stopped_utc"), e.get("resets_at_utc"), e.get("tier"), e.get("model"),
+                    e.get("resume_session"), last)],
+                capture_output=True, text=True, timeout=40)
+            ok = "ASK-DREW-OK" in r.stdout
+        except Exception:
+            ok = False
+        if ok:
+            def mark(state, name=name):
+                for x in state["entries"]:
+                    if x.get("slice") == name and x.get("capped"):
+                        x["blocker"] = utc(now())
+            locked(mark)
+
+
+def cmd_gate(model):
+    if held():
+        print("HELD")
+        return 0
+    t = now()
+    entries = current(lookups=True)
+    due = [e for e, w in entries if w == "due"]
+    wait = [e["resets_at"] for e in stops([e for e, _w in entries], t, model)]
+    if due:
+        say("DUE n=%d" % len(due))
+    elif wait:
+        say("BLOCKED_UNTIL_" + utc(min(wait)))
+    else:
+        say("CLEAR")
+    raise_blockers()
+    return 0
+
+
+def cmd_list():
+    keep = ("slice", "cause", "limit", "scope", "stopped_utc", "resets_at_utc", "tier", "model", "effort",
+            "resume_session", "failed", "ignored")
+    print(json.dumps([dict({k: e.get(k) for k in keep}, state=w, due=w == "due") for e, w in current()]))
+    return 0
+
+
+def cmd_vars(which):
+    if which == "--due" and held():
+        print("")
+        return 0
+    t = now()
+    written = []
+    for e, w in current(lookups=which == "--due"):
+        if which == "--due":
+            if w != "due":
+                continue
+        elif e.get("slice") != which:
+            continue
+        name = e["slice"]
+        v = dict(e.get("vars") or {})
+        note = ("CREDIT-STOP RESUME: this slice was stopped by a usage limit at %s, not by a failure. "
+                "Continue it from its existing worktree and branch (the `wip:` checkpoint) and "
+                "memory/projects/monster-realm-%s-progress.md; re-verify git state first."
+                % (e.get("stopped_utc"), name))
+        prior = str(v.get("resume_block") or "")
+        v.update({"slice": name, "tier": e.get("tier"), "model": e.get("model"), "effort": e.get("effort"),
+                  "resume_block": note if note in prior else (prior + "\n" if prior else "") + note})
+        v.setdefault("touches", e.get("touches") or "")
+        v.setdefault("target_desc", "resume %s per its spec section and park memo" % name)
+        if e.get("resume_session"):
+            v["resume_session"] = e["resume_session"]
+        else:
+            v.pop("resume_session", None)
+        path = os.path.join(TMP, "mr_pass_%s.vars.json" % name)
+        try:
+            with open(path + ".tmp", "w") as f:
+                json.dump(v, f, indent=1)
+            os.replace(path + ".tmp", path)
+            written.append(name)
+        except OSError:
+            pass
+    if which == "--due" and written:
+        def mark(state):
+            for x in state["entries"]:
+                if x.get("slice") in written and not x.get("capped"):
+                    x["offered_at"] = int(t)
+        locked(mark)
+    print(",".join(written))
+    return 0
+
+
+def cmd_launch_check(name, model):
+    t = now()
+    for e in stops(load()["entries"], t, model) if os.path.exists(STATE) else []:
+        print("REFUSE credit refused for %s until %s (slice %s, limit %s)"
+              % ("every model" if covers(e.get("scope"), "") else e.get("scope"), e.get("resets_at_utc"),
+                 e.get("slice"), e.get("limit")))
+        return 0
+    print("OK")
+    return 0
+
+
+def cmd_failed(name, status):
+    if not os.path.exists(STATE):
+        print("NOOP")
+        return 0
+    t = now()
+
+    def run(state):
+        for e in state["entries"]:
+            if e.get("slice") == name and e.get("offered_at") is not None and not e.get("capped"):
+                e["last_failure"] = "mr-spawn " + (str(status or "")[:40] or "did not launch")
+                record_failure(state, e, t)
+                return "FAILED n=%d%s" % (state["resumes"][name]["failed"], " capped" if e.get("capped") else "")
+        return "NOOP"
+
+    out = locked(run)
+    say(out)
+    if out != "NOOP" and not held():
+        raise_blockers()
+    return 0
+
+
+def cmd_ignored(names):
+    if not os.path.exists(STATE):
+        print("NOOP")
+        return 0
+    t = now()
+
+    def run(state):
+        out = []
+        for e, w in settle(state, t, False):
+            name = e.get("slice")
+            if name not in names or w != "due" or e.get("offered_at") is None:
+                continue
+            rec = state["resumes"].setdefault(name, {})
+            rec["ignored"] = int(rec.get("ignored") or 0) + 1
+            del e["offered_at"]
+            if rec["ignored"] >= MAX_IGNORED:
+                e["capped"] = True
+                e["capped_by"] = "ignored"
+            out.append("%s n=%d%s" % (name, rec["ignored"], " capped" if e.get("capped") else ""))
+        return out
+
+    out = locked(run)
+    say("IGNORED " + " ".join(out) if out else "NOOP")
+    if out and not held():
+        raise_blockers()
+    return 0
+
+
+def cmd_drop(name):
+    if not os.path.exists(STATE):
+        print("DROPPED 0")
+        return 0
+    t = now()
+
+    def run(state):
+        gone = [e for e in state["entries"] if e.get("slice") == name]
+        state["entries"] = [e for e in state["entries"] if e.get("slice") != name]
+        state["dropped"] = (state["dropped"] + [e.get("key") for e in gone])[-200:]
+        if gone:
+            # What a later refusal of this slice is measured against.
+            rec = state["resumes"].setdefault(name, {})
+            rec["waited_for"] = max(int(e.get("resets_at") or 0) for e in gone)
+            rec["left_at"] = int(t)
+        return len(gone)
+
+    print("DROPPED %d" % locked(run))
+    return 0
+
+
+_NAME = r"[A-Za-z0-9][A-Za-z0-9._-]*"
+
+
+def main(argv):
+    if argv == ["scan"]:
+        return cmd_scan()
+    if argv == ["gate"]:
+        return cmd_gate(None)
+    if len(argv) == 3 and argv[:2] == ["gate", "--model"]:
+        return cmd_gate(argv[2])
+    if argv == ["list"]:
+        return cmd_list()
+    if len(argv) == 2 and argv[0] == "vars":
+        return cmd_vars(argv[1])
+    if len(argv) == 3 and argv[0] == "launch-check" and re.fullmatch(_NAME, argv[1]):
+        return cmd_launch_check(argv[1], argv[2])
+    if len(argv) in (2, 3) and argv[0] == "failed" and re.fullmatch(_NAME, argv[1]):
+        return cmd_failed(argv[1], argv[2] if len(argv) == 3 else "")
+    if len(argv) == 2 and argv[0] == "ignored" and re.fullmatch(r"%s(,%s)*" % (_NAME, _NAME), argv[1]):
+        return cmd_ignored(argv[1].split(","))
+    if len(argv) == 2 and argv[0] == "drop" and re.fullmatch(_NAME, argv[1]):
+        return cmd_drop(argv[1])
+    sys.stderr.write("usage: mr-interrupted scan | gate [--model M] | list | vars --due|<slice> | "
+                     "launch-check <slice> <model> | failed <slice> [<status>] | ignored <slice,...> | "
+                     "drop <slice>\n")
+    return 2
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except Exception as exc:     # the wrapper reads stdout; a crash must not look like a verdict
+        sys.stderr.write("mr-interrupted: %s: %s\n" % (type(exc).__name__, exc))
+        sys.exit(0)

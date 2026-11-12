@@ -41,6 +41,8 @@ for d in rows:
         e["finish"]=d["ts"]; e["cost"]=e.get("cost",0)+fnum(d.get("cost_usd"))
         m=re.search(r"ATTEMPTS=(\d+)", o); e["attempts"]=int(m.group(1)) if m else None
         e.setdefault("tier",tier_of(d))
+    # A killed session's row carries whatever its log reported; it is spend on the slice too.
+    if o.startswith("CRASHED"): e["cost"]=e.get("cost",0)+fnum(d.get("cost_usd"))
     if o.startswith("MERGED"):
         e["merge"]=d["ts"]; e.setdefault("tier",tier_of(d))
         if fnum(d.get("cost_usd"))>0: e["cost"]=e.get("cost",0)+fnum(d.get("cost_usd"))
