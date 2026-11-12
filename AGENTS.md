@@ -67,6 +67,11 @@ the full rationale and `standards/` for the engineering rules.
 ## Safety / permissions
 - Destructive ops (force-push, history rewrite, DB drops, bulk deletes) require
   explicit human approval. Use `/rewind` to roll back a bad path.
+- The Bash guard blocks every recursive `rm`. Remove scratch directories and finished git
+  worktrees under `/tmp` with `memory/projects/mr-clean-scratch PATH...` (dry run; `--apply`
+  performs it; `--stale` lists candidates). It refuses anything outside the scratch roots and
+  keeps a worktree with uncommitted or unmerged work — a `SKIP`/`REFUSED` line is the answer,
+  not a prompt to find another way to delete.
 - Subagents must not spawn subagents (orchestration depth = 1).
 - Respect per-run budget caps for multi-agent work (cap N at 2–3).
 
