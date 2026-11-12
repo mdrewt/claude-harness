@@ -64,9 +64,10 @@ except Exception: pass  # fall back to defaults above
 def budget():
     now=time.time()
     ws=now-7*86400
+    wend=None   # known only for an anchored window; a rolling one has no moment at which it resets
     try:
         a=float(open(MEM+"/.weekly-reset-anchor").read().strip())
-        if a<=now: ws=a+int((now-a)//(7*86400))*7*86400
+        if a<=now: ws=a+int((now-a)//(7*86400))*7*86400; wend=ws+7*86400
     except Exception: pass
     d7=0.0; fab=0.0; latest={}
     for l in open(MEM+"/monster-realm-usage-ledger.jsonl"):
@@ -120,7 +121,8 @@ def budget():
     state="NORMAL"
     if eff>HARD*WEEKLY: state="HARD-STOP"
     elif eff>SOFT*WEEKLY: state="SOFT-PAUSE"
-    return {"window_start_utc":datetime.datetime.fromtimestamp(ws,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
+    return {"window_start_utc":datetime.datetime.fromtimestamp(ws,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "window_end_utc":datetime.datetime.fromtimestamp(wend,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if wend else None,"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
             "unreconciled_est_usd":est,"inflight_committed_est_usd":round(committed,2),"inflight_runs":live,"effective_usd":round(eff,2),"weekly_limit_usd":WEEKLY,
             "soft_pause_frac":SOFT,"hard_stop_frac":HARD,"fable_guard_frac":FGUARD,
             "fable_allowance_usd":FALLOW,"fable_guard_usd":round(FGUARD*FALLOW,2),"fable_ok": fab < FGUARD*FALLOW,"state":state}
@@ -130,6 +132,11 @@ out["budget"]=b
 def state_extra():
     d=json.load(open(MEM+"/mr-state.json")); return d.get("rate_limit_resets_at")
 out["rate_limit_resets_at"]=safe(state_extra,"error")
+# The slices a credit stop interrupted (mr-interrupted's record): `due` entries are resumed first.
+def interrupted():
+    r=subprocess.run([MEM+"/mr-interrupted","list"], capture_output=True, text=True, timeout=20)
+    return json.loads(r.stdout)
+out["interrupted"]=safe(interrupted,"error")
 def lastfail():
     p=MEM+"/.native-supervisor-last-failure"
     return open(p).read().strip() if os.path.exists(p) else None

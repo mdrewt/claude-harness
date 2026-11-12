@@ -19,21 +19,21 @@ supersede-in-place per `$HARNESS/standards/decisions.md`).
 scans or checks-of-checks; coverage/mutation are reports; a check protects a protected category
 or is not added.
 
-**Model routing** (rooted runs): routine = opus@high ·
-hard = fable@xhigh (schema/reducers, netcode/predictor, security surfaces, resume-after-park, prior
-failed attempt) · content = opus@medium. Always ALIASES, never pinned ids; the wrapper escalates a
-failing opus run's final attempt to fable@xhigh (budget-guarded). Launch-row `notes` MUST begin
+**Model routing** (rooted runs): routine = opus@high · hard = fable@xhigh (schema/reducers,
+netcode/predictor, security surfaces, resume after a no-progress park, prior failed attempt) ·
+content = opus@medium. Always ALIASES, never pinned ids; the wrapper escalates a failing opus
+run's final attempt to fable@xhigh (budget-guarded). Launch-row `notes` MUST begin
 `tier=<...>; reason=<...>`.
 
 **Budget governor** (situation bundle vs `mr-budget-config.json`): NORMAL → proceed · SOFT-PAUSE
-(>90%) → no new launches (merges/parks/records fine) · HARD-STOP (>97%) → finish records, exit ·
-UNKNOWN → proceed + record a BLOCKER.
+(>90%) → no new launches (resumes/merges/parks/records fine) · HARD-STOP (>97%) → the wrapper
+stands down · UNKNOWN → proceed + record a BLOCKER.
 
 ## Execution model
 
 0. **Fast-path standdown:** list `$MEM/.harness-runner.*.lock` per-run locks, `ps` each recorded
    `session_leader`, check `/tmp/mr_pass_<slice>.done`. A live pid, no `.done` awaiting merge, no
-   non-green `ci` event → exit immediately (no ledger row).
+   non-green `ci` event, no `resume_first` → exit immediately (no ledger row).
 1. **One step per tick:** reconcile from live ground truth → at most ONE mutating action ∈
    {merge a finished slice · launch eligible slice(s) · resume a parked slice · promote a residual ·
    stand down · finish} → record → exit. One composite allowed: merge→launch after the merge
@@ -67,7 +67,9 @@ UNKNOWN → proceed + record a BLOCKER.
 
 ## Gates (in order; stop at the first stop)
 
-1. **Reset-time:** recorded rate-limit `resetsAt` still future → exit.
+1. **Credit-stop resume:** TICK PROVENANCE `resume_first=<slices>` → their vars are written (own
+   tier and session, never escalated): after gate 2, `mr-spawn` ALL — this tick's action, ahead
+   of Pick work and a red `master`. Merged or PR-open → `$MEM/mr-interrupted drop <slice>`.
 2. **Sync + probe + lock:** `git fetch --all --prune` both repos; stand down on human activity
    (resident IDE claude pid new/growing; non-repo-artifact writes in ~6 min; handoff/ledger mtime
    ahead of its recorded ts — idle-open ≥45 min with zero writes is NOT active). Take the mutex
@@ -120,18 +122,18 @@ UNKNOWN → proceed + record a BLOCKER.
 through `mr-feedback` (triage adds; only supervisor decision runs write dispositions/terminals);
 retro-request events follow `$MEM/mr-retro-playbook.md`.
 
-## Fan-out (N ≤ 2 default; ≤ 4 with the protocol below)
+## Fan-out (≤ 4 in flight)
 
-Open another slot only if ALL hold: code/test `touches:` pairwise disjoint (undeclared =
-colliding; mr-disjoint strips the doc set, adds widened files) · neither touches its
-always-serial structural set or any table/schema/migration (parallelize around it
-contract-first) · `free -g` shows ≳ one full build free.
+Launch EVERY ready candidate passing ALL of: code/test `touches:` pairwise disjoint
+(undeclared = colliding; mr-disjoint strips the doc set, adds widened files) · outside its
+always-serial structural set and any table/schema/migration (parallelize around it
+contract-first) · `after:` merged · `free -g` ≳ one full build free per launch · quiet window ·
+governor NORMAL with `effective_usd` + the launches' tier caps under SOFT-PAUSE (a run started
+past it is cut off mid-way). Only these rules hold a ready candidate; `held=` names the rule.
 Run `$MEM/mr-disjoint "<slice>:paths" …` — SERIAL-REQUIRED is final; SAFE + a shared
-registry/enum/id axis → pre-assign the choice space per sibling in target_desc; judgment may
-only downgrade toward serial. **N≥3:** partitioning mandatory (pre-assign ranges), stagger
-launches across ticks, memory rule per slot, stay ≳$150 clear of SOFT-PAUSE. Merges stay serial
-and audited; conflicting PRs park, EXCEPT a conflict set ⊆ doc set (resolve: union/append;
-DECISIONS.md unions by title; CHANGELOG regenerates via git cliff).
+registry/enum/id axis → pre-assign each sibling's range in target_desc (a duplicate id wastes a
+merge). Merges stay serial and audited; conflicting PRs park, EXCEPT a conflict set ⊆ doc set
+(resolve: union/append; DECISIONS.md unions by title; CHANGELOG regenerates via git cliff).
 **Quiet window:** a `type: refactor` slice launches at its spec'd `tier:`, one at a time, only
 when nothing in flight, open or parked overlaps its `touches:` (judge globs yourself); nothing
 overlapping launches until it merges or goes `blocked:`; it merges first. Parked on a missed pin
@@ -140,8 +142,8 @@ or file → widen its spec `touches:`, relaunch at its `tier:` (no resume→hard
 ## Launch
 
 Write `/tmp/mr_pass_<slice>.vars.json` — `{slice, model, effort, touches, target_desc, resume_block,
-tier}` (+`items:[...]` for covered feedback rows; flip them IN-WORK at launch, SHIPPED-VERIFIED at
-merge) — touches/target from the slice's `M*.spec.md`; resume_block from the park memo
+tier}` (+`items:[...]` for covered feedback rows; flip them SHIPPED-VERIFIED at merge) —
+touches/target from the slice's `M*.spec.md`; resume_block from the park memo
 (`$MEM/monster-realm-<slice>-progress.md`) when resuming. Call `$MEM/mr-spawn <slice>`: it renders
 the brief, re-probes for humans (PROBE-TRIPPED → stand down) and launches detached. Anything
 but LAUNCHED = launch failure — never hand-launch. Its `REPO-*` refusals are to fix, not work
@@ -184,29 +186,26 @@ around (push the harness before spawning a harness slice).
 - Milestone's last slice merged → a LATER tick's action, doc-only PRs: lasting decisions into the
   owning repo's `docs/DECISIONS.md`; delete its spec and its uncited `$MEM/monster-realm-<slice>-*`
   files; update PLAN §9/§Built.
-- Park counter: ~3 no-progress parks → `blocked:` + BLOCKER (rate-limit parks exempt); 3 wrapper
+- Park counter: ~3 no-progress parks → `blocked:` + BLOCKER (credit stops exempt); 3 wrapper
   attempts without PR or documented park → investigate sizing, never a 4th relaunch.
 - Ledger row → handoff entry → write `mr-state.json` → release locks.
 
-## Rate-limit watch (on every poll of a live run)
+## Credit stop
 
-Parse `rate_limit_event` objects from live logs with python over `.rate_limit_info` — NEVER grep
-raw text. Absent events/fields → BLOCKER, never silent. **Trip ONLY on `status=="rejected"`**
-(`allowed_warning` is routine). On trip: `touch /tmp/mr_stop_all` + per-slice stop flags; capture
-`resetsAt` into handoff+ledger+state; spawn `$MEM/mr-reset-watch <resetsAt>` detached; ~10 min
-grace; kill stragglers by RECORDED pids only (`kill -TERM` then `-KILL`; never `pkill -f`, it hits
-unrelated sessions); fallback-park with a labeled `wip:` checkpoint commit. Outcome = PARKED (no
-counter bump); never merge a stopped/`wip:` branch.
+`interrupted[]` not `due` (a `rejected` rate limit; the wrapper set the stop flags and armed the
+reset tick) → launch nothing; per slice: live ~10 min after `stopped_utc` → kill RECORDED pids
+only (`kill -TERM`, then `-KILL`; never `pkill -f`); uncommitted work → labeled `wip:` commit +
+push; park memo; PARKED (no counter bump). Never merge a stopped/`wip:` branch.
 
 ## Output
 
 End with: timestamp, run_id, governor, slices + outcomes, PR links, `master` CI after, audits,
 BLOCKERs, risks. Append ONE line to `$MEM/mr-native-tick.log`:
 `<utc> <run_id> DECISION <summary>[ held=<slice>:<why>,…]`: `held=` lists ready
-candidates not launched; `<why>` = overlap|structural|after|cap|pacing|memory|quiet|other:<word>.
+candidates not launched; `<why>` = overlap|structural|after|cap|budget|memory|quiet.
 
 ## Gotchas
 
-- Orchestration depth = 1.
+- Racing ticks → mutex only. Orchestration depth = 1.
 - Worktree missing → `git worktree list` first (`git -C <missing> … | wc -l` fake-reads 0).
 - SIGHUP EXIT=129 → always `setsid` + assert detachment. One heredoc per shell input; timestamps inside python.

@@ -34,6 +34,11 @@ counter. It is written even when the invocation is killed or stopped by a rate l
 could emit a result event (bt-7: no result event, cost-state $64.30). Both sources can only
 miss spend, never invent it, so a run's cost is the larger of the two.
 
+A launch that continues an earlier session (mr-launch.sh's credit-stop resume) shares that
+session's counter with the launch before it. Its ATTEMPT=1 marker carries `RESUME=<session id>
+PRIOR=<the counter at launch>`, and the transcript figure for that launch is the session total
+minus PRIOR — the earlier launch has its own cost row.
+
 NOT USED: `modelUsage` (cumulative like the total), `"subtype":"init"` (not 1:1 with
 invocations).
 
@@ -52,7 +57,10 @@ CONTRACT
                                   attempts    invocations started (ATTEMPT / COST-CAP-WRAP)
                                   unpriced    invocations that ended without a result event
                                   log_cost    spend the log's result events report, or null
-                                  transcript_cost  the transcript's cost-state, or null
+                                  transcript_cost  the transcript's cost-state, or null; less
+                                              session_prior for a resumed session
+                                  session_prior    PRIOR of a launch that resumed this session
+                                              (what it had spent before), else 0
                                   cost        the larger of the two, 4dp; null when neither
                                               source reports a cost
                                   source      "log" | "transcript" | null — which one set it
@@ -156,7 +164,8 @@ def run_of_log(path, transcripts=None):
     """Describe the build session a log holds. Never raises; see the module contract."""
     run = {"launch": None, "session_id": None, "model": None, "escalated": False,
            "attempts": 0, "unpriced": 0, "log_cost": None, "transcript_cost": None,
-           "cost": None, "source": None}
+           "session_prior": 0, "cost": None, "source": None}
+    resumed = None       # (session id, PRIOR) from the launch marker of a credit-stop resume
     total = 0.0
     saw = False
     prev = None          # last cumulative reading of the counter run in progress
@@ -181,6 +190,11 @@ def run_of_log(path, transcripts=None):
                         run["model"] = fields.get("MODEL") or None
                         stamp = re.sub(r"[^0-9TZ]", "", fields.get("TS", ""))
                         run["launch"] = stamp if re.fullmatch(r"\d{8}T\d{6}Z", stamp) else None
+                        if fields.get("RESUME"):
+                            resumed = (fields["RESUME"], _finite(fields.get("PRIOR")))
+                            if resumed[1]:
+                                # a result without its own usage is read against the carried counter
+                                prev, restart = resumed[1], False
                 continue
             if run["session_id"] is None:
                 m = _SID.search(line)
@@ -211,6 +225,12 @@ def run_of_log(path, transcripts=None):
     if saw and math.isfinite(total):
         run["log_cost"] = round(total, 4)
     run["transcript_cost"] = transcript_cost(run["session_id"], transcripts)
+    # Only when the log's session IS the resumed one: after a failed resume the log holds a new
+    # session, whose counter started at zero.
+    if resumed and resumed[1] and resumed[0] == run["session_id"]:
+        run["session_prior"] = resumed[1]
+        if run["transcript_cost"] is not None:
+            run["transcript_cost"] = round(max(0.0, run["transcript_cost"] - resumed[1]), 4)
     known = [(c, s) for c, s in ((run["log_cost"], "log"), (run["transcript_cost"], "transcript"))
              if c is not None]
     if known:
@@ -333,7 +353,7 @@ def selftest():
     if bad:
         print("mr-cost-sum SELFTEST FAIL (%d)" % bad)
         return 1
-    print("mr-cost-sum SELFTEST OK (%d cases)" % (len(_CASES) + 1 + 2 * len(_REAL) + 2))
+    print("mr-cost-sum SELFTEST OK (%d cases)" % (len(_CASES) + 1 + 2 * len(_REAL) + 5))
     return 0
 
 
@@ -391,6 +411,28 @@ def _selftest_real_shapes():
         os.unlink(p)
         if (got["cost"], got["source"], got["attempts"], got["unpriced"]) != (28.2911, "log", 2, 1):
             print("FAIL priced-then-killed got=%r" % (got,))
+            bad += 1
+        # A launch that resumes the rate-limit-stopped session ($28.8414 at the stop, $53.3614
+        # in its transcript now): the launch's own spend is the difference, from either source.
+        sid = "b4935a17-6de2-4273-aad7-439574365dbf"
+        marker = "ATTEMPT=1 MODEL=fable EFFORT=xhigh REPO=project RESUME=%s PRIOR=28.8414 TS=2026-11-06T01:25:22Z\n" % sid
+        init = '{"type":"system","subtype":"init","session_id":"%s","model":"claude-fable-5-1"}\n' % sid
+        result = '{"type":"result","session_id":"%s","total_cost_usd":53.3614}\n' % sid
+        p = os.path.join(empty, "resumed-session")
+        for body, want in ((init, (24.52, "transcript", None)), (init + result, (24.52, "log", 24.52))):
+            with open(p, "w") as f:
+                f.write(marker + body)
+            got = run_of_log(p, transcripts)
+            if (got["cost"], got["source"], got["log_cost"]) != want or got["session_prior"] != 28.8414:
+                print("FAIL resumed-session want=%r got=%r" % (want, got))
+                bad += 1
+        # The resume failed and the log holds a new session: nothing is subtracted from it.
+        with open(p, "w") as f:
+            f.write(marker + open(os.path.join(here, "single-attempt.stream")).read())
+        got = run_of_log(p, transcripts)
+        os.unlink(p)
+        if got["cost"] != 28.2911 or got["session_prior"] != 0:
+            print("FAIL resume-fell-back got=%r" % (got,))
             bad += 1
         missing = run_of_log("/nonexistent/mr-cost-sum/definitely-not-here", empty)
         if missing["cost"] is not None or missing["attempts"] or missing["launch"]:

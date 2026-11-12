@@ -27,3 +27,5 @@ mr-residuals.jsonl
 # lp-gates: the durable arming baseline (one row per `mr-gates verify`). Append-only production
 # state, same class as the usage ledger; it is in mr-backup's CANONICAL set instead.
 mr-acceptance-log.jsonl
+# mr-interrupted's record of the slices a credit stop interrupted — runtime state, rewritten by ticks
+mr-interrupted.json

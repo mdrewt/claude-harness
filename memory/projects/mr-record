@@ -652,7 +652,9 @@ with open(LEDGER,"a+") as f:
 if recorded:
     # The session has its row; what it has spent since goes in beside it.
     sid=(run or {}).get("session_id")
-    late=top_up({sid: cost}) if sid and cost is not None else []
+    # top_up compares a session TOTAL with the session's rows; a launch that resumed the session
+    # reports its own share, so what the session had spent before that launch is added back.
+    late=top_up({sid: float(cost)+float((run or {}).get("session_prior") or 0)}) if sid and cost is not None else []
     print("ledger-skip: %s already has its cost row"%row["run_id"])
     if late: _backup(LEDGER)
     sys.exit(0)

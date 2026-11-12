@@ -4,7 +4,7 @@
 runs cheap bash gates and, when action may be needed, invokes one headless `claude -p` decision
 tick (opus@medium) with `mr-supervisor-prompt-native.md` + a live situation bundle. The tick
 picks/launches/merges ONE unit of work; detached "rooted runs" (opus/fable) do the implementation.
-Events (slice done/crash, PR checks or a watched `master` run concluding, rate-limit reset) fire
+Events (slice done/crash, PR checks or a watched `master` run concluding, a credit reset) fire
 extra ticks; cron is the safety net. A `master` push run on a tree its PR run already passed
 fires only when it does not pass.
 
@@ -44,24 +44,25 @@ reset|manual|decision> <VERB> …`; a decision session appends one line of its o
 
     <utc> <run_id> DECISION <summary>[ held=<slice>:<why>[,<slice>:<why>…]]
 
-`held=` is present when the tick launched or held while another candidate was ready and not
-launched; it names each such candidate with one reason from a closed set, so parallelism lost to
-a rule can be counted apart from parallelism lost to judgment:
+The tick launches every ready candidate that passes the fan-out rules, up to 4 in flight; using
+the weekly credit early is not a reason to hold one, because the same work costs the same credit
+whenever it runs. `held=` is present when a ready candidate was not launched, and names each one
+with the rule that held it:
 
 | `<why>` | The candidate was not launched because |
 |---|---|
 | `overlap` | its code/test `touches:` collide with work in flight (or are undeclared) |
 | `structural` | it touches its always-serial structural set or a table/schema/migration |
 | `after` | a slice it must follow is not merged |
-| `cap` | the fan-out slot limit is reached |
-| `pacing` | budget margin or the staggered-launch rule |
+| `cap` | 4 runs are in flight |
+| `budget` | the governor is at SOFT-PAUSE, or this launch's tier cap would cross it (a run started past the threshold is cut off mid-way) |
 | `memory` | `free -g` shows less than one full build free |
 | `quiet` | a refactor's quiet window covers it |
-| `other:<word>` | none of the above; the word names the judgment |
 
 The session writes one DECISION line, and `held=` on it lists every held candidate. After the
 session ends the wrapper reads that line and logs `HELD rid=<rid> n=<count> <field>`, or
-`HELD rid=<rid> invalid=<field>` when the field is outside the grammar, or
+`HELD rid=<rid> invalid=<field>` when an entry has no reason or one outside the set (a hold by
+judgment), or
 `HELD rid=<rid> invalid=decision-lines:<n>` when the session wrote more than one DECISION line
 (entries spread over several lines cannot be counted). `grep -a ' HELD '` is the count;
 `grep -a ' held='` the raw decisions.
@@ -94,6 +95,39 @@ session ends the wrapper reads that line and logs `HELD rid=<rid> n=<count> <fie
 
 Every other row (`LAUNCHED`, `MERGED`, `PARKED`, CI waits) records an event and carries no cost.
 A slice's spend is the sum of its build-session and `CORRECTION` rows.
+
+## Credit stops (`mr-interrupted`)
+A build session whose pass log ends on a `rate_limit_event` with `status: rejected` has had its
+credit refused until that event's `resetsAt` — the short window and the weekly cap arrive the
+same way. Every tick, before any gate (so also while held or over budget), the wrapper runs
+`mr-interrupted scan`:
+- It records the slice in `mr-interrupted.json` (untracked): tier, model, effort, CLI session id,
+  launch vars, reset time. While the reset is ahead it records every other live slice too (they
+  draw on the same credit) and sets `/tmp/mr_stop_all` + `/tmp/mr_stop_<slice>`, so runs
+  checkpoint and stop. The wrapper logs `CREDIT-STOP new=<slices> resets=<epoch> limit=<type>`
+  and starts `mr-reset-watch`.
+- That tick still runs its decision session, which parks the stopped slices (`wip:` checkpoint,
+  memo, `PARKED`). Later ticks log `STANDDOWN credit-stop BLOCKED_UNTIL_<utc>` until a reset passes.
+- The first tick after the reset — the watcher's `src=reset` tick, or cron's next one if the
+  watcher died; the gate compares the recorded time with the clock — writes each due slice's
+  launch vars back (`mr-interrupted vars --due`) and names them as `resume_first=` in the
+  prompt's TICK PROVENANCE; the bundle lists them as `interrupted[]`. The session's one action
+  is `mr-spawn` for all of them, ahead of everything else including a red `master`. A due
+  resume also passes the live-chain fast path and the `.blocked-on-human` gate; the operator
+  hold and HARD-STOP still stop it.
+- The resume runs at the tier, model and effort the slice was stopped at, and `mr-launch.sh`
+  continues the stopped CLI session (`--resume <id>`) when its transcript is on disk; otherwise,
+  or when the CLI cannot resume it, it starts a new session from the brief, whose resume block
+  points at the `wip:` checkpoint. `mr-spawn` removes the record once the slice is launched.
+- A resume refused again (the log's earliest reset was not the last one) is recorded again
+  with the later reset.
+
+The tick's own session being refused arms `rate_limit_resets_at` in `mr-state.json` and a reset
+watcher. The budget governor's HARD-STOP is separate: it is this loop's dollar estimate
+(`weekly_limit_usd` × `hard_stop_frac`), it stops decision sessions and not runs — a live run
+finishes and its event waits — and it clears when the weekly window (`budget.window_end_utc`)
+rolls over, for which the wrapper arms the same watcher. The estimate and the plan's real limit
+are independent: the plan can refuse credit while the governor reads NORMAL.
 
 ## Slice scope (`touches:`)
 A slice edits the files its spec's `touches:` declares; a run that measures a further file it

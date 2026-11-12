@@ -295,17 +295,438 @@ else
   done <<EOF
 none|$D|
 one|$D held=bt-14:after|n=1 bt-14:after
-several|$D held=bt-14:after,uif-3:overlap,st-2:other:spec-gap|n=3 bt-14:after,uif-3:overlap,st-2:other:spec-gap
-every-reason|$D held=a:overlap,b:structural,c:after,d:cap,e:pacing,f:memory,g:quiet|n=7 a:overlap,b:structural,c:after,d:cap,e:pacing,f:memory,g:quiet
+several|$D held=bt-14:after,uif-3:overlap,st-2:budget|n=3 bt-14:after,uif-3:overlap,st-2:budget
+every-reason|$D held=a:overlap,b:structural,c:after,d:cap,e:budget,f:memory,g:quiet|n=7 a:overlap,b:structural,c:after,d:cap,e:budget,f:memory,g:quiet
 unknown-reason|$D held=bt-14:judgment|invalid=bt-14:judgment
+pacing-is-no-rule|$D held=bt-14:pacing|invalid=bt-14:pacing
+named-judgment|$D held=bt-14:other:spec-gap|invalid=bt-14:other:spec-gap
 no-reason|$D held=bt-14|invalid=bt-14
-bare-other|$D held=bt-14:other:|invalid=bt-14:other:
+one-unreasoned-among-valid|$D held=bt-14:after,uif-3|invalid=bt-14:after,uif-3
 spaced-list|$D held=bt-14:after, uif-3:overlap|invalid=bt-14:after,
 EOF
   # One DECISION line per held candidate instead of one line carrying the list.
   GOT=$(hf "$D held=bt-14:after"$'\n'"$D held=uif-3:overlap")
   [ "$GOT" = "invalid=decision-lines:2" ] || { echo "SELFCHECK-FAIL held-field two-lines: got '$GOT'"; BAD=1; }
 fi
+# credit-stop: a rate-limit rejection stops slices, and the first tick after the reset resumes
+# them. Driven through the REAL mr-interrupted, the REAL wrapper logic of mr-native-tick.sh
+# (extracted by content: the CREDIT STOP block, the human gate, the live-chain fast path, the
+# credit gate, the governor/resume block and the TICK PROVENANCE line), the REAL mr-situation,
+# mr-reset-watch and mr-launch.sh with their paths pointed at a sandbox, and stubs for what
+# spends money or reaches the network (claude, gh). Nothing here reads or writes the live MEM.
+/usr/bin/python3 - "$MEM" <<'PYCREDIT' || BAD=1
+import json, os, re, shutil, subprocess, sys, tempfile, time
+
+MEM = sys.argv[1]
+LIVE_MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
+LIVE_HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
+REJECTED = open(os.path.join(MEM, "fixtures", "run-cost", "rate-limit-rejected.stream")).read()
+SID = "b4935a17-6de2-4273-aad7-439574365dbf"
+RESET = 1793923200                      # the fixture's resetsAt: 2026-11-06T00:00:00Z
+STOPPED = RESET - 356000                # the tick that found the stop, 99 h earlier
+bad = 0
+
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL credit-stop-%s" % name) + (": " + detail if detail else ""))
+
+
+def between(src, start, end):
+    a = src.find(start)
+    b = src.find(end, a + 1) if a >= 0 else -1
+    return src[a:b] if a >= 0 and b > a else ""
+
+
+def line_with(src, needle):
+    return next((l for l in src.splitlines() if needle in l), "")
+
+
+tick_src = open(os.path.join(MEM, "mr-native-tick.sh")).read()
+pieces = {
+    "credit-stop": between(tick_src, "\n# CREDIT STOP ", "\n# RECONCILE "),
+    "human-gate": between(tick_src, '\nif [ -f "$MEM/.blocked-on-human" ]', "\n# gate 0:"),
+    "fast-path": line_with(tick_src, 'log "STANDDOWN live-chain:'),
+    "credit-gate": line_with(tick_src, 'log "STANDDOWN credit-stop '),
+    "governor": between(tick_src, "\n# situation bundle + governor", "\n# assemble prompt"),
+    "provenance": line_with(tick_src, "## TICK PROVENANCE"),
+}
+for name, text in pieces.items():
+    if "mr-" not in text and "STANDDOWN" not in text and "PROVENANCE" not in text:
+        fail("anchor", "could not extract the %s piece of mr-native-tick.sh" % name)
+        sys.exit(bad)
+
+
+class Box:
+    """One sandboxed loop: its own MEM, /tmp and clock."""
+
+    def __init__(self):
+        self.root = tempfile.mkdtemp(prefix="mr-selfcheck-credit-")
+        self.mem = os.path.join(self.root, "mem")
+        self.tmp = os.path.join(self.root, "tmp")
+        os.makedirs(os.path.join(self.mem, "pending-events"))
+        os.makedirs(self.tmp)
+        self.procs = []
+        shutil.copy2(os.path.join(MEM, "mr-interrupted"), self.mem)
+        shutil.copy2(os.path.join(MEM, "mr-budget-config.json"), self.mem)
+        open(os.path.join(self.mem, "monster-realm-usage-ledger.jsonl"), "w").close()
+        with open(os.path.join(self.mem, "mr-state.json"), "w") as f:
+            f.write("{}")
+        # The real bundle generator on the sandbox, without gh; the wrapper adds a red master CI.
+        sit = open(os.path.join(MEM, "mr-situation")).read()
+        if LIVE_MEM not in sit:
+            fail("anchor", "mr-situation no longer names its MEM")
+        with open(os.path.join(self.mem, "mr-situation.real"), "w") as f:
+            f.write(sit.replace(LIVE_MEM, self.mem).replace("/tmp/mr_", self.tmp + "/mr_"))
+        self.script("mr-situation", 'bash "%s/mr-situation.real" --no-gh --fresh | /usr/bin/python3 -c "\n'
+                    'import json,sys\nd=json.load(sys.stdin)\n'
+                    "d['master_ci_latest']=[{'conclusion':'failure','status':'completed'}]\n"
+                    'print(json.dumps(d))"\n' % self.mem)
+        self.script("mr-reset-watch", 'echo "$1" >> "%s/watch.log"\n' % self.root)
+        tick = ["set -u", "MEM=%s" % self.mem, "LOG=%s/tick.log" % self.root, 'SRC=${SRC:-cron}', 'EVFILE=""',
+                'TS(){ date -u +%Y-%m-%dT%H:%M:%SZ; }', 'log(){ echo "src=$SRC $*" >> "$LOG"; }',
+                pieces["credit-stop"], pieces["human-gate"],
+                'LIVE=${LIVE:-0}; DONE_WAIT=0; PENDING=""; LIVE_SLICES=" other(1)"',
+                pieces["fast-path"], pieces["credit-gate"], pieces["governor"],
+                'RID=rid; PROMPTF=%s/prompt.md; : > "$PROMPTF"' % self.root, pieces["provenance"],
+                'echo "REACHED-SESSION governor=$GSTATE resume_first=$RESUME_FIRST"', ""]
+        with open(os.path.join(self.root, "tick.sh"), "w") as f:
+            f.write("\n".join(tick).replace("/tmp/mr_", self.tmp + "/mr_"))
+
+    def script(self, name, body):
+        path = os.path.join(self.mem, name)
+        with open(path, "w") as f:
+            f.write("#!/bin/bash\n" + body)
+        os.chmod(path, 0o755)
+
+    def env(self, now, **extra):
+        e = dict(os.environ, MR_INTERRUPTED_TMP=self.tmp, MR_INTERRUPTED_NOW=str(now))
+        e.pop("MR_FORCE", None)
+        e.update(extra)
+        return e
+
+    def tick(self, now, **extra):
+        """One pass of the wrapper logic. Returns (stdout, the tick-log lines it added)."""
+        log = os.path.join(self.root, "tick.log")
+        before = os.path.getsize(log) if os.path.exists(log) else 0
+        r = subprocess.run(["bash", os.path.join(self.root, "tick.sh")], env=self.env(now, **extra),
+                           capture_output=True, text=True, timeout=120)
+        time.sleep(0.3)             # the reset watcher is started in the background
+        added = open(log).read()[before:] if os.path.exists(log) else ""
+        return r.stdout, added
+
+    def tool(self, now, *args):
+        r = subprocess.run([os.path.join(self.mem, "mr-interrupted")] + list(args), env=self.env(now),
+                           capture_output=True, text=True, timeout=60)
+        return r.stdout.strip()
+
+    def slice(self, name, tier, model, effort, log=None, live=False):
+        if live:
+            p = subprocess.Popen(["sleep", "600"])
+        else:
+            p = subprocess.Popen(["true"])
+            p.wait()
+        self.procs.append(p)
+        with open(os.path.join(self.mem, ".harness-runner.%s.lock" % name), "w") as f:
+            json.dump({"slice": name, "session_leader": p.pid, "started_utc": "2026-11-01T20:00:36Z",
+                       "tier": tier, "model": model, "effort": effort, "repo": "project",
+                       "touches": ["client/src/%s.ts" % name]}, f)
+        with open(os.path.join(self.tmp, "mr_pass_%s.vars.json" % name), "w") as f:
+            json.dump({"slice": name, "tier": tier, "model": model, "effort": effort,
+                       "touches": "client/src/%s.ts" % name, "target_desc": "build " + name,
+                       "resume_block": ""}, f)
+        with open(os.path.join(self.tmp, "mr_pass_%s.log" % name), "w") as f:
+            f.write(log if log is not None else
+                    "ATTEMPT=1 MODEL=%s EFFORT=%s TS=2026-11-01T20:00:40Z\n"
+                    '{"type":"system","subtype":"init","session_id":"11111111-2222-3333-4444-555555555555"}\n'
+                    % (model, effort))
+        return p
+
+    def vars(self, name):
+        try:
+            return json.load(open(os.path.join(self.tmp, "mr_pass_%s.vars.json" % name)))
+        except Exception:
+            return {}
+
+    def watched(self):
+        try:
+            return open(os.path.join(self.root, "watch.log")).read().split()
+        except OSError:
+            return []
+
+    def flags(self):
+        return sorted(n for n in os.listdir(self.tmp) if n.startswith("mr_stop_"))
+
+    def close(self):
+        for p in self.procs:
+            if p.poll() is None:
+                p.kill()
+                p.wait()
+        shutil.rmtree(self.root, ignore_errors=True)
+
+
+def offered(listing):
+    return sorted((e["slice"], e["tier"], e["model"], e["effort"], e["due"]) for e in listing)
+
+
+WANT = [("s-a", "routine", "opus", "high"), ("s-b", "content", "opus", "medium")]
+
+# ---- two running slices stopped by one rejection; the reset tick resumes both -----------------
+box = Box()
+try:
+    box.slice("s-a", "routine", "opus", "high", log=REJECTED)            # its session was refused
+    sibling = box.slice("s-b", "content", "opus", "medium", live=True)   # still running beside it
+    out, log = box.tick(STOPPED, SRC="crash")
+    state = box.tool(STOPPED, "list")
+    try:
+        listing = json.loads(state)
+    except ValueError:
+        listing = []
+    if "CREDIT-STOP new=s-a,s-b resets=%d limit=seven_day_overage_included" % RESET not in log:
+        fail("stop-recorded", "tick log: %r" % log)
+    if offered(listing) != [w + (False,) for w in WANT]:
+        fail("stop-records-tier", "list: %r" % (state,))
+    if box.flags() != ["mr_stop_all", "mr_stop_s-a", "mr_stop_s-b"]:
+        fail("stop-flags", "flags: %r" % (box.flags(),))
+    if box.watched() != ["2026-11-06T00:00:00Z"]:
+        fail("stop-arms-reset-tick", "mr-reset-watch calls: %r" % (box.watched(),))
+    # The tick that finds the stop still reaches its session (it parks the slices) and resumes nothing.
+    if out.strip() != "REACHED-SESSION governor=NORMAL resume_first=":
+        fail("stop-tick-parks", "stdout: %r" % out)
+    sibling.kill()
+    sibling.wait()
+    # Until the reset: no decision session, and the record stays.
+    out, log = box.tick(STOPPED + 3600)
+    if "STANDDOWN credit-stop BLOCKED_UNTIL_2026-11-06T00:00:00Z" not in log or "REACHED-SESSION" in out:
+        fail("waits-for-reset", "stdout=%r log=%r" % (out, log))
+    if box.tool(RESET - 1, "gate") != "BLOCKED_UNTIL_2026-11-06T00:00:00Z":
+        fail("gate-before-reset", box.tool(RESET - 1, "gate"))
+    # The reset tick, with master CI red in the same bundle: both slices, at the tier, model and
+    # effort they were stopped at, on the stopped session where there is one.
+    out, log = box.tick(RESET + 130, SRC="reset")
+    if "REACHED-SESSION governor=NORMAL resume_first=s-a,s-b" not in out:
+        fail("reset-tick-resumes-all", "stdout=%r log=%r" % (out, log))
+    prompt = open(os.path.join(box.root, "prompt.md")).read()
+    if "src=reset" not in prompt or " resume_first=s-a,s-b" not in prompt:
+        fail("reset-tick-tells-session", "provenance: %r" % prompt)
+    got = [(n, box.vars(n).get("tier"), box.vars(n).get("model"), box.vars(n).get("effort")) for n in ("s-a", "s-b")]
+    if got != WANT:
+        fail("resume-at-stopped-tier", "vars: %r" % (got,))
+    if box.vars("s-a").get("resume_session") != SID or "CREDIT-STOP RESUME" not in box.vars("s-a").get("resume_block", "") \
+            or box.vars("s-a").get("target_desc") != "build s-a":
+        fail("resume-same-session", "vars: %r" % (box.vars("s-a"),))
+    r = subprocess.run(["bash", os.path.join(box.mem, "mr-situation")], env=box.env(RESET + 130),
+                       capture_output=True, text=True, timeout=60)
+    try:
+        bundle = json.loads(r.stdout)
+    except ValueError:
+        bundle = {}
+    if offered(bundle.get("interrupted") or []) != [w + (True,) for w in WANT] \
+            or (bundle.get("master_ci_latest") or [{}])[0].get("conclusion") != "failure":
+        fail("bundle-offers-interrupted", "bundle: %r" % ({k: bundle.get(k) for k in ("interrupted", "master_ci_latest")},))
+    # A slice that is launched again leaves the record, and its stopped log does not put it back.
+    box.tool(RESET + 200, "drop", "s-a")
+    box.tool(RESET + 200, "scan")
+    if [e["slice"] for e in json.loads(box.tool(RESET + 200, "list"))] != ["s-b"]:
+        fail("dropped-stays-dropped", box.tool(RESET + 200, "list"))
+finally:
+    box.close()
+
+# ---- the short window, and a watcher that died ------------------------------------------------
+box = Box()
+try:
+    short = REJECTED.replace(str(RESET), str(STOPPED + 7200)).replace("seven_day_overage_included", "five_hour")
+    box.slice("s-a", "routine", "opus", "high", log=short)
+    sibling = box.slice("s-b", "content", "opus", "medium", live=True)
+    box.slice("s-c", "hard", "fable", "xhigh", log=REJECTED.replace('"status":"rejected","resetsAt"', '"status":"allowed_warning","resetsAt"'))
+    out, log = box.tick(STOPPED, SRC="crash")
+    if "CREDIT-STOP new=s-a,s-b resets=%d limit=five_hour" % (STOPPED + 7200) not in log:
+        fail("short-window-recorded", "tick log: %r" % log)
+    sibling.kill()
+    sibling.wait()
+    # No reset tick ever arrives (the watcher here is a stub). Cron's ticks: before the reset they
+    # stand down; the first one after it resumes both — past a human-gate marker and a live chain.
+    with open(os.path.join(box.mem, ".blocked-on-human"), "w") as f:
+        f.write("DECISION(some-question) waiting\n")
+    out, log = box.tick(STOPPED + 3600, SRC="cron", LIVE="1")
+    if "REACHED-SESSION" in out or "STANDDOWN" not in log:
+        fail("watcher-died-waits", "stdout=%r log=%r" % (out, log))
+    out, log = box.tick(STOPPED + 7200 + 1800, SRC="cron", LIVE="1")
+    if "REACHED-SESSION governor=NORMAL resume_first=s-a,s-b" not in out:
+        fail("watcher-died-cron-resumes", "stdout=%r log=%r" % (out, log))
+    if [box.vars(n).get("tier") for n in ("s-a", "s-b")] != ["routine", "content"]:
+        fail("watcher-died-tier", "tiers: %r" % ([box.vars(n).get("tier") for n in ("s-a", "s-b")],))
+    # With nothing to resume the same cron tick is stopped by the marker, then by the live chain.
+    for name in ("s-a", "s-b"):
+        box.tool(STOPPED + 9100, "drop", name)
+    out, log = box.tick(STOPPED + 9200, SRC="cron", LIVE="1")
+    if "REACHED-SESSION" in out or "STANDDOWN gated-on-human" not in log:
+        fail("human-gate-still-holds", "stdout=%r log=%r" % (out, log))
+    os.unlink(os.path.join(box.mem, ".blocked-on-human"))
+    out, log = box.tick(STOPPED + 9300, SRC="cron", LIVE="1")
+    if "REACHED-SESSION" in out or "STANDDOWN live-chain" not in log:
+        fail("live-chain-still-holds", "stdout=%r log=%r" % (out, log))
+finally:
+    box.close()
+
+# ---- the budget governor's weekly HARD-STOP ---------------------------------------------------
+box = Box()
+try:
+    def week(anchor_days_ago, spent_days_ago):
+        now = time.time()
+        with open(os.path.join(box.mem, ".weekly-reset-anchor"), "w") as f:
+            f.write("%d\n" % (now - anchor_days_ago * 86400))
+        ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - spent_days_ago * 86400))
+        with open(os.path.join(box.mem, "monster-realm-usage-ledger.jsonl"), "w") as f:
+            f.write(json.dumps({"ts": ts, "slice": "old", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)",
+                                "cost_usd": 2750.0, "model": "fable"}) + "\n")
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(now - anchor_days_ago * 86400) + 7 * 86400))
+
+    # Over 97% of the weekly figure with a run in flight: no session, the run is left alone, and
+    # a reset tick is armed for the end of the window.
+    wend = week(3, 1)
+    running = box.slice("s-run", "routine", "opus", "high", live=True)
+    out, log = box.tick(RESET + 130)
+    if "REACHED-SESSION" in out or "STANDDOWN budget-hard-stop" not in log or wend not in log:
+        fail("hard-stop-stands-down", "stdout=%r log=%r" % (out, log))
+    if box.flags() or box.tool(RESET + 130, "list") != "[]" or running.poll() is not None:
+        fail("hard-stop-leaves-runs", "flags=%r list=%r" % (box.flags(), box.tool(RESET + 130, "list")))
+    if box.watched() != [wend]:
+        fail("hard-stop-arms-window-end", "want %r, mr-reset-watch calls: %r" % (wend, box.watched()))
+    # A slice the plan's own weekly cap stopped is recorded even while the governor stands the
+    # tick down, and is not resumed until the window has rolled over.
+    box.slice("s-a", "hard", "fable", "xhigh", log=REJECTED)
+    out, log = box.tick(RESET + 130)
+    if "REACHED-SESSION" in out or "CREDIT-STOP new=s-a " not in log or box.vars("s-a").get("resume_session"):
+        fail("hard-stop-records-not-resumes", "stdout=%r log=%r" % (out, log))
+    week(7.01, 1)
+    out, log = box.tick(RESET + 130)
+    if "REACHED-SESSION governor=NORMAL resume_first=s-a" not in out \
+            or (box.vars("s-a").get("tier"), box.vars("s-a").get("resume_session")) != ("hard", SID):
+        fail("hard-stop-rollover-resumes", "stdout=%r log=%r vars=%r" % (out, log, box.vars("s-a")))
+finally:
+    box.close()
+
+# ---- mr-reset-watch fires one tick per reset time ---------------------------------------------
+box = Box()
+try:
+    watch = open(os.path.join(MEM, "mr-reset-watch")).read()
+    if LIVE_MEM not in watch or "/tmp/mr_resetwatch_" not in watch:
+        fail("anchor", "mr-reset-watch no longer names its MEM or its lock dir")
+    with open(os.path.join(box.root, "reset-watch.sh"), "w") as f:
+        f.write(watch.replace(LIVE_MEM, box.mem).replace("/tmp/mr_", box.tmp + "/mr_"))
+    box.script("mr-native-tick.sh", 'echo "$MR_EVENT_SRC $1" >> "%s/fired.log"\n' % box.root)
+    past = str(int(time.time()) - 200)
+    for _ in range(2):
+        subprocess.run(["bash", os.path.join(box.root, "reset-watch.sh"), past], capture_output=True, timeout=30,
+                       env=dict(os.environ, MR_NO_EVENT_BRIDGE="0"))
+        time.sleep(0.5)
+    try:
+        fired = open(os.path.join(box.root, "fired.log")).read().splitlines()
+    except OSError:
+        fired = []
+    if fired != ["reset %s/pending-events/rate-limit.reset.md" % box.mem]:
+        fail("reset-watch-fires-once", "ticks fired: %r" % (fired,))
+finally:
+    box.close()
+
+# ---- the resume continues the stopped session -------------------------------------------------
+# mr-spawn hands the vars' resume_session to mr-launch.sh; mr-launch.sh resumes that session when
+# its transcript is on disk and starts from the brief when it is not or the CLI refuses.
+box = Box()
+try:
+    spawn = open(os.path.join(MEM, "mr-spawn")).read()
+    step = between(spawn, "\nRSID=$(", "\n  LAST_SEEN_MODEL=")
+    if "mr-launch.sh" not in step:
+        fail("anchor", "could not extract mr-spawn's launch line")
+    else:
+        box.script("mr-launch.sh", 'printf "%%s|" "$@" >> "%s/launch-args"; echo >> "%s/launch-args"\n' % (box.root, box.root))
+        with open(os.path.join(box.root, "spawn-step.sh"), "w") as f:
+            f.write("MEM=%s\nS=s-a; MODEL=opus; EFFORT=high; REPO=project; V=\"$1\"\n%s\n}\nattempt_launch; wait\n" % (box.mem, step))
+        for i, value in enumerate((SID, "x; touch /tmp/pwned", None)):
+            v = os.path.join(box.root, "v%d.json" % i)
+            with open(v, "w") as f:
+                json.dump({"slice": "s-a", "resume_session": value} if value else {"slice": "s-a"}, f)
+            subprocess.run(["bash", os.path.join(box.root, "spawn-step.sh"), v], capture_output=True, timeout=30)
+        got = open(os.path.join(box.root, "launch-args")).read().splitlines()
+        if got != ["s-a|opus|high|project|%s|" % SID, "s-a|opus|high|project||", "s-a|opus|high|project||"]:
+            fail("spawn-passes-session", "mr-launch.sh args: %r" % (got,))
+
+    launch = open(os.path.join(MEM, "mr-launch.sh")).read()
+    if LIVE_HARNESS not in launch:
+        fail("anchor", "mr-launch.sh no longer names its HARNESS")
+    harness = os.path.join(box.root, "harness")
+    rundir = os.path.join(harness, "projects", "monster-realm")
+    hmem = os.path.join(harness, "memory", "projects")
+    home = os.path.join(box.root, "home")
+    stubs = os.path.join(box.root, "bin")
+    for d in (rundir, hmem, stubs):
+        os.makedirs(d)
+    shutil.copy2(os.path.join(MEM, "mr-cost-sum"), hmem)
+    with open(os.path.join(box.root, "launch.sh"), "w") as f:
+        f.write(launch.replace(LIVE_HARNESS, harness).replace("/tmp/mr_", box.tmp + "/mr_"))
+    # claude: logs its arguments; refuses a --resume when told to; otherwise emits one result.
+    with open(os.path.join(stubs, "claude"), "w") as f:
+        f.write('#!/bin/bash\necho "$*" >> "%s/claude-args"\n'
+                'case " $* " in *" --resume "*) [ -e "%s/refuse-resume" ] && { echo "No conversation found" >&2; exit 1; };; esac\n'
+                'echo \'{"type":"assistant","session_id":"%s"}\'\n'
+                'echo \'{"type":"result","session_id":"%s","total_cost_usd":1.5}\'\n' % (box.root, box.root, SID, SID))
+    with open(os.path.join(stubs, "gh"), "w") as f:
+        f.write('#!/bin/bash\necho "feat/s-a"\n')          # the slice's PR is open: a terminal state
+    for n in ("claude", "gh"):
+        os.chmod(os.path.join(stubs, n), 0o755)
+    transcript = os.path.join(home, ".claude", "projects", re.sub(r"[^A-Za-z0-9]", "-", rundir), SID + ".jsonl")
+    env = dict(os.environ, HOME=home, PATH=stubs + ":" + os.environ.get("PATH", ""),
+               MR_NO_EVENT_BRIDGE="1", MR_NO_OLLAMA="1", MR_NO_ESCALATE="1")
+
+    def launch_once(resume, with_transcript, refuse):
+        for n in ("claude-args", "refuse-resume"):
+            try:
+                os.unlink(os.path.join(box.root, n))
+            except OSError:
+                pass
+        for n in os.listdir(box.tmp):
+            os.unlink(os.path.join(box.tmp, n))
+        shutil.rmtree(os.path.join(home, ".claude"), ignore_errors=True)
+        if with_transcript:
+            os.makedirs(os.path.dirname(transcript))
+            with open(transcript, "w") as f:
+                f.write('{"type":"cost-state","totalCostUSD":28.8414}\n')
+        if refuse:
+            open(os.path.join(box.root, "refuse-resume"), "w").close()
+        with open(os.path.join(box.tmp, "mr_pass_s-a.md"), "w") as f:
+            f.write("THE BRIEF\n")
+        subprocess.run(["bash", os.path.join(box.root, "launch.sh"), "s-a", "opus", "high", "project", resume],
+                       env=env, capture_output=True, text=True, timeout=60)
+        try:
+            calls = open(os.path.join(box.root, "claude-args")).read().splitlines()
+        except OSError:
+            calls = []
+        try:
+            log = open(os.path.join(box.tmp, "mr_pass_s-a.log")).read()
+        except OSError:
+            log = ""
+        return calls, log
+
+    calls, log = launch_once(SID, True, False)
+    if len(calls) != 1 or "--resume %s " % SID not in calls[0] or "THE BRIEF" in calls[0] \
+            or "--model opus --effort high" not in calls[0] or "RESUME=%s PRIOR=28.8414 TS=" % SID not in log:
+        fail("launch-resumes-session", "claude calls=%r log=%r" % (calls, log[:300]))
+    calls, log = launch_once(SID, False, False)
+    if len(calls) != 1 or "--resume" in calls[0] or "THE BRIEF" not in calls[0] or "RESUME=" in log:
+        fail("launch-falls-back-no-transcript", "claude calls=%r log=%r" % (calls, log[:300]))
+    calls, log = launch_once(SID, True, True)
+    if len(calls) != 2 or "--resume" not in calls[0] or "--resume" in calls[1] or "THE BRIEF" not in calls[1] \
+            or "RESUME-FAILED" not in log:
+        fail("launch-falls-back-refused", "claude calls=%r log=%r" % (calls, log[:300]))
+    calls, log = launch_once("", True, False)
+    if len(calls) != 1 or "--resume" in calls[0] or "THE BRIEF" not in calls[0]:
+        fail("launch-plain", "claude calls=%r" % (calls,))
+finally:
+    box.close()
+sys.exit(bad)
+PYCREDIT
 # lp-00: repo routing is the SSOT both mr-spawn and mr-launch.sh read. Its register carries the real
 # declared touches of live slices, so a classification regression reds HERE rather than at spawn —
 # where the cost is a slice launched into the wrong repo's main checkout.

@@ -38,7 +38,8 @@ symbol names exist.
 ## Supervisor cost accounting reconstructs per-invocation cost
 Claude CLI logs report cumulative `total_cost_usd`, carried across `--resume`; a run's own spend
 is reconstructed by `mr-cost-sum` (the single implementation) from each result event's own usage,
-or the session transcript's `cost-state` when that reports more.
+or the session transcript's `cost-state` when that reports more; a launch that resumes an
+earlier session subtracts what that session had spent before it (`PRIOR=` on its launch marker).
 Each build session gets exactly one ledger cost row, keyed by the launch stamp in its pass log
 (`mr-record ledger --from-log`), and the usage ledger is append-only — a wrong figure is
 corrected by appending a signed `CORRECTION` row, never by rewriting; spend a session makes after
@@ -48,6 +49,23 @@ resumed run, and judging "already recorded" from the slice name and a time windo
 of every relaunch.
 Rules out: hand-summing costs at call sites, deciding a session is recorded from its slice name
 and a time window, and editing ledger rows in place.
+
+## A credit stop is recorded by the tick wrapper and resumed before any other work
+When a build session's pass log ends on a `rejected` rate-limit event, `mr-interrupted` records
+the stopped slices (tier, model, effort, CLI session, launch vars, reset time) before any gate
+of the tick; the first tick after the reset writes their launch vars back and its one action is
+to relaunch all of them, at the tier they were stopped at, on the stopped CLI session when its
+transcript is still on disk. Fan-out launches every ready candidate that passes a named rule
+(overlap, structural, `after:`, 4 in flight, memory, quiet window, the governor's thresholds);
+spending the weekly credit early is not one of them.
+A stop is not a failure, so nothing about the slice is re-decided: the work costs the same
+credit whenever it runs, an interrupted run's context and uncommitted step are the most
+expensive things to rebuild, and a decision session that has to infer what was stopped — or
+that never runs because a hold, the budget stand-down or its own refused session ended the tick
+first — leaves the work parked until someone notices.
+Rules out: escalating a credit-stop resume to the hard tier, ranking it behind other picks,
+holding a ready slice to spread spend over the week, and moving the detection or the reset
+arithmetic back into the supervisor prompt.
 
 ## Noisy Bash output is filtered by rewriting the command, not the result
 The quiet hook rewrites recognized noisy commands to a tee-to-log wrapper that withholds pass

@@ -1,6 +1,8 @@
 #!/bin/bash
 # mr-spawn <slice> [--dry] — build brief + lock + detached launch + asserts, from /tmp/mr_pass_<slice>.vars.json
-# vars.json: {slice, model, effort, touches, target_desc, resume_block, tier}
+# vars.json: {slice, model, effort, touches, target_desc, resume_block, tier[, resume_session]}
+# resume_session (a CLI session id; mr-interrupted writes it for a slice a credit stop interrupted)
+# makes the launcher continue that session instead of starting a new one from the brief.
 # Kills a failed first attempt BY RECORDED PID before its single retry. Prints one status JSON line.
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
@@ -1057,8 +1059,9 @@ else
   emit GATES-SEED-SKIPPED "mr-gates missing or not executable at $MEM/mr-gates"
 fi
 RID="mr-spawn-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+RSID=$(/usr/bin/python3 -c "import json,re,sys;r=str(json.load(open(sys.argv[1])).get('resume_session') or '');print(r if re.fullmatch(r'[0-9a-fA-F-]{8,64}',r) else '')" "$V" 2>/dev/null)
 attempt_launch(){
-  setsid bash "$MEM/mr-launch.sh" "$S" "$MODEL" "$EFFORT" "$REPO" >/dev/null 2>&1 & LEADER=$!
+  setsid bash "$MEM/mr-launch.sh" "$S" "$MODEL" "$EFFORT" "$REPO" "$RSID" >/dev/null 2>&1 & LEADER=$!
   LAST_SEEN_MODEL=""
   disown 2>/dev/null || true
   sleep 4
@@ -1092,7 +1095,7 @@ if ! attempt_launch; then
   if ! attempt_launch; then kill_attempt; status FAIL "launch asserts failed twice — $(fail_evidence)" 1; fi
 fi
 CPID=$(pgrep -P "$LEADER" 2>/dev/null | head -1)
-export S V MEM RID LEADER CPID MODEL EFFORT B REPO PR_REPO BASE_BRANCH
+export S V MEM RID LEADER CPID MODEL EFFORT B REPO PR_REPO BASE_BRANCH RSID
 if ! /usr/bin/python3 - <<'PYLOCK'
 import json, os, datetime
 v=json.load(open(os.environ["V"]))
@@ -1104,7 +1107,8 @@ lock={"run_id":os.environ["RID"],"slice":os.environ["S"],
  "brief":os.environ["B"],"done_flag":"/tmp/mr_pass_%s.done"%os.environ["S"],
  "touches":touches,
  "model":os.environ["MODEL"],"effort":os.environ["EFFORT"],"tier":v.get("tier","routine"),
- "repo":os.environ["REPO"],"pr_repo":os.environ["PR_REPO"],"base_branch":os.environ["BASE_BRANCH"]}
+ "repo":os.environ["REPO"],"pr_repo":os.environ["PR_REPO"],"base_branch":os.environ["BASE_BRANCH"],
+ "resume_session":os.environ.get("RSID") or None}
 open(os.environ["MEM"]+"/.harness-runner."+os.environ["S"]+".lock","w").write(json.dumps(lock,indent=1))
 PYLOCK
 then kill_attempt; status FAIL "lock write failed after launch (attempt killed)" 1; fi
@@ -1116,4 +1120,7 @@ for IT in $ITEMS; do
   FR=$("$MEM/mr-feedback" set "$IT" --state IN-WORK 2>&1)
   case "$FR" in FEEDBACK-SET*) :;; *) emit ITEMS-FLIP-FAIL "$IT: $FR";; esac   # emit only — status() exits
 done
+# The slice runs again, so it is no longer an interrupted one (advisory: a stale record only makes
+# the next tick look at a slice that is live).
+"$MEM/mr-interrupted" drop "$S" >/dev/null 2>&1 || true
 status LAUNCHED "leader=$LEADER claude_pid=${CPID:-?} model=$MODEL effort=$EFFORT tier=${TIER:-?} repo=$REPO pr_repo=$PR_REPO brief_bytes=$(stat -c %s "$B" 2>/dev/null || echo ?) rid=$RID"

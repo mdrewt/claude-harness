@@ -1,5 +1,11 @@
 #!/bin/bash
-# mr-reset-watch <resets_at: epoch-or-ISO8601> — sleep until rate-limit reset +120s, then fire a tick. Launch detached.
+# mr-reset-watch <resets_at: epoch-or-ISO8601> — wait until that time +120s, then fire a tick with
+# src=reset. Launch detached. Callers: mr-native-tick.sh, when mr-interrupted records a credit stop,
+# when the tick's own session is refused, and at a budget HARD-STOP (the weekly window's end).
+# One live watcher per reset time: a second call for the same time exits, a call that finds the
+# first one dead takes over, and a call after the time has passed does nothing (cron's next tick
+# is the fallback). The wait re-reads the wall clock every 5 minutes instead of sleeping once, so
+# a suspended host or a stepped clock cannot move the firing time off the clock the reset is on.
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
 unset MR_FORCE MR_TICK_DRYRUN MR_OPERATOR_RUN MR_EVENT_SRC 2>/dev/null || true   # forced-ness must not propagate to the ticks we spawn
@@ -16,10 +22,20 @@ except ValueError:
 PY
 )
 [ "$E" = "0" ] && exit 0
-NOW=$(date +%s); WAIT=$(( E - NOW + 120 )); [ "$WAIT" -lt 0 ] && WAIT=0
-[ "$WAIT" -gt 604800 ] && exit 0   # >7d: nonsense value, let cron handle it
-sleep "$WAIT"
+[ $(( E - $(date +%s) )) -gt 604800 ] && exit 0   # >7d: nonsense value, let cron handle it
+LK="/tmp/mr_resetwatch_$E.d"
+if ! mkdir "$LK" 2>/dev/null; then
+  OP=$(cat "$LK/pid" 2>/dev/null)
+  { [ -n "$OP" ] && kill -0 "$OP" 2>/dev/null; } && exit 0
+  [ $(( E + 120 - $(date +%s) )) -le 0 ] && exit 0
+fi
+echo $$ > "$LK/pid"
+while :; do
+  LEFT=$(( E + 120 - $(date +%s) ))
+  [ "$LEFT" -le 0 ] && break
+  sleep $(( LEFT < 300 ? LEFT : 300 ))
+done
 EV="$MEM/pending-events/rate-limit.reset.md"
-echo "EVENT src=reset at=$(date -u +%Y-%m-%dT%H:%M:%SZ) — recorded resetsAt ($R) has passed; re-evaluate parked work" > "$EV"
+echo "EVENT src=reset at=$(date -u +%Y-%m-%dT%H:%M:%SZ) — the recorded reset ($R) has passed; resume what interrupted[] lists" > "$EV"
 MR_EVENT_SRC=reset setsid /bin/bash "$MEM/mr-native-tick.sh" "$EV" >/dev/null 2>&1 &
 exit 0

@@ -20,11 +20,11 @@ log(){ echo "$(TS) pid=$$ src=$SRC $*" >> "$LOG"; }
 # `invalid=<field>` for a malformed one, and nothing when the line carries none. A session writes
 # ONE DECISION line; given several, only one could be read and the held entries on the others
 # would go uncounted, so that prints `invalid=decision-lines:<n>`. Grammar:
-# held=<slice>:<why>[,<slice>:<why>...], <why> one of overlap|structural|after|cap|pacing|memory|
-# quiet|other:<word>. The closed set is what lets parallelism lost to a rule be counted apart from
-# parallelism lost to judgment, so a field outside it is reported instead of passed through.
+# held=<slice>:<why>[,<slice>:<why>...], <why> one of overlap|structural|after|cap|budget|memory|
+# quiet — the rules that may hold a ready candidate. A hold names its rule, so a missing reason or
+# one outside the set (a judgment) prints as invalid instead of being counted as a rule.
 held_field(){
-  local f n id='[A-Za-z0-9][A-Za-z0-9._-]*' why='(overlap|structural|after|cap|pacing|memory|quiet|other:[A-Za-z0-9_-]+)'
+  local f n id='[A-Za-z0-9][A-Za-z0-9._-]*' why='(overlap|structural|after|cap|budget|memory|quiet)'
   n=$(printf '%s\n' "$1" | grep -c .)
   if [ "$n" -gt 1 ]; then printf 'invalid=decision-lines:%s' "$n"; return 0; fi
   case "$1" in *" held="*) f=${1##* held=}; f=${f%% *} ;; *) return 0 ;; esac
@@ -47,6 +47,22 @@ if [ "${_hb_fail:-0}" -le "${_hb_ok:-0}" ]; then date -u +%s > "$MEM/.native-sup
 # generations; the haiku hop it replaced is recorded at mr-launch.sh:94 as "0 invocations ever". mr-ollama
 # and the local stack are deliberately RETAINED for manual/experimental use — its consumers still degrade
 # on OLLAMA-UNAVAILABLE. Rollback: restore from git history if a real per-tick consumer ever appears.)
+
+# CREDIT STOP (runs even when disabled/over-budget): a build session whose pass log ends on a
+# `rejected` rate_limit_event has had its credit refused until the event's resetsAt — the short
+# window or the weekly cap alike. `mr-interrupted scan` records that slice and every slice live
+# beside it (tier, model, effort, CLI session, launch vars) and trips the cooperative stop flags;
+# this block arms the reset tick. It sits above every gate because the record has to exist
+# whichever gate ends this tick: the gates below read it (CGATE), the situation bundle carries it
+# as `interrupted[]`, and the first tick after the reset resumes from it.
+CS=$(timeout 60 "$MEM/mr-interrupted" scan 2>/dev/null)
+CGATE=$(timeout 60 "$MEM/mr-interrupted" gate 2>/dev/null)
+CS_NEW=0
+case "$CS" in
+  "STOP "*)
+    CS_NEW=1; log "CREDIT-$CS gate=${CGATE:-none}"
+    case "$CGATE" in BLOCKED_UNTIL_*) setsid /bin/bash "$MEM/mr-reset-watch" "${CGATE#BLOCKED_UNTIL_}" >/dev/null 2>&1 & ;; esac ;;
+esac
 
 # RECONCILE (accounting; runs even when disabled/over-budget): one cost row per ended build session.
 # `mr-record ledger --from-log` owns the row: it names the session by the launch stamp in its pass
@@ -209,7 +225,8 @@ if [ -d "$ARCH" ] && { [ ! -f "$ARCH/.last-rollup" ] || [ $(( $(date +%s) - $(st
   touch "$ARCH/.last-rollup" 2>/dev/null || true
 fi
 
-if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ]; then
+# A due credit-stop resume (CGATE) is not what the marker waits on, so it passes like an event tick.
+if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ] && [ "${CGATE#DUE }" = "${CGATE:-}" ]; then
   WAKE=$(grep -m1 -oE "wake_file=[^ ]+" "$MEM/.blocked-on-human" 2>/dev/null | cut -d= -f2)
   MAGE=$(( $(date +%s) - $(stat -c %Y "$MEM/.blocked-on-human" 2>/dev/null || echo 0) ))
   if [ -n "$WAKE" ] && [ -e "$WAKE" ]; then
@@ -299,7 +316,7 @@ for LS in $LIVE_BARE; do
     *) log "RATE-LIMIT-TELEMETRY slice=$LS ${TEL:-no-output}" ;;
   esac
 done
-if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ] && [ -z "$PENDING" ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
+if [ "$LIVE" -eq 1 ] && [ "$DONE_WAIT" -eq 0 ] && [ -z "$PENDING" ] && [ "${CGATE#DUE }" = "${CGATE:-}" ]; then log "STANDDOWN live-chain:$LIVE_SLICES"; exit 0; fi
 
 # gate 2: rate-limit reset-time from mr-state.json
 # (ACCEPTED DUPLICATION: mr-situation also surfaces rate_limit_resets_at as data; THIS gate is the sole
@@ -325,6 +342,10 @@ except Exception as e:
 PY
 )
 case "$RLGATE" in BLOCKED_UNTIL_*) log "STANDDOWN rate-limit $RLGATE"; exit 0;; esac
+# The same gate for a credit stop mr-interrupted recorded: no decision session until a recorded
+# slice's reset has passed. The tick that records the stop goes on (CS_NEW), so one session parks
+# the stopped slices while their state is fresh.
+if [ "$CS_NEW" = 0 ]; then case "$CGATE" in BLOCKED_UNTIL_*) log "STANDDOWN credit-stop $CGATE"; exit 0;; esac; fi
 
 # gate 3: human-activity probe
 IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
@@ -381,13 +402,26 @@ SIT=$("$MEM/mr-situation" 2>/dev/null || echo '{"error":"situation-unavailable"}
 GSTATE=$(echo "$SIT" | /usr/bin/python3 -c "import json,sys
 try: print(json.load(sys.stdin).get('budget',{}).get('state','UNKNOWN'))
 except Exception: print('UNKNOWN')")
-if [ "$GSTATE" = "HARD-STOP" ]; then log "STANDDOWN budget-hard-stop (>97% of weekly); pending events retained"; exit 0; fi
+# HARD-STOP stops decision sessions, not runs: a live run finishes and its event waits here. The
+# figure falls back under the threshold when the weekly window rolls over, so a reset tick is armed
+# for that moment (one watcher per time; re-armed here every tick if it died).
+if [ "$GSTATE" = "HARD-STOP" ]; then
+  WEND=$(echo "$SIT" | /usr/bin/python3 -c "import json,sys
+try: print(json.load(sys.stdin).get('budget',{}).get('window_end_utc') or '')
+except Exception: print('')")
+  [ -n "$WEND" ] && { setsid /bin/bash "$MEM/mr-reset-watch" "$WEND" >/dev/null 2>&1 & }
+  log "STANDDOWN budget-hard-stop (>97% of weekly; window ends ${WEND:-unknown}); pending events retained"; exit 0
+fi
+# CREDIT-STOP RESUME: every recorded slice whose reset has passed gets its launch vars written
+# back (same tier, model, effort and CLI session) before the session starts, and the session is
+# told their names: resuming them is this tick's action, and all it has left to do is mr-spawn.
+RESUME_FIRST=$(timeout 60 "$MEM/mr-interrupted" vars --due 2>/dev/null)
 
 # assemble prompt (SSOT + situation + pending events + event arg)
 RID="native-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 PROMPTF="/tmp/mr_tick_prompt_$RID.md"
 cat "$MEM/mr-supervisor-prompt-native.md" > "$PROMPTF"
-{ echo; echo "## TICK PROVENANCE"; echo "src=$SRC forced=${MR_FORCE:-0} invoked_at=$(TS) rid=$RID"; } >> "$PROMPTF"
+{ echo; echo "## TICK PROVENANCE"; echo "src=$SRC forced=${MR_FORCE:-0} invoked_at=$(TS) rid=$RID${RESUME_FIRST:+ resume_first=$RESUME_FIRST}"; } >> "$PROMPTF"
 { echo; echo "## LIVE SITUATION (HINTS-ONLY — mechanically generated; re-verify anything you are about to mutate; governor state: $GSTATE$([ "$GSTATE" = UNKNOWN ] && echo ' — BUDGET UNCOMPUTABLE, flag this as a BLOCKER in your records'))"; echo '```json'; echo "$SIT"; echo '```'; } >> "$PROMPTF"
 CONSUMED=""
 for EV in "$MEM"/pending-events/*.md; do
@@ -455,9 +489,8 @@ env -u MR_FORCE -u MR_SLICE -u MR_EVENT_SRC "${OPTOK[@]}" timeout 5400 claude --
   --output-format stream-json --verbose \
   -p "$(cat "$PROMPTF")" >> "$TLOG" 2>&1
 RC=$?
-# cost via the mr-cost-sum SSOT (third and last copy of the old naive sum — see mr-cost-sum's
-# header). A tick is a single `claude -p` invocation so this site was never miscounted in
-# practice; it calls the helper so the buggy loop exists nowhere in the tree.
+# The tick's own spend, read by mr-cost-sum like every other cost in the ledger: a log's
+# `total_cost_usd` is cumulative and repeats across result events, so no call site adds it up.
 COST=$("$MEM/mr-cost-sum" "$TLOG" 2>/dev/null)
 [ -z "$COST" ] && log "COST-HELPER-FAILED mr-cost-sum produced no output for tick $RID — SUPERVISOR row will record COST-UNKNOWN"
 COST=${COST:--}
@@ -582,7 +615,8 @@ print("ARMED %s" % iso)
 PYRL
 )
   case "$ARMED" in
-    ARMED*)   log "RATE-LIMIT-GATE $ARMED — gate 2 will stand down (free) until then" ;;
+    ARMED*)   log "RATE-LIMIT-GATE $ARMED — gate 2 will stand down (free) until then"
+              setsid /bin/bash "$MEM/mr-reset-watch" "${ARMED#ARMED }" >/dev/null 2>&1 & ;;
     SKIPPED*) log "RATE-LIMIT-GATE-SKIPPED $ARMED" ;;
   esac
   if [ "${MR_NO_TOAST:-0}" != "1" ] && echo "$REASON" | grep -qiE "not logged in|/login"; then
