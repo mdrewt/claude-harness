@@ -506,19 +506,22 @@ TICKMODEL=${TICKMODEL:--}
 [ "$TICKMODEL" = "-" ] && TICKMODEL="$SUP_MODEL"
 log "SPAWN-DONE rc=$RC cost=${COST:-unknown} model=$TICKMODEL rid=$RID"
 # CREDIT-STOP OFFER NOT TAKEN: this line is reached only after a decision session was started —
-# every stand-down above (hold, human activity, live chain, rate limit, credit stop, chain mutex,
+# every wrapper stand-down above (hold, live chain, rate limit, credit stop, chain mutex,
 # HARD-STOP) and the dry run exit before it — and RC=0 says the session ran to its end instead
-# of being refused, timed out or logged out. A slice named in this tick's resume_first that is
-# still offered and due after such a session (not launched, not dropped, no failed resume
-# counted) was paid for and passed over; `mr-interrupted ignored` counts that, and caps the slice
-# when it keeps happening, so it cannot make every hourly tick a paid session.
-if [ "$RC" -eq 0 ] && [ -n "$RESUME_FIRST" ]; then
+# of being refused, timed out or logged out. A session that itself stood down (its DECISION line
+# opens with a stand-down: human activity, a racing tick, a live run) passed nothing over, so it is not counted. A
+# slice named in this tick's resume_first that is still offered and due after any other session
+# (not launched, not dropped, no failed resume counted) was paid for and passed over;
+# `mr-interrupted ignored` counts that, and caps the slice when it keeps happening, so it cannot
+# make every hourly tick a paid session.
+DECLINES=$(tail -c "+$((LOGPOS+1))" "$LOG" 2>/dev/null | grep -a ' DECISION ')
+if [ "$RC" -eq 0 ] && [ -n "$RESUME_FIRST" ] && ! printf '%s\n' "$DECLINES" | grep -qiE ' DECISION stand-?down'; then
   IGN=$(timeout 60 "$MEM/mr-interrupted" ignored "$RESUME_FIRST" 2>/dev/null)
   case "$IGN" in "IGNORED "*) log "CREDIT-RESUME-$IGN rid=$RID" ;; esac
 fi
 # One HELD line per tick whose DECISION names held candidates (or names them malformed), keyed by
 # this wrapper's rid so it joins to the SPAWN lines around it.
-HELD=$(held_field "$(tail -c "+$((LOGPOS+1))" "$LOG" 2>/dev/null | grep -a ' DECISION ')")
+HELD=$(held_field "$DECLINES")
 [ -n "$HELD" ] && log "HELD rid=$RID $HELD"
 CEN=$(grep -o '"subagent_type":"[a-z-]*"' "$TLOG" 2>/dev/null | sort | uniq -c | awk '{printf "%s=%s ",$2,$1}' | tr -d '"' | sed 's/subagent_type=//g; s/subagent_type://g')
 # NOTE: `grep -c` prints 0 AND exits 1 on no match, so the old `|| echo 0` appended a SECOND

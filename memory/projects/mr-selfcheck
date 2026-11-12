@@ -430,7 +430,8 @@ class Box:
                 # session (SESSION, a shell command standing in for claude; its exit code is RC),
                 # then the wrapper's after-session block.
                 '[ "${RUN_SESSION:-0}" = 1 ] || exit 0', 'SUP_EFFORT=high; CONSUMED=""; TLOG=/dev/null',
-                pieces["dry-run"], '( eval "${SESSION:-true}" ); RC=$?', pieces["after-session"], ""]
+                pieces["dry-run"], 'LOGPOS=$(stat -c %s "$LOG" 2>/dev/null || echo 0)',
+                '( eval "${SESSION:-true}" ); RC=$?', pieces["after-session"], ""]
         with open(os.path.join(self.root, "tick.sh"), "w") as f:
             f.write("\n".join(tick).replace("/tmp/mr_", self.tmp + "/mr_"))
 
@@ -1151,14 +1152,19 @@ try:
     week(7.01, 1)
     dry = [box.tick(T + 600 + 60 * n, RUN_SESSION="1", MR_TICK_DRYRUN="1") for n in range(1, 5)]
     died = [box.tick(T + 900 + 60 * n, RUN_SESSION="1", SESSION="exit 1") for n in range(1, 5)]
+    # A session that ran and itself stood down (human activity) passed nothing over, in any of
+    # the spellings the tick log carries.
+    stood = [box.tick(T + 1000 + 30 * n, RUN_SESSION="1",
+                      SESSION='echo "2026-11-12T12:01:42Z rid DECISION %s human-activity" >> "$LOG"' % word)
+             for n, word in enumerate(("STANDDOWN", "standdown:", "stand-down:", "STAND-DOWN"))]
     if any("STANDDOWN budget-hard-stop" not in log for _o, log in hard) \
             or any("resume_first=s-a\n" not in out or "DECISION-NEEDED (dryrun)" not in out for out, _l in dry) \
             or any("resume_first=s-a\n" not in out for out, _l in died):
         fail("standdown-setup", "hard=%r dry=%r died=%r" % (hard, dry, died))
-    if any("CREDIT-RESUME-IGNORED" in log for _o, log in seen + hard + dry + died) \
+    if any("CREDIT-RESUME-IGNORED" in log for _o, log in seen + hard + dry + died + stood) \
             or counts(box, T + 1200) != {"s-a": ("due", 0, 0)} or box.asks():
         fail("standdown-records-nothing", "list=%r asks=%r logs=%r"
-             % (counts(box, T + 1200), box.asks(), [l for _o, l in seen + hard + dry + died]))
+             % (counts(box, T + 1200), box.asks(), [l for _o, l in seen + hard + dry + died + stood]))
     for n in (1, 2, 3):
         box.tick(T + 1200 + n * 3600, RUN_SESSION="1")
         if counts(box, T + 1200 + n * 3600) != {"s-a": ("due", 0, n) if n < 3 else ("capped", 0, 3)}:
