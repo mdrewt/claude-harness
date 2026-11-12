@@ -16,6 +16,23 @@ fires only when it does not pass.
 - `mr-supervisor-status [-f|--pretty]` — state, live runs, budget, decision issues; tail the log.
 - `mr-supervisor-chat` — resume the Claude session behind a past slice or tick.
 
+## Scratch cleanup (`memory/projects/mr-clean-scratch`)
+The guard hook blocks every recursive `rm`, so agents remove scratch through this tool; its
+safety is in code. `mr-clean-scratch PATH...` is a dry run (target, size, action); `--apply`
+performs it; `--stale` lists candidates untouched for 60 minutes and is refused with `--apply`,
+since the roots hold other live sessions' files — a deletion names its path (a named path is
+exempt from that floor only).
+- Removable: `/tmp/claude-<uid>/**/scratchpad/*`, `/tmp/mr-*/`, `/tmp/tmp.*/`, and registered
+  worktrees of either repo under `/tmp/<name>.<random>/`. Refused: anything else, any path
+  through a symlink, main checkouts, the repo checkouts, `$HOME`, and paths naming the hold
+  flag, a runner lock or `pending-events`. Deletion follows no symlink and stays on one
+  filesystem; nothing goes while a process has its cwd inside.
+- A registered worktree goes through unforced `git worktree remove` + `prune`, and only when
+  clean, unlocked, and its HEAD is on a remote-tracking branch, on the default branch, or under
+  a merged PR. A dirty or unmerged one is reported as `SKIP` with the reason — discarding it is
+  the supervisor's `git worktree remove --force` call, for sandboxes a finished run named.
+- Deletions are appended to `mr-clean-scratch.log` (untracked). Exit 1 = a named target stayed.
+
 ## Health signals (all in `memory/projects/`)
 `.native-supervisor-heartbeat` (fresh = ticks running) · `.native-supervisor-last-success` /
 `-last-failure` · `mr-native-tick.log` (one DECISION/SKIP line per tick) · `mr-state.json`
@@ -33,4 +50,4 @@ fires only when it does not pass.
 `mr-hold` provenance (an unattributed flag wedges the loop) · `mr-lock`/`mr-unlock` (the only
 sanctioned chain-mutex take/heartbeat/reap pair — they agree on one `owner.json` schema so a tick
 never hand-rolls the lock file) · the guard-bash hook (blocks destructive commands incl. the flag
-file) · `supervisor-disable-teeth.sh` (kill-switch selftest) · the tick's flock + chain mutex pair.
+file; `mr-clean-scratch` is the recursive delete it leaves open) · `supervisor-disable-teeth.sh` (kill-switch selftest) · the tick's flock + chain mutex pair.

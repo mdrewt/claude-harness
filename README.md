@@ -166,7 +166,8 @@ SpacetimeDB version's docs. Full integration testing needs a running instance
   (planner, tester, reviewer, verifier, red-team, judge, doc-keeper, researcher)
   and slash-commands. A `PreToolUse` hook and permission deny-list block
   destructive shell commands; each generated project carries a minimal copy of
-  those guardrails.
+  those guardrails. Scratch under `/tmp` is removed with `memory/projects/mr-clean-scratch`,
+  which checks each target in code instead of loosening the guard.
 
 ---
 
