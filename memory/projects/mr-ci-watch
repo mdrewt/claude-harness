@@ -1,20 +1,24 @@
 #!/bin/bash
 # mr-ci-watch <pr-number> <slice> — zero-token CI watcher. Launch DETACHED: setsid bash mr-ci-watch PR SLICE & disown
 #   or: mr-ci-watch --run <run-id> — same, for one workflow run (a rerun of a master push run or a PR run).
-#   or: mr-ci-watch --sha <commit>  — same, for the CI push run of that master commit (after a merge).
-#   Run/sha events carry sha=<the run's head commit> so the tick can match it against origin/master.
+#   or: mr-ci-watch --sha <commit> [--quiet-green] — same, for the CI push run of that master commit (after a merge).
+#      --quiet-green: a passing run fires nothing (a slice is already launched on that tree); red, cancelled and
+#      inconclusive still fire, and that pending event is what gets a tick past the wrapper's live-chain standdown.
+#   Run/sha events carry attempt=<n> (1 = never rerun; an attempt-1 red after a rerun request means the rerun
+#   did not requeue) and sha=<the run's head commit> so the tick can match it against origin/master.
 # Distinguishes checks-concluded vs gh-error (retry<=3 backoff -> INCONCLUSIVE). Fires a tick via pending-event.
 set -u
 exec 9>&- 2>/dev/null || true   # drop inherited tick-flock fd (prevents lock wedge)
 unset MR_FORCE MR_TICK_DRYRUN MR_OPERATOR_RUN MR_EVENT_SRC 2>/dev/null || true   # forced-ness must not propagate to the ticks we spawn
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
-RUN=""; SHA=""
+RUN=""; SHA=""; QUIET=0; HSHA=""
 case "${1:-}" in
   --run) RUN="${2:?run-id}"; case "$RUN" in *[!0-9]*) echo "mr-ci-watch: run id must be numeric" >&2; exit 2;; esac
     S="run-$RUN"; REF="run=$RUN";;
   --sha) SHA="${2:?commit}"; case "$SHA" in *[!0-9a-f]*) echo "mr-ci-watch: commit must be a hex sha" >&2; exit 2;; esac
     [ "${#SHA}" = 40 ] || { echo "mr-ci-watch: commit must be a full 40-char sha" >&2; exit 2; }
-    S="sha-$SHA"; REF="sha=$SHA";;
+    case "${3:-}" in "") ;; --quiet-green) QUIET=1;; *) echo "mr-ci-watch: unknown option $3" >&2; exit 2;; esac
+    S="sha-$SHA"; REF="sha=$SHA"; HSHA="$SHA";;
   *) PR="${1:?pr}"; S="${2:?slice}"; REF="pr=$PR";;
 esac
 [ -f "$MEM/.native-supervisor-disabled" ] && exit 0
@@ -45,7 +49,8 @@ $(timeout 45 gh run view "$RID" -R mdrewt/monster-realm --log-failed 2>/dev/null
   fi
   printf '%s' "$OUT"
 }
-run_state(){ timeout 30 gh run view "$RUN" -R mdrewt/monster-realm --json status,conclusion -q '.status+" "+.conclusion' 2>/dev/null; }
+run_state(){ # prints: <status> <attempt> <conclusion>
+  timeout 30 gh run view "$RUN" -R mdrewt/monster-realm --json status,conclusion,attempt -q '"\(.status) \(.attempt) \(.conclusion)"' 2>/dev/null; }
 if [ -n "$SHA" ]; then
   # GitHub creates the push run a few seconds after the merge; the newest master run before then belongs to an older commit.
   for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
@@ -53,20 +58,20 @@ if [ -n "$SHA" ]; then
     [ -n "$RUN" ] && break; sleep 10
   done
   [ -n "$RUN" ] || { fire inconclusive "CI-WATCH-INCONCLUSIVE no CI push run found for $SHA"; exit 0; }
-  REF="run=$RUN sha=$SHA"
 elif [ -n "$RUN" ]; then
-  REF="run=$RUN sha=$(timeout 30 gh run view "$RUN" -R mdrewt/monster-realm --json headSha -q .headSha 2>/dev/null)"
+  HSHA=$(timeout 30 gh run view "$RUN" -R mdrewt/monster-realm --json headSha -q .headSha 2>/dev/null)
   # A rerun requested a moment ago can still read as the concluded previous attempt; give it a minute to requeue.
   for _ in 1 2 3 4 5 6; do case "$(run_state)" in completed*) sleep 10;; *) break;; esac; done
 fi
 if [ -n "$RUN" ]; then
   for TRY in 1 2 3; do
     timeout 3300 gh run watch "$RUN" -R mdrewt/monster-realm --exit-status >/dev/null 2>&1; RC=$?
-    CONC=$(run_state)
-    case "$CONC" in
-      "completed success") fire green "run $RUN passed"; exit 0;;
-      "completed cancelled") fire cancelled "run $RUN was cancelled (on master: a newer push superseded it)"; exit 0;;
-      completed*) fire red "run $RUN concluded ${CONC#completed } (watch rc=$RC)
+    read -r ST ATT CONC <<<"$(run_state)"
+    REF="run=$RUN attempt=${ATT:-?} sha=$HSHA"
+    case "$ST $CONC" in
+      "completed success") [ "$QUIET" = 1 ] || fire green "run $RUN passed"; exit 0;;
+      "completed cancelled") fire cancelled "run $RUN was cancelled"; exit 0;;
+      completed*) fire red "run $RUN concluded ${CONC:-unknown} (watch rc=$RC)
 --- failed step log tail (run $RUN) ---
 $(timeout 45 gh run view "$RUN" -R mdrewt/monster-realm --log-failed 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | tail -n 60 | head -c 4000)"; exit 0;;
     esac

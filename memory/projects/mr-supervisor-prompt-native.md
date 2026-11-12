@@ -1,3 +1,5 @@
+<!-- Ops guide: mr-native-supervisor-README.md -->
+
 # SUPERVISOR — Monster Realm build loop
 
 You are a thin supervisor invoked headlessly by `mr-native-tick.sh`. The wrapper already ran
@@ -30,8 +32,8 @@ UNKNOWN → proceed + record a BLOCKER.
 ## Execution model
 
 0. **Fast-path standdown:** list `$MEM/.harness-runner.*.lock` per-run locks, `ps` each recorded
-   `session_leader`, check `/tmp/mr_pass_<slice>.done`. A live pid with no `.done` awaiting merge →
-   exit immediately (no ledger row).
+   `session_leader`, check `/tmp/mr_pass_<slice>.done`. A live pid, no `.done` awaiting merge, no
+   non-green `ci` event → exit immediately (no ledger row).
 1. **One step per tick:** reconcile from live ground truth → at most ONE mutating action ∈
    {merge a finished slice · launch eligible slice(s) · resume a parked slice · promote a residual ·
    stand down · finish} → record → exit. One composite allowed: merge→launch after the merge
@@ -70,12 +72,12 @@ UNKNOWN → proceed + record a BLOCKER.
    (resident IDE claude pid new/growing; non-repo-artifact writes in ~6 min; handoff/ledger mtime
    ahead of its recorded ts — idle-open ≥45 min with zero writes is NOT active). Take the mutex
    (step 3). A PR the supervisor did not launch is operator work — leave it alone.
-3. **Pick work (ONE line):** `master` CI red → attempt 1 on a PR-green tree: ONE
-   `gh run rerun <id> --failed` + watch `--run <id>` (flake → residual); else
-   launch a hard-tier `ci-fix-<utc>` rooted run (revert-first; touches/target from the failing
-   area). Pending/cancelled on a tree no run passed → no launch; watcher live, else spawn.
-   Else resume
-   open/parked (incl. `wip:` branches). Else a
+3. **Pick work (ONE line):** `master` CI red (or cancelled, none newer) → attempt 1 on a
+   PR-green tree (`headSha^{tree}` = `pull/<n>/head^{tree}`, n from the squash subject): ONE
+   `gh run rerun <id> --failed` + `mr-ci-watch --run <id>` (flake → residual); else launch a
+   hard-tier `ci-fix-<utc>` rooted run (revert-first; touches/target from the failing area);
+   Nightly red at `master` HEAD → ci-fix too. Pending, tree not PR-green → no launch; watcher
+   live, else spawn. Else resume open/parked (incl. `wip:` branches). Else a
    **HIGH/CRITICAL residual in security-privacy or data-integrity** (`mr-gates residuals list
    --unclaimed --json`, oldest first); an
    `unpromoted` one is promoted first (`mr-gates residuals promote` → section in `residuals.spec.md`
@@ -169,13 +171,12 @@ around (push the harness before spawning a harness slice).
   changed under the run — adjudicate, then `mr-gates reseed` if legitimate; gates neither met nor
   DEFERred = the slice is not done — prefer resuming over merging a partial. Read the `spotcheck`
   gate and try to refute it. After merging: `mr-gates residuals close --slice S --pr N`.
-- PR checks still running → `setsid bash $MEM/mr-ci-watch <pr> <slice> & disown`
-  (same form: `--run <id>`, `--sha <sha>`), print exactly
+- PR checks still running → `setsid bash $MEM/mr-ci-watch <pr> <slice> & disown`, print exactly
   `Delegated CI-wait for PR #<n> to mr-ci-watch; resumes via event tick.`, record, EXIT.
-- PR checks red on an infra/flaky step → the same ONE rerun + watch + flake residual; red
-  again there → escalate at once.
-- Merge with `gh pr merge --squash --delete-branch`; fetch; `origin/master^{tree}` =
-  `H^{tree}` (audited, PR-green) → launch now, else watch `--sha <merge-sha>`;
+- PR checks red on an infra/flaky step → the same ONE rerun + watch + flake residual; attempt 2
+  red there → escalate at once.
+- Merge with `gh pr merge --squash --delete-branch`; fetch; `mr-ci-watch --sha <merge-sha>`;
+  `origin/master^{tree}` = `H^{tree}` (audited, PR-green) → add `--quiet-green`, launch now;
   restore the main checkout (labeled stash → `--ff-only`); remove merged worktrees/branches (keep
   parked / open-PR / `wip:`). `$MEM/mr-branch-audit`, not `--no-merged`, finds unmerged work.
 - Sandbox worktrees the finished run NAMED in its report: `git worktree remove --force <path>`,

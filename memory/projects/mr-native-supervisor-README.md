@@ -5,7 +5,8 @@ runs cheap bash gates and, when action may be needed, invokes one headless `clau
 tick (opus@medium) with `mr-supervisor-prompt-native.md` + a live situation bundle. The tick
 picks/launches/merges ONE unit of work; detached "rooted runs" (opus/fable) do the implementation.
 Events (slice done/crash, PR checks or a watched `master` run concluding, rate-limit reset) fire
-extra ticks; cron is the safety net.
+extra ticks; cron is the safety net. A `master` push run on a tree its PR run already passed
+fires only when it does not pass.
 
 ## Controls (all on PATH)
 - `mr-supervisor-disable` — pause (writes the provenance-attributed hold flag). Agents cannot run it.
