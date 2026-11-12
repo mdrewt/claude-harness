@@ -36,12 +36,17 @@ Rules out: trusting either graph alone for impact analysis, and natural-language
 symbol names exist.
 
 ## Supervisor cost accounting reconstructs per-invocation cost
-Claude CLI logs report cumulative `total_cost_usd`; per-run cost is reconstructed by
-`mr-cost-sum` (the single implementation), and the usage ledger is append-only — a wrong figure
-is corrected by appending a signed negative `CORRECTION` row, never by rewriting. Budget
-governance is only as good as the ledger, and three naive summation copies measurably drifted
-before the SSOT existed.
-Rules out: hand-summing costs at call sites and editing ledger rows in place.
+Claude CLI logs report cumulative `total_cost_usd`, carried across `--resume`; a run's own spend
+is reconstructed by `mr-cost-sum` (the single implementation) from each result event's own usage,
+or the session transcript's `cost-state` when that reports more.
+Each build session gets exactly one ledger cost row, keyed by the launch stamp in its pass log
+(`mr-record ledger --from-log`), and the usage ledger is append-only — a wrong figure is
+corrected by appending a signed negative `CORRECTION` row, never by rewriting. Budget governance
+is only as good as the ledger: summing result events or per-attempt totals double-counts a
+resumed run, and judging "already recorded" from the slice name and a time window drops the row
+of every relaunch.
+Rules out: hand-summing costs at call sites, deciding a session is recorded from its slice name
+and a time window, and editing ledger rows in place.
 
 ## Noisy Bash output is filtered by rewriting the command, not the result
 The quiet hook rewrites recognized noisy commands to a tee-to-log wrapper that withholds pass

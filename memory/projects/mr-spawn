@@ -1024,6 +1024,16 @@ rm -f "/tmp/mr_stop_$S" /tmp/mr_stop_all
 # RESUMED slice's stale lock on disk with its `.done` deleted and no new run started — which is
 # exactly RECONCILE part 2's "dead-pid lock with no .done" predicate, injecting a phantom CRASHED
 # row into the ledger the budget governor reads.
+# The outgoing session's cost row is written BEFORE its flags go and its log is rotated: past
+# this point the tick's reconcile can no longer see that session. mr-record writes one row per
+# session, so this is a no-op for a session the tick already recorded (`.done.recorded` skips even
+# the call). Advisory on failure, like the gates seed below: accounting must not refuse a launch.
+if [ -s "/tmp/mr_pass_$S.log" ] && [ ! -e "/tmp/mr_pass_$S.done.recorded" ]; then
+  if [ -f "/tmp/mr_pass_$S.done" ]; then PREV_OUT="FINISHED($(head -c 40 "/tmp/mr_pass_$S.done"))"; else PREV_OUT="CRASHED(no-done at relaunch)"; fi
+  timeout 60 "$MEM/mr-record" ledger --slice "$S" --outcome "$PREV_OUT" --ci not-applicable \
+    --from-log "/tmp/mr_pass_$S.log" --notes "recorded at relaunch" >/dev/null 2>&1 \
+    || emit COST-ROW-FAILED "previous session of $S has no ledger cost row; its log is kept as /tmp/mr_pass_$S.log.prev-*"
+fi
 rm -f "/tmp/mr_pass_$S.done" "/tmp/mr_pass_$S.done.recorded"
 # A resume's log/err are append-only (mr-launch.sh:103-104 uses >>), so a stale prior attempt's
 # log survives underneath the new one. attempt_launch()'s model-class assert greps with -m1 (first

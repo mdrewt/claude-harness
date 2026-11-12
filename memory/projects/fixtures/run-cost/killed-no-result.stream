@@ -1,0 +1,4 @@
+ATTEMPT=1 MODEL=fable EFFORT=xhigh REPO=project RUNDIR=/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm PRREPO=mdrewt/monster-realm TS=2026-10-31T21:00:38Z
+{"type":"system","subtype":"init","session_id":"ce4f8526-17d2-4519-b1b3-3cc9f2de2235","model":"claude-fable-5-1"}
+{"type":"assistant","message":{"model":"claude-fable-5-1","usage":{"input_tokens":2,"cache_creation_input_tokens":38269,"cache_read_input_tokens":14962,"output_tokens":7}},"session_id":"ce4f8526-17d2-4519-b1b3-3cc9f2de2235"}
+{"type":"assistant","message":{"model":"claude-fable-5-1","usage":{"input_tokens":2,"cache_creation_input_tokens":38269,"cache_read_input_tokens":14962,"output_tokens":7}},"session_id":"ce4f8526-17d2-4519-b1b3-3cc9f2de2235"}
