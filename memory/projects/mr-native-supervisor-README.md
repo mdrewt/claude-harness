@@ -38,6 +38,13 @@ exempt from that floor only).
 `-last-failure` · `mr-native-tick.log` (one DECISION/SKIP line per tick) · `mr-state.json`
 (inflight/queue/notes) · budget: `mr-cost-watch`/`mr-usage-snap`, config in `mr-budget-config.json`.
 
+## Slice scope (`touches:`)
+A slice edits the files its spec's `touches:` declares; a run that measures a further file it
+needs adds it with `mr-touches widen`, which refuses a file other unmerged work holds and the
+files that define the gate or steer the loop. Grants live in `gates/<slice>.widened.jsonl` and are
+read by `mr-disjoint`, `mr-gates render` and `mr-audit`'s `scope` block. The rules are in the
+`mr-touches` header.
+
 ## Verification & rollback
 - Dry-run a tick: `MR_TICK_DRYRUN=1 MR_FORCE=1 bash memory/projects/mr-native-tick.sh`
   (assembles the prompt, spawns nothing).

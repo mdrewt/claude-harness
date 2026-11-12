@@ -5,6 +5,9 @@
 # TWO HALVES, deliberately different kinds of claim (lp-04; cost-accounting decision, docs/DECISIONS.md):
 #   POLICY   — `orchestration` (+ top-level `mandatory_read` / `read_reason`).  A real verdict.
 #              Verdicts: CLEAN | CLEAN-doc-exempt | FLAGGED | AUDIT-ERROR (treat AUDIT-ERROR as FLAGGED).
+#              `scope` (mr-touches scope): a changed file outside the slice's declared + widened
+#              touches, or any widened file that is not a test file, sets `mandatory_read`; the
+#              block lists the widened files with reasons.
 #   ADVISORY — `gating_advisory` and `disposition`.  EVIDENCE for an LLM diff read, NEVER a merge
 #              predicate.  Both carry `"advisory": true` and an in-band `contract` string, because
 #              the reader is an LLM and the contract has to sit where the reader already looks.
@@ -219,6 +222,52 @@ def audit_acceptance(a, out, tool=None):
     acc["spotcheck"] = v.get("spotcheck")
     acc["status"] = v.get("verdict", "AUDIT-ERROR")
     out["acceptance"] = acc
+
+
+def audit_scope(a, out, tool=None):
+    """POLICY read trigger: the PR's changed files against the slice's set.
+
+    `mr-touches scope` lists every base...head file outside declared touches + the run's widened
+    record + sibling tests + the doc set. A non-empty list forces the diff read, because a file
+    the run edited without a grant is the scope escape `touches:` exists to surface; the widened
+    rows ride along so the reader judges each stated reason in the same read. A widened row that
+    mr-touches does not mark `"test": true` forces the read under every verdict: the run granted
+    itself a code file, and whoever merges reads what it did there. NO-TOUCHES (no launch lock)
+    and NOT-MEASURED (no --repo/--base/--head) are absent measurements and force nothing by
+    themselves; a scope that could not be computed forces the read like any other audit error.
+
+    `tool` is a FUNCTION PARAMETER, as in audit_acceptance: the selftest points it at a stub.
+    """
+    sc = {}
+    out["scope"] = sc
+    if not (a.get("repo") and a.get("base") and a.get("head")):
+        sc.update(verdict="NOT-MEASURED", reason="repo/base/head missing")
+        return
+    exe = tool or os.path.join(os.environ.get("A_MEM", "."), "mr-touches")
+    try:
+        r = subprocess.run([exe, "scope", "--slice", str(a.get("slice", "?")), "--repo", a["repo"],
+                            "--base", a["base"], "--head", a["head"]],
+                           capture_output=True, text=True, timeout=90)
+        v = json.loads(r.stdout)
+        if not isinstance(v, dict) or v.get("verdict") not in (
+                "IN-SCOPE", "OUT-OF-SCOPE", "NO-TOUCHES", "AUDIT-ERROR"):
+            raise ValueError("scope returned no known verdict")
+        if not isinstance(v.get("widened", []), list):
+            raise ValueError("scope returned a malformed widened list")
+    except Exception as e:
+        v = {"verdict": "AUDIT-ERROR", "reason": "%s: %s" % (type(e).__name__, str(e)[:160])}
+    for k in ("verdict", "reason", "changed", "outside", "outside_truncated", "widened"):
+        if k in v:
+            sc[k] = v[k]
+    if sc["verdict"] == "OUT-OF-SCOPE":
+        force_read(out, "scope: %d file(s) outside declared+widened touches (scope.outside)"
+                   % (len(v.get("outside") or []) + int(v.get("outside_truncated") or 0)))
+    elif sc["verdict"] == "AUDIT-ERROR":
+        force_read(out, "scope-unavailable")
+    code = [w for w in sc.get("widened") or []
+            if not (isinstance(w, dict) and w.get("test") is True)]
+    if code:
+        force_read(out, "scope: %d self-granted non-test file(s) (scope.widened)" % len(code))
 
 # --- disposition markers (docs/workflow-loops.md §Disposition markers) -----
 # `parked -> <queued spec id | wontfix>`.  The grammar, the location, the rule and the owner
@@ -1579,6 +1628,79 @@ def _st_a_battery(chk, tmp):
                    out3["acceptance"]["status"]}))
 
 
+def _st_t_battery(chk, tmp):
+    """The scope block. Drives audit_scope() directly against a stub `mr-touches` (the real
+    diff-vs-touches arithmetic is mr-touches' own selftest, T15/T16)."""
+    d = _st_mkdir(tmp, "scope")
+
+    def stub(name, body):
+        q = os.path.join(d, name)
+        _st_w(q, "#!/bin/sh\ncat <<'J'\n" + body + "\nJ\n")
+        os.chmod(q, 0o755)
+        return q
+
+    def run(tool, **extra):
+        a = {"slice": "s1", "repo": d, "base": "B", "head": "H"}
+        a.update(extra)
+        out = {"mandatory_read": False, "read_reason": [], "policy": POLICY_CLEAN}
+        audit_scope(a, out, tool=tool)
+        return out
+
+    o = run(stub("in", '{"verdict":"IN-SCOPE","changed":3,"outside":[],"widened":'
+                       '[{"path":"a/pin.test.ts","why":"count pin 9->10","test":true}]}'))
+    chk.check("T1/in-scope-verdict", "IN-SCOPE", _st_get(o["scope"], "verdict"))
+    chk.check("T1/in-scope-no-read", False, o["mandatory_read"])
+    chk.check("T1/widened-carried",
+              [{"path": "a/pin.test.ts", "why": "count pin 9->10", "test": True}],
+              _st_get(o["scope"], "widened"),
+              "the reader of the audit must see each self-granted file and its reason")
+
+    o = run(stub("out", '{"verdict":"OUT-OF-SCOPE","changed":4,"outside":["justfile","x/y.rs"],'
+                        '"outside_truncated":3,"widened":[]}'))
+    chk.check("T2/out-of-scope-forces-read", True, o["mandatory_read"])
+    chk.check("T2/policy-flagged", POLICY_FLAGGED, o["policy"])
+    chk.check("T2/reason", ["scope: 5 file(s) outside declared+widened touches (scope.outside)"],
+              o["read_reason"])
+    chk.check("T2/outside-listed", ["justfile", "x/y.rs"], _st_get(o["scope"], "outside"))
+
+    o = run(stub("none", '{"verdict":"NO-TOUCHES","reason":"no launch lock","widened":[]}'))
+    chk.check("T3/no-touches-is-no-measurement", [], o["read_reason"])
+
+    o = run(os.path.join(d, "does-not-exist"))
+    chk.check("T4/missing-tool-verdict", "AUDIT-ERROR", _st_get(o["scope"], "verdict"))
+    chk.check("T4/missing-tool-forces-read", ["scope-unavailable"], o["read_reason"],
+              "a scope that could not be computed must not read as one that found nothing")
+    o = run(stub("odd", '{"verdict":"FINE"}'))
+    chk.check("T5/unknown-verdict-fails-closed", "AUDIT-ERROR", _st_get(o["scope"], "verdict"))
+
+    o = run(stub("code", '{"verdict":"IN-SCOPE","changed":3,"outside":[],"widened":['
+                         '{"path":"a/pin.test.ts","why":"pin","test":true},'
+                         '{"path":"a/store.ts","why":"E0004","test":false},'
+                         '{"path":"a/unmarked.ts","why":"x"}]}'))
+    chk.check("T7/widened-non-test-forces-read", True, o["mandatory_read"],
+              "a self-granted code file is read by whoever merges, in scope or not")
+    chk.check("T7/policy-flagged", POLICY_FLAGGED, o["policy"])
+    chk.check("T7/reason", ["scope: 2 self-granted non-test file(s) (scope.widened)"],
+              o["read_reason"], "a row without a true `test` mark counts as code")
+    o = run(stub("both", '{"verdict":"OUT-OF-SCOPE","changed":2,"outside":["x/y.rs"],"widened":['
+                         '{"path":"a/store.ts","why":"E0004","test":false}]}'))
+    chk.check("T7/both-reasons", ["scope: 1 file(s) outside declared+widened touches (scope.outside)",
+                                  "scope: 1 self-granted non-test file(s) (scope.widened)"],
+              o["read_reason"])
+    o = run(stub("nolock", '{"verdict":"NO-TOUCHES","reason":"no launch lock","widened":['
+                           '{"path":"a/store.ts","why":"E0004","test":false}]}'))
+    chk.check("T7/no-touches-still-reads-widened-code",
+              ["scope: 1 self-granted non-test file(s) (scope.widened)"], o["read_reason"])
+    o = run(stub("badw", '{"verdict":"IN-SCOPE","changed":1,"outside":[],"widened":"a/store.ts"}'))
+    chk.check("T7/malformed-widened-fails-closed", ["scope-unavailable"], o["read_reason"])
+
+    o = run(os.path.join(d, "does-not-exist"), repo=None)
+    chk.check("T6/no-inputs-not-measured", "NOT-MEASURED", _st_get(o["scope"], "verdict"))
+    chk.check("T6/no-inputs-adds-no-reason", [], o["read_reason"],
+              "audit_gating already forces the read for missing inputs; a second reason here "
+              "would break every consumer pinned on the exact read_reason list")
+
+
 _ST_GIT_SCRUB = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
                  "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
                  "GIT_CEILING_DIRECTORIES")
@@ -1610,6 +1732,7 @@ def _selftest():
         _st_s_battery(chk, tmp, logs, ginfo)
         _st_x_battery(chk, tmp, logs)
         _st_a_battery(chk, tmp)
+        _st_t_battery(chk, tmp)
 
     # ---- X3: the selftest writes NOTHING under /tmp -------------------------------------------
     # Every emit() above is handed an artifact_dir inside the tempdir. A single missed argument
@@ -1654,6 +1777,7 @@ try:
     audit_orchestration(a, out)
     audit_gating(a, out)
     audit_acceptance(a, out)
+    audit_scope(a, out)
 except Exception as e:
     out["orchestration"] = out.get("orchestration", {"verdict": "AUDIT-ERROR"})
     # Preserve a successfully computed advisory block for the same reason the line above preserves

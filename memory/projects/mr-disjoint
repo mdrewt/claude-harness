@@ -3,9 +3,16 @@
 # usage: mr-disjoint "sliceA:path1,path2,..." "sliceB:path3,..." [...]
 # ALWAYS rc=0; JSON verdict on stdout. NECESSARY-NOT-SUFFICIENT: the supervisor may still
 # SERIALIZE on semantic grounds this check cannot see; it may NEVER override toward parallel.
-# Operates on DECLARED touches only — boyscout deltas live inside declared files by
-# construction and are never inputs here (D6 doctrine).
+# Operates on DECLARED touches — boyscout deltas live inside declared files by construction and
+# are never inputs here (D6 doctrine) — plus the files each NAMED slice's run has widened into
+# (mr-touches' record, gates/<slice>.widened.jsonl): name each argument by its slice id so a
+# sibling is checked against the set the run really holds. `widened` in the output lists them.
+# Every path is compared in one canonical spelling (`//`, `/./` and the `projects/monster-realm/`
+# prefix removed), and a directory overlaps the files under it with or without its slash.
+# MR_WIDEN_DIR points the record read at another gates dir (selftests); MR_DISJOINT_NO_GRAPH=1
+# skips the advisory coupling annotation (mr-touches needs only the verdict).
 set -u
+export DJ_WIDEN_DIR="${MR_WIDEN_DIR:-/home/mdrewt/projects/ai-apps/claude-harness/memory/projects/gates}"
 export DJ_ARGS=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
 /usr/bin/python3 <<'PY'
 import json, os, fnmatch
@@ -13,12 +20,34 @@ argv=json.loads(os.environ["DJ_ARGS"])
 STRUCTURAL=["Cargo.lock","package-lock.json","client/src/module_bindings/*","evals/run.mjs","*schema*","*migration*"]
 # Doc set: supervisor-reconciled at merge (union/append), so overlap here never forces serial.
 DOC_SET={"CHANGELOG.md","ARCHITECTURE.md","docs/DECISIONS.md"}
-slices={}
+def widened(name):
+    got=[]
+    try:
+        for l in open(os.path.join(os.environ["DJ_WIDEN_DIR"],name+".widened.jsonl"),errors="replace"):
+            try: p=json.loads(l).get("path")
+            except Exception: continue
+            if p and p not in got: got.append(p)
+    except OSError: pass
+    return got
+def canon(p):
+    # One spelling per file, so two spellings of it can never read as disjoint: the
+    # `projects/monster-realm/` prefix mr-repo-of accepts is dropped, `//` and `/./` collapse.
+    # mr-touches holds a second copy of this function and of DOC_SET; its selftest (T23) fails
+    # when either differs.
+    p=p.strip(); tail="/" if p.endswith("/") else ""
+    p=os.path.normpath(p)
+    if p.startswith("projects/monster-realm/"): p=p[len("projects/monster-realm/"):]
+    return p+tail
+slices={}; grown={}
 for a in argv:
     if ":" not in a: continue
     name,paths=a.split(":",1)
-    slices[name]=[p.strip() for p in paths.split(",") if p.strip() and p.strip() not in DOC_SET]
+    declared=list(dict.fromkeys(canon(p) for p in paths.split(",") if p.strip()))
+    extra=[p for p in map(canon,widened(name)) if p not in declared]
+    if extra: grown[name]=extra
+    slices[name]=[p for p in declared+extra if p not in DOC_SET]
 out={"slices":list(slices),"pairs":[],"structural_hits":{},"verdict":"SAFE"}
+if grown: out["widened"]=grown
 def hits_structural(p):
     return any(fnmatch.fnmatch(p,pat) or pat.strip("*") in p for pat in STRUCTURAL)
 for n,ps in slices.items():
@@ -31,8 +60,8 @@ for i in range(len(names)):
         inter=set()
         for pa in slices[a]:
             for pb in slices[b]:
-                # A directory token (trailing slash) overlaps every path under it.
-                under=(pa.endswith("/") and pb.startswith(pa)) or (pb.endswith("/") and pa.startswith(pb))
+                # A directory token overlaps every path under it, with or without its slash.
+                under=pb.startswith(pa.rstrip("/")+"/") or pa.startswith(pb.rstrip("/")+"/")
                 if pa==pb or under or fnmatch.fnmatch(pa,pb) or fnmatch.fnmatch(pb,pa): inter.add(pa)
         out["pairs"].append({"pair":[a,b],"overlap":sorted(inter),"disjoint":not inter})
 if out["structural_hits"]: out["verdict"]="SERIAL-REQUIRED(structural)"
@@ -52,7 +81,7 @@ def coupling(pa_list, pb_list):
         return int(n)
     except Exception:
         return None  # graph unavailable -> annotation absent, never blocking
-for pr in out["pairs"]:
+for pr in ([] if os.environ.get("MR_DISJOINT_NO_GRAPH") else out["pairs"]):
     a,b=pr["pair"]
     c=coupling(slices[a],slices[b])
     if c is not None: pr["advisory_coupling_edges"]=c

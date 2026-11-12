@@ -87,7 +87,9 @@ default branch identifies it. How it is verified is `testing-tdd.md`
   directory prefix, never a bare directory; every pin with its disposition;
   affected e2e helpers; and any config keyed on the moved file's path (a
   mutation-test exclusion is re-keyed in the same slice). A file the move
-  needs that the list misses is a hidden-dependency stop.
+  needs that the list misses is a hidden-dependency stop: a refactor slice
+  never widens its own list in-run, because every pin needs a disposition the
+  spec records.
 - **Criteria are id-led SHALL bullets whose checks are test-runner
   invocations**: the test that reaches the moved behavior through its
   destination module, the suites that already cover it, and the full e2e run
