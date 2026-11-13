@@ -133,6 +133,18 @@ stopped. Every tick, before any gate, the wrapper runs `mr-interrupted scan`:
   or when the CLI cannot resume it, it starts a new session from the brief (one
   `RESUME-FALLBACK`/`RESUME-FAILED` line in the pass log says so), whose resume block points at
   the `wip:` checkpoint. `mr-spawn` removes the record once the slice is launched.
+- **A red `master` has one owner, the supervisor's `ci-fix-*` run.** The resumes go ahead of
+  it, so every resumed run can find `master` red; a run that left its slice to fix `master`
+  would be one of several doing the same. The brief says only a `ci-fix-*` slice fixes or
+  reverts `master`. `mr-launch.sh` also ends every `--resume` prompt with that rule (the
+  credit-stop resume, and its own resumes after a transient failure or an early stop), and
+  `mr-interrupted` writes it into the resume block of the brief a new session starts from. A
+  resumed session rereads its whole context, which can hold a brief that tells every run to
+  fix a red `master`: the prompt says it overrides the brief, and it is the last thing read.
+  For a `ci-fix-*` slice both say the opposite: `master` is its work. A session that is running
+  under a wrapper started before `mr-launch.sh` carried the rule keeps the brief it was given
+  until it ends, so it can still leave its slice for a red `master`; it gets the rule the next
+  time a wrapper resumes it.
 
 **When a slice is offered.** Its reset has passed, no other recorded stop that covers its model
 is still waiting for a reset (`gate`, `vars --due` and `mr-spawn`'s `launch-check` ask the same
