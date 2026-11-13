@@ -1047,6 +1047,10 @@ case "$CSCHK" in "REFUSE "*) status CREDIT-STOPPED "${CSCHK#REFUSE } — refusin
 # launches credit-stop resumes, and so does this one (vars carrying `resume_session`): the slice
 # is offered only after the reset it waited for. A bundle that cannot answer does not hold the
 # launch.
+# A reading older than the freshness bound (`stale` on the model's entry) is a pause nothing but
+# a session on that model can re-measure, so one launch per `probe_every_s` goes through as the
+# probe and the rest are refused. The probe is claimed by a marker in $MEM named for the window
+# and its reset, so the claim ends with the window it was made in.
 MPCHK=$("$MEM/mr-situation" --no-gh 2>/dev/null | /usr/bin/python3 -c '
 import json, sys
 try:
@@ -1055,9 +1059,27 @@ try:
     w = (b.get("model_states") or {}).get(m) or {}
     resume = json.load(open(sys.argv[2])).get("resume_session")
     if b.get("state") == "NORMAL" and w.get("state") in ("SOFT-PAUSE", "HARD-STOP") and not resume:
-        print("REFUSE %s: its window %s reads %.0f%% and resets %s" % (w["state"], w.get("window"), 100 * w.get("utilisation", 0), w.get("resets_at_utc")))
+        probe, note = False, ""
+        if w.get("stale"):
+            import glob, os, re, time
+            safe = lambda v: re.sub(r"[^A-Za-z0-9_-]", "", str(v))
+            stem = os.path.join(sys.argv[3], ".model-window-probe.%s." % safe(w.get("window")))
+            mark = stem + safe(w.get("resets_at_utc"))
+            for old in glob.glob(stem + "*"):
+                if old != mark:
+                    os.unlink(old)
+            try:
+                os.close(os.open(mark, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                probe = True
+            except FileExistsError:
+                if time.time() - os.path.getmtime(mark) > float(w.get("probe_every_s") or 10800):
+                    os.utime(mark)
+                    probe = True
+            note = " (read %s; the one launch that re-measures it has gone)" % w.get("sample_utc")
+        if not probe:
+            print("REFUSE %s: its window %s reads %.0f%%%s and resets %s" % (w["state"], w.get("window"), 100 * w.get("utilisation", 0), note, w.get("resets_at_utc")))
 except Exception:
-    pass' "$MODEL" "$V" 2>/dev/null)
+    pass' "$MODEL" "$V" "$MEM" 2>/dev/null)
 case "$MPCHK" in "REFUSE "*) status BUDGET-MODEL-PAUSED "${MPCHK#REFUSE } — refusing to launch $S on $MODEL (held=budget)" 1 ;; esac
 # Stop-flag clearing sits BELOW the --dry exit (lp-gates final review). `/tmp/mr_stop_all` is the
 # GLOBAL cooperative stop -- mr-launch.sh checks it before every spawn and every run polls it --

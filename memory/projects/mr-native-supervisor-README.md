@@ -194,10 +194,16 @@ Rules for a reading:
   `budget.model_states.<model>` — the worse of it and `budget.state` — and `budget.fable_ok`,
   which gates the wrapper's escalation to Fable.
 - **Reset.** A reading is void once its window's `resetsAt` has passed: the next window starts
-  empty, so a pause never outlives the window it was read from.
+  empty, so a pause never outlives the window it was read from. The window's newest sample
+  decides which `resetsAt` that is, so a reset time the plan moves earlier takes effect with
+  the sample that reports it.
 - **Freshness.** The plan's figure moves both ways inside a window, so only a reading younger
-  than `telemetry_fresh_s` is acted on as read. A model's own window is reported only by
-  sessions on that model; an older reading of it is dropped.
+  than `telemetry_fresh_s` is acted on as read. An older one under the soft threshold is not in
+  force; an older one over it reads SOFT-PAUSE. A model's own window is reported only by
+  sessions on that model, so its older reading (`stale` in `budget.model_states.<model>`) keeps
+  `fable_ok` false and `mr-spawn` lets one new launch on the model through per
+  `telemetry_fresh_s` to measure it, refusing the rest. The launch that went is recorded by
+  `$MEM/.model-window-probe.<window>.<reset>`; deleting that file allows another.
 - **Launches.** A pause on every model is the decision session's rule (SOFT-PAUSE: only
   `resume_first` slices). A pause on one model alone is `mr-spawn`'s: it refuses a new launch on
   that model with `BUDGET-MODEL-PAUSED` (`held=budget`) and launches other models and credit-stop

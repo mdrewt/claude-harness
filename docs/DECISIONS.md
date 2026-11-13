@@ -87,20 +87,28 @@ A window covers one model when its name carries the model or `telemetry_window_m
 every model otherwise (the scope rule of `mr-interrupted`): the windows every model shares set
 `budget.state`, a model's own window sets `budget.model_states.<model>`, and `mr-spawn` refuses a
 new launch on a model whose own window is paused while other models launch. A reading is its
-window's newest sample. It is void once the window's `resetsAt` has passed, acted on as read for
-`telemetry_fresh_s` (3 h), and after that a shared window still over the soft threshold reads
-SOFT-PAUSE (`telemetry-stale`) while a model's own window is dropped. HARD-STOP arms its reset
-tick for `budget.resets_at_utc`, the plan's own reset.
+window's newest sample among rows whose `resetsAt` is ahead, under the `resetsAt` that sample
+carries. It is void once that `resetsAt` has passed, acted on as read for `telemetry_fresh_s`
+(3 h), and after that a window still over the soft threshold reads SOFT-PAUSE: `telemetry-stale`
+on a shared window, and on a model's own window a pause that `mr-spawn` lets one launch per
+`telemetry_fresh_s` through to re-measure, with `fable_ok` false meanwhile. HARD-STOP arms its
+reset tick for `budget.resets_at_utc`, the plan's own reset.
 The dollar figure is this loop's ledger against a hand-set limit, and the plan has refused credit
 while it read 40%; the plan's figure is the one that cuts a run off. The thresholds avoid that
 waste (a run started just under the cap dies mid-way) and do not pace spend. The plan's figure
 also falls inside a window (measured: 0.95 to 0.77, 0.93 to 0 with the same `resetsAt`), so an
 old reading is never held to the reset: a stale HARD-STOP would leave no session to see the
 fall, where SOFT-PAUSE lets one decision session run, launch nothing new and leave the next
-sample. Only sessions on a model report that model's window, so a stale pause there could be
-lifted by nothing but the launch it forbids.
+sample. Only sessions on a model report that model's window, so a stale pause there can be
+lifted by nothing but a launch on that model: one launch per freshness period is that probe
+(claimed by a `.model-window-probe.<window>.<reset>` marker in `$MEM`), which bounds what a
+window still at its limit can cut off to one run per period instead of a whole fan-out. The
+newest sample names the window's instance because the plan's latest word is the one in force:
+ranking instances by `resetsAt` would let one row with a later reset time void every sample
+after it.
 Rules out: holding a pause on the highest reading of a window, standing the loop down on a
-reading older than the freshness bound, pausing every model for one model's window, and moving
+reading older than the freshness bound, dropping a model's stale over-threshold reading (the
+dollar fallback then reads the model as open), pausing every model for one model's window, and moving
 the grading or the window rules into the supervisor prompt.
 
 ## Noisy Bash output is filtered by rewriting the command, not the result

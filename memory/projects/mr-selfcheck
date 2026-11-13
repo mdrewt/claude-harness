@@ -317,7 +317,7 @@ fi
 # spends money or reaches the network or the operator (claude, gh, mr-ask-drew), and its own spec
 # corpus. Nothing here reads or writes the live MEM.
 /usr/bin/python3 - "$MEM" <<'PYCREDIT' || BAD=1
-import json, os, re, shutil, subprocess, sys, tempfile, time
+import glob, json, os, re, shutil, subprocess, sys, tempfile, time
 
 MEM = sys.argv[1]
 LIVE_MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
@@ -767,6 +767,9 @@ try:
     with open(os.path.join(box.root, "spawn-check.sh"), "w") as f:
         f.write('MEM=%s; S=s-x; MODEL="$1"; V="$2"\nstatus(){ echo "$1 $2"; exit "${3:-0}"; }\n%s\necho LAUNCH\n' % (box.mem, check))
 
+    def probes():
+        return glob.glob(os.path.join(box.mem, ".model-window-probe.*"))
+
     def launch(model, resume=None):
         v = os.path.join(box.root, "launch.vars.json")
         with open(v, "w") as f:
@@ -837,12 +840,44 @@ try:
     if "utilisation" in b or b.get("model_states"):
         fail("governor-stale-falls-back", "a stale reading is still reported: %r" % (b,))
     # Old and over the threshold on a window every model shares: SOFT-PAUSE, so a session runs
-    # and leaves the next sample. A model's own window that old is dropped.
+    # and leaves the next sample. The pause is the decision session's, not mr-spawn's.
     spent(100.0)
     sampled([event(FABLE_EV, seven_day=0.98, seven_day_overage_included=0.99)], age=FRESH + 300)
-    b = reads("stale-over-threshold", {"state": "SOFT-PAUSE", "source": "telemetry-stale", "utilisation": 0.98, "fable_ok": True})
-    if b.get("model_states") or launch("fable") != "LAUNCH":
-        fail("governor-stale-model-window", "model_states=%r launch=%r" % (b.get("model_states"), launch("fable")))
+    b = reads("stale-over-threshold", {"state": "SOFT-PAUSE", "source": "telemetry-stale", "utilisation": 0.98, "fable_ok": False})
+    if (b.get("model_states") or {}).get("fable", {}).get("state") != "SOFT-PAUSE" or launch("fable") != "LAUNCH" or probes():
+        fail("governor-stale-shared-window", "model_states=%r probes=%r" % (b.get("model_states"), probes()))
+    # Old and over the threshold on a model's own window, the shared one low: the model stays
+    # paused and closed to escalation, and one launch per freshness period goes through to
+    # measure it. Other models and credit-stop resumes launch and do not spend the probe.
+    sampled([event(FABLE_EV, seven_day=0.40, seven_day_overage_included=0.95)], age=FRESH + 300)
+    b = reads("stale-model-window", {"state": "NORMAL", "source": "calibration", "fable_ok": False})
+    fable = (b.get("model_states") or {}).get("fable") or {}
+    if (fable.get("state"), fable.get("stale"), fable.get("utilisation")) != ("SOFT-PAUSE", True, 0.95):
+        fail("governor-stale-model-window", "model_states: %r" % (b.get("model_states"),))
+    got = [launch("opus"), launch("fable", resume=SID), launch("fable"), launch("fable"), launch("claude-fable-5-1"), launch("opus")]
+    if got[:3] != ["LAUNCH"] * 3 or not got[3].startswith("BUDGET-MODEL-PAUSED SOFT-PAUSE") \
+            or not got[4].startswith("BUDGET-MODEL-PAUSED") or got[5] != "LAUNCH" or len(probes()) != 1:
+        fail("governor-stale-model-window-probe", "opus, resume, fable x3, opus: %r probes=%r" % (got, probes()))
+    # The next freshness period has its own probe; so has the window after a reset.
+    os.utime(probes()[0], (NOW - FRESH - 60, NOW - FRESH - 60))
+    got = [launch("fable"), launch("fable")]
+    if got[0] != "LAUNCH" or not got[1].startswith("BUDGET-MODEL-PAUSED") or len(probes()) != 1:
+        fail("governor-stale-model-window-next-probe", "%r probes=%r" % (got, probes()))
+    sampled([event(FABLE_EV, resets=WEEK_END + 3600, seven_day=0.40, seven_day_overage_included=0.95)], age=FRESH + 300)
+    got = [launch("fable"), launch("fable")]
+    if got[0] != "LAUNCH" or not got[1].startswith("BUDGET-MODEL-PAUSED") or len(probes()) != 1:
+        fail("governor-stale-model-window-new-reset", "%r probes=%r" % (got, probes()))
+    # The probe's own sample decides from then on: still over the threshold, every launch is refused.
+    sampled([event(FABLE_EV, resets=WEEK_END + 3600, seven_day=0.40, seven_day_overage_included=0.95)], keep=True)
+    if not launch("fable").startswith("BUDGET-MODEL-PAUSED SOFT-PAUSE: its window seven_day_overage_included reads 95% and"):
+        fail("governor-probe-sample-over", "launch=%r" % (launch("fable"),))
+
+    # The plan's newest word on a window stands, whichever reset time it carries: a later sample
+    # with an earlier resetsAt replaces the reading taken under the later one.
+    sampled([event(TICK_EV, resets=NOW + 3 * 86400, seven_day=0.95)], age=5 * 3600)
+    sampled([event(TICK_EV, resets=NOW + 3 * 86400 - 3600, seven_day=0.10)], age=60, keep=True)
+    reads("earlier-reset-newer-sample", {"state": "NORMAL", "source": "telemetry", "utilisation": 0.10,
+                                         "resets_at_utc": utc(NOW + 3 * 86400 - 3600)})
 
     # A reset clears a pause: a reading whose window has ended says nothing about the next one.
     sampled([event(FABLE_EV, resets=NOW - 60, seven_day=0.98, seven_day_overage_included=1.0)], age=120)

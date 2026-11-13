@@ -34,6 +34,7 @@ Thumbs.db
 # --- Harness-runner runtime state (generated locks + per-project telemetry) ---
 .harness-runner.*.lock
 .harness-runner.lock.d/
+memory/projects/.model-window-probe.*
 memory/projects/*-usage-ledger.jsonl
 # Windows drive-letter strings written as literal dir names (a path-handling bug)
 memory/projects/[A-Za-z]:*

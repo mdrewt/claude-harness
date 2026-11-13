@@ -71,16 +71,19 @@ except Exception: pass
 # REAL UTILISATION. The CLI's rate_limit_event rows (mr-cost-watch telemetry writes them) carry the
 # plan's own figure per window: a 0..1 utilisation and the window's resetsAt. A window covers one
 # model when its name carries the model or `telemetry_window_models` maps it, every model
-# otherwise — mr-interrupted's scope rule. A window's reading is its newest sample, and it is in
-# force by these rules:
+# otherwise — mr-interrupted's scope rule. A window's reading is its newest sample among the rows
+# whose resetsAt is still ahead, with the resetsAt that sample carries: the plan's latest word on
+# the window decides, whichever reset time it names. It is in force by these rules:
 #   - never once its resetsAt has passed: the window it measured is over and the next starts empty;
 #   - as read, for FRESH_S after it was read. The figure moves both ways inside a window (the plan
 #     restores credit mid-window), so an older reading is not acted on as if it were current;
-#   - older than that and over the soft threshold, on a window that covers every model: SOFT-PAUSE,
-#     whatever it read. A decision session then runs, launches nothing new and leaves the next
+#   - older than that and over the soft threshold: SOFT-PAUSE, whatever it read. On a window that
+#     covers every model a decision session then runs, launches nothing new and leaves the next
 #     sample; standing down on it (HARD-STOP) would leave no session to notice the figure fall.
-#     A model's own window is sampled only by sessions on that model, so there an older reading
-#     is dropped: the next launch on the model is what measures it.
+#     A model's own window is sampled only by sessions on that model, so its entry carries
+#     `stale` and `probe_every_s`: mr-spawn lets one launch on the model through per that period
+#     to measure it and refuses the rest, and `fable_ok` stays false for escalations;
+#   - older than that and under the soft threshold: not at all.
 # With no reading in force for an axis the ledger's dollars against the calibrated limits decide.
 TEL_TAIL=4<<20   # bytes of the telemetry file read: about a week of rows
 FRESH_S=10800.0  # three hourly ticks: one decision session can hold the tick lock for 90 minutes
@@ -122,17 +125,16 @@ def real_utilisation(now):
             if w.get("status")=="rejected" and not (_num(u) and u>1): u=1.0
             if not (_num(u) and u>=0 and _num(r)): continue
             if r>1e11: r=r/1000.0
-            if r>now+8*86400: continue          # not a reset time
-            cur=wins.get(name)
-            if cur is None or r>cur["resets"]: wins[name]={"window":name,"resets":r,"samples":[(ts,float(u))]}
-            elif r==cur["resets"]: cur["samples"].append((ts,float(u)))
+            if r<=now or r>now+8*86400: continue   # a window that is over, or not a reset time
+            wins.setdefault(name,[]).append((ts,r,float(u)))
     best={}
-    for w in wins.values():
+    for name,rows in wins.items():
         # One tick reads several logs a second or two apart, each ending on its own last event:
         # the newest reading is the highest of that pass.
-        w["ts"]=max(t for t,_u in w["samples"]); w["u"]=max(u for t,u in w["samples"] if t>=w["ts"]-60)
-        m=window_model(w["window"]); w["stale"]=now-w["ts"]>FRESH_S
-        if w["resets"]<=now or (w["stale"] and (m is not None or w["u"]<=SOFT)): continue
+        ts,r,_u=max(rows)
+        w={"window":name,"resets":r,"ts":ts,"u":max(u for t,rr,u in rows if rr==r and t>=ts-60)}
+        m=window_model(name); w["stale"]=now-ts>FRESH_S
+        if w["stale"] and w["u"]<=SOFT: continue
         w["state"]="SOFT-PAUSE" if w["stale"] else grade(w["u"])
         key=lambda x: (ORDER.index(x["state"]),x["u"],x["resets"])
         if m not in best or key(w)>key(best[m]): best[m]=w
@@ -207,7 +209,9 @@ def budget():
     # A model with a window of its own in force: the worse of that window and the state above.
     models={}
     for m,w in tel.items():
-        if m is not None: models[m]={"state":max(w["state"],state,key=ORDER.index),"utilisation":w["u"],"window":w["window"],"resets_at_utc":iso(w["resets"])}
+        if m is None: continue
+        models[m]={"state":max(w["state"],state,key=ORDER.index),"utilisation":w["u"],"window":w["window"],"resets_at_utc":iso(w["resets"])}
+        if w["stale"]: models[m].update({"stale":True,"sample_utc":iso(w["ts"]),"probe_every_s":FRESH_S})
     fable_ok=models["fable"]["state"]=="NORMAL" if "fable" in models else fab < FGUARD*FALLOW
     out={"window_start_utc":iso(ws),"window_end_utc":iso(wend) if wend else None,"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
             "unreconciled_est_usd":est,"inflight_committed_est_usd":round(committed,2),"inflight_runs":live,"effective_usd":round(eff,2),"weekly_limit_usd":WEEKLY,
