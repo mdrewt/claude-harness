@@ -354,5 +354,3 @@ consent); and it must hold at the official server's population.
 - Whether the game is sold. This doc calls it non-commercial and open-source; a Steam early-access
   release usually carries a price, and the SpacetimeDB licence terms differ for a commercial product.
 - How large a friends server is expected to get (a handful, or a community of fifty).
-- "Controller support before launch" (operator, 2026-10-01) is read as before early access, since the
-  Steam build is where controllers matter most; confirm.
