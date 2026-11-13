@@ -11,65 +11,907 @@ exact twins of an earlier test in the same block.
     mr-prune keep   [--repo R] [--at REF] [--mem DIR] --file F --test T --reason TEXT
     mr-prune --selftest [ID ...]      fixtures/prune/battery.py; rc=0 pass, rc=1 fail
 
-Defaults: R = projects/monster-realm of the checkout this tool is in; REF = origin/master; DIR = the
-directory this tool is in. A usage error, or a repo, ref or DIR that cannot be read, prints
-`PRUNE-ERROR ...` on stderr and exits 2.
+Defaults: R = projects/monster-realm of the checkout this tool is in; REF =
+refs/remotes/origin/master; DIR = the directory this tool is in. `PRUNE-ERROR ...` on stderr and
+rc=2 for a usage error, an R that is not the top level of a git repository, a REF that is not a
+commit, a DIR that is missing or inside R when the command writes, or a write that fails.
 
 A row is a candidate for someone to read, never a reason to delete a test: the deletion rule is
-standards/testing-tdd.md, "Deleting a check is legitimate". No gate reads this tool's output.
+standards/testing-tdd.md, "Deleting a check is legitimate". No gate reads this tool's output, and
+`census` exits 0 whatever it finds.
+
+census prints, in this order:
+    PRUNE-CENSUS <commit>
+    totals <package> product-lines=N test-lines=N ratio=X.XX test-files=N tests=N unparsed=N ...
+    totals out-of-scope evals=N sim-harness=N client-wasm=N
+    duplicates <file> :: "<candidate>" -> "<survivor>"
+    protected-twins <file> :: "<candidate>" -> "<survivor>" token=<token>
+    counts duplicates=N protected-twins=N identical-other-scope=N kept=N unparsed=N
+  Packages and their test files:
+    game-core       game-core/src/**/*_tests.rs, game-core/tests/*.rs
+    server-module   server-module/src/**/*_tests.rs
+    client          client/src/**/*.test.ts
+  Product lines are the package's other .rs files outside tests/ and benches/, and client/src's
+  other .ts files outside module_bindings/. A line is one newline. `tests` counts the tests the
+  lexer delimits and `unparsed` the ones it cannot. The remaining keys count what the census does
+  not read: inline `#[cfg(test)] mod` bodies in product files, client/e2e/**/*.spec.ts,
+  client/test-util/, evals/**/*.eval.mjs, and the .rs files of sim-harness/ and client-wasm/.
+  Names are JSON strings, and so is a path holding anything outside [A-Za-z0-9_./-].
+  `--record LABEL` appends one JSON row (label, commit, totals, counts) to DIR/prune/trend.jsonl
+  and prints `recorded LABEL`.
+
+A test, per language:
+  TypeScript  `it(title, fn)` or `test(title, fn)`, with or without `.each(table)`, written as a
+              statement at the file's top level or directly in the callback of a `describe(...)` /
+              `describe.sequential(...)` that is itself written so; plain string titles; a function
+              literal among the arguments. Name: the describe titles and the test title joined by
+              " > ". Block: the innermost describe callback.
+  Rust        a `fn` with a body under an attribute whose last path segment is `test`, at the top
+              level or inside `mod name { ... }` only. Name: the mod names and the fn name joined
+              by "::". Block: the innermost mod.
+  Anything else that declares a test is `unparsed` and appears in no row: a test built in a loop, a
+  helper or a macro (`proptest!`), a computed title, any other modifier. A name taken by an earlier
+  test of the file gets " #2", " #3", ... appended.
+  An unlexable file has no lexed test: its lines that look like a test declaration count as
+  `unparsed`, and `PRUNE-WARN unlexable <file>` goes to stderr. That is a file that is not UTF-8,
+  that the lexer cannot tokenise or bracket-match, or in which the lexer finds fewer declarations
+  than such lines (text it took for a string or a comment was not one).
+
+Twins. Two tests of one file are twins when they share the block, the form and the body, and the
+body does not depend on the test's name:
+  form   every token of the declaration except the name and the body: the callee and its case
+         table, the callback's header, other arguments; in Rust the attributes (doc attributes
+         apart) and the signature.
+  body   the tokens between the braces. Comments and the whitespace between tokens are not tokens;
+         every literal is one token, compared as written.
+  name   a test whose form or body holds `toMatchSnapshot`, `toThrowErrorMatchingSnapshot`,
+         `currentTestName`, `expect.getState`, `function_name!` or `insta::` is never a twin.
+The candidate is the later test and the survivor the earliest twin in the block. The same form and
+body in another block of the file is counted under `identical-other-scope`: other blocks can carry
+other hooks and bindings. A pair whose path or names hold a protected token (PROTECTED below) is
+listed under `protected-twins`: removing one follows the standard's protected path.
+
+twin confirms a claimed pair at a commit, T being the test to remove and S the one that stays.
+`PRUNE-TWIN-OK` (rc=0) when they are twins and T is defined after S; the line continues with
+` protected=<token>` for a protected pair and ` kept` for one the keep file holds. Otherwise
+`PRUNE-TWIN-FAIL <rule> ...` (rc=1). Reported alone, first that applies: `missing` (F is not a test
+file at the commit), `unparsed` (F is unlexable), `missing` (T or S names no lexed test),
+`same-test`. Otherwise every broken rule among `block`, `form`, `body`, `name-dependent`, `order`.
+`order` is a rule because a pair confirmed in both directions would let one change remove both.
+
+keep records a pair that is identical on purpose (the second run proves something the first cannot)
+in DIR/mr-prune-keep.json as {file: {test name: {"hash", "reason"}}}. census then omits the
+candidate's row and counts it under `kept` until its form or body changes. `PRUNE-KEEP-OK ...`
+(rc=0) or `PRUNE-KEEP-FAIL missing | not-a-candidate | keep-file-unreadable` (rc=1, nothing
+written). census and twin read a keep file they cannot parse as empty and say so on stderr, so a
+broken keep file can only add rows.
+
+The inspected repository is read through `git rev-parse`, `git ls-tree` and `git cat-file` at the
+commit; nothing is checked out and the work tree is never read. The only files written are the keep
+file and the trend file, and never inside R.
+
+Shebang is `/usr/bin/python3` on purpose: `#!/usr/bin/env python3` exits 126 in unpinned cwds under
+asdf.
 """
+import hashlib
+import json
 import os
+import re
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BATTERY = os.path.join(HERE, "fixtures", "prune", "battery.py")
+DEFAULT_REPO = os.path.normpath(os.path.join(HERE, "..", "..", "projects", "monster-realm"))
+# Spelled in full: `origin/master` would resolve to a local branch of that name first.
+DEFAULT_REF = "refs/remotes/origin/master"
 
-VALUE_FLAGS = {
-    "census": ("repo", "at", "mem", "record"),
-    "twin": ("repo", "at", "mem", "file", "test", "survivor"),
-    "keep": ("repo", "at", "mem", "file", "test", "reason"),
+PROTECTED = (
+    "priv", "secur", "auth", "account", "guard", "lifecycle", "delet", "erase", "anonym", "export",
+    "rekey", "claim", "oidc", "credential", "owner", "hidden", "reaper", "retain", "refus", "reject",
+    "a11y", "contrast", "i18n", "catalog", "locale", "movement", "predict", "reconcil", "netcode",
+    "interp", "parity", "determin", "oracle", "leak",
+)
+NAME_DEPENDENT = ("toMatchSnapshot", "toThrowErrorMatchingSnapshot", "currentTestName",
+                  "expect.getState", "function_name!", "insta::")
+
+PACKAGES = ("game-core", "server-module", "client")
+TEST_FILE = {
+    "game-core": re.compile(r"^game-core/(?:src/(?:.*/)?[^/]*_tests\.rs|tests/[^/]+\.rs)$"),
+    "server-module": re.compile(r"^server-module/src/(?:.*/)?[^/]*_tests\.rs$"),
+    "client": re.compile(r"^client/src/(?:.*/)?[^/]*\.test\.ts$"),
+}
+PRODUCT_FILE = {
+    "game-core": re.compile(r"^game-core/(?!tests/|benches/).*\.rs$"),
+    "server-module": re.compile(r"^server-module/(?!tests/|benches/).*\.rs$"),
+    "client": re.compile(r"^client/src/(?!module_bindings/).*\.ts$"),
+}
+# Counted, never read: (totals row, key, pattern).
+OUT_OF_SCOPE = (
+    ("client", "e2e", re.compile(r"^client/e2e/.*\.spec\.ts$")),
+    ("client", "test-util", re.compile(r"^client/test-util/")),
+    ("out-of-scope", "evals", re.compile(r"^evals/.*\.eval\.mjs$")),
+    ("out-of-scope", "sim-harness", re.compile(r"^sim-harness/.*\.rs$")),
+    ("out-of-scope", "client-wasm", re.compile(r"^client-wasm/.*\.rs$")),
+)
+# A line that declares a test, read without the lexer: what an unlexable file's tests are counted
+# by, and the floor a lexed file's count is held to.
+TEST_LINE = {
+    "ts": re.compile(r"^\s*(?:it|test)(?:\.\w+)*\(", re.M),
+    "rs": re.compile(r"^\s*#\[(?:\w+::)*test\]", re.M),
 }
 
 
-class Usage(Exception):
+class Fail(Exception):
+    """A usage error or an input that cannot be read: PRUNE-ERROR, rc=2."""
+
+
+class LexError(Exception):
     pass
+
+
+# ---------------------------------------------------------------------------------------------
+# Lexers. A token is (kind, text, offset); text is the exact source slice, so two token sequences
+# are equal only when the sources differ in comments and in whitespace between tokens.
+# ---------------------------------------------------------------------------------------------
+def _alternation(operators):
+    return "|".join(re.escape(op) for op in sorted(operators, key=len, reverse=True))
+
+
+TS_MASTER = re.compile(
+    r"(?P<ws>\s+)"
+    r"|(?P<lc>//[^\n\r  ]*)"
+    r"|(?P<bc>/\*.*?\*/)"
+    r"|(?P<id>[A-Za-z_$\u0080-\U0010ffff][\w$\u0080-\U0010ffff]*)"
+    r"|(?P<num>(?:0[xXbBoO]\w+|(?:\d[\d_]*\.?[\d_]*|\.\d[\d_]*)(?:[eE][+-]?\d+)?)n?)"
+    r"|(?P<str>'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\")"
+    r"|(?P<punct>" + _alternation([
+        ">>>=", "...", "===", "!==", "**=", "<<=", ">>=", ">>>", "&&=", "||=", "??=", "=>", "==",
+        "!=", "<=", ">=", "&&", "||", "??", "?.", "++", "--", "+=", "-=", "*=", "/=", "%=", "&=",
+        "|=", "^=", "<<", ">>", "**", "{", "}", "(", ")", "[", "]", ";", ",", "<", ">", "+", "-",
+        "*", "/", "%", "&", "|", "^", "!", "~", "?", ":", "=", ".", "@", "#"]) + ")",
+    re.S,
+)
+TS_REGEX = re.compile(r"/(?:[^/\\\n\[]|\\.|\[(?:[^\]\\\n]|\\.)*\])+/\w*")
+TS_TEMPLATE_CHUNK = re.compile(r"(?:[^`\\$]|\\.|\$(?!\{))*", re.S)
+# After these words a `/` starts a regex literal, not a division.
+TS_REGEX_AFTER_WORD = {"return", "typeof", "case", "in", "of", "delete", "void", "throw", "new",
+                       "else", "do", "await", "yield", "instanceof"}
+# After a closing bracket a `/` is read as division. When the same text also scans as a regex
+# literal holding one of these, the two readings tokenise differently (a quote opens a string, `//`
+# a comment), so the file is refused instead of guessed at.
+TS_AMBIGUOUS_REGEX = re.compile(r"['\"`]|//|/\*")
+
+
+def lex_ts(src):
+    toks, n, i = [], len(src), 0
+    template = []       # one brace depth per open `${`
+    while i < n:
+        c = src[i]
+        if c == "`" or (c == "}" and template and template[-1] == 0):
+            if c == "}":
+                template.pop()
+            j = TS_TEMPLATE_CHUNK.match(src, i + 1).end()
+            if j >= n:
+                raise LexError("unterminated template")
+            if src[j] == "`":
+                toks.append(("tpl", src[i:j + 1], i))
+                i = j + 1
+            else:
+                toks.append(("tpl", src[i:j + 2], i))
+                template.append(0)
+                i = j + 2
+            continue
+        if c == "/" and src[i + 1:i + 2] not in ("/", "*"):
+            regex = TS_REGEX.match(src, i)
+            prev = toks[-1] if toks else None
+            if regex and prev and prev[0] == "punct" and prev[1] in (")", "]", "}"):
+                if TS_AMBIGUOUS_REGEX.search(regex.group(), 1):
+                    raise LexError("`/` after a closing bracket: regex or division")
+                regex = None
+            elif prev and (prev[0] in ("num", "str", "re", "tpl")
+                           or (prev[0] == "id" and prev[1] not in TS_REGEX_AFTER_WORD)
+                           or (prev[0] == "punct" and prev[1] in ("++", "--"))):
+                regex = None
+            if regex:
+                toks.append(("re", regex.group(), i))
+                i = regex.end()
+                continue
+        m = TS_MASTER.match(src, i)
+        if not m:
+            raise LexError("unexpected %r" % src[i:i + 12])
+        kind = m.lastgroup
+        if kind not in ("ws", "lc", "bc"):
+            text = m.group()
+            if template and kind == "punct":
+                if text == "{":
+                    template[-1] += 1
+                elif text == "}":
+                    template[-1] -= 1
+            toks.append((kind, text, i))
+        i = m.end()
+    if template:
+        raise LexError("unterminated template")
+    return toks
+
+
+RS_MASTER = re.compile(
+    r"(?P<ws>\s+)"
+    r"|(?P<lc>//[^\n]*)"
+    r"|(?P<raw>(?:br|cr|r)(?P<hashes>#*)\")"
+    r"|(?P<str>[bc]?\"(?:[^\"\\]|\\.)*\")"
+    r"|(?P<chr>b?'(?:[^'\\\n]|\\(?:u\{[0-9a-fA-F_]+\}|x[0-9a-fA-F]{2}|.))')"
+    r"|(?P<life>'[A-Za-z_][A-Za-z0-9_]*)"
+    r"|(?P<id>(?:r#)?[A-Za-z_\u0080-\U0010ffff][A-Za-z0-9_\u0080-\U0010ffff]*)"
+    r"|(?P<num>0[xob][0-9a-fA-F_]+[a-z0-9]*"
+    r"|\d[\d_]*(?:\.(?![.A-Za-z_])[\d_]*)?(?:[eE][+-]?[\d_]+)?[a-z0-9]*)"
+    r"|(?P<punct>" + _alternation([
+        "<<=", ">>=", "...", "..=", "::", "->", "=>", "==", "!=", "<=", ">=", "&&", "||", "+=",
+        "-=", "*=", "/=", "%=", "^=", "&=", "|=", "<<", ">>", "..", "{", "}", "(", ")", "[", "]",
+        ";", ",", "<", ">", "+", "-", "*", "/", "%", "&", "|", "^", "!", "~", "?", ":", "=", ".",
+        "@", "#", "$"]) + ")",
+    re.S,
+)
+
+
+def lex_rs(src):
+    toks, n, i = [], len(src), 0
+    while i < n:
+        if src.startswith("/*", i):      # block comments nest
+            depth, i = 1, i + 2
+            while depth:
+                opens, closes = src.find("/*", i), src.find("*/", i)
+                if closes < 0:
+                    raise LexError("unterminated block comment")
+                if 0 <= opens < closes:
+                    depth, i = depth + 1, opens + 2
+                else:
+                    depth, i = depth - 1, closes + 2
+            continue
+        m = RS_MASTER.match(src, i)
+        if not m:
+            raise LexError("unexpected %r" % src[i:i + 12])
+        kind = m.lastgroup
+        if kind == "raw":
+            close = '"' + m.group("hashes")
+            j = src.find(close, m.end())
+            if j < 0:
+                raise LexError("unterminated raw string")
+            toks.append(("str", src[i:j + len(close)], i))
+            i = j + len(close)
+            continue
+        if kind not in ("ws", "lc"):
+            toks.append((kind, m.group(), i))
+        i = m.end()
+    return toks
+
+
+BRACKETS = {"(": ")", "[": "]", "{": "}"}
+CLOSERS = frozenset(BRACKETS.values())
+
+
+def match_brackets(toks):
+    """{index of an opening bracket: index of its closer}. The braces of a template's `${ }` are
+    part of the template tokens, so they are not seen here."""
+    match, stack = {}, []
+    for index, (kind, text, _offset) in enumerate(toks):
+        if kind != "punct":
+            continue
+        if text in BRACKETS:
+            stack.append(index)
+        elif text in CLOSERS:
+            if not stack or BRACKETS[toks[stack[-1]][1]] != text:
+                raise LexError("unbalanced %s" % text)
+            match[stack.pop()] = index
+    if stack:
+        raise LexError("unclosed %s" % toks[stack[-1]][1])
+    return match
+
+
+# ---------------------------------------------------------------------------------------------
+# Tests.
+# ---------------------------------------------------------------------------------------------
+NAME_SLOT = "\x00"      # stands in a form where the test's name was
+
+
+class Test:
+    """One lexed test. `block` identifies its innermost enclosing block; `form` and `body` are
+    tuples of token texts; `index` is its position among the file's lexed tests."""
+    __slots__ = ("name", "block", "form", "body", "index")
+
+    def __init__(self, name, block, form, body):
+        self.name, self.block, self.form, self.body, self.index = name, block, form, body, 0
+
+    def digest(self):
+        raw = "\x00".join(self.form) + "\x01" + "\x00".join(self.body)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    def name_dependent(self):
+        joined = "".join(self.form) + "".join(self.body)
+        return any(marker in joined for marker in NAME_DEPENDENT)
+
+
+def _is(tok, text):
+    return tok[0] == "punct" and tok[1] == text
+
+
+def _word(tok, text):
+    return tok[0] == "id" and tok[1] == text
+
+
+def _texts(toks, a, b):
+    return tuple(t[1] for t in toks[a:b])
+
+
+def _plain_title(toks, a, b):
+    """The title when the argument toks[a:b] is one plain string literal, else None."""
+    if b - a != 1:
+        return None
+    kind, text, _offset = toks[a]
+    if kind == "str" or (kind == "tpl" and len(text) > 1 and text[0] == "`" and text[-1] == "`"):
+        return text[1:-1]
+    return None
+
+
+def _arguments(toks, match, opener):
+    """[(start, end)] of the top-level arguments inside the parenthesis at `opener`."""
+    args, start, i, close = [], opener + 1, opener + 1, match[opener]
+    while i < close:
+        if i in match:
+            i = match[i]
+        elif _is(toks[i], ","):
+            args.append((start, i))
+            start = i + 1
+        i += 1
+    if start < close:
+        args.append((start, close))
+    return args
+
+
+def _function_literal(toks, match, a, b):
+    """(first, end) when the argument toks[a:b] is a function literal: toks[first] is the `{` of a
+    block body and `end` its `}`, or toks[first] is the `=>` of an expression body that runs to
+    `end`. None for any other argument."""
+    i = a + 1 if _word(toks[a], "async") and a + 1 < b else a
+    if _word(toks[i], "function"):
+        while i < b and not _is(toks[i], "("):
+            i += 1
+        if i >= b:
+            return None
+        i = match[i] + 1
+        while i < b and not _is(toks[i], "{"):
+            i = match.get(i, i) + 1
+        return (i, match[i]) if i < b and match[i] == b - 1 else None
+    if _is(toks[i], "("):               # an arrow's parameters: one parenthesis or one identifier
+        i = match[i] + 1
+    elif toks[i][0] == "id":
+        i += 1
+    else:
+        return None
+    if i < b and _is(toks[i], ":"):      # a return type
+        while i < b and not _is(toks[i], "=>"):
+            i = match.get(i, i) + 1
+    if i >= b or not _is(toks[i], "=>"):
+        return None
+    if i + 1 < b and _is(toks[i + 1], "{") and match[i + 1] == b - 1:
+        return (i + 1, b - 1)
+    return (i, b)
+
+
+def tests_ts(src):
+    """-> (tests, unparsed). Raises LexError for a file that cannot be tokenised."""
+    toks = lex_ts(src)
+    match = match_brackets(toks)
+    tests, unparsed, n = [], 0, len(toks)
+    describes = {}      # index of a body `{` -> title, for a describe written as the rule allows
+    describe_calls = set()      # the argument parenthesis of such a describe
+    scope = []          # per open bracket: ("describe", title, index) | ("call",) | None
+    i = 0
+    while i < n:
+        kind, text, _offset = toks[i]
+        if kind == "punct":
+            if text in BRACKETS:
+                scope.append(("describe", describes[i], i) if i in describes
+                             else ("call",) if i in describe_calls else None)
+            elif text in CLOSERS:
+                scope.pop()
+            i += 1
+            continue
+        if kind != "id" or text not in ("it", "test", "describe") or (i and _is(toks[i - 1], ".")):
+            i += 1
+            continue
+        # The callee: the word, then `.each(table)` for a test or `.sequential` for a describe.
+        # Any other modifier is read to its end so the call can be counted, and is not `plain`.
+        j, plain = i + 1, True
+        if j + 1 < n and _is(toks[j], ".") and toks[j + 1][0] == "id":
+            modifier = toks[j + 1][1]
+            if text == "describe" and modifier == "sequential":
+                j += 2
+            elif text != "describe" and modifier == "each" and j + 2 < n and _is(toks[j + 2], "("):
+                j = match[j + 2] + 1
+            else:
+                plain = False
+                while j < n and (_is(toks[j], ".") or toks[j][0] in ("id", "tpl")):
+                    j += 1
+                if j < n and _is(toks[j], "(") and match[j] + 1 < n and _is(toks[match[j] + 1], "("):
+                    j = match[j] + 1
+        if j >= n or not _is(toks[j], "("):
+            i += 1
+            continue
+        opener, close = j, match[j]
+        args = _arguments(toks, match, opener)
+        title = _plain_title(toks, *args[0]) if args else None
+        fn = None       # the callback: the last function literal after the title
+        for a, b in reversed(args[1:]):
+            fn = _function_literal(toks, match, a, b)
+            if fn:
+                break
+        # A statement directly in a describe body (or the file) whose enclosing brackets, up to
+        # the file, are all such describes.
+        placed = (all(s is not None for s in scope) and (not scope or scope[-1][0] == "describe")
+                  and (i == 0 or toks[i - 1][0] == "punct" and toks[i - 1][1] in ("{", "}", ";")))
+        if text == "describe":
+            if plain and placed and title is not None and fn and _is(toks[fn[0]], "{"):
+                describes[fn[0]] = title
+                describe_calls.add(opener)
+            i += 1      # walk into the call either way: its tests are found there
+            continue
+        if not (plain and placed and title is not None and fn):
+            unparsed += 1
+            i = close + 1
+            continue
+        outer = [s for s in scope if s[0] == "describe"]
+        first, end = fn
+        form = (_texts(toks, i, args[0][0]) + (NAME_SLOT,) + _texts(toks, args[0][1], first + 1)
+                + _texts(toks, end, close + 1))
+        tests.append(Test(" > ".join([s[1] for s in outer] + [title]),
+                          outer[-1][2] if outer else -1, form, _texts(toks, first + 1, end)))
+        i = close + 1
+    return tests, unparsed
+
+
+RS_QUALIFIERS = {"pub", "async", "const", "unsafe", "extern", "default"}
+RS_CFG_TEST = ("#", "[", "cfg", "(", "test", ")", "]")
+
+
+def _attribute_path(toks, a, b):
+    """`#[a::b(...)]` at toks[a:b] -> ["a", "b"]."""
+    path = []
+    for kind, text, _offset in toks[a + 2:b - 1]:
+        if kind == "id":
+            path.append(text)
+        elif text != "::":
+            break
+    return path
+
+
+def tests_rs(src):
+    """-> (tests, unparsed, inline test modules). Raises LexError."""
+    toks = lex_rs(src)
+    match = match_brackets(toks)
+    tests, unparsed, inline, n = [], 0, 0, len(toks)
+    mods = {}           # index of a body `{` -> mod name, for a mod reached through mods only
+    scope = []          # per open bracket: ("mod", name, index) | None
+    attrs, item = [], None      # the pending item's attributes [(start, end)], and where they end
+    i = 0
+    while i < n:
+        kind, text, _offset = toks[i]
+        if _is(toks[i], "#") and i + 1 < n and _is(toks[i + 1], "["):
+            end = match[i + 1] + 1
+            attrs.append((i, end))
+            i = item = end
+            continue
+        if kind == "id" and text in RS_QUALIFIERS and attrs:
+            i += 1
+            if text == "pub" and i < n and _is(toks[i], "("):
+                i = match[i] + 1
+            elif text == "extern" and i < n and toks[i][0] == "str":
+                i += 1
+            continue
+        named = i + 1 < n and toks[i + 1][0] == "id"
+        if _word(toks[i], "mod") and named and i + 2 < n and _is(toks[i + 2], "{"):
+            if any(_texts(toks, a, b) == RS_CFG_TEST for a, b in attrs):
+                inline += 1
+            if all(s is not None for s in scope):
+                mods[i + 2] = toks[i + 1][1]
+            attrs, item = [], None
+            i += 2
+            continue
+        if _word(toks[i], "fn") and named:
+            j = i + 2
+            while j < n and not (_is(toks[j], "{") or _is(toks[j], ";")):
+                j = match.get(j, j) + 1
+            is_test = any(_attribute_path(toks, a, b)[-1:] == ["test"] for a, b in attrs)
+            if is_test and j < n and _is(toks[j], "{"):
+                if all(s is not None for s in scope):
+                    form = ()
+                    for a, b in attrs:
+                        if _attribute_path(toks, a, b)[:1] != ["doc"]:
+                            form += _texts(toks, a, b)
+                    form += _texts(toks, item, i + 1) + (NAME_SLOT,) + _texts(toks, i + 2, j + 1)
+                    tests.append(Test("::".join([s[1] for s in scope] + [toks[i + 1][1]]),
+                                      scope[-1][2] if scope else -1, form,
+                                      _texts(toks, j + 1, match[j])))
+                else:
+                    unparsed += 1
+                attrs, item = [], None
+                i = match[j] + 1
+                continue
+        if kind == "punct":
+            if text in BRACKETS:
+                scope.append(("mod", mods[i], i) if i in mods else None)
+            elif text in CLOSERS:
+                scope.pop()
+        attrs, item = [], None
+        i += 1
+    return tests, unparsed, inline
+
+
+def parse_tests(path, data):
+    """-> (tests, unparsed count, lexable?) for the bytes of one test file. Names are unique."""
+    lang = "ts" if path.endswith(".ts") else "rs"
+    try:
+        src = data.decode("utf-8")
+        tests, unparsed = tests_ts(src) if lang == "ts" else tests_rs(src)[:2]
+        if len(tests) + unparsed < len(TEST_LINE[lang].findall(src)):
+            raise LexError("fewer declarations than test-shaped lines")
+    except Exception:       # whatever one odd file does to the lexer, the report goes on
+        return [], len(TEST_LINE[lang].findall(data.decode("utf-8", "replace"))), False
+    taken = set()
+    for index, t in enumerate(tests):
+        name, k = t.name, 1
+        while name in taken:
+            k += 1
+            name = "%s #%d" % (t.name, k)
+        taken.add(name)
+        t.name, t.index = name, index
+    return tests, unparsed, True
+
+
+def twin_pairs(tests):
+    """-> ([(candidate, survivor)], identical-other-scope count), in definition order."""
+    pairs, other, seen = [], 0, {}
+    for t in tests:
+        if t.name_dependent():
+            continue
+        earlier = seen.setdefault((t.form, t.body), [])
+        same_block = [e for e in earlier if e.block == t.block]
+        if same_block:
+            pairs.append((t, same_block[0]))
+        elif earlier:
+            other += 1
+        earlier.append(t)
+    return pairs, other
+
+
+def protected_token(*texts):
+    lowered = [text.lower() for text in texts]
+    for token in PROTECTED:
+        if any(token in text for text in lowered):
+            return token
+    return None
+
+
+# ---------------------------------------------------------------------------------------------
+# The inspected repository: object reads at one commit.
+# ---------------------------------------------------------------------------------------------
+def _git(repo, *args, data=None):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(GIT_OPTIONAL_LOCKS="0", GIT_NO_LAZY_FETCH="1")
+    try:
+        return subprocess.run(["git", "--no-replace-objects", "-C", repo] + list(args), input=data,
+                              env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except OSError as e:
+        raise Fail("cannot run git: %s" % e)
+
+
+def _git_line(repo, *args):
+    done = _git(repo, *args)
+    return None if done.returncode else done.stdout.decode("utf-8", "replace").strip()
+
+
+class Snapshot:
+    """The regular files of `repo` at `ref`: their paths, and their contents on request."""
+
+    def __init__(self, repo, ref):
+        # `git -C` would read an enclosing repository for a directory that is not one itself.
+        bare = _git_line(repo, "rev-parse", "--is-bare-repository") if os.path.isdir(repo) else None
+        top = bare and _git_line(repo, "rev-parse",
+                                 "--absolute-git-dir" if bare == "true" else "--show-toplevel")
+        if not top or os.path.realpath(top) != os.path.realpath(repo):
+            raise Fail("--repo %s is not the top level of a git repository" % repo)
+        self.commit = _git_line(repo, "rev-parse", "--verify", "--quiet", "--end-of-options",
+                                ref + "^{commit}")
+        if not self.commit or not re.fullmatch(r"[0-9a-f]{40,64}", self.commit):
+            raise Fail("--at %s is not a commit in %s" % (ref, repo))
+        self.repo, self.blobs = repo, {}
+        tree = _git(repo, "ls-tree", "-r", "-z", self.commit)
+        if tree.returncode:
+            raise Fail("cannot list %s" % self.commit)
+        for entry in tree.stdout.split(b"\0"):
+            meta, _tab, path = entry.partition(b"\t")
+            fields = meta.split()
+            if len(fields) == 3 and fields[1] == b"blob" and fields[0] in (b"100644", b"100755"):
+                self.blobs[path.decode("utf-8", "surrogateescape")] = fields[2].decode("ascii")
+
+    def read(self, paths):
+        """{path: bytes} for the given paths, in one `cat-file --batch`."""
+        paths = list(paths)
+        if not paths:
+            return {}
+        request = "".join(self.blobs[p] + "\n" for p in paths).encode("ascii")
+        out = _git(self.repo, "cat-file", "--batch", data=request).stdout
+        contents, at = {}, 0
+        for p in paths:
+            eol = out.find(b"\n", at)
+            header = out[at:eol].split()
+            if eol < 0 or len(header) != 3 or header[1] != b"blob":
+                raise Fail("cannot read %s at %s" % (p, self.commit))
+            size = int(header[2])
+            contents[p] = out[eol + 1:eol + 1 + size]
+            at = eol + 1 + size + 1
+        return contents
+
+
+# ---------------------------------------------------------------------------------------------
+# Keep file and trend file.
+# ---------------------------------------------------------------------------------------------
+def keep_path(mem):
+    return os.path.join(mem, "mr-prune-keep.json")
+
+
+def load_keep(mem):
+    """-> the keep file's object, {} when the file is absent. Raises ValueError when it is not
+    {file: {test: {"hash": str, ...}}}."""
+    try:
+        with open(keep_path(mem), encoding="utf-8") as fh:
+            keep = json.load(fh)
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeDecodeError) as e:
+        raise ValueError(str(e))
+    shaped = isinstance(keep, dict) and all(
+        isinstance(tests, dict) and all(
+            isinstance(entry, dict) and isinstance(entry.get("hash"), str)
+            for entry in tests.values())
+        for tests in keep.values())
+    if not shaped:
+        raise ValueError("not {file: {test: {hash, reason}}}")
+    return keep
+
+
+def keep_or_empty(mem):
+    try:
+        return load_keep(mem)
+    except ValueError as e:
+        sys.stderr.write("PRUNE-WARN keep-file %s unreadable (%s): read as empty\n"
+                         % (keep_path(mem), e))
+        return {}
+
+
+def is_kept(keep, path, test):
+    return keep.get(path, {}).get(test.name, {}).get("hash") == test.digest()
+
+
+def writable_mem(opts, repo):
+    """The --mem directory of a command that writes: it exists and is outside the repository."""
+    mem = opts.get("mem", HERE)
+    if not os.path.isdir(mem):
+        raise Fail("--mem %s is not a directory" % mem)
+    relative = os.path.relpath(os.path.realpath(mem), os.path.realpath(repo))
+    if relative != ".." and not relative.startswith(".." + os.sep):
+        raise Fail("--mem %s is inside --repo: this tool writes nothing there" % mem)
+    return mem
+
+
+def write_file(path, text, append=False):
+    try:
+        if append:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(text)
+        else:
+            tmp = "%s.tmp.%d" % (path, os.getpid())
+            with open(tmp, "w", encoding="utf-8") as fh:
+                fh.write(text)
+            os.replace(tmp, path)
+    except OSError as e:
+        raise Fail("cannot write %s: %s" % (path, e))
+
+
+# ---------------------------------------------------------------------------------------------
+# Subcommands.
+# ---------------------------------------------------------------------------------------------
+def census(snap, keep):
+    """-> (totals, rows, counts, unlexable files). A row is (section, file, candidate name,
+    survivor name, protected token or None)."""
+    totals = {p: {"product-lines": 0, "test-lines": 0, "ratio": None, "test-files": 0, "tests": 0,
+                  "unparsed": 0} for p in PACKAGES}
+    totals["game-core"]["inline-modules"] = totals["server-module"]["inline-modules"] = 0
+    totals["client"].update({"e2e": 0, "test-util": 0})
+    totals["out-of-scope"] = {"evals": 0, "sim-harness": 0, "client-wasm": 0}
+    tests_of, product_of = {}, {}       # path -> package
+    for path in snap.blobs:
+        for row, key, pattern in OUT_OF_SCOPE:
+            if pattern.match(path):
+                totals[row][key] += 1
+        for pkg in PACKAGES:
+            if TEST_FILE[pkg].match(path):
+                tests_of[path] = pkg
+            elif PRODUCT_FILE[pkg].match(path):
+                product_of[path] = pkg
+    contents = snap.read(sorted(tests_of) + sorted(product_of))
+    unlexable = []
+    for path, pkg in product_of.items():
+        totals[pkg]["product-lines"] += contents[path].count(b"\n")
+        if path.endswith(".rs"):
+            try:
+                totals[pkg]["inline-modules"] += tests_rs(contents[path].decode("utf-8"))[2]
+            except Exception:       # as in parse_tests: one odd file does not stop the report
+                unlexable.append(path)
+    rows = []
+    counts = {"duplicates": 0, "protected-twins": 0, "identical-other-scope": 0, "kept": 0,
+              "unparsed": 0}
+    for path in sorted(tests_of):
+        package = totals[tests_of[path]]
+        tests, unparsed, lexable = parse_tests(path, contents[path])
+        if not lexable:
+            unlexable.append(path)
+        package["test-lines"] += contents[path].count(b"\n")
+        package["test-files"] += 1
+        package["tests"] += len(tests)
+        package["unparsed"] += unparsed
+        counts["unparsed"] += unparsed
+        pairs, other = twin_pairs(tests)
+        counts["identical-other-scope"] += other
+        for cand, surv in pairs:
+            if is_kept(keep, path, cand):
+                counts["kept"] += 1
+                continue
+            token = protected_token(path, cand.name, surv.name)
+            section = "protected-twins" if token else "duplicates"
+            counts[section] += 1
+            rows.append((section, path, cand.name, surv.name, token))
+    for pkg in PACKAGES:
+        package = totals[pkg]
+        if package["product-lines"]:
+            package["ratio"] = float("%.2f" % (package["test-lines"] / package["product-lines"]))
+    return totals, rows, counts, sorted(unlexable)
+
+
+def _quoted(name):
+    return json.dumps(name, ensure_ascii=False)
+
+
+def _shown(path):
+    return path if re.fullmatch(r"[A-Za-z0-9_./-]+", path) else json.dumps(path)
+
+
+def _emit(lines):
+    sys.stdout.buffer.write(("\n".join(lines) + "\n").encode("utf-8"))
+    sys.stdout.buffer.flush()
+
+
+def cmd_census(opts):
+    repo, label = opts.get("repo", DEFAULT_REPO), opts.get("record")
+    mem = opts.get("mem", HERE)
+    if label is not None:
+        if not label or "\n" in label or "\r" in label:
+            raise Fail("--record needs a one-line label")
+        mem = writable_mem(opts, repo)
+    snap = Snapshot(repo, opts.get("at", DEFAULT_REF))
+    totals, rows, counts, unlexable = census(snap, keep_or_empty(mem))
+    for path in unlexable:
+        sys.stderr.write("PRUNE-WARN unlexable %s\n" % _shown(path))
+    out = ["PRUNE-CENSUS " + snap.commit]
+    for row in PACKAGES + ("out-of-scope",):
+        out.append("totals %s %s" % (row, " ".join(
+            "%s=%s" % (k, "n/a" if v is None else "%.2f" % v if k == "ratio" else v)
+            for k, v in totals[row].items())))
+    for wanted in ("duplicates", "protected-twins"):
+        for section, path, cand, surv, token in rows:
+            if section == wanted:
+                out.append("%s %s :: %s -> %s%s" % (section, _shown(path), _quoted(cand),
+                                                    _quoted(surv), " token=" + token if token else ""))
+    out.append("counts " + " ".join("%s=%d" % kv for kv in counts.items()))
+    if label is not None:
+        row = {"label": label, "commit": snap.commit, "totals": totals, "counts": counts}
+        write_file(os.path.join(mem, "prune", "trend.jsonl"),
+                   json.dumps(row, ensure_ascii=False) + "\n", append=True)
+        out.append("recorded " + label)
+    _emit(out)
+    return 0
+
+
+def _tests_at(opts):
+    """-> (tests, lexable?) of --file at --at, or None when it is not a test file there."""
+    snap = Snapshot(opts.get("repo", DEFAULT_REPO), opts.get("at", DEFAULT_REF))
+    path = opts["file"]
+    if path not in snap.blobs or not any(TEST_FILE[p].match(path) for p in PACKAGES):
+        return None
+    tests, _unparsed, lexable = parse_tests(path, snap.read([path])[path])
+    return tests, lexable
+
+
+def _need(opts, *names):
+    for name in names:
+        if not opts.get(name):
+            raise Fail("--%s is required" % name)
+
+
+def cmd_twin(opts):
+    _need(opts, "file", "test", "survivor")
+    found = _tests_at(opts)
+    by_name = {t.name: t for t in found[0]} if found else {}
+    cand, surv = by_name.get(opts["test"]), by_name.get(opts["survivor"])
+    if found is None:
+        broken = ["missing"]
+    elif not found[1]:
+        broken = ["unparsed"]
+    elif cand is None or surv is None:
+        broken = ["missing"]
+    elif cand is surv:
+        broken = ["same-test"]
+    else:
+        broken = [rule for rule, bad in (
+            ("block", cand.block != surv.block), ("form", cand.form != surv.form),
+            ("body", cand.body != surv.body),
+            ("name-dependent", cand.name_dependent() or surv.name_dependent()),
+            ("order", cand.index < surv.index)) if bad]
+    if broken:
+        _emit(["PRUNE-TWIN-FAIL " + " ".join(broken)])
+        return 1
+    token = protected_token(opts["file"], cand.name, surv.name)
+    kept = is_kept(keep_or_empty(opts.get("mem", HERE)), opts["file"], cand)
+    _emit(["PRUNE-TWIN-OK" + (" protected=" + token if token else "") + (" kept" if kept else "")])
+    return 0
+
+
+def cmd_keep(opts):
+    _need(opts, "file", "test", "reason")
+    mem = writable_mem(opts, opts.get("repo", DEFAULT_REPO))
+    found = _tests_at(opts)
+    cand = next((t for t in found[0] if t.name == opts["test"]), None) if found else None
+    keep = why = None
+    if cand is None:
+        why = "missing"
+    elif not any(c is cand for c, _survivor in twin_pairs(found[0])[0]):
+        why = "not-a-candidate"
+    else:
+        try:
+            keep = load_keep(mem)
+        except ValueError:
+            why = "keep-file-unreadable"
+    if why:
+        _emit(["PRUNE-KEEP-FAIL " + why])
+        return 1
+    keep.setdefault(opts["file"], {})[cand.name] = {"hash": cand.digest(), "reason": opts["reason"]}
+    write_file(keep_path(mem), json.dumps(keep, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+    _emit(["PRUNE-KEEP-OK %s :: %s hash=%s" % (_shown(opts["file"]), _quoted(cand.name), cand.digest())])
+    return 0
+
+
+COMMANDS = {
+    "census": (cmd_census, ("repo", "at", "mem", "record")),
+    "twin": (cmd_twin, ("repo", "at", "mem", "file", "test", "survivor")),
+    "keep": (cmd_keep, ("repo", "at", "mem", "file", "test", "reason")),
+}
 
 
 def parse_args(argv):
     """-> (subcommand, {flag: value}). Every flag takes one value."""
-    if not argv or argv[0] not in VALUE_FLAGS:
-        raise Usage("expected one of: census, twin, keep, --selftest")
+    if not argv or argv[0] not in COMMANDS:
+        raise Fail("expected one of: census, twin, keep, --selftest")
     sub, opts, i = argv[0], {}, 1
     while i < len(argv):
         name = argv[i][2:] if argv[i].startswith("--") else None
-        if name not in VALUE_FLAGS[sub]:
-            raise Usage("%s: unknown argument %r" % (sub, argv[i]))
+        if name not in COMMANDS[sub][1]:
+            raise Fail("%s: unknown argument %r" % (sub, argv[i]))
         if i + 1 >= len(argv):
-            raise Usage("%s: --%s needs a value" % (sub, name))
+            raise Fail("%s: --%s needs a value" % (sub, name))
         opts[name] = argv[i + 1]
         i += 2
     return sub, opts
-
-
-def cmd_census(opts):
-    print("PRUNE-CENSUS " + "0" * 40)
-    for pkg, extra in (("game-core", "inline-modules=0"), ("server-module", "inline-modules=0"),
-                       ("client", "e2e=0 test-util=0")):
-        print("totals %s product-lines=0 test-lines=0 ratio=n/a test-files=0 tests=0 unparsed=0 %s"
-              % (pkg, extra))
-    print("totals out-of-scope evals=0 sim-harness=0 client-wasm=0")
-    print("counts duplicates=0 protected-twins=0 identical-other-scope=0 kept=0 unparsed=0")
-    return 0
-
-
-def cmd_twin(opts):
-    print("PRUNE-TWIN-FAIL missing")
-    return 1
-
-
-def cmd_keep(opts):
-    print("PRUNE-KEEP-FAIL missing")
-    return 1
 
 
 def main(argv):
@@ -77,10 +919,10 @@ def main(argv):
         os.execv("/usr/bin/python3", ["/usr/bin/python3", BATTERY, os.path.abspath(__file__)] + argv[1:])
     try:
         sub, opts = parse_args(argv)
-    except Usage as e:
+        return COMMANDS[sub][0](opts)
+    except Fail as e:
         sys.stderr.write("PRUNE-ERROR %s\n" % e)
         return 2
-    return {"census": cmd_census, "twin": cmd_twin, "keep": cmd_keep}[sub](opts)
 
 
 if __name__ == "__main__":
