@@ -96,9 +96,13 @@ player impact and keep **at most 5**; genuine contradictions between lenses go t
 
 - **Absorbed:** the fix falls in a surface a queued §9 milestone already rebuilds or owns
   (that spec's scope/`touches:` cover it). It joins that spec's "Absorbs residuals" list
-  (edited in the 3c PR) and its `--target` below is that milestone's absorbing slice id —
-  or `backlog` while the milestone has no `### <slice id>` section yet (the "Absorbs" line is
-  then the claim; name the milestone in `--reason`). Never double-schedule an absorbed finding.
+  (edited in the 3c PR) and its `--target` below is that milestone's absorbing slice id.
+  While the milestone has no `### <slice id>` section, a MED/LOW finding files to `backlog`
+  (name the milestone in `--reason`) and its "Absorbs" entry reads "the absorbing slice's PR
+  dispositions it `fixed`" — no slice merge closes a `backlog` row. A HIGH/CRITICAL finding
+  is never absorbed that way: the supervisor promotes such a `backlog` row into its own slice
+  and the loop cannot disposition it, so it is Scheduled. Never double-schedule an absorbed
+  finding.
 - **Scheduled:** every other finding goes into THIS run's milestone
   `M-weekly-review-<UTC-date>`, grouped into 1–4 slices `wr<YYMMDD>-a..d` by surface
   (pulled backlog rows included), with pairwise-disjoint `touches:` where possible so the
@@ -143,11 +147,14 @@ $MEM/mr-gates residuals add --slice weekly-review-<UTC-date> --gate F<n> \
   --severity <LOW|MED|HIGH|CRITICAL>
 ```
 
-The two refusals mean different things. `OUT-OF-BOUNDS` (exit 2) is a verdict on the finding:
-drop it, delete it from the spec file just written, and say so. `TARGET-MISSING` (exit 3) is
-never a reason to drop a verified finding — the `### <slice id>` heading is absent or spelled
-differently from `--target`: fix the heading or the flag and re-run. Every kept finding ends
-3b with a `RESIDUAL-ADDED` line or an `OUT-OF-BOUNDS` refusal. Only the supervisor promotes.
+The word after `ERROR:` names the refusal; only one is a verdict. `OUT-OF-BOUNDS` is policy:
+drop the finding, delete it from the spec file just written, and say so — except the
+"checking apparatus" refusal, a text match on title and reason: drop it only when its subject
+really is the checking apparatus, otherwise reword as the message says and re-run.
+`TARGET-MISSING` (exit 3) is never a reason to drop a verified finding — the `### <slice id>`
+heading is absent or spelled differently from `--target`: fix the heading or the flag and
+re-run. `BAD-TAG` is a mistyped flag: fix it and re-run. Every kept finding ends 3b with a
+`RESIDUAL-ADDED` line or an `OUT-OF-BOUNDS` refusal. Only the supervisor promotes.
 
 **3c — Schedule in the harness plan (doc-only auto-merge PR).** Zero kept findings AND zero
 pulled rows → skip 3c entirely; everything absorbed and nothing pulled → there is no new spec

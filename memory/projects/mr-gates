@@ -17,8 +17,10 @@ __doc__ = """mr-gates — the per-slice ACCEPTANCE LEDGER and the residual sink 
     mr-gates residuals list [--unclaimed] [--json]      # oldest first; age is a label only
                             | add --slice S --gate G --title T --target X --reason R
                                   [--category C --severity V]
-                                  # refusals: exit 3 TARGET-MISSING (no `### X` section on disk:
-                                  # write the section, then re-run) | exit 2 OUT-OF-BOUNDS (policy)
+                                  # refusals, told apart by the leader after `ERROR: `:
+                                  # TARGET-MISSING (exit 3; no `### X` section on disk: write
+                                  # it, re-run) | BAD-TAG (exit 2; fix --category/--severity,
+                                  # re-run) | OUT-OF-BOUNDS (exit 2; policy)
                             | promote --id R [--category C --severity V] [--spec-file F]
                             | close --slice S [--pr N]   # also deletes its residuals.spec.md section
                             | disposition --id R --as wontfix|fixed --reason T
@@ -1901,6 +1903,13 @@ def cmd_residuals(a, sub):
                            RC_TARGET_MISSING)
         cat = (a.get("category") or "").lower() or None
         sev = (a.get("severity") or "").upper() or None
+        if target not in LEGAL_DISPOSITIONS and (cat not in CATEGORIES or sev not in SEVERITIES):
+            # A mistyped flag is a usage error with its own leader: OUT-OF-BOUNDS is the leader a
+            # caller drops findings on, and a typo says nothing about the finding.
+            return die("BAD-TAG: --category must be one of {%s} and --severity one of {%s}; got "
+                       "%r / %r. The finding itself is NOT refused: fix the flag and re-run."
+                       % ("|".join(CATEGORIES), "|".join(SEVERITIES),
+                          a.get("category"), a.get("severity")))
         refused = defer_policy_findings(a["slice"], a["gate"], target, a["reason"], a["title"],
                                         cat, sev, rows)
         if refused:
@@ -2944,12 +2953,13 @@ def selftest():
         wres = os.path.join(root, "wr-residuals.jsonl")
 
         def wr_add(gate, title, target, reason="server/src/trade.rs:10 @ abc1234 — accepts a "
-                                               "negative amount; reject it"):
+                                               "negative amount; reject it",
+                   category="data-integrity", severity="MED"):
             err = _io.StringIO()
             with contextlib.redirect_stdout(_io.StringIO()), contextlib.redirect_stderr(err):
                 rc = cmd_residuals({"slice": "weekly-review-2026-11-18", "gate": gate,
                                     "title": title, "target": target, "reason": reason,
-                                    "category": "data-integrity", "severity": "MED",
+                                    "category": category, "severity": severity,
                                     "_residuals": wres, "_specs": wspecs}, "add")
             return rc, err.getvalue()
 
@@ -2973,6 +2983,13 @@ def selftest():
         chk.ok("O2b-policy-refusal-is-named", err_app.startswith("ERROR: OUT-OF-BOUNDS")
                and "TARGET-MISSING" not in err_app,
                "the fixture must isolate the policy refusal: its target section exists")
+        # A mistyped flag on an existing target is neither refusal above: the review re-runs it.
+        for kw in ({"category": "ux"}, {"severity": "medium"}):
+            rc_tag, err_tag = wr_add("F1", real, "wr261118-a", **kw)
+            chk.ok("O2c-bad-tag-is-not-out-of-bounds[%s]" % list(kw)[0],
+                   rc_tag != 0 and err_tag.startswith("ERROR: BAD-TAG")
+                   and "OUT-OF-BOUNDS" not in err_tag and wr_open() == {},
+                   "a typo in --category/--severity is not a verdict on the finding")
         rc_ok, _e = wr_add("F1", real, "wr261118-a")
         wrow = wr_open().get("R-weekly-review-2026-11-18-F1") or {}
         chk.eq("O3-finding-survives-once-section-exists",
@@ -2998,9 +3015,37 @@ def selftest():
                "filing first is refused TARGET-MISSING for every scheduled finding")
         chk.ok("O7-prompt-drops-only-out-of-bounds",
                "`TARGET-MISSING` (exit %d)" % RC_TARGET_MISSING in p3
-               and "`OUT-OF-BOUNDS` (exit 2)" in p3 and "A refusal means" not in p3,
+               and "`OUT-OF-BOUNDS`" in p3 and "A refusal means" not in p3,
                "an unqualified `a refusal means drop it` discards a verified finding whose "
                "section is merely not written yet")
+        p3flat = " ".join(p3.split())
+        chk.ok("O8-prompt-reruns-a-bad-tag", "`BAD-TAG` is a mistyped flag: fix it and re-run"
+               in p3flat)
+        chk.ok("O9-prompt-drops-an-apparatus-match-only-when-true",
+               "drop it only when its subject really is the checking apparatus" in p3flat,
+               "the apparatus refusal is a text match on title+reason; a finding that merely "
+               "cites such a path is reworded, not dropped")
+        # An absorbed finding whose milestone has no slice section is a `backlog` row: no slice
+        # merge closes it (O5) and the supervisor promotes an unpromoted HIGH/CRITICAL
+        # security-privacy or data-integrity row into its own slice. So only MED/LOW is absorbed
+        # that way, and the absorbing slice dispositions the row itself.
+        def wr_fixed(rid):
+            err = _io.StringIO()
+            with contextlib.redirect_stdout(_io.StringIO()), contextlib.redirect_stderr(err):
+                return cmd_residuals({"id": rid, "as": "fixed", "pr": "7", "_residuals": wres,
+                                      "reason": "fixture: the absorbing slice merged"},
+                                     "disposition")
+        wr_add("F4", "the server SHALL cap the trade ledger", "backlog", severity="HIGH")
+        chk.ok("O10-loop-cannot-disposition-a-high-backlog-row",
+               wr_fixed("R-weekly-review-2026-11-18-F4") != 0
+               and "R-weekly-review-2026-11-18-F4" in wr_open(),
+               "why a HIGH/CRITICAL finding is scheduled, never absorbed via backlog")
+        chk.eq("O11-absorbing-slice-dispositions-the-backlog-row",
+               (0, ["R-weekly-review-2026-11-18-F4"]),
+               (wr_fixed("R-weekly-review-2026-11-18-F3"), sorted(wr_open())))
+        chk.ok("O12-prompt-bounds-backlog-absorption",
+               "A HIGH/CRITICAL finding is never absorbed that way" in p3flat
+               and "dispositions it `fixed`" in p3flat)
     finally:
         cleanup()
 
