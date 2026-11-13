@@ -194,6 +194,11 @@ Each item is ticked **met**, or given a finding with a disposition. Then the ope
 - [ ] Export is owner-only, rate-limited and reaped. Evidence: `m22s4_exporter_set_equals_manifest_both_directions`,
   `acct_export_reaper_deletes_whole_bundles_only`, `EXPORT_REQUEST_COOLDOWN_MS` (`privacy.rs`).
 - [ ] Backups honour deletion: `observability-dr.md` §8 has been followed for the launch deployment.
+- [ ] The data export's scope has been checked by someone qualified against the privacy rules that
+  apply where the official server's players are (operator, 2026-11-13: the export is for the data
+  held about the person; game state is included where a query on existing tables provides it, and
+  no table or column is added for the export's sake). Evidence: the reviewer's note and
+  `schema::DATA_LIFECYCLE_MANIFEST`'s `exportable` column.
 
 **D. Dependency and build audit**
 - [ ] `cargo audit` is clean and gitleaks is clean (both blocking in CI, `.github/workflows/ci.yml`).
