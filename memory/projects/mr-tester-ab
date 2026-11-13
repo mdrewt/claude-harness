@@ -1333,14 +1333,14 @@ def run_suite(ctx, snap_sha, ref, files, only=None, budget=3600, merge=False):
         unresolved = (runner or {}).get("unresolved")
         note = ctx.__dict__.get("setup_note", {}).get((runner or {}).get("name"))
         here = [c for c in cases if mine.search(c[0] + " " + c[1])]
-        hits = {name: next((c for c in here if c[1] == name or c[1].endswith("::" + name)
-                            or c[1].endswith(" > " + name)), None) for name, _ in declared[path]}
+        named = lambda c, name: c[1] == name or c[1].endswith("::" + name) or c[1].endswith(" > " + name)
+        hits = {name: next((c for c in here if named(c, name)), None) for name, _ in declared[path]}
         # The report holds a failure under this file that is none of the file's tests (vitest
         # names it after the file) and holds none of the arm's tests: the file was not collected.
-        named = lambda c, name: c[1] == name or c[1].endswith("::" + name) or c[1].endswith(" > " + name)
-        every = [n for n, _ in tests_in(ctx, path, git(ctx.game, "show", "%s:%s" % (ref, path), check=False))]
-        uncollected = None if any(hits.values()) else next(
-            (c for c in here if c[2] == "fail" and not any(named(c, n) for n in every)), None)
+        uncollected = None
+        if not any(hits.values()) and any(c[2] == "fail" for c in here):
+            every = [n for n, _ in tests_in(ctx, path, git(ctx.game, "show", "%s:%s" % (ref, path), check=False))]
+            uncollected = next((c for c in here if c[2] == "fail" and not any(named(c, n) for n in every)), None)
         if uncollected and unresolved and note and re.search(unresolved, uncollected[4]):
             for name, tag in declared[path]:
                 results["%s::%s" % (path, name)] = (
