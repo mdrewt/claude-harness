@@ -102,6 +102,14 @@ except Exception:
 }
 # (haiku triage hop removed 2026-07-26 — 0 invocations ever; the local-model triage below covers the identical ambiguous-failure class for $0 and works during API outages. Rollback: git history.)
 
+# Who fixes a red master, said last in every --resume prompt (mr-interrupted's master_rule says the
+# same in a resumed slice's brief). A resumed session reads its whole context again, and a brief
+# rendered from an older template tells every run to fix master; the prompt is the newest instruction
+# and says it overrides. A ci-fix-* slice is the one run whose work is master.
+case "$S" in
+  ci-fix-*) MASTER_RULE="A red master is this slice's own work: it is the ci-fix run that owns master, so keep fixing it." ;;
+  *) MASTER_RULE="A red master has one owner, the supervisor's ci-fix-* run: never fix or revert master in this session — this overrides the brief and anything else this session read earlier — and keep building $S." ;;
+esac
 A=1
 # Credit-stop resume. The CLI resumes a session from its transcript, filed under the run directory's
 # project slug. PRIOR is what the session had spent before this launch: mr-cost-sum subtracts it from
@@ -116,7 +124,7 @@ if [ -n "$RSID" ]; then
   echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$PRREPO RESUME=$RSID PRIOR=$PRIOR TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
   P="Your session was stopped by a usage limit, not by a failure, and the limit has reset. Stop flags are cleared. Re-verify the worktree and branch state (git status, git log) — uncommitted changes are from the step that was cut off — then continue the brief from where you left off. Terminal state is unchanged: PR OPEN with local ci green; NEVER run gh pr merge (supervisor-only)."
   ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$RSID" \
-    -p "$P" \
+    -p "$P $MASTER_RULE" \
     --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>"$E"
   RC=$?
   # A session the CLI could not resume ends at once with no assistant event in the log.
@@ -169,7 +177,7 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
   { [ -f "/tmp/mr_stop_$S" ] || [ -f /tmp/mr_stop_all ]; } && break   # mechanical gate before EVERY spawn (cost-watch review cond i)
   echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
   ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
-    -p "$P" \
+    -p "$P $MASTER_RULE" \
     --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
   RC=$?
 done

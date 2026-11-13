@@ -133,6 +133,18 @@ stopped. Every tick, before any gate, the wrapper runs `mr-interrupted scan`:
   or when the CLI cannot resume it, it starts a new session from the brief (one
   `RESUME-FALLBACK`/`RESUME-FAILED` line in the pass log says so), whose resume block points at
   the `wip:` checkpoint. `mr-spawn` removes the record once the slice is launched.
+- **A red `master` has one owner, the supervisor's `ci-fix-*` run.** The resumes go ahead of
+  it, so every resumed run can find `master` red; a run that left its slice to fix `master`
+  would be one of several doing the same. The brief says only a `ci-fix-*` slice fixes or
+  reverts `master`. `mr-launch.sh` also ends every `--resume` prompt with that rule (the
+  credit-stop resume, and its own resumes after a transient failure or an early stop), and
+  `mr-interrupted` writes it into the resume block of the brief a new session starts from. A
+  resumed session rereads its whole context, which can hold a brief that tells every run to
+  fix a red `master`: the prompt says it overrides the brief, and it is the last thing read.
+  For a `ci-fix-*` slice both say the opposite: `master` is its work. A session that is running
+  under a wrapper started before `mr-launch.sh` carried the rule keeps the brief it was given
+  until it ends, so it can still leave its slice for a red `master`; it gets the rule the next
+  time a wrapper resumes it.
 
 **When a slice is offered.** Its reset has passed, no other recorded stop that covers its model
 is still waiting for a reset (`gate`, `vars --due` and `mr-spawn`'s `launch-check` ask the same
@@ -219,6 +231,27 @@ needs adds it with `mr-touches widen`, which refuses a file other unmerged work 
 files that define the gate or steer the loop. Grants live in `gates/<slice>.widened.jsonl` and are
 read by `mr-disjoint`, `mr-gates render` and `mr-audit`'s `scope` block. The rules are in the
 `mr-touches` header.
+
+## Spec notes (`mr-gates notes`)
+
+The spec corpus a run reads is the harness main checkout, where a run cannot commit. What a build
+learns about its spec goes to `gates/<slice>.notes.jsonl` (`mr-gates notes add`), and a follow-up
+in a note is a residual row (`--followup` files it), so the drain sees it.
+
+- **Pending is read from the spec:** a note is pending while its paragraph is absent from the
+  slice's section at HEAD of the spec checkout. No row records a fold, so an edit that is written
+  and then stashed or discarded before it is committed is pending again.
+- **At merge:** `mr-gates residuals close` prints `NOTES-PENDING` when the merged slice has pending
+  notes. `mr-gates notes fold --slice S` writes them as `Build note (S): …` at the end of the
+  slice's section; the edit ships as the tick's doc-only spec PR. Fold refuses a spec with
+  uncommitted edits.
+- **A Build note found uncommitted in a spec file** (a run wrote into the checkout):
+  `residuals close` prints `NOTES-STRAY <file>: mr-gates notes adopt --slice S before stashing it`.
+  Adopt stores it (with `--followup …` or `--residual R-…` when it names a follow-up) before the
+  labeled stash. After the file is back at HEAD and fast-forwarded, `notes fold` writes it again.
+- **At milestone close:** `mr-gates notes harvest --spec-file F` must exit 0 before `F` is deleted.
+  It blocks on a pending note, an uncommitted edit, or a follow-up-worded Build note with no
+  residual row; `notes adopt` gives a committed Build note its row, one paragraph per call.
 
 ## Verification & rollback
 - Dry-run a tick: `MR_TICK_DRYRUN=1 MR_FORCE=1 bash memory/projects/mr-native-tick.sh`

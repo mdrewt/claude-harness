@@ -3,7 +3,7 @@ Build exactly ONE mergeable Monster Realm v2 slice — `<SLICE>` (<TARGET_DESC>)
 **Scope:** your diff ⊆ `touches:` — <TOUCHES> — plus sibling tests of declared code files and a `docs/DECISIONS.md` entry ONLY at `standards/decisions.md`'s bar (mandatory if `touches:` names it). List extras under PR-body `touches-delta:`. Need another file (proved by probe, red test, compile error or named pin; any stage; never insurance)? Unless your spec forbids widening: `$MEM/mr-touches widen --slice <SLICE> --why "<proof>" <path>…`; REFUSED = hidden dependency: stop + handoff note.
 **Boy Scout (within `touches:` only):** bounded in-file cleanups (file-local names, dead code, comment accuracy), ≤ ~40 lines / 3 hunks, attributed under `boyscout-delta:` (`file:lines — why`); excess is a follow-up flag, never a blocker; no cleanup in gating tests or interface-freeze slices.
 **`type: refactor` slice:** `standards/spec-driven.md` §Refactor slices binds (PR title `refactor(<scope>): <SLICE> — …`; `moved-tests:` rows; whole or parked, no DEFER, no `mr-touches`); the Boy Scout cap never limits the declared move.
-**If `master` CI is red, fix/revert it to green instead and stop** — this overrides scope and Boy Scout.
+**Only a `ci-fix-*` slice fixes/reverts a red `master`** (over scope and Boy Scout); others keep building.
 
 **Facts:** the spec corpus is `/home/mdrewt/projects/ai-apps/claude-harness/specs/monster-realm-v2/`. Decisions live in `docs/DECISIONS.md` only; an `ADR-NNNN` in a comment names nothing. `$MEM` = `/home/mdrewt/projects/ai-apps/claude-harness/memory/projects`. `mr-*` flags: each tool's header comment (no `--help`). Scratch/PoC files go in a `mktemp -d` sandbox: recursive deletes are guard-blocked in EVERY spelling — leave it, name it in the report, never retry.
 
@@ -21,7 +21,7 @@ Build exactly ONE mergeable Monster Realm v2 slice — `<SLICE>` (<TARGET_DESC>)
 `DEFER: <gate-id> -> <slice id | backlog | wontfix> [category/SEVERITY] — <reason>` is the only other legal exit; deferring more than half is a sizing failure.
 Put `mr-gates render --slice <SLICE> --format pr` output in the PR body.
 
-**Definition of done:** this slice's gate (see REPO above) green, honestly, per `testing-tdd.md` · review lenses closed · comments and docs you add or touch state current behaviour, never its history (after committing, `$MEM/mr-comment-scan --repo <WT_ROOT>/<SLICE>`: CLEAN, or each finding answered under `comment-scan:` in the PR body) · spec reflects reality. **Budget is bounded by the weekly plan allowance — prefer lenses that catch distinct defect classes over redundant re-runs; never trade a review lens for cost.**
+**Definition of done:** this slice's gate (REPO above) green, honestly, per `testing-tdd.md` · review lenses closed · comments/docs you add or touch state current behaviour, never history (once committed, `$MEM/mr-comment-scan --repo <WT_ROOT>/<SLICE>`: CLEAN or each finding answered under PR-body `comment-scan:`) · spec gaps/follow-ups: `$MEM/mr-gates notes add`, never a main-checkout edit. **Budget: the weekly plan allowance — prefer lenses catching distinct defect classes over re-runs; never trade a lens for cost.**
 
 **Merge is supervisor-owned:** get this slice's gate green locally, open the PR on `<PR_REPO>`, then STOP. `gh pr merge` is FORBIDDEN to you. After ~4–5 red→fix cycles without local green, PARK (commit + push, leave the PR open, document the blocker).
 

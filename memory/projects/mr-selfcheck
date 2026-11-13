@@ -605,6 +605,28 @@ try:
     if box.vars("s-a").get("resume_session") != SID or "CREDIT-STOP RESUME" not in box.vars("s-a").get("resume_block", "") \
             or box.vars("s-a").get("target_desc") != "build s-a":
         fail("resume-same-session", "vars: %r" % (box.vars("s-a"),))
+    # The reset tick resumes ahead of a red master, so up to four resumed runs see it red at once:
+    # the resume note each one's brief carries leaves master to the supervisor's ci-fix run, and
+    # the brief of any other slice names that run as the only one that fixes master.
+    def brief(v):
+        vj, out = os.path.join(box.root, "brief.vars.json"), os.path.join(box.root, "brief.md")
+        with open(vj, "w") as f:
+            json.dump(v, f)
+        e = dict(os.environ, S=v["slice"], V=vj, MEM=MEM, REPO="project", PR_REPO="mdrewt/monster-realm",
+                 BASE_BRANCH="master", WT_ROOT=box.root, CAP="60")
+        subprocess.run(["bash", os.path.join(MEM, "mr-spawn"), "--render-brief",
+                        os.path.join(MEM, "mr-brief-template.md"), out, ""],
+                       env=e, capture_output=True, text=True, timeout=60)
+        return re.sub(r"\s+", " ", open(out).read()) if os.path.isfile(out) else ""
+    KEEP = "never fix or revert it here, whatever this session read earlier: keep building this slice."
+    OWNER = "Only a `ci-fix-*` slice fixes/reverts a red `master`"
+    resumed, plain = brief(box.vars("s-a")), brief(dict(box.vars("s-a"), resume_block=""))
+    if "CREDIT-STOP RESUME" not in resumed or KEEP not in resumed or "`ci-fix-*` run" not in resumed:
+        fail("resumed-run-leaves-red-master", "rendered brief: %r" % resumed[:1500])
+    RESUMED_BRIEF = resumed
+    if OWNER not in plain or KEEP in plain or "CREDIT-STOP" in plain \
+            or "instead and stop" in plain:
+        fail("one-owner-for-red-master", "rendered brief: %r" % plain[:1500])
     bundle = box.bundle(RESET + 130)
     if offered(bundle.get("interrupted") or []) != [w + ("due",) for w in WANT] \
             or (bundle.get("master_ci_latest") or [{}])[0].get("conclusion") != "failure":
@@ -620,6 +642,19 @@ try:
     box.tool(RESET + 200, "scan")
     if [e["slice"] for e in json.loads(box.tool(RESET + 200, "list"))] != ["s-b"]:
         fail("dropped-stays-dropped", box.tool(RESET + 200, "list"))
+finally:
+    box.close()
+
+# ---- a credit-stopped ci-fix run keeps its job: master is its slice ----------------------------
+box = Box()
+try:
+    CIFIX = "ci-fix-20261105T2200"
+    box.slice(CIFIX, "routine", "opus", "high", log=rejected())
+    box.tick(STOPPED, SRC="crash")
+    box.tick(RESET + 130, SRC="reset")
+    note = box.vars(CIFIX).get("resume_block", "")
+    if "CREDIT-STOP RESUME" not in note or "keep fixing it" not in note or "never fix or revert" in note:
+        fail("resumed-ci-fix-keeps-master", "vars: %r" % (box.vars(CIFIX),))
 finally:
     box.close()
 
@@ -980,20 +1015,26 @@ try:
         f.write(launch.replace(LIVE_HARNESS, harness).replace("/tmp/mr_", box.tmp + "/mr_"))
     # claude: logs its arguments; refuses a --resume when told to; otherwise emits one result.
     with open(os.path.join(stubs, "claude"), "w") as f:
-        f.write('#!/bin/bash\necho "$*" >> "%s/claude-args"\n'
+        f.write('#!/bin/bash\necho "$*" | tr "\\n" " " >> "%s/claude-args"; echo >> "%s/claude-args"\n'
                 'case " $* " in *" --resume "*) [ -e "%s/refuse-resume" ] && { echo "No conversation found" >&2; exit 1; };; esac\n'
                 'echo \'{"type":"assistant","session_id":"%s"}\'\n'
-                'echo \'{"type":"result","session_id":"%s","total_cost_usd":1.5}\'\n' % (box.root, box.root, SID, SID))
+                # One transient API failure, after the session has started: the wrapper resumes it.
+                '[ -e "%s/overloaded-once" ] && { rm -f "%s/overloaded-once"; echo "API Error: 529 overloaded" >&2; exit 1; }\n'
+                'echo \'{"type":"result","session_id":"%s","total_cost_usd":1.5}\'\n'
+                % (box.root, box.root, box.root, SID, box.root, box.root, SID))
     with open(os.path.join(stubs, "gh"), "w") as f:
-        f.write('#!/bin/bash\necho "feat/s-a"\n')          # the slice's PR is open: a terminal state
-    for n in ("claude", "gh"):
+        # The slice's PR is open (a terminal state) unless a fixture says the run has not opened it.
+        f.write('#!/bin/bash\n[ -e "%s/no-pr" ] || printf "feat/s-a\\nfix/ci-fix-20261105T2200\\n"\n' % box.root)
+    with open(os.path.join(stubs, "sleep"), "w") as f:
+        f.write('#!/bin/bash\nexit 0\n')                    # the wrapper's back-off between attempts
+    for n in ("claude", "gh", "sleep"):
         os.chmod(os.path.join(stubs, n), 0o755)
     transcript = os.path.join(home, ".claude", "projects", re.sub(r"[^A-Za-z0-9]", "-", rundir), SID + ".jsonl")
     env = dict(os.environ, HOME=home, PATH=stubs + ":" + os.environ.get("PATH", ""),
                MR_NO_EVENT_BRIDGE="1", MR_NO_OLLAMA="1", MR_NO_ESCALATE="1")
 
-    def launch_once(resume, with_transcript, refuse):
-        for n in ("claude-args", "refuse-resume"):
+    def launch_once(resume, with_transcript, refuse, slice_="s-a", brief="THE BRIEF\n", flags=()):
+        for n in ("claude-args", "refuse-resume", "overloaded-once", "no-pr"):
             try:
                 os.unlink(os.path.join(box.root, n))
             except OSError:
@@ -1007,16 +1048,18 @@ try:
                 f.write('{"type":"cost-state","totalCostUSD":28.8414}\n')
         if refuse:
             open(os.path.join(box.root, "refuse-resume"), "w").close()
-        with open(os.path.join(box.tmp, "mr_pass_s-a.md"), "w") as f:
-            f.write("THE BRIEF\n")
-        subprocess.run(["bash", os.path.join(box.root, "launch.sh"), "s-a", "opus", "high", "project", resume],
+        for n in flags:
+            open(os.path.join(box.root, n), "w").close()
+        with open(os.path.join(box.tmp, "mr_pass_%s.md" % slice_), "w") as f:
+            f.write(brief)
+        subprocess.run(["bash", os.path.join(box.root, "launch.sh"), slice_, "opus", "high", "project", resume],
                        env=env, capture_output=True, text=True, timeout=60)
         try:
             calls = open(os.path.join(box.root, "claude-args")).read().splitlines()
         except OSError:
             calls = []
         try:
-            log = open(os.path.join(box.tmp, "mr_pass_s-a.log")).read()
+            log = open(os.path.join(box.tmp, "mr_pass_%s.log" % slice_)).read()
         except OSError:
             log = ""
         return calls, log
@@ -1036,6 +1079,35 @@ try:
     calls, log = launch_once("", True, False)
     if len(calls) != 1 or "--resume" in calls[0] or "THE BRIEF" not in calls[0] or "RESUME-FALLBACK" in log:
         fail("launch-plain", "claude calls=%r log=%r" % (calls, log[:300]))
+
+    # A red master has one owner. The reset tick resumes every interrupted slice ahead of a red
+    # master, and a resumed session's context can hold a brief that tells every run to fix it: so
+    # the rule is the last thing each resumed session reads, on every path into one.
+    LEAVE = "never fix or revert master in this session — this overrides the brief"
+    OWNS = "it is the ci-fix run that owns master, so keep fixing it."
+    # 1. the credit-stop --resume prompt
+    calls, log = launch_once(SID, True, False)
+    if len(calls) != 1 or "--resume" not in calls[0] or LEAVE not in calls[0] or "keep building s-a." not in calls[0]:
+        fail("resume-prompt-leaves-red-master", "claude calls=%r" % (calls,))
+    # 2. the new session from the brief, when the stopped session cannot be continued: the brief
+    #    mr-interrupted's vars render to, handed over whole
+    for why, tr, refuse in (("no-transcript", False, False), ("refused", True, True)):
+        calls, log = launch_once(SID, tr, refuse, brief=RESUMED_BRIEF)
+        if not calls or "--resume" in calls[-1] or KEEP not in calls[-1] or OWNER not in calls[-1]:
+            fail("fallback-brief-leaves-red-master[%s]" % why, "claude calls=%r" % (calls,))
+    # 3. the wrapper's own resumes: after a transient API failure, and after a stop with no PR open
+    calls, log = launch_once("", True, False, flags=("overloaded-once", "no-pr"))
+    if len(calls) != 3 or "--resume" in calls[0] or LEAVE in calls[0] \
+            or "transient API/network error" not in calls[1] or "stopped before a valid stopping point" not in calls[2] \
+            or any("--resume %s " % SID not in c or LEAVE not in c for c in calls[1:]):
+        fail("auto-resume-leaves-red-master", "claude calls=%r log=%r" % (calls, log[:300]))
+    # A ci-fix run keeps its job on the same paths.
+    calls, log = launch_once(SID, True, False, slice_="ci-fix-20261105T2200")
+    if len(calls) != 1 or "--resume" not in calls[0] or OWNS not in calls[0] or "never fix" in calls[0]:
+        fail("resume-prompt-ci-fix-keeps-master", "claude calls=%r" % (calls,))
+    calls, log = launch_once("", True, False, slice_="ci-fix-20261105T2200", flags=("overloaded-once", "no-pr"))
+    if len(calls) != 3 or OWNS not in calls[1] or OWNS not in calls[2] or any("never fix" in c for c in calls):
+        fail("auto-resume-ci-fix-keeps-master", "claude calls=%r log=%r" % (calls, log[:300]))
 finally:
     box.close()
 # ---- what takes a slice off the record --------------------------------------------------------

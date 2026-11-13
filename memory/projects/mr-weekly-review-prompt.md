@@ -19,7 +19,7 @@ the hourly supervisor builds them next. Drew reads the one-page report in the ta
 - **At most 5 findings per run.** Each MUST name a protected-category defect
   (`standards/testing-tdd.md` "What earns a check": gameplay, security-privacy,
   data-integrity, netcode-determinism, ux-a11y critical flows, content) with a
-  `path:line @ <SHA>` citation.
+  `path:line @ <SHA>` citation; Phase 2's recurring-cause proposal is the one exception.
 - **At most ~5 pulled residuals per run** (Phase 3a-pull), separate from the 5-finding cap:
   each re-verified against the pinned clone before it is scheduled. Zero is a fine number —
   an empty, obsolete or already-absorbed backlog never becomes manufactured work.
@@ -90,14 +90,26 @@ minimal failing-test sketch. Drop anything unverified. Rank survivors by severit
 player impact and keep **at most 5**; genuine contradictions between lenses go to one fresh
 **opus** adjudicator running `$HARNESS/.claude/agents/judge.md`'s bias protocol.
 
+**Recurring cause.** From the week's park causes, ci-fix causes, lens findings and recorded
+`plan-delta:` lines, name the single most frequent recurring cause and propose ONE rule change at
+the earliest pipeline step that could have prevented it (a spec-authoring rule, a tester rule, a
+tool check), as a finding like any other (category `loop-ops`, inside the five). If the
+`plan-delta:` lines read as scope growth or dropped requirements rather than improvements, say so
+and propose tightening `standards/spec-driven.md` §Adapting the plan.
+
 ## Phase 3 — Enter findings into the registry, then schedule them
 
 **3a — Route and group.** Before filing, decide where each kept finding's FIX will land:
 
 - **Absorbed:** the fix falls in a surface a queued §9 milestone already rebuilds or owns
   (that spec's scope/`touches:` cover it). It joins that spec's "Absorbs residuals" list
-  (edited in the 3c PR) and its `--target` below is that milestone's absorbing slice id
-  (the milestone name if not yet elaborated). Never double-schedule an absorbed finding.
+  (edited in the 3c PR) and its `--target` below is that milestone's absorbing slice id.
+  While the milestone has no `### <slice id>` section, a MED/LOW finding files to `backlog`
+  (name the milestone in `--reason`) and its "Absorbs" entry reads "the absorbing slice's PR
+  dispositions it `fixed`" — no slice merge closes a `backlog` row. A HIGH/CRITICAL finding
+  is never absorbed that way: the supervisor promotes such a `backlog` row into its own slice
+  and the loop cannot disposition it, so it is Scheduled. Never double-schedule an absorbed
+  finding.
 - **Scheduled:** every other finding goes into THIS run's milestone
   `M-weekly-review-<UTC-date>`, grouped into 1–4 slices `wr<YYMMDD>-a..d` by surface
   (pulled backlog rows included), with pairwise-disjoint `touches:` where possible so the
@@ -119,7 +131,21 @@ that has a `residuals.spec.md` section gets that section deleted in the 3c PR (t
 hand-scheduling rule). Pull NOTHING when no eligible row survives verification — only
 genuinely useful, still-valid work enters the milestone, never filler to reach five.
 
-**3b — Registry intake.** For each kept finding (n = 1..5):
+**3b — Write the milestone spec, then registry intake.** `mr-gates` files a residual only
+against a `### <slice id>` section that is on disk under `$HARNESS/specs/monster-realm-v2/`, so
+the spec file is written FIRST (skip it when nothing is scheduled and nothing pulled):
+
+Author `$HARNESS/specs/monster-realm-v2/M-weekly-review-<UTC-date>.spec.md` in the house
+spec shape, sketch+ level: a Status header ("authored by the weekly review, pinned @ <SHA>;
+elaborate via `milestone-loop-prompt.md` when reached if gates ceremony is still needed"),
+`Depends on:`, a 2–3 line Problem/intent, then one `### wr<YYMMDD>-<a..d>` section per slice
+carrying category · severity · size, each finding's or pulled row's EARS line(s), `touches:`,
+its residual id (`R-weekly-review-<UTC-date>-F<n>` for a finding), the `path:line @ <SHA>`
+evidence (fresh citations for pulled rows) and the proposed fix; pulled rows are listed under
+"Absorbs residuals". Finding detail lives here and in the registry — never in PLAN.md. The
+file stays uncommitted until 3c ships it.
+
+Then, for each kept finding (n = 1..5):
 
 ```
 $MEM/mr-gates residuals add --slice weekly-review-<UTC-date> --gate F<n> \
@@ -128,21 +154,20 @@ $MEM/mr-gates residuals add --slice weekly-review-<UTC-date> --gate F<n> \
   --severity <LOW|MED|HIGH|CRITICAL>
 ```
 
-A refusal means the finding was out of bounds: drop it and say so. Only the supervisor promotes.
+The word after `ERROR:` names the refusal; only one is a verdict. `OUT-OF-BOUNDS` is policy:
+drop the finding, delete it from the spec file just written, and say so — except the
+"checking apparatus" refusal, a text match on title and reason: drop it only when its subject
+really is the checking apparatus, otherwise reword as the message says and re-run.
+`TARGET-MISSING` (exit 3) is never a reason to drop a verified finding — the `### <slice id>`
+heading is absent or spelled differently from `--target`: fix the heading or the flag and
+re-run. `BAD-TAG` is a mistyped flag: fix it and re-run. Every kept finding ends 3b with a
+`RESIDUAL-ADDED` line or an `OUT-OF-BOUNDS` refusal. Only the supervisor promotes.
 
 **3c — Schedule in the harness plan (doc-only auto-merge PR).** Zero kept findings AND zero
-pulled rows → skip 3c entirely; everything absorbed and nothing pulled → skip the new spec
+pulled rows → skip 3c entirely; everything absorbed and nothing pulled → there is no new spec
 but still PR the "Absorbs" edits.
 
-1. Author `$HARNESS/specs/monster-realm-v2/M-weekly-review-<UTC-date>.spec.md` in the house
-   spec shape, sketch+ level: a Status header ("authored by the weekly review, pinned @ <SHA>;
-   elaborate via `milestone-loop-prompt.md` when reached if gates ceremony is still needed"),
-   `Depends on:`, a 2–3 line Problem/intent, then one section per slice carrying category ·
-   severity · size, each finding's or pulled row's EARS line(s), `touches:`, its residual id,
-   the `path:line @ <SHA>` evidence (fresh citations for pulled rows) and the proposed fix;
-   pulled rows are listed under "Absorbs residuals". Finding detail lives here and in the
-   registry — never in PLAN.md.
-2. Insert the milestone into `PLAN.md` §9 as the FIRST item — a one-line summary + status
+1. Insert the milestone into `PLAN.md` §9 as the FIRST item — a one-line summary + status
    naming the spec file and the filed residual ids — renumbering the list and fixing any
    intra-§9 "item N" cross-references the renumbering breaks. Exception: when the milestone's
    remaining slices genuinely depend on a queued item, place it immediately AFTER that
@@ -150,7 +175,7 @@ but still PR the "Absorbs" edits.
    makes the hourly supervisor build it next under its own "first unfinished non-`blocked:`
    item" rule; the supervisor's CI-fix / resume / HIGH-residual / structural priorities still
    rightly run first.
-3. Ship it the way the loop ships docs: branch `wr-sched-<UTC-date>` off `origin/main` of the
+2. Ship it the way the loop ships docs: branch `wr-sched-<UTC-date>` off `origin/main` of the
    HARNESS repo; commit with EXPLICIT paths only (the new spec, `PLAN.md`, any "Absorbs"
    edits, any pulled-row `residuals.spec.md` section deletions — never `git add -A`); push;
    `gh pr create` (subject `docs(spec): weekly-review-<UTC-date> — schedule <k> findings +
