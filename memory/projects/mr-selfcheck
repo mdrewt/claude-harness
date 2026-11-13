@@ -38,6 +38,16 @@ EOF
 # counter carries the previous attempt's total, a relaunch, a killed session, and the older
 # counter-restart shape (uxd2, naive $423.65 -> true $165.65).
 "$MEM/mr-cost-sum" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-sum selftest"; BAD=1; }
+# mr-tester-ab: the tester A/B experiment's tool. Its fixtures run in temporary directories against a
+# toy game repository and a toy test runner, and where cargo-nextest is installed against a real
+# cargo workspace through the shipped runner. The count floor is here as well as in the tool, so a
+# selftest that stops running its batteries cannot read as a pass.
+AB_ST=$("$MEM/mr-tester-ab" --selftest 2>&1 | tail -n 1)
+AB_N=${AB_ST#TESTER-AB-SELFTEST-OK }
+case "$AB_ST" in
+  "TESTER-AB-SELFTEST-OK "*) [ "$AB_N" -ge 320 ] 2>/dev/null || { echo "SELFCHECK-FAIL mr-tester-ab selftest ran $AB_N fixtures (floor 320)"; BAD=1; } ;;
+  *) echo "SELFCHECK-FAIL mr-tester-ab selftest: $(echo "$AB_ST" | cut -c1-160)"; BAD=1 ;;
+esac
 # run-cost: every ended build session leaves exactly one ledger cost row, carrying that session's
 # own spend. Driven through the REAL writer (mr-record) and the REAL reconcile block of
 # mr-native-tick.sh (extracted by content, with its /tmp/mr_* paths and MEM pointed at a sandbox)
@@ -1681,7 +1691,7 @@ MEM = sys.argv[1]
 AUDIT = os.path.join(MEM, "mr-audit")
 FIXTURE_SLICE = "mr-audit-fixture"          # never a live slice id: the artifact path is shared
 FIXTURE_ARTIFACT = "/tmp/mr_audit_%s.json" % FIXTURE_SLICE
-COUNT_FLOOR = 62   # mirrors mr-audit's _ST_COUNT_FLOOR (lp-gates: 24 -> 62)
+COUNT_FLOOR = 70   # mirrors mr-audit's _ST_COUNT_FLOOR
 bad = 0
 
 
@@ -1886,6 +1896,242 @@ if os.path.exists(FIXTURE_ARTIFACT):
 
 sys.exit(bad)
 PYAUDIT
+# tester-ab: after its verdict is out, mr-audit tells mr-tester-ab that a slice the experiment planned
+# reached its audit (finalize_ab). The REAL mr-audit runs here in a sandbox MEM beside a stub
+# mr-tester-ab: the stub is called with `finalize` and the audited head for a slice with a manifest,
+# with `close-check` for any other slice while the ledger exists and holds no close row (the
+# experiment's last close condition is met by days passing, after its last slice has merged), else not;
+# and a stub that fails changes neither the audit JSON nor the exit code and leaves no file behind.
+# The hanging finalize is in mr-audit's own battery, where the timeout is a parameter.
+/usr/bin/python3 - "$MEM" <<'PYABAUDIT' || BAD=1
+import json, os, shutil, subprocess, sys, tempfile
+
+MEM = sys.argv[1]
+SLICE = "mr-audit-fixture"                  # the artifact path is shared; never a live slice id
+ARTIFACT = "/tmp/mr_audit_%s.json" % SLICE
+bad = 0
+
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL tester-ab-audit-%s" % name) + (": " + detail if detail else ""))
+
+
+with tempfile.TemporaryDirectory(prefix="mr-selfcheck-ab-audit-") as TMP:
+    mem = os.path.join(TMP, "memory", "projects")
+    os.makedirs(mem)
+    shutil.copy2(os.path.join(MEM, "mr-audit"), mem)
+    log = os.path.join(TMP, "clean.jsonl")
+    with open(log, "w") as fh:
+        for role in ("tester", "reviewer"):
+            fh.write('{"name":"Agent","input":{"subagent_type":"%s"},"model":"claude-opus-5"}\n' % role)
+    seen = os.path.join(TMP, "seen")
+
+    def stub(body):
+        path = os.path.join(mem, "mr-tester-ab")
+        with open(path, "w") as fh:
+            fh.write("#!/bin/sh\n" + body + "\n")
+        os.chmod(path, 0o755)
+
+    def audit():
+        try:
+            r = subprocess.run(["bash", os.path.join(mem, "mr-audit"), "--slice", SLICE, "--log", log,
+                                "--repo", TMP, "--base", "a", "--head", "b"],
+                               capture_output=True, text=True, timeout=120)
+            return r.returncode, r.stdout
+        except subprocess.TimeoutExpired:
+            return None, ""
+
+    def tree():
+        return sorted(os.path.join(d, f) for d, _, fs in os.walk(TMP) for f in fs)
+
+    stub('echo "$*" >> %s' % seen)
+    rc0, out0 = audit()
+    if os.path.exists(seen):
+        fail("called-without-a-manifest", open(seen).read().strip()[:160])
+    ledger = os.path.join(mem, "mr-tester-ab.jsonl")
+    for rows, want in (('{"kind": "snap", "name": "m", "slice": "np-1"}\n', "close-check\n"),
+                       ('{"kind": "snap", "name": "m", "slice": "np-1"}\n{"kind": "close", "reason": "cap", "slice": "-"}\n', "")):
+        with open(ledger, "w") as fh:
+            fh.write(rows)
+        rc, out = audit()
+        called = open(seen).read() if os.path.exists(seen) else ""
+        if called != want or rc != 0 or out != out0:
+            fail("close-check-on-an-unplanned-slice", "with %s in the ledger mr-audit must call %r and print the "
+                 "same audit; it called %r (rc %r)" % ("a close row" if not want else "no close row", want, called[:160], rc))
+        if os.path.exists(seen):
+            os.remove(seen)
+    os.remove(ledger)
+    os.makedirs(os.path.join(mem, "tester-ab", SLICE))
+    with open(os.path.join(mem, "tester-ab", SLICE, "manifest.json"), "w") as fh:
+        fh.write("{}\n")
+    rc1, out1 = audit()
+    called = open(seen).read() if os.path.exists(seen) else ""
+    if called != "finalize %s --repo %s --head b\n" % (SLICE, TMP):
+        fail("not-called-for-a-planned-slice", "mr-audit must call `mr-tester-ab finalize <slice> --repo "
+             "<repo> --head <head>` once when tester-ab/<slice>/manifest.json exists; got %r" % called[:200])
+    if os.path.exists(seen):
+        os.remove(seen)
+    stub("echo noise; echo noise >&2; exit 3")
+    before = tree()
+    rc2, out2 = audit()
+    if (rc0, rc1, rc2) != (0, 0, 0):
+        fail("exit-code", "mr-audit exited %r / %r / %r (no manifest / finalize ok / finalize failing); "
+             "all three must be 0" % (rc0, rc1, rc2))
+    if not (out0 == out1 == out2):
+        fail("verdict-changed", "the audit JSON differs between a run without a manifest, one whose "
+             "finalize succeeds and one whose finalize fails")
+    try:
+        if json.loads(out2)["orchestration"]["verdict"] != "CLEAN":
+            fail("verdict", "expected orchestration CLEAN from the fixture log: %r" % out2[:200])
+    except Exception as exc:
+        fail("stdout-not-json", "%s: %r" % (exc, out2[:200]))
+    if tree() != before:
+        fail("left-a-file-behind", "%r" % sorted(set(tree()) ^ set(before)))
+try:
+    if os.path.exists(ARTIFACT):
+        os.remove(ARTIFACT)
+except OSError as exc:
+    fail("cleanup", "could not remove %s: %s" % (ARTIFACT, exc))
+sys.exit(bad)
+PYABAUDIT
+# tester-ab: mr-spawn adds one sentence to the tier block, and the experiment's bump to the cap, on a
+# slice `mr-tester-ab eligible` answers `yes` for — and on no other. The REAL mr-spawn renders here
+# from a sandbox MEM (the template, mr-repo-of, mr-tester-ab and a config this block writes):
+#   * config disabled: every tier renders byte-for-byte what it renders with no mr-tester-ab at all;
+#   * enabled, eligible routine slice: exactly that brief plus the sentence;
+#   * enabled, eligible hard slice: the hard-tier sentence stays and the experiment's follows it;
+#   * enabled, ineligible prefix / harness slice / closed experiment: no sentence, no bump.
+/usr/bin/python3 - "$MEM" <<'PYABSPAWN' || BAD=1
+import json, os, shutil, subprocess, sys, tempfile
+
+MEM = sys.argv[1]
+bad = 0
+
+
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print(("SELFCHECK-FAIL tester-ab-spawn-%s" % name) + (": " + detail if detail else ""))
+
+
+def sentence(slice_, tier):
+    return ("TESTER A/B: give your tester prompt a `## Contracts` section (the signatures the tests will call, each "
+            "test file's path and, for Rust, its module name); before step 4 run `$MEM/mr-tester-ab plan %s --tier %s "
+            "--prompt <your tester prompt file>` and do exactly what it prints; run `$MEM/mr-tester-ab mark %s` before the first post-implementation "
+            "lens batch and `$MEM/mr-tester-ab escapes %s` before opening the PR; `AB-SKIP` means proceed "
+            "normally.\n" % (slice_, tier, slice_, slice_))
+
+
+with tempfile.TemporaryDirectory(prefix="mr-selfcheck-ab-spawn-") as TMP:
+    mem = os.path.join(TMP, "mem")
+    os.makedirs(mem)
+    for name in ("mr-spawn", "mr-brief-template.md", "mr-repo-of", "mr-tester-ab"):
+        shutil.copy2(os.path.join(MEM, name), os.path.join(mem, name))
+    tool, parked = os.path.join(mem, "mr-tester-ab"), os.path.join(TMP, "mr-tester-ab.parked")
+    with open(os.path.join(MEM, "mr-tester-ab.config.json")) as fh:
+        shipped = json.load(fh)
+
+    def config(enabled):
+        with open(os.path.join(mem, "mr-tester-ab.config.json"), "w") as fh:
+            json.dump(dict(shipped, enabled=enabled, prefixes=["np-"], required_slices=["LP1"],
+                           exclude_slices=["np-x"], cap_bump_usd=30), fh)
+
+    def render(slice_, tier, repo="project"):
+        vars_json = os.path.join(TMP, "vars.json")
+        with open(vars_json, "w") as fh:
+            json.dump({"slice": slice_, "model": "sonnet", "effort": "high", "touches": "server-module/src/x.rs",
+                       "target_desc": "fixture", "resume_block": "", "tier": tier}, fh)
+        out = os.path.join(TMP, "brief.md")
+        if os.path.exists(out):
+            os.remove(out)
+        env = dict(os.environ, S=slice_, V=vars_json, REPO=repo, PR_REPO="o/r", BASE_BRANCH="master",
+                   WT_ROOT="/w", CAP="60")
+        try:
+            subprocess.run(["bash", os.path.join(mem, "mr-spawn"), "--render-brief",
+                            os.path.join(mem, "mr-brief-template.md"), out, "server-module/src/x.rs"],
+                           env=env, capture_output=True, text=True, timeout=120)
+            with open(out) as fh:
+                return fh.read()
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+
+    def cap(slice_, repo, value):
+        try:
+            return subprocess.run(["bash", os.path.join(mem, "mr-spawn"), "--ab-cap", slice_, repo, value],
+                                  capture_output=True, text=True, timeout=60).stdout
+        except subprocess.TimeoutExpired:
+            return None
+
+    CASES = [("np-a", "routine", "project"), ("np-a", "hard", "project"), ("np-a", "content", "project"),
+             ("ts-9", "routine", "project"), ("np-x", "routine", "project"), ("np-a", "routine", "harness")]
+    # Today's brief: what mr-spawn renders with no mr-tester-ab beside it.
+    config(True)
+    os.rename(tool, parked)
+    today = {case: render(*case) for case in CASES}
+    cap_today = cap("np-a", "project", "60")
+    os.rename(parked, tool)
+    if any(text is None or "TESTER A/B" in text or "REPO: **" not in text for text in today.values()):
+        fail("baseline", "mr-spawn --render-brief did not render the plain brief in the sandbox")
+    elif cap_today != "60\n":
+        fail("cap-without-the-tool", "%r" % cap_today)
+    else:
+        config(False)
+        for case in CASES:
+            if render(*case) != today[case]:
+                fail("disabled-not-byte-identical", "slice=%s tier=%s repo=%s: with the config disabled the "
+                     "brief must be byte-for-byte today's" % case)
+        if cap("np-a", "project", "60") != "60\n":
+            fail("disabled-cap", "%r" % cap("np-a", "project", "60"))
+        config(True)
+        for tier in ("routine", "hard", "content"):
+            case = ("np-a", tier, "project")
+            mark = "REPO: **project**"
+            want = today[case].replace(mark, sentence("np-a", tier) + mark, 1)
+            got = render(*case)
+            if got != want:
+                fail("enabled-%s" % tier, "an eligible %s slice must render today's brief plus the one "
+                     "TESTER A/B sentence at the end of the tier block (got %d bytes, want %d)"
+                     % (tier, len(got or ""), len(want)))
+        # No tester prompt carries a `## Contracts` heading unless the builder is told to write
+        # one: without it every first `plan` call answers AB-NEED and costs a builder round.
+        if "`## Contracts` section" not in sentence("np-a", "routine") or "module name" not in sentence("np-a", "routine") \
+                or "## Contracts" in today[("np-a", "routine", "project")]:
+            fail("contracts-named", "the sentence must tell the builder to write the `## Contracts` section, and "
+                 "only the experiment's sentence may")
+        hard = render("np-a", "hard", "project") or ""
+        if "QUALITY TIER: HARD — invoke the tester subagent with model opus" not in hard \
+                or hard.find("QUALITY TIER: HARD") > hard.find("TESTER A/B:"):
+            fail("hard-keeps-its-sentence", "the hard-tier sentence must stay, before the experiment's")
+        for case, why in ((("ts-9", "routine", "project"), "ineligible-prefix"),
+                          (("np-x", "routine", "project"), "excluded-slice"),
+                          (("np-a", "routine", "harness"), "harness-slice")):
+            if render(*case) != today[case]:
+                fail(why, "must render today's brief, without the sentence")
+        for args, want in ((("np-a", "project", "60"), "90\n"), (("np-a", "project", "150"), "180\n"),
+                           (("np-a", "project", "75.5"), "105.5\n"), (("LP1", "project", "60"), "90\n"),
+                           (("ts-9", "project", "60"), "60\n"), (("np-a", "harness", "60"), "60\n")):
+            if cap(*args) != want:
+                fail("cap", "--ab-cap %s -> %r, want %r" % (" ".join(args), cap(*args), want))
+        # A closed experiment takes no further slice.
+        with open(os.path.join(mem, "mr-tester-ab.jsonl"), "w") as fh:
+            fh.write(json.dumps({"v": 1, "kind": "close", "slice": "-", "ts": "2026-01-01T00:00:00Z", "reason": "cap"}) + "\n")
+        if render("np-a", "routine", "project") != today[("np-a", "routine", "project")] \
+                or cap("np-a", "project", "60") != "60\n":
+            fail("closed", "after the close row no sentence and no bump")
+        os.remove(os.path.join(mem, "mr-tester-ab.jsonl"))
+        # A tool that fails answers nothing, whatever it printed; one that answers nonsense bumps nothing.
+        with open(tool, "w") as fh:
+            fh.write("#!/bin/sh\necho 'yes 30'; exit 1\n")
+        if cap("np-a", "project", "60") != "60\n" or render("np-a", "routine", "project") != today[("np-a", "routine", "project")]:
+            fail("failing-tool", "a mr-tester-ab that exits non-zero must change neither the cap nor the brief")
+        with open(tool, "w") as fh:
+            fh.write("#!/bin/sh\necho 'yes please'\n")
+        if cap("np-a", "project", "60") != "60\n":
+            fail("nonsense-bump", "%r" % cap("np-a", "project", "60"))
+sys.exit(bad)
+PYABSPAWN
 # lp-11a: POLYGLOT INTERPRETER GUARD on every python mr-* tool.
 #
 # `bash <a python file>` does not read the shebang — it interprets the source as shell, which

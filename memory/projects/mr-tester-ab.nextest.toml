@@ -1,0 +1,11 @@
+# The nextest profile mr-tester-ab replays shadow tests under: a junit report at
+# target/nextest/ab/junit.xml under the workspace root, every test run to the end.
+[profile.ab]
+fail-fast = false
+# A test still running after three 20 s periods is stopped and reported as a failure. Without a
+# limit one deadlocked test holds the runner to its own timeout, and every test of that arm at
+# that snapshot is then recorded not-run.
+slow-timeout = { period = "20s", terminate-after = 3 }
+
+[profile.ab.junit]
+path = "junit.xml"

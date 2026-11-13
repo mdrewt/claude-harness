@@ -722,6 +722,29 @@ brief_notice(){
   fi
 }
 
+# tester-ab: `mr-tester-ab eligible` answers `yes <cap bump usd>` for a slice the tester A/B
+# experiment takes (config enabled, slice in its lists, project repo, experiment open). ADVISORY like
+# the skills block: a tool that is absent, slow, disabled or failing answers nothing, and the brief
+# and the cap are then exactly what they are without the experiment.
+ab_answer(){
+  local ans
+  ans=$(timeout 10 "$MEM/mr-tester-ab" eligible "${1:-}" "${2:-}" 2>/dev/null) || ans=""
+  printf '%s\n' "$ans"
+}
+# ab_cap <slice> <repo> <cap>: the cap plus the experiment's bump on such a slice (its shadow
+# testers run inside the build session, so cost-watch would read them as the slice's own spend);
+# else the cap unchanged.
+ab_cap(){
+  local ans
+  ans=$(ab_answer "${1:-}" "${2:-}")
+  case "$ans" in
+    "yes "*) /usr/bin/python3 -c 'import sys
+c = float(sys.argv[1]) + float(sys.argv[2])
+print(int(c) if c == int(c) else c)' "${3:-}" "${ans#yes }" 2>/dev/null || echo "${3:-}" ;;
+    *) echo "${3:-}" ;;
+  esac
+}
+
 build_brief(){
   local raw="${1:-}" tpl="${2:-}" out="${3:-}" rc=0
   # `local blk=$(...)` would MASK the subprocess exit status (`local`'s own status wins), so the
@@ -731,13 +754,15 @@ build_brief(){
     brief_notice SKILLS-MAP-ERROR "required-skill mapping failed for touches=$(echo "$raw" | head -c 200); brief rendered WITHOUT the skills block (advisory — the spawn continues)"
     blk=""
   }
+  local ab
+  ab=$(ab_answer "${S:-}" "${REPO:-}")
   # S/V stay environment-passed (unchanged from the original block); the three moved inputs do not.
   export S V
   # F2: a render failure is a REFUSAL (template drift must not ship a mangled brief), but this
   # file promises "one status JSON line" and mr-spawn:6 has discarded stderr — so a bare `exit 1`
   # here is a silent death. Say what happened first, then propagate. `rc=$?` must be the very
   # next statement after the heredoc: any command in between (including `local`) overwrites it.
-  /usr/bin/python3 - "$tpl" "$out" "$blk" <<'PYBRIEF'
+  /usr/bin/python3 - "$tpl" "$out" "$blk" "$ab" <<'PYBRIEF'
 import json, os, sys
 S=os.environ["S"]; v=json.load(open(os.environ["V"]))
 # lp-skills F1 — SINGLE-PASS SUBSTITUTION. The renderer applies the keys below as a CHAIN of
@@ -784,6 +809,12 @@ touches_str=", ".join(_t) if isinstance(_t,list) else str(_t)
 tier=v.get("tier") or (_ for _ in ()).throw(SystemExit("vars.json missing required field: tier (hard|routine|content)"))
 tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard"
  else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models — do not bump lens models upward on a content slice (THIS OVERRIDES the build-loop prompt bump-one-tier default for this slice). The tester requirement is UNCHANGED — meaningful tests first, always.\n" if tier=="content" else "")
+# tester-ab: on a slice the experiment takes, one sentence for every tier. The tool prints the rest.
+# It names the `## Contracts` section because `plan` asks for it once and then skips the slice: a
+# prompt written with it costs no extra builder round.
+if sys.argv[4].startswith("yes "):
+    tier_block+=("TESTER A/B: give your tester prompt a `## Contracts` section (the signatures the tests will call, each test file's path and, for Rust, its module name); before step 4 run `$MEM/mr-tester-ab plan %s --tier %s --prompt <your tester prompt file>` and do exactly what it prints; run `$MEM/mr-tester-ab mark %s` before the first post-implementation lens batch and `$MEM/mr-tester-ab escapes %s` before opening the PR; `AB-SKIP` means proceed normally.\n"
+                 % (v["slice"], tier, v["slice"], v["slice"]))
 rb=v.get("resume_block","") or ""
 repo=os.environ["REPO"]
 # The gate differs by repo and saying so is load-bearing. monster-realm `just ci` is the real gate.
@@ -843,6 +874,12 @@ case "${1:-}" in
     MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"; export MEM
     build_brief "${4:-}" "${2:-}" "${3:-}"
     exit $?
+    ;;
+  --ab-cap)
+    # --ab-cap <slice> <repo> <cap>: the cap the live path would use, for the selfcheck.
+    MEM="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"; export MEM
+    ab_cap "${2:-}" "${3:-}" "${4:-}"
+    exit 0
     ;;
 esac
 
@@ -943,6 +980,7 @@ v=json.load(open('/tmp/mr_pass_$S.vars.json'))
 c=json.load(open('$MEM/mr-budget-config.json'))
 caps=c.get('slice_caps_usd',{})
 print(v.get('cap_override') or v.get('cap_usd') or caps.get(v.get('tier',''),caps.get('default',60)))" 2>/dev/null || echo 60)
+CAP=$(ab_cap "$S" "$REPO" "$CAP")
 export CAP
 # pre-launch cost-flag hygiene (review F-C/F-G: spawn owns cleanup; a watcher must never erase live state)
 #
