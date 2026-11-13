@@ -226,13 +226,17 @@ The spec corpus a run reads is the harness main checkout, where a run cannot com
 learns about its spec goes to `gates/<slice>.notes.jsonl` (`mr-gates notes add`), and a follow-up
 in a note is a residual row (`--followup` files it), so the drain sees it.
 
-- **At merge:** `mr-gates residuals close` prints `NOTES-PENDING` when the merged slice has notes.
-  `mr-gates notes fold --slice S` writes them as `Build note (S): …` at the end of the slice's
-  section; the edit ships as the tick's doc-only spec PR. Fold refuses a spec with uncommitted edits.
-- **A Build note found uncommitted in a spec file** (a run wrote into the checkout): before the
-  labeled stash, `mr-gates notes adopt --slice S` stores it (with `--followup …` or
-  `--residual R-…` when it names a follow-up). After the file is back at HEAD and fast-forwarded,
-  `notes fold` writes it again.
+- **Pending is read from the spec:** a note is pending while its paragraph is absent from the
+  slice's section at HEAD of the spec checkout. No row records a fold, so an edit that is written
+  and then stashed or discarded before it is committed is pending again.
+- **At merge:** `mr-gates residuals close` prints `NOTES-PENDING` when the merged slice has pending
+  notes. `mr-gates notes fold --slice S` writes them as `Build note (S): …` at the end of the
+  slice's section; the edit ships as the tick's doc-only spec PR. Fold refuses a spec with
+  uncommitted edits.
+- **A Build note found uncommitted in a spec file** (a run wrote into the checkout):
+  `residuals close` prints `NOTES-STRAY <file>: mr-gates notes adopt --slice S before stashing it`.
+  Adopt stores it (with `--followup …` or `--residual R-…` when it names a follow-up) before the
+  labeled stash. After the file is back at HEAD and fast-forwarded, `notes fold` writes it again.
 - **At milestone close:** `mr-gates notes harvest --spec-file F` must exit 0 before `F` is deleted.
   It blocks on a pending note, an uncommitted edit, or a follow-up-worded Build note with no
   residual row; `notes adopt` gives a committed Build note its row, one paragraph per call.

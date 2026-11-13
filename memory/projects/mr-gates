@@ -43,13 +43,16 @@ run cannot commit to. What a build learns about its spec therefore goes to
 `$MEM/gates/<slice>.notes.jsonl` (`notes add`), never into a spec file. A note that names a
 follow-up is stored only with a residual row behind it (`--followup` files one through the same
 admission rules as `residuals add`; `--residual` links an existing one), so a follow-up is always a
-row the drain sees. `residuals close` prints NOTES-PENDING at merge; `notes fold` writes each
-pending note as a `Build note (<slice>): …` paragraph at the end of the slice's section, for the
-supervisor's doc-only spec PR, and refuses a spec file with uncommitted edits. `notes adopt` takes
-a Build-note paragraph that is already in the section (one a run wrote into the checkout, or one
-merged before this store) one paragraph per call: uncommitted -> pending, so it folds after the
-file is restored; committed -> folded. `notes harvest` is the milestone-close check: it blocks
-on a pending note, an uncommitted spec edit, or a follow-up-worded Build note with no residual row.
+row the drain sees. A note is PENDING while its paragraph is absent from the slice's section at
+HEAD of the spec checkout; nothing stores that state, so an edit that is written and then lost
+before it is committed leaves the note pending. `residuals close` prints NOTES-PENDING at merge,
+and NOTES-STRAY for a Build note that sits uncommitted and unstored in a spec file; `notes fold`
+writes each pending note as a `Build note (<slice>): …` paragraph at the end of the slice's
+section, for the supervisor's doc-only spec PR, and refuses a spec file with uncommitted edits.
+`notes adopt` stores a Build-note paragraph that is already in the section (one a run wrote into
+the checkout, or one merged before this store), one paragraph per call. `notes harvest` is the
+milestone-close check: it blocks on a pending note, an uncommitted spec edit, or a
+follow-up-worded Build note with no residual row.
 
 WHY THIS EXISTS (lp-gates)
 --------------------------
@@ -1843,10 +1846,13 @@ def cmd_residuals(a, sub):
         # and it is recorded on the row rather than silently assumed.
         # Printed ahead of every refusal below: the merge tick reads this line whether or not the
         # slice had residuals to close.
-        pending = [n for n in notes_of(sl, a.get("_gates_dir")) if not n.get("folded_at")]
+        _name, pending = pending_notes(sl, a.get("_gates_dir"), a.get("_specs") or SPECS)
         if pending:
             print("NOTES-PENDING %d for %s: `mr-gates notes fold --slice %s`, then ship the spec "
                   "edit as a doc-only chore PR" % (len(pending), sl, sl))
+        for name, sid in stray_notes(a.get("_gates_dir"), a.get("_specs") or SPECS):
+            print("NOTES-STRAY %s: `mr-gates notes adopt --slice %s` before stashing it"
+                  % (name, sid))
         forced = bool(a.get("force"))
         if forced and not a.get("reason"):
             return die("--force requires --reason: forcing a residual closed without saying why "
@@ -2056,6 +2062,45 @@ def section_span(text, slice_id):
     return m.start(), (e.start() if e else len(text))
 
 
+def head_section(specs, name, slice_id):
+    """The slice's section of spec `name` as committed at HEAD, whitespace-normalised; "" when
+    the file or the section is not there."""
+    rc, head = _git(specs, "show", "HEAD:./" + name)
+    span = section_span(head, slice_id) if rc == 0 else None
+    return _norm(head[span[0]:span[1]]) if span else ""
+
+
+def pending_notes(slice_id, gates_dir, specs):
+    """-> (spec file name or None, the slice's notes whose paragraph is not in its section at
+    HEAD). Read from the spec each time: a fold that was written and never committed is still
+    pending, whatever happened to the working file."""
+    notes = notes_of(slice_id, gates_dir)
+    if not notes:
+        return None, []
+    name, _sec = find_section(slice_id, specs)
+    sec = head_section(specs, name, slice_id) if name else ""
+    return name, [n for n in notes if _norm(note_para(slice_id, n["text"])) not in sec]
+
+
+def stray_notes(gates_dir, specs):
+    """-> [(spec file name, slice id)]: a Build-note paragraph that is in a spec file with
+    uncommitted edits, not in that section at HEAD and not stored. A stash would take it out of
+    sight unrecorded."""
+    rc, out = _git(specs, "status", "--porcelain", "--", ".")
+    found = []
+    for name in sorted(set(os.path.basename(ln[3:].strip().strip('"'))
+                           for ln in out.splitlines() if rc == 0)):
+        text = read_gates_file(os.path.join(specs, name)) if name.endswith(".spec.md") else None
+        for sid in SECTION_ID.findall(text or ""):
+            start, end = section_span(text, sid)
+            stored = set(_norm(note_para(sid, n["text"])) for n in notes_of(sid, gates_dir))
+            head = head_section(specs, name, sid)
+            if any(_norm(p) not in stored and _norm(p) not in head
+                   for p in build_note_paras(text[start:end])):
+                found.append((name, sid))
+    return found
+
+
 def _note_links(a, slice_id, text):
     """-> (error, [residual id]). The residual rows behind a note: `--residual` names existing
     rows, `--followup` files one. A follow-up-worded text with neither is refused."""
@@ -2117,42 +2162,41 @@ def cmd_notes(a, sub):
                                 if n.endswith(".notes.jsonl"))
             except OSError:
                 slices = []
-        notes = [n for s in slices for n in notes_of(s, gdir)]
+        notes = []
+        for s in slices:
+            pend = set(n["id"] for n in pending_notes(s, gdir, specs)[1])
+            notes += [dict(n, state="pending" if n["id"] in pend else "folded")
+                      for n in notes_of(s, gdir)]
         if a.get("json"):
             print(json.dumps(notes, indent=1, sort_keys=True))
             return 0
         for n in notes:
             print("  %-12s %-4s %-7s %s%s" % (
-                n.get("slice"), n["id"], "folded" if n.get("folded_at") else "pending",
+                n.get("slice"), n["id"], n["state"],
                 "[%s] " % ", ".join(n["residuals"]) if n.get("residuals") else "",
                 _norm(n["text"])[:100]))
         if not notes:
             print("  (no spec notes)")
         return 0
     if sub == "fold":
-        pending = [n for n in notes_of(sl, gdir) if not n.get("folded_at")]
+        name, pending = pending_notes(sl, gdir, specs)
         if not pending:
             print("NOTES-FOLDED 0 for %s" % sl)
             return 0
-        name, _sec = find_section(sl, specs)
         if name is None:
             return die("NOTES-NO-SECTION: no spec section for %s; its %d note(s) stay pending "
                        "(`mr-gates notes list --slice %s`)" % (sl, len(pending), sl))
         if spec_dirty(specs, name):
-            return die("NOTES-FOLD-REFUSED: %s has uncommitted edits. A Build note a run wrote "
-                       "there is taken in with `mr-gates notes adopt --slice <its slice>`; then "
-                       "restore the file to HEAD and fold." % name)
+            return die("NOTES-FOLD-REFUSED: %s has uncommitted edits. Commit a fold that is "
+                       "already written there; a Build note a run wrote there is taken in with "
+                       "`mr-gates notes adopt --slice <its slice>`, then restore the file to "
+                       "HEAD and fold." % name)
         full = os.path.join(specs, name)
         text = read_gates_file(full)
         start, end = section_span(text, sl)
-        sec = text[start:end]
-        add = [p for p in (note_para(sl, n["text"]) for n in pending)
-               if _norm(p) not in _norm(sec)]
-        atomic_write(full, text[:start] + sec.rstrip("\n") + "".join("\n\n" + p for p in add)
+        atomic_write(full, text[:start] + text[start:end].rstrip("\n")
+                     + "".join("\n\n" + note_para(sl, n["text"]) for n in pending)
                      + "\n" + ("\n" + text[end:] if end < len(text) else ""))
-        for n in pending:
-            residual_append({"id": n["id"], "folded_at": utc_now(), "spec_file": name},
-                            notes_path(sl, gdir))
         print("NOTES-FOLDED %d for %s into %s -- ship the edit as a doc-only chore PR"
               % (len(pending), sl, name))
         return 0
@@ -2171,15 +2215,12 @@ def cmd_notes(a, sub):
         err, rids = _note_links(a, sl, para)
         if err:
             return die("%s\n  the paragraph: %s" % (err, _norm(para)[:300]))
-        rc, head = _git(specs, "show", "HEAD:./" + name)
-        committed = rc == 0 and _norm(para) in _norm(head)
-        row = {"id": "n%d" % (len(notes_of(sl, gdir)) + 1), "slice": sl, "at": utc_now(), "text": para,
-               "residuals": rids, "spec_file": name}
-        if committed:
-            row["folded_at"] = row["at"]
+        row = {"id": "n%d" % (len(notes_of(sl, gdir)) + 1), "slice": sl, "at": utc_now(),
+               "text": para, "residuals": rids}
         residual_append(row, notes_path(sl, gdir))
         print("NOTE-ADOPTED %s %s %s%s; %d more Build note(s) in the section" % (
-            sl, row["id"], "folded (already committed)" if committed else
+            sl, row["id"], "folded (already committed)"
+            if _norm(para) in head_section(specs, name, sl) else
             "pending (restore %s to HEAD, then `mr-gates notes fold --slice %s`)" % (name, sl),
             " -> " + ", ".join(rids) if rids else "", len(fresh) - 1))
         return 0
@@ -2198,10 +2239,9 @@ def cmd_notes(a, sub):
             notes = notes_of(sid, gdir)
             n_notes += len(notes)
             n_rows += sum(len(n.get("residuals") or []) for n in notes)
-            for n in notes:
-                if not n.get("folded_at"):
-                    blocks.append("NOTE-PENDING %s %s: %s (`mr-gates notes fold --slice %s`)"
-                                  % (sid, n["id"], _norm(n["text"])[:100], sid))
+            for n in pending_notes(sid, gdir, specs)[1]:
+                blocks.append("NOTE-PENDING %s %s: %s (`mr-gates notes fold --slice %s`)"
+                              % (sid, n["id"], _norm(n["text"])[:100], sid))
             tracked = set(_norm(note_para(sid, n["text"])) for n in notes if n.get("residuals"))
             start, end = section_span(text, sid)
             for p in build_note_paras(text[start:end]):
@@ -3268,9 +3308,10 @@ def selftest():
         # The merge tick: `residuals close` names the pending notes; fold writes them.
         buf = _io.StringIO()
         with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(_io.StringIO()):
-            cmd_residuals({"slice": "nt-1", "_residuals": nres, "_gates_dir": ngd}, "close")
-        chk.ok("P3-close-names-pending-notes", "NOTES-PENDING 2 for nt-1" in buf.getvalue(),
-               buf.getvalue())
+            cmd_residuals({"slice": "nt-1", "_residuals": nres, "_gates_dir": ngd,
+                           "_specs": nspecs}, "close")
+        chk.ok("P3-close-names-pending-notes", "NOTES-PENDING 2 for nt-1" in buf.getvalue()
+               and "NOTES-STRAY" not in buf.getvalue(), buf.getvalue())
         with open(nspec, "a") as fh:
             fh.write("stray\n")
         rc, out = notes("fold", slice="nt-1")
@@ -3287,12 +3328,22 @@ def selftest():
             "helper is a follow-up.\n\n### nt-2 — second\n") in folded_text, folded_text)
         chk.ok("P4d-fold-keeps-the-rest", folded_text.endswith(
             "### nt-2 — second\n- **nt-2.1:** Y SHALL hold.\n\n## Appendix\ntail\n"))
+        # Folded is read from HEAD: a fold whose edit is lost before it is committed is pending.
+        chk.eq("P4g0-written-uncommitted-is-pending", 2, len(pending_notes("nt-1", ngd, nspecs)[1]))
+        with open(nspec, "w") as fh:
+            fh.write(NT)
+        rc, out = notes("harvest", spec_file="M-nt.spec.md")
+        chk.ok("P4g-lost-fold-blocks-harvest", rc == 1 and "NOTE-PENDING nt-1 n1" in out
+               and "NOTE-PENDING nt-1 n2" in out, out)
+        rc, out = notes("fold", slice="nt-1")
+        chk.ok("P4h-lost-fold-writes-again", "NOTES-FOLDED 2 for nt-1" in out
+               and read_gates_file(nspec) == folded_text, out)
         ngit("commit", "-q", "-am", "fold")
         chk.ok("P4e-fold-once", "NOTES-FOLDED 0" in notes("fold", slice="nt-1")[1]
                and read_gates_file(nspec) == folded_text)
         chk.ok("P4f-no-section-keeps-notes", notes("add", slice="nt-9", text="x")[0] == 0
                and notes("fold", slice="nt-9")[0] == 2
-               and not notes_of("nt-9", ngd)[0].get("folded_at"))
+               and len(pending_notes("nt-9", ngd, nspecs)[1]) == 1)
         # A Build note a run wrote into the checkout (uncommitted): adopt, restore, fold.
         stray = ("Build note (nt-2): `pvp.spec.ts` and `account-e2e.eval.mjs` are unedited. The\n"
                  "two-character lookup repeats `open_trade_session`'s; one shared `guards.rs`\n"
@@ -3300,6 +3351,14 @@ def selftest():
         dirty = folded_text.replace("\n\n## Appendix", "\n\n" + stray + "\n\n## Appendix")
         with open(nspec, "w") as fh:
             fh.write(dirty)
+        def close_out():
+            b = _io.StringIO()
+            with contextlib.redirect_stdout(b), contextlib.redirect_stderr(_io.StringIO()):
+                cmd_residuals({"slice": "nt-1", "_residuals": nres, "_gates_dir": ngd,
+                               "_specs": nspecs}, "close")
+            return b.getvalue()
+        chk.ok("P5-close-names-a-stray-note", "NOTES-STRAY M-nt.spec.md: `mr-gates notes adopt "
+               "--slice nt-2` before stashing it" in close_out(), close_out())
         rc, out = notes("harvest", spec_file="M-nt.spec.md")
         chk.ok("P5-harvest-blocks-a-dirty-spec", rc == 1 and "SPEC-DIRTY" in out
                and "FOLLOWUP-UNTRACKED nt-2" in out, out)
@@ -3311,6 +3370,8 @@ def selftest():
                and "R-nt-2-GUARDS" in out, out)
         chk.eq("P5d-adopt-leaves-the-file", dirty, read_gates_file(nspec))
         chk.ok("P5e-adopt-once", "NOTES-ADOPTED 0" in notes("adopt", slice="nt-2")[1])
+        chk.ok("P5e2-adopted-is-no-stray", "NOTES-STRAY" not in close_out()
+               and "NOTES-PENDING" not in close_out(), close_out())
         with open(nspec, "w") as fh:
             fh.write(folded_text)
         rc, out = notes("harvest", spec_file="M-nt.spec.md")
