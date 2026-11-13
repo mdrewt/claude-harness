@@ -693,6 +693,9 @@ PRUNE_NOT_MILESTONE=("structure.spec.md","residuals.spec.md")
 PRUNE_SLICE_HEADING=re.compile(r"^###\s+(\S+)\s+—\s")
 PRUNE_SLICES=re.compile(r"##\s+Slices\s*$")
 PRUNE_SPEC_MAX=4<<20
+# Fetch and census together, under the 120s a supervisor Bash call is allowed; a close of
+# M-trade-sessions against the game repo took 7.4s (measured 2026-11-13).
+PRUNE_TIMEOUT_S=90
 
 def _spec_slice_ids(text):
     """(slice ids, fences balanced): the `### <id> — ` headings under `## Slices`, code fences
@@ -749,9 +752,6 @@ def prune_close(slice_id):
                                "--at","refs/remotes/origin/master","--mem",PRUNE_MEM])
     print("prune-close: "+(out.strip().splitlines() or ["(no output)"])[0])
 
-# Fetch and census together, under the 120s a supervisor Bash call is allowed; a close of
-# M-trade-sessions against the game repo took 7.4s (measured 2026-11-13).
-PRUNE_TIMEOUT_S=90
 PRUNE_MEM=os.environ.get("MR_RECORD_PRUNE_MEM") or MEM
 if closing and outcome.strip().upper().startswith("MERGED") \
         and not (os.environ.get("MR_RECORD_LEDGER") and not os.environ.get("MR_RECORD_PRUNE_MEM")):
