@@ -77,9 +77,9 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    low-end frame budget. Small slices; closes before the Playtest-4 gate.
 7. **M-scale-readiness** (`M-scale-readiness.spec.md`, sketch 2026-11-12): the costs a static
    scaling audit and load run found growing faster than the population. Built: private movement
-   intent, idle empty zones and per-zone `character` subscriptions. Open: the per-input
-   owned-monster scan, whole-table `player_quest` and `profile` subscriptions, the unreaped
-   `battle_summary`, the device-resolution terrain bake, resuming a session where it left off, and
+   intent, idle empty zones, per-zone `character` subscriptions, resuming a session where it
+   left off and on-demand reapers. Open: the per-input owned-monster scan, whole-table `player_quest` and `profile` subscriptions, the unreaped
+   `battle_summary`, the device-resolution terrain bake, and
    a load tool that reports fan-out. Sized to the operator's official-server target (2026-11-12):
    ~100 zones, 8–12 players per zone on average and ~50 at peak, ~600 concurrent world-wide and
    ~1,000 at peak. Must land before any playtest above ~20 concurrent players, and before launch.
