@@ -409,14 +409,15 @@ last batch merges (see ts-6a).
 ## Slices
 
 Order: ts-0a ‖ ts-0b ‖ ts-1 → ts-2 → ts-3 → ts-4 → ts-5 → ts-6a → the 14 fix batches ts-6a wrote,
-`ts-6b-1` … `ts-6b-14`, in the order their `after:` lines give: ts-6b-1 alone, then the server
-batches (ts-6b-2 → ts-6b-3 ‖ ts-6b-6) beside the client chain (ts-6b-4 → ts-6b-5 → ts-6b-7 → ts-6b-8
-→ ts-6b-9 → ts-6b-10 → ts-6b-11 → ts-6b-12 → ts-6b-13), then ts-6b-14. The milestone closes on
-ts-6b-14, not on ts-5. Concurrency-eligible pairs (the seed trio; a server batch beside a client
-batch) are file-disjoint per `mr-disjoint`. Only ts-2 changes structural surfaces (schema,
-bindings), and it has no concurrent partner; ts-6b-1 and ts-6b-14 edit comments in `schema.rs`,
-which `mr-disjoint` also treats as structural, so each runs alone. Serially ordered slices may
-reopen a file their ancestor touched; each such reopen is named in the later slice.
+`ts-6b-1` … `ts-6b-14`, in the order their `after:` lines give: ts-6b-1 alone; then three tracks
+side by side — the server batches (ts-6b-2 → ts-6b-3 ‖ ts-6b-6), the `main.ts` client chain (ts-6b-4
+→ ts-6b-5 → ts-6b-7) and the list views (ts-6b-8); then ts-6b-9 → ts-6b-10 → ts-6b-11 → ts-6b-12 →
+ts-6b-13, which share `main.ts` or the i18n catalogs; then ts-6b-14. The milestone closes on
+ts-6b-14, not on ts-5. Concurrency-eligible pairs (the seed trio; batches on different tracks) are
+file-disjoint per `mr-disjoint`. Only ts-2 changes structural surfaces (schema, bindings), and it
+has no concurrent partner; ts-6b-1 and ts-6b-14 edit comments in `schema.rs`, which `mr-disjoint`
+also treats as structural, so each runs alone. Serially ordered slices may reopen a file their
+ancestor touched; each such reopen is named in the later slice.
 
 ### ts-0a — move the trade swap machinery into `trading_session.rs`
 type: refactor · tier: routine
@@ -888,7 +889,10 @@ by that batch, evidence = the batch id).
   `fixed` cites the PR the evidence names). HIGH/CRITICAL rows, if any appear, go to `mr-ask-drew`.
 
 **At merge (supervisor).** Apply the `resolved-*` and `wontfix` dispositions; `ask` rows go out as
-issues; then the fix batches are this milestone's next unbuilt slices.
+issues; then the fix batches are this milestone's next unbuilt slices. An `ask` the operator answers
+with a fix becomes a further `ts-6b-K` section ordered before the last batch, which adds it to its
+`after:`; one answered no, or still unanswered when the last batch is ready, closes as `wontfix`
+citing its issue.
 
 #### Fix-batch contract (part 2 of the sweep: every `ts-6b-K` inherits this)
 
@@ -918,8 +922,8 @@ section is the contract every batch inherits:
 #### Triage table (ts-6a)
 
 Triaged 2026-11-13 against monster-realm `master` @ `3278f6b5`. 174 residuals were open at launch;
-170 are in scope and listed here once each. Verdicts: 58 `fix` in 14 batches, 25 `resolved-fixed`,
-15 `resolved-obsolete`, 65 `wontfix`, 3 `ask`, and 4 duplicates that close with the batch fixing
+170 are in scope and listed here once each. Verdicts: 59 `fix` in 14 batches, 25 `resolved-fixed`,
+15 `resolved-obsolete`, 64 `wontfix`, 3 `ask`, and 4 duplicates that close with the batch fixing
 their defect.
 
 Reading the table: `sev` is the triaged grade, with the ledger's grade in brackets where it changed;
@@ -938,6 +942,7 @@ Out of scope, each owned by a live, unbuilt slice of another milestone:
 |---|---|---|---|---|---|
 | `R-bt-7-GUESTTACTICAL` | MED (was LOW) | security-privacy | resolved-fixed | Same defect as `R-weekly-review-2026-10-16-F2`; closed with it by ts-6b-1. | ts-6b-1 |
 | `R-rb-128-X2` | LOW (was MED) | ux-a11y | fix | guards.rs REJECT_DELETION_GATED still says 'new trades, battles and challenges are unavailable', yet require_not_deleting gates join, move, care, evolve, rename, party edits, talk, shop and recruit. Players see a wrong reason. Tests compare against the const; only two client tests hold the literal as sample data. | ts-6b-1 |
+| `R-rb-65-RUNBOOK-LOGCAVEAT` | LOW (was MED) | security-privacy | fix | Still missing. docs/runbooks/observability-dr.md section 8 lists shared historical rows and backups but not the logs. Every cascade logs account_deletion_cascade with the subject identity (cascade_fields), and every claim logs guest_claim_export_purge with the guest identity. Loki keeps both for 30 days. | ts-6b-1 |
 | `R-weekly-review-2026-10-09-F3` | LOW | gameplay | fix | Still real. accept_challenge (pvp.rs) neither refuses nor ends a party's player_conversation. The suspended dialogueView frame stays on top (contextStack reconcile keeps it while view.conversation), and dialogueScreen returns unhandled for D-pad/A while inBattle, so ScreenHost never reaches the battle base. talk/advance_dialogue already refuse in battle, so the conversation is dead. | ts-6b-1 |
 | `R-weekly-review-2026-10-16-F2` | MED | security-privacy | fix | Still real. rekey_all moves no battle rows. battle_gc keeps the anchor, battle_tactical and battle_summary. sweep_prior_terminals runs only on that identity's next battle, which a claimed guest never has. account_deletion_reaper runs erase_tactical_rows and anonymize_battles for the account identity only, so the guest's rows escape both the export and the erasure. | ts-6b-1 |
 | `R-ts-5-NOTE1BC25F` | LOW | security-privacy | fix | One rule has two copies: pvp::characters_in_interact_range and an inline match in trading_session::open_trade_session both look up the two characters through player.entity_id and call within_interact_range. A missing character counts as out of range in each copy. | ts-6b-2 |
@@ -963,20 +968,21 @@ Out of scope, each owned by a live, unbuilt slice of another milestone:
 | `R-bt-15-CLOCKSKEW` | LOW | ux-a11y | resolved-fixed | Same defect as `R-weekly-review-2026-11-06-F3`; closed with it by ts-6b-7. | ts-6b-7 |
 | `R-weekly-review-2026-11-06-F1` | MED | ux-a11y | fix | Still real: ticker.ts carries no live region by design and nothing routes tactical events to ui/liveRegion; main.ts announces only the frame title and the wild Still-there countdown, so a screen-reader player never hears whose turn it is, a KO, or the battle end. | ts-6b-7 |
 | `R-weekly-review-2026-11-06-F3` | MED | ux-a11y | fix | Still real: pumpStillThere and pumpClock pass raw Date.now() to stillThereSeconds and clockVM against server epoch deadline_ms; client/src has no server-time offset, so a skewed device clock hides the Still-there warning before an auto-pass or paints a wrong PvP ring. | ts-6b-7 |
-| `R-ci-fix-20261109T0400-LATEFOCUS-SCROLL` | LOW | ux-a11y | fix | openOverlayA11y's setTimeout(0) still calls initialFocusSelector .focus() with no options; when a nav key moved the cursor first (not DOM focus), focus() scrolls the frame back to its anchor. The same-macrotask skip only covers focus already inside root. | ts-6b-8 |
-| `R-ctl-13-REANNOUNCE` | LOW | ux-a11y | resolved-fixed | Same defect as `R-uif-4-REPEATSAY`; closed with it by ts-6b-8. | ts-6b-8 |
-| `R-polish-1-CLAIMRESULTCATCHREENTRY` | LOW | ux-a11y | fix | connection.ts still chains pendingClaim.then(ok callback).catch(reject callback), so a throw inside main.ts onClaimResult's claim-succeeded path (applyClaim/render) re-enters onClaimResult as a rejection after the stored code was already cleared. | ts-6b-8 |
-| `R-rb-52-GRACEANNOUNCE` | MED | ux-a11y | fix | rb-92 never landed. The #privacy-countdown banner is deliberately not live, and main.ts's change-detected privacy block only pumps account-changed; nothing announces the active to grace phase edge, including a deletion requested from another session. | ts-6b-8 |
-| `R-rb-53-E1` | LOW (was MED) | ux-a11y | fix | rb-94 never landed. main.ts's onBatchApplied recomputes exportAssembly and repaints the privacy status label in place; nothing announces the incomplete to complete edge, so a screen-reader user waiting for the export is not told it is ready. | ts-6b-8 |
-| `R-uif-4-REPEATSAY` | LOW | ux-a11y | fix | LiveRegion.announce returns early when message equals #pending ?? #lastWritten, so any repeat of the last painted text is never spoken: a second identical toast (same refusal twice) and a second tradeSession notice.changed both go silent. All callers are already edge-driven. | ts-6b-8 |
-| `R-weekly-review-2026-10-02-F4` | LOW | ux-a11y | fix | a11yCopy.ts is still a frozen English-only map with its own t(); overlayA11y.ts, announcements.ts, render/world.ts and main.ts resolve the 16 overlay names and a11y.world.region through it, catalog.fr.ts has no a11y keys and messageIds A11yKey is never. | ts-6b-8 |
-| `R-ci-fix-20261002T0901Z-VIEWREBUILD` | MED | ux-a11y | fix | Box, dialogue (polish-1) and raising (ctl-7b #rendered key) were fixed, but ShopView.render, HealView.render, QuestLogView.render and EvolutionView.refresh still replaceChildren their rows on every store batch, so a pointer press spanning a batch loses its row and shop buy/sell buttons lose their disabled lock. | ts-6b-9 |
-| `R-ctl-8a-CTL8A.2` | LOW | ux-a11y | fix | shopScreen settle() still calls navReconcile(layout, layout, state.nav) with no previous layout, so reseat cannot find the vanished key's index and lands on row 0 after a sell-all or sold-out row. bagScreen and journalScreen already keep state.layout for this. | ts-6b-9 |
-| `R-uif-10-SHOPFOCUS` | LOW | ux-a11y | fix | shopView #apply toggles #forSaleList/#inventoryList hidden on a tab switch without checking focus; a Tab-focused list container (the nav tab stop) is left inside a hidden subtree and focus heals to the world canvas. raisingView already re-homes via #hiddenInFrame. | ts-6b-9 |
-| `R-uif-10-TITLES` | LOW | ux-a11y | fix | Half obsolete: ts-3 replaced trade-propose, and the session editor paints an h2 from tradeSession.title. The heal half is still real: healView.ts paints no title and the catalog has no heal.title key, so the heal frame starts without the frame anatomy's title bar. | ts-6b-9 |
+| `R-ci-fix-20261002T0901Z-VIEWREBUILD` | MED | ux-a11y | fix | Box, dialogue (polish-1) and raising (ctl-7b #rendered key) were fixed, but ShopView.render, HealView.render, QuestLogView.render and EvolutionView.refresh still replaceChildren their rows on every store batch, so a pointer press spanning a batch loses its row and shop buy/sell buttons lose their disabled lock. | ts-6b-8 |
+| `R-ctl-8a-CTL8A.2` | LOW | ux-a11y | fix | shopScreen settle() still calls navReconcile(layout, layout, state.nav) with no previous layout, so reseat cannot find the vanished key's index and lands on row 0 after a sell-all or sold-out row. bagScreen and journalScreen already keep state.layout for this. | ts-6b-8 |
+| `R-uif-10-SHOPFOCUS` | LOW | ux-a11y | fix | shopView #apply toggles #forSaleList/#inventoryList hidden on a tab switch without checking focus; a Tab-focused list container (the nav tab stop) is left inside a hidden subtree and focus heals to the world canvas. raisingView already re-homes via #hiddenInFrame. | ts-6b-8 |
+| `R-uif-10-TITLES` | LOW | ux-a11y | fix | Half obsolete: ts-3 replaced trade-propose, and the session editor paints an h2 from tradeSession.title. The heal half is still real: healView.ts paints no title and the catalog has no heal.title key, so the heal frame starts without the frame anatomy's title bar. | ts-6b-8 |
+| `R-ci-fix-20261109T0400-LATEFOCUS-SCROLL` | LOW | ux-a11y | fix | openOverlayA11y's setTimeout(0) still calls initialFocusSelector .focus() with no options; when a nav key moved the cursor first (not DOM focus), focus() scrolls the frame back to its anchor. The same-macrotask skip only covers focus already inside root. | ts-6b-9 |
+| `R-ctl-13-REANNOUNCE` | LOW | ux-a11y | resolved-fixed | Same defect as `R-uif-4-REPEATSAY`; closed with it by ts-6b-9. | ts-6b-9 |
+| `R-polish-1-CLAIMRESULTCATCHREENTRY` | LOW | ux-a11y | fix | connection.ts still chains pendingClaim.then(ok callback).catch(reject callback), so a throw inside main.ts onClaimResult's claim-succeeded path (applyClaim/render) re-enters onClaimResult as a rejection after the stored code was already cleared. | ts-6b-9 |
+| `R-rb-52-GRACEANNOUNCE` | MED | ux-a11y | fix | rb-92 never landed. The #privacy-countdown banner is deliberately not live, and main.ts's change-detected privacy block only pumps account-changed; nothing announces the active to grace phase edge, including a deletion requested from another session. | ts-6b-9 |
+| `R-rb-53-E1` | LOW (was MED) | ux-a11y | fix | rb-94 never landed. main.ts's onBatchApplied recomputes exportAssembly and repaints the privacy status label in place; nothing announces the incomplete to complete edge, so a screen-reader user waiting for the export is not told it is ready. | ts-6b-9 |
+| `R-uif-4-REPEATSAY` | LOW | ux-a11y | fix | LiveRegion.announce returns early when message equals #pending ?? #lastWritten, so any repeat of the last painted text is never spoken: a second identical toast (the same refusal twice) and a second identical request line both go silent. The callers read as edge-driven; the batch confirms each before the dedup goes. | ts-6b-9 |
+| `R-weekly-review-2026-10-02-F4` | LOW | ux-a11y | fix | a11yCopy.ts is still a frozen English-only map with its own t(); overlayA11y.ts, announcements.ts, render/world.ts and main.ts resolve the 16 overlay names and a11y.world.region through it, catalog.fr.ts has no a11y keys and messageIds A11yKey is never. | ts-6b-9 |
 | `R-21r-e-E1` | MED | ux-a11y | fix | The wizard is gone, but the session editor inherited the gap: tradeSession.prompt.confirm reads 'Confirm this trade? A completed trade cannot be undone.' It never says that confirm_trade_session resets each traded monster's Trust and Quality-Time (reset_trainer_bond), or that trading it back does not restore them. | ts-6b-10 |
 | `R-ctl-8g-CTL8G.1-DEADPATH` | LOW | ux-a11y | fix | Still present: contextStack.socialPanel maps 'players' to tradeView, socialScreen paint overrides it to leaderboardView, and tradeView #applySocial keeps an unreachable social.players.placeholder branch (the trade root is hidden on Players, so its kept paint is null). Catalog key is dead. | ts-6b-10 |
 | `R-uif-9-UIF9.2` | LOW (was MED) | ux-a11y | fix | paintSocialChrome (tradeView.ts) still renders #social-sheet via renderNav as a plain listbox, not createContextSheet, with no Back row (pvp.spec.ts pins exactly Accept, Decline). The Monsters ContextSheet decision says Social reuses the kit placement and kit.sheet.back row. | ts-6b-10 |
+| `R-21r-b2-E1` | LOW | ux-a11y | fix | privacyView.ts writes PRIVACY_PSEUDONYMIZATION_DISCLOSURE once in its constructor, raw English, so a fr player reads the account-deletion disclosure in English. Every other privacy string is in the catalog; this one stayed out because a module-level t() would freeze the boot locale, and privacyView.i18n.test.ts pins it as raw. The English wording is pinned byte-identical to the eval's PIN_PSEUDONYMIZATION and stays so. | ts-6b-11 |
 | `R-qf-13-QF13.4` | LOW | ux-a11y | fix | #claim-privacy-btn and ClaimViewHandlers.onPrivacy survive: in the combined Profile the button only moves the cursor to the Privacy section directly below (main.ts onPrivacy calls profileView.focusSection). It is a now-pointless extra row in the Account section. | ts-6b-11 |
 | `R-uif-17-KITPOLISH` | LOW | ux-a11y | fix | Of the row's five cosmetic items one is worth a change: Monsters, Inventory and Controls paint a plain h2 where every other frame uses the kit title bar, and Inventory repeats the title as an in-panel h3. Profile's native buttons and overflow, the list focus outline, the Help band and the How to Play line stay as shipped. | ts-6b-11 |
 | `R-ctl-15-LAUNCHERATTR` | LOW | ux-a11y | fix | Still present: index.html chips keep data-menu-launcher and data-help-launcher and a comment saying clicks are delegated on them; no client source reads them (chips press via data-button in pointerSource). indexShell.smoke.test.ts pins the dead attributes and several test comments narrate the delegate. | ts-6b-12 |
@@ -996,7 +1002,6 @@ Out of scope, each owned by a live, unbuilt slice of another milestone:
 | `R-ctl-7a-CTL7A.4` | LOW | loop-ops | fix | Still stale: evolutionNotice.ts:17 and evolutionNotice.test.ts:578 cite the deleted #help-hint at z-index 50; menuView.ts:102 says most child shells are in-flow. privacyView, battleView.test and PLAYTEST.md were already fixed (PLAYTEST by #699). | ts-6b-14 |
 | `R-pgcc-c-RESEEDDOCBLOCK` | LOW | loop-ops | fix | main.battle-reseed.test.ts still quotes removed latch code (battleReseedPending, lines ~641-742) and stale main.ts:1828/:2174/:1852 line cites. | ts-6b-14 |
 | `R-qf-6-QF6.1` | LOW | loop-ops | fix | wallet-balance.spec.ts:~934 still says a rejected advance leaves the overlay open; since qf-6 dismiss closes it. | ts-6b-14 |
-| `R-rb-65-RUNBOOK-LOGCAVEAT` | LOW (was MED) | security-privacy | fix | Still missing. docs/runbooks/observability-dr.md section 8 lists shared historical rows and backups but not the logs. Every cascade logs account_deletion_cascade with the subject identity (cascade_fields), and every claim logs guest_claim_export_purge with the guest identity. Loki keeps both for 30 days. | ts-6b-14 |
 | `R-ts-4-STALECOMMENTS` | LOW | loop-ops | fix | Stale text is still at master: guards.rs 115 and 299, movement.rs 355, schema.rs 753 and 766, monster_mgmt_tests.rs 245, game-core trading/rules.rs, wallet-balance.spec.ts 86, index.html 40, worldScreen.test.ts 373, SKILL.md 28, and recording.rules.yml 29 and 32, whose regexes still name propose_trade and accept_trade. | ts-6b-14 |
 | `R-20r-d-B1-ack` | LOW (was MED) | ux-a11y | wontfix | Still count-based: ack_evolution_notices(count) drains a prefix and the client sends count 1 per dismissed banner. Losing a banner needs two tabs on one identity acking inside one batch latency, and the evolution itself persists. Keying the ack changes the reducer signature and the bindings for a cosmetic two-tab race. Decision: "Evolution graph and the auto-evolve rule". Impact: With two tabs open, rarely, one evolution reveal banner is never shown; the evolved monster is unaffected. | — |
 | `R-20r-d-B1-cap` | LOW (was MED) | data-integrity | wontfix | Still uncapped (evolution.rs has no length bound on pending_evolution_notice.entries), but growth is self-inflicted only, bounded by owned monsters times evolution tiers (24 bytes each), and removed by the deletion cascade. Any cap must drop the newest notice, and nobody is harmed today. Decision: "Evolution graph and the auto-evolve rule". Impact: None: only a player who never dismisses banners grows their own small private row. | — |
@@ -1004,7 +1009,6 @@ Out of scope, each owned by a live, unbuilt slice of another milestone:
 | `R-21r-a-FAINTPENALTY` | LOW | gameplay | resolved-fixed | bt-9 made the tactical settle call battle::apply_faint_penalties on every Settled close with a good HP write-back, a recruit success included (its doc names R-21r-a-FAINTPENALTY); the 1v1 attempt_recruit was deleted in bt-17. Refs: #629 #672 `9d5f7e84` `d90c32c9`; test `server-module/src/tactics_settle_tests.rs` :: "a_recruit_win_with_a_fainted_party_member_adds_exactly_one_unfavorable_t…"; decision "Battles run on one engine at a time; the tactical cutover was a flip, not a toggle". | — |
 | `R-21r-a-TERMINALSWEEP` | LOW | data-integrity | resolved-fixed | bt-9 routed every tactical finish (recruit included) through tactics_settle::settle, which always calls battle::sweep_prior_terminals; bt-17 then deleted taming::attempt_recruit entirely. The sweep test runs Finish::Recruit among its finishes. Refs: #629 #672 `9d5f7e84` `d90c32c9`; test `server-module/src/tactics_settle_tests.rs` :: "every_finish_sweeps_the_players_prior_terminal_anchors_with_their_tactic…"; decision "Battles run on one engine at a time; the tactical cutover was a flip, not a toggle". | — |
 | `R-21r-a-WBALERT` | LOW | loop-ops | wontfix | The six named 1v1 sites were deleted by bt-17. Successors exist (tactical_writeback_err, tactical_settle_err, tactical_recruit_resolve_err, wild_disconnect_writeback_err) and ops/observability still has no rule or panel on them, but they are invariant-fault logs searchable in Loki on a loopback-only stack. An alert is speculative hardening. Decision: "Observability: the module never times itself or calls out". | — |
-| `R-21r-b2-E1` | LOW | ux-a11y | ask | privacyView.ts constructor still writes PRIVACY_PSEUDONYMIZATION_DISCLOSURE raw English, and the verbatim compliance wording is pinned to evals PIN_PSEUDONYMIZATION. Question: may the mandated-verbatim disclosure get an fr translation? Default: yes, a catalog key whose en value stays byte-identical to the pin, painted in show(). Impact: A French-locale player reads the account-deletion privacy disclosure in English only. | — |
 | `R-bt-11-ITEMROW` | LOW | gameplay | wontfix | Not a defect: the greyed Item row matches the server, which rejects Item entries with ITEMS_NOT_AVAILABLE. In-battle items are an unbuilt feature recorded in M-battle-tactics-design.md (Item verb cost 3, items gain battle_use); the sub-list belongs to that feature slice. | — |
 | `R-bt-11-RULEHOME` | LOW | netcode-determinism | wontfix | Both restated predicates in client-wasm forecast_of (stab, status_blocked) are differentially tested against the real game-core damage_pipeline and resolve_attack, so a game-core edit to either rule fails the client-wasm suite rather than drifting silently. Forecast is display-only. Decision: "Rules are written once, in game-core". | — |
 | `R-bt-12-INITPARITY` | LOW | netcode-determinism | wontfix | The only assumption, strict per-round alternation, is pinned in game-core: priority_for_round is tested over rounds 0..65535 and an upkeep test asserts tie_priority flips and initiative is rebuilt after run_upkeep. next_initiative_of calls those same functions; the result is a display forecast. Decision: "Rules are written once, in game-core". | — |
@@ -1076,14 +1080,14 @@ Out of scope, each owned by a live, unbuilt slice of another milestone:
 | `R-rb-111-CONTENTION` | LOW (was MED) | security-privacy | wontfix | mint_export_stamp refuses only when all 16 ms of the probe window hold live stamps, which needs at least one export per millisecond from many identities. The refusal is retryable and short, and the 60 s cooldown plus admission tiers already bound the burst. Speculative hardening. | — |
 | `R-rb-111-STAMPORACLE` | LOW (was MED) | security-privacy | wontfix | The stamp offset leaks at most 4 bits of anonymous third-party export timing, with no identity or content. An owner-scoped probe is impossible because the stamp must be globally unique for the reaper's per-stamp delete bound. Negligible. | — |
 | `R-rb-121-DEFER-FOCUS-RECHECK` | LOW (was MED) | ux-a11y | resolved-fixed | ctl-5 added the fire-time check: the deferred-focus timer in openOverlayA11y returns early when connectedInside(root, document.activeElement), exactly the requested skip. Refs: #541 `8e315102`; test `client/src/ui/overlayA11y.test.ts` :: "CTL5-7-DEFER-SKIP-INSIDE: when focus is already on a connected element i…". | — |
-| `R-rb-125-X7` | LOW (was MED) | ux-a11y | wontfix | Feature polish, not a defect. The passive reveal banner (evolutionNotice.ts) is the accepted default; the cutscene idea is recorded in harness residuals.spec.md (R-rb-125-X7, schedule by hand). It needs new copy and reduced-motion animation work. | — |
+| `R-rb-125-X7` | LOW (was MED) | ux-a11y | wontfix | Feature polish, not a defect. The passive reveal banner (evolutionNotice.ts) is the accepted default; a transformation cutscene needs new copy and reduced-motion animation work and belongs to a presentation milestone if the operator wants one. | — |
 | `R-rb-128-X1` | LOW (was MED) | ux-a11y | wontfix | Still real: enqueue_move and set_move reject a mid-grace caller, the client does not block input, so a held key jitters and logs one reject per press. There is no desync. The flow is rare and self-inflicted after delete_account, the profile shows the pending banner, and a fix needs a new wasm-exposed predicate. | — |
-| `R-rb-132-NEWCOMERSHED` | LOW (was MED) | security-privacy | wontfix | Organic shedding needs about 10,735 live rows, roughly 600 never-credited guest bundles alive within one 7-day TTL. That is implausible at the documented scale. A refused guest can earn a wallet row or claim an account to move tier. A reserved floor would add state, which the export rules forbid. Decision: "Account deletion and data export". | — |
-| `R-rb-132-WALLETSYBIL` | MED | security-privacy | wontfix | Real but availability-only: a sybil fleet can fill the anonymous half of the export cap, never the account-holder half, and discloses nothing. A real fix needs per-identity state stored for the export, which decision "Account deletion and data export" rules out. The ledger title says HIGH; the earlier triage and this one grade it MED. Impact: A guest with no account can be refused a data export while the anonymous tier is full; claiming an account restores it. | — |
+| `R-rb-132-NEWCOMERSHED` | LOW (was MED) | security-privacy | wontfix | Organic shedding needs about 10,735 live rows, roughly 600 never-credited guest bundles alive within one 7-day TTL, which is implausible at the documented scale. A refused guest moves tier by earning a wallet row (one quest or one won battle). A reserved newcomer floor would add state for the export, which the export rules forbid. Decision: "Account deletion and data export". | — |
+| `R-rb-132-WALLETSYBIL` | MED | security-privacy | ask | Wider than filed. ALLOWED_ISSUERS is a placeholder, so provision_or_touch_account creates no account row and every caller draws on the anonymous export tier: about 1,265 throwaway identities a week, each winning one wild battle and requesting one export, can refuse every player's data export for 7 days at a time. A fix needs sign-in or per-identity state, which decision "Account deletion and data export" rules out storing for the export. Ask: accept until a real sign-in issuer ships and make that a launch condition, or bound it sooner? Default: accept as a launch condition. The ledger title says HIGH; its severity field and the earlier triage say MED. Impact: Until sign-in exists, a bot fleet can leave every player unable to export their data for a week at a time; after it, only guests without an account are exposed and claiming one restores the export. | — |
 | `R-rb-56-FOLLOWUP-ACC` | MED | ux-a11y | resolved-obsolete | The 1v1 skill buttons and their btn.title were deleted with battleView.ts in bt-17 (64f66cca, #671). The tactical forecast panel shows the hit percent as visible text (tactics.forecast.hit "Hit N%") for the aimed target. Refs: #671 `64f66cca`; test `client/src/tactics/forecast.test.ts` :: "BT11-7-FORECAST-VM-LINES: lines follow type, stab, flank, guard with the…"; decision "Battles run on one engine at a time; the tactical cutover was a flip, not a toggle". | — |
 | `R-rb-57-X4` | LOW (was MED) | ux-a11y | wontfix | Still true: CharacterView sets no accessible properties. But Idle/Walking/Jumping are cosmetic world-sprite states that no decision or interaction depends on. Exposing them would mean opting the world canvas into the Pixi AccessibilitySystem, which is a world-a11y feature, not a defect. | — |
 | `R-rb-59-X6` | LOW (was MED) | ux-a11y | resolved-obsolete | The PvP opponent card (#opponentCardEl, vm.pvpOpponentName) was deleted with battleView.ts in bt-17 (64f66cca, #671). The tactical PvP shell has no opponent card and the deploy panel never paints the opponent roster. Refs: #671 `64f66cca`; test `client/src/tactics/commandModel.test.ts` :: "BT11-1-MENU-PVP: in a player battle the menu omits Recruit and Flee and…"; decision "Battles run on one engine at a time; the tactical cutover was a flip, not a toggle"; decision "The battle frame has one owner per tactical phase". | — |
-| `R-rb-73-ABORT-PHANTOM` | MED | data-integrity | wontfix | A phantom needs on_disconnect itself to abort, which only a host or datastore failure can cause (no reachable panic). The module API cannot list the host's live clients. Clearing every player_session at sync_content would run cleanup while other tabs are still connected, bringing back the multi-tab bug ADR-0245 fixed. Cost outweighs an unreachable trigger. Impact: Only after a host failure during a logout: that player's character could stay visible after they leave, and later logouts skip cleanup. | — |
+| `R-rb-73-ABORT-PHANTOM` | MED | data-integrity | wontfix | A phantom needs on_disconnect itself to abort, which only a host or datastore failure can cause (no reachable panic). The module API cannot list the host's live clients, and clearing every player_session at sync_content would run cleanup while other tabs are still connected, the multi-tab bug that last-connection-out gating exists to prevent. Cost outweighs an unreachable trigger. Impact: Only after a host failure during a logout: that player's character stays visible after they leave and their later logouts skip cleanup, until the stale session row is removed by hand. | — |
 | `R-rb-73-TOKEN-WEDGE` | LOW (was MED) | security-privacy | wontfix | Anyone holding a live socket as the identity holds the account. Keeping presence rows while that socket lives is correct behaviour. The wild-battle half is now bounded: tactical wild battles auto-flee on idle-clock expiry (clock::expire returns AutoFlee for wild). Trades and challenges have TTL reapers. | — |
 | `R-rb-73-WILD-HOLD` | LOW (was MED) | gameplay | resolved-fixed | Every wild battle is now tactical (bt-16 flip). Its deploy window and every turn window arm a scheduled tactical_deadline_fire, and wild expiry returns AutoFlee (game-core tactics/clock.rs expire), so a held or idle wild battle ends without a disconnect. Refs: #627 #668 `96391886` `a1f93f8f`; test `server-module/src/tactics_tests.rs` :: "deadline_fire_at_the_deadline_auto_flees_persists_hp_and_voids_ready_row…"; decision "Battles run on one engine at a time; the tactical cutover was a flip, not a toggle". | — |
 | `R-rb-76-CHALLENGERGRACE` | LOW (was MED) | security-privacy | resolved-fixed | accept_challenge now opens battles only through tactics::start_pvp_tactical, which calls require_subject_not_deleting for both challenger and opponent. A mid-grace challenger's challenge is refused, stays Pending and expires under the 2-minute CHALLENGE_TTL_MS. No battle names the deleting account. Refs: #660 #668 `ccba5d43` `a1f93f8f`; test `server-module/src/pvp_tests.rs` :: "nh_accept_challenge_refuses_a_format_0_or_deleting_challenger_and_keeps_…"; decision "Battles run on one engine at a time; the tactical cutover was a flip, not a toggle". | — |
@@ -1107,12 +1111,12 @@ Out of scope, each owned by a live, unbuilt slice of another milestone:
 | `R-weekly-review-2026-11-06-F4` | LOW | gameplay | wontfix | Still true that sendGuarded's frozen arm skips onRejected after #send set #inflight and dropped the draft, but a frozen link always ends in a reconnect whose resetPredictionState calls tacticsBattle.reset(), which clears in-flight keys and drafts anyway; the player sees the disconnected notice meanwhile. | — |
 | `R-weekly-review-2026-11-06-F5` | LOW | gameplay | wontfix | Friendly fire is an engine mechanic (geometry FfFilter AllButSelf and All, design ff_filter), but all 15 shipped tactics_skills use ff_filter Enemies, so no ally can hit an ally and ledger_of's last-opposite-side-hit credit is unreachable. Settle this with R-bt-9-LEDGERHOME when the fold moves to game-core. Decision: "Tactical settlement derives the reward ledger from the transcript". | — |
 
-### ts-6b-1 — guest-claim erasure, the deletion-gate reason, and conversations at challenge accept
+### ts-6b-1 — guest-claim erasure, the deletion-gate reason, conversations at challenge accept, the runbook's log caveat
 type: feature · tier: hard
 category: security-privacy · severity: MED · size: MODERATE
-touches: server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/battle.rs, server-module/src/schema.rs, server-module/src/guards.rs, server-module/src/guards_tests.rs, client/src/ui/statusModel.test.ts, client/src/main.dialogueEnded.test.ts, server-module/src/pvp.rs, server-module/src/pvp_tests.rs
+touches: server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/battle.rs, server-module/src/schema.rs, server-module/src/guards.rs, server-module/src/guards_tests.rs, client/src/ui/statusModel.test.ts, client/src/main.dialogueEnded.test.ts, server-module/src/pvp.rs, server-module/src/pvp_tests.rs, docs/runbooks/observability-dr.md
 after: [ts-6a]
-Closes residuals: `R-weekly-review-2026-10-16-F2`, `R-bt-7-GUESTTACTICAL` (duplicate of `R-weekly-review-2026-10-16-F2`), `R-rb-128-X2`, `R-weekly-review-2026-10-09-F3`
+Closes residuals: `R-weekly-review-2026-10-16-F2`, `R-bt-7-GUESTTACTICAL` (duplicate of `R-weekly-review-2026-10-16-F2`), `R-rb-128-X2`, `R-weekly-review-2026-10-09-F3`, `R-rb-65-RUNBOOK-LOGCAVEAT`
 
 Runs alone: it edits `server-module/src/schema.rs`, a structural path for `mr-disjoint`. The edit is
 the doc comments on `erase_tactical_rows` and the `NOT_REKEYED` rationale; no table, column or
@@ -1130,11 +1134,14 @@ the Fix-batch contract):
   purge_export_bundles, call schema::erase_tactical_rows(ctx, guest) then
   battle::anonymize_battles(ctx, guest). Guard 10 already rules out an ongoing battle. Update the
   'only from the reaper' doc comments and the NOT_REKEYED rationale.
-- `R-rb-128-X2` — Reword the const to a generic line, e.g. 'account deletion requested; this action
-  is unavailable until deletion is cancelled'. Update the literal in the two client test samples.
+- `R-rb-128-X2` — Reword the const to the criterion's string and update the literal in the two
+  client test samples.
 - `R-weekly-review-2026-10-09-F3` — In accept_challenge, after start_pvp_tactical succeeds, delete
   player_conversation for both the acceptor and the challenger. The client already pops a dialogue
   frame silently when its conversation ends, which hands D-pad/A back to the battle base.
+- `R-rb-65-RUNBOOK-LOGCAVEAT` — Add one bullet to section 8: the account_deletion_cascade and
+  guest_claim_export_purge lines name the erased or retired Identity and stay in Loki for its 30-day
+  retention (section 4).
 
 - **ts-6b-1.1:** WHEN a guest claim completes, THE SERVER SHALL leave no `battle` or
   `battle_summary` row naming the retired guest identity, treating the opponent's side of those rows
@@ -1142,14 +1149,19 @@ the Fix-batch contract):
   `R-bt-7-GUESTTACTICAL` (`guest_claim_tombstones_the_guests_terminal_battle_and_summary_rows` in
   `server-module/src/accounts_tests.rs`).
 
-- **ts-6b-1.2:** WHEN `require_not_deleting` refuses a caller, THE SERVER SHALL return a reason that
-  is true for every gated action and names no single action class — closes `R-rb-128-X2`
-  (`a_mid_grace_caller_is_refused_with_a_reason_naming_no_single_action_class` in
-  `server-module/src/guards_tests.rs`).
+- **ts-6b-1.2:** WHEN `require_not_deleting` refuses a caller, THE SERVER SHALL return `account
+  deletion requested; this action is unavailable until the deletion is cancelled` for every gated
+  reducer — closes `R-rb-128-X2` (`a_mid_grace_caller_gets_the_same_reason_from_move_talk_and_buy`
+  in `server-module/src/guards_tests.rs`).
 
 - **ts-6b-1.3:** WHEN a PvP challenge is accepted, THE SERVER SHALL end any open NPC conversation of
   either party in the transaction that starts the battle — closes `R-weekly-review-2026-10-09-F3`
   (`accept_challenge_ends_both_parties_open_conversations` in `server-module/src/pvp_tests.rs`).
+
+- **ts-6b-1.4:** WHEN the runbook lists where an erased identity survives, IT SHALL name the
+  deletion-cascade and claim-purge log lines and their 30-day Loki retention — closes
+  `R-rb-65-RUNBOOK-LOGCAVEAT` (doc-only; the line names `account_deletion_cascade` and
+  `guest_claim_export_purge`, each emitted by a server test the PR cites).
 
 ### ts-6b-2 — shop and heal reach: the server checks where the caller stands
 type: feature · tier: hard
@@ -1247,11 +1259,13 @@ the Fix-batch contract):
   talk and choose propagate the Err so the transaction rolls back and the quest stays completable.
 
 - **ts-6b-3.1:** WHEN a reducer debits `qty` units of one item from one owner, THE SERVER SHALL
-  apply the debit as one checked stack write, delete a drained stack, and reject a shortfall leaving
-  the stack unchanged — closes `R-ts-2-SWAPCOST`
-  (`consume_n_debits_the_whole_quantity_in_one_write_and_deletes_a_drained_stack` in
-  `server-module/src/inventory_tests.rs`;
-  `ts4_apply_swap_deletes_a_drained_stack_row_and_leaves_a_bystander_untouched` passes unedited).
+  remove exactly `qty`, delete a drained stack, and reject a shortfall leaving the stack unchanged,
+  through one primitive that `sell`, `heal_party` and `apply_swap` share — closes `R-ts-2-SWAPCOST`
+  (`consume_n_removes_the_quantity_deletes_a_drained_stack_and_rejects_a_shortfall_unchanged` in
+  `server-module/src/inventory_tests.rs`; the existing sell, heal and swap debit tests pass
+  unedited, `ts4_apply_swap_deletes_a_drained_stack_row_and_leaves_a_bystander_untouched` among
+  them. The write count is not observable from a test; the per-unit loops leaving is read in
+  review).
 
 - **ts-6b-3.2:** IF a heal location's cost item is locked by the caller's confirmed trade side, THEN
   THE SERVER SHALL reject `heal_party` before any write — closes `R-ts-2-HEALCOSTLOCK` and its
@@ -1268,13 +1282,14 @@ the Fix-batch contract):
 - **ts-6b-3.4:** IF a quest or dialogue reward would exceed the receiver's stack or balance cap,
   THEN THE SERVER SHALL reject the call and leave the quest, dialogue, inventory and wallet state
   unchanged — closes `R-weekly-review-2026-10-16-F3`
-  (`quest_completion_at_a_full_stack_is_refused_and_the_quest_stays_active` in
+  (`quest_completion_at_a_full_stack_is_refused_and_the_quest_stays_active` and
+  `a_dialogue_reward_at_a_full_stack_is_refused_and_the_dialogue_does_not_advance` in
   `server-module/src/npc_tests.rs`).
 
 ### ts-6b-4 — tactical rules have one home: the unit join, deploy slots, strike and AP counts
 type: feature · tier: hard
 category: netcode-determinism · severity: LOW · size: MODERATE
-touches: game-core/src/tactics/content.rs, game-core/src/tactics/content_tests.rs, game-core/src/tactics/mod.rs, server-module/src/tactics.rs, client-wasm/src/lib.rs, game-core/src/tactics/encounter.rs, game-core/src/tactics/encounter_tests.rs, client-wasm/src/tactics_tests.rs, client/src/tactics/wasm.ts, client/src/tactics/wasm.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.accel.test.ts, client/src/main.controls.test.ts, client/src/main.help.test.ts, client/src/main.input.test.ts, client/src/main.reconnectStack.test.ts, client/src/tactics/clock.ts, client/src/tactics/clock.test.ts, client/src/tactics/hud.ts, client/src/tactics/hud.test.ts, client/src/tactics/tacticsBattle.ts
+touches: game-core/src/tactics/content.rs, game-core/src/tactics/content_tests.rs, game-core/src/tactics/mod.rs, server-module/src/tactics.rs, client-wasm/src/lib.rs, game-core/src/tactics/encounter.rs, game-core/src/tactics/encounter_tests.rs, client-wasm/src/tactics_tests.rs, client/src/tactics/wasm.ts, client/src/tactics/wasm.test.ts, client/src/main.ts, client/src/main.dispatch.test.ts, client/src/main.accel.test.ts, client/src/main.controls.test.ts, client/src/main.help.test.ts, client/src/main.input.test.ts, client/src/main.reconnectStack.test.ts, client/src/tactics/clock.ts, client/src/tactics/clock.test.ts, client/src/tactics/hud.ts, client/src/tactics/hud.test.ts, client/src/tactics/tacticsBattle.ts, server-module/src/tactics_tests.rs
 after: [ts-6b-1]
 Closes residuals: `R-bt-11-SHAREDJOIN`, `R-bt-12-DEPLOYCAP`, `R-bt-15-STRIKESMAX`, `R-bt-10-APPIPSMIRROR`
 
@@ -1307,13 +1322,17 @@ the Fix-batch contract):
 - **ts-6b-4.1:** WHEN a `battle_unit` row is joined into a `TacticalUnit`, THE SERVER and THE CLIENT
   SHALL build its `UnitKit` through the one game-core function — closes `R-bt-11-SHAREDJOIN`
   (`unit_kit_joins_species_affinity_and_kit_moves_with_the_row_level_and_stats` in
-  `game-core/src/tactics/content_tests.rs`).
+  `game-core/src/tactics/content_tests.rs`; the unit-join comparison in
+  `client-wasm/src/tactics_tests.rs` is re-pointed from its hand-written copy to the game-core
+  function, and a case in `server-module/src/tactics_tests.rs` holds `TacticsContent::unit_kit`
+  equal to it for a content species).
 
 - **ts-6b-4.2:** WHEN the client sizes a deploy panel, THE CLIENT SHALL use the game-core deploy
   slot count the server enforces for that map — closes `R-bt-12-DEPLOYCAP`
   (`deploy_slots_is_the_pack_cap_bounded_by_the_side_a_spawns` in
   `game-core/src/tactics/encounter_tests.rs`; a host test in `client-wasm/src/tactics_tests.rs` that
-  the export equals it for every content map).
+  the export equals it for every content map; a `client/src/main.dispatch.test.ts` case that the
+  deploy panel offers as many slots as the export answers).
 
 - **ts-6b-4.3:** WHEN the PvP strike pips are painted, THE CLIENT SHALL draw as many pips as the
   loaded tuning's `autopass_forfeit` — closes `R-bt-15-STRIKESMAX`
@@ -1343,6 +1362,9 @@ world is interact, and B already dismisses the error toast and the request banne
 
 X as quick Move on Monsters is the secondary action M-ui-foundation's control table names for that
 screen.
+
+The batch is filed under gameplay for its lead row: a double click on a dialogue choice answers the
+next node unread.
 
 Suggested change per row (the root cause is in the triage table; the builder adapts the change under
 the Fix-batch contract):
@@ -1386,8 +1408,9 @@ the Fix-batch contract):
 
 - **ts-6b-5.5:** WHEN the Monsters screen sends a monster to the party, THE CLIENT SHALL send the
   one exported next-free-slot sentinel, `NEXT_FREE_PARTY_SLOT` — closes
-  `R-pgcc-d-monstersScreen-sentinel` (the Move cases in
-  `client/src/ui/screens/monstersScreen.test.ts` assert the sent slot equals the exported constant).
+  `R-pgcc-d-monstersScreen-sentinel` (no new test, the two values being equal today: `npm --prefix
+  client run typecheck` and the existing Move cases in
+  `client/src/ui/screens/monstersScreen.test.ts` pass).
 
 ### ts-6b-6 — tactical settlement and wild AI: tests on unreached protected paths, and the dead 1v1 helpers
 type: feature · tier: routine
@@ -1490,14 +1513,58 @@ the Fix-batch contract):
   Finished batch waits for the shell playback to drain before the results panel takes the frame` in
   `client/src/main.dispatch.test.ts`).
 
-### ts-6b-8 — announcements and focus: grace and export edges, repeats, French overlay names, the claim result
+### ts-6b-8 — list views keep their rows: Shop, Heal, Journal, Evolve
 type: feature · tier: routine
 category: ux-a11y · severity: MED · size: MODERATE
-touches: client/src/main.ts, client/src/main.privacyWiring.test.ts, client/src/ui/liveRegion.ts, client/src/ui/liveRegion.test.ts, client/src/ui/a11yCopy.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/a11yCopy.test.ts, client/src/ui/overlayA11y.test.ts, client/src/ui/overlayA11y.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts
-after: [ts-6b-7]
+touches: client/src/ui/shopView.ts, client/src/ui/healView.ts, client/src/ui/questLogView.ts, client/src/ui/evolutionView.ts, client/src/ui/shopView.test.ts, client/src/ui/healView.test.ts, client/src/ui/questLogView.test.ts, client/src/ui/evolutionView.test.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/shopScreen.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/i18n/catalogParity.test.ts
+after: [ts-6b-1]
+Closes residuals: `R-ci-fix-20261002T0901Z-VIEWREBUILD`, `R-ctl-8a-CTL8A.2`, `R-uif-10-SHOPFOCUS`, `R-uif-10-TITLES`
+
+Store batches arrive more often in a crowded zone, so a view that rebuilds its rows on every batch
+drops pointer presses there. Box, Dialogue and Inventory already skip an unchanged render; the same
+guard goes on the four views that still rebuild.
+
+Suggested change per row (the root cause is in the triage table; the builder adapts the change under
+the Fix-batch contract):
+
+- `R-ci-fix-20261002T0901Z-VIEWREBUILD` — Give each of the four views raisingView's render-key
+  guard: compute a key from the view-model rows and skip the row rebuild when it is unchanged (keep
+  the kept-paint reapply). Alternatively move the lists onto renderNav's keyed diff.
+- `R-ctl-8a-CTL8A.2` — Keep the last NavLayout in ShopScreenState (as bagScreen does) and call
+  navReconcile(state.layout, layout, state.nav) in settle.
+- `R-uif-10-SHOPFOCUS` — In shopView #apply, after toggling the lists, if document.activeElement
+  sits in the now-hidden list move focus to the active list container (else the title).
+- `R-uif-10-TITLES` — Add heal.title to catalog.en and catalog.fr. healView paints it as the frame's
+  leading h2 through t, resolved at each show so a locale switch applies.
+
+- **ts-6b-8.1:** WHEN a store batch re-renders an open Shop, Heal, Journal or Evolve view whose view
+  model is unchanged, THE CLIENT SHALL keep the existing row and control nodes, and a Shop button's
+  disabled lock SHALL survive the batch — closes `R-ci-fix-20261002T0901Z-VIEWREBUILD` (`a batch
+  render with an unchanged view model keeps the same row and button nodes` in
+  `client/src/ui/shopView.test.ts`, with the same case in `healView.test.ts`, `questLogView.test.ts`
+  and `evolutionView.test.ts`).
+
+- **ts-6b-8.2:** WHEN the shop row under the cursor disappears, THE CLIENT SHALL re-seat the cursor
+  on its nearest neighbour — closes `R-ctl-8a-CTL8A.2` (`selling out the cursor's stack seats the
+  cursor on the neighbouring row, not the first` in `client/src/ui/screens/shopScreen.test.ts`).
+
+- **ts-6b-8.3:** WHEN the shop tab changes while focus is in the list being hidden, THE CLIENT SHALL
+  move focus to the shown list — closes `R-uif-10-SHOPFOCUS` (`switching tabs with focus on the Buy
+  list moves focus to the Sell list` in `client/src/ui/shopView.test.ts`).
+
+- **ts-6b-8.4:** WHEN the heal frame is shown, THE CLIENT SHALL show a localized title bar first —
+  closes `R-uif-10-TITLES` (`the heal frame opens with a localized title` in
+  `client/src/ui/healView.test.ts`).
+
+### ts-6b-9 — announcements and focus: grace and export edges, repeats, French overlay names, the claim result
+type: feature · tier: routine
+category: ux-a11y · severity: MED · size: MODERATE
+touches: client/src/main.ts, client/src/main.privacyWiring.test.ts, client/src/ui/liveRegion.ts, client/src/ui/liveRegion.test.ts, client/src/ui/a11yCopy.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/a11yCopy.test.ts, client/src/ui/overlayA11y.test.ts, client/src/ui/overlayA11y.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/i18n/catalogParity.test.ts, client/src/ui/i18n/catalogShape.test.ts, client/src/ui/i18n/i18nTypes.compile.test.ts, client/src/ui/i18n/resolver.ts, client/src/ui/announcements.ts, client/src/render/world.ts
+after: [ts-6b-7, ts-6b-8]
 Closes residuals: `R-rb-52-GRACEANNOUNCE`, `R-rb-53-E1`, `R-uif-4-REPEATSAY`, `R-ctl-13-REANNOUNCE` (duplicate of `R-uif-4-REPEATSAY`), `R-weekly-review-2026-10-02-F4`, `R-ci-fix-20261109T0400-LATEFOCUS-SCROLL`, `R-polish-1-CLAIMRESULTCATCHREENTRY`
 
-Reopens (serial): `main.ts` from ts-6b-7.
+Reopens (serial): `catalog.en.ts`, `catalog.fr.ts`, `catalog.test.ts`, `catalogParity.test.ts`,
+`messageIds.ts` from ts-6b-8; `main.ts` from ts-6b-7.
 
 The repeat fix removes the dedup against the last written text and keeps the merge inside one
 coalescing window. Before it lands the builder confirms every `announce` caller is edge-driven; one
@@ -1524,89 +1591,45 @@ the Fix-batch contract):
   onClaimResult(ok), (err) => onClaimResult(rejected)) so the reject arm only sees reducer
   rejections.
 
-- **ts-6b-8.1:** WHEN the account moves from active to deletion grace, including through another
+- **ts-6b-9.1:** WHEN the account moves from active to deletion grace, including through another
   session's request, THE CLIENT SHALL announce the grace deadline once through the live region, and
   a boot into an existing grace SHALL stay silent — closes `R-rb-52-GRACEANNOUNCE` (`an account
   entering deletion grace is announced once` in `client/src/main.privacyWiring.test.ts`).
 
-- **ts-6b-8.2:** WHEN a data export goes from incomplete to complete, THE CLIENT SHALL announce it
+- **ts-6b-9.2:** WHEN a data export goes from incomplete to complete, THE CLIENT SHALL announce it
   once through the live region, and a reconnect that replays the chunks SHALL NOT announce it again
   — closes `R-rb-53-E1` (`a data export that finishes assembling is announced once` in
   `client/src/main.privacyWiring.test.ts`).
 
-- **ts-6b-8.3:** WHEN the same announcement is made again after it was spoken, THE CLIENT SHALL
+- **ts-6b-9.3:** WHEN the same announcement is made again after it was spoken, THE CLIENT SHALL
   write it to the live region again, while identical announcements inside one coalescing window
   SHALL still merge — closes `R-uif-4-REPEATSAY` and its duplicate `R-ctl-13-REANNOUNCE` (`a
   repeated identical announcement after the first was painted is written again` in
   `client/src/ui/liveRegion.test.ts`; the suite's consecutive-dedup case is rewritten by the
   tester).
 
-- **ts-6b-8.4:** WHILE the locale is fr, THE CLIENT SHALL name and announce every overlay and the
+- **ts-6b-9.4:** WHILE the locale is fr, THE CLIENT SHALL name and announce every overlay and the
   world region with the fr catalog copy — closes `R-weekly-review-2026-10-02-F4` (`under the fr
   locale an opened overlay is named and announced in French` in
   `client/src/ui/overlayA11y.test.ts`).
 
-- **ts-6b-8.5:** WHEN the deferred initial focus fires, THE CLIENT SHALL focus the anchor without
+- **ts-6b-9.5:** WHEN the deferred initial focus fires, THE CLIENT SHALL focus the anchor without
   scrolling the frame — closes `R-ci-fix-20261109T0400-LATEFOCUS-SCROLL` (`the deferred initial
   focus does not scroll the frame` in `client/src/ui/overlayA11y.test.ts`).
 
-- **ts-6b-8.6:** IF the claim-success handler throws, THEN THE CLIENT SHALL NOT report the claim as
+- **ts-6b-9.6:** IF the claim-success handler throws, THEN THE CLIENT SHALL NOT report the claim as
   rejected — closes `R-polish-1-CLAIMRESULTCATCHREENTRY` (`a throw in the claim-success handler is
   not reported as a claim rejection` in `client/src/net/connection.runtime.test.ts`).
-
-### ts-6b-9 — list views keep their rows: Shop, Heal, Journal, Evolve
-type: feature · tier: routine
-category: ux-a11y · severity: MED · size: MODERATE
-touches: client/src/ui/shopView.ts, client/src/ui/healView.ts, client/src/ui/questLogView.ts, client/src/ui/evolutionView.ts, client/src/ui/shopView.test.ts, client/src/ui/healView.test.ts, client/src/ui/questLogView.test.ts, client/src/ui/evolutionView.test.ts, client/src/ui/screens/shopScreen.ts, client/src/ui/screens/shopScreen.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts
-after: [ts-6b-8]
-Closes residuals: `R-ci-fix-20261002T0901Z-VIEWREBUILD`, `R-ctl-8a-CTL8A.2`, `R-uif-10-SHOPFOCUS`, `R-uif-10-TITLES`
-
-Reopens (serial): `catalog.en.ts`, `catalog.fr.ts` from ts-6b-8.
-
-Store batches arrive more often in a crowded zone, so a view that rebuilds its rows on every batch
-drops pointer presses there. Box, Dialogue and Inventory already skip an unchanged render; the same
-guard goes on the four views that still rebuild.
-
-Suggested change per row (the root cause is in the triage table; the builder adapts the change under
-the Fix-batch contract):
-
-- `R-ci-fix-20261002T0901Z-VIEWREBUILD` — Give each of the four views raisingView's render-key
-  guard: compute a key from the view-model rows and skip the row rebuild when it is unchanged (keep
-  the kept-paint reapply). Alternatively move the lists onto renderNav's keyed diff.
-- `R-ctl-8a-CTL8A.2` — Keep the last NavLayout in ShopScreenState (as bagScreen does) and call
-  navReconcile(state.layout, layout, state.nav) in settle.
-- `R-uif-10-SHOPFOCUS` — In shopView #apply, after toggling the lists, if document.activeElement
-  sits in the now-hidden list move focus to the active list container (else the title).
-- `R-uif-10-TITLES` — Add heal.title to catalog.en and catalog.fr. healView paints it as the frame's
-  leading h2 through t, resolved at each show so a locale switch applies.
-
-- **ts-6b-9.1:** WHEN a store batch re-renders an open Shop, Heal, Journal or Evolve view whose view
-  model is unchanged, THE CLIENT SHALL keep the existing row and control nodes, and a Shop button's
-  disabled lock SHALL survive the batch — closes `R-ci-fix-20261002T0901Z-VIEWREBUILD` (`a batch
-  render with an unchanged view model keeps the same row and button nodes` in
-  `client/src/ui/shopView.test.ts`, with the same case in `healView.test.ts`, `questLogView.test.ts`
-  and `evolutionView.test.ts`).
-
-- **ts-6b-9.2:** WHEN the shop row under the cursor disappears, THE CLIENT SHALL re-seat the cursor
-  on its nearest neighbour — closes `R-ctl-8a-CTL8A.2` (`selling out the cursor's stack seats the
-  cursor on the neighbouring row, not the first` in `client/src/ui/screens/shopScreen.test.ts`).
-
-- **ts-6b-9.3:** WHEN the shop tab changes while focus is in the list being hidden, THE CLIENT SHALL
-  move focus to the shown list — closes `R-uif-10-SHOPFOCUS` (`switching tabs with focus on the Buy
-  list moves focus to the Sell list` in `client/src/ui/shopView.test.ts`).
-
-- **ts-6b-9.4:** WHEN the heal frame is shown, THE CLIENT SHALL show a localized title bar first —
-  closes `R-uif-10-TITLES` (`the heal frame opens with a localized title` in
-  `client/src/ui/healView.test.ts`).
 
 ### ts-6b-10 — Social: the row sheet is the kit sheet, Players opens on its panel, the trade confirm names the bond reset
 type: feature · tier: routine
 category: ux-a11y · severity: MED · size: MODERATE
-touches: client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/tradeSessionView.ts, client/src/ui/tradeSessionView.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/screens/socialScreen.ts, client/src/ui/screens/socialScreen.test.ts, client/e2e/pvp.spec.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/reachability.test.ts
+touches: client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/tradeSessionView.ts, client/src/ui/tradeSessionView.test.ts, client/src/ui/tradeView.ts, client/src/ui/tradeView.test.ts, client/src/ui/screens/socialScreen.ts, client/src/ui/screens/socialScreen.test.ts, client/e2e/pvp.spec.ts, client/src/ui/contextStack.ts, client/src/ui/contextStack.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/reachability.test.ts, client/src/ui/i18n/catalogParity.test.ts
 after: [ts-6b-9]
 Closes residuals: `R-21r-e-E1`, `R-uif-9-UIF9.2`, `R-ctl-8g-CTL8G.1-DEADPATH`
 
-Reopens (serial): `catalog.en.ts`, `catalog.fr.ts` from ts-6b-9; `messageIds.ts` from ts-6b-8.
+Reopens (serial): `catalog.en.ts`, `catalog.fr.ts`, `catalog.test.ts`, `catalogParity.test.ts`,
+`messageIds.ts` from ts-6b-9.
 
 Decision "The Monsters action sheet is one corner-anchored ContextSheet; Summary is a page in the
 frame" has Social reuse the kit sheet and its Back row; this batch delivers that.
@@ -1641,15 +1664,19 @@ the Fix-batch contract):
   (`socialPanel opens the Players tab on the leaderboard panel` in
   `client/src/ui/contextStack.test.ts`).
 
-### ts-6b-11 — frame chrome: one title bar, no Privacy door
+### ts-6b-11 — frame chrome and Profile: one title bar, no Privacy door, the disclosure in the player's language
 type: feature · tier: routine
 category: ux-a11y · severity: LOW · size: MODERATE
-touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/raisingView.ts, client/src/ui/raisingView.test.ts, client/src/ui/controlsView.ts, client/src/ui/controlsView.test.ts, client/e2e/ui-whole.spec.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/claimView.i18n.test.ts, client/src/main.ts, client/src/main.input.test.ts, client/src/main.accel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/accounts.spec.ts, client/src/ui/i18n/catalogParity.test.ts, client/src/ui/privacyView.ts, client/src/ui/privacyView.i18n.test.ts
+touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/raisingView.ts, client/src/ui/raisingView.test.ts, client/src/ui/controlsView.ts, client/src/ui/controlsView.test.ts, client/e2e/ui-whole.spec.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/claimView.i18n.test.ts, client/src/main.ts, client/src/main.input.test.ts, client/src/main.accel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/ui/privacyView.ts, client/src/ui/privacyView.i18n.test.ts, client/src/ui/privacyBanner.ts, client/src/ui/i18n/catalogParity.test.ts, client/e2e/accounts.spec.ts
 after: [ts-6b-10]
-Closes residuals: `R-uif-17-KITPOLISH`, `R-qf-13-QF13.4`
+Closes residuals: `R-uif-17-KITPOLISH`, `R-qf-13-QF13.4`, `R-21r-b2-E1`
 
-Reopens (serial): `catalog.en.ts`, `catalog.fr.ts`, `catalog.test.ts`, `messageIds.ts` from
-ts-6b-10; `main.ts` from ts-6b-8; `main.accel.test.ts`, `main.input.test.ts` from ts-6b-4.
+Reopens (serial): `catalog.en.ts`, `catalog.fr.ts`, `catalog.test.ts`, `catalogParity.test.ts`,
+`messageIds.ts` from ts-6b-10; `main.ts` from ts-6b-9; `main.accel.test.ts`, `main.input.test.ts`
+from ts-6b-4.
+
+The disclosure's English wording is the pinned compliance text and does not change; the fr value is
+a translation of it, like every other privacy string in the catalog.
 
 Suggested change per row (the root cause is in the triage table; the builder adapts the change under
 the Fix-batch contract):
@@ -1659,6 +1686,9 @@ the Fix-batch contract):
 - `R-qf-13-QF13.4` — Delete #claim-privacy-btn, ClaimViewHandlers.onPrivacy, the main.ts handler and
   the claim.privacyButton catalog/messageId keys; drop the row from claimView rows and the tests
   that click it.
+- `R-21r-b2-E1` — Add a catalog key whose en value is the exported constant and whose fr value is
+  its translation; privacyView paints it through t() at show(), not in the constructor. The
+  byte-identity pin on the English constant is untouched.
 
 - **ts-6b-11.1:** WHEN the Monsters, Inventory or Controls frame shows, THE CLIENT SHALL render its
   title in the one kit title bar, with no repeated in-panel heading — closes `R-uif-17-KITPOLISH`
@@ -1671,15 +1701,21 @@ the Fix-batch contract):
   section's rows are its claim actions only, with no privacy door` in
   `client/src/ui/claimView.test.ts`).
 
+- **ts-6b-11.3:** WHILE the locale is fr, THE CLIENT SHALL show the pseudonymization disclosure in
+  French, and the English text SHALL stay byte-identical to the pinned wording — closes
+  `R-21r-b2-E1` (`the privacy disclosure follows the locale` in
+  `client/src/ui/privacyView.i18n.test.ts`, which replaces that file's stays-raw case; the
+  byte-identity case in `client/src/ui/privacyBanner.test.ts` passes unedited).
+
 ### ts-6b-12 — retired trade and launcher markup
 type: feature · tier: routine
 category: ux-a11y · severity: LOW · size: MODERATE
-touches: client/index.html, client/src/indexShell.smoke.test.ts, client/src/ui/screens/profileScreen.ts, client/src/ui/careAction.ts, client/src/ui/screens/bagScreen.boot.test.ts, client/src/ui/screens/journalScreen.boot.test.ts, client/src/ui/tradeSessionModel.ts, client/src/ui/tradeSessionModel.test.ts, client/src/ui/screens/tradeSessionScreen.ts, client/src/ui/screens/tradeSessionScreen.test.ts, client/src/ui/tradeSessionView.test.ts, client/src/ui/feedbackPolicy.ts, client/src/ui/tradeView.ts, client/e2e/trade.spec.ts, client/src/main.controls.test.ts, client/src/main.chips.test.ts, client/src/main.a11yFocus.test.ts, client/e2e/movement-input.spec.ts, client/e2e/a11y.spec.ts, client/src/ui/feedbackPolicy.test.ts, client/e2e/ui-screens.spec.ts, client/src/main.input.test.ts, client/src/main.reconnectStack.test.ts, client/src/ui/hintBar.test.ts
+touches: client/index.html, client/src/indexShell.smoke.test.ts, client/src/ui/screens/profileScreen.ts, client/src/ui/careAction.ts, client/src/ui/screens/bagScreen.boot.test.ts, client/src/ui/screens/journalScreen.boot.test.ts, client/src/ui/tradeSessionModel.ts, client/src/ui/tradeSessionModel.test.ts, client/src/ui/screens/tradeSessionScreen.ts, client/src/ui/screens/tradeSessionScreen.test.ts, client/src/ui/tradeSessionView.test.ts, client/src/ui/feedbackPolicy.ts, client/e2e/trade.spec.ts, client/src/main.controls.test.ts, client/src/main.chips.test.ts, client/src/main.a11yFocus.test.ts, client/e2e/movement-input.spec.ts, client/e2e/a11y.spec.ts, client/src/ui/feedbackPolicy.test.ts, client/e2e/ui-screens.spec.ts, client/src/main.input.test.ts, client/src/main.reconnectStack.test.ts, client/src/ui/hintBar.test.ts
 after: [ts-6b-11]
 Closes residuals: `R-ts-3-STATICSHELL`, `R-ts-4-CLIENTDEADENDS`, `R-ctl-15-LAUNCHERATTR`
 
-Reopens (serial): `main.input.test.ts` from ts-6b-11; `tradeSessionView.test.ts`, `tradeView.ts`
-from ts-6b-10; `main.controls.test.ts` from ts-6b-5; `main.reconnectStack.test.ts` from ts-6b-4.
+Reopens (serial): `main.input.test.ts` from ts-6b-11; `tradeSessionView.test.ts` from ts-6b-10;
+`main.controls.test.ts` from ts-6b-5; `main.reconnectStack.test.ts` from ts-6b-4.
 
 Deletions only. The shell keeps its element ids: renaming them touches 19 files and a player sees
 nothing.
@@ -1690,17 +1726,17 @@ the Fix-batch contract):
 - `R-ts-3-STATICSHELL` — Strip the dead static children from the #tradepropose-overlay shell,
   leaving only the Close button. Update the indexShell smoke rosters and reword the stale comments.
   Keep the ids: a rename touches 19 files and the player sees nothing.
-- `R-ts-4-CLIENTDEADENDS` — Delete legacyOfferMonsterIds and its check, the two feedback kinds and
-  their policy rows, careAction's onRejected, the four unused trade-overlay nodes and their e2e
-  existence assertions, and the unreachable Players-placeholder branch if it has no caller.
+- `R-ts-4-CLIENTDEADENDS` — Delete legacyOfferMonsterIds and its check, the trade-answered and
+  trade-settled feedback kinds and their policy rows, careAction's onRejected, and the four unused
+  trade-overlay nodes with their e2e existence assertions.
 - `R-ctl-15-LAUNCHERATTR` — Delete both attributes and the delegate comment from index.html, drop
   their pins in indexShell.smoke.test.ts, select #chip-start by id in main.controls.test.ts, and
   rewrite the stale delegate comments to the pointer dispatcher.
 
 - **ts-6b-12.1:** WHEN the page loads, THE CLIENT SHALL ship the trade editor shell with no retired
-  wizard control — closes `R-ts-3-STATICSHELL` (the shell roster case in
-  `client/src/indexShell.smoke.test.ts` lists only the Close button for the trade editor;
-  `tradeSessionView.test.ts` and `client/e2e/trade-session.spec.ts` pass).
+  wizard control — closes `R-ts-3-STATICSHELL` (deletion only, with no new roster assertion:
+  `client/src/indexShell.smoke.test.ts` passes once its pins on the deleted nodes are dropped, and
+  `tradeSessionView.test.ts` and `client/e2e/trade-session.spec.ts` pass unedited).
 
 - **ts-6b-12.2:** THE CLIENT SHALL carry no input, message kind or DOM node that only the retired
   offer path produced, and a monster in another session SHALL stay blocked from an offer — closes
@@ -1770,9 +1806,9 @@ the Fix-batch contract):
 ### ts-6b-14 — comment, doc and test-infrastructure accuracy; closes the sweep
 type: feature · tier: hard
 category: loop-ops · severity: LOW · size: MODERATE
-touches: server-module/src/guards.rs, server-module/src/movement.rs, server-module/src/schema.rs, server-module/src/monster_mgmt_tests.rs, game-core/src/trading/rules.rs, client/e2e/wallet-balance.spec.ts, client/index.html, client/src/ui/screens/worldScreen.test.ts, client/src/ui/screens/requestHost.test.ts, .claude/skills/spacetimedb-client/SKILL.md, ops/observability/rules/recording.rules.yml, ARCHITECTURE.md, game-core/src/tactics/golden.rs, game-core/src/tactics/golden_tests.rs, client/src/ui/overlayA11y.ts, client/src/ui/overlayA11y.test.ts, client/src/main.accel.test.ts, client/src/main.input.test.ts, client/src/main.a11yFocus.test.ts, client/src/ui/evolutionNotice.ts, client/src/ui/evolutionNotice.test.ts, client/src/ui/menuView.ts, client/src/main.battle-reseed.test.ts, client/src/ui/dialogueModel.ts, client/src/ui/screens/healScreen.ts, client/src/net/rowConvert.ts, client/src/ui/contextStack.test.ts, game-core/src/npc/mod.rs, docs/runbooks/observability-dr.md, .github/workflows/ci.yml, client/playwright.config.ts
+touches: server-module/src/guards.rs, server-module/src/movement.rs, server-module/src/schema.rs, server-module/src/monster_mgmt_tests.rs, game-core/src/trading/rules.rs, client/e2e/wallet-balance.spec.ts, client/index.html, client/src/ui/screens/worldScreen.test.ts, client/src/ui/screens/requestHost.test.ts, .claude/skills/spacetimedb-client/SKILL.md, ops/observability/rules/recording.rules.yml, ARCHITECTURE.md, game-core/src/tactics/golden.rs, game-core/src/tactics/golden_tests.rs, client/src/ui/overlayA11y.ts, client/src/ui/overlayA11y.test.ts, client/src/main.accel.test.ts, client/src/main.input.test.ts, client/src/main.a11yFocus.test.ts, client/src/ui/evolutionNotice.ts, client/src/ui/evolutionNotice.test.ts, client/src/ui/menuView.ts, client/src/main.battle-reseed.test.ts, client/src/ui/dialogueModel.ts, client/src/ui/screens/healScreen.ts, client/src/net/rowConvert.ts, client/src/ui/contextStack.test.ts, game-core/src/npc/mod.rs, .github/workflows/ci.yml, client/playwright.config.ts
 after: [ts-6b-1, ts-6b-2, ts-6b-3, ts-6b-4, ts-6b-5, ts-6b-6, ts-6b-7, ts-6b-8, ts-6b-9, ts-6b-10, ts-6b-11, ts-6b-12, ts-6b-13]
-Closes residuals: `R-ts-4-STALECOMMENTS`, `R-21r-e-E2`, `R-bt-11-DOCROT`, `R-ctl-11b-STALENARRATION`, `R-ctl-7a-CTL7A.4`, `R-pgcc-c-RESEEDDOCBLOCK`, `R-qf-6-QF6.1`, `R-ctl-10a-DOCS`, `R-rb-65-RUNBOOK-LOGCAVEAT`, `R-ci-fix-20261002T0501Z-E2EARTIFACTS`, `R-ci-fix-20261101T0505-CTXSTACK-FLOOR`
+Closes residuals: `R-ts-4-STALECOMMENTS`, `R-21r-e-E2`, `R-bt-11-DOCROT`, `R-ctl-11b-STALENARRATION`, `R-ctl-7a-CTL7A.4`, `R-pgcc-c-RESEEDDOCBLOCK`, `R-qf-6-QF6.1`, `R-ctl-10a-DOCS`, `R-ci-fix-20261002T0501Z-E2EARTIFACTS`, `R-ci-fix-20261101T0505-CTXSTACK-FLOOR`
 
 Runs alone, as the last batch: it edits comment text in `server-module/src/schema.rs`, a structural
 path for `mr-disjoint`. No table, column or reducer signature changes.
@@ -1805,9 +1841,6 @@ the Fix-batch contract):
   re-talks.
 - `R-ctl-10a-DOCS` — Reword the five comments to the current Face-and-Y interact flow; drop the
   prompt claim on TALK_RANGE.
-- `R-rb-65-RUNBOOK-LOGCAVEAT` — Add one bullet to section 8: the account_deletion_cascade and
-  guest_claim_export_purge lines name the erased or retired Identity and stay in Loki for its 30-day
-  retention (section 4).
 - `R-ci-fix-20261002T0501Z-E2EARTIFACTS` — Set use.trace retain-on-failure in playwright.config.ts;
   in ci.yml e2e-shard add an if failure upload-artifact step for client/test-results and
   /tmp/stdb.log.
@@ -1848,20 +1881,17 @@ the Fix-batch contract):
   face-and-Y interact flow and name no removed key or function — closes `R-ctl-10a-DOCS`
   (comment-only; `cargo nextest run -p game-core` and the client vitest suite pass).
 
-- **ts-6b-14.9:** WHEN the runbook lists where an erased identity survives, IT SHALL name the
-  deletion-cascade and claim-purge log lines and their 30-day Loki retention — closes
-  `R-rb-65-RUNBOOK-LOGCAVEAT` (doc-only; the line names `account_deletion_cascade` and
-  `guest_claim_export_purge`, each emitted by a server test the PR cites).
-
-- **ts-6b-14.10:** WHEN an e2e shard fails, THE CI job SHALL keep the Playwright traces and the
+- **ts-6b-14.9:** WHEN an e2e shard fails, THE CI job SHALL keep the Playwright traces and the
   SpacetimeDB log as a run artifact — closes `R-ci-fix-20261002T0501Z-E2EARTIFACTS` (CI config; the
   PR links a deliberately failed shard run on the branch that carries the artifact).
 
-- **ts-6b-14.11:** THE reconcile property test SHALL run from a fixed seed, so its non-vacuity
-  floors hold on every run — closes `R-ci-fix-20261101T0505-CTXSTACK-FLOOR` (`reconcile over
-  generated stacks of stamped, unstamped and foreign-battle frames follows the independent oracle
-  and is idempotent` in `client/src/ui/contextStack.test.ts` passes 20 consecutive runs).
+- **ts-6b-14.10:** THE reconcile property test SHALL run from a fixed seed, so its generated sample
+  and its non-vacuity floors are the same on every run — closes
+  `R-ci-fix-20261101T0505-CTXSTACK-FLOOR` (test infrastructure: the seed is passed in the
+  `fc.assert` options of `reconcile over generated stacks of stamped, unstamped and foreign-battle
+  frames follows the independent oracle and is idempotent` in `client/src/ui/contextStack.test.ts`,
+  and the suite passes).
 
-- **ts-6b-14.12:** WHEN this batch merges, NO residual in the ts-6a triage table SHALL still be open
+- **ts-6b-14.11:** WHEN this batch merges, NO residual in the ts-6a triage table SHALL still be open
   in `mr-gates residuals list --json` (each closed as fixed with a PR or as wontfix with a reason),
   and `just ci` and `just e2e` SHALL be green on `master`; that merge closes the milestone.
