@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 ''''exec /usr/bin/python3 "$0" "$@" # '''
 # ^ POLYGLOT INTERPRETER GUARD: a shell that runs this file re-execs it under python3 first.
-"""mr-prune selftest battery (tp-1, criteria TP1-A1..TP1-A15).
+"""mr-prune selftest battery: one fixture per criterion id (TP1-A1..TP1-A15).
 
     /usr/bin/python3 battery.py <absolute path of mr-prune> [ID ...]
 
@@ -278,6 +278,28 @@ def read_bytes(path):
         return f.read()
 
 
+def warned(res, path):
+    return ("PRUNE-WARN unlexable " + path) in [l.strip() for l in res.err.splitlines()]
+
+
+def refused(res):
+    """Exit 2 with a PRUNE-ERROR line on stderr and no census output."""
+    return (res.rc == 2 and any(l.startswith("PRUNE-ERROR") for l in res.err.splitlines())
+            and "PRUNE-CENSUS" not in res.out)
+
+
+def pkg(res, name, keys=("tests", "unparsed")):
+    return {k: res.totals.get(name, {}).get(k) for k in keys}
+
+
+def census_of(*files):
+    """A fresh repo holding (path, bytes) files, one commit, one census."""
+    repo = Repo()
+    for rel, data in files:
+        repo.put(rel, data)
+    return census(repo, repo.commit(), new_mem())
+
+
 # --------------------------------------------------------------------------------------------
 # checks
 # --------------------------------------------------------------------------------------------
@@ -420,6 +442,33 @@ def tp1_a2(ctx):
     exp_c = counts(2, 0, 0, 0, 0)
     ctx.check("counts: only the two identical-literal pairs are duplicates",
               res.counts == exp_c, exp_c, res.counts, res)
+    a2_lexer_traps(ctx)
+
+
+def a2_lexer_traps(ctx):
+    rt = "client/src/ui/regexTrap.test.ts"
+    tt = "client/src/ui/traps.test.ts"
+    rr = "game-core/src/text/traps_tests.rs"
+    repo = Repo()
+    repo.fixture(rt, "a2_regex_trap.test.ts")
+    repo.fixture(tt, "a2_ts_traps.test.ts")
+    repo.fixture(rr, "a2_rs_traps_tests.rs")
+    sha = repo.commit()
+    mem = new_mem()
+    res = census(repo, sha, mem)
+    ctx.check("regex literals holding comment openers inside ${} do not hide a launch(1)/launch(2) difference: no row",
+              rows_of(res, rt) == [], [], rows_of(res, rt), res)
+    r = twin(repo, sha, mem, rt, "launch > b", "launch > a")
+    ctx.check("twin does not confirm the launch(1)/launch(2) pair",
+              r.rc == 1 and r.first.startswith("PRUNE-TWIN-FAIL "), "PRUNE-TWIN-FAIL ... / exit 1", r.first, r)
+    exp_tt = [D(tt, "traps > control again", "traps > control")]
+    ctx.check("TS bodies differing only inside a regex, after // in a string or inside a nested template print no row; the true pair prints",
+              rows_of(res, tt) == exp_tt, exp_tt, rows_of(res, tt), res)
+    exp_rr = [D(rr, "control_again", "control")]
+    ctx.check("Rust bodies differing only in a raw string, a char literal, after a nested block comment or on a lifetime line print no row; the pair differing only inside nested comments prints",
+              rows_of(res, rr) == exp_rr, exp_rr, rows_of(res, rr), res)
+    ctx.check("the TS and Rust lexer-trap files stay lexable (no PRUNE-WARN unlexable)",
+              not warned(res, tt) and not warned(res, rr), "no warning for either file", res.err, res)
 
 
 def tp1_a3(ctx):
@@ -484,6 +533,14 @@ def tp1_a5(ctx):
               srt(exp_each + exp_att), res.rows, res)
     exp_c = counts(2, 0, 0, 0, 0)
     ctx.check("counts: 2 duplicates", res.counts == exp_c, exp_c, res.counts, res)
+    te = "client/src/ui/typedEach.test.ts"
+    res = census_of((te, fixture_bytes("a5_typedEach.test.ts")))
+    exp = [D(te, "pairs > joins %s again", "pairs > joins %s")]
+    ctx.check("it.each<T> twins with one type argument list and table print one row; other type arguments or another table print none",
+              res.rows == exp, exp, res.rows, res)
+    got = pkg(res, "client")
+    ctx.check("all four it.each<T> tests are counted as tests",
+              got == {"tests": "4", "unparsed": "0"}, {"tests": "4", "unparsed": "0"}, got, res)
 
 
 def tp1_a6(ctx):
@@ -510,6 +567,15 @@ def tp1_a6(ctx):
               srt(res.rows) == exp, exp, res.rows, res)
     exp_c = counts(2, 0, 0, 0, 0)
     ctx.check("counts: name-dependent pairs are not duplicates", res.counts == exp_c, exp_c, res.counts, res)
+    gold = "client/src/ui/golden.test.ts"
+    known = "game-core/src/text/known_tests.rs"
+    res = census_of((gold, fixture_bytes("a6_golden.test.ts")), (known, fixture_bytes("a6_known_tests.rs")))
+    exp = [D(gold, "golden > reads the table again", "golden > reads the table")]
+    ctx.check("a twin pair reading task.name prints no row; the plain pair beside it does",
+              rows_of(res, gold) == exp, exp, rows_of(res, gold), res)
+    exp = [D(known, "table_b", "table_a")]
+    ctx.check("a twin pair using line!() prints no row; the plain pair beside it does",
+              rows_of(res, known) == exp, exp, rows_of(res, known), res)
 
 
 def tp1_a7(ctx):
@@ -573,6 +639,52 @@ def tp1_a8(ctx):
               srt(res.rows) == exp, exp, res.rows, res)
     exp_c = counts(3, 0, 0, 0, 6)
     ctx.check("counts.unparsed is the packages' sum (4 + 2)", res.counts == exp_c, exp_c, res.counts, res)
+    a8_lexer_counts(ctx)
+
+
+NOT_UTF8 = (b"describe('bytes', () => {\n  it('one', () => {\n    expect(f('\xff')).toBe(1);\n  });\n\n"
+            b"  it('one again', () => {\n    expect(f('\xff')).toBe(1);\n  });\n});\n")
+
+
+def a8_lexer_counts(ctx):
+    cm = "client/src/ui/commented.test.ts"
+    res = census_of((cm, fixture_bytes("a8_commented.test.ts")))
+    got = pkg(res, "client")
+    exp = {"tests": "0", "unparsed": "3"}
+    ctx.check("a test-shaped line inside a block comment makes the file unlexable: no row, unparsed = its 3 test-shaped lines",
+              res.rows == [] and got == exp, ([], exp), (res.rows, got), res)
+    ctx.check("that file is named on stderr as unlexable", warned(res, cm), "PRUNE-WARN unlexable " + cm,
+              res.err, res)
+
+    tg = "client/src/ui/tagged.test.ts"
+    res = census_of((tg, fixture_bytes("a8_tagged.test.ts")))
+    exp = ([D(tg, "sums > adds one and two again", "sums > adds one and two")], {"tests": "2", "unparsed": "1"}, False)
+    got = (res.rows, pkg(res, "client"), warned(res, tg))
+    ctx.check("a tagged-template it.each table counts 1 unparsed and its file stays lexed (the twin pair prints, no warning)",
+              got == exp, exp, got, res)
+
+    mc = "game-core/src/battle/macro_tests.rs"
+    res = census_of((mc, fixture_bytes("a8_macro_tests.rs")))
+    exp = ([D(mc, "real_b", "real_a")], {"tests": "2", "unparsed": "1"}, False)
+    got = (res.rows, pkg(res, "game-core"), warned(res, mc))
+    ctx.check("a #[test] fn inside macro_rules! counts 1 unparsed and its file stays lexed (the twin pair prints, no warning)",
+              got == exp, exp, got, res)
+
+    bad = "client/src/ui/bytes.test.ts"
+    res = census_of((bad, NOT_UTF8), (CONTROL, fixture_bytes("control.test.ts")))
+    ctx.check("a test file that is not valid UTF-8 prints no row; the pair in another file prints",
+              res.rows == [CTRL], [CTRL], res.rows, res)
+    exp = ({"tests": "2", "unparsed": "2"}, True)
+    got = (pkg(res, "client"), warned(res, bad))
+    ctx.check("the non-UTF-8 file is unlexable: its 2 test lines count unparsed and it is named on stderr",
+              got == exp, exp, got, res)
+
+    iv = "client/src/ui/itVar.test.ts"
+    res = census_of((iv, fixture_bytes("a8_itVar.test.ts")))
+    exp = ([D(iv, "helper > reads a key again", "helper > reads a key")], {"tests": "2", "unparsed": "0"})
+    got = (res.rows, pkg(res, "client"))
+    ctx.check("a file-level variable named it adds nothing to unparsed; the twin pair prints",
+              got == exp, exp, got, res)
 
 
 KEPT = "client/src/ui/kept.test.ts"
@@ -614,6 +726,36 @@ def tp1_a9(ctx):
               r1.rows == [CTRL], [CTRL], r1.rows, r1)
     exp_c = counts(1, 0, 0, 1, 0)
     ctx.check("the kept candidate adds one to kept", r1.counts == exp_c, exp_c, r1.counts, r1)
+    a9_refusals(ctx)
+
+
+def a9_refusals(ctx):
+    repo = Repo()
+    repo.fixture(KEPT, "a9_kept_v1.test.ts")
+    repo.fixture(CONTROL, "control.test.ts")
+    sha = repo.commit()
+    mem = new_mem()
+    kpath = os.path.join(mem, "mr-prune-keep.json")
+    r = keep(repo, sha, mem, KEPT, KEPT_S2, REASON)
+    want = "PRUNE-KEEP-FAIL not-a-candidate"
+    ctx.check("keep refuses a test with no earlier twin: not-a-candidate, exit 1, no keep file written",
+              r.rc == 1 and r.first == want and not os.path.exists(kpath), want, (r.first, os.path.exists(kpath)), r)
+    r = keep(repo, sha, mem, KEPT, "stack > no such test", REASON)
+    want = "PRUNE-KEEP-FAIL missing"
+    ctx.check("keep refuses an absent test name: missing, exit 1, no keep file written",
+              r.rc == 1 and r.first == want and not os.path.exists(kpath), want, (r.first, os.path.exists(kpath)), r)
+    corrupt = b"not json\n"
+    with open(kpath, "wb") as f:
+        f.write(corrupt)
+    r = keep(repo, sha, mem, KEPT, KEPT_T, REASON)
+    want = "PRUNE-KEEP-FAIL keep-file-unreadable"
+    after = read_bytes(kpath)
+    ctx.check("keep refuses an unreadable keep file: keep-file-unreadable, exit 1, the file byte-identical",
+              r.rc == 1 and r.first == want and after == corrupt, (want, corrupt), (r.first, after), r)
+    r = census(repo, sha, mem)
+    ctx.check("census with an unreadable keep file exits 0, prints the candidate's row and kept=0",
+              r.rc == 0 and D(KEPT, KEPT_T, KEPT_S1) in r.rows and (r.counts or {}).get("kept") == "0",
+              (D(KEPT, KEPT_T, KEPT_S1), "kept=0"), (r.rows, r.counts), r)
 
 
 def tp1_a10(ctx):
@@ -635,6 +777,23 @@ def tp1_a10(ctx):
     ctx.check("at the commit whose hash was recorded the row stays omitted (kept=1)",
               rk.rc == 0 and r1.rows == [CTRL] and (r1.counts or {}).get("kept") == "1",
               ([CTRL], "kept=1"), (r1.rows, r1.counts), r1)
+
+    # keeping a second candidate keeps the first entry
+    mem2 = new_mem()
+    ka = keep(repo, sha1, mem2, KEPT, KEPT_T, REASON)
+    kb = keep(repo, sha1, mem2, CONTROL, CTRL_T, REASON)
+    kpath = os.path.join(mem2, "mr-prune-keep.json")
+    got = read_json(kpath) if os.path.isfile(kpath) else None
+    entries = None
+    if isinstance(got, dict) and all(isinstance(v, dict) for v in got.values()):
+        entries = sorted((f, n) for f, names in got.items() for n in names)
+    exp = sorted([(KEPT, KEPT_T), (CONTROL, CTRL_T)])
+    ctx.check("keeping a second candidate leaves the first entry: two entries in the keep file",
+              ka.rc == 0 and kb.rc == 0 and entries == exp, exp, (ka.first, kb.first, got), kb)
+    r = census(repo, sha1, mem2)
+    exp_c = counts(0, 0, 0, 2, 0)
+    ctx.check("both kept candidates are omitted and counted (kept=2)",
+              r.rows == [] and r.counts == exp_c, ([], exp_c), (r.rows, r.counts), r)
 
 
 def tp1_a11(ctx):
@@ -666,17 +825,33 @@ def tp1_a11(ctx):
               rk.rc == 0 and r.rc == 0 and r.first == "PRUNE-TWIN-OK protected=auth kept",
               "keep exit 0, then PRUNE-TWIN-OK protected=auth kept", ("keep exit %s" % rk.rc, r.first), r)
 
+    st = "client/src/ui/sameTitle.test.ts"
+    repo = Repo()
+    repo.fixture(st, "a11_sameTitle.test.ts")
+    sha = repo.commit()
+    mem = new_mem()
+    res = census(repo, sha, mem)
+    exp = [D(st, "menu > opens #2", "menu > opens")]
+    ctx.check("a repeated title gets ' #2': the row names 'menu > opens #2' as candidate of 'menu > opens'",
+              res.rows == exp, exp, res.rows, res)
+    r = twin(repo, sha, mem, st, "menu > opens #2", "menu > opens")
+    ctx.check("twin confirms the pair by its ' #2' name: PRUNE-TWIN-OK, exit 0",
+              r.rc == 0 and r.first == "PRUNE-TWIN-OK", "PRUNE-TWIN-OK", r.first, r)
+
 
 def tp1_a12(ctx):
     rules = "client/src/ui/rules.test.ts"
     repo = Repo()
     repo.fixture(rules, "a12_rules.test.ts")
     repo.fixture(BRK, "a8_broken.test.ts")
+    repo.put("client/src/main.ts", ts_lines(3))
     sha = repo.commit()
     mem = new_mem()
     f1, f2 = "rules > first > ", "rules > second > "
     for name, path, t, s, expect in (
         ("a file absent at the commit fails as missing", "client/src/ui/absent.test.ts",
+         f1 + "base copy", f1 + "base", "missing"),
+        ("a file present at the commit but not an eligible test file fails as missing", "client/src/main.ts",
          f1 + "base copy", f1 + "base", "missing"),
         ("a test name absent from the file fails as missing", rules, f1 + "no such test", f1 + "base", "missing"),
         ("a pair in an unlexable file fails as unparsed", BRK, "broken > two again", "broken > two", "unparsed"),
@@ -783,6 +958,13 @@ def tp1_a13(ctx):
     ctx.check("at an earlier --at commit a missing package prints zeros with ratio n/a and the client row counts that commit",
               r1.rc == 0 and got1 == exp1, exp1, got1, r1)
 
+    r = run_tool("census", "--repo", os.path.join(repo.path, "client"), "--at", sha2, "--mem", new_mem())
+    ctx.check("a --repo that is a subdirectory of the work tree is refused: exit 2, PRUNE-ERROR, no PRUNE-CENSUS",
+              refused(r), "exit 2 + PRUNE-ERROR", r.first, r)
+    r = run_tool("census", "--repo", repo.path, "--at", "no-such-ref", "--mem", new_mem())
+    ctx.check("an --at that names no commit is refused: exit 2, PRUNE-ERROR, no PRUNE-CENSUS",
+              refused(r), "exit 2 + PRUNE-ERROR", r.first, r)
+
 
 def json_totals_match(text, js):
     if not isinstance(js, dict) or set(js) != set(text) or len(text) != 4:
@@ -886,6 +1068,25 @@ def tp1_a15(ctx):
               r.rc == 0 and r.first.startswith("PRUNE-KEEP-OK "), "PRUNE-KEEP-OK ...", r.first, r)
     after = snapshot(repo)
     ctx.check("keep leaves the worktree, index and refs unchanged", after == before, before, after, r)
+
+    inside = os.path.join(repo.path, "memdir")
+    os.makedirs(inside)
+    before = snapshot(repo)
+    r = run_tool("census", "--repo", repo.path, "--at", sha, "--mem", inside, "--record", "x")
+    after = snapshot(repo)
+    ctx.check("--record with a --mem inside --repo is refused: exit 2, PRUNE-ERROR, nothing written in the repo",
+              refused(r) and os.listdir(inside) == [] and after == before,
+              "exit 2 + PRUNE-ERROR, memdir empty, repo unchanged", (r.rc, os.listdir(inside), after == before), r)
+    target = os.path.join(repo.path, "linked")
+    os.makedirs(target)
+    outside = new_mem()
+    os.symlink(target, os.path.join(outside, "prune"))
+    before = snapshot(repo)
+    r = run_tool("census", "--repo", repo.path, "--at", sha, "--mem", outside, "--record", "x")
+    after = snapshot(repo)
+    ctx.check("--record whose prune/ is a symlink into --repo is refused: exit 2, PRUNE-ERROR, nothing created in the repo",
+              refused(r) and os.listdir(target) == [] and after == before,
+              "exit 2 + PRUNE-ERROR, linked dir empty, repo unchanged", (r.rc, os.listdir(target), after == before), r)
 
 
 FIXTURES = [

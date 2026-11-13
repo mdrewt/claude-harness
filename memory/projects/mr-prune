@@ -506,7 +506,7 @@ def tests_ts(src):
     return tests, unparsed
 
 
-RS_QUALIFIERS = {"pub", "async", "const", "unsafe", "extern", "default"}
+RS_QUALIFIERS = {"pub", "async", "const", "unsafe", "extern"}
 RS_CFG_TEST = ("#", "[", "cfg", "(", "test", ")", "]")
 
 
