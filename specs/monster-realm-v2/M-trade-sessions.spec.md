@@ -803,6 +803,18 @@ reach `Ok` (co-located fixture); and `account-e2e.eval.mjs` `S9-challenge2-pendi
 - **ts-5.2:** THE existing PvP and challenge callers SHALL pass with their challengers in range
   (`cargo nextest run -p server-module pvp_tests trading_tests`, `just eval`, `just e2e`).
 
+Build note (ts-5): both criteria are met. `pvp-full.spec.ts`, `pvp.spec.ts`, `ranked-forfeit.spec.ts`
+and `account-e2e.eval.mjs` are unedited: measured, their challengers stand on the shared zone-0 spawn
+tile or walk face to face (`openFaceToFace`), and they pass against the guarded server; only
+`respond-request.spec.ts`'s challenge case changed (challenge in range, then stand apart). The cargo
+package in ts-5.2's command is `monster-realm-module` (the directory is `server-module`). The range
+check sits directly after "target joined and online", before the ranked account gate and every later
+guard; its order against the ranked gate is unobservable while that gate is inert
+(R-ts-5-RANKEDORDER, backlog). `accept_challenge`, `decline_challenge` and `cancel_challenge` have no
+range rule, and a test holds that. The two-character lookup repeats `open_trade_session`'s because
+`guards.rs` and `trading_session.rs` are outside `touches:`; one shared `guards.rs` helper is a
+follow-up.
+
 ### ts-6a — residual sweep, part 1: triage every open residual and section the fix batches
 type: design · tier: hard
 category: residuals/triage · severity: MED · size: HEAVY
