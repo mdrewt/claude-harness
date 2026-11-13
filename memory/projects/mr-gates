@@ -11,7 +11,7 @@ __doc__ = """mr-gates — the per-slice ACCEPTANCE LEDGER and the residual sink 
     mr-gates status    --slice S [--json]
     mr-gates lint      --slice S [--json]
     mr-gates check     --slice S [--timeout N]        # run-side: execute CHECKs, flip boxes
-    mr-gates verify    --slice S [--json] [--budget N]  # SUPERVISOR-side independent re-run
+    mr-gates verify    --slice S [--json] [--budget N] [--head REF]  # SUPERVISOR-side re-run
     mr-gates render    --slice S --format pr|park|handoff   # pr|park list mr-touches widens
     mr-gates reseed    --slice S --reason TEXT        # supervisor-only; clears SEED-DRIFT
     mr-gates residuals list [--unclaimed] [--json]      # oldest first; age is a label only
@@ -731,12 +731,75 @@ def child_env():
     return env
 
 
+def toolchain_dirs(cwd, home=None):
+    """The bin dirs a builder's shell resolves `cargo`/`node`/`just`/`spacetime` from, for a CHECK
+    run in `cwd`: every asdf pin in the nearest `.tool-versions` at or above `cwd` that is
+    installed, then rustup's proxies (`rust-toolchain.toml` picks the channel) and `~/.local/bin`.
+    Explicit install dirs, never asdf shims: a shim exits 126 where its tool is unpinned."""
+    home = home or os.path.expanduser("~")
+    dirs, d = [], os.path.abspath(cwd or ".")
+    while True:
+        tv = os.path.join(d, ".tool-versions")
+        if os.path.isfile(tv):
+            with open(tv, errors="replace") as fh:
+                for ln in fh:
+                    parts = ln.split("#")[0].split()
+                    if len(parts) >= 2:
+                        dirs.append(os.path.join(home, ".asdf", "installs", parts[0], parts[1],
+                                                 "bin"))
+            break
+        up = os.path.dirname(d)
+        if up == d:
+            break
+        d = up
+    dirs += [os.path.join(home, ".cargo", "bin"), os.path.join(home, ".local", "bin")]
+    return [x for x in dirs if os.path.isdir(x)]
+
+
+def verify_env(cwd, home=None):
+    """`verify` runs from the supervisor tick, whose PATH has no `~/.cargo/bin` and resolves `node`
+    to the system one. A CHECK that fails only because its runner is missing reads as a claimed
+    gate that does not hold, so verify prepends the builder's pinned toolchain for `cwd`."""
+    env = child_env()
+    env["PATH"] = os.pathsep.join(toolchain_dirs(cwd, home) + [env["PATH"]])
+    return env
+
+
+# A CHECK that drives a live SpacetimeDB host or a browser is one `verify` cannot re-run: the
+# tick has neither. Both halves must hold -- the command names such a runner AND its fresh output
+# shows the missing dependency -- so a CHECK that ran and failed on its own terms stays an
+# EVIDENCE-MISMATCH. The PR's e2e/eval CI jobs ran these against a real host at the same head.
+CI_RUNNER = re.compile(r"\b(?:e2e|playwright|spacetime|evals?)\b")
+CI_NEEDS = (("server", re.compile(r"Connection refused|tcp connect error|ECONNREFUSED")),
+            ("browser", re.compile(r"Executable doesn't exist at|browserType\.launch:")))
+
+
+def ci_only_need(check, output):
+    """-> "server" | "browser" | None"""
+    if not CI_RUNNER.search(check or ""):
+        return None
+    for need, rx in CI_NEEDS:
+        if rx.search(output or ""):
+            return need
+    return None
+
+
+def head_of(cwd, ref=None):
+    try:
+        r = subprocess.run(["git", "-C", cwd, "rev-parse", "--verify", "--quiet",
+                            (ref or "HEAD") + "^{commit}"],
+                           capture_output=True, text=True, timeout=30)
+        return r.stdout.strip() or None
+    except Exception:
+        return None
+
+
 PROTECTED = ("native-supervisor-disabled", "mr-hold", "mr-supervisor-disable",
              "mr-supervisor-enable", "mr-residuals.jsonl", "monster-realm-usage-ledger",
              "monster-realm-handoff")
 
 
-def run_check(cmd, cwd, timeout, guard=None, screen=True):
+def run_check(cmd, cwd, timeout, guard=None, screen=True, env=None):
     """-> (ok_to_run, output, elapsed, why_not)"""
     # Refused BEFORE guard-bash, because guard-bash allows plenty of shapes that merely NAME these
     # paths and only blocks specific destructive verbs. A gate CHECK has no legitimate reason to
@@ -751,7 +814,7 @@ def run_check(cmd, cwd, timeout, guard=None, screen=True):
             return False, "", 0.0, why
     t0 = time.time()
     try:
-        r = subprocess.run(cmd, shell=True, cwd=cwd, env=child_env(), capture_output=True,
+        r = subprocess.run(cmd, shell=True, cwd=cwd, env=env or child_env(), capture_output=True,
                            text=True, timeout=timeout)
         out = (r.stdout or "")
         if r.stderr:
@@ -1304,7 +1367,9 @@ def cmd_verify(a):
     cwd = a.get("cwd") or worktree_for(slice_id, repo_root) or repo_root
     out["cwd"] = cwd
     budget = float(a.get("budget") or POLICY["verify_budget_s"])
-    spent, reverified, not_reverified, mismatch, drift = 0.0, [], [], [], []
+    spent, reverified, not_reverified, mismatch, drift, ci_only = 0.0, [], [], [], [], []
+    env = verify_env(cwd, a.get("_home"))
+    head = head_of(cwd, a.get("head"))
     for g in gates:
         if g.id in defers or not g.check or not g.check.strip():
             continue
@@ -1312,12 +1377,19 @@ def cmd_verify(a):
             not_reverified.append({"gate": g.id, "why": "global-budget-exhausted"})
             continue
         ok, o, el, why = run_check(g.check, cwd, POLICY["check_timeout_s"], a.get("_guard"),
-                                   screen=not a.get("_no_guard"))
+                                   screen=not a.get("_no_guard"), env=env)
         spent += el
         if not ok:
             not_reverified.append({"gate": g.id, "why": why})
             continue
         passed = expect_matches(g.expect, o) if g.expect else False
+        need = ci_only_need(g.check, o) if g.checked and not passed else None
+        if need:
+            ci_only.append({"gate": g.id, "needs": need, "head": head,
+                            "fresh": cap_evidence(o, expect=g.expect)[:160],
+                            "confirm": "verify has no %s; read this gate's test in the PR's "
+                                       "e2e/eval CI jobs for head %s" % (need, head or "(unknown)")})
+            continue
         fresh = expect_line(g.expect, o) if g.expect else None
         rec = _norm(g.evidence or "")
         # Normalized SUBSTRING on the deciding line, never a byte-compare of whole output:
@@ -1338,6 +1410,7 @@ def cmd_verify(a):
     out["reverified"], out["not_reverified"], out["evidence_mismatch"] = \
         reverified, not_reverified, mismatch
     out["evidence_drift"] = drift
+    out["ci_only"] = ci_only
     out["reverified_count"] = len(reverified)
     live_gates = [g for g in gates if g.id not in defers]
     if live_gates and not reverified:
@@ -1414,6 +1487,11 @@ def cmd_verify(a):
         out["reasons"].append("EVIDENCE-MISMATCH on %d gate(s)" % len(mismatch))
     if not_reverified:
         out["reasons"].append("NOT-REVERIFIED on %d gate(s) (fails closed)" % len(not_reverified))
+    if ci_only:
+        out["reasons"].append("CI-ONLY on %d gate(s) (%s): not a mismatch -- confirm the PR's "
+                              "e2e/eval CI jobs for head %s"
+                              % (len(ci_only), ", ".join(c["gate"] for c in ci_only)[:80],
+                                 (head or "(unknown)")[:12]))
     if unmet:
         out["reasons"].append("%d gate(s) neither met nor DEFERred" % len(unmet))
     if any(f[0] == "BLOCK" for f in findings):
@@ -1847,7 +1925,7 @@ def cmd_residuals(a, sub):
 # CLI
 # ---------------------------------------------------------------------------------------------
 FLAGS = {"slice", "scope", "repo", "json", "timeout", "format", "reason", "budget", "cwd",
-         "force",
+         "force", "head",
          "id", "spec-file", "as", "pr", "unclaimed", "severity", "title", "touches", "gate",
          "target", "source-slice", "domain", "category", "dry-run", "apply", "operator-issue"}
 VALUELESS = {"json", "unclaimed", "force", "dry-run", "apply"}
@@ -2399,6 +2477,86 @@ def selftest():
         chk.eq("W5-fraud-still-caught", 1, len(vf["evidence_mismatch"]),
                "ticked box + a re-run that does NOT pass is the actual fraud signal and must FLAG")
         chk.eq("W6-fraud-flags", "FLAGGED", vf["verdict"])
+
+        # P: verify's environment. The tick shell has no cargo and the system node, and no
+        # SpacetimeDB host or browser; neither absence is evidence about the slice.
+        fhome = os.path.join(root, "fxhome")
+        for rel, body in ((".cargo/bin/cargo", 'test "$1" = mr-gates-fx && echo "cargo: 1 passed"'),
+                          (".asdf/installs/nodejs/9.9.9/bin/node",
+                           'test "$1" = --mr-gates-fx && echo "node: 1 passed"')):
+            q = os.path.join(fhome, rel)
+            atomic_write(q, "#!/bin/sh\n%s\n" % body)
+            os.chmod(q, 0o755)
+        pwt = os.path.join(root, "fxwt", "client")
+        os.makedirs(pwt)
+        atomic_write(os.path.join(root, "fxwt", ".tool-versions"),
+                     "nodejs 9.9.9\njust 0.0.0  # not installed\n")
+        chk.eq("P1-toolchain-dirs",
+               [os.path.join(fhome, ".asdf/installs/nodejs/9.9.9/bin"),
+                os.path.join(fhome, ".cargo/bin")],
+               toolchain_dirs(pwt, fhome),
+               "the pin nearest above cwd, installed tools only, then rustup's proxies")
+
+        def P(body, cwd=None, home=None):
+            atomic_write(gates_path("fx-p", gdir), "# Gates: fx-p\nSeed: s\n\n" + body)
+            buf = _io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cmd_verify({"slice": "fx-p", "_specs": specs, "_gates_dir": gdir,
+                            "_residuals": resid, "_no_guard": True, "cwd": cwd or root,
+                            "repo": root, "budget": "20", "_home": home or fhome,
+                            "_acceptance_log": os.path.join(root, "acc-p.jsonl")})
+            return json.loads(buf.getvalue())
+
+        tool_gates = ("- [x] X1: t\n  CHECK: cargo mr-gates-fx\n  EXPECT: /cargo: 1 passed/\n"
+                      "  EVIDENCE: cargo: 1 passed\n"
+                      "- [x] X2: t\n  CHECK: node --mr-gates-fx\n  EXPECT: /node: 1 passed/\n"
+                      "  EVIDENCE: node: 1 passed\n")
+        vp = P(tool_gates, cwd=pwt)
+        chk.eq("P2-pinned-toolchain-check-passes", ([], ["X1", "X2"]),
+               (vp["evidence_mismatch"], [r["gate"] for r in vp["reverified"] if r["passed"]]),
+               "a cargo/node CHECK must re-run under the builder's toolchain, not the tick's PATH")
+        chk.eq("P3-no-toolchain-is-a-mismatch", 2,
+               len(P(tool_gates, cwd=pwt, home=os.path.join(root, "nohome"))["evidence_mismatch"]),
+               "the fixture discriminates: without the provisioned dirs both CHECKs fail")
+
+        refused = "echo 'error: tcp connect error: Connection refused (os error 111)'"
+        vs = P("- [x] X1: t\n  CHECK: echo npm run e2e; %s\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: 1 passed\n"
+               "- [x] X2: t\n  CHECK: echo '1 passed'\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: 1 passed\n" % refused)
+        chk.eq("P4-no-server-is-ci-only", ([("X1", "server")], [], []),
+               ([(c["gate"], c["needs"]) for c in vs["ci_only"]], vs["evidence_mismatch"],
+                [r for r in vs["reasons"] if "EVIDENCE-MISMATCH" in r]),
+               "an e2e CHECK refused by an absent host says nothing about the slice")
+        chk.ok("P5-ci-only-points-at-ci",
+               any(r.startswith("CI-ONLY on 1 gate(s) (X1)") and "CI jobs for head" in r
+                   for r in vs["reasons"]) and "CI jobs for head" in vs["ci_only"][0]["confirm"],
+               "the status must say where the gate WAS exercised")
+        chk.eq("P6-ci-only-is-not-reverified", ["X2"], [r["gate"] for r in vs["reverified"]],
+               "a gate verify could not run must never count as independently re-run")
+        vg = P("- [x] X1: t\n  CHECK: echo npm run e2e; echo '1 failed'\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: 1 passed\n"
+               "- [x] X2: t\n  CHECK: %s\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: 1 passed\n"
+               "- [ ] X3: t\n  CHECK: echo e2e; %s\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: pending\n" % (refused, refused))
+        chk.eq("P7-genuine-mismatch-stays-loud",
+               (["X1", "X2"], [], True, "FLAGGED"),
+               ([m["gate"] for m in vg["evidence_mismatch"]], vg["ci_only"],
+                "EVIDENCE-MISMATCH on 2 gate(s)" in vg["reasons"], vg["verdict"]),
+               "an e2e CHECK that ran and failed, and a refused connection in a CHECK that names "
+               "no server runner, are both the fraud signal; an unticked gate claims nothing")
+        chk.eq("P8-browser", "browser",
+               ci_only_need("npx playwright test", "browserType.launch: Executable doesn't exist "
+                                                   "at /x/chrome"))
+        subprocess.run("git init -q . && git -c user.name=fx -c user.email=fx@fx commit -q "
+                       "--allow-empty -m fx", shell=True, cwd=pwt, capture_output=True)
+        hd = head_of(pwt)
+        chk.ok("P9-ci-only-names-the-head",
+               bool(hd) and len(hd) == 40 and P(
+                   "- [x] X1: t\n  CHECK: echo e2e; %s\n  EXPECT: /1 passed/\n"
+                   "  EVIDENCE: 1 passed\n" % refused, cwd=pwt)["ci_only"][0]["head"] == hd,
+               "CI is the evidence only for the exact head verify looked at")
 
         # W7: an absent ledger is an absent measurement, not a failed one.
         buf = _io.StringIO()
