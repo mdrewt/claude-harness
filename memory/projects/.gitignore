@@ -29,5 +29,6 @@ mr-residuals.jsonl
 mr-acceptance-log.jsonl
 # mr-interrupted's record of the slices a credit stop interrupted — runtime state, rewritten by ticks
 mr-interrupted.json
-# mr-prune's recorded census rows (prune/trend.jsonl) — appended by runs; any row can be recomputed from the commit it names
-prune/
+# mr-prune's recorded census rows (prune/trend.jsonl) — appended by runs; any row can be recomputed from
+# the commit it names. Anchored: fixtures/prune/ is tracked.
+/prune/

@@ -7,7 +7,7 @@
 exact twins of an earlier test in the same block.
 
     mr-prune census [--repo R] [--at REF] [--mem DIR] [--record LABEL]
-    mr-prune twin   [--repo R] [--at REF] --file F --test T --survivor S
+    mr-prune twin   [--repo R] [--at REF] [--mem DIR] --file F --test T --survivor S
     mr-prune keep   [--repo R] [--at REF] [--mem DIR] --file F --test T --reason TEXT
     mr-prune --selftest [ID ...]      fixtures/prune/battery.py; rc=0 pass, rc=1 fail
 
@@ -26,7 +26,7 @@ BATTERY = os.path.join(HERE, "fixtures", "prune", "battery.py")
 
 VALUE_FLAGS = {
     "census": ("repo", "at", "mem", "record"),
-    "twin": ("repo", "at", "file", "test", "survivor"),
+    "twin": ("repo", "at", "mem", "file", "test", "survivor"),
     "keep": ("repo", "at", "mem", "file", "test", "reason"),
 }
 
