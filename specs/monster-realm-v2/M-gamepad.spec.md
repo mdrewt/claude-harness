@@ -2,8 +2,9 @@
 
 **Status:** sketch, 2026-10-01. Elaborate with `milestone-loop-prompt.md` when PLAN §9 reaches it,
 against the CURRENT game repo · **Project:** monster-realm (client) · **Depends on:**
-`M-postgate-console-controls` (all slices merged) · **Target:** before launch (operator,
-2026-10-01: "a milestone to add that support will be planned … before the game releases").
+`M-postgate-console-controls` (all slices merged) · **Target:** before early access (operator,
+2026-10-01: "a milestone to add that support will be planned … before the game releases";
+2026-11-13: "controller support should be before early access").
 
 ## Problem / intent
 

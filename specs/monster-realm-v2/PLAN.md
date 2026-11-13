@@ -145,7 +145,8 @@ ONE gate after every coverage milestone closes. No interim playtest.
 
 - **Release order** (operator, 2026-11-12; `game-design.md` §14): early access = the Steam build
   with single-player worlds and friends hosting → the official server opens → official release adds
-  modding. **Early access** is gated on M-local-play and on M-gamepad (operator, 2026-10-01).
+  modding. **Early access** is gated on M-local-play and on M-gamepad (operator, 2026-10-01;
+  "before early access" confirmed 2026-11-13).
   **Opening the official server** is gated on M25 completion (human sign-off checklist,
   operator-approved) and M-scale-readiness.
 - **Three ways to play, one codebase** (`game-design.md` §14): every slice must work with one player

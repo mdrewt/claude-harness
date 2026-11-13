@@ -94,8 +94,8 @@ figures are extrapolated — SR9 exists to replace them with measurements):
   makes the spawn zone the peak (see the population target) and, in a single-player world, sends
   the player back to the start each time they open the game. Keep the character's zone and tile
   across a disconnect (or restore them at join) so a returning player appears where they left.
-  A gameplay change: the operator decides the rule (last position, last heal point, or spread
-  spawns) at elaboration. [default: last position]
+  The rule (operator, 2026-11-13): decide each case on its merits, defaulting to the last position
+  when no action is clearly correct.
 
 ## Watch items (graph in the load run; no slice unless a budget is breached)
 
@@ -105,10 +105,10 @@ figures are extrapolated — SR9 exists to replace them with measurements):
 - `client-wasm` `overlays_of` recomputes every result per call and is called up to four times per
   derive (~1 ms each, event-driven).
 - Commit log growth: ~140 KB/s at 100 continuous movers.
-- An empty world still runs three recurring jobs: the 60 s `mr_heartbeat` (the
-  `mr-alloy-ingest-stalled` alert's dead-man's switch; it writes nothing) and the `playtest_reaper`
-  (300 s) and `export_bundle_reaper` (hourly) intervals. Stopping the heartbeat needs that alert
-  reworked first.
+- An empty world keeps the 60 s `mr_heartbeat` on purpose (operator, 2026-11-13: it is how a broken
+  server is noticed when nobody is on it; it writes nothing). The `playtest_reaper` and
+  `export_bundle_reaper` intervals are the other two recurring jobs; they should run only when
+  something is owed.
 - `battle_challenge` is public and subscribed whole; rows are bounded per online player and reaped.
 - The post stack on software or integrated GPUs, unmeasured on real hardware; it is off in
   production builds.
