@@ -1691,7 +1691,7 @@ def tp2_a12(ctx):
     all_dups = {r[1] for r in full.rows if r[0] == "duplicates"}
     ctx.check("control: without --spec every twin file, the orphans, the literal-variants and the signals print (and no slices=)",
               all_dups == {AA, BB, CC, DD, EE} and {r[1] for r in full.rows if r[0] == "protected-twins"} == {AU}
-              and {r[1] for r in full.orph} == {"game-core/src/z/zz.rs", "game-core/src/y/yy.rs", "client/src/other/prod.ts"}
+              and {r[0] for r in full.orph} == {"game-core/src/z/zz.rs", "game-core/src/y/yy.rs", "client/src/other/prod.ts"}
               and sorted(r[0] for r in full.lv) == sorted([BB, DD]) and sorted(r[0] for r in full.sig) == sorted([AA, DD])
               and "slices=" not in full.out,
               "all rows, no slices=", (full.rows, full.orph, full.lv, full.sig), full)
