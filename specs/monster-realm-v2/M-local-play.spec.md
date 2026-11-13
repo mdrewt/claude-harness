@@ -106,3 +106,6 @@ account issuer, with the official server rejecting any other audience.
 - `M21b-3 Steam login` (PLAN §9) is the Steam build's sign-in protocol and is consumed here.
 - **Groundwork that runs ahead of the rest (PLAN §9 item 2):** LP0, LP1 and LP10. They are small,
   they unblock everything else here, and LP1 and LP10 are true of the official server too.
+- **Tester A/B experiment:** the PR that sections the groundwork slices also adds the ids of its
+  tester-bearing slices (LP1, LP10) to `required_slices` in
+  `memory/projects/mr-tester-ab.config.json`: their ids match none of the prefixes it ships.

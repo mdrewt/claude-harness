@@ -32,7 +32,8 @@ FILES
 -----
   mr-tester-ab.config.json   tracked. Arms, eligibility, caps, runner commands.
   mr-tester-ab.jsonl         the ledger. Append-only, one JSON object per line, written under
-                             flock. Every row has v, kind, slice, ts. Gitignored.
+                             one flock that `plan` and the close hold across read, decision
+                             and append. Every row has v, kind, slice, ts. Gitignored.
   tester-ab/<slice>/         manifest, the tester prompt, the slice's gates file as it stood at
                              `plan`, shadow reports, failure output. Gitignored.
   tester-ab/judge/           per judge bundle: its key (item -> candidate or claim, label), where
@@ -125,8 +126,12 @@ slice exactly one of the replicate and the arm it copies found.
 
 COMMANDS
 --------
-  eligible <slice> [<repo>]   `yes <cap bump usd>` or `no <reason>`. For mr-spawn.
-  plan <slice> --prompt <file> [--worktree <dir>] [--tier <t>] [--milestone <m>]
+  eligible <slice> [<repo> [<type>]]
+                              `yes <cap bump usd>` or `no <reason>`. For mr-spawn. A slice whose
+                              type (the one given, or the `type:` line of its spec section) is
+                              in `no_tester_types` is out: it has no tester call.
+  plan <slice> --prompt <file> [--worktree <dir>] [--tier <t>] [--milestone <m>] [--type <t>]
+                              Holds the ledger lock from the cap check to its assignment row.
                               Snapshot the slice worktree as `base`, export it once per shadow,
                               write each shadow's prompt into its export, keep the prompt and
                               the slice's gates file, and print the Agent calls. A second call
@@ -137,8 +142,10 @@ COMMANDS
                               as a commit under its ref, price the runs from their transcripts,
                               flag contamination, arm mismatch and leak, copy the reports, delete
                               the exports the manifest registered, print the claim digest. It
-                              lists the worktree paths a contaminated shadow named, for the
-                              builder to remove before committing.
+                              lists the paths in the worktree and in the game's main checkout
+                              that any shadow named, priced or not, for the builder to remove
+                              before committing. While a shadow has started and not returned
+                              it prints `AB-WAIT` and records nothing: run it again.
   mark <slice>                Record the worktree as g1. Run before the first lens batch that
                               follows the implementation.
   escapes <slice>             Record the worktree as g2. With `escapes_in_session`, replay the
@@ -211,7 +218,9 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+# The real path: the tool is also reached through a symlink to the harness checkout, and the
+# directory it addresses must be the one its neighbours (mr-retro-request) name.
+HERE = os.path.dirname(os.path.realpath(__file__))
 SLICE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 CRITERION_RE = re.compile(r"criterion:\s*([A-Za-z0-9][\w.\-]*)")
 SHADOW_ROLES = ("shadow", "replicate")
@@ -334,20 +343,48 @@ def write_json(path, obj):
     os.replace(tmp, path)
 
 
+_HELD = {}      # ledger path -> [descriptor, depth] of the lock this process holds
+
+
+@contextlib.contextmanager
+def ledger_lock(ctx):
+    """The one exclusive flock every ledger writer takes, on the ledger itself. A command whose
+    write depends on what it read holds it across read -> decide -> append: `plan` from the cap
+    check to its assignment row, the close from the look for a `close` row to that row and the
+    retro request. Two such commands at once would otherwise both decide on the same ledger.
+    Re-entrant in a process: an append inside a holder writes through the held descriptor.
+    A ledger that cannot be opened for writing stops the command here, before it wrote anything."""
+    held = _HELD.get(ctx.ledger)
+    if held:
+        held[1] += 1
+        try:
+            yield held[0]
+        finally:
+            held[1] -= 1
+        return
+    try:
+        fd = os.open(ctx.ledger, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    except OSError as exc:
+        raise Skip("ledger-unwritable: %s" % (exc.strerror or exc))
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        _HELD[ctx.ledger] = [fd, 1]
+        yield fd
+    finally:
+        _HELD.pop(ctx.ledger, None)
+        os.close(fd)
+
+
 def append(ctx, rows):
-    """Append rows to the ledger: one write per call, under an exclusive flock, so two writers
+    """Append rows to the ledger: one write per call, under the ledger lock, so two writers
     never interleave inside a line."""
     stamp = now()
     text = "".join(json.dumps(dict({"v": 1, "ts": stamp}, **row), sort_keys=True) + "\n"
                    for row in rows)
     if not text:
         return
-    fd = os.open(ctx.ledger, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+    with ledger_lock(ctx) as fd:
         os.write(fd, text.encode())
-    finally:
-        os.close(fd)
 
 
 def read(ctx):
@@ -573,14 +610,44 @@ def closed(rows):
     return bool(of(rows, "close"))
 
 
-def ineligible(ctx, slice_):
-    """None when the slice is in the experiment, else the reason."""
+def slice_type(ctx, slice_):
+    """The `type:` line of the slice's spec section (`### <slice> ...` up to the next `### `
+    heading) under the harness repo's `specs_dir`, lower case; None when there is no such
+    directory, section or line."""
+    cfg = ctx.cfg
+    if not cfg.get("harness_repo"):
+        return None
+    root = os.path.join(cfg["harness_repo"], cfg.get("specs_dir", "specs/monster-realm-v2"))
+    head = re.compile(r"^### %s(?![\w.-])" % re.escape(slice_), re.M)
+    for path in sorted(glob.glob(os.path.join(glob.escape(root), "*.spec.md"))):
+        try:
+            with open(path, errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        at = head.search(text)
+        if at:
+            end = re.compile(r"^### ", re.M).search(text, at.end())
+            kind = re.search(r"^type:\s*([A-Za-z][\w-]*)", text[at.end():end.start() if end else len(text)], re.M)
+            return kind.group(1).lower() if kind else None
+    return None
+
+
+def ineligible(ctx, slice_, said=None):
+    """None when the slice is in the experiment, else the reason. A slice in the lists is still
+    out when its type is one of `no_tester_types`: such a slice issues no tester call, so there
+    is nothing for a shadow to copy and nothing its cap bump would pay for. The type is the one
+    its launch vars carry (`said`) or the one its spec section states; either refuses."""
     cfg = ctx.cfg
     if slice_ in cfg.get("exclude_slices", []):
         return "excluded"
-    if slice_ in cfg.get("required_slices", []) or any(slice_.startswith(p) for p in cfg.get("prefixes", [])):
-        return None
-    return "ineligible"
+    if slice_ not in cfg.get("required_slices", []) and not any(slice_.startswith(p) for p in cfg.get("prefixes", [])):
+        return "ineligible"
+    without = [str(t).lower() for t in cfg.get("no_tester_types", [])]
+    for kind in (said, slice_type(ctx, slice_)):
+        if kind and str(kind).lower() in without:
+            return "no-tester: a %s slice has no tester call" % str(kind).lower()
+    return None
 
 
 def spent(rows):
@@ -608,7 +675,7 @@ def committed(ctx, rows):
 def cmd_eligible(ctx, args):
     pos, _ = options(args)
     slice_ = check_slice(pos[0] if pos else "")
-    why = ineligible(ctx, slice_)
+    why = ineligible(ctx, slice_, pos[2] if len(pos) > 2 else None)
     if why is None and len(pos) > 1 and pos[1] != "project":
         why = "not-a-game-slice"
     if why is None and closed(read(ctx)):
@@ -671,16 +738,23 @@ def kept_gates(ctx, slice_):
 
 
 def cmd_plan(ctx, args):
-    pos, opt = options(args, valued=("--prompt", "--worktree", "--tier", "--milestone"))
+    pos, opt = options(args, valued=("--prompt", "--worktree", "--tier", "--milestone", "--type"))
     slice_ = check_slice(pos[0] if pos else "")
-    rows = read(ctx)
-    if closed(rows):
-        raise Skip("closed")
-    why = ineligible(ctx, slice_)
+    why = ineligible(ctx, slice_, opt.get("type"))
     if why:
         raise Skip(why)
     if os.environ.get("CLAUDE_CODE_SUBAGENT_MODEL"):
         raise Skip("CLAUDE_CODE_SUBAGENT_MODEL is set: every subagent would run on one model")
+    # The cap is read and the assignment row that counts against it is written under one lock:
+    # of several plans at once, each sees the reserve of those before it.
+    with ledger_lock(ctx):
+        plan_slice(ctx, slice_, opt)
+
+
+def plan_slice(ctx, slice_, opt):
+    rows = read(ctx)
+    if closed(rows):
+        raise Skip("closed")
     side = ctx.side_of(slice_)
     skipped = [r for r in of(rows, "assignment", slice_) if r.get("skipped")]
     if skipped:
@@ -902,8 +976,44 @@ def changed_files(repo, old, new):
     return out
 
 
+def ended(path):
+    """Whether a run's transcript ends with its final message: an assistant message with text
+    and no tool call. A run at work ends in a tool call or a tool result."""
+    last = None
+    with contextlib.suppress(OSError):
+        with open(path, errors="replace") as fh:
+            for line in fh:
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                msg = event.get("message") if isinstance(event, dict) else None
+                if isinstance(msg, dict) and msg.get("content"):
+                    last = (event.get("type"), msg["content"])
+    if not last or last[0] != "assistant":
+        return False
+    if isinstance(last[1], str):
+        return True
+    kinds = {b.get("type") for b in last[1] if isinstance(b, dict)}
+    return "text" in kinds and "tool_use" not in kinds
+
+
+def still_running(ctx, entry, paths):
+    """Whether a shadow has started and not returned: it has a transcript, its export holds no
+    output file, and a transcript of it neither ends with a final message nor has been idle
+    for `shadow_stalled_s` (a run that died mid-call never writes one)."""
+    if os.path.exists(os.path.join(entry["export"], REPORT_FILE)):
+        return False
+    idle = float(ctx.cfg.get("shadow_stalled_s", 1800))
+    for path in paths:
+        with contextlib.suppress(OSError):
+            if time.time() - os.path.getmtime(path) < idle and not ended(path):
+                return True
+    return False
+
+
 def cmd_collect(ctx, args):
-    pos, _ = options(args)
+    pos, opt = options(args, flags=("--session-ended",))
     slice_ = check_slice(pos[0] if pos else "")
     manifest = ctx.manifest(slice_)
     if not manifest:
@@ -912,6 +1022,15 @@ def cmd_collect(ctx, args):
         raise Skip("already-collected")
     side = ctx.side_of(slice_)
     transcripts, sessions = find_runs(ctx, manifest)
+    # A collect while shadows are at work would record them failed, delete the exports under
+    # them and close the slice to a second collect. `score` passes --session-ended: the build
+    # session is over by then and nothing of it is running.
+    waiting = [l for l, paths in transcripts.items()
+               if not opt.get("session-ended") and still_running(ctx, manifest["labels"][l], paths)]
+    if waiting:
+        print("AB-WAIT %s: %d shadow(s) have not returned. Nothing is recorded and no export is removed; "
+              "run this collect again when every Agent call of the plan has returned." % (slice_, len(waiting)))
+        return
     priced = {}
     for session in sorted(sessions):
         with contextlib.suppress(Exception):
@@ -935,15 +1054,24 @@ def cmd_collect(ctx, args):
                            exclude=(REPORT_FILE, PROMPT_FILE))
         files = [p for s, p in changed_files(ctx.game, manifest["base"], ref) if s != "D"] if ref else []
         tests = [p for p in files if is_test(ctx, p)]
+        strings, blocked, leak = [], 0, False
+        for one in paths:
+            said, last_text, errors = scan_transcript(one)
+            strings += said
+            blocked += errors
+            leak = leak or last_text.strip().lower().rstrip(".") != "done"
+        # Paths outside its export that the run named: in another export, in the builder's
+        # worktree, in the game's main checkout. Looked for in every run that left a transcript,
+        # priced or not: a file it wrote there is in a tree the builder commits from.
+        others = [s.replace(root, "") for s in strings]
+        outside = [p for p in (manifest["worktree"], ctx.game) if p]
+        named = any(ctx.cache in s or any(p in s for p in outside) for s in others)
+        for s in others:
+            for p in outside:
+                strays.update(re.findall(re.escape(p) + r"[^\s\"'`;|&<>()]*", s))
         if not path or not cost or not (files or report):
             row["status"] = "failed"
         else:
-            strings, blocked, leak = [], 0, False
-            for one in paths:
-                said, last_text, errors = scan_transcript(one)
-                strings += said
-                blocked += errors
-                leak = leak or last_text.strip().lower().rstrip(".") != "done"
             # Every session that worked in the export is paid for, whichever wrote the tests.
             row.update(session=os.path.basename(os.path.dirname(os.path.dirname(path))),
                        agent_id=cost["agent_id"], tool_use_id=cost["tool_use_id"],
@@ -953,11 +1081,8 @@ def cmd_collect(ctx, args):
                        cost_usd=round(sum(c["cost_usd"] or 0.0 for c in costs), 6), bash_blocked=blocked, leak=leak)
             if len(paths) > 1:
                 row.update(status="rerun", sessions_in_export=len(paths))
-            others = [s.replace(root, "") for s in strings]
-            if any(ctx.cache in s or manifest["worktree"] in s for s in others):
+            if named:
                 row["status"] = "contaminated"
-                for s in others:
-                    strays.update(re.findall(re.escape(manifest["worktree"]) + r"[^\s\"'`;|&<>()]*", s))
             elif row["status"] == "ok" and (entry["model"] not in (cost["model"] or "") or cost["effort"] != entry["effort"]):
                 row["status"] = "arm-mismatch"
         if ref and tests:
@@ -1049,8 +1174,8 @@ def cmd_collect(ctx, args):
               "it is priced in full and not scored (`rerun`)." % (slice_, again))
     if strays:
         # The run is not scored, but whatever it wrote there is still in the builder's tree.
-        print("AB-CONTAMINATED %s: a shadow run named these paths in your worktree. Before you commit, "
-              "delete any of them your own tester did not write:" % slice_)
+        print("AB-CONTAMINATED %s: a shadow run named these paths in your worktree or the game's main checkout. "
+              "Before you commit, delete any of them your own tester did not write, and commit none:" % slice_)
         for path in sorted(strays)[:20]:
             print("  " + path)
     limit = int(ctx.cfg.get("claims_digest_limit", 8))
@@ -1879,7 +2004,7 @@ def cmd_score(ctx, args):
     if not manifest.get("collected"):
         # The build session ended without `collect`: the shadows' work is still in the exports.
         with contextlib.redirect_stdout(io.StringIO()):
-            cmd_collect(ctx, [slice_])
+            cmd_collect(ctx, [slice_, "--session-ended"])
     with score_lock(ctx):
         if opt.get("end"):
             branch = ctx.cfg.get("default_branch", "master")
@@ -2132,12 +2257,19 @@ def close_if_due(ctx, current=None, reason=None):
     rows = read(ctx)
     if closed(rows):
         return None
-    reason = reason or close_reason(ctx, rows, current)
-    if reason:
+    reason = reason or close_reason(ctx, rows, current)     # may ask gh: before the lock is taken
+    if not reason:
+        return None
+    # Of several closes at once, the first to hold the lock writes the row and asks for the
+    # retro; the others find the row.
+    with ledger_lock(ctx):
+        rows = read(ctx)
+        if closed(rows):
+            return None
         append(ctx, [{"kind": "close", "slice": "-", "reason": reason,
                       "scored_slices": len({r["slice"] for r in of(rows, "snap") if r["name"] == "m"})}])
         queue_retro(ctx)
-        print("AB-CLOSED %s" % reason)
+    print("AB-CLOSED %s" % reason)
     return reason
 
 
@@ -2153,18 +2285,22 @@ def cmd_close_check(ctx, args):
     if closed(read(ctx)):
         raise Skip("closed")
     if not close_if_due(ctx, reason="sample-done" if opt.get("sample-done") else None):
+        if closed(read(ctx)):       # another close took the lock first
+            raise Skip("closed")
         print("AB-OPEN no close condition holds")
 
 
 def queue_retro(ctx):
     """Ask the loop for the close analysis. mr-retro-request writes to the directory its own
     source names, so it is run only when that is this tool's directory: a copy of the tooling in
-    a sandbox never queues an event in the live one."""
+    a sandbox never queues an event in the live one. Both are compared as real paths: the live
+    tool is reached through a symlink to the harness checkout as well as directly."""
     script = os.path.join(ctx.mem, "mr-retro-request")
     with contextlib.suppress(Exception):
         with open(script) as fh:
-            if ("\nMEM=%s\n" % ctx.mem) not in fh.read():
-                return
+            named = re.search(r"^MEM=(\S+)$", fh.read(), re.M)
+        if not named or os.path.realpath(named.group(1)) != os.path.realpath(ctx.mem):
+            return
         subprocess.run(["bash", script, "tester-ab close"], timeout=10, stdin=subprocess.DEVNULL,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -2241,6 +2377,8 @@ def cmd_status(ctx, args):
         for name, holds, where in close_conditions(ctx, rows, ask=False):
             print("  closes on %-15s %s: %s" % (name, "met at the next audit" if holds else "pending", where))
     registered = set()
+    if not of(rows, "assignment"):
+        print("  no slice planned yet")
     for row in of(rows, "assignment"):
         slice_ = row["slice"]
         if row.get("skipped"):
@@ -3530,9 +3668,11 @@ class _Box:
         manifest = self.ctx().manifest(slice_)
         return {e["arm"]: (label, e["export"]) for label, e in manifest["labels"].items()}
 
-    def transcript(self, first, model, effort, inputs=(), final="done", role="tester", tokens=1000000, at=None):
+    def transcript(self, first, model, effort, inputs=(), final="done", role="tester", tokens=1000000, at=None,
+                   running=False):
         """Write one subagent transcript. `tokens` input tokens: $2.00 on sonnet, $4.00 on opus.
-        It starts at `at`; by default a minute ago, each one a second after the one before."""
+        It starts at `at`; by default a minute ago, each one a second after the one before.
+        `running` leaves out the final message: the run is still at work."""
         self.agents += 1
         agent = "f%03d" % self.agents
         sub = os.path.join(self.tr, "proj", self.session, "subagents")
@@ -3553,6 +3693,8 @@ class _Box:
             {"type": "assistant", "timestamp": stamp(2), "effort": effort, "version": "9.9.9",
              "message": {"id": "m2", "model": _MODEL_ID.get(model, model),
                          "content": [{"type": "text", "text": final}], "usage": {}}}]
+        if running:
+            events.pop()
         with open(os.path.join(sub, "agent-%s.jsonl" % agent), "w") as fh:
             fh.write("".join(json.dumps(e) + "\n" for e in events))
         with open(os.path.join(sub, "agent-%s.meta.json" % agent), "w") as fh:
@@ -5659,10 +5801,11 @@ def _st_gates(chk, tmp):
         and criterion_text(box.ctx(), "np-a", "X9") == "", criterion_text(box.ctx(), "np-a", "C3-SPEED-IS-SEVEN"))
 
 
-def _st_shipped_config(chk):
-    """The config beside this tool loads and has what the commands read."""
+def _st_shipped_config(chk, here=HERE):
+    """The config beside this tool loads and has what the commands read. No check reads the value
+    of `enabled`: the operator turns the experiment on and off, and the gate holds either way."""
     try:
-        cfg = Ctx(HERE).cfg
+        cfg = Ctx(here).cfg
     except Exception as exc:
         chk("config/loads", False, exc)
         return
@@ -5698,11 +5841,11 @@ def _st_shipped_config(chk):
         "game-core/tests/a.rs", "server-module/src/battle_tests.rs", "client/src/ui/a.test.ts", "client/e2e/x.spec.ts"))
         and not is_test(probe, "game-core/src/combat/mod.rs") and is_game_code(probe, "client/src/main.ts")
         and not is_game_code(probe, "docs/x.md") and not is_game_code(probe, "client/src/a.test.ts"))
-    chk("config/nextest-profile-ships", os.path.isfile(os.path.join(HERE, "mr-tester-ab.nextest.toml")))
+    chk("config/nextest-profile-ships", os.path.isfile(os.path.join(here, "mr-tester-ab.nextest.toml")))
     # One deadlocked test must end as a failure of that test, well inside the runner's own
     # timeout: without a per-test limit it holds the runner until every result of the arm is lost.
     import tomllib
-    with open(os.path.join(HERE, "mr-tester-ab.nextest.toml"), "rb") as fh:
+    with open(os.path.join(here, "mr-tester-ab.nextest.toml"), "rb") as fh:
         slow = tomllib.load(fh).get("profile", {}).get("ab", {}).get("slow-timeout") or {}
     period = re.fullmatch(r"(\d+)s", str(slow.get("period", "")))
     chk("config/nextest-stops-a-test-that-hangs", period and slow.get("terminate-after", 0) >= 1
@@ -5722,7 +5865,7 @@ def _st_shipped_config(chk):
     # nextest writes its report under the workspace root, whatever CARGO_TARGET_DIR says.
     chk("config/nextest-report-is-under-the-workspace", nextest.get("junit") == "target/nextest/ab/junit.xml"
         and nextest.get("no_tests_rc") == 4 and nextest.get("probe"), nextest.get("junit"))
-    probe.mem, probe.scratch = HERE, os.path.join(HERE, "no-scratch")
+    probe.mem, probe.scratch = here, os.path.join(here, "no-scratch")
     files = ["game-core/tests/arm_a.rs", "server-module/src/battle_tests.rs", "game-core/tests/suite/mod.rs"]
     want = "(binary(=arm_a) | test(/(^|::)battle_tests::/) | test(/(^|::)suite::/)) & test(/(^|::)(a|b)$/)"
     chk("config/tests-run-in-their-own-files-only", fill(probe, nextest.get("cmd", []), nextest, files, ["b", "a"], {})[-1] == want
@@ -5737,17 +5880,20 @@ def _st_shipped_config(chk):
     chk("config/bloat-price-is-the-measured-one", 0.0002 <= per_line <= 0.0004, per_line)
     chk("config/pilot-settings", cfg.get("port_enabled") is False and cfg["mutants"]["enabled"] is True
         and cfg["mutants"]["wall_budget_s"] == 3600 and cfg["mutants"].get("ok_rc") == [0, 2, 3]
-        and cfg.get("escapes_in_session") is True and cfg.get("enabled") is False, cfg.get("mutants"))
+        and cfg.get("escapes_in_session") is True, cfg.get("mutants"))
+    # Design and refactor slices issue no tester call; np-b is a study whose section states no type.
+    chk("config/slices-without-a-tester-are-out", {"design", "refactor"} <= set(cfg.get("no_tester_types", []))
+        and "np-b" in cfg.get("exclude_slices", []) and cfg.get("specs_dir"), cfg.get("exclude_slices"))
     chk("config/escapes-budget-under-the-bash-timeout", 0 < cfg["escapes_budget_s"] < 120, cfg.get("escapes_budget_s"))
     # Beside the loop's own files (not in a sandbox copy of this tool): what the retro is told to
     # do at the close, and what the brief and the harness's tester definition say of the tester.
     def beside(*parts):
         try:
-            with open(os.path.join(HERE, *parts)) as fh:
+            with open(os.path.join(here, *parts)) as fh:
                 return fh.read()
         except OSError:
             return None
-    if os.path.exists(os.path.join(HERE, "mr-selfcheck")):
+    if os.path.exists(os.path.join(here, "mr-selfcheck")):
         play = (beside("mr-retro-playbook.md") or "").split("TESTER A/B CLOSE", 1)[-1]
         chk("close/the-retro-lifts-the-blocks-and-decides-d2", "blocked: tester-ab-close" in play
             and "M-test-pruning.spec.md" in play and "structure.spec.md" in play and "`tp-3`" in play
@@ -5766,13 +5912,209 @@ def _st_shipped_config(chk):
         and int(cfg["runner_env"].get("NEXTEST_TEST_THREADS", 0)) >= 1 and cfg.get("runner_path"), cfg.get("runner_env"))
 
 
+def _held(box, argvs, wait=2.0):
+    """Start the commands at once while this process holds the ledger's lock, let each reach the
+    lock (or, with no lock around its decision, decide on the ledger as it stands), then let
+    go. Returns their outputs."""
+    fd = os.open(box.ctx().ledger, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        procs = [subprocess.Popen([os.path.join(box.mem, "mr-tester-ab"), *argv], stdout=subprocess.PIPE,
+                                  stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, text=True) for argv in argvs]
+        time.sleep(wait)
+    finally:
+        os.close(fd)
+    return [p.communicate(timeout=120)[0] for p in procs]
+
+
+def _st_types(chk, tmp):
+    """A design or refactor slice has no tester call: it is out whatever its id."""
+    box = _Box(os.path.join(tmp, "types"), no_tester_types=["design", "refactor"], specs_dir="specs/v2")
+    box.commit(box.harness, "sections", {"specs/v2/a.spec.md": (
+        "# A\n\n### np-des — a study\ntype: design · tier: hard\n\ntext\n\n### np-ref — a tidy-up\n\ntype: Refactor · tier: routine\n\n"
+        "### np-plain — no type line\n\ntext\n\n### np-feat — a feature\ntype: feature · tier: routine\n\n"
+        "### LP1 — listed and a design\ntype: design · tier: hard\n")})
+    said = {s: box.run("eligible", s, "project") for s in ("np-des", "np-ref", "np-plain", "np-feat", "np-de", "LP1")}
+    chk("types/design-and-refactor-sections-are-out", said["np-des"] == "no no-tester: a design slice has no tester call\n"
+        and said["np-ref"] == "no no-tester: a refactor slice has no tester call\n" and said["LP1"] == said["np-des"], said)
+    # A section with no type line takes none from the section after it, nor from a longer id.
+    chk("types/a-feature-or-untyped-section-is-in", said["np-feat"] == said["np-plain"] == said["np-de"] == "yes 30\n", said)
+    chk("types/the-launch-vars-type-refuses-too", box.run("eligible", "np-a", "project", "refactor")
+        == "no no-tester: a refactor slice has no tester call\n" and box.run("eligible", "np-des", "project", "feature")
+        == said["np-des"] and box.run("eligible", "np-a", "project", "feature") == "yes 30\n"
+        and box.run("eligible", "np-a", "project", "") == "yes 30\n", box.run("eligible", "np-a", "project", "refactor"))
+    wt = box.worktree("np-des")
+    prompt = box.prompt("np-des", wt)
+    out = box.run("plan", "np-des", "--prompt", prompt)
+    wt_a = box.worktree("np-a")
+    typed = box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt_a), "--type", "design")
+    chk("types/plan-skips-a-slice-without-a-tester", out == "AB-SKIP no-tester: a design slice has no tester call\n"
+        and typed == out and not box.rows() and not os.path.exists(box.cache)
+        and not os.path.exists(box.ctx().ledger), (out, typed))
+    chk("status/an-open-experiment-with-no-slice", "tester-ab: open; arm spend $0.00, $0.00 with the reserve" in box.run("status")
+        and "\n  no slice planned yet\n" in box.run("status"), box.run("status"))
+
+
+def _st_locked(chk, tmp):
+    """Commands whose write depends on what they read hold one lock across both."""
+    reserve = {"sonnet": 2, "opus": 5}
+    for name, start, want in (("at-the-cap", 499.99, [0, 0, 0, 2]), ("at-the-step-down", 399.99, [2, 2, 2, 5])):
+        box = _Box(os.path.join(tmp, "locked-" + name), reserve_usd=reserve)
+        append(box.ctx(), [{"kind": "run", "slice": "np-z", "role": "shadow", "cost_usd": start}])
+        slices = ["np-a", "np-b", "np-c", "np-d"]
+        outs = _held(box, [["plan", s, "--prompt", box.prompt(s, box.worktree(s))] for s in slices])
+        arms = sorted(len(r["arms_planned"]) for r in box.rows("assignment")) if name == "at-the-step-down" \
+            else sorted([0] * (4 - len(box.rows("assignment"))) + [len(r["arms_planned"]) for r in box.rows("assignment")])
+        chk("lock/concurrent-plans-%s" % name, arms == want and sorted(o.count("Agent(") for o in outs) == want
+            and (name != "at-the-cap" or outs.count("AB-SKIP cap\n") == 3), (arms, [o[:40] for o in outs]))
+    # Six closes at once: one row, one retro request.
+    box = _Box(os.path.join(tmp, "locked-close"))
+    retro = _retro_stub(box)
+    append(box.ctx(), [{"kind": "snap", "slice": "np-a", "name": "base", "sha": "0"}])
+    outs = _held(box, [["close-check", "--sample-done"]] * 6)
+    chk("lock/concurrent-closes-write-one-row-and-one-request", len(box.rows("close")) == 1
+        and retro() == ["tester-ab close"] and sorted(outs) == ["AB-CLOSED sample-done\n"] + ["AB-SKIP closed\n"] * 5,
+        (len(box.rows("close")), retro(), outs))
+    # A ledger that cannot be written: the plan stops before it has written anything.
+    box = _Box(os.path.join(tmp, "locked-readonly"), reserve_usd=reserve)
+    append(box.ctx(), [{"kind": "snap", "slice": "np-z", "name": "base", "sha": "0"}])
+    wt = box.worktree("np-a")
+    prompt = box.prompt("np-a", wt)
+    os.chmod(box.ctx().ledger, 0o444)
+    try:
+        outs = [box.run("plan", "np-a", "--prompt", prompt) for _ in range(2)]
+    finally:
+        os.chmod(box.ctx().ledger, 0o644)
+    chk("lock/an-unwritable-ledger-leaves-no-manifest", all(o.startswith("AB-SKIP ledger-unwritable") for o in outs)
+        and box.ctx().manifest("np-a") is None and not os.path.exists(box.ctx().side_of("np-a"))
+        and not os.path.exists(box.cache) and not git(box.game, "for-each-ref", "refs/mr-ab").strip()
+        and committed(box.ctx(), box.rows()) == 0, outs)
+    chk("lock/the-plan-runs-once-the-ledger-is-writable", box.run("plan", "np-a", "--prompt", prompt).count("Agent(") == 5
+        and committed(box.ctx(), box.rows()) == 16, committed(box.ctx(), box.rows()))
+
+
+def _st_retro(chk, tmp):
+    """The close request reaches the loop from wherever the tool is invoked, and stays."""
+    # Through a symlink to its directory, as `~/.claude/harness` is to the harness checkout.
+    for name, through_link, names_link in (("tool-through-a-symlink", True, False), ("request-names-a-symlink", False, True)):
+        box = _Box(os.path.join(tmp, "retro-" + name))
+        link = os.path.join(box.tmp, "link")
+        os.symlink(box.mem, link)
+        retro = _retro_stub(box)
+        if names_link:
+            path = os.path.join(box.mem, "mr-retro-request")
+            with open(path) as fh:
+                text = fh.read()
+            with open(path, "w") as fh:
+                fh.write(text.replace("MEM=%s\n" % box.mem, "MEM=%s\n" % link))
+        append(box.ctx(), [{"kind": "snap", "slice": "np-a", "name": "base", "sha": "0"}])
+        done = subprocess.run([os.path.join(link if through_link else box.mem, "mr-tester-ab"), "close-check", "--sample-done"],
+                              capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        chk("retro/" + name, done.stdout == "AB-CLOSED sample-done\n" and retro() == ["tester-ab close"]
+            and len(box.rows("close")) == 1, (done.stdout, retro()))
+    # The real mr-retro-request, addressed at a sandbox: the close request has a file of its own,
+    # so an ordinary retro request before or after it replaces neither.
+    real = os.path.join(HERE, "mr-retro-request")
+    if not os.path.exists(real):
+        chk("retro/the-close-request-has-its-own-file", not os.path.exists(os.path.join(HERE, "mr-selfcheck")), real)
+        return
+    mem = os.path.join(tmp, "retro-real")
+    os.makedirs(mem)
+    with open(real) as fh:
+        text = fh.read()
+    line = re.search(r"^MEM=\S+$", text, re.M)
+    copy = text.replace(line.group(0), "MEM=%s" % mem) if line else ""
+    if not line or len(re.findall(r"^MEM=", copy, re.M)) != 1 or line.group(0) in copy:
+        chk("retro/the-close-request-has-its-own-file", False, "mr-retro-request does not name its directory on one MEM= line")
+        return
+    os.makedirs(os.path.join(mem, "pending-events"))
+    script = os.path.join(mem, "mr-retro-request")
+    with open(script, "w") as fh:
+        fh.write(copy)
+    for note in (["an ordinary window"], ["tester-ab close"], ["a later ordinary window"]):
+        subprocess.run(["bash", script, *note], capture_output=True, timeout=30, stdin=subprocess.DEVNULL)
+    events = os.path.join(mem, "pending-events")
+    found = {n: open(os.path.join(events, n)).read() for n in sorted(os.listdir(events))} if os.path.isdir(events) else {}
+    chk("retro/the-close-request-has-its-own-file", sorted(found) == ["retro.request.md", "retro.request.tester-ab.md"]
+        and "\nwindow: tester-ab close\n" in found["retro.request.tester-ab.md"]
+        and "\nwindow: a later ordinary window\n" in found["retro.request.md"]
+        and "mr-retro-playbook.md" in found["retro.request.tester-ab.md"], sorted(found))
+
+
+def _st_collect_guards(chk, tmp):
+    """A collect while shadows are at work waits; a stray file anywhere in the game repo is named."""
+    box = _Box(os.path.join(tmp, "collect-wait"))
+    wt = box.worktree("np-a")
+    box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+    for arm in ("S-med", "S-high", "O-med"):
+        box.shadow("np-a", arm, {"tests/x.toy": _toy(_T_ATK)})
+    for arm in ("O-high", "S-med-r"):
+        box.shadow("np-a", arm, {"tests/x.toy": _toy(_T_ATK)}, report=None, running=True)
+    outs = [box.run("collect", "np-a") for _ in range(2)]
+    exports = os.path.join(box.cache, "np-a")
+    chk("collect/waits-while-a-shadow-is-running", all(o.startswith("AB-WAIT np-a: 2 shadow(s) have not returned") for o in outs)
+        and "collect again" in outs[0] and not box.rows("run") and len(os.listdir(exports)) == 5
+        and box.ctx().manifest("np-a")["collected"] is False
+        and not re.search(r"\ba[1-5]\b|sonnet|opus", outs[0]), outs)
+    # One returns (its output file is there); the other has been silent past the stall limit.
+    with open(os.path.join(box.labels("np-a")["O-high"][1], REPORT_FILE), "w") as fh:
+        fh.write("FINDINGS\nNONE\n")
+    one = box.run("collect", "np-a")
+    box.cfg["shadow_stalled_s"] = 0
+    box.write_cfg()
+    done = box.run("collect", "np-a")
+    runs = {r["arm"]: r["status"] for r in box.rows("run", "np-a")}
+    chk("collect/proceeds-when-every-shadow-returned-or-stalled", one.startswith("AB-WAIT np-a: 1 shadow(s)")
+        and done.startswith("AB-COLLECTED np-a:") and set(runs.values()) == {"ok"} and len(runs) == 5
+        and os.listdir(exports) == [], (one, done, runs))
+    # `score` collects for a session that is over: nothing of it is running.
+    box.cfg["shadow_stalled_s"] = 1800
+    box.write_cfg()
+    wt_b = box.worktree("np-b")
+    box.run("plan", "np-b", "--prompt", box.prompt("np-b", wt_b))
+    box.shadow("np-b", "S-med", {"tests/x.toy": _toy(_T_ATK)}, report=None, running=True)
+    chk("collect/a-session-that-ended-is-collected", box.run("collect", "np-b").startswith("AB-WAIT np-b")
+        and box.run("collect", "np-b", "--session-ended").startswith("AB-COLLECTED np-b:"), box.run("status"))
+    # Strays: a write into the game's main checkout, and one by a run that cannot be priced.
+    box = _Box(os.path.join(tmp, "collect-strays"))
+    wt = box.worktree("np-a")
+    box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+    in_main, in_wt = os.path.join(box.game, "tests", "main_stray.toy"), os.path.join(wt, "tests", "stray.toy")
+    box.shadow("np-a", "S-med", {"tests/x.toy": _toy(_T_ATK)}, inputs=[("Write", {"file_path": in_main, "content": "x"})])
+    box.shadow("np-a", "S-high", {}, report=None, inputs=[("Write", {"file_path": in_wt, "content": "x"})])
+    box.shadow("np-a", "O-med", {"tests/x.toy": _toy(_T_ATK)})
+    out = box.run("collect", "np-a")
+    runs = {r["arm"]: r["status"] for r in box.rows("run", "np-a")}
+    chk("collect/a-write-into-the-main-checkout-is-contamination", runs.get("S-med") == "contaminated"
+        and "\n  %s\n" % in_main in out and "or the game's main checkout" in out and runs.get("O-med") == "ok", (runs, out))
+    chk("collect/an-unpriced-run-still-has-its-strays-named", runs.get("S-high") == "failed" and "\n  %s\n" % in_wt in out
+        and out.count("\n  /") == 2, (runs, out))
+
+
+def _st_enabled_either_way(chk, tmp):
+    """The shipped config passes its checks with the experiment on and with it off."""
+    with open(os.path.join(HERE, "mr-tester-ab.config.json")) as fh:
+        shipped = json.load(fh)
+    for value in (True, False):
+        here = os.path.join(tmp, "shipped-%s" % value)
+        os.makedirs(here)
+        with open(os.path.join(here, "mr-tester-ab.config.json"), "w") as fh:
+            json.dump(dict(shipped, enabled=value), fh)
+        shutil.copy2(os.path.join(HERE, "mr-tester-ab.nextest.toml"), here)
+        inner = _Check()
+        _st_shipped_config(inner, here)
+        chk("config/checks-hold-with-enabled-%s" % str(value).lower(), inner.n > 10 and inner.fails == 0, (inner.n, inner.fails))
+
+
+
 _BATTERIES = [_st_disabled, _st_plan, _st_collect, _st_score, _st_no_game_diff, _st_ledger]
-_FLOOR = 320
+_FLOOR = 345
 _BATTERIES += [_st_judge, _st_report]
 _BATTERIES += [_st_session, _st_finalize, _st_offline, _st_uncollected]
 _BATTERIES += [_st_runner, _st_reaudit, _st_nextest]
 _BATTERIES += [_st_adoption, _st_setup, _st_own]
 _BATTERIES += [_st_budget, _st_gaps, _st_close_check, _st_replan, _st_end_merge, _st_unloadable, _st_gates]
+_BATTERIES += [_st_types, _st_locked, _st_retro, _st_collect_guards, _st_enabled_either_way]
 # MORE-BATTERIES
 
 
