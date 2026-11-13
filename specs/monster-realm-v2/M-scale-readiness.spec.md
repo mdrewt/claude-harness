@@ -32,10 +32,9 @@ figures are extrapolated — SR9 exists to replace them with measurements):
   is its own zone (plus a warp destination while it stands within 4 tiles of the warp): 4.8 KB/s
   measured in a zone of 50, about 2 KB/s in a zone of 10. The 20 KB/s budget is reached near 220
   walkers in one zone.
-- **Every session starts in zone 0** and the character is deleted on the last disconnect, so the
-  spawn zone, not a 50-player zone, is the real peak: about 170 players there if a 30-minute session
-  spends 5 minutes in it, about 330 at 10 minutes (over budget: 58.9 KB/s per client was measured
-  at 500 in one zone). SR11 is therefore the next slice for the byte budget.
+- **A returning session resumes on the tile it left;** only a first-ever join starts at the zone-0
+  spawn. The spawn zone is a peak only for new accounts arriving together (58.9 KB/s per client was
+  measured at 500 walkers in one zone).
 - **The reducer thread is one writer for the whole world.** Measured at 750 walking players: 15.5%
   of it, of which the per-player own-row query is about 3.3–4.0 µs per step (1.6–2.0% at 1,000).
   SR2 removes the part that grows with monsters owned.
@@ -52,7 +51,7 @@ figures are extrapolated — SR9 exists to replace them with measurements):
 - **`battle_summary` retention:** what the per-battle telemetry is for and how long it is kept.
   [default: keep the newest N rows, N from the account count]
 
-## Scope (sketch) — one slice per item; SR11 and SR9 first, then by value per size
+## Scope (sketch) — one slice per item; SR9 first, then by value per size
 
 - **SR2 Party lookup by index.** `battle::lead_party_ids` filters `monster` by owner and then drops
   Storage rows, on every accepted move input. Measured linear: ~3k fuel and 0.4 µs per owned monster
@@ -90,13 +89,6 @@ figures are extrapolated — SR9 exists to replace them with measurements):
   `spacetime_num_bytes_sent_to_clients_total` counts each delta once, not once per subscriber, so it
   cannot stand in for this.
 
-- **SR11 A session resumes where it left off.** `join_game` spawns every session in zone 0, which
-  makes the spawn zone the peak (see the population target) and, in a single-player world, sends
-  the player back to the start each time they open the game. Keep the character's zone and tile
-  across a disconnect (or restore them at join) so a returning player appears where they left.
-  The rule (operator, 2026-11-13): decide each case on its merits, defaulting to the last position
-  when no action is clearly correct.
-
 ## Watch items (graph in the load run; no slice unless a budget is breached)
 
 - `content::sync_content` rewrites two rows per stored monster in one transaction on each content
@@ -105,10 +97,8 @@ figures are extrapolated — SR9 exists to replace them with measurements):
 - `client-wasm` `overlays_of` recomputes every result per call and is called up to four times per
   derive (~1 ms each, event-driven).
 - Commit log growth: ~140 KB/s at 100 continuous movers.
-- An empty world keeps the 60 s `mr_heartbeat` on purpose (operator, 2026-11-13: it is how a broken
-  server is noticed when nobody is on it; it writes nothing). The `playtest_reaper` and
-  `export_bundle_reaper` intervals are the other two recurring jobs; they should run only when
-  something is owed.
+- An empty world runs one recurring job, the 60 s `mr_heartbeat`, on purpose (operator,
+  2026-11-13: it is how a broken server is noticed when nobody is on it; it writes nothing).
 - `battle_challenge` is public and subscribed whole; rows are bounded per online player and reaped.
 - The post stack on software or integrated GPUs, unmeasured on real hardware; it is off in
   production builds.
@@ -128,7 +118,10 @@ frame), build, bundle and startup.
   schema) at elaboration.
 - Built: movement intent is a private table and the tick publishes the queue and the ack with the
   position (game #743, #744); a zone ticks only while a player is in it (game #745); `character`
-  is subscribed for the own row and per zone, with `player` world-wide (game #746–#748). Their
-  rules are the game repo's `docs/DECISIONS.md` entries on movement intent, empty zones and world
-  scope. Scope `player` too only if it measures above 1 KB/s per client or the target passes about
+  is subscribed for the own row and per zone, with `player` world-wide (game #746–#748); a session
+  resumes where it left off (game #750); the playtest and export-bundle reapers run only when
+  something is owed (game #751). Their
+  rules are the game repo's `docs/DECISIONS.md` entries on movement intent, empty zones, world
+  scope and resuming a session. The saved position is not in the data export (an account that
+  exports before joining gets none); exporting it needs the export reaper's caps retuned. Scope `player` too only if it measures above 1 KB/s per client or the target passes about
   5,000 concurrent; hold the own-row query only at login if reducer-thread share ever binds.
