@@ -688,6 +688,193 @@ try:
 finally:
     box.close()
 
+# ---- the budget governor reads the plan's real utilisation -------------------------------------
+# Real rate_limit_event rows (fixtures/governor/, and the recorded Fable-limit stop) go through
+# the real telemetry writer into a sandbox file; the real bundle generator reads it there.
+box = Box()
+try:
+    EVENTS = [json.loads(l) for l in open(os.path.join(MEM, "fixtures", "governor", "rate-limit-events.stream"))]
+    TICK_EV, ALLOWED_EV, FABLE_EV = EVENTS         # an opus tick · status `allowed` · a Fable session
+    TEL = os.path.join(box.mem, "mr-rate-limit-telemetry.jsonl")
+    CFG = json.load(open(os.path.join(box.mem, "mr-budget-config.json")))
+    FRESH, LIMIT = CFG["telemetry_fresh_s"], CFG["weekly_limit_usd"]
+    NOW = int(time.time())
+    WEEK_END = NOW + 2 * 86400                     # the plan's reset; the dollar week ends a day later
+    serial = [0]
+
+    def utc(epoch):
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch))
+
+    def event(ev, resets=WEEK_END, **windows):
+        """The recorded event with each named window's utilisation, and every reset time, rewritten."""
+        ev = json.loads(json.dumps(ev))
+        ri = ev["rate_limit_info"]
+        ri["resetsAt"] = resets
+        for name, w in ri["unifiedWindows"].items():
+            w["resetsAt"] = resets
+            if name in windows:
+                w["utilization"] = windows[name]
+                if ri.get("rateLimitType") == name and "utilization" in ri:
+                    ri["utilization"] = windows[name]
+        return json.dumps(ev, separators=(",", ":"))
+
+    def sampled(lines, age=0, keep=False):
+        """Run the telemetry writer over a session log holding these lines, as read `age` s ago."""
+        if not keep and os.path.exists(TEL):
+            os.unlink(TEL)
+        serial[0] += 1
+        log = os.path.join(box.tmp, "mr_native_tick_gov%d.log" % serial[0])
+        with open(log, "w") as f:
+            for i, l in enumerate(lines):
+                d = json.loads(l)
+                if d.get("type") == "rate_limit_event":
+                    d["uuid"] = "gov-%d-%d" % (serial[0], i)
+                f.write(json.dumps(d, separators=(",", ":")) + "\n")
+        had = len(open(TEL).readlines()) if os.path.exists(TEL) else 0
+        r = subprocess.run([os.path.join(MEM, "mr-cost-watch"), "telemetry", log, "tick-post-spawn", "0", TEL],
+                           capture_output=True, text=True, timeout=60)
+        rows = [json.loads(l) for l in open(TEL)] if os.path.exists(TEL) else []
+        if not r.stdout.startswith("OK rows=") or len(rows) == had:
+            fail("governor-writer", "mr-cost-watch telemetry wrote nothing: %r" % r.stdout)
+        for row in rows[had:]:
+            row["ts"] = utc(NOW - age)
+        with open(TEL, "w") as f:
+            f.write("".join(json.dumps(row, separators=(",", ":")) + "\n" for row in rows))
+
+    def spent(usd):
+        """Ledger dollars in a dollar week that ends a day after the plan's window."""
+        with open(os.path.join(box.mem, ".weekly-reset-anchor"), "w") as f:
+            f.write("%d\n" % (NOW - 4 * 86400))
+        with open(os.path.join(box.mem, "monster-realm-usage-ledger.jsonl"), "w") as f:
+            f.write(json.dumps({"ts": utc(NOW - 86400), "slice": "old", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)",
+                                "cost_usd": usd, "model": "fable"}) + "\n")
+
+    def budget():
+        return box.bundle(NOW).get("budget") or {}
+
+    def reads(name, want, b=None):
+        b = budget() if b is None else b
+        got = dict((k, b.get(k)) for k in want)
+        if got != want:
+            fail("governor-" + name, "want %r, bundle budget: %r" % (want, b))
+        return b
+
+    # mr-spawn's model-window check, as it stands in mr-spawn, on the sandbox bundle.
+    spawn_src = open(os.path.join(MEM, "mr-spawn")).read()
+    check = between(spawn_src, "\n# MODEL WINDOW PAUSED", "\n# Stop-flag clearing sits BELOW")
+    if "BUDGET-MODEL-PAUSED" not in check:
+        fail("anchor", "could not extract mr-spawn's model-window check")
+    with open(os.path.join(box.root, "spawn-check.sh"), "w") as f:
+        f.write('MEM=%s; S=s-x; MODEL="$1"; V="$2"\nstatus(){ echo "$1 $2"; exit "${3:-0}"; }\n%s\necho LAUNCH\n' % (box.mem, check))
+
+    def launch(model, resume=None):
+        v = os.path.join(box.root, "launch.vars.json")
+        with open(v, "w") as f:
+            json.dump({"slice": "s-x", "model": model, "resume_session": resume}, f)
+        r = subprocess.run(["bash", os.path.join(box.root, "spawn-check.sh"), model, v], capture_output=True, text=True, timeout=60)
+        return r.stdout.strip()
+
+    # 40% real while the ledger's dollars are over the hard threshold: the real figure decides.
+    # The event's status is `allowed`: its utilisation is only inside unifiedWindows.
+    spent(2750.0)
+    sampled([event(ALLOWED_EV, seven_day=0.40, five_hour=0.10, seven_day_overage_included=0.30)])
+    reads("real-040", {"state": "NORMAL", "source": "telemetry", "utilisation": 0.40, "window": "seven_day",
+                       "effective_usd": round(0.40 * LIMIT, 2), "resets_at_utc": utc(WEEK_END), "fable_ok": True})
+    out, log = box.tick(NOW)
+    if "REACHED-SESSION governor=NORMAL" not in out:
+        fail("governor-real-040-tick", "stdout=%r log=%r" % (out, log))
+    # The plan ahead of the dollars: the ledger at 40% of the calibrated limit, the plan at 91%, at 98%.
+    spent(0.40 * LIMIT)
+    sampled([event(TICK_EV, seven_day=0.91)])
+    reads("real-091", {"state": "SOFT-PAUSE", "source": "telemetry", "utilisation": 0.91, "resets_at_utc": utc(WEEK_END)})
+    out, log = box.tick(NOW)
+    if "REACHED-SESSION governor=SOFT-PAUSE" not in out:
+        fail("governor-real-091-tick", "stdout=%r log=%r" % (out, log))
+    sampled([event(TICK_EV, seven_day=0.98)])
+    reads("real-098", {"state": "HARD-STOP", "source": "telemetry", "utilisation": 0.98, "resets_at_utc": utc(WEEK_END)})
+    # HARD-STOP's reset tick is armed for the plan's reset, not for the dollar week's end.
+    out, log = box.tick(NOW)
+    if "REACHED-SESSION" in out or "STANDDOWN budget-hard-stop" not in log or utc(WEEK_END) not in log \
+            or box.watched() != [utc(WEEK_END)]:
+        fail("governor-hard-stop-real-reset", "stdout=%r log=%r watched=%r" % (out, log, box.watched()))
+    # The figure fell inside the window (the plan restored credit): the newest reading stands.
+    sampled([event(TICK_EV, seven_day=0.98)], age=1800)
+    sampled([event(TICK_EV, seven_day=0.38)], keep=True)
+    reads("mid-window-drop", {"state": "NORMAL", "source": "telemetry", "utilisation": 0.38})
+
+    # A model's own window near its limit with the general one low: that model alone is paused.
+    spent(100.0)
+    sampled([event(FABLE_EV, seven_day=0.40, seven_day_overage_included=0.95)])
+    b = reads("model-window", {"state": "NORMAL", "source": "telemetry", "utilisation": 0.40, "fable_ok": False})
+    if (b.get("model_states") or {}).get("fable") != {"state": "SOFT-PAUSE", "utilisation": 0.95,
+                                                      "window": "seven_day_overage_included", "resets_at_utc": utc(WEEK_END)}:
+        fail("governor-model-window", "model_states: %r" % (b.get("model_states"),))
+    got = [launch("fable"), launch("claude-fable-5-1"), launch("opus"), launch("fable", resume=SID)]
+    if not got[0].startswith("BUDGET-MODEL-PAUSED SOFT-PAUSE: its window seven_day_overage_included reads 95%") \
+            or not got[1].startswith("BUDGET-MODEL-PAUSED") or got[2:] != ["LAUNCH", "LAUNCH"]:
+        fail("governor-model-window-launch", "fable, fable id, opus, fable resume: %r" % (got,))
+    out, log = box.tick(NOW)
+    if "REACHED-SESSION governor=NORMAL" not in out:
+        fail("governor-model-window-tick", "stdout=%r log=%r" % (out, log))
+    # The recorded stop itself: the Fable window rejected, the general one at 91%.
+    sampled([event(json.loads(REJECTED.splitlines()[2]))])
+    b = reads("recorded-stop", {"state": "SOFT-PAUSE", "source": "telemetry", "utilisation": 0.91, "fable_ok": False})
+    if (b.get("model_states") or {}).get("fable", {}).get("state") != "HARD-STOP":
+        fail("governor-recorded-stop", "model_states: %r" % (b.get("model_states"),))
+    # With every window under its threshold nothing is refused.
+    sampled([event(FABLE_EV, seven_day=0.40, seven_day_overage_included=0.60)])
+    b = reads("model-window-normal", {"state": "NORMAL", "fable_ok": True})
+    if (b.get("model_states") or {}).get("fable", {}).get("state") != "NORMAL" or launch("fable") != "LAUNCH":
+        fail("governor-model-window-normal", "model_states=%r launch=%r" % (b.get("model_states"), launch("fable")))
+
+    # A reading older than the freshness bound is not acted on: the dollars decide again.
+    spent(2750.0)
+    sampled([event(ALLOWED_EV, seven_day=0.40, five_hour=0.10, seven_day_overage_included=0.30)], age=FRESH - 300)
+    reads("fresh-inside-bound", {"state": "NORMAL", "source": "telemetry"})
+    sampled([event(ALLOWED_EV, seven_day=0.40, five_hour=0.10, seven_day_overage_included=0.30)], age=FRESH + 300)
+    b = reads("stale-falls-back", {"state": "HARD-STOP", "source": "calibration", "effective_usd": 2750.0,
+                                   "resets_at_utc": utc(NOW - 4 * 86400 + 7 * 86400)})
+    if "utilisation" in b or b.get("model_states"):
+        fail("governor-stale-falls-back", "a stale reading is still reported: %r" % (b,))
+    # Old and over the threshold on a window every model shares: SOFT-PAUSE, so a session runs
+    # and leaves the next sample. A model's own window that old is dropped.
+    spent(100.0)
+    sampled([event(FABLE_EV, seven_day=0.98, seven_day_overage_included=0.99)], age=FRESH + 300)
+    b = reads("stale-over-threshold", {"state": "SOFT-PAUSE", "source": "telemetry-stale", "utilisation": 0.98, "fable_ok": True})
+    if b.get("model_states") or launch("fable") != "LAUNCH":
+        fail("governor-stale-model-window", "model_states=%r launch=%r" % (b.get("model_states"), launch("fable")))
+
+    # A reset clears a pause: a reading whose window has ended says nothing about the next one.
+    sampled([event(FABLE_EV, resets=NOW - 60, seven_day=0.98, seven_day_overage_included=1.0)], age=120)
+    b = reads("reset-clears-pause", {"state": "NORMAL", "source": "calibration", "fable_ok": True, "model_states": {}})
+    out, log = box.tick(NOW)
+    if "REACHED-SESSION governor=NORMAL" not in out or launch("fable") != "LAUNCH":
+        fail("governor-reset-clears-pause-tick", "stdout=%r log=%r launch=%r" % (out, log, launch("fable")))
+    # The first reading of the new window replaces the old window's.
+    sampled([event(TICK_EV, resets=NOW - 60, seven_day=0.98)], age=120)
+    sampled([event(TICK_EV, resets=NOW - 60 + 7 * 86400, seven_day=0.02)], age=30, keep=True)
+    reads("reset-new-window", {"state": "NORMAL", "source": "telemetry", "utilisation": 0.02,
+                               "resets_at_utc": utc(NOW - 60 + 7 * 86400)})
+
+    # No telemetry file, or rows that are not readings: the calibration, as before.
+    spent(0.95 * LIMIT)
+    os.unlink(TEL)
+    reads("no-telemetry", {"state": "SOFT-PAUSE", "source": "calibration", "effective_usd": round(0.95 * LIMIT, 2)})
+    with open(TEL, "w") as f:
+        f.write('not json\n{"ts":"%s","ri":{"unifiedWindows":{"seven_day":{"utilization":"0.2","resetsAt":%d}}}}\n'
+                '{"ts":"%s","rateLimitType":"seven_day","utilization":0.2,"resetsAt":%d}\n'
+                % (utc(NOW), WEEK_END, utc(NOW), NOW + 400 * 86400))
+    reads("unreadable-rows", {"state": "SOFT-PAUSE", "source": "calibration"})
+    # UNKNOWN is what an uncomputable budget reads, with or without a real reading.
+    sampled([event(TICK_EV, seven_day=0.40)])
+    os.unlink(os.path.join(box.mem, "monster-realm-usage-ledger.jsonl"))
+    reads("unknown-unchanged", {"state": "UNKNOWN"})
+    out, log = box.tick(NOW)
+    if "REACHED-SESSION governor=UNKNOWN" not in out:
+        fail("governor-unknown-tick", "stdout=%r log=%r" % (out, log))
+finally:
+    box.close()
+
 # ---- mr-reset-watch fires one tick per reset time ---------------------------------------------
 box = Box()
 try:

@@ -409,14 +409,16 @@ GSTATE=$(echo "$SIT" | /usr/bin/python3 -c "import json,sys
 try: print(json.load(sys.stdin).get('budget',{}).get('state','UNKNOWN'))
 except Exception: print('UNKNOWN')")
 # HARD-STOP stops decision sessions, not runs: a live run finishes and its event waits here. The
-# figure falls back under the threshold when the weekly window rolls over, so a reset tick is armed
-# for that moment (one watcher per time; re-armed here every tick if it died).
+# figure falls back under the threshold when the window it was read from resets (`resets_at_utc`:
+# the plan's own resetsAt on telemetry, the dollar week's end on the calibration), so a reset tick
+# is armed for that moment (one watcher per time; re-armed here every tick if it died).
 if [ "$GSTATE" = "HARD-STOP" ]; then
   WEND=$(echo "$SIT" | /usr/bin/python3 -c "import json,sys
-try: print(json.load(sys.stdin).get('budget',{}).get('window_end_utc') or '')
+try: b=json.load(sys.stdin).get('budget',{}); print(b.get('resets_at_utc') or '', b.get('source') or '?', b.get('window') or 'weekly')
 except Exception: print('')")
+  GSRC=${WEND#* }; WEND=${WEND%% *}
   [ -n "$WEND" ] && { setsid /bin/bash "$MEM/mr-reset-watch" "$WEND" >/dev/null 2>&1 & }
-  log "STANDDOWN budget-hard-stop (>97% of weekly; window ends ${WEND:-unknown}); pending events retained"; exit 0
+  log "STANDDOWN budget-hard-stop (>97% by ${GSRC:-?}; window ends ${WEND:-unknown}); pending events retained"; exit 0
 fi
 # CREDIT-STOP RESUME: every recorded slice whose reset has passed gets its launch vars written
 # back (same tier, model, effort and CLI session) before the session starts, and the session is

@@ -848,11 +848,12 @@ emit(){ SLICE="$S" ST="$1" DET="$2" /usr/bin/python3 -c "import json,os;print(js
 # stops being offered. Counted: FAIL, REPO-MIXED, REPO-EXTERNAL, REPO-UNRESOLVED,
 # REPO-OUT-OF-SYNC, COSTPARK-GATE, a brief that does not render. Exempt (listed below): the
 # launch happened or was a dry probe; the operator hold; a human at work; the slice already
-# running; a credit stop still waiting. Each exempt cause also keeps the slice from being `due`
+# running; a credit stop still waiting; the model's own window paused (never an offered resume:
+# vars with `resume_session` pass it). Each exempt cause also keeps the slice from being `due`
 # or stands the tick down before a session is paid for, so none of them recurs as a paid tick.
 status(){
   emit "$1" "$2"
-  case "$1" in LAUNCHED|DRY|HOLD-PRESENT|PROBE-TRIPPED|ALREADY-RUNNING|CREDIT-STOPPED) : ;;
+  case "$1" in LAUNCHED|DRY|HOLD-PRESENT|PROBE-TRIPPED|ALREADY-RUNNING|CREDIT-STOPPED|BUDGET-MODEL-PAUSED) : ;;
     *) timeout 60 "$MEM/mr-interrupted" failed "$S" "$1" >/dev/null 2>&1 || true ;;
   esac
   exit "${3:-0}"
@@ -1039,6 +1040,25 @@ if [ "$DRY" = "--dry" ]; then status DRY "brief built; model=$MODEL effort=$EFFO
 # answer does not hold the launch.
 CSCHK=$(timeout 30 "$MEM/mr-interrupted" launch-check "$S" "$MODEL" 2>/dev/null)
 case "$CSCHK" in "REFUSE "*) status CREDIT-STOPPED "${CSCHK#REFUSE } — refusing to launch $S on $MODEL" 1 ;; esac
+# MODEL WINDOW PAUSED: the governor reads this model's own plan window over the soft threshold
+# while the windows every model shares are under it (`budget.model_states` in the bundle), so a run
+# started on this model now is cut off mid-way while one on another model is not. Only that case
+# is refused here: a pause that covers every model is the decision session's rule. That rule still
+# launches credit-stop resumes, and so does this one (vars carrying `resume_session`): the slice
+# is offered only after the reset it waited for. A bundle that cannot answer does not hold the
+# launch.
+MPCHK=$("$MEM/mr-situation" --no-gh 2>/dev/null | /usr/bin/python3 -c '
+import json, sys
+try:
+    b = json.load(sys.stdin).get("budget") or {}
+    m = next((k for k in ("fable", "opus", "sonnet", "haiku") if k in sys.argv[1].lower()), "")
+    w = (b.get("model_states") or {}).get(m) or {}
+    resume = json.load(open(sys.argv[2])).get("resume_session")
+    if b.get("state") == "NORMAL" and w.get("state") in ("SOFT-PAUSE", "HARD-STOP") and not resume:
+        print("REFUSE %s: its window %s reads %.0f%% and resets %s" % (w["state"], w.get("window"), 100 * w.get("utilisation", 0), w.get("resets_at_utc")))
+except Exception:
+    pass' "$MODEL" "$V" 2>/dev/null)
+case "$MPCHK" in "REFUSE "*) status BUDGET-MODEL-PAUSED "${MPCHK#REFUSE } — refusing to launch $S on $MODEL (held=budget)" 1 ;; esac
 # Stop-flag clearing sits BELOW the --dry exit (lp-gates final review). `/tmp/mr_stop_all` is the
 # GLOBAL cooperative stop -- mr-launch.sh checks it before every spawn and every run polls it --
 # so clearing it from a dry probe silently disarmed the operator's all-slice stop.

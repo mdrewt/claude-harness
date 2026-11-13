@@ -78,6 +78,31 @@ the reset arithmetic back into the supervisor prompt, dropping a slice because i
 exited 0, offering a failed resume without bound, counting an offer nothing acted on as a
 failure, and touching a stop flag or starting a watcher under an operator hold.
 
+## The budget governor reads the plan's real utilisation; the dollar calibration is its fallback
+`mr-situation` grades the governor (NORMAL, SOFT-PAUSE over 90%, HARD-STOP over 97%) from the
+utilisation the CLI's `rate_limit_event` rows report per plan window
+(`mr-rate-limit-telemetry.jsonl`), and from the ledger's dollars against `mr-budget-config.json`
+only for an axis with no reading in force; `budget.source` in the bundle names which decided.
+A window covers one model when its name carries the model or `telemetry_window_models` maps it,
+every model otherwise (the scope rule of `mr-interrupted`): the windows every model shares set
+`budget.state`, a model's own window sets `budget.model_states.<model>`, and `mr-spawn` refuses a
+new launch on a model whose own window is paused while other models launch. A reading is its
+window's newest sample. It is void once the window's `resetsAt` has passed, acted on as read for
+`telemetry_fresh_s` (3 h), and after that a shared window still over the soft threshold reads
+SOFT-PAUSE (`telemetry-stale`) while a model's own window is dropped. HARD-STOP arms its reset
+tick for `budget.resets_at_utc`, the plan's own reset.
+The dollar figure is this loop's ledger against a hand-set limit, and the plan has refused credit
+while it read 40%; the plan's figure is the one that cuts a run off. The thresholds avoid that
+waste (a run started just under the cap dies mid-way) and do not pace spend. The plan's figure
+also falls inside a window (measured: 0.95 to 0.77, 0.93 to 0 with the same `resetsAt`), so an
+old reading is never held to the reset: a stale HARD-STOP would leave no session to see the
+fall, where SOFT-PAUSE lets one decision session run, launch nothing new and leave the next
+sample. Only sessions on a model report that model's window, so a stale pause there could be
+lifted by nothing but the launch it forbids.
+Rules out: holding a pause on the highest reading of a window, standing the loop down on a
+reading older than the freshness bound, pausing every model for one model's window, and moving
+the grading or the window rules into the supervisor prompt.
+
 ## Noisy Bash output is filtered by rewriting the command, not the result
 The quiet hook rewrites recognized noisy commands to a tee-to-log wrapper that withholds pass
 walls while keeping failures, diagnostics, and summaries whole; the full log path is printed,
