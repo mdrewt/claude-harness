@@ -595,6 +595,27 @@ try:
     if box.vars("s-a").get("resume_session") != SID or "CREDIT-STOP RESUME" not in box.vars("s-a").get("resume_block", "") \
             or box.vars("s-a").get("target_desc") != "build s-a":
         fail("resume-same-session", "vars: %r" % (box.vars("s-a"),))
+    # The reset tick resumes ahead of a red master, so up to four resumed runs see it red at once:
+    # the resume note each one's brief carries leaves master to the supervisor's ci-fix run, and
+    # the brief of any other slice names that run as the only one that fixes master.
+    def brief(v):
+        vj, out = os.path.join(box.root, "brief.vars.json"), os.path.join(box.root, "brief.md")
+        with open(vj, "w") as f:
+            json.dump(v, f)
+        e = dict(os.environ, S=v["slice"], V=vj, MEM=MEM, REPO="project", PR_REPO="mdrewt/monster-realm",
+                 BASE_BRANCH="master", WT_ROOT=box.root, CAP="60")
+        subprocess.run(["bash", os.path.join(MEM, "mr-spawn"), "--render-brief",
+                        os.path.join(MEM, "mr-brief-template.md"), out, ""],
+                       env=e, capture_output=True, text=True, timeout=60)
+        return re.sub(r"\s+", " ", open(out).read()) if os.path.isfile(out) else ""
+    KEEP = "never fix or revert it here, whatever this session read earlier: keep building this slice."
+    OWNER = "Only a `ci-fix-*` slice fixes/reverts a red `master`"
+    resumed, plain = brief(box.vars("s-a")), brief(dict(box.vars("s-a"), resume_block=""))
+    if "CREDIT-STOP RESUME" not in resumed or KEEP not in resumed or "`ci-fix-*` run" not in resumed:
+        fail("resumed-run-leaves-red-master", "rendered brief: %r" % resumed[:1500])
+    if OWNER not in plain or KEEP in plain or "CREDIT-STOP" in plain \
+            or "instead and stop" in plain:
+        fail("one-owner-for-red-master", "rendered brief: %r" % plain[:1500])
     bundle = box.bundle(RESET + 130)
     if offered(bundle.get("interrupted") or []) != [w + ("due",) for w in WANT] \
             or (bundle.get("master_ci_latest") or [{}])[0].get("conclusion") != "failure":

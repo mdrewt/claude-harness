@@ -653,7 +653,9 @@ def cmd_vars(which):
         v = dict(e.get("vars") or {})
         note = ("CREDIT-STOP RESUME: this slice was stopped by a usage limit at %s, not by a failure. "
                 "Continue it from its existing worktree and branch (the `wip:` checkpoint) and "
-                "memory/projects/monster-realm-%s-progress.md; re-verify git state first."
+                "memory/projects/monster-realm-%s-progress.md; re-verify git state first. "
+                "A red `master` is the supervisor's next pick after the resumes (its `ci-fix-*` run): "
+                "never fix or revert it here, whatever this session read earlier: keep building this slice."
                 % (e.get("stopped_utc"), name))
         prior = str(v.get("resume_block") or "")
         v.update({"slice": name, "tier": e.get("tier"), "model": e.get("model"), "effort": e.get("effort"),
