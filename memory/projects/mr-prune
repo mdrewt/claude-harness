@@ -1350,7 +1350,6 @@ PR_TAIL = re.compile(r" \(#\d+\)$")
 SECTION_SAFE = re.compile(r"(?!.*SHALL)[A-Za-z0-9_./-]+")
 WIDE_ORPHAN = 12        # an orphan row of more files is a design question, not a section row
 SECTION_ROWS, SECTION_FILES = 6, 12
-PROTECTED_KINDS = ("protected-twins", "orphan-protected")
 
 
 def spec_slice_ids(text):
@@ -1370,10 +1369,10 @@ def live_commits(commits):
     `commits` are (id, subject, body), a commit before its parents. A commit a pending claim
     names is undone and makes no claim of its own, so a revert of a revert restores the
     original."""
-    by_sha, sizes, by_subject, named = set(), set(), {}, {}
+    by_sha, by_subject, named = [], {}, {}
     for sha, subject, body in commits:
         bare = PR_TAIL.sub("", subject)
-        claim = next((sha[:n] for n in sizes if sha[:n] in by_sha), None)
+        claim = next((prefix for prefix in by_sha if sha.startswith(prefix)), None)
         if claim is not None:
             by_sha.remove(claim)
             continue
@@ -1383,8 +1382,7 @@ def live_commits(commits):
         reverted = REVERTS_LINE.findall(subject + "\n" + body)
         quoted = REVERT_SUBJECT.fullmatch(bare)
         if reverted:
-            by_sha.update(reverted)
-            sizes.update(map(len, reverted))
+            by_sha.extend(reverted)
         elif quoted:
             key = PR_TAIL.sub("", quoted.group(1))
             by_subject[key] = by_subject.get(key, 0) + 1
@@ -1422,11 +1420,12 @@ def route_rows(rows, unbuilt):
     for row in rows:
         files = row_files(row)
         token = row.get("token") or protected_token(*files)
-        slices = [] if token else [{"spec": spec, "slice": sid} for spec, sid, patterns in unbuilt
-                                   if any(p.match(f) for p in patterns for f in files)]
         if token:
             row["route"], row["token"] = "report", token
-        elif slices:
+            continue
+        slices = [{"spec": spec, "slice": sid} for spec, sid, patterns in unbuilt
+                  if any(p.match(f) for p in patterns for f in files)]
+        if slices:
             row["route"], row["slices"] = "slice", slices
         elif len(files) > WIDE_ORPHAN or not all(SECTION_SAFE.fullmatch(f) for f in files):
             row["route"] = "report"
@@ -1475,14 +1474,14 @@ def section_text(label, commit, taken):
         "touches: " + ", ".join(files),
         "after: []",
         "",
-        "`mr-prune close` listed these rows for `%s` at `%s`. Each is a candidate, never a reason"
-        % (label, commit),
-        "to delete (`standards/testing-tdd.md` §Deleting a check is legitimate). The run that builds",
-        "this section reads each pair and each symbol's tests first and removes only the rows it",
-        "confirms. A row it does not confirm stays, with its reason in the PR body; a pair kept on",
-        "purpose is recorded with `mr-prune keep`. A twin's candidate is deleted and its survivor",
-        "stays; a symbol is deleted with the tests that reach only it. Each deleted test has a",
-        "`moved-tests:` row in the PR body. A name below is a JSON string.",
+        "`mr-prune close` listed these rows for `%s` at `%s`." % (label, commit),
+        "Each is a candidate, never a reason to delete (`standards/testing-tdd.md` §Deleting a check",
+        "is legitimate). The run that builds this section reads each pair and each symbol's tests",
+        "first and removes only the rows it confirms. A row it does not confirm stays, with its",
+        "reason in the PR body; a pair kept on purpose is recorded with `mr-prune keep`. A twin's",
+        "candidate is deleted and its survivor stays; a symbol is deleted with the tests that reach",
+        "only it. Each deleted test has a `moved-tests:` row in the PR body. A name below is a JSON",
+        "string.",
         "",
     ]
     for row in taken:
