@@ -837,7 +837,9 @@ def rs_items(toks, match, a, b, items):
             i += 2 if toks[i][1] == "extern" else 1
         kind = toks[i][1] if toks[i][0] == "id" else None
         if kind == "use":
-            i = strip(i)
+            end = strip(i)
+            items.append(Item("region", names=_reached(toks, i, end)))
+            i = end
             continue
         if kind in ("fn", "struct", "enum", "union", "trait", "mod", "impl"):
             j = i + 1
@@ -945,6 +947,7 @@ def ts_items(src, toks, match):
         start = i
         end = strip(i)
         if end is not None:
+            items.append(Item("region", names=_reached(toks, i, end)))
             i = end
             continue
         exported = _word(toks[i], "export")

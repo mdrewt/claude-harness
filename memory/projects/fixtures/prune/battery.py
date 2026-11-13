@@ -1347,6 +1347,86 @@ def tp2_a1(ctx):
     ctx.check("orphans rows are sorted by file, then symbol", order_ok(res.orph), "sorted", res.orph, res)
     ctx.check("no unprotected symbol lands under orphan-protected", res.orph_prot == [], [], res.orph_prot, res)
     clean(ctx, res)
+    a1_regressions(ctx)
+
+
+def a1_regressions(ctx):
+    """False positives of the name match (each symbol below is named, one way or another, by
+    production code) beside symbols that must stay listed."""
+    R = "game-core/src/reg/"
+    RT, TT = R + "reg_tests.rs", "client/src/reg/reg.test.ts"
+    repo = Repo()
+    # (l) look-alike that stays listed: only a `pub use` re-export names it
+    repo.put(R + "mod.rs", "pub use resolve::{resolve_turn};\n")
+    repo.put(R + "resolve.rs", "pub fn resolve_turn() -> u32 { 1 }\n")
+    # (a) aliased imports, Rust and TS
+    repo.put(R + "thing.rs", "pub fn thing_fn() -> u32 { 1 }\n")
+    repo.put(R + "alias_user.rs", "use crate::reg::thing::thing_fn as renamed;\n\n#[spacetimedb::reducer]\n"
+                                  "pub fn alias_entry() -> u32 {\n    renamed()\n}\n")
+    repo.put("client/src/reg/a.ts", "export function foo(): number { return 1; }\n")
+    repo.put("client/src/reg/aUser.ts", "import { foo as f2 } from './a';\nconsole.log(f2());\n")
+    # (b) glob import of an enum's variants
+    repo.put(R + "k.rs", "pub enum Kind {\n    Fire,\n    Water,\n}\n")
+    repo.put(R + "k_user.rs", "use crate::reg::k::Kind::*;\n\n#[spacetimedb::reducer]\npub fn kind_entry() {\n"
+                              "    let _x = Fire;\n}\n")
+    # (c) raw identifier
+    repo.put(R + "m.rs", "pub fn r#type() -> u32 { 1 }\n")
+    repo.put(R + "m_user.rs", "#[spacetimedb::reducer]\npub fn raw_entry() -> u32 {\n    crate::reg::m::r#type()\n}\n")
+    # (d) fn main is an entry point
+    repo.put("server-module/src/main.rs", "pub fn main_helper() -> u32 { 1 }\n\nfn main() {\n    main_helper();\n}\n")
+    # (e) a top-level initializer runs at load
+    repo.put("client/src/reg/overlay.ts", "export function installOverlay(): number { return 1; }\n"
+                                          "const installed = installOverlay();\n")
+    # (f) a file without semicolons; `unused` is the control that stays listed
+    repo.put("client/src/reg/handler.ts", "export class Handler {}\nexport const unused = 1\nregister(Handler)\n")
+    # (g) a keyword-named property followed by division
+    repo.put("client/src/reg/stats.ts", "export const total = 10;\n")
+    repo.put("client/src/reg/statsUser.ts", "const stats = { of: 4 };\nconsole.log(stats.of / total / 2);\n")
+    # (h) compile-time assert
+    repo.put(R + "len.rs", "pub const LEN: usize = 4;\nconst _: () = assert!(LEN == 4);\n")
+    # (i) extension trait on a primitive
+    repo.put(R + "ext.rs", "pub trait Ext {\n    fn double(&self) -> String;\n}\n\nimpl Ext for str {\n"
+                           "    fn double(&self) -> String {\n        format!(\"{}{}\", self, self)\n    }\n}\n")
+    # (j) an entry point's callee in the same file
+    repo.put(R + "entry.rs", "#[spacetimedb::reducer]\npub fn reducer_one() {\n    inner_g()\n}\n\npub fn inner_g() {}\n")
+    # (k) impl liveness follows the self type
+    repo.put(R + "s_live.rs", "pub struct SLive;\n\nimpl SLive {\n    pub fn m() -> u32 {\n        helper_live()\n"
+                              "    }\n}\n\npub fn helper_live() -> u32 { 1 }\n")
+    repo.put(R + "s_user.rs", "#[spacetimedb::reducer]\npub fn s_entry() {\n    let _s = SLive;\n}\n")
+    repo.put(R + "s_dead.rs", "pub struct SDead;\n\nimpl SDead {\n    pub fn m() -> u32 {\n        helper_dead()\n"
+                              "    }\n}\n\npub fn helper_dead() -> u32 { 1 }\n")
+    # one row per symbol: a TS overload
+    repo.put("client/src/reg/over.ts", "export function overloaded(a: string): void;\nexport function overloaded(a: any) {}\n")
+    repo.put(RT, "#[test]\nfn names_reg() {\n    let _ = SDead;\n    helper_dead();\n    resolve_turn();\n}\n")
+    repo.put(TT, "describe('reg', () => {\n  it('x', () => {\n    expect(unused).toBe(1);\n"
+                 "    overloaded('a');\n  });\n});\n")
+    res = census(repo, repo.commit(), new_mem())
+    exp = [O(R + "s_dead.rs", "SDead", [RT]), O(R + "s_dead.rs", "helper_dead", [RT]),
+           O(R + "resolve.rs", "resolve_turn", [RT]), O("client/src/reg/handler.ts", "unused", [TT]),
+           O("client/src/reg/over.ts", "overloaded", [TT])]
+    ctx.check("control: the re-exported symbol, the impl of a self type nothing names (with its callee), the semicolon-less "
+              "`unused` and the TS overload are listed, and nothing else is",
+              sset(res.orph) == sset(exp), sset(exp), sset(res.orph), res)
+    listed = [r[1] for r in res.orph]
+    for label, names in (
+        ("an aliased import (Rust `use X as Y`, TS `import { X as Y }`) names X", ["thing_fn", "foo"]),
+        ("a glob import `use path::Kind::*;` names Kind", ["Kind"]),
+        ("a raw identifier r#type called through a path counts as a reference, under either spelling", ["r#type", "type"]),
+        ("fn main calls its same-file helper", ["main_helper"]),
+        ("a top-level TS initializer runs at load and keeps installOverlay alive", ["installOverlay", "installed"]),
+        ("an ASI file's `register(Handler)` statement keeps Handler alive", ["Handler"]),
+        ("`stats.of / total / 2` is a division naming total, not a regex", ["total"]),
+        ("`const _: () = assert!(LEN == 4)` keeps LEN alive", ["LEN"]),
+        ("an impl for a primitive keeps its trait alive", ["Ext"]),
+        ("a reducer's same-file callee is live", ["reducer_one", "inner_g"]),
+        ("an impl is live when its self type is named elsewhere: its type and its method's callee are not listed",
+         ["SLive", "helper_live"]),
+    ):
+        hit = [n for n in names if n in listed]
+        ctx.check(label, hit == [], [], hit, res)
+    n_over = [r for r in res.orph if r[1] == "overloaded"]
+    ctx.check("a TS overload set gives exactly one orphans row", len(n_over) == 1, 1, n_over, res)
+    clean(ctx, res)
 
 
 def tp2_a2(ctx):
@@ -1419,7 +1499,7 @@ def tp2_a5(ctx):
     repo.put(PB, "#[cfg(test)]\npub fn helper_only() -> u32 { 1 }\n\npub fn plain_orphan() -> u32 { 2 }\n\n"
                  "#[cfg(test)]\nfn inner_helper() {}\n\npub fn target_of_testonly() -> u32 { 3 }\n\n"
                  "#[cfg(test)]\npub fn caller_t() {\n    target_of_testonly();\n}\n\n"
-                 "#[cfg(test)]\nmod inside {\n    pub fn in_mod_helper() {}\n}\n")
+                 "#[cfg(test)]\nmod inside {\n    pub fn in_mod_helper() {}\n}\n\n#[cfg(test)]\nmod x_tests;\n")
     repo.put(PT, "#[test]\nfn names() {\n    helper_only();\n    plain_orphan();\n    inner_helper();\n"
                  "    target_of_testonly();\n    caller_t();\n    in_mod_helper();\n}\n")
     res = census(repo, repo.commit(), new_mem())
@@ -1428,6 +1508,9 @@ def tp2_a5(ctx):
     ctx.check("a cfg(test) item outside a test mod (any visibility) carries test-only; a plain orphan does not; a symbol "
               "named only by a cfg(test) item is still an ordinary orphan; an item inside a cfg(test) mod is not listed",
               sset(res.orph) == sset(exp), sset(exp), sset(res.orph), res)
+    decl = [r for r in res.orph if r[1] == "x_tests"]
+    ctx.check("a `#[cfg(test)] mod x_tests;` declaration is not an item to list (no row for x_tests), while the cfg(test) fns beside it are",
+              decl == [] and len(res.orph) == 5, "no x_tests row", decl, res)
     clean(ctx, res)
 
 
@@ -1487,6 +1570,24 @@ def tp2_a7(ctx):
               "spec and a product file print nothing",
               sset(res.sig) == sset(exp), sset(exp), sset(res.sig), res)
     clean(ctx, res)
+    a7_nonutf8_path(ctx)
+
+
+def a7_nonutf8_path(ctx):
+    LP, LT = "client/src/ui/lonely.ts", "client/src/ui/lonely.test.ts"
+    body = "describe('l', () => {\n  it('x', () => {\n    expect(lonelyFn()).toBe(1);\n  });\n});\n"
+    repo = Repo()
+    repo.put(LP, "export function lonelyFn(): number { return 1; }\n")
+    repo.put(LT, body)
+    bad = os.path.join(os.fsencode(repo.path), b"client/src/ui", b"\xff.test.ts")
+    with open(bad, "wb") as f:
+        f.write(body.encode("utf-8"))
+    res = census(repo, repo.commit(), new_mem())
+    rows = [r for r in res.orph if r[1] == "lonelyFn"]
+    ctx.check("a tracked test file whose path is not UTF-8 does not break the census: exit 0, the orphan row prints with a valid "
+              "tests= JSON array naming both test files",
+              res.rc == 0 and len(rows) == 1 and len(rows[0][3]) == 2 and LT in rows[0][3] and res.bad == [],
+              "exit 0, one lonelyFn row, 2 tests, parseable", (res.rc, rows, res.bad), res)
 
 
 def ts_hist_repo():
@@ -1556,6 +1657,18 @@ def tp2_a8(ctx):
     ctx.check("census leaves the worktree, index and refs unchanged (history is read, never altered)",
               after == before, before, after, res)
     clean(ctx, res)
+
+    # paths that need quoting in git output
+    QP, BP, NP = 'client/src/ui/q"uote.test.ts', "client/src/ui/b\\slash.test.ts", "client/src/ui/plainq.test.ts"
+    qrepo = Repo()
+    commit_files(qrepo, {QP: ts_marked("a"), BP: ts_marked("a"), NP: ts_marked("a")}, "base")
+    for k in ("b", "c"):
+        sha_q = commit_files(qrepo, {QP: ts_marked(k), BP: ts_marked(k)}, "quoted %s" % k)
+        sha_q = commit_files(qrepo, {NP: ts_marked(k)}, "plain %s" % k)
+    r = census(qrepo, sha_q, new_mem())
+    exp_q = [S(QP, churn=2), S(BP, churn=2), S(NP, churn=2)]
+    ctx.check("a test file whose path holds a double quote or a backslash gets churn counted like a plain one (2 each)",
+              sset(r.sig) == sset(exp_q), sset(exp_q), sset(r.sig), r)
 
     # the 300-commit window: 303 commits, the 3 newest of 5 small commits are inside it
     WT = "client/src/ui/win.test.ts"
@@ -1724,6 +1837,22 @@ def tp2_a12(ctx):
         r = run_tool("census", "--repo", repo.path, "--at", sha, "--mem", mem, "--spec", path)
         ctx.check(name + " is refused: exit 2, PRUNE-ERROR, no PRUNE-CENSUS", refused(r), "exit 2 + PRUNE-ERROR", r.first, r)
 
+    # spec-parsing edge cases, over the same census
+    spec2 = os.path.join(d, "y.spec.md")
+    fence = "`" * 3
+    with open(spec2, "w", encoding="utf-8") as f:
+        f.write(("# Test spec\n\n## Slices\n\n### e-1 EM empty first line\ntouches:\ntouches: client/src/ui/aa.test.ts\n\n"
+                 "### s2 EM fenced block first\n" + fence + "text\n# a comment line inside a fence\n" + fence + "\n"
+                 "touches: client/src/render/**\n\n"
+                 "### c-3 EM control\ntouches: client/src/ui/sub/**\n").replace("EM", chr(0x2014)))
+    sp2 = census(repo, sha, mem, "--spec", spec2)
+    exp2 = {("duplicates", BB, "bb > one again"): ["c-3"], ("protected-twins", AU, "auth > one again"): ["c-3"],
+            ("duplicates", CC, "cc > one again"): ["s2"], ("literal-variants", BB, ""): ["c-3"]}
+    ctx.check("a slice whose first touches: line is empty matches nothing (its second line is ignored: aa.test.ts prints no row, "
+              "not even its signal); a `# comment` line inside a code fence does not end the slice, so s2 still matches render/**",
+              sp2.slices == exp2 and sp2.sig == [] and {r[1] for r in sp2.rows} == {BB, AU, CC},
+              (exp2, []), (sp2.slices, sp2.sig, sp2.rows), sp2)
+
 
 GH_FIELDS = "databaseId,workflowName,headSha,status,conclusion,attempt,startedAt,updatedAt"
 GH_BASE = datetime(2026, 11, 10, 12, 0, 0)
@@ -1877,11 +2006,14 @@ def tp2_a14(ctx):
     env_absent["PATH"] = bindir
     exits = Gh(good, rc=1)
     junk = Gh("this is not json\n")
+    deep = Gh("[" * 100000 + "]" * 100000 + "\n")
     nulls = {"seconds": "null", "conclusion": "null", "nightly": "null", "reruns-to-green": "null"}
     jnulls = {"seconds": None, "conclusion": None, "nightly": None, "reruns_to_green": None}
     for name, env, gh in (("gh absent from PATH", env_absent, None),
                           ("gh exits 1 (with a valid-looking answer on stdout)", exits.env(), exits),
-                          ("gh prints something that is not JSON", junk.env(), junk)):
+                          ("gh prints something that is not JSON", junk.env(), junk),
+                          ("gh prints 100000 nested arrays (deeper than a JSON parser's recursion limit)",
+                           deep.env(), deep)):
         mem = new_mem()
         r = census(repo, sha, mem, "--ci", "--record", "n", env=env)
         d = read_bytes(os.path.join(mem, "prune", "trend.jsonl"))
