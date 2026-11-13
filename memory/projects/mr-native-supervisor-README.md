@@ -262,7 +262,8 @@ suite at a commit; `mr-prune close --spec F` records what milestone `F` added un
 - **At a milestone's last merge:** `mr-record ledger` runs it. When a MERGED row leaves every slice
   of the milestone spec holding that slice with a MERGED row, the hook fetches the game repo and
   runs `mr-prune close` against `origin/master`. A failure is one `WARN prune-close:` line and the
-  row stands; `mr-prune close --spec F` run by hand records the same row later.
+  row stands; `git -C projects/monster-realm fetch origin` then `mr-prune close --spec F`, run by
+  hand, records the same row later (`close` itself never fetches).
 - **At the close PR:** the bundle's `prune_close` lists each section file whose milestone spec is
   still in the corpus; the doc-only PR that deletes that spec appends the section to
   `structure.spec.md` (its "Written by" rule names this source).
