@@ -653,6 +653,10 @@ def export_touched(ctx, manifest, entry):
     return snapshot(ctx.game, root, manifest["base"], "tester-ab probe", exclude=(REPORT_FILE, PROMPT_FILE)) != manifest["base"]
 
 
+# One entry of an acceptance ledger, capturing its id: `- [ ] ID: ...` or `- [x] **ID:** ...`.
+GATE_ENTRY = r"^- \[.\] \*{0,2}([A-Za-z0-9][\w.\-]*):\*{0,2}"
+
+
 def kept_gates(ctx, slice_):
     """The slice's acceptance ledger: the copy `plan` kept, else the live file, else the
     archived one (mr-record moves a gates file to gates/archive 30 days after the merge, and
@@ -1720,7 +1724,7 @@ def criteria_count(ctx, slice_, rows):
     """How many criteria the slice has: the entries of its acceptance ledger, else the distinct
     criterion tags its arms used between them. One number for the slice, so lines per criterion
     compares what the arms wrote and not how many tags each of them spread it over."""
-    listed = set(re.findall(r"^- \[.\] ([A-Za-z0-9][\w.\-]*):", kept_gates(ctx, slice_), re.M))
+    listed = set(re.findall(GATE_ENTRY, kept_gates(ctx, slice_), re.M))
     return len(listed) or len({r["criterion_tag"] for r in execs(rows, slice_) if r.get("criterion_tag")})
 
 
@@ -2350,15 +2354,24 @@ def contracts_of(prompt):
 
 
 def criterion_text(ctx, slice_, tag):
-    """The lines that state a criterion: those naming its id in the slice's acceptance ledger
-    (`kept_gates`), else in the tester prompt `plan` kept."""
+    """What states a criterion: its sentence in the slice's acceptance ledger (`kept_gates`),
+    then the lines of the tester prompt `plan` kept that name its id.
+
+    A ledger entry is `- [ ] <ID>: <sentence>` with its CHECK, EXPECT and EVIDENCE lines under
+    it. The entry of a tag is the one with that id; else the entries whose lines name the tag
+    (a test contract's own tag is named in the CHECK of the criterion it belongs to); else the
+    entry whose id the tag starts with, punctuation aside (`CTL12-4-SAVE-SHAPE` is under
+    `CTL12.4`). Only the sentence is shown: a CHECK line is a shell command."""
     if not tag:
         return ""
     named = re.compile(r"(?<![\w.-])%s(?![\w-])" % re.escape(tag))
-    hits = [l.strip() for l in kept_gates(ctx, slice_).split("\n") if named.search(l)]
-    if not hits:
-        hits = [l.strip() for l in slice_prompt(ctx, slice_).split("\n") if named.search(l)]
-    return " ".join(hits[:5])[:1200]
+    entries = re.findall(GATE_ENTRY + r"[ \t]*(.*(?:\n[ \t]+\S.*)*)", kept_gates(ctx, slice_), re.M)
+    flat = lambda text: re.sub(r"[^a-z0-9]", "", text.lower())
+    mine = [e for e in entries if e[0] == tag] or [e for e in entries if named.search(e[1])] \
+        or sorted((e for e in entries if flat(tag).startswith(flat(e[0]))), key=lambda e: len(e[0]))[-1:]
+    hits = ["%s: %s" % (e[0], e[1].split("\n")[0].strip()) for e in mine[:2]]
+    hits += [l.strip() for l in slice_prompt(ctx, slice_).split("\n") if named.search(l)][:3]
+    return " ".join(hits)[:1200]
 
 
 def cited_lines(ctx, rows, slice_, where):
@@ -5623,7 +5636,7 @@ def _st_gates(chk, tmp):
     out = box.run("judge-pack")
     bundle = open(bundle_place(box.ctx(), 1)[0]).read() if "AB-JUDGE-PACK" in out else ""
     chk("gates/the-judge-is-shown-the-criterion-after-the-live-file-is-gone",
-        bundle.count("criterion: C2 - [ ] C2: THE defence of a new monster SHALL be three.") == 3, bundle[:1500])
+        bundle.count("criterion: C2 C2: THE defence of a new monster SHALL be three.\n") == 3, bundle[:1500])
     lab = {label: arm for arm, (label, _) in box.labels("np-a").items()}
     q = {lab[r["label"]]: r for r in box.rows("quality", "np-a")}
     # Both wrote four test lines; S-med used one tag and O-med two. The slice has four criteria.
@@ -5636,6 +5649,14 @@ def _st_gates(chk, tmp):
         fh.write(gates)
     chk("gates/the-archive-is-read-when-nothing-was-kept", "SHALL be seven" in criterion_text(box.ctx(), "np-a", "C3")
         and criterion_text(box.ctx(), "np-b", "C3") == "")
+    # A test contract's own tag is shown the sentence of the criterion it belongs to: the one
+    # whose CHECK names it, else the one whose id it starts with; never the CHECK command.
+    with open(os.path.join(box.mem, "gates", "archive", "np-a.gates.md"), "w") as fh:
+        fh.write(gates.replace("CHECK: just ci", "CHECK: just test C3-SPEED-IS-SEVEN"))
+    chk("gates/a-sub-tag-is-shown-its-criterion's-sentence",
+        criterion_text(box.ctx(), "np-a", "C3-SPEED-IS-SEVEN") == "C1: WHEN a monster attacks THE damage SHALL use its attack."
+        and criterion_text(box.ctx(), "np-a", "C2-DEFENCE") == "C2: THE defence of a new monster SHALL be three."
+        and criterion_text(box.ctx(), "np-a", "X9") == "", criterion_text(box.ctx(), "np-a", "C3-SPEED-IS-SEVEN"))
 
 
 def _st_shipped_config(chk):
