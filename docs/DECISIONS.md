@@ -157,7 +157,7 @@ again until the test changes. The look is when a milestone closes, when everythi
 exists; a removal is acted on only when a spec is elaborated, in a slice that already lists the
 file, or through the structural queue, never in a session of its own.
 `mr-prune close` records that look once per milestone. The milestone's commits are the ones whose
-subject names one of its slices as `<type>(<scope>): <slice id> — `, less any a later commit says
+subject names one of its slices as `<type>[(<scope>)]: <slice id> — `, less any a later commit says
 it reverts: the rule `structure.spec.md` uses for "built". They are a set, not a first-to-last
 range, because other milestones, refactors and CI fixes merge between a milestone's slices. Each
 candidate in the files those commits changed gets one route: `slice` when an unbuilt slice of
