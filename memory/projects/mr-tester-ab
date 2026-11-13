@@ -42,11 +42,15 @@ LEDGER ROWS (kind)
 ------------------
   assignment  milestone, tier, labels {label: arm}, prompt_sha256, base_ref, tester_md_sha,
               arms_planned, skipped (null or the reason)
-  run         label, arm, role (primary | shadow | replicate | followup), twin, session,
+  run         label, arm, role (primary | shadow | replicate | followup | judge), twin, session,
               agent_id, tool_use_id, model_observed, effort_observed, cli_version, started,
               duration_s, calls, bash_blocked, tokens, cost_usd, status (ok | failed |
               contaminated | arm-mismatch), leak, tests_ref, files, non_test_files, tests, test_loc
-  snap        name (base | g1 | g2 | m | end), sha, source (tool | derived)
+  snap        name (base | g1 | g2 | m | end), sha, source (tool | derived). base: the tree the
+              testers saw. g1: the first green implementation, before any lens ran (`mark`; else
+              derived as the last commit before the first lens call). g2: green after the lens
+              fixes (`escapes`). m: the head the pre-merge audit saw (`finalize`). end: the
+              default-branch head when the analysis runs (`score --end`).
   exec        label, snap, test_id, criterion_tag, result (pass | fail | no-compile | not-run),
               runtime_ms, run_n, ported
   claim       claim_id, label, type (base | spec), test, where, text, text_sha
@@ -59,6 +63,8 @@ LEDGER ROWS (kind)
               error | no-tests). A reported measure; nothing gates on it.
   slice       status (scored | degraded | void), arms_ok, area, added_cost_usd,
               cumulative_added_usd. The latest row of a slice stands.
+  handoff     label, test_id, handoff_id: a failing shadow test `escapes` handed to the builder
+  close       reason, scored_slices. Written once; `plan` skips every slice from then on.
   verdict     ref (a candidate id or a claim id), item, label, scale, bundle, verdict,
               duplicate_of, criterion, wrong_behaviour, severity
   finding     finding_id, class, status (confirmed | pending | out-of-scope | rejected), verdict,
@@ -85,10 +91,22 @@ COMMANDS
                               as a commit under its ref, price the runs from their transcripts,
                               flag contamination, arm mismatch and leak, copy the reports, delete
                               the exports the manifest registered, print the claim digest.
+  mark <slice>                Record the worktree as g1. Run before the first lens batch that
+                              follows the implementation.
+  escapes <slice>             Record the worktree as g2. With `escapes_in_session`, replay the
+                              shadow tests there under a wall budget and write up to
+                              `handoff_limit` failing ones, arm removed, to a file for the
+                              red-team. Run after the lens fixes, before the PR opens.
+  finalize <slice> [--repo <dir> --head <ref>] [--no-score]
+                              Record m, start `score` detached, and close the experiment when a
+                              close condition holds: a `close` row and one retro request
+                              (`tester-ab close`). mr-audit calls it, bounded and fail-open.
   score <slice> [--end]       Replay each arm's tests at every recorded snapshot (base: claimed
                               tests only; m: twice), derive candidates and the per-arm quality
                               and seeded-defect rows. `--end` first records the game repo's
                               default-branch head as `end`. Runs what is missing; under a flock.
+                              It collects first when the session ended without `collect`, and
+                              records the tester calls after the primary as follow-ups.
   status                      What is planned, collected, scored and spent; stale exports.
   judge-pack                  Write every item without a verdict (candidates, claims, tests
                               still failing at m) to a shuffled bundle with arm, model and
@@ -825,7 +843,8 @@ def read_junit(path):
 
 
 def run_runner(ctx, runner, files, names, budget):
-    """Run one runner over `files` in the scratch directory. (junit cases, compiled, wall)."""
+    """Run one runner over `files` in the scratch directory.
+    (junit cases, whether it built, whether it timed out, wall seconds)."""
     cwd = os.path.join(ctx.scratch, runner.get("cwd", ""))
     junit = os.path.join(ctx.cache, "junit.xml")
     # A runner that writes its report to a path of its own names it in `junit`.
@@ -1269,14 +1288,22 @@ def score_lock(ctx):
 def cmd_score(ctx, args):
     pos, opt = options(args, flags=("--end",))
     slice_ = check_slice(pos[0] if pos else "")
-    if not ctx.manifest(slice_):
+    manifest = ctx.manifest(slice_)
+    if not manifest:
         raise Skip("no-manifest")
+    if not manifest.get("collected"):
+        # The build session ended without `collect`: the shadows' work is still in the exports.
+        with contextlib.redirect_stdout(io.StringIO()):
+            cmd_collect(ctx, [slice_])
     with score_lock(ctx):
         if opt.get("end"):
             branch = ctx.cfg.get("default_branch", "master")
             head = git(ctx.game, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/" + branch, check=False).strip() \
                 or git(ctx.game, "rev-parse", branch).strip()
             record_snap(ctx, slice_, "end", head)
+        agents = session_rows(ctx, read(ctx), slice_)
+        append(ctx, followups(ctx, slice_, read(ctx), agents))
+        derive_g1(ctx, slice_, read(ctx), agents)
         replay(ctx, slice_, read(ctx))
         append(ctx, derive(ctx, slice_, read(ctx)))
         append(ctx, quality(ctx, slice_, read(ctx)))
@@ -1286,6 +1313,222 @@ def cmd_score(ctx, args):
     print("AB-SCORED %s: %d result(s), %d candidate(s)" % (
         slice_, len(of(rows, "exec", slice_)),
         len(latest(of(rows, "candidate", slice_), lambda r: (r["label"], r.get("test_id") or r.get("claim_id"))))))
+
+
+# --------------------------------------------------------------------------- mark, escapes, finalize
+def planned(ctx, slice_):
+    manifest = ctx.manifest(slice_)
+    if not manifest:
+        raise Skip("no-manifest")
+    return manifest
+
+
+def snap_worktree(ctx, slice_, name):
+    """Record the slice worktree as it stands (uncommitted work included) as snapshot `name`,
+    once."""
+    manifest = planned(ctx, slice_)
+    if name in snaps_of(read(ctx), slice_):
+        raise Skip("%s is already recorded for %s" % (name, slice_))
+    worktree = manifest["worktree"]
+    sha = snapshot(worktree, worktree, git(worktree, "rev-parse", "HEAD").strip(),
+                   "tester-ab %s %s" % (slice_, name))
+    record_snap(ctx, slice_, name, sha)
+    return sha
+
+
+def cmd_mark(ctx, args):
+    pos, _ = options(args)
+    slice_ = check_slice(pos[0] if pos else "")
+    print("AB-MARK %s: first green recorded (%s)" % (slice_, snap_worktree(ctx, slice_, "g1")[:12]))
+
+
+def cmd_escapes(ctx, args):
+    pos, _ = options(args)
+    slice_ = check_slice(pos[0] if pos else "")
+    sha = snap_worktree(ctx, slice_, "g2")
+    print("AB-ESCAPES %s: green after the lens fixes recorded (%s)" % (slice_, sha[:12]))
+    if not ctx.cfg.get("escapes_in_session"):
+        return
+    # The handoff is advisory: a scorer that is busy, or a budget that runs out, leaves the
+    # slice to be scored at merge.
+    os.makedirs(ctx.cache, exist_ok=True)
+    fd = os.open(os.path.join(ctx.cache, "score.lock"), os.O_WRONLY | os.O_CREAT, 0o644)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise Skip("scorer-busy: no in-session handoff; proceed")
+        complete = replay(ctx, slice_, read(ctx), only_snaps=("g2",), budget=ctx.cfg.get("escapes_budget_s", 900))
+    finally:
+        os.close(fd)
+    rows = read(ctx)
+    failing = sorted(((label, test) for (label, test), by in result_table(rows, slice_).items()
+                      if settled(by.get("g2")) == "fail"), key=lambda lt: sha256("handoff:%s:%s:%s" % ((slice_,) + lt)))
+    failing = failing[:int(ctx.cfg.get("handoff_limit", 5))]
+    if not complete:
+        print("AB-SKIP budget: the replay did not finish in the wall budget; the rest is scored at merge")
+    if not failing:
+        print("AB-ESCAPES %s: no shadow test fails here" % slice_)
+        return
+    refs = {r["label"]: r["tests_ref"] for r in ok_runs(rows, slice_)}
+    parts = ["# Shadow tests failing after the lens fixes: %s\n\nEach is a test written blind from this slice's "
+             "criteria that fails against the current tree. Rule on each: a real defect in the implementation is "
+             "fixed through the normal lens-fix path; a wrong test needs no action.\n" % slice_]
+    handed = []
+    for i, (label, test) in enumerate(failing):
+        path, name = test.rsplit("::", 1)
+        fails = {}
+        with contextlib.suppress(OSError, ValueError):
+            with open(os.path.join(ctx.side_of(slice_), "fail", "%s.g2.1.json" % label)) as fh:
+                fails = json.load(fh)
+        parts.append("\n## e%d\n\n```\n%s\n```\n\nFailure output:\n\n```\n%s\n```\n" % (
+            i + 1, redact(ctx, test_excerpt(ctx, refs[label], path, name)), redact(ctx, fails.get(test, "(not kept)"))))
+        handed.append({"kind": "handoff", "slice": slice_, "label": label, "test_id": test, "handoff_id": "e%d" % (i + 1)})
+    out = os.path.join(ctx.side_of(slice_), "escapes.md")
+    with open(out, "w") as fh:
+        fh.write("".join(parts))
+    append(ctx, handed)
+    print("AB-ESCAPES %s: %d shadow test(s) fail here. Pass %s to the red-team; fix what it confirms before "
+          "opening the PR." % (slice_, len(handed), out))
+
+
+def merged(ctx, slice_, deadline):
+    """Whether the slice's PR is merged, by `gh`: True, False, or None when gh cannot say."""
+    left = deadline - time.time()
+    if left <= 0 or not ctx.cfg.get("pr_repo"):
+        return None
+    try:
+        done = subprocess.run(["gh", "pr", "list", "--repo", ctx.cfg["pr_repo"], "--state", "merged", "--head",
+                               ctx.cfg.get("branch_prefix", "slice/") + slice_, "--json", "number"],
+                              capture_output=True, text=True, timeout=min(4, left), stdin=subprocess.DEVNULL)
+        return bool(json.loads(done.stdout)) if done.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def close_reason(ctx, rows, current):
+    """The first close condition that holds, or None.
+
+      required-slices  every required slice has an m snapshot and is merged (the one being
+                       finalized counts as merging), and no planned slice lacks its m snapshot
+      max-slices       the backstop number of slices have at least two valid scored arms and an m
+      cap              the arm, judge and port spend has reached the cap
+      backstop-days    the default branch has commits on that many distinct days since the
+                       first m snapshot
+    """
+    cfg = ctx.cfg
+    stops = cfg.get("backstops", {})
+    with_m = {r["slice"]: r["ts"] for r in reversed(of(rows, "snap")) if r["name"] == "m"}
+    assigned = [r["slice"] for r in of(rows, "assignment") if not r.get("skipped")]
+    required = cfg.get("required_slices", [])
+    if required and all(s in with_m for s in required) and all(s in with_m for s in assigned):
+        deadline = time.time() + 8
+        if all(s == current or merged(ctx, s, deadline) for s in required):
+            return "required-slices"
+    scored = [s for s in with_m if len([r for r in ok_runs(rows, s) if r["role"] == "shadow"]) >= 2]
+    if len(scored) >= stops.get("max_scored_slices", 16):
+        return "max-slices"
+    if spent(rows) >= cfg.get("cap_arm_usd", float("inf")):
+        return "cap"
+    if with_m:
+        branch = cfg.get("default_branch", "master")
+        ref = "refs/remotes/origin/" + branch
+        if not git(ctx.game, "rev-parse", "--verify", "--quiet", ref, check=False).strip():
+            ref = branch
+        days = set(git(ctx.game, "log", "--since=" + min(with_m.values()), "--format=%cs", ref, check=False).split())
+        if len(days) >= stops.get("loop_active_days", 45):
+            return "backstop-days"
+    return None
+
+
+def cmd_finalize(ctx, args):
+    pos, opt = options(args, valued=("--repo", "--head"), flags=("--no-score",))
+    slice_ = check_slice(pos[0] if pos else "")
+    manifest = planned(ctx, slice_)
+    rows = read(ctx)
+    if "m" not in snaps_of(rows, slice_):
+        repo = opt.get("repo") or manifest["worktree"]
+        sha = git(repo, "rev-parse", "--verify", (opt.get("head") or "HEAD") + "^{commit}").strip()
+        record_snap(ctx, slice_, "m", sha)
+        if not opt.get("no-score"):
+            # Detached: the replay takes minutes and its caller waits seconds.
+            subprocess.Popen([os.path.join(ctx.mem, "mr-tester-ab"), "score", slice_], start_new_session=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    rows = read(ctx)
+    if not closed(rows):
+        reason = close_reason(ctx, rows, slice_)
+        if reason:
+            append(ctx, [{"kind": "close", "slice": "-", "reason": reason,
+                          "scored_slices": len({r["slice"] for r in of(rows, "snap") if r["name"] == "m"})}])
+            queue_retro(ctx)
+            print("AB-CLOSED %s" % reason)
+    print("AB-FINALIZED %s" % slice_)
+
+
+def queue_retro(ctx):
+    """Ask the loop for the close analysis. mr-retro-request writes to the directory its own
+    source names, so it is run only when that is this tool's directory: a copy of the tooling in
+    a sandbox never queues an event in the live one."""
+    script = os.path.join(ctx.mem, "mr-retro-request")
+    with contextlib.suppress(Exception):
+        with open(script) as fh:
+            if ("\nMEM=%s\n" % ctx.mem) not in fh.read():
+                return
+        subprocess.run(["bash", script, "tester-ab close"], timeout=10, stdin=subprocess.DEVNULL,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def session_rows(ctx, rows, slice_):
+    """mr-cost-sum's rows for the subagents of the sessions the slice's runs came from, shadow
+    testers left out (a shadow's first message names an export)."""
+    out = {}
+    for session in sorted({r["session"] for r in of(rows, "run", slice_) if r.get("session")}):
+        with contextlib.suppress(Exception):
+            for agent, row in by_role(ctx, session).items():
+                paths = glob.glob(os.path.join(glob.escape(ctx.transcripts), "*", session, "subagents",
+                                               "agent-%s.jsonl" % agent))
+                with open(paths[0], errors="replace") as fh:
+                    if ctx.cache not in fh.readline(400000):
+                        out[agent] = row
+    return out
+
+
+def followups(ctx, slice_, rows, agents):
+    """Run rows for the tester calls after the primary (corrections, lens pins, scope splits):
+    they run under tier policy and are recorded, not scored."""
+    known = {r.get("agent_id") for r in of(rows, "run", slice_)}
+    primary = next((r for r in of(rows, "run", slice_) if r.get("role") == "primary"), None)
+    if not primary:
+        return []
+    return [{"kind": "run", "slice": slice_, "label": "followup", "arm": "primary", "role": "followup",
+             "twin": False, "status": "ok", "leak": False, "agent_id": a["agent_id"],
+             "tool_use_id": a["tool_use_id"], "model_observed": a["model"], "effort_observed": a["effort"],
+             "cli_version": a["version"], "started": a["started"], "duration_s": a["duration_s"],
+             "calls": a["calls"], "tokens": a["tokens"], "cost_usd": a["cost_usd"]}
+            for a in sorted(agents.values(), key=lambda a: a["started"] or "")
+            if a["role"] == "tester" and a["agent_id"] not in known and (a["started"] or "") > (primary.get("started") or "")]
+
+
+def derive_g1(ctx, slice_, rows, agents):
+    """When `mark` did not run: the last commit of the slice before its first lens call after
+    the primary tester, recorded as g1 with source `derived`."""
+    snaps = snaps_of(rows, slice_)
+    primary = next((r for r in of(rows, "run", slice_) if r.get("role") == "primary"), None)
+    if "g1" in snaps or "m" not in snaps or not primary:
+        return
+    after = (epoch(primary.get("started")) or 0) + (primary.get("duration_s") or 0)
+    lenses = ctx.cfg.get("lens_roles", [])
+    first = min((epoch(a["started"]) for a in agents.values()
+                 if a["role"] in lenses and (epoch(a["started"]) or 0) > after), default=None)
+    if first is None:
+        return
+    last = None
+    for line in git(ctx.game, "log", "--reverse", "--format=%H %ct", "%s..%s" % (snaps["base"], snaps["m"])).splitlines():
+        sha, _, stamp = line.partition(" ")
+        if int(stamp) <= first:
+            last = sha
+    if last:
+        record_snap(ctx, slice_, "g1", last, source="derived")
 
 
 # --------------------------------------------------------------------------- status
@@ -1475,7 +1718,7 @@ def sample_open(items, limit):
     rest = [i for i in items if i[2] != "open-fail"]
     groups = {}
     for item in sorted((i for i in items if i[2] == "open-fail"), key=lambda i: sha256(i[0])):
-        groups.setdefault((i_slice(item), item[3]), []).append(item)
+        groups.setdefault((item[1], item[3]), []).append(item)
     room = max(0, limit - len(rest))
     per = max((len(g) for g in groups.values()), default=0)
     while per > 0 and sum(min(per, len(g)) for g in groups.values()) > room:
@@ -1486,10 +1729,6 @@ def sample_open(items, limit):
             kept.append(item)
             scale[item[0]] = round(len(group) / min(per, len(group)), 4)
     return kept, scale
-
-
-def i_slice(item):
-    return item[1]
 
 
 def cmd_judge_pack(ctx, args):
@@ -1951,13 +2190,11 @@ def render_report(rows, cfg):
     out += ["## Arms", "", "Totals are per slice. The replicate is not in the reference set or the decision.", ""]
     out += arm_table(st.slices) + ["", "With pending findings counted:", ""] + arm_table(st.slices, True) + [""]
 
-    out += ["## Findings by class", "",
-            "| Arm | lens-caught | escape | base | spec | New work only (lens-caught + escape) | Missed |", "|---|---|---|---|---|---|---|"]
-    for arm in st.arms:
-        got = [f for s in st.valid(arm) for f in st.found(s, arm)]
-        by = [sum(1 for f in got if f["class"] == k) for k in CLASSES]
-        out.append("| %s | %d | %d | %d | %d | %d | %d |" % (arm, *by, by[0] + by[1],
-                                                           sum(len(st.missed(s, arm)) for s in st.valid(arm))))
+    out += ["## Findings by class", "", "| Class | " + " | ".join(st.arms) + " |", "|---|" + "---|" * len(st.arms)]
+    got = {arm: [f["class"] for s in st.valid(arm) for f in st.found(s, arm)] for arm in st.arms}
+    for name, classes in [(k, (k,)) for k in CLASSES] + [("New work only (lens-caught + escape)", CLASSES[:2])]:
+        out.append("| %s | %s |" % (name, " | ".join(str(sum(1 for k in got[a] if k in classes)) for a in st.arms)))
+    out.append("| Missed | %s |" % " | ".join(str(sum(len(st.missed(s, a)) for s in st.valid(a))) for a in st.arms))
     ref_all = [f for s in st.slices for f in st.reference(s, False)]
     escapes = sum(1 for f in ref_all if f["class"] == "escape")
     out += ["", "Reference set: %d finding(s); %s were escapes." % (
@@ -2161,7 +2398,8 @@ def cmd_report(ctx, args):
 
 COMMANDS = {"eligible": cmd_eligible, "plan": cmd_plan, "collect": cmd_collect,
             "score": cmd_score, "status": cmd_status, "judge-pack": cmd_judge_pack,
-            "judge-apply": cmd_judge_apply, "fix-cost": cmd_fix_cost, "report": cmd_report}
+            "judge-apply": cmd_judge_apply, "fix-cost": cmd_fix_cost, "report": cmd_report,
+            "mark": cmd_mark, "escapes": cmd_escapes, "finalize": cmd_finalize}
 
 
 def main(argv, mem=HERE):
@@ -3110,8 +3348,12 @@ def _st_report(chk, tmp):
                    + [{"kind": "mutants", "slice": "s03", "label": "a1", "status": "budget", "generated": 0,
                        "caught": 0, "missed": 0, "unviable": 0, "timeouts": 0}])
     text = render_report(rows, cfg)
-    chk("report/class-lines-and-new-work-only", "| O-med | 10 | 10 | 10 | 1 | 20 | 0 |" in text
-        and "| S-med | 0 | 10 | 0 | 0 | 10 | 21 |" in text, text.split("## Findings by class")[1][:600])
+    by_class = text.split("## Findings by class")[1].split("\n\nReference set")[0]
+    chk("report/class-lines-and-new-work-only", by_class.strip().splitlines() == [
+        "| Class | S-med | S-high | O-med | O-high |", "|---|---|---|---|---|",
+        "| lens-caught | 0 | 0 | 10 | 0 |", "| escape | 10 | 0 | 10 | 0 |", "| base | 0 | 0 | 10 | 0 |",
+        "| spec | 0 | 0 | 1 | 0 |", "| New work only (lens-caught + escape) | 10 | 0 | 20 | 0 |",
+        "| Missed | 21 | 31 | 0 | 28 |"], by_class)
     chk("report/header-counts", "- Slices: 10 scored or degraded (0 degraded), 1 void." in text
         and "- Findings: 32 confirmed, 0 pending, 1 out of scope, 1 rejected for an incomplete verdict." in text, text[:500])
     chk("report/out-of-scope-and-rejected-not-counted", "s02 — base defect outside the slice's reach" in text
@@ -3166,6 +3408,276 @@ def _st_report(chk, tmp):
         and len({interval([-5.5, 5.1, -3.3, 8.7, 0.2, 2.9, -7.4, 4.6, 1.3, -2.2, 9.9]) for _ in range(4)}) == 1)
 
 
+def _by_command(box, slice_="np-a", finalize=("--no-score",)):
+    """A snapshot hook for _scenario that records g1, g2 and m the way a build session does."""
+    outs = {}
+
+    def hook(name, sha):
+        if name == "g1":
+            outs[name] = box.run("mark", slice_)
+        elif name == "g2":
+            outs[name] = box.run("escapes", slice_)
+        else:
+            outs[name] = box.run("finalize", slice_, "--repo", os.path.join(box.game, ".claude", "worktrees", slice_),
+                                 "--head", sha, *finalize)
+    return hook, outs
+
+
+def _retro_stub(box):
+    """A stand-in for mr-retro-request that addresses the sandbox and logs each call."""
+    log = os.path.join(box.tmp, "retro.log")
+    with open(os.path.join(box.mem, "mr-retro-request"), "w") as fh:
+        fh.write("#!/bin/bash\nMEM=%s\necho \"$*\" >> %s\n" % (box.mem, log))
+    return lambda: open(log).read().splitlines() if os.path.exists(log) else []
+
+
+@contextlib.contextmanager
+def _gh(box, merged=(), works=True, absent=False):
+    """Put a `gh` first on PATH that reports the given slices' PRs as merged, or fails; or take
+    every directory that holds a `gh` off PATH."""
+    bin_dir = os.path.join(box.tmp, "bin-%d" % len(os.listdir(box.tmp)))
+    os.makedirs(bin_dir)
+    with open(os.path.join(bin_dir, "gh"), "w") as fh:
+        fh.write("#!/bin/bash\n%s\ncase \" $* \" in %s *) echo '[]';; esac\n" % (
+            "" if works else "echo 'gh: not logged in' >&2; exit 4",
+            " ".join("*' slice/%s '*) echo '[{\"number\":1}]';;" % s for s in merged)))
+    os.chmod(os.path.join(bin_dir, "gh"), 0o755)
+    old = os.environ["PATH"]
+    os.environ["PATH"] = bin_dir + os.pathsep + old
+    if absent:
+        os.environ["PATH"] = os.pathsep.join(d for d in old.split(os.pathsep)
+                                             if d and not os.path.exists(os.path.join(d, "gh")))
+    try:
+        yield
+    finally:
+        os.environ["PATH"] = old
+
+
+def _st_session(chk, tmp):
+    extra = dict(prices=_PRICES, handoff_limit=3, escapes_in_session=True, escapes_budget_s=120,
+                 backstops={"max_scored_slices": 16, "loop_active_days": 45})
+    box = _Box(os.path.join(tmp, "session"), **extra)
+    hook, outs = _by_command(box)
+    wt = None
+
+    def dirty_then(name, sha):
+        # mark sees the tree as it stands: an uncommitted edit is part of the first green.
+        if name == "g1":
+            with open(os.path.join(box.game, ".claude", "worktrees", "np-a", "docs", "note.md"), "w") as fh:
+                fh.write("uncommitted\n")
+        hook(name, sha)
+        if name == "g1":
+            outs["mark-again"] = box.run("mark", "np-a")
+            git(os.path.join(box.game, ".claude", "worktrees", "np-a"), "checkout", "-q", "--", "docs/note.md")
+
+    wt = _scenario(box, hook=dirty_then)
+    snaps = snaps_of(box.rows(), "np-a")
+    chk("mark/records-first-green-with-uncommitted-work", outs["g1"].startswith("AB-MARK np-a: first green recorded")
+        and git(box.game, "show", snaps["g1"] + ":docs/note.md") == "uncommitted\n"
+        and "def=2" in git(box.game, "show", snaps["g1"] + ":game/rules.txt")
+        and git(box.game, "rev-parse", "refs/mr-ab/np-a/g1").strip() == snaps["g1"], outs["g1"])
+    chk("mark/once", outs["mark-again"] == "AB-SKIP g1 is already recorded for np-a\n"
+        and len([r for r in box.rows("snap", "np-a") if r["name"] == "g1"]) == 1, outs["mark-again"])
+    chk("mark/no-manifest", box.run("mark", "np-z") == "AB-SKIP no-manifest\n"
+        and box.run("escapes", "np-z") == "AB-SKIP no-manifest\n" and box.run("finalize", "np-z") == "AB-SKIP no-manifest\n")
+    # escapes: g2, then the shadow suites there; up to the limit of failing tests go to a file.
+    handoff = os.path.join(box.mem, "tester-ab", "np-a", "escapes.md")
+    text = open(handoff).read() if os.path.exists(handoff) else ""
+    handed = box.rows("handoff", "np-a")
+    lab = {label: arm for arm, (label, _) in box.labels("np-a").items()}
+    chk("escapes/records-g2", "def=3" in git(box.game, "show", snaps["g2"] + ":game/rules.txt")
+        and "spd=6" in git(box.game, "show", snaps["g2"] + ":game/rules.txt")
+        and "AB-ESCAPES np-a: green after the lens fixes recorded" in outs["g2"], outs["g2"])
+    # Failing at g2: t_spd twice, the claimed t_old, t_wrong. The limit is three.
+    chk("escapes/handoff-capped", "3 shadow test(s) fail here. Pass %s to the red-team" % handoff in outs["g2"]
+        and text.count("\n## e") == 3 and len(handed) == 3
+        and {h["test_id"].rsplit("::", 1)[1] for h in handed} <= {"t_spd", "t_old", "t_wrong"}, outs["g2"])
+    leaks = [w for w in [a["arm"] for a in _ARMS] + ["sonnet", "opus", box.cache, "s_med", "s_high", "o_med", "o_high"]
+             if w.lower() in text.lower()] + re.findall(r"\ba[1-5]\b", text)
+    chk("escapes/handoff-blind", leaks == [] and "expected " in text and "test t_" in text, leaks or text)
+    chk("escapes/runs-only-g2", {r["snap"] for r in box.rows("exec", "np-a")} == {"g2"})
+    # finalize: m is the commit the audit names.
+    chk("finalize/records-m", outs["m"] == "AB-FINALIZED np-a\n"
+        and "spd=7" in git(box.game, "show", snaps["m"] + ":game/rules.txt")
+        and git(box.game, "rev-parse", "refs/mr-ab/np-a/m").strip() == snaps["m"], outs["m"])
+    n = len(box.rows())
+    chk("finalize/once", box.run("finalize", "np-a", "--no-score") == "AB-FINALIZED np-a\n" and len(box.rows()) == n)
+    box.run("score", "np-a")
+    cands = latest(box.rows("candidate", "np-a"), lambda r: (r["label"], r.get("test_id") or r.get("claim_id")))
+    chk("escapes/handed-candidates-are-marked", {(c["label"], c["test_id"]) for c in cands if c["handed_in_session"]}
+        == {(h["label"], h["test_id"]) for h in handed} and len(cands) == 8,
+        [(lab[c["label"]], c.get("test_id"), c["handed_in_session"]) for c in cands])
+    chk("escapes/same-classes-as-offline", sorted(c["type"] for c in cands) == sorted(
+        ["lens-caught"] * 3 + ["escape"] * 2 + ["base", "open-fail", "spec"]), sorted(c["type"] for c in cands))
+    # Off by config, busy scorer, exhausted budget: g2 is recorded and the slice goes on.
+    for name, over, want in (("off", {"escapes_in_session": False}, None),
+                             ("budget", {"escapes_budget_s": 0}, "AB-SKIP budget"),
+                             ("busy", {}, "AB-SKIP scorer-busy")):
+        box2 = _Box(os.path.join(tmp, "escapes-" + name), **dict(extra, **over))
+        hook2, outs2 = _by_command(box2)
+        lock = None
+        if name == "busy":
+            os.makedirs(box2.cache, exist_ok=True)
+            lock = os.open(os.path.join(box2.cache, "score.lock"), os.O_WRONLY | os.O_CREAT, 0o644)
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            _scenario(box2, hook=hook2)
+        finally:
+            if lock is not None:
+                os.close(lock)
+        chk("escapes/%s-records-g2-and-hands-nothing" % name, "g2" in snaps_of(box2.rows(), "np-a")
+            and box2.rows("handoff", "np-a") == [] and not os.path.exists(os.path.join(box2.mem, "tester-ab", "np-a", "escapes.md"))
+            and (want is None or want in outs2["g2"]) and outs2["g2"].startswith("AB-ESCAPES np-a: green after")
+            and (name != "off" or box2.rows("exec", "np-a") == []), outs2["g2"])
+
+
+def _st_finalize(chk, tmp):
+    extra = dict(prices=_PRICES, backstops={"max_scored_slices": 16, "loop_active_days": 45})
+    # The detached score: finalize returns at once and the replay lands in the ledger.
+    box = _Box(os.path.join(tmp, "detached"), **extra)
+    hook, outs = _by_command(box, finalize=())
+    started = time.time()
+    _scenario(box, hook=hook)
+    waited = 0
+    while waited < 90 and len(box.rows("mutants", "np-a")) < 5:
+        time.sleep(0.5)
+        waited += 0.5
+    chk("finalize/starts-a-detached-score", outs["m"] == "AB-FINALIZED np-a\n" and len(box.rows("mutants", "np-a")) == 5
+        and any(r["snap"] == "m" for r in box.rows("exec", "np-a")) and box.rows("slice", "np-a"), (waited, outs["m"]))
+    with score_lock(box.ctx()):      # the scorer has let go before the sandbox is removed
+        pass
+    # Close on the required slices: every one finalized and merged, the current one counted as merging.
+    box = _Box(os.path.join(tmp, "close-required"), required_slices=["np-a", "np-b"], pr_repo="o/r", **extra)
+    retro = _retro_stub(box)
+    hook, outs = _by_command(box)
+    _scenario(box, hook=hook)
+    chk("close/not-before-every-required-slice", "AB-CLOSED" not in outs["m"] and not box.rows("close") and retro() == [])
+    wt = box.worktree("np-b")
+    box.run("plan", "np-b", "--prompt", box.prompt("np-b", wt))
+    for arm in ("S-med", "O-med"):
+        box.shadow("np-b", arm, {"tests/b.toy": _toy(_T_ATK)})
+    box.run("collect", "np-b")
+    with _gh(box, merged=()):
+        unmerged = box.run("finalize", "np-b", "--no-score")
+    chk("close/needs-the-others-merged", unmerged == "AB-FINALIZED np-b\n" and not box.rows("close"), unmerged)
+    with _gh(box, works=False):
+        broken = box.run("finalize", "np-b", "--no-score")
+    chk("close/fails-open-when-gh-cannot-answer", broken == "AB-FINALIZED np-b\n" and not box.rows("close")
+        and "m" in snaps_of(box.rows(), "np-b"), broken)
+    with _gh(box, absent=True):
+        have = shutil.which("gh")
+        none = box.run("finalize", "np-b", "--no-score")
+    chk("close/fails-open-without-gh", have is None and none == "AB-FINALIZED np-b\n" and not box.rows("close"), (have, none))
+    with _gh(box, merged=("np-a",)):
+        done = box.run("finalize", "np-b", "--no-score")
+        again = box.run("finalize", "np-b", "--no-score")
+        other = box.run("finalize", "np-a", "--no-score")
+    close = box.rows("close")
+    chk("close/required-slices", done == "AB-CLOSED required-slices\nAB-FINALIZED np-b\n" and len(close) == 1
+        and close[0]["reason"] == "required-slices" and close[0]["scored_slices"] == 2, done)
+    chk("close/fires-once", again == "AB-FINALIZED np-b\n" and other == "AB-FINALIZED np-a\n"
+        and len(box.rows("close")) == 1 and retro() == ["tester-ab close"], (again, retro()))
+    chk("close/plan-skips-afterwards", box.run("plan", "np-c", "--prompt", box.prompt("np-c", wt)) == "AB-SKIP closed\n")
+    # A planned slice without its m keeps the experiment open.
+    box = _Box(os.path.join(tmp, "close-unfinalized"), required_slices=["np-a"], pr_repo="o/r", **extra)
+    wt = box.worktree("np-b")
+    box.run("plan", "np-b", "--prompt", box.prompt("np-b", wt))
+    hook, outs = _by_command(box)
+    _scenario(box, hook=hook)
+    chk("close/waits-for-unfinalized-manifests", outs["m"] == "AB-FINALIZED np-a\n" and not box.rows("close"), outs["m"])
+    # The backstops, each alone.
+    for name, over in (("max-slices", {"backstops": {"max_scored_slices": 1, "loop_active_days": 45}}),
+                       ("cap", {"cap_arm_usd": 14})):
+        box = _Box(os.path.join(tmp, "close-" + name), **dict(extra, **over))
+        retro = _retro_stub(box)
+        hook, outs = _by_command(box)
+        _scenario(box, hook=hook)
+        chk("close/" + name, outs["m"] == "AB-CLOSED %s\nAB-FINALIZED np-a\n" % name
+            and [c["reason"] for c in box.rows("close")] == [name] and retro() == ["tester-ab close"], outs["m"])
+    # Loop-active days: distinct days with a commit on the default branch since the first m.
+    box = _Box(os.path.join(tmp, "close-days"), **dict(extra, backstops={"max_scored_slices": 16, "loop_active_days": 3}))
+    retro = _retro_stub(box)
+    hook, outs = _by_command(box)
+    _scenario(box, hook=hook)
+    opens = []
+    for days in (1, 1, 2):
+        opens.append(box.run("finalize", "np-a", "--no-score"))
+        stamp = "%d +0000" % (time.time() + days * 86400)
+        git(box.game, *_GIT_ID, "commit", "-q", "--allow-empty", "-m", "a later day",
+            env={"GIT_COMMITTER_DATE": stamp, "GIT_AUTHOR_DATE": stamp})
+    shut = box.run("finalize", "np-a", "--no-score")
+    chk("close/backstop-days", outs["m"] == "AB-FINALIZED np-a\n" and opens == ["AB-FINALIZED np-a\n"] * 3
+        and shut == "AB-CLOSED backstop-days\nAB-FINALIZED np-a\n" and retro() == ["tester-ab close"]
+        and [c["reason"] for c in box.rows("close")] == ["backstop-days"], (opens, shut))
+    # A copy of the real mr-retro-request addresses the live directory, so a sandbox never runs it.
+    box = _Box(os.path.join(tmp, "close-live-retro"), cap_arm_usd=1, **extra)
+    marker = os.path.join(box.tmp, "ran")
+    with open(os.path.join(box.mem, "mr-retro-request"), "w") as fh:
+        fh.write("#!/bin/bash\nMEM=/somewhere/else/memory/projects\ntouch %s\n" % marker)
+    hook, outs = _by_command(box)
+    _scenario(box, hook=hook)
+    chk("close/sandbox-never-queues-a-live-retro", "AB-CLOSED cap" in outs["m"] and not os.path.exists(marker), outs["m"])
+
+
+def _st_offline(chk, tmp):
+    """Without `mark`: g1 is derived from the first lens call after the primary, and later
+    tester calls are recorded as follow-ups."""
+    box = _Box(os.path.join(tmp, "offline"), prices=_PRICES, lens_roles=["reviewer", "verifier"])
+    made = {}
+
+    def hook(name, sha):
+        if name == "g1":
+            made["green"] = sha
+            time.sleep(1.1)
+            made["followup"] = box.transcript("Fix the wrong test", "sonnet", "medium", at=time.time())
+            made["lens"] = box.transcript("Review np-a", "opus", "medium", role="reviewer", at=time.time())
+            box.transcript("Review np-a again", "opus", "medium", role="reviewer", at=time.time() + 30)
+            time.sleep(1.1)
+        elif name == "m":
+            record_snap(box.ctx(), "np-a", "m", sha)
+
+    box.transcript("Review the np-a plan", "opus", "medium", role="reviewer", at=time.time() - 300)
+    _scenario(box, hook=hook)
+    box.run("score", "np-a")
+    g1 = [r for r in box.rows("snap", "np-a") if r["name"] == "g1"]
+    chk("offline/g1-derived-from-first-lens-call", len(g1) == 1 and g1[0]["sha"] == made["green"]
+        and g1[0]["source"] == "derived", g1)
+    follow = [r for r in box.rows("run", "np-a") if r["role"] == "followup"]
+    chk("offline/followup-testers-recorded-not-scored", [r["agent_id"] for r in follow] == [made["followup"]]
+        and follow[0]["cost_usd"] == 2.0 and spent(box.rows()) == 14.0, follow)
+    n = len(box.rows())
+    box.run("score", "np-a")
+    chk("offline/recorded-once", len(box.rows()) == n)
+    # No g2 was recorded either: a test that fails at the first green and passes at m is
+    # lens-caught, whichever fix turned it.
+    chk("offline/classes-with-a-derived-g1-and-no-g2", sorted(c["type"] for c in latest(
+        box.rows("candidate", "np-a"), lambda r: (r["label"], r.get("test_id") or r.get("claim_id")))) == sorted(
+        ["lens-caught"] * 5 + ["base", "open-fail", "spec"]))
+
+
+def _st_uncollected(chk, tmp):
+    """A session that ended before `collect`: scoring collects first, so the shadows' work is
+    kept and the exports go."""
+    box = _Box(os.path.join(tmp, "uncollected"), prices=_PRICES, required_slices=[])
+    wt = box.worktree("np-a")
+    box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+    for arm in ("S-med", "O-med"):
+        box.shadow("np-a", arm, {"tests/%s.toy" % arm.lower().replace("-", "_"): _toy(_T_ATK)})
+    sha = box.commit(wt, "green", {"game/rules.txt": "hp=10\nold=bug\nmp=4\natk=5\n"})
+    box.commit(wt, "after the audit", {"game/rules.txt": "hp=10\nold=bug\nmp=4\natk=6\n"})
+    box.run("finalize", "np-a", "--repo", wt, "--head", sha, "--no-score")
+    chk("finalize/m-is-the-audited-head-not-the-worktree-head", snaps_of(box.rows(), "np-a").get("m") == sha)
+    # An empty list of required slices is not a list that is complete.
+    chk("close/empty-required-list-never-closes", box.rows("close") == [])
+    out = box.run("score", "np-a")
+    runs = {r["arm"]: r["status"] for r in box.rows("run", "np-a")}
+    chk("score/collects-what-the-session-left", out.startswith("AB-SCORED np-a:")
+        and runs == {"S-med": "ok", "O-med": "ok", "S-high": "failed", "O-high": "failed", "S-med-r": "failed"}
+        and os.listdir(os.path.join(box.cache, "np-a")) == [] and box.ctx().manifest("np-a")["collected"]
+        and {r["result"] for r in box.rows("exec", "np-a")} == {"pass"}
+        and box.rows("slice", "np-a")[-1]["status"] == "degraded", (out, runs))
+
+
 def _st_shipped_config(chk):
     """The config beside this tool loads and has what the commands read."""
     try:
@@ -3203,8 +3715,9 @@ def _st_shipped_config(chk):
 
 
 _BATTERIES = [_st_disabled, _st_plan, _st_collect, _st_score, _st_no_game_diff, _st_ledger]
-_FLOOR = 130
+_FLOOR = 170
 _BATTERIES += [_st_judge, _st_report]
+_BATTERIES += [_st_session, _st_finalize, _st_offline, _st_uncollected]
 # MORE-BATTERIES
 
 

@@ -431,6 +431,29 @@ def emit(out, artifact_dir="/tmp"):
     except Exception:
         pass
 
+
+def finalize_ab(a, mem, tool=None, timeout=20):
+    """Tell the tester A/B experiment that this slice reached its pre-merge audit, when the
+    experiment planned the slice (a manifest exists). It records the audited head and starts its
+    own scoring detached. FAIL-OPEN: the call is bounded, its output and exit code are discarded,
+    and nothing it does or fails to do reaches the audit JSON or this tool's exit code.
+
+    `tool` and `timeout` are FUNCTION PARAMETERS, as in audit_acceptance: the selftest points
+    them at stubs. Never raises."""
+    try:
+        slice_id = a.get("slice", "")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", slice_id):
+            return
+        if not os.path.isfile(os.path.join(mem, "tester-ab", slice_id, "manifest.json")):
+            return
+        argv = [tool or os.path.join(mem, "mr-tester-ab"), "finalize", slice_id]
+        if a.get("repo") and a.get("head"):
+            argv += ["--repo", a["repo"], "--head", a["head"]]
+        subprocess.run(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=timeout)
+    except Exception:
+        pass
+
 # ============================ SELFTEST (gating tests — lp-04) ============================
 # TESTER-AUTHORED, TDD RED PHASE. The implementer MUST NOT edit anything below this line to
 # fit a buggy implementation; a wrong expectation is corrected FROM THE SPEC/PLAN by the tester.
@@ -466,11 +489,12 @@ import contextlib
 import glob as _st_glob
 import io
 import tempfile
+import time
 
 _ST_MISSING = "<key-absent>"
-_ST_COUNT_FLOOR = 62          # mirrored in mr-selfcheck's wiring; a shrinking battery must red.
-                              # 24 -> 62 with lp-gates' A battery (64 fixtures run). The old floor sat 33
-                              # below actual, so it could not have caught a battery losing half its teeth.
+_ST_COUNT_FLOOR = 70          # mirrored in mr-selfcheck's wiring; a shrinking battery must red.
+                              # 79 fixtures run. A floor far below the actual count cannot catch a
+                              # battery that loses half its teeth, so it follows the count up.
 
 
 class _StChk(object):
@@ -1706,6 +1730,48 @@ _ST_GIT_SCRUB = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIREC
                  "GIT_CEILING_DIRECTORIES")
 
 
+def _st_ab_battery(chk, tmp):
+    """finalize_ab: called only for a slice the experiment planned, with the audited head, and
+    a finalize that fails or hangs neither raises nor leaves anything behind."""
+    mem = _st_mkdir(tmp, "ab-mem")
+    seen = os.path.join(tmp, "ab-seen")
+
+    def stub(name, body):
+        path = os.path.join(tmp, "ab-" + name)
+        _st_w(path, "#!/bin/sh\n" + body + "\n")
+        os.chmod(path, 0o755)
+        return path
+
+    def listing():
+        return sorted(os.path.join(d, f) for d, _, fs in os.walk(mem) for f in fs)
+
+    record = stub("record", 'echo "$*" >> %s' % seen)
+    args = {"slice": "ab-s1", "repo": "/r", "head": "abc123"}
+    finalize_ab(args, mem, tool=record)
+    chk.check("AB1/no-manifest-no-call", False, os.path.exists(seen),
+              "a slice the experiment did not plan must not reach the tool at all")
+    _st_w(os.path.join(_st_mkdir(mem, "tester-ab", "ab-s1"), "manifest.json"), "{}")
+    before = listing()
+    finalize_ab(args, mem, tool=record)
+    got = open(seen).read() if os.path.exists(seen) else ""
+    chk.check("AB2/called-with-the-audited-head", "finalize ab-s1 --repo /r --head abc123\n", got)
+    finalize_ab({"slice": "ab-s1"}, mem, tool=record)
+    got = open(seen).read() if os.path.exists(seen) else ""
+    chk.check("AB3/no-repo-no-head-args", "finalize ab-s1 --repo /r --head abc123\nfinalize ab-s1\n", got)
+    chk.check("AB4/failing-finalize", None,
+              finalize_ab(args, mem, tool=stub("fail", "echo noise; echo more >&2; exit 3")),
+              "a failing finalize must be invisible")
+    start = time.time()
+    chk.check("AB5/hanging-finalize", None, finalize_ab(args, mem, tool=stub("hang", "exec sleep 30"), timeout=1))
+    chk.check("AB5/hanging-finalize/bounded", True, time.time() - start < 10,
+              "the call is bounded by its timeout, not by the tool")
+    chk.check("AB6/missing-tool", None, finalize_ab(args, mem, tool=os.path.join(tmp, "ab-absent")))
+    chk.check("AB7/hostile-slice-id", None, finalize_ab({"slice": "../../etc"}, mem, tool=record))
+    got = open(seen).read() if os.path.exists(seen) else ""
+    chk.check("AB7/hostile-slice-id/not-called", 2, got.count("\n"))
+    chk.check("AB8/leaves-nothing-behind", before, listing())
+
+
 def selftest():
     """Scrubs repo-redirecting GIT_* vars for the WHOLE run, then restores them.
 
@@ -1733,6 +1799,7 @@ def _selftest():
         _st_x_battery(chk, tmp, logs)
         _st_a_battery(chk, tmp)
         _st_t_battery(chk, tmp)
+        _st_ab_battery(chk, tmp)
 
     # ---- X3: the selftest writes NOTHING under /tmp -------------------------------------------
     # Every emit() above is handed an artifact_dir inside the tempdir. A single missed argument
@@ -1806,5 +1873,7 @@ except Exception as e:
 if out["disposition"].get("status") == "AUDIT-ERROR":
     force_read(out, "disposition-corpus-unreadable")
 emit(out)
+# After the verdict is printed and written, so nothing the experiment's tool does can change it.
+finalize_ab(a, os.environ["A_MEM"])
 sys.exit(0)
 PY
