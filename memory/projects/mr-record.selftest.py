@@ -41,7 +41,7 @@ def write(path, text, exe=False):
 
 
 def base_env():
-    env = dict(os.environ)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     for k in ("MR_BACKUP_ROOT", "MR_RECORD_PRUNE_MEM", "MR_RECORD_PRUNE_TIMEOUT"):
         env.pop(k, None)
     env.update({
@@ -261,6 +261,18 @@ def a2_non_merged_closing_row_no_call():
     with_world(body, {"m-one.spec.md": ["a", "b", "c"]}, ["a", "b"])
 
 
+def a2_unclosed_fence_spec():
+    def body(w):
+        write(os.path.join(w.corpus, "m-one.spec.md"),
+              "# Spec\n\n## Slices\n\n### a — A\ntype: feature\n```\n### b — B\n")
+        r = record(w, "a")
+        check(r.returncode == 0, "rc %s: %s" % (r.returncode, r.stderr))
+        check(row_in_ledger(w, "a", "MERGED"), "MERGED row not appended")
+        check(calls_of(w) == [], "mr-prune ran for a spec with an unclosed fence")
+        check(len(warns(r)) == 1, "expected one WARN prune-close line, got %r" % warns(r))
+    with_world(body, {"m-one.spec.md": ["a", "b"]}, [])
+
+
 # ================================================================================ TP5-A3
 def a3_structure_residuals_none():
     cases = [("structure.spec.md", "st-1", ["st-1"]),
@@ -273,10 +285,10 @@ def a3_structure_residuals_none():
             check(row_in_ledger(w, sid, "MERGED"), "%s: row not appended" % sid)
             check(calls_of(w) == [], "%s: mr-prune ran" % sid)
             check(warns(r) == [], "%s: unexpected WARN prune-close" % sid)
-        specs = {"m-one.spec.md": ["a"]}
+        specs = {"m-one.spec.md": ["a"]}      # complete once `a` is merged: only the holding-spec rule stops the call
         if name:
             specs[name] = ids
-        with_world(body, specs, [])
+        with_world(body, specs, ["a"])
 
 
 # ================================================================================ TP5-A4
@@ -296,6 +308,19 @@ def a4_failure_is_total():
     with_world(body_for(0, 20), specs, ["a", "b"], with_prune=False)
     with_world(body_for(1, 20), specs, ["a", "b"], mode="fail")
     with_world(body_for(1, 20), specs, ["a", "b"], mode="sleep")
+
+
+def a4_fetch_failure_stops_census():
+    def body(w):
+        git("remote", "set-url", "origin", os.path.join(w.sb, "no-such-origin.git"), cwd=w.repo)
+        r = record(w, "c")
+        check(r.returncode == 0, "rc %s: %s" % (r.returncode, r.stderr))
+        check(row_in_ledger(w, "c", "MERGED"), "ledger row lost")
+        check(len(warns(r)) == 1, "expected one WARN prune-close line, got %r" % warns(r))
+        check(calls_of(w) == [], "mr-prune ran after a failed fetch")
+        check(not [l for l in r.stdout.splitlines() if l.startswith("prune-close: ")],
+              "success line printed on failure")
+    with_world(body, {"m-one.spec.md": ["a", "b", "c"]}, ["a", "b"])
 
 
 # ================================================================================ TP5-A5
@@ -417,9 +442,9 @@ def a8_close_is_a_file():
 
 FIXTURES = {
     "TP5-A1": [a1_last_slice_runs_close, a1_integration_real_prune],
-    "TP5-A2": [a2_incomplete_no_call, a2_non_merged_closing_row_no_call],
+    "TP5-A2": [a2_incomplete_no_call, a2_non_merged_closing_row_no_call, a2_unclosed_fence_spec],
     "TP5-A3": [a3_structure_residuals_none],
-    "TP5-A4": [a4_failure_is_total],
+    "TP5-A4": [a4_failure_is_total, a4_fetch_failure_stops_census],
     "TP5-A5": [a5_no_prune_dir_no_hook],
     "TP5-A6": [a6_one_entry, a6_two_sorted],
     "TP5-A7": [a7_no_section_file, a7_spec_gone],
@@ -434,6 +459,34 @@ def size_of(path):
         return os.path.getsize(path)
     except OSError:
         return None
+
+
+FIXTURE_RUN_IDS = {"run-new"}
+FIXTURE_SLICES = {"a", "b", "c", "st-1", "r-1", "zzz-1", "m-1"}
+
+
+def real_ledger_leak(before):
+    """The live loop may append to the real ledger meanwhile: only bytes past the starting offset
+    are read, and only a row naming a fixture run_id or slice (or a shrink) is a failure."""
+    now = size_of(REAL_LEDGER)
+    if before is None:
+        return None if now is None else None
+    if now is None or now < before:
+        return "the real ledger shrank or vanished"
+    with open(REAL_LEDGER, "rb") as f:
+        f.seek(before)
+        tail = f.read().decode("utf-8", "replace")
+    for line in tail.splitlines():
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(d, dict):
+            continue
+        rid = str(d.get("run_id") or "")
+        if rid in FIXTURE_RUN_IDS or rid.startswith("old-") or d.get("slice") in FIXTURE_SLICES:
+            return "a fixture row reached the real ledger: %s" % line[:120]
+    return None
 
 
 def main(argv):
@@ -456,9 +509,10 @@ def main(argv):
             except Exception as e:
                 failed = True
                 print("RECORD-SELFTEST-FAIL %s: %s: %s: %s" % (fid, case.__name__, type(e).__name__, e))
-    if size_of(REAL_LEDGER) != before:
+    leak = real_ledger_leak(before)
+    if leak:
         failed = True
-        print("RECORD-SELFTEST-FAIL %s: the real ledger changed size" % run_ids[0])
+        print("RECORD-SELFTEST-FAIL %s: %s" % (run_ids[0], leak))
     if failed:
         return 1
     print("RECORD-SELFTEST-OK %d%s" % (n, "".join(" " + i for i in ids)))

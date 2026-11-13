@@ -1663,7 +1663,7 @@ DJ() { "$MEM/mr-disjoint" "$@" 2>/dev/null | /usr/bin/python3 -c 'import json,sy
 # the merge-time close census (mr-record's prune-close hook) and the bundle's prune_close field.
 # The fixture count is parsed so a battery that stops running its cases cannot read as a pass.
 RS_N=$("$MEM/mr-record" --selftest 2>/dev/null | sed -n 's/^RECORD-SELFTEST-OK \([0-9][0-9]*\)$/\1/p')
-[ "${RS_N:-0}" -ge 18 ] || { echo "SELFCHECK-FAIL mr-record selftest (fixtures run: ${RS_N:-none}, floor 18)"; BAD=1; }
+[ "${RS_N:-0}" -ge 20 ] || { echo "SELFCHECK-FAIL mr-record selftest (fixtures run: ${RS_N:-none}, floor 20)"; BAD=1; }
 # launch machinery: brief rendering, placeholder integrity, repo routing, probe behavior.
 "$MEM/mr-spawn" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-spawn selftest"; BAD=1; }
 # lp-04: mr-audit's policy/detector split + the disposition sweep.
