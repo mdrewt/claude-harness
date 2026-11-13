@@ -148,22 +148,25 @@ broken keep file can only add rows.
 
 close records, once per milestone, what the milestone's own commits added and the candidates in
 the files they changed. FILE is the milestone's spec, named `<label>.spec.md` with a label of
-[A-Za-z0-9_.-]; a FILE named otherwise, or with no slice, is a PRUNE-ERROR.
+[A-Za-z0-9_.-]; a FILE named otherwise, or with no slice, is a PRUNE-ERROR. REF is read as it
+stands in R: nothing is fetched, so the caller brings R up to date first.
   Slices   the `### <id> — ` headings under FILE's `## Slices` heading, code fences aside.
   Commits  a commit names a slice when its subject is `<type>[(<scope>)][!]: <id> — ...`: a
-           Conventional Commit prefix with a lower-case type, then the id as the first word, one
-           space, an em dash, one space. A commit is undone when a later commit that is not
-           itself undone says it reverts it: the later message holds `This reverts commit <sha>`
-           (seven or more hex digits that begin the commit's id), or the later subject is
-           `Revert "<subject>"`, a trailing ` (#N)` aside on both. One `Revert "..."` undoes one
-           commit, the newest earlier one with that subject. The milestone's commits are the
-           commits reachable from REF that name one of its slices and are not undone; a slice
-           with none is `unmatched`. Commits between them that name none of its slices add
-           nothing.
-  Changed  the paths in `git show --numstat` of each of those commits against its first parent,
-           a rename read as a delete and an add. A path is a test file or a product file as
-           census's totals count them (the package patterns above), whether or not it still
-           exists; any other path adds to no line count.
+           Conventional Commit prefix with a lower-case type other than `revert`, then the id as
+           the first word, one space, an em dash, one space. A commit is undone when a later
+           commit that is not itself undone says it reverts it. A commit says so in one way
+           only: a message line starting `This reverts commit <sha>` (seven or more hex digits
+           that begin the reverted commit's id); or, with no such line, the subject
+           `Revert "<subject>"`, which undoes the newest earlier commit with that subject that
+           is not already undone, a trailing ` (#N)` aside on both. The milestone's commits are
+           the commits reachable from REF that name one of its slices and are not undone; a
+           slice with none is `unmatched`. A commit that names none of its slices adds nothing,
+           wherever it sits.
+  Changed  the paths in `git show --numstat` of each of those commits, a rename read as a delete
+           and an add. A merge commit adds no path and no line: what it brings in counts on the
+           commits it merges. A path is a test file or a product file as census's totals count
+           them (the package patterns above), whether or not it still exists; any other path,
+           and a file git shows as binary, adds to no line count.
   Rows     census's `duplicates`, `protected-twins`, `orphans` and `orphan-protected` rows at REF
            with a file among the changed paths, in census's order. A twin row's file is its test
            file; an orphan row's files are the defining file and its tests.
@@ -180,36 +183,45 @@ the files they changed. FILE is the milestone's spec, named `<label>.spec.md` wi
                       entry could not name.
   Section  the `structure` rows are walked `duplicates` first, then `orphans`, each by file, then
            name. A row is taken when the section then holds at most 6 rows and 12 distinct
-           files; a row not taken is marked over-cap and the walk goes on. The section file is
-           written when a row is taken and DIR/mr-tester-ab.jsonl holds a row of kind `close`
-           (the tester A/B experiment has closed). It is one section in structure.spec.md's
-           shape, its id left as `st-<n>` for whoever appends it:
-               ### st-<n> — <title>
+           files; a row not taken is marked over-cap and the walk goes on. The marks are made
+           whether or not a section file is written. The file is written when a row is taken
+           and DIR/mr-tester-ab.jsonl holds a line that is a JSON object with "kind": "close"
+           (the tester A/B experiment has closed; a file that is missing or unreadable holds
+           none). It is one section in structure.spec.md's shape, its id left as `st-<n>` for
+           whoever appends it:
+               ### st-<n> — <label>: twin tests and unreached symbols from the close census
                type: refactor · tier: routine
                touches: <the files of its rows, sorted, comma-separated>
                after: []
-           then, per row, a list item naming the row (file, and the candidate or the symbol; a
-           test name as a JSON string) with three sub-items: `reason:` (a same-block twin; a
-           symbol no production file names, or one compiled only under test), `surviving check:`
-           (the survivor by file and name; for a symbol, the compiler and the suites that still
-           run) and `confirmed at merge:` (what the supervisor, who is not the tester that made
-           the deletion, checks: `mr-prune twin` on the PR base, the `moved-tests:` row). It
-           ends with one criterion, `- **ST<n>.1:** WHEN ... SHALL pass.`: the suites of the
-           listed files' packages. A row is a candidate there too: the run that builds the
-           section removes only the rows it confirms.
+           then a paragraph on how the rows are read, and one list item per row:
+               - `<file>` :: <candidate, or symbol>
+                 - reason: a same-block twin | a symbol no production file names | a symbol
+                   compiled only under test
+                 - surviving check: `<file>` :: <survivor> | the compiler, and the suites that
+                   still run
+                 - confirmed at merge: what the supervisor, who is not the tester that made the
+                   deletion, checks (`mr-prune twin` on the PR base; the `moved-tests:` rows)
+           then a `Pins:` line and one criterion, `- **ST<n>.1:** WHEN ... SHALL pass.`, naming
+           the suites of the listed files' packages. Every test and symbol name in it is an
+           ASCII JSON string with the H of `SHALL` written as its unicode escape: it decodes to
+           the name, cannot break a line, and leaves the criterion the only line a ledger seeds
+           a gate from. A row is a candidate there too: the run that builds the section removes
+           only the rows it confirms.
   Writes   all under DIR/prune/, in this order:
            close/<label>.json        {"label", "commit", "spec": FILE's name,
                                       "experiment-closed": bool, "section": the section file's
-                                      name or null, "rows": [...]}. A twin row is {"kind",
-                                      "file", "candidate", "survivor", "route"}; an orphan row
-                                      {"kind", "file", "symbol", "test-only", "tests", "route"}.
-                                      A protected row adds "token", a `slice` row "slices":
-                                      [{"spec", "slice"}, ...], a `structure` row "over-cap":
-                                      bool.
-           close/<label>.section.md  when due; a file of that name left by a run that stopped
-                                      early is removed when none is due.
-           trend.jsonl               one appended row: `census --record <label>`'s row (with a
-                                      `ci` object under --ci) plus "close": {
+                                      name without a directory, or null, "rows": [...]}. A twin
+                                      row is {"kind", "file", "candidate", "survivor", "route"};
+                                      an orphan row {"kind", "file", "symbol", "test-only",
+                                      "tests", "route"}. A protected row adds "token", a `slice`
+                                      row "slices": [{"spec", "slice"}, ...], a `structure` row
+                                      "over-cap": bool.
+           close/<label>.section.md  when due. A file of that name is removed when none is due,
+                                      and again when the trend row cannot be written, so a
+                                      section file always has its row.
+           trend.jsonl               one appended row, on a line of its own: `census --record
+                                      <label>`'s row (with a `ci` object under --ci) plus
+                                      "close": {
                                         "slices": {<id>: [<commit>, ...]}  matched ids in FILE's
                                                                     order, commits oldest first
                                         "unmatched": [<id>, ...]
@@ -220,19 +232,23 @@ the files they changed. FILE is the milestone's spec, named `<label>.spec.md` wi
                                                     "test-lines": N, "product-lines": N,
                                                     "ratio": X.XX or null}
                                                                     the changed paths that are
-                                                                    files at REF, their lines
-                                                                    there, test over product
+                                                                    files at REF and their lines
+                                                                    there; test over product to
+                                                                    two decimals, null over zero
                                         "signals": {"source-text": N, "churn": N,
                                                     "protected-churn": N, "widened": N}}
                                                                     changed test files at REF
                                                                     carrying each signal
-  Output   `PRUNE-CLOSE <label> <commit>`, a `slice <id> <commit>...` line per matched slice, an
-           `unmatched <id>` line per other slice, `rows listed=N slice=N structure=N report=N
-           over-cap=N`, `section <file name>` or `section none`, the `ci` line under --ci, and
-           `recorded <label>`. When trend.jsonl already holds a row with this label and a
-           `close` object: `PRUNE-CLOSE-SKIP <label>` alone, nothing is read from R or written,
-           rc=0. A `*.spec.md` beside FILE that cannot be read is skipped with `PRUNE-WARN spec
-           ...` on stderr.
+  Output   `PRUNE-CLOSE <label> <commit>`, a `slice <id> <commit> [<commit> ...]` line per matched
+           slice, an `unmatched <id>` line per other slice, `rows listed=N slice=N structure=N
+           report=N over-cap=N`, `section <file name>` or `section none`, the `ci` line under
+           --ci, and `recorded <label>`. A `*.spec.md` beside FILE that cannot be read is skipped
+           with `PRUNE-WARN spec ...` on stderr.
+  Once     when trend.jsonl already holds a line that is a JSON object with this label and a
+           `close` object, the answer is `PRUNE-CLOSE-SKIP <label>` alone: nothing is read from
+           R, nothing is written, rc=0. Argument and FILE errors come before it. Any other line
+           is passed over (a `census --record` row under the same label is not a close); a
+           trend.jsonl that cannot be read is a PRUNE-ERROR, since the check cannot be made.
 
 The inspected repository is read through `git rev-parse`, `git ls-tree`, `git cat-file`,
 `git log` and `git show` at the commit; nothing is checked out and the work tree is never read.
