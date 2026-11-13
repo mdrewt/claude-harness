@@ -98,3 +98,111 @@ ten specs themselves.
 
 Confirmed in the diff at merge, not by a criterion: each of the ten specs imports its helper from
 `./stdb` and its local copy is gone.
+
+### st-3 — shared roster and count pins: one owner per fact
+type: design · tier: hard
+blocked: tester-ab-close
+touches: docs/DECISIONS.md, docs/refactors/test-pins.md
+after: []
+
+Several client tests assert the same fact as a literal, so a slice that adds one screen, string or
+subscription edits test files outside its own modules. The help overlay's 16 rows are asserted
+eight times across `client/src/main.help.test.ts` and `client/src/ui/helpView.test.ts`; the 29
+subscription queries four times across `client/src/net/connection.runtime.test.ts` and
+`client/src/net/connection.test.ts`; `OVERLAY_IDS` is named in 33 test files.
+The files changed most often by commits that did not change their subject are
+`client/src/ui/i18n/catalog.test.ts`, `ui/screens/index.test.ts`, `ui/i18n/catalogParity.test.ts`,
+`ui/contextStack.test.ts` and `ui/reachability.test.ts`. Most are accessibility, i18n,
+reachability and privacy gates. This slice decides, for each fact pinned in more than one place,
+which one test owns the literal and what every other test asserts instead. It changes no code and
+removes no gate: every protected behaviour keeps an executing check.
+
+It reads those files in full, with `memory/projects/mr-prune census --mem memory/projects` output
+(`protected-churn`, `signals`) and the `gates/*.widened.jsonl` rows when the tool and rows exist.
+It has a `judge` score at least two designs, one of which is "leave the pins as they are":
+`mr-touches widen` already lets a run add a pin file to its own `touches:`, so the plan states
+what the pins still cost.
+The block lifts when `memory/projects/mr-tester-ab.jsonl` holds a `close` row: a shadow test that
+edits a pin file stops applying once a consolidation rewrites it, which that experiment scores as
+a brittle break.
+
+`docs/refactors/test-pins.md` records:
+
+- each shared fact: its name, the product value it comes from, and every test that asserts it;
+- the owner test for each, and for every other assertion one disposition: derive the expected
+  value from the product registry, assert on the test's own entity only, or delete with the
+  surviving test named by path and name (`standards/testing-tdd.md` §Deleting a check; a
+  protected-category deletion names how the survivor is demonstrated);
+- for a pin that reads source text, its disposition under §Behavior-preserving changes;
+- the slices still to make, in order, one line each: the fact and the test files it edits.
+
+`docs/DECISIONS.md` gets one entry for the rule chosen and the one it rules out.
+
+- **ST3.1:** WHEN the client is type-checked and the vitest suites of the files the plan names run
+  THEY SHALL pass.
+
+Confirmed by reading at merge, not by a criterion: every fact the plan lists names an owner test
+that exists; no listed disposition leaves a protected behaviour with no executing check; the
+run's log shows the `judge`.
+
+### st-4 — what stays of the 1v1 battle rules in `game-core`
+type: design · tier: hard
+blocked: tester-ab-close
+touches: docs/DECISIONS.md, docs/refactors/combat-carried-rules.md
+after: []
+
+`docs/DECISIONS.md` "Battles run on one engine at a time; the tactical cutover was a flip, not a
+toggle" keeps `game-core`'s `combat::*` as the type home of the stored `Battle.state` and of the
+rules the tactical engine reuses. Part of it has no production caller. No production file outside
+`game-core/src/combat/` and the `lib.rs` re-export names `resolve_turn`, `resolve_full_turn`,
+`resolve_enemy_turn`, `resolve_player_swap`, `resolve_recruit_failure`, `advance_turn`
+(`combat/resolve.rs`), `weather_attack_modifier`, `apply_weather_damage`, `tick_weather`
+(`combat/weather.rs`), `apply_entry_ability`, `apply_ability_modifiers` (`combat/ability.rs`),
+`TurnChoice` or `TurnVariance`. Their tests are `combat/battle_core_tests.rs`,
+`combat/battle_0hp_tests.rs`, `combat/weather_tests.rs`, `combat/ability_tests.rs`,
+`monster/battle_redteam_tests.rs` and part of `combat/status_tests.rs`; `benches/hot_paths.rs`
+and `benches/budgets.rs` time `resolve_turn`. The same decision leaves ten row-to-`BattleMonster`
+helpers in `server-module/src/marshal.rs` and `content_cache.rs` compiled only under `cfg(test)`
+"until they are deleted with named survivors". This slice decides what goes, what stays and in
+what order. It changes no code.
+
+It reads `game-core/src/combat/` and `game-core/src/tactics/` in full, with the tests named above
+and `memory/projects/mr-prune census` `orphans` output when the tool exists; the code graphs
+(`code-intel` skill) answer what calls each symbol. It has a `judge` score at least two designs,
+one of which keeps everything. The result respects these, or says in the decision entry what it
+supersedes:
+
+- Types stored in `Battle.state` and every rule a production tactical path calls stay (schema
+  changes are additive).
+- Entry abilities and weather return with the tactical depth waves (PLAN §9, M-battle-tactics
+  depth); the plan says whether their 1v1 rules stay as the source for that work.
+- `tactics/resolve_tests.rs`, `tactics/queue_tests.rs` and `tactics/upkeep_tests.rs` execute
+  `resolve_turn`, `apply_pre_turn_effects` and `apply_post_turn_effects` as the expected value for
+  carried rules. The plan says what each compares against once its oracle goes.
+- `monster/battle_redteam_tests.rs` holds tests written for past findings. Each gets one
+  disposition: the rule is carried, with the surviving tactical test named and demonstrated as
+  `standards/testing-tdd.md` §Deleting a check requires for a protected category; or the
+  behaviour has no production path, with the symbol whose removal proves it.
+
+The block lifts when `memory/projects/mr-tester-ab.jsonl` holds a `close` row: a shadow test that
+calls a symbol an extraction deletes stops compiling, which that experiment scores as a brittle
+break.
+
+`docs/refactors/combat-carried-rules.md` records:
+
+- every `pub` item of `game-core/src/combat/` as stored type, carried rule, test oracle, source
+  for a deferred wave, or unreached;
+- for each test file named above, which tests stay and, per removed test family, the surviving
+  test or the removed symbol;
+- the `.cargo/mutants.toml` entries, bench budgets and `budget_check_tests.rs` rows that name a
+  removed function;
+- the extractions still to make, in order, one line each: the symbols and test files it removes.
+
+`docs/DECISIONS.md` gets the outcome under the existing battle-engine entry, superseding in place
+what it says about `combat::*`.
+
+- **ST4.1:** WHEN `cargo nextest run -p game-core -p server-module` runs THE suites SHALL pass.
+
+Confirmed by reading at merge, not by a criterion: every symbol and test file the plan names
+exists; no item classed unreached is named by a production file; each `battle_redteam_tests.rs`
+test has a disposition; the run's log shows the `judge`.

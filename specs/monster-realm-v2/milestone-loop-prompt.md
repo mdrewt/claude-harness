@@ -27,7 +27,8 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
    testable, security (`ctx.sender()`, reject-never-clamp) and determinism criteria where they
    apply, netcode-smoothness criteria for any movement/render surface · Plan (API/table/data
    sketches, version-sensitive SpacetimeDB flags, a "what the next milestone consumes" boundary
-   preview) · Tasks as small vertical slices (`M{N}a/b/…`), **each with an explicit `touches:`
+   preview; the contract of every interface a slice adds; numbers as absolute budgets or a
+   first-slice baseline, per `standards/spec-driven.md` §Rules) · Tasks as small vertical slices (`M{N}a/b/…`), **each with an explicit `touches:`
    path-set** along natural module boundaries so disjoint slices can fan out; slice order follows
    the real dependency chain (rule → reducer → client), not just file-disjointness · Risks/decisions.
    A feature slice's `touches:` lists the files its design names and every file a sibling slice
@@ -92,6 +93,8 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
   module, or gives one line on why no seam exists yet; every slice that moves code is
   `type: refactor` with its tier, pins and measured `touches:`.
 - Risks/decisions recorded; PLAN §9 line updated; no contradictions left in live files.
+- Every `blocked:` names its lifting event, who lifts it and a fallback; every follow-up is a
+  tracked row.
 
 ## Cross-cutting invariants (apply where the milestone adds the thing)
 
@@ -134,7 +137,7 @@ pass).
   navigable by D-pad + buttons; never add a mandatory single-purpose hotkey (accelerators are
   optional and remappable).
 - **M-gamepad** (sketch): controller support as one more input source on the virtual-button
-  layer; must land before launch. Elaborate after M-postgate-console-controls merges.
+  layer; must land before early access. Elaborate after M-postgate-console-controls merges.
 - **M-postgate-client-coverage**: specced and re-scoped 2026-10-01 (pgcc-b superseded by the
   controls milestone).
 

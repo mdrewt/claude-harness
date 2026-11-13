@@ -96,9 +96,9 @@ account issuer, with the official server rejecting any other audience.
 
 - Private worlds run the official rules until `M-modding`; a host controls only who may join.
 - **Idle rule (operator, 2026-11-12):** a zone with no player in it does not update, or updates as
-  little as possible. Built for zones (game #745): with nobody connected a world runs one
-  write-free heartbeat call a minute and two housekeeping intervals, and writes nothing to disk.
-  LP0 measures what is left; a session resuming where it left off is `M-scale-readiness` SR11.
+  little as possible. Built (game #745, #750, #751): with nobody connected a world runs one
+  write-free heartbeat call a minute and writes nothing to disk, and a player who returns appears
+  on the tile they left. LP0 measures what is left.
 - Costs that matter more on a player's machine than on ours, found on 2026-11-12: commit-log growth, `battle_summary` never reaped (`M-scale-readiness` SR7), the device-resolution
   terrain bake (SR8).
 - The privacy model (private tables behind owner-scoped views) still keeps one player's data from

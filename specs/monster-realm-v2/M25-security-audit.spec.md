@@ -194,6 +194,31 @@ Each item is ticked **met**, or given a finding with a disposition. Then the ope
 - [ ] Export is owner-only, rate-limited and reaped. Evidence: `m22s4_exporter_set_equals_manifest_both_directions`,
   `acct_export_reaper_deletes_whole_bundles_only`, `EXPORT_REQUEST_COOLDOWN_MS` (`privacy.rs`).
 - [ ] Backups honour deletion: `observability-dr.md` §8 has been followed for the launch deployment.
+- [ ] The data export's scope has been checked by someone qualified against the privacy rules that
+  apply where the official server's players are (operator, 2026-11-13: the export is for the data
+  held about the person; game state is included where a query on existing tables provides it, and
+  no table or column is added for the export's sake). Evidence: the reviewer's note and
+  `schema::DATA_LIFECYCLE_MANIFEST`'s `exportable` column.
+- [ ] A person can get everything held about them, not only the self-service export: a contact route
+  is published and the privacy runbook says how to answer an access request by hand within a month,
+  including rows the export leaves out. Evidence: the runbook section and the published route.
+- [ ] Person-level data held outside the game database is inventoried, each with what it holds, why,
+  how long it is kept, and how it is exported and deleted: the account issuer's database (the data
+  the issuer needs to function), server and ingress logs, client telemetry, and backups. The
+  operator's rule (2026-11-13) is that nothing beyond what the issuer needs is collected about a
+  person, except diagnostics used to improve the game (bug reports, performance metrics), and that
+  no player data is sold or shared with a third party; the inventory shows that holds, and states
+  for the diagnostics what identity they carry and what notice or consent they need.
+  Evidence: the inventory in the privacy runbook; log and telemetry samples checked for identities
+  and IP addresses.
+  The inventory marks each of these "applies" (with the same fields) or "does not apply": IP
+  addresses and connection records kept for rate limiting, attack blocking and bans · the
+  processors that run the service (host, email sender, Steam) · records kept to honour a deletion
+  (tombstones, anonymised rows) · moderation records, chat logs and reports · player-written content
+  other players see (names, guild names, chat) · linked platform identities · public standings ·
+  anti-cheat signals · support correspondence, including access and deletion requests · consent
+  and age records · purchase and tax records · legal preservation requests · playtest feedback
+  naming testers.
 
 **D. Dependency and build audit**
 - [ ] `cargo audit` is clean and gitleaks is clean (both blocking in CI, `.github/workflows/ci.yml`).

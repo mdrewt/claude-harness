@@ -56,7 +56,50 @@ optional. Omit empty sections — never fill with filler.
   slice is one mergeable structural change with behavior unchanged (§Refactor
   slices).
 - Acceptance criteria are the source for the `tester` subagent's tests.
-- Changing intent means changing the spec first, then regenerating code.
+- A slice that adds an interface another slice, its own tests or the client calls
+  states that contract in its section (names, signatures, data shapes): the tests
+  are written before the code, by a different author, and both work to it.
+- An acceptance number is an absolute budget, or is set from a baseline the first
+  slice measures. A relative figure names its absolute anchor.
+- A `blocked:` names the event that lifts it, who lifts it, and what happens if the
+  event never comes.
+- A follow-up is a tracked row (a residual, a DEFER or a spec section), never a
+  sentence in a PR body, a commit message or a note.
+- Changing intent means changing the spec first, then regenerating code. Changing
+  the plan does not (§Adapting the plan during a build).
+
+## Adapting the plan during a build
+
+A spec fixes the intent and the acceptance criteria. Its plan (the API and table
+sketches, the suggested mechanism, the task order inside a slice) is the best
+guess of someone who had not built it yet. The agent building a slice adapts
+the plan when it meets something the spec did not foresee, or sees a way that
+is genuinely better, and says so.
+
+- **Free to change:** how a criterion is met — the mechanism, the internal
+  design, names not fixed by a stated contract, the order of work, an extra test
+  or a simpler structure — as long as every criterion is still met and the diff
+  stays inside the slice's `touches:` (widened by measurement where the tooling
+  allows).
+- **"Genuinely better"** means measurably so, or plainly simpler for the same
+  behaviour: fewer moving parts, a defect the planned way would have had, a
+  cheaper path to the same criterion. A preference is not a reason, and neither
+  is scope the spec did not ask for.
+- **A criterion that turns out wrong or unreachable** is not silently dropped
+  or reinterpreted. The agent meets the intent another way and records the
+  criterion as deferred with what it did instead, or parks if the intent itself
+  is in doubt. Whoever merges adjudicates, and the spec is amended then.
+- **Never the builder's to change:** persisted data, the schema or the wire
+  format beyond what the spec states; gameplay or anything a player sees; the
+  security or privacy posture; a cost ceiling; anything git cannot undo; a gate,
+  a guard or the loop's own tooling. Those go to the operator or the supervisor
+  as before.
+- **An improvement outside the slice** is a tracked follow-up, not extra scope.
+- **Every adaptation is recorded where the merge audit reads it:** a
+  `plan-delta:` heading in the PR body with one line each — what the spec
+  planned, what was built, and the evidence that it is better or that the plan
+  could not work. An unrecorded departure is a defect even when the result is
+  right.
 
 ## Refactor slices
 A refactor slice changes where code lives or how modules reach each other, and
