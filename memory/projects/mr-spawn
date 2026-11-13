@@ -260,6 +260,12 @@ def t6_end_to_end(selfdir):
         if "Must-apply skills" not in written:
             print("SKILLS-SELFTEST-FAIL t6-missing-header: rendered brief has no skills header")
             bad = 1
+        # A run's spec notes have a home it can write; a spec in a main checkout is not one.
+        if ("spec gaps/follow-ups: `$MEM/mr-gates notes add`, never a main-checkout edit"
+                not in written):
+            print("SKILLS-SELFTEST-FAIL t6-spec-notes-home: rendered brief does not send spec "
+                  "gaps and follow-ups to `mr-gates notes add`")
+            bad = 1
         placeholders = ["<SLICE>", "<TOUCHES>", "<TARGET_DESC>", "<RESUME_BLOCK>",
                          "<TIER_BLOCK>", "<REPO_BLOCK>", "<PR_REPO>", "<BASE_BRANCH>",
                          "<WT_ROOT>", "<CAP_USD>", "<SKILLS_BLOCK>"]

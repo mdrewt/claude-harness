@@ -21,7 +21,7 @@ Build exactly ONE mergeable Monster Realm v2 slice — `<SLICE>` (<TARGET_DESC>)
 `DEFER: <gate-id> -> <slice id | backlog | wontfix> [category/SEVERITY] — <reason>` is the only other legal exit; deferring more than half is a sizing failure.
 Put `mr-gates render --slice <SLICE> --format pr` output in the PR body.
 
-**Definition of done:** this slice's gate (see REPO above) green, honestly, per `testing-tdd.md` · review lenses closed · comments and docs you add or touch state current behaviour, never its history (after committing, `$MEM/mr-comment-scan --repo <WT_ROOT>/<SLICE>`: CLEAN, or each finding answered under `comment-scan:` in the PR body) · spec reflects reality. **Budget is bounded by the weekly plan allowance — prefer lenses that catch distinct defect classes over redundant re-runs; never trade a review lens for cost.**
+**Definition of done:** this slice's gate (REPO above) green, honestly, per `testing-tdd.md` · review lenses closed · comments/docs you add or touch state current behaviour, never history (once committed, `$MEM/mr-comment-scan --repo <WT_ROOT>/<SLICE>`: CLEAN or each finding answered under PR-body `comment-scan:`) · spec gaps/follow-ups: `$MEM/mr-gates notes add`, never a main-checkout edit. **Budget: the weekly plan allowance — prefer lenses catching distinct defect classes over re-runs; never trade a lens for cost.**
 
 **Merge is supervisor-owned:** get this slice's gate green locally, open the PR on `<PR_REPO>`, then STOP. `gh pr merge` is FORBIDDEN to you. After ~4–5 red→fix cycles without local green, PARK (commit + push, leave the PR open, document the blocker).
 

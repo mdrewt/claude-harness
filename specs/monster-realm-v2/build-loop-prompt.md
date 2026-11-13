@@ -4,7 +4,7 @@ The build-phase companion to `milestone-loop-prompt.md` (which *specs*). Run in 
 
 ## Mission
 
-Build the specced slices of the **current** roadmap (`PLAN.md` §9, first unfinished item wins) against the **current** game repo at `projects/monster-realm`. Work test-first, one mergeable slice at a time, leaving the code easier to change. The spec is the source of truth: to deviate, change the spec first. Don't pause to ask; take the disciplined default, flag residual risk in the PR, and proceed.
+Build the specced slices of the **current** roadmap (`PLAN.md` §9, first unfinished item wins) against the **current** game repo at `projects/monster-realm`. Work test-first, one mergeable slice at a time, leaving the code easier to change. The spec is the source of truth: a deviation is a `DEFER` or a recorded spec note (step 9), never a silent call. Don't pause to ask; take the disciplined default, flag residual risk in the PR, and proceed.
 
 ## Grounding (re-read fresh each slice)
 
@@ -26,7 +26,7 @@ Work in an isolated worktree at `.claude/worktrees/<slice>`. Route model/effort 
 6. **Targeted fix loop** — iterate on `just ci-fast <crate>` or per-crate clippy/nextest/vitest; never the full `just ci` to inspect one failure.
 7. **Full lens batch** — `reviewer`, `/simplify`, `red-team`, `reducer-security-auditor`, `desync-guard`, then `verifier` (asserts no gating test was weakened, skipped or deleted without adjudication); close every finding.
 8. **Full gate once** — one full `just ci` green, then `mr-gates check --slice <slice>`: every gate met with evidence or DEFERred.
-9. **Close** — `doc-keeper`, editing ONLY files inside the declared or widened `touches:`: a `docs/DECISIONS.md` entry only when `standards/decisions.md`'s bar is met (a spec that names DECISIONS.md in `touches:` mandates its edits); memory only when durable. Fix the spec if the build revealed a gap.
+9. **Close** — `doc-keeper`, editing ONLY files inside the declared or widened `touches:`: a `docs/DECISIONS.md` entry only when `standards/decisions.md`'s bar is met (a spec that names DECISIONS.md in `touches:` mandates its edits); memory only when durable. A spec gap or a follow-up the build revealed is recorded with `$MEM/mr-gates notes add --slice <slice> --text "…"` (a follow-up takes `--followup`, which files its residual row): the spec corpus is the harness main checkout, where a run cannot commit, so the supervisor folds the notes into the spec at merge. Never edit a file in a main checkout.
 10. **STOP** at PR open + local green. The supervisor owns CI-watch and merge.
 
 ## Invariants (rationale: the game repo's `docs/DECISIONS.md`)

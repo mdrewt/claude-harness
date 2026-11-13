@@ -157,7 +157,7 @@ around (push the harness before spawning a harness slice).
   real failure: triage, don't blind-relaunch.
 - **`mr-audit --slice S --log L --repo R --base B --head H [--tier hard]`** at every merge (R =
   the repo PATH; B = `git merge-base origin/master <branch>`, so sibling fan-out merges never
-  read as removals): CLEAN → proceed; FLAGGED/AUDIT-ERROR → read the diff and adjudicate yourself
+  read as removals): CLEAN → proceed; FLAGGED/AUDIT-ERROR → read the diff and adjudicate
   (hard-tier: always read). `gating_advisory.removed_checks` names each **removed or
   de-wired check** — adjudicate under the deletion rule in `standards/testing-tdd.md` (named
   reason + named surviving check; protected categories need a demonstrated survivor). A
@@ -168,24 +168,24 @@ around (push the harness before spawning a harness slice).
   weakening → BLOCKER + next target = revert/fix; a legitimate deletion proceeds with your
   one-line verdict in the ledger notes.
 - **`mr-gates verify --slice S --json`** (ADVISORY — adjudicate, never rubber-stamp): mr-audit
-  already folds one verify pass into its output — READ that block; re-run only the gate(s) you
-  are adjudicating. `EVIDENCE-MISMATCH`/`NOT-REVERIFIED` = treat unmet; `SEED-DRIFT` = the spec
+  folds one verify pass into its output — READ that block; re-run only the gate(s) you
+  adjudicate. `EVIDENCE-MISMATCH`/`NOT-REVERIFIED` = treat unmet; `SEED-DRIFT` = the spec
   changed under the run — adjudicate, then `mr-gates reseed` if legitimate; gates neither met nor
   DEFERred = the slice is not done — prefer resuming over merging a partial. Read the `spotcheck`
   gate and try to refute it. After merging: `mr-gates residuals close --slice S --pr N`.
 - PR checks still running → `setsid bash $MEM/mr-ci-watch <pr> <slice> & disown`, print exactly
   `Delegated CI-wait for PR #<n> to mr-ci-watch; resumes via event tick.`, record, EXIT.
 - PR checks red on an infra/flaky step → the same ONE rerun + watch + flake residual; attempt 2
-  red there → escalate at once.
+  red there → escalate.
 - Merge with `gh pr merge --squash --delete-branch`; fetch; `mr-ci-watch --sha <merge-sha>`;
   `origin/master^{tree}` = `H^{tree}` (audited, PR-green) → add `--quiet-green`, launch now;
   restore the main checkout (labeled stash → `--ff-only`); remove merged worktrees/branches (keep
   parked / open-PR / `wip:`). `$MEM/mr-branch-audit`, not `--no-merged`, finds unmerged work.
-- Sandbox worktrees the finished run NAMED in its report: `git worktree remove --force <path>`,
+- Sandbox worktrees the finished run NAMED: `git worktree remove --force <path>`,
   then `git worktree prune` — never bare `rm`, never one it did not name.
-- Milestone's last slice merged → a LATER tick's action, doc-only PRs: lasting decisions into the
-  owning repo's `docs/DECISIONS.md`; delete its spec and its uncited `$MEM/monster-realm-<slice>-*`
-  files; update PLAN §9/§Built.
+- Milestone's last slice merged → a LATER tick, doc-only PRs: lasting decisions into the owning
+  repo's `docs/DECISIONS.md`; `mr-gates notes harvest --spec-file F` rc 0, then
+  delete its spec and uncited `$MEM/monster-realm-<slice>-*` files; update PLAN §9/§Built.
 - Park counter: ~3 no-progress parks → `blocked:` + BLOCKER (credit stops exempt); 3 wrapper
   attempts without PR or documented park → investigate sizing, never a 4th relaunch.
 - Ledger row → handoff entry → write `mr-state.json` → release locks.
