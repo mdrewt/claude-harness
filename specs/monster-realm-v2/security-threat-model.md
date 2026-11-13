@@ -190,7 +190,10 @@ about it alone. The other two change who is trusted, not the code.
   server never runs them.
 - **We hold as little about a person as the game needs** (operator, 2026-11-13): the account
   issuer's own records and nothing more is the aim, and no player data is sold or shared with a
-  third party. Every way to play signs in through the account issuer, so that account record is
+  third party. The one allowed addition is diagnostics used to improve the game itself — bug and
+  crash reports, performance metrics — which is never shared with a third party either, carries
+  no more identity than the diagnosis needs, and is off by default outside the official server
+  (`M-local-play.spec.md` LP10). Every way to play signs in through the account issuer, so that account record is
   ours to answer for even for a player who only uses private servers or single-player worlds.
 - **Player data on a private server** (export, deletion) is answered by its host, not by us; what the
   client tells a player before joining one is an open question in `game-design.md` §14.
