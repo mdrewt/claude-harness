@@ -206,7 +206,9 @@ Each item is ticked **met**, or given a finding with a disposition. Then the ope
   how long it is kept, and how it is exported and deleted: the account issuer's database (the data
   the issuer needs to function), server and ingress logs, client telemetry, and backups. The
   operator's rule (2026-11-13) is that nothing beyond what the issuer needs is collected about a
-  person and no player data is sold or shared with a third party; the inventory shows that holds.
+  person, except diagnostics used to improve the game (bug reports, performance metrics), and that
+  no player data is sold or shared with a third party; the inventory shows that holds, and states
+  for the diagnostics what identity they carry and what notice or consent they need.
   Evidence: the inventory in the privacy runbook; log and telemetry samples checked for identities
   and IP addresses.
 
