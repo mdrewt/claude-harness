@@ -60,10 +60,10 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    feasibility slice (licence terms once the operator's negotiation lands, desktop shell, sign-in
    design, a one-player world's footprint), the server address as run-time configuration, and
    telemetry off by default outside the official server.
-3. **M-netcode-presence** (`M-netcode-presence.spec.md`, specced 2026-10-24): remote-player
+3. **M-netcode-presence** (`M-netcode-presence.spec.md`, sketch 2026-10-24 — elaborate when reached): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched) and tap-to-turn facing (never cancel-on-keyup — ADR-0148).
-4. **M-econ-onboarding** (`M-econ-onboarding.spec.md`, specced 2026-10-24): starter kit,
+4. **M-econ-onboarding** (`M-econ-onboarding.spec.md`, sketch 2026-10-24 — elaborate when reached): starter kit,
    faucet/sink tuning (fixes the uncapped practice-battle faucet), heal-cost timing. Decisions
    ANSWERED (#587): kit = ~200g + 2–3 items once-only; recruit pays NOTHING (quest faucets
    compensate in eo-4); healing free until eo-4; monster-sink gap accepted (GDD §7 note).
@@ -77,7 +77,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    tester A/B close). `tp-3` and the design sections `st-3` (shared pins) and `st-4` (what stays
    of the 1v1 battle rules) are `blocked: tester-ab-close`; until it lifts the close census
    records and opens no removal.
-6. **M-identity-handles** (`M-identity-handles.spec.md`, specced 2026-10-24): minted name
+6. **M-identity-handles** (`M-identity-handles.spec.md`, sketch 2026-10-24 — elaborate when reached): minted name
    discriminator (survives the M22 re-key cascade), Players-tab info (name + discriminator +
    lead-monster level + nearby), Sign-In hidden until an issuer exists. All four decisions
    ANSWERED (#588, recommendations accepted). Feeds M19.
