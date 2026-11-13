@@ -39,12 +39,13 @@ EOF
 # counter-restart shape (uxd2, naive $423.65 -> true $165.65).
 "$MEM/mr-cost-sum" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-sum selftest"; BAD=1; }
 # mr-tester-ab: the tester A/B experiment's tool. Its fixtures run in temporary directories against a
-# toy game repository and a toy test runner. The count floor is here as well as in the tool, so a
+# toy game repository and a toy test runner, and where cargo-nextest is installed against a real
+# cargo workspace through the shipped runner. The count floor is here as well as in the tool, so a
 # selftest that stops running its batteries cannot read as a pass.
 AB_ST=$("$MEM/mr-tester-ab" --selftest 2>&1 | tail -n 1)
 AB_N=${AB_ST#TESTER-AB-SELFTEST-OK }
 case "$AB_ST" in
-  "TESTER-AB-SELFTEST-OK "*) [ "$AB_N" -ge 170 ] 2>/dev/null || { echo "SELFCHECK-FAIL mr-tester-ab selftest ran $AB_N fixtures (floor 170)"; BAD=1; } ;;
+  "TESTER-AB-SELFTEST-OK "*) [ "$AB_N" -ge 215 ] 2>/dev/null || { echo "SELFCHECK-FAIL mr-tester-ab selftest ran $AB_N fixtures (floor 215)"; BAD=1; } ;;
   *) echo "SELFCHECK-FAIL mr-tester-ab selftest: $(echo "$AB_ST" | cut -c1-160)"; BAD=1 ;;
 esac
 # run-cost: every ended build session leaves exactly one ledger cost row, carrying that session's
