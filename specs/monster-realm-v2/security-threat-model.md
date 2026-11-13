@@ -188,5 +188,9 @@ about it alone. The other two change who is trusted, not the code.
 - **Mods** (private worlds only, from the official release) are code or data from a stranger running
   on the host's and the players' machines; `M-modding.spec.md` owns that threat model. The official
   server never runs them.
+- **We hold as little about a person as the game needs** (operator, 2026-11-13): the account
+  issuer's own records and nothing more is the aim, and no player data is sold or shared with a
+  third party. Every way to play signs in through the account issuer, so that account record is
+  ours to answer for even for a player who only uses private servers or single-player worlds.
 - **Player data on a private server** (export, deletion) is answered by its host, not by us; what the
   client tells a player before joining one is an open question in `game-design.md` §14.

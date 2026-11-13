@@ -199,6 +199,16 @@ Each item is ticked **met**, or given a finding with a disposition. Then the ope
   held about the person; game state is included where a query on existing tables provides it, and
   no table or column is added for the export's sake). Evidence: the reviewer's note and
   `schema::DATA_LIFECYCLE_MANIFEST`'s `exportable` column.
+- [ ] A person can get everything held about them, not only the self-service export: a contact route
+  is published and the privacy runbook says how to answer an access request by hand within a month,
+  including rows the export leaves out. Evidence: the runbook section and the published route.
+- [ ] Person-level data held outside the game database is inventoried, each with what it holds, why,
+  how long it is kept, and how it is exported and deleted: the account issuer's database (the data
+  the issuer needs to function), server and ingress logs, client telemetry, and backups. The
+  operator's rule (2026-11-13) is that nothing beyond what the issuer needs is collected about a
+  person and no player data is sold or shared with a third party; the inventory shows that holds.
+  Evidence: the inventory in the privacy runbook; log and telemetry samples checked for identities
+  and IP addresses.
 
 **D. Dependency and build audit**
 - [ ] `cargo audit` is clean and gitleaks is clean (both blocking in CI, `.github/workflows/ci.yml`).
