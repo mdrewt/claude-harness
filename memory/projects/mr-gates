@@ -11,19 +11,48 @@ __doc__ = """mr-gates — the per-slice ACCEPTANCE LEDGER and the residual sink 
     mr-gates status    --slice S [--json]
     mr-gates lint      --slice S [--json]
     mr-gates check     --slice S [--timeout N]        # run-side: execute CHECKs, flip boxes
-    mr-gates verify    --slice S [--json] [--budget N]  # SUPERVISOR-side independent re-run
+    mr-gates verify    --slice S [--json] [--budget N] [--head REF]  # SUPERVISOR-side re-run
     mr-gates render    --slice S --format pr|park|handoff   # pr|park list mr-touches widens
     mr-gates reseed    --slice S --reason TEXT        # supervisor-only; clears SEED-DRIFT
     mr-gates residuals list [--unclaimed] [--json]      # oldest first; age is a label only
                             | add --slice S --gate G --title T --target X --reason R
                                   [--category C --severity V]
+                                  # refusals, told apart by the leader after `ERROR: `:
+                                  # TARGET-MISSING (exit 3; no `### X` section on disk: write
+                                  # it, re-run) | BAD-TAG (exit 2; fix --category/--severity,
+                                  # re-run) | OUT-OF-BOUNDS (exit 2; policy)
                             | promote --id R [--category C --severity V] [--spec-file F]
                             | close --slice S [--pr N]   # also deletes its residuals.spec.md section
                             | disposition --id R --as wontfix|fixed --reason T
                                   # fixed: MED/LOW only, needs a PR ref (--pr or #N in --reason)
                             | sweep --dry-run|--apply    # MED/LOW, >30d, cited paths gone -> obsolete
                             | policy [--json]
+    mr-gates notes add --slice S --text T [--followup TITLE --category C --severity V
+                                           [--gate G] [--target X] [--reason R] | --residual R-…]
+                   | list [--slice S] [--json]
+                   | fold --slice S            # supervisor: pending notes -> S's spec section
+                   | adopt --slice S [--followup … | --residual R-…]   # a Build note already
+                                               # written in S's spec section -> a stored note
+                   | harvest --spec-file F     # NOTES-HARVESTED before F may be deleted
     mr-gates --selftest
+
+SPEC NOTES (`notes`)
+--------------------
+A run builds in a slice worktree; the spec corpus it reads is the harness MAIN checkout, which a
+run cannot commit to. What a build learns about its spec therefore goes to
+`$MEM/gates/<slice>.notes.jsonl` (`notes add`), never into a spec file. A note that names a
+follow-up is stored only with a residual row behind it (`--followup` files one through the same
+admission rules as `residuals add`; `--residual` links an existing one), so a follow-up is always a
+row the drain sees. A note is PENDING while its paragraph is absent from the slice's section at
+HEAD of the spec checkout; nothing stores that state, so an edit that is written and then lost
+before it is committed leaves the note pending. `residuals close` prints NOTES-PENDING at merge,
+and NOTES-STRAY for a Build note that sits uncommitted and unstored in a spec file; `notes fold`
+writes each pending note as a `Build note (<slice>): …` paragraph at the end of the slice's
+section, for the supervisor's doc-only spec PR, and refuses a spec file with uncommitted edits.
+`notes adopt` stores a Build-note paragraph that is already in the section (one a run wrote into
+the checkout, or one merged before this store), one paragraph per call. `notes harvest` is the
+milestone-close check: it blocks on a pending note, an uncommitted spec edit, or a
+follow-up-worded Build note with no residual row.
 
 WHY THIS EXISTS (lp-gates)
 --------------------------
@@ -731,12 +760,77 @@ def child_env():
     return env
 
 
+def toolchain_dirs(cwd, home=None):
+    """The bin dirs a builder's shell resolves `cargo`/`node`/`just`/`spacetime` from, for a CHECK
+    run in `cwd`: every asdf pin in the nearest `.tool-versions` at or above `cwd` that is
+    installed, then rustup's proxies (`rust-toolchain.toml` picks the channel) and `~/.local/bin`.
+    Explicit install dirs, never asdf shims: a shim exits 126 where its tool is unpinned."""
+    home = home or os.path.expanduser("~")
+    dirs, d = [], os.path.abspath(cwd or ".")
+    while True:
+        tv = os.path.join(d, ".tool-versions")
+        if os.path.isfile(tv):
+            with open(tv, errors="replace") as fh:
+                for ln in fh:
+                    parts = ln.split("#")[0].split()
+                    if len(parts) >= 2:
+                        dirs.append(os.path.join(home, ".asdf", "installs", parts[0], parts[1],
+                                                 "bin"))
+            break
+        up = os.path.dirname(d)
+        if up == d:
+            break
+        d = up
+    dirs += [os.path.join(home, ".cargo", "bin"), os.path.join(home, ".local", "bin")]
+    return [x for x in dirs if os.path.isdir(x)]
+
+
+def verify_env(cwd, home=None):
+    """`verify` runs from the supervisor tick, whose PATH has no `~/.cargo/bin` and resolves `node`
+    to the system one. A CHECK that fails only because its runner is missing reads as a claimed
+    gate that does not hold, so verify prepends the builder's pinned toolchain for `cwd`."""
+    env = child_env()
+    env["PATH"] = os.pathsep.join(toolchain_dirs(cwd, home) + [env["PATH"]])
+    return env
+
+
+# A CHECK that drives a live SpacetimeDB host or a browser is one `verify` cannot re-run: the
+# tick has neither. Both halves must hold -- the command INVOKES the e2e runner AND its fresh
+# output shows the missing dependency -- so a CHECK that ran and failed on its own terms stays an
+# EVIDENCE-MISMATCH. The PR's e2e CI job ran these against a real host at the same head.
+# An invocation, never a bare word: `e2e`/`spacetime`/`evals` also name paths, crates and static
+# snapshot checks that need no host. Shell (`npm run e2e`) and argv (`'run','e2e'`) spellings.
+CI_RUNNER = re.compile(r"""\brun['",\s]{1,4}e2e\b|\bplaywright\s+test\b""")
+CI_NEEDS = (("server", re.compile(r"Connection refused|tcp connect error|ECONNREFUSED")),
+            ("browser", re.compile(r"Executable doesn't exist at|browserType\.launch:")))
+
+
+def ci_only_need(check, output):
+    """-> "server" | "browser" | None"""
+    if not CI_RUNNER.search(check or ""):
+        return None
+    for need, rx in CI_NEEDS:
+        if rx.search(output or ""):
+            return need
+    return None
+
+
+def head_of(cwd, ref=None):
+    try:
+        r = subprocess.run(["git", "-C", cwd, "rev-parse", "--verify", "--quiet",
+                            (ref or "HEAD") + "^{commit}"],
+                           capture_output=True, text=True, timeout=30)
+        return r.stdout.strip() or None
+    except Exception:
+        return None
+
+
 PROTECTED = ("native-supervisor-disabled", "mr-hold", "mr-supervisor-disable",
              "mr-supervisor-enable", "mr-residuals.jsonl", "monster-realm-usage-ledger",
              "monster-realm-handoff")
 
 
-def run_check(cmd, cwd, timeout, guard=None, screen=True):
+def run_check(cmd, cwd, timeout, guard=None, screen=True, env=None):
     """-> (ok_to_run, output, elapsed, why_not)"""
     # Refused BEFORE guard-bash, because guard-bash allows plenty of shapes that merely NAME these
     # paths and only blocks specific destructive verbs. A gate CHECK has no legitimate reason to
@@ -751,7 +845,7 @@ def run_check(cmd, cwd, timeout, guard=None, screen=True):
             return False, "", 0.0, why
     t0 = time.time()
     try:
-        r = subprocess.run(cmd, shell=True, cwd=cwd, env=child_env(), capture_output=True,
+        r = subprocess.run(cmd, shell=True, cwd=cwd, env=env or child_env(), capture_output=True,
                            text=True, timeout=timeout)
         out = (r.stdout or "")
         if r.stderr:
@@ -1210,9 +1304,12 @@ def cmd_render(a):
     return 0
 
 
-def die(msg):
+RC_TARGET_MISSING = 3
+
+
+def die(msg, rc=2):
     sys.stderr.write("ERROR: %s\n" % msg)
-    return 2
+    return rc
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1304,7 +1401,9 @@ def cmd_verify(a):
     cwd = a.get("cwd") or worktree_for(slice_id, repo_root) or repo_root
     out["cwd"] = cwd
     budget = float(a.get("budget") or POLICY["verify_budget_s"])
-    spent, reverified, not_reverified, mismatch, drift = 0.0, [], [], [], []
+    spent, reverified, not_reverified, mismatch, drift, ci_only = 0.0, [], [], [], [], []
+    env = verify_env(cwd, a.get("_home"))
+    head = head_of(cwd, a.get("head"))
     for g in gates:
         if g.id in defers or not g.check or not g.check.strip():
             continue
@@ -1312,12 +1411,19 @@ def cmd_verify(a):
             not_reverified.append({"gate": g.id, "why": "global-budget-exhausted"})
             continue
         ok, o, el, why = run_check(g.check, cwd, POLICY["check_timeout_s"], a.get("_guard"),
-                                   screen=not a.get("_no_guard"))
+                                   screen=not a.get("_no_guard"), env=env)
         spent += el
         if not ok:
             not_reverified.append({"gate": g.id, "why": why})
             continue
         passed = expect_matches(g.expect, o) if g.expect else False
+        need = ci_only_need(g.check, o) if g.checked and not passed else None
+        if need:
+            ci_only.append({"gate": g.id, "needs": need, "head": head,
+                            "fresh": cap_evidence(o, expect=g.expect)[:160],
+                            "confirm": "verify has no %s; read this gate's test in the PR's "
+                                       "e2e CI job for head %s" % (need, head or "(unknown)")})
+            continue
         fresh = expect_line(g.expect, o) if g.expect else None
         rec = _norm(g.evidence or "")
         # Normalized SUBSTRING on the deciding line, never a byte-compare of whole output:
@@ -1338,6 +1444,7 @@ def cmd_verify(a):
     out["reverified"], out["not_reverified"], out["evidence_mismatch"] = \
         reverified, not_reverified, mismatch
     out["evidence_drift"] = drift
+    out["ci_only"] = ci_only
     out["reverified_count"] = len(reverified)
     live_gates = [g for g in gates if g.id not in defers]
     if live_gates and not reverified:
@@ -1401,9 +1508,10 @@ def cmd_verify(a):
     out["residuals_open"] = len(open_residuals(rows))
     out["residual_alarms"] = ["%s: %s" % (k, v) for k, v in residual_alarms(rows)]
 
-    # Verdict. Fails CLOSED.
+    # Verdict. Fails CLOSED. A CI-ONLY gate is a ticked claim nothing here re-ran or looked up in
+    # CI, so it cannot ride under CLEAN; its reason names the head whose CI job settles it.
     if out["seed_drift"] or out.get("seed_missing") or out.get("criteria_missing") \
-            or out.get("no_check_executed") or mismatch or not_reverified or \
+            or out.get("no_check_executed") or mismatch or not_reverified or ci_only or \
             any(f[0] == "BLOCK" for f in findings) or unmet or sec is None \
             or out.get("total", 0) == 0:
         out["verdict"] = "FLAGGED"
@@ -1414,6 +1522,11 @@ def cmd_verify(a):
         out["reasons"].append("EVIDENCE-MISMATCH on %d gate(s)" % len(mismatch))
     if not_reverified:
         out["reasons"].append("NOT-REVERIFIED on %d gate(s) (fails closed)" % len(not_reverified))
+    if ci_only:
+        out["reasons"].append("CI-ONLY on %d gate(s) (%s): not a mismatch -- confirm the PR's "
+                              "e2e CI job for head %s"
+                              % (len(ci_only), ", ".join(c["gate"] for c in ci_only)[:80],
+                                 (head or "(unknown)")[:12]))
     if unmet:
         out["reasons"].append("%d gate(s) neither met nor DEFERred" % len(unmet))
     if any(f[0] == "BLOCK" for f in findings):
@@ -1731,6 +1844,15 @@ def cmd_residuals(a, sub):
         # promoted slice's OWN ledger must be fully resolved before its residuals close.
         # `--force` is the honest escape (e.g. the slice legitimately DEFERred it onward again),
         # and it is recorded on the row rather than silently assumed.
+        # Printed ahead of every refusal below: the merge tick reads this line whether or not the
+        # slice had residuals to close.
+        _name, pending = pending_notes(sl, a.get("_gates_dir"), a.get("_specs") or SPECS)
+        if pending:
+            print("NOTES-PENDING %d for %s: `mr-gates notes fold --slice %s`, then ship the spec "
+                  "edit as a doc-only chore PR" % (len(pending), sl, sl))
+        for name, sid in stray_notes(a.get("_gates_dir"), a.get("_specs") or SPECS):
+            print("NOTES-STRAY %s: `mr-gates notes adopt --slice %s` before stashing it"
+                  % (name, sid))
         forced = bool(a.get("force"))
         if forced and not a.get("reason"):
             return die("--force requires --reason: forcing a residual closed without saying why "
@@ -1801,19 +1923,31 @@ def cmd_residuals(a, sub):
         if target not in ("backlog",) + LEGAL_DISPOSITIONS:
             specs = a.get("_specs") or SPECS
             if find_section(target, specs)[1] is None:
-                return die("--target %r is not `backlog`, %s, or an existing spec section name "
-                           "(the same rule cmd_lint's DEFER-target check already enforces, the "
-                           "14r-c-2 class). A free-text recommendation here creates status:targeted "
-                           "with no real claim on it — invisible to `residuals list --unclaimed` "
-                           "and refused by `residuals promote` (both key off status==promoted). Use "
-                           "`backlog` and put the recommendation in --reason instead."
-                           % (target, "/".join(LEGAL_DISPOSITIONS)))
+                # Its own leader and exit code: this refusal says where the row may point, never
+                # whether the finding is admissible. A caller that drops refused findings must be
+                # able to tell it from the policy refusal below, or a finding filed one step
+                # before its section is written is discarded as if it were out of bounds.
+                return die("TARGET-MISSING: --target %r is not `backlog`, %s, or an existing spec "
+                           "section name (the same rule cmd_lint's DEFER-target check already "
+                           "enforces, the 14r-c-2 class). The finding itself is NOT refused: write "
+                           "the `### %s` section into a spec file under %s and re-run, or use "
+                           "`backlog` and name the intended slice in --reason. A row pointing at "
+                           "a section that exists nowhere is status:targeted with no real claim "
+                           "on it." % (target, "/".join(LEGAL_DISPOSITIONS), target, specs),
+                           RC_TARGET_MISSING)
         cat = (a.get("category") or "").lower() or None
         sev = (a.get("severity") or "").upper() or None
+        if target not in LEGAL_DISPOSITIONS and (cat not in CATEGORIES or sev not in SEVERITIES):
+            # A mistyped flag is a usage error with its own leader: OUT-OF-BOUNDS is the leader a
+            # caller drops findings on, and a typo says nothing about the finding.
+            return die("BAD-TAG: --category must be one of {%s} and --severity one of {%s}; got "
+                       "%r / %r. The finding itself is NOT refused: fix the flag and re-run."
+                       % ("|".join(CATEGORIES), "|".join(SEVERITIES),
+                          a.get("category"), a.get("severity")))
         refused = defer_policy_findings(a["slice"], a["gate"], target, a["reason"], a["title"],
                                         cat, sev, rows)
         if refused:
-            return die("; ".join(refused))
+            return die("OUT-OF-BOUNDS: " + "; ".join(refused))
         rid = residual_upsert(a["slice"], a["gate"], a["title"], target, a["reason"],
                               {"Repo": a.get("domain", "project")}, path,
                               category=cat, severity=sev)
@@ -1844,12 +1978,294 @@ def cmd_residuals(a, sub):
 
 
 # ---------------------------------------------------------------------------------------------
+# Spec notes. The store is `<gates dir>/<slice>.notes.jsonl`: append-only, folded by note id.
+# ---------------------------------------------------------------------------------------------
+FOLLOWUP_WORDS = re.compile(r"\bfollow[- ]?ups?\b|\bTODO\b", re.I)
+NOTE_HEAD = re.compile(r"^(\s*)([-*]\s+)?\**Build note\b")
+LIST_ITEM = re.compile(r"^(\s*)[-*]\s+")
+SLICE_ID = re.compile(r"^[\w.-]+$")
+SECTION_ID = re.compile(r"^### ([\w.-]+)", re.M)
+
+
+def notes_path(slice_id, gates_dir=None):
+    return os.path.join(gates_dir or GATES_DIR, "%s.notes.jsonl" % slice_id)
+
+
+def notes_of(slice_id, gates_dir=None):
+    """The slice's notes in the order they were added, each folded over its later rows."""
+    folded, order = {}, []
+    for r in residual_rows(notes_path(slice_id, gates_dir)):
+        nid = r.get("id")
+        if not nid:
+            continue
+        if nid not in folded:
+            order.append(nid)
+        folded[nid] = dict(folded.get(nid, {}), **r)
+    return [folded[i] for i in order if folded[i].get("text")]
+
+
+def note_para(slice_id, text):
+    """The paragraph a note is in its spec section. An adopted paragraph is kept verbatim."""
+    if NOTE_HEAD.match(text):
+        return text
+    para = "Build note (%s): %s" % (slice_id, text.strip())
+    if "\n" not in para:
+        import textwrap
+        para = textwrap.fill(para, width=100, break_long_words=False, break_on_hyphens=False)
+    return para
+
+
+def build_note_paras(sec):
+    """Every Build-note paragraph of a spec section: from its `Build note` line to the next blank
+    line, heading or Build note; a note that is a list item also ends at its next sibling item."""
+    paras, cur, ind = [], None, None
+    for ln in sec.splitlines():
+        m = NOTE_HEAD.match(ln)
+        if m:
+            if cur:
+                paras.append("\n".join(cur))
+            cur, ind = [ln], (len(m.group(1)) if m.group(2) else None)
+            continue
+        if cur is None:
+            continue
+        b = LIST_ITEM.match(ln)
+        if not ln.strip() or ln.startswith("#") or (ind is not None and b
+                                                    and len(b.group(1)) <= ind):
+            paras.append("\n".join(cur))
+            cur = None
+        else:
+            cur.append(ln)
+    if cur:
+        paras.append("\n".join(cur))
+    return paras
+
+
+def _git(root, *args):
+    try:
+        r = subprocess.run(["git", "-C", root] + list(args), stdout=subprocess.PIPE,
+                           stderr=subprocess.DEVNULL, universal_newlines=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return 1, ""
+    return r.returncode, r.stdout
+
+
+def spec_dirty(specs, name):
+    rc, out = _git(specs, "status", "--porcelain", "--", name)
+    return rc == 0 and bool(out.strip())
+
+
+def section_span(text, slice_id):
+    m = head_re(slice_id).search(text)
+    if not m:
+        return None
+    e = SECTION_END.search(text, m.end())
+    return m.start(), (e.start() if e else len(text))
+
+
+def head_section(specs, name, slice_id):
+    """The slice's section of spec `name` as committed at HEAD, whitespace-normalised; "" when
+    the file or the section is not there."""
+    rc, head = _git(specs, "show", "HEAD:./" + name)
+    span = section_span(head, slice_id) if rc == 0 else None
+    return _norm(head[span[0]:span[1]]) if span else ""
+
+
+def pending_notes(slice_id, gates_dir, specs):
+    """-> (spec file name or None, the slice's notes whose paragraph is not in its section at
+    HEAD). Read from the spec each time: a fold that was written and never committed is still
+    pending, whatever happened to the working file."""
+    notes = notes_of(slice_id, gates_dir)
+    if not notes:
+        return None, []
+    name, _sec = find_section(slice_id, specs)
+    sec = head_section(specs, name, slice_id) if name else ""
+    return name, [n for n in notes if _norm(note_para(slice_id, n["text"])) not in sec]
+
+
+def stray_notes(gates_dir, specs):
+    """-> [(spec file name, slice id)]: a Build-note paragraph that is in a spec file with
+    uncommitted edits, not in that section at HEAD and not stored. A stash would take it out of
+    sight unrecorded."""
+    rc, out = _git(specs, "status", "--porcelain", "--", ".")
+    found = []
+    for name in sorted(set(os.path.basename(ln[3:].strip().strip('"'))
+                           for ln in out.splitlines() if rc == 0)):
+        text = read_gates_file(os.path.join(specs, name)) if name.endswith(".spec.md") else None
+        for sid in SECTION_ID.findall(text or ""):
+            start, end = section_span(text, sid)
+            stored = set(_norm(note_para(sid, n["text"])) for n in notes_of(sid, gates_dir))
+            head = head_section(specs, name, sid)
+            if any(_norm(p) not in stored and _norm(p) not in head
+                   for p in build_note_paras(text[start:end])):
+                found.append((name, sid))
+    return found
+
+
+def _note_links(a, slice_id, text):
+    """-> (error, [residual id]). The residual rows behind a note: `--residual` names existing
+    rows, `--followup` files one. A follow-up-worded text with neither is refused."""
+    rids = []
+    if a.get("residual"):
+        folded = fold_residuals(residual_rows(a.get("_residuals")))
+        for rid in [x.strip() for x in a["residual"].split(",") if x.strip()]:
+            if rid not in folded:
+                return "no residual %r" % rid, []
+            rids.append(rid)
+    if a.get("followup"):
+        gate = a.get("gate") or "NOTE" + hashlib.sha1(
+            _norm(a["followup"]).encode()).hexdigest()[:6].upper()
+        # The note text is NOT the row's reason: a build note cites test and eval files by path,
+        # and the admission rule reads such a path in a reason as an apparatus subject.
+        rc = cmd_residuals({"slice": slice_id, "gate": gate, "title": a["followup"],
+                            "target": a.get("target") or "backlog",
+                            "reason": a.get("reason") or "recorded with the %s build note"
+                            % slice_id,
+                            "category": a.get("category"), "severity": a.get("severity"),
+                            "_residuals": a.get("_residuals"), "_specs": a.get("_specs")}, "add")
+        if rc:
+            return "the follow-up row was refused (above); nothing stored", []
+        rids.append(residual_id(slice_id, gate))
+    if not rids and FOLLOWUP_WORDS.search(text):
+        return ("this note names a follow-up, and a follow-up is a residual row, never prose "
+                "only: pass --followup TITLE --category C --severity V (files the row; "
+                "`--target wontfix` records a declined one) or --residual R-… (an existing "
+                "row)"), []
+    return None, rids
+
+
+def cmd_notes(a, sub):
+    gdir, specs = a.get("_gates_dir"), a.get("_specs") or SPECS
+    sl = a.get("slice")
+    if sub in ("add", "fold", "adopt") and not (sl and SLICE_ID.match(sl)):
+        return die("notes %s requires --slice <slice id>" % sub)
+    if sub == "add":
+        text = (a.get("text") or "").strip()
+        if not text:
+            return die("notes add requires --text")
+        if any(_norm(n["text"]) == _norm(text) for n in notes_of(sl, gdir)):
+            print("NOTE-EXISTS %s" % sl)
+            return 0
+        err, rids = _note_links(a, sl, text)
+        if err:
+            return die(err)
+        nid = "n%d" % (len(notes_of(sl, gdir)) + 1)
+        residual_append({"id": nid, "slice": sl, "at": utc_now(), "text": text,
+                         "residuals": rids}, notes_path(sl, gdir))
+        print("NOTE-ADDED %s %s%s" % (sl, nid, " -> " + ", ".join(rids) if rids else ""))
+        return 0
+    if sub == "list":
+        if sl:
+            slices = [sl]
+        else:
+            try:
+                slices = sorted(n[:-len(".notes.jsonl")] for n in os.listdir(gdir or GATES_DIR)
+                                if n.endswith(".notes.jsonl"))
+            except OSError:
+                slices = []
+        notes = []
+        for s in slices:
+            pend = set(n["id"] for n in pending_notes(s, gdir, specs)[1])
+            notes += [dict(n, state="pending" if n["id"] in pend else "folded")
+                      for n in notes_of(s, gdir)]
+        if a.get("json"):
+            print(json.dumps(notes, indent=1, sort_keys=True))
+            return 0
+        for n in notes:
+            print("  %-12s %-4s %-7s %s%s" % (
+                n.get("slice"), n["id"], n["state"],
+                "[%s] " % ", ".join(n["residuals"]) if n.get("residuals") else "",
+                _norm(n["text"])[:100]))
+        if not notes:
+            print("  (no spec notes)")
+        return 0
+    if sub == "fold":
+        name, pending = pending_notes(sl, gdir, specs)
+        if not pending:
+            print("NOTES-FOLDED 0 for %s" % sl)
+            return 0
+        if name is None:
+            return die("NOTES-NO-SECTION: no spec section for %s; its %d note(s) stay pending "
+                       "(`mr-gates notes list --slice %s`)" % (sl, len(pending), sl))
+        if spec_dirty(specs, name):
+            return die("NOTES-FOLD-REFUSED: %s has uncommitted edits. Commit a fold that is "
+                       "already written there; a Build note a run wrote there is taken in with "
+                       "`mr-gates notes adopt --slice <its slice>`, then restore the file to "
+                       "HEAD and fold." % name)
+        full = os.path.join(specs, name)
+        text = read_gates_file(full)
+        start, end = section_span(text, sl)
+        atomic_write(full, text[:start] + text[start:end].rstrip("\n")
+                     + "".join("\n\n" + note_para(sl, n["text"]) for n in pending)
+                     + "\n" + ("\n" + text[end:] if end < len(text) else ""))
+        print("NOTES-FOLDED %d for %s into %s -- ship the edit as a doc-only chore PR"
+              % (len(pending), sl, name))
+        return 0
+    if sub == "adopt":
+        name, _sec = find_section(sl, specs)
+        if name is None:
+            return die("no spec section for %s" % sl)
+        text = read_gates_file(os.path.join(specs, name))
+        start, end = section_span(text, sl)
+        stored = set(_norm(note_para(sl, n["text"])) for n in notes_of(sl, gdir))
+        fresh = [p for p in build_note_paras(text[start:end]) if _norm(p) not in stored]
+        if not fresh:
+            print("NOTES-ADOPTED 0 for %s" % sl)
+            return 0
+        para = fresh[0]
+        err, rids = _note_links(a, sl, para)
+        if err:
+            return die("%s\n  the paragraph: %s" % (err, _norm(para)[:300]))
+        row = {"id": "n%d" % (len(notes_of(sl, gdir)) + 1), "slice": sl, "at": utc_now(),
+               "text": para, "residuals": rids}
+        residual_append(row, notes_path(sl, gdir))
+        print("NOTE-ADOPTED %s %s %s%s; %d more Build note(s) in the section" % (
+            sl, row["id"], "folded (already committed)"
+            if _norm(para) in head_section(specs, name, sl) else
+            "pending (restore %s to HEAD, then `mr-gates notes fold --slice %s`)" % (name, sl),
+            " -> " + ", ".join(rids) if rids else "", len(fresh) - 1))
+        return 0
+    if sub == "harvest":
+        name = a.get("spec_file") or ""
+        if "/" in name or ".." in name or not name.endswith(".spec.md"):
+            return die("harvest requires --spec-file <name>.spec.md (a bare name in the corpus)")
+        text = read_gates_file(os.path.join(specs, name))
+        if text is None:
+            return die("no spec file %s" % name)
+        blocks, n_notes, n_rows = [], 0, 0
+        if spec_dirty(specs, name):
+            blocks.append("SPEC-DIRTY %s has uncommitted edits (`mr-gates notes adopt` takes a "
+                          "Build note in; then restore the file)" % name)
+        for sid in SECTION_ID.findall(text):
+            notes = notes_of(sid, gdir)
+            n_notes += len(notes)
+            n_rows += sum(len(n.get("residuals") or []) for n in notes)
+            for n in pending_notes(sid, gdir, specs)[1]:
+                blocks.append("NOTE-PENDING %s %s: %s (`mr-gates notes fold --slice %s`)"
+                              % (sid, n["id"], _norm(n["text"])[:100], sid))
+            tracked = set(_norm(note_para(sid, n["text"])) for n in notes if n.get("residuals"))
+            start, end = section_span(text, sid)
+            for p in build_note_paras(text[start:end]):
+                if FOLLOWUP_WORDS.search(p) and _norm(p) not in tracked:
+                    blocks.append("FOLLOWUP-UNTRACKED %s: %s (`mr-gates notes adopt --slice %s` "
+                                  "with --followup or --residual)" % (sid, _norm(p)[:160], sid))
+        for b in blocks:
+            print("  " + b)
+        if blocks:
+            print("NOTES-UNHARVESTED %s: %d blocking -- do not delete it" % (name, len(blocks)))
+            return 1
+        print("NOTES-HARVESTED %s (%d note(s), %d follow-up row(s))" % (name, n_notes, n_rows))
+        return 0
+    return die("unknown notes subcommand %r (add|list|fold|adopt|harvest)" % sub)
+
+
+# ---------------------------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------------------------
 FLAGS = {"slice", "scope", "repo", "json", "timeout", "format", "reason", "budget", "cwd",
-         "force",
+         "force", "head",
          "id", "spec-file", "as", "pr", "unclaimed", "severity", "title", "touches", "gate",
-         "target", "source-slice", "domain", "category", "dry-run", "apply", "operator-issue"}
+         "target", "source-slice", "domain", "category", "dry-run", "apply", "operator-issue",
+         "text", "followup", "residual"}
 VALUELESS = {"json", "unclaimed", "force", "dry-run", "apply"}
 
 
@@ -1890,6 +2306,10 @@ def main(argv):
             return die("residuals needs a subcommand "
                        "(list|add|promote|close|disposition|sweep|policy)")
         rsub, rest = rest[0], rest[1:]
+    if sub == "notes":
+        if not rest or rest[0].startswith("--"):
+            return die("notes needs a subcommand (add|list|fold|adopt|harvest)")
+        rsub, rest = rest[0], rest[1:]
     a, err = parse_args(rest)
     if err:
         return die(err)
@@ -1902,6 +2322,8 @@ def main(argv):
         return table[sub](a)
     if sub == "residuals":
         return cmd_residuals(a, rsub)
+    if sub == "notes":
+        return cmd_notes(a, rsub)
     return die("unknown subcommand %r" % sub)
 
 
@@ -1909,7 +2331,7 @@ def main(argv):
 # --selftest. rc 0 pass / 1 fail. Prints MR-GATES-SELFTEST-OK <n> on pass, -FAIL <id> per failure.
 # Every fixture drives the REAL functions over temp dirs — never an env override on a gate input.
 # ---------------------------------------------------------------------------------------------
-_ST_FLOOR = 30
+_ST_FLOOR = 235
 
 
 class _Chk(object):
@@ -2400,6 +2822,143 @@ def selftest():
                "ticked box + a re-run that does NOT pass is the actual fraud signal and must FLAG")
         chk.eq("W6-fraud-flags", "FLAGGED", vf["verdict"])
 
+        # Q: verify's environment. The tick shell has no cargo and the system node, and no
+        # SpacetimeDB host or browser; neither absence is evidence about the slice.
+        fhome = os.path.join(root, "fxhome")
+        for rel, body in ((".cargo/bin/cargo", 'test "$1" = mr-gates-fx && echo "cargo: 1 passed"'),
+                          (".asdf/installs/nodejs/9.9.9/bin/node",
+                           'test "$1" = --mr-gates-fx && echo "node: 1 passed"')):
+            q = os.path.join(fhome, rel)
+            atomic_write(q, "#!/bin/sh\n%s\n" % body)
+            os.chmod(q, 0o755)
+        pwt = os.path.join(root, "fxwt", "client")
+        os.makedirs(pwt)
+        atomic_write(os.path.join(root, "fxwt", ".tool-versions"),
+                     "nodejs 9.9.9\njust 0.0.0  # not installed\n")
+        chk.eq("Q1-toolchain-dirs",
+               [os.path.join(fhome, ".asdf/installs/nodejs/9.9.9/bin"),
+                os.path.join(fhome, ".cargo/bin")],
+               toolchain_dirs(pwt, fhome),
+               "the pin nearest above cwd, installed tools only, then rustup's proxies")
+
+        def P(body, cwd=None, home=None):
+            atomic_write(gates_path("fx-p", gdir), "# Gates: fx-p\nSeed: s\n\n" + body)
+            buf = _io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cmd_verify({"slice": "fx-p", "_specs": specs, "_gates_dir": gdir,
+                            "_residuals": resid, "_no_guard": True, "cwd": cwd or root,
+                            "repo": root, "budget": "20", "_home": home or fhome,
+                            "_acceptance_log": os.path.join(root, "acc-p.jsonl")})
+            return json.loads(buf.getvalue())
+
+        tool_gates = ("- [x] X1: t\n  CHECK: cargo mr-gates-fx\n  EXPECT: /cargo: 1 passed/\n"
+                      "  EVIDENCE: cargo: 1 passed\n"
+                      "- [x] X2: t\n  CHECK: node --mr-gates-fx\n  EXPECT: /node: 1 passed/\n"
+                      "  EVIDENCE: node: 1 passed\n")
+        vp = P(tool_gates, cwd=pwt)
+        chk.eq("Q2-pinned-toolchain-check-passes", ([], ["X1", "X2"]),
+               (vp["evidence_mismatch"], [r["gate"] for r in vp["reverified"] if r["passed"]]),
+               "a cargo/node CHECK must re-run under the builder's toolchain, not the tick's PATH")
+        chk.eq("Q3-no-toolchain-is-a-mismatch", 2,
+               len(P(tool_gates, cwd=pwt, home=os.path.join(root, "nohome"))["evidence_mismatch"]),
+               "the fixture discriminates: without the provisioned dirs both CHECKs fail")
+
+        refused = "echo 'error: tcp connect error: Connection refused (os error 111)'"
+        vs = P("- [x] X1: t\n  CHECK: echo npm run e2e; %s\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: 1 passed\n"
+               "- [x] X2: t\n  CHECK: echo '1 passed'\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: 1 passed\n" % refused)
+        chk.eq("Q4-no-server-is-ci-only", ([("X1", "server")], [], []),
+               ([(c["gate"], c["needs"]) for c in vs["ci_only"]], vs["evidence_mismatch"],
+                [r for r in vs["reasons"] if "EVIDENCE-MISMATCH" in r]),
+               "an e2e CHECK refused by an absent host says nothing about the slice")
+        chk.ok("Q5-ci-only-points-at-ci",
+               any(r.startswith("CI-ONLY on 1 gate(s) (X1)") and "CI job for head" in r
+                   for r in vs["reasons"]) and "CI job for head" in vs["ci_only"][0]["confirm"],
+               "the status must say where the gate WAS exercised")
+        chk.eq("Q6-ci-only-is-not-reverified", ["X2"], [r["gate"] for r in vs["reverified"]],
+               "a gate verify could not run must never count as independently re-run")
+        vg = P("- [x] X1: t\n  CHECK: echo npm run e2e; echo '1 failed'\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: 1 passed\n"
+               "- [x] X2: t\n  CHECK: %s\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: 1 passed\n"
+               "- [ ] X3: t\n  CHECK: echo npm run e2e; %s\n  EXPECT: /1 passed/\n"
+               "  EVIDENCE: pending\n" % (refused, refused))
+        chk.eq("Q7-genuine-mismatch-stays-loud",
+               (["X1", "X2"], [], True, "FLAGGED"),
+               ([m["gate"] for m in vg["evidence_mismatch"]], vg["ci_only"],
+                "EVIDENCE-MISMATCH on 2 gate(s)" in vg["reasons"], vg["verdict"]),
+               "an e2e CHECK that ran and failed, and a refused connection in a CHECK that names "
+               "no server runner, are both the fraud signal; an unticked gate claims nothing")
+        chk.eq("Q8-browser", "browser",
+               ci_only_need("npx playwright test", "browserType.launch: Executable doesn't exist "
+                                                   "at /x/chrome"))
+        subprocess.run("git init -q . && git -c user.name=fx -c user.email=fx@fx commit -q "
+                       "--allow-empty -m fx", shell=True, cwd=pwt, capture_output=True)
+        hd = head_of(pwt)
+        chk.ok("Q9-ci-only-names-the-head",
+               bool(hd) and len(hd) == 40 and P(
+                   "- [x] X1: t\n  CHECK: echo npm run e2e; %s\n  EXPECT: /1 passed/\n"
+                   "  EVIDENCE: 1 passed\n" % refused, cwd=pwt)["ci_only"][0]["head"] == hd,
+               "CI is the evidence only for the exact head verify looked at")
+
+        # The runner test is an invocation. A path, crate name, builtin or comment that merely
+        # contains the word reaches no host, so a refused connection there is the slice's own.
+        lookalikes = ("echo cargo test -p spacetime-module; %s", "eval \"%s\"",
+                      "echo vitest run client/e2e/x.test.ts; %s", "echo grep -c x evals/; %s",
+                      "%s # npm e2e", "echo node evals/spacetime-type-snapshot.eval.mjs; %s")
+        vl = P("".join("- [x] X%d: t\n  CHECK: %s\n  EXPECT: /1 passed/\n  EVIDENCE: 1 passed\n"
+                       % (i, c % refused) for i, c in enumerate(lookalikes, 1)))
+        chk.eq("Q10-word-is-not-an-invocation", (["X1", "X2", "X3", "X4", "X5", "X6"], []),
+               ([m["gate"] for m in vl["evidence_mismatch"]], vl["ci_only"]),
+               "a failing non-e2e CHECK that prints 'Connection refused' is EVIDENCE-MISMATCH")
+        chk.eq("Q11-invocation-spellings", ["server", "server", "browser", None, None],
+               [ci_only_need(c, "ECONNREFUSED 127.0.0.1:3000 browserType.launch: x") for c in (
+                   "npm --prefix client run e2e -- e2e/a.spec.ts",
+                   "node -e \"spawnSync('npm',['--prefix','client','run','e2e','--'])\"")]
+               + [ci_only_need("npx playwright test", "browserType.launch: x"),
+                  ci_only_need("npx playwright install chromium", "browserType.launch: x"),
+                  ci_only_need("cargo nextest run -p e2e", "Connection refused")])
+
+        # The verdict on the seeded section, where nothing else can FLAG it: the same ledger is
+        # CLEAN when every CHECK passes, so each non-CLEAN verdict below is that one gate's.
+        atomic_write(os.path.join(fhome, ".cargo/bin/npm"),
+                     "#!/bin/sh\n%s\nexit 1\n" % refused)
+        os.chmod(os.path.join(fhome, ".cargo/bin/npm"), 0o755)
+        pgdir = os.path.join(root, "gates-p")
+        os.makedirs(pgdir)
+        with contextlib.redirect_stdout(_io.StringIO()):
+            cmd_init({"slice": "fx-a", "_specs": specs, "_gates_dir": pgdir, "scope": "fixture"})
+        seeded = read_gates_file(gates_path("fx-a", pgdir)).replace("- [ ] E", "- [x] E")
+        blank = "  CHECK: \n  EXPECT: \n  EVIDENCE: pending\n"
+
+        def PV(e2_check):
+            body = seeded
+            for c in ("cargo mr-gates-fx", e2_check, "cargo mr-gates-fx"):
+                body = body.replace(blank, "  CHECK: %s\n  EXPECT: /1 passed/\n"
+                                           "  EVIDENCE: 1 passed\n" % c, 1)
+            atomic_write(gates_path("fx-a", pgdir), body)
+            buf = _io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cmd_verify({"slice": "fx-a", "_specs": specs, "_gates_dir": pgdir,
+                            "_residuals": resid, "_no_guard": True, "cwd": pwt, "repo": root,
+                            "budget": "20", "_home": fhome,
+                            "_acceptance_log": os.path.join(root, "acc-p.jsonl")})
+            return json.loads(buf.getvalue())
+
+        vc = PV("cargo mr-gates-fx")
+        chk.eq("Q12-seeded-control-is-clean", ("CLEAN", []), (vc["verdict"], vc["reasons"]),
+               "the control: with every CHECK passing nothing else flags this ledger")
+        vo = PV("npm run e2e -- e2e/a.spec.ts")
+        chk.eq("Q13-ci-only-alone-is-not-clean",
+               ("FLAGGED", ["E2"], [], [], ["CI-ONLY"]),
+               (vo["verdict"], [c["gate"] for c in vo["ci_only"]], vo["evidence_mismatch"],
+                vo["not_reverified"], [r.split(" ", 1)[0] for r in vo["reasons"]]),
+               "a ticked gate nobody re-ran must not pass under CLEAN; CI-ONLY is its only reason")
+        vx = PV("cargo mr-gates-fx-fails")
+        chk.eq("Q14-seeded-mismatch-flags", ("FLAGGED", [], ["E2"]),
+               (vx["verdict"], vx["ci_only"], [m["gate"] for m in vx["evidence_mismatch"]]))
+
         # W7: an absent ledger is an absent measurement, not a failed one.
         buf = _io.StringIO()
         with contextlib.redirect_stdout(buf):
@@ -2512,21 +3071,21 @@ def selftest():
                parse_gates(read_gates_file(rp))[0].get("Touches"),
                "a spec that no longer declares touches must not blank the header")
 
-        # W: render carries mr-touches' widen record into the PR body and the park memo.
+        # X: render carries mr-touches' widen record into the PR body and the park memo.
         def rendered(fmt):
             wbuf = _io.StringIO()
             with contextlib.redirect_stdout(wbuf):
                 cmd_render({"slice": "rs-1", "_gates_dir": gdir, "format": fmt})
             return wbuf.getvalue()
-        chk.ok("W1-no-record-no-line", "widened" not in rendered("pr").lower()
+        chk.ok("X1-no-record-no-line", "widened" not in rendered("pr").lower()
                and "WIDENED" not in rendered("park"))
         atomic_write(os.path.join(gdir, "rs-1.widened.jsonl"),
                      '{"path": "b/pin.test.ts", "why": "count pin 9->10"}\nnot json\n'
                      '{"path": "b/pin.test.ts", "why": "repeat"}\n{"path": "c/t.rs", "why": "x"}\n')
-        chk.ok("W2-pr-lists-widened", "touches-widened: (files this run granted itself" in
+        chk.ok("X2-pr-lists-widened", "touches-widened: (files this run granted itself" in
                rendered("pr") and rendered("pr").endswith(
                    "- b/pin.test.ts — count pin 9->10\n- c/t.rs — x\n"), rendered("pr"))
-        chk.ok("W3-park-lists-widened", "## TOUCHES WIDENED (2)" in rendered("park")
+        chk.ok("X3-park-lists-widened", "## TOUCHES WIDENED (2)" in rendered("park")
                and "- b/pin.test.ts — count pin 9->10" in rendered("park"), rendered("park"))
 
         # T5: promote appended at EOF, past the file's own append marker.
@@ -2694,6 +3253,154 @@ def selftest():
                not has(L("- [ ] X1: t\n  CHECK: node $MEM/x.mjs\n  EXPECT: /ok/\n"),
                        "outside the target"))
 
+        # --- P. spec notes ----------------------------------------------------------------------
+        # A git repo of its own: fold and adopt read what is committed and what is not.
+        nrepo = os.path.join(root, "notes-repo")
+        nspecs = os.path.join(nrepo, "specs")
+        ngd = os.path.join(root, "notes-gates")
+        nres = os.path.join(root, "notes-residuals.jsonl")
+        os.makedirs(nspecs)
+        nspec = os.path.join(nspecs, "M-nt.spec.md")
+        NT = ("# M-nt\n\n### nt-1 — first\n- **nt-1.1:** X SHALL hold.\n\n"
+              "### nt-2 — second\n- **nt-2.1:** Y SHALL hold.\n\n## Appendix\ntail\n")
+        with open(nspec, "w") as fh:
+            fh.write(NT)
+
+        def ngit(*args):
+            return subprocess.call(["git", "-C", nrepo, "-c", "user.name=fx",
+                                    "-c", "user.email=fx@example.invalid"] + list(args),
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        def notes(sub, **kw):
+            buf = _io.StringIO()
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                rc = cmd_notes(dict(kw, _gates_dir=ngd, _specs=nspecs, _residuals=nres), sub)
+            return rc, buf.getvalue()
+
+        ngit("init", "-q")
+        ngit("add", "-A")
+        ngit("commit", "-q", "-m", "fx")
+        rc, out = notes("add", slice="nt-1", text="the cargo package is `mod`, not `server-module`.")
+        chk.ok("P1-add-stores", rc == 0 and "NOTE-ADDED nt-1 n1" in out, out)
+        chk.eq("P1b-spec-untouched", NT, read_gates_file(nspec),
+               "a run's note never reaches a spec file")
+        chk.ok("P1c-idempotent", "NOTE-EXISTS" in notes(
+            "add", slice="nt-1", text="the cargo package is `mod`,  not `server-module`.")[1])
+        # A follow-up is a residual row or it is refused.
+        fu = "the lookup repeats; one shared `guards.rs` helper is a follow-up."
+        rc, out = notes("add", slice="nt-1", text=fu)
+        chk.ok("P2-followup-prose-refused", rc == 2 and "residual row" in out, out)
+        chk.eq("P2b-nothing-stored", 1, len(notes_of("nt-1", ngd)))
+        rc, out = notes("add", slice="nt-1", text=fu, followup="one shared guards.rs helper")
+        chk.ok("P2c-followup-needs-category", rc == 2 and "BAD-TAG" in out, out)
+        chk.eq("P2d-no-row-no-note", (1, 0), (len(notes_of("nt-1", ngd)),
+                                              len(residual_rows(nres))))
+        rc, out = notes("add", slice="nt-1", text=fu, followup="one shared guards.rs helper",
+                        category="gameplay", severity="LOW", gate="GUARDS")
+        chk.ok("P2e-followup-files-a-row", rc == 0 and "R-nt-1-GUARDS" in out, out)
+        row = fold_residuals(residual_rows(nres)).get("R-nt-1-GUARDS") or {}
+        chk.eq("P2f-row-is-open-backlog", ("unpromoted", "nt-1", "LOW"),
+               (row.get("status"), row.get("source_slice"), row.get("severity")))
+        chk.eq("P2g-row-is-drainable", ["R-nt-1-GUARDS"],
+               [r["id"] for r in open_residuals(residual_rows(nres))])
+        chk.ok("P2h-unknown-residual-refused",
+               notes("add", slice="nt-1", text="a TODO", residual="R-nope-X")[0] == 2)
+        # The merge tick: `residuals close` names the pending notes; fold writes them.
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(_io.StringIO()):
+            cmd_residuals({"slice": "nt-1", "_residuals": nres, "_gates_dir": ngd,
+                           "_specs": nspecs}, "close")
+        chk.ok("P3-close-names-pending-notes", "NOTES-PENDING 2 for nt-1" in buf.getvalue()
+               and "NOTES-STRAY" not in buf.getvalue(), buf.getvalue())
+        with open(nspec, "a") as fh:
+            fh.write("stray\n")
+        rc, out = notes("fold", slice="nt-1")
+        chk.ok("P4-fold-refuses-a-dirty-spec", rc == 2 and "NOTES-FOLD-REFUSED" in out, out)
+        with open(nspec, "w") as fh:
+            fh.write(NT)
+        rc, out = notes("fold", slice="nt-1")
+        folded_text = read_gates_file(nspec)
+        chk.ok("P4b-fold-writes", rc == 0 and "NOTES-FOLDED 2 for nt-1 into M-nt.spec.md" in out,
+               out)
+        chk.ok("P4c-fold-lands-at-the-section-end", (
+            "- **nt-1.1:** X SHALL hold.\n\nBuild note (nt-1): the cargo package is `mod`, not "
+            "`server-module`.\n\nBuild note (nt-1): the lookup repeats; one shared `guards.rs` "
+            "helper is a follow-up.\n\n### nt-2 — second\n") in folded_text, folded_text)
+        chk.ok("P4d-fold-keeps-the-rest", folded_text.endswith(
+            "### nt-2 — second\n- **nt-2.1:** Y SHALL hold.\n\n## Appendix\ntail\n"))
+        # Folded is read from HEAD: a fold whose edit is lost before it is committed is pending.
+        chk.eq("P4g0-written-uncommitted-is-pending", 2, len(pending_notes("nt-1", ngd, nspecs)[1]))
+        with open(nspec, "w") as fh:
+            fh.write(NT)
+        rc, out = notes("harvest", spec_file="M-nt.spec.md")
+        chk.ok("P4g-lost-fold-blocks-harvest", rc == 1 and "NOTE-PENDING nt-1 n1" in out
+               and "NOTE-PENDING nt-1 n2" in out, out)
+        rc, out = notes("fold", slice="nt-1")
+        chk.ok("P4h-lost-fold-writes-again", "NOTES-FOLDED 2 for nt-1" in out
+               and read_gates_file(nspec) == folded_text, out)
+        ngit("commit", "-q", "-am", "fold")
+        chk.ok("P4e-fold-once", "NOTES-FOLDED 0" in notes("fold", slice="nt-1")[1]
+               and read_gates_file(nspec) == folded_text)
+        chk.ok("P4f-no-section-keeps-notes", notes("add", slice="nt-9", text="x")[0] == 0
+               and notes("fold", slice="nt-9")[0] == 2
+               and len(pending_notes("nt-9", ngd, nspecs)[1]) == 1)
+        # A Build note a run wrote into the checkout (uncommitted): adopt, restore, fold.
+        stray = ("Build note (nt-2): `pvp.spec.ts` and `account-e2e.eval.mjs` are unedited. The\n"
+                 "two-character lookup repeats `open_trade_session`'s; one shared `guards.rs`\n"
+                 "helper is a follow-up.")
+        dirty = folded_text.replace("\n\n## Appendix", "\n\n" + stray + "\n\n## Appendix")
+        with open(nspec, "w") as fh:
+            fh.write(dirty)
+        def close_out():
+            b = _io.StringIO()
+            with contextlib.redirect_stdout(b), contextlib.redirect_stderr(_io.StringIO()):
+                cmd_residuals({"slice": "nt-1", "_residuals": nres, "_gates_dir": ngd,
+                               "_specs": nspecs}, "close")
+            return b.getvalue()
+        chk.ok("P5-close-names-a-stray-note", "NOTES-STRAY M-nt.spec.md: `mr-gates notes adopt "
+               "--slice nt-2` before stashing it" in close_out(), close_out())
+        rc, out = notes("harvest", spec_file="M-nt.spec.md")
+        chk.ok("P5a-harvest-blocks-a-dirty-spec", rc == 1 and "SPEC-DIRTY" in out
+               and "FOLLOWUP-UNTRACKED nt-2" in out, out)
+        rc, out = notes("adopt", slice="nt-2")
+        chk.ok("P5b-adopt-refuses-untracked-followup", rc == 2 and "residual row" in out, out)
+        rc, out = notes("adopt", slice="nt-2", followup="one shared guards.rs helper for the "
+                        "two-character lookup", category="gameplay", severity="LOW", gate="GUARDS")
+        chk.ok("P5c-adopt-stores-pending", rc == 0 and "NOTE-ADOPTED nt-2 n1 pending" in out
+               and "R-nt-2-GUARDS" in out, out)
+        chk.eq("P5d-adopt-leaves-the-file", dirty, read_gates_file(nspec))
+        chk.ok("P5e-adopt-once", "NOTES-ADOPTED 0" in notes("adopt", slice="nt-2")[1])
+        chk.ok("P5e2-adopted-is-no-stray", "NOTES-STRAY" not in close_out()
+               and "NOTES-PENDING" not in close_out(), close_out())
+        with open(nspec, "w") as fh:
+            fh.write(folded_text)
+        rc, out = notes("harvest", spec_file="M-nt.spec.md")
+        chk.ok("P5f-harvest-blocks-a-pending-note", rc == 1 and "NOTE-PENDING nt-2 n1" in out, out)
+        notes("fold", slice="nt-2")
+        chk.eq("P5g-restore-then-fold-reproduces-it", dirty, read_gates_file(nspec))
+        ngit("commit", "-q", "-am", "fold2")
+        rc, out = notes("harvest", spec_file="M-nt.spec.md")
+        chk.ok("P6-harvested", rc == 0 and "NOTES-HARVESTED M-nt.spec.md (3 note(s), 2 follow-up "
+               "row(s))" in out, out)
+        # A committed Build note from before the store: harvest blocks until it has a row.
+        with open(nspec, "w") as fh:
+            fh.write(dirty.replace("- **nt-2.1:** Y SHALL hold.\n", "- **nt-2.1:** Y SHALL hold.\n"
+                                   "- Build note (park): Z is a follow-up.\n  more of it\n"
+                                   "- Evidence: not a note.\n"))
+        ngit("commit", "-q", "-am", "legacy")
+        rc, out = notes("harvest", spec_file="M-nt.spec.md")
+        chk.ok("P6b-legacy-followup-blocks", rc == 1 and "FOLLOWUP-UNTRACKED nt-2: - Build note "
+               "(park): Z is a follow-up. more of it (" in out, out)
+        rc, out = notes("adopt", slice="nt-2", residual="R-nt-2-GUARDS")
+        chk.ok("P6c-adopt-committed-is-folded", rc == 0 and "folded (already committed)" in out,
+               out)
+        chk.eq("P6d-harvest-clear", 0, notes("harvest", spec_file="M-nt.spec.md")[0])
+        chk.ok("P6e-harvest-wants-a-bare-name",
+               notes("harvest", spec_file="../M-nt.spec.md")[0] == 2)
+        chk.ok("P7-slice-id-is-a-file-name", notes("add", slice="../x", text="t")[0] == 2)
+        rc, out = notes("list")
+        chk.ok("P8-list", rc == 0 and "nt-9" in out and "pending" in out and "folded" in out, out)
+
         # --- L. render determinism ------------------------------------------------------------
         _h, gr, dr, _e = parse_gates(read_gates_file(gp))
         line = acceptance_line("fx-a", _h, gr, dr)
@@ -2706,6 +3413,109 @@ def selftest():
                     bool(blocked(L("- [ ] E1: t\n  CHECK: cargo test\n  EXPECT: /1 passed/\n")))}
         chk.eq("M1-lint-discriminates", {True, False}, verdicts,
                "a lint that blocks everything or nothing carries no information (lp-04)")
+
+        # --- O. the weekly review's Phase 3, end to end: a verified finding survives ------------
+        # The review files a finding against the `wr*` slice of a milestone spec it authors in
+        # the same run. A missing section and an inadmissible finding are different refusals:
+        # the review drops only the second.
+        wspecs = os.path.join(root, "wr-specs")
+        os.makedirs(wspecs)
+        wres = os.path.join(root, "wr-residuals.jsonl")
+
+        def wr_add(gate, title, target, reason="server/src/trade.rs:10 @ abc1234 — accepts a "
+                                               "negative amount; reject it",
+                   category="data-integrity", severity="MED"):
+            err = _io.StringIO()
+            with contextlib.redirect_stdout(_io.StringIO()), contextlib.redirect_stderr(err):
+                rc = cmd_residuals({"slice": "weekly-review-2026-11-18", "gate": gate,
+                                    "title": title, "target": target, "reason": reason,
+                                    "category": category, "severity": severity,
+                                    "_residuals": wres, "_specs": wspecs}, "add")
+            return rc, err.getvalue()
+
+        def wr_open():
+            return dict((r["id"], r) for r in open_residuals(residual_rows(wres)))
+
+        real = "the server SHALL reject a negative trade amount"
+        rc_early, err_early = wr_add("F1", real, "wr261118-a")
+        chk.eq("O1-missing-section-has-its-own-exit", RC_TARGET_MISSING, rc_early,
+               "a caller that drops refused findings must be able to tell `the section is not "
+               "written yet` from `the finding is out of bounds`")
+        chk.ok("O1b-missing-section-is-named", err_early.startswith("ERROR: TARGET-MISSING")
+               and "OUT-OF-BOUNDS" not in err_early)
+        chk.eq("O1c-nothing-filed-yet", {}, wr_open())
+        with open(os.path.join(wspecs, "M-weekly-review-2026-11-18.spec.md"), "w") as fh:
+            fh.write("## 2. Slices\n\n### wr261118-a — trade bounds\n`touches: server/src/trade.rs`\n"
+                     "\nEARS: %s. residual: R-weekly-review-2026-11-18-F1\n" % real)
+        rc_app, err_app = wr_add("F2", "mr-gates SHALL lint more gates", "wr261118-a",
+                                 "memory/projects/mr-gates:1 — the gate tool itself")
+        chk.eq("O2-apparatus-finding-is-policy-refusal", 2, rc_app)
+        chk.ok("O2b-policy-refusal-is-named", err_app.startswith("ERROR: OUT-OF-BOUNDS")
+               and "TARGET-MISSING" not in err_app,
+               "the fixture must isolate the policy refusal: its target section exists")
+        # A mistyped flag on an existing target is neither refusal above: the review re-runs it.
+        for kw in ({"category": "ux"}, {"severity": "medium"}):
+            rc_tag, err_tag = wr_add("F1", real, "wr261118-a", **kw)
+            chk.ok("O2c-bad-tag-is-not-out-of-bounds[%s]" % list(kw)[0],
+                   rc_tag != 0 and err_tag.startswith("ERROR: BAD-TAG")
+                   and "OUT-OF-BOUNDS" not in err_tag and wr_open() == {},
+                   "a typo in --category/--severity is not a verdict on the finding")
+        rc_ok, _e = wr_add("F1", real, "wr261118-a")
+        wrow = wr_open().get("R-weekly-review-2026-11-18-F1") or {}
+        chk.eq("O3-finding-survives-once-section-exists",
+               (0, "targeted", "wr261118-a", ["R-weekly-review-2026-11-18-F1"]),
+               (rc_ok, wrow.get("status"), wrow.get("promoted_slice"), sorted(wr_open())))
+        rc_abs, _e = wr_add("F3", "the client SHALL show the trade error", "backlog")
+        chk.eq("O4-unelaborated-absorber-files-to-backlog", (0, "unpromoted"),
+               (rc_abs, (wr_open().get("R-weekly-review-2026-11-18-F3") or {}).get("status")))
+        with contextlib.redirect_stdout(_io.StringIO()):
+            cmd_residuals({"slice": "wr261118-a", "_residuals": wres, "_specs": wspecs,
+                           "_gates_dir": gdir, "force": True, "pr": "1",
+                           "reason": "fixture: the slice merged"}, "close")
+        chk.eq("O5-slice-merge-closes-the-finding", ["R-weekly-review-2026-11-18-F3"],
+               sorted(wr_open()), "the row must be claimed by the slice that fixes it")
+        # The procedure the review follows is the sibling prompt: it must write the spec section
+        # before it files against it, and must not treat every refusal as a verdict.
+        wprompt = read_gates_file(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                               "mr-weekly-review-prompt.md")) or ""
+        p3 = wprompt[wprompt.find("## Phase 3"): wprompt.find("## Phase 4")]
+        at_spec = p3.find("Author `$HARNESS/specs/monster-realm-v2/M-weekly-review-")
+        at_add = p3.find("mr-gates residuals add --slice weekly-review-")
+        chk.ok("O6-prompt-writes-the-section-before-filing", 0 <= at_spec < at_add,
+               "filing first is refused TARGET-MISSING for every scheduled finding")
+        chk.ok("O7-prompt-drops-only-out-of-bounds",
+               "`TARGET-MISSING` (exit %d)" % RC_TARGET_MISSING in p3
+               and "`OUT-OF-BOUNDS`" in p3 and "A refusal means" not in p3,
+               "an unqualified `a refusal means drop it` discards a verified finding whose "
+               "section is merely not written yet")
+        p3flat = " ".join(p3.split())
+        chk.ok("O8-prompt-reruns-a-bad-tag", "`BAD-TAG` is a mistyped flag: fix it and re-run"
+               in p3flat)
+        chk.ok("O9-prompt-drops-an-apparatus-match-only-when-true",
+               "drop it only when its subject really is the checking apparatus" in p3flat,
+               "the apparatus refusal is a text match on title+reason; a finding that merely "
+               "cites such a path is reworded, not dropped")
+        # An absorbed finding whose milestone has no slice section is a `backlog` row: no slice
+        # merge closes it (O5) and the supervisor promotes an unpromoted HIGH/CRITICAL
+        # security-privacy or data-integrity row into its own slice. So only MED/LOW is absorbed
+        # that way, and the absorbing slice dispositions the row itself.
+        def wr_fixed(rid):
+            err = _io.StringIO()
+            with contextlib.redirect_stdout(_io.StringIO()), contextlib.redirect_stderr(err):
+                return cmd_residuals({"id": rid, "as": "fixed", "pr": "7", "_residuals": wres,
+                                      "reason": "fixture: the absorbing slice merged"},
+                                     "disposition")
+        wr_add("F4", "the server SHALL cap the trade ledger", "backlog", severity="HIGH")
+        chk.ok("O10-loop-cannot-disposition-a-high-backlog-row",
+               wr_fixed("R-weekly-review-2026-11-18-F4") != 0
+               and "R-weekly-review-2026-11-18-F4" in wr_open(),
+               "why a HIGH/CRITICAL finding is scheduled, never absorbed via backlog")
+        chk.eq("O11-absorbing-slice-dispositions-the-backlog-row",
+               (0, ["R-weekly-review-2026-11-18-F4"]),
+               (wr_fixed("R-weekly-review-2026-11-18-F3"), sorted(wr_open())))
+        chk.ok("O12-prompt-bounds-backlog-absorption",
+               "A HIGH/CRITICAL finding is never absorbed that way" in p3flat
+               and "dispositions it `fixed`" in p3flat)
     finally:
         cleanup()
 

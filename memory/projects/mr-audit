@@ -200,6 +200,9 @@ def audit_acceptance(a, out, tool=None):
     cmd = [exe, "verify", "--slice", str(a.get("slice", "?")), "--json", "--budget", budget]
     if a.get("repo"):
         cmd += ["--repo", a["repo"]]
+    if a.get("head"):
+        # A CI-ONLY gate is evidenced by the PR's CI for one exact commit; name the audited one.
+        cmd += ["--head", a["head"]]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=int(budget) + 120)
         v = json.loads(r.stdout)
@@ -218,6 +221,7 @@ def audit_acceptance(a, out, tool=None):
             acc[k] = v[k]
     acc["evidence_mismatch"] = v.get("evidence_mismatch", [])
     acc["not_reverified"] = v.get("not_reverified", [])
+    acc["ci_only"] = v.get("ci_only", [])
     acc["lint_blocks"] = [f for f in v.get("lint", []) if f.get("severity") == "BLOCK"]
     acc["spotcheck"] = v.get("spotcheck")
     acc["status"] = v.get("verdict", "AUDIT-ERROR")
@@ -1588,6 +1592,7 @@ def _st_a_battery(chk, tmp):
                    '{"slice":"s2","verdict":"FLAGGED","seeded":4,"met":2,"unmet":2,"deferred":0,'
                    '"seed_drift":true,"unmet_ids":["E3","E4"],"reasons":["SEED-DRIFT"],'
                    '"evidence_mismatch":[{"gate":"E1","why":"x"}],"not_reverified":[],'
+                   '"ci_only":[{"gate":"E5","needs":"server","head":"abc"}],'
                    '"lint":[{"severity":"BLOCK","gate":"E2","message":"vacuous"},'
                    '{"severity":"WARN","gate":"E3","message":"m"}]}\nJ\n')
     out2 = {}
@@ -1599,6 +1604,14 @@ def _st_a_battery(chk, tmp):
     chk.check("A2/lint-blocks-only", 1, len(acc2.get("lint_blocks", [])),
               "WARNs are noise in a merge conversation; only BLOCKs are folded")
     chk.check("A2/mismatch-kept", 1, len(acc2.get("evidence_mismatch", [])))
+    chk.check("A2/ci-only-kept-apart", ["E5"], [c.get("gate") for c in acc2.get("ci_only", [])],
+              "a gate verify could not run is read against the PR's CI, not as a mismatch")
+    argv_log = os.path.join(d, "argv")
+    echo = stub("gates-argv", '#!/bin/sh\necho "$*" > %s\necho \'{"verdict":"CLEAN"}\'\n' % argv_log)
+    audit_acceptance({"slice": "s2", "repo": d, "head": "feedc0de"}, {}, tool=echo)
+    with open(argv_log) as fh:
+        chk.check("A2/head-forwarded", True, "--head feedc0de" in fh.read(),
+                  "CI evidence is per commit: verify must name the head being audited")
 
     out3 = {}
     audit_acceptance({"slice": "s3"}, out3, tool=os.path.join(d, "does-not-exist"))
