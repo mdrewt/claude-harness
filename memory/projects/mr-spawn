@@ -804,8 +804,10 @@ tier=v.get("tier") or (_ for _ in ()).throw(SystemExit("vars.json missing requir
 tier_block=("QUALITY TIER: HARD — invoke the tester subagent with model opus; depth over speed; this session runs at xhigh effort.\n" if tier=="hard"
  else "QUALITY TIER: CONTENT — data-drop slice: right-size the lens battery (reviewer + verifier mandatory; add red-team/domain auditors ONLY if the slice touches validation/parsing/security surfaces). Depth comes from the content gates (parity/determinism/schema-snapshot), not redundant lenses. Lenses run on their DECLARED agent models — do not bump lens models upward on a content slice (THIS OVERRIDES the build-loop prompt bump-one-tier default for this slice). The tester requirement is UNCHANGED — meaningful tests first, always.\n" if tier=="content" else "")
 # tester-ab: on a slice the experiment takes, one sentence for every tier. The tool prints the rest.
+# It names the `## Contracts` section because `plan` asks for it once and then skips the slice: a
+# prompt written with it costs no extra builder round.
 if sys.argv[4].startswith("yes "):
-    tier_block+=("TESTER A/B: before step 4 run `$MEM/mr-tester-ab plan %s --tier %s --prompt <your tester prompt file>` and do exactly what it prints; run `$MEM/mr-tester-ab mark %s` before the first post-implementation lens batch and `$MEM/mr-tester-ab escapes %s` before opening the PR; `AB-SKIP` means proceed normally.\n"
+    tier_block+=("TESTER A/B: give your tester prompt a `## Contracts` section (the signatures the tests will call, each test file's path and, for Rust, its module name); before step 4 run `$MEM/mr-tester-ab plan %s --tier %s --prompt <your tester prompt file>` and do exactly what it prints; run `$MEM/mr-tester-ab mark %s` before the first post-implementation lens batch and `$MEM/mr-tester-ab escapes %s` before opening the PR; `AB-SKIP` means proceed normally.\n"
                  % (v["slice"], tier, v["slice"], v["slice"]))
 rb=v.get("resume_block","") or ""
 repo=os.environ["REPO"]

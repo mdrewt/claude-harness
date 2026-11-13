@@ -45,7 +45,7 @@ EOF
 AB_ST=$("$MEM/mr-tester-ab" --selftest 2>&1 | tail -n 1)
 AB_N=${AB_ST#TESTER-AB-SELFTEST-OK }
 case "$AB_ST" in
-  "TESTER-AB-SELFTEST-OK "*) [ "$AB_N" -ge 215 ] 2>/dev/null || { echo "SELFCHECK-FAIL mr-tester-ab selftest ran $AB_N fixtures (floor 215)"; BAD=1; } ;;
+  "TESTER-AB-SELFTEST-OK "*) [ "$AB_N" -ge 288 ] 2>/dev/null || { echo "SELFCHECK-FAIL mr-tester-ab selftest ran $AB_N fixtures (floor 288)"; BAD=1; } ;;
   *) echo "SELFCHECK-FAIL mr-tester-ab selftest: $(echo "$AB_ST" | cut -c1-160)"; BAD=1 ;;
 esac
 # run-cost: every ended build session leaves exactly one ledger cost row, carrying that session's
@@ -1930,8 +1930,9 @@ def fail(name, detail=""):
 
 
 def sentence(slice_, tier):
-    return ("TESTER A/B: before step 4 run `$MEM/mr-tester-ab plan %s --tier %s --prompt <your tester prompt file>` "
-            "and do exactly what it prints; run `$MEM/mr-tester-ab mark %s` before the first post-implementation "
+    return ("TESTER A/B: give your tester prompt a `## Contracts` section (the signatures the tests will call, each "
+            "test file's path and, for Rust, its module name); before step 4 run `$MEM/mr-tester-ab plan %s --tier %s "
+            "--prompt <your tester prompt file>` and do exactly what it prints; run `$MEM/mr-tester-ab mark %s` before the first post-implementation "
             "lens batch and `$MEM/mr-tester-ab escapes %s` before opening the PR; `AB-SKIP` means proceed "
             "normally.\n" % (slice_, tier, slice_, slice_))
 
@@ -2006,6 +2007,12 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-ab-spawn-") as TMP:
                 fail("enabled-%s" % tier, "an eligible %s slice must render today's brief plus the one "
                      "TESTER A/B sentence at the end of the tier block (got %d bytes, want %d)"
                      % (tier, len(got or ""), len(want)))
+        # No tester prompt carries a `## Contracts` heading unless the builder is told to write
+        # one: without it every first `plan` call answers AB-NEED and costs a builder round.
+        if "`## Contracts` section" not in sentence("np-a", "routine") or "module name" not in sentence("np-a", "routine") \
+                or "## Contracts" in today[("np-a", "routine", "project")]:
+            fail("contracts-named", "the sentence must tell the builder to write the `## Contracts` section, and "
+                 "only the experiment's sentence may")
         hard = render("np-a", "hard", "project") or ""
         if "QUALITY TIER: HARD — invoke the tester subagent with model opus" not in hard \
                 or hard.find("QUALITY TIER: HARD") > hard.find("TESTER A/B:"):
