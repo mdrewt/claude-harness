@@ -9,6 +9,9 @@ Two independent dials — *which model* and *how much effort/orchestration*.
 | Opus   | implementation, review, verification verdicts, loop decisions, planning, judging, audits; the tester on hard-tier slices |
 | Fable  | hard-tier implementation |
 
+On a slice the tester A/B experiment takes, the shadow testers' model and effort come from
+`memory/projects/mr-tester-ab`; the gating tester follows the tier policy in this table.
+
 Rule: raise a role's tier when its billed cost is small and its output gates what merges or what
 gets built next (reviewer, verifier, the supervisor tick). Keep the cheaper tier where volume is
 high and another role checks the output (the routine-tier tester, red-team). Each agent's tier is
