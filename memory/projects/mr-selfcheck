@@ -1657,6 +1657,9 @@ DJ() { "$MEM/mr-disjoint" "$@" 2>/dev/null | /usr/bin/python3 -c 'import json,sy
 "$MEM/mr-touches" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-touches selftest"; BAD=1; }
 # the slice brief's comment check: what it flags, and above all what it must leave alone.
 "$MEM/mr-comment-scan" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-comment-scan selftest"; BAD=1; }
+# the test census: the twins it must list, the look-alikes it must not (another file, another
+# block, another case table, a literal that differs), and the inspected repository left untouched.
+"$MEM/mr-prune" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-prune selftest"; BAD=1; }
 # launch machinery: brief rendering, placeholder integrity, repo routing, probe behavior.
 "$MEM/mr-spawn" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-spawn selftest"; BAD=1; }
 # lp-04: mr-audit's policy/detector split + the disposition sweep.

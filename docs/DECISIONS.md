@@ -137,5 +137,31 @@ The documentation rule in `standards/principles.md` is judged by the reviewer, b
 pressure skips prose rules, and the commonest violations (a slice id, "used to") are mechanical
 to spot. Scanning added lines only keeps the existing corpus from flagging every diff.
 Rules out: promoting it to a failing gate, scanning whole files, or an inline suppression marker
-(a comment written for the tool to parse). This is the one sanctioned source-text scan; it does
-not license others (`standards/testing-tdd.md`).
+(a comment written for the tool to parse). This scan and the test census (see the entry below)
+are the two sanctioned source-text scans; neither licenses others (`standards/testing-tdd.md`).
+
+## The test census is a report: recorded at milestone close, acted on at elaboration
+`memory/projects/mr-prune census` reads the game repo's test files at a commit and prints the
+suite's size per package and the tests that are exact twins of an earlier test in the same block.
+It is a second report-only source-text scan, beside `mr-comment-scan`; it exits 0 whatever it
+finds and no gate reads it. A row is a candidate for someone to read, never a reason to delete:
+`standards/testing-tdd.md` (Deleting a check is legitimate) stays the only authority for removal.
+Twins: same file, same enclosing block, same declaration form, and a token-identical body
+(comments and whitespace between tokens ignored, every literal compared as written) that does not
+depend on the test's name. The later test is the candidate, the earlier the survivor. A pair whose
+path or names carry a protected token is listed apart and follows the standard's protected path.
+`mr-prune twin` re-checks a claimed pair at a commit, and only with the candidate as the later test.
+A pair that is identical on purpose is recorded with `mr-prune keep` in the tracked
+`memory/projects/mr-prune-keep.json`, keyed by file, test name and body hash, and is not listed
+again until the test changes. The look is when a milestone closes, when everything it added
+exists; a removal is acted on only when a spec is elaborated, in a slice that already lists the
+file, or through the structural queue, never in a session of its own.
+Measured on the suite, almost nothing is provably redundant under a rule strict enough to be safe
+(the strict count was zero). Mutation results cannot show a test is redundant (a few tests kill
+every mutant of a module whose other tests assert different rules) and TypeScript has no mutation
+tool. A dedicated prune session costs tens of dollars per milestone to act on a usually empty list.
+Rules out: promoting the census to a failing gate or a ratchet on its counts, an inline keep
+marker in test source (a comment written for a tool to parse), using a row, a count or a mutation
+result as a deletion reason by itself, and a per-milestone prune session with its own PR type; the
+last is to be reconsidered when the tester A/B experiment closes, from its report and the recorded
+census rows.
