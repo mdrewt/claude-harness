@@ -15,7 +15,8 @@ test files.
 Defaults: R = projects/monster-realm of the checkout this tool is in; REF =
 refs/remotes/origin/master; DIR = the directory this tool is in. `PRUNE-ERROR ...` on stderr and
 rc=2 for a usage error, an R that is not the top level of a git repository, a REF that is not a
-commit, a DIR that is missing or inside R when the command writes, or a write that fails.
+commit, a log that cannot be read, a --spec FILE that cannot be read, a DIR that is missing or
+inside R when the command writes, or a write that fails.
 
 A row is a candidate for someone to read, never a reason to delete a test: the deletion rule is
 standards/testing-tdd.md, "Deleting a check is legitimate". No gate reads this tool's output, and
@@ -44,7 +45,8 @@ census prints, in this order:
   not read: inline `#[cfg(test)] mod` bodies in product files, client/e2e/**/*.spec.ts,
   client/test-util/, evals/**/*.eval.mjs, and the .rs files of sim-harness/ and client-wasm/.
   Names are JSON strings, and so is a path holding anything outside [A-Za-z0-9_./-].
-  Rows of a section are sorted by file, then name. `totals` and `counts` cover the whole commit.
+  Twin rows come in file order and, within a file, definition order; the other sections are sorted
+  by file, then name. `totals` and `counts` cover the whole commit.
   `--record LABEL` appends one JSON row (label, commit, totals, counts, and with --ci a `ci` object
   {seconds, conclusion, nightly, reruns_to_green}) to DIR/prune/trend.jsonl and prints
   `recorded LABEL`.
@@ -60,14 +62,16 @@ const, static; or a top-level `export` function, class, interface, type, enum or
 client/src (module_bindings/ aside). Methods, variants and `export default` are not symbols. It is
 listed when no production file but its own names it and no live code of its own file does. Live
 code: an item with an attribute other than doc, inline, must_use, allow, derive, cfg_attr (an
-entry point: reducer, table, wasm export, track_caller, ...; never listed); code that is not a
-symbol (a macro call, a top-level TypeScript statement, an impl whose self type is live); a symbol
-named by another production file or by live code of its file. Production is every tracked text
-file except the test files below, any `tests/` or `benches/` directory, client/test-util/, *.md and
-*.txt; client/e2e, evals, client-wasm, sim-harness, HTML and config count. A file names what its
-identifiers and the words inside its literals spell, comments, `use ...;`, `import ...` and
-`export ... from ...` aside, and inline `#[cfg(test)]` modules and items aside; a file the lexer
-cannot read names every word of its text. An item compiled only under `#[cfg(test)]` outside a test
+entry point: reducer, table, wasm export, track_caller, ...; never listed), `fn main`, `const _`;
+code with no name (a macro call, a top-level TypeScript statement, the initializer of a top-level
+TypeScript const/let/var/type, an impl whose self type is live or is a primitive, slice or
+tuple); and any item, private ones included, named by another production file or by live code of
+its file. Production is every tracked text file except test files wherever they are (`*_tests.rs`,
+`*.test.ts`, a `tests/` or `benches/` directory), client/test-util/, *.md and *.txt; client/e2e,
+evals, client-wasm, sim-harness, HTML and config count. A file names what its identifiers and the
+words inside its literals spell, comments and module-level `#[cfg(test)]` modules and items aside.
+A `use ...;`, `import ...` or `export ... from ...` statement names only what it reaches through:
+X of `X as Y` and of `X::...`. A file the lexer cannot read names every word of its text. An item compiled only under `#[cfg(test)]` outside a test
 module is listed as `test-only`. `tests=` holds the test files whose names include the symbol. A
 defining path or a symbol holding a protected token goes under `orphan-protected`. The match is by
 name, so a name used for two things hides an orphan; a row is for a refactor to prove.
@@ -271,7 +275,8 @@ def lex_ts(src):
                 regex = None
             elif prev and (prev[0] in ("num", "str", "re")
                            or (prev[0] == "tpl" and prev[1][-1] == "`")    # not after its `${`
-                           or (prev[0] == "id" and prev[1] not in TS_REGEX_AFTER_WORD)
+                           or (prev[0] == "id" and (prev[1] not in TS_REGEX_AFTER_WORD
+                                                    or (len(toks) > 1 and toks[-2][1] in (".", "?."))))
                            or (prev[0] == "punct" and prev[1] in ("++", "--"))):
                 regex = None
             if regex:
@@ -716,7 +721,6 @@ TS_LIKE = re.compile(r"\.(?:ts|tsx|js|jsx|mjs|cjs)$")
 WORD = re.compile(r"[A-Za-z_$][\w$]*")
 # An item attribute outside these marks an entry point (reducer, table, wasm export, ...).
 PLAIN_ATTRIBUTES = {"doc", "inline", "must_use", "allow", "derive", "cfg_attr"}
-RS_SYMBOL_KINDS = {"fn", "struct", "enum", "union", "trait", "type", "const", "static"}
 TS_SYMBOL_KINDS = {"function", "class", "interface", "type", "enum", "const", "let", "var"}
 TS_STATEMENT_START = {"export", "import", "function", "class", "interface", "type", "enum", "const",
                       "let", "var", "declare", "abstract", "async", "namespace", "module"}
@@ -733,13 +737,26 @@ class Item:
         self.candidate, self.test_only, self.entry = candidate, test_only, entry
 
 
+def _reached(toks, a, b):
+    """The names a use / import / export-from statement at toks[a:b] reaches a symbol through
+    without re-exporting it: X of `X as Y`, and X of `X::...` (a path prefix, `Kind::*`)."""
+    out = set()
+    for i in range(a, b - 1):
+        kind, text, _offset = toks[i]
+        if kind == "id" and (_is(toks[i + 1], "::") or (
+                _word(toks[i + 1], "as") and i + 2 < b and not _word(toks[i + 2], "_"))):
+            out.add(text[2:] if text.startswith("r#") else text)
+    return out
+
+
 def _names(toks, a, b, strip):
-    """The identifiers of toks[a:b] and the words inside its literals, without the statements
-    `strip(toks, i)` says end at an index (it returns None for any other position)."""
+    """The identifiers of toks[a:b] and the words inside its literals. A statement `strip(i)` says
+    ends at an index (None for any other position) adds only the names it reaches through."""
     out, i = set(), a
     while i < b:
         end = strip(i)
         if end is not None:
+            out |= _reached(toks, i, end)
             i = end
             continue
         kind, text, _offset = toks[i]
@@ -753,15 +770,20 @@ def _names(toks, a, b, strip):
 
 def _rs_use_end(toks, match, i):
     """The index after a `use ...;` starting at toks[i]; None when toks[i] does not start one."""
-    if not _word(toks[i], "use"):
+    if not _word(toks[i], "use") or (i + 1 < len(toks) and _is(toks[i + 1], "<")):
         return None
     while i < len(toks) and not _is(toks[i], ";"):
         i = match.get(i, i) + 1
     return i + 1
 
 
+RS_PRIMITIVES = {"str", "bool", "char", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16",
+                 "i32", "i64", "i128", "isize", "f32", "f64"}
+
+
 def _rs_self_type(toks, a, b):
-    """The name of an impl's self type from the tokens between `impl` and its body."""
+    """The name of an impl's self type from the tokens between `impl` and its body; None for a
+    type no symbol names (a primitive, slice, tuple), whose impl is then live."""
     depth, start, i = 0, a, a
     while i < b:
         text = toks[i][1]
@@ -781,7 +803,7 @@ def _rs_self_type(toks, a, b):
                 return None
         elif kind == "id" and depth == 0 and text not in ("dyn", "mut", "crate", "super", "self", "impl"):
             name = text
-    return name
+    return None if name in RS_PRIMITIVES else name
 
 
 def rs_items(toks, match, a, b, items):
@@ -830,11 +852,13 @@ def rs_items(toks, match, a, b, items):
                 i = end
                 continue
             name = toks[i + 1][1] if i + 1 < b and toks[i + 1][0] == "id" and kind != "impl" else None
+            entry = entry or (kind == "fn" and name == "main")      # a binary's entry point
         elif kind in ("const", "static", "type"):
             j = i + 1
             if j < b and _word(toks[j], "mut"):
                 j += 1
-            name = toks[j][1] if j < b and toks[j][0] == "id" else None
+            name = toks[j][1] if j < b and toks[j][0] == "id" and toks[j][1] != "_" else None
+            entry = entry or name is None       # `const _: () = assert!(...)` runs at compile time
             while j < b and not _is(toks[j], ";"):
                 j = match.get(j, j) + 1
             end = j + 1
@@ -849,6 +873,8 @@ def rs_items(toks, match, a, b, items):
             i = max(end, i + 1)
             continue
         names = _names(toks, start, end, strip)
+        if name and name.startswith("r#"):
+            name = name[2:]
         if test_only:
             items.append(Item("test", name, test_only=bool(name) and kind != "mod"))
         elif kind == "impl":
@@ -856,8 +882,7 @@ def rs_items(toks, match, a, b, items):
         elif kind == "mod":
             pass        # `mod name;`
         else:
-            items.append(Item(kind, name, names, entry=entry,
-                              candidate=public and kind in RS_SYMBOL_KINDS and bool(name)))
+            items.append(Item(kind, name, names, entry=entry, candidate=public and bool(name)))
         i = max(end, i + 1)
     return items
 
@@ -947,7 +972,12 @@ def ts_items(src, toks, match):
             end = _ts_statement_end(src, toks, match, i, n)
         end = max(end, start + 1)
         names = _names(toks, start, end, strip)
-        items.append(Item(kind, name, names, candidate=exported) if name else Item("region", names=names))
+        if kind in ("function", "class", "interface", "enum"):
+            items.append(Item(kind, name, names, candidate=exported))
+        else:       # an initializer runs at load, and a line it swallowed without `;` runs too
+            if name:
+                items.append(Item(kind, name, candidate=exported))
+            items.append(Item("region", names=names - {name}))
         i = end
     return items
 
@@ -959,7 +989,7 @@ def product_items(path, data):
     try:
         src = data.decode("utf-8")
     except UnicodeDecodeError:
-        return [], set()
+        return [], set(WORD.findall(data.decode("utf-8", "replace")))
     try:
         if path.endswith(".rs"):
             toks = lex_rs(src)
@@ -1006,9 +1036,9 @@ def orphans_of(path, items, named_elsewhere):
     return out
 
 
-def orphan_rows(blobs, contents):
-    """-> [(section, file, symbol, test-only?, [test files], token)] over the snapshot's files.
-    `contents` holds every file read for names; `blobs` lists every path."""
+def orphan_rows(contents):
+    """-> [(section, file, symbol, test-only?, [test files], token)], one per symbol, over
+    `contents`, every file read for names."""
     names_of, items_of = {}, {}
     for path, data in contents.items():
         items, names = product_items(path, data)
@@ -1021,11 +1051,14 @@ def orphan_rows(blobs, contents):
             for name in names:
                 by_name.setdefault(name, set()).add(path)
     test_files = sorted(p for p in names_of if any(TEST_FILE[k].match(p) for k in PACKAGES))
-    rows = []
+    rows, seen = [], set()
     for path in sorted(items_of):
         def elsewhere(name, path=path):
             return bool(by_name.get(name, set()) - {path})
         for symbol, test_only in orphans_of(path, items_of[path], elsewhere):
+            if (path, symbol) in seen:      # an overload, or a type and a value of one name
+                continue
+            seen.add((path, symbol))
             tests = [t for t in test_files if symbol in names_of[t]]
             token = protected_token(path, symbol)
             rows.append(("orphan-protected" if token else "orphans", path, symbol, test_only, tests,
@@ -1062,12 +1095,12 @@ def subject_of(path):
 
 def churn_counts(log, test_files):
     """{test file: commits that changed it by CHURN_MAX_LINES lines or fewer and left its subject
-    alone}, from `git log --format=%x00%H --numstat` text."""
+    alone}, from `git log -z --format=%x01%H --numstat` text."""
     counts = {}
-    for commit in log.split("\0")[1:]:
+    for commit in log.split("\x01")[1:]:
         changed = {}
-        for line in commit.splitlines()[1:]:
-            fields = line.split("\t", 2)
+        for entry in commit.split("\0")[1:]:
+            fields = entry.lstrip("\n").split("\t", 2)
             if len(fields) == 3:
                 added, deleted, path = fields
                 changed[path] = (int(added) + int(deleted)
@@ -1131,18 +1164,23 @@ def _glob(entry):
 def spec_touches(text):
     """[(slice id, [pattern])] for each `### <id> — ` heading of a spec, from the first `touches:`
     line under it."""
-    slices, current = [], None
+    slices, current, fenced = [], None, False
     for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+        if fenced:
+            continue
         heading = SLICE_HEADING.match(line)
         if heading:
-            current = (heading.group(1), [])
+            current = [heading.group(1), [], False]
             slices.append(current)
         elif line.startswith("#"):
             current = None
-        elif current is not None and not current[1] and line.startswith("touches:"):
+        elif current is not None and not current[2] and line.startswith("touches:"):
             entries = [e.strip().strip("`").strip() for e in line[len("touches:"):].split(",")]
             current[1].extend(_glob(e) for e in entries if e)
-    return slices
+            current[2] = True
+    return [(sid, patterns) for sid, patterns, _seen in slices]
 
 
 def slices_naming(slices, files):
@@ -1195,7 +1233,7 @@ def read_ci(repo, commit):
         try:
             done = subprocess.run(
                 [gh, "run", "list", "--branch", CI_BRANCH, "--limit", str(CI_RUN_LIMIT), "--json",
-                 "databaseId,workflowName,headSha,status,conclusion,attempt,startedAt,updatedAt"],
+                 "workflowName,headSha,status,conclusion,attempt,startedAt,updatedAt"],
                 cwd=repo, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 timeout=180)
             runs = json.loads(done.stdout.decode("utf-8")) if not done.returncode else None
@@ -1205,7 +1243,7 @@ def read_ci(repo, commit):
                 why = "gh answered something other than a list of runs"
             else:
                 return ci_fields(runs, commit)
-        except (OSError, subprocess.TimeoutExpired, ValueError) as e:
+        except (OSError, subprocess.TimeoutExpired, ValueError, RecursionError) as e:
             why = "gh failed: %s" % (str(e) or type(e).__name__)
     sys.stderr.write("PRUNE-WARN ci %s: fields are null\n" % why)
     return dict.fromkeys(CI_FIELDS)
@@ -1436,8 +1474,8 @@ def read_spec(path):
 
 
 def churn_of(snap, test_files):
-    log = _git(snap.repo, "-c", "core.quotePath=false", "log", "-n", str(CHURN_WINDOW),
-               "--no-renames", "--format=%x00%H", "--numstat", snap.commit)
+    log = _git(snap.repo, "log", "-z", "-n", str(CHURN_WINDOW), "--no-renames", "--no-textconv",
+               "--no-ext-diff", "--no-show-signature", "--format=%x01%H", "--numstat", snap.commit)
     if log.returncode:
         raise Fail("cannot read the log of %s" % snap.commit)
     return churn_counts(log.stdout.decode("utf-8", "surrogateescape"), set(test_files))
@@ -1478,10 +1516,10 @@ def cmd_census(opts):
     for section, path, cand, surv, token in report.rows:
         add(section, "%s %s :: %s -> %s%s" % (section, _shown(path), _quoted(cand), _quoted(surv),
                                               " token=" + token if token else ""), path)
-    for section, path, symbol, test_only, tests, token in orphan_rows(snap.blobs, report.contents):
+    for section, path, symbol, test_only, tests, token in orphan_rows(report.contents):
         add(section, "%s %s :: %s%s tests=%s%s" % (
             section, _shown(path), _quoted(symbol), " test-only" if test_only else "",
-            json.dumps(tests, separators=(",", ":"), ensure_ascii=False),
+            json.dumps(tests, separators=(",", ":")),
             " token=" + token if token else ""), path, *tests)
     churn, widened = churn_of(snap, report.test_files), widened_counts(mem)
     for path in report.test_files:
