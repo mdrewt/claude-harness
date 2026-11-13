@@ -3,10 +3,11 @@
 # ^ POLYGLOT INTERPRETER GUARD. `bash <this file>` would otherwise run the python source as shell
 # and execute any backticked prose in it. Python reads this line as a no-op string; sh/bash
 # re-execs the file under python3 before reaching any other line. mr-selfcheck enforces it.
-"""mr-prune — a read-only census of the game repo's test suite: its size, and the tests that are
-exact twins of an earlier test in the same block.
+"""mr-prune — a read-only census of the game repo's test suite: its size, the tests that are exact
+twins of an earlier test in the same block, the product symbols only tests name, and signals on
+test files.
 
-    mr-prune census [--repo R] [--at REF] [--mem DIR] [--record LABEL]
+    mr-prune census [--repo R] [--at REF] [--mem DIR] [--record LABEL] [--spec FILE] [--ci]
     mr-prune twin   [--repo R] [--at REF] [--mem DIR] --file F --test T --survivor S
     mr-prune keep   [--repo R] [--at REF] [--mem DIR] --file F --test T --reason TEXT
     mr-prune --selftest [ID ...]      fixtures/prune/battery.py; rc=0 pass, rc=1 fail
@@ -26,7 +27,13 @@ census prints, in this order:
     totals out-of-scope evals=N sim-harness=N client-wasm=N
     duplicates <file> :: "<candidate>" -> "<survivor>"
     protected-twins <file> :: "<candidate>" -> "<survivor>" token=<token>
+    orphans <file> :: "<symbol>"[ test-only] tests=["<test file>",...]
+    orphan-protected <file> :: "<symbol>"[ test-only] tests=[...] token=<token>
+    literal-variants <file> groups=N
+    signals <file>[ source-text][ churn=N][ widened=N]
+    protected-churn <file> churn=N token=<token>
     counts duplicates=N protected-twins=N identical-other-scope=N kept=N unparsed=N
+    ci seconds=N conclusion=W nightly=W reruns-to-green=N           (with --ci; null when unknown)
   Packages and their test files:
     game-core       game-core/src/**/*_tests.rs, game-core/tests/*.rs
     server-module   server-module/src/**/*_tests.rs
@@ -37,8 +44,49 @@ census prints, in this order:
   not read: inline `#[cfg(test)] mod` bodies in product files, client/e2e/**/*.spec.ts,
   client/test-util/, evals/**/*.eval.mjs, and the .rs files of sim-harness/ and client-wasm/.
   Names are JSON strings, and so is a path holding anything outside [A-Za-z0-9_./-].
-  `--record LABEL` appends one JSON row (label, commit, totals, counts) to DIR/prune/trend.jsonl
-  and prints `recorded LABEL`.
+  Rows of a section are sorted by file, then name. `totals` and `counts` cover the whole commit.
+  `--record LABEL` appends one JSON row (label, commit, totals, counts, and with --ci a `ci` object
+  {seconds, conclusion, nightly, reruns_to_green}) to DIR/prune/trend.jsonl and prints
+  `recorded LABEL`.
+  `--spec FILE` prints only the rows with a file that a `touches:` entry of FILE names, each ending
+  ` slices=<id>,...`: the `### <id> — ` slices, in file order, whose first `touches:` line under
+  the heading names one. Entries are comma-separated, backticks dropped; `**` crosses directories,
+  `*` and `?` do not, and an entry names everything under it as a directory. A twin row's file is
+  its test file; an orphan row's files are the defining file and its tests.
+
+Orphans. A symbol is a module-level item of game-core/src or server-module/src (top level or in a
+`mod name { }` that is not `#[cfg(test)]`): `pub`/`pub(...)` fn, struct, enum, union, trait, type,
+const, static; or a top-level `export` function, class, interface, type, enum or const/let/var of
+client/src (module_bindings/ aside). Methods, variants and `export default` are not symbols. It is
+listed when no production file but its own names it and no live code of its own file does. Live
+code: an item with an attribute other than doc, inline, must_use, allow, derive, cfg_attr (an
+entry point: reducer, table, wasm export, track_caller, ...; never listed); code that is not a
+symbol (a macro call, a top-level TypeScript statement, an impl whose self type is live); a symbol
+named by another production file or by live code of its file. Production is every tracked text
+file except the test files below, any `tests/` or `benches/` directory, client/test-util/, *.md and
+*.txt; client/e2e, evals, client-wasm, sim-harness, HTML and config count. A file names what its
+identifiers and the words inside its literals spell, comments, `use ...;`, `import ...` and
+`export ... from ...` aside, and inline `#[cfg(test)]` modules and items aside; a file the lexer
+cannot read names every word of its text. An item compiled only under `#[cfg(test)]` outside a test
+module is listed as `test-only`. `tests=` holds the test files whose names include the symbol. A
+defining path or a symbol holding a protected token goes under `orphan-protected`. The match is by
+name, so a name used for two things hides an orphan; a row is for a refactor to prove.
+
+Signals, per test file:
+  source-text   it calls include_str!, read_to_string, readFileSync or readFile (a token, not text
+                in a comment or a literal)
+  churn=N       N of the last 300 commits on REF changed it by 12 lines or fewer (added plus
+                deleted) and left its subject file alone: same directory, stem without `_tests` or
+                `.test`
+  widened=N     N rows of DIR/gates/*.widened.jsonl have it as `path`
+  A churned file whose path holds a protected token is also listed under `protected-churn`.
+  `literal-variants` counts the groups of two or more tests of one block whose forms and bodies
+  are equal once every literal is masked and that are not all the same test.
+
+--ci reads one `gh run list --branch master` from R's directory: seconds and conclusion of the
+newest completed CI run on the commit, the newest completed Nightly's conclusion, and how many of
+the newest 300 CI runs concluded success on attempt 2 or later. gh missing from PATH, failing or
+answering something else: the four are null, `PRUNE-WARN ci ...` goes to stderr, rc stays 0.
 
 A test, per language:
   TypeScript  `it(title, fn)` or `test(title, fn)`, with or without `.each(table)`, written as a
@@ -93,8 +141,8 @@ candidate's row and counts it under `kept` until its form or body changes. `PRUN
 written). census and twin read a keep file they cannot parse as empty and say so on stderr, so a
 broken keep file can only add rows.
 
-The inspected repository is read through `git rev-parse`, `git ls-tree` and `git cat-file` at the
-commit; nothing is checked out and the work tree is never read. The only files written are the keep
+The inspected repository is read through `git rev-parse`, `git ls-tree`, `git cat-file` and
+`git log` at the commit; nothing is checked out and the work tree is never read. The only files written are the keep
 file and the trend file, and never inside R.
 
 Shebang is `/usr/bin/python3` on purpose: `#!/usr/bin/env python3` exits 126 in unpinned cwds under
