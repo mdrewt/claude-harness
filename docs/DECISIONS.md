@@ -156,12 +156,22 @@ A pair that is identical on purpose is recorded with `mr-prune keep` in the trac
 again until the test changes. The look is when a milestone closes, when everything it added
 exists; a removal is acted on only when a spec is elaborated, in a slice that already lists the
 file, or through the structural queue, never in a session of its own.
+`mr-prune close` records that look once per milestone. The milestone's commits are the ones whose
+subject names one of its slices as `<type>[(<scope>)]: <slice id> — `, less any a later commit says
+it reverts: the rule `structure.spec.md` uses for "built". They are a set, not a first-to-last
+range, because other milestones, refactors and CI fixes merge between a milestone's slices. Each
+candidate in the files those commits changed gets one route: `slice` when an unbuilt slice of
+another spec already lists a file of it, so that spec's elaboration acts on it; `structure`, into
+one refactor section per close, capped at 6 rows and 12 files so that one run can read every row
+before it removes any; `report` for a protected row and for an orphan wider than 12 files, which
+is a design question. The section is not written while the tester A/B experiment is open.
 Measured on the suite, almost nothing is provably redundant under a rule strict enough to be safe
 (the strict count was zero). Mutation results cannot show a test is redundant (a few tests kill
 every mutant of a module whose other tests assert different rules) and TypeScript has no mutation
 tool. A dedicated prune session costs tens of dollars per milestone to act on a usually empty list.
 Rules out: promoting the census to a failing gate or a ratchet on its counts, an inline keep
 marker in test source (a comment written for a tool to parse), using a row, a count or a mutation
-result as a deletion reason by itself, and a per-milestone prune session with its own PR type; the
-last is to be reconsidered when the tester A/B experiment closes, from its report and the recorded
-census rows.
+result as a deletion reason by itself, a first-to-last commit range as what a milestone added, an
+uncapped section or one section per candidate, and a per-milestone prune session with its own PR
+type; the last is to be reconsidered when the tester A/B experiment closes, from its report and
+the recorded census rows.

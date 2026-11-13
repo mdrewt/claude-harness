@@ -1,13 +1,15 @@
 #!/usr/bin/python3
 ''''exec /usr/bin/python3 "$0" "$@" # '''
 # ^ POLYGLOT INTERPRETER GUARD: a shell that runs this file re-execs it under python3 first.
-"""mr-prune selftest battery: one fixture per criterion id (TP1-A1..TP1-A15, TP2-A1..TP2-A14).
+"""mr-prune selftest battery: one fixture per criterion id (TP1-A1..TP1-A15, TP2-A1..TP2-A14,
+TP4-A1..TP4-A19).
 
     /usr/bin/python3 battery.py <absolute path of mr-prune> [ID ...]
 
 Drives the tool only as a subprocess, over temporary git repositories built here, always with
 --repo, --at <sha> and --mem <temp dir> (the CI fixtures also put a fake `gh` first on PATH, or
-remove `gh` from PATH). One fixture per criterion id. A failed check prints
+remove `gh` from PATH; the TP4 `close` fixtures also pass --spec <a spec in a temp directory>).
+One fixture per criterion id. A failed check prints
 "FAIL <ID> <check>: ..." and the run goes on. The last stdout line is
 "PRUNE-SELFTEST-OK <checks>[ <ID>...]" (exit 0) or "PRUNE-SELFTEST-FAIL <failed>/<checks>" (exit 1).
 TP1-A16 has no fixture here: it is proved by running mr-selfcheck itself.
@@ -2029,6 +2031,1394 @@ def tp2_a14(ctx):
                       len(gh.calls()) == 1, 1, gh.calls(), r)
 
 
+# --------------------------------------------------------------------------------------------
+# TP4 helpers: `mr-prune close`
+# --------------------------------------------------------------------------------------------
+
+EM = chr(0x2014)        # the dash of a slice heading and of a naming subject
+MIDDOT = chr(0x00b7)    # the middle dot of `type: ... <dot> tier: ...`
+TOUCHED = "// touched\n"
+CLOSE_FILE_KEYS = {"label", "commit", "spec", "experiment-closed", "section", "rows"}
+CLOSE_OBJ_KEYS = {"slices", "unmatched", "added", "removed", "changed", "signals"}
+TREND_KEYS = {"label", "commit", "totals", "counts", "close"}
+CRITERION_RE = re.compile(r"^- \*\*ST<n>\.1:\*\* WHEN .+ SHALL pass\.$")
+ITEM_RE = re.compile(r"^- `([^`]+)` :: (\".*\")$")
+SUB_RE = re.compile(r"^\s+- (reason|surviving check|confirmed at merge): (.*)$")
+
+
+def subject(sid, text="work", prefix="feat"):
+    """A Conventional Commit subject naming slice `sid`."""
+    return "%s: %s %s %s" % (prefix, sid, EM, text)
+
+
+def reverting(first_line, sha):
+    """A message whose body says it reverts `sha` (a full id or a prefix of one)."""
+    return "%s\n\nThis reverts commit %s." % (first_line, sha)
+
+
+def change(repo, msg, put=None, drop=()):
+    """One commit writing `put` {path: text} and deleting `drop`; -> its sha."""
+    for rel in drop:
+        os.remove(os.path.join(repo.path, rel))
+    for rel, data in (put or {}).items():
+        repo.put(rel, data)
+    return repo.commit(msg)
+
+
+def touch(repo, msg, rels):
+    """One commit appending a comment line to each of `rels`; -> its sha."""
+    for rel in rels:
+        with open(os.path.join(repo.path, rel), "ab") as f:
+            f.write(TOUCHED.encode("utf-8"))
+    return repo.commit(msg)
+
+
+def filler(n, tag="line"):
+    """n comment lines: lines that define and name nothing."""
+    return "".join("// %s %d\n" % (tag, i) for i in range(n))
+
+
+def tw_text(tag, uses=()):
+    """A TS test file of one twin pair in describe(tag); both bodies name each of `uses`."""
+    body = "expect(run('%s'%s)).toBe(1);" % (tag, "".join(", " + u for u in uses))
+    return "describe('%s', () => {\n%s\n%s});\n" % (tag, it_("one", body), it_("one again", body))
+
+
+def tw_names(tag):
+    """(candidate, survivor) of tw_text(tag)."""
+    return tag + " > one again", tag + " > one"
+
+
+def ts_def(*names):
+    return "".join("export function %s(): number { return 1; }\n" % n for n in names)
+
+
+def ts_use(*names):
+    """A TS test file of one test calling each of `names`."""
+    return ("describe('u', () => {\n  it('x', () => {\n    expect(%s).toBe(1);\n  });\n});\n"
+            % " + ".join("%s()" % n for n in names))
+
+
+def slice_block(sid, touches=None, body="Body text.\n"):
+    text = "### %s %s a slice\ntype: feature %s tier: routine\n" % (sid, EM, MIDDOT)
+    if touches is not None:
+        text += "touches: %s\n" % touches
+    return text + "after: []\n\n" + body + "\n"
+
+
+def spec_text(slices):
+    """A milestone spec whose `## Slices` holds one section per (id, touches-or-None)."""
+    return ("# A milestone\n\nIntro.\n\n## Slices\n\n"
+            + "".join(slice_block(sid, touches) for sid, touches in slices) + "## Risks\n\nNone.\n")
+
+
+def spec_dir():
+    return tempfile.mkdtemp(prefix="specs-", dir=ROOT)
+
+
+def put_spec(d, name, text):
+    path = os.path.join(d, name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(text if isinstance(text, bytes) else text.encode("utf-8"))
+    return path
+
+
+def closed_mem():
+    """A --mem whose mr-tester-ab.jsonl holds a close row: the experiment has closed."""
+    mem = new_mem()
+    with open(os.path.join(mem, "mr-tester-ab.jsonl"), "w") as f:
+        f.write('{"kind": "shadow", "slice": "x-1"}\n{"kind": "close", "ts": "2026-11-13T00:00:00Z"}\n')
+    return mem
+
+
+def close(repo, sha, mem, spec, *extra, env=None):
+    r = run_tool("close", "--repo", repo.path, "--at", sha, "--mem", mem, "--spec", spec, *extra, env=env)
+    r.cslices, r.cunmatched, r.crows, r.csection = {}, [], None, None
+    for line in r.out.splitlines():
+        line = line.rstrip("\r")
+        parts = line.split(" ")
+        if parts[0] == "slice" and len(parts) >= 3:
+            r.cslices[parts[1]] = parts[2:]
+        elif parts[0] == "unmatched" and len(parts) == 2:
+            r.cunmatched.append(parts[1])
+        elif parts[0] == "rows":
+            r.crows = kv(parts[1:])
+        elif parts[0] == "section" and len(parts) == 2:
+            r.csection = parts[1]
+        elif parts[0] == "ci":
+            r.ci = kv(parts[1:])
+        elif parts[0] == "recorded":
+            r.recorded = line[len("recorded "):]
+    return r
+
+
+def close_refused(res):
+    """Exit 2 with a PRUNE-ERROR line on stderr and no close output."""
+    return (res.rc == 2 and any(l.startswith("PRUNE-ERROR") for l in res.err.splitlines())
+            and "PRUNE-CLOSE" not in res.out)
+
+
+def crows(listed_n, sl, st, rep, over):
+    return {"listed": str(listed_n), "slice": str(sl), "structure": str(st), "report": str(rep),
+            "over-cap": str(over)}
+
+
+def close_path(mem, label, suffix=".json"):
+    return os.path.join(mem, "prune", "close", label + suffix)
+
+
+def trend_path(mem):
+    return os.path.join(mem, "prune", "trend.jsonl")
+
+
+def load(path):
+    """Parsed JSON of a file; None when absent; "<not JSON>" when it does not parse."""
+    data = read_bytes(path)
+    if data is None:
+        return None
+    try:
+        return json.loads(data.decode("utf-8"))
+    except ValueError:
+        return "<not JSON>"
+
+
+def close_file(mem, label):
+    return load(close_path(mem, label))
+
+
+def listed(mem, label):
+    """The close file's rows, or what stands there instead."""
+    cf = close_file(mem, label)
+    return cf.get("rows") if isinstance(cf, dict) else cf
+
+
+def section_text(mem, label):
+    data = read_bytes(close_path(mem, label, ".section.md"))
+    return None if data is None else data.decode("utf-8", "replace")
+
+
+def parse_line(data):
+    try:
+        return json.loads(data.decode("utf-8"))
+    except (ValueError, AttributeError):
+        return None
+
+
+def trend_rows(mem):
+    return [parse_line(l) for l in (read_bytes(trend_path(mem)) or b"").splitlines()]
+
+
+def close_row(mem, label):
+    """The last trend row that is the close of `label`."""
+    rows = [r for r in trend_rows(mem)
+            if isinstance(r, dict) and r.get("label") == label and isinstance(r.get("close"), dict)]
+    return rows[-1] if rows else None
+
+
+def close_obj(mem, label):
+    row = close_row(mem, label)
+    return row["close"] if row else None
+
+
+def recorded_row(repo, sha, label, *extra, env=None):
+    """`census --record <label>`'s row at sha, in a fresh --mem: the oracle for a close row's
+    label, commit, totals and counts (and ci)."""
+    mem = new_mem()
+    census(repo, sha, mem, "--record", label, *extra, env=env)
+    rows = trend_rows(mem)
+    return rows[-1] if rows else None
+
+
+def dig(x, *keys):
+    for k in keys:
+        if not isinstance(x, dict):
+            return None
+        x = x.get(k)
+    return x
+
+
+def items(x):
+    return [[k, v] for k, v in x.items()] if isinstance(x, dict) else x
+
+
+def _routed(row, route, token, slices, over):
+    row["route"] = route
+    if token is not None:
+        row["token"] = token
+    if route == "slice":
+        row["slices"] = [{"spec": s, "slice": i} for s, i in slices]
+    if route == "structure":
+        row["over-cap"] = over
+    return row
+
+
+def jt(path, cand, surv, route, kind="duplicates", token=None, slices=(), over=False):
+    """A twin row of the close file."""
+    return _routed({"kind": kind, "file": path, "candidate": cand, "survivor": surv}, route, token, slices, over)
+
+
+def jo(path, sym, tests, route, kind="orphans", test_only=False, token=None, slices=(), over=False):
+    """An orphan row of the close file."""
+    return _routed({"kind": kind, "file": path, "symbol": sym, "test-only": test_only, "tests": sorted(tests)},
+                   route, token, slices, over)
+
+
+def rid(row):
+    """(file, candidate or symbol) of a close-file row."""
+    if not isinstance(row, dict):
+        return ("<not an object>", repr(row))
+    return (row.get("file"), row.get("candidate", row.get("symbol")))
+
+
+def by_id(rows):
+    return {rid(r): r for r in rows} if isinstance(rows, list) else {}
+
+
+def changed_exp(tf, pf, tl, pl):
+    return {"test-files": tf, "product-files": pf, "test-lines": tl, "product-lines": pl,
+            "ratio": None if pl == 0 else "%.2f" % (tl / pl)}
+
+
+def changed_got(obj):
+    """The close object's `changed`, a numeric ratio shown as "%.2f" for comparison."""
+    c = dig(obj, "changed")
+    if not isinstance(c, dict):
+        return c
+    c = dict(c)
+    r = c.get("ratio")
+    if isinstance(r, (int, float)) and not isinstance(r, bool):
+        c["ratio"] = "%.2f" % r
+    return c
+
+
+def section_items(text):
+    """[(file, raw JSON name, decoded name or None, {sub-item: text})] of a section file's rows."""
+    out, cur = [], None
+    for line in (text or "").splitlines():
+        m = ITEM_RE.match(line)
+        if m:
+            try:
+                name = json.loads(m.group(2))
+            except ValueError:
+                name = None
+            cur = (m.group(1), m.group(2), name, {})
+            out.append(cur)
+            continue
+        s = SUB_RE.match(line)
+        if s and cur is not None:
+            cur[3].setdefault(s.group(1), s.group(2))
+        elif line.strip() and not line.startswith((" ", "\t")):
+            cur = None
+    return out
+
+
+def tree_state(root, skip=None):
+    """{relative path: sha256 | "dir" | "link:<target>"} of everything under root, `skip` aside."""
+    out = {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if os.path.join(dirpath, d) != skip]
+        out[os.path.relpath(dirpath, root) + "/"] = "dir"
+        for fn in filenames + [d for d in dirnames if os.path.islink(os.path.join(dirpath, d))]:
+            full = os.path.join(dirpath, fn)
+            rel = os.path.relpath(full, root)
+            if os.path.islink(full):
+                out[rel] = "link:" + os.readlink(full)
+            else:
+                with open(full, "rb") as f:
+                    out[rel] = hashlib.sha256(f.read()).hexdigest()
+    return out
+
+
+# --------------------------------------------------------------------------------------------
+# TP4 fixtures
+# --------------------------------------------------------------------------------------------
+
+
+def tp4_a1(ctx):
+    repo = Repo()
+    paths = {}
+
+    def tw(tag):
+        paths[tag] = "client/src/%s/%s.test.ts" % (tag, tag)
+        return {paths[tag]: tw_text(tag)}
+
+    change(repo, "chore: base", {"client/src/base/b.ts": filler(5)})
+    c_ts1 = change(repo, subject("ts-1", "first (#3)", "feat(loop)"), tw("alpha"))
+    for msg, tag in (("fix: ts-10 %s an id that begins with ts-1" % EM, "bravo"),
+                     ("chore: prepare ts-1 %s the id is not the first word" % EM, "charlie")):
+        change(repo, msg, tw(tag))
+    c_ts2a = change(repo, subject("ts-2", "second"), tw("delta"))
+    for msg, tag in (("Feat: ts-2 %s an upper-case type" % EM, "echo"),
+                     ("revert: ts-2 %s revert is not a naming type" % EM, "foxtrot"),
+                     ("feat: ts-2 - an ascii hyphen", "golf"),
+                     ("feat: ts-2 %sno space after the dash" % EM, "hotel"),
+                     ("feat: ts-2  %s two spaces before the dash" % EM, "india"),
+                     ("feat: ts-1%s no space before the dash" % EM, "juliet"),
+                     ("feat: ts-2", "kilo"),
+                     ("ts-1 %s no type" % EM, "lima"),
+                     ("chore: misc\n\nfeat: ts-1 %s named only in the body" % EM, "mike"),
+                     ("feat: zz-1 %s a heading after the Slices section" % EM, "november"),
+                     ("feat: qq-1 %s a heading inside a code fence" % EM, "oscar"),
+                     ("feat: pre-1 %s a heading before the Slices section" % EM, "papa")):
+        change(repo, msg, tw(tag))
+    c_ts2b = change(repo, subject("ts-2", "breaking", "feat(ui)!"), tw("quebec"))
+    change(repo, subject("ts-1", "after the --at commit"), tw("romeo"))
+    fence = "`" * 3
+    text = ("# M-one\n\n## Design\n\n" + slice_block("pre-1") + "## Slices\n\n" + slice_block("ts-2")
+            + slice_block("ab-3", body="%stext\n### qq-1 %s fenced\n%s\n" % (fence, EM, fence))
+            + slice_block("ts-1") + "## Notes\n\n" + slice_block("zz-1"))
+    label = "M-one"
+    spec = put_spec(spec_dir(), label + ".spec.md", text)
+    mem = new_mem()
+    r = close(repo, c_ts2b, mem, spec)
+    co = close_obj(mem, label)
+    exp_sl = [["ts-2", [c_ts2a, c_ts2b]], ["ts-1", [c_ts1]]]
+    got_sl = items(dig(co, "slices"))
+    ctx.check("the milestone's commits are exactly the reachable ones whose subject is `<type>[(<scope>)][!]: <id> <em dash> ` for a "
+              "slice under ## Slices, ids in the spec's order: ts-2 (bare, and with scope and !), ts-1 (with a (#N) tail); "
+              "not ts-10, an id not first, an upper-case or `revert` type, a hyphen, a missing or doubled space at the dash, "
+              "no type, an id only in the body, headings outside ## Slices or in a fence, nor a commit after --at",
+              got_sl == exp_sl, exp_sl, got_sl, r)
+    ctx.check("the slice with no commit is unmatched; pre-1, qq-1 and zz-1 are not slices of the spec",
+              dig(co, "unmatched") == ["ab-3"], ["ab-3"], dig(co, "unmatched"), r)
+    out = items(r.cslices)
+    ctx.check("stdout says the same: `slice ts-2 <c> <c>`, `slice ts-1 <c>`, `unmatched ab-3`",
+              out == exp_sl and r.cunmatched == ["ab-3"], (exp_sl, ["ab-3"]), (out, r.cunmatched), r)
+    exp_files = sorted(paths[t] for t in ("alpha", "delta", "quebec"))
+    rows = listed(mem, label)
+    got_files = sorted(rid(x)[0] for x in rows) if isinstance(rows, list) else rows
+    ctx.check("only the twin files those three commits added are listed, none of another commit's",
+              got_files == exp_files, exp_files, got_files, r)
+    exp_add = {"test-lines": 3 * lines_of(tw_text("alpha")), "product-lines": 0}
+    ctx.check("lines added are the three commits' lines only", dig(co, "added") == exp_add, exp_add, dig(co, "added"), r)
+
+
+def tp4_a2(ctx):
+    repo = Repo()
+    paths = {}
+
+    def tw(tag):
+        paths[tag] = "client/src/%s/%s.test.ts" % (tag, tag)
+        return {paths[tag]: tw_text(tag)}
+
+    change(repo, "chore: base", {"client/src/base/b.ts": filler(5)})
+    s1 = subject("rv-1", "add alpha")
+    r1 = change(repo, s1, tw("alpha"))
+    change(repo, reverting('Revert "%s"' % s1, r1), drop=[paths["alpha"]])
+    s2 = subject("rv-2", "add bravo")
+    change(repo, s2 + " (#5)", tw("bravo"))
+    change(repo, 'Revert "%s" (#6)' % s2, drop=[paths["bravo"]])
+    s3 = subject("rv-3", "add charlie")
+    r3 = change(repo, s3, tw("charlie"))
+    r3r = change(repo, reverting('Revert "%s"' % s3, r3[:7]), drop=[paths["charlie"]])
+    change(repo, reverting('Revert "Revert "%s""' % s3, r3r), tw("charlie"))
+    s4 = subject("rv-4", "add delta")
+    change(repo, s4, tw("delta"))
+    change(repo, 'Revert "%s"' % s4, drop=[paths["delta"]])
+    r4b = change(repo, s4, tw("delta"))
+    s5 = subject("rv-5", "add echo")
+    r5a = change(repo, s5, tw("echo"))
+    change(repo, s5, tw("foxtrot"))
+    change(repo, 'Revert "%s"' % s5, drop=[paths["foxtrot"]])
+    r6a = change(repo, subject("rv-6", "add golf"), tw("golf"))
+    s6 = subject("rv-6", "add hotel")
+    r6b = change(repo, s6, tw("hotel"))
+    change(repo, reverting('Revert "%s"' % s6, r6a), drop=[paths["golf"]])
+    r8 = change(repo, subject("rv-8", "add india"), tw("india"))
+    change(repo, reverting("chore: a note", r8[:6]))
+    # the commits below change no file, so the line sums of the six commits above stand
+    r9a = change(repo, subject("rv-9", "first"))
+    r9b = change(repo, subject("rv-9", "second"))
+    r9c = change(repo, subject("rv-9", "third"))
+    change(repo, "chore: undo two\n\nThis reverts commit %s.\nThis reverts commit %s." % (r9a, r9b))
+    s10 = subject("rv-10", "add")
+    r10 = change(repo, s10)
+    change(repo, 'Revert "%s"' % s10)
+    change(repo, 'Revert "Revert "%s""' % s10)
+    s11 = subject("rv-11", "add")
+    r11a = change(repo, s11)
+    change(repo, s11)
+    change(repo, s11)
+    change(repo, 'Revert "%s"' % s11)
+    change(repo, 'Revert "%s"' % s11)
+    r12a = change(repo, subject("rv-12", "stays"))
+    s12 = subject("rv-12", "goes")
+    change(repo, s12 + " (#7)")
+    change(repo, 'Revert "%s (#7)" (#8)' % s12)
+    s13 = subject("rv-13", "add")
+    r13 = change(repo, s13)
+    change(repo, reverting('Revert "%s"' % s13, "0123456789abcdef0123456789abcdef01234567"))
+    s7 = subject("rv-7", "add juliet")
+    r7 = change(repo, s7, tw("juliet"))
+    change(repo, reverting('Revert "%s"' % s7, r7), drop=[paths["juliet"]])
+    label = "M-rev"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("rv-%d" % k, None) for k in range(1, 14)]))
+    mem = new_mem()
+    r = close(repo, r7, mem, spec)
+    co = close_obj(mem, label)
+    sl = dig(co, "slices")
+    for sid, exp, why in (
+        ("rv-3", [r3], "a revert of a revert restores the original: rv-3 keeps its commit (the inner revert names it by a 7-hex prefix)"),
+        ("rv-4", [r4b], "a re-landed commit with a reverted commit's subject is not undone: rv-4 is its re-landing only"),
+        ("rv-5", [r5a], "a `Revert \"<subject>\"` with no reverts line undoes only the newest earlier commit of that subject: rv-5 keeps the first"),
+        ("rv-6", [r6b], "a `This reverts commit` line decides over the subject: rv-6 loses the commit the line names and keeps the one the subject names"),
+        ("rv-7", [r7], "a revert that is not reachable from --at undoes nothing: rv-7 keeps its commit"),
+        ("rv-8", [r8], "a reverts line with only 6 hex digits undoes nothing: rv-8 keeps its commit"),
+        ("rv-9", [r9c], "a message with two `This reverts commit` lines undoes both commits: rv-9 keeps only its third"),
+        ("rv-10", [r10], "a revert of a revert by subject alone (`Revert \"Revert \"X\"\"`, no reverts line) restores X: "
+                         "rv-10 keeps its commit"),
+        ("rv-11", [r11a], "a second subject-only revert passes over the same-subject commit already undone and undoes the "
+                          "next older one: of three rv-11 commits two reverts leave the oldest"),
+        ("rv-12", [r12a], "`Revert \"X (#7)\" (#8)` undoes `X (#7)`, (#N) tails aside on both: rv-12 keeps only its other commit"),
+        ("rv-13", [r13], "a reverts line whose sha matches no commit undoes nothing, and the subject is not read in its place: "
+                         "rv-13 keeps its commit"),
+    ):
+        got = sl.get(sid) if isinstance(sl, dict) else sl
+        ctx.check(why, got == exp, exp, got, r)
+    exp_ids = ["rv-3", "rv-4", "rv-5", "rv-6", "rv-7", "rv-8", "rv-9", "rv-10", "rv-11", "rv-12", "rv-13"]
+    got_ids = list(sl) if isinstance(sl, dict) else sl
+    ctx.check("a commit reverted by a reverts line (full id) and one reverted by subject alone, (#N) tails aside, leave "
+              "rv-1 and rv-2 unmatched and out of slices",
+              got_ids == exp_ids and dig(co, "unmatched") == ["rv-1", "rv-2"], (exp_ids, ["rv-1", "rv-2"]),
+              (got_ids, dig(co, "unmatched")), r)
+    exp_add = {"test-lines": 6 * lines_of(tw_text("alpha")), "product-lines": 0}
+    exp_rm = {"test-lines": 0, "product-lines": 0}
+    ctx.check("lines added are those of the six commits that stand; reverted commits and reverts add and remove nothing",
+              dig(co, "added") == exp_add and dig(co, "removed") == exp_rm, (exp_add, exp_rm),
+              (dig(co, "added"), dig(co, "removed")), r)
+
+
+def tp4_a3(ctx):
+    T1, T2, P1 = "client/src/m1/m1.test.ts", "client/src/m2/m2.test.ts", "game-core/src/m1.rs"
+    O1, O1P = "client/src/o1/o1.test.ts", "server-module/src/o1.rs"
+    O2, O3 = "client/src/o2/o2.test.ts", "game-core/src/o3/o3_tests.rs"
+    repo = Repo()
+    change(repo, "chore: base", {"client/src/base.ts": filler(4)})
+    t1, mid, tail, t2 = tw_text("mone"), filler(6, "other"), filler(4, "finish"), tw_text("mtwo")
+    c1 = change(repo, subject("mx-1", "start"), {T1: t1, P1: filler(9, "p")})
+    change(repo, subject("ot-4", "another milestone"), {T1: t1 + mid, O1: tw_text("oone"), O1P: filler(30)})
+    change(repo, "ci-fix-20261101T0000Z: green again", {O2: tw_text("otwo")})
+    change(repo, "refactor(core): st-2 %s a structural share" % EM, {O3: rs_pair("othree")})
+    c5 = change(repo, subject("mx-1", "finish"), {T1: t1 + mid + tail, T2: t2})
+    label = "M-mix"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("mx-1", None)]))
+    mem = new_mem()
+    r = close(repo, c5, mem, spec)
+    co = close_obj(mem, label)
+    ctx.check("the set is the two mx-1 commits, not the range between them",
+              items(dig(co, "slices")) == [["mx-1", [c1, c5]]], [["mx-1", [c1, c5]]], dig(co, "slices"), r)
+    exp_add = {"test-lines": lines_of(t1) + lines_of(tail) + lines_of(t2), "product-lines": 9}
+    ctx.check("lines added omit what the other milestone's, the ci-fix and the structural commits added, even to a file the set changed",
+              dig(co, "added") == exp_add, exp_add, dig(co, "added"), r)
+    exp_ch = changed_exp(2, 1, lines_of(t1 + mid + tail) + lines_of(t2), 9)
+    ctx.check("changed files are the set's own (2 test files, 1 product file), not the in-between commits' files",
+              changed_got(co) == exp_ch, exp_ch, changed_got(co), r)
+    rows = listed(mem, label)
+    got = sorted(rid(x) for x in rows) if isinstance(rows, list) else rows
+    exp = sorted([(T1, "mone > one again"), (T2, "mtwo > one again")])
+    ctx.check("the twin rows of files only the in-between commits added are not listed; the set's own are",
+              got == exp, exp, got, r)
+
+
+def tp4_a4(ctx):
+    T, Pf = "client/src/k1/k1.test.ts", "client/src/k1/k1.ts"
+    repo = Repo()
+    change(repo, "chore: base", {"client/src/main.ts": filler(12)})
+    sha = change(repo, subject("ka-1", "add"), {T: tw_text("kone"), Pf: filler(8)})
+    d = spec_dir()
+    label = "M-a.b_c-4"
+    spec = put_spec(d, label + ".spec.md", spec_text([("ka-1", None), ("ka-2", None)]))
+    mem = new_mem()
+    census(repo, sha, mem, "--record", "baseline")
+    pre = read_bytes(trend_path(mem)) or b""
+    r = close(repo, sha, mem, spec)
+    post = read_bytes(trend_path(mem)) or b""
+    ctx.check("close exits 0, prints `PRUNE-CLOSE <label> <commit>` first (label: the file name less .spec.md) and "
+              "`recorded <label>` last",
+              r.rc == 0 and r.first == "PRUNE-CLOSE %s %s" % (label, sha) and r.out.splitlines()[-1:] == ["recorded " + label],
+              ("PRUNE-CLOSE %s %s" % (label, sha), "recorded " + label), (r.first, r.out.splitlines()[-1:]), r)
+    want = ["PRUNE-CLOSE", "slice", "unmatched", "rows", "section", "recorded"]
+    ctx.check("stdout lines come in the contract's order", prefixes(r) == want, want, prefixes(r), r)
+    new = post[len(pre):] if pre and post.startswith(pre) else None
+    ctx.check("exactly one newline-terminated row is appended to prune/trend.jsonl; the earlier row is untouched",
+              pre.count(b"\n") == 1 and new is not None and new.count(b"\n") == 1 and new.endswith(b"\n"),
+              "the baseline line + one line", post, r)
+    row = parse_line(new)
+    ctx.check("the row is a JSON object of label, commit, totals, counts and close",
+              isinstance(row, dict) and set(row) == TREND_KEYS and row.get("label") == label and row.get("commit") == sha,
+              (sorted(TREND_KEYS), label, sha), row, r)
+    oracle = recorded_row(repo, sha, label)
+
+    def pick(x):
+        return {k: x.get(k) for k in ("label", "commit", "totals", "counts")} if isinstance(x, dict) else x
+
+    ctx.check("label, commit, totals and counts equal what `census --record <label>` records at the commit",
+              isinstance(oracle, dict) and pick(row) == pick(oracle), pick(oracle), pick(row), r)
+    got_keys = sorted(row["close"]) if isinstance(row, dict) and isinstance(row.get("close"), dict) else None
+    ctx.check("the close object holds slices, unmatched, added, removed, changed and signals",
+              got_keys == sorted(CLOSE_OBJ_KEYS), sorted(CLOSE_OBJ_KEYS), got_keys, r)
+    cf = close_file(mem, label)
+    exp_cf = {"label": label, "commit": sha, "spec": label + ".spec.md", "experiment-closed": False, "section": None}
+    got_cf = {k: cf.get(k) for k in exp_cf} if isinstance(cf, dict) else cf
+    ctx.check("prune/close/<label>.json holds label, commit, the spec's file name, experiment-closed false, section null and rows",
+              isinstance(cf, dict) and set(cf) == CLOSE_FILE_KEYS and got_cf == exp_cf and isinstance(cf.get("rows"), list),
+              exp_cf, cf, r)
+
+    gh = Gh(json.dumps(ci_runs(sha, "0" * 40)))
+    mem2 = new_mem()
+    r2 = close(repo, sha, mem2, spec, "--ci", env=gh.env())
+    row2 = close_row(mem2, label)
+    exp_ci = {"seconds": 95, "conclusion": "success", "nightly": "failure", "reruns_to_green": 2}
+    oracle2 = recorded_row(repo, sha, label, "--ci", env=gh.env())
+    ctx.check("with --ci the row carries census's `ci` object (as `census --ci --record` records it) and stdout a `ci` line "
+              "before `recorded`",
+              dig(row2, "ci") == exp_ci and dig(oracle2, "ci") == exp_ci and prefixes(r2)[-3:] == ["section", "ci", "recorded"]
+              and r2.ci == {"seconds": "95", "conclusion": "success", "nightly": "failure", "reruns-to-green": "2"},
+              (exp_ci, ["section", "ci", "recorded"]), (dig(row2, "ci"), prefixes(r2)[-3:], r2.ci), r2)
+
+    mem3 = new_mem()
+    cut = b'{"label": "earlier", "commit": "ab'
+    os.makedirs(os.path.join(mem3, "prune"))
+    with open(trend_path(mem3), "wb") as f:
+        f.write(cut)
+    r3 = close(repo, sha, mem3, spec)
+    post3 = read_bytes(trend_path(mem3)) or b""
+    tail = post3[len(cut) + 1:] if post3.startswith(cut + b"\n") else None
+    row3 = parse_line(tail) if tail is not None else None
+    ctx.check("a trend.jsonl whose last line is cut off (no newline) keeps that line as it was, and the close row starts on a "
+              "line of its own, newline-terminated, and parses as this label's close",
+              r3.rc == 0 and tail is not None and tail.count(b"\n") == 1 and tail.endswith(b"\n") and isinstance(row3, dict)
+              and row3.get("label") == label and isinstance(row3.get("close"), dict),
+              "the cut line + newline + one close row", post3, r3)
+
+    de = spec_dir()
+    fence = "`" * 3
+    nm = put_spec(de, "notes.md", spec_text([("ka-1", None)]))
+    sp = put_spec(de, "M one.spec.md", spec_text([("ka-1", None)]))
+    shl = put_spec(de, "M-SHALL.spec.md", spec_text([("ka-1", None)]))
+    ns = put_spec(de, "M-noslice.spec.md", "# M\n\n## Slices\n\n%s\n### ka-1 %s fenced\n%s\n\n## Notes\n\n%s"
+                  % (fence, EM, fence, slice_block("ka-1")))
+    dirspec = os.path.join(de, "M-dir.spec.md")
+    os.makedirs(dirspec)
+    for name, path in (("no --spec", None),
+                       ("a --spec path that does not exist", os.path.join(de, "M-absent.spec.md")),
+                       ("a --spec not named <label>.spec.md", nm),
+                       ("a --spec whose label holds a space", sp),
+                       ("a --spec whose label holds the word SHALL", shl),
+                       ("a --spec with no slice under ## Slices (one only in a fence, one only under another heading)", ns),
+                       ("a --spec that is a directory", dirspec)):
+        m = new_mem()
+        args = ["close", "--repo", repo.path, "--at", sha, "--mem", m] + ([] if path is None else ["--spec", path])
+        e = run_tool(*args)
+        ctx.check(name + " is refused: exit 2, PRUNE-ERROR, no PRUNE-CLOSE, nothing written under --mem",
+                  close_refused(e) and os.listdir(m) == [], "exit 2 + PRUNE-ERROR, empty --mem", (e.rc, e.first, os.listdir(m)), e)
+    missing = os.path.join(ROOT, "no-such-mem")
+    e = run_tool("close", "--repo", repo.path, "--at", sha, "--mem", missing, "--spec", spec)
+    ctx.check("a --mem that does not exist is refused (exit 2, PRUNE-ERROR) and not created",
+              close_refused(e) and not os.path.exists(missing), "exit 2 + PRUNE-ERROR, no directory",
+              (e.rc, os.path.exists(missing)), e)
+
+
+def tp4_a5(ctx):
+    TB0, PB0 = "client/src/nb/base.test.ts", "game-core/src/nb.rs"
+    T1, T1R, IT = "client/src/nt/t1.test.ts", "client/src/nt/t1r.test.ts", "game-core/tests/flow.rs"
+    P1, BIN = "client/src/nt/p1.ts", "game-core/src/nb_blob.rs"
+    repo = Repo()
+    tb0, pb0 = pad(tw_text("nbase")), filler(40, "pb")
+    change(repo, "chore: base", {TB0: tb0, PB0: pb0})
+    t1, p1, it = pad(tw_text("nt")), filler(15, "p1"), rs_pair("flow")
+    c1 = change(repo, subject("nm-1", "one"), {
+        T1: t1, P1: p1, IT: it,
+        # paths that are neither test nor product files: they add to no line count
+        "docs/x.md": filler(7), "client/e2e/x.spec.ts": filler(5), "client/src/module_bindings/types.ts": filler(9),
+        "game-core/benches/b.rs": filler(4), "client/test-util/u.ts": filler(3), "server-module/tests/it.rs": filler(6)})
+    tb0, pb0 = tb0 + filler(50, "mid"), pb0 + filler(10, "pbm")
+    change(repo, "chore: unrelated growth", {TB0: tb0, PB0: pb0})
+    old3, old4 = "// pad 3\n// pad 4\n// pad 5\n", "// pb 10\n// pb 11\n// pb 12\n// pb 13\n"
+    assert tb0.count(old3) == 1 and pb0.count(old4) == 1
+    tb0, pb0 = tb0.replace(old3, filler(5, "two")), pb0.replace(old4, "// pb changed\n")
+    c2 = change(repo, subject("nm-2", "two"), {TB0: tb0, PB0: pb0, BIN: b"\x00\x01binary\x00\x02"})
+    c3 = change(repo, subject("nm-1", "three, a rename"), {T1R: t1}, drop=[T1])
+    c4 = change(repo, subject("nm-2", "four", "feat(x)!"), drop=[P1])
+    # a merge commit naming nm-2 brings in a side branch's twin file: it adds no path and no line
+    SIDE = "client/src/side/side.test.ts"
+    git(repo.path, "checkout", "-q", "-b", "side")
+    change(repo, "chore: side work", {SIDE: tw_text("side")})
+    git(repo.path, "checkout", "-q", "main")
+    change(repo, "chore: main moves on", {"docs/main.md": filler(3)})
+    git(repo.path, "-c", "commit.gpgsign=false", "merge", "-q", "--no-ff", "-m", subject("nm-2", "merge side"), "side")
+    mg = git(repo.path, "rev-parse", "HEAD").strip()
+    label = "M-num"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("nm-2", None), ("nm-3", None), ("nm-1", None)]))
+    mem = new_mem()
+    r = close(repo, mg, mem, spec)
+    co = close_obj(mem, label)
+    rows = listed(mem, label)
+    got = sorted(rid(x) for x in rows) if isinstance(rows, list) else rows
+    exp = sorted([(TB0, "nbase > one again"), (T1R, "nt > one again"), (IT, "flow_b")])
+    ctx.check("a merge commit naming a slice adds no changed path: the side branch's twin file is not listed; the set's are",
+              got == exp, exp, got, r)
+    exp_sl = [["nm-2", [c2, c4, mg]], ["nm-1", [c1, c3]]]
+    ctx.check("each matched id carries its commits, oldest first, ids in the spec's order (nm-2 before nm-1); nm-3 is unmatched",
+              items(dig(co, "slices")) == exp_sl and dig(co, "unmatched") == ["nm-3"], (exp_sl, ["nm-3"]),
+              (dig(co, "slices"), dig(co, "unmatched")), r)
+    lt1 = lines_of(t1)
+    exp_add = {"test-lines": lt1 + lines_of(it) + 5 + lt1, "product-lines": 15 + 1}
+    exp_rm = {"test-lines": 3 + lt1, "product-lines": 4 + 15}
+    ctx.check("added sums each commit's numstat over test and product files only: a new test, a game-core/tests file, 5 lines "
+              "of a 3-for-5 edit, a rename's new side; a product file and 1 line of a 4-for-1 edit (not the lines at --at, "
+              "not docs/e2e/module_bindings/benches/test-util/server tests, not a binary file)",
+              dig(co, "added") == exp_add, exp_add, dig(co, "added"), r)
+    ctx.check("removed sums the deleted side: 3 lines of the edit and a renamed file's old side; 4 product lines and a deleted "
+              "product file",
+              dig(co, "removed") == exp_rm, exp_rm, dig(co, "removed"), r)
+
+
+def tp4_a6(ctx):
+    TA, PA = "client/src/ra/ra.test.ts", "client/src/ra/ra.ts"
+    TB, TP = "client/src/rb/rb.test.ts", "client/src/auth/ap.test.ts"
+    TW, TD = "game-core/src/rw/rw_tests.rs", "client/src/rd/rd.test.ts"
+    TU = "client/src/secure/ru.test.ts"
+    PG, PX, PU = "game-core/src/rg.rs", "server-module/src/px.rs", "client/src/main.ts"
+    repo = Repo()
+    tb, tp = pad(tw_text("rb")), ts_marked("p")
+    tu = ts_marked("u", ["const t = readFileSync('x', 'utf8');"])
+    change(repo, "chore: base", {TB: tb, TP: tp, TU: tu, PU: filler(500)})
+    ta, tw_, pa = pad(ts_pair("ra", READ_EXTRA)), rs_marked("w"), filler(30)
+    change(repo, subject("rt-1", "a"), {TA: ta, TW: tw_, TD: pad(tw_text("rd")), PA: pa, PX: filler(10),
+                                        "docs/notes.md": filler(40)})
+    ta = ta + filler(30, "grow")
+    tu = tu.replace("// filler 3\n", "// filler three\n")
+    change(repo, "chore: grow ra, nudge ru", {TA: ta, TU: tu})
+    tb = tb.replace("// pad 5\n", "// pad five\n")
+    tp = tp.replace("// filler 5\n", "// filler five\n")
+    change(repo, subject("rt-1", "b"), {TB: tb, TP: tp, PG: filler(20)})
+    sha = change(repo, subject("rt-1", "c"), drop=[TD, PX])
+    label = "M-ratio"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("rt-1", None)]))
+    mem = new_mem()
+    gates = os.path.join(mem, "gates")
+    os.makedirs(gates)
+    with open(os.path.join(gates, "s-1.widened.jsonl"), "w") as f:
+        f.write("".join(json.dumps({"slice": "s-1", "path": p, "why": "pin"}) + "\n" for p in (TW, TW, TU)))
+    r = close(repo, sha, mem, spec)
+    co = close_obj(mem, label)
+    tl = lines_of(ta) + lines_of(tb) + lines_of(tp) + lines_of(tw_)
+    exp = changed_exp(4, 2, tl, 50)
+    ctx.check("changed counts the set's paths that are test or product files at --at with their lines there (a later commit's "
+              "growth included; a deleted file, docs and the files the set never touched aside): ratio test over product",
+              changed_got(co) == exp, exp, changed_got(co), r)
+    exp_s = {"source-text": 1, "churn": 2, "protected-churn": 1, "widened": 1}
+    ctx.check("signals count the changed test files at --at carrying each: source-text 1, churn 2, protected-churn 1, widened 1 "
+              "(the untouched test file carrying all four adds nothing; widened counts files, not rows)",
+              dig(co, "signals") == exp_s, exp_s, dig(co, "signals"), r)
+
+    label2 = "M-tonly"
+    spec2 = put_spec(spec_dir(), label2 + ".spec.md", spec_text([("to-1", None)]))
+    tb2 = tb.replace("// pad 6\n", "// pad six\n")
+    sha2 = change(repo, subject("to-1", "tests only", "test"), {TB: tb2})
+    mem2 = new_mem()
+    r2 = close(repo, sha2, mem2, spec2)
+    co2 = close_obj(mem2, label2)
+    exp2 = changed_exp(1, 0, lines_of(tb2), 0)
+    ctx.check("a set that changed no product file has ratio null over zero product lines",
+              changed_got(co2) == exp2, exp2, changed_got(co2), r2)
+
+
+def tp4_a7(ctx):
+    TWX, PRT = "client/src/lx/lx.test.ts", "client/src/lx/ownerPanel.test.ts"
+    DA, TA = "game-core/src/la/la.rs", "game-core/src/la/la_tests.rs"
+    DB, TB = "client/src/lb/lb.ts", "client/src/lb/lb.test.ts"
+    DC, TC1, TC2 = "client/src/lc/lc.ts", "client/src/lc/lc.test.ts", "client/src/lc2/more.test.ts"
+    DP, TPV = "server-module/src/privacy.rs", "server-module/src/privacy_tests.rs"
+    repo = Repo()
+    change(repo, "chore: base", {
+        TWX: tw_text("lx"), PRT: tw_text("op"),
+        DA: "pub fn lonely_a() -> u32 { 1 }\n\n#[cfg(test)]\npub fn helper_only() -> u32 { 2 }\n",
+        TA: "#[test]\nfn names() {\n    assert_eq!(lonely_a() + helper_only(), 3);\n}\n",
+        DB: ts_def("lonelyB"), TB: ts_use("lonelyB"), DC: ts_def("lonelyC"), TC1: ts_use("lonelyC"), TC2: ts_use("lonelyC"),
+        DP: "pub fn plain_p() -> u32 { 1 }\n", TPV: "#[test]\nfn names() {\n    assert_eq!(plain_p(), 1);\n}\n"})
+    sha = touch(repo, subject("ls-1", "touch"), [TWX, PRT, DA, TB, TC2, TPV])
+    label = "M-list"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("ls-1", None)]))
+    mem = new_mem()
+    r = close(repo, sha, mem, spec)
+    exp = [jt(TWX, *tw_names("lx"), "structure"),
+           jt(PRT, *tw_names("op"), "report", kind="protected-twins", token="owner"),
+           jo(DB, "lonelyB", [TB], "structure"),
+           jo(DC, "lonelyC", [TC1, TC2], "structure"),
+           jo(DA, "helper_only", [TA], "structure", test_only=True),
+           jo(DA, "lonely_a", [TA], "structure"),
+           jo(DP, "plain_p", [TPV], "report", kind="orphan-protected", token="priv")]
+    got = by_id(listed(mem, label))
+    for name, row in (
+        ("a duplicates row whose test file the set changed is listed", exp[0]),
+        ("a protected-twins row whose test file the set changed is listed, with its token", exp[1]),
+        ("an orphan whose only changed file is a test naming it is listed (its defining file untouched)", exp[2]),
+        ("an orphan is listed when one of two tests naming it changed; tests holds both", exp[3]),
+        ("a test-only orphan whose defining file changed is listed with test-only true", exp[4]),
+        ("an orphan whose defining file changed is listed (its test untouched)", exp[5]),
+        ("an orphan-protected row whose test file changed is listed, with its token", exp[6]),
+    ):
+        ctx.check(name, got.get(rid(row)) == row, row, got.get(rid(row)), r)
+    rows = listed(mem, label)
+    ctx.check("the close file lists exactly those rows, in census's order (duplicates, protected-twins, orphans by file then "
+              "name, orphan-protected)", rows == exp, exp, rows, r)
+    ctx.check("stdout counts them: `rows listed=7 slice=0 structure=5 report=2 over-cap=0`",
+              r.crows == crows(7, 0, 5, 2, 0), crows(7, 0, 5, 2, 0), r.crows, r)
+
+
+def tp4_a8(ctx):
+    TWY, NY, SIB = "client/src/ny/ny.test.ts", "client/src/ny/ny.ts", "client/src/ny/sib.ts"
+    TWZ, TWR = "client/src/nz/nz.test.ts", "client/src/nr/nr.test.ts"
+    DQ, TQ, OQ = "client/src/nq/nq.ts", "client/src/nq/nq.test.ts", "client/src/nq/other.test.ts"
+    DPP, DPT, ORIG = "game-core/src/np/np.rs", "game-core/src/np/np_tests.rs", "game-core/src/np/np.rs.orig"
+    TWP, DO, DOT = "client/src/np2/pos.test.ts", "client/src/npo/npo.ts", "client/src/npo/npo.test.ts"
+    repo = Repo()
+    change(repo, "chore: base", {
+        TWY: tw_text("ny"), NY: filler(3), SIB: filler(3), TWZ: tw_text("nz"), TWR: tw_text("nr"),
+        DQ: ts_def("quietQ"), TQ: ts_use("quietQ"),
+        OQ: "describe('o', () => {\n  it('x', () => {\n    expect(1).toBe(1);\n  });\n});\n",
+        DPP: "pub fn quiet_p() -> u32 { 1 }\n", DPT: "#[test]\nfn names() {\n    assert_eq!(quiet_p(), 1);\n}\n",
+        TWP: tw_text("pos"), DO: ts_def("posO"), DOT: ts_use("posO")})
+    touch(repo, "chore: tidy nz", [TWZ])
+    s1 = subject("nn-1", "touch nr")
+    n1 = touch(repo, s1, [TWR])
+    change(repo, reverting('Revert "%s"' % s1, n1), {TWR: tw_text("nr")})
+    repo.put(ORIG, filler(2, "orig"))
+    sha = touch(repo, subject("nn-2", "touch"), [NY, SIB, OQ, TWP, DOT])
+    label = "M-not"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("nn-1", None), ("nn-2", None)]))
+    mem = new_mem()
+    r = close(repo, sha, mem, spec)
+    full = census(repo, sha, new_mem())
+    present = ({r_[1] for r_ in full.rows} >= {TWY, TWZ, TWR, TWP}
+               and {(o[0], o[1]) for o in full.orph} >= {(DQ, "quietQ"), (DPP, "quiet_p"), (DO, "posO")})
+    ctx.check("control: at --at the census has a row for every one of these files", present, "rows for all",
+              (full.rows, full.orph), full)
+    rows = listed(mem, label)
+    got = sorted(rid(x) for x in rows) if isinstance(rows, list) else rows
+    exp = sorted([(TWP, "pos > one again"), (DO, "posO")])
+    ctx.check("only rows with a changed file are listed (a twin file and an orphan's test the set changed); not a twin file "
+              "whose subject or a sibling changed, one only a non-milestone commit changed, one only a reverted milestone "
+              "commit changed, an orphan beside a changed unrelated test, nor an orphan whose path is a prefix of a changed path",
+              got == exp, exp, got, r)
+
+
+def tp4_a9(ctx):
+    TW = {k: "client/src/a%d/tw%d.test.ts" % (k, k) for k in range(1, 8)}
+    OD, ODT = "game-core/src/od/od.rs", "game-core/src/od/od_tests.rs"
+    OE, OET = "client/src/oe/oe.ts", "client/src/oe/oe.test.ts"
+    base = {TW[k]: tw_text("tw%d" % k) for k in TW}
+    base.update({OD: "pub fn od_lonely() -> u32 { 1 }\n",
+                 ODT: "#[test]\nfn names() {\n    assert_eq!(od_lonely(), 1);\n}\n",
+                 OE: ts_def("oeLonely"), OET: ts_use("oeLonely")})
+    repo = Repo()
+    change(repo, "chore: base", base)
+    change(repo, subject("nx-2", "built in another milestone"))
+    s3 = subject("nx-3", "built, then reverted")
+    n3 = change(repo, s3)
+    change(repo, reverting('Revert "%s"' % s3, n3))
+    sha = touch(repo, subject("mm-1", "touch"), [TW[k] for k in sorted(TW)] + [ODT, OE])
+    change(repo, subject("nx-6", "built after the --at commit"))
+    d = spec_dir()
+    label = "M-main"
+    spec = put_spec(d, label + ".spec.md", spec_text([("mm-1", "docs/"), ("mm-2", TW[7])]))
+    put_spec(d, "A-other.spec.md", spec_text([("ao-1", TW[1])]))
+    put_spec(d, "M-next.spec.md", spec_text([
+        ("nx-9", TW[1]), ("nx-1", "client/src/a1/**"), ("nx-2", "client/src/a2/"),
+        ("nx-3", "`client/src/a3/*.test.ts`"), ("nx-4", OD), ("nx-5", "`%s`" % OET), ("nx-6", "client/src/a6/**"),
+        ("nx-7", "docs/nothing.md\ntouches: " + TW[5])]))
+    put_spec(d, "sub/M-deep.spec.md", spec_text([("dp-1", TW[4])]))
+    put_spec(d, "notes.md", spec_text([("nn-1", TW[4])]))
+    put_spec(d, "Z-bad.spec.md", b"# Bad\n\n## Slices\n\n### bd-1 \xe2\x80\x94 x\ntouches: " + TW[2].encode("utf-8")
+             + b"\n\n\xff\xfe not UTF-8\n")
+    mem = new_mem()
+    r = close(repo, sha, mem, spec)
+    A_, M = "A-other.spec.md", "M-next.spec.md"
+    got = by_id(listed(mem, label))
+    for name, row in (
+        ("a twin file that unbuilt slices of two other specs list gets route slice with each: specs by file name, slices in "
+         "file order (nx-9 before nx-1)", jt(TW[1], *tw_names("tw1"), "slice", slices=[(A_, "ao-1"), (M, "nx-9"), (M, "nx-1")])),
+        ("a twin file listed only by a built slice (and by an unreadable spec) is not routed slice",
+         jt(TW[2], *tw_names("tw2"), "structure")),
+        ("a slice whose only commit is reverted is unbuilt: route slice",
+         jt(TW[3], *tw_names("tw3"), "slice", slices=[(M, "nx-3")])),
+        ("a slice in a subdirectory's spec, or in a file not named *.spec.md, does not route",
+         jt(TW[4], *tw_names("tw4"), "structure")),
+        ("only a slice's first touches: line is read", jt(TW[5], *tw_names("tw5"), "structure")),
+        ("a slice built only after --at is unbuilt at --at: route slice",
+         jt(TW[6], *tw_names("tw6"), "slice", slices=[(M, "nx-6")])),
+        ("an unbuilt slice of the --spec file itself does not route", jt(TW[7], *tw_names("tw7"), "structure")),
+        ("an orphan listed through its changed test is routed by a slice listing its defining file",
+         jo(OD, "od_lonely", [ODT], "slice", slices=[(M, "nx-4")])),
+        ("an orphan listed through its changed defining file is routed by a slice listing its test",
+         jo(OE, "oeLonely", [OET], "slice", slices=[(M, "nx-5")])),
+    ):
+        ctx.check(name, got.get(rid(row)) == row, row, got.get(rid(row)), r)
+    ctx.check("stdout: `rows listed=9 slice=5 structure=4 report=0 over-cap=0`",
+              r.crows == crows(9, 5, 4, 0, 0), crows(9, 5, 4, 0, 0), r.crows, r)
+    ctx.check("the unreadable spec beside --spec is skipped with PRUNE-WARN spec on stderr and the run exits 0",
+              r.rc == 0 and any(l.startswith("PRUNE-WARN spec") for l in r.err.splitlines()), "PRUNE-WARN spec ...", r.err, r)
+
+    # a second spec directory: a directory named *.spec.md, and a sibling whose fences hold a touches: line and a heading
+    d2 = spec_dir()
+    spec2 = put_spec(d2, label + ".spec.md", spec_text([("mm-1", "docs/")]))
+    os.makedirs(os.path.join(d2, "B-dir.spec.md"))
+    fence = "`" * 3
+    put_spec(d2, "M-fence.spec.md", "# F\n\n## Slices\n\n"
+             + slice_block("fz-1", None, body="%s\ntouches: %s\n%s\n" % (fence, TW[2], fence))
+             + slice_block("fz-2", "docs/x.md", body="%s\n### fz-3 %s fenced\ntouches: %s\n%s\n" % (fence, EM, TW[3], fence))
+             + slice_block("fz-4", TW[4]) + "## Risks\n\nNone.\n")
+    mem2 = new_mem()
+    r2 = close(repo, sha, mem2, spec2)
+    got2 = by_id(listed(mem2, label))
+    ctrl = jt(TW[4], *tw_names("tw4"), "slice", slices=[("M-fence.spec.md", "fz-4")])
+    ctx.check("control: a slice after the fences of a sibling spec routes its file (fz-4), beside a directory named B-dir.spec.md",
+              got2.get(rid(ctrl)) == ctrl, ctrl, got2.get(rid(ctrl)), r2)
+    ctx.check("a directory named *.spec.md beside --spec is skipped with PRUNE-WARN spec on stderr and the run exits 0",
+              r2.rc == 0 and any(l.startswith("PRUNE-WARN spec") for l in r2.err.splitlines()), "PRUNE-WARN spec ...",
+              (r2.rc, r2.err), r2)
+    for name, k in (("a `touches:` line inside a code fence of a sibling slice does not route its file", 2),
+                    ("a `### id <em dash> ` heading inside a code fence of a sibling spec is not a slice: its touches: line "
+                     "does not route", 3)):
+        row = got2.get(rid(jt(TW[k], *tw_names("tw%d" % k), "structure")))
+        ctx.check(name, dig(row, "route") == "structure" and "slices" not in (row or {}), "route structure",
+                  row, r2)
+
+
+def tp4_a10(ctx):
+    TWA, TWB, TWS = "client/src/ta/twa.test.ts", "client/src/tb/twb.test.ts", "client/src/tsl/tws.test.ts"
+    W12, W13 = "client/src/w12/w12.ts", "client/src/w13/w13.ts"
+    W12T = ["client/src/w12/t%02d.test.ts" % i for i in range(11)]
+    W13T = ["client/src/w13/t%02d.test.ts" % i for i in range(12)]
+    base = {TWA: tw_text("twa"), TWB: tw_text("twb"), TWS: tw_text("tws"),
+            W12: ts_def("wideTwelve"), W13: ts_def("wideThirteen")}
+    base.update({p: ts_use("wideTwelve") for p in W12T})
+    base.update({p: ts_use("wideThirteen") for p in W13T})
+    repo = Repo()
+    change(repo, "chore: base", base)
+    change(repo, subject("ot-1", "built elsewhere"))
+    sha = touch(repo, subject("te-1", "touch"), [TWA, TWB, TWS, W12, W13])
+    d = spec_dir()
+    label = "M-ten"
+    spec = put_spec(d, label + ".spec.md", spec_text([("te-1", "client/src/ta/**")]))
+    put_spec(d, "M-oth.spec.md", spec_text([("ot-1", "client/src/tb/twb.test.ts, client/src/w12/**"), ("ot-2", TWS)]))
+    mem = new_mem()
+    r = close(repo, sha, mem, spec)
+    got = by_id(listed(mem, label))
+
+    def bare(row):
+        """A structure row without its over-cap mark (A15's subject), the mark checked to be a bool."""
+        if not isinstance(row, dict) or type(row.get("over-cap")) is not bool:
+            return row
+        return {k: v for k, v in row.items() if k != "over-cap"}
+
+    for name, row in (
+        ("a duplicates row no slice lists gets route structure", jt(TWA, *tw_names("twa"), "structure")),
+        ("a duplicates row only a built slice of another spec lists gets route structure",
+         jt(TWB, *tw_names("twb"), "structure")),
+        ("an orphans row of exactly 12 files (defining file + 11 tests), listed only by a built slice, gets route structure",
+         jo(W12, "wideTwelve", W12T, "structure")),
+    ):
+        exp = bare(row)
+        ctx.check(name + " (with an over-cap bool)", bare(got.get(rid(row))) == exp, row, got.get(rid(row)), r)
+    for name, row in (
+        ("control: a twin an unbuilt slice of another spec lists gets route slice",
+         jt(TWS, *tw_names("tws"), "slice", slices=[("M-oth.spec.md", "ot-2")])),
+        ("control: an orphans row of 13 files gets route report", jo(W13, "wideThirteen", W13T, "report")),
+    ):
+        ctx.check(name, got.get(rid(row)) == row, row, got.get(rid(row)), r)
+
+
+def tp4_a11(ctx):
+    PRT = "client/src/pr/ownerView.test.ts"
+    PV, PVT = "server-module/src/privacy.rs", "server-module/src/privacy_tests.rs"
+    WA, WB = "client/src/wa/wa.ts", "client/src/wb/wb.ts"
+    WT = ["client/src/wt/t%02d.test.ts" % i for i in range(12)]
+    SP, TWC = "client/src/sp/sp ace.test.ts", "client/src/tc/twc.test.ts"
+    PO, POT = "client/src/po/po.ts", "client/src/po/ownerPo.test.ts"
+    SH = "client/src/sh/SHALL-x.test.ts"
+    base = {PRT: tw_text("view"), PV: "pub fn plain_q() -> u32 { 1 }\n",
+            PVT: "#[test]\nfn names() {\n    assert_eq!(plain_q(), 1);\n}\n",
+            WA: ts_def("wideA"), WB: ts_def("wideB"), SP: tw_text("spc"), TWC: tw_text("twc"),
+            PO: ts_def("poLonely"), POT: ts_use("poLonely"), SH: tw_text("shx")}
+    base.update({p: ts_use("wideA", "wideB") for p in WT})
+    repo = Repo()
+    change(repo, "chore: base", base)
+    sha = touch(repo, subject("el-1", "touch"), [PRT, PVT, WA, WB, SP, TWC, PO, SH])
+    d = spec_dir()
+    label = "M-elv"
+    spec = put_spec(d, label + ".spec.md", spec_text([("el-1", None)]))
+    put_spec(d, "M-xx.spec.md", spec_text([("xx-1", "%s, %s, %s, %s" % (PRT, WB, PV, PO))]))
+    mem = new_mem()
+    r = close(repo, sha, mem, spec)
+    got = by_id(listed(mem, label))
+    for name, row in (
+        ("a protected-twins row gets route report with its token, though an unbuilt slice lists its file",
+         jt(PRT, *tw_names("view"), "report", kind="protected-twins", token="owner")),
+        ("an orphan-protected row gets route report with its token, though an unbuilt slice lists its defining file",
+         jo(PV, "plain_q", [PVT], "report", kind="orphan-protected", token="priv")),
+        ("an orphans row of 13 files that no slice lists gets route report", jo(WA, "wideA", WT, "report")),
+        ("an orphans row of 13 files that an unbuilt slice lists gets route slice (slice is decided first)",
+         jo(WB, "wideB", WT, "slice", slices=[("M-xx.spec.md", "xx-1")])),
+        ("a duplicates row no slice lists whose path holds a space gets route report", jt(SP, *tw_names("spc"), "report")),
+        ("control: a plain duplicates row no slice lists gets route structure", jt(TWC, *tw_names("twc"), "structure")),
+        ("an orphans row with a test file whose path holds a protected token stays kind orphans and gets route report with "
+         "that token, though an unbuilt slice lists its defining file",
+         jo(PO, "poLonely", [POT], "report", token="owner")),
+        ("a duplicates row no slice lists whose path holds the word SHALL gets route report", jt(SH, *tw_names("shx"), "report")),
+    ):
+        ctx.check(name, got.get(rid(row)) == row, row, got.get(rid(row)), r)
+    ctx.check("stdout: `rows listed=8 slice=1 structure=1 report=6 over-cap=0`",
+              r.crows == crows(8, 1, 1, 6, 0), crows(8, 1, 1, 6, 0), r.crows, r)
+
+
+def tp4_a12(ctx):
+    T, DX, DXT = "client/src/x1/x1.test.ts", "game-core/src/x2/x2.rs", "game-core/src/x2/x2_tests.rs"
+    repo = Repo()
+    change(repo, "chore: base", {"client/src/base.ts": filler(4)})
+    sha = change(repo, subject("ex-1", "add"), {T: tw_text("xone"), DX: "pub fn lonely_x() -> u32 { 1 }\n",
+                                                DXT: "#[test]\nfn names() {\n    assert_eq!(lonely_x(), 1);\n}\n"})
+    label = "M-exp"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("ex-1", None)]))
+    others = "".join(l + "\n" for l in (
+        json.dumps({"kind": "shadow", "slice": "ex-1"}), json.dumps({"kind": "Close"}), json.dumps({"kind": ["close"]}),
+        json.dumps({"row": {"kind": "close"}}), json.dumps(["close", {"kind": "close"}]), '{"kind": "close"',
+        "kind: close", ""))
+
+    def write_ab(text):
+        def setup(mem):
+            with open(os.path.join(mem, "mr-tester-ab.jsonl"), "w") as f:
+                f.write(text)
+        return setup
+
+    def stale(mem):
+        p = close_path(mem, label, ".section.md")
+        os.makedirs(os.path.dirname(p))
+        with open(p, "wb") as f:
+            f.write(b"### st-<n> stale\n")
+
+    for name, setup in (
+        ("mr-tester-ab.jsonl absent", lambda mem: None),
+        ("mr-tester-ab.jsonl holding other kinds, a mis-cased or nested kind, an array, a truncated and a non-JSON line",
+         write_ab(others)),
+        ("mr-tester-ab.jsonl a directory (unreadable)", lambda mem: os.makedirs(os.path.join(mem, "mr-tester-ab.jsonl"))),
+        ("mr-tester-ab.jsonl absent and a stale section file present", stale),
+    ):
+        mem = new_mem()
+        setup(mem)
+        r = close(repo, sha, mem, spec)
+        cf = close_file(mem, label)
+        ctx.check(name + ": the trend row and the close file are written, experiment-closed false and section null",
+                  r.rc == 0 and close_row(mem, label) is not None and isinstance(cf, dict)
+                  and cf.get("experiment-closed") is False and "section" in cf and cf["section"] is None,
+                  "row + close file (false, null)", (r.rc, close_row(mem, label), cf), r)
+        ctx.check(name + ": no section file and `section none`, though 2 rows are routed structure",
+                  not os.path.exists(close_path(mem, label, ".section.md")) and r.csection == "none"
+                  and dig(r.crows, "structure") == "2",
+                  ("no file", "none", "2"), (os.path.exists(close_path(mem, label, ".section.md")), r.csection, r.crows), r)
+    mem = closed_mem()
+    r = close(repo, sha, mem, spec)
+    cf = close_file(mem, label)
+    name = label + ".section.md"
+    ctx.check("control: with a close row in mr-tester-ab.jsonl the same run writes the section file and says so",
+              os.path.isfile(close_path(mem, label, ".section.md")) and r.csection == name
+              and dig(cf, "experiment-closed") is True and dig(cf, "section") == name,
+              (name, True), (os.path.isfile(close_path(mem, label, ".section.md")), r.csection, cf), r)
+
+
+def tp4_a13(ctx):
+    E = chr(0x00e9)
+    TW = "client/src/s2/cafe.test.ts"
+    MD, MT, UT = "client/src/s1/model.ts", "client/src/s1/model.test.ts", "client/src/s0/use.test.ts"
+    PRT, TWS = "client/src/s3/guardBar.test.ts", "client/src/s4/tws.test.ts"
+    title = "caf" + E
+    body = "expect(run('c')).toBe(1);"
+    tw = "describe('%s', () => {\n%s\n%s});\n" % (title, it_("it SHALL hold", body), it_("it SHALL hold again", body))
+    use = "describe('m', () => {\n  it('x', () => {\n    expect(SHALL_CAP).toBe(1);\n  });\n});\n"
+    repo = Repo()
+    change(repo, "chore: base", {"client/src/base.ts": filler(4)})
+    SHP = "client/src/s5/SHALL-y.test.ts"
+    sha = change(repo, subject("se-1", "add"), {TW: tw, MD: "export const SHALL_CAP = 1;\n", MT: use, UT: use,
+                                                PRT: tw_text("bar"), TWS: tw_text("tws"), SHP: tw_text("shy")})
+    d = spec_dir()
+    label = "M-sect"
+    spec = put_spec(d, label + ".spec.md", spec_text([("se-1", None)]))
+    put_spec(d, "M-s4.spec.md", spec_text([("sl-1", TWS)]))
+    mem = closed_mem()
+    r = close(repo, sha, mem, spec)
+    text = section_text(mem, label)
+    name = label + ".section.md"
+    ctx.check("with the experiment closed and structure rows, one section file is written and named in the close file and stdout",
+              text is not None and r.csection == name and dig(close_file(mem, label), "section") == name,
+              name, (text is not None, r.csection, dig(close_file(mem, label), "section")), r)
+    lines = (text or "").splitlines()
+    exp_head = ["### st-<n> %s %s: twin tests and unreached symbols from the close census" % (EM, label),
+                "type: refactor %s tier: routine" % MIDDOT,
+                "touches: " + ", ".join(sorted([TW, MD, MT, UT])),
+                "after: []"]
+    ctx.check("the section opens with the st-<n> heading, `type: refactor <middle dot> tier: routine`, touches = the structure rows' files "
+              "sorted (a twin's test file, an orphan's defining file and both its tests; not the report or slice rows' files), "
+              "and `after: []`", lines[:4] == exp_head, exp_head, lines[:4], r)
+    its = section_items(text)
+    got = sorted((f, n) for f, raw, n, sub in its)
+    exp = sorted([(TW, title + " > it SHALL hold again"), (MD, "SHALL_CAP")])
+    ctx.check("one list item per structure row, `- `<file>` :: <JSON name>`, the JSON decoding to the name",
+              got == exp, exp, got, r)
+    bad = [raw for f, raw, n, sub in its if not raw.isascii() or "SHALL" in raw]
+    ctx.check("names are ASCII JSON strings, the H of SHALL escaped", its != [] and bad == [], [], bad, r)
+    shall = [l for l in lines if "SHALL" in l]
+    ctx.check("the only line holding SHALL is the one criterion `- **ST<n>.1:** WHEN ... SHALL pass.`",
+              len(shall) == 1 and bool(CRITERION_RE.match(shall[0])), "one criterion line", shall, r)
+    ctx.check("the section has a `Pins:` line", any(l.startswith("Pins:") for l in lines), "Pins: ...", lines, r)
+    shp = jt(SHP, *tw_names("shy"), "report")
+    got_shp = by_id(listed(mem, label)).get(rid(shp))
+    ctx.check("control for the one-SHALL-line check: a twin row whose path holds SHALL is listed, routed report (so its "
+              "path is in neither touches: nor an item)", got_shp == shp, shp, got_shp, r)
+
+    if os.geteuid() == 0:
+        print("NOTE TP4-A13 failed-write check skipped: running as root, a read-only mode does not bind", flush=True)
+        return
+    memf = closed_mem()
+    census(repo, sha, memf, "--record", "earlier")
+    tp = trend_path(memf)
+    pre = read_bytes(tp)
+    os.chmod(tp, 0o444)
+    rf = close(repo, sha, memf, spec)
+    left = [p for p in (close_path(memf, label), close_path(memf, label, ".section.md")) if os.path.lexists(p)]
+    ctx.check("when the trend row cannot be written (trend.jsonl read-only) the run exits 2 with PRUNE-ERROR, leaves neither "
+              "close file, and trend.jsonl is unchanged",
+              pre is not None and rf.rc == 2 and any(l.startswith("PRUNE-ERROR") for l in rf.err.splitlines())
+              and left == [] and read_bytes(tp) == pre,
+              "exit 2 + PRUNE-ERROR, no close file, trend unchanged", (rf.rc, left, pre is not None and read_bytes(tp) == pre), rf)
+
+
+def tp4_a14(ctx):
+    TW = "client/src/r1/r1.test.ts"
+    R2, R2T = "game-core/src/r2/r2.rs", "game-core/src/r2/r2_tests.rs"
+    repo = Repo()
+    change(repo, "chore: base", {"client/src/base.ts": filler(4)})
+    sha = change(repo, subject("rs-1", "add"), {
+        TW: tw_text("rone"),
+        R2: "pub fn plain_r() -> u32 { 1 }\n\n#[cfg(test)]\npub fn only_r() -> u32 { 2 }\n",
+        R2T: "#[test]\nfn names() {\n    assert_eq!(plain_r() + only_r(), 3);\n}\n"})
+    label = "M-reasons"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("rs-1", None)]))
+    mem = closed_mem()
+    r = close(repo, sha, mem, spec)
+    its = {(f, n): sub for f, raw, n, sub in section_items(section_text(mem, label))}
+    cand, surv = tw_names("rone")
+    exp_keys = sorted([(TW, cand), (R2, "plain_r"), (R2, "only_r")])
+    ctx.check("control: the section lists the twin and both orphans", sorted(its) == exp_keys, exp_keys, sorted(its), r)
+    sub = its.get((TW, cand), {})
+    m = re.fullmatch(r"`([^`]+)` :: (\".*\")", sub.get("surviving check", ""))
+    surv_got = None
+    if m:
+        try:
+            surv_got = (m.group(1), json.loads(m.group(2)))
+        except ValueError:
+            surv_got = None
+    ctx.check("a twin's item: reason `a same-block twin`, surviving check the survivor by path and JSON name, and a "
+              "confirmation naming `mr-prune twin`",
+              sub.get("reason") == "a same-block twin" and surv_got == (TW, surv)
+              and "mr-prune twin" in sub.get("confirmed at merge", ""),
+              ("a same-block twin", (TW, surv), "mr-prune twin"), sub, r)
+    for sym, reason in (("plain_r", "a symbol no production file names"), ("only_r", "a symbol compiled only under test")):
+        sub = its.get((R2, sym), {})
+        ctx.check("an orphan's item (%s): reason `%s`, surviving check `the compiler, and the suites that still run`, and a "
+                  "confirmed-at-merge sub-item" % (sym, reason),
+                  sub.get("reason") == reason and sub.get("surviving check") == "the compiler, and the suites that still run"
+                  and sub.get("confirmed at merge", "").strip() != "",
+                  (reason, "the compiler, and the suites that still run", "non-empty"), sub, r)
+
+
+def tp4_a15(ctx):
+    C = "client/src/cap/"
+    A, B, Cc = C + "a.test.ts", C + "b.test.ts", C + "c.test.ts"
+    O1, O2, O3, O4 = C + "o1.ts", C + "o2.ts", C + "o3.ts", C + "o4.ts"
+    T3 = C + "t3.test.ts"
+    BIG = [C + "big/g%d.test.ts" % i for i in range(9)]
+    MID = [C + "mid/m%d.test.ts" % i for i in range(6)]
+    one, two = "expect(run('b1', capMid)).toBe(1);", "expect(run('b2', capMid)).toBe(1);"
+    b_text = ("describe('b', () => {\n" + it_("one", one) + "\n" + it_("one again", one) + "\n"
+              + it_("two", two) + "\n" + it_("two again", two) + "});\n")
+    files = {A: tw_text("a", ["capMid", "capTiny"]), B: b_text, Cc: tw_text("c", ["capMid"]),
+             O1: ts_def("capBig"), O2: ts_def("capMid"), O3: ts_def("capSmall", "capZed"), O4: ts_def("capTiny"),
+             T3: ts_use("capSmall", "capZed")}
+    files.update({p: ts_use("capBig") for p in BIG})
+    files.update({p: ts_use("capMid") for p in MID})
+    repo = Repo()
+    change(repo, "chore: base", {"client/src/base.ts": filler(4)})
+    sha = change(repo, subject("cp-1", "add"), files)
+    label = "M-cap"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("cp-1", None)]))
+    # walk: 4 twins (3 files) taken; capBig (10 files: 13) over; capMid (10 files, 3 shared: 10) taken; capSmall (12 files,
+    # 6 rows) taken; capZed (no new file, 7th row) over; capTiny (13 files) over
+    exp_over = {(A, "a > one again"): False, (B, "b > one again"): False, (B, "b > two again"): False,
+                (Cc, "c > one again"): False, (O1, "capBig"): True, (O2, "capMid"): False, (O3, "capSmall"): False,
+                (O3, "capZed"): True, (O4, "capTiny"): True}
+    exp_items = sorted(k for k, v in exp_over.items() if not v)
+    exp_touch = "touches: " + ", ".join(sorted({A, B, Cc, O2, O3, T3} | set(MID)))
+
+    def overs(mem):
+        rows = listed(mem, label)
+        if not isinstance(rows, list):
+            return rows
+        return {rid(x): x.get("over-cap") if x.get("route") == "structure" else "route " + str(x.get("route"))
+                for x in rows}
+
+    mem = closed_mem()
+    r = close(repo, sha, mem, spec)
+    got = overs(mem)
+    ctx.check("twins are walked before orphans, each by file then name; a row is taken while the section holds <= 6 rows and "
+              "<= 12 distinct files (a file shared with taken rows counted once), and the walk goes on past a row that does not "
+              "fit: capBig, capZed (7th row) and capTiny (13th file) are over-cap, the rest are not",
+              got == exp_over, exp_over, got, r)
+    text = section_text(mem, label)
+    its = sorted((f, n) for f, raw, n, sub in section_items(text))
+    ctx.check("the section holds exactly the 6 rows taken", its == exp_items, exp_items, its, r)
+    head = (text or "").splitlines()[2:3]
+    ctx.check("its touches: are the 12 distinct files of the rows taken, sorted", head == [exp_touch], [exp_touch], head, r)
+    ctx.check("stdout: `rows listed=9 slice=0 structure=9 report=0 over-cap=3`",
+              r.crows == crows(9, 0, 9, 0, 3), crows(9, 0, 9, 0, 3), r.crows, r)
+    mem2 = new_mem()
+    r2 = close(repo, sha, mem2, spec)
+    got2 = overs(mem2)
+    ctx.check("with the experiment open the same over-cap marks are made in the close file, and no section is written",
+              got2 == exp_over and not os.path.exists(close_path(mem2, label, ".section.md")), exp_over, got2, r2)
+
+    # 7 twin rows in 6 files, where file-then-name, name-then-file and file-then-source-order each cut a different 7th row:
+    # q1..q5 hold one pair each (names e5..e1, reversed against the files); q6 holds pair `ab` above pair `aa`
+    Q = ["client/src/ord/q%d.test.ts" % i for i in range(1, 7)]
+    qfiles = {Q[i]: tw_text("e%d" % (5 - i)) for i in range(5)}
+    qfiles[Q[5]] = tw_text("ab") + tw_text("aa")
+    repo2 = Repo()
+    change(repo2, "chore: base", {"client/src/base.ts": filler(4)})
+    sha2 = change(repo2, subject("od-1", "add"), qfiles)
+    label3 = "M-ord"
+    spec3 = put_spec(spec_dir(), label3 + ".spec.md", spec_text([("od-1", None)]))
+    mem3 = new_mem()
+    r3 = close(repo2, sha2, mem3, spec3)
+    exp3 = {(Q[i], "e%d > one again" % (5 - i)): False for i in range(5)}
+    exp3[(Q[5], "aa > one again")] = False
+    exp3[(Q[5], "ab > one again")] = True
+    rows3 = listed(mem3, label3)
+    got3 = ({rid(x): x.get("over-cap") if x.get("route") == "structure" else "route " + str(x.get("route")) for x in rows3}
+            if isinstance(rows3, list) else rows3)
+    ctx.check("the walk orders by file first, then by name within a file: q1..q5 and q6's `aa` are taken, q6's `ab` (defined "
+              "above `aa`) is the 7th row and over-cap; not q1's `e5` (last by name) nor q6's `aa` (last by source order)",
+              got3 == exp3 and r3.crows == crows(7, 0, 7, 0, 1), (exp3, crows(7, 0, 7, 0, 1)), (got3, r3.crows), r3)
+
+
+def tp4_a16(ctx):
+    PRT, TWS, TWP = "client/src/g1/guardRail.test.ts", "client/src/g2/gs.test.ts", "client/src/g3/gp.test.ts"
+    repo = Repo()
+    change(repo, "chore: base", {"client/src/base.ts": filler(4)})
+    change(repo, subject("nn-1", "add"), {PRT: tw_text("rail"), TWS: tw_text("gs")})
+    sha = change(repo, subject("sm-1", "add"), {TWP: tw_text("gp")})
+    d = spec_dir()
+    label = "M-none"
+    spec = put_spec(d, label + ".spec.md", spec_text([("nn-1", None)]))
+    put_spec(d, "M-later.spec.md", spec_text([("lt-1", TWS)]))
+    spec2 = put_spec(spec_dir(), "M-some.spec.md", spec_text([("sm-1", None)]))
+    mem = closed_mem()
+    stale = close_path(mem, label, ".section.md")
+    os.makedirs(os.path.dirname(stale))
+    with open(stale, "wb") as f:
+        f.write(b"### st-<n> stale\n")
+    r = close(repo, sha, mem, spec)
+    exp = [jt(TWS, *tw_names("gs"), "slice", slices=[("M-later.spec.md", "lt-1")]),
+           jt(PRT, *tw_names("rail"), "report", kind="protected-twins", token="guard")]
+    rows = listed(mem, label)
+    ctx.check("control: the listed rows are a protected pair (report) and a twin an unbuilt slice lists (slice)",
+              rows == exp, exp, rows, r)
+    cf = close_file(mem, label)
+    ctx.check("with no row routed structure and the experiment closed, no section file is written (a stale one is removed); "
+              "the close file says section null, stdout `section none` and structure=0",
+              r.rc == 0 and not os.path.exists(stale) and dig(cf, "experiment-closed") is True and isinstance(cf, dict)
+              and "section" in cf and cf["section"] is None and r.csection == "none" and dig(r.crows, "structure") == "0",
+              ("no file", "section null", "none"), (os.path.exists(stale), cf, r.csection, r.crows), r)
+    r2 = close(repo, sha, mem, spec2)
+    ctx.check("control: in the same --mem a milestone with a structure row gets its section file",
+              os.path.isfile(close_path(mem, "M-some", ".section.md")) and r2.csection == "M-some.section.md",
+              "M-some.section.md", (os.path.isfile(close_path(mem, "M-some", ".section.md")), r2.csection), r2)
+
+
+def tp4_a17(ctx):
+    T, T2 = "client/src/once/once.test.ts", "client/src/once/twice.test.ts"
+    repo = Repo()
+    change(repo, "chore: base", {"client/src/base.ts": filler(3)})
+    sha = change(repo, subject("on-1", "add"), {T: tw_text("once")})
+    d = spec_dir()
+    label = "M-once"
+    spec_body = spec_text([("on-1", None)])
+    spec = put_spec(d, label + ".spec.md", spec_body)
+    mem = closed_mem()
+    census(repo, sha, mem, "--record", label)
+    with open(trend_path(mem), "a") as f:
+        for line in (json.dumps({"label": label, "close": None}), json.dumps({"label": label, "close": "done"}),
+                     "not json at all", json.dumps([label, {"close": {}}]),
+                     json.dumps({"label": label + "-other", "close": {}})):
+            f.write(line + "\n")
+    pre = read_bytes(trend_path(mem))
+    r1 = close(repo, sha, mem, spec)
+    post = read_bytes(trend_path(mem)) or b""
+    ctx.check("a census --record row under the label, a null or string close, a non-JSON line, an array and another label's "
+              "close are not this label's close: the first run closes and appends one row",
+              r1.rc == 0 and r1.first == "PRUNE-CLOSE %s %s" % (label, sha) and post.startswith(pre)
+              and post[len(pre):].count(b"\n") == 1 and close_row(mem, label) is not None,
+              "PRUNE-CLOSE + one appended row", (r1.first, post[len(pre):]), r1)
+    cj, cs = close_path(mem, label), close_path(mem, label, ".section.md")
+    first_ok = os.path.isfile(cj) and os.path.isfile(cs)
+    for p in (cj, cs):
+        if os.path.isfile(p):
+            with open(p, "wb") as f:
+                f.write(b"sentinel\n")
+    t1 = read_bytes(trend_path(mem))
+    listing = sorted(os.listdir(os.path.join(mem, "prune", "close"))) if first_ok else None
+    sha2 = change(repo, subject("on-1", "more"), {T2: tw_text("twice")})
+    r2 = close(repo, sha2, mem, spec)
+    ctx.check("a second close for the label, at a later commit, prints `PRUNE-CLOSE-SKIP <label>` alone and exits 0",
+              first_ok and r2.rc == 0 and r2.out.splitlines() == ["PRUNE-CLOSE-SKIP " + label],
+              ["PRUNE-CLOSE-SKIP " + label], (first_ok, r2.rc, r2.out.splitlines()), r2)
+    unchanged = (read_bytes(trend_path(mem)) == t1 and read_bytes(cj) == b"sentinel\n" and read_bytes(cs) == b"sentinel\n"
+                 and first_ok and sorted(os.listdir(os.path.join(mem, "prune", "close"))) == listing)
+    ctx.check("the skip writes nothing: no second trend row, the close and section files not rewritten, no new file",
+              unchanged, "all byte-identical", (read_bytes(cj), read_bytes(cs)), r2)
+    put_spec(d, label + ".spec.md", "# M\n\n## Slices\n\nNo slice yet.\n")
+    r3 = close(repo, sha2, mem, spec)
+    ctx.check("a FILE error comes before the skip: the label's spec with no slice is refused (exit 2, PRUNE-ERROR), nothing written",
+              close_refused(r3) and read_bytes(trend_path(mem)) == t1 and read_bytes(cj) == b"sentinel\n",
+              "exit 2 + PRUNE-ERROR", (r3.rc, r3.first), r3)
+    put_spec(d, label + ".spec.md", spec_body)
+    mem3 = new_mem()
+    os.makedirs(trend_path(mem3))
+    r4 = close(repo, sha, mem3, spec)
+    ctx.check("a trend.jsonl that cannot be read is a PRUNE-ERROR (the once check cannot be made) and no close file is written",
+              close_refused(r4) and not os.path.exists(os.path.join(mem3, "prune", "close")),
+              "exit 2 + PRUNE-ERROR, no close/", (r4.rc, r4.first, os.listdir(os.path.join(mem3, "prune"))), r4)
+
+
+def tp4_a18(ctx):
+    T1, P1 = "client/src/z1/z1.test.ts", "client/src/z1/z1.ts"
+    repo = Repo()
+    change(repo, "chore: base", {T1: tw_text("zone"), P1: ts_def("zLonely")})
+    change(repo, "chore: prepare zr-1 %s mentioned, not named" % EM, {"client/src/z2/z2.test.ts": tw_text("ztwo")})
+    sha = change(repo, subject("ot-7", "another milestone"), {"client/src/z3/z3.test.ts": tw_text("zthree")})
+    label = "M-zero"
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("zr-2", None), ("zr-1", None)]))
+    mem = closed_mem()
+    r = close(repo, sha, mem, spec)
+    co = close_obj(mem, label)
+    full = census(repo, sha, new_mem())
+    ctx.check("control: the census at the commit has 3 twin rows and an orphan", len(full.rows) == 3 and len(full.orph) == 1,
+              (3, 1), (full.rows, full.orph), full)
+    ctx.check("exit 0 and every id is recorded unmatched, in the spec's order, with no slice (stdout too)",
+              r.rc == 0 and dig(co, "slices") == {} and dig(co, "unmatched") == ["zr-2", "zr-1"]
+              and r.cunmatched == ["zr-2", "zr-1"] and r.cslices == {},
+              ({}, ["zr-2", "zr-1"]), (r.rc, dig(co, "slices"), dig(co, "unmatched"), r.cunmatched), r)
+    zero = {"test-lines": 0, "product-lines": 0}
+    ctx.check("lines added and removed are zero", dig(co, "added") == zero and dig(co, "removed") == zero,
+              (zero, zero), (dig(co, "added"), dig(co, "removed")), r)
+    ctx.check("changed is zero files and lines with ratio null; signals are all zero",
+              changed_got(co) == changed_exp(0, 0, 0, 0)
+              and dig(co, "signals") == {"source-text": 0, "churn": 0, "protected-churn": 0, "widened": 0},
+              changed_exp(0, 0, 0, 0), (changed_got(co), dig(co, "signals")), r)
+    ctx.check("the candidate list is empty: rows [] in the close file, `rows listed=0 ...`, and no section file though the "
+              "experiment is closed",
+              listed(mem, label) == [] and r.crows == crows(0, 0, 0, 0, 0) and r.csection == "none"
+              and not os.path.exists(close_path(mem, label, ".section.md")),
+              ([], crows(0, 0, 0, 0, 0), "none"), (listed(mem, label), r.crows, r.csection), r)
+    oracle = recorded_row(repo, sha, label)
+    row = close_row(mem, label)
+    ctx.check("the row still carries the census's totals and counts at the commit",
+              isinstance(oracle, dict) and dig(row, "totals") == oracle.get("totals") and dig(row, "counts") == oracle.get("counts"),
+              oracle, row, r)
+
+
+def tp4_a19(ctx):
+    T, DV, DVT = "client/src/v1/v1.test.ts", "client/src/v2/v2.ts", "client/src/v2/v2.test.ts"
+    repo = Repo()
+    change(repo, "chore: base", {"client/src/base.ts": filler(4)})
+    sha = change(repo, subject("vw-1", "add"), {T: tw_text("vone"), DV: ts_def("vLonely"), DVT: ts_use("vLonely")})
+    repo.put(T, "describe('changed in the worktree only', () => {});\n")
+    repo.put("client/src/untracked.ts", filler(2))
+    d = spec_dir()
+    label = "M-view"
+    spec = put_spec(d, label + ".spec.md", spec_text([("vw-1", T)]))
+    put_spec(d, "M-else.spec.md", spec_text([("el-1", "client/src/elsewhere/**")]))
+    put_spec(d, "notes.md", "# notes\n")
+    mem = closed_mem()
+    os.makedirs(os.path.join(mem, "gates"))
+    for rel, text in (("gates/v.widened.jsonl", json.dumps({"slice": "v", "path": T, "why": "pin"}) + "\n"),
+                      ("mr-prune-keep.json", "{}\n"), ("notes.txt", "a note\n")):
+        with open(os.path.join(mem, rel), "w") as f:
+            f.write(text)
+    prune = os.path.join(mem, "prune")
+    before = (snapshot(repo), tree_state(mem, prune), tree_state(d))
+    r = close(repo, sha, mem, spec)
+    after = (snapshot(repo), tree_state(mem, prune), tree_state(d))
+    ids = [rid(x) for x in listed(mem, label) or []] if isinstance(listed(mem, label), list) else []
+    ctx.check("control: close ran from the commit (its twin row listed, not the worktree's edit) and wrote the close file, the "
+              "section file and the trend row",
+              r.rc == 0 and (T, "vone > one again") in ids and os.path.isfile(close_path(mem, label, ".section.md"))
+              and close_row(mem, label) is not None, "all written", (r.rc, ids), r)
+    ctx.check("the inspected repository's worktree (an uncommitted edit, an untracked file), index and refs are unchanged",
+              after[0] == before[0], before[0], after[0], r)
+    ctx.check("every file under --mem outside prune/ (tester-ab, gates, keep file, a note) is unchanged, none added",
+              after[1] == before[1], before[1], after[1], r)
+    ctx.check("the spec directory is unchanged: nothing written beside the spec", after[2] == before[2], before[2], after[2], r)
+    in_prune = (sorted(os.listdir(prune)) if os.path.isdir(prune) else None,
+                sorted(os.listdir(os.path.join(prune, "close"))) if os.path.isdir(os.path.join(prune, "close")) else None)
+    exp_prune = (["close", "trend.jsonl"], [label + ".json", label + ".section.md"])
+    ctx.check("prune/ holds only trend.jsonl and close/, and close/ only <label>.json and <label>.section.md",
+              in_prune == exp_prune, exp_prune, in_prune, r)
+
+    inside = os.path.join(repo.path, "memdir")
+    os.makedirs(inside)
+    with open(os.path.join(inside, "mr-tester-ab.jsonl"), "w") as f:
+        f.write('{"kind": "close"}\n')
+    before = snapshot(repo)
+    r = close(repo, sha, inside, spec)
+    ctx.check("a --mem inside --repo is refused (exit 2, PRUNE-ERROR) and nothing is written in the repository",
+              close_refused(r) and snapshot(repo) == before and os.listdir(inside) == ["mr-tester-ab.jsonl"],
+              "exit 2 + PRUNE-ERROR, repo unchanged", (r.rc, os.listdir(inside)), r)
+    target = os.path.join(repo.path, "linked")
+    os.makedirs(target)
+    outside = closed_mem()
+    os.symlink(target, os.path.join(outside, "prune"))
+    before = snapshot(repo)
+    r = close(repo, sha, outside, spec)
+    ctx.check("a --mem whose prune/ is a symlink into --repo gets nothing written into the repository",
+              os.listdir(target) == [] and snapshot(repo) == before, "linked dir empty, repo unchanged",
+              (os.listdir(target), snapshot(repo) == before), r)
+
+    away = tempfile.mkdtemp(prefix="away-", dir=ROOT)
+    mem_ok = closed_mem()
+    os.symlink(away, os.path.join(mem_ok, "prune"))
+    r = close(repo, sha, mem_ok, spec)
+    ctx.check("control: a prune/ that is a symlink to a directory outside the repository is allowed: exit 0, the close file "
+              "and the trend row written there",
+              r.rc == 0 and os.path.isfile(os.path.join(away, "close", label + ".json")) and close_row(mem_ok, label) is not None,
+              "exit 0, files under the linked directory", (r.rc, sorted(os.listdir(away))), r)
+    elsewhere = tempfile.mkdtemp(prefix="elsewhere-", dir=ROOT)
+    tgt = os.path.join(elsewhere, "t.jsonl")
+    with open(tgt, "wb") as f:
+        f.write(b'{"label": "elsewhere"}\n')
+    mem_ln = closed_mem()
+    os.makedirs(os.path.join(mem_ln, "prune"))
+    os.symlink(tgt, trend_path(mem_ln))
+    r = close(repo, sha, mem_ln, spec)
+    ctx.check("a prune/trend.jsonl that is a symlink to a file outside prune/ is a PRUNE-ERROR (exit 2), the link's target "
+              "is not written, and no close file is left",
+              r.rc == 2 and any(l.startswith("PRUNE-ERROR") for l in r.err.splitlines())
+              and read_bytes(tgt) == b'{"label": "elsewhere"}\n' and not os.path.lexists(close_path(mem_ln, label))
+              and not os.path.lexists(close_path(mem_ln, label, ".section.md")),
+              "exit 2 + PRUNE-ERROR, target unchanged", (r.rc, read_bytes(tgt), os.listdir(os.path.join(mem_ln, "prune"))), r)
+
+
 FIXTURES = [
     ("TP1-A1", tp1_a1), ("TP1-A2", tp1_a2), ("TP1-A3", tp1_a3), ("TP1-A4", tp1_a4),
     ("TP1-A5", tp1_a5), ("TP1-A6", tp1_a6), ("TP1-A7", tp1_a7), ("TP1-A8", tp1_a8),
@@ -2038,6 +3428,11 @@ FIXTURES = [
     ("TP2-A5", tp2_a5), ("TP2-A6", tp2_a6), ("TP2-A7", tp2_a7), ("TP2-A8", tp2_a8),
     ("TP2-A9", tp2_a9), ("TP2-A10", tp2_a10), ("TP2-A11", tp2_a11), ("TP2-A12", tp2_a12),
     ("TP2-A13", tp2_a13), ("TP2-A14", tp2_a14),
+    ("TP4-A1", tp4_a1), ("TP4-A2", tp4_a2), ("TP4-A3", tp4_a3), ("TP4-A4", tp4_a4),
+    ("TP4-A5", tp4_a5), ("TP4-A6", tp4_a6), ("TP4-A7", tp4_a7), ("TP4-A8", tp4_a8),
+    ("TP4-A9", tp4_a9), ("TP4-A10", tp4_a10), ("TP4-A11", tp4_a11), ("TP4-A12", tp4_a12),
+    ("TP4-A13", tp4_a13), ("TP4-A14", tp4_a14), ("TP4-A15", tp4_a15), ("TP4-A16", tp4_a16),
+    ("TP4-A17", tp4_a17), ("TP4-A18", tp4_a18), ("TP4-A19", tp4_a19),
 ]
 
 

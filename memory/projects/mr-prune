@@ -10,6 +10,7 @@ test files.
     mr-prune census [--repo R] [--at REF] [--mem DIR] [--record LABEL] [--spec FILE] [--ci]
     mr-prune twin   [--repo R] [--at REF] [--mem DIR] --file F --test T --survivor S
     mr-prune keep   [--repo R] [--at REF] [--mem DIR] --file F --test T --reason TEXT
+    mr-prune close  [--repo R] [--at REF] [--mem DIR] --spec FILE [--ci]
     mr-prune --selftest [ID ...]      fixtures/prune/battery.py; rc=0 pass, rc=1 fail
 
 Defaults: R = projects/monster-realm of the checkout this tool is in; REF =
@@ -20,7 +21,7 @@ inside R when the command writes, or a write that fails.
 
 A row is a candidate for someone to read, never a reason to delete a test: the deletion rule is
 standards/testing-tdd.md, "Deleting a check is legitimate". No gate reads this tool's output, and
-`census` exits 0 whatever it finds.
+`census` and `close` exit 0 whatever they find.
 
 census prints, in this order:
     PRUNE-CENSUS <commit>
@@ -48,8 +49,8 @@ census prints, in this order:
   Twin rows come in file order and, within a file, definition order; the other sections are sorted
   by file, then name. `totals` and `counts` cover the whole commit.
   `--record LABEL` appends one JSON row (label, commit, totals, counts, and with --ci a `ci` object
-  {seconds, conclusion, nightly, reruns_to_green}) to DIR/prune/trend.jsonl and prints
-  `recorded LABEL`.
+  {seconds, conclusion, nightly, reruns_to_green}) to DIR/prune/trend.jsonl, on a line of its own,
+  and prints `recorded LABEL`.
   `--spec FILE` prints only the rows with a file that a `touches:` entry of FILE names, each ending
   ` slices=<id>,...`: the `### <id> — ` slices, in file order, whose first `touches:` line under
   the heading names one. Entries are comma-separated, backticks dropped; `**` crosses directories,
@@ -145,9 +146,125 @@ candidate's row and counts it under `kept` until its form or body changes. `PRUN
 written). census and twin read a keep file they cannot parse as empty and say so on stderr, so a
 broken keep file can only add rows.
 
-The inspected repository is read through `git rev-parse`, `git ls-tree`, `git cat-file` and
-`git log` at the commit; nothing is checked out and the work tree is never read. The only files written are the keep
-file and the trend file, and never inside R.
+close records, once per milestone, what the milestone's own commits added and the candidates in
+the files they changed. FILE is the milestone's spec, named `<label>.spec.md` with a label of
+[A-Za-z0-9_.-] that does not hold `SHALL`; a FILE named otherwise, or with no slice, is a
+PRUNE-ERROR. REF is read as it stands in R: nothing is fetched, so the caller brings R up to date
+first.
+  Slices   the `### <id> — ` headings under FILE's `## Slices` heading, code fences aside.
+  Commits  a commit names a slice when its subject is `<type>[(<scope>)][!]: <id> — ...`: a
+           Conventional Commit prefix with a lower-case type other than `revert`, then the id as
+           the first word, one space, an em dash, one space. A commit is undone when a later
+           commit that is not itself undone says it reverts it. A commit says so in one way
+           only: by its message lines that start `This reverts commit <sha>`, each undoing the
+           commit whose id begins with those seven or more hex digits; or, with no such line, by
+           the subject `Revert "<subject>"`, which undoes the newest earlier commit with that
+           subject that is not already undone, a trailing ` (#N)` aside on both. The milestone's
+           commits are the commits reachable from REF that name one of its slices and are not
+           undone; a slice with none is `unmatched`. A commit that names none of its slices adds
+           nothing, wherever it sits.
+  Changed  the paths in `git show --numstat` of each of those commits, a rename read as a delete
+           and an add. A merge commit that names a slice is one of its commits and adds no path
+           and no line: what it brings in counts on the commits it merges. A path is a test file
+           or a product file as census's totals count them (the package patterns above), whether
+           or not it still exists; any other path, and a file git shows as binary, adds to no
+           line count.
+  Rows     census's `duplicates`, `protected-twins`, `orphans` and `orphan-protected` rows at REF
+           with a file among the changed paths, section by section in that order, each as
+           census sorts it. A twin row's file is its test file; an orphan row's files are the
+           defining file and its tests.
+  Routes   report     every `protected-twins` and `orphan-protected` row, and an `orphans` row
+                      with a test file whose path holds a protected token (the row then carries
+                      that token): removing a protected test follows the standard's protected
+                      path, whichever slice lists the file.
+           slice      any other row with a file that a `touches:` entry names (read as --spec
+                      reads them) in a slice of another `*.spec.md` in FILE's directory, when no
+                      commit reachable from REF names that slice without being undone. Every
+                      such slice is recorded, specs by file name, slices in file order.
+           report     of the rows left: an `orphans` row of more than 12 files, and a row with a
+                      path the section could not carry (outside [A-Za-z0-9_./-], which a
+                      `touches:` entry could not name, or holding `SHALL`).
+           structure  every other row: a `duplicates` row, or an `orphans` row of 12 files or
+                      fewer.
+  Section  the `structure` rows are walked `duplicates` first, then `orphans`, each by file, then
+           name. A row is taken when the section then holds at most 6 rows and 12 distinct
+           files; a row not taken is marked over-cap and the walk goes on. The marks are made
+           whether or not a section file is written. The file is written when a row is taken
+           and DIR/mr-tester-ab.jsonl holds a line that is a JSON object with "kind": "close"
+           (the tester A/B experiment has closed; a file that is missing or unreadable holds
+           none). It is one section in structure.spec.md's shape, its number left as `<n>` in
+           `st-<n>` and `ST<n>` for whoever appends it:
+               ### st-<n> — <label>: twin tests and unreached symbols from the close census
+               type: refactor · tier: routine
+               touches: <the files of its rows, sorted, comma-separated>
+               after: []
+           then a paragraph on how the rows are read, and one list item per row:
+               - `<file>` :: <candidate, or symbol>
+                 - reason: a same-block twin | a symbol no production file names | a symbol
+                   compiled only under test
+                 - surviving check: `<file>` :: <survivor> | the compiler, and the suites that
+                   still run
+                 - confirmed at merge: what the supervisor, who is not the tester that made the
+                   deletion, checks (`mr-prune twin` on the PR base, or that `mr-prune census`
+                   there lists the symbol under `orphans`; the `moved-tests:` rows)
+           then a `Pins:` paragraph (what to look for before the first edit, and that a row
+           needing a file or a symbol the section does not list stays), one criterion,
+           `- **ST<n>.1:** WHEN ... SHALL pass.`, naming the suites of the listed files'
+           packages, and a line on what is confirmed in the diff at merge. Every test and
+           symbol name in it is an ASCII JSON string with the H of `SHALL` written as its
+           unicode escape: it decodes to the name, cannot break a line, and leaves the criterion
+           the only line a ledger seeds a gate from. A row is a candidate there too: the run
+           that builds the section removes only the rows it confirms.
+  Writes   all under DIR/prune/ (a link there that leads out of it is a PRUNE-ERROR), in this
+           order; when one fails, both close files are removed, so they stand only with their
+           row:
+           close/<label>.json        {"label", "commit", "spec": FILE's name,
+                                      "experiment-closed": bool, "section": the section file's
+                                      name without a directory, or null, "rows": [...]}. A twin
+                                      row is {"kind", "file", "candidate", "survivor", "route"};
+                                      an orphan row {"kind", "file", "symbol", "test-only",
+                                      "tests", "route"}; "kind" is the row's census section. A
+                                      protected row adds "token", a `slice` row "slices":
+                                      [{"spec": a file name, "slice": an id}, ...], a `structure`
+                                      row "over-cap": bool.
+           close/<label>.section.md  when due; a file of that name is removed when none is
+                                      due.
+           trend.jsonl               one appended row, on a line of its own: `census --record
+                                      <label>`'s row (with a `ci` object under --ci) plus
+                                      "close": {
+                                        "slices": {<id>: [<commit>, ...]}  matched ids in FILE's
+                                                                    order, commits oldest first
+                                        "unmatched": [<id>, ...]
+                                        "added":   {"test-lines": N, "product-lines": N}
+                                        "removed": {"test-lines": N, "product-lines": N}
+                                                                    numstat sums over the commits
+                                        "changed": {"test-files": N, "product-files": N,
+                                                    "test-lines": N, "product-lines": N,
+                                                    "ratio": X.XX or null}
+                                                                    the changed paths that are
+                                                                    files at REF and their lines
+                                                                    there; test over product to
+                                                                    two decimals, null over zero
+                                        "signals": {"source-text": N, "churn": N,
+                                                    "protected-churn": N, "widened": N}}
+                                                                    changed test files at REF
+                                                                    carrying each signal
+  Output   `PRUNE-CLOSE <label> <commit>`, a `slice <id> <commit> [<commit> ...]` line per matched
+           slice, then an `unmatched <id>` line per other slice, `rows listed=N slice=N
+           structure=N report=N over-cap=N`, `section <file name>` or `section none`, the `ci`
+           line under --ci, and `recorded <label>`. A `*.spec.md` beside FILE that is not a
+           regular file or cannot be read is skipped with `PRUNE-WARN spec ...` on stderr; a
+           directory that cannot be listed is a PRUNE-ERROR.
+  Once     when trend.jsonl already holds a line that is a JSON object with this label and a
+           `close` object, the answer is `PRUNE-CLOSE-SKIP <label>` alone: nothing is read from
+           R, nothing is written, rc=0. Argument and FILE errors come before it. Any other line
+           is passed over (a `census --record` row under the same label is not a close); a
+           trend.jsonl that cannot be read is a PRUNE-ERROR, since the check cannot be made.
+
+The inspected repository is read through `git rev-parse`, `git ls-tree`, `git cat-file`,
+`git log` and `git show` at the commit; nothing is checked out and the work tree is never read.
+The only files written are the keep file, the trend file and the two close files, and never
+inside R.
 
 Shebang is `/usr/bin/python3` on purpose: `#!/usr/bin/env python3` exits 126 in unpinned cwds under
 asdf.
@@ -197,6 +314,18 @@ OUT_OF_SCOPE = (
     ("out-of-scope", "sim-harness", re.compile(r"^sim-harness/.*\.rs$")),
     ("out-of-scope", "client-wasm", re.compile(r"^client-wasm/.*\.rs$")),
 )
+
+
+def kind_of(path):
+    """(package, "test" | "product") for a path the totals count, else None."""
+    for pkg in PACKAGES:
+        if TEST_FILE[pkg].match(path):
+            return pkg, "test"
+        if PRODUCT_FILE[pkg].match(path):
+            return pkg, "product"
+    return None
+
+
 # A line that declares a test, read without the lexer: what an unlexable file's tests are counted
 # by, and the floor a lexed file's count is held to.
 TEST_LINE = {
@@ -1115,6 +1244,22 @@ def churn_counts(log, test_files):
     return counts
 
 
+def json_objects(path):
+    """The lines of a file that are JSON objects, parsed; any other line is passed over. A line
+    ends at a newline and nowhere else. Raises OSError when the file cannot be read."""
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        lines = fh.read().split("\n")
+    rows = []
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except (ValueError, RecursionError):
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
 def widened_counts(mem):
     """{path: rows naming it} over DIR/gates/*.widened.jsonl; a line that is not a JSON object with
     a string `path` is skipped."""
@@ -1125,16 +1270,11 @@ def widened_counts(mem):
         return counts
     for name in names:
         try:
-            with open(os.path.join(gates, name), encoding="utf-8", errors="replace") as fh:
-                lines = fh.read().splitlines()
+            rows = json_objects(os.path.join(gates, name))
         except OSError:
             continue
-        for line in lines:
-            try:
-                row = json.loads(line)
-            except ValueError:
-                continue
-            if isinstance(row, dict) and isinstance(row.get("path"), str):
+        for row in rows:
+            if isinstance(row.get("path"), str):
                 counts[row["path"]] = counts.get(row["path"], 0) + 1
     return counts
 
@@ -1161,18 +1301,24 @@ def _glob(entry):
             out, i = out + "[^/]", i + 1
         else:
             out, i = out + re.escape(entry[i]), i + 1
-    return re.compile(out + "(?:/.*)?$")
+    return re.compile(out + r"(?:/.*)?\Z")
+
+
+def _unfenced(text):
+    """The lines of a spec outside its code fences."""
+    fenced = False
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+        if not fenced:
+            yield line
 
 
 def spec_touches(text):
     """[(slice id, [pattern])] for each `### <id> — ` heading of a spec, from the first `touches:`
     line under it."""
-    slices, current, fenced = [], None, False
-    for line in text.splitlines():
-        if line.lstrip().startswith("```"):
-            fenced = not fenced
-        if fenced:
-            continue
+    slices, current = [], None
+    for line in _unfenced(text):
         heading = SLICE_HEADING.match(line)
         if heading:
             current = [heading.group(1), [], False]
@@ -1188,6 +1334,187 @@ def spec_touches(text):
 
 def slices_naming(slices, files):
     return [sid for sid, patterns in slices if any(p.match(f) for p in patterns for f in files)]
+
+
+# ---------------------------------------------------------------------------------------------
+# close: a milestone's commits, and where each candidate row in the files they changed goes.
+# ---------------------------------------------------------------------------------------------
+SPEC_SUFFIX = ".spec.md"
+SLICES_HEADING = re.compile(r"##\s+Slices\s*$")
+NAMING_SUBJECT = re.compile(r"(?P<type>[a-z]+)(?:\([^)]*\))?!?: (?P<id>\S+) — ")
+REVERTS_LINE = re.compile(r"^This reverts commit ([0-9a-f]{7,64})\b", re.M)
+REVERT_SUBJECT = re.compile(r'Revert "(.*)"')
+PR_TAIL = re.compile(r" \(#\d+\)$")
+# What the section can carry outside a JSON string, a label or a path: text a `touches:` entry
+# names literally, and without the letters a ledger seeds a gate from.
+SECTION_SAFE = re.compile(r"(?!.*SHALL)[A-Za-z0-9_./-]+")
+WIDE_ORPHAN = 12        # an orphan row of more files is a design question, not a section row
+SECTION_ROWS, SECTION_FILES = 6, 12
+
+
+def spec_slice_ids(text):
+    """The ids of the `### <id> — ` headings under a spec's `## Slices` heading, each once."""
+    ids, inside = [], False
+    for line in _unfenced(text):
+        if re.match(r"#{1,2}\s", line):
+            inside = bool(SLICES_HEADING.match(line))
+        heading = SLICE_HEADING.match(line) if inside else None
+        if heading and heading.group(1) not in ids:
+            ids.append(heading.group(1))
+    return ids
+
+
+def live_commits(commits):
+    """{slice id: [commit, oldest first]} over the commits that name a slice and are not undone.
+    `commits` are (id, subject, body), a commit before its parents. A commit a pending claim
+    names is undone and makes no claim of its own, so a revert of a revert restores the
+    original."""
+    by_sha, by_subject, named = [], {}, {}
+    for sha, subject, body in commits:
+        bare = PR_TAIL.sub("", subject)
+        claim = next((prefix for prefix in by_sha if sha.startswith(prefix)), None)
+        if claim is not None:
+            by_sha.remove(claim)
+            continue
+        if by_subject.get(bare):
+            by_subject[bare] -= 1
+            continue
+        reverted = REVERTS_LINE.findall(subject + "\n" + body)
+        quoted = REVERT_SUBJECT.fullmatch(bare)
+        if reverted:
+            by_sha.extend(reverted)
+        elif quoted:
+            key = PR_TAIL.sub("", quoted.group(1))
+            by_subject[key] = by_subject.get(key, 0) + 1
+        naming = NAMING_SUBJECT.match(subject)
+        if naming and naming.group("type") != "revert":
+            named.setdefault(naming.group("id"), []).append(sha)
+    return {sid: shas[::-1] for sid, shas in named.items()}
+
+
+def row_files(row):
+    """A close row's files: a twin's test file; an orphan's defining file and its tests."""
+    return [row["file"]] + row.get("tests", [])
+
+
+def close_rows(report, changed):
+    """census's twin and orphan rows with a file among `changed`, as the close file's objects, in
+    census's order."""
+    rows = {kind: [] for kind in ("duplicates", "protected-twins", "orphans", "orphan-protected")}
+
+    def add(kind, token, fields):
+        rows[kind].append({"kind": kind, **fields, **({"token": token} if token else {})})
+
+    for kind, path, cand, surv, token in report.rows:
+        if path in changed:
+            add(kind, token, {"file": path, "candidate": cand, "survivor": surv})
+    for kind, path, symbol, test_only, tests, token in orphan_rows(report.contents):
+        if path in changed or changed.intersection(tests):
+            add(kind, token, {"file": path, "symbol": symbol, "test-only": test_only, "tests": tests})
+    return [row for kind in rows for row in rows[kind]]
+
+
+def route_rows(rows, unbuilt):
+    """Gives each row its route. `unbuilt` is the (spec file name, slice id, [pattern]) of the
+    slices of other specs that no standing commit names."""
+    for row in rows:
+        files = row_files(row)
+        token = row.get("token") or protected_token(*files)
+        if token:
+            row["route"], row["token"] = "report", token
+            continue
+        slices = [{"spec": spec, "slice": sid} for spec, sid, patterns in unbuilt
+                  if any(p.match(f) for p in patterns for f in files)]
+        if slices:
+            row["route"], row["slices"] = "slice", slices
+        elif len(files) > WIDE_ORPHAN or not all(SECTION_SAFE.fullmatch(f) for f in files):
+            row["route"] = "report"
+        else:
+            row["route"], row["over-cap"] = "structure", False
+
+
+def _row_name(row):
+    return row["candidate"] if "candidate" in row else row["symbol"]
+
+
+def cap_section(rows):
+    """The `structure` rows the section takes, in its order; the others are marked over-cap."""
+    taken, files = [], set()
+    for row in sorted((r for r in rows if r["route"] == "structure"),
+                      key=lambda r: (r["kind"] != "duplicates", r["file"], _row_name(r))):
+        union = files | set(row_files(row))
+        if len(taken) < SECTION_ROWS and len(union) <= SECTION_FILES:
+            taken.append(row)
+            files = union
+        else:
+            row["over-cap"] = True
+    return taken
+
+
+def _spelled(name):
+    """A name as the section writes it: an ASCII JSON string, so it cannot break a line, with the
+    H of SHALL escaped, so a ledger seeds no gate from a row."""
+    return json.dumps(name).replace("SHALL", "S\\u0048ALL")
+
+
+SUPERVISOR = "the supervisor, who is not the tester that made the deletion,"
+
+
+def section_text(label, commit, taken):
+    """One refactor section in structure.spec.md's shape for the rows taken."""
+    files = sorted({f for row in taken for f in row_files(row)})
+    packages = {kind_of(f)[0] for f in files}
+    rust = ["`%s`" % pkg for pkg in ("game-core", "server-module") if pkg in packages]
+    suites = ["the test suites of %s run" % " and ".join(rust)] if rust else []
+    if "client" in packages:
+        suites.append("the client is type-checked and its vitest suites run")
+    out = [
+        "### st-<n> — %s: twin tests and unreached symbols from the close census" % label,
+        "type: refactor · tier: routine",
+        "touches: " + ", ".join(files),
+        "after: []",
+        "",
+        "`mr-prune close` listed these rows for `%s` at `%s`." % (label, commit),
+        "Each is a candidate, never a reason to delete (`standards/testing-tdd.md` §Deleting a check",
+        "is legitimate). The run that builds this section reads each pair and each symbol's tests",
+        "first and removes only the rows it confirms. A row it does not confirm stays, with its",
+        "reason in the PR body; a pair kept on purpose is recorded with `mr-prune keep`. A twin's",
+        "candidate is deleted and its survivor stays; a symbol is deleted with the tests that reach",
+        "only it. Each deleted test has a `moved-tests:` row in the PR body. A name below is a JSON",
+        "string.",
+        "",
+    ]
+    for row in taken:
+        out.append("- `%s` :: %s" % (row["file"], _spelled(_row_name(row))))
+        if "candidate" in row:
+            out += ["  - reason: a same-block twin",
+                    "  - surviving check: `%s` :: %s" % (row["file"], _spelled(row["survivor"])),
+                    "  - confirmed at merge: %s runs `mr-prune twin` on the PR base with this file,"
+                    " candidate and survivor, and reads the `moved-tests:` row" % SUPERVISOR]
+        else:
+            out += ["  - reason: a symbol %s" % ("compiled only under test" if row["test-only"]
+                                                else "no production file names"),
+                    "  - surviving check: the compiler, and the suites that still run",
+                    "  - confirmed at merge: %s checks that `mr-prune census` on the PR base lists"
+                    " the symbol under `orphans`, and reads the `moved-tests:` rows of the tests"
+                    " removed with it from %s"
+                    % (SUPERVISOR, ", ".join("`%s`" % t for t in row["tests"]) or "no test file")]
+    out += [
+        "",
+        "Pins: none known. Before the first edit the run looks for tests that read a listed file",
+        "as text, and for `.cargo/mutants.toml` entries and bench budgets that name a removed",
+        "symbol; each is disposed of under `standards/testing-tdd.md` §Behavior-preserving changes.",
+        "A removed symbol can still be named outside `touches:`: by a `use` or a re-export, a bench,",
+        "a test file the census does not read, or another symbol that only tests reach. The",
+        "compiler finds each. A row whose removal needs a file or a symbol not listed here stays,",
+        "with that reason in the PR body.",
+        "",
+        "- **ST<n>.1:** WHEN %s THEY SHALL pass." % " and ".join(suites),
+        "",
+        "Confirmed in the diff at merge, not by a criterion: each deleted test has its",
+        "`moved-tests:` row, and the run removed no row it did not confirm.",
+    ]
+    return "\n".join(out) + "\n"
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1360,18 +1687,28 @@ def writable_mem(opts):
     return mem
 
 
-def write_file(path, text, repo, append=False):
-    """Appends `text` to `path`, or replaces it. Refused when `path`, links followed, is inside
-    the inspected repository."""
+def _outside(path, repo):
+    """Raises Fail when `path`, links followed, is inside the inspected repository."""
     inside = os.path.relpath(os.path.realpath(path), os.path.realpath(repo))
     if inside != ".." and not inside.startswith(".." + os.sep):
         raise Fail("%s is inside --repo: this tool writes nothing there" % path)
+
+
+def write_file(path, text, repo, append=False):
+    """Appends `text` to `path` on a line of its own, or replaces the file; missing parent
+    directories are made. Refused when `path` is inside the inspected repository."""
+    _outside(path, repo)
     tmp = "%s.tmp.%d" % (path, os.getpid())
     try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         if append:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "a", encoding="utf-8") as fh:
-                fh.write(text)
+            with open(path, "ab+") as fh:
+                size = fh.seek(0, os.SEEK_END)
+                if size:
+                    fh.seek(size - 1)
+                    if fh.read(1) != b"\n":     # a cut-off last line
+                        text = "\n" + text
+                fh.write(text.encode("utf-8"))
         else:
             with open(tmp, "w", encoding="utf-8") as fh:
                 fh.write(text)
@@ -1380,6 +1717,17 @@ def write_file(path, text, repo, append=False):
         if os.path.exists(tmp):
             os.unlink(tmp)
         raise Fail("cannot write %s: %s" % (path, e))
+
+
+def remove_file(path, repo):
+    """Removes `path` when it exists, under write_file's refusal."""
+    _outside(path, repo)
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        raise Fail("cannot remove %s: %s" % (path, e))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1404,11 +1752,9 @@ def census(snap, keep):
         for row, key, pattern in OUT_OF_SCOPE:
             if pattern.match(path):
                 totals[row][key] += 1
-        for pkg in PACKAGES:
-            if TEST_FILE[pkg].match(path):
-                tests_of[path] = pkg
-            elif PRODUCT_FILE[pkg].match(path):
-                product_of[path] = pkg
+        kind = kind_of(path)
+        if kind:
+            (tests_of if kind[1] == "test" else product_of)[path] = kind[0]
     contents = snap.read(sorted(p for p in snap.blobs if not BINARY.search(p)))
     unlexable, literal_variants, source_text = [], {}, set()
     for path, pkg in product_of.items():
@@ -1484,6 +1830,31 @@ def churn_of(snap, test_files):
     return churn_counts(log.stdout.decode("utf-8", "surrogateescape"), set(test_files))
 
 
+def read_census(snap, mem):
+    """census() under DIR's keep file, each unlexable file named on stderr."""
+    report = census(snap, keep_or_empty(mem))
+    for path in report.unlexable:
+        sys.stderr.write("PRUNE-WARN unlexable %s\n" % _shown(path))
+    return report
+
+
+def trend_path(mem):
+    return os.path.join(mem, "prune", "trend.jsonl")
+
+
+def trend_row(label, snap, report, ci):
+    row = {"label": label, "commit": snap.commit, "totals": report.totals, "counts": report.counts}
+    if ci is not None:
+        row["ci"] = ci
+    return row
+
+
+def _ci_line(ci):
+    """The `ci` output line, when --ci asked for one."""
+    return [] if ci is None else ["ci " + " ".join(
+        "%s=%s" % (k.replace("_", "-"), "null" if v is None else v) for k, v in ci.items())]
+
+
 def cmd_census(opts):
     repo, label = opts.get("repo", DEFAULT_REPO), opts.get("record")
     mem = opts.get("mem", HERE)
@@ -1493,9 +1864,7 @@ def cmd_census(opts):
         mem = writable_mem(opts)
     slices = read_spec(opts["spec"]) if "spec" in opts else None
     snap = Snapshot(repo, opts.get("at", DEFAULT_REF))
-    report = census(snap, keep_or_empty(mem))
-    for path in report.unlexable:
-        sys.stderr.write("PRUNE-WARN unlexable %s\n" % _shown(path))
+    report = read_census(snap, mem)
 
     def scope(*files):
         """The row's ` slices=` suffix under --spec; None when no slice of the spec names a file."""
@@ -1543,15 +1912,9 @@ def cmd_census(opts):
         out.extend(lines.get(section, []))
     out.append("counts " + " ".join("%s=%d" % kv for kv in report.counts.items()))
     ci = read_ci(repo, snap.commit) if "ci" in opts else None
-    if ci is not None:
-        out.append("ci " + " ".join("%s=%s" % (k.replace("_", "-"), "null" if v is None else v)
-                                     for k, v in ci.items()))
+    out.extend(_ci_line(ci))
     if label is not None:
-        row = {"label": label, "commit": snap.commit, "totals": report.totals,
-               "counts": report.counts}
-        if ci is not None:
-            row["ci"] = ci
-        write_file(os.path.join(mem, "prune", "trend.jsonl"), json.dumps(row) + "\n", repo,
+        write_file(trend_path(mem), json.dumps(trend_row(label, snap, report, ci)) + "\n", repo,
                    append=True)
         out.append("recorded " + label)
     _emit(out)
@@ -1627,10 +1990,173 @@ def cmd_keep(opts):
     return 0
 
 
+def read_commits(snap):
+    """[(id, subject, body)] of every commit reachable from the snapshot's, a commit before its
+    parents. Records are NUL-separated, which no message can hold."""
+    log = _git(snap.repo, "log", "-z", "--topo-order", "--no-show-signature",
+               "--format=%H%n%s%n%b", snap.commit)
+    if log.returncode:
+        raise Fail("cannot read the log of %s" % snap.commit)
+    records = log.stdout.decode("utf-8", "surrogateescape").split("\0")
+    return [tuple((record + "\n\n").split("\n", 2)) for record in records if record]
+
+
+def changes_of(snap, commits):
+    """-> (paths, added, removed) over `git show --numstat` of each commit: the paths they
+    changed, and the lines they added and removed in test files and in product files. A merge
+    commit shows no path; a binary file shows no line."""
+    changed = set()
+    added, removed = ({"test-lines": 0, "product-lines": 0} for _ in range(2))
+    for commit in commits:
+        shown = _git(snap.repo, "show", "--numstat", "-z", "--format=", "--root", "--no-renames",
+                     "--no-textconv", "--no-ext-diff", "--no-show-signature", "--diff-merges=off",
+                     commit)
+        if shown.returncode:
+            raise Fail("cannot read the changes of %s" % commit)
+        for entry in shown.stdout.decode("utf-8", "surrogateescape").split("\0"):
+            fields = entry.lstrip("\n").split("\t", 2)
+            if len(fields) != 3:
+                continue
+            plus, minus, path = fields
+            changed.add(path)
+            kind = kind_of(path)
+            if kind and plus.isdigit() and minus.isdigit():
+                added[kind[1] + "-lines"] += int(plus)
+                removed[kind[1] + "-lines"] += int(minus)
+    return changed, added, removed
+
+
+def other_slices(spec):
+    """[(spec file name, slice id, [pattern])] over the other `*.spec.md` files of the spec's
+    directory, by file name; one that cannot be read is named on stderr and skipped."""
+    directory = os.path.dirname(os.path.abspath(spec))
+    try:
+        names = sorted(n for n in os.listdir(directory) if n.endswith(SPEC_SUFFIX))
+    except OSError as e:
+        raise Fail("cannot list the specs beside --spec %s: %s" % (spec, e))
+    out = []
+    for name in names:
+        path = os.path.join(directory, name)
+        try:
+            if os.path.samefile(path, spec):
+                continue
+            if not os.path.isfile(path):
+                raise OSError("not a regular file")
+            with open(path, encoding="utf-8") as fh:
+                slices = spec_touches(fh.read())
+        except (OSError, ValueError) as e:
+            sys.stderr.write("PRUNE-WARN spec %s unreadable (%s): skipped\n" % (_shown(name), e))
+            continue
+        out.extend((name, sid, patterns) for sid, patterns in slices)
+    return out
+
+
+def cmd_close(opts):
+    _need(opts, "spec")
+    repo, spec = opts.get("repo", DEFAULT_REPO), opts["spec"]
+    name = os.path.basename(spec)
+    label = name[:-len(SPEC_SUFFIX)] if name.endswith(SPEC_SUFFIX) else ""
+    if not SECTION_SAFE.fullmatch(label):
+        raise Fail("--spec %s is not named <label>.spec.md, the label of [A-Za-z0-9_.-] and without"
+                   " SHALL" % spec)
+    try:
+        with open(spec, encoding="utf-8") as fh:
+            ids = spec_slice_ids(fh.read())
+    except (OSError, ValueError) as e:
+        raise Fail("--spec %s cannot be read: %s" % (spec, e))
+    if not ids:
+        raise Fail("--spec %s has no `### <id> — ` slice under `## Slices`" % spec)
+    mem = writable_mem(opts)
+    try:
+        trend = json_objects(trend_path(mem))
+    except FileNotFoundError:
+        trend = []
+    except OSError as e:
+        raise Fail("cannot read %s, so cannot tell whether %s is closed: %s"
+                   % (trend_path(mem), label, e))
+    if any(row.get("label") == label and isinstance(row.get("close"), dict) for row in trend):
+        _emit(["PRUNE-CLOSE-SKIP " + label])
+        return 0
+
+    snap = Snapshot(repo, opts.get("at", DEFAULT_REF))
+    report = read_census(snap, mem)
+    named = live_commits(read_commits(snap))
+    matched = {sid: named[sid] for sid in ids if sid in named}
+    changed, added, removed = changes_of(snap, [c for commits in matched.values() for c in commits])
+    at_ref = {"test": [], "product": []}       # the changed paths that are files at the commit
+    for path in sorted(changed):
+        kind = kind_of(path)
+        if kind and path in report.contents:
+            at_ref[kind[1]].append(path)
+    lines = {kind: sum(report.contents[p].count(b"\n") for p in paths)
+             for kind, paths in at_ref.items()}
+    churn, widened = churn_of(snap, report.test_files), widened_counts(mem)
+    close = {
+        "slices": matched,
+        "unmatched": [sid for sid in ids if sid not in named],
+        "added": added,
+        "removed": removed,
+        "changed": {"test-files": len(at_ref["test"]), "product-files": len(at_ref["product"]),
+                    "test-lines": lines["test"], "product-lines": lines["product"],
+                    "ratio": (float("%.2f" % (lines["test"] / lines["product"]))
+                              if lines["product"] else None)},
+        "signals": {
+            "source-text": sum(1 for p in at_ref["test"] if p in report.source_text),
+            "churn": sum(1 for p in at_ref["test"] if churn.get(p)),
+            "protected-churn": sum(1 for p in at_ref["test"] if churn.get(p) and protected_token(p)),
+            "widened": sum(1 for p in at_ref["test"] if widened.get(p))},
+    }
+
+    rows = close_rows(report, changed)
+    route_rows(rows, [s for s in other_slices(spec) if s[1] not in named])
+    taken = cap_section(rows)
+    try:
+        closed = any(row.get("kind") == "close"
+                     for row in json_objects(os.path.join(mem, "mr-tester-ab.jsonl")))
+    except OSError:
+        closed = False
+    section = label + ".section.md" if taken and closed else None
+    ci = read_ci(repo, snap.commit) if "ci" in opts else None
+
+    prune = os.path.realpath(os.path.join(mem, "prune"))
+    files = [os.path.join(prune, "close", label + suffix) for suffix in (".json", ".section.md")]
+    for path in files + [trend_path(mem)]:
+        if os.path.commonpath([prune, os.path.realpath(path)]) != prune:
+            raise Fail("%s leads out of %s through a link" % (path, prune))
+    try:
+        write_file(files[0], json.dumps(
+            {"label": label, "commit": snap.commit, "spec": name, "experiment-closed": closed,
+             "section": section, "rows": rows}, indent=2) + "\n", repo)
+        if section:
+            write_file(files[1], section_text(label, snap.commit, taken), repo)
+        else:
+            remove_file(files[1], repo)
+        write_file(trend_path(mem), json.dumps(dict(trend_row(label, snap, report, ci), close=close))
+                   + "\n", repo, append=True)
+    except Fail:        # the close files stand only with their row
+        for path in files:
+            try:
+                remove_file(path, repo)
+            except Fail:
+                pass
+        raise
+    routes = [row["route"] for row in rows]
+    _emit(["PRUNE-CLOSE %s %s" % (label, snap.commit)]
+          + ["slice %s %s" % (_shown(sid), " ".join(commits)) for sid, commits in matched.items()]
+          + ["unmatched " + _shown(sid) for sid in close["unmatched"]]
+          + ["rows listed=%d slice=%d structure=%d report=%d over-cap=%d" % (
+              len(rows), routes.count("slice"), routes.count("structure"), routes.count("report"),
+              sum(1 for row in rows if row.get("over-cap"))),
+             "section " + (section or "none")]
+          + _ci_line(ci) + ["recorded " + label])
+    return 0
+
+
 COMMANDS = {
     "census": (cmd_census, ("repo", "at", "mem", "record", "spec", "ci")),
     "twin": (cmd_twin, ("repo", "at", "mem", "file", "test", "survivor")),
     "keep": (cmd_keep, ("repo", "at", "mem", "file", "test", "reason")),
+    "close": (cmd_close, ("repo", "at", "mem", "spec", "ci")),
 }
 
 
@@ -1640,7 +2166,7 @@ SWITCHES = {"ci"}       # flags that take no value
 def parse_args(argv):
     """-> (subcommand, {flag: value}). Every flag but a SWITCHES one takes one value."""
     if not argv or argv[0] not in COMMANDS:
-        raise Fail("expected one of: census, twin, keep, --selftest")
+        raise Fail("expected one of: census, twin, keep, close, --selftest")
     sub, opts, i = argv[0], {}, 1
     while i < len(argv):
         name = argv[i][2:] if argv[i].startswith("--") else None
