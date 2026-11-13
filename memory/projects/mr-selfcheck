@@ -2002,7 +2002,10 @@ PYABAUDIT
 #   * config disabled: every tier renders byte-for-byte what it renders with no mr-tester-ab at all;
 #   * enabled, eligible routine slice: exactly that brief plus the sentence;
 #   * enabled, eligible hard slice: the hard-tier sentence stays and the experiment's follows it;
-#   * enabled, ineligible prefix / harness slice / closed experiment: no sentence, no bump.
+#   * enabled, ineligible prefix / harness slice / closed experiment: no sentence, no bump;
+#   * enabled, eligible prefix on a slice with no tester call (its spec section, or its launch
+#     vars, say `type: design` or `type: refactor`): no sentence, no bump.
+# The block writes `enabled` itself for every case: nothing here reads the shipped value.
 /usr/bin/python3 - "$MEM" <<'PYABSPAWN' || BAD=1
 import json, os, shutil, subprocess, sys, tempfile
 
@@ -2018,10 +2021,11 @@ def fail(name, detail=""):
 
 def sentence(slice_, tier):
     return ("TESTER A/B: give your tester prompt a `## Contracts` section (the signatures the tests will call, each "
-            "test file's path and, for Rust, its module name); before step 4 run `$MEM/mr-tester-ab plan %s --tier %s "
+            "test file's path and, for Rust, its module name) and name this worktree's absolute path in it; "
+            "before step 4 run `$MEM/mr-tester-ab plan %s --tier %s "
             "--prompt <your tester prompt file>` and do exactly what it prints; run `$MEM/mr-tester-ab mark %s` before the first post-implementation "
             "lens batch and `$MEM/mr-tester-ab escapes %s` before opening the PR; `AB-SKIP` means proceed "
-            "normally.\n" % (slice_, tier, slice_, slice_))
+            "normally; a slice with no tester call runs none of this.\n" % (slice_, tier, slice_, slice_))
 
 
 with tempfile.TemporaryDirectory(prefix="mr-selfcheck-ab-spawn-") as TMP:
@@ -2033,16 +2037,25 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-ab-spawn-") as TMP:
     with open(os.path.join(MEM, "mr-tester-ab.config.json")) as fh:
         shipped = json.load(fh)
 
+    # The slice types the tool reads: spec sections in a sandbox harness repo.
+    specs = os.path.join(TMP, "harness", "specs", "v2")
+    os.makedirs(specs)
+    with open(os.path.join(specs, "fixture.spec.md"), "w") as fh:
+        fh.write("# Fixture\n\n### np-des — a study\ntype: design · tier: hard\n\n### np-ref — a tidy-up\n"
+                 "type: refactor · tier: routine\n\n### np-feat — a feature\ntype: feature · tier: routine\n")
+
     def config(enabled):
         with open(os.path.join(mem, "mr-tester-ab.config.json"), "w") as fh:
             json.dump(dict(shipped, enabled=enabled, prefixes=["np-"], required_slices=["LP1"],
-                           exclude_slices=["np-x"], cap_bump_usd=30), fh)
+                           exclude_slices=["np-x"], cap_bump_usd=30, harness_repo=os.path.join(TMP, "harness"),
+                           specs_dir="specs/v2", no_tester_types=["design", "refactor"]), fh)
 
-    def render(slice_, tier, repo="project"):
+    def render(slice_, tier, repo="project", kind=None):
         vars_json = os.path.join(TMP, "vars.json")
         with open(vars_json, "w") as fh:
-            json.dump({"slice": slice_, "model": "sonnet", "effort": "high", "touches": "server-module/src/x.rs",
-                       "target_desc": "fixture", "resume_block": "", "tier": tier}, fh)
+            json.dump(dict({"slice": slice_, "model": "sonnet", "effort": "high", "touches": "server-module/src/x.rs",
+                            "target_desc": "fixture", "resume_block": "", "tier": tier},
+                           **({"type": kind} if kind else {})), fh)
         out = os.path.join(TMP, "brief.md")
         if os.path.exists(out):
             os.remove(out)
@@ -2065,7 +2078,10 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-ab-spawn-") as TMP:
             return None
 
     CASES = [("np-a", "routine", "project"), ("np-a", "hard", "project"), ("np-a", "content", "project"),
-             ("ts-9", "routine", "project"), ("np-x", "routine", "project"), ("np-a", "routine", "harness")]
+             ("ts-9", "routine", "project"), ("np-x", "routine", "project"), ("np-a", "routine", "harness"),
+             ("np-des", "hard", "project"), ("np-ref", "routine", "project"), ("np-feat", "routine", "project"),
+             ("np-a", "routine", "project", "design"), ("np-a", "hard", "project", "refactor"),
+             ("np-a", "routine", "project", "feature")]
     # Today's brief: what mr-spawn renders with no mr-tester-ab beside it.
     config(True)
     os.rename(tool, parked)
@@ -2081,7 +2097,7 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-ab-spawn-") as TMP:
         for case in CASES:
             if render(*case) != today[case]:
                 fail("disabled-not-byte-identical", "slice=%s tier=%s repo=%s: with the config disabled the "
-                     "brief must be byte-for-byte today's" % case)
+                     "brief must be byte-for-byte today's" % case[:3])
         if cap("np-a", "project", "60") != "60\n":
             fail("disabled-cap", "%r" % cap("np-a", "project", "60"))
         config(True)
@@ -2106,12 +2122,29 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-ab-spawn-") as TMP:
             fail("hard-keeps-its-sentence", "the hard-tier sentence must stay, before the experiment's")
         for case, why in ((("ts-9", "routine", "project"), "ineligible-prefix"),
                           (("np-x", "routine", "project"), "excluded-slice"),
-                          (("np-a", "routine", "harness"), "harness-slice")):
+                          (("np-a", "routine", "harness"), "harness-slice"),
+                          (("np-des", "hard", "project"), "design-section"),
+                          (("np-ref", "routine", "project"), "refactor-section"),
+                          (("np-a", "routine", "project", "design"), "design-in-the-vars"),
+                          (("np-a", "hard", "project", "refactor"), "refactor-in-the-vars")):
             if render(*case) != today[case]:
                 fail(why, "must render today's brief, without the sentence")
+        # A slice that does have a tester keeps the sentence, whichever way its type is stated.
+        for case in (("np-feat", "routine", "project"), ("np-a", "routine", "project", "feature")):
+            mark = "REPO: **project**"
+            if render(*case) != today[case].replace(mark, sentence(case[0], case[1]) + mark, 1):
+                fail("feature-type", "slice=%s: a feature slice of an eligible prefix must carry the sentence" % case[0])
+        # The first `plan` answers AB-NEED for a prompt without the worktree's path, and a slice
+        # whose build issues no tester call must not run the experiment's steps.
+        if "name this worktree's absolute path in it" not in sentence("np-a", "routine") \
+                or "a slice with no tester call runs none of this" not in sentence("np-a", "routine"):
+            fail("sentence-clauses", "the sentence must ask for the worktree's absolute path in the tester prompt "
+                 "and say that a slice with no tester call runs none of it")
         for args, want in ((("np-a", "project", "60"), "90\n"), (("np-a", "project", "150"), "180\n"),
                            (("np-a", "project", "75.5"), "105.5\n"), (("LP1", "project", "60"), "90\n"),
-                           (("ts-9", "project", "60"), "60\n"), (("np-a", "harness", "60"), "60\n")):
+                           (("ts-9", "project", "60"), "60\n"), (("np-a", "harness", "60"), "60\n"),
+                           (("np-des", "project", "60"), "60\n"), (("np-ref", "project", "60"), "60\n"),
+                           (("np-feat", "project", "60"), "90\n")):
             if cap(*args) != want:
                 fail("cap", "--ab-cap %s -> %r, want %r" % (" ".join(args), cap(*args), want))
         # A closed experiment takes no further slice.
