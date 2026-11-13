@@ -33,8 +33,13 @@ FILES
   mr-tester-ab.config.json   tracked. Arms, eligibility, caps, runner commands.
   mr-tester-ab.jsonl         the ledger. Append-only, one JSON object per line, written under
                              flock. Every row has v, kind, slice, ts. Gitignored.
-  tester-ab/<slice>/         manifest, shadow reports, failure output. Gitignored.
+  tester-ab/<slice>/         manifest, the tester prompt, shadow reports, failure output. Gitignored.
+  tester-ab/judge/           per judge bundle: its key (item -> candidate or claim, label), where
+                             the bundle is, and the verdicts. Never beside the bundle.
   <cache_root>/<slice>/<id>/ one plain export of the tree per shadow run; not a git worktree.
+  <cache_root>/judge/<id>/   one judge bundle: bundle.md, the merged tree of each slice in it and
+                             the whole test file of each test item. Nothing there, nor anything
+                             it names, maps an item to an arm.
   <cache_root>/scratch/      the one directory every replay runs in; <cache_root>/target is the
                              cargo target directory they share.
   tester-ab/<slice>/score.err  why the last `score` stopped, while it has not run through since.
@@ -48,30 +53,45 @@ LEDGER ROWS (kind)
   run         label, arm, role (primary | shadow | replicate | followup | judge), twin, session,
               agent_id, tool_use_id, model_observed, effort_observed, cli_version, started,
               duration_s, calls, bash_blocked, tokens, cost_usd, status (ok | failed |
-              contaminated | arm-mismatch), leak, tests_ref, files, non_test_files, tests, test_loc
+              contaminated | arm-mismatch), leak, tests_ref, files, non_test_files, tests (the
+              tests the arm wrote: new, or changed against the base tree), tests_existing (those
+              already in the files it edited; never run or counted), undetected (test lines
+              written and no test found in them), test_loc
   snap        name (base | g1 | g2 | m | end), sha, source (tool | derived). base: the tree the
               testers saw. g1: the first green implementation, before any lens ran (`mark`; else
               derived as the last commit before the first lens call). g2: green after the lens
               fixes (`escapes`). m: the head the pre-merge audit saw (`finalize`). end: the
               default-branch head when the analysis runs (`score --end`).
   exec        label, snap, sha, test_id, criterion_tag, result (pass | fail | no-compile |
-              not-run), runtime_ms, run_n, ported. A row counts while `sha` is the snapshot's
-              current commit: recording a snapshot again retires the results of the earlier one.
+              not-run), reason (why a test did not run), runtime_ms, run_n, ported. Only the
+              tests an arm wrote have rows. A row counts while `sha` is the snapshot's current
+              commit: recording a snapshot again retires the results of the earlier one.
   claim       claim_id, label, type (base | spec), test, where, text, text_sha
   candidate   candidate_id, type (lens-caught | escape | base | spec | open-fail | withdrawn),
               label, test_id or claim_id, snap_fail, snap_pass, game_diff, scope (in | out),
               handed_in_session. The latest row of a (label, test_id or claim_id) stands;
               `withdrawn` says the current results no longer support it.
-  quality     label, no_compile_files, flaky, not_run, brittle, test_loc, tests,
-              loc_per_criterion, dup_assert_lines, runtime_ms, bloat_usd. The latest row of a
-              label stands. not_run counts tests no runner executed at m: a file no runner
-              fits, or a test the build never compiled in (a Rust module no `mod` line names).
-              Such a test can find nothing.
+  quality     label, no_compile_files, flaky, not_run, brittle, brittle_files, test_loc, tests,
+              ran, gap (null | no-test-detected | none-ran), loc_per_criterion,
+              dup_assert_lines, runtime_ms, bloat_usd. The latest row of a label stands. tests
+              counts the arm's own tests as the patterns find them when the slice is scored.
+              not_run counts tests no runner executed at m: a file no runner fits, a test the
+              build never compiled in (a Rust module no `mod` line names), an import that did
+              not resolve. Such a test can find nothing; an arm none of whose tests ran has
+              `gap` set and is listed in the report. brittle counts causes, not tests: the tests
+              of a file that pass at m and fail at end count once per distinct failure, a file
+              that no longer compiles at end counts once (brittle_files), and brittle_tests is
+              how many tests those took down; a test whose criterion the spec added or changed
+              since m is excused.
   mutants     label, generated, caught, missed, unviable, timeouts, wall_s, status (ok | budget |
               error | no-tests). A reported measure; nothing gates on it.
   slice       status (scored | degraded | void), arms_ok, area, added_cost_usd,
               cumulative_added_usd. The latest row of a slice stands.
-  handoff     label, test_id, handoff_id: a failing shadow test `escapes` handed to the builder
+  handoff     label, test_id, handoff_id (its candidate id): a failing shadow test `escapes`
+              handed to the builder
+  adoption    candidate_id, commit, handed, tests, test_added (the tests the commit added or
+              changed, or `none`), lines_added, over_limit: a fix commit whose `AB-Adopt:`
+              trailer cites a handed test. What the experiment itself put into the suite.
   close       reason, scored_slices. Written once; `plan` skips every slice from then on.
   verdict     ref (a candidate id or a claim id), item, label, scale, bundle, verdict,
               duplicate_of, criterion, wrong_behaviour, severity, scope (a base claim: in | out)
@@ -110,10 +130,13 @@ COMMANDS
   escapes <slice>             Record the worktree as g2. With `escapes_in_session`, replay the
                               shadow tests there under a wall budget and write up to
                               `handoff_limit` failing ones, arm removed, to a file for the
-                              red-team. Run after the lens fixes, before the PR opens.
+                              red-team, and print the adoption rule: fix a real defect, add at
+                              most one test for it, cite the test's id in an `AB-Adopt:`
+                              trailer. Run after the lens fixes, before the PR opens.
   finalize <slice> [--repo <dir> --head <ref>] [--no-score]
-                              Record m, start `score` detached at the lowest CPU and I/O
-                              priority, and close the experiment when a close condition holds:
+                              Record m and the adoptions among the slice's commits, start
+                              `score` detached at the lowest CPU and I/O priority, and close
+                              the experiment when a close condition holds:
                               a `close` row and one retro request (`tester-ab close`). A later
                               call naming another head records m again and scores it. mr-audit
                               calls it, bounded and fail-open.
@@ -125,20 +148,26 @@ COMMANDS
                               It collects first when the session ended without `collect`, and
                               records the tester calls after the primary as follow-ups. A runner
                               that cannot start records nothing: the next `score` retries.
-  status                      What is planned, collected, scored and spent; stale exports.
+  status                      What is planned, collected, scored and spent; where each close
+                              condition stands; arms with no test detected or run; stale exports.
   judge-pack                  Write every item without a verdict (candidates, claims, tests
                               still failing at m) to a shuffled bundle with arm, model and
-                              export paths removed, and print the one Agent call for the judge.
-  judge-apply <verdicts.json> Enter the judge's verdicts and the findings they support. A `bug`
-                              or `design-defect` verdict without a criterion and a wrong
-                              behaviour is rejected.
+                              export paths removed, in a directory of its own with the code
+                              and criteria the items need, and print the one Agent call for the
+                              judge.
+  judge-apply <verdicts.json> Enter the judge's verdicts and the findings they support: from the
+                              file when it exists, else from the final message of the judge's
+                              transcript (the judge agent has no Write tool). A `bug` or
+                              `design-defect` verdict without a criterion and a wrong behaviour
+                              is rejected.
   fix-cost <finding> <usd>    Record what fixing a finding cost; five of a class replace its
                               historical price.
   report [--out <file>]       The close report, a pure function of the ledger and the config:
                               per-arm cost, found and missed by class, quality, Total in three
-                              price scenarios, main effects, noise floor, seeded defects,
-                              splits, and the decision rule's result. Default file:
-                              retros/<utc>-tester-ab.md.
+                              price scenarios and by term, measurement gaps, main effects, noise
+                              floor, seeded defects, splits, the decision rule's result, what
+                              the experiment added to the suite, and the census rows under
+                              prune/ when there are any. Default file: retros/<utc>-tester-ab.md.
   --selftest                  Fixtures against temporary directories and a toy test runner; where
                               cargo-nextest is installed, the shipped runner against a real
                               cargo workspace too. Prints `TESTER-AB-SELFTEST-OK <n>`.
@@ -166,7 +195,10 @@ SLICE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 CRITERION_RE = re.compile(r"criterion:\s*([A-Za-z0-9][\w.\-]*)")
 SHADOW_ROLES = ("shadow", "replicate")
 PROMPT_FILE = "TESTER-PROMPT.md"
-REPORT_FILE = "REPORT.md"
+# The CLI refuses a subagent Write to a file named like a report (`REPORT.md`), so the shadow's
+# output file carries a name it accepts.
+REPORT_FILE = "SHADOW-OUTPUT"
+ADOPT_RE = re.compile(r"^AB-Adopt:\s*(\S+)", re.M)
 _GIT_SCRUB = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
               "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_ALTERNATE_OBJECT_DIRECTORIES")
 _GIT_ID = ("-c", "user.name=mr-tester-ab", "-c", "user.email=mr-tester-ab@localhost",
@@ -180,13 +212,14 @@ FOOTER = """
 You work in an exported copy of the tree at {root}. It is not a git repository. Read and write
 only inside {root}.
 
-- Tag every test with its criterion id: a comment `criterion: <ID>` on the line directly above
-  the test.
+- Tag every test you write with its criterion id: a comment `criterion: <ID>` on the line
+  directly above the test, above any attribute such as `#[test]`.
 - End your report with a `FINDINGS` block: the line `FINDINGS`, then at most three lines of the
   form `- kind: base|spec | test: <test name or none> | where: <path:line> | <one sentence naming
   the wrong behaviour>`, or the single line `NONE`. `base` is a defect in code that exists in
   this tree; `spec` is a contradiction or gap in the spec.
-- Write the whole report to {root}/REPORT.md. Your final message is the single word `done`.
+- Write the whole report to the file {root}/{report} with the Write tool. Your final message is
+  the single word `done`.
 """
 
 
@@ -401,28 +434,113 @@ def is_game_code(ctx, path):
     return bool(re.search(ctx.cfg.get("game_code", "$^"), path)) and not is_test(ctx, path)
 
 
-def tests_in(ctx, path, text):
-    """[(name, criterion tag)] of the tests a file declares. The tag is the nearest
-    `criterion: <ID>` on the test's own line or the three lines above it."""
+def _close(text, at, open_, rust):
+    """The offset just past the bracket that closes the one opened at or after `at`, or None.
+    String literals and comments are skipped; in Rust a `'` opens no string (it marks a
+    lifetime)."""
+    close = {"{": "}", "(": ")"}[open_]
+    quotes = '"' if rust else "\"'`"
+    depth, i, n = 0, at, len(text)
+    while i < n:
+        c = text[i]
+        if c in quotes:
+            j = i + 1
+            while j < n and text[j] != c:
+                j += 2 if text[j] == "\\" else 1
+            i = j + 1
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i)
+            i = n if j < 0 else j + 2
+        else:
+            if c == open_:
+                depth += 1
+            elif c == close and depth:
+                depth -= 1
+                if depth == 0:
+                    return i + 1
+            i += 1
+    return None
+
+
+def test_spans(ctx, path, text):
+    """[(name, criterion tag, first line, line after the last)] of the tests a file declares.
+
+    A test begins at the non-blank lines directly above its declaration (at most three: its tag
+    and attributes) and ends where its body's bracket closes when the pattern names one
+    (`body`: `{` is looked for after the match, `(` from its start), else at the next test.
+    The tag is the nearest `criterion: <ID>` from the line that names the test back to three
+    lines above the declaration, never reaching into the test before: a tag above `#[test]`
+    and one between `#[test]` and `fn` are both found."""
     for pat in ctx.cfg.get("test_patterns", []):
         if not re.search(pat["match"], path):
             continue
         lines = text.split("\n")
-        out = []
+        found = []
         for m in re.finditer(pat["test"], text, re.M):
             name = next((g for g in reversed(m.groups()) if g), None)
-            if not name:
-                continue
-            at = text.count("\n", 0, m.start())
+            if name:
+                found.append((name, m, text.count("\n", 0, m.start()), text.count("\n", 0, m.end())))
+        closes = []          # the line after each body's closing bracket, where the pattern names one
+        for name, m, first, last in found:
+            at = _close(text, m.start() if pat.get("body") == "(" else m.end(), pat["body"],
+                        path.endswith(".rs")) if pat.get("body") else None
+            closes.append(None if at is None else text.count("\n", 0, at) + 1)
+        # The lines above a test belong to it only down to where the test before it ends.
+        floors = [-1] + [max(found[i][3], (closes[i] or 0) - 1) for i in range(len(found) - 1)]
+        tops = []
+        for (_, _, first, _), floor in zip(found, floors):
+            top = first
+            while top - 1 > floor and first - top < 3 and lines[top - 1].strip():
+                top -= 1
+            tops.append(top)
+        out = []
+        for i, (name, m, first, last) in enumerate(found):
             tag = ""
-            for line in reversed(lines[max(0, at - 3):at + 1]):
-                found = CRITERION_RE.search(line)
-                if found:
-                    tag = found.group(1)
+            for line in reversed(lines[max(floors[i] + 1, first - 3):last + 1]):
+                hit = CRITERION_RE.search(line)
+                if hit:
+                    tag = hit.group(1)
                     break
-            out.append((name, tag))
+            end = tops[i + 1] if i + 1 < len(found) else len(lines)
+            if closes[i] is not None:
+                end = min(end, closes[i])
+            out.append((name, tag, tops[i], max(end, last + 1)))
         return out
     return []
+
+
+def tests_in(ctx, path, text):
+    """[(name, criterion tag)] of the tests a file declares."""
+    return [(name, tag) for name, tag, _, _ in test_spans(ctx, path, text)]
+
+
+def _body(lines):
+    """A test's lines without comments and whitespace: a tag added to an existing test, or a
+    formatter's rewrap, is not a change to it."""
+    return "".join("".join(l.split()) for l in lines if not re.match(r"\s*(//|/\*|\*|#(?![\[!]))", l))
+
+
+def own_tests(ctx, ref, path, base=None):
+    """[(name, criterion tag)] of the tests of `path` at `ref` that the arm wrote: those the
+    base version of the file (the parent of the arm's commit) does not hold, or holds with
+    another body. A test that was already in a file the arm edited is not the arm's: it is not
+    run, counted, priced, charged as a false positive or a brittle break, or credited with a
+    seeded defect."""
+    base = base or ref + "^"
+    cache = ctx.__dict__.setdefault("_own", {})
+    key = (base, ref, path)
+    if key not in cache:
+        new = git(ctx.game, "show", "%s:%s" % (ref, path), check=False)
+        old = git(ctx.game, "show", "%s:%s" % (base, path), check=False)
+        before = {}
+        for name, _, a, b in test_spans(ctx, path, old):
+            before.setdefault(name, set()).add(_body(old.split("\n")[a:b]))
+        cache[key] = [(name, tag) for name, tag, a, b in test_spans(ctx, path, new)
+                      if _body(new.split("\n")[a:b]) not in before.get(name, ())]
+    return cache[key]
 
 
 # --------------------------------------------------------------------------- eligibility
@@ -481,9 +599,10 @@ def assign(slice_, arms):
     return {"a%d" % (i + 1): arm for i, arm in enumerate(order)}
 
 
-def export_tree(repo, sha, dest):
+def export_tree(repo, sha, dest, paths=()):
+    """Unpack the commit's tree, or only `paths` of it, as plain files under `dest`."""
     os.makedirs(dest)
-    archive = subprocess.Popen(["git", "-C", repo, "archive", "--format=tar", sha],
+    archive = subprocess.Popen(["git", "-C", repo, "archive", "--format=tar", sha, "--", *paths],
                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                env={k: v for k, v in os.environ.items() if k not in _GIT_SCRUB})
     untar = subprocess.run(["tar", "-x", "-C", dest], stdin=archive.stdout, capture_output=True)
@@ -528,7 +647,8 @@ def cmd_plan(ctx, args):
         prompt = fh.read()
     need = []
     if not re.search(r"^## Contracts\b", prompt, re.M):
-        need.append("a `## Contracts` section with the signatures the tests will call")
+        need.append("a `## Contracts` section with the signatures the tests will call and each test "
+                    "file's path (for Rust, its module name)")
     if worktree not in prompt:
         need.append("the worktree path %s" % worktree)
     if need:
@@ -555,7 +675,7 @@ def cmd_plan(ctx, args):
         root = os.path.join(ctx.cache, slice_, os.urandom(8).hex())
         export_tree(worktree, base, root)
         with open(os.path.join(root, PROMPT_FILE), "w") as fh:
-            fh.write(prompt.replace(worktree, root) + FOOTER.format(root=root))
+            fh.write(prompt.replace(worktree, root) + FOOTER.format(root=root, report=REPORT_FILE))
         labels[label] = {"arm": arm["arm"], "model": arm["model"], "effort": arm["effort"],
                          "role": arm.get("role", "shadow"), "export": root}
         calls.append('Agent(subagent_type="tester", model="%s", effort="%s", description="tester %s %s", '
@@ -578,6 +698,8 @@ def cmd_plan(ctx, args):
     os.makedirs(side, exist_ok=True)
     with open(os.path.join(side, "plan.out"), "w") as fh:
         fh.write(text)
+    with open(os.path.join(side, PROMPT_FILE), "w") as fh:      # the judge is shown its criteria
+        fh.write(prompt)
     write_json(ctx.manifest_path(slice_), {
         "slice": slice_, "milestone": opt.get("milestone"), "tier": opt.get("tier"),
         "worktree": worktree, "head_at_plan": head, "base": base, "labels": labels,
@@ -679,6 +801,15 @@ def parse_findings(report):
     return out[:3]
 
 
+def local_path(ctx, root, value):
+    """`value` with the export's path, and the harness repo's, taken off the front of any path
+    in it."""
+    for prefix in (root, ctx.cfg.get("harness_repo") or ""):
+        if prefix:
+            value = value.replace(prefix.rstrip("/") + "/", "").replace(prefix.rstrip("/"), "")
+    return value
+
+
 def changed_files(repo, old, new):
     """[(status letter, path)] between two commits."""
     out = []
@@ -743,7 +874,13 @@ def cmd_collect(ctx, args):
             row["tests_ref"] = ref
             numstat = git(ctx.game, "diff", "--numstat", manifest["base"], ref, "--", *tests)
             row["test_loc"] = sum(int(l.split("\t")[0]) for l in numstat.splitlines() if l.split("\t")[0].isdigit())
-            row["tests"] = sum(len(tests_in(ctx, p, git(ctx.game, "show", "%s:%s" % (ref, p)))) for p in tests)
+            own = sum(len(own_tests(ctx, ref, p, manifest["base"])) for p in tests)
+            row["tests"] = own
+            row["tests_existing"] = sum(len(tests_in(ctx, p, git(ctx.game, "show", "%s:%s" % (ref, p))))
+                                        for p in tests) - own
+            # Test lines were written and the patterns find no test in them: nothing of this
+            # run will be replayed, so it is said and recorded, not left to read as "found nothing".
+            row["undetected"] = own == 0
         row["files"] = tests
         row["non_test_files"] = [p for p in files if not is_test(ctx, p)]
         if report:
@@ -752,6 +889,8 @@ def cmd_collect(ctx, args):
                 fh.write(report)
         if row["status"] == "ok":
             for kind, test, where, text in parse_findings(report):
+                # Paths are kept relative to the tree: the export's own path would name the run.
+                where, text = (local_path(ctx, root, v) for v in (where, text))
                 claims.append({"kind": "claim", "slice": slice_, "label": label, "type": kind,
                                "claim_id": "c" + sha256("%s|%s|%s" % (slice_, label, text))[:8],
                                "test": test, "where": where, "text": text, "text_sha": sha256(text)})
@@ -801,6 +940,10 @@ def cmd_collect(ctx, args):
             tally[row["status"]] = tally.get(row["status"], 0) + 1
     print("AB-COLLECTED %s: %s; %d export(s) removed" % (
         slice_, ", ".join("%d %s" % (n, s) for s, n in sorted(tally.items())) or "no runs", removed))
+    blind = sum(1 for r in runs if r.get("undetected"))
+    if blind:
+        print("AB-WARN %s: %d shadow run(s) wrote test lines in which no test of their own was detected. "
+              "Nothing of such a run can be replayed; the run row records it (`undetected`)." % (slice_, blind))
     if strays:
         # The run is not scored, but whatever it wrote there is still in the builder's tree.
         print("AB-CONTAMINATED %s: a shadow run named these paths in your worktree. Before you commit, "
@@ -887,7 +1030,14 @@ def read_junit(path):
             ms = 0
         text = ""
         if bad is not None:
-            text = ((bad.get("message") or "") + "\n" + (bad.text or "")).strip()[:4000]
+            text = ((bad.get("message") or "") + "\n" + (bad.text or "")).strip()
+            if not text:
+                # A test the runner killed (a signal, its timeout) has no message: what the
+                # report does hold is the failure's type and the test's captured output.
+                said = "\n".join((c.text or "").strip() for c in case if c.tag in ("system-err", "system-out"))
+                text = ("%s\n%s" % (bad.get("type") or "", said[-3000:])).strip() or \
+                    "(the runner reported a failure and no output: the test was killed or timed out)"
+            text = text[:4000]
         out.append((case.get("classname") or "", case.get("name") or "",
                     "fail" if bad is not None else "not-run" if skipped else "pass", ms, text))
     return out
@@ -948,12 +1098,44 @@ def runner_env(ctx):
     return env
 
 
-def run_runner(ctx, runner, files, names, budget):
+def setup_stamps(ctx):
+    """{step: the stamp it last ran against}, from the cache."""
+    try:
+        with open(os.path.join(ctx.cache, "setup-stamps.json")) as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def setup_steps(ctx, runner, cwd, snap_sha):
+    """[(step, key, stamp)] of the runner's setup steps that are due at this snapshot.
+
+    A step is due when its `if_missing` path (relative to the runner's directory) is absent, or
+    when the snapshot's `stamp` paths (relative to the tree: a lockfile, the sources of a built
+    package) are not the ones the step last ran against. What a step leaves behind is ignored
+    by git, so it survives from one snapshot to the next and would otherwise serve a tree it
+    was not built from."""
+    saved = setup_stamps(ctx)
+    due = []
+    for i, step in enumerate(runner.get("setup", [])):
+        key = "%s/%d" % (runner.get("name"), i)
+        stamp = None
+        if step.get("stamp") and snap_sha:
+            stamp = " ".join(git(ctx.game, "rev-parse", "--verify", "--quiet", "%s:%s" % (snap_sha, path),
+                                 check=False).strip() or "-" for path in step["stamp"])
+        missing = step.get("if_missing") and not os.path.exists(os.path.join(cwd, step["if_missing"]))
+        if missing or (stamp is not None and saved.get(key) != stamp) or not (step.get("if_missing") or step.get("stamp")):
+            due.append((step, key, stamp))
+    return due
+
+
+def run_runner(ctx, runner, files, names, budget, snap_sha=None):
     """Run one runner over `files` in the scratch directory.
     (junit cases, whether it built, whether it timed out, wall seconds).
 
     `budget` covers the probe, the setup and the test command together. A probe or setup step
-    that fails, or a command that cannot be started (exit 127), raises RunnerError."""
+    that fails, or a command that cannot be started (exit 127), raises RunnerError; a setup
+    step marked `optional` that fails is noted in `ctx.setup_note` and the run goes on."""
     cwd = os.path.join(ctx.scratch, runner.get("cwd", ""))
     junit = os.path.join(ctx.cache, "junit.xml")
     # A runner that writes its report to a path of its own names it in `junit`, relative to the
@@ -965,14 +1147,24 @@ def run_runner(ctx, runner, files, names, budget):
     argv = fill(ctx, runner["cmd"], runner, files, names, {"files": rel, "junit": junit})
     env = runner_env(ctx)
     start = time.time()
-    steps = [runner["probe"]] if runner.get("probe") else []
-    marker = runner.get("setup_if_missing")
-    if marker and not os.path.exists(os.path.join(cwd, marker)):
-        steps += runner.get("setup", [])
-    for step in steps:
-        rc, _, _, tail = run_cmd(step, cwd, env, budget - (time.time() - start))
+    notes = ctx.__dict__.setdefault("setup_note", {})
+    notes.pop(runner.get("name"), None)
+
+    def fail(step, rc, tail):
+        return "%s: `%s` exit %s: %s" % (runner.get("name"), " ".join(step), rc, " ".join(tail.split())[-200:])
+
+    if runner.get("probe"):
+        rc, _, _, tail = run_cmd(runner["probe"], cwd, env, budget - (time.time() - start))
         if rc != 0:
-            raise RunnerError("%s: `%s` exit %s: %s" % (runner.get("name"), " ".join(step), rc, " ".join(tail.split())[-200:]))
+            raise RunnerError(fail(runner["probe"], rc, tail))
+    for step, key, stamp in setup_steps(ctx, runner, cwd, snap_sha):
+        rc, _, _, tail = run_cmd(step["cmd"], cwd, env, budget - (time.time() - start))
+        if rc != 0 and not step.get("optional"):
+            raise RunnerError(fail(step["cmd"], rc, tail))
+        if rc != 0:
+            notes[runner.get("name")] = "setup step " + fail(step["cmd"], rc, tail)
+        elif stamp is not None:
+            write_json(os.path.join(ctx.cache, "setup-stamps.json"), dict(setup_stamps(ctx), **{key: stamp}))
     rc, timed_out, wall, tail = run_cmd(argv, cwd, env, min(budget - (time.time() - start), runner.get("timeout_s", 1200)))
     if rc == 127:
         raise RunnerError("%s: `%s` cannot start: %s" % (runner.get("name"), argv[0], " ".join(tail.split())[-200:]))
@@ -982,31 +1174,43 @@ def run_runner(ctx, runner, files, names, budget):
 
 
 def run_suite(ctx, snap_sha, ref, files, only=None, budget=3600):
-    """Replay one arm's test files against the tree checked out in the scratch directory.
-    {test id: (result, criterion tag, milliseconds, failure text)}.
+    """Replay the tests one arm wrote (`own_tests`) against the tree checked out in the scratch
+    directory. {test id: (result, criterion tag, milliseconds, failure text or the reason a
+    test did not run)}.
 
     A runner that exits non-zero without a report did not build: its files are then run one at
     a time, so one file that does not compile is charged alone. A test the report does not hold
     under its own file is `not-run`: the build never compiled it in (a Rust module no `mod` line
-    names), whatever a test of the same name elsewhere did."""
+    names), whatever a test of the same name elsewhere did. A failure whose text matches the
+    runner's `unresolved` pattern is `not-run` too: an import that does not resolve (a package
+    the setup did not build) says nothing about the code under test."""
     results = {}
     declared = {}
     for path in files:
-        text = git(ctx.game, "show", "%s:%s" % (ref, path))
-        declared[path] = [(n, tag) for n, tag in tests_in(ctx, path, text)
+        declared[path] = [(n, tag) for n, tag in own_tests(ctx, ref, path)
                           if only is None or "%s::%s" % (path, n) in only]
     start = time.time()
 
-    def record(path, cases, compiled, timed_out):
+    def record(path, cases, compiled, timed_out, runner=None):
         mine = re.compile(r"(?<![\w-])%s(?![\w-])" % re.escape(stem_of(path)))
+        unresolved = (runner or {}).get("unresolved")
         for name, tag in declared[path]:
             hit = next((c for c in cases if mine.search(c[0] + " " + c[1])
                         and (c[1] == name or c[1].endswith("::" + name) or c[1].endswith(" > " + name))), None)
-            if hit:
+            if hit and hit[2] == "fail" and unresolved and re.search(unresolved, hit[4]):
+                note = ctx.__dict__.get("setup_note", {}).get(runner.get("name"))
+                why = "unresolved import: " + " ".join(hit[4].split())[:160] + ("; " + note if note else "")
+                results["%s::%s" % (path, name)] = ("not-run", tag, hit[3], why)
+            elif hit:
                 results["%s::%s" % (path, name)] = (hit[2], tag, hit[3], hit[4])
-            else:
+            elif timed_out:
+                results["%s::%s" % (path, name)] = ("not-run", tag, 0, "the runner ran out of time")
+            elif compiled:
                 results["%s::%s" % (path, name)] = (
-                    "not-run" if compiled or timed_out else "no-compile", tag, 0, "")
+                    "not-run", tag, 0, "the runner's report holds no such test under this file" if runner
+                    else "no runner fits this file")
+            else:
+                results["%s::%s" % (path, name)] = ("no-compile", tag, 0, "")
 
     todo = [p for p in files if declared[p]]
     for runner in ctx.cfg.get("runners", []):
@@ -1021,19 +1225,19 @@ def run_suite(ctx, snap_sha, ref, files, only=None, budget=3600):
             left = budget - (time.time() - start)
             if left <= 0:
                 for path in group:
-                    record(path, [], True, True)
+                    record(path, [], True, True, runner)
                 continue
             overlay(ctx, ref, group)
             try:
                 names = [n for p in group for n, _ in declared[p]]
-                cases, compiled, timed_out, _ = run_runner(ctx, runner, group, names, left)
+                cases, compiled, timed_out, _ = run_runner(ctx, runner, group, names, left, snap_sha)
             finally:
                 clear_overlay(ctx, snap_sha, group)
             if not compiled and not timed_out and len(group) > 1:
                 groups += [[p] for p in group]
                 continue
             for path in group:
-                record(path, cases, compiled, timed_out)
+                record(path, cases, compiled, timed_out, runner)
     for path in todo:        # no runner executes this kind of file
         record(path, [], True, False)
     return results
@@ -1108,10 +1312,11 @@ def replay(ctx, slice_, rows, only_snaps=None, budget=None):
                     checkout(ctx, snaps[snap])
                     fresh = False
                 results = run_suite(ctx, snaps[snap], ref, files, only, left if left is not None else 3600)
-                append(ctx, [{"kind": "exec", "slice": slice_, "label": label, "snap": snap,
-                              "sha": snaps[snap], "test_id": test, "criterion_tag": tag, "result": result,
-                              "runtime_ms": ms, "run_n": run_n, "ported": False}
-                             for test, (result, tag, ms, _) in sorted(results.items())])
+                append(ctx, [dict({"kind": "exec", "slice": slice_, "label": label, "snap": snap,
+                                   "sha": snaps[snap], "test_id": test, "criterion_tag": tag, "result": result,
+                                   "runtime_ms": ms, "run_n": run_n, "ported": False},
+                                  **({"reason": why[:300]} if result == "not-run" else {}))
+                             for test, (result, tag, ms, why) in sorted(results.items())])
                 fails = {t: r[3] for t, r in results.items() if r[0] == "fail"}
                 if fails:
                     write_json(os.path.join(ctx.side_of(slice_), "fail", "%s.%s.%d.json" % (label, snap, run_n)), fails)
@@ -1189,7 +1394,7 @@ def derive(ctx, slice_, rows):
     def add(kind, label, key, snap_fail, snap_pass, scope="in"):
         diff = bool(snap_fail and snap_pass and game_diff(ctx, snaps[snap_fail], snaps[snap_pass]))
         found.append({"kind": "candidate", "slice": slice_, "type": kind, "label": label,
-                      "candidate_id": "k" + sha256("%s|%s|%s" % (slice_, label, key))[:10],
+                      "candidate_id": candidate_id(slice_, label, key),
                       ("claim_id" if kind == "spec" else "test_id"): key,
                       "snap_fail": snap_fail, "snap_pass": snap_pass, "game_diff": diff,
                       "scope": scope, "handed_in_session": (label, key) in handed})
@@ -1241,7 +1446,17 @@ def derive(ctx, slice_, rows):
 
 
 def quality(ctx, slice_, rows):
-    """One mechanical quality row per arm that has results at m."""
+    """One mechanical quality row per arm once its tests were replayed at m. An arm in whose
+    test lines no test was detected gets its row too, with `gap` saying so: it found nothing
+    because nothing of it could run, which must not read as a clean arm.
+
+    brittle  one cause in one file is one break, because one repair mends it: the tests of a
+             file that pass at m and fail at end count once per distinct failure (its first
+             line, numbers aside), and a file that passes at m and no longer compiles at end
+             counts once. A test whose criterion the spec added or changed since m is excused.
+             `brittle_tests` is how many tests those breaks took down.
+    gap      `no-test-detected`: test lines written, no test found in them;
+             `none-ran`: tests found, and not one of them ran at m. Else null."""
     snaps = snaps_of(rows, slice_)
     table = result_table(rows, slice_)
     bloat = ctx.cfg.get("bloat", {})
@@ -1250,35 +1465,52 @@ def quality(ctx, slice_, rows):
         + bloat.get("cached_turns", 0) * bloat.get("cached_usd_per_mtok", 0)) / 1e6
     spec_diff = None
     out = []
+    if "m" not in snaps:
+        return out
     for run in ok_runs(rows, slice_):
         label = run["label"]
         mine = {t: s for (l, t), s in table.items() if l == label}
-        if not any("m" in s for s in mine.values()):
-            continue
+        own = [n for p in run.get("files", []) for n, _ in own_tests(ctx, run["tests_ref"], p)]
+        if own and not any("m" in s for s in mine.values()):
+            continue        # not replayed yet
         first = "g1" if "g1" in snaps else "m"
         broken = {t.rsplit("::", 1)[0] for t, s in mine.items() if "no-compile" in s.get(first, [])}
-        brittle = 0
-        for test, by_snap in mine.items():
-            if settled(by_snap.get("m")) == "pass" and settled(by_snap.get("end")) in ("fail", "no-compile"):
-                tag = next((r["criterion_tag"] for r in execs(rows, slice_)
-                            if r["label"] == label and r["test_id"] == test), "")
+        tag_of = {r["test_id"]: r["criterion_tag"] for r in execs(rows, slice_) if r["label"] == label}
+        said_at_end = {}
+        with contextlib.suppress(OSError, ValueError):
+            with open(os.path.join(ctx.side_of(slice_), "fail", "%s.end.1.json" % label)) as fh:
+                said_at_end = json.load(fh)
+        causes, stale, broke = set(), set(), 0
+        for test, by_snap in sorted(mine.items()):
+            end = settled(by_snap.get("end"))
+            if settled(by_snap.get("m")) == "pass" and end in ("fail", "no-compile"):
+                tag = tag_of.get(test, "")
                 if spec_diff is None:
                     spec_diff = spec_changes(ctx, rows, slice_)
-                if not tag or not re.search(r"\b%s\b" % re.escape(tag), spec_diff):
-                    brittle += 1
+                if tag and re.search(r"(?<![\w.-])%s(?![\w-])" % re.escape(tag), spec_diff):
+                    continue
+                broke += 1
+                if end == "fail":
+                    first_line = next((l for l in said_at_end.get(test, "").split("\n") if l.strip()), "")
+                    causes.add((test.rsplit("::", 1)[0], re.sub(r"\d+", "#", " ".join(first_line.split()))[:120] or test))
+                else:
+                    stale.add(test.rsplit("::", 1)[0])
         asserts = {}
         for path in run.get("files", []):
             for line in git(ctx.game, "show", "%s:%s" % (run["tests_ref"], path), check=False).split("\n"):
                 norm = " ".join(line.split())
                 if re.search(r"\bassert|\bexpect\(", norm):
                     asserts[norm] = asserts.get(norm, 0) + 1
-        tags = {r["criterion_tag"] for r in execs(rows, slice_) if r["label"] == label and r["criterion_tag"]}
+        tags = {tag for tag in tag_of.values() if tag}
         loc = run.get("test_loc", 0)
+        ran = sum(1 for s in mine.values() if settled(s.get("m")) in ("pass", "fail", "flaky"))
         out.append({"kind": "quality", "slice": slice_, "label": label,
                     "no_compile_files": len(broken),
                     "flaky": sum(1 for s in mine.values() if settled(s.get("m")) == "flaky"),
                     "not_run": sum(1 for s in mine.values() if settled(s.get("m")) == "not-run"),
-                    "brittle": brittle, "test_loc": loc, "tests": run.get("tests", 0),
+                    "brittle": len(causes) + len(stale), "brittle_files": len(stale), "brittle_tests": broke,
+                    "test_loc": loc, "tests": len(own), "ran": ran,
+                    "gap": "no-test-detected" if not own else "none-ran" if not ran else None,
                     "loc_per_criterion": round(loc / max(1, len(tags)), 2),
                     "dup_assert_lines": sum(n - 1 for n in asserts.values()),
                     "runtime_ms": sum(r["runtime_ms"] for r in execs(rows, slice_)
@@ -1289,19 +1521,36 @@ def quality(ctx, slice_, rows):
 
 
 def spec_changes(ctx, rows, slice_):
-    """The text of every spec-corpus diff committed in the harness repo since the slice's m."""
+    """The spec-corpus lines the harness repo's commits since the slice's m added or changed.
+
+    Only such a line excuses a test that broke: a criterion that was reworded moved the target.
+    A line a commit removes excuses nothing, and neither does a line it moves (removed and
+    added with the same text in one commit, or a renamed file): closing a milestone deletes
+    its whole spec, every criterion id in it, and no criterion changed."""
     stamp = next((r["ts"] for r in of(rows, "snap", slice_) if r["name"] == "m"), None)
     harness = ctx.cfg.get("harness_repo")
     if not stamp or not harness or not os.path.isdir(harness):
         return ""
-    return git(harness, "log", "--since=" + stamp, "-p", "--format=", "--", "specs", check=False)
+    log = git(harness, "log", "--since=" + stamp, "-p", "-M", "--format=%x01%ct%x02", "--", "specs", check=False)
+    kept = []
+    for commit in log.split("\x01"):
+        when, _, diff = commit.partition("\x02")
+        if not when.strip().isdigit() or int(when) <= (epoch(stamp) or 0):
+            continue        # `--since` keeps a commit of the very second m was recorded in
+        lines = diff.split("\n")
+        removed = {" ".join(l[1:].split()) for l in lines if l.startswith("-") and not l.startswith("---")}
+        kept += [l[1:] for l in lines if l.startswith("+") and not l.startswith("+++")
+                 and " ".join(l[1:].split()) not in removed]
+    return "\n".join(kept)
 
 
 def mutants(ctx, slice_, rows):
     """The seeded-defect measure: mutate the lines the slice changed in matching files, once per
-    arm, with only that arm's tests that pass at m deciding what is caught (`runner` names the
-    runner whose `scopes` keep the run to the arm's own files). One wall budget covers the
-    slice; an arm it does not reach is recorded as `budget`."""
+    arm, with only the tests that arm wrote and that pass at m deciding what is caught (`runner`
+    names the runner whose `scopes` keep the run to the arm's own files; the names keep it to
+    the arm's own tests in them). One wall budget covers the slice; an arm it does not reach is
+    recorded as `budget`. The command's exit code must be one of `ok_rc`, else the row is
+    `error`."""
     cfg = ctx.cfg.get("mutants", {})
     snaps = snaps_of(rows, slice_)
     if not cfg.get("enabled") or "m" not in snaps or "base" not in snaps:
@@ -1325,11 +1574,11 @@ def mutants(ctx, slice_, rows):
                "missed": 0, "unviable": 0, "timeouts": 0, "wall_s": 0, "status": "ok"}
         files, names = [], []
         for path in run.get("files", []):
-            mine = {t: settled(s.get("m")) for (l, t), s in table.items()
-                    if l == label and t.rsplit("::", 1)[0] == path}
-            if mine and all(r == "pass" for r in mine.values()):
+            passing = [t.rsplit("::", 1)[1] for (l, t), s in sorted(table.items())
+                       if l == label and t.rsplit("::", 1)[0] == path and settled(s.get("m")) == "pass"]
+            if passing:
                 files.append(path)
-                names += [t.rsplit("::", 1)[1] for t in mine]
+                names += passing
         left = cfg.get("wall_budget_s", 1800) - (time.time() - start)
         if not files:
             row["status"] = "no-tests"
@@ -1362,8 +1611,10 @@ def mutants(ctx, slice_, rows):
             row["wall_s"] = round(wall)
             if timed_out:
                 row["status"] = "budget"
-            elif len(counts) < 4:
-                row["status"] = "error"
+            elif len(counts) < 4 or rc not in cfg.get("ok_rc", [0]):
+                # Its exit code says whether the lists mean anything: a baseline that fails
+                # (the arm's tests do not pass in the unmutated tree) leaves four empty lists.
+                row.update(status="error", rc=rc)
             else:
                 row.update(counts, generated=sum(counts.values()))
         append(ctx, [row])
@@ -1444,6 +1695,11 @@ def cmd_score(ctx, args):
     rows = read(ctx)
     print("AB-SCORED %s: %d result(s), %d candidate(s)" % (
         slice_, len(execs(rows, slice_)), len(current_candidates(rows, slice_))))
+    gaps = [q for q in latest(of(rows, "quality", slice_), lambda r: r["label"]) if q.get("gap")]
+    if gaps:
+        print("AB-WARN %s: %d arm(s) had no test of their own run at the merged code (%s). They are recorded "
+              "(`gap`) and listed in the report; such an arm found nothing because nothing of it ran."
+              % (slice_, len(gaps), ", ".join(sorted({q["gap"] for q in gaps}))))
 
 
 # --------------------------------------------------------------------------- mark, escapes, finalize
@@ -1471,6 +1727,48 @@ def cmd_mark(ctx, args):
     pos, _ = options(args)
     slice_ = check_slice(pos[0] if pos else "")
     print("AB-MARK %s: first green recorded (%s)" % (slice_, snap_worktree(ctx, slice_, "g1")[:12]))
+
+
+# What the builder does with a shadow test that exposes a real defect before merge. The shadow
+# test itself never enters the repo: what the experiment adds to the suite is at most one test a
+# defect, and `finalize` records each one so that growth is visible in the report.
+ADOPTION_RULE = ("For each one that is a real defect: fix the defect. Add at most ONE test for it, the smallest that "
+                 "catches it, and prefer extending an existing test to writing a new one; add none if the gating "
+                 "tests already catch it after the fix. Put the trailer `AB-Adopt: <its id>` (the `k...` "
+                 "heading in the file) on the fix commit.")
+
+
+def candidate_id(slice_, label, key):
+    return "k" + sha256("%s|%s|%s" % (slice_, label, key))[:10]
+
+
+def adoptions(ctx, slice_, rows):
+    """Ledger rows for the commits between base and m whose `AB-Adopt:` trailer names a handed
+    test: the tests the commit added or changed (`none` when it changed none) and the test
+    lines it added. A commit is recorded once."""
+    snaps = snaps_of(rows, slice_)
+    if "m" not in snaps or "base" not in snaps:
+        return []
+    known = {(r["candidate_id"], r["commit"]) for r in of(rows, "adoption", slice_)}
+    handed = {r["handoff_id"] for r in of(rows, "handoff", slice_)}
+    out = []
+    log = git(ctx.game, "log", "--reverse", "--format=%H%x00%B%x01", "%s..%s" % (snaps["base"], snaps["m"]), check=False)
+    for entry in log.split("\x01"):
+        sha, _, body = entry.strip().partition("\x00")
+        for cand in sorted(set(ADOPT_RE.findall(body))):
+            if not sha or (cand, sha) in known:
+                continue
+            tests, lines = [], 0
+            for stat in git(ctx.game, "show", "--numstat", "--no-renames", "--format=", sha, check=False).splitlines():
+                added, _, path = (stat.split("\t") + ["", ""])[:3]
+                if not path or not is_test(ctx, path):
+                    continue
+                lines += int(added) if added.isdigit() else 0
+                tests += ["%s::%s" % (path, n) for n, _ in own_tests(ctx, sha, path)]
+            out.append({"kind": "adoption", "slice": slice_, "candidate_id": cand, "commit": sha,
+                        "handed": cand in handed, "tests": tests, "test_added": ", ".join(tests) or "none",
+                        "lines_added": lines, "over_limit": len(tests) > 1})
+    return out
 
 
 def cmd_escapes(ctx, args):
@@ -1506,23 +1804,24 @@ def cmd_escapes(ctx, args):
     refs = {r["label"]: r["tests_ref"] for r in ok_runs(rows, slice_)}
     parts = ["# Shadow tests failing after the lens fixes: %s\n\nEach is a test written blind from this slice's "
              "criteria that fails against the current tree. Rule on each: a real defect in the implementation is "
-             "fixed through the normal lens-fix path; a wrong test needs no action.\n" % slice_]
+             "fixed through the normal lens-fix path; a wrong test needs no action.\n\n%s\n" % (slice_, ADOPTION_RULE)]
     handed = []
     for i, (label, test) in enumerate(failing):
+        cand = candidate_id(slice_, label, test)
         path, name = test.rsplit("::", 1)
         fails = {}
         with contextlib.suppress(OSError, ValueError):
             with open(os.path.join(ctx.side_of(slice_), "fail", "%s.g2.1.json" % label)) as fh:
                 fails = json.load(fh)
-        parts.append("\n## e%d\n\n```\n%s\n```\n\nFailure output:\n\n```\n%s\n```\n" % (
-            i + 1, redact(ctx, test_excerpt(ctx, refs[label], path, name)), redact(ctx, fails.get(test, "(not kept)"))))
-        handed.append({"kind": "handoff", "slice": slice_, "label": label, "test_id": test, "handoff_id": "e%d" % (i + 1)})
+        parts.append("\n## %s\n\n```\n%s\n```\n\nFailure output:\n\n```\n%s\n```\n" % (
+            cand, redact(ctx, test_excerpt(ctx, refs[label], path, name)), redact(ctx, fails.get(test, "(not kept)"))))
+        handed.append({"kind": "handoff", "slice": slice_, "label": label, "test_id": test, "handoff_id": cand})
     out = os.path.join(ctx.side_of(slice_), "escapes.md")
     with open(out, "w") as fh:
         fh.write("".join(parts))
     append(ctx, handed)
     print("AB-ESCAPES %s: %d shadow test(s) fail here. Pass %s to the red-team; fix what it confirms before "
-          "opening the PR." % (slice_, len(handed), out))
+          "opening the PR.\n%s" % (slice_, len(handed), out, ADOPTION_RULE))
 
 
 def merged(ctx, slice_, deadline):
@@ -1539,40 +1838,58 @@ def merged(ctx, slice_, deadline):
         return None
 
 
-def close_reason(ctx, rows, current):
-    """The first close condition that holds, or None.
+def close_conditions(ctx, rows, current=None, ask=True):
+    """[(condition, whether it holds, where it stands)], in the order `finalize` tries them.
 
       required-slices  every required slice has an m snapshot and is merged (the one being
-                       finalized counts as merging), and no planned slice lacks its m snapshot
+                       finalized counts as merging), and no planned slice lacks its m snapshot.
+                       With no slice listed this condition is off and the other three close
+                       the experiment.
       max-slices       the backstop number of slices have at least two valid scored arms and an m
       cap              the arm, judge and port spend, with the reserve of every unpriced
                        planned arm, has reached the cap
       backstop-days    the default branch has commits on that many distinct days since the
                        first m snapshot
-    """
+
+    `ask` false leaves out the one question that needs the network (whether the required
+    slices' PRs are merged): `status` reports without it."""
     cfg = ctx.cfg
     stops = cfg.get("backstops", {})
     with_m = {r["slice"]: r["ts"] for r in reversed(of(rows, "snap")) if r["name"] == "m"}
     assigned = [r["slice"] for r in of(rows, "assignment") if not r.get("skipped")]
     required = cfg.get("required_slices", [])
-    if required and all(s in with_m for s in required) and all(s in with_m for s in assigned):
-        deadline = time.time() + 8
-        if all(s == current or merged(ctx, s, deadline) for s in required):
-            return "required-slices"
+    out = []
+    if not required:
+        out.append(("required-slices", False, "off: no slice is listed"))
+    else:
+        have = [s for s in required if s in with_m]
+        open_ = [s for s in assigned if s not in with_m]
+        holds = len(have) == len(required) and not open_
+        if holds and ask:
+            deadline = time.time() + 8
+            holds = all(s == current or merged(ctx, s, deadline) for s in required)
+        out.append(("required-slices", holds, "%d of %d required slice(s) finalized%s" % (
+            len(have), len(required), "; %d planned slice(s) not finalized" % len(open_) if open_ else "")))
     scored = [s for s in with_m if len([r for r in ok_runs(rows, s) if r["role"] == "shadow"]) >= 2]
-    if len(scored) >= stops.get("max_scored_slices", 16):
-        return "max-slices"
-    if committed(ctx, rows) >= cfg.get("cap_arm_usd", float("inf")):
-        return "cap"
+    most = stops.get("max_scored_slices", 16)
+    out.append(("max-slices", len(scored) >= most, "%d of %d scored slice(s)" % (len(scored), most)))
+    cap = cfg.get("cap_arm_usd", float("inf"))
+    out.append(("cap", committed(ctx, rows) >= cap, "$%.2f of $%s committed" % (committed(ctx, rows), cap)))
+    days, limit = set(), stops.get("loop_active_days", 45)
     if with_m:
         branch = cfg.get("default_branch", "master")
         ref = "refs/remotes/origin/" + branch
         if not git(ctx.game, "rev-parse", "--verify", "--quiet", ref, check=False).strip():
             ref = branch
         days = set(git(ctx.game, "log", "--since=" + min(with_m.values()), "--format=%cs", ref, check=False).split())
-        if len(days) >= stops.get("loop_active_days", 45):
-            return "backstop-days"
-    return None
+    out.append(("backstop-days", len(days) >= limit, "%d of %d loop-active day(s) since the first finalized slice" % (
+        len(days), limit)))
+    return out
+
+
+def close_reason(ctx, rows, current):
+    """The first close condition that holds, or None."""
+    return next((name for name, holds, _ in close_conditions(ctx, rows, current) if holds), None)
 
 
 def cmd_finalize(ctx, args):
@@ -1592,6 +1909,8 @@ def cmd_finalize(ctx, args):
                 subprocess.Popen([os.path.join(ctx.mem, "mr-tester-ab"), "score", slice_, "--background"],
                                  start_new_session=True, stdin=subprocess.DEVNULL,
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with contextlib.suppress(Exception):         # a record for the report, never a reason to stop
+        append(ctx, adoptions(ctx, slice_, read(ctx)))
     rows = read(ctx)
     if not closed(rows):
         reason = close_reason(ctx, rows, slice_)
@@ -1676,6 +1995,11 @@ def cmd_status(ctx, args):
     print("tester-ab: %s; arm spend $%.2f, $%.2f with the reserve of unpriced runs, of $%s (step down at $%s)" % (
         "closed" if closed(rows) else "open", spent(rows), committed(ctx, rows),
         ctx.cfg.get("cap_arm_usd"), ctx.cfg.get("step_down_usd")))
+    if closed(rows):
+        print("  closed: %s" % of(rows, "close")[-1].get("reason"))
+    else:
+        for name, holds, where in close_conditions(ctx, rows, ask=False):
+            print("  closes on %-15s %s: %s" % (name, "met at the next finalize" if holds else "pending", where))
     registered = set()
     for row in of(rows, "assignment"):
         slice_ = row["slice"]
@@ -1694,6 +2018,15 @@ def cmd_status(ctx, args):
         with contextlib.suppress(OSError):
             with open(os.path.join(ctx.side_of(slice_), "score.err")) as fh:
                 print("  %-14s last score stopped: %s" % ("", fh.read().strip()[:300]))
+        # What the patterns find now (the quality row) stands over what they found at collect.
+        arm_of = {r["label"]: r["arm"] for r in runs}
+        gap = {q["label"]: q.get("gap") for q in latest(of(rows, "quality", slice_), lambda r: r["label"])}
+        for r in sorted(runs, key=lambda r: r["label"]):
+            if gap.get(r["label"], "no-test-detected" if r.get("undetected") else None) == "no-test-detected":
+                print("  %-14s %s: test lines written, no test detected in them" % ("", arm_of[r["label"]]))
+        for q in latest(of(rows, "quality", slice_), lambda r: r["label"]):
+            if q.get("gap") == "none-ran":
+                print("  %-14s %s: %d test(s) detected, none ran at the merged code" % ("", arm_of.get(q["label"]), q.get("tests", 0)))
     for path in sorted(glob.glob(os.path.join(glob.escape(ctx.cache), "*", "*"))):
         if os.path.isdir(path) and re.fullmatch(r"[0-9a-f]{16}", os.path.basename(path)) and path not in registered:
             print("  stale export: %s" % path)
@@ -1728,9 +2061,13 @@ A `bug` or `design-defect` verdict must name the criterion and the observable wr
 without both it is discarded. Name the criterion by its id alone. Several items may show one
 defect: rule the first, and every other one `duplicate-of` it.
 
-Write a JSON array to `{verdicts}`, one object per item:
+Everything an item needs is in this file's directory, and nothing else is there: read nothing
+outside it. `tree/<slice>/` is the game's code and gating tests as the slice merged them, without
+the experiment's tests. `items/<item id>/` holds the whole file a test item's test sits in.
+
+Your whole final message is the verdicts and nothing else: a JSON array, no prose around it, no
+code fence, one object per item:
 `{{"id": "i001", "verdict": "...", "criterion": "...", "wrong_behaviour": "...", "severity": "minor|major"}}`.
-Then reply with the single word `done`.
 """
 
 
@@ -1742,60 +2079,73 @@ def current_candidates(rows, slice_=None):
 
 def redact(ctx, text, extra=()):
     """Remove what would tell the judge which arm wrote an item: paths under the cache, arm and
-    model names."""
+    model names. A model id is a model's name with its `claude-` prefix and version; any other
+    word that starts with `claude-` (a repository's name in a cited path) stays."""
     for path in sorted(set(extra) | {ctx.cache}, key=len, reverse=True):
         text = text.replace(path, "[path]")
+    models = "sonnet|opus|fable|haiku"
     names = sorted((re.escape(a["arm"]) for a in ctx.cfg.get("arms", [])), key=len, reverse=True)
-    return re.sub(r"(?i)\b(%s|sonnet|opus|fable|haiku|claude-[\w.-]+)\b" % "|".join(names), "[redacted]", text)
+    return re.sub(r"(?i)\b(%s|claude-(?:%s)[\w.-]*|%s)\b" % ("|".join(names), models, models), "[redacted]", text)
 
 
 def test_excerpt(ctx, ref, path, name):
-    """The test's own lines: from its criterion tag to the line before the next test."""
+    """The test's own lines: from its criterion tag to the end of its body, or to the line
+    before the next test."""
     text = git(ctx.game, "show", "%s:%s" % (ref, path), check=False)
     lines = text.split("\n")
-    starts = []
-    for pat in ctx.cfg.get("test_patterns", []):
-        if re.search(pat["match"], path):
-            starts = [(text.count("\n", 0, m.start()), next((g for g in reversed(m.groups()) if g), ""))
-                      for m in re.finditer(pat["test"], text, re.M)]
-            break
-    def top(i):         # where test i begins: its line, or the comment lines directly above it
-        first, before = starts[i][0], starts[i - 1][0] if i else -1
-        while first - 1 > before and starts[i][0] - first < 3 and lines[first - 1].strip():
-            first -= 1
-        return first
-
-    for i, (_, found) in enumerate(starts):
+    for found, _, top, end in test_spans(ctx, path, text):
         if found == name:
-            end = top(i + 1) if i + 1 < len(starts) else len(lines)
-            return "\n".join(lines[top(i):min(end, top(i) + 80)]).rstrip()
+            return "\n".join(lines[top:min(end, top + 80)]).rstrip()
     return ""
 
 
+def slice_prompt(ctx, slice_):
+    try:
+        with open(os.path.join(ctx.side_of(slice_), PROMPT_FILE), errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def contracts_of(prompt):
+    """The `## Contracts` section of a tester prompt, to the next heading of its level."""
+    m = re.search(r"^## Contracts\b.*?(?=^## |\Z)", prompt, re.M | re.S)
+    return m.group(0).rstrip()[:8000] if m else ""
+
+
 def criterion_text(ctx, slice_, tag):
+    """The lines that state a criterion: those naming its id in the slice's gates file, else in
+    the tester prompt `plan` kept."""
     if not tag:
         return ""
+    named = re.compile(r"(?<![\w.-])%s(?![\w-])" % re.escape(tag))
     try:
         with open(os.path.join(ctx.mem, "gates", "%s.gates.md" % slice_), errors="replace") as fh:
-            hits = [l.strip() for l in fh if re.search(r"\b%s\b" % re.escape(tag), l)]
+            hits = [l.strip() for l in fh if named.search(l)]
     except OSError:
         hits = []
+    if not hits:
+        hits = [l.strip() for l in slice_prompt(ctx, slice_).split("\n") if named.search(l)]
     return " ".join(hits[:5])[:1200]
 
 
 def cited_lines(ctx, rows, slice_, where):
-    """The lines a claim cites: from the harness repo, else from the slice's latest snapshot."""
+    """The lines a claim cites, as its author saw them: from the tester prompt, from the harness
+    repo, else from the slice's base snapshot (the tree the testers were given; the merged
+    tree's line numbers have moved)."""
     m = re.match(r"(.+?):(\d+)$", where)
     path, line = (m.group(1), int(m.group(2))) if m else (where, 1)
     text = ""
     harness = ctx.cfg.get("harness_repo") or ""
     full = os.path.normpath(os.path.join(harness, path))
-    if harness and full.startswith(os.path.normpath(harness) + os.sep) and os.path.isfile(full):
+    if os.path.basename(path) == PROMPT_FILE:
+        text = slice_prompt(ctx, slice_)
+    elif harness and full.startswith(os.path.normpath(harness) + os.sep) and os.path.isfile(full):
         with open(full, errors="replace") as fh:
             text = fh.read()
     else:
         snaps = snaps_of(rows, slice_)
-        sha = snaps.get("m") or snaps.get("base")
+        sha = snaps.get("base") or snaps.get("m")
         if sha:
             text = git(ctx.game, "show", "%s:%s" % (sha, path), check=False)
     lines = text.split("\n")
@@ -1803,8 +2153,9 @@ def cited_lines(ctx, rows, slice_, where):
 
 
 def judge_items(ctx, rows):
-    """Everything not yet ruled on: [(ref, slice, kind, label, body text)]. A base claim whose
-    test is a candidate is judged as that candidate."""
+    """Everything not yet ruled on: [(ref, slice, kind, label, body text, test file or None)],
+    the test file as (tests ref, path). A base claim whose test is a candidate is judged as
+    that candidate."""
     judged = {r["ref"] for r in of(rows, "verdict")}
     items = []
     claim_of = {}
@@ -1832,8 +2183,11 @@ def judge_items(ctx, rows):
             with open(os.path.join(ctx.side_of(slice_), "fail", "%s.%s.1.json" % (label, cand["snap_fail"]))) as fh:
                 fails = json.load(fh)
         snaps = snaps_of(rows, slice_)
-        body = ["kind: test", "criterion: %s %s" % (tag or "(untagged)", criterion_text(ctx, slice_, tag)),
+        body = ["kind: test", "slice: %s" % slice_,
+                "criterion: %s %s" % (tag or "(untagged)", criterion_text(ctx, slice_, tag)),
                 "", "### Test", "```", test_excerpt(ctx, run["tests_ref"], path, name), "```",
+                "Its whole file is `items/{item}/test-file%s`; in the tree it sits in `%s/`." % (
+                    os.path.splitext(path)[1], os.path.dirname(path)),
                 "", "### Failure output", "```", fails.get(test, "(not kept)"), "```"]
         if claim:
             body += ["", "### The author's claim", claim["text"]]
@@ -1844,15 +2198,17 @@ def judge_items(ctx, rows):
             body += ["", "### Game-code change after which the test passes", "```diff"] + diff[:300] + (
                 ["... (%d more lines)" % (len(diff) - 300)] if len(diff) > 300 else []) + ["```"]
         else:
-            body += ["", "The test still fails at the merged code."]
-        items.append((cand["candidate_id"], slice_, cand["type"], label, "\n".join(body)))
+            touched = [p for _, p in changed_files(ctx.game, snaps["base"], snaps["m"]) if is_game_code(ctx, p)]
+            body += ["", "The test still fails at the merged code. The game code this slice changed, under "
+                     "`tree/%s/`:" % slice_] + ["- `%s`" % p for p in touched[:40]]
+        items.append((cand["candidate_id"], slice_, cand["type"], label, "\n".join(body), (run["tests_ref"], path)))
     for claim in of(rows, "claim"):
         if claim["claim_id"] in judged or claim["claim_id"] in covered:
             continue
-        body = ["kind: claim (%s)" % claim["type"], "", "### Claim", claim["text"],
+        body = ["kind: claim (%s)" % claim["type"], "slice: %s" % claim["slice"], "", "### Claim", claim["text"],
                 "", "### Cited lines (%s)" % claim["where"], "```",
                 cited_lines(ctx, rows, claim["slice"], claim["where"]), "```"]
-        items.append((claim["claim_id"], claim["slice"], "claim", claim["label"], "\n".join(body)))
+        items.append((claim["claim_id"], claim["slice"], "claim", claim["label"], "\n".join(body), None))
     return items
 
 
@@ -1875,34 +2231,91 @@ def sample_open(items, limit):
     return kept, scale
 
 
+def bundle_place(ctx, n):
+    """Where bundle `n` is, from the pointer `judge-pack` left: (its file, its directory)."""
+    with open(os.path.join(ctx.side, "judge", "bundle-%d.where.json" % n)) as fh:
+        where = json.load(fh)
+    return where["bundle"], where["dir"]
+
+
 def cmd_judge_pack(ctx, args):
+    """The bundle is written to a directory of its own under the cache root, with the code and
+    the test files its items need, and the judge is told to read nothing else. What maps an
+    item to its arm (the key, the manifests, the plan output, the ledger) stays in this tool's
+    directory, which neither the bundle nor the call names."""
     options(args)
     rows = read(ctx)
     judge = ctx.cfg.get("judge", {})
     items, scale = sample_open(judge_items(ctx, rows), int(judge.get("max_items", 150)))
     if not items:
         raise Skip("nothing-to-judge")
-    out_dir = os.path.join(ctx.side, "judge")
-    os.makedirs(out_dir, exist_ok=True)
-    n = 1 + len(glob.glob(os.path.join(glob.escape(out_dir), "bundle-*.md")))
-    bundle = os.path.join(out_dir, "bundle-%d.md" % n)
-    verdicts = os.path.join(out_dir, "verdicts-%d.json" % n)
+    key_dir = os.path.join(ctx.side, "judge")
+    os.makedirs(key_dir, exist_ok=True)
+    n = 1 + len(glob.glob(os.path.join(glob.escape(key_dir), "bundle-*.key.json")))
+    out_dir = os.path.join(ctx.cache, "judge", "b%d-%s" % (n, os.urandom(6).hex()))
+    os.makedirs(os.path.join(ctx.cache, "judge"), exist_ok=True)
+    os.makedirs(out_dir)
+    bundle = os.path.join(out_dir, "bundle.md")
+    verdicts = os.path.join(key_dir, "verdicts-%d.json" % n)
     items.sort(key=lambda i: sha256("judge-%d:%s" % (n, i[0])))
     exports = [e["export"] for row in of(rows, "assignment") for e in (ctx.manifest(row["slice"]) or {}).get("labels", {}).values()]
-    parts = [JUDGE_HEADER.format(n=n, count=len(items), verdicts=verdicts)]
+    hide = exports + [ctx.mem]
+    parts = [JUDGE_HEADER.format(n=n, count=len(items))]
+    for slice_ in sorted({i[1] for i in items}):
+        snaps = snaps_of(rows, slice_)
+        sha = snaps.get("m") or snaps.get("base")
+        if sha:
+            # The top-level directories that hold game code or tests: not the repository's
+            # agent definitions (a dot-directory, where model names are written), nor its docs.
+            tops = sorted({p.split("/", 1)[0] for p in git(ctx.game, "ls-tree", "-r", "--name-only", sha).splitlines()
+                           if "/" in p and not p.startswith(".") and (is_game_code(ctx, p) or is_test(ctx, p))})
+            export_tree(ctx.game, sha, os.path.join(out_dir, "tree", slice_), tops)
+        contracts = contracts_of(slice_prompt(ctx, slice_))
+        if contracts:
+            parts.append("\n---\n## Slice %s: what its tests were written against\n\n%s\n" % (
+                slice_, redact(ctx, contracts, hide)))
     key = {}
-    for i, (ref, slice_, kind, label, body) in enumerate(items):
+    for i, (ref, slice_, kind, label, body, test_file) in enumerate(items):
         item_id = "i%03d" % (i + 1)
         key[item_id] = {"ref": ref, "slice": slice_, "kind": kind, "label": label, "scale": scale.get(ref, 1)}
-        parts.append("\n---\n## %s\n\n%s\n" % (item_id, redact(ctx, body, exports)))
+        parts.append("\n---\n## %s\n\n%s\n" % (item_id, redact(ctx, body.replace("{item}", item_id), hide)))
+        if test_file:
+            dest = os.path.join(out_dir, "items", item_id, "test-file" + os.path.splitext(test_file[1])[1])
+            os.makedirs(os.path.dirname(dest))
+            with open(dest, "w") as fh:
+                fh.write(redact(ctx, git(ctx.game, "show", "%s:%s" % test_file, check=False), hide))
     with open(bundle, "w") as fh:
         fh.write("".join(parts))
-    write_json(os.path.join(out_dir, "bundle-%d.key.json" % n), key)
+    write_json(os.path.join(key_dir, "bundle-%d.key.json" % n), key)
+    write_json(os.path.join(key_dir, "bundle-%d.where.json" % n), {"bundle": bundle, "dir": out_dir})
     print("AB-JUDGE-PACK %d item(s) in %s. Issue this one call, then run: %s/mr-tester-ab judge-apply %s"
           % (len(items), bundle, ctx.mem, verdicts))
     print('Agent(subagent_type="judge", model="%s", effort="%s", description="judge bundle %d", '
           'prompt="Read %s and rule on every item exactly as it instructs.")'
           % (judge.get("model", "fable"), judge.get("effort", "high"), n, bundle))
+
+
+def judge_transcript(ctx, bundle):
+    """The transcript of the judge run whose first message names the bundle, or None."""
+    for found in sorted(glob.glob(os.path.join(glob.escape(ctx.transcripts), "*", "*", "subagents", "agent-*.jsonl"))):
+        with contextlib.suppress(OSError):
+            if os.path.getmtime(found) < os.path.getmtime(bundle) - 120:
+                continue
+            with open(found, errors="replace") as fh:
+                if bundle in fh.readline(400000):
+                    return found
+    return None
+
+
+def said_verdicts(text):
+    """The JSON array in a judge's final message, or None: the message itself, or what lies
+    between its first `[` and its last `]`."""
+    for cut in (text, text[text.find("["):text.rfind("]") + 1]):
+        with contextlib.suppress(ValueError):
+            given = json.loads(cut)
+            if isinstance(given, list):
+                return given
+    return None
 
 
 def findings(rows, slice_):
@@ -1995,8 +2408,18 @@ def cmd_judge_apply(ctx, args):
     m = re.fullmatch(r"verdicts-(\d+)\.json", os.path.basename(path))
     if not m:
         raise Skip("verdicts file must be the verdicts-<n>.json a bundle names")
-    with open(os.path.join(os.path.dirname(path), "bundle-%s.key.json" % m.group(1))) as fh:
+    with open(os.path.join(ctx.side, "judge", "bundle-%s.key.json" % m.group(1))) as fh:
         key = json.load(fh)
+    bundle = bundle_place(ctx, int(m.group(1)))[0]
+    transcript = judge_transcript(ctx, bundle)
+    if not os.path.exists(path):
+        # The judge has no Write tool: its verdicts are its final message, read from its
+        # transcript and kept as the file this command names.
+        given = said_verdicts(scan_transcript(transcript)[1]) if transcript else None
+        if given is None:
+            raise Skip("no verdicts: %s does not exist and no judge transcript that names %s ends in a JSON array"
+                       % (path, bundle))
+        write_json(path, given)
     with open(path) as fh:
         given = json.load(fh)
     if not isinstance(given, list):
@@ -2038,23 +2461,15 @@ def cmd_judge_apply(ctx, args):
         out += findings(read(ctx), slice_)
     append(ctx, out)
     # The judge's own run counts toward the cap; its transcript is the one that names the bundle.
-    bundle = os.path.join(os.path.dirname(os.path.abspath(path)), "bundle-%s.md" % m.group(1))
-    if not any(r.get("role") == "judge" and r.get("bundle") == int(m.group(1)) for r in of(rows, "run")):
-        for found in glob.glob(os.path.join(glob.escape(ctx.transcripts), "*", "*", "subagents", "agent-*.jsonl")):
-            with contextlib.suppress(Exception):
-                if os.path.getmtime(found) < os.path.getmtime(bundle) - 120:
-                    continue
-                with open(found, errors="replace") as fh:
-                    if bundle not in fh.readline(400000):
-                        continue
-                session = os.path.basename(os.path.dirname(os.path.dirname(found)))
-                cost = by_role(ctx, session).get(agent_id(found))
-                if cost:
-                    append(ctx, [{"kind": "run", "slice": "-", "label": "judge", "arm": "judge", "role": "judge",
-                                  "bundle": int(m.group(1)), "status": "ok", "session": session,
-                                  "agent_id": cost["agent_id"], "model_observed": cost["model"],
-                                  "effort_observed": cost["effort"], "cost_usd": cost["cost_usd"]}])
-                    break
+    if transcript and not any(r.get("role") == "judge" and r.get("bundle") == int(m.group(1)) for r in of(rows, "run")):
+        with contextlib.suppress(Exception):
+            session = os.path.basename(os.path.dirname(os.path.dirname(transcript)))
+            cost = by_role(ctx, session).get(agent_id(transcript))
+            if cost:
+                append(ctx, [{"kind": "run", "slice": "-", "label": "judge", "arm": "judge", "role": "judge",
+                              "bundle": int(m.group(1)), "status": "ok", "session": session,
+                              "agent_id": cost["agent_id"], "model_observed": cost["model"],
+                              "effort_observed": cost["effort"], "cost_usd": cost["cost_usd"]}])
     tally = {}
     for row in out:
         tally[row["status"]] = tally.get(row["status"], 0) + 1
@@ -2211,14 +2626,19 @@ class Stats:
     def run_cost(self, slice_, arm):
         return self.runs[(slice_, arm)].get("cost_usd") or 0.0
 
-    def total(self, slice_, arm, scenario, pending=False):
-        """Run cost, plus each miss at its class's price, plus the priced quality counts."""
+    def terms(self, slice_, arm, scenario, pending=False):
+        """The Total's terms, in order: run cost, misses at their class's price, false positives,
+        flaky tests, brittle breaks, bloat."""
         p, q = self.prices, self.quality.get((slice_, arm), {})
         fp = p["fp_low"] if scenario == "low" else p["fp"]
-        return (self.run_cost(slice_, arm)
-                + sum(miss_price(p, scenario, f["class"], self.measured) for f in self.missed(slice_, arm, pending))
-                + self.false_positives(slice_, arm) * fp + q.get("flaky", 0) * p["flake"]
-                + q.get("brittle", 0) * fp + q.get("bloat_usd", 0.0))
+        return (self.run_cost(slice_, arm),
+                sum(miss_price(p, scenario, f["class"], self.measured) for f in self.missed(slice_, arm, pending)),
+                self.false_positives(slice_, arm) * fp, q.get("flaky", 0) * p["flake"],
+                q.get("brittle", 0) * fp, q.get("bloat_usd", 0.0))
+
+    def total(self, slice_, arm, scenario, pending=False):
+        """Run cost, plus each miss at its class's price, plus the priced quality counts."""
+        return sum(self.terms(slice_, arm, scenario, pending))
 
     def paired(self, arm, other, value, slices=None):
         """[value(arm) - value(other)] over the slices where both ran validly."""
@@ -2325,8 +2745,9 @@ class Stats:
         return mean(diffs), interval(diffs), sign_test(diffs), len(diffs)
 
 
-def render_report(rows, cfg):
-    """The close report as markdown: a pure function of the ledger rows and the config."""
+def render_report(rows, cfg, census=()):
+    """The close report as markdown: a pure function of the ledger rows, the config and the
+    census rows handed in (`memory/projects/prune/trend.jsonl`, when that file exists)."""
     st = Stats(rows, cfg)
     money = lambda v: "$%.2f" % v
     span = lambda b: "n/a" if not b else "[%.2f, %.2f]" % b
@@ -2366,6 +2787,29 @@ def render_report(rows, cfg):
     out += ["## Arms", "", "Totals are per slice. The replicate is not in the reference set or the decision. "
             "A test that never ran (no runner fits its file, or the build never compiled it in) can find nothing.", ""]
     out += arm_table(st.slices) + ["", "With pending findings counted:", ""] + arm_table(st.slices, True) + [""]
+    out += ["Tests counts the tests an arm wrote: new, or changed against the tree it was given. A test that was "
+            "already in a file it edited is not run, counted or priced. Brittle counts causes: the tests of one file "
+            "that fail at the default-branch head with the same failure are one break, and so is a file that no "
+            "longer compiles there (%s test(s) broken in all)." % " / ".join(
+                "%s %d" % (a, sum(st.quality.get((s, a), {}).get("brittle_tests", 0) for s in st.valid(a))) for a in st.arms), "",
+            "Total, central scenario, by term (mean per slice):", "",
+            "| Arm | Run cost | Misses | False positives | Flaky | Brittle | Bloat | Total |", "|---|---|---|---|---|---|---|---|"]
+    for arm in st.arms + ([st.replicate] if st.replicate else []):
+        mine = st.valid(arm)
+        if mine:
+            parts = [mean(st.terms(s, arm, "central")[i] for s in mine) for i in range(6)]
+            out.append("| %s | %s | %s |" % (arm, " | ".join(money(v) for v in parts), money(sum(parts))))
+    out.append("")
+    gaps = sorted((s, arm, q.get("gap")) for (s, arm), q in st.quality.items() if q.get("gap") and s in st.slices and arm)
+    gaps += sorted((s, arm, "no-test-detected") for (s, arm), r in st.runs.items()      # not scored yet
+                   if r.get("undetected") and s in st.slices and (s, arm) not in st.quality)
+    out += ["## Measurement gaps", "",
+            "An arm listed here had no test of its own run on that slice: it found nothing there because nothing "
+            "of it ran, not because it looked and found the code sound.", ""]
+    out += ["- %s %s: %s" % (s, arm, {"no-test-detected": "test lines written, no test detected in them",
+                                      "none-ran": "tests detected, none ran at the merged code"}[gap])
+            for s, arm, gap in gaps] or ["None."]
+    out.append("")
 
     out += ["## Findings by class", "", "| Class | " + " | ".join(st.arms) + " |", "|---|" + "---|" * len(st.arms)]
     got = {arm: [f["class"] for s in st.valid(arm) for f in st.found(s, arm)] for arm in st.arms}
@@ -2512,7 +2956,9 @@ def render_report(rows, cfg):
     loc = {a: mean(st.quality.get((s, a), {}).get("loc_per_criterion", 0) for s in st.valid(a)) for a in st.arms if st.valid(a)}
     fpr = {a: sum(st.false_positives(s, a) for s in st.valid(a))
            / max(1, sum(st.quality.get((s, a), {}).get("tests", 0) for s in st.valid(a))) for a in st.arms if st.valid(a)}
-    for arm in loc:
+    # The size and false-positive guard is part of the decision: with too few slices to decide,
+    # it proposes nothing either.
+    for arm in (loc if decision["choice"] else ()):
         over = [what for what, table in (("lines per criterion", loc), ("false-positive rate", fpr))
                 if table[arm] > 1.5 * median(table.values())]
         if over:
@@ -2551,6 +2997,26 @@ def render_report(rows, cfg):
         out.append("- %s %s — %s: %s" % (f["finding_id"], f["slice"], why, f.get("wrong_behaviour") or "-"))
     if not aside:
         out.append("None.")
+    adopted = latest(of(rows, "adoption"), lambda r: (r["slice"], r["candidate_id"], r["commit"]))
+    out += ["", "## Tests the experiment added to the suite", "",
+            "A shadow test never enters the repo. When one exposed a real defect before merge, the builder fixed the "
+            "defect, was allowed at most one test for it and cited the shadow test on the fix commit. %d such adoption(s) are recorded: %d test(s) added or "
+            "changed, %d test line(s) added, %d with no test, %d over the one-test limit." % (
+                len(adopted), sum(len(a.get("tests", [])) for a in adopted), sum(a.get("lines_added", 0) for a in adopted),
+                sum(1 for a in adopted if not a.get("tests")), sum(1 for a in adopted if a.get("over_limit"))), ""]
+    out += ["- %s %s (%s): %s; %d line(s)%s" % (a["slice"], a["candidate_id"], a["commit"][:8], a.get("test_added") or "none",
+                                                a.get("lines_added", 0), "; over the limit" if a.get("over_limit") else "")
+            for a in sorted(adopted, key=lambda a: (a["slice"], a["candidate_id"], a["commit"]))]
+    if census:
+        out += ["", "## Test census trend", "",
+                "The rows `mr-prune` recorded per milestone while the experiment ran, as recorded. Read beside the "
+                "bloat and brittle figures above when deciding whether a per-milestone prune session is worth building.", ""]
+        flat = lambda row, lead="": [x for k, v in sorted(row.items()) for x in (
+            flat(v, lead + k + ".") if isinstance(v, dict) else ["%s%s=%s" % (lead, k, v)]
+            if isinstance(v, (int, float) if lead else (int, float, str)) and not isinstance(v, bool)
+            and k not in ("label", "commit") else [])]
+        out += ["- %s @ %s: %s" % (row.get("label", "-"), str(row.get("commit", "-"))[:8], ", ".join(flat(row)) or "-")
+                for row in census if isinstance(row, dict)]
     out += ["", "## Spot-check list", "",
             "Every counted finding. Its tests, failure output and fix diff are in the judge bundle that holds its items. "
             "A finding with several items is one defect: the judge called them duplicates, or they are tests ruled "
@@ -2567,7 +3033,13 @@ def render_report(rows, cfg):
 
 def cmd_report(ctx, args):
     _, opt = options(args, valued=("--out",))
-    text = render_report(read(ctx), ctx.cfg)
+    census = []
+    with contextlib.suppress(OSError):          # read-only; no such file is no section
+        with open(os.path.join(ctx.mem, "prune", "trend.jsonl"), errors="replace") as fh:
+            for line in fh:
+                with contextlib.suppress(ValueError):
+                    census.append(json.loads(line))
+    text = render_report(read(ctx), ctx.cfg, census)
     path = opt.get("out") or os.path.join(ctx.mem, "retros", "%s-tester-ab.md" % datetime.datetime.now(
         datetime.timezone.utc).strftime("%Y%m%dT%H%M"))
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
@@ -2622,6 +3094,8 @@ time.sleep(float(os.environ.get("TOY_RUN_SLEEP", 0)))
 rules = dict(l.strip().split("=", 1) for l in open("game/rules.txt") if "=" in l)
 if any(l.startswith("BROKEN") for f in files for l in open(f)):
     sys.exit(2)                                   # does not build: no report
+if any(l.split()[:1] == ["requires"] and l.split()[1] not in rules for f in files for l in open(f)):
+    sys.exit(2)                                   # builds only where the rules hold that key
 cases = []
 for f in files:
     for line in open(f):
@@ -2629,6 +3103,8 @@ for f in files:
         if w[:1] == ["test"]:
             k, v = w[2].split("=", 1)
             cases.append((f, w[1], rules.get(k) == v, "expected %s=%s, got %s" % (k, v, rules.get(k))))
+        elif w[:1] == ["needs"]:                  # imports a file the setup builds
+            cases.append((f, w[1], os.path.exists(w[2]), 'Failed to resolve import "%s". Does the file exist?' % w[2]))
         elif w[:1] == ["flaky"]:                  # passes on every other run
             flip = ".toyflip-" + w[1]
             ok = not os.path.exists(flip)
@@ -2664,6 +3140,10 @@ for f in glob.glob("tests/*.toy"):
         if w[:1] == ["test"] and w[1] in names:
             asserted.add(w[2])
 os.makedirs(os.path.join(out, "mutants.out"))
+if os.environ.get("TOY_MUTANTS_RC"):              # the baseline failed: empty lists, a telling exit
+    for name in ("caught", "missed", "unviable", "timeout"):
+        open(os.path.join(out, "mutants.out", name + ".txt"), "w").close()
+    sys.exit(int(os.environ["TOY_MUTANTS_RC"]))
 lists = {"caught": [a for a in added if a in asserted], "missed": [a for a in added if a not in asserted],
          "unviable": [], "timeout": []}
 for name, lines in lists.items():
@@ -2720,7 +3200,7 @@ class _Box:
             "cap_arm_usd": 500, "step_down_usd": 400, "cap_bump_usd": 30, "claims_digest_limit": 2,
             "test_paths": ["^tests/"], "game_code": "^(game|client)/",
             "spec_paths": "^specs/", "areas": {"rust": "^game/", "client": "^client/"},
-            "test_patterns": [{"match": r"\.toy$", "test": r"^(?:test|flaky|ghost)\s+(\S+)"}],
+            "test_patterns": [{"match": r"\.toy$", "test": r"^(?:test|flaky|ghost|needs)\s+(\S+)"}],
             "runners": [{"name": "toy", "match": r"\.toy$", "cwd": "", "timeout_s": 60, "no_tests_rc": 4,
                          "cmd": ["/usr/bin/python3", os.path.join(toy, "run.py"), "{junit}", "{files}"]}],
             "mutants": {"enabled": True, "match": "^game/", "wall_budget_s": 60,
@@ -2737,7 +3217,8 @@ class _Box:
             "game/other.rs": "pub fn other() {}\n", "client/ui.txt": "title=Realm\n",
             "docs/note.md": "note\n", ".gitignore": "ignored/\n",
             ".claude/agents/tester.md": "tester\n"})
-        self.commit(self.harness, "initial", {"specs/m.spec.md": "C1 C2 C3\n"})
+        self.commit(self.harness, "initial", {"specs/m.spec.md": "C1 C2 C3\n",
+                                              "specs/closed.spec.md": "C9 hp stays 10\nC2 defence\n"})
 
     def write_cfg(self):
         with open(os.path.join(self.mem, "mr-tester-ab.config.json"), "w") as fh:
@@ -2894,7 +3375,8 @@ def _st_plan(chk, tmp):
     wt_b = box.worktree("np-b")
     bare = box.prompt("np-b", wt_b, contracts=False)
     first, second, third = (box.run("plan", "np-b", "--prompt", bare) for _ in range(3))
-    chk("plan/contracts-asked-once", first.startswith("AB-NEED np-b") and "## Contracts" in first, first)
+    chk("plan/contracts-asked-once", first.startswith("AB-NEED np-b") and "## Contracts" in first
+        and "each test file's path (for Rust, its module name)" in first, first)
     chk("plan/contracts-then-skip", second == "AB-SKIP prompt-incomplete\n" and third == second
         and [r.get("skipped") for r in box.rows("assignment", "np-b")] == ["prompt-incomplete"]
         and not os.path.exists(os.path.join(box.cache, "np-b")), (second, third))
@@ -2928,8 +3410,15 @@ def _st_plan(chk, tmp):
     chk("plan/export-has-untracked-not-ignored", os.path.isfile(os.path.join(one, "untracked.md"))
         and not os.path.exists(os.path.join(one, "ignored")))
     chk("plan/prompt-path-replaced-and-footer", wt not in body and "in %s.\n" % one in body
-        and "## Contracts" in body and "%s/REPORT.md" % one in body and "FINDINGS" in body
+        and "## Contracts" in body and "%s/%s" % (one, REPORT_FILE) in body and "FINDINGS" in body
         and body.startswith(open(prompt).read().replace(wt, one)), body[:300])
+    # The CLI refuses a subagent Write to a report-named markdown file: every shadow would then
+    # return its report as its final message, into the builder's context.
+    chk("plan/report-file-is-one-a-subagent-may-write", "REPORT.md" not in body and not REPORT_FILE.lower().endswith(".md")
+        and not re.search(r"(?i)report|summary|findings|analysis", REPORT_FILE), REPORT_FILE)
+    chk("plan/footer-says-where-the-tag-goes", "above any attribute such as `#[test]`" in body, body[-900:])
+    chk("plan/keeps-the-prompt-for-the-judge", open(os.path.join(box.mem, "tester-ab", "np-a", PROMPT_FILE)).read()
+        == open(prompt).read())
     base = git(box.game, "rev-parse", "refs/mr-ab/np-a/base").strip()
     assignment = box.rows("assignment", "np-a")
     chk("plan/base-ref-and-rows", manifest.get("base") == base
@@ -2957,6 +3446,11 @@ def _st_plan(chk, tmp):
     append(ctx, [{"kind": "run", "slice": "np-a", "role": "judge", "cost_usd": 1.0}])
     wt_d = box.worktree("np-d")
     out_d = box.run("plan", "np-d", "--prompt", box.prompt("np-d", wt_d))
+    # Both tester guards act on agent type "tester" alone, and that agent has no shell: an arm
+    # under any other type would run unguarded.
+    types = re.findall(r'subagent_type="([^"]*)"', out + out_c + out_d)
+    chk("plan/never-another-agent-type", len(types) == 12 and set(types) == {"tester"}
+        and (out + out_c + out_d).count("Agent(") == 12, types)
     chk("cap/step-down-at-400", sorted(re.findall(r'model="(\w+)", effort="(\w+)"', out_d))
         == [("opus", "medium"), ("sonnet", "medium")]
         and box.rows("assignment", "np-d")[0]["arms_planned"] == ["S-med", "O-med"], out_d)
@@ -3006,9 +3500,10 @@ def _st_collect(chk, tmp):
     box.shadow("np-a", "O-high", {"tests/y.toy": _toy(_T_ATK)}, effort="medium")
     box.shadow("np-a", "S-med-r", {"tests/x.toy": _toy(_T_ATK, _T_DEF), "game/rules.txt": "hp=99\n"},
                report="notes\n\nFINDINGS\n- kind: base | test: t_old | where: game/rules.txt:2 | old is wrong\n"
-                      "- kind: spec | test: none | where: specs/m.spec.md:3 | C1 contradicts C2\n"
+                      "- kind: spec | test: none | where: %s/specs/m.spec.md:3 | C1 contradicts C2 in %s/TESTER-PROMPT.md\n"
                       "- kind: base | test: `t_c` | where: `game/x.rs:1` | third\n"
-                      "- kind: base | test: t_d | where: game/x.rs:9 | fourth is over the limit\n",
+                      "- kind: base | test: t_d | where: game/x.rs:9 | fourth is over the limit\n"
+                      % (lab["S-med-r"][1], lab["S-med-r"][1]),
                final="Here is my report: three findings")
     stray = os.path.join(box.cache, "np-a", "0123456789abcdef")
     os.makedirs(stray)
@@ -3038,7 +3533,7 @@ def _st_collect(chk, tmp):
         and git(box.game, "rev-parse", ref + "^").strip() == box.ctx().manifest("np-a")["base"], tree)
     chk("collect/test-files-and-counts", rep.get("files") == ["tests/x.toy"]
         and rep.get("non_test_files") == ["game/rules.txt"] and rep.get("tests") == 2
-        and rep.get("test_loc") == 4, rep)
+        and rep.get("tests_existing") == 0 and rep.get("undetected") is False and rep.get("test_loc") == 4, rep)
     chk("collect/removes-only-registered-exports", os.path.isdir(stray)
         and sorted(os.listdir(os.path.join(box.cache, "np-a"))) == ["0123456789abcdef"]
         and "5 export(s) removed" in out, os.listdir(os.path.join(box.cache, "np-a")))
@@ -3048,6 +3543,11 @@ def _st_collect(chk, tmp):
         ("base", "t_old", "game/rules.txt:2"), ("spec", "", "specs/m.spec.md:3"), ("base", "t_c", "game/x.rs:1")]
         and all(c["label"] == lab["S-med-r"][0] and re.fullmatch(r"c[0-9a-f]{8}", c["claim_id"]) for c in claims),
         claims)
+    # A claim that cites a path inside its export is kept relative to the tree: the export's path
+    # is what the plan output shows beside the arm.
+    chk("collect/claims-carry-no-export-path", not any(box.cache in c["where"] + c["text"] for c in claims)
+        and box.cache not in "".join(l for l in out.splitlines() if l.startswith("  claim "))
+        and claims[1]["text"] == "C1 contradicts C2 in TESTER-PROMPT.md", claims)
     digest = [l for l in out.splitlines() if l.startswith("  claim ")]
     chk("collect/digest-capped-and-blind", len(digest) == 2 and "AB-Claim: <id>" in out
         and not any(a["arm"] in out for a in _ARMS)
@@ -3184,11 +3684,12 @@ def _st_score(chk, tmp):
         and quality_rows["S-high"]["bloat_usd"] == round(8 * 12 * (4 * 4 + 150 * 0.2) / 1e6, 4)
         and quality_rows["S-high"]["runtime_ms"] == 40, quality_rows["S-high"])
     # The seeded-defect measure: the four lines the slice added to game/, each arm judged by its
-    # own tests that pass at m. A file with a failing or flaky test is left out.
+    # own tests that pass at m. A failing or flaky test decides nothing; the passing tests beside
+    # it in the file still do.
     muts = {arm_of[r["label"]]: (r["status"], r["generated"], r["caught"], r["missed"])
             for r in box.rows("mutants", "np-a")}
     chk("mutants/per-arm-kill-counts", muts == {
-        "S-med": ("no-tests", 0, 0, 0), "S-high": ("ok", 4, 3, 1), "O-med": ("ok", 4, 2, 2),
+        "S-med": ("ok", 4, 2, 2), "S-high": ("ok", 4, 3, 1), "O-med": ("ok", 4, 2, 2),
         "O-high": ("ok", 4, 1, 3), "S-med-r": ("ok", 4, 2, 2)}, muts)
     row = (box.rows("slice", "np-a") or [{}])[-1]
     chk("slice/standing-area-cost", row.get("status") == "scored" and row.get("area") == "rust"
@@ -3199,7 +3700,9 @@ def _st_score(chk, tmp):
     box.run("score", "np-a")
     chk("score/reruns-nothing", len(box.rows()) == n, len(box.rows()) - n)
     # The end snapshot: an open failure stays open, brittle tests show, the spec claim's commit
-    # is found.
+    # is found. A milestone close deletes a whole spec after m: every criterion id in it is on a
+    # removed line, and no criterion changed.
+    box.commit(box.harness, "docs(spec): the milestone closed; its spec is deleted", {"specs/closed.spec.md": None})
     out = box.run("score", "np-a", "--end")
     end = git(box.game, "rev-parse", "master").strip()
     chk("score/end-records-default-branch-head", snaps_of(box.rows(), "np-a").get("end") == end
@@ -3210,6 +3713,14 @@ def _st_score(chk, tmp):
         quality_rows["S-high"])
     chk("quality/not-brittle-when-the-spec-changed-the-criterion", quality_rows["O-high"]["brittle"] == 0,
         quality_rows["O-high"])
+    spec_text = spec_changes(box.ctx(), box.rows(), "np-a")
+    chk("quality/a-deleted-spec-excuses-no-brittle-test", "C9" not in spec_text and "defence" not in spec_text
+        and "C8" in spec_text and quality_rows["S-high"]["brittle"] == 1, spec_text)
+    # A line that moves (removed and added with the same text in one commit) changed no criterion.
+    box.commit(box.harness, "docs(spec): a section moves to its own file",
+               {"specs/m.spec.md": "C5 new rule\n", "specs/m2.spec.md": "intro\nC1 C2 C3 C8 mp\n"})
+    chk("quality/a-moved-spec-line-is-no-change", "C5 new rule" in spec_changes(box.ctx(), box.rows(), "np-a")
+        and spec_changes(box.ctx(), box.rows(), "np-a").count("C8") == 1, spec_changes(box.ctx(), box.rows(), "np-a"))
     chk("score/one-mutants-row-per-arm", len(box.rows("mutants", "np-a")) == 5)
     ctx = box.ctx()
     snaps = snaps_of(box.rows(), "np-a")
@@ -3248,10 +3759,23 @@ def _st_score(chk, tmp):
     finally:
         del os.environ["TOY_MUTANTS_SLEEP"]
     states = [r["status"] for r in box3.rows("mutants", "np-a")]
-    chk("mutants/budget-recorded", sorted(states) == ["budget"] * 4 + ["no-tests"]
+    chk("mutants/budget-recorded", sorted(states) == ["budget"] * 5
         and all(r["generated"] == 0 for r in box3.rows("mutants", "np-a")), states)
     box3.cfg["mutants"]["enabled"] = False
     box3.write_cfg()
+    # A baseline that fails leaves four empty lists and a telling exit code: an error, not a
+    # measured arm with no mutants.
+    box4 = _Box(os.path.join(tmp, "score-mutants-rc"), prices=_PRICES)
+    _scenario(box4)
+    os.environ["TOY_MUTANTS_RC"] = "4"
+    try:
+        box4.run("score", "np-a")
+    finally:
+        del os.environ["TOY_MUTANTS_RC"]
+    chk("mutants/a-failed-baseline-is-an-error", [(r["status"], r.get("rc"), r["generated"]) for r in box4.rows("mutants", "np-a")]
+        == [("error", 4, 0)] * 5, box4.rows("mutants", "np-a")[:1])
+    st4 = Stats(box4.rows(), box4.cfg)
+    chk("mutants/an-error-is-not-a-kill-rate", all(st4.kill_rate("np-a", a["arm"]) is None for a in _ARMS))
 
 
 def _st_no_game_diff(chk, tmp):
@@ -3305,11 +3829,50 @@ def _st_judge(chk, tmp):
         fh.write("- [ ] **C2:** WHEN a monster defends THE defence SHALL be 3\n- [ ] **C3:** speed is 7\n")
     out = box.run("judge-pack")
     judge_dir = os.path.join(box.mem, "tester-ab", "judge")
-    bundle = open(os.path.join(judge_dir, "bundle-1.md")).read()
+    bundle_path, bundle_dir = bundle_place(box.ctx(), 1)
+    bundle = open(bundle_path).read()
     key = json.load(open(os.path.join(judge_dir, "bundle-1.key.json")))
+    call = next((l for l in out.splitlines() if l.startswith("Agent(")), "")
     chk("judge-pack/one-call-to-the-judge", out.count("Agent(") == 1
         and 'Agent(subagent_type="judge", model="fable", effort="high"' in out
-        and os.path.join(judge_dir, "bundle-1.md") in out and "judge-apply %s/verdicts-1.json" % judge_dir in out, out)
+        and bundle_path in call and "judge-apply %s/verdicts-1.json" % judge_dir in out, out)
+    # Blinding, by trying to recover an arm: read every file reachable from the bundle's
+    # directory, up to the root that holds it, and look for anything that names an arm or a
+    # model, or that leads to the files which map a label to its arm (this tool's directory).
+    def recover(start):
+        top = start
+        while os.path.dirname(top) not in (box.tmp, os.path.dirname(box.tmp), "/"):
+            top = os.path.dirname(top)
+        hits = []
+        for folder, _, names in os.walk(top):
+            for name in names:
+                path = os.path.join(folder, name)
+                with open(path, errors="replace") as fh:
+                    text = fh.read()
+                hits += ["%s: %s" % (os.path.relpath(path, top), w) for w in [a["arm"] for a in _ARMS] + [box.mem]
+                         if w in text]
+                hits += ["%s: %s" % (os.path.relpath(path, top), w) for w in ("sonnet", "opus")
+                         if w in text.lower()]
+                if re.search(r'"a[1-5]"\s*:', text):       # a label keyed to something
+                    hits.append("%s: label map" % os.path.relpath(path, top))
+        return top, hits
+    top, hits = recover(bundle_dir)
+    chk("judge-pack/no-arm-is-recoverable-from-the-bundle-directory", hits == [] and top == box.cache
+        and box.mem not in call and sorted(os.listdir(bundle_dir)) == ["bundle.md", "items", "tree"]
+        and not bundle_dir.startswith(box.mem + os.sep) and not bundle_dir.startswith(box.game + os.sep), (top, hits[:6]))
+    # The same attempt from where the manifests and the plan output are does recover one: the
+    # attempt has teeth.
+    chk("judge-pack/the-recovery-attempt-finds-the-mapping-where-it-is", recover(os.path.join(box.mem, "tester-ab", "judge"))[1] != [])
+    tree = os.path.join(bundle_dir, "tree", "np-a")
+    chk("judge-pack/bundle-carries-the-merged-code", "spd=7" in open(os.path.join(tree, "game", "rules.txt")).read()
+        and not os.path.exists(os.path.join(tree, ".git")) and not os.path.exists(os.path.join(tree, "tests", "s_med.toy"))
+        and sorted(os.listdir(tree)) == ["client", "game", "tests"]
+        and os.path.exists(os.path.join(box.game, ".claude", "agents", "tester.md"))
+        and "tree/<slice>/" in bundle and "read nothing\noutside it" in bundle, os.listdir(tree))
+    chk("judge-pack/bundle-carries-the-contracts", "## Slice np-a: what its tests were written against" in bundle
+        and "rules: key=value lines in game/rules.txt" in bundle, bundle[:1800])
+    chk("judge-pack/judge-writes-no-file", "final message" in bundle and "verdicts-1.json" not in bundle
+        and "JSON array" in bundle, bundle[:1800])
     # Seven test-backed candidates and the spec claim; the base claim rides on its candidate.
     chk("judge-pack/items", len(key) == 8 and bundle.count("\n## i0") == 8
         and sorted(v["kind"] for v in key.values()) == sorted(
@@ -3327,10 +3890,26 @@ def _st_judge(chk, tmp):
         and "expected def=3, got 2" in lens and "at [path]" in lens and "THE defence SHALL be 3" in lens
         and "-def=2" in lens and "+def=3" in lens and "t_atk" not in lens and "C7" not in lens,
         lens)
-    chk("judge-pack/open-failure-says-so", "still fails at the merged code" in part(item("S-med", "t_wrong")))
+    wrong = part(item("S-med", "t_wrong"))
+    whole = os.path.join(bundle_dir, "items", item("S-med", "t_wrong"), "test-file.toy")
+    chk("judge-pack/open-failure-says-so", "still fails at the merged code" in wrong)
+    chk("judge-pack/open-failure-has-code-and-whole-test-file", "- `game/rules.txt`" in wrong and "`tree/np-a/`" in wrong
+        and "items/%s/test-file.toy" % item("S-med", "t_wrong") in wrong and "in the tree it sits in `tests/`" in wrong
+        and os.path.isfile(whole) and "test t_atk atk=5" in open(whole).read(), wrong)
     chk("judge-pack/base-item-carries-the-claim", "old holds the wrong value" in part(item("O-med", "t_old")))
     chk("judge-pack/claim-item-cites-lines", "C1 and C2 cannot both hold" in part(item("O-med", "claim"))
         and "C1 C2 C3 C8 mp" in part(item("O-med", "claim")), part(item("O-med", "claim")))
+    # A claim's line number is one of the tree its author saw, the base; the merged tree's
+    # lines have moved. A line of the tester prompt is read from the prompt `plan` kept.
+    ctx = box.ctx()
+    chk("judge/cited-lines-are-the-base-tree's", "old=bug" in cited_lines(ctx, box.rows(), "np-a", "game/rules.txt:2")
+        and "old=fixed" not in cited_lines(ctx, box.rows(), "np-a", "game/rules.txt:2")
+        and "Write the red tests for np-a" in cited_lines(ctx, box.rows(), "np-a", PROMPT_FILE + ":1"),
+        cited_lines(ctx, box.rows(), "np-a", "game/rules.txt:2"))
+    # Without a gates file the criterion's text is the prompt's line that names it.
+    chk("judge/criterion-text-falls-back-to-the-prompt", "THE defence SHALL be 3" in criterion_text(ctx, "np-a", "C2")
+        and criterion_text(ctx, "np-z", "C2") == "" and "np-a" in criterion_text(ctx, "np-a", "np-a"),
+        criterion_text(ctx, "np-a", "np-a"))
     # Verdicts. t_wrong is left without one.
     crit = {"criterion": "C2", "wrong_behaviour": "defence resolves to 2 where the criterion requires 3"}
     verdicts = [
@@ -3342,15 +3921,19 @@ def _st_judge(chk, tmp):
         dict(id=item("O-med", "t_old"), verdict="design-defect", criterion="C4", wrong_behaviour="old keeps the value bug"),
         dict(id=item("O-med", "claim"), verdict="not-a-defect"),
         dict(id="i999", verdict="bug", **crit), dict(id=item("S-med", "t_wrong"), verdict="looks fine"), "junk"]
+    # The judge has no Write tool: its verdicts are its final message, which judge-apply reads
+    # from its transcript and keeps as the file it was asked for.
     path = os.path.join(judge_dir, "verdicts-1.json")
-    with open(path, "w") as fh:
-        json.dump(verdicts, fh)
-    with open(os.path.join(judge_dir, "bundle-1.md"), "a") as fh:
-        fh.write("")
-    judge_agent = box.transcript("Read %s and rule on every item exactly as it instructs." % os.path.join(judge_dir, "bundle-1.md"),
-                                 "fable", "high", role="judge", tokens=500000)
+    none_yet = box.run("judge-apply", path)
+    chk("judge-apply/no-verdicts-yet", none_yet.startswith("AB-SKIP no verdicts:") and not os.path.exists(path)
+        and box.rows("verdict") == [], none_yet)
+    judge_agent = box.transcript("Read %s and rule on every item exactly as it instructs." % bundle_path,
+                                 "fable", "high", role="judge", tokens=500000,
+                                 final="Here are my verdicts.\n" + json.dumps(verdicts))
     before = spent(box.rows())
     out = box.run("judge-apply", path)
+    chk("judge-apply/verdicts-read-from-the-judge's-final-message", os.path.exists(path)
+        and json.load(open(path)) == verdicts and said_verdicts("[]") == [] and said_verdicts("no array") is None, out)
     finds = {(f["class"], f["status"]): f for f in latest(box.rows("finding", "np-a"), lambda r: r["finding_id"])}
     chk("judge-apply/tally", out.startswith("AB-JUDGED 7 verdict(s) applied, 1 unusable, 1 item(s) without one; "
                                             "findings: 3 confirmed, 1 rejected"), out)
@@ -3383,9 +3966,12 @@ def _st_judge(chk, tmp):
     out = box.run("judge-pack")
     key2 = json.load(open(os.path.join(judge_dir, "bundle-2.key.json")))
     chk("judge-pack/only-unjudged-items", sorted(v["kind"] for v in key2.values()) == ["claim", "claim", "open-fail"]
-        and "bundle-2.md" in out, key2)
+        and bundle_place(box.ctx(), 2)[0] in out, key2)
     id2 = lambda want: next(i for i, v in key2.items() if want in (v["ref"], v["kind"]))
-    with open(os.path.join(judge_dir, "verdicts-2.json"), "w") as fh:
+    chk("judge-pack/each-bundle-has-its-own-directory", bundle_place(box.ctx(), 2)[1] != bundle_dir
+        and os.path.dirname(bundle_place(box.ctx(), 2)[1]) == os.path.dirname(bundle_dir)
+        and "stale export" not in box.run("status"), bundle_place(box.ctx(), 2))
+    with open(os.path.join(judge_dir, "verdicts-2.json"), "w") as fh:  # a file that is there is used as it is
         json.dump([{"id": id2("open-fail"), "verdict": "bug", "criterion": "C7", "wrong_behaviour": "zz is never set to 1"},
                    {"id": id2("cfar00001"), "verdict": "bug", "criterion": "C9", "wrong_behaviour": "other returns nothing at all"},
                    {"id": id2("cnear0001"), "verdict": "bug", "criterion": "C9", "wrong_behaviour": "help does nothing at all"}], fh)
@@ -3425,6 +4011,22 @@ def _st_judge(chk, tmp):
     text = open(report).read() if os.path.exists(report) else ""
     chk("report/written-from-a-real-ledger", out == "AB-REPORT %s\n" % report and "## Decision" in text
         and "**No model change: report only.**" in text and "| S-high | 1 | 4 | 3 | 75% |" in text, text[:400])
+    # The census rows mr-prune recorded, when there are any: read, never written.
+    chk("report/no-census-no-section", "## Test census trend" not in text)
+    os.makedirs(os.path.join(box.mem, "prune"))
+    trend = os.path.join(box.mem, "prune", "trend.jsonl")
+    with open(trend, "w") as fh:
+        fh.write(json.dumps({"label": "M-netcode-presence", "commit": "0123456789abcdef", "test_lines": 4100,
+                             "ratio": 1.4, "ci": None, "close": {"test_lines_added": 310, "slices": {"np-a": "abc"}}}) + "\n"
+                 "not json\n" + json.dumps({"label": "baseline", "commit": "fedcba98", "test_lines": 3800}) + "\n")
+    before = open(trend).read()
+    box.run("report", "--out", report)
+    text = open(report).read()
+    chk("report/census-trend-rows", "## Test census trend" in text
+        and "- M-netcode-presence @ 01234567: close.test_lines_added=310, ratio=1.4, test_lines=4100" in text
+        and "- baseline @ fedcba98: test_lines=3800" in text and open(trend).read() == before
+        and text.index("## Test census trend") < text.index("## Spot-check list"),
+        text.split("## Test census trend")[1][:400] if "## Test census trend" in text else "")
     default = box.run("report")
     chk("report/default-path", re.fullmatch(r"AB-REPORT %s/retros/\d{8}T\d{4}-tester-ab\.md\n" % re.escape(box.mem), default), default)
     # An out-of-scope base claim the judge confirms is recorded and never counted.
@@ -3463,6 +4065,9 @@ def _st_judge(chk, tmp):
         and {scale[i[0]] for i in kept if i[3] == "a2"} == {1.0}, (len(kept), per))
     chk("judge/redact", redact(box.ctx(), "S-med-r and S-med on Claude-Sonnet-5-5 at %s/x" % box.cache)
         == "[redacted] and [redacted] on [redacted] at [path]/x", redact(box.ctx(), "S-med-r and S-med"))
+    # A cited path must stay one the judge can open: only a model's id is a name to remove.
+    chk("judge/redact-keeps-a-repository-name", redact(box.ctx(), "/home/u/claude-harness/specs/a.md and claude-opus-5-5")
+        == "/home/u/claude-harness/specs/a.md and [redacted]", redact(box.ctx(), "/home/u/claude-harness/specs/a.md"))
 
 
 def _ledger(n, found=(), costs=None, tiers=None, areas=None, quality=None, replicate=(), failed=(), extra=()):
@@ -3529,10 +4134,12 @@ def _st_report(chk, tmp):
     chk("noise-floor/replicate-alone", floor([("escape", (), "confirmed")], (0,)) == 1.0
         and floor([("escape", ("S-med",), "confirmed")], (0,)) == 0.0
         and floor([("escape", ("S-med",), "pending")], ()) == 0.0, floor([("escape", (), "confirmed")], (0,)))
-    chk("report/total-per-scenario", totals == [
-        round(2.7 + 3 * 5.35 + 4.5 * 0.71 + 21.64 + 0.71 + 0.01, 2),
-        round(2.7 + 21.64 + 7.79 + 21.64 + 4.5 * 2.07 + 21.64 + 2.07 + 0.01, 2),
-        round(2.7 + 55.0 + 7.79 + 41.43 + 4.5 * 2.07 + 21.64 + 2.07 + 0.01, 2)], totals)
+    want = [2.7 + 3 * 5.35 + 4.5 * 0.71 + 21.64 + 0.71 + 0.01,
+            2.7 + 21.64 + 7.79 + 21.64 + 4.5 * 2.07 + 21.64 + 2.07 + 0.01,
+            2.7 + 55.0 + 7.79 + 41.43 + 4.5 * 2.07 + 21.64 + 2.07 + 0.01]
+    chk("report/total-per-scenario", all(abs(st.total("s01", "S-med", sc) - w) < 1e-9 for sc, w in zip(SCENARIOS, want)), totals)
+    chk("report/total-is-the-sum-of-its-terms", [round(v, 2) for v in st.terms("s01", "S-med", "central")]
+        == [2.7, round(21.64 + 7.79 + 21.64, 2), round(4.5 * 2.07, 2), 21.64, 2.07, 0.01], st.terms("s01", "S-med", "central"))
     chk("report/pending-counted-or-not", len(st.missed("s01", "O-med")) == 0 and len(st.missed("s01", "O-med", True)) == 1
         and len(st.found("s01", "S-med")) == 0 and len(st.found("s01", "S-med", True)) == 1
         and round(st.total("s01", "O-med", "central", True) - st.total("s01", "O-med", "central"), 2) == 21.64)
@@ -3540,6 +4147,11 @@ def _st_report(chk, tmp):
     few = decision(_ledger(5, [("escape", opus, "confirmed")] * 2))
     chk("decision/report-only-under-six-slices", "**No model change: report only.**" in few
         and "5 scored slice(s), fewer than six" in few, few)
+    # With too few slices to decide, the size and false-positive guard proposes nothing either.
+    few_big = decision(_ledger(5, [("lens-caught", all4, "confirmed")], quality={
+        "O-high": {"loc_per_criterion": 40.0}, "S-high": {"no_compile_files": 3}}))
+    chk("decision/report-only-proposes-no-rule-change", "**No model change: report only.**" in few_big
+        and "rule change" not in few_big and "is above 1.5 times" not in few_big, few_big)
     # Rule 2: an arm replaces the cheapest when all four conditions hold.
     win = decision(_ledger(8, [("escape", opus, "confirmed")] * 2))
     chk("decision/quality-winner", "**O-med at effort medium** (a quality result)." in win
@@ -3766,12 +4378,19 @@ def _st_session(chk, tmp):
         and "AB-ESCAPES np-a: green after the lens fixes recorded" in outs["g2"], outs["g2"])
     # Failing at g2: t_spd twice, the claimed t_old, t_wrong. The limit is three.
     chk("escapes/handoff-capped", "3 shadow test(s) fail here. Pass %s to the red-team" % handoff in outs["g2"]
-        and text.count("\n## e") == 3 and len(handed) == 3
+        and text.count("\n## k") == 3 and len(handed) == 3
         and {h["test_id"].rsplit("::", 1)[1] for h in handed} <= {"t_spd", "t_old", "t_wrong"}, outs["g2"])
     leaks = [w for w in [a["arm"] for a in _ARMS] + ["sonnet", "opus", box.cache, "s_med", "s_high", "o_med", "o_high"]
              if w.lower() in text.lower()] + re.findall(r"\ba[1-5]\b", text)
     chk("escapes/handoff-blind", leaks == [] and "expected " in text and "test t_" in text, leaks or text)
     chk("escapes/runs-only-g2", {r["snap"] for r in box.rows("exec", "np-a")} == {"g2"})
+    # What the builder is told to do with one that is a real defect: one test at most, by rule.
+    rule = ("fix the defect. Add at most ONE test for it, the smallest that catches it, and prefer extending an existing "
+            "test to writing a new one; add none if the gating tests already catch it after the fix. Put the trailer "
+            "`AB-Adopt: <its id>`")
+    chk("escapes/prints-the-adoption-rule", rule in outs["g2"] and rule in text
+        and all(re.fullmatch(r"k[0-9a-f]{10}", h["handoff_id"]) and "\n## %s\n" % h["handoff_id"] in text for h in handed),
+        outs["g2"])
     # finalize: m is the commit the audit names.
     chk("finalize/records-m", outs["m"] == "AB-FINALIZED np-a\n"
         and "spd=7" in git(box.game, "show", snaps["m"] + ":game/rules.txt")
@@ -3780,6 +4399,8 @@ def _st_session(chk, tmp):
     chk("finalize/once", box.run("finalize", "np-a", "--no-score") == "AB-FINALIZED np-a\n" and len(box.rows()) == n)
     box.run("score", "np-a")
     cands = latest(box.rows("candidate", "np-a"), lambda r: (r["label"], r.get("test_id") or r.get("claim_id")))
+    chk("escapes/handoff-ids-are-the-candidate-ids", {h["handoff_id"] for h in handed}
+        <= {c["candidate_id"] for c in cands}, [h["handoff_id"] for h in handed])
     chk("escapes/handed-candidates-are-marked", {(c["label"], c["test_id"]) for c in cands if c["handed_in_session"]}
         == {(h["label"], h["test_id"]) for h in handed} and len(cands) == 8,
         [(lab[c["label"]], c.get("test_id"), c["handed_in_session"]) for c in cands])
@@ -3805,6 +4426,44 @@ def _st_session(chk, tmp):
             and box2.rows("handoff", "np-a") == [] and not os.path.exists(os.path.join(box2.mem, "tester-ab", "np-a", "escapes.md"))
             and (want is None or want in outs2["g2"]) and outs2["g2"].startswith("AB-ESCAPES np-a: green after")
             and (name != "off" or box2.rows("exec", "np-a") == []), outs2["g2"])
+
+
+def _st_adoption(chk, tmp):
+    """finalize records what a handed shadow test put into the suite: per fix commit that cites
+    one, the tests it added or changed and the test lines it added; the report totals them."""
+    box = _Box(os.path.join(tmp, "adoption"), prices=_PRICES, handoff_limit=3, escapes_in_session=True, escapes_budget_s=120)
+    hook, outs = _by_command(box)
+    wt = os.path.join(box.game, ".claude", "worktrees", "np-a")
+
+    def fixes(name, sha):
+        if name == "m":
+            ids = [h["handoff_id"] for h in box.rows("handoff", "np-a")]
+            # One fix extends an existing test and adds one; one adds two new tests; one adds none.
+            box.commit(wt, "fix: speed\n\nAB-Adopt: %s" % ids[0], {"tests/primary.toy": _toy(_T_ATK, _T_SPD), "game/a.rs": "// a\n"})
+            box.commit(wt, "fix: old\n\nAB-Adopt: %s" % ids[1], {"tests/extra.toy": _toy(("t_x", "old=fixed", "C4"), ("t_y", "hp=10", "C4"))})
+            box.commit(wt, "fix: nothing to add\n\nAB-Adopt: %s\nAB-Adopt: kffffffffff" % ids[2], {"game/b.rs": "// b\n"})
+            sha = box.commit(wt, "a test with no trailer", {"tests/unrelated.toy": _toy(("t_z", "hp=10", "C1"))})
+        hook(name, sha)
+
+    _scenario(box, hook=fixes)
+    ids = [h["handoff_id"] for h in box.rows("handoff", "np-a")]
+    rows = {r["candidate_id"]: r for r in box.rows("adoption", "np-a")}
+    chk("adoption/recorded-per-fix-commit", len(ids) == 3 and set(rows) == set(ids) | {"kffffffffff"}
+        and rows[ids[0]]["test_added"] == "tests/primary.toy::t_spd" and rows[ids[0]]["lines_added"] == 2
+        and rows[ids[0]]["over_limit"] is False
+        and rows[ids[1]]["tests"] == ["tests/extra.toy::t_x", "tests/extra.toy::t_y"] and rows[ids[1]]["over_limit"] is True
+        and rows[ids[1]]["lines_added"] == 4
+        and rows[ids[2]]["test_added"] == "none" and rows[ids[2]]["lines_added"] == 0 and rows[ids[2]]["handed"] is True
+        and rows["kffffffffff"]["handed"] is False, rows)
+    n = len(box.rows("adoption"))
+    box.run("finalize", "np-a", "--no-score")
+    chk("adoption/recorded-once", len(box.rows("adoption")) == n == 4)
+    box.run("score", "np-a")
+    text = render_report(box.rows(), box.cfg)
+    chk("report/totals-what-the-experiment-added-to-the-suite", "4 such adoption(s) are recorded: 3 test(s) added or "
+        "changed, 6 test line(s) added, 2 with no test, 1 over the one-test limit." in text
+        and "tests/extra.toy::t_x, tests/extra.toy::t_y; 4 line(s); over the limit" in text,
+        text.split("## Tests the experiment added")[1][:700] if "## Tests the experiment added" in text else text[:300])
 
 
 def _st_finalize(chk, tmp):
@@ -3879,6 +4538,34 @@ def _st_finalize(chk, tmp):
         _scenario(box, hook=hook)
         chk("close/" + name, outs["m"] == "AB-CLOSED %s\nAB-FINALIZED np-a\n" % name
             and [c["reason"] for c in box.rows("close")] == [name] and retro() == ["tester-ab close"], outs["m"])
+    # With no required list the first condition is off: the backstops close the experiment, and
+    # `status` says where each condition stands.
+    box = _Box(os.path.join(tmp, "close-no-required"), required_slices=[], pr_repo="o/r",
+               **dict(extra, backstops={"max_scored_slices": 2, "loop_active_days": 45}))
+    retro = _retro_stub(box)
+    hook, outs = _by_command(box)
+    _scenario(box, hook=hook)
+    status = box.run("status")
+    chk("close/status-says-which-condition-is-pending", not box.rows("close")
+        and "closes on required-slices pending: off: no slice is listed" in status
+        and "closes on max-slices      pending: 1 of 2 scored slice(s)" in status
+        and "closes on cap             pending: $14.00 of $500 committed" in status
+        and "closes on backstop-days   pending: 1 of 45 loop-active day(s) since the first finalized slice" in status, status)
+    wt = box.worktree("np-b")
+    box.run("plan", "np-b", "--prompt", box.prompt("np-b", wt))
+    for arm in ("S-med", "O-med"):
+        box.shadow("np-b", arm, {"tests/b.toy": _toy(_T_ATK)})
+    box.run("collect", "np-b")
+    with _gh(box, works=False):
+        done = box.run("finalize", "np-b", "--no-score")
+    chk("close/no-required-list-closes-on-a-backstop", done == "AB-CLOSED max-slices\nAB-FINALIZED np-b\n"
+        and [c["reason"] for c in box.rows("close")] == ["max-slices"] and retro() == ["tester-ab close"]
+        and "  closed: max-slices" in box.run("status"), done)
+    box = _Box(os.path.join(tmp, "close-required-status"), required_slices=["np-a", "np-b"], pr_repo="o/r", **extra)
+    hook, outs = _by_command(box)
+    _scenario(box, hook=hook)
+    chk("close/status-counts-the-required-slices", "closes on required-slices pending: 1 of 2 required slice(s) finalized"
+        in box.run("status"), box.run("status"))
     # Loop-active days: distinct days with a commit on the default branch since the first m.
     box = _Box(os.path.join(tmp, "close-days"), **dict(extra, backstops={"max_scored_slices": 16, "loop_active_days": 3}))
     retro = _retro_stub(box)
@@ -3953,7 +4640,7 @@ def _st_uncollected(chk, tmp):
     box.run("finalize", "np-a", "--repo", wt, "--head", sha, "--no-score")
     chk("finalize/m-is-the-audited-head-not-the-worktree-head", snaps_of(box.rows(), "np-a").get("m") == sha)
     # An empty list of required slices is not a list that is complete.
-    chk("close/empty-required-list-never-closes", box.rows("close") == [])
+    chk("close/an-empty-required-list-is-not-a-complete-one", box.rows("close") == [])
     out = box.run("score", "np-a")
     runs = {r["arm"]: r["status"] for r in box.rows("run", "np-a")}
     chk("score/collects-what-the-session-left", out.startswith("AB-SCORED np-a:")
@@ -3987,7 +4674,7 @@ def _st_runner(chk, tmp):
     # about the tests: no result is written and the next score runs them.
     for name, change in (("cannot-start", lambda c: c["runners"][0]["cmd"].__setitem__(0, "/no/such/python3")),
                          ("probe-fails", lambda c: c["runners"][0].update(probe=["false"])),
-                         ("setup-fails", lambda c: c["runners"][0].update(setup_if_missing="absent", setup=[["false"]]))):
+                         ("setup-fails", lambda c: c["runners"][0].update(setup=[{"cmd": ["false"], "if_missing": "absent"}]))):
         box.cfg = json.loads(json.dumps(good))
         change(box.cfg)
         box.write_cfg()
@@ -4029,7 +4716,7 @@ def _st_runner(chk, tmp):
         and "atk=5" in open(os.path.join(scratch, "game", "rules.txt")).read()
         and os.path.isfile(os.path.join(scratch, "ignored", "built")), os.listdir(scratch))
     # The budget covers setup and the test command together.
-    slow = {"name": "slow", "cwd": "", "timeout_s": 60, "setup_if_missing": "absent", "setup": [["sleep", "1.5"]],
+    slow = {"name": "slow", "cwd": "", "timeout_s": 60, "setup": [{"cmd": ["sleep", "1.5"], "if_missing": "absent"}],
             "cmd": ["sleep", "5"]}
     began = time.time()
     _, _, timed_out, _ = run_runner(ctx, slow, [], [], 2.5)
@@ -4061,6 +4748,183 @@ def _st_runner(chk, tmp):
         (pid, overlaid, alive, os.listdir(os.path.join(scratch, "tests"))))
     with score_lock(ctx):
         pass
+
+
+def _st_setup(chk, tmp):
+    """A runner builds what its tests import, and rebuilds it for the snapshot it replays; an
+    import that still does not resolve is a test that did not run, with the reason, and never a
+    failure of the test."""
+    build = ["/usr/bin/python3", "-c", "import os,sys; os.makedirs('ignored', exist_ok=True); "
+             "open('ignored/pkg', 'w').close(); open('ignored/built.log', 'a').write(sys.argv[1] + '\\n')"]
+
+    def play(name, steps, unresolved="Failed to resolve import"):
+        box = _Box(os.path.join(tmp, "setup-" + name), prices=_PRICES, mutants={"enabled": False})
+        box.cfg["runners"][0].update(setup=steps, unresolved=unresolved)
+        box.write_cfg()
+        wt = box.worktree("np-a")
+        box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+        for arm in ("S-med", "O-med"):
+            box.shadow("np-a", arm, {"tests/%s.toy" % arm[0].lower(): "# criterion: C1\nneeds t_boot ignored/pkg\n" + _toy(_T_ATK)})
+        box.run("collect", "np-a")
+        ctx = box.ctx()
+        record_snap(ctx, "np-a", "g1", box.commit(wt, "green", {"game/rules.txt": "hp=10\natk=5\n"}))
+        record_snap(ctx, "np-a", "g2", box.commit(wt, "docs", {"docs/note.md": "later\n"}))
+        record_snap(ctx, "np-a", "m", box.commit(wt, "fix", {"game/rules.txt": "hp=10\natk=5\nmp=1\n"}))
+        return box, box.run("score", "np-a")
+
+    # Built by the setup: the importing test runs and passes.
+    box, out = play("built", [{"cmd": build + ["pkg"], "if_missing": "ignored/pkg", "stamp": ["game/rules.txt"]}])
+    results = {(r["snap"], r["test_id"].rsplit("::", 1)[1]) : r["result"] for r in box.rows("exec", "np-a")}
+    chk("setup/runner-builds-what-its-tests-import", out.startswith("AB-SCORED") and set(results.values()) == {"pass"}
+        and results.get(("g1", "t_boot")) == "pass", results)
+    # g1 and g2 hold the same rules file and m another: the step ran for g1 and again for m.
+    built = open(os.path.join(box.cache, "scratch", "ignored", "built.log")).read().split()
+    chk("setup/reruns-when-the-snapshot's-stamp-paths-differ", built == ["pkg", "pkg"], built)
+    # Not built (the optional step fails): not-run with the reason; no failure, no candidate, no
+    # false positive, and the arm's other test still counts.
+    box, out = play("unbuilt", [{"cmd": ["false"], "if_missing": "ignored/pkg", "optional": True}])
+    boot = [r for r in box.rows("exec", "np-a") if r["test_id"].endswith("t_boot")]
+    chk("setup/unresolved-import-is-not-run-with-its-reason", out.startswith("AB-SCORED") and boot
+        and {r["result"] for r in boot} == {"not-run"}
+        and all(r["reason"].startswith('unresolved import: Failed to resolve import "ignored/pkg"')
+                and "setup step toy: `false` exit 1" in r["reason"] for r in boot)
+        and {r["result"] for r in box.rows("exec", "np-a") if r["test_id"].endswith("t_atk")} == {"pass"}, boot[:1])
+    q = box.rows("quality", "np-a")
+    chk("setup/unresolved-import-is-no-failure-no-candidate", current_candidates(box.rows(), "np-a") == []
+        and [x["not_run"] for x in q] == [1, 1] and [x["no_compile_files"] for x in q] == [0, 0]
+        and [x["gap"] for x in q] == [None, None] and not os.path.isdir(os.path.join(box.mem, "tester-ab", "np-a", "fail")), q)
+    # Without the pattern the same output would be a failing test, an open-fail candidate.
+    box, out = play("unmatched", [{"cmd": ["false"], "if_missing": "ignored/pkg", "optional": True}], unresolved=None)
+    chk("setup/the-pattern-is-what-tells-them-apart", sorted(c["type"] for c in current_candidates(box.rows(), "np-a"))
+        == ["open-fail", "open-fail"])
+    # A test the runner killed leaves a failure with no message: its type and captured output
+    # are the failure text.
+    xml = os.path.join(tmp, "killed.xml")
+    with open(xml, "w") as fh:
+        fh.write('<testsuite><testcase classname="c" name="hung" time="60"><failure type="test timeout"/>'
+                 '<system-err>waiting for the fixture lock</system-err></testcase>'
+                 '<testcase classname="c" name="dead" time="1"><failure/></testcase></testsuite>')
+    cases = {c[1]: c for c in read_junit(xml)}
+    chk("junit/a-killed-test-has-a-failure-text", cases["hung"][2] == "fail"
+        and cases["hung"][4] == "test timeout\nwaiting for the fixture lock"
+        and "killed or timed out" in cases["dead"][4], cases)
+
+
+def _st_own(chk, tmp):
+    """Only the tests an arm wrote are its own: new, or changed against the base tree. A test
+    that was already in a file it edited is not run, counted, priced, charged or credited."""
+    old = _toy(("t_keep", "hp=10", "C1"), ("t_edit", "mp=4", "C2"), ("t_gone", "hp=11", "C3"))
+    narrow = [{"match": r"\.toy$", "test": r"^(?:test)\s+(t_new\S*)"}]
+    box = _Box(os.path.join(tmp, "own"), prices=_PRICES, test_patterns=narrow)
+    wide = [{"match": r"\.toy$", "test": r"^(?:test|flaky|ghost|needs)\s+(\S+)"}]
+    box.commit(box.game, "an existing suite", {"tests/old.toy": old, "tests/two.toy": _toy(("t_a", "hp=10", "C1"), ("t_b", "hp=10", "C1"))})
+    wt = box.worktree("np-a")
+    box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+    lab = {arm: label for arm, (label, _) in box.labels("np-a").items()}
+    # S-med edits the existing file: one test retagged (a comment), one changed, one added.
+    # t_gone already fails at the base and would be a false positive of whoever it is charged to.
+    edited = "# criterion: C9\ntest t_keep hp=10\n# criterion: C2\ntest t_edit mp=5\n# criterion: C3\ntest t_gone hp=11\n" \
+        + _toy(("t_new", "atk=5", "C4"))
+    box.shadow("np-a", "S-med", {"tests/old.toy": edited})
+    # S-high writes prose where a test should be: nothing is detected.
+    box.shadow("np-a", "S-high", {"tests/prose.toy": "it should cap the attack\nand the defence\n"})
+    # O-med's new file builds only where the rules hold `hp`; its two tests pass at m.
+    box.shadow("np-a", "O-med", {"tests/hp.toy": "requires hp\n" + _toy(("t_h1", "atk=5", "H1"), ("t_h2", "atk=5", "H2"))})
+    # O-high appends to an existing file whose tests stop holding at the end.
+    box.shadow("np-a", "O-high", {"tests/two.toy": _toy(("t_a", "hp=10", "C1"), ("t_b", "hp=10", "C1"), ("t_c", "atk=5", "C6"))})
+    # The replicate's three tests all stop holding at the end: two for one cause, one for another.
+    box.shadow("np-a", "S-med-r", {"tests/r.toy": _toy(("t_r1", "hp=10", "R1"), ("t_r2", "hp=10", "R2"), ("t_r3", "spd=1", "R3"))})
+    out = box.run("collect", "np-a")
+    runs = {r["arm"]: r for r in box.rows("run", "np-a")}
+    # The count taken at collect is the pattern's of that moment (here a narrow one).
+    chk("own/collect-counts-own-and-existing", (runs["S-med"]["tests"], runs["S-med"]["tests_existing"]) == (1, 0), runs["S-med"])
+    box.cfg["test_patterns"] = wide
+    box.write_cfg()
+    ctx = box.ctx()
+    ref = runs["S-med"]["tests_ref"]
+    chk("own/new-and-changed-tests-only", own_tests(ctx, ref, "tests/old.toy") == [("t_edit", "C2"), ("t_new", "C4")]
+        and len(tests_in(ctx, "tests/old.toy", git(box.game, "show", ref + ":tests/old.toy"))) == 4,
+        own_tests(ctx, ref, "tests/old.toy"))
+    chk("own/no-test-detected-is-said-at-collect", runs["S-high"]["undetected"] is True and runs["S-high"]["tests"] == 0
+        and runs["S-med"]["undetected"] is False and "AB-WARN np-a: 4 shadow run(s) wrote test lines in which no test" in out, out)
+    record_snap(ctx, "np-a", "g1", box.commit(wt, "green", {"game/rules.txt": "hp=10\nold=bug\nmp=5\natk=5\n"}))
+    record_snap(ctx, "np-a", "m", box.commit(wt, "fix", {"game/rules.txt": "hp=10\nold=bug\nmp=5\natk=5\nspd=1\n"}))
+    git(box.game, "merge", "-q", "--ff-only", "slice/np-a")
+    box.commit(box.game, "later work renames hp", {"game/rules.txt": "life=10\nold=bug\nmp=5\natk=5\nspd=2\n"})
+    out = box.run("score", "np-a", "--end")
+    ran = {(r["label"], r["test_id"].rsplit("::", 1)[1]) for r in box.rows("exec", "np-a")}
+    chk("own/only-own-tests-are-replayed", {t for l, t in ran if l == lab["S-med"]} == {"t_edit", "t_new"}
+        and {t for l, t in ran if l == lab["O-high"]} == {"t_c"}, sorted(ran))
+    q = {r["label"]: r for r in latest(box.rows("quality", "np-a"), lambda r: r["label"])}
+    # Counted at score with the patterns of the moment, not the number collect took.
+    chk("own/quality-counts-own-tests-at-score", q[lab["S-med"]]["tests"] == 2 and q[lab["S-med"]]["ran"] == 2
+        and q[lab["O-high"]]["tests"] == 1 and q[lab["O-med"]]["tests"] == 2, q[lab["S-med"]])
+    cands = [(c["label"], c["test_id"].rsplit("::", 1)[1], c["type"]) for c in current_candidates(box.rows(), "np-a")]
+    # t_gone, already failing in the file S-med edited, is no candidate of S-med's; the one
+    # candidate is the replicate's own new test, which the last fix turned.
+    chk("own/an-existing-failing-test-is-no-candidate-of-the-arm", cands == [(lab["S-med-r"], "t_r3", "lens-caught")], cands)
+    # Seeded defects in the three lines the slice added (mp, atk, spd): S-med's own two tests
+    # catch two; O-high's own t_c catches one.
+    muts = {r["label"]: (r["status"], r["caught"], r["missed"]) for r in box.rows("mutants", "np-a")}
+    chk("own/mutants-are-killed-by-own-tests-only", muts.get(lab["S-med"]) == ("ok", 2, 1)
+        and muts.get(lab["O-high"]) == ("ok", 1, 2) and lab["S-high"] not in muts, muts)
+    # Brittle: O-med's file stops building at the end (two tests, one cause): one break.
+    # O-high's own test still passes there; the two existing tests that now fail are not its own.
+    chk("own/brittle-counts-a-file-that-stops-compiling-once", q[lab["O-med"]]["brittle"] == 1
+        and q[lab["O-med"]]["brittle_files"] == 1 and q[lab["O-high"]]["brittle"] == 0
+        and q[lab["S-med"]]["brittle"] == 0 and q[lab["O-med"]]["brittle_tests"] == 2, (q[lab["O-med"]], q[lab["O-high"]]))
+    chk("own/brittle-counts-one-cause-in-one-file-once", q[lab["S-med-r"]]["brittle"] == 2
+        and q[lab["S-med-r"]]["brittle_tests"] == 3 and q[lab["S-med-r"]]["brittle_files"] == 0, q[lab["S-med-r"]])
+    # The arm with nothing detected gets its row and is named everywhere it would otherwise be silent.
+    text = render_report(box.rows(), box.cfg)
+    chk("own/no-test-detected-is-recorded-and-reported", q[lab["S-high"]]["gap"] == "no-test-detected"
+        and q[lab["S-high"]]["tests"] == 0 and "AB-WARN np-a: 1 arm(s) had no test of their own run" in out
+        and "- np-a S-high: test lines written, no test detected in them" in text
+        and "S-high: test lines written, no test detected in them" in box.run("status")
+        and box.run("status").count("no test detected") == 1 and text.count("no test detected in them") == 1,
+        (out, q[lab["S-high"]], box.run("status")))
+    st = Stats(box.rows(), box.cfg)
+    chk("own/total-terms-are-those-of-own-tests", [round(v, 2) for v in st.terms("np-a", "O-med", "central")][:5]
+        == [4.0, 0.0, 0.0, 0.0, 2.07]
+        and [round(v, 2) for v in st.terms("np-a", "S-med", "central")][1:5] == [0.0, 0.0, 0.0, 0.0]
+        and "| O-med | $4.00 | $0.00 | $0.00 | $0.00 | $2.07 |" in text, st.terms("np-a", "O-med", "central"))
+    # A test that is in the report only as not-run: detected, none ran.
+    box2 = _Box(os.path.join(tmp, "own-none-ran"), prices=_PRICES, mutants={"enabled": False})
+    wt = box2.worktree("np-a")
+    box2.run("plan", "np-a", "--prompt", box2.prompt("np-a", wt))
+    box2.shadow("np-a", "S-med", {"tests/gh.toy": _toy("ghost t_gh")})
+    box2.shadow("np-a", "O-med", {"tests/ok.toy": _toy(_T_ATK)})
+    box2.run("collect", "np-a")
+    record_snap(box2.ctx(), "np-a", "m", box2.commit(wt, "green", {"game/rules.txt": "hp=10\natk=5\n"}))
+    out = box2.run("score", "np-a")
+    gaps = {r["label"]: r["gap"] for r in box2.rows("quality", "np-a")}
+    lab2 = {arm: label for arm, (label, _) in box2.labels("np-a").items()}
+    chk("own/none-ran-is-recorded-and-reported", gaps == {lab2["S-med"]: "none-ran", lab2["O-med"]: None}
+        and "(none-ran)" in out and "- np-a S-med: tests detected, none ran at the merged code" in render_report(box2.rows(), box2.cfg)
+        and "S-med: 1 test(s) detected, none ran at the merged code" in box2.run("status"), (gaps, out))
+    reason = [r.get("reason") for r in box2.rows("exec", "np-a") if r["result"] == "not-run"]
+    chk("own/a-test-that-did-not-run-says-why", reason and set(reason) == {"the runner's report holds no such test under this file"}, reason)
+    # The shipped patterns end a test at its body's closing bracket: a test appended inside the
+    # module leaves the tests above it as they were.
+    shipped = Ctx(HERE).cfg["test_patterns"]
+    box3 = _Box(os.path.join(tmp, "own-shipped"), test_patterns=shipped, test_paths=[r"_tests\.rs$", r"\.test\.ts$"])
+    rs = "mod t {\n    #[test]\n    fn old_one() {\n        assert_eq!(f(\"}\"), 1);\n    }\n%s}\n"
+    ts = "describe('x', () => {\n  it('old one', () => {\n    expect(f(')')).toBe(1);\n  });\n%s});\n"
+    box3.commit(box3.game, "suites", {"core/a_tests.rs": rs % "", "client/a.test.ts": ts % ""})
+    wt = box3.worktree("np-a")
+    box3.run("plan", "np-a", "--prompt", box3.prompt("np-a", wt))
+    box3.shadow("np-a", "S-med", {
+        "core/a_tests.rs": rs.replace("    #[test]\n    fn old_one", "    // criterion: T1\n    #[test]\n    fn old_one")
+        % "\n    #[test]\n    // criterion: T2\n    fn new_one() {\n        assert!(true);\n    }\n",
+        "client/a.test.ts": ts % "  // criterion: U2\n  it('new one', () => {\n    expect(1).toBe(1);\n  });\n"})
+    box3.run("collect", "np-a")
+    run3 = next(r for r in box3.rows("run", "np-a") if r["arm"] == "S-med")
+    ref = run3["tests_ref"]
+    chk("own/shipped-patterns-tell-appended-tests-from-existing-ones",
+        own_tests(box3.ctx(), ref, "core/a_tests.rs") == [("new_one", "T2")]
+        and own_tests(box3.ctx(), ref, "client/a.test.ts") == [("new one", "U2")]
+        and run3["tests"] == 2 and run3["tests_existing"] == 2,
+        (own_tests(box3.ctx(), ref, "core/a_tests.rs"), own_tests(box3.ctx(), ref, "client/a.test.ts")))
 
 
 def _st_reaudit(chk, tmp):
@@ -4202,6 +5066,12 @@ def _st_shipped_config(chk):
     ts = "describe('x', () => {\n  // criterion: UI-2\n  it('renders the badge', () => {});\n  test.each([1])(\"n %s\", () => {});\n});\n"
     chk("config/rust-tests-found", tests_in(probe, "game-core/tests/a.rs", rust) == [("caps_damage", "BT-3"), ("joins", "")],
         tests_in(probe, "game-core/tests/a.rs", rust))
+    # A tag between the attribute and the `fn`: the test is found, and so is its tag; a tag is
+    # never taken from the test above.
+    under = ("#[test]\n// criterion: TS-1\nfn tagged_under() {}\n#[test]\nfn untagged() {}\n\n"
+             "/// criterion: TS-2\n#[test]\n#[should_panic]\n// why it panics\npub fn tagged_above() {}\n")
+    chk("config/rust-test-with-a-comment-under-the-attribute", tests_in(probe, "server-module/src/x_tests.rs", under)
+        == [("tagged_under", "TS-1"), ("untagged", ""), ("tagged_above", "TS-2")], tests_in(probe, "server-module/src/x_tests.rs", under))
     chk("config/ts-tests-found", tests_in(probe, "client/src/a.test.ts", ts) == [("renders the badge", "UI-2")],
         tests_in(probe, "client/src/a.test.ts", ts))
     chk("config/test-paths", all(is_test(probe, p) for p in (
@@ -4209,6 +5079,25 @@ def _st_shipped_config(chk):
         and not is_test(probe, "game-core/src/combat/mod.rs") and is_game_code(probe, "client/src/main.ts")
         and not is_game_code(probe, "docs/x.md") and not is_game_code(probe, "client/src/a.test.ts"))
     chk("config/nextest-profile-ships", os.path.isfile(os.path.join(HERE, "mr-tester-ab.nextest.toml")))
+    # One deadlocked test must end as a failure of that test, well inside the runner's own
+    # timeout: without a per-test limit it holds the runner until every result of the arm is lost.
+    import tomllib
+    with open(os.path.join(HERE, "mr-tester-ab.nextest.toml"), "rb") as fh:
+        slow = tomllib.load(fh).get("profile", {}).get("ab", {}).get("slow-timeout") or {}
+    period = re.fullmatch(r"(\d+)s", str(slow.get("period", "")))
+    chk("config/nextest-stops-a-test-that-hangs", period and slow.get("terminate-after", 0) >= 1
+        and int(period.group(1)) * slow["terminate-after"] * 4 <= next(r["timeout_s"] for r in cfg["runners"] if r["name"] == "nextest"),
+        slow)
+    vitest = next((r for r in cfg["runners"] if r["name"] == "vitest"), {})
+    steps = {s["if_missing"]: s for s in vitest.get("setup", [])}
+    chk("config/client-runner-builds-the-wasm-package", "../client-wasm/pkg" in steps
+        and steps["../client-wasm/pkg"]["cmd"][:2] == ["wasm-pack", "build"] and steps["../client-wasm/pkg"].get("optional")
+        and "client-wasm" in steps["../client-wasm/pkg"]["stamp"] and "game-core" in steps["../client-wasm/pkg"]["stamp"]
+        and steps.get("node_modules", {}).get("stamp") == ["client/package-lock.json"], vitest.get("setup"))
+    chk("config/an-unresolved-import-is-recognised", re.search(vitest.get("unresolved", "$^"),
+        'Failed to resolve import "../../client-wasm/pkg/client_wasm.js" from "src/main.ts". Does the file exist?')
+        and not re.search(vitest.get("unresolved", "$^"), "AssertionError: expected 'K' to be 'T'"))
+    chk("config/patterns-say-where-a-test-ends", [p.get("body") for p in cfg["test_patterns"]] == ["{", "("])
     nextest = next((r for r in cfg["runners"] if r["name"] == "nextest"), {})
     # nextest writes its report under the workspace root, whatever CARGO_TARGET_DIR says.
     chk("config/nextest-report-is-under-the-workspace", nextest.get("junit") == "target/nextest/ab/junit.xml"
@@ -4219,18 +5108,47 @@ def _st_shipped_config(chk):
     chk("config/tests-run-in-their-own-files-only", fill(probe, nextest.get("cmd", []), nextest, files, ["b", "a"], {})[-1] == want
         and fill(probe, cfg["mutants"]["cmd"], runner_named(probe, cfg["mutants"].get("runner")), files, ["b", "a"], {})[-1] == want,
         fill(probe, nextest.get("cmd", []), nextest, files, ["b", "a"], {})[-1:])
+    # The reserve of five arms covers what five runs cost on the measured slices (10.34).
     chk("config/reserve-for-every-arm", all(cfg.get("reserve_usd", {}).get(a["model"], 0) > 0 for a in cfg["arms"])
-        and sum(cfg["reserve_usd"][a["model"]] for a in cfg["arms"]) >= 24, cfg.get("reserve_usd"))
+        and 10.34 <= sum(cfg["reserve_usd"][a["model"]] for a in cfg["arms"]) <= cfg["cap_bump_usd"], cfg.get("reserve_usd"))
+    bloat = cfg.get("bloat", {})
+    per_line = bloat["tokens_per_line"] * (bloat["fresh_reads"] * bloat["fresh_usd_per_mtok"]
+                                           + bloat["cached_turns"] * bloat["cached_usd_per_mtok"]) / 1e6
+    chk("config/bloat-price-is-the-measured-one", 0.0002 <= per_line <= 0.0004, per_line)
+    chk("config/pilot-settings", cfg.get("port_enabled") is False and cfg["mutants"]["enabled"] is True
+        and cfg["mutants"]["wall_budget_s"] == 3600 and cfg["mutants"].get("ok_rc") == [0, 2, 3]
+        and cfg.get("escapes_in_session") is True and cfg.get("enabled") is False, cfg.get("mutants"))
     chk("config/escapes-budget-under-the-bash-timeout", 0 < cfg["escapes_budget_s"] < 120, cfg.get("escapes_budget_s"))
+    # Beside the loop's own files (not in a sandbox copy of this tool): what the retro is told to
+    # do at the close, and what the brief and the harness's tester definition say of the tester.
+    def beside(*parts):
+        try:
+            with open(os.path.join(HERE, *parts)) as fh:
+                return fh.read()
+        except OSError:
+            return None
+    if os.path.exists(os.path.join(HERE, "mr-selfcheck")):
+        play = (beside("mr-retro-playbook.md") or "").split("TESTER A/B CLOSE", 1)[-1]
+        chk("close/the-retro-lifts-the-blocks-and-decides-d2", "blocked: tester-ab-close" in play
+            and "M-test-pruning.spec.md" in play and "structure.spec.md" in play and "`tp-3`" in play
+            and "`st-3` and `st-4`" in play and "decision D2" in play and "census" in play, play[-900:])
+        brief = beside("mr-brief-template.md") or ""
+        chk("tester/the-brief-says-the-tester-has-no-shell", "the tester's tools have no shell" in brief
+            and "static-only" not in brief, brief[:0])
+        agent = beside("..", "..", ".claude", "agents", "tester.md") or ""
+        tools = re.search(r"^tools:(.*)$", agent, re.M)
+        chk("tester/the-harness-tester-has-no-shell", tools and "Bash" not in tools.group(1)
+            and "Write" in tools.group(1) and "## No shell" in agent, tools and tools.group(0))
     chk("config/replays-are-bounded", int(cfg.get("runner_env", {}).get("CARGO_BUILD_JOBS", 0)) >= 1
         and int(cfg["runner_env"].get("NEXTEST_TEST_THREADS", 0)) >= 1 and cfg.get("runner_path"), cfg.get("runner_env"))
 
 
 _BATTERIES = [_st_disabled, _st_plan, _st_collect, _st_score, _st_no_game_diff, _st_ledger]
-_FLOOR = 215
+_FLOOR = 288
 _BATTERIES += [_st_judge, _st_report]
 _BATTERIES += [_st_session, _st_finalize, _st_offline, _st_uncollected]
 _BATTERIES += [_st_runner, _st_reaudit, _st_nextest]
+_BATTERIES += [_st_adoption, _st_setup, _st_own]
 # MORE-BATTERIES
 
 
