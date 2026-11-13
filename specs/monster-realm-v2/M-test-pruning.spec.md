@@ -350,7 +350,7 @@ rows are confirmed. It is not a seeded gate.
 
 ## Tester A/B experiment
 
-The experiment (plan: `scratchpad/tester-ab/PLAN.md`) runs shadow testers on the tester-bearing
+The experiment (its rules are in the header of `memory/projects/mr-tester-ab`) runs shadow testers on the tester-bearing
 slices of M-trade-sessions (`ts-6b-K`), M-local-play groundwork, M-netcode-presence and
 M-econ-onboarding, keeps `.claude/agents/tester.md` frozen, and scores a shadow test `brittle`
 when it passes at the slice's merge and fails or stops compiling at the default-branch head when
@@ -360,7 +360,9 @@ the analysis runs.
   symbol, or edits a pin file that a consolidation rewrites, stops compiling. So `tp-3` (which
   turns the routing on) and the sections `st-3` and `st-4` carry `blocked: tester-ab-close`. The
   supervisor lifts it when `memory/projects/mr-tester-ab.jsonl` holds a `close` row (operator
-  decision D3).
+  decision D3). An experiment that never ran cannot hold it: the block also lifts once
+  M-econ-onboarding, the last sample milestone, has closed while `mr-tester-ab.config.json` is
+  absent or reads `enabled: false`.
 - `tp-1` and `tp-2` add a report tool nothing calls. `tp-1` adds one line each to `mr-selfcheck`
   and `memory/projects/.gitignore`, which the experiment's own build also edits; `mr-disjoint`
   serialises the launches.
