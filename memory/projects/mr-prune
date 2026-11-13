@@ -60,8 +60,8 @@ A test, per language:
 Twins. Two tests of one file are twins when they share the block, the form and the body, and the
 body does not depend on the test's name:
   form   every token of the declaration except the name and the body: the callee and its case
-         table, the callback's header, other arguments; in Rust the attributes (doc attributes
-         apart) and the signature.
+         table, the callback's header, other arguments; in Rust the attributes and the
+         signature.
   body   the tokens between the braces. Comments and the whitespace between tokens are not tokens;
          every literal is one token, compared as written.
   name   a test whose form or body holds `toMatchSnapshot`, `toThrowErrorMatchingSnapshot`,
@@ -492,14 +492,14 @@ def tests_rs(src):
     tests, unparsed, inline, n = [], 0, 0, len(toks)
     mods = {}           # index of a body `{` -> mod name, for a mod reached through mods only
     scope = []          # per open bracket: ("mod", name, index) | None
-    attrs, item = [], None      # the pending item's attributes [(start, end)], and where they end
+    attrs = []          # the pending item's attributes, [(start, end)]
     i = 0
     while i < n:
         kind, text, _offset = toks[i]
         if _is(toks[i], "#") and i + 1 < n and _is(toks[i + 1], "["):
             end = match[i + 1] + 1
             attrs.append((i, end))
-            i = item = end
+            i = end
             continue
         if kind == "id" and text in RS_QUALIFIERS and attrs:
             i += 1
@@ -514,7 +514,7 @@ def tests_rs(src):
                 inline += 1
             if all(s is not None for s in scope):
                 mods[i + 2] = toks[i + 1][1]
-            attrs, item = [], None
+            attrs = []
             i += 2
             continue
         if _word(toks[i], "fn") and named:
@@ -524,17 +524,14 @@ def tests_rs(src):
             is_test = any(_attribute_path(toks, a, b)[-1:] == ["test"] for a, b in attrs)
             if is_test and j < n and _is(toks[j], "{"):
                 if all(s is not None for s in scope):
-                    form = ()
-                    for a, b in attrs:
-                        if _attribute_path(toks, a, b)[:1] != ["doc"]:
-                            form += _texts(toks, a, b)
-                    form += _texts(toks, item, i + 1) + (NAME_SLOT,) + _texts(toks, i + 2, j + 1)
+                    form = (_texts(toks, attrs[0][0], i + 1) + (NAME_SLOT,)
+                            + _texts(toks, i + 2, j + 1))
                     tests.append(Test("::".join([s[1] for s in scope] + [toks[i + 1][1]]),
                                       scope[-1][2] if scope else -1, form,
                                       _texts(toks, j + 1, match[j])))
                 else:
                     unparsed += 1
-                attrs, item = [], None
+                attrs = []
                 i = match[j] + 1
                 continue
         if kind == "punct":
@@ -542,7 +539,7 @@ def tests_rs(src):
                 scope.append(("mod", mods[i], i) if i in mods else None)
             elif text in CLOSERS:
                 scope.pop()
-        attrs, item = [], None
+        attrs = []
         i += 1
     return tests, unparsed, inline
 
