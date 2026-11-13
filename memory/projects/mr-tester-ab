@@ -33,7 +33,8 @@ FILES
   mr-tester-ab.config.json   tracked. Arms, eligibility, caps, runner commands.
   mr-tester-ab.jsonl         the ledger. Append-only, one JSON object per line, written under
                              flock. Every row has v, kind, slice, ts. Gitignored.
-  tester-ab/<slice>/         manifest, the tester prompt, shadow reports, failure output. Gitignored.
+  tester-ab/<slice>/         manifest, the tester prompt, the slice's gates file as it stood at
+                             `plan`, shadow reports, failure output. Gitignored.
   tester-ab/judge/           per judge bundle: its key (item -> candidate or claim, label), where
                              the bundle is, and the verdicts. Never beside the bundle.
   <cache_root>/<slice>/<id>/ one plain export of the tree per shadow run; not a git worktree.
@@ -52,11 +53,13 @@ LEDGER ROWS (kind)
               arms_planned, skipped (null or the reason)
   run         label, arm, role (primary | shadow | replicate | followup | judge), twin, session,
               agent_id, tool_use_id, model_observed, effort_observed, cli_version, started,
-              duration_s, calls, bash_blocked, tokens, cost_usd, status (ok | failed |
-              contaminated | arm-mismatch), leak, tests_ref, files, non_test_files, tests (the
-              tests the arm wrote: new, or changed against the base tree), tests_existing (those
-              already in the files it edited; never run or counted), undetected (test lines
-              written and no test found in them), test_loc
+              duration_s, calls, bash_blocked, tokens, cost_usd (of every session that worked in
+              the export), status (ok | failed | contaminated | arm-mismatch | rerun: more than
+              one session worked in the export), sessions_in_export, leak, tests_ref, files,
+              non_test_files, tests (the tests the arm wrote: new, or changed against the base
+              tree), tests_existing (those already in the files it edited; never run or
+              counted), undetected (test lines written and no test found in them), gap
+              (`no-test-file`: an ok run that wrote nothing under the test paths), test_loc
   snap        name (base | g1 | g2 | m | end), sha, source (tool | derived). base: the tree the
               testers saw. g1: the first green implementation, before any lens ran (`mark`; else
               derived as the last commit before the first lens call). g2: green after the lens
@@ -65,15 +68,20 @@ LEDGER ROWS (kind)
   exec        label, snap, sha, test_id, criterion_tag, result (pass | fail | no-compile |
               not-run), reason (why a test did not run), runtime_ms, run_n, ported. Only the
               tests an arm wrote have rows. A row counts while `sha` is the snapshot's current
-              commit: recording a snapshot again retires the results of the earlier one.
+              commit: recording a snapshot again retires the results of the earlier one. A run
+              the in-session budget stopped has no rows. A file the runner could not collect
+              (it reports a failure under the file and none of its tests) is `no-compile`.
   claim       claim_id, label, type (base | spec), test, where, text, text_sha
   candidate   candidate_id, type (lens-caught | escape | base | spec | open-fail | withdrawn),
               label, test_id or claim_id, snap_fail, snap_pass, game_diff, scope (in | out),
               handed_in_session. The latest row of a (label, test_id or claim_id) stands;
               `withdrawn` says the current results no longer support it.
-  quality     label, no_compile_files, flaky, not_run, brittle, brittle_files, test_loc, tests,
-              ran, gap (null | no-test-detected | none-ran), loc_per_criterion,
-              dup_assert_lines, runtime_ms, bloat_usd. The latest row of a label stands. tests
+  quality     label, no_compile_files, flaky, not_run, brittle, brittle_files, stale_files,
+              test_loc, tests, ran, gap (null | no-test-detected | none-ran), criteria,
+              loc_per_criterion (test_loc over the slice's criteria: its gates entries, else the
+              tags its arms used between them), dup_assert_lines, runtime_ms, bloat_usd. The
+              latest row of a label stands. A run with a gap, here or on its run row, is listed
+              in `status` and the report and is in no table and no decision. tests
               counts the arm's own tests as the patterns find them when the slice is scored.
               not_run counts tests no runner executed at m: a file no runner fits, a test the
               build never compiled in (a Rust module no `mod` line names), an import that did
@@ -82,17 +90,20 @@ LEDGER ROWS (kind)
               of a file that pass at m and fail at end count once per distinct failure, a file
               that no longer compiles at end counts once (brittle_files), and brittle_tests is
               how many tests those took down; a test whose criterion the spec added or changed
-              since m is excused.
+              since m is excused. At end an arm's edit to a file that existed before it is
+              merged into the file as the default branch has it; a forced merge whose tests
+              fail or do not build counts in stale_files, not in brittle.
   mutants     label, generated, caught, missed, unviable, timeouts, wall_s, status (ok | budget |
               error | no-tests). A reported measure; nothing gates on it.
-  slice       status (scored | degraded | void), arms_ok, area, added_cost_usd,
-              cumulative_added_usd. The latest row of a slice stands.
+  slice       status (scored | degraded | void), arms_ok (scored arms with an ok run and no
+              gap), area, added_cost_usd, cumulative_added_usd. The latest row of a slice stands.
   handoff     label, test_id, handoff_id (its candidate id): a failing shadow test `escapes`
               handed to the builder
   adoption    candidate_id, commit, handed, tests, test_added (the tests the commit added or
               changed, or `none`), lines_added, over_limit: a fix commit whose `AB-Adopt:`
               trailer cites a handed test. What the experiment itself put into the suite.
-  close       reason, scored_slices. Written once; `plan` skips every slice from then on.
+  close       reason (required-slices | max-slices | cap | backstop-days | sample-done),
+              scored_slices. Written once; `plan` skips every slice from then on.
   verdict     ref (a candidate id or a claim id), item, label, scale, bundle, verdict,
               duplicate_of, criterion, wrong_behaviour, severity, scope (a base claim: in | out)
   finding     finding_id, class, status (confirmed | pending | out-of-scope | rejected |
@@ -117,8 +128,11 @@ COMMANDS
   eligible <slice> [<repo>]   `yes <cap bump usd>` or `no <reason>`. For mr-spawn.
   plan <slice> --prompt <file> [--worktree <dir>] [--tier <t>] [--milestone <m>]
                               Snapshot the slice worktree as `base`, export it once per shadow,
-                              write each shadow's prompt into its export, and print the Agent
-                              calls. A second call for the same slice prints the same calls.
+                              write each shadow's prompt into its export, keep the prompt and
+                              the slice's gates file, and print the Agent calls. A second call
+                              before any commit prints the calls of the shadows that have not
+                              started (a transcript names the export, or the export changed);
+                              the others are kept and never issued again.
   collect <slice>             After the calls return: keep each shadow's new and changed files
                               as a commit under its ref, price the runs from their transcripts,
                               flag contamination, arm mismatch and leak, copy the reports, delete
@@ -140,6 +154,12 @@ COMMANDS
                               a `close` row and one retro request (`tester-ab close`). A later
                               call naming another head records m again and scores it. mr-audit
                               calls it, bounded and fail-open.
+  close-check [--sample-done] Close the experiment when a close condition holds, outside any
+                              slice of it: mr-audit calls this on the audit of every slice the
+                              experiment did not plan, while the ledger has no `close` row, so
+                              the loop-active-days backstop closes it after its last slice has
+                              merged. `--sample-done` closes it whatever the conditions say
+                              (the supervisor, once the last sample milestone has closed).
   score <slice> [--end] [--background]
                               Replay each arm's tests at every recorded snapshot (base: claimed
                               tests only; m: twice), derive candidates and the per-arm quality
@@ -147,7 +167,8 @@ COMMANDS
                               default-branch head as `end`. Runs what is missing; under a flock.
                               It collects first when the session ended without `collect`, and
                               records the tester calls after the primary as follow-ups. A runner
-                              that cannot start records nothing: the next `score` retries.
+                              that cannot start records nothing: the next `score` retries. It
+                              also runs what an in-session replay did not finish.
   status                      What is planned, collected, scored and spent; where each close
                               condition stands; arms with no test detected or run; stale exports.
   judge-pack                  Write every item without a verdict (candidates, claims, tests
@@ -198,6 +219,10 @@ PROMPT_FILE = "TESTER-PROMPT.md"
 # The CLI refuses a subagent Write to a file named like a report (`REPORT.md`), so the shadow's
 # output file carries a name it accepts.
 REPORT_FILE = "SHADOW-OUTPUT"
+# Why a test has no result when its runner was stopped by the clock, and when a file the arm
+# edited could not be built together with what the default branch has since made of it.
+OUT_OF_TIME = "the runner ran out of time"
+STALE = "stale file: the default branch has since changed the lines this arm's edit touches, and the two do not work together"
 ADOPT_RE = re.compile(r"^AB-Adopt:\s*(\S+)", re.M)
 _GIT_SCRUB = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
               "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_ALTERNATE_OBJECT_DIRECTORIES")
@@ -611,6 +636,36 @@ def export_tree(repo, sha, dest, paths=()):
         raise RuntimeError("export of %s failed" % sha[:12])
 
 
+def shadow_call(slice_, label, entry):
+    """The Agent call of one shadow. Its type is `tester` and no other: the tester guards act on
+    that type, and that agent has no shell."""
+    return ('Agent(subagent_type="tester", model="%s", effort="%s", description="tester %s %s", '
+            'prompt="Your task is in %s/%s. Read it fully and follow it exactly.")'
+            % (entry["model"], entry["effort"], label, slice_, entry["export"], PROMPT_FILE))
+
+
+def export_touched(ctx, manifest, entry):
+    """Whether a shadow has worked in its export: the directory is gone, holds the shadow's
+    output file, or differs from the base tree."""
+    root = entry["export"]
+    if not os.path.isdir(root) or os.path.exists(os.path.join(root, REPORT_FILE)):
+        return True
+    return snapshot(ctx.game, root, manifest["base"], "tester-ab probe", exclude=(REPORT_FILE, PROMPT_FILE)) != manifest["base"]
+
+
+def kept_gates(ctx, slice_):
+    """The slice's acceptance ledger: the copy `plan` kept, else the live file, else the
+    archived one (mr-record moves a gates file to gates/archive 30 days after the merge, and
+    the judge is packed later than that)."""
+    for path in (os.path.join(ctx.side_of(slice_), "gates.md"),
+                 os.path.join(ctx.mem, "gates", "%s.gates.md" % slice_),
+                 os.path.join(ctx.mem, "gates", "archive", "%s.gates.md" % slice_)):
+        with contextlib.suppress(OSError):
+            with open(path, errors="replace") as fh:
+                return fh.read()
+    return ""
+
+
 def cmd_plan(ctx, args):
     pos, opt = options(args, valued=("--prompt", "--worktree", "--tier", "--milestone"))
     slice_ = check_slice(pos[0] if pos else "")
@@ -630,13 +685,31 @@ def cmd_plan(ctx, args):
         ctx.game, ctx.cfg.get("worktree_root", ".claude/worktrees"), slice_))
     manifest = ctx.manifest(slice_)
     if manifest:
-        # Shadows never rerun. The same calls are printed again only while nothing can have
-        # changed: not collected, and the worktree still at the commit the base was taken from.
+        # Shadows never rerun. Calls are printed again only while nothing can have changed (not
+        # collected, the worktree still at the commit the base was taken from), and only for the
+        # shadows that have not started: a second run in an export that holds a first run's
+        # tests would mix two runs into one arm's suite.
         head = git(worktree, "rev-parse", "HEAD", check=False).strip()
         if manifest.get("collected") or head != manifest.get("head_at_plan"):
             raise Skip("already-planned: run `collect %s` if you have not; issue no shadow call" % slice_)
-        with open(os.path.join(side, "plan.out")) as fh:
-            sys.stdout.write(fh.read())
+        ran = find_runs(ctx, manifest)[0]
+        started = sorted(l for l, e in manifest["labels"].items() if l in ran or export_touched(ctx, manifest, e))
+        if not started:
+            with open(os.path.join(side, "plan.out")) as fh:
+                sys.stdout.write(fh.read())
+            return
+        calls = [shadow_call(slice_, l, e) for l, e in sorted(manifest["labels"].items()) if l not in started]
+        collect = "%s/mr-tester-ab collect %s" % (ctx.mem, slice_)
+        if not calls:
+            print("AB-PLAN %s: every shadow has already started or finished; issue no shadow call. When all have "
+                  "returned run: %s" % (slice_, collect))
+            return
+        print("AB-PLAN %s: %d shadow(s) have already started or finished and are kept as they are. Issue only these "
+              "%d Agent call(s) in ONE foreground message, with your own tester call if it has not returned:"
+              % (slice_, len(started), len(calls)))
+        for i, call in enumerate(calls):
+            print("%d. %s" % (i + 1, call))
+        print("When all have returned run: %s" % collect)
         return
     total = committed(ctx, rows)
     if total >= ctx.cfg.get("cap_arm_usd", 0):
@@ -678,9 +751,7 @@ def cmd_plan(ctx, args):
             fh.write(prompt.replace(worktree, root) + FOOTER.format(root=root, report=REPORT_FILE))
         labels[label] = {"arm": arm["arm"], "model": arm["model"], "effort": arm["effort"],
                          "role": arm.get("role", "shadow"), "export": root}
-        calls.append('Agent(subagent_type="tester", model="%s", effort="%s", description="tester %s %s", '
-                     'prompt="Your task is in %s/%s. Read it fully and follow it exactly.")'
-                     % (arm["model"], arm["effort"], label, slice_, root, PROMPT_FILE))
+        calls.append(shadow_call(slice_, label, labels[label]))
     try:
         with open(os.path.join(ctx.game, ".claude", "agents", "tester.md"), "rb") as fh:
             tester_md = hashlib.sha256(fh.read()).hexdigest()
@@ -700,6 +771,10 @@ def cmd_plan(ctx, args):
         fh.write(text)
     with open(os.path.join(side, PROMPT_FILE), "w") as fh:      # the judge is shown its criteria
         fh.write(prompt)
+    gates = kept_gates(ctx, slice_)     # kept beside the prompt: the live file is archived later
+    if gates:
+        with open(os.path.join(side, "gates.md"), "w") as fh:
+            fh.write(gates)
     write_json(ctx.manifest_path(slice_), {
         "slice": slice_, "milestone": opt.get("milestone"), "tier": opt.get("tier"),
         "worktree": worktree, "head_at_plan": head, "base": base, "labels": labels,
@@ -755,8 +830,9 @@ def scan_transcript(path):
 
 
 def find_runs(ctx, manifest):
-    """({label: transcript path}, {session id}) of the shadows: a shadow's transcript is the one
-    whose first message names its export."""
+    """({label: [transcript path, oldest first]}, {session id}) of the shadows: a shadow's
+    transcripts are those whose first message names its export. There is one, unless a shadow
+    call was issued again."""
     since = (epoch(manifest["planned"]) or 0) - 120
     found, sessions = {}, set()
     for path in glob.glob(os.path.join(glob.escape(ctx.transcripts), "*", "*", "subagents", "agent-*.jsonl")):
@@ -769,8 +845,10 @@ def find_runs(ctx, manifest):
             continue
         for label, entry in manifest["labels"].items():
             if entry["export"] in head:
-                found[label] = path
+                found.setdefault(label, []).append(path)
                 sessions.add(os.path.basename(os.path.dirname(os.path.dirname(path))))
+    for paths in found.values():
+        paths.sort(key=lambda p: (os.path.getmtime(p), p))
     return found, sessions
 
 
@@ -837,10 +915,12 @@ def cmd_collect(ctx, args):
     runs, claims, strays = [], [], set()
     for label in sorted(manifest["labels"]):
         entry = manifest["labels"][label]
-        root, path = entry["export"], transcripts.get(label)
+        root, paths = entry["export"], transcripts.get(label, [])
+        path = paths[0] if paths else None
         row = {"kind": "run", "slice": slice_, "label": label, "arm": entry["arm"],
                "role": entry["role"], "twin": False, "status": "ok", "leak": False}
-        cost = priced.get(agent_id(path)) if path else None
+        costs = [priced[agent_id(p)] for p in paths if agent_id(p) in priced]
+        cost = costs[0] if len(costs) == len(paths) and costs else None
         report = ""
         with contextlib.suppress(OSError):
             with open(os.path.join(root, REPORT_FILE), errors="replace") as fh:
@@ -854,20 +934,27 @@ def cmd_collect(ctx, args):
         if not path or not cost or not (files or report):
             row["status"] = "failed"
         else:
-            strings, last_text, blocked = scan_transcript(path)
+            strings, blocked, leak = [], 0, False
+            for one in paths:
+                said, last_text, errors = scan_transcript(one)
+                strings += said
+                blocked += errors
+                leak = leak or last_text.strip().lower().rstrip(".") != "done"
+            # Every session that worked in the export is paid for, whichever wrote the tests.
             row.update(session=os.path.basename(os.path.dirname(os.path.dirname(path))),
                        agent_id=cost["agent_id"], tool_use_id=cost["tool_use_id"],
                        model_observed=cost["model"], effort_observed=cost["effort"],
                        cli_version=cost["version"], started=cost["started"],
                        duration_s=cost["duration_s"], calls=cost["calls"], tokens=cost["tokens"],
-                       cost_usd=cost["cost_usd"], bash_blocked=blocked,
-                       leak=last_text.strip().lower().rstrip(".") != "done")
+                       cost_usd=round(sum(c["cost_usd"] or 0.0 for c in costs), 6), bash_blocked=blocked, leak=leak)
+            if len(paths) > 1:
+                row.update(status="rerun", sessions_in_export=len(paths))
             others = [s.replace(root, "") for s in strings]
             if any(ctx.cache in s or manifest["worktree"] in s for s in others):
                 row["status"] = "contaminated"
                 for s in others:
                     strays.update(re.findall(re.escape(manifest["worktree"]) + r"[^\s\"'`;|&<>()]*", s))
-            elif entry["model"] not in (cost["model"] or "") or cost["effort"] != entry["effort"]:
+            elif row["status"] == "ok" and (entry["model"] not in (cost["model"] or "") or cost["effort"] != entry["effort"]):
                 row["status"] = "arm-mismatch"
         if ref and tests:
             set_ref(ctx.game, slice_, label, ref)
@@ -883,6 +970,10 @@ def cmd_collect(ctx, args):
             row["undetected"] = own == 0
         row["files"] = tests
         row["non_test_files"] = [p for p in files if not is_test(ctx, p)]
+        if row["status"] == "ok" and not tests:
+            # Nothing under the test paths: tests written inside a source file, or a report
+            # alone. Nothing of this run can be replayed, and that is recorded, not left silent.
+            row["gap"] = "no-test-file"
         if report:
             os.makedirs(side, exist_ok=True)
             with open(os.path.join(side, "%s.report.md" % label), "w") as fh:
@@ -944,6 +1035,14 @@ def cmd_collect(ctx, args):
     if blind:
         print("AB-WARN %s: %d shadow run(s) wrote test lines in which no test of their own was detected. "
               "Nothing of such a run can be replayed; the run row records it (`undetected`)." % (slice_, blind))
+    bare = sum(1 for r in runs if r.get("gap") == "no-test-file")
+    if bare:
+        print("AB-WARN %s: %d shadow run(s) wrote no file under the test paths (tests inside a source file, or a "
+              "report alone). Nothing of such a run can be replayed; the run row records it (`gap`)." % (slice_, bare))
+    again = sum(1 for r in runs if r.get("status") == "rerun")
+    if again:
+        print("AB-WARN %s: %d shadow(s) ran more than once in one export. Such a suite is a mix of two runs: "
+              "it is priced in full and not scored (`rerun`)." % (slice_, again))
     if strays:
         # The run is not scored, but whatever it wrote there is still in the builder's tree.
         print("AB-CONTAMINATED %s: a shadow run named these paths in your worktree. Before you commit, "
@@ -975,14 +1074,44 @@ def checkout(ctx, sha):
     git_scratch(ctx, "clean", "-fdq")
 
 
-def overlay(ctx, ref, files):
+def overlay(ctx, ref, files, onto=None):
+    """Write the arm's version of each file into the scratch directory. Returns the paths that
+    were merged by force.
+
+    With `onto` (a snapshot later than the slice's merge), a file the arm edited rather than
+    created is not replaced whole: the file's other content has moved on since the arm saw it,
+    and the arm's copy of that content would stop building for reasons the arm did not cause.
+    The arm's change against its base is merged into the file as `onto` holds it. Where the two
+    changed the same lines both sides' lines are kept (a forced merge): its path is returned,
+    and a failure in such a file is no evidence about the arm's tests. That is the common case
+    where the gating tester edited the same fixture as the arm: such a file shows that a test
+    still passes, and cannot show that it broke."""
+    show = lambda rev, path: subprocess.run(["git", "-C", ctx.game, "show", "%s:%s" % (rev, path)], capture_output=True)
+    forced = set()
     for path in files:
         dest = os.path.join(ctx.scratch, path)
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         blob = subprocess.run(["git", "-C", ctx.game, "show", "%s:%s" % (ref, path)],
                               capture_output=True, check=True).stdout
+        base, theirs = (show(ref + "^", path), show(onto, path)) if onto else (None, None)
+        if onto and base.returncode == 0 and theirs.returncode == 0 and theirs.stdout != base.stdout:
+            with tempfile.TemporaryDirectory(prefix="mr-tester-ab-merge-") as tmp:
+                names = []
+                for name, data in (("theirs", theirs.stdout), ("base", base.stdout), ("arm", blob)):
+                    names.append(os.path.join(tmp, name))
+                    with open(names[-1], "wb") as fh:
+                        fh.write(data)
+                done = subprocess.run(["git", "merge-file", "-p", "-q"] + names, capture_output=True)
+                if done.returncode > 0 and done.returncode < 128:      # that many conflicts
+                    done = subprocess.run(["git", "merge-file", "-p", "-q", "--union"] + names, capture_output=True)
+                    forced.add(path)
+                if done.returncode == 0:
+                    blob = done.stdout
+                else:
+                    forced.discard(path)        # not text: the arm's file as it is
         with open(dest, "wb") as fh:
             fh.write(blob)
+    return forced
 
 
 def clear_overlay(ctx, snap_sha, files):
@@ -1173,7 +1302,7 @@ def run_runner(ctx, runner, files, names, budget, snap_sha=None):
     return cases, bool(cases) or rc in (0, runner.get("no_tests_rc")), timed_out, wall
 
 
-def run_suite(ctx, snap_sha, ref, files, only=None, budget=3600):
+def run_suite(ctx, snap_sha, ref, files, only=None, budget=3600, merge=False):
     """Replay the tests one arm wrote (`own_tests`) against the tree checked out in the scratch
     directory. {test id: (result, criterion tag, milliseconds, failure text or the reason a
     test did not run)}.
@@ -1183,8 +1312,16 @@ def run_suite(ctx, snap_sha, ref, files, only=None, budget=3600):
     under its own file is `not-run`: the build never compiled it in (a Rust module no `mod` line
     names), whatever a test of the same name elsewhere did. A failure whose text matches the
     runner's `unresolved` pattern is `not-run` too: an import that does not resolve (a package
-    the setup did not build) says nothing about the code under test."""
+    the setup did not build) says nothing about the code under test: the setup step that
+    should have built the package failed (`setup_note`). With every setup step done, an import
+    that does not resolve is the test's own. A file the runner reports as failed while it
+    reports none of the file's tests could not be collected (a syntax error, a static import of
+    a module that does not exist): its tests are `no-compile`, as a Rust file that does not
+    build. With `merge` the arm's files are merged into the snapshot's (`overlay`); in a file
+    merged by force a test that passes has passed, and one that fails, or a file that does not
+    build, is `not-run` for that reason: the forced lines may be what broke it."""
     results = {}
+    forced = set()
     declared = {}
     for path in files:
         declared[path] = [(n, tag) for n, tag in own_tests(ctx, ref, path)
@@ -1194,21 +1331,40 @@ def run_suite(ctx, snap_sha, ref, files, only=None, budget=3600):
     def record(path, cases, compiled, timed_out, runner=None):
         mine = re.compile(r"(?<![\w-])%s(?![\w-])" % re.escape(stem_of(path)))
         unresolved = (runner or {}).get("unresolved")
+        note = ctx.__dict__.get("setup_note", {}).get((runner or {}).get("name"))
+        here = [c for c in cases if mine.search(c[0] + " " + c[1])]
+        hits = {name: next((c for c in here if c[1] == name or c[1].endswith("::" + name)
+                            or c[1].endswith(" > " + name)), None) for name, _ in declared[path]}
+        # The report holds a failure under this file that is none of the file's tests (vitest
+        # names it after the file) and holds none of the arm's tests: the file was not collected.
+        named = lambda c, name: c[1] == name or c[1].endswith("::" + name) or c[1].endswith(" > " + name)
+        every = [n for n, _ in tests_in(ctx, path, git(ctx.game, "show", "%s:%s" % (ref, path), check=False))]
+        uncollected = None if any(hits.values()) else next(
+            (c for c in here if c[2] == "fail" and not any(named(c, n) for n in every)), None)
+        if uncollected and unresolved and note and re.search(unresolved, uncollected[4]):
+            for name, tag in declared[path]:
+                results["%s::%s" % (path, name)] = (
+                    "not-run", tag, 0, "unresolved import: " + " ".join(uncollected[4].split())[:160] + "; " + note)
+            return
+        if uncollected:
+            compiled = False
         for name, tag in declared[path]:
-            hit = next((c for c in cases if mine.search(c[0] + " " + c[1])
-                        and (c[1] == name or c[1].endswith("::" + name) or c[1].endswith(" > " + name))), None)
-            if hit and hit[2] == "fail" and unresolved and re.search(unresolved, hit[4]):
-                note = ctx.__dict__.get("setup_note", {}).get(runner.get("name"))
-                why = "unresolved import: " + " ".join(hit[4].split())[:160] + ("; " + note if note else "")
+            hit = hits[name]
+            if hit and hit[2] == "fail" and unresolved and note and re.search(unresolved, hit[4]):
+                why = "unresolved import: " + " ".join(hit[4].split())[:160] + "; " + note
                 results["%s::%s" % (path, name)] = ("not-run", tag, hit[3], why)
+            elif hit and hit[2] == "fail" and path in forced:
+                results["%s::%s" % (path, name)] = ("not-run", tag, hit[3], STALE)
             elif hit:
                 results["%s::%s" % (path, name)] = (hit[2], tag, hit[3], hit[4])
             elif timed_out:
-                results["%s::%s" % (path, name)] = ("not-run", tag, 0, "the runner ran out of time")
+                results["%s::%s" % (path, name)] = ("not-run", tag, 0, OUT_OF_TIME)
             elif compiled:
                 results["%s::%s" % (path, name)] = (
                     "not-run", tag, 0, "the runner's report holds no such test under this file" if runner
                     else "no runner fits this file")
+            elif path in forced:
+                results["%s::%s" % (path, name)] = ("not-run", tag, 0, STALE)
             else:
                 results["%s::%s" % (path, name)] = ("no-compile", tag, 0, "")
 
@@ -1227,7 +1383,7 @@ def run_suite(ctx, snap_sha, ref, files, only=None, budget=3600):
                 for path in group:
                     record(path, [], True, True, runner)
                 continue
-            overlay(ctx, ref, group)
+            forced.update(overlay(ctx, ref, group, snap_sha if merge else None))
             try:
                 names = [n for p in group for n, _ in declared[p]]
                 cases, compiled, timed_out, _ = run_runner(ctx, runner, group, names, left, snap_sha)
@@ -1248,8 +1404,29 @@ def snaps_of(rows, slice_):
 
 
 def ok_runs(rows, slice_):
+    """The shadow runs whose tests are replayed."""
     return [r for r in of(rows, "run", slice_)
             if r.get("role") in SHADOW_ROLES and r.get("status") == "ok" and r.get("tests_ref")]
+
+
+def gaps_of(rows, slice_=None):
+    """{(slice, label): gap} of the shadow runs with status ok that measured nothing of their
+    arm: `no-test-file` (nothing under the test paths), `no-test-detected` (test lines, no test
+    found in them), `none-ran` (tests found, not one of them ran at the merged code). What the
+    slice's scoring found (the quality row) stands over what `collect` saw. Such a run is
+    listed in `status` and the report, and is in no table and no decision: it found nothing
+    because nothing of it ran, which says nothing about its arm."""
+    out = {}
+    for r in of(rows, "run", slice_):
+        if r.get("role") in SHADOW_ROLES and r.get("status") == "ok":
+            gap = r.get("gap") or ("no-test-detected" if r.get("undetected") else None)
+            if gap:
+                out[(r["slice"], r["label"])] = gap
+    for q in of(rows, "quality", slice_):
+        out.pop((q["slice"], q["label"]), None)
+        if q.get("gap"):
+            out[(q["slice"], q["label"])] = q["gap"]
+    return out
 
 
 def execs(rows, slice_):
@@ -1279,7 +1456,13 @@ def game_diff(ctx, old, new):
 
 def replay(ctx, slice_, rows, only_snaps=None, budget=None):
     """Run every (arm, snapshot, run) the ledger has no result for. Returns False when the
-    budget ran out first."""
+    budget ran out first.
+
+    Under a budget (the in-session `escapes`), a run the clock stopped writes no row at all, and
+    neither does one the budget never reached: a result of `not-run` there would stand for good,
+    and the arm would be charged a miss for a defect its test catches. `score` runs it at merge.
+    At `end` an arm's edit to a file that already existed is merged into the file as the default
+    branch has it (`overlay`)."""
     snaps = snaps_of(rows, slice_)
     done = {(r["label"], r["snap"], r.get("run_n", 1)) for r in execs(rows, slice_)}
     claimed = {}
@@ -1311,7 +1494,11 @@ def replay(ctx, slice_, rows, only_snaps=None, budget=None):
                 if fresh:
                     checkout(ctx, snaps[snap])
                     fresh = False
-                results = run_suite(ctx, snaps[snap], ref, files, only, left if left is not None else 3600)
+                results = run_suite(ctx, snaps[snap], ref, files, only, left if left is not None else 3600,
+                                    merge=snap == "end")
+                if left is not None and any(r[0] == "not-run" and r[3] == OUT_OF_TIME for r in results.values()):
+                    complete = False
+                    continue
                 append(ctx, [dict({"kind": "exec", "slice": slice_, "label": label, "snap": snap,
                                    "sha": snaps[snap], "test_id": test, "criterion_tag": tag, "result": result,
                                    "runtime_ms": ms, "run_n": run_n, "ported": False},
@@ -1454,7 +1641,10 @@ def quality(ctx, slice_, rows):
              file that pass at m and fail at end count once per distinct failure (its first
              line, numbers aside), and a file that passes at m and no longer compiles at end
              counts once. A test whose criterion the spec added or changed since m is excused.
-             `brittle_tests` is how many tests those breaks took down.
+             `brittle_tests` is how many tests those breaks took down. At end an arm's edit to
+             a file that existed before it is merged into the file as the default branch has
+             it; where that merge had to be forced and a test then fails or the file does not
+             build, the file is counted in `stale_files` and is no break.
     gap      `no-test-detected`: test lines written, no test found in them;
              `none-ran`: tests found, and not one of them ran at m. Else null."""
     snaps = snaps_of(rows, slice_)
@@ -1480,6 +1670,11 @@ def quality(ctx, slice_, rows):
         with contextlib.suppress(OSError, ValueError):
             with open(os.path.join(ctx.side_of(slice_), "fail", "%s.end.1.json" % label)) as fh:
                 said_at_end = json.load(fh)
+        why_end = {r["test_id"]: r.get("reason") or "" for r in execs(rows, slice_)
+                   if r["label"] == label and r["snap"] == "end"}
+        # A file merged by force at end whose tests fail or do not build there: reported, never charged.
+        unmerged = {t.rsplit("::", 1)[0] for t, s in mine.items()
+                    if settled(s.get("m")) == "pass" and why_end.get(t) == STALE}
         causes, stale, broke = set(), set(), 0
         for test, by_snap in sorted(mine.items()):
             end = settled(by_snap.get("end"))
@@ -1501,7 +1696,7 @@ def quality(ctx, slice_, rows):
                 norm = " ".join(line.split())
                 if re.search(r"\bassert|\bexpect\(", norm):
                     asserts[norm] = asserts.get(norm, 0) + 1
-        tags = {tag for tag in tag_of.values() if tag}
+        criteria = criteria_count(ctx, slice_, rows)
         loc = run.get("test_loc", 0)
         ran = sum(1 for s in mine.values() if settled(s.get("m")) in ("pass", "fail", "flaky"))
         out.append({"kind": "quality", "slice": slice_, "label": label,
@@ -1509,15 +1704,24 @@ def quality(ctx, slice_, rows):
                     "flaky": sum(1 for s in mine.values() if settled(s.get("m")) == "flaky"),
                     "not_run": sum(1 for s in mine.values() if settled(s.get("m")) == "not-run"),
                     "brittle": len(causes) + len(stale), "brittle_files": len(stale), "brittle_tests": broke,
+                    "stale_files": len(unmerged),
                     "test_loc": loc, "tests": len(own), "ran": ran,
                     "gap": "no-test-detected" if not own else "none-ran" if not ran else None,
-                    "loc_per_criterion": round(loc / max(1, len(tags)), 2),
+                    "criteria": criteria, "loc_per_criterion": round(loc / max(1, criteria), 2),
                     "dup_assert_lines": sum(n - 1 for n in asserts.values()),
                     "runtime_ms": sum(r["runtime_ms"] for r in execs(rows, slice_)
                                       if r["label"] == label and r["snap"] == "m" and r.get("run_n", 1) == 1),
                     "bloat_usd": round(loc * per_line, 4)})
     known = {r["label"]: r for r in of(rows, "quality", slice_)}
     return [q for q in out if any(known.get(q["label"], {}).get(k) != v for k, v in q.items())]
+
+
+def criteria_count(ctx, slice_, rows):
+    """How many criteria the slice has: the entries of its acceptance ledger, else the distinct
+    criterion tags its arms used between them. One number for the slice, so lines per criterion
+    compares what the arms wrote and not how many tags each of them spread it over."""
+    listed = set(re.findall(r"^- \[.\] ([A-Za-z0-9][\w.\-]*):", kept_gates(ctx, slice_), re.M))
+    return len(listed) or len({r["criterion_tag"] for r in execs(rows, slice_) if r.get("criterion_tag")})
 
 
 def spec_changes(ctx, rows, slice_):
@@ -1623,11 +1827,12 @@ def mutants(ctx, slice_, rows):
 def slice_row(ctx, slice_, rows):
     """The slice's standing once it has an m snapshot: `scored` with all four scored arms valid,
     `degraded` with two or three, `void` with fewer; the area its merged diff falls in; what the
-    experiment added to its cost."""
+    experiment added to its cost. A run with a measurement gap (`gaps_of`) is not valid."""
     snaps = snaps_of(rows, slice_)
     if "m" not in snaps:
         return []
-    valid = [r["arm"] for r in ok_runs(rows, slice_) if r["role"] == "shadow"]
+    gaps = gaps_of(rows, slice_)
+    valid = [r["arm"] for r in ok_runs(rows, slice_) if r["role"] == "shadow" and (slice_, r["label"]) not in gaps]
     files = [p for _, p in changed_files(ctx.game, snaps["base"], snaps["m"])]
     hit = [name for name, pattern in sorted(ctx.cfg.get("areas", {}).items())
            if any(re.search(pattern, p) for p in files)]
@@ -1870,7 +2075,9 @@ def close_conditions(ctx, rows, current=None, ask=True):
             holds = all(s == current or merged(ctx, s, deadline) for s in required)
         out.append(("required-slices", holds, "%d of %d required slice(s) finalized%s" % (
             len(have), len(required), "; %d planned slice(s) not finalized" % len(open_) if open_ else "")))
-    scored = [s for s in with_m if len([r for r in ok_runs(rows, s) if r["role"] == "shadow"]) >= 2]
+    gaps = gaps_of(rows)
+    scored = [s for s in with_m if len([r for r in ok_runs(rows, s) if r["role"] == "shadow"
+                                        and (s, r["label"]) not in gaps]) >= 2]
     most = stops.get("max_scored_slices", 16)
     out.append(("max-slices", len(scored) >= most, "%d of %d scored slice(s)" % (len(scored), most)))
     cap = cfg.get("cap_arm_usd", float("inf"))
@@ -1911,15 +2118,38 @@ def cmd_finalize(ctx, args):
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     with contextlib.suppress(Exception):         # a record for the report, never a reason to stop
         append(ctx, adoptions(ctx, slice_, read(ctx)))
-    rows = read(ctx)
-    if not closed(rows):
-        reason = close_reason(ctx, rows, slice_)
-        if reason:
-            append(ctx, [{"kind": "close", "slice": "-", "reason": reason,
-                          "scored_slices": len({r["slice"] for r in of(rows, "snap") if r["name"] == "m"})}])
-            queue_retro(ctx)
-            print("AB-CLOSED %s" % reason)
+    close_if_due(ctx, slice_)
     print("AB-FINALIZED %s" % slice_)
+
+
+def close_if_due(ctx, current=None, reason=None):
+    """Close the experiment when it is open and a close condition holds (or `reason` is given):
+    the `close` row, once, and one retro request. Returns the reason, or None."""
+    rows = read(ctx)
+    if closed(rows):
+        return None
+    reason = reason or close_reason(ctx, rows, current)
+    if reason:
+        append(ctx, [{"kind": "close", "slice": "-", "reason": reason,
+                      "scored_slices": len({r["slice"] for r in of(rows, "snap") if r["name"] == "m"})}])
+        queue_retro(ctx)
+        print("AB-CLOSED %s" % reason)
+    return reason
+
+
+def cmd_close_check(ctx, args):
+    """The close conditions, tried outside any slice of the experiment: the backstop of
+    loop-active days is met by days passing, after the last eligible slice has merged and no
+    `finalize` is left to come. mr-audit calls this on every audit of a slice the experiment
+    did not plan, while the ledger holds no `close` row. `--sample-done` closes an open
+    experiment whatever the conditions say: the supervisor passes it once the last sample
+    milestone has closed, so that the items blocked on the close are not held by slices that
+    will never come."""
+    _, opt = options(args, flags=("--sample-done",))
+    if closed(read(ctx)):
+        raise Skip("closed")
+    if not close_if_due(ctx, reason="sample-done" if opt.get("sample-done") else None):
+        print("AB-OPEN no close condition holds")
 
 
 def queue_retro(ctx):
@@ -1989,6 +2219,12 @@ def derive_g1(ctx, slice_, rows, agents):
 
 
 # --------------------------------------------------------------------------- status
+# How `status` words each measurement gap (`gaps_of`).
+GAPS = {"no-test-file": "no file under the test paths (it wrote: %(wrote)s)",
+        "no-test-detected": "test lines written, no test detected in them",
+        "none-ran": "%(n)d test(s) detected, none ran at the merged code"}
+
+
 def cmd_status(ctx, args):
     options(args)
     rows = read(ctx)
@@ -1999,7 +2235,7 @@ def cmd_status(ctx, args):
         print("  closed: %s" % of(rows, "close")[-1].get("reason"))
     else:
         for name, holds, where in close_conditions(ctx, rows, ask=False):
-            print("  closes on %-15s %s: %s" % (name, "met at the next finalize" if holds else "pending", where))
+            print("  closes on %-15s %s: %s" % (name, "met at the next audit" if holds else "pending", where))
     registered = set()
     for row in of(rows, "assignment"):
         slice_ = row["slice"]
@@ -2018,15 +2254,15 @@ def cmd_status(ctx, args):
         with contextlib.suppress(OSError):
             with open(os.path.join(ctx.side_of(slice_), "score.err")) as fh:
                 print("  %-14s last score stopped: %s" % ("", fh.read().strip()[:300]))
-        # What the patterns find now (the quality row) stands over what they found at collect.
-        arm_of = {r["label"]: r["arm"] for r in runs}
-        gap = {q["label"]: q.get("gap") for q in latest(of(rows, "quality", slice_), lambda r: r["label"])}
+        gaps = gaps_of(rows, slice_)
+        tests = {q["label"]: q.get("tests", 0) for q in of(rows, "quality", slice_)}
         for r in sorted(runs, key=lambda r: r["label"]):
-            if gap.get(r["label"], "no-test-detected" if r.get("undetected") else None) == "no-test-detected":
-                print("  %-14s %s: test lines written, no test detected in them" % ("", arm_of[r["label"]]))
-        for q in latest(of(rows, "quality", slice_), lambda r: r["label"]):
-            if q.get("gap") == "none-ran":
-                print("  %-14s %s: %d test(s) detected, none ran at the merged code" % ("", arm_of.get(q["label"]), q.get("tests", 0)))
+            gap = gaps.get((slice_, r["label"]))
+            if gap:
+                print("  %-14s %s: %s" % ("", r["arm"], GAPS[gap] % {
+                    "n": tests.get(r["label"], 0), "wrote": ", ".join(r.get("non_test_files", [])[:3]) or "a report alone"}))
+            if r["status"] == "rerun":
+                print("  %-14s %s: ran %d times in one export; priced, not scored" % ("", r["arm"], r.get("sessions_in_export", 2)))
     for path in sorted(glob.glob(os.path.join(glob.escape(ctx.cache), "*", "*"))):
         if os.path.isdir(path) and re.fullmatch(r"[0-9a-f]{16}", os.path.basename(path)) and path not in registered:
             print("  stale export: %s" % path)
@@ -2114,16 +2350,12 @@ def contracts_of(prompt):
 
 
 def criterion_text(ctx, slice_, tag):
-    """The lines that state a criterion: those naming its id in the slice's gates file, else in
-    the tester prompt `plan` kept."""
+    """The lines that state a criterion: those naming its id in the slice's acceptance ledger
+    (`kept_gates`), else in the tester prompt `plan` kept."""
     if not tag:
         return ""
     named = re.compile(r"(?<![\w.-])%s(?![\w-])" % re.escape(tag))
-    try:
-        with open(os.path.join(ctx.mem, "gates", "%s.gates.md" % slice_), errors="replace") as fh:
-            hits = [l.strip() for l in fh if named.search(l)]
-    except OSError:
-        hits = []
+    hits = [l.strip() for l in kept_gates(ctx, slice_).split("\n") if named.search(l)]
     if not hits:
         hits = [l.strip() for l in slice_prompt(ctx, slice_).split("\n") if named.search(l)]
     return " ".join(hits[:5])[:1200]
@@ -2581,6 +2813,7 @@ class Stats:
         self.findings = [f for f in latest(of(rows, "finding"), lambda r: r["finding_id"]) if f["slice"] in self.slices]
         self.quality = {}
         label_arm = {(r["slice"], r["label"]): r["arm"] for r in of(rows, "run")}
+        self.gaps = {(s, label_arm.get((s, l))): gap for (s, l), gap in gaps_of(rows).items()}
         for q in of(rows, "quality"):
             self.quality[(q["slice"], label_arm.get((q["slice"], q["label"])))] = q
         self.judged = {}
@@ -2601,8 +2834,11 @@ class Stats:
 
     # -- cells -----------------------------------------------------------------------------
     def ok(self, slice_, arm):
+        """Whether the arm's run on the slice is a measurement of the arm: its status is ok, its
+        tests are kept, and it has no measurement gap. Every table, the Total and the decision
+        take valid runs only, as the slice's standing does."""
         run = self.runs.get((slice_, arm))
-        return bool(run and run.get("status") == "ok")
+        return bool(run and run.get("status") == "ok" and run.get("tests_ref") and (slice_, arm) not in self.gaps)
 
     def reference(self, slice_, pending):
         """The findings the scored arms found on a slice."""
@@ -2790,8 +3026,12 @@ def render_report(rows, cfg, census=()):
     out += ["Tests counts the tests an arm wrote: new, or changed against the tree it was given. A test that was "
             "already in a file it edited is not run, counted or priced. Brittle counts causes: the tests of one file "
             "that fail at the default-branch head with the same failure are one break, and so is a file that no "
-            "longer compiles there (%s test(s) broken in all)." % " / ".join(
-                "%s %d" % (a, sum(st.quality.get((s, a), {}).get("brittle_tests", 0) for s in st.valid(a))) for a in st.arms), "",
+            "longer compiles there (%s test(s) broken in all). An arm's edit to a file that existed before it is "
+            "merged into that file as the default branch has it; %d such file(s) could only be merged by force and "
+            "then failed or did not build: they are no break, and no evidence that the tests in them hold either. Lines/criterion divides an arm's test lines by the slice's number of "
+            "criteria, the same for every arm." % (" / ".join(
+                "%s %d" % (a, sum(st.quality.get((s, a), {}).get("brittle_tests", 0) for s in st.valid(a))) for a in st.arms),
+                sum(st.quality.get((s, a), {}).get("stale_files", 0) for a in st.arms for s in st.valid(a))), "",
             "Total, central scenario, by term (mean per slice):", "",
             "| Arm | Run cost | Misses | False positives | Flaky | Brittle | Bloat | Total |", "|---|---|---|---|---|---|---|---|"]
     for arm in st.arms + ([st.replicate] if st.replicate else []):
@@ -2800,15 +3040,20 @@ def render_report(rows, cfg, census=()):
             parts = [mean(st.terms(s, arm, "central")[i] for s in mine) for i in range(6)]
             out.append("| %s | %s | %s |" % (arm, " | ".join(money(v) for v in parts), money(sum(parts))))
     out.append("")
-    gaps = sorted((s, arm, q.get("gap")) for (s, arm), q in st.quality.items() if q.get("gap") and s in st.slices and arm)
-    gaps += sorted((s, arm, "no-test-detected") for (s, arm), r in st.runs.items()      # not scored yet
-                   if r.get("undetected") and s in st.slices and (s, arm) not in st.quality)
+    gaps = sorted((s, arm, gap) for (s, arm), gap in st.gaps.items() if arm and s in st.assignment)
     out += ["## Measurement gaps", "",
             "An arm listed here had no test of its own run on that slice: it found nothing there because nothing "
-            "of it ran, not because it looked and found the code sound.", ""]
-    out += ["- %s %s: %s" % (s, arm, {"no-test-detected": "test lines written, no test detected in them",
+            "of it ran, not because it looked and found the code sound. Such a run is not a valid run: it is in "
+            "no table above or below and not in the decision.", ""]
+    out += ["- %s %s: %s" % (s, arm, {"no-test-file": "no file under the test paths (tests inside a source file, or a report alone)",
+                                      "no-test-detected": "test lines written, no test detected in them",
                                       "none-ran": "tests detected, none ran at the merged code"}[gap])
             for s, arm, gap in gaps] or ["None."]
+    if gaps:
+        out += ["", "Runs with a gap, by arm: %s." % ", ".join(
+            "%s %d" % (a, sum(1 for _, arm, _ in gaps if arm == a)) for a in st.arms + ([st.replicate] if st.replicate else []))]
+    reruns = sorted((s, arm) for (s, arm), r in st.runs.items() if r.get("status") == "rerun")
+    out += ["- %s %s: ran more than once in one export; priced, not scored" % pair for pair in reruns]
     out.append("")
 
     out += ["## Findings by class", "", "| Class | " + " | ".join(st.arms) + " |", "|---|" + "---|" * len(st.arms)]
@@ -3051,7 +3296,7 @@ def cmd_report(ctx, args):
 COMMANDS = {"eligible": cmd_eligible, "plan": cmd_plan, "collect": cmd_collect,
             "score": cmd_score, "status": cmd_status, "judge-pack": cmd_judge_pack,
             "judge-apply": cmd_judge_apply, "fix-cost": cmd_fix_cost, "report": cmd_report,
-            "mark": cmd_mark, "escapes": cmd_escapes, "finalize": cmd_finalize}
+            "mark": cmd_mark, "escapes": cmd_escapes, "finalize": cmd_finalize, "close-check": cmd_close_check}
 
 
 def main(argv, mem=HERE):
@@ -3105,6 +3350,9 @@ for f in files:
             cases.append((f, w[1], rules.get(k) == v, "expected %s=%s, got %s" % (k, v, rules.get(k))))
         elif w[:1] == ["needs"]:                  # imports a file the setup builds
             cases.append((f, w[1], os.path.exists(w[2]), 'Failed to resolve import "%s". Does the file exist?' % w[2]))
+        elif w[:1] == ["UNCOLLECTED"]:            # the file failed to load: one failure named after the file
+            cases = [c for c in cases if c[0] != f] + [(f, f, False, " ".join(w[1:]))]
+            break
         elif w[:1] == ["flaky"]:                  # passes on every other run
             flip = ".toyflip-" + w[1]
             ok = not os.path.exists(flip)
@@ -3680,7 +3928,7 @@ def _st_score(chk, tmp):
     chk("quality/never-ran", quality_rows["S-med-r"]["not_run"] == 1 and quality_rows["S-med"]["not_run"] == 0
         and table.get(("S-med-r", "t_gh")) == {"g1": "not-run", "g2": "not-run", "m": "not-run"}, table.get(("S-med-r", "t_gh")))
     chk("quality/size", quality_rows["S-high"]["tests"] == 4 and quality_rows["S-high"]["test_loc"] == 8
-        and quality_rows["S-high"]["loc_per_criterion"] == 2.0
+        and quality_rows["S-high"]["criteria"] == 7 and quality_rows["S-high"]["loc_per_criterion"] == 1.14
         and quality_rows["S-high"]["bloat_usd"] == round(8 * 12 * (4 * 4 + 150 * 0.2) / 1e6, 4)
         and quality_rows["S-high"]["runtime_ms"] == 40, quality_rows["S-high"])
     # The seeded-defect measure: the four lines the slice added to game/, each arm judged by its
@@ -4084,7 +4332,7 @@ def _ledger(n, found=(), costs=None, tiers=None, areas=None, quality=None, repli
             name = arm["arm"]
             rows.append({"kind": "run", "slice": s, "label": "a%d" % (j + 1), "arm": name, "role": arm["role"],
                          "status": "failed" if (s, name) in failed else "ok", "cost_usd": costs[name],
-                         "twin": name == "S-med", "cli_version": "9.9.9", "leak": False})
+                         "twin": name == "S-med", "cli_version": "9.9.9", "leak": False, "tests_ref": "0" * 40})
             q = {"no_compile_files": 0, "flaky": 0, "brittle": 0, "not_run": 0, "tests": 10, "test_loc": 100,
                  "loc_per_criterion": 10.0, "bloat_usd": 0.05}
             q.update((quality or {}).get(name, {}))
@@ -5039,6 +5287,357 @@ def _st_nextest(chk, tmp):
         quality_rows)
 
 
+def _st_budget(chk, tmp):
+    """An in-session replay the wall budget cuts short writes no result for the run it stopped
+    or never reached, so `score` runs those at merge and finds what an unhurried replay finds."""
+    box = _Box(os.path.join(tmp, "escapes-slow"), prices=_PRICES, handoff_limit=3, escapes_in_session=True, escapes_budget_s=1)
+    hook, outs = _by_command(box)
+
+    def slow(name, sha):
+        if name == "g2":
+            os.environ["TOY_RUN_SLEEP"] = "3"       # every suite outlasts the budget
+        try:
+            hook(name, sha)
+        finally:
+            os.environ.pop("TOY_RUN_SLEEP", None)
+
+    _scenario(box, hook=slow)
+    chk("escapes/a-run-the-budget-stopped-writes-no-result", "AB-SKIP budget" in outs["g2"]
+        and box.rows("exec", "np-a") == [] and box.rows("handoff", "np-a") == [], (outs["g2"], box.rows("exec", "np-a")[:2]))
+    box.run("score", "np-a")
+    lab = {label: arm for arm, (label, _) in box.labels("np-a").items()}
+    at_g2 = {(lab[r["label"]], r["test_id"].rsplit("::", 1)[1]): r["result"] for r in box.rows("exec", "np-a") if r["snap"] == "g2"}
+    cands = sorted((lab[c["label"]], (c.get("test_id") or "claim").rsplit("::", 1)[-1], c["type"])
+                   for c in current_candidates(box.rows(), "np-a"))
+    chk("escapes/score-replays-what-the-budget-cut", at_g2.get(("O-high", "t_spd")) == "fail"
+        and at_g2.get(("S-high", "t_spd")) == "fail" and at_g2.get(("S-med", "t_def")) == "pass"
+        and not any(r.get("reason") == OUT_OF_TIME for r in box.rows("exec", "np-a")), at_g2)
+    chk("escapes/candidates-equal-the-offline-ones", cands == sorted([
+        ("O-high", "t_spd", "escape"), ("O-med", "t_old", "base"), ("O-med", "claim", "spec"),
+        ("S-high", "t_def", "lens-caught"), ("S-high", "t_spd", "escape"), ("S-med", "t_def", "lens-caught"),
+        ("S-med", "t_wrong", "open-fail"), ("S-med-r", "t_def", "lens-caught")]), cands)
+
+
+def _st_gaps(chk, tmp):
+    """A shadow that wrote no file under the test paths (tests inside a source file; a report
+    alone) is recorded, said, listed, and is no valid run of its arm."""
+    box = _Box(os.path.join(tmp, "gap-files"), prices=_PRICES, mutants={"enabled": False})
+    wt = box.worktree("np-a")
+    box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+    box.shadow("np-a", "S-med", {"tests/a.toy": _toy(_T_ATK)})
+    box.shadow("np-a", "O-high", {"tests/b.toy": _toy(_T_ATK)})
+    box.shadow("np-a", "S-high", {"game/inline_mod.rs": "#[cfg(test)]\nmod t {\n    #[test]\n    fn caps() {}\n}\n"})
+    box.shadow("np-a", "O-med", {}, report="I found the code sound.\n\nFINDINGS\nNONE\n")
+    box.shadow("np-a", "S-med-r", {"tests/c.toy": _toy(_T_ATK)})
+    out = box.run("collect", "np-a")
+    runs = {r["arm"]: r for r in box.rows("run", "np-a")}
+    chk("gap/no-test-file-is-recorded-at-collect", runs["S-high"]["status"] == "ok" and runs["S-high"].get("gap") == "no-test-file"
+        and runs["S-high"]["non_test_files"] == ["game/inline_mod.rs"] and "tests_ref" not in runs["S-high"]
+        and runs["O-med"].get("gap") == "no-test-file" and runs["O-med"]["non_test_files"] == []
+        and "gap" not in runs["S-med"], (runs["S-high"], runs["O-med"]))
+    chk("gap/no-test-file-is-said-at-collect", "AB-WARN np-a: 2 shadow run(s) wrote no file under the test paths" in out, out)
+    record_snap(box.ctx(), "np-a", "m", box.commit(wt, "green", {"game/rules.txt": "hp=10\natk=5\n"}))
+    box.run("score", "np-a")
+    row = box.rows("slice", "np-a")[-1]
+    st = Stats(box.rows(), box.cfg)
+    text = render_report(box.rows(), box.cfg)
+    status = box.run("status")
+    chk("gap/the-report-agrees-with-the-slice-row", row["status"] == "degraded" and sorted(row["arms_ok"]) == ["O-high", "S-med"]
+        and [a for a in st.arms if st.ok("np-a", a)] == ["S-med", "O-high"]
+        and "| S-high | 0 |" in text and "| O-med | 0 |" in text and "| S-med | 1 |" in text, (row, text[:900]))
+    chk("gap/no-test-file-is-listed-in-the-report", "- np-a S-high: no file under the test paths" in text
+        and "- np-a O-med: no file under the test paths" in text
+        and "Runs with a gap, by arm: S-med 0, S-high 1, O-med 1, O-high 0, S-med-r 0." in text,
+        text.split("## Measurement gaps")[1][:700])
+    chk("gap/no-test-file-is-listed-in-status", "S-high: no file under the test paths (it wrote: game/inline_mod.rs)" in status
+        and "O-med: no file under the test paths (it wrote: a report alone)" in status, status)
+    # A run with any gap is in no table and no decision: here S-high's tests never ran on s01.
+    rows = _ledger(6, found=[("escape", ("O-med",), "confirmed")],
+                   extra=[{"kind": "quality", "slice": "s01", "label": "a2", "gap": "none-ran", "tests": 3, "not_run": 3}])
+    st = Stats(rows, dict(box.cfg, prices=_PRICES))
+    chk("gap/a-gap-run-is-no-valid-run-of-the-decision", not st.ok("s01", "S-high") and st.valid("S-high") == ["s%02d" % i for i in range(2, 7)]
+        and st.missed("s01", "S-med") and len(st.paired("S-high", "S-med", lambda s, a: st.total(s, a, "central"))) == 5
+        and len(st.paired("O-med", "S-med", lambda s, a: 0)) == 6, st.valid("S-high"))
+
+
+def _st_close_check(chk, tmp):
+    """The close is tried outside any slice of the experiment: with the last eligible slice
+    merged, days pass and an audit of some other slice closes it."""
+    extra = dict(prices=_PRICES, required_slices=[], pr_repo="o/r", backstops={"max_scored_slices": 16, "loop_active_days": 3})
+    box = _Box(os.path.join(tmp, "close-check"), **extra)
+    retro = _retro_stub(box)
+    hook, outs = _by_command(box)
+    _scenario(box, hook=hook)
+    early = box.run("close-check")
+    chk("close-check/open-while-no-condition-holds", early == "AB-OPEN no close condition holds\n" and not box.rows("close")
+        and retro() == [], early)
+    for days in (1, 2):
+        stamp = "%d +0000" % (time.time() + days * 86400)
+        git(box.game, *_GIT_ID, "commit", "-q", "--allow-empty", "-m", "a later day",
+            env={"GIT_COMMITTER_DATE": stamp, "GIT_AUTHOR_DATE": stamp})
+    status = box.run("status")
+    chk("close-check/status-says-the-next-audit-closes", "closes on backstop-days   met at the next audit: 3 of 3" in status, status)
+    # The real mr-audit, auditing a slice the experiment never planned (in a sandbox copy of
+    # this tool without mr-audit beside it, the command the audit calls).
+    said = ""
+    if os.path.exists(os.path.join(HERE, "mr-audit")):
+        shutil.copy2(os.path.join(HERE, "mr-audit"), os.path.join(box.mem, "mr-audit"))
+        log = os.path.join(box.tmp, "audit.jsonl")
+        with open(log, "w") as fh:
+            fh.write('{"name":"Agent","input":{"subagent_type":"tester"},"model":"claude-opus-5"}\n')
+        audit = subprocess.run(["bash", os.path.join(box.mem, "mr-audit"), "--slice", "mr-ab-close-fixture", "--log", log,
+                                "--repo", box.tmp, "--base", "a", "--head", "b"], capture_output=True, text=True, timeout=120)
+        said = "rc %s %s" % (audit.returncode, audit.stderr[-200:])
+        with contextlib.suppress(OSError):
+            os.unlink("/tmp/mr_audit_mr-ab-close-fixture.json")
+    else:
+        said = box.run("close-check")
+    close = box.rows("close")
+    chk("close-check/an-audit-of-another-slice-closes-it", len(close) == 1
+        and close[0]["reason"] == "backstop-days" and close[0]["scored_slices"] == 1 and retro() == ["tester-ab close"],
+        (said, close))
+    again = box.run("close-check")
+    wt = box.worktree("np-b")
+    chk("close-check/once", again == "AB-SKIP closed\n" and len(box.rows("close")) == 1 and retro() == ["tester-ab close"]
+        and box.run("plan", "np-b", "--prompt", box.prompt("np-b", wt)) == "AB-SKIP closed\n", again)
+    # The last sample milestone closed with the experiment still open: the supervisor closes it.
+    box = _Box(os.path.join(tmp, "close-sample-done"), **extra)
+    retro = _retro_stub(box)
+    hook, outs = _by_command(box)
+    _scenario(box, hook=hook)
+    done = box.run("close-check", "--sample-done")
+    chk("close-check/sample-done-closes-an-open-experiment", done == "AB-CLOSED sample-done\n"
+        and [c["reason"] for c in box.rows("close")] == ["sample-done"] and retro() == ["tester-ab close"]
+        and box.run("close-check", "--sample-done") == "AB-SKIP closed\n", done)
+
+
+def _st_replan(chk, tmp):
+    """`plan` again, mid-batch: the shadows that started are kept, only the others are printed;
+    a shadow that ran twice in one export is priced in full and not scored."""
+    box = _Box(os.path.join(tmp, "replan"), prices=_PRICES)
+    wt = box.worktree("np-a")
+    prompt = box.prompt("np-a", wt)
+    first = box.run("plan", "np-a", "--prompt", prompt)
+    lab = box.labels("np-a")
+    box.shadow("np-a", "S-med", {"tests/s_med.toy": _toy(_T_ATK)})
+    box.shadow("np-a", "O-med", {"tests/o_med.toy": _toy(_T_ATK)})
+    again = box.run("plan", "np-a", "--prompt", prompt)
+    calls = [l for l in again.splitlines() if "Agent(" in l]
+    chk("replan/prints-only-the-shadows-that-have-not-started", again.startswith(
+        "AB-PLAN np-a: 2 shadow(s) have already started or finished and are kept as they are. Issue only these 3 Agent call(s)")
+        and len(calls) == 3 and not any(lab[a][1] in again for a in ("S-med", "O-med"))
+        and all(lab[a][1] in again for a in ("S-high", "O-high", "S-med-r"))
+        and all(c.split(". ", 1)[1] in first for c in calls) and set(re.findall(r'subagent_type="([^"]*)"', again)) == {"tester"}
+        and again.rstrip().endswith("mr-tester-ab collect np-a"), again)
+    # Started and killed before its transcript was written: its export is no longer the base tree.
+    os.makedirs(os.path.join(lab["S-high"][1], "tests"), exist_ok=True)
+    with open(os.path.join(lab["S-high"][1], "tests", "half.toy"), "w") as fh:
+        fh.write("test t_half atk=5\n")
+    chk("replan/an-export-that-changed-has-started", box.run("plan", "np-a", "--prompt", prompt).count("Agent(") == 2)
+    box.shadow("np-a", "S-high", {"tests/s_high.toy": _toy(_T_ATK)})
+    box.shadow("np-a", "O-high", {"tests/o_high.toy": _toy(_T_ATK)})
+    box.shadow("np-a", "S-med-r", {"tests/s_med_r.toy": _toy(_T_ATK)})
+    full = box.run("plan", "np-a", "--prompt", prompt)
+    chk("replan/nothing-left-to-issue", full.startswith("AB-PLAN np-a: every shadow has already started or finished; issue no shadow call")
+        and "Agent(" not in full, full)
+    # The call was issued again all the same: two sessions worked in S-med's export.
+    box.shadow("np-a", "S-med", {"tests/s_med2.toy": _toy(_T_DEF)})
+    out = box.run("collect", "np-a")
+    runs = {r["arm"]: r for r in box.rows("run", "np-a")}
+    chk("replan/a-second-run-in-one-export-is-priced-in-full-and-not-scored", runs["S-med"]["status"] == "rerun"
+        and runs["S-med"]["cost_usd"] == 4.0 and runs["S-med"]["sessions_in_export"] == 2
+        and runs["O-med"]["status"] == "ok" and runs["O-med"]["cost_usd"] == 4.0 and spent(box.rows()) == 16.0
+        and "AB-WARN np-a: 1 shadow(s) ran more than once in one export" in out
+        and all(r["label"] != runs["S-med"]["label"] for r in ok_runs(box.rows(), "np-a")), (runs["S-med"], out))
+    chk("replan/status-names-the-rerun", "S-med: ran 2 times in one export; priced, not scored" in box.run("status"), box.run("status"))
+
+
+def _st_end_merge(chk, tmp):
+    """At the default-branch head an arm's edit to a file that existed before it is merged into
+    that file as the head has it: the file's old content, which the arm did not write, cannot
+    break the arm's tests, and a real break of one of them still shows."""
+    pad = "# pad 1\n# pad 2\n# pad 3\n# pad 4\n# pad 5\n# pad 6\n"
+    old = "requires mp\n# criterion: C1\ntest t_old hp=10\n" + pad
+    box = _Box(os.path.join(tmp, "end-merge"), prices=_PRICES, mutants={"enabled": False})
+    box.commit(box.game, "an existing suite", {"tests/shared.toy": old})
+    wt = box.worktree("np-a")
+    box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+    lab = {arm: label for arm, (label, _) in box.labels("np-a").items()}
+    box.shadow("np-a", "S-med", {"tests/shared.toy": old + _toy(("t_a", "atk=5", "C2"))})
+    box.shadow("np-a", "S-high", {"tests/shared.toy": old + _toy(("t_b", "hp=10", "C3"))})
+    # O-med also rewrites the line the default branch changes afterwards.
+    box.shadow("np-a", "O-med", {"tests/shared.toy": old.replace("requires mp\n", "requires mp  # the fixture\n")
+                                 + _toy(("t_c", "atk=5", "C4"))})
+    box.shadow("np-a", "O-high", {"tests/new.toy": "requires mp\n" + _toy(("t_d", "atk=5", "C5"))})
+    # The replicate rewords a comment the default branch rewords too: the merge is forced, and builds.
+    box.shadow("np-a", "S-med-r", {"tests/shared.toy": old.replace("# pad 2\n", "# pad 2, kept\n")
+                                   + _toy(("t_e", "hp=10", "C6"), ("t_f", "atk=5", "C7"))})
+    box.run("collect", "np-a")
+    record_snap(box.ctx(), "np-a", "m", box.commit(wt, "green", {"game/rules.txt": "hp=10\nold=bug\nmp=4\natk=5\n"}))
+    git(box.game, "merge", "-q", "--ff-only", "slice/np-a")
+    # Later work renames the fixture key the old suite requires, and raises hp.
+    box.commit(box.game, "later work", {"game/rules.txt": "hp=11\nold=bug\nmana=4\natk=5\n",
+                                        "tests/shared.toy": "requires mana\n# criterion: C1\ntest t_old hp=11\n"
+                                        + pad.replace("# pad 2\n", "# pad two\n")})
+    box.run("score", "np-a", "--end")
+    end = {(r["label"], r["test_id"].rsplit("::", 1)[1]): (r["result"], r.get("reason")) for r in box.rows("exec", "np-a")
+           if r["snap"] == "end"}
+    at_m = {r["result"] for r in box.rows("exec", "np-a") if r["snap"] == "m"}
+    q = {r["label"]: r for r in latest(box.rows("quality", "np-a"), lambda r: r["label"])}
+    chk("end/an-edit-to-an-existing-file-is-merged-into-the-head's", at_m == {"pass"}
+        and end.get((lab["S-med"], "t_a")) == ("pass", None) and q[lab["S-med"]]["brittle"] == 0
+        and q[lab["S-med"]]["stale_files"] == 0, (end.get((lab["S-med"], "t_a")), q[lab["S-med"]]))
+    chk("end/a-real-break-in-an-existing-file-still-shows", end.get((lab["S-high"], "t_b"), ("",))[0] == "fail"
+        and q[lab["S-high"]]["brittle"] == 1 and q[lab["S-high"]]["brittle_files"] == 0, (end.get((lab["S-high"], "t_b")), q[lab["S-high"]]))
+    chk("end/a-forced-merge-that-does-not-build-is-stale-not-brittle", end.get((lab["O-med"], "t_c")) == ("not-run", STALE)
+        and q[lab["O-med"]]["brittle"] == 0 and q[lab["O-med"]]["stale_files"] == 1, (end.get((lab["O-med"], "t_c")), q[lab["O-med"]]))
+    chk("end/a-file-the-arm-created-is-its-own", end.get((lab["O-high"], "t_d"), ("",))[0] == "no-compile"
+        and q[lab["O-high"]]["brittle"] == 1 and q[lab["O-high"]]["brittle_files"] == 1, (end.get((lab["O-high"], "t_d")), q[lab["O-high"]]))
+    chk("end/in-a-forced-merge-a-pass-counts-and-a-failure-is-stale", end.get((lab["S-med-r"], "t_e")) == ("not-run", STALE)
+        and end.get((lab["S-med-r"], "t_f")) == ("pass", None) and q[lab["S-med-r"]]["brittle"] == 0
+        and q[lab["S-med-r"]]["stale_files"] == 1, (end.get((lab["S-med-r"], "t_e")), end.get((lab["S-med-r"], "t_f")), q[lab["S-med-r"]]))
+    text = render_report(box.rows(), box.cfg)
+    scratch = box.ctx().scratch
+    chk("end/the-report-counts-stale-files-apart", "1 such file(s) could only be merged by force" in text
+        and open(os.path.join(scratch, "tests", "shared.toy")).read().startswith("requires mana\n")
+        and "t_a" not in open(os.path.join(scratch, "tests", "shared.toy")).read(), text[:200])
+
+
+# What vitest's junit reporter wrote for three files in the game's client: one whose static
+# import names no module, one with a failing and a passing test, one that does not parse.
+_VITEST_JUNIT = '''<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="4" failures="3" errors="0" time="0.00768082">
+    <testsuite name="src/zzprobe/imp.test.ts" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="src/zzprobe/imp.test.ts" name="src/zzprobe/imp.test.ts" time="0">
+            <failure message="Cannot find module &apos;./invented-module&apos; imported from /c/src/zzprobe/imp.test.ts" type="Error">
+Error: Cannot find module &apos;./invented-module&apos; imported from /c/src/zzprobe/imp.test.ts
+Serialized Error: { code: &apos;ERR_MODULE_NOT_FOUND&apos; }
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/zzprobe/ok.test.ts" tests="2" failures="1" errors="0" skipped="0" time="0.00768082">
+        <testcase classname="src/zzprobe/ok.test.ts" name="fine one" time="0.001547279">
+        </testcase>
+        <testcase classname="src/zzprobe/ok.test.ts" name="bad one" time="0.005117163">
+            <failure message="expected 1 to be 2 // Object.is equality" type="AssertionError">
+AssertionError: expected 1 to be 2 // Object.is equality
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/zzprobe/syn.test.ts" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="src/zzprobe/syn.test.ts" name="src/zzprobe/syn.test.ts" time="0">
+            <failure message="Transform failed with 1 error:
+/c/src/zzprobe/syn.test.ts:3:0: ERROR: Unexpected end of file" type="Error">
+Error: Transform failed with 1 error:
+            </failure>
+        </testcase>
+    </testsuite>
+</testsuites>
+'''
+
+
+def _st_unloadable(chk, tmp):
+    """A test file the runner could not collect is `no-compile`, a false positive of its arm, as
+    a Rust file that does not build; it is `not-run` only where the setup step that builds what
+    it imports failed."""
+    def play(name, steps):
+        box = _Box(os.path.join(tmp, "uncollected-" + name), prices=_PRICES, mutants={"enabled": False})
+        box.cfg["runners"][0].update(setup=steps, unresolved="Failed to resolve import|Cannot find (module|package)")
+        box.write_cfg()
+        wt = box.worktree("np-a")
+        box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+        box.shadow("np-a", "S-med", {"tests/syn.toy": _toy(_T_ATK) + "UNCOLLECTED Transform failed: Unexpected end of file\n"})
+        box.shadow("np-a", "O-med", {"tests/imp.toy": _toy(_T_ATK) + "UNCOLLECTED Cannot find module './invented'\n",
+                                     "tests/fine.toy": _toy(_T_DEF)})
+        box.run("collect", "np-a")
+        record_snap(box.ctx(), "np-a", "g1", box.commit(wt, "green", {"game/rules.txt": "hp=10\natk=5\ndef=3\n"}))
+        record_snap(box.ctx(), "np-a", "m", box.commit(wt, "docs", {"docs/note.md": "later\n"}))
+        box.run("score", "np-a")
+        lab = {label: arm for arm, (label, _) in box.labels("np-a").items()}
+        got = {(lab[r["label"]], r["test_id"].rsplit("/", 1)[1]): r["result"] for r in box.rows("exec", "np-a") if r["snap"] == "m"}
+        return box, got, {lab[q["label"]]: q for q in box.rows("quality", "np-a")}
+
+    box, got, q = play("plain", [])
+    st = Stats(box.rows(), box.cfg)
+    chk("uncollected/a-file-that-was-not-collected-is-no-compile", got == {
+        ("S-med", "syn.toy::t_atk"): "no-compile", ("O-med", "imp.toy::t_atk"): "no-compile", ("O-med", "fine.toy::t_def"): "pass"}
+        and q["S-med"]["no_compile_files"] == 1 and q["O-med"]["no_compile_files"] == 1 and q["O-med"]["not_run"] == 0, got)
+    chk("uncollected/it-is-one-false-positive-of-its-arm", st.false_positives("np-a", "O-med") == 1
+        and round(st.terms("np-a", "O-med", "central")[2], 2) == 2.07 and current_candidates(box.rows(), "np-a") == [], st.terms("np-a", "O-med", "central"))
+    box, got, q = play("setup-failed", [{"cmd": ["false"], "if_missing": "ignored/pkg", "optional": True}])
+    why = {r.get("reason") for r in box.rows("exec", "np-a") if r["test_id"].endswith("imp.toy::t_atk")}
+    chk("uncollected/an-import-the-failed-setup-should-have-built-is-not-run", got.get(("O-med", "imp.toy::t_atk")) == "not-run"
+        and got.get(("S-med", "syn.toy::t_atk")) == "no-compile" and q["O-med"]["no_compile_files"] == 0
+        and all(w and w.startswith("unresolved import: Cannot find module") and "setup step toy: `false` exit 1" in w for w in why), (got, why))
+    # The shape vitest writes, read by the shipped test patterns.
+    shipped = Ctx(HERE).cfg
+    canned = os.path.join(tmp, "vitest-junit.xml")
+    with open(canned, "w") as fh:
+        fh.write(_VITEST_JUNIT)
+    unresolved = next(r["unresolved"] for r in shipped["runners"] if r["name"] == "vitest")
+    box = _Box(os.path.join(tmp, "uncollected-vitest"), prices=_PRICES, mutants={"enabled": False},
+               test_patterns=shipped["test_patterns"], test_paths=[r"\.test\.ts$"],
+               runners=[{"name": "vitest", "match": r"\.test\.ts$", "cwd": "", "timeout_s": 60, "unresolved": unresolved,
+                         "cmd": ["/bin/sh", "-c", "cp %s {junit}; exit 1" % canned]}])
+    wt = box.worktree("np-a")
+    box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+    head = "import { it, expect } from 'vitest';\n"
+    box.shadow("np-a", "S-med", {
+        "src/zzprobe/syn.test.ts": head + "it('syntax one', () => { expect(1).toBe(1) ;\n",
+        "src/zzprobe/imp.test.ts": head + "import { nope } from './invented-module';\nit('imports one', () => { expect(nope).toBe(1); });\n",
+        "src/zzprobe/ok.test.ts": head + "it('fine one', () => { expect(1).toBe(1); });\nit('bad one', () => { expect(1).toBe(2); });\n"})
+    box.run("collect", "np-a")
+    record_snap(box.ctx(), "np-a", "m", box.commit(wt, "green", {"game/rules.txt": "hp=10\natk=5\n"}))
+    box.run("score", "np-a")
+    got = {r["test_id"].rsplit("/", 1)[1]: r["result"] for r in box.rows("exec", "np-a") if r["run_n"] == 1}
+    chk("uncollected/vitest's-report-of-a-file-it-could-not-load", got == {
+        "syn.test.ts::syntax one": "no-compile", "imp.test.ts::imports one": "no-compile",
+        "ok.test.ts::fine one": "pass", "ok.test.ts::bad one": "fail"}
+        and box.rows("quality", "np-a")[-1]["no_compile_files"] == 2, got)
+
+
+def _st_gates(chk, tmp):
+    """The slice's acceptance ledger is kept at `plan`: the judge is shown a criterion's text
+    after the live file has been archived, and lines per criterion divides by the slice's
+    criteria, the same number for every arm."""
+    box = _Box(os.path.join(tmp, "gates"), prices=_PRICES, mutants={"enabled": False},
+               judge={"model": "fable", "effort": "high", "max_items": 150})
+    gates = ("# Gates: np-a\n\n- [ ] C1: WHEN a monster attacks THE damage SHALL use its attack.\n  CHECK: just ci\n"
+             "- [ ] C2: THE defence of a new monster SHALL be three.\n- [x] C3: THE speed SHALL be seven.\n"
+             "- [ ] C4: THE old rule SHALL be fixed.\n")
+    live = os.path.join(box.mem, "gates", "np-a.gates.md")
+    os.makedirs(os.path.dirname(live))
+    with open(live, "w") as fh:
+        fh.write(gates)
+    wt = box.worktree("np-a")
+    box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+    kept = os.path.join(box.mem, "tester-ab", "np-a", "gates.md")
+    chk("gates/kept-at-plan", os.path.isfile(kept) and open(kept).read() == gates)
+    box.shadow("np-a", "S-med", {"tests/a.toy": _toy(("t_def", "def=3", "C2"), ("t_def2", "def=3", "C2"))})
+    box.shadow("np-a", "O-med", {"tests/b.toy": _toy(_T_ATK, _T_DEF)})
+    box.run("collect", "np-a")
+    record_snap(box.ctx(), "np-a", "g1", box.commit(wt, "green", {"game/rules.txt": "hp=10\natk=5\ndef=2\n"}))
+    record_snap(box.ctx(), "np-a", "m", box.commit(wt, "fix", {"game/rules.txt": "hp=10\natk=5\ndef=3\n"}))
+    box.run("score", "np-a")
+    os.unlink(live)             # thirty days on, mr-record has moved it away
+    out = box.run("judge-pack")
+    bundle = open(bundle_place(box.ctx(), 1)[0]).read() if "AB-JUDGE-PACK" in out else ""
+    chk("gates/the-judge-is-shown-the-criterion-after-the-live-file-is-gone",
+        bundle.count("criterion: C2 - [ ] C2: THE defence of a new monster SHALL be three.") == 3, bundle[:1500])
+    lab = {label: arm for arm, (label, _) in box.labels("np-a").items()}
+    q = {lab[r["label"]]: r for r in box.rows("quality", "np-a")}
+    # Both wrote four test lines; S-med used one tag and O-med two. The slice has four criteria.
+    chk("gates/lines-per-criterion-divides-by-the-slice's-criteria", q["S-med"]["criteria"] == 4 and q["O-med"]["criteria"] == 4
+        and q["S-med"]["test_loc"] == q["O-med"]["test_loc"] == 4
+        and q["S-med"]["loc_per_criterion"] == q["O-med"]["loc_per_criterion"] == 1.0, (q["S-med"], q["O-med"]))
+    os.unlink(kept)
+    os.makedirs(os.path.join(box.mem, "gates", "archive"))
+    with open(os.path.join(box.mem, "gates", "archive", "np-a.gates.md"), "w") as fh:
+        fh.write(gates)
+    chk("gates/the-archive-is-read-when-nothing-was-kept", "SHALL be seven" in criterion_text(box.ctx(), "np-a", "C3")
+        and criterion_text(box.ctx(), "np-b", "C3") == "")
+
+
 def _st_shipped_config(chk):
     """The config beside this tool loads and has what the commands read."""
     try:
@@ -5132,6 +5731,9 @@ def _st_shipped_config(chk):
         chk("close/the-retro-lifts-the-blocks-and-decides-d2", "blocked: tester-ab-close" in play
             and "M-test-pruning.spec.md" in play and "structure.spec.md" in play and "`tp-3`" in play
             and "`st-3` and `st-4`" in play and "decision D2" in play and "census" in play, play[-900:])
+        spec = beside("..", "..", "specs", "monster-realm-v2", "M-test-pruning.spec.md") or ""
+        chk("close/the-spec-says-how-an-open-experiment-stops-holding-the-blocks", "mr-tester-ab close-check --sample-done" in spec
+            and '"close-check"' in (beside("mr-audit") or ""), spec[:0])
         brief = beside("mr-brief-template.md") or ""
         chk("tester/the-brief-says-the-tester-has-no-shell", "the tester's tools have no shell" in brief
             and "static-only" not in brief, brief[:0])
@@ -5144,11 +5746,12 @@ def _st_shipped_config(chk):
 
 
 _BATTERIES = [_st_disabled, _st_plan, _st_collect, _st_score, _st_no_game_diff, _st_ledger]
-_FLOOR = 288
+_FLOOR = 320
 _BATTERIES += [_st_judge, _st_report]
 _BATTERIES += [_st_session, _st_finalize, _st_offline, _st_uncollected]
 _BATTERIES += [_st_runner, _st_reaudit, _st_nextest]
 _BATTERIES += [_st_adoption, _st_setup, _st_own]
+_BATTERIES += [_st_budget, _st_gaps, _st_close_check, _st_replan, _st_end_merge, _st_unloadable, _st_gates]
 # MORE-BATTERIES
 
 

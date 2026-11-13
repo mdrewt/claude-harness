@@ -439,8 +439,11 @@ def emit(out, artifact_dir="/tmp"):
 def finalize_ab(a, mem, tool=None, timeout=20):
     """Tell the tester A/B experiment that this slice reached its pre-merge audit, when the
     experiment planned the slice (a manifest exists). It records the audited head and starts its
-    own scoring detached. FAIL-OPEN: the call is bounded, its output and exit code are discarded,
-    and nothing it does or fails to do reaches the audit JSON or this tool's exit code.
+    own scoring detached. On any other slice, while the experiment's ledger exists and holds no
+    `close` row, it asks for a `close-check` instead: the experiment's last close condition is
+    met by loop-active days passing, after its last slice has merged, and an audit is the one
+    event that keeps coming. FAIL-OPEN: the call is bounded, its output and exit code are
+    discarded, and nothing it does or fails to do reaches the audit JSON or this tool's exit code.
 
     `tool` and `timeout` are FUNCTION PARAMETERS, as in audit_acceptance: the selftest points
     them at stubs. Never raises."""
@@ -448,11 +451,16 @@ def finalize_ab(a, mem, tool=None, timeout=20):
         slice_id = a.get("slice", "")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", slice_id):
             return
-        if not os.path.isfile(os.path.join(mem, "tester-ab", slice_id, "manifest.json")):
-            return
-        argv = [tool or os.path.join(mem, "mr-tester-ab"), "finalize", slice_id]
-        if a.get("repo") and a.get("head"):
-            argv += ["--repo", a["repo"], "--head", a["head"]]
+        if os.path.isfile(os.path.join(mem, "tester-ab", slice_id, "manifest.json")):
+            argv = [tool or os.path.join(mem, "mr-tester-ab"), "finalize", slice_id]
+            if a.get("repo") and a.get("head"):
+                argv += ["--repo", a["repo"], "--head", a["head"]]
+        else:
+            # The ledger's rows are written with sorted keys, one object a line.
+            with open(os.path.join(mem, "mr-tester-ab.jsonl"), errors="replace") as fh:
+                if any('"kind": "close"' in line for line in fh):
+                    return
+            argv = [tool or os.path.join(mem, "mr-tester-ab"), "close-check"]
         subprocess.run(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL, timeout=timeout)
     except Exception:
@@ -1744,8 +1752,9 @@ _ST_GIT_SCRUB = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIREC
 
 
 def _st_ab_battery(chk, tmp):
-    """finalize_ab: called only for a slice the experiment planned, with the audited head, and
-    a finalize that fails or hangs neither raises nor leaves anything behind."""
+    """finalize_ab: `finalize` for a slice the experiment planned, with the audited head;
+    `close-check` for any other slice while the ledger exists and holds no close row; and a
+    call that fails or hangs neither raises nor leaves anything behind."""
     mem = _st_mkdir(tmp, "ab-mem")
     seen = os.path.join(tmp, "ab-seen")
 
@@ -1783,6 +1792,25 @@ def _st_ab_battery(chk, tmp):
     got = open(seen).read() if os.path.exists(seen) else ""
     chk.check("AB7/hostile-slice-id/not-called", 2, got.count("\n"))
     chk.check("AB8/leaves-nothing-behind", before, listing())
+    # A slice the experiment did not plan: with an open ledger the audit asks for a close-check,
+    # since no finalize is left to come once the experiment's last slice has merged.
+    os.remove(seen)
+    other = {"slice": "ab-s2", "repo": "/r", "head": "abc123"}
+    ledger = os.path.join(mem, "mr-tester-ab.jsonl")
+    _st_w(ledger, '{"kind": "assignment", "slice": "ab-s1"}\n{"kind": "snap", "name": "m", "slice": "ab-s1"}\n')
+    finalize_ab(other, mem, tool=record)
+    got = open(seen).read() if os.path.exists(seen) else ""
+    chk.check("AB9/open-ledger-asks-for-a-close-check", "close-check\n", got,
+              "an audit of a slice without a manifest must call `close-check` while the ledger has no close row")
+    chk.check("AB9/failing-close-check", None, finalize_ab(other, mem, tool=stub("fail2", "echo noise; exit 3")))
+    with open(ledger, "a") as fh:
+        fh.write('{"kind": "close", "reason": "backstop-days", "slice": "-"}\n')
+    finalize_ab(other, mem, tool=record)
+    got = open(seen).read() if os.path.exists(seen) else ""
+    chk.check("AB10/closed-ledger-no-call", "close-check\n", got, "a closed experiment is not asked again")
+    finalize_ab(args, mem, tool=record)
+    got = open(seen).read() if os.path.exists(seen) else ""
+    chk.check("AB11/a-planned-slice-still-finalizes", "close-check\nfinalize ab-s1 --repo /r --head abc123\n", got)
 
 
 def selftest():

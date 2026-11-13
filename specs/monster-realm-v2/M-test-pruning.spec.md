@@ -360,9 +360,14 @@ the analysis runs.
   symbol, or edits a pin file that a consolidation rewrites, stops compiling. So `tp-3` (which
   turns the routing on) and the sections `st-3` and `st-4` carry `blocked: tester-ab-close`. The
   supervisor lifts it when `memory/projects/mr-tester-ab.jsonl` holds a `close` row (operator
-  decision D3). An experiment that never ran cannot hold it: the block also lifts once
+  decision D3). The experiment writes that row itself: every pre-merge audit tries its close
+  conditions (`mr-tester-ab close-check`), so the loop-active-days backstop closes it after its
+  last slice has merged. An experiment that never ran cannot hold the block: it also lifts once
   M-econ-onboarding, the last sample milestone, has closed while `mr-tester-ab.config.json` is
-  absent or reads `enabled: false`.
+  absent or reads `enabled: false`. An enabled experiment that is still open when that
+  milestone closes has no slice left to wait for: the supervisor runs
+  `$MEM/mr-tester-ab close-check --sample-done`, which writes the `close` row and queues the
+  close retro, and the block lifts by the first rule.
 - `tp-1` and `tp-2` add a report tool nothing calls. `tp-1` adds one line each to `mr-selfcheck`
   and `memory/projects/.gitignore`, which the experiment's own build also edits; `mr-disjoint`
   serialises the launches.

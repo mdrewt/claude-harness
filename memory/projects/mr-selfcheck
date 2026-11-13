@@ -45,7 +45,7 @@ EOF
 AB_ST=$("$MEM/mr-tester-ab" --selftest 2>&1 | tail -n 1)
 AB_N=${AB_ST#TESTER-AB-SELFTEST-OK }
 case "$AB_ST" in
-  "TESTER-AB-SELFTEST-OK "*) [ "$AB_N" -ge 288 ] 2>/dev/null || { echo "SELFCHECK-FAIL mr-tester-ab selftest ran $AB_N fixtures (floor 288)"; BAD=1; } ;;
+  "TESTER-AB-SELFTEST-OK "*) [ "$AB_N" -ge 320 ] 2>/dev/null || { echo "SELFCHECK-FAIL mr-tester-ab selftest ran $AB_N fixtures (floor 320)"; BAD=1; } ;;
   *) echo "SELFCHECK-FAIL mr-tester-ab selftest: $(echo "$AB_ST" | cut -c1-160)"; BAD=1 ;;
 esac
 # run-cost: every ended build session leaves exactly one ledger cost row, carrying that session's
@@ -1898,7 +1898,9 @@ sys.exit(bad)
 PYAUDIT
 # tester-ab: after its verdict is out, mr-audit tells mr-tester-ab that a slice the experiment planned
 # reached its audit (finalize_ab). The REAL mr-audit runs here in a sandbox MEM beside a stub
-# mr-tester-ab: the stub is called for a slice with a manifest and only then, with the audited head;
+# mr-tester-ab: the stub is called with `finalize` and the audited head for a slice with a manifest,
+# with `close-check` for any other slice while the ledger exists and holds no close row (the
+# experiment's last close condition is met by days passing, after its last slice has merged), else not;
 # and a stub that fails changes neither the audit JSON nor the exit code and leaves no file behind.
 # The hanging finalize is in mr-audit's own battery, where the timeout is a parameter.
 /usr/bin/python3 - "$MEM" <<'PYABAUDIT' || BAD=1
@@ -1948,6 +1950,19 @@ with tempfile.TemporaryDirectory(prefix="mr-selfcheck-ab-audit-") as TMP:
     rc0, out0 = audit()
     if os.path.exists(seen):
         fail("called-without-a-manifest", open(seen).read().strip()[:160])
+    ledger = os.path.join(mem, "mr-tester-ab.jsonl")
+    for rows, want in (('{"kind": "snap", "name": "m", "slice": "np-1"}\n', "close-check\n"),
+                       ('{"kind": "snap", "name": "m", "slice": "np-1"}\n{"kind": "close", "reason": "cap", "slice": "-"}\n', "")):
+        with open(ledger, "w") as fh:
+            fh.write(rows)
+        rc, out = audit()
+        called = open(seen).read() if os.path.exists(seen) else ""
+        if called != want or rc != 0 or out != out0:
+            fail("close-check-on-an-unplanned-slice", "with %s in the ledger mr-audit must call %r and print the "
+                 "same audit; it called %r (rc %r)" % ("a close row" if not want else "no close row", want, called[:160], rc))
+        if os.path.exists(seen):
+            os.remove(seen)
+    os.remove(ledger)
     os.makedirs(os.path.join(mem, "tester-ab", SLICE))
     with open(os.path.join(mem, "tester-ab", SLICE, "manifest.json"), "w") as fh:
         fh.write("{}\n")
