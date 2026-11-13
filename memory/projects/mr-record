@@ -18,6 +18,9 @@
 #               promoted residual, and has sat untouched >30d — move-never-delete into
 #               gates/archive/ with an INDEX.md recovery line. Also hooked on every MERGED
 #               closing `ledger` row (the merge-time close point); see the gates-rotate block.
+#   --selftest [ID ...]  runs mr-record.selftest.py beside this copy (RECORD-SELFTEST-OK <n> on pass).
+#   A MERGED closing `ledger` row that leaves every slice of its milestone spec with a MERGED row
+#   also runs `mr-prune close` for that spec; see the prune-close block at the end.
 #               (lp-queue) mr-state.json's `queue[]` fast-path-hint pointers — see the queue block
 #               below. These are the SOLE writers of the `queue` key: a tick's own end-of-tick
 #               mr-state.json write must re-read `queue` fresh immediately before writing (never its
@@ -42,6 +45,8 @@ MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 # a self-locating MEM would let a worktree copy fork the append-only SSOT. Only the mr-backup
 # HELPER is resolved beside the copy actually being run (MEM_SELF, see _backup_bin).
 MEM_SELF="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# The battery beside this copy drives a sandbox copy of it; see mr-record.selftest.py.
+[ "${1:-}" = --selftest ] && { shift; exec /usr/bin/python3 "$MEM_SELF/mr-record.selftest.py" "$@"; }
 SUB="${1:?usage: mr-record ledger|handoff|queue-add|queue-remove|gates-rotate ...}"; shift
 export MEM MEM_SELF SUB
 ARGS_JSON=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@")
@@ -674,4 +679,62 @@ if closing and outcome.strip().upper().startswith("MERGED") \
         and not (os.environ.get("MR_RECORD_LEDGER") and not os.environ.get("MR_RECORD_GATES_DIR")):
     try: gates_rotate(False)
     except Exception as exc: sys.stderr.write("WARN gates-rotate: %s: %s\n"%(type(exc).__name__,exc))
+# prune-close hook: when this MERGED row leaves every `### <id> — ` slice under `## Slices` of the
+# milestone spec holding the slice with a MERGED row, the game repo is fetched and
+# `mr-prune close` records the milestone's census (prune/trend.jsonl, prune/close/). A milestone
+# spec is any *.spec.md of the corpus but structure.spec.md and residuals.spec.md. TOTAL like
+# gates-rotate: any failure is one `WARN prune-close:` line on stderr and the row stands. mr-prune
+# is resolved only beside the running copy, so a sandbox copy without it is the missing case.
+# Fixture guard: a fixture ledger runs the hook only with MR_RECORD_PRUNE_MEM (the --mem dir) set.
+PRUNE_NOT_MILESTONE=("structure.spec.md","residuals.spec.md")
+PRUNE_SLICE_HEADING=re.compile(r"^###\s+(\S+)\s+—\s")
+PRUNE_SLICES=re.compile(r"##\s+Slices\s*$")
+
+def _spec_slice_ids(text):
+    """mr-prune's grammar: the `### <id> — ` headings under `## Slices`, code fences aside."""
+    ids, inside, fenced = [], False, False
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"): fenced = not fenced
+        if fenced: continue
+        if re.match(r"#{1,2}\s", line): inside = bool(PRUNE_SLICES.match(line))
+        m = PRUNE_SLICE_HEADING.match(line) if inside else None
+        if m and m.group(1) not in ids: ids.append(m.group(1))
+    return ids
+
+def prune_close(slice_id):
+    corpus=os.path.join(HARNESS,"specs","monster-realm-v2")
+    holding=[]
+    for name in sorted(os.listdir(corpus)):
+        if not name.endswith(".spec.md") or name in PRUNE_NOT_MILESTONE: continue
+        path=os.path.join(corpus,name)
+        ids=_spec_slice_ids(open(path,errors="replace").read())
+        if slice_id in ids: holding.append((path,ids))
+    if not holding: return
+    if len(holding)>1:
+        raise RuntimeError("%s is a slice of %d milestone specs: %s"%(slice_id,len(holding),
+                           ", ".join(os.path.basename(p) for p,_ in holding)))
+    spec,ids=holding[0]
+    if not set(ids)<=_merged_slices(LEDGER): return
+    limit=float(os.environ.get("MR_RECORD_PRUNE_TIMEOUT") or 300)
+    repo=os.path.join(HARNESS,"projects","monster-realm")
+    prune=os.path.join(os.environ.get("MEM_SELF") or MEM,"mr-prune")
+    if not os.path.isfile(prune): raise RuntimeError("%s is missing"%prune)
+    def step(what, cmd):
+        try: r=subprocess.run(cmd,capture_output=True,text=True,timeout=limit,stdin=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired: raise RuntimeError("%s ran past %gs"%(what,limit))
+        if r.returncode!=0:
+            tail=(r.stderr.strip().splitlines() or ["(no stderr)"])[-1]
+            raise RuntimeError("%s exited %d: %s"%(what,r.returncode,tail[:200]))
+        return r.stdout
+    step("git fetch",["git","-C",repo,"fetch","--quiet","origin"])
+    out=step("mr-prune close",[sys.executable,prune,"close","--spec",spec,"--repo",repo,
+                               "--at","refs/remotes/origin/master","--mem",PRUNE_MEM])
+    print("prune-close: "+(out.strip().splitlines() or ["(no output)"])[0])
+
+PRUNE_MEM=os.environ.get("MR_RECORD_PRUNE_MEM") or MEM
+if closing and outcome.strip().upper().startswith("MERGED") \
+        and not (os.environ.get("MR_RECORD_LEDGER") and not os.environ.get("MR_RECORD_PRUNE_MEM")):
+    try: prune_close(slice_)
+    except Exception as exc:
+        sys.stderr.write("WARN prune-close: %s\n"%" ".join(("%s: %s"%(type(exc).__name__,exc)).split()))
 PY
