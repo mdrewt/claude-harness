@@ -2427,11 +2427,33 @@ def tp4_a2(ctx):
     change(repo, reverting('Revert "%s"' % s6, r6a), drop=[paths["golf"]])
     r8 = change(repo, subject("rv-8", "add india"), tw("india"))
     change(repo, reverting("chore: a note", r8[:6]))
+    # the commits below change no file, so the line sums of the six commits above stand
+    r9a = change(repo, subject("rv-9", "first"))
+    r9b = change(repo, subject("rv-9", "second"))
+    r9c = change(repo, subject("rv-9", "third"))
+    change(repo, "chore: undo two\n\nThis reverts commit %s.\nThis reverts commit %s." % (r9a, r9b))
+    s10 = subject("rv-10", "add")
+    r10 = change(repo, s10)
+    change(repo, 'Revert "%s"' % s10)
+    change(repo, 'Revert "Revert "%s""' % s10)
+    s11 = subject("rv-11", "add")
+    r11a = change(repo, s11)
+    change(repo, s11)
+    change(repo, s11)
+    change(repo, 'Revert "%s"' % s11)
+    change(repo, 'Revert "%s"' % s11)
+    r12a = change(repo, subject("rv-12", "stays"))
+    s12 = subject("rv-12", "goes")
+    change(repo, s12 + " (#7)")
+    change(repo, 'Revert "%s (#7)" (#8)' % s12)
+    s13 = subject("rv-13", "add")
+    r13 = change(repo, s13)
+    change(repo, reverting('Revert "%s"' % s13, "0123456789abcdef0123456789abcdef01234567"))
     s7 = subject("rv-7", "add juliet")
     r7 = change(repo, s7, tw("juliet"))
     change(repo, reverting('Revert "%s"' % s7, r7), drop=[paths["juliet"]])
     label = "M-rev"
-    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("rv-%d" % k, None) for k in range(1, 9)]))
+    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("rv-%d" % k, None) for k in range(1, 14)]))
     mem = new_mem()
     r = close(repo, r7, mem, spec)
     co = close_obj(mem, label)
@@ -2443,10 +2465,18 @@ def tp4_a2(ctx):
         ("rv-6", [r6b], "a `This reverts commit` line decides over the subject: rv-6 loses the commit the line names and keeps the one the subject names"),
         ("rv-7", [r7], "a revert that is not reachable from --at undoes nothing: rv-7 keeps its commit"),
         ("rv-8", [r8], "a reverts line with only 6 hex digits undoes nothing: rv-8 keeps its commit"),
+        ("rv-9", [r9c], "a message with two `This reverts commit` lines undoes both commits: rv-9 keeps only its third"),
+        ("rv-10", [r10], "a revert of a revert by subject alone (`Revert \"Revert \"X\"\"`, no reverts line) restores X: "
+                         "rv-10 keeps its commit"),
+        ("rv-11", [r11a], "a second subject-only revert passes over the same-subject commit already undone and undoes the "
+                          "next older one: of three rv-11 commits two reverts leave the oldest"),
+        ("rv-12", [r12a], "`Revert \"X (#7)\" (#8)` undoes `X (#7)`, (#N) tails aside on both: rv-12 keeps only its other commit"),
+        ("rv-13", [r13], "a reverts line whose sha matches no commit undoes nothing, and the subject is not read in its place: "
+                         "rv-13 keeps its commit"),
     ):
         got = sl.get(sid) if isinstance(sl, dict) else sl
         ctx.check(why, got == exp, exp, got, r)
-    exp_ids = ["rv-3", "rv-4", "rv-5", "rv-6", "rv-7", "rv-8"]
+    exp_ids = ["rv-3", "rv-4", "rv-5", "rv-6", "rv-7", "rv-8", "rv-9", "rv-10", "rv-11", "rv-12", "rv-13"]
     got_ids = list(sl) if isinstance(sl, dict) else sl
     ctx.check("a commit reverted by a reverts line (full id) and one reverted by subject alone, (#N) tails aside, leave "
               "rv-1 and rv-2 unmatched and out of slices",
@@ -2547,10 +2577,26 @@ def tp4_a4(ctx):
               and r2.ci == {"seconds": "95", "conclusion": "success", "nightly": "failure", "reruns-to-green": "2"},
               (exp_ci, ["section", "ci", "recorded"]), (dig(row2, "ci"), prefixes(r2)[-3:], r2.ci), r2)
 
+    mem3 = new_mem()
+    cut = b'{"label": "earlier", "commit": "ab'
+    os.makedirs(os.path.join(mem3, "prune"))
+    with open(trend_path(mem3), "wb") as f:
+        f.write(cut)
+    r3 = close(repo, sha, mem3, spec)
+    post3 = read_bytes(trend_path(mem3)) or b""
+    tail = post3[len(cut) + 1:] if post3.startswith(cut + b"\n") else None
+    row3 = parse_line(tail) if tail is not None else None
+    ctx.check("a trend.jsonl whose last line is cut off (no newline) keeps that line as it was, and the close row starts on a "
+              "line of its own, newline-terminated, and parses as this label's close",
+              r3.rc == 0 and tail is not None and tail.count(b"\n") == 1 and tail.endswith(b"\n") and isinstance(row3, dict)
+              and row3.get("label") == label and isinstance(row3.get("close"), dict),
+              "the cut line + newline + one close row", post3, r3)
+
     de = spec_dir()
     fence = "`" * 3
     nm = put_spec(de, "notes.md", spec_text([("ka-1", None)]))
     sp = put_spec(de, "M one.spec.md", spec_text([("ka-1", None)]))
+    shl = put_spec(de, "M-SHALL.spec.md", spec_text([("ka-1", None)]))
     ns = put_spec(de, "M-noslice.spec.md", "# M\n\n## Slices\n\n%s\n### ka-1 %s fenced\n%s\n\n## Notes\n\n%s"
                   % (fence, EM, fence, slice_block("ka-1")))
     dirspec = os.path.join(de, "M-dir.spec.md")
@@ -2559,6 +2605,7 @@ def tp4_a4(ctx):
                        ("a --spec path that does not exist", os.path.join(de, "M-absent.spec.md")),
                        ("a --spec not named <label>.spec.md", nm),
                        ("a --spec whose label holds a space", sp),
+                       ("a --spec whose label holds the word SHALL", shl),
                        ("a --spec with no slice under ## Slices (one only in a fence, one only under another heading)", ns),
                        ("a --spec that is a directory", dirspec)):
         m = new_mem()
@@ -2815,6 +2862,31 @@ def tp4_a9(ctx):
     ctx.check("the unreadable spec beside --spec is skipped with PRUNE-WARN spec on stderr and the run exits 0",
               r.rc == 0 and any(l.startswith("PRUNE-WARN spec") for l in r.err.splitlines()), "PRUNE-WARN spec ...", r.err, r)
 
+    # a second spec directory: a directory named *.spec.md, and a sibling whose fences hold a touches: line and a heading
+    d2 = spec_dir()
+    spec2 = put_spec(d2, label + ".spec.md", spec_text([("mm-1", "docs/")]))
+    os.makedirs(os.path.join(d2, "B-dir.spec.md"))
+    fence = "`" * 3
+    put_spec(d2, "M-fence.spec.md", "# F\n\n## Slices\n\n"
+             + slice_block("fz-1", None, body="%s\ntouches: %s\n%s\n" % (fence, TW[2], fence))
+             + slice_block("fz-2", "docs/x.md", body="%s\n### fz-3 %s fenced\ntouches: %s\n%s\n" % (fence, EM, TW[3], fence))
+             + slice_block("fz-4", TW[4]) + "## Risks\n\nNone.\n")
+    mem2 = new_mem()
+    r2 = close(repo, sha, mem2, spec2)
+    got2 = by_id(listed(mem2, label))
+    ctrl = jt(TW[4], *tw_names("tw4"), "slice", slices=[("M-fence.spec.md", "fz-4")])
+    ctx.check("control: a slice after the fences of a sibling spec routes its file (fz-4), beside a directory named B-dir.spec.md",
+              got2.get(rid(ctrl)) == ctrl, ctrl, got2.get(rid(ctrl)), r2)
+    ctx.check("a directory named *.spec.md beside --spec is skipped with PRUNE-WARN spec on stderr and the run exits 0",
+              r2.rc == 0 and any(l.startswith("PRUNE-WARN spec") for l in r2.err.splitlines()), "PRUNE-WARN spec ...",
+              (r2.rc, r2.err), r2)
+    for name, k in (("a `touches:` line inside a code fence of a sibling slice does not route its file", 2),
+                    ("a `### id <em dash> ` heading inside a code fence of a sibling spec is not a slice: its touches: line "
+                     "does not route", 3)):
+        row = got2.get(rid(jt(TW[k], *tw_names("tw%d" % k), "structure")))
+        ctx.check(name, dig(row, "route") == "structure" and "slices" not in (row or {}), "route structure",
+                  row, r2)
+
 
 def tp4_a10(ctx):
     TWA, TWB, TWS = "client/src/ta/twa.test.ts", "client/src/tb/twb.test.ts", "client/src/tsl/tws.test.ts"
@@ -2866,17 +2938,20 @@ def tp4_a11(ctx):
     WA, WB = "client/src/wa/wa.ts", "client/src/wb/wb.ts"
     WT = ["client/src/wt/t%02d.test.ts" % i for i in range(12)]
     SP, TWC = "client/src/sp/sp ace.test.ts", "client/src/tc/twc.test.ts"
+    PO, POT = "client/src/po/po.ts", "client/src/po/ownerPo.test.ts"
+    SH = "client/src/sh/SHALL-x.test.ts"
     base = {PRT: tw_text("view"), PV: "pub fn plain_q() -> u32 { 1 }\n",
             PVT: "#[test]\nfn names() {\n    assert_eq!(plain_q(), 1);\n}\n",
-            WA: ts_def("wideA"), WB: ts_def("wideB"), SP: tw_text("spc"), TWC: tw_text("twc")}
+            WA: ts_def("wideA"), WB: ts_def("wideB"), SP: tw_text("spc"), TWC: tw_text("twc"),
+            PO: ts_def("poLonely"), POT: ts_use("poLonely"), SH: tw_text("shx")}
     base.update({p: ts_use("wideA", "wideB") for p in WT})
     repo = Repo()
     change(repo, "chore: base", base)
-    sha = touch(repo, subject("el-1", "touch"), [PRT, PVT, WA, WB, SP, TWC])
+    sha = touch(repo, subject("el-1", "touch"), [PRT, PVT, WA, WB, SP, TWC, PO, SH])
     d = spec_dir()
     label = "M-elv"
     spec = put_spec(d, label + ".spec.md", spec_text([("el-1", None)]))
-    put_spec(d, "M-xx.spec.md", spec_text([("xx-1", "%s, %s, %s" % (PRT, WB, PV))]))
+    put_spec(d, "M-xx.spec.md", spec_text([("xx-1", "%s, %s, %s, %s" % (PRT, WB, PV, PO))]))
     mem = new_mem()
     r = close(repo, sha, mem, spec)
     got = by_id(listed(mem, label))
@@ -2890,10 +2965,14 @@ def tp4_a11(ctx):
          jo(WB, "wideB", WT, "slice", slices=[("M-xx.spec.md", "xx-1")])),
         ("a duplicates row no slice lists whose path holds a space gets route report", jt(SP, *tw_names("spc"), "report")),
         ("control: a plain duplicates row no slice lists gets route structure", jt(TWC, *tw_names("twc"), "structure")),
+        ("an orphans row with a test file whose path holds a protected token stays kind orphans and gets route report with "
+         "that token, though an unbuilt slice lists its defining file",
+         jo(PO, "poLonely", [POT], "report", token="owner")),
+        ("a duplicates row no slice lists whose path holds the word SHALL gets route report", jt(SH, *tw_names("shx"), "report")),
     ):
         ctx.check(name, got.get(rid(row)) == row, row, got.get(rid(row)), r)
-    ctx.check("stdout: `rows listed=6 slice=1 structure=1 report=4 over-cap=0`",
-              r.crows == crows(6, 1, 1, 4, 0), crows(6, 1, 1, 4, 0), r.crows, r)
+    ctx.check("stdout: `rows listed=8 slice=1 structure=1 report=6 over-cap=0`",
+              r.crows == crows(8, 1, 1, 6, 0), crows(8, 1, 1, 6, 0), r.crows, r)
 
 
 def tp4_a12(ctx):
@@ -2961,8 +3040,9 @@ def tp4_a13(ctx):
     use = "describe('m', () => {\n  it('x', () => {\n    expect(SHALL_CAP).toBe(1);\n  });\n});\n"
     repo = Repo()
     change(repo, "chore: base", {"client/src/base.ts": filler(4)})
+    SHP = "client/src/s5/SHALL-y.test.ts"
     sha = change(repo, subject("se-1", "add"), {TW: tw, MD: "export const SHALL_CAP = 1;\n", MT: use, UT: use,
-                                                PRT: tw_text("bar"), TWS: tw_text("tws")})
+                                                PRT: tw_text("bar"), TWS: tw_text("tws"), SHP: tw_text("shy")})
     d = spec_dir()
     label = "M-sect"
     spec = put_spec(d, label + ".spec.md", spec_text([("se-1", None)]))
@@ -2993,6 +3073,26 @@ def tp4_a13(ctx):
     ctx.check("the only line holding SHALL is the one criterion `- **ST<n>.1:** WHEN ... SHALL pass.`",
               len(shall) == 1 and bool(CRITERION_RE.match(shall[0])), "one criterion line", shall, r)
     ctx.check("the section has a `Pins:` line", any(l.startswith("Pins:") for l in lines), "Pins: ...", lines, r)
+    shp = jt(SHP, *tw_names("shy"), "report")
+    got_shp = by_id(listed(mem, label)).get(rid(shp))
+    ctx.check("control for the one-SHALL-line check: a twin row whose path holds SHALL is listed, routed report (so its "
+              "path is in neither touches: nor an item)", got_shp == shp, shp, got_shp, r)
+
+    if os.geteuid() == 0:
+        print("NOTE TP4-A13 failed-write check skipped: running as root, a read-only mode does not bind", flush=True)
+        return
+    memf = closed_mem()
+    census(repo, sha, memf, "--record", "earlier")
+    tp = trend_path(memf)
+    pre = read_bytes(tp)
+    os.chmod(tp, 0o444)
+    rf = close(repo, sha, memf, spec)
+    left = [p for p in (close_path(memf, label), close_path(memf, label, ".section.md")) if os.path.lexists(p)]
+    ctx.check("when the trend row cannot be written (trend.jsonl read-only) the run exits 2 with PRUNE-ERROR, leaves neither "
+              "close file, and trend.jsonl is unchanged",
+              pre is not None and rf.rc == 2 and any(l.startswith("PRUNE-ERROR") for l in rf.err.splitlines())
+              and left == [] and read_bytes(tp) == pre,
+              "exit 2 + PRUNE-ERROR, no close file, trend unchanged", (rf.rc, left, pre is not None and read_bytes(tp) == pre), rf)
 
 
 def tp4_a14(ctx):
@@ -3088,6 +3188,28 @@ def tp4_a15(ctx):
     got2 = overs(mem2)
     ctx.check("with the experiment open the same over-cap marks are made in the close file, and no section is written",
               got2 == exp_over and not os.path.exists(close_path(mem2, label, ".section.md")), exp_over, got2, r2)
+
+    # 7 twin rows in 6 files, where file-then-name, name-then-file and file-then-source-order each cut a different 7th row:
+    # q1..q5 hold one pair each (names e5..e1, reversed against the files); q6 holds pair `ab` above pair `aa`
+    Q = ["client/src/ord/q%d.test.ts" % i for i in range(1, 7)]
+    qfiles = {Q[i]: tw_text("e%d" % (5 - i)) for i in range(5)}
+    qfiles[Q[5]] = tw_text("ab") + tw_text("aa")
+    repo2 = Repo()
+    change(repo2, "chore: base", {"client/src/base.ts": filler(4)})
+    sha2 = change(repo2, subject("od-1", "add"), qfiles)
+    label3 = "M-ord"
+    spec3 = put_spec(spec_dir(), label3 + ".spec.md", spec_text([("od-1", None)]))
+    mem3 = new_mem()
+    r3 = close(repo2, sha2, mem3, spec3)
+    exp3 = {(Q[i], "e%d > one again" % (5 - i)): False for i in range(5)}
+    exp3[(Q[5], "aa > one again")] = False
+    exp3[(Q[5], "ab > one again")] = True
+    rows3 = listed(mem3, label3)
+    got3 = ({rid(x): x.get("over-cap") if x.get("route") == "structure" else "route " + str(x.get("route")) for x in rows3}
+            if isinstance(rows3, list) else rows3)
+    ctx.check("the walk orders by file first, then by name within a file: q1..q5 and q6's `aa` are taken, q6's `ab` (defined "
+              "above `aa`) is the 7th row and over-cap; not q1's `e5` (last by name) nor q6's `aa` (last by source order)",
+              got3 == exp3 and r3.crows == crows(7, 0, 7, 0, 1), (exp3, crows(7, 0, 7, 0, 1)), (got3, r3.crows), r3)
 
 
 def tp4_a16(ctx):
@@ -3272,6 +3394,29 @@ def tp4_a19(ctx):
     ctx.check("a --mem whose prune/ is a symlink into --repo gets nothing written into the repository",
               os.listdir(target) == [] and snapshot(repo) == before, "linked dir empty, repo unchanged",
               (os.listdir(target), snapshot(repo) == before), r)
+
+    away = tempfile.mkdtemp(prefix="away-", dir=ROOT)
+    mem_ok = closed_mem()
+    os.symlink(away, os.path.join(mem_ok, "prune"))
+    r = close(repo, sha, mem_ok, spec)
+    ctx.check("control: a prune/ that is a symlink to a directory outside the repository is allowed: exit 0, the close file "
+              "and the trend row written there",
+              r.rc == 0 and os.path.isfile(os.path.join(away, "close", label + ".json")) and close_row(mem_ok, label) is not None,
+              "exit 0, files under the linked directory", (r.rc, sorted(os.listdir(away))), r)
+    elsewhere = tempfile.mkdtemp(prefix="elsewhere-", dir=ROOT)
+    tgt = os.path.join(elsewhere, "t.jsonl")
+    with open(tgt, "wb") as f:
+        f.write(b'{"label": "elsewhere"}\n')
+    mem_ln = closed_mem()
+    os.makedirs(os.path.join(mem_ln, "prune"))
+    os.symlink(tgt, trend_path(mem_ln))
+    r = close(repo, sha, mem_ln, spec)
+    ctx.check("a prune/trend.jsonl that is a symlink to a file outside prune/ is a PRUNE-ERROR (exit 2), the link's target "
+              "is not written, and no close file is left",
+              r.rc == 2 and any(l.startswith("PRUNE-ERROR") for l in r.err.splitlines())
+              and read_bytes(tgt) == b'{"label": "elsewhere"}\n' and not os.path.lexists(close_path(mem_ln, label))
+              and not os.path.lexists(close_path(mem_ln, label, ".section.md")),
+              "exit 2 + PRUNE-ERROR, target unchanged", (r.rc, read_bytes(tgt), os.listdir(os.path.join(mem_ln, "prune"))), r)
 
 
 FIXTURES = [

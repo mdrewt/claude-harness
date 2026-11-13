@@ -148,7 +148,7 @@ broken keep file can only add rows.
 
 close records, once per milestone, what the milestone's own commits added and the candidates in
 the files they changed. FILE is the milestone's spec, named `<label>.spec.md` with a label of
-[A-Za-z0-9_.-] that does not hold the word SHALL; a FILE named otherwise, or with no slice, is a
+[A-Za-z0-9_.-] that does not hold `SHALL`; a FILE named otherwise, or with no slice, is a
 PRUNE-ERROR. REF is read as it stands in R: nothing is fetched, so the caller brings R up to date
 first.
   Slices   the `### <id> — ` headings under FILE's `## Slices` heading, code fences aside.
@@ -173,20 +173,19 @@ first.
            with a file among the changed paths, section by section in that order, each as
            census sorts it. A twin row's file is its test file; an orphan row's files are the
            defining file and its tests.
-  Routes   slice      a `duplicates` or `orphans` row with a file that a `touches:` entry names
-                      (read as --spec reads them) in a slice of another `*.spec.md` in FILE's
-                      directory, when no commit reachable from REF names that slice without
-                      being undone. Every such slice is recorded, specs by file name, slices in
-                      file order.
-           structure  any other `duplicates` row, and any other `orphans` row of 12 files or
-                      fewer.
-           report     every `protected-twins` and `orphan-protected` row, and an `orphans` row
+  Routes   report     every `protected-twins` and `orphan-protected` row, and an `orphans` row
                       with a test file whose path holds a protected token (the row then carries
                       that token): removing a protected test follows the standard's protected
-                      path, whichever slice lists the file. Of the rows no such slice lists: an
-                      `orphans` row of more than 12 files, and a row with a path the section
-                      could not carry (outside [A-Za-z0-9_./-], which a `touches:` entry could
-                      not name, or holding the word SHALL).
+                      path, whichever slice lists the file.
+           slice      any other row with a file that a `touches:` entry names (read as --spec
+                      reads them) in a slice of another `*.spec.md` in FILE's directory, when no
+                      commit reachable from REF names that slice without being undone. Every
+                      such slice is recorded, specs by file name, slices in file order.
+           report     of the rows left: an `orphans` row of more than 12 files, and a row with a
+                      path the section could not carry (outside [A-Za-z0-9_./-], which a
+                      `touches:` entry could not name, or holding `SHALL`).
+           structure  every other row: a `duplicates` row, or an `orphans` row of 12 files or
+                      fewer.
   Section  the `structure` rows are walked `duplicates` first, then `orphans`, each by file, then
            name. A row is taken when the section then holds at most 6 rows and 12 distinct
            files; a row not taken is marked over-cap and the walk goes on. The marks are made
@@ -1302,7 +1301,7 @@ def _glob(entry):
             out, i = out + "[^/]", i + 1
         else:
             out, i = out + re.escape(entry[i]), i + 1
-    return re.compile(out + r"(?:/.*)?\Z", re.S)
+    return re.compile(out + r"(?:/.*)?\Z")
 
 
 def _unfenced(text):
@@ -1347,7 +1346,7 @@ REVERTS_LINE = re.compile(r"^This reverts commit ([0-9a-f]{7,64})\b", re.M)
 REVERT_SUBJECT = re.compile(r'Revert "(.*)"')
 PR_TAIL = re.compile(r" \(#\d+\)$")
 # What the section can carry outside a JSON string, a label or a path: text a `touches:` entry
-# names literally, and without the word a ledger seeds a gate from.
+# names literally, and without the letters a ledger seeds a gate from.
 SECTION_SAFE = re.compile(r"(?!.*SHALL)[A-Za-z0-9_./-]+")
 WIDE_ORPHAN = 12        # an orphan row of more files is a design question, not a section row
 SECTION_ROWS, SECTION_FILES = 6, 12
@@ -2060,7 +2059,7 @@ def cmd_close(opts):
     label = name[:-len(SPEC_SUFFIX)] if name.endswith(SPEC_SUFFIX) else ""
     if not SECTION_SAFE.fullmatch(label):
         raise Fail("--spec %s is not named <label>.spec.md, the label of [A-Za-z0-9_.-] and without"
-                   " the word SHALL" % spec)
+                   " SHALL" % spec)
     try:
         with open(spec, encoding="utf-8") as fh:
             ids = spec_slice_ids(fh.read())
