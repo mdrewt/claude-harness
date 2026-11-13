@@ -67,6 +67,23 @@ CONTRACT
   mr-cost-sum --session <id> -> the cost-state total of that CLI session's transcript to 4dp,
                                 or "-". ALWAYS exits 0. What a session has spent by now,
                                 for a caller that holds its id and no log.
+  mr-cost-sum --by-role <session id> [<logfile>]
+                             -> one JSON object pricing each subagent of that session from
+                                its own transcript. ALWAYS exits 0:
+                                  session_id  as given
+                                  main        the row of the session's own transcript, or null
+                                  subagents   one row per <session>/subagents/agent-*.jsonl,
+                                              oldest first
+                                  priced      {model: USD} over every row
+                                  check       with a logfile: {model: {priced, log, delta}}
+                                              against the costUSD the log's result events
+                                              report per model; else null
+                                A row: agent_id, role (the subagent's agentType), description,
+                                tool_use_id (the Agent call that spawned it), model and effort
+                                (those of most of its messages), models ({model: messages}),
+                                version (the CLI's), started, duration_s, calls (messages),
+                                tokens {in, cw5m, cw1h, cr, out}, cost_usd (null when a model
+                                is not in the rate table).
   mr-cost-sum --selftest     -> exit 0 pass, 1 fail.
 
   * no result event and no cost-state, unreadable or missing file -> "-" / cost null
@@ -80,6 +97,15 @@ before its first result event contributes nothing to the log's figure, so `unpri
 
 MR_COST_TRANSCRIPTS names the transcript root (default ~/.claude/projects); fixtures point it
 at their own excerpts.
+
+PER-ROLE COST
+-------------
+A subagent's spend is in no log event: the log's per-model `costUSD` adds every subagent on
+that model together. Its transcript has it. Each API message is written once per content block
+under one `message.id`, and the last of them carries the message's final `usage`, so a
+transcript is priced as the sum over message ids of that last usage at _RATES. Summed over a
+session, the result equals the log's `costUSD` per model (fixtures/run-cost/by-role: ts-5,
+opus $9.4969 and sonnet $0.5296 across twelve subagents).
 """
 
 import glob
@@ -239,6 +265,169 @@ def run_of_log(path, transcripts=None):
     return run
 
 
+# USD per million tokens: input, 5-minute cache write, 1-hour cache write, cache read, output.
+# Keyed by a substring of the model id.
+_RATES = {"opus": (4.0, 5.0, 8.0, 0.2, 20.0),
+          "sonnet": (2.0, 2.5, 4.0, 0.1, 10.0),
+          "fable": (8.0, 10.0, 16.0, 0.2, 40.0)}
+_TOKENS = ("in", "cw5m", "cw1h", "cr", "out")
+
+
+def _rate(model):
+    for family, rate in _RATES.items():
+        if family in (model or ""):
+            return rate
+    return None
+
+
+def _usage_tokens(usage):
+    """(in, cw5m, cw1h, cr, out) of one message's usage. A usage without the per-lifetime
+    split is a 5-minute write."""
+    def n(obj, key):
+        val = obj.get(key) if isinstance(obj, dict) else None
+        return val if isinstance(val, int) and not isinstance(val, bool) and val > 0 else 0
+    split = usage.get("cache_creation")
+    if isinstance(split, dict) and split:
+        cw5m, cw1h = n(split, "ephemeral_5m_input_tokens"), n(split, "ephemeral_1h_input_tokens")
+    else:
+        cw5m, cw1h = n(usage, "cache_creation_input_tokens"), 0
+    return (n(usage, "input_tokens"), cw5m, cw1h, n(usage, "cache_read_input_tokens"),
+            n(usage, "output_tokens"))
+
+
+def _epoch(stamp):
+    import datetime
+    try:
+        return datetime.datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return None
+
+
+def role_row(path, meta=None):
+    """Price one transcript. None when it holds no priced-or-unpriced model message."""
+    msgs = {}            # message id -> (model, usage, effort); the last event of an id wins
+    first = last = None
+    version = None
+    try:
+        fh = open(path, errors="replace")
+    except Exception:
+        return None
+    with fh:
+        for line in fh:
+            if '"assistant"' not in line:
+                continue
+            try:
+                event = json.loads(line)
+            except Exception:
+                continue
+            if not isinstance(event, dict) or event.get("type") != "assistant":
+                continue
+            msg = event.get("message")
+            if not isinstance(msg, dict) or not msg.get("id") or msg.get("model") == "<synthetic>":
+                continue
+            usage = msg.get("usage")
+            msgs[msg["id"]] = (msg.get("model"), usage if isinstance(usage, dict) else {},
+                               event.get("effort"))
+            version = event.get("version") or version
+            stamp = event.get("timestamp")
+            if stamp:
+                first = first or stamp
+                last = stamp
+    if not msgs:
+        return None
+    tokens = [0, 0, 0, 0, 0]
+    models, efforts, by_model = {}, {}, {}
+    cost = 0.0
+    for model, usage, effort in msgs.values():
+        models[model] = models.get(model, 0) + 1
+        efforts[effort] = efforts.get(effort, 0) + 1
+        got = _usage_tokens(usage)
+        tokens = [a + b for a, b in zip(tokens, got)]
+        rate = _rate(model)
+        if rate is None:
+            cost = None
+        else:
+            own = sum(t * r for t, r in zip(got, rate)) / 1e6
+            by_model[model] = by_model.get(model, 0.0) + own
+            if cost is not None:
+                cost += own
+    meta = meta if isinstance(meta, dict) else {}
+    t0, t1 = _epoch(first), _epoch(last)
+    most = lambda counts: max(sorted(counts, key=str), key=lambda k: counts[k])
+    return {"agent_id": os.path.basename(path)[:-len(".jsonl")].replace("agent-", "", 1),
+            "role": meta.get("agentType"), "description": meta.get("description"),
+            "tool_use_id": meta.get("toolUseId"),
+            "model": most(models), "effort": most(efforts), "models": models, "version": version,
+            "started": first,
+            "duration_s": round(t1 - t0) if t0 is not None and t1 is not None else None,
+            "calls": len(msgs), "tokens": dict(zip(_TOKENS, tokens)),
+            "cost_usd": None if cost is None else round(cost, 4),
+            "_by_model": by_model}
+
+
+def log_model_costs(path):
+    """{model: USD} the log's result events report, from model_usage_since_last_result."""
+    out = {}
+    try:
+        fh = open(path, errors="replace")
+    except Exception:
+        return out
+    with fh:
+        for line in fh:
+            if '"type":"result"' not in line and '"type": "result"' not in line:
+                continue
+            try:
+                event = json.loads(line)
+            except Exception:
+                continue
+            since = event.get("model_usage_since_last_result") if isinstance(event, dict) else None
+            if not isinstance(since, dict):
+                continue
+            for model, usage in since.items():
+                cost = _finite(usage.get("costUSD") if isinstance(usage, dict) else None)
+                if cost is not None:
+                    out[model] = out.get(model, 0.0) + cost
+    return out
+
+
+def by_role(session_id, log=None, root=None):
+    """Price a session's own transcript and each of its subagents'. Never raises."""
+    out = {"session_id": session_id, "main": None, "subagents": [], "priced": {}, "check": None}
+    if not session_id or not re.fullmatch(r"[0-9a-fA-F-]{8,64}", session_id):
+        return out
+    root = root or os.environ.get("MR_COST_TRANSCRIPTS") or os.path.expanduser("~/.claude/projects")
+    rows = []
+    for path in glob.glob(os.path.join(glob.escape(root), "*", session_id + ".jsonl")):
+        out["main"] = role_row(path) or out["main"]
+    if out["main"]:
+        out["main"]["agent_id"] = None
+        rows.append(out["main"])
+    for path in sorted(glob.glob(os.path.join(glob.escape(root), "*", session_id, "subagents",
+                                              "agent-*.jsonl"))):
+        meta = None
+        try:
+            with open(path[:-len(".jsonl")] + ".meta.json") as fh:
+                meta = json.load(fh)
+        except Exception:
+            pass
+        row = role_row(path, meta)
+        if row:
+            out["subagents"].append(row)
+            rows.append(row)
+    out["subagents"].sort(key=lambda r: (r["started"] or "", r["agent_id"]))
+    for row in rows:
+        for model, cost in row.pop("_by_model").items():
+            out["priced"][model] = out["priced"].get(model, 0.0) + cost
+    out["priced"] = {m: round(c, 4) for m, c in sorted(out["priced"].items())}
+    if log:
+        logged = log_model_costs(log)
+        out["check"] = {m: {"priced": out["priced"].get(m), "log": round(logged[m], 4) if m in logged else None,
+                            "delta": round(out["priced"][m] - logged[m], 4) + 0.0
+                            if m in logged and m in out["priced"] else None}
+                        for m in sorted(set(logged) | set(out["priced"]))}
+    return out
+
+
 def cost_of_log(path):
     """Return (total_float, saw_result_event). Never raises."""
     cost = run_of_log(path)["cost"]
@@ -350,11 +539,81 @@ def selftest():
         print("FAIL missing-file want=- got=%.4f" % total)
         bad += 1
     bad += _selftest_real_shapes()
+    bad += _selftest_by_role()
     if bad:
         print("mr-cost-sum SELFTEST FAIL (%d)" % bad)
         return 1
-    print("mr-cost-sum SELFTEST OK (%d cases)" % (len(_CASES) + 1 + 2 * len(_REAL) + 5))
+    print("mr-cost-sum SELFTEST OK (%d cases)" % (len(_CASES) + 1 + 2 * len(_REAL) + 5 + 8))
     return 0
+
+
+def _selftest_by_role():
+    """--by-role over the ts-5 subagent transcripts (fixtures/run-cost/README.md) and the pass
+    log of the same session. Eight cases."""
+    import tempfile
+    bad = 0
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "run-cost")
+    sid = "fa35ac05-b129-4394-a634-ef612da0c7d6"
+    got = by_role(sid, os.path.join(here, "single-attempt.stream"), os.path.join(here, "by-role"))
+
+    def case(name, ok, detail=""):
+        nonlocal bad
+        if not ok:
+            print("FAIL by-role/%-24s %s" % (name, detail))
+            bad += 1
+
+    check = got["check"] or {}
+    # The log's own figure, per model, to the cent: every subagent on that model is in the sum.
+    case("opus-reproduces-log", (check.get("claude-opus-5-5") or {}).get("priced") == 9.4969
+         and (check.get("claude-opus-5-5") or {}).get("delta") == 0.0, repr(check))
+    # The sonnet transcripts keep their repeated message ids; counting every event instead of
+    # the last per id reads $1.07 here.
+    case("sonnet-reproduces-log", (check.get("claude-sonnet-5-5") or {}).get("priced") == 0.5296
+         and (check.get("claude-sonnet-5-5") or {}).get("delta") == 0.0, repr(check))
+    # The session's own transcript is not in the fixture: its model has a log figure and no
+    # priced one, and no difference is claimed.
+    case("unpriced-model-no-delta", check.get("claude-fable-5-2") ==
+         {"priced": None, "log": 18.2646, "delta": None}, repr(check.get("claude-fable-5-2")))
+    rows = got["subagents"]
+    first = rows[0] if rows else {}
+    case("rows-oldest-first", len(rows) == 12 and got["main"] is None
+         and [r["started"] for r in rows] == sorted(r["started"] for r in rows), "n=%d" % len(rows))
+    testers = [r for r in rows if r["role"] == "tester"]
+    case("tester-row", len(testers) == 4 and testers[0] == {
+        "agent_id": "a7abf4aa9020bf69a", "role": "tester", "description": "Write ts-5 red tests",
+        "tool_use_id": "toolu_012ZhQreKDkVbyjfi1hZi12q", "model": "claude-opus-5-5",
+        "effort": "medium", "models": {"claude-opus-5-5": 46}, "version": testers[0].get("version"),
+        "started": testers[0].get("started"), "duration_s": testers[0].get("duration_s"),
+        "calls": 46, "tokens": testers[0].get("tokens"), "cost_usd": 3.9906}
+        and isinstance(testers[0]["duration_s"], int) and testers[0]["duration_s"] > 0
+        and sorted(testers[0]["tokens"]) == sorted(_TOKENS), repr(testers[:1]))
+    case("row-costs-sum-to-priced", abs(sum(r["cost_usd"] for r in rows)
+                                        - sum(got["priced"].values())) < 0.001, repr(got["priced"]))
+    # A model outside the rate table has no cost, and a usage without the per-lifetime split
+    # is priced as a 5-minute write.
+    tmp = tempfile.mkdtemp(prefix="mr-cost-sum-selftest-")
+    sub = os.path.join(tmp, "p", sid, "subagents")
+    os.makedirs(sub)
+    paths = [os.path.join(sub, "agent-x1.jsonl"), os.path.join(sub, "agent-x2.jsonl")]
+    try:
+        for path, model in zip(paths, ("claude-sonnet-5-5", "some-other-model")):
+            with open(path, "w") as f:
+                f.write(json.dumps({"type": "assistant", "timestamp": "2026-11-12T00:00:00Z",
+                                    "message": {"id": "m1", "model": model, "usage": {
+                                        "input_tokens": 1000000, "cache_creation_input_tokens": 1000000,
+                                        "output_tokens": 1000000}}}) + "\n")
+        synth = by_role(sid, None, tmp)
+        costs = {r["agent_id"]: r["cost_usd"] for r in synth["subagents"]}
+        case("unsplit-write-and-unknown-model", costs == {"x1": 14.5, "x2": None}
+             and synth["check"] is None, repr(costs))
+    finally:
+        for path in paths:
+            os.unlink(path)
+        os.removedirs(sub)
+    empty = by_role("not a session id", None, here)
+    case("bad-session-id", empty == {"session_id": "not a session id", "main": None,
+                                     "subagents": [], "priced": {}, "check": None}, repr(empty))
+    return bad
 
 
 # Excerpts of real pass logs and session transcripts (fixtures/run-cost/README.md): marker lines
@@ -451,6 +710,13 @@ if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--session":
         _now = transcript_cost(sys.argv[2])
         sys.stdout.write("-\n" if _now is None else "%.4f\n" % _now)
+        sys.exit(0)
+    if len(sys.argv) in (3, 4) and sys.argv[1] == "--by-role":
+        try:
+            _roles = by_role(sys.argv[2], sys.argv[3] if len(sys.argv) == 4 else None)
+        except Exception:
+            _roles = {"session_id": sys.argv[2], "main": None, "subagents": [], "priced": {}, "check": None}
+        sys.stdout.write(json.dumps(_roles) + "\n")
         sys.exit(0)
     if len(sys.argv) != 2:
         sys.stdout.write("-\n")
