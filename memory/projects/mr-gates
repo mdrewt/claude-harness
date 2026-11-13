@@ -17,6 +17,8 @@ __doc__ = """mr-gates — the per-slice ACCEPTANCE LEDGER and the residual sink 
     mr-gates residuals list [--unclaimed] [--json]      # oldest first; age is a label only
                             | add --slice S --gate G --title T --target X --reason R
                                   [--category C --severity V]
+                                  # refusals: exit 3 TARGET-MISSING (no `### X` section on disk:
+                                  # write the section, then re-run) | exit 2 OUT-OF-BOUNDS (policy)
                             | promote --id R [--category C --severity V] [--spec-file F]
                             | close --slice S [--pr N]   # also deletes its residuals.spec.md section
                             | disposition --id R --as wontfix|fixed --reason T
@@ -1275,9 +1277,12 @@ def cmd_render(a):
     return 0
 
 
-def die(msg):
+RC_TARGET_MISSING = 3
+
+
+def die(msg, rc=2):
     sys.stderr.write("ERROR: %s\n" % msg)
-    return 2
+    return rc
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1882,19 +1887,24 @@ def cmd_residuals(a, sub):
         if target not in ("backlog",) + LEGAL_DISPOSITIONS:
             specs = a.get("_specs") or SPECS
             if find_section(target, specs)[1] is None:
-                return die("--target %r is not `backlog`, %s, or an existing spec section name "
-                           "(the same rule cmd_lint's DEFER-target check already enforces, the "
-                           "14r-c-2 class). A free-text recommendation here creates status:targeted "
-                           "with no real claim on it — invisible to `residuals list --unclaimed` "
-                           "and refused by `residuals promote` (both key off status==promoted). Use "
-                           "`backlog` and put the recommendation in --reason instead."
-                           % (target, "/".join(LEGAL_DISPOSITIONS)))
+                # Its own leader and exit code: this refusal says where the row may point, never
+                # whether the finding is admissible. A caller that drops refused findings must be
+                # able to tell it from the policy refusal below, or a finding filed one step
+                # before its section is written is discarded as if it were out of bounds.
+                return die("TARGET-MISSING: --target %r is not `backlog`, %s, or an existing spec "
+                           "section name (the same rule cmd_lint's DEFER-target check already "
+                           "enforces, the 14r-c-2 class). The finding itself is NOT refused: write "
+                           "the `### %s` section into a spec file under %s and re-run, or use "
+                           "`backlog` and name the intended slice in --reason. A row pointing at "
+                           "a section that exists nowhere is status:targeted with no real claim "
+                           "on it." % (target, "/".join(LEGAL_DISPOSITIONS), target, specs),
+                           RC_TARGET_MISSING)
         cat = (a.get("category") or "").lower() or None
         sev = (a.get("severity") or "").upper() or None
         refused = defer_policy_findings(a["slice"], a["gate"], target, a["reason"], a["title"],
                                         cat, sev, rows)
         if refused:
-            return die("; ".join(refused))
+            return die("OUT-OF-BOUNDS: " + "; ".join(refused))
         rid = residual_upsert(a["slice"], a["gate"], a["title"], target, a["reason"],
                               {"Repo": a.get("domain", "project")}, path,
                               category=cat, severity=sev)
@@ -2924,6 +2934,73 @@ def selftest():
                     bool(blocked(L("- [ ] E1: t\n  CHECK: cargo test\n  EXPECT: /1 passed/\n")))}
         chk.eq("M1-lint-discriminates", {True, False}, verdicts,
                "a lint that blocks everything or nothing carries no information (lp-04)")
+
+        # --- O. the weekly review's Phase 3, end to end: a verified finding survives ------------
+        # The review files a finding against the `wr*` slice of a milestone spec it authors in
+        # the same run. A missing section and an inadmissible finding are different refusals:
+        # the review drops only the second.
+        wspecs = os.path.join(root, "wr-specs")
+        os.makedirs(wspecs)
+        wres = os.path.join(root, "wr-residuals.jsonl")
+
+        def wr_add(gate, title, target, reason="server/src/trade.rs:10 @ abc1234 — accepts a "
+                                               "negative amount; reject it"):
+            err = _io.StringIO()
+            with contextlib.redirect_stdout(_io.StringIO()), contextlib.redirect_stderr(err):
+                rc = cmd_residuals({"slice": "weekly-review-2026-11-18", "gate": gate,
+                                    "title": title, "target": target, "reason": reason,
+                                    "category": "data-integrity", "severity": "MED",
+                                    "_residuals": wres, "_specs": wspecs}, "add")
+            return rc, err.getvalue()
+
+        def wr_open():
+            return dict((r["id"], r) for r in open_residuals(residual_rows(wres)))
+
+        real = "the server SHALL reject a negative trade amount"
+        rc_early, err_early = wr_add("F1", real, "wr261118-a")
+        chk.eq("O1-missing-section-has-its-own-exit", RC_TARGET_MISSING, rc_early,
+               "a caller that drops refused findings must be able to tell `the section is not "
+               "written yet` from `the finding is out of bounds`")
+        chk.ok("O1b-missing-section-is-named", err_early.startswith("ERROR: TARGET-MISSING")
+               and "OUT-OF-BOUNDS" not in err_early)
+        chk.eq("O1c-nothing-filed-yet", {}, wr_open())
+        with open(os.path.join(wspecs, "M-weekly-review-2026-11-18.spec.md"), "w") as fh:
+            fh.write("## 2. Slices\n\n### wr261118-a — trade bounds\n`touches: server/src/trade.rs`\n"
+                     "\nEARS: %s. residual: R-weekly-review-2026-11-18-F1\n" % real)
+        rc_app, err_app = wr_add("F2", "mr-gates SHALL lint more gates", "wr261118-a",
+                                 "memory/projects/mr-gates:1 — the gate tool itself")
+        chk.eq("O2-apparatus-finding-is-policy-refusal", 2, rc_app)
+        chk.ok("O2b-policy-refusal-is-named", err_app.startswith("ERROR: OUT-OF-BOUNDS")
+               and "TARGET-MISSING" not in err_app,
+               "the fixture must isolate the policy refusal: its target section exists")
+        rc_ok, _e = wr_add("F1", real, "wr261118-a")
+        wrow = wr_open().get("R-weekly-review-2026-11-18-F1") or {}
+        chk.eq("O3-finding-survives-once-section-exists",
+               (0, "targeted", "wr261118-a", ["R-weekly-review-2026-11-18-F1"]),
+               (rc_ok, wrow.get("status"), wrow.get("promoted_slice"), sorted(wr_open())))
+        rc_abs, _e = wr_add("F3", "the client SHALL show the trade error", "backlog")
+        chk.eq("O4-unelaborated-absorber-files-to-backlog", (0, "unpromoted"),
+               (rc_abs, (wr_open().get("R-weekly-review-2026-11-18-F3") or {}).get("status")))
+        with contextlib.redirect_stdout(_io.StringIO()):
+            cmd_residuals({"slice": "wr261118-a", "_residuals": wres, "_specs": wspecs,
+                           "_gates_dir": gdir, "force": True, "pr": "1",
+                           "reason": "fixture: the slice merged"}, "close")
+        chk.eq("O5-slice-merge-closes-the-finding", ["R-weekly-review-2026-11-18-F3"],
+               sorted(wr_open()), "the row must be claimed by the slice that fixes it")
+        # The procedure the review follows is the sibling prompt: it must write the spec section
+        # before it files against it, and must not treat every refusal as a verdict.
+        wprompt = read_gates_file(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                               "mr-weekly-review-prompt.md")) or ""
+        p3 = wprompt[wprompt.find("## Phase 3"): wprompt.find("## Phase 4")]
+        at_spec = p3.find("Author `$HARNESS/specs/monster-realm-v2/M-weekly-review-")
+        at_add = p3.find("mr-gates residuals add --slice weekly-review-")
+        chk.ok("O6-prompt-writes-the-section-before-filing", 0 <= at_spec < at_add,
+               "filing first is refused TARGET-MISSING for every scheduled finding")
+        chk.ok("O7-prompt-drops-only-out-of-bounds",
+               "`TARGET-MISSING` (exit %d)" % RC_TARGET_MISSING in p3
+               and "`OUT-OF-BOUNDS` (exit 2)" in p3 and "A refusal means" not in p3,
+               "an unqualified `a refusal means drop it` discards a verified finding whose "
+               "section is merely not written yet")
     finally:
         cleanup()
 
