@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 ''''exec /usr/bin/python3 "$0" "$@" # '''
-# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# ^ POLYGLOT INTERPRETER GUARD. `bash <this file>` would otherwise interpret the python
 # source as shell and EXECUTE any backticked prose in it as commands. Python reads this line as a
 # no-op string; sh/bash re-execs the file under python3 before reaching any other line.
 # Statically enforced for every python mr-* tool by mr-selfcheck.
@@ -57,8 +57,11 @@ LEDGER ROWS (kind)
   candidate   candidate_id, type (lens-caught | escape | base | spec | open-fail), label,
               test_id or claim_id, snap_fail, snap_pass, game_diff, scope (in | out),
               handed_in_session. The latest row of a (label, test_id or claim_id) stands.
-  quality     label, no_compile_files, flaky, brittle, test_loc, tests, loc_per_criterion,
-              dup_assert_lines, runtime_ms, bloat_usd. The latest row of a label stands.
+  quality     label, no_compile_files, flaky, not_run, brittle, test_loc, tests,
+              loc_per_criterion, dup_assert_lines, runtime_ms, bloat_usd. The latest row of a
+              label stands. not_run counts tests no runner executed at m: a file no runner
+              fits, or a test the build never compiled in (a Rust module no `mod` line names).
+              Such a test can find nothing.
   mutants     label, generated, caught, missed, unviable, timeouts, wall_s, status (ok | budget |
               error | no-tests). A reported measure; nothing gates on it.
   slice       status (scored | degraded | void), arms_ok, area, added_cost_usd,
@@ -1158,6 +1161,7 @@ def quality(ctx, slice_, rows):
         out.append({"kind": "quality", "slice": slice_, "label": label,
                     "no_compile_files": len(broken),
                     "flaky": sum(1 for s in mine.values() if settled(s.get("m")) == "flaky"),
+                    "not_run": sum(1 for s in mine.values() if settled(s.get("m")) == "not-run"),
                     "brittle": brittle, "test_loc": loc, "tests": run.get("tests", 0),
                     "loc_per_criterion": round(loc / max(1, len(tags)), 2),
                     "dup_assert_lines": sum(n - 1 for n in asserts.values()),
@@ -2169,25 +2173,27 @@ def render_report(rows, cfg):
         ""]
 
     def arm_table(slices, pending=False):
-        lines = ["| Arm | Valid runs | Run cost | Found | Missed | Recall | False pos. | Flaky | Brittle | Lines/criterion | Total low | Total central | Total high |",
-                 "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        lines = ["| Arm | Valid runs | Run cost | Found | Missed | Recall | False pos. | Flaky | Brittle | Tests | Never ran | Lines/criterion | Total low | Total central | Total high |",
+                 "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for arm in st.arms + ([st.replicate] if st.replicate else []):
             mine = st.valid(arm, slices)
             if not mine:
-                lines.append("| %s | 0 | | | | | | | | | | | |" % arm)
+                lines.append("| %s | 0 | | | | | | | | | | | | | |" % arm)
                 continue
             q = [st.quality.get((s, arm), {}) for s in mine]
-            lines.append("| %s | %d | %s | %d | %d | %s | %g | %d | %d | %.1f | %s | %s | %s |" % (
+            lines.append("| %s | %d | %s | %d | %d | %s | %g | %d | %d | %d | %d | %.1f | %s | %s | %s |" % (
                 arm + (" (replicate)" if arm == st.replicate else ""), len(mine),
                 money(mean(st.run_cost(s, arm) for s in mine)),
                 sum(len(st.found(s, arm, pending)) for s in mine),
                 sum(len(st.missed(s, arm, pending)) for s in mine), pct(st.recall([arm], slices, pending)),
                 sum(st.false_positives(s, arm) for s in mine), sum(x.get("flaky", 0) for x in q),
-                sum(x.get("brittle", 0) for x in q), mean(x.get("loc_per_criterion", 0) for x in q),
+                sum(x.get("brittle", 0) for x in q), sum(x.get("tests", 0) for x in q),
+                sum(x.get("not_run", 0) for x in q), mean(x.get("loc_per_criterion", 0) for x in q),
                 *(money(mean(st.total(s, arm, sc, pending) for s in mine)) for sc in SCENARIOS)))
         return lines
 
-    out += ["## Arms", "", "Totals are per slice. The replicate is not in the reference set or the decision.", ""]
+    out += ["## Arms", "", "Totals are per slice. The replicate is not in the reference set or the decision. "
+            "A test that never ran (no runner fits its file, or the build never compiled it in) can find nothing.", ""]
     out += arm_table(st.slices) + ["", "With pending findings counted:", ""] + arm_table(st.slices, True) + [""]
 
     out += ["## Findings by class", "", "| Class | " + " | ".join(st.arms) + " |", "|---|" + "---|" * len(st.arms)]
@@ -2449,6 +2455,7 @@ for f in files:
             ok = not os.path.exists(flip)
             open(flip, "w").close() if ok else os.unlink(flip)
             cases.append((f, w[1], ok, "flipped"))
+        # a `ghost` line declares a test this runner never executes
 with open(junit, "w") as out:
     out.write("<testsuite>")
     for f, name, ok, why in cases:
@@ -2531,7 +2538,7 @@ class _Box:
             "cap_arm_usd": 500, "step_down_usd": 400, "cap_bump_usd": 30, "claims_digest_limit": 2,
             "test_paths": ["^tests/"], "game_code": "^(game|client)/",
             "spec_paths": "^specs/", "areas": {"rust": "^game/", "client": "^client/"},
-            "test_patterns": [{"match": r"\.toy$", "test": r"^(?:test|flaky)\s+(\S+)"}],
+            "test_patterns": [{"match": r"\.toy$", "test": r"^(?:test|flaky|ghost)\s+(\S+)"}],
             "runners": [{"name": "toy", "match": r"\.toy$", "cwd": "", "timeout_s": 60,
                          "cmd": ["/usr/bin/python3", os.path.join(toy, "run.py"), "{junit}", "{files}"]}],
             "mutants": {"enabled": True, "match": "^game/", "wall_budget_s": 60,
@@ -2896,7 +2903,8 @@ def _scenario(box, slice_="np-a", rust=True, hook=None):
                       "- kind: spec | test: none | where: specs/m.spec.md:1 | C1 and C2 cannot both hold\n")
     box.shadow(slice_, "O-high", {"tests/o_high_a.toy": _toy(_T_DEF, "BROKEN"),
                                   "tests/o_high_b.toy": _toy(_T_SPD, t_mp)})
-    box.shadow(slice_, "S-med-r", {"tests/s_med_r.toy": _toy(_T_ATK, _T_DEF)})
+    box.shadow(slice_, "S-med-r", {"tests/s_med_r.toy": _toy(_T_ATK, _T_DEF),
+                                   "tests/s_med_r_gh.toy": _toy("ghost t_gh")})
     box.transcript("Write the red tests for %s in %s." % (slice_, wt), "sonnet", "medium")
     box.run("collect", slice_)
     ctx = box.ctx()
@@ -2964,6 +2972,8 @@ def _st_score(chk, tmp):
     chk("quality/no-compile-flaky", quality_rows["O-high"]["no_compile_files"] == 1
         and quality_rows["O-med"]["flaky"] == 1 and quality_rows["S-med"]["flaky"] == 0
         and quality_rows["S-med"]["no_compile_files"] == 0, quality_rows.get("O-high"))
+    chk("quality/never-ran", quality_rows["S-med-r"]["not_run"] == 1 and quality_rows["S-med"]["not_run"] == 0
+        and table.get(("S-med-r", "t_gh")) == {"g1": "not-run", "g2": "not-run", "m": "not-run"}, table.get(("S-med-r", "t_gh")))
     chk("quality/size", quality_rows["S-high"]["tests"] == 4 and quality_rows["S-high"]["test_loc"] == 8
         and quality_rows["S-high"]["loc_per_criterion"] == 2.0
         and quality_rows["S-high"]["bloat_usd"] == round(8 * 12 * (4 * 4 + 150 * 0.2) / 1e6, 4)
@@ -3224,7 +3234,7 @@ def _ledger(n, found=(), costs=None, tiers=None, areas=None, quality=None, repli
             rows.append({"kind": "run", "slice": s, "label": "a%d" % (j + 1), "arm": name, "role": arm["role"],
                          "status": "failed" if (s, name) in failed else "ok", "cost_usd": costs[name],
                          "twin": name == "S-med", "cli_version": "9.9.9", "leak": False})
-            q = {"no_compile_files": 0, "flaky": 0, "brittle": 0, "tests": 10, "test_loc": 100,
+            q = {"no_compile_files": 0, "flaky": 0, "brittle": 0, "not_run": 0, "tests": 10, "test_loc": 100,
                  "loc_per_criterion": 10.0, "bloat_usd": 0.05}
             q.update((quality or {}).get(name, {}))
             rows.append(dict(q, kind="quality", slice=s, label="a%d" % (j + 1)))
@@ -3320,10 +3330,14 @@ def _st_report(chk, tmp):
         and "Tiers are not decided separately" in tiers(4) and "Tier hard alone" not in tiers(4), tiers(5))
     # Rule 7: an arm far above the median size or false-positive rate gets a rule change.
     bloat = decision(_ledger(8, [("lens-caught", all4, "confirmed")], quality={
-        "O-high": {"loc_per_criterion": 40.0}, "S-high": {"no_compile_files": 3}}))
+        "O-high": {"loc_per_criterion": 40.0, "not_run": 4}, "S-high": {"no_compile_files": 3}}))
     chk("decision/bloat-and-false-positive-guard",
         "- O-high is above 1.5 times the arms' median lines per criterion: it gets a `tester.md` rule change" in bloat
         and "- S-high is above 1.5 times the arms' median false-positive rate" in bloat and "- S-med is above" not in bloat, bloat)
+    never = render_report(_ledger(8, [("lens-caught", all4, "confirmed")], quality={"O-high": {"not_run": 4}}), cfg)
+    chk("report/tests-that-never-ran", "| Brittle | Tests | Never ran |" in never
+        and "| O-high | 8 | $9.00 | 8 | 0 | 100% | 0 | 0 | 0 | 80 | 32 | 10.0 |" in never
+        and "| S-med | 8 | $2.70 | 8 | 0 | 100% | 0 | 0 | 0 | 80 | 0 | 10.0 |" in never, never.split("## Arms")[1][:900])
     # Rule 8: no arm at 70% recall and a pair at 90% for less.
     pair = decision(_ledger(8, [("escape", ("S-med",), "confirmed"), ("escape", ("S-high",), "confirmed")]))
     chk("decision/two-tester-proposal", "PROPOSAL for the operator: no arm reaches 70% recall and S-med + S-high reach 100%" in pair
