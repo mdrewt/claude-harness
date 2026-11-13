@@ -2,10 +2,14 @@
 # mr-retro-request [window-note] — queue a retro for the native loop to execute (retro-by-loop,
 # operator-approved 2026-07-27). Writes a pending event; the next decision run follows
 # $MEM/mr-retro-playbook.md and writes its report to $MEM/retros/<utc>.md instead of building.
+# One event file holds the latest ordinary request. A note that starts `tester-ab` (the experiment's
+# close, which the playbook runs as a procedure of its own) has its own file: it is asked for once,
+# and an ordinary request made before the loop reads it must not replace it.
 set -u
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 mkdir -p "$MEM/retros"
-EV="$MEM/pending-events/retro.request.md"; EVT="$EV.building.$$"
+case "${1:-}" in tester-ab*) EV="$MEM/pending-events/retro.request.tester-ab.md" ;; *) EV="$MEM/pending-events/retro.request.md" ;; esac
+EVT="$EV.building.$$"
 { echo "EVENT src=retro-request at=$(date -u +%Y-%m-%dT%H:%M:%SZ) — operator/system requested a retrospective"
   echo "window: ${*:-since the last retro report in \$MEM/retros/ (or last 24h if none)}"
   echo "instructions: follow \$MEM/mr-retro-playbook.md exactly; write the full report to \$MEM/retros/$(date -u +%Y%m%dT%H%M).md; do NOT launch build work in the same run; keep subagent deep-dives to <=2 sonnet agents unless evidence demands more."
