@@ -1,12 +1,13 @@
 #!/usr/bin/python3
 ''''exec /usr/bin/python3 "$0" "$@" # '''
 # ^ POLYGLOT INTERPRETER GUARD: a shell that runs this file re-execs it under python3 first.
-"""mr-prune selftest battery: one fixture per criterion id (TP1-A1..TP1-A15).
+"""mr-prune selftest battery: one fixture per criterion id (TP1-A1..TP1-A15, TP2-A1..TP2-A14).
 
     /usr/bin/python3 battery.py <absolute path of mr-prune> [ID ...]
 
 Drives the tool only as a subprocess, over temporary git repositories built here, always with
---repo, --at <sha> and --mem <temp dir>. One fixture per criterion id. A failed check prints
+--repo, --at <sha> and --mem <temp dir> (the CI fixtures also put a fake `gh` first on PATH, or
+remove `gh` from PATH). One fixture per criterion id. A failed check prints
 "FAIL <ID> <check>: ..." and the run goes on. The last stdout line is
 "PRUNE-SELFTEST-OK <checks>[ <ID>...]" (exit 0) or "PRUNE-SELFTEST-FAIL <failed>/<checks>" (exit 1).
 TP1-A16 has no fixture here: it is proved by running mr-selfcheck itself.
@@ -20,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
+from datetime import datetime, timedelta
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = None      # the one temp root; removed at exit
@@ -144,11 +146,20 @@ class Result:
         self.rows = []
         self.counts = None
         self.recorded = None
+        # TP2 sections; the TP1 `rows` list keeps only duplicates and protected-twins
+        self.orph = []        # (file, symbol, test_only, tests-tuple)
+        self.orph_prot = []   # (file, symbol, test_only, tests-tuple, token)
+        self.lv = []          # (file, groups)
+        self.sig = []         # (file, source_text, churn|None, widened|None)
+        self.pchurn = []      # (file, churn, token)
+        self.ci = None        # kv dict of the `ci` line
+        self.slices = {}      # (section, file, name-or-"") -> [slice ids]
+        self.bad = []         # new-section lines the parser could not read
 
 
-def run_tool(*args):
+def run_tool(*args, env=None):
     cmd = ([TOOL] if os.access(TOOL, os.X_OK) else ["/usr/bin/python3", TOOL]) + list(args)
-    p = subprocess.run(cmd, cwd=NEUTRAL, env=clean_env(),
+    p = subprocess.run(cmd, cwd=NEUTRAL, env=clean_env() if env is None else env,
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=300)
     return Result(p.returncode, p.stdout.decode("utf-8", "replace"),
                   p.stderr.decode("utf-8", "replace"))
@@ -198,8 +209,85 @@ def parse_row(line):
     return (section, path, cand, surv, token)
 
 
-def census(repo, sha, mem, *extra):
-    r = run_tool("census", "--repo", repo.path, "--at", sha, "--mem", mem, *extra)
+SLICES_RE = re.compile(r" slices=([^ ]+)$")
+
+
+def split_slices(line):
+    """'<row> slices=a,b' -> ('<row>', ['a', 'b']); no suffix -> (line, None)."""
+    m = SLICES_RE.search(line)
+    if not m:
+        return line, None
+    return line[:m.start()], m.group(1).split(",")
+
+
+def split_path(rest):
+    """A bare path or a JSON-string path at the start of rest -> (path, remainder)."""
+    if rest.startswith('"'):
+        path, i = json.JSONDecoder().raw_decode(rest)
+        return path, rest[i:]
+    if " " in rest:
+        path, tail = rest.split(" ", 1)
+        return path, " " + tail
+    return rest, ""
+
+
+def compact(x):
+    return json.dumps(x, separators=(",", ":"))
+
+
+def parse_orphan(section, rest):
+    """'<file> :: <JSON sym>[ test-only] tests=<compact JSON array>[ token=<t>]' -> row tuple or None."""
+    dec = json.JSONDecoder()
+    try:
+        path, rest = split_path(rest)
+        if not rest.startswith(" :: "):
+            return None
+        sym, i = dec.raw_decode(rest[4:])
+        rest = rest[4 + i:]
+        test_only = rest.startswith(" test-only")
+        if test_only:
+            rest = rest[len(" test-only"):]
+        if not rest.startswith(" tests="):
+            return None
+        raw = rest[len(" tests="):]
+        tests, i = dec.raw_decode(raw)
+        rest = raw[i:]
+        if not isinstance(tests, list) or not all(isinstance(t, str) for t in tests):
+            return None
+        if raw[:i] != compact(tests) or tests != sorted(tests):
+            return None
+    except ValueError:
+        return None
+    if not isinstance(path, str) or not isinstance(sym, str):
+        return None
+    if section == "orphan-protected":
+        m = re.fullmatch(r" token=(\S+)", rest)
+        return (path, sym, test_only, tuple(tests), m.group(1)) if m else None
+    return (path, sym, test_only, tuple(tests)) if rest == "" else None
+
+
+def parse_other(section, rest):
+    """literal-variants / signals / protected-churn lines (slices already stripped)."""
+    try:
+        path, rest = split_path(rest)
+    except ValueError:
+        return None
+    if section == "literal-variants":
+        m = re.fullmatch(r" groups=(\d+)", rest)
+        return (path, int(m.group(1))) if m else None
+    if section == "protected-churn":
+        m = re.fullmatch(r" churn=(\d+) token=(\S+)", rest)
+        return (path, int(m.group(1)), m.group(2)) if m else None
+    m = re.fullmatch(r"( source-text)?(?: churn=(\d+))?(?: widened=(\d+))?", rest)
+    if not m or rest == "":
+        return None
+    return (path, m.group(1) is not None,
+            None if m.group(2) is None else int(m.group(2)),
+            None if m.group(3) is None else int(m.group(3)))
+
+
+def census(repo, sha, mem, *extra, env=None):
+    r = run_tool("census", "--repo", repo.path, "--at", sha, "--mem", mem, *extra, env=env)
     for line in r.out.splitlines():
         line = line.rstrip("\r")
         if line.startswith("PRUNE-CENSUS "):
@@ -209,8 +297,33 @@ def census(repo, sha, mem, *extra):
             if len(parts) >= 2:
                 r.totals[parts[1]] = kv(parts[2:])
         elif line.startswith("duplicates ") or line.startswith("protected-twins "):
-            row = parse_row(line)
+            base, sl = split_slices(line)
+            row = parse_row(base)
             r.rows.append(row if row is not None else ("malformed", line, None, None, None))
+            if row is not None and sl is not None:
+                r.slices[(row[0], row[1], row[2])] = sl
+        elif line.startswith(("orphans ", "orphan-protected ")):
+            section, rest = line.split(" ", 1)
+            base, sl = split_slices(rest)
+            row = parse_orphan(section, base)
+            if row is None:
+                r.bad.append(line)
+            else:
+                (r.orph if section == "orphans" else r.orph_prot).append(row)
+                if sl is not None:
+                    r.slices[(section, row[0], row[1])] = sl
+        elif line.startswith(("literal-variants ", "signals ", "protected-churn ")):
+            section, rest = line.split(" ", 1)
+            base, sl = split_slices(rest)
+            row = parse_other(section, base)
+            if row is None:
+                r.bad.append(line)
+            else:
+                {"literal-variants": r.lv, "signals": r.sig, "protected-churn": r.pchurn}[section].append(row)
+                if sl is not None:
+                    r.slices[(section, row[0], "")] = sl
+        elif line.startswith("ci "):
+            r.ci = kv(line.split(" ")[1:])
         elif line.startswith("counts "):
             r.counts = kv(line.split(" ")[1:])
         elif line.startswith("recorded "):
@@ -1089,11 +1202,842 @@ def tp1_a15(ctx):
               "exit 2 + PRUNE-ERROR, linked dir empty, repo unchanged", (r.rc, os.listdir(target), after == before), r)
 
 
+# --------------------------------------------------------------------------------------------
+# TP2 helpers
+# --------------------------------------------------------------------------------------------
+
+
+def pad(s):
+    """20 trailing comment lines: a test file added in one commit is then over the 12-line churn
+    bound, so only the commits a fixture means to count are counted."""
+    return s + "".join("// pad %d\n" % i for i in range(20))
+
+
+def commit_files(repo, files, msg="fixture"):
+    for rel, data in files.items():
+        repo.put(rel, data)
+    return repo.commit(msg)
+
+
+def O(path, sym, tests, test_only=False):
+    return (path, sym, test_only, tuple(sorted(tests)))
+
+
+def OP(path, sym, tests, token, test_only=False):
+    return O(path, sym, tests, test_only) + (token,)
+
+
+def S(path, st=False, churn=None, widened=None):
+    return (path, st, churn, widened)
+
+
+def sset(rows):
+    return sorted(rows, key=repr)
+
+
+def order_ok(rows):
+    keys = [(r[0], r[1]) for r in rows]
+    return keys == sorted(keys)
+
+
+def clean(ctx, res):
+    ctx.check("every orphans/signals/literal-variants/protected-churn line is in the contract format",
+              res.bad == [], [], res.bad, res)
+
+
+def prefixes(res):
+    out = []
+    for line in res.out.splitlines():
+        p = line.split(" ", 1)[0]
+        if not out or out[-1] != p:
+            out.append(p)
+    return out
+
+
+def ts_pair(tag, extra=""):
+    return ("describe('%s', () => {\n  it('one', () => {\n    expect(run('%s')).toBe(1);\n  });\n\n"
+            "  it('one again', () => {\n    expect(run('%s')).toBe(1);\n  });\n%s});\n") % (tag, tag, tag, extra)
+
+
+def rs_pair(tag, extra=""):
+    return ("#[test]\nfn %s_a() {\n    assert_eq!(run(\"%s\"), 1);\n}\n\n"
+            "#[test]\nfn %s_b() {\n    assert_eq!(run(\"%s\"), 1);\n}\n%s") % (tag, tag, tag, tag, extra)
+
+
+def ts_marked(marker, extra=()):
+    lines = ["describe('m', () => {", "  it('one', () => {", "    expect(1).toBe(1);", "  });"]
+    lines += ["  // filler %d" % i for i in range(20)]
+    lines += ["  // marker " + marker, "});"] + list(extra)
+    return "\n".join(lines) + "\n"
+
+
+def rs_marked(marker, extra=()):
+    lines = ["#[test]", "fn one() {", "    assert_eq!(1, 1);", "}"]
+    lines += ["// filler %d" % i for i in range(20)]
+    lines += ["// marker " + marker] + list(extra)
+    return "\n".join(lines) + "\n"
+
+
+def it_(name, body, kind="it"):
+    return "  %s('%s', () => {\n    %s\n  });\n" % (kind, name, body)
+
+
+LV_EXTRA = it_("lv1", "expect(calc(1)).toBe('a');") + it_("lv2", "expect(calc(2)).toBe('b');")
+READ_EXTRA = ("  it('reads', () => {\n    const t = readFileSync('x', 'utf8');\n"
+              "    expect(t).toBe('');\n  });\n")
+
+
+# --------------------------------------------------------------------------------------------
+# TP2 fixtures
+# --------------------------------------------------------------------------------------------
+
+
+def tp2_a1(ctx):
+    OB, OT, OI = "game-core/src/battle/orph.rs", "game-core/src/battle/orph_tests.rs", "game-core/tests/orph_it.rs"
+    TM, TT = "client/src/ui/orphModel.ts", "client/src/ui/orphModel.test.ts"
+    repo = Repo()
+    repo.put("game-core/src/battle/mod.rs", "pub mod orph;\npub mod user;\npub use orph::{rehomed};\n")
+    repo.put(OB, "pub fn solo_orphan() -> u32 { 1 }\npub fn called_prod() -> u32 { 2 }\n"
+                 "pub fn comment_only() -> u32 { 3 }\npub fn rehomed() -> u32 { 4 }\n"
+                 "pub fn chain_b() -> u32 { 5 }\npub fn chain_a() -> u32 { chain_b() + 1 }\n"
+                 "pub fn dead_b() -> u32 { 6 }\npub fn dead_a() -> u32 { dead_b() + 1 }\n"
+                 "pub(crate) fn crate_orphan() -> u32 { 7 }\npub const ORPHAN_CONST: u32 = 8;\n"
+                 "pub struct OrphanShape;\n")
+    repo.put("game-core/src/battle/user.rs",
+             "use super::orph::{called_prod, chain_a, rehomed};\n\n"
+             "// comment_only is deliberately not called here\n/* comment_only, again, in a block comment */\n"
+             "/// rehomed is named in a doc comment too\n#[spacetimedb::reducer]\n"
+             "pub fn run_all() -> u32 {\n    called_prod() + chain_a()\n}\n")
+    repo.put(OT, "use super::*;\n\n#[test]\nfn names_them() {\n    assert_eq!(solo_orphan(), 1);\n"
+                 "    assert_eq!(comment_only(), 3);\n    assert_eq!(rehomed(), 4);\n    assert_eq!(chain_b(), 5);\n"
+                 "    assert_eq!(dead_a() + dead_b(), 15);\n    assert_eq!(crate_orphan(), 7);\n"
+                 "    assert_eq!(ORPHAN_CONST, 8);\n    let _ = OrphanShape;\n}\n")
+    repo.put(OI, "#[test]\nfn it_names() {\n    assert_eq!(solo_orphan(), 1);\n}\n")
+    repo.put(TM, "export function tsOrphan(): number { return 1; }\nexport function tsCalled(): number { return 2; }\n"
+                 "export function tsReexp(): number { return 3; }\nexport function tsCommentOnly(): number { return 5; }\n"
+                 "export const TS_CONST = 4;\nexport function tsChainB(): number { return 1; }\n"
+                 "export function tsChainA(): number { return tsChainB(); }\n"
+                 "export function tsDeadB(): number { return 1; }\n"
+                 "export function tsDeadA(): number { return tsDeadB(); }\n")
+    repo.put("client/src/ui/orphUser.ts",
+             "import { tsCalled, tsReexp, tsOrphan, tsChainA } from './orphModel';\n"
+             "export { tsReexp } from './orphModel';\n// tsCommentOnly is not called here\n"
+             "/* tsCommentOnly either */\nconsole.log(tsCalled(), tsChainA());\n")
+    repo.put(TT, "import { tsOrphan, tsReexp, tsCommentOnly, TS_CONST, tsDeadA, tsDeadB, tsChainB } from './orphModel';\n"
+                 "describe('orphModel', () => {\n  it('names them', () => {\n    expect(tsOrphan()).toBe(1);\n"
+                 "    expect(tsReexp()).toBe(3);\n    expect(tsCommentOnly()).toBe(5);\n    expect(TS_CONST).toBe(4);\n"
+                 "    expect(tsDeadA() + tsDeadB() + tsChainB()).toBe(3);\n  });\n});\n")
+    res = census(repo, repo.commit(), new_mem())
+    exp = [O(OB, "solo_orphan", [OT, OI]), O(OB, "comment_only", [OT]), O(OB, "rehomed", [OT]),
+           O(OB, "dead_a", [OT]), O(OB, "dead_b", [OT]), O(OB, "crate_orphan", [OT]),
+           O(OB, "ORPHAN_CONST", [OT]), O(OB, "OrphanShape", [OT]),
+           O(TM, "tsOrphan", [TT]), O(TM, "tsReexp", [TT]), O(TM, "tsCommentOnly", [TT]),
+           O(TM, "TS_CONST", [TT]), O(TM, "tsDeadA", [TT]), O(TM, "tsDeadB", [TT])]
+    ctx.check("orphans lists exactly: a pub fn / pub(crate) fn / const / struct and TS exports named by tests only, "
+              "names only in comments, `use`/`pub use` and `import`/`export ... from`, and an in-file chain whose head is "
+              "an orphan (each with the test files naming it)",
+              sset(res.orph) == sset(exp), sset(exp), sset(res.orph), res)
+    live = {"called_prod", "chain_a", "chain_b", "run_all", "tsCalled", "tsChainA", "tsChainB"}
+    leaked = [r for r in res.orph if r[1] in live]
+    ctx.check("a symbol called by a production file, and an in-file chain whose head is called from another file, "
+              "are not listed", leaked == [], [], leaked, res)
+    both = [r[3] for r in res.orph if r[1] == "solo_orphan"]
+    ctx.check("tests= holds every eligible test file naming the symbol, sorted",
+              both == [tuple(sorted([OT, OI]))], [tuple(sorted([OT, OI]))], both, res)
+    ctx.check("orphans rows are sorted by file, then symbol", order_ok(res.orph), "sorted", res.orph, res)
+    ctx.check("no unprotected symbol lands under orphan-protected", res.orph_prot == [], [], res.orph_prot, res)
+    clean(ctx, res)
+    a1_regressions(ctx)
+
+
+def a1_regressions(ctx):
+    """False positives of the name match (each symbol below is named, one way or another, by
+    production code) beside symbols that must stay listed."""
+    R = "game-core/src/reg/"
+    RT, TT = R + "reg_tests.rs", "client/src/reg/reg.test.ts"
+    repo = Repo()
+    # (l) look-alike that stays listed: only a `pub use` re-export names it
+    repo.put(R + "mod.rs", "pub use resolve::{resolve_turn};\n")
+    repo.put(R + "resolve.rs", "pub fn resolve_turn() -> u32 { 1 }\n")
+    # (a) aliased imports, Rust and TS
+    repo.put(R + "thing.rs", "pub fn thing_fn() -> u32 { 1 }\n")
+    repo.put(R + "alias_user.rs", "use crate::reg::thing::thing_fn as renamed;\n\n#[spacetimedb::reducer]\n"
+                                  "pub fn alias_entry() -> u32 {\n    renamed()\n}\n")
+    repo.put("client/src/reg/a.ts", "export function foo(): number { return 1; }\n")
+    repo.put("client/src/reg/aUser.ts", "import { foo as f2 } from './a';\nconsole.log(f2());\n")
+    # (b) glob import of an enum's variants
+    repo.put(R + "k.rs", "pub enum Kind {\n    Fire,\n    Water,\n}\n")
+    repo.put(R + "k_user.rs", "use crate::reg::k::Kind::*;\n\n#[spacetimedb::reducer]\npub fn kind_entry() {\n"
+                              "    let _x = Fire;\n}\n")
+    # (c) raw identifier
+    repo.put(R + "m.rs", "pub fn r#type() -> u32 { 1 }\n")
+    repo.put(R + "m_user.rs", "#[spacetimedb::reducer]\npub fn raw_entry() -> u32 {\n    crate::reg::m::r#type()\n}\n")
+    # (d) fn main is an entry point
+    repo.put("server-module/src/main.rs", "pub fn main_helper() -> u32 { 1 }\n\nfn main() {\n    main_helper();\n}\n")
+    # (e) a top-level initializer runs at load
+    repo.put("client/src/reg/overlay.ts", "export function installOverlay(): number { return 1; }\n"
+                                          "const installed = installOverlay();\n")
+    # (f) a file without semicolons; `unused` is the control that stays listed
+    repo.put("client/src/reg/handler.ts", "export class Handler {}\nexport const unused = 1\nregister(Handler)\n")
+    # (g) a keyword-named property followed by division
+    repo.put("client/src/reg/stats.ts", "export const total = 10;\n")
+    repo.put("client/src/reg/statsUser.ts", "const stats = { of: 4 };\nconsole.log(stats.of / total / 2);\n")
+    # (h) compile-time assert
+    repo.put(R + "len.rs", "pub const LEN: usize = 4;\nconst _: () = assert!(LEN == 4);\n")
+    # (i) extension trait on a primitive
+    repo.put(R + "ext.rs", "pub trait Ext {\n    fn double(&self) -> String;\n}\n\nimpl Ext for str {\n"
+                           "    fn double(&self) -> String {\n        format!(\"{}{}\", self, self)\n    }\n}\n")
+    # (j) an entry point's callee in the same file
+    repo.put(R + "entry.rs", "#[spacetimedb::reducer]\npub fn reducer_one() {\n    inner_g()\n}\n\npub fn inner_g() {}\n")
+    # (k) impl liveness follows the self type
+    repo.put(R + "s_live.rs", "pub struct SLive;\n\nimpl SLive {\n    pub fn m() -> u32 {\n        helper_live()\n"
+                              "    }\n}\n\npub fn helper_live() -> u32 { 1 }\n")
+    repo.put(R + "s_user.rs", "#[spacetimedb::reducer]\npub fn s_entry() {\n    let _s = SLive;\n}\n")
+    repo.put(R + "s_dead.rs", "pub struct SDead;\n\nimpl SDead {\n    pub fn m() -> u32 {\n        helper_dead()\n"
+                              "    }\n}\n\npub fn helper_dead() -> u32 { 1 }\n")
+    # one row per symbol: a TS overload
+    repo.put("client/src/reg/over.ts", "export function overloaded(a: string): void;\nexport function overloaded(a: any) {}\n")
+    repo.put(RT, "#[test]\nfn names_reg() {\n    let _ = SDead;\n    helper_dead();\n    resolve_turn();\n}\n")
+    repo.put(TT, "describe('reg', () => {\n  it('x', () => {\n    expect(unused).toBe(1);\n"
+                 "    overloaded('a');\n  });\n});\n")
+    res = census(repo, repo.commit(), new_mem())
+    exp = [O(R + "s_dead.rs", "SDead", [RT]), O(R + "s_dead.rs", "helper_dead", [RT]),
+           O(R + "resolve.rs", "resolve_turn", [RT]), O("client/src/reg/handler.ts", "unused", [TT]),
+           O("client/src/reg/over.ts", "overloaded", [TT])]
+    ctx.check("control: the re-exported symbol, the impl of a self type nothing names (with its callee), the semicolon-less "
+              "`unused` and the TS overload are listed, and nothing else is",
+              sset(res.orph) == sset(exp), sset(exp), sset(res.orph), res)
+    listed = [r[1] for r in res.orph]
+    for label, names in (
+        ("an aliased import (Rust `use X as Y`, TS `import { X as Y }`) names X", ["thing_fn", "foo"]),
+        ("a glob import `use path::Kind::*;` names Kind", ["Kind"]),
+        ("a raw identifier r#type called through a path counts as a reference, under either spelling", ["r#type", "type"]),
+        ("fn main calls its same-file helper", ["main_helper"]),
+        ("a top-level TS initializer runs at load and keeps installOverlay alive", ["installOverlay", "installed"]),
+        ("an ASI file's `register(Handler)` statement keeps Handler alive", ["Handler"]),
+        ("`stats.of / total / 2` is a division naming total, not a regex", ["total"]),
+        ("`const _: () = assert!(LEN == 4)` keeps LEN alive", ["LEN"]),
+        ("an impl for a primitive keeps its trait alive", ["Ext"]),
+        ("a reducer's same-file callee is live", ["reducer_one", "inner_g"]),
+        ("an impl is live when its self type is named elsewhere: its type and its method's callee are not listed",
+         ["SLive", "helper_live"]),
+    ):
+        hit = [n for n in names if n in listed]
+        ctx.check(label, hit == [], [], hit, res)
+    n_over = [r for r in res.orph if r[1] == "overloaded"]
+    ctx.check("a TS overload set gives exactly one orphans row", len(n_over) == 1, 1, n_over, res)
+    clean(ctx, res)
+
+
+def tp2_a2(ctx):
+    CB = "game-core/src/calc/core.rs"
+    CT, YT = "game-core/src/calc/core_tests.rs", "game-core/tests/y.rs"
+    repo = Repo()
+    repo.put(CB, "pub fn only_inline() -> u32 { 1 }\npub fn only_bench() -> u32 { 2 }\npub fn only_it() -> u32 { 3 }\n"
+                 "pub fn only_unit() -> u32 { 4 }\npub fn real_used() -> u32 { 5 }\n\n#[cfg(test)]\nmod tests {\n"
+                 "    use super::*;\n\n    #[test]\n    fn t() {\n        assert_eq!(only_inline(), 1);\n    }\n}\n")
+    repo.put("game-core/src/calc/entry.rs", "#[spacetimedb::reducer]\npub fn entry() -> u32 {\n    real_used()\n}\n")
+    repo.put("game-core/benches/x.rs", "fn bench() {\n    only_bench();\n}\n")
+    repo.put(YT, "#[test]\nfn y() {\n    assert_eq!(only_it(), 3);\n}\n")
+    repo.put(CT, "#[test]\nfn u() {\n    assert_eq!(only_unit(), 4);\n}\n")
+    res = census(repo, repo.commit(), new_mem())
+    exp = [O(CB, "only_inline", []), O(CB, "only_bench", []), O(CB, "only_it", [YT]), O(CB, "only_unit", [CT])]
+    ctx.check("a symbol named only in an inline cfg(test) mod, in benches/, in game-core/tests/*.rs or in a *_tests.rs "
+              "is listed (benches and inline mods are not test files: tests=[]); the one a production file calls is not",
+              sset(res.orph) == sset(exp), sset(exp), sset(res.orph), res)
+    clean(ctx, res)
+
+
+def tp2_a3(ctx):
+    SY, ST = "game-core/src/m/sym.rs", "game-core/src/m/sym_tests.rs"
+    HK, HT = "client/src/ui/hooks.ts", "client/src/ui/hooks.test.ts"
+    repo = Repo()
+    repo.put(SY, "".join("pub fn %s() {}\n" % n for n in
+                         ("in_e2e", "in_eval", "in_wasm", "in_sim", "in_html", "in_test_only", "in_notes_md")))
+    repo.put(HK, "export function tsE2e() {}\nexport function tsEval() {}\nexport function tsTestOnly() {}\n")
+    repo.put("client/e2e/hook.spec.ts", "test('x', async () => {\n  tsE2e();\n  in_e2e();\n});\n")
+    repo.put("evals/b.eval.mjs", "tsEval();\nin_eval();\n")
+    repo.put("client-wasm/src/lib.rs", "pub fn w() {\n    in_wasm();\n}\n")
+    repo.put("sim-harness/src/main.rs", "fn main() {\n    in_sim();\n}\n")
+    repo.put("client/index.html", "<script>in_html();</script>\n")
+    repo.put("docs/notes.md", "in_notes_md is mentioned here\n")
+    repo.put(ST, "#[test]\nfn s() {\n    in_test_only();\n    in_notes_md();\n}\n")
+    repo.put(HT, "describe('h', () => {\n  it('x', () => {\n    expect(tsTestOnly()).toBe(undefined);\n  });\n});\n")
+    res = census(repo, repo.commit(), new_mem())
+    exp = [O(SY, "in_test_only", [ST]), O(SY, "in_notes_md", [ST]), O(HK, "tsTestOnly", [HT])]
+    ctx.check("symbols named in client/e2e, evals, client-wasm, sim-harness or HTML are not listed; one named only by a "
+              "test file, and one named only in a .md file, are",
+              sset(res.orph) == sset(exp), sset(exp), sset(res.orph), res)
+    clean(ctx, res)
+
+
+def tp2_a4(ctx):
+    AB, AT = "game-core/src/attrs/a.rs", "game-core/src/attrs/a_tests.rs"
+    names = ["reducer_fn", "wasm_fn", "tracked_fn", "TableRow", "doc_fn", "inline_fn", "must_fn", "allow_fn",
+             "DeriveStruct", "CfgAttrStruct", "stacked_fn"]
+    repo = Repo()
+    repo.put(AB, "#[spacetimedb::reducer]\npub fn reducer_fn() {}\n\n#[wasm_bindgen]\npub fn wasm_fn() {}\n\n"
+                 "#[track_caller]\npub fn tracked_fn() {}\n\n#[spacetimedb::table(name = t)]\npub struct TableRow {\n"
+                 "    pub id: u32,\n}\n\n/// documented\npub fn doc_fn() {}\n\n#[inline]\npub fn inline_fn() {}\n\n"
+                 "#[must_use]\npub fn must_fn() -> u32 { 1 }\n\n#[allow(dead_code)]\npub fn allow_fn() {}\n\n"
+                 "#[derive(Debug, Clone)]\npub struct DeriveStruct;\n\n"
+                 "#[cfg_attr(feature = \"x\", derive(Debug))]\npub struct CfgAttrStruct;\n\n"
+                 "#[inline]\n#[must_use]\npub fn stacked_fn() -> u32 { 2 }\n")
+    repo.put(AT, "#[test]\nfn names_all() {\n" + "".join("    let _ = %s;\n" % n for n in names) + "}\n")
+    res = census(repo, repo.commit(), new_mem())
+    listed = ["doc_fn", "inline_fn", "must_fn", "allow_fn", "DeriveStruct", "CfgAttrStruct", "stacked_fn"]
+    exp = [O(AB, n, [AT]) for n in listed]
+    ctx.check("items with only doc/inline/must_use/allow/derive/cfg_attr attributes are listed; reducer, table, "
+              "wasm_bindgen and track_caller items are entry points and are not",
+              sset(res.orph) == sset(exp), sset(exp), sset(res.orph), res)
+    clean(ctx, res)
+
+
+def tp2_a5(ctx):
+    PB, PT = "game-core/src/t/prod.rs", "game-core/src/t/prod_tests.rs"
+    repo = Repo()
+    repo.put(PB, "#[cfg(test)]\npub fn helper_only() -> u32 { 1 }\n\npub fn plain_orphan() -> u32 { 2 }\n\n"
+                 "#[cfg(test)]\nfn inner_helper() {}\n\npub fn target_of_testonly() -> u32 { 3 }\n\n"
+                 "#[cfg(test)]\npub fn caller_t() {\n    target_of_testonly();\n}\n\n"
+                 "#[cfg(test)]\nmod inside {\n    pub fn in_mod_helper() {}\n}\n\n#[cfg(test)]\nmod x_tests;\n")
+    repo.put(PT, "#[test]\nfn names() {\n    helper_only();\n    plain_orphan();\n    inner_helper();\n"
+                 "    target_of_testonly();\n    caller_t();\n    in_mod_helper();\n}\n")
+    res = census(repo, repo.commit(), new_mem())
+    exp = [O(PB, "helper_only", [PT], True), O(PB, "inner_helper", [PT], True), O(PB, "caller_t", [PT], True),
+           O(PB, "plain_orphan", [PT]), O(PB, "target_of_testonly", [PT])]
+    ctx.check("a cfg(test) item outside a test mod (any visibility) carries test-only; a plain orphan does not; a symbol "
+              "named only by a cfg(test) item is still an ordinary orphan; an item inside a cfg(test) mod is not listed",
+              sset(res.orph) == sset(exp), sset(exp), sset(res.orph), res)
+    decl = [r for r in res.orph if r[1] == "x_tests"]
+    ctx.check("a `#[cfg(test)] mod x_tests;` declaration is not an item to list (no row for x_tests), while the cfg(test) fns beside it are",
+              decl == [] and len(res.orph) == 5, "no x_tests row", decl, res)
+    clean(ctx, res)
+
+
+def tp2_a6(ctx):
+    OK_, OKT = "game-core/src/ok.rs", "game-core/src/ok_tests.rs"
+    PV, PVT = "server-module/src/privacy.rs", "server-module/src/privacy_tests.rs"
+    IH, IHT = "client/src/ui/i18nHelper.ts", "client/src/ui/i18nHelper.test.ts"
+    PL, PLT = "client/src/ui/plainHelper.ts", "client/src/ui/plainHelper.test.ts"
+    repo = Repo()
+    repo.put(OK_, "pub fn plain_one() {}\npub fn guard_x() {}\npub fn auth_guard() {}\npub fn Hidden_stuff() {}\n")
+    repo.put(OKT, "#[test]\nfn n() {\n    plain_one();\n    guard_x();\n    auth_guard();\n    Hidden_stuff();\n}\n")
+    repo.put(PV, "pub fn plain_name_fn() {}\npub fn claim_it() {}\n")
+    repo.put(PVT, "#[test]\nfn n() {\n    plain_name_fn();\n    claim_it();\n}\n")
+    repo.put(IH, "export function fmt(): number { return 1; }\n")
+    repo.put(IHT, "describe('i', () => {\n  it('x', () => {\n    expect(fmt()).toBe(1);\n  });\n});\n")
+    repo.put(PL, "export function tsPlain(): number { return 1; }\n")
+    repo.put(PLT, "describe('p', () => {\n  it('x', () => {\n    expect(tsPlain()).toBe(1);\n  });\n});\n")
+    res = census(repo, repo.commit(), new_mem())
+    exp_p = [OP(PV, "plain_name_fn", [PVT], "priv"), OP(PV, "claim_it", [PVT], "priv"),
+             OP(OK_, "guard_x", [OKT], "guard"), OP(OK_, "auth_guard", [OKT], "auth"),
+             OP(OK_, "Hidden_stuff", [OKT], "hidden"), OP(IH, "fmt", [IHT], "i18n")]
+    ctx.check("a protected token in the defining path (priv, i18n) or in the symbol name (guard, hidden, case-insensitive) "
+              "moves the orphan to orphan-protected; token= is the first of the tool's list that matches (priv before "
+              "claim, auth before guard)",
+              sset(res.orph_prot) == sset(exp_p), sset(exp_p), sset(res.orph_prot), res)
+    exp = [O(OK_, "plain_one", [OKT]), O(PL, "tsPlain", [PLT])]
+    ctx.check("unprotected orphans stay under orphans and a protected one is not repeated there",
+              sset(res.orph) == sset(exp), sset(exp), sset(res.orph), res)
+    clean(ctx, res)
+
+
+def tp2_a7(ctx):
+    pos = [("client/src/ui/s1.test.ts", pad("describe('s', () => {\n  it('x', () => {\n    const t = readFileSync('a.ts', 'utf8');\n"
+                                            "    expect(t).toBe('');\n  });\n});\n")),
+           ("client/src/ui/s2.test.ts", pad("describe('s', () => {\n  it('x', async () => {\n    const t = await readFile('a.ts');\n"
+                                            "    expect(t).toBe('');\n  });\n});\n")),
+           ("game-core/src/s3_tests.rs", pad("#[test]\nfn s3() {\n    let t = include_str!(\"lib.rs\");\n    assert!(t.len() > 0);\n}\n")),
+           ("server-module/src/s4_tests.rs", pad("#[test]\nfn s4() {\n    let t = std::fs::read_to_string(\"a.rs\").unwrap();\n"
+                                                 "    assert!(t.len() > 0);\n}\n"))]
+    neg = [("client/src/ui/n1.test.ts", pad("// readFileSync is not called\n/* readFile neither */\n"
+                                            "describe('n', () => {\n  it('x', () => {\n    expect('readFileSync').toBe(`readFile`);\n  });\n});\n")),
+           ("game-core/src/n2_tests.rs", pad("// include_str!(\"x\") in a comment\n/// read_to_string in a doc comment\n#[test]\nfn n2() {\n"
+                                             "    let s = \"read_to_string and include_str\";\n    assert!(s.len() > 0);\n}\n")),
+           ("client/src/ui/n3.test.ts", pad("describe('n', () => {\n  it('x', () => {\n    expect(readFileSyncish()).toBe(1);\n"
+                                            "    expect(myreadFile()).toBe(1);\n    expect(readFileAsync()).toBe(1);\n  });\n});\n")),
+           ("game-core/src/n4_tests.rs", pad("#[test]\nfn n4() {\n    read_to_string_lossy();\n    include_str_x();\n}\n")),
+           # not eligible test files
+           ("client/e2e/x.spec.ts", pad("test('x', async () => {\n  readFileSync('a');\n});\n")),
+           ("client/src/ui/loader.ts", pad("export const loaded = readFileSync('a');\n"))]
+    repo = Repo()
+    for rel, data in pos + neg:
+        repo.put(rel, data)
+    res = census(repo, repo.commit(), new_mem())
+    exp = [S(rel, st=True) for rel, _ in pos]
+    ctx.check("a test file calling include_str!, read_to_string, readFileSync or readFile is printed under signals as "
+              "source-text (and no other signal); a word only in a comment or a string, a look-alike identifier, an e2e "
+              "spec and a product file print nothing",
+              sset(res.sig) == sset(exp), sset(exp), sset(res.sig), res)
+    clean(ctx, res)
+    a7_nonutf8_path(ctx)
+
+
+def a7_nonutf8_path(ctx):
+    LP, LT = "client/src/ui/lonely.ts", "client/src/ui/lonely.test.ts"
+    body = "describe('l', () => {\n  it('x', () => {\n    expect(lonelyFn()).toBe(1);\n  });\n});\n"
+    repo = Repo()
+    repo.put(LP, "export function lonelyFn(): number { return 1; }\n")
+    repo.put(LT, body)
+    bad = os.path.join(os.fsencode(repo.path), b"client/src/ui", b"\xff.test.ts")
+    with open(bad, "wb") as f:
+        f.write(body.encode("utf-8"))
+    res = census(repo, repo.commit(), new_mem())
+    rows = [r for r in res.orph if r[1] == "lonelyFn"]
+    ctx.check("a tracked test file whose path is not UTF-8 does not break the census: exit 0, the orphan row prints with a valid "
+              "tests= JSON array naming both test files",
+              res.rc == 0 and len(rows) == 1 and len(rows[0][3]) == 2 and LT in rows[0][3] and res.bad == [],
+              "exit 0, one lonelyFn row, 2 tests, parseable", (res.rc, rows, res.bad), res)
+
+
+def ts_hist_repo():
+    """The A8 history; returns (repo, sha)."""
+    HT, HS = "client/src/ui/hist.test.ts", "client/src/ui/hist.ts"
+    RT, RS = "game-core/src/h/hist_tests.rs", "game-core/src/h/hist.rs"
+    OTH, OTD = "client/src/ui/other.test.ts", "client/src/other.ts"
+    QT = "client/src/ui/quiet.test.ts"
+    repo = Repo()
+    commit_files(repo, {HT: ts_marked("m0"), HS: "export const h = 0;\n", RT: rs_marked("r0"), RS: "pub fn h() {}\n",
+                        OTH: ts_marked("o0"), OTD: "export const o = 0;\n", QT: ts_marked("q0")}, "base")
+    for k in (1, 2, 3):
+        commit_files(repo, {HT: ts_marked("m%d" % k)}, "small %d" % k)                      # counted x3
+    commit_files(repo, {HT: ts_marked("m4"), HS: "export const h = 1;\n"}, "with subject")  # subject changed
+    e13 = ["// x%d" % i for i in range(13)]
+    commit_files(repo, {HT: ts_marked("m4", e13)}, "13 added")                              # not counted
+    t12 = ["// y%d" % i for i in range(12)]
+    commit_files(repo, {HT: ts_marked("m4", e13 + t12)}, "12 added")                        # counted
+    commit_files(repo, {HT: ts_marked("m4", e13 + t12[:5] + ["// z%d" % i for i in range(6)])},
+                 "7 deleted 6 added")                                                       # 13: not counted
+    commit_files(repo, {HT: ts_marked("m4", e13 + t12[:5] + ["// w%d" % i for i in range(6)])},
+                 "6 deleted 6 added")                                                       # 12: counted
+    commit_files(repo, {RT: rs_marked("r1")}, "rs small 1")
+    commit_files(repo, {RT: rs_marked("r2")}, "rs small 2")
+    commit_files(repo, {RT: rs_marked("r3"), RS: "pub fn h() { }\n"}, "rs with subject")
+    commit_files(repo, {OTH: ts_marked("o1")}, "other small 1")
+    commit_files(repo, {OTH: ts_marked("o2"), OTD: "export const o = 1;\n"}, "other, subject elsewhere")
+    commit_files(repo, {QT: ts_marked("q0", ["// q%d" % i for i in range(30)])}, "quiet, big")
+    return repo, repo.commit("tip")
+
+
+def fast_import(repo, commits):
+    """Append (message, {path: bytes}) commits, oldest first, to main with one git fast-import."""
+    parts = []
+    for n, (msg, files) in enumerate(commits):
+        m = msg.encode("utf-8")
+        parts.append(b"commit refs/heads/main\ncommitter Fixture <fixture@example.invalid> 1767225600 +0000\n")
+        parts.append(b"data %d\n%s\n" % (len(m), m))
+        if n == 0:
+            parts.append(b"from refs/heads/main^0\n")
+        for path, data in files.items():
+            parts.append(b"M 100644 inline %s\ndata %d\n%s\n" % (path.encode("utf-8"), len(data), data))
+        parts.append(b"\n")
+    p = subprocess.run(["git", "fast-import", "--quiet"], cwd=repo.path, env=git_env(), input=b"".join(parts),
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+    if p.returncode != 0:
+        raise RuntimeError("fixture git fast-import failed: " + p.stderr.decode("utf-8", "replace"))
+    git(repo.path, "reset", "-q", "--hard", "HEAD")
+
+
+def tp2_a8(ctx):
+    HT = "client/src/ui/hist.test.ts"
+    RT = "game-core/src/h/hist_tests.rs"
+    OTH = "client/src/ui/other.test.ts"
+    repo, sha = ts_hist_repo()
+    mem = new_mem()
+    before = snapshot(repo)
+    res = census(repo, sha, mem)
+    after = snapshot(repo)
+    exp = [S(HT, churn=5), S(RT, churn=2), S(OTH, churn=2)]
+    ctx.check("churn counts the commits that changed the test file by 12 lines or fewer without its subject: "
+              "hist.test.ts 5 (3 small, one of exactly 12 added, one of 6 deleted + 6 added; not the commit that also "
+              "changed hist.ts, not 13 added, not 7 deleted + 6 added); Rust hist_tests.rs 2 (subject hist.rs); "
+              "other.test.ts 2 (a same-stem file in ANOTHER dir is not its subject); a file with only a big change prints nothing",
+              sset(res.sig) == sset(exp), sset(exp), sset(res.sig), res)
+    ctx.check("unprotected churned files print no protected-churn row", res.pchurn == [], [], res.pchurn, res)
+    ctx.check("census leaves the worktree, index and refs unchanged (history is read, never altered)",
+              after == before, before, after, res)
+    clean(ctx, res)
+
+    # paths that need quoting in git output
+    QP, BP, NP = 'client/src/ui/q"uote.test.ts', "client/src/ui/b\\slash.test.ts", "client/src/ui/plainq.test.ts"
+    qrepo = Repo()
+    commit_files(qrepo, {QP: ts_marked("a"), BP: ts_marked("a"), NP: ts_marked("a")}, "base")
+    for k in ("b", "c"):
+        sha_q = commit_files(qrepo, {QP: ts_marked(k), BP: ts_marked(k)}, "quoted %s" % k)
+        sha_q = commit_files(qrepo, {NP: ts_marked(k)}, "plain %s" % k)
+    r = census(qrepo, sha_q, new_mem())
+    exp_q = [S(QP, churn=2), S(BP, churn=2), S(NP, churn=2)]
+    ctx.check("a test file whose path holds a double quote or a backslash gets churn counted like a plain one (2 each)",
+              sset(r.sig) == sset(exp_q), sset(exp_q), sset(r.sig), r)
+
+    # the 300-commit window: 303 commits, the 3 newest of 5 small commits are inside it
+    WT = "client/src/ui/win.test.ts"
+    wrepo = Repo()
+    wrepo.put(WT, ts_marked("s0"))
+    wrepo.commit("base")
+    commits = [("small %d" % k, {WT: ts_marked("s%d" % k).encode("utf-8")}) for k in range(1, 6)]
+    commits += [("filler %d" % i, {"notes.txt": ("n%d\n" % i).encode("utf-8")}) for i in range(297)]
+    fast_import(wrepo, commits)
+    head = git(wrepo.path, "rev-parse", "HEAD").strip()
+    total = git(wrepo.path, "rev-list", "--count", "HEAD").strip()
+    r = census(wrepo, head, new_mem())
+    ctx.check("churn reads only the newest 300 commits of the ref (fixture history has %s): 3 of the 5 small commits" % total,
+              total == "303" and sset(r.sig) == [S(WT, churn=3)], [S(WT, churn=3)], (total, r.sig), r)
+
+
+def tp2_a9(ctx):
+    CAT = "client/src/ui/i18n/catalog.test.ts"
+    PLN = "client/src/ui/plain.test.ts"
+    PRV = "server-module/src/privacy_tests.rs"
+    SEC = "client/src/ui/security.test.ts"
+    repo = Repo()
+    commit_files(repo, {CAT: ts_marked("a"), PLN: ts_marked("a"), PRV: rs_marked("a"),
+                        SEC: ts_marked("a", ["const t = readFileSync('x', 'utf8');"])}, "base")
+    commit_files(repo, {CAT: ts_marked("b")}, "cat 1")
+    commit_files(repo, {PLN: ts_marked("b")}, "plain 1")
+    commit_files(repo, {CAT: ts_marked("c")}, "cat 2")
+    commit_files(repo, {PLN: ts_marked("c")}, "plain 2")
+    sha = commit_files(repo, {PRV: rs_marked("b")}, "privacy 1")
+    res = census(repo, sha, new_mem())
+    exp_s = [S(CAT, churn=2), S(PLN, churn=2), S(PRV, churn=1), S(SEC, st=True)]
+    ctx.check("signals carries churn for the protected and the unprotected churned files, and source-text for a protected-path file with no churn",
+              sset(res.sig) == sset(exp_s), sset(exp_s), sset(res.sig), res)
+    exp_c = [(CAT, 2, "i18n"), (PRV, 1, "priv")]
+    ctx.check("a churned file whose path holds a protected token is also printed under protected-churn with the "
+              "churn count and the first matching token; the unprotected churned file and the protected file without churn are not",
+              sset(res.pchurn) == sset(exp_c), sset(exp_c), sset(res.pchurn), res)
+    clean(ctx, res)
+
+
+def tp2_a10(ctx):
+    LT = "client/src/ui/lit.test.ts"
+    LR = "game-core/src/lit/lit_tests.rs"
+    ts = ("describe('g1', () => {\n" + it_("a", "expect(f(1)).toBe('x');") + it_("b", "expect(f(2)).toBe('y');")
+          + it_("c", "expect(f(3)).toBe('z');") + it_("d", "expect(g(1)).toBe(1);") + it_("e", "expect(g(2)).toBe(2);")
+          + it_("t1", "expect(h(1)).toBe(1);") + it_("t2", "expect(h(1)).toBe(1);")
+          + it_("i1", "expect(k(1)).toBe(1);") + it_("i2", "expect(m(1)).toBe(1);")
+          + it_("q1", "expect(q(2)).toBe(1);") + it_("r1", "expect(r(1)).toBe(1);")
+          + it_("r2", "expect(r(2)).toBe(1);", "test")
+          + "});\n\ndescribe('g2', () => {\n" + it_("q2", "expect(q(3)).toBe(1);") + "});\n")
+    rs = ("#[test]\nfn lit_a() {\n    assert_eq!(calc(1, \"x\"), 'a');\n}\n\n"
+          "#[test]\nfn lit_b() {\n    assert_eq!(calc(2, \"y\"), 'b');\n}\n\n"
+          "#[test]\n#[ignore]\nfn lit_c() {\n    assert_eq!(calc(3, \"z\"), 'c');\n}\n\n"
+          "#[test]\nfn lone() {\n    assert_eq!(other(1), 1);\n}\n")
+    repo = Repo()
+    repo.put(LT, pad(ts))
+    repo.put(LR, pad(rs))
+    res = census(repo, repo.commit(), new_mem())
+    exp = [(LT, 2), (LR, 1)]
+    ctx.check("bodies equal once literals are masked are one group per file: TS a/b/c and d/e (2 groups; exact twins "
+              "t1/t2, identifier differences, different declaration forms and different blocks form none); Rust lit_a/lit_b "
+              "(1 group; an extra attribute breaks the group)",
+              sset(res.lv) == sset(exp), sset(exp), sset(res.lv), res)
+    names = ["g1 > a", "g1 > b", "g1 > c", "g1 > d", "g1 > e", "g1 > r1", "g1 > r2", "g1 > q1", "g2 > q2",
+             "lit_a", "lit_b", "lit_c"]
+    hits = [l for l in res.out.splitlines() if any(n in l for n in names)]
+    ctx.check("no row names a literal-variant test, under any section", hits == [], [], hits, res)
+    exp_d = [D(LT, "g1 > t2", "g1 > t1")]
+    ctx.check("the exact twins stay an ordinary duplicates row, and nothing else prints as a twin",
+              res.rows == exp_d, exp_d, res.rows, res)
+    clean(ctx, res)
+
+
+def tp2_a11(ctx):
+    W, Z = "client/src/ui/w.test.ts", "client/src/ui/z.test.ts"
+    repo = Repo()
+    repo.put(W, ts_marked("a"))
+    repo.put(Z, ts_marked("a"))
+    repo.put("client/src/ui/notatest.ts", "export const n = 1;\n")
+    sha = repo.commit()
+    mem = new_mem()
+    gates = os.path.join(mem, "gates")
+    os.makedirs(gates)
+
+    def row(slice_id, path, why="pin"):
+        return json.dumps({"ts": "2026-11-01T00:00:00Z", "slice": slice_id, "path": path, "why": why})
+
+    with open(os.path.join(gates, "a-1.widened.jsonl"), "w") as f:
+        f.write("\n".join([row("a-1", W), row("a-1", W, "count"), row("a-1", Z), row("a-1", "client/src/ui/notatest.ts"),
+                           "{not json", "", json.dumps({"ts": "t", "slice": "a-1", "why": "no path"})]) + "\n")
+    with open(os.path.join(gates, "b-2.widened.jsonl"), "w") as f:
+        f.write(row("b-2", W) + "\n")
+    with open(os.path.join(gates, "c.jsonl"), "w") as f:
+        f.write("\n".join(row("c", Z) for _ in range(5)) + "\n")
+    res = census(repo, sha, mem)
+    exp = [S(W, widened=3), S(Z, widened=1)]
+    ctx.check("widened is the number of rows naming the test file across gates/*.widened.jsonl (3 and 1); a row naming a "
+              "non-test path, a malformed line, a blank line, a row without a path and a file not named *.widened.jsonl add nothing",
+              sset(res.sig) == sset(exp), sset(exp), sset(res.sig), res)
+    clean(ctx, res)
+
+
+def tp2_a12(ctx):
+    AA, BB = "client/src/ui/aa.test.ts", "client/src/ui/sub/bb.test.ts"
+    AU, CC = "client/src/ui/sub/auth.test.ts", "client/src/render/cc.test.ts"
+    DD, EE = "client/src/other/dd.test.ts", "game-core/src/z/ee_tests.rs"
+    YT = "game-core/tests/y_it.rs"
+    repo = Repo()
+    repo.put(AA, pad(ts_pair("aa", READ_EXTRA)))
+    repo.put(BB, pad(ts_pair("bb", LV_EXTRA)))
+    repo.put(AU, pad(ts_pair("auth")))
+    repo.put(CC, pad(ts_pair("cc")))
+    repo.put(DD, pad(ts_pair("dd", LV_EXTRA + READ_EXTRA + it_("ghosts", "expect(ghost()).toBe(1);"))))
+    repo.put(EE, pad(rs_pair("ee", "#[test]\nfn names_z() {\n    assert_eq!(zorph(), 1);\n}\n")))
+    repo.put(YT, pad("#[test]\nfn names_y() {\n    assert_eq!(yorph(), 2);\n}\n"))
+    repo.put("game-core/src/z/zz.rs", "pub fn zorph() -> u32 { 1 }\n")
+    repo.put("game-core/src/y/yy.rs", "pub fn yorph() -> u32 { 2 }\n")
+    repo.put("client/src/other/prod.ts", "export function ghost(): number { return 1; }\n")
+    sha = repo.commit()
+    mem = new_mem()
+    d = tempfile.mkdtemp(prefix="spec-", dir=ROOT)
+    spec = os.path.join(d, "x.spec.md")
+    em, dot = chr(0x2014), chr(0x00b7)
+    with open(spec, "w", encoding="utf-8") as f:
+        f.write(("# Test spec\n\n## Slices\n\n### zed-1 EM first slice\ntype: feature DOT tier: routine\n"
+                 "touches: client/src/ui/aa.test.ts, client/src/ui/sub/**, `game-core/src/z/`\n\n"
+                 "### alp-2 EM second slice\n"
+                 "touches: `client/src/ui/*.test.ts`, client/src/render/**, game-core/tests/*.rs\n"
+                 "touches: client/src/other/**\n\n"
+                 "### nope-3 EM third slice\ntouches: client/src/nomatch/**\n").replace("EM", em).replace("DOT", dot))
+    full = census(repo, sha, mem)
+    sp = census(repo, sha, mem, "--spec", spec)
+    all_dups = {r[1] for r in full.rows if r[0] == "duplicates"}
+    ctx.check("control: without --spec every twin file, the orphans, the literal-variants and the signals print (and no slices=)",
+              all_dups == {AA, BB, CC, DD, EE} and {r[1] for r in full.rows if r[0] == "protected-twins"} == {AU}
+              and {r[0] for r in full.orph} == {"game-core/src/z/zz.rs", "game-core/src/y/yy.rs", "client/src/other/prod.ts"}
+              and sorted(r[0] for r in full.lv) == sorted([BB, DD]) and sorted(r[0] for r in full.sig) == sorted([AA, DD])
+              and "slices=" not in full.out,
+              "all rows, no slices=", (full.rows, full.orph, full.lv, full.sig), full)
+    matched_rows = [r for r in full.rows if r[1] != DD]
+    ctx.check("--spec prints only the twin rows whose file matches a touches: entry (exact path, `**` across `/`, a backticked "
+              "directory with a trailing `/`, `ui/*.test.ts` not crossing into sub/); the unmatched file prints none",
+              srt(sp.rows) == srt(matched_rows), srt(matched_rows), srt(sp.rows), sp)
+    prod_z, prod_y = "game-core/src/z/zz.rs", "game-core/src/y/yy.rs"
+    exp_o = [O(prod_z, "zorph", [EE]), O(prod_y, "yorph", [YT])]
+    ctx.check("an orphan row prints when its defining file OR one of its test files matches; one matching neither does not",
+              sset(sp.orph) == sset(exp_o), sset(exp_o), sset(sp.orph), sp)
+    ctx.check("literal-variants and signals rows follow the same filter",
+              sp.lv == [(BB, 1)] and sp.sig == [S(AA, st=True)], ([(BB, 1)], [S(AA, st=True)]), (sp.lv, sp.sig), sp)
+    cand = {AA: "aa > one again", BB: "bb > one again", CC: "cc > one again", EE: "ee_b"}
+    exp_sl = {("duplicates", AA, cand[AA]): ["zed-1", "alp-2"], ("duplicates", BB, cand[BB]): ["zed-1"],
+              ("duplicates", CC, cand[CC]): ["alp-2"], ("duplicates", EE, cand[EE]): ["zed-1"],
+              ("protected-twins", AU, "auth > one again"): ["zed-1"],
+              ("orphans", prod_z, "zorph"): ["zed-1"], ("orphans", prod_y, "yorph"): ["alp-2"],
+              ("literal-variants", BB, ""): ["zed-1"], ("signals", AA, ""): ["zed-1", "alp-2"]}
+    ctx.check("every printed row ends with slices= listing each slice id whose touches: matches, in spec order (zed-1 before "
+              "alp-2, not alphabetical), using only the FIRST touches: line of a section",
+              sp.slices == exp_sl, exp_sl, sp.slices, sp)
+    ctx.check("totals, counts and the commit are identical to a run without --spec",
+              sp.totals == full.totals and sp.counts == full.counts and sp.commit == full.commit and sp.rc == 0,
+              (full.totals, full.counts), (sp.totals, sp.counts), sp)
+    want = ["PRUNE-CENSUS", "totals", "duplicates", "protected-twins", "orphans", "literal-variants", "signals", "counts"]
+    ctx.check("sections print in the contract order", prefixes(sp) == want, want, prefixes(sp), sp)
+    clean(ctx, sp)
+    for name, path in (("a --spec path that does not exist", os.path.join(d, "absent.md")), ("a --spec that is a directory", d)):
+        r = run_tool("census", "--repo", repo.path, "--at", sha, "--mem", mem, "--spec", path)
+        ctx.check(name + " is refused: exit 2, PRUNE-ERROR, no PRUNE-CENSUS", refused(r), "exit 2 + PRUNE-ERROR", r.first, r)
+
+    # spec-parsing edge cases, over the same census
+    spec2 = os.path.join(d, "y.spec.md")
+    fence = "`" * 3
+    with open(spec2, "w", encoding="utf-8") as f:
+        f.write(("# Test spec\n\n## Slices\n\n### e-1 EM empty first line\ntouches:\ntouches: client/src/ui/aa.test.ts\n\n"
+                 "### s2 EM fenced block first\n" + fence + "text\n# a comment line inside a fence\n" + fence + "\n"
+                 "touches: client/src/render/**\n\n"
+                 "### c-3 EM control\ntouches: client/src/ui/sub/**\n").replace("EM", chr(0x2014)))
+    sp2 = census(repo, sha, mem, "--spec", spec2)
+    exp2 = {("duplicates", BB, "bb > one again"): ["c-3"], ("protected-twins", AU, "auth > one again"): ["c-3"],
+            ("duplicates", CC, "cc > one again"): ["s2"], ("literal-variants", BB, ""): ["c-3"]}
+    ctx.check("a slice whose first touches: line is empty matches nothing (its second line is ignored: aa.test.ts prints no row, "
+              "not even its signal); a `# comment` line inside a code fence does not end the slice, so s2 still matches render/**",
+              sp2.slices == exp2 and sp2.sig == [] and {r[1] for r in sp2.rows} == {BB, AU, CC},
+              (exp2, []), (sp2.slices, sp2.sig, sp2.rows), sp2)
+
+
+GH_FIELDS = "databaseId,workflowName,headSha,status,conclusion,attempt,startedAt,updatedAt"
+GH_BASE = datetime(2026, 11, 10, 12, 0, 0)
+
+
+def iso(dt):
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def gh_run(i, wf, sha, status, concl, attempt, start_min, secs):
+    start = GH_BASE + timedelta(minutes=start_min)
+    return {"databaseId": i, "workflowName": wf, "headSha": sha, "status": status, "conclusion": concl,
+            "attempt": attempt, "startedAt": iso(start), "updatedAt": iso(start + timedelta(seconds=secs))}
+
+
+class Gh:
+    """A fake `gh`: logs its argv, prints a canned answer, exits with a canned code."""
+
+    def __init__(self, text, rc=0):
+        self.dir = tempfile.mkdtemp(prefix="gh-", dir=ROOT)
+        self.log = os.path.join(self.dir, "calls.log")
+        data = os.path.join(self.dir, "data.txt")
+        with open(data, "w") as f:
+            f.write(text)
+        script = ("#!/usr/bin/python3\nimport json, sys\nwith open(%r, 'a') as f:\n"
+                  "    f.write(json.dumps(sys.argv[1:]) + '\\n')\nwith open(%r) as f:\n"
+                  "    sys.stdout.write(f.read())\nsys.exit(%d)\n") % (self.log, data, rc)
+        path = os.path.join(self.dir, "gh")
+        with open(path, "w") as f:
+            f.write(script)
+        os.chmod(path, 0o755)
+
+    def env(self):
+        env = clean_env()
+        env["PATH"] = self.dir + os.pathsep + os.environ.get("PATH", "")
+        return env
+
+    def calls(self):
+        if not os.path.exists(self.log):
+            return []
+        with open(self.log) as f:
+            return [json.loads(l) for l in f.read().splitlines() if l]
+
+    def reset(self):
+        if os.path.exists(self.log):
+            os.remove(self.log)
+
+
+def ci_runs(head, old):
+    other = "e" * 40
+    rows = [
+        gh_run(1, "CI", head, "in_progress", "", 1, 0, 0),             # newest for the commit, not completed
+        gh_run(2, "Nightly", other, "in_progress", "", 1, -1, 0),      # newest Nightly, not completed
+        gh_run(3, "CI", head, "completed", "success", 1, -10, 95),     # the answer: 95 s, success
+        gh_run(4, "CI", head, "completed", "failure", 1, -20, 30),     # older run of the same commit
+        gh_run(5, "Nightly", other, "completed", "failure", 1, -30, 3600),
+        gh_run(6, "Nightly", other, "completed", "success", 1, -40, 3600),
+        gh_run(7, "CI", other, "completed", "success", 2, -50, 100),   # rerun to green (1)
+        gh_run(8, "CI", other, "completed", "success", 3, -60, 100),   # rerun to green (2)
+        gh_run(9, "CI", other, "completed", "failure", 2, -70, 100),   # rerun, not green
+        gh_run(10, "CI", other, "completed", "success", 1, -80, 100),  # green first time
+        gh_run(11, "Nightly", other, "completed", "success", 2, -90, 100),  # not a CI run
+        gh_run(12, "CI", old, "completed", "failure", 1, -100, 600),   # the older commit's run
+    ]
+    rows += [gh_run(100 + i, "CI", "f" * 40, "completed", "success", 1, -(200 + i), 60) for i in range(300)]
+    rows.append(gh_run(999, "CI", other, "completed", "success", 2, -5000, 100))  # outside the newest 300
+    rows.sort(key=lambda r: r["startedAt"], reverse=True)
+    return rows
+
+
+def tp2_a13(ctx):
+    repo = Repo()
+    repo.fixture(CONTROL, "control.test.ts")
+    old = repo.commit("old")
+    repo.put("client/src/main.ts", ts_lines(3))
+    head = repo.commit("head")
+    repo.put("client/src/later.ts", ts_lines(2))
+    third = repo.commit("third, no CI run")
+    gh = Gh(json.dumps(ci_runs(head, old)))
+    env = gh.env()
+    want = {"seconds": "95", "conclusion": "success", "nightly": "failure", "reruns-to-green": "2"}
+    mem = new_mem()
+    before = snapshot(repo)
+    r = census(repo, head, mem, "--ci", env=env)
+    after = snapshot(repo)
+    calls = gh.calls()
+    ctx.check("--ci prints the CI run's wall seconds and conclusion for the commit (newest COMPLETED run: 95 s, success), "
+              "the newest completed Nightly's conclusion (failure), and the rerun-to-green count among the newest 300 CI runs "
+              "(2: attempt>=2 and success; not attempt 2 failure, attempt 1 success, a Nightly, or a run past the 300th)",
+              r.rc == 0 and r.ci == want, want, r.ci, r)
+    ctx.check("--ci makes exactly one gh call, `gh run list ...`",
+              len(calls) == 1 and calls[0][:2] == ["run", "list"], "one call starting run list", calls, r)
+    ctx.check("--ci without --record writes nothing under --mem", os.listdir(mem) == [], [], os.listdir(mem), r)
+    ctx.check("census --ci leaves the worktree, index and refs unchanged", after == before, before, after, r)
+    ctx.check("the census rows still print with --ci", CTRL in r.rows, CTRL, r.rows, r)
+
+    gh.reset()
+    r = census(repo, head, mem, "--ci", "--record", "lbl", env=env)
+    trend = os.path.join(mem, "prune", "trend.jsonl")
+    d = read_bytes(trend)
+    row = json.loads(d.decode("utf-8")) if d else None
+    exp_ci = {"seconds": 95, "conclusion": "success", "nightly": "failure", "reruns_to_green": 2}
+    got = row.get("ci") if isinstance(row, dict) else row
+    ctx.check("the trend row carries a \"ci\" object with seconds, conclusion, nightly and reruns_to_green (ints, not strings)",
+              got == exp_ci and type(got.get("seconds")) is int and type(got.get("reruns_to_green")) is int,
+              exp_ci, got, r)
+    ctx.check("the trend row keeps label, commit, totals and counts beside \"ci\"",
+              isinstance(row, dict) and row.get("label") == "lbl" and row.get("commit") == head
+              and "totals" in row and "counts" in row, "label/commit/totals/counts", row, r)
+    ctx.check("the ci line sits after counts and before recorded; --ci --record is one gh call",
+              prefixes(r)[-3:] == ["counts", "ci", "recorded"] and len(gh.calls()) == 1,
+              (["counts", "ci", "recorded"], 1), (prefixes(r)[-3:], len(gh.calls())), r)
+
+    gh.reset()
+    r = census(repo, head, mem, "--record", "last", "--ci", env=env)
+    lines = (read_bytes(trend) or b"").decode("utf-8").splitlines()
+    last = json.loads(lines[-1]) if lines else None
+    ctx.check("--ci takes no value: as the last flag it still parses, prints the ci line and records \"ci\"",
+              r.rc == 0 and r.ci == want and isinstance(last, dict) and last.get("label") == "last"
+              and last.get("ci") == exp_ci, (want, exp_ci), (r.ci, last), r)
+
+    r = census(repo, old, mem, "--ci", env=env)
+    w_old = {"seconds": "600", "conclusion": "failure", "nightly": "failure", "reruns-to-green": "2"}
+    ctx.check("the run is matched by head sha: at the older commit the CI figures are that commit's run (600 s, failure)",
+              r.ci == w_old, w_old, r.ci, r)
+    r = census(repo, third, mem, "--ci", env=env)
+    w_none = {"seconds": "null", "conclusion": "null", "nightly": "failure", "reruns-to-green": "2"}
+    ctx.check("a commit with no CI run gets null seconds and conclusion; nightly and reruns still print",
+              r.ci == w_none, w_none, r.ci, r)
+
+    gh.reset()
+    mem2 = new_mem()
+    r = census(repo, head, mem2, "--record", "nociflag", env=env)
+    d = read_bytes(os.path.join(mem2, "prune", "trend.jsonl"))
+    row = json.loads(d.decode("utf-8")) if d else None
+    ctx.check("without --ci there is no ci line, no \"ci\" key in the row, and gh is never run",
+              r.ci is None and isinstance(row, dict) and "ci" not in row and gh.calls() == [],
+              "no ci anywhere, zero gh calls", (r.ci, row, gh.calls()), r)
+
+
+def tp2_a14(ctx):
+    repo = Repo()
+    repo.fixture(CONTROL, "control.test.ts")
+    sha = repo.commit()
+    good = json.dumps([gh_run(1, "CI", sha, "completed", "success", 1, -10, 95),
+                       gh_run(2, "Nightly", sha, "completed", "success", 1, -20, 100),
+                       gh_run(3, "CI", "e" * 40, "completed", "success", 2, -30, 100)])
+    bindir = tempfile.mkdtemp(prefix="nogh-", dir=ROOT)
+    os.symlink(shutil.which("git"), os.path.join(bindir, "git"))
+    env_absent = clean_env()
+    env_absent["PATH"] = bindir
+    exits = Gh(good, rc=1)
+    junk = Gh("this is not json\n")
+    deep = Gh("[" * 100000 + "]" * 100000 + "\n")
+    nulls = {"seconds": "null", "conclusion": "null", "nightly": "null", "reruns-to-green": "null"}
+    jnulls = {"seconds": None, "conclusion": None, "nightly": None, "reruns_to_green": None}
+    for name, env, gh in (("gh absent from PATH", env_absent, None),
+                          ("gh exits 1 (with a valid-looking answer on stdout)", exits.env(), exits),
+                          ("gh prints something that is not JSON", junk.env(), junk),
+                          ("gh prints 100000 nested arrays (deeper than a JSON parser's recursion limit)",
+                           deep.env(), deep)):
+        mem = new_mem()
+        r = census(repo, sha, mem, "--ci", "--record", "n", env=env)
+        d = read_bytes(os.path.join(mem, "prune", "trend.jsonl"))
+        row = json.loads(d.decode("utf-8")) if d else None
+        ctx.check(name + ": exit 0, the ci line is all null, and the census rows still print",
+                  r.rc == 0 and r.ci == nulls and CTRL in r.rows and r.commit == sha, (0, nulls, CTRL),
+                  (r.rc, r.ci, r.rows), r)
+        got = row.get("ci") if isinstance(row, dict) else row
+        ctx.check(name + ": the row is still appended, with \"ci\" all null",
+                  got == jnulls and isinstance(row, dict) and row.get("label") == "n", jnulls, row, r)
+        if gh is not None:
+            ctx.check(name + ": gh was actually run once (the null is a failure, not a skip)",
+                      len(gh.calls()) == 1, 1, gh.calls(), r)
+
+
 FIXTURES = [
     ("TP1-A1", tp1_a1), ("TP1-A2", tp1_a2), ("TP1-A3", tp1_a3), ("TP1-A4", tp1_a4),
     ("TP1-A5", tp1_a5), ("TP1-A6", tp1_a6), ("TP1-A7", tp1_a7), ("TP1-A8", tp1_a8),
     ("TP1-A9", tp1_a9), ("TP1-A10", tp1_a10), ("TP1-A11", tp1_a11), ("TP1-A12", tp1_a12),
     ("TP1-A13", tp1_a13), ("TP1-A14", tp1_a14), ("TP1-A15", tp1_a15),
+    ("TP2-A1", tp2_a1), ("TP2-A2", tp2_a2), ("TP2-A3", tp2_a3), ("TP2-A4", tp2_a4),
+    ("TP2-A5", tp2_a5), ("TP2-A6", tp2_a6), ("TP2-A7", tp2_a7), ("TP2-A8", tp2_a8),
+    ("TP2-A9", tp2_a9), ("TP2-A10", tp2_a10), ("TP2-A11", tp2_a11), ("TP2-A12", tp2_a12),
+    ("TP2-A13", tp2_a13), ("TP2-A14", tp2_a14),
 ]
 
 

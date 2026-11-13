@@ -3,10 +3,11 @@
 # ^ POLYGLOT INTERPRETER GUARD. `bash <this file>` would otherwise run the python source as shell
 # and execute any backticked prose in it. Python reads this line as a no-op string; sh/bash
 # re-execs the file under python3 before reaching any other line. mr-selfcheck enforces it.
-"""mr-prune — a read-only census of the game repo's test suite: its size, and the tests that are
-exact twins of an earlier test in the same block.
+"""mr-prune — a read-only census of the game repo's test suite: its size, the tests that are exact
+twins of an earlier test in the same block, the product symbols only tests name, and signals on
+test files.
 
-    mr-prune census [--repo R] [--at REF] [--mem DIR] [--record LABEL]
+    mr-prune census [--repo R] [--at REF] [--mem DIR] [--record LABEL] [--spec FILE] [--ci]
     mr-prune twin   [--repo R] [--at REF] [--mem DIR] --file F --test T --survivor S
     mr-prune keep   [--repo R] [--at REF] [--mem DIR] --file F --test T --reason TEXT
     mr-prune --selftest [ID ...]      fixtures/prune/battery.py; rc=0 pass, rc=1 fail
@@ -14,7 +15,8 @@ exact twins of an earlier test in the same block.
 Defaults: R = projects/monster-realm of the checkout this tool is in; REF =
 refs/remotes/origin/master; DIR = the directory this tool is in. `PRUNE-ERROR ...` on stderr and
 rc=2 for a usage error, an R that is not the top level of a git repository, a REF that is not a
-commit, a DIR that is missing or inside R when the command writes, or a write that fails.
+commit, a log that cannot be read, a --spec FILE that cannot be read, a DIR that is missing or
+inside R when the command writes, or a write that fails.
 
 A row is a candidate for someone to read, never a reason to delete a test: the deletion rule is
 standards/testing-tdd.md, "Deleting a check is legitimate". No gate reads this tool's output, and
@@ -26,7 +28,13 @@ census prints, in this order:
     totals out-of-scope evals=N sim-harness=N client-wasm=N
     duplicates <file> :: "<candidate>" -> "<survivor>"
     protected-twins <file> :: "<candidate>" -> "<survivor>" token=<token>
+    orphans <file> :: "<symbol>"[ test-only] tests=["<test file>",...]
+    orphan-protected <file> :: "<symbol>"[ test-only] tests=[...] token=<token>
+    literal-variants <file> groups=N
+    signals <file>[ source-text][ churn=N][ widened=N]
+    protected-churn <file> churn=N token=<token>
     counts duplicates=N protected-twins=N identical-other-scope=N kept=N unparsed=N
+    ci seconds=N conclusion=W nightly=W reruns-to-green=N           (with --ci; null when unknown)
   Packages and their test files:
     game-core       game-core/src/**/*_tests.rs, game-core/tests/*.rs
     server-module   server-module/src/**/*_tests.rs
@@ -37,8 +45,52 @@ census prints, in this order:
   not read: inline `#[cfg(test)] mod` bodies in product files, client/e2e/**/*.spec.ts,
   client/test-util/, evals/**/*.eval.mjs, and the .rs files of sim-harness/ and client-wasm/.
   Names are JSON strings, and so is a path holding anything outside [A-Za-z0-9_./-].
-  `--record LABEL` appends one JSON row (label, commit, totals, counts) to DIR/prune/trend.jsonl
-  and prints `recorded LABEL`.
+  Twin rows come in file order and, within a file, definition order; the other sections are sorted
+  by file, then name. `totals` and `counts` cover the whole commit.
+  `--record LABEL` appends one JSON row (label, commit, totals, counts, and with --ci a `ci` object
+  {seconds, conclusion, nightly, reruns_to_green}) to DIR/prune/trend.jsonl and prints
+  `recorded LABEL`.
+  `--spec FILE` prints only the rows with a file that a `touches:` entry of FILE names, each ending
+  ` slices=<id>,...`: the `### <id> — ` slices, in file order, whose first `touches:` line under
+  the heading names one. Entries are comma-separated, backticks dropped; `**` crosses directories,
+  `*` and `?` do not, and an entry names everything under it as a directory. A twin row's file is
+  its test file; an orphan row's files are the defining file and its tests.
+
+Orphans. A symbol is a module-level item of game-core/src or server-module/src (top level or in a
+`mod name { }` that is not `#[cfg(test)]`): `pub`/`pub(...)` fn, struct, enum, union, trait, type,
+const, static; or a top-level `export` function, class, interface, type, enum or const/let/var of
+client/src (module_bindings/ aside). Methods, variants and `export default` are not symbols. It is
+listed when no production file but its own names it and no live code of its own file does. Live
+code: an item with an attribute other than doc, inline, must_use, allow, derive, cfg_attr (an
+entry point: reducer, table, wasm export, track_caller, ...; never listed), `fn main`, `const _`;
+code with no name (a macro call, a top-level TypeScript statement, the initializer of a top-level
+TypeScript const/let/var/type, an impl whose self type is live or is a primitive, slice or
+tuple); and any item, private ones included, named by another production file or by live code of
+its file. Production is every tracked text file except test files wherever they are (`*_tests.rs`,
+`*.test.ts`, a `tests/` or `benches/` directory), client/test-util/, *.md and *.txt; client/e2e,
+evals, client-wasm, sim-harness, HTML and config count. A file names what its identifiers and the
+words inside its literals spell, comments and module-level `#[cfg(test)]` modules and items aside.
+A `use ...;`, `import ...` or `export ... from ...` statement names only what it reaches through:
+X of `X as Y` and of `X::...`. A file the lexer cannot read names every word of its text. An item compiled only under `#[cfg(test)]` outside a test
+module is listed as `test-only`. `tests=` holds the test files whose names include the symbol. A
+defining path or a symbol holding a protected token goes under `orphan-protected`. The match is by
+name, so a name used for two things hides an orphan; a row is for a refactor to prove.
+
+Signals, per test file:
+  source-text   it calls include_str!, read_to_string, readFileSync or readFile (a token, not text
+                in a comment or a literal)
+  churn=N       N of the last 300 commits on REF changed it by 12 lines or fewer (added plus
+                deleted) and left its subject file alone: same directory, stem without `_tests` or
+                `.test`
+  widened=N     N rows of DIR/gates/*.widened.jsonl have it as `path`
+  A churned file whose path holds a protected token is also listed under `protected-churn`.
+  `literal-variants` counts the groups of two or more tests of one block whose forms and bodies
+  are equal once every literal is masked and that are not all the same test.
+
+--ci reads one `gh run list --branch master` from R's directory: seconds and conclusion of the
+newest completed CI run on the commit, the newest completed Nightly's conclusion, and how many of
+the newest 300 CI runs concluded success on attempt 2 or later. gh missing from PATH, failing or
+answering something else: the four are null, `PRUNE-WARN ci ...` goes to stderr, rc stays 0.
 
 A test, per language:
   TypeScript  `it(title, fn)` or `test(title, fn)`, with or without `.each(table)`, written as a
@@ -93,17 +145,19 @@ candidate's row and counts it under `kept` until its form or body changes. `PRUN
 written). census and twin read a keep file they cannot parse as empty and say so on stderr, so a
 broken keep file can only add rows.
 
-The inspected repository is read through `git rev-parse`, `git ls-tree` and `git cat-file` at the
-commit; nothing is checked out and the work tree is never read. The only files written are the keep
+The inspected repository is read through `git rev-parse`, `git ls-tree`, `git cat-file` and
+`git log` at the commit; nothing is checked out and the work tree is never read. The only files written are the keep
 file and the trend file, and never inside R.
 
 Shebang is `/usr/bin/python3` on purpose: `#!/usr/bin/env python3` exits 126 in unpinned cwds under
 asdf.
 """
+import datetime
 import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -221,7 +275,8 @@ def lex_ts(src):
                 regex = None
             elif prev and (prev[0] in ("num", "str", "re")
                            or (prev[0] == "tpl" and prev[1][-1] == "`")    # not after its `${`
-                           or (prev[0] == "id" and prev[1] not in TS_REGEX_AFTER_WORD)
+                           or (prev[0] == "id" and (prev[1] not in TS_REGEX_AFTER_WORD
+                                                    or (len(toks) > 1 and toks[-2][1] in (".", "?."))))
                            or (prev[0] == "punct" and prev[1] in ("++", "--"))):
                 regex = None
             if regex:
@@ -323,15 +378,23 @@ def match_brackets(toks):
 # Tests.
 # ---------------------------------------------------------------------------------------------
 NAME_SLOT = "\x00"      # stands in a form where the test's name was
+LITERAL_SLOT = "\x01"   # stands in a masked form or body where a literal was
+LITERAL_KINDS = frozenset(("str", "tpl", "num", "re", "chr"))
+
+
+def _masked(toks):
+    """The token texts with every literal replaced by LITERAL_SLOT."""
+    return tuple(LITERAL_SLOT if kind in LITERAL_KINDS else text for kind, text, _offset in toks)
 
 
 class Test:
     """One lexed test. `block` identifies its innermost enclosing block; `form` and `body` are
     tuples of token texts; `index` is its position among the file's lexed tests."""
-    __slots__ = ("name", "block", "form", "body", "index")
+    __slots__ = ("name", "block", "form", "body", "masked", "index")
 
-    def __init__(self, name, block, form, body):
+    def __init__(self, name, block, form, body, masked):
         self.name, self.block, self.form, self.body, self.index = name, block, form, body, 0
+        self.masked = masked        # (form, body) with every literal token replaced by LITERAL_SLOT
 
     def digest(self):
         return hashlib.sha256(json.dumps([self.form, self.body]).encode("ascii")).hexdigest()[:16]
@@ -498,10 +561,13 @@ def tests_ts(src):
             continue
         outer = [s for s in scope if s[0] == "describe"]
         first, end = fn
-        form = (_texts(toks, i, args[0][0]) + (NAME_SLOT,) + _texts(toks, args[0][1], first + 1)
-                + _texts(toks, end, close + 1))
+        pieces = ((i, args[0][0]), (args[0][1], first + 1), (end, close + 1))
+        form = _texts(toks, *pieces[0]) + (NAME_SLOT,) + sum((_texts(toks, *p) for p in pieces[1:]), ())
+        masked = (_masked(toks[slice(*pieces[0])]) + (NAME_SLOT,)
+                  + sum((_masked(toks[slice(*p)]) for p in pieces[1:]), ()))
         tests.append(Test(" > ".join([s[1] for s in outer] + [title]),
-                          outer[-1][2] if outer else -1, form, _texts(toks, first + 1, end)))
+                          outer[-1][2] if outer else -1, form, _texts(toks, first + 1, end),
+                          (masked, _masked(toks[first + 1:end]))))
         i = close + 1
     return tests, unparsed
 
@@ -567,9 +633,12 @@ def tests_rs(src):
                 if all(s is not None for s in scope):
                     form = (_texts(toks, attrs[0][0], i + 1) + (NAME_SLOT,)
                             + _texts(toks, i + 2, j + 1))
+                    masked = (_masked(toks[attrs[0][0]:i + 1]) + (NAME_SLOT,)
+                              + _masked(toks[i + 2:j + 1]))
                     tests.append(Test("::".join([s[1] for s in scope] + [toks[i + 1][1]]),
                                       scope[-1][2] if scope else -1, form,
-                                      _texts(toks, j + 1, match[j])))
+                                      _texts(toks, j + 1, match[j]),
+                                      (masked, _masked(toks[j + 1:match[j]]))))
                 else:
                     unparsed += 1
                 attrs = []
@@ -628,6 +697,559 @@ def protected_token(*texts):
         if any(token in text for text in lowered):
             return token
     return None
+
+
+def literal_variant_groups(tests):
+    """Groups of two or more tests in one block whose form and body are equal once every literal is
+    masked and that hold at least two different unmasked bodies: a count."""
+    groups = {}
+    for t in tests:
+        groups.setdefault((t.block, t.masked), set()).add((t.form, t.body))
+    return sum(1 for exact in groups.values() if len(exact) >= 2)
+
+
+# ---------------------------------------------------------------------------------------------
+# Orphans: product symbols that only tests name.
+# ---------------------------------------------------------------------------------------------
+ORPHAN_SOURCE = re.compile(r"^(?:(?:game-core|server-module)/src/.*\.rs|client/src/(?!module_bindings/).*\.ts)$")
+# What is not production: names here do not keep a symbol alive.
+NOT_PRODUCTION = re.compile(
+    r"(?:^|/)(?:tests|benches)/|^client/test-util/|_tests\.rs$|\.test\.ts$|\.(?:md|txt)$")
+# Blobs never read for names.
+BINARY = re.compile(r"\.(?:png|jpe?g|gif|webp|ico|bmp|wasm|ttf|otf|woff2?|mp3|ogg|wav|zip|gz|pdf)$", re.I)
+TS_LIKE = re.compile(r"\.(?:ts|tsx|js|jsx|mjs|cjs)$")
+WORD = re.compile(r"[A-Za-z_$][\w$]*")
+# An item attribute outside these marks an entry point (reducer, table, wasm export, ...).
+PLAIN_ATTRIBUTES = {"doc", "inline", "must_use", "allow", "derive", "cfg_attr"}
+TS_SYMBOL_KINDS = {"function", "class", "interface", "type", "enum", "const", "let", "var"}
+TS_STATEMENT_START = {"export", "import", "function", "class", "interface", "type", "enum", "const",
+                      "let", "var", "declare", "abstract", "async", "namespace", "module"}
+
+
+class Item:
+    """A region of a product file. `kind` is "region" for code that is not a symbol (always live),
+    "test" for code compiled only under test (never a reference), "impl" for an impl block (live
+    when its self type is), else the item keyword. `names` is every name the region holds."""
+    __slots__ = ("kind", "name", "candidate", "test_only", "entry", "names")
+
+    def __init__(self, kind, name=None, names=(), candidate=False, test_only=False, entry=False):
+        self.kind, self.name, self.names = kind, name, set(names)
+        self.candidate, self.test_only, self.entry = candidate, test_only, entry
+
+
+def _reached(toks, a, b):
+    """The names a use / import / export-from statement at toks[a:b] reaches a symbol through
+    without re-exporting it: X of `X as Y`, and X of `X::...` (a path prefix, `Kind::*`)."""
+    out = set()
+    for i in range(a, b - 1):
+        kind, text, _offset = toks[i]
+        if kind == "id" and (_is(toks[i + 1], "::") or (
+                _word(toks[i + 1], "as") and i + 2 < b and not _word(toks[i + 2], "_"))):
+            out.add(text[2:] if text.startswith("r#") else text)
+    return out
+
+
+def _names(toks, a, b, strip):
+    """The identifiers of toks[a:b] and the words inside its literals. A statement `strip(i)` says
+    ends at an index (None for any other position) adds only the names it reaches through."""
+    out, i = set(), a
+    while i < b:
+        end = strip(i)
+        if end is not None:
+            out |= _reached(toks, i, end)
+            i = end
+            continue
+        kind, text, _offset = toks[i]
+        if kind == "id":
+            out.add(text[2:] if text.startswith("r#") else text)
+        elif kind in ("str", "tpl", "chr"):
+            out.update(WORD.findall(text))
+        i += 1
+    return out
+
+
+def _rs_use_end(toks, match, i):
+    """The index after a `use ...;` starting at toks[i]; None when toks[i] does not start one."""
+    if not _word(toks[i], "use") or (i + 1 < len(toks) and _is(toks[i + 1], "<")):
+        return None
+    while i < len(toks) and not _is(toks[i], ";"):
+        i = match.get(i, i) + 1
+    return i + 1
+
+
+RS_PRIMITIVES = {"str", "bool", "char", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16",
+                 "i32", "i64", "i128", "isize", "f32", "f64"}
+
+
+def _rs_self_type(toks, a, b):
+    """The name of an impl's self type from the tokens between `impl` and its body; None for a
+    type no symbol names (a primitive, slice, tuple), whose impl is then live."""
+    depth, start, i = 0, a, a
+    while i < b:
+        text = toks[i][1]
+        if toks[i][0] == "punct":
+            depth += {"<": 1, ">": -1, ">>": -2}.get(text, 0)
+        elif depth == 0 and text == "for":
+            start = i + 1
+        elif depth == 0 and text == "where":
+            b = i
+            break
+        i += 1
+    depth, name = 0, None
+    for kind, text, _offset in toks[start:b]:
+        if kind == "punct":
+            depth += {"<": 1, ">": -1, ">>": -2}.get(text, 0)
+            if depth == 0 and text in ("(", "["):
+                return None
+        elif kind == "id" and depth == 0 and text not in ("dyn", "mut", "crate", "super", "self", "impl"):
+            name = text
+    return None if name in RS_PRIMITIVES else name
+
+
+def rs_items(toks, match, a, b, items):
+    """Appends the items of toks[a:b], a module body, to `items`."""
+    strip = lambda i: _rs_use_end(toks, match, i)
+    i = a
+    while i < b:
+        start, attrs = i, []
+        while i + 1 < b and _is(toks[i], "#") and (_is(toks[i + 1], "[") or _is(toks[i + 1], "!")):
+            bracket = i + 1 if _is(toks[i + 1], "[") else i + 2
+            if bracket >= b or not _is(toks[bracket], "["):
+                break
+            if bracket == i + 1:
+                attrs.append((i, match[bracket] + 1))
+            i = match[bracket] + 1
+        if i >= b:
+            break
+        test_only = any(_texts(toks, x, y) == RS_CFG_TEST for x, y in attrs)
+        entry = any((_attribute_path(toks, x, y) or [""])[0] not in PLAIN_ATTRIBUTES
+                    for x, y in attrs if _texts(toks, x, y) != RS_CFG_TEST)
+        public = _word(toks[i], "pub")
+        if public:
+            i += 1
+            if i < b and _is(toks[i], "("):
+                i = match[i] + 1
+        while i + 1 < b and toks[i][0] == "id" and (
+                toks[i][1] in ("async", "unsafe", "default")
+                or (toks[i][1] == "const" and toks[i + 1][0] == "id"
+                    and toks[i + 1][1] in ("fn", "unsafe", "async", "extern"))
+                or (toks[i][1] == "extern" and toks[i + 1][0] == "str")):
+            i += 2 if toks[i][1] == "extern" else 1
+        kind = toks[i][1] if toks[i][0] == "id" else None
+        if kind == "use":
+            end = strip(i)
+            items.append(Item("region", names=_reached(toks, i, end)))
+            i = end
+            continue
+        if kind in ("fn", "struct", "enum", "union", "trait", "mod", "impl"):
+            j = i + 1
+            while j < b and not (_is(toks[j], "{") or _is(toks[j], ";")):
+                j = match.get(j, j) + 1
+            end = match[j] + 1 if j < b and _is(toks[j], "{") else j + 1
+            if kind == "mod" and j < b and _is(toks[j], "{"):
+                if test_only:
+                    items.append(Item("test"))
+                else:
+                    rs_items(toks, match, j + 1, match[j], items)
+                i = end
+                continue
+            name = toks[i + 1][1] if i + 1 < b and toks[i + 1][0] == "id" and kind != "impl" else None
+            entry = entry or (kind == "fn" and name == "main")      # a binary's entry point
+        elif kind in ("const", "static", "type"):
+            j = i + 1
+            if j < b and _word(toks[j], "mut"):
+                j += 1
+            name = toks[j][1] if j < b and toks[j][0] == "id" and toks[j][1] != "_" else None
+            entry = entry or name is None       # `const _: () = assert!(...)` runs at compile time
+            while j < b and not _is(toks[j], ";"):
+                j = match.get(j, j) + 1
+            end = j + 1
+        else:       # a macro invocation, macro_rules!, an extern item: code that is not a symbol
+            j = i
+            while j < b and not (toks[j][0] == "punct" and (toks[j][1] in BRACKETS or toks[j][1] == ";")):
+                j += 1
+            end = match[j] + 1 if j < b and toks[j][1] in BRACKETS else j + 1
+            if end < b and _is(toks[end], ";"):
+                end += 1
+            items.append(Item("test" if test_only else "region", names=_names(toks, start, end, strip)))
+            i = max(end, i + 1)
+            continue
+        names = _names(toks, start, end, strip)
+        if name and name.startswith("r#"):
+            name = name[2:]
+        if test_only:
+            items.append(Item("test", name, test_only=bool(name) and kind != "mod"))
+        elif kind == "impl":
+            items.append(Item("impl", _rs_self_type(toks, i + 1, j), names, entry=entry))
+        elif kind == "mod":
+            pass        # `mod name;`
+        else:
+            items.append(Item(kind, name, names, entry=entry, candidate=public and bool(name)))
+        i = max(end, i + 1)
+    return items
+
+
+def _ts_newline_before(src, toks, i):
+    return i > 0 and "\n" in src[toks[i - 1][2] + len(toks[i - 1][1]):toks[i][2]]
+
+
+def _ts_statement_end(src, toks, match, i, n):
+    """The index after the statement running from toks[i]: through its `;`, or up to a line that
+    starts another declaration."""
+    j = i
+    while j < n:
+        if _is(toks[j], ";"):
+            return j + 1
+        if (j > i and toks[j][0] == "id" and toks[j][1] in TS_STATEMENT_START
+                and _ts_newline_before(src, toks, j)):
+            return j
+        j = match.get(j, j) + 1
+    return n
+
+
+def _ts_module_end(toks, match, i, n):
+    """The index after an `import ... 'x'` or `export ... from 'x'` statement at toks[i]; None when
+    toks[i] starts neither."""
+    if toks[i][0] != "id" or (i and _is(toks[i - 1], ".")):
+        return None
+    j = i + 1
+    if toks[i][1] == "import":
+        if j >= n or _is(toks[j], "(") or _is(toks[j], "."):
+            return None
+        while j < n and not _is(toks[j], ";"):
+            if toks[j][0] == "str" and (j == i + 1 or _word(toks[j - 1], "from")):
+                break
+            j = match.get(j, j) + 1
+        else:
+            return None
+    elif toks[i][1] == "export":
+        if j < n and _word(toks[j], "type"):
+            j += 1
+        if j < n and _is(toks[j], "{"):
+            j = match[j] + 1
+        elif j < n and _is(toks[j], "*"):
+            j += 3 if j + 2 < n and _word(toks[j + 1], "as") else 1
+        else:
+            return None
+        if not (j + 1 < n and _word(toks[j], "from") and toks[j + 1][0] == "str"):
+            return None
+        j += 1
+    else:
+        return None
+    return j + 2 if j + 1 < n and _is(toks[j + 1], ";") else j + 1
+
+
+def ts_items(src, toks, match):
+    """The top-level statements of a TypeScript product file as items."""
+    n, items, i = len(toks), [], 0
+    strip = lambda k: _ts_module_end(toks, match, k, n)
+    while i < n:
+        start = i
+        end = strip(i)
+        if end is not None:
+            items.append(Item("region", names=_reached(toks, i, end)))
+            i = end
+            continue
+        exported = _word(toks[i], "export")
+        if exported:
+            i += 1
+        kind = name = None
+        if i < n and toks[i][0] == "id" and toks[i][1] not in ("default", "declare"):
+            j = i + 1 if toks[i][1] in ("async", "abstract") else i
+            if j < n and _word(toks[j], "const") and j + 1 < n and _word(toks[j + 1], "enum"):
+                j += 1
+            if j < n and toks[j][0] == "id" and toks[j][1] in TS_SYMBOL_KINDS:
+                k = j + 1 + (j + 1 < n and _is(toks[j + 1], "*"))
+                if k < n and toks[k][0] == "id":
+                    kind, name = toks[j][1], toks[k][1]
+                    if kind == "type" and not (k + 1 < n and toks[k + 1][1] in ("=", "<")):
+                        kind = name = None
+        if kind in ("function", "class", "interface", "enum"):
+            j = i
+            while j < n and not (_is(toks[j], "{") or _is(toks[j], ";")):
+                j = match.get(j, j) + 1
+            while j < n and _is(toks[j], "{") and match[j] + 1 < n and _is(toks[match[j] + 1], "{"):
+                j = match[j] + 1        # a return type written as an object type
+            end = match[j] + 1 if j < n and _is(toks[j], "{") else min(j + 1, n)
+        else:
+            end = _ts_statement_end(src, toks, match, i, n)
+        end = max(end, start + 1)
+        names = _names(toks, start, end, strip)
+        if kind in ("function", "class", "interface", "enum"):
+            items.append(Item(kind, name, names, candidate=exported))
+        else:       # an initializer runs at load, and a line it swallowed without `;` runs too
+            if name:
+                items.append(Item(kind, name, candidate=exported))
+            items.append(Item("region", names=names - {name}))
+        i = end
+    return items
+
+
+def product_items(path, data):
+    """-> (items, names) of one file: `items` its symbols and regions when it is a product file,
+    `names` every name it holds outside test code, comments and use/import/export-from statements.
+    A file the lexer cannot read has no items and every word of its text as names."""
+    try:
+        src = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return [], set(WORD.findall(data.decode("utf-8", "replace")))
+    try:
+        if path.endswith(".rs"):
+            toks = lex_rs(src)
+            items = rs_items(toks, match_brackets(toks), 0, len(toks), [])
+        elif TS_LIKE.search(path):
+            toks = lex_ts(src)
+            items = ts_items(src, toks, match_brackets(toks))
+        else:
+            return [], set(WORD.findall(src))
+    except Exception:       # as in parse_tests: one odd file does not stop the report
+        return [], set(WORD.findall(src))
+    names = set()
+    for item in items:
+        if item.kind != "test":
+            names |= item.names
+    return items, names
+
+
+def orphans_of(path, items, named_elsewhere):
+    """-> [(symbol, test-only?)] of one product file: candidates no production file but this one
+    names, and that no live region of this file names. `named_elsewhere(name)` says whether
+    another production file names it."""
+    live, said = set(), set()
+    changed = True
+    while changed:
+        changed = False
+        for index, item in enumerate(items):
+            if index in live or item.kind == "test":
+                continue
+            alive = (item.kind == "region" or item.entry
+                     or (item.kind == "impl" and (item.name is None or item.name in said
+                                                  or named_elsewhere(item.name)))
+                     or (item.kind != "impl" and (item.name in said or named_elsewhere(item.name))))
+            if alive:
+                live.add(index)
+                said |= item.names
+                changed = True
+    out = []
+    for index, item in enumerate(items):
+        if item.test_only:
+            out.append((item.name, True))
+        elif item.candidate and index not in live:
+            out.append((item.name, False))
+    return out
+
+
+def orphan_rows(contents):
+    """-> [(section, file, symbol, test-only?, [test files], token)], one per symbol, over
+    `contents`, every file read for names."""
+    names_of, items_of = {}, {}
+    for path, data in contents.items():
+        items, names = product_items(path, data)
+        if ORPHAN_SOURCE.match(path) and not NOT_PRODUCTION.search(path):
+            items_of[path] = items
+        names_of[path] = names
+    by_name = {}        # name -> production files naming it
+    for path, names in names_of.items():
+        if not NOT_PRODUCTION.search(path):
+            for name in names:
+                by_name.setdefault(name, set()).add(path)
+    test_files = sorted(p for p in names_of if any(TEST_FILE[k].match(p) for k in PACKAGES))
+    rows, seen = [], set()
+    for path in sorted(items_of):
+        def elsewhere(name, path=path):
+            return bool(by_name.get(name, set()) - {path})
+        for symbol, test_only in orphans_of(path, items_of[path], elsewhere):
+            if (path, symbol) in seen:      # an overload, or a type and a value of one name
+                continue
+            seen.add((path, symbol))
+            tests = [t for t in test_files if symbol in names_of[t]]
+            token = protected_token(path, symbol)
+            rows.append(("orphan-protected" if token else "orphans", path, symbol, test_only, tests,
+                         token))
+    return sorted(rows, key=lambda r: (r[1], r[2]))
+
+
+# ---------------------------------------------------------------------------------------------
+# Signals on test files.
+# ---------------------------------------------------------------------------------------------
+SOURCE_TEXT = {"include_str", "read_to_string", "readFileSync", "readFile"}
+CHURN_WINDOW = 300
+CHURN_MAX_LINES = 12
+
+
+def reads_source(path, data):
+    """Whether a test file calls one of SOURCE_TEXT, comments and literals aside."""
+    try:
+        src = data.decode("utf-8")
+        toks = lex_ts(src) if path.endswith(".ts") else lex_rs(src)
+        return any(kind == "id" and text in SOURCE_TEXT for kind, text, _offset in toks)
+    except Exception:       # unlexable: read the raw words
+        return bool(SOURCE_TEXT & set(WORD.findall(data.decode("utf-8", "replace"))))
+
+
+def subject_of(path):
+    """The product file a test file is named for: same directory, stem without the test suffix."""
+    if path.endswith("_tests.rs"):
+        return path[:-len("_tests.rs")] + ".rs"
+    if path.endswith(".test.ts"):
+        return path[:-len(".test.ts")] + ".ts"
+    return None
+
+
+def churn_counts(log, test_files):
+    """{test file: commits that changed it by CHURN_MAX_LINES lines or fewer and left its subject
+    alone}, from `git log -z --format=%x01%H --numstat` text."""
+    counts = {}
+    for commit in log.split("\x01")[1:]:
+        changed = {}
+        for entry in commit.split("\0")[1:]:
+            fields = entry.lstrip("\n").split("\t", 2)
+            if len(fields) == 3:
+                added, deleted, path = fields
+                changed[path] = (int(added) + int(deleted)
+                                 if added.isdigit() and deleted.isdigit() else None)
+        for path, lines in changed.items():
+            if (path in test_files and lines is not None and lines <= CHURN_MAX_LINES
+                    and subject_of(path) not in changed):
+                counts[path] = counts.get(path, 0) + 1
+    return counts
+
+
+def widened_counts(mem):
+    """{path: rows naming it} over DIR/gates/*.widened.jsonl; a line that is not a JSON object with
+    a string `path` is skipped."""
+    counts, gates = {}, os.path.join(mem, "gates")
+    try:
+        names = sorted(n for n in os.listdir(gates) if n.endswith(".widened.jsonl"))
+    except OSError:
+        return counts
+    for name in names:
+        try:
+            with open(os.path.join(gates, name), encoding="utf-8", errors="replace") as fh:
+                lines = fh.read().splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict) and isinstance(row.get("path"), str):
+                counts[row["path"]] = counts.get(row["path"], 0) + 1
+    return counts
+
+
+# ---------------------------------------------------------------------------------------------
+# --spec: the slices whose `touches:` name a file.
+# ---------------------------------------------------------------------------------------------
+SLICE_HEADING = re.compile(r"^###\s+(\S+)\s+—\s")
+
+
+def _glob(entry):
+    """A regex for one `touches:` entry: `**` crosses directories, `*` and `?` do not, and an entry
+    names everything under it when it is a directory."""
+    entry = entry.rstrip("/")
+    out, i = "", 0
+    while i < len(entry):
+        if entry.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif entry.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif entry[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif entry[i] == "?":
+            out, i = out + "[^/]", i + 1
+        else:
+            out, i = out + re.escape(entry[i]), i + 1
+    return re.compile(out + "(?:/.*)?$")
+
+
+def spec_touches(text):
+    """[(slice id, [pattern])] for each `### <id> — ` heading of a spec, from the first `touches:`
+    line under it."""
+    slices, current, fenced = [], None, False
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+        if fenced:
+            continue
+        heading = SLICE_HEADING.match(line)
+        if heading:
+            current = [heading.group(1), [], False]
+            slices.append(current)
+        elif line.startswith("#"):
+            current = None
+        elif current is not None and not current[2] and line.startswith("touches:"):
+            entries = [e.strip().strip("`").strip() for e in line[len("touches:"):].split(",")]
+            current[1].extend(_glob(e) for e in entries if e)
+            current[2] = True
+    return [(sid, patterns) for sid, patterns, _seen in slices]
+
+
+def slices_naming(slices, files):
+    return [sid for sid, patterns in slices if any(p.match(f) for p in patterns for f in files)]
+
+
+# ---------------------------------------------------------------------------------------------
+# --ci: one `gh run list` over the game's master runs.
+# ---------------------------------------------------------------------------------------------
+CI_FIELDS = ("seconds", "conclusion", "nightly", "reruns_to_green")
+CI_BRANCH, CI_WORKFLOW, NIGHTLY_WORKFLOW = "master", "CI", "Nightly"
+CI_RUN_LIMIT = 1000
+CI_RERUN_WINDOW = 300
+
+
+def _seconds(run):
+    try:
+        start, end = (datetime.datetime.fromisoformat(run[k].replace("Z", "+00:00"))
+                      for k in ("startedAt", "updatedAt"))
+        return int((end - start).total_seconds())
+    except (KeyError, AttributeError, TypeError, ValueError):
+        return None
+
+
+def _word_or_none(value):
+    return value if isinstance(value, str) and re.fullmatch(r"[A-Za-z_]+", value) else None
+
+
+def ci_fields(runs, commit):
+    """The CI fields from `gh run list` rows, newest first."""
+    ci = [r for r in runs if r.get("workflowName") == CI_WORKFLOW]
+    own = next((r for r in ci if r.get("headSha") == commit and r.get("status") == "completed"),
+               None)
+    nightly = next((r for r in runs if r.get("workflowName") == NIGHTLY_WORKFLOW
+                    and r.get("status") == "completed"), None)
+    reruns = sum(1 for r in ci[:CI_RERUN_WINDOW] if r.get("conclusion") == "success"
+                 and isinstance(r.get("attempt"), int) and r["attempt"] >= 2)
+    return {"seconds": _seconds(own) if own else None,
+            "conclusion": _word_or_none(own.get("conclusion")) if own else None,
+            "nightly": _word_or_none(nightly.get("conclusion")) if nightly else None,
+            "reruns_to_green": reruns}
+
+
+def read_ci(repo, commit):
+    """The CI fields, all None (with a PRUNE-WARN) when `gh` is not on PATH or does not answer."""
+    gh, why = shutil.which("gh"), None
+    if not gh:
+        why = "gh not on PATH"
+    else:
+        try:
+            done = subprocess.run(
+                [gh, "run", "list", "--branch", CI_BRANCH, "--limit", str(CI_RUN_LIMIT), "--json",
+                 "workflowName,headSha,status,conclusion,attempt,startedAt,updatedAt"],
+                cwd=repo, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=180)
+            runs = json.loads(done.stdout.decode("utf-8")) if not done.returncode else None
+            if done.returncode:
+                why = "gh exited %d" % done.returncode
+            elif not isinstance(runs, list) or not all(isinstance(r, dict) for r in runs):
+                why = "gh answered something other than a list of runs"
+            else:
+                return ci_fields(runs, commit)
+        except (OSError, subprocess.TimeoutExpired, ValueError, RecursionError) as e:
+            why = "gh failed: %s" % (str(e) or type(e).__name__)
+    sys.stderr.write("PRUNE-WARN ci %s: fields are null\n" % why)
+    return dict.fromkeys(CI_FIELDS)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -763,9 +1385,15 @@ def write_file(path, text, repo, append=False):
 # ---------------------------------------------------------------------------------------------
 # Subcommands.
 # ---------------------------------------------------------------------------------------------
+class Report:
+    """What `census` reads at one commit. `rows` are the twin rows, each (section, file,
+    candidate name, survivor name, protected token or None); `contents` every text blob read."""
+    __slots__ = ("totals", "rows", "counts", "unlexable", "contents", "test_files",
+                 "literal_variants", "source_text")
+
+
 def census(snap, keep):
-    """-> (totals, rows, counts, unlexable files). A row is (section, file, candidate name,
-    survivor name, protected token or None)."""
+    """-> a Report of the snapshot's totals, twins and per-test-file facts."""
     totals = {p: {"product-lines": 0, "test-lines": 0, "ratio": None, "test-files": 0, "tests": 0,
                   "unparsed": 0} for p in PACKAGES}
     totals["game-core"]["inline-modules"] = totals["server-module"]["inline-modules"] = 0
@@ -781,8 +1409,8 @@ def census(snap, keep):
                 tests_of[path] = pkg
             elif PRODUCT_FILE[pkg].match(path):
                 product_of[path] = pkg
-    contents = snap.read(sorted(tests_of) + sorted(product_of))
-    unlexable = []
+    contents = snap.read(sorted(p for p in snap.blobs if not BINARY.search(p)))
+    unlexable, literal_variants, source_text = [], {}, set()
     for path, pkg in product_of.items():
         totals[pkg]["product-lines"] += contents[path].count(b"\n")
         if path.endswith(".rs"):
@@ -803,6 +1431,9 @@ def census(snap, keep):
         package["tests"] += len(tests)
         package["unparsed"] += unparsed
         counts["unparsed"] += unparsed
+        literal_variants[path] = literal_variant_groups(tests)
+        if reads_source(path, contents[path]):
+            source_text.add(path)
         pairs, other = twin_pairs(tests)
         counts["identical-other-scope"] += other
         for cand, surv in pairs:
@@ -817,7 +1448,11 @@ def census(snap, keep):
         package = totals[pkg]
         if package["product-lines"]:
             package["ratio"] = float("%.2f" % (package["test-lines"] / package["product-lines"]))
-    return totals, rows, counts, sorted(unlexable)
+    report = Report()
+    report.totals, report.rows, report.counts, report.unlexable = totals, rows, counts, sorted(unlexable)
+    report.contents, report.test_files = contents, sorted(tests_of)
+    report.literal_variants, report.source_text = literal_variants, source_text
+    return report
 
 
 def _quoted(name):
@@ -833,6 +1468,22 @@ def _emit(lines):
     sys.stdout.buffer.flush()
 
 
+def read_spec(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return spec_touches(fh.read())
+    except (OSError, ValueError) as e:
+        raise Fail("--spec %s cannot be read: %s" % (path, e))
+
+
+def churn_of(snap, test_files):
+    log = _git(snap.repo, "log", "-z", "-n", str(CHURN_WINDOW), "--no-renames", "--no-textconv",
+               "--no-ext-diff", "--no-show-signature", "--format=%x01%H", "--numstat", snap.commit)
+    if log.returncode:
+        raise Fail("cannot read the log of %s" % snap.commit)
+    return churn_counts(log.stdout.decode("utf-8", "surrogateescape"), set(test_files))
+
+
 def cmd_census(opts):
     repo, label = opts.get("repo", DEFAULT_REPO), opts.get("record")
     mem = opts.get("mem", HERE)
@@ -840,23 +1491,66 @@ def cmd_census(opts):
         if not label or "\n" in label or "\r" in label:
             raise Fail("--record needs a one-line label")
         mem = writable_mem(opts)
+    slices = read_spec(opts["spec"]) if "spec" in opts else None
     snap = Snapshot(repo, opts.get("at", DEFAULT_REF))
-    totals, rows, counts, unlexable = census(snap, keep_or_empty(mem))
-    for path in unlexable:
+    report = census(snap, keep_or_empty(mem))
+    for path in report.unlexable:
         sys.stderr.write("PRUNE-WARN unlexable %s\n" % _shown(path))
+
+    def scope(*files):
+        """The row's ` slices=` suffix under --spec; None when no slice of the spec names a file."""
+        if slices is None:
+            return ""
+        ids = slices_naming(slices, files)
+        return " slices=" + ",".join(ids) if ids else None
+
     out = ["PRUNE-CENSUS " + snap.commit]
     for row in PACKAGES + ("out-of-scope",):
         out.append("totals %s %s" % (row, " ".join(
             "%s=%s" % (k, "n/a" if v is None else "%.2f" % v if k == "ratio" else v)
-            for k, v in totals[row].items())))
-    for wanted in ("duplicates", "protected-twins"):
-        for section, path, cand, surv, token in rows:
-            if section == wanted:
-                out.append("%s %s :: %s -> %s%s" % (section, _shown(path), _quoted(cand),
-                                                    _quoted(surv), " token=" + token if token else ""))
-    out.append("counts " + " ".join("%s=%d" % kv for kv in counts.items()))
+            for k, v in report.totals[row].items())))
+    lines = {}
+
+    def add(section, text, *files):
+        suffix = scope(*files)
+        if suffix is not None:
+            lines.setdefault(section, []).append(text + suffix)
+
+    for section, path, cand, surv, token in report.rows:
+        add(section, "%s %s :: %s -> %s%s" % (section, _shown(path), _quoted(cand), _quoted(surv),
+                                              " token=" + token if token else ""), path)
+    for section, path, symbol, test_only, tests, token in orphan_rows(report.contents):
+        add(section, "%s %s :: %s%s tests=%s%s" % (
+            section, _shown(path), _quoted(symbol), " test-only" if test_only else "",
+            json.dumps(tests, separators=(",", ":")),
+            " token=" + token if token else ""), path, *tests)
+    churn, widened = churn_of(snap, report.test_files), widened_counts(mem)
+    for path in report.test_files:
+        if report.literal_variants[path]:
+            add("literal-variants", "literal-variants %s groups=%d"
+                % (_shown(path), report.literal_variants[path]), path)
+        signals = (["source-text"] if path in report.source_text else []) + [
+            "%s=%d" % (name, n) for name, n in (("churn", churn.get(path, 0)),
+                                                ("widened", widened.get(path, 0))) if n]
+        if signals:
+            add("signals", "signals %s %s" % (_shown(path), " ".join(signals)), path)
+        token = protected_token(path) if path in churn else None
+        if token:
+            add("protected-churn", "protected-churn %s churn=%d token=%s"
+                % (_shown(path), churn[path], token), path)
+    for section in ("duplicates", "protected-twins", "orphans", "orphan-protected",
+                    "literal-variants", "signals", "protected-churn"):
+        out.extend(lines.get(section, []))
+    out.append("counts " + " ".join("%s=%d" % kv for kv in report.counts.items()))
+    ci = read_ci(repo, snap.commit) if "ci" in opts else None
+    if ci is not None:
+        out.append("ci " + " ".join("%s=%s" % (k.replace("_", "-"), "null" if v is None else v)
+                                     for k, v in ci.items()))
     if label is not None:
-        row = {"label": label, "commit": snap.commit, "totals": totals, "counts": counts}
+        row = {"label": label, "commit": snap.commit, "totals": report.totals,
+               "counts": report.counts}
+        if ci is not None:
+            row["ci"] = ci
         write_file(os.path.join(mem, "prune", "trend.jsonl"), json.dumps(row) + "\n", repo,
                    append=True)
         out.append("recorded " + label)
@@ -934,14 +1628,17 @@ def cmd_keep(opts):
 
 
 COMMANDS = {
-    "census": (cmd_census, ("repo", "at", "mem", "record")),
+    "census": (cmd_census, ("repo", "at", "mem", "record", "spec", "ci")),
     "twin": (cmd_twin, ("repo", "at", "mem", "file", "test", "survivor")),
     "keep": (cmd_keep, ("repo", "at", "mem", "file", "test", "reason")),
 }
 
 
+SWITCHES = {"ci"}       # flags that take no value
+
+
 def parse_args(argv):
-    """-> (subcommand, {flag: value}). Every flag takes one value."""
+    """-> (subcommand, {flag: value}). Every flag but a SWITCHES one takes one value."""
     if not argv or argv[0] not in COMMANDS:
         raise Fail("expected one of: census, twin, keep, --selftest")
     sub, opts, i = argv[0], {}, 1
@@ -949,6 +1646,10 @@ def parse_args(argv):
         name = argv[i][2:] if argv[i].startswith("--") else None
         if name not in COMMANDS[sub][1]:
             raise Fail("%s: unknown argument %r" % (sub, argv[i]))
+        if name in SWITCHES:
+            opts[name] = True
+            i += 1
+            continue
         if i + 1 >= len(argv):
             raise Fail("%s: --%s needs a value" % (sub, name))
         opts[name] = argv[i + 1]
