@@ -174,6 +174,9 @@ ONE gate after every coverage milestone closes. No interim playtest.
 - Frozen surfaces: `client/src/module_bindings/` is generated-only (game repo AGENTS.md) and
   schema changes are additive-only (DECISIONS.md "Schema changes are additive"); any schema
   change needs bindings regen + a publish-over-data proof (docs/debloat/REPORT.md §maintainer).
+- **Tester A/B experiment** runs over §9 items 1–4: each feature slice it takes adds five shadow
+  testers (about $10) whose tests never enter the repo. It stops at a $500 cap; its state is read
+  with `memory/projects/mr-tester-ab status`.
 - Toolchain: SpacetimeDB 2.8.1 CLI/host + 2.8.1 module crate; 2.x syntax
   (`#[table(accessor = x)]`, `ctx.sender()`); upgrade runbook in the game repo's
   `docs/runbooks/spacetimedb-upgrade.md`.

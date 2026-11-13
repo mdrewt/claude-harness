@@ -1,6 +1,6 @@
 {
  "v": 1,
- "enabled": false,
+ "enabled": true,
  "_enabled": "The operator enables the experiment. Unless this is the JSON value true, every mr-tester-ab command prints AB-SKIP disabled and mr-spawn renders the brief without the experiment's sentence.",
  "game_repo": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm",
  "harness_repo": "/home/mdrewt/projects/ai-apps/claude-harness",
