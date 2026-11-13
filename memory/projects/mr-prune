@@ -49,8 +49,8 @@ census prints, in this order:
   Twin rows come in file order and, within a file, definition order; the other sections are sorted
   by file, then name. `totals` and `counts` cover the whole commit.
   `--record LABEL` appends one JSON row (label, commit, totals, counts, and with --ci a `ci` object
-  {seconds, conclusion, nightly, reruns_to_green}) to DIR/prune/trend.jsonl and prints
-  `recorded LABEL`.
+  {seconds, conclusion, nightly, reruns_to_green}) to DIR/prune/trend.jsonl, on a line of its own,
+  and prints `recorded LABEL`.
   `--spec FILE` prints only the rows with a file that a `touches:` entry of FILE names, each ending
   ` slices=<id>,...`: the `### <id> — ` slices, in file order, whose first `touches:` line under
   the heading names one. Entries are comma-separated, backticks dropped; `**` crosses directories,
@@ -148,8 +148,9 @@ broken keep file can only add rows.
 
 close records, once per milestone, what the milestone's own commits added and the candidates in
 the files they changed. FILE is the milestone's spec, named `<label>.spec.md` with a label of
-[A-Za-z0-9_.-]; a FILE named otherwise, or with no slice, is a PRUNE-ERROR. REF is read as it
-stands in R: nothing is fetched, so the caller brings R up to date first.
+[A-Za-z0-9_.-] that does not hold the word SHALL; a FILE named otherwise, or with no slice, is a
+PRUNE-ERROR. REF is read as it stands in R: nothing is fetched, so the caller brings R up to date
+first.
   Slices   the `### <id> — ` headings under FILE's `## Slices` heading, code fences aside.
   Commits  a commit names a slice when its subject is `<type>[(<scope>)][!]: <id> — ...`: a
            Conventional Commit prefix with a lower-case type other than `revert`, then the id as
@@ -179,18 +180,21 @@ stands in R: nothing is fetched, so the caller brings R up to date first.
                       file order.
            structure  any other `duplicates` row, and any other `orphans` row of 12 files or
                       fewer.
-           report     every `protected-twins` and `orphan-protected` row; an `orphans` row of more
-                      than 12 files that no such slice lists; and a `duplicates` or `orphans` row
-                      no such slice lists with a path outside [A-Za-z0-9_./-], which a `touches:`
-                      entry could not name.
+           report     every `protected-twins` and `orphan-protected` row, and an `orphans` row
+                      with a test file whose path holds a protected token (the row then carries
+                      that token): removing a protected test follows the standard's protected
+                      path, whichever slice lists the file. Of the rows no such slice lists: an
+                      `orphans` row of more than 12 files, and a row with a path the section
+                      could not carry (outside [A-Za-z0-9_./-], which a `touches:` entry could
+                      not name, or holding the word SHALL).
   Section  the `structure` rows are walked `duplicates` first, then `orphans`, each by file, then
            name. A row is taken when the section then holds at most 6 rows and 12 distinct
            files; a row not taken is marked over-cap and the walk goes on. The marks are made
            whether or not a section file is written. The file is written when a row is taken
            and DIR/mr-tester-ab.jsonl holds a line that is a JSON object with "kind": "close"
            (the tester A/B experiment has closed; a file that is missing or unreadable holds
-           none). It is one section in structure.spec.md's shape, its id left as `st-<n>` for
-           whoever appends it:
+           none). It is one section in structure.spec.md's shape, its number left as `<n>` in
+           `st-<n>` and `ST<n>` for whoever appends it:
                ### st-<n> — <label>: twin tests and unreached symbols from the close census
                type: refactor · tier: routine
                touches: <the files of its rows, sorted, comma-separated>
@@ -202,14 +206,19 @@ stands in R: nothing is fetched, so the caller brings R up to date first.
                  - surviving check: `<file>` :: <survivor> | the compiler, and the suites that
                    still run
                  - confirmed at merge: what the supervisor, who is not the tester that made the
-                   deletion, checks (`mr-prune twin` on the PR base; the `moved-tests:` rows)
-           then a `Pins:` line and one criterion, `- **ST<n>.1:** WHEN ... SHALL pass.`, naming
-           the suites of the listed files' packages. Every test and symbol name in it is an
-           ASCII JSON string with the H of `SHALL` written as its unicode escape: it decodes to
-           the name, cannot break a line, and leaves the criterion the only line a ledger seeds
-           a gate from. A row is a candidate there too: the run that builds the section removes
-           only the rows it confirms.
-  Writes   all under DIR/prune/, in this order:
+                   deletion, checks (`mr-prune twin` on the PR base, or that `mr-prune census`
+                   there lists the symbol under `orphans`; the `moved-tests:` rows)
+           then a `Pins:` paragraph (what to look for before the first edit, and that a row
+           needing a file or a symbol the section does not list stays), one criterion,
+           `- **ST<n>.1:** WHEN ... SHALL pass.`, naming the suites of the listed files'
+           packages, and a line on what is confirmed in the diff at merge. Every test and
+           symbol name in it is an ASCII JSON string with the H of `SHALL` written as its
+           unicode escape: it decodes to the name, cannot break a line, and leaves the criterion
+           the only line a ledger seeds a gate from. A row is a candidate there too: the run
+           that builds the section removes only the rows it confirms.
+  Writes   all under DIR/prune/ (a link there that leads out of it is a PRUNE-ERROR), in this
+           order; when one fails, both close files are removed, so they stand only with their
+           row:
            close/<label>.json        {"label", "commit", "spec": FILE's name,
                                       "experiment-closed": bool, "section": the section file's
                                       name without a directory, or null, "rows": [...]}. A twin
@@ -219,9 +228,8 @@ stands in R: nothing is fetched, so the caller brings R up to date first.
                                       protected row adds "token", a `slice` row "slices":
                                       [{"spec": a file name, "slice": an id}, ...], a `structure`
                                       row "over-cap": bool.
-           close/<label>.section.md  when due. A file of that name is removed when none is due,
-                                      and again when the trend row cannot be written, so a
-                                      section file always has its row.
+           close/<label>.section.md  when due; a file of that name is removed when none is
+                                      due.
            trend.jsonl               one appended row, on a line of its own: `census --record
                                       <label>`'s row (with a `ci` object under --ci) plus
                                       "close": {
@@ -245,8 +253,9 @@ stands in R: nothing is fetched, so the caller brings R up to date first.
   Output   `PRUNE-CLOSE <label> <commit>`, a `slice <id> <commit> [<commit> ...]` line per matched
            slice, then an `unmatched <id>` line per other slice, `rows listed=N slice=N
            structure=N report=N over-cap=N`, `section <file name>` or `section none`, the `ci`
-           line under --ci, and `recorded <label>`. A `*.spec.md` beside FILE that cannot be read
-           is skipped with `PRUNE-WARN spec ...` on stderr.
+           line under --ci, and `recorded <label>`. A `*.spec.md` beside FILE that is not a
+           regular file or cannot be read is skipped with `PRUNE-WARN spec ...` on stderr; a
+           directory that cannot be listed is a PRUNE-ERROR.
   Once     when trend.jsonl already holds a line that is a JSON object with this label and a
            `close` object, the answer is `PRUNE-CLOSE-SKIP <label>` alone: nothing is read from
            R, nothing is written, rc=0. Argument and FILE errors come before it. Any other line
@@ -1237,8 +1246,8 @@ def churn_counts(log, test_files):
 
 
 def json_objects(path):
-    """The lines of a file that are JSON objects, parsed; any other line is passed over. Raises
-    OSError when the file cannot be read."""
+    """The lines of a file that are JSON objects, parsed; any other line is passed over. A line
+    ends at a newline and nowhere else. Raises OSError when the file cannot be read."""
     with open(path, encoding="utf-8", errors="replace") as fh:
         lines = fh.read().split("\n")
     rows = []
@@ -1293,7 +1302,7 @@ def _glob(entry):
             out, i = out + "[^/]", i + 1
         else:
             out, i = out + re.escape(entry[i]), i + 1
-    return re.compile(out + "(?:/.*)?$")
+    return re.compile(out + r"(?:/.*)?\Z", re.S)
 
 
 def _unfenced(text):
@@ -1332,16 +1341,17 @@ def slices_naming(slices, files):
 # close: a milestone's commits, and where each candidate row in the files they changed goes.
 # ---------------------------------------------------------------------------------------------
 SPEC_SUFFIX = ".spec.md"
-LABEL = re.compile(r"[A-Za-z0-9_.-]+")
 SLICES_HEADING = re.compile(r"##\s+Slices\s*$")
 NAMING_SUBJECT = re.compile(r"(?P<type>[a-z]+)(?:\([^)]*\))?!?: (?P<id>\S+) — ")
 REVERTS_LINE = re.compile(r"^This reverts commit ([0-9a-f]{7,64})\b", re.M)
-REVERT_SUBJECT = re.compile(r'Revert "(.*)"(?: \(#\d+\))?')
+REVERT_SUBJECT = re.compile(r'Revert "(.*)"')
 PR_TAIL = re.compile(r" \(#\d+\)$")
-PLAIN_PATH = re.compile(r"[A-Za-z0-9_./-]+")     # what a `touches:` entry names literally
+# What the section can carry outside a JSON string, a label or a path: text a `touches:` entry
+# names literally, and without the word a ledger seeds a gate from.
+SECTION_SAFE = re.compile(r"(?!.*SHALL)[A-Za-z0-9_./-]+")
 WIDE_ORPHAN = 12        # an orphan row of more files is a design question, not a section row
 SECTION_ROWS, SECTION_FILES = 6, 12
-TWIN_KINDS, PROTECTED_KINDS = ("duplicates", "protected-twins"), ("protected-twins", "orphan-protected")
+PROTECTED_KINDS = ("protected-twins", "orphan-protected")
 
 
 def spec_slice_ids(text):
@@ -1361,10 +1371,10 @@ def live_commits(commits):
     `commits` are (id, subject, body), a commit before its parents. A commit a pending claim
     names is undone and makes no claim of its own, so a revert of a revert restores the
     original."""
-    by_sha, by_subject, named = [], {}, {}
+    by_sha, sizes, by_subject, named = set(), set(), {}, {}
     for sha, subject, body in commits:
         bare = PR_TAIL.sub("", subject)
-        claim = next((prefix for prefix in by_sha if sha.startswith(prefix)), None)
+        claim = next((sha[:n] for n in sizes if sha[:n] in by_sha), None)
         if claim is not None:
             by_sha.remove(claim)
             continue
@@ -1372,9 +1382,10 @@ def live_commits(commits):
             by_subject[bare] -= 1
             continue
         reverted = REVERTS_LINE.findall(subject + "\n" + body)
-        quoted = REVERT_SUBJECT.fullmatch(subject)
+        quoted = REVERT_SUBJECT.fullmatch(bare)
         if reverted:
-            by_sha.extend(reverted)
+            by_sha.update(reverted)
+            sizes.update(map(len, reverted))
         elif quoted:
             key = PR_TAIL.sub("", quoted.group(1))
             by_subject[key] = by_subject.get(key, 0) + 1
@@ -1406,30 +1417,33 @@ def close_rows(report, changed):
     return [row for kind in rows for row in rows[kind]]
 
 
-def route_rows(rows, listed_by):
-    """Gives each row its route. `listed_by(files)` is the unbuilt slices of other specs that list
-    one of the files, as the row's `slices`."""
+def route_rows(rows, unbuilt):
+    """Gives each row its route. `unbuilt` is the (spec file name, slice id, [pattern]) of the
+    slices of other specs that no standing commit names."""
     for row in rows:
         files = row_files(row)
-        slices = [] if row["kind"] in PROTECTED_KINDS else listed_by(files)
-        if slices:
+        token = row.get("token") or protected_token(*files)
+        slices = [] if token else [{"spec": spec, "slice": sid} for spec, sid, patterns in unbuilt
+                                   if any(p.match(f) for p in patterns for f in files)]
+        if token:
+            row["route"], row["token"] = "report", token
+        elif slices:
             row["route"], row["slices"] = "slice", slices
-        elif (row["kind"] in PROTECTED_KINDS or len(files) > WIDE_ORPHAN
-              or not all(PLAIN_PATH.fullmatch(f) for f in files)):
+        elif len(files) > WIDE_ORPHAN or not all(SECTION_SAFE.fullmatch(f) for f in files):
             row["route"] = "report"
         else:
             row["route"], row["over-cap"] = "structure", False
 
 
 def _row_name(row):
-    return row["candidate"] if row["kind"] in TWIN_KINDS else row["symbol"]
+    return row["candidate"] if "candidate" in row else row["symbol"]
 
 
 def cap_section(rows):
     """The `structure` rows the section takes, in its order; the others are marked over-cap."""
     taken, files = [], set()
     for row in sorted((r for r in rows if r["route"] == "structure"),
-                      key=lambda r: (r["kind"] not in TWIN_KINDS, r["file"], _row_name(r))):
+                      key=lambda r: (r["kind"] != "duplicates", r["file"], _row_name(r))):
         union = files | set(row_files(row))
         if len(taken) < SECTION_ROWS and len(union) <= SECTION_FILES:
             taken.append(row)
@@ -1474,7 +1488,7 @@ def section_text(label, commit, taken):
     ]
     for row in taken:
         out.append("- `%s` :: %s" % (row["file"], _spelled(_row_name(row))))
-        if row["kind"] in TWIN_KINDS:
+        if "candidate" in row:
             out += ["  - reason: a same-block twin",
                     "  - surviving check: `%s` :: %s" % (row["file"], _spelled(row["survivor"])),
                     "  - confirmed at merge: %s runs `mr-prune twin` on the PR base with this file,"
@@ -1489,10 +1503,13 @@ def section_text(label, commit, taken):
                     % (SUPERVISOR, ", ".join("`%s`" % t for t in row["tests"]) or "no test file")]
     out += [
         "",
-        "Pins: the census lists none. Before the first edit the run looks for tests that read a",
-        "listed file as text, and for `.cargo/mutants.toml` entries and bench budgets that name a",
-        "removed symbol; each is disposed of under `standards/testing-tdd.md` §Behavior-preserving",
-        "changes.",
+        "Pins: none known. Before the first edit the run looks for tests that read a listed file",
+        "as text, and for `.cargo/mutants.toml` entries and bench budgets that name a removed",
+        "symbol; each is disposed of under `standards/testing-tdd.md` §Behavior-preserving changes.",
+        "A removed symbol can still be named outside `touches:`: by a `use` or a re-export, a bench,",
+        "a test file the census does not read, or another symbol that only tests reach. The",
+        "compiler finds each. A row whose removal needs a file or a symbol not listed here stays,",
+        "with that reason in the PR body.",
         "",
         "- **ST<n>.1:** WHEN %s THEY SHALL pass." % " and ".join(suites),
         "",
@@ -2015,12 +2032,18 @@ def other_slices(spec):
     """[(spec file name, slice id, [pattern])] over the other `*.spec.md` files of the spec's
     directory, by file name; one that cannot be read is named on stderr and skipped."""
     directory = os.path.dirname(os.path.abspath(spec))
+    try:
+        names = sorted(n for n in os.listdir(directory) if n.endswith(SPEC_SUFFIX))
+    except OSError as e:
+        raise Fail("cannot list the specs beside --spec %s: %s" % (spec, e))
     out = []
-    for name in sorted(os.listdir(directory)):
+    for name in names:
         path = os.path.join(directory, name)
         try:
-            if not name.endswith(SPEC_SUFFIX) or os.path.samefile(path, spec):
+            if os.path.samefile(path, spec):
                 continue
+            if not os.path.isfile(path):
+                raise OSError("not a regular file")
             with open(path, encoding="utf-8") as fh:
                 slices = spec_touches(fh.read())
         except (OSError, ValueError) as e:
@@ -2035,8 +2058,9 @@ def cmd_close(opts):
     repo, spec = opts.get("repo", DEFAULT_REPO), opts["spec"]
     name = os.path.basename(spec)
     label = name[:-len(SPEC_SUFFIX)] if name.endswith(SPEC_SUFFIX) else ""
-    if not LABEL.fullmatch(label):
-        raise Fail("--spec %s is not named <label>.spec.md, the label of [A-Za-z0-9_.-]" % spec)
+    if not SECTION_SAFE.fullmatch(label):
+        raise Fail("--spec %s is not named <label>.spec.md, the label of [A-Za-z0-9_.-] and without"
+                   " the word SHALL" % spec)
     try:
         with open(spec, encoding="utf-8") as fh:
             ids = spec_slice_ids(fh.read())
@@ -2063,8 +2087,9 @@ def cmd_close(opts):
     changed, added, removed = changes_of(snap, [c for commits in matched.values() for c in commits])
     at_ref = {"test": [], "product": []}       # the changed paths that are files at the commit
     for path in sorted(changed):
-        if kind_of(path) and path in report.contents:
-            at_ref[kind_of(path)[1]].append(path)
+        kind = kind_of(path)
+        if kind and path in report.contents:
+            at_ref[kind[1]].append(path)
     lines = {kind: sum(report.contents[p].count(b"\n") for p in paths)
              for kind, paths in at_ref.items()}
     churn, widened = churn_of(snap, report.test_files), widened_counts(mem)
@@ -2085,9 +2110,7 @@ def cmd_close(opts):
     }
 
     rows = close_rows(report, changed)
-    unbuilt = [s for s in other_slices(spec) if s[1] not in named]
-    route_rows(rows, lambda files: [{"spec": other, "slice": sid} for other, sid, patterns in unbuilt
-                                    if any(p.match(f) for p in patterns for f in files)])
+    route_rows(rows, [s for s in other_slices(spec) if s[1] not in named])
     taken = cap_section(rows)
     try:
         closed = any(row.get("kind") == "close"
@@ -2097,25 +2120,32 @@ def cmd_close(opts):
     section = label + ".section.md" if taken and closed else None
     ci = read_ci(repo, snap.commit) if "ci" in opts else None
 
-    close_dir = os.path.join(mem, "prune", "close")
-    section_path = os.path.join(close_dir, label + ".section.md")
-    write_file(os.path.join(close_dir, label + ".json"), json.dumps(
-        {"label": label, "commit": snap.commit, "spec": name, "experiment-closed": closed,
-         "section": section, "rows": rows}, indent=2) + "\n", repo)
-    if section:
-        write_file(section_path, section_text(label, snap.commit, taken), repo)
-    else:
-        remove_file(section_path, repo)
+    prune = os.path.realpath(os.path.join(mem, "prune"))
+    files = [os.path.join(prune, "close", label + suffix) for suffix in (".json", ".section.md")]
+    for path in files + [trend_path(mem)]:
+        if os.path.commonpath([prune, os.path.realpath(path)]) != prune:
+            raise Fail("%s leads out of %s through a link" % (path, prune))
     try:
+        write_file(files[0], json.dumps(
+            {"label": label, "commit": snap.commit, "spec": name, "experiment-closed": closed,
+             "section": section, "rows": rows}, indent=2) + "\n", repo)
+        if section:
+            write_file(files[1], section_text(label, snap.commit, taken), repo)
+        else:
+            remove_file(files[1], repo)
         write_file(trend_path(mem), json.dumps(dict(trend_row(label, snap, report, ci), close=close))
                    + "\n", repo, append=True)
-    except Fail:
-        remove_file(section_path, repo)     # a section file always has its row
+    except Fail:        # the close files stand only with their row
+        for path in files:
+            try:
+                remove_file(path, repo)
+            except Fail:
+                pass
         raise
     routes = [row["route"] for row in rows]
     _emit(["PRUNE-CLOSE %s %s" % (label, snap.commit)]
-          + ["slice %s %s" % (sid, " ".join(commits)) for sid, commits in matched.items()]
-          + ["unmatched " + sid for sid in close["unmatched"]]
+          + ["slice %s %s" % (_shown(sid), " ".join(commits)) for sid, commits in matched.items()]
+          + ["unmatched " + _shown(sid) for sid in close["unmatched"]]
           + ["rows listed=%d slice=%d structure=%d report=%d over-cap=%d" % (
               len(rows), routes.count("slice"), routes.count("structure"), routes.count("report"),
               sum(1 for row in rows if row.get("over-cap"))),
