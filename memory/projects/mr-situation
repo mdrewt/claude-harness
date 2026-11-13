@@ -13,7 +13,9 @@ fi
 export MEM NOGH
 /usr/bin/python3 - <<'PY' > "$CACHE.tmp" 2>/dev/null || echo '{"authority":"HINTS-ONLY","error":"situation-generator-crashed"}' > "$CACHE.tmp"
 import json, os, glob, re, subprocess, time, datetime
-MEM=os.environ["MEM"]; NOGH=os.environ.get("NOGH")=="1"
+# NOGH first so this line does NOT start with `MEM=`: fixtures replace the one shell-level `^MEM=`
+# line above with a sandbox path and count exactly one substitution.
+NOGH=os.environ.get("NOGH")=="1"; MEM=os.environ["MEM"]
 out={"authority":"HINTS-ONLY (re-verify anything you are about to mutate)",
      "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
 def safe(fn, default):
@@ -243,6 +245,21 @@ def watchers():
     rc,so,_=run("pgrep -af 'mr-ci-watch|mr-reset-watch' | grep -v grep", 5)
     return so.splitlines() if so else []
 out["live_watchers"]=safe(watchers,[])
+# A close census section (`mr-prune close`, run by mr-record's MERGED-row hook) waits under
+# prune/close/ until the doc-only PR that deletes its milestone's spec appends it to
+# structure.spec.md; once the spec is gone from the corpus the entry is gone too.
+def prune_close():
+    corpus=os.path.join(os.path.dirname(os.path.dirname(MEM)),"specs","monster-realm-v2")
+    entries=[]
+    for p in sorted(glob.glob(os.path.join(glob.escape(MEM),"prune","close","*.section.md"))):
+        label=os.path.basename(p)[:-len(".section.md")]
+        try: label.encode("utf-8")
+        except UnicodeEncodeError: continue    # not a label mr-prune writes
+        if os.path.isfile(p) and os.path.isfile(os.path.join(corpus,label+".spec.md")):
+            entries.append({"milestone":label,"section_file":p,
+                            "action":"append to structure.spec.md in the doc-only PR that deletes %s.spec.md"%label})
+    return entries
+out["prune_close"]=safe(prune_close,[])
 print(json.dumps(out, indent=1))
 PY
 mv "$CACHE.tmp" "$CACHE"

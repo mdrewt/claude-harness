@@ -14,9 +14,10 @@ deleted and never counts toward a playtest gate, and an empty `## Slices` means 
   extractions a plan file under the game's `docs/refactors/` lists, written per that structure
   pass as a doc-only PR), by the supervisor when a parked slice or a spec author names an
   internal-design choice nobody has recorded (one `type: design` section, doc-only PR; the
-  parked slice gains it in `after:`), or by the operator. Never by a build run, and never invented to fill the
-  share. Structural findings are not
-  residuals.
+  parked slice gains it in `after:`), by the supervisor at a milestone's close, from the section
+  `mr-prune close` wrote for it (the bundle's `prune_close`; one section per close, appended in
+  the doc-only PR that deletes the milestone's spec), or by the operator. Never by a build run,
+  and never invented to fill the share. Structural findings are not residuals.
 - **Built** means the game repo's `origin/master` carries a subject naming `<slice id> —`,
   whatever its type, that no later revert undoes. A built section is deleted by the next
   doc-only PR that edits this file. Ids are never reused.

@@ -253,6 +253,21 @@ in a note is a residual row (`--followup` files it), so the drain sees it.
   It blocks on a pending note, an uncommitted edit, or a follow-up-worded Build note with no
   residual row; `notes adopt` gives a committed Build note its row, one paragraph per call.
 
+## Test census (`mr-prune`)
+`mr-prune` lists test-removal candidates for someone to read; no gate reads it and a row is never
+a reason to delete a test (`standards/testing-tdd.md` decides). `mr-prune census` reports the
+suite at a commit; `mr-prune close --spec F` records what milestone `F` added under
+`memory/projects/prune/` (a `trend.jsonl` row and `close/<milestone>.json`, plus
+`close/<milestone>.section.md` once the tester A/B experiment has its `close` row).
+- **At a milestone's last merge:** `mr-record ledger` runs it. When a MERGED row leaves every slice
+  of the milestone spec holding that slice with a MERGED row, the hook fetches the game repo and
+  runs `mr-prune close` against `origin/master`. A failure is one `WARN prune-close:` line and the
+  row stands; `git -C projects/monster-realm fetch origin` then `mr-prune close --spec F`, run by
+  hand, records the same row later (`close` itself never fetches).
+- **At the close PR:** the bundle's `prune_close` lists each section file whose milestone spec is
+  still in the corpus; the doc-only PR that deletes that spec appends the section to
+  `structure.spec.md` (its "Written by" rule names this source).
+
 ## Verification & rollback
 - Dry-run a tick: `MR_TICK_DRYRUN=1 MR_FORCE=1 bash memory/projects/mr-native-tick.sh`
   (assembles the prompt, spawns nothing).
