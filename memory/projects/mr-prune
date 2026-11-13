@@ -155,21 +155,23 @@ stands in R: nothing is fetched, so the caller brings R up to date first.
            Conventional Commit prefix with a lower-case type other than `revert`, then the id as
            the first word, one space, an em dash, one space. A commit is undone when a later
            commit that is not itself undone says it reverts it. A commit says so in one way
-           only: a message line starting `This reverts commit <sha>` (seven or more hex digits
-           that begin the reverted commit's id); or, with no such line, the subject
-           `Revert "<subject>"`, which undoes the newest earlier commit with that subject that
-           is not already undone, a trailing ` (#N)` aside on both. The milestone's commits are
-           the commits reachable from REF that name one of its slices and are not undone; a
-           slice with none is `unmatched`. A commit that names none of its slices adds nothing,
-           wherever it sits.
+           only: by its message lines that start `This reverts commit <sha>`, each undoing the
+           commit whose id begins with those seven or more hex digits; or, with no such line, by
+           the subject `Revert "<subject>"`, which undoes the newest earlier commit with that
+           subject that is not already undone, a trailing ` (#N)` aside on both. The milestone's
+           commits are the commits reachable from REF that name one of its slices and are not
+           undone; a slice with none is `unmatched`. A commit that names none of its slices adds
+           nothing, wherever it sits.
   Changed  the paths in `git show --numstat` of each of those commits, a rename read as a delete
-           and an add. A merge commit adds no path and no line: what it brings in counts on the
-           commits it merges. A path is a test file or a product file as census's totals count
-           them (the package patterns above), whether or not it still exists; any other path,
-           and a file git shows as binary, adds to no line count.
+           and an add. A merge commit that names a slice is one of its commits and adds no path
+           and no line: what it brings in counts on the commits it merges. A path is a test file
+           or a product file as census's totals count them (the package patterns above), whether
+           or not it still exists; any other path, and a file git shows as binary, adds to no
+           line count.
   Rows     census's `duplicates`, `protected-twins`, `orphans` and `orphan-protected` rows at REF
-           with a file among the changed paths, in census's order. A twin row's file is its test
-           file; an orphan row's files are the defining file and its tests.
+           with a file among the changed paths, section by section in that order, each as
+           census sorts it. A twin row's file is its test file; an orphan row's files are the
+           defining file and its tests.
   Routes   slice      a `duplicates` or `orphans` row with a file that a `touches:` entry names
                       (read as --spec reads them) in a slice of another `*.spec.md` in FILE's
                       directory, when no commit reachable from REF names that slice without
@@ -213,9 +215,10 @@ stands in R: nothing is fetched, so the caller brings R up to date first.
                                       name without a directory, or null, "rows": [...]}. A twin
                                       row is {"kind", "file", "candidate", "survivor", "route"};
                                       an orphan row {"kind", "file", "symbol", "test-only",
-                                      "tests", "route"}. A protected row adds "token", a `slice`
-                                      row "slices": [{"spec", "slice"}, ...], a `structure` row
-                                      "over-cap": bool.
+                                      "tests", "route"}; "kind" is the row's census section. A
+                                      protected row adds "token", a `slice` row "slices":
+                                      [{"spec": a file name, "slice": an id}, ...], a `structure`
+                                      row "over-cap": bool.
            close/<label>.section.md  when due. A file of that name is removed when none is due,
                                       and again when the trend row cannot be written, so a
                                       section file always has its row.
@@ -240,10 +243,10 @@ stands in R: nothing is fetched, so the caller brings R up to date first.
                                                                     changed test files at REF
                                                                     carrying each signal
   Output   `PRUNE-CLOSE <label> <commit>`, a `slice <id> <commit> [<commit> ...]` line per matched
-           slice, an `unmatched <id>` line per other slice, `rows listed=N slice=N structure=N
-           report=N over-cap=N`, `section <file name>` or `section none`, the `ci` line under
-           --ci, and `recorded <label>`. A `*.spec.md` beside FILE that cannot be read is skipped
-           with `PRUNE-WARN spec ...` on stderr.
+           slice, then an `unmatched <id>` line per other slice, `rows listed=N slice=N
+           structure=N report=N over-cap=N`, `section <file name>` or `section none`, the `ci`
+           line under --ci, and `recorded <label>`. A `*.spec.md` beside FILE that cannot be read
+           is skipped with `PRUNE-WARN spec ...` on stderr.
   Once     when trend.jsonl already holds a line that is a JSON object with this label and a
            `close` object, the answer is `PRUNE-CLOSE-SKIP <label>` alone: nothing is read from
            R, nothing is written, rc=0. Argument and FILE errors come before it. Any other line
