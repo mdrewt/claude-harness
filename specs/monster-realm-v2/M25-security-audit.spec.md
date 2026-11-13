@@ -211,6 +211,14 @@ Each item is ticked **met**, or given a finding with a disposition. Then the ope
   for the diagnostics what identity they carry and what notice or consent they need.
   Evidence: the inventory in the privacy runbook; log and telemetry samples checked for identities
   and IP addresses.
+  The inventory marks each of these "applies" (with the same fields) or "does not apply": IP
+  addresses and connection records kept for rate limiting, attack blocking and bans · the
+  processors that run the service (host, email sender, Steam) · records kept to honour a deletion
+  (tombstones, anonymised rows) · moderation records, chat logs and reports · player-written content
+  other players see (names, guild names, chat) · linked platform identities · public standings ·
+  anti-cheat signals · support correspondence, including access and deletion requests · consent
+  and age records · purchase and tax records · legal preservation requests · playtest feedback
+  naming testers.
 
 **D. Dependency and build audit**
 - [ ] `cargo audit` is clean and gitleaks is clean (both blocking in CI, `.github/workflows/ci.yml`).
