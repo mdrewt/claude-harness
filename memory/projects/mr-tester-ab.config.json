@@ -1,0 +1,53 @@
+{
+ "v": 1,
+ "enabled": false,
+ "_enabled": "The operator enables the experiment. Unless this is the JSON value true, every mr-tester-ab command prints AB-SKIP disabled and mr-spawn renders the brief without the experiment's sentence.",
+ "game_repo": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm",
+ "harness_repo": "/home/mdrewt/projects/ai-apps/claude-harness",
+ "worktree_root": ".claude/worktrees",
+ "default_branch": "master",
+ "cache_root": "~/.cache/mr-tester-ab",
+ "transcripts_root": "~/.claude/projects",
+ "arms": [
+  {"arm": "S-med", "model": "sonnet", "effort": "medium", "role": "shadow"},
+  {"arm": "S-high", "model": "sonnet", "effort": "high", "role": "shadow"},
+  {"arm": "O-med", "model": "opus", "effort": "medium", "role": "shadow"},
+  {"arm": "O-high", "model": "opus", "effort": "high", "role": "shadow"},
+  {"arm": "S-med-r", "model": "sonnet", "effort": "medium", "role": "replicate"}
+ ],
+ "step_down_arms": ["S-med", "O-med"],
+ "prefixes": ["ts-6b-", "np-", "eo-"],
+ "required_slices": [],
+ "exclude_slices": [],
+ "_eligibility": "A slice is in the experiment when it is listed in required_slices or starts with a prefix, and is not in exclude_slices. List design, refactor and doc-only slices of those prefixes in exclude_slices: they have no tester.",
+ "cap_arm_usd": 500,
+ "step_down_usd": 400,
+ "cap_bump_usd": 30,
+ "claims_digest_limit": 8,
+ "test_paths": ["(^|/)tests/", "_tests?\\.rs$", "\\.(test|spec)\\.[cm]?[jt]sx?$", "(^|/)e2e/", "^evals/", "(^|/)test-util/", "(^|/)proptest-regressions/"],
+ "game_code": "^(game-core|server-module|client|client-wasm|sim-harness)/",
+ "spec_paths": "^(specs/|memory/projects/gates/|docs/DECISIONS\\.md$)",
+ "test_patterns": [
+  {"match": "\\.rs$", "test": "#\\[(?:\\w+::)*test[^\\]]*\\]\\s*(?:#\\[[^\\]]*\\]\\s*)*(?:pub\\s+)?(?:async\\s+)?fn\\s+(\\w+)"},
+  {"match": "\\.[cm]?[jt]sx?$", "test": "^[ \\t]*(?:it|test)(?:\\.\\w+)*\\(\\s*(?:'([^']+)'|\"([^\"]+)\"|`([^`]+)`)"}
+ ],
+ "runners": [
+  {"name": "nextest", "match": "\\.rs$", "cwd": "", "timeout_s": 1800,
+   "cmd": ["cargo", "nextest", "run", "--config-file", "{tool}/mr-tester-ab.nextest.toml", "--profile", "ab", "--no-fail-fast", "{packages}", "-E", "test(/(^|::)({names})$/)"],
+   "junit": "{target}/nextest/ab/junit.xml"},
+  {"name": "vitest", "match": "\\.(test|spec)\\.[cm]?[jt]sx?$", "exclude": "(^|/)e2e/", "cwd": "client", "timeout_s": 900,
+   "setup_if_missing": "node_modules", "setup": [["npm", "ci"]],
+   "cmd": ["npx", "vitest", "run", "--reporter=junit", "--outputFile={junit}", "{files}"]}
+ ],
+ "_runners": "Each arm's test files are overlaid on a snapshot in <cache_root>/scratch and run by the first runner whose match fits. {files} expands to the files, {packages} to a -p pair per cargo package they belong to, {names} to their test names as a regex alternation, {junit} to the report path, {tool} to this directory. A file no runner fits (Playwright specs) is recorded not-run.",
+ "mutants": {
+  "enabled": true,
+  "match": "^(game-core|server-module)/.*\\.rs$",
+  "wall_budget_s": 1800,
+  "cmd": ["cargo", "mutants", "{packages}", "--test-tool", "nextest", "--in-diff", "{diff}", "--output", "{out}", "--no-shuffle", "--", "-E", "test(/(^|::)({names})$/)"]
+ },
+ "_mutants": "The seeded-defect measure, reported beside confirmed findings and never a gate: on a slice whose merged diff changes a matching file, the changed lines are mutated once per arm with only that arm's tests that pass at merge deciding what is caught. One wall budget covers the slice.",
+ "areas": {"rust": "^(game-core|server-module)/.*\\.rs$", "client": "^client/.*\\.[cm]?[jt]sx?$"},
+ "_areas": "The area of a slice is the one pattern its merged diff matches, mixed when it matches both, other when neither.",
+ "bloat": {"tokens_per_line": 12, "fresh_reads": 4, "fresh_usd_per_mtok": 4, "cached_turns": 150, "cached_usd_per_mtok": 0.2}
+}

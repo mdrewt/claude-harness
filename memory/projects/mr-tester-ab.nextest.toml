@@ -1,0 +1,7 @@
+# The nextest profile mr-tester-ab replays shadow tests under: a junit report at
+# <target>/nextest/ab/junit.xml, every test run to the end.
+[profile.ab]
+fail-fast = false
+
+[profile.ab.junit]
+path = "junit.xml"

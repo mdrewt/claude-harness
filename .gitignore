@@ -36,5 +36,8 @@ Thumbs.db
 .harness-runner.lock.d/
 memory/projects/.model-window-probe.*
 memory/projects/*-usage-ledger.jsonl
+# Tester A/B experiment: the ledger and the per-slice side files (mr-tester-ab)
+memory/projects/mr-tester-ab.jsonl
+memory/projects/tester-ab/
 # Windows drive-letter strings written as literal dir names (a path-handling bug)
 memory/projects/[A-Za-z]:*

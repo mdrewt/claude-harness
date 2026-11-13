@@ -38,6 +38,15 @@ EOF
 # counter carries the previous attempt's total, a relaunch, a killed session, and the older
 # counter-restart shape (uxd2, naive $423.65 -> true $165.65).
 "$MEM/mr-cost-sum" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-cost-sum selftest"; BAD=1; }
+# mr-tester-ab: the tester A/B experiment's tool. Its fixtures run in temporary directories against a
+# toy game repository and a toy test runner. The count floor is here as well as in the tool, so a
+# selftest that stops running its batteries cannot read as a pass.
+AB_ST=$("$MEM/mr-tester-ab" --selftest 2>&1 | tail -n 1)
+AB_N=${AB_ST#TESTER-AB-SELFTEST-OK }
+case "$AB_ST" in
+  "TESTER-AB-SELFTEST-OK "*) [ "$AB_N" -ge 80 ] 2>/dev/null || { echo "SELFCHECK-FAIL mr-tester-ab selftest ran $AB_N fixtures (floor 80)"; BAD=1; } ;;
+  *) echo "SELFCHECK-FAIL mr-tester-ab selftest: $(echo "$AB_ST" | cut -c1-160)"; BAD=1 ;;
+esac
 # run-cost: every ended build session leaves exactly one ledger cost row, carrying that session's
 # own spend. Driven through the REAL writer (mr-record) and the REAL reconcile block of
 # mr-native-tick.sh (extracted by content, with its /tmp/mr_* paths and MEM pointed at a sandbox)

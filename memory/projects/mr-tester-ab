@@ -1,0 +1,2029 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands. Python reads this line as a
+# no-op string; sh/bash re-execs the file under python3 before reaching any other line.
+# Statically enforced for every python mr-* tool by mr-selfcheck.
+"""mr-tester-ab — the tester A/B experiment: shadow testers, replay, ledger.
+
+WHAT IT MEASURES
+----------------
+On an eligible slice the tier-policy tester writes the gating tests as always. Extra tester runs
+(the arms: a model and an effort each, plus one replicate) write tests blind from the same prompt
+and the same tree. Their tests never enter the repo. This tool keeps each arm's tests under a
+local ref, replays them against recorded snapshots of the builder's implementation, and records
+which arm's unedited test flipped on a game-code change. A judge that is not an arm rules which
+flips are real defects.
+
+SAFETY CONTRACT
+---------------
+  * `enabled` in mr-tester-ab.config.json must be the JSON value true. Otherwise every command
+    prints `AB-SKIP disabled` and reads and writes nothing else.
+  * Every command exits 0 (`--selftest` exits 1 on failure). On a skip or an error it prints
+    `AB-SKIP <reason>` and the slice proceeds as it does without the experiment.
+  * No command starts a model session. `plan` prints Agent calls for the builder to issue.
+  * No command reads or writes a stop flag, a lock of the loop, or a merge.
+  * It addresses the directory it ships in (config, ledger, side files), so a copy in a
+    temporary directory is a sandbox.
+
+FILES
+-----
+  mr-tester-ab.config.json   tracked. Arms, eligibility, caps, runner commands.
+  mr-tester-ab.jsonl         the ledger. Append-only, one JSON object per line, written under
+                             flock. Every row has v, kind, slice, ts. Gitignored.
+  tester-ab/<slice>/         manifest, shadow reports, failure output. Gitignored.
+  <cache_root>/<slice>/<id>/ one plain export of the tree per shadow run; not a git worktree.
+  <cache_root>/scratch/      the one directory every replay runs in; <cache_root>/target is the
+                             cargo target directory they share.
+  refs/mr-ab/<slice>/<name>  in the game repo, local: the snapshots (base, g1, g2, m, end) and
+                             each shadow's tests (its label).
+
+LEDGER ROWS (kind)
+------------------
+  assignment  milestone, tier, labels {label: arm}, prompt_sha256, base_ref, tester_md_sha,
+              arms_planned, skipped (null or the reason)
+  run         label, arm, role (primary | shadow | replicate | followup), twin, session,
+              agent_id, tool_use_id, model_observed, effort_observed, cli_version, started,
+              duration_s, calls, bash_blocked, tokens, cost_usd, status (ok | failed |
+              contaminated | arm-mismatch), leak, tests_ref, files, non_test_files, tests, test_loc
+  snap        name (base | g1 | g2 | m | end), sha, source (tool | derived)
+  exec        label, snap, test_id, criterion_tag, result (pass | fail | no-compile | not-run),
+              runtime_ms, run_n, ported
+  claim       claim_id, label, type (base | spec), test, where, text, text_sha
+  candidate   candidate_id, type (lens-caught | escape | base | spec | open-fail), label,
+              test_id or claim_id, snap_fail, snap_pass, game_diff, scope (in | out),
+              handed_in_session. The latest row of a (label, test_id or claim_id) stands.
+  quality     label, no_compile_files, flaky, brittle, test_loc, tests, loc_per_criterion,
+              dup_assert_lines, runtime_ms, bloat_usd. The latest row of a label stands.
+  mutants     label, generated, caught, missed, unviable, timeouts, wall_s, status (ok | budget |
+              error | no-tests). A reported measure; nothing gates on it.
+  slice       status (scored | degraded | void), arms_ok, area, added_cost_usd,
+              cumulative_added_usd. The latest row of a slice stands.
+
+COMMANDS
+--------
+  eligible <slice> [<repo>]   `yes <cap bump usd>` or `no <reason>`. For mr-spawn.
+  plan <slice> --prompt <file> [--worktree <dir>] [--tier <t>] [--milestone <m>]
+                              Snapshot the slice worktree as `base`, export it once per shadow,
+                              write each shadow's prompt into its export, and print the Agent
+                              calls. A second call for the same slice prints the same calls.
+  collect <slice>             After the calls return: keep each shadow's new and changed files
+                              as a commit under its ref, price the runs from their transcripts,
+                              flag contamination, arm mismatch and leak, copy the reports, delete
+                              the exports the manifest registered, print the claim digest.
+  score <slice> [--end]       Replay each arm's tests at every recorded snapshot (base: claimed
+                              tests only; m: twice), derive candidates and the per-arm quality
+                              and seeded-defect rows. `--end` first records the game repo's
+                              default-branch head as `end`. Runs what is missing; under a flock.
+  status                      What is planned, collected, scored and spent; stale exports.
+  --selftest                  Fixtures against temporary directories and a toy test runner.
+                              Prints `TESTER-AB-SELFTEST-OK <n>`.
+"""
+
+import contextlib
+import datetime
+import fcntl
+import glob
+import hashlib
+import io
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import xml.etree.ElementTree as ET
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SLICE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+CRITERION_RE = re.compile(r"criterion:\s*([A-Za-z0-9][\w.\-]*)")
+SHADOW_ROLES = ("shadow", "replicate")
+PROMPT_FILE = "TESTER-PROMPT.md"
+REPORT_FILE = "REPORT.md"
+_GIT_SCRUB = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+              "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_ALTERNATE_OBJECT_DIRECTORIES")
+_GIT_ID = ("-c", "user.name=mr-tester-ab", "-c", "user.email=mr-tester-ab@localhost",
+           "-c", "commit.gpgsign=false")
+
+FOOTER = """
+
+---
+## Shadow run
+
+You work in an exported copy of the tree at {root}. It is not a git repository. Read and write
+only inside {root}.
+
+- Tag every test with its criterion id: a comment `criterion: <ID>` on the line directly above
+  the test.
+- End your report with a `FINDINGS` block: the line `FINDINGS`, then at most three lines of the
+  form `- kind: base|spec | test: <test name or none> | where: <path:line> | <one sentence naming
+  the wrong behaviour>`, or the single line `NONE`. `base` is a defect in code that exists in
+  this tree; `spec` is a contradiction or gap in the spec.
+- Write the whole report to {root}/REPORT.md. Your final message is the single word `done`.
+"""
+
+
+class Skip(Exception):
+    """The command stops and prints `AB-SKIP <reason>`."""
+
+
+class Ctx:
+    def __init__(self, mem):
+        self.mem = mem
+        with open(os.path.join(mem, "mr-tester-ab.config.json")) as fh:
+            self.cfg = json.load(fh)
+        if not isinstance(self.cfg, dict):
+            raise ValueError("config is not an object")
+        self.ledger = os.path.join(mem, "mr-tester-ab.jsonl")
+        self.side = os.path.join(mem, "tester-ab")
+        self.game = self.cfg.get("game_repo", "")
+        self.cache = os.path.expanduser(self.cfg.get("cache_root", "~/.cache/mr-tester-ab"))
+        self.transcripts = os.path.expanduser(self.cfg.get("transcripts_root", "~/.claude/projects"))
+        self.scratch = os.path.join(self.cache, "scratch")
+
+    def side_of(self, slice_):
+        return os.path.join(self.side, slice_)
+
+    def manifest_path(self, slice_):
+        return os.path.join(self.side_of(slice_), "manifest.json")
+
+    def manifest(self, slice_):
+        try:
+            with open(self.manifest_path(slice_)) as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            return None
+
+    def arm(self, name):
+        return next((a for a in self.cfg.get("arms", []) if a.get("arm") == name), None)
+
+
+# --------------------------------------------------------------------------- small helpers
+def now():
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def epoch(stamp):
+    try:
+        return datetime.datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def sha256(text):
+    return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()
+
+
+def check_slice(slice_):
+    if not slice_ or not SLICE_RE.fullmatch(slice_):
+        raise Skip("bad-slice-id")
+    return slice_
+
+
+def options(args, valued=(), flags=()):
+    """(positionals, {option: value}). An unknown option is a usage error."""
+    pos, opt = [], {}
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in valued and i + 1 < len(args):
+            opt[a[2:]] = args[i + 1]
+            i += 2
+        elif a in flags:
+            opt[a[2:]] = True
+            i += 1
+        elif a.startswith("--"):
+            raise Skip("usage: unknown or incomplete option %s" % a)
+        else:
+            pos.append(a)
+            i += 1
+    return pos, opt
+
+
+def write_json(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = "%s.tmp.%d" % (path, os.getpid())
+    with open(tmp, "w") as fh:
+        json.dump(obj, fh, indent=1, sort_keys=True)
+        fh.write("\n")
+    os.replace(tmp, path)
+
+
+def append(ctx, rows):
+    """Append rows to the ledger: one write per call, under an exclusive flock, so two writers
+    never interleave inside a line."""
+    stamp = now()
+    text = "".join(json.dumps(dict({"v": 1, "ts": stamp}, **row), sort_keys=True) + "\n"
+                   for row in rows)
+    if not text:
+        return
+    fd = os.open(ctx.ledger, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        os.write(fd, text.encode())
+    finally:
+        os.close(fd)
+
+
+def read(ctx):
+    rows = []
+    try:
+        with open(ctx.ledger, errors="replace") as fh:
+            for line in fh:
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(row, dict) and row.get("kind"):
+                    rows.append(row)
+    except OSError:
+        pass
+    return rows
+
+
+def of(rows, kind, slice_=None):
+    return [r for r in rows if r.get("kind") == kind and (slice_ is None or r.get("slice") == slice_)]
+
+
+def latest(rows, key):
+    """The last row per key(row), in first-seen order."""
+    out = {}
+    for row in rows:
+        out[key(row)] = row
+    return list(out.values())
+
+
+def git(repo, *args, env=None, cwd=None, data=None, check=True):
+    """Run git and return its stdout. Repo-redirecting variables of the caller never apply."""
+    clean = {k: v for k, v in os.environ.items() if k not in _GIT_SCRUB}
+    clean.update(env or {})
+    argv = ["git"] + (["-C", repo] if repo else []) + list(args)
+    done = subprocess.run(argv, env=clean, cwd=cwd, input=data, capture_output=True, timeout=600)
+    if check and done.returncode != 0:
+        raise RuntimeError("git %s: %s" % (" ".join(args[:2]), done.stderr.decode(errors="replace").strip()[:200]))
+    return done.stdout.decode(errors="replace")
+
+
+def common_dir(repo):
+    path = git(repo, "rev-parse", "--git-common-dir").strip()
+    return os.path.normpath(os.path.join(repo, path))
+
+
+def snapshot(repo, tree, parent, message, exclude=()):
+    """A commit holding everything under `tree` that git would track (ignore rules apply), with
+    `parent` as its parent; `parent` itself when the two trees are equal."""
+    gitdir = common_dir(repo)
+    fd, index = tempfile.mkstemp(prefix="mr-tester-ab-index-")
+    os.close(fd)
+    os.unlink(index)
+    env = {"GIT_INDEX_FILE": index}
+    base = ["--git-dir", gitdir, "--work-tree", tree]
+    try:
+        git(None, *base, "read-tree", parent, env=env, cwd=tree)
+        git(None, *base, "add", "-A", ".", env=env, cwd=tree)
+        if exclude:
+            git(None, *base, "rm", "--cached", "-q", "--ignore-unmatch", "--", *exclude, env=env, cwd=tree)
+        new_tree = git(None, *base, "write-tree", env=env, cwd=tree).strip()
+        if new_tree == git(repo, "rev-parse", parent + "^{tree}").strip():
+            return git(repo, "rev-parse", parent).strip()
+        return git(repo, *_GIT_ID, "commit-tree", new_tree, "-p", parent, "-m", message).strip()
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(index)
+
+
+def set_ref(repo, slice_, name, sha):
+    git(repo, "update-ref", "refs/mr-ab/%s/%s" % (slice_, name), sha)
+
+
+def record_snap(ctx, slice_, name, sha, source="tool"):
+    """Keep a snapshot alive under its ref and enter it in the ledger."""
+    set_ref(ctx.game, slice_, name, sha)
+    append(ctx, [{"kind": "snap", "slice": slice_, "name": name, "sha": sha, "source": source}])
+
+
+def run_cmd(argv, cwd, env, timeout):
+    """(exit code, timed out, wall seconds, output tail). The command gets its own process group
+    and the whole group is killed on a timeout, so a build tool's children do not outlive it."""
+    start = time.time()
+    try:
+        proc = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, start_new_session=True)
+    except OSError as exc:
+        return 127, False, 0.0, str(exc)
+    try:
+        out, _ = proc.communicate(timeout=max(1, timeout))
+        return proc.returncode, False, time.time() - start, out.decode(errors="replace")[-4000:]
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(OSError):
+            os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        return -9, True, time.time() - start, ""
+
+
+def is_test(ctx, path):
+    return any(re.search(p, path) for p in ctx.cfg.get("test_paths", []))
+
+
+def is_game_code(ctx, path):
+    return bool(re.search(ctx.cfg.get("game_code", "$^"), path)) and not is_test(ctx, path)
+
+
+def tests_in(ctx, path, text):
+    """[(name, criterion tag)] of the tests a file declares. The tag is the nearest
+    `criterion: <ID>` on the test's own line or the three lines above it."""
+    for pat in ctx.cfg.get("test_patterns", []):
+        if not re.search(pat["match"], path):
+            continue
+        lines = text.split("\n")
+        out = []
+        for m in re.finditer(pat["test"], text, re.M):
+            name = next((g for g in reversed(m.groups()) if g), None)
+            if not name:
+                continue
+            at = text.count("\n", 0, m.start())
+            tag = ""
+            for line in reversed(lines[max(0, at - 3):at + 1]):
+                found = CRITERION_RE.search(line)
+                if found:
+                    tag = found.group(1)
+                    break
+            out.append((name, tag))
+        return out
+    return []
+
+
+# --------------------------------------------------------------------------- eligibility
+def closed(rows):
+    return bool(of(rows, "close"))
+
+
+def ineligible(ctx, slice_):
+    """None when the slice is in the experiment, else the reason."""
+    cfg = ctx.cfg
+    if slice_ in cfg.get("exclude_slices", []):
+        return "excluded"
+    if slice_ in cfg.get("required_slices", []) or any(slice_.startswith(p) for p in cfg.get("prefixes", [])):
+        return None
+    return "ineligible"
+
+
+def spent(rows):
+    """What the cap counts: the arm, judge and port runs."""
+    return sum(r.get("cost_usd") or 0.0 for r in of(rows, "run")
+               if r.get("role") in SHADOW_ROLES + ("judge", "port"))
+
+
+def cmd_eligible(ctx, args):
+    pos, _ = options(args)
+    slice_ = check_slice(pos[0] if pos else "")
+    why = ineligible(ctx, slice_)
+    if why is None and len(pos) > 1 and pos[1] != "project":
+        why = "not-a-game-slice"
+    if why is None and closed(read(ctx)):
+        why = "closed"
+    print("no %s" % why if why else "yes %d" % int(ctx.cfg.get("cap_bump_usd", 0)))
+
+
+# --------------------------------------------------------------------------- plan
+def assign(slice_, arms):
+    """{label: arm}: a fixed permutation per slice, so labels say nothing about the arm and a
+    second plan of the slice cannot differ."""
+    order = sorted(arms, key=lambda a: sha256("tester-ab-v1:%s:%s" % (slice_, a["arm"])))
+    return {"a%d" % (i + 1): arm for i, arm in enumerate(order)}
+
+
+def export_tree(repo, sha, dest):
+    os.makedirs(dest)
+    archive = subprocess.Popen(["git", "-C", repo, "archive", "--format=tar", sha],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               env={k: v for k, v in os.environ.items() if k not in _GIT_SCRUB})
+    untar = subprocess.run(["tar", "-x", "-C", dest], stdin=archive.stdout, capture_output=True)
+    archive.stdout.close()
+    if archive.wait() != 0 or untar.returncode != 0:
+        raise RuntimeError("export of %s failed" % sha[:12])
+
+
+def cmd_plan(ctx, args):
+    pos, opt = options(args, valued=("--prompt", "--worktree", "--tier", "--milestone"))
+    slice_ = check_slice(pos[0] if pos else "")
+    rows = read(ctx)
+    if closed(rows):
+        raise Skip("closed")
+    why = ineligible(ctx, slice_)
+    if why:
+        raise Skip(why)
+    if os.environ.get("CLAUDE_CODE_SUBAGENT_MODEL"):
+        raise Skip("CLAUDE_CODE_SUBAGENT_MODEL is set: every subagent would run on one model")
+    side = ctx.side_of(slice_)
+    skipped = [r for r in of(rows, "assignment", slice_) if r.get("skipped")]
+    if skipped:
+        raise Skip(skipped[-1]["skipped"])
+    worktree = os.path.abspath(opt.get("worktree") or os.path.join(
+        ctx.game, ctx.cfg.get("worktree_root", ".claude/worktrees"), slice_))
+    manifest = ctx.manifest(slice_)
+    if manifest:
+        # Shadows never rerun. The same calls are printed again only while nothing can have
+        # changed: not collected, and the worktree still at the commit the base was taken from.
+        head = git(worktree, "rev-parse", "HEAD", check=False).strip()
+        if manifest.get("collected") or head != manifest.get("head_at_plan"):
+            raise Skip("already-planned: run `collect %s` if you have not; issue no shadow call" % slice_)
+        with open(os.path.join(side, "plan.out")) as fh:
+            sys.stdout.write(fh.read())
+        return
+    total = spent(rows)
+    if total >= ctx.cfg.get("cap_arm_usd", 0):
+        raise Skip("cap")
+    if not opt.get("prompt"):
+        raise Skip("usage: plan <slice> --prompt <file>")
+    with open(opt["prompt"]) as fh:
+        prompt = fh.read()
+    need = []
+    if not re.search(r"^## Contracts\b", prompt, re.M):
+        need.append("a `## Contracts` section with the signatures the tests will call")
+    if worktree not in prompt:
+        need.append("the worktree path %s" % worktree)
+    if need:
+        asked = os.path.join(side, "asked")
+        if os.path.exists(asked):
+            append(ctx, [{"kind": "assignment", "slice": slice_, "skipped": "prompt-incomplete"}])
+            raise Skip("prompt-incomplete")
+        os.makedirs(side, exist_ok=True)
+        open(asked, "w").close()
+        print("AB-NEED %s: the tester prompt lacks %s. Add it and run plan again; a second "
+              "incomplete prompt skips the experiment for this slice." % (slice_, " and ".join(need)))
+        return
+    arms = [a for a in ctx.cfg["arms"]]
+    if total >= ctx.cfg.get("step_down_usd", float("inf")):
+        arms = [a for a in arms if a["arm"] in ctx.cfg.get("step_down_arms", [])]
+    if not arms:
+        raise Skip("no-arms")
+    head = git(worktree, "rev-parse", "HEAD").strip()
+    base = snapshot(worktree, worktree, head, "tester-ab %s base" % slice_)
+    set_ref(worktree, slice_, "base", base)
+    labels = {}
+    calls = []
+    for label, arm in assign(slice_, arms).items():
+        root = os.path.join(ctx.cache, slice_, os.urandom(8).hex())
+        export_tree(worktree, base, root)
+        with open(os.path.join(root, PROMPT_FILE), "w") as fh:
+            fh.write(prompt.replace(worktree, root) + FOOTER.format(root=root))
+        labels[label] = {"arm": arm["arm"], "model": arm["model"], "effort": arm["effort"],
+                         "role": arm.get("role", "shadow"), "export": root}
+        calls.append('Agent(subagent_type="tester", model="%s", effort="%s", description="tester %s %s", '
+                     'prompt="Your task is in %s/%s. Read it fully and follow it exactly.")'
+                     % (arm["model"], arm["effort"], label, slice_, root, PROMPT_FILE))
+    try:
+        with open(os.path.join(ctx.game, ".claude", "agents", "tester.md"), "rb") as fh:
+            tester_md = hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        tester_md = None
+    out = ["AB-PLAN %s: issue these %d Agent calls in ONE foreground message, in this order, before "
+           "any test file exists." % (slice_, len(calls) + 1),
+           "1. your own tester call, exactly as without the experiment: your prompt file unmodified, "
+           "the model the QUALITY TIER line names, no effort parameter. It writes the gating tests."]
+    out += ["%d. %s" % (i + 2, call) for i, call in enumerate(calls)]
+    out += ["Calls 2-%d are shadows: their tests never enter the repo. Each ends with the single "
+            "word `done`; do not read their exports or reports." % (len(calls) + 1),
+            "When all have returned run: %s/mr-tester-ab collect %s" % (ctx.mem, slice_)]
+    text = "\n".join(out) + "\n"
+    os.makedirs(side, exist_ok=True)
+    with open(os.path.join(side, "plan.out"), "w") as fh:
+        fh.write(text)
+    write_json(ctx.manifest_path(slice_), {
+        "slice": slice_, "milestone": opt.get("milestone"), "tier": opt.get("tier"),
+        "worktree": worktree, "head_at_plan": head, "base": base, "labels": labels,
+        "prompt_sha256": sha256(prompt), "tester_md_sha": tester_md, "planned": now(),
+        "collected": False})
+    append(ctx, [{"kind": "assignment", "slice": slice_, "milestone": opt.get("milestone"),
+                  "tier": opt.get("tier"), "labels": {l: e["arm"] for l, e in labels.items()},
+                  "prompt_sha256": sha256(prompt), "base_ref": base, "tester_md_sha": tester_md,
+                  "arms_planned": [a["arm"] for a in arms], "skipped": None},
+                 {"kind": "snap", "slice": slice_, "name": "base", "sha": base, "source": "tool"}])
+    sys.stdout.write(text)
+
+
+# --------------------------------------------------------------------------- collect
+def scan_transcript(path):
+    """What a run did, from its transcript: every string in its tool inputs, its last text, the
+    number of Bash calls that errored."""
+    strings, bash, last_text, blocked = [], set(), "", 0
+
+    def walk(value):
+        if isinstance(value, str):
+            strings.append(value)
+        elif isinstance(value, dict):
+            for v in value.values():
+                walk(v)
+        elif isinstance(value, list):
+            for v in value:
+                walk(v)
+
+    with open(path, errors="replace") as fh:
+        for line in fh:
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            msg = event.get("message") if isinstance(event, dict) else None
+            content = msg.get("content") if isinstance(msg, dict) else None
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if event.get("type") == "assistant" and block.get("type") == "text":
+                    last_text = block.get("text") or last_text
+                elif event.get("type") == "assistant" and block.get("type") == "tool_use":
+                    walk(block.get("input"))
+                    if block.get("name") == "Bash":
+                        bash.add(block.get("id"))
+                elif block.get("type") == "tool_result" and block.get("is_error") \
+                        and block.get("tool_use_id") in bash:
+                    blocked += 1
+    return strings, last_text, blocked
+
+
+def find_runs(ctx, manifest):
+    """({label: transcript path}, {session id}) of the shadows: a shadow's transcript is the one
+    whose first message names its export."""
+    since = (epoch(manifest["planned"]) or 0) - 120
+    found, sessions = {}, set()
+    for path in glob.glob(os.path.join(glob.escape(ctx.transcripts), "*", "*", "subagents", "agent-*.jsonl")):
+        try:
+            if os.path.getmtime(path) < since:
+                continue
+            with open(path, errors="replace") as fh:
+                head = fh.readline(400000)
+        except OSError:
+            continue
+        for label, entry in manifest["labels"].items():
+            if entry["export"] in head:
+                found[label] = path
+                sessions.add(os.path.basename(os.path.dirname(os.path.dirname(path))))
+    return found, sessions
+
+
+def by_role(ctx, session):
+    """{agent id: mr-cost-sum's row} for a session's subagents."""
+    env = dict(os.environ, MR_COST_TRANSCRIPTS=ctx.transcripts)
+    done = subprocess.run([os.path.join(ctx.mem, "mr-cost-sum"), "--by-role", session],
+                          capture_output=True, text=True, timeout=120, env=env)
+    return {r["agent_id"]: r for r in json.loads(done.stdout).get("subagents", [])}
+
+
+def agent_id(path):
+    return os.path.basename(path)[len("agent-"):-len(".jsonl")]
+
+
+def parse_findings(report):
+    """[(type, test, where, sentence)] from the last FINDINGS block of a report, at most three."""
+    at = [i for i, line in enumerate(report.split("\n")) if line.strip() == "FINDINGS"]
+    if not at:
+        return []
+    out = []
+    for line in report.split("\n")[at[-1] + 1:]:
+        m = re.match(r"\s*-\s*kind:\s*(base|spec)\s*\|\s*test:\s*(.*?)\s*\|\s*where:\s*(.*?)\s*\|\s*(.+)", line)
+        if m:
+            test = m.group(2).strip("`")
+            out.append((m.group(1), "" if test.lower() == "none" else test, m.group(3).strip("`"),
+                        " ".join(m.group(4).split())))
+    return out[:3]
+
+
+def changed_files(repo, old, new):
+    """[(status letter, path)] between two commits."""
+    out = []
+    for line in git(repo, "diff", "--name-status", "--no-renames", old, new).splitlines():
+        status, _, path = line.partition("\t")
+        if path:
+            out.append((status[:1], path))
+    return out
+
+
+def cmd_collect(ctx, args):
+    pos, _ = options(args)
+    slice_ = check_slice(pos[0] if pos else "")
+    manifest = ctx.manifest(slice_)
+    if not manifest:
+        raise Skip("no-manifest")
+    if manifest.get("collected"):
+        raise Skip("already-collected")
+    side = ctx.side_of(slice_)
+    transcripts, sessions = find_runs(ctx, manifest)
+    priced = {}
+    for session in sorted(sessions):
+        with contextlib.suppress(Exception):
+            priced.update(by_role(ctx, session))
+    runs, claims = [], []
+    for label in sorted(manifest["labels"]):
+        entry = manifest["labels"][label]
+        root, path = entry["export"], transcripts.get(label)
+        row = {"kind": "run", "slice": slice_, "label": label, "arm": entry["arm"],
+               "role": entry["role"], "twin": False, "status": "ok", "leak": False}
+        cost = priced.get(agent_id(path)) if path else None
+        report = ""
+        with contextlib.suppress(OSError):
+            with open(os.path.join(root, REPORT_FILE), errors="replace") as fh:
+                report = fh.read()
+        ref = None
+        if os.path.isdir(root):
+            ref = snapshot(ctx.game, root, manifest["base"], "tester-ab %s %s" % (slice_, label),
+                           exclude=(REPORT_FILE, PROMPT_FILE))
+        files = [p for s, p in changed_files(ctx.game, manifest["base"], ref) if s != "D"] if ref else []
+        tests = [p for p in files if is_test(ctx, p)]
+        if not path or not cost or not (files or report):
+            row["status"] = "failed"
+        else:
+            strings, last_text, blocked = scan_transcript(path)
+            row.update(session=os.path.basename(os.path.dirname(os.path.dirname(path))),
+                       agent_id=cost["agent_id"], tool_use_id=cost["tool_use_id"],
+                       model_observed=cost["model"], effort_observed=cost["effort"],
+                       cli_version=cost["version"], started=cost["started"],
+                       duration_s=cost["duration_s"], calls=cost["calls"], tokens=cost["tokens"],
+                       cost_usd=cost["cost_usd"], bash_blocked=blocked,
+                       leak=last_text.strip().lower().rstrip(".") != "done")
+            others = [s.replace(root, "") for s in strings]
+            if any(ctx.cache in s or manifest["worktree"] in s for s in others):
+                row["status"] = "contaminated"
+            elif entry["model"] not in (cost["model"] or "") or cost["effort"] != entry["effort"]:
+                row["status"] = "arm-mismatch"
+        if ref and tests:
+            set_ref(ctx.game, slice_, label, ref)
+            row["tests_ref"] = ref
+            numstat = git(ctx.game, "diff", "--numstat", manifest["base"], ref, "--", *tests)
+            row["test_loc"] = sum(int(l.split("\t")[0]) for l in numstat.splitlines() if l.split("\t")[0].isdigit())
+            row["tests"] = sum(len(tests_in(ctx, p, git(ctx.game, "show", "%s:%s" % (ref, p)))) for p in tests)
+        row["files"] = tests
+        row["non_test_files"] = [p for p in files if not is_test(ctx, p)]
+        if report:
+            os.makedirs(side, exist_ok=True)
+            with open(os.path.join(side, "%s.report.md" % label), "w") as fh:
+                fh.write(report)
+        if row["status"] == "ok":
+            for kind, test, where, text in parse_findings(report):
+                claims.append({"kind": "claim", "slice": slice_, "label": label, "type": kind,
+                               "claim_id": "c" + sha256("%s|%s|%s" % (slice_, label, text))[:8],
+                               "test": test, "where": where, "text": text, "text_sha": sha256(text)})
+        runs.append(row)
+    # The primary is the first tester of the same sessions that is not a shadow. A scored arm on
+    # the primary's model and effort is its twin: the implementation is built to pass a suite
+    # like its own.
+    paths = {agent_id(p): p for session in sessions for p in glob.glob(os.path.join(
+        glob.escape(ctx.transcripts), "*", session, "subagents", "agent-*.jsonl"))}
+
+    def is_shadow(agent):       # of this slice or any other: its first message names an export
+        with open(paths[agent], errors="replace") as fh:
+            return ctx.cache in fh.readline(400000)
+
+    primary = next((r for r in sorted(priced.values(), key=lambda r: r["started"] or "")
+                    if r["role"] == "tester" and r["agent_id"] in paths and not is_shadow(r["agent_id"])
+                    and (epoch(r["started"]) or 0) >= (epoch(manifest["planned"]) or 0) - 120), None)
+    if primary:
+        # The primary is not scored; a primary that read a shadow's export is still recorded,
+        # because the implementation is then built against tests it should never have seen.
+        seen = scan_transcript(paths[primary["agent_id"]])[0]
+        runs.append({"kind": "run", "slice": slice_, "label": "primary", "arm": "primary",
+                     "role": "primary", "twin": False, "leak": False,
+                     "status": "contaminated" if any(ctx.cache in s for s in seen) else "ok",
+                     "agent_id": primary["agent_id"], "tool_use_id": primary["tool_use_id"],
+                     "model_observed": primary["model"], "effort_observed": primary["effort"],
+                     "cli_version": primary["version"], "started": primary["started"],
+                     "duration_s": primary["duration_s"], "calls": primary["calls"],
+                     "tokens": primary["tokens"], "cost_usd": primary["cost_usd"]})
+        for row in runs:
+            entry = manifest["labels"].get(row["label"])
+            row["twin"] = bool(entry and entry["role"] == "shadow" and entry["model"] in (primary["model"] or "")
+                               and entry["effort"] == primary["effort"])
+    append(ctx, runs + claims)
+    removed = 0
+    for entry in manifest["labels"].values():
+        root = entry["export"]
+        # Only what the manifest registered, and only under this slice's cache directory.
+        if os.path.dirname(root) == os.path.join(ctx.cache, slice_) and os.path.isdir(root):
+            shutil.rmtree(root)
+            removed += 1
+    manifest["collected"] = True
+    write_json(ctx.manifest_path(slice_), manifest)
+    tally = {}
+    for row in runs:
+        if row["role"] in SHADOW_ROLES:
+            tally[row["status"]] = tally.get(row["status"], 0) + 1
+    print("AB-COLLECTED %s: %s; %d export(s) removed" % (
+        slice_, ", ".join("%d %s" % (n, s) for s, n in sorted(tally.items())) or "no runs", removed))
+    limit = int(ctx.cfg.get("claims_digest_limit", 8))
+    ordered = sorted(claims, key=lambda c: c["claim_id"])
+    for claim in ordered[:limit]:
+        print("  claim %s [%s] %s — %s" % (claim["claim_id"], claim["type"], claim["where"], claim["text"]))
+    if ordered:
+        print("A claim is advisory. Act on one only through the normal route, with the trailer "
+              "`AB-Claim: <id>` on the commit; a claim alone never justifies a park.")
+
+
+# --------------------------------------------------------------------------- replay
+def git_scratch(ctx, *args):
+    return git(None, "--git-dir", common_dir(ctx.game), "--work-tree", ctx.scratch, *args,
+               env={"GIT_INDEX_FILE": os.path.join(ctx.cache, "scratch.index")}, cwd=ctx.scratch)
+
+
+def checkout(ctx, sha):
+    """Make the scratch directory the tree of `sha`. Files git does not track there (installed
+    packages, build output) stay, so one directory serves every replay."""
+    os.makedirs(ctx.scratch, exist_ok=True)
+    git_scratch(ctx, "read-tree", "--reset", "-u", sha)
+
+
+def overlay(ctx, ref, files):
+    for path in files:
+        dest = os.path.join(ctx.scratch, path)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        blob = subprocess.run(["git", "-C", ctx.game, "show", "%s:%s" % (ref, path)],
+                              capture_output=True, check=True).stdout
+        with open(dest, "wb") as fh:
+            fh.write(blob)
+
+
+def clear_overlay(ctx, snap_sha, files):
+    """Put every overlaid path back to what the snapshot holds there, or remove it."""
+    for path in files:
+        dest = os.path.join(ctx.scratch, path)
+        blob = subprocess.run(["git", "-C", ctx.game, "show", "%s:%s" % (snap_sha, path)], capture_output=True)
+        if blob.returncode == 0:
+            with open(dest, "wb") as fh:
+                fh.write(blob.stdout)
+        else:
+            with contextlib.suppress(OSError):
+                os.unlink(dest)
+
+
+def crate_of(ctx, path):
+    """The cargo package a file belongs to: the `name` of the nearest Cargo.toml above it."""
+    here = os.path.dirname(path)
+    while True:
+        try:
+            with open(os.path.join(ctx.scratch, here, "Cargo.toml")) as fh:
+                m = re.search(r'^\[package\][^\[]*?^name\s*=\s*"([^"]+)"', fh.read(), re.M | re.S)
+            if m:
+                return m.group(1)
+        except OSError:
+            pass
+        if not here:
+            return None
+        here = os.path.dirname(here)
+
+
+def read_junit(path):
+    """[(classname, name, result, milliseconds, failure text)] of a junit file; [] when absent."""
+    try:
+        root = ET.parse(path).getroot()
+    except (OSError, ET.ParseError):
+        return []
+    out = []
+    for case in root.iter("testcase"):
+        bad = next((c for c in case if c.tag in ("failure", "error")), None)
+        skipped = any(c.tag == "skipped" for c in case)
+        try:
+            ms = int(float(case.get("time") or 0) * 1000)
+        except ValueError:
+            ms = 0
+        text = ""
+        if bad is not None:
+            text = ((bad.get("message") or "") + "\n" + (bad.text or "")).strip()[:4000]
+        out.append((case.get("classname") or "", case.get("name") or "",
+                    "fail" if bad is not None else "not-run" if skipped else "pass", ms, text))
+    return out
+
+
+def run_runner(ctx, runner, files, names, budget):
+    """Run one runner over `files` in the scratch directory. (junit cases, compiled, wall)."""
+    cwd = os.path.join(ctx.scratch, runner.get("cwd", ""))
+    junit = os.path.join(ctx.cache, "junit.xml")
+    # A runner that writes its report to a path of its own names it in `junit`.
+    out_junit = os.path.join(ctx.scratch, runner.get("junit", junit).replace(
+        "{target}", os.path.join(ctx.cache, "target")))
+    with contextlib.suppress(OSError):
+        os.unlink(out_junit)
+    rel = [os.path.relpath(os.path.join(ctx.scratch, f), cwd) for f in files]
+    crates = sorted({c for c in (crate_of(ctx, f) for f in files) if c})
+    argv = []
+    for token in runner["cmd"]:
+        if token == "{files}":
+            argv += rel
+        elif token == "{packages}":
+            argv += [x for c in crates for x in ("-p", c)]
+        else:
+            argv.append(token.replace("{junit}", junit).replace("{tool}", ctx.mem)
+                        .replace("{names}", "|".join(re.escape(n) for n in sorted(set(names)))))
+    env = dict(os.environ, CARGO_TARGET_DIR=os.path.join(ctx.cache, "target"))
+    marker = runner.get("setup_if_missing")
+    if marker and not os.path.exists(os.path.join(cwd, marker)):
+        for setup in runner.get("setup", []):
+            run_cmd(setup, cwd, env, budget)
+    rc, timed_out, wall, _ = run_cmd(argv, cwd, env, min(budget, runner.get("timeout_s", 1200)))
+    cases = [] if timed_out else read_junit(out_junit)
+    return cases, bool(cases) or rc == 0, timed_out, wall
+
+
+def run_suite(ctx, snap_sha, ref, files, only=None, budget=3600):
+    """Replay one arm's test files against the tree checked out in the scratch directory.
+    {test id: (result, criterion tag, milliseconds, failure text)}.
+
+    A runner that exits non-zero without a report did not build: its files are then run one at
+    a time, so one file that does not compile is charged alone."""
+    results = {}
+    declared = {}
+    for path in files:
+        text = git(ctx.game, "show", "%s:%s" % (ref, path))
+        declared[path] = [(n, tag) for n, tag in tests_in(ctx, path, text)
+                          if only is None or "%s::%s" % (path, n) in only]
+    start = time.time()
+
+    def record(path, cases, compiled, timed_out):
+        stem = os.path.splitext(os.path.basename(path))[0]
+        for name, tag in declared[path]:
+            hit = next((c for c in cases if stem in c[0] + " " + c[1]
+                        and (c[1] == name or c[1].endswith("::" + name) or c[1].endswith(" > " + name))), None)
+            if hit:
+                results["%s::%s" % (path, name)] = (hit[2], tag, hit[3], hit[4])
+            else:
+                results["%s::%s" % (path, name)] = (
+                    "not-run" if compiled or timed_out else "no-compile", tag, 0, "")
+
+    todo = [p for p in files if declared[p]]
+    for runner in ctx.cfg.get("runners", []):
+        mine = [p for p in todo if re.search(runner["match"], p)
+                and not (runner.get("exclude") and re.search(runner["exclude"], p))]
+        todo = [p for p in todo if p not in mine]
+        if not mine:
+            continue
+        groups = [mine]
+        while groups:
+            group = groups.pop(0)
+            left = budget - (time.time() - start)
+            if left <= 0:
+                for path in group:
+                    record(path, [], True, True)
+                continue
+            overlay(ctx, ref, group)
+            try:
+                names = [n for p in group for n, _ in declared[p]]
+                cases, compiled, timed_out, _ = run_runner(ctx, runner, group, names, left)
+            finally:
+                clear_overlay(ctx, snap_sha, group)
+            if not compiled and not timed_out and len(group) > 1:
+                groups += [[p] for p in group]
+                continue
+            for path in group:
+                record(path, cases, compiled, timed_out)
+    for path in todo:        # no runner executes this kind of file
+        record(path, [], True, False)
+    return results
+
+
+def snaps_of(rows, slice_):
+    return {r["name"]: r["sha"] for r in of(rows, "snap", slice_)}
+
+
+def ok_runs(rows, slice_):
+    return [r for r in of(rows, "run", slice_)
+            if r.get("role") in SHADOW_ROLES and r.get("status") == "ok" and r.get("tests_ref")]
+
+
+def result_table(rows, slice_):
+    """{(label, test id): {snap: [result of run 1, run 2, ...]}}"""
+    table = {}
+    for row in sorted(of(rows, "exec", slice_), key=lambda r: r.get("run_n", 1)):
+        table.setdefault((row["label"], row["test_id"]), {}).setdefault(row["snap"], []).append(row["result"])
+    return table
+
+
+def settled(results):
+    """One result for a snapshot: the shared result of its runs, `flaky` when they disagree."""
+    if not results:
+        return None
+    return results[0] if len(set(results)) == 1 else "flaky"
+
+
+def game_diff(ctx, old, new):
+    return any(is_game_code(ctx, p) for _, p in changed_files(ctx.game, old, new))
+
+
+def replay(ctx, slice_, rows, only_snaps=None, budget=None):
+    """Run every (arm, snapshot, run) the ledger has no result for. Returns False when the
+    budget ran out first."""
+    snaps = snaps_of(rows, slice_)
+    done = {(r["label"], r["snap"], r.get("run_n", 1)) for r in of(rows, "exec", slice_)}
+    claimed = {}
+    for claim in of(rows, "claim", slice_):
+        if claim.get("type") == "base" and claim.get("test"):
+            claimed.setdefault(claim["label"], set()).add(claim["test"])
+    start = time.time()
+    complete = True
+    for snap in ("base", "g1", "g2", "m", "end"):
+        if snap not in snaps or (only_snaps and snap not in only_snaps):
+            continue
+        fresh = True
+        for run in ok_runs(rows, slice_):
+            label, ref, files = run["label"], run["tests_ref"], run.get("files", [])
+            only = None
+            if snap == "base":       # every red-phase test fails here; only a claimed one is evidence
+                names = claimed.get(label)
+                if not names:
+                    continue
+                only = {"%s::%s" % (p, n) for p in files
+                        for n, _ in tests_in(ctx, p, git(ctx.game, "show", "%s:%s" % (ref, p))) if n in names}
+            for run_n in ((1, 2) if snap == "m" else (1,)):
+                if (label, snap, run_n) in done:
+                    continue
+                left = None if budget is None else budget - (time.time() - start)
+                if left is not None and left <= 0:
+                    complete = False
+                    continue
+                if fresh:
+                    checkout(ctx, snaps[snap])
+                    fresh = False
+                results = run_suite(ctx, snaps[snap], ref, files, only, left if left is not None else 3600)
+                append(ctx, [{"kind": "exec", "slice": slice_, "label": label, "snap": snap,
+                              "test_id": test, "criterion_tag": tag, "result": result,
+                              "runtime_ms": ms, "run_n": run_n, "ported": False}
+                             for test, (result, tag, ms, _) in sorted(results.items())])
+                fails = {t: r[3] for t, r in results.items() if r[0] == "fail"}
+                if fails:
+                    write_json(os.path.join(ctx.side_of(slice_), "fail", "%s.%s.%d.json" % (label, snap, run_n)), fails)
+    return complete
+
+
+def imports(text, stem):
+    """Whether a source text names `stem` in an import, use or mod line."""
+    return any(re.search(r"\b%s\b" % re.escape(stem), line)
+               for line in text.split("\n")
+               if re.match(r"\s*(pub(\([a-z]+\))?\s+)?(use|mod|import|export)\b|.*\brequire\(", line))
+
+
+def claim_scope(ctx, slice_, snaps, where):
+    """`in` when the file a base claim names is one the slice's diff touches or one a touched
+    file imports; else `out`."""
+    path = where.rsplit(":", 1)[0] if re.search(r":\d+$", where) else where
+    if "m" not in snaps:
+        return "out"
+    touched = [p for _, p in changed_files(ctx.game, snaps["base"], snaps["m"])]
+    if path in touched:
+        return "in"
+    stem = os.path.splitext(os.path.basename(path))[0]
+    if stem in ("mod", "lib", "index", "main"):
+        stem = os.path.basename(os.path.dirname(path))
+    for other in touched:
+        text = git(ctx.game, "show", "%s:%s" % (snaps["m"], other), check=False)
+        if stem and imports(text, stem):
+            return "in"
+    return "out"
+
+
+def claim_commits(ctx, rows, slice_, snaps):
+    """{claim id: sha} of commits whose `AB-Claim:` trailer names a claim and which change a file
+    that counts: non-test game code in the game repo; the spec corpus, a gates file or
+    DECISIONS.md in the harness repo."""
+    out = {}
+    assigned = of(rows, "assignment", slice_)
+    since = assigned[0]["ts"] if assigned else "1970-01-01T00:00:00Z"
+    last = snaps.get("end") or snaps.get("m")
+    sources = []
+    if last:
+        sources.append((ctx.game, ["%s..%s" % (snaps["base"], last)], lambda p: is_game_code(ctx, p)))
+    harness = ctx.cfg.get("harness_repo")
+    if harness and os.path.isdir(harness):
+        counts = ctx.cfg.get("spec_paths", r"^(specs/|memory/projects/gates/|docs/DECISIONS\.md$)")
+        sources.append((harness, ["--since=" + since, "HEAD"], lambda p: bool(re.search(counts, p))))
+    for repo, span, counted in sources:
+        log = git(repo, "log", "--format=%H%x00%B%x01", *span, check=False)
+        for entry in log.split("\x01"):
+            sha, _, body = entry.strip().partition("\x00")
+            for claim in re.findall(r"^AB-Claim:\s*(\S+)", body, re.M):
+                files = git(repo, "show", "--name-only", "--format=", sha, check=False).split()
+                if any(counted(p) for p in files):
+                    out.setdefault(claim, sha)
+    return out
+
+
+def derive(ctx, slice_, rows):
+    """The candidates the recorded results support, as ledger rows (without those unchanged).
+
+      lens-caught  fails at g1, passes at g2 (at m when no g2 was recorded), game code changed
+      escape       fails at g2, passes at m or at end, game code changed between
+      base         a claimed test that fails at base and passes at m or at end, where game-code
+                   lines that existed at base changed
+      spec         a spec claim that a counted commit names in an `AB-Claim:` trailer
+      open-fail    still failing at m (both runs)
+    """
+    snaps = snaps_of(rows, slice_)
+    table = result_table(rows, slice_)
+    claims = of(rows, "claim", slice_)
+    handed = {(r["label"], r["test_id"]) for r in of(rows, "handoff", slice_)}
+    found = []
+
+    def add(kind, label, key, snap_fail, snap_pass, scope="in"):
+        diff = bool(snap_fail and snap_pass and game_diff(ctx, snaps[snap_fail], snaps[snap_pass]))
+        found.append({"kind": "candidate", "slice": slice_, "type": kind, "label": label,
+                      "candidate_id": "k" + sha256("%s|%s|%s" % (slice_, label, key))[:10],
+                      ("claim_id" if kind == "spec" else "test_id"): key,
+                      "snap_fail": snap_fail, "snap_pass": snap_pass, "game_diff": diff,
+                      "scope": scope, "handed_in_session": (label, key) in handed})
+
+    claimed = {}
+    for claim in claims:
+        if claim["type"] == "base" and claim.get("test"):
+            claimed[(claim["label"], claim["test"])] = claim
+    for (label, test), by_snap in sorted(table.items()):
+        at = {snap: settled(by_snap.get(snap)) for snap in ("base", "g1", "g2", "m", "end")}
+        if at["m"] == "flaky":       # its flips say nothing about the code
+            continue
+        fixed = "m" if at["m"] == "pass" else "end" if at["end"] == "pass" else None
+        claim = claimed.get((label, test.rsplit("::", 1)[-1]))
+        if claim and at["base"] == "fail" and fixed:
+            numstat = git(ctx.game, "diff", "--numstat", "--no-renames", snaps["base"], snaps[fixed])
+            existing = any(l.split("\t")[1] not in ("0", "-") and is_game_code(ctx, l.split("\t")[2])
+                           for l in numstat.splitlines() if l.count("\t") == 2)
+            if existing:
+                add("base", label, test, "base", fixed, claim_scope(ctx, slice_, snaps, claim.get("where", "")))
+                continue
+        if at["g1"] == "fail" and at["g2"] == "pass":
+            add("lens-caught", label, test, "g1", "g2")
+        elif at["g1"] == "fail" and at["g2"] is None and at["m"] == "pass":
+            add("lens-caught", label, test, "g1", "m")
+        elif at["g2"] == "fail" and fixed:
+            add("escape", label, test, "g2", fixed)
+        elif at["m"] == "fail" and at["end"] == "pass":
+            add("escape", label, test, "m", "end")
+        elif at["m"] == "fail":
+            add("open-fail", label, test, "m", None)
+    # A flip with no game-code change between the two snapshots is not evidence of a defect.
+    found = [c for c in found if c["type"] == "open-fail" or c["game_diff"]]
+    commits = claim_commits(ctx, rows, slice_, snaps) if any(c["type"] == "spec" for c in claims) else {}
+    for claim in claims:
+        if claim["type"] == "spec" and claim["claim_id"] in commits:
+            add("spec", claim["label"], claim["claim_id"], None, None)
+            found[-1]["fix"] = commits[claim["claim_id"]]
+    known = {(r["label"], r.get("test_id") or r.get("claim_id")): r for r in of(rows, "candidate", slice_)}
+    fresh = []
+    for cand in found:
+        old = known.get((cand["label"], cand.get("test_id") or cand.get("claim_id")))
+        if not old or any(old.get(k) != v for k, v in cand.items()):
+            fresh.append(cand)
+    return fresh
+
+
+def quality(ctx, slice_, rows):
+    """One mechanical quality row per arm that has results at m."""
+    snaps = snaps_of(rows, slice_)
+    table = result_table(rows, slice_)
+    bloat = ctx.cfg.get("bloat", {})
+    per_line = bloat.get("tokens_per_line", 0) * (
+        bloat.get("fresh_reads", 0) * bloat.get("fresh_usd_per_mtok", 0)
+        + bloat.get("cached_turns", 0) * bloat.get("cached_usd_per_mtok", 0)) / 1e6
+    spec_diff = None
+    out = []
+    for run in ok_runs(rows, slice_):
+        label = run["label"]
+        mine = {t: s for (l, t), s in table.items() if l == label}
+        if not any("m" in s for s in mine.values()):
+            continue
+        first = "g1" if "g1" in snaps else "m"
+        broken = {t.rsplit("::", 1)[0] for t, s in mine.items() if "no-compile" in s.get(first, [])}
+        brittle = 0
+        for test, by_snap in mine.items():
+            if settled(by_snap.get("m")) == "pass" and settled(by_snap.get("end")) in ("fail", "no-compile"):
+                tag = next((r["criterion_tag"] for r in of(rows, "exec", slice_)
+                            if r["label"] == label and r["test_id"] == test), "")
+                if spec_diff is None:
+                    spec_diff = spec_changes(ctx, rows, slice_)
+                if not tag or not re.search(r"\b%s\b" % re.escape(tag), spec_diff):
+                    brittle += 1
+        asserts = {}
+        for path in run.get("files", []):
+            for line in git(ctx.game, "show", "%s:%s" % (run["tests_ref"], path), check=False).split("\n"):
+                norm = " ".join(line.split())
+                if re.search(r"\bassert|\bexpect\(", norm):
+                    asserts[norm] = asserts.get(norm, 0) + 1
+        tags = {r["criterion_tag"] for r in of(rows, "exec", slice_) if r["label"] == label and r["criterion_tag"]}
+        loc = run.get("test_loc", 0)
+        out.append({"kind": "quality", "slice": slice_, "label": label,
+                    "no_compile_files": len(broken),
+                    "flaky": sum(1 for s in mine.values() if settled(s.get("m")) == "flaky"),
+                    "brittle": brittle, "test_loc": loc, "tests": run.get("tests", 0),
+                    "loc_per_criterion": round(loc / max(1, len(tags)), 2),
+                    "dup_assert_lines": sum(n - 1 for n in asserts.values()),
+                    "runtime_ms": sum(r["runtime_ms"] for r in of(rows, "exec", slice_)
+                                      if r["label"] == label and r["snap"] == "m" and r.get("run_n", 1) == 1),
+                    "bloat_usd": round(loc * per_line, 4)})
+    known = {r["label"]: r for r in of(rows, "quality", slice_)}
+    return [q for q in out if any(known.get(q["label"], {}).get(k) != v for k, v in q.items())]
+
+
+def spec_changes(ctx, rows, slice_):
+    """The text of every spec-corpus diff committed in the harness repo since the slice's m."""
+    stamp = next((r["ts"] for r in of(rows, "snap", slice_) if r["name"] == "m"), None)
+    harness = ctx.cfg.get("harness_repo")
+    if not stamp or not harness or not os.path.isdir(harness):
+        return ""
+    return git(harness, "log", "--since=" + stamp, "-p", "--format=", "--", "specs", check=False)
+
+
+def mutants(ctx, slice_, rows):
+    """The seeded-defect measure: mutate the lines the slice changed in matching files, once per
+    arm, with only that arm's tests that pass at m deciding what is caught. One wall budget
+    covers the slice; an arm it does not reach is recorded as `budget`."""
+    cfg = ctx.cfg.get("mutants", {})
+    snaps = snaps_of(rows, slice_)
+    if not cfg.get("enabled") or "m" not in snaps or "base" not in snaps:
+        return
+    paths = [p for s, p in changed_files(ctx.game, snaps["base"], snaps["m"])
+             if s != "D" and re.search(cfg["match"], p) and not is_test(ctx, p)]
+    if not paths:
+        return
+    done = {r["label"] for r in of(rows, "mutants", slice_)}
+    table = result_table(rows, slice_)
+    diff_file = os.path.join(ctx.cache, "mutants.diff")
+    out_dir = os.path.join(ctx.cache, "mutants-out")
+    start = time.time()
+    fresh = True
+    for run in ok_runs(rows, slice_):
+        label = run["label"]
+        if label in done or not any(l == label and "m" in s for (l, _), s in table.items()):
+            continue
+        row = {"kind": "mutants", "slice": slice_, "label": label, "generated": 0, "caught": 0,
+               "missed": 0, "unviable": 0, "timeouts": 0, "wall_s": 0, "status": "ok"}
+        files, names = [], []
+        for path in run.get("files", []):
+            mine = {t: settled(s.get("m")) for (l, t), s in table.items()
+                    if l == label and t.rsplit("::", 1)[0] == path}
+            if mine and all(r == "pass" for r in mine.values()):
+                files.append(path)
+                names += [t.rsplit("::", 1)[1] for t in mine]
+        left = cfg.get("wall_budget_s", 1800) - (time.time() - start)
+        if not files:
+            row["status"] = "no-tests"
+        elif left <= 0:
+            row["status"] = "budget"
+        else:
+            if fresh:
+                checkout(ctx, snaps["m"])
+                with open(diff_file, "w") as fh:
+                    fh.write(git(ctx.game, "diff", snaps["base"], snaps["m"], "--", *paths))
+                fresh = False
+            shutil.rmtree(out_dir, ignore_errors=True)
+            overlay(ctx, run["tests_ref"], files)
+            try:
+                crates = sorted({c for c in (crate_of(ctx, p) for p in paths) if c})
+                argv = []
+                for token in cfg["cmd"]:
+                    if token == "{packages}":
+                        argv += [x for c in crates for x in ("-p", c)]
+                    else:
+                        argv.append(token.replace("{diff}", diff_file).replace("{out}", out_dir)
+                                    .replace("{tool}", ctx.mem)
+                                    .replace("{names}", "|".join(re.escape(n) for n in sorted(set(names)))))
+                env = dict(os.environ, CARGO_TARGET_DIR=os.path.join(ctx.cache, "target"))
+                _, timed_out, wall, _ = run_cmd(argv, ctx.scratch, env, left)
+            finally:
+                clear_overlay(ctx, snaps["m"], files)
+            counts = {}
+            for key, name in (("caught", "caught.txt"), ("missed", "missed.txt"),
+                              ("unviable", "unviable.txt"), ("timeouts", "timeout.txt")):
+                try:
+                    with open(os.path.join(out_dir, "mutants.out", name)) as fh:
+                        counts[key] = sum(1 for line in fh if line.strip())
+                except OSError:
+                    pass
+            row["wall_s"] = round(wall)
+            if timed_out:
+                row["status"] = "budget"
+            elif len(counts) < 4:
+                row["status"] = "error"
+            else:
+                row.update(counts, generated=sum(counts.values()))
+        append(ctx, [row])
+
+
+def slice_row(ctx, slice_, rows):
+    """The slice's standing once it has an m snapshot: `scored` with all four scored arms valid,
+    `degraded` with two or three, `void` with fewer; the area its merged diff falls in; what the
+    experiment added to its cost."""
+    snaps = snaps_of(rows, slice_)
+    if "m" not in snaps:
+        return []
+    valid = [r["arm"] for r in ok_runs(rows, slice_) if r["role"] == "shadow"]
+    files = [p for _, p in changed_files(ctx.game, snaps["base"], snaps["m"])]
+    hit = [name for name, pattern in sorted(ctx.cfg.get("areas", {}).items())
+           if any(re.search(pattern, p) for p in files)]
+    row = {"kind": "slice", "slice": slice_, "arms_ok": valid,
+           "status": "void" if len(valid) < 2 else "degraded" if len(valid) < 4 else "scored",
+           "area": hit[0] if len(hit) == 1 else "mixed" if hit else "other",
+           "added_cost_usd": round(sum(r.get("cost_usd") or 0.0 for r in of(rows, "run", slice_)
+                                       if r.get("role") in SHADOW_ROLES), 4),
+           "cumulative_added_usd": round(spent(rows), 4)}
+    old = (of(rows, "slice", slice_) or [{}])[-1]
+    return [] if all(old.get(k) == v for k, v in row.items()) else [row]
+
+
+@contextlib.contextmanager
+def score_lock(ctx):
+    os.makedirs(ctx.cache, exist_ok=True)
+    fd = os.open(os.path.join(ctx.cache, "score.lock"), os.O_WRONLY | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
+
+
+def cmd_score(ctx, args):
+    pos, opt = options(args, flags=("--end",))
+    slice_ = check_slice(pos[0] if pos else "")
+    if not ctx.manifest(slice_):
+        raise Skip("no-manifest")
+    with score_lock(ctx):
+        if opt.get("end"):
+            branch = ctx.cfg.get("default_branch", "master")
+            head = git(ctx.game, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/" + branch, check=False).strip() \
+                or git(ctx.game, "rev-parse", branch).strip()
+            record_snap(ctx, slice_, "end", head)
+        replay(ctx, slice_, read(ctx))
+        append(ctx, derive(ctx, slice_, read(ctx)))
+        append(ctx, quality(ctx, slice_, read(ctx)))
+        append(ctx, slice_row(ctx, slice_, read(ctx)))
+        mutants(ctx, slice_, read(ctx))
+    rows = read(ctx)
+    print("AB-SCORED %s: %d result(s), %d candidate(s)" % (
+        slice_, len(of(rows, "exec", slice_)),
+        len(latest(of(rows, "candidate", slice_), lambda r: (r["label"], r.get("test_id") or r.get("claim_id"))))))
+
+
+# --------------------------------------------------------------------------- status
+def cmd_status(ctx, args):
+    options(args)
+    rows = read(ctx)
+    print("tester-ab: %s; arm spend $%.2f of $%s (step down at $%s)" % (
+        "closed" if closed(rows) else "open", spent(rows), ctx.cfg.get("cap_arm_usd"), ctx.cfg.get("step_down_usd")))
+    registered = set()
+    for row in of(rows, "assignment"):
+        slice_ = row["slice"]
+        if row.get("skipped"):
+            print("  %-14s skipped: %s" % (slice_, row["skipped"]))
+            continue
+        manifest = ctx.manifest(slice_) or {}
+        if not manifest.get("collected"):
+            registered |= {e["export"] for e in manifest.get("labels", {}).values()}
+        runs = [r for r in of(rows, "run", slice_) if r.get("role") in SHADOW_ROLES]
+        print("  %-14s %s; runs ok %d of %d; snapshots %s; results %d; candidates %d" % (
+            slice_, "collected" if manifest.get("collected") else "planned",
+            sum(1 for r in runs if r["status"] == "ok"), len(row.get("arms_planned", [])),
+            ",".join(sorted(snaps_of(rows, slice_))) or "-", len(of(rows, "exec", slice_)),
+            len(of(rows, "candidate", slice_))))
+    for path in sorted(glob.glob(os.path.join(glob.escape(ctx.cache), "*", "*"))):
+        if os.path.isdir(path) and re.fullmatch(r"[0-9a-f]{16}", os.path.basename(path)) and path not in registered:
+            print("  stale export: %s" % path)
+
+
+COMMANDS = {"eligible": cmd_eligible, "plan": cmd_plan, "collect": cmd_collect,
+            "score": cmd_score, "status": cmd_status}
+
+
+def main(argv, mem=HERE):
+    """Every path returns 0: the experiment never fails the slice it rides on."""
+    try:
+        ctx = Ctx(mem)
+    except Exception as exc:
+        print("AB-SKIP config: %s" % str(exc)[:200])
+        return 0
+    if ctx.cfg.get("enabled") is not True:
+        print("AB-SKIP disabled")
+        return 0
+    command = COMMANDS.get(argv[0] if argv else "")
+    if not command:
+        print("AB-SKIP usage: mr-tester-ab %s ..." % " | ".join(sorted(COMMANDS)))
+        return 0
+    try:
+        command(ctx, argv[1:])
+    except Skip as skip:
+        print("AB-SKIP %s" % skip)
+    except Exception as exc:
+        print("AB-SKIP error in %s: %s: %s" % (argv[0], type(exc).__name__, str(exc)[:300]))
+    return 0
+
+
+# SELFTEST-BEGIN
+# --------------------------------------------------------------------------- selftest
+# Every fixture runs in a temporary directory: a copy of this tool and of mr-cost-sum as the
+# MEM, a toy game repository, a toy test runner and transcripts written by the fixture.
+
+_TOY_RUNNER = r'''
+import os, sys
+from xml.sax.saxutils import quoteattr
+junit, files = sys.argv[1], sys.argv[2:]
+rules = dict(l.strip().split("=", 1) for l in open("game/rules.txt") if "=" in l)
+if any(l.startswith("BROKEN") for f in files for l in open(f)):
+    sys.exit(2)                                   # does not build: no report
+cases = []
+for f in files:
+    for line in open(f):
+        w = line.split()
+        if w[:1] == ["test"]:
+            k, v = w[2].split("=", 1)
+            cases.append((f, w[1], rules.get(k) == v, "expected %s=%s, got %s" % (k, v, rules.get(k))))
+        elif w[:1] == ["flaky"]:                  # passes on every other run
+            flip = ".toyflip-" + w[1]
+            ok = not os.path.exists(flip)
+            open(flip, "w").close() if ok else os.unlink(flip)
+            cases.append((f, w[1], ok, "flipped"))
+with open(junit, "w") as out:
+    out.write("<testsuite>")
+    for f, name, ok, why in cases:
+        out.write("<testcase classname=%s name=%s time=\"0.01\">" % (quoteattr(f), quoteattr(name)))
+        out.write("" if ok else "<failure message=%s>at %s</failure>" % (quoteattr(why), os.getcwd()))
+        out.write("</testcase>")
+    out.write("</testsuite>")
+sys.exit(0 if all(c[2] for c in cases) else 1)
+'''
+
+# One seeded defect per `key=value` line the diff adds; it is caught when a test that is in the
+# tree and named on the command line asserts that key.
+_TOY_MUTANTS = r'''
+import glob, os, sys, time
+diff, out, names = sys.argv[1], sys.argv[2], set(sys.argv[3].split("|"))
+if os.environ.get("TOY_MUTANTS_SLEEP") and not os.path.exists(diff + ".slept"):
+    open(diff + ".slept", "w").close()            # only the first run is slow
+    time.sleep(float(os.environ["TOY_MUTANTS_SLEEP"]))
+added = [l[1:].strip() for l in open(diff) if l.startswith("+") and not l.startswith("+++") and "=" in l]
+asserted = set()
+for f in glob.glob("tests/*.toy"):
+    for line in open(f):
+        w = line.split()
+        if w[:1] == ["test"] and w[1] in names:
+            asserted.add(w[2])
+os.makedirs(os.path.join(out, "mutants.out"))
+lists = {"caught": [a for a in added if a in asserted], "missed": [a for a in added if a not in asserted],
+         "unviable": [], "timeout": []}
+for name, lines in lists.items():
+    with open(os.path.join(out, "mutants.out", name + ".txt"), "w") as fh:
+        fh.write("".join(l + "\n" for l in lines))
+'''
+
+_ARMS = [{"arm": "S-med", "model": "sonnet", "effort": "medium", "role": "shadow"},
+         {"arm": "S-high", "model": "sonnet", "effort": "high", "role": "shadow"},
+         {"arm": "O-med", "model": "opus", "effort": "medium", "role": "shadow"},
+         {"arm": "O-high", "model": "opus", "effort": "high", "role": "shadow"},
+         {"arm": "S-med-r", "model": "sonnet", "effort": "medium", "role": "replicate"}]
+_MODEL_ID = {"sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
+
+
+class _Check:
+    def __init__(self):
+        self.n = 0
+        self.fails = 0
+
+    def __call__(self, name, ok, detail=""):
+        self.n += 1
+        if not ok:
+            self.fails += 1
+            print("FAIL %s %s" % (name, str(detail)[:600]))
+
+
+class _Box:
+    """A sandbox: MEM, toy game repo with a worktree per slice, harness repo, transcripts."""
+
+    def __init__(self, tmp, **over):
+        self.tmp = tmp
+        self.mem = os.path.join(tmp, "mem")
+        self.game = os.path.join(tmp, "game")
+        self.harness = os.path.join(tmp, "harness")
+        self.cache = os.path.join(tmp, "cache")
+        self.tr = os.path.join(tmp, "transcripts")
+        self.session = "0a0a0a0a-0000-4000-8000-000000000001"
+        self.agents = 0
+        os.makedirs(self.mem)
+        for name in ("mr-tester-ab", "mr-cost-sum"):
+            shutil.copy2(os.path.join(HERE, name), os.path.join(self.mem, name))
+        toy = os.path.join(tmp, "toy")
+        os.makedirs(toy)
+        for name, body in (("run.py", _TOY_RUNNER), ("mutants.py", _TOY_MUTANTS)):
+            with open(os.path.join(toy, name), "w") as fh:
+                fh.write(body)
+        self.cfg = {
+            "v": 1, "enabled": True, "game_repo": self.game, "harness_repo": self.harness,
+            "worktree_root": ".claude/worktrees", "default_branch": "master",
+            "cache_root": self.cache, "transcripts_root": self.tr, "arms": _ARMS,
+            "step_down_arms": ["S-med", "O-med"], "prefixes": ["np-", "eo-"],
+            "required_slices": ["LP1"], "exclude_slices": ["np-x"],
+            "cap_arm_usd": 500, "step_down_usd": 400, "cap_bump_usd": 30, "claims_digest_limit": 2,
+            "test_paths": ["^tests/"], "game_code": "^(game|client)/",
+            "spec_paths": "^specs/", "areas": {"rust": "^game/", "client": "^client/"},
+            "test_patterns": [{"match": r"\.toy$", "test": r"^(?:test|flaky)\s+(\S+)"}],
+            "runners": [{"name": "toy", "match": r"\.toy$", "cwd": "", "timeout_s": 60,
+                         "cmd": ["/usr/bin/python3", os.path.join(toy, "run.py"), "{junit}", "{files}"]}],
+            "mutants": {"enabled": True, "match": "^game/", "wall_budget_s": 60,
+                        "cmd": ["/usr/bin/python3", os.path.join(toy, "mutants.py"), "{diff}", "{out}", "{names}"]},
+            "bloat": {"tokens_per_line": 12, "fresh_reads": 4, "fresh_usd_per_mtok": 4,
+                      "cached_turns": 150, "cached_usd_per_mtok": 0.2}}
+        self.cfg.update(over)
+        self.write_cfg()
+        for repo in (self.game, self.harness):
+            os.makedirs(repo)
+            git(repo, "init", "-q", "-b", "master")
+        self.commit(self.game, "initial", {
+            "game/rules.txt": "hp=10\nold=bug\nmp=4\n", "game/helper.rs": "pub fn help() {}\n",
+            "game/other.rs": "pub fn other() {}\n", "client/ui.txt": "title=Realm\n",
+            "docs/note.md": "note\n", ".gitignore": "ignored/\n",
+            ".claude/agents/tester.md": "tester\n"})
+        self.commit(self.harness, "initial", {"specs/m.spec.md": "C1 C2 C3\n"})
+
+    def write_cfg(self):
+        with open(os.path.join(self.mem, "mr-tester-ab.config.json"), "w") as fh:
+            json.dump(self.cfg, fh)
+
+    def ctx(self):
+        return Ctx(self.mem)
+
+    def run(self, *argv):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = main(list(argv), mem=self.mem)
+        return buf.getvalue() if rc == 0 else "RC=%s %s" % (rc, buf.getvalue())
+
+    def rows(self, kind=None, slice_=None):
+        rows = read(self.ctx())
+        return rows if kind is None else of(rows, kind, slice_)
+
+    def commit(self, repo, message, files):
+        """Write files (None deletes) and commit. Returns the sha."""
+        for path, body in files.items():
+            dest = os.path.join(repo, path)
+            if body is None:
+                os.unlink(dest)
+                continue
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with open(dest, "w") as fh:
+                fh.write(body)
+        git(repo, "add", "-A")
+        git(repo, *_GIT_ID, "commit", "-q", "--allow-empty", "-m", message)
+        return git(repo, "rev-parse", "HEAD").strip()
+
+    def worktree(self, slice_):
+        path = os.path.join(self.game, ".claude", "worktrees", slice_)
+        git(self.game, "worktree", "add", "-q", "-b", "slice/" + slice_, path, "master")
+        return path
+
+    def prompt(self, slice_, worktree, contracts=True):
+        path = os.path.join(self.tmp, "prompt-%s.md" % slice_)
+        with open(path, "w") as fh:
+            fh.write("Write the red tests for %s in %s.\n" % (slice_, worktree))
+            if contracts:
+                fh.write("\n## Contracts\n\nrules: key=value lines in game/rules.txt\n")
+        return path
+
+    def labels(self, slice_):
+        """{arm: (label, export)} of a planned slice."""
+        manifest = self.ctx().manifest(slice_)
+        return {e["arm"]: (label, e["export"]) for label, e in manifest["labels"].items()}
+
+    def transcript(self, first, model, effort, inputs=(), final="done", role="tester", tokens=1000000):
+        """Write one subagent transcript. `tokens` input tokens: $2.00 on sonnet, $4.00 on opus."""
+        self.agents += 1
+        agent = "f%03d" % self.agents
+        sub = os.path.join(self.tr, "proj", self.session, "subagents")
+        os.makedirs(sub, exist_ok=True)
+        stamp = lambda s: (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=s + self.agents)
+                           ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        content = [{"type": "tool_use", "id": "t%d" % i, "name": name, "input": inp}
+                   for i, (name, inp) in enumerate(inputs)]
+        events = [
+            {"type": "user", "timestamp": stamp(0), "message": {"role": "user", "content": first}},
+            {"type": "assistant", "timestamp": stamp(1), "effort": effort, "version": "9.9.9",
+             "message": {"id": "m1", "model": _MODEL_ID.get(model, model), "content": content,
+                         "usage": {"input_tokens": tokens}}},
+            {"type": "user", "timestamp": stamp(2), "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "t%d" % i, "is_error": name == "Bash"}
+                for i, (name, _) in enumerate(inputs)]}},
+            {"type": "assistant", "timestamp": stamp(3), "effort": effort, "version": "9.9.9",
+             "message": {"id": "m2", "model": _MODEL_ID.get(model, model),
+                         "content": [{"type": "text", "text": final}], "usage": {}}}]
+        with open(os.path.join(sub, "agent-%s.jsonl" % agent), "w") as fh:
+            fh.write("".join(json.dumps(e) + "\n" for e in events))
+        with open(os.path.join(sub, "agent-%s.meta.json" % agent), "w") as fh:
+            json.dump({"agentType": role, "description": "x", "toolUseId": "toolu_" + agent}, fh)
+        return agent
+
+    def shadow(self, slice_, arm, files, report="FINDINGS\nNONE\n", **how):
+        """Play one shadow tester: write its files and report into its export, and a transcript."""
+        label, root = self.labels(slice_)[arm]
+        for path, body in files.items():
+            dest = os.path.join(root, path)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with open(dest, "w") as fh:
+                fh.write(body)
+        if report is not None:
+            with open(os.path.join(root, REPORT_FILE), "w") as fh:
+                fh.write(report)
+        entry = self.ctx().arm(arm)
+        inputs = [("Read", {"file_path": os.path.join(root, PROMPT_FILE)}),
+                  ("Bash", {"command": "cargo test"})] + list(how.pop("inputs", ()))
+        how.setdefault("model", entry["model"])
+        how.setdefault("effort", entry["effort"])
+        return self.transcript("Your task is in %s/%s. Read it fully and follow it exactly." % (root, PROMPT_FILE),
+                               inputs=inputs, **how)
+
+
+def _toy(*tests):
+    """A toy test file: (name, key=value, criterion) triples; `flaky` and `BROKEN` verbatim."""
+    out = []
+    for test in tests:
+        if isinstance(test, str):
+            out.append(test)
+        else:
+            out += ["# criterion: %s" % test[2], "test %s %s" % (test[0], test[1])]
+    return "\n".join(out) + "\n"
+
+
+_T_ATK, _T_DEF, _T_SPD = ("t_atk", "atk=5", "C1"), ("t_def", "def=3", "C2"), ("t_spd", "spd=7", "C3")
+
+
+def _st_disabled(chk, tmp):
+    """With `enabled` anything but true, every entry point prints AB-SKIP and writes nothing."""
+    for value in (False, "true", 1, None):
+        box = _Box(os.path.join(tmp, "disabled-%r" % (value,)), enabled=value)
+        worktree = box.worktree("np-a")
+        before = sorted(os.listdir(box.mem))
+        refs = git(box.game, "for-each-ref")
+        outs = [box.run(*argv) for argv in (
+            ["eligible", "np-a"], ["plan", "np-a", "--prompt", box.prompt("np-a", worktree)],
+            ["collect", "np-a"], ["score", "np-a"], ["score", "np-a", "--end"], ["status"],
+            ["mark", "np-a"], ["escapes", "np-a"], ["finalize", "np-a"], ["judge-pack"],
+            ["judge-apply", "x.json"], ["report"], ["fix-cost", "f1", "3"], [], ["nonsense"])]
+        chk("disabled/%r/all-skip" % (value,), all(o == "AB-SKIP disabled\n" for o in outs), outs)
+        chk("disabled/%r/writes-nothing" % (value,), sorted(os.listdir(box.mem)) == before
+            and not os.path.exists(box.cache) and git(box.game, "for-each-ref") == refs,
+            sorted(os.listdir(box.mem)))
+    box = _Box(os.path.join(tmp, "no-config"))
+    os.unlink(os.path.join(box.mem, "mr-tester-ab.config.json"))
+    chk("disabled/missing-config-skips", box.run("status").startswith("AB-SKIP config:"), box.run("status"))
+
+
+def _st_plan(chk, tmp):
+    box = _Box(os.path.join(tmp, "plan"))
+    wt = box.worktree("np-a")
+    prompt = box.prompt("np-a", wt)
+    chk("plan/eligible-prefix", box.run("eligible", "np-a") == "yes 30\n", box.run("eligible", "np-a"))
+    chk("plan/eligible-required", box.run("eligible", "LP1", "project") == "yes 30\n")
+    chk("plan/eligible-harness-slice", box.run("eligible", "np-a", "harness") == "no not-a-game-slice\n")
+    chk("plan/ineligible-prefix", box.run("plan", "ts-9", "--prompt", prompt) == "AB-SKIP ineligible\n"
+        and box.run("eligible", "ts-9") == "no ineligible\n")
+    chk("plan/excluded", box.run("plan", "np-x", "--prompt", prompt) == "AB-SKIP excluded\n")
+    chk("plan/bad-slice-id", box.run("plan", "../np-a", "--prompt", prompt) == "AB-SKIP bad-slice-id\n")
+    os.environ["CLAUDE_CODE_SUBAGENT_MODEL"] = "sonnet"
+    try:
+        out = box.run("plan", "np-a", "--prompt", prompt)
+    finally:
+        del os.environ["CLAUDE_CODE_SUBAGENT_MODEL"]
+    chk("plan/subagent-model-override-skips", out.startswith("AB-SKIP CLAUDE_CODE_SUBAGENT_MODEL")
+        and not box.rows() and not os.path.exists(box.cache), out)
+    # A prompt without the contracts section is asked for once, then the slice is skipped.
+    wt_b = box.worktree("np-b")
+    bare = box.prompt("np-b", wt_b, contracts=False)
+    first, second, third = (box.run("plan", "np-b", "--prompt", bare) for _ in range(3))
+    chk("plan/contracts-asked-once", first.startswith("AB-NEED np-b") and "## Contracts" in first, first)
+    chk("plan/contracts-then-skip", second == "AB-SKIP prompt-incomplete\n" and third == second
+        and [r.get("skipped") for r in box.rows("assignment", "np-b")] == ["prompt-incomplete"]
+        and not os.path.exists(os.path.join(box.cache, "np-b")), (second, third))
+    # The plan proper.
+    with open(os.path.join(wt, "untracked.md"), "w") as fh:
+        fh.write("the builder's plan\n")
+    os.makedirs(os.path.join(wt, "ignored"))
+    with open(os.path.join(wt, "ignored", "junk"), "w") as fh:
+        fh.write("x")
+    out = box.run("plan", "np-a", "--prompt", prompt, "--tier", "routine", "--milestone", "np")
+    calls = [l for l in out.splitlines() if "Agent(" in l]
+    manifest = box.ctx().manifest("np-a") or {"labels": {}}
+    chk("plan/prints-primary-and-five-shadows", out.startswith("AB-PLAN np-a: issue these 6 Agent calls")
+        and len(calls) == 5 and all('subagent_type="tester"' in c for c in calls)
+        and out.splitlines()[1].startswith("1. your own tester call"), out)
+    chk("plan/models-and-efforts", sorted(re.findall(r'model="(\w+)", effort="(\w+)"', out)) == sorted(
+        (a["model"], a["effort"]) for a in _ARMS), calls)
+    chk("plan/output-hides-arms", not any(a["arm"] in out for a in _ARMS)
+        and sorted(manifest["labels"]) == ["a1", "a2", "a3", "a4", "a5"]
+        and sorted(e["arm"] for e in manifest["labels"].values()) == sorted(a["arm"] for a in _ARMS), out)
+    chk("plan/label-order-is-fixed-per-slice",
+        {l: a["arm"] for l, a in assign("np-a", _ARMS).items()} == {l: e["arm"] for l, e in manifest["labels"].items()}
+        and assign("np-a", _ARMS) != assign("np-c", _ARMS) and assign("np-a", _ARMS) == assign("np-a", _ARMS[::-1]))
+    exports = [e["export"] for e in manifest["labels"].values()]
+    one = exports[0] if exports else ""
+    body = open(os.path.join(one, PROMPT_FILE)).read() if one else ""
+    chk("plan/export-is-a-plain-tree", len(set(exports)) == 5 and all(
+        os.path.isfile(os.path.join(e, "game", "rules.txt")) and not os.path.exists(os.path.join(e, ".git"))
+        and os.path.dirname(e) == os.path.join(box.cache, "np-a") for e in exports)
+        and one not in git(box.game, "worktree", "list"), exports)
+    chk("plan/export-has-untracked-not-ignored", os.path.isfile(os.path.join(one, "untracked.md"))
+        and not os.path.exists(os.path.join(one, "ignored")))
+    chk("plan/prompt-path-replaced-and-footer", wt not in body and "in %s.\n" % one in body
+        and "## Contracts" in body and "%s/REPORT.md" % one in body and "FINDINGS" in body
+        and body.startswith(open(prompt).read().replace(wt, one)), body[:300])
+    base = git(box.game, "rev-parse", "refs/mr-ab/np-a/base").strip()
+    assignment = box.rows("assignment", "np-a")
+    chk("plan/base-ref-and-rows", manifest.get("base") == base
+        and git(box.game, "show", base + ":untracked.md") == "the builder's plan\n"
+        and len(assignment) == 1 and assignment[0]["skipped"] is None
+        and assignment[0]["labels"] == {l: e["arm"] for l, e in manifest["labels"].items()}
+        and assignment[0]["tester_md_sha"] == hashlib.sha256(b"tester\n").hexdigest()
+        and [(r["name"], r["sha"]) for r in box.rows("snap", "np-a")] == [("base", base)], assignment)
+    # Idempotent: the same text, nothing new on disk or in the ledger.
+    n_rows, n_dirs = len(box.rows()), sorted(os.listdir(os.path.join(box.cache, "np-a")))
+    again = box.run("plan", "np-a", "--prompt", prompt)
+    chk("plan/idempotent", again == out and len(box.rows()) == n_rows
+        and sorted(os.listdir(os.path.join(box.cache, "np-a"))) == n_dirs, again)
+    # After a commit in the worktree (a red commit exists) no call is printed again.
+    box.commit(wt, "red tests", {"tests/primary.toy": _toy(_T_ATK)})
+    late = box.run("plan", "np-a", "--prompt", prompt)
+    chk("plan/no-relaunch-after-a-commit", late.startswith("AB-SKIP already-planned") and "Agent(" not in late, late)
+    # The cap: step down at $400, stop at $500.
+    ctx = box.ctx()
+    append(ctx, [{"kind": "run", "slice": "np-a", "role": "shadow", "cost_usd": 399.0},
+                 {"kind": "run", "slice": "np-a", "role": "primary", "cost_usd": 300.0}])
+    wt_c = box.worktree("np-c")
+    out_c = box.run("plan", "np-c", "--prompt", box.prompt("np-c", wt_c))
+    chk("cap/primary-spend-not-counted", len(re.findall(r"Agent\(", out_c)) == 5, out_c)
+    append(ctx, [{"kind": "run", "slice": "np-a", "role": "judge", "cost_usd": 1.0}])
+    wt_d = box.worktree("np-d")
+    out_d = box.run("plan", "np-d", "--prompt", box.prompt("np-d", wt_d))
+    chk("cap/step-down-at-400", sorted(re.findall(r'model="(\w+)", effort="(\w+)"', out_d))
+        == [("opus", "medium"), ("sonnet", "medium")]
+        and box.rows("assignment", "np-d")[0]["arms_planned"] == ["S-med", "O-med"], out_d)
+    append(ctx, [{"kind": "run", "slice": "np-a", "role": "replicate", "cost_usd": 100.0}])
+    wt_e = box.worktree("np-e")
+    out_e = box.run("plan", "np-e", "--prompt", box.prompt("np-e", wt_e))
+    chk("cap/skip-at-500", out_e == "AB-SKIP cap\n" and not box.rows("assignment", "np-e")
+        and not os.path.exists(os.path.join(box.cache, "np-e")), out_e)
+    append(ctx, [{"kind": "close", "slice": "-", "reason": "cap", "scored_slices": 2}])
+    chk("plan/closed", box.run("plan", "np-e", "--prompt", box.prompt("np-e", wt_e)) == "AB-SKIP closed\n"
+        and box.run("eligible", "np-e") == "no closed\n")
+
+
+def _st_collect(chk, tmp):
+    box = _Box(os.path.join(tmp, "collect"))
+    wt = box.worktree("np-a")
+    box.run("plan", "np-a", "--prompt", box.prompt("np-a", wt))
+    lab = box.labels("np-a")
+    other = lab["O-high"][1]
+    # One fault per arm.
+    box.shadow("np-a", "S-med", {"tests/x.toy": _toy(_T_ATK)},
+               inputs=[("Read", {"file_path": os.path.join(other, "tests", "y.toy")})])
+    box.shadow("np-a", "S-high", {"tests/x.toy": _toy(_T_ATK)},
+               inputs=[("Bash", {"command": "ls %s/tests" % wt})])
+    box.shadow("np-a", "O-med", {"tests/x.toy": _toy(_T_ATK)}, model="sonnet")
+    box.shadow("np-a", "O-high", {"tests/y.toy": _toy(_T_ATK)}, effort="medium")
+    box.shadow("np-a", "S-med-r", {"tests/x.toy": _toy(_T_ATK, _T_DEF), "game/rules.txt": "hp=99\n"},
+               report="notes\n\nFINDINGS\n- kind: base | test: t_old | where: game/rules.txt:2 | old is wrong\n"
+                      "- kind: spec | test: none | where: specs/m.spec.md:3 | C1 contradicts C2\n"
+                      "- kind: base | test: `t_c` | where: `game/x.rs:1` | third\n"
+                      "- kind: base | test: t_d | where: game/x.rs:9 | fourth is over the limit\n",
+               final="Here is my report: three findings")
+    stray = os.path.join(box.cache, "np-a", "0123456789abcdef")
+    os.makedirs(stray)
+    out = box.run("collect", "np-a")
+    runs = {r["arm"]: r for r in box.rows("run", "np-a")}
+    status = {arm: r["status"] for arm, r in runs.items()}
+    chk("collect/contamination-other-export", status.get("S-med") == "contaminated", status)
+    chk("collect/contamination-worktree", status.get("S-high") == "contaminated", status)
+    chk("collect/arm-mismatch-model", status.get("O-med") == "arm-mismatch"
+        and runs["O-med"]["model_observed"] == "claude-sonnet-5-5", status)
+    chk("collect/arm-mismatch-effort", status.get("O-high") == "arm-mismatch"
+        and runs["O-high"]["effort_observed"] == "medium", status)
+    rep = runs.get("S-med-r", {})
+    chk("collect/leak-flagged", rep.get("leak") is True and rep.get("status") == "ok"
+        and runs["S-med"]["leak"] is False, rep)
+    chk("collect/cost-and-run-fields", rep.get("cost_usd") == 2.0 and runs["O-high"]["cost_usd"] == 4.0
+        and rep.get("calls") == 2 and rep.get("bash_blocked") == 1 and rep.get("cli_version") == "9.9.9"
+        and rep.get("role") == "replicate" and rep.get("tokens", {}).get("in") == 1000000
+        and rep.get("session") == box.session and rep.get("tool_use_id", "").startswith("toolu_f"), rep)
+    ref = git(box.game, "rev-parse", "--verify", "--quiet", "refs/mr-ab/np-a/" + lab["S-med-r"][0], check=False).strip()
+    tree = git(box.game, "ls-tree", "-r", "--name-only", ref).split() if ref else []
+    chk("collect/tests-kept-under-a-ref", ref and rep.get("tests_ref") == ref and "tests/x.toy" in tree
+        and REPORT_FILE not in tree and PROMPT_FILE not in tree
+        and git(box.game, "show", ref + ":tests/x.toy") == _toy(_T_ATK, _T_DEF)
+        and git(box.game, "rev-parse", ref + "^").strip() == box.ctx().manifest("np-a")["base"], tree)
+    chk("collect/test-files-and-counts", rep.get("files") == ["tests/x.toy"]
+        and rep.get("non_test_files") == ["game/rules.txt"] and rep.get("tests") == 2
+        and rep.get("test_loc") == 4, rep)
+    chk("collect/removes-only-registered-exports", os.path.isdir(stray)
+        and sorted(os.listdir(os.path.join(box.cache, "np-a"))) == ["0123456789abcdef"]
+        and "5 export(s) removed" in out, os.listdir(os.path.join(box.cache, "np-a")))
+    chk("collect/status-lists-the-stale-export", "stale export: %s" % stray in box.run("status"), box.run("status"))
+    claims = box.rows("claim", "np-a")
+    chk("collect/claims-parsed-at-most-three", [(c["type"], c["test"], c["where"]) for c in claims] == [
+        ("base", "t_old", "game/rules.txt:2"), ("spec", "", "specs/m.spec.md:3"), ("base", "t_c", "game/x.rs:1")]
+        and all(c["label"] == lab["S-med-r"][0] and re.fullmatch(r"c[0-9a-f]{8}", c["claim_id"]) for c in claims),
+        claims)
+    digest = [l for l in out.splitlines() if l.startswith("  claim ")]
+    chk("collect/digest-capped-and-blind", len(digest) == 2 and "AB-Claim: <id>" in out
+        and not any(a["arm"] in out for a in _ARMS)
+        and not re.search(r"\ba[1-5]\b|sonnet|opus", out), out)
+    chk("collect/report-copied", open(os.path.join(box.mem, "tester-ab", "np-a",
+                                                   lab["S-med-r"][0] + ".report.md")).read().startswith("notes"))
+    chk("collect/only-once", box.run("collect", "np-a") == "AB-SKIP already-collected\n"
+        and len(box.rows("run", "np-a")) == 5)
+    chk("collect/no-manifest", box.run("collect", "np-z") == "AB-SKIP no-manifest\n")
+    # A shadow with no transcript failed; the primary is found and its twin flagged.
+    wt_b = box.worktree("eo-1")
+    box.run("plan", "eo-1", "--prompt", box.prompt("eo-1", wt_b))
+    lab_b = box.labels("eo-1")
+    for arm in ("S-med", "S-high", "O-med", "S-med-r"):
+        box.shadow("eo-1", arm, {"tests/x.toy": _toy(_T_ATK)})
+    primary = box.transcript("Write the red tests for eo-1 in %s." % wt_b, "opus", "medium",
+                             inputs=[("Read", {"file_path": os.path.join(lab_b["S-med"][1], "tests", "x.toy")})])
+    box.transcript("Review eo-1", "opus", "medium", role="reviewer")
+    box.run("collect", "eo-1")
+    runs = {r["arm"]: r for r in box.rows("run", "eo-1")}
+    chk("collect/missing-transcript-is-failed", runs["O-high"]["status"] == "failed"
+        and "cost_usd" not in runs["O-high"]
+        and [r["status"] for a, r in runs.items() if a not in ("O-high", "primary")] == ["ok"] * 4, runs["O-high"])
+    chk("collect/primary-recorded", runs.get("primary", {}).get("agent_id") == primary
+        and runs["primary"]["role"] == "primary" and runs["primary"]["cost_usd"] == 4.0, runs.get("primary"))
+    chk("collect/primary-that-read-an-export", runs.get("primary", {}).get("status") == "contaminated")
+    chk("collect/twin-is-the-arm-like-the-primary", {a for a, r in runs.items() if r["twin"]} == {"O-med"},
+        {a: r["twin"] for a, r in runs.items()})
+    chk("collect/spend-counts-shadows-only", spent(box.rows()) == 22.0, spent(box.rows()))
+    # A slice with two or three valid scored arms is degraded; with fewer it is void. A run that
+    # failed is missing, and the replicate is not a scored arm.
+    ctx = box.ctx()
+    for slice_ in ("np-a", "eo-1"):
+        record_snap(ctx, slice_, "m", ctx.manifest(slice_)["base"])
+    standing = {s: (slice_row(ctx, s, box.rows()) or [{}])[0] for s in ("np-a", "eo-1")}
+    chk("slice/void-and-degraded", standing["np-a"].get("status") == "void" and standing["np-a"].get("arms_ok") == []
+        and standing["eo-1"].get("status") == "degraded"
+        and sorted(standing["eo-1"].get("arms_ok", [])) == ["O-med", "S-high", "S-med"]
+        and standing["eo-1"].get("area") == "other", standing)
+
+
+def _scenario(box, slice_="np-a", rust=True):
+    """Plan, play five shadows, collect, and build the snapshots g1, g2, m and end of a slice.
+
+    rules at base: hp=10 old=bug mp=4.   g1: +atk=5 def=2 spd=6.   g2: def=3 (a lens fix).
+    m: spd=7 old=fixed.   end: hp=11 mp=5, and the spec corpus changes criterion C8."""
+    wt = box.worktree(slice_)
+    box.run("plan", slice_, "--prompt", box.prompt(slice_, wt))
+    t_old, t_wrong = ("t_old", "old=fixed", "C4"), ("t_wrong", "zz=1", "C7")
+    t_brit, t_mp = ("t_brit", "hp=10", "C9"), ("t_mp", "mp=4", "C8")
+    box.shadow(slice_, "S-med", {"tests/s_med.toy": _toy(_T_ATK, _T_DEF, t_wrong)})
+    box.shadow(slice_, "S-high", {"tests/s_high.toy": _toy(_T_ATK, _T_DEF, _T_SPD, t_brit)})
+    box.shadow(slice_, "O-med", {"tests/o_med.toy": _toy(_T_ATK, t_old),
+                                 "tests/o_med_fl.toy": _toy("flaky t_fl")},
+               report="FINDINGS\n- kind: base | test: t_old | where: game/rules.txt:2 | old holds the wrong value\n"
+                      "- kind: spec | test: none | where: specs/m.spec.md:1 | C1 and C2 cannot both hold\n")
+    box.shadow(slice_, "O-high", {"tests/o_high_a.toy": _toy(_T_DEF, "BROKEN"),
+                                  "tests/o_high_b.toy": _toy(_T_SPD, t_mp)})
+    box.shadow(slice_, "S-med-r", {"tests/s_med_r.toy": _toy(_T_ATK, _T_DEF)})
+    box.transcript("Write the red tests for %s in %s." % (slice_, wt), "sonnet", "medium")
+    box.run("collect", slice_)
+    ctx = box.ctx()
+    target = "game/rules.txt" if rust else "client/ui.txt"
+    rules = lambda **kv: "".join("%s=%s\n" % p for p in kv.items())
+    box.commit(wt, "red", {"tests/primary.toy": _toy(_T_ATK)})
+    g1 = box.commit(wt, "green", {target: rules(hp=10, old="bug", mp=4, atk=5, **{"def": 2}, spd=6),
+                                  "game/main.rs" if rust else "docs/main.md": "use helper;\nfn main() {}\n"})
+    g2 = box.commit(wt, "lens fix", {target: rules(hp=10, old="bug", mp=4, atk=5, **{"def": 3}, spd=6)})
+    m = box.commit(wt, "last fix", {target: rules(hp=10, old="fixed", mp=4, atk=5, **{"def": 3}, spd=7)})
+    for name, sha in (("g1", g1), ("g2", g2), ("m", m)):
+        record_snap(ctx, slice_, name, sha)
+    git(box.game, "merge", "-q", "--ff-only", "slice/" + slice_)
+    box.commit(box.game, "later work", {target: rules(hp=11, old="fixed", mp=5, atk=5, **{"def": 3}, spd=7)})
+    time.sleep(1.1)          # the spec change is after m to the second
+    spec = [c["claim_id"] for c in box.rows("claim", slice_) if c["type"] == "spec"]
+    box.commit(box.harness, "spec: C8 reworded\n\nAB-Claim: %s" % spec[0], {"specs/m.spec.md": "C1 C2 C3 C8 mp\n"})
+    return wt
+
+
+def _st_score(chk, tmp):
+    box = _Box(os.path.join(tmp, "score"))
+    _scenario(box)
+    lab = {arm: label for arm, (label, _) in box.labels("np-a").items()}
+    arm_of = {label: arm for arm, label in lab.items()}
+    out = box.run("score", "np-a")
+    chk("score/reports", out.startswith("AB-SCORED np-a:"), out)
+    table = {(arm_of[l], t.rsplit("::", 1)[1]): {s: settled(r) for s, r in by.items()}
+             for (l, t), by in result_table(box.rows(), "np-a").items()}
+    chk("score/results-per-snapshot", table.get(("S-med", "t_def")) == {"g1": "fail", "g2": "pass", "m": "pass"}
+        and table.get(("S-high", "t_spd")) == {"g1": "fail", "g2": "fail", "m": "pass"}
+        and table.get(("S-med", "t_atk")) == {"g1": "pass", "g2": "pass", "m": "pass"}, table.get(("S-med", "t_def")))
+    chk("score/base-runs-claimed-tests-only", table.get(("O-med", "t_old")) == {
+        "base": "fail", "g1": "fail", "g2": "fail", "m": "pass"}
+        and [k for k, v in table.items() if "base" in v] == [("O-med", "t_old")], table.get(("O-med", "t_old")))
+    chk("score/m-runs-twice", sorted(r["run_n"] for r in box.rows("exec", "np-a")
+                                     if r["snap"] == "m" and r["test_id"].endswith("t_atk")
+                                     and r["label"] == lab["S-med"]) == [1, 2])
+    chk("score/no-compile-charged-to-one-file",
+        table.get(("O-high", "t_def")) == {"g1": "no-compile", "g2": "no-compile", "m": "no-compile"}
+        and table.get(("O-high", "t_spd")) == {"g1": "fail", "g2": "fail", "m": "pass"}, table.get(("O-high", "t_def")))
+    chk("score/flaky-at-m", table.get(("O-med", "t_fl"), {}).get("m") == "flaky", table.get(("O-med", "t_fl")))
+    chk("score/criterion-tags", {r["criterion_tag"] for r in box.rows("exec", "np-a")
+                                 if r["test_id"].endswith("t_def")} == {"C2"}
+        and {r["criterion_tag"] for r in box.rows("exec", "np-a") if r["test_id"].endswith("t_fl")} == {""})
+    cands = lambda: sorted((arm_of[c["label"]], (c.get("test_id") or "claim").rsplit("::", 1)[-1], c["type"],
+                            c["snap_fail"], c["snap_pass"])
+                           for c in latest(box.rows("candidate", "np-a"),
+                                           lambda r: (r["label"], r.get("test_id") or r.get("claim_id"))))
+    want = [("O-high", "t_spd", "escape", "g2", "m"), ("O-med", "t_old", "base", "base", "m"),
+            ("S-high", "t_def", "lens-caught", "g1", "g2"), ("S-high", "t_spd", "escape", "g2", "m"),
+            ("S-med", "t_def", "lens-caught", "g1", "g2"), ("S-med", "t_wrong", "open-fail", "m", None),
+            ("S-med-r", "t_def", "lens-caught", "g1", "g2")]
+    spec = ("O-med", "claim", "spec", None, None)
+    # A criterion restated as a test (t_atk: red at base, green from g1) is in no class, and a
+    # test that is flaky at m is never a candidate.
+    chk("score/candidates-by-class", cands() == sorted(want + [spec]), cands())
+    base = next((c for c in box.rows("candidate", "np-a") if c["type"] == "base"), {})
+    chk("score/base-claim-in-scope", base.get("scope") == "in" and base.get("game_diff") is True, base)
+    scratch = box.ctx().scratch
+    chk("score/scratch-left-as-the-snapshot", not os.path.exists(os.path.join(scratch, "tests", "s_med.toy"))
+        and os.path.isfile(os.path.join(scratch, "tests", "primary.toy"))
+        and "spd=7" in open(os.path.join(scratch, "game", "rules.txt")).read()
+        and not os.path.exists(os.path.join(scratch, ".git")), os.listdir(scratch))
+    quality_rows = {arm_of[q["label"]]: q for q in box.rows("quality", "np-a")}
+    chk("quality/no-compile-flaky", quality_rows["O-high"]["no_compile_files"] == 1
+        and quality_rows["O-med"]["flaky"] == 1 and quality_rows["S-med"]["flaky"] == 0
+        and quality_rows["S-med"]["no_compile_files"] == 0, quality_rows.get("O-high"))
+    chk("quality/size", quality_rows["S-high"]["tests"] == 4 and quality_rows["S-high"]["test_loc"] == 8
+        and quality_rows["S-high"]["loc_per_criterion"] == 2.0
+        and quality_rows["S-high"]["bloat_usd"] == round(8 * 12 * (4 * 4 + 150 * 0.2) / 1e6, 4)
+        and quality_rows["S-high"]["runtime_ms"] == 40, quality_rows["S-high"])
+    # The seeded-defect measure: the four lines the slice added to game/, each arm judged by its
+    # own tests that pass at m. A file with a failing or flaky test is left out.
+    muts = {arm_of[r["label"]]: (r["status"], r["generated"], r["caught"], r["missed"])
+            for r in box.rows("mutants", "np-a")}
+    chk("mutants/per-arm-kill-counts", muts == {
+        "S-med": ("no-tests", 0, 0, 0), "S-high": ("ok", 4, 3, 1), "O-med": ("ok", 4, 2, 2),
+        "O-high": ("ok", 4, 1, 3), "S-med-r": ("ok", 4, 2, 2)}, muts)
+    row = (box.rows("slice", "np-a") or [{}])[-1]
+    chk("slice/standing-area-cost", row.get("status") == "scored" and row.get("area") == "rust"
+        and sorted(row.get("arms_ok", [])) == ["O-high", "O-med", "S-high", "S-med"]
+        and row.get("added_cost_usd") == 14.0 and row.get("cumulative_added_usd") == 14.0, row)
+    # Nothing is run twice.
+    n = len(box.rows())
+    box.run("score", "np-a")
+    chk("score/reruns-nothing", len(box.rows()) == n, len(box.rows()) - n)
+    # The end snapshot: an open failure stays open, brittle tests show, the spec claim's commit
+    # is found.
+    out = box.run("score", "np-a", "--end")
+    end = git(box.game, "rev-parse", "master").strip()
+    chk("score/end-records-default-branch-head", snaps_of(box.rows(), "np-a").get("end") == end
+        and git(box.game, "rev-parse", "refs/mr-ab/np-a/end").strip() == end)
+    chk("score/candidates-after-end", cands() == sorted(want + [spec]), cands())
+    quality_rows = {arm_of[q["label"]]: q for q in latest(box.rows("quality", "np-a"), lambda r: r["label"])}
+    chk("quality/brittle", quality_rows["S-high"]["brittle"] == 1 and quality_rows["S-med"]["brittle"] == 0,
+        quality_rows["S-high"])
+    chk("quality/not-brittle-when-the-spec-changed-the-criterion", quality_rows["O-high"]["brittle"] == 0,
+        quality_rows["O-high"])
+    chk("score/one-mutants-row-per-arm", len(box.rows("mutants", "np-a")) == 5)
+    ctx = box.ctx()
+    snaps = snaps_of(box.rows(), "np-a")
+    chk("scope/untouched-file-is-out", claim_scope(ctx, "np-a", snaps, "client/ui.txt:1") == "out"
+        and claim_scope(ctx, "np-a", snaps, "game/other.rs:1") == "out")
+    chk("scope/file-a-touched-file-imports-is-in", claim_scope(ctx, "np-a", snaps, "game/helper.rs:1") == "in"
+        and claim_scope(ctx, "np-a", snaps, "game/rules.txt") == "in")
+    chk("scope/imports", imports("use crate::helper::help;\n", "helper") and imports("import {a} from './helper'", "helper")
+        and not imports("// helper is nice\nlet helper = 1;\n", "helper") and not imports("use crate::helpers;", "helper"))
+    chk("score/no-manifest", box.run("score", "np-z") == "AB-SKIP no-manifest\n")
+    # A trailer counts only on a commit that changes a file that counts.
+    spec_id = next(c["claim_id"] for c in box.rows("claim", "np-a") if c["type"] == "spec")
+    box.commit(box.harness, "notes\n\nAB-Claim: cffffffff", {"notes.md": "x\n"})
+    box.commit(box.game, "docs\n\nAB-Claim: ceeeeeeee", {"docs/note.md": "y\n"})
+    box.commit(box.game, "fix\n\nAB-Claim: cdddddddd", {"game/other.rs": "pub fn other() -> u8 { 1 }\n"})
+    box.run("score", "np-a", "--end")
+    chk("spec/trailer-needs-a-counted-file", claim_commits(ctx, box.rows(), "np-a", snaps_of(box.rows(), "np-a")).keys()
+        == {spec_id, "cdddddddd"}, claim_commits(ctx, box.rows(), "np-a", snaps_of(box.rows(), "np-a")))
+    # A slice that changes no matching file is not mutation-scored; flips there are still flips,
+    # but a flip with no game-code change between the snapshots is no candidate.
+    box2 = _Box(os.path.join(tmp, "score-client"), game_code="^game/")
+    _scenario(box2, rust=False)
+    box2.run("score", "np-a")
+    chk("mutants/client-only-slice-not-scored", box2.rows("mutants", "np-a") == []
+        and len(box2.rows("exec", "np-a")) > 20)
+    chk("slice/client-area", box2.rows("slice", "np-a")[-1]["area"] == "client", box2.rows("slice", "np-a"))
+    # A wall budget the first arm exhausts: the arm it interrupted and those after it say so,
+    # though each of the later ones would have finished in time.
+    box3 = _Box(os.path.join(tmp, "score-budget"))
+    box3.cfg["mutants"]["wall_budget_s"] = 1
+    box3.write_cfg()
+    _scenario(box3)
+    os.environ["TOY_MUTANTS_SLEEP"] = "5"
+    try:
+        box3.run("score", "np-a")
+    finally:
+        del os.environ["TOY_MUTANTS_SLEEP"]
+    states = [r["status"] for r in box3.rows("mutants", "np-a")]
+    chk("mutants/budget-recorded", sorted(states) == ["budget"] * 4 + ["no-tests"]
+        and all(r["generated"] == 0 for r in box3.rows("mutants", "np-a")), states)
+    box3.cfg["mutants"]["enabled"] = False
+    box3.write_cfg()
+
+
+def _st_no_game_diff(chk, tmp):
+    """A test that flips where only non-game files changed is not a candidate."""
+    box = _Box(os.path.join(tmp, "nodiff"), game_code="^nothing/")
+    _scenario(box)
+    box.run("score", "np-a")
+    kinds = sorted({c["type"] for c in box.rows("candidate", "np-a")})
+    chk("score/flip-without-game-code-change-is-no-candidate", kinds == ["open-fail", "spec"], kinds)
+
+
+def _st_ledger(chk, tmp):
+    """Two concurrent writers leave a well-formed ledger."""
+    box = _Box(os.path.join(tmp, "ledger"))
+    code = ("import importlib.machinery, importlib.util, sys\n"
+            "loader = importlib.machinery.SourceFileLoader('ab', sys.argv[1])\n"
+            "ab = importlib.util.module_from_spec(importlib.util.spec_from_loader('ab', loader))\n"
+            "loader.exec_module(ab)\n"
+            "ctx = ab.Ctx(sys.argv[2])\n"
+            "for i in range(150):\n"
+            "    ab.append(ctx, [{'kind': 'exec', 'slice': sys.argv[3], 'n': i, 'pad': 'x' * 9000},\n"
+            "                    {'kind': 'exec', 'slice': sys.argv[3], 'n': i, 'pad': 'y' * 9000}])\n")
+    procs = [subprocess.Popen(["/usr/bin/python3", "-c", code, os.path.join(box.mem, "mr-tester-ab"), box.mem, who])
+             for who in ("w1", "w2")]
+    codes = [p.wait() for p in procs]
+    lines = open(os.path.join(box.mem, "mr-tester-ab.jsonl")).read().split("\n")
+    good = 0
+    for line in lines[:-1]:
+        with contextlib.suppress(ValueError):
+            row = json.loads(line)
+            good += len(row["pad"]) == 9000 and row["v"] == 1 and bool(row["ts"])
+    chk("ledger/concurrent-writers", codes == [0, 0] and good == 600 and lines[-1] == "" and len(lines) == 601,
+        (codes, good, len(lines)))
+    chk("ledger/reader-skips-a-torn-line", len(read(box.ctx())) == 600)
+    with open(os.path.join(box.mem, "mr-tester-ab.jsonl"), "a") as fh:
+        fh.write('{"kind": "exec", "slice": "torn\n[1]\n')
+    chk("ledger/reader-skips-garbage", len(read(box.ctx())) == 600)
+
+
+def _st_shipped_config(chk):
+    """The config beside this tool loads and has what the commands read."""
+    try:
+        cfg = Ctx(HERE).cfg
+    except Exception as exc:
+        chk("config/loads", False, exc)
+        return
+    arms = {a["arm"]: (a["model"], a["effort"], a["role"]) for a in cfg.get("arms", [])}
+    chk("config/arms", arms == {a["arm"]: (a["model"], a["effort"], a["role"]) for a in _ARMS}, arms)
+    chk("config/enabled-is-a-boolean", isinstance(cfg.get("enabled"), bool))
+    chk("config/caps", 0 < cfg["step_down_usd"] < cfg["cap_arm_usd"] and cfg["cap_bump_usd"] > 0
+        and set(cfg["step_down_arms"]) <= set(arms))
+    compiled = True
+    try:
+        for pattern in cfg["test_paths"] + [cfg["game_code"], cfg["spec_paths"], cfg["mutants"]["match"]] \
+                + [x for r in cfg["runners"] for x in (r["match"], r.get("exclude", ""))] \
+                + [x for p in cfg["test_patterns"] for x in (p["match"], p["test"])]:
+            re.compile(pattern)
+    except (re.error, KeyError):
+        compiled = False
+    chk("config/patterns-compile", compiled)
+    probe = Ctx.__new__(Ctx)
+    probe.cfg = cfg
+    rust = "// criterion: BT-3\n#[test]\nfn caps_damage() {}\n\n#[tokio::test]\n#[ignore]\nasync fn joins() {}\n"
+    ts = "describe('x', () => {\n  // criterion: UI-2\n  it('renders the badge', () => {});\n  test.each([1])(\"n %s\", () => {});\n});\n"
+    chk("config/rust-tests-found", tests_in(probe, "game-core/tests/a.rs", rust) == [("caps_damage", "BT-3"), ("joins", "")],
+        tests_in(probe, "game-core/tests/a.rs", rust))
+    chk("config/ts-tests-found", tests_in(probe, "client/src/a.test.ts", ts) == [("renders the badge", "UI-2")],
+        tests_in(probe, "client/src/a.test.ts", ts))
+    chk("config/test-paths", all(is_test(probe, p) for p in (
+        "game-core/tests/a.rs", "server-module/src/battle_tests.rs", "client/src/ui/a.test.ts", "client/e2e/x.spec.ts"))
+        and not is_test(probe, "game-core/src/combat/mod.rs") and is_game_code(probe, "client/src/main.ts")
+        and not is_game_code(probe, "docs/x.md") and not is_game_code(probe, "client/src/a.test.ts"))
+    chk("config/nextest-profile-ships", os.path.isfile(os.path.join(HERE, "mr-tester-ab.nextest.toml")))
+
+
+_BATTERIES = [_st_disabled, _st_plan, _st_collect, _st_score, _st_no_game_diff, _st_ledger]
+_FLOOR = 80
+
+
+def selftest():
+    chk = _Check()
+    saved = {k: os.environ.pop(k) for k in _GIT_SCRUB + ("CLAUDE_CODE_SUBAGENT_MODEL",) if k in os.environ}
+    try:
+        with tempfile.TemporaryDirectory(prefix="mr-tester-ab-selftest-") as tmp:
+            for battery in _BATTERIES:
+                try:
+                    battery(chk, tmp)
+                except Exception as exc:
+                    import traceback
+                    chk("%s raised" % battery.__name__, False, traceback.format_exc()[-900:])
+        _st_shipped_config(chk)
+    finally:
+        os.environ.update(saved)
+    if chk.fails or chk.n < _FLOOR:
+        print("TESTER-AB-SELFTEST-FAILED %d of %d (floor %d)" % (chk.fails, chk.n, _FLOOR))
+        return 1
+    print("TESTER-AB-SELFTEST-OK %d" % chk.n)
+    return 0
+# SELFTEST-END
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--selftest"]:
+        sys.exit(selftest())
+    sys.exit(main(sys.argv[1:]))
