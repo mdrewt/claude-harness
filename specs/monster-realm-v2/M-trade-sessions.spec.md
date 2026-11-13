@@ -933,10 +933,7 @@ surface. A `resolved-fixed` row that names a batch is a duplicate: it is disposi
 batch merges, not when this slice does. A MED `wontfix` or an `ask` ends with its player-facing
 impact. An `ask` row is treated as `wontfix` until the operator answers.
 
-Out of scope, each owned by a live, unbuilt slice of another milestone:
-`R-weekly-review-2026-10-02-F1` → M-netcode-presence `np-d` (NPD.1); `R-weekly-review-2026-10-23-F2`
-→ M-netcode-presence `np-d` (NPD.2); `R-weekly-review-2026-10-09-F1` → M-econ-onboarding `eo-2`
-(EO2.1); `R-weekly-review-2026-10-23-F1` → M-econ-onboarding `eo-1` (EO1.2).
+Out of scope, each owned by a live, unbuilt slice of another milestone: `R-weekly-review-2026-10-02-F1` → M-netcode-presence `np-d` (NPD.1); `R-weekly-review-2026-10-23-F2` → M-netcode-presence `np-d` (NPD.2); `R-weekly-review-2026-10-09-F1` → M-econ-onboarding `eo-2` (EO2.1); `R-weekly-review-2026-10-23-F1` → M-econ-onboarding `eo-1` (EO1.2).
 
 | id | sev | category | verdict | evidence or root cause | batch |
 |---|---|---|---|---|---|
