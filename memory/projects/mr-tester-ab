@@ -59,6 +59,20 @@ LEDGER ROWS (kind)
               error | no-tests). A reported measure; nothing gates on it.
   slice       status (scored | degraded | void), arms_ok, area, added_cost_usd,
               cumulative_added_usd. The latest row of a slice stands.
+  verdict     ref (a candidate id or a claim id), item, label, scale, bundle, verdict,
+              duplicate_of, criterion, wrong_behaviour, severity
+  finding     finding_id, class, status (confirmed | pending | out-of-scope | rejected), verdict,
+              criterion, wrong_behaviour, severity, members, found_by, missed_by,
+              replicate_found, fix_cost_usd. The latest row of a finding stands.
+
+FOUND, MISSED, LEGITIMATE
+-------------------------
+A legitimate finding is a confirmed bug or design defect in the game code: an unedited test of
+an arm flipped on a game-code change (or a counted commit names a spec claim), and the judge
+ruled `bug` or `design-defect` naming the criterion and the wrong behaviour. Items the judge
+marks duplicates are one finding. An arm found it when its own test is in that evidence. The
+reference set of a slice is what the scored arms found between them; an arm's misses are the
+reference findings it did not find, where its run was valid. The replicate is in neither.
 
 COMMANDS
 --------
@@ -76,6 +90,19 @@ COMMANDS
                               and seeded-defect rows. `--end` first records the game repo's
                               default-branch head as `end`. Runs what is missing; under a flock.
   status                      What is planned, collected, scored and spent; stale exports.
+  judge-pack                  Write every item without a verdict (candidates, claims, tests
+                              still failing at m) to a shuffled bundle with arm, model and
+                              export paths removed, and print the one Agent call for the judge.
+  judge-apply <verdicts.json> Enter the judge's verdicts and the findings they support. A `bug`
+                              or `design-defect` verdict without a criterion and a wrong
+                              behaviour is rejected.
+  fix-cost <finding> <usd>    Record what fixing a finding cost; five of a class replace its
+                              historical price.
+  report [--out <file>]       The close report, a pure function of the ledger and the config:
+                              per-arm cost, found and missed by class, quality, Total in three
+                              price scenarios, main effects, noise floor, seeded defects,
+                              splits, and the decision rule's result. Default file:
+                              retros/<utc>-tester-ab.md.
   --selftest                  Fixtures against temporary directories and a toy test runner.
                               Prints `TESTER-AB-SELFTEST-OK <n>`.
 """
@@ -1287,8 +1314,854 @@ def cmd_status(ctx, args):
             print("  stale export: %s" % path)
 
 
+# --------------------------------------------------------------------------- judge
+VERDICTS = ("bug", "design-defect", "incomplete-work", "wrong-test", "not-a-defect", "not-game-code")
+DEFECT = ("bug", "design-defect")
+EVIDENCE = ("lens-caught", "escape", "base", "spec")     # classes with a mechanical precondition
+
+JUDGE_HEADER = """# Judge bundle {n}
+
+You rule on {count} items from a testing experiment. Each item is either a test that failed
+against a recorded snapshot of the game's code, or a one-sentence claim about existing code or
+about the spec. You are not told who wrote an item, and it does not matter.
+
+A legitimate finding is an actual, confirmed bug or design defect in the game code. A test that
+fails because the test is wrong is not one. Work that was simply not finished yet at the failing
+snapshot is not one.
+
+For every item give exactly one verdict:
+
+- `bug`: the game code behaved wrongly against the named criterion.
+- `design-defect`: the design or the spec is wrong or contradicts itself.
+- `incomplete-work`: the code was not finished at that snapshot; nothing was wrong in what existed.
+- `wrong-test`: the test asserts something the criterion does not require, or cannot pass.
+- `not-a-defect`: the claim or the failure describes correct behaviour.
+- `not-game-code`: the defect is real but lies outside the game's code and spec.
+- `duplicate-of:<item id>`: the same defect as an earlier item you ruled `bug` or `design-defect`.
+
+A `bug` or `design-defect` verdict must name the criterion and the observable wrong behaviour;
+without both it is discarded.
+
+Write a JSON array to `{verdicts}`, one object per item:
+`{{"id": "i001", "verdict": "...", "criterion": "...", "wrong_behaviour": "...", "severity": "minor|major"}}`.
+Then reply with the single word `done`.
+"""
+
+
+def current_candidates(rows, slice_=None):
+    return latest(of(rows, "candidate", slice_),
+                  lambda r: (r["slice"], r["label"], r.get("test_id") or r.get("claim_id")))
+
+
+def redact(ctx, text, extra=()):
+    """Remove what would tell the judge which arm wrote an item: paths under the cache, arm and
+    model names."""
+    for path in sorted(set(extra) | {ctx.cache}, key=len, reverse=True):
+        text = text.replace(path, "[path]")
+    names = sorted((re.escape(a["arm"]) for a in ctx.cfg.get("arms", [])), key=len, reverse=True)
+    return re.sub(r"(?i)\b(%s|sonnet|opus|fable|haiku|claude-[\w.-]+)\b" % "|".join(names), "[redacted]", text)
+
+
+def test_excerpt(ctx, ref, path, name):
+    """The test's own lines: from its criterion tag to the line before the next test."""
+    text = git(ctx.game, "show", "%s:%s" % (ref, path), check=False)
+    lines = text.split("\n")
+    starts = []
+    for pat in ctx.cfg.get("test_patterns", []):
+        if re.search(pat["match"], path):
+            starts = [(text.count("\n", 0, m.start()), next((g for g in reversed(m.groups()) if g), ""))
+                      for m in re.finditer(pat["test"], text, re.M)]
+            break
+    def top(i):         # where test i begins: its line, or the comment lines directly above it
+        first, before = starts[i][0], starts[i - 1][0] if i else -1
+        while first - 1 > before and starts[i][0] - first < 3 and lines[first - 1].strip():
+            first -= 1
+        return first
+
+    for i, (_, found) in enumerate(starts):
+        if found == name:
+            end = top(i + 1) if i + 1 < len(starts) else len(lines)
+            return "\n".join(lines[top(i):min(end, top(i) + 80)]).rstrip()
+    return ""
+
+
+def criterion_text(ctx, slice_, tag):
+    if not tag:
+        return ""
+    try:
+        with open(os.path.join(ctx.mem, "gates", "%s.gates.md" % slice_), errors="replace") as fh:
+            hits = [l.strip() for l in fh if re.search(r"\b%s\b" % re.escape(tag), l)]
+    except OSError:
+        hits = []
+    return " ".join(hits[:5])[:1200]
+
+
+def cited_lines(ctx, rows, slice_, where):
+    """The lines a claim cites: from the harness repo, else from the slice's latest snapshot."""
+    m = re.match(r"(.+?):(\d+)$", where)
+    path, line = (m.group(1), int(m.group(2))) if m else (where, 1)
+    text = ""
+    harness = ctx.cfg.get("harness_repo") or ""
+    full = os.path.normpath(os.path.join(harness, path))
+    if harness and full.startswith(os.path.normpath(harness) + os.sep) and os.path.isfile(full):
+        with open(full, errors="replace") as fh:
+            text = fh.read()
+    else:
+        snaps = snaps_of(rows, slice_)
+        sha = snaps.get("m") or snaps.get("base")
+        if sha:
+            text = git(ctx.game, "show", "%s:%s" % (sha, path), check=False)
+    lines = text.split("\n")
+    return "\n".join(lines[max(0, line - 4):line + 3])
+
+
+def judge_items(ctx, rows):
+    """Everything not yet ruled on: [(ref, slice, kind, label, body text)]. A base claim whose
+    test is a candidate is judged as that candidate."""
+    judged = {r["ref"] for r in of(rows, "verdict")}
+    items = []
+    claim_of = {}
+    for claim in of(rows, "claim"):
+        claim_of[(claim["slice"], claim["label"], claim.get("test") or claim["claim_id"])] = claim
+    covered = set()
+    for cand in current_candidates(rows):
+        slice_, label = cand["slice"], cand["label"]
+        if cand["type"] == "spec":
+            continue
+        test = cand["test_id"]
+        path, name = test.rsplit("::", 1)
+        claim = claim_of.get((slice_, label, name)) if cand["type"] == "base" else None
+        if claim:
+            covered.add(claim["claim_id"])
+        if cand["candidate_id"] in judged:
+            continue
+        run = next((r for r in ok_runs(rows, slice_) if r["label"] == label), None)
+        if not run:
+            continue
+        tag = next((r["criterion_tag"] for r in of(rows, "exec", slice_)
+                    if r["label"] == label and r["test_id"] == test), "")
+        fails = {}
+        with contextlib.suppress(OSError, ValueError):
+            with open(os.path.join(ctx.side_of(slice_), "fail", "%s.%s.1.json" % (label, cand["snap_fail"]))) as fh:
+                fails = json.load(fh)
+        snaps = snaps_of(rows, slice_)
+        body = ["kind: test", "criterion: %s %s" % (tag or "(untagged)", criterion_text(ctx, slice_, tag)),
+                "", "### Test", "```", test_excerpt(ctx, run["tests_ref"], path, name), "```",
+                "", "### Failure output", "```", fails.get(test, "(not kept)"), "```"]
+        if claim:
+            body += ["", "### The author's claim", claim["text"]]
+        if cand.get("snap_pass"):
+            changed = [p for _, p in changed_files(ctx.game, snaps[cand["snap_fail"]], snaps[cand["snap_pass"]])
+                       if is_game_code(ctx, p)]
+            diff = git(ctx.game, "diff", snaps[cand["snap_fail"]], snaps[cand["snap_pass"]], "--", *changed).split("\n")
+            body += ["", "### Game-code change after which the test passes", "```diff"] + diff[:300] + (
+                ["... (%d more lines)" % (len(diff) - 300)] if len(diff) > 300 else []) + ["```"]
+        else:
+            body += ["", "The test still fails at the merged code."]
+        items.append((cand["candidate_id"], slice_, cand["type"], label, "\n".join(body)))
+    for claim in of(rows, "claim"):
+        if claim["claim_id"] in judged or claim["claim_id"] in covered:
+            continue
+        body = ["kind: claim (%s)" % claim["type"], "", "### Claim", claim["text"],
+                "", "### Cited lines (%s)" % claim["where"], "```",
+                cited_lines(ctx, rows, claim["slice"], claim["where"]), "```"]
+        items.append((claim["claim_id"], claim["slice"], "claim", claim["label"], "\n".join(body)))
+    return items
+
+
+def sample_open(items, limit):
+    """Keep at most `limit` items: every item but the still-failing tests is kept; those are cut
+    to the same number per arm and slice. Returns (kept, {ref: scale})."""
+    rest = [i for i in items if i[2] != "open-fail"]
+    groups = {}
+    for item in sorted((i for i in items if i[2] == "open-fail"), key=lambda i: sha256(i[0])):
+        groups.setdefault((i_slice(item), item[3]), []).append(item)
+    room = max(0, limit - len(rest))
+    per = max((len(g) for g in groups.values()), default=0)
+    while per > 0 and sum(min(per, len(g)) for g in groups.values()) > room:
+        per -= 1
+    kept, scale = list(rest), {}
+    for group in groups.values():
+        for item in group[:per]:
+            kept.append(item)
+            scale[item[0]] = round(len(group) / min(per, len(group)), 4)
+    return kept, scale
+
+
+def i_slice(item):
+    return item[1]
+
+
+def cmd_judge_pack(ctx, args):
+    options(args)
+    rows = read(ctx)
+    judge = ctx.cfg.get("judge", {})
+    items, scale = sample_open(judge_items(ctx, rows), int(judge.get("max_items", 150)))
+    if not items:
+        raise Skip("nothing-to-judge")
+    out_dir = os.path.join(ctx.side, "judge")
+    os.makedirs(out_dir, exist_ok=True)
+    n = 1 + len(glob.glob(os.path.join(glob.escape(out_dir), "bundle-*.md")))
+    bundle = os.path.join(out_dir, "bundle-%d.md" % n)
+    verdicts = os.path.join(out_dir, "verdicts-%d.json" % n)
+    items.sort(key=lambda i: sha256("judge-%d:%s" % (n, i[0])))
+    exports = [e["export"] for row in of(rows, "assignment") for e in (ctx.manifest(row["slice"]) or {}).get("labels", {}).values()]
+    parts = [JUDGE_HEADER.format(n=n, count=len(items), verdicts=verdicts)]
+    key = {}
+    for i, (ref, slice_, kind, label, body) in enumerate(items):
+        item_id = "i%03d" % (i + 1)
+        key[item_id] = {"ref": ref, "slice": slice_, "kind": kind, "label": label, "scale": scale.get(ref, 1)}
+        parts.append("\n---\n## %s\n\n%s\n" % (item_id, redact(ctx, body, exports)))
+    with open(bundle, "w") as fh:
+        fh.write("".join(parts))
+    write_json(os.path.join(out_dir, "bundle-%d.key.json" % n), key)
+    print("AB-JUDGE-PACK %d item(s) in %s. Issue this one call, then run: %s/mr-tester-ab judge-apply %s"
+          % (len(items), bundle, ctx.mem, verdicts))
+    print('Agent(subagent_type="judge", model="%s", effort="%s", description="judge bundle %d", '
+          'prompt="Read %s and rule on every item exactly as it instructs.")'
+          % (judge.get("model", "fable"), judge.get("effort", "high"), n, bundle))
+
+
+def findings(rows, slice_):
+    """The findings the verdicts of a slice support, as ledger rows.
+
+    Items the judge marked duplicates of one another are one finding. It is `confirmed` when an
+    item in it has a mechanical precondition (a flip, or a counted commit for a spec claim),
+    `pending` when the judge confirms a defect that nothing has fixed yet, and `out-of-scope`
+    when its only evidence is a base claim outside the slice's reach."""
+    verdicts = {v["ref"]: v for v in of(rows, "verdict", slice_)}
+    cands = {}
+    for cand in current_candidates(rows, slice_):
+        cands[cand["candidate_id"]] = cand
+        if cand["type"] == "spec":
+            cands[cand["claim_id"]] = cand
+    arm_of = {r["label"]: (r["arm"], r["role"]) for r in of(rows, "run", slice_)}
+    valid = sorted(r["arm"] for r in ok_runs(rows, slice_) if r["role"] == "shadow")
+
+    def root(ref, seen=()):
+        target = verdicts[ref].get("duplicate_of")
+        return root(target, seen + (ref,)) if target in verdicts and target not in seen and target != ref else ref
+
+    clusters = {}
+    for ref in sorted(verdicts):
+        clusters.setdefault(root(ref), []).append(ref)
+    out = []
+    for head, members in sorted(clusters.items()):
+        verdict = verdicts[head]
+        if verdict["verdict"] not in DEFECT + ("rejected-incomplete",):
+            continue
+        row = {"kind": "finding", "slice": slice_, "finding_id": "f" + sha256("%s|%s" % (slice_, head))[:8],
+               "verdict": verdict["verdict"], "criterion": verdict.get("criterion"),
+               "wrong_behaviour": verdict.get("wrong_behaviour"), "severity": verdict.get("severity"),
+               "members": members, "found_by": [], "missed_by": [], "replicate_found": False,
+               "class": None, "status": "rejected", "fix_cost_usd": None}
+        if verdict["verdict"] in DEFECT:
+            kinds = []
+            proven, open_ = set(), set()
+            for ref in members:
+                cand = cands.get(ref)
+                arm, role = arm_of.get(verdicts[ref]["label"], (None, None))
+                kind = cand["type"] if cand else verdicts[ref]["item"]
+                if cand and cand["type"] == "base" and cand.get("scope") == "out":
+                    kind = "out-of-scope"
+                kinds.append(kind)
+                if role == "replicate":
+                    row["replicate_found"] = row["replicate_found"] or kind in EVIDENCE
+                elif arm:
+                    (proven if kind in EVIDENCE else open_).add(arm)
+            hit = [k for k in EVIDENCE if k in kinds]
+            if hit:
+                row.update({"class": hit[0], "status": "confirmed", "found_by": sorted(proven)})
+            elif "out-of-scope" in kinds:
+                row.update({"class": "out-of-scope", "status": "out-of-scope", "found_by": sorted(open_)})
+            else:
+                claim_kind = next((c["type"] for c in of(rows, "claim", slice_) if c["claim_id"] in members), None)
+                row.update({"class": claim_kind or "escape", "status": "pending", "found_by": sorted(open_)})
+            row["missed_by"] = [a for a in valid if a not in row["found_by"]]
+        old = next((r for r in reversed(of(rows, "finding", slice_)) if r["finding_id"] == row["finding_id"]), None)
+        if old:
+            row["fix_cost_usd"] = old.get("fix_cost_usd")
+        if not old or any(old.get(k) != v for k, v in row.items()):
+            out.append(row)
+    return out
+
+
+def cmd_judge_apply(ctx, args):
+    pos, _ = options(args)
+    if not pos:
+        raise Skip("usage: judge-apply <verdicts.json>")
+    path = pos[0]
+    m = re.fullmatch(r"verdicts-(\d+)\.json", os.path.basename(path))
+    if not m:
+        raise Skip("verdicts file must be the verdicts-<n>.json a bundle names")
+    with open(os.path.join(os.path.dirname(path), "bundle-%s.key.json" % m.group(1))) as fh:
+        key = json.load(fh)
+    with open(path) as fh:
+        given = json.load(fh)
+    if not isinstance(given, list):
+        raise Skip("verdicts file is not a JSON array")
+    rows = read(ctx)
+    judged = {r["ref"] for r in of(rows, "verdict")}
+    new, bad = [], 0
+    for entry in given:
+        item = key.get(entry.get("id")) if isinstance(entry, dict) else None
+        if not item or item["ref"] in judged:
+            continue
+        verdict = str(entry.get("verdict", "")).strip()
+        target = None
+        said = lambda field: " ".join(str(entry.get(field) or "").split())
+        if verdict.startswith("duplicate-of:"):
+            target = (key.get(verdict.split(":", 1)[1].strip()) or {}).get("ref")
+            if not target or target == item["ref"]:
+                bad += 1
+                continue
+        elif verdict not in VERDICTS:
+            bad += 1
+            continue
+        elif verdict in DEFECT and (len(said("criterion")) < 2 or len(said("wrong_behaviour")) < 8
+                                    or said("criterion").lower() in ("none", "n/a", "unknown")):
+            verdict = "rejected-incomplete"      # a defect verdict names its criterion and the wrong behaviour
+        judged.add(item["ref"])
+        new.append({"kind": "verdict", "slice": item["slice"], "ref": item["ref"], "item": item["kind"],
+                    "label": item["label"], "scale": item.get("scale", 1), "bundle": int(m.group(1)),
+                    "verdict": "duplicate" if target else verdict, "duplicate_of": target,
+                    "criterion": said("criterion"), "wrong_behaviour": said("wrong_behaviour"),
+                    "severity": entry.get("severity") if entry.get("severity") in ("minor", "major") else None})
+    append(ctx, new)
+    out = []
+    for slice_ in sorted({v["slice"] for v in new}):
+        out += findings(read(ctx), slice_)
+    append(ctx, out)
+    # The judge's own run counts toward the cap; its transcript is the one that names the bundle.
+    bundle = os.path.join(os.path.dirname(os.path.abspath(path)), "bundle-%s.md" % m.group(1))
+    if not any(r.get("role") == "judge" and r.get("bundle") == int(m.group(1)) for r in of(rows, "run")):
+        for found in glob.glob(os.path.join(glob.escape(ctx.transcripts), "*", "*", "subagents", "agent-*.jsonl")):
+            with contextlib.suppress(Exception):
+                if os.path.getmtime(found) < os.path.getmtime(bundle) - 120:
+                    continue
+                with open(found, errors="replace") as fh:
+                    if bundle not in fh.readline(400000):
+                        continue
+                session = os.path.basename(os.path.dirname(os.path.dirname(found)))
+                cost = by_role(ctx, session).get(agent_id(found))
+                if cost:
+                    append(ctx, [{"kind": "run", "slice": "-", "label": "judge", "arm": "judge", "role": "judge",
+                                  "bundle": int(m.group(1)), "status": "ok", "session": session,
+                                  "agent_id": cost["agent_id"], "model_observed": cost["model"],
+                                  "effort_observed": cost["effort"], "cost_usd": cost["cost_usd"]}])
+                    break
+    tally = {}
+    for row in out:
+        tally[row["status"]] = tally.get(row["status"], 0) + 1
+    print("AB-JUDGED %d verdict(s) applied, %d unusable, %d item(s) without one; findings: %s" % (
+        len(new), bad, len([k for k in key.values() if k["ref"] not in judged]),
+        ", ".join("%d %s" % (n, s) for s, n in sorted(tally.items())) or "none"))
+    for row in out:
+        if row["status"] in ("pending", "out-of-scope"):
+            print("  file as a residual: %s %s [%s] %s — %s" % (
+                row["finding_id"], row["slice"], row["status"], row["criterion"], row["wrong_behaviour"]))
+
+
+def cmd_fix_cost(ctx, args):
+    """fix-cost <finding id> <usd>: record what fixing a finding cost."""
+    pos, _ = options(args)
+    if len(pos) != 2:
+        raise Skip("usage: fix-cost <finding id> <usd>")
+    cost = float(pos[1])
+    if not 0 <= cost < 100000:
+        raise Skip("fix cost out of range")
+    old = next((r for r in reversed(of(read(ctx), "finding")) if r["finding_id"] == pos[0]), None)
+    if not old:
+        raise Skip("no such finding")
+    row = {k: v for k, v in old.items() if k not in ("v", "ts")}
+    row["fix_cost_usd"] = round(cost, 4)
+    append(ctx, [row])
+    print("AB-FIX-COST %s $%.2f" % (pos[0], cost))
+
+
+# --------------------------------------------------------------------------- report
+CLASSES = ("lens-caught", "escape", "base", "spec")
+SCENARIOS = ("low", "central", "high")
+
+
+def mean(values):
+    values = list(values)
+    return sum(values) / len(values) if values else 0.0
+
+
+def median(values):
+    values = sorted(values)
+    if not values:
+        return 0.0
+    mid = len(values) // 2
+    return values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
+
+
+def interval(diffs, seed=20261113, draws=2000):
+    """The 80% bootstrap interval of the mean of paired differences, resampling slices. The
+    generator is seeded, so a ledger always yields the same interval."""
+    import random
+    diffs = list(diffs)
+    if len(diffs) < 2:
+        return None
+    rng = random.Random(seed)
+    means = sorted(mean(rng.choice(diffs) for _ in diffs) for _ in range(draws))
+    return means[int(0.10 * draws)], means[int(0.90 * draws) - 1]
+
+
+def sign_test(diffs):
+    """Two-sided exact sign test p-value over the non-zero differences; None with none."""
+    import math
+    pos = sum(1 for d in diffs if d > 1e-9)
+    neg = sum(1 for d in diffs if d < -1e-9)
+    n = pos + neg
+    if not n:
+        return None
+    tail = sum(math.comb(n, k) for k in range(0, min(pos, neg) + 1)) / 2 ** n
+    return min(1.0, 2 * tail)
+
+
+def miss_price(prices, scenario, klass, measured):
+    if scenario == "low":
+        return prices["lens_caught_low"]
+    if klass in measured:
+        return measured[klass]
+    if klass == "lens-caught":
+        return prices["lens_caught"]
+    if scenario == "central":
+        return prices["post_merge"]
+    return prices["spec_high"] if klass == "spec" else prices["escape_high"]
+
+
+class Stats:
+    """Everything the report prints, computed from ledger rows alone."""
+
+    def __init__(self, rows, cfg):
+        self.cfg = cfg
+        self.prices = cfg["prices"]
+        arms = cfg.get("arms", [])
+        self.arms = [a["arm"] for a in arms if a.get("role", "shadow") == "shadow"]
+        copy = next((a for a in arms if a.get("role") == "replicate"), None)
+        self.replicate = copy["arm"] if copy else None
+        # the scored arm the replicate is a second run of
+        self.twin_of = next((a["arm"] for a in arms if copy and a.get("role", "shadow") == "shadow"
+                             and (a["model"], a["effort"]) == (copy["model"], copy["effort"])), None)
+        self.model = {a["arm"]: a["model"] for a in arms}
+        self.effort = {a["arm"]: a["effort"] for a in arms}
+        self.rows = rows
+        standing = {r["slice"]: r for r in of(rows, "slice")}
+        self.assignment = {r["slice"]: r for r in of(rows, "assignment") if not r.get("skipped")}
+        self.void = sorted(s for s, r in standing.items() if r["status"] == "void")
+        self.slices = sorted(s for s, r in standing.items() if r["status"] != "void" and s in self.assignment)
+        self.standing = standing
+        self.runs = {}
+        for run in of(rows, "run"):
+            if run.get("role") in SHADOW_ROLES:
+                self.runs[(run["slice"], run["arm"])] = run
+        self.findings = [f for f in latest(of(rows, "finding"), lambda r: r["finding_id"]) if f["slice"] in self.slices]
+        self.quality = {}
+        label_arm = {(r["slice"], r["label"]): r["arm"] for r in of(rows, "run")}
+        for q in of(rows, "quality"):
+            self.quality[(q["slice"], label_arm.get((q["slice"], q["label"])))] = q
+        self.judged = {}
+        for v in of(rows, "verdict"):
+            cell = self.judged.setdefault((v["slice"], label_arm.get((v["slice"], v["label"]))), [0.0, 0.0])
+            if v["verdict"] == "wrong-test" and v["item"] == "open-fail":
+                cell[0] += v.get("scale", 1)
+            elif v["verdict"] == "not-a-defect" and v["item"] == "claim":
+                cell[1] += 1
+        self.mutants = {(m["slice"], label_arm.get((m["slice"], m["label"]))): m for m in of(rows, "mutants")}
+        self.measured = {}
+        for klass in CLASSES:
+            costs = [f["fix_cost_usd"] for f in self.findings if f["class"] == klass and f.get("fix_cost_usd") is not None]
+            if len(costs) >= 5:
+                self.measured[klass] = round(mean(costs), 2)
+
+    # -- cells -----------------------------------------------------------------------------
+    def ok(self, slice_, arm):
+        run = self.runs.get((slice_, arm))
+        return bool(run and run.get("status") == "ok")
+
+    def reference(self, slice_, pending):
+        """The findings the scored arms found on a slice."""
+        return [f for f in self.findings if f["slice"] == slice_ and f["class"] in CLASSES
+                and (f["status"] == "confirmed" or (pending and f["status"] == "pending"))
+                and any(a in self.arms for a in f["found_by"])]
+
+    def hit(self, finding, arm):
+        return bool(finding.get("replicate_found")) if arm == self.replicate else arm in finding["found_by"]
+
+    def found(self, slice_, arm, pending=False):
+        return [f for f in self.reference(slice_, pending) if self.hit(f, arm)]
+
+    def missed(self, slice_, arm, pending=False):
+        return [f for f in self.reference(slice_, pending) if not self.hit(f, arm)]
+
+    def false_positives(self, slice_, arm):
+        wrong, rejected = self.judged.get((slice_, arm), (0.0, 0.0))
+        return wrong + rejected + self.quality.get((slice_, arm), {}).get("no_compile_files", 0)
+
+    def run_cost(self, slice_, arm):
+        return self.runs[(slice_, arm)].get("cost_usd") or 0.0
+
+    def total(self, slice_, arm, scenario, pending=False):
+        """Run cost, plus each miss at its class's price, plus the priced quality counts."""
+        p, q = self.prices, self.quality.get((slice_, arm), {})
+        fp = p["fp_low"] if scenario == "low" else p["fp"]
+        return (self.run_cost(slice_, arm)
+                + sum(miss_price(p, scenario, f["class"], self.measured) for f in self.missed(slice_, arm, pending))
+                + self.false_positives(slice_, arm) * fp + q.get("flaky", 0) * p["flake"]
+                + q.get("brittle", 0) * fp + q.get("bloat_usd", 0.0))
+
+    def paired(self, arm, other, value, slices=None):
+        """[value(arm) - value(other)] over the slices where both ran validly."""
+        return [value(s, arm) - value(s, other) for s in (self.slices if slices is None else slices)
+                if self.ok(s, arm) and self.ok(s, other)]
+
+    def valid(self, arm, slices=None):
+        return [s for s in (self.slices if slices is None else slices) if self.ok(s, arm)]
+
+    def noise_floor(self, slices=None):
+        """Mean per-slice disagreement, in findings, between the replicate and the arm it copies."""
+        if not self.replicate or not self.twin_of:
+            return 0.0
+        return mean(abs(d) for d in self.paired(self.twin_of, self.replicate,
+                                                lambda s, a: len(self.found(s, a)), slices))
+
+    def recall(self, arms, slices=None, pending=False):
+        """Share of the reference set that any of `arms` found, where all of them ran validly."""
+        hit = total = 0
+        for s in (self.slices if slices is None else slices):
+            if not all(self.ok(s, a) for a in arms):
+                continue
+            for f in self.reference(s, pending):
+                total += 1
+                hit += any(self.hit(f, a) for a in arms)
+        return (hit / total) if total else None
+
+    def kill_rate(self, slice_, arm):
+        m = self.mutants.get((slice_, arm))
+        if not m or m["status"] != "ok" or not (m["caught"] + m["missed"]):
+            return None
+        return m["caught"] / (m["caught"] + m["missed"])
+
+    # -- the decision rule -----------------------------------------------------------------
+    def decide(self, slices=None):
+        """Apply the rule to a set of slices. Returns a dict: basis (report-only | quality |
+        cost-default), choice, effort, reasons."""
+        slices = self.slices if slices is None else slices
+        arms = [a for a in self.arms if self.valid(a, slices)]
+        out = {"basis": "report-only", "choice": None, "effort": None, "reasons": []}
+        if len(slices) < 6 or not arms:
+            out["reasons"].append("%d scored slice(s), fewer than six: no model change" % len(slices))
+            return out
+        cost = {a: mean(self.run_cost(s, a) for s in self.valid(a, slices)) for a in arms}
+        ref = min(arms, key=lambda a: (cost[a], a))
+        floor = self.noise_floor(slices)
+        winners = []
+        for arm in arms:
+            if arm == ref:
+                continue
+            why = []
+            for pending in (False, True):
+                tag = " with pending findings counted" if pending else ""
+                for scenario in SCENARIOS:
+                    if mean(self.paired(arm, ref, lambda s, a: self.total(s, a, scenario, pending), slices)) >= 0:
+                        why.append("its Total is not lower in the %s scenario%s" % (scenario, tag))
+                bounds = interval(self.paired(arm, ref, lambda s, a: self.total(s, a, "central", pending), slices))
+                if not bounds or bounds[1] >= 0:
+                    why.append("the 80%% interval of the difference includes zero%s" % tag)
+            lead = mean(self.paired(arm, ref, lambda s, a: len(self.found(s, a)), slices))
+            if lead <= floor:
+                why.append("its lead in findings (%.2f a slice) does not exceed the noise floor (%.2f)" % (lead, floor))
+            if why:
+                out["reasons"].append("%s does not replace %s: %s" % (arm, ref, "; ".join(why)))
+            else:
+                winners.append(arm)
+        if winners:
+            best = min(winners, key=lambda a: (mean(self.total(s, a, "central") for s in self.valid(a, slices)), a))
+            out.update(basis="quality", choice=best)
+            out["reasons"].append("%s replaces %s: lower Total in all three scenarios, interval excludes zero, "
+                                  "holds with pending findings counted and not, lead above the noise floor" % (best, ref))
+        else:
+            out.update(basis="cost-default", choice=ref)
+            out["reasons"].append("%s is the cheapest arm to run: a cost default, not a quality result" % ref)
+        gain = self.main_effect("effort", lambda s, a: len(self.found(s, a)), slices)
+        if gain is None or gain[0] <= floor:
+            out["effort"] = "medium"
+            out["reasons"].append("effort shows no gain in findings beyond the noise floor: set effort to medium explicitly")
+        else:
+            out["effort"] = self.effort[out["choice"]]
+        return out
+
+    def main_effect(self, factor, value, slices=None):
+        """(mean, interval, sign-test p, n) of the per-slice difference between the mean of the
+        arms at the factor's upper level (opus; high) and at its lower, over slices where all
+        scored arms ran validly."""
+        level = self.model if factor == "model" else self.effort
+        upper = "opus" if factor == "model" else "high"
+        up = [a for a in self.arms if level[a] == upper]
+        down = [a for a in self.arms if level[a] != upper]
+        if not up or not down:
+            return None
+        diffs = [mean(value(s, a) for a in up) - mean(value(s, a) for a in down)
+                 for s in (self.slices if slices is None else slices) if all(self.ok(s, a) for a in up + down)]
+        if not diffs:
+            return None
+        return mean(diffs), interval(diffs), sign_test(diffs), len(diffs)
+
+
+def render_report(rows, cfg):
+    """The close report as markdown: a pure function of the ledger rows and the config."""
+    st = Stats(rows, cfg)
+    money = lambda v: "$%.2f" % v
+    span = lambda b: "n/a" if not b else "[%.2f, %.2f]" % b
+    pval = lambda p: "n/a" if p is None else "%.3f" % p
+    pct = lambda v: "n/a" if v is None else "%.0f%%" % (100 * v)
+    out = ["# Tester A/B report", ""]
+    spend = sum(r.get("cost_usd") or 0.0 for r in of(rows, "run") if r.get("role") in SHADOW_ROLES + ("judge", "port"))
+    closed_rows = of(rows, "close")
+    out += ["- Slices: %d scored or degraded (%d degraded), %d void." % (
+        len(st.slices), sum(1 for s in st.slices if st.standing[s]["status"] == "degraded"), len(st.void)),
+        "- Arm, judge and port spend: %s of a %s cap." % (money(spend), money(cfg.get("cap_arm_usd", 0))),
+        "- Experiment: %s." % ("closed (%s)" % closed_rows[-1].get("reason") if closed_rows else "open"),
+        "- Findings: %d confirmed, %d pending, %d out of scope, %d rejected for an incomplete verdict." % tuple(
+            sum(1 for f in st.findings if f["status"] == s) for s in ("confirmed", "pending", "out-of-scope", "rejected")),
+        ""]
+
+    def arm_table(slices, pending=False):
+        lines = ["| Arm | Valid runs | Run cost | Found | Missed | Recall | False pos. | Flaky | Brittle | Lines/criterion | Total low | Total central | Total high |",
+                 "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        for arm in st.arms + ([st.replicate] if st.replicate else []):
+            mine = st.valid(arm, slices)
+            if not mine:
+                lines.append("| %s | 0 | | | | | | | | | | | |" % arm)
+                continue
+            q = [st.quality.get((s, arm), {}) for s in mine]
+            lines.append("| %s | %d | %s | %d | %d | %s | %g | %d | %d | %.1f | %s | %s | %s |" % (
+                arm + (" (replicate)" if arm == st.replicate else ""), len(mine),
+                money(mean(st.run_cost(s, arm) for s in mine)),
+                sum(len(st.found(s, arm, pending)) for s in mine),
+                sum(len(st.missed(s, arm, pending)) for s in mine), pct(st.recall([arm], slices, pending)),
+                sum(st.false_positives(s, arm) for s in mine), sum(x.get("flaky", 0) for x in q),
+                sum(x.get("brittle", 0) for x in q), mean(x.get("loc_per_criterion", 0) for x in q),
+                *(money(mean(st.total(s, arm, sc, pending) for s in mine)) for sc in SCENARIOS)))
+        return lines
+
+    out += ["## Arms", "", "Totals are per slice. The replicate is not in the reference set or the decision.", ""]
+    out += arm_table(st.slices) + ["", "With pending findings counted:", ""] + arm_table(st.slices, True) + [""]
+
+    out += ["## Findings by class", "",
+            "| Arm | lens-caught | escape | base | spec | New work only (lens-caught + escape) | Missed |", "|---|---|---|---|---|---|---|"]
+    for arm in st.arms:
+        got = [f for s in st.valid(arm) for f in st.found(s, arm)]
+        by = [sum(1 for f in got if f["class"] == k) for k in CLASSES]
+        out.append("| %s | %d | %d | %d | %d | %d | %d |" % (arm, *by, by[0] + by[1],
+                                                           sum(len(st.missed(s, arm)) for s in st.valid(arm))))
+    ref_all = [f for s in st.slices for f in st.reference(s, False)]
+    escapes = sum(1 for f in ref_all if f["class"] == "escape")
+    out += ["", "Reference set: %d finding(s); %s were escapes." % (
+        len(ref_all), pct(escapes / len(ref_all) if ref_all else None)), ""]
+
+    out += ["## Main effects and noise floor", "",
+            "| Effect | Measure | Mean difference per slice | 80% interval | Sign test p | Slices |", "|---|---|---|---|---|---|"]
+    for factor, label in (("model", "opus minus sonnet"), ("effort", "high minus medium")):
+        for name, value in (("findings found", lambda s, a: len(st.found(s, a))),
+                            ("Total, central", lambda s, a: st.total(s, a, "central"))):
+            effect = st.main_effect(factor, value)
+            out.append("| %s | %s | %s | %s | %s | %s |" % ((label, name) + (
+                ("%.2f" % effect[0], span(effect[1]), pval(effect[2]), effect[3]) if effect else ("n/a",) * 4)))
+    out += ["", "Noise floor: %s and its replicate %s disagree by %.2f finding(s) a slice. A difference between "
+            "arms no larger than that is not a result." % (st.twin_of, st.replicate, st.noise_floor()), ""]
+
+    out += ["## Seeded defects (reported only)", "",
+            "Kill rate of mutants seeded in the lines each slice changed, judged by one arm's passing tests "
+            "alone. It gates nothing and is not part of the decision rule; weigh it when confirmed findings "
+            "are inconclusive.", "",
+            "| Arm | Slices measured | Mutants | Caught | Kill rate, pooled | Mean per slice | vs %s, 80%% interval | Not measured |" % (st.arms[0] if st.arms else "-"),
+            "|---|---|---|---|---|---|---|---|"]
+    for arm in st.arms + ([st.replicate] if st.replicate else []):
+        rated = [s for s in st.slices if st.kill_rate(s, arm) is not None]
+        caught = sum(st.mutants[(s, arm)]["caught"] for s in rated)
+        seen = sum(st.mutants[(s, arm)]["caught"] + st.mutants[(s, arm)]["missed"] for s in rated)
+        base_arm = st.arms[0] if st.arms else arm
+        both = [s for s in rated if st.kill_rate(s, base_arm) is not None]
+        diffs = [st.kill_rate(s, arm) - st.kill_rate(s, base_arm) for s in both]
+        other = {}
+        for s in st.slices:
+            m = st.mutants.get((s, arm))
+            if m and m["status"] != "ok":
+                other[m["status"]] = other.get(m["status"], 0) + 1
+        out.append("| %s | %d | %d | %d | %s | %s | %s | %s |" % (
+            arm, len(rated), seen, caught, pct(caught / seen if seen else None),
+            pct(mean(st.kill_rate(s, arm) for s in rated) if rated else None),
+            "-" if arm == base_arm else span(interval(diffs)),
+            ", ".join("%d %s" % (n, k) for k, n in sorted(other.items())) or "-"))
+    if st.replicate and st.twin_of:
+        both = [s for s in st.slices if st.kill_rate(s, st.replicate) is not None and st.kill_rate(s, st.twin_of) is not None]
+        out += ["", "Noise floor: %s and %s differ by %s in kill rate a slice (%d slice(s))." % (
+            st.twin_of, st.replicate,
+            pct(mean(abs(st.kill_rate(s, st.replicate) - st.kill_rate(s, st.twin_of)) for s in both) if both else None), len(both))]
+    measured = sorted({s for (s, _), m in st.mutants.items() if s in st.slices})
+    if measured:
+        out += ["", "| Slice | " + " | ".join(st.arms + ([st.replicate] if st.replicate else [])) + " |",
+                "|---|" + "---|" * (len(st.arms) + bool(st.replicate))]
+        for s in measured:
+            out.append("| %s | %s |" % (s, " | ".join(
+                pct(st.kill_rate(s, a)) if st.kill_rate(s, a) is not None else st.mutants.get((s, a), {}).get("status", "-")
+                for a in st.arms + ([st.replicate] if st.replicate else []))))
+    out.append("")
+
+    def split(title, groups, least=1):
+        lines = []
+        for name, slices in groups:
+            if len(slices) < least:
+                continue
+            lines += ["", "%s: %s (%d slice(s))" % (title, name, len(slices)), "",
+                      "| Arm | Valid runs | Found | Missed | Total central |", "|---|---|---|---|---|"]
+            for arm in st.arms:
+                mine = st.valid(arm, slices)
+                lines.append("| %s | %d | %d | %d | %s |" % (
+                    arm, len(mine), sum(len(st.found(s, arm)) for s in mine),
+                    sum(len(st.missed(s, arm)) for s in mine),
+                    money(mean(st.total(s, arm, "central") for s in mine)) if mine else "n/a"))
+        return lines
+
+    by = lambda key: sorted({key(s) for s in st.slices}, key=str)
+    tier = lambda s: st.assignment[s].get("tier") or "unset"
+    area = lambda s: st.standing[s].get("area") or "other"
+    cli = lambda s: next((r.get("cli_version") for r in of(rows, "run", s) if r.get("cli_version")), None)
+    block = lambda s: "CLI %s, tester.md %s" % (cli(s), (st.assignment[s].get("tester_md_sha") or "unknown")[:8])
+    derived = {r["slice"] for r in of(rows, "snap") if r["name"] == "g1" and r.get("source") == "derived"}
+    leaked = {s for (s, _), r in st.runs.items() if r.get("leak")}
+    out += ["## Splits", ""]
+    for arm in st.arms:
+        twin = [s for s in st.valid(arm) if st.runs[(s, arm)].get("twin")]
+        rest = [s for s in st.valid(arm) if s not in twin]
+        out.append("- %s: as the primary's twin %d slice(s), %.2f finding(s) a slice; otherwise %d slice(s), %.2f." % (
+            arm, len(twin), mean(len(st.found(s, arm)) for s in twin),
+            len(rest), mean(len(st.found(s, arm)) for s in rest)))
+    out += split("Tier", [(t, [s for s in st.slices if tier(s) == t]) for t in by(tier)], 5)
+    out += split("Area", [(a, [s for s in st.slices if area(s) == a]) for a in by(area)], 5)
+    if len(by(block)) > 1:
+        out += split("Block", [(b, [s for s in st.slices if block(s) == b]) for b in by(block)])
+    if derived & set(st.slices):
+        out += split("First-green snapshot", [("recorded by `mark`", [s for s in st.slices if s not in derived]),
+                                              ("derived", [s for s in st.slices if s in derived])])
+    if leaked:
+        out += split("Leak", [("no shadow report reached the builder", [s for s in st.slices if s not in leaked]),
+                              ("a shadow report leaked", [s for s in st.slices if s in leaked])])
+    out.append("")
+
+    decision = st.decide()
+    out += ["## Prices", ""]
+    for klass in CLASSES:
+        if klass in st.measured:
+            out.append("- %s: measured mean fix cost %s replaces the historical price %s in the central and high scenarios." % (
+                klass, money(st.measured[klass]), money(miss_price(st.prices, "central", klass, {}))))
+    cost = {a: mean(st.run_cost(s, a) for s in st.valid(a)) for a in st.arms if st.valid(a)}
+    ref = min(cost, key=lambda a: (cost[a], a)) if cost else None
+    for arm in st.arms:
+        if arm == ref or not st.valid(arm) or not ref:
+            continue
+        other = mean(st.paired(arm, ref, lambda s, a: st.total(s, a, "central") - sum(
+            miss_price(st.prices, "central", f["class"], st.measured) for f in st.missed(s, a))))
+        misses = mean(st.paired(arm, ref, lambda s, a: len(st.missed(s, a))))
+        if misses * other < 0:
+            out.append("- %s and %s tie at a miss price of %s." % (arm, ref, money(other / -misses)))
+        else:
+            out.append("- %s against %s: no miss price makes them tie (%s misses %+.2f a slice, other costs %+.2f)." % (
+                arm, ref, arm, misses, other))
+    pairs = [(st.recall([a, b]), a, b) for i, a in enumerate(st.arms) for b in st.arms[i + 1:]
+             if st.recall([a, b]) is not None]
+    best = max(pairs, key=lambda p: (p[0], p[1], p[2])) if pairs else None
+    if best:
+        out.append("- Best pair recall: %s + %s find %s of the reference set." % (best[1], best[2], pct(best[0])))
+    out.append("")
+
+    out += ["## Decision", ""]
+    if decision["choice"]:
+        out.append("**%s at effort %s** (%s)." % (decision["choice"], decision["effort"], {
+            "quality": "a quality result", "cost-default": "a cost default, not a quality result"}[decision["basis"]]))
+    else:
+        out.append("**No model change: report only.**")
+    out += ["- " + r for r in decision["reasons"]]
+    tiers = [(t, [s for s in st.slices if tier(s) == t]) for t in by(tier)]
+    if len(tiers) > 1 and all(len(s) >= 5 for _, s in tiers):
+        for name, slices in tiers:
+            sub = st.decide(slices)
+            out.append("- Tier %s alone: %s at effort %s (%s)." % (name, sub["choice"], sub["effort"], sub["basis"])
+                       if sub["choice"] else "- Tier %s alone: report only." % name)
+    elif len(tiers) > 1:
+        out.append("- Tiers are not decided separately: not every tier has five scored slices.")
+    loc = {a: mean(st.quality.get((s, a), {}).get("loc_per_criterion", 0) for s in st.valid(a)) for a in st.arms if st.valid(a)}
+    fpr = {a: sum(st.false_positives(s, a) for s in st.valid(a))
+           / max(1, sum(st.quality.get((s, a), {}).get("tests", 0) for s in st.valid(a))) for a in st.arms if st.valid(a)}
+    for arm in loc:
+        over = [what for what, table in (("lines per criterion", loc), ("false-positive rate", fpr))
+                if table[arm] > 1.5 * median(table.values())]
+        if over:
+            out.append("- %s is above 1.5 times the arms' median %s: it gets a `tester.md` rule change whichever model is chosen."
+                       % (arm, " and ".join(over)))
+    singles = [st.recall([a]) for a in st.arms if st.recall([a]) is not None]
+    if best and singles and max(singles) < 0.70 and best[0] >= 0.90:
+        both = [s for s in st.slices if st.ok(s, best[1]) and st.ok(s, best[2])]
+
+        def pair_total(s):
+            union = [f for f in st.reference(s, False) if best[1] not in f["found_by"] and best[2] not in f["found_by"]]
+            own = sum(st.total(s, a, "central") - sum(miss_price(st.prices, "central", f["class"], st.measured)
+                                                      for f in st.missed(s, a)) for a in best[1:])
+            return own + sum(miss_price(st.prices, "central", f["class"], st.measured) for f in union)
+        single = min(mean(st.total(s, a, "central") for s in st.valid(a)) for a in st.arms if st.valid(a))
+        if both and mean(pair_total(s) for s in both) < single:
+            out.append("- PROPOSAL for the operator: no arm reaches 70%% recall and %s + %s reach %s at a lower Total "
+                       "(%s a slice against %s), second run included: a permanent two-tester setup." % (
+                           best[1], best[2], pct(best[0]), money(mean(pair_total(s) for s in both)), money(single)))
+    model_gain = st.main_effect("model", lambda s, a: len(st.found(s, a)))
+    if decision["basis"] == "cost-default" and st.model.get(decision["choice"]) != "opus" \
+            and (model_gain is None or model_gain[0] <= st.noise_floor()):
+        out.append("- PROPOSAL for the operator: the result is a cost default and opus showed no lead in findings beyond "
+                   "the noise floor. Whether the cost default also replaces opus on hard-tier slices is the operator's "
+                   "ruling; nothing applies it.")
+    out.append("")
+
+    out += ["## Recorded, not counted", ""]
+    aside = [f for f in st.findings if f["status"] in ("out-of-scope", "rejected", "pending")
+             or (f["status"] == "confirmed" and not any(a in st.arms for a in f["found_by"]))]
+    for f in sorted(aside, key=lambda f: (f["slice"], f["finding_id"])):
+        why = {"out-of-scope": "base defect outside the slice's reach; filed as a residual",
+               "rejected": "verdict named no criterion or no wrong behaviour",
+               "pending": "confirmed, fix not merged; counted only in the pending tables"}.get(
+                   f["status"], "found by the replicate alone")
+        out.append("- %s %s — %s: %s" % (f["finding_id"], f["slice"], why, f.get("wrong_behaviour") or "-"))
+    if not aside:
+        out.append("None.")
+    out += ["", "## Spot-check list", "",
+            "Every counted finding. Its tests, failure output and fix diff are in the judge bundle that holds its items.", ""]
+    for f in sorted(ref_all, key=lambda f: (f["slice"], f["finding_id"])):
+        out.append("- %s %s [%s, %s, %s] criterion %s — %s. Found by %s; missed by %s. Items: %s." % (
+            f["finding_id"], f["slice"], f["class"], f["verdict"], f.get("severity") or "unrated",
+            f.get("criterion") or "-", f.get("wrong_behaviour") or "-", ", ".join(f["found_by"]),
+            ", ".join(f["missed_by"]) or "none", ", ".join(f["members"])))
+    if not ref_all:
+        out.append("None.")
+    return "\n".join(out) + "\n"
+
+
+def cmd_report(ctx, args):
+    _, opt = options(args, valued=("--out",))
+    text = render_report(read(ctx), ctx.cfg)
+    path = opt.get("out") or os.path.join(ctx.mem, "retros", "%s-tester-ab.md" % datetime.datetime.now(
+        datetime.timezone.utc).strftime("%Y%m%dT%H%M"))
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w") as fh:
+        fh.write(text)
+    print("AB-REPORT %s" % path)
+
+
 COMMANDS = {"eligible": cmd_eligible, "plan": cmd_plan, "collect": cmd_collect,
-            "score": cmd_score, "status": cmd_status}
+            "score": cmd_score, "status": cmd_status, "judge-pack": cmd_judge_pack,
+            "judge-apply": cmd_judge_apply, "fix-cost": cmd_fix_cost, "report": cmd_report}
 
 
 def main(argv, mem=HERE):
@@ -1488,25 +2361,27 @@ class _Box:
         manifest = self.ctx().manifest(slice_)
         return {e["arm"]: (label, e["export"]) for label, e in manifest["labels"].items()}
 
-    def transcript(self, first, model, effort, inputs=(), final="done", role="tester", tokens=1000000):
-        """Write one subagent transcript. `tokens` input tokens: $2.00 on sonnet, $4.00 on opus."""
+    def transcript(self, first, model, effort, inputs=(), final="done", role="tester", tokens=1000000, at=None):
+        """Write one subagent transcript. `tokens` input tokens: $2.00 on sonnet, $4.00 on opus.
+        It starts at `at`; by default a minute ago, each one a second after the one before."""
         self.agents += 1
         agent = "f%03d" % self.agents
         sub = os.path.join(self.tr, "proj", self.session, "subagents")
         os.makedirs(sub, exist_ok=True)
-        stamp = lambda s: (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=s + self.agents)
-                           ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        start = time.time() - 60 + self.agents if at is None else at
+        stamp = lambda s: datetime.datetime.fromtimestamp(start + s, datetime.timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%S.000Z")
         content = [{"type": "tool_use", "id": "t%d" % i, "name": name, "input": inp}
                    for i, (name, inp) in enumerate(inputs)]
         events = [
             {"type": "user", "timestamp": stamp(0), "message": {"role": "user", "content": first}},
-            {"type": "assistant", "timestamp": stamp(1), "effort": effort, "version": "9.9.9",
+            {"type": "assistant", "timestamp": stamp(0), "effort": effort, "version": "9.9.9",
              "message": {"id": "m1", "model": _MODEL_ID.get(model, model), "content": content,
                          "usage": {"input_tokens": tokens}}},
-            {"type": "user", "timestamp": stamp(2), "message": {"role": "user", "content": [
+            {"type": "user", "timestamp": stamp(1), "message": {"role": "user", "content": [
                 {"type": "tool_result", "tool_use_id": "t%d" % i, "is_error": name == "Bash"}
                 for i, (name, _) in enumerate(inputs)]}},
-            {"type": "assistant", "timestamp": stamp(3), "effort": effort, "version": "9.9.9",
+            {"type": "assistant", "timestamp": stamp(2), "effort": effort, "version": "9.9.9",
              "message": {"id": "m2", "model": _MODEL_ID.get(model, model),
                          "content": [{"type": "text", "text": final}], "usage": {}}}]
         with open(os.path.join(sub, "agent-%s.jsonl" % agent), "w") as fh:
@@ -1764,8 +2639,10 @@ def _st_collect(chk, tmp):
         and standing["eo-1"].get("area") == "other", standing)
 
 
-def _scenario(box, slice_="np-a", rust=True):
+def _scenario(box, slice_="np-a", rust=True, hook=None):
     """Plan, play five shadows, collect, and build the snapshots g1, g2, m and end of a slice.
+    `hook(name, sha)` is called after the commit of g1, g2 and m; by default it records the
+    commit as that snapshot.
 
     rules at base: hp=10 old=bug mp=4.   g1: +atk=5 def=2 spd=6.   g2: def=3 (a lens fix).
     m: spd=7 old=fixed.   end: hp=11 mp=5, and the spec corpus changes criterion C8."""
@@ -1787,13 +2664,12 @@ def _scenario(box, slice_="np-a", rust=True):
     ctx = box.ctx()
     target = "game/rules.txt" if rust else "client/ui.txt"
     rules = lambda **kv: "".join("%s=%s\n" % p for p in kv.items())
+    hook = hook or (lambda name, sha: record_snap(ctx, slice_, name, sha))
     box.commit(wt, "red", {"tests/primary.toy": _toy(_T_ATK)})
-    g1 = box.commit(wt, "green", {target: rules(hp=10, old="bug", mp=4, atk=5, **{"def": 2}, spd=6),
-                                  "game/main.rs" if rust else "docs/main.md": "use helper;\nfn main() {}\n"})
-    g2 = box.commit(wt, "lens fix", {target: rules(hp=10, old="bug", mp=4, atk=5, **{"def": 3}, spd=6)})
-    m = box.commit(wt, "last fix", {target: rules(hp=10, old="fixed", mp=4, atk=5, **{"def": 3}, spd=7)})
-    for name, sha in (("g1", g1), ("g2", g2), ("m", m)):
-        record_snap(ctx, slice_, name, sha)
+    hook("g1", box.commit(wt, "green", {target: rules(hp=10, old="bug", mp=4, atk=5, **{"def": 2}, spd=6),
+                                        "game/main.rs" if rust else "docs/main.md": "use helper;\nfn main() {}\n"}))
+    hook("g2", box.commit(wt, "lens fix", {target: rules(hp=10, old="bug", mp=4, atk=5, **{"def": 3}, spd=6)}))
+    hook("m", box.commit(wt, "last fix", {target: rules(hp=10, old="fixed", mp=4, atk=5, **{"def": 3}, spd=7)}))
     git(box.game, "merge", "-q", "--ff-only", "slice/" + slice_)
     box.commit(box.game, "later work", {target: rules(hp=11, old="fixed", mp=5, atk=5, **{"def": 3}, spd=7)})
     time.sleep(1.1)          # the spec change is after m to the second
@@ -1962,6 +2838,334 @@ def _st_ledger(chk, tmp):
     chk("ledger/reader-skips-garbage", len(read(box.ctx())) == 600)
 
 
+_PRICES = {"lens_caught": 7.79, "lens_caught_low": 5.35, "post_merge": 21.64, "escape_high": 55.0,
+           "spec_high": 41.43, "fp": 2.07, "fp_low": 0.71, "flake": 21.64}
+
+
+def _st_judge(chk, tmp):
+    box = _Box(os.path.join(tmp, "judge"), prices=_PRICES, judge={"model": "fable", "effort": "high", "max_items": 150})
+    _scenario(box)
+    box.run("score", "np-a", "--end")
+    lab = {arm: label for arm, (label, _) in box.labels("np-a").items()}
+    os.makedirs(os.path.join(box.mem, "gates"))
+    with open(os.path.join(box.mem, "gates", "np-a.gates.md"), "w") as fh:
+        fh.write("- [ ] **C2:** WHEN a monster defends THE defence SHALL be 3\n- [ ] **C3:** speed is 7\n")
+    out = box.run("judge-pack")
+    judge_dir = os.path.join(box.mem, "tester-ab", "judge")
+    bundle = open(os.path.join(judge_dir, "bundle-1.md")).read()
+    key = json.load(open(os.path.join(judge_dir, "bundle-1.key.json")))
+    chk("judge-pack/one-call-to-the-judge", out.count("Agent(") == 1
+        and 'Agent(subagent_type="judge", model="fable", effort="high"' in out
+        and os.path.join(judge_dir, "bundle-1.md") in out and "judge-apply %s/verdicts-1.json" % judge_dir in out, out)
+    # Seven test-backed candidates and the spec claim; the base claim rides on its candidate.
+    chk("judge-pack/items", len(key) == 8 and bundle.count("\n## i0") == 8
+        and sorted(v["kind"] for v in key.values()) == sorted(
+            ["lens-caught"] * 3 + ["escape"] * 2 + ["base", "open-fail", "claim"]), sorted(v["kind"] for v in key.values()))
+    exports = [e["export"] for e in box.ctx().manifest("np-a")["labels"].values()]
+    leaks = [w for w in [a["arm"] for a in _ARMS] + ["sonnet", "opus", "fable", box.cache, "s_med", "o_high"] + exports
+             if w.lower() in bundle.lower()] + re.findall(r"\ba[1-5]\b", bundle)
+    chk("judge-pack/blind", leaks == [], leaks)
+    item = lambda arm, name: next(i for i, v in key.items() if v["label"] == lab[arm] and (
+        name == v["kind"] or any(c["candidate_id"] == v["ref"] and c["test_id"].endswith("::" + name)
+                                 for c in box.rows("candidate", "np-a") if c.get("test_id"))))
+    part = lambda item_id: bundle.split("\n## %s\n" % item_id)[1].split("\n---\n")[0]
+    lens = part(item("S-med", "t_def"))
+    chk("judge-pack/test-item-has-test-output-criterion-diff", "test t_def def=3" in lens
+        and "expected def=3, got 2" in lens and "at [path]" in lens and "THE defence SHALL be 3" in lens
+        and "-def=2" in lens and "+def=3" in lens and "t_atk" not in lens and "C7" not in lens,
+        lens)
+    chk("judge-pack/open-failure-says-so", "still fails at the merged code" in part(item("S-med", "t_wrong")))
+    chk("judge-pack/base-item-carries-the-claim", "old holds the wrong value" in part(item("O-med", "t_old")))
+    chk("judge-pack/claim-item-cites-lines", "C1 and C2 cannot both hold" in part(item("O-med", "claim"))
+        and "C1 C2 C3 C8 mp" in part(item("O-med", "claim")), part(item("O-med", "claim")))
+    # Verdicts. t_wrong is left without one.
+    crit = {"criterion": "C2", "wrong_behaviour": "defence resolves to 2 where the criterion requires 3"}
+    verdicts = [
+        dict(id=item("S-med", "t_def"), verdict="bug", severity="major", **crit),
+        dict(id=item("S-high", "t_def"), verdict="duplicate-of:" + item("S-med", "t_def")),
+        dict(id=item("S-med-r", "t_def"), verdict="duplicate-of:" + item("S-high", "t_def")),
+        dict(id=item("S-high", "t_spd"), verdict="bug", criterion="C3", wrong_behaviour=" "),
+        dict(id=item("O-high", "t_spd"), verdict="bug", criterion="C3", wrong_behaviour="speed stays 6 after the lens fixes"),
+        dict(id=item("O-med", "t_old"), verdict="design-defect", criterion="C4", wrong_behaviour="old keeps the value bug"),
+        dict(id=item("O-med", "claim"), verdict="not-a-defect"),
+        dict(id="i999", verdict="bug", **crit), dict(id=item("S-med", "t_wrong"), verdict="looks fine"), "junk"]
+    path = os.path.join(judge_dir, "verdicts-1.json")
+    with open(path, "w") as fh:
+        json.dump(verdicts, fh)
+    with open(os.path.join(judge_dir, "bundle-1.md"), "a") as fh:
+        fh.write("")
+    judge_agent = box.transcript("Read %s and rule on every item exactly as it instructs." % os.path.join(judge_dir, "bundle-1.md"),
+                                 "fable", "high", role="judge", tokens=500000)
+    before = spent(box.rows())
+    out = box.run("judge-apply", path)
+    finds = {(f["class"], f["status"]): f for f in latest(box.rows("finding", "np-a"), lambda r: r["finding_id"])}
+    chk("judge-apply/tally", out.startswith("AB-JUDGED 7 verdict(s) applied, 1 unusable, 1 item(s) without one; "
+                                            "findings: 3 confirmed, 1 rejected"), out)
+    lens_f = finds.get(("lens-caught", "confirmed"), {})
+    chk("judge-apply/duplicates-are-one-finding", lens_f.get("found_by") == ["S-high", "S-med"]
+        and lens_f.get("missed_by") == ["O-high", "O-med"] and lens_f.get("replicate_found") is True
+        and len(lens_f.get("members", [])) == 3 and lens_f.get("criterion") == "C2"
+        and lens_f.get("severity") == "major", lens_f)
+    chk("judge-apply/defect-verdict-needs-criterion-and-behaviour", (None, "rejected") in finds
+        and finds[(None, "rejected")]["verdict"] == "rejected-incomplete" and finds[(None, "rejected")]["found_by"] == [],
+        finds.get((None, "rejected")))
+    esc = finds.get(("escape", "confirmed"), {})
+    chk("judge-apply/escape-found-by-one-arm", esc.get("found_by") == ["O-high"]
+        and esc.get("missed_by") == ["O-med", "S-high", "S-med"] and esc.get("replicate_found") is False, esc)
+    chk("judge-apply/base-finding", finds.get(("base", "confirmed"), {}).get("found_by") == ["O-med"]
+        and finds[("base", "confirmed")]["verdict"] == "design-defect", finds.get(("base", "confirmed")))
+    judge_run = [r for r in box.rows("run") if r.get("role") == "judge"]
+    chk("judge-apply/judge-run-counts-toward-the-cap", len(judge_run) == 1 and judge_run[0]["agent_id"] == judge_agent
+        and judge_run[0]["cost_usd"] == 4.0 and spent(box.rows()) == before + 4.0, judge_run)
+    n = len(box.rows())
+    again = box.run("judge-apply", path)
+    chk("judge-apply/applies-once", again.startswith("AB-JUDGED 0 verdict(s) applied") and len(box.rows()) == n, again)
+    # The second bundle holds only what has no verdict yet; a confirmed defect nothing fixed is pending.
+    out = box.run("judge-pack")
+    key2 = json.load(open(os.path.join(judge_dir, "bundle-2.key.json")))
+    chk("judge-pack/only-unjudged-items", [v["kind"] for v in key2.values()] == ["open-fail"] and "bundle-2.md" in out, key2)
+    with open(os.path.join(judge_dir, "verdicts-2.json"), "w") as fh:
+        json.dump([{"id": "i001", "verdict": "bug", "criterion": "C7", "wrong_behaviour": "zz is never set to 1"}], fh)
+    out = box.run("judge-apply", os.path.join(judge_dir, "verdicts-2.json"))
+    pend = next((f for f in box.rows("finding", "np-a") if f["status"] == "pending"), {})
+    chk("judge-apply/unfixed-defect-is-pending", pend.get("class") == "escape" and pend.get("found_by") == ["S-med"]
+        and "file as a residual: %s np-a [pending] C7" % pend.get("finding_id") in out, out)
+    chk("judge-pack/nothing-left", box.run("judge-pack") == "AB-SKIP nothing-to-judge\n")
+    chk("judge-apply/bad-file-name", box.run("judge-apply", "/tmp/x.json").startswith("AB-SKIP verdicts file must be"))
+    # fix-cost keeps the finding and sets its cost.
+    out = box.run("fix-cost", esc["finding_id"], "12.5")
+    now_esc = latest(box.rows("finding", "np-a"), lambda r: r["finding_id"])
+    chk("fix-cost/recorded", out == "AB-FIX-COST %s $12.50\n" % esc["finding_id"]
+        and [f["fix_cost_usd"] for f in now_esc if f["finding_id"] == esc["finding_id"]] == [12.5]
+        and [f["found_by"] for f in now_esc if f["finding_id"] == esc["finding_id"]] == [["O-high"]]
+        and box.run("fix-cost", "fnope", "1") == "AB-SKIP no such finding\n", out)
+    # A wrong test and a rejected claim are false positives of their arm, in the report's terms.
+    st = Stats(box.rows(), box.cfg)
+    chk("judge/false-positives-per-arm", st.false_positives("np-a", "O-med") == 1 and st.false_positives("np-a", "O-high") == 1
+        and st.false_positives("np-a", "S-high") == 0, [st.false_positives("np-a", a) for a in st.arms])
+    report = os.path.join(box.tmp, "report.md")
+    out = box.run("report", "--out", report)
+    text = open(report).read() if os.path.exists(report) else ""
+    chk("report/written-from-a-real-ledger", out == "AB-REPORT %s\n" % report and "## Decision" in text
+        and "**No model change: report only.**" in text and "| S-high | 1 | 4 | 3 | 75% |" in text, text[:400])
+    default = box.run("report")
+    chk("report/default-path", re.fullmatch(r"AB-REPORT %s/retros/\d{8}T\d{4}-tester-ab\.md\n" % re.escape(box.mem), default), default)
+    # An out-of-scope base claim the judge confirms is recorded and never counted.
+    rows = box.rows()
+    cand = next(c for c in rows if c.get("kind") == "candidate" and c["type"] == "base")
+    verdict = next(v for v in rows if v.get("kind") == "verdict" and v["ref"] == cand["candidate_id"])
+    moved = [dict(r, slice="np-q") for r in rows if r.get("kind") == "run" and r.get("slice") == "np-a"] + [
+        dict(cand, slice="np-q", scope="out"), dict(verdict, slice="np-q")]
+    found = findings(moved, "np-q")
+    chk("judge/out-of-scope-base", len(found) == 1 and found[0]["status"] == "out-of-scope"
+        and found[0]["class"] == "out-of-scope", found)
+    # Sampling: every other item is kept; still-failing tests are cut evenly per arm and slice.
+    many = [("k%d" % i, "s1", "open-fail", "a1", "") for i in range(60)] + [
+        ("m%d" % i, "s1", "open-fail", "a2", "") for i in range(9)] + [("e%d" % i, "s1", "escape", "a1", "") for i in range(20)]
+    kept, scale = sample_open(many, 40)
+    per = {l: sum(1 for i in kept if i[2] == "open-fail" and i[3] == l) for l in ("a1", "a2")}
+    chk("judge-pack/sampling", len(kept) == 40 and sum(1 for i in kept if i[2] == "escape") == 20
+        and per == {"a1": 11, "a2": 9} and {scale[i[0]] for i in kept if i[3] == "a1" and i[2] == "open-fail"} == {5.4545}
+        and {scale[i[0]] for i in kept if i[3] == "a2"} == {1.0}, (len(kept), per))
+    chk("judge/redact", redact(box.ctx(), "S-med-r and S-med on Claude-Sonnet-5-5 at %s/x" % box.cache)
+        == "[redacted] and [redacted] on [redacted] at [path]/x", redact(box.ctx(), "S-med-r and S-med"))
+
+
+def _ledger(n, found=(), costs=None, tiers=None, areas=None, quality=None, replicate=(), failed=(), extra=()):
+    """A fixture ledger of n scored slices s01..: `found` lists (class, arms that found it,
+    status) once per slice unless a fourth element names the slices."""
+    costs = costs or {"S-med": 2.7, "S-high": 3.5, "O-med": 6.5, "O-high": 9.0, "S-med-r": 2.7}
+    rows = []
+    for i in range(n):
+        s = "s%02d" % (i + 1)
+        tier = (tiers or ["routine"] * n)[i]
+        rows.append({"kind": "assignment", "slice": s, "tier": tier, "tester_md_sha": "ab" * 32, "skipped": None})
+        rows.append({"kind": "slice", "slice": s, "status": "scored", "area": (areas or ["rust"] * n)[i]})
+        for j, arm in enumerate(_ARMS):
+            name = arm["arm"]
+            rows.append({"kind": "run", "slice": s, "label": "a%d" % (j + 1), "arm": name, "role": arm["role"],
+                         "status": "failed" if (s, name) in failed else "ok", "cost_usd": costs[name],
+                         "twin": name == "S-med", "cli_version": "9.9.9", "leak": False})
+            q = {"no_compile_files": 0, "flaky": 0, "brittle": 0, "tests": 10, "test_loc": 100,
+                 "loc_per_criterion": 10.0, "bloat_usd": 0.05}
+            q.update((quality or {}).get(name, {}))
+            rows.append(dict(q, kind="quality", slice=s, label="a%d" % (j + 1)))
+        for k, spec in enumerate(found):
+            klass, arms, status = spec[:3]
+            if len(spec) > 3 and s not in spec[3]:
+                continue
+            rows.append({"kind": "finding", "slice": s, "finding_id": "f%s-%d" % (s, k), "class": klass,
+                         "status": status, "verdict": "bug", "criterion": "C%d" % k, "wrong_behaviour": "wrong %d" % k,
+                         "severity": "minor", "found_by": sorted(arms), "members": ["k%d" % k],
+                         "missed_by": sorted(a for a in ("S-med", "S-high", "O-med", "O-high") if a not in arms),
+                         "replicate_found": k in replicate, "fix_cost_usd": None})
+    return rows + list(extra)
+
+
+def _st_report(chk, tmp):
+    cfg = {"arms": _ARMS, "prices": _PRICES, "cap_arm_usd": 500}
+    all4 = ("S-med", "S-high", "O-med", "O-high")
+    opus = ("O-med", "O-high")
+    decision = lambda rows: render_report(rows, cfg).split("## Decision\n\n")[1].split("\n## ")[0]
+    line = lambda text, arm: next((l for l in text.splitlines() if l.startswith("- %s does not replace" % arm)), "")
+
+    # Totals: run cost, each miss at its class's price, the priced quality counts.
+    rows = _ledger(1, [("escape", opus, "confirmed"), ("lens-caught", opus, "confirmed"), ("spec", opus, "confirmed"),
+                       ("escape", ("S-med",), "pending")],
+                   quality={"S-med": {"no_compile_files": 1, "flaky": 1, "brittle": 1, "bloat_usd": 0.01}},
+                   extra=[dict(kind="verdict", slice="s01", label="a1", ref=ref, item=item, verdict=verdict, scale=scale)
+                          for ref, item, verdict, scale in (
+                              ("k1", "open-fail", "wrong-test", 2.5), ("c1", "claim", "not-a-defect", 1),
+                              ("k2", "open-fail", "incomplete-work", 1), ("k3", "escape", "bug", 1))])
+    st = Stats(rows, cfg)
+    totals = [round(st.total("s01", "S-med", sc), 2) for sc in SCENARIOS]
+    # False positives of S-med: one file that does not compile, a wrong test standing for 2.5
+    # sampled ones, one rejected claim.
+    chk("report/false-positives", st.false_positives("s01", "S-med") == 4.5 and st.false_positives("s01", "O-med") == 0,
+        st.false_positives("s01", "S-med"))
+    chk("report/total-per-scenario", totals == [
+        round(2.7 + 3 * 5.35 + 4.5 * 0.71 + 21.64 + 0.71 + 0.01, 2),
+        round(2.7 + 21.64 + 7.79 + 21.64 + 4.5 * 2.07 + 21.64 + 2.07 + 0.01, 2),
+        round(2.7 + 55.0 + 7.79 + 41.43 + 4.5 * 2.07 + 21.64 + 2.07 + 0.01, 2)], totals)
+    chk("report/pending-counted-or-not", len(st.missed("s01", "O-med")) == 0 and len(st.missed("s01", "O-med", True)) == 1
+        and len(st.found("s01", "S-med")) == 0 and len(st.found("s01", "S-med", True)) == 1
+        and round(st.total("s01", "O-med", "central", True) - st.total("s01", "O-med", "central"), 2) == 21.64)
+    # Rule 6: fewer than six scored slices.
+    few = decision(_ledger(5, [("escape", opus, "confirmed")] * 2))
+    chk("decision/report-only-under-six-slices", "**No model change: report only.**" in few
+        and "5 scored slice(s), fewer than six" in few, few)
+    # Rule 2: an arm replaces the cheapest when all four conditions hold.
+    win = decision(_ledger(8, [("escape", opus, "confirmed")] * 2))
+    chk("decision/quality-winner", "**O-med at effort medium** (a quality result)." in win
+        and "O-med replaces S-med" in win and "PROPOSAL" not in win, win)
+    # Rule 3: no proven difference is a cost default; the hard-tier question goes to the operator.
+    same = decision(_ledger(8, [("lens-caught", all4, "confirmed")], replicate=(0,)))
+    chk("decision/cost-default", "**S-med at effort medium** (a cost default, not a quality result)." in same
+        and "set effort to medium explicitly" in same, same)
+    # Rule 1: the reference is whichever arm is cheapest to run, not a fixed one.
+    cheap_opus = decision(_ledger(8, [("lens-caught", all4, "confirmed")], replicate=(0,), costs={
+        "S-med": 2.7, "S-high": 3.5, "O-med": 6.5, "O-high": 1.0, "S-med-r": 2.7}))
+    chk("decision/reference-is-the-cheapest-arm", "**O-high at effort medium** (a cost default" in cheap_opus
+        and "PROPOSAL for the operator: the result is a cost default" not in cheap_opus, cheap_opus)
+    chk("decision/hard-tier-question-is-the-operators", "PROPOSAL for the operator: the result is a cost default" in same
+        and "nothing applies it" in same, same)
+    # Rule 2d: a lead no larger than the replicate's disagreement is not a result.
+    noisy = decision(_ledger(8, [("escape", opus, "confirmed")], replicate=(0,)))
+    chk("decision/lead-within-noise-floor", "(a cost default" in noisy and line(noisy, "O-med")
+        == "- O-med does not replace S-med: its lead in findings (1.00 a slice) does not exceed the noise floor (1.00)",
+        line(noisy, "O-med"))
+    # Rule 2c: the result must hold with pending findings counted.
+    flip = decision(_ledger(8, [("escape", ("O-med",), "confirmed"), ("escape", ("S-med",), "pending"),
+                                ("escape", ("S-med",), "pending")]))
+    chk("decision/must-hold-with-pending-counted", "(a cost default" in flip and line(flip, "O-med").startswith(
+        "- O-med does not replace S-med: its Total is not lower in the low scenario with pending findings counted"),
+        line(flip, "O-med"))
+    # Rule 2a: lower in the central scenario alone is not enough.
+    cheap = dict(_PRICES, lens_caught_low=0.5)
+    low = render_report(_ledger(8, [("escape", opus, "confirmed")]), dict(cfg, prices=cheap)).split("## Decision")[1]
+    chk("decision/all-three-scenarios", "(a cost default" in low and line(low, "O-med").startswith(
+        "- O-med does not replace S-med: its Total is not lower in the low scenario; its Total is not lower in the low "
+        "scenario with pending findings counted") and "central" not in line(low, "O-med"), line(low, "O-med"))
+    # Rule 2b: the interval must exclude zero.
+    mixed = decision(_ledger(8, [("escape", opus, "confirmed", ("s01",)), ("escape", opus, "confirmed", ("s01",)),
+                                 ("escape", opus, "confirmed", ("s01",)), ("escape", opus, "confirmed", ("s01",)),
+                                 ("escape", opus, "confirmed", ("s01",)), ("escape", opus, "confirmed", ("s01",))]))
+    chk("decision/interval-must-exclude-zero", "(a cost default" in mixed and line(mixed, "O-med").startswith(
+        "- O-med does not replace S-med: the 80% interval of the difference includes zero;"), line(mixed, "O-med"))
+    # Rule 4: effort stays high only when high effort finds more than the noise floor.
+    effort = decision(_ledger(8, [("escape", ("S-high", "O-high"), "confirmed")]))
+    chk("decision/effort-kept-when-it-pays", "**S-high at effort high** (a quality result)." in effort
+        and "set effort to medium" not in effort, effort)
+    # Rule 5: tiers are decided separately only with five scored slices in each.
+    tiers = lambda hard: decision(_ledger(10, [("escape", opus, "confirmed")] * 2, tiers=["hard"] * hard + ["routine"] * (10 - hard)))
+    chk("decision/tiers-with-five-each", "- Tier hard alone: report only." in tiers(5) and "- Tier routine alone:" in tiers(5)
+        and "Tiers are not decided separately" in tiers(4) and "Tier hard alone" not in tiers(4), tiers(5))
+    # Rule 7: an arm far above the median size or false-positive rate gets a rule change.
+    bloat = decision(_ledger(8, [("lens-caught", all4, "confirmed")], quality={
+        "O-high": {"loc_per_criterion": 40.0}, "S-high": {"no_compile_files": 3}}))
+    chk("decision/bloat-and-false-positive-guard",
+        "- O-high is above 1.5 times the arms' median lines per criterion: it gets a `tester.md` rule change" in bloat
+        and "- S-high is above 1.5 times the arms' median false-positive rate" in bloat and "- S-med is above" not in bloat, bloat)
+    # Rule 8: no arm at 70% recall and a pair at 90% for less.
+    pair = decision(_ledger(8, [("escape", ("S-med",), "confirmed"), ("escape", ("S-high",), "confirmed")]))
+    chk("decision/two-tester-proposal", "PROPOSAL for the operator: no arm reaches 70% recall and S-med + S-high reach 100%" in pair
+        and "a permanent two-tester setup" in pair, pair)
+    enough = decision(_ledger(8, [("escape", ("S-med",), "confirmed")] * 3 + [("escape", ("S-high",), "confirmed")]))
+    chk("decision/no-two-tester-proposal-when-an-arm-reaches-70", "two-tester" not in enough and "two-tester" not in win
+        and "- Best pair recall: S-med + S-high find 100%" in render_report(
+            _ledger(8, [("escape", ("S-med",), "confirmed")] * 3 + [("escape", ("S-high",), "confirmed")]), cfg), enough)
+
+    # The report's tables.
+    rows = _ledger(10, [("lens-caught", ("O-med",), "confirmed"), ("escape", ("O-med", "S-med"), "confirmed"),
+                        ("base", ("O-med",), "confirmed"), ("spec", ("O-med",), "confirmed", ("s01",)),
+                        ("out-of-scope", ("O-high",), "out-of-scope", ("s02",)), (None, (), "rejected", ("s03",)),
+                        ("escape", (), "confirmed", ("s04",))],
+                   areas=["rust"] * 5 + ["client"] * 4 + ["mixed"], failed={("s05", "O-high")}, replicate=(6,),
+                   extra=[{"kind": "slice", "slice": "s99", "status": "void"},
+                          {"kind": "assignment", "slice": "s99", "skipped": None},
+                          {"kind": "snap", "slice": "s02", "name": "g1", "sha": "x", "source": "derived"}]
+                   + [{"kind": "mutants", "slice": "s%02d" % i, "label": "a%d" % j, "status": "ok", "generated": 10,
+                       "caught": c, "missed": 10 - c, "unviable": 0, "timeouts": 0}
+                      for i in (1, 2) for j, c in ((1, 4), (2, 6), (3, 8), (4, 8), (5, 5))]
+                   + [{"kind": "mutants", "slice": "s03", "label": "a1", "status": "budget", "generated": 0,
+                       "caught": 0, "missed": 0, "unviable": 0, "timeouts": 0}])
+    text = render_report(rows, cfg)
+    chk("report/class-lines-and-new-work-only", "| O-med | 10 | 10 | 10 | 1 | 20 | 0 |" in text
+        and "| S-med | 0 | 10 | 0 | 0 | 10 | 21 |" in text, text.split("## Findings by class")[1][:600])
+    chk("report/header-counts", "- Slices: 10 scored or degraded (0 degraded), 1 void." in text
+        and "- Findings: 32 confirmed, 0 pending, 1 out of scope, 1 rejected for an incomplete verdict." in text, text[:500])
+    chk("report/out-of-scope-and-rejected-not-counted", "s02 — base defect outside the slice's reach" in text
+        and "s03 — verdict named no criterion" in text and "s04 — found by the replicate alone" in text
+        and "| O-high | 9 | $9.00 | 0 | 28 | 0% |" in text, text.split("## Arms")[1][:900])
+    chk("report/failed-run-is-missing-not-zero", "| O-high | 9 |" in text and "| O-med | 10 |" in text)
+    chk("report/area-split-needs-five", "Area: rust (5 slice(s))" in text and "Area: client" not in text
+        and "Area: mixed" not in text and "Tier:" in text, [l for l in text.splitlines() if l.startswith(("Area", "Tier"))])
+    chk("report/derived-first-green-split", "First-green snapshot: derived (1 slice(s))" in text
+        and "First-green snapshot: recorded by `mark` (9 slice(s))" in text)
+    chk("report/twin-split", "- S-med: as the primary's twin 10 slice(s), 1.00 finding(s) a slice; otherwise 0 slice(s)" in text)
+    chk("report/escape-share-and-best-pair", "Reference set: 31 finding(s); 32% were escapes." in text
+        and "- Best pair recall: S-med + O-med find 100% of the reference set." in text, text.split("## Prices")[1][:600])
+    chk("report/break-even", "- O-med and S-med tie at a miss price of $1.81." in text, text.split("## Prices")[1][:600])
+    seeded = text.split("## Seeded defects")[1].split("## Splits")[0]
+    chk("report/seeded-defects-table", "| S-med | 2 | 20 | 8 | 40% | 40% | - | 1 budget |" in seeded
+        and "| O-med | 2 | 20 | 16 | 80% | 80% | [0.40, 0.40] | - |" in seeded
+        and "Noise floor: S-med and S-med-r differ by 10% in kill rate a slice (2 slice(s))." in seeded
+        and "| s03 | budget | - | - | - | - |" in seeded and "is not part of the decision rule" in seeded, seeded)
+    chk("report/spot-check-list", text.count("\n- fs") >= 31 and "criterion C1 — wrong 1. Found by O-med, S-med; missed by O-high, S-high." in text)
+    main_fx = text.split("## Main effects")[1].split("## Seeded")[0]
+    chk("report/main-effects-and-noise-floor", "| opus minus sonnet | findings found |" in main_fx
+        and "| opus minus sonnet | findings found | 1.06 |" in main_fx and "| high minus medium | findings found | -2.06 |" in main_fx
+        and main_fx.count("| 0.004 | 9 |") == 4
+        and "Noise floor: S-med and its replicate S-med-r disagree by 1.00 finding(s) a slice." in main_fx, main_fx)
+    # Five measured fix costs of a class replace its historical price.
+    priced = [dict(r, fix_cost_usd=10.0) if r.get("kind") == "finding" and r["class"] == "escape" else r
+              for r in _ledger(8, [("escape", opus, "confirmed")])]
+    chk("report/measured-price-replaces-historical",
+        "- escape: measured mean fix cost $10.00 replaces the historical price $21.64" in render_report(priced, cfg)
+        and round(Stats(priced, cfg).total("s01", "S-med", "central"), 2) == round(2.7 + 10.0 + 0.05, 2)
+        and round(Stats(priced, cfg).total("s01", "S-med", "low"), 2) == round(2.7 + 5.35 + 0.05, 2))
+    four = [dict(r, fix_cost_usd=10.0) if r.get("kind") == "finding" else r for r in _ledger(4, [("escape", opus, "confirmed")])]
+    chk("report/four-measured-costs-do-not", Stats(four, cfg).measured == {})
+    # Byte-stable: the same ledger renders the same text in any process.
+    ledger = os.path.join(tmp, "report-ledger.json")
+    with open(ledger, "w") as fh:
+        json.dump([rows, cfg], fh)
+    code = ("import importlib.machinery, importlib.util, json, sys\n"
+            "loader = importlib.machinery.SourceFileLoader('ab', sys.argv[1])\n"
+            "ab = importlib.util.module_from_spec(importlib.util.spec_from_loader('ab', loader))\n"
+            "loader.exec_module(ab)\n"
+            "rows, cfg = json.load(open(sys.argv[2]))\n"
+            "sys.stdout.write(ab.render_report(rows, cfg))\n")
+    outs = [subprocess.run(["/usr/bin/python3", "-c", code, os.path.join(HERE, "mr-tester-ab"), ledger],
+                           capture_output=True, text=True, env=dict(os.environ, PYTHONHASHSEED=seed)).stdout
+            for seed in ("1", "2")]
+    chk("report/byte-stable", outs[0] == outs[1] == text and len(text) > 3000, (len(outs[0]), len(outs[1]), len(text)))
+    chk("report/interval-and-sign-test", interval([1.0] * 5) == (1.0, 1.0) and interval([3.0]) is None
+        and sign_test([1, 1, 1, 1, -1, 0]) == 0.375 and sign_test([0, 0]) is None
+        and interval([-5, 5, -5, 5, -5, 5])[0] < 0 < interval([-5, 5, -5, 5, -5, 5])[1]
+        and len({interval([-5.5, 5.1, -3.3, 8.7, 0.2, 2.9, -7.4, 4.6, 1.3, -2.2, 9.9]) for _ in range(4)}) == 1)
+
+
 def _st_shipped_config(chk):
     """The config beside this tool loads and has what the commands read."""
     try:
@@ -1999,7 +3203,9 @@ def _st_shipped_config(chk):
 
 
 _BATTERIES = [_st_disabled, _st_plan, _st_collect, _st_score, _st_no_game_diff, _st_ledger]
-_FLOOR = 80
+_FLOOR = 130
+_BATTERIES += [_st_judge, _st_report]
+# MORE-BATTERIES
 
 
 def selftest():
