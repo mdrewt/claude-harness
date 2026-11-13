@@ -40,66 +40,6 @@ deleted and never counts toward a playtest gate, and an empty `## Slices` means 
 
 ## Slices
 
-### st-2 — client shell: module map and state ownership
-type: design · tier: hard
-touches: docs/DECISIONS.md, docs/refactors/client-shell.md
-after: []
-
-`client/src/main.ts` holds the client shell in one module with no exports and about a hundred
-module-level `let` bindings. `ARCHITECTURE.md` names owners for some of that state (the context
-stack lives in `ui/contextStack.ts`), but nothing says where the rest belongs, so each extraction
-would have to invent its own seam. This slice decides it and changes no code.
-
-It reads `client/src/main.ts` in full, with the modules it wires and the `main.*.test.ts` suites
-that boot it; the code graphs (`code-intel` skill) answer what reads each binding. It has a
-`judge` score at least two decompositions on what each costs in moved state, test re-pointing
-and import cycles. The result conforms to the `docs/DECISIONS.md` entries "Context stack
-ownership" and "Client UI: virtual buttons, one context stack, one overlay frame", or
-supersedes in place only what they say about which module owns what; what a player sees or
-presses is not this slice's to change.
-
-`docs/refactors/client-shell.md` records:
-
-- the target module map: each module, its one responsibility, and what it may import;
-- an owner for every module-level mutable binding in `client/src/main.ts`, grouped (context
-  stack and overlays, session and claim, prediction and input, per-feature view state, DEV
-  hooks), and how other modules reach it;
-- the extractions still to make, in order, one line each: the symbols it moves and
-  whether it is a plain move or changes ownership.
-
-`docs/DECISIONS.md` gets one entry for the decomposition chosen and the one it rules out.
-
-- **ST2.1:** WHEN the client is type-checked and the `client/src/main.*.test.ts` suites run THEY
-  SHALL pass.
-
-Confirmed by reading at merge, not by a criterion: the plan names an owner for as many bindings
-as `client/src/main.ts` has module-level `let`s at head, none twice; the allowed imports form no
-cycle; every symbol an extraction line names exists; and the run's log shows the `judge`.
-
-### st-1 — e2e SQL helpers have one home
-type: refactor · tier: routine
-touches: client/e2e/stdb.ts, client/e2e/battle-dpad.spec.ts, client/e2e/encounter-battle.spec.ts, client/e2e/evolution.spec.ts, client/e2e/tactics-pvp.spec.ts, client/e2e/tactics-wild.spec.ts, client/e2e/menu-flow.spec.ts, client/e2e/my-battle-privacy.spec.ts, client/e2e/pointer.spec.ts, client/e2e/ui-inventory.spec.ts, client/e2e/ui-whole.spec.ts
-after: []
-
-Five e2e specs each define the same `sqlRows` (`battle-dpad`, `encounter-battle`, `evolution`,
-`tactics-pvp`, `tactics-wild`) and five define the same `ownerSql` (`menu-flow`,
-`my-battle-privacy`, `pointer`, `ui-inventory`, `ui-whole`). One copy of each moves into a new
-`client/e2e/stdb.ts`; each of the ten specs imports the helper it called and its local copy is
-deleted. The `ownerSql` definitions in `recruit`, `tactics-pvp`, `tactics-wild` and `ui-chrome`
-differ in body and stay where they are. This is a move of test scaffolding, so it is the
-tester's edit end to end (`standards/testing-tdd.md` §Behavior-preserving changes).
-
-Pins: none. No test reads these specs for their helper text; `client/src/ui/reachability.test.ts`
-scans every e2e file for retired control ids, and the moved bodies name none. Covering tests: the
-ten specs themselves.
-
-- **ST1.1:** WHEN the ten listed specs run against a live module THEY SHALL pass with every
-  assertion unedited.
-- **ST1.2:** WHEN the client is type-checked and linted THE e2e tree SHALL pass.
-
-Confirmed in the diff at merge, not by a criterion: each of the ten specs imports its helper from
-`./stdb` and its local copy is gone.
-
 ### st-3 — shared roster and count pins: one owner per fact
 type: design · tier: hard
 blocked: tester-ab-close
@@ -207,3 +147,88 @@ what it says about `combat::*`.
 Confirmed by reading at merge, not by a criterion: every symbol and test file the plan names
 exists; no item classed unreached is named by a production file; each `battle_redteam_tests.rs`
 test has a disposition; the run's log shows the `judge`.
+
+### st-5 — client shell: the session constants leave `main.ts`
+type: refactor · tier: routine
+touches: client/src/main.ts, client/src/shell/config.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, docs/refactors/client-shell.md, ARCHITECTURE.md
+after: []
+
+Extraction 1 of `docs/refactors/client-shell.md`, a plain move. `client/src/shell/config.ts` is
+created and takes `URI`, `DB`, `DEV_LOG_LEVEL`, `sendLogger`, `fateLogger`, `ZONE_ID`, `STEP_MS`,
+`QUEUE_CAP`, `PARTY_SIZE`, `PARTY_SLOT_NONE`, `MAX_TRADE_MONSTERS_PER_SIDE`,
+`DELETION_GRACE_MS_DEFAULT` and `WASM_READY_MS` as exports; `main.ts` imports them and its
+bodies change only by that import. The module follows the plan's rules 5 and 6: it imports the
+wasm package and the pure resolvers, writes nothing to the document, registers nothing, reads no
+locale, and the throw on a misconfigured production build still happens at import. A wasm export
+`main.ts` did not import by name joins the stubs in `client/test-util/mainBootHarness.ts` and the
+inline ones (the plan's "Tests and docs that follow the code").
+
+Pins: none. No test reads these names out of `main.ts` text; `client/src/main.claimCode.test.ts`
+recomputes `URI` and `DB` from `resolveConnectionConfig` and does not read the shell's copy.
+Covering tests: the `client/src/main.*.test.ts` suites, which boot the shell through `./main`
+(`main.boot`, `main.claimCode`, `main.zoneCue`, `main.partyFull`, `main.exportTransport`).
+
+- **ST5.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites run THEY SHALL pass with every assertion unedited.
+- **ST5.2:** WHEN the client's full vitest suite runs IT SHALL pass.
+
+Confirmed in the diff at merge, not by a criterion: the thirteen names are declared in
+`shell/config.ts` and nowhere in `main.ts`; `shell/config.ts` imports no other shell module and
+registers no listener; its plan line is gone.
+
+### st-6 — client shell: the boot-built view handles get an owner
+type: refactor · tier: hard
+touches: client/src/main.ts, client/src/shell/views.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, docs/refactors/client-shell.md, ARCHITECTURE.md
+after: [st-5]
+
+Extraction 2 of `docs/refactors/client-shell.md`, an ownership change. `client/src/shell/views.ts`
+is created and owns, as `export let`, the handles `boxView`, `raisingView`, `evolutionView`,
+`dialogueView`, `questLogView`, `healView`, `shopView`, `tradeView`, `pvpView`,
+`leaderboardView`, `profileView`, `renameView`, `tradeProposeView`, `helpView`, `menuView`,
+`claimView`, `privacyView`, `controlsView`, `controlsSavedLine`, `sessionView`,
+`evolutionNoticeBanner`, `errorOverlayView` and `hintBarView`. `main()` keeps every construction
+with its handler closures (rule 8) and hands each instance to the owner function the plan
+proposes as `mountViews`, in the same statement order; it builds into a local any instance it
+uses again in the same function and mounts that local (rule 3). `views.ts` imports no shell
+module.
+
+Pins: none in the plan's table. `client/src/ui/overlayRegistry.test.ts`,
+`client/src/main.a11yFocus.test.ts` and `client/src/main.dispatch.test.ts` name these handles as
+overlay ids, not as `main.ts` text, and are not edited. Covering tests: the
+`client/src/main.*.test.ts` suites (`main.dispatch`, `main.a11yFocus`, `main.menu`, `main.help`,
+`main.hintBar`, `main.frameErrorWiring`, `main.controls`).
+
+- **ST6.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites run THEY SHALL pass with every assertion unedited.
+- **ST6.2:** WHEN the client's full vitest suite runs IT SHALL pass.
+
+Confirmed in the diff at merge, not by a criterion: no handle above is declared in `main.ts`;
+each is assigned only inside `shell/views.ts`; no construction left `main()`; its plan line is
+gone.
+
+### st-7 — client shell: the live input devices get an owner
+type: refactor · tier: hard
+touches: client/src/main.ts, client/src/shell/inputState.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, docs/refactors/client-shell.md, ARCHITECTURE.md
+after: [st-6]
+
+Extraction 3 of `docs/refactors/client-shell.md`, an ownership change.
+`client/src/shell/inputState.ts` is created and takes `bindings`, `keyboard`, `held`,
+`inputRouter`, `navHeldCodes`, `releaseAllInput` and `applyBindings`. `navHeldCodes` is exported
+as a `ReadonlySet` (rule 2); its adds in `onKeyDown` and `captureControlsKey` and its delete in
+the keyup listener become calls to the owner functions the plan proposes as `noteNavHeld` and
+`releaseNavHeld`. `bindings` and `keyboard` are assigned only inside the owner. `held` and
+`inputRouter` are used through their own methods. The keyup listener stays registered in
+`main.ts` in its place in "Registration order" (rule 4). `inputState.ts` imports no shell module.
+
+Pins: none in the plan's table. Covering tests: `client/src/main.input.test.ts`,
+`client/src/main.remap.test.ts`, `client/src/main.controls.test.ts`,
+`client/src/main.accel.test.ts` and the other `client/src/main.*.test.ts` suites; the
+`client/e2e` controls and d-pad specs exercise the same paths in a browser.
+
+- **ST7.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites run THEY SHALL pass with every assertion unedited.
+- **ST7.2:** WHEN the client's full vitest suite runs IT SHALL pass.
+
+Confirmed in the diff at merge, not by a criterion: the seven names are declared in
+`shell/inputState.ts` and nowhere in `main.ts`; no module outside the owner mutates
+`navHeldCodes` or assigns `bindings` or `keyboard`; its plan line is gone.
