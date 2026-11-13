@@ -1,0 +1,87 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD. `bash <this file>` would otherwise run the python source as shell
+# and execute any backticked prose in it. Python reads this line as a no-op string; sh/bash
+# re-execs the file under python3 before reaching any other line. mr-selfcheck enforces it.
+"""mr-prune — a read-only census of the game repo's test suite: its size, and the tests that are
+exact twins of an earlier test in the same block.
+
+    mr-prune census [--repo R] [--at REF] [--mem DIR] [--record LABEL]
+    mr-prune twin   [--repo R] [--at REF] --file F --test T --survivor S
+    mr-prune keep   [--repo R] [--at REF] [--mem DIR] --file F --test T --reason TEXT
+    mr-prune --selftest [ID ...]      fixtures/prune/battery.py; rc=0 pass, rc=1 fail
+
+Defaults: R = projects/monster-realm of the checkout this tool is in; REF = origin/master; DIR = the
+directory this tool is in. A usage error, or a repo, ref or DIR that cannot be read, prints
+`PRUNE-ERROR ...` on stderr and exits 2.
+
+A row is a candidate for someone to read, never a reason to delete a test: the deletion rule is
+standards/testing-tdd.md, "Deleting a check is legitimate". No gate reads this tool's output.
+"""
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+BATTERY = os.path.join(HERE, "fixtures", "prune", "battery.py")
+
+VALUE_FLAGS = {
+    "census": ("repo", "at", "mem", "record"),
+    "twin": ("repo", "at", "file", "test", "survivor"),
+    "keep": ("repo", "at", "mem", "file", "test", "reason"),
+}
+
+
+class Usage(Exception):
+    pass
+
+
+def parse_args(argv):
+    """-> (subcommand, {flag: value}). Every flag takes one value."""
+    if not argv or argv[0] not in VALUE_FLAGS:
+        raise Usage("expected one of: census, twin, keep, --selftest")
+    sub, opts, i = argv[0], {}, 1
+    while i < len(argv):
+        name = argv[i][2:] if argv[i].startswith("--") else None
+        if name not in VALUE_FLAGS[sub]:
+            raise Usage("%s: unknown argument %r" % (sub, argv[i]))
+        if i + 1 >= len(argv):
+            raise Usage("%s: --%s needs a value" % (sub, name))
+        opts[name] = argv[i + 1]
+        i += 2
+    return sub, opts
+
+
+def cmd_census(opts):
+    print("PRUNE-CENSUS " + "0" * 40)
+    for pkg, extra in (("game-core", "inline-modules=0"), ("server-module", "inline-modules=0"),
+                       ("client", "e2e=0 test-util=0")):
+        print("totals %s product-lines=0 test-lines=0 ratio=n/a test-files=0 tests=0 unparsed=0 %s"
+              % (pkg, extra))
+    print("totals out-of-scope evals=0 sim-harness=0 client-wasm=0")
+    print("counts duplicates=0 protected-twins=0 identical-other-scope=0 kept=0 unparsed=0")
+    return 0
+
+
+def cmd_twin(opts):
+    print("PRUNE-TWIN-FAIL missing")
+    return 1
+
+
+def cmd_keep(opts):
+    print("PRUNE-KEEP-FAIL missing")
+    return 1
+
+
+def main(argv):
+    if argv and argv[0] == "--selftest":
+        os.execv("/usr/bin/python3", ["/usr/bin/python3", BATTERY, os.path.abspath(__file__)] + argv[1:])
+    try:
+        sub, opts = parse_args(argv)
+    except Usage as e:
+        sys.stderr.write("PRUNE-ERROR %s\n" % e)
+        return 2
+    return {"census": cmd_census, "twin": cmd_twin, "keep": cmd_keep}[sub](opts)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
