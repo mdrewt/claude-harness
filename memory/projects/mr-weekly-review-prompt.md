@@ -19,7 +19,7 @@ the hourly supervisor builds them next. Drew reads the one-page report in the ta
 - **At most 5 findings per run.** Each MUST name a protected-category defect
   (`standards/testing-tdd.md` "What earns a check": gameplay, security-privacy,
   data-integrity, netcode-determinism, ux-a11y critical flows, content) with a
-  `path:line @ <SHA>` citation.
+  `path:line @ <SHA>` citation; Phase 2's recurring-cause proposal is the one exception.
 - **At most ~5 pulled residuals per run** (Phase 3a-pull), separate from the 5-finding cap:
   each re-verified against the pinned clone before it is scheduled. Zero is a fine number —
   an empty, obsolete or already-absorbed backlog never becomes manufactured work.
@@ -89,6 +89,13 @@ given only the claim and location. HIGH/CRITICAL additionally need a concrete re
 minimal failing-test sketch. Drop anything unverified. Rank survivors by severity × likely
 player impact and keep **at most 5**; genuine contradictions between lenses go to one fresh
 **opus** adjudicator running `$HARNESS/.claude/agents/judge.md`'s bias protocol.
+
+**Recurring cause.** From the week's park causes, ci-fix causes, lens findings and recorded
+`plan-delta:` lines, name the single most frequent recurring cause and propose ONE rule change at
+the earliest pipeline step that could have prevented it (a spec-authoring rule, a tester rule, a
+tool check), as a finding like any other (category `loop-ops`, inside the five). If the
+`plan-delta:` lines read as scope growth or dropped requirements rather than improvements, say so
+and propose tightening `standards/spec-driven.md` §Adapting the plan.
 
 ## Phase 3 — Enter findings into the registry, then schedule them
 
