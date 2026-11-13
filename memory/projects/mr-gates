@@ -766,10 +766,12 @@ def verify_env(cwd, home=None):
 
 
 # A CHECK that drives a live SpacetimeDB host or a browser is one `verify` cannot re-run: the
-# tick has neither. Both halves must hold -- the command names such a runner AND its fresh output
-# shows the missing dependency -- so a CHECK that ran and failed on its own terms stays an
-# EVIDENCE-MISMATCH. The PR's e2e/eval CI jobs ran these against a real host at the same head.
-CI_RUNNER = re.compile(r"\b(?:e2e|playwright|spacetime|evals?)\b")
+# tick has neither. Both halves must hold -- the command INVOKES the e2e runner AND its fresh
+# output shows the missing dependency -- so a CHECK that ran and failed on its own terms stays an
+# EVIDENCE-MISMATCH. The PR's e2e CI job ran these against a real host at the same head.
+# An invocation, never a bare word: `e2e`/`spacetime`/`evals` also name paths, crates and static
+# snapshot checks that need no host. Shell (`npm run e2e`) and argv (`'run','e2e'`) spellings.
+CI_RUNNER = re.compile(r"""\brun['",\s]{1,4}e2e\b|\bplaywright\s+test\b""")
 CI_NEEDS = (("server", re.compile(r"Connection refused|tcp connect error|ECONNREFUSED")),
             ("browser", re.compile(r"Executable doesn't exist at|browserType\.launch:")))
 
@@ -1388,7 +1390,7 @@ def cmd_verify(a):
             ci_only.append({"gate": g.id, "needs": need, "head": head,
                             "fresh": cap_evidence(o, expect=g.expect)[:160],
                             "confirm": "verify has no %s; read this gate's test in the PR's "
-                                       "e2e/eval CI jobs for head %s" % (need, head or "(unknown)")})
+                                       "e2e CI job for head %s" % (need, head or "(unknown)")})
             continue
         fresh = expect_line(g.expect, o) if g.expect else None
         rec = _norm(g.evidence or "")
@@ -1474,9 +1476,10 @@ def cmd_verify(a):
     out["residuals_open"] = len(open_residuals(rows))
     out["residual_alarms"] = ["%s: %s" % (k, v) for k, v in residual_alarms(rows)]
 
-    # Verdict. Fails CLOSED.
+    # Verdict. Fails CLOSED. A CI-ONLY gate is a ticked claim nothing here re-ran or looked up in
+    # CI, so it cannot ride under CLEAN; its reason names the head whose CI job settles it.
     if out["seed_drift"] or out.get("seed_missing") or out.get("criteria_missing") \
-            or out.get("no_check_executed") or mismatch or not_reverified or \
+            or out.get("no_check_executed") or mismatch or not_reverified or ci_only or \
             any(f[0] == "BLOCK" for f in findings) or unmet or sec is None \
             or out.get("total", 0) == 0:
         out["verdict"] = "FLAGGED"
@@ -1489,7 +1492,7 @@ def cmd_verify(a):
         out["reasons"].append("NOT-REVERIFIED on %d gate(s) (fails closed)" % len(not_reverified))
     if ci_only:
         out["reasons"].append("CI-ONLY on %d gate(s) (%s): not a mismatch -- confirm the PR's "
-                              "e2e/eval CI jobs for head %s"
+                              "e2e CI job for head %s"
                               % (len(ci_only), ", ".join(c["gate"] for c in ci_only)[:80],
                                  (head or "(unknown)")[:12]))
     if unmet:
@@ -2529,8 +2532,8 @@ def selftest():
                 [r for r in vs["reasons"] if "EVIDENCE-MISMATCH" in r]),
                "an e2e CHECK refused by an absent host says nothing about the slice")
         chk.ok("P5-ci-only-points-at-ci",
-               any(r.startswith("CI-ONLY on 1 gate(s) (X1)") and "CI jobs for head" in r
-                   for r in vs["reasons"]) and "CI jobs for head" in vs["ci_only"][0]["confirm"],
+               any(r.startswith("CI-ONLY on 1 gate(s) (X1)") and "CI job for head" in r
+                   for r in vs["reasons"]) and "CI job for head" in vs["ci_only"][0]["confirm"],
                "the status must say where the gate WAS exercised")
         chk.eq("P6-ci-only-is-not-reverified", ["X2"], [r["gate"] for r in vs["reverified"]],
                "a gate verify could not run must never count as independently re-run")
@@ -2538,7 +2541,7 @@ def selftest():
                "  EVIDENCE: 1 passed\n"
                "- [x] X2: t\n  CHECK: %s\n  EXPECT: /1 passed/\n"
                "  EVIDENCE: 1 passed\n"
-               "- [ ] X3: t\n  CHECK: echo e2e; %s\n  EXPECT: /1 passed/\n"
+               "- [ ] X3: t\n  CHECK: echo npm run e2e; %s\n  EXPECT: /1 passed/\n"
                "  EVIDENCE: pending\n" % (refused, refused))
         chk.eq("P7-genuine-mismatch-stays-loud",
                (["X1", "X2"], [], True, "FLAGGED"),
@@ -2554,9 +2557,66 @@ def selftest():
         hd = head_of(pwt)
         chk.ok("P9-ci-only-names-the-head",
                bool(hd) and len(hd) == 40 and P(
-                   "- [x] X1: t\n  CHECK: echo e2e; %s\n  EXPECT: /1 passed/\n"
+                   "- [x] X1: t\n  CHECK: echo npm run e2e; %s\n  EXPECT: /1 passed/\n"
                    "  EVIDENCE: 1 passed\n" % refused, cwd=pwt)["ci_only"][0]["head"] == hd,
                "CI is the evidence only for the exact head verify looked at")
+
+        # The runner test is an invocation. A path, crate name, builtin or comment that merely
+        # contains the word reaches no host, so a refused connection there is the slice's own.
+        lookalikes = ("echo cargo test -p spacetime-module; %s", "eval \"%s\"",
+                      "echo vitest run client/e2e/x.test.ts; %s", "echo grep -c x evals/; %s",
+                      "%s # npm e2e", "echo node evals/spacetime-type-snapshot.eval.mjs; %s")
+        vl = P("".join("- [x] X%d: t\n  CHECK: %s\n  EXPECT: /1 passed/\n  EVIDENCE: 1 passed\n"
+                       % (i, c % refused) for i, c in enumerate(lookalikes, 1)))
+        chk.eq("P10-word-is-not-an-invocation", (["X1", "X2", "X3", "X4", "X5", "X6"], []),
+               ([m["gate"] for m in vl["evidence_mismatch"]], vl["ci_only"]),
+               "a failing non-e2e CHECK that prints 'Connection refused' is EVIDENCE-MISMATCH")
+        chk.eq("P11-invocation-spellings", ["server", "server", "browser", None, None],
+               [ci_only_need(c, "ECONNREFUSED 127.0.0.1:3000 browserType.launch: x") for c in (
+                   "npm --prefix client run e2e -- e2e/a.spec.ts",
+                   "node -e \"spawnSync('npm',['--prefix','client','run','e2e','--'])\"")]
+               + [ci_only_need("npx playwright test", "browserType.launch: x"),
+                  ci_only_need("npx playwright install chromium", "browserType.launch: x"),
+                  ci_only_need("cargo nextest run -p e2e", "Connection refused")])
+
+        # The verdict on the seeded section, where nothing else can FLAG it: the same ledger is
+        # CLEAN when every CHECK passes, so each non-CLEAN verdict below is that one gate's.
+        atomic_write(os.path.join(fhome, ".cargo/bin/npm"),
+                     "#!/bin/sh\n%s\nexit 1\n" % refused)
+        os.chmod(os.path.join(fhome, ".cargo/bin/npm"), 0o755)
+        pgdir = os.path.join(root, "gates-p")
+        os.makedirs(pgdir)
+        with contextlib.redirect_stdout(_io.StringIO()):
+            cmd_init({"slice": "fx-a", "_specs": specs, "_gates_dir": pgdir, "scope": "fixture"})
+        seeded = read_gates_file(gates_path("fx-a", pgdir)).replace("- [ ] E", "- [x] E")
+        blank = "  CHECK: \n  EXPECT: \n  EVIDENCE: pending\n"
+
+        def PV(e2_check):
+            body = seeded
+            for c in ("cargo mr-gates-fx", e2_check, "cargo mr-gates-fx"):
+                body = body.replace(blank, "  CHECK: %s\n  EXPECT: /1 passed/\n"
+                                           "  EVIDENCE: 1 passed\n" % c, 1)
+            atomic_write(gates_path("fx-a", pgdir), body)
+            buf = _io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cmd_verify({"slice": "fx-a", "_specs": specs, "_gates_dir": pgdir,
+                            "_residuals": resid, "_no_guard": True, "cwd": pwt, "repo": root,
+                            "budget": "20", "_home": fhome,
+                            "_acceptance_log": os.path.join(root, "acc-p.jsonl")})
+            return json.loads(buf.getvalue())
+
+        vc = PV("cargo mr-gates-fx")
+        chk.eq("P12-seeded-control-is-clean", ("CLEAN", []), (vc["verdict"], vc["reasons"]),
+               "the control: with every CHECK passing nothing else flags this ledger")
+        vo = PV("npm run e2e -- e2e/a.spec.ts")
+        chk.eq("P13-ci-only-alone-is-not-clean",
+               ("FLAGGED", ["E2"], [], [], ["CI-ONLY"]),
+               (vo["verdict"], [c["gate"] for c in vo["ci_only"]], vo["evidence_mismatch"],
+                vo["not_reverified"], [r.split(" ", 1)[0] for r in vo["reasons"]]),
+               "a ticked gate nobody re-ran must not pass under CLEAN; CI-ONLY is its only reason")
+        vx = PV("cargo mr-gates-fx-fails")
+        chk.eq("P14-seeded-mismatch-flags", ("FLAGGED", [], ["E2"]),
+               (vx["verdict"], vx["ci_only"], [m["gate"] for m in vx["evidence_mismatch"]]))
 
         # W7: an absent ledger is an absent measurement, not a failed one.
         buf = _io.StringIO()
