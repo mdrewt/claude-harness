@@ -153,7 +153,7 @@ path or names carry a protected token is listed apart and follows the standard's
 `mr-prune twin` re-checks a claimed pair at a commit, and only with the candidate as the later test.
 A pair that is identical on purpose is recorded with `mr-prune keep` in the tracked
 `memory/projects/mr-prune-keep.json`, keyed by file, test name and body hash, and is not listed
-again until its body changes. The look is when a milestone closes, when everything it added
+again until the test changes. The look is when a milestone closes, when everything it added
 exists; a removal is acted on only when a spec is elaborated, in a slice that already lists the
 file, or through the structural queue, never in a session of its own.
 Measured on the suite, almost nothing is provably redundant under a rule strict enough to be safe

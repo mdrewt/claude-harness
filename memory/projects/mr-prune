@@ -55,7 +55,9 @@ A test, per language:
   An unlexable file has no lexed test: its lines that look like a test declaration count as
   `unparsed`, and `PRUNE-WARN unlexable <file>` goes to stderr. That is a file that is not UTF-8,
   that the lexer cannot tokenise or bracket-match, or in which the lexer finds fewer declarations
-  than such lines (text it took for a string or a comment was not one).
+  than such lines, whatever the reason: a test line inside a block comment or a template literal,
+  or text the lexer took for a string or a comment that was not one. A product .rs file the lexer
+  cannot read is named the same way and adds nothing to `inline-modules`.
 
 Twins. Two tests of one file are twins when they share the block, the form and the body, and the
 body does not depend on the test's name:
@@ -64,14 +66,19 @@ body does not depend on the test's name:
          signature.
   body   the tokens between the braces. Comments and the whitespace between tokens are not tokens;
          every literal is one token, compared as written.
-  name   a test whose form or body holds `toMatchSnapshot`, `toThrowErrorMatchingSnapshot`,
-         `currentTestName`, `expect.getState`, `function_name!` or `insta::` is never a twin.
+  name   a test whose form or body holds one of NAME_DEPENDENT below (a snapshot matcher,
+         `currentTestName`, `expect.getState`, `function_name!`, `insta::`, ...) is never a twin.
 The candidate is the later test and the survivor the earliest twin in the block. The same form and
 body in another block of the file is counted under `identical-other-scope`: other blocks can carry
 other hooks and bindings. A pair whose path or names hold a protected token (PROTECTED below) is
 listed under `protected-twins`: removing one follows the standard's protected path.
+Twins can still differ when they run, through state they share: a counter one of them increments,
+a table reassigned between two `.each` calls. No lexer sees that, so a row is read before anyone
+acts on it, and a pair that must stay is recorded with `keep`.
 
 twin confirms a claimed pair at a commit, T being the test to remove and S the one that stays.
+F is the path as census prints it; T and S are the names themselves (a row's JSON strings,
+decoded), " #2" included.
 `PRUNE-TWIN-OK` (rc=0) when they are twins and T is defined after S; the line continues with
 ` protected=<token>` for a protected pair and ` kept` for one the keep file holds. Otherwise
 `PRUNE-TWIN-FAIL <rule> ...` (rc=1). Reported alone, first that applies: `missing` (F is not a test
@@ -112,8 +119,10 @@ PROTECTED = (
     "a11y", "contrast", "i18n", "catalog", "locale", "movement", "predict", "reconcil", "netcode",
     "interp", "parity", "determin", "oracle", "leak",
 )
-NAME_DEPENDENT = ("toMatchSnapshot", "toThrowErrorMatchingSnapshot", "currentTestName",
-                  "expect.getState", "function_name!", "insta::")
+# What makes a test read its own name, file or position. Matched in lower case against the test's
+# tokens joined with nothing between them, so `snapshot` covers every snapshot matcher and macro.
+NAME_DEPENDENT = ("snapshot", "currenttestname", "expect.getstate", "task.name", "function_name!",
+                  "insta::", "thread::current", "module_path!(", "file!(", "line!(", "column!(")
 
 PACKAGES = ("game-core", "server-module", "client")
 TEST_FILE = {
@@ -137,8 +146,8 @@ OUT_OF_SCOPE = (
 # A line that declares a test, read without the lexer: what an unlexable file's tests are counted
 # by, and the floor a lexed file's count is held to.
 TEST_LINE = {
-    "ts": re.compile(r"^\s*(?:it|test)(?:\.\w+)*\(", re.M),
-    "rs": re.compile(r"^\s*#\[(?:\w+::)*test\]", re.M),
+    "ts": re.compile(r"^[ \t]*(?:it|test)(?:\.\w+)*[(<`]", re.M),
+    "rs": re.compile(r"^[ \t]*#\[(?:\w+::)*test\]", re.M),
 }
 
 
@@ -173,10 +182,11 @@ TS_MASTER = re.compile(
     re.S,
 )
 TS_REGEX = re.compile(r"/(?:[^/\\\n\[]|\\.|\[(?:[^\]\\\n]|\\.)*\])+/\w*")
+TS_REGEX_SPAN = 2000    # how far a regex literal is looked for: keeps a line of `/[` linear
 TS_TEMPLATE_CHUNK = re.compile(r"(?:[^`\\$]|\\.|\$(?!\{))*", re.S)
 # After these words a `/` starts a regex literal, not a division.
 TS_REGEX_AFTER_WORD = {"return", "typeof", "case", "in", "of", "delete", "void", "throw", "new",
-                       "else", "do", "await", "yield", "instanceof"}
+                       "else", "do", "await", "yield", "instanceof", "default", "extends"}
 # After a closing bracket a `/` is read as division. When the same text also scans as a regex
 # literal holding one of these, the two readings tokenise differently (a quote opens a string, `//`
 # a comment), so the file is refused instead of guessed at.
@@ -203,13 +213,14 @@ def lex_ts(src):
                 i = j + 2
             continue
         if c == "/" and src[i + 1:i + 2] not in ("/", "*"):
-            regex = TS_REGEX.match(src, i)
+            regex = TS_REGEX.match(src, i, min(n, i + TS_REGEX_SPAN))
             prev = toks[-1] if toks else None
             if regex and prev and prev[0] == "punct" and prev[1] in (")", "]", "}"):
                 if TS_AMBIGUOUS_REGEX.search(regex.group(), 1):
                     raise LexError("`/` after a closing bracket: regex or division")
                 regex = None
-            elif prev and (prev[0] in ("num", "str", "re", "tpl")
+            elif prev and (prev[0] in ("num", "str", "re")
+                           or (prev[0] == "tpl" and prev[1][-1] == "`")    # not after its `${`
                            or (prev[0] == "id" and prev[1] not in TS_REGEX_AFTER_WORD)
                            or (prev[0] == "punct" and prev[1] in ("++", "--"))):
                 regex = None
@@ -323,11 +334,10 @@ class Test:
         self.name, self.block, self.form, self.body, self.index = name, block, form, body, 0
 
     def digest(self):
-        raw = "\x00".join(self.form) + "\x01" + "\x00".join(self.body)
-        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+        return hashlib.sha256(json.dumps([self.form, self.body]).encode("ascii")).hexdigest()[:16]
 
     def name_dependent(self):
-        joined = "".join(self.form) + "".join(self.body)
+        joined = ("".join(self.form) + "".join(self.body)).lower()
         return any(marker in joined for marker in NAME_DEPENDENT)
 
 
@@ -398,6 +408,25 @@ def _function_literal(toks, match, a, b):
     return (i, b)
 
 
+TS_TEST_MODIFIERS = {"each", "for", "skip", "only", "todo", "fails", "concurrent", "sequential",
+                     "skipIf", "runIf"}
+
+
+def _type_arguments(toks, match, i):
+    """The index after a `<...>` type-argument list starting at toks[i]; `i` when there is none."""
+    if i >= len(toks) or not _is(toks[i], "<"):
+        return i
+    depth, j = 0, i
+    while j < len(toks):
+        if toks[j][0] == "punct":
+            depth += {"<": 1, ">": -1, ">>": -2, ">>>": -3}.get(toks[j][1], 0)
+            j = match.get(j, j)
+        j += 1
+        if depth <= 0:
+            return j
+    return i
+
+
 def tests_ts(src):
     """-> (tests, unparsed). Raises LexError for a file that cannot be tokenised."""
     toks = lex_ts(src)
@@ -420,21 +449,28 @@ def tests_ts(src):
         if kind != "id" or text not in ("it", "test", "describe") or (i and _is(toks[i - 1], ".")):
             i += 1
             continue
-        # The callee: the word, then `.each(table)` for a test or `.sequential` for a describe.
-        # Any other modifier is read to its end so the call can be counted, and is not `plain`.
+        # The callee: the word, then `.each(table)` or `.each<T>(table)` for a test, `.sequential`
+        # for a describe. Any other modifier is read as far as it goes and is not `plain`.
         j, plain = i + 1, True
         if j + 1 < n and _is(toks[j], ".") and toks[j + 1][0] == "id":
             modifier = toks[j + 1][1]
-            if text == "describe" and modifier == "sequential":
-                j += 2
-            elif text != "describe" and modifier == "each" and j + 2 < n and _is(toks[j + 2], "("):
-                j = match[j + 2] + 1
+            j, plain = _type_arguments(toks, match, j + 2), False
+            if text == "describe":
+                plain = modifier == "sequential"
+            elif modifier not in TS_TEST_MODIFIERS:
+                i += 1          # a property of something else named `it` or `test`
+                continue
+            elif modifier == "each" and j < n and _is(toks[j], "("):
+                j, plain = match[j] + 1, True
             else:
-                plain = False
                 while j < n and (_is(toks[j], ".") or toks[j][0] in ("id", "tpl")):
                     j += 1
                 if j < n and _is(toks[j], "(") and match[j] + 1 < n and _is(toks[match[j] + 1], "("):
                     j = match[j] + 1
+                if j >= n or not _is(toks[j], "("):     # a tagged table whose call is not found
+                    unparsed += 1
+                    i += 1
+                    continue
         if j >= n or not _is(toks[j], "("):
             i += 1
             continue
@@ -485,6 +521,10 @@ def _attribute_path(toks, a, b):
     return path
 
 
+def _is_test(toks, attrs):
+    return any(_attribute_path(toks, a, b)[-1:] == ["test"] for a, b in attrs)
+
+
 def tests_rs(src):
     """-> (tests, unparsed, inline test modules). Raises LexError."""
     toks = lex_rs(src)
@@ -517,12 +557,13 @@ def tests_rs(src):
             attrs = []
             i += 2
             continue
+        if _word(toks[i], "fn") and not named and _is_test(toks, attrs):
+            unparsed += 1       # `fn $name` in a macro_rules! body
         if _word(toks[i], "fn") and named:
             j = i + 2
             while j < n and not (_is(toks[j], "{") or _is(toks[j], ";")):
                 j = match.get(j, j) + 1
-            is_test = any(_attribute_path(toks, a, b)[-1:] == ["test"] for a, b in attrs)
-            if is_test and j < n and _is(toks[j], "{"):
+            if j < n and _is(toks[j], "{") and _is_test(toks, attrs):
                 if all(s is not None for s in scope):
                     form = (_texts(toks, attrs[0][0], i + 1) + (NAME_SLOT,)
                             + _texts(toks, i + 2, j + 1))
@@ -665,8 +706,8 @@ def load_keep(mem):
             keep = json.load(fh)
     except FileNotFoundError:
         return {}
-    except (OSError, UnicodeDecodeError) as e:
-        raise ValueError(str(e))
+    except (OSError, RecursionError) as e:      # JSON and UTF-8 errors are ValueErrors already
+        raise ValueError(str(e) or type(e).__name__)
     shaped = isinstance(keep, dict) and all(
         isinstance(tests, dict) and all(
             isinstance(entry, dict) and isinstance(entry.get("hash"), str)
@@ -690,29 +731,32 @@ def is_kept(keep, path, test):
     return keep.get(path, {}).get(test.name, {}).get("hash") == test.digest()
 
 
-def writable_mem(opts, repo):
-    """The --mem directory of a command that writes: it exists and is outside the repository."""
+def writable_mem(opts):
     mem = opts.get("mem", HERE)
     if not os.path.isdir(mem):
         raise Fail("--mem %s is not a directory" % mem)
-    relative = os.path.relpath(os.path.realpath(mem), os.path.realpath(repo))
-    if relative != ".." and not relative.startswith(".." + os.sep):
-        raise Fail("--mem %s is inside --repo: this tool writes nothing there" % mem)
     return mem
 
 
-def write_file(path, text, append=False):
+def write_file(path, text, repo, append=False):
+    """Appends `text` to `path`, or replaces it. Refused when `path`, links followed, is inside
+    the inspected repository."""
+    inside = os.path.relpath(os.path.realpath(path), os.path.realpath(repo))
+    if inside != ".." and not inside.startswith(".." + os.sep):
+        raise Fail("%s is inside --repo: this tool writes nothing there" % path)
+    tmp = "%s.tmp.%d" % (path, os.getpid())
     try:
         if append:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "a", encoding="utf-8") as fh:
                 fh.write(text)
         else:
-            tmp = "%s.tmp.%d" % (path, os.getpid())
             with open(tmp, "w", encoding="utf-8") as fh:
                 fh.write(text)
             os.replace(tmp, path)
     except OSError as e:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
         raise Fail("cannot write %s: %s" % (path, e))
 
 
@@ -795,7 +839,7 @@ def cmd_census(opts):
     if label is not None:
         if not label or "\n" in label or "\r" in label:
             raise Fail("--record needs a one-line label")
-        mem = writable_mem(opts, repo)
+        mem = writable_mem(opts)
     snap = Snapshot(repo, opts.get("at", DEFAULT_REF))
     totals, rows, counts, unlexable = census(snap, keep_or_empty(mem))
     for path in unlexable:
@@ -813,8 +857,8 @@ def cmd_census(opts):
     out.append("counts " + " ".join("%s=%d" % kv for kv in counts.items()))
     if label is not None:
         row = {"label": label, "commit": snap.commit, "totals": totals, "counts": counts}
-        write_file(os.path.join(mem, "prune", "trend.jsonl"),
-                   json.dumps(row, ensure_ascii=False) + "\n", append=True)
+        write_file(os.path.join(mem, "prune", "trend.jsonl"), json.dumps(row) + "\n", repo,
+                   append=True)
         out.append("recorded " + label)
     _emit(out)
     return 0
@@ -866,7 +910,7 @@ def cmd_twin(opts):
 
 def cmd_keep(opts):
     _need(opts, "file", "test", "reason")
-    mem = writable_mem(opts, opts.get("repo", DEFAULT_REPO))
+    mem = writable_mem(opts)
     found = _tests_at(opts)
     cand = next((t for t in found[0] if t.name == opts["test"]), None) if found else None
     keep = why = None
@@ -883,7 +927,8 @@ def cmd_keep(opts):
         _emit(["PRUNE-KEEP-FAIL " + why])
         return 1
     keep.setdefault(opts["file"], {})[cand.name] = {"hash": cand.digest(), "reason": opts["reason"]}
-    write_file(keep_path(mem), json.dumps(keep, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+    write_file(keep_path(mem), json.dumps(keep, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+               opts.get("repo", DEFAULT_REPO))
     _emit(["PRUNE-KEEP-OK %s :: %s hash=%s" % (_shown(opts["file"]), _quoted(cand.name), cand.digest())])
     return 0
 
@@ -907,6 +952,10 @@ def parse_args(argv):
         if i + 1 >= len(argv):
             raise Fail("%s: --%s needs a value" % (sub, name))
         opts[name] = argv[i + 1]
+        try:
+            opts[name].encode("utf-8")
+        except UnicodeEncodeError:
+            raise Fail("%s: --%s is not UTF-8" % (sub, name))
         i += 2
     return sub, opts
 
