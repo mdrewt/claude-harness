@@ -2331,7 +2331,7 @@ def main(argv):
 # --selftest. rc 0 pass / 1 fail. Prints MR-GATES-SELFTEST-OK <n> on pass, -FAIL <id> per failure.
 # Every fixture drives the REAL functions over temp dirs — never an env override on a gate input.
 # ---------------------------------------------------------------------------------------------
-_ST_FLOOR = 30
+_ST_FLOOR = 235
 
 
 class _Chk(object):
@@ -2822,7 +2822,7 @@ def selftest():
                "ticked box + a re-run that does NOT pass is the actual fraud signal and must FLAG")
         chk.eq("W6-fraud-flags", "FLAGGED", vf["verdict"])
 
-        # P: verify's environment. The tick shell has no cargo and the system node, and no
+        # Q: verify's environment. The tick shell has no cargo and the system node, and no
         # SpacetimeDB host or browser; neither absence is evidence about the slice.
         fhome = os.path.join(root, "fxhome")
         for rel, body in ((".cargo/bin/cargo", 'test "$1" = mr-gates-fx && echo "cargo: 1 passed"'),
@@ -2835,7 +2835,7 @@ def selftest():
         os.makedirs(pwt)
         atomic_write(os.path.join(root, "fxwt", ".tool-versions"),
                      "nodejs 9.9.9\njust 0.0.0  # not installed\n")
-        chk.eq("P1-toolchain-dirs",
+        chk.eq("Q1-toolchain-dirs",
                [os.path.join(fhome, ".asdf/installs/nodejs/9.9.9/bin"),
                 os.path.join(fhome, ".cargo/bin")],
                toolchain_dirs(pwt, fhome),
@@ -2856,10 +2856,10 @@ def selftest():
                       "- [x] X2: t\n  CHECK: node --mr-gates-fx\n  EXPECT: /node: 1 passed/\n"
                       "  EVIDENCE: node: 1 passed\n")
         vp = P(tool_gates, cwd=pwt)
-        chk.eq("P2-pinned-toolchain-check-passes", ([], ["X1", "X2"]),
+        chk.eq("Q2-pinned-toolchain-check-passes", ([], ["X1", "X2"]),
                (vp["evidence_mismatch"], [r["gate"] for r in vp["reverified"] if r["passed"]]),
                "a cargo/node CHECK must re-run under the builder's toolchain, not the tick's PATH")
-        chk.eq("P3-no-toolchain-is-a-mismatch", 2,
+        chk.eq("Q3-no-toolchain-is-a-mismatch", 2,
                len(P(tool_gates, cwd=pwt, home=os.path.join(root, "nohome"))["evidence_mismatch"]),
                "the fixture discriminates: without the provisioned dirs both CHECKs fail")
 
@@ -2868,15 +2868,15 @@ def selftest():
                "  EVIDENCE: 1 passed\n"
                "- [x] X2: t\n  CHECK: echo '1 passed'\n  EXPECT: /1 passed/\n"
                "  EVIDENCE: 1 passed\n" % refused)
-        chk.eq("P4-no-server-is-ci-only", ([("X1", "server")], [], []),
+        chk.eq("Q4-no-server-is-ci-only", ([("X1", "server")], [], []),
                ([(c["gate"], c["needs"]) for c in vs["ci_only"]], vs["evidence_mismatch"],
                 [r for r in vs["reasons"] if "EVIDENCE-MISMATCH" in r]),
                "an e2e CHECK refused by an absent host says nothing about the slice")
-        chk.ok("P5-ci-only-points-at-ci",
+        chk.ok("Q5-ci-only-points-at-ci",
                any(r.startswith("CI-ONLY on 1 gate(s) (X1)") and "CI job for head" in r
                    for r in vs["reasons"]) and "CI job for head" in vs["ci_only"][0]["confirm"],
                "the status must say where the gate WAS exercised")
-        chk.eq("P6-ci-only-is-not-reverified", ["X2"], [r["gate"] for r in vs["reverified"]],
+        chk.eq("Q6-ci-only-is-not-reverified", ["X2"], [r["gate"] for r in vs["reverified"]],
                "a gate verify could not run must never count as independently re-run")
         vg = P("- [x] X1: t\n  CHECK: echo npm run e2e; echo '1 failed'\n  EXPECT: /1 passed/\n"
                "  EVIDENCE: 1 passed\n"
@@ -2884,19 +2884,19 @@ def selftest():
                "  EVIDENCE: 1 passed\n"
                "- [ ] X3: t\n  CHECK: echo npm run e2e; %s\n  EXPECT: /1 passed/\n"
                "  EVIDENCE: pending\n" % (refused, refused))
-        chk.eq("P7-genuine-mismatch-stays-loud",
+        chk.eq("Q7-genuine-mismatch-stays-loud",
                (["X1", "X2"], [], True, "FLAGGED"),
                ([m["gate"] for m in vg["evidence_mismatch"]], vg["ci_only"],
                 "EVIDENCE-MISMATCH on 2 gate(s)" in vg["reasons"], vg["verdict"]),
                "an e2e CHECK that ran and failed, and a refused connection in a CHECK that names "
                "no server runner, are both the fraud signal; an unticked gate claims nothing")
-        chk.eq("P8-browser", "browser",
+        chk.eq("Q8-browser", "browser",
                ci_only_need("npx playwright test", "browserType.launch: Executable doesn't exist "
                                                    "at /x/chrome"))
         subprocess.run("git init -q . && git -c user.name=fx -c user.email=fx@fx commit -q "
                        "--allow-empty -m fx", shell=True, cwd=pwt, capture_output=True)
         hd = head_of(pwt)
-        chk.ok("P9-ci-only-names-the-head",
+        chk.ok("Q9-ci-only-names-the-head",
                bool(hd) and len(hd) == 40 and P(
                    "- [x] X1: t\n  CHECK: echo npm run e2e; %s\n  EXPECT: /1 passed/\n"
                    "  EVIDENCE: 1 passed\n" % refused, cwd=pwt)["ci_only"][0]["head"] == hd,
@@ -2909,10 +2909,10 @@ def selftest():
                       "%s # npm e2e", "echo node evals/spacetime-type-snapshot.eval.mjs; %s")
         vl = P("".join("- [x] X%d: t\n  CHECK: %s\n  EXPECT: /1 passed/\n  EVIDENCE: 1 passed\n"
                        % (i, c % refused) for i, c in enumerate(lookalikes, 1)))
-        chk.eq("P10-word-is-not-an-invocation", (["X1", "X2", "X3", "X4", "X5", "X6"], []),
+        chk.eq("Q10-word-is-not-an-invocation", (["X1", "X2", "X3", "X4", "X5", "X6"], []),
                ([m["gate"] for m in vl["evidence_mismatch"]], vl["ci_only"]),
                "a failing non-e2e CHECK that prints 'Connection refused' is EVIDENCE-MISMATCH")
-        chk.eq("P11-invocation-spellings", ["server", "server", "browser", None, None],
+        chk.eq("Q11-invocation-spellings", ["server", "server", "browser", None, None],
                [ci_only_need(c, "ECONNREFUSED 127.0.0.1:3000 browserType.launch: x") for c in (
                    "npm --prefix client run e2e -- e2e/a.spec.ts",
                    "node -e \"spawnSync('npm',['--prefix','client','run','e2e','--'])\"")]
@@ -2947,16 +2947,16 @@ def selftest():
             return json.loads(buf.getvalue())
 
         vc = PV("cargo mr-gates-fx")
-        chk.eq("P12-seeded-control-is-clean", ("CLEAN", []), (vc["verdict"], vc["reasons"]),
+        chk.eq("Q12-seeded-control-is-clean", ("CLEAN", []), (vc["verdict"], vc["reasons"]),
                "the control: with every CHECK passing nothing else flags this ledger")
         vo = PV("npm run e2e -- e2e/a.spec.ts")
-        chk.eq("P13-ci-only-alone-is-not-clean",
+        chk.eq("Q13-ci-only-alone-is-not-clean",
                ("FLAGGED", ["E2"], [], [], ["CI-ONLY"]),
                (vo["verdict"], [c["gate"] for c in vo["ci_only"]], vo["evidence_mismatch"],
                 vo["not_reverified"], [r.split(" ", 1)[0] for r in vo["reasons"]]),
                "a ticked gate nobody re-ran must not pass under CLEAN; CI-ONLY is its only reason")
         vx = PV("cargo mr-gates-fx-fails")
-        chk.eq("P14-seeded-mismatch-flags", ("FLAGGED", [], ["E2"]),
+        chk.eq("Q14-seeded-mismatch-flags", ("FLAGGED", [], ["E2"]),
                (vx["verdict"], vx["ci_only"], [m["gate"] for m in vx["evidence_mismatch"]]))
 
         # W7: an absent ledger is an absent measurement, not a failed one.
@@ -3071,21 +3071,21 @@ def selftest():
                parse_gates(read_gates_file(rp))[0].get("Touches"),
                "a spec that no longer declares touches must not blank the header")
 
-        # W: render carries mr-touches' widen record into the PR body and the park memo.
+        # X: render carries mr-touches' widen record into the PR body and the park memo.
         def rendered(fmt):
             wbuf = _io.StringIO()
             with contextlib.redirect_stdout(wbuf):
                 cmd_render({"slice": "rs-1", "_gates_dir": gdir, "format": fmt})
             return wbuf.getvalue()
-        chk.ok("W1-no-record-no-line", "widened" not in rendered("pr").lower()
+        chk.ok("X1-no-record-no-line", "widened" not in rendered("pr").lower()
                and "WIDENED" not in rendered("park"))
         atomic_write(os.path.join(gdir, "rs-1.widened.jsonl"),
                      '{"path": "b/pin.test.ts", "why": "count pin 9->10"}\nnot json\n'
                      '{"path": "b/pin.test.ts", "why": "repeat"}\n{"path": "c/t.rs", "why": "x"}\n')
-        chk.ok("W2-pr-lists-widened", "touches-widened: (files this run granted itself" in
+        chk.ok("X2-pr-lists-widened", "touches-widened: (files this run granted itself" in
                rendered("pr") and rendered("pr").endswith(
                    "- b/pin.test.ts — count pin 9->10\n- c/t.rs — x\n"), rendered("pr"))
-        chk.ok("W3-park-lists-widened", "## TOUCHES WIDENED (2)" in rendered("park")
+        chk.ok("X3-park-lists-widened", "## TOUCHES WIDENED (2)" in rendered("park")
                and "- b/pin.test.ts — count pin 9->10" in rendered("park"), rendered("park"))
 
         # T5: promote appended at EOF, past the file's own append marker.
@@ -3292,7 +3292,7 @@ def selftest():
         chk.ok("P2-followup-prose-refused", rc == 2 and "residual row" in out, out)
         chk.eq("P2b-nothing-stored", 1, len(notes_of("nt-1", ngd)))
         rc, out = notes("add", slice="nt-1", text=fu, followup="one shared guards.rs helper")
-        chk.ok("P2c-followup-needs-category", rc == 2 and "category/SEVERITY" in out, out)
+        chk.ok("P2c-followup-needs-category", rc == 2 and "BAD-TAG" in out, out)
         chk.eq("P2d-no-row-no-note", (1, 0), (len(notes_of("nt-1", ngd)),
                                               len(residual_rows(nres))))
         rc, out = notes("add", slice="nt-1", text=fu, followup="one shared guards.rs helper",
@@ -3360,7 +3360,7 @@ def selftest():
         chk.ok("P5-close-names-a-stray-note", "NOTES-STRAY M-nt.spec.md: `mr-gates notes adopt "
                "--slice nt-2` before stashing it" in close_out(), close_out())
         rc, out = notes("harvest", spec_file="M-nt.spec.md")
-        chk.ok("P5-harvest-blocks-a-dirty-spec", rc == 1 and "SPEC-DIRTY" in out
+        chk.ok("P5a-harvest-blocks-a-dirty-spec", rc == 1 and "SPEC-DIRTY" in out
                and "FOLLOWUP-UNTRACKED nt-2" in out, out)
         rc, out = notes("adopt", slice="nt-2")
         chk.ok("P5b-adopt-refuses-untracked-followup", rc == 2 and "residual row" in out, out)
