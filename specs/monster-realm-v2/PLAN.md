@@ -67,12 +67,16 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    faucet/sink tuning (fixes the uncapped practice-battle faucet), heal-cost timing. Decisions
    ANSWERED (#587): kit = ~200g + 2–3 items once-only; recruit pays NOTHING (quest faucets
    compensate in eo-4); healing free until eo-4; monster-sink gap accepted (GDD §7 note).
-5. **M-test-pruning** (`M-test-pruning.spec.md`, elaborated 2026-11-13 — 3 harness slices, head
-   `tp-1`): a read-only test census (`mr-prune`) run at milestone elaboration — same-block
-   duplicate tests, product code only tests reach, pin and churn signals, one trend row; rows are
-   candidates routed through the existing deletion rule and `structure.spec.md`, never reasons. No
-   prune session (revisit at the tester A/B close). `tp-3` and the design sections `st-3` (shared
-   pins) and `st-4` (what stays of the 1v1 battle rules) are `blocked: tester-ab-close`.
+5. **M-test-pruning** (`M-test-pruning.spec.md`, elaborated 2026-11-13 — 5 harness slices, head
+   `tp-1`): a read-only test census (`mr-prune`) that looks at milestone close and is acted on at
+   elaboration — same-block duplicate tests, product code only tests reach, pin and churn
+   signals, one trend row with what the closing milestone's own commits added; rows are
+   candidates routed through the existing deletion rule, a slice that already lists the file, or
+   one capped `structure.spec.md` section per close, never reasons. The close census runs from
+   `mr-record`'s MERGED-row hook (no supervisor-prompt text). No prune session (revisit at the
+   tester A/B close). `tp-3` and the design sections `st-3` (shared pins) and `st-4` (what stays
+   of the 1v1 battle rules) are `blocked: tester-ab-close`; until it lifts the close census
+   records and opens no removal.
 6. **M-identity-handles** (`M-identity-handles.spec.md`, specced 2026-10-24): minted name
    discriminator (survives the M22 re-key cascade), Players-tab info (name + discriminator +
    lead-monster level + nearby), Sign-In hidden until an issuer exists. All four decisions
