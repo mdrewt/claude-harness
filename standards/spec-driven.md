@@ -56,6 +56,15 @@ optional. Omit empty sections — never fill with filler.
   slice is one mergeable structural change with behavior unchanged (§Refactor
   slices).
 - Acceptance criteria are the source for the `tester` subagent's tests.
+- A slice that adds an interface another slice, its own tests or the client calls
+  states that contract in its section (names, signatures, data shapes): the tests
+  are written before the code, by a different author, and both work to it.
+- An acceptance number is an absolute budget, or is set from a baseline the first
+  slice measures. A relative figure names its absolute anchor.
+- A `blocked:` names the event that lifts it, who lifts it, and what happens if the
+  event never comes.
+- A follow-up is a tracked row (a residual, a DEFER or a spec section), never a
+  sentence in a PR body, a commit message or a note.
 - Changing intent means changing the spec first, then regenerating code.
 
 ## Refactor slices
