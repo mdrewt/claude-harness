@@ -12,7 +12,12 @@
  "soft_pause_frac": 0.9,
  "hard_stop_frac": 0.97,
  "fable_guard_frac": 0.9,
- "_semantics": "soft/hard fracs apply to weekly_limit_usd; fable_ok = fable_spend < fable_guard_frac * fable_allowance_usd (allowance is its own axis now, NOT a fraction of weekly). Old fields kept for reader fallback compatibility.",
+ "_semantics": "The governor (mr-situation) reads the plan's real utilisation from mr-rate-limit-telemetry.jsonl and grades it with soft_pause_frac / hard_stop_frac; the dollar figures here decide only for an axis with no reading in force (bundle budget.source = calibration), and scale effective_usd for the per-launch check. On the calibration: soft/hard fracs apply to weekly_limit_usd; fable_ok = fable_spend < fable_guard_frac * fable_allowance_usd (the allowance is its own axis, not a fraction of weekly).",
+ "telemetry_fresh_s": 10800,
+ "telemetry_window_models": {
+  "seven_day_overage_included": "fable"
+ },
+ "_telemetry_note": "telemetry_fresh_s: how long a reading is acted on as read (three hourly ticks; a decision session can hold the tick lock for 90 minutes). telemetry_window_models: plan windows that cover one model although their name does not carry it; seven_day_overage_included is reported only to Fable sessions and is the window the CLI's 'You've reached your Fable limit' rejection names (fixtures/run-cost/rate-limit-rejected.stream). A window whose name carries a model covers that model; any other covers every model.",
  "single_run_alert_usd": 150,
  "pricing_per_mtok": {
   "opus": {

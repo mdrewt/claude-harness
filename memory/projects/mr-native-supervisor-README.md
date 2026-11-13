@@ -36,7 +36,8 @@ exempt from that floor only).
 ## Health signals (all in `memory/projects/`)
 `.native-supervisor-heartbeat` (fresh = ticks running) · `.native-supervisor-last-success` /
 `-last-failure` · `mr-native-tick.log` (one DECISION/SKIP line per tick; grammar below) · `mr-state.json`
-(inflight/queue/notes) · budget: `mr-cost-watch`/`mr-usage-snap`, config in `mr-budget-config.json`.
+(inflight/queue/notes) · budget: `mr-cost-watch`/`mr-usage-snap`, config in `mr-budget-config.json`
+(governor: "Budget governor" below).
 
 ## Record grammar
 **Tick log** (`mr-native-tick.log`). The wrapper writes `<utc> pid=<n> src=<cron|done|ci|crash|
@@ -55,7 +56,7 @@ with the rule that held it:
 | `structural` | it touches its always-serial structural set or a table/schema/migration |
 | `after` | a slice it must follow is not merged |
 | `cap` | 4 runs are in flight |
-| `budget` | the governor is at SOFT-PAUSE, or this launch's tier cap would cross it (a run started past the threshold is cut off mid-way) |
+| `budget` | the governor is at SOFT-PAUSE, this launch's tier cap would cross it, or its model's own plan window is paused (a run started past the threshold is cut off mid-way) |
 | `memory` | `free -g` shows less than one full build free |
 | `quiet` | a refactor's quiet window covers it |
 
@@ -167,11 +168,50 @@ other. After 3 ignored offers the slice is `capped` exactly as above, and the on
 `DECISION(credit-resume-<slice>)` issue says the session did not act on the offer.
 
 The tick's own session being refused arms `rate_limit_resets_at` in `mr-state.json` and a reset
-watcher. The budget governor's HARD-STOP is separate: it is this loop's dollar estimate
-(`weekly_limit_usd` × `hard_stop_frac`), it stops decision sessions and not runs — a live run
-finishes and its event waits — and it clears when the weekly window (`budget.window_end_utc`)
-rolls over, for which the wrapper arms the same watcher. The estimate and the plan's real limit
-are independent: the plan can refuse credit while the governor reads NORMAL.
+watcher. The budget governor's HARD-STOP is separate: it stops decision sessions and not runs —
+a live run finishes and its event waits — and it clears when the window it was read from resets
+(`budget.resets_at_utc`), for which the wrapper arms the same watcher.
+
+## Budget governor
+`mr-situation` computes it into the bundle's `budget`: NORMAL, SOFT-PAUSE (over
+`soft_pause_frac`, 90%) or HARD-STOP (over `hard_stop_frac`, 97%); UNKNOWN when the ledger
+cannot be read. The thresholds keep a run from being started just under the cap and cut off
+mid-way; they do not spread spend over the week.
+
+`budget.source` names what decided:
+
+| `source` | The state is graded from |
+|---|---|
+| `telemetry` | the plan's real utilisation: the newest reading of a plan window in `mr-rate-limit-telemetry.jsonl` (the `rate_limit_event` rows `mr-cost-watch telemetry` samples from tick and slice logs), read within `telemetry_fresh_s` (3 h) |
+| `telemetry-stale` | a reading older than that, still over the soft threshold, on a window whose reset is ahead. It reads SOFT-PAUSE whatever its figure: the decision session that runs launches nothing new and leaves a fresh sample |
+| `calibration` | the ledger's dollars this week (plus estimates for runs not yet recorded) against `weekly_limit_usd` in `mr-budget-config.json`. In force only when no reading is |
+
+Rules for a reading:
+- **Window.** `five_hour`, `seven_day` and any window not known to belong to one model cover
+  every model and set `budget.state`; the highest one in force decides. A window covers one
+  model when its name carries the model or `telemetry_window_models` in the config maps it
+  (`seven_day_overage_included` is the Fable allowance). Such a window sets
+  `budget.model_states.<model>` — the worse of it and `budget.state` — and `budget.fable_ok`,
+  which gates the wrapper's escalation to Fable.
+- **Reset.** A reading is void once its window's `resetsAt` has passed: the next window starts
+  empty, so a pause never outlives the window it was read from. The window's newest sample
+  decides which `resetsAt` that is, so a reset time the plan moves earlier takes effect with
+  the sample that reports it.
+- **Freshness.** The plan's figure moves both ways inside a window, so only a reading younger
+  than `telemetry_fresh_s` is acted on as read. An older one under the soft threshold is not in
+  force; an older one over it reads SOFT-PAUSE. A model's own window is reported only by
+  sessions on that model, so its older reading (`stale` in `budget.model_states.<model>`) keeps
+  `fable_ok` false and `mr-spawn` lets one new launch on the model through per
+  `telemetry_fresh_s` to measure it, refusing the rest. The launch that went is recorded by
+  `$MEM/.model-window-probe.<window>.<reset>`; deleting that file allows another.
+- **Launches.** A pause on every model is the decision session's rule (SOFT-PAUSE: only
+  `resume_first` slices). A pause on one model alone is `mr-spawn`'s: it refuses a new launch on
+  that model with `BUDGET-MODEL-PAUSED` (`held=budget`) and launches other models and credit-stop
+  resumes.
+
+On telemetry `effective_usd` is the utilisation × `weekly_limit_usd`, so the per-launch check
+(`effective_usd` + `tier_caps_usd` ≤ `soft_pause_usd`) reads one scale under either source;
+`utilisation`, `window` and `sample_utc` carry the reading itself.
 
 ## Slice scope (`touches:`)
 A slice edits the files its spec's `touches:` declares; a run that measures a further file it

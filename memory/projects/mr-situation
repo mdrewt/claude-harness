@@ -12,7 +12,7 @@ if [ "$FRESH" = 0 ] && [ -f "$CACHE" ]; then
 fi
 export MEM NOGH
 /usr/bin/python3 - <<'PY' > "$CACHE.tmp" 2>/dev/null || echo '{"authority":"HINTS-ONLY","error":"situation-generator-crashed"}' > "$CACHE.tmp"
-import json, os, glob, subprocess, time, datetime
+import json, os, glob, re, subprocess, time, datetime
 MEM=os.environ["MEM"]; NOGH=os.environ.get("NOGH")=="1"
 out={"authority":"HINTS-ONLY (re-verify anything you are about to mutate)",
      "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
@@ -68,6 +68,77 @@ try:
     _caps=json.load(open(MEM+"/mr-budget-config.json")).get("slice_caps_usd")
     if isinstance(_caps,dict) and _caps and all(isinstance(v,(int,float)) and not isinstance(v,bool) and v>0 for v in _caps.values()): CAPS=_caps
 except Exception: pass
+# REAL UTILISATION. The CLI's rate_limit_event rows (mr-cost-watch telemetry writes them) carry the
+# plan's own figure per window: a 0..1 utilisation and the window's resetsAt. A window covers one
+# model when its name carries the model or `telemetry_window_models` maps it, every model
+# otherwise — mr-interrupted's scope rule. A window's reading is its newest sample among the rows
+# whose resetsAt is still ahead, with the resetsAt that sample carries: the plan's latest word on
+# the window decides, whichever reset time it names. It is in force by these rules:
+#   - never once its resetsAt has passed: the window it measured is over and the next starts empty;
+#   - as read, for FRESH_S after it was read. The figure moves both ways inside a window (the plan
+#     restores credit mid-window), so an older reading is not acted on as if it were current;
+#   - older than that and over the soft threshold: SOFT-PAUSE, whatever it read. On a window that
+#     covers every model a decision session then runs, launches nothing new and leaves the next
+#     sample; standing down on it (HARD-STOP) would leave no session to notice the figure fall.
+#     A model's own window is sampled only by sessions on that model, so its entry carries
+#     `stale` and `probe_every_s`: mr-spawn lets one launch on the model through per that period
+#     to measure it and refuses the rest, and `fable_ok` stays false for escalations;
+#   - older than that and under the soft threshold: not at all.
+# With no reading in force for an axis the ledger's dollars against the calibrated limits decide.
+TEL_TAIL=4<<20   # bytes of the telemetry file read: about a week of rows
+FRESH_S=10800.0  # three hourly ticks: one decision session can hold the tick lock for 90 minutes
+WMODELS={"seven_day_overage_included":"fable"}
+try:
+    _c=json.load(open(MEM+"/mr-budget-config.json"))
+    _fs=_c.get("telemetry_fresh_s")
+    if isinstance(_fs,(int,float)) and not isinstance(_fs,bool) and _fs>0: FRESH_S=float(_fs)
+    _wm=_c.get("telemetry_window_models")
+    if isinstance(_wm,dict): WMODELS=dict((str(k),str(v).lower()) for k,v in _wm.items())
+except Exception: pass
+ORDER=("NORMAL","SOFT-PAUSE","HARD-STOP")
+def grade(frac): return "HARD-STOP" if frac>HARD else "SOFT-PAUSE" if frac>SOFT else "NORMAL"
+def iso(e): return datetime.datetime.fromtimestamp(e,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+def _num(v): return isinstance(v,(int,float)) and not isinstance(v,bool) and v==v
+def window_model(name):
+    for m in ("fable","opus","sonnet","haiku"):
+        if re.search(r"(^|_)%s($|_)"%m, name): return m
+    return WMODELS.get(name)
+def real_utilisation(now):
+    """{None or model: {window, u, resets, ts, stale, state}}: per axis, the worst reading in force."""
+    wins={}
+    try:
+        with open(MEM+"/mr-rate-limit-telemetry.jsonl","rb") as f:
+            f.seek(0,2); size=f.tell(); f.seek(max(0,size-TEL_TAIL)); data=f.read(TEL_TAIL)
+    except OSError: return {}
+    for raw in data.split(b"\n"):
+        try:
+            row=json.loads(raw.decode("utf-8","replace"))
+            ts=datetime.datetime.strptime(row["ts"][:19],"%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
+            ri=row.get("ri") if isinstance(row.get("ri"),dict) else {}
+        except Exception: continue   # the tail's cut first line, or a torn row
+        if ts>now+300: continue
+        uw=ri.get("unifiedWindows")
+        seen=dict((str(k),v) for k,v in uw.items() if isinstance(v,dict)) if isinstance(uw,dict) else {}
+        seen.setdefault(str(row.get("rateLimitType")),{"utilization":row.get("utilization"),"resetsAt":row.get("resetsAt"),"status":row.get("status")})
+        for name,w in seen.items():
+            u,r=w.get("utilization"),w.get("resetsAt")
+            if w.get("status")=="rejected" and not (_num(u) and u>1): u=1.0
+            if not (_num(u) and u>=0 and _num(r)): continue
+            if r>1e11: r=r/1000.0
+            if r<=now or r>now+8*86400: continue   # a window that is over, or not a reset time
+            wins.setdefault(name,[]).append((ts,r,float(u)))
+    best={}
+    for name,rows in wins.items():
+        # One tick reads several logs a second or two apart, each ending on its own last event:
+        # the newest reading is the highest of that pass.
+        ts,r,_u=max(rows)
+        w={"window":name,"resets":r,"ts":ts,"u":max(u for t,rr,u in rows if rr==r and t>=ts-60)}
+        m=window_model(name); w["stale"]=now-ts>FRESH_S
+        if w["stale"] and w["u"]<=SOFT: continue
+        w["state"]="SOFT-PAUSE" if w["stale"] else grade(w["u"])
+        key=lambda x: (ORDER.index(x["state"]),x["u"],x["resets"])
+        if m not in best or key(w)>key(best[m]): best[m]=w
+    return best
 def budget():
     now=time.time()
     ws=now-7*86400
@@ -124,15 +195,31 @@ def budget():
             os.kill(int(pid),0)
             committed+=tier_est.get(str(lk.get("tier","routine")),25.0); live+=1
         except Exception: pass
+    # `source` names what is in force. On telemetry `effective_usd` is the real utilisation put on
+    # the dollar scale (x weekly_limit_usd), so the per-launch check against `soft_pause_usd` and
+    # `tier_caps_usd` reads one scale either way; a live run's spend is already in the utilisation.
     eff=d7+est+committed
-    state="NORMAL"
-    if eff>HARD*WEEKLY: state="HARD-STOP"
-    elif eff>SOFT*WEEKLY: state="SOFT-PAUSE"
-    return {"window_start_utc":datetime.datetime.fromtimestamp(ws,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "window_end_utc":datetime.datetime.fromtimestamp(wend,datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if wend else None,"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
+    state=grade(eff/WEEKLY); source="calibration"; real={}; resets=iso(wend) if wend else None
+    try: tel=real_utilisation(now)
+    except Exception: tel={}
+    g=tel.get(None)
+    if g:
+        state=g["state"]; source="telemetry-stale" if g["stale"] else "telemetry"; eff=g["u"]*WEEKLY; resets=iso(g["resets"])
+        real={"utilisation":g["u"],"window":g["window"],"sample_utc":iso(g["ts"])}
+    # A model with a window of its own in force: the worse of that window and the state above.
+    models={}
+    for m,w in tel.items():
+        if m is None: continue
+        models[m]={"state":max(w["state"],state,key=ORDER.index),"utilisation":w["u"],"window":w["window"],"resets_at_utc":iso(w["resets"])}
+        if w["stale"]: models[m].update({"stale":True,"sample_utc":iso(w["ts"]),"probe_every_s":FRESH_S})
+    fable_ok=models["fable"]["state"]=="NORMAL" if "fable" in models else fab < FGUARD*FALLOW
+    out={"window_start_utc":iso(ws),"window_end_utc":iso(wend) if wend else None,"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
             "unreconciled_est_usd":est,"inflight_committed_est_usd":round(committed,2),"inflight_runs":live,"effective_usd":round(eff,2),"weekly_limit_usd":WEEKLY,
             "soft_pause_frac":SOFT,"hard_stop_frac":HARD,"soft_pause_usd":round(SOFT*WEEKLY,2),"tier_caps_usd":CAPS,"fable_guard_frac":FGUARD,
-            "fable_allowance_usd":FALLOW,"fable_guard_usd":round(FGUARD*FALLOW,2),"fable_ok": fab < FGUARD*FALLOW,"state":state}
+            "fable_allowance_usd":FALLOW,"fable_guard_usd":round(FGUARD*FALLOW,2),"fable_ok":fable_ok,"source":source}
+    out.update(real)
+    out.update({"resets_at_utc":resets,"model_states":models,"state":state})
+    return out
 b=safe(budget,{"state":"UNKNOWN","error":"budget-computation-failed"})
 if not isinstance(b,dict) or "state" not in b: b={"state":"UNKNOWN","error":str(b)[:120]}
 out["budget"]=b
