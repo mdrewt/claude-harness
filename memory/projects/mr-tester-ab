@@ -2676,18 +2676,38 @@ def cmd_judge_pack(ctx, args):
     print('Agent(subagent_type="judge", model="%s", effort="%s", description="judge bundle %d", '
           'prompt="Read %s and rule on every item exactly as it instructs.")'
           % (judge.get("model", "fable"), judge.get("effort", "high"), n, bundle))
+    # Operator fallback rule (2026-11-14, `model_fallback` in mr-budget-config.json): a judge the
+    # plan refuses on its own model's limit is issued once more on the fallback; each verdict
+    # records the model that gave it (`judge_model`), so a fallback verdict stays separable.
+    fb = load_model_fallback(ctx.mem).get(str(judge.get("model", "fable")).lower())
+    if fb:
+        print("If that call is refused by the %s usage limit, issue it once more with model=\"%s\" "
+              "(same arguments); judge-apply records which model judged." % (judge.get("model", "fable"), fb))
+
+
+def load_model_fallback(mem):
+    """{model: fallback model} from mr-budget-config.json beside this tool; {} when unreadable."""
+    try:
+        with open(os.path.join(mem, "mr-budget-config.json")) as fh:
+            m = json.load(fh).get("model_fallback")
+        return dict((str(k).lower(), str(v).lower()) for k, v in m.items() if v) if isinstance(m, dict) else {}
+    except Exception:
+        return {}
 
 
 def judge_transcript(ctx, bundle):
-    """The transcript of the judge run whose first message names the bundle, or None."""
+    """The newest transcript of a judge run whose first message names the bundle, or None: a
+    judge refused by a usage limit and issued again on the fallback model leaves two."""
+    best = None
     for found in sorted(glob.glob(os.path.join(glob.escape(ctx.transcripts), "*", "*", "subagents", "agent-*.jsonl"))):
         with contextlib.suppress(OSError):
-            if os.path.getmtime(found) < os.path.getmtime(bundle) - 120:
+            mtime = os.path.getmtime(found)
+            if mtime < os.path.getmtime(bundle) - 120:
                 continue
             with open(found, errors="replace") as fh:
-                if bundle in fh.readline(400000):
-                    return found
-    return None
+                if bundle in fh.readline(400000) and (best is None or mtime > best[0]):
+                    best = (mtime, found)
+    return best[1] if best else None
 
 
 def said_verdicts(text):
@@ -2809,6 +2829,10 @@ def cmd_judge_apply(ctx, args):
         raise Skip("verdicts file is not a JSON array")
     rows = read(ctx)
     judged = {r["ref"] for r in of(rows, "verdict")}
+    judge_cost = None
+    if transcript:
+        with contextlib.suppress(Exception):
+            judge_cost = by_role(ctx, os.path.basename(os.path.dirname(os.path.dirname(transcript)))).get(agent_id(transcript))
     new, bad = [], 0
     for entry in given:
         item = key.get(entry.get("id")) if isinstance(entry, dict) else None
@@ -2837,7 +2861,8 @@ def cmd_judge_apply(ctx, args):
                     "label": item["label"], "scale": item.get("scale", 1), "bundle": int(m.group(1)),
                     "verdict": "duplicate" if target else verdict, "duplicate_of": target,
                     "criterion": said("criterion"), "wrong_behaviour": said("wrong_behaviour"),
-                    "severity": entry.get("severity") if entry.get("severity") in ("minor", "major") else None})
+                    "severity": entry.get("severity") if entry.get("severity") in ("minor", "major") else None,
+                    "judge_model": (judge_cost or {}).get("model")})
     append(ctx, new)
     out = []
     for slice_ in sorted({v["slice"] for v in new}):
@@ -2847,7 +2872,7 @@ def cmd_judge_apply(ctx, args):
     if transcript and not any(r.get("role") == "judge" and r.get("bundle") == int(m.group(1)) for r in of(rows, "run")):
         with contextlib.suppress(Exception):
             session = os.path.basename(os.path.dirname(os.path.dirname(transcript)))
-            cost = by_role(ctx, session).get(agent_id(transcript))
+            cost = judge_cost
             if cost:
                 append(ctx, [{"kind": "run", "slice": "-", "label": "judge", "arm": "judge", "role": "judge",
                               "bundle": int(m.group(1)), "status": "ok", "session": session,

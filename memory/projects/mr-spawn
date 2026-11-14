@@ -1102,6 +1102,11 @@ case "$CSCHK" in "REFUSE "*) status CREDIT-STOPPED "${CSCHK#REFUSE } — refusin
 # a session on that model can re-measure, so one launch per `probe_every_s` goes through as the
 # probe and the rest are refused. The probe is claimed by a marker in $MEM named for the window
 # and its reset, so the claim ends with the window it was made in.
+# A model with a `model_fallback` (mr-budget-config.json) is never held by its own window, at any
+# reading, fresh or stale: it gets the first try, so a reset or a mid-window credit restore is used
+# at once, and a run the limit cuts off — at launch or mid-way — continues on the fallback
+# (mr-launch.sh). Nothing is downgraded ahead of a refusal. The pause and probe above remain for a
+# model with its own window and no fallback.
 MPCHK=$("$MEM/mr-situation" --no-gh 2>/dev/null | /usr/bin/python3 -c '
 import json, sys
 try:
@@ -1109,7 +1114,12 @@ try:
     m = next((k for k in ("fable", "opus", "sonnet", "haiku") if k in sys.argv[1].lower()), "")
     w = (b.get("model_states") or {}).get(m) or {}
     resume = json.load(open(sys.argv[2])).get("resume_session")
-    if b.get("state") == "NORMAL" and w.get("state") in ("SOFT-PAUSE", "HARD-STOP") and not resume:
+    try:
+        fallback = (json.load(open(sys.argv[3] + "/mr-budget-config.json")).get("model_fallback") or {}).get(m)
+    except Exception:
+        fallback = None
+    first_try = bool(fallback)
+    if b.get("state") == "NORMAL" and w.get("state") in ("SOFT-PAUSE", "HARD-STOP") and not resume and not first_try:
         probe, note = False, ""
         if w.get("stale"):
             import glob, os, re, time

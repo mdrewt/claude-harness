@@ -815,6 +815,15 @@ try:
     def probes():
         return glob.glob(os.path.join(box.mem, ".model-window-probe.*"))
 
+    def with_fallback(on):
+        """The sandbox config with the live `model_fallback` (fable -> opus), or without any: the
+        pause and probe below are what a model with its own window and NO fallback gets."""
+        cfg = json.load(open(os.path.join(MEM, "mr-budget-config.json")))
+        if not on:
+            cfg.pop("model_fallback", None)
+        with open(os.path.join(box.mem, "mr-budget-config.json"), "w") as f:
+            json.dump(cfg, f)
+
     def launch(model, resume=None):
         v = os.path.join(box.root, "launch.vars.json")
         with open(v, "w") as f:
@@ -857,10 +866,15 @@ try:
     if (b.get("model_states") or {}).get("fable") != {"state": "SOFT-PAUSE", "utilisation": 0.95,
                                                       "window": "seven_day_overage_included", "resets_at_utc": utc(WEEK_END)}:
         fail("governor-model-window", "model_states: %r" % (b.get("model_states"),))
+    # Fable has a fallback: its own window holds nothing back at any reading (first try, then Opus).
+    if [launch("fable"), launch("claude-fable-5-1"), launch("opus")] != ["LAUNCH"] * 3 or probes():
+        fail("governor-fallback-soft-first-try", "a model with a fallback was held by its own SOFT-PAUSE")
+    with_fallback(False)
     got = [launch("fable"), launch("claude-fable-5-1"), launch("opus"), launch("fable", resume=SID)]
+    with_fallback(True)
     if not got[0].startswith("BUDGET-MODEL-PAUSED SOFT-PAUSE: its window seven_day_overage_included reads 95%") \
             or not got[1].startswith("BUDGET-MODEL-PAUSED") or got[2:] != ["LAUNCH", "LAUNCH"]:
-        fail("governor-model-window-launch", "fable, fable id, opus, fable resume: %r" % (got,))
+        fail("governor-model-window-launch", "no fallback: fable, fable id, opus, fable resume: %r" % (got,))
     out, log = box.tick(NOW)
     if "REACHED-SESSION governor=NORMAL" not in out:
         fail("governor-model-window-tick", "stdout=%r log=%r" % (out, log))
@@ -869,6 +883,18 @@ try:
     b = reads("recorded-stop", {"state": "SOFT-PAUSE", "source": "telemetry", "utilisation": 0.91, "fable_ok": False})
     if (b.get("model_states") or {}).get("fable", {}).get("state") != "HARD-STOP":
         fail("governor-recorded-stop", "model_states: %r" % (b.get("model_states"),))
+    # Fable's own window over the hard line, the shared one low: a new Fable launch goes through to
+    # try Fable first (mr-launch.sh falls back to Opus if refused); fresh or stale, no probe spent.
+    sampled([event(FABLE_EV, seven_day=0.40, seven_day_overage_included=0.99)])
+    b = reads("fable-hard-first-try", {"state": "NORMAL", "fable_ok": False})
+    if (b.get("model_states") or {}).get("fable", {}).get("state") != "HARD-STOP" \
+            or [launch("fable"), launch("claude-fable-5-1"), launch("opus")] != ["LAUNCH"] * 3:
+        fail("governor-fable-hard-first-try", "model_states=%r" % (b.get("model_states"),))
+    sampled([event(FABLE_EV, seven_day=0.40, seven_day_overage_included=0.99)], age=FRESH + 300)
+    b = reads("fable-hard-stale-first-try", {"state": "NORMAL", "fable_ok": False})
+    if ((b.get("model_states") or {}).get("fable") or {}).get("stale") is not True \
+            or [launch("fable"), launch("fable")] != ["LAUNCH"] * 2 or probes():
+        fail("governor-fable-hard-stale-first-try", "model_states=%r probes=%r" % (b.get("model_states"), probes()))
     # With every window under its threshold nothing is refused.
     sampled([event(FABLE_EV, seven_day=0.40, seven_day_overage_included=0.60)])
     b = reads("model-window-normal", {"state": "NORMAL", "fable_ok": True})
@@ -891,9 +917,10 @@ try:
     b = reads("stale-over-threshold", {"state": "SOFT-PAUSE", "source": "telemetry-stale", "utilisation": 0.98, "fable_ok": False})
     if (b.get("model_states") or {}).get("fable", {}).get("state") != "SOFT-PAUSE" or launch("fable") != "LAUNCH" or probes():
         fail("governor-stale-shared-window", "model_states=%r probes=%r" % (b.get("model_states"), probes()))
-    # Old and over the threshold on a model's own window, the shared one low: the model stays
-    # paused and closed to escalation, and one launch per freshness period goes through to
-    # measure it. Other models and credit-stop resumes launch and do not spend the probe.
+    # Old and over the threshold on a model's own window, the shared one low: a model WITHOUT a
+    # fallback stays paused and closed to escalation, and one launch per freshness period goes
+    # through to measure it. Other models and credit-stop resumes launch and do not spend the probe.
+    with_fallback(False)
     sampled([event(FABLE_EV, seven_day=0.40, seven_day_overage_included=0.95)], age=FRESH + 300)
     b = reads("stale-model-window", {"state": "NORMAL", "source": "calibration", "fable_ok": False})
     fable = (b.get("model_states") or {}).get("fable") or {}
@@ -916,6 +943,9 @@ try:
     sampled([event(FABLE_EV, resets=WEEK_END + 3600, seven_day=0.40, seven_day_overage_included=0.95)], keep=True)
     if not launch("fable").startswith("BUDGET-MODEL-PAUSED SOFT-PAUSE: its window seven_day_overage_included reads 95% and"):
         fail("governor-probe-sample-over", "launch=%r" % (launch("fable"),))
+    with_fallback(True)
+    if launch("fable") != "LAUNCH":
+        fail("governor-fallback-stale-first-try", "launch=%r" % (launch("fable"),))
 
     # The plan's newest word on a window stands, whichever reset time it carries: a later sample
     # with an earlier resetsAt replaces the reading taken under the later one.
@@ -1011,17 +1041,21 @@ try:
     for d in (rundir, hmem, stubs):
         os.makedirs(d)
     shutil.copy2(os.path.join(MEM, "mr-cost-sum"), hmem)
+    shutil.copy2(os.path.join(MEM, "mr-interrupted"), hmem)
+    shutil.copy2(os.path.join(MEM, "mr-budget-config.json"), hmem)
     with open(os.path.join(box.root, "launch.sh"), "w") as f:
         f.write(launch.replace(LIVE_HARNESS, harness).replace("/tmp/mr_", box.tmp + "/mr_"))
     # claude: logs its arguments; refuses a --resume when told to; otherwise emits one result.
     with open(os.path.join(stubs, "claude"), "w") as f:
         f.write('#!/bin/bash\necho "$*" | tr "\\n" " " >> "%s/claude-args"; echo >> "%s/claude-args"\n'
                 'case " $* " in *" --resume "*) [ -e "%s/refuse-resume" ] && { echo "No conversation found" >&2; exit 1; };; esac\n'
+                # Fable's own limit: the recorded refusal (CLI's newer wording), once per fixture file.
+                'case " $* " in *" --model fable "*) [ -e "%s/fable-limit" ] && { tail -n +2 "%s/fable-limit"; exit 1; };; esac\n'
                 'echo \'{"type":"assistant","session_id":"%s"}\'\n'
                 # One transient API failure, after the session has started: the wrapper resumes it.
                 '[ -e "%s/overloaded-once" ] && { rm -f "%s/overloaded-once"; echo "API Error: 529 overloaded" >&2; exit 1; }\n'
                 'echo \'{"type":"result","session_id":"%s","total_cost_usd":1.5}\'\n'
-                % (box.root, box.root, box.root, SID, box.root, box.root, SID))
+                % (box.root, box.root, box.root, box.root, box.root, SID, box.root, box.root, SID))
     with open(os.path.join(stubs, "gh"), "w") as f:
         # The slice's PR is open (a terminal state) unless a fixture says the run has not opened it.
         f.write('#!/bin/bash\n[ -e "%s/no-pr" ] || printf "feat/s-a\\nfix/ci-fix-20261105T2200\\n"\n' % box.root)
@@ -1031,10 +1065,10 @@ try:
         os.chmod(os.path.join(stubs, n), 0o755)
     transcript = os.path.join(home, ".claude", "projects", re.sub(r"[^A-Za-z0-9]", "-", rundir), SID + ".jsonl")
     env = dict(os.environ, HOME=home, PATH=stubs + ":" + os.environ.get("PATH", ""),
-               MR_NO_EVENT_BRIDGE="1", MR_NO_OLLAMA="1", MR_NO_ESCALATE="1")
+               MR_NO_EVENT_BRIDGE="1", MR_NO_OLLAMA="1", MR_NO_ESCALATE="1", MR_INTERRUPTED_TMP=box.tmp)
 
-    def launch_once(resume, with_transcript, refuse, slice_="s-a", brief="THE BRIEF\n", flags=()):
-        for n in ("claude-args", "refuse-resume", "overloaded-once", "no-pr"):
+    def launch_once(resume, with_transcript, refuse, slice_="s-a", brief="THE BRIEF\n", flags=(), model="opus", effort="high", stop=False):
+        for n in ("claude-args", "refuse-resume", "overloaded-once", "no-pr", "fable-limit"):
             try:
                 os.unlink(os.path.join(box.root, n))
             except OSError:
@@ -1042,6 +1076,8 @@ try:
         for n in os.listdir(box.tmp):
             os.unlink(os.path.join(box.tmp, n))
         shutil.rmtree(os.path.join(home, ".claude"), ignore_errors=True)
+        if stop:
+            open(os.path.join(box.tmp, "mr_stop_all"), "w").close()
         if with_transcript:
             os.makedirs(os.path.dirname(transcript))
             with open(transcript, "w") as f:
@@ -1049,10 +1085,12 @@ try:
         if refuse:
             open(os.path.join(box.root, "refuse-resume"), "w").close()
         for n in flags:
-            open(os.path.join(box.root, n), "w").close()
+            with open(os.path.join(box.root, n), "w") as f:
+                if n == "fable-limit":
+                    f.write(REJECTED.replace("You've reached your Fable limit.", "You've hit your Fable limit \u00b7 resets Nov 6."))
         with open(os.path.join(box.tmp, "mr_pass_%s.md" % slice_), "w") as f:
             f.write(brief)
-        subprocess.run(["bash", os.path.join(box.root, "launch.sh"), slice_, "opus", "high", "project", resume],
+        subprocess.run(["bash", os.path.join(box.root, "launch.sh"), slice_, model, effort, "project", resume],
                        env=env, capture_output=True, text=True, timeout=60)
         try:
             calls = open(os.path.join(box.root, "claude-args")).read().splitlines()
@@ -1079,6 +1117,31 @@ try:
     calls, log = launch_once("", True, False)
     if len(calls) != 1 or "--resume" in calls[0] or "THE BRIEF" not in calls[0] or "RESUME-FALLBACK" in log:
         fail("launch-plain", "claude calls=%r log=%r" % (calls, log[:300]))
+
+    # Fable's own limit refuses the session: it continues ONCE on Opus, same effort, resuming the
+    # same session, even though the slice's PR is already open (it was cut off mid-step).
+    calls, log = launch_once("", True, False, model="fable", effort="xhigh", flags=("fable-limit",))
+    if len(calls) != 2 or "--model fable --effort xhigh" not in calls[0] \
+            or "--model opus --effort xhigh" not in calls[1] or "--resume %s " % SID not in calls[1] \
+            or "fable usage limit refused this session" not in calls[1] \
+            or "MODEL=opus EFFORT=xhigh FALLBACK-FROM=fable session=%s" % SID not in log:
+        fail("launch-fable-limit-falls-back", "claude calls=%r log=%r" % (calls, log[-400:]))
+    # The CLI cannot resume across the switch: a new session from the brief, on Opus.
+    calls, log = launch_once("", True, True, model="fable", effort="xhigh", flags=("fable-limit",))
+    if len(calls) != 3 or "--model opus" not in calls[2] or "--resume" in calls[2] or "THE BRIEF" not in calls[2] \
+            or "FALLBACK-RESUME-FAILED" not in log:
+        fail("launch-fable-limit-fresh-on-opus", "claude calls=%r log=%r" % (calls, log[-400:]))
+    # Not under a stop flag, and not when the shared windows read HARD-STOP.
+    calls, log = launch_once("", True, False, model="fable", effort="xhigh", flags=("fable-limit",), stop=True)
+    if len(calls) != 1 or "FALLBACK-SKIPPED fable limit: a stop flag is up" not in log:
+        fail("launch-fable-limit-stop-flag-no-fallback", "claude calls=%r log=%r" % (calls, log[-400:]))
+    with open(os.path.join(hmem, "mr-situation"), "w") as f:
+        f.write('#!/bin/bash\necho \'{"budget":{"state":"HARD-STOP"}}\'\n')
+    os.chmod(os.path.join(hmem, "mr-situation"), 0o755)
+    calls2, log2 = launch_once("", True, False, model="fable", effort="xhigh", flags=("fable-limit",))
+    os.unlink(os.path.join(hmem, "mr-situation"))
+    if len(calls2) != 1 or "FALLBACK-SKIPPED fable limit: shared windows at HARD-STOP" not in log2:
+        fail("launch-fable-limit-hard-stop-no-fallback", "claude calls=%r log=%r" % (calls2, log2[-400:]))
 
     # A red master has one owner. The reset tick resumes every interrupted slice ahead of a red
     # master, and a resumed session's context can hold a brief that tells every run to fix it: so
@@ -1384,8 +1447,11 @@ try:
         fail("later-stop-holds-due-slice", "gate, offer, launch-check, list: %r" % (got,))
     T = RESET + 86400 + 130
     got = (box.tool(T, "gate", "--model", "opus"), box.tool(T, "launch-check", "s-a", "opus"), box.tool(T, "vars", "--due"))
-    if got != ("DUE n=2", "OK", "s-a,s-b") or box.states(T).get("s-f") != "waiting":
-        fail("other-model-stop-holds-nothing", "gate, launch-check, offer: %r list=%r" % (got, box.states(T)))
+    if got != ("DUE n=3", "OK", "s-a,s-b,s-f") or box.vars("s-f").get("model") != "opus":
+        fail("other-model-stop-holds-nothing", "gate, launch-check, offer: %r list=%r vars=%r" % (got, box.states(T), box.vars("s-f")))
+    # A supervisor on the stopped model stands down even with offers due: it would be refused.
+    if not box.tool(T, "gate", "--model", "fable").startswith("BLOCKED_UNTIL_"):
+        fail("gate-own-model-covered", box.tool(T, "gate", "--model", "fable"))
 finally:
     box.close()
 
@@ -1577,16 +1643,36 @@ try:
 finally:
     box.close()
 
-# ---- a limit on one model stops and gates that model only -----------------------------------------
+# ---- a limit on one model with a fallback holds nothing back ---------------------------------------
+# Operator rule 2026-11-14 (`model_fallback`: fable -> opus). A live slice's Fable-limit refusal
+# belongs to its wrapper, which continues it on Opus; no sibling is flagged (each falls back when
+# its own call is refused); a dead slice is recorded and resumed on Opus at once, on Fable after
+# the reset. The CLI's newer wording ("hit your Fable limit") is the same one-model stop.
 box = Box()
 try:
     box.slice("s-a", "hard", "fable", "xhigh", log=REJECTED)                 # "your Fable limit"
     opus = box.slice("s-b", "content", "opus", "medium", live=True)
     fable = box.slice("s-c", "hard", "fable", "xhigh", live=True)
+    box.slice("s-h", "hard", "fable", "xhigh", live=True,
+              log=REJECTED.replace("You've reached your Fable limit.", "You've hit your Fable limit \u00b7 resets Nov 6, 7pm."))
     out, log = box.tick(STOPPED, SRC="crash")
-    if "CREDIT-STOP new=s-a,s-c resets=%d limit=seven_day_overage_included scope=fable" % RESET not in log \
-            or box.flags() != ["mr_stop_s-a", "mr_stop_s-c"] or box.watched() != [str(RESET)]:
+    if "CREDIT-STOP new=s-a resets=%d limit=seven_day_overage_included scope=fable" % RESET not in log \
+            or box.flags() != [] or box.watched() != [str(RESET)]:
         fail("one-model-stop", "log=%r flags=%r watch=%r" % (log, box.flags(), box.watched()))
+    if box.tool(STOPPED, "rejection", "s-h") != "REJECTED scope=fable fallback=opus" \
+            or box.tool(STOPPED, "rejection", "s-c") != "NONE":
+        fail("rejection-question", "s-h=%r s-c=%r" % (box.tool(STOPPED, "rejection", "s-h"), box.tool(STOPPED, "rejection", "s-c")))
+    # The stopped slice is due at once, on Opus, same tier and effort, while the Fable stop is ahead.
+    if box.states(STOPPED + 60) != {"s-a": "due"} or box.tool(STOPPED + 60, "vars", "--due") != "s-a" \
+            or (box.vars("s-a").get("model"), box.vars("s-a").get("effort"), box.vars("s-a").get("tier"),
+                box.vars("s-a").get("fallback_from"), box.vars("s-a").get("resume_session")) != ("opus", "xhigh", "hard", "fable", SID) \
+            or "runs on opus at the same tier and effort" not in box.vars("s-a").get("resume_block", ""):
+        fail("one-model-stop-resumes-on-fallback", "list=%r vars=%r" % (box.states(STOPPED + 60), box.vars("s-a")))
+    # After the Fable reset nothing is downgraded: the resume runs on its own model again.
+    box.tool(RESET + 60, "vars", "s-a")
+    if (box.vars("s-a").get("model"), box.vars("s-a").get("fallback_from")) != ("fable", None) \
+            or "runs on opus" in box.vars("s-a").get("resume_block", ""):
+        fail("one-model-stop-reset-restores-model", "vars=%r" % (box.vars("s-a"),))
     # The supervisor (opus) is not covered: its ticks go on. A fable supervisor would stand down.
     out, log = box.tick(STOPPED + 3600)
     if "REACHED-SESSION" not in out or "STANDDOWN" in log:
@@ -1594,7 +1680,7 @@ try:
     out, log = box.tick(STOPPED + 3600, SUP_MODEL="fable")
     if "REACHED-SESSION" in out or "STANDDOWN credit-stop BLOCKED_UNTIL_2026-11-06T00:00:00Z" not in log:
         fail("one-model-stop-covers-own-model", "stdout=%r log=%r" % (out, log))
-    # New launches: mr-spawn refuses the stopped model until the reset, and launches the others.
+    # New launches go to their own model first, Fable included: mr-launch.sh falls back if refused.
     spawn = open(os.path.join(MEM, "mr-spawn")).read()
     with open(os.path.join(box.root, "spawn-credit.sh"), "w") as f:
         f.write("MEM=%s\nS=\"$1\"\nMODEL=\"$2\"\n%s\n%s\n}\n%s\necho PASSED\n"
@@ -1605,8 +1691,8 @@ try:
         r = subprocess.run(["bash", os.path.join(box.root, "spawn-credit.sh"), "s-new", model], env=box.env(now),
                            capture_output=True, text=True, timeout=60)
         got.append((r.returncode, "CREDIT-STOPPED" in r.stdout, "PASSED" in r.stdout))
-    if got != [(0, False, True), (1, True, False), (0, False, True)]:
-        fail("one-model-stop-gates-launches", "opus, fable, fable after reset: %r" % (got,))
+    if got != [(0, False, True), (0, False, True), (0, False, True)]:
+        fail("one-model-stop-fable-first", "opus, fable, fable after reset: %r" % (got,))
     # The model can also be named by the limit type; a rejection that names none covers all.
     for name, text, want in (("s-t", rejected("seven_day_opus", model="fable"), "opus"),
                              ("s-u", rejected("seven_day_overage_included", model=None), "all"),

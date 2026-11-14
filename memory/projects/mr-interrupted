@@ -13,9 +13,21 @@ fact on disk at that moment, so it is recorded here by the tick wrapper instead 
 inferred by a decision session days later.
 
 SCOPE. A rejection covers one model or all of them. It covers one model when `rateLimitType`
-names it, or when the CLI's limit message names it ("You've reached your Fable limit") and
-neither general window (`five_hour`, `seven_day`) is itself rejected; anything else covers all
-models. A one-model stop records, flags and gates only slices running that model.
+names it, or when the CLI's limit message names it ("You've reached your Fable limit", later
+"You've hit your Fable limit") — or, when the message has neither wording, when the config's
+`telemetry_window_models` maps the rejected window to it — and neither general window
+(`five_hour`, `seven_day`) is itself rejected; anything else (a message naming no model, no
+window detail) covers all models. A one-model stop records, flags and gates only slices running that model.
+
+FALLBACK. `model_fallback` in mr-budget-config.json maps a model to the one its sessions continue
+on when a stop covers that model alone (operator rule 2026-11-14: Fable -> Opus, the only
+downgrade). Such a stop holds nothing back: mr-launch.sh continues a refused session on the
+fallback at once (`rejection` is its question), so `scan` leaves a live slice's one-model
+rejection to its wrapper and flags no sibling (each continues on the fallback when its own call
+is refused); a slice the stop did interrupt is due at once and its `vars` run it on the fallback,
+same tier and effort, until that stop's reset — after it, on its own model again. `launch-check`
+lets a new launch on the model through: it tries its own model first and falls back only when
+refused.
 
   mr-interrupted scan          Called by mr-native-tick.sh before its gates, on every tick. For
                                each runner lock whose session ended on a rejection it records the
@@ -57,6 +69,10 @@ models. A one-model stop records, flags and gates only slices running that model
                                these slices offered. Counts one ignored offer for each that is
                                still offered and `due`; prints `IGNORED <slice> n=<k>[ capped] ...`
                                or `NOOP`.
+  mr-interrupted rejection <slice>
+                               mr-launch.sh's question after a session exits: `REJECTED
+                               scope=<all|model> fallback=<model|->` when the slice's pass log's
+                               last invocation ended on a rejection, else `NONE`.
   mr-interrupted drop <slice>  Removes the slice's record. mr-spawn calls it once the slice is
                                launched again.
 
@@ -128,7 +144,7 @@ GENERAL_WINDOWS = ("five_hour", "seven_day")
 PR_REPOS = {"harness": "mdrewt/claude-harness", "project": "mdrewt/monster-realm"}
 _SID = re.compile(r'"session_id":"([0-9a-fA-F-]{8,64})"')
 _INVOKE = ("ATTEMPT=", "COST-CAP-WRAP start")
-_LIMIT_MSG = re.compile(r"reached your (\w+) limit", re.I)
+_LIMIT_MSG = re.compile(r"(?:reached|hit) your (\w+) limit", re.I)   # both CLI wordings seen
 _BLOCKED = re.compile(r"(^###[^\n]*blocked:|^[\s>*`-]*blocked:\s*\S|`blocked:\s*[\w<])", re.M | re.I)
 _NEXT_HEAD = re.compile(r"^### ", re.M)
 
@@ -148,6 +164,21 @@ def held():
     return os.path.exists(HOLD)
 
 
+def config_map(key):
+    """A {str: str} map from mr-budget-config.json (lower-cased, empty values dropped); {} when
+    unreadable. `model_fallback` = {model: fallback}; `telemetry_window_models` = {window: model}."""
+    try:
+        with open(os.path.join(MEM, "mr-budget-config.json")) as f:
+            m = json.load(f).get(key)
+        return dict((str(k).lower(), str(v).lower()) for k, v in m.items() if v) if isinstance(m, dict) else {}
+    except Exception:
+        return {}
+
+
+FALLBACK = config_map("model_fallback")
+WINDOW_MODELS = config_map("telemetry_window_models")
+
+
 def family(model):
     m = str(model or "").lower()
     return next((k for k in MODELS if k in m), m)
@@ -162,6 +193,15 @@ def stops(entries, t, model=None):
     model). The one answer to "would a launch on this model be refused now?"."""
     return [e for e in entries if not e.get("capped") and float(e.get("resets_at") or 0) > t
             and (model is None or covers(e.get("scope"), model))]
+
+
+def run_model(e, entries, t):
+    """The model a resume of e's slice runs on: the fallback of its own model while a stop on
+    that model alone is still ahead, else its own model."""
+    m = family(e.get("model") or "opus")
+    if m in FALLBACK and any(x.get("scope") == m for x in stops(entries, t)):
+        return FALLBACK[m]
+    return e.get("model") or "opus"
 
 
 def load():
@@ -201,12 +241,13 @@ def scope_of(info, message):
             return m
     windows = info.get("unifiedWindows")
     named = _LIMIT_MSG.search(message or "")
-    if typ in GENERAL_WINDOWS or not named or named.group(1).lower() not in MODELS or not isinstance(windows, dict):
+    model = named.group(1).lower() if named else WINDOW_MODELS.get(typ, "")
+    if typ in GENERAL_WINDOWS or model not in MODELS or not isinstance(windows, dict):
         return "all"
     for w in GENERAL_WINDOWS:
         if isinstance(windows.get(w), dict) and windows[w].get("status") == "rejected":
             return "all"
-    return named.group(1).lower()
+    return model
 
 
 def read_log(slice_):
@@ -402,6 +443,9 @@ def cmd_scan():
             # written nothing for two minutes after the rejection is not.
             if alive and not ended and time.time() - mtime < 120:
                 continue
+            scopes = set(s for _r, _l, s in rejected)
+            if alive and len(scopes) == 1 and next(iter(scopes)) in FALLBACK:
+                continue    # its wrapper continues the session on the fallback model
             stopped = min(mtime, t)
             if t - stopped > MAX_AGE:
                 continue
@@ -427,7 +471,8 @@ def cmd_scan():
                     record_failure(state, e, t, wait_until=e["resets_at"])
                     rec.pop("left_at", None)
             new.append(e)
-        ahead = [e for e in new if e["resets_at"] > t]
+        # A stop with a fallback flags nothing: every session it refuses continues on the fallback.
+        ahead = [e for e in new if e["resets_at"] > t and e["scope"] not in FALLBACK]
         if ahead and not hold:
             ahead.sort(key=lambda e: (e["scope"] != "all", e["resets_at"]))
             for name, lock, alive, done in found:
@@ -445,7 +490,7 @@ def cmd_scan():
             if any(e["scope"] == "all" for e in ahead):
                 touch("mr_stop_all")
             for e in new:
-                if e["resets_at"] > t:
+                if e["resets_at"] > t and e["scope"] not in FALLBACK:
                     touch("mr_stop_" + e["slice"])
         fresh = set(e["slice"] for e in new)
         state["entries"] = [e for e in state["entries"] if e.get("slice") not in fresh] + new
@@ -535,8 +580,9 @@ def settle(state, t, lookups):
         if e.get("capped"):
             out.append((e, "capped"))
             continue
-        if float(e.get("resets_at") or 0) > t or float(e.get("not_before") or 0) > t \
-                or stops(state["entries"], t, e.get("model")):
+        runs_on = run_model(e, state["entries"], t)
+        if (float(e.get("resets_at") or 0) > t and covers(e.get("scope"), runs_on)) \
+                or float(e.get("not_before") or 0) > t or stops(state["entries"], t, runs_on):
             out.append((e, "waiting"))
             continue
         if slice_live(e.get("slice")):
@@ -620,7 +666,10 @@ def cmd_gate(model):
     entries = current(lookups=True)
     due = [e for e, w in entries if w == "due"]
     wait = [e["resets_at"] for e in stops([e for e, _w in entries], t, model)]
-    if due:
+    if wait and model is not None:
+        # The session that would take the offers runs on a model a stop still covers.
+        say("BLOCKED_UNTIL_" + utc(min(wait)))
+    elif due:
         say("DUE n=%d" % len(due))
     elif wait:
         say("BLOCKED_UNTIL_" + utc(min(wait)))
@@ -654,6 +703,7 @@ def cmd_vars(which):
         return 0
     t = now()
     written = []
+    everything = load()["entries"]
     for e, w in current(lookups=which == "--due"):
         if which == "--due":
             if w != "due":
@@ -666,8 +716,16 @@ def cmd_vars(which):
                 "Continue it from its existing worktree and branch (the `wip:` checkpoint) and "
                 "memory/projects/monster-realm-%s-progress.md; re-verify git state first. %s"
                 % (e.get("stopped_utc"), name, master_rule(name)))
+        runs_on = run_model(e, everything, t)
+        if runs_on != (e.get("model") or "opus"):
+            note += (" This resume runs on %s at the same tier and effort: %s's own limit refused it "
+                     "until %s (operator fallback rule)." % (runs_on, family(e.get("model")).capitalize(),
+                                                             e.get("resets_at_utc")))
+            v["fallback_from"] = e.get("model")
+        else:
+            v.pop("fallback_from", None)
         prior = str(v.get("resume_block") or "")
-        v.update({"slice": name, "tier": e.get("tier"), "model": e.get("model"), "effort": e.get("effort"),
+        v.update({"slice": name, "tier": e.get("tier"), "model": runs_on, "effort": e.get("effort"),
                   "resume_block": note if note in prior else (prior + "\n" if prior else "") + note})
         v.setdefault("touches", e.get("touches") or "")
         v.setdefault("target_desc", "resume %s per its spec section and park memo" % name)
@@ -696,6 +754,8 @@ def cmd_vars(which):
 def cmd_launch_check(name, model):
     t = now()
     for e in stops(load()["entries"], t, model) if os.path.exists(STATE) else []:
+        if e.get("scope") in FALLBACK:
+            continue        # tried on its own model first; mr-launch.sh falls back if refused
         print("REFUSE credit refused for %s until %s (slice %s, limit %s)"
               % ("every model" if covers(e.get("scope"), "") else e.get("scope"), e.get("resets_at_utc"),
                  e.get("slice"), e.get("limit")))
@@ -753,6 +813,17 @@ def cmd_ignored(names):
     return 0
 
 
+def cmd_rejection(name):
+    rejected = read_log(name)[2]
+    if not rejected:
+        print("NONE")
+        return 0
+    scopes = set(s for _r, _l, s in rejected)
+    scope = scopes.pop() if len(scopes) == 1 else "all"
+    print("REJECTED scope=%s fallback=%s" % (scope, FALLBACK.get(scope) or "-"))
+    return 0
+
+
 def cmd_drop(name):
     if not os.path.exists(STATE):
         print("DROPPED 0")
@@ -794,6 +865,8 @@ def main(argv):
         return cmd_failed(argv[1], argv[2] if len(argv) == 3 else "")
     if len(argv) == 2 and argv[0] == "ignored" and re.fullmatch(r"%s(,%s)*" % (_NAME, _NAME), argv[1]):
         return cmd_ignored(argv[1].split(","))
+    if len(argv) == 2 and argv[0] == "rejection" and re.fullmatch(_NAME, argv[1]):
+        return cmd_rejection(argv[1])
     if len(argv) == 2 and argv[0] == "drop" and re.fullmatch(_NAME, argv[1]):
         return cmd_drop(argv[1])
     sys.stderr.write("usage: mr-interrupted scan | gate [--model M] | list | vars --due|<slice> | "
