@@ -628,7 +628,6 @@ Confirmed by reading at merge, not by a criterion: run on the game's `origin/mas
 
 ### tp-3 — the census is a step of milestone elaboration
 type: feature · tier: routine
-blocked: tester-ab-close
 touches: specs/monster-realm-v2/milestone-loop-prompt.md, memory/projects/mr-native-supervisor-README.md
 after: [tp-2]
 
@@ -645,7 +644,7 @@ tool list gains `mr-prune`. The bullet:
 > inside the three-section limit. `orphan-protected`, `signals` and `protected-churn` rows are
 > named in the spec's Risks. A `duplicates` row never gets a slice of its own.
 
-The first run after the block lifts records a row labelled `baseline`.
+The first run records a row labelled `baseline`.
 
 - **TP3-A1:** WHEN `mr-selfcheck` runs from the worktree THE check SHALL print SELFCHECK-OK.
 

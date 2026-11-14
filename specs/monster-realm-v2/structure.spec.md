@@ -42,7 +42,6 @@ deleted and never counts toward a playtest gate, and an empty `## Slices` means 
 
 ### st-3 — shared roster and count pins: one owner per fact
 type: design · tier: hard
-blocked: tester-ab-close
 touches: docs/DECISIONS.md, docs/refactors/test-pins.md
 after: []
 
@@ -63,9 +62,6 @@ It reads those files in full, with `memory/projects/mr-prune census --mem memory
 It has a `judge` score at least two designs, one of which is "leave the pins as they are":
 `mr-touches widen` already lets a run add a pin file to its own `touches:`, so the plan states
 what the pins still cost.
-The block lifts when `memory/projects/mr-tester-ab.jsonl` holds a `close` row: a shadow test that
-edits a pin file stops applying once a consolidation rewrites it, which that experiment scores as
-a brittle break.
 
 `docs/refactors/test-pins.md` records:
 
@@ -88,7 +84,6 @@ run's log shows the `judge`.
 
 ### st-4 — what stays of the 1v1 battle rules in `game-core`
 type: design · tier: hard
-blocked: tester-ab-close
 touches: docs/DECISIONS.md, docs/refactors/combat-carried-rules.md
 after: []
 
@@ -124,10 +119,6 @@ supersedes:
   disposition: the rule is carried, with the surviving tactical test named and demonstrated as
   `standards/testing-tdd.md` §Deleting a check requires for a protected category; or the
   behaviour has no production path, with the symbol whose removal proves it.
-
-The block lifts when `memory/projects/mr-tester-ab.jsonl` holds a `close` row: a shadow test that
-calls a symbol an extraction deletes stops compiling, which that experiment scores as a brittle
-break.
 
 `docs/refactors/combat-carried-rules.md` records:
 
