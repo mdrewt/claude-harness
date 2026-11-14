@@ -55,11 +55,14 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    the operator-directed residual sweep (2026-11-11): `ts-6a` triages every open residual
    (resolved / obsolete / fix / wontfix) and sections the `ts-6b-K` fix batches, which close the
    milestone.
-2. **M-local-play groundwork** (`M-local-play.spec.md` LP0, LP1, LP10; sketch 2026-11-12) — pulled
-   ahead because early access depends on it and each part is small: the `type: design`
-   feasibility slice (licence terms once the operator's negotiation lands, desktop shell, sign-in
-   design, a one-player world's footprint), the server address as run-time configuration, and
-   telemetry off by default outside the official server or any development/test servers.
+2. **M-local-play groundwork** (`M-local-play.spec.md` LP0, LP1, LP10; elaborated 2026-11-14 — 3
+   slices, heads `lpg-0` ‖ `lpg-1`, then `lpg-10`; LP2–LP9 stay sketch for item 9) — pulled ahead
+   because early access depends on it and each part is small: the `type: design` feasibility slice
+   (records the licence state while the operator's negotiation runs, desktop shell, sign-in
+   questions, the footprint of a one-player world and an eight-player host and the budgets set
+   from it), the server address as run-time configuration (a shell document the page receives
+   before the client starts), and, for a single-player or friends world, no telemetry and no
+   account token — telemetry stays on for the official server and development/test servers.
 3. **M-netcode-presence** (`M-netcode-presence.spec.md`, sketch 2026-10-24 — elaborate when reached): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched) and tap-to-turn facing (never cancel-on-keyup — ADR-0148).
@@ -93,12 +96,12 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    a load tool that reports fan-out. Sized to the operator's official-server target (2026-11-12):
    ~100 zones, 8–12 players per zone on average and ~50 at peak, ~600 concurrent world-wide and
    ~1,000 at peak. Must land before any playtest above ~20 concurrent players, and before launch.
-9. **M-local-play** (`M-local-play.spec.md`, sketch 2026-11-12): the early-access shape —
+9. **M-local-play** (`M-local-play.spec.md`, LP2–LP9 sketch 2026-11-12): the early-access shape —
    single-player worlds on a server the game starts, opening a world to friends, private-server
    access (valid account, then the host's allowlist or password), the standalone server package,
-   sign-in once then offline, unattended upgrade, and the solo-completeness audit. Opens with a
-   `type: design` feasibility slice (SpacetimeDB redistribution licence, desktop shell, resource
-   budgets; item 2 runs it ahead). **Early access is gated on it.**
+   sign-in once then offline, unattended upgrade, and the solo-completeness audit. Its groundwork
+   (the `type: design` feasibility slice, run-time connection target, telemetry rule) is item 2;
+   elaborate LP2–LP9 against `lpg-0`'s record. **Early access is gated on it.**
 10. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S1 rewrites two e2e tests that currently
    assert the trade-oracle leak as intended behavior, and S2 changes a frozen schema; the
