@@ -270,6 +270,11 @@ a reason to delete a test (`standards/testing-tdd.md` decides). `mr-prune census
 suite at a commit; `mr-prune close --spec F` records what milestone `F` added under
 `memory/projects/prune/` (a `trend.jsonl` row and `close/<milestone>.json`, plus
 `close/<milestone>.section.md` once the tester A/B experiment has its `close` row).
+Subcommands: `census`, `twin` (re-checks one `pruned-tests:` claim at a commit), `keep` (records
+a pair kept on purpose in `mr-prune-keep.json`), `close`, and `--selftest`; flags are in its header.
+- **At milestone elaboration:** the structure pass of `milestone-loop-prompt.md` runs
+  `mr-prune census --spec F --ci --record <milestone id>` and routes its rows. `trend.jsonl`'s
+  `baseline` row is the whole suite before any elaboration census ran.
 - **At a milestone's last merge:** `mr-record ledger` runs it. When a MERGED row leaves every slice
   of the milestone spec holding that slice with a MERGED row, the hook fetches the game repo and
   runs `mr-prune close` against `origin/master`. A failure is one `WARN prune-close:` line and the
@@ -283,7 +288,7 @@ suite at a commit; `mr-prune close --spec F` records what milestone `F` added un
 - Dry-run a tick: `MR_TICK_DRYRUN=1 MR_FORCE=1 bash memory/projects/mr-native-tick.sh`
   (assembles the prompt, spawns nothing).
 - `memory/projects/mr-selfcheck` — wiring + tool selftests (SELFCHECK-OK expected; NOTES are
-  reports, never gates). Individual tools: `mr-gates|mr-audit|mr-spawn|mr-cost-watch --selftest`.
+  reports, never gates). Individual tools: `mr-gates|mr-audit|mr-spawn|mr-cost-watch|mr-prune --selftest`.
 - Rollback: `git revert` whole commits in this repo; a bad prompt/doctrine change reverts cleanly.
   Emergency stop: `mr-supervisor-disable`, then `touch /tmp/mr_stop_all` for live runs.
 
