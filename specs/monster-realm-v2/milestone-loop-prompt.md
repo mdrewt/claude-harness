@@ -72,6 +72,16 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
      and naming the tests that already cover the moved behaviour. Never a residual row. When a plan
      file under the game's `docs/refactors/` lists extractions not yet sectioned there, those
      come first.
+   - Run `memory/projects/mr-prune census --spec <this spec> --mem memory/projects --ci --record
+     <milestone id>` against the game repo's `origin/master`. Its rows are candidates, never
+     reasons (`standards/testing-tdd.md` §Deleting a check). A `duplicates` row whose pair you
+     have read goes into the section of a slice that already lists the file, as a line
+     `pruned-tests: <path> :: <test> -> <path> :: <surviving test>`, with "confirmed at merge:
+     `mr-prune twin` on the PR base"; a pair kept on purpose is recorded with `mr-prune keep`. An
+     `orphans` row becomes a `type: refactor` section in `structure.spec.md` that removes the
+     symbol and its tests together, inside the three-section limit. `orphan-protected`, `signals`
+     and `protected-churn` rows are named in the spec's Risks. A `duplicates` row never gets a
+     slice of its own.
 3. **Review lenses**: reviewer + red-team + `/simplify` on the draft, against `standards/` and
    the M{N}→M{N+1} boundary. Apply real findings; note what changed.
 4. **Document.** A `docs/DECISIONS.md` entry in the game repo is the BUILD slice's job, not the
