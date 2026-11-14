@@ -22,7 +22,9 @@ or is not added.
 **Model routing** (rooted runs): routine = opus@high · hard = fable@xhigh (schema/reducers,
 netcode/predictor, security surfaces, resume after a no-progress park, prior failed attempt) ·
 content = opus@medium. Always ALIASES, never pinned ids; the wrapper escalates a failing opus
-run's final attempt to fable@xhigh (budget-guarded). Launch-row `notes` MUST begin
+run's final attempt to fable@xhigh (budget-guarded). Route Fable as usual even when its own window
+is out: a session refused on Fable's own limit continues on Opus by itself (`model_fallback`, the only
+downgrade; README "Fallback") — never pre-assign Opus for it. Launch-row `notes` MUST begin
 `tier=<...>; reason=<...>`.
 
 **Budget governor** (bundle `budget`): NORMAL → proceed · SOFT-PAUSE (>90%) → launch only

@@ -219,7 +219,18 @@ Rules for a reading:
 - **Launches.** A pause on every model is the decision session's rule (SOFT-PAUSE: only
   `resume_first` slices). A pause on one model alone is `mr-spawn`'s: it refuses a new launch on
   that model with `BUDGET-MODEL-PAUSED` (`held=budget`) and launches other models and credit-stop
-  resumes.
+  resumes. Exception: a model with a `model_fallback` is never held by its own window, at any
+  reading — it gets the first try, and a refusal falls back (below).
+- **Fallback** (operator rule 2026-11-14 — the only downgrade; `model_fallback` in
+  mr-budget-config.json, today `fable -> opus`). A session refused on its model's OWN limit
+  (`mr-interrupted rejection <slice>` reads `scope=fable`) continues once on the fallback at the same
+  tier and effort: `mr-launch.sh` resumes the same session (a new one from the brief if the CLI
+  cannot), even with the slice's PR already open, and logs `FALLBACK-FROM=`. Not under a stop flag
+  and not when the shared windows read HARD-STOP (`FALLBACK-SKIPPED`). Such a stop flags no
+  sibling and never gates a launch; a slice it did interrupt is due at once and `mr-interrupted
+  vars` runs it on the fallback (`fallback_from` in the vars) until that stop's reset, on its own
+  model after. Nothing is downgraded ahead of a refusal, so a reset costs nothing. The A/B judge
+  follows the same rule (re-issued on the fallback; verdicts carry `judge_model`).
 
 On telemetry `effective_usd` is the utilisation × `weekly_limit_usd`, so the per-launch check
 (`effective_usd` + `tier_caps_usd` ≤ `soft_pause_usd`) reads one scale under either source;

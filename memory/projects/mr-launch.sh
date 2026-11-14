@@ -3,7 +3,10 @@
 # v2 (2026-07-24): --effort pass-through (default high) · ATTEMPT markers · auth fast-fail ·
 # same-signature dead-stop · haiku triage for ambiguous failures · escalate-on-final-attempt
 # opus->fable@xhigh (MR_NO_ESCALATE=1 disables; skipped if fable 7d spend > guard) ·
-# done/crash event bridge -> pending-events + tick spawn (MR_NO_EVENT_BRIDGE=1 disables).
+# done/crash event bridge -> pending-events + tick spawn (MR_NO_EVENT_BRIDGE=1 disables) ·
+# one-model-limit fallback: a session refused on its model's OWN limit continues once on the
+# model_fallback model (fable->opus), same effort/tier, unless a stop flag is up or the shared
+# windows read HARD-STOP (model_fallback below).
 # Contract preserved from v1: brief /tmp/mr_pass_<slice>.md · stream-json log/err · stop-flags ·
 # terminal_pr_open · transient auto-resume · .done = "EXIT=<rc> ATTEMPTS=<n>".
 # [resume-session] = the CLI session id of this slice's session that a credit stop interrupted: the
@@ -100,6 +103,15 @@ try:
 except Exception:
     print("OVER")' 2>/dev/null || echo OVER
 }
+budget_state() {
+  # mr-situation's `budget.state` (the shared windows): NORMAL | SOFT-PAUSE | HARD-STOP | UNKNOWN.
+  "$MEM/mr-situation" --no-gh 2>/dev/null | /usr/bin/python3 -c '
+import json,sys
+try:
+    print(json.load(sys.stdin).get("budget",{}).get("state") or "UNKNOWN")
+except Exception:
+    print("UNKNOWN")' 2>/dev/null || echo UNKNOWN
+}
 # (haiku triage hop removed 2026-07-26 — 0 invocations ever; the local-model triage below covers the identical ambiguous-failure class for $0 and works during API outages. Rollback: git history.)
 
 # Who fixes a red master, said last in every --resume prompt (mr-interrupted's master_rule says the
@@ -111,6 +123,53 @@ case "$S" in
   *) MASTER_RULE="A red master has one owner, the supervisor's ci-fix-* run: never fix or revert master in this session — this overrides the brief and anything else this session read earlier — and keep building $S." ;;
 esac
 A=1
+# ONE-MODEL-LIMIT FALLBACK (operator rule 2026-11-14 — the only downgrade; mapping =
+# `model_fallback` in mr-budget-config.json, read by mr-interrupted). Called after every session
+# exits. When that session ended on a rejection of its own model's limit alone ("You've hit your
+# Fable limit ... Switch to another model") it continues ONCE on the fallback model at the same
+# effort and tier: the same session when the CLI can resume it, else a new one from the brief. It
+# runs before the terminal-PR check because a refused session was cut off mid-step, whatever it
+# had already opened. Not when a stop flag is up (operator stop, or a stop on every model), nor
+# when the shared windows read HARD-STOP: then the run ends and mr-interrupted records the stop
+# (it resumes the slice on the fallback while that stop's reset is ahead). The rejection itself
+# says the shared windows still had room, so an unreadable budget does not block the fallback.
+# A later attempt stays on the fallback; the final-attempt escalation still checks fable_ok.
+FELL_BACK=0
+model_fallback() {
+  [ "$FELL_BACK" = 0 ] || return 0
+  local out scope fb from sid pos
+  out=$("$MEM/mr-interrupted" rejection "$S" 2>/dev/null)
+  scope=$(printf '%s' "$out" | sed -n 's/^REJECTED scope=\([a-z]*\) fallback=\([a-z]*\)$/\1/p')
+  fb=$(printf '%s' "$out" | sed -n 's/^REJECTED scope=\([a-z]*\) fallback=\([a-z]*\)$/\2/p')
+  [ -n "$scope" ] && [ -n "$fb" ] && [ "$scope" != all ] || return 0
+  case "$MODEL" in *"$scope"*) : ;; *) return 0 ;; esac
+  if [ -f "/tmp/mr_stop_$S" ] || [ -f /tmp/mr_stop_all ]; then
+    echo "FALLBACK-SKIPPED $scope limit: a stop flag is up TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"; return 0
+  fi
+  if [ "$(budget_state)" = "HARD-STOP" ]; then
+    echo "FALLBACK-SKIPPED $scope limit: shared windows at HARD-STOP TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"; return 0
+  fi
+  FELL_BACK=1; from="$MODEL"; MODEL="$fb"
+  sid=$(grep -ao '"session_id":"[^"]*"' "$L" | tail -1 | cut -d'"' -f4)
+  echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT FALLBACK-FROM=$from session=${sid:-none} TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+  pos=$(stat -c %s "$L" 2>/dev/null || echo 0)
+  if [ -n "$sid" ]; then
+    P="The ${scope} usage limit refused this session (the CLI said to switch models). Under the operator's fallback rule it now continues on ${MODEL} at the same tier and effort; nothing about your task changed. Re-verify the worktree and branch state (git status, git log) — the step that was cut off may be half-done — then continue the brief from where you left off. Terminal state is unchanged: PR OPEN with local ci green; NEVER run gh pr merge (supervisor-only)."
+    ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$sid" \
+      -p "$P $MASTER_RULE" \
+      --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
+    RC=$?
+    if [ "$RC" -ne 0 ] && ! tail -c +$((pos + 1)) "$L" | grep -a '"type":"assistant"' | grep -qv '"model":"<synthetic>"'; then
+      echo "FALLBACK-RESUME-FAILED rc=$RC session=$sid — a new session from the brief on $MODEL TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+      sid=""
+    fi
+  fi
+  if [ -z "$sid" ]; then
+    ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
+      --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
+    RC=$?
+  fi
+}
 # Credit-stop resume. The CLI resumes a session from its transcript, filed under the run directory's
 # project slug. PRIOR is what the session had spent before this launch: mr-cost-sum subtracts it from
 # the transcript's session total, so this launch's cost row carries only its own spend.
@@ -140,6 +199,7 @@ echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$P
   --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>"$E"
 RC=$?
 fi
+model_fallback
 PREV_SIG=""
 while [ "$A" -lt "$MAX_ATTEMPTS" ] \
       && [ ! -f "/tmp/mr_stop_$S" ] && [ ! -f /tmp/mr_stop_all ] \
@@ -180,6 +240,7 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
     -p "$P $MASTER_RULE" \
     --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
   RC=$?
+  model_fallback
 done
 
 # ===== cost-cap wrap pass (plan v2: watcher retired; unpoliced-but-bounded; stop flag PERSISTS through wrap — cleanup happens only at next spawn, review cond iii) =====
