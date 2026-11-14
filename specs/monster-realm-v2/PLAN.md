@@ -56,13 +56,13 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    (resolved / obsolete / fix / wontfix) and sections the `ts-6b-K` fix batches, which close the
    milestone.
 2. **M-local-play groundwork** (`M-local-play.spec.md` LP0, LP1, LP10; elaborated 2026-11-14 — 3
-   slices, head `lpg-0`, chain `lpg-0 → lpg-1 → lpg-10`; LP2–LP9 stay sketch for item 9) — pulled
-   ahead because early access depends on it and each part is small: the `type: design`
-   feasibility slice (records the licence state while the operator's negotiation runs, desktop
-   shell, sign-in questions, a one-player world's footprint and the budgets set from it), the
-   server address as run-time configuration (a shell document the page receives before the client
-   starts), and telemetry off whenever that document names a single-player or friends world, kept
-   for the official server and development/test servers.
+   slices, heads `lpg-0` ‖ `lpg-1`, then `lpg-10`; LP2–LP9 stay sketch for item 9) — pulled ahead
+   because early access depends on it and each part is small: the `type: design` feasibility slice
+   (records the licence state while the operator's negotiation runs, desktop shell, sign-in
+   questions, the footprint of a one-player world and an eight-player host and the budgets set
+   from it), the server address as run-time configuration (a shell document the page receives
+   before the client starts), and, for a single-player or friends world, no telemetry and no
+   account token — telemetry stays on for the official server and development/test servers.
 3. **M-netcode-presence** (`M-netcode-presence.spec.md`, sketch 2026-10-24 — elaborate when reached): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched) and tap-to-turn facing (never cancel-on-keyup — ADR-0148).
