@@ -63,8 +63,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    from it), the server address as run-time configuration (a shell document the page receives
    before the client starts), and, for a single-player or friends world, no telemetry and no
    account token — telemetry stays on for the official server and development/test servers.
-3. **M-netcode-presence** (`M-netcode-presence.spec.md`, elaborated 2026-11-14 — 6 slices, heads
-   `np-a` ‖ `np-c1` ‖ `np-d` ‖ `np-e`, then `np-c2`, then the study `np-b`): remote-player
+3. **M-netcode-presence** (`M-netcode-presence.spec.md`, elaborated 2026-11-14 — 5 slices, heads
+   `np-a` ‖ `np-c1` ‖ `np-d`, then `np-c2`, then the study `np-b`): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched), tap-to-turn as a tail-appended `MoveInput::Face` that turns, or
    steps when already facing (never cancel-on-keyup — ADR-0148), queued moves dropped at battle
