@@ -59,7 +59,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    ahead because early access depends on it and each part is small: the `type: design`
    feasibility slice (licence terms once the operator's negotiation lands, desktop shell, sign-in
    design, a one-player world's footprint), the server address as run-time configuration, and
-   telemetry off by default outside the official server.
+   telemetry off by default outside the official server or any development/test servers.
 3. **M-netcode-presence** (`M-netcode-presence.spec.md`, sketch 2026-10-24 — elaborate when reached): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched) and tap-to-turn facing (never cancel-on-keyup — ADR-0148).

@@ -53,7 +53,7 @@ same module and the same client run as a local and a privately hosted game, with
   needed to progress or complete the collection requires another player) and fix or list each
   exception. Multiplayer-only screens show a clear empty state in a one-player world.
 - **LP10 No telemetry by default.** A single-player or private world sends nothing to our
-  observability stack unless the player opts in; the official server's client keeps its telemetry.
+  observability stack unless the player opts in; the official server's client and development/test clients/servers keeps their telemetry.
 
 ## Sign-in design (proposed 2026-11-12; LP0 verifies it against SpacetimeDB's auth, the operator is open to alternatives)
 
