@@ -18,7 +18,7 @@
  ],
  "step_down_arms": ["S-med", "O-med"],
  "prefixes": ["ts-6b-", "np-", "eo-"],
- "required_slices": [],
+ "required_slices": ["lpg-1", "lpg-10"],
  "exclude_slices": ["np-b"],
  "no_tester_types": ["design", "refactor"],
  "specs_dir": "specs/monster-realm-v2",
