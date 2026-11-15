@@ -1748,6 +1748,24 @@ the Fix-batch contract):
   closes `R-uif-10-TITLES` (`the heal frame opens with a localized title` in
   `client/src/ui/healView.test.ts`).
 
+Build note (ts-6b-8): The bigint-safe render-key JSON (JSON.stringify([currentLocale(), shown],
+bigint->decimal replacer)) now lives in six views (raisingView, boxView, bagScreen, shopView,
+healView, evolutionView); a shared ui/renderKey helper is a candidate refactor slice — it lives
+outside every fix batch's touches.
+
+Build note (ts-6b-8): Heal's overlay accessible name comes from a11y.overlay.healView.title
+(a11yCopy.ts, English only) while the new visible h2 #heal-title is localized (heal.title: Heal /
+Soins); ts-6b-9 owns French overlay names and should cover healView (or point aria-labelledby at
+#heal-title).
+
+Build note (ts-6b-8): evals/account-e2e.eval.mjs's orphan sweep (~line 2100) reads the
+machine-global marker os.tmpdir()/mr-acct-e2e.pid and SIGKILLs marker.pid while it is alive, so a
+sibling slice's concurrent just ci SIGKILLs this slice's live 'node evals/run.mjs' (measured 3x on
+ts-6b-8 while ts-6b-2 and ts-6b-4 ran CI: 'Killed', exit 137). The killed run's orphan
+spacetimedb-standalone then holds the global data-dir lock, so the next account-e2e reds with
+'spacetime did not become ready'. Fix: a per-worktree marker (or a per-run --data-dir), and kill
+only a marker pid whose cwd is this worktree.
+
 ### ts-6b-9 — announcements and focus: grace and export edges, repeats, French overlay names, the claim result
 type: feature · tier: routine
 category: ux-a11y · severity: MED · size: MODERATE
