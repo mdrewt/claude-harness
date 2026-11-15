@@ -395,6 +395,24 @@ measurement is a frame-interval sample of at least 600 frames, taken by a Playwr
 
 - **th-6.4:** THE post-stack entry in `docs/DECISIONS.md` SHALL state that a production build that turns the stack on keeps it off on a software rasteriser (SwiftShader, llvmpipe), recognised from the WebGL renderer string, with the 35.1 ms/frame software-GL record as its Why.
 
+Build note (th-6): th-6 result: the post stack's software-rasteriser rule is written into its
+DECISIONS.md entry; the measured stack-on misses (SwiftShader, llvmpipe, and the integrated Radeon
+at 1920x1080 and above) are this follow-up's evidence. Lifting event: the slice that first turns the
+stack on in a production build.
+
+Build note (th-6): th-6 result: stack off, the only measured miss is SwiftShader at 3840x2160 device
+pixels (26.0 fps; 13.5 on two cores). Every renderer meets the objective at 1280x720 DPR 1 at CPU
+1x, 4x and 6x.
+
+Build note (th-6): Spec note (th-6): the Named deferral 'The post stack's software-renderer guard in
+code -> the slice that first turns the stack on in a production build' covers only software
+rasterisers. th-6 measured the host's integrated Radeon (through WSL2's D3D12 layer) missing the
+objective with the stack on at 1920x1080 and above, so that slice also owes a weak-GPU bound and a
+native-driver measurement; R-th-6-POSTSTACK-GUARD carries both. Also: th-6.3's operator filing did
+not trigger because the host exposes an integrated GPU (AMD Radeon(TM) Graphics, reached through
+D3D12); its rows are a desktop iGPU, not a laptop one, which the same row's native-driver
+measurement covers.
+
 ## Post-integration verification (the milestone is done when all hold on `master`)
 
 - Full `just ci` green, with `just eval` included: `bindings-drift`, `spacetime-type-snapshot`
