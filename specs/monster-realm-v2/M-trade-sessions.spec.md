@@ -1954,6 +1954,17 @@ the Fix-batch contract):
   `client/src/ui/privacyView.i18n.test.ts`, which replaces that file's stays-raw case; the
   byte-identity case in `client/src/ui/privacyBanner.test.ts` passes unedited).
 
+Build note (ts-6b-11): Serial Reopens metadata: ts-6b-11 widened into client/e2e/a11y.spec.ts,
+client/src/ui/reachability.test.ts, client/src/ui/overlayA11yWiring.test.ts,
+client/src/ui/profileView.test.ts, client/src/ui/screens/profileScreen.boot.test.ts and
+client/src/ui/profileView.ts (mr-touches widened, proofs recorded). ts-6b-12's Reopens line should
+name a11y.spec.ts from ts-6b-11; ts-6b-13's should name reachability.test.ts and
+overlayA11yWiring.test.ts from ts-6b-11 (not ts-6b-10).
+
+Build note (ts-6b-11): Stale comment out of ts-6b-11's touches: client/src/main.dispatch.test.ts:187
+still lists 'the privacy door' among Profile's open paths (the door is gone; Privacy is reached by
+the Down walk). ts-6b-13 reopens that file and can fix it in a line.
+
 ### ts-6b-12 — retired trade and launcher markup
 type: feature · tier: routine
 category: ux-a11y · severity: LOW · size: MODERATE
