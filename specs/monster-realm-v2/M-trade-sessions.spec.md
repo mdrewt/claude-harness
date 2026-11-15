@@ -1369,6 +1369,51 @@ the Fix-batch contract):
   `a_dialogue_reward_at_a_full_stack_is_refused_and_the_dialogue_does_not_advance` in
   `server-module/src/npc_tests.rs`).
 
+Build note (ts-6b-3): ts-6b-3.1 says the write count is not observable from a test. It is: the
+native test host counts write syscalls per table (Fixture::writes_to / reset_writes in
+server-module/src/native_host_tests.rs), and the slice's tests assert exactly one inventory write
+per debited stack at consume_n, sell, heal_party and apply_swap.
+
+Build note (ts-6b-3): Contract as built. inventory: consume_n(ctx, owner, item_id, qty), consume_one
+= consume_n(.., 1), item_count(ctx, owner, item_id), ERR_NOT_ENOUGH_ITEM. economy:
+check_currency_spend(want, balance, escrowed) and check_item_spend(want, count, escrowed) over one
+private rule (shortfall first; a trade named only when the raw holding covers the request). npc:
+apply_effects_to_db and apply_quest_trigger return Result; apply_quest_trigger takes the quest
+definitions as a parameter; talk and advance_dialogue keep every guard and hand the dialogue logic
+over a resolved tree to open_dialogue(ctx, me, &Npc, &DialogueTree) and choose_in_dialogue(ctx, me,
+conv, &DialogueTree, choice_idx). A whole-body wrapper was not possible: the deletion-gate census in
+privacy_enforcement_tests requires each reducer's own body to hold its require_not_deleting gate,
+and it rejects an impl-block method that takes a ReducerContext.
+
+Build note (ts-6b-3): ts-6b-3.3 names buy, sell and heal. train and consume_crystalized_essence had
+the same defect in the same file (holding none of the item said 'item is in an active trade') and
+now call the same rule; nh_train_refusals_never_burn_food's 'only a stranger owns the food' row is
+re-pinned to 'not enough of that item'.
+
+Build note (ts-6b-3): Heal with no stack of the cost item still says 'item not in inventory'
+(consume_n's text), because ts-6b-3.1 keeps the existing heal tests unedited and two of them pin
+that text; a short stack says 'not enough of that item'. sell says 'not enough of that item' in both
+cases. apply_swap's refusal for a short stack changed from 'item not in inventory' to 'not enough of
+that item' (unreachable behind the session's own checks).
+
+Build note (ts-6b-3): A quest reward or dialogue GrantItem larger than a cap can never be granted,
+so its quest can never complete; and a full stack of a reward item that cannot be sold or consumed
+blocks talk with that NPC for good. No shipped content has an item reward. validate_npc_content and
+the quest loader check neither.
+
+Build note (ts-6b-3): tactics.rs (the tactical item-use adapter, around the escrow-netted count
+above take_item) keeps its own copy of 'held minus what trades lock', folding over every row; the
+spend rule now has one home in economy.rs for buy, sell, heal, train and
+consume_crystalized_essence. game-core's session check_offered_item compares the same way; one
+game-core check_spend(want, held, locked) could serve both.
+
+Build note (ts-6b-3): heal_party's currency cost is still unreachable from a reducer-level test: the
+price is read from the heal-location content cache, which is not injectable, and no shipped location
+charges currency. Only the evaluate_heal_currency seam is tested, so three wrong implementations
+survive (the currency lock read dropped from the closure, the item debit skipped when a currency
+cost exists, the currency spend ahead of the item debit). The same kind of seam npc.rs now has (the
+reducer keeps its guards and hands a resolved definition to a helper) would close it.
+
 ### ts-6b-4 — tactical rules have one home: the unit join, deploy slots, strike and AP counts
 type: feature · tier: hard
 category: netcode-determinism · severity: LOW · size: MODERATE
