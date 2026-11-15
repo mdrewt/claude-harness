@@ -205,8 +205,9 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
 - Platform & compliance: **M20** observability/performance · **M21** accounts/auth (Steam login
   is §9 item 16) · **M22** privacy/deletion/export · **M23** accessibility · **M24** i18n
   (en/fr) · **M25 S0** threat-model consolidation.
-- Client: **M-postgate-console-controls** (`ctl-*`; the virtual-button controls, design SSOT
-  `console-controls-design.md`) · **M-postgate-client-coverage** (`pgcc-*`) ·
+- Client: **M-postgate-console-controls** (`ctl-*`; the virtual-button controls — one binding
+  table, the context stack, D-pad screens, face-to-face interaction, remapping, the generated
+  hint bar, pointer and touch; design SSOT `console-controls-design.md`) · **M-postgate-client-coverage** (`pgcc-*`) ·
   **M-pre-playtest-polish** · **M-ui-foundation** (`wf-1`, `uif-*`; the shared menu kit — tokens,
   one scale authority, TabBar/ContextSheet/EmptyState/RowCard, four feedback channels — and the
   flattened menu IA; design SSOT `M-ui-foundation-wireframes.md`) · **M-world-art-pass** (`wap-*`;
