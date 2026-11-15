@@ -1108,6 +1108,24 @@ Out of scope, each owned by a live, unbuilt slice of another milestone: `R-weekl
 | `R-weekly-review-2026-11-06-F4` | LOW | gameplay | wontfix | Still true that sendGuarded's frozen arm skips onRejected after #send set #inflight and dropped the draft, but a frozen link always ends in a reconnect whose resetPredictionState calls tacticsBattle.reset(), which clears in-flight keys and drafts anyway; the player sees the disconnected notice meanwhile. | — |
 | `R-weekly-review-2026-11-06-F5` | LOW | gameplay | wontfix | Friendly fire is an engine mechanic (geometry FfFilter AllButSelf and All, design ff_filter), but all 15 shipped tactics_skills use ff_filter Enemies, so no ally can hit an ally and ledger_of's last-opposite-side-hit credit is unreachable. Settle this with R-bt-9-LEDGERHOME when the fold moves to game-core. Decision: "Tactical settlement derives the reward ledger from the transcript". | — |
 
+Build note (ts-6a): PLAN.md §9 is outside this slice's touches and still describes M-trade-sessions
+as 7 slices then the ts-6 sweep, and item 15 still names rb-128-E1, R-rb-73-ABORT-PHANTOM,
+R-rb-132-WALLETSYBIL and R-rb-52-GRACEANNOUNCE as open fill-work. After this merge the milestone's
+remaining slices are ts-6b-1 to ts-6b-14, and those four rows are closed in the ledger (E1),
+wontfix, ask and routed to ts-6b-9.
+
+Build note (ts-6a): Eight wontfix rows are feature ideas, not defects. Seven stay recorded in
+console-controls-design.md §17 (R-ctl-RUN, R-ctl-BINDSYNC, R-ctl-COMPASS, R-ctl-LAYOUTMAP,
+R-ctl-TOUCHWALK, R-ctl-WELCOME, R-ctl-OBJINTERACT) and one in M-battle-tactics-design.md
+(R-bt-11-ITEMROW). M-netcode-presence.spec.md, M-gamepad.spec.md and M-identity-handles.spec.md cite
+R-ctl-RUN, R-ctl-TOUCHWALK and R-ctl-8g-CTL8G.1 by residual id; once those ids close, the citations
+point at the design-doc section instead.
+
+Build note (ts-6a): R-weekly-review-2026-11-06-F2 and -F5 are wontfix because no shipped tactical
+skill can hit an ally (all 15 use ff_filter Enemies). The first content slice that authors an
+AllButSelf or All skill decides whether flank applies to an ally target and who is credited for an
+ally KO; both rules live in game-core (geometry::is_flanked, the reward ledger fold).
+
 ### ts-6b-1 — guest-claim erasure, the deletion-gate reason, conversations at challenge accept, the runbook's log caveat
 type: feature · tier: hard
 category: security-privacy · severity: MED · size: MODERATE
