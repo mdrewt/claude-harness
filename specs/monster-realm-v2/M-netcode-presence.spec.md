@@ -272,6 +272,47 @@ needs the delay pinned says so.
 
 - **np-a.9:** WHEN one browser context holds a direction for a straight walk and a second context watches, THE watcher's rendered position for the walker SHALL not stand still for `STEP_MS` or longer between the walker's second authoritative position change and the key's release, and SHALL equal the walker's authoritative tile within the window plus two `STEP_MS` after the walk ends (`client/e2e/remote-walk.spec.ts`).
 
+Build note (np-a): The existing test '(xix) T-A' in client/src/render/renderResolver.test.ts was
+amended, although this section says the re-anchor cases stay unedited. Its two steps (6000, 6040,
+same direction) are a straight walk, and np-a.6 forbids the 0.199-tile back-step it pinned; only the
+exact value changed (now: no back-step), its two bound assertions are unchanged. Two store pins
+named here and main.worldReveal.test.ts [WS-GAP-ZONE] (touches widened: its fixture built jitter
+from same-tile rows) were amended for the debounce.
+
+Build note (np-a): np-a.9 as worded does not fail on the defect. Measured in the browser: on
+localhost a held walk delivers a step every tick with no Idle row between steps, so the pre-change
+client shows no pause; with 150 ms each-way delay on the walker's WebSocket (Playwright
+routeWebSocket) every step misses one tick and the watcher receives step / Idle / step, on which the
+pre-change client stands 183 ms per tile as sampled on frames, under the criterion's 'STEP_MS or
+longer'. client/e2e/remote-walk.spec.ts therefore runs a delayed walk asserting np-a.3's bound (no
+stand-still of 100 ms or more: 183 ms before, 33 ms after) and an undelayed walk; np-a.9 should name
+the delayed stream and the 100 ms bound.
+
+Build note (np-a): Mechanism built differently from the sketch, each for a measured reason (PR
+plan-delta): (1) for a walking remote (two one-tile position changes at most the window apart, the
+newer within it, any direction) a bracket up to the window is lerped across instead of re-anchored,
+via a new idleSpanMs parameter of interpolateHistory: after the debounce a held walk's brackets span
+two steps plus or minus jitter, exactly on REANCHOR_SPAN_STEPS, and every bracket a few ms over 400
+ms was held ~210 ms and then slid; REANCHOR_SPAN_STEPS itself is unchanged and now decides only
+brackets that open at first sight, at a snap, or span more than the window. (2) A remote two tiles
+or more (Manhattan) from its target is drawn at the target (REMOTE_SNAP_TILES): the slew cap equals
+the fastest walk, so a remote left behind by a burst never caught up while the walker kept moving.
+(3) The store's record is the tile delta and arrival of the last two position changes plus
+turnedInPlace (sticky until the next position change); it carries no facing, so no
+direction-to-delta table exists in TypeScript, and a turn away and back does not restart the
+continuation. (4) JITTER_IDLE_GAP_STEPS lives in client/src/shared/interpConfig.ts (touches
+widened), read by net/store.ts and render/.
+
+Build note (np-a): Consequences for np-b and the playtest: with the debounce a remote walking one
+step per two ticks has a jitter estimate near one step, so it is drawn at the 2.5-step delay cap and
+the interp-gap gauge reads 500 ms for it; a stop shows up to half a tile of overshoot held until the
+600 ms window ends, then a 100 ms return drawn Walking; a tap-turn (np-c2's Face row) sets
+turnedInPlace, so contract C2 holds.
+
+Build note (np-a): A same-tile row with action Jumping and the walk's facing does not end a
+continued walk: the remote is drawn Jumping while drifting up to half a tile ahead until the window
+ends. The spec's predicate has no clause for it.
+
 ### np-c1 — the press rule: `MoveInput::Face` turns, or steps when already facing
 type: feature · tier: hard
 category: movement/rules (operator directive, item 165) · severity: HIGH · size: MODERATE
