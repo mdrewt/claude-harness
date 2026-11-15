@@ -526,6 +526,34 @@ Confirmed by reading at merge, not by a criterion: the fixtures include bodies c
 `render/camera.test.ts` and `ui/renameModel.test.ts`; the decision entry states what the scan
 rules out.
 
+Build note (tp-1): The ignore entry is `/prune/`, anchored: a bare `prune/` also ignores
+`fixtures/prune/`, so the battery and its fixtures could never be committed.
+
+Build note (tp-1): `--mem DIR` arrives here, on census, twin and keep: it roots the keep file
+(`DIR/mr-prune-keep.json`) and the trend file (`DIR/prune/trend.jsonl`), and is what lets a fixture
+point both away from the live files. tp-2 adds the `widened` signal read from the same root. The
+default REF is `refs/remotes/origin/master` and the default --repo is `projects/monster-realm`
+beside the tool, which exists only in the main checkout.
+
+Build note (tp-1): `mr-prune twin` has a rule the twin-rule list does not: `order`. T must be the
+later-defined test, because a pair confirmed in both directions would let one change delete both. A
+protected or kept pair still prints `PRUNE-TWIN-OK` and exits 0 (TP1-A11), with ` protected=<token>`
+and ` kept` on that line; whether a protected pair should fail instead is a spec question for tp-3's
+merge wording.
+
+Build note (tp-1): Built beyond the five name-dependence markers of twin rule 5: any `snapshot`
+matcher or macro, `task.name`, `thread::current`, `module_path!`, `file!`, `line!`, `column!`. Not
+built, and worth a line in Risks: twins that differ at run time through shared state (a counter one
+increments, a table reassigned between two `.each` calls), and a candidate whose title carries a
+criterion tag a live ledger CHECK selects with `vitest -t` (deleting it leaves that gate green on
+fewer tests). The author reads the pair for both.
+
+Build note (tp-1): A file is unlexable, and all its test lines `unparsed`, when it is not UTF-8,
+cannot be tokenised or bracket-matched, or holds more test-shaped lines than the lexer found
+declarations (a commented-out test does this). `census` names each on stderr as `PRUNE-WARN
+unlexable <file>`; at game master 3278f6b5 there is none, and the lexed counts are 1,160 / 971 /
+4,954 with 45 / 10 / 28 unparsed.
+
 ### tp-2 — `mr-prune`: orphans, signals, spec scope, CI fields
 type: feature · tier: routine
 touches: memory/projects/mr-prune, memory/projects/fixtures/prune/*
