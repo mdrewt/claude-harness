@@ -129,10 +129,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    the Playtest-4 gates): D1 entry abilities on deploy + 4-AP Swap/reserve, D2 weather/field
    (upkeep slot 3), D3 signature wave + one 2×2-footprint line. Design SSOT:
    `M-battle-tactics-design.md`. Hold-to-act inputs (Hold Y cancel, Hold B skip) belong to M-gamepad.
-14. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle —
-   notably rb-128-E1 (avatar lost on reload during deletion grace), R-rb-73-ABORT-PHANTOM,
-   R-rb-132-WALLETSYBIL and R-rb-52-GRACEANNOUNCE. A row a pt3 milestone absorbs is marked in its
-   spec (econ: 2026-10-09-F1).
+14. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
+   row a pt3 milestone absorbs is marked in its spec (econ: 2026-10-09-F1).
 15. **M21b-3 Steam login** — the Steam build's sign-in protocol, consumed by M-local-play (item 8);
    scoped when that milestone is elaborated. Steam Input maps onto the virtual buttons.
 16. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
