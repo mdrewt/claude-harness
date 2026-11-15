@@ -159,13 +159,13 @@ ONE gate after every coverage milestone closes. No interim playtest.
   the end of the available content, checked against the solo rule in `game-design.md` §14.
 - **Playtest-3** completed (PASS WITH CHANGES, 2026-10). **Playtest-4** = strict §10: ONE gate
   after all coverage milestones close (operator ruling 2026-10-24, #583 D5 — no interim gate).
-- **RLS remains unenforced at SpacetimeDB 2.8.1** — privacy is enforced by the private-table +
+- **RLS remains unenforced at SpacetimeDB 2.11.0** — privacy is enforced by the private-table +
   owner-scoped-view pattern (DECISIONS.md "Table privacy"); the RLS re-open triggers recorded in
   `security-threat-model.md` and `validation-checklist.md` still do not fire.
 - Frozen surfaces: `client/src/module_bindings/` is generated-only (game repo AGENTS.md) and
   schema changes are additive-only (DECISIONS.md "Schema changes are additive"); any schema
   change needs bindings regen + a publish-over-data proof (docs/debloat/REPORT.md §maintainer).
-- Toolchain: SpacetimeDB 2.8.1 CLI/host + 2.8.1 module crate; 2.x syntax
+- Toolchain: SpacetimeDB 2.11.0 CLI/host + 2.11.0 module crate; 2.x syntax
   (`#[table(accessor = x)]`, `ctx.sender()`); upgrade runbook in the game repo's
   `docs/runbooks/spacetimedb-upgrade.md`.
 
