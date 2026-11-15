@@ -1178,6 +1178,43 @@ the Fix-batch contract):
   `R-rb-65-RUNBOOK-LOGCAVEAT` (doc-only; the line names `account_deletion_cascade` and
   `guest_claim_export_purge`, each emitted by a server test the PR cites).
 
+Build note (ts-6b-1): The NOT_REKEYED rationale is a comment in server-module/src/accounts_tests.rs
+(above the roster in acct_rekey_roster_is_total_and_game_data_sees_every_rekeyed_table), not in
+schema.rs as this section says; the schema.rs edit is the erase_tactical_rows doc comment only. The
+tester updated the accounts_tests.rs comment.
+
+Build note (ts-6b-1): A pin outside touches held battle::anonymize_battles reaper-only:
+privacy_enforcement_tests::no_reducer_writes_a_retired_1v1_table_bt17_1 censuses every
+client-callable reducer that reaches pvp_deadline_schedule, battle_action or battle_wild. The claim
+now reaches pvp_deadline_schedule and battle_wild through anonymize_battles' deletes (no insert).
+server-module/src/privacy_enforcement_tests.rs was widened by mr-touches and the tester re-pointed
+the pin to exact sets: (a) exactly complete_guest_claim, (c) the four tactical sweepers plus
+complete_guest_claim, (b) and (d) unchanged.
+
+Build note (ts-6b-1): Two texts outside touches still name the deletion cascade as the only eraser
+of a finished battle's tactical rows: ARCHITECTURE.md 'Claiming guest progress' (lists what the
+claim moves and purges; it now also erases the guest's finished battles) and the client/src/main.ts
+refreshBattle comment 'a shell whose row the deletion cascade erased'. Both stay true but
+incomplete; candidates for the ts-6b-14 doc batch.
+
+Build note (ts-6b-1): A wild encounter that starts while the walker has an open NPC conversation
+leaves the player_conversation row in place (movement.rs encounter start; only accept_challenge ends
+conversations). Same stuck-dialogue-frame symptom as R-weekly-review-2026-10-09-F3, reachable when a
+queued step lands on grass after talk succeeds. Not in this section's criteria; not verified end to
+end.
+
+Build note (ts-6b-1): Lens findings recorded, not acted on (each is existing cascade behaviour or
+outside the criteria): erase_tactical_rows never finalises a battle_summary whose outcome is still
+Ongoing; a completed claim runs one full battle_unit scan (one claim per account, fresh guest and
+account each); battle_challenge rows TARGETING the retired guest live until the challenge TTL reaper
+and its playtest_event rows until that table's TTL; the tombstoned wild and practice anchors of a
+retired identity persist as a deleted account's do; a dialogue reply that races the accept now
+toasts 'advance: no active conversation' where it toasted the in-battle refusal.
+
+Build note (ts-6b-1): REJECT_DELETION_GATED is one string for every gated shape, so a
+terminal-marker account (already erased, still connected) also reads 'until the deletion is
+cancelled'. The criterion fixes the text; guards.rs records why there is one message.
+
 ### ts-6b-2 — shop and heal reach: the server checks where the caller stands
 type: feature · tier: hard
 category: security-privacy · severity: MED · size: MODERATE
