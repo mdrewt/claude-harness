@@ -1634,6 +1634,15 @@ the Fix-batch contract):
   clippy pass after the deletion; `marshal_tests.rs` and `content_cache_tests.rs` keep their
   live-helper cases, and the PR lists each deleted test with its reason).
 
+Build note (ts-6b-6): Stale prose naming the 1v1 helpers ts-6b-6 deleted, outside its touches:
+game-core/src/combat/damage.rs:34 and the debug_assert message at :59 (battle_monster_from_row as
+the zero-defense boundary; the live boundary is tactics::resolve::validate_unit),
+combat/resolve.rs:41, combat/ability.rs:16-17 (build_ability_store), combat/ability_tests.rs:1162,
+combat/weather_tests.rs:1769/1830/1838/1846/1855/1926/1939 (skill_defs_from_rows),
+taming/rules_tests.rs:1084 (wild_battle_monster). Also client/src/ui/evolutionModel.test.ts:562,591
+and client/src/ui/boxModel.test.ts:593 cite marshal.rs:354-362 by line; after the deletion that
+range no longer holds evolution_path_from_row. Cite it by name.
+
 ### ts-6b-7 — tactical battle client: spoken turn events, server-time countdowns, results after playback
 type: feature · tier: routine
 category: ux-a11y · severity: MED · size: MODERATE
