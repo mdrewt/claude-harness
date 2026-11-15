@@ -1561,6 +1561,27 @@ the Fix-batch contract):
   client run typecheck` and the existing Move cases in
   `client/src/ui/screens/monstersScreen.test.ts` pass).
 
+Build note (ts-6b-5): ts-6b-5 spec note: the six main.*.test.ts files that faked a free-floating
+[data-shop-id]/[data-choice-idx] button (dispatch, shopBalance, input, reconnectStack,
+dialogueEnded, dialogueDismiss) were not in touches:; they are sibling tests of main.ts and were
+rewritten to click the real rendered button after the reveal. Two e2e specs (shop-npc,
+wallet-balance) were widened by measured red: their Shop click landed inside the reveal.
+
+Build note (ts-6b-5): ScreenHost.monstersQuickMove is unpinned: a red-team mutant 'return true' (X
+chip in the Monsters sheet and summary phases) passed every gate. Add a main.ts-level hint-bar test
+that the X chip shows in the Monsters list and not on its sheet.
+
+Build note (ts-6b-5): monstersScreen X compares the settled phase only: a settle that re-seats the
+list cursor onto another monster (its monster left) lets X move a monster the player did not aim at.
+Guard X on settled.nav === state.nav as well (observe settles each batch first in the shipped loop,
+so this is the belt).
+
+Build note (ts-6b-5): client/e2e/dialogue.spec.ts 13.5c-5 single-clicks the choice right after
+talkUntilOpen, inside the 600 ms reveal, which a click now only finishes; it still passes (19/19
+locally) by burning one 20 s attempt of MAX_ADVANCE_ATTEMPTS. Use dblclick as shop-npc and
+wallet-balance now do. client/e2e/movement-input.spec.ts:374's comment still says main.ts delegates
+on [data-choice-idx].
+
 ### ts-6b-6 — tactical settlement and wild AI: tests on unreached protected paths, and the dead 1v1 helpers
 type: feature · tier: routine
 category: gameplay · severity: LOW · size: MODERATE
