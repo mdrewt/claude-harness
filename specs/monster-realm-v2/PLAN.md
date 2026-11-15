@@ -45,14 +45,18 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M-scale-readiness** (`M-scale-readiness.spec.md`, sketch 2026-11-12): the costs a static
-   scaling audit and load run found growing faster than the population. Built: private movement
-   intent, idle empty zones, per-zone `character` subscriptions, resuming a session where it
-   left off and on-demand reapers. Open: the per-input owned-monster scan, whole-table `player_quest` and `profile` subscriptions, the unreaped
-   `battle_summary`, the device-resolution terrain bake, and
-   a load tool that reports fan-out. Sized to the operator's official-server target (2026-11-12):
-   ~100 zones, 8–12 players per zone on average and ~50 at peak, ~600 concurrent world-wide and
-   ~1,000 at peak. Must land before any playtest above ~20 concurrent players, and before launch.
+1. **M-scale-readiness** (`M-scale-readiness.spec.md`, elaborated 2026-11-15 — 12 slices, heads
+   `sr-9a` ‖ `sr-9d` ‖ `sr-6a` ‖ `sr-8` ‖ `sr-4a`; schema chain `sr-2` → `sr-7` → `sr-3` → `sr-4b`):
+   the costs a static scaling audit and load run found growing faster than the population. Built:
+   private movement intent, idle empty zones, per-zone `character` subscriptions, resuming a
+   session where it left off and on-demand reapers. Open: a load tool that reports per-client
+   download, runs nightly and spreads 1,000 clients over 100 load-only zones; the per-input
+   owned-monster scan; owner views rebuilt on every batch; the unreaped `battle_summary`; the
+   whole-table `player_quest` and `profile` subscriptions; and the device-resolution terrain
+   bake. Sized to the operator's official-server target (2026-11-12): ~100 zones, 8–12 players
+   per zone on average and ~50 at peak, ~600 concurrent world-wide and ~1,000 at peak, 50k
+   stored accounts (default). Must land before any playtest above ~20 concurrent players, and
+   before launch.
 2. **M-local-play** (`M-local-play.spec.md`, LP2–LP9 sketch 2026-11-12): the early-access shape —
    single-player worlds on a server the game starts, opening a world to friends, private-server
    access (valid account, then the host's allowlist or password), the standalone server package,

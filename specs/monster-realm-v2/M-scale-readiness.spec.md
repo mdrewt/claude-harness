@@ -178,8 +178,10 @@ batcher's owner-view reconcile block into `client/src/net/viewReconcile.ts` with
 behaviour. Then `sr-6b` adds the dirty set there, and `sr-3` and `sr-4b` register their view
 there. `connection.ts` keeps only wiring: the subscription strings, the row handlers that mark a
 view dirty, and the call. The moved block writes only to the store, which `store.ts` owns, so the
-move is `tier: routine`. No test reads `connection.ts` as text (measured:
-`connection.test.ts`'s `readFileSync` reads `main.ts`). Every behaviour the block has is covered
+move is `tier: routine`. One test reads `connection.ts` as text:
+`ui/leaderboardView.test.ts` `RL13-conn-sub-01` asserts the `'SELECT * FROM profile'`
+subscription string. `sr-6a` does not move that string, and `sr-4b` removes it (see that slice).
+Every behaviour the block has is covered
 through `connect()` by `connection.runtime.test.ts`, `connection.test.ts` and
 `connection.conversationCoalesce.test.ts`, which stay unedited in `sr-6a`.
 
@@ -237,7 +239,7 @@ header's "What a bot subscribes to" section is restated. All tests are the file'
 
 - **sr-9a.1:** WHEN a level's usable scrape window ends, THE driver SHALL report `rx_bytes_per_client_per_s` as the bytes all bots received in the window divided by the bot count and the window's seconds, and `rx_bytes_per_client_per_s_max` as the largest single bot's rate, in both the JSON report and the rendered table (`sim-harness/src/bin/mr_load_driver.rs` inline tests, fed byte counts and a scrape schedule).
 
-- **sr-9a.2:** WHEN a bot opens its subscription, THE driver SHALL send `SELECT * FROM player` byte-identical to the client's query in `client/src/net/connection.ts`, and SHALL still read the bot's own `entity_id` from its own row when other players' rows arrive before, after or around it in the same message (`sim-harness/src/bin/mr_load_driver.rs` inline tests).
+- **sr-9a.2:** WHEN a bot opens its subscription, THE driver SHALL send `SELECT * FROM player`, byte-identical to the client's whole-table `player` query, and SHALL still read the bot's own `entity_id` from its own row when other players' rows arrive before, after or around it in the same message (`sim-harness/src/bin/mr_load_driver.rs` inline tests).
 
 - **sr-9a.3:** WHEN `--clients-max` is 1,000, THE driver SHALL accept it, and WHEN it is 1,001, THE driver SHALL reject it with the cap in the message (`sim-harness/src/bin/mr_load_driver.rs` inline tests).
 
@@ -476,7 +478,7 @@ completion transaction delivers the quest delete and the conversation row in one
 ### sr-4b — the client subscribes a bounded leaderboard, not every profile
 type: feature · tier: hard
 category: performance/server · severity: MED · size: MODERATE
-touches: server-module/src/schema.rs, server-module/src/ranking.rs, server-module/src/ranking_tests.rs, server-module/src/accounts_tests.rs, server-module/src/native_host_tests.rs, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, evals/baselines/client-visible-tables.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/leaderboard_top_table.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/e2e/ui-social.spec.ts, docs/DECISIONS.md, ARCHITECTURE.md
+touches: server-module/src/schema.rs, server-module/src/ranking.rs, server-module/src/ranking_tests.rs, server-module/src/accounts_tests.rs, server-module/src/native_host_tests.rs, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, evals/baselines/client-visible-tables.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/leaderboard_top_table.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/src/ui/leaderboardView.test.ts, client/e2e/ui-social.spec.ts, docs/DECISIONS.md, ARCHITECTURE.md
 after: [sr-3, sr-4a]
 
 A public `leaderboard_top` table (`identity` primary key) holds the identities of the top 100
@@ -496,6 +498,10 @@ baselines. `docs/DECISIONS.md` "Table privacy" names `leaderboard_top`. Name fal
 reads `store.profile(id)` after `store.player(id)`. A counterpart outside the top 100 who is
 offline now resolves to the existing empty-name fallback. This is accepted: names shown for
 online players come from `player`. `sr-4b.4` pins the online case.
+Pin: `ui/leaderboardView.test.ts` `RL13-conn-sub-01` reads `connection.ts` as text for
+`'SELECT * FROM profile'`. It is deleted (a source-text scan); its survivor is `sr-4b.3`'s
+subscription-set case in `connection.runtime.test.ts`, which asserts through `connect()` what the
+client subscribes. Its `RL15-structural` scan in the same file stays.
 
 - **sr-4b.1:** WHEN a ranked match settles, THE `leaderboard_top` table SHALL hold exactly the identities of the top 100 profiles by rating desc, name asc, identity asc, including WHEN a member falls below the 100th and the next profile enters (`server-module/src/ranking_tests.rs`).
 
@@ -532,7 +538,26 @@ online players come from `player`. `sr-4b.4` pins the online case.
 Run: `memory/projects/mr-prune census --spec specs/monster-realm-v2/M-scale-readiness.spec.md
 --mem memory/projects --ci --record M-scale-readiness`.
 
-CENSUS-PENDING
+Recorded as `M-scale-readiness` (CI 336 s, success; nightly success). Inside the touched area
+there are no `duplicates`, `orphans` or `orphan-protected` rows. So no `pruned-tests:` line and
+no `structure.spec.md` section follow from it. The rows to keep in view:
+
+- `signals … source-text`: `client/src/ui/leaderboardModel.test.ts` and
+  `client/src/ui/leaderboardView.test.ts` (the `RL15-structural` write-path scans, `sr-4a`), and
+  `server-module/src/privacy_enforcement_tests.rs` (the module and deletion-gate census, `sr-9b`
+  and `sr-7`; churn 6, widened 2). Each slice that touches one keeps the scan passing. None is
+  extended, and none is made the evidence of a criterion here.
+- `protected-churn`: `server-module/src/accounts_tests.rs` (token `account`; `sr-7`, `sr-4b`) and
+  `server-module/src/privacy_enforcement_tests.rs` (token `priv`; `sr-9b`, `sr-7`). These are the
+  census and re-key rosters that every new table or module bumps. The bump is a named
+  intentional change in each slice. Never delete a case there.
+- `signals` churn only: `native_host_tests.rs` (5; `sr-7`, `sr-3`, `sr-4b`), the describer
+  arrays each of those three slices bumps in turn. Also `monster_mgmt_tests.rs`,
+  `battle_tests.rs`, `npc_tests.rs`, `accounts_tests.rs`, `connection.runtime.test.ts`,
+  `store.test.ts` and `socialModel.test.ts` (churn 1–3).
+- `literal-variants`: `client/src/net/store.test.ts` (3 groups; `sr-4a`, `sr-3`) and
+  `client/src/ui/leaderboardModel.test.ts` (2 groups; `sr-4a`). A slice adding cases there extends
+  an existing table-driven group instead of a fourth near-copy.
 
 ## Risks / flags
 
