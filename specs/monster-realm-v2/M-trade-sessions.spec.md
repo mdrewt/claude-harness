@@ -2006,6 +2006,31 @@ the Fix-batch contract):
   (`client/src/main.chips.test.ts`, `client/src/main.controls.test.ts` and `client/e2e/a11y.spec.ts`
   pass selecting the chips by id).
 
+Build note (ts-6b-12): ts-6b-12 retired four toast kinds, not two: trade-answered and trade-settled
+(the triage named these; producers gone since ts-4 204b6e59) plus trade-offer-sent and
+trade-propose-rejected (producers gone since ts-3 4a7c442c deleted the wizard). Fold this into
+specs/monster-realm-v2/M-ui-foundation-wireframes.md '### Channel table', which
+feedbackPolicy.test.ts names as its contract: 63 -> 59 rows (16 hint + 32 toast + 10 modal + 1
+blocking).
+
+Build note (ts-6b-12): ts-6b-12.1 says tradeSessionView.test.ts 'passes unedited', but 12.2's
+deletion of TradeSessionInput.legacyOfferMonsterIds turns its fixture property into a TS
+excess-property error, so that one line had to go. Nothing else in the file changed.
+
+Build note (ts-6b-12): Comments and fixtures outside ts-6b-12's touches still describe the deleted
+#trade-overlay children and the launcher delegates. The tests stay green, but the comments are
+stale. tradeView.test.ts lines 7 and 70-71 say index.html keeps the four static parts as empty
+nodes. reachability.test.ts line 1313 says qf8MountTradeShell mirrors the five-part shell.
+pointerSource.test.ts line 1298 says 'old launcher delegates'. screens/index.test.ts line 37 names
+tradeProposeScreen. catalog.en.ts line 516, catalog.fr.ts line 525 and catalog.test.ts line 758 cite
+careAction.ts:72, which has drifted.
+
+Build note (ts-6b-12): ts-6b-12 widened its touches by two files, both proven red against the real
+index.html. socialScreen.boot.test.ts: TRADE_PARTS reads #trade-my-side and throws.
+overlayA11yWiring.test.ts: QF1-1-SCOPE-NATIVE-EVERYWHERE has a floor of 8 native controls, now 5 +
+17 + 3. ts-6b-13 also touches overlayA11yWiring.test.ts, so add it to ts-6b-13's 'Reopens (serial)'
+list as reopened from ts-6b-12.
+
 ### ts-6b-13 — unread view members and the heal fallback
 type: feature · tier: routine
 category: ux-a11y · severity: LOW · size: MODERATE
