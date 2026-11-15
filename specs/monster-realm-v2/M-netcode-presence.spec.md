@@ -370,6 +370,51 @@ through `moveInputToWasm`).
 
 - **np-c1.8:** THE client marshaling SHALL round-trip `Face` for every direction between the SDK and wasm shapes, and SHALL map no `Face` to `Step` (`client/src/convert/convert.test.ts`).
 
+Build note (np-c1): Rollout exposure, measured (plan red-team probe against the SDK, and a live
+rehearsal on host 2.11.0). (1) Publishing this module over master's WITHOUT --delete-data is
+accepted: the migration plan prints 'Changed columns for table character' and 'move_intent',
+existing rows survive, and no break-clients confirmation is asked. The host's SATS variant names are
+step / jump / face (lower case): a call with {"face":{"east":[]}} decodes on the new module and is
+refused at decode on master's. (2) The server accepts Face from the moment the module is published,
+and character.move_queue is public, so a raw reducer call can queue one without any shipped sender.
+The SDK's generated sum decoder has no default arm: a bundle built before np-c1 reads the unknown
+tag as undefined, leaves the payload byte in the stream, and the row loop throws, so that client
+loses the whole transaction update (or its initial subscription) for every row of the zone, whoever
+queued the Face. The spec's remedy stands (module and bundle deploy together; every open tab
+reloads) but the trigger is any caller, not only np-c2's first press: np-c2's PR rollout note should
+say so.
+
+Build note (np-c1): A client bundle keeps running against a module whose public schema has widened:
+nothing compares the bundle's generated bindings with the module and forces a reload, so the rollout
+order above is a manual step.
+
+Build note (np-c1): game_core::apply_move_coded (the wasm export predict_move) maps every input_kind
+other than 0 to Jump. Face is deliberately not carried there (the spec's named deferral), so a
+caller passing 2 gets a Jump instead of an error.
+
+Build note (np-c1): For np-c2 (lens findings on np-c1, no change needed here). (1) Verifier:
+client/src/net/rowConvert.ts is unchanged and passes a queued Face through moveInputToWasm, but no
+client test feeds it a character row whose moveQueue holds a Face; a wrong conversion there passed
+the whole client suite. np-c2 is the first slice in which the own row carries a pending Face, so its
+tap-to-turn e2e (or a rowConvert case) is where that path gets exercised. (2) Desync-guard: a
+pending SetMove is replayed against the last delivered row; if a tick drains an entry between that
+row and the set_move call, the server judges a Face against a facing the client has not seen, and
+turn-or-step can be mispredicted until the next row (Jump has the same window today). np-c2 sends
+presses through enqueue_move as specced; keep it so. (3) The applyMove fakes in predictor.test.ts,
+movementSim.test.ts, heldKeys.test.ts and switchZoneAtomicity.test.ts refuse a Face with a thrown
+error instead of modelling it (no test sends one through them); ackOnRow.property.test.ts models it
+and draws it. A later test that sends Face through one of the refusing fakes writes that arm then.
+
+Build note (np-c1): Build notes. (1) Tests added beyond the criteria's literal wording, each for a
+wrong implementation the artifact red-team showed passing: a turn takes its own tick ahead of a
+queued Step (server) and its own slot in the predictor's drain; set_move carries a Face; a Face
+queued behind a Step is judged when it drains; the drain-time battle lock holds with a Face at the
+head of the queue. (2) Left unpinned on purpose: a turn on grass that drew from the encounter RNG
+without opening a battle would pass (the grass test uses an always-firing table); it changes no
+player-visible outcome. (3) evals/js-path-parity and evals/movement-parity carry no Face case (the
+flat-code path cannot express it); the cross-target proof is the real-wasm block in
+predictor.test.ts, which the desync lens judged adequate.
+
 ### np-c2 — a press of a direction you do not face turns first
 type: feature · tier: hard
 category: movement/input (operator directive, item 165) · severity: HIGH · size: MODERATE
