@@ -1472,6 +1472,27 @@ the Fix-batch contract):
   AP as read through the rules port — closes `R-bt-10-APPIPSMIRROR` (`the active row draws apMax
   pips from its input` in `client/src/tactics/hud.test.ts`).
 
+Build note (ts-6b-4): touches: omitted two files the change forced.
+client/src/tactics/tacticsBattle.test.ts (the sibling test of the declared tacticsBattle.ts): its
+StrikesVM literals need strikesMax and its HUD pip read expected six pips against a fake rules port
+whose fresh budget has 7 AP. client/src/tactics/deployPanel.ts: the doc comment on
+WildDeployInput.slotCount named the removed TacticsTuning.max_pack; one comment line, widened
+through mr-touches.
+
+Build note (ts-6b-4): Contract as built: the wasm export is tactics_deploy_slots(map_id: u32) ->
+Result<u8, JsValue> (an unknown map id throws, as tactics_map does), behind the host-testable
+deploy_slots_of(map_id) -> Result<u8, String>; clockVM takes strikesMax and carries it on each
+StrikesVM, because the painter receives only the view model; the rules port method is
+TacticsClientRules.deploySlots(mapId).
+
+Build note (ts-6b-4): Every validated battle map has exactly three side-A spawn cells (map.rs
+SPAWN_SLOTS), so deploy_slots answers 3 on all shipped content and the two server call sites are
+behaviourally equal to a bare MAX_PACK there; deploy_units also refuses a duplicate slot and a slot
+past the spawn row, which bounds the picks by the spawn count on its own. That the server sites call
+deploy_slots was confirmed by the desync-guard and reducer-security lenses reading the code; no
+behaviour test can separate it, and the formula is pinned in game-core on hand-built maps of 0 to
+300 cells.
+
 ### ts-6b-5 — pointer and controller reach: dialogue clicks, the evolution notice, sheet rows, quick Move
 type: feature · tier: routine
 category: gameplay · severity: MED · size: MODERATE
