@@ -620,3 +620,30 @@ Reopens `ARCHITECTURE.md` (the telemetry and accounts paragraphs) and `docs/DECI
   document of kind `local` or `private`, `connect` SHALL receive an empty `authIssuer` and
   `authClientId`, and WHEN the kind is `official` or `test` IT SHALL receive the configured values
   (`client/src/main.targetKindGate.test.ts`).
+
+Build note (lpg-10): An empty authIssuer is not an off switch. net/oidc.ts builds the discovery URL
+as issuer + '/.well-known/openid-configuration', so with issuer '' it is fetched from the page's own
+origin. In a local or private world the Account section's Sign in control still shows; pressing it
+registers a claim code with that world's server (net/connection.ts startSignIn) and then fetches
+discovery from the page origin, which fails unless that origin serves one. A tab that holds the
+account marker for the same (uri, db) (the target was served earlier as official or test in that
+tab) still calls renewOrExchange: a stored refresh token is posted to the token endpoint the page
+origin's discovery names, and with none stored the tab parks at session-expired instead of playing
+anonymously. The build's issuer and client id are never used in any of these. The design section's
+sentence that an empty issuer and client id are 'the configuration under which the OIDC flow
+contacts no network and supplies no account token (AUTH-44)' holds only for a tab with no account
+marker whose player never presses Sign in. Gated kinds need an explicit sign-in-off mode in connect:
+no OIDC client call, no claim-code registration, the Sign in control hidden, and credential storage
+that cannot carry an account marker across a change of kind.
+
+Build note (lpg-10): Two docs outside this slice's touches are left incomplete, not false:
+ops/auth/README.md (step 5, 'client: build with VITE_MR_OIDC_ISSUER, VITE_MR_OIDC_CLIENT_ID and
+VITE_MR_OIDC_REDIRECT_URI') and README.md's paragraph on the shell document's kind do not say that
+the OIDC variables and VITE_MR_OTLP_ENDPOINT take effect only for a target of kind official or test.
+ARCHITECTURE.md and docs/DECISIONS.md state it.
+
+Build note (lpg-10): Two comments in client/src/net/connection.ts, outside this slice's touches,
+still say that with no issuer the OIDC flow 'contacts no network' (the authIssuer option's doc
+comment and the comment above createOidcClient). That holds for a connect by a tab with no account
+marker; a pressed Sign in fetches discovery from the page's own origin. They belong with the sign-in
+off switch recorded in the first note.
