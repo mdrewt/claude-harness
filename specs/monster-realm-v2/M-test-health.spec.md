@@ -17,16 +17,18 @@ deferral); R-ci-fix-20261101T0505-CTXSTACK-FLOOR → stays a backlog row (named 
 
 Measured at `0c491981`/`5fdc4712` and on the CI runs since 2026-11-12:
 
-- **Five e2e tests failed on CI and passed on a rerun of the same tree** (2026-11-12 to 2026-11-15,
-  found by reading the attempt-1 jobs of every rerun run; Playwright `retries` is unset in
-  `client/playwright.config.ts`, so a rerun of failed jobs is the only second attempt):
+- **Five e2e tests failed on CI with no code defect behind the failure** (2026-11-12 to
+  2026-11-15). Each failure either passed when its shard was rerun or failed once on a tree that
+  was green on another run. They were found by reading the attempt-1 jobs of every rerun run.
+  Playwright `retries` is unset in `client/playwright.config.ts`, so a rerun of failed jobs is the
+  only second attempt:
 
   | Test | Runs (attempt 1) | Cause | Status |
   |---|---|---|---|
-  | `ui-feedback.spec.ts` UIF4B.2 Controls (`#controls-tabs` y 13.4 → −18.6 at 640×240) | 43177899663 (`ci/e2e-shards`), 43502080006 (`master` 2170be97) | the overlay's deferred initial focus landed between two rect reads and scrolled the frame | fixed: the test settles on the rows' focus (#765); `openOverlayA11y` focuses with `preventScroll` (#768) |
+  | `ui-feedback.spec.ts` UIF4B.2 Controls (`#controls-tabs` y 13.4 → −18.6 at 640×240) | 43177899663 (`ci/e2e-shards`, green on attempt 2); 43502080006 (`master` 2170be97, not rerun; the same client tree was green on PR #763) | the overlay's deferred initial focus landed between two rect reads and scrolled the frame | fixed: the test settles on the rows' focus (#765); `openOverlayA11y` focuses with `preventScroll` (#768) |
   | `recruit.spec.ts` R1 ("an own turn adjacent to the wild within 3 battles") | 43175445374 (`ci/e2e-shards`), PR #729 | a kiting (Skittish) wild held its distance for the whole approach bound in 3 battles | fixed: `MAX_R1_BATTLES` 3 → 8, about 7e-6 a run (#742) |
   | `ui-feedback.spec.ts` UIF4B.2 rename (`[data-testid="rename-input"]` stayed hidden 10 s after `N`) | 43554594387 (PR #770, shard 4) | unknown: the first window, 14.4 s into the shard's first file, straight after `page.goto` + `ready` | **th-1** |
-  | `tactics-wild.spec.ts` BT12-5-WILD-RECRUIT (`readOwnMonsters` stayed 3, 2 expected) | 43362803625 (PR #751, shard 3) | unknown | **th-1** |
+  | `tactics-wild.spec.ts` BT12-5-WILD-RECRUIT (`readOwnMonsters` stayed 3, 2 expected) | 43362803625 (PR #751, shard 3; the shard passed on attempt 2, and the run stayed red on another job) | unknown | **th-1** |
   | `remote-walk.spec.ts` np-a.9 (sprite stood still past its bound) | 43637897095 (PR #780), 43648331632 (`master` 630369c3) | CI step-arrival jitter against a timing threshold | R-np-a-flake (np-a follow-up) |
 
   Nothing tells anyone this list exists. The `e2e` job (`scripts/e2e-shard-union.mjs`) downloads
@@ -121,25 +123,39 @@ Named deferrals:
   are no Playwright retries (`retries` unset), so a report's `flaky` count is 0 and stays a failure
   as today.
 - `decision-defaulted:dev-expire-shape=move-deadline-then-arm-now`: `dev_expire_tactical_window`
-  sets the open window's `battle_clock.deadline_ms` to the call's time and re-arms each of the
-  battle's pending `tactical_deadline_sched` rows at that time through `arm_deadline`. The
-  scheduler's own `tactical_deadline_fire` then expires the window in the next transaction. Nothing
+  sets the open window's `battle_clock.deadline_ms` to the call's time and arms one fire at that
+  time through `arm_deadline`, for the unit and `window_seq` of that window's pending
+  `tactical_deadline_sched` row. The scheduler's own `tactical_deadline_fire` then expires the
+  window in the next transaction. Nothing
   else in the expiry path changes, and every timestamp stays real. Overriding `now` would leave
   later windows opening ahead of real time.
 - `decision-defaulted:dev-expire-scope=any-active-tactical-window`: the reducer acts on any Active
   tactical battle with an open turn window, wild or PvP. A wild expiry is an AutoFlee, as the real
   deadline would be. It refuses a Deploying battle, which has no turn window, rather than reaching
   into the deploy path.
-- `decision-defaulted:dev-expire-caller=any-identity-in-a-dev-build`: the e2e calls it from the
-  CLI (`spacetime call`), whose identity is neither player's. The boundary is the build. The
-  reducer exists only under `dev_reducers`, which only the e2e jobs and local e2e recipes build.
-  `th-4.4` proves the production module lacks it. The reducer still passes the deletion gate first
-  (`grant_bait` precedent) and joins `EXPECTED_GATED`.
-- `decision-defaulted:dev-expire-home=server-module/src/dev_clock.rs`: a new module, declared on
-  the last line of `server-module/src/lib.rs` as `#[cfg(feature = "dev_reducers")] mod dev_clock;`.
-  `tactics.rs` changes one keyword: `arm_deadline` becomes `pub(crate)`. No other line of the
-  production build moves, so no panic location baked into the wasm moves, and the production wasm
-  stays byte-identical (`th-4.4`).
+- `decision-defaulted:dev-expire-caller=module-owner-only`: the e2e calls it from the CLI
+  (`spacetime call`), whose identity is the publisher, the one `ownerSql` already runs as. The
+  reducer admits only the database owner, checked against the `config` row's `owner_identity` as
+  `sync_content` does (`server-module/src/content.rs`), never against `ctx.identity()`. A player
+  calling it gets `Err` even in a dev build. The first boundary is still the build: the reducer
+  exists only under `dev_reducers`, which only the e2e jobs and local e2e recipes build, and
+  `th-4.6`/`th-4.7` prove a production or published module lacks it. The reducer also passes the
+  deletion gate first (`grant_bait` precedent) and joins `EXPECTED_GATED`.
+- `decision-defaulted:dev-expire-side=named-by-the-caller`: the call names the side whose window
+  it expires (`side: u8`, 0 for A, 1 for B). A call that reaches the battle during the other
+  side's window is refused, so a slow test cannot strike the wrong player.
+- `decision-defaulted:dev-expire-home=server-module/src/dev_clock.rs`: a new module in the
+  `taming.rs` shape, declared without a `cfg` on the last line of `server-module/src/lib.rs` as
+  `mod dev_clock;`. Every item in it, its `use` lines included, carries
+  `#[cfg(feature = "dev_reducers")]`. Its test module is a plain `#[cfg(test)] #[path =
+  "dev_clock_tests.rs"] mod dev_clock_tests;`, and the feature gate goes on the test items inside
+  that file. `privacy_enforcement_tests.rs`'s module parser refuses any other `cfg` on a module
+  line: `classify_root_mod` and `scan_mod` accept only `#[cfg(test)]`, measured by applying a
+  `cfg(feature)` module line to a copy of `master`, which failed three of its tests with
+  `UnsupportedShape`. `tactics.rs` changes one keyword: `arm_deadline` becomes `pub(crate)`. No
+  other line of the production build moves, so no panic location baked into the wasm moves. A
+  build of that shape (the keyword, a trailing module line, a gated stub) gave the same sha256 as
+  `master` (`49c4b9bf…`), and `th-4.6` re-proves it on the real slice.
 - `decision-defaulted:real-time-path=first-strike-real`: BT15-4-SECRECY-AFK keeps its first AutoPass
   strike on the real scheduler, measured at ≥ one live window after B's window opened, and takes
   strikes 2–4 through the reducer. The real fire therefore stays covered inside the same two-browser
@@ -154,7 +170,8 @@ Named deferrals:
 ## Contracts between slices
 
 - **C1 (`th-3` → `th-1`):** the summary rows th-3 writes are what the register triages: a test the
-  union lists that the register does not hold is a new flake. Proof after merge: a CI run on
+  union lists that neither the register nor an existing row holds (np-a.9 is R-np-a-flake's) is a
+  new flake. Proof after merge: a CI run on
   `master` whose failed shard was rerun lists that test in its `e2e` job summary.
 - **C2 (`th-4` ↔ `ih-1`):** `ih-1` adds a column to `player` and sweeps every server test file that
   holds a `Player` literal. `th-4`'s new test file builds its players only through the
@@ -176,36 +193,42 @@ touches: scripts/e2e-shard-union.mjs, scripts/e2e-shard-union.test.mjs
 after: []
 
 `e2e-shard-union.mjs` reads every attempt's report, not only the highest one's. It also writes the
-listing to `$GITHUB_STEP_SUMMARY` when that variable names a file. GitHub sets it in the `e2e` job,
+listing to `$GITHUB_STEP_SUMMARY` when that variable names a file. A shard that dies before writing any file
+uploads no artifact (`if-no-files-found: warn`), so that attempt is invisible to the script.
+GitHub shows a bounded number of warning annotations per step, so the summary table, not the
+annotations, is the complete list. GitHub sets it in the `e2e` job,
 so `.github/workflows/ci.yml` does not change. The existing tests run through `just ci`
 (`door "scripts node suites"`). They build artifacts in a temporary directory and spawn the
 script; the new cases extend that file and its `report` fixture with per-test results and titles.
 
 - **th-3.1:** WHEN an attempt below a shard's highest attempt holds a test as unexpected and the highest attempt holds it as expected, THE union script SHALL print one `rerun-passed:` line for it naming its spec file and line, its title, the shard, the failing attempts and the passing attempt, and SHALL exit 0 when every existing rule holds (`scripts/e2e-shard-union.test.mjs`).
 
-- **th-3.2:** WHEN `GITHUB_STEP_SUMMARY` names a file, THE union script SHALL append to it a table with one row per test of `th-3.1`, or the line "No e2e test passed only on a rerun." when there is none (`scripts/e2e-shard-union.test.mjs`).
+- **th-3.2:** WHEN `GITHUB_STEP_SUMMARY` names a file, THE union script SHALL append to it a table with one row per test of `th-3.1`, or the line "No e2e test passed only on a rerun." when there is none, whether the script then exits 0 or 1 (`scripts/e2e-shard-union.test.mjs`).
 
 - **th-3.3:** WHEN the script lists a test under `th-3.1`, THE script SHALL also print one `::warning` workflow command for it whose `file` is the test's repository path (`client/e2e/<file>`), whose `line` is its line and whose message holds its title (`scripts/e2e-shard-union.test.mjs`).
 
 - **th-3.4:** WHEN a test is unexpected on its shard's highest attempt, THE script SHALL exit 1 as today and SHALL NOT list it as passed on a rerun (`scripts/e2e-shard-union.test.mjs`).
 
-- **th-3.5:** WHEN an attempt below a shard's highest has no readable `e2e.json` (the shard died before its report), THE script SHALL name that attempt as unreadable in the listing and SHALL NOT fail for it when the highest attempt is complete (`scripts/e2e-shard-union.test.mjs`).
+- **th-3.5:** WHEN the artifact directory of an attempt below a shard's highest holds no readable `e2e.json`, THE script SHALL name that attempt as unreadable in the listing and SHALL NOT fail for it when the highest attempt is complete (`scripts/e2e-shard-union.test.mjs`).
 
 ### th-4 — a dev reducer expires a tactical turn window now; the AFK e2e stops waiting
 type: feature · tier: hard
 category: test-speed · severity: MED · size: MODERATE
-touches: server-module/src/dev_clock.rs, server-module/src/dev_clock_tests.rs, server-module/src/tactics.rs, server-module/src/lib.rs, server-module/src/privacy_enforcement_tests.rs, client/e2e/stdb.ts, client/e2e/tactics-pvp.spec.ts, docs/DECISIONS.md
+touches: server-module/src/dev_clock.rs, server-module/src/dev_clock_tests.rs, server-module/src/tactics.rs, server-module/src/lib.rs, server-module/src/privacy_enforcement_tests.rs, .cargo/mutants.toml, scripts/verify-release-reducers.mjs, scripts/verify-release-reducers.test.mjs, client/e2e/stdb.ts, client/e2e/tactics-pvp.spec.ts, docs/DECISIONS.md
 after: []
 
-`dev_expire_tactical_window(ctx, battle_id: u64) -> Result<(), String>` (`dev_clock.rs`, under
-`#[cfg(feature = "dev_reducers")]`):
-1. `require_not_deleting(ctx, "dev_expire_tactical_window")` first.
+`dev_expire_tactical_window(ctx, battle_id: u64, side: u8) -> Result<(), String>` (`dev_clock.rs`,
+under `#[cfg(feature = "dev_reducers")]`):
+1. `require_not_deleting(ctx, "dev_expire_tactical_window")` first, then the owner check
+   (`dev-expire-caller`).
 2. It refuses, with `log_reject` and no write, when the battle has no `battle_tactical` row, is not
-   `Phase::Active`, or holds no clock row with `window_open_ms` set.
-3. Otherwise it sets that clock row's `deadline_ms` to `marshal::now_ms(ctx)` and re-arms each of
-   the battle's pending `tactical_deadline_sched` rows at that time (`arm_deadline`, its unit and
-   `window_seq` copied).
-4. The original rows stay. Each later fire finds its window closed and changes nothing.
+   `Phase::Active`, holds no clock row with `window_open_ms` set, or that row's side is not `side`.
+3. Otherwise it sets that clock row's `deadline_ms` to `marshal::now_ms(ctx)` and arms one fire at
+   that time (`arm_deadline`, with the unit and `window_seq` of that window's pending
+   `tactical_deadline_sched` row).
+4. The scheduler's fire at that time expires the window, and `tactical_deadline_fire`'s
+   `disarm_deadlines` deletes the battle's other deadline rows, the original one included. A
+   re-armed row whose `window_seq` is stale, or the deploy unit's under Active, is a no-op.
 
 Its tests (`dev_clock_tests.rs`, `#[cfg(all(test, feature = "dev_reducers"))]`, declared from
 `dev_clock.rs`; `just test` passes the feature) drive the native host through the
@@ -216,8 +239,13 @@ monster-realm-module/dev_reducers -E 'package(monster-realm-module)'` for the re
 Measured pins:
 - `privacy_enforcement_tests.rs` pins `EXPECTED_GATED` as a set in both directions and scans
   `grant_bait` "even though its cfg hides it": the new reducer joins the set. The scanner parses
-  every module `lib.rs` declares, so `dev_clock.rs` uses the code shapes it already accepts. A
-  scanner that misses a `cfg`-attributed `mod` line is a measured widen of that test file only.
+  every module `lib.rs` declares and refuses a `cfg(feature)` module line, so `dev_clock.rs` takes
+  the `taming.rs` shape (`dev-expire-home`). The scanner itself does not change.
+- `scripts/verify-release-reducers.mjs` (`just playtest-verify-release`, run on a published
+  module through `spacetime describe`) refuses a module exporting a name in `FORBIDDEN_REDUCERS`.
+  The new name joins that list, and `scripts/verify-release-reducers.test.mjs`'s exact-set
+  assertion moves with it. That list is what catches a playtest publish built with the feature by
+  mistake.
 - `client/e2e/tactics-pvp.spec.ts`: the header's "no reducer is called from the page or the CLI"
   and its TIMING note change (named intentional change). The AFK loop's
   `elapsed ≥ (AFK_STRIKES - 1) × windowMs` becomes "the first strike lands ≥ one live window after
@@ -226,24 +254,37 @@ Measured pins:
   charset-checked the same way (a reducer name matching `^dev_[a-z_]+$`, decimal arguments only)
   and runs `spacetime call -s <server> <db>` without a shell. No other e2e helper calls a reducer
   from the CLI today (grep `'call'` over `client/e2e/`: none).
-- No bindings, schema baseline, `.cargo/mutants.toml` entry or CI workflow changes. The e2e jobs
-  already build and publish the dev wasm.
+- `privacy_enforcement_tests.rs` also pins `EXPECTED_MODULES`, the crate-root module list in
+  declaration order: `"dev_clock"` joins it last.
+- `.cargo/mutants.toml` (declared, not widened: it is test-runner config). The nightly server
+  mutation run builds without `dev_reducers`, so the new reducer's mutants survive vacuously, as
+  entry 8 records for `grant_bait`. Each surviving mutant gets an `exclude_re` key by file,
+  function, operator and column, and entry 8's comment names the reducer and the
+  `--features dev_reducers` test that kills it for real.
+- No bindings, schema baseline or CI workflow changes. The e2e jobs already build and publish the
+  dev wasm.
 
 The `docs/DECISIONS.md` entry records the rule: an e2e may expire a tactical window through the
 dev-only reducer; one real-time strike stays in the same test; a dev reducer never reaches the
 production module.
 
-- **th-4.1:** WHEN `dev_expire_tactical_window` is called for an Active PvP tactical battle whose side B has an open window, THE SERVER SHALL set that window's `deadline_ms` to the call's time and arm a deadline fire at that time, and THE fire at that time SHALL book one AutoPass strike on B exactly as `tactical_deadline_fire` does at a real deadline (`server-module/src/dev_clock_tests.rs`).
+- **th-4.1:** WHEN the module owner calls `dev_expire_tactical_window` for an Active PvP tactical battle with side B's window open and `side` 1, THE SERVER SHALL set that window's `deadline_ms` to the call's time and arm a deadline fire at that time, and THE fire at that time SHALL book one AutoPass strike on B exactly as `tactical_deadline_fire` does at a real deadline (`server-module/src/dev_clock_tests.rs`).
 
 - **th-4.2:** WHEN the reducer is called four times across B's successive windows with A acting live in between, THE fourth fire SHALL forfeit B and finish the battle with side A winning (`server-module/src/dev_clock_tests.rs`).
 
-- **th-4.3:** WHEN the reducer is called for a battle that does not exist, is Deploying or Finished, or has no open window, THE SERVER SHALL return `Err`, log a structured reject and write no row; and WHEN a window it expired reaches its original scheduled fire, THAT fire SHALL change nothing (`server-module/src/dev_clock_tests.rs`).
+- **th-4.3:** WHEN the reducer is called for an Active wild tactical battle whose player window is open, THE fire SHALL end the battle in the AutoFlee a real deadline gives (`server-module/src/dev_clock_tests.rs`).
 
-- **th-4.4:** THE production module, built without `dev_reducers`, SHALL export no `dev_expire_tactical_window`: `just gen` on the slice's tree leaves `client/src/module_bindings/` unchanged, and the release wasm built from the slice SHALL be byte-identical to the one built from its base, with both sha256 sums recorded in the PR.
+- **th-4.4:** WHEN the caller is not the module owner, or the battle does not exist, is Deploying or Finished, has no open window, or has the other side's window open, THE SERVER SHALL return `Err`, log a structured reject and write no row (`server-module/src/dev_clock_tests.rs`).
 
-- **th-4.5:** WHEN B goes AFK in BT15-4-SECRECY-AFK, THE battle SHALL book exactly four AutoPass strikes on B, the first by the real scheduler at least one live window after B's window opened and the other three through `dev_expire_tactical_window`, and SHALL end with side A winning and A never struck (`client/e2e/tactics-pvp.spec.ts`).
+- **th-4.5:** WHEN a fire carrying the expired window's original `(unit_id, window_seq)` runs after the expiry, THAT fire SHALL change nothing (`server-module/src/dev_clock_tests.rs`).
 
-- **th-4.6:** THE BT15-4-SECRECY-AFK test SHALL take at most 75 s in its CI shard's `e2e.json` (135.9 s at `0c491981`), read from the PR run's `e2e-timings-*` artifact and recorded in the PR.
+- **th-4.6:** THE release wasm built without `dev_reducers` from the slice SHALL be byte-identical to the one built from its base: one checkout path and one target dir, the toolchain `rust-toolchain.toml` pins, `cargo build -p monster-realm-module --release --target wasm32-unknown-unknown`, the base built first, with both sha256 sums recorded in the PR.
+
+- **th-4.7:** WHEN a published module's reducer list holds `dev_expire_tactical_window`, THE release-reducer check SHALL refuse it, as it refuses `grant_bait` (`scripts/verify-release-reducers.test.mjs`).
+
+- **th-4.8:** WHEN B goes AFK in BT15-4-SECRECY-AFK, THE battle SHALL book exactly four AutoPass strikes on B, the first by the real scheduler at least one live window after B's window opened and the other three through `dev_expire_tactical_window`, and SHALL end with side A winning and A never struck (`client/e2e/tactics-pvp.spec.ts`).
+
+- **th-4.9:** THE BT15-4-SECRECY-AFK test SHALL take at most 75 s in its CI shard's `e2e.json` (135.9 s at `0c491981`), read from the PR run's `e2e-timings-*` artifact and recorded in the PR.
 
 ### th-1 — root-cause study: the two e2e flakes with no known cause
 type: design · tier: hard
@@ -258,11 +299,11 @@ it judge product or test. Probes run in a scratch worktree; only the register is
 product cause is a defect in the game, so its fix is a feature slice with a red-first regression
 test, never a widened test bound.
 
-- **th-1.1:** THE register SHALL give, for UIF4B.2 rename (run 43554594387 attempt 1: `[data-testid="rename-input"]` stayed hidden 10 s after `N` in the first window, straight after `page.goto` and `ready`), the measured cause, a forcing recipe that reproduces the CI signature on `master`'s code, and whether the product or the test is wrong.
+- **th-1.1:** THE register SHALL record, for UIF4B.2 rename (run 43554594387 attempt 1: `[data-testid="rename-input"]` stayed hidden 10 s after `N` in the first window, straight after `page.goto` and `ready`), every forcing attempt tried, each with its runs and failures (k of n), and WHEN one reproduces the CI signature on `master`'s code, the cause it shows and whether the product or the test is wrong.
 
-- **th-1.2:** THE register SHALL give the same three things for BT12-5-WILD-RECRUIT (run 43362803625 attempt 1: `readOwnMonsters` stayed 3 where 2 was expected after the recruit).
+- **th-1.2:** THE register SHALL record the same for BT12-5-WILD-RECRUIT (run 43362803625 attempt 1: `readOwnMonsters` stayed 3 where 2 was expected after the recruit).
 
-- **th-1.3:** THE register SHALL end each flake in one of two ways: a follow-up `th-` slice (its `touches:`, its forcing regression test, product or test), filed with `mr-gates notes add --followup`; or "not reproduced", with every forcing attempt tried and a residual row.
+- **th-1.3:** WHEN a forcing attempt reproduces a flake, THE register SHALL name a follow-up `th-` slice (its `touches:`, its forcing regression test, product or test), filed with `mr-gates notes add --followup`; WHEN none does, THE register SHALL say "not reproduced" and file a residual row whose lifting event is the flake's next listing by th-3.
 
 - **th-1.4:** THE register SHALL list every e2e test that failed on attempt 1 and passed on a rerun of the same tree in a CI run between 2026-11-15 and the study's start, found by the method of this spec's Problem table, each mapped to a register entry, an existing row or a named fix.
 
@@ -278,9 +319,9 @@ measurement is a frame-interval sample of at least 600 frames, taken by a Playwr
 `Emulation.setCPUThrottlingRate`). It reports median, p95, and the shares above 16.7 ms and above
 33.3 ms. The look-dev scene's per-pass method stays as recorded.
 
-- **th-6.1:** THE record SHALL give frame intervals for the live client (stack off, zone 0, 1280×720, DPR 1) on the host's hardware GL at CPU throttling 1×, 4× and 6× and on SwiftShader at 1× and 4×, each row naming the GL renderer string, the host and the method needed to repeat it.
+- **th-6.1:** THE record SHALL give frame intervals for the live client (stack off, zone 0, 1280×720, DPR 1) on the host's hardware GL at CPU throttling 1×, 4× and 6× and on SwiftShader at 1× and 4×, each row naming the GL renderer string, the host and the method needed to repeat it; WHEN Chromium on the host reaches no hardware GL, THE record SHALL say so with the renderer string it got, and the hardware rows SHALL join `th-6.3`'s operator measurement.
 
-- **th-6.2:** THE record SHALL read each row against the client-fps SLO (p50 ≥ 55 fps, OBS-25), and a row that misses it SHALL name its largest per-frame cost and a follow-up row or `th-` slice.
+- **th-6.2:** THE record SHALL read each row against the client-fps SLO (p50 ≥ 55 fps, OBS-25; a median frame interval ≤ 18.2 ms), and a row that misses it SHALL name its largest per-frame cost and a follow-up row or `th-` slice.
 
 - **th-6.3:** THE record SHALL state whether the host exposes an integrated GPU; WHEN it does not, THE integrated-GPU row SHALL be filed as an operator measurement at the Playtest-4 gate with the method, through `mr-gates notes add --followup`.
 
@@ -302,11 +343,12 @@ measurement is a frame-interval sample of at least 600 frames, taken by a Playwr
 
 ## Risks
 
-- **A dev reducer is a production risk if the feature leaks.** A release built with
-  `--features dev_reducers` would let any identity expire any battle's window. The release
-  recipes (`just build`, `just publish`) pass no feature, and `th-4.4`'s byte identity plus the
-  unchanged bindings prove the production module is untouched. Any later dev reducer carries the
-  same proof.
+- **A dev reducer is a production risk if the feature leaks.** A release
+  built with `--features dev_reducers` would let the database owner expire any battle's window. The
+  release recipes (`just build`, `just publish`) pass no feature. `th-4.6`'s one-time byte identity
+  and the unchanged bindings (`bindings-drift`) prove the production module is untouched, and
+  `th-4.7` makes the published playtest check (`scripts/verify-release-reducers.mjs`) the standing
+  proof. Any later dev reducer carries the same proofs.
 - **The AFK e2e now trusts the dev path for three of its four strikes.** The native host's AutoPass
   tests and th-4's first real strike cover the real scheduler. A defect that only shows on the
   second or later real window would be caught by the native-host tests, not the e2e.
