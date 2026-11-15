@@ -173,8 +173,8 @@ Rules out: promoting the census to a failing gate or a ratchet on its counts, an
 marker in test source (a comment written for a tool to parse), using a row, a count or a mutation
 result as a deletion reason by itself, a first-to-last commit range as what a milestone added, an
 uncapped section or one section per candidate, and a per-milestone prune session with its own PR
-type; the last is to be reconsidered when the tester A/B experiment closes, from its report and
-the recorded census rows.
+type: the tester A/B experiment measured test bloat at about $0.20-0.25 a slice, and the tester's
+writing rules now cut it where the tests are written.
 
 ## The tester runs on Opus at medium effort and files defects apart from questions
 The `tester` agent is Opus at effort medium on every tier. It writes tests only for behaviour a
@@ -182,8 +182,8 @@ criterion states, and reports each finding once, as a defect (one observable wro
 evidence) or a question (spec silence, an unsure runtime fact, a test-file or brief slip).
 Measured by the tester A/B experiment (2026-11-13/14, 16 slices, five arms, a Fable judge): Opus
 medium found all 4 confirmed defects whose fixes merged (10 of 11 once confirmed defects not yet
-fixed are counted), the two Sonnet arms found 0 of the 4, and high effort found no more than medium in either model. Every real
-finding came from the tester's written claims about the base code and the spec, none from a
+fixed are counted), the two Sonnet arms found 0 of the 4, and high effort found no more than
+medium in either model. Every real finding came from the tester's written claims about the base code and the spec, none from a
 failing test; a blind review of four slices' tests scored the arms' test code nearly the same,
 with Sonnet medium the leanest. Of 132 judged items, about 70 false positives were spec silence
 claimed as a defect or claims about test files and the brief, which the two-channel report
