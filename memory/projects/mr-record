@@ -263,7 +263,8 @@ def _parse_entry_ts(chunk):
     needs a clean None signal, not an exception mid-rotation."""
     m = TS_RE.match(chunk)
     if not m: return None
-    tok = m.group(1).rstrip("Z")
+    # `T~11:45Z` marks an approximate time; it dates the entry like `T11:45Z`.
+    tok = m.group(1).rstrip("Z").replace("T~", "T")
     try: return datetime.datetime.fromisoformat(tok)
     except ValueError: pass
     try: return datetime.datetime.combine(datetime.date.fromisoformat(tok), datetime.time.min)
