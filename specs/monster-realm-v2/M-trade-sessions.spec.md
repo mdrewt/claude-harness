@@ -1831,6 +1831,25 @@ the Fix-batch contract):
   rejected — closes `R-polish-1-CLAIMRESULTCATCHREENTRY` (`a throw in the claim-success handler is
   not reported as a claim rejection` in `client/src/net/connection.runtime.test.ts`).
 
+Build note (ts-6b-9): ts-6b-9.2 adaptation (plan-delta): server request_data_export writes every
+chunk in one transaction, so the client sees none→complete in one batch and almost never
+incomplete→complete; the announcement fires on any not-same-complete→complete edge after the first
+assembly since boot/reconnect. Hardening option, not needed today: if a later change ever splits the
+base snapshot so my_export_bundle arrives in a batch after the first post-(re)connect flush, the
+replay would read as a fresh completion — key the guard on hydratedSinceReconnect (onHydrated)
+instead of exportAssembly===undefined, and have the privacyWiring harness drive onHydrated.
+
+Build note (ts-6b-9): client/src/ui/helpView.i18n.test.ts:232,242 — the test title and failure
+message still say the a11y catalog is en-only; since ts-6b-9 the a11y.* names live in
+catalog.en.ts/catalog.fr.ts and resolve in the current locale. The assertion runs under en and still
+passes; only the claim is stale (file outside ts-6b-9 touches).
+
+Build note (ts-6b-9): ts-6b-9.5 made the deferred overlay focus scroll-free.
+client/e2e/ui-help.spec.ts:31-34 and its UIF14.5 fixture test (line ~481) still say the late focus
+scrolls the Help frame back to its top; the test passes (its settled ordering asserts nothing about
+the scroll), but the comments now describe the old behaviour. The file was outside ts-6b-9's
+touches.
+
 ### ts-6b-10 — Social: the row sheet is the kit sheet, Players opens on its panel, the trade confirm names the bond reset
 type: feature · tier: routine
 category: ux-a11y · severity: MED · size: MODERATE
