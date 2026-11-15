@@ -173,5 +173,5 @@ Rules out: promoting the census to a failing gate or a ratchet on its counts, an
 marker in test source (a comment written for a tool to parse), using a row, a count or a mutation
 result as a deletion reason by itself, a first-to-last commit range as what a milestone added, an
 uncapped section or one section per candidate, and a per-milestone prune session with its own PR
-type: the tester A/B experiment measured test bloat at about $0.20-0.25 a slice, and the tester's
-writing rules now cut it where the tests are written.
+type; the last is to be reconsidered when the tester A/B experiment closes, from its report and
+the recorded census rows.
