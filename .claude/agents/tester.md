@@ -62,8 +62,8 @@ found by noticing them, not by a red test. Keep the two channels apart so the bu
 
 - **Tests** — only for behaviour a criterion states.
 - **Findings** — each one either a **defect** or a **question**, filed once (no duplicates):
-  - **Defect:** one observable wrong outcome plus the evidence (file and symbol, or the test that
-    shows it). The code at base, the spec and the brief are all in scope: a pre-existing bug the
+  - **Defect:** one observable wrong outcome plus the evidence: the file and symbol you read, or a
+    test you wrote that the orchestrator's red run will show failing. The code at base, the spec and the brief are all in scope: a pre-existing bug the
     slice builds on, a `touches:` list missing a file the change breaks, two criteria that
     contradict. If you cannot name the wrong outcome, it is a question.
   - **Question:** the spec is silent or ambiguous, a runtime fact you are unsure of, or a
@@ -71,15 +71,16 @@ found by noticing them, not by a red test. Keep the two channels apart so the bu
 
 ## Writing rules
 
-- **Assert only what a criterion states.** Spec silence is a question, not an assertion; a guess
-  that later matches the build is still a guess the next change breaks.
+- **Assert what a criterion states or directly implies** — its boundaries, its refusals and a
+  positive control beside each refusal. Spec silence is a question, not an assertion; a guess that
+  later matches the build is still a guess the next change breaks.
 - **One behaviour per test.** When a criterion names one test, keep it short and put the other
   scenarios in their own tests, so a failure says what broke.
 - **Expected values come from their owner**: the catalog key, the constant, the function that
   computes it, never a pasted English string or a magic count. Do not import production names
   the contract does not give you.
-- **Existing tests the change breaks**: list each one with the criterion that breaks it; adapt
-  it only when the brief puts it in your scope.
+- **Existing tests the change breaks** are yours: the implementer may not edit a test that fails
+  against the change. Adapt each one from the spec and list it with the criterion that breaks it.
 - **Stay fast**: the cheapest level that proves the criterion (unit before booted shell before
   e2e), the smallest fixture, an injected clock, no real waits. Add an e2e only when the
   criterion is about the browser itself.
