@@ -402,6 +402,36 @@ and the quest is the recruit-loop faucet, citing the worksheet.
 
 - **eo-4.5:** EVERY battle-usable item (the tactical item sidecar) SHALL be sold by a shop at a buy price above 0 and at or below the median buy price of the shop's stock, the lower middle value when the count is even, so its flat AP cost (`item_cost`, `game-core/content/tactics_tuning.ron`) is balanced by a price a player pays and by the item being used up (pt3-2026-10-145) (`game-core/tests/pt_d3_tuning.rs`).
 
+Build note (eo-4): Readings taken where eo-4's criteria leave room (each is what the tests encode).
+eo-4.4 'mean wild BST' is the spawn-weighted mean of zone 0's encounter entries (integer floor); on
+the shipped table it is 321, so a KO pays 32 (the budget row says about 31): 16 gold a battle, a
+Lure Berry in 13 battles. The criterion pays each KO at the reward of the mean BST; the game pays
+each wild's own reward (31.3 on average), a gap below one gold per KO. eo-4.1 is 'at least' the Lure
+Berry's price, as the EARS says, not 'exactly one'. A price counts only in a shop some NPC offers
+(game_core::interact::npc_offers_shop, the predicate economy::require_shop_in_reach uses), so a shop
+no NPC opens cannot satisfy eo-4.1, eo-4.4 or eo-4.5.
+
+Build note (eo-4): recruit-loop-budget does not model the party clamp. effective_pack limits a wild
+pack to the conscious party, so the budget row's 0.5 KOs a battle holds for a party of three or
+more. A two-monster party averages 0.4 KOs: 12.8 gold a battle, 16 battles for a Lure Berry, outside
+'within 15'. A one-monster party meets only lone wilds, so recruit-only play pays it nothing; a
+fresh player's first recruits are carried by the kit and quest_001. eo-4.4 is written over zone 0's
+pack_weights, which is the full-party case; it holds and is tested as written, and
+docs/economy-tuning.md states the assumption.
+
+Build note (eo-4): eo-4.5's bound is relative to the shop's own stock. Measured: with the Antidote
+and both essence shards all at 3200 the median is 3200 and the criterion holds; the only absolute
+ceiling on a price is pt_d3_content_sanity_bands (100 KO rewards of the best-paying wild). A shop
+whose whole stock is the one battle item satisfies the criterion at any price for the same reason.
+The worksheet lists this under the limits no test pins; an absolute ceiling would be a new tuning
+value for the spec to state.
+
+Build note (eo-4): World-content gap the eo-4 red-team measured: nothing validates where an NPC or a
+heal location stands. A shopkeeper moved to (500,500), put on a tree tile, or left in a zone whose
+only warp is removed passes validate_npc_content and every other publish validator, and the tuning
+tests then read a price no player can pay (they check that an NPC offers the shop, not that the NPC
+can be walked to). The shipped shopkeeper is covered end to end by client/e2e/shop-npc.spec.ts.
+
 ## Post-integration verification (the milestone is done when all hold on `master`)
 
 - Full `just ci` green, with `just eval` included: the `content-version` eval passes at the second
