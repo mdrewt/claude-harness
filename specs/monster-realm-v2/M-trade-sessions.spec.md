@@ -1893,6 +1893,24 @@ the Fix-batch contract):
   (`socialPanel opens the Players tab on the leaderboard panel` in
   `client/src/ui/contextStack.test.ts`).
 
+Build note (ts-6b-10): ts-6b-10.2 paints a Back row (kit.sheet.back) as the LAST row of the Social
+row sheet, a top-level sheet, as the spec requires; docs/DECISIONS.md 'The Monsters action sheet is
+one corner-anchored ContextSheet…' (and the world-sheet decision after it) say a top-level sheet
+ends with Close and only a sub-list with Back. The decision text should name Social's Back row as
+the exception (or a later slice switches Social to Close); DECISIONS.md was not in touches.
+
+Build note (ts-6b-10): ts-6b-10.3 makes socialPanel('players') the leaderboard panel; a PLAIN Social
+open (socialPanel(null), the menu's Social row) that the adapter lands on Players still shows the
+trade root for the first paint before the adapter switches to the leaderboard (main.ts:1318
+openSeated -> showSocialPanel(socialPanel(tab))). Closing that needs main.ts (owned by st-6 during
+this slice).
+
+Build note (ts-6b-10): The Social sheet is placed with placeContextSheet against the host panel
+(.mr-shell, which has a frame border): the kit measures the outer box, so the sheet sits one
+border-width right/down of the intended inset; no browser test pins Social sheet placement and
+nothing re-places it on resize (a paint re-places it). Candidate kit fix: measure the containing
+block's padding box (clientLeft/clientTop) in placeContextSheet.
+
 ### ts-6b-11 — frame chrome and Profile: one title bar, no Privacy door, the disclosure in the player's language
 type: feature · tier: routine
 category: ux-a11y · severity: LOW · size: MODERATE
