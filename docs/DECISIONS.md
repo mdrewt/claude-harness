@@ -175,3 +175,20 @@ result as a deletion reason by itself, a first-to-last commit range as what a mi
 uncapped section or one section per candidate, and a per-milestone prune session with its own PR
 type; the last is to be reconsidered when the tester A/B experiment closes, from its report and
 the recorded census rows.
+
+## The tester runs on Opus at medium effort and files defects apart from questions
+The `tester` agent is Opus at effort medium on every tier. It writes tests only for behaviour a
+criterion states, and reports each finding once, as a defect (one observable wrong outcome with
+evidence) or a question (spec silence, an unsure runtime fact, a test-file or brief slip).
+Measured by the tester A/B experiment (2026-11-13/14, 16 slices, five arms, a Fable judge): Opus
+medium found all 4 confirmed defects (10 of 11 counting confirmed-but-unfixed ones), the two
+Sonnet arms found 0, and high effort found no more than medium in either model. Every real
+finding came from the tester's written claims about the base code and the spec, none from a
+failing test; a blind review of four slices' tests scored the arms' test code nearly the same,
+with Sonnet medium the leanest. Of 132 judged items, about 70 false positives were spec silence
+claimed as a defect or claims about test files and the brief, which the two-channel report
+separates without losing any real finding (each real one named a concrete wrong outcome).
+Rules out: a Sonnet tester (cheaper per run, dearer per slice once a missed defect is priced above
+about $10), raising tester effort, and tests that pin behaviour no criterion states. Untested and
+cheaper, if cost ever forces it: Sonnet medium writing the tests beside an Opus medium pass that
+only files findings.
