@@ -1272,6 +1272,37 @@ the Fix-batch contract):
 - **ts-6b-2.3:** THE existing shop, heal, recruit, trade and PvP flows SHALL pass with their
   characters in reach (`cargo nextest run -p monster-realm-module`, `just e2e`).
 
+Build note (ts-6b-2): Content precondition of the reach rules is unenforced: buy/sell measure from
+an NPC's home tile plus wander_radius and heal_party from the heal tile, so (a) an NPC whose spawn
+tile lies outside its wander disc, or whose way home is walled, talks from where it stands but sells
+only near home, and (b) a Heal(location) NPC (the client opens the heal frame from one,
+client/src/ui/interactModel.ts npcActions) that stands or wanders more than one tile from its
+location's tile gets every honest heal refused. No shipped NPC has either shape (spawn == home for
+both; no Heal(_) NPC). game-core content validation (validate_npc_content /
+validate_npc_interactions, game-core/src/content.rs, outside ts-6b-2's touches) should refuse both;
+the decision entry 'Interaction target: the tile in front, then your own tile' rules them out in
+prose.
+
+Build note (ts-6b-2): Spec facts that had moved by d10c6c02: client/e2e/recruit.spec.ts no longer
+calls buy, sell or heal_party directly (ctl-10a walks to (7,3) and faces the heal tile), so the
+slice changed only its WORLD FACTS comment; battle_tests.rs and monster_mgmt_tests.rs already had
+their caller on the heal tile and needed no edit; server-module/src/guards_tests.rs (the sibling
+test of guards.rs, not in touches:) pinned buy's answer for a caller with no character and was
+re-pinned; game-core/src/npc/rules.rs was widened for one token (manhattan_distance -> pub(crate)).
+The contract grew one function under plan-delta: game_core::interact::npc_offers_shop(interaction,
+shop: Option<u32>) -> bool.
+
+Build note (ts-6b-2): Left as found, outside touches: client/src/main.ts (held by ts-6b-4) has a
+healParty comment saying the server 'still validates zone and cooldown' — it validates reach of the
+heal tile and cooldown; .cargo/mutants.toml names a pvp.rs line (89:5) that was already stale and
+its pattern does not depend on it; server-module/src/raising_tests.rs keeps an older block header
+describing source pins and a file census that no test performs any more. Not asserted by any test,
+by the standard's rule that a log line is not protected behaviour: the reject log lines of buy,
+sell, heal_party and challenge_pvp's range guard (four log-only patches survive the suite).
+heal_party's reach-before-wallet order has no executing proof because no heal location charges
+currency (the cost comes from the content cache); reach-before-battle, -cooldown and -item-cost are
+proven.
+
 ### ts-6b-3 — economy debits and one-time rewards
 type: feature · tier: hard
 category: data-integrity · severity: MED · size: MODERATE
