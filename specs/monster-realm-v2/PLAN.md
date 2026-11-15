@@ -84,10 +84,13 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    `mr-record`'s MERGED-row hook (no supervisor-prompt text). No prune session (revisit at the
    tester A/B close). `tp-3` and the design sections `st-3` (shared pins) and `st-4` (what stays
    of the 1v1 battle rules) are buildable.
-6. **M-identity-handles** (`M-identity-handles.spec.md`, sketch 2026-10-24 — elaborate when reached): minted name
-   discriminator (survives the M22 re-key cascade), Players-tab info (name + discriminator +
-   lead-monster level + nearby), Sign-In hidden until an issuer exists. All four decisions
-   ANSWERED (#588, recommendations accepted). Feeds M19.
+6. **M-identity-handles** (`M-identity-handles.spec.md`, elaborated 2026-11-14 — 4 slices, heads
+   `ih-4` ‖ `ih-1` (after `eo-1`), then `ih-2`, then `ih-3`): a minted, never-reissued name
+   discriminator in a private table, mirrored onto the public `player` row, carried by the guest
+   claim, erased at deletion and exported to its owner; a live lead-monster level on `player`; the
+   Players tab showing name + low-contrast tag + lead level + Nearby, tags in request banners and
+   trade rows, none in battle; Sign In hidden until a build has an issuer, then labelled with its
+   provider. All four decisions ANSWERED (#588). Feeds M19.
 7. **M-test-health** (`M-test-health.spec.md`, sketch 2026-11-12): root-cause the two observed e2e
    flakes (UIF4B.2 at 640×240 may be a layout defect), count flakes in the e2e union job, a
    `dev_reducers` deadline skew so the PvP AFK test stops waiting on real 30 s windows, and a

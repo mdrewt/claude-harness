@@ -1,170 +1,440 @@
-# Spec: M-identity-handles — stable player discriminator for non-unique names (SKETCH)
+# Spec: M-identity-handles — a minted discriminator for non-unique names, and an honest Sign In
 
-**Status:** sketch, 2026-10-24 (Playtest-3 feedback episode). Elaborate with
-`milestone-loop-prompt.md` when PLAN §9 reaches it, against the CURRENT game repo ·
-**Project:** monster-realm (server + client) · **Feeds:** `M19-social.spec.md` (friend requests
-and chat need this identity primitive — M19's sketch is reshaped to consume it, not re-derive it)
-· **Decisions ANSWERED 2026-10-24** — monster-realm #588 (`pt3-identity-accounts`), all four
-recommendations accepted verbatim (`memory/projects/decisions/issue-588.answer.md`): minted
-numeric discriminator carried through the account-claim re-key; Players tab = name +
-discriminator + lead-monster level + "nearby" marker; Sign-In hidden while no issuer is
-configured (labeled "Sign in / create account with <provider>" once one is); M19 moves ahead of
-M18. All formerly-pending rows below are resolved in place.
-**Feedback items:** pt3-2026-10-087, pt3-2026-10-088, pt3-2026-10-099.
-**Absorbs (conditional — NOT activated):** R-ctl-8g-CTL8G.1 (zone name in the Players tab) does
-NOT absorb here: #588 D2 picked lead-monster level, not zone. The residual stays open where it
-lives.
+**Status:** elaborated 2026-11-14 (from the 2026-10-24 sketch) against game `master` `9fb5bd25`.
+`eo-1` (M-econ-onboarding) is in flight: it creates `server-module/src/onboarding.rs` and edits
+`join_game`, the claim tests and the `account-e2e` eval, so the server slices here run after it.
+· **Project:** monster-realm (server + client) · **Slices:** 4 — `ih-4` ‖ `ih-1`, then `ih-2`,
+then `ih-3`. Anchors are files and symbols, never line numbers. · **Feeds:** `M19-social.spec.md`
+(friend requests and chat consume the display contract `ih-3` ships).
 
-## Problem / intent
+**Decisions ANSWERED 2026-10-24** — monster-realm #588 (`pt3-identity-accounts`), all four
+recommendations accepted verbatim; `memory/projects/decisions/issue-588.answer.md` is the SSOT:
+- **D1** a minted numeric discriminator (e.g. `Drew#4821`), assigned at first join, never
+  changing, carried through the account-claim re-key; shown low-contrast in Social/trade lists,
+  omitted in battles, name tags and NPC dialogue.
+- **D2** the Players tab shows name + discriminator + lead-monster level + "Nearby".
+- **D3** the Account screen gets a UI-only fix: Sign In hidden while no issuer is configured,
+  labelled "Sign in / create account with <provider>" once one is. Wiring a real issuer is a
+  future milestone.
+- **D4** M19 moves ahead of M18 (PLAN §9 carries it).
 
-Display names are free-choice and deliberately NON-unique, and the operator wants to keep that:
-item 087 embeds the preference "I like that players can choose whatever name they want", which
-rules out enforced-unique names. But the Players tab then "could fill up with multiple players
-using the same name, and no way for another player to determine who is who"
-(`playtest-feedback-2026-10.md` ≈251–255, repeated ≈295–297). His suggested remedy (item 088,
-"One option…") is a Discord-style minted suffix: unique, persistent across renames, omitted for
-immersion in battles/name tags/NPC dialogue, shown low-contrast in chat/trade/friend contexts.
-This milestone mints that discriminator server-side, renders it by the operator's own context
-split, and also absorbs the Account-screen registration confusion (item 099), because both land
-on the same identity/account surfaces.
+**Feedback items:** pt3-2026-10-087 (names stay free and non-unique, so the Players tab cannot
+tell same-named players apart) → `ih-1` + `ih-3`; pt3-2026-10-088 (a Discord-style suffix,
+unique and persistent across renames, omitted for immersion) → `ih-1` (mint), `ih-2` (the
+level D2 added), `ih-3` (display); pt3-2026-10-099 (a Sign In button with no way to register)
+→ `ih-4`. **Residuals:** none absorbed. `R-ctl-8g-CTL8G.1` (zone name in the Players tab) was
+dispositioned `wontfix` by ts-6a (`M-trade-sessions.spec.md`, the residual triage table) because
+D2 picked lead-monster level, not zone.
 
-## Ground truth (fact-checked 2026-10-24; symbols, not line numbers)
+## Problem
 
-- **No uniqueness today:** `set_profile_name` (`server-module/src/ranking.rs`, ADR-0132) and
-  `join_game` (`server-module/src/movement.rs`) validate via `guards::validate_name` only —
-  trim/NFC, non-empty, ≤ `MAX_NAME_LEN`, alphanumeric+space. `Player.name` carries no
-  `#[unique]` (`server-module/src/schema.rs`, `Player`).
-- **Players tab shows name + Nearby only;** the identity hex is the nav key but is not shown;
-  `#<hex8>` renders only as the fallback for an EMPTY name (`client/src/ui/socialModel.ts`,
-  `SocialPlayerRow`; shipped by ctl-8g against CTL8G.1, zone name DEFERRED as
-  R-ctl-8g-CTL8G.1).
-- **Identity is NOT stable:** the guest→account claim re-keys the player's data onto a new
-  `Identity` (`accounts::rekey_all`, `server-module/src/accounts.rs`). Anything derived from the
-  Identity hex — the `#<hex8>` fallback, `player.entity_id` — changes on claim, so a hex-derived
-  suffix violates item 088's "unique and persistent".
-- **The `player` row itself is NOT re-keyed:** `rekey_all` delegates cover monsters, evolution
-  notices, inventory, npc state, heal cooldowns, wallet and profile — `player` is deliberately
-  left behind (the rekey-roster pin
-  `acct_rekey_roster_is_total_and_game_data_sees_every_rekeyed_table`,
-  `server-module/src/accounts_tests.rs`, classifies every owner-keyed table as re-keyed or
-  deliberately left). A discriminator appended to `player` would therefore NOT survive a claim.
-- **The lifecycle gate exists and names the constraint:** every owner-keyed table must be
-  classified in `DATA_LIFECYCLE_MANIFEST` (`server-module/src/schema.rs`) AND in the re-key
-  roster — "a new owner-keyed table cannot ship without a claim-flow decision" (the M22
-  REKEY_MANIFEST/G6 machinery, now living as the manifest + `accounts_tests.rs` pins).
-- **Sign In is an OIDC redirect:** the Account screen's Sign In dispatches `startSignIn`
-  (`client/src/net/oidc.ts`) to an external IdP configured by `VITE_MR_OIDC_ISSUER` et al.
-  (`client/src/main.ts`, `authIssuer`); registration, if offered, happens AT the provider and
-  nothing in the UI says so. Server-side, `ALLOWED_ISSUERS` is still the fail-closed
-  `.invalid` placeholder (`server-module/src/accounts.rs`), so no sign-in can succeed today by
-  design.
+Measured at `9fb5bd25`:
 
-## Scope (sketch)
-
-- **Server spine — a minted discriminator.** A numeric discriminator minted ONCE per player at
-  character creation, unique across all players (`#[unique]`/`#[auto_inc]`-class mechanism),
-  NEVER derived from the Identity hex. Storage is additive-only: a NEW table (e.g.
-  `player_handle`: identity key + minted value) or an appended `#[default]` column on an
-  already-re-keyed table — the sketch leans NEW TABLE, because `player` is not re-keyed (see
-  Ground truth) and `profile` rows only exist after first rating application. Decide the final
-  shape at elaboration.
-- **Claim-cascade carriage (hard constraint).** Whatever holds the minted value registers in
-  `DATA_LIFECYCLE_MANIFEST` (deletion policy + basis + exportable) AND gains a `rekey_*`
-  delegate in `accounts::rekey_all`, so the discriminator survives the guest→account re-key.
-  The existing roster and round-trip pins
+- **Names are not unique, and duplicates are the default.** `join_game`
+  (`server-module/src/movement.rs`) and `set_profile_name` (`server-module/src/ranking.rs`)
+  validate through `guards::validate_name` only (trim, NFC, non-empty, at most `MAX_NAME_LEN`,
+  alphanumeric and space). `Player.name` (`server-module/src/schema.rs`) has no `#[unique]`, and
+  the client joins every identity with the name `Player` (`client/src/main.ts`, the `connect`
+  call), so until players rename, every row on the Players tab reads the same.
+- **The Players tab cannot tell them apart.** `socialPlayers` (`client/src/ui/socialModel.ts`)
+  builds `SocialPlayerRow { key, name, nearby }`: the key is the identity hex, which is never
+  shown; `#<hex8>` appears only as the fallback for an empty name (`playerName`,
+  `client/src/ui/tradeSessionModel.ts`). `leaderboardView.ts` paints the name in a `<bdi>` and the
+  Nearby badge.
+- **The identity is not stable.** The guest claim re-keys the guest's rows onto the account
+  identity (`accounts::rekey_all`, `server-module/src/accounts.rs`), so anything derived from the
+  identity hex changes on claim.
+- **The `player` row is neither re-keyed nor durable.** `rekey_all` delegates monsters, evolution
+  notices, inventory, npc state, heal cooldown, wallet, profile, formation and last position, and
+  ends the trade sessions of both identities; `player` is deliberately left behind
   (`acct_rekey_roster_is_total_and_game_data_sees_every_rekeyed_table`,
-  `acct_guest_claim_round_trip_moves_every_row_and_spends_the_code`) extend to cover it — they
-  are the gate, not a new mechanism.
-- **Renames keep the suffix.** `set_profile_name` (and its RL-7 rate-limit allowlist,
-  ADR-0132) is untouched; the discriminator is independent of the name.
-- **Client display rules (the operator's own split, item 088).** Shown LOW-CONTRAST next to the
-  name in Social/disambiguation contexts — the Players tab, trade-request and challenge-request
-  banners, and (when M19 lands) friend requests and chat. OMITTED in battles, name tags and NPC
-  dialogue for immersion. The suffix join is a typed i18n catalog string with a slot (en+fr),
-  never string concatenation in view code; the Players-tab rendering stays inside the shipped
-  nav-adapter model (no mouse-only element).
-- **Players tab extra info — DECIDED (#588 D2):** name + discriminator + the LEVEL of the
-  player's lead monster + the "nearby" marker. Zone was NOT picked, so R-ctl-8g-CTL8G.1's
-  conditional absorption does NOT activate (that residual stays where it lives; its
-  hidden-dependency note is moot here). Lead-monster level is new subscribed surface — elaborate
-  its data path against the owner-scoped view model (the LEAD monster's level is the owner's
-  public-enough signal the operator chose; keep it out of any private-table read path).
-- **`#<hex8>` fallback retired or re-based.** The empty-name fallback can become the
-  discriminator itself (stable, unlike hex8 which changes on claim) — decide at elaboration.
-- **Account-screen honesty (item 099) — DECIDED (#588 D3): UI-only fix.** HIDE Sign In while no
-  issuer is configured; when one is, label it "Sign in / create account with <provider>". Wiring
-  a real OIDC issuer stays its own future milestone; auth stays pluggable per client build
-  (standing ruling, `feedback-auth-modularity`; Steam/native deferred per M21b-2).
+  `server-module/src/accounts_tests.rs`, holds 11 re-keyed and 16 not-re-keyed tables). And
+  `on_disconnect` (`server-module/src/lib.rs`) deletes the `player` row, so `join_game` inserts a
+  fresh one every session. A value stored only on `player` would be re-minted each session.
+- **The lifecycle gate names the constraint.** Every table has one entry in
+  `DATA_LIFECYCLE_MANIFEST` (`server-module/src/schema.rs`; deletion policy + basis + `exportable`),
+  `accounts_tests.rs` compares that set with the module definition, and the `account-e2e` eval
+  (`evals/account-e2e.eval.mjs`) carries a 61-entry transcription of it
+  (`M22S9_MANIFEST_TRANSCRIPTION`). `privacy.rs` asserts at compile time that every exportable
+  table has an exporter. A new owner-keyed table needs a claim decision, a deletion decision and an
+  export decision together.
+- **Other players' monsters are private.** `monster_pub` is a private table read only through the
+  owner-scoped `my_monster_pub` view, so no client can see another player's lead level today. The
+  lead is the party monster with the lowest `party_slot` (`battle::lead_party_ids`,
+  `server-module/src/battle.rs`).
+- **Sign In always shows, and nothing says registration happens at the provider.** The Account
+  section of the Profile screen (`client/src/ui/claimView.ts`, rules in `claimModel.ts`
+  `claimActions`) offers Sign In in the `prompt` and `sign-in-failed` phases whatever the build.
+  `main.ts` passes `connect` the build's `VITE_MR_OIDC_ISSUER` only for target kinds `official` and
+  `test`, else the empty string; the issuer is read nowhere else (docs/DECISIONS.md, "A target's
+  kind gates telemetry and account sign-in"). Server-side, `accounts::ALLOWED_ISSUERS` is the
+  fail-closed `.invalid` placeholder, so no sign-in can succeed today by design, and no build sets
+  an issuer.
 
-## Non-goals
+## Scope
 
-- Enforced-unique names (ruled out by item 087's embedded preference).
-- Friend requests, chat, block lists — M19 owns them; this milestone only supplies the
-  identity primitive and the display contract M19 consumes.
-- A first-party registration flow or an auth-provider choice (M21b-* decision territory;
-  only the UI-honesty fix is in scope unless pt3-identity-accounts rules otherwise).
-- Rename machinery changes (ADR-0132 reducer, ADR-0133 input hygiene stand).
-- Leaderboard/profile rework (`profile` stays the public leaderboard surface, ADR-0125 mirror
-  untouched).
+**In:**
+- A private `player_handle` table holding one minted discriminator per identity, minted at join
+  when the identity has none, carried by the guest claim, erased by the deletion cascade and
+  included in the owner's data export (`ih-1`).
+- Two appended public columns on `player`: `discriminator` (the mirror `join_game` writes from
+  the handle) and `lead_level` (`ih-1` adds it; `ih-2` keeps it equal to the lead's level).
+- The client display: the Players tab row (name, low-contrast tag, lead level, Nearby), the
+  incoming trade and challenge request banners and the Trades-tab session row; every other
+  surface stays name-only (`ih-3`).
+- The Account-screen honesty fix (`ih-4`).
 
-## Constraints that bind the design
+**Named deferrals:**
+- The player's own tag on the Profile screen (so a player can tell a friend who they are) →
+  M19, whose friend requests are the first flow that needs it.
+- Tags on the Rankings tab, the trade editor heading and the PvP challenge rows → backlog (the
+  leaderboard is a non-goal; the other two already sit under a surface that shows the tag).
+- A low-contrast span inside single-line banner text → backlog (`banner-tag-style` below).
+- A real OIDC issuer and its server allow-list → its own future milestone (D3; M21b-2 owns the
+  native/Steam protocols).
 
-- **Additive-only schema** (appended `#[default]` columns or new tables; no reorder/rename);
-  client bindings are generated-only, so the new table/column forces a bindings regen between
-  the server spine and the client tail.
-- **The M22 re-key/lifecycle gate** (named above) — carriage through claim AND a deletion-policy
-  classification (freed vs tombstoned on account deletion) are decided together, in the
-  manifest, not ad hoc.
-- **Not derived from Identity; no PII.** Accounts hold no PII (Identity = f(iss, sub)); a
-  minted integer carries none. The discriminator is public-by-design (its whole purpose is
-  cross-player disambiguation) — mirroring the already-public `player` table is acceptable, but
-  the private-tables + owner-scoped-views doctrine governs anything beyond the minted value.
-- **Determinism doctrine untouched:** minting is server-side allocation (like `entity_id`), not
-  a game rule; no game-core change is expected. If any rule ever needs it, it lives once in
-  game-core.
-- **i18n total catalog (en+fr)** for every new string; the virtual-button/context-stack controls
-  doctrine for every touched surface.
+**Non-goals:** enforced-unique names (item 087 keeps names free); friend requests, chat and block
+lists (M19); rename machinery (`set_profile_name` and the rename UI stand); leaderboard rework
+(`profile` and its name mirror stay as they are); any `game-core` change (minting is server
+allocation, not a game rule).
 
-## Acceptance sketch (full EARS at elaboration)
+## Prior rulings that bind
 
-- **IDH-mint:** WHEN a character is created, THE SERVER SHALL mint a discriminator unique
-  across all players and persist it additively; a player SHALL keep exactly one for life.
-- **IDH-rename:** WHEN a player renames, THE discriminator SHALL NOT change.
-- **IDH-claim:** WHEN a guest claims an account, THE discriminator SHALL follow onto the
-  claimer identity — proven by extending the existing claim round-trip and rekey-roster pins,
-  not by a parallel test rig.
-- **IDH-display:** WHEN two online players share a name, THE Players tab (and trade/challenge
-  request surfaces) SHALL render each with the low-contrast suffix so the rows are
-  distinguishable; battle, name-tag and NPC-dialogue surfaces SHALL NOT render it.
-- **IDH-auth-ui:** WHEN no OIDC issuer is configured, THE Account screen SHALL NOT render the
-  Sign In affordance at all; WHEN one is configured, THE affordance SHALL be labelled
-  "Sign in / create account with <provider>" (i18n-slotted) — #588 D3.
-- **IDH-i18n:** every new string ships in en+fr through the typed catalog with its roster pins
-  updated.
+- **Auth stays pluggable per client build** (`feedback-auth-modularity`): the provider label and
+  the issuer are build values passed in at one seam; no code path assumes one provider.
+- **Export scope** (`feedback-data-export-scope`): the export is data about the person, through
+  simple reads of existing tables. `player_handle` exists for play; the export reads it with one
+  owner-keyed lookup and adds no table or column for its own sake.
+- **Privacy doctrine:** owner-keyed state lives in a private table; RLS is unenforced at the
+  pinned SpacetimeDB and is never the boundary. The discriminator and the lead level are public by
+  design (their purpose is cross-player disambiguation), so they are mirrored onto `player`, which
+  is public and holds a row only while its identity is online.
+- **Additive schema:** a new table and appended `#[default]` columns only; bindings regenerate
+  only through `just gen`.
 
-## Decisions — ANSWERED 2026-10-24 (#588 `pt3-identity-accounts`; answer file is SSOT)
+## Decisions (reversible; documented defaults — no operator question)
 
-- **Suffix format and mechanism — DECIDED (D1):** a minted numeric discriminator (e.g.
-  `Drew#4821`), assigned at first join, never changing, carried through the account-claim
-  re-key; shown low-contrast in Social/trade/chat lists, omitted in battles, nametags and NPC
-  dialogue. (The mechanism itself — not just the format — is confirmed.) Exact digit
-  count/zero-padding: elaboration detail.
-- **Players-tab info — DECIDED (D2):** name + discriminator + lead-monster level + "nearby".
-- **Account-screen scope — DECIDED (D3):** UI-only honesty fix now (hide; provider-labelled when
-  configured); issuer wiring is a future milestone.
-- **Roadmap — DECIDED (D4):** M19 moves ahead of M18; M18 re-sketches after the tactical P2
-  (PLAN §9 updated).
-- **Storage shape** (new `player_handle` table vs appended column on a re-keyed table) remains an
-  elaboration-time design call INSIDE the constraints above — the sketch leans new-table; the
-  slice confirms against current schema.
+- `decision-defaulted:handle-storage=private-player_handle+player-mirror` — `player_handle`
+  (`owner_identity` primary key, `discriminator: u32` `#[unique] #[auto_inc]`) is private and
+  durable. `player.discriminator` (`#[default(0u32)]`, appended) is the public copy `join_game`
+  writes each session. Storing it only on `player` fails (the row is deleted at disconnect and
+  not re-keyed); a public `player_handle` would publish every identity that ever joined, including
+  offline ones; `profile` rows exist only after a first rating.
+- `decision-defaulted:mint=auto_inc-sequence` — the value is the table's `auto_inc` sequence
+  (insert 0, read back the assigned value), as `character.entity_id` and `monster_id` are. It is
+  unique by the `#[unique]` constraint, never derived from the identity, and never reissued:
+  SpacetimeDB sequences only grow, so a deleted player's tag is never minted to someone else. A
+  re-key re-inserts the explicit value (a non-zero insert does not draw from the sequence). The
+  join-order disclosure is in Risks.
+- `decision-defaulted:handle-owner=onboarding.rs` — `ensure_handle`, `rekey_handle`,
+  `erase_handle` and `has_handle` live in `server-module/src/onboarding.rs`, which `eo-1` creates
+  as the home of first-join grants. `join_game` gains one call, `accounts.rs` one line each in
+  `rekey_all`, `account_has_game_data` and the deletion cascade. No `mod` line is added to
+  `lib.rs`.
+- `decision-defaulted:legacy-identity=mint-at-next-join` — an identity that joined before `ih-1`
+  has no handle; its next join mints one. Publishing the column add disconnects every client, so
+  every live session rejoins and is minted.
+- `decision-defaulted:deletion=erase-and-zero-mirror` — the cascade erases the handle
+  (`DeletionPolicy::Erase`, `exportable: true`), and `ranking::player_with_deleted_name` also sets
+  the surviving `player` row's `discriminator` and `lead_level` to 0, so the tombstoned row cannot
+  be linked back to a tag seen in a trade or a future chat.
+- `decision-defaulted:claim-collision=refuse` — `has_handle` joins `account_has_game_data`, so an
+  account identity that holds a handle cannot take a guest's data ("already has game data", the
+  existing refusal and its client bucket `retain-destination-terminal`). An account that joined
+  before claiming already holds a starter monster, so this refuses nothing new in practice; it
+  makes "two handles on one key" unrepresentable.
+- `decision-defaulted:retired-guest=mints-fresh` — the retired guest token of a completed claim
+  holds no handle after the re-key, so if it joins again it is minted a new tag. It is a new,
+  empty identity in every other respect too.
+- `decision-defaulted:lead-level=public-mirror-on-player` — `player.lead_level: u8`
+  (`#[default(0u8)]`, appended; 0 means no party) is refreshed by one helper,
+  `battle::refresh_lead_level(ctx, owner)`, beside `lead_party` (the lead's SSOT). It writes the
+  `player` row only when the row exists and the value differs. It is called where the lead's level
+  or the party's order can change: the end of `join_game` (after the starter), the dual-write
+  seam `monster_mgmt::update_monster_synced` (every battle write-back, level-up, faint, box and
+  reorder passes through it) when the written row's `level` or `party_slot` differs from the
+  stored one, the recruit insert (`taming.rs`) and the session-trade slot move
+  (`trading_session.rs`). Quality-Time accrual (`raising::accrue_quality_time`) and the content
+  resync change neither and get no call. A view was rejected: the pinned SpacetimeDB has only
+  owner-scoped views here, and a per-subscriber view over `monster` costs a recompute per change.
+- `decision-defaulted:tag-format=hash+min4-zero-pad` — the tag is `#` plus the decimal value
+  padded to four digits (`#0042`), growing past four digits without truncation. 0 renders no tag.
+  The join is the catalog string `identity.tag` (en and fr), never concatenation in view code.
+- `decision-defaulted:empty-name-fallback=tag-where-known` — on the surfaces that show tags, an
+  empty name shows the tag alone; `playerName`'s `#<hex8>` fallback stays for name-only surfaces
+  and for an identity the store does not hold.
+- `decision-defaulted:banner-tag-style=plain-join` — the request banners and the Trades-tab row
+  are single text lines; they carry the tag through `identity.taggedName` (`Drew #0042`) in the
+  same text colour. The low-contrast span is on the Players tab, where a row is built from parts.
+- `decision-defaulted:level-copy=reuse-tactics.hud.level` — the Players row's level reads through
+  the existing `tactics.hud.level` key (`Lv.5` / `Niv.5`); 0 renders no level.
+- `decision-defaulted:muted-token=--mr-text-muted` — the tag uses the existing
+  `--mr-text-muted` token (`client/src/styles.css`), which the a11y suite already checks in both
+  themes; no new colour.
+- `decision-defaulted:provider-label=VITE_MR_OIDC_PROVIDER_NAME-else-issuer-host` — the label's
+  provider is a build value `VITE_MR_OIDC_PROVIDER_NAME`; when the issuer is set and the name is
+  not, the issuer URL's host. An issuer that does not parse as an `https:` URL gives no offer.
+- `decision-defaulted:issuer-read-once=one-assignment` — `main.ts` reads the issuer env once into
+  a `const`, under the existing target-kind gate, and passes that value to both `connect` and
+  `signInOffer`. The DECISIONS entry's "anywhere but that one `connect` call" becomes "anywhere but
+  that one assignment", and its "treating the empty issuer as a complete off switch" rule-out is
+  restated: hiding the control is presentation, and the `connect` gate stays the boundary.
+- `decision-defaulted:no-offer-copy=guest-play-continues` — with no offer, the `prompt` phase body
+  says accounts are not available on this server yet and play continues as a guest
+  (`claim.prompt.noProvider`). Decline keeps its current rule.
+- `decision-defaulted:e2e-issuer=placeholder` — `client/playwright.config.ts` gives the e2e dev
+  server `VITE_MR_OIDC_ISSUER=https://auth.monster-realm.invalid/` (the server's own placeholder)
+  and a provider name, so `accounts.spec.ts` keeps its fail-safe sign-in flow (A2) against a
+  configured but unreachable issuer. The no-issuer case is the default of every real build and is
+  proven through the DOM view tests.
 
-## Notes (sequencing / fan-out)
+Every value above a player sees (tag format, label copy, level copy) is not the builder's to move
+(`standards/spec-driven.md` §Adapting the plan during a build). A build whose measurement
+contradicts one records it with `mr-gates notes add` and, if the slice cannot hold, parks.
 
-- Natural slice shape: a serial server spine (schema + mint + rekey/lifecycle registration +
-  tests) → bindings regen → a client display tail (socialModel/banner surfaces + i18n). The
-  Account-screen fix is a separate, parallelizable client slice once the decision lands.
-- The Players-tab rendering touches the same `socialModel`/`leaderboardView` surface the
-  pending UI-chrome rework restyles — order with it (and after `so-2`, which owns Social frame
-  routing) so the roster pins are not rewritten twice.
-- M19's sketch consumed this milestone's output by name; when M19 is re-sketched, its friend
-  request and chat surfaces take the IDH-display contract as given.
+## Contracts between slices
+
+- **C1 (`ih-1` → `ih-2`, `ih-3`):** `Player` gains `discriminator: u32` and `lead_level: u8`,
+  appended with defaults, in one schema change; the client bindings (`player_table.ts`,
+  `types.ts`) carry both. `ih-2` writes `lead_level` and adds no column; `ih-3` reads both. Proof
+  after merge: `bindings-drift` clean and the `spacetime-type-snapshot` and table-schema baselines
+  unchanged by `ih-2` and `ih-3`.
+- **C2 (`ih-1` ↔ claim / deletion / export):** `player_handle` is re-keyed by `rekey_all`, counted
+  by `account_has_game_data`, erased by the cascade and exported to its owner. Proof after merge:
+  `ih-1.5`–`ih-1.8` pass on `master`, and `account-e2e` (`just eval`) passes with its 62-entry
+  transcription.
+- **C3 (`ih-2` → `ih-3`):** a live `player.lead_level` equals `battle::lead_party`'s level for its
+  identity at every commit (0 with no party). Proof after merge: `ih-3.6`'s e2e reads the
+  starter's level for each joined player.
+- **C4 (`ih-3` → M19):** `taggedName(players, identity)` and `formatTag(discriminator)` in
+  `client/src/ui/playerTag.ts` are the one way a surface shows a tag; `playerName` stays
+  name-only. M19's friend requests and chat call them.
+- **C5 (`ih-4` ↔ the target-kind gate):** `signInOffer(issuer, providerName)` receives the value
+  `connect` receives. Proof after merge: `client/src/main.targetKindGate.test.ts` and
+  `accounts.spec.ts` pass together on `master`.
+
+## Structure
+
+The server spine adds no logic to `join_game` or `rekey_all`: the handle helpers go in
+`onboarding.rs` (created by `eo-1`), the lead-level refresh beside `lead_party` in `battle.rs`.
+Only `ih-1` edits `schema.rs`, `accounts.rs`, `ranking.rs` and `privacy.rs`. `ih-1` and `ih-2`
+share one production file, `movement.rs` (`ih-1` the mint call and the mirror fields, `ih-2` one
+refresh call at the end of `join_game`), and the test files `movement_tests.rs`,
+`monster_mgmt_tests.rs`, `battle_tests.rs` and `trading_session_tests.rs`, where `ih-1` edits only
+`Player` literals and `ih-2` adds cases. They are ordered (`ih-2` after `ih-1`), so no refactor
+slice comes first. The client tail puts its two helpers in a new `client/src/ui/playerTag.ts`;
+`socialModel.ts`, `noticeModel.ts` and `leaderboardView.ts` call them. `ih-3` and `ih-4` share the
+three i18n catalog files and are ordered (`ih-3` after `ih-4`). `main.ts` receives wiring only
+(`ih-4`: one `const` and one argument).
+
+### ih-4 — Sign In shows only when an issuer exists, labelled with its provider
+type: feature · tier: hard
+category: auth/ux · severity: MED · size: SMALL
+touches: client/src/ui/claimModel.ts, client/src/ui/claimModel.test.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/claimView.i18n.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/main.ts, client/src/main.targetKindGate.test.ts, client/playwright.config.ts, client/e2e/accounts.spec.ts, ops/auth/README.md, docs/DECISIONS.md
+after: []
+
+- `claimModel.ts` gains `type SignInOffer = { readonly kind: 'none' } | { readonly kind:
+  'provider'; readonly name: string }` and the pure `signInOffer(issuer: string, providerName:
+  string): SignInOffer`. `buildClaimViewModel(state, offer)` takes it; `ClaimActions.signIn` is
+  false for `none`, and `ClaimViewModel` gains `signInLabel: string | undefined`.
+- `claimView.ts` writes the Sign In button's text from `vm.signInLabel`
+  (`t('claim.signInWithProvider', { provider })`, en and fr); `claim.signInButton` is removed with
+  its last caller. The provider name is player-visible build text and goes through the slot, never
+  concatenation.
+- `main.ts`: the issuer `const` (`issuer-read-once`), `VITE_MR_OIDC_PROVIDER_NAME` read beside it,
+  the offer computed once and passed at each `buildClaimViewModel` call.
+- `ops/auth/README.md` lists the new build variable with the other three. The `docs/DECISIONS.md`
+  entry "A target's kind gates telemetry and account sign-in" is amended in place
+  (`issuer-read-once`).
+- Measured pins: `claimView.i18n.test.ts` maps `claim-signin-btn` to `claim.signInButton`
+  (re-pointed); `accounts.spec.ts` A1 asserts the button text `t('claim.signInButton')` (re-pointed
+  to the provider label). `main.targetKindGate.test.ts` boots `main.ts` under each kind; it gains
+  the no-control case for `local` and `private`.
+
+- **ih-4.1:** WHEN `signInOffer` receives an empty issuer, THE SYSTEM SHALL return `none`, and WHEN it receives an `https:` issuer with a provider name, THE SYSTEM SHALL return that name; with no name it SHALL return the issuer's host; and for an issuer that is not an `https:` URL it SHALL return `none` (`client/src/ui/claimModel.test.ts`).
+
+- **ih-4.2:** WHEN the offer is `none`, THE claim view model SHALL offer no Sign In action in any phase, and THE Account section SHALL render no visible Sign In control (`client/src/ui/claimModel.test.ts`, `client/src/ui/claimView.test.ts`).
+
+- **ih-4.3:** WHEN the offer is `none` and the claim is in the `prompt` phase, THE body SHALL read the `claim.prompt.noProvider` copy saying accounts are not available here yet and play continues as a guest (`client/src/ui/claimModel.test.ts`).
+
+- **ih-4.4:** WHEN the offer names a provider, THE Sign In control SHALL read "Sign in / create account with <provider>" in English and "Se connecter / créer un compte avec <provider>" in French, the provider passed through the catalog slot (`client/src/ui/claimView.i18n.test.ts`).
+
+- **ih-4.5:** WHEN `main.ts` boots under target kind `local` or `private` with a build issuer set, THE Account section SHALL render no Sign In control (`client/src/main.targetKindGate.test.ts`).
+
+- **ih-4.6:** WHEN the e2e build (placeholder issuer and provider name set) opens Profile then Account, THE Sign In button SHALL read the provider label, and pressing it SHALL fail safe as it does today: failure copy, a claim code in session storage, the world still playing (`client/e2e/accounts.spec.ts`).
+
+### ih-1 — the minted discriminator: table, mint at join, claim, deletion, export
+type: feature · tier: hard
+category: identity/schema · severity: MED · size: MODERATE
+touches: server-module/src/schema.rs, server-module/src/onboarding.rs, server-module/src/onboarding_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/ranking.rs, server-module/src/ranking_tests.rs, server-module/src/privacy.rs, server-module/src/privacy_tests.rs, server-module/src/battle_tests.rs, server-module/src/content_tests.rs, server-module/src/economy_tests.rs, server-module/src/guards_tests.rs, server-module/src/lifecycle_tests.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/npc_tests.rs, server-module/src/pvp_tests.rs, server-module/src/raising_tests.rs, server-module/src/tactics_tests.rs, server-module/src/trading_session_tests.rs, server-module/src/trading_tests.rs, client/src/module_bindings/player_table.ts, client/src/module_bindings/types.ts, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, evals/baselines/spacetime-types.json, docs/DECISIONS.md
+after: [eo-1]
+
+- `schema.rs`: the private `player_handle` table (`handle-storage`, `mint`); `Player` gains
+  `discriminator: u32` and `lead_level: u8`, both appended with `#[default]`; one manifest entry
+  `player_handle` (`Erase`, `exportable: true`, a basis with no slash in it).
+- `onboarding.rs`: `ensure_handle(ctx, owner) -> u32` (find, else insert 0 and return the
+  assigned value), `rekey_handle(ctx, from, to)`, `erase_handle(ctx, owner)`,
+  `has_handle(ctx, owner) -> bool`.
+- `join_game` calls `ensure_handle` before it inserts the `player` row and writes the value and
+  `lead_level: 0` into it (`ih-2` makes the level real).
+- `accounts.rs`: `rekey_handle` in `rekey_all`, `has_handle` in `account_has_game_data`,
+  `erase_handle` in the deletion cascade.
+- `ranking::player_with_deleted_name` zeroes both new columns (`deletion`).
+- `privacy.rs`: `rows_player_handle` and its JSON writer join the exporter table; the `player`
+  exporter's exhaustive destructure gains the two columns.
+- Measured pins (each a named intentional change; the build widens for any further one it
+  measures):
+  - Every `Player { … }` literal in the server test files listed in `touches:` gains the two
+    fields. Assertions stay.
+  - The native host aborts on a write to a table a test did not register: every native caller of
+    `join_game` (`movement_tests.rs`, `monster_mgmt_tests.rs`, `guards_tests.rs`,
+    `accounts_tests.rs`) registers `player_handle`.
+  - `acct_rekey_roster_is_total_and_game_data_sees_every_rekeyed_table`: `REKEYED` goes from 11
+    to 12 with `player_handle`.
+  - `evals/account-e2e.eval.mjs`: `M22S9_MANIFEST_TRANSCRIPTION` gains
+    `player_handle:Erase:owner_identity:1` and its count comment goes from 61 to 62.
+  - `evals/baselines/table-schemas.json` and `spacetime-types.json` are re-recorded; the client
+    bindings regenerate through `just gen` (`player_table.ts`, `types.ts`; a private table gets
+    no binding file). `client-visible-tables.json` and `client-surface-privacy` see no change:
+    `player` is already visible and the new columns are public by design.
+- The `docs/DECISIONS.md` entry records the discriminator rule ("a minted, never-reissued
+  sequence value per identity, private at rest, mirrored onto the public `player` row while
+  online, carried by the claim, erased at deletion"), naming `handle-storage`, `mint` and
+  `deletion`.
+
+- **ih-1.1:** WHEN an identity with no handle joins, THE SERVER SHALL insert one `player_handle` row whose discriminator is non-zero and differs from every other row's, and SHALL write that value to the new `player` row's `discriminator` in the same transaction (`server-module/src/onboarding_tests.rs`, through `join_game` on the native host).
+
+- **ih-1.2:** WHEN an identity that holds a handle disconnects and joins again, THE SERVER SHALL mint nothing and SHALL write the same discriminator to the new `player` row (`server-module/src/onboarding_tests.rs`).
+
+- **ih-1.3:** WHEN two identities join with the same name, THE two `player` rows SHALL carry different discriminators (`server-module/src/onboarding_tests.rs`).
+
+- **ih-1.4:** WHEN a player renames through `set_profile_name`, THE handle row and the `player` row's discriminator SHALL be unchanged (`server-module/src/ranking_tests.rs`).
+
+- **ih-1.5:** WHEN a guest that holds a handle is claimed into an account, THE account identity SHALL hold the guest's discriminator and THE guest identity SHALL hold no handle row, proven by extending `acct_guest_claim_round_trip_moves_every_row_and_spends_the_code`, and THE rekey roster pin SHALL classify `player_handle` as re-keyed (`server-module/src/accounts_tests.rs`).
+
+- **ih-1.6:** WHEN an account identity that holds a handle and no other game data tries to complete a guest claim, THE SERVER SHALL refuse with `already has game data` and move nothing (`server-module/src/accounts_tests.rs`).
+
+- **ih-1.7:** WHEN an identity's deletion completes, THE identity's handle row SHALL be gone, THE surviving `player` row's `discriminator` and `lead_level` SHALL be 0, and a later first join by another identity SHALL be minted a discriminator different from the erased one (`server-module/src/accounts_tests.rs`).
+
+- **ih-1.8:** WHEN a player requests a data export, THE bundle SHALL hold the caller's `player_handle` row and the `discriminator` and `lead_level` of the caller's `player` row, and no other identity's handle (`server-module/src/privacy_tests.rs`).
+
+### ih-2 — the lead-monster level stays live on the player row
+type: feature · tier: hard
+category: identity/social · severity: LOW · size: SMALL
+touches: server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/monster_mgmt.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/taming.rs, server-module/src/taming_tests.rs, server-module/src/trading_session.rs, server-module/src/trading_session_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs
+after: [ih-1]
+
+- `battle::refresh_lead_level(ctx, owner)` reads `lead_party_ids`, then the lead's level (0 with
+  no party), and updates the `player` row only when it exists and holds a different value. It
+  never fails its caller: an offline owner has no row and is skipped.
+- Callers (`lead-level`): the end of `join_game`; `update_monster_synced` when the written row's
+  `level` or `party_slot` differs from the stored one; the recruit insert in `taming.rs`; the
+  session-trade slot move in `trading_session.rs` (both sides). `evolution.rs` gets a call only if
+  the build measures that an evolution can change `level` (then it widens).
+- No schema, reducer signature or bindings change.
+
+- **ih-2.1:** WHEN a fresh identity joins and receives the starter, THE `player` row's `lead_level` SHALL equal the starter's level (`server-module/src/movement_tests.rs`).
+
+- **ih-2.2:** WHEN a battle write-back levels up the lead monster, THE owner's `player.lead_level` SHALL equal the new level when the transaction commits (`server-module/src/battle_tests.rs`).
+
+- **ih-2.3:** WHEN the owner moves a different monster into the lead party slot, or boxes the lead, THE owner's `player.lead_level` SHALL equal the new lead's level, or 0 when the party is empty (`server-module/src/monster_mgmt_tests.rs`).
+
+- **ih-2.4:** WHEN a recruit puts a monster into an empty party, THE recruiter's `lead_level` SHALL become that monster's level (`server-module/src/taming_tests.rs`).
+
+- **ih-2.5:** WHEN a session trade executes and moves either side's lead, THE `lead_level` of both sides SHALL equal their new leads' levels (`server-module/src/trading_session_tests.rs`).
+
+- **ih-2.6:** WHEN a monster write runs for an owner with no `player` row, THE write SHALL succeed and SHALL insert no `player` row (`server-module/src/monster_mgmt_tests.rs`).
+
+### ih-3 — the tag and the lead level on the Social surfaces
+type: feature · tier: hard
+category: identity/social · severity: MED · size: MODERATE
+touches: client/src/ui/playerTag.ts, client/src/ui/playerTag.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/leaderboardView.ts, client/src/ui/leaderboardView.test.ts, client/src/ui/noticeModel.ts, client/src/ui/noticeModel.test.ts, client/src/ui/tradeSessionModel.test.ts, client/src/tactics/clock.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/styles.css, client/src/net/connection.runtime.test.ts, client/src/shell/inputState.test.ts, client/src/shell/views.test.ts, client/src/ui/interactModel.test.ts, client/src/ui/pvpModel.test.ts, client/src/ui/pvpView.test.ts, client/src/ui/screens/bagScreen.boot.test.ts, client/src/ui/screens/journalScreen.boot.test.ts, client/src/ui/screens/profileScreen.boot.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/screens/socialScreen.test.ts, client/src/ui/screens/tradeSessionScreen.test.ts, client/src/ui/tradeSessionView.test.ts, client/e2e/identity-handles.spec.ts
+after: [ih-2, ih-4]
+
+- `StorePlayer` gains `discriminator: number` and `leadLevel: number`, converted in `rowConvert.ts`.
+- `playerTag.ts` (new): `formatTag(discriminator: number): string | null` (`tag-format`) and
+  `taggedName(players, identity): string` (`identity.taggedName`, or the name alone with no tag,
+  or the tag alone for an empty name). Catalog keys `identity.tag` and `identity.taggedName`, en
+  and fr.
+- `SocialPlayerRow` gains `tag: string | null` and `level: number | null`; `leaderboardView.ts`
+  paints name (`<bdi>`), tag (a `span.mr-player-tag` coloured `--mr-text-muted`), level and the
+  Nearby badge as separate nodes, inside the shipped nav-adapter row.
+- `noticeModel.ts` (`fromName` of both request kinds) and `socialModel.ts`'s session row
+  (`partnerName`) call `taggedName`. `playerName` is unchanged and keeps every other caller,
+  including the tactical battle clock (`client/src/tactics/clock.ts`). No player name tag is drawn
+  in the world at `9fb5bd25`, and NPC dialogue names no player.
+- Measured pins: the `StorePlayer` literals in the test files listed in `touches:` gain the two
+  fields (assertions stay). Before adding a fixture builder, the build greps `client/test-util/`
+  for one and extends it if it exists.
+
+- **ih-3.1:** WHEN a `player` row arrives, THE store's `StorePlayer` SHALL carry its `discriminator` and `lead_level` as `discriminator` and `leadLevel` (`client/src/net/rowConvert.test.ts`).
+
+- **ih-3.2:** WHEN `formatTag` receives 0, THE SYSTEM SHALL return null; for 42 it SHALL return `#0042` and for 123456 `#123456`; and `taggedName` SHALL return the name alone for a player with no tag and the tag alone for an empty name (`client/src/ui/playerTag.test.ts`).
+
+- **ih-3.3:** WHEN two other online players share a name, THE Players tab view model SHALL give each its own row with its own tag and its lead level, and a row whose `leadLevel` is 0 SHALL carry no level (`client/src/ui/socialModel.test.ts`).
+
+- **ih-3.4:** WHEN the Players tab renders a row, THE name, the tag in a `--mr-text-muted` element, the level through `tactics.hud.level` and the Nearby badge SHALL render as separate nodes, with the name never passed through the resolver (`client/src/ui/leaderboardView.test.ts`).
+
+- **ih-3.5:** WHEN an incoming trade or challenge request is shown, THE banner name SHALL be the requester's `taggedName`, and THE Trades-tab session row SHALL name its partner the same way (`client/src/ui/noticeModel.test.ts`, `client/src/ui/socialModel.test.ts`).
+
+- **ih-3.6:** WHEN the tactical battle clock names a player who has a tag, THE name SHALL be the bare name with no tag (`client/src/tactics/clock.test.ts`).
+
+- **ih-3.7:** WHEN three browser identities join with the default name, THE third's Players tab SHALL list two rows with the same name, different tags and each the starter's level (`client/e2e/identity-handles.spec.ts`).
+
+## Post-integration verification (the milestone is done when all hold on `master`)
+
+- Full `just ci` green with `just eval`: `account-e2e` passes with its 62-entry transcription
+  (C2); `bindings-drift` is clean; the table-schema and type baselines change only in `ih-1` (C1);
+  `client-surface-privacy` shows no change.
+- On `master`, `client/e2e/identity-handles.spec.ts` and `client/e2e/accounts.spec.ts` pass in
+  the same run: three joined identities read as distinct rows with levels (C3), and the
+  provider-labelled Sign In fails safe (C5).
+- `server-module/src/accounts_tests.rs`'s `ih-1.5`–`ih-1.7` cases and the roster pin pass on
+  `master` together with `eo-1`'s claim cases (both slices edit the claim fixtures).
+- One manual pass on a fresh local database, recorded in `ih-3`'s PR: two browsers, one renamed
+  to the other's name; the third browser's Players tab tells them apart; a level-up in one
+  changes its row; a disconnect and rejoin keeps its tag.
+
+## Risks
+
+- **The tag reveals join order.** A sequence value tells a reader roughly how many identities
+  joined before this one. It carries no personal data; a random draw would hide it at the cost of
+  collision retries. Reversible for future mints (the `#[unique]` constraint holds whichever
+  scheme draws the next value); existing tags keep their values.
+- **Tags are cheap to mint.** Anonymous identities cost nothing, so a tag proves "a different
+  identity", not "a different person". Impersonation needs the same name and the same tag, which
+  the never-reissued sequence prevents.
+- **The lead level is now public.** Any client sees each online player's lead level. D2 chose it
+  as a public-enough signal; it was owner-only before. No other monster field is mirrored.
+- **Lead-level staleness if a writer bypasses the seam.** A future site that writes a monster's
+  `level` or `party_slot` without `update_monster_synced` and without `refresh_lead_level` leaves
+  the mirror stale until the next seam write or join. `update_monster_synced`'s doc comment names
+  the explicit sites; `ih-2` adds the refresh rule to that list.
+- **Write cost.** `refresh_lead_level` runs one owner-indexed `monster` read per qualifying write,
+  never per movement input (Quality-Time accrual is excluded). It writes the public `player` row
+  only on a change.
+- **`eo-1` and `ih-1` both edit the claim and join fixtures.** The order (`ih-1` after `eo-1`) is
+  the mitigation; `ih-1` rebases on `eo-1`'s fixtures rather than re-deriving them.
+- **The hidden Sign In is proven below the browser.** No e2e build runs without an issuer (the
+  fail-safe flow needs one); the DOM view tests and `main.targetKindGate.test.ts` carry the hidden
+  case.
+- **mr-prune census** (2026-11-14, `9fb5bd25`, `--spec` this file, recorded as
+  `M-identity-handles`): 0 duplicates, so no `pruned-tests:` line.
+  - **orphans:** `HEAL_COOLDOWN_MS` (`server-module/src/raising.rs`) is read only by
+    `raising_tests.rs`'s `evaluate_heal` boundary cases; the heal reducer takes its cooldown from
+    elsewhere. It goes to one `type: refactor` section of `structure.spec.md` (remove the constant
+    and re-point or delete its two cases with a named survivor), filed through `mr-gates notes`
+    because this PR may not edit that file. `ih-1` edits only `raising_tests.rs`'s `Player`
+    literals.
+  - **orphan-protected:** `CLAIM_EVENT_KINDS` (`client/src/ui/claimModel.ts`, token `claim`) is
+    read only by `claimModel.test.ts`. `ih-4` edits the claim model and leaves it alone.
+  - **signals** (named, no action): source-text reads in `claimModel.test.ts`,
+    `claimView.test.ts`, `leaderboardView.test.ts`, `content_tests.rs`, `lifecycle_tests.rs`,
+    `movement_tests.rs` and `privacy_tests.rs`; recent churn in most of the `StorePlayer` and
+    `Player` fixture files. The slices edit fixtures and add cases there and add no source-text
+    read.
+  - **protected-churn:** `claimView.i18n.test.ts` (token `claim`), `accounts_tests.rs`
+    (`account`), `lifecycle_tests.rs` (`lifecycle`), `privacy_tests.rs` (`priv`). Each is edited
+    by exactly one slice, and only to re-point a pin or add a case.
+  - **literal-variants:** `guards_tests.rs` (3 groups) and `lifecycle_tests.rs` (1), none in the
+    `Player` literals `ih-1` edits.
