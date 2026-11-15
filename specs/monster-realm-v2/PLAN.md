@@ -45,27 +45,19 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M-local-play groundwork** (`M-local-play.spec.md` LP0, LP1, LP10; elaborated 2026-11-14 — 3
-   slices, heads `lpg-0` ‖ `lpg-1`, then `lpg-10`; LP2–LP9 stay sketch for item 8) — pulled ahead
-   because early access depends on it and each part is small: the `type: design` feasibility slice
-   (records the licence state while the operator's negotiation runs, desktop shell, sign-in
-   questions, the footprint of a one-player world and an eight-player host and the budgets set
-   from it), the server address as run-time configuration (a shell document the page receives
-   before the client starts), and, for a single-player or friends world, no telemetry and no
-   account token — telemetry stays on for the official server and development/test servers.
-2. **M-netcode-presence** (`M-netcode-presence.spec.md`, elaborated 2026-11-14 — 5 slices, heads
+1. **M-netcode-presence** (`M-netcode-presence.spec.md`, elaborated 2026-11-14 — 5 slices, heads
    `np-a` ‖ `np-c1` ‖ `np-d`, then `np-c2`, then the study `np-b`): remote-player
    continued-walk extrapolation (operator-ruled; Idle-debounce + staleness timeout; own-path
    predictor machinery untouched), tap-to-turn as a tail-appended `MoveInput::Face` that turns, or
    steps when already facing (never cancel-on-keyup — ADR-0148), queued moves dropped at battle
    start, and a reconnect backoff that climbs on open-then-drop.
-3. **M-econ-onboarding** (`M-econ-onboarding.spec.md`, elaborated 2026-11-14 — 2 slices, head
+2. **M-econ-onboarding** (`M-econ-onboarding.spec.md`, elaborated 2026-11-14 — 2 slices, head
    `eo-1`, then `eo-4`): a starter kit (200 gold, 2 Lure Berries, 1 Antidote) and the starter
    monster granted once per identity behind a persistent marker, which closes the rejoin re-grant
    (R-weekly-review-2026-10-23-F1); then one tuning pass with a worksheet (healing stays free,
    quest_001 pays 150, prices unchanged). The practice faucet (R-weekly-review-2026-10-09-F1) was
    closed by the tactical cutover; recruiting pays nothing (#587).
-4. **M-test-pruning** (`M-test-pruning.spec.md`, elaborated 2026-11-13 — 5 harness slices, head
+3. **M-test-pruning** (`M-test-pruning.spec.md`, elaborated 2026-11-13 — 5 harness slices, head
    `tp-1`): a read-only test census (`mr-prune`) that looks at milestone close and is acted on at
    elaboration — same-block duplicate tests, product code only tests reach, pin and churn
    signals, one trend row with what the closing milestone's own commits added; rows are
@@ -73,14 +65,14 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    one capped `structure.spec.md` section per close, never reasons. The close census runs from
    `mr-record`'s MERGED-row hook (no supervisor-prompt text). No prune session. `tp-3` and the design sections `st-3` (shared pins) and `st-4` (what stays
    of the 1v1 battle rules) are built.
-5. **M-identity-handles** (`M-identity-handles.spec.md`, elaborated 2026-11-14 — 4 slices, heads
+4. **M-identity-handles** (`M-identity-handles.spec.md`, elaborated 2026-11-14 — 4 slices, heads
    `ih-4` ‖ `ih-1` (after `eo-1`), then `ih-2`, then `ih-3`): a minted, never-reissued name
    discriminator in a private table, mirrored onto the public `player` row, carried by the guest
    claim, erased at deletion and exported to its owner; a live lead-monster level on `player`; the
    Players tab showing name + low-contrast tag + lead level + Nearby, tags in request banners and
    trade rows, none in battle; Sign In hidden until a build has an issuer, then labelled with its
    provider. All four decisions ANSWERED (#588). Feeds M19.
-6. **M-test-health** (`M-test-health.spec.md`, elaborated 2026-11-15 — 4 slices, all heads `th-3`
+5. **M-test-health** (`M-test-health.spec.md`, elaborated 2026-11-15 — 4 slices, all heads `th-3`
    ‖ `th-4` ‖ `th-1` ‖ `th-6`): the e2e union job lists every test that passed only on a rerun;
    a `dev_reducers`-only reducer expires a tactical turn window now, so the PvP AFK e2e (136 s)
    keeps one real-time strike and takes three through it; a study root-causes the two flakes with
@@ -88,7 +80,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    stack's software-renderer rule. Recruit R1 and the UIF4B.2 Controls flake are already fixed
    (#742, #765/#768); population-agnostic specs are deferred (R-th-spec-POPAGNOSTIC). Closes
    before the Playtest-4 gate.
-7. **M-scale-readiness** (`M-scale-readiness.spec.md`, sketch 2026-11-12): the costs a static
+6. **M-scale-readiness** (`M-scale-readiness.spec.md`, sketch 2026-11-12): the costs a static
    scaling audit and load run found growing faster than the population. Built: private movement
    intent, idle empty zones, per-zone `character` subscriptions, resuming a session where it
    left off and on-demand reapers. Open: the per-input owned-monster scan, whole-table `player_quest` and `profile` subscriptions, the unreaped
@@ -96,33 +88,33 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    a load tool that reports fan-out. Sized to the operator's official-server target (2026-11-12):
    ~100 zones, 8–12 players per zone on average and ~50 at peak, ~600 concurrent world-wide and
    ~1,000 at peak. Must land before any playtest above ~20 concurrent players, and before launch.
-8. **M-local-play** (`M-local-play.spec.md`, LP2–LP9 sketch 2026-11-12): the early-access shape —
+7. **M-local-play** (`M-local-play.spec.md`, LP2–LP9 sketch 2026-11-12): the early-access shape —
    single-player worlds on a server the game starts, opening a world to friends, private-server
    access (valid account, then the host's allowlist or password), the standalone server package,
    sign-in once then offline, unattended upgrade, and the solo-completeness audit. Its groundwork
-   (the `type: design` feasibility slice, run-time connection target, telemetry rule) is item 1;
-   elaborate LP2–LP9 against `lpg-0`'s record. **Early access is gated on it.**
-9. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
+   is built (§Built); elaborate LP2–LP9 against `lpg-0`'s record (the game's
+   `docs/local-play.md`). **Early access is gated on it.**
+8. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S2 changes a frozen schema and waits for the
    operator's ratification at the harness-revision Checkpoint 2, which lifts this block. S1 as
    written has nothing left to change: `propose_trade`, `respond_trade` and `confirm_trade` return
    one fixed error and read nothing, and `trade-zz-negative.spec.ts` cases 1b and 3b are session
    no-oracle cases (M-trade-sessions `ts-4`); the M25 spec's S1 text is rewritten when M25 is
-   re-elaborated. Its server-side slices may run alongside items 1–5 where files are disjoint.
+   re-elaborated. Its server-side slices may run alongside items 1–4 where files are disjoint.
    **Opening the official server is gated on its completion.**
-10. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
+9. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
    layer, consuming the context-stack ownership design, plus the hold/long-press edges the
    tactical battle defers (Hold Y cancel-and-clear, Hold B skip playback). **Must land before launch** (operator,
    2026-10-01). Ordered after the tactical battle UI (M-battle-tactics, built) — operator-CONFIRMED
    (#583 D4, 2026-10-24).
-11. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — absorbs the
-   discriminator surfaces from item 5; ordered AHEAD of M18 — operator-CONFIRMED (#588 D4,
+10. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — absorbs the
+   discriminator surfaces from item 4; ordered AHEAD of M18 — operator-CONFIRMED (#588 D4,
    2026-10-24). M23's social a11y retrofit scope un-defers with it.
-12. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — the playtest-3
+11. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — the playtest-3
    read did NOT confirm it as next content; its 1v1 "additive resolve_coop_turn" premise dies
    with the tactical overhaul. Re-sketch on the tactical engine (M-battle-tactics P2 is built; tactical sides natively support
    allies).
-13. **M-battle-tactics depth** (unspecced) — `blocked:playtest-4-read`: the operator-deferred tactical
+12. **M-battle-tactics depth** (unspecced) — `blocked:playtest-4-read`: the operator-deferred tactical
    features, specced after the Playtest-4 read. Obstacles/cover blocking movement and ranged/AoE
    (pt3-2026-10-138; the `blocks_los` tile column and LoS(blockers) signature are already in place),
    tile elevation with attack bonuses (-139; `elevation` column, default 0), line/cone AoE (-141;
@@ -130,23 +122,23 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    the Playtest-4 gates): D1 entry abilities on deploy + 4-AP Swap/reserve, D2 weather/field
    (upkeep slot 3), D3 signature wave + one 2×2-footprint line. Design SSOT:
    `M-battle-tactics-design.md`. Hold-to-act inputs (Hold Y cancel, Hold B skip) belong to M-gamepad.
-14. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
+13. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
    row a pt3 milestone absorbs is marked in its spec (econ: 2026-10-09-F1).
-15. **M21b-3 Steam login** — the Steam build's sign-in protocol, consumed by M-local-play (item 8);
+14. **M21b-3 Steam login** — the Steam build's sign-in protocol, consumed by M-local-play (item 7);
    scoped when that milestone is elaborated. Steam Input maps onto the virtual buttons.
-16. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
+15. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
    (`standards/spec-driven.md` §Refactor slices). The supervisor's structural share schedules it
    ahead of this position; when no earlier item has a launchable slice, its slices launch in
    file order. Its `type: design` slices decide internal-design questions; those are not operator
    decisions. An empty file is a finished item once no plan file under the game's
    `docs/refactors/` lists an extraction still to make. With no section open and a plan file
    listing extractions, the tick's action is to section the next three.
-17. **M-modding** (`M-modding.spec.md`, sketch) — `blocked:early-access-release`: host-moddable
+16. **M-modding** (`M-modding.spec.md`, sketch) — `blocked:early-access-release`: host-moddable
    private worlds, part of the official release. Until it opens, its standing constraint binds
    every slice: content is loaded data, one seam per kind of extension, no content id named in
    rules or views.
 
-Milestone specs for items 1–13 and 17 are sketches or ceremony-pending where marked: elaborate via
+Milestone specs for items 1–12 and 16 are sketches or ceremony-pending where marked: elaborate via
 `milestone-loop-prompt.md` when reached, against the CURRENT game repo. ⛩ **Playtest-4 gate** is DECIDED (#583 D5, 2026-10-24 — strict §10, alternative A):
 ONE gate after every coverage milestone closes. No interim playtest.
 
@@ -167,13 +159,13 @@ ONE gate after every coverage milestone closes. No interim playtest.
   the end of the available content, checked against the solo rule in `game-design.md` §14.
 - **Playtest-3** completed (PASS WITH CHANGES, 2026-10). **Playtest-4** = strict §10: ONE gate
   after all coverage milestones close (operator ruling 2026-10-24, #583 D5 — no interim gate).
-- **RLS remains unenforced at SpacetimeDB 2.8.1** — privacy is enforced by the private-table +
+- **RLS remains unenforced at SpacetimeDB 2.11.0** — privacy is enforced by the private-table +
   owner-scoped-view pattern (DECISIONS.md "Table privacy"); the RLS re-open triggers recorded in
   `security-threat-model.md` and `validation-checklist.md` still do not fire.
 - Frozen surfaces: `client/src/module_bindings/` is generated-only (game repo AGENTS.md) and
   schema changes are additive-only (DECISIONS.md "Schema changes are additive"); any schema
   change needs bindings regen + a publish-over-data proof (docs/debloat/REPORT.md §maintainer).
-- Toolchain: SpacetimeDB 2.8.1 CLI/host + 2.8.1 module crate; 2.x syntax
+- Toolchain: SpacetimeDB 2.11.0 CLI/host + 2.11.0 module crate; 2.x syntax
   (`#[table(accessor = x)]`, `ctx.sender()`); upgrade runbook in the game repo's
   `docs/runbooks/spacetimedb-upgrade.md`.
 
@@ -189,7 +181,7 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
   world · **M12** NPCs/dialogue/quests · **M13** economy · **M14** deeper battle · **M15**
   trading · **M16** PvP · **M17** ranked ladder.
 - Platform & compliance: **M20** observability/performance · **M21** accounts/auth (Steam login
-  is §9 item 15) · **M22** privacy/deletion/export · **M23** accessibility · **M24** i18n
+  is §9 item 14) · **M22** privacy/deletion/export · **M23** accessibility · **M24** i18n
   (en/fr) · **M25 S0** threat-model consolidation.
 - Client: **M-postgate-console-controls** (`ctl-*`; the virtual-button controls — one binding
   table, the context stack, D-pad screens, face-to-face interaction, remapping, the generated
@@ -207,6 +199,11 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
   executes — with auto-cancel, the propose path reduced to a fixed-error stub, and server range
   checks on trades, challenges, shops and heals; the `ts-6` sweep triaged every open residual and
   fixed the survivors).
+- Local play: **M-local-play** groundwork (`lpg-0`, `lpg-1`, `lpg-10`; the feasibility record
+  `docs/local-play.md` — licence state, the Electron shell and its preload hook, the sign-in
+  answers, the measured footprint and the budgets set from it — the connection target as a
+  run-time shell document, and the target-kind gate that keeps telemetry and the build's account
+  sign-in to servers we operate). LP2–LP9 are §9 item 7.
 - Playtest-3 fixes: **M-pt3-quickfix** (`qf-*`; the playtest-3 bug-fix and
   low-hanging-fruit wave).
 - Corrective: **M-test-truth** (`ttd-1`; one whole-tree i18n scan replaces the per-file
