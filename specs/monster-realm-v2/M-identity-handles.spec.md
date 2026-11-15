@@ -444,6 +444,33 @@ after: [ih-1]
 
 - **ih-2.5:** WHEN a monster write runs for an owner with no `player` row, THE write SHALL succeed and SHALL insert no `player` row (`server-module/src/monster_mgmt_tests.rs`).
 
+Build note (ih-2): Measured pins differ from the section's list. battle_tests.rs: no shipped case
+goes red, so no fixture there registers player writable; only the new lead-level cases do, locally.
+trading_session_tests.rs: the builder behind the seven ts2 cases that abort is s2_base, which now
+registers player writable. onboarding_tests.rs (outside the declared touches, widened by
+measurement): the three ih-1 cases that pinned the joiner's player row as (discriminator, 0) now
+expect the lead's level, read from the joiner's monster row. Proven by a probe build: 1038 run, 10
+red (7 trade aborts, 3 onboarding assertions), the same 10 with dev_reducers.
+
+Build note (ih-2): The Player doc comment in server-module/src/schema.rs still says join_game writes
+0, the cascade zeroes it, and nothing else writes lead_level. That sentence is false once this slice
+merges: battle::refresh_lead_level writes it. schema.rs is outside this slice's touches and is a
+structural path that cannot be granted while sibling slices are unmerged, so the comment is left for
+a later slice; the same sentence in docs/DECISIONS.md was rewritten here.
+
+Build note (ih-2): set_party_slot has no cooldown. Before this slice it wrote only the owner's
+private monster rows; it now also updates the public player row whenever the call changes the lead's
+level, and that update goes to every subscriber of player. set_profile_name already writes the same
+public row on every call with no cooldown, so the exposure is not new in kind. If a limit is added
+it belongs on every reducer that writes player.
+
+Build note (ih-2): Three properties are true by construction and carry no test. (1) A seam write
+that changes only the owner does not refresh: the guest claim is the one such caller, and its guards
+9 and 11 leave neither identity a player row; the seam's doc comment says so. (2) The seam's
+qualifying test saves reads only: a seam that refreshed on every write produces the same rows and
+write counts, so no test separates the two. (3) The level byte is copied as stored, with no Level
+parse; no test seeds an out-of-range level, which no shipped writer can produce.
+
 ### ih-3 — the tag and the lead level on the Social surfaces
 type: feature · tier: hard
 category: identity/social · severity: MED · size: MODERATE
