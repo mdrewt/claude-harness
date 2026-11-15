@@ -641,6 +641,24 @@ is committed. The record goes in `docs/send-pipeline-depth.md`. Its outcome goes
 
 - **np-b.3:** THE record SHALL end in go or no-go: a go names a follow-up `np-` slice with its `touches:` and the teleport bound it must hold; a contested tradeoff becomes an `mr-ask-drew` question instead of a decision.
 
+Build note (np-b): The record is a no-go on both forms of the depth change. The study measured three
+gate variants, not two: the spec's '<= 1' names no emitter, and the frame-loop emitter and the
+divergence emitter behave differently (every teleport comes from the divergence emitter). The spec's
+premise that MOVE_QUEUE_CAP 2 leaves room for one more in-flight step does not hold: with two
+continuation steps in flight the server queue is full and a turn pressed mid-walk is refused (30 of
+30 presses).
+
+Build note (np-b): Past about 92 ms of link delay each way a held walk starts to miss server ticks,
+and from about 100 ms it runs at half speed with the own avatar stopping on every tile. Neither
+measured depth change is the remedy; docs/send-pipeline-depth.md lists what a later change must hold
+(the teleport bound of depth 1, a press mid-walk accepted, local holds unchanged).
+
+Build note (np-b): With the shipped gate the own avatar teleports in 6 of 450 presses from rest at
+30 Hz (0 of 450 at 60 Hz). The row that drains the first continuation step can arrive within one
+frame of its send when a frame exceeds 25 ms; the reconcile then moves prediction forward, reports a
+divergence, and the divergence emitter sends a step the next frame predicts at once. The comment
+above predictor.drain in the frame loop states the drain order takes the share to zero.
+
 ## Post-integration verification (the milestone is done when all hold on `master`)
 
 - Full `just ci` green. Bindings drift is 0 after `np-c1`'s regeneration, and the spacetime-type
