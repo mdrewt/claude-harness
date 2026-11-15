@@ -260,6 +260,32 @@ def prune_close():
                             "action":"append to structure.spec.md in the doc-only PR that deletes %s.spec.md"%label})
     return entries
 out["prune_close"]=safe(prune_close,[])
+# A milestone spec still in the corpus whose every `### <id> — ` slice under `## Slices` has a
+# MERGED ledger row is built and waits for its close slice (oldest last merge first). Same slice grammar as mr-record's
+# prune-close hook; a spec with no slices section is never listed (nothing proves it built).
+def closable_milestones():
+    corpus=os.path.join(os.path.dirname(os.path.dirname(MEM)),"specs","monster-realm-v2")
+    merged={}
+    for l in open(os.path.join(MEM,"monster-realm-usage-ledger.jsonl"),errors="replace"):
+        try: d=json.loads(l)
+        except Exception: continue
+        if str(d.get("outcome") or "").upper().startswith("MERGED") and d.get("slice"): merged[d["slice"]]=max(merged.get(d["slice"],""),str(d.get("ts") or ""))
+    entries=[]
+    for name in sorted(os.listdir(corpus)):
+        p=os.path.join(corpus,name)
+        if not name.endswith(".spec.md") or name in ("structure.spec.md","residuals.spec.md") or not os.path.isfile(p): continue
+        ids,inside,fenced=set(),False,False
+        for line in open(p,errors="replace").read(4<<20).splitlines():
+            if line.lstrip().startswith("```"): fenced=not fenced
+            if fenced: continue
+            if re.match(r"#{1,2}\s",line): inside=bool(re.match(r"##\s+Slices\s*$",line))
+            m=re.match(r"^###\s+(\S+)\s+—\s",line) if inside else None
+            if m: ids.add(m.group(1))
+        if ids and not fenced and ids<=set(merged):
+            entries.append({"milestone":name[:-len(".spec.md")],"spec":p,"slices":len(ids),
+                            "last_merged":max(merged[i] for i in ids)})
+    return sorted(entries,key=lambda e:e["last_merged"])    # oldest first
+out["closable_milestones"]=safe(closable_milestones,[])
 print(json.dumps(out, indent=1))
 PY
 mv "$CACHE.tmp" "$CACHE"

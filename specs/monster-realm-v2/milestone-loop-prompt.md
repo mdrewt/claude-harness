@@ -30,7 +30,9 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
    preview; the contract of every interface a slice adds; numbers as absolute budgets or a
    first-slice baseline, per `standards/spec-driven.md` §Rules) · Tasks as small vertical slices (`M{N}a/b/…`), **each with an explicit `touches:`
    path-set** along natural module boundaries so disjoint slices can fan out; slice order follows
-   the real dependency chain (rule → reducer → client), not just file-disjointness · Risks/decisions.
+   the real dependency chain (rule → reducer → client), not just file-disjointness; every slice is a
+   `### <id> — <title>` heading under one `## Slices` heading (the close census and
+   `closable_milestones` read only that section) · Risks/decisions.
    A feature slice's `touches:` lists the files its design names and every file a sibling slice
    also edits, because fan-out reads it. The pins and callers that only a build-time measurement
    (a probe, a red test, a compile error) reveals are added by the build itself

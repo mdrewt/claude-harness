@@ -90,8 +90,9 @@ UNKNOWN → proceed + record a BLOCKER.
    `origin/master` is a `refactor(` → launch `structure.spec.md`'s first unbuilt non-`blocked:`
    slice whose `after:` is built and quiet window clear; none unbuilt but a
    `$PROJ/docs/refactors/` plan lists extractions → section the next three (doc-only chore PR =
-   the tick's action). Else a valid
-   `queue[]` head (re-verify live; remove if stale). Else the **first unfinished non-`blocked:`
+   the tick's action). Else the oldest bundle `closable_milestones[]` entry → launch its
+   `close-<milestone>` slice (After a pass; also a ready fan-out candidate beside any launch).
+   Else a valid `queue[]` head (re-verify live; remove if stale). Else the **first unfinished non-`blocked:`
    item in PLAN §9 order** — launch its first unbuilt slice per that milestone's own spec; a
    milestone with no spec gets one authored first (milestone-loop-prompt.md, a doc-only chore PR =
    the tick's action). Queue-add weighed runners-up whether or not you launch. **MED/LOW residuals
@@ -185,9 +186,12 @@ around (push the harness before spawning a harness slice).
   parked / open-PR / `wip:`). `$MEM/mr-branch-audit`, not `--no-merged`, finds unmerged work.
 - Sandbox worktrees the finished run NAMED: `git worktree remove --force <path>`,
   then `git worktree prune` — never bare `rm`, never one it did not name.
-- Milestone's last slice merged → a LATER tick, doc-only PRs: lasting decisions into the owning
-  repo's `docs/DECISIONS.md`; `mr-gates notes harvest --spec-file F` rc 0, then
-  delete its spec and uncited `$MEM/monster-realm-<slice>-*` files; update PLAN §9/§Built.
+- Milestone built (in `closable_milestones[]`) → `close-<milestone>`: routine, harness, doc-only,
+  touches its spec F + PLAN.md + `structure.spec.md`. target_desc: `mr-gates notes fold` per slice,
+  then `notes harvest --spec-file F` rc 0; lasting decisions present in the owning repo's
+  `docs/DECISIONS.md` (missing → PR body; you ship them as a game doc-only PR at merge); its
+  `prune_close` section appended to `structure.spec.md`; delete F (or only its built slices if PLAN
+  §9 names unbuilt scope in F) and uncited `$MEM/monster-realm-<slice>-*`; PLAN §9 → §Built.
 - Park counter: ~3 no-progress parks → `blocked:` + BLOCKER (credit stops exempt); 3 wrapper
   attempts without PR or documented park → investigate sizing, never a 4th relaunch.
 - Ledger row → handoff entry → write `mr-state.json` → release locks.

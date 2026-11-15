@@ -221,6 +221,8 @@ code or test file. The movement code moves to `shell/movement.ts` at extraction 
 of those lands second re-points its edit. The st-5…st-7 sections and lpg-10 also edit `main.ts`
 at other symbols, and the supervisor's overlap check serialises them.
 
+## Slices
+
 ### np-a — remote continued-walk extrapolation
 type: feature · tier: hard
 category: netcode-render (operator-ruled) · severity: HIGH · size: MODERATE

@@ -236,6 +236,8 @@ the quest parity snapshot test), `evals/baselines/content-hash.json` and
 `client/e2e/wallet-balance.spec.ts`, and they are ordered (`eo-4` after `eo-1`), so no refactor
 slice comes first.
 
+## Slices
+
 ### eo-1 — starter kit at first join; the starter is granted once per identity
 type: feature · tier: hard
 category: economy/onboarding · severity: MED · size: MODERATE

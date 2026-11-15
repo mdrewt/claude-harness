@@ -232,6 +232,8 @@ slice comes first. The client tail puts its two helpers in a new `client/src/ui/
 three i18n catalog files and are ordered (`ih-3` after `ih-4`). `main.ts` receives wiring only
 (`ih-4`: one `const` and one argument).
 
+## Slices
+
 ### ih-4 — Sign In shows only when an issuer exists, labelled with its provider
 type: feature · tier: hard
 category: auth/ux · severity: MED · size: SMALL
