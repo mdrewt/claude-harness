@@ -160,9 +160,10 @@ allocation, not a game rule).
 - `decision-defaulted:tag-format=hash+min4-zero-pad` — the tag is `#` plus the decimal value
   padded to four digits (`#0042`), growing past four digits without truncation. 0 renders no tag.
   The join is the catalog string `identity.tag` (en and fr), never concatenation in view code.
-- `decision-defaulted:empty-name-fallback=tag-where-known` — on the surfaces that show tags, an
-  empty name shows the tag alone; `playerName`'s `#<hex8>` fallback stays for name-only surfaces
-  and for an identity the store does not hold.
+- `decision-defaulted:empty-name-fallback=hex8-kept` — `playerName`'s `#<hex8>` fallback stays
+  as it is. `validate_name` refuses an empty name at join and rename, so a player the store holds
+  always has one; the fallback is reached only for an identity the store does not hold, which has
+  no tag to show either.
 - `decision-defaulted:banner-tag-style=plain-join` — the request banners and the Trades-tab row
   are single text lines; they carry the tag through `identity.taggedName` (`Drew #0042`) in the
   same text colour. The low-contrast span is on the Players tab, where a row is built from parts.
@@ -171,9 +172,10 @@ allocation, not a game rule).
 - `decision-defaulted:muted-token=--mr-text-muted` — the tag uses the existing
   `--mr-text-muted` token (`client/src/styles.css`), which the a11y suite already checks in both
   themes; no new colour.
-- `decision-defaulted:provider-label=VITE_MR_OIDC_PROVIDER_NAME-else-issuer-host` — the label's
-  provider is a build value `VITE_MR_OIDC_PROVIDER_NAME`; when the issuer is set and the name is
-  not, the issuer URL's host. An issuer that does not parse as an `https:` URL gives no offer.
+- `decision-defaulted:provider-label=VITE_MR_OIDC_PROVIDER_NAME-else-issuer` — the label's
+  provider is a build value `VITE_MR_OIDC_PROVIDER_NAME`, set beside the issuer
+  (`ops/auth/README.md`); a build that sets the issuer and not the name shows the issuer string.
+  No URL parsing: the OIDC flow already refuses an issuer it cannot use.
 - `decision-defaulted:issuer-read-once=one-assignment` — `main.ts` reads the issuer env once into
   a `const`, under the existing target-kind gate, and passes that value to both `connect` and
   `signInOffer`. The DECISIONS entry's "anywhere but that one `connect` call" becomes "anywhere but
@@ -242,7 +244,9 @@ after: []
   its last caller. The provider name is player-visible build text and goes through the slot, never
   concatenation.
 - `main.ts`: the issuer `const` (`issuer-read-once`), `VITE_MR_OIDC_PROVIDER_NAME` read beside it,
-  the offer computed once and passed at each `buildClaimViewModel` call.
+  the offer computed once and passed at each `buildClaimViewModel` call; the `claimSignIn` command
+  calls `startSignIn` only when the offer names a provider (a hidden control is not a disabled
+  command).
 - `ops/auth/README.md` lists the new build variable with the other three. The `docs/DECISIONS.md`
   entry "A target's kind gates telemetry and account sign-in" is amended in place
   (`issuer-read-once`).
@@ -251,7 +255,7 @@ after: []
   to the provider label). `main.targetKindGate.test.ts` boots `main.ts` under each kind; it gains
   the no-control case for `local` and `private`.
 
-- **ih-4.1:** WHEN `signInOffer` receives an empty issuer, THE SYSTEM SHALL return `none`, and WHEN it receives an `https:` issuer with a provider name, THE SYSTEM SHALL return that name; with no name it SHALL return the issuer's host; and for an issuer that is not an `https:` URL it SHALL return `none` (`client/src/ui/claimModel.test.ts`).
+- **ih-4.1:** WHEN `signInOffer` receives an empty issuer, THE SYSTEM SHALL return `none`, and WHEN it receives an issuer with a provider name, THE SYSTEM SHALL return that name, and with an empty name the issuer string (`client/src/ui/claimModel.test.ts`).
 
 - **ih-4.2:** WHEN the offer is `none`, THE claim view model SHALL offer no Sign In action in any phase, and THE Account section SHALL render no visible Sign In control (`client/src/ui/claimModel.test.ts`, `client/src/ui/claimView.test.ts`).
 
@@ -259,7 +263,7 @@ after: []
 
 - **ih-4.4:** WHEN the offer names a provider, THE Sign In control SHALL read "Sign in / create account with <provider>" in English and "Se connecter / créer un compte avec <provider>" in French, the provider passed through the catalog slot (`client/src/ui/claimView.i18n.test.ts`).
 
-- **ih-4.5:** WHEN `main.ts` boots under target kind `local` or `private` with a build issuer set, THE Account section SHALL render no Sign In control (`client/src/main.targetKindGate.test.ts`).
+- **ih-4.5:** WHEN `main.ts` boots under target kind `local` or `private` with a build issuer set, THE Account section SHALL render no Sign In control, and a dispatched `claimSignIn` command SHALL not call the connection's `startSignIn` (`client/src/main.targetKindGate.test.ts`).
 
 - **ih-4.6:** WHEN the e2e build (placeholder issuer and provider name set) opens Profile then Account, THE Sign In button SHALL read the provider label, and pressing it SHALL fail safe as it does today: failure copy, a claim code in session storage, the world still playing (`client/e2e/accounts.spec.ts`).
 
@@ -280,6 +284,10 @@ after: [eo-1]
 - `accounts.rs`: `rekey_handle` in `rekey_all`, `has_handle` in `account_has_game_data`,
   `erase_handle` in the deletion cascade.
 - `ranking::player_with_deleted_name` zeroes both new columns (`deletion`).
+- The native host must draw `player_handle.discriminator` from a sequence for `ih-1.1`, `ih-1.3`
+  and `ih-1.7` to mean anything. The build confirms it does (a 0 insert returns a fresh value, an
+  explicit insert keeps its value); if it does not, the build extends the host fixture first and
+  says so in the PR.
 - `privacy.rs`: `rows_player_handle` and its JSON writer join the exporter table; the `player`
   exporter's exhaustive destructure gains the two columns.
 - Measured pins (each a named intentional change; the build widens for any further one it
@@ -318,6 +326,8 @@ after: [eo-1]
 
 - **ih-1.8:** WHEN a player requests a data export, THE bundle SHALL hold the caller's `player_handle` row and the `discriminator` and `lead_level` of the caller's `player` row, and no other identity's handle (`server-module/src/privacy_tests.rs`).
 
+- **ih-1.9:** WHEN an identity whose deletion is pending or complete calls `join_game`, THE SERVER SHALL refuse it, mint no handle and leave any surviving `player` row's `discriminator` at its current value (`server-module/src/accounts_tests.rs`).
+
 ### ih-2 — the lead-monster level stays live on the player row
 type: feature · tier: hard
 category: identity/social · severity: LOW · size: SMALL
@@ -329,8 +339,10 @@ after: [ih-1]
   never fails its caller: an offline owner has no row and is skipped.
 - Callers (`lead-level`): the end of `join_game`; `update_monster_synced` when the written row's
   `level` or `party_slot` differs from the stored one; the recruit insert in `taming.rs`; the
-  session-trade slot move in `trading_session.rs` (both sides). `evolution.rs` gets a call only if
-  the build measures that an evolution can change `level` (then it widens).
+  session-trade slot move in `trading_session.rs` (both sides). `evolution.rs` gets no call:
+  `game_core::evolve` carries the level over, and its direct write changes no `party_slot`.
+- `update_monster_synced`'s doc comment, which names the explicit write sites, gains the rule: a
+  site that writes `level` or `party_slot` outside the seam calls `refresh_lead_level`.
 - No schema, reducer signature or bindings change.
 
 - **ih-2.1:** WHEN a fresh identity joins and receives the starter, THE `player` row's `lead_level` SHALL equal the starter's level (`server-module/src/movement_tests.rs`).
@@ -353,8 +365,8 @@ after: [ih-2, ih-4]
 
 - `StorePlayer` gains `discriminator: number` and `leadLevel: number`, converted in `rowConvert.ts`.
 - `playerTag.ts` (new): `formatTag(discriminator: number): string | null` (`tag-format`) and
-  `taggedName(players, identity): string` (`identity.taggedName`, or the name alone with no tag,
-  or the tag alone for an empty name). Catalog keys `identity.tag` and `identity.taggedName`, en
+  `taggedName(players, identity): string` (`playerName` joined with the tag through
+  `identity.taggedName`, or `playerName` alone when there is no tag). Catalog keys `identity.tag` and `identity.taggedName`, en
   and fr.
 - `SocialPlayerRow` gains `tag: string | null` and `level: number | null`; `leaderboardView.ts`
   paints name (`<bdi>`), tag (a `span.mr-player-tag` coloured `--mr-text-muted`), level and the
@@ -369,7 +381,7 @@ after: [ih-2, ih-4]
 
 - **ih-3.1:** WHEN a `player` row arrives, THE store's `StorePlayer` SHALL carry its `discriminator` and `lead_level` as `discriminator` and `leadLevel` (`client/src/net/rowConvert.test.ts`).
 
-- **ih-3.2:** WHEN `formatTag` receives 0, THE SYSTEM SHALL return null; for 42 it SHALL return `#0042` and for 123456 `#123456`; and `taggedName` SHALL return the name alone for a player with no tag and the tag alone for an empty name (`client/src/ui/playerTag.test.ts`).
+- **ih-3.2:** WHEN `formatTag` receives 0, THE SYSTEM SHALL return null; for 42 it SHALL return `#0042` and for 123456 `#123456`; and `taggedName` SHALL return the bare name for a player whose discriminator is 0 (`client/src/ui/playerTag.test.ts`).
 
 - **ih-3.3:** WHEN two other online players share a name, THE Players tab view model SHALL give each its own row with its own tag and its lead level, and a row whose `leadLevel` is 0 SHALL carry no level (`client/src/ui/socialModel.test.ts`).
 
@@ -404,8 +416,19 @@ after: [ih-2, ih-4]
 - **Tags are cheap to mint.** Anonymous identities cost nothing, so a tag proves "a different
   identity", not "a different person". Impersonation needs the same name and the same tag, which
   the never-reissued sequence prevents.
-- **The lead level is now public.** Any client sees each online player's lead level. D2 chose it
-  as a public-enough signal; it was owner-only before. No other monster field is mirrored.
+- **The lead level is now public, and so are its changes.** Any client sees each online player's
+  lead level. D2 chose it as a public-enough signal; it was owner-only before. No other monster
+  field is mirrored, but an observer who watches the value over a session sees reorders, boxing
+  and lead level-ups as they happen. Accepted for D2; bucketing the value is the remedy if a
+  playtest finds it matters.
+- **The tag links a guest to the account it was claimed into.** That is D1's intent (the tag
+  survives the claim). Anyone who saw the guest's `Name #0042` sees the account's row carry 0042.
+  The server already records the link (`guest_claim`); claim guard 9 keeps the two rows from being
+  online together. Deletion zeroes the tag on the surviving `player` row only; tags already copied
+  into another player's memory or screenshots are out of reach.
+- **Sequence exhaustion.** A `u32` sequence that ran out would make the `player_handle` insert,
+  and so the join, fail with an error and a reject log, never wrap. That is about 4.3 billion
+  identities; guests are never reaped, so the count only grows.
 - **Lead-level staleness if a writer bypasses the seam.** A future site that writes a monster's
   `level` or `party_slot` without `update_monster_synced` and without `refresh_lead_level` leaves
   the mirror stale until the next seam write or join. `update_monster_synced`'s doc comment names
