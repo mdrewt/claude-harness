@@ -1,216 +1,350 @@
-# Spec: M-econ-onboarding — economy sources + new-player onboarding (SKETCH)
+# Spec: M-econ-onboarding — a real start for a new player, one tuning pass
 
-**Status:** sketch, 2026-10-24 (Playtest-3 feedback processing, episode pt3-2026-10). Elaborate with
-`milestone-loop-prompt.md` when PLAN §9 reaches it, against the CURRENT game repo · **Project:**
-monster-realm (game-core + server-module + content; client only via regenerated bindings and
-quickfix-owned display) · **Risk class:** promoted HEAVY — economy balance (GDD §7's sinks ≥ faucets
-model is the invariant; this milestone edits the faucets) · **Depends on:** `M-pt3-quickfix`
-(reward-visibility UI: grant toast + wallet display — tune a VISIBLE economy, not an invisible one)
-· **Decisions ANSWERED 2026-10-24** — monster-realm #587 (`pt3-econ-world`); verbatim answers at
-`memory/projects/decisions/issue-587.answer.md` (SSOT). D1: recruit pays NOTHING (alternative A —
-the monster is the reward; quest faucets compensate, see eo-3/eo-4). D2: starter kit accepted
-(~200g + 2–3 basic items, once-only). D3: healing stays free until eo-4 tunes faucets+sinks
-together. D4: no monster sink needed now (GDD §7 note recorded). D5: art direction stays
-¾/32px/storybook with 2D-HD as a post stack (lands in M-world-art-pass). All slices unblocked.
+**Status:** elaborated 2026-11-14 (from the 2026-10-24 sketch) against game `master` `9fb5bd25`
+(after st-7). np-b, a docs-only study (`docs/send-pipeline-depth.md`, `docs/DECISIONS.md`), is the
+only slice in flight; no eo- slice edits its record. · **Project:** monster-realm · **Slices:** 2 —
+`eo-1`, then `eo-4`. The sketch's `eo-2` and `eo-3` are rulings with no build (below). Anchors are
+files and symbols, never line numbers.
 
-**Feedback items:** pt3-2026-10-064, pt3-2026-10-157 · cross-link: pt3-2026-10-145 (the flat
-in-battle item AP cost belongs to `M-battle-tactics`; the item PRICE balancing that rule leans on
-lands here).
-**Absorbs residuals:** R-weekly-review-2026-10-09-F1 (practice self-battles are an uncapped
-currency/XP faucet), R-weekly-review-2026-10-23-F1 (join_game re-grants a starter whenever the
-identity owns zero monsters — trade-away + rejoin mints starters and rerolls hidden IVs).
-
+**Feedback items:** pt3-2026-10-064 (a new player should start with a few basic items or enough
+money to buy some) → `eo-1`; pt3-2026-10-157 (no way to earn money; nothing affordable) → `eo-1`
+(the start) + `eo-4` (the tuning pass). Cross-link, not absorbed: pt3-2026-10-145 (the flat
+in-battle item AP cost) belongs to `M-battle-tactics`; `eo-4` checks the price side of that rule.
+**Absorbed residuals:** R-weekly-review-2026-10-23-F1 (join_game re-grants a starter whenever the
+identity owns zero monsters) → `eo-1` (criterion `eo-1.2`, the sketch's EO1.2);
+R-weekly-review-2026-10-09-F1 (practice self-battles are an uncapped currency/XP faucet) →
+resolved by the M-battle-tactics cutover, no build (the sketch's `eo-2`, see "Rulings with no
+build"). `M-trade-sessions.spec.md` routes both here under those ids.
 
 > **Balance stance (operator, 2026-11-12; GDD §7 and §14):** the economy is not a major aspect of
 > the game. Tune items, prices and rewards as for a single-player game (Pokémon-style), with
 > exceptions only where the official server's shared economy needs one; every number here must feel
 > fair to one player with nobody to trade with.
-## Problem / intent — ground truth (fact-checked 2026-10-24 against code + the playtest-3 DB)
 
-Evidence anchors are file + symbol as of 2026-10-24; symbols, not line numbers.
+## Problem
 
-- `join_game` grants ONLY a level-5 starter monster (`server-module/src/movement.rs`, the
-  `has_monsters` guard): no items, no wallet row (`player_wallet` is created lazily on first grant,
-  `economy.rs`). The playtest identity's inventory table was EMPTY for the whole session.
-- Faucets ARE wired: KO-win currency = `loser_BST / BATTLE_CURRENCY_BST_DIVISOR` (=10, ≈31g per
-  typical wild win — `game-core/src/currency.rs::battle_currency_reward`, granted from
-  `server-module/src/battle.rs::write_back_battle_results`); quest_001 pays 50g once
-  (`game-core/content/quests/000-core.ron`); selling follows the 40%-of-buy convention
-  (`ItemDef.sell_price`; `economy.rs::sell_items`) — unusable from a zero-item start.
-- But the operator's dominant loop paid NOTHING: all four recorded battle endings were successful
-  RECRUITS, and recruit success grants no XP (standing ruling), no currency (no `grant_currency` in
-  `taming.rs`), no essence — only the monster. The wallet held exactly the 50g quest reward, which
-  arrived with zero acknowledgment. The economy is experientially faucet-less even though faucets
-  exist (feedback: "I have no method of earning more of the game's money", pt3-2026-10-157).
-- The cheapest shop item is 150g ≈ 5 wild KO wins (`game-core/content/shops/000-core.ron`, whose
-  own comments document the 40% sell convention and the "~5 wild wins" sizing).
-- Two integrity defects sit on this same ground: `write_back_battle_results` grants currency/XP on
-  every `SideAWins` including practice self-battles (`start_battle` allows opponent==self) — a
-  scriptable zero-cost farm (R-weekly-review-2026-10-09-F1); and the starter grant is gated only on
-  live monster ownership, so trade-away + rejoin mints starters (R-weekly-review-2026-10-23-F1).
-- GDD §7 (`game-design.md`): faucets "modest and metered", "Design for sinks ≥ faucets (mild
-  deflation)". Its sink list includes town healing cost (inert — healing is free, a documented
-  pre-release convenience, `game-design.md` 2026-09 amendment note) and fusion as "a hard monster
-  sink" — STALE: fusion was removed 2026-08-02 (essence redesign), so the economy silently lost its
-  only monster sink.
+Measured at `9fb5bd25`:
 
-Intent: give a new player a real start (pt3-2026-10-064: "Every new player should either start with
-a few basic items, or enough starting money to buy some from the shop"), make the operator's core
-loop pay something the operator actually decides on, and run one faucet/sink tuning pass under the
-GDD model — closing the two faucet-integrity residuals in the same move. `M-pt3-quickfix` owns
-making rewards VISIBLE (toast + wallet display); this milestone owns the BALANCE.
+- **A new player starts with nothing but a monster.** `join_game` (`server-module/src/movement.rs`)
+  inserts the player, character and `move_intent` rows, then grants the starter monster when the
+  identity owns no `monster` row. It writes no item and no wallet: `economy::grant_currency`
+  creates `player_wallet` lazily on the first grant. The cheapest shop item is the Antidote at
+  150 (`game-core/content/shops/000-core.ron`: Lure Berry 200, Power Root 300, Antidote 150, the
+  two essence shards 500).
+- **The starter grant infers "new player" from live ownership.** `on_disconnect` deletes the
+  `player` row, so every session's first `join_game` runs the grant check again. An identity that
+  reaches zero monsters gets a second starter with fresh hidden IVs
+  (R-weekly-review-2026-10-23-F1). Today the only path to zero monsters is account deletion: the
+  session trade refuses a trade that would leave a side with no monster
+  (`game_core::trading::session`, `TradeSessionError::LastMonster`), the legacy propose path
+  returns `LEGACY_TRADE_RETIRED` (`server-module/src/trading.rs`), and no reducer releases a
+  monster. Any future path to zero monsters would reopen the re-grant, because the rule reads
+  ownership.
+- **Faucets exist and are visible.** Each wild KO in a tactical battle adds
+  `battle_currency_reward(victim BST)` (BST / `BATTLE_CURRENCY_BST_DIVISOR` = 10, about 31 for a
+  typical wild) to the battle ledger (`game_core::tactics::rewards::on_unit_defeated`), paid at
+  settle (`server-module/src/tactics_settle.rs::pay_ledger`). quest_001 pays 50 once
+  (`game-core/content/quests/000-core.ron`). Selling pays the item's `sell_price` (40% of buy).
+  M-pt3-quickfix (closed; PLAN §Built) made them visible: the wallet readout in the shop and quest
+  log (`client/e2e/wallet-balance.spec.ts`), the quest-reward toast (`statusModel.ts`
+  `questCompletionAck`, `client/e2e/dialogue.spec.ts` UIF4.2) and the KO-win payout lines (qf-17).
+  The sketch's dependency is therefore met; this milestone adds no reward-visibility UI.
+- **Recruiting changed shape.** A tactical wild battle seats a pack. A recruited wild earns nobody
+  anything (`on_unit_defeated` refuses a `Recruited` victim), but the wilds the player KOs in the
+  same battle still pay. A battle against a single wild that ends in a recruit pays nothing, and
+  a single wild is 600 of every 1000 encounters (`pack_weights` in
+  `game-core/content/tactics_zones/`).
+- **Healing is free and its price is data.** `heal_party` (`server-module/src/raising.rs`) charges
+  `HealLocationDef.cost_currency` through `evaluate_heal_currency` when it is above 0; the one
+  location (`game-core/content/heal_locations/000-core.ron`) sets none. The client heal view
+  already shows a price (`client/src/ui/healModel.ts`, `costCurrency`).
+- **No item restores HP.** The item registry (`game-core/content/items/000-core.ron`) holds a
+  bait (Lure Berry), a training food (Power Root), a status cure (Antidote) and two essence shards.
+  Only the Antidote is usable in battle (`game-core/content/tactics_items/000-core.ron`).
 
-## Scope (sketch)
+## Scope
 
-- **eo-1** starter kit at join — a real once-only game rule (ADR-0091 GrantItem pattern), contents
-  DECIDED (#587 D2: ~200g + 2–3 basic items — a heal item and a bait); fixes the rejoin re-grant
-  trap for the starter monster AND the kit.
-- **eo-2** close the practice-battle faucet (R-weekly-review-2026-10-09-F1) — unblocked, land first.
-- **eo-3** recruit yields — DECIDED (#587 D1): NO payout; no build. The faucet consequence moves to
-  eo-4: quest rewards become the compensating faucet for recruit-heavy playstyles.
-- **eo-4** faucet/sink tuning pass — sizes starter kit vs shop prices vs KO/quest rewards vs sinks;
-  owns introducing the heal cost WHEN this pass tunes faucets+sinks together (#587 D3 — free until
-  then) and the item-price ↔ AP-cost coupling (pt3-2026-10-145); must tune quest faucets strong
-  enough that a recruit-dominant player still earns (D1 consequence). Runs LAST, on a visible
-  economy.
+In:
+- **`eo-1`** — the starter kit (#587 D2) granted at an identity's first join, together with the
+  starter monster, once per identity, recorded by a persistent claimed marker that does not read
+  ownership. Closes R-weekly-review-2026-10-23-F1.
+- **`eo-4`** — one faucet/sink tuning pass under the balance stance: a worksheet checked in beside
+  the content change, the quest reward retuned, the heal-cost question settled, content invariants
+  the worksheet relies on pinned as tests.
 
-## Non-goals
+Named deferrals:
+- **An HP-restoring item** (a potion) is a new item effect, battle action and UI → a later content
+  or battle-depth milestone. The kit's "heal item" is the Antidote, the only healing item that exists.
+- **A soulbound flag** for kit items → not built (decision `kit-tradeable` below). The official
+  server's alt-identity farm is named in Risks with its owner.
+- **A welcome notice** for the kit → backlog (ux-a11y/LOW). The kit shows in the wallet readout and
+  the Bag.
+- **More quest content** (repeatable or additional quests as a recruit-loop faucet) → the
+  content/world milestones. `eo-4` tunes the one quest that exists.
+- **A replacement monster sink** → not needed now (#587 D4); `eo-4`'s worksheet records the gap.
+- **Economy metrics** (currency supply, price drift) → the observability milestone (M20 follow-on).
+- **The legacy battle funnel's unreachable self-battle branch** (`write_back_battle_results`'s
+  `is_practice` arm and its only caller of `practice_xp_reward`) → a follow-up row (the funnel's
+  retirement), see "Rulings with no build".
 
-- Reward-visibility UI (grant toast, wallet display, quest-reward acknowledgment): `M-pt3-quickfix`.
-- The AP system and in-battle item AP costs: `M-battle-tactics` (only the currency-price side of the
-  operator's "balanced by the price of the item" rule lands here).
-- Heal-point landmark art/signage and zone signposting: the world/art presentation milestone — this
-  milestone touches only whether healing CHARGES.
-- Trade-side floor guards (no-empty-side confirm, last-monster rule, in-party/≥1-HP preconditions):
-  the trade-redesign milestone. eo-1 names the seam (Risks) but does not build it.
-- A replacement monster sink for removed fusion: FLAGGED in Open decisions, not solved here.
-- M20 economy metrics (currency supply / price drift dashboards): later; named only as the
-  measuring instrument the tuning pass's worksheet anticipates.
-- Dev reducers: never ship (standing ruling); every grant here is a real game rule.
+## Prior rulings that bind
 
-## Constraints (house rules + standing rulings that bind the design)
+- #587 (answer file `memory/projects/decisions/issue-587.answer.md`, SSOT): D1 recruit pays
+  NOTHING; D2 a one-time small starter kit per player, ~200 gold + 2–3 basic items; D3 healing stays
+  free until this milestone tunes faucets and sinks together; D4 no monster sink now.
+- "No recruit XP" (`docs/DECISIONS.md`, recruit mechanics) stands; nothing here pays a recruit.
+- Grants ride the single surfaces: `economy::grant_currency` (wallet) and `inventory::grant_item`
+  (items), with `MAX_BALANCE` / `MAX_ITEM_STACK` headroom checked first — reject, never clamp.
+- A once-only grant is gated by a persistent marker set in the same transaction as the grant,
+  never inferred from what the identity owns (the GrantItem `NotFlag`+`SetFlag` pattern that
+  `validate_content` rule 6c enforces for dialogue content).
+- Content is data in `game-core/content/`, carried by `CONTENT_VERSION`
+  (`server-module/src/lib.rs`) and the `content-version` eval's baseline
+  (`evals/baselines/content-hash.json`). Schema changes are additive only. No dev reducers.
 
-- Rules once in game-core: deterministic, integer, seeded. Reward formulas stay BST-based integer
-  division in `game-core/src/currency.rs` (the essence divisor is deliberately 3x steeper — keep
-  that relationship intact when tuning).
-- Grants ride the existing primitives: `apply_grant` on the private `player_wallet` (ADR-0081;
-  owner-scoped `my_wallet` view per ADR-0154) and the single item-insert path every grant funnels
-  through (buy / trade confirm / dialogue GrantItem). MAX_BALANCE / MAX_ITEM_STACK headroom and
-  reject-don't-clamp stand.
-- Once-only grants follow the ADR-0091 GrantItem pattern: a PERSISTENT claimed marker
-  (NotFlag+SetFlag-style), enforced server-side — never inferred from live ownership (that
-  inference IS the R-weekly-review-2026-10-23-F1 trap).
-- Content is data: kit contents, prices, quest rewards, heal cost live in RON under
-  `game-core/content/` with a CONTENT_VERSION bump; tuning is a data change, not a code change.
-- SpacetimeDB schema changes additive-only; tables private + owner-scoped views.
-- Client bindings generated-only; any new player-facing strings go through the typed i18n catalog
-  (en + fr) — though the display surface itself is `M-pt3-quickfix`'s.
-- "No recruit XP" is a standing ruling (DECISIONS.md recruit mechanics; reaffirmed by the operator's
-  own 2026-10 AP-recruit rule). eo-3 may not quietly amend it — any XP-on-recruit option must be
-  named as an amendment in the decision issue.
+## Rulings with no build
 
-## Slices (sketch; `touches:` provisional, finalized at elaboration)
+- **Sketch `eo-2` — the practice faucet is closed.** Every battle a player can start is tactical
+  (`tactics::start_pvp_tactical` and the wild start are the only `battle` inserts, each with its
+  `battle_tactical` row). A self battle is `BattleKind::Practice`, and `on_unit_defeated` pays a
+  Practice KO nothing. Tests: `game-core/src/tactics/rewards_tests.rs`
+  `practice_friendly_fire_and_wild_kills_pay_nothing_bt5_6` and
+  `server-module/src/tactics_settle_tests.rs`
+  `a_practice_settle_rates_and_rewards_nothing_but_writes_back_both_lists_hp_bt14_6`. The legacy
+  funnel `battle::write_back_battle_results` still pays currency and practice XP on `SideAWins`,
+  but it runs only for an anchor with no `battle_tactical` row (the disconnect auto-flee, which
+  ends `Fled`, and `pvp::apply_pvp_forfeit` on a legacy anchor), and no reducer creates one. On a
+  legacy self battle both forfeit paths forfeit side A: `forfeit_on_disconnect` takes the
+  `player_identity` side first, and `pvp_deadline_forfeit_side` sees the same submission state for
+  both sides of one identity and forfeits A. Both end `SideBWins`, which pays nothing.
+  R-weekly-review-2026-10-09-F1's disposition: resolved (fixed by M-battle-tactics), with this
+  evidence. The unreachable branch is a follow-up row, not a slice of this milestone.
+- **Sketch `eo-3` — recruit yields:** no payout (#587 D1). No build, no slice. `eo-4` owns the
+  consequence.
 
-### eo-1 — starter kit at join: once-only grant, rejoin mint closed
+## Decisions (reversible; documented defaults — no operator question)
+
+- `decision-defaulted:starter-claim-marker=reserved-dialogue-flag` — the marker is the flag
+  `sys:starter_claimed` in the owner's private `player_dialogue_state.flags`. That row is already
+  rekeyed by the guest claim, erased by the deletion cascade (`account-e2e` lists it `Erase`),
+  counted by `accounts::account_has_game_data`, and never sent to a client. A new table would need
+  all four wired. Writes go through a `pub(crate)` helper in `npc.rs`, the table's owner. Content
+  may not name a `sys:` flag: `validate_content` refuses any dialogue condition or effect that
+  does.
+- `decision-defaulted:kit-contents=200g+2xLureBerry+1xAntidote` — #587 D2's "~200g + 2–3 basic
+  items (a heal item and a bait)". The Antidote is the heal item: the only one that exists. Two
+  Lure Berries, because recruiting is the operator's dominant loop. The 200 gold buys exactly one
+  more Lure Berry, the intended first purchase.
+- `decision-defaulted:kit-content-home=game-core/content/starter_kit.ron` — one record
+  (`currency`, `items: [(item_id, qty)]`), loaded by `game_core::content::load_starter_kit`,
+  checked by `validate_content` (items exist, every qty ≥ 1, no item twice, each qty within
+  `MAX_ITEM_STACK`, currency within `MAX_BALANCE`), and read on the server through
+  `content_cache::cached_starter_kit` (the ADR-0089 `LazyLock` pattern). It is not synced to a
+  table: no client reads it.
+- `decision-defaulted:kit-tradeable=yes` — kit items are ordinary items. Soulbinding needs a new
+  item field and a trade rule. Each fresh identity already gets a tradeable starter monster, so the
+  kit adds 200 gold per identity to an alt farm that exists today (Risks).
+- `decision-defaulted:legacy-joiner=kit-without-second-starter` — an identity with no marker that
+  already owns a monster (it joined before `eo-1`) gets the kit and the marker, and no second
+  monster. An identity with no marker and no monster gets both. An identity with the marker gets
+  nothing.
+- `decision-defaulted:kit-headroom=whole-kit-or-none` — the kit is checked against the wallet and
+  stack caps before any write. A kit that does not fit (reachable only for a legacy joiner near a
+  cap) is not granted, the marker is not set, the join still succeeds, and a structured
+  `starter_kit_skipped` log line names the cap. The next join tries again. A fresh identity always
+  fits.
+- `decision-defaulted:export-tier-signal=unchanged` — `request_data_export` sizes its admission
+  cap with `export_live_row_cap(is_account_holder, wallet_exists)` (`server-module/src/privacy.rs`).
+  An anonymous caller with no wallet row gets the smallest "newcomer" tier. The kit gives every
+  joiner a wallet, so after `eo-1` that tier holds only identities that connected and never
+  joined. `eo-1` keeps the signal: any per-identity signal an anonymous identity can earn is cheap,
+  and the open R-rb-132-WALLETSYBIL ask (sign-in as a launch condition) already covers the
+  anonymous tier. The cost of reaching the larger anonymous tier drops from a join plus one quest
+  Talk to a join (Risks).
+- `decision-defaulted:kit-ack=none` — no new notice. The wallet readout and the Bag show the kit.
+- `decision-defaulted:onboarding-module=server-module/src/onboarding.rs` — the grant decision
+  (`starter_grant(claimed, owns_monster) -> StarterGrant`, pure) and the kit grant live in a new
+  module. `join_game` keeps its statements and replaces its `has_monsters` test with one call. The
+  monster-roll block stays in `movement.rs`, gated by the decision's `monster` field: this slice
+  changes the gate, it does not move the block.
+- `decision-defaulted:heal-cost=free` — `eo-4` keeps every heal location at no cost. Under the
+  balance stance (Pokémon-style: healing is free), a heal charge would be a sink against a
+  one-player faucet. GDD §7's "town healing cost" stays inert, and the worksheet records it with
+  the monster-sink gap.
+- `decision-defaulted:quest-reward=quest_001:50->150` — the one quest pays an Antidote's price.
+  #587 D1 makes quests the compensating faucet for recruit-heavy play.
+- `decision-defaulted:prices-and-divisor=unchanged` — `BATTLE_CURRENCY_BST_DIVISOR` stays 10 (the
+  essence divisor stays 3× steeper), shop prices stay, sell stays 40% of buy. At about 31 gold a
+  KO, a Lure Berry costs about seven KOs; `eo-4.4`'s worksheet measures whether that holds per
+  session.
+- `decision-defaulted:recruit-loop-faucet=pack-KOs-plus-quest` — a recruit-heavy player earns
+  from the wilds KO'd in a pack battle and from the quest. A lone-wild recruit pays nothing (D1).
+  The worksheet gives the per-session number for that loop.
+
+The builder may move a default value when the worksheet's measurement contradicts it, one
+`plan-delta:` line each (`standards/spec-driven.md` §Adapting the plan during a build).
+
+## Contracts between slices
+
+- **C1 (`eo-1` → `eo-4`):** the kit file `starter_kit.ron`, the loader, and a fresh identity's
+  start state of 200 gold, 2 Lure Berries and 1 Antidote. `eo-4`'s worksheet and its affordability
+  invariant read the kit through `load_starter_kit`. Proof after merge: `eo-4.1` passes on
+  `master`, and `client/e2e/wallet-balance.spec.ts` reads `Gold: 350` (kit + quest).
+- **C2 (`eo-1` ↔ guest claim / deletion):** the marker lives in a row the claim rekeys and the
+  cascade erases. Proof after merge: `eo-1.5` and `account-e2e` (`just eval`) pass on `master`.
+- **C3 (`eo-1`, `eo-4` ↔ `CONTENT_VERSION`):** each slice bumps `CONTENT_VERSION` once and
+  re-records `evals/baselines/content-hash.json`. The pair is ordered, so the second bump starts
+  from the first. Proof after merge: the `content-version` eval passes on `master`.
+
+## Structure
+
+`join_game` is a multi-responsibility reducer. `eo-1` adds no logic to it: the decision and the
+kit grant go in `server-module/src/onboarding.rs`, the marker helpers in `npc.rs` (the table's
+owner), the loader in `game-core/src/content.rs` beside `load_heal_locations`. `eo-4` changes data,
+a tuning test and a doc. The two slices share `server-module/src/lib.rs`,
+`evals/baselines/content-hash.json` and `client/e2e/wallet-balance.spec.ts`, and they are ordered
+(`eo-4` after `eo-1`). No production file is edited by both, so no refactor slice comes first.
+
+### eo-1 — starter kit at first join; the starter is granted once per identity
+type: feature · tier: hard
 category: economy/onboarding · severity: MED · size: MODERATE
-touches (provisional): game-core (starter-kit rule + content), server-module/src/movement.rs
-(join_game), server-module/src/schema.rs (additive claimed marker), game-core/content/
-DECIDED (#587 D2): both money and items, small — ~200g + 2–3 basic items (a heal item and a
-bait), once per player. Soulbound-vs-tradeable was not addressed in the answer: an
-elaboration-time call (the GDD's anti-farm soulbind lever is available; eo-1 picks and records it).
+touches: game-core/content/starter_kit.ron, game-core/src/content.rs, server-module/src/onboarding.rs, server-module/src/onboarding_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/npc.rs, server-module/src/npc_tests.rs, server-module/src/content_cache.rs, server-module/src/content_cache_tests.rs, server-module/src/lib.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/guards_tests.rs, server-module/src/accounts_tests.rs, evals/baselines/content-hash.json, client/e2e/wallet-balance.spec.ts, client/e2e/trade-zz-negative.spec.ts, client/e2e/recruit.spec.ts, client/e2e/battle-dpad.spec.ts, docs/DECISIONS.md
+after: []
 
-Design that is FIXED regardless of the pending decision:
+`join_game` asks `onboarding` what to grant before its monster block:
+- `starter_grant(claimed, owns_monster)` returns `{ monster, kit }`. Claimed: neither. Not
+  claimed: the kit, plus the monster when the identity owns none.
+- `onboarding::grant_kit` checks the kit against the caps (`check_currency_headroom`,
+  `check_item_headroom`), then grants through `grant_currency` and `grant_item`, then sets the
+  marker.
+- The decision and the writes run in the one `join_game` transaction.
 
-- **EO1.1:** WHEN an identity completes its first join, THE SERVER SHALL grant the starter monster
-  and the starter kit exactly once, recording a persistent per-identity claimed marker (additive
-  schema) that does not depend on what the identity currently owns.
-- **EO1.2:** WHEN an identity that has already claimed rejoins owning zero monsters (or zero items,
-  or an empty wallet), THE SERVER SHALL NOT grant again — closes R-weekly-review-2026-10-23-F1 for
-  the starter monster and prevents the kit from inheriting the same trap.
-- **EO1.3:** THE kit's contents SHALL be content RON under `game-core/content/` carried by
-  CONTENT_VERSION, granted through `apply_grant` / the single item-insert path, so the operator can
-  retune contents as data.
+`server-module/src/lib.rs` gains `mod onboarding;` and the `CONTENT_VERSION` bump. No schema,
+reducer signature or bindings change, and no client source change.
 
-Risk note (hidden-dependency seam, named so neither milestone assumes the other shipped it): the
-rejoin re-grant is today's ACCIDENTAL recovery path for a monster-less identity. Closing it makes
-"zero monsters" permanent unless a floor guard exists. The trade-redesign milestone owns the
-operator's own floor rules (no-empty-side confirm; monsters must be in-party/≥1 HP); elaboration
-must check whether any OTHER path to zero monsters exists (release/storage edge cases) and, if so,
-either guard it in eo-1 or raise it. The GDD's "consider soulbinding the starter" lever is decision
-material for `pt3-econ-world`, not assumed.
+Measured pins (each a named intentional change; the build widens for any further one it measures):
+- The native host aborts on a write to a table a test did not register. Every native caller of
+  `join_game` is in one of `movement_tests.rs`, `monster_mgmt_tests.rs` (`dw_insert_sites`, a
+  brand-new player), `guards_tests.rs` and `accounts_tests.rs`. A fresh-identity call now also
+  writes `inventory`, `player_wallet` and `player_dialogue_state`, and its fixture registers them.
+  Assertions stay.
+- `client/e2e/wallet-balance.spec.ts`: `EXPECTED_BALANCE_TEXT` `Gold: 50` becomes `Gold: 250` (kit
+  + quest). The second identity's "unknown" arm was "B has no wallet row"; B now owns 200. The
+  privacy assertion becomes "B reads its own 200, never A's 250".
+- `client/e2e/trade-zz-negative.spec.ts`: the "A must hold no coin" / "B holds no coin"
+  preconditions become the kit's 200. Seeded balances count from there.
+- `client/e2e/recruit.spec.ts` R1 ("a fresh inventory holds no bait") and
+  `client/e2e/battle-dpad.spec.ts` (`NO_BAIT_ROW` absent) now see the kit's Lure Berries. Their
+  no-bait case needs an identity that spends or sells its berries first, or the test's subject
+  changes to "the kit's bait row is offered".
+- `evals/baselines/content-hash.json` is re-recorded with `CONTENT_VERSION`.
+- Not in `touches:`: `account-e2e`'s per-table string marks tables the fixture owns rows in. The
+  fixture already owns `inventory`, `player_wallet` and `player_dialogue_state` rows (`:1`), so
+  the kit adds no owned table. The `client-surface-privacy`, `spacetime-type-snapshot` and
+  `bindings-drift` evals see no change, because no table, type or reducer changes.
 
-### eo-2 — close the practice-battle faucet (unblocked; land ahead of the tuning pass)
-category: economy-integrity · severity: MED (scriptable exploit) · size: SMALL
-touches (provisional): game-core (battle-reward gating rule + tests), server-module/src/battle.rs
-(write_back_battle_results), server-module tests
+The `docs/DECISIONS.md` entry records the starter rule ("the starter is a once-per-identity grant
+recorded by a marker; ownership is never the test"), the kit and the reserved `sys:` flag
+namespace.
 
-- **EO2.1:** WHEN a battle's two sides belong to the same identity (a practice/self battle), THE
-  SERVER SHALL grant no currency and no XP from its outcome (essence/trust/QT are already
-  wild-gated — this extends the same gate to the currency/XP arm). Closes
-  R-weekly-review-2026-10-09-F1.
-- **EO2.2:** WHEN a wild or PvP battle ends in a KO win, THE SERVER SHALL grant exactly what it
-  grants today (regression fixture: the wild-win faucet unchanged, the self-battle fixture asserts
-  zero grants).
+- **eo-1.1:** WHEN an identity with no starter marker and no monster joins, THE SERVER SHALL grant one starter monster, 200 gold, 2 Lure Berries and 1 Antidote, and set the marker, in the one `join_game` transaction (`server-module/src/onboarding_tests.rs`, through `join_game` on the native host).
 
-The residual's own note says "must close when faucets get tuned"; it is an exploit today, so it
-lands FIRST and the tuning pass assumes it closed.
+- **eo-1.2:** WHEN an identity whose marker is set joins owning zero monsters, zero items and no wallet row, THE SERVER SHALL grant nothing (`server-module/src/onboarding_tests.rs`). Closes R-weekly-review-2026-10-23-F1.
 
-### eo-3 — recruit yields: DECIDED, NO BUILD (#587 D1 — alternative A)
-category: economy/gameplay · severity: — · size: ZERO (ruling recorded; no code)
+- **eo-1.3:** WHEN an identity with no marker that owns a monster joins, THE SERVER SHALL grant the kit and set the marker, and SHALL insert no monster (`server-module/src/onboarding_tests.rs`).
 
-The operator chose "no payout": a successful recruit yields the monster and nothing else — no
-currency, no XP, no essence. This REAFFIRMS the standing no-recruit-XP ruling and extends it to
-currency/essence; `M-battle-tactics`' tactical recruit inherits it (its former open question is
-closed). The consequence is owned by eo-4: with the recruit loop deliberately unpaid, quest
-faucets must carry recruit-dominant playstyles (the operator accepted this coupling in the issue's
-alternative text). The GDD §7 note (2026-10-24) records both this and the accepted
-no-monster-sink gap.
+- **eo-1.4:** WHEN the kit would push the joiner's balance past `MAX_BALANCE` or a stack past `MAX_ITEM_STACK`, THE SERVER SHALL grant no part of the kit, leave the marker unset, log `starter_kit_skipped`, and still complete the join (`server-module/src/onboarding_tests.rs`).
 
-### eo-4 — faucet/sink tuning pass (last; after eo-1..3 decisions and M-pt3-quickfix visibility)
-category: economy-balance · severity: HIGH leverage, LOW code risk · size: MODERATE (mostly data)
-touches (provisional): game-core/content/ (shops, items, quests, heal_locations, starter kit),
-game-core/src/currency.rs consts, docs
-after: [eo-1, eo-2, eo-3]
+- **eo-1.5:** WHEN a guest identity that claimed its kit is claimed into an account, THE account SHALL hold the marker, and a later join of the account SHALL grant nothing; WHEN an identity's deletion completes, THE marker SHALL be gone with the rest of its dialogue state (`server-module/src/accounts_tests.rs`).
 
-- One pass under the GDD sinks ≥ faucets model. Dials: `BATTLE_CURRENCY_BST_DIVISOR`, shop buy
-  prices + the 40% sell convention, quest rewards, kit size, heal cost. Deliverable: a short tuning
-  worksheet (gold-per-session per loop — KO grind, recruit loop post-eo-3, quest line — vs the
-  cheapest/median sink) checked in next to the content change; tuned values land as content/const
-  changes with a CONTENT_VERSION bump; NO new mechanics.
-- Heal-location cost timing — DECIDED (#587 D3): healing stays FREE until this pass tunes
-  faucets+sinks together; eo-4 owns introducing the cost as part of the one tuning pass. The RON
-  already carries `cost_item_id`/`cost_qty` fields, so "charge" is a content + `heal_party`
-  change, not a redesign.
-- Item price ↔ AP coupling (pt3-2026-10-145): the operator ruled the flat in-battle item AP cost is
-  "balanced by the price of the item (in the game's currency) and by using up the item permanently".
-  `M-battle-tactics` owns the AP side; THIS pass owns pricing items so that rule holds. If
-  `M-battle-tactics` has not pinned AP costs when eo-4 runs, eo-4 prices provisionally and names
-  the re-check in the battle milestone rather than blocking on it.
-- Visibility precondition: the quest reward arriving invisibly is WHY the operator believed no
-  faucet existed — do not tune against an economy the player cannot see; `M-pt3-quickfix`'s wallet
-  display + grant toast land first.
+- **eo-1.6:** WHEN content holds a starter kit naming an unknown item, a zero quantity, an item twice, a quantity above `MAX_ITEM_STACK` or a currency above `MAX_BALANCE`, or a dialogue condition or effect naming a `sys:` flag, THE content validation SHALL refuse it with an error naming the offending entry (`game-core/src/content.rs` tests).
 
-## Decisions — ANSWERED 2026-10-24 (#587 `pt3-econ-world`; answer file is SSOT)
+- **eo-1.7:** WHEN a fresh browser identity joins and opens the shop, THE wallet readout SHALL read `Gold: 200` and the Bag SHALL list 2 Lure Berries and 1 Antidote (`client/e2e/wallet-balance.spec.ts`).
 
-1. Starter-kit contents: both, small — ~200g + 2–3 basic items (heal + bait), once-only
-   (recommendation accepted). Soulbound-vs-tradeable: unaddressed → eo-1 elaboration call.
-2. Recruit yields: NO payout (alternative A). See eo-3.
-3. Heal-location cost timing: free until eo-4 tunes faucets+sinks together (recommendation
-   accepted).
-4. Monster sink: gap ACCEPTED — "Currently, there's no need for a monster sink"; noted in GDD §7
-   (2026-10-24 note). eo-4's worksheet still records the gap so tuning numbers are read with it
-   in mind; a replacement sink is future decision material, not this milestone's.
+### eo-4 — faucet/sink tuning pass
+type: feature · tier: hard
+category: economy-balance · severity: MED · size: SMALL (data + one doc + tests)
+touches: docs/economy-tuning.md, game-core/content/quests/000-core.ron, game-core/tests/pt_d3_tuning.rs, server-module/src/lib.rs, evals/baselines/content-hash.json, client/e2e/wallet-balance.spec.ts, client/e2e/dialogue.spec.ts, docs/DECISIONS.md
+after: [eo-1]
 
-## Sequencing / integration notes
+The worksheet `docs/economy-tuning.md` is a new file. It states current behaviour and reads the
+numbers from the content and the code it names. A later retune edits it in the same PR as the
+values. The content tests extend the existing `game-core/tests/pt_d3_tuning.rs`, which already
+pins the anti-arbitrage rule and the price bands over the shipped registries.
 
-- eo-2 is independent — land it first. eo-1 is fully decided and buildable; eo-3 is a recorded
-  ruling with no build. eo-4 runs last, `after:` eo-1/eo-2 and after `M-pt3-quickfix`'s
-  visibility slices.
-- Fan-out shape (per the M18 fan-out note): a game-core rule slice gates its server-module reducer
-  slice; content data is parallel; the client is untouched except regenerated bindings and whatever
-  display `M-pt3-quickfix` already owns. Post-integration: full `just ci` green, bindings-drift 0,
-  schema snapshot additive, and one end-to-end check that a FRESH identity joins, receives exactly
-  one kit, earns from its first battle outcome per the decided rules, and can afford the intended
-  first purchase.
-- Evidence anchors in this spec are file + symbol at 2026-10-24 (m25-s0 doctrine: symbols, not
-  line numbers; de-quantified where rot is likely).
+Measured pins: `client/e2e/dialogue.spec.ts` UIF4.2's toast text ("You received 50 gold.") and
+`client/e2e/wallet-balance.spec.ts`'s quest-completion balance move with the reward. The toast
+reports the balance gain across the batch, so the kit does not enter it. Client unit tests that
+use 50 are fixtures that do not read content (`statusModel.test.ts`, `catalog.test.ts`) and stay.
+
+The `docs/DECISIONS.md` entry records the tuning ruling: healing free under the balance stance,
+the quest as the recruit-loop faucet, prices and divisor unchanged, with the worksheet as the
+evidence.
+
+- **eo-4.1:** THE shipped content SHALL let a fresh player afford one Lure Berry from the kit's currency alone, and SHALL price every battle-usable item (`tactics_items`) at no more than the median shop buy price (`game-core/tests/pt_d3_tuning.rs`, over `load_starter_kit`, `load_shops`, `load_items` and the tactical item sidecar).
+
+- **eo-4.2:** THE shipped heal locations SHALL charge nothing: `cost_currency` 0, no cost item and `cost_qty` 0 (`game-core/tests/pt_d3_tuning.rs`, over `load_heal_locations`).
+
+- **eo-4.3:** WHEN a player completes quest_001, THE SERVER SHALL credit 150 gold once, and THE toast SHALL say "You received 150 gold." (`client/e2e/dialogue.spec.ts` UIF4.2; `client/e2e/wallet-balance.spec.ts` reads `Gold: 350` for a fresh identity that completed it).
+
+- **eo-4.4:** THE worksheet SHALL give gold per 30-minute session for three loops — KO grind, recruit-heavy pack battles (one recruit and the rest KO'd), and the quest line — each against the cheapest and the median shop price. It SHALL name every input it uses with its source (BST range and typical BST, pack sizes from `tactics_zones`, `BATTLE_CURRENCY_BST_DIVISOR`, shop and sell prices, the kit, the quest reward) and record the inert heal sink and the monster-sink gap (`docs/economy-tuning.md`).
+
+- **eo-4.5:** THE worksheet SHALL check the operator's item rule (pt3-2026-10-145: the flat in-battle item AP cost is balanced by the item's price and its consumption) for every battle-usable item against the AP cost `M-battle-tactics` pins (`item_cost` in `game-core/content/tactics_tuning.ron`), and SHALL name the re-check that a later AP or price change owes (`docs/economy-tuning.md`).
+
+## Post-integration verification (the milestone is done when all hold on `master`)
+
+- Full `just ci` green, with `just eval` included: the `content-version` eval passes at the second
+  bump (C3), and `bindings-drift`, `spacetime-type-snapshot` and `client-surface-privacy` show no
+  change (no schema, type or reducer change in either slice).
+- On `master`, `client/e2e/wallet-balance.spec.ts` (`eo-1.7`, `eo-4.3`) and
+  `client/e2e/dialogue.spec.ts` pass together. That is the integrated proof of C1: a fresh identity
+  joins, receives exactly one kit, completes the quest and holds 350.
+- `server-module/src/accounts_tests.rs`'s `eo-1.5` case and the `account-e2e` eval pass together
+  (C2).
+- One manual playtest pass on a fresh local database, recorded in `eo-4`'s PR, with the same steps
+  run in a single-player world and on a friends server:
+  - a new player sees 200 gold and the kit in the Bag;
+  - they buy one Lure Berry;
+  - a pack battle that ends in a recruit pays the KOs;
+  - a disconnect and rejoin grants nothing again.
+
+## Risks
+
+- **Alt-identity farming on the official server.** An anonymous identity costs nothing to mint,
+  and each one gets a tradeable starter monster today. With `eo-1` it also gets 200 gold, 2 Lure
+  Berries and an Antidote, which a session trade can move to a main identity. In a single-player
+  world or on a friends server this is harmless. On the official server it is a faucet bounded only
+  by identity creation. The guard belongs to the identity/trade rules for the official server: an
+  account-holder requirement for trading, or a soulbind flag. The spec files a follow-up row; it is
+  not built here.
+- **The export newcomer tier gets cheaper to leave** (`export-tier-signal` above). Before `eo-1`
+  an anonymous identity needed one currency grant (the quest_001 Talk) to move from the newcomer
+  export cap to the anonymous cap. After it, a join is enough. That widens R-rb-132-WALLETSYBIL a
+  little and changes neither its fix (sign-in) nor its pending ask. `eo-1`'s PR states it, and the
+  row's text is updated through `mr-gates notes`.
+- **Deletion and rejoin.** A completed deletion erases the marker with the dialogue state, so the
+  same identity starts fresh, kit included. While a deletion is pending, `require_not_deleting`
+  refuses `join_game`, `open_trade_session` and `set_trade_offer`, so no new offer can move assets
+  out during the window. This is the intended fresh start, not a leak.
+- **A reserved flag inside dialogue state.** Content that named `sys:starter_claimed` could clear
+  the marker and re-open the grant. `eo-1.6` makes `validate_content` refuse any `sys:` flag in
+  dialogue content. That check is the boundary, so it lands in the same slice.
+- **The e2e corpus assumed an empty start.** Four specs are measured pins. Others that only read
+  their own purchases still pass, and the build runs the whole e2e suite, widening for any further
+  measured pin. A widen refused because a live slice holds the file is a hidden-dependency stop.
+- **Default numbers are judgement.** Quest 150, free healing and the kit split are reversible data.
+  If the playtest finds the economy too loose or too tight, the remedy is a content retune, with
+  the worksheet in the same PR.
+- **mr-prune census** (2026-11-14, `9fb5bd25`, `--spec` this file, recorded as
+  `M-econ-onboarding`): 0 duplicates, so no `pruned-tests:` line.
+  - **orphans:** ten single-string `parse_*` wrappers in `game-core/src/content.rs` (`parse_shops`,
+    `parse_heal_locations`, `parse_quest_defs`, `parse_npc_defs`, `parse_zones`,
+    `parse_dialogue_trees`, `parse_evolution_paths`, `parse_encounters`, `parse_species`,
+    `parse_abilities`) that only tests call. Their loaders call the `_parts` forms. They go to one
+    `type: refactor` section of `structure.spec.md`, filed through `mr-gates notes` because this
+    PR may not edit that file. `eo-1` adds no such wrapper: `load_starter_kit` and its tests call
+    the one parse path.
+  - **signals** (named, no action): `movement_tests.rs` reads source as text; `accounts_tests.rs`
+    (also `protected-churn`, token `account`), `monster_mgmt_tests.rs` and `npc_tests.rs` churned
+    in recent merges. `eo-1` edits only their `join_game` fixtures and adds no source-text read.
+  - **literal-variants:** `guards_tests.rs`, 3 groups, none in the `join_game` case `eo-1` edits.

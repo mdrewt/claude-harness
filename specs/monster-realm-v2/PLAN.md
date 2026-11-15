@@ -69,10 +69,12 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    predictor machinery untouched), tap-to-turn as a tail-appended `MoveInput::Face` that turns, or
    steps when already facing (never cancel-on-keyup — ADR-0148), queued moves dropped at battle
    start, and a reconnect backoff that climbs on open-then-drop.
-4. **M-econ-onboarding** (`M-econ-onboarding.spec.md`, sketch 2026-10-24 — elaborate when reached): starter kit,
-   faucet/sink tuning (fixes the uncapped practice-battle faucet), heal-cost timing. Decisions
-   ANSWERED (#587): kit = ~200g + 2–3 items once-only; recruit pays NOTHING (quest faucets
-   compensate in eo-4); healing free until eo-4; monster-sink gap accepted (GDD §7 note).
+4. **M-econ-onboarding** (`M-econ-onboarding.spec.md`, elaborated 2026-11-14 — 2 slices, head
+   `eo-1`, then `eo-4`): a starter kit (200 gold, 2 Lure Berries, 1 Antidote) and the starter
+   monster granted once per identity behind a persistent marker, which closes the rejoin re-grant
+   (R-weekly-review-2026-10-23-F1); then one tuning pass with a worksheet (healing stays free,
+   quest_001 pays 150, prices unchanged). The practice faucet (R-weekly-review-2026-10-09-F1) was
+   closed by the tactical cutover; recruiting pays nothing (#587).
 5. **M-test-pruning** (`M-test-pruning.spec.md`, elaborated 2026-11-13 — 5 harness slices, head
    `tp-1`): a read-only test census (`mr-prune`) that looks at milestone close and is acted on at
    elaboration — same-block duplicate tests, product code only tests reach, pin and churn
