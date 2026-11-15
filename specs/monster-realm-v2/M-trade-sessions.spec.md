@@ -1692,6 +1692,19 @@ the Fix-batch contract):
   Finished batch waits for the shell playback to drain before the results panel takes the frame` in
   `client/src/main.dispatch.test.ts`).
 
+Build note (ts-6b-7): ts-6b-7.2 residual: a Deploying battle's clock rows carry a deadline but no
+windowOpenMs (server tactics.rs clock_of_row), so the 45 s deploy countdown reads the last
+live-window estimate, or the raw device clock on a fresh page load / before any live window. A
+server-time sample that does not need an open window (e.g. the reducer transaction timestamp via
+net/connection.ts) would close it.
+
+Build note (ts-6b-7): ts-6b-7.1/.3 residuals (LOW, ux-a11y): (a) the status-notice queue holds one
+notice, so a toast queued after a battle line replaces it (the battle line now joins onto a queued
+toast, not the reverse); (b) during the results wait the Finished vm is not rendered (it would raise
+a stale turn banner/turn line), so the board shows the pre-final state under the last ≤3.4 s of
+beats while the ticker and speech carry the KO and the end; (c) during the wait Select / D-pad and
+pointer clicks on the shell's dock are not consumed (A/B/Start skip the playback).
+
 ### ts-6b-8 — list views keep their rows: Shop, Heal, Journal, Evolve
 type: feature · tier: routine
 category: ux-a11y · severity: MED · size: MODERATE
