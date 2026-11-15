@@ -56,6 +56,12 @@ their re-exports are removed; each caller passes the same RON to the `*_parts` f
 A test whose only subject is a wrapper itself goes under `standards/testing-tdd.md` "Deleting a
 check", naming the `*_parts` test that survives it.
 
+The M-econ-onboarding close census (`mr-prune close`, game `cee8c4f2`) routes these ten rows here
+and one more: `clamp_position` in `game-core/src/lib.rs`, a `pub fn` that only its own test
+`clamp_position_bounds` calls. It is a candidate: the build confirms that no production file or
+other crate names it, then removes it with that test under the same "Deleting a check" rule, or
+keeps it and gives the caller it found in the PR.
+
 - **ST8.1:** WHEN `cargo nextest run -p game-core` runs IT SHALL pass, with no assertion edited
   other than a re-pointed call.
 - **ST8.2:** WHEN `just ci` runs on the slice's head IT SHALL pass.
