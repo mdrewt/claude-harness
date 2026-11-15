@@ -76,7 +76,7 @@ walkers; larger figures are extrapolated, and `sr-9b`'s run replaces them with m
   as a name fallback after `store.player(id)`. The crate's index iterators run ascending only, so
   a view cannot read a top-K from a `rating` index without a full scan.
 - **SR6 holds.** The `MicrotaskBatcher` callback in `connect()` rebuilds every owner-scoped view
-  from the SDK cache on every batch. That is fourteen `reconcile*FromView` calls (`my_monster_pub`,
+  from the SDK cache on every batch. That is thirteen `reconcile*FromView` calls (`my_monster_pub`,
   `my_battle`, `my_export_bundle`, `my_pending_evolution_notices`, `my_inventory`, the seven
   tactical views, `my_trade_session`) before `store.flushBatch()`.
 - **SR7 holds.** `battle_summary` is private, one row per battle (inserted at the Active start by
@@ -144,11 +144,18 @@ retention, or changes cost only. So none goes to `mr-ask-drew`.
   (`PLAYTEST_REAP_MAX_DELETE_PER_TICK`'s value) and re-arms while the table is still over. With
   nothing owed, no row is scheduled.
 - `decision-defaulted:leaderboard-top-k=100`.
+- `decision-defaulted:own-rank-below-top-k=100+` — when the caller ranks below the top 100, its
+  own row shows `100+` instead of a number. After `sr-4b` the client no longer holds the profiles
+  that a true rank needs, so `sr-4a` uses the same marker and the contract does not change
+  between the two slices.
 - `decision-defaulted:leaderboard-shape=membership-table-plus-join` — a public `leaderboard_top`
   table holds only the identities of the top 100 profiles. `ranking.rs`, the sole owner of
   `profile` writes, keeps it. The client subscribes the profile rows of its members through a
   join subscription, plus its own row by identity. Display data stays in `profile`, so a rename
-  or a cascade tombstone reaches the leaderboard with no second write. If the join subscription
+  or a cascade tombstone reaches the leaderboard with no second write. The membership is an
+  invariant, not an incremental guess. After every transaction that writes `profile`, the table
+  equals the true top 100 by the full order key (rating desc, name asc, identity asc). Tombstoned
+  and anonymized rows rank like any other, as they do on today's board. If the join subscription
   is refused by the pinned host, the fallback is a `leaderboard_top` that carries the four
   display columns, written by every `ranking.rs` profile writer. Either way the client
   contract below is the same.
@@ -185,8 +192,10 @@ Every behaviour the block has is covered
 through `connect()` by `connection.runtime.test.ts`, `connection.test.ts` and
 `connection.conversationCoalesce.test.ts`, which stay unedited in `sr-6a`.
 
-`ranking.rs` already owns every `profile` write (`get_or_init_profile`, `apply_pvp_rating`,
-`set_profile_name`, `rekey_profile`, `anonymize_display_names`). `sr-4b`'s membership upkeep
+`ranking.rs` already owns every `profile` write: `get_or_init_profile` (which inserts at the
+first rating and refreshes the name), `apply_pvp_rating`, `rekey_profile` (the claimer's carried
+row and the guest's tombstone) and `anonymize_display_names`. `set_profile_name` writes only
+`player.name`; `profile.name` follows at the next rating. `sr-4b`'s membership upkeep
 goes there, so no new module is needed. The `battle_summary` reaper is new state, so it goes in
 a new module `server-module/src/summary_reaper.rs`. `tactics_settle.rs` gains only the arm call
 after its insert. The load-only reducer goes in a new module `server-module/src/load_dev.rs`.
@@ -229,9 +238,10 @@ The driver already drains every bot's socket (`t19`'s payload sink). This slice 
 each bot receives during a level's usable scrape window and reports two fields per level:
 `rx_bytes_per_client_per_s` (the mean over bots) and `rx_bytes_per_client_per_s_max` (the
 worst bot). Both are integers, on the JSON report and in the rendered table. The window is the
-driver's own scrape schedule, so the driver still reads no wall clock. The bot's opening query
-becomes `SELECT * FROM player`, byte-identical to the client's, and `RowScan` picks the bot's
-own row out of the world-wide rows by its identity. `MAX_CLIENTS` rises to 1,000. The tests that
+driver's own scrape schedule, so the driver still reads no wall clock. Every Subscribe the
+bot sends replaces its whole query set. So `SELECT * FROM player`, byte-identical to the
+client's, goes into the opening set and into every set `scope_queries` builds. `RowScan` picks
+the bot's own row out of the world-wide rows by its identity. `MAX_CLIENTS` rises to 1,000. The tests that
 pin 500 (`MAX_CLIENTS`'s CLI cap and `total_driver_threads`) and the opening-query tests that
 expect `own_player_query` change in this slice, as named intentional changes. The module
 header's "What a bot subscribes to" section is restated. All tests are the file's inline
@@ -239,7 +249,7 @@ header's "What a bot subscribes to" section is restated. All tests are the file'
 
 - **sr-9a.1:** WHEN a level's usable scrape window ends, THE driver SHALL report `rx_bytes_per_client_per_s` as the bytes all bots received in the window divided by the bot count and the window's seconds, and `rx_bytes_per_client_per_s_max` as the largest single bot's rate, in both the JSON report and the rendered table (`sim-harness/src/bin/mr_load_driver.rs` inline tests, fed byte counts and a scrape schedule).
 
-- **sr-9a.2:** WHEN a bot opens its subscription, THE driver SHALL send `SELECT * FROM player`, byte-identical to the client's whole-table `player` query, and SHALL still read the bot's own `entity_id` from its own row when other players' rows arrive before, after or around it in the same message (`sim-harness/src/bin/mr_load_driver.rs` inline tests).
+- **sr-9a.2:** WHEN a bot opens its subscription or re-subscribes for a new zone, THE query set it sends SHALL include `SELECT * FROM player`, byte-identical to the client's whole-table `player` query, and the driver SHALL still read the bot's own `entity_id` from its own row when other players' rows arrive before, after or around it in the same message (`sim-harness/src/bin/mr_load_driver.rs` inline tests).
 
 - **sr-9a.3:** WHEN `--clients-max` is 1,000, THE driver SHALL accept it, and WHEN it is 1,001, THE driver SHALL reject it with the cap in the message (`sim-harness/src/bin/mr_load_driver.rs` inline tests).
 
@@ -250,9 +260,9 @@ touches: ops/observability/rules/recording.rules.yml, ops/observability/rules/re
 after: []
 
 A recording rule `mr:reducer_thread_share:rate5m` is
-`sum by (reducer) (rate(spacetime_txn_elapsed_time_sec_sum[5m]))`. A second rule,
-`mr:reducer_thread_share_total:rate5m`, is the sum over reducers. The dashboard gains one panel
-stacking the first rule by reducer, with the total as a line. The rule's behaviour is tested with
+`sum by (reducer) (rate(spacetime_txn_elapsed_time_sec_sum[5m]))`. The dashboard gains one panel
+stacking it by reducer; the panel's total is `sum(mr:reducer_thread_share:rate5m)`, so no second
+rule is recorded. The rule's behaviour is tested with
 `promtool test rules` over fixture series in the new `recording.rules.test.yml`. `validate.mjs`
 runs it in the Prometheus image beside its existing `promtool check rules` step, so CI's
 `observability` job (`just observability-validate`) executes it. `validate.mjs` is a test-runner
@@ -260,9 +270,7 @@ file and this slice declares it. The host's `spacetime_num_bytes_sent_to_clients
 each delta once, not once per subscriber, so no rule here stands in for `sr-9a`'s per-client
 download.
 
-- **sr-9d.1:** WHEN `promtool test rules` evaluates `recording.rules.test.yml` over fixture series in which `movement_tick` spends 0.12 s and `enqueue_move` 0.03 s of transaction time per second, THE recorded `mr:reducer_thread_share:rate5m` SHALL be 0.12 and 0.03 for those reducers and `mr:reducer_thread_share_total:rate5m` 0.15 (`ops/observability/rules/recording.rules.test.yml`, run by `ops/observability/validate.mjs`).
-
-- **sr-9d.2:** WHEN the rule file fails its rule tests, THE observability validation SHALL exit non-zero and name the failing test (`ops/observability/validate.mjs` under `just observability-validate`, proven by one run against a deliberately wrong expected value in the PR's red step).
+- **sr-9d.1:** WHEN `promtool test rules` evaluates `recording.rules.test.yml` over fixture series in which `movement_tick` spends 0.12 s and `enqueue_move` 0.03 s of transaction time per second, THE recorded `mr:reducer_thread_share:rate5m` SHALL be 0.12 and 0.03 for those reducers (`ops/observability/rules/recording.rules.test.yml`, run by `ops/observability/validate.mjs`).
 
 ### sr-9c — the nightly runs the load driver for a few seconds
 type: feature · tier: routine
@@ -302,24 +310,32 @@ the game's "Dev-only reducers never ship" entry:
   PR.
 
 The reducer moves only the caller's own character (`ctx.sender()`), to the zone's spawn tile,
-through the `movement.rs` forwarder. That forwarder arms the zone's tick as a join does. The
+through the `movement.rs` forwarder. It refuses a caller in an ongoing battle, as a warp does.
+Like a warp, it clears and publishes the caller's queued moves, and it arms the zone's tick as
+a join does. The
 entry's list of dev reducers names the new reducer. The driver gains `--zones <n>`, which makes
-each bot call the reducer for zone `10000 + (bot index mod n)` after it joins, and
-`--walking-share <pct>`, which makes only that share of bots send moves. `just load-host` builds
-and publishes the load build. The run of record is in DoD.
+each bot call the reducer for zone `10000 + (bot index mod n)` after it joins, `--hot-zone <n>`,
+which first puts `n` bots in zone 10000, and `--walking-share <pct>`, which makes only that share
+of bots send moves. `just load-host` builds and publishes the load build, and `just test` gains a
+nextest line with `load_test_zones` so the with-feature tests run in CI. Every edit the default
+build compiles is placed after the file's last production item, so no default-build panic
+location moves, and the release wasm stays byte-identical. This includes the `content.rs` hook,
+the `lib.rs` `mod` lines and the `movement.rs` forwarder. The without-feature case of `sr-9b.1`
+runs in the default test run. It is the guard that the generated zones never reach a shipped
+build, the e2e build or `client-wasm`. The run of record is in DoD.
 
 - **sr-9b.1:** WHEN game-core is built with `load_test_zones`, THE zone registry and the zone maps SHALL each hold the 2 shipped zones plus 100 generated zones with ids 10000–10099, every generated tile walkable and each spawn tile in bounds, and `validate_content` SHALL pass; WHEN built without the feature, THE registry SHALL hold exactly the shipped zones (`game-core/src/load_test_zones.rs` tests run with and without the feature).
 
-- **sr-9b.2:** WHEN a caller invokes `dev_place_in_load_zone` with a zone id in 10000–10099, THE reducer SHALL move only the caller's own character to that zone's spawn tile and arm that zone's tick, and WHEN the id is outside that band or the caller has no character, THE reducer SHALL reject with an error and change no row (`server-module/src/load_dev_tests.rs`, native host).
+- **sr-9b.2:** WHEN a caller invokes `dev_place_in_load_zone` with a zone id in 10000–10099, THE reducer SHALL move only the caller's own character to that zone's spawn tile, clear its queued moves and arm that zone's tick, and WHEN the id is outside that band, the caller has no character or the caller is in an ongoing battle, THE reducer SHALL reject with an error and change no row (`server-module/src/load_dev_tests.rs`, native host).
 
 - **sr-9b.3:** WHEN the module is built without `dev_reducers`, THE published reducer list SHALL not contain `dev_place_in_load_zone` (`scripts/verify-release-reducers.mjs` against the default build, and the release wasm's sha256 equal to the base's).
 
-- **sr-9b.4:** WHEN the driver runs with `--zones 100` and `--walking-share 30`, THE bots SHALL be placed round-robin over zones 10000–10099 and only 30% of them SHALL send moves (`sim-harness/src/bin/mr_load_driver.rs` inline tests over the placement and walking-set plans).
+- **sr-9b.4:** WHEN the driver runs with `--zones 100`, `--hot-zone 50` and `--walking-share 30`, THE first 50 bots SHALL be placed in zone 10000, the rest round-robin over zones 10000–10099, and only 30% of all bots SHALL send moves (`sim-harness/src/bin/mr_load_driver.rs` inline tests over the placement and walking-set plans).
 
 ### sr-2 — the party is read through an `(owner, slot)` index
 type: feature · tier: hard
-category: performance/server · severity: HIGH · size: SMALL
-touches: server-module/src/schema.rs, server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/monster_mgmt.rs, server-module/src/monster_mgmt_tests.rs, evals/baselines/table-schemas.json
+category: performance/server · severity: HIGH · size: MODERATE
+touches: server-module/src/schema.rs, server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/monster_mgmt.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/native_host_tests.rs, server-module/src/accounts_tests.rs, server-module/src/guards_tests.rs, server-module/src/movement_tests.rs, server-module/src/onboarding_tests.rs, server-module/src/raising_tests.rs, server-module/src/tactics_tests.rs, server-module/src/trading_session_tests.rs, evals/baselines/table-schemas.json
 after: [sr-9a]
 
 `monster` gains `index(accessor = owner_party, btree(columns = [owner_identity, party_slot]))`.
@@ -327,27 +343,42 @@ The single-column `owner_identity` index stays, because the re-key, erase and ex
 owned monster. `lead_party_ids` reads `owner_party().filter((owner, 0..PARTY_SLOT_NONE))`. The
 range is ascending by slot, so the explicit sort goes. `set_party_slot` collects occupied slots
 through the same range. Every caller of `lead_party_ids` keeps its signature. The schema baseline
-is re-recorded. `monster` is private, so no binding changes. Measured in DoD: the per-input
+is re-recorded. `monster` is private, so no binding changes.
+The native test host stops on a multi-column index prefix today: `datastore_index_scan_range_bsatn`
+calls `unmodelled(…)`, and `Fixture::table` registers single-column indexes only. So
+`native_host_tests.rs` gains the multi-column prefix range scan and a composite-index
+registration. This is test infrastructure with no criterion of its own; `sr-2.1` and `sr-2.2`
+exercise it. Every fixture that registers `monster` reaches `lead_party_ids` through
+`enqueue_move` or a party read, so each one also registers the new index. That is one line each,
+a named intentional change, in `accounts_tests.rs`, `battle_tests.rs`, `guards_tests.rs`,
+`monster_mgmt_tests.rs`, `movement_tests.rs`, `onboarding_tests.rs`, `raising_tests.rs`,
+`tactics_tests.rs` and `trading_session_tests.rs`. Their assertions stay unedited. Measured in DoD: the per-input
 cost at 1 vs 1,000 Storage monsters, before and after, with `sr-9a`'s driver.
 
 - **sr-2.1:** WHEN an owner holds party monsters in non-contiguous slots and 1,000 Storage monsters, THE `lead_party_ids` helper SHALL return exactly the party ids ordered by slot, and `None` WHEN the owner holds only Storage monsters (`server-module/src/battle_tests.rs`, native host).
 
-- **sr-2.2:** WHEN `set_party_slot` assigns a slot while the owner holds Storage monsters, THE reducer SHALL accept a free slot and reject an occupied or out-of-range slot exactly as before, with the existing `set_party_slot` cases passing unedited (`server-module/src/monster_mgmt_tests.rs`).
+- **sr-2.2:** WHEN `set_party_slot` assigns a slot while the owner holds Storage monsters, THE reducer SHALL accept a free slot and reject an occupied or out-of-range slot exactly as before, with the existing `set_party_slot` cases' assertions unedited (`server-module/src/monster_mgmt_tests.rs`, whose fixture registers the new index).
 
 - **sr-2.3:** WHEN this module is published without `--delete-data` over a database the base module filled with monsters, THE publish SHALL succeed and every owner's party SHALL read back through the new index unchanged (publish-over-data proof; the command transcript is in the PR).
 
 ### sr-7 — `battle_summary` is capped by an on-demand reaper
 type: feature · tier: hard
 category: data-integrity/performance · severity: MED · size: MODERATE
-touches: server-module/src/schema.rs, server-module/src/summary_reaper.rs, server-module/src/summary_reaper_tests.rs, server-module/src/lib.rs, server-module/src/tactics_settle.rs, server-module/src/privacy_enforcement_tests.rs, server-module/src/native_host_tests.rs, server-module/src/accounts_tests.rs, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, ops/observability/rules/recording.rules.yml, docs/DECISIONS.md
+touches: server-module/src/schema.rs, server-module/src/summary_reaper.rs, server-module/src/summary_reaper_tests.rs, server-module/src/lib.rs, server-module/src/tactics_settle.rs, server-module/src/privacy_enforcement_tests.rs, server-module/src/native_host_tests.rs, server-module/src/accounts_tests.rs, server-module/src/battle_tests.rs, server-module/src/tactics_tests.rs, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, ops/observability/rules/recording.rules.yml, docs/DECISIONS.md
 after: [sr-2, sr-9d, sr-9b]
 
 `summary_reaper.rs` holds `BATTLE_SUMMARY_CAP` (100,000), the per-run delete limit (8,192), the
 schedule table `battle_summary_reaper_schedule` (`scheduled(battle_summary_reaper)`), and its
-arm and run functions, in `playtest.rs`'s on-demand one-shot shape. The reaper deletes from the
-lowest `battle_id` upward. It skips a row whose `battle` anchor exists and is not terminal. Live
-rows are the newest by construction, so a skip is rare. `tactics_settle.rs` calls the arm after
-its insert. The new table gets a `DATA_LIFECYCLE_MANIFEST` row (`NotOwned`, not exportable).
+arm, run and ensure functions, in `playtest.rs`'s on-demand one-shot shape. The reaper walks
+the primary key range upward from the lowest `battle_id`. It skips a row while `battle` or
+`battle_tactical` still holds that `battle_id`. An idle or long battle can be the oldest, and
+`tactics_settle.rs` re-inserts a zeroed summary for a battle whose summary is missing, so a
+skipped row is never deleted early and never re-armed in a loop. `tactics_settle.rs` calls the
+arm after its insert. `init` and `sync_content` call the ensure beside `ensure_playtest_reaper`,
+so a database already over the cap at publish is reaped. The arm reads `battle_summary`'s row
+count, which the native host serves only for a scannable table. So the three fixtures that
+register `battle_summary` (`accounts_tests.rs`, `battle_tests.rs`, `tactics_tests.rs`) mark it
+scannable and register the schedule table. The new table gets a `DATA_LIFECYCLE_MANIFEST` row (`NotOwned`, not exportable).
 `battle_summary`'s basis states the cap. The census bumps follow: `TABLE_DESCRIBERS`, the
 account-e2e transcription, the re-key census, and `EXPECTED_MODULES`. The new scheduled function
 is classified in `recording.rules.yml`'s scheduled-function list (as the other reapers are).
@@ -355,13 +386,15 @@ is classified in `recording.rules.yml`'s scheduled-function list (as the other r
 
 - **sr-7.1:** WHEN an insert takes `battle_summary` above `BATTLE_SUMMARY_CAP` and no reaper run is scheduled, THE module SHALL schedule exactly one run, and WHEN the table is at or below the cap, THE module SHALL schedule none (`server-module/src/summary_reaper_tests.rs`).
 
-- **sr-7.2:** WHEN the reaper runs with the table over the cap, THE reaper SHALL delete the lowest-`battle_id` rows down to the cap, at most 8,192 per run, never a row whose `battle` anchor is live, and SHALL schedule one more run only while the table is still over the cap (`server-module/src/summary_reaper_tests.rs`).
+- **sr-7.2:** WHEN the reaper runs with the table over the cap, THE reaper SHALL delete the lowest-`battle_id` rows down to the cap, at most 8,192 per run, never a row whose `battle_id` is still held by a `battle` or `battle_tactical` row, and SHALL schedule one more run only while the table is still over the cap (`server-module/src/summary_reaper_tests.rs`).
 
 - **sr-7.3:** WHEN a client calls `battle_summary_reaper`, THE reducer SHALL reject it as scheduler-only and change no row (`server-module/src/summary_reaper_tests.rs`, native host).
 
 - **sr-7.4:** WHEN an account is erased, THE surviving `battle_summary` rows naming it SHALL carry `TOMBSTONE_IDENTITY` on its side as before, with the existing erase cases passing unedited (`server-module/src/accounts_tests.rs`).
 
-- **sr-7.5:** WHEN this module is published without `--delete-data` over a database holding `battle_summary` rows, THE publish SHALL succeed and the rows SHALL survive (publish-over-data proof; transcript in the PR).
+- **sr-7.5:** WHEN `init` or `sync_content` runs while `battle_summary` is over the cap and no reaper run is scheduled, THE module SHALL schedule one (`server-module/src/summary_reaper_tests.rs`).
+
+- **sr-7.6:** WHEN this module is published without `--delete-data` over a database holding `battle_summary` rows, THE publish SHALL succeed and the rows SHALL survive (publish-over-data proof; transcript in the PR).
 
 ### sr-6a — move the owner-view reconciles out of `connection.ts`
 type: refactor · tier: routine
@@ -369,7 +402,7 @@ category: structure/client · severity: LOW · size: SMALL
 touches: client/src/net/connection.ts, client/src/net/viewReconcile.ts, client/src/net/viewReconcile.test.ts
 after: []
 
-Moves the batcher callback's reconcile block (the fourteen `reconcile*FromView` calls, their
+Moves the batcher callback's reconcile block (the thirteen `reconcile*FromView` calls, their
 `guarded` and `present` helpers, and their try/catch grouping) into `viewReconcile.ts`
 `reconcileOwnerViews(store, db)`. The batcher calls it, then runs the hydration edge and
 `store.flushBatch()` as today. The throw-containment grouping is kept exactly: the monster,
@@ -378,7 +411,7 @@ tactical view and `my_trade_session` is guarded alone. Dependents: `sr-6b`, `sr-
 moved-tests: none (no test reads the moved source as text; the behaviour tests run through
 `connect()` and stay unedited). `viewReconcile.test.ts` covers the moved function directly.
 
-- **sr-6a.1:** WHEN `reconcileOwnerViews` runs over a fake view cache, THE store SHALL receive the same fourteen reconciles with the same rows as the inline block delivered, and a converter that throws for one view SHALL leave the other groups' reconciles applied (`client/src/net/viewReconcile.test.ts`).
+- **sr-6a.1:** WHEN `reconcileOwnerViews` runs over a fake view cache, THE store SHALL receive the same thirteen reconciles with the same rows as the inline block delivered, and a converter that throws for one view SHALL leave the other groups' reconciles applied (`client/src/net/viewReconcile.test.ts`).
 
 - **sr-6a.2:** THE connection's behaviour SHALL be unchanged: `client/src/net/connection.runtime.test.ts`, `client/src/net/connection.test.ts` and `client/src/net/connection.conversationCoalesce.test.ts` pass with their assertions unedited.
 
@@ -391,8 +424,9 @@ after: [sr-6a]
 `viewReconcile.ts` gains a per-view dirty set: `markDirty(view)`, `markAllDirty()`, and a
 `reconcileOwnerViews` that runs only the dirty views and then clears them. A view's
 `onInsert`/`onDelete` handlers in `wireTables` mark that view. `markAllDirty()` runs on every
-applied snapshot, on a rebuild (reconnect), and beside `store.reset()`. A reconcile that throws
-leaves its view dirty, so the next batch retries it. Cost per batch then follows the views that
+applied snapshot, on a rebuild (reconnect), and beside `store.reset()`. A throw inside a try
+group leaves the throwing view, and every view of that group that did not run, dirty, so the
+next batch retries them. Cost per batch then follows the views that
 changed, not batch rate × monsters owned.
 
 - **sr-6b.1:** WHEN a batch changes rows of no owner view (only `character` or `player` rows), THE batcher SHALL run no owner-view reconcile and still flush the batch (`client/src/net/viewReconcile.test.ts`, `client/src/net/connection.runtime.test.ts`).
@@ -401,7 +435,7 @@ changed, not batch rate × monsters owned.
 
 - **sr-6b.3:** WHEN a snapshot is applied, a rebuild connects, or the store is reset, THE next batch SHALL reconcile every owner view (`client/src/net/connection.runtime.test.ts`).
 
-- **sr-6b.4:** WHEN a view's reconcile throws, THE view SHALL stay dirty and be reconciled again on the next batch, and the other views and the flush SHALL proceed (`client/src/net/viewReconcile.test.ts`).
+- **sr-6b.4:** WHEN a view's reconcile throws, THE view and every view of its try group that did not run SHALL stay dirty and be reconciled on the next batch, and the other groups' reconciles and the flush SHALL proceed (`client/src/net/viewReconcile.test.ts`).
 
 ### sr-8 — terrain chunks bake at resolution 1
 type: feature · tier: routine
@@ -415,40 +449,44 @@ on a device-scale change (the post-stack rebuild on a resolution change stays). 
 in `terrainLayout.test.ts` that expect the device scale ("every create call receives the
 deviceScale", "a rebuild at a new deviceScale uses the new scale", the `chunkTextureRequest`
 mapping) are re-pointed at resolution 1, as a named intentional change. The `world.ts` header
-comment on device-scale baking is restated. `world-art.spec.ts` gains a second browser context
-at `deviceScaleFactor: 2` for its existing pixel proof. Texture bytes per tile drop from
+comment on device-scale baking is restated. `world-art.spec.ts` runs its existing pixel proof in two more
+browser contexts, at `deviceScaleFactor: 2` and `1.5`. The second exercises a fractional
+`stageScale`: `viewportScale` keeps the device scale an integer, so each texel stays a whole
+number of device pixels. The deleted re-bake branch in `resize` gets no criterion of its own:
+it is removed, not changed, and `sr-8.1` pins the one resolution that remains. Texture bytes per tile drop from
 4 KB × scale² to 4 KB (165 MB → about 10 MB for today's zone on a 4K display).
 
 - **sr-8.1:** WHEN chunks are built at any device scale, THE cache SHALL request every chunk texture at resolution 1 with nearest sampling (`client/src/render/terrainLayout.test.ts`).
 
-- **sr-8.2:** WHEN `world-art.spec.ts`'s pixel proof runs in a `deviceScaleFactor: 2` context as well as the existing `deviceScaleFactor: 1` one, THE proof SHALL pass in both with its thresholds unedited (`client/e2e/world-art.spec.ts`).
+- **sr-8.2:** WHEN `world-art.spec.ts`'s pixel proof runs in `deviceScaleFactor: 2` and `1.5` contexts as well as the existing `deviceScaleFactor: 1` one, THE proof SHALL pass in all three with its thresholds unedited (`client/e2e/world-art.spec.ts`).
 
 ### sr-4a — the leaderboard renders top 100 plus the caller, only when a profile changed
 type: feature · tier: routine
 category: performance/client · severity: MED · size: SMALL
-touches: client/src/ui/leaderboardModel.ts, client/src/ui/leaderboardModel.test.ts, client/src/ui/leaderboardView.ts, client/src/ui/leaderboardView.test.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/main.ts
+touches: client/src/ui/leaderboardModel.ts, client/src/ui/leaderboardModel.test.ts, client/src/ui/leaderboardView.ts, client/src/ui/leaderboardView.test.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/screens/socialScreen.ts, client/src/ui/screens/socialScreen.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/main.ts
 after: []
 
 `AuthoritativeStore` gains `profilesVersion()`, bumped by `upsertProfile` and by `reset`.
 `buildLeaderboardViewModel` keeps the total order (rating desc, raw name asc, identity asc). It
-returns the top `LEADERBOARD_TOP_K` (100) rows, each with its 1-based `rank`, plus the caller's
-own row with its rank when it ranks below 100. It memoises on `(profilesVersion, identity)`:
-an unchanged pair returns the same object without sorting. `main.ts`'s leaderboard batch listener
-re-renders only when that object changed. The Social screen reads the same memoised model through
-`buildSocialVm`. The view shows the rank number on every row and needs no new string. The
+returns the top `LEADERBOARD_TOP_K` (100) rows, each with its 1-based `rank`. When the caller
+ranks below 100, it adds the caller's own row marked `100+`. It memoises on
+`(profilesVersion, identity)`: an unchanged pair returns the same object without sorting.
+`LeaderboardView.render` skips the DOM rebuild when handed the object it last rendered. The
+Social screen's `viewModel` passes `store.profilesVersion()` through `buildSocialVm`, so it reads
+the same memoised model. The view shows the rank on every row and needs no new string. The
 `RL15-structural` source scans in both leaderboard test files are unaffected (no write path is
 added). Their existing cases with ≤100 profiles stay unedited.
 
-- **sr-4a.1:** WHEN the store holds more than 100 profiles, THE leaderboard view model SHALL hold the top 100 in the existing total order with ranks 1–100, plus the caller's own row with its true rank WHEN the caller ranks below 100 (`client/src/ui/leaderboardModel.test.ts`).
+- **sr-4a.1:** WHEN the store holds more than 100 profiles, THE leaderboard view model SHALL hold the top 100 in the existing total order with ranks 1–100, plus the caller's own row marked `100+` WHEN the caller ranks below 100 (`client/src/ui/leaderboardModel.test.ts`).
 
-- **sr-4a.2:** WHEN a store batch changes no profile row and the identity is unchanged, THE leaderboard model SHALL return the previous view model without sorting, and THE leaderboard view and the Social rankings tab SHALL not re-render (`client/src/ui/leaderboardModel.test.ts`, `client/src/ui/leaderboardView.test.ts`, `client/src/ui/socialModel.test.ts`).
+- **sr-4a.2:** WHEN a store batch changes no profile row and the identity is unchanged, THE leaderboard model SHALL return the previous view model without sorting, and THE leaderboard view and the Social rankings tab SHALL not rebuild their rows (`client/src/ui/leaderboardModel.test.ts`, `client/src/ui/leaderboardView.test.ts`, `client/src/ui/screens/socialScreen.test.ts`).
 
-- **sr-4a.3:** WHEN the caller's own row is shown below the top 100, THE view SHALL render its rank number and mark it as the caller's row, in the Social rankings tab and the leaderboard overlay alike (`client/src/ui/leaderboardView.test.ts`, `client/src/ui/socialModel.test.ts`).
+- **sr-4a.3:** WHEN the caller's own row is shown below the top 100, THE view SHALL render `100+` as its rank and mark it as the caller's row, in the Social rankings tab and the leaderboard overlay alike (`client/src/ui/leaderboardView.test.ts`, `client/src/ui/socialModel.test.ts`).
 
 ### sr-3 — `player_quest` is owner-only
 type: feature · tier: hard
 category: security-privacy/performance · severity: MED · size: MODERATE
-touches: server-module/src/schema.rs, server-module/src/npc_tests.rs, server-module/src/native_host_tests.rs, evals/baselines/table-schemas.json, evals/baselines/client-visible-tables.json, client/src/module_bindings/index.ts, client/src/module_bindings/player_quest_table.ts, client/src/module_bindings/my_player_quest_table.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/src/net/viewReconcile.ts, client/src/net/viewReconcile.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/e2e/dialogue.spec.ts, docs/DECISIONS.md, ARCHITECTURE.md
+touches: server-module/src/schema.rs, server-module/src/npc_tests.rs, server-module/src/native_host_tests.rs, evals/baselines/table-schemas.json, evals/baselines/client-visible-tables.json, client/src/module_bindings/index.ts, client/src/module_bindings/player_quest_table.ts, client/src/module_bindings/my_player_quest_table.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/src/net/viewReconcile.ts, client/src/net/viewReconcile.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/connection.test.ts, client/src/main.dialogueEnded.test.ts, server-module/src/accounts_tests.rs, client/e2e/dialogue.spec.ts, docs/DECISIONS.md, ARCHITECTURE.md
 after: [sr-7, sr-6b, sr-4a]
 
 `player_quest` loses `public`. A `my_player_quest` view (`ViewContext` only, the
@@ -459,7 +497,11 @@ unchanged; `npc_tests.rs` gains the view test. The client subscribes
 view is PK-less, so it is registered in `viewReconcile.ts` as an authoritative, dirty-gated
 reconcile (`store.reconcileQuestsFromView`). `ownQuests` and its callers are unchanged. The
 bindings regenerate with `just gen`. The two baselines are re-recorded. `VIEW_DESCRIBERS` gains
-the view. `docs/DECISIONS.md` "Table privacy" moves `player_quest` from the public-on-purpose list
+the view. Named pin changes: `accounts_tests.rs`
+`generated_view_roster_is_exactly_sixteen_caller_scoped_views_bt7_1` (seventeen, and the
+positional `VIEW_MY_*` ids), `connection.test.ts` `ts-4.4`'s exact subscription list (`player_quest`
+becomes `my_player_quest`, still 29 queries), and the comment in `main.dialogueEnded.test.ts`
+that calls `player_quest` public. `docs/DECISIONS.md` "Table privacy" moves `player_quest` from the public-on-purpose list
 to the owner-scoped views, and `ARCHITECTURE.md`'s public-world-state row drops it. Hidden
 consumer checked: the quest-completion toast (`ui/statusModel.ts`) diffs `pqId`s across batches.
 An authoritative reconcile keeps a step advance's `pqId` and removes a completed one, and the
@@ -478,20 +520,32 @@ completion transaction delivers the quest delete and the conversation row in one
 ### sr-4b — the client subscribes a bounded leaderboard, not every profile
 type: feature · tier: hard
 category: performance/server · severity: MED · size: MODERATE
-touches: server-module/src/schema.rs, server-module/src/ranking.rs, server-module/src/ranking_tests.rs, server-module/src/accounts_tests.rs, server-module/src/native_host_tests.rs, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, evals/baselines/client-visible-tables.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/leaderboard_top_table.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/src/ui/leaderboardView.test.ts, client/e2e/ui-social.spec.ts, docs/DECISIONS.md, ARCHITECTURE.md
+touches: server-module/src/schema.rs, server-module/src/ranking.rs, server-module/src/ranking_tests.rs, server-module/src/accounts_tests.rs, server-module/src/native_host_tests.rs, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, evals/baselines/client-visible-tables.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/leaderboard_top_table.ts, client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, client/src/net/connection.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/ui/leaderboardView.test.ts, client/e2e/ui-social.spec.ts, client/e2e/ui-chrome.spec.ts, server-module/src/lib.rs, docs/DECISIONS.md, ARCHITECTURE.md
 after: [sr-3, sr-4a]
 
 A public `leaderboard_top` table (`identity` primary key) holds the identities of the top 100
-profiles in the leaderboard's total order. `ranking.rs` keeps it inside the transactions that
-already write `profile`:
-- `apply_pvp_rating` updates it incrementally. A full rescan of `profile` runs only when a
-  member's rating falls below the 100th, the one case that needs the next candidate.
-- `rekey_profile` re-keys a member.
-- `set_profile_name` and `anonymize_display_names` need nothing, because names stay in `profile`.
+profiles in the leaderboard's total order. `ranking.rs` restores the membership invariant (§Decisions)
+inside every transaction that writes `profile`:
+- `get_or_init_profile` and `apply_pvp_rating` (a settle writes both participants);
+- `rekey_profile`, which writes the claimer's carried row and the guest's tombstone (rating 0);
+- `anonymize_display_names`, because the name is part of the order key and can move a row
+  across the 100th place on a rating tie.
+
+Each of those transactions ends with one rescan of `profile` that rewrites the membership. It
+has no incremental or boundary logic, because profile writes are rare: first ratings, settles,
+claims and deletions. `init` and `sync_content` run the same rescan, so a database published
+over existing profiles is filled at once. The rescan is O(profiles). Its cost at 50,000
+profiles is measured in DoD, and that number decides whether anything smarter is ever built.
 
 The client replaces `SELECT * FROM profile` with two queries. One is the join subscription that
 delivers the members' profile rows. The other is the caller's own row,
-`SELECT * FROM profile WHERE identity = 0x<own>`. `profile` stays public and never deleted. The
+`SELECT * FROM profile WHERE identity = 0x<own>`. A member that leaves the top 100 now arrives as
+a delete. `profile` gains an `onDelete` handler and the store a `removeProfile`; both are
+deliberately absent today. `profile` stays public and never deleted on the server.
+`ui-chrome.spec.ts` seeds `profile` rows by owner SQL for its Rankings cases, which bypasses
+the reducers. It also seeds their `leaderboard_top` rows. `connection.test.ts` `ts-4.4`'s exact
+list changes: the whole-table `profile` query gives way to the two new ones, so it holds 30
+queries. The
 new table gets its manifest row (not exportable; its identity follows the profile's re-key), the
 census bumps (`TABLE_DESCRIBERS`, the account-e2e transcription, the re-key census), and both
 baselines. `docs/DECISIONS.md` "Table privacy" names `leaderboard_top`. Name fallback: `main.ts`
@@ -503,15 +557,17 @@ Pin: `ui/leaderboardView.test.ts` `RL13-conn-sub-01` reads `connection.ts` as te
 subscription-set case in `connection.runtime.test.ts`, which asserts through `connect()` what the
 client subscribes. Its `RL15-structural` scan in the same file stays.
 
-- **sr-4b.1:** WHEN a ranked match settles, THE `leaderboard_top` table SHALL hold exactly the identities of the top 100 profiles by rating desc, name asc, identity asc, including WHEN a member falls below the 100th and the next profile enters (`server-module/src/ranking_tests.rs`).
+- **sr-4b.1:** WHEN any `ranking.rs` write to `profile` commits (a first rating, a settle, a guest-claim re-key, an anonymize), THE `leaderboard_top` table SHALL hold exactly the identities of the top 100 profiles by rating desc, name asc, identity asc, including WHEN a member falls below the 100th, WHEN a rating tie at the boundary is broken by an anonymized name, and WHEN fewer than 100 profiles exist (`server-module/src/ranking_tests.rs`).
 
 - **sr-4b.2:** WHEN a guest claim re-keys a member's profile, THE member's `leaderboard_top` row SHALL carry the claiming identity and the retired guest's SHALL be gone (`server-module/src/ranking_tests.rs`, `server-module/src/accounts_tests.rs` re-key census).
 
-- **sr-4b.3:** WHEN the client subscribes, THE subscription SHALL contain the `leaderboard_top`-scoped profile query and the own-row profile query and no whole-table `profile` query (`client/src/net/connection.runtime.test.ts`).
+- **sr-4b.3:** WHEN the client subscribes, THE subscription SHALL contain the `leaderboard_top`-scoped profile query and the own-row profile query and no whole-table `profile` query, and WHEN a profile row is deleted from the subscription, THE store SHALL drop it (`client/src/net/connection.runtime.test.ts`, `client/src/net/store.test.ts`).
 
 - **sr-4b.4:** WHEN two players finish a ranked match, THE Social rankings tab of each SHALL list both with their new ratings and ranks through the real UI, and a trade or challenge counterpart who is online SHALL still show their name (`client/e2e/ui-social.spec.ts`).
 
-- **sr-4b.5:** WHEN this module is published without `--delete-data` over a database holding more than 100 profiles, THE publish SHALL succeed and the first ranked settle afterwards SHALL fill `leaderboard_top` with the true top 100 (publish-over-data proof; transcript in the PR).
+- **sr-4b.5:** WHEN `init` or `sync_content` runs over 150 profiles and an empty `leaderboard_top`, THE table SHALL hold the true top 100 when it returns (`server-module/src/ranking_tests.rs`).
+
+- **sr-4b.6:** WHEN this module is published without `--delete-data` over a database holding more than 100 profiles, THE publish SHALL succeed and `leaderboard_top` SHALL hold the true top 100 before any ranked match (publish-over-data proof; transcript in the PR).
 
 ## Post-integration verification (the milestone's DoD)
 
@@ -520,14 +576,15 @@ client subscribes. Its `RL15-structural` scan in the same file stays.
 - **The run of record (`sr-9b`'s DoD).** `just load-host`, then the driver at 1,000 clients over
   100 zones, with one zone filled to 50 (`--zones` plus a 50-bot block) and a 30% walking share.
   The run is repeated after the last slice. The report gives tick p95, input round-trip p95,
-  `rx_bytes_per_client_per_s` and its max, and `mr:reducer_thread_share_total:rate5m` against
+  `rx_bytes_per_client_per_s` and its max, and `sum(mr:reducer_thread_share:rate5m)` against
   the four budgets. A breached budget becomes a follow-up row naming the Watch item or deferral
   that owns it. The numbers replace this spec's extrapolations through a spec note. The
   co-location caveat applies: a run on one machine records it.
 - **Per-slice before/after.** `sr-2`, `sr-3`, `sr-4b` and `sr-6b` each record one measurement in
   their PR body:
   - `sr-2`: the per-input reducer time at 1 vs 1,000 Storage monsters, now flat;
-  - `sr-3` and `sr-4b`: the subscription's initial bytes at 50,000 seeded profiles and quest rows;
+  - `sr-3` and `sr-4b`: the subscription's initial bytes at 50,000 seeded profiles and quest rows,
+    and for `sr-4b` the rescan's reducer time at 50,000 profiles;
   - `sr-6b`: client batch time with a full Storage.
 - **The combined behaviour:** a player walks, talks to complete a quest, fights a ranked match and
   opens Social. The e2e suite covers each step through the real UI (`dialogue.spec.ts`,
@@ -565,6 +622,14 @@ no `structure.spec.md` section follow from it. The rows to keep in view:
   documented fallback copies the four display columns into `leaderboard_top`. That fallback
   makes every `ranking.rs` profile writer also write the copy. The builder proves the join first,
   with a two-client probe in the slice's plan.
+- **`sr-4b`'s rescan is O(profiles)** and runs once per profile-writing transaction, which comes
+  at human rates. The DoD measurement at 50,000 profiles decides whether an incremental update
+  or a `rating` index is needed. That index would be one more serial schema
+  step, and an index on a subscribed table may disconnect clients when it is published.
+- **Byte-identical default wasm (`sr-9b`).** The release profile keeps overflow checks and panic
+  locations, so any line the default build compiles that moves shifts a panic location. Placing
+  every edit after the file's last production item is what keeps the sums equal. A mismatch
+  parks the slice, as the dev-reducer entry requires.
 - **A view's update arrives as an unordered insert+delete pair.** `sr-3`'s reconcile must be
   authoritative from the cache, never per-row. `sr-6b`'s dirty set is what keeps that cheap.
 - **`load_test_zones` must never reach a shipped or e2e build.** It is a separate feature from
