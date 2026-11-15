@@ -287,6 +287,34 @@ production module.
 
 - **th-4.9:** THE BT15-4-SECRECY-AFK test SHALL take at most 75 s in its CI shard's `e2e.json` (135.9 s at `0c491981`), read from the PR run's `e2e-timings-*` artifact and recorded in the PR.
 
+Build note (th-4): dev-expire-home says tactics.rs changes one keyword (arm_deadline becomes
+pub(crate)). That shape is not rustfmt-clean: the signature line is 98 columns, 109 with the
+keyword, so cargo fmt --all --check (just lint) rewraps it to 7 lines, every later line of
+tactics.rs moves and the default release wasm changes (sha256 b50df23b… against base 261f2378… at
+ac8c52c4; the unformatted one-keyword shape gives the base sum, which is what the spec measured).
+th-4 keeps arm_deadline private and adds a dev_reducers-gated pub(crate) forwarder dev_arm_deadline
+after the last production item of tactics.rs; the default release wasm is byte-identical to base
+with it.
+
+Build note (th-4): The th-4 mutants.toml pin (each surviving mutant gets an exclude_re key) cannot
+cover cargo-mutants 27.1.0's struct-field genre: exclude_re and -F/-E are not applied to 'delete
+field … from struct … expression' mutants (measured with --list -E 'delete field'). th-4 writes the
+clock row as a field assignment plus update(row), which generates no such mutant; nightly-equivalent
+run on dev_clock.rs: 1 tested, 1 caught, 0 missed. The pending deadline row is matched on the
+waiting unit as well as window_seq (window_seq counts per side), and three refusals the spec does
+not list exist: side outside 0/1, an unregistered (all-zero) owner, and no pending deadline row.
+docs/DECISIONS.md was edited in place (the 'Dev-only reducers never ship' entry rewritten to the
+current state, per standards/decisions.md), not appended.
+
+Build note (th-4): Security audit of th-4 (pre-existing, outside touches):
+client/e2e/global-setup.ts publishes MR_DEV_MODULE_WASM with --delete-data to whatever
+STDB_SERVER/VITE_STDB_DB name, so an e2e run pointed at a playtest target would publish the dev
+module there with nothing verifying it afterwards (the owner check still limits
+dev_expire_tactical_window to the publisher). Fix shape: global-setup refuses MR_DEV_MODULE_WASM
+when the server is not loopback or the db is MR_PLAYTEST_DB. Same follow-up:
+server-module/Cargo.toml's dev_reducers comment still names start_wild_battle and the recruit e2e;
+the current dev reducers are grant_bait and dev_expire_tactical_window.
+
 ### th-1 — root-cause study: the two e2e flakes with no known cause
 type: design · tier: hard
 category: test-health (study) · severity: MED · size: SMALL
