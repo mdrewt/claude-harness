@@ -308,6 +308,45 @@ test, never a widened test bound.
 
 - **th-1.4:** THE register SHALL list every e2e test that failed on attempt 1 and passed on a rerun of the same tree in a CI run between 2026-11-15 and the study's start, found by the method of this spec's Problem table, each mapped to a register entry, an existing row or a named fix.
 
+Build note (th-1): th-1 result for BT12-5-WILD-RECRUIT (run 43362803625): the cause is the test's
+loop answering no-recruit before a Recruit pressed on its sixteenth own turn resolves; PR #752
+(merged two hours after the run) fixed that copy of the loop, and the study reproduces the signature
+by forcing with the failing tree's loop on master's product (7 of 8 runs at the real bound, 0 of 6
+with master's loop). recruit.spec.ts R2 holds a second copy of the loop in the unfixed shape: forced
+on master, 5 of 12 runs fail Expected 2 Received 3. Follow-up slice th-7 (test, not product): the
+weaken-then-recruit loop moves to client/e2e/controls.ts and both specs call it, keeping R2's three
+answers and bookkeeping and BT12-5-WILD-RECRUIT's forecast-attack count as arguments; touches
+client/e2e/controls.ts, client/e2e/controls.spec.ts, client/e2e/recruit.spec.ts,
+client/e2e/tactics-wild.spec.ts; forcing regression test: a fake-page case in controls.spec.ts where
+a Recruit pressed on the last allowed own turn resolves after the loop's last iteration and the loop
+answers recruited, run red against R2's present shape and green against the waiting shape; after the
+move the Recruit-held recipe of docs/e2e-flakes.md entry 2 is run on both specs.
+
+Build note (th-1): th-1 result for UIF4B.2 rename (run 43554594387): not reproduced. The CI call log
+is reproduced only by injecting a second document (join held after a reload: 5 of 5; a reload issued
+300 ms before the press: 5 of 6); 81 runs of shard-order replay, one-core, CPU-throttle and
+timer-hold recipes gave 0. The client drops an accelerator without a word while identity is empty
+(before join), and nothing found replaces the document ready() saw. The residual row lifts at the
+test's next rerun listing; a failed shard has kept its traces since commit 0e7a089d, so that
+occurrence is decidable.
+
+Build note (th-1): th-1.4 census (runs created 2026-11-15T00:00Z to 11:56Z): 27 runs, none rerun, so
+no test passed only on a rerun. One e2e test failed once with no rerun on code that was green on
+another run: zone-scope.spec.ts A walks to the warp (run 43690080900, PR #791, shard 5),
+ANTI-VACUITY frames were sampled on both sides of the warp, Expected > 0 Received 0. It is new to
+the Problem table, is register entry 3, and is not studied; its residual row lifts at its next rerun
+listing or when the kept trace is read.
+
+Build note (th-1): For the th-7 planner, two things the th-1 lenses found. (1) The loop's steps
+(openMenu, recruitByButtons, waitOwnTurnOrEnd) read the tactical shell's DOM as well as __mrTactics
+and __game, so the controls.spec.ts regression case either fakes that much of the shell or drives
+the loop through its steps passed as arguments; the loop also needs its own-turn bound as an
+argument. (2) An unmeasured neighbour of the same shape: fightToOutcome (client/e2e/controls.ts)
+re-reads the tactical state right after its last iteration's End Turn and throws 'did not finish
+within maxOwnTurns' when the reply that ends the battle lands after that read; its callers treat the
+throw as a kiting wild and re-hunt, so the cost is a lost win, not a wrong pass. Read by a reviewer,
+not reproduced.
+
 ### th-6 — low-end frame times, and the post stack's software-renderer rule
 type: design · tier: hard
 category: performance (study) · severity: MED · size: SMALL
