@@ -103,11 +103,12 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    (the `type: design` feasibility slice, run-time connection target, telemetry rule) is item 1;
    elaborate LP2–LP9 against `lpg-0`'s record. **Early access is gated on it.**
 9. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
-   S0 done) — `blocked:checkpoint-2-ratification`: S1 and S2 (S2 changes a frozen schema) wait
-   for the operator's ratification at the harness-revision Checkpoint 2, which lifts this block.
-   `propose_trade` is a fixed-error stub and `trade-zz-negative.spec.ts` cases 1b and 3b are
-   session no-oracle cases (M-trade-sessions `ts-4`), so S1 has nothing left to change in those
-   files. Its server-side slices may run alongside items 1–5 where files are disjoint.
+   S0 done) — `blocked:checkpoint-2-ratification`: S2 changes a frozen schema and waits for the
+   operator's ratification at the harness-revision Checkpoint 2, which lifts this block. S1 as
+   written has nothing left to change: `propose_trade`, `respond_trade` and `confirm_trade` return
+   one fixed error and read nothing, and `trade-zz-negative.spec.ts` cases 1b and 3b are session
+   no-oracle cases (M-trade-sessions `ts-4`); the M25 spec's S1 text is rewritten when M25 is
+   re-elaborated. Its server-side slices may run alongside items 1–5 where files are disjoint.
    **Opening the official server is gated on its completion.**
 10. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
    layer, consuming the context-stack ownership design, plus the hold/long-press edges the
