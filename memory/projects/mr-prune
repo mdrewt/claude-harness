@@ -189,10 +189,8 @@ first.
   Section  the `structure` rows are walked `duplicates` first, then `orphans`, each by file, then
            name. A row is taken when the section then holds at most 6 rows and 12 distinct
            files; a row not taken is marked over-cap and the walk goes on. The marks are made
-           whether or not a section file is written. The file is written when a row is taken
-           and DIR/mr-tester-ab.jsonl holds a line that is a JSON object with "kind": "close"
-           (the tester A/B experiment has closed; a file that is missing or unreadable holds
-           none). It is one section in structure.spec.md's shape, its number left as `<n>` in
+           whether or not a section file is written. The file is written when a row is
+           taken. It is one section in structure.spec.md's shape, its number left as `<n>` in
            `st-<n>` and `ST<n>` for whoever appends it:
                ### st-<n> — <label>: twin tests and unreached symbols from the close census
                type: refactor · tier: routine
@@ -219,7 +217,7 @@ first.
            order; when one fails, both close files are removed, so they stand only with their
            row:
            close/<label>.json        {"label", "commit", "spec": FILE's name,
-                                      "experiment-closed": bool, "section": the section file's
+                                      "section": the section file's
                                       name without a directory, or null, "rows": [...]}. A twin
                                       row is {"kind", "file", "candidate", "survivor", "route"};
                                       an orphan row {"kind", "file", "symbol", "test-only",
@@ -2110,12 +2108,7 @@ def cmd_close(opts):
     rows = close_rows(report, changed)
     route_rows(rows, [s for s in other_slices(spec) if s[1] not in named])
     taken = cap_section(rows)
-    try:
-        closed = any(row.get("kind") == "close"
-                     for row in json_objects(os.path.join(mem, "mr-tester-ab.jsonl")))
-    except OSError:
-        closed = False
-    section = label + ".section.md" if taken and closed else None
+    section = label + ".section.md" if taken else None
     ci = read_ci(repo, snap.commit) if "ci" in opts else None
 
     prune = os.path.realpath(os.path.join(mem, "prune"))
@@ -2125,7 +2118,7 @@ def cmd_close(opts):
             raise Fail("%s leads out of %s through a link" % (path, prune))
     try:
         write_file(files[0], json.dumps(
-            {"label": label, "commit": snap.commit, "spec": name, "experiment-closed": closed,
+            {"label": label, "commit": snap.commit, "spec": name,
              "section": section, "rows": rows}, indent=2) + "\n", repo)
         if section:
             write_file(files[1], section_text(label, snap.commit, taken), repo)

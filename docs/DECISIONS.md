@@ -164,7 +164,7 @@ candidate in the files those commits changed gets one route: `slice` when an unb
 another spec already lists a file of it, so that spec's elaboration acts on it; `structure`, into
 one refactor section per close, capped at 6 rows and 12 files so that one run can read every row
 before it removes any; `report` for a protected row and for an orphan wider than 12 files, which
-is a design question. The section is not written while the tester A/B experiment is open.
+is a design question.
 Measured on the suite, almost nothing is provably redundant under a rule strict enough to be safe
 (the strict count was zero). Mutation results cannot show a test is redundant (a few tests kill
 every mutant of a module whose other tests assert different rules) and TypeScript has no mutation

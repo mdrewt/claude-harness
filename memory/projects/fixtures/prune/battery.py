@@ -2038,7 +2038,7 @@ def tp2_a14(ctx):
 EM = chr(0x2014)        # the dash of a slice heading and of a naming subject
 MIDDOT = chr(0x00b7)    # the middle dot of `type: ... <dot> tier: ...`
 TOUCHED = "// touched\n"
-CLOSE_FILE_KEYS = {"label", "commit", "spec", "experiment-closed", "section", "rows"}
+CLOSE_FILE_KEYS = {"label", "commit", "spec", "section", "rows"}
 CLOSE_OBJ_KEYS = {"slices", "unmatched", "added", "removed", "changed", "signals"}
 TREND_KEYS = {"label", "commit", "totals", "counts", "close"}
 CRITERION_RE = re.compile(r"^- \*\*ST<n>\.1:\*\* WHEN .+ SHALL pass\.$")
@@ -2122,14 +2122,6 @@ def put_spec(d, name, text):
     with open(path, "wb") as f:
         f.write(text if isinstance(text, bytes) else text.encode("utf-8"))
     return path
-
-
-def closed_mem():
-    """A --mem whose mr-tester-ab.jsonl holds a close row: the experiment has closed."""
-    mem = new_mem()
-    with open(os.path.join(mem, "mr-tester-ab.jsonl"), "w") as f:
-        f.write('{"kind": "shadow", "slice": "x-1"}\n{"kind": "close", "ts": "2026-11-13T00:00:00Z"}\n')
-    return mem
 
 
 def close(repo, sha, mem, spec, *extra, env=None):
@@ -2559,9 +2551,9 @@ def tp4_a4(ctx):
     ctx.check("the close object holds slices, unmatched, added, removed, changed and signals",
               got_keys == sorted(CLOSE_OBJ_KEYS), sorted(CLOSE_OBJ_KEYS), got_keys, r)
     cf = close_file(mem, label)
-    exp_cf = {"label": label, "commit": sha, "spec": label + ".spec.md", "experiment-closed": False, "section": None}
+    exp_cf = {"label": label, "commit": sha, "spec": label + ".spec.md", "section": label + ".section.md"}
     got_cf = {k: cf.get(k) for k in exp_cf} if isinstance(cf, dict) else cf
-    ctx.check("prune/close/<label>.json holds label, commit, the spec's file name, experiment-closed false, section null and rows",
+    ctx.check("prune/close/<label>.json holds label, commit, the spec's file name, the section file's name and rows",
               isinstance(cf, dict) and set(cf) == CLOSE_FILE_KEYS and got_cf == exp_cf and isinstance(cf.get("rows"), list),
               exp_cf, cf, r)
 
@@ -2975,60 +2967,6 @@ def tp4_a11(ctx):
               r.crows == crows(8, 1, 1, 6, 0), crows(8, 1, 1, 6, 0), r.crows, r)
 
 
-def tp4_a12(ctx):
-    T, DX, DXT = "client/src/x1/x1.test.ts", "game-core/src/x2/x2.rs", "game-core/src/x2/x2_tests.rs"
-    repo = Repo()
-    change(repo, "chore: base", {"client/src/base.ts": filler(4)})
-    sha = change(repo, subject("ex-1", "add"), {T: tw_text("xone"), DX: "pub fn lonely_x() -> u32 { 1 }\n",
-                                                DXT: "#[test]\nfn names() {\n    assert_eq!(lonely_x(), 1);\n}\n"})
-    label = "M-exp"
-    spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("ex-1", None)]))
-    others = "".join(l + "\n" for l in (
-        json.dumps({"kind": "shadow", "slice": "ex-1"}), json.dumps({"kind": "Close"}), json.dumps({"kind": ["close"]}),
-        json.dumps({"row": {"kind": "close"}}), json.dumps(["close", {"kind": "close"}]), '{"kind": "close"',
-        "kind: close", ""))
-
-    def write_ab(text):
-        def setup(mem):
-            with open(os.path.join(mem, "mr-tester-ab.jsonl"), "w") as f:
-                f.write(text)
-        return setup
-
-    def stale(mem):
-        p = close_path(mem, label, ".section.md")
-        os.makedirs(os.path.dirname(p))
-        with open(p, "wb") as f:
-            f.write(b"### st-<n> stale\n")
-
-    for name, setup in (
-        ("mr-tester-ab.jsonl absent", lambda mem: None),
-        ("mr-tester-ab.jsonl holding other kinds, a mis-cased or nested kind, an array, a truncated and a non-JSON line",
-         write_ab(others)),
-        ("mr-tester-ab.jsonl a directory (unreadable)", lambda mem: os.makedirs(os.path.join(mem, "mr-tester-ab.jsonl"))),
-        ("mr-tester-ab.jsonl absent and a stale section file present", stale),
-    ):
-        mem = new_mem()
-        setup(mem)
-        r = close(repo, sha, mem, spec)
-        cf = close_file(mem, label)
-        ctx.check(name + ": the trend row and the close file are written, experiment-closed false and section null",
-                  r.rc == 0 and close_row(mem, label) is not None and isinstance(cf, dict)
-                  and cf.get("experiment-closed") is False and "section" in cf and cf["section"] is None,
-                  "row + close file (false, null)", (r.rc, close_row(mem, label), cf), r)
-        ctx.check(name + ": no section file and `section none`, though 2 rows are routed structure",
-                  not os.path.exists(close_path(mem, label, ".section.md")) and r.csection == "none"
-                  and dig(r.crows, "structure") == "2",
-                  ("no file", "none", "2"), (os.path.exists(close_path(mem, label, ".section.md")), r.csection, r.crows), r)
-    mem = closed_mem()
-    r = close(repo, sha, mem, spec)
-    cf = close_file(mem, label)
-    name = label + ".section.md"
-    ctx.check("control: with a close row in mr-tester-ab.jsonl the same run writes the section file and says so",
-              os.path.isfile(close_path(mem, label, ".section.md")) and r.csection == name
-              and dig(cf, "experiment-closed") is True and dig(cf, "section") == name,
-              (name, True), (os.path.isfile(close_path(mem, label, ".section.md")), r.csection, cf), r)
-
-
 def tp4_a13(ctx):
     E = chr(0x00e9)
     TW = "client/src/s2/cafe.test.ts"
@@ -3047,11 +2985,11 @@ def tp4_a13(ctx):
     label = "M-sect"
     spec = put_spec(d, label + ".spec.md", spec_text([("se-1", None)]))
     put_spec(d, "M-s4.spec.md", spec_text([("sl-1", TWS)]))
-    mem = closed_mem()
+    mem = new_mem()
     r = close(repo, sha, mem, spec)
     text = section_text(mem, label)
     name = label + ".section.md"
-    ctx.check("with the experiment closed and structure rows, one section file is written and named in the close file and stdout",
+    ctx.check("with structure rows, one section file is written and named in the close file and stdout",
               text is not None and r.csection == name and dig(close_file(mem, label), "section") == name,
               name, (text is not None, r.csection, dig(close_file(mem, label), "section")), r)
     lines = (text or "").splitlines()
@@ -3081,7 +3019,7 @@ def tp4_a13(ctx):
     if os.geteuid() == 0:
         print("NOTE TP4-A13 failed-write check skipped: running as root, a read-only mode does not bind", flush=True)
         return
-    memf = closed_mem()
+    memf = new_mem()
     census(repo, sha, memf, "--record", "earlier")
     tp = trend_path(memf)
     pre = read_bytes(tp)
@@ -3106,7 +3044,7 @@ def tp4_a14(ctx):
         R2T: "#[test]\nfn names() {\n    assert_eq!(plain_r() + only_r(), 3);\n}\n"})
     label = "M-reasons"
     spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("rs-1", None)]))
-    mem = closed_mem()
+    mem = new_mem()
     r = close(repo, sha, mem, spec)
     its = {(f, n): sub for f, raw, n, sub in section_items(section_text(mem, label))}
     cand, surv = tw_names("rone")
@@ -3169,7 +3107,7 @@ def tp4_a15(ctx):
         return {rid(x): x.get("over-cap") if x.get("route") == "structure" else "route " + str(x.get("route"))
                 for x in rows}
 
-    mem = closed_mem()
+    mem = new_mem()
     r = close(repo, sha, mem, spec)
     got = overs(mem)
     ctx.check("twins are walked before orphans, each by file then name; a row is taken while the section holds <= 6 rows and "
@@ -3183,11 +3121,6 @@ def tp4_a15(ctx):
     ctx.check("its touches: are the 12 distinct files of the rows taken, sorted", head == [exp_touch], [exp_touch], head, r)
     ctx.check("stdout: `rows listed=9 slice=0 structure=9 report=0 over-cap=3`",
               r.crows == crows(9, 0, 9, 0, 3), crows(9, 0, 9, 0, 3), r.crows, r)
-    mem2 = new_mem()
-    r2 = close(repo, sha, mem2, spec)
-    got2 = overs(mem2)
-    ctx.check("with the experiment open the same over-cap marks are made in the close file, and no section is written",
-              got2 == exp_over and not os.path.exists(close_path(mem2, label, ".section.md")), exp_over, got2, r2)
 
     # 7 twin rows in 6 files, where file-then-name, name-then-file and file-then-source-order each cut a different 7th row:
     # q1..q5 hold one pair each (names e5..e1, reversed against the files); q6 holds pair `ab` above pair `aa`
@@ -3223,7 +3156,7 @@ def tp4_a16(ctx):
     spec = put_spec(d, label + ".spec.md", spec_text([("nn-1", None)]))
     put_spec(d, "M-later.spec.md", spec_text([("lt-1", TWS)]))
     spec2 = put_spec(spec_dir(), "M-some.spec.md", spec_text([("sm-1", None)]))
-    mem = closed_mem()
+    mem = new_mem()
     stale = close_path(mem, label, ".section.md")
     os.makedirs(os.path.dirname(stale))
     with open(stale, "wb") as f:
@@ -3235,9 +3168,9 @@ def tp4_a16(ctx):
     ctx.check("control: the listed rows are a protected pair (report) and a twin an unbuilt slice lists (slice)",
               rows == exp, exp, rows, r)
     cf = close_file(mem, label)
-    ctx.check("with no row routed structure and the experiment closed, no section file is written (a stale one is removed); "
+    ctx.check("with no row routed structure, no section file is written (a stale one is removed); "
               "the close file says section null, stdout `section none` and structure=0",
-              r.rc == 0 and not os.path.exists(stale) and dig(cf, "experiment-closed") is True and isinstance(cf, dict)
+              r.rc == 0 and not os.path.exists(stale) and isinstance(cf, dict)
               and "section" in cf and cf["section"] is None and r.csection == "none" and dig(r.crows, "structure") == "0",
               ("no file", "section null", "none"), (os.path.exists(stale), cf, r.csection, r.crows), r)
     r2 = close(repo, sha, mem, spec2)
@@ -3255,7 +3188,7 @@ def tp4_a17(ctx):
     label = "M-once"
     spec_body = spec_text([("on-1", None)])
     spec = put_spec(d, label + ".spec.md", spec_body)
-    mem = closed_mem()
+    mem = new_mem()
     census(repo, sha, mem, "--record", label)
     with open(trend_path(mem), "a") as f:
         for line in (json.dumps({"label": label, "close": None}), json.dumps({"label": label, "close": "done"}),
@@ -3309,7 +3242,7 @@ def tp4_a18(ctx):
     sha = change(repo, subject("ot-7", "another milestone"), {"client/src/z3/z3.test.ts": tw_text("zthree")})
     label = "M-zero"
     spec = put_spec(spec_dir(), label + ".spec.md", spec_text([("zr-2", None), ("zr-1", None)]))
-    mem = closed_mem()
+    mem = new_mem()
     r = close(repo, sha, mem, spec)
     co = close_obj(mem, label)
     full = census(repo, sha, new_mem())
@@ -3326,8 +3259,7 @@ def tp4_a18(ctx):
               changed_got(co) == changed_exp(0, 0, 0, 0)
               and dig(co, "signals") == {"source-text": 0, "churn": 0, "protected-churn": 0, "widened": 0},
               changed_exp(0, 0, 0, 0), (changed_got(co), dig(co, "signals")), r)
-    ctx.check("the candidate list is empty: rows [] in the close file, `rows listed=0 ...`, and no section file though the "
-              "experiment is closed",
+    ctx.check("the candidate list is empty: rows [] in the close file, `rows listed=0 ...`, and no section file",
               listed(mem, label) == [] and r.crows == crows(0, 0, 0, 0, 0) and r.csection == "none"
               and not os.path.exists(close_path(mem, label, ".section.md")),
               ([], crows(0, 0, 0, 0, 0), "none"), (listed(mem, label), r.crows, r.csection), r)
@@ -3350,7 +3282,7 @@ def tp4_a19(ctx):
     spec = put_spec(d, label + ".spec.md", spec_text([("vw-1", T)]))
     put_spec(d, "M-else.spec.md", spec_text([("el-1", "client/src/elsewhere/**")]))
     put_spec(d, "notes.md", "# notes\n")
-    mem = closed_mem()
+    mem = new_mem()
     os.makedirs(os.path.join(mem, "gates"))
     for rel, text in (("gates/v.widened.jsonl", json.dumps({"slice": "v", "path": T, "why": "pin"}) + "\n"),
                       ("mr-prune-keep.json", "{}\n"), ("notes.txt", "a note\n")):
@@ -3367,7 +3299,7 @@ def tp4_a19(ctx):
               and close_row(mem, label) is not None, "all written", (r.rc, ids), r)
     ctx.check("the inspected repository's worktree (an uncommitted edit, an untracked file), index and refs are unchanged",
               after[0] == before[0], before[0], after[0], r)
-    ctx.check("every file under --mem outside prune/ (tester-ab, gates, keep file, a note) is unchanged, none added",
+    ctx.check("every file under --mem outside prune/ (gates, keep file, a note) is unchanged, none added",
               after[1] == before[1], before[1], after[1], r)
     ctx.check("the spec directory is unchanged: nothing written beside the spec", after[2] == before[2], before[2], after[2], r)
     in_prune = (sorted(os.listdir(prune)) if os.path.isdir(prune) else None,
@@ -3378,16 +3310,16 @@ def tp4_a19(ctx):
 
     inside = os.path.join(repo.path, "memdir")
     os.makedirs(inside)
-    with open(os.path.join(inside, "mr-tester-ab.jsonl"), "w") as f:
-        f.write('{"kind": "close"}\n')
+    with open(os.path.join(inside, "note.txt"), "w") as f:
+        f.write("a note\n")
     before = snapshot(repo)
     r = close(repo, sha, inside, spec)
     ctx.check("a --mem inside --repo is refused (exit 2, PRUNE-ERROR) and nothing is written in the repository",
-              close_refused(r) and snapshot(repo) == before and os.listdir(inside) == ["mr-tester-ab.jsonl"],
+              close_refused(r) and snapshot(repo) == before and os.listdir(inside) == ["note.txt"],
               "exit 2 + PRUNE-ERROR, repo unchanged", (r.rc, os.listdir(inside)), r)
     target = os.path.join(repo.path, "linked")
     os.makedirs(target)
-    outside = closed_mem()
+    outside = new_mem()
     os.symlink(target, os.path.join(outside, "prune"))
     before = snapshot(repo)
     r = close(repo, sha, outside, spec)
@@ -3396,7 +3328,7 @@ def tp4_a19(ctx):
               (os.listdir(target), snapshot(repo) == before), r)
 
     away = tempfile.mkdtemp(prefix="away-", dir=ROOT)
-    mem_ok = closed_mem()
+    mem_ok = new_mem()
     os.symlink(away, os.path.join(mem_ok, "prune"))
     r = close(repo, sha, mem_ok, spec)
     ctx.check("control: a prune/ that is a symlink to a directory outside the repository is allowed: exit 0, the close file "
@@ -3407,7 +3339,7 @@ def tp4_a19(ctx):
     tgt = os.path.join(elsewhere, "t.jsonl")
     with open(tgt, "wb") as f:
         f.write(b'{"label": "elsewhere"}\n')
-    mem_ln = closed_mem()
+    mem_ln = new_mem()
     os.makedirs(os.path.join(mem_ln, "prune"))
     os.symlink(tgt, trend_path(mem_ln))
     r = close(repo, sha, mem_ln, spec)
@@ -3430,7 +3362,7 @@ FIXTURES = [
     ("TP2-A13", tp2_a13), ("TP2-A14", tp2_a14),
     ("TP4-A1", tp4_a1), ("TP4-A2", tp4_a2), ("TP4-A3", tp4_a3), ("TP4-A4", tp4_a4),
     ("TP4-A5", tp4_a5), ("TP4-A6", tp4_a6), ("TP4-A7", tp4_a7), ("TP4-A8", tp4_a8),
-    ("TP4-A9", tp4_a9), ("TP4-A10", tp4_a10), ("TP4-A11", tp4_a11), ("TP4-A12", tp4_a12),
+    ("TP4-A9", tp4_a9), ("TP4-A10", tp4_a10), ("TP4-A11", tp4_a11),
     ("TP4-A13", tp4_a13), ("TP4-A14", tp4_a14), ("TP4-A15", tp4_a15), ("TP4-A16", tp4_a16),
     ("TP4-A17", tp4_a17), ("TP4-A18", tp4_a18), ("TP4-A19", tp4_a19),
 ]
