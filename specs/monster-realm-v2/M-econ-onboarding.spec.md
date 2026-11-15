@@ -34,8 +34,11 @@ Measured at `9fb5bd25`:
 - **The starter grant infers "new player" from live ownership.** `on_disconnect` deletes the
   `player` row, so every session's first `join_game` runs the grant check again. An identity that
   reaches zero monsters gets a second starter with fresh hidden IVs
-  (R-weekly-review-2026-10-23-F1). Today the only path to zero monsters is account deletion: the
-  session trade refuses a trade that would leave a side with no monster
+  (R-weekly-review-2026-10-23-F1). Two paths reach zero monsters today. One is account deletion,
+  after which the identity can never join again. The other is the guest claim:
+  `accounts::complete_guest_claim` moves every monster to the account through `rekey_all`, and the
+  retired guest token can still call `join_game`, so it gets a second starter. The session trade
+  refuses a trade that would leave a side with no monster
   (`game_core::trading::session`, `TradeSessionError::LastMonster`), the legacy propose path
   returns `LEGACY_TRADE_RETIRED` (`server-module/src/trading.rs`), and no reducer releases a
   monster. Any future path to zero monsters would reopen the re-grant, because the rule reads
@@ -98,7 +101,7 @@ Named deferrals:
   (items), with `MAX_BALANCE` / `MAX_ITEM_STACK` headroom checked first — reject, never clamp.
 - A once-only grant is gated by a persistent marker set in the same transaction as the grant,
   never inferred from what the identity owns (the GrantItem `NotFlag`+`SetFlag` pattern that
-  `validate_content` rule 6c enforces for dialogue content).
+  `validate_npc_content` rule 6c enforces for dialogue content).
 - Content is data in `game-core/content/`, carried by `CONTENT_VERSION`
   (`server-module/src/lib.rs`) and the `content-version` eval's baseline
   (`evals/baselines/content-hash.json`). Schema changes are additive only. No dev reducers.
@@ -130,42 +133,51 @@ Named deferrals:
 
 - `decision-defaulted:starter-claim-marker=reserved-dialogue-flag` — the marker is the flag
   `sys:starter_claimed` in the owner's private `player_dialogue_state.flags`. That row is already
-  rekeyed by the guest claim, erased by the deletion cascade (`account-e2e` lists it `Erase`),
-  counted by `accounts::account_has_game_data`, and never sent to a client. A new table would need
-  all four wired. Writes go through a `pub(crate)` helper in `npc.rs`, the table's owner. Content
-  may not name a `sys:` flag: `validate_content` refuses any dialogue condition or effect, or
-  quest condition, that does. `validate_content` runs in the content tests (CI), not at load: the
-  embedded trees are validated before they ship.
+  rekeyed by the guest claim (`npc::rekey_npc_state`), erased by the deletion cascade
+  (`npc::erase_npc_state`), counted by `accounts::account_has_game_data`, and delivered to no
+  client; it appears only in the owner's own data export (the table is `exportable`). A new table
+  would need a lifecycle-manifest entry plus the rekey, game-data, export and schema-baseline
+  wiring. Writes go through a `pub(crate)` helper in `npc.rs`, the table's owner. Content may not
+  name a `sys:` flag: `validate_npc_content` (`game-core/src/content.rs`, home of the GrantItem
+  rule 6c) refuses any dialogue condition or effect, quest start condition or quest step condition
+  that does. It runs in the publish validate phase (`server-module/src/content.rs`) and in the
+  content tests, so a tree that names one never ships.
 - `decision-defaulted:retired-guest=marker-tombstone` — `accounts::complete_guest_claim` moves the
-  guest's dialogue row to the account (`npc::rekey_npc_state`), and nothing stops the retired guest
-  token from calling `join_game` again: it holds no account row, so `require_not_deleting` passes.
-  Without the marker it would get a second kit and a fresh starter. When the moved row holds
-  `sys:` flags, `rekey_npc_state` leaves the guest a row with only those flags and a copy of
-  `done_quests`, so the retired guest gets no second kit or starter and cannot redo a quest. This
-  is a named change to "the claim moves, never copies": the account holds the whole row, and the
-  guest keeps the tombstone.
+  guest's dialogue row to the account, and nothing stops the retired guest token from calling
+  `join_game` again: it holds no account row, so `require_not_deleting` passes. Without a marker it
+  would get a second kit and a fresh starter. When the moved row holds `sys:` flags,
+  `rekey_npc_state` leaves the guest a row with only those flags and a copy of `done_quests`, so the
+  retired guest gets no second kit or starter and cannot redo a quest. This is a named change to
+  "the claim moves, never copies": the account holds the whole row, and the guest keeps the
+  tombstone.
 - `decision-defaulted:kit-contents=200g+2xLureBerry+1xAntidote` — #587 D2's "~200g + 2–3 basic
   items (a heal item and a bait)". The Antidote is the heal item: the only one that exists. Two
   Lure Berries, because recruiting is the operator's dominant loop. The 200 gold buys exactly one
   more Lure Berry, the intended first purchase.
 - `decision-defaulted:kit-content-home=game-core/content/starter_kit.ron` — one record
-  (`currency`, `items: [(item_id, qty)]`), loaded by `game_core::content::load_starter_kit`,
-  checked by `validate_content` (items exist, every qty ≥ 1, no item twice, each qty within
-  `MAX_ITEM_STACK`, currency within `MAX_BALANCE`), and read on the server through
-  `content_cache::cached_starter_kit` (the ADR-0089 `LazyLock` pattern). It is not synced to a
-  table: no client reads it.
+  (`currency`, `items: [(item_id, qty)]`; `tactics_tuning.ron` is the single-record precedent),
+  loaded by `load_starter_kit` and checked by a new `validate_starter_kit(&kit, &items)` beside
+  `validate_shops` (items exist, every qty ≥ 1, no item twice, each qty within `MAX_ITEM_STACK`,
+  currency within `MAX_BALANCE`). `game-core/src/lib.rs` re-exports both beside the other
+  `load_*`/`validate_*` names, and `server-module/src/content.rs`'s publish validate phase calls
+  the validator. The server reads the kit through `content_cache::cached_starter_kit` (the ADR-0089
+  `LazyLock` pattern). It is not synced to a table: no client reads it.
+- `decision-defaulted:kit-load-failure=fail-loud` — when `cached_starter_kit` returns `Err` at
+  join, `join_game` refuses with a structured reject log, as it does today when the starter species
+  is missing ("content sync required"). Nothing is written. The embedded kit is validated at
+  publish, so this arm is reachable only through a broken build.
 - `decision-defaulted:kit-tradeable=yes` — kit items are ordinary items. Soulbinding needs a new
-  item field and a trade rule. Each fresh identity already gets a tradeable starter monster, so the
-  kit adds 200 gold per identity to an alt farm that exists today (Risks).
+  item field and a trade rule. Each fresh identity already gets a tradeable starter monster; the
+  alt-farm consequence is in Risks.
 - `decision-defaulted:legacy-joiner=kit-without-second-starter` — an identity with no marker that
   already owns a monster (it joined before `eo-1`) gets the kit and the marker, and no second
   monster. An identity with no marker and no monster gets both. An identity with the marker gets
   nothing.
 - `decision-defaulted:kit-headroom=whole-kit-or-none` — the kit is checked against the wallet and
   stack caps before any write. A kit that does not fit (reachable only for a legacy joiner near a
-  cap) is not granted, the marker is not set, the join still succeeds, and a structured
-  `starter_kit_skipped` log line names the cap. The next join tries again. A fresh identity always
-  fits.
+  cap) is not granted, the marker is not set, the join still succeeds, and a
+  `starter_kit_skipped` line names the cap through `observability::mr_log`. The next join tries
+  again. A fresh identity always fits.
 - `decision-defaulted:export-tier-signal=unchanged` — `request_data_export` sizes its admission
   cap with `export_live_row_cap(is_account_holder, wallet_exists)` (`server-module/src/privacy.rs`).
   An anonymous caller with no wallet row gets the smallest "newcomer" tier. The kit gives every
@@ -179,7 +191,8 @@ Named deferrals:
   (`starter_grant(claimed, owns_monster) -> StarterGrant`, pure) and the kit grant live in a new
   module. `join_game` keeps its statements and replaces its `has_monsters` test with one call. The
   monster-roll block stays in `movement.rs`, gated by the decision's `monster` field: this slice
-  changes the gate, it does not move the block.
+  changes the gate, it does not move the block. `privacy_enforcement_tests.rs` parses every module
+  `lib.rs` declares, so `onboarding.rs` uses the code shapes its parser already accepts.
 - `decision-defaulted:heal-cost=free` — `eo-4` keeps every heal location at no cost. Under the
   balance stance (Pokémon-style: healing is free), a heal charge would be a sink against a
   one-player faucet. GDD §7's "town healing cost" stays inert, and the worksheet records it with
@@ -187,25 +200,27 @@ Named deferrals:
 - `decision-defaulted:quest-reward=quest_001:50->150` — the one quest pays an Antidote's price.
   #587 D1 makes quests the compensating faucet for recruit-heavy play.
 - `decision-defaulted:prices-and-divisor=unchanged` — `BATTLE_CURRENCY_BST_DIVISOR` stays 10 (the
-  essence divisor stays 3× steeper), shop prices stay, sell stays 40% of buy. At about 31 gold a
-  KO, a Lure Berry costs about seven KOs; `eo-4.4`'s worksheet measures whether that holds per
-  session.
-- `decision-defaulted:recruit-loop-faucet=pack-KOs-plus-quest` — a recruit-heavy player earns
-  from the wilds KO'd in a pack battle and from the quest. A lone-wild recruit pays nothing (D1).
-  The worksheet gives the per-session number for that loop.
+  essence divisor stays 3× steeper), shop prices stay, sell stays 40% of buy.
+- `decision-defaulted:recruit-loop-budget=lure-berry-within-15-battles` — a recruit-heavy player
+  (every wild battle ends in a recruit, the rest of the pack KO'd) earns from the KOs. With zone 0's
+  `pack_weights` (600/300/100), 0.5 KOs a battle on average, so about 15 gold a battle at a 31-gold
+  KO: a Lure Berry in about 13 battles. `eo-4.4` pins "within 15". A lone-wild recruit pays
+  nothing (D1).
 
-The builder may move a default value when the worksheet's measurement contradicts it, one
-`plan-delta:` line each (`standards/spec-driven.md` §Adapting the plan during a build).
+Every value above is gameplay a player sees, so it is not the builder's to move
+(`standards/spec-driven.md` §Adapting the plan during a build). A build whose measurement
+contradicts one records it with `mr-gates notes add` and, if the slice cannot hold, parks.
 
 ## Contracts between slices
 
-- **C1 (`eo-1` → `eo-4`):** the kit file `starter_kit.ron`, the loader, and a fresh identity's
-  start state of 200 gold, 2 Lure Berries and 1 Antidote. `eo-4`'s worksheet and its affordability
-  invariant read the kit through `load_starter_kit`. Proof after merge: `eo-4.1` passes on
-  `master`, and `client/e2e/wallet-balance.spec.ts` reads `Gold: 350` (kit + quest).
+- **C1 (`eo-1` → `eo-4`):** the kit file `starter_kit.ron`, `load_starter_kit`, and a fresh
+  identity's start state of 200 gold, 2 Lure Berries and 1 Antidote. `eo-4.1` reads the kit
+  through the loader. Proof after merge: `eo-4.1` passes on `master`, and
+  `client/e2e/wallet-balance.spec.ts` reads `Gold: 350` (kit + quest).
 - **C2 (`eo-1` ↔ guest claim / deletion):** the marker lives in a row the claim rekeys (leaving
-  the guest a tombstone) and the cascade erases. Proof after merge: `eo-1.5`, `eo-1.6` and
-  `account-e2e` (`just eval`) pass on `master`.
+  the guest a tombstone) and the cascade erases. Proof after merge: `eo-1.5`, `eo-1.6`, `eo-1.7`
+  and `account-e2e` (`just eval`), whose vacuity allowlist no longer excuses
+  `player_dialogue_state`, pass on `master`.
 - **C3 (`eo-1`, `eo-4` ↔ `CONTENT_VERSION`):** each slice bumps `CONTENT_VERSION` once and
   re-records `evals/baselines/content-hash.json`. The pair is ordered, so the second bump starts
   from the first. Proof after merge: the `content-version` eval passes on `master`.
@@ -214,15 +229,17 @@ The builder may move a default value when the worksheet's measurement contradict
 
 `join_game` is a multi-responsibility reducer. `eo-1` adds no logic to it: the decision and the
 kit grant go in `server-module/src/onboarding.rs`, the marker helpers in `npc.rs` (the table's
-owner), the loader in `game-core/src/content.rs` beside `load_heal_locations`. `eo-4` changes data,
-a tuning test and a doc. The two slices share `server-module/src/lib.rs`,
-`evals/baselines/content-hash.json` and `client/e2e/wallet-balance.spec.ts`, and they are ordered
-(`eo-4` after `eo-1`). No production file is edited by both, so no refactor slice comes first.
+owner), the loader and validator in `game-core/src/content.rs` beside `load_shops` /
+`validate_shops`. `eo-4` changes data, tests and a doc. The slices share
+`server-module/src/lib.rs` (the version constant), `game-core/src/content.rs` (`eo-4` edits only
+the quest parity snapshot test), `evals/baselines/content-hash.json` and
+`client/e2e/wallet-balance.spec.ts`, and they are ordered (`eo-4` after `eo-1`), so no refactor
+slice comes first.
 
 ### eo-1 — starter kit at first join; the starter is granted once per identity
 type: feature · tier: hard
 category: economy/onboarding · severity: MED · size: MODERATE
-touches: game-core/content/starter_kit.ron, game-core/src/content.rs, server-module/src/onboarding.rs, server-module/src/onboarding_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/npc.rs, server-module/src/npc_tests.rs, server-module/src/content_cache.rs, server-module/src/content_cache_tests.rs, server-module/src/lib.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/guards_tests.rs, server-module/src/accounts_tests.rs, evals/baselines/content-hash.json, client/e2e/wallet-balance.spec.ts, client/e2e/trade-zz-negative.spec.ts, client/e2e/recruit.spec.ts, client/e2e/battle-dpad.spec.ts, docs/DECISIONS.md
+touches: game-core/content/starter_kit.ron, game-core/src/content.rs, game-core/src/lib.rs, server-module/src/onboarding.rs, server-module/src/onboarding_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/npc.rs, server-module/src/npc_tests.rs, server-module/src/content.rs, server-module/src/content_cache.rs, server-module/src/content_cache_tests.rs, server-module/src/lib.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/guards_tests.rs, server-module/src/accounts_tests.rs, evals/baselines/content-hash.json, evals/account-e2e.eval.mjs, client/e2e/wallet-balance.spec.ts, client/e2e/trade-zz-negative.spec.ts, client/e2e/trade-full.spec.ts, client/e2e/trade-session.spec.ts, client/e2e/recruit.spec.ts, client/e2e/tactics-wild.spec.ts, client/e2e/encounter-battle.spec.ts, docs/DECISIONS.md
 after: []
 
 `join_game` asks `onboarding` what to grant before its monster block:
@@ -238,32 +255,41 @@ reducer signature or bindings change, and no client source change.
 
 Measured pins (each a named intentional change; the build widens for any further one it measures):
 - The native host aborts on a write to a table a test did not register. Every native caller of
-  `join_game` is in one of `movement_tests.rs`, `monster_mgmt_tests.rs` (`dw_insert_sites`, a
-  brand-new player), `guards_tests.rs` and `accounts_tests.rs`. A fresh-identity call now also
-  writes `inventory`, `player_wallet` and `player_dialogue_state`, and its fixture registers them.
+  `join_game` is in `movement_tests.rs`, `monster_mgmt_tests.rs` (`dw_insert_sites`, a brand-new
+  player), `guards_tests.rs` or `accounts_tests.rs`. A fresh-identity call now also writes
+  `inventory`, `player_wallet` and `player_dialogue_state`, and its fixture registers them.
   Assertions stay.
-- `client/e2e/wallet-balance.spec.ts`: `EXPECTED_BALANCE_TEXT` `Gold: 50` becomes `Gold: 250` (kit
-  + quest). The second identity's "unknown" arm was "B has no wallet row"; B now owns 200. The
-  privacy assertion becomes "B reads its own 200, never A's 250".
-- `client/e2e/trade-zz-negative.spec.ts`: the "A must hold no coin" / "B holds no coin"
-  preconditions become the kit's 200. Seeded balances count from there.
-- `client/e2e/recruit.spec.ts` R1 ("a fresh inventory holds no bait") and
-  `client/e2e/battle-dpad.spec.ts` (`NO_BAIT_ROW` absent) now see the kit's Lure Berries. Their
-  no-bait case needs an identity that spends or sells its berries first, or the test's subject
-  changes to "the kit's bait row is offered".
 - A claim test in `accounts_tests.rs` or `npc_tests.rs` that asserts the guest keeps no
-  `player_dialogue_state` row changes to "keeps only the tombstone" (`retired-guest` above). The
-  `account-e2e` eval checks monsters for move-not-copy, not dialogue state (it cannot seed that
-  table), so it is unaffected.
+  `player_dialogue_state` row changes to "keeps only the tombstone" (`retired-guest`).
+- `evals/account-e2e.eval.mjs`: `player_dialogue_state` leaves `S9_VACUITY_ALLOWLIST` (the reason
+  it gives, "no zone-0 organic writer", is false once `join_game` writes the marker) and
+  `S9_VACUITY_ALLOWLIST_CAP` goes from 9 to 8. Its `buildSeedStatements` inserts item rows that
+  would sit beside the kit's stacks; they seed by update (or delete-then-insert) instead.
+- e2e seeding: an identity now owns one stack of item 1 and of item 3 and a wallet row from its
+  join. A spec that SQL-inserts a second stack of either item breaks the one-stack-per-item rule
+  (`item_count` and `consume_n` read the first row), and one that inserts a `player_wallet` row
+  collides on its key. Those seeds become updates: `tactics-wild.spec.ts` (bait),
+  `recruit.spec.ts`, `trade-zz-negative.spec.ts`, `trade-full.spec.ts` (items and wallet).
+- e2e start-state assertions:
+  - `wallet-balance.spec.ts`: `EXPECTED_BALANCE_TEXT` `Gold: 50` becomes `Gold: 250`, as do its
+    `'50'` literals. "B must own NO player_wallet row" and the "unknown" arm become "B reads its
+    own 200, never A's 250". The escape valve that treats "a wallet row exists" as "the quest paid"
+    reads the balance instead.
+  - `trade-zz-negative.spec.ts` "A must hold no coin" / "B holds no coin" and `trade-full.spec.ts`
+    "hold no item" / "no wallet row" become the kit's state. Seeded balances count from there.
+  - `trade-session.spec.ts`: the coin branches its comments call unreachable are now taken. The
+    comments and the branches' expectations change.
+  - `recruit.spec.ts` R1 ("a fresh inventory holds no bait") becomes "the kit's bait row is
+    offered". Its no-bait case uses an identity that has sold its berries first.
+  - `encounter-battle.spec.ts`'s "the win must credit currency" (`balance > 0`) would pass on the
+    kit alone. It compares against the balance read before the battle.
 - `evals/baselines/content-hash.json` is re-recorded with `CONTENT_VERSION`.
-- Not in `touches:`: `account-e2e`'s per-table string marks tables the fixture owns rows in. The
-  fixture already owns `inventory`, `player_wallet` and `player_dialogue_state` rows (`:1`), so
-  the kit adds no owned table. The `client-surface-privacy`, `spacetime-type-snapshot` and
-  `bindings-drift` evals see no change, because no table, type or reducer changes.
+- The `client-surface-privacy`, `spacetime-type-snapshot` and `bindings-drift` evals see no
+  change, because no table, type or reducer changes.
 
 The `docs/DECISIONS.md` entry records the starter rule ("the starter is a once-per-identity grant
-recorded by a marker; ownership is never the test"), the kit and the reserved `sys:` flag
-namespace.
+recorded by a marker; ownership is never the test"), the retired-guest tombstone, the kit and the
+reserved `sys:` flag namespace.
 
 - **eo-1.1:** WHEN an identity with no starter marker and no monster joins, THE SERVER SHALL grant one starter monster, 200 gold, 2 Lure Berries and 1 Antidote, and set the marker, in the one `join_game` transaction (`server-module/src/onboarding_tests.rs`, through `join_game` on the native host).
 
@@ -273,56 +299,63 @@ namespace.
 
 - **eo-1.4:** WHEN the kit would push the joiner's balance past `MAX_BALANCE` or a stack past `MAX_ITEM_STACK`, THE SERVER SHALL grant no part of the kit, leave the marker unset, log `starter_kit_skipped`, and still complete the join (`server-module/src/onboarding_tests.rs`).
 
-- **eo-1.5:** WHEN a guest identity that claimed its kit is claimed into an account, THE account SHALL hold the marker and a later join of the account SHALL grant nothing, and WHEN the retired guest identity joins again, THE SERVER SHALL grant it no kit and no monster and SHALL not pay it quest_001 again (`server-module/src/accounts_tests.rs`).
+- **eo-1.5:** WHEN a guest identity holding the marker is claimed into an account, THE account SHALL hold the marker and the guest's quest history, and a later join of the account SHALL grant nothing (`server-module/src/accounts_tests.rs`).
 
-- **eo-1.6:** WHEN an identity's deletion completes, THE marker SHALL be gone with the rest of its dialogue state, and THE identity's `join_game` SHALL be refused (`server-module/src/accounts_tests.rs`).
+- **eo-1.6:** WHEN the retired guest identity of a completed claim joins again, THE SERVER SHALL grant it no kit and no monster, and a talk to quest_001's NPC SHALL pay it nothing (`server-module/src/accounts_tests.rs`).
 
-- **eo-1.7:** WHEN content holds a starter kit naming an unknown item, a zero quantity, an item twice, a quantity above `MAX_ITEM_STACK` or a currency above `MAX_BALANCE`, or a dialogue condition or effect or a quest condition naming a `sys:` flag, THE content validation SHALL refuse it with an error naming the offending entry (`game-core/src/content.rs` tests).
+- **eo-1.7:** WHEN an identity's deletion completes, THE marker SHALL be gone with the rest of its dialogue state, and THE identity's `join_game` SHALL be refused (`server-module/src/accounts_tests.rs`).
 
-- **eo-1.8:** WHEN a fresh browser identity joins and opens the shop, THE wallet readout SHALL read `Gold: 200` and the Bag SHALL list 2 Lure Berries and 1 Antidote (`client/e2e/wallet-balance.spec.ts`).
+- **eo-1.8:** WHEN content holds a starter kit naming an unknown item, a zero quantity, an item twice, a quantity above `MAX_ITEM_STACK` or a currency above `MAX_BALANCE`, or a dialogue condition or effect or a quest start or step condition naming a `sys:` flag, THE content validation SHALL refuse it with an error naming the offending entry (`game-core/src/content.rs` tests).
+
+- **eo-1.9:** WHEN the starter kit cannot be loaded at join, THE SERVER SHALL refuse the join with a structured reject log and write nothing (`server-module/src/onboarding_tests.rs`).
+
+- **eo-1.10:** WHEN a fresh browser identity joins and opens the shop, THE wallet readout SHALL read `Gold: 200` and the Bag SHALL list 2 Lure Berries and 1 Antidote (`client/e2e/wallet-balance.spec.ts`).
 
 ### eo-4 — faucet/sink tuning pass
 type: feature · tier: hard
-category: economy-balance · severity: MED · size: SMALL (data + one doc + tests)
-touches: docs/economy-tuning.md, game-core/content/quests/000-core.ron, game-core/tests/pt_d3_tuning.rs, server-module/src/lib.rs, evals/baselines/content-hash.json, client/e2e/wallet-balance.spec.ts, client/e2e/dialogue.spec.ts, docs/DECISIONS.md
+category: economy-balance · severity: MED · size: SMALL (data + tests + one doc)
+touches: docs/economy-tuning.md, game-core/content/quests/000-core.ron, game-core/src/content.rs, game-core/tests/pt_d3_tuning.rs, server-module/src/lib.rs, evals/baselines/content-hash.json, client/e2e/wallet-balance.spec.ts, client/e2e/dialogue.spec.ts, docs/DECISIONS.md
 after: [eo-1]
 
-The worksheet `docs/economy-tuning.md` is a new file. It states current behaviour and reads the
-numbers from the content and the code it names. A later retune edits it in the same PR as the
-values. The content tests extend the existing `game-core/tests/pt_d3_tuning.rs`, which already
-pins the anti-arbitrage rule and the price bands over the shipped registries.
+The tuning invariants are tests over the shipped content: they extend the existing
+`game-core/tests/pt_d3_tuning.rs`, which already pins the anti-arbitrage rule and the price bands.
+The worksheet `docs/economy-tuning.md` (new; not a criterion) explains the numbers for whoever
+retunes next: gold per loop against the cheapest and median sink, the inert heal sink, the
+monster-sink gap and the pt3-2026-10-145 price↔AP rule. It cites the `pt_d3_tuning.rs` tests
+by name instead of copying their values, so a retune that breaks the reasoning fails a test.
 
-Measured pins: `client/e2e/dialogue.spec.ts` UIF4.2's toast text ("You received 50 gold.") and
-`client/e2e/wallet-balance.spec.ts`'s quest-completion balance move with the reward. The toast
-reports the balance gain across the batch, so the kit does not enter it. Client unit tests that
-use 50 are fixtures that do not read content (`statusModel.test.ts`, `catalog.test.ts`) and stay.
+Measured pins:
+- `game-core/src/content.rs` `m12c_quest_defs_parity_snapshot` pins quest_001's `currency: 50`.
+- `client/e2e/dialogue.spec.ts` UIF4.2's toast text ("You received 50 gold.") and
+  `client/e2e/wallet-balance.spec.ts`'s quest-completion balance move with the reward. The toast
+  reports the balance gain across the batch, so the kit does not enter it.
+- Client unit tests that use 50 are fixtures that read no content (`statusModel.test.ts`,
+  `catalog.test.ts`, `main.dialogueEnded.test.ts`) and stay.
 
-The `docs/DECISIONS.md` entry records the tuning ruling: healing free under the balance stance,
-the quest as the recruit-loop faucet, prices and divisor unchanged, with the worksheet as the
-evidence.
+The `docs/DECISIONS.md` entry records the tuning ruling: healing is free under the balance stance,
+and the quest is the recruit-loop faucet, citing the worksheet.
 
-- **eo-4.1:** THE shipped content SHALL let a fresh player afford one Lure Berry from the kit's currency alone, and SHALL price every battle-usable item (`tactics_items`) at no more than the median shop buy price (`game-core/tests/pt_d3_tuning.rs`, over `load_starter_kit`, `load_shops`, `load_items` and the tactical item sidecar).
+- **eo-4.1:** THE shipped content SHALL let a fresh player afford one Lure Berry from the kit's currency alone (`game-core/tests/pt_d3_tuning.rs`, over `load_starter_kit`, `load_shops` and `load_items`).
 
 - **eo-4.2:** THE shipped heal locations SHALL charge nothing: `cost_currency` 0, no cost item and `cost_qty` 0 (`game-core/tests/pt_d3_tuning.rs`, over `load_heal_locations`).
 
 - **eo-4.3:** WHEN a player completes quest_001, THE SERVER SHALL credit 150 gold once, and THE toast SHALL say "You received 150 gold." (`client/e2e/dialogue.spec.ts` UIF4.2; `client/e2e/wallet-balance.spec.ts` reads `Gold: 350` for a fresh identity that completed it).
 
-- **eo-4.4:** THE worksheet SHALL give gold per 30-minute session for three loops — KO grind, recruit-heavy pack battles (one recruit and the rest KO'd), and the quest line — each against the cheapest and the median shop price. It SHALL name every input it uses with its source (BST range and typical BST, pack sizes from `tactics_zones`, `BATTLE_CURRENCY_BST_DIVISOR`, shop and sell prices, the kit, the quest reward) and record the inert heal sink and the monster-sink gap (`docs/economy-tuning.md`).
+- **eo-4.4:** THE expected currency of one recruit-heavy wild battle in zone 0 (its `pack_weights`, every wild but one KO'd, each KO paying `battle_currency_reward` of the encounter table's mean wild BST) SHALL buy a Lure Berry within 15 battles (`game-core/tests/pt_d3_tuning.rs`, over `load_encounters`, `load_species`, the tactical zone table and `load_shops`).
 
-- **eo-4.5:** THE worksheet SHALL check the operator's item rule (pt3-2026-10-145: the flat in-battle item AP cost is balanced by the item's price and its consumption) for every battle-usable item against the AP cost `M-battle-tactics` pins (`item_cost` in `game-core/content/tactics_tuning.ron`), and SHALL name the re-check that a later AP or price change owes (`docs/economy-tuning.md`).
+- **eo-4.5:** EVERY battle-usable item (the tactical item sidecar) SHALL be sold by a shop at a buy price above 0 and at or below the median buy price of the shop's stock, the lower middle value when the count is even, so its flat AP cost (`item_cost`, `game-core/content/tactics_tuning.ron`) is balanced by a price a player pays and by the item being used up (pt3-2026-10-145) (`game-core/tests/pt_d3_tuning.rs`).
 
 ## Post-integration verification (the milestone is done when all hold on `master`)
 
 - Full `just ci` green, with `just eval` included: the `content-version` eval passes at the second
-  bump (C3), and `bindings-drift`, `spacetime-type-snapshot` and `client-surface-privacy` show no
-  change (no schema, type or reducer change in either slice).
-- On `master`, `client/e2e/wallet-balance.spec.ts` (`eo-1.8`, `eo-4.3`) and
+  bump (C3); `account-e2e` passes with its trimmed allowlist (C2); and `bindings-drift`,
+  `spacetime-type-snapshot` and `client-surface-privacy` show no change (no schema, type or reducer
+  change in either slice).
+- On `master`, `client/e2e/wallet-balance.spec.ts` (`eo-1.10`, `eo-4.3`) and
   `client/e2e/dialogue.spec.ts` pass together. That is the integrated proof of C1: a fresh identity
   joins, receives exactly one kit, completes the quest and holds 350.
-- `server-module/src/accounts_tests.rs`'s `eo-1.5` and `eo-1.6` cases and the `account-e2e` eval pass together
-  (C2).
-- One manual playtest pass on a fresh local database, recorded in `eo-4`'s PR, with the same steps
-  run in a single-player world and on a friends server:
+- `server-module/src/accounts_tests.rs`'s `eo-1.5`–`eo-1.7` cases pass on `master` (C2).
+- One manual playtest pass on one fresh local database, recorded in `eo-4`'s PR:
   - a new player sees 200 gold and the kit in the Bag;
   - they buy one Lure Berry;
   - a pack battle that ends in a recruit pays the KOs;
@@ -354,10 +387,11 @@ evidence.
   identity never gets a second kit. While a deletion is pending, the same gate refuses
   `open_trade_session` and `set_trade_offer`.
 - **A marker with zero monsters is final.** `eo-1.2` grants nothing to a claimed identity that owns
-  no monster. Today only deletion reaches zero monsters, and deletion blocks the join. A future
+  no monster. Today deletion (which blocks the join) and the guest claim (whose retired guest keeps a
+  tombstone marker) reach zero monsters. A future
   release or loss mechanic must bring its own floor rule; this one does not re-grant.
 - **A reserved flag inside dialogue state.** Content that named `sys:starter_claimed` could clear
-  the marker and re-open the grant. `eo-1.7` makes `validate_content` refuse any `sys:` flag in
+  the marker and re-open the grant. `eo-1.8` makes `validate_npc_content` refuse any `sys:` flag in
   dialogue or quest content. That check is the boundary, so it lands in the same slice.
 - **The e2e corpus assumed an empty start.** Four specs are measured pins. Others that only read
   their own purchases still pass, and the build runs the whole e2e suite, widening for any further
