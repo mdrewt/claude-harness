@@ -59,15 +59,16 @@ check", naming the `*_parts` test that survives it.
 The M-econ-onboarding close census (`mr-prune close`, game `cee8c4f2`) routes these ten rows here
 and one more: `clamp_position` in `game-core/src/lib.rs`, a `pub fn` that only its own test
 `clamp_position_bounds` calls. It is a candidate: the build confirms that no production file or
-other crate names it, then removes it with that test under the same "Deleting a check" rule, or
-keeps it and gives the caller it found in the PR.
+other crate names it, then removes it with that test (the surviving check is the compiler: the
+test's subject is gone), or keeps it and names the caller it found in the PR body.
 
 - **ST8.1:** WHEN `cargo nextest run -p game-core` runs IT SHALL pass, with no assertion edited
   other than a re-pointed call.
 - **ST8.2:** WHEN `just ci` runs on the slice's head IT SHALL pass.
 
 Confirmed in the diff at merge, not by a criterion: none of the ten names is declared or
-re-exported; every deleted test names its survivor in the PR body.
+re-exported; every deleted test names its survivor in the PR body; `clamp_position` is declared
+nowhere, or the PR body names the caller that keeps it.
 
 ### st-9 — server raising: the test-only `HEAL_COOLDOWN_MS` constant goes
 type: refactor · tier: routine

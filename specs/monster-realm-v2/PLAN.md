@@ -190,12 +190,12 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
   press of a direction you do not face turns and a press you face steps; a battle start drops
   the battlers' queued moves; the reconnect backoff climbs one rung per failed attempt; and the
   send-depth study that keeps one step in flight, the game's `docs/send-pipeline-depth.md`).
-- Economy: **M-econ-onboarding** (`eo-*`; a first join grants the starter kit — 200 gold, 2 Lure
-  Berries, 1 Antidote, data in the game's `game-core/content/starter_kit.ron` — and the starter
-  monster once per identity, behind the `sys:starter_claimed` marker in the owner's dialogue state,
-  with a tombstone left to the retired guest of a claim; then one tuning pass: healing is free,
-  quest_001 pays 150 as the recruit loop's faucet, and the relations between the numbers are
-  tests in the game's `game-core/tests/pt_d3_tuning.rs`, explained in its `docs/economy-tuning.md`).
+- Economy: **M-econ-onboarding** (`eo-*`; a first join grants the starter kit, data in the game's
+  `game-core/content/starter_kit.ron`, and the starter monster once per identity, behind the
+  `sys:starter_claimed` marker in the owner's dialogue state, with a tombstone left to the retired
+  guest of a claim; then one tuning pass: healing is free, quest_001 is the recruit loop's faucet,
+  and the relations between the numbers are tests in the game's `game-core/tests/pt_d3_tuning.rs`,
+  explained in its `docs/economy-tuning.md`).
 - Playtest-3 fixes: **M-pt3-quickfix** (`qf-*`; the playtest-3 bug-fix and
   low-hanging-fruit wave).
 - Corrective: **M-test-truth** (`ttd-1`; one whole-tree i18n scan replaces the per-file
@@ -213,7 +213,7 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
 
 ## Risks (live)
 
-- The two deliberate pre-release economy gaps (heal sink inert; PvP side-B reward) are OWNER
+- Free healing (the game's `docs/DECISIONS.md`) and the PvP side-B reward gap are OWNER
   decisions, not bugs — do not "fix" them without an operator directive.
 - M18/M19 build cost is speculative until the playtest-3 read; treat their sketches as intent.
 - Any schema change re-opens migration risk: publish-over-data proof required, always.
