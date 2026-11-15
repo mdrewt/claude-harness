@@ -416,6 +416,70 @@ Steamworks/overlay integration, licence, signing and update.
   per hour — each derived from a reported median with its headroom stated and at most twice that
   median unless the entry gives the reason.
 
+Build note (lpg-0): lpg-0.1 and the lpg-0 preamble name the pinned host as 2.8.1 and one conversion
+date. The game pins SpacetimeDB 2.11.0 (AGENTS.md; lockstep since 2026-10-15), and the measurements
+ran on 2.11.0. "2.16.0" is the version in LICENSE.txt on the SpacetimeDB default branch; it has no
+release tag (newest release v2.15.0, 2026-11-10, Change Date 2031-11-05). The 2.11.0 file carries
+Change Date 2031-09-15; 2031-11-10 is the default-branch file's. The licence converts a version on
+its Change Date or the fourth anniversary of that version's first public distribution, whichever
+comes first. docs/local-play.md section 1 states both files.
+
+Build note (lpg-0): The Notes line "the log grows ~6 MB per hour of one player walking" reads,
+measured at 0e7a089d on 2.11.0 (median of three 30-minute runs): 8.21 MiB per hour for one client
+walking at five intents a second, 44.99 for eight, 1.24 for one connected player standing still, and
+none with nobody connected.
+
+Build note (lpg-0): Sign-in design: "the server checks it, applies the host's access rule, and then
+issues its own token for that world" has no mechanism at 2.11.0. A standalone host mints only
+anonymous tokens (POST /v1/identity, random subject, iss "localhost") and a module cannot sign.
+docs/local-play.md section 3 names the design as: connect under the world's own anonymous token and
+verify the attestation as a reducer argument with a verifier compiled into the module. It also
+records that the audience-scoped fallback's defence is one any-of allow-list checked in the connect
+reducer.
+
+Build note (lpg-0): LP3 can create a world without the spacetime command-line tool: the module
+publishes over the host's HTTP API (PUT /v1/database/<name> with the wasm body and a token from POST
+/v1/identity), 1.2 s on the measuring machine. The host needs --jwt-key-dir (or both key paths) and
+creates the key pair on first start; it listens on 0.0.0.0:3000 unless --listen-addr is given.
+
+Build note (lpg-0): The Named-deferrals row "A stable world address across launches" assumes the
+reconnect token survives a launch. It does not: client/src/net/authToken.ts keeps it in per-tab
+session storage, so an app that starts with empty session storage joins as a new anonymous player
+and the previous launch's character is out of reach. Measured: three launches against one world made
+three players; with the first launch's session-storage entry written back before the page's scripts
+ran, three launches resumed the first identity. LP2/LP3/LP4 need the shell to carry that token
+across launches, or the account binding, before a single-player world keeps its player.
+
+Build note (lpg-0): The official module checks issuer and audience only in the connect reducer
+(provision_or_touch_account in server-module/src/accounts.rs). The SpacetimeDB host does not check
+aud (token_validation.rs: validate_aud = false), and the wrong-audience control in
+evals/account-e2e.eval.mjs is a WebSocket connect. Whether a wrong-audience token from an allowed
+issuer is refused on POST /v1/database/<db>/call/<reducer> and /v1/database/<db>/sql is untested,
+and audience_allowed passes a token if any entry of a multi-valued aud is listed. To settle before
+an account issuer is deployed and before the audience-scoped fallback of the sign-in design is
+relied on: one wrong-audience token against those two routes with the issuer rig account-e2e builds.
+
+Build note (lpg-0): Measured on a 2.11.0 standalone host: a token whose iss is https://<any host>
+makes the host resolve that name and request /.well-known/openid-configuration from it
+(crates/core/src/auth/token_validation.rs lines 233 to 240; there is no issuer allow-list, only an
+http/https scheme check). Anyone who can reach a friends server's port, or the official server's,
+can make the host send a request to a host of their choosing. LP6 and LP7, and the official
+deployment, need a rule in front of the host: drop a token whose iss is not the host's own or a
+listed issuer.
+
+Build note (lpg-0): While any player is connected the movement tick commits a transaction every 200
+ms whether or not anyone moves: about 72 bytes of commit log per tick, 1.24 MiB per hour per world
+with one player standing still (lpg-0 measurement, median of three runs). The idle rule covers a
+zone with nobody in it; a tick that changes no row could skip its commit.
+
+Build note (lpg-0): The own-issuer sign-in design has two security conditions that exist nowhere in
+code and that LP6 must build and test before a private server sees a real attestation: the official
+server must refuse attestation binding (the same module runs there), and a hostile host must not be
+able to relay an attestation to another private world. Audience plus nonce do not stop the relay,
+and naming the player's identity does not either, because every standalone host calls itself
+"localhost" and its operator can sign any subject. docs/local-play.md section 3 gives the analysis
+and the open parts.
+
 ### lpg-1 — the connection target is run-time configuration
 type: feature · tier: hard
 category: local-play/connection · severity: HIGH · size: MODERATE
