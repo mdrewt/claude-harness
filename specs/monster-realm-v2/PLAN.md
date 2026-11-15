@@ -203,9 +203,10 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
   before; the dev-only `dev_expire_tactical_window` reducer, callable by the module owner alone,
   so the PvP AFK e2e takes one strike in real time and three through it; the game's
   `docs/e2e-flakes.md` register of e2e flakes with no merged fix; the low-end frame-time record,
-  `docs/art/style-guide.md` §Low-end frame times; the game's `docs/DECISIONS.md` "Dev-only
-  reducers never ship" and "The world post stack is `pixi-filters`, on the world layer only,
-  planned from injected time", which holds the software-rasteriser rule).
+  `docs/art/style-guide.md` §Low-end frame times; the game's `docs/DECISIONS.md` "The e2e job
+  lists the tests that passed only on a rerun; a flake stays in `docs/e2e-flakes.md` until its fix
+  merges", "Dev-only reducers never ship" and "The world post stack is `pixi-filters`, on the
+  world layer only, planned from injected time", which holds the software-rasteriser rule).
 - Infra: **M-infra-a** CI caching · **M-stdb-2x** module SDK 2.8.1 · **M-loop-infrastructure**
   (the supervisor tooling, `memory/projects/mr-*`) · **M-test-pruning** (`tp-*`; the `mr-prune`
   test census: run at milestone close from `mr-record`'s MERGED-row hook and shown to the close
