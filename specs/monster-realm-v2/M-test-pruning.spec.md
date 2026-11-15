@@ -5,10 +5,7 @@
 `tp-5` are both built ·
 **Project:** harness loop tooling (`memory/projects/`, `specs/`, `docs/`); no game file is edited
 by this milestone · **Source:** operator request 2026-11-13, and the operator's question of the
-same day that put the look at milestone close (D8) · **Depends on:** `tp-3` and the two
-`structure.spec.md` sections this spec's PR adds (`st-3`, `st-4`) carry
-`blocked: tester-ab-close`; `tp-4` and `tp-5` are not blocked, and while the block stands they
-record and open no removal (§Tester A/B experiment).
+same day that put the look at milestone close (D8).
 Anchors cite files and symbols. Measurements are dated and name how they were taken.
 
 ## Problem / intent
@@ -68,7 +65,7 @@ list of candidates and a place in the workflow where someone reads it.
   M-trade-sessions `ts-3` lists 15 test files outside its own modules to add one screen. Most of
   these are accessibility, i18n and privacy gates, which no prune may remove.
 - **A prune session costs more than it saves.** A test line costs about $0.0005 per slice that
-  reads it (tester A/B plan, bloat formula); the whole 1,910-test game-core suite runs in about
+  reads it (the tester A/B experiment's bloat formula); the whole 1,910-test game-core suite runs in about
   1.8 s. A dedicated session per milestone costs tens of dollars and, by the first bullet, finds
   nothing it may safely delete.
 
@@ -84,8 +81,8 @@ the commits of the milestone's own slices, it records what the milestone added a
 candidates in the files it changed. **At milestone elaboration** it acts: the spec author routes
 the rows for the files the coming slices list through channels that already exist. A close
 candidate in a file no specced slice lists goes to the standing structural queue instead of
-waiting for a slice that may never come. How many tests a slice writes is the tester's rules,
-which the tester A/B experiment measures and will change.
+waiting for a slice that may never come. How many tests a slice writes is the tester's rules
+(`.claude/agents/tester.md`).
 
 ## Scope
 
@@ -100,7 +97,7 @@ what stays of the 1v1 battle rules).
 
 | Deferral | Target |
 |---|---|
-| A per-milestone prune session, its trigger, tickets, caps and its own PR type. | Revisit when the tester A/B experiment closes: its report prices bloat and brittle breaks per arm, and the census rows recorded by then show the trend. The harness `docs/DECISIONS.md` entry names this trigger. |
+| A per-milestone prune session, its trigger, tickets, caps and its own PR type. | Never: the tester A/B experiment priced test bloat at about $0.20-0.25 a slice, and the tester's writing rules cut it where tests are written (D2). |
 | Removing a test because another test kills the same mutants. | never (see the second measurement) |
 | Merging literal-variant tests into one table-driven test. No parametrised-test crate is in the workspace, so a Rust merge is a loop that stops at its first failing row and loses the behaviour-led names. The census prints a count. | the tester's rules after the A/B experiment |
 | Replaying removed tests against later bug fixes. With no removal class beyond same-block twins there is nothing a replay could catch. | never |
@@ -160,7 +157,6 @@ milestone close: the MERGED ledger row of the milestone's last slice (mr-record 
        │                 shows it to the tick that opens the close PR, which appends it to
        │                 structure.spec.md
        │      report     protected rows and signals: recorded, never sectioned
-       └─ while the tester A/B experiment is open: the row and the candidates, no section file
 
 milestone elaboration (milestone-loop-prompt.md, structure pass)
   └─ mr-prune census --spec <the spec> --record <milestone id>     read-only, seconds, no session
@@ -228,11 +224,6 @@ then name. Rows that do not fit are marked `over-cap` in the close file; a later
 again, because every row is recomputed from the code. When no row is routed `structure`, no
 section file is written and the close PR adds nothing to `structure.spec.md`.
 
-**While the tester A/B experiment is open.** `mr-prune close` writes the row and the close file
-and no section file until `memory/projects/mr-tester-ab.jsonl` holds a `close` row, the same
-condition that lifts `blocked: tester-ab-close`. Recording changes nothing a shadow test compiles
-against.
-
 **How the close step runs it.** `mr-record ledger` runs `mr-prune close` from its MERGED-row hook
 when the row just written completes a milestone: every slice id of the spec that holds the merged
 slice now has a MERGED row. The supervisor writes that row at every merge, so no prompt text asks
@@ -262,7 +253,7 @@ under that rule.
 | Shared count and roster pins | `protected-churn`, `signals: widened` | `st-3` (design). |
 | Retired 1v1 rules | `orphans` | `st-4` (design). |
 | Flaky tests | not printed | M-test-health. |
-| What one milestone added | the `close` object of its trend row | The operator and the tester A/B report read the trend. |
+| What one milestone added | the `close` object of its trend row | The operator reads the trend. |
 
 ### The twin rule
 
@@ -348,42 +339,11 @@ exits 0 when T and S are twins at that commit, else `PRUNE-TWIN-FAIL <rule>` and
 how whoever merges confirms a `pruned-tests:` line against the PR base, the way `moved-tests:`
 rows are confirmed. It is not a seeded gate.
 
-## Tester A/B experiment
-
-The experiment (its rules are in the header of `memory/projects/mr-tester-ab`) runs shadow testers on the tester-bearing
-slices of M-trade-sessions (`ts-6b-K`), M-local-play groundwork, M-netcode-presence and
-M-econ-onboarding, keeps `.claude/agents/tester.md` frozen, and scores a shadow test `brittle`
-when it passes at the slice's merge and fails or stops compiling at the default-branch head when
-the analysis runs.
-
-- A removal between those two points can change that score: a shadow test that calls an orphan
-  symbol, or edits a pin file that a consolidation rewrites, stops compiling. So `tp-3` (which
-  turns the routing on) and the sections `st-3` and `st-4` carry `blocked: tester-ab-close`. The
-  supervisor lifts it when `memory/projects/mr-tester-ab.jsonl` holds a `close` row (operator
-  decision D3). The experiment writes that row itself: every pre-merge audit tries its close
-  conditions (`mr-tester-ab close-check`), so the loop-active-days backstop closes it after its
-  last slice has merged. An experiment that never ran cannot hold the block: it also lifts once
-  M-econ-onboarding, the last sample milestone, has closed while `mr-tester-ab.config.json` is
-  absent or reads `enabled: false`. An enabled experiment that is still open when that
-  milestone closes has no slice left to wait for: the supervisor runs
-  `$MEM/mr-tester-ab close-check --sample-done`, which writes the `close` row and queues the
-  close retro, and the block lifts by the first rule.
-- `tp-1` and `tp-2` add a report tool nothing calls. `tp-1` adds one line each to `mr-selfcheck`
-  and `memory/projects/.gitignore`, which the experiment's own build also edits; `mr-disjoint`
-  serialises the launches.
-- `tp-4` and `tp-5` make the close census run while the experiment is open. It reads commits and
-  writes two untracked files under `prune/`; it opens no section until the `close` row exists, so
-  nothing a shadow test calls or edits moves. The per-milestone rows it records over the sample
-  milestones are trend data the experiment's close reads beside its own report.
-- No slice here touches `tester.md`, its guards, `mr-spawn`, `mr-audit` or the retro playbook.
-- The experiment's close changes the tester's rules and prices bloat. Whether a per-milestone
-  prune session is worth building is decided then, from its report and the recorded census rows.
-
 ## Risks / flags
 
 - **The yield is small by design.** The census will usually print no `duplicates` row. Its value
   is the orphan list, the pin signals for `st-3`, and a trend the operator can read.
-- **The larger removals are the two design slices**, which wait on the experiment and are built by
+- **The larger removals are the two design slices**, which are built by
   the structural share, not by this milestone. `st-4`'s extractions may remove several thousand
   test lines with the code they test; `st-3` changes where literals live and removes no gate.
 - **Name matching is approximate** in the orphan rule (trait methods, macro-built names, a name
@@ -450,8 +410,6 @@ the analysis runs.
   the census should read.
 - **A first-to-last commit range for "what the milestone added".** Other work merges between a
   milestone's slices; the subject-named set counts only its own.
-- **Opening removal sections while the experiment runs.** Covered by D3; the close census records
-  and waits.
 - **One section per candidate, or no cap.** A close can list more rows than one run removes with
   care, and each section holds a quiet window; one capped section per close keeps the structural
   share for the moves it exists for.
@@ -460,9 +418,8 @@ the analysis runs.
 
 | # | Question | Default |
 |---|---|---|
-| D1 | PLAN §9 position. | New item 5, after M-econ-onboarding (the last tester A/B sample milestone) and before M-identity-handles. Alternatives: beside M-test-health; or earlier, with `tp-3` still blocked. |
+| D1 | PLAN §9 position. | New item 5, after M-econ-onboarding and before M-identity-handles. Alternatives: beside M-test-health; or earlier, with `tp-3` still blocked. |
 | D2 | A per-milestone prune session, as first proposed. | Not built. Census at close and at elaboration; removals ride in slices that already touch the file, or in one capped `structure.spec.md` section per close. Revisit at the A/B experiment's close. Alternative: build a capped session now, against the review's cost finding. |
-| D3 | Removals while the A/B experiment runs. | Held: `tp-3`, `st-3` and `st-4` are `blocked: tester-ab-close`. Alternative: unblock `st-3` and `st-4` now; they are docs-only, and only their extractions would wait. |
 | D4 | A second report-only source-text scan in the harness. | Yes, recorded in `docs/DECISIONS.md`; never a gate. Alternative: no tool; authors grep by hand. |
 | D5 | Mutation results as a reason to remove a test; a TypeScript mutation tool. | No to both. |
 | D6 | What stays of the 1v1 battle rules. | `st-4` decides and records it; stored types and rules the tactical engine or its depth waves use stay. Alternative: rule now that all of `combat::*` stays, and delete `st-4`. |
@@ -481,14 +438,14 @@ the analysis runs.
   the census rows it acted on.
 - The first milestone whose last slice merges after `tp-5` has one row with a `close` object in
   `prune/trend.jsonl` and a `prune/close/<milestone>.json`; its slice ids match the squash
-  subjects on the game's `origin/master`; and while `mr-tester-ab.jsonl` holds no `close` row
-  there is no section file and `mr-situation` prints an empty `prune_close`.
+  subjects on the game's `origin/master`; and when a row is routed `structure` its section file
+  exists and `mr-situation` lists it under `prune_close`.
 - `wc -c memory/projects/mr-supervisor-prompt-native.md` prints 15796.
 - Lasting decision: harness `docs/DECISIONS.md` "The test census is a report: recorded at
   milestone close, acted on at elaboration" (what it lists, that a row is never a reason, the
   twin rule, the keep file, how a milestone's commits are found, the routes and the cap, what it
-  rules out, and the A/B close as the point to revisit a prune session).
-- `structure.spec.md` carries `st-3` and `st-4`; their blocks lift on the experiment's close row.
+  rules out, including a per-milestone prune session).
+- `structure.spec.md` carries `st-3` and `st-4`.
 
 ## Slices
 
@@ -700,11 +657,7 @@ how a milestone's commits are found, the routes and the cap.
 - **TP4-A11:** WHEN a listed row is `protected-twins` or `orphan-protected`, or is an `orphans` row
   with more than 12 files, THE tool SHALL give it the route `report`.
 
-- **TP4-A12:** WHEN `<mem>/mr-tester-ab.jsonl` is absent or holds no `close` row THE tool SHALL
-  write the trend row and the close file and no section file.
-
-- **TP4-A13:** WHEN `<mem>/mr-tester-ab.jsonl` holds a `close` row and at least one row is routed
-  `structure` THE tool SHALL write one `prune/close/<label>.section.md` in `structure.spec.md`'s
+- **TP4-A13:** WHEN at least one row is routed `structure` THE tool SHALL write one `prune/close/<label>.section.md` in `structure.spec.md`'s
   section shape, `type: refactor · tier: routine`, whose `touches:` are the files of its rows.
 
 - **TP4-A14:** WHEN the section file is written THE section SHALL name, for each row, its reason,
