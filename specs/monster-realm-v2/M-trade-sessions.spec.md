@@ -2086,6 +2086,18 @@ the Fix-batch contract):
   `R-qf-9-RAISINGVESTIGES` (`npm --prefix client run typecheck`; `client/src/ui/raisingView.test.ts`
   and `client/src/ui/overlayA11yWiring.test.ts` pass).
 
+Build note (ts-6b-13): The section's sentence that BoxViewCallbacks.onSetPartySlot, partySlotNone
+and PvpViewCallbacks.onAccept/onDecline/onCancel 'leave in the same edit where the type checker
+agrees': the type checker does not agree — main.ts passes all five and main.dispatch.test.ts reaches
+the setPartySlot / acceptChallenge / declineChallenge / cancelChallenge dispatch arms through
+handlerOf('BoxView'|'PvpView', …) (≈12 call sites, e.g. :656-665, :980-1011, :1108, :1692,
+:1803-1817). Removing them is a re-routing of those dispatch tests onto the screen-command path, not
+a deletion, so ts-6b-13 keeps them (comments updated to say why).
+
+Build note (ts-6b-13): client/src/ui/screens/healScreen.test.ts:158 (outside ts-6b-13's touches)
+still says a location-less heal makes dispatch heal at locations[0]; since ts-6b-13 a healParty
+command without locationId does not typecheck. ts-6b-14 (comment accuracy sweep) should reword it.
+
 ### ts-6b-14 — comment, doc and test-infrastructure accuracy; closes the sweep
 type: feature · tier: hard
 category: loop-ops · severity: LOW · size: MODERATE
