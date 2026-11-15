@@ -501,6 +501,51 @@ F2 (`np-d.2`, `np-d.5`, `np-d.6`, `np-d.7`):
 
 - **np-d.7:** WHEN successive attempts each open and drop before the first applied subscription, THE scheduled reconnect delays SHALL follow the ladder rung by rung, skipping none, up to its cap (`client/src/net/connection.runtime.test.ts`).
 
+Build note (np-d): Elaboration (npres-spec) scoped np-d's F2 fix to the frozen rung only. Reconnect
+delay jitter (a restarted host is retried in lockstep by every client) and a host that applies the
+subscription then drops (onConnected resets the ladder each time, so retries stay at the first rung)
+remain open; red-team lens finding 8 on the npres-spec draft.
+
+Build note (np-d): Reconnect, pre-existing and outside np-d's two fixes:
+client/src/net/connection.ts attemptBuild can run while the policy link is connected — a rebuild
+timer still pending when another attempt applies (a second user retry from the session overlay; a
+bfcache pageshow during an attempt that then succeeds), reconnectNow or continueAnonymously called
+while connected, or an applied subscription delivered after the same build's drop.
+onReconnectAttempt is a no-op from connected, so the superseded live build goes stale without its
+socket being closed, and if the new attempt fails by connect error onAttemptFailed is a no-op too:
+the client retries every 1000 ms with linkFrozen false and no applied connection. One rung per
+failed attempt (np-d.5) therefore holds only for attempts started on a link that is not connected. A
+fix has two candidate shapes: cancel the pending rebuild timer when an attempt starts or applies, or
+make a superseding attempt mark the link reconnecting. np-d's two wiring tests for reconnectNow and
+continueAnonymously (connection.runtime.test.ts) drive the call with a rebuild timer pending and
+assume that timer survives; a fix that cancels it re-points those two tests.
+
+Build note (np-d): Reconnect, pre-existing and outside np-d's two fixes: an attempt that ends in
+neither a failure event nor an applied subscription is never retried. In
+client/src/net/connection.ts a build whose socket opens (onConnect) and then neither applies nor
+closes, a base subscription whose onError fires (it only reports through opts.onError), or a
+resolveCredential that never settles leaves the policy link reconnecting with no rebuild timer
+pending: input is frozen with no recovery short of a reload. np-d's rule (one rung per failed
+attempt) needs a failure event to act on. The fix is an attempt watchdog: a timer started with the
+attempt that, on expiry, supersedes the build, closes its socket and reports the attempt as failed
+(one rung).
+
+Build note (np-d): np-d build notes. (1) drop_queued_moves empties an existing move_intent row only.
+A character with a published character.move_queue and no move_intent row (a session from before the
+table existed) keeps that queue: the next tick seeds the intent row from it and the drain lock holds
+it until the battle ends. join_game always creates the row and movement_tick seeds a missing one on
+its first pass, so the state lasts at most one STEP_MS after the publish that added the table; the
+plan and both review lenses accepted leaving it unhandled. (2) Contract C3 as measured by the desync
+lens: on the tick that starts a wild battle the owner's predictor replays the one remaining
+published step (predicted tile one ahead for one tick) and the next row pulls it back while the
+battle frame is already on the stack; the manual playtest pass should also look for a visible
+pull-back when the battle overlay closes. (3) A bfcache pageshow restore while an attempt is in
+flight (or parked at a session terminal) now counts that attempt as failed, one rung (rebuild at
+2000 ms where master gave 1000); no test pins it, because the spec does not cover the page-lifecycle
+path. (4) sim-harness scenario BL-3 (a battle-locked character still accepts enqueues,
+sim-harness/src/world.rs) disagrees with the server, where enqueue_move and set_move refuse
+mid-battle; that mismatch is on master and np-d does not change the sim.
+
 ### np-b — send-pipeline depth: a study with a go/no-go
 type: design · tier: hard
 category: netcode-supply (study) · severity: MED · size: SMALL
