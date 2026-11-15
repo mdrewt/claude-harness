@@ -277,6 +277,23 @@ after: []
 
 - **ih-4.6:** WHEN the e2e build (placeholder issuer and provider name set) opens Profile then Account, THE Sign In button SHALL read the provider label, and pressing it SHALL fail safe as it does today: failure copy, a claim code in session storage, the world still playing (`client/e2e/accounts.spec.ts`).
 
+Build note (ih-4): Measured pins the section does not list: client/src/main.dispatch.test.ts boots
+main.ts with no issuer and asserts the Account section's onSignIn reaches startSignIn (two tests;
+the boot gains an issuer, assertions unchanged), and ARCHITECTURE.md's Accounts paragraph enumerates
+the client build variables (it gains VITE_MR_OIDC_PROVIDER_NAME). Both were added to touches by
+mr-touches widen. catalog.test.ts holds the 543-key count at six sites, not five. The Sign In label
+is written by claimView.render() only: show() receives no view model, and only a render can show the
+button, so the claim-signin-btn row leaves claimView.i18n.test.ts's both-doors roster and gets its
+own assertions (empty after the constructor and after show(), the model's string after render).
+
+Build note (ih-4): With no sign-in offer the Account section keeps copy and a row that assume one.
+The code-pending body still says to sign in to claim the progress and the sign-in-failed bodies
+still say to try signing in again, while no Sign In row exists (reachable in a tab that holds a
+claim code minted under a build with an issuer, or minted by the old always-shown button, then
+loaded with no offer). In the prompt phase the only row is Decline, with no claim to decline, under
+the title Keep your guest progress. The section changes the prompt body only (no-offer-copy), so the
+rest needs a copy decision.
+
 ### ih-1 — the minted discriminator: table, mint at join, claim, deletion, export
 type: feature · tier: hard
 category: identity/schema · severity: MED · size: MODERATE
