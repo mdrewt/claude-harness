@@ -461,6 +461,82 @@ press sends `Face`, and a press you face steps.
 
 - **np-c2.7:** THE input guardrails SHALL hold: OS key-repeat sends nothing, a keyup sends no `clear_queue` or `set_move`, a frame push clears the held set, and the NH2 no-cancel and dual-code scenarios of `client/e2e/movement-input.spec.ts` pass unedited.
 
+Build note (np-c2): np-c2.7's clause 'the … dual-code scenarios pass unedited' cannot hold for
+scenario B of client/e2e/movement-input.spec.ts. B parks with recenter(page, 4) before every
+attempt; a retried East attempt and the first West attempt enter that call in the same state (x=5
+facing East) and need opposite facings, so a tap then turns and scores 0 tiles. Built: recenter(p,
+targetX, facing = 'East') parks facing a direction (one setup tap when the row faces another way),
+and B's call names its rep's direction; B's key timeline, retry rule and assertions are
+byte-identical, and C, D, E, F have no changed line. Recorded as DEFER np-c2.7 -> wontfix on that
+clause. Amend the criterion to: 'the nh2 no-cancel scenario (C) and the dual-code scenarios (B, E)
+pass with their key timelines and assertions unedited; B's park names the tap direction'.
+
+Build note (np-c2): Pins the np-c2 section did not list, each measured by a red e2e run with the
+press sending Face: movement-input.spec.ts scenario G ('every ack arrived on a row that moved the
+character' is false for a turn row, so G's park now names South and its assertions are unedited);
+world-art.spec.ts WAP10.2's last bare D-pad press onto the warp (it arrived facing another way; it
+now turns to face the warp first through controls.ts dpadFace); and three specs outside touches,
+widened: menu-flow.spec.ts step 11 and pointer.spec.ts step 13 (the setup reaches the post facing
+North with faceTile) and ui-world-sheets.spec.ts UIF12.4 (Left turns, a second Left walks).
+zone-scope.spec.ts and remote-walk.spec.ts stayed green unedited, as the section predicted.
+
+Build note (np-c2): For the next playtest (the section's named deferral on the mid-walk turn pause):
+with a direction held and walking, a short tap of a perpendicular key turns the character for one
+movement slot and the walk then falls back to the held key; turning a corner while walking needs the
+second key held past HOLD_COMMIT_MS (150 ms) or pressed twice. Measured by the red-team lens on the
+unit harness; it follows from 'only a fresh press sends Face' and is reversible in the one game-core
+rule.
+
+Build note (np-c2): Three descriptions of the press outside np-c2's touches still say it is an
+immediate Step: the header of client/src/prediction/heldKeys.ts ('the keydown's FIRST step stays
+ungated … never the immediate step', and the HOLD_COMMIT_MS note built on it), the keydown model in
+client/src/prediction/movementSim.test.ts (it sends Step on keydown), and one case description in
+client/src/prediction/predictor.test.ts. The gating they describe (commit threshold,
+outstanding-work gate) does not depend on the input variant, so nothing is red; the wording and the
+sim's keydown should say Face, and the sim's walk-start timing should include the turn slot.
+
+Build note (np-c2): The np-a.9 remote-walk failures (PR #780 attempt 1 'stood still 150 ms', master
+630369c3 attempt 1 'never moves backwards', PR #783 twice 'stood still 133 ms') have one cause, and
+it is the test's stimulus, not the renderer and not the press rule: client/e2e/remote-walk.spec.ts
+delayed the walker's WebSocket 150 ms each way on the premise that a step then reaches the server
+300 ms after the acknowledging tick. The walker page's frame time and two relay hops add to that, so
+on a slow machine a step misses TWO ticks; the ~600 ms gap sits on the stalledIn boundary (> 3
+steps) and is judged by assertions written for the two-step stream. Measured with the press flipped
+back to Step: 6 of 16 runs fail pinned to 2 cores (branch: 3 of 13); pinned to 1 core every gap is
+~600 ms. np-c2 replaces the stimulus: each input the walker sends is held in the route and released
+by the walker's own Idle row, so every step misses exactly one tick (2 cores 30/30, CI green on
+three pushes); a step that still misses two ticks inside the checked span now fails as a
+PRECONDITION naming the stimulus. No assertion or threshold of np-a.9 changed. R-np-a-flake can be
+dispositioned fixed by PR #783.
+
+Build note (np-c2): client/e2e/remote-walk.spec.ts's 100 ms stand-still bound catches a renderer
+that never continues a walk (renderResolver's continueWalk branch disabled) by a thin margin: the
+adaptive render delay climbs 250, 294, 332 ms on the every-other-tick stream, so that renderer
+stands 133 ms on the first checked tile only and less on each later one. Measured: unconstrained 5
+of 5 mutant runs red; pinned to 2 cores 5 of 6; pinned to 1 core 5 of 6 (the two green runs measured
+under 100 ms through frame quantisation). The margin is the same under the previous fixed-delay
+stimulus (133 ms), provided the walk starts from rest, which the spec file now makes a fact. The
+store defect the test was written for (a snapshot per same-tile row) is caught at 183-200 ms.
+Continuation itself is pinned exactly by np-a.1 and np-a.2 in renderResolver.test.ts. Follow-up:
+give the e2e a wider margin for the no-continuation case (for instance, assert the drawn position
+passes the newest tile during a two-step gap), without touching the 100 ms bound.
+
+Build note (np-c2): For np-b's study (measured while diagnosing np-a.9): when a walker's step misses
+two ticks, the watcher gets a gap of three steps, exactly JITTER_IDLE_GAP_STEPS. The remote is
+continued half a tile (the cap) in about 200 ms and then stands there 117-167 ms; when the gap
+reaches the window the continuation ends and the late step's bracket interpolates behind the drawn
+position, so the remote moves back up to 0.26 tile in one frame (CI, master 630369c3: 5.5 to 5.3475;
+local 1 core: 5.455 to 5.195). On 2-core CI runners about a third of steps missed two ticks at a 300
+ms round trip plus the client's frame time. The study's pipeline measurements should include this
+three-step-gap case when it sizes the window and the cap.
+
+Build note (np-c2): Correction to the note on the late step at the window boundary: its figure
+'about a third of steps missed two ticks on 2-core CI runners' comes from the four FAILING CI runs
+only (7 of 20 gaps: PR #783 twice, PR #780 attempt 1, master 630369c3 attempt 1). A passing run
+prints no arrivals, so the rate over all runs is lower and was not measured. Measured locally with
+the fixed-delay stimulus: pinned to 2 cores 21 of 145 gaps were three steps; pinned to 1 core all
+25.
+
 ### np-d — movement-pipeline hygiene: queued moves end at battle start; the backoff climbs
 type: feature · tier: hard
 category: netcode-determinism (R-weekly-review-2026-10-02-F1, R-weekly-review-2026-10-23-F2) · severity: MED · size: SMALL
