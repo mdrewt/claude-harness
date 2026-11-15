@@ -91,10 +91,14 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    Players tab showing name + low-contrast tag + lead level + Nearby, tags in request banners and
    trade rows, none in battle; Sign In hidden until a build has an issuer, then labelled with its
    provider. All four decisions ANSWERED (#588). Feeds M19.
-7. **M-test-health** (`M-test-health.spec.md`, sketch 2026-11-12): root-cause the two observed e2e
-   flakes (UIF4B.2 at 640×240 may be a layout defect), count flakes in the e2e union job, a
-   `dev_reducers` deadline skew so the PvP AFK test stops waiting on real 30 s windows, and a
-   low-end frame budget. Small slices; closes before the Playtest-4 gate.
+7. **M-test-health** (`M-test-health.spec.md`, elaborated 2026-11-15 — 4 slices, all heads `th-3`
+   ‖ `th-4` ‖ `th-1` ‖ `th-6`): the e2e union job lists every test that passed only on a rerun;
+   a `dev_reducers`-only reducer expires a tactical turn window now, so the PvP AFK e2e (136 s)
+   keeps one real-time strike and takes three through it; a study root-causes the two flakes with
+   no known cause (UIF4B.2 rename, BT12-5-WILD-RECRUIT); a low-end frame-time study, with the post
+   stack's software-renderer rule. Recruit R1 and the UIF4B.2 Controls flake are already fixed
+   (#742, #765/#768); population-agnostic specs are deferred (R-th-spec-POPAGNOSTIC). Closes
+   before the Playtest-4 gate.
 8. **M-scale-readiness** (`M-scale-readiness.spec.md`, sketch 2026-11-12): the costs a static
    scaling audit and load run found growing faster than the population. Built: private movement
    intent, idle empty zones, per-zone `character` subscriptions, resuming a session where it
