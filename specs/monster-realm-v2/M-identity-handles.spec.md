@@ -365,6 +365,55 @@ after: [eo-1]
 
 - **ih-1.9:** WHEN an identity whose deletion is pending or complete calls `join_game`, THE SERVER SHALL refuse it, mint no handle and leave any surviving `player` row's `discriminator` at its current value (`server-module/src/accounts_tests.rs`).
 
+Build note (ih-1): ensure_handle returns Result<u32, String>, not the sketched u32: the mint is
+try_insert, a refused insert (exhausted sequence, or a taken value) maps to the static reason
+'handle unavailable', and join_with_kit logs it through log_reject before any presence row is
+written. That is the behaviour the Risks row describes (an error and a reject log); a u32 return
+could only panic. Proven by onboarding_tests
+a_join_whose_mint_is_refused_fails_with_a_reject_line_and_writes_no_presence_row.
+
+Build note (ih-1): Measured pins beyond the section's list (all moved by exactly the one table and
+two columns): privacy_tests m22s4_exporter_set_equals_manifest_both_directions (17 to 18) and
+m22s4_serializer_per_table_shape; accounts_tests data_lifecycle_partition_matches_spec_section3,
+data_lifecycle_export_scope_structurally_narrower, m22s6_table_row_registry_matches_manifest
+(identity-bearing rows 31 to 32), m22s6_owner_keyed_tables_are_erase_or_anonymize (27 to 28),
+acct_export_chunks_carry_exactly_the_callers_rows_per_table,
+acct_deletion_reaper_erases_every_owned_row_and_nothing_else; onboarding_tests JOIN_TABLES (9 to
+10). Two listed items needed no edit: evals/baselines/spacetime-types.json holds nested
+SpacetimeTypes only, so --write produced no diff; guards_tests.rs rb128's caller is refused before
+any write, so it registers nothing (only its Player literals changed).
+
+Build note (ih-1): The eighteenth exportable table moves the minimum export bundle from 17 to 18
+chunks, and two DoS-bound tests in privacy_tests.rs were sized on 17. rb115 keeps its four tick
+tuples (its populations are literal row counts); only its sizing tuple moved. rb111 is re-derived
+and renamed rb111_one_tick_reaps_fifteen_whole_bundles_from_a_same_millisecond_burst: a 256-row
+window over 18-row bundles touches 15 stamps, so the 16-stamp write cap cannot bind on bundles this
+module writes and that test no longer shows it binding. The cap stays proven by
+rb109_stamp_cap_binds_when_the_window_holds_more_than_sixteen_stamps,
+rb109_oversized_tick_is_bounded_and_reaps_the_oldest_bundles_whole and
+rb115_count_is_the_distinct_expired_stamps_before_the_cap (the verifier set the cap to 15 and to 17
+and watched them go red). privacy.rs comments are restated for eighteen in five places.
+
+Build note (ih-1): The DECISIONS.md entry states the storage, mint and deletion decisions in prose
+and does not cite the handle-storage, mint and deletion keys by name: no entry in that log cites a
+spec key, and the keys stop resolving when this spec file is retired.
+
+Build note (ih-1): A session that stays connected through its own deletion cascade keeps its
+tombstoned player row (tag 0, lead level 0). When the same identity connects again,
+provision_or_touch_account re-registers the account fresh while that row still stands: join_game
+answers 'already joined' until the old socket closes, set_profile_name passes the deletion gate
+again and can rename the tombstone, and a guest claim completed in that window gives the account a
+handle the standing row does not mirror. The state exists on master for the name tombstone; the
+mirror heals at the next join. Found by the plan red-team; the remedy belongs to how the cascade
+treats a connected subject (close its presence row, or refuse re-registration while one stands), not
+to the handle.
+
+Build note (ih-1): The legacy-identity decision rests on a publish disconnecting every live session,
+so that each one rejoins and is minted. This build did not verify that against a live database
+upgrade. A player row that outlives the publish keeps discriminator 0 until its session ends:
+join_game answers 'already joined' with an Err, which rolls back, so nothing can backfill the row in
+place.
+
 ### ih-2 — the lead-monster level stays live on the player row
 type: feature · tier: hard
 category: identity/social · severity: LOW · size: SMALL
