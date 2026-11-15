@@ -198,6 +198,15 @@ def _norm(s):
     return " ".join(s.split()).strip()
 
 
+# Durations (`0.004s`, `894ms`, `1m2s`) and clock times (`00:55:44`) move between two runs of the
+# same passing check; the evidence comparison drops them so only counts and names decide.
+_VOLATILE = re.compile(r"\b\d+(?:\.\d+)?\s*(?:ms|s|m)\b|\b\d{1,2}:\d{2}(?::\d{2})?\b")
+
+
+def _stable(s):
+    return _norm(_VOLATILE.sub("", s or ""))
+
+
 def head_re(slice_id):
     # Anchored (the retired slice-quality tool:490): an unanchored search for `lp-02` matches `lp-02b` first.
     return re.compile(r"^### %s(?![\w.-])" % re.escape(slice_id), re.M)
@@ -1428,7 +1437,8 @@ def cmd_verify(a):
         rec = _norm(g.evidence or "")
         # Normalized SUBSTRING on the deciding line, never a byte-compare of whole output:
         # a byte-compare punishes real runners for timings/ordering and rewards static greps.
-        agrees = bool(fresh) and (fresh in rec or rec in fresh or not rec)
+        sf, sr = _stable(fresh), _stable(rec)
+        agrees = bool(fresh) and (sf in sr or sr in sf or not rec)
         reverified.append({"gate": g.id, "passed": passed, "agrees_with_evidence": agrees,
                            "fresh": (fresh or cap_evidence(o, expect=g.expect))[:160],
                            "seconds": round(el, 1)})
@@ -2334,6 +2344,14 @@ def main(argv):
 _ST_FLOOR = 235
 
 
+def _st_stable(c):
+    # Same passing summary, different timing: agrees. A different count still differs.
+    a = _stable("Summary [ 0.004s] 1 test run: 1 passed, 9 skipped")
+    c.eq("stable-timing", a, _stable("Summary [ 0.015s] 1 test run: 1 passed, 9 skipped"))
+    c.eq("stable-clock", _stable("Start at 00:55:44 | Duration 1.69s"), _stable("Start at 01:09:54 | Duration 1.61s"))
+    c.ok("stable-counts-differ", a != _stable("Summary [ 0.004s] 1 test run: 0 passed, 9 skipped"))
+
+
 class _Chk(object):
     def __init__(self):
         self.n = 0
@@ -2384,6 +2402,7 @@ def selftest():
     import contextlib
     import io as _io
     chk = _Chk()
+    _st_stable(chk)
     root, cleanup = _st_tmp(chk)
     try:
         specs = os.path.join(root, "specs")

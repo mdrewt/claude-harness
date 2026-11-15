@@ -47,7 +47,7 @@ UNKNOWN → proceed + record a BLOCKER.
    no un-merged `.done`. Take/heartbeat ONLY via `$MEM/mr-lock take --run_id "$RUN_ID" --pid P`
    (`P` = the `mr-native-tick.sh` pid from your `ps` probe) / `mr-lock heartbeat --run_id
    "$RUN_ID"` — never hand-write the lock file. Release/reap ONLY via `$MEM/mr-unlock`
-   (`mutex|stale|all`); on UNLOCK-MUTEX-FAILED report and stop — never `rm -rf`. The WRAPPER's
+   (`mutex|stale|all|slice S`); on UNLOCK-MUTEX-FAILED report and stop — never `rm -rf`. The WRAPPER's
    pid holds the mutex, so your end-of-tick `mr-unlock mutex` is expected to be REFUSED.
 4. **State:** `mr-state.json` — first read, last write of every tick, atomic (temp+mv). Schema v3:
    `master{sha,ci,nightly}`, `inflight[]`, `awaiting_merge[]`, `queue[]`, `park_counters{}`,
@@ -182,7 +182,7 @@ around (push the harness before spawning a harness slice).
   red there → escalate.
 - Merge with `gh pr merge --squash --delete-branch`; fetch; `mr-ci-watch --sha <merge-sha>`;
   `origin/master^{tree}` = `H^{tree}` (audited, PR-green) → add `--quiet-green`, launch now;
-  restore the main checkout (labeled stash → `--ff-only`); remove merged worktrees/branches (keep
+  restore the main checkout (labeled stash → `--ff-only`); `mr-unlock slice <S>`; remove merged worktrees/branches (keep
   parked / open-PR / `wip:`). `$MEM/mr-branch-audit`, not `--no-merged`, finds unmerged work.
 - Sandbox worktrees the finished run NAMED: `git worktree remove --force <path>`,
   then `git worktree prune` — never bare `rm`, never one it did not name.

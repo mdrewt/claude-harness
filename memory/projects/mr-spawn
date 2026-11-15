@@ -968,7 +968,10 @@ case "$AHEAD$BEHIND" in *ERR*) status REPO-OUT-OF-SYNC "$SYNCDIR: could not comp
 # while origin/master was still 1.x, so a slice would have built against the pre-bump syntax.
 # ADVISORY, not a refusal — a dirty project tree is routine (doctrine says stash strays, not commit
 # them) and blocking on it would stop ordinary work. The supervisor decides.
-DIRTY=$(git -C "$SYNCDIR" status --porcelain --untracked-files=no 2>/dev/null | wc -l)
+# The loop's own record files (ledgers, logs, handoff, state) are always dirty in the harness main
+# checkout and no slice builds from them; counting them made this fire on every harness launch.
+DIRTY=$(git -C "$SYNCDIR" status --porcelain --untracked-files=no 2>/dev/null \
+  | grep -vE '^.. memory/projects/([^/]+\.jsonl|mr-native-tick\.log[^/]*|mr-state\.json|monster-realm-handoff[^/]*\.md)$' | wc -l)
 [ "${DIRTY:-0}" -gt 0 ] && emit DIRTY-TREE-ADVISORY "$SYNCDIR has $DIRTY uncommitted tracked change(s); the slice branches from origin/$BASE_BRANCH and will NOT see them. Confirm that is intended before relying on this run."
 if [ "${AHEAD:-0}" != 0 ] || [ "${BEHIND:-0}" != 0 ]; then
   status REPO-OUT-OF-SYNC "$SYNCDIR $BASE_BRANCH is ahead=$AHEAD behind=$BEHIND vs origin/$BASE_BRANCH; the brief branches from origin/$BASE_BRANCH, so the slice would build on the wrong base. Push (or ff-only sync) first, then re-spawn."

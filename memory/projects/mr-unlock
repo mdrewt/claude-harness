@@ -3,6 +3,9 @@
 #
 #   mr-unlock mutex          # release .harness-runner.lock.d (only if its owner pid is dead)
 #   mr-unlock stale          # reap .harness-runner.<slice>.lock whose session_leader is dead
+#   mr-unlock slice S        # the same reap for slice S only — the merge-time call. A blanket
+#                            # `stale` would also take a credit-stopped slice's lock, which
+#                            # mr-interrupted reads to offer its resume.
 #   mr-unlock all            # both
 #   mr-unlock own PID        # release the mutex IFF its owner.json pid == PID. The one case where
 #                            # a LIVE owner may be released: PID is the caller itself (the tick
@@ -95,10 +98,11 @@ release_own() {
 }
 
 reap_stale() {
-  local D="${1:-$MEM}" n=0
+  local D="${1:-$MEM}" ONLY="${2:-}" n=0
   for LK in "$D"/.harness-runner.*.lock; do
     [ -e "$LK" ] || continue
     local SL; SL=$(basename "$LK"); SL=${SL#.harness-runner.}; SL=${SL%.lock}
+    [ -n "$ONLY" ] && [ "$SL" != "$ONLY" ] && continue
     local P; P=$(pid_of "$LK")
     if alive "$P"; then
       echo "UNLOCK-KEEP $SL (session_leader $P alive)"
@@ -171,6 +175,16 @@ selftest() {
   [ -e "$T/.harness-runner.deadslice.lock" ] && { echo "UNLOCK-SELFTEST-FAIL dead lock survived"; BAD=1; }
   [ -e "$T/.harness-runner.liveslice.lock" ] || { echo "UNLOCK-SELFTEST-FAIL LIVE lock was reaped"; BAD=1; }
 
+  # 5b. slice-scoped reap takes only the named dead lock; another dead lock and a live named one stay
+  echo '{"session_leader": 999999}' > "$T/.harness-runner.mergedslice.lock"
+  echo '{"session_leader": 999999}' > "$T/.harness-runner.stoppedslice.lock"
+  reap_stale "$T" mergedslice >/dev/null
+  [ -e "$T/.harness-runner.mergedslice.lock" ] && { echo "UNLOCK-SELFTEST-FAIL named dead lock survived"; BAD=1; }
+  [ -e "$T/.harness-runner.stoppedslice.lock" ] || { echo "UNLOCK-SELFTEST-FAIL slice reap took another slice's lock"; BAD=1; }
+  reap_stale "$T" liveslice >/dev/null
+  [ -e "$T/.harness-runner.liveslice.lock" ] || { echo "UNLOCK-SELFTEST-FAIL slice reap took a LIVE lock"; BAD=1; }
+  rm -f "$T/.harness-runner.stoppedslice.lock"
+
   # 6. garbage json reads as dead (documented fail direction), and is reaped
   echo 'not json at all' > "$T/.harness-runner.garbage.lock"
   reap_stale "$T" >/dev/null
@@ -208,6 +222,8 @@ selftest() {
 case "${1:-}" in
   mutex)      release_mutex || RC=1 ;;
   stale)      reap_stale ;;
+  slice)      case "${2:-}" in ""|*[!A-Za-z0-9._-]*) echo "UNLOCK-SLICE-USAGE slice name required ([A-Za-z0-9._-])"; RC=2 ;;
+                *) reap_stale "$MEM" "$2" ;; esac ;;
   own)        release_own "${2:-}" || RC=$? ;;
   all)        release_mutex || RC=1; reap_stale ;;
   --selftest) selftest || RC=1 ;;
