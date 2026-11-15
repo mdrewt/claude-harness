@@ -732,6 +732,61 @@ temporary directory against the game's `origin/master` and `M-trade-sessions.spe
 newest closed milestone's spec from harness history), the matched slice ids are the ones
 `git log --oneline` shows; the section text carries no criterion that is a source-text read.
 
+Build note (tp-4): TP4-A1: a commit names a slice when its subject is '<type>[(<scope>)][!]: <id> —
+...' with a lower-case type other than 'revert', the id as the FIRST word after the prefix, then one
+space, an em dash, one space. All 76 slice-naming subjects on the game's origin/master at d10c6c02
+have that form; an id elsewhere in a subject does not name the slice and leaves it unmatched. Slice
+ids are read only under the spec's '## Slices' heading, code fences aside.
+
+Build note (tp-4): TP4-A2: 'says it reverts' is built as the two forms git and GitHub write. Each
+message line starting 'This reverts commit <sha>' (7+ hex) undoes the commit whose id begins with
+it; with no such line, the subject 'Revert "<subject>"' undoes the newest earlier commit with that
+subject that is not already undone, a trailing ' (#N)' aside on both. An undone commit undoes
+nothing, so a revert of a revert restores the original. A free-form 'revert <sha>' subject is not
+read. A merge commit that names a slice is listed among its commits and adds no path and no line
+(its side commits count on their own subjects); a binary file adds a changed path and no line.
+
+Build note (tp-4): TP4-A9/A10/A11 route order as built: (1) report for every protected-twins and
+orphan-protected row AND for an orphans row with a test file whose path holds a protected token (the
+row carries that token; removing a protected test follows the standard's protected path); (2) slice
+when an unbuilt slice of another *.spec.md beside --spec lists a file of the row; every such slice
+is recorded as slices: [{spec, slice}], specs by file name; unbuilt means no commit that is not
+undone names the slice; (3) report for an orphans row of more than 12 files (defining file + tests)
+and for a row with a path outside [A-Za-z0-9_./-] or holding SHALL, which the section could not
+carry; (4) structure otherwise. TP4-A11's 'orphans row with more than 12 files' is read as one no
+unbuilt slice lists (the Candidate-kinds table's order); TP4-A10 does not apply to the rows of (1)
+and (3). Reword A10/A11 to that order.
+
+Build note (tp-4): TP4-A15 cap as built: structure rows are walked duplicates first, then orphans,
+each by file then name; a row is taken when the section then holds at most 6 rows and 12 DISTINCT
+files; a row not taken is marked over-cap and the walk goes on, so a later smaller row can still be
+taken. The marks are made while the tester A/B experiment is open too; only the section file waits.
+
+Build note (tp-4): mr-prune close refusals and write rules beyond the criteria: --spec must be named
+<label>.spec.md (label of [A-Za-z0-9_.-], not holding SHALL) and hold at least one slice under '##
+Slices', else PRUNE-ERROR rc=2 with nothing written, because a close row is permanent for its label.
+A trend.jsonl that cannot be read is a PRUNE-ERROR (the once-only check cannot be made). Writes are
+close/<label>.json, the section, then the trend row last; when one fails both close files are
+removed. A path under <mem>/prune/ that leads out of it through a link is refused. --repo and --mem
+keep the tool's defaults.
+
+Build note (tp-4): For tp-5: mr-prune close reads --at as it stands in the repo and never fetches.
+The MERGED-row hook must bring the game checkout's origin/master up to the merge (git fetch) or pass
+the merged sha as --at before it runs close; otherwise the milestone's last slice is recorded
+unmatched and the label is spent (TP4-A17 then skips every later run). Recovery by hand is deleting
+that row from prune/trend.jsonl.
+
+Build note (tp-4): The close section's touches: for an orphan are its defining file and the eligible
+test files naming it (TP4-A13). A symbol is often also named where the census does not look: a 'pub
+use' or re-export in another file, a bench, a test file outside the eligible patterns, or another
+orphan of the same file that calls it. A type: refactor slice cannot widen, so the generated section
+says such a row stays with its reason in the PR body. Seen on the game's origin/master at d10c6c02
+for M-trade-sessions: the two structure rows are resolve_turn and resolve_player_swap
+(game-core/src/combat/resolve.rs, 4 and 6 files), which benches/hot_paths.rs, benches/budgets.rs and
+resolve_full_turn also name, and which st-4 exists to decide. The routes cannot hold a row for an
+open type: design slice (st-4 lists only docs), so after the experiment closes such rows reach a
+refactor section; whether a design slice should name the symbols it holds is a spec question.
+
 ### tp-5 — the merge of a milestone's last slice runs the close census
 type: feature · tier: routine
 touches: memory/projects/mr-record, memory/projects/mr-situation, memory/projects/mr-selfcheck, specs/monster-realm-v2/structure.spec.md, memory/projects/mr-native-supervisor-README.md
