@@ -2190,3 +2190,48 @@ the Fix-batch contract):
 - **ts-6b-14.11:** WHEN this batch merges, NO residual in the ts-6a triage table SHALL still be open
   in `mr-gates residuals list --json` (each closed as fixed with a PR or as wontfix with a reason),
   and `just ci` and `just e2e` SHALL be green on `master`; that merge closes the milestone.
+
+Build note (ts-6b-14): ops/observability/rules/recording.rules.yml: the two $slo_set regexes still
+name move_player, create_player, challenge_player and evolve_monster, which match no reducer in
+server-module/src, so half the allowlist records nothing. The file header says the set leaves out
+reducers whose main refusal is a guard, while the three names ts-6b-14 added by spec
+(open_trade_session, set_trade_offer, confirm_trade_session) refuse through guards. The mr-scheduler
+group lists neither trade_session_reaper, tactical_deadline_fire, tactical_advance nor battle_gc as
+in or out of scope. Fix: rebuild the allowlist and the scheduler list from the live reducers and
+settle the guard-refusal rule.
+
+Build note (ts-6b-14): Stale text ts-6b-14 found and left, because it is outside the batch touches
+or outside the ten triage rows. Outside touches: game-core/src/trading/mod.rs:5-6 (presents
+authorize_respond and authorize_confirm as live guards; no reducer calls them);
+server-module/src/trading.rs:26 (says the facts are public through trade_offer, which the client
+does not subscribe to); client/src/tactics/golden.parity.test.ts:14 (BT11.7 forward reference);
+client-wasm/src/lib.rs talk_range doc (says the client interact prompt reads it; no client
+production code does); client/src/input/router.test.ts:2212 (narrates the deleted worldHasFocus);
+server-module/src/inventory_tests.rs:128 (cites trading_tests
+nh_trade_confirm_swaps_every_asset_and_conserves_every_total, which does not exist); main.boot,
+main.privacyWiring, main.frameErrorWiring, main.reducedMotionWiring, main.exportTransport,
+main.i18nBoot and main.privacyCountdown test headers cite main.wiring.test.ts, which does not exist;
+docs/DECISIONS.md:243 lists the trade_offer deleters without the cancelled-deletion path. Inside
+touches, outside the rows: client/src/main.a11yFocus.test.ts:10 and :656 (main.wiring.test.ts
+cites); client/src/main.input.test.ts:3963-3969 and :4202 (wrong-implementation lists written
+against the removed propose wizard); the ctl-10a T-retired history tags in
+client/e2e/wallet-balance.spec.ts (9 sites) and client/src/main.input.test.ts (4 sites).
+
+Build note (ts-6b-14): ts-6b-14.9 build finding: the suggested use.trace retain-on-failure with full
+tracing takes a DOM snapshot inside every awaited action, which pushed the 90 ms key tap of
+client/e2e/movement-input.spec.ts past its 140 ms budget on the runner (run 43572095533, e2e-shard
+2). Shipped as trace { mode: retain-on-failure, snapshots: false }: the trace keeps the action log,
+console, network log and film strip and drops DOM snapshots (run 43573970351: shard 2 green, shard 5
+failed on purpose and uploaded e2e-failure-5-1 with trace.zip and tmp/stdb.log). Limits, disclosed:
+a failure inside beforeAll itself has no test-scoped trace, and a cancelled run uploads nothing (if:
+failure()).
+
+Build note (ts-6b-14): ts-6b-14.11 is a merge-time criterion: the ledger CHECK is just ci only,
+because a builder may not disposition residuals. At PR time mr-gates residuals list --json still
+holds 56 triage-table rows: the 10 this batch fixes, 43 fixed by merged batches ts-6b-2 to ts-6b-13
+whose dispositions were not applied, and the 3 ask rows (R-bt-7-SUMMARYEXPORT,
+R-qf-6-PLAYERQUESTPUBLIC, R-rb-132-WALLETSYBIL). The PR body of #774 carries the id to PR list.
+
+Build note (ts-6b-14): More history-worded comments ts-6b-14 left in a touched file, outside its
+triage rows: client/src/main.a11yFocus.test.ts lines 908, 913, 1102, 1205, 1210 and 1347 still
+describe the deleted #help-hint badge (the element is the Start chip, #chip-start).
