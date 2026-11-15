@@ -513,6 +513,27 @@ after: [ih-2, ih-4]
 
 - **ih-3.7:** WHEN three browser identities join with the default name, THE third's Players tab SHALL list two rows with the same name, different tags and each the starter's level (`client/e2e/identity-handles.spec.ts`).
 
+Build note (ih-3): The tag is muted (--mr-text-muted) on a plain Players row and takes the row's own
+text colour on the cursor row: the cursor row's fill is --mr-frame-fg, where muted text measures
+about 1.5:1. The spec's 'a span.mr-player-tag coloured --mr-text-muted' holds for every row but the
+one under the cursor. Same-named rows are ordered by tag number (the spec is silent; identity-hex
+order put #0107 above #0042).
+
+Build note (ih-3): touches: missed two test files a probe measured, both widened:
+client/src/main.targetKindGate.test.ts (a 24th main boot test with a store.upsertPlayer literal,
+added by ih-4 after the spec counted 23) and client/src/ui/i18n/catalogParity.test.ts (PARITY-02
+pins the exact resolver-importing file roster, which ui/playerTag.ts joins). Contract C3 names
+'ih-3.6's e2e'; the e2e is ih-3.7's.
+
+Build note (ih-3): Left name-only by scope, seen while building: the Players tab walk-up line
+(social.players.walkUp reads the row's name; socialScreen.ts is outside touches) and, by the spec's
+named deferrals, the trade editor heading and the Rankings tab. In a one-line banner a right-to-left
+name and its tag are reordered by the bidi algorithm as one run (name, then tag, read right to
+left); the Players row isolates the name in a bdi, the banner join does not
+(banner-tag-style=plain-join). The manual pass showed that a rejoin resets a renamed player to the
+client's default name 'Player' (the client joins every identity with that name) while the tag stays,
+so same-named rows are the common case, not the exception.
+
 ## Post-integration verification (the milestone is done when all hold on `master`)
 
 - Full `just ci` green with `just eval`: `account-e2e` passes with its 62-entry transcription
