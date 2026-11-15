@@ -335,7 +335,7 @@ build, the e2e build or `client-wasm`. The run of record is in DoD.
 ### sr-2 — the party is read through an `(owner, slot)` index
 type: feature · tier: hard
 category: performance/server · severity: HIGH · size: MODERATE
-touches: server-module/src/schema.rs, server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/monster_mgmt.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/native_host_tests.rs, server-module/src/accounts_tests.rs, server-module/src/guards_tests.rs, server-module/src/movement_tests.rs, server-module/src/onboarding_tests.rs, server-module/src/raising_tests.rs, server-module/src/tactics_tests.rs, server-module/src/trading_session_tests.rs, evals/baselines/table-schemas.json
+touches: server-module/src/schema.rs, server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/monster_mgmt.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/native_host_tests.rs, server-module/src/accounts_tests.rs, server-module/src/guards_tests.rs, server-module/src/movement_tests.rs, server-module/src/onboarding_tests.rs, server-module/src/raising_tests.rs, server-module/src/tactics_tests.rs, server-module/src/trading_session_tests.rs, evals/battle-schema-snapshot.eval.mjs, evals/baselines/table-schemas.json
 after: [sr-9a]
 
 `monster` gains `index(accessor = owner_party, btree(columns = [owner_identity, party_slot]))`.
@@ -343,7 +343,10 @@ The single-column `owner_identity` index stays, because the re-key, erase and ex
 owned monster. `lead_party_ids` reads `owner_party().filter((owner, 0..PARTY_SLOT_NONE))`. The
 range is ascending by slot, so the explicit sort goes. `set_party_slot` collects occupied slots
 through the same range. Every caller of `lead_party_ids` keeps its signature. The schema baseline
-is re-recorded. `monster` is private, so no binding changes.
+is re-recorded. `evals/battle-schema-snapshot.eval.mjs` throws on any table-level `index(…)` today
+(`parseTables`), so its parser learns the `btree(columns = [...])` form and records each
+composite index (accessor + ordered columns) in the baseline. Every other table-level form still
+throws, and no existing baseline assertion is loosened. `monster` is private, so no binding changes.
 The native test host stops on a multi-column index prefix today: `datastore_index_scan_range_bsatn`
 calls `unmodelled(…)`, and `Fixture::table` registers single-column indexes only. So
 `native_host_tests.rs` gains the multi-column prefix range scan and a composite-index
