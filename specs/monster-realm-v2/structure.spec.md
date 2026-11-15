@@ -223,3 +223,44 @@ Pins: none in the plan's table. Covering tests: `client/src/main.input.test.ts`,
 Confirmed in the diff at merge, not by a criterion: the seven names are declared in
 `shell/inputState.ts` and nowhere in `main.ts`; no module outside the owner mutates
 `navHeldCodes` or assigns `bindings` or `keyboard`; its plan line is gone.
+
+### st-8 — game-core content: the single-string `parse_*` wrappers leave the API
+type: refactor · tier: routine
+touches: game-core/src/content.rs, game-core/src/lib.rs, game-core/src/taming/rules_tests.rs, game-core/src/combat/ability_tests.rs, game-core/src/combat/weather_tests.rs
+after: []
+
+From the M-econ-onboarding elaboration census (`mr-prune census`, game `9fb5bd25`; callers
+re-measured at `5fdc4712`). Ten `pub` wrappers in `game-core/src/content.rs` — `parse_shops`,
+`parse_heal_locations`, `parse_quest_defs`, `parse_npc_defs`, `parse_zones`,
+`parse_dialogue_trees`, `parse_evolution_paths`, `parse_encounters`, `parse_species`,
+`parse_abilities` — are re-exported from `game-core/src/lib.rs` and called only by tests: the
+`content.rs` test module, `taming/rules_tests.rs`, `combat/ability_tests.rs` and
+`combat/weather_tests.rs`. Every one has a `*_parts` form, which the loaders use. The wrappers and
+their re-exports are removed; each caller passes the same RON to the `*_parts` form as one part.
+A test whose only subject is a wrapper itself goes under `standards/testing-tdd.md` "Deleting a
+check", naming the `*_parts` test that survives it.
+
+- **ST8.1:** WHEN `cargo nextest run -p game-core` runs IT SHALL pass, with no assertion edited
+  other than a re-pointed call.
+- **ST8.2:** WHEN `just ci` runs on the slice's head IT SHALL pass.
+
+Confirmed in the diff at merge, not by a criterion: none of the ten names is declared or
+re-exported; every deleted test names its survivor in the PR body.
+
+### st-9 — server raising: the test-only `HEAL_COOLDOWN_MS` constant goes
+type: refactor · tier: routine
+touches: server-module/src/raising.rs, server-module/src/raising_tests.rs
+after: []
+
+From the M-identity-handles elaboration census (`mr-prune census`, game `9fb5bd25`; re-measured
+at `5fdc4712`). `pub(crate) const HEAL_COOLDOWN_MS` in `server-module/src/raising.rs` is read
+only by the `evaluate_heal` boundary cases in `raising_tests.rs`, which pass it as the
+`cooldown` argument. The constant is removed. Those cases keep their boundary values (elapsed ==
+cooldown is allowed, one ms short is refused, a clock that runs backwards is refused) with a
+cooldown local to the test module.
+
+- **ST9.1:** WHEN `cargo nextest run -p monster-realm-module` runs IT SHALL pass, and the three
+  `evaluate_heal` boundary cases SHALL still assert the same outcomes.
+- **ST9.2:** WHEN `just ci` runs on the slice's head IT SHALL pass.
+
+Confirmed in the diff at merge, not by a criterion: `HEAL_COOLDOWN_MS` is declared nowhere.

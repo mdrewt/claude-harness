@@ -106,7 +106,9 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
   `type: refactor` with its tier, pins and measured `touches:`.
 - Risks/decisions recorded; PLAN §9 line updated; no contradictions left in live files.
 - Every `blocked:` names its lifting event, who lifts it and a fallback; every follow-up is a
-  tracked row.
+  tracked row: an edit this run cannot make (outside its `touches:`, or a loop-control file such
+  as `structure.spec.md`) is `mr-gates notes add --followup`, never a bare note — an elaboration
+  slice has no `### <id>` section, so a bare note never folds anywhere.
 
 ## Cross-cutting invariants (apply where the milestone adds the thing)
 
