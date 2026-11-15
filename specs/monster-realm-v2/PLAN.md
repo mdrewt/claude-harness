@@ -193,9 +193,9 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
 - Identity: **M-identity-handles** (`ih-*`; a minted, never-reissued tag per identity, private
   at rest and mirrored onto the public `player` row while online, carried by the guest claim,
   erased at deletion and exported to its owner; the lead monster's level kept live on `player`;
-  the Players tab, the request banners and the Trades-tab row show the tag, and battles and the
-  world show the name alone; Sign In shows only on a build with an issuer, labelled with its
-  provider; the game's `docs/DECISIONS.md` "A player's tag is a minted sequence value: private at
+  the Players tab, the request banners and the Trades-tab row show the tag, battles show the name
+  alone and the world draws no player name; Sign In shows only where `connect` receives an issuer
+  (a server we operate, on a build that has one), labelled with its provider; the game's `docs/DECISIONS.md` "A player's tag is a minted sequence value: private at
   rest, mirrored on the public player row while online" and "A target's kind gates telemetry and
   account sign-in: only servers we operate get either").
 - Playtest-3 fixes: **M-pt3-quickfix** (`qf-*`; the playtest-3 bug-fix and
