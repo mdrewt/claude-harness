@@ -177,8 +177,8 @@ type: the tester A/B experiment measured test bloat at about $0.20-0.25 a slice,
 writing rules now cut it where the tests are written.
 
 ## The tester runs on Opus at medium effort and files defects apart from questions
-The `tester` agent is Opus at effort medium on every tier. It writes tests only for behaviour a
-criterion states, and reports each finding once, as a defect (one observable wrong outcome with
+The `tester` agent is Opus at effort medium on every tier. It writes tests for behaviour a
+criterion states or directly implies (its boundaries and refusals), and reports each finding once, as a defect (one observable wrong outcome with
 evidence) or a question (spec silence, an unsure runtime fact, a test-file or brief slip).
 Measured by the tester A/B experiment (2026-11-13/14, 16 slices, five arms, a Fable judge): Opus
 medium found all 4 confirmed defects whose fixes merged (10 of 11 once confirmed defects not yet
