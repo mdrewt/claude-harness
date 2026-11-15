@@ -831,3 +831,17 @@ field. `mr-supervisor-prompt-native.md` is not edited.
 Confirmed by reading at merge, not by a criterion: `structure.spec.md` carries the clause above;
 `wc -c memory/projects/mr-supervisor-prompt-native.md` prints 15796 at the PR head; the hook sits
 after the row is appended and reported, as `gates-rotate` does.
+
+Build note (tp-5): The close hook keys on the spec grammar mr-prune close reads: `### <id> — `
+headings under an exact `## Slices` heading. Measured 2026-11-13 over the corpus: M-netcode-presence
+(slices under '## Prior rulings…'), M25-security-audit (under '## Acceptance criteria (EARS)'),
+M-pre-playtest-polish (no '## Slices') and M-econ-onboarding ('## Slices (sketch; …)') have no slice
+ids by that grammar, so neither the hook nor a hand-run mr-prune close records them; and a heading
+that will never merge (pgcc-b SUPERSEDED, eo-3 DECIDED NO BUILD) keeps its milestone from ever
+completing. Whether such headings count as closed, and whether an off-grammar milestone spec should
+warn, is a spec question for the next M-test-pruning edit.
+
+Build note (tp-5): The spec's merge-time read 'wc -c memory/projects/mr-supervisor-prompt-native.md
+prints 15796' (tp-5 section and Post-integration verification) is stale: the file is 15788 bytes at
+both 5d506dd and the tp-5 head (last edited in #210); tp-5 does not edit it. The figure to confirm
+at merge is 15788, i.e. unchanged from base.
