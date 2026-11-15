@@ -611,6 +611,22 @@ Confirmed by reading at merge, not by a criterion: run on the game's `origin/mas
 `orphans` section lists `resolve_turn` and the `signals` section lists
 `client/src/ui/i18n/catalog.test.ts`.
 
+Build note (tp-2): TP2-A3 / §The orphan rule: test files wherever they sit (*_tests.rs, *.test.ts,
+tests/, benches/) are not production, including client-wasm/src/*_tests.rs and sim-harness/tests/;
+mr-prune implements that (client-wasm/src/tactics_tests.rs is real). Reword A3 to 'named in
+client/e2e/**, evals/**, or the non-test files of client-wasm/ and sim-harness/'.
+
+Build note (tp-2): TP2-A14 and §Totals say 'three fields' but TP2-A13 lists four values (CI wall
+seconds, CI conclusion, Nightly conclusion, rerun-to-green count); mr-prune records four keys
+(ci.seconds, ci.conclusion, ci.nightly, ci.reruns_to_green) and nulls all four. Reword to 'four
+fields' / 'those fields'.
+
+Build note (tp-2): mr-prune orphan rule, recorded limits (header): use/import statements name only
+what they reach through (X of 'X as Y', X of 'X::'), so a trait used only by method calls after 'use
+a::Tr;' is listed unless an impl of it is live; methods and enum variants are not symbols; an
+out-of-line '#[cfg(test)] mod helpers;' whose file is not *_tests.rs is read as production. Rows
+stay candidates for a refactor's compile to prove.
+
 ### tp-3 — the census is a step of milestone elaboration
 type: feature · tier: routine
 touches: specs/monster-realm-v2/milestone-loop-prompt.md, memory/projects/mr-native-supervisor-README.md
