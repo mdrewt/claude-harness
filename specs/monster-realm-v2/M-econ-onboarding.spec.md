@@ -74,18 +74,19 @@ In:
 
 Named deferrals:
 - **An HP-restoring item** (a potion) is a new item effect, battle action and UI → a later content
-  or battle-depth milestone. The kit's "heal item" is the Antidote, the only healing item that exists.
+  or battle-depth milestone (row R-econ-spec-NOTE241D57). The kit's "heal item" is the Antidote,
+  the only healing item that exists.
 - **A soulbound flag** for kit items → not built (decision `kit-tradeable` below). The official
-  server's alt-identity farm is named in Risks with its owner.
-- **A welcome notice** for the kit → backlog (ux-a11y/LOW). The kit shows in the wallet readout and
+  server's alt-identity farm is named in Risks with its row.
+- **A welcome notice** for the kit → backlog (ux-a11y/LOW, row R-econ-spec-NOTE7D4055). The kit shows in the wallet readout and
   the Bag.
 - **More quest content** (repeatable or additional quests as a recruit-loop faucet) → the
-  content/world milestones. `eo-4` tunes the one quest that exists.
+  content/world milestones (row R-econ-spec-NOTE241D57). `eo-4` tunes the one quest that exists.
 - **A replacement monster sink** → not needed now (#587 D4); `eo-4`'s worksheet records the gap.
 - **Economy metrics** (currency supply, price drift) → the observability milestone (M20 follow-on).
 - **The legacy battle funnel's unreachable self-battle branch** (`write_back_battle_results`'s
-  `is_practice` arm and its only caller of `practice_xp_reward`) → a follow-up row (the funnel's
-  retirement), see "Rulings with no build".
+  `is_practice` arm and its only caller of `practice_xp_reward`) → row R-econ-spec-NOTE27294A (the
+  funnel's retirement), see "Rulings with no build".
 
 ## Prior rulings that bind
 
@@ -113,10 +114,13 @@ Named deferrals:
   `a_practice_settle_rates_and_rewards_nothing_but_writes_back_both_lists_hp_bt14_6`. The legacy
   funnel `battle::write_back_battle_results` still pays currency and practice XP on `SideAWins`,
   but it runs only for an anchor with no `battle_tactical` row (the disconnect auto-flee, which
-  ends `Fled`, and `pvp::apply_pvp_forfeit` on a legacy anchor), and no reducer creates one. On a
-  legacy self battle both forfeit paths forfeit side A: `forfeit_on_disconnect` takes the
-  `player_identity` side first, and `pvp_deadline_forfeit_side` sees the same submission state for
-  both sides of one identity and forfeits A. Both end `SideBWins`, which pays nothing.
+  ends `Fled`, and `pvp::apply_pvp_forfeit` on a legacy anchor). Both `battle` insert sites in
+  `tactics.rs` write the `battle_tactical` row in the same transaction, so no new legacy anchor can
+  exist. A self battle left over from before the cutover would also pay nothing:
+  `forfeit_on_disconnect` forfeits the `player_identity` side first, which ends `SideBWins`, and
+  `pvp_deadline_reaper` sees the same submission state for both sides of one identity, so it
+  returns early or forfeits A. A pre-cutover non-self legacy PvP anchor is ordinary PvP, not this
+  residual.
   R-weekly-review-2026-10-09-F1's disposition: resolved (fixed by M-battle-tactics), with this
   evidence. The unreachable branch is a follow-up row, not a slice of this milestone.
 - **Sketch `eo-3` — recruit yields:** no payout (#587 D1). No build, no slice. `eo-4` owns the
@@ -129,8 +133,17 @@ Named deferrals:
   rekeyed by the guest claim, erased by the deletion cascade (`account-e2e` lists it `Erase`),
   counted by `accounts::account_has_game_data`, and never sent to a client. A new table would need
   all four wired. Writes go through a `pub(crate)` helper in `npc.rs`, the table's owner. Content
-  may not name a `sys:` flag: `validate_content` refuses any dialogue condition or effect that
-  does.
+  may not name a `sys:` flag: `validate_content` refuses any dialogue condition or effect, or
+  quest condition, that does. `validate_content` runs in the content tests (CI), not at load: the
+  embedded trees are validated before they ship.
+- `decision-defaulted:retired-guest=marker-tombstone` — `accounts::complete_guest_claim` moves the
+  guest's dialogue row to the account (`npc::rekey_npc_state`), and nothing stops the retired guest
+  token from calling `join_game` again: it holds no account row, so `require_not_deleting` passes.
+  Without the marker it would get a second kit and a fresh starter. When the moved row holds
+  `sys:` flags, `rekey_npc_state` leaves the guest a row with only those flags and a copy of
+  `done_quests`, so the retired guest gets no second kit or starter and cannot redo a quest. This
+  is a named change to "the claim moves, never copies": the account holds the whole row, and the
+  guest keeps the tombstone.
 - `decision-defaulted:kit-contents=200g+2xLureBerry+1xAntidote` — #587 D2's "~200g + 2–3 basic
   items (a heal item and a bait)". The Antidote is the heal item: the only one that exists. Two
   Lure Berries, because recruiting is the operator's dominant loop. The 200 gold buys exactly one
@@ -190,8 +203,9 @@ The builder may move a default value when the worksheet's measurement contradict
   start state of 200 gold, 2 Lure Berries and 1 Antidote. `eo-4`'s worksheet and its affordability
   invariant read the kit through `load_starter_kit`. Proof after merge: `eo-4.1` passes on
   `master`, and `client/e2e/wallet-balance.spec.ts` reads `Gold: 350` (kit + quest).
-- **C2 (`eo-1` ↔ guest claim / deletion):** the marker lives in a row the claim rekeys and the
-  cascade erases. Proof after merge: `eo-1.5` and `account-e2e` (`just eval`) pass on `master`.
+- **C2 (`eo-1` ↔ guest claim / deletion):** the marker lives in a row the claim rekeys (leaving
+  the guest a tombstone) and the cascade erases. Proof after merge: `eo-1.5`, `eo-1.6` and
+  `account-e2e` (`just eval`) pass on `master`.
 - **C3 (`eo-1`, `eo-4` ↔ `CONTENT_VERSION`):** each slice bumps `CONTENT_VERSION` once and
   re-records `evals/baselines/content-hash.json`. The pair is ordered, so the second bump starts
   from the first. Proof after merge: the `content-version` eval passes on `master`.
@@ -237,6 +251,10 @@ Measured pins (each a named intentional change; the build widens for any further
   `client/e2e/battle-dpad.spec.ts` (`NO_BAIT_ROW` absent) now see the kit's Lure Berries. Their
   no-bait case needs an identity that spends or sells its berries first, or the test's subject
   changes to "the kit's bait row is offered".
+- A claim test in `accounts_tests.rs` or `npc_tests.rs` that asserts the guest keeps no
+  `player_dialogue_state` row changes to "keeps only the tombstone" (`retired-guest` above). The
+  `account-e2e` eval checks monsters for move-not-copy, not dialogue state (it cannot seed that
+  table), so it is unaffected.
 - `evals/baselines/content-hash.json` is re-recorded with `CONTENT_VERSION`.
 - Not in `touches:`: `account-e2e`'s per-table string marks tables the fixture owns rows in. The
   fixture already owns `inventory`, `player_wallet` and `player_dialogue_state` rows (`:1`), so
@@ -255,11 +273,13 @@ namespace.
 
 - **eo-1.4:** WHEN the kit would push the joiner's balance past `MAX_BALANCE` or a stack past `MAX_ITEM_STACK`, THE SERVER SHALL grant no part of the kit, leave the marker unset, log `starter_kit_skipped`, and still complete the join (`server-module/src/onboarding_tests.rs`).
 
-- **eo-1.5:** WHEN a guest identity that claimed its kit is claimed into an account, THE account SHALL hold the marker, and a later join of the account SHALL grant nothing; WHEN an identity's deletion completes, THE marker SHALL be gone with the rest of its dialogue state (`server-module/src/accounts_tests.rs`).
+- **eo-1.5:** WHEN a guest identity that claimed its kit is claimed into an account, THE account SHALL hold the marker and a later join of the account SHALL grant nothing, and WHEN the retired guest identity joins again, THE SERVER SHALL grant it no kit and no monster and SHALL not pay it quest_001 again (`server-module/src/accounts_tests.rs`).
 
-- **eo-1.6:** WHEN content holds a starter kit naming an unknown item, a zero quantity, an item twice, a quantity above `MAX_ITEM_STACK` or a currency above `MAX_BALANCE`, or a dialogue condition or effect naming a `sys:` flag, THE content validation SHALL refuse it with an error naming the offending entry (`game-core/src/content.rs` tests).
+- **eo-1.6:** WHEN an identity's deletion completes, THE marker SHALL be gone with the rest of its dialogue state, and THE identity's `join_game` SHALL be refused (`server-module/src/accounts_tests.rs`).
 
-- **eo-1.7:** WHEN a fresh browser identity joins and opens the shop, THE wallet readout SHALL read `Gold: 200` and the Bag SHALL list 2 Lure Berries and 1 Antidote (`client/e2e/wallet-balance.spec.ts`).
+- **eo-1.7:** WHEN content holds a starter kit naming an unknown item, a zero quantity, an item twice, a quantity above `MAX_ITEM_STACK` or a currency above `MAX_BALANCE`, or a dialogue condition or effect or a quest condition naming a `sys:` flag, THE content validation SHALL refuse it with an error naming the offending entry (`game-core/src/content.rs` tests).
+
+- **eo-1.8:** WHEN a fresh browser identity joins and opens the shop, THE wallet readout SHALL read `Gold: 200` and the Bag SHALL list 2 Lure Berries and 1 Antidote (`client/e2e/wallet-balance.spec.ts`).
 
 ### eo-4 — faucet/sink tuning pass
 type: feature · tier: hard
@@ -296,10 +316,10 @@ evidence.
 - Full `just ci` green, with `just eval` included: the `content-version` eval passes at the second
   bump (C3), and `bindings-drift`, `spacetime-type-snapshot` and `client-surface-privacy` show no
   change (no schema, type or reducer change in either slice).
-- On `master`, `client/e2e/wallet-balance.spec.ts` (`eo-1.7`, `eo-4.3`) and
+- On `master`, `client/e2e/wallet-balance.spec.ts` (`eo-1.8`, `eo-4.3`) and
   `client/e2e/dialogue.spec.ts` pass together. That is the integrated proof of C1: a fresh identity
   joins, receives exactly one kit, completes the quest and holds 350.
-- `server-module/src/accounts_tests.rs`'s `eo-1.5` case and the `account-e2e` eval pass together
+- `server-module/src/accounts_tests.rs`'s `eo-1.5` and `eo-1.6` cases and the `account-e2e` eval pass together
   (C2).
 - One manual playtest pass on a fresh local database, recorded in `eo-4`'s PR, with the same steps
   run in a single-player world and on a friends server:
@@ -311,24 +331,34 @@ evidence.
 ## Risks
 
 - **Alt-identity farming on the official server.** An anonymous identity costs nothing to mint,
-  and each one gets a tradeable starter monster today. With `eo-1` it also gets 200 gold, 2 Lure
-  Berries and an Antidote, which a session trade can move to a main identity. In a single-player
-  world or on a friends server this is harmless. On the official server it is a faucet bounded only
-  by identity creation. The guard belongs to the identity/trade rules for the official server: an
-  account-holder requirement for trading, or a soulbind flag. The spec files a follow-up row; it is
-  not built here.
+  and each one already gets a tradeable starter monster. After both slices a throwaway identity
+  also yields about 570 gold to a main identity through a session trade: 200 from the kit, 220
+  from selling the kit, 150 from quest_001. That is more than one essence shard (500). Session
+  trades need no account (`trading_session::open_trade_session` checks only join, reach and the
+  deletion gate). Gating the kit on an account is not available: no issuer is provisioned yet
+  (`ALLOWED_ISSUERS` is a fail-closed placeholder), so nobody would get the kit. In a
+  single-player world or on a friends server the farm is harmless. On the official server it is a
+  launch condition beside R-rb-132-WALLETSYBIL's: before that server opens, trading requires an
+  account on both sides, or the kit and quest payouts become untradeable. Row
+  R-econ-spec-NOTEDED5DD tracks it; it is not built here.
+- **A one-time kit for every existing identity** (`legacy-joiner`). Pre-launch this reaches only
+  development and playtest databases.
 - **The export newcomer tier gets cheaper to leave** (`export-tier-signal` above). Before `eo-1`
   an anonymous identity needed one currency grant (the quest_001 Talk) to move from the newcomer
   export cap to the anonymous cap. After it, a join is enough. That widens R-rb-132-WALLETSYBIL a
   little and changes neither its fix (sign-in) nor its pending ask. `eo-1`'s PR states it, and the
   row's text is updated through `mr-gates notes`.
-- **Deletion and rejoin.** A completed deletion erases the marker with the dialogue state, so the
-  same identity starts fresh, kit included. While a deletion is pending, `require_not_deleting`
-  refuses `join_game`, `open_trade_session` and `set_trade_offer`, so no new offer can move assets
-  out during the window. This is the intended fresh start, not a leak.
+- **Deletion closes the identity.** The cascade erases the marker with the dialogue state, but the
+  anonymised `account` row keeps its terminal marker, and `require_not_deleting`
+  (`accounts::should_reject_for_deletion`) refuses that identity's `join_game` for good. A deleted
+  identity never gets a second kit. While a deletion is pending, the same gate refuses
+  `open_trade_session` and `set_trade_offer`.
+- **A marker with zero monsters is final.** `eo-1.2` grants nothing to a claimed identity that owns
+  no monster. Today only deletion reaches zero monsters, and deletion blocks the join. A future
+  release or loss mechanic must bring its own floor rule; this one does not re-grant.
 - **A reserved flag inside dialogue state.** Content that named `sys:starter_claimed` could clear
-  the marker and re-open the grant. `eo-1.6` makes `validate_content` refuse any `sys:` flag in
-  dialogue content. That check is the boundary, so it lands in the same slice.
+  the marker and re-open the grant. `eo-1.7` makes `validate_content` refuse any `sys:` flag in
+  dialogue or quest content. That check is the boundary, so it lands in the same slice.
 - **The e2e corpus assumed an empty start.** Four specs are measured pins. Others that only read
   their own purchases still pass, and the build runs the whole e2e suite, widening for any further
   measured pin. A widen refused because a live slice holds the file is a hidden-dependency stop.
