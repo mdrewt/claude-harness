@@ -126,8 +126,7 @@ Named deferrals:
   sets the open window's `battle_clock.deadline_ms` to the call's time and arms one fire at that
   time through `arm_deadline`, for the unit and `window_seq` of that window's pending
   `tactical_deadline_sched` row. The scheduler's own `tactical_deadline_fire` then expires the
-  window in the next transaction. Nothing
-  else in the expiry path changes, and every timestamp stays real. Overriding `now` would leave
+  window in the next transaction. Nothing else in the expiry path changes, and every timestamp stays real. Overriding `now` would leave
   later windows opening ahead of real time.
 - `decision-defaulted:dev-expire-scope=any-active-tactical-window`: the reducer acts on any Active
   tactical battle with an open turn window, wild or PvP. A wild expiry is an AutoFlee, as the real
@@ -171,8 +170,8 @@ Named deferrals:
 
 - **C1 (`th-3` → `th-1`):** the summary rows th-3 writes are what the register triages: a test the
   union lists that neither the register nor an existing row holds (np-a.9 is R-np-a-flake's) is a
-  new flake. Proof after merge: a CI run on
-  `master` whose failed shard was rerun lists that test in its `e2e` job summary.
+  new flake. Proof after merge: a CI run on `master` whose failed shard was rerun lists that test
+  in its `e2e` job summary.
 - **C2 (`th-4` ↔ `ih-1`):** `ih-1` adds a column to `player` and sweeps every server test file that
   holds a `Player` literal. `th-4`'s new test file builds its players only through the
   `tactics::tactics_tests` fixtures (`world`, `start_pvp`), never with a `Player` literal, so the
@@ -193,11 +192,11 @@ touches: scripts/e2e-shard-union.mjs, scripts/e2e-shard-union.test.mjs
 after: []
 
 `e2e-shard-union.mjs` reads every attempt's report, not only the highest one's. It also writes the
-listing to `$GITHUB_STEP_SUMMARY` when that variable names a file. A shard that dies before writing any file
-uploads no artifact (`if-no-files-found: warn`), so that attempt is invisible to the script.
-GitHub shows a bounded number of warning annotations per step, so the summary table, not the
-annotations, is the complete list. GitHub sets it in the `e2e` job,
-so `.github/workflows/ci.yml` does not change. The existing tests run through `just ci`
+listing to `$GITHUB_STEP_SUMMARY` when that variable names a file. GitHub sets it in the `e2e` job,
+so `.github/workflows/ci.yml` does not change. A shard that dies before writing any file uploads
+no artifact (`if-no-files-found: warn`), so that attempt is invisible to the script. GitHub shows
+a bounded number of warning annotations per step, so the summary table, not the annotations, is
+the complete list. The existing tests run through `just ci`
 (`door "scripts node suites"`). They build artifacts in a temporary directory and spawn the
 script; the new cases extend that file and its `report` fixture with per-test results and titles.
 
@@ -230,8 +229,8 @@ under `#[cfg(feature = "dev_reducers")]`):
    `disarm_deadlines` deletes the battle's other deadline rows, the original one included. A
    re-armed row whose `window_seq` is stale, or the deploy unit's under Active, is a no-op.
 
-Its tests (`dev_clock_tests.rs`, `#[cfg(all(test, feature = "dev_reducers"))]`, declared from
-`dev_clock.rs`; `just test` passes the feature) drive the native host through the
+Its tests (`dev_clock_tests.rs`, a plain `#[cfg(test)]` module declared from `dev_clock.rs`, each
+test item gated by the feature; `just test` passes the feature) drive the native host through the
 `tactics::tactics_tests` fixtures (C2). Gates: `cargo nextest run --features
 monster-realm-module/dev_reducers -E 'package(monster-realm-module)'` for the reducer;
 `just e2e` (or the CI shard) for the spec.
@@ -272,7 +271,7 @@ production module.
 
 - **th-4.2:** WHEN the reducer is called four times across B's successive windows with A acting live in between, THE fourth fire SHALL forfeit B and finish the battle with side A winning (`server-module/src/dev_clock_tests.rs`).
 
-- **th-4.3:** WHEN the reducer is called for an Active wild tactical battle whose player window is open, THE fire SHALL end the battle in the AutoFlee a real deadline gives (`server-module/src/dev_clock_tests.rs`).
+- **th-4.3:** WHEN the reducer is called for an Active wild tactical battle whose player window is open, with `side` 0, THE fire SHALL end the battle in the AutoFlee a real deadline gives (`server-module/src/dev_clock_tests.rs`).
 
 - **th-4.4:** WHEN the caller is not the module owner, or the battle does not exist, is Deploying or Finished, has no open window, or has the other side's window open, THE SERVER SHALL return `Err`, log a structured reject and write no row (`server-module/src/dev_clock_tests.rs`).
 
