@@ -653,6 +653,11 @@ Confirmed by reading at merge, not by a criterion: the bullet sits in the struct
 matches the text above; `prune/trend.jsonl` in the main checkout holds the `baseline` row; the
 README names the tool's subcommands.
 
+Build note (tp-3): The structure-pass census bullet (text locked by the tp-3 spec) runs against the
+game repo's origin/master but does not say to fetch first, and census never fetches; an elaboration
+session can census a stale commit. The tp-3 baseline row was taken after a fetch (9d5c66c). A later
+edit could prefix the step with `git -C projects/monster-realm fetch origin`.
+
 ### tp-4 — `mr-prune close`: what a milestone added, its candidates and their routes
 type: feature · tier: hard
 touches: memory/projects/mr-prune, memory/projects/fixtures/prune/*, docs/DECISIONS.md
