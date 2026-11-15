@@ -185,6 +185,8 @@ in `dev_clock.rs`, so no refactor slice comes first. The two studies commit docs
 CI script and its test. The only file the th- slices share with each other is `docs/DECISIONS.md`
 (`th-4`, `th-6`), which is append-only.
 
+## Slices
+
 ### th-3 — the e2e job lists the tests that passed only on a rerun
 type: feature · tier: routine
 category: loop-ops (test health) · severity: MED · size: SMALL
