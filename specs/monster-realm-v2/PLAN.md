@@ -81,8 +81,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    signals, one trend row with what the closing milestone's own commits added; rows are
    candidates routed through the existing deletion rule, a slice that already lists the file, or
    one capped `structure.spec.md` section per close, never reasons. The close census runs from
-   `mr-record`'s MERGED-row hook (no supervisor-prompt text). No prune session (revisit at the
-   tester A/B close). `tp-3` and the design sections `st-3` (shared pins) and `st-4` (what stays
+   `mr-record`'s MERGED-row hook (no supervisor-prompt text). No prune session. `tp-3` and the design sections `st-3` (shared pins) and `st-4` (what stays
    of the 1v1 battle rules) are buildable.
 6. **M-identity-handles** (`M-identity-handles.spec.md`, elaborated 2026-11-14 — 4 slices, heads
    `ih-4` ‖ `ih-1` (after `eo-1`), then `ih-2`, then `ih-3`): a minted, never-reissued name
@@ -188,9 +187,6 @@ ONE gate after every coverage milestone closes. No interim playtest.
 - Frozen surfaces: `client/src/module_bindings/` is generated-only (game repo AGENTS.md) and
   schema changes are additive-only (DECISIONS.md "Schema changes are additive"); any schema
   change needs bindings regen + a publish-over-data proof (docs/debloat/REPORT.md §maintainer).
-- **Tester A/B experiment** runs over §9 items 1–4: each feature slice it takes adds five shadow
-  testers (about $10) whose tests never enter the repo. It stops at a $500 cap; its state is read
-  with `memory/projects/mr-tester-ab status`.
 - Toolchain: SpacetimeDB 2.8.1 CLI/host + 2.8.1 module crate; 2.x syntax
   (`#[table(accessor = x)]`, `ctx.sender()`); upgrade runbook in the game repo's
   `docs/runbooks/spacetimedb-upgrade.md`.

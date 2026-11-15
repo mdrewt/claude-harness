@@ -351,9 +351,6 @@ the official server rejecting any other audience.
 - The privacy model (private tables behind owner-scoped views) still keeps one player's data from
   another player's client in every world. It does not keep it from the host, who owns the database.
 - `M21b-3 Steam login` (PLAN §9 item 16) is the Steam build's sign-in protocol and is consumed here.
-- **Tester A/B experiment:** `lpg-1` and `lpg-10` (the tester-bearing groundwork slices) are listed
-  in `required_slices` of `memory/projects/mr-tester-ab.config.json`; `lpg-0` is `type: design` and
-  has no tester.
 
 ## Slices
 

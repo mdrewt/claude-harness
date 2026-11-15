@@ -269,7 +269,7 @@ in a note is a residual row (`--followup` files it), so the drain sees it.
 a reason to delete a test (`standards/testing-tdd.md` decides). `mr-prune census` reports the
 suite at a commit; `mr-prune close --spec F` records what milestone `F` added under
 `memory/projects/prune/` (a `trend.jsonl` row and `close/<milestone>.json`, plus
-`close/<milestone>.section.md` once the tester A/B experiment has its `close` row).
+`close/<milestone>.section.md` when rows are routed to the structural queue).
 Subcommands: `census`, `twin` (re-checks one `pruned-tests:` claim at a commit), `keep` (records
 a pair kept on purpose in `mr-prune-keep.json`), `close`, and `--selftest`; flags are in its header.
 - **At milestone elaboration:** the structure pass of `milestone-loop-prompt.md` runs
