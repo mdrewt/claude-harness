@@ -38,8 +38,8 @@ Measured at `9fb5bd25`:
   call), so until players rename, every row on the Players tab reads the same.
 - **The Players tab cannot tell them apart.** `socialPlayers` (`client/src/ui/socialModel.ts`)
   builds `SocialPlayerRow { key, name, nearby }`: the key is the identity hex, which is never
-  shown; `#<hex8>` appears only as the fallback for an empty name (`playerName`,
-  `client/src/ui/tradeSessionModel.ts`). `leaderboardView.ts` paints the name in a `<bdi>` and the
+  shown; `#<hex8>` appears only as the fallback for an empty name (inline in `socialPlayers`, and
+  in `playerName`, `client/src/ui/tradeSessionModel.ts`). `leaderboardView.ts` paints the name in a `<bdi>` and the
   Nearby badge.
 - **The identity is not stable.** The guest claim re-keys the guest's rows onto the account
   identity (`accounts::rekey_all`, `server-module/src/accounts.rs`), so anything derived from the
@@ -144,8 +144,9 @@ allocation, not a game rule).
   before claiming already holds a starter monster, so this refuses nothing new in practice; it
   makes "two handles on one key" unrepresentable.
 - `decision-defaulted:retired-guest=mints-fresh` — the retired guest token of a completed claim
-  holds no handle after the re-key, so if it joins again it is minted a new tag. It is a new,
-  empty identity in every other respect too.
+  holds no handle after the re-key, so if it joins again it is minted a new tag. `eo-1` leaves it
+  a starter-marker tombstone, so it gets no kit and no starter; it shares nothing with the account
+  but the claim record.
 - `decision-defaulted:lead-level=public-mirror-on-player` — `player.lead_level: u8`
   (`#[default(0u8)]`, appended; 0 means no party) is refreshed by one helper,
   `battle::refresh_lead_level(ctx, owner)`, beside `lead_party` (the lead's SSOT). It writes the
@@ -153,8 +154,9 @@ allocation, not a game rule).
   or the party's order can change: the end of `join_game` (after the starter), the dual-write
   seam `monster_mgmt::update_monster_synced` (every battle write-back, level-up, faint, box and
   reorder passes through it) when the written row's `level` or `party_slot` differs from the
-  stored one, the recruit insert (`taming.rs`) and the session-trade slot move
-  (`trading_session.rs`). Quality-Time accrual (`raising::accrue_quality_time`) and the content
+  stored one (compared against the `monster_pub` row the seam already reads, so no extra read),
+  and the session-trade slot move (`trading_session.rs`). A recruit needs no call:
+  `taming::insert_recruited` always stores the monster (`PARTY_SLOT_NONE`). Quality-Time accrual (`raising::accrue_quality_time`) and the content
   resync change neither and get no call. A view was rejected: the pinned SpacetimeDB has only
   owner-scoped views here, and a per-subscriber view over `monster` costs a recompute per change.
 - `decision-defaulted:tag-format=hash+min4-zero-pad` — the tag is `#` plus the decimal value
@@ -177,8 +179,9 @@ allocation, not a game rule).
   (`ops/auth/README.md`); a build that sets the issuer and not the name shows the issuer string.
   No URL parsing: the OIDC flow already refuses an issuer it cannot use.
 - `decision-defaulted:issuer-read-once=one-assignment` — `main.ts` reads the issuer env once into
-  a `const`, under the existing target-kind gate, and passes that value to both `connect` and
-  `signInOffer`. The DECISIONS entry's "anywhere but that one `connect` call" becomes "anywhere but
+  a module-scope `const` beside the `TARGET_KIND` import (the `operatedByUs` test moves with it,
+  because `renderClaim` and the other `buildClaimViewModel` callers run outside `main()`), and
+  passes that value to both `connect` and `signInOffer`. The DECISIONS entry's "anywhere but that one `connect` call" becomes "anywhere but
   that one assignment", and its "treating the empty issuer as a complete off switch" rule-out is
   restated: hiding the control is presentation, and the `connect` gate stays the boundary.
 - `decision-defaulted:no-offer-copy=guest-play-continues` — with no offer, the `prompt` phase body
@@ -232,7 +235,7 @@ three i18n catalog files and are ordered (`ih-3` after `ih-4`). `main.ts` receiv
 ### ih-4 — Sign In shows only when an issuer exists, labelled with its provider
 type: feature · tier: hard
 category: auth/ux · severity: MED · size: SMALL
-touches: client/src/ui/claimModel.ts, client/src/ui/claimModel.test.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/claimView.i18n.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/main.ts, client/src/main.targetKindGate.test.ts, client/playwright.config.ts, client/e2e/accounts.spec.ts, ops/auth/README.md, docs/DECISIONS.md
+touches: client/src/ui/claimModel.ts, client/src/ui/claimModel.test.ts, client/src/ui/claimView.ts, client/src/ui/claimView.test.ts, client/src/ui/claimView.i18n.test.ts, client/src/ui/profileView.test.ts, client/src/ui/screens/profileScreen.boot.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/main.ts, client/src/main.targetKindGate.test.ts, client/src/main.claimCode.test.ts, client/playwright.config.ts, client/e2e/accounts.spec.ts, ops/auth/README.md, docs/DECISIONS.md
 after: []
 
 - `claimModel.ts` gains `type SignInOffer = { readonly kind: 'none' } | { readonly kind:
@@ -252,7 +255,12 @@ after: []
   (`issuer-read-once`).
 - Measured pins: `claimView.i18n.test.ts` maps `claim-signin-btn` to `claim.signInButton`
   (re-pointed); `accounts.spec.ts` A1 asserts the button text `t('claim.signInButton')` (re-pointed
-  to the provider label). `main.targetKindGate.test.ts` boots `main.ts` under each kind; it gains
+  to the provider label); `catalog.test.ts`'s full English key list pins `claim.signInButton`
+  (re-pointed to the new keys); `profileView.test.ts` and `main.claimCode.test.ts` call
+  `buildClaimViewModel` with one argument, and `profileView.test.ts` expects `claim-signin-btn` as
+  the Account section's default row (it passes an offer; the no-offer default row is Decline);
+  `profileScreen.boot.test.ts` boots `main.ts` with no issuer and seats focus on Sign in (its cases
+  boot with an issuer set, plus one no-issuer case). `main.targetKindGate.test.ts` boots `main.ts` under each kind; it gains
   the no-control case for `local` and `private`.
 
 - **ih-4.1:** WHEN `signInOffer` receives an empty issuer, THE SYSTEM SHALL return `none`, and WHEN it receives an issuer with a provider name, THE SYSTEM SHALL return that name, and with an empty name the issuer string (`client/src/ui/claimModel.test.ts`).
@@ -270,7 +278,7 @@ after: []
 ### ih-1 — the minted discriminator: table, mint at join, claim, deletion, export
 type: feature · tier: hard
 category: identity/schema · severity: MED · size: MODERATE
-touches: server-module/src/schema.rs, server-module/src/onboarding.rs, server-module/src/onboarding_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/ranking.rs, server-module/src/ranking_tests.rs, server-module/src/privacy.rs, server-module/src/privacy_tests.rs, server-module/src/battle_tests.rs, server-module/src/content_tests.rs, server-module/src/economy_tests.rs, server-module/src/guards_tests.rs, server-module/src/lifecycle_tests.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/npc_tests.rs, server-module/src/pvp_tests.rs, server-module/src/raising_tests.rs, server-module/src/tactics_tests.rs, server-module/src/trading_session_tests.rs, server-module/src/trading_tests.rs, client/src/module_bindings/player_table.ts, client/src/module_bindings/types.ts, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, evals/baselines/spacetime-types.json, docs/DECISIONS.md
+touches: server-module/src/schema.rs, server-module/src/onboarding.rs, server-module/src/onboarding_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/ranking.rs, server-module/src/ranking_tests.rs, server-module/src/privacy.rs, server-module/src/privacy_tests.rs, server-module/src/battle_tests.rs, server-module/src/content_tests.rs, server-module/src/economy_tests.rs, server-module/src/guards_tests.rs, server-module/src/lifecycle_tests.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/npc_tests.rs, server-module/src/pvp_tests.rs, server-module/src/raising_tests.rs, server-module/src/tactics_tests.rs, server-module/src/trading_session_tests.rs, server-module/src/trading_tests.rs, server-module/src/native_host_tests.rs, client/src/module_bindings/player_table.ts, client/src/module_bindings/types.ts, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, evals/baselines/spacetime-types.json, docs/DECISIONS.md
 after: [eo-1]
 
 - `schema.rs`: the private `player_handle` table (`handle-storage`, `mint`); `Player` gains
@@ -297,10 +305,20 @@ after: [eo-1]
   - The native host aborts on a write to a table a test did not register: every native caller of
     `join_game` (`movement_tests.rs`, `monster_mgmt_tests.rs`, `guards_tests.rs`,
     `accounts_tests.rs`) registers `player_handle`.
-  - `acct_rekey_roster_is_total_and_game_data_sees_every_rekeyed_table`: `REKEYED` goes from 11
-    to 12 with `player_handle`.
+  - `native_host_tests.rs`: `TABLE_DESCRIBERS` (61 entries, the source of `module_def()`) gains
+    the `player_handle` describer, else the manifest-vs-module-definition test fails. The host
+    models one `u64` `auto_inc` column per table; the `u32` discriminator registers through cast
+    closures.
+  - `accounts_tests.rs`: `acct_rekey_roster_is_total_and_game_data_sees_every_rekeyed_table`'s
+    `REKEYED` goes from 11 to 12; `[bt7/export-unchanged]` (exactly seventeen exportable tables)
+    goes to eighteen; `[bt7/manifest-census]` goes from 61 to 62; the `m22s6_table_row_types`
+    registry gains the table.
   - `evals/account-e2e.eval.mjs`: `M22S9_MANIFEST_TRANSCRIPTION` gains
-    `player_handle:Erase:owner_identity:1` and its count comment goes from 61 to 62.
+    `player_handle:Erase:owner_identity:1`; `checkCascadeTruth`'s hard `entries.length !== 61`
+    check and the count comment go to 62.
+  - `privacy.rs`: the comments that spell out the minimum bundle ("17 chunks", "16 * 17 = 272")
+    are restated for eighteen; `EXPORT_MIN_BUNDLE_ROWS` derives from `EXPORTERS.len()` and needs
+    no edit.
   - `evals/baselines/table-schemas.json` and `spacetime-types.json` are re-recorded; the client
     bindings regenerate through `just gen` (`player_table.ts`, `types.ts`; a private table gets
     no binding file). `client-visible-tables.json` and `client-surface-privacy` see no change:
@@ -320,7 +338,7 @@ after: [eo-1]
 
 - **ih-1.5:** WHEN a guest that holds a handle is claimed into an account, THE account identity SHALL hold the guest's discriminator and THE guest identity SHALL hold no handle row, proven by extending `acct_guest_claim_round_trip_moves_every_row_and_spends_the_code`, and THE rekey roster pin SHALL classify `player_handle` as re-keyed (`server-module/src/accounts_tests.rs`).
 
-- **ih-1.6:** WHEN an account identity that holds a handle and no other game data tries to complete a guest claim, THE SERVER SHALL refuse with `already has game data` and move nothing (`server-module/src/accounts_tests.rs`).
+- **ih-1.6:** WHEN an account identity that holds a handle and no other game data (a seeded fixture: `join_game` mints the handle and grants the starter together) tries to complete a guest claim, THE SERVER SHALL refuse with `already has game data` and move nothing (`server-module/src/accounts_tests.rs`).
 
 - **ih-1.7:** WHEN an identity's deletion completes, THE identity's handle row SHALL be gone, THE surviving `player` row's `discriminator` and `lead_level` SHALL be 0, and a later first join by another identity SHALL be minted a discriminator different from the erased one (`server-module/src/accounts_tests.rs`).
 
@@ -331,19 +349,22 @@ after: [eo-1]
 ### ih-2 — the lead-monster level stays live on the player row
 type: feature · tier: hard
 category: identity/social · severity: LOW · size: SMALL
-touches: server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/monster_mgmt.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/taming.rs, server-module/src/taming_tests.rs, server-module/src/trading_session.rs, server-module/src/trading_session_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs
+touches: server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/monster_mgmt.rs, server-module/src/monster_mgmt_tests.rs, server-module/src/trading_session.rs, server-module/src/trading_session_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs
 after: [ih-1]
 
 - `battle::refresh_lead_level(ctx, owner)` reads `lead_party_ids`, then the lead's level (0 with
   no party), and updates the `player` row only when it exists and holds a different value. It
   never fails its caller: an offline owner has no row and is skipped.
 - Callers (`lead-level`): the end of `join_game`; `update_monster_synced` when the written row's
-  `level` or `party_slot` differs from the stored one; the recruit insert in `taming.rs`; the
-  session-trade slot move in `trading_session.rs` (both sides). `evolution.rs` gets no call:
+  `level` or `party_slot` differs from its `monster_pub` row; the session-trade slot move in
+  `trading_session.rs` (both sides). `evolution.rs` gets no call:
   `game_core::evolve` carries the level over, and its direct write changes no `party_slot`.
 - `update_monster_synced`'s doc comment, which names the explicit write sites, gains the rule: a
   site that writes `level` or `party_slot` outside the seam calls `refresh_lead_level`.
 - No schema, reducer signature or bindings change.
+- Measured pin: native-host tests in `battle_tests.rs` and `trading_session_tests.rs` register
+  `player` as not writable; a qualifying monster write now updates the owner's `player` row
+  (seeded with `lead_level: 0`), so those fixtures register it writable. Assertions stay.
 
 - **ih-2.1:** WHEN a fresh identity joins and receives the starter, THE `player` row's `lead_level` SHALL equal the starter's level (`server-module/src/movement_tests.rs`).
 
@@ -351,16 +372,14 @@ after: [ih-1]
 
 - **ih-2.3:** WHEN the owner moves a different monster into the lead party slot, or boxes the lead, THE owner's `player.lead_level` SHALL equal the new lead's level, or 0 when the party is empty (`server-module/src/monster_mgmt_tests.rs`).
 
-- **ih-2.4:** WHEN a recruit puts a monster into an empty party, THE recruiter's `lead_level` SHALL become that monster's level (`server-module/src/taming_tests.rs`).
+- **ih-2.4:** WHEN a session trade executes and moves either side's lead, THE `lead_level` of both sides SHALL equal their new leads' levels (`server-module/src/trading_session_tests.rs`).
 
-- **ih-2.5:** WHEN a session trade executes and moves either side's lead, THE `lead_level` of both sides SHALL equal their new leads' levels (`server-module/src/trading_session_tests.rs`).
-
-- **ih-2.6:** WHEN a monster write runs for an owner with no `player` row, THE write SHALL succeed and SHALL insert no `player` row (`server-module/src/monster_mgmt_tests.rs`).
+- **ih-2.5:** WHEN a monster write runs for an owner with no `player` row, THE write SHALL succeed and SHALL insert no `player` row (`server-module/src/monster_mgmt_tests.rs`).
 
 ### ih-3 — the tag and the lead level on the Social surfaces
 type: feature · tier: hard
 category: identity/social · severity: MED · size: MODERATE
-touches: client/src/ui/playerTag.ts, client/src/ui/playerTag.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/leaderboardView.ts, client/src/ui/leaderboardView.test.ts, client/src/ui/noticeModel.ts, client/src/ui/noticeModel.test.ts, client/src/ui/tradeSessionModel.test.ts, client/src/tactics/clock.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/styles.css, client/src/net/connection.runtime.test.ts, client/src/shell/inputState.test.ts, client/src/shell/views.test.ts, client/src/ui/interactModel.test.ts, client/src/ui/pvpModel.test.ts, client/src/ui/pvpView.test.ts, client/src/ui/screens/bagScreen.boot.test.ts, client/src/ui/screens/journalScreen.boot.test.ts, client/src/ui/screens/profileScreen.boot.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/screens/socialScreen.test.ts, client/src/ui/screens/tradeSessionScreen.test.ts, client/src/ui/tradeSessionView.test.ts, client/e2e/identity-handles.spec.ts
+touches: client/src/ui/playerTag.ts, client/src/ui/playerTag.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, client/src/ui/socialModel.ts, client/src/ui/socialModel.test.ts, client/src/ui/leaderboardView.ts, client/src/ui/leaderboardView.test.ts, client/src/ui/noticeModel.ts, client/src/ui/noticeModel.test.ts, client/src/ui/tradeSessionModel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/styles.css, client/src/net/connection.runtime.test.ts, client/src/shell/inputState.test.ts, client/src/shell/views.test.ts, client/src/ui/interactModel.test.ts, client/src/ui/pvpModel.test.ts, client/src/ui/pvpView.test.ts, client/src/ui/screens/bagScreen.boot.test.ts, client/src/ui/screens/journalScreen.boot.test.ts, client/src/ui/screens/profileScreen.boot.test.ts, client/src/ui/screens/socialScreen.boot.test.ts, client/src/ui/screens/socialScreen.test.ts, client/src/ui/screens/tradeSessionScreen.test.ts, client/src/ui/tradeSessionView.test.ts, client/src/main.accel.test.ts, client/src/main.battle-reseed.test.ts, client/src/main.boot.test.ts, client/src/main.chips.test.ts, client/src/main.controls.test.ts, client/src/main.dialogueDismiss.test.ts, client/src/main.dialogueEnded.test.ts, client/src/main.dispatch.test.ts, client/src/main.feedbackCore.test.ts, client/src/main.feedbackI18n.test.ts, client/src/main.help.test.ts, client/src/main.hintBar.test.ts, client/src/main.input.test.ts, client/src/main.menu.test.ts, client/src/main.notices.test.ts, client/src/main.noticesRt.test.ts, client/src/main.partyFull.test.ts, client/src/main.reconnectStack.test.ts, client/src/main.remap.test.ts, client/src/main.shopBalance.test.ts, client/src/main.social.test.ts, client/src/main.worldReveal.test.ts, client/src/main.zoneCue.test.ts, client/e2e/ui-social.spec.ts, client/e2e/ui-screens.spec.ts, client/e2e/identity-handles.spec.ts
 after: [ih-2, ih-4]
 
 - `StorePlayer` gains `discriminator: number` and `leadLevel: number`, converted in `rowConvert.ts`.
@@ -372,24 +391,30 @@ after: [ih-2, ih-4]
   paints name (`<bdi>`), tag (a `span.mr-player-tag` coloured `--mr-text-muted`), level and the
   Nearby badge as separate nodes, inside the shipped nav-adapter row.
 - `noticeModel.ts` (`fromName` of both request kinds) and `socialModel.ts`'s session row
-  (`partnerName`) call `taggedName`. `playerName` is unchanged and keeps every other caller,
-  including the tactical battle clock (`client/src/tactics/clock.ts`). No player name tag is drawn
-  in the world at `9fb5bd25`, and NPC dialogue names no player.
-- Measured pins: the `StorePlayer` literals in the test files listed in `touches:` gain the two
-  fields (assertions stay). Before adding a fixture builder, the build greps `client/test-util/`
+  (`partnerName`) call `taggedName`; `socialPeopleKey` (the Players tab's repaint key) adds the tag
+  and the level, so a live level change repaints the row. `playerName` is unchanged and keeps its
+  other callers. `StorePlayer.name` stays the raw name, so every surface that reads it stays
+  tag-free: the tactical battle clock (`main.ts` hands it `store.player(id)?.name`), the rename
+  view and the rest. No player name tag is drawn in the world at `9fb5bd25`, and NPC dialogue
+  names no player.
+- Measured pins: the `StorePlayer` literals and `store.upsertPlayer({ … })` calls in the test
+  files listed in `touches:` (the unit tests, the 23 `client/src/main.*.test.ts` boot tests, and
+  the fake-store players of `client/e2e/ui-social.spec.ts` and `ui-screens.spec.ts`, which
+  `tsconfig` type-checks) gain the two fields; assertions stay. `catalog.test.ts`'s full English
+  key list gains the `identity.*` keys. Before adding a fixture builder, the build greps `client/test-util/`
   for one and extends it if it exists.
 
 - **ih-3.1:** WHEN a `player` row arrives, THE store's `StorePlayer` SHALL carry its `discriminator` and `lead_level` as `discriminator` and `leadLevel` (`client/src/net/rowConvert.test.ts`).
 
 - **ih-3.2:** WHEN `formatTag` receives 0, THE SYSTEM SHALL return null; for 42 it SHALL return `#0042` and for 123456 `#123456`; and `taggedName` SHALL return the bare name for a player whose discriminator is 0 (`client/src/ui/playerTag.test.ts`).
 
-- **ih-3.3:** WHEN two other online players share a name, THE Players tab view model SHALL give each its own row with its own tag and its lead level, and a row whose `leadLevel` is 0 SHALL carry no level (`client/src/ui/socialModel.test.ts`).
+- **ih-3.3:** WHEN two other online players share a name, THE Players tab view model SHALL give each its own row with its own tag and its lead level, and a row whose `leadLevel` is 0 SHALL carry no level, and WHEN a listed player's tag or level changes THE `socialPeopleKey` SHALL change (`client/src/ui/socialModel.test.ts`).
 
 - **ih-3.4:** WHEN the Players tab renders a row, THE name, the tag in a `--mr-text-muted` element, the level through `tactics.hud.level` and the Nearby badge SHALL render as separate nodes, with the name never passed through the resolver (`client/src/ui/leaderboardView.test.ts`).
 
 - **ih-3.5:** WHEN an incoming trade or challenge request is shown, THE banner name SHALL be the requester's `taggedName`, and THE Trades-tab session row SHALL name its partner the same way (`client/src/ui/noticeModel.test.ts`, `client/src/ui/socialModel.test.ts`).
 
-- **ih-3.6:** WHEN the tactical battle clock names a player who has a tag, THE name SHALL be the bare name with no tag (`client/src/tactics/clock.test.ts`).
+- **ih-3.6:** WHEN a `player` row with a non-zero discriminator arrives, THE store's `StorePlayer.name` SHALL be the raw name with no tag folded in, so the name-only surfaces that read it (the battle clock, the rename view) show no tag (`client/src/net/rowConvert.test.ts`).
 
 - **ih-3.7:** WHEN three browser identities join with the default name, THE third's Players tab SHALL list two rows with the same name, different tags and each the starter's level (`client/e2e/identity-handles.spec.ts`).
 
@@ -433,9 +458,10 @@ after: [ih-2, ih-4]
   `level` or `party_slot` without `update_monster_synced` and without `refresh_lead_level` leaves
   the mirror stale until the next seam write or join. `update_monster_synced`'s doc comment names
   the explicit sites; `ih-2` adds the refresh rule to that list.
-- **Write cost.** `refresh_lead_level` runs one owner-indexed `monster` read per qualifying write,
-  never per movement input (Quality-Time accrual is excluded). It writes the public `player` row
-  only on a change.
+- **Write cost.** The seam's qualifying test compares against the `monster_pub` row it already
+  reads, so an HP-only write costs nothing new. A qualifying write adds one owner-indexed `monster`
+  read and one `player` point read, never per movement input (Quality-Time accrual is excluded),
+  and writes the public `player` row only on a change.
 - **`eo-1` and `ih-1` both edit the claim and join fixtures.** The order (`ih-1` after `eo-1`) is
   the mitigation; `ih-1` rebases on `eo-1`'s fixtures rather than re-deriving them.
 - **The hidden Sign In is proven below the browser.** No e2e build runs without an issuer (the
