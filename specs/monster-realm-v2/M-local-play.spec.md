@@ -557,6 +557,26 @@ configuration".
   another target, no key of the first target SHALL be read or written
   (`client/src/main.claimCode.test.ts`).
 
+Build note (lpg-1): uri rule built stricter than the design sentence ('an absolute ws:/wss: URL with
+no userinfo, query or fragment (a path is allowed)'): '//' is required; the authority holds no
+backslash or '@'; no space or ASCII control character anywhere; a path must end in '/' and hold no
+'.' or '..' segment (also spelled %2e). Reason, measured: the SDK resolves
+'v1/database/<db>/subscribe' relative to the uri, so 'wss://h/stdb' and 'wss://h/stdb/../' dial
+'wss://h/v1/...' while the reconnect token and claim code are keyed on the raw string. Host
+spellings are NOT canonicalized (letter case, default port, IDNA forms are accepted; two spellings
+are two keys, the stated cutover risk). The design text should read 'a path, if present, ends in /
+and holds no dot segment'.
+
+Build note (lpg-1): Tooling built beyond the design text, all fail-closed: (1) 'vite build' resolves
+the document it emits with the production resolver, so a VITE_STDB_DB/VITE_STDB_URI the client would
+refuse fails the build, and it warns when VITE_STDB_URI is set without VITE_STDB_DB (no file is
+written); (2) verify-build-hooks.mjs scans every file under the build directory for the
+MR_PLAYTEST_DB name (not only .js) and requires the built index.html to load /shell-config.js from a
+classic script tag (outside comments, without async/defer/nomodule/type). lpg-1.5's round trip holds
+for JSON-shaped documents; a document with a non-enumerable own field or an inherited toJSON is
+accepted by the resolver but does not survive JSON.stringify (unreachable from the plugin, which
+renders literals).
+
 ### lpg-10 — single-player and friends worlds: no telemetry, no account token
 type: feature · tier: hard
 category: local-play/privacy · severity: HIGH · size: LIGHT
