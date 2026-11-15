@@ -313,6 +313,61 @@ reserved `sys:` flag namespace.
 
 - **eo-1.10:** WHEN a fresh browser identity joins and opens the shop, THE wallet readout SHALL read `Gold: 200` and the Bag SHALL list 2 Lure Berries and 1 Antidote (`client/e2e/wallet-balance.spec.ts`).
 
+Build note (eo-1): Plan-delta (onboarding-module row): join_game keeps only its deletion gate and
+hands content_cache::cached_starter_kit() to a new pub(crate) movement::join_with_kit, which holds
+the former body. The cached kit is embedded and cannot fail on the native test host, so eo-1.9 needs
+the kit passed in; the kit is resolved before take_start (the first write), so a kit that cannot
+load refuses before anything is written on a host with no rollback. The refusal is unconditional (a
+marker-holding identity is refused too).
+
+Build note (eo-1): Plan-delta (retired-guest row): npc::rekey_npc_state leaves the retired guest a
+tombstone on EVERY claim (its sys: flags, the starter marker whether or not it held it, a copy of
+done_quests), not only when the moved row holds sys: flags. eo-1.6 is unconditional, and a guest
+without the marker (it joined before eo-1, or its kit was skipped at a cap) left no row, re-joined
+with no monster and was granted a second starter and kit (found by the plan red-team, the code
+reviewer and the reducer security audit). The spec's own pin applied:
+acct_guest_claim_round_trip_moves_every_row_and_spends_the_code now asserts the guest keeps only the
+tombstone. A guest retired before eo-1 deployed has no tombstone and is still granted a starter and
+kit at its next join (the legacy-joiner class).
+
+Build note (eo-1): eo-1.6 quest clause: proven for a quest the guest had finished (the tombstone
+copies done_quests, as the retired-guest row states). A quest the guest had started but not finished
+(its player_quest row moves to the account) or never started can still be earned once by the retired
+guest. That gold cannot leave it: the retired guest owns no monster, and a session trade refuses a
+side that would hold none (TradeSessionError::LastMonster).
+
+Build note (eo-1): Pins measured beyond the spec's list (each widened with its red run):
+server-module/src/privacy_enforcement_tests.rs EXPECTED_MODULES gains 'onboarding' (lib.rs declares
+the module); client/e2e/ui-inventory.spec.ts UIF8.4 reads the empty Other pocket (the kit fills Bait
+and Medicine); client/e2e/a11y.spec.ts CTL7B-E2E-RAISING measures the Bag over the empty Food
+pocket; server-module/src/accounts_tests.rs sr11_join_tables registers the inventory auto-inc.
+recruit.spec.ts R1's no-bait case removes the kit's berry stack with owner SQL where the spec's pin
+says 'sold its berries first': no e2e drives the Sell tab and the state is the same.
+client/e2e/monster-privacy.spec.ts SQL-inserts a second stack of item 1 beside the kit's and still
+passes (it asserts with some()); it was not edited.
+
+Build note (eo-1): The publish-phase validate_starter_kit call in sync_content_inner has no test
+that fails when it is removed (a measured surviving mutant): sync_content_inner reads the cached kit
+and has no seam to inject an invalid one. The shipped kit is validated against the shipped items by
+game-core's eo-1.8 test, so an invalid kit cannot pass CI.
+
+Build note (eo-1): R-rb-132-WALLETSYBIL after eo-1: a join alone now creates the player_wallet row
+(the kit's 200 gold), so export_live_row_cap's 'newcomer' tier holds only identities that connected
+and never joined; the cost of leaving it drops from a join plus one quest Talk to a join (spec
+decision export-tier-signal=unchanged).
+
+Build note (eo-1): Follow-up: the retired guest's tombstone row (reserved flags and quest ids under
+the retired guest identity) is not erased when the account that claimed it is deleted;
+docs/DECISIONS.md records it as an accepted consequence.
+
+Build note (eo-1): Follow-up: an account that claims a retired (tombstone-only) guest ends with the
+starter marker and no monster, with its one claim spent; a zero-monster identity holding the marker
+is final by eo-1.2.
+
+Build note (eo-1): Follow-up: the a11y contrast measurement of the Bag covers an empty pocket only;
+the default frame (Bait listing the kit's Lure Berry) is unmeasured because #bag-list's gradient
+defeats the arithmetic.
+
 ### eo-4 — faucet/sink tuning pass
 type: feature · tier: hard
 category: economy-balance · severity: MED · size: SMALL (data + tests + one doc)
