@@ -1,7 +1,7 @@
 # Spec: M-local-play — single-player worlds and friends hosting
 
 **Status:** LP2–LP9 are an unelaborated sketch (2026-11-12), elaborated with
-`milestone-loop-prompt.md` when PLAN §9 item 7 is reached, against the current game repo and
+`milestone-loop-prompt.md` when its PLAN §9 item is reached, against the current game repo and
 `lpg-0`'s record (the game's `docs/local-play.md`). The groundwork (LP0, LP1, LP10 as `lpg-0`,
 `lpg-1`, `lpg-10`) is built: PLAN §Built · **Project:** monster-realm (client shell, packaging,
 server-module access rules, auth) · **Design SSOT:** `game-design.md` §14 · **Target:** the
@@ -73,7 +73,7 @@ Each default stands unless the operator overrules it:
 
 ## Unelaborated sketch — LP2 to LP9 (2026-11-12; NOT buildable, no slice ids)
 
-Elaborate with `milestone-loop-prompt.md` when PLAN §9 item 7 is reached, against the current game
+Elaborate with `milestone-loop-prompt.md` when its PLAN §9 item is reached, against the current game
 repo and `docs/local-play.md`. Nothing below is a slice yet.
 
 - **LP2 Desktop shell.** An Electron shell that hosts the existing web client unchanged, starts and
@@ -165,4 +165,4 @@ a private host then learns official identities.
   (`ARCHITECTURE.md` and `docs/DECISIONS.md` do). Two comments in `client/src/net/connection.ts` still say
   that with no issuer the OIDC flow "contacts no network"; they go with the sign-in-off mode
   (R-lpg-10-NOTEBFC99B).
-- `M21b-3 Steam login` (PLAN §9 item 14) is the Steam build's sign-in protocol and is consumed here.
+- `M21b-3 Steam login` (its own PLAN §9 item) is the Steam build's sign-in protocol and is consumed here.
