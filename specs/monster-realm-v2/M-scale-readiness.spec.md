@@ -253,6 +253,25 @@ header's "What a bot subscribes to" section is restated. All tests are the file'
 
 - **sr-9a.3:** WHEN `--clients-max` is 1,000, THE driver SHALL accept it, and WHEN it is 1,001, THE driver SHALL reject it with the cap in the message (`sim-harness/src/bin/mr_load_driver.rs` inline tests).
 
+Build note (sr-9a): sr-9a: the spec's 'rendered table' had no existing referent (the driver printed
+JSON only). Built as render_table: a tab-separated per-level table on stderr (concurrency, valid,
+p95, both rx rates), so stdout stays the bare JSON report. Specs reading 'the rendered table' (sr-9b
+DoD run of record) mean this stderr table.
+
+Build note (sr-9a): sr-9a: rx window honesty — each Subscribe re-sends the whole player table, so a
+bot downloads it 3x during connect; one warm-up scrape may not cover the burst at 1,000 bots,
+letting a late bot set rx_bytes_per_client_per_s_max. Not gated. sr-9b's run of record should hold
+enough scrapes (or check the scoped count at the first usable scrape) before reading _max; consider
+gating the rx window start on all bots scoped.
+
+Build note (sr-9a): sr-9a: docs/local-play.md §7 (~l.347) says the driver's clients hold only the
+character subscriptions; since sr-9a they also hold SELECT * FROM player world-wide. Outside sr-9a
+touches; the next slice touching local-play.md (or sr-9c/sr-9b) should qualify it.
+
+Build note (sr-9a): sr-9a reviewer nit, pre-existing: mr_load_driver read_response_head discards any
+bytes read past the 101 handshake head; if the host's first frame shares that read, the drain starts
+mid-frame. Not observed live; worth a look in sr-9c (which runs the driver in CI).
+
 ### sr-9d — reducer-thread share by reducer, recorded and graphed
 type: feature · tier: routine
 category: loop-ops/observability · severity: MED · size: SMALL
