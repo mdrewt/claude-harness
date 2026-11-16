@@ -45,13 +45,14 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M-local-play** (`M-local-play.spec.md`, elaborated 2026-11-16 into 18 `lpw-` slices): the
+1. **M-local-play** (`M-local-play.spec.md`, elaborated 2026-11-16 into 17 `lpw-` slices): the
    early-access shape — sign-in off and a kept identity for local and private worlds, protocol
-   numbers and unattended upgrade, the solo-completeness audit, the desktop shell, worlds, opening
-   a world to friends, private-server access and the standalone server package. lpw-1 to lpw-9
-   build first; the packaging slices are `blocked:licence` (operator), the overlay proof and the shell
-   `blocked:operator-steam-machine` and the account binding and access rule
-   `blocked:account-service` (operator). Groundwork built (§Built). **Early access is gated on it.**
+   numbers and unattended upgrade, the solo-completeness audit, the access design and the host's
+   open or password rule, then the desktop shell, worlds, opening a world to friends and the
+   standalone server package. lpw-1 to lpw-9 build first; the overlay proof and the shell are
+   `blocked:operator-steam-machine`, the packaging slices `blocked:licence` and the account
+   binding `blocked:account-service` (all operator). Groundwork built (§Built). **Early access is
+   gated on it.**
 2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S2 changes a frozen schema and waits for the
    operator's ratification at the harness-revision Checkpoint 2, which lifts this block. S1 as
@@ -84,8 +85,9 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    `M-battle-tactics-design.md`. Hold-to-act inputs (Hold Y cancel, Hold B skip) belong to M-gamepad.
 7. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
    row a pt3 milestone absorbs is marked in its spec.
-8. **M21b-3 Steam login** — the Steam build's sign-in protocol, consumed by M-local-play;
-   scoped when that milestone is elaborated. Steam Input maps onto the virtual buttons.
+8. **M21b-3 Steam login** — the Steam build's sign-in protocol and the Steamworks wiring
+   (overlay enable, Steam Input onto the virtual buttons) in M-local-play's desktop shell
+   (`lpw-11`); unspecced, elaborated once `lpw-10` proves the overlay.
 9. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
    (`standards/spec-driven.md` §Refactor slices). The supervisor's structural share schedules it
    ahead of this position; when no earlier item has a launchable slice, its slices launch in
