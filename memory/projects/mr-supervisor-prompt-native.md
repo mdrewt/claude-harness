@@ -131,8 +131,8 @@ Launch EVERY ready candidate passing ALL of: code/test `touches:` pairwise disjo
 (undeclared = colliding; mr-disjoint strips the doc set, adds widened files) · outside its
 always-serial structural set and any table/schema/migration (parallelize around it
 contract-first) · `after:` merged · `free -g` ≳ one full build free per launch · quiet window ·
-`effective_usd` + the launches' `tier_caps_usd` ≤ `soft_pause_usd` (a run started past it is
-cut off mid-way; UNKNOWN: skip). Only these rules hold a ready candidate; `held=` names the rule.
+the tier is `true` in bundle `budget.launchable_tiers`, and the tick's launches' summed
+`launch_est_usd` ≤ `launch_headroom_usd` (absent/UNKNOWN: skip; never redo this from other $ fields). Only these rules hold a ready candidate; `held=` names the rule.
 Run `$MEM/mr-disjoint "<slice>:paths" …` — SERIAL-REQUIRED is final; SAFE + a shared
 registry/enum/id axis → pre-assign each sibling's range in target_desc (a duplicate id wastes a
 merge). Merges stay serial and audited; conflicting PRs park, EXCEPT a conflict set ⊆ doc set

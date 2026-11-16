@@ -56,7 +56,7 @@ with the rule that held it:
 | `structural` | it touches its always-serial structural set or a table/schema/migration |
 | `after` | a slice it must follow is not merged |
 | `cap` | 4 runs are in flight |
-| `budget` | the governor is at SOFT-PAUSE, this launch's tier cap would cross it, or its model's own plan window is paused (a run started past the threshold is cut off mid-way) |
+| `budget` | the governor is at SOFT-PAUSE, `budget.launchable_tiers` is false for this launch's tier (or the tick's launches together exceed `launch_headroom_usd`), or its model's own plan window is paused |
 | `memory` | `free -g` shows less than one full build free |
 | `quiet` | a refactor's quiet window covers it |
 
@@ -232,9 +232,16 @@ Rules for a reading:
   model after. Nothing is downgraded ahead of a refusal, so a reset costs nothing. The A/B judge
   follows the same rule (re-issued on the fallback; verdicts carry `judge_model`).
 
-On telemetry `effective_usd` is the utilisation × `weekly_limit_usd`, so the per-launch check
-(`effective_usd` + `tier_caps_usd` ≤ `soft_pause_usd`) reads one scale under either source;
-`utilisation`, `window` and `sample_utc` carry the reading itself.
+On telemetry `effective_usd` is the utilisation × `weekly_limit_usd`; `utilisation`, `window` and
+`sample_utc` carry the reading itself. The per-launch check is computed by `mr-situation`, never by
+the session: `projected_usd` = the spend in force plus live runs' `launch_est_usd` (on telemetry
+their remaining spend is not in the figure yet), and `launchable_tiers[t]` = NORMAL and
+`projected_usd` + `launch_est_usd[t]` ≤ `hard_stop_frac` × `weekly_limit_usd` (the HARD line). The soft line already
+stops new launches through the governor; a launch only has to finish before the hard line, where
+decision sessions stop (live runs still finish; a plan refusal at 100% is a credit stop that
+`mr-interrupted` resumes). `launch_est_usd` is about p90 of ledger runs per tier;
+`slice_caps_usd`/`tier_caps_usd` stay cost-watch alert lines. Why (2026-11-16, the per-launch check): a tick at 86% real,
+governor NORMAL, held its only ready hard slice on `effective_usd` + the $150 cap > soft (91.4%).
 
 ## Slice scope (`touches:`)
 A slice edits the files its spec's `touches:` declares; a run that measures a further file it

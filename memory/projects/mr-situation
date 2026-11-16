@@ -63,13 +63,20 @@ try:
     _fa=float(_c.get("fable_allowance_usd") or 0.5*_w)
     if _w>0 and 0<_s<=_h<=1 and 0<_f<=1 and _fa>0: WEEKLY,SOFT,HARD,FGUARD,FALLOW=_w,_s,_h,_f,_fa
 except Exception: pass  # fall back to defaults above
-# What mr-spawn caps a launch at, per tier: with effective_usd and soft_pause_usd it is the whole
-# per-launch budget check, so the session does not open the config file.
+# What mr-spawn caps a launch at, per tier (cost-watch alert line; not the launch check below).
 CAPS={"default":60}
 try:
     _caps=json.load(open(MEM+"/mr-budget-config.json")).get("slice_caps_usd")
     if isinstance(_caps,dict) and _caps and all(isinstance(v,(int,float)) and not isinstance(v,bool) and v>0 for v in _caps.values()): CAPS=_caps
 except Exception: pass
+# What one run of a tier is expected to cost: about p90 of the ledger's runs per tier (2026-10..11:
+# hard p90 $78, routine p90 $34). One table for the in-flight exposure and the launch check below.
+EST={"hard":90.0,"routine":25.0,"content":35.0,"default":25.0}
+try:
+    _e=json.load(open(MEM+"/mr-budget-config.json")).get("launch_est_usd")
+    if isinstance(_e,dict) and _e and all(isinstance(v,(int,float)) and not isinstance(v,bool) and v>0 for v in _e.values()): EST=dict(_e)
+except Exception: pass
+def est_of(t): return float(EST.get(str(t),EST.get("default",25.0)))
 # REAL UTILISATION. The CLI's rate_limit_event rows (mr-cost-watch telemetry writes them) carry the
 # plan's own figure per window: a 0..1 utilisation and the window's resetsAt. A window covers one
 # model when its name carries the model or `telemetry_window_models` maps it, every model
@@ -184,10 +191,8 @@ def budget():
         if last is None or str(last.get("outcome","")).upper().startswith("LAUNCH"):
             try: t=json.load(open(MEM+f"/.harness-runner.{sl}.lock")).get("tier","routine")
             except Exception: t="routine"
-            est+={"hard":90.0,"routine":25.0,"content":35.0}.get(str(t),25.0)
+            est+=est_of(t)
     # in-flight committed exposure: live runs have spent tokens the ledger cannot see yet.
-    # Rough per-tier medians (from ledger history); matters at N>=3 where 4 slices ~ $300 committed.
-    tier_est={"hard":90.0,"routine":25.0,"content":35.0}
     committed=0.0; live=0
     for L in glob.glob(MEM+"/.harness-runner.*.lock"):
         sl=os.path.basename(L)[len(".harness-runner."):-len(".lock")]
@@ -195,11 +200,10 @@ def budget():
         try:
             lk=json.load(open(L)); pid=lk.get("session_leader")
             os.kill(int(pid),0)
-            committed+=tier_est.get(str(lk.get("tier","routine")),25.0); live+=1
+            committed+=est_of(lk.get("tier","routine")); live+=1
         except Exception: pass
     # `source` names what is in force. On telemetry `effective_usd` is the real utilisation put on
-    # the dollar scale (x weekly_limit_usd), so the per-launch check against `soft_pause_usd` and
-    # `tier_caps_usd` reads one scale either way; a live run's spend is already in the utilisation.
+    # the dollar scale (x weekly_limit_usd); a live run's spend SO FAR is in it, its remainder is not.
     eff=d7+est+committed
     state=grade(eff/WEEKLY); source="calibration"; real={}; resets=iso(wend) if wend else None
     try: tel=real_utilisation(now)
@@ -214,10 +218,20 @@ def budget():
         if m is None: continue
         models[m]={"state":max(w["state"],state,key=ORDER.index),"utilisation":w["u"],"window":w["window"],"resets_at_utc":iso(w["resets"])}
         if w["stale"]: models[m].update({"stale":True,"sample_utc":iso(w["ts"]),"probe_every_s":FRESH_S})
+    # THE PER-LAUNCH CHECK, computed here so no session re-derives it from the dollar fields. The
+    # soft threshold is the governor's (no new launches past it); a launch only has to FINISH before
+    # the hard one, where decision sessions stop (live runs still finish). So: the spend in force,
+    # plus what live runs may still spend (on telemetry their remainder is not in the figure — the
+    # whole estimate is counted, the safe side), plus the launch's own estimate, stays under hard.
+    # Why (2026-11-16 incident): mr-native-supervisor-README.md, "per-launch check".
+    projected=eff+(committed if source.startswith("telemetry") else 0.0)
+    headroom=max(0.0,HARD*WEEKLY-projected)
+    launchable=dict((t,state=="NORMAL" and est_of(t)<=headroom) for t in EST if t!="default")
     fable_ok=models["fable"]["state"]=="NORMAL" if "fable" in models else fab < FGUARD*FALLOW
     out={"window_start_utc":iso(ws),"window_end_utc":iso(wend) if wend else None,"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
             "unreconciled_est_usd":est,"inflight_committed_est_usd":round(committed,2),"inflight_runs":live,"effective_usd":round(eff,2),"weekly_limit_usd":WEEKLY,
-            "soft_pause_frac":SOFT,"hard_stop_frac":HARD,"soft_pause_usd":round(SOFT*WEEKLY,2),"tier_caps_usd":CAPS,"fable_guard_frac":FGUARD,
+            "soft_pause_frac":SOFT,"hard_stop_frac":HARD,"soft_pause_usd":round(SOFT*WEEKLY,2),"tier_caps_usd":CAPS,"launch_est_usd":EST,
+            "projected_usd":round(projected,2),"launch_headroom_usd":round(headroom,2),"launchable_tiers":launchable,"fable_guard_frac":FGUARD,
             "fable_allowance_usd":FALLOW,"fable_guard_usd":round(FGUARD*FALLOW,2),"fable_ok":fable_ok,"source":source}
     out.update(real)
     out.update({"resets_at_utc":resets,"model_states":models,"state":state})
