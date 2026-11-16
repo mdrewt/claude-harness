@@ -499,6 +499,40 @@ is classified in `recording.rules.yml`'s scheduled-function list (as the other r
 
 - **sr-7.6:** WHEN this module is published without `--delete-data` over a database holding `battle_summary` rows, THE publish SHALL succeed and the rows SHALL survive (publish-over-data proof; transcript in the PR).
 
+Build note (sr-7): sr-7.5's tests (sr7_5_init_over_the_cap_arms_exactly_one_reaper_run,
+sr7_5_sync_content_arms_one_run_over_the_cap_and_none_at_it) live in
+server-module/src/content_tests.rs mod nh_sync, not summary_reaper_tests.rs: that fixture is the one
+that runs crate::init and crate::sync_content on the native host (content_tests.rs was widened by a
+measured probe: init reading battle_summary.count() panicked its World unmodelled).
+
+Build note (sr-7): The re-arm rule is stricter than the decision bullet's 're-arms while the table
+is still over': a run re-arms only when it stopped at its 8,192 limit with the table still over the
+cap. A run that walked every row and is still over left only held rows and arms nothing; the next
+over-cap summary insert arms the next run. This keeps a table held over the cap (e.g. by erased
+accounts' permanently-tombstoned anchors) from repeating a full scan every 300 s while no battle
+starts. sr-7.2's 'only while still over the cap' holds.
+
+Build note (sr-7): The spec's fixture rule (accounts_tests, battle_tests and tactics_tests mark
+battle_summary scannable and register the schedule table) was measured, not applied wholesale: only
+tactics_tests' world (shared by tactics_settle_tests and movement_tests) reaches the summary insert,
+so only it gained .scannable(); content_tests' nh_sync World registers both tables because
+init/sync_content read them. accounts_tests and battle_tests never insert a summary, and marking
+battle_summary scannable there would only remove the host's guard against full scans. The 8,192
+per-run limit at the reducer is proven by the sr-7.6 live two-run probe, not a unit test: the native
+host's point delete decodes every row, so 8,192 deletes over 108k rows is infeasible there (the
+constant is pinned by a unit test).
+
+Build note (sr-7): Held covers more than live battles: a finished battle's anchor stays until its
+player's next battle, and an erased account's tombstoned anchor is never deleted, so those summaries
+are held forever and the table can exceed the cap by their number (and each run walks them first).
+The spec's SHALL names battle/battle_tactical presence, so sr-7 ships that rule and
+docs/DECISIONS.md states the true bound.
+
+Build note (sr-7): The cap is a soft cap under sustained abuse: a run deletes at most 8,192 rows per
+300 s (~27 rows/s), so battles started faster than that (many guest identities looping a wild
+encounter and forfeit) grow the table past the cap; expected load is ~0.35 battles/s. Not a
+regression (the table was unbounded).
+
 ### sr-6a — move the owner-view reconciles out of `connection.ts`
 type: refactor · tier: routine
 category: structure/client · severity: LOW · size: SMALL
