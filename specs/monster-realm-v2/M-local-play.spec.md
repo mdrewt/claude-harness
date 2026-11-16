@@ -59,11 +59,11 @@ measured medians" and "A target's kind gates telemetry and account sign-in".
 | Account sign-in toward a `local` or `private` world | lpw-15 | The account token is the account issuer's id_token, addressed to the build-wide client id; a host that received it could replay it. lpw-1 makes sign-in off complete for those kinds; only the attestation binding (lpw-15) brings an account to such a world, and never as the connection token |
 | OIDC issuer, client id and redirect as run-time configuration | lpw-15 | A world that is its own issuer changes what those values mean; they stay build-time until that design is verified |
 | A transport rule for plaintext `ws:` to a non-loopback host | lpw-8 (lays out the options), the operator (decides; asked below), lpw-14 (enforces) | The resolver accepts plaintext `ws:` to any host; with lpw-2 the token it carries also lives across launches |
-| A friends-server footprint under battles and trades, not walking alone | follow-up row filed by lp-spec (`mr_load_driver` battle and trade load) | `mr_load_driver` drives movement only; the friends-server memory and disk budgets stay a walking-only floor until the driver can battle and trade |
+| A friends-server footprint under battles and trades, not walking alone | follow-up row R-lp-spec-NOTED803F5 (`mr_load_driver` battle and trade load) | `mr_load_driver` drives movement only; the friends-server memory and disk budgets stay a walking-only floor until the driver can battle and trade |
 | The opening notice that a host can read a joiner's data | lpw-9 | Part of private-server access (decision-defaulted below) |
 | Steamworks in the shell: overlay enable, Steam Input, the Steam sign-in protocol | `M21b-3 Steam login` (PLAN §9) | lpw-10 proves the overlay can draw; wiring Steamworks into the shipped shell is the Steam build's integration, which M21b-3 scopes on top of lpw-11's shell |
 | A movement tick that commits a transaction five times a second while only idle players are in a zone (R-lpg-0-IDLETICK) | backlog (the open row) | NPCs step on that tick while a player is present, so an idle player's zone is not idle; whether a transaction that writes no row still appends to the commit log at 2.11.0 is unmeasured. 1.24 MiB an hour is a tenth of the single-player disk budget (12 MiB an hour, `docs/local-play.md` §6) |
-| A rule in front of the official host that drops a token naming an unlisted issuer (R-lpg-0-ISSUERFETCH, official half) | M25 (PLAN §9 item 2; follow-up row filed by lp-spec) | The official deployment is not this milestone; lpw-12, lpw-14 and lpw-17 close it for local, friends and standalone servers |
+| A rule in front of the official host that drops a token naming an unlisted issuer (R-lpg-0-ISSUERFETCH, official half) | M25 (PLAN §9 item 2; follow-up row R-lp-spec-NOTEC8F763) | The official deployment is not this milestone; lpw-12, lpw-14 and lpw-17 close it for local, friends and standalone servers |
 | A wrong-audience account token on the host's HTTP call and sql routes (R-lpg-0-HTTPAUDIENCE) | lpw-8 measures it; it binds only on the audience-scoped fallback | The own-issuer design never hands a private host an account token; the fallback makes the official module's audience check the single defence |
 | A server-side refusal of a client older than `min_client_protocol` | none (by design) | lpw-4 is a player-facing message, not a security gate: every reducer already validates its own input against authoritative state |
 
@@ -112,7 +112,7 @@ Each default stands unless the operator overrules it:
   do not allow bundling: the shell drives a host the player installs separately (lpw-12's `host.ts`
   with a configured binary path), and the shell document does not change.
 - **Who signs the attestation, and plaintext `ws:` for friends servers (operator-owned, open; put
-  through `mr-ask-drew` by lp-spec).** lpw-15 needs an account service that signs a short-lived
+  through `mr-ask-drew` by lp-spec: monster-realm#821).** lpw-15 needs an account service that signs a short-lived
   attestation with a key and issuer name the official server does not trust (`docs/local-play.md`
   §3); no account issuer is deployed. Lifting event: the operator names the account service and
   where the attestation is signed. Fallback if none comes: single-player worlds stay unbound
