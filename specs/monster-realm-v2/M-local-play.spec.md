@@ -58,7 +58,7 @@ measured medians" and "A target's kind gates telemetry and account sign-in".
 | The bundled and standalone server sending nothing to our stack | lpw-12 (bundled host) and lpw-17 (standalone package) | Our stack only receives what we configure it to scrape; what the SpacetimeDB host itself sends off the machine is measured in `docs/local-play.md` §5 and held by the packaging slices |
 | Account sign-in toward a `local` or `private` world | lpw-15 | The account token is the account issuer's id_token, addressed to the build-wide client id; a host that received it could replay it. lpw-1 makes sign-in off complete for those kinds; only the attestation binding (lpw-15) brings an account to such a world, and never as the connection token |
 | OIDC issuer, client id and redirect as run-time configuration | lpw-15 | A world that is its own issuer changes what those values mean; they stay build-time until that design is verified |
-| A transport rule for plaintext `ws:` to a non-loopback host | lpw-8 (lays out the options), the operator (decides; asked below), lpw-14 (enforces) | The resolver accepts plaintext `ws:` to any host; with lpw-2 the token it carries also lives across launches |
+| A transport rule for plaintext `ws:` to a non-loopback host | the operator (decided 2026-11-16, monster-realm#821: plaintext only to loopback and private-range addresses), lpw-14 (enforces) | The resolver accepts plaintext `ws:` to any host; with lpw-2 the token it carries also lives across launches |
 | A friends-server footprint under battles and trades, not walking alone | follow-up row R-lp-spec-NOTED803F5 (`mr_load_driver` battle and trade load) | `mr_load_driver` drives movement only; the friends-server memory and disk budgets stay a walking-only floor until the driver can battle and trade |
 | The opening notice that a host can read a joiner's data | lpw-9 | Part of private-server access (decision-defaulted below) |
 | Steamworks in the shell: overlay enable, Steam Input, the Steam sign-in protocol | `M21b-3 Steam login` (PLAN §9) | lpw-10 proves the overlay can draw; wiring Steamworks into the shipped shell is the Steam build's integration, which M21b-3 scopes on top of lpw-11's shell |
@@ -103,7 +103,7 @@ Each default stands unless the operator overrules it:
 - `decision-defaulted:invite-link=copyable-text-no-url-handler` — an invite is a `uri` and `db` as
   text the shell's address form accepts; the shell registers no URL scheme (consumed by lpw-14).
 
-## Operator questions (open)
+## Operator questions
 
 - **Licence (operator-owned, open).** Packaging (lpw-12, lpw-13, lpw-14, lpw-16, lpw-17) waits on
   the terms the operator has been negotiating with the licensor since 2026-11-12;
@@ -111,15 +111,16 @@ Each default stands unless the operator overrules it:
   the negotiated terms (or that none are needed) in `docs/local-play.md` §1. Fallback if the terms
   do not allow bundling: the shell drives a host the player installs separately (lpw-12's `host.ts`
   with a configured binary path), and the shell document does not change.
-- **Who signs the attestation, and plaintext `ws:` for friends servers (operator-owned, open; put
-  through `mr-ask-drew` by lp-spec: monster-realm#821).** lpw-15 needs an account service that signs a short-lived
-  attestation with a key and issuer name the official server does not trust (`docs/local-play.md`
-  §3); no account issuer is deployed. Lifting event: the operator names the account service and
-  where the attestation is signed. Fallback if none comes: single-player worlds stay unbound
-  (lpw-2's device-kept identity), and friends servers run lpw-9's open and password rules only.
-  The same issue asks whether a friends server may serve plaintext `ws:` (a LAN host has no
-  certificate); lpw-14 waits on the answer (recommended default: plaintext only to a private-range
-  or loopback address, `wss:` otherwise).
+- **Who signs the attestation, and plaintext `ws:` for friends servers — ANSWERED 2026-11-16
+  (monster-realm#821; the game's `docs/DECISIONS.md` "A private world verifies an account by a
+  per-world attestation our account service signs" and "A friends server may serve plaintext `ws:`
+  only to loopback and private-range addresses").** (1) A small attestation route beside the
+  account service we deploy (the sign-in broker), with its own signing key and issuer name; the
+  account service is otherwise unchanged. A holder-bound credential (the client signs each world's
+  proof with a device key) was weighed and not chosen; it stays the named upgrade path. lpw-15 now
+  waits only on that account service being deployed with the route. (2) Plaintext `ws:` only to
+  loopback and private-range (RFC 1918 / ULA) addresses; `wss:` for anything else; lpw-14 enforces
+  it.
 
 ## Risks / flags
 
@@ -186,13 +187,25 @@ The isolation comes from **who vouches for the player in each world**, not from 
   world is bound to the account; later sessions resume the world's own anonymous token, which the
   client keeps across launches (lpw-2, R-lpg-0-SESSIONTOKEN).
 - The design holds on four conditions `docs/local-play.md` §3 leaves open: the in-module verifier
-  spike (lpw-7); an account issuer (or an endpoint beside it) that can sign the attestation (the
-  operator question above); the official server refusing attestation binding, since the same module
+  spike (lpw-7); an endpoint beside the account service that signs the attestation (decided by the operator,
+  see below; it ships with the account service); the official server refusing attestation binding, since the same module
   runs there; and the relay of an attestation from one private world to another closed, which
   audience and nonce do not stop because every standalone host calls itself `localhost` and its
   operator can sign any subject (R-lpg-0-ATTESTRELAY). lpw-8 designs the last two and lpw-15 tests
   them, with a hostile-host rig, before a private server sees a real attestation. With all four
   met, nothing the host ever holds is a login anywhere else.
+
+**Decided shape of the attestation (operator, 2026-11-16, monster-realm#821).** The attestation is
+signed by a route beside the account service, not by the account issuer's own key, so the official
+server never trusts it. It is a compact signed JWT carrying a key id (`kid`); the module holds a
+list of accepted attestation keys as module data, so a key can be rotated by shipping the next key
+before the old one retires. The attestation lives minutes and names one world and that world's
+nonce; the route rate-limits binds per account and does not keep the world it was addressed to
+past the request. In the client the attestation is fetched behind one source interface (as
+`ConnectCredential` isolates sign-in), so a second source can be added without touching the bind
+path. Upgrade path, not built: a holder-bound credential (a JWT carrying the device key in `cnf`,
+about a day long, with a client-signed proof per world) as a second source, if first binds on a LAN
+with no internet, or keeping who-plays-with-whom from our service, become requirements.
 
 Fallback if the verifier spike fails: audience-scoped tokens from the account issuer, with the
 official module's audience check as the single defence (its HTTP-route question answered first);
@@ -381,7 +394,7 @@ type: design · tier: hard
 touches: docs/local-play.md
 after: [lpw-7]
 - Residuals: R-lpg-0-ATTESTRELAY (designed here, tested in lpw-15), R-lpg-0-HTTPAUDIENCE (measured here).
-- Decides, with a `judge` over at least two alternatives each: (a) how a connection the host's rule has not admitted is kept from every world row and reducer (at 2.11.0 a connection `on_connect` accepts can subscribe public tables at once); (b) how the official server refuses attestation binding when the same module runs everywhere; (c) what the attestation names so a hostile host cannot relay one world's attestation to another (`docs/local-play.md` §3: the verifying key of the client's own world token, checked by the client, is the starting direction). It also lays out (d), the transport options for plaintext `ws:` to a non-loopback friends server, for the operator's answer.
+- Decides, with a `judge` over at least two alternatives each: (a) how a connection the host's rule has not admitted is kept from every world row and reducer (at 2.11.0 a connection `on_connect` accepts can subscribe public tables at once); (b) how the official server refuses attestation binding when the same module runs everywhere; (c) what the attestation names so a hostile host cannot relay one world's attestation to another (`docs/local-play.md` §3: the verifying key of the client's own world token, checked by the client, is the starting direction). (d), plaintext `ws:` to a friends server, is decided (operator, 2026-11-16: loopback and private-range only; lpw-14 enforces).
 
 - **lpw-8.1:** WHEN the design is recorded, THE SYSTEM SHALL name in `docs/local-play.md` §3 the chosen answer to each of (a) to (c), the rejected alternatives, and the test lpw-9 or lpw-15 runs to prove each.
 
@@ -500,12 +513,12 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 ### lpw-14 — open a world to friends, and close it again
 
 type: feature · tier: hard
-touches: desktop/src/openToFriends.ts, desktop/src/openToFriends.test.ts, desktop/src/hostGate.ts, desktop/src/hostGate.test.ts, desktop/src/launcher/worldSettings.ts, desktop/src/launcher/worldSettings.test.ts, desktop/src/main.ts, desktop/e2e/friends.spec.ts
+touches: client/src/net/connectionConfig.ts, client/src/net/connectionConfig.test.ts, desktop/src/openToFriends.ts, desktop/src/openToFriends.test.ts, desktop/src/hostGate.ts, desktop/src/hostGate.test.ts, desktop/src/launcher/worldSettings.ts, desktop/src/launcher/worldSettings.test.ts, desktop/src/main.ts, desktop/e2e/friends.spec.ts
 after: [lpw-13, lpw-9]
-blocked: licence — as lpw-12, and transitively operator-steam-machine; also waits on the operator's plaintext `ws:` answer (operator questions); fallback: as lpw-12.
+blocked: licence — as lpw-12, and transitively operator-steam-machine; fallback: as lpw-12.
 - Residuals: R-lpg-0-ISSUERFETCH (friends half).
 - Decisions: `decision-defaulted:invite-link=copyable-text-no-url-handler`, `decision-defaulted:world-access-default=open-until-opened-to-friends`.
-- Contract: opening makes the gate (lpw-12) listen on the chosen interface as well, with the same route allow-list and issuer rule; the `Origin` rule admits a joiner's page by the transport rule the operator answers. The host stays on loopback. Joiners use kind `private`.
+- Contract: opening makes the gate (lpw-12) listen on the chosen interface as well, with the same route allow-list and issuer rule; the `Origin` rule admits a joiner's page by the operator's transport rule (plaintext `ws:` only to loopback and private-range addresses). The host stays on loopback. Joiners use kind `private`.
 
 - **lpw-14.1:** WHEN the player asks to open a world whose rule is still the default `Open`, THE SYSTEM SHALL ask the host to choose `Open` or `Password` first and open nothing until they do.
 
@@ -516,17 +529,19 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; also wa
 - **lpw-14.4:** WHEN the player closes the world to friends, THE SYSTEM SHALL stop listening beyond loopback and close every connection that came in that way, upgraded WebSockets included, while the host's own player keeps playing.
 
 - **lpw-14.5:** WHEN a player copies the invite, THE SYSTEM SHALL produce the world's `uri` and `db` as text that lpw-11's address form accepts as kind `private`.
-- DoD: lpw-14.1 to lpw-14.5 green; the milestone's one e2e flow (create, play, quit, reopen, open to a friend, the friend joins, close) green in `desktop/e2e/friends.spec.ts`.
+
+- **lpw-14.6:** WHEN a shell document names a `ws:` uri whose host is not a loopback address or a private-range address (RFC 1918 IPv4, IPv6 ULA `fc00::/7`), THE CLIENT SHALL refuse the document with a named error and open no connection, and SHALL accept the same host over `wss:`.
+- DoD: lpw-14.1 to lpw-14.6 green; the milestone's one e2e flow (create, play, quit, reopen, open to a friend, the friend joins, close) green in `desktop/e2e/friends.spec.ts`.
 
 ### lpw-15 — sign in once to bind a world; the account check and the allowlist
 
 type: feature · tier: hard
 touches: server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/schema.rs, server-module/src/lib.rs, server-module/src/accounts.rs, server-module/src/privacy.rs, server-module/Cargo.toml, Cargo.lock, server-module/src/accounts_tests.rs, server-module/src/native_host_tests.rs, server-module/src/privacy_enforcement_tests.rs, evals/baselines/table-schemas.json, evals/baselines/client-callable-reducers.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/bind_world_account_reducer.ts, client/src/net/attestation.ts, client/src/net/attestation.test.ts, client/src/ui/profileView.ts, client/src/ui/profileView.test.ts, client/src/ui/screens/profileScreen.ts, client/src/ui/screens/profileScreen.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts, client/src/main.ts, client/src/main.worldBinding.test.ts
 after: [lpw-9, lpw-7]
-blocked: account-service — lifted when the operator names the account service that signs attestations (operator questions); who lifts it: the operator; fallback: worlds stay unbound (lpw-2's device-kept identity) and friends servers keep lpw-9's open and password rules.
+blocked: account-service — the signer is decided (an attestation route beside the account service, operator 2026-11-16, monster-realm#821); lifted when that account service is deployed with the route and its attestation key and issuer name are recorded; who lifts it: the operator; fallback: worlds stay unbound (lpw-2's device-kept identity) and friends servers keep lpw-9's open and password rules.
 - Residuals: R-lpg-0-ATTESTRELAY (closes it with the hostile-host rig).
 - Decision: `decision-defaulted:private-server-idp-unreachable=accept-seen-refuse-new`.
-- Schema change (always-serial, after lpw-9): a private `world_binding` table (identity, account subject, bound at; `Erase` at the deletion cascade and included in the player's data export) and a private nonce table (one outstanding nonce per identity, from `ctx.rng()`, expiring in minutes), the reducer `bind_world_account(attestation)`, and `Allowlist` added to `world_access`'s rule. The verifier lpw-7 chose, with the attestation key as module data. The client asks for the attestation once, in a `local` or `private` world, from Profile.
+- Schema change (always-serial, after lpw-9): a private `world_binding` table (identity, account subject, bound at; `Erase` at the deletion cascade and included in the player's data export) and a private nonce table (one outstanding nonce per identity, from `ctx.rng()`, expiring in minutes), the reducer `bind_world_account(attestation)`, and `Allowlist` added to `world_access`'s rule. The verifier lpw-7 chose, with the accepted attestation keys as a `kid`-keyed list in module data. The client asks for the attestation once, in a `local` or `private` world, from Profile.
 
 - **lpw-15.1:** WHEN `bind_world_account` receives an attestation that verifies, names this world as lpw-8 defines it, carries this identity's outstanding nonce and has not expired, THE SYSTEM SHALL record the binding for `ctx.sender()` and spend the nonce.
 
