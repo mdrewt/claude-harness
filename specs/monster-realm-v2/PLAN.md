@@ -180,7 +180,8 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
   rule, and a load-only build that spreads 1,000 clients over 100 zones. The population target is
   `game-design.md` §14; the rules are the game's `docs/DECISIONS.md` "Table privacy: private
   tables plus owner-scoped views", "The leaderboard is a membership table that the client joins",
-  "`battle_summary` keeps the newest 100,000 battles" and "Dev-only reducers never ship").
+  "`battle_summary` keeps the newest 100,000 battles", "World rows are subscribed by zone", which
+  holds the budgets, and "Dev-only reducers never ship").
 - Economy: **M-econ-onboarding** (`eo-*`; a first join grants the starter kit, data in the game's
   `game-core/content/starter_kit.ron`, and the starter monster once per identity, behind the
   `sys:starter_claimed` marker in the owner's dialogue state, with a tombstone left to the retired
