@@ -27,8 +27,8 @@ is out: a session refused on Fable's own limit continues on Opus by itself (`mod
 downgrade; README "Fallback") — never pre-assign Opus for it. Launch-row `notes` MUST begin
 `tier=<...>; reason=<...>`.
 
-**Budget governor** (bundle `budget`): NORMAL → proceed · SOFT-PAUSE (>90%) → launch only
-`resume_first` slices (merges/parks/records fine) · HARD-STOP (>97%) → the wrapper stands down ·
+**Budget governor** (bundle `budget`): NORMAL/SOFT-PAUSE → proceed; new launches only as
+`budget.launchable_tiers` allows (`resume_first` always) · HARD-STOP (>97%) → the wrapper stands down ·
 UNKNOWN → proceed + record a BLOCKER.
 
 ## Execution model
