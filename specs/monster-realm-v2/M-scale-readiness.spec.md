@@ -322,6 +322,21 @@ header section is restated.
 
 - **sr-9c.2:** WHEN the nightly workflow runs, THE load-smoke job SHALL publish the default module to a fresh in-memory host, run `just load-smoke` (20 clients, one level, `--fail-on-invalid`), and fail the nightly when the driver exits non-zero (`.github/workflows/nightly.yml`; evidence: one `workflow_dispatch` run of the nightly on the PR branch, linked in the PR).
 
+Build note (sr-9c): sr-9c adds the nightly load-smoke job and `just load-smoke`, but three docs
+outside its touches still describe the old state: ARCHITECTURE.md's Load bullet says mr_load_driver
+'never runs in CI' and its Nightly row omits the load smoke; README.md's 'The nightly checks' row
+omits `just load-smoke`; CONTRIBUTING.md's 'When the nightly run is red' says nothing about a red
+load-smoke (it means the 20-bot level was invalid or the ramp aborted: the log's last stderr line
+names each level as <concurrency>:<reason>). The driver's own header ('Where this binary runs') is
+current.
+
+Build note (sr-9c): sr-9c fixed mr_load_driver dropping the WS bytes behind the 101 head
+(split_response_head + a seeded DrainState). The split and the seeded drain are unit-tested, but the
+wiring between them is not: read_response_head is TcpStream-bound, connect_client returns the
+leftover, and client_thread seeds the drain from it. Reverting any of those three passes every unit
+test; only a live run on a busy host catches it. Making read_response_head generic over Read, and
+testing it with a reader that delivers the head and a frame in one read, would close the first hop.
+
 ### sr-9b — a load-only build spreads 1,000 clients over 100 zones
 type: feature · tier: hard
 category: loop-ops/observability · severity: HIGH · size: MODERATE
