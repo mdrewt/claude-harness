@@ -731,7 +731,16 @@ try:
     EVENTS = [json.loads(l) for l in open(os.path.join(MEM, "fixtures", "governor", "rate-limit-events.stream"))]
     TICK_EV, ALLOWED_EV, FABLE_EV = EVENTS         # an opus tick · status `allowed` · a Fable session
     TEL = os.path.join(box.mem, "mr-rate-limit-telemetry.jsonl")
+    # The readings below sit either side of 90%/97%: the sandbox owns those lines, so tuning the
+    # live thresholds in mr-budget-config.json does not red these cases.
+    PINNED = {"soft_pause_frac": 0.90, "hard_stop_frac": 0.97}
+
+    def write_cfg(cfg):
+        cfg.update(PINNED)
+        with open(os.path.join(box.mem, "mr-budget-config.json"), "w") as f:
+            json.dump(cfg, f)
     CFG = json.load(open(os.path.join(box.mem, "mr-budget-config.json")))
+    write_cfg(CFG)
     FRESH, LIMIT = CFG["telemetry_fresh_s"], CFG["weekly_limit_usd"]
     NOW = int(time.time())
     WEEK_END = NOW + 2 * 86400                     # the plan's reset; the dollar week ends a day later
@@ -811,8 +820,7 @@ try:
         cfg = json.load(open(os.path.join(MEM, "mr-budget-config.json")))
         if not on:
             cfg.pop("model_fallback", None)
-        with open(os.path.join(box.mem, "mr-budget-config.json"), "w") as f:
-            json.dump(cfg, f)
+        write_cfg(cfg)
 
     def launch(model, resume=None):
         v = os.path.join(box.root, "launch.vars.json")
@@ -855,20 +863,26 @@ try:
     sampled([event(TICK_EV, seven_day=0.86)])
     b = reads("launch-086", {"state": "NORMAL", "launchable_tiers": dict((t, True) for t in EST)})
     if b.get("projected_usd") != round(0.86 * LIMIT, 2) \
-            or b.get("launch_headroom_usd") != round(CFG["hard_stop_frac"] * LIMIT - 0.86 * LIMIT, 2):
+            or b.get("launch_headroom_usd") != round(0.97 * LIMIT - 0.86 * LIMIT, 2):
         fail("governor-launch-086-headroom", "budget: %r" % (b,))
     # Live runs' remaining spend is not in the plan's figure: the bundle counts their estimates.
     for i in range(3):
         box.slice("live-h%d" % i, "hard", "fable", "xhigh", live=True, spec=False)
-    head = CFG["hard_stop_frac"] * LIMIT - 0.86 * LIMIT - 3 * EST["hard"]
+    head = 0.97 * LIMIT - 0.86 * LIMIT - 3 * EST["hard"]
     want = dict((t, EST[t] <= head) for t in EST)
     reads("launch-086-live", {"state": "NORMAL", "launchable_tiers": want, "inflight_runs": 3,
                               "projected_usd": round(0.86 * LIMIT + 3 * EST["hard"], 2)})
     for L in glob.glob(os.path.join(box.mem, ".harness-runner.live-h*.lock")):
         os.unlink(L)
-    # Past the soft line nothing new launches, whatever the headroom.
-    sampled([event(TICK_EV, seven_day=0.91)])
-    reads("launch-091", {"state": "SOFT-PAUSE", "launchable_tiers": dict((t, False) for t in EST)})
+    # Past the soft line a launch still goes when it fits under the hard one (operator 2026-11-16).
+    sampled([event(TICK_EV, seven_day=0.935)])
+    head = 0.97 * LIMIT - 0.935 * LIMIT
+    reads("launch-0935", {"state": "SOFT-PAUSE", "launchable_tiers": dict((t, EST[t] <= head) for t in EST)})
+    # A stale reading over the soft line launches nothing; past the hard line nothing fits.
+    sampled([event(TICK_EV, seven_day=0.935)], age=FRESH + 300)
+    reads("launch-stale", {"source": "telemetry-stale", "launchable_tiers": dict((t, False) for t in EST)})
+    sampled([event(TICK_EV, seven_day=0.98)])
+    reads("launch-098", {"state": "HARD-STOP", "launchable_tiers": dict((t, False) for t in EST)})
 
     # A model's own window near its limit with the general one low: that model alone is paused.
     spent(100.0)

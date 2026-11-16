@@ -218,15 +218,17 @@ def budget():
         if m is None: continue
         models[m]={"state":max(w["state"],state,key=ORDER.index),"utilisation":w["u"],"window":w["window"],"resets_at_utc":iso(w["resets"])}
         if w["stale"]: models[m].update({"stale":True,"sample_utc":iso(w["ts"]),"probe_every_s":FRESH_S})
-    # THE PER-LAUNCH CHECK, computed here so no session re-derives it from the dollar fields. The
-    # soft threshold is the governor's (no new launches past it); a launch only has to FINISH before
-    # the hard one, where decision sessions stop (live runs still finish). So: the spend in force,
+    # THE PER-LAUNCH CHECK, computed here so no session re-derives it from the dollar fields. A
+    # launch only has to FINISH before the hard line, where decision sessions stop (live runs still
+    # finish); SOFT-PAUSE alone holds nothing (operator 2026-11-16). So: the spend in force,
     # plus what live runs may still spend (on telemetry their remainder is not in the figure — the
     # whole estimate is counted, the safe side), plus the launch's own estimate, stays under hard.
     # Why (2026-11-16 incident): mr-native-supervisor-README.md, "per-launch check".
     projected=eff+(committed if source.startswith("telemetry") else 0.0)
     headroom=max(0.0,HARD*WEEKLY-projected)
-    launchable=dict((t,state=="NORMAL" and est_of(t)<=headroom) for t in EST if t!="default")
+    # A stale reading over the soft line is not a figure to launch against: nothing until resampled.
+    fits=state in ("NORMAL","SOFT-PAUSE") and source!="telemetry-stale"
+    launchable=dict((t,fits and est_of(t)<=headroom) for t in EST if t!="default")
     fable_ok=models["fable"]["state"]=="NORMAL" if "fable" in models else fab < FGUARD*FALLOW
     out={"window_start_utc":iso(ws),"window_end_utc":iso(wend) if wend else None,"d7_usd":round(d7,2),"fable_d7_usd":round(fab,2),"unreconciled_runs":unrec,
             "unreconciled_est_usd":est,"inflight_committed_est_usd":round(committed,2),"inflight_runs":live,"effective_usd":round(eff,2),"weekly_limit_usd":WEEKLY,

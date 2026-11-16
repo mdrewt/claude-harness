@@ -1077,7 +1077,7 @@ try:
     except Exception:
         fallback = None
     first_try = bool(fallback)
-    if b.get("state") == "NORMAL" and w.get("state") in ("SOFT-PAUSE", "HARD-STOP") and not resume and not first_try:
+    if b.get("state") in ("NORMAL", "SOFT-PAUSE") and w.get("state") in ("SOFT-PAUSE", "HARD-STOP") and not resume and not first_try:
         probe, note = False, ""
         if w.get("stale"):
             import glob, os, re, time

@@ -56,7 +56,7 @@ with the rule that held it:
 | `structural` | it touches its always-serial structural set or a table/schema/migration |
 | `after` | a slice it must follow is not merged |
 | `cap` | 4 runs are in flight |
-| `budget` | the governor is at SOFT-PAUSE, `budget.launchable_tiers` is false for this launch's tier (or the tick's launches together exceed `launch_headroom_usd`), or its model's own plan window is paused |
+| `budget` | `budget.launchable_tiers` is false for this launch's tier (or the tick's launches together exceed `launch_headroom_usd`), or its model's own plan window is paused |
 | `memory` | `free -g` shows less than one full build free |
 | `quiet` | a refactor's quiet window covers it |
 
@@ -187,15 +187,16 @@ a live run finishes and its event waits — and it clears when the window it was
 ## Budget governor
 `mr-situation` computes it into the bundle's `budget`: NORMAL, SOFT-PAUSE (over
 `soft_pause_frac`, 90%) or HARD-STOP (over `hard_stop_frac`, 97%); UNKNOWN when the ledger
-cannot be read. The thresholds keep a run from being started just under the cap and cut off
-mid-way; they do not spread spend over the week.
+cannot be read. SOFT-PAUSE holds no launch by itself (operator 2026-11-16): a launch goes when
+`budget.launchable_tiers` allows it, i.e. it fits under the HARD line. Neither spreads spend
+over the week.
 
 `budget.source` names what decided:
 
 | `source` | The state is graded from |
 |---|---|
 | `telemetry` | the plan's real utilisation: the newest reading of a plan window in `mr-rate-limit-telemetry.jsonl` (the `rate_limit_event` rows `mr-cost-watch telemetry` samples from tick and slice logs), read within `telemetry_fresh_s` (3 h) |
-| `telemetry-stale` | a reading older than that, still over the soft threshold, on a window whose reset is ahead. It reads SOFT-PAUSE whatever its figure: the decision session that runs launches nothing new and leaves a fresh sample |
+| `telemetry-stale` | a reading older than that, still over the soft threshold, on a window whose reset is ahead. It reads SOFT-PAUSE whatever its figure, with every `launchable_tiers` false: the decision session that runs launches nothing new and leaves a fresh sample |
 | `calibration` | the ledger's dollars this week (plus estimates for runs not yet recorded) against `weekly_limit_usd` in `mr-budget-config.json`. In force only when no reading is |
 
 Rules for a reading:
@@ -216,8 +217,8 @@ Rules for a reading:
   `fable_ok` false and `mr-spawn` lets one new launch on the model through per
   `telemetry_fresh_s` to measure it, refusing the rest. The launch that went is recorded by
   `$MEM/.model-window-probe.<window>.<reset>`; deleting that file allows another.
-- **Launches.** A pause on every model is the decision session's rule (SOFT-PAUSE: only
-  `resume_first` slices). A pause on one model alone is `mr-spawn`'s: it refuses a new launch on
+- **Launches.** On every model, the decision session launches only what `launchable_tiers`
+  allows (plus `resume_first` slices). A pause on one model alone is `mr-spawn`'s: it refuses a new launch on
   that model with `BUDGET-MODEL-PAUSED` (`held=budget`) and launches other models and credit-stop
   resumes. Exception: a model with a `model_fallback` is never held by its own window, at any
   reading — it gets the first try, and a refusal falls back (below).
@@ -235,9 +236,9 @@ Rules for a reading:
 On telemetry `effective_usd` is the utilisation × `weekly_limit_usd`; `utilisation`, `window` and
 `sample_utc` carry the reading itself. The per-launch check is computed by `mr-situation`, never by
 the session: `projected_usd` = the spend in force plus live runs' `launch_est_usd` (on telemetry
-their remaining spend is not in the figure yet), and `launchable_tiers[t]` = NORMAL and
-`projected_usd` + `launch_est_usd[t]` ≤ `hard_stop_frac` × `weekly_limit_usd` (the HARD line). The soft line already
-stops new launches through the governor; a launch only has to finish before the hard line, where
+their remaining spend is not in the figure yet), and `launchable_tiers[t]` = NORMAL or SOFT-PAUSE (not a stale reading) and
+`projected_usd` + `launch_est_usd[t]` ≤ `hard_stop_frac` × `weekly_limit_usd` (the HARD line). A launch only has to finish
+before the hard line, where
 decision sessions stop (live runs still finish; a plan refusal at 100% is a credit stop that
 `mr-interrupted` resumes). `launch_est_usd` is about p90 of ledger runs per tier;
 `slice_caps_usd`/`tier_caps_usd` stay cost-watch alert lines. Why (2026-11-16, the per-launch check): a tick at 86% real,
