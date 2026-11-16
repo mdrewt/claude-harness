@@ -552,6 +552,12 @@ moved-tests: none (no test reads the moved source as text; the behaviour tests r
 
 - **sr-6a.2:** THE connection's behaviour SHALL be unchanged: `client/src/net/connection.runtime.test.ts`, `client/src/net/connection.test.ts` and `client/src/net/connection.conversationCoalesce.test.ts` pass with their assertions unedited.
 
+Build note (sr-6a): ARCHITECTURE.md's client net module list (around L471-478) does not name
+net/viewReconcile.ts, and its 'connection.ts rebuilds every view-backed collection' line now happens
+through viewReconcile.ts reconcileOwnerViews (and overstates: my_account uses onUpdate).
+ARCHITECTURE.md is outside sr-6a's touches (a refactor slice never widens); sr-6b (which touches
+viewReconcile.ts) or a doc slice should add the line.
+
 ### sr-6b — owner views reconcile only when dirty
 type: feature · tier: hard
 category: performance/client · severity: MED · size: SMALL
