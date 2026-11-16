@@ -119,8 +119,8 @@ Named deferrals:
   follow-up row filed by that slice.
 - **The driver holding the client's other tables** (`profile`, `npc`, content and the owner views)
   → wontfix for load: walking writes none of them, so they add no per-step fan-out.
-- **Exporting `battle_summary`** (R-bt-7-SUMMARYEXPORT) → stays a backlog residual; a data-export
-  question, not a scale one.
+- **Exporting `battle_summary`** (R-bt-7-SUMMARYEXPORT) → `rb-137` in `residuals.spec.md`
+  (operator-approved, monster-realm#755); a data-export question, not a scale one.
 - **Moving `M25-security-audit.spec.md` S3/S5's public-table lists** (they name `player_quest` and
   `profile` as public on purpose) → a follow-up row on this slice; that spec re-elaborates when
   M25 is unblocked.
