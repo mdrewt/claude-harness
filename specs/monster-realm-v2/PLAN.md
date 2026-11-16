@@ -53,15 +53,17 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    `blocked:operator-steam-machine`, and the packaging slices `blocked:licence` (operator);
    the world binding (lpw-15, every player binds) builds on item 2's attestation route. Groundwork built (§Built). **Early access is
    gated on it.**
-2. **M-account-service** (`M-account-service.spec.md`, authored 2026-11-16 into 10 `acs-` slices):
-   **every player must own the game on Steam, for now** (operator, 2026-11-16), browser players
-   included, in every way to play. Our own small OIDC issuer (`oidc-provider`) with Steam ticket
-   and Steam OpenID sign-in, an ownership check on every issuance, a dev-only email issuer, and the
-   per-world attestation route; the official module admits only entitled accounts; the client and
-   the shell sign in before play. acs-1 to acs-6 build first against a Steam stub; the deployment
-   (acs-7) is `blocked:operator-steamworks-and-hosting`, the shell sign-in (acs-10) transitively
-   `blocked:operator-steam-machine`. **Early access is gated on it** (every world's players bind
-   through its attestation route).
+2. **M-account-service** (`M-account-service.spec.md`, authored 2026-11-16, 12 `acs-` slices in
+   two phases): **every player must own the game on Steam, for now** (operator, 2026-11-16),
+   browser players included, in every way to play. Our own small OIDC issuer (`oidc-provider`).
+   **Phase 1 (acs-1 to acs-7), now:** the dev and test service (email-and-password sign-in, a
+   per-account entitlement flag, the per-world attestation route) on `localhost:4455` and at
+   `auth.monster-realm.spookyowltech.com` (acs-5 `blocked:operator-dev-host`), the module's trusted
+   issuers per build and its ownership rule in `join_game`, and the client's sign-in screen.
+   **Phase 2 (acs-8 to acs-12):** Steam ticket and Steam OpenID sign-in, the `CheckAppOwnership`
+   rule, production deployment and the shell's Steam sign-in, `blocked:operator-steamworks` until
+   the operator supplies the Steam app id and publisher key (planned about two months before early
+   access). **Early access is gated on it** (every world's players bind through its attestation).
 3. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S2 changes a frozen schema and waits for the
    operator's ratification at the harness-revision Checkpoint 2, which lifts this block. S1 as
@@ -96,7 +98,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    row a pt3 milestone absorbs is marked in its spec.
 9. **M21b-3 Steamworks in the shell** — the Steamworks wiring (overlay enable, Steam Input onto
    the virtual buttons) in M-local-play's desktop shell (`lpw-11`); unspecced, elaborated once
-   `lpw-10` proves the overlay. The Steam sign-in moved to M-account-service (acs-10).
+   `lpw-10` proves the overlay. The Steam sign-in moved to M-account-service (acs-12).
 10. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
    (`standards/spec-driven.md` §Refactor slices). The supervisor's structural share schedules it
    ahead of this position; when no earlier item has a launchable slice, its slices launch in
