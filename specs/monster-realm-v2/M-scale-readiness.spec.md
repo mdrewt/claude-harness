@@ -379,6 +379,36 @@ build, the e2e build or `client-wasm`. The run of record is in DoD.
 
 - **sr-9b.4:** WHEN the driver runs with `--zones 100`, `--hot-zone 50` and `--walking-share 30`, THE first 50 bots SHALL be placed in zone 10000, the rest round-robin over zones 10000–10099, and only 30% of all bots SHALL send moves (`sim-harness/src/bin/mr_load_driver.rs` inline tests over the placement and walking-set plans).
 
+Build note (sr-9b): Built: the reducer and its movement forwarder are gated on load_test_zones
+(which implies dev_reducers; a const assert refuses a build where it does not), not on dev_reducers
+alone, so the e2e/CI dev wasm holds no any-identity placement reducer. The spec's 'a dev_reducers
+reducer' / 'dev_reducers-gated forwarder' wording is superseded.
+
+Build note (sr-9b): Built: 'place every default-build edit after the file's last production item'
+cannot reach the loaders' bodies; the hooks are one-line macro wraps on the loaders' own lines
+(content::load_zones, content::load_zone_maps, tactics::content::load_tactics_zones) whose
+feature-off arm is the original expression. Measured: one ungated pub fn in a new game-core module
+changed the default release wasm sum (3d8bb751…, dc7485c9… vs base 3fe769d7…), so game-core's
+default build compiles only consts and macros for the load build.
+
+Build note (sr-9b): Spec gap fixed in-slice: validate_tactics_zones requires a tactics_zones row per
+loaded zone, so appending zones and maps alone makes the load build's init panic
+(MissingZoneEntry(10000)); load_tactics_zones gains the same hook (zone 0's row copied per load
+zone). game-core/src/tactics/content.rs and ARCHITECTURE.md were widened.
+
+Build note (sr-9b): DoD wording: with the spec-literal placement (bot i -> 10000 + i mod n after the
+hot block) the run of record's hot zone holds 50 + 9 = 59 bots at 1,000 clients / 100 zones /
+--hot-zone 50, not 'one zone at 50'. The walking set is spread by zone (Bresenham over bots ranked
+by (zone, index)); picking by index alone at 30% put every walker in 30 of 100 zones.
+
+Build note (sr-9b): The driver's build_level_sample counter feeds (join_committed_total_delta and
+the new placement_committed_delta) have no unit test: a copy-pasted reducer name in the placement
+feed survives all 270 driver tests (verifier-written mutant).
+
+Build note (sr-9b): docs/runbooks/playtest-ops.md (just playtest-verify-release) still names only
+start_wild_battle and grant_bait as refused; FORBIDDEN_REDUCERS also holds
+dev_expire_tactical_window (since th-4) and dev_place_in_load_zone. Outside sr-9b's touches.
+
 ### sr-2 — the party is read through an `(owner, slot)` index
 type: feature · tier: hard
 category: performance/server · severity: HIGH · size: MODERATE
