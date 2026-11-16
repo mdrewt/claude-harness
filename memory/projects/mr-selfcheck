@@ -621,7 +621,7 @@ try:
     if offered(bundle.get("interrupted") or []) != [w + ("due",) for w in WANT] \
             or (bundle.get("master_ci_latest") or [{}])[0].get("conclusion") != "failure":
         fail("bundle-offers-interrupted", "bundle: %r" % ({k: bundle.get(k) for k in ("interrupted", "master_ci_latest")},))
-    # The per-launch budget check reads its figures from the bundle: the caps mr-spawn applies.
+    # The bundle carries the caps mr-spawn applies and the soft line, as configured.
     caps = json.load(open(os.path.join(box.mem, "mr-budget-config.json")))
     b = bundle.get("budget") or {}
     if b.get("tier_caps_usd") != caps["slice_caps_usd"] \
@@ -848,6 +848,27 @@ try:
     sampled([event(TICK_EV, seven_day=0.98)], age=1800)
     sampled([event(TICK_EV, seven_day=0.38)], keep=True)
     reads("mid-window-drop", {"state": "NORMAL", "source": "telemetry", "utilisation": 0.38})
+
+    # The per-launch check is the bundle's, against the HARD line (2026-11-16: 86% real, governor
+    # NORMAL, and a hand check of effective + the $150 cap against the SOFT line held a hard slice).
+    EST = dict((t, v) for t, v in CFG["launch_est_usd"].items() if t != "default")
+    sampled([event(TICK_EV, seven_day=0.86)])
+    b = reads("launch-086", {"state": "NORMAL", "launchable_tiers": dict((t, True) for t in EST)})
+    if b.get("projected_usd") != round(0.86 * LIMIT, 2) \
+            or b.get("launch_headroom_usd") != round(CFG["hard_stop_frac"] * LIMIT - 0.86 * LIMIT, 2):
+        fail("governor-launch-086-headroom", "budget: %r" % (b,))
+    # Live runs' remaining spend is not in the plan's figure: the bundle counts their estimates.
+    for i in range(3):
+        box.slice("live-h%d" % i, "hard", "fable", "xhigh", live=True, spec=False)
+    head = CFG["hard_stop_frac"] * LIMIT - 0.86 * LIMIT - 3 * EST["hard"]
+    want = dict((t, EST[t] <= head) for t in EST)
+    reads("launch-086-live", {"state": "NORMAL", "launchable_tiers": want, "inflight_runs": 3,
+                              "projected_usd": round(0.86 * LIMIT + 3 * EST["hard"], 2)})
+    for L in glob.glob(os.path.join(box.mem, ".harness-runner.live-h*.lock")):
+        os.unlink(L)
+    # Past the soft line nothing new launches, whatever the headroom.
+    sampled([event(TICK_EV, seven_day=0.91)])
+    reads("launch-091", {"state": "SOFT-PAUSE", "launchable_tiers": dict((t, False) for t in EST)})
 
     # A model's own window near its limit with the general one low: that model alone is paused.
     spent(100.0)

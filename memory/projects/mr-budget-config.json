@@ -57,6 +57,13 @@
   "default": 60
  },
  "escalation_headroom_usd": 60,
+ "launch_est_usd": {
+  "hard": 90,
+  "routine": 25,
+  "content": 35,
+  "default": 25
+ },
+ "_launch_est_note": "What one run of a tier is expected to cost (about p90 of ledger runs 2026-10..11: hard p90 $78, routine p90 $34). mr-situation uses it for live runs' remaining exposure and the per-launch check: budget.launchable_tiers[t] = state NORMAL and projected_usd + launch_est_usd[t] <= hard_stop_frac x weekly_limit_usd. slice_caps_usd stays the cost-watch alert line, not a launch check.",
  "model_fallback": {"fable": "opus"},
  "_model_fallback_note": "Operator rule 2026-11-14: the ONLY downgrade. A session the plan refuses on a model's OWN limit (a one-model credit stop, e.g. 'You've reached your Fable limit') while the shared windows are not at HARD-STOP continues on the mapped model, same tier and effort: mr-launch.sh continues the refused session at once, and mr-interrupted resumes a slice such a stop interrupted on the mapped model until that stop's reset (after it, on its own model again). New launches still go to their own model first (mr-spawn never holds a model with a fallback on its own window, at any reading); nothing is downgraded ahead of a refusal, so a reset or a mid-window credit restore costs nothing. Remove a key to turn its fallback off.",
  "costwatch_enforce": false,
