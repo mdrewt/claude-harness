@@ -45,7 +45,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M-local-play** (`M-local-play.spec.md`, elaborated 2026-11-16 into 17 `lpw-` slices): the
+1. **M-local-play** (`M-local-play.spec.md`, elaborated 2026-11-16 into 18 `lpw-` slices): the
    early-access shape — sign-in off and a kept identity for local and private worlds, protocol
    numbers and unattended upgrade, the solo-completeness audit, the access design and the host's
    open or password rule, then the desktop shell, worlds, opening a world to friends and the
