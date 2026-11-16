@@ -580,6 +580,35 @@ changed, not batch rate × monsters owned.
 
 - **sr-6b.4:** WHEN a view's reconcile throws, THE view and every view of its try group that did not run SHALL stay dirty and be reconciled on the next batch, and the other groups' reconciles and the flush SHALL proceed (`client/src/net/viewReconcile.test.ts`).
 
+Build note (sr-6b): client/src/net/store.ts comments at reconcileMonstersFromView ('The connection
+adapter calls this in EVERY batcher flush') and reconcileEvolutionNoticesFromView ('This reconcile
+runs on EVERY flush') are false after sr-6b: a reconcile runs only on a batch where its view is
+dirty (its rows changed, or a snapshot, rebuild, reset or handler throw marked every view). The
+change-detection rationale still holds (a one-row change rebuilds the whole view; a snapshot
+re-delivers unchanged rows). sr-6b's comment-only widen was refused (store.ts claimed by unmerged
+sr-4a). store.test.ts rationale prose near the same reconciles says the same.
+
+Build note (sr-6b): .claude/skills/spacetimedb-client/SKILL.md 'The per-transaction reconcile
+trigger' says connection.ts rebuilds view-backed collections from the SDK cache before flushing, and
+'After a schema or type change' says a new view needs its converter and store wiring. Since
+sr-6a/sr-6b the rebuild lives in net/viewReconcile.ts and runs only for dirty views; a new owner
+view (sr-3, sr-4b) must also get a RECONCILE entry and a TRY_GROUPS slot there (the wireTables loop
+over OWNER_VIEWS then marks it). Skill files steer the loop, so not edited by the slice.
+
+Build note (sr-6b): Pre-existing (master has it too), found by sr-6b's red-team: after handleDrop()
+the store is reset but current still names the dead connection until the rebuild timer, and the SDK
+never clears a dead connection's cache, so a batch flushed in that window (practically only a
+microtask already queued in the drop's own task) rebuilds the owner views from the dead cache — the
+rows the reset meant to drop. sr-6b keeps the behaviour (its reset-site tests assert the reconciles
+run, not the refilled rows). A fix would reconcile against nothing while no build is live, or clear
+current in handleDrop (which other code reads).
+
+Build note (sr-6b): Extends n1 (R-sr-6b-NOTE28D488): client/src/net/store.test.ts rationale prose
+and two assertion messages also say the owner-view reconciles run on every flush / every movement
+tick (near lines 1060, 4158, 4915, 4928, 5075 [assertion message], 5180, 5416, 5453 [assertion
+message], 6267 at sr-6b's head). store.test.ts sits with store.ts under unmerged sr-4a's claim. The
+change-detection rationale those lines defend still holds; only the cadence claim is false.
+
 ### sr-8 — terrain chunks bake at resolution 1
 type: feature · tier: routine
 category: performance/render · severity: MED · size: SMALL
