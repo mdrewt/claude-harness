@@ -441,6 +441,29 @@ cost at 1 vs 1,000 Storage monsters, before and after, with `sr-9a`'s driver.
 
 - **sr-2.3:** WHEN this module is published without `--delete-data` over a database the base module filled with monsters, THE publish SHALL succeed and every owner's party SHALL read back through the new index unchanged (publish-over-data proof; the command transcript is in the PR).
 
+Build note (sr-2): sr-2's touches omit evals/battle-schema-snapshot.eval.mjs, and the slice cannot
+land without it. Its parseTables throws 'monster: table-level index() is not modelled here' (line
+117) on any table-level index(...) argument, and a two-column btree can only be declared there, so
+adding owner_party makes just eval (and just ci) fail; measured in /tmp/sr-2-probe.BjSf9s against
+e85d6735. The same parser records only field-level #[index(btree)] columns, so 're-record the schema
+baseline' with --write cannot express the new index either. mr-touches refuses the eval (a gate
+file: only the spec may declare it). standards/testing-tdd.md says this source-parsing eval is
+replaced by a generated-artifact equivalent when next touched, not patched; the native host already
+captures the RawModuleDef (native_host_tests.rs module_def()), which carries every index including
+multi-column ones. Before sr-2 can build, the spec must either declare the eval (and its
+replacement) in sr-2's touches or order a slice that replaces it first.
+
+Build note (sr-2): Resolved by decision (a) (harness PR #245). evals/battle-schema-snapshot.eval.mjs
+now models exactly one table-level form, index(accessor = X, btree(columns = [a, b, ..])), with two
+or more distinct struct columns, and records it as composite_indexes (accessor + declared column
+order) on that table's baseline entry only, so the re-recorded table-schemas.json changes monster
+alone. Every other table-level index form, a one-column table-level btree (it belongs on the field
+as #[index(btree)]) and a repeated accessor throw. Any top-level table argument whose first word is
+index is checked, so a leading U+200E (which Rust lexes as whitespace) cannot hide one. The eval
+remains a parse of hand-written source: the generated-artifact replacement that
+standards/testing-tdd.md names for it (the native host already captures the RawModuleDef, which
+carries multi-column indexes) is not part of sr-2.
+
 ### sr-7 — `battle_summary` is capped by an on-demand reaper
 type: feature · tier: hard
 category: data-integrity/performance · severity: MED · size: MODERATE
