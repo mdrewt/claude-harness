@@ -15,32 +15,6 @@ the checking apparatus are never tracked here.
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
-### rb-137 — export `battle_summary` and `player_formation` (R-bt-7-SUMMARYEXPORT; operator-approved, issue #755)
-type: feature · tier: hard
-category: security-privacy · severity: MED · size: SMALL
-touches: server-module/src/privacy.rs, server-module/src/privacy_tests.rs, server-module/src/schema.rs, evals/account-e2e.eval.mjs, docs/DECISIONS.md
-after: —
-
-The operator accepted the recommendation (2026-11-16, monster-realm#755): a player's export
-includes their `battle_summary` rows and their `player_formation` row. Both are read with
-owner-keyed index queries on the existing tables, with no schema change, following the
-"Export scope" rule in "Account deletion and data export". `privacy.rs` gains two exporters beside
-`rows_heal_cooldown` (the summary rows found through each identity column that names the caller;
-the formation row by `owner_identity`). In `DATA_LIFECYCLE_MANIFEST` both entries become
-`exportable: true` and their `basis` text is updated. `exporters_cover_manifest` then requires the
-exporters. A summary row names both sides, so it is exported the same way the existing `battle`
-exporter treats the other participant. `account-e2e.eval.mjs` gets the new table names in its
-export transcription. In `docs/DECISIONS.md`, "Tactical battle privacy is structural, and tactical
-rows are not exportable" is superseded in place: the summary and the formation are exported, and
-the other tactical tables stay non-exportable for the reason that decision already gives. The
-same PR adds a line to "Account deletion and data export": a configured real sign-in issuer
-(`ALLOWED_ISSUERS`) is a **launch condition** for the official server, because the anonymous
-export tier's sybil exposure (R-rb-132-WALLETSYBIL) is accepted until then (operator,
-monster-realm#757).
-
-- **rb-137.1:** WHEN a player who fought a battle requests a data export, THE bundle SHALL contain that battle's `battle_summary` row, and SHALL NOT contain a summary row for a battle the player was not in (`server-module/src/privacy_tests.rs`).
-- **rb-137.2:** WHEN a player with a saved formation requests a data export, THE bundle SHALL contain their `player_formation` row and no other player's (`server-module/src/privacy_tests.rs`).
-
 ### rb-92 — R-rb-52-GRACEANNOUNCE
 category: ux-a11y · severity: MED · status: promoted · **absorbed by M-trade-sessions `ts-6b-9` — do not build separately**
 EARS: WHEN an account moves from active to deletion-grace (including via another session's sync) THE CLIENT SHALL announce the grace deadline exactly once through the live region.
