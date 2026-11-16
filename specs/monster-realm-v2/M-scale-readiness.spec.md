@@ -632,6 +632,16 @@ it is removed, not changed, and `sr-8.1` pins the one resolution that remains. T
 
 - **sr-8.2:** WHEN `world-art.spec.ts`'s pixel proof runs in `deviceScaleFactor: 2` and `1.5` contexts as well as the existing `deviceScaleFactor: 1` one, THE proof SHALL pass in all three with its thresholds unedited (`client/e2e/world-art.spec.ts`).
 
+Build note (sr-8): sr-8.2 is a no-regression guard: world-art 9/9 also passed on the pre-sr-8
+renderer (device-scale bake), so the e2e cannot tell resolution 1 from the old bake. sr-8.1's unit
+teeth carry the resolution; a world.ts bakeChunk override of resolution after the
+chunkTextureRequest spread is invisible to both (coverage-excluded shell; source scans are banned).
+world-art now runs 3 contexts: ~2.0 min locally for 9 tests vs ~40 s before; the sr-8.2 CHECK needs
+mr-gates --timeout >= 300 (the default timed it out).
+
+Build note (sr-8): Correction to n1: the '~40 s before' world-art runtime is an estimate (one third
+of the measured 2.0 min for three contexts), not a measurement.
+
 ### sr-4a — the leaderboard renders top 100 plus the caller, only when a profile changed
 type: feature · tier: routine
 category: performance/client · severity: MED · size: SMALL
