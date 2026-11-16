@@ -665,6 +665,11 @@ added). Their existing cases with ≤100 profiles stay unedited.
 
 - **sr-4a.3:** WHEN the caller's own row is shown below the top 100, THE view SHALL render `100+` as its rank and mark it as the caller's row, in the Social rankings tab and the leaderboard overlay alike (`client/src/ui/leaderboardView.test.ts`, `client/src/ui/socialModel.test.ts`).
 
+Build note (sr-4a): sr-4a memoises the sort, but main.ts's batch listener and socialScreen.viewModel
+still call store.allProfiles() (an O(profiles) copy) on every batch before the memo is consulted.
+Harmless once sr-4b bounds the subscribed profiles to ~101; if sr-4b slips, a lazy profiles source
+would remove the copy (main.social.test.ts pins the eager call).
+
 ### sr-3 — `player_quest` is owner-only
 type: feature · tier: hard
 category: security-privacy/performance · severity: MED · size: MODERATE
