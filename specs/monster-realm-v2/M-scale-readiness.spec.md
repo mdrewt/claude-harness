@@ -291,6 +291,19 @@ download.
 
 - **sr-9d.1:** WHEN `promtool test rules` evaluates `recording.rules.test.yml` over fixture series in which `movement_tick` spends 0.12 s and `enqueue_move` 0.03 s of transaction time per second, THE recorded `mr:reducer_thread_share:rate5m` SHALL be 0.12 and 0.03 for those reducers (`ops/observability/rules/recording.rules.test.yml`, run by `ops/observability/validate.mjs`).
 
+Build note (sr-9d): ops/observability/README.md (outside sr-9d touches:) is stale after this slice:
+its file table (~line 84) has no row for rules/recording.rules.test.yml and the validate.mjs row
+(~line 90) says it 'runs each config through its upstream validator' — it now also runs promtool
+test rules. A one-line doc fix for any later ops slice.
+
+Build note (sr-9d): Measured on a live SpacetimeDB 2.11 host: spacetime_txn_elapsed_time_sec_sum
+carries txn_type; each reducer has a Reducer row and a smaller Update row (~10%), and non-reducer
+work (Subscribe/Sql/Internal/Unsubscribe/Update) has reducer="". The spec's sum by (reducer)
+therefore sums Reducer+Update per reducer and records non-reducer work as one label-less series.
+Whether Update time is nested in Reducer time, and whether non-reducer txns occupy the single
+writer, is unmeasured, so the dashboard total is transaction-seconds/s and may exceed 1.0. promtool
+needed fuzzy_compare (1 ULP) and exact-binary fixture increments to compare 0.12/0.03.
+
 ### sr-9c — the nightly runs the load driver for a few seconds
 type: feature · tier: routine
 category: loop-ops/observability · severity: MED · size: SMALL
