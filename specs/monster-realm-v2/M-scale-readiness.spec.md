@@ -783,6 +783,43 @@ client subscribes. Its `RL15-structural` scan in the same file stays.
 
 - **sr-4b.6:** WHEN this module is published without `--delete-data` over a database holding more than 100 profiles, THE publish SHALL succeed and `leaderboard_top` SHALL hold the true top 100 before any ranked match (publish-over-data proof; transcript in the PR).
 
+Build note (sr-4b): sr-4b.2 vs sr-4b.1 at small scale: with fewer than 100 profiles the guest-claim
+tombstone (rating 0) stays a leaderboard_top member, because the membership invariant ranks
+tombstones like any other row (sr-4b.1, the spec's Decisions). 'The retired guest's row SHALL be
+gone' holds once 100 profiles rank above the tombstone; ranking_tests encodes both
+(a_claim_over_a_full_board_swaps_the_guest_for_the_claimer_sr4b_2,
+a_claim_in_a_small_world_keeps_the_guest_tombstone_a_member_sr4b_2). Suggest rewording sr-4b.2 to
+'is not a member once 100 profiles outrank it'.
+
+Build note (sr-4b): plan-delta: sr-4b.5's tests live in content_tests.rs mod nh_sync
+(init_over_150_profiles_fills_the_board_with_the_true_top_100_sr4b_5,
+sync_content_fills_the_board_on_the_reseed_and_the_skip_path_sr4b_5), not ranking_tests.rs as the
+criterion's file hint says: the native-host world that can run crate::init and crate::sync_content
+is private to that module.
+
+Build note (sr-4b): A publish of sr-4b over existing data leaves leaderboard_top empty until the
+owner's sync_content (or the first rated settle): init runs only at database creation.
+scripts/smoke-republish.sh and just playtest-up call sync_content; just publish, the nightly load
+publish and README.md's guidance (sync_content only after a content change) do not. Measured in
+gates/sr-4b.6-publish-probe.md (step 6b: 0 rows after publish, 100 after sync_content).
+
+Build note (sr-4b): Security lens (reducer-security-auditor on sr-4b, Medium): two colluding account
+holders can loop challenge_pvp, accept_challenge, deploy_units x2, forfeit with no cooldown; each
+settle pays one O(profiles) leaderboard rescan (~7.7 ms at 50,000 profiles,
+gates/sr-4b.6-publish-probe.md), roughly 4-8% of the reducer thread per pair by the auditor's
+estimate. The spec defers incremental upkeep until the DoD number binds; the cheap guard if it does:
+skip the scan when no row the transaction wrote is or becomes a member (~100 PK lookups).
+
+Build note (sr-4b): The ladder order (rating desc, name by UTF-16 code units, identity) and K=100
+now live twice: client/src/ui/leaderboardModel.ts compareProfiles + LEADERBOARD_TOP_K (display rank)
+and server-module/src/ranking.rs top_identities + LEADERBOARD_TOP_K (membership). They must agree at
+the 100th place; a game-core home exported through client-wasm would make it one rule (AGENTS
+invariant 1).
+
+Build note (sr-4b): Spec §Scope deferral: M25-security-audit.spec.md S3/S5's public-table lists
+still name player_quest (private since sr-3) and profile as public on purpose, and miss
+leaderboard_top (public since sr-4b); that spec re-elaborates when M25 is unblocked.
+
 ## Post-integration verification (the milestone's DoD)
 
 - Full `just ci` green on `master` after the last slice; `bindings-drift` clean; the nightly's
