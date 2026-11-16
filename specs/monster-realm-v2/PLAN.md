@@ -49,7 +49,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    early-access shape — sign-in off and a kept identity for local and private worlds, protocol
    numbers and unattended upgrade, the solo-completeness audit, the desktop shell, worlds, opening
    a world to friends, private-server access and the standalone server package. lpw-1 to lpw-9
-   build first; the packaging slices are `blocked:licence` (operator), the overlay proof
+   build first; the packaging slices are `blocked:licence` (operator), the overlay proof and the shell
    `blocked:operator-steam-machine` and the account binding and access rule
    `blocked:account-service` (operator). Groundwork built (§Built). **Early access is gated on it.**
 2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;

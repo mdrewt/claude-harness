@@ -133,8 +133,13 @@ Each default stands unless the operator overrules it:
 - **Schema chain.** lpw-3, lpw-15 and lpw-16 change the schema. They are ordered (lpw-3, then
   lpw-15, then lpw-16), and lpw-3's new table is published to a live server only knowing that a
   schema-changing publish disconnects connected clients.
-- **mr-prune census** (game `63fc0b0a`, recorded as `M-local-play`): see the census note under
-  §Post-integration verification.
+- **mr-prune census** (game `63fc0b0a`, recorded as `M-local-play`): no `duplicates` and no
+  `orphans` rows for the touched files. Signals, each named in its slice: source-text reads in
+  `authToken.test.ts` (it reads the SDK's `dist`, not `authToken.ts`; lpw-2), `connection.test.ts`
+  (`E1-MAIN` reads `main.ts`; lpw-5) and `content_tests.rs` (`bt6_5` reads `sync_content_inner`'s
+  text; lpw-4); churn on `main.targetKindGate.test.ts`, `connection.runtime.test.ts`,
+  `socialModel.test.ts` and `socialScreen.test.ts`; literal variants in `authToken.test.ts` and
+  `connection.test.ts`.
 
 ## Sign-in design (lpw-8, lpw-9, lpw-15 and lpw-16 build against `docs/local-play.md` §3; the operator is open to alternatives)
 
@@ -212,10 +217,6 @@ Each slice is green alone; the milestone is done when the merged whole is:
 - Once the account service exists: a world bound to an account opens later with the network down
   (lpw-15), and no attestation or token a private host received is accepted by the official server
   or by another private world (lpw-16).
-- **Census note (`mr-prune census`, game `63fc0b0a`, recorded as `M-local-play`).** Rows for the
-  files these slices touch are candidates only (`standards/testing-tdd.md` §Deleting a check). The
-  rows and their disposition are listed in lp-spec's PR body; no `duplicates` pair was folded into a
-  slice and no `orphans` row produced a `structure.spec.md` section.
 
 ## Slices
 
@@ -290,6 +291,7 @@ touches: server-module/src/lib.rs, server-module/src/content_tests.rs, scripts/s
 after: [lpw-3]
 - Residuals: R-sr-4b-NOTE505D57 (closes it).
 - Decision: `decision-defaulted:content-reseed=first-connect-after-upgrade`.
+- Pins (keep, do not re-point): `server-module/src/content.rs`'s inline `sync_content_guard_references_owner_identity` reads `lib.rs` as text and needs `pub fn sync_content(ctx:` with its `owner_identity` check in that body; `content_tests.rs` `sync_content_validates_tactics_content_before_any_write_bt6_5` reads `sync_content_inner`'s text. The shared helper leaves both bodies where they are.
 - Re-verified: `init` runs only at database creation (`sync_content`'s own refusal text says so) and the version gate in `sync_content_inner` returns early when `config.content_version` equals `CONTENT_VERSION`.
 - Contract: `on_connect` runs, before it opens the session, the same steps the owner's `sync_content` runs after `sync_content_inner` (zone schedules, reapers, leaderboard refresh, `ensure_module_info`) whenever `config.content_version` differs from `CONTENT_VERSION`; one private helper in `lib.rs` serves both callers. The owner check stays on the `sync_content` reducer.
 
@@ -393,6 +395,7 @@ blocked: operator-steam-machine — lifted when the operator runs the probe belo
 type: feature · tier: hard
 touches: desktop/package.json, desktop/package-lock.json, desktop/tsconfig.json, desktop/vitest.config.ts, desktop/playwright.config.ts, desktop/src/main.ts, desktop/src/preload.ts, desktop/src/worldEntry.ts, desktop/src/worldEntry.test.ts, desktop/src/window.ts, desktop/src/window.test.ts, desktop/e2e/shell.spec.ts, justfile, .github/workflows/ci.yml, biome.json, .gitignore
 after: [lpw-10, lpw-2]
+blocked: operator-steam-machine — transitively, through lpw-10 (the shell is built only once the overlay is proved); fallback: as lpw-10.
 - Not licence-dependent: the shell hosts the unchanged web client and joins a server someone else runs.
 - Contract: a new `desktop/` package (Electron main + preload). `worldEntry.ts` turns a stored or typed entry `{ uri, db, kind }` into the shell document, validating it with the client's own `resolveConnectionConfig` (imported from `client/src/net/connectionConfig.ts`, never copied). The preload exposes the document with `contextBridge.exposeInMainWorld('__MR_SHELL_CONFIG__', doc)`. A typed address is kind `private`. `justfile` gains `desktop-test` and `desktop-e2e`; `ci.yml` runs them.
 
