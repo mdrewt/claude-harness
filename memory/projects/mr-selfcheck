@@ -3067,6 +3067,16 @@ if dup_count > 0:
     fail("lp-handoff-rotate-idempotent", "re-running rotation duplicated %d archive entr%s -- not crash-safe"
          % (dup_count, "y" if dup_count == 1 else "ies"))
 
+# --- handoff-rotate: an approximate `T~HH:MMZ` header dates its entry (never pinned as unparseable) ---
+open(HANDOFF, "w").close()
+with open(HANDOFF, "a") as f:
+    f.write("\n## 2026-01-03T~05:00Z — approximate-time entry\nbody\n")
+    f.write("\n## 2026-01-04T00:00:00Z — normal entry\n" + ("pad " * 12000) + "\n")
+rc, out, err = rec("handoff", ["--title", "approx-trigger", "--body", "approx-trigger"])
+if rc != 0 or "no parseable" in out + err:
+    fail("lp-handoff-rotate-approx-time",
+         "a `T~` header was not dated (rc=%r, output=%r)" % (rc, (out + err).strip()[:200]))
+
 # --- corpus-pollution guard: none of this block's fixtures may have touched the REAL corpus ---
 if sha(REAL_STATE) != real_state_before:
     fail("lp-queue-corpus-pollution", "the REAL mr-state.json changed during this selftest")
