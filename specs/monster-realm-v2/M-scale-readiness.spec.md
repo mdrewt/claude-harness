@@ -704,6 +704,33 @@ completion transaction delivers the quest delete and the conversation row in one
 
 - **sr-3.5:** WHEN this module is published without `--delete-data` over a database holding `player_quest` rows, THE publish SHALL succeed and each owner's rows SHALL be readable through `my_player_quest` (publish-over-data proof; transcript in the PR).
 
+Build note (sr-3): The agent-facing .claude/skills/spacetimedb-client/SKILL.md still lists
+player_quest among the public tables of the base subscription and omits my_player_quest from its
+views; it is outside sr-3's touches.
+
+Build note (sr-3): After sr-3 the connection writes quests only through
+store.reconcileQuestsFromView; AuthoritativeStore.upsertQuest/removeQuest have no production caller
+and survive only as test seeds (client/src/ui/screens/journalScreen.boot.test.ts,
+client/src/main.dialogueEnded.test.ts, client/src/net/store.test.ts). Removing them needs those
+fixtures moved to the reconcile; journalScreen.boot.test.ts is outside sr-3's touches.
+
+Build note (sr-3): M25-security-audit.spec.md S3/S5 still list player_quest among the
+public-on-purpose tables; after sr-3 it is private behind my_player_quest (the spec's named
+follow-up row for this slice).
+
+Build note (sr-3): DoD measurement (sr-3): one SDK client's initial subscription bytes at 50,003
+player_quest rows (2.11.0 host, scratch DB) — before (base 05c58793, SELECT * FROM player_quest):
+1,942,532 bytes, 50,003 rows; after (sr-3, SELECT * FROM my_player_quest): 154 bytes for an owner
+with two quests, 97 with one, 42 with none. The publish without --delete-data needed only
+--yes=migrate (no break-clients consent); its plan was 'Created view: my_player_quest' plus 'Changed
+access for table player_quest (public -> private)'. Evidence:
+memory/projects/gates/sr-3.5-publish-probe.md.
+
+Build note (sr-3): player_quest's private access is guarded by the generated-artifact evals
+(bindings-drift + client-surface-privacy: a re-added public emits player_quest_table.ts and reds the
+allowlist); no native-host TableAccess pin was added for it (the reducer-security-auditor suggested
+one, as ts2_privacy_session_tables_are_private has for the trade tables).
+
 ### sr-4b — the client subscribes a bounded leaderboard, not every profile
 type: feature · tier: hard
 category: performance/server · severity: MED · size: MODERATE
