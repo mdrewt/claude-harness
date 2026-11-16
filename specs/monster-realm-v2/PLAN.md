@@ -50,10 +50,19 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    numbers and unattended upgrade, the solo-completeness audit, the access design and the host's
    open or password rule, then the desktop shell, worlds, opening a world to friends and the
    standalone server package. lpw-1 to lpw-9 build first; the overlay proof and the shell are
-   `blocked:operator-steam-machine`, the packaging slices `blocked:licence` and the account
-   binding `blocked:account-service` (all operator). Groundwork built (§Built). **Early access is
+   `blocked:operator-steam-machine`, and the packaging slices `blocked:licence` (operator);
+   the world binding (lpw-15, every player binds) builds on item 2's attestation route. Groundwork built (§Built). **Early access is
    gated on it.**
-2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
+2. **M-account-service** (`M-account-service.spec.md`, authored 2026-11-16 into 10 `acs-` slices):
+   **every player must own the game on Steam, for now** (operator, 2026-11-16), browser players
+   included, in every way to play. Our own small OIDC issuer (`oidc-provider`) with Steam ticket
+   and Steam OpenID sign-in, an ownership check on every issuance, a dev-only email issuer, and the
+   per-world attestation route; the official module admits only entitled accounts; the client and
+   the shell sign in before play. acs-1 to acs-6 build first against a Steam stub; the deployment
+   (acs-7) is `blocked:operator-steamworks-and-hosting`, the shell sign-in (acs-10) transitively
+   `blocked:operator-steam-machine`. **Early access is gated on it** (every world's players bind
+   through its attestation route).
+3. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S2 changes a frozen schema and waits for the
    operator's ratification at the harness-revision Checkpoint 2, which lifts this block. S1 as
    written has nothing left to change: `propose_trade`, `respond_trade` and `confirm_trade` return
@@ -61,21 +70,21 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    no-oracle cases (M-trade-sessions `ts-4`); the M25 spec's S1 text is rewritten when M25 is
    re-elaborated.
    **Opening the official server is gated on its completion.**
-3. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
+4. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
    layer, consuming the context-stack ownership design, plus the hold/long-press edges the
    tactical battle defers (Hold Y cancel-and-clear, Hold B skip playback). **Must land before launch** (operator,
    2026-10-01). Ordered after the tactical battle UI (M-battle-tactics, built) — operator-CONFIRMED
    (#583 D4, 2026-10-24).
-4. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — its friend requests and
+5. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — its friend requests and
    chat show players through the tag helpers M-identity-handles built (`formatTag` and
    `taggedName` in the game's `client/src/ui/playerTag.ts`), and it owns the player's own tag on
    the Profile screen, which no surface shows yet; ordered AHEAD of M18 — operator-CONFIRMED
    (#588 D4, 2026-10-24). M23's social a11y retrofit scope un-defers with it.
-5. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — the playtest-3
+6. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — the playtest-3
    read did NOT confirm it as next content; its 1v1 "additive resolve_coop_turn" premise dies
    with the tactical overhaul. Re-sketch on the tactical engine (M-battle-tactics P2 is built; tactical sides natively support
    allies).
-6. **M-battle-tactics depth** (unspecced) — `blocked:playtest-4-read`: the operator-deferred tactical
+7. **M-battle-tactics depth** (unspecced) — `blocked:playtest-4-read`: the operator-deferred tactical
    features, specced after the Playtest-4 read. Obstacles/cover blocking movement and ranged/AoE
    (pt3-2026-10-138; the `blocks_los` tile column and LoS(blockers) signature are already in place),
    tile elevation with attack bonuses (-139; `elevation` column, default 0), line/cone AoE (-141;
@@ -83,19 +92,19 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    the Playtest-4 gates): D1 entry abilities on deploy + 4-AP Swap/reserve, D2 weather/field
    (upkeep slot 3), D3 signature wave + one 2×2-footprint line. Design SSOT:
    `M-battle-tactics-design.md`. Hold-to-act inputs (Hold Y cancel, Hold B skip) belong to M-gamepad.
-7. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
+8. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
    row a pt3 milestone absorbs is marked in its spec.
-8. **M21b-3 Steam login** — the Steam build's sign-in protocol and the Steamworks wiring
-   (overlay enable, Steam Input onto the virtual buttons) in M-local-play's desktop shell
-   (`lpw-11`); unspecced, elaborated once `lpw-10` proves the overlay.
-9. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
+9. **M21b-3 Steamworks in the shell** — the Steamworks wiring (overlay enable, Steam Input onto
+   the virtual buttons) in M-local-play's desktop shell (`lpw-11`); unspecced, elaborated once
+   `lpw-10` proves the overlay. The Steam sign-in moved to M-account-service (acs-10).
+10. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
    (`standards/spec-driven.md` §Refactor slices). The supervisor's structural share schedules it
    ahead of this position; when no earlier item has a launchable slice, its slices launch in
    file order. Its `type: design` slices decide internal-design questions; those are not operator
    decisions. An empty file is a finished item once no plan file under the game's
    `docs/refactors/` lists an extraction still to make. With no section open and a plan file
    listing extractions, the tick's action is to section the next three.
-10. **M-modding** (`M-modding.spec.md`, sketch) — `blocked:early-access-release`: host-moddable
+11. **M-modding** (`M-modding.spec.md`, sketch) — `blocked:early-access-release`: host-moddable
    private worlds, part of the official release. Until it opens, its standing constraint binds
    every slice: content is loaded data, one seam per kind of extension, no content id named in
    rules or views.
@@ -108,8 +117,9 @@ ONE gate after every coverage milestone closes. No interim playtest.
 
 - **Release order** (operator, 2026-11-12; `game-design.md` §14): early access = the Steam build
   with single-player worlds and friends hosting → the official server opens → official release adds
-  modding. **Early access** is gated on M-local-play and on M-gamepad (operator, 2026-10-01;
-  "before early access" confirmed 2026-11-13).
+  modding. **Early access** is gated on M-local-play, on M-account-service (every player must own the
+  game on Steam, operator 2026-11-16) and on M-gamepad (operator, 2026-10-01; "before early
+  access" confirmed 2026-11-13).
   **Opening the official server** is gated on M25 completion (human sign-off checklist,
   operator-approved) and on M-scale-readiness's 1,000-client run of record meeting the
   official-server budgets (the milestone is built; the run is residual
