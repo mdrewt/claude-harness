@@ -45,12 +45,13 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M-local-play** (`M-local-play.spec.md`, LP2–LP9 sketch 2026-11-12): the early-access shape —
-   single-player worlds on a server the game starts, opening a world to friends, private-server
-   access (valid account, then the host's allowlist or password), the standalone server package,
-   sign-in once then offline, unattended upgrade, and the solo-completeness audit. Its groundwork
-   is built (§Built); elaborate LP2–LP9 against `lpg-0`'s record (the game's
-   `docs/local-play.md`). **Early access is gated on it.**
+1. **M-local-play** (`M-local-play.spec.md`, elaborated 2026-11-16 into 18 `lpw-` slices): the
+   early-access shape — sign-in off and a kept identity for local and private worlds, protocol
+   numbers and unattended upgrade, the solo-completeness audit, the desktop shell, worlds, opening
+   a world to friends, private-server access and the standalone server package. lpw-1 to lpw-9
+   build first; the packaging slices are `blocked:licence` (operator), the overlay proof
+   `blocked:operator-steam-machine` and the account binding and access rule
+   `blocked:account-service` (operator). Groundwork built (§Built). **Early access is gated on it.**
 2. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S2 changes a frozen schema and waits for the
    operator's ratification at the harness-revision Checkpoint 2, which lifts this block. S1 as
@@ -164,7 +165,7 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
   `docs/local-play.md` — licence state, the Electron shell and its preload hook, the sign-in
   answers, the measured footprint and the budgets set from it — the connection target as a
   run-time shell document, and the target-kind gate that keeps telemetry and the build's account
-  sign-in to servers we operate). LP2–LP9 are §9's M-local-play item.
+  sign-in to servers we operate). LP2–LP9 are §9's M-local-play item (its `lpw-` slices).
 - Netcode: **M-netcode-presence** (`np-*`; one snapshot per position in the store and a
   bounded continued walk for remote players, slewed at walking speed; `MoveInput::Face`, so a
   press of a direction you do not face turns and a press you face steps; a battle start drops
