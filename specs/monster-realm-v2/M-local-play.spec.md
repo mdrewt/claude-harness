@@ -1,6 +1,6 @@
 # Spec: M-local-play — single-player worlds and friends hosting
 
-**Status:** elaborated 2026-11-16 (`lp-spec`) into 17 `lpw-` slices, against game `master`
+**Status:** elaborated 2026-11-16 (`lp-spec`) into 18 `lpw-` slices (lpw-18, the friends-server transport, added 2026-11-16 by the operator's ruling on monster-realm#821), against game `master`
 `63fc0b0a` (`84e3cd96` plus the doc-only #820) and `lpg-0`'s record (the game's
 `docs/local-play.md`). The groundwork (LP0, LP1, LP10 as `lpg-0`, `lpg-1`, `lpg-10`) is built:
 PLAN §Built · **Project:** monster-realm (client, server module, `game-core`, a new desktop shell
@@ -32,9 +32,9 @@ measured medians" and "A target's kind gates telemetry and account sign-in".
 | LP2 Desktop shell | lpw-10 (overlay proof), lpw-11 (shell, join by address), lpw-12 (bundled host behind a host gate) | No shell package exists (no `desktop/`, no Electron dependency). The Steam overlay over an Electron window is still unmeasured (`docs/local-play.md` §2) |
 | LP3 Worlds | lpw-13 (worlds), lpw-16 (telemetry opt-in) | No world registry; `init` stores the publisher as `config.owner_identity`, and `sync_content` refuses every other caller |
 | LP4 Sign in once, then offline | lpw-1 (sign-in off), lpw-2 (identity across launches), lpw-15 (world binding) | `createAuthTokenGate` keeps the reconnect token in `sessionStorage` (`client/src/net/authToken.ts`); `ALLOWED_ISSUERS` in `server-module/src/accounts.rs` is the `.invalid` placeholder, so no account issuer exists |
-| LP5 Open to friends | lpw-14 | Nothing listens beyond what the host is started with; the host fetches any issuer a token names (`docs/local-play.md` §5) |
+| LP5 Open to friends | lpw-18 (transport: per-world certificate, TLS at the gate, pinned invites), lpw-14 | Nothing listens beyond what the host is started with; the host fetches any issuer a token names (`docs/local-play.md` §5) |
 | LP6 Private-server access | lpw-7 (verifier spike), lpw-8 (access design), lpw-9 (access rule), lpw-15 (account check and allowlist) | The module has no access rule: `on_connect` opens a session for every connection and checks issuer and audience only for a token that carries a JWT |
-| LP7 Standalone server package | lpw-17 | Nothing packaged |
+| LP7 Standalone server package | lpw-17 (with automatic certificates for a domain) | Nothing packaged |
 | LP8 Unattended upgrade | lpw-3 (protocol numbers, every publish path re-seeds as the owner), lpw-4 (the client refuses a server it cannot speak to), lpw-13 (the shell upgrades a world) | `init` runs only at database creation; `just publish` makes no `sync_content` call (`playtest-up`, `playtest-wipe` and `scripts/smoke-republish.sh` do); the client has no version check, only the `content-stale` hint a failed zone switch raises |
 | LP9 Alone is complete | lpw-5 (content audit), lpw-6 (empty Challenges tab) | No evolution path names a trade or PvP condition (`EvolutionPath` gates are level, essence, trust, quality time, nutrition). Players shows `social.players.none` (`leaderboardView.ts`), Trades `trade.status.none` (`tradeView.ts`), Rankings `leaderboard.empty`; only Challenges (`pvpView.ts`) is bare |
 
@@ -47,8 +47,9 @@ measured medians" and "A target's kind gates telemetry and account sign-in".
 | Budgets (memory, idle CPU, start-up to playable, disk growth per hour) for a single-player world and a friends server | lpw-12, lpw-14, lpw-17 | "Local-play budgets are measured medians"; `docs/local-play.md` §6. Each consuming slice's criteria cite a number from it |
 | LP10 — a `local`/`private` target gets no telemetry, and `connect` gets neither the build's issuer nor its client id | lpw-1, lpw-16, lpw-15 | "A target's kind gates telemetry and account sign-in"; `observability/config.test.ts`, `main.targetKindGate.test.ts`. lpw-16's opt-in, lpw-15's binding and lpw-1's sign-in-off mode are the only paths that may change it |
 | The protocol numbers (lpw-3): `module_info.protocol` and `module_info.min_client_protocol`, and the client's own `protocol_version()` | lpw-4, lpw-13, lpw-17 | lpw-3's `docs/DECISIONS.md` entry |
-| The access design (lpw-8): how an unadmitted connection is held off world rows, how the official server refuses binding, how relay is closed, the friends-server transport options | lpw-9, lpw-14, lpw-15 | lpw-8's `docs/local-play.md` §3 update and `docs/DECISIONS.md` entries |
-| The host gate (lpw-12): the only listener a page or a friend reaches; a route allow-list, an `Origin` rule and the issuer rule in front of the host | lpw-13, lpw-14, lpw-17 | lpw-12's `docs/DECISIONS.md` entry |
+| The access design (lpw-8): how an unadmitted connection is held off world rows, how the official server refuses binding, how relay is closed | lpw-9, lpw-14, lpw-15 | lpw-8's `docs/local-play.md` §3 update and `docs/DECISIONS.md` entries |
+| The host gate (lpw-12): the only listener a page or a friend reaches; a route allow-list, an `Origin` rule and the issuer rule in front of the host | lpw-13, lpw-18, lpw-14, lpw-17 | lpw-12's `docs/DECISIONS.md` entry |
+| The transport rule and the world certificate (lpw-18): TLS beyond loopback, the certificate fingerprint in the invite and the shell document, the shell's pin, the reconnect key `(fingerprint, db)` for a pinned target | lpw-14, lpw-17, lpw-8 (relay lead) | the game's `docs/DECISIONS.md` "Private servers carry their own encryption: a real certificate for a domain, a pinned self-signed one otherwise; plaintext only on loopback" |
 
 ## Named deferrals (declared, not dropped)
 
@@ -58,7 +59,7 @@ measured medians" and "A target's kind gates telemetry and account sign-in".
 | The bundled and standalone server sending nothing to our stack | lpw-12 (bundled host) and lpw-17 (standalone package) | Our stack only receives what we configure it to scrape; what the SpacetimeDB host itself sends off the machine is measured in `docs/local-play.md` §5 and held by the packaging slices |
 | Account sign-in toward a `local` or `private` world | lpw-15 | The account token is the account issuer's id_token, addressed to the build-wide client id; a host that received it could replay it. lpw-1 makes sign-in off complete for those kinds; only the attestation binding (lpw-15) brings an account to such a world, and never as the connection token |
 | OIDC issuer, client id and redirect as run-time configuration | lpw-15 | A world that is its own issuer changes what those values mean; they stay build-time until that design is verified |
-| A transport rule for plaintext `ws:` to a non-loopback host | the operator (decided 2026-11-16, monster-realm#821: plaintext only to loopback and private-range addresses), lpw-14 (enforces) | The resolver accepts plaintext `ws:` to any host; with lpw-2 the token it carries also lives across launches |
+| A transport rule for plaintext `ws:` to a non-loopback host | the operator (decided 2026-11-16, monster-realm#821, revised the same day: plaintext only on loopback; a domain uses a real certificate, a bare IP or LAN address a pinned self-signed one), lpw-18 (enforces), lpw-17 (domain certificates) | The resolver accepts plaintext `ws:` to any host; with lpw-2 the token it carries also lives across launches |
 | A friends-server footprint under battles and trades, not walking alone | follow-up row R-lp-spec-NOTED803F5 (`mr_load_driver` battle and trade load) | `mr_load_driver` drives movement only; the friends-server memory and disk budgets stay a walking-only floor until the driver can battle and trade |
 | The opening notice that a host can read a joiner's data | lpw-9 | Part of private-server access (decision-defaulted below) |
 | Steamworks in the shell: overlay enable, Steam Input, the Steam sign-in protocol | `M21b-3 Steam login` (PLAN §9) | lpw-10 proves the overlay can draw; wiring Steamworks into the shipped shell is the Steam build's integration, which M21b-3 scopes on top of lpw-11's shell |
@@ -113,21 +114,17 @@ Each default stands unless the operator overrules it:
   with a configured binary path), and the shell document does not change.
 - **Who signs the attestation, and plaintext `ws:` for friends servers — ANSWERED 2026-11-16
   (monster-realm#821; the game's `docs/DECISIONS.md` "A private world verifies an account by a
-  per-world attestation our account service signs" and "A friends server may serve plaintext `ws:`
-  only to loopback and private-range addresses").** (1) A small attestation route beside the
+  per-world attestation our account service signs" and "Private servers carry their own encryption…" (revised the same day)).** (1) A small attestation route beside the
   account service we deploy (the sign-in broker), with its own signing key and issuer name; the
   account service is otherwise unchanged. A holder-bound credential (the client signs each world's
   proof with a device key) was weighed and not chosen; it stays the named upgrade path. lpw-15 now
-  waits only on that account service being deployed with the route. (2) Plaintext `ws:` only to
-  loopback and private-range (RFC 1918 / ULA) addresses; `wss:` for anything else; lpw-14 enforces
-  it.
+  waits only on that account service being deployed with the route. (2) Revised the same day (the operator's concern is Minecraft-style hosting over the internet, by bare IP or registered domain, more than LAN): plaintext `ws:` only on loopback; a server with a domain serves `wss:` with a real certificate (lpw-17 obtains and renews one, or the host's own reverse proxy); a server with a bare IP, public or LAN, or a shell world opened to friends serves `wss:` with a per-world self-signed certificate whose fingerprint the invite carries and the shell pins (lpw-18); a browser joiner accepts that certificate once. Game `docs/DECISIONS.md` "Private servers carry their own encryption: a real certificate for a domain, a pinned self-signed one otherwise; plaintext only on loopback".
 
 ## Risks / flags
 
 - **Identity continuity at a deployment.** The reconnect key is the raw `(uri, db)` pair, so a host
   whose document spells the target differently from the one it replaces (case, trailing slash,
-  port) gives every returning anonymous player a new identity. Each deployment's document is checked
-  against the previous spelling; lpw-12 fixes each world's port for this reason.
+  port) gives every returning anonymous player a new identity. Each deployment's document is checked against the previous spelling; lpw-12 fixes each world's port for this reason. A pinned target (lpw-18) keys the token on `(fingerprint, db)` instead, so a host whose address changes (a home or LAN address reassigned) keeps its returning players.
 - **The host reaches out on a stranger's word.** A 2.11.0 standalone host given a token whose `iss`
   is any `http` or `https` issuer fetches that host's `/.well-known/openid-configuration` (no issuer
   allow-list). lpw-12's host gate drops such a token before the host sees it (R-lpg-0-ISSUERFETCH);
@@ -214,6 +211,7 @@ a private host then learns official identities.
 ## Notes
 
 - Private worlds run the official rules until `M-modding`; a host controls only who may join.
+- **A LAN with no internet** gets encrypted, authenticated connections (checking a pinned fingerprint is local), and the open and password rules work. A first account bind needs the attestation route, so an `Allowlist` world cannot admit a new joiner until the network is back; earlier binds keep working.
 - **Idle rule (operator, 2026-11-12):** a zone with no player in it does not update, or updates as
   little as possible. With nobody connected a world runs one
   write-free heartbeat call a minute and writes nothing to disk, and a player who returns appears
@@ -251,8 +249,7 @@ Each slice is green alone; the milestone is done when the merged whole is:
   message (lpw-4).
 - Once the licence and the overlay proof lift: from a clean install the shell creates a world,
   plays it, quits, reopens it as the same player within the `docs/local-play.md` §6 single-player
-  budgets, opens it to a friend who joins under the host's rule, and closes it again (lpw-11 to
-  lpw-14, one e2e flow in lpw-14).
+  budgets, opens it to a friend who joins under the host's rule, and closes it again (lpw-11 to lpw-14 and lpw-18, one e2e flow in lpw-14), the friend's shell connecting over `wss:` to the pinned certificate the invite names.
 - Once the account service exists: a world bound to an account opens later with the network down
   (lpw-15), and no attestation a private host received is accepted by the official server or by
   another private world (lpw-15's hostile-host rig).
@@ -394,7 +391,7 @@ type: design · tier: hard
 touches: docs/local-play.md
 after: [lpw-7]
 - Residuals: R-lpg-0-ATTESTRELAY (designed here, tested in lpw-15), R-lpg-0-HTTPAUDIENCE (measured here).
-- Decides, with a `judge` over at least two alternatives each: (a) how a connection the host's rule has not admitted is kept from every world row and reducer (at 2.11.0 a connection `on_connect` accepts can subscribe public tables at once); (b) how the official server refuses attestation binding when the same module runs everywhere; (c) what the attestation names so a hostile host cannot relay one world's attestation to another (`docs/local-play.md` §3: the verifying key of the client's own world token, checked by the client, is the starting direction). (d), plaintext `ws:` to a friends server, is decided (operator, 2026-11-16: loopback and private-range only; lpw-14 enforces).
+- Decides, with a `judge` over at least two alternatives each: (a) how a connection the host's rule has not admitted is kept from every world row and reducer (at 2.11.0 a connection `on_connect` accepts can subscribe public tables at once); (b) how the official server refuses attestation binding when the same module runs everywhere; (c) what the attestation names so a hostile host cannot relay one world's attestation to another (`docs/local-play.md` §3: the verifying key of the client's own world token, checked by the client, is the starting direction; a second candidate, from the operator's ruling on monster-realm#821, is the server certificate fingerprint the client pinned (lpw-18), named in the attestation request and compared by the world against its own, as Minecraft's online mode binds its session check to the server's key; it reaches every pinned server but not a domain server the client did not pin, which the design must cover). (d), plaintext `ws:` to a friends server, is decided (operator, 2026-11-16: loopback and private-range only; lpw-14 enforces).
 
 - **lpw-8.1:** WHEN the design is recorded, THE SYSTEM SHALL name in `docs/local-play.md` §3 the chosen answer to each of (a) to (c), the rejected alternatives, and the test lpw-9 or lpw-15 runs to prove each.
 
@@ -510,15 +507,39 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 - **lpw-13.6:** WHEN the player deletes a world after confirming, THE SYSTEM SHALL stop its host and remove its directory and its backup copy, and no other world's directory SHALL change.
 - DoD: lpw-13.1 to lpw-13.6 green; `just desktop-test` and `just desktop-e2e` green.
 
+### lpw-18 — the friends-server transport: a per-world certificate, TLS at the gate, pinned invites
+
+type: feature · tier: hard
+touches: desktop/src/worldCert.ts, desktop/src/worldCert.test.ts, desktop/src/tlsPin.ts, desktop/src/tlsPin.test.ts, desktop/src/hostGate.ts, desktop/src/hostGate.test.ts, desktop/src/worlds.ts, desktop/src/worlds.test.ts, desktop/src/launcher/addressForm.ts, desktop/src/launcher/addressForm.test.ts, desktop/src/main.ts, desktop/e2e/tls.spec.ts, client/src/net/shellDocument.ts, client/src/net/shellDocument.test.ts, client/src/net/connectionConfig.ts, client/src/net/connectionConfig.test.ts, client/src/net/authToken.ts, client/src/net/authToken.test.ts
+after: [lpw-13]
+blocked: licence — as lpw-12, and transitively operator-steam-machine; fallback: as lpw-12.
+- Decision: the operator's transport rule (monster-realm#821, 2026-11-16; game `docs/DECISIONS.md` "Private servers carry their own encryption…").
+- Contract: `worldCert.ts` makes one key pair and self-signed certificate per world, kept in the world's directory (readable by the user alone, kept across restarts and upgrades, in the world's backup copy so a restore keeps every friend's pin). The fingerprint is the SHA-256 of the certificate's public key (SPKI), printed in a form the invite and the address form share. Beyond loopback the gate ends TLS with that certificate and forwards to the host on loopback; it also serves the client's built page and a shell document naming itself, so a browser joiner loads the page and its `wss:` from one origin. The shell document gains an optional `connection.fingerprint`; the shell pins it for every connection its window makes (`tlsPin.ts`, through Electron's session certificate check). The client's reconnect key for a target with a fingerprint is `(fingerprint, db)`; without one it stays `(uri, db)` (the `storageKey` derivation, one function in `authToken.ts`).
+
+- **lpw-18.1:** WHEN a world is created, THE SYSTEM SHALL create its key pair and certificate, and WHEN the world is restarted, upgraded, or restored from its backup copy, THE SYSTEM SHALL serve the same certificate.
+
+- **lpw-18.2:** WHEN the gate listens beyond loopback, THE SYSTEM SHALL accept only TLS with the world's certificate on that interface and refuse a plaintext connection.
+
+- **lpw-18.3:** WHEN the shell connects to a target whose shell document carries a fingerprint, THE SYSTEM SHALL complete the connection only if the server's certificate matches it, refuse a mismatch with a named error even when a certificate authority would accept that certificate, and open no WebSocket on a refused connection.
+
+- **lpw-18.4:** WHEN a shell document names a `ws:` uri whose host is not a loopback address, THE CLIENT SHALL refuse the document with a named error and open no connection.
+
+- **lpw-18.5:** WHEN a shell document names a `wss:` uri with no fingerprint, THE CLIENT SHALL connect under the platform's ordinary certificate checks (the registered-domain case).
+
+- **lpw-18.6:** WHEN a pinned target's address changes and its certificate does not, THE CLIENT SHALL resume the identity stored for `(fingerprint, db)`.
+
+- **lpw-18.7:** WHEN a browser loads the client page from the gate over `https:`, THE SYSTEM SHALL serve the page and a shell document whose `uri` is the gate's own `wss:` origin, and the joiner SHALL play without any other origin.
+- DoD: lpw-18.1 to lpw-18.7 green; `just desktop-test`, `just desktop-e2e` and `just ci` green.
+
 ### lpw-14 — open a world to friends, and close it again
 
 type: feature · tier: hard
-touches: client/src/net/connectionConfig.ts, client/src/net/connectionConfig.test.ts, desktop/src/openToFriends.ts, desktop/src/openToFriends.test.ts, desktop/src/hostGate.ts, desktop/src/hostGate.test.ts, desktop/src/launcher/worldSettings.ts, desktop/src/launcher/worldSettings.test.ts, desktop/src/main.ts, desktop/e2e/friends.spec.ts
-after: [lpw-13, lpw-9]
+touches: desktop/src/openToFriends.ts, desktop/src/openToFriends.test.ts, desktop/src/hostGate.ts, desktop/src/hostGate.test.ts, desktop/src/launcher/worldSettings.ts, desktop/src/launcher/worldSettings.test.ts, desktop/src/main.ts, desktop/e2e/friends.spec.ts
+after: [lpw-18, lpw-9]
 blocked: licence — as lpw-12, and transitively operator-steam-machine; fallback: as lpw-12.
 - Residuals: R-lpg-0-ISSUERFETCH (friends half).
 - Decisions: `decision-defaulted:invite-link=copyable-text-no-url-handler`, `decision-defaulted:world-access-default=open-until-opened-to-friends`.
-- Contract: opening makes the gate (lpw-12) listen on the chosen interface as well, with the same route allow-list and issuer rule; the `Origin` rule admits a joiner's page by the operator's transport rule (plaintext `ws:` only to loopback and private-range addresses). The host stays on loopback. Joiners use kind `private`.
+- Contract: opening makes the gate (lpw-12) listen on the chosen interface as well, with the same route allow-list and issuer rule; beyond loopback it serves only TLS with the world's certificate (lpw-18), and the `Origin` rule admits a joiner's page served by the gate itself or the app's own scheme. The host stays on loopback. Joiners use kind `private`.
 
 - **lpw-14.1:** WHEN the player asks to open a world whose rule is still the default `Open`, THE SYSTEM SHALL ask the host to choose `Open` or `Password` first and open nothing until they do.
 
@@ -528,10 +549,9 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 
 - **lpw-14.4:** WHEN the player closes the world to friends, THE SYSTEM SHALL stop listening beyond loopback and close every connection that came in that way, upgraded WebSockets included, while the host's own player keeps playing.
 
-- **lpw-14.5:** WHEN a player copies the invite, THE SYSTEM SHALL produce the world's `uri` and `db` as text that lpw-11's address form accepts as kind `private`.
+- **lpw-14.5:** WHEN a player copies the invite, THE SYSTEM SHALL produce the world's `wss:` `uri`, `db` and certificate fingerprint as text that lpw-11's address form accepts as kind `private`.
 
-- **lpw-14.6:** WHEN a shell document names a `ws:` uri whose host is not a loopback address or a private-range address (RFC 1918 IPv4, IPv6 ULA `fc00::/7`), THE CLIENT SHALL refuse the document with a named error and open no connection, and SHALL accept the same host over `wss:`.
-- DoD: lpw-14.1 to lpw-14.6 green; the milestone's one e2e flow (create, play, quit, reopen, open to a friend, the friend joins, close) green in `desktop/e2e/friends.spec.ts`.
+- DoD: lpw-14.1 to lpw-14.5 green; the milestone's one e2e flow (create, play, quit, reopen, open to a friend, the friend joins, close) green in `desktop/e2e/friends.spec.ts`.
 
 ### lpw-15 — sign in once to bind a world; the account check and the allowlist
 
@@ -575,15 +595,20 @@ blocked: licence — transitively, through lpw-14; and account-service, transiti
 ### lpw-17 — a standalone server package
 
 type: feature · tier: hard
-touches: desktop/src/serverCli.ts, desktop/src/serverCli.test.ts, desktop/package.json, docs/hosting.md
+touches: desktop/src/serverCli.ts, desktop/src/serverCli.test.ts, desktop/src/acme.ts, desktop/src/acme.test.ts, desktop/e2e/acme.spec.ts, desktop/package.json, docs/hosting.md
 after: [lpw-14]
 blocked: licence — as lpw-12, and transitively operator-steam-machine; fallback: a host installs SpacetimeDB themselves and follows `docs/hosting.md` to publish the module and run the gate.
 - Residuals: R-lpg-0-ISSUERFETCH (standalone half), R-sr-4b-NOTE505D57 (the package's publish path).
-- Contract: a headless command built from the same `worlds.ts`, `publish.ts`, `host.ts` and `hostGate.ts` as the shell, distributed outside the Steam store; `docs/hosting.md` is the host's guide (install, access rule, backup without the owner token, upgrade).
+- Contract: a headless command built from the same `worlds.ts`, `publish.ts`, `host.ts` and `hostGate.ts` as the shell, distributed outside the Steam store; `docs/hosting.md` is the host's guide (install, access rule, backup without the owner token, upgrade, and the three ways to serve TLS: a domain name the command certifies itself, the host's own certificate or reverse proxy, or the world's self-signed certificate and its fingerprint). `acme.ts` obtains and renews a certificate over ACME (HTTP-01 on port 80, or TLS-ALPN-01 on 443); its tests run against Pebble, the ACME test server, never a public CA.
 
 - **lpw-17.1:** WHEN a host runs the standalone command to create, start or upgrade a world, THE SYSTEM SHALL do what the shell does for the same step, with the same gate and access rule.
 
 - **lpw-17.2:** WHEN a host backs up and restores a world as `docs/hosting.md` describes, THE SYSTEM SHALL restore every row (a test restores a backup into a fresh directory and compares).
 
 - **lpw-17.3:** WHEN the standalone host runs idle with nobody connected, measured by `docs/local-play.md` §7's method, THE SYSTEM SHALL stay within the friends-server idle budget (1.0 % of one thread, §6), and a number over budget is a failure unless a `docs/DECISIONS.md` entry raises it.
-- DoD: lpw-17.1 to lpw-17.3 green; `just desktop-test` green.
+- **lpw-17.4:** WHEN a host gives the standalone command a domain name, THE SYSTEM SHALL obtain a certificate for it over ACME, serve `wss:` and `https:` with it, and renew it before it expires without a restart.
+
+- **lpw-17.5:** WHEN a host gives a certificate and key path instead, THE SYSTEM SHALL serve those, and WHEN the host gives neither, THE SYSTEM SHALL serve the world's self-signed certificate (lpw-18) and print its fingerprint with the invite.
+
+- **lpw-17.6:** WHEN certificate issuance or renewal fails, THE SYSTEM SHALL keep serving the last valid certificate, log the failure, and never fall back to plaintext beyond loopback.
+- DoD: lpw-17.1 to lpw-17.6 green; `just desktop-test` and `just desktop-e2e` green.
