@@ -40,91 +40,126 @@ deleted and never counts toward a playtest gate, and an empty `## Slices` means 
 
 ## Slices
 
-### st-8 — game-core content: the single-string `parse_*` wrappers leave the API
-type: refactor · tier: routine
-touches: game-core/src/content.rs, game-core/src/lib.rs, game-core/src/taming/rules_tests.rs, game-core/src/combat/ability_tests.rs, game-core/src/combat/weather_tests.rs
+### st-11 — client shell: the message sinks get an owner
+type: refactor · tier: hard
+touches: client/src/main.ts, client/src/shell/feedback.ts, client/src/shell/feedback.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, client/src/ui/i18n/catalogParity.test.ts, client/src/ui/statusModel.test.ts, client/src/net/oidc.test.ts, docs/refactors/client-shell.md, ARCHITECTURE.md, docs/DECISIONS.md
 after: []
 
-From the M-econ-onboarding elaboration census (`mr-prune census`, game `9fb5bd25`; callers
-re-measured at `5fdc4712`). Ten `pub` wrappers in `game-core/src/content.rs` — `parse_shops`,
-`parse_heal_locations`, `parse_quest_defs`, `parse_npc_defs`, `parse_zones`,
-`parse_dialogue_trees`, `parse_evolution_paths`, `parse_encounters`, `parse_species`,
-`parse_abilities` — are re-exported from `game-core/src/lib.rs` and called only by tests: the
-`content.rs` test module, `taming/rules_tests.rs`, `combat/ability_tests.rs` and
-`combat/weather_tests.rs`. Every one has a `*_parts` form, which the loaders use. The wrappers and
-their re-exports are removed; each caller passes the same RON to the `*_parts` form as one part.
-A test whose only subject is a wrapper itself goes under `standards/testing-tdd.md` "Deleting a
-check", naming the `*_parts` test that survives it.
+Extraction 4 of `docs/refactors/client-shell.md`, an ownership change.
+`client/src/shell/feedback.ts` is created and takes `route`, `reportError`, `showToast`,
+`paintToast`, `tickToast`, `setWorldHint`, `topHint`, `hintOnMenu`, `paintWorldHint`,
+`resetFeedbackSinks`, `announceNow`, `dismissErrorToast`, `pushError`, `reportPaintError`,
+`eventRing`, `errorRing`, `liveRegion`, `MOVE_REJECT_PREFIX` and the bindings `statusEl`,
+`toastChrome`, `toastState`, `worldHints`, `saidHint`, `menuHint`, `statusNotice`,
+`announcedSinceFrame`, `lastA11ySnapshot`, `toastDismissedSeq`, `handlingError` and
+`lastPaintErrorMessage`. It imports only `shell/views.ts` among the shell modules. Three
+writers sit outside it, each per the plan's "Ports", "Pumps" and "Owners": the hint-host port
+(`hintOnMenu` reads whether the main menu is the top frame, `paintWorldHint` repaints the menu)
+is installed by `main.ts` at module scope before its first listener; `main()` mounts
+`statusEl` and `toastChrome` through owner functions; and the announcement edge and notice step
+of the frame loop become one pump owned by `feedback.ts`, called from the frame loop in the
+same position with the parameter object the plan names (the top overlay, the line
+`pumpStillThere` returned, the world-edge focus return). The `onReconnect` reset of
+`statusNotice` becomes an owner call. The `error` and `unhandledrejection` listeners stay
+registered in `main.ts` in their place in "Registration order" (rule 4).
 
-The M-econ-onboarding close census (`mr-prune close`, game `cee8c4f2`) routes these ten rows here
-and one more: `clamp_position` in `game-core/src/lib.rs`, a `pub fn` that only its own test
-`clamp_position_bounds` calls. It is a candidate: the build confirms that no production file or
-other crate names it, then removes it with that test (the surviving check is the compiler: the
-test's subject is gone), or keeps it and names the caller it found in the PR body.
+Pins, from the plan's "Tests and docs that follow the code": `client/src/ui/i18n/catalogParity.test.ts`
+pins `main.ts` as the resolver of `a11y.world.region`, which the announcement edge resolves; the
+key is pinned on `feedback.ts`, the roster of files that import the resolver gains the module,
+and the two-binding proof moves to a file that still imports both `t` functions, with the union
+of resolved keys unchanged. The tester makes that edit. Comments that name `main.ts` as the home
+or caller of a moved symbol are re-pointed: `client/src/ui/statusModel.test.ts`,
+`client/src/net/oidc.test.ts`, `client/src/ui/i18n/catalogParity.test.ts` (measured at
+`16e2cb3c`). `docs/DECISIONS.md` "Four message channels, chosen by one policy table" names
+`main.ts`'s sinks and is rewritten in place to name `shell/feedback.ts`. Covering tests:
+`client/src/main.feedbackCore.test.ts`, `client/src/main.feedbackI18n.test.ts`,
+`client/src/main.frameErrorWiring.test.ts`, `client/src/main.a11yFocus.test.ts` and the other
+`client/src/main.*.test.ts` suites.
 
-- **ST8.1:** WHEN `cargo nextest run -p game-core` runs IT SHALL pass, with no assertion edited
-  other than a re-pointed call.
-- **ST8.2:** WHEN `just ci` runs on the slice's head IT SHALL pass.
+- **ST11.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites run THEY SHALL pass with every assertion unedited.
+- **ST11.2:** WHEN the client's full vitest suite runs IT SHALL pass, with
+  `client/src/ui/i18n/catalogParity.test.ts` asserting the same union of resolved keys.
 
-Confirmed in the diff at merge, not by a criterion: none of the ten names is declared or
-re-exported; every deleted test names its survivor in the PR body; `clamp_position` is declared
-nowhere, or the PR body names the caller that keeps it.
+Confirmed in the diff at merge, not by a criterion: the names above are declared in
+`shell/feedback.ts` and nowhere in `main.ts`; each binding is assigned only inside the owner;
+`feedback.ts` imports no shell module but `views`, registers nothing on `store`, `window` or
+`document`, and resolves no catalog string at module scope; the frame loop calls the pump where
+the edge and the step stood; its plan line is gone.
 
-### st-9 — server raising: the test-only `HEAL_COOLDOWN_MS` constant goes
-type: refactor · tier: routine
-touches: server-module/src/raising.rs, server-module/src/raising_tests.rs
-after: []
+### st-12 — client shell: the server link gets an owner
+type: refactor · tier: hard
+touches: client/src/main.ts, client/src/shell/session.ts, client/src/shell/session.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, docs/refactors/client-shell.md, ARCHITECTURE.md, docs/DECISIONS.md
+after: [st-11]
 
-From the M-identity-handles elaboration census (`mr-prune census`, game `9fb5bd25`; re-measured
-at `5fdc4712`). `pub(crate) const HEAL_COOLDOWN_MS` in `server-module/src/raising.rs` is read
-only by the `evaluate_heal` boundary cases in `raising_tests.rs`, which pass it as the
-`cooldown` argument. The constant is removed. Those cases keep their boundary values (elapsed ==
-cooldown is allowed, one ms short is refused, a clock that runs backwards is refused) with a
-cooldown local to the test module.
+Extraction 5 of `docs/refactors/client-shell.md`, an ownership change.
+`client/src/shell/session.ts` is created and takes `store`, `identity`, `conn`,
+`hydratedSinceReconnect`, `resolveReady`, `ready`, `sessionGateBlocks`, `liveReducers`,
+`privacyLinkLive`, `sendGuarded`, `SEND_REJECT_KIND`, `SendWhere`, `battleEmit`,
+`lastOwnRating` and the two batch listeners that step the battle and ranked emit latches. It
+imports only `shell/config.ts` and `shell/feedback.ts` among the shell modules. Writers outside
+it become owner functions per the plan's "Owners": `main()` mounts `conn`; `onReady` and
+`onReconnect` set `identity` (event); `onHydrated` and `onReconnect` set
+`hydratedSinceReconnect` (event); `onReconnect` arming the reseed writes `battleEmit` (event);
+`resetPredictionState` resets `battleEmit` and `lastOwnRating` (reset). The two emit-latch
+listeners keep their place as item 12 of "Registration order": their bodies move to the owner
+as named exports and `main.ts` registers them by name (rule 4). `store` is constructed at the
+owner's import (rule 5) and is used through its own methods.
 
-- **ST9.1:** WHEN `cargo nextest run -p monster-realm-module` runs IT SHALL pass, and the three
-  `evaluate_heal` boundary cases SHALL still assert the same outcomes.
-- **ST9.2:** WHEN `just ci` runs on the slice's head IT SHALL pass.
+Pins: none in the plan's table for this line. `client/src/net/connection.test.ts` reads
+`main.ts` for `applyClaim` and three absence checks; `applyClaim` moves with `account.ts`, so
+the file is not edited here. Comments that name `main.ts` as the home of a moved symbol are
+re-pointed: `client/src/main.battle-reseed.test.ts` and `client/src/main.privacyCountdown.test.ts`
+(`sessionGateBlocks`; measured at `16e2cb3c`). None of the moved bodies resolves a catalog key at
+`16e2cb3c`; a build that finds one adds `client/src/ui/i18n/catalogParity.test.ts` under the
+plan's row for it. `docs/DECISIONS.md` "Four message channels, chosen by one policy table" is
+re-pointed wherever it still names `main.ts` for `sendGuarded`'s refusal routing. Covering
+tests: `client/src/main.battle-reseed.test.ts`, `client/src/main.reconnectStack.test.ts`,
+`client/src/main.privacyCountdown.test.ts`, `client/src/main.boot.test.ts` and the other
+`client/src/main.*.test.ts` suites; `client/src/net/connection.runtime.test.ts` covers the link
+itself and is not edited.
 
-Confirmed in the diff at merge, not by a criterion: `HEAL_COOLDOWN_MS` is declared nowhere.
+- **ST12.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites run THEY SHALL pass with every assertion unedited.
+- **ST12.2:** WHEN the client's full vitest suite runs IT SHALL pass.
 
-### st-10 — M-trade-sessions: twin tests and unreached symbols from the close census
-type: refactor · tier: routine
-touches: client/src/input/glyphs.test.ts, client/src/input/glyphs.ts, client/src/ui/controlsModel.test.ts, client/src/ui/controlsView.test.ts, client/src/ui/feedbackPolicy.test.ts, client/src/ui/feedbackPolicy.ts, client/src/ui/overlayRegistry.test.ts, client/src/ui/overlayRegistry.ts
-after: []
+Confirmed in the diff at merge, not by a criterion: the names above are declared in
+`shell/session.ts` and nowhere in `main.ts`; `identity`, `conn`, `hydratedSinceReconnect`,
+`battleEmit` and `lastOwnRating` are assigned only inside the owner; the emit-latch listeners
+are still registered by `main.ts` as item 12; its plan line is gone.
 
-`mr-prune close` listed these rows for `M-trade-sessions` at `0e7a089de2e46fbad06b1c83b170878de3a6940c`.
-Each is a candidate, never a reason to delete (`standards/testing-tdd.md` §Deleting a check
-is legitimate). The run that builds this section reads each pair and each symbol's tests
-first and removes only the rows it confirms. A row it does not confirm stays, with its
-reason in the PR body; a pair kept on purpose is recorded with `mr-prune keep`. A twin's
-candidate is deleted and its survivor stays; a symbol is deleted with the tests that reach
-only it. Each deleted test has a `moved-tests:` row in the PR body. A name below is a JSON
-string. The census's fourth row, `game-core/src/combat/resolve.rs` :: "resolve_player_swap", is
-not here: `docs/refactors/combat-carried-rules.md` removes it in its extraction line 3.
+### st-13 — client shell: what a screen adapter reads gets an owner
+type: refactor · tier: hard
+touches: client/src/main.ts, client/src/shell/screenContext.ts, client/src/shell/screenContext.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, client/src/render/motionPreference.ts, docs/refactors/client-shell.md, ARCHITECTURE.md
+after: [st-12]
 
-- `client/src/input/glyphs.ts` :: "resetLearnedKeys"
-  - reason: a symbol no production file names
-  - surviving check: the compiler, and the suites that still run
-  - confirmed at merge: the supervisor, who is not the tester that made the deletion, checks that `mr-prune census` on the PR base lists the symbol under `orphans`, and reads the `moved-tests:` rows of the tests removed with it from `client/src/input/glyphs.test.ts`, `client/src/ui/controlsModel.test.ts`, `client/src/ui/controlsView.test.ts`
-- `client/src/ui/feedbackPolicy.ts` :: "MESSAGE_KINDS"
-  - reason: a symbol no production file names
-  - surviving check: the compiler, and the suites that still run
-  - confirmed at merge: the supervisor, who is not the tester that made the deletion, checks that `mr-prune census` on the PR base lists the symbol under `orphans`, and reads the `moved-tests:` rows of the tests removed with it from `client/src/ui/feedbackPolicy.test.ts`
-- `client/src/ui/overlayRegistry.ts` :: "OverlayHandles"
-  - reason: a symbol no production file names
-  - surviving check: the compiler, and the suites that still run
-  - confirmed at merge: the supervisor, who is not the tester that made the deletion, checks that `mr-prune census` on the PR base lists the symbol under `orphans`, and reads the `moved-tests:` rows of the tests removed with it from `client/src/ui/overlayRegistry.test.ts`
+Extraction 6 of `docs/refactors/client-shell.md`, an ownership change.
+`client/src/shell/screenContext.ts` is created and takes `screenCtx`, `motionPreference`,
+`boundShopId`, `boundHealLocationId`, `boundSocialTab`, `boundMonstersTab` and
+`boundTradeSessionId`. The plan's line and its "Owners" row name `boundProposeTarget`, which
+`main.ts` no longer declares: ts-3 (#730) replaced it with `boundTradeSessionId`, the binding
+`screenCtx.tradeSessionId` reads at `16e2cb3c`. The slice takes `boundTradeSessionId` and
+corrects the plan's row: its writers are `openTradeEditor` (event), `resetTradeSessionState`
+(reset) and the batch listener that drops a closed session (event). It imports only
+`shell/inputState.ts` and `shell/session.ts` among the shell modules. The other writers become
+owner functions per the plan: `openPendingShop`, `runInteract`, `openSocial` and
+`openMenuTarget` bind (event), and `main` clears (reset). `motionPreference` is constructed at
+the owner's import and keeps the one listener a shell module's scope may create, the media-query
+listener, which still registers before the first batch listener (rule 5). `screenCtx`'s getters
+read the owner's bindings through the live imports (rule 1).
 
-Pins: none known. Before the first edit the run looks for tests that read a listed file
-as text, and for `.cargo/mutants.toml` entries and bench budgets that name a removed
-symbol; each is disposed of under `standards/testing-tdd.md` §Behavior-preserving changes.
-A removed symbol can still be named outside `touches:`: by a `use` or a re-export, a bench,
-a test file the census does not read, or another symbol that only tests reach. The
-compiler finds each. A row whose removal needs a file or a symbol not listed here stays,
-with that reason in the PR body.
+Pins: none in the plan's table. The comment in `client/src/render/motionPreference.ts` that
+names `main.ts` as the caller of `motionPreferenceFromWindow` is re-pointed (measured at
+`16e2cb3c`). Covering tests: `client/src/main.reducedMotionWiring.test.ts`,
+`client/src/main.shopBalance.test.ts`, `client/src/main.social.test.ts`,
+`client/src/main.dispatch.test.ts` and the other `client/src/main.*.test.ts` suites; the
+`client/src/ui/screens/*.boot.test.ts` suites read `screenCtx` through the screens they boot.
 
-- **ST10.1:** WHEN the client is type-checked and its vitest suites run THEY SHALL pass.
+- **ST13.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites run THEY SHALL pass with every assertion unedited.
+- **ST13.2:** WHEN the client's full vitest suite runs IT SHALL pass.
 
-Confirmed in the diff at merge, not by a criterion: each deleted test has its
-`moved-tests:` row, and the run removed no row it did not confirm.
+Confirmed in the diff at merge, not by a criterion: the seven names are declared in
+`shell/screenContext.ts` and nowhere in `main.ts`; each `bound*` binding is assigned only
+inside the owner; the media-query listener still registers before the first batch listener;
+the plan's line is gone and its `boundProposeTarget` row names `boundTradeSessionId`.
