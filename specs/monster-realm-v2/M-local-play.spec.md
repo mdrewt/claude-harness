@@ -895,6 +895,36 @@ after: []
 - **lpw-38.3:** WHEN the design is recorded, THE SYSTEM SHALL show, by a throwaway probe on crate 2.12.0, that the chosen alternative links the server-module test binary, with the count of tests that pass and the name of each that does not.
 - DoD: lpw-38.1 to lpw-38.3 met; the plan merged; a `docs/DECISIONS.md` entry for the test host's design; lpw-39's `touches:` and `moved-tests:` written into the PR body for the supervisor to copy here.
 
+Build note (lpw-38): Under lpw-38's chosen design the crates spacetimedb and
+spacetimedb-bindings-sys become path packages (vendor/, [patch.crates-io]), and cargo audit 0.22.2
+(rustsec 0.33, query_vulnerabilities) skips every package not sourced from crates.io, so CI's
+blocking SCA step stops covering those two crates once lpw-39 merges. No advisory exists for them
+today (OSV and GitHub, 2026-11-22). A slice cannot edit .github/workflows/ci.yml; the step needed is
+a cargo audit over a lockfile naming the two crates at their vendored versions with a crates.io
+source. Until then the upgrade runbook checks their advisories at each hop (lpw-39 writes that
+step).
+
+Build note (lpw-38): lpw-39's DoD says the plan file is updated to the built state, while
+standards/spec-driven.md says the slice that makes a design's last extraction deletes its plan file.
+lpw-38's file list follows lpw-39's DoD (the plan, docs/refactors/native-test-host.md, is brought to
+the built state), because the plan holds the measurements behind the docs/DECISIONS.md entry and
+lpw-34's later hops re-apply its patch. The supervisor may settle which rule binds before copying
+lpw-39's touches.
+
+Build note (lpw-38): For lpw-35 (a world's server checks a player's account itself, by procedures):
+under lpw-38's chosen test host the vendored spacetimedb keeps its native-only ProcedureContext
+branches (2.12.0 src/lib.rs:1563, :1609, :1808 panic; src/http.rs:559 returns an error), so a native
+test of a procedure needs the same kind of cfg edit in vendor/native-host.patch plus procedure_*
+host functions in native_host_tests.rs. The docs/DECISIONS.md entry 'Server-module tests run on our
+own host ABI, over the two vendor crates patched where they refuse a native host' allows exactly
+that. lpw-35's design should count those files.
+
+Build note (lpw-38): SDK 2.12.0's token-rejection message carries the HTTP status
+(dist/index.mjs:5219: 'Failed to verify token: ${status} ${statusText}').
+client/src/net/authToken.ts never deletes a stored token on one rejection because the 2.11.0 message
+could not tell a 401 from a transient 5xx. That reason stops holding at 2.12.0. lpw-39 keeps the
+behaviour, since it is a refactor. A later slice may let a 401 count differently from a 5xx.
+
 ### lpw-39 — the native test host moves to the host lpw-38 chose, with the Fixture's API kept
 
 type: refactor · tier: hard
