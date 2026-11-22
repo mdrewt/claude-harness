@@ -175,6 +175,24 @@ list it in `after:`. Each extraction slice deletes its own line from the plan
 file and brings `ARCHITECTURE.md` in line with the structure it leaves; the
 slice that makes the last extraction deletes the plan file.
 
+**A docs slice rewrites documentation and nothing else.** It is marked
+`type: docs · tier: routine`, and exists so that documentation work is a
+section the loop builds, never a sentence that waits to be remembered. It
+changes no code, test, recipe or generated file, so it has no red run, no
+tester and `moved-tests: none`. Its `touches:` are documents, and it runs alone
+against any document it rewrites: its `after:` names every open slice whose
+section says it rewrites an entry or section in its range; any other edit to
+the same document is left to that slice and absorbed when the docs slice
+rebases on the default branch before its PR opens. A `reviewer` reads the whole diff against the code and
+answers three questions for every entry or section changed: is each reason and
+each "rules out" clause still stated, or its removal named in the PR with the
+reason; does every fact kept match the code today; is everything moved out
+present where the PR says it went. Its PR title is `docs(<scope>): <slice id> —
+<what was rewritten>`, and the PR body carries a `moved:` row per relocated
+passage (`from -> to`). Its criteria are checked by reading, recorded as
+citations, never by a script that measures prose. Whoever merges reads the
+reviewer's answers against the diff.
+
 **What still goes to the operator:** a change to persisted data, the schema or
 the wire format; to gameplay or anything a player sees; to the security or
 privacy posture; to a cost ceiling; or anything git cannot undo. A refactor
