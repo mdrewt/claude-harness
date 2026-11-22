@@ -635,3 +635,24 @@ after: [lpw-15]
 
 - **lpw-21.5:** WHEN the owner changes the rule from `Allowlist` to `Open` or `Password`, THE SYSTEM SHALL admit exactly as lpw-9 defines for that rule, the list unread until the rule is `Allowlist` again.
 - DoD: lpw-21.1 to lpw-21.5 green; `just ci` green; the game's `docs/DECISIONS.md` allowlist entry amended.
+
+### lpw-22 — a player erases and reads their own world binding without the host
+
+type: feature · tier: hard
+touches: server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/lib.rs, evals/baselines/client-callable-reducers.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/unbind_world_account_reducer.ts
+after: [lpw-15, lpw-21]
+- Decision: operator, 2026-11-22, monster-realm#847. In a world we do not operate, a player erases their own binding by a reducer and reads it through the owner-scoped view lpw-15 already ships; keep what a world holds about accounts and identities minimal and secure. No new table, column or export machinery (export is data about the person through simple queries on existing tables).
+- Contract: `unbind_world_account()` deletes the caller's `world_binding` row and any outstanding nonce for `ctx.sender()`, and nothing else; on an official build it is refused with no write (lpw-8 (b)). It is the one reducer the access rule does not gate, so a player the host has removed can still erase their link. The game's `docs/DECISIONS.md` world-binding entry (written by lpw-15) is amended in place to state this.
+
+- **lpw-22.1:** WHEN a bound identity calls `unbind_world_account` in a `local` or `private` world, THE SYSTEM SHALL delete that identity's binding and outstanding nonce and write nothing else.
+
+- **lpw-22.2:** WHEN the caller has no binding, THE SYSTEM SHALL succeed with no write.
+
+- **lpw-22.3:** WHEN the world's rule (`Open`, `Password` or `Allowlist`) refuses the caller, including an account the owner removed from the list, THE SYSTEM SHALL still run `unbind_world_account` for that caller.
+
+- **lpw-22.4:** WHEN `unbind_world_account` runs on an official build, THE SYSTEM SHALL refuse it with no write.
+
+- **lpw-22.5:** WHEN an identity reads the owner-scoped binding view, THE SYSTEM SHALL return only that identity's own binding, and after lpw-22.1 none.
+
+- **lpw-22.6:** WHEN an unbound identity later calls `join_game` on an enforcing build, THE SYSTEM SHALL refuse it as lpw-15.7 defines, until it binds again.
+- DoD: lpw-22.1 to lpw-22.6 green; `just ci` green, `bindings-drift` clean; the game's `docs/DECISIONS.md` world-binding entry amended.
