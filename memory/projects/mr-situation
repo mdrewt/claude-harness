@@ -54,8 +54,13 @@ def ghdecisions():
     rows=[]
     for repo in ("mdrewt/monster-realm","mdrewt/claude-harness"):
         rc,so,se=run(f"gh issue list -R {repo} --label decision --state open -L 100 --json number,title,comments", 25)
-        if rc!=0: return "error:gh:"+se[:100]
-        for i in sorted(json.loads(so or "[]"), key=lambda i: i["number"]):
+        try:
+            if rc!=0: raise ValueError("gh:"+se[:100])
+            issues=sorted(json.loads(so or "[]"), key=lambda i: i["number"])
+        except Exception as e:
+            # One repo's failure does not hide the other's rows.
+            rows.append({"repo":repo,"error":str(e)[:120]}); continue
+        for i in issues:
             ans=[c for c in i.get("comments",[]) if (c.get("author") or {}).get("login")=="mdrewt"
                  and not (c.get("body") or "").lstrip().startswith("<!--mr-system-->")]
             rows.append({"repo":repo,"issue":i["number"],"title":(i.get("title") or "")[:100],

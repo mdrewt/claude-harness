@@ -81,6 +81,8 @@ esac
     writeFileSync(path.join(root, `list.${repo.replace('/', '_')}.json`), JSON.stringify(issues));
   }
   const env = { ...process.env, PATH: `${bin}:/usr/bin:/bin`, HOME: root };
+  // A caller's own switch must not turn the watcher under test off.
+  delete env.MR_NO_EVENT_BRIDGE;
   return { root, mem, env };
 }
 
@@ -116,16 +118,23 @@ test('the bundle lists each open decision issue and whether the operator answere
   ]);
 });
 
-test('the bundle says so when the decision issues cannot be listed', () => {
+test("a repo whose decision issues cannot be listed is an error row beside the other repo's rows", () => {
   const box = sandbox('mr-situation');
-  writeFileSync(path.join(box.root, 'list.mdrewt_monster-realm.json'), 'not json');
+  writeFileSync(path.join(box.root, 'list.mdrewt_claude-harness.json'), 'not json');
   const out = execFileSync('bash', [path.join(box.mem, 'mr-situation'), '--fresh'], {
     env: box.env,
     encoding: 'utf8',
   });
   const decisions = JSON.parse(out).open_decisions;
-  assert.equal(typeof decisions, 'string');
-  assert.match(decisions, /^error:/);
+  assert.deepEqual(
+    decisions.map((row) => [row.repo, row.issue ?? null, typeof row.error]),
+    [
+      ['mdrewt/monster-realm', 11, 'undefined'],
+      ['mdrewt/monster-realm', 12, 'undefined'],
+      ['mdrewt/monster-realm', 13, 'undefined'],
+      ['mdrewt/claude-harness', null, 'string'],
+    ],
+  );
 });
 
 test('the watcher records an answer although the directory it started in is gone', () => {
