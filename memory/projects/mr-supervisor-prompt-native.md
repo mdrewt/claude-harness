@@ -105,7 +105,9 @@ UNKNOWN → proceed + record a BLOCKER.
    (on ASK-DREW-UNAVAILABLE write `$MEM/.blocked-on-human` with a `wake_file=<path>` line).
    REVERSIBLE choices take the documented default (internal design → a `type: design`
    slice), recorded as `decision-defaulted:<q>=<choice>`,
-   and PROCEED. On consuming a decision answer, CLOSE its issue with a comment starting
+   and PROCEED. An `open_decisions` entry of the bundle with `answered: true` is an answer
+   nothing has consumed: consume it this tick, before any launch (write it into the spec or
+   `docs/DECISIONS.md` by PR, then close). On consuming a decision answer, CLOSE its issue with a comment starting
    `<!--mr-system-->`. Game decisions → issues on monster-realm; loop/process → claude-harness.
    **Kill-switch provenance:** the hold flag = `$MEM/.native-supervisor-disabled`, managed ONLY
    via `mr-hold` (never create/touch/chmod/mv/rm/redirect it). Unattributed = OPERATOR = never
