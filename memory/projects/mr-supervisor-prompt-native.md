@@ -87,7 +87,7 @@ UNKNOWN → proceed + record a BLOCKER.
    `unpromoted` one is promoted first (`mr-gates residuals promote` → section in `residuals.spec.md`
    → `mr-record queue-add`; ship as a doc-only chore PR; that is the tick's action). Else the
    **structural share**: none of the last 10 `<type>(<scope>): <slice> — …` subjects on `$PROJ`
-   `origin/master` is a `refactor(` → launch `structure.spec.md`'s first unbuilt non-`blocked:`
+   `origin/master` is a `refactor(` or a `docs(` naming a slice → launch `structure.spec.md`'s first unbuilt non-`blocked:`
    slice whose `after:` is built and quiet window clear; none unbuilt but a
    `$PROJ/docs/refactors/` plan lists extractions → section the next three (doc-only chore PR =
    the tick's action). Else the oldest bundle `closable_milestones[]` entry → launch its
@@ -170,7 +170,8 @@ around (push the harness before spawning a harness slice).
   `type: refactor` PR: audit `--tier hard`, read the test diff — no assertion edited, no mock
   added, each `moved-tests:` survivor present at head; merge with
   `--subject 'refactor(<scope>): <slice> — … (#N)'` (`type: design`: audit `--doc-only`, read the
-  plan vs the code, subject `docs(design): <slice> — …`). Genuine
+  plan vs the code, subject `docs(design): <slice> — …`; `type: docs`: audit `--doc-only`, read the
+  reviewer's three answers against the diff, subject `docs(<scope>): <slice> — …`). Genuine
   weakening → BLOCKER + next target = revert/fix; a legitimate deletion proceeds with your
   one-line verdict in the ledger notes.
 - **`mr-gates verify --slice S --json`** (ADVISORY — adjudicate, never rubber-stamp): mr-audit

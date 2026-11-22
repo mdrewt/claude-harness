@@ -2,7 +2,7 @@
 
 The standing backlog of structural work on the game repo: moves, extractions and interface
 changes that leave behaviour unchanged, and the design slices that decide how. Every section is
-a `type: refactor` or `type: design` slice bound by `standards/spec-driven.md` §Refactor slices,
+a `type: refactor`, `type: design` or `type: docs` slice bound by `standards/spec-driven.md` §Refactor slices,
 in build order. This file is standing: it is never
 deleted and never counts toward a playtest gate, and an empty `## Slices` means nothing is open.
 
@@ -23,10 +23,11 @@ deleted and never counts toward a playtest gate, and an empty `## Slices` means 
   doc-only PR that edits this file. Ids are never reused.
 - **Section shape:** heading `### st-<n> — <title>`; then the lines
   `type: refactor · tier: routine` (a move), `type: refactor · tier: hard` (an interface or
-  ownership change) or `type: design · tier: hard`, `touches:`, `after: [...]`, and `blocked: <reason>` while an operator
+  ownership change) `type: design · tier: hard` or `type: docs · tier: routine`, `touches:`, `after: [...]`, and `blocked: <reason>` while an operator
   decision is open; then what moves (exported symbols, never line numbers), each pin with its
   disposition, the tests that already cover the moved behaviour, and id-led `SHALL` criteria
-  whose checks are test-runner invocations.
+  whose checks are test-runner invocations (a `type: docs` section moves no code: its criteria
+  are checked by reading, per `standards/spec-driven.md`).
 - **`touches:`** names the source and destination files literally and test families as globs
   with a literal directory prefix (`client/src/main.*.test.ts`), never a bare directory. An
   extraction sectioned from a plan file also lists that plan file and `ARCHITECTURE.md`, and its
@@ -163,3 +164,87 @@ Confirmed in the diff at merge, not by a criterion: the seven names are declared
 `shell/screenContext.ts` and nowhere in `main.ts`; each `bound*` binding is assigned only
 inside the owner; the media-query listener still registers before the first batch listener;
 the plan's line is gone and its `boundProposeTarget` row names `boundTradeSessionId`.
+
+### st-14 — decision log: foundations and rules
+
+type: docs · tier: routine
+touches: docs/DECISIONS.md, ARCHITECTURE.md
+after: [lpw-27]
+- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "One repository, one cargo workspace" to "Tactical content lives in sidecar registries keyed by id", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
+
+- **st-14.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
+
+- **st-14.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
+- DoD: st-14.1 and st-14.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
+
+### st-15 — decision log: server authority, privacy, zones and sessions
+
+type: docs · tier: routine
+touches: docs/DECISIONS.md, ARCHITECTURE.md
+after: [st-14, lpw-26, lpw-29]
+- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Server authority: thin reducers in domain modules" to "World rows are subscribed by zone", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
+
+- **st-15.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
+
+- **st-15.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
+- DoD: st-15.1 and st-15.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
+
+### st-16 — decision log: prediction, movement input and scaling
+
+type: docs · tier: routine
+touches: docs/DECISIONS.md, ARCHITECTURE.md
+after: [st-15]
+- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Bounded client prediction" to "Integer pixel scaling", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
+
+- **st-16.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
+
+- **st-16.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
+- DoD: st-16.1 and st-16.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
+
+### st-17 — decision log: gameplay rules: evolution, trade, economy, battle
+
+type: docs · tier: routine
+touches: docs/DECISIONS.md, ARCHITECTURE.md
+after: [st-16]
+- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Evolution graph and the auto-evolve rule" to "Wild AI plans are a pure function of the public board", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
+
+- **st-17.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
+
+- **st-17.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
+- DoD: st-17.1 and st-17.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
+
+### st-18 — decision log: accounts, lifecycle, schema and operations
+
+type: docs · tier: routine
+touches: docs/DECISIONS.md, ARCHITECTURE.md
+after: [st-17, lpw-32, lpw-34, lpw-36]
+- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Accounts, guest identity and the claim flow" to "Observability: the module never times itself or calls out", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
+
+- **st-18.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
+
+- **st-18.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
+- DoD: st-18.1 and st-18.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
+
+### st-19 — decision log: client UI and rendering
+
+type: docs · tier: routine
+touches: docs/DECISIONS.md, ARCHITECTURE.md
+after: [st-18, lpw-30]
+- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Client UI: virtual buttons, one context stack, one overlay frame" to "The world post stack is `pixi-filters`, on the world layer only, planned from injected time", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
+
+- **st-19.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
+
+- **st-19.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
+- DoD: st-19.1 and st-19.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
+
+### st-20 — decision log: local play, access and the account service
+
+type: docs · tier: routine
+touches: docs/DECISIONS.md, ARCHITECTURE.md
+after: [st-19, lpw-35, lpw-37]
+- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "The connection target is run-time configuration: a shell document set before the client module runs" to the last entry of the file, in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
+
+- **st-20.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
+
+- **st-20.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
+- DoD: st-20.1 and st-20.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
