@@ -85,7 +85,9 @@ UNKNOWN → proceed + record a BLOCKER.
    **HIGH/CRITICAL residual in security-privacy or data-integrity** (`mr-gates residuals list
    --unclaimed --json`, oldest first); an
    `unpromoted` one is promoted first (`mr-gates residuals promote` → section in `residuals.spec.md`
-   → `mr-record queue-add`; ship as a doc-only chore PR; that is the tick's action). Else the
+   → `mr-record queue-add`; ship as a doc-only chore PR; that is the tick's action); a `targeted` one
+   is owned by its `promoted_slice` section — launch that slice here when ready, else carry on down (a
+   slice that is MERGED, sectionless or `blocked:` owns nothing: promote it as an `unpromoted` one). Else the
    **structural share**: none of the last 10 `<type>(<scope>): <slice> — …` subjects on `$PROJ`
    `origin/master` is a `refactor(` or a `docs(` naming a slice → launch `structure.spec.md`'s first unbuilt non-`blocked:`
    slice whose `after:` is built and quiet window clear; none unbuilt but a
@@ -130,7 +132,7 @@ retro-request events follow `$MEM/mr-retro-playbook.md`.
 
 ## Fan-out (≤ 4 in flight)
 
-Launch EVERY ready candidate passing ALL of: code/test `touches:` pairwise disjoint
+Launch EVERY ready candidate (bundle `ready_slices[]` hints them, not in priority order; re-verify) passing ALL of: code/test `touches:` pairwise disjoint
 (undeclared = colliding; mr-disjoint strips the doc set, adds widened files) · outside its
 always-serial structural set and any table/schema/migration (parallelize around it
 contract-first) · `after:` merged · `free -g` ≳ one full build free per launch · quiet window ·
@@ -189,7 +191,8 @@ around (push the harness before spawning a harness slice).
   restore the main checkout (labeled stash → `--ff-only`); `mr-unlock slice <S>`; remove merged worktrees/branches (keep
   parked / open-PR / `wip:`). `$MEM/mr-branch-audit`, not `--no-merged`, finds unmerged work.
 - Sandbox worktrees the finished run NAMED: `git worktree remove --force <path>`,
-  then `git worktree prune` — never bare `rm`, never one it did not name.
+  then `git worktree prune` — never bare `rm`, never one it did not name (`mr-clean-scratch --stale`
+  lists the rest, for the operator).
 - Milestone built (in `closable_milestones[]`) → `close-<milestone>`: routine, harness, doc-only,
   touches its spec F + PLAN.md + `structure.spec.md`. target_desc: `mr-gates notes fold` per slice,
   then `notes harvest --spec-file F` rc 0; lasting decisions present in the owning repo's
@@ -220,3 +223,4 @@ candidates not launched; `<why>` = overlap|structural|after|cap|budget|memory|qu
 - Racing ticks → mutex only. Orchestration depth = 1.
 - Worktree missing → `git worktree list` first (`git -C <missing> … | wc -l` fake-reads 0).
 - SIGHUP EXIT=129 → always `setsid` + assert detachment. One heredoc per shell input; timestamps inside python.
+- Liveness → bundle `locks[].alive`; a `ps` probe never prints `cmd`/`args` (a claude cmdline is its whole prompt): `ps -eo pid,ppid,etime,comm`.

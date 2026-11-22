@@ -297,32 +297,80 @@ def prune_close():
                             "action":"append to structure.spec.md in the doc-only PR that deletes %s.spec.md"%label})
     return entries
 out["prune_close"]=safe(prune_close,[])
-# A milestone spec still in the corpus whose every `### <id> — ` slice under `## Slices` has a
-# MERGED ledger row is built and waits for its close slice (oldest last merge first). Same slice grammar as mr-record's
-# prune-close hook; a spec with no slices section is never listed (nothing proves it built).
-def closable_milestones():
-    corpus=os.path.join(os.path.dirname(os.path.dirname(MEM)),"specs","monster-realm-v2")
-    merged={}
+CORPUS=os.path.join(os.path.dirname(os.path.dirname(MEM)),"specs","monster-realm-v2")
+def ledger_slices():
+    """(slice -> ts of its latest MERGED row, slice -> outcome of its latest row): MERGED rows are
+    what "built" means for both lists below."""
+    merged,last={},{}
     for l in open(os.path.join(MEM,"monster-realm-usage-ledger.jsonl"),errors="replace"):
         try: d=json.loads(l)
         except Exception: continue
-        if str(d.get("outcome") or "").upper().startswith("MERGED") and d.get("slice"): merged[d["slice"]]=max(merged.get(d["slice"],""),str(d.get("ts") or ""))
+        if not isinstance(d,dict) or not d.get("slice"): continue
+        o=str(d.get("outcome") or ""); t=str(d.get("ts") or "")
+        if o.upper().startswith("MERGED"): merged[d["slice"]]=max(merged.get(d["slice"],""),t)
+        if t>=last.get(d["slice"],("",))[0]: last[d["slice"]]=(t,o)
+    return merged,{k:v[1] for k,v in last.items()}
+def spec_slices(text):
+    """(ids in file order, fence-unclosed?) of the `### <id> — ` headings under `## Slices`,
+    outside code fences. Same slice grammar as mr-record's prune-close hook."""
+    ids,inside,fenced=[],False,False
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"): fenced=not fenced
+        if fenced: continue
+        if re.match(r"#{1,2}\s",line): inside=bool(re.match(r"##\s+Slices\s*$",line))
+        m=re.match(r"^###\s+(\S+)\s+—\s",line) if inside else None
+        if m and m.group(1) not in ids: ids.append(m.group(1))
+    return ids,fenced
+# A milestone spec still in the corpus whose every slice has a MERGED ledger row is built and waits
+# for its close slice (oldest last merge first); a spec with no slices section is never listed
+# (nothing proves it built).
+def closable_milestones():
+    merged=ledger_slices()[0]
     entries=[]
-    for name in sorted(os.listdir(corpus)):
-        p=os.path.join(corpus,name)
+    for name in sorted(os.listdir(CORPUS)):
+        p=os.path.join(CORPUS,name)
         if not name.endswith(".spec.md") or name in ("structure.spec.md","residuals.spec.md") or not os.path.isfile(p): continue
-        ids,inside,fenced=set(),False,False
-        for line in open(p,errors="replace").read(4<<20).splitlines():
-            if line.lstrip().startswith("```"): fenced=not fenced
-            if fenced: continue
-            if re.match(r"#{1,2}\s",line): inside=bool(re.match(r"##\s+Slices\s*$",line))
-            m=re.match(r"^###\s+(\S+)\s+—\s",line) if inside else None
-            if m: ids.add(m.group(1))
-        if ids and not fenced and ids<=set(merged):
+        ids,fenced=spec_slices(open(p,errors="replace").read(4<<20))
+        if ids and not fenced and set(ids)<=set(merged):
             entries.append({"milestone":name[:-len(".spec.md")],"spec":p,"slices":len(ids),
                             "last_merged":max(merged[i] for i in ids)})
     return sorted(entries,key=lambda e:e["last_merged"])    # oldest first
 out["closable_milestones"]=safe(closable_milestones,[])
+# The unbuilt slices a launch could take: no MERGED row, no run lock (live or awaiting reconcile),
+# no open `slice/<id>` PR, no `blocked:` line in its section, not `— SUPERSEDED` in its heading,
+# and every `after:` slice MERGED. Spec-name then file order, which is NOT priority; `last` is the
+# slice's latest ledger outcome (a PARKED one is a resume, not a fresh launch). A HINT for the
+# Pick-work and fan-out rules, which still decide. Section and `after:` grammar are mr-gates' own
+# (`section_of`, `AFTER_LINE`), loaded from the file beside this one; milestone- or PLAN-level
+# blocks are not read here. structure.spec.md slices are listed too; its own share rule picks them.
+def ready_slices():
+    import importlib.machinery, importlib.util, sys
+    sys.dont_write_bytecode=True    # mr-gates has no .py name; a cached .pyc would litter MEM
+    loader=importlib.machinery.SourceFileLoader("mr_gates_lib",os.path.join(MEM,"mr-gates"))
+    spec=importlib.util.spec_from_loader("mr_gates_lib",loader)
+    mrg=importlib.util.module_from_spec(spec); loader.exec_module(mrg)
+    merged,last=ledger_slices()
+    running={l.get("slice") for l in out.get("locks",[]) if isinstance(l,dict)}
+    prs=out.get("open_prs")
+    running|={str(p.get("headRefName",""))[len("slice/"):] for p in (prs if isinstance(prs,list) else [])
+              if isinstance(p,dict) and str(p.get("headRefName","")).startswith("slice/")}
+    entries=[]
+    for name in sorted(os.listdir(CORPUS)):
+        p=os.path.join(CORPUS,name)
+        if not name.endswith(".spec.md") or name=="residuals.spec.md" or not os.path.isfile(p): continue
+        text=open(p,errors="replace").read(4<<20)
+        ids,fenced=spec_slices(text)
+        if fenced: continue
+        for i in ids:
+            if i in merged or i in running: continue
+            sec=mrg.section_of(text,i) or ""
+            if re.search(r"(?m)^`?blocked:",sec) or re.match(r"###\s+\S+\s+—\s+SUPERSEDED\b",sec): continue
+            m=mrg.AFTER_LINE.search(sec)
+            deps=[t.strip().strip("`") for t in m.group(1).split(",") if t.strip()] if m else []
+            if all(d in merged for d in deps):
+                entries.append({"milestone":name[:-len(".spec.md")],"slice":i,"after":deps,"last":last.get(i)})
+    return entries
+out["ready_slices"]=safe(ready_slices,"")
 print(json.dumps(out, indent=1))
 PY
 mv "$CACHE.tmp" "$CACHE"

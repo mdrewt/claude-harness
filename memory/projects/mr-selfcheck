@@ -107,6 +107,19 @@ try:
     rc, out = record("ts-3", "CRASHED(no-done at relaunch)", fx("resume-cumulative.stream"))
     if rc != 0 or "ledger-skip:" not in out or len(rows()) != 1:
         fail("same-session-once", "rc=%r out=%r rows=%d" % (rc, out.strip()[:120], len(rows())))
+    # A MERGED close offered as a session's cost row is refused, nothing written: with the cost
+    # row already there it used to be dropped as `ledger-skip:` at rc 0, MERGED hooks and all.
+    rc, out = record("ts-3", "MERGED", fx("resume-cumulative.stream"))
+    if rc == 0 or "written without it: use --run_id" not in out or len(rows()) != 1:
+        fail("merged-close-refuses-from-log", "rc=%r out=%r rows=%d" % (rc, out.strip()[:120], len(rows())))
+    # ... and a session with no row yet does not get a MERGED one as its cost row either.
+    rc, out = record("ts-9", "MERGED", fx("killed-no-result.stream"))
+    if rc == 0 or [r for r in rows() if r.get("slice") == "ts-9"]:
+        fail("merged-from-log-no-row", "rc=%r out=%r" % (rc, out.strip()[:120]))
+    # The rule is an allow-list: any other event (here PARKED) is refused the same way.
+    rc, out = record("ts-3", "PARKED(credit stop)", fx("resume-cumulative.stream"))
+    if rc == 0 or len(rows()) != 1:
+        fail("event-row-refuses-from-log", "rc=%r out=%r rows=%d" % (rc, out.strip()[:120], len(rows())))
     # Killed before any result event: the transcript's cost-state still has the spend, and the
     # row says that is where the figure came from.
     rc, out = record("bt-7", "FINISHED(EXIT=143 ATTEMPTS=1)", fx("killed-no-result.stream"))
