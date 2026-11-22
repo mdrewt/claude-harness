@@ -616,3 +616,22 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 
 - **lpw-17.6:** WHEN certificate issuance or renewal fails, THE SYSTEM SHALL keep serving the last valid certificate, log the failure, and never fall back to plaintext beyond loopback.
 - DoD: lpw-17.1 to lpw-17.6 green; `just desktop-test` and `just desktop-e2e` green.
+
+### lpw-21 — the allowlist is seeded when switched on and always lists the host
+
+type: feature · tier: hard
+touches: server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/lib.rs
+after: [lpw-15]
+- Decision: operator, 2026-11-22, monster-realm#846. A bound identity is governed by the list alone (lpw-15's default stands), and the list is each world's own (one module database is one world). On top of it: switching a world to `Allowlist` creates the list from the players already let in, the host's own account is always on it, the host adds or removes accounts, and switching the rule off restores the rule lpw-9 built. No new table: the seed is read from the existing `world_binding` and `world_admission` rows. `decision-defaulted:allowlist-reenable=union-with-kept-list` (the list is kept while the rule is off, and a later switch back adds the seed to it rather than replacing it; reversible).
+- Contract: no schema change. `set_world_access` seeds the list inside the same transaction as the rule change; `set_world_allowlist` (lpw-15) keeps the owner's account whatever the call names. The game's `docs/DECISIONS.md` entry for the allowlist (written by lpw-15) is amended in place to state these rules.
+
+- **lpw-21.1:** WHEN the owner changes a world's rule to `Allowlist`, THE SYSTEM SHALL add to the list the account of every binding whose identity the rule in force before the call admitted (under `Open` every binding, under `Password` each identity holding an admission), and the owner's own bound account, keeping every account already listed.
+
+- **lpw-21.2:** WHEN that seed would put more than `MAX_ALLOWLIST_ACCOUNTS` accounts on the list, THE SYSTEM SHALL refuse the rule change with lpw-15's too-many error and write nothing.
+
+- **lpw-21.3:** WHEN a world's rule is `Allowlist` and the owner's identity is bound, THE SYSTEM SHALL keep the owner's account on the list: a `set_world_allowlist` call that omits it stores it anyway, and an owner who binds while the rule is `Allowlist` has their account added.
+
+- **lpw-21.4:** WHEN the owner removes an account from the list, THE SYSTEM SHALL refuse every later reducer call (`join_game` included) from each bound identity whose account it was, connected or not, and WHEN the owner adds an account, THE SYSTEM SHALL admit an identity bound to it at its next call.
+
+- **lpw-21.5:** WHEN the owner changes the rule from `Allowlist` to `Open` or `Password`, THE SYSTEM SHALL admit exactly as lpw-9 defines for that rule, the list unread until the rule is `Allowlist` again.
+- DoD: lpw-21.1 to lpw-21.5 green; `just ci` green; the game's `docs/DECISIONS.md` allowlist entry amended.
