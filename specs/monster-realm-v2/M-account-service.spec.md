@@ -2,7 +2,7 @@
 
 **Status:** authored 2026-11-16 from the operator's rulings on monster-realm#821 and the same
 day's follow-ups; revised the same day into two phases (the operator supplies the Steam app id and
-publisher key about two months before early access): 12 `acs-` slices, against game `master`
+publisher key about two months before early access): 12 `acs-` slices (acs-13 added 2026-11-22 by the operator's ruling on monster-realm#849), against game `master`
 `08d4d12f` · **Project:** monster-realm (a new `account-service/` package, the server module, the
 client, the desktop shell) · **Design SSOT:** the game's `docs/DECISIONS.md` entries "Every player
 must own the game on Steam, for now", "The account service is our own small OIDC issuer; Steam is
@@ -259,6 +259,7 @@ blocked: operator-dev-host — lifted when the operator points `auth.monster-rea
 - **acs-5.1:** WHEN the hosted instance is deployed, THE SYSTEM SHALL serve discovery and keys at `https://auth.monster-realm.spookyowltech.com` under a publicly trusted certificate, and the runbook SHALL record the check.
 
 - **acs-5.2:** WHEN a dev build of the client and module, run on another machine, signs in an entitled and a not-entitled tester account against the hosted instance, THE SYSTEM SHALL let only the entitled one join, recorded in the runbook.
+- Testers use private worlds on dev builds only with acs-13's build (operator, 2026-11-22, monster-realm#849).
 - DoD: acs-5.1 and acs-5.2 recorded; `just ci` green.
 
 ### acs-6 — the module trusts issuers by build and admits only entitled players
@@ -373,6 +374,23 @@ blocked: operator-steamworks — as acs-8, and operator-steam-machine transitive
 
 - **acs-12.3:** WHEN a token nears expiry, THE SYSTEM SHALL exchange a fresh ticket before it expires.
 - DoD: acs-12.1 to acs-12.3 green; `just desktop-test` and `just ci` green.
+
+### acs-13 — a dev build for other machines holds the hosted-dev attestation key alone
+
+type: feature · tier: hard
+touches: server-module/Cargo.toml, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, docs/local-play.md, docs/account-service.md
+after: [acs-5, lpw-15]
+- Decision: operator, 2026-11-22, monster-realm#849 (accepted the recommendation). The local-dev attestation key is derivable from the public repository, so a build that accepts it stops nobody in a private world. Closes R-acs-3-DEVKEY-FORGEABLE.
+- Contract: one more build feature, for dev builds that testers reach from other machines: it trusts the hosted-dev login issuer and accepts only the attestation key acs-5 publishes, never the local-dev key; local development keeps today's dev build and the public key. A binding made under a key the build does not hold counts for nothing (lpw-15 records each binding's key). A release feature still wins over it, as over every dev feature.
+
+- **acs-13.1:** WHEN the hosted-dev build verifies an attestation signed with the local-dev key, THE SYSTEM SHALL refuse it with no write.
+
+- **acs-13.2:** WHEN the hosted-dev build verifies an attestation signed with the hosted-dev key that passes lpw-15.1's checks, THE SYSTEM SHALL record the binding.
+
+- **acs-13.3:** WHEN an identity bound under the local-dev key calls `join_game` on the hosted-dev build, THE SYSTEM SHALL refuse it as unbound.
+
+- **acs-13.4:** WHEN the hosted-dev feature is named with a release feature, THE SYSTEM SHALL build the release profile and accept no dev key.
+- DoD: acs-13.1 to acs-13.4 green; `just ci` green; the game's `docs/DECISIONS.md` entry "Ownership is enforced unless a dev feature switches it off" amended in place.
 
 ## Post-integration verification
 
