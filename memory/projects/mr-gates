@@ -754,8 +754,9 @@ def lint_gates(gates, defers, specs_dir=None, slice_id=None, residuals_path=None
                                           "`wontfix`" % target))
             elif find_section(target, specs_dir)[1] is None:
                 # An id that exists in no spec is exactly the `14r-c-2` class: it lints clean, the
-                # row is emitted `status:targeted`, and `residuals list --unclaimed` never shows
-                # it. Use `backlog` when no section exists yet — that is what promote is for.
+                # row is emitted `status:targeted` at a slice no section owns, so nothing ever
+                # builds it (`residuals list --unclaimed` lists it, but there is no slice to launch). Use
+                # `backlog` when no section exists yet — that is what promote is for.
                 out.append(("BLOCK", gid, "DEFER target %r exists in no spec section. Use "
                                           "`backlog` (the supervisor promotes it into a real "
                                           "section) or name a section that exists." % target))
@@ -2705,7 +2706,7 @@ def selftest():
                    for s2, _g, m in L("- [ ] E1: a\n\nDEFER: E1 -> zz-99-nope — a real reason here\n",
                                       sd=specs)),
                "an id that exists in no spec is the 14r-c-2 class: lints clean, emits a targeted "
-               "row, and is invisible to `residuals list --unclaimed`")
+               "row at a slice no section owns, which nothing ever builds")
         chk.ok("F14b-backlog-target-ok",
                not any("exists in no spec" in m for _s, _g, m in
                        L("- [ ] E1: a\n\nDEFER: E1 -> backlog — a real reason here\n", sd=specs)))

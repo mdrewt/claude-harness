@@ -7,7 +7,8 @@
 #               attempts and model are read from its pass log, and a session that already has
 #               its row is skipped (`ledger-skip:`, rc 0); spend it made after that row goes
 #               in as a `CORRECTION(late spend)` row, here and when the slice's MERGED row is
-#               written. See the --from-log block and top_up below.
+#               written. See the --from-log block and top_up below. Takes only FINISHED(...)/
+#               CRASHED(...): a MERGED close or other event is its own `--run_id` row.
 #   handoff     --title T (--body "..." | --body-file F)
 #               Auto-rotates the live file once it exceeds ~40KB (lp-handoff-rotate) — see the
 #               ENTRY_RE/rotate_handoff block below for the algorithm.
@@ -534,6 +535,12 @@ def top_up(fresh=None):
 if run_log:
     if a.get("run_id"): die("--from-log derives the session's run_id from the log; drop --run_id")
     if cost not in (None,"","null"): die("--from-log reads the cost from the log; drop --cost")
+    # A session's cost row is the reconcile's FINISHED/CRASHED row (mr-native-tick.sh, mr-spawn);
+    # any other outcome is an event row of its own. Taken here it would be dropped as
+    # `ledger-skip:` (rc 0) once the cost row exists -- a MERGED close and its hooks with it, which
+    # is how a built slice reads as unbuilt -- or else become a cost row it is not.
+    if not re.match(r"(FINISHED|CRASHED)\(", outcome.strip().upper()):
+        die("--from-log writes a session's FINISHED(...)/CRASHED(...) cost row; a MERGED, PARKED or other event row is written without it: use --run_id")
     try:
         r=subprocess.run([sys.executable, helper, "--run", run_log], capture_output=True, text=True, timeout=60)
         run=json.loads(r.stdout) if r.returncode==0 else None

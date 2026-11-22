@@ -3,9 +3,9 @@
 
     /usr/bin/python3 mr-record.selftest.py [ID ...]      (also: mr-record --selftest [ID ...])
 
-IDs are TP5-A1..TP5-A8; none = all. Each fixture drives the REAL mr-record / mr-situation (copied
-into a sandbox) with a stub or the real mr-prune beside the copy. Nothing touches the real memory
-dir, ledger, gates dir or game repo.
+IDs are TP5-A1..TP5-A8 and SIT-R1 (mr-situation's `ready_slices`); none = all. Each fixture
+drives the REAL mr-record / mr-situation (copied into a sandbox) with a stub or the real mr-prune
+beside the copy. Nothing touches the real memory dir, ledger, gates dir or game repo.
 """
 import json
 import os
@@ -334,7 +334,8 @@ def a5_no_prune_dir_no_hook():
 
 
 # ================================================================================ mr-situation
-def situation(sb, labels_with_spec, section_labels, json_labels=(), mkprune=True, mode="normal"):
+def situation(sb, labels_with_spec, section_labels, json_labels=(), mkprune=True, mode="normal",
+              prep=None):
     mem = os.path.join(sb, "memory", "projects")
     os.makedirs(mem)
     src = open(os.path.join(HERE, "mr-situation"), encoding="utf-8").read()
@@ -357,6 +358,8 @@ def situation(sb, labels_with_spec, section_labels, json_labels=(), mkprune=True
                 write(os.path.join(close, label + ".json"), "{}\n")
             if mode == "chmod":
                 os.chmod(close, 0)
+    if prep:
+        prep(mem)
     r = subprocess.run(["bash", copy, "--no-gh", "--fresh"], capture_output=True, text=True,
                        timeout=120, cwd=sb)
     return mem, r
@@ -440,6 +443,83 @@ def a8_close_is_a_file():
     run_situation(["m-one"], [], mode="file")
 
 
+# ================================================================================ SIT-R1
+READY_SPEC = """# M-ready
+
+## Slices
+
+### m1 — built
+after: []
+
+### r1 — ready on a built slice
+after: [m1]
+
+### r2 — waits on an unbuilt slice
+after: [r1]
+
+### b1 — blocked
+after: []
+blocked: operator — lifted by a fixture
+
+### s1 — SUPERSEDED (2026-10-01)
+Not launchable.
+
+### run1 — has a live run
+after: []
+
+### run2 — its run's lock awaits reconcile
+after: []
+
+### r3 — ready, no after line
+
+```
+### fake-9 — a heading inside a fence
+```
+"""
+
+
+def ready_world(with_gates=True):
+    """mr-situation over one spec, a ledger holding m1's MERGED row and r1's FINISHED row, run1's
+    live lock and run2's dead one."""
+    sb = tempfile.mkdtemp(prefix="mr-record-selftest-")
+    try:
+        mem, r = situation(sb, [], [], mkprune=False, prep=lambda mem: _ready_prep(sb, mem, with_gates))
+        check(r.returncode == 0, "mr-situation rc %s" % r.returncode)
+        try:
+            data = json.loads(r.stdout)
+        except ValueError as e:
+            raise Fail("stdout is not valid JSON: %s" % e)
+        return data
+    finally:
+        shutil.rmtree(sb, ignore_errors=True)
+
+
+def _ready_prep(sb, mem, with_gates):
+    write(os.path.join(sb, "specs", "monster-realm-v2", "M-ready.spec.md"), READY_SPEC)
+    write(os.path.join(mem, "monster-realm-usage-ledger.jsonl"),
+          json.dumps({"ts": "2026-11-01T00:00:00Z", "slice": "m1", "outcome": "MERGED"}) + "\n"
+          + json.dumps({"ts": "2026-11-01T00:00:00Z", "slice": "r1", "outcome": "FINISHED(EXIT=0)"}) + "\n")
+    write(os.path.join(mem, ".harness-runner.run1.lock"), json.dumps({"session_leader": os.getpid()}))
+    write(os.path.join(mem, ".harness-runner.run2.lock"), json.dumps({"session_leader": None}))
+    if with_gates:
+        shutil.copy(os.path.join(HERE, "mr-gates"), os.path.join(mem, "mr-gates"))
+
+
+def r1_ready_list():
+    rs = ready_world().get("ready_slices")
+    check(isinstance(rs, list), "ready_slices %r, want a list" % (rs,))
+    check([e.get("slice") for e in rs] == ["r1", "r3"],
+          "ready_slices %r, want [r1, r3]" % [e.get("slice") for e in rs])
+    check(rs[0] == {"milestone": "M-ready", "slice": "r1", "after": ["m1"], "last": "FINISHED(EXIT=0)"},
+          "r1 entry %r" % (rs[0],))
+    check(rs[1].get("last") is None, "r3 has no ledger row, last %r" % (rs[1].get("last"),))
+
+
+def r1_no_gates_tool():
+    rs = ready_world(with_gates=False).get("ready_slices")
+    check(isinstance(rs, str) and rs.startswith("error:"), "ready_slices %r, want an error: string" % (rs,))
+
+
 FIXTURES = {
     "TP5-A1": [a1_last_slice_runs_close, a1_integration_real_prune],
     "TP5-A2": [a2_incomplete_no_call, a2_non_merged_closing_row_no_call, a2_unclosed_fence_spec],
@@ -449,6 +529,7 @@ FIXTURES = {
     "TP5-A6": [a6_one_entry, a6_two_sorted],
     "TP5-A7": [a7_no_section_file, a7_spec_gone],
     "TP5-A8": [a8_no_prune_dir, a8_unreadable_dir, a8_close_is_a_file],
+    "SIT-R1": [r1_ready_list, r1_no_gates_tool],
 }
 # a3 and a4 loop over several sandboxes inside one function; count them as the cases they run.
 CASE_COUNT = {a3_structure_residuals_none: 3, a4_failure_is_total: 3}
