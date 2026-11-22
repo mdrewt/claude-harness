@@ -95,14 +95,24 @@ Each default stands unless the operator overrules it:
   cookie or cache of a token), so closing the browser ends it and the next visit signs in. Neither
   client creates a new character at every visit. This overrules the device-storage default below
   for a browser, and lpw-19's open question 3 (a public computer; a character per browser,
-  R-lpw-19-SHAREDCOMPUTER). Its open question 2 follows: a browser signs in at the start of every
-  browser session, and within a session the design's once-a-day re-check stands. lpw-35 designs
-  the identity mechanism and names the slices that build it, including lpw-2's change.
-- `decision-defaulted:address-changes-hands=accept-for-early-access` — the two cases lpw-19
-  left open where a server's address changes hands (a browser still running an earlier holder's
-  page; a moved server still accepting its old address until its certificate expires) are
-  accepted for early access, mitigated by a random port per world; a name service is the upgrade
-  path (R-lpw-19-CHANGEDHANDS; monster-realm#855 question 1, not overruled).
+  R-lpw-19-SHAREDCOMPUTER). Its open question 2 (operator correction, 2026-11-22): the
+  once-a-day re-check is the server's own and covers only the account hosting the server, never a
+  joining player's; a joining player is checked at each connection (monster-realm#848), which for
+  a browser means a sign-in at the start of every browser session and no daily re-check within
+  it. lpw-24.3's client-side host re-check therefore moves to the server. lpw-35 designs the
+  identity mechanism and names the slices that build it, including lpw-2's and lpw-24's changes.
+- `decision-defaulted:address-changes-hands=accept-narrowed-for-early-access` — the two cases
+  lpw-19 left open where a server's address changes hands (a browser still running an earlier
+  holder's page; a moved server still accepting its old address until its certificate expires)
+  are accepted for early access, mitigated by a random port per world, and narrowed by the plan
+  above (the operator asked for question 1 to be re-evaluated against it, 2026-11-22,
+  monster-realm#855): since a browser keeps nothing past its session, a friend's server serves
+  its page with no persistent cache and no service worker, so an earlier holder's code survives
+  only in a tab left open across the change; and the server's own daily call to the account
+  service confirms the public address it is reached at, so a moved server stops accepting its
+  old address within a day instead of the certificate's 160 hours. lpw-35 designs both against
+  its chosen alternative (lpw-35.6); a name service stays the upgrade path
+  (R-lpw-19-CHANGEDHANDS).
 - `decision-defaulted:local-private-reconnect-token=device-storage` — toward a `local` or `private`
   target the anonymous reconnect token is kept in the origin's persistent storage, so a relaunch
   resumes the player; `official` and `test` keep per-tab storage (consumed by lpw-2). Reverting
@@ -991,7 +1001,7 @@ type: design · tier: hard
 touches: docs/refactors/account-checks.md, docs/DECISIONS.md
 after: [lpw-34]
 - Operator, 2026-11-22: the crate's `unstable` feature may be turned on for procedures, which can make HTTP requests and run from a schedule table. lpw-23 and lpw-24 carry every account re-check on the client, so a client that never asks is never re-checked; a server that asks for itself closes that. The operator also asks whether the server can ask by a token instead of by account, and how much of the attestation and identity machinery is still needed.
-- Operator, 2026-11-22 (monster-realm#855): a player's character in a world follows their account, not their client: the same Steam-backed account joining the same world from the desktop app or from any browser continues the same character. At sign-in the account service supplies the identity the world authenticates and authorizes; the desktop client may keep it, a browser keeps nothing past its session and signs in again. Every alternative is judged on meeting this, with fork (c)'s relay still closed (a hostile host given that identity can reach no other world as the player).
+- Operator, 2026-11-22 (monster-realm#855): a player's character in a world follows their account, not their client: the same Steam-backed account joining the same world from the desktop app or from any browser continues the same character. At sign-in the account service supplies the identity the world authenticates and authorizes; the desktop client may keep it, a browser keeps nothing past its session and signs in again. Every alternative is judged on meeting this, with fork (c)'s relay still closed (a hostile host given that identity can reach no other world as the player). Correction, same issue: the once-a-day re-check is done by the server and covers only the hosting account; a joining player is checked at each connection only (a browser: once per browser session).
 - The design to judge, over at least three alternatives. (A) Keep the attestation (lpw-15) and add a scheduled procedure that re-checks each binding through a handle the account service issued at bind: opaque, one per account per world, revocable, so the world never names an account to ask about it. (B) Replace the in-module signature check with a join ticket, as Minecraft's session check does: the client tells the account service which world it is joining and gets a one-use ticket, the world's procedure presents the ticket with its own name, and the service answers with the handle and the entitlement; no attestation key in any build, no verifier crate, no nonce table. (C) For the desktop build, the ticket is Steam's own: a Web API ticket whose identity string names the world, verified by the account service for the world's procedure; (B) for a browser. What lpw-15 and acs-3 already built is not a criterion (operator, 2026-11-22: only the best final design counts): the cost of removing it is reported, not scored. In every alternative the publisher key never leaves the account service, the world's name is still the one the player's own software authenticated (fork (c)), and a first bind needs the world's host online.
 
 - **lpw-35.1:** WHEN the design is recorded, THE SYSTEM SHALL state in `docs/refactors/account-checks.md`, for each alternative: what the world, its host, the account service and a reader of the world's data directory each learn and keep about a player; what a hostile host can replay or relay and where it is refused; what happens to a first bind and to a re-check when the world's host, the player or the service is offline; and which tables, reducers, crates, build key lists and account-service routes it adds or removes against what lpw-15 and acs-3 built.
@@ -1001,6 +1011,8 @@ after: [lpw-34]
 - **lpw-35.3:** WHEN the design is recorded, THE SYSTEM SHALL name each procedure the chosen design declares and what lpw-34's module-definition check and the reducer census must then allow, and nothing wider.
 
 - **lpw-35.4:** WHEN the design is recorded, THE SYSTEM SHALL list the changes it makes to lpw-2, lpw-23, lpw-24, lpw-19, lpw-22, lpw-36, acs-3 and acs-12, the slices that build it, and every table, view, reducer and crate of lpw-15 the chosen design leaves dead, which lpw-33 removes, by a note in this spec.
+- **lpw-35.6:** WHEN the design is recorded, THE SYSTEM SHALL state, for the chosen design, how the server's own daily check of its hosting account runs (no client involved) and that no joining player is re-checked within a connection, and how it narrows the two cases where an address changes hands: a friend's page served with no persistent cache and no service worker, and the daily check confirming the server's public address so a moved server stops accepting its old one within a day; each with the test that proves it, or the measured reason it cannot.
+
 - DoD: the record, a judge's scores over the alternatives, the `docs/DECISIONS.md` entries "A private world verifies an account by a per-world attestation our account service signs" and "The official build holds no attestation key…" amended to the outcome, and the building slices named.
 
 ### lpw-36 — a caller who is not entitled is refused by every reducer, not only at the join
