@@ -11,7 +11,7 @@
 #   handoff     --title T (--body "..." | --body-file F)
 #               Auto-rotates the live file once it exceeds ~40KB (lp-handoff-rotate) — see the
 #               ENTRY_RE/rotate_handoff block below for the algorithm.
-#   queue-add   --slice S --spec-file F --reason "..." [--run_id R]
+#   queue-add   --slice S --spec-file F --reason "..." [--run_id R] [--at head|tail]   (default tail)
 #   queue-remove --slice S
 #   gates-rotate [--dry-run]
 #               Archives gates/<slice>.gates.md files whose slice is MERGED, holds no open
@@ -174,7 +174,7 @@ while i<len(argv):
     if i+1>=len(argv) or argv[i+1].startswith("--"): die("flag "+k+" requires a value")
     v=argv[i+1]
     key=k[2:]
-    if key not in ("run_id","slice","outcome","cost","model","attempts","orch","gating","cycles","standdowns","ci","notes","from-log","title","body","body-file","spec-file","reason"): die("unknown flag --"+key+" (allowed: run_id slice outcome cost model attempts orch gating cycles standdowns ci notes from-log title body body-file spec-file reason)")
+    if key not in ("run_id","slice","outcome","cost","model","attempts","orch","gating","cycles","standdowns","ci","notes","from-log","title","body","body-file","spec-file","reason","at"): die("unknown flag --"+key+" (allowed: run_id slice outcome cost model attempts orch gating cycles standdowns ci notes from-log title body body-file spec-file reason at)")
     a[key]=v; i+=2
 ts=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -420,6 +420,8 @@ if SUB=="queue-add":
     reason=a.get("reason") or die("--reason required")
     if not SLICE_ID_RE.match(slice_): die("--slice fails validation (expected e.g. lp-08, 15r-sec-a): "+slice_)
     if "\n" in reason: die("--reason must be a single line")
+    at=a.get("at","tail")
+    if at not in ("head","tail"): die("--at must be head or tail, got: "+at)
     # Repo-relative under specs/ only -- every real M*.spec.md lives there (confirmed at design
     # time), and it incidentally bounds path traversal the same way the lp-tester-tools allowlist
     # does for a different reason.
@@ -437,12 +439,15 @@ if SUB=="queue-add":
             die(f"--slice {slice_} is already queued -- queue-remove it first to replace")
         if len(q) >= QUEUE_CAP:
             die(f"queue[] is at its cap ({QUEUE_CAP}) -- something isn't consuming it; delete a stale entry before adding")
-        q.append({"slice": slice_, "spec_file": spec_file, "reason": reason,
+        # The supervisor consumes queue[0], so position is the priority: --at head is the one
+        # reorder a caller needs without removing and re-adding everything ahead of it.
+        q.insert(0 if at=="head" else len(q),
+                 {"slice": slice_, "spec_file": spec_file, "reason": reason,
                   "added_utc": ts, "added_by": a.get("run_id") or "n/a",
                   "derived_from_master_sha": (state.get("master") or {}).get("sha", "n/a")})
         result["n"] = len(q)
     _with_state_lock(_add)
-    print(f"queue-added: {slice_} (queue now has {result.get('n','?')} entries)"); sys.exit(0)
+    print(f"queue-added: {slice_}{' at head' if at=='head' else ''} (queue now has {result.get('n','?')} entries)"); sys.exit(0)
 
 if SUB=="queue-remove":
     slice_=a.get("slice") or die("--slice required")

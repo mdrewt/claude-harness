@@ -2,7 +2,7 @@
 
 **Status:** authored 2026-11-16 from the operator's rulings on monster-realm#821 and the same
 day's follow-ups; revised the same day into two phases (the operator supplies the Steam app id and
-publisher key about two months before early access): 12 `acs-` slices (acs-13 added 2026-11-22 by the operator's ruling on monster-realm#849), against game `master`
+publisher key about two months before early access); the slices are the `### acs-` sections under "Slices", against game `master`
 `08d4d12f` · **Project:** monster-realm (a new `account-service/` package, the server module, the
 client, the desktop shell) · **Design SSOT:** the game's `docs/DECISIONS.md` entries "Every player
 must own the game on Steam, for now", "The account service is our own small OIDC issuer; Steam is

@@ -8,6 +8,7 @@
 __doc__ = """mr-gates — the per-slice ACCEPTANCE LEDGER and the residual sink with a drain (lp-gates).
 
     mr-gates init      --slice S [--scope TEXT] [--repo harness|project]
+    mr-gates init      --slice S --dry-run [--specs DIR]   # author preview: writes nothing
     mr-gates status    --slice S [--json]
     mr-gates lint      --slice S [--json]
     mr-gates check     --slice S [--timeout N]        # run-side: execute CHECKs, flip boxes
@@ -82,6 +83,8 @@ TWO ROOTS (the retired slice-quality tool's rule): the GATE is self-locating, th
 a worktree fork the append-only residual SSOT. Pure functions take explicit paths so `--selftest`
 can drive them over temp dirs; there is deliberately NO env override on any gate input
 (mr-selfcheck:6-8: "an override is a surface for greening production vacuously").
+The one exception is `init --dry-run --specs DIR`: it previews a section drafted in a worktree and
+writes nothing, so it gates nothing; `--specs` is refused everywhere else.
 """
 
 import fcntl
@@ -220,23 +223,56 @@ def section_of(text, slice_id):
     return text[m.start(): n.start()] if n else text[m.start():]
 
 
-def find_section(slice_id, specs_dir=None):
-    """-> (spec_filename, section_text) or (None, None)."""
+def spec_texts(specs_dir=None):
+    """Yields (spec_filename, text) for each readable *.spec.md, in name order."""
     specs_dir = specs_dir or SPECS
     try:
         names = sorted(n for n in os.listdir(specs_dir) if n.endswith(".spec.md"))
     except OSError:
-        return None, None
+        return
     for name in names:
         try:
             with open(os.path.join(specs_dir, name), errors="replace") as fh:
-                text = fh.read()
+                yield name, fh.read()
         except OSError:
             continue
+
+
+def find_section(slice_id, specs_dir=None):
+    """-> (spec_filename, section_text) or (None, None)."""
+    for name, text in spec_texts(specs_dir):
         sec = section_of(text, slice_id)
         if sec is not None:
             return name, sec
     return None, None
+
+
+SLICE_TYPES = ("feature", "design", "refactor", "docs")
+# standards/spec-driven.md fixes two pairings: `type: design · tier: hard`, `type: docs · tier: routine`.
+TYPE_TIER = {"design": "hard", "docs": "routine"}
+TYPE_LINE = re.compile(r"^`?type:\s*(\S+)\s*·\s*tier:\s*([\w-]+)", re.M)
+AFTER_LINE = re.compile(r"^`?after:\s*\[([^\]\n]*)\]", re.M)
+
+
+def section_findings(slice_id, sec, specs_dir=None, gates_dir=None):
+    """What `init --dry-run` tells an author about a drafted section. Reads the spec directory and
+    the ledgers (a built slice whose section was deleted still has one); writes nothing."""
+    out, corpus, gdir = [], list(spec_texts(specs_dir)), gates_dir or GATES_DIR
+    m = TYPE_LINE.search(sec)
+    if m and m.group(1) not in SLICE_TYPES:
+        out.append("TYPE-UNKNOWN %s" % m.group(1))
+    elif m and TYPE_TIER.get(m.group(1), m.group(2)) != m.group(2):
+        out.append("TIER-MISMATCH %s is %s" % (m.group(1), TYPE_TIER[m.group(1)]))
+    m = AFTER_LINE.search(sec)
+    for dep in [t.strip().strip("`") for t in m.group(1).split(",") if t.strip()] if m else []:
+        if not any(head_re(dep).search(text) for _n, text in corpus) and not any(
+                os.path.exists(gates_path(dep, d))
+                for d in (gdir, os.path.join(gdir, "archive"))):
+            out.append("AFTER-UNKNOWN %s" % dep)
+    dup = [name for name, text in corpus for _m in head_re(slice_id).finditer(text)]
+    if len(dup) > 1:
+        out.append("ID-DUPLICATE %s" % ", ".join(dup))
+    return out
 
 
 def _ears_span(sec):
@@ -336,11 +372,44 @@ def shall_uncaptured(sec, criteria):
 # ---------------------------------------------------------------------------------------------
 GATE_LINE = re.compile(r"^- \[( |x|X)\] (\S+):\s*(.*)$")
 ATTR_LINE = re.compile(r"^\s+(CHECK|EXPECT|EVIDENCE|MANUAL):\s?(.*)$")
+_DEFER_TAG = r"\[([A-Za-z-]*)(?:/([A-Za-z]*))?\]"
 DEFER_LINE = re.compile(r"^(?:DEFER|ABANDON):\s+(\S+?)\s*(?:->|→)\s*(\S+)"
-                        r"(?:\s+\[([A-Za-z-]*)(?:/([A-Za-z]*))?\])?\s+(?:—|--)\s+(.+)$")
+                        r"(?:\s+" + _DEFER_TAG + r")?\s+(?:—|--)\s+(.+)$")
 # ABANDON with no target is unlazy's shape; accepted and normalised to wontfix, reason still required.
 ABANDON_BARE = re.compile(r"^ABANDON:\s+(\S+?)\s+(?:—|--)?\s*(.+)$")
 HDR = re.compile(r"^([A-Za-z][A-Za-z ]*):\s*(.*)$")
+DEFER_TAG = re.compile("^" + _DEFER_TAG + "$")
+
+
+def defer_fault(line):
+    """The part of a `DEFER:` line that DEFER_LINE refused, or "" when no known fault fits (the
+    caller then prints the grammar alone rather than a guess)."""
+    body = line[len("DEFER:"):]
+    if body[:1].strip():
+        return "no space after `DEFER:`"
+    # The reason may hold an arrow of its own, so the arrow is looked for before the separator.
+    sep = re.search(r"\s(?:—|--)\s+\S", body)
+    head = body[:sep.start()] if sep else body
+    arrow = re.search(r"->|→", head)
+    if not arrow:
+        return "no `->` between the gate id and the target"
+    ids = head[:arrow.start()].split()
+    if not ids:
+        return "no gate id before `->`"
+    if len(ids) > 1:
+        return "one gate id per DEFER line: a single token before `->`"
+    if not sep:
+        if re.search(r"\s(?:—|--)\s*$", body):
+            return "no reason after ` — `"
+        return ("no ` — ` before a reason: an em dash or `--` with a space on each side "
+                "(`-`, `–` and `:` do not separate)")
+    mid = head[arrow.end():].split(None, 1)
+    if not mid:
+        return "no target after `->`"
+    if len(mid) == 2 and not DEFER_TAG.match(mid[1].strip()):
+        return ("between the target and ` — ` only the tag `[category/SEVERITY]` may stand "
+                "(letters and hyphens, one `/`, no spaces); got %r" % mid[1].strip()[:40])
+    return ""
 
 
 class Gate(object):
@@ -392,8 +461,10 @@ def parse_gates(text):
                 if m2:
                     defers[m2.group(1)] = Defer("wontfix", m2.group(2).strip())
                 else:
-                    errs.append("line %d: unparseable DEFER (want "
-                                "`DEFER: <gate> -> <target> — <reason>`): %s" % (i + 1, line[:80]))
+                    fault = defer_fault(line) if line.startswith("DEFER:") else ""
+                    errs.append("line %d: unparseable DEFER%s (want `DEFER: <gate> -> <target> "
+                                "[<category>/<SEVERITY>] — <reason>`): %s"
+                                % (i + 1, " — " + fault if fault else "", line[:80]))
             cur = None
             continue
         if in_header:
@@ -506,6 +577,7 @@ def expect_line(expect, output):
 # other rule, re-executes deterministically, matches byte-for-byte, and certifies nothing.
 RUNNER_HEADS = {"cargo", "just", "npm", "npx", "pnpm", "node", "vitest", "pytest", "playwright"}
 ENVASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=\S*$")
+WRAPPER_HEADS = {"cd", "bash", "sh", "env", "timeout"}
 
 
 def command_head(cmd):
@@ -622,10 +694,18 @@ def lint_gates(gates, defers, specs_dir=None, slice_id=None, residuals_path=None
         if g.check:
             c = g.check
             if seeded and not is_runner(c):
+                head = command_head(c)
+                wrapped = head.startswith("(") or os.path.basename(head) in WRAPPER_HEADS
                 out.append(("BLOCK", g.id,
                             "seeded gate CHECK must invoke a gate runner (%s) or be MANUAL: with a "
-                            "citation; got head %r" % ("|".join(sorted(RUNNER_HEADS)) + "|mr-*",
-                                                       command_head(c))))
+                            "citation; got head %r%s" % (
+                                "|".join(sorted(RUNNER_HEADS)) + "|mr-*", head,
+                                " — the runner must be the first word after any VAR=value; a "
+                                "subshell, `cd` or wrapper is not one" + (
+                                    "" if os.path.basename(head) in ("env", "timeout") else
+                                    " (point the runner at the directory: `cargo "
+                                    "--manifest-path`, `npm --prefix`, `just -f`)")
+                                if wrapped else "")))
             adhoc = adhoc_script_paths(c) if seeded else []
             if adhoc:
                 out.append(("BLOCK", g.id,
@@ -1000,7 +1080,7 @@ SEEDED_HDR = "# Gates: %s"
 
 
 def build_gates_text(slice_id, spec_file, criteria, scope, repo, uncaptured, seed,
-                     touches=None):
+                     touches=None, notes_pending=None):
     L = [SEEDED_HDR % slice_id]
     L.append("Spec: %s#%s" % (spec_file or "(none)", slice_id))
     L.append("Seed: %s" % seed)
@@ -1015,6 +1095,11 @@ def build_gates_text(slice_id, spec_file, criteria, scope, repo, uncaptured, see
     if uncaptured:
         L.append("Note: %d SHALL(s) in the section are in no criterion — add X* gates or explain."
                  % uncaptured)
+    if notes_pending:
+        L.append("Note: build notes not yet in this spec's text — %s. `mr-gates notes list "
+                 "--slice <id> --json` prints a slice's notes in full: read the ones that bear "
+                 "on this slice before you plan; a file one adds is asked for with `mr-touches widen`."
+                 % _pending_label(notes_pending, "%s (%d)", ", ", " and %d more"))
     L.append("")
     L.append("<!-- Fill CHECK/EXPECT during the PLAN phase. A seeded gate's CHECK must invoke a")
     L.append("     real gate runner (cargo/just/npm/npx/pnpm/node/vitest/pytest or an mr-* tool),")
@@ -1041,19 +1126,32 @@ def cmd_init(a):
     criteria = extract_criteria(sec) if sec else []
     uncap = shall_uncaptured(sec, criteria) if sec else 0
     seed = seed_hash(criteria)
+    if a.get("dry_run"):  # an author's preview: the real parse, no ledger and no other file
+        print("GATES-DRYRUN %s criteria=%d seed=%s spec=%s shall-uncaptured=%d%s" % (
+            slice_id, len(criteria), seed, spec_file or "NONE", uncap,
+            "" if spec_file else " SPEC-SECTION-NOT-FOUND"))
+        for f in section_findings(slice_id, sec or "", a.get("_specs"), a.get("_gates_dir")):
+            print("  SECTION " + f)
+        return 0 if spec_file else 2
     path = gates_path(slice_id, a.get("_gates_dir"))
     existing = read_gates_file(path)
 
     if existing is None:
+        try:  # advisory only: a sibling's unreadable notes file never fails a seed
+            pend = spec_pending_notes(spec_file, a.get("_gates_dir"), a.get("_specs") or SPECS)
+        except Exception:
+            pend = []
         atomic_write(path, build_gates_text(slice_id, spec_file, criteria, a.get("scope"),
                                             a.get("repo"), uncap, seed,
-                                            extract_touches(sec) if sec else []))
+                                            extract_touches(sec) if sec else [], pend))
         msg = "GATES-SEEDED %s criteria=%d seed=%s spec=%s" % (
             slice_id, len(criteria), seed, spec_file or "NONE")
         if not spec_file:
             msg += " SPEC-SECTION-NOT-FOUND"
         if uncap:
             msg += " shall-uncaptured=%d" % uncap
+        if pend:
+            msg += " NOTES-PENDING-IN-SPEC=" + _pending_label(pend, "%s:%d", ",", "+%d")
         if len(criteria) > 10:
             msg += (" SIZE-WARN=%d (right-size: ship the smallest coherent increment and DEFER the "
                     "rest)" % len(criteria))
@@ -2092,6 +2190,25 @@ def pending_notes(slice_id, gates_dir, specs):
     return name, [n for n in notes if _norm(note_para(slice_id, n["text"])) not in sec]
 
 
+def spec_pending_notes(spec_file, gates_dir, specs):
+    """-> [(slice id, n)]: each section of `spec_file` holding n build notes that are not in the
+    spec text at HEAD. A note reaches the spec only when the supervisor's fold PR merges, after
+    its slice does, so a slice launched before then is seeded from a section that may predate
+    what its siblings' runs recorded."""
+    try:
+        with open(os.path.join(specs, spec_file or ""), errors="replace") as fh:
+            ids = SECTION_ID.findall(fh.read())
+    except OSError:
+        return []
+    counts = ((sid, len(pending_notes(sid, gates_dir, specs)[1])) for sid in dict.fromkeys(ids))
+    return [(sid, n) for sid, n in counts if n]
+
+
+def _pending_label(pend, item, sep, more, cap=20):
+    return sep.join(item % p for p in pend[:cap]) + (more % (len(pend) - cap)
+                                                     if len(pend) > cap else "")
+
+
 def stray_notes(gates_dir, specs):
     """-> [(spec file name, slice id)]: a Build-note paragraph that is in a spec file with
     uncommitted edits, not in that section at HEAD and not stored. A stash would take it out of
@@ -2275,7 +2392,7 @@ FLAGS = {"slice", "scope", "repo", "json", "timeout", "format", "reason", "budge
          "force", "head",
          "id", "spec-file", "as", "pr", "unclaimed", "severity", "title", "touches", "gate",
          "target", "source-slice", "domain", "category", "dry-run", "apply", "operator-issue",
-         "text", "followup", "residual"}
+         "text", "followup", "residual", "specs"}
 VALUELESS = {"json", "unclaimed", "force", "dry-run", "apply"}
 
 
@@ -2323,6 +2440,10 @@ def main(argv):
     a, err = parse_args(rest)
     if err:
         return die(err)
+    if "specs" in a:  # the header's one exception to "no override on a gate input"
+        if sub != "init" or not a.get("dry_run"):
+            return die("--specs is read only by `init --dry-run` (a preview gates nothing)")
+        a["_specs"] = a.pop("specs")
     need_slice = ("init", "status", "check", "verify", "render", "reseed", "lint")
     if sub in need_slice and not a.get("slice"):
         return die("%s requires --slice" % sub)
@@ -2485,6 +2606,33 @@ def selftest():
         _h, _g, dd, ee = parse_gates("- [ ] E1: t\n\nDEFER: E1 no arrow at all\n")
         chk.eq("E4-malformed-is-error", 1, len(ee))
         chk.eq("E5-malformed-not-silent", {}, dd)
+        # Each refused DEFER says which part was refused; an unknown fault prints the grammar alone.
+        for name, bad_line, phrase in (
+                ("E6-no-arrow", "DEFER: E1 no arrow at all", "no `->`"),
+                ("E6-arrow-only-in-reason", "DEFER: E1 backlog — see a -> b", "no `->`"),
+                ("E6-empty-reason", "DEFER: E1 -> backlog [gameplay/MED] — ", "no reason after"),
+                ("E6-no-gate-id", "DEFER: -> backlog — a real reason", "no gate id"),
+                ("E6b-hyphen-separator", "DEFER: E1 -> backlog [gameplay/MED] - a real reason",
+                 "no ` — ` before a reason"),
+                ("E6c-en-dash-separator", "DEFER: E1 -> fx-b – a real reason",
+                 "no ` — ` before a reason"),
+                ("E6d-tag-charset", "DEFER: E1 -> backlog [data_integrity/MED] — a real reason",
+                 "only the tag `[category/SEVERITY]`"),
+                ("E6e-tag-spaces", "DEFER: E1 -> backlog [gameplay / MED] — a real reason",
+                 "only the tag `[category/SEVERITY]`"),
+                ("E6f-two-gates", "DEFER: E1, E2 -> backlog [gameplay/MED] — a real reason",
+                 "one gate id per DEFER line")):
+            _h, _g, dd, ee = parse_gates("- [ ] E1: t\n\n" + bad_line + "\n")
+            chk.ok(name, len(ee) == 1 and phrase in ee[0] and "(want `DEFER: <gate> ->" in ee[0]
+                   and dd == {}, repr(ee))
+        _h, _g, dd, ee = parse_gates(
+            "- [ ] E1: t\n\n- [ ] E2: t\n\nDEFER: E1 -> fx-b — the first parses\n"
+            "DEFER: E2 -> backlog (gameplay/MED) — the second does not\n")
+        chk.ok("E6g-second-line-is-the-one-named", list(dd) == ["E1"] and len(ee) == 1
+               and ee[0].startswith("line 6: ") and "got '(gameplay/MED)'" in ee[0], repr(ee))
+        _h, _g, _d, ee = parse_gates("- [ ] E1: t\n\nABANDON: E1\n")
+        chk.ok("E6h-unknown-fault-prints-the-grammar-alone",
+               len(ee) == 1 and ee[0].startswith("line 3: unparseable DEFER (want "), repr(ee))
 
         # --- F. lint: the proven evasions ----------------------------------------------------
         def L(body, sd=None):
@@ -2565,6 +2713,17 @@ def selftest():
                not any("exists in no spec" in m for _s, _g, m in
                        L("- [ ] E1: a\n\nDEFER: E1 -> fx-b — a real reason here\n", sd=specs)),
                "a target that DOES resolve must pass, or every honest deferral is blocked")
+        wrapped = L("- [ ] E1: t\n  CHECK: (cd client && npm test)\n  EXPECT: /1 passed/\n")
+        chk.ok("F15-subshell-check-names-the-wrapper",
+               [m for s2, _g, m in wrapped if s2 == "BLOCK"
+                and "got head '(cd'" in m and "a subshell, `cd` or wrapper is not one" in m],
+               repr(wrapped))
+        chk.ok("F15b-plain-non-runner-gets-no-wrapper-hint",
+               not any("wrapper" in m for _s, _g, m in
+                       L('- [ ] E1: t\n  CHECK: grep -q "fn foo" src/a.rs\n  EXPECT: /x/\n')))
+        chk.ok("F15c-env-prefixed-runner-still-passes",
+               not blocked(L("- [ ] E1: t\n  CHECK: CI=1 npm --prefix client test\n"
+                             "  EXPECT: /1 passed/\n")))
         chk.ok("F11b-fixture-isolates-the-rule",
                all("sizing failure" in m for s, _g, m in mass if s == "BLOCK"),
                "the fixture must isolate the rule under test or it greens on an unrelated finding")
@@ -3419,6 +3578,27 @@ def selftest():
         chk.ok("P7-slice-id-is-a-file-name", notes("add", slice="../x", text="t")[0] == 2)
         rc, out = notes("list")
         chk.ok("P8-list", rc == 0 and "nt-9" in out and "pending" in out and "folded" in out, out)
+        # A slice seeded while a sibling's note is not yet in the spec text is told so, at init.
+        def seed(sl):
+            b = _io.StringIO()
+            with contextlib.redirect_stdout(b):
+                cmd_init({"slice": sl, "_specs": nspecs, "_gates_dir": ngd, "scope": "fx"})
+            return b.getvalue(), read_gates_file(gates_path(sl, ngd))
+        notes("add", slice="nt-1", text="`access.rs` is split; the gate lives in `gate.rs`.")
+        out, led = seed("nt-2")
+        chk.ok("P9-init-names-a-siblings-pending-note", "GATES-SEEDED nt-2 " in out
+               and " NOTES-PENDING-IN-SPEC=nt-1:1" in out, out)
+        chk.ok("P9b-ledger-header-points-at-them",
+               "\nNote: build notes not yet in this spec's text — nt-1 (1). `mr-gates notes list "
+               "--slice <id> --json` prints" in led, led)
+        chk.eq("P9c-ledger-still-parses", [], parse_gates(led)[3])
+        notes("fold", slice="nt-1")
+        ngit("commit", "-q", "-am", "fold3")
+        out, led = seed("nt-1")
+        chk.ok("P9d-nothing-pending-nothing-said", "GATES-SEEDED nt-1 " in out
+               and "NOTES-PENDING" not in out and "build notes not yet" not in led, out + led)
+        capped = _pending_label([("s%d" % i, 1) for i in range(22)], "%s:%d", ",", "+%d")
+        chk.ok("P9e-a-long-list-is-cut-with-a-count", capped.endswith(",s19:1+2"), capped)
 
         # --- L. render determinism ------------------------------------------------------------
         _h, gr, dr, _e = parse_gates(read_gates_file(gp))
@@ -3535,6 +3715,59 @@ def selftest():
         chk.ok("O12-prompt-bounds-backlog-absorption",
                "A HIGH/CRITICAL finding is never absorbed that way" in p3flat
                and "dispositions it `fixed`" in p3flat)
+
+        # --- PV. init --dry-run: an author's preview of a drafted section; it writes nothing ------
+        pspecs, pgd = os.path.join(root, "p-specs"), os.path.join(root, "p-gates")
+        os.makedirs(pspecs)
+        os.makedirs(os.path.join(pgd, "archive"))
+        open(os.path.join(pgd, "archive", "pv-built.gates.md"), "w").close()
+        psec = "### %s — fixture\ntype: %s\nafter: [%s]\n\nEARS: THE TOOL SHALL do one thing.\n\n"
+        prow = [("pv-ok", "feature · tier: hard", "pv-built, pv-des"),
+                ("pv-des", "design · tier: routine", ""), ("pv-doc", "docs · tier: hard", ""),
+                ("pv-unk", "spike · tier: hard", ""), ("pv-aft", "refactor · tier: hard", "nope"),
+                ("pv-dup", "docs · tier: routine", "")]
+        for pname, prs in (("P-a.spec.md", prow), ("P-b.spec.md", prow[-1:])):
+            with open(os.path.join(pspecs, pname), "w") as fh:
+                fh.write("".join(psec % r for r in prs) + "### pv-old — no type line\nProse.\n")
+
+        def pv(sid, **kw):
+            out = _io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(_io.StringIO()):
+                rc = cmd_init(dict({"slice": sid, "_specs": pspecs, "_gates_dir": pgd}, **kw))
+            return rc, out.getvalue().splitlines()
+
+        def pv_main(*argv):
+            err = _io.StringIO()
+            with contextlib.redirect_stdout(_io.StringIO()), contextlib.redirect_stderr(err):
+                return main(["mr-gates"] + list(argv)), err.getvalue()
+        pbefore = sorted(os.walk(root))
+        pseed = seed_hash(extract_criteria(find_section("pv-ok", pspecs)[1]))
+        chk.eq("PV1-clean-section-and-ledger-only-after",
+               (0, ["GATES-DRYRUN pv-ok criteria=1 seed=%s spec=P-a.spec.md shall-uncaptured=0"
+                    % pseed]), pv("pv-ok", dry_run=True))
+        for fid, sid, want in (("PV2-design-tier", "pv-des", ["  SECTION TIER-MISMATCH design is hard"]),
+                               ("PV3-docs-tier", "pv-doc", ["  SECTION TIER-MISMATCH docs is routine"]),
+                               ("PV4-type-unknown", "pv-unk", ["  SECTION TYPE-UNKNOWN spike"]),
+                               ("PV5-after-unknown", "pv-aft", ["  SECTION AFTER-UNKNOWN nope"]),
+                               ("PV6-duplicate", "pv-dup",
+                                ["  SECTION ID-DUPLICATE P-a.spec.md, P-b.spec.md"]),
+                               ("PV7-no-type-line", "pv-old",
+                                ["  SECTION ID-DUPLICATE P-a.spec.md, P-b.spec.md"])):
+            prc, plines = pv(sid, dry_run=True)
+            chk.eq(fid, (0, want), (prc, plines[1:]))
+        pnope = pv("pv-nope", dry_run=True)
+        chk.eq("PV8-not-found-exits-2", (2, True), (pnope[0], "SPEC-SECTION-NOT-FOUND" in pnope[1][0]))
+        chk.eq("PV9-dry-run-writes-no-file", pbefore, sorted(os.walk(root)))
+        for fid, argv in (("PV10-specs-refused-without-dry-run", ("init", "--slice", "pv-ok")),
+                          ("PV11-specs-refused-for-status", ("status", "--slice", "pv-ok", "--dry-run")),
+                          ("PV12-specs-refused-for-lint", ("lint", "--slice", "pv-ok"))):
+            prc, perr = pv_main(*(argv + ("--specs", pspecs)))
+            chk.ok(fid, prc == 2 and "init --dry-run" in perr and not os.path.exists(gates_path("pv-ok")), perr)
+        chk.eq("PV13-specs-with-dry-run-accepted", (0, False),
+               (pv_main("init", "--slice", "pv-ok", "--dry-run", "--specs", pspecs)[0],
+                os.path.exists(gates_path("pv-ok"))))
+        chk.ok("PV14-real-init-still-seeds", pv("pv-des")[1][0].startswith("GATES-SEEDED pv-des criteria=1 ")
+               and os.path.exists(gates_path("pv-des", pgd)))
     finally:
         cleanup()
 

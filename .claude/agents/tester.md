@@ -1,6 +1,6 @@
 ---
 name: tester
-description: Writes tests from acceptance criteria (TDD red phase). Use to author failing tests that encode a spec task's EARS criteria. Does NOT implement the feature.
+description: Writes failing tests from a spec task's EARS criteria (TDD red phase). Does NOT implement the feature. Has no shell, so it cannot compile or run; brief it with a `## Contracts` section, and split a large criteria set into a run per criterion group.
 tools: Read, Grep, Glob, Write, Edit
 model: opus
 effort: medium
