@@ -11,6 +11,9 @@ export PATH="$PATH:/home/mdrewt/.asdf/shims:/home/mdrewt/bin"
 MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 OPERATOR=mdrewt
 N="${1:?issue}"; S="${2:?slug}"
+# A run starts this watcher from its slice worktree, which is deleted when the slice merges; gh
+# cannot run from a directory that is gone, and every later poll would fail.
+cd "$MEM" 2>/dev/null || cd /
 REPO="${3:-}"
 [ -z "$REPO" ] && [ -f "$MEM/decisions/issue-$N.url" ] && REPO=$(sed "s|https://github.com/||;s|/issues/.*||" "$MEM/decisions/issue-$N.url")
 REPO="${REPO:-mdrewt/monster-realm}"
