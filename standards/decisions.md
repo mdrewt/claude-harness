@@ -11,6 +11,14 @@ Write an entry only when **both** hold:
 2. The "why" is **not evident from the code** (a maintainer would plausibly
    undo it or ask why).
 
+A "why" names a constraint outside the repository's own scaffolding: the
+product, its platform, its users, its running cost, or law. The effort of
+editing tests, a slice's file list or a pinned baseline, or of keeping a build
+hash stable, is never one: remove that brittleness in the same change or a
+tracked slice, and decide the design on its merits. An existing entry that
+gives such a reason is rewritten when next edited. A reviewer flags any new or
+edited "why" that names a test, a file list, a baseline or a hash.
+
 New dependencies and cross-cutting patterns usually qualify. Bug fixes,
 implementation details, process events, and anything the type system or an
 existing test already explains do not. **Roughly a few entries per milestone

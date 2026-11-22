@@ -1,6 +1,6 @@
 # Spec: M-local-play — single-player worlds and friends hosting
 
-**Status:** elaborated 2026-11-16 (`lp-spec`) into 18 `lpw-` slices, with lpw-19 and lpw-20 added 2026-11-22 by the operator's rulings on monster-realm#833 and #840, and lpw-23 and lpw-24 by the ruling on #848; lpw-8 and lpw-15 revised the same day for the ownership rule (every player owns the game on Steam; M-account-service) (lpw-18, the friends-server transport, added 2026-11-16 by the operator's ruling on monster-realm#821), against game `master`
+**Status:** elaborated 2026-11-16 (`lp-spec`) into 18 `lpw-` slices, with lpw-19 and lpw-20 added 2026-11-22 by the operator's rulings on monster-realm#833 and #840, and lpw-23 and lpw-24 by the ruling on #848; lpw-25, lpw-26, lpw-27, lpw-29, lpw-30, lpw-32 and lpw-33 added the same day from the operator's review of the recorded decisions (the wire-contract check, the idle tick, tactical content's home, the PvP roster reveal, the mutation gates and the two schema consolidations; lpw-28 and lpw-31 are not used); lpw-8 and lpw-15 revised the same day for the ownership rule (every player owns the game on Steam; M-account-service) (lpw-18, the friends-server transport, added 2026-11-16 by the operator's ruling on monster-realm#821), against game `master`
 `63fc0b0a` (`84e3cd96` plus the doc-only #820) and `lpg-0`'s record (the game's
 `docs/local-play.md`). The groundwork (LP0, LP1, LP10 as `lpg-0`, `lpg-1`, `lpg-10`) is built:
 PLAN §Built · **Project:** monster-realm (client, server module, `game-core`, a new desktop shell
@@ -615,7 +615,7 @@ after: [lpw-8]
 ### lpw-20 — the module never receives a world password
 
 type: feature · tier: hard
-touches: server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/privacy_enforcement_tests.rs, evals/baselines/client-callable-reducers.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/set_world_access_reducer.ts, client/src/module_bindings/admit_reducer.ts, docs/local-play.md
+touches: server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/privacy_enforcement_tests.rs, evals/baselines/client-callable-reducers.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/set_world_access_reducer.ts, client/src/module_bindings/admit_reducer.ts, docs/local-play.md, client/src/net/wireContract.json, game-core/src/lib.rs
 after: [lpw-15]
 - Residuals: R-lpw-9-COMMITLOG (the module half; lpw-14 builds the gate's check).
 - Operator ruling monster-realm#840 (2026-11-22). Measured in lpw-9: the host's commit log keeps the arguments of every committed reducer call in the clear. Schema stays additive: `world_access`'s salt and hash columns stay and are written empty. Always-serial after lpw-15 (both edit `access.rs`).
@@ -693,7 +693,7 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 ### lpw-21 — the allowlist is seeded when switched on and always lists the host
 
 type: feature · tier: hard
-touches: server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/lib.rs
+touches: server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/lib.rs, client/src/net/wireContract.json, game-core/src/lib.rs
 after: [lpw-15]
 - Decision: operator, 2026-11-22, monster-realm#846. A bound identity is governed by the list alone (lpw-15's default stands), and the list is each world's own (one module database is one world). On top of it: switching a world to `Allowlist` creates the list from the players already let in, the host's own account is always on it, the host adds or removes accounts, and switching the rule off restores the rule lpw-9 built. No new table: the seed is read from the existing `world_binding` and `world_admission` rows. `decision-defaulted:allowlist-reenable=union-with-kept-list` (the list is kept while the rule is off, and a later switch back adds the seed to it rather than replacing it; reversible).
 - Contract: no schema change. `set_world_access` seeds the list inside the same transaction as the rule change; `set_world_allowlist` (lpw-15) keeps the owner's account whatever the call names. The game's `docs/DECISIONS.md` entry for the allowlist (written by lpw-15) is amended in place to state these rules.
@@ -712,7 +712,7 @@ after: [lpw-15]
 ### lpw-22 — a player erases and reads their own world binding without the host
 
 type: feature · tier: hard
-touches: server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/lib.rs, evals/baselines/client-callable-reducers.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/unbind_world_account_reducer.ts
+touches: server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/lib.rs, evals/baselines/client-callable-reducers.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/unbind_world_account_reducer.ts, client/src/net/wireContract.json, game-core/src/lib.rs
 after: [lpw-15, lpw-21]
 - Decision: operator, 2026-11-22, monster-realm#847. In a world we do not operate, a player erases their own binding by a reducer and reads it through the owner-scoped view lpw-15 already ships; keep what a world holds about accounts and identities minimal and secure. No new table, column or export machinery (export is data about the person through simple queries on existing tables).
 - Contract: `unbind_world_account()` deletes the caller's `world_binding` row and any outstanding nonce for `ctx.sender()`, and nothing else; on an official build it is refused with no write (lpw-8 (b)). It is the one reducer the access rule does not gate, so a player the host has removed can still erase their link. The game's `docs/DECISIONS.md` world-binding entry (written by lpw-15) is amended in place to state this.
@@ -733,7 +733,7 @@ after: [lpw-15, lpw-21]
 ### lpw-23 — a world re-checks a bound account with every answer and keeps the last known status
 
 type: feature · tier: hard
-touches: server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/schema.rs, evals/baselines/table-schemas.json, account-service/src/attest.ts, account-service/src/attest.test.ts, docs/account-service.md, docs/local-play.md
+touches: server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/schema.rs, evals/baselines/table-schemas.json, account-service/src/attest.ts, account-service/src/attest.test.ts, docs/account-service.md, docs/local-play.md, client/src/net/wireContract.json, game-core/src/lib.rs
 after: [lpw-15, lpw-22]
 - Decision: operator, 2026-11-22, monster-realm#848 (the "Account checks at connection" entry above). An answer can be negative, so the attestation route must be able to say "this account is not entitled" in a form the world can verify.
 - Contract: `POST /attest` for a valid token whose account is not entitled returns an attestation with `mr_ent` false instead of refusing (this amends acs-3.2 for that case only; a missing, expired or foreign token is still refused). `bind_world_account` on an identity that already has a binding replaces its status and check time with the new attestation's, positive or negative, under the same checks as lpw-15.1 and lpw-15.2. `entitled(ctx)` reads the last stored status, with no expiry. The binding row holds the entitlement and the time of its last check; a column is added only if lpw-15's row lacks one (then this slice is schema-serial). The host's daily check is the owner's own binding re-checked the same way (lpw-24 sends it); this slice adds no timer and no outgoing request from the module.
@@ -769,3 +769,103 @@ after: [lpw-15, lpw-19, lpw-23]
 
 - **lpw-24.5:** WHEN the client boots toward any target and opens no `local` or `private` world, THE CLIENT SHALL make zero requests to the account service.
 - DoD: lpw-24.1 to lpw-24.5 green; `just ci` green.
+
+### lpw-25 — a change an older client cannot read fails the build until `MIN_CLIENT_PROTOCOL` rises
+
+type: feature · tier: hard
+touches: client/src/net/wireContract.test.ts, client/src/net/wireContract.json, client-wasm/src/lib.rs, game-core/src/lib.rs, docs/DECISIONS.md
+after: [lpw-15]
+- Operator, 2026-11-22 (decision review, concern 2). "The module publishes its protocol numbers…" says its bump rule has no test, and the failure it guards is silent: the 2.11.0 SDK throws inside its row decoder on a subscribed row that gained a column, with neither an applied nor an error callback.
+- Contract: one committed file, `client/src/net/wireContract.json`, holds one entry per `PROTOCOL_VERSION`, appended and never rewritten; entries below `MIN_CLIENT_PROTOCOL` may be deleted. An entry is read from the generated bindings (`client/src/module_bindings/`), never from hand-written source, with names as they travel on the wire, in two parts. Server to client: every subscribable table and view with its columns in order and its primary key, and every type reachable from a column, with its fields or variants in order. Client to server: every reducer with its arguments in order, and every type reachable only from an argument. The check: the current bindings must keep every entry from `MIN_CLIENT_PROTOCOL` up to the current number. For the server-to-client part any difference in something an entry holds breaks it. For the client-to-server part a removed, re-typed or reordered argument, field or variant breaks it, and an added variant or a new reducer does not. The test reads both numbers through wasm exports; `min_client_protocol()` is added to `client-wasm` beside `protocol_version()`, with the parity test its neighbour has. The test's update mode writes only a missing entry for the current `PROTOCOL_VERSION` and never overwrites one; a slice still iterating deletes its own new entry by hand, so the deletion shows in its diff. Bootstrap: nothing is deployed, so this slice raises `MIN_CLIENT_PROTOCOL` to the current `PROTOCOL_VERSION` and records that one entry. Every later slice that changes the bindings appends its entry: the two files it needs for that (`client/src/net/wireContract.json`, `game-core/src/lib.rs`) are in the `touches:` of lpw-20 to lpw-23 and lpw-32.
+
+- **lpw-25.1:** WHEN the generated bindings differ in any way from the entry recorded for the current `PROTOCOL_VERSION`, or the file holds no entry for it, THE SYSTEM SHALL fail the client test run until `PROTOCOL_VERSION` rises and its entry is recorded.
+
+- **lpw-25.2:** WHEN the generated bindings break, as the contract defines for each direction, anything held by any entry from `MIN_CLIENT_PROTOCOL` to the current number, THE SYSTEM SHALL fail the client test run until `MIN_CLIENT_PROTOCOL` rises above every entry the change breaks.
+
+- **lpw-25.3:** WHEN the bindings differ from those entries only by tables, views, reducers or types none of them holds, or by a variant added to a type reachable only from a reducer argument, THE SYSTEM SHALL pass with `MIN_CLIENT_PROTOCOL` unchanged.
+
+- **lpw-25.4:** WHEN a table an entry above `MIN_CLIENT_PROTOCOL` first recorded gains a column, THE SYSTEM SHALL fail as lpw-25.2 does (a client at that entry's number subscribes it).
+- DoD: lpw-25.1 to lpw-25.4 green, each watched failing once on bindings regenerated from an uncommitted scratch schema edit; `just ci` green; "The module publishes its protocol numbers…" in the game's `docs/DECISIONS.md` rewritten to name the check.
+
+### lpw-26 — a zone's movement tick runs only while there is work for it (design)
+
+type: design · tier: hard
+touches: docs/refactors/idle-tick.md, docs/DECISIONS.md
+after: [lpw-25]
+- Residuals: R-lpg-0-IDLETICK.
+- Operator, 2026-11-22 (decision review, concern 3). A zone with a player in it commits a `movement_tick` transaction every `STEP_MS` whether or not anything moves: 1.24 MiB of commit log an hour for one player standing still, 8.21 walking and 44.99 for eight, with no shrink seen (`docs/local-play.md` §4). The operator wants the empty transactions gone for disk, bandwidth and reducer-thread reasons, client prediction kept, and a remote player's stop never left wrong on another client. Ordered after lpw-25 by the operator; nothing in it depends on that slice.
+- The design to judge, over at least two alternatives: a tick armed as a one-shot only while work is pending (an undrained input that can drain, a character whose row still shows a step that has ended, an NPC move coming due), which does not re-arm when it finds none; NPC wander derived from the clock or scheduled at its next move. Alternatives include a slower interval while a zone is quiescent and leaving the interval and shrinking what each tick writes. The smoothness contract ("Bounded client prediction", "Held keys", "Remote interpolation") is the constraint. Each alternative is measured from an unmerged prototype branch whose commit the record names; the slice merges no code. Whether an event table (rows broadcast and not stored) fits any of it is answered for the SpacetimeDB version the game pins.
+
+- **lpw-26.1:** WHEN the design is recorded, THE SYSTEM SHALL state in `docs/refactors/idle-tick.md`, for each alternative and for today, the transactions per hour (from the host's `/v1/metrics` reducer counters) and commit-log bytes per hour (by `docs/local-play.md` §7's method) for one player standing still, one walking and eight walking, in a zone with NPCs and in one without, and the bytes of one transaction that writes no row.
+
+- **lpw-26.2:** WHEN the design is recorded, THE SYSTEM SHALL show by measurement on a 2.11.0 host that under the chosen alternative a walking player's step-timing distribution is no wider than today's (`docs/send-pipeline-depth.md`), that a remote client receives the row that ends a walk no later than it does today, what a client that reconnects mid-walk is sent, and what arming from the intake reducers adds to a walking player's rows.
+
+- **lpw-26.3:** WHEN the design is recorded, THE SYSTEM SHALL name everything the interval tick does today with how it is done under the chosen alternative: NPC wander; releasing an NPC from a conversation that ended; the drain lock while a battle holds a queue (a held queue is not work); the grass trigger; warps; publishing the standing row and settling it to Idle; the disarm and the NPC reset when the last player leaves; the recovery after a tick whose transaction failed (a one-shot row is consumed and its re-arm rolled back); and converting the interval rows a live database holds at publish. It SHALL name the slices that build it, by a note in this spec.
+- DoD: the record, a judge's scores over the alternatives, and "An empty zone does no work; no state depends on a tick having run" amended in the game's `docs/DECISIONS.md`.
+
+### lpw-27 — tactical content joins the rows it describes, and a test builds a content row in one place (design)
+
+type: design · tier: hard
+touches: docs/refactors/tactics-content.md, docs/DECISIONS.md
+after: [lpw-25]
+- Operator, 2026-11-22 (decision review, concern 4). "Tactical content lives in sidecar registries keyed by id" gives two reasons: a new field breaks about 100 hand-built struct literals in tests, and the 1v1 system was not yet retired. bt-17 retired it. The first reason is test brittleness shaping content, which `standards/decisions.md` no longer accepts as a reason.
+- The design to judge, over at least two alternatives: one constructor per carried content struct that tests call, so a new field edits one place; then the tactical fields folded onto `SkillDef`, `Species`, `ItemDef`, `ZoneDef` and the encounter row, with the `encounter` table's schema change taken at the second consolidation (lpw-33). Alternatives: a test-only `Default` per carried struct, used as `..Default::default()`, with the sidecars kept; and keeping the sidecars as they are with a product reason recorded. The fold adds no column to a public content table (`species_row`, `skill_row`, `item_row`, `zone_def`, `encounter`) except through lpw-33.
+
+- **lpw-27.1:** WHEN the design is recorded, THE SYSTEM SHALL state in `docs/refactors/tactics-content.md` the count of struct literals of each carried content type outside its constructor, the chosen home of each tactical field, what the fold changes in `CONTENT_VERSION`, the content tables and the client's wasm exports, and the slices that build it, each small enough to merge alone.
+
+- **lpw-27.2:** WHEN the alternative kept is the sidecars, THE SYSTEM SHALL record in the game's `docs/DECISIONS.md` a reason that names no test, tool or file list.
+- DoD: the record, a judge's scores, the `docs/DECISIONS.md` entry rewritten to the outcome, and the building slices named in this spec by a note.
+
+### lpw-29 — a PvP battle's anchor hides the opponent's roster until the battle is Active
+
+type: feature · tier: hard
+touches: server-module/src/schema.rs, server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/tactics.rs, server-module/src/tactics_tests.rs, server-module/src/privacy_enforcement_tests.rs, client/src/net/store.ts, client/src/net/store.test.ts, client/src/main.ts, client/e2e/tactics-pvp.spec.ts, docs/DECISIONS.md
+after: []
+- Operator, 2026-11-22 (decision review, concern 5). "Tactical battle privacy is structural…" records as an accepted reveal that `my_battle` returns the whole `Battle` row, so from Deploying each PvP player sees the opponent's species, levels, stats and known skills. No schema or bindings change and no data wipe: this is not the consolidation (lpw-32) and is not schema-serial.
+- Contract: only for a `Pvp` battle whose `battle_tactical` phase is Deploying and whose two identities differ, `my_battle` returns the caller a copy of the row with the other side's `team` empty; a wild battle, a Practice battle and every Active or Finished battle are returned as stored. The stored row is unchanged, so settlement, forfeit and disconnect during Deploying write back as today. The client's own-perspective conversion and its DEV battle hook accept an empty opponent team. The e2e named in `touches:` is the tactical PvP spec; the slice confirms its path at the start and widens if it differs.
+
+- **lpw-29.1:** WHEN a PvP battle between two players is Deploying, THE SYSTEM SHALL deliver to each participant, through every view, no species, level, stat or skill of the opponent's monsters.
+
+- **lpw-29.2:** WHEN that battle becomes Active, THE SYSTEM SHALL deliver the opponent's side as it does today, and a wild or Practice battle SHALL be delivered whole in every phase.
+
+- **lpw-29.3:** WHEN a participant forfeits or disconnects while the battle is Deploying, THE SYSTEM SHALL settle and write back HP as it does today.
+
+- **lpw-29.4:** WHEN the client receives a battle row whose opponent team is empty, THE CLIENT SHALL show the deploy panel and report no error.
+- DoD: lpw-29.1 to lpw-29.4 green; `just ci` and the e2e green; the "Accepted reveals" sentence of "Tactical battle privacy is structural…" reworded in place.
+
+### lpw-32 — the schema is consolidated: the retired 1v1 tables, their reaper and a retired column go
+
+type: feature · tier: hard
+touches: server-module/src/schema.rs, server-module/src/battle.rs, server-module/src/battle_tests.rs, server-module/src/pvp.rs, server-module/src/pvp_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/evolution.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/privacy.rs, server-module/src/privacy_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/native_host_tests.rs, server-module/src/privacy_enforcement_tests.rs, game-core/src/lib.rs, game-core/src/combat/pvp.rs, game-core/src/combat/mod.rs, evals/battle-schema-snapshot.eval.mjs, evals/spacetime-type-snapshot.eval.mjs, evals/account-e2e.eval.mjs, evals/baselines/table-schemas.json, evals/baselines/spacetime-types.json, client/src/net/wireContract.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/player_table.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/rowConvert.ts, client/src/net/rowConvert.test.ts, docs/DECISIONS.md, docs/runbooks/playtest-ops.md
+after: [lpw-20, lpw-23, lpw-25]
+- Operator, 2026-11-22 (decision review, concern 5): a wipe-and-consolidate pass now, and a second before early access (lpw-33). No database holds data worth keeping yet, so what "Schema changes are additive" has kept only for live data goes in one declared break.
+- Contract: always-serial, and the one slice allowed a change the automatic migration refuses. It launches only when no unmerged slice touches `server-module/src/schema.rs`, `game-core/src/lib.rs` or `evals/baselines/table-schemas.json`, and a schema slice queued meanwhile waits on it. It removes: the tables `battle_action`, `battle_wild` and `pvp_deadline_schedule` with their manifest entries, exporters and cascade steps; the scheduled reducer `pvp_deadline_reaper` and `disarm_pvp_deadlines`; `player.last_input_seq` (`seed_intent` then reads `acked_seq` alone); `world_access`'s salt and hash columns (dead after lpw-20); and the game-core items left with no caller (`PvpAction`, `pvp_deadline_forfeit_side`). `battle_wild_unit` stays: it is live. Both protocol numbers rise and the wire contract gains its entry. The two append-only evals skip their merge-base comparison only when the working baseline carries a top-level `consolidation` marker naming this slice that its merge-base copy lacks; the next schema change removes the marker. `evals/account-e2e.eval.mjs` stops querying the dropped tables. The data deletion is one step the runbook names: `just playtest-wipe` for the playtest database and a local `--delete-data` publish (the nightly republish check already starts from an empty in-memory host). "Schema changes are additive" is rewritten: additive between consolidations, and a consolidation is a slice the spec declares.
+
+- **lpw-32.1:** WHEN the module's tables and reducers are listed from its generated definition, THE SYSTEM SHALL hold no `battle_action`, `battle_wild` or `pvp_deadline_schedule` table and no `pvp_deadline_reaper`, `player` SHALL have no `last_input_seq` column, and `world_access` no salt or hash column.
+
+- **lpw-32.2:** WHEN an account is deleted, exported or claimed on the consolidated module, THE SYSTEM SHALL do as it does today for every table that remains.
+
+- **lpw-32.3:** WHEN a later schema change removes or reorders a column, table or variant without a consolidation marker for its own slice, THE SYSTEM SHALL fail the two append-only checks as it does today.
+
+- **lpw-32.4:** WHEN a client built before the consolidation connects, THE CLIENT SHALL be told to update the game, shown by lpw-4.1's test under the raised `MIN_CLIENT_PROTOCOL`.
+- DoD: lpw-32.1 to lpw-32.4 green; `just ci`, the e2e and the nightly republish check green; `bindings-drift` clean; the wipe of the playtest database recorded in the PR; the `docs/DECISIONS.md` entries "Schema changes are additive" and "Battles run on one engine at a time…" rewritten.
+
+### lpw-33 — the second schema consolidation, before early access (reserved)
+
+type: feature · tier: hard
+touches: server-module/src/schema.rs
+after: [lpw-32]
+blocked: early-access-schema-freeze — the last consolidation runs once every schema-changing slice of the early-access milestones (M-local-play, M-account-service, M-gamepad) has merged; lifted by the supervisor then, when this section is elaborated from what those slices retired; fallback: none, early access is gated on it (PLAN §9).
+- Operator, 2026-11-22: a second wipe-and-consolidate pass is planned and performed before early access. Reserved so the gate has an id; its contract and criteria are written when it is unblocked, on lpw-32's model, and it takes the `encounter` table change of lpw-27's fold if that design chose the fold.
+
+### lpw-30 — the mutation gates judge rules, not log lines: game-core stays zero-tolerance nightly, the server is gated on a pull request's changed lines
+
+type: feature · tier: hard
+touches: .cargo/mutants.toml, justfile, .github/workflows/nightly.yml, .github/workflows/ci.yml, CONTRIBUTING.md, docs/DECISIONS.md
+after: []
+- Operator, 2026-11-22 (decision review, concern 6), on the condition that the gates do not grow. The harness standard reads mutation scores as reports; the game's nightly gates are a recorded exception, and the server gate also requires killing a mutant that changes only a log line, which is paid for in tests that assert log text.
+- Contract: `mutation` (game-core, nightly, every shard zero-tolerance) is unchanged. On the server, the bodies of the logging functions (`guards::log_reject`, `observability::mr_log`, `mr_log_breadcrumb`, `json_escape`) are excluded from mutation by function name in `.cargo/mutants.toml`, with one line of reason. The server's zero-tolerance gate moves from the nightly full sweep to the pull request: CI runs `just mutate-diff origin/master` restricted to `monster-realm-module`, so its base is the merge base. The full server sweep runs weekly, sharded as today, and files its survivors as one report issue on the default branch; it fails nothing. Accepted in writing in the `docs/DECISIONS.md` entry: a diff gate does not see a test weakened or deleted with no source line changed, which the weekly report is read for. A test that asserts only a log line's text is deleted, under `standards/testing-tdd.md` §Deleting a check, only when no tool parses the line it asserts (the `mr_log` envelope and its `evt` keys are parsed and stay tested); the files are widened as the slice measures them.
+
+- **lpw-30.1:** WHEN cargo-mutants lists the server's mutants (`cargo mutants --list`), THE SYSTEM SHALL list none that replaces the body of `log_reject`, `mr_log`, `mr_log_breadcrumb` or `json_escape`.
+- Verified by run, not by a test (CI wiring is not tested): one pull-request run with a planted server survivor that is never committed fails the diff gate and passes without it; one workflow-dispatch run of the weekly sweep on the branch exits zero with survivors listed, its issue step dry-run. Both run ids are in the PR.
+- DoD: lpw-30.1 green; the two runs recorded; `just ci` green; "The nightly mutation gates run sharded and both are zero-tolerance" and `CONTRIBUTING.md`'s survivor rule rewritten.

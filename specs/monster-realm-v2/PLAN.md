@@ -51,7 +51,20 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    open or password rule, then the desktop shell, worlds, opening a world to friends and the
    standalone server package. lpw-1 to lpw-9 build first; the overlay proof and the shell are
    `blocked:operator-steam-machine`, and the packaging slices `blocked:licence` (operator);
-   the world binding (lpw-15, every player binds) builds on item 2's attestation route. Groundwork built (§Built). **Early access is
+   the world binding (lpw-15, every player binds) builds on item 2's attestation route. lpw-25 to
+   lpw-33 come from the operator's review of the recorded decisions (2026-11-22): the
+   wire-contract check (lpw-25), the idle-tick design (lpw-26), tactical content's home (lpw-27),
+   the PvP roster reveal (lpw-29), the mutation gates (lpw-30), the schema consolidation (lpw-32)
+   and the second one before early access (lpw-33, `blocked:early-access-schema-freeze`). Two
+   items of that review are documentation only and have no slice, because the loop has no slice
+   type for a doc rewrite: bringing the game's `docs/DECISIONS.md` entries to the standard's 10 to
+   25 lines by subsystem (mechanics to `ARCHITECTURE.md`, measurements to their records), after
+   lpw-27, lpw-30 and lpw-32, which rewrite entries themselves; and dropping the byte-identical
+   wasm proof and the forwarder placement rule from "Dev-only reducers never ship" (what survives:
+   the published-module check, the release recipe's check, the census and the compile refusal of a
+   release feature with a dev feature; accepted loss: dev code that is not a reducer changing the
+   default build's bytes goes unseen). Both wait on the operator's choice of how doc rewrites are
+   scheduled. Groundwork built (§Built). **Early access is
    gated on it.**
 2. **M-account-service** (`M-account-service.spec.md`, authored 2026-11-16, 12 `acs-` slices in
    two phases): **every player must own the game on Steam, for now** (operator, 2026-11-16),
@@ -122,6 +135,8 @@ ONE gate after every coverage milestone closes. No interim playtest.
   modding. **Early access** is gated on M-local-play, on M-account-service (every player must own the
   game on Steam, operator 2026-11-16) and on M-gamepad (operator, 2026-10-01; "before early
   access" confirmed 2026-11-13).
+  The second schema consolidation (`lpw-33`) is part of that gate: it is unblocked and elaborated
+  when every schema-changing slice of those three milestones has merged.
   **Opening the official server** is gated on M25 completion (human sign-off checklist,
   operator-approved) and on M-scale-readiness's 1,000-client run of record meeting the
   official-server budgets (the milestone is built; the run is residual
