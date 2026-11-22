@@ -3040,6 +3040,20 @@ else:
         fail("lp-queue-independent-writes",
              "two separate queue-add calls must BOTH survive (each re-reads fresh before writing) -- got %r" % (slices,))
 
+# --- queue-add --at head: the new entry is queue[0]; the entries already queued keep their order ---
+rc, out, err = rec("queue-add", ["--slice", REAL_HEADINGS[2], "--spec-file", REAL_SPEC,
+                                  "--reason", "ahead of the rest", "--at", "head"])
+order = [e.get("slice") for e in json.load(open(STATE)).get("queue", [])]
+if rc != 0 or order != [REAL_HEADINGS[2], REAL_HEADINGS[0], REAL_HEADINGS[1]]:
+    fail("lp-queue-add-at-head",
+         "--at head must insert at queue[0] and keep the others in order -- rc=%r order=%r stderr=%r"
+         % (rc, order, err.strip()[:160]))
+rc, out, err = rec("queue-add", ["--slice", REAL_HEADINGS[3], "--spec-file", REAL_SPEC,
+                                  "--reason", "no such position", "--at", "sideways"])
+if rc == 0 or [e.get("slice") for e in json.load(open(STATE)).get("queue", [])] != order:
+    fail("lp-queue-add-at-rejects-unknown",
+         "an --at value other than head or tail must be refused and leave queue[] as it was (rc=%r)" % (rc,))
+
 # --- queue-add: cap enforcement ---
 reset_state()
 for s in REAL_HEADINGS[:5]:
