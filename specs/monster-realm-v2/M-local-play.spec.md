@@ -895,12 +895,45 @@ after: []
 - **lpw-38.3:** WHEN the design is recorded, THE SYSTEM SHALL show, by a throwaway probe on crate 2.12.0, that the chosen alternative links the server-module test binary, with the count of tests that pass and the name of each that does not.
 - DoD: lpw-38.1 to lpw-38.3 met; the plan merged; a `docs/DECISIONS.md` entry for the test host's design; lpw-39's `touches:` and `moved-tests:` written into the PR body for the supervisor to copy here.
 
+Build note (lpw-38): Under lpw-38's chosen design the crates spacetimedb and
+spacetimedb-bindings-sys become path packages (vendor/, [patch.crates-io]), and cargo audit 0.22.2
+(rustsec 0.33, query_vulnerabilities) skips every package not sourced from crates.io, so CI's
+blocking SCA step stops covering those two crates once lpw-39 merges. No advisory exists for them
+today (OSV and GitHub, 2026-11-22). A slice cannot edit .github/workflows/ci.yml; the step needed is
+a cargo audit over a lockfile naming the two crates at their vendored versions with a crates.io
+source. Until then the upgrade runbook checks their advisories at each hop (lpw-39 writes that
+step).
+
+Build note (lpw-38): lpw-39's DoD says the plan file is updated to the built state, while
+standards/spec-driven.md says the slice that makes a design's last extraction deletes its plan file.
+lpw-38's file list follows lpw-39's DoD (the plan, docs/refactors/native-test-host.md, is brought to
+the built state), because the plan holds the measurements behind the docs/DECISIONS.md entry and
+lpw-34's later hops re-apply its patch. The supervisor may settle which rule binds before copying
+lpw-39's touches.
+
+Build note (lpw-38): For lpw-35 (a world's server checks a player's account itself, by procedures):
+under lpw-38's chosen test host the vendored spacetimedb keeps its native-only ProcedureContext
+branches (2.12.0 src/lib.rs:1563, :1609, :1808 panic; src/http.rs:559 returns an error), so a native
+test of a procedure needs the same kind of cfg edit in vendor/native-host.patch plus procedure_*
+host functions in native_host_tests.rs. The docs/DECISIONS.md entry 'Server-module tests run on our
+own host ABI, over the two vendor crates patched where they refuse a native host' allows exactly
+that. lpw-35's design should count those files.
+
+Build note (lpw-38): SDK 2.12.0's token-rejection message carries the HTTP status
+(dist/index.mjs:5219: 'Failed to verify token: ${status} ${statusText}').
+client/src/net/authToken.ts never deletes a stored token on one rejection because the 2.11.0 message
+could not tell a 401 from a transient 5xx. That reason stops holding at 2.12.0. lpw-39 keeps the
+behaviour, since it is a refactor. A later slice may let a 401 count differently from a 5xx.
+
 ### lpw-39 — the native test host moves to the host lpw-38 chose, with the Fixture's API kept
 
 type: refactor · tier: hard
-touches: server-module/src/native_host_tests.rs, server-module/Cargo.toml, Cargo.toml, Cargo.lock, docs/refactors/native-test-host.md, ARCHITECTURE.md, docs/DECISIONS.md
+touches: Cargo.toml, Cargo.lock, vendor/spacetimedb/**, vendor/spacetimedb-bindings-sys/**, vendor/native-host.patch, vendor/PRISTINE.sha256, vendor/README.md, .gitattributes, server-module/Cargo.toml, server-module/src/native_host_tests.rs, evals/account-e2e.eval.mjs, scripts/ci-tools.sh, client/package.json, client/package-lock.json, client/src/module_bindings/index.ts, client/src/net/authToken.test.ts, client/src/net/authToken.ts, docs/runbooks/spacetimedb-upgrade.md, docs/DECISIONS.md, ARCHITECTURE.md, AGENTS.md, README.md, docs/PLAYTEST.md, docs/runbooks/playtest-ops.md, docs/e2e-flakes.md, docs/local-play.md, scripts/playtest-report.mjs, .claude/skills/spacetimedb-reducer/SKILL.md, .claude/skills/spacetimedb-client/SKILL.md, docs/refactors/native-test-host.md
 after: [lpw-38]
-blocked: design — lifted by the supervisor when lpw-38 merges and its plan's file list and `moved-tests:` are copied into this section (`touches:` widened to them); fallback: none, lpw-34 waits on this slice.
+- `moved-tests:` `client/src/net/authToken.test.ts :: SDK-DRIFT (nh4): the spacetimedb SDK still throws the exact token-rejection message string > BITES: dist/index.mjs contains the literal substring "Failed to verify token: ${response.statusText}"` -> `client/src/net/authToken.test.ts :: SDK-DRIFT (nh4): the spacetimedb SDK still throws the exact token-rejection message string > BITES: dist/index.mjs contains the literal substring "Failed to verify token: ${status} ${statusText}"`
+- Unblocked 2026-11-22 when lpw-38 merged (monster-realm #858): `touches:` and `moved-tests:` copied from its PR body; the plan is `docs/refactors/native-test-host.md` (alternative B, the two vendor crates patched in `#[cfg]` attributes, landing as lpw-34's first lockstep hop to 2.12.0). No server-module test changes; the one moved test above is the SDK-drift needle.
+- Supervisor, 2026-11-22 (lpw-38 note n2), decision-defaulted: plan-file-lifecycle=keep — lpw-39 brings `docs/refactors/native-test-host.md` to the built state rather than deleting it, because lpw-34's later hops re-apply its patch and the `docs/DECISIONS.md` entry rests on its measurements; it is deleted when lpw-34 closes the upgrade.
+- Always-serial, like lpw-34: it rewrites `Cargo.lock`, the client lockfile and the bindings, so it launches only when no unmerged slice touches the module, the bindings or a lockfile. The 2.12.0 host runs only under an isolated `HOME` with the 2.12.0 binaries first on `PATH` (a newer host stamps the shared data directory one-way).
 - Contract: the extraction lpw-38's plan names, done as a refactor: every server-module test that passes before it passes after it, unchanged except where lpw-38's plan names the test and the reason. If the plan lands it as a hop to 2.12.0, the CLI, the host, the crate and the SDK move together by `docs/runbooks/spacetimedb-upgrade.md` and that hop counts as lpw-34's first.
 
 - **lpw-39.1:** WHEN the server-module tests run after the change, THE SYSTEM SHALL link and pass every test that passed before it, on the crate version lpw-38's plan names, with the Fixture's public API unchanged.
