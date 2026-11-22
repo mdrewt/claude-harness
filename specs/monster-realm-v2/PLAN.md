@@ -55,16 +55,16 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    lpw-33 come from the operator's review of the recorded decisions (2026-11-22): the
    wire-contract check (lpw-25), the idle-tick design (lpw-26), tactical content's home (lpw-27),
    the PvP roster reveal (lpw-29), the mutation gates (lpw-30), the schema consolidation (lpw-32)
-   and the second one before early access (lpw-33, `blocked:early-access-schema-freeze`). Two
+   and the second one before early access (lpw-33, `blocked:early-access-schema-freeze`). **lpw-34 upgrades SpacetimeDB from 2.11.0 to 2.16.1 and launches next** (operator,
+   2026-11-22), alone, once the slices in flight have merged; lpw-35 then designs account checks made
+   by the world's server (the operator allows the crate's `unstable` feature for procedures) before
+   lpw-24 builds the client's part. Two
    items of that review are documentation only and have no slice, because the loop has no slice
    type for a doc rewrite: bringing the game's `docs/DECISIONS.md` entries to the standard's 10 to
    25 lines by subsystem (mechanics to `ARCHITECTURE.md`, measurements to their records), after
-   lpw-27, lpw-30 and lpw-32, which rewrite entries themselves; and dropping the byte-identical
-   wasm proof and the forwarder placement rule from "Dev-only reducers never ship" (what survives:
-   the published-module check, the release recipe's check, the census and the compile refusal of a
-   release feature with a dev feature; accepted loss: dev code that is not a reducer changing the
-   default build's bytes goes unseen). Both wait on the operator's choice of how doc rewrites are
-   scheduled. Groundwork built (§Built). **Early access is
+   lpw-27, lpw-30 and lpw-32, which rewrite entries themselves; and dropping the byte-identical wasm proof from "Dev-only reducers never ship", which the
+   operator's session made directly (2026-11-22). The first waits on the operator's choice of how
+   doc rewrites are scheduled. Groundwork built (§Built). **Early access is
    gated on it.**
 2. **M-account-service** (`M-account-service.spec.md`, authored 2026-11-16, 12 `acs-` slices in
    two phases): **every player must own the game on Steam, for now** (operator, 2026-11-16),
