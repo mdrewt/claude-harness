@@ -1,6 +1,6 @@
 # Spec: M-local-play — single-player worlds and friends hosting
 
-**Status:** elaborated 2026-11-16 (`lp-spec`) into 18 `lpw-` slices; lpw-8 and lpw-15 revised the same day for the ownership rule (every player owns the game on Steam; M-account-service) (lpw-18, the friends-server transport, added 2026-11-16 by the operator's ruling on monster-realm#821), against game `master`
+**Status:** elaborated 2026-11-16 (`lp-spec`) into 18 `lpw-` slices, with lpw-19 and lpw-20 added 2026-11-22 by the operator's rulings on monster-realm#833 and #840; lpw-8 and lpw-15 revised the same day for the ownership rule (every player owns the game on Steam; M-account-service) (lpw-18, the friends-server transport, added 2026-11-16 by the operator's ruling on monster-realm#821), against game `master`
 `63fc0b0a` (`84e3cd96` plus the doc-only #820) and `lpg-0`'s record (the game's
 `docs/local-play.md`). The groundwork (LP0, LP1, LP10 as `lpg-0`, `lpg-1`, `lpg-10`) is built:
 PLAN §Built · **Project:** monster-realm (client, server module, `game-core`, a new desktop shell
@@ -118,6 +118,25 @@ Each default stands unless the operator overrules it:
   account service we deploy (the sign-in broker), with its own signing key and issuer name; the
   account service is otherwise unchanged. A holder-bound credential (the client signs each world's
   proof with a device key) was weighed and not chosen; it stays the named upgrade path. The service is M-account-service (PLAN §9): acs-3 builds the route, acs-5 hosts the dev and test instance, acs-11 deploys production; lpw-15 builds against the dev issuer. (2) Revised the same day (the operator's concern is Minecraft-style hosting over the internet, by bare IP or registered domain, more than LAN): plaintext `ws:` only on loopback; a server with a domain serves `wss:` with a real certificate (lpw-17 obtains and renews one, or the host's own reverse proxy); a server with a bare IP, public or LAN, or a shell world opened to friends serves `wss:` with a per-world self-signed certificate whose fingerprint the invite carries and the shell pins (lpw-18); a browser joiner accepts that certificate once. Game `docs/DECISIONS.md` "Private servers carry their own encryption: a real certificate for a domain, a pinned self-signed one otherwise; plaintext only on loopback".
+- **A browser joins a friends server by its address — ANSWERED 2026-11-22 (monster-realm#833).**
+  The lpw-8 default (on an enforcing build a friends server is joined from the desktop app only) is
+  overruled: a player at a public computer with no desktop build must be able to join a friend's
+  cloud server from a browser by navigating to its address, a static IP address included, with
+  security kept. lpw-19 designs it (the sign-in on the account service's own origin that lpw-8
+  weighed as "C2 with a browser flow", extended to a server reached by IP address); until it is
+  built, lpw-18.7's browser joiner plays only on a build that does not enforce ownership.
+  R-lpw-8-BROWSERBIND is lpw-19's residual.
+- **Where the world password is checked — ANSWERED 2026-11-22 (monster-realm#840).** The operator
+  wants a password exposed as little as possible, hashed or not, with a reader of logs as the
+  attacker, leaned to checking it at the gate and left the choice to the build. Chosen: the gate
+  checks the password and the module never receives one (alternative 3). The gate keeps the
+  Argon2id salt and hash in the world's directory beside the owner credential, counts wrong
+  attempts itself, and admits a joiner through the owner's outright admission; no reducer argument
+  ever carries a typed password or a value derived from one, so the host's commit log holds
+  neither the password nor a joiner's wrong guesses. A host with no gate has no password door: its
+  owner admits identities from the command line. lpw-20 changes the module; lpw-14 builds the
+  gate's check. It replaces the remedy R-lpw-9-COMMITLOG names (callers stretch the password
+  before the call), which still put a password-equivalent in the log.
 
 ## Risks / flags
 
@@ -530,6 +549,7 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 - **lpw-18.6:** WHEN a pinned target's address changes and its certificate does not, THE CLIENT SHALL resume the identity stored for `(fingerprint, db)`.
 
 - **lpw-18.7:** WHEN a browser loads the client page from the gate over `https:`, THE SYSTEM SHALL serve the page and a shell document whose `uri` is the gate's own `wss:` origin, and the joiner SHALL play without any other origin.
+- Operator ruling monster-realm#833: lpw-18.7's browser joiner plays on an enforcing build once lpw-19's design is built; until then only on a build that does not enforce ownership.
 - DoD: lpw-18.1 to lpw-18.7 green; `just desktop-test`, `just desktop-e2e` and `just ci` green.
 
 ### lpw-14 — open a world to friends, and close it again
@@ -542,6 +562,8 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 - Decisions: `decision-defaulted:invite-link=copyable-text-no-url-handler`, `decision-defaulted:world-access-default=open-until-opened-to-friends`.
 - Contract: opening makes the gate (lpw-12) listen on the chosen interface as well, with the same route allow-list and issuer rule; beyond loopback it serves only TLS with the world's certificate (lpw-18), and the `Origin` rule admits a joiner's page served by the gate itself or the app's own scheme. The host stays on loopback. Joiners use kind `private`.
 
+- Operator ruling monster-realm#840: the gate checks the world password itself (lpw-20 takes it out of the module). It keeps an Argon2id salt and hash in the world's directory with the owner credential's permissions, never in a backup copy's readable part or a log, counts wrong attempts by source address and by identity (five in ten minutes, as lpw-9.3), and on the right password admits the joiner through the owner's `set_world_access` admission.
+
 - **lpw-14.1:** WHEN the player asks to open a world whose rule is still the default `Open`, THE SYSTEM SHALL ask the host to choose `Open` or `Password` first and open nothing until they do.
 
 - **lpw-14.2:** WHEN the player opens a world to friends, THE SYSTEM SHALL accept joiners on the chosen interface under lpw-9's rule, and each joiner's character SHALL be their own in that world.
@@ -552,7 +574,51 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 
 - **lpw-14.5:** WHEN a player copies the invite, THE SYSTEM SHALL produce the world's `wss:` `uri`, `db` and certificate fingerprint as text that lpw-11's address form accepts as kind `private`.
 
-- DoD: lpw-14.1 to lpw-14.5 green; the milestone's one e2e flow (create, play, quit, reopen, open to a friend, the friend joins, close) green in `desktop/e2e/friends.spec.ts`.
+- **lpw-14.6:** WHEN a joiner gives the gate's door the world's password, THE SYSTEM SHALL admit that identity without any call to the module that carries the password or a value derived from it, and WHEN the password is wrong SHALL admit nobody, write nothing to the world's database and refuse that identity and that address after five wrong attempts in ten minutes.
+- DoD: lpw-14.1 to lpw-14.6 green; the milestone's one e2e flow (create, play, quit, reopen, open to a friend, the friend joins, close) green in `desktop/e2e/friends.spec.ts`.
+
+### lpw-19 — a browser binds a friends server it reached by address (design)
+
+type: design · tier: hard
+touches: docs/local-play.md
+after: [lpw-8]
+- Residuals: R-lpw-8-BROWSERBIND.
+- Operator ruling monster-realm#833 (2026-11-22): a player with no desktop build joins a friend's
+  cloud server from a browser by its address, a static IP address included, with security kept.
+  Fork (c) of the access design binds only from the desktop shell, because a page a world's gate
+  serves may be the hostile host's code and must never hold a login token. The design to judge,
+  over at least two alternatives: the page sends the browser to the account service's own origin,
+  the player signs in there, and the service returns only an attestation whose `aud` it derives
+  from the address it returns to. lpw-8's note lists the checks for a domain server (WHATWG parse,
+  `https:` only, no user-info, one fixed return path, the database inside the signed name, a state
+  value the page made, a scrubbed fragment, `frame-ancestors 'none'`, no cookie as a way into the
+  attest route, consent each time with the server's name shown, the return address kept out of
+  access logs). The open question is what names a server reached by IP address: a browser has no
+  trustworthy name for a self-signed certificate, so the candidates are a publicly trusted
+  certificate for the IP address (the gate or the standalone server obtains and renews one) named
+  as an address, and a name the account service issues for the server's own key.
+
+- **lpw-19.1:** WHEN the design is recorded, THE SYSTEM SHALL name in `docs/local-play.md` §3 how a browser joiner of a friends server at a domain name and at a bare IP address obtains an attestation, what the attestation's `aud` is in each case and what authenticated it, the rejected alternatives, and the test that proves each.
+
+- **lpw-19.2:** WHEN the design is recorded, THE SYSTEM SHALL show that a page a hostile host's gate serves never holds a login token the official server accepts, and that the relay of fork (c) stays closed for a browser joiner by relay, by proxy and by an address that changes hands.
+
+- **lpw-19.3:** WHEN the design is recorded, THE SYSTEM SHALL list the changes it makes to lpw-15's client bind flow, lpw-17, lpw-18.7, acs-3's route and the world's names, and state what a joiner at a server whose address has no publicly trusted certificate is shown.
+- DoD: the record, a `docs/DECISIONS.md` update of "An attestation names the server as the player's own software authenticated it" (the desktop-only default is overruled), and the slices that build it named in this spec by a note.
+
+### lpw-20 — the module never receives a world password
+
+type: feature · tier: hard
+touches: server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/privacy_enforcement_tests.rs, evals/baselines/client-callable-reducers.json, client/src/module_bindings/index.ts, client/src/module_bindings/types.ts, client/src/module_bindings/set_world_access_reducer.ts, client/src/module_bindings/admit_reducer.ts, docs/local-play.md
+after: [lpw-15]
+- Residuals: R-lpw-9-COMMITLOG (the module half; lpw-14 builds the gate's check).
+- Operator ruling monster-realm#840 (2026-11-22). Measured in lpw-9: the host's commit log keeps the arguments of every committed reducer call in the clear. Schema stays additive: `world_access`'s salt and hash columns stay and are written empty. Always-serial after lpw-15 (both edit `access.rs`).
+
+- **lpw-20.1:** WHEN the owner sets the rule to `Password`, THE SYSTEM SHALL store the rule with no salt and no hash and admit only the owner and admitted identities, and no reducer the module declares SHALL take a password, a hash of one or a value derived from one as an argument.
+
+- **lpw-20.2:** WHEN a world holds a salt and hash stored by an earlier module, THE SYSTEM SHALL clear them at the owner's next `set_world_access` and admit nobody by them meanwhile.
+
+- **lpw-20.3:** WHEN an identity the owner admitted outright joins a `Password` world, THE SYSTEM SHALL admit it as lpw-9.5 does, and an identity never admitted SHALL be refused at connect and in every reducer as lpw-9.2 does.
+- DoD: lpw-20.1 to lpw-20.3 green; `just ci` green, `bindings-drift` clean; `docs/DECISIONS.md` "The door records a wrong password and answers Ok…" rewritten to the gate's check.
 
 ### lpw-15 — every player binds a world once with an attestation; ownership and the allowlist
 
