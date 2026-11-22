@@ -1,6 +1,6 @@
 # Spec: M-local-play — single-player worlds and friends hosting
 
-**Status:** elaborated 2026-11-16 (`lp-spec`) into 18 `lpw-` slices, with lpw-19 and lpw-20 added 2026-11-22 by the operator's rulings on monster-realm#833 and #840; lpw-8 and lpw-15 revised the same day for the ownership rule (every player owns the game on Steam; M-account-service) (lpw-18, the friends-server transport, added 2026-11-16 by the operator's ruling on monster-realm#821), against game `master`
+**Status:** elaborated 2026-11-16 (`lp-spec`) into 18 `lpw-` slices, with lpw-19 and lpw-20 added 2026-11-22 by the operator's rulings on monster-realm#833 and #840, and lpw-23 and lpw-24 by the ruling on #848; lpw-8 and lpw-15 revised the same day for the ownership rule (every player owns the game on Steam; M-account-service) (lpw-18, the friends-server transport, added 2026-11-16 by the operator's ruling on monster-realm#821), against game `master`
 `63fc0b0a` (`84e3cd96` plus the doc-only #820) and `lpg-0`'s record (the game's
 `docs/local-play.md`). The groundwork (LP0, LP1, LP10 as `lpg-0`, `lpg-1`, `lpg-10`) is built:
 PLAN §Built · **Project:** monster-realm (client, server module, `game-core`, a new desktop shell
@@ -72,10 +72,17 @@ measured medians" and "A target's kind gates telemetry and account sign-in".
 
 Each default stands unless the operator overrules it:
 
-- `decision-defaulted:private-server-idp-unreachable=accept-seen-refuse-new` — when the identity
-  provider cannot be reached, a private server accepts players it has already seen and refuses new
-  ones (consumed by lpw-15, where "cannot be reached" is a joiner who presents no attestation: one
-  admitted before is admitted again, a new one is refused).
+- Account checks at connection (operator, 2026-11-22, monster-realm#848; replaces the default
+  `private-server-idp-unreachable=accept-seen-refuse-new`, which it keeps as cases 2 and 3): a
+  world checks each player's account as part of every connection, in every kind of world. (1) An
+  answer about the account arrives: the connection is admitted or refused by that answer, and the
+  identity's stored status is written or updated. (2) No answer, an identity the world does not
+  know: refused until an answer arrives and the account is verified. (3) No answer, a known
+  identity: admitted or refused by its last known status, with no expiry; the next answer updates
+  it. The host's own account is checked once a day the same way. A binding is therefore not
+  "checked once and kept": lpw-23 (module and attestation route) and lpw-24 (client) build it, and
+  lpw-24 replaces lpw-15.6. The operator allows adjusting the workflow per kind of world, with
+  judgement.
 - `decision-defaulted:private-server-host-notice=yes-once-per-server` — a player sees, once per
   server, a notice that its host can read and change their data in that world (consumed by lpw-9).
 - `decision-defaulted:local-private-reconnect-token=device-storage` — toward a `local` or `private`
@@ -722,3 +729,43 @@ after: [lpw-15, lpw-21]
 
 - **lpw-22.6:** WHEN an unbound identity later calls `join_game` on an enforcing build, THE SYSTEM SHALL refuse it as lpw-15.7 defines, until it binds again.
 - DoD: lpw-22.1 to lpw-22.6 green; `just ci` green, `bindings-drift` clean; the game's `docs/DECISIONS.md` world-binding entry amended.
+
+### lpw-23 — a world re-checks a bound account with every answer and keeps the last known status
+
+type: feature · tier: hard
+touches: server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/schema.rs, evals/baselines/table-schemas.json, account-service/src/attest.ts, account-service/src/attest.test.ts, docs/account-service.md, docs/local-play.md
+after: [lpw-15, lpw-22]
+- Decision: operator, 2026-11-22, monster-realm#848 (the "Account checks at connection" entry above). An answer can be negative, so the attestation route must be able to say "this account is not entitled" in a form the world can verify.
+- Contract: `POST /attest` for a valid token whose account is not entitled returns an attestation with `mr_ent` false instead of refusing (this amends acs-3.2 for that case only; a missing, expired or foreign token is still refused). `bind_world_account` on an identity that already has a binding replaces its status and check time with the new attestation's, positive or negative, under the same checks as lpw-15.1 and lpw-15.2. `entitled(ctx)` reads the last stored status, with no expiry. The binding row holds the entitlement and the time of its last check; a column is added only if lpw-15's row lacks one (then this slice is schema-serial). The host's daily check is the owner's own binding re-checked the same way (lpw-24 sends it); this slice adds no timer and no outgoing request from the module.
+
+- **lpw-23.1:** WHEN a bound identity's new attestation verifies and carries `mr_ent`, THE SYSTEM SHALL update that binding's status to entitled and its check time, and admit it as lpw-15.7 defines.
+
+- **lpw-23.2:** WHEN a bound identity's new attestation verifies and carries `mr_ent` false, THE SYSTEM SHALL update that binding's status to not entitled, and refuse its later `join_game` calls with acs-6.1's error until a later attestation says entitled.
+
+- **lpw-23.3:** WHEN a known identity calls `join_game` with no new attestation, THE SYSTEM SHALL admit or refuse it by its stored status, however old.
+
+- **lpw-23.4:** WHEN an identity with no binding calls `join_game` on an enforcing build, THE SYSTEM SHALL refuse it as lpw-15.7 defines.
+
+- **lpw-23.5:** WHEN the attestation route receives a valid token for an account that is not entitled, THE SYSTEM SHALL return an attestation with `mr_ent` false and the other claims of acs-3's contract, and SHALL still refuse a missing, expired or foreign token with none.
+
+- **lpw-23.6:** WHEN a new attestation fails any lpw-15.2 check, THE SYSTEM SHALL leave the stored binding unchanged.
+- DoD: lpw-23.1 to lpw-23.6 green; `just ci` green, `bindings-drift` clean; the game's `docs/DECISIONS.md` world-binding entry amended in place for #848 (no longer "checked once and kept").
+
+### lpw-24 — the client checks the player's account at every connection to a world
+
+type: feature · tier: hard
+touches: client/src/net/attestation.ts, client/src/net/attestation.test.ts, client/src/net/oidc.ts, client/src/net/oidc.test.ts, client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/shellDocument.ts, client/src/net/connectionConfig.ts, client/src/shell/session.ts, client/src/main.ts, client/src/main.worldBinding.test.ts, client/src/main.targetKindGate.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts
+after: [lpw-15, lpw-19, lpw-23]
+- Decision: operator, 2026-11-22, monster-realm#848. This is the client bind flow lpw-15 deferred (lpw-15.6 and lpw-15.8, plan "Sizing"), shaped by the ruling: it replaces lpw-15.6 (no request on a later open) with a check at every connection, and carries lpw-15.8 unchanged. lpw-15's development recipe (a `justfile` entry, which a run cannot be granted) is named in the PR body for the supervisor.
+- Contract: before each `join_game` in a `local` or `private` world the client asks our issuer for an attestation (lpw-15's sign-in, which never reaches `connect` or the host) and binds with it, positive or negative. When the issuer cannot be reached it joins with no attestation and the module decides (lpw-23.3, lpw-23.4). While a world the player hosts is running, the host's client re-checks the host's own account once a day, the same way. lpw-1.1's rule (requests to our issuer during a bind and nowhere else) holds; a boot that opens no world makes zero OIDC requests.
+
+- **lpw-24.1:** WHEN the client opens a `local` or `private` world and the issuer answers, THE CLIENT SHALL bind with the new attestation before calling `join_game`.
+
+- **lpw-24.2:** WHEN the issuer cannot be reached, THE CLIENT SHALL call `join_game` with no new attestation and show the module's answer.
+
+- **lpw-24.3:** WHEN a world the player hosts has been running a day since the host's last check, THE CLIENT SHALL re-check the host's account as in lpw-24.1, and retry while the issuer cannot be reached.
+
+- **lpw-24.4:** WHEN an account that is not entitled asks for an attestation through the client, THE CLIENT SHALL show acs-7.2's not-owned message (lpw-15.8).
+
+- **lpw-24.5:** WHEN the client boots toward any target and opens no `local` or `private` world, THE CLIENT SHALL make zero requests to the account service.
+- DoD: lpw-24.1 to lpw-24.5 green; `just ci` green.
