@@ -277,6 +277,47 @@ after: [gp-1]
 - **gp-2.8:** WHEN the operator's required flow is played on the mocked pad only (Start, Down, A to Bag, RB, A A A to feed, B back to the menu with the menu still open, Up A to Monsters, move a monster to storage and back, Start to the world, then Up), THE SYSTEM SHALL reach the same states the keyboard flow reaches, ending with the character one tile North (`pad-menu-flow.spec.ts`).
 - DoD: gp-2.1 to gp-2.8 green; `menu-flow.spec.ts` still green; `just ci` green.
 
+Build note (gp-2): gp-2 reports a throwing navigator.getGamepads through the error ring, not
+reportError: shell/inputState holds a fault-sink port (installPadFaultSink; console.error until
+installed, because GamepadSource swallows a throwing reporter) and main.ts installs, at module
+scope, pushError('uncaught', 'gamepad: <message>'). reportError needs a MessageKind and a
+player-facing catalog string (feedbackPolicy, messageIds, both catalogs, the catalog.test roster),
+none in gp-2's touches, and records the fault as 'reducer'. What the player sees: the error overlay
+once (pushError), no toast or hint line. inputState imports no shell module (the layering rule in
+docs/DECISIONS.md).
+
+Build note (gp-2): Measured at gp-2 (Playwright's Chromium, 2026-11-22): navigator.getGamepads is a
+function and returns [null,null,null,null] on an insecure http origin (a LAN IP) as on localhost;
+isSecureContext was false there. The Risks line 'Chromium exposes the Gamepad API only to secure
+contexts' is not what this build does; whether a real pad is reported on an insecure origin is
+unverified (no physical pad). The wiring handles both an absent API and empty slots.
+
+Build note (gp-2): gp-2 pad wiring as built (main.ts pollPad, for gp-4/gp-5/gp-6): the frame reads
+the pad right after its first syncStack (so the guards read a synced stack), before the session-gate
+early return and inputRouter.tick. Gate blocks: releaseAllInput() (which reads the pad, then latches
+it) and nothing routes. A poll that holds a press (a down edge or an accelerator) while focus is
+outside #game-screen or while Controls waits for a key: releaseAllInput() and nothing routes, so the
+ignored press owes no release (a stray release would end another source's hold, and under gp-6's
+tap-at-release it would act). A poll of releases only routes whatever the focus. The press decision
+is made once per poll: A and B in one frame on a Controls slot start the capture and then end it
+through the screen's B; gp-5's capture hand-off should decide per edge. pressEdges (shared with
+pointerPress) routes every edge in its own try and rethrows the first error after the last edge; a
+throw there loses that poll's accelerators and the rest of that frame (accepted LOW).
+
+Build note (gp-2): For gp-5: while a KEY slot capture waits, gp-2 drops every pad press (the adopted
+gp-5 rule), so a pad-only player who pressed A on a keyboard slot cannot cancel that capture from
+the pad; only a key, the Cancel chip or the pointer ends it. gp-5.6 lets Escape cancel a pad
+capture, but no pad button cancels a key capture.
+
+Build note (gp-2): ARCHITECTURE.md's shell/inputState paragraph does not name the pad source,
+installPadFaultSink, or that releaseAllInput also runs on every gated frame and on a pad press
+ignored outside the game screen (gp-2 could not edit it: outside touches).
+
+Build note (gp-2): client/e2e/pad-menu-flow.spec.ts copies about 180 lines of
+client/e2e/menu-flow.spec.ts (helpers, types, the sheet walk, every assertion) because
+menu-flow.spec.ts was outside gp-2 touches; a change to the flow now lands twice. controls.ts
+setPressSource exists so one flow body can serve both sources.
+
 ### gp-3 — one tactical battle turn, pad only
 
 type: feature · tier: routine
