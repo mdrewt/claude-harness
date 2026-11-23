@@ -224,6 +224,22 @@ after: []
 - **gp-1.15:** WHEN `getPads` throws on every poll, THE SYSTEM SHALL return no edges each time and call `onError` exactly once.
 - DoD: gp-1.1 to gp-1.15 green (fast-check properties for the stick's hysteresis and the source's balanced edges); `just ci` green.
 
+Build note (gp-1): GamepadSource.capture() semantics as built: a press seen during capture owes
+nothing (it emits no edge on release, so the captured button acts only after release and re-press,
+gp-5.9); an up edge owed by a button or stick direction held from before the capture is queued and
+emitted first by the next poll(), so gp-5 needs no extra router release at capture entry;
+releaseAll()/rebind() drop that queue. A stick direction first reached during capture stays latched
+until the stick reads centre. With several indices newly pressed in one capture read, the lowest
+bindable index wins over a reserved/unbindable one (which alone gives 'refused').
+
+Build note (gp-1): GamepadSource details gp-2 relies on: constructor is (getPads, bindings =
+PAD_DEFAULT_BINDINGS, { onError }); onError fires once per source lifetime; getPads may return any
+array-like (Array.from), and a throw or a malformed pad reads as no pads, releasing every owed edge.
+An accelerator binding is resolved before a button binding on the same index, as the keyboard path
+does. Within one poll: queued capture ups, then ups of vanished/disconnected/replaced pads, then
+each present pad's buttons in index order, then its stick (old direction's up before the new one's
+down).
+
 ### gp-2 — a connected pad plays the game: the operator's menu flow, pad only
 
 type: feature · tier: hard
