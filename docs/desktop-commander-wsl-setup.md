@@ -15,7 +15,7 @@ Windows: the `defaultShell` resetting to PowerShell, the PowerShell→wsl quote-
 
 DC is a **stdio MCP server**: Claude Desktop launches it as a child process and talks to it
 over stdin/stdout. It is **not** a background daemon. So "autostart DC when WSL begins" isn't
-literally possible — Claude Desktop starts DC on demand. What we *do* make autostart is the
+literally possible — Claude Desktop starts DC on demand. What we _do_ make autostart is the
 **Ubuntu distro itself** (boot at login + a keep-alive), so the distro is always warm and DC
 launches into it instantly. That also keeps your detached build loop alive when Claude
 Desktop is closed.
@@ -24,13 +24,13 @@ Desktop is closed.
 
 - Distro name: **`Ubuntu`** (24.04.4 LTS), default user **`mdrewt`**, **systemd enabled**
   (`/etc/wsl.conf` has `[boot] systemd=true`).
-- A child of a `bash -lc` login shell inherits the **full toolchain**: `node v24.13.1`
+- A child of a `bash -lc` login shell inherits the **full toolchain**: `node v24.22.3`
   (asdf shims), `cargo`/`rustc`/`wasm-pack` (`~/.cargo/bin`), `spacetime` + `claude`
   (`~/.local/bin`), `just`, `git`. → DC started via `bash -lc` passes all of this to every
   command it runs.
 - `claude_desktop_config.json` currently has **no `mcpServers`** section — DC is installed as
   a DXT extension (managed in Settings → Extensions), so the switch is "disable the extension
-  + add a manual `mcpServers` entry."
+  - add a manual `mcpServers` entry."
 - A `bash -lc` startup produces clean stdout (MCP-safe).
 
 ---
@@ -88,7 +88,7 @@ The global install is faster, offline-capable, and pins the version until you re
 In a new chat, confirm DC is healthy and now native:
 
 - DC tools are present.
-- Ask it to run: `uname -a` → Linux; `node -v` → **v24.13.1**; `pwd` → `/home/mdrewt…`.
+- Ask it to run: `uname -a` → Linux; `node -v` → **v24.22.3**; `pwd` → `/home/mdrewt…`.
 - Check `get_config` → `defaultShell` is a Linux shell (e.g. `/bin/bash`), **not**
   `powershell.exe`.
 - Restart Claude Desktop once more and re-check `get_config` → it should **still** be bash.
@@ -103,6 +103,7 @@ Two pieces, both optional but recommended (especially if you want the build loop
 running while Claude Desktop is closed):
 
 **(a) Boot Ubuntu at Windows login — Task Scheduler**
+
 - Task Scheduler → Create Task… → General: name "Start Ubuntu (WSL)", "Run whether user is
   logged on or not" is fine; check "Hidden".
 - Triggers → New → "At log on" (your account).
@@ -144,17 +145,18 @@ vmIdleTimeout=-1
 ## Step 5 — Post-switch follow-ups (I can do these for you afterward)
 
 - **Harness docs:** with DC native in WSL there is no PowerShell fallback and no
-  `wsl -d Ubuntu bash -lc` wrapper *at all*. The `wsl-harness-exec` skill and the
+  `wsl -d Ubuntu bash -lc` wrapper _at all_. The `wsl-harness-exec` skill and the
   `monster-realm-v2-milestone-runner` task SKILL should be simplified to "DC runs natively in
   WSL — run commands directly." (We kept the wrapper as a documented fallback precisely because
   the Windows setup was flaky; once you're on WSL it's dead weight.)
-- **`start_process` timeout quirk** may *improve* — a native bash gives DC a prompt to detect
+- **`start_process` timeout quirk** may _improve_ — a native bash gives DC a prompt to detect
   command completion on, so the cosmetic "timed out" may stop happening. Re-test after switching.
 - **Build loop** (native `claude` in WSL) is unaffected — it never used DC.
 
 ## Rollback
 
 If DC doesn't connect after the restart:
+
 1. Re-enable the Desktop Commander DXT (Settings → Extensions).
 2. Remove the `mcpServers` block from `claude_desktop_config.json` (or restore the `.bak`).
 3. Restart Claude Desktop.

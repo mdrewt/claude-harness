@@ -1,4 +1,5 @@
 # Gates: ts-6b-10
+
 Spec: M-trade-sessions.spec.md#ts-6b-10
 Seed: f6031ca624beb3fb
 Seeded: 2026-11-14T02:44:38Z
@@ -18,16 +19,16 @@ Touches: client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, cli
      residual may not DEFER to `backlog`. -->
 
 - [ ] ts-6b-10.1: WHEN a player is asked to confirm a trade whose own side offers a monster, THE CLIENT SHALL state that the monster's trust and quality time reset and are not restored by trading back, and a side offering no monster SHALL see the plain prompt — closes `R-21r-e-E1` (`the confirm prompt warns of the bond reset only when your offer includes a monster` in `client/src/ui/tradeSessionView.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/tradeSessionView.test.ts -t "the confirm prompt warns of the bond reset only when your offer includes a monster"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/tradeSessionView.test.ts -t "the confirm prompt warns of the bond reset only when your offer includes a monster"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-10.2: WHEN the player opens a Social row's sheet, THE CLIENT SHALL render it as the kit ContextSheet ending with a Back row whose A closes the sheet and sends nothing — closes `R-uif-9-UIF9.2` (`the Social row sheet ends with a Back row whose A closes the sheet and sends nothing` in `client/src/ui/screens/socialScreen.test.ts`; `client/e2e/pvp.spec.ts` answers a challenge through the sheet).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/screens/socialScreen.test.ts -t "the Social row sheet ends with a Back row whose A closes the sheet and sends nothing"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/screens/socialScreen.test.ts -t "the Social row sheet ends with a Back row whose A closes the sheet and sends nothing"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-10.3: WHEN the Social frame opens on Players, THE CLIENT SHALL show the leaderboard panel directly, with no trade-root placeholder path — closes `R-ctl-8g-CTL8G.1-DEADPATH` (`socialPanel opens the Players tab on the leaderboard panel` in `client/src/ui/contextStack.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/contextStack.test.ts -t "socialPanel opens the Players tab on the leaderboard panel"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/contextStack.test.ts -t "socialPanel opens the Players tab on the leaderboard panel"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending

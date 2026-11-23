@@ -9,8 +9,8 @@ Tier: hard (a new authentication surface). Sandbox: `/tmp/acs-1-sb.hJBE1z` (prob
 - `oidc-provider` latest is 9.15.1 (MIT; dependencies `koa`, `jose`, `debug`; no install script in the
   tree). It ships no types: `@types/oidc-provider` 9.13.1 typechecks under TypeScript 7.0.2, including
   `ExternalSigningKey`. vitest 4.1.12 imports `node:sqlite` and `.ts`-suffixed relative imports.
-- Node 24.22.0 (the repo pin): `node:sqlite` loads with no warning (SQLite 3.53.4); `node file.ts` runs
-  TypeScript by type stripping; `import.meta.main` is true for the entry file. On 24.13.1 the same code
+- Node 24.22.3 (the repo pin): `node:sqlite` loads with no warning (SQLite 3.53.4); `node file.ts` runs
+  TypeScript by type stripping; `import.meta.main` is true for the entry file. On 24.22.3 the same code
   runs and `node:sqlite` prints an ExperimentalWarning.
 - **Discovery follows the request, not the issuer.** A default provider answers
   `GET /.well-known/openid-configuration` with `Host: evil.example` by publishing
@@ -85,18 +85,18 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
 unset. A set value is taken exactly as written (never trimmed, never normalised). Every refusal is a
 `ConfigError` whose `setting` is the env name at fault. **No message ever carries a setting's value.**
 
-| Setting | local-dev | hosted-dev | production |
-|---|---|---|---|
-| `MR_ACCOUNT_PROFILE` | required for every profile; exactly one of the three names, anything else refused | | |
-| `issuer` | `LOCAL_DEV_ISSUER` | `HOSTED_DEV_ISSUER` | the value of `MR_ACCOUNT_ISSUER` |
-| `MR_ACCOUNT_ISSUER` | refused when set | refused when set | required; rule below |
-| `MR_ACCOUNT_SIGN_IN` | unset or `dev-password` → `dev-password`; anything else refused | same | unset or `steam` → `steam`; anything else refused (so `dev-password` is) |
-| `MR_ACCOUNT_DATA_DIR` | default `LOCAL_DEV_DATA_DIR` | required | required |
-| `MR_ACCOUNT_KEY_FILE` | default `path.join(dataDir, 'keys.json')`; `keys = { kind: 'file', path, generateIfMissing: true }` | same default; `generateIfMissing: false` | refused when set; `keys = { kind: 'external' }` |
-| an env name matching `/^MR_STEAM_.*KEY/i` (the publisher key is `MR_STEAM_PUBLISHER_KEY`) | refused when set, `setting` = that name | same | not read |
-| `MR_ACCOUNT_HOST` | default `127.0.0.1`; a value must satisfy `net.isIP(v) !== 0 \|\| v === 'localhost'` | same | same |
-| `MR_ACCOUNT_PORT` | default `4455`; a value must match `/^(0\|[1-9]\d{0,4})$/` and be ≤ 65535 (0 = the OS picks) | same | same |
-| any other set name whose `trim().toUpperCase()` starts with `MR_ACCOUNT_` | refused, `setting` = the name as written (a misspelt or wrong-case setting never falls back to a default) | | |
+| Setting                                                                                   | local-dev                                                                                                 | hosted-dev                               | production                                                               |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
+| `MR_ACCOUNT_PROFILE`                                                                      | required for every profile; exactly one of the three names, anything else refused                         |                                          |                                                                          |
+| `issuer`                                                                                  | `LOCAL_DEV_ISSUER`                                                                                        | `HOSTED_DEV_ISSUER`                      | the value of `MR_ACCOUNT_ISSUER`                                         |
+| `MR_ACCOUNT_ISSUER`                                                                       | refused when set                                                                                          | refused when set                         | required; rule below                                                     |
+| `MR_ACCOUNT_SIGN_IN`                                                                      | unset or `dev-password` → `dev-password`; anything else refused                                           | same                                     | unset or `steam` → `steam`; anything else refused (so `dev-password` is) |
+| `MR_ACCOUNT_DATA_DIR`                                                                     | default `LOCAL_DEV_DATA_DIR`                                                                              | required                                 | required                                                                 |
+| `MR_ACCOUNT_KEY_FILE`                                                                     | default `path.join(dataDir, 'keys.json')`; `keys = { kind: 'file', path, generateIfMissing: true }`       | same default; `generateIfMissing: false` | refused when set; `keys = { kind: 'external' }`                          |
+| an env name matching `/^MR_STEAM_.*KEY/i` (the publisher key is `MR_STEAM_PUBLISHER_KEY`) | refused when set, `setting` = that name                                                                   | same                                     | not read                                                                 |
+| `MR_ACCOUNT_HOST`                                                                         | default `127.0.0.1`; a value must satisfy `net.isIP(v) !== 0 \|\| v === 'localhost'`                      | same                                     | same                                                                     |
+| `MR_ACCOUNT_PORT`                                                                         | default `4455`; a value must match `/^(0\|[1-9]\d{0,4})$/` and be ≤ 65535 (0 = the OS picks)              | same                                     | same                                                                     |
+| any other set name whose `trim().toUpperCase()` starts with `MR_ACCOUNT_`                 | refused, `setting` = the name as written (a misspelt or wrong-case setting never falls back to a default) |                                          |                                                                          |
 
 - A set `MR_ACCOUNT_DATA_DIR` or `MR_ACCOUNT_KEY_FILE` must be absolute and normalised
   (`path.resolve(v) === v`) and not the filesystem root.
@@ -111,12 +111,22 @@ unset. A set value is taken exactly as written (never trimmed, never normalised)
 ```ts
 // account-service/src/keys.ts
 export interface SigningJwk {
-  readonly kty: 'EC'; readonly crv: 'P-256'; readonly alg: 'ES256'; readonly use: 'sig';
-  readonly kid: string; readonly x: string; readonly y: string; readonly d: string;
+	readonly kty: "EC";
+	readonly crv: "P-256";
+	readonly alg: "ES256";
+	readonly use: "sig";
+	readonly kid: string;
+	readonly x: string;
+	readonly y: string;
+	readonly d: string;
 }
-export interface SigningKeys { readonly keys: readonly SigningJwk[] }   // keys[0] signs; every key is published
-export function generateSigningKey(): SigningJwk;   // fresh P-256 key; kid = RFC 7638 thumbprint (SHA-256, base64url) of its public JWK
-export function loadSigningKeys(config: Pick<Config, 'profile' | 'keys'>): SigningKeys;
+export interface SigningKeys {
+	readonly keys: readonly SigningJwk[];
+} // keys[0] signs; every key is published
+export function generateSigningKey(): SigningJwk; // fresh P-256 key; kid = RFC 7638 thumbprint (SHA-256, base64url) of its public JWK
+export function loadSigningKeys(
+	config: Pick<Config, "profile" | "keys">,
+): SigningKeys;
 ```
 
 - Key file: JSON, exactly `{ "profile": "<the profile it was made for>", "keys": [ <key>, ... ] }`.
@@ -138,18 +148,22 @@ export function loadSigningKeys(config: Pick<Config, 'profile' | 'keys'>): Signi
 
 ```ts
 // account-service/src/store/sqliteAdapter.ts
-import type { Adapter } from 'oidc-provider';
+import type { Adapter } from "oidc-provider";
 export interface AccountStore {
-  readonly adapter: (model: string) => Adapter;   // what the provider's `adapter` option takes
-  purgeExpired(): number;                          // deletes expired records, returns how many
-  close(): void;
+	readonly adapter: (model: string) => Adapter; // what the provider's `adapter` option takes
+	purgeExpired(): number; // deletes expired records, returns how many
+	close(): void;
 }
-export function openAccountStore(path: string, now?: () => number): AccountStore;
+export function openAccountStore(
+	path: string,
+	now?: () => number,
+): AccountStore;
 // path: a file path or ':memory:'. now: epoch seconds; default the wall clock.
 ```
 
 `openAccountStore` on a file path creates the file with mode 0600 when it is absent. Per model name
 (records of two models never see each other, in any operation):
+
 - `upsert(id, payload, expiresIn)`: stores the payload. `expiresIn` a finite number: the record
   expires at `now() + expiresIn` (zero or negative: already expired). `undefined`: it never expires.
   Any other `expiresIn` (NaN, Infinity, a string) rejects with a `TypeError` and stores nothing. A
@@ -169,20 +183,21 @@ export function openAccountStore(path: string, now?: () => number): AccountStore
 
 ```ts
 // account-service/src/provider.ts
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import type Provider from 'oidc-provider';
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type Provider from "oidc-provider";
 export interface AccountProvider {
-  readonly provider: Provider;
-  readonly handler: (req: IncomingMessage, res: ServerResponse) => void;
+	readonly provider: Provider;
+	readonly handler: (req: IncomingMessage, res: ServerResponse) => void;
 }
 export function createAccountProvider(options: {
-  readonly issuer: string;
-  readonly keys: SigningKeys;
-  readonly adapter: (model: string) => Adapter;
+	readonly issuer: string;
+	readonly keys: SigningKeys;
+	readonly adapter: (model: string) => Adapter;
 }): AccountProvider;
 ```
 
 Through `handler` (an `http.createServer(handler)` on any port):
+
 - A request whose `Host` header is not the issuer's host (`new URL(issuer).host`, compared
   case-insensitively; a missing Host counts as different) gets **421** and a `text/plain` body; the
   provider never sees it. A request target that does not start with `/` gets **400**.
@@ -206,13 +221,13 @@ Through `handler` (an `http.createServer(handler)` on any port):
 ```ts
 // account-service/src/server.ts
 export interface RunningServer {
-  readonly config: Config;
-  readonly url: string;            // what is actually bound: http://127.0.0.1:<port>, IPv6 as http://[::1]:<port>
-  close(): Promise<void>;          // stops listening, stops the purge timer, closes the store
+	readonly config: Config;
+	readonly url: string; // what is actually bound: http://127.0.0.1:<port>, IPv6 as http://[::1]:<port>
+	close(): Promise<void>; // stops listening, stops the purge timer, closes the store
 }
 export function startServer(
-  env: Readonly<Record<string, string | undefined>>,
-  log?: (line: string) => void,
+	env: Readonly<Record<string, string | undefined>>,
+	log?: (line: string) => void,
 ): Promise<RunningServer>;
 ```
 
@@ -251,13 +266,13 @@ the SQLite file is opened with Node's built-in `node:sqlite`, no native SQLite p
 
 ### Tests (the tester's files)
 
-| File | Carries |
-|---|---|
-| `src/config.test.ts` | acs-1.2: each refused setting alone against a control that loads; the three profiles' issuers and defaults; the issuer spellings; port and host shapes; unknown and wrong-case names; no value in any message |
-| `src/keys.test.ts` | acs-1.1 (keys by `kid`) and acs-1.2 (the key-file mark): generation, reuse, modes, every refusal in the contract, no key material in a message, `external` refused |
-| `src/store/sqliteAdapter.test.ts` | X1: the contract above under an injected clock, and the provider's own models (`Grant`, `AuthorizationCode`, `RefreshToken`, `Session`) driven through the store; persistence across reopen; `purgeExpired` |
-| `src/provider.test.ts` | acs-1.1: discovery, the key set, the Host rule and the forwarded headers, the closed defaults |
-| `src/server.test.ts` | acs-1.4: the real `just --no-deps account-dev` against a temp data directory and port 0, twice (same `kid`, `x`, `y`; key file bytes unchanged); acs-1.2 at process level (exit 1, the setting on stderr, nothing written); file modes |
+| File                              | Carries                                                                                                                                                                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/config.test.ts`              | acs-1.2: each refused setting alone against a control that loads; the three profiles' issuers and defaults; the issuer spellings; port and host shapes; unknown and wrong-case names; no value in any message                          |
+| `src/keys.test.ts`                | acs-1.1 (keys by `kid`) and acs-1.2 (the key-file mark): generation, reuse, modes, every refusal in the contract, no key material in a message, `external` refused                                                                     |
+| `src/store/sqliteAdapter.test.ts` | X1: the contract above under an injected clock, and the provider's own models (`Grant`, `AuthorizationCode`, `RefreshToken`, `Session`) driven through the store; persistence across reopen; `purgeExpired`                            |
+| `src/provider.test.ts`            | acs-1.1: discovery, the key set, the Host rule and the forwarded headers, the closed defaults                                                                                                                                          |
+| `src/server.test.ts`              | acs-1.4: the real `just --no-deps account-dev` against a temp data directory and port 0, twice (same `kid`, `x`, `y`; key file bytes unchanged); acs-1.2 at process level (exit 1, the setting on stderr, nothing written); file modes |
 
 ## Plan review (reviewer + red-team, both read-only; no blocker)
 
@@ -273,6 +288,7 @@ test; the symlink guard and the hidden-lock-file freshness test in `account-inst
 `docs/account-service.md` named as a deliverable; the `DECISIONS.md` amendment cut to one clause.
 
 Answered, not adopted:
+
 - "Refuse `0.0.0.0` for local-dev": acs-4.2 runs the `local-dev` profile in a container, which must
   bind the wildcard; the default stays loopback and a wider bind is an explicit setting.
 - "Refuse or tighten a loose data directory": a mounted volume's mode is the operator's. The files the

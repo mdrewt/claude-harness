@@ -1,10 +1,12 @@
 # lpw-34 plan, increment 1: the generated-definition check, with the version hops deferred
 
 ## Why this is the increment
+
 At step 1 the hop past 2.11.0 measured blocked, on three counts (notes n1 and n2, residual R-lpw-34-NOTE7A6229):
+
 - From 2.12.0 on, `spacetimedb-bindings-sys` always defines native host-ABI stubs. They collide with
   `native_host_tests.rs`, and 769 of 1311 module tests fail.
-- SDK >= 2.14.0 needs Node >= 24.22.1, and the workflows that pin Node are not grantable.
+- SDK >= 2.14.0 needs Node >= 24.22.3, and the workflows that pin Node are not grantable.
 - SDK 2.16.1 is under the npm cooldown until 2026-11-27.
 
 The part of lpw-34 that holds at any version is lpw-34.6: the check that replaces the guarantee
@@ -14,6 +16,7 @@ guard in place. Gates .1, .2, .3, .4, .5 and .7 all name 2.16.1 or the recorded 
 DEFERred with the measured reason.
 
 ## Functional core / imperative shell
+
 - **Default build (Rust, test code).** `server-module/src/privacy_enforcement_tests.rs` gets
   `fn definition_violations(def: &RawModuleDefV10) -> Vec<String>`. It walks every section:
   - `HttpHandlers`, `HttpRoutes` and `RowLevelSecurity` must be empty, and each entry is named in a
@@ -45,6 +48,7 @@ DEFERred with the measured reason.
   environment variable names it.
 
 ## Tests (tester; the orchestrator proves red)
+
 - Rust: the two tests above, in `privacy_enforcement_tests.rs`. Red proof: a planted handler, route
   and filter in a sandbox copy with `unstable` switched on, never committed.
 - JS units in `scripts/verify-release-reducers.test.mjs`. Red until the export exists.
@@ -57,6 +61,7 @@ DEFERred with the measured reason.
     once, on exactly the built file.
 
 ## Docs (in touches)
+
 - The `justfile` recipe comment.
 - The `verify-release-reducers.mjs` header.
 - `docs/local-play.md` §3 "What the module never declares".
@@ -66,10 +71,12 @@ DEFERred with the measured reason.
 - The justfile node-door floor is re-derived.
 
 ## Ledger
+
 - .6 gets a node CHECK that runs the named Rust tests and both node files, and that calls
   `findDefinitionViolations` on a planted def and a clean def.
 - The rest are DEFERred to `backlog`, each citing R-lpw-34-NOTE7A6229, n1 or n2.
 
 ## Evidence beyond tests
+
 - Real `just release-module world` and `official` on CLI 2.11.0, both accepted.
 - The sandbox planted-handler watch: the Rust test fails, and release-module refuses.

@@ -1,7 +1,7 @@
 # qf-7b plan — battle legacy-control retirement, remainder (2026-10-30)
 
 Worktree `.claude/worktrees/qf-7b`, branch `slice/qf-7b` from `origin/master` b75c28e9 (deps campaign
-merged: Node 24.22.0, spacetime 2.11.0 — the machine matches, no PATH shim needed this time).
+merged: Node 24.22.3, spacetime 2.11.0 — the machine matches, no PATH shim needed this time).
 
 ## Scope decision (measured, not assumed)
 
@@ -10,6 +10,7 @@ e2e deleted) + the in-`touches:` half of QF7B.1/QF7.4: every e2e that clicked th
 migrates to the command list's Run (`battle-command-run`) now, so the follow-up is view + catalog only.
 
 **DEFER (hidden dependency):**
+
 - **QF7B.1** — removing the Flee button leaves `battle.action.flee` with zero literal requesters.
   `catalogParity.test.ts` PARITY-04 (`walkClientSrc` reads every non-test `.ts` under `client/src`;
   `DEAD_KEY_EXEMPT` is pinned to `[]`) then reds in `just ci`. Closing it needs
@@ -24,13 +25,13 @@ Deferred 2/4 = exactly half (the sizing cap is "more than half").
 
 `#open: BattleCommand | null` (QF7.2) becomes the single source for all three contextual lists:
 
-| `#open` | skills grid (`#skillsEl`) | bait list (`#actionsEl`) | bench rows | cure list |
-|---|---|---|---|---|
-| null | — | — | — | as today (ungated; spec silent) |
-| fight | rendered | — | — | as today |
-| recruit | — | rendered (+ confirm when picked) | — | as today |
-| swap | — | — | rendered | as today |
-| bag | — | — | — | as today (+ target when picked) |
+| `#open` | skills grid (`#skillsEl`) | bait list (`#actionsEl`)         | bench rows | cure list                       |
+| ------- | ------------------------- | -------------------------------- | ---------- | ------------------------------- |
+| null    | —                         | —                                | —          | as today (ungated; spec silent) |
+| fight   | rendered                  | —                                | —          | as today                        |
+| recruit | —                         | rendered (+ confirm when picked) | —          | as today                        |
+| swap    | —                         | —                                | rendered   | as today                        |
+| bag     | —                         | —                                | —          | as today (+ target when picked) |
 
 - `#renderSkills(vm)`: early-return unless `this.#open === 'fight'` (keeps the existing `!ongoing`,
   `skills.length === 0`, `pvpPendingSubmit` returns).
@@ -70,6 +71,7 @@ sweeps census elements); re-rendering from `#choosePick` twice; touching the cat
 ## Gates — see `gates/qf-7b.gates.md` (CHECKs are vitest JSON roster pins + git no-deletion + 2 e2e)
 
 ## Risks / follow-ups
+
 - `client/e2e/a11y.spec.ts` CTL7B-E2E-BATTLE (outside touches) mounts a BattleView at 640x360 and
   requires the ongoing battle to SCROLL (`scrollable: true`). Without the skills grid at rest the frame is
   ~47 px shorter. MEASURE with a live server after the implementation; if red → hidden dependency
@@ -79,6 +81,7 @@ sweeps census elements); re-rendering from `#choosePick` twice; touching the cat
   That is the command-first model the feedback (-133) asks for; the e2e witnesses move accordingly.
 
 ## Evidence log (2026-10-30)
+
 - RED (unit): bfd011cc — 33 failures on origin/master's view, every one an absence-at-rest assertion
   (12 new teeth + migrated 20r-a/rb-121/ctl-8i/QF7.2/boot); tsc + biome clean.
 - GREEN: a2f83bfb — 141/141 (battleView.test.ts + battleScreen.boot.test.ts), tsc + biome clean,

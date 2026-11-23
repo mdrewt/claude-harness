@@ -1,4 +1,5 @@
 # Gates: ts-6b-13
+
 Spec: M-trade-sessions.spec.md#ts-6b-13
 Seed: 42a91927c7274784
 Seeded: 2026-11-14T06:23:26Z
@@ -18,26 +19,26 @@ Touches: client/src/ui/healModel.ts, client/src/ui/healModel.test.ts, client/src
      residual may not DEFER to `backlog`. -->
 
 - [ ] ts-6b-13.1: WHEN a heal frame issues `healParty`, THE CLIENT SHALL always carry the bound location id, with no first-location fallback path — closes `R-ctl-10a-HEALTARGET` (`npm --prefix client run typecheck` with `locationId` required; `client/src/main.dispatch.test.ts`, `client/src/ui/screens/healScreen.test.ts` and the catalog parity suite pass).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/main.dispatch.test.ts src/ui/screens/healScreen.test.ts src/ui/healModel.test.ts src/ui/feedbackPolicy.test.ts src/ui/i18n/catalog.test.ts src/ui/i18n/catalogParity.test.ts src/ui/i18n/resolver.test.ts src/ui/contextStack.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/main.dispatch.test.ts src/ui/screens/healScreen.test.ts src/ui/healModel.test.ts src/ui/feedbackPolicy.test.ts src/ui/i18n/catalog.test.ts src/ui/i18n/catalogParity.test.ts src/ui/i18n/resolver.test.ts src/ui/contextStack.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending
 
 - [ ] ts-6b-13.2: THE Box view SHALL declare no heal callback, the Box Heal Party control being retired — closes `R-ctl-10a-BOXCB` (`npm --prefix client run typecheck`; `client/src/ui/boxView.test.ts` and `client/src/ui/overlayA11yWiring.test.ts` pass).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/boxView.test.ts src/ui/overlayA11yWiring.test.ts src/main.dispatch.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/boxView.test.ts src/ui/overlayA11yWiring.test.ts src/main.dispatch.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending
 
 - [ ] ts-6b-13.3: THE PvP view SHALL declare no challenge-initiate callback, a challenge starting only face to face — closes `R-ctl-10b-PVPCB` (`npm --prefix client run typecheck`; `client/src/ui/pvpView.test.ts` and `client/src/ui/overlayA11yWiring.test.ts` pass).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/pvpView.test.ts src/ui/overlayA11yWiring.test.ts src/main.dispatch.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/pvpView.test.ts src/ui/overlayA11yWiring.test.ts src/main.dispatch.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending
 
 - [ ] ts-6b-13.4: THE CLIENT SHALL compute challenge-busy players in one place, `interactModel.pendingChallengeIdentities` — closes `R-ctl-10b-PVPPLAYERS` (`npm --prefix client run typecheck`; `client/src/ui/pvpModel.test.ts` and `client/src/ui/pvpView.test.ts` pass without `challengeablePlayers`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/pvpModel.test.ts src/ui/pvpView.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/pvpModel.test.ts src/ui/pvpView.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending
 
 - [ ] ts-6b-13.5: THE CLIENT SHALL construct `RaisingView` from its parent element only — closes `R-qf-9-RAISINGVESTIGES` (`npm --prefix client run typecheck`; `client/src/ui/raisingView.test.ts` and `client/src/ui/overlayA11yWiring.test.ts` pass).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/raisingView.test.ts src/ui/overlayA11yWiring.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/raisingView.test.ts src/ui/overlayA11yWiring.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending

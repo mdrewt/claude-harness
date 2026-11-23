@@ -12,7 +12,7 @@ from `origin/master` `88a3c8cb` (lpw-15 merged as #850).
   each of two forks: (f) how a page a gate serves obtains an attestation; (g) what names a server a
   browser reached by a bare IP address.
 - Scratch lives in `/tmp/lpw-19-sb.jRhuAJ/` (never merged): `p1/` the name-derivation prototype and
-  its output under Node 24.22.0; `p2/` the headless-Chromium probes (fragment, redirect, opener,
+  its output under Node 24.22.3; `p2/` the headless-Chromium probes (fragment, redirect, opener,
   history); `p3/` copies of the red-team's probes (a previous holder's service worker and cache,
   `Origin` under each referrer policy); `judge/DOSSIER.md` the evidence the judges scored
   (`DOSSIER.v1.md` is what the red-team and reviewer read); `ledger/` the ledger checks.

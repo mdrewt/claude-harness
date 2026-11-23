@@ -8,7 +8,7 @@ Everything you write goes under the slice worktree:
 
 (`WT` below; paths in this brief are relative to `WT/account-service/` unless they start with `/`).
 The package exists (acs-1 and acs-2 are merged) with `node_modules` installed (`oidc-provider`
-9.15.1, `jose` 6.2.18, `vitest` 4, TypeScript 7, Node 24.22.0). **`src/attest.ts` does not exist,
+9.15.1, `jose` 6.2.18, `vitest` 4, TypeScript 7, Node 24.22.3). **`src/attest.ts` does not exist,
 and `src/keys.ts`, `src/rateLimit.ts` and `src/server.ts` have none of the new behaviour**, so the
 new test file fails at import and every appended test fails on behaviour until the implementer
 lands it. That is the expected red state. You have no shell: I run everything and report back.
@@ -73,12 +73,12 @@ the contract, and also against the exported constants where one exists.
 
 ## Files and gates
 
-| File | New or existing | Gates it must carry | What goes there |
-|---|---|---|---|
-| `src/attest.test.ts` | new | acs-3.1, acs-3.2, acs-3.3, acs-3.4, acs-3.5 | the route over real HTTP with fake dependencies |
-| `src/keys.test.ts` | existing, append | acs-3.1, acs-3.4 | attestation keys: generate, load, publish, disjointness |
-| `src/rateLimit.test.ts` | existing, append | acs-3.3 | `retryAfter` |
-| `src/server.test.ts` | existing, append and one setup edit | acs-3.1, acs-3.5 | the route served by `startServer`, end to end |
+| File                    | New or existing                     | Gates it must carry                         | What goes there                                         |
+| ----------------------- | ----------------------------------- | ------------------------------------------- | ------------------------------------------------------- |
+| `src/attest.test.ts`    | new                                 | acs-3.1, acs-3.2, acs-3.3, acs-3.4, acs-3.5 | the route over real HTTP with fake dependencies         |
+| `src/keys.test.ts`      | existing, append                    | acs-3.1, acs-3.4                            | attestation keys: generate, load, publish, disjointness |
+| `src/rateLimit.test.ts` | existing, append                    | acs-3.3                                     | `retryAfter`                                            |
+| `src/server.test.ts`    | existing, append and one setup edit | acs-3.1, acs-3.5                            | the route served by `startServer`, end to end           |
 
 Read each existing test file before you append: reuse its helpers and its style, add `describe`
 blocks at the end, and leave existing tests as they are except for the one setup edit named below.
@@ -95,6 +95,7 @@ status no route row uses (for example 418) and records that it ran. Send request
 you advance.
 
 Make bearer tokens yourself, two ways:
+
 - ordinary ones with `jose`'s `SignJWT` and the login key (the private JWK is in your hands);
 - hostile ones by hand (base64url header, base64url payload, signature from `node:crypto`), which
   lets you write any header and any payload: `alg: 'none'` with an empty signature, `HS256` keyed

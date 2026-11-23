@@ -3,9 +3,10 @@
 ## DONE (0)
 
 ## REMAINING (3) — the exact next steps
+
 - QF14.1 (unchecked): ONE new accelerator row SHALL open Options › Controls directly, bound by default to a free key that is NOT Tab
 - QF14.2 (unchecked): THE new accelerator SHALL be remappable like every other accel and SHALL appear automatically in the generated
-- QF14.3 (unchecked): THE reachability pin SHALL be updated by hand as a literal manifest change, with the intentional count change 
+- QF14.3 (unchecked): THE reachability pin SHALL be updated by hand as a literal manifest change, with the intentional count change
 
 ## DEFERRED (0)
 
@@ -13,26 +14,30 @@
 
 Branch `slice/qf-14` @ cb1d6719 = origin/master a668c3d1 + one empty wip commit (pushed). No code,
 no PR (empty diff). Worktree `.claude/worktrees/qf-14` is kept with `client/node_modules` (Node
-24.22.0) and `client-wasm/pkg` (copied from the main checkout) ready. Ledger untouched: 3/3
+24.22.3) and `client-wasm/pkg` (copied from the main checkout) ready. Ledger untouched: 3/3
 seeded, CHECK/EXPECT blank (PLAN not reached), no DEFER.
 
 ### Why no part fits the declared touches (all three criteria depend on it)
+
 The accelerator set is the closed tuple `ACCELS` in **client/src/input/buttons.ts:23**. `Accel` derives from
 it, so `Bindings.accels` in bindings.ts cannot gain a row without it. Two more exhaustive tables
 are typed off it:
+
 - **client/src/input/router.ts:126** `ACCEL_PATHS: Record<MenuAccel, AccelPath>`. The new row is
   `{ menu: ['options', 'controls'], frame: 'controlsView' }`; the menu keys are verified in
   menuModel.ts:139-155.
 - **client/src/ui/controlsModel.ts:78** `ACCEL_LABELS: Record<Accel, () => string>`.
-QF14.2 (help/hint) is already generated from `ACCELS` (helpModel/optionsScreen/controlsView derive rows),
-so no help-generator edit is needed once the three files are widened. The spec's Evidence line names
-bindings.ts ≈32–44 as "the accel table", but that file only holds the default codes; the roster is in buttons.ts.
+  QF14.2 (help/hint) is already generated from `ACCELS` (helpModel/optionsScreen/controlsView derive rows),
+  so no help-generator edit is needed once the three files are widened. The spec's Evidence line names
+  bindings.ts ≈32–44 as "the accel table", but that file only holds the default codes; the roster is in buttons.ts.
 
 ### MEASURED blast radius (tsc + full client vitest, 4673 tests; probe reverted)
+
 The probe patch is saved at `memory/projects/monster-realm-qf-14-probe.patch`. It adds accel `Y` = `KeyY`
 → Options › Controls, plus the catalog key `controls.accel.controls` ('Controls' / 'Commandes', which
 matches `menu.options.controls.title` in fr). The fr `@desc` is missing from the patch; catalogShape
 flags it, and the fix stays inside touches. Results:
+
 - TS: `router.test.ts(1505)` TS2741 (`EXPECTED` path table missing the new key).
 - Red OUTSIDE touches (5 test files, all count/roster pins, all intentional manifest updates):
   - client/src/input/router.test.ts: CTL11A-1-PATHS ("nine paths"), CTL11A-1-DECIDE, CTL11A-2-DECIDE-DENIED
@@ -46,6 +51,7 @@ flags it, and the fix stays inside touches. Results:
 - e2e: no count pins. client/e2e/controls.spec.ts reads `DEFAULT_BINDINGS.accels.J/B` only, and a11y.spec.ts pins F9/F8 rows only.
 
 ### Default-key choice (measured)
+
 - **KeyK** (the "Keys" mnemonic) costs 20 more reds. ~20 tests use K as "the free key": main.remap
   (9), controlsModel.test (6), optionsScreen.test, bindingStore.test, and a11yFocus CTL11B-1-BOOT-UNBOUND.
 - G, H, T and O are RETIRED keys, pinned as inert (CTL10B-2-BOOT-O-NOOP; CTL11B-1-BOOT-UNBOUND lists
@@ -56,11 +62,12 @@ flags it, and the fix stays inside touches. Results:
   are per-tab, so no id collision.
 
 ### Ask: widen qf-14 touches, then relaunch at PLAN in the existing worktree
+
 REQUIRED production: client/src/input/buttons.ts, client/src/input/router.ts, client/src/ui/controlsModel.ts
 REQUIRED tests: client/src/input/router.test.ts, client/src/ui/helpModel.test.ts, client/src/main.help.test.ts,
-  client/src/ui/i18n/catalog.test.ts, client/src/ui/screens/optionsScreen.test.ts
+client/src/ui/i18n/catalog.test.ts, client/src/ui/screens/optionsScreen.test.ts
 RECOMMENDED: client/src/main.accel.test.ts (a boot-level proof that the new key opens Controls through the real
-  shell; ROWS literal :428-457) and client/src/ui/controlsModel.test.ts (the label row)
+shell; ROWS literal :428-457) and client/src/ui/controlsModel.test.ts (the label row)
 Size stays FEATHER: about 7 production lines plus the pin bumps.
 
 Park record PR: https://github.com/mdrewt/monster-realm/pull/613 (draft, never merge; close unmerged when the real qf-14 PR opens).

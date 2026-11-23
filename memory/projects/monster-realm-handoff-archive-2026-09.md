@@ -1,6 +1,7 @@
 # monster-realm v2 -- supervisor handoff ARCHIVE (2026-09, entries appended oldest-first -- this file is never rewritten)
 
 ---
+
 ## 2026-09-11T~21:40Z — rb-77 PR#461 OPEN — crate-root module wiring + guards.rs cfg-freedom gated by one ordinary Rust test (ADR-0247, closes R-rb-46-LIBRSMOD); local `just ci` GREEN (ledger X4); ledger 6/6 met, 0 deferred; verifier PASS (SUPERVISOR OWNS THE MERGE)
 
 ## 2026-09-12T~13:00Z — rb-79 PR pending — propose_trade gate prefix byte-frozen (ADR-0249, closes R-rb-46-TRADINGCFG)
@@ -19,7 +20,7 @@
 
 **ENVIRONMENT NOTES:** nextest fail-fast cancelled the M13 full run at 418/421, so the rb-47 roster kill needed a filtered re-run to confirm M13 death — tree clean, both runs logged. The reducer-security-auditor agent definition carries a stale premise that the module builds against spacetimedb crate 1.12.0; it is 2.8.1 per ADR-0197 — a harness-side agent-definition fix, not a slice issue.
 
-**MERGE INSTRUCTION:** From `.claude/worktrees/rb-79`, run `mr-gates verify --slice rb-79 --budget ≥2400`; CI-EXIT must be 0; `mr-audit` with orchestration as listed above; squash-merge with Conventional Commit title matching the ADR decision (scope: security-authz,ci-gates); `mr-gates residuals close --slice rb-79 --pr <number>` closes R-rb-46-TRADINGCFG; age R-rb-79-{BELOWGATE,ADR0248D6,LIBRS89,XFILEINSERT}; reconcile ADR index (0249) / CHANGELOG / ARCHITECTURE; refresh code graphs on canonical checkout post-merge; delete branch + worktree; scratch in /tmp (rb-79/, rb-79-review-*, rb79-artifact, rb79-verify, rb79-mutants*) safe to delete. ADR next-free: 0250.
+**MERGE INSTRUCTION:** From `.claude/worktrees/rb-79`, run `mr-gates verify --slice rb-79 --budget ≥2400`; CI-EXIT must be 0; `mr-audit` with orchestration as listed above; squash-merge with Conventional Commit title matching the ADR decision (scope: security-authz,ci-gates); `mr-gates residuals close --slice rb-79 --pr <number>` closes R-rb-46-TRADINGCFG; age R-rb-79-{BELOWGATE,ADR0248D6,LIBRS89,XFILEINSERT}; reconcile ADR index (0249) / CHANGELOG / ARCHITECTURE; refresh code graphs on canonical checkout post-merge; delete branch + worktree; scratch in /tmp (rb-79/, rb-79-review-_, rb79-artifact, rb79-verify, rb79-mutants_) safe to delete. ADR next-free: 0250.
 
 ---
 
@@ -77,7 +78,6 @@ Follow-up flags (outside touches, not edited): ADR-0243:147 "holds privacy.rs at
 
 Gotchas measured this run: the tester agent's PreToolUse hook blocks cargo (orchestrator must run fmt + RED stages); a register run and a `just ci` in the same worktree collide (shared target dir + spacetime rig) → one false-RED for the verifier; `residuals add --reason` with backticks inside double quotes loses the quoted text (use single quotes).
 
-
 ## 2026-09-18T~14:05Z — rb-88 PR#476 OPEN — focusTrap.ts:58-62 retracts the false "S4 must close-before-open" prescription in place (comment-only, line-count neutral; three ordinary vitest tests; closes R-17r-e-E3); local `just ci` GREEN (ledger X4 + verifier client re-run 3150/3150); ledger 5/5 met, 0 deferred; verifier APPROVE; desync-guard PASS (SUPERVISOR OWNS THE MERGE)
 
 **TERMINAL STATE: PR https://github.com/mdrewt/monster-realm/pull/476 (head a92ff9e, branch `fix/rb-88-focustrap-stale-close-before-open`, worktree `.claude/worktrees/rb-88`, base bc45236). Remote CI (`ci` + `e2e`) pending at hand-off. Main checkout untouched on master.** No ADR (none assigned; ADR-0224 comment-only). Diff: `client/src/ui/focusTrap.ts` (5 comment lines in/out at :58-62 — the file is line-cited at :52-56/:64/:65-73/:88-94/:136/:150 by 7 files, so neutrality is load-bearing), `client/src/ui/focusTrap.test.ts` (+154, one appended describe: `rb-88-SIBLING-ROOTS-NO-STACK`, `rb-88-SAME-ROOT-TWICE-STACKS`, `rb-88-ONE-LISTENER-PER-ROOT-ZERO-ON-MOUNT`; 19→22), `ARCHITECTURE.md` (one `**rb-88**` paragraph at :2299). Ledger X1 count 22/22 · X2 neutrality + 8/8 facts + **sha256 pin of the approved block** (`gates/rb-88.x2.mjs`; added after the artifact red-team measured a paraphrased-contradiction bypass of the presence needles — bite-proved) · X3 harness-side vitest mutant register (`gates/rb-88.mutants.mjs`, scratch client copies, 6/6 killed each by ≥1 rb-88 test, 3 controls) · X4 `just ci` · X5 touches ⊆ {focusTrap.ts, focusTrap.test.ts, ARCHITECTURE.md} + no docs/adr + knowledge/adr-digest drift 0. Lenses: planner (sonnet) · plan reviewer + plan red-team (sonnet, parallel) · tester (sonnet; tester CAN write the worktree now, still cannot execute — orchestrator ran the RED-claim proof `expected btn-1 to be btn-2`) · test reviewer · impl reviewer + red-team + desync-guard (parallel; all clean) · /simplify (nothing to collapse) · verifier (sonnet, APPROVE; own `e.target` mutant killed). Implementer = orchestrator (5-line verbatim comment swap; ≠ tester). Spend ≈ well under the $60 target (7 sonnet subagents, one `just ci`).
@@ -99,6 +99,7 @@ Environment incident, handled: the supervisor's rb-88 X4 re-verify (`just ci`, p
 ---
 
 ## 2026-09-18T~19:35Z — m23-s9 PR#478 OPEN — evolution overlay contrast tokens + `prefers-contrast: more` + em→px (ADR-0253 SELF-ASSIGNED); local `just ci` GREEN (2373 Rust / 99 evals / 108 files·3159 client tests); ledger 7/7 met; verifier PASS 12/12 mutants
+
 Branch `feat/m23-s9-evolution-contrast` (worktree `.claude/worktrees/m23-s9`, HEAD df203cc, pushed), PR https://github.com/mdrewt/monster-realm/pull/478, remote ci+e2e pending at open. Terminal state = PR open + local gate green; supervisor owns the merge. Diff: `client/src/styles.css` (9 `--mr-evo-*` `:root` tokens + trailing AAA `@media (prefers-contrast: more)` block), `client/src/ui/evolutionView.ts` (inline `var()` tokens, `background-color` longhand, 14/13/12px), `client/src/ui/evolutionView.test.ts` (+1371: `m23s9 X1–X4` DOM-computed WCAG oracles — ADR-0224 forbids the spec §5.3 eval, so A11Y-30/31 land as vitest like S8 did), ADR-0253 + DIGEST regen, `ARCHITECTURE.md` 2 sentences. `client/index.html` declared but UNCHANGED (X7 MANUAL: viewport has no zoom block). **Supervisor actions:** (1) ADR number 0253 was self-assigned because the launch gave `None` — renumber at merge if taken; (2) the ledger's X7 EVIDENCE cites the CANONICAL checkout path `…/monster-realm/client/index.html:5` (unchanged from master, so it resolves either side of the merge); (3) `mr-gates verify` X1–X6 CHECKs are cwd-relative — run from the worktree or post-merge checkout. Lens record: planner → reviewer+red-team on the plan (dropped the 3:1 large-text tier — WCAG large is 24px/18.67px-bold, nothing here qualifies; `#999` fails 4.43:1 on the worst-case `#333`; scope by `atStack` not text slicing) → tester (2 rounds) → reviewer+red-team on the tests (red-team wrote the cheat: 9 GREEN bypasses — rule ORDER, class/element+`!important` stylesheet route, happy-dom silent drops of `var(--x,fb)`/UPPERCASE, `<style>` injection, textless cover element, border-only consumption, fp monotone — all closed round 2) → impl (orchestrator) → /simplify inline (2 inherited-redundant colours dropped) → verifier (folded impl-review lens under the `/tmp/mr_warn_m23-s9` landing flag; PASS) → doc-keeper. Domain auditors N/A (no server/game-core). One CI red→fix cycle: rb-89's `overlayA11y.test.ts` pins the `NO CLOSE-BEFORE-OPEN` header paragraph at exactly 5 `//` lines and the extractor runs to the first non-comment line — a header paragraph appended AFTER it grows the window; moved the m23-s9 paragraph above it. Follow-up flags (outside touches, not edited): `client/vite.config.ts:105` "evolution/fusion screen" (fusion retired); spec §2.7 large-text threshold conflates pt/px (ADR-0253 D4). Residuals: 1.4.11 non-text (button 1.39:1 under `more`, out of scope §3.1); `prefers-contrast: more` has no e2e.
 
 ## 2026-09-19T~03:50Z — 20r-b: PR #481 open, local gate green (essence reward/cap SSOT + R14)
@@ -158,6 +159,7 @@ Follow-up flags (outside touches, not changed): `docs/specs/20r-a-plan.md:18,116
 ## 2026-09-26T~17:40Z — rb-125: PR #514 open, local gate green, ledger 6/8 met + 2 DEFER (evolution banner AT announcement + focus; partial R-20r-d-B1)
 
 **TERMINAL STATE:** branch `fix/rb-125-evolution-notice-overlay`, worktree `.claude/worktrees/rb-125`, HEAD `7b4e83e`, pushed. PR https://github.com/mdrewt/monster-realm/pull/514 is open; remote ci/e2e were pending at open. The supervisor owns the merge.
+
 - Local `just ci`: CI-EXIT=0, 2471 Rust, 3446 client, 99 evals.
 - Verifier: PASS. The acceptance probe is `memory/projects/gates/rb-125.gates.mjs` x1-x6 (independent oracle over the real banner).
 - ADR-0272 (assigned number).
@@ -165,6 +167,7 @@ Follow-up flags (outside touches, not changed): `docs/specs/20r-a-plan.md:18,116
 **What shipped.** `ui/evolutionNotice.ts` gains injected `{announce, returnFocus}` sinks and `render({key,label}|null)`. It announces once per `evolutionNoticeKey`, locks with `aria-disabled` instead of `disabled`, and returns focus only on the visible→hidden edge when focus was inside. `main.ts` wires the sinks to the `LiveRegion` singleton with `performance.now()` and to `worldCanvasEl?.focus()`.
 
 **Deferred to backlog.** X7 is the cutscene; X8 is the 18th OverlayId with a passive tier plus the `*View.ts` rename. Adding the 18th id and the rename measured 39 red tests in 12 files, at least 6 of them outside touches. **The follow-up slice's `touches:` MUST include:**
+
 - `overlayA11yWiring{,.concurrency}.test.ts`
 - `announcements{,.test}.ts`
 - `i18n/catalogParity.test.ts` and `i18n/hardcodedStrings.test.ts`
@@ -181,11 +184,12 @@ Follow-up flags (outside touches, not changed): `docs/specs/20r-a-plan.md:18,116
 ## 2026-09-27T~06:30Z — rb-131: PR #518 open, local gate green, ledger 1/1 met (nightly i18n-completion job; closes R-m24-s8-X13)
 
 **TERMINAL STATE:** branch `fix/rb-131-nightly-i18n-completion`, worktree `.claude/worktrees/rb-131`, pushed. PR https://github.com/mdrewt/monster-realm/pull/518 is open; remote CI running. Merge is supervisor-owned.
+
 - Local `just ci`: CI-EXIT=0 (2496 Rust tests). The verifier re-ran it independently: CI-EXIT=0. `just eval` (99 PASS) was re-run after the ARCHITECTURE.md edit.
 - Ledger E1: CHECK `node memory/projects/gates/rb-131.probe.mjs` (absolute path). 14 positive + 17 bite checks, exact job-block/recipe pins. RED on master (22 FAIL), WIRED on branch.
 - No ADR (none assigned; ADR-0264 D8 is the decision). touches-delta: ARCHITECTURE.md (rb-131 paragraph + count-free boyscout).
 
-**What shipped.** `nightly.yml` job `i18n-completion` (checkout, setup-node 24.13.1 no cache, setup-just, `run: just i18n-completion-check`) with a preamble citing the policy doc; a policy-matrix row (owner build-loop supervisor, ADR-0264); `notify.needs` += `i18n-completion`.
+**What shipped.** `nightly.yml` job `i18n-completion` (checkout, setup-node 24.22.3 no cache, setup-just, `run: just i18n-completion-check`) with a preamble citing the policy doc; a policy-matrix row (owner build-loop supervisor, ADR-0264); `notify.needs` += `i18n-completion`.
 
 **Residual registered:** R-rb-131-RT1 (backlog). No in-repo test guards this job against neutering. The eval's `jobIsNotNeutered` runs per fixed job name, and ADR-0224 bans growing the eval. A durable fix needs a node --test sibling + justfile edit, or a client vitest.
 
@@ -196,6 +200,7 @@ Follow-up flags (outside touches, not changed): `docs/specs/20r-a-plan.md:18,116
 ## 2026-09-28T~11:45Z — 21r-a: PR #528 open, local gate green ×2, ledger 1/1 met (attempt_recruit write-backs log-and-commit; closes the 21st-review softlock finding)
 
 **TERMINAL STATE:** branch `slice/21r-a`, worktree `.claude/worktrees/21r-a`, HEAD `592d9191` pushed (4 wip commits: plan d88af46 → RED 414df9c7 → GREEN 8eaac0da → tests round 2 592d9191), base master `4f36de2` (master since took 21r-b `ba4dbbc9`, client-only; merge dry-run clean). PR https://github.com/mdrewt/monster-realm/pull/528 — remote CI running at open. Merge is supervisor-owned (squash, Conventional Commit `fix(taming): …`). Main checkout untouched.
+
 - Local `just ci`: CI-EXIT=0 twice — orchestrator on 8eaac0da, verifier on 592d9191 (1956 Rust / 17 binaries, 3130 client / 129 files, 15/15 evals, secrets clean, wasm, 8/8 observability). Verifier `just e2e`: 88 pass, 1 pre-existing skip, 1 unrelated flake (`movement-input.spec.ts`, flaky across different tests on re-run; no client file in the diff).
 - Ledger `21r-a.gates.md` 1/1 met (B1 = `cargo nextest … -E 'test(/nh_21ra_/)'`, exact `2 tests run: 2 passed`), 0 deferred. RED record `gates/21r-a.red-before.md`; plan `monster-realm-21r-a-plan.md` (REV 2). No ADR / DECISIONS entry (extends the in-code `battle::submit_attack` rationale).
 
@@ -208,4 +213,3 @@ Follow-up flags (outside touches, not changed): `docs/specs/20r-a-plan.md:18,116
 **Follow-up flags (outside touches, not changed):** (1) three `log::set_logger` installers now break plain `cargo test -p monster-realm-module` and the `just mutate` baseline (nextest paths unaffected; documented on the sink) — durable fix is one shared sink in `native_host_tests.rs` (touches battle_tests.rs + native_host_tests.rs); (2) cross-file stale comment "terminal rows are immediately GC'd" at taming.rs ~:249 + battle.rs:724/:876; (3) log-and-commit block duplicated 5× — helper candidate; (4) `wild_disconnect_writeback_err` bypasses mr_log. Memory: [[native-host-unregistered-index-read-hides-sweep-order-mutants]], [[set-logger-test-sinks-are-nextest-only]]. Post-merge: refresh the graphs on the canonical checkout.
 
 ---
-

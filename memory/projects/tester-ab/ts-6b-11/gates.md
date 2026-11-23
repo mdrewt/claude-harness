@@ -1,4 +1,5 @@
 # Gates: ts-6b-11
+
 Spec: M-trade-sessions.spec.md#ts-6b-11
 Seed: bc6957e477b960e8
 Seeded: 2026-11-14T04:23:26Z
@@ -18,16 +19,16 @@ Touches: client/src/ui/boxView.ts, client/src/ui/boxView.test.ts, client/src/ui/
      residual may not DEFER to `backlog`. -->
 
 - [ ] ts-6b-11.1: WHEN the Monsters, Inventory or Controls frame shows, THE CLIENT SHALL render its title in the one kit title bar, with no repeated in-panel heading — closes `R-uif-17-KITPOLISH` (`the Inventory frame has one title bar and no in-panel heading` in `client/src/ui/raisingView.test.ts`, with the same case in `boxView.test.ts` and `controlsView.test.ts`; `client/e2e/ui-whole.spec.ts` measures the three titles).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/raisingView.test.ts src/ui/boxView.test.ts src/ui/controlsView.test.ts -t "frame has one title bar and no in-panel heading"
-  EXPECT: /Tests +3 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/raisingView.test.ts src/ui/boxView.test.ts src/ui/controlsView.test.ts -t "frame has one title bar and no in-panel heading"
+      EXPECT: /Tests +3 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-11.2: WHEN Profile shows the Account section, THE CLIENT SHALL offer no separate Privacy door, Privacy staying reachable as its own section — closes `R-qf-13-QF13.4` (`the Account section's rows are its claim actions only, with no privacy door` in `client/src/ui/claimView.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/claimView.test.ts -t "the Account section's rows are its claim actions only, with no privacy door"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/claimView.test.ts -t "the Account section's rows are its claim actions only, with no privacy door"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-11.3: WHILE the locale is fr, THE CLIENT SHALL show the pseudonymization disclosure in French, and the English text SHALL stay byte-identical to the pinned wording — closes `R-21r-b2-E1` (`the privacy disclosure follows the locale` in `client/src/ui/privacyView.i18n.test.ts`, which replaces that file's stays-raw case; the byte-identity case in `client/src/ui/privacyBanner.test.ts` passes unedited).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/ui/privacyView.i18n.test.ts src/ui/privacyBanner.test.ts -t "the privacy disclosure follows the locale|RB52C-DISCLOSURE-PIN BITES"
-  EXPECT: /Tests +2 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/privacyView.i18n.test.ts src/ui/privacyBanner.test.ts -t "the privacy disclosure follows the locale|RB52C-DISCLOSURE-PIN BITES"
+      EXPECT: /Tests +2 passed \| \d+ skipped \(/
+      EVIDENCE: pending

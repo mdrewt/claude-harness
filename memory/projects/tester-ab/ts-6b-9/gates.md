@@ -1,4 +1,5 @@
 # Gates: ts-6b-9
+
 Spec: M-trade-sessions.spec.md#ts-6b-9
 Seed: d7e349b46ac3eff7
 Seeded: 2026-11-14T01:33:42Z
@@ -18,31 +19,31 @@ Touches: client/src/main.ts, client/src/main.privacyWiring.test.ts, client/src/u
      residual may not DEFER to `backlog`. -->
 
 - [ ] ts-6b-9.1: WHEN the account moves from active to deletion grace, including through another session's request, THE CLIENT SHALL announce the grace deadline once through the live region, and a boot into an existing grace SHALL stay silent — closes `R-rb-52-GRACEANNOUNCE` (`an account entering deletion grace is announced once` in `client/src/main.privacyWiring.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/main.privacyWiring.test.ts -t "an account entering deletion grace is announced once"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/main.privacyWiring.test.ts -t "an account entering deletion grace is announced once"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-9.2: WHEN a data export goes from incomplete to complete, THE CLIENT SHALL announce it once through the live region, and a reconnect that replays the chunks SHALL NOT announce it again — closes `R-rb-53-E1` (`a data export that finishes assembling is announced once` in `client/src/main.privacyWiring.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/main.privacyWiring.test.ts -t "a data export that finishes assembling is announced once"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/main.privacyWiring.test.ts -t "a data export that finishes assembling is announced once"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-9.3: WHEN the same announcement is made again after it was spoken, THE CLIENT SHALL write it to the live region again, while identical announcements inside one coalescing window SHALL still merge — closes `R-uif-4-REPEATSAY` and its duplicate `R-ctl-13-REANNOUNCE` (`a repeated identical announcement after the first was painted is written again` in `client/src/ui/liveRegion.test.ts`; the suite's consecutive-dedup case is rewritten by the tester).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/ui/liveRegion.test.ts -t "a repeated identical announcement after the first was painted is written again"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/liveRegion.test.ts -t "a repeated identical announcement after the first was painted is written again"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-9.4: WHILE the locale is fr, THE CLIENT SHALL name and announce every overlay and the world region with the fr catalog copy — closes `R-weekly-review-2026-10-02-F4` (`under the fr locale an opened overlay is named and announced in French` in `client/src/ui/overlayA11y.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/ui/overlayA11y.test.ts -t "under the fr locale an opened overlay is named and announced in French"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/overlayA11y.test.ts -t "under the fr locale an opened overlay is named and announced in French"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-9.5: WHEN the deferred initial focus fires, THE CLIENT SHALL focus the anchor without scrolling the frame — closes `R-ci-fix-20261109T0400-LATEFOCUS-SCROLL` (`the deferred initial focus does not scroll the frame` in `client/src/ui/overlayA11y.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/ui/overlayA11y.test.ts -t "the deferred initial focus does not scroll the frame"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/overlayA11y.test.ts -t "the deferred initial focus does not scroll the frame"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-9.6: IF the claim-success handler throws, THEN THE CLIENT SHALL NOT report the claim as rejected — closes `R-polish-1-CLAIMRESULTCATCHREENTRY` (`a throw in the claim-success handler is not reported as a claim rejection` in `client/src/net/connection.runtime.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/net/connection.runtime.test.ts -t "a throw in the claim-success handler is not reported as a claim rejection"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/net/connection.runtime.test.ts -t "a throw in the claim-success handler is not reported as a claim rejection"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending

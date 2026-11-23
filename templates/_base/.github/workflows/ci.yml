@@ -19,7 +19,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '24.13.1' }
+        with: { node-version: '24.22.3' }
       - uses: extractions/setup-just@v2
       - run: just setup
       - run: just lint

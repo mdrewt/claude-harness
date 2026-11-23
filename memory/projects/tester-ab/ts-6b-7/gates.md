@@ -1,4 +1,5 @@
 # Gates: ts-6b-7
+
 Spec: M-trade-sessions.spec.md#ts-6b-7
 Seed: 1fe25f68978f940d
 Seeded: 2026-11-14T00:32:01Z
@@ -18,16 +19,16 @@ Touches: client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.t
      residual may not DEFER to `backlog`. -->
 
 - [ ] ts-6b-7.1: WHEN a visible tactical battle ingests an own-turn start, a KO or the battle end, THE CLIENT SHALL announce it once through the live region, and SHALL NOT announce damage lines or replayed history — closes `R-weekly-review-2026-11-06-F1` (`announces own turn start, a KO and the finish through the announce dep but not damage lines or replayed history` in `client/src/tactics/tacticsBattle.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/tactics/tacticsBattle.test.ts -t "announces own turn start, a KO and the finish through the announce dep but not damage lines or replayed history"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/tactics/tacticsBattle.test.ts -t "announces own turn start, a KO and the finish through the announce dep but not damage lines or replayed history"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-7.2: WHILE a battle clock window is open, THE CLIENT SHALL compute the Still-there countdown and the PvP clock ring from a server-time estimate, not the raw device clock — closes `R-weekly-review-2026-11-06-F3` and its duplicate `R-bt-15-CLOCKSKEW` (`a client clock 60 s behind still counts the last minute of a window` in `client/src/net/serverClock.test.ts`; a `client/src/main.dispatch.test.ts` case that both pumps read the estimate).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/net/serverClock.test.ts src/main.dispatch.test.ts -t "a client clock 60 s behind still counts the last minute of a window|the Still-there countdown and the PvP clock ring both read the server-time estimate, not the raw device clock"
-  EXPECT: /Tests +2 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/net/serverClock.test.ts src/main.dispatch.test.ts -t "a client clock 60 s behind still counts the last minute of a window|the Still-there countdown and the PvP clock ring both read the server-time estimate, not the raw device clock"
+      EXPECT: /Tests +2 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-7.3: WHEN a Finished batch arrives while the tactical shell is playing beats, THE CLIENT SHALL show the results panel only after the playback drains — closes `R-bt-12-RESULTSDRAIN` (`a Finished batch waits for the shell playback to drain before the results panel takes the frame` in `client/src/main.dispatch.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/main.dispatch.test.ts -t "a Finished batch waits for the shell playback to drain before the results panel takes the frame"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/main.dispatch.test.ts -t "a Finished batch waits for the shell playback to drain before the results panel takes the frame"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending

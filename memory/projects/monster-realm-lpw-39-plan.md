@@ -67,7 +67,7 @@ dev-dependency, `sha2 = { version = "0.11", default-features = false }`) and `st
    predicates (an empty `all()`/`any()` allowed), `target_arch = "<s>"` or `feature = "<s>"` with
    `<s>` in `[A-Za-z0-9_-]*`; any other key, an unbalanced paren, a `]`, or trailing text fails.
    (So a `+` line cannot smuggle code after its attribute.)
-5b. **Wasm equivalence.** Evaluating `<A>` and `<B>` with `target_arch = "wasm32"`, for EVERY
+   5b. **Wasm equivalence.** Evaluating `<A>` and `<B>` with `target_arch = "wasm32"`, for EVERY
    on/off assignment of the features either names, gives the same result. (So on wasm each patched
    attribute selects what the original selected: the shipped module is the vendor's code.)
 6. **Hashes.** Every held file's sha256 — after the reverse-apply for patched files — equals its
@@ -128,7 +128,6 @@ Built: `. /tmp/lpw39-iso.u5sDDx/env.sh` (2.12.0 CLI + standalone from the verifi
 `$ISO/bin`; 2.11.0 pair in `$ISO/bin211`; just 1.58.0 install dir on PATH because the asdf shim
 needs `~/bin/asdf`). The block below is the recipe it follows.
 
-
 ```sh
 ISO=$(mktemp -d /tmp/lpw39-home.XXXXXX); mkdir -p $ISO/bin
 cp ~/.local/share/spacetime/bin/2.12.0/spacetimedb-cli $ISO/bin/spacetime
@@ -136,7 +135,7 @@ cp ~/.local/share/spacetime/bin/2.12.0/spacetimedb-standalone $ISO/bin/
 export RUSTUP_HOME=$HOME/.rustup CARGO_HOME=$HOME/.cargo ASDF_DATA_DIR=$HOME/.asdf \
   PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright GIT_CONFIG_GLOBAL=$HOME/.gitconfig \
   DOCKER_CONFIG=$HOME/.docker npm_config_cache=$HOME/.npm
-export PATH="$ISO/bin:$HOME/.asdf/installs/nodejs/24.22.0/bin:$HOME/.asdf/shims:$HOME/.cargo/bin:$PATH"
+export PATH="$ISO/bin:$HOME/.asdf/installs/nodejs/24.22.3/bin:$HOME/.asdf/shims:$HOME/.cargo/bin:$PATH"
 export HOME=$ISO/home XDG_DATA_HOME=$ISO/home/.local/share XDG_CONFIG_HOME=$ISO/home/.config
 ```
 (`$HOME/.local/bin` deliberately NOT on PATH: its `spacetime` is the version proxy into the operator's
@@ -154,10 +153,10 @@ data dir.) Verify `spacetime --version` says 2.12.0 and `which spacetime` is `$I
    2.12.0` (the seven `spacetimedb*` at 2.12.0), `server-module/Cargo.toml` comment,
    `native_host_tests.rs` citation comments, `account-e2e` non-member dirs list, `ci-tools.sh` pin +
    sha256 `154853dd…2f89` (re-verify by download), `npm install spacetimedb@2.12.0` — the install argument is exact (a
-   range would resolve past 2.13, and 2.14+ needs Node 24.22.1); `package.json` gets npm's default
+   range would resolve past 2.13, and 2.14+ needs Node 24.22.3); `package.json` gets npm's default
    `"^2.12.0"` as the design says, the lock pins 2.12.0, `just gen` in the isolated
    shell, `authToken.ts` comments. Targeted: nextest module + feature sets, vitest authToken, probe.
-4b. The runbook legs that start a host, all in the isolated shell (`$ISO/bin` also holds the
+   4b. The runbook legs that start a host, all in the isolated shell (`$ISO/bin` also holds the
    2.11.0 `spacetimedb-standalone`/`spacetimedb-cli` from the release tarball): step 1 (release
    notes 2.11.0→2.12.0, `gh release view v2.12.0`); step 6 (2.11.0 host publishes master's module
    and seeds data on an isolated data dir → stop → 2.12.0 host on the same dir → publish this

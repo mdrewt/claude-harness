@@ -1,4 +1,5 @@
 # Gates: lpg-10
+
 Spec: M-local-play.spec.md#lpg-10
 Seed: f0258c344356ccfd
 Seeded: 2026-11-14T14:50:29Z
@@ -18,26 +19,26 @@ Touches: client/src/observability/config.ts, client/src/observability/config.tes
      residual may not DEFER to `backlog`. -->
 
 - [ ] lpg-10.1: FOR every member of `TARGET_KINDS` other than `official` and `test`, `resolveTelemetryConfig` SHALL return `disabled` with a reason naming the kind for every endpoint and interval input, including a valid `https:` origin; the `kind` parameter SHALL be required (`client/src/observability/config.test.ts`, iterating `TARGET_KINDS` so an unclassified new kind fails).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/observability/config.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/observability/config.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending
 
 - [ ] lpg-10.2: WHEN the target kind is `official` or `test`, `resolveTelemetryConfig` SHALL return what it returned before this slice for the same endpoint, interval, build mode and jitter — the existing `config.test.ts` cases pass with only the kind argument added.
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/observability/config.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npm --prefix client run typecheck && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/observability/config.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending
 
 - [ ] lpg-10.3: WHEN the client boots with `VITE_MR_OTLP_ENDPOINT` set to a valid origin and a shell document of kind `local` or `private`, THE telemetry loader SHALL never be called (`client/src/main.targetKindGate.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/main.targetKindGate.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/main.targetKindGate.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending
 
 - [ ] lpg-10.4: WHEN the client boots with `VITE_MR_OTLP_ENDPOINT` set to a valid origin and a shell document of kind `official` or `test`, THE telemetry loader SHALL be called once with the exporter URL `<origin>/v1/metrics` (`client/src/main.targetKindGate.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/main.targetKindGate.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/main.targetKindGate.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending
 
 - [ ] lpg-10.5: WHEN the client boots with the OIDC issuer and client id variables set and a shell document of kind `local` or `private`, `connect` SHALL receive an empty `authIssuer` and `authClientId`, and WHEN the kind is `official` or `test` IT SHALL receive the configured values (`client/src/main.targetKindGate.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/main.targetKindGate.test.ts
-  EXPECT: /Tests +\d+ passed \(\d+\)/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/main.targetKindGate.test.ts
+      EXPECT: /Tests +\d+ passed \(\d+\)/
+      EVIDENCE: pending

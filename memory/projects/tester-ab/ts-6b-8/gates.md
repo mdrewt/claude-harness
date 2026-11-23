@@ -1,4 +1,5 @@
 # Gates: ts-6b-8
+
 Spec: M-trade-sessions.spec.md#ts-6b-8
 Seed: a3b60057340936f1
 Seeded: 2026-11-13T16:13:13Z
@@ -18,21 +19,21 @@ Touches: client/src/ui/shopView.ts, client/src/ui/healView.ts, client/src/ui/que
      residual may not DEFER to `backlog`. -->
 
 - [ ] ts-6b-8.1: WHEN a store batch re-renders an open Shop, Heal, Journal or Evolve view whose view model is unchanged, THE CLIENT SHALL keep the existing row and control nodes, and a Shop button's disabled lock SHALL survive the batch — closes `R-ci-fix-20261002T0901Z-VIEWREBUILD` (`a batch render with an unchanged view model keeps the same row and button nodes` in `client/src/ui/shopView.test.ts`, with the same case in `healView.test.ts`, `questLogView.test.ts` and `evolutionView.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/ui/shopView.test.ts src/ui/healView.test.ts src/ui/questLogView.test.ts src/ui/evolutionView.test.ts -t "a batch render with an unchanged view model keeps the same row and button nodes"
-  EXPECT: /Tests +4 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/shopView.test.ts src/ui/healView.test.ts src/ui/questLogView.test.ts src/ui/evolutionView.test.ts -t "a batch render with an unchanged view model keeps the same row and button nodes"
+      EXPECT: /Tests +4 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-8.2: WHEN the shop row under the cursor disappears, THE CLIENT SHALL re-seat the cursor on its nearest neighbour — closes `R-ctl-8a-CTL8A.2` (`selling out the cursor's stack seats the cursor on the neighbouring row, not the first` in `client/src/ui/screens/shopScreen.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/ui/screens/shopScreen.test.ts -t "selling out the cursor's stack seats the cursor on the neighbouring row, not the first"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/screens/shopScreen.test.ts -t "selling out the cursor's stack seats the cursor on the neighbouring row, not the first"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-8.3: WHEN the shop tab changes while focus is in the list being hidden, THE CLIENT SHALL move focus to the shown list — closes `R-uif-10-SHOPFOCUS` (`switching tabs with focus on the Buy list moves focus to the Sell list` in `client/src/ui/shopView.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/ui/shopView.test.ts -t "switching tabs with focus on the Buy list moves focus to the Sell list"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/shopView.test.ts -t "switching tabs with focus on the Buy list moves focus to the Sell list"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending
 
 - [ ] ts-6b-8.4: WHEN the heal frame is shown, THE CLIENT SHALL show a localized title bar first — closes `R-uif-10-TITLES` (`the heal frame opens with a localized title` in `client/src/ui/healView.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.13.1/bin:$PATH npx --prefix client vitest run --root client src/ui/healView.test.ts -t "the heal frame opens with a localized title"
-  EXPECT: /Tests +1 passed \| \d+ skipped \(/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/ui/healView.test.ts -t "the heal frame opens with a localized title"
+      EXPECT: /Tests +1 passed \| \d+ skipped \(/
+      EVIDENCE: pending

@@ -3,6 +3,7 @@
 ## DONE (0)
 
 ## REMAINING (7) — the exact next steps
+
 - lpw-34.1 (unchecked): WHEN the workspace is built and tested after the upgrade, THE SYSTEM SHALL use 2.16.1 for the CLI, the host, t
 - lpw-34.2 (unchecked): WHEN a database created and played on by the 2.11.0 host with the module before this slice is opened by the 2.
 - lpw-34.3 (unchecked): WHEN a client built before the upgrade connects to the upgraded server, THE CLIENT SHALL either play or be tol
@@ -25,11 +26,12 @@
      server-module tests fail.
    - The vendor's way is the `test-utils` feature, which intercepts at the Rust level (TestDatastore in the
      table handle). A design slice and then a refactor slice must give the Fixture a host on >= 2.12 first.
-2. **Node pin (note n1).** SDK >= 2.14.0 needs Node >= 24.22.1 under `engine-strict`. `mr-touches` refused
+2. **Node pin (note n1).** SDK >= 2.14.0 needs Node >= 24.22.3 under `engine-strict`. `mr-touches` refused
    `.github/workflows/ci.yml` and `nightly.yml`.
 3. **npm cooldown (note n1).** SDK 2.16.1 gets ETARGET until 2026-11-27T03:14:38Z.
 
 ## Facts for the relaunch
+
 - The hops the release notes mark: 2.12.0 (commit log), 2.14.x (generated TS bindings: import extensions),
   2.16.1 (old clients skip new columns; callback errors fail the connection).
 - Crates >= 2.12 need rustc 1.97 (pinned 1.99.0: fine).
@@ -44,6 +46,7 @@
 - CLI 2.12.0 is installed under `~/.local/share/spacetime/bin/2.12.0`; `current` stays 2.11.0.
 
 ## Why no partial PR (measured 2026-11-22)
+
 - lpw-34.6, the generated-definition check, is the one gate that holds at 2.11.0. Its plan is in
   `monster-realm-lpw-34-plan.md` (not executed), and its CHECK is pre-filled in the ledger with the
   exact test titles.
@@ -53,7 +56,25 @@
 - The plan and CHECK are reusable by the relaunch, once the native-host port lands.
 
 ## Resume point
+
 - Branch `slice/lpw-34`, pushed: two empty `wip:` commits on eb3cf06c, no code.
-- Relaunch only after the native-host port lands, Node >= 24.22.1 is pinned, and 2026-11-27T03:15Z has passed.
+- Relaunch only after the native-host port lands, Node >= 24.22.3 is pinned, and 2026-11-27T03:15Z has passed.
 - Sandboxes left in place: /tmp/lpw34-npmprobe.0tYzZv, /tmp/lpw34-relnotes.vdb26t, /tmp/lpw34-tools.jjBTaJ,
   /tmp/lpw34-muldefs.yIte9e (a target dir), /tmp/lpw34-crates.3tojVf, /tmp/lpw34-msg.*.
+
+## Update 2026-11-23 (operator, interactive session) — all three blockers cleared
+
+- 1 (native host): lpw-38/lpw-39 merged (monster-realm #864): the Fixture links on >= 2.12.0.
+- 2 (Node pin): operator raised `.tool-versions` to nodejs 24.22.3 and `engines` to `>=24.22.3 <25`.
+  The other note-n1 sites (workflows, .npmrc comments, devcontainer, account-service image, AGENTS.md,
+  README.md, docs/PLAYTEST.md) are still 24.22.3 and are this slice's to raise (all in its touches now).
+- 3 (npm cooldown): operator-approved bypass for spacetimedb 2.16.1 only. Five transitive packages the
+  bypass let in younger than 7 days were re-resolved under the cooldown. happy-dom moved to 21.0.4
+  (operator, security fix).
+- **Resume point:** `slice/lpw-34` @ `93643fa4` (master merged in at 8fb360b0, then the operator's
+  dependency commit). Measured there (Node 24.22.3, bindings still 2.11-generated): `npm ci` clean,
+  client vitest 6694/6694, `tsc --noEmit` clean (needs `just wasm` first in a fresh worktree).
+  Keep that commit's three files as they are; any further npm install runs WITH the cooldown.
+- Next: the crate/CLI/host hops by the runbook (2.12.0 commit log → 2.14.x binding import extensions →
+  2.16.1), bindings regen, `unstable` on, then lpw-34.1–.7. The lpw-34.6 plan in
+  `monster-realm-lpw-34-plan.md` is reusable.

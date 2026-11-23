@@ -81,28 +81,28 @@ plus `--selftest` of every tool touched/added. No ADR (loop-infra slices record 
 
 ## Teeth (the spec's three injected defects + controls)
 
-| id | assertion | injected defect that must RED it |
-| --- | --- | --- |
-| T1 | `allowed_warning`/`seven_day` fixture ⇒ row with `utilization == 0.87` | filter on `status=="rejected"` (defect a) |
-| T2 | `rejected` fixture with no `utilization` ⇒ row with `utilization is None` | `if util is None: continue` (defect b) |
-| T3 | extracted `PYRL`: `allowed_warning`-only log ⇒ `NONE` and state fixture UNWRITTEN; `rejected` log ⇒ `ARMED <iso>` | widen the arming predicate to include `allowed_warning` (defect c); narrowing it REDs the other half |
-| T4 | vacuity control: a log with no rate-limit events ⇒ `rows=0` and no file created; fixture set yields ≥2 distinct `rateLimitType` | an emitter that emits on every line |
-| T5 | exact key set on every row; `0 <= utilization <= 1`; every row < 1024 B and valid standalone JSON | schema drift / unit drift |
-| T6 | idempotency: same log twice ⇒ no doubling (`dup=` counts the second pass) | broken uuid dedup |
-| T7 | negative control: a `type:"user"` line containing `"rateLimitType":"seven_day"` in `tool_use_result` ⇒ NOT persisted | a raw-substring reader (the defect this slice fixes) |
-| T8 | `telemetry` dispatch never creates `/tmp/mr_costwatch_*.lock.d` | missing inline `exit 0` (red-team PoC #2) |
-| T9 | static: every `gate` literal at the tick's call sites is in the closed vocabulary; the telemetry call at site (b) precedes `if [ "$RC" -eq 0 ]`, appears once, and `PYRL` follows it | someone moves the call into the RC branch |
-| T10 | production non-pollution: `mr-state.json` and the production telemetry file unchanged by the selftest | the red-team PoC #1 hazard |
+| id  | assertion                                                                                                                                                                            | injected defect that must RED it                                                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| T1  | `allowed_warning`/`seven_day` fixture ⇒ row with `utilization == 0.87`                                                                                                               | filter on `status=="rejected"` (defect a)                                                            |
+| T2  | `rejected` fixture with no `utilization` ⇒ row with `utilization is None`                                                                                                            | `if util is None: continue` (defect b)                                                               |
+| T3  | extracted `PYRL`: `allowed_warning`-only log ⇒ `NONE` and state fixture UNWRITTEN; `rejected` log ⇒ `ARMED <iso>`                                                                    | widen the arming predicate to include `allowed_warning` (defect c); narrowing it REDs the other half |
+| T4  | vacuity control: a log with no rate-limit events ⇒ `rows=0` and no file created; fixture set yields ≥2 distinct `rateLimitType`                                                      | an emitter that emits on every line                                                                  |
+| T5  | exact key set on every row; `0 <= utilization <= 1`; every row < 1024 B and valid standalone JSON                                                                                    | schema drift / unit drift                                                                            |
+| T6  | idempotency: same log twice ⇒ no doubling (`dup=` counts the second pass)                                                                                                            | broken uuid dedup                                                                                    |
+| T7  | negative control: a `type:"user"` line containing `"rateLimitType":"seven_day"` in `tool_use_result` ⇒ NOT persisted                                                                 | a raw-substring reader (the defect this slice fixes)                                                 |
+| T8  | `telemetry` dispatch never creates `/tmp/mr_costwatch_*.lock.d`                                                                                                                      | missing inline `exit 0` (red-team PoC #2)                                                            |
+| T9  | static: every `gate` literal at the tick's call sites is in the closed vocabulary; the telemetry call at site (b) precedes `if [ "$RC" -eq 0 ]`, appears once, and `PYRL` follows it | someone moves the call into the RC branch                                                            |
+| T10 | production non-pollution: `mr-state.json` and the production telemetry file unchanged by the selftest                                                                                | the red-team PoC #1 hazard                                                                           |
 
 ## Files
 
-| file | status | change |
-| --- | --- | --- |
-| `memory/projects/mr-cost-watch` | declared | header block + `telemetry_emit()` heredoc `<<'PYTEL'` + dispatch with inline `exit 0` |
-| `memory/projects/mr-native-tick.sh` | declared | two call sites, ~8 lines; `:432-490` untouched |
-| `memory/projects/mr-telemetry-selftest` | declared (new) | the tests |
-| `memory/projects/mr-selfcheck` | **touches-delta** | one `--selftest` wiring line + rationale comment |
-| `memory/projects/.gitignore` | **touches-delta** | one line: the runtime telemetry file |
+| file                                    | status            | change                                                                                |
+| --------------------------------------- | ----------------- | ------------------------------------------------------------------------------------- |
+| `memory/projects/mr-cost-watch`         | declared          | header block + `telemetry_emit()` heredoc `<<'PYTEL'` + dispatch with inline `exit 0` |
+| `memory/projects/mr-native-tick.sh`     | declared          | two call sites, ~8 lines; `:432-490` untouched                                        |
+| `memory/projects/mr-telemetry-selftest` | declared (new)    | the tests                                                                             |
+| `memory/projects/mr-selfcheck`          | **touches-delta** | one `--selftest` wiring line + rationale comment                                      |
+| `memory/projects/.gitignore`            | **touches-delta** | one line: the runtime telemetry file                                                  |
 
 Out file: `$MEM/mr-rate-limit-telemetry.jsonl` (untracked). Reviewer argued for tracking it (the sibling
 `mr-usage-daily.jsonl` is tracked, durability matters for a cost SSOT). REJECTED with the tradeoff
@@ -116,5 +116,5 @@ the read path (lp-12).
 tests (`mr-telemetry-selftest` + the `mr-selfcheck` wiring line, RED, naming the missing subcommand) →
 implementation (`mr-cost-watch`, then `mr-native-tick.sh`, then `.gitignore`) → green →
 review lenses + verifier → proof-of-teeth matrix (3 injected defects, captured verbatim) → docs → PR.
-`just ci` needs `export PATH="$HOME/.asdf/shims:$PATH"` (node 24.13.1) or `adr-lint.test.mjs` REDs
+`just ci` needs `export PATH="$HOME/.asdf/shims:$PATH"` (node 24.22.3) or `adr-lint.test.mjs` REDs
 spuriously on `import.meta.dirname` under /usr/bin/node v18.

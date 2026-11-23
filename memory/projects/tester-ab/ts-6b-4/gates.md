@@ -1,4 +1,5 @@
 # Gates: ts-6b-4
+
 Spec: M-trade-sessions.spec.md#ts-6b-4
 Seed: 5e8633ecc77b6146
 Seeded: 2026-11-13T16:13:06Z
@@ -18,21 +19,21 @@ Touches: game-core/src/tactics/content.rs, game-core/src/tactics/content_tests.r
      residual may not DEFER to `backlog`. -->
 
 - [ ] ts-6b-4.1: WHEN a `battle_unit` row is joined into a `TacticalUnit`, THE SERVER and THE CLIENT SHALL build its `UnitKit` through the one game-core function — closes `R-bt-11-SHAREDJOIN` (`unit_kit_joins_species_affinity_and_kit_moves_with_the_row_level_and_stats` in `game-core/src/tactics/content_tests.rs`; the unit-join comparison in `client-wasm/src/tactics_tests.rs` is re-pointed from its hand-written copy to the game-core function, and a case in `server-module/src/tactics_tests.rs` holds `TacticsContent::unit_kit` equal to it for a content species).
-  CHECK: PATH=$HOME/.cargo/bin:$PATH cargo nextest run -p game-core -p client-wasm -p monster-realm-module --run-ignored all -E 'test(=tactics::content_tests::unit_kit_joins_species_affinity_and_kit_moves_with_the_row_level_and_stats) + test(=tactics_tests::bt11_unit_join) + test(=tactics::tactics_tests::unit_kit_of_a_content_species_equals_the_game_core_join)' 2>&1
-  EXPECT: / 3 tests run: 3 passed/
-  EVIDENCE: pending
+      CHECK: PATH=$HOME/.cargo/bin:$PATH cargo nextest run -p game-core -p client-wasm -p monster-realm-module --run-ignored all -E 'test(=tactics::content_tests::unit_kit_joins_species_affinity_and_kit_moves_with_the_row_level_and_stats) + test(=tactics_tests::bt11_unit_join) + test(=tactics::tactics_tests::unit_kit_of_a_content_species_equals_the_game_core_join)' 2>&1
+      EXPECT: / 3 tests run: 3 passed/
+      EVIDENCE: pending
 
 - [ ] ts-6b-4.2: WHEN the client sizes a deploy panel, THE CLIENT SHALL use the game-core deploy slot count the server enforces for that map — closes `R-bt-12-DEPLOYCAP` (`deploy_slots_is_the_pack_cap_bounded_by_the_side_a_spawns` in `game-core/src/tactics/encounter_tests.rs`; a host test in `client-wasm/src/tactics_tests.rs` that the export equals it for every content map; a `client/src/main.dispatch.test.ts` case that the deploy panel offers as many slots as the export answers).
-  CHECK: PATH=$HOME/.cargo/bin:$PATH cargo nextest run -p game-core -p client-wasm --run-ignored all -E 'test(=tactics::encounter_tests::deploy_slots_is_the_pack_cap_bounded_by_the_side_a_spawns) + test(=tactics_tests::deploy_slots_export_equals_game_core_for_every_content_map)' 2>&1 | tail -3 && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/main.dispatch.test.ts -t 'ts-6b-4.2' 2>&1
-  EXPECT: /\b2 tests run: 2 passed\b[\s\S]*Tests\s+1 passed \| \d+ skipped/
-  EVIDENCE: pending
+      CHECK: PATH=$HOME/.cargo/bin:$PATH cargo nextest run -p game-core -p client-wasm --run-ignored all -E 'test(=tactics::encounter_tests::deploy_slots_is_the_pack_cap_bounded_by_the_side_a_spawns) + test(=tactics_tests::deploy_slots_export_equals_game_core_for_every_content_map)' 2>&1 | tail -3 && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/main.dispatch.test.ts -t 'ts-6b-4.2' 2>&1
+      EXPECT: /\b2 tests run: 2 passed\b[\s\S]*Tests\s+1 passed \| \d+ skipped/
+      EVIDENCE: pending
 
 - [ ] ts-6b-4.3: WHEN the PvP strike pips are painted, THE CLIENT SHALL draw as many pips as the loaded tuning's `autopass_forfeit` — closes `R-bt-15-STRIKESMAX` (`tuning_out_carries_autopass_forfeit` in `client-wasm/src/tactics_tests.rs`; a `client/src/tactics/clock.test.ts` case that a view model built with seven strikes paints seven pips).
-  CHECK: PATH=$HOME/.cargo/bin:$PATH cargo nextest run -p client-wasm --run-ignored all -E 'test(=tactics_tests::tuning_out_carries_autopass_forfeit)' 2>&1 | tail -3 && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/tactics/clock.test.ts src/main.dispatch.test.ts -t 'ts-6b-4.3' 2>&1
-  EXPECT: /\b1 test run: 1 passed\b[\s\S]*Tests\s+2 passed \| \d+ skipped/
-  EVIDENCE: pending
+      CHECK: PATH=$HOME/.cargo/bin:$PATH cargo nextest run -p client-wasm --run-ignored all -E 'test(=tactics_tests::tuning_out_carries_autopass_forfeit)' 2>&1 | tail -3 && NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/tactics/clock.test.ts src/main.dispatch.test.ts -t 'ts-6b-4.3' 2>&1
+      EXPECT: /\b1 test run: 1 passed\b[\s\S]*Tests\s+2 passed \| \d+ skipped/
+      EVIDENCE: pending
 
 - [ ] ts-6b-4.4: WHEN the active unit's AP pips are drawn, THE CLIENT SHALL draw the tuning's turn AP as read through the rules port — closes `R-bt-10-APPIPSMIRROR` (`the active row draws apMax pips from its input` in `client/src/tactics/hud.test.ts`).
-  CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.0/bin:$PATH npx --prefix client vitest run --root client src/tactics/hud.test.ts src/tactics/tacticsBattle.test.ts -t 'ts-6b-4.4' 2>&1
-  EXPECT: /Tests\s+2 passed \| \d+ skipped/
-  EVIDENCE: pending
+      CHECK: NO_COLOR=1 PATH=$HOME/.asdf/installs/nodejs/24.22.3/bin:$PATH npx --prefix client vitest run --root client src/tactics/hud.test.ts src/tactics/tacticsBattle.test.ts -t 'ts-6b-4.4' 2>&1
+      EXPECT: /Tests\s+2 passed \| \d+ skipped/
+      EVIDENCE: pending

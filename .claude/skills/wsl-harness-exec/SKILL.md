@@ -11,7 +11,7 @@ This harness lives in **WSL Ubuntu**, and **Desktop Commander runs natively insi
 
 ## Just run commands
 
-DC was launched from a login shell, so the full asdf toolchain (node 24.13.1, cargo, spacetime, wasm-pack, just) is already on `PATH` and is inherited by every command DC runs. Run things directly:
+DC was launched from a login shell, so the full asdf toolchain (node 24.22.3, cargo, spacetime, wasm-pack, just) is already on `PATH` and is inherited by every command DC runs. Run things directly:
 
 ```
 cd ~/projects/ai-apps/claude-harness && cargo test

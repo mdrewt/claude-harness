@@ -2,16 +2,17 @@ The access and attestation design for single-player and friends worlds is record
 
 **The measurement (lpw-8.3).** One wrong-audience account token, on a 2.11.0 standalone host, with the issuer rig `evals/account-e2e.eval.mjs` builds and the module at `d6d80547`:
 
-| Token | `POST /v1/database/<db>/call/join_game` | `POST /v1/database/<db>/sql` |
-|---|---|---|
-| Account token, wrong audience | 403, body `unrecognized audience` | 403, body `unrecognized audience` |
-| Account token, right audience | 200 | 200, with rows |
-| Token from an issuer the module does not list | 200 | 200, with rows |
-| The host's own anonymous token | 200 | 200, with rows |
+| Token                                         | `POST /v1/database/<db>/call/join_game` | `POST /v1/database/<db>/sql`      |
+| --------------------------------------------- | --------------------------------------- | --------------------------------- |
+| Account token, wrong audience                 | 403, body `unrecognized audience`       | 403, body `unrecognized audience` |
+| Account token, right audience                 | 200                                     | 200, with rows                    |
+| Token from an issuer the module does not list | 200                                     | 200, with rows                    |
+| The host's own anonymous token                | 200                                     | 200, with rows                    |
 
 Every route that reads a row or calls a reducer (the WebSocket, `call`, `sql`, the MCP tools) runs the module's connect reducer first, and a refusal there is complete. `GET /schema` and module-defined HTTP handlers do not run it. This closes R-lpg-0-HTTPAUDIENCE: the audience check holds on the HTTP routes.
 
 decided:
+
 - (a) how an unadmitted connection is kept off every row and reducer -> the connect reducer refuses an identity the rule has not admitted, every reducer a player can call makes the same check, connections open when the rule changes are admitted, and the owner relays the door (over: row filters on every public table; every table private behind a view; refusing at connect only)
 - (b) how the official server refuses attestation binding -> the `official` build holds no attestation key and the `world` build trusts no login issuer, both lists being constants of the build (over: a row or flag in the database; the world-name check and the route alone; a database identity compiled in)
 - (c) what the attestation names -> the server as the player's own software authenticated it, `spki:<fingerprint>/<db>` or `dns:<host>:<port>/<db>`, bound from the desktop shell (over: the key that verifies the client's world token; the server's address or database identity; the same names with a browser sign-in flow built now)
@@ -61,30 +62,34 @@ Each CHECK is a computation over the record's own tables (node 18, no shell in t
 
 ## Gate
 
-`just ci` green locally at `ae05f50d` (the PR head): 3,417 + 1,120 + 3,089 Rust tests, the three node:test doors (141 / 83 / 3), 15 evals, 309 `account-service` tests in 5 files, 6,256 client tests in 245 files, verify-build OK, 9 observability checks, `CI-EXIT=0`. It ran under Node 24.22.0, with the CLI's data directory and the temp directory pointed at a scratch path so that a sibling slice's run could not collide with it. `mr-gates check`: 4/4 met; `mr-gates lint`: clean; `mr-touches scope`: IN-SCOPE (2 files, no widen).
+`just ci` green locally at `ae05f50d` (the PR head): 3,417 + 1,120 + 3,089 Rust tests, the three node:test doors (141 / 83 / 3), 15 evals, 309 `account-service` tests in 5 files, 6,256 client tests in 245 files, verify-build OK, 9 observability checks, `CI-EXIT=0`. It ran under Node 24.22.3, with the CLI's data directory and the temp directory pointed at a scratch path so that a sibling slice's run could not collide with it. `mr-gates check`: 4/4 met; `mr-gates lint`: clean; `mr-touches scope`: IN-SCOPE (2 files, no widen).
 
 touches-delta:
+
 - `docs/DECISIONS.md` — the spec's definition of done requires an entry per decided fork.
 
 boyscout-delta:
+
 - `docs/local-play.md` "Whether an account issuer can mint an attestation as a second token type" (one paragraph) — it said "Open"; the issuer and the attestation route are decided and not built.
 - `docs/local-play.md` "What identifies a player between launches" (one paragraph) — it said nothing does; the client keeps the token on the device for a `local` or `private` target (R-lpw-2-LOCALPLAYDOC).
 - `docs/DECISIONS.md`, six older entries, one or two sentences each, so the log does not contradict the new entries: "One game, three ways to play…" (a deployment's module is built to trust the accounts it takes); "Accounts, guest identity and the claim flow" (`on_connect` never rejects a connection for having no account; a world's access rule may refuse an identity it has not admitted); "A private world verifies an account…" (pointers to the two new entries; the reason `BeginAuthSession` was not chosen); "Private servers carry their own encryption…" (the shell is the only way to join on an enforcing build; the fingerprint is what the attestation names); "Every player must own the game on Steam, for now" (the build input, by name); "The account service is our own small OIDC issuer…" (the official module trusts its login tokens, a world's module its attestations).
 
 plan-delta:
+
 - A red-team pass on the dossier ran before the judges, and a second reviewer re-read the lens-fix diff; neither was in the first plan.
 - The admission probe gained two row-filter variants after the first two failed, to find whether any shape works.
-- The first local `just ci` ran under Node 24.13.1 from a stale note and went red at `account-test`; the repository pins 24.22.0 (row R-lpw-8-NODEKEYCHECK records what that showed).
+- The first local `just ci` ran under Node 24.22.3 from a stale note and went red at `account-test`; the repository pins 24.22.3 (row R-lpw-8-NODEKEYCHECK records what that showed).
 
 comment-scan: FLAGGED 61, all one kind, all in `docs/local-play.md`: `[id]`, a slice or criterion id. They stand: lpw-8.1 and lpw-8.4 require the record to name the tests lpw-9, lpw-15 and acs-6 run, and the table of what the design changes is keyed by the slice whose contract changes. The ids are the harness specs' own section and criterion names, introduced in the section's first paragraph. The four new decision entries carry none.
 
 Items: none
 
-Spec notes (`mr-gates notes list --slice lpw-8`): n1 with R-lpw-8-RELAYRIG (target lpw-14), n2 with R-lpw-8-HOSTLOOPBACK (target lpw-12: a page in the player's browser can open a WebSocket to the host's own loopback port), n3 with R-lpw-8-LIVEADMISSION (target acs-6: no test shows an unadmitted identity refused on `call` and `sql`), n4 with R-lpw-8-BROWSERBIND (backlog), n5 (M-local-play amendments), n6 (M-account-service amendments), n7 with R-lpw-8-NODEKEYCHECK (backlog: `account-service` accepts a mismatched key file on Node 24.13.1, inside its `engines` range), n8 (lpw-15 and R-lpg-0-ATTESTRELAY).
+Spec notes (`mr-gates notes list --slice lpw-8`): n1 with R-lpw-8-RELAYRIG (target lpw-14), n2 with R-lpw-8-HOSTLOOPBACK (target lpw-12: a page in the player's browser can open a WebSocket to the host's own loopback port), n3 with R-lpw-8-LIVEADMISSION (target acs-6: no test shows an unadmitted identity refused on `call` and `sql`), n4 with R-lpw-8-BROWSERBIND (backlog), n5 (M-local-play amendments), n6 (M-account-service amendments), n7 with R-lpw-8-NODEKEYCHECK (backlog: `account-service` accepts a mismatched key file on Node 24.22.3, inside its `engines` range), n8 (lpw-15 and R-lpg-0-ATTESTRELAY).
 
 Scratch, left in place: `/tmp/lpw-8-sb.6z0WKO/` (both probes, their raw output, the dossier and the judges' results, the ledger checks), `/tmp/lpw-8-rt.bJCDDn/` (the red-team's probe run), `/tmp/lpw-8-judge-*.*/` (the judges' scratch; `-e` holds the feature-table crate).
 
 not-verified:
+
 - Anything the design says a slice will build: none of it is built. In particular that the ownership features leave the schema and the generated bindings unchanged, that `--build-options` carries a feature into a publish (argument parsing only was tried), and that the profile section survives into the module's own artefact (a crate of one file was tried).
 - The relay closed end to end over two gated hosts (R-lpw-8-RELAYRIG).
 - What a row filter costs a subscription, and any access measurement on a host version other than 2.11.0.

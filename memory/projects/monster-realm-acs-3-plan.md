@@ -13,8 +13,8 @@ as the player's own software authenticated it"; `docs/local-play.md` §3 forks (
   `EdDSA`; a set of ES256 keys answers an Ed25519 token with `ERR_JWKS_NO_MATCHING_KEY`. A compact
   attestation with the eight claims is about 330 bytes plus the world and nonce.
 - **An Ed25519 private key is 32 bytes**; Node builds one from them alone as PKCS#8 (the 16-byte
-  prefix `302e020100300506032b657004220420` then the bytes) and exports `x`. Node 24.22.0 refuses
-  an OKP JWK whose `d` is not the private half of `x`; the EC case was accepted by 24.13.1, so the
+  prefix `302e020100300506032b657004220420` then the bytes) and exports `x`. Node 24.22.3 refuses
+  an OKP JWK whose `d` is not the private half of `x`; the EC case was accepted by 24.22.3, so the
   loader derives `x` from `d` itself and compares.
 - **`mr-touches` refuses `account-service/package.json`** ("gate or loop-control file: never
   self-granted"): a manifest at any depth is in a slice's set only when its spec declares it. So
@@ -24,7 +24,7 @@ as the player's own software authenticated it"; `docs/local-play.md` §3 forks (
   applies `clientBasedCORS` to the real request.
 - **`server.test.ts` holds the start line to one line** (`expect(lines).toHaveLength(1)`, a regex
   ending at the login `kids`), and one test starts `hosted-dev` on a login key file alone.
-- Baseline: `npm test` in `account-service/`, 12 files, 596 tests, 6.3 s, green on Node 24.22.0.
+- Baseline: `npm test` in `account-service/`, 12 files, 596 tests, 6.3 s, green on Node 24.22.3.
 
 ## Design
 
@@ -104,23 +104,23 @@ Paths are relative to `account-service/`. Relative imports carry `.ts`.
 ```ts
 /** A private Ed25519 attestation key, as a JWK. */
 export interface AttestationJwk {
-  readonly kty: 'OKP';
-  readonly crv: 'Ed25519';
-  readonly alg: 'Ed25519';
-  readonly use: 'sig';
-  readonly kid: string;
-  readonly x: string; // 32 bytes, unpadded base64url (43 characters)
-  readonly d: string; // 32 bytes, unpadded base64url (43 characters)
+	readonly kty: "OKP";
+	readonly crv: "Ed25519";
+	readonly alg: "Ed25519";
+	readonly use: "sig";
+	readonly kid: string;
+	readonly x: string; // 32 bytes, unpadded base64url (43 characters)
+	readonly d: string; // 32 bytes, unpadded base64url (43 characters)
 }
 /** Its public half: every member but `d`. */
-export type PublicAttestationJwk = Omit<AttestationJwk, 'd'>;
+export type PublicAttestationJwk = Omit<AttestationJwk, "d">;
 /** The attestation keys: the first signs. */
 export interface AttestationKeys {
-  readonly keys: readonly AttestationJwk[];
+	readonly keys: readonly AttestationJwk[];
 }
 
 /** The attestation key file's name; it sits in the directory of the login key file. */
-export const ATTESTATION_KEY_FILE_NAME = 'attestation-keys.json';
+export const ATTESTATION_KEY_FILE_NAME = "attestation-keys.json";
 
 /** A fresh random key whose `kid` is the RFC 7638 thumbprint of its public half. */
 export function generateAttestationKey(): AttestationJwk;
@@ -134,12 +134,14 @@ export function publicAttestationKey(key: AttestationJwk): PublicAttestationJwk;
  * 'MR_ACCOUNT_PROFILE' for `production`); none carries key material.
  */
 export function loadAttestationKeys(
-  config: Pick<Config, 'profile' | 'keys'>,
-  login: SigningKeys,
+	config: Pick<Config, "profile" | "keys">,
+	login: SigningKeys,
 ): AttestationKeys;
 
 /** The public attestation keys a module build may accept, per profile. */
-export function publishedAttestationKeys(): Readonly<Record<Profile, readonly PublicAttestationJwk[]>>;
+export function publishedAttestationKeys(): Readonly<
+	Record<Profile, readonly PublicAttestationJwk[]>
+>;
 ```
 
 Behaviour:
@@ -187,7 +189,7 @@ oldest live hit turns W old, rounded up. After that many seconds pass, `take(key
 ### `src/attest.ts` (new)
 
 ```ts
-export const ATTEST_PATH = '/attest';
+export const ATTEST_PATH = "/attest";
 export const ATTESTATION_TTL_SECONDS = 300;
 export const ATTESTATION_LIMIT = 20;
 export const ATTESTATION_WINDOW_SECONDS = 3600;
@@ -195,24 +197,33 @@ export const MAX_WORLD_LENGTH = 512;
 export const MAX_NONCE_LENGTH = 128;
 export const MAX_ATTEST_BODY_BYTES = 1024;
 /** Every claim of an attestation. */
-export const ATTESTATION_CLAIMS = ['iss', 'sub', 'aud', 'nonce', 'mr_ent', 'iat', 'exp', 'jti'] as const;
+export const ATTESTATION_CLAIMS = [
+	"iss",
+	"sub",
+	"aud",
+	"nonce",
+	"mr_ent",
+	"iat",
+	"exp",
+	"jti",
+] as const;
 
 /** The issuer name an attestation carries: `<issuer>/attest`. */
 export function attestationIssuer(issuer: string): string;
 
 export interface AttestRouteOptions {
-  /** The login issuer, as tokens carry it (for example 'http://localhost:4455'). */
-  readonly issuer: string;
-  /** The login keys: a bearer token must verify under the public half of one of them. */
-  readonly loginKeys: SigningKeys;
-  /** The attestation keys: the first signs. */
-  readonly attestationKeys: AttestationKeys;
-  /** The account behind a subject, read for every attestation; undefined when there is none. */
-  readonly account: (sub: string) => Promise<Account | undefined>; // Account from interactions/router.ts
-  /** Receives every line the route logs. */
-  readonly log: (line: string) => void;
-  /** Whole epoch seconds; default `Math.floor(Date.now() / 1000)`. The only clock the route reads. */
-  readonly now?: () => number;
+	/** The login issuer, as tokens carry it (for example 'http://localhost:4455'). */
+	readonly issuer: string;
+	/** The login keys: a bearer token must verify under the public half of one of them. */
+	readonly loginKeys: SigningKeys;
+	/** The attestation keys: the first signs. */
+	readonly attestationKeys: AttestationKeys;
+	/** The account behind a subject, read for every attestation; undefined when there is none. */
+	readonly account: (sub: string) => Promise<Account | undefined>; // Account from interactions/router.ts
+	/** Receives every line the route logs. */
+	readonly log: (line: string) => void;
+	/** Whole epoch seconds; default `Math.floor(Date.now() / 1000)`. The only clock the route reads. */
+	readonly now?: () => number;
 }
 
 /**
@@ -220,7 +231,7 @@ export interface AttestRouteOptions {
  * and false, having touched nothing, when the request is not for the route.
  */
 export function createAttestRoute(
-  options: AttestRouteOptions,
+	options: AttestRouteOptions,
 ): (req: IncomingMessage, res: ServerResponse) => boolean;
 ```
 
@@ -236,23 +247,23 @@ lower-cases the same way).
 An error body is exactly `{"error":"<code>"}`. An answer sent before the body was read (405, 401,
 the first 403, 415) and the 413 also carry `connection: close`.
 
-| Request | Status | Body / headers |
-|---|---|---|
-| `OPTIONS` | 204 | no body; `access-control-allow-methods: POST`, `access-control-allow-headers: authorization, content-type`, `access-control-max-age: 600` |
-| any method but `POST`, `OPTIONS` | 405 | `method_not_allowed`; `allow: POST, OPTIONS` |
-| no `Authorization` header, or not `Bearer <compact JWT>` (scheme case-insensitive, one space) | 401 | `invalid_token`; `www-authenticate: Bearer` |
-| token not signed by a login key with ES256 (another key, `alg` `none`/`HS256`/`Ed25519`, an attestation, a changed payload) | 401 | `invalid_token`; `www-authenticate: Bearer` |
-| token's `iss` is not the issuer | 401 | same |
-| token's `exp` absent, not a number, or `exp <= now()` (the injected clock, never the system's) | 401 | same |
-| token's `sub` not a string of 1 to 255 characters of `0x21`–`0x7E`, or `aud` not a string | 401 | same |
-| token's `mr_ent` absent, not an array, or without `base-game` | 403 | `not_entitled` |
-| `Content-Type` absent, or its media type (the part before any `;`, trimmed, lower-cased) not `application/json`; parameters are ignored | 415 | `invalid_request` |
-| body over 1024 bytes, counted as raw bytes as they arrive (a `Content-Length` over 1024 is refused before any is read) | 413 | `invalid_request` |
-| body not JSON; not an object with exactly the members `world` and `nonce`; either not a string; `world` not 1 to 512, or `nonce` not 1 to 128, characters of `0x21`–`0x7E` | 400 | `invalid_request` |
-| the account already has 20 live hits | 429 | `rate_limited`; `retry-after: <whole seconds, at least 1>` |
-| `account(sub)` resolves undefined or `entitled: false` | 403 | `not_entitled` |
-| `account(sub)` rejects or throws (with anything, an `Error` or not), or signing fails | 500 | `server_error` |
-| otherwise | 200 | `{"attestation":"<compact JWT>"}` |
+| Request                                                                                                                                                                    | Status | Body / headers                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPTIONS`                                                                                                                                                                  | 204    | no body; `access-control-allow-methods: POST`, `access-control-allow-headers: authorization, content-type`, `access-control-max-age: 600` |
+| any method but `POST`, `OPTIONS`                                                                                                                                           | 405    | `method_not_allowed`; `allow: POST, OPTIONS`                                                                                              |
+| no `Authorization` header, or not `Bearer <compact JWT>` (scheme case-insensitive, one space)                                                                              | 401    | `invalid_token`; `www-authenticate: Bearer`                                                                                               |
+| token not signed by a login key with ES256 (another key, `alg` `none`/`HS256`/`Ed25519`, an attestation, a changed payload)                                                | 401    | `invalid_token`; `www-authenticate: Bearer`                                                                                               |
+| token's `iss` is not the issuer                                                                                                                                            | 401    | same                                                                                                                                      |
+| token's `exp` absent, not a number, or `exp <= now()` (the injected clock, never the system's)                                                                             | 401    | same                                                                                                                                      |
+| token's `sub` not a string of 1 to 255 characters of `0x21`–`0x7E`, or `aud` not a string                                                                                  | 401    | same                                                                                                                                      |
+| token's `mr_ent` absent, not an array, or without `base-game`                                                                                                              | 403    | `not_entitled`                                                                                                                            |
+| `Content-Type` absent, or its media type (the part before any `;`, trimmed, lower-cased) not `application/json`; parameters are ignored                                    | 415    | `invalid_request`                                                                                                                         |
+| body over 1024 bytes, counted as raw bytes as they arrive (a `Content-Length` over 1024 is refused before any is read)                                                     | 413    | `invalid_request`                                                                                                                         |
+| body not JSON; not an object with exactly the members `world` and `nonce`; either not a string; `world` not 1 to 512, or `nonce` not 1 to 128, characters of `0x21`–`0x7E` | 400    | `invalid_request`                                                                                                                         |
+| the account already has 20 live hits                                                                                                                                       | 429    | `rate_limited`; `retry-after: <whole seconds, at least 1>`                                                                                |
+| `account(sub)` resolves undefined or `entitled: false`                                                                                                                     | 403    | `not_entitled`                                                                                                                            |
+| `account(sub)` rejects or throws (with anything, an `Error` or not), or signing fails                                                                                      | 500    | `server_error`                                                                                                                            |
+| otherwise                                                                                                                                                                  | 200    | `{"attestation":"<compact JWT>"}`                                                                                                         |
 
 The rows are in checking order: a request that fails two rows gets the earlier row's answer (an
 expired token with a bad body is 401; a token without `mr_ent` and a bad body is 403). No refusal
@@ -319,13 +330,13 @@ the module's code.
 
 ## Tests (tester; gate id is the last token of the title)
 
-| Gate | Files | What proves it |
-|---|---|---|
+| Gate    | Files                                                          | What proves it                                                                                                                                                                                                                   |
+| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | acs-3.1 | `src/attest.test.ts`, `src/keys.test.ts`, `src/server.test.ts` | the 200 answer; header and the eight claims exactly; signature under the attestation key; `aud`/`nonce` byte for byte; fresh `jti`; `iat`/`exp`; the fixed local-dev key and the published file; end to end with a real ID token |
-| acs-3.2 | `src/attest.test.ts` | every refusal row before the limit, each alone, each with no attestation and no hit taken |
-| acs-3.3 | `src/attest.test.ts`, `src/rateLimit.test.ts` | 20 pass, the 21st is 429 with `retry-after`, the window's end readmits; per account; `retryAfter` |
-| acs-3.4 | `src/attest.test.ts`, `src/keys.test.ts` | an attestation does not verify under the login key set; a login token does not verify under the attestation keys; an attestation as bearer is 401; key files of the other type are refused; a shared `kid` is refused |
-| acs-3.5 | `src/attest.test.ts`, `src/server.test.ts` | every line logged across the success, each refusal and the failures holds neither the world nor the nonce |
+| acs-3.2 | `src/attest.test.ts`                                           | every refusal row before the limit, each alone, each with no attestation and no hit taken                                                                                                                                        |
+| acs-3.3 | `src/attest.test.ts`, `src/rateLimit.test.ts`                  | 20 pass, the 21st is 429 with `retry-after`, the window's end readmits; per account; `retryAfter`                                                                                                                                |
+| acs-3.4 | `src/attest.test.ts`, `src/keys.test.ts`                       | an attestation does not verify under the login key set; a login token does not verify under the attestation keys; an attestation as bearer is 401; key files of the other type are refused; a shared `kid` is refused            |
+| acs-3.5 | `src/attest.test.ts`, `src/server.test.ts`                     | every line logged across the success, each refusal and the failures holds neither the world nor the nonce                                                                                                                        |
 
 ## Ledger CHECK shape
 

@@ -8,7 +8,7 @@ Tier: hard (an authentication surface). Sandbox: `/tmp/acs-2-sb.AOYgeY` (probes 
 
 - **No new dependency is possible or needed.** `package-lock.json` is a structural path: `mr-touches`
   refuses it while lpw-4 and lpw-8 are unmerged. Node's built-in `crypto.argon2('argon2id', …)` exists
-  on 24.13.1 and 24.22.0 with no warning and reproduces RFC 9106's argon2id vector; m=19456 KiB, t=2,
+  on 24.22.3 and 24.22.3 with no warning and reproduces RFC 9106's argon2id vector; m=19456 KiB, t=2,
   p=1 takes 20–40 ms. `jose` 6.2.18 is installed as `oidc-provider`'s own dependency (the lock
   file pins it), so a test can import it as an independent verifier without a lock-file change;
   acs-3 declares it when it signs attestations with it.
@@ -132,17 +132,17 @@ export function accountClaims(account: { readonly sub: string; readonly entitled
 ```ts
 // account-service/src/rateLimit.ts
 export interface RateLimiter {
-  /** Records a hit for `key` and returns true, unless `key` already has `limit` live hits (then false, nothing recorded). */
-  take(key: string): boolean;
-  /** Removes the most recent hit of `key`, if it has one. */
-  giveBack(key: string): void;
-  /** How many keys have at least one live hit now. */
-  readonly size: number;
+	/** Records a hit for `key` and returns true, unless `key` already has `limit` live hits (then false, nothing recorded). */
+	take(key: string): boolean;
+	/** Removes the most recent hit of `key`, if it has one. */
+	giveBack(key: string): void;
+	/** How many keys have at least one live hit now. */
+	readonly size: number;
 }
 export function createRateLimiter(options: {
-  readonly limit: number;          // a positive safe integer
-  readonly windowSeconds: number;  // a positive finite number
-  readonly now?: () => number;     // epoch seconds; default the wall clock (Math.floor(Date.now() / 1000))
+	readonly limit: number; // a positive safe integer
+	readonly windowSeconds: number; // a positive finite number
+	readonly now?: () => number; // epoch seconds; default the wall clock (Math.floor(Date.now() / 1000))
 }): RateLimiter;
 ```
 A hit taken at `t` is live while `now() - t < windowSeconds`. Keys are exact strings (`__proto__`
@@ -153,30 +153,36 @@ or `windowSeconds`.
 
 ```ts
 // account-service/src/interactions/router.ts
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import type Provider from 'oidc-provider';
-import type { Adapter } from 'oidc-provider';
-import type { SignInMethod } from '../config.ts';
-export interface Account { readonly sub: string; readonly entitled: boolean }
-export type SignInOutcome =
-  | { readonly kind: 'signed-in'; readonly sub: string }
-  | { readonly kind: 'not-owned' }   // the right password for an account that is not entitled
-  | { readonly kind: 'refused' }     // wrong email or password; never says which
-  | { readonly kind: 'locked' }      // this email has had too many failures
-  | { readonly kind: 'busy' };       // too many attempts are being checked at once; nothing was counted
-export interface PasswordStep {
-  readonly kind: 'password';
-  attempt(email: string, password: string): Promise<SignInOutcome>;
-  /** The account behind a subject, read afresh at every issuance; undefined when there is none. */
-  account(sub: string): Promise<Account | undefined>;
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type Provider from "oidc-provider";
+import type { Adapter } from "oidc-provider";
+import type { SignInMethod } from "../config.ts";
+export interface Account {
+	readonly sub: string;
+	readonly entitled: boolean;
 }
-export type SignInStep = PasswordStep;   // phase 2 adds the Steam steps here
-export function signInStepFor(method: SignInMethod, adapter: (model: string) => Adapter): SignInStep | undefined;
+export type SignInOutcome =
+	| { readonly kind: "signed-in"; readonly sub: string }
+	| { readonly kind: "not-owned" } // the right password for an account that is not entitled
+	| { readonly kind: "refused" } // wrong email or password; never says which
+	| { readonly kind: "locked" } // this email has had too many failures
+	| { readonly kind: "busy" }; // too many attempts are being checked at once; nothing was counted
+export interface PasswordStep {
+	readonly kind: "password";
+	attempt(email: string, password: string): Promise<SignInOutcome>;
+	/** The account behind a subject, read afresh at every issuance; undefined when there is none. */
+	account(sub: string): Promise<Account | undefined>;
+}
+export type SignInStep = PasswordStep; // phase 2 adds the Steam steps here
+export function signInStepFor(
+	method: SignInMethod,
+	adapter: (model: string) => Adapter,
+): SignInStep | undefined;
 // 'dev-password' → devPasswordStep(adapter); 'steam' → undefined (this build has no Steam step)
 export function createInteractionRouter(options: {
-  readonly provider: Provider;
-  readonly issuer: string;
-  readonly signIn: SignInStep;
+	readonly provider: Provider;
+	readonly issuer: string;
+	readonly signIn: SignInStep;
 }): (req: IncomingMessage, res: ServerResponse) => Promise<void>;
 ```
 The router is reached through `createAccountProvider(...).handler` (below); tests drive it over HTTP
@@ -184,34 +190,53 @@ with a stub `PasswordStep` or the real one.
 
 ```ts
 // account-service/src/interactions/devPassword.ts
-import type { Adapter } from 'oidc-provider';
-import type { RateLimiter } from '../rateLimit.ts';
-import type { PasswordStep } from './router.ts';
+import type { Adapter } from "oidc-provider";
+import type { RateLimiter } from "../rateLimit.ts";
+import type { PasswordStep } from "./router.ts";
 export const PASSWORD_FAILURE_LIMIT = 5;
 export const PASSWORD_FAILURE_WINDOW_SECONDS = 600;
 export const MAX_EMAIL_LENGTH = 254;
 export const MAX_PASSWORD_LENGTH = 128;
 export const MAX_CONCURRENT_HASHES = 4;
-export interface DevAccount { readonly sub: string; readonly email: string; readonly entitled: boolean }
+export interface DevAccount {
+	readonly sub: string;
+	readonly email: string;
+	readonly entitled: boolean;
+}
 export class DevAccountError extends Error {
-  readonly reason: 'invalid-email' | 'exists' | 'unknown';
+	readonly reason: "invalid-email" | "exists" | "unknown";
 }
 export interface DevAccounts {
-  create(email: string, options: { readonly entitled: boolean }): Promise<{ readonly account: DevAccount; readonly password: string }>;
-  resetPassword(email: string): Promise<{ readonly account: DevAccount; readonly password: string }>;
-  setEntitled(email: string, entitled: boolean): Promise<DevAccount>;
-  find(email: string): Promise<DevAccount | undefined>;
+	create(
+		email: string,
+		options: { readonly entitled: boolean },
+	): Promise<{ readonly account: DevAccount; readonly password: string }>;
+	resetPassword(
+		email: string,
+	): Promise<{ readonly account: DevAccount; readonly password: string }>;
+	setEntitled(email: string, entitled: boolean): Promise<DevAccount>;
+	find(email: string): Promise<DevAccount | undefined>;
 }
 export function devAccounts(adapter: (model: string) => Adapter): DevAccounts;
 /** An argon2id hash in the PHC string format, under a fresh 16-byte salt. */
 export function hashPassword(password: string): Promise<string>;
 /** Whether `password` is the one `hash` was made from. False, never a throw, for a hash it cannot parse. */
-export function verifyPassword(hash: string, password: string): Promise<boolean>;
+export function verifyPassword(
+	hash: string,
+	password: string,
+): Promise<boolean>;
 export function devPasswordStep(
-  adapter: (model: string) => Adapter,
-  deps?: { readonly failures?: RateLimiter; readonly verifyPassword?: (hash: string, password: string) => Promise<boolean> },
+	adapter: (model: string) => Adapter,
+	deps?: {
+		readonly failures?: RateLimiter;
+		readonly verifyPassword?: (
+			hash: string,
+			password: string,
+		) => Promise<boolean>;
+	},
 ): PasswordStep;
 ```
+
 - **Emails.** Normalised with NFKC then lower case. Valid: 3 to 254 UTF-16 code units (a string's
   `length`, as HTML's `maxlength` counts) after normalising, matching `/^[^\s@]+@[^\s@]+$/`, with
   no control character. Every `DevAccounts` method normalises
@@ -248,10 +273,10 @@ export function devPasswordStep(
   5. An account and a right password → the slot is given back; `signed-in` with its `sub` when
      entitled, `not-owned` when not.
   6. Otherwise `refused`; the slot stays taken.
-  A `verifyPassword` that rejects makes `attempt` reject, with the slot still taken.
-  So five wrong attempts for one email inside ten minutes lock that email until ten minutes after
-  the first of them, the right password included; an email with no account locks the same way; and
-  twenty attempts fired at once for one email compute at most five hashes.
+     A `verifyPassword` that rejects makes `attempt` reject, with the slot still taken.
+     So five wrong attempts for one email inside ten minutes lock that email until ten minutes after
+     the first of them, the right password included; an email with no account locks the same way; and
+     twenty attempts fired at once for one email compute at most five hashes.
 
 ```ts
 // account-service/src/interactions/pages.ts
@@ -261,6 +286,7 @@ export function signInPage(options: { readonly action: string; readonly notice?:
 export function notOwnedPage(): string;
 export function endedPage(): string;
 ```
+
 - `PAGE_HEADERS` has exactly: `content-type: text/html; charset=utf-8`, `cache-control: no-store`,
   `x-content-type-options: nosniff`, `x-frame-options: DENY`, `referrer-policy: same-origin`, and
   `content-security-policy` whose directives include `default-src 'none'`, `frame-ancestors 'none'`,
@@ -281,23 +307,23 @@ export function endedPage(): string;
 
 ```ts
 // account-service/src/provider.ts  (createAccountProvider gains one option; registerClient is new)
-import type { SignInStep } from './interactions/router.ts';
+import type { SignInStep } from "./interactions/router.ts";
 export const AUTHORIZATION_CODE_TTL_SECONDS = 60;
-export const REFRESH_TOKEN_TTL_SECONDS = 2_592_000;   // 30 days
+export const REFRESH_TOKEN_TTL_SECONDS = 2_592_000; // 30 days
 export const SIGN_IN_TTL_SECONDS = 600;
 export const MAX_PENDING_SIGN_INS = 20_000;
 export function createAccountProvider(options: {
-  readonly issuer: string;
-  readonly keys: SigningKeys;
-  readonly adapter: (model: string) => Adapter;
-  readonly signIn?: SignInStep;
-  /** Sign-ins that may be started within `SIGN_IN_TTL_SECONDS`; default `MAX_PENDING_SIGN_INS`. */
-  readonly maxPendingSignIns?: number;
+	readonly issuer: string;
+	readonly keys: SigningKeys;
+	readonly adapter: (model: string) => Adapter;
+	readonly signIn?: SignInStep;
+	/** Sign-ins that may be started within `SIGN_IN_TTL_SECONDS`; default `MAX_PENDING_SIGN_INS`. */
+	readonly maxPendingSignIns?: number;
 }): AccountProvider;
 /** Stores (or replaces) a public client with one redirect address. */
 export function registerClient(
-  adapter: (model: string) => Adapter,
-  client: { readonly clientId: string; readonly redirectUri: string },
+	adapter: (model: string) => Adapter,
+	client: { readonly clientId: string; readonly redirectUri: string },
 ): Promise<void>;
 ```
 `registerClient` throws a `TypeError` naming the rule, and stores nothing, unless `clientId` matches
@@ -364,9 +390,9 @@ With `signIn` (everything below is through `handler`, with the issuer's `Host`):
   4. no live sign-in for the request's cookies and `<uid>` → 400 with `endedPage`;
   5. a body over 8192 bytes, counted as it is read → 413 `text/plain`;
   6. not exactly one `email` and one `password` field → 400 `text/plain` (other fields are ignored).
-  None of those calls the step or writes. A sign-in that has already succeeded answers a further
-  POST with the same 303 again, without calling the step and without a second grant. Otherwise, by
-  `signIn.attempt(email, password)`:
+     None of those calls the step or writes. A sign-in that has already succeeded answers a further
+     POST with the same 303 again, without calling the step and without a second grant. Otherwise, by
+     `signIn.attempt(email, password)`:
   - `signed-in` → 303 to `<issuer>/auth/<uid>`; one `Grant` for that subject and client with the
     `openid` scope is stored.
   - `not-owned` → 403 with `notOwnedPage`; no grant is stored. The sign-in stays open (the form
@@ -375,9 +401,9 @@ With `signIn` (everything below is through `handler`, with the issuer's `Host`):
   - `refused` → 400 with `signInPage` and the `refused` notice.
   - `locked` → 429 with `signInPage` and the `locked` notice.
   - `busy` → 503 with `signInPage` and the `busy` notice.
-  An `attempt` that rejects → 500 `text/plain` with no detail of the error.
-  Every reply of the router carries `cache-control: no-store` and `x-content-type-options: nosniff`;
-  every page carries all of `PAGE_HEADERS`.
+    An `attempt` that rejects → 500 `text/plain` with no detail of the error.
+    Every reply of the router carries `cache-control: no-store` and `x-content-type-options: nosniff`;
+    every page carries all of `PAGE_HEADERS`.
 - **`GET /auth/<uid>`** (the resume) after `signed-in` → 303 to the registered redirect address with
   `code`, the request's `state` and `iss`. It sets no cookie the service ever reads back. If the
   account has stopped being entitled since the password step, it starts a new sign-in step instead
@@ -423,24 +449,27 @@ With `signIn` (everything below is through `handler`, with the issuer's `Host`):
 
 ```ts
 // account-service/src/admin/cli.ts
-export interface AdminIo { out(line: string): void; err(line: string): void }
+export interface AdminIo {
+	out(line: string): void;
+	err(line: string): void;
+}
 /** Runs one admin command and returns the process exit code. */
 export function runAdmin(
-  argv: readonly string[],
-  env: Readonly<Record<string, string | undefined>>,
-  io: AdminIo,
+	argv: readonly string[],
+	env: Readonly<Record<string, string | undefined>>,
+	io: AdminIo,
 ): Promise<number>;
 ```
 Run as `node src/admin/cli.ts <command> …` from `account-service/` with the service's own
 `MR_ACCOUNT_*` environment (it loads the same `loadConfig(env)`), against the same database file,
 while the service runs or not.
 
-| Command | On success (exit 0) prints to `out`, one `name=value` per line |
-|---|---|
-| `create-account <email> [--not-entitled]` | `sub=`, `email=` (normalised), `entitled=true\|false`, `password=` |
-| `reset-password <email>` | `sub=`, `email=`, `entitled=`, `password=` (the new one) |
-| `set-entitlement <email> entitled\|not-entitled` | `sub=`, `email=`, `entitled=` |
-| `set-client <client-id> <redirect-uri>` | `client=`, `redirect_uri=` |
+| Command                                          | On success (exit 0) prints to `out`, one `name=value` per line     |
+| ------------------------------------------------ | ------------------------------------------------------------------ |
+| `create-account <email> [--not-entitled]`        | `sub=`, `email=` (normalised), `entitled=true\|false`, `password=` |
+| `reset-password <email>`                         | `sub=`, `email=`, `entitled=`, `password=` (the new one)           |
+| `set-entitlement <email> entitled\|not-entitled` | `sub=`, `email=`, `entitled=`                                      |
+| `set-client <client-id> <redirect-uri>`          | `client=`, `redirect_uri=`                                         |
 
 - Exit 2 with a usage text on `err` and nothing on `out`: no command, an unknown command, a wrong
   number of arguments, an unknown flag. Nothing is opened or written.
@@ -458,24 +487,29 @@ while the service runs or not.
 
 ```ts
 // account-service/src/server.ts — one changed call
-createAccountProvider({ issuer, keys, adapter: store.adapter, signIn: signInStepFor(config.signIn, store.adapter) })
+createAccountProvider({
+	issuer,
+	keys,
+	adapter: store.adapter,
+	signIn: signInStepFor(config.signIn, store.adapter),
+});
 ```
 A server started on `local-dev` with a client and an account made by `runAdmin` against the same
 data directory serves the form at `/interaction/<uid>` and completes a sign-in.
 
 ## Tests (the tester writes them; names lead with the behaviour, the gate id is a trailing token)
 
-| File | Carries |
-|---|---|
-| `src/claims.test.ts` | acs-2.1 (claim names, `mr_ent` only when entitled) |
-| `src/rateLimit.test.ts` | acs-2.3 (window, `take`/`giveBack`, forgetting, bad options) |
-| `src/interactions/devPassword.test.ts` | acs-2.3 (five failures lock, unknown email identical, parallel attempts, one hash per attempt), acs-2.6 (argon2id PHC, recomputed with `node:crypto`; nothing but the hash stored) |
-| `src/interactions/pages.test.ts` | acs-2.2 (the not-owned page takes nothing and names nothing), headers, escaping |
-| `src/interactions/router.test.ts` | acs-2.2, acs-2.3 over HTTP with a stub step: each outcome's status and page, origin/content-type/size/method rules, cookies |
-| `src/interactions/flow.integration.test.ts` | acs-2.1, acs-2.2, acs-2.4, acs-2.5, acs-2.7 (verified with `jose` against `/jwks`; refused at `exp`) end to end over HTTP with the SQLite store and the real step; at rest; no session reuse; the cap (through `maxPendingSignIns`); time with vitest's fake `Date` |
-| `src/admin/cli.test.ts` | acs-2.6 (`runAdmin` in process; one spawned run of the entry point; production refused with nothing written) |
-| `src/provider.test.ts` (sibling, appended) | `registerClient` rules; discovery with a sign-in step |
-| `src/server.test.ts` (sibling of the widened file, appended) | the `local-dev` server completes a sign-in (the widen's red proof) |
+| File                                                         | Carries                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/claims.test.ts`                                         | acs-2.1 (claim names, `mr_ent` only when entitled)                                                                                                                                                                                                                  |
+| `src/rateLimit.test.ts`                                      | acs-2.3 (window, `take`/`giveBack`, forgetting, bad options)                                                                                                                                                                                                        |
+| `src/interactions/devPassword.test.ts`                       | acs-2.3 (five failures lock, unknown email identical, parallel attempts, one hash per attempt), acs-2.6 (argon2id PHC, recomputed with `node:crypto`; nothing but the hash stored)                                                                                  |
+| `src/interactions/pages.test.ts`                             | acs-2.2 (the not-owned page takes nothing and names nothing), headers, escaping                                                                                                                                                                                     |
+| `src/interactions/router.test.ts`                            | acs-2.2, acs-2.3 over HTTP with a stub step: each outcome's status and page, origin/content-type/size/method rules, cookies                                                                                                                                         |
+| `src/interactions/flow.integration.test.ts`                  | acs-2.1, acs-2.2, acs-2.4, acs-2.5, acs-2.7 (verified with `jose` against `/jwks`; refused at `exp`) end to end over HTTP with the SQLite store and the real step; at rest; no session reuse; the cap (through `maxPendingSignIns`); time with vitest's fake `Date` |
+| `src/admin/cli.test.ts`                                      | acs-2.6 (`runAdmin` in process; one spawned run of the entry point; production refused with nothing written)                                                                                                                                                        |
+| `src/provider.test.ts` (sibling, appended)                   | `registerClient` rules; discovery with a sign-in step                                                                                                                                                                                                               |
+| `src/server.test.ts` (sibling of the widened file, appended) | the `local-dev` server completes a sign-in (the widen's red proof)                                                                                                                                                                                                  |
 
 Red proof: the new files fail at the import of the module they gate; the appended tests fail on
 behaviour. After green: a hand-written wrong-implementation pass over the protected behaviours

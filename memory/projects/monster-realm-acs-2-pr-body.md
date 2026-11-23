@@ -28,6 +28,7 @@ Choices the spec leaves open, and things measured against the library before the
 
 Acceptance: 7/7 met, 0 deferred, 0 unmet — acs-2 seed:f37ac57c90a9e27c
 touches-widened: (files this run granted itself via mr-touches; whoever merges judges each reason)
+
 - account-service/src/server.ts — probe: server.ts builds the provider itself (createAccountProvider({issuer, keys, adapter}) inside startServer, no injection point), so a local-dev server never gets the sign-in step and /interaction/<uid> stays 404; the one call must pass signIn. server.test.ts carries the red test of that wiring.
 - account-service/src/server.test.ts — probe: server.ts builds the provider itself (createAccountProvider({issuer, keys, adapter}) inside startServer, no injection point), so a local-dev server never gets the sign-in step and /interaction/<uid> stays 404; the one call must pass signIn. server.test.ts carries the red test of that wiring.
 
@@ -74,6 +75,7 @@ None.
 Plan: reviewer (1 blocker: the expired-token half of acs-2.7 had no contract; closed) and red-team (2 high: unbounded hashing per sign-in, the cap as a kill switch; both changed the design). Built artifact: reviewer and red-team (both found the cap skipped by `HEAD /auth`, `/AUTH` and `/auth/`; closed with tests for each spelling), a re-read of the fix diff (a resumed sign-in got a fresh ten minutes outside the cap; closed with a test), verifier (FAIL, then PASS). `reducer-security-auditor` and `desync-guard` do not apply: no reducer, no `game-core`.
 
 Answered, not changed:
+
 - An attempt that ends in an internal error (the store, the hash) keeps its slot of the five: an error path never yields a free guess. Five store errors in ten minutes therefore lock an email.
 - A sender that declares a large `Content-Length` and sends nothing holds its connection until Node's request timeout, as any slow client can.
 - `Sec-Fetch-Site` is not consulted and no test pins that: the `Origin` rule is tested for absent, foreign, `null`, prefix and `Referer`-only requests.
@@ -93,6 +95,7 @@ Answered, not changed:
 Items: none
 
 ## Checklist
+
 - [x] `just ci` green (no netcode, reducer or client flow changed, so no `just e2e`)
 - [x] Failing test written before the change
 - [x] `docs/DECISIONS.md` updated if a design decision changed (none did)
@@ -105,6 +108,6 @@ Items: none
 - `hosted-dev` (an `https:` issuer behind a proxy): `Secure` cookies and the `Host` rule were not exercised on a deployed instance (acs-4, acs-5).
 - Remote-only gates (gitleaks in the workflow over the commit range, `cargo audit`, the e2e shards) were not run locally; gitleaks was run by hand in filesystem mode.
 - Windows: file-mode assertions are POSIX-only, and nothing was run on Windows.
-- Node 24.13.1, the low end of the `engines` range: `crypto.argon2` was probed there, the suite was run on 24.22.0 only.
+- Node 24.22.3, the low end of the `engines` range: `crypto.argon2` was probed there, the suite was run on 24.22.3 only.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
