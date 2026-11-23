@@ -426,6 +426,24 @@ after: [lpw-4]
 - **lpw-6.2:** WHEN a lone player opens Social in a fresh world, THE CLIENT SHALL show an empty line on each of the four tabs (one e2e flow in `ui-social.spec.ts`).
 - DoD: lpw-6.1 and lpw-6.2 green; `just ci` and the e2e green.
 
+### lpw-40 — the Profile screen shows the player their own tag
+
+type: feature · tier: routine
+touches: client/src/ui/renameModel.ts, client/src/ui/renameModel.test.ts, client/src/ui/renameView.ts, client/src/ui/renameView.test.ts, client/index.html, client/src/main.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, client/e2e/identity-handles.spec.ts
+after: []
+- Operator, 2026-11-23: pulled forward from M19 (deferred past early access with M18). Friends who trade and challenge each other see one another as a name and a tag (`noticeModel.ts` and `socialModel.ts` use `taggedName` and `formatTag`), but no surface shows a player their own tag, so a player cannot tell a friend which of several same-named players they are.
+- Re-verified at harness `2192a1c`: the Profile frame's Name section (`renameView.ts`, `#rename-current`) shows the stored name alone, from `buildRenameViewModel(store.player(identity)?.name ?? '', '')` in `main.ts` `showProfile`; `StorePlayer.discriminator` is on the client (0 means no tag), and a tag is minted once per identity and never changes on a rename (the game's `docs/DECISIONS.md` "A player's tag is a minted sequence value").
+- Contract: `buildRenameViewModel` takes the player's discriminator and returns `displayTag: string | null` from `formatTag` (`client/src/ui/playerTag.ts`), the one formatter, never a copy of its padding; `renameView.ts` writes it as text (never markup) in its own element after the current name, styled as the Players tab styles a tag. Client-only, no schema or reducer change.
+
+- **lpw-40.1:** WHEN the Profile frame opens for a player whose row carries a tag, THE CLIENT SHALL show that tag, as `formatTag` gives it, beside the current name in the Name section.
+
+- **lpw-40.2:** WHEN the player's row carries no tag (discriminator 0) or the store holds no row for the player, THE CLIENT SHALL show the current name alone, with no tag element text and no placeholder.
+
+- **lpw-40.3:** WHEN the player renames and the new name arrives, THE CLIENT SHALL show the new name with the same tag.
+
+- **lpw-40.4:** WHEN two identities join with the same default name and each opens Profile, THE CLIENT SHALL show each the tag the other's Players tab lists for them, both read against the minted `player.discriminator` from owner SQL (`identity-handles.spec.ts`).
+- DoD: lpw-40.1 to lpw-40.4 green; `just ci` and the e2e green (the i18n completeness suite included, when the section gains a label).
+
 ### lpw-7 — an attestation verifier compiled into the module (spike)
 
 type: design · tier: hard
