@@ -330,9 +330,11 @@ in every world, not only in single-player ones.
   (content loading, rule hooks, client asset and text lookup) stay single and explicit.
 
 **Release order.**
-1. *Early access:* the Steam build with single-player worlds and friends hosting.
-2. *The official server* opens after that.
-3. *Official release:* modding for private worlds.
+1. *Closed beta* (operator, 2026-11-23): invited players, on the game's own Steam app. Steam lobbies,
+   P2P networking and achievements follow it (`M-steam-features`).
+2. *Early access:* the Steam build with single-player worlds and friends hosting.
+3. *The official server* opens after that.
+4. *Official release:* modding for private worlds.
 
 **What this asks of every feature.** A feature is designed against all three: it must work with one
 player and nobody else online; it must cost nothing where no player is (a zone with nobody in it does

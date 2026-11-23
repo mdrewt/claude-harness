@@ -2,7 +2,7 @@
 
 **Status:** authored 2026-11-16 from the operator's rulings on monster-realm#821 and the same
 day's follow-ups; revised the same day into two phases (the operator supplies the Steam app id and
-publisher key about two months before early access); the slices are the `### acs-` sections under "Slices", against game `master`
+publisher key about two months before early access); revised 2026-11-23 (phase 2 builds against Steam's development App ID 480, except production); the slices are the `### acs-` sections under "Slices", against game `master`
 `08d4d12f` · **Project:** monster-realm (a new `account-service/` package, the server module, the
 client, the desktop shell) · **Design SSOT:** the game's `docs/DECISIONS.md` entries "Every player
 must own the game on Steam, for now", "The account service is our own small OIDC issuer; Steam is
@@ -20,10 +20,17 @@ until its lifting event.
   development and tests, and at `auth.monster-realm.spookyowltech.com` for testing from other
   machines. Everything that consumes accounts (the attestation, the module's ownership rule, the
   client's sign-in screen, M-local-play's world binding) builds and tests against it.
-- **Phase 2 — Steam and production (acs-8 to acs-12),** `blocked:operator-steamworks` until the
-  operator supplies the Steam app id and publisher Web API key (planned about two months before
-  early access). It adds the Steam sign-in steps and the ownership check behind the same token
-  shape, so nothing built in phase 1 changes but configuration.
+- **Phase 2 — Steam and production (acs-8 to acs-12).** It adds the Steam sign-in steps and the
+  ownership check behind the same token shape, so nothing built in phase 1 changes but
+  configuration. Operator, 2026-11-23: the operator has a Steamworks partner account, and until
+  Valve has verified the operator's identity (about four weeks) and the game's own app exists,
+  development uses App ID 480 (Spacewar, Valve's app for development). So acs-8, acs-9, acs-10 and
+  acs-12 build now, in the dev profiles, against 480 and the Steam stub. acs-12 still follows
+  M-local-play's shell (lpw-11). Only acs-11, production, stays `blocked:operator-steamworks` until
+  the operator supplies the game's app id and publisher Web API key. 480 proves the sign-in steps,
+  never ownership of our game: every Steam account can run Spacewar, and `CheckAppOwnership` answers
+  only for the publisher's own apps. In the dev profiles, a Steam player is therefore entitled by
+  the same admin flag as a dev account (`decision-defaulted:steam-dev`).
 
 ## Problem / intent
 
@@ -76,12 +83,20 @@ the attestation never learn which method signed a player in.
   to sign in through its own API rather than SpacetimeAuth's Steam path: an issuer of its own in
   front of SpacetimeDB, the shape chosen here. Unconfirmed; BitCraft has no browser client and no
   player-hosted servers.
+- **App ID 480** (operator, 2026-11-23) is Valve's development app. Any Steam account can run it,
+  so a ticket made with `GetAuthTicketForWebApi` under 480 and Steam's OpenID sign-in exercise the
+  real Steam steps, but nothing under 480 can say whether a player owns our game. Its achievements,
+  stats and lobbies are Spacewar's and shared with every developer who uses it. Whether
+  `AuthenticateUserTicket` accepts an ordinary (non-publisher) Web API key for app 480 is
+  unconfirmed. acs-8 checks it against Valve's current documentation and records the answer in
+  `docs/account-service.md`. If it does not, the live ticket check waits for acs-11 and the stub
+  stays the gate.
 
 ## Named deferrals (declared, not dropped)
 
 | Deferred | Target | Why |
 |---|---|---|
-| The Steam sign-in methods and the ownership check | phase 2 (acs-8 to acs-12) | The operator supplies the Steam app id and publisher key about two months before early access; phase 1 uses the dev method's per-account entitlement in their place |
+| The live ownership check (`CheckAppOwnership`) and the game's own app id | acs-11 | The operator supplies the game's app id and publisher key once Valve has verified the operator (about four weeks from 2026-11-23); until then App ID 480 and the dev entitlement flag stand in, and acs-8 to acs-10 and acs-12 build against them |
 | The production issuer's location | acs-11 (the operator names it) | `spookyowltech.com` hosts dev and test only, until the operator chooses where production runs |
 | Guest (anonymous) play on the official server | the operator ("for now") | Ownership is required; the guest claim flow (`start_guest_claim`/`complete_guest_claim`) stays built and tested but no guest reaches `join_game` on an enforcing build (acs-6) |
 | High availability (a second instance, Postgres) | after the official server's first month | One instance with SQLite on a volume and an hourly backup; discovery and keys are cached by every host for minutes to hours, so a short outage blocks only new sign-ins and new binds |
@@ -130,6 +145,17 @@ the attestation never learn which method signed a player in.
 - `decision-defaulted:rate-limits=ticket-30h-per-steamid-60m-per-ip-attest-20h-dev-5-per-10m` —
   ticket exchanges 30 an hour per SteamID and 60 a minute per IP; attestations 20 an hour per
   account; dev password failures 5 per 10 minutes per account (consumed by acs-2, acs-3, acs-9).
+- `decision-defaulted:steam-dev=app-480-dev-flag-entitlement-default-not-entitled` — (phase 2,
+  operator 2026-11-23) the dev profiles (`local-dev`, `hosted-dev`) may take
+  `MR_STEAM_APP_ID`, and accept only `480`, so a dev deployment can never act for the game's own
+  app. They may also take `MR_STEAM_WEB_API_KEY`, the operator's ordinary Web API key, which is
+  optional and is used only for a live ticket check. They never take `MR_STEAM_PUBLISHER_KEY`,
+  which stays production's alone. With 480 set, a dev profile offers the Steam sign-ins beside the
+  password form. A Steam player's entitlement there is the admin flag
+  (`set-entitlement steam:<steamid64> entitled`), and an account with no flag is not entitled:
+  the hosted dev issuer is reachable from the internet, and any Steam account can run 480.
+  `checkAppOwnership` is never called outside `production` (consumed by acs-8, acs-9, acs-10,
+  acs-12).
 
 ## Operator questions (open)
 
@@ -139,7 +165,10 @@ the attestation never learn which method signed a player in.
   acs-5 waits.
 - **Steamworks app and publisher key (operator-owned; planned about two months before early
   access).** The service needs the game's Steam app id and a publisher Web API key; the shell needs
-  the app id. Lifting event for `blocked:operator-steamworks`: the operator records the app id in
+  the app id. Status, 2026-11-23: the operator's Steamworks partner account exists and Valve is
+  verifying the operator's identity (about four weeks), so App ID 480 stands in for development
+  (`decision-defaulted:steam-dev`). An ordinary Web API key for the dev profiles' live ticket check
+  is optional, and only the operator can register it. Lifting event for `blocked:operator-steamworks`: the operator records the app id in
   `docs/account-service.md` and stores the publisher key in the production deployment's secret
   store.
 - **Production host and issuer domain (operator-owned, with the Steam inputs).** Where production
@@ -299,10 +328,10 @@ after: [acs-2, acs-6, lpw-4]
 ### acs-8 — Steam checks and the ownership rule
 
 type: feature · tier: hard
-touches: account-service/src/steam/webApi.ts, account-service/src/steam/webApi.test.ts, account-service/src/steam/ownership.ts, account-service/src/steam/ownership.test.ts, account-service/src/denyList.ts, account-service/src/denyList.test.ts, account-service/test-util/steamStub.ts, docs/account-service.md
+touches: account-service/src/steam/webApi.ts, account-service/src/steam/webApi.test.ts, account-service/src/steam/ownership.ts, account-service/src/steam/ownership.test.ts, account-service/src/denyList.ts, account-service/src/denyList.test.ts, account-service/test-util/steamStub.ts, account-service/src/config.ts, account-service/src/config.test.ts, account-service/src/admin/cli.ts, account-service/src/admin/cli.test.ts, account-service/src/store/sqliteAdapter.ts, account-service/src/store/sqliteAdapter.test.ts, docs/account-service.md
 after: [acs-3]
-blocked: operator-steamworks — lifted when the operator supplies the Steam app id and publisher Web API key (planned about two months before early access; operator questions); fallback: none — early access waits on phase 2.
-- Contract: `webApi.ts` is the only reader of the publisher key: `authenticateTicket(ticket, identity)` and `checkAppOwnership(steamId)`, each with a timeout and no retry on a 4xx. `ownership.ts` is the pure rule `entitled(ownership, steamId)` from the ownership default. `denyList.ts` holds our own bans by SteamID. `steamStub.ts` is a local fake of the Steam Web API and OpenID endpoints every phase-2 test uses; no test reaches Steam. The slice first confirms the response fields against Valve's current partner documentation and records them in `docs/account-service.md`.
+- Built against App ID 480 and the stub (operator, 2026-11-23; `decision-defaulted:steam-dev`). `checkAppOwnership` is built and tested against the stub here, and its first live call is acs-11's.
+- Contract: `webApi.ts` is the only reader of the Steam Web API key (production's publisher key; a dev profile's optional ordinary key), and the app id comes from the profile: `authenticateTicket(ticket, identity)` and `checkAppOwnership(steamId)`, each with a timeout and no retry on a 4xx. `ownership.ts` is the pure rule `entitled(ownership, steamId)` from the ownership default. `denyList.ts` holds our own bans by SteamID. `steamStub.ts` is a local fake of the Steam Web API and OpenID endpoints every phase-2 test uses; no test reaches Steam. The slice first confirms the response fields against Valve's current partner documentation and records them in `docs/account-service.md`.
 
 - **acs-8.1:** WHEN `entitled` is given each combination of `ownsapp`, `permanent`, `sitelicense` and an `ownersteamid` equal to or different from the player's, THE SYSTEM SHALL return true only for an owned, permanent, non-site licence held by the player.
 
@@ -311,15 +340,18 @@ blocked: operator-steamworks — lifted when the operator supplies the Steam app
 - **acs-8.3:** WHEN any request, response or error is logged, THE SYSTEM SHALL log neither the publisher key nor a ticket (a test captures every log line of a full exchange against the stub).
 
 - **acs-8.4:** WHEN a SteamID is on the deny-list, THE SYSTEM SHALL treat it as not entitled whatever Steam answers.
-- DoD: acs-8.1 to acs-8.4 green; `just ci` green.
+
+- **acs-8.5:** WHEN a dev profile is configured with `MR_STEAM_APP_ID` other than `480`, or with `MR_STEAM_PUBLISHER_KEY`, THE SYSTEM SHALL refuse to start, naming the setting and never its value; with `480` and with or without `MR_STEAM_WEB_API_KEY`, it SHALL start and offer the Steam sign-ins beside the password form.
+
+- **acs-8.6:** WHEN a dev profile decides a Steam player's entitlement, THE SYSTEM SHALL read only the admin flag on `steam:<steamid64>` (an account with none is not entitled) and SHALL never call `checkAppOwnership`; `production` SHALL call it and never read a dev flag.
+- DoD: acs-8.1 to acs-8.6 green; `just ci` green; a live `AuthenticateUserTicket` run under 480 recorded in `docs/account-service.md` when the operator's ordinary key is in the local env, or the PR naming why it was not run.
 
 ### acs-9 — the desktop sign-in: a Steam ticket for an ID token
 
 type: feature · tier: hard
 touches: account-service/src/grants/steamTicket.ts, account-service/src/grants/steamTicket.test.ts, account-service/src/claims.ts, account-service/src/claims.test.ts, account-service/src/rateLimit.ts, account-service/src/rateLimit.test.ts, account-service/src/provider.ts
 after: [acs-8]
-blocked: operator-steamworks — as acs-8.
-- Contract: a grant `urn:monster-realm:steam-ticket` (`registerGrantType`) takes `steam_ticket` (hex) and the client id, calls `authenticateTicket` with the identity default and `checkAppOwnership`, and returns an ID token from `claims.ts` with `sub` `steam:<steamid64>` and the same claims as acs-2.1. No refresh token: the desktop exchanges a fresh ticket.
+- Contract: a grant `urn:monster-realm:steam-ticket` (`registerGrantType`) takes `steam_ticket` (hex) and the client id, calls `authenticateTicket` with the identity default and the profile's entitlement source (`checkAppOwnership` in `production`, the dev flag under 480, per acs-8), and returns an ID token from `claims.ts` with `sub` `steam:<steamid64>` and the same claims as acs-2.1. No refresh token: the desktop exchanges a fresh ticket.
 
 - **acs-9.1:** WHEN a ticket that Steam authenticates for an entitled player is exchanged, THE SYSTEM SHALL return an ID token whose claims are exactly those `claims.ts` names, with `sub` `steam:<steamid64>`.
 
@@ -333,8 +365,7 @@ blocked: operator-steamworks — as acs-8.
 type: feature · tier: hard
 touches: account-service/src/interactions/router.ts, account-service/src/interactions/router.test.ts, account-service/src/interactions/steamOpenId.ts, account-service/src/interactions/steamOpenId.test.ts, account-service/src/interactions/pages.ts, account-service/src/interactions/pages.test.ts, account-service/src/interactions/flow.integration.test.ts, account-service/src/claims.ts
 after: [acs-9]
-blocked: operator-steamworks — as acs-8.
-- Contract: in the `production` profile `router.ts` redirects the interaction to Steam's OpenID login with `return_to` exactly our callback and `realm` our origin; the dev profiles keep the password form. `steamOpenId.ts` verifies the reply: Steam answers `is_valid:true` to `check_authentication`; `op_endpoint`, `return_to` and the interaction's state match exactly; `claimed_id` matches `^https://steamcommunity\.com/openid/id/(\d{17})$`; `response_nonce` was not seen within its window. The ownership rule then decides; an entitled player finishes as `steam:<steamid64>`, through acs-2's code, PKCE and refresh machinery; every refresh re-checks ownership.
+- Contract: in the `production` profile `router.ts` redirects the interaction to Steam's OpenID login with `return_to` exactly our callback and `realm` our origin. A dev profile keeps the password form and, when acs-8's config enables Steam (App ID 480), offers the same Steam step beside it; OpenID itself names no app id, and the entitlement source is the profile's (acs-8). `steamOpenId.ts` verifies the reply: Steam answers `is_valid:true` to `check_authentication`; `op_endpoint`, `return_to` and the interaction's state match exactly; `claimed_id` matches `^https://steamcommunity\.com/openid/id/(\d{17})$`; `response_nonce` was not seen within its window. The ownership rule then decides; an entitled player finishes as `steam:<steamid64>`, through acs-2's code, PKCE and refresh machinery; every refresh re-checks ownership.
 
 - **acs-10.1:** WHEN an entitled Steam player completes the flow against the stub, THE SYSTEM SHALL return a code exchangeable for the same token shape as acs-2.1 with `sub` `steam:<steamid64>`.
 
@@ -343,15 +374,17 @@ blocked: operator-steamworks — as acs-8.
 - **acs-10.3:** WHEN the Steam player is not entitled, or a refresh finds them no longer entitled or on the deny-list, THE SYSTEM SHALL issue nothing and revoke any chain.
 
 - **acs-10.4:** WHEN the same player signs in through the ticket grant and through the browser, THE SYSTEM SHALL issue tokens with the same `sub`.
-- DoD: acs-10.1 to acs-10.4 green; `just ci` green.
+
+- **acs-10.5:** WHEN a dev profile without Steam enabled serves the sign-in step, THE SYSTEM SHALL offer the password form alone; with Steam enabled it SHALL offer both, and a Steam sign-in there SHALL be entitled only by the dev flag.
+- DoD: acs-10.1 to acs-10.5 green; `just ci` green.
 
 ### acs-11 — production: the issuer deployed and release builds turned on
 
 type: feature · tier: hard
 touches: docs/runbooks/account-service.md, docs/account-service.md, ops/auth/.env.example, server-module/src/accounts.rs, server-module/src/accounts_tests.rs
 after: [acs-4, acs-6, acs-10]
-blocked: operator-steamworks — as acs-8, and the operator names the production host and issuer domain (operator questions).
-- Contract: acs-4's recipe with the `production` profile on the operator's production host; signing keys in its KMS through `oidc-provider`'s external signing; discovery and keys copied to a CDN on every key change. The release build's trusted issuer takes the real production value, and `audience_allowed` tightens to exact single-value equality, as that constant's sequencing note requires.
+blocked: operator-steamworks — lifted when the operator supplies the game's own Steam app id and publisher Web API key (Valve is verifying the operator's identity as of 2026-11-23, about four weeks; App ID 480 stands in until then), and the operator names the production host and issuer domain (operator questions); fallback: none — early access waits on it.
+- Contract: the game's app id replaces 480 in `production` and in the shell's release build, and `checkAppOwnership` makes its first live call. acs-4's recipe with the `production` profile on the operator's production host; signing keys in its KMS through `oidc-provider`'s external signing; discovery and keys copied to a CDN on every key change. The release build's trusted issuer takes the real production value, and `audience_allowed` tightens to exact single-value equality, as that constant's sequencing note requires.
 
 - **acs-11.1:** WHEN the deployed production service is exercised with a real Steam ticket and a real browser sign-in by an owning account and by a non-owning account (the operator's two accounts), THE SYSTEM SHALL issue tokens only to the owner, recorded in the runbook.
 
@@ -365,10 +398,10 @@ blocked: operator-steamworks — as acs-8, and the operator names the production
 type: feature · tier: hard
 touches: desktop/src/steamTicket.ts, desktop/src/steamTicket.test.ts, desktop/src/preload.ts, desktop/src/main.ts, desktop/package.json, desktop/package-lock.json, client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/main.ts
 after: [lpw-11, acs-7, acs-9]
-blocked: operator-steamworks — as acs-8, and operator-steam-machine transitively through lpw-11 (M-local-play); fallback: the shell uses acs-10's browser sign-in in its own window.
-- Contract: the shell's main process gets a ticket with `steamworks.js` `getAuthTicketForWebApi("monster-realm-account")` (version pinned against the shell's Electron), exchanges it at acs-9's grant, and hands the page an ID token through the preload hook as one more `ConnectCredential` source; the page never sees the ticket. The same source serves lpw-15's attestation request in the shell.
+- Built against App ID 480 (operator, 2026-11-23): a dev build's shell runs as app 480 and exchanges its ticket at a dev profile with Steam enabled (acs-8). The app id comes from the shell's build configuration and is never named in the page or the client bundle; a release build takes the game's id at acs-11. It follows M-local-play's shell (lpw-11, after lpw-10's overlay probe). If lpw-10's decision picks Tauri, that design slice rewrites this hand-off for the shell's Rust process.
+- Contract: the shell's main process gets a ticket with its Steamworks binding's `getAuthTicketForWebApi("monster-realm-account")` (`steamworks.js` for Electron, the version pinned against the shell's Electron), exchanges it at acs-9's grant, and hands the page an ID token through the preload hook as one more `ConnectCredential` source; the page never sees the ticket. The same source serves lpw-15's attestation request in the shell.
 
-- **acs-12.1:** WHEN the shell starts toward an `official` target with Steam running, THE SYSTEM SHALL sign the player in with no prompt and connect with the issued token.
+- **acs-12.1:** WHEN the shell starts toward an `official` target with Steam running, THE SYSTEM SHALL sign the player in with no prompt and connect with the issued token (the desktop e2e against the stub; one live run as app 480 on the operator's Windows host is recorded in `docs/account-service.md` when the loop can drive it, per lpw-10).
 
 - **acs-12.2:** WHEN Steam is not running or the exchange is refused, THE SYSTEM SHALL show acs-7's sign-in screen with the reason, and SHALL not fall back to anonymous play on an enforcing server.
 

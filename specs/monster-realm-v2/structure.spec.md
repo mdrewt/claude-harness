@@ -41,129 +41,24 @@ deleted and never counts toward a playtest gate, and an empty `## Slices` means 
 
 ## Slices
 
-### st-11 — client shell: the message sinks get an owner
-type: refactor · tier: hard
-touches: client/src/main.ts, client/src/shell/feedback.ts, client/src/shell/feedback.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, client/src/ui/i18n/catalogParity.test.ts, client/src/ui/statusModel.test.ts, client/src/net/oidc.test.ts, docs/refactors/client-shell.md, ARCHITECTURE.md, docs/DECISIONS.md
+### st-21 — client platform: one client, any desktop shell (design)
+
+type: design · tier: hard
+touches: docs/refactors/client-platform.md, docs/refactors/client-shell.md, ARCHITECTURE.md, docs/DECISIONS.md
 after: []
 
-Extraction 4 of `docs/refactors/client-shell.md`, an ownership change.
-`client/src/shell/feedback.ts` is created and takes `route`, `reportError`, `showToast`,
-`paintToast`, `tickToast`, `setWorldHint`, `topHint`, `hintOnMenu`, `paintWorldHint`,
-`resetFeedbackSinks`, `announceNow`, `dismissErrorToast`, `pushError`, `reportPaintError`,
-`eventRing`, `errorRing`, `liveRegion`, `MOVE_REJECT_PREFIX` and the bindings `statusEl`,
-`toastChrome`, `toastState`, `worldHints`, `saidHint`, `menuHint`, `statusNotice`,
-`announcedSinceFrame`, `lastA11ySnapshot`, `toastDismissedSeq`, `handlingError` and
-`lastPaintErrorMessage`. It imports only `shell/views.ts` among the shell modules. Three
-writers sit outside it, each per the plan's "Ports", "Pumps" and "Owners": the hint-host port
-(`hintOnMenu` reads whether the main menu is the top frame, `paintWorldHint` repaints the menu)
-is installed by `main.ts` at module scope before its first listener; `main()` mounts
-`statusEl` and `toastChrome` through owner functions; and the announcement edge and notice step
-of the frame loop become one pump owned by `feedback.ts`, called from the frame loop in the
-same position with the parameter object the plan names (the top overlay, the line
-`pumpStillThere` returned, the world-edge focus return). The `onReconnect` reset of
-`statusNotice` becomes an owner call. The `error` and `unhandledrejection` listeners stay
-registered in `main.ts` in their place in "Registration order" (rule 4).
+- Operator, 2026-11-23. Before M-local-play's overlay probe (lpw-10), the client gets a cross-cutting refactor that adds and removes no feature. The aim is code that is clean, DRY, reusable and extensible, and easy to maintain and change, with most of it shared by an Electron shell and a Tauri shell whatever the probe finds. The two shells differ only where their frameworks force it. In the best case both draw the overlay and run the same bundle, and lpw-10 compares them like for like. The standing rule is PLAN's "Three ways to play, one codebase": client code is shared across shells, never forked.
+- The design is the plan file `docs/refactors/client-platform.md`, in three parts:
+  - **The host seam.** Every place the client reaches something a shell provides differently, measured from the code by symbol and file. These are: how the shell document and connection target arrive (`__MR_SHELL_CONFIG__`, `client/src/net/shellDocument.ts`); persistent storage; opening an external link and saving a file (the data export, the bug bundle); window, fullscreen and visibility; input sources (the keyboard, the gamepad, and later Steam Input onto the same virtual buttons); and the Steam calls a shell may offer (overlay activation, the auth ticket acs-12 hands over, achievements). Each concern gets one port. The browser build is the only adapter this work writes, and no Electron or Tauri code is written. A port is cut from concrete call sites: one with a single implementation and no second host that needs it is not added.
+  - **The rest of `docs/refactors/client-shell.md`**, its extractions 7 to 18. Each is kept, reordered or superseded by name, and none is dropped silently.
+  - **Duplication and structure across `client/src/`** (`ui/`, `render/`, `net/`, `input/`, `tactics/`, `shell/`). Each finding is either an extraction with its owner module or recorded as not worth moving, with the reason.
+- At least two seam shapes are judged, for example one host object injected at boot, and per-concern ports under `client/src/platform/` with the adapter chosen at build time. They are scored on what each shell must write, how they test with the client's existing fakes, and what leaves `main.ts`. A `judge` scores them.
+- The plan lists its extractions in order, one slice each, per `standards/spec-driven.md` §Refactor slices: move or interface, never both, with `touches:` measured. The supervisor sections them three at a time as usual. The PR that sections the last one adds that id to lpw-10's `after:` in `M-local-play.spec.md`.
 
-Pins, from the plan's "Tests and docs that follow the code": `client/src/ui/i18n/catalogParity.test.ts`
-pins `main.ts` as the resolver of `a11y.world.region`, which the announcement edge resolves; the
-key is pinned on `feedback.ts`, the roster of files that import the resolver gains the module,
-and the two-binding proof moves to a file that still imports both `t` functions, with the union
-of resolved keys unchanged. The tester makes that edit. Comments that name `main.ts` as the home
-or caller of a moved symbol are re-pointed: `client/src/ui/statusModel.test.ts`,
-`client/src/net/oidc.test.ts`, `client/src/ui/i18n/catalogParity.test.ts` (measured at
-`16e2cb3c`). `docs/DECISIONS.md` "Four message channels, chosen by one policy table" names
-`main.ts`'s sinks and is rewritten in place to name `shell/feedback.ts`. Covering tests:
-`client/src/main.feedbackCore.test.ts`, `client/src/main.feedbackI18n.test.ts`,
-`client/src/main.frameErrorWiring.test.ts`, `client/src/main.a11yFocus.test.ts` and the other
-`client/src/main.*.test.ts` suites.
-
-- **ST11.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
-  suites run THEY SHALL pass with every assertion unedited.
-- **ST11.2:** WHEN the client's full vitest suite runs IT SHALL pass, with
-  `client/src/ui/i18n/catalogParity.test.ts` asserting the same union of resolved keys.
-
-Confirmed in the diff at merge, not by a criterion: the names above are declared in
-`shell/feedback.ts` and nowhere in `main.ts`; each binding is assigned only inside the owner;
-`feedback.ts` imports no shell module but `views`, registers nothing on `store`, `window` or
-`document`, and resolves no catalog string at module scope; the frame loop calls the pump where
-the edge and the step stood; its plan line is gone.
-
-### st-12 — client shell: the server link gets an owner
-type: refactor · tier: hard
-touches: client/src/main.ts, client/src/shell/session.ts, client/src/shell/session.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, docs/refactors/client-shell.md, ARCHITECTURE.md, docs/DECISIONS.md
-after: [st-11]
-
-Extraction 5 of `docs/refactors/client-shell.md`, an ownership change.
-`client/src/shell/session.ts` is created and takes `store`, `identity`, `conn`,
-`hydratedSinceReconnect`, `resolveReady`, `ready`, `sessionGateBlocks`, `liveReducers`,
-`privacyLinkLive`, `sendGuarded`, `SEND_REJECT_KIND`, `SendWhere`, `battleEmit`,
-`lastOwnRating` and the two batch listeners that step the battle and ranked emit latches. It
-imports only `shell/config.ts` and `shell/feedback.ts` among the shell modules. Writers outside
-it become owner functions per the plan's "Owners": `main()` mounts `conn`; `onReady` and
-`onReconnect` set `identity` (event); `onHydrated` and `onReconnect` set
-`hydratedSinceReconnect` (event); `onReconnect` arming the reseed writes `battleEmit` (event);
-`resetPredictionState` resets `battleEmit` and `lastOwnRating` (reset). The two emit-latch
-listeners keep their place as item 12 of "Registration order": their bodies move to the owner
-as named exports and `main.ts` registers them by name (rule 4). `store` is constructed at the
-owner's import (rule 5) and is used through its own methods.
-
-Pins: none in the plan's table for this line. `client/src/net/connection.test.ts` reads
-`main.ts` for `applyClaim` and three absence checks; `applyClaim` moves with `account.ts`, so
-the file is not edited here. Comments that name `main.ts` as the home of a moved symbol are
-re-pointed: `client/src/main.battle-reseed.test.ts` and `client/src/main.privacyCountdown.test.ts`
-(`sessionGateBlocks`; measured at `16e2cb3c`). None of the moved bodies resolves a catalog key at
-`16e2cb3c`; a build that finds one adds `client/src/ui/i18n/catalogParity.test.ts` under the
-plan's row for it. `docs/DECISIONS.md` "Four message channels, chosen by one policy table" is
-re-pointed wherever it still names `main.ts` for `sendGuarded`'s refusal routing. Covering
-tests: `client/src/main.battle-reseed.test.ts`, `client/src/main.reconnectStack.test.ts`,
-`client/src/main.privacyCountdown.test.ts`, `client/src/main.boot.test.ts` and the other
-`client/src/main.*.test.ts` suites; `client/src/net/connection.runtime.test.ts` covers the link
-itself and is not edited.
-
-- **ST12.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
-  suites run THEY SHALL pass with every assertion unedited.
-- **ST12.2:** WHEN the client's full vitest suite runs IT SHALL pass.
-
-Confirmed in the diff at merge, not by a criterion: the names above are declared in
-`shell/session.ts` and nowhere in `main.ts`; `identity`, `conn`, `hydratedSinceReconnect`,
-`battleEmit` and `lastOwnRating` are assigned only inside the owner; the emit-latch listeners
-are still registered by `main.ts` as item 12; its plan line is gone.
-
-### st-13 — client shell: what a screen adapter reads gets an owner
-type: refactor · tier: hard
-touches: client/src/main.ts, client/src/shell/screenContext.ts, client/src/shell/screenContext.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, client/src/render/motionPreference.ts, docs/refactors/client-shell.md, ARCHITECTURE.md
-after: [st-12]
-
-Extraction 6 of `docs/refactors/client-shell.md`, an ownership change.
-`client/src/shell/screenContext.ts` is created and takes `screenCtx`, `motionPreference`,
-`boundShopId`, `boundHealLocationId`, `boundSocialTab`, `boundMonstersTab` and
-`boundTradeSessionId`. The plan's line and its "Owners" row name `boundProposeTarget`, which
-`main.ts` no longer declares: ts-3 (#730) replaced it with `boundTradeSessionId`, the binding
-`screenCtx.tradeSessionId` reads at `16e2cb3c`. The slice takes `boundTradeSessionId` and
-corrects the plan's row: its writers are `openTradeEditor` (event), `resetTradeSessionState`
-(reset) and the batch listener that drops a closed session (event). It imports only
-`shell/inputState.ts` and `shell/session.ts` among the shell modules. The other writers become
-owner functions per the plan: `openPendingShop`, `runInteract`, `openSocial` and
-`openMenuTarget` bind (event), and `main` clears (reset). `motionPreference` is constructed at
-the owner's import and keeps the one listener a shell module's scope may create, the media-query
-listener, which still registers before the first batch listener (rule 5). `screenCtx`'s getters
-read the owner's bindings through the live imports (rule 1).
-
-Pins: none in the plan's table. The comment in `client/src/render/motionPreference.ts` that
-names `main.ts` as the caller of `motionPreferenceFromWindow` is re-pointed (measured at
-`16e2cb3c`). Covering tests: `client/src/main.reducedMotionWiring.test.ts`,
-`client/src/main.shopBalance.test.ts`, `client/src/main.social.test.ts`,
-`client/src/main.dispatch.test.ts` and the other `client/src/main.*.test.ts` suites; the
-`client/src/ui/screens/*.boot.test.ts` suites read `screenCtx` through the screens they boot.
-
-- **ST13.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
-  suites run THEY SHALL pass with every assertion unedited.
-- **ST13.2:** WHEN the client's full vitest suite runs IT SHALL pass.
-
-Confirmed in the diff at merge, not by a criterion: the seven names are declared in
-`shell/screenContext.ts` and nowhere in `main.ts`; each `bound*` binding is assigned only
-inside the owner; the media-query listener still registers before the first batch listener;
-the plan's line is gone and its `boundProposeTarget` row names `boundTradeSessionId`.
+- **ST21.1:** WHEN the design is recorded, THE SYSTEM SHALL list in `docs/refactors/client-platform.md` every client call site that reaches a host-provided capability (symbol and file), the port that owns it, and what a browser, an Electron and a Tauri adapter would each provide for it.
+- **ST21.2:** WHEN the design is recorded, THE SYSTEM SHALL list its extractions in order, each with whether it is a move or an interface change, its tier, the modules it creates and the tests that already cover the moved behaviour, and SHALL name every remaining extraction of `docs/refactors/client-shell.md` as kept, reordered or superseded.
+- **ST21.3:** WHEN the design is recorded, THE SYSTEM SHALL state, for each extraction, that it adds and removes no feature, and SHALL list every defect found along the way as a finding for a tracked follow-up, never a fix inside a refactor slice.
+- DoD: the plan; a judge's scores over the seam shapes; a `docs/DECISIONS.md` entry for the chosen seam; `ARCHITECTURE.md`'s client section naming the plan.
 
 ### st-14 — decision log: foundations and rules
 
