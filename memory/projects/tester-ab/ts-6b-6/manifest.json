@@ -1,0 +1,49 @@
+{
+ "base": "49d74a6020993cea45a00c4e54f26a2d8a6ed12f",
+ "collected": true,
+ "head_at_plan": "49d74a6020993cea45a00c4e54f26a2d8a6ed12f",
+ "labels": {
+  "a1": {
+   "arm": "O-med",
+   "effort": "medium",
+   "export": "/home/mdrewt/.cache/mr-tester-ab/ts-6b-6/18dcf9667492bee1",
+   "model": "opus",
+   "role": "shadow"
+  },
+  "a2": {
+   "arm": "S-med",
+   "effort": "medium",
+   "export": "/home/mdrewt/.cache/mr-tester-ab/ts-6b-6/98fa34e6811d72e4",
+   "model": "sonnet",
+   "role": "shadow"
+  },
+  "a3": {
+   "arm": "O-high",
+   "effort": "high",
+   "export": "/home/mdrewt/.cache/mr-tester-ab/ts-6b-6/763b545f755f6de4",
+   "model": "opus",
+   "role": "shadow"
+  },
+  "a4": {
+   "arm": "S-high",
+   "effort": "high",
+   "export": "/home/mdrewt/.cache/mr-tester-ab/ts-6b-6/6bf9c2abf793399a",
+   "model": "sonnet",
+   "role": "shadow"
+  },
+  "a5": {
+   "arm": "S-med-r",
+   "effort": "medium",
+   "export": "/home/mdrewt/.cache/mr-tester-ab/ts-6b-6/e4c0b8a37bdd66a0",
+   "model": "sonnet",
+   "role": "replicate"
+  }
+ },
+ "milestone": null,
+ "planned": "2026-11-13T18:10:47Z",
+ "prompt_sha256": "0849b0d8c9fbe266be8113de161a99944a1950f4bd7efddceca26ed9f0b96b9b",
+ "slice": "ts-6b-6",
+ "tester_md_sha": "0c7b257b458eb1695f38616c93d40fa20755f22057a1469039e4e484b12c7616",
+ "tier": "routine",
+ "worktree": "/home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/ts-6b-6"
+}

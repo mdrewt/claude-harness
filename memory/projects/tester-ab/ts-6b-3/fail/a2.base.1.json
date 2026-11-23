@@ -1,0 +1,3 @@
+{
+ "server-module/src/raising_tests.rs::heal_party_refuses_a_cost_item_locked_by_a_confirmed_trade_session": "thread 'raising::raising_tests::nh::heal_party_refuses_a_cost_item_locked_by_a_confirmed_trade_session' (3639168) panicked at server-module/src/raising_tests.rs:3422:9\nthread 'raising::raising_tests::nh::heal_party_refuses_a_cost_item_locked_by_a_confirmed_trade_session' (3639168) panicked at server-module/src/raising_tests.rs:3422:9:\nassertion `left == right` failed: A's confirmed opener side locks 2 of 2\n  left: Ok(())\n right: Err(\"item is in an active trade\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+}

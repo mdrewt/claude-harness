@@ -1,0 +1,3 @@
+{
+ "server-module/src/trading_session_tests.rs::apply_swap_debits_each_item_stack_in_one_write_and_refuses_a_shortfall_unchanged": "test timeout\nrunning 1 test\ntest trading_session::trading_session_tests::apply_swap_debits_each_item_stack_in_one_write_and_refuses_a_shortfall_unchanged has been running for over 60 seconds"
+}

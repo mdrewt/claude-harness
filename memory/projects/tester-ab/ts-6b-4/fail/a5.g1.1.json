@@ -1,0 +1,3 @@
+{
+ "client/src/tactics/wasm.test.ts::BT11-7-RULES-BIND: the real pkg is fresh and binds every method; a missing export throws naming it; out-of-range primitives throw RangeError before wasm; wasm errors are rethrown by identity; forecast resolves the kit skill": "client-wasm/pkg is older than client-wasm/src or game-core/src \u2014 run `just wasm`: expected false to be true // Object.is equality\n\nAssertionError: client-wasm/pkg is older than client-wasm/src or game-core/src \u2014 run `just wasm`: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n \u276f src/tactics/wasm.test.ts:687:7"
+}

@@ -1022,3 +1022,96 @@
 {"ev": "set", "id": "pt3-2026-10-052", "state": "IN-WORK", "ts": "2026-10-26T20:01:30Z"}
 {"ev": "set", "id": "pt3-2026-10-062", "state": "IN-WORK", "ts": "2026-10-26T20:01:30Z"}
 {"ev": "set", "id": "pt3-2026-10-093", "state": "IN-WORK", "ts": "2026-10-26T20:01:30Z"}
+{"ev": "set", "id": "pt3-2026-10-028", "state": "IN-WORK", "ts": "2026-10-30T14:00:55Z"}
+{"ev": "set", "id": "pt3-2026-10-157", "note": "qf-17 launched (wallet in shop, QF17.3)", "state": "IN-WORK", "ts": "2026-10-30T22:32:42Z"}
+{"ev": "set", "id": "pt3-2026-10-156", "state": "IN-WORK", "ts": "2026-10-30T22:32:54Z"}
+{"ev": "set", "id": "pt3-2026-10-156", "evidence": "qf-15 merged 35f85d59 (#615); master CI green", "state": "VERIFIED", "ts": "2026-10-30T22:33:01Z"}
+{"ev": "set", "id": "pt3-2026-10-156", "evidence": "qf-15 merged 35f85d59 (#615): zone cue + warp off elder_oak home; master CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-10-30T22:33:08Z"}
+{"ev": "set", "id": "pt3-2026-10-030", "state": "IN-WORK", "ts": "2026-11-07T16:45:21Z"}
+{"ev": "set", "id": "pt3-2026-10-055", "state": "IN-WORK", "ts": "2026-11-07T16:45:21Z"}
+{"ev": "set", "id": "pt3-2026-10-089", "state": "IN-WORK", "ts": "2026-11-07T16:45:21Z"}
+{"ev": "set", "id": "pt3-2026-10-094", "state": "IN-WORK", "ts": "2026-11-07T16:45:21Z"}
+{"ev": "set", "id": "pt3-2026-10-170", "state": "IN-WORK", "ts": "2026-11-07T16:45:21Z"}
+{"ev": "set", "id": "pt3-2026-10-171", "state": "IN-WORK", "ts": "2026-11-07T16:45:21Z"}
+{"ev": "set", "id": "pt3-2026-10-173", "state": "IN-WORK", "ts": "2026-11-07T16:45:21Z"}
+{"ev": "set", "id": "pt3-2026-10-175", "state": "IN-WORK", "ts": "2026-11-07T16:45:21Z"}
+{"ev": "set", "id": "pt3-2026-10-014", "state": "IN-WORK", "ts": "2026-11-07T18:06:44Z"}
+{"ev": "set", "id": "pt3-2026-10-131", "state": "IN-WORK", "ts": "2026-11-07T18:06:44Z"}
+{"ev": "set", "id": "pt3-2026-10-164", "state": "IN-WORK", "ts": "2026-11-07T18:06:44Z"}
+{"ev": "set", "id": "pt3-2026-10-014", "evidence": "PR#675 merged 637b38b8", "state": "VERIFIED", "ts": "2026-11-07T18:53:28Z"}
+{"ev": "set", "id": "pt3-2026-10-014", "evidence": "PR#675 monster-realm uif-2 merged 637b38b8; e2e ui-scale + unit gates met", "state": "SHIPPED-VERIFIED", "ts": "2026-11-07T18:53:28Z"}
+{"ev": "set", "id": "pt3-2026-10-131", "evidence": "PR#675 merged 637b38b8", "state": "VERIFIED", "ts": "2026-11-07T18:53:29Z"}
+{"ev": "set", "id": "pt3-2026-10-131", "evidence": "PR#675 monster-realm uif-2 merged 637b38b8; e2e ui-scale + unit gates met", "state": "SHIPPED-VERIFIED", "ts": "2026-11-07T18:53:29Z"}
+{"ev": "set", "id": "pt3-2026-10-164", "evidence": "PR#675 merged 637b38b8", "state": "VERIFIED", "ts": "2026-11-07T18:53:29Z"}
+{"ev": "set", "id": "pt3-2026-10-164", "evidence": "PR#675 monster-realm uif-2 merged 637b38b8; e2e ui-scale + unit gates met", "state": "SHIPPED-VERIFIED", "ts": "2026-11-07T18:53:29Z"}
+{"ev": "set", "id": "pt3-2026-10-047", "action": "uif-3 launch", "state": "IN-WORK", "ts": "2026-11-07T19:02:18Z"}
+{"ev": "set", "id": "pt3-2026-10-060", "action": "uif-3 launch", "state": "IN-WORK", "ts": "2026-11-07T19:02:18Z"}
+{"ev": "set", "id": "pt3-2026-10-169", "action": "uif-3 launch", "state": "IN-WORK", "ts": "2026-11-07T19:02:18Z"}
+{"ev": "set", "id": "pt3-2026-10-172", "action": "uif-3 launch", "state": "IN-WORK", "ts": "2026-11-07T19:02:18Z"}
+{"ev": "set", "id": "pt3-2026-10-058", "state": "IN-WORK", "ts": "2026-11-08T00:00:56Z"}
+{"ev": "set", "id": "pt3-2026-10-153", "state": "IN-WORK", "ts": "2026-11-08T00:00:56Z"}
+{"ev": "set", "id": "pt3-2026-10-153", "evidence": "PR#678 merged 9607aaa4; master CI green run 42439449581", "state": "VERIFIED", "ts": "2026-11-08T02:55:10Z"}
+{"ev": "set", "id": "pt3-2026-10-153", "evidence": "PR#678 merged 9607aaa4; master CI green run 42439449581", "state": "SHIPPED-VERIFIED", "ts": "2026-11-08T02:55:10Z"}
+{"ev": "set", "id": "pt3-2026-10-040", "state": "IN-WORK", "ts": "2026-11-08T04:21:05Z"}
+{"ev": "set", "id": "pt3-2026-10-046", "state": "IN-WORK", "ts": "2026-11-08T04:21:05Z"}
+{"ev": "set", "id": "pt3-2026-10-038", "state": "IN-WORK", "ts": "2026-11-08T05:08:57Z"}
+{"ev": "set", "id": "pt3-2026-10-039", "state": "IN-WORK", "ts": "2026-11-08T05:08:57Z"}
+{"ev": "set", "id": "pt3-2026-10-045", "state": "IN-WORK", "ts": "2026-11-08T05:08:57Z"}
+{"ev": "set", "id": "pt3-2026-10-049", "state": "IN-WORK", "ts": "2026-11-08T06:22:27Z"}
+{"ev": "set", "id": "pt3-2026-10-053", "state": "IN-WORK", "ts": "2026-11-08T06:22:27Z"}
+{"ev": "set", "id": "pt3-2026-10-104", "state": "IN-WORK", "ts": "2026-11-08T06:22:29Z"}
+{"ev": "set", "id": "pt3-2026-10-038", "evidence": "PR#681 merged 167ecee2", "state": "VERIFIED", "ts": "2026-11-08T06:22:39Z"}
+{"ev": "set", "id": "pt3-2026-10-038", "evidence": "PR#681 merged 167ecee2; master CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-08T06:22:39Z"}
+{"ev": "set", "id": "pt3-2026-10-039", "evidence": "PR#681 merged 167ecee2", "state": "VERIFIED", "ts": "2026-11-08T06:22:39Z"}
+{"ev": "set", "id": "pt3-2026-10-039", "evidence": "PR#681 merged 167ecee2; master CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-08T06:22:39Z"}
+{"ev": "set", "id": "pt3-2026-10-045", "evidence": "PR#681 merged 167ecee2", "state": "VERIFIED", "ts": "2026-11-08T06:22:39Z"}
+{"ev": "set", "id": "pt3-2026-10-045", "evidence": "PR#681 merged 167ecee2; master CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-08T06:22:39Z"}
+{"ev": "set", "id": "pt3-2026-10-060", "evidence": "PR#681 merged 167ecee2", "state": "VERIFIED", "ts": "2026-11-08T06:22:39Z"}
+{"ev": "set", "id": "pt3-2026-10-060", "evidence": "PR#681 merged 167ecee2; master CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-08T06:22:39Z"}
+{"ev": "set", "id": "pt3-2026-10-169", "evidence": "PR#681 merged 167ecee2", "state": "VERIFIED", "ts": "2026-11-08T06:22:40Z"}
+{"ev": "set", "id": "pt3-2026-10-169", "evidence": "PR#681 merged 167ecee2; master CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-08T06:22:40Z"}
+{"ev": "set", "id": "pt3-2026-10-086", "state": "IN-WORK", "ts": "2026-11-08T14:00:55Z"}
+{"ev": "set", "id": "pt3-2026-10-025", "state": "IN-WORK", "ts": "2026-11-08T18:00:48Z"}
+{"ev": "set", "id": "pt3-2026-10-031", "state": "IN-WORK", "ts": "2026-11-08T22:00:54Z"}
+{"ev": "set", "id": "pt3-2026-10-110", "state": "IN-WORK", "ts": "2026-11-09T00:01:00Z"}
+{"ev": "set", "id": "pt3-2026-10-113", "state": "IN-WORK", "ts": "2026-11-09T00:01:00Z"}
+{"ev": "set", "id": "pt3-2026-10-114", "state": "IN-WORK", "ts": "2026-11-09T00:01:00Z"}
+{"ev": "set", "id": "pt3-2026-10-110", "evidence": "uif-14 PR#691 gates met", "state": "VERIFIED", "ts": "2026-11-09T01:07:50Z"}
+{"ev": "set", "id": "pt3-2026-10-110", "evidence": "uif-14 merged PR#691 8efaa4d0; master CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-09T01:07:50Z"}
+{"ev": "set", "id": "pt3-2026-10-113", "evidence": "uif-14 PR#691 gates met", "state": "VERIFIED", "ts": "2026-11-09T01:07:50Z"}
+{"ev": "set", "id": "pt3-2026-10-113", "evidence": "uif-14 merged PR#691 8efaa4d0; master CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-09T01:07:50Z"}
+{"ev": "set", "id": "pt3-2026-10-114", "evidence": "uif-14 PR#691 gates met", "state": "VERIFIED", "ts": "2026-11-09T01:07:50Z"}
+{"ev": "set", "id": "pt3-2026-10-114", "evidence": "uif-14 merged PR#691 8efaa4d0; master CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-09T01:07:50Z"}
+{"ev": "set", "id": "pt3-2026-10-079", "state": "IN-WORK", "ts": "2026-11-09T02:00:54Z"}
+{"ev": "set", "id": "pt3-2026-10-102", "state": "IN-WORK", "ts": "2026-11-09T02:00:54Z"}
+{"ev": "set", "id": "pt3-2026-10-109", "state": "IN-WORK", "ts": "2026-11-09T02:00:55Z"}
+{"ev": "set", "id": "pt3-2026-10-111", "state": "IN-WORK", "ts": "2026-11-09T02:00:55Z"}
+{"ev": "set", "id": "pt3-2026-10-097", "state": "IN-WORK", "ts": "2026-11-09T10:01:10Z"}
+{"ev": "set", "id": "pt3-2026-10-021", "state": "IN-WORK", "ts": "2026-11-09T17:40:41Z"}
+{"ev": "set", "id": "pt3-2026-10-022", "state": "IN-WORK", "ts": "2026-11-09T17:40:41Z"}
+{"ev": "set", "id": "pt3-2026-10-155", "state": "IN-WORK", "ts": "2026-11-09T17:40:41Z"}
+{"ev": "set", "id": "pt3-2026-10-166", "state": "IN-WORK", "ts": "2026-11-09T17:40:41Z"}
+{"ev": "set", "id": "pt3-2026-10-161", "state": "IN-WORK", "ts": "2026-11-09T20:00:58Z"}
+{"ev": "set", "id": "pt3-2026-10-162", "state": "IN-WORK", "ts": "2026-11-09T20:00:58Z"}
+{"ev": "set", "id": "pt3-2026-10-162", "evidence": "monster-realm#709 merged 7abb7726 (wap-8), master CI green", "state": "VERIFIED", "ts": "2026-11-10T15:55:31Z"}
+{"ev": "set", "id": "pt3-2026-10-021", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-021", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "SHIPPED-VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-022", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-022", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "SHIPPED-VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-155", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-155", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "SHIPPED-VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-161", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-161", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "SHIPPED-VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-166", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-166", "evidence": "monster-realm PR#724 merged 52550b42 (wap-10 closes M-world-art-pass; world-art e2e 3/3 green in PR CI at 92b6f932)", "state": "SHIPPED-VERIFIED", "ts": "2026-11-10T21:03:51Z"}
+{"ev": "set", "id": "pt3-2026-10-162", "evidence": "monster-realm PR#709 (wap-8 Verdant Hollow 28x20) + PR#707 (wap-7 Tideglass Cove 32x20) merged; PR#724 wap-10 world-art e2e green; M-world-art-pass closed", "state": "SHIPPED-VERIFIED", "ts": "2026-11-11T02:02:11Z"}
+{"ev": "set", "id": "pt3-2026-10-081", "state": "IN-WORK", "ts": "2026-11-11T03:52:12Z"}
+{"ev": "set", "id": "pt3-2026-10-082", "state": "IN-WORK", "ts": "2026-11-11T04:48:51Z"}
+{"ev": "set", "id": "pt3-2026-10-083", "state": "IN-WORK", "ts": "2026-11-11T04:49:01Z"}
+{"ev": "set", "id": "pt3-2026-10-084", "state": "IN-WORK", "ts": "2026-11-11T04:49:01Z"}
+{"ev": "set", "id": "pt3-2026-10-080", "state": "IN-WORK", "ts": "2026-11-11T09:58:35Z"}
+{"ev": "set", "id": "pt3-2026-10-085", "state": "IN-WORK", "ts": "2026-11-11T12:30:20Z"}
+{"ev": "set", "id": "pt3-2026-10-085", "evidence": "monster-realm PR#730 squash 4a7c442c (ts-3), CI green", "state": "VERIFIED", "ts": "2026-11-11T18:27:31Z"}
+{"ev": "set", "id": "pt3-2026-10-085", "evidence": "monster-realm PR#730 squash 4a7c442c (ts-3), CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-11T18:27:31Z"}
+{"ev": "set", "id": "pt3-2026-10-086", "evidence": "monster-realm PR#730 squash 4a7c442c (ts-3), CI green", "state": "VERIFIED", "ts": "2026-11-11T18:27:31Z"}
+{"ev": "set", "id": "pt3-2026-10-086", "evidence": "monster-realm PR#730 squash 4a7c442c (ts-3), CI green", "state": "SHIPPED-VERIFIED", "ts": "2026-11-11T18:27:31Z"}

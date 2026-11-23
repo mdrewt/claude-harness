@@ -1,0 +1,5 @@
+{
+ "client/src/observability/config.test.ts::a target kind outside TargetKind resolves disabled with a reason and never throws": "kind=bogus: expected 'enabled' to be 'disabled' // Object.is equality\n\nAssertionError: kind=bogus: expected 'enabled' to be 'disabled' // Object.is equality\n\nExpected: \"disabled\"\nReceived: \"enabled\"\n\n \u276f src/observability/config.test.ts:573:49",
+ "client/src/observability/config.test.ts::the target kind parameter is required: a call without it resolves disabled": "expected 'enabled' to be 'disabled' // Object.is equality\n\nAssertionError: expected 'enabled' to be 'disabled' // Object.is equality\n\nExpected: \"disabled\"\nReceived: \"enabled\"\n\n \u276f src/observability/config.test.ts:582:22",
+ "client/src/observability/config.test.ts::two different gated kinds resolve different reasons": "expected disabled for local\n\nError: expected disabled for local\n \u276f src/observability/config.test.ts:562:42\n \u276f src/observability/config.test.ts:560:33"
+}

@@ -1,0 +1,926 @@
+[
+ {
+  "criterion": "",
+  "id": "i001",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "none in game code: concerns the tester brief's stub guidance (map 13 answers 2) for main.dispatch.test.ts"
+ },
+ {
+  "criterion": "ts-6b-3.1",
+  "id": "i002",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: contract silence only; merged consume_n returns Ok for qty 0 before any lookup"
+ },
+ {
+  "criterion": "",
+  "id": "i003",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: a reducer Err aborts the transaction, so writes made before a refusal do not persist in production; only the native test host keeps them"
+ },
+ {
+  "criterion": "",
+  "id": "i004",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: remark about a deliberately out-of-play fixture; the reach rule itself is correct"
+ },
+ {
+  "criterion": "",
+  "id": "i005",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: stale assertion. Merged code announces 'Still there? 30 s' once and then speaks the own-turn line as a queued notice, so the region's final text is the turn line; the merged gating test reads every write instead"
+ },
+ {
+  "criterion": "",
+  "id": "i006",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: the guard left with the removed Shop dep; no criterion requires it"
+ },
+ {
+  "criterion": "",
+  "id": "i007",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: wording only; merged HealView resolves heal.title on every render"
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i008",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the failing arm ingests on a shown shell before its first render; the first render starts a new battle and clears the log and queued speech by design, and main.ts always renders before it feeds"
+ },
+ {
+  "criterion": "",
+  "id": "i009",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "stale comment in privacyBanner.test.ts, a test file"
+ },
+ {
+  "criterion": "ts-6b-7.3",
+  "id": "i010",
+  "severity": "minor",
+  "verdict": "bug",
+  "wrong_behaviour": "On the Finished batch the client hid the tactical shell and showed the results panel at once, so that batch's final KO and BattleEnd beats and ticker lines never played on the visible shell."
+ },
+ {
+  "criterion": "",
+  "id": "i011",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "none in game code: tension between two instructions in the tester brief about the map 13 stub answer"
+ },
+ {
+  "criterion": "ts-6b-8.1",
+  "id": "i012",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: production sets the locale once at boot, the spec points at raisingView's guard (which keys on the locale), and the merged keys include currentLocale()"
+ },
+ {
+  "criterion": "",
+  "id": "i013",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: remark on which assertion carries the red in indexShell.smoke.test.ts"
+ },
+ {
+  "criterion": "",
+  "id": "i014",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "unconfirmed: socialScreen.boot.test.ts did change with the slice, but the ts-6b-12 touches line is not in the bundle, so the omission cannot be checked"
+ },
+ {
+  "criterion": "",
+  "id": "i015",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: comment-only inaccuracy on a dead fallback the slice removes; no observable behaviour"
+ },
+ {
+  "criterion": "",
+  "id": "i016",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: the spec is silent on the order rather than wrong; merged code runs both helpers after rekey_all and no snapshot lost a formation"
+ },
+ {
+  "criterion": "",
+  "id": "i017",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "stale references to the nonexistent main.wiring.test.ts in test-file headers"
+ },
+ {
+  "criterion": "ts-6b-12.1",
+  "id": "i018",
+  "severity": "minor",
+  "verdict": "design-defect",
+  "wrong_behaviour": "The criterion states tradeSessionView.test.ts passes unedited, yet ts-6b-12.2 deletes TradeSessionInput.legacyOfferMonsterIds, which that file's fixture passes: it becomes an excess-property type error and the merged slice had to edit the file."
+ },
+ {
+  "criterion": "",
+  "id": "i019",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "brief omission: existing results cases needed drain frames under ts-6b-7.3 (the merged gating tests add them as named changes); the behaviour itself is correct"
+ },
+ {
+  "criterion": "",
+  "id": "i020",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "comment in the e2e spec wallet-balance.spec.ts, a test file"
+ },
+ {
+  "criterion": "",
+  "id": "i021",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "stale reference to the nonexistent main.wiring.test.ts in a test-file header"
+ },
+ {
+  "criterion": "",
+  "id": "i022",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: stale assertion. Merged code announces 'Still there? 30 s' once and then speaks the own-turn line as a queued notice, so the region's final text is the turn line"
+ },
+ {
+  "criterion": "",
+  "id": "i023",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "stale reference to the nonexistent main.wiring.test.ts in test-file headers"
+ },
+ {
+  "criterion": "ts-6b-8.2",
+  "id": "i024",
+  "severity": "minor",
+  "verdict": "bug",
+  "wrong_behaviour": "shopScreen settle() reconciled the new layout against itself, so when the row under the cursor vanished (a sold-out stock row or a sold-off stack) the cursor re-seated on row 0 instead of the neighbouring row."
+ },
+ {
+  "criterion": "",
+  "id": "i025",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the test expects the first Up from the last row (Decline) to stay on Decline; with the privacy row gone the section has two rows, so Up correctly lands on Sign in, as the merged gating test expects"
+ },
+ {
+  "criterion": "ts-6b-3.2",
+  "id": "i026",
+  "severity": "minor",
+  "verdict": "bug",
+  "wrong_behaviour": "heal_party debited its item cost unit by unit with no trade-lock check and returned Ok, spending units locked by the caller's confirmed trade-session side or live offer."
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i027",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the failing arm ingests on a shown shell before its first render; the first render starts a new battle and clears queued speech by design, and main.ts always renders before it feeds"
+ },
+ {
+  "criterion": "",
+  "id": "i028",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: reachability remark; the dispatch-wide refusal remains correct defence in depth"
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i029",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: merged hide() un-hears a turn line it dropped unspoken, so the next show speaks that turn once; the test demands it never be spoken, which 'announce it once' does not require"
+ },
+ {
+  "criterion": "",
+  "id": "i030",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "stale doc comment inside the cfg(test) module of rules.rs"
+ },
+ {
+  "criterion": "",
+  "id": "i031",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "stale narration in router.test.ts comments; no behaviour involved"
+ },
+ {
+  "criterion": "lpg-1.8",
+  "id": "i032",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the test spies on Storage.prototype, which happy-dom's instance-bound getItem/setItem/removeItem bypass, so it records nothing; merged main.ts reads and marks the nudge under the document's keys (the gating test with instance spies passes)"
+ },
+ {
+  "criterion": "ts-6b-8.2",
+  "id": "i033",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the test treats Berry (index 2 of 4) as the last Buy row; when it sells out the cursor correctly lands on the row now at index 2 (item 12), not Potion"
+ },
+ {
+  "criterion": "",
+  "id": "i034",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "omission in the tester brief's file list (the file did need the edit); the claim does not name the spec"
+ },
+ {
+  "criterion": "",
+  "id": "i035",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "unconfirmed: both test files did change with the slice, but the ts-6b-5 touches line is not in the bundle, so the omission cannot be checked"
+ },
+ {
+  "criterion": "ts-6b-3.1",
+  "id": "i036",
+  "severity": "minor",
+  "verdict": "design-defect",
+  "wrong_behaviour": "The criterion's note says the write count is not observable from a test and leaves the one-write debit to review, but the native host's Fixture::writes_to already counted insert/update/delete calls per table before the slice; the merged tests gate exactly one inventory write per debited stack."
+ },
+ {
+  "criterion": "",
+  "id": "i037",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: testability remark; no shipped heal location charges currency"
+ },
+ {
+  "criterion": "",
+  "id": "i038",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "stale fixtures and comments in test files"
+ },
+ {
+  "criterion": "",
+  "id": "i039",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "factual slip in the tester brief (max_windows_per_turn is 3, autopass_forfeit is 4)"
+ },
+ {
+  "criterion": "ts-6b-8.1",
+  "id": "i040",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: production sets the locale once at boot and the merged render keys include currentLocale()"
+ },
+ {
+  "criterion": "ts-6b-8.2",
+  "id": "i041",
+  "severity": "minor",
+  "verdict": "duplicate-of:i024",
+  "wrong_behaviour": "same defect as i024: a vanished cursor row re-seats on row 0"
+ },
+ {
+  "criterion": "ts-6b-3.1",
+  "id": "i042",
+  "severity": "minor",
+  "verdict": "duplicate-of:i036",
+  "wrong_behaviour": "same defect as i036: the spec's claim that the write count is unobservable"
+ },
+ {
+  "criterion": "ts-6b-11.2",
+  "id": "i043",
+  "severity": "minor",
+  "verdict": "design-defect",
+  "wrong_behaviour": "The slice's touches list omits client/src/main.exportTransport.test.ts, whose privacyOpener() requires exactly one privacy button in #claim-overlay; removing the door breaks that suite and the merged slice had to rewrite it. Other test files that pin the door are omitted the same way."
+ },
+ {
+  "criterion": "ts-6b-13.1",
+  "id": "i044",
+  "severity": "minor",
+  "verdict": "design-defect",
+  "wrong_behaviour": "The slice's touches list omits client/src/ui/contextStack.test.ts, whose { kind: 'healParty' } fixture stops type-checking once locationId is required; the merged slice had to edit it. (Criterion id inferred: the bundle quotes no ts-6b-13 criterion.)"
+ },
+ {
+  "criterion": "",
+  "id": "i045",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "vacuity risk in pvp_tests.rs (early return when the ranked gate errs): a test-file concern"
+ },
+ {
+  "criterion": "",
+  "id": "i046",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: stale assertion. Merged code announces 'Still there? 30 s' once and then speaks the own-turn line as a queued notice, so the region's final text is the turn line"
+ },
+ {
+  "criterion": "",
+  "id": "i047",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: reachability remark; a dialogue click at a battle base correctly sends nothing"
+ },
+ {
+  "criterion": "ts-6b-12.2",
+  "id": "i048",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: the two kinds sit in an adaptable suggested-change line; the criterion already covers every kind only the retired path produced, and the merged slice removed all four"
+ },
+ {
+  "criterion": "lpg-1.8",
+  "id": "i049",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the Storage.prototype spy records nothing under happy-dom's instance-bound storage methods; the merged gating test with instance spies passes"
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i050",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: timing assumption. Merged code speaks shell lines through the status-notice queue (held one 500 ms window, then the live region's own 500 ms window), so the text lands about 1 s after the tick; the test stops listening after 800 ms"
+ },
+ {
+  "criterion": "ts-6b-12.1",
+  "id": "i051",
+  "severity": "minor",
+  "verdict": "duplicate-of:i018",
+  "wrong_behaviour": "same defect as i018: 'passes unedited' contradicts the legacyOfferMonsterIds deletion"
+ },
+ {
+  "criterion": "ts-6b-10.3",
+  "id": "i052",
+  "severity": "minor",
+  "verdict": "design-defect",
+  "wrong_behaviour": "catalog.fr.ts states that every value puts U+00A0 before a question mark, yet the contracted French text for tradeSession.prompt.confirmMonsters (like its sibling tradeSession.prompt.confirm and six other prompts) has an ASCII space there, so the line can wrap before the question mark; the rule and the mandated value contradict. (Criterion id inferred.)"
+ },
+ {
+  "criterion": "",
+  "id": "i053",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: test-oracle remark; base_speed is built from the species speed by design"
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i054",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: merged hide() un-hears a turn line it dropped unspoken, so the next show speaks that turn once; the criterion does not require it to stay silent"
+ },
+ {
+  "criterion": "",
+  "id": "i055",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "inconsistency inside the builder's plan.md; the operative contract (vm.offer.monsterIds) is unambiguous"
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i056",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: merged hide() un-hears a turn line it dropped unspoken, so the next show speaks that turn once; the criterion does not require it to stay silent"
+ },
+ {
+  "criterion": "ts-6b-10.2",
+  "id": "i057",
+  "severity": "minor",
+  "verdict": "design-defect",
+  "wrong_behaviour": "The criterion makes Social's top-level sheet end in a Back row (kit.sheet.back), but in the kit that row is the last row of a sub-list and returns to the sheet's own rows, while a top-level sheet ends in Close (kit.sheet.close, as boxView and raisingView do); merged Social closes its sheet from a row labelled Back, unlike the other frames."
+ },
+ {
+  "criterion": "",
+  "id": "i058",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: stale assertion. Merged code announces 'Still there? 30 s' once and then speaks the own-turn line as a queued notice, so the region's final text is the turn line"
+ },
+ {
+  "criterion": "lpg-1.7",
+  "id": "i059",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "unconfirmed: the lpg-1.7 wording is not in the bundle; the merged client and e2e report the connect failure on #status"
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i060",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: merged hide() un-hears a turn line it dropped unspoken, so the next show speaks that turn once; the criterion does not require it to stay silent"
+ },
+ {
+  "criterion": "",
+  "id": "i061",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "none in game code: concerns the tester brief's stub guidance (map 13 answers 2)"
+ },
+ {
+  "criterion": "",
+  "id": "i062",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: the brief and spec are silent on the order rather than wrong; merged code runs both helpers after rekey_all"
+ },
+ {
+  "criterion": "",
+  "id": "i063",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "unconfirmed test-maintenance wording; no game behaviour involved"
+ },
+ {
+  "criterion": "",
+  "id": "i064",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the helper takes the first [data-context-sheet] in the document, which is another frame's sheet root in the booted page; Social's own sheet does show (the merged gating test scopes the lookup to #social-sheet)"
+ },
+ {
+  "criterion": "",
+  "id": "i065",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "guidance in the tester brief about test fixtures"
+ },
+ {
+  "criterion": "",
+  "id": "i066",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: an empty MR_PLAYTEST_DB falls back to the default and a whitespace-only one fails, before and after the slice; contract ambiguity only"
+ },
+ {
+  "criterion": "ts-6b-3.2",
+  "id": "i067",
+  "severity": "minor",
+  "verdict": "duplicate-of:i026",
+  "wrong_behaviour": "same defect as i026: heal_party spends a trade-locked cost item"
+ },
+ {
+  "criterion": "",
+  "id": "i068",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: intended. DIALOGUE_RESEND_MS swallows a second A for 1 s after any issued command, sent or not, and self-heals; the merged gating test pins this"
+ },
+ {
+  "criterion": "ts-6b-7.3",
+  "id": "i069",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: at most a one-frame hold for a zero-length beat"
+ },
+ {
+  "criterion": "",
+  "id": "i070",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: ambiguity only (case sensitivity of the whole-word match)"
+ },
+ {
+  "criterion": "ts-6b-7.3",
+  "id": "i071",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: ambiguity only; merged code starts the grace at the sync where the results panel takes the frame"
+ },
+ {
+  "criterion": "ts-6b-11.2",
+  "id": "i072",
+  "severity": "minor",
+  "verdict": "duplicate-of:i043",
+  "wrong_behaviour": "same defect as i043: touches omits main.exportTransport.test.ts"
+ },
+ {
+  "criterion": "",
+  "id": "i073",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: the spec's condition (where the type checker agrees) is not met, so the five members stay, as the contract says"
+ },
+ {
+  "criterion": "",
+  "id": "i074",
+  "severity": "minor",
+  "verdict": "incomplete-work",
+  "wrong_behaviour": "none: the comment matched the code at that snapshot; the slice reworded it when it changed the rule"
+ },
+ {
+  "criterion": "",
+  "id": "i075",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: intended 1 s resend guard after any issued command; it self-heals"
+ },
+ {
+  "criterion": "",
+  "id": "i076",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: ambiguity only (absolute or relative path in stderr)"
+ },
+ {
+  "criterion": "",
+  "id": "i077",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the file's own privacyOpener() helper still demands the privacy door that ts-6b-11.2 removes, so the case cannot pass"
+ },
+ {
+  "criterion": "ts-6b-11.2",
+  "id": "i078",
+  "severity": "minor",
+  "verdict": "duplicate-of:i043",
+  "wrong_behaviour": "same defect as i043: the ts-6b-11 touches list omits test files the slice must edit"
+ },
+ {
+  "criterion": "",
+  "id": "i079",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "inconsistency inside the builder's plan.md; the operative contract is unambiguous"
+ },
+ {
+  "criterion": "",
+  "id": "i080",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "inconsistency inside the builder's plan.md; the operative contract is unambiguous"
+ },
+ {
+  "criterion": "",
+  "id": "i081",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "none in game code: the snapshot's client-wasm/pkg was older than the sources (pkg not rebuilt), an environment condition"
+ },
+ {
+  "criterion": "",
+  "id": "i082",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: the merged checker bounds each vm run at 1000 ms; contract silence only"
+ },
+ {
+  "criterion": "",
+  "id": "i083",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "none in game code: stale client-wasm/pkg in the snapshot environment"
+ },
+ {
+  "criterion": "",
+  "id": "i084",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: stale assertion. Merged code announces 'Still there? 30 s' once and then speaks the own-turn line as a queued notice, so the region's final text is the turn line"
+ },
+ {
+  "criterion": "",
+  "id": "i085",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "design of a gating test: the freshness check walks every file under src, test files included"
+ },
+ {
+  "criterion": "",
+  "id": "i086",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "an existing questLogView.test.ts expectation conflicts with ts-6b-8.1 and the brief did not list it: a test and brief concern"
+ },
+ {
+  "criterion": "",
+  "id": "i087",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: empty MR_PLAYTEST_DB falls back to the default, whitespace-only fails; contract ambiguity only"
+ },
+ {
+  "criterion": "ts-6b-7.2",
+  "id": "i088",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: arithmetic slip. at50 subtracts SKEW twice, so by server time 110 s remain and null is the correct answer"
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i089",
+  "severity": "major",
+  "verdict": "design-defect",
+  "wrong_behaviour": "The contracted wiring (shell announce = announceNow at tick()) speaks the shell's line before the same frame's overlay-open edge and countdown line; the live region keeps only the last message of its 500 ms window, so the own-turn line on a battle's first show (or a KO/finish line beside the results edge) never reaches #a11y-live. The merged code routes it through the notice queue instead."
+ },
+ {
+  "criterion": "",
+  "id": "i090",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: empty MR_PLAYTEST_DB falls back to the default, whitespace-only fails; contract ambiguity only"
+ },
+ {
+  "criterion": "",
+  "id": "i091",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: intended 1 s resend guard after any issued command; the merged gating test pins it"
+ },
+ {
+  "criterion": "",
+  "id": "i092",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "unconfirmed test-maintenance wording; no game behaviour involved"
+ },
+ {
+  "criterion": "ts-6b-11.2",
+  "id": "i093",
+  "severity": "minor",
+  "verdict": "duplicate-of:i043",
+  "wrong_behaviour": "same defect as i043: touches omits main.exportTransport.test.ts"
+ },
+ {
+  "criterion": "ts-6b-11.2",
+  "id": "i094",
+  "severity": "minor",
+  "verdict": "duplicate-of:i043",
+  "wrong_behaviour": "same defect as i043: the ts-6b-11 touches list omits test files the slice must edit (raisingView.test.ts is in fact listed)"
+ },
+ {
+  "criterion": "",
+  "id": "i095",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "stale comment in accounts_tests.rs, a test file"
+ },
+ {
+  "criterion": "",
+  "id": "i096",
+  "severity": "minor",
+  "verdict": "incomplete-work",
+  "wrong_behaviour": "none: the todo!() bodies are the red-phase API freeze; merged deploy_slots_of returns Ok or Err"
+ },
+ {
+  "criterion": "",
+  "id": "i097",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the fixture never renders the privacy view, so #privacy-delete-btn is still hidden; the merged test renders both sections first"
+ },
+ {
+  "criterion": "ts-6b-10.2",
+  "id": "i098",
+  "severity": "minor",
+  "verdict": "duplicate-of:i057",
+  "wrong_behaviour": "same defect as i057: Back row on a top-level sheet against the kit's Close convention"
+ },
+ {
+  "criterion": "",
+  "id": "i099",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: with two rows, the first Up from Decline correctly lands on Sign in; the test expects it to stay on Decline"
+ },
+ {
+  "criterion": "",
+  "id": "i100",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "none in game code: stale client-wasm/pkg in the snapshot environment"
+ },
+ {
+  "criterion": "",
+  "id": "i101",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "none in game code: concerns the tester brief's stub guidance (map 13 answers 2)"
+ },
+ {
+  "criterion": "ts-6b-3.1",
+  "id": "i102",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: self-deadlock. The first fixture() guard (a process-wide non-reentrant lock held until drop) is still alive when the loop calls fixture() again, so the test hangs; merged apply_swap debits each stack through one consume_n write"
+ },
+ {
+  "criterion": "",
+  "id": "i103",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: spec silence on focus during the prompt swap"
+ },
+ {
+  "criterion": "",
+  "id": "i104",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: stale expectation; under ts-6b-7.3 the Finished batch waits for the shell's playback, and the merged gating test adds the drain as a named change"
+ },
+ {
+  "criterion": "",
+  "id": "i105",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: hypothetical; a dialogue click at a battle base sends nothing in merged code"
+ },
+ {
+  "criterion": "ts-6b-13.1",
+  "id": "i106",
+  "severity": "minor",
+  "verdict": "duplicate-of:i044",
+  "wrong_behaviour": "same defect as i044: touches omits contextStack.test.ts"
+ },
+ {
+  "criterion": "",
+  "id": "i107",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the test replaces the dialogue adapter with a stand-in that consumes A; since ts-6b-5 a Shop click is a seek + A through that adapter, so nothing is sent (the merged test gives the stand-in a pick)"
+ },
+ {
+  "criterion": "",
+  "id": "i108",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "brief omission: existing results cases needed drain frames under ts-6b-7.3; the behaviour itself is correct"
+ },
+ {
+  "criterion": "ts-6b-6.3",
+  "id": "i109",
+  "severity": "minor",
+  "verdict": "design-defect",
+  "wrong_behaviour": "The spec says the row deletes ten cfg(test) helpers, but eleven exist: five in marshal.rs (skill_defs_from_rows among them) and six in content_cache.rs; taken literally one dead helper stays and the DECISIONS amendment repeats a wrong count."
+ },
+ {
+  "criterion": "",
+  "id": "i110",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: NPC movement never writes zone_id (zone crossings are not implemented), so home and zone cannot diverge"
+ },
+ {
+  "criterion": "",
+  "id": "i111",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: with two rows, the first Up from Decline correctly lands on Sign in; the test expects it to stay on Decline"
+ },
+ {
+  "criterion": "",
+  "id": "i112",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "stale test-name reference in an inventory_tests.rs doc comment"
+ },
+ {
+  "criterion": "ts-6b-3.1",
+  "id": "i113",
+  "severity": "minor",
+  "verdict": "duplicate-of:i036",
+  "wrong_behaviour": "same defect as i036: the spec's claim that the write count is unobservable"
+ },
+ {
+  "criterion": "",
+  "id": "i114",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: testability remark; a refusal after the currency spend rolled back with the transaction, and merged code debits the item before the currency"
+ },
+ {
+  "criterion": "",
+  "id": "i115",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "none in game code: stale client-wasm/pkg in the snapshot environment"
+ },
+ {
+  "criterion": "",
+  "id": "i116",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: stale line number in a code comment (since reworded); no behaviour"
+ },
+ {
+  "criterion": "",
+  "id": "i117",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: intended 1 s resend guard after any issued command; the merged gating test pins it"
+ },
+ {
+  "criterion": "",
+  "id": "i118",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "an existing questLogView.test.ts expectation conflicts with ts-6b-8.1: a test concern"
+ },
+ {
+  "criterion": "ts-6b-3.4",
+  "id": "i119",
+  "severity": "minor",
+  "verdict": "bug",
+  "wrong_behaviour": "apply_quest_trigger deleted the player_quest row and marked the quest done, then credited the reward through grant_item / grant_currency, which clamp at the stack and balance caps: a player at a cap lost the reward silently and could not complete the quest again. (Criterion id inferred: the bundle quotes only ts-6b-3.1 to .3.)"
+ },
+ {
+  "criterion": "ts-6b-3.4",
+  "id": "i120",
+  "severity": "minor",
+  "verdict": "duplicate-of:i119",
+  "wrong_behaviour": "same defect as i119: quest reward clamped away at a cap while the quest is consumed"
+ },
+ {
+  "criterion": "lpg-1.8",
+  "id": "i121",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the Storage.prototype spy records nothing under happy-dom's instance-bound storage methods; merged main.ts uses the document's keys"
+ },
+ {
+  "criterion": "lpg-1.8",
+  "id": "i122",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: the Storage.prototype spy records nothing under happy-dom's instance-bound storage methods; merged main.ts uses the document's keys"
+ },
+ {
+  "criterion": "",
+  "id": "i123",
+  "severity": "minor",
+  "verdict": "not-game-code",
+  "wrong_behaviour": "none in game code: concerns the tester brief's stub guidance (map 13 answers 2)"
+ },
+ {
+  "criterion": "",
+  "id": "i124",
+  "severity": "minor",
+  "verdict": "incomplete-work",
+  "wrong_behaviour": "none: target kinds arrived with lpg-1; gating telemetry by kind is lpg-10's own planned work"
+ },
+ {
+  "criterion": "ts-6b-8.1",
+  "id": "i125",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: fixture miscount; the second monster's default card also has a path row, so three rows are correct"
+ },
+ {
+  "criterion": "",
+  "id": "i126",
+  "severity": "minor",
+  "verdict": "incomplete-work",
+  "wrong_behaviour": "none: target kinds arrived with lpg-1; gating sign-in by kind is lpg-10's own planned work"
+ },
+ {
+  "criterion": "ts-6b-11.3",
+  "id": "i127",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: criterion silence on whether render() may write the disclosure"
+ },
+ {
+  "criterion": "",
+  "id": "i128",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: test-coverage remark about shipped dialogue content"
+ },
+ {
+  "criterion": "ts-6b-1.1",
+  "id": "i129",
+  "severity": "minor",
+  "verdict": "not-a-defect",
+  "wrong_behaviour": "none: battle_action has no producer left and is swept per battle; a challenge targeting the retired guest is removed by the challenge TTL reaper"
+ },
+ {
+  "criterion": "ts-6b-11.2",
+  "id": "i130",
+  "severity": "minor",
+  "verdict": "duplicate-of:i043",
+  "wrong_behaviour": "same defect as i043: the ts-6b-11 touches list omits test files the slice must edit"
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i131",
+  "severity": "minor",
+  "verdict": "wrong-test",
+  "wrong_behaviour": "none: timing assumption. The KO line goes through the status-notice queue and reaches #a11y-live about 1 s after the tick; the test reads the region 650 ms after it"
+ },
+ {
+  "criterion": "ts-6b-7.1",
+  "id": "i132",
+  "severity": "major",
+  "verdict": "duplicate-of:i089",
+  "wrong_behaviour": "same defect as i089: shell speech through announceNow is overwritten inside the live region's coalescing window"
+ }
+]

@@ -587,3 +587,11 @@ Do the best job you can, as correctly as possible. Be aware of token cost (that 
 
 
 review for fragile code, tests, evals, and guards that are easily broken by valid code changes. Breaks do to invalid/incorrect code changes are expected and are the reason why teeth are in place, but this is an actively developed project where things will frequently change and the code should be flexible enough to avoid as much unnecessary future rework as possible when necessary changes are made.
+
+
+
+
+  Still waiting on you (none of it blocks the first ticks):
+  - DNS for auth.monster-realm.spookyowltech.com (acs-5); localhost works meanwhile.
+  - The Steam app ID and publisher key, about two months before early access (phase 2).
+  - The licence terms and the Steam-machine overlay test (the M-local-play shell slices).

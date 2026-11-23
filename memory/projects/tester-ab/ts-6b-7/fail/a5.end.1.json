@@ -1,0 +1,3 @@
+{
+ "client/src/net/serverClock.test.ts::a client clock 60 s behind still counts the last minute of a window": "the server-time estimate shows the real 50: expected null to be 50 // Object.is equality\n\nAssertionError: the server-time estimate shows the real 50: expected null to be 50 // Object.is equality\n\n- Expected:\n50\n\n+ Received:\nnull\n\n \u276f src/net/serverClock.test.ts:68:7"
+}

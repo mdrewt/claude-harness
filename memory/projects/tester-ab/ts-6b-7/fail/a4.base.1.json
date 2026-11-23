@@ -1,0 +1,3 @@
+{
+ "client/src/main.dispatch.test.ts::a Finished batch waits for the shell playback to drain before the results panel takes the frame": "right after the Finished batch: the shell is displayed: expected false to be true // Object.is equality\n\nAssertionError: right after the Finished batch: the shell is displayed: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n \u276f shellOwns src/main.dispatch.test.ts:9399:87\n \u276f src/main.dispatch.test.ts:9573:5"
+}

@@ -1,0 +1,87 @@
+diff --git a/client/src/input/bindings.ts b/client/src/input/bindings.ts
+index a0f91619..28267bfd 100644
+--- a/client/src/input/bindings.ts
++++ b/client/src/input/bindings.ts
+@@ -39,6 +39,7 @@ export const DEFAULT_BINDINGS: Bindings = Object.freeze({
+     L: codes('KeyL'),
+     N: codes('KeyN'),
+     C: codes('KeyC'),
++    Y: codes('KeyY'),
+     F9: codes('F9'),
+     F8: codes('F8'),
+   }),
+diff --git a/client/src/input/buttons.ts b/client/src/input/buttons.ts
+index b527fafc..3f053d48 100644
+--- a/client/src/input/buttons.ts
++++ b/client/src/input/buttons.ts
+@@ -21,7 +21,7 @@ export type VButton = (typeof VBUTTONS)[number];
+ 
+ /** Optional, remappable shortcuts that open a canonical menu path (design §3). Named by
+  *  their default key: the accelerator `B` (Storage) is not the button `B` (Backspace). */
+-export const ACCELS = ['B', 'I', 'V', 'J', 'U', 'P', 'L', 'N', 'C', 'F9', 'F8'] as const;
++export const ACCELS = ['B', 'I', 'V', 'J', 'U', 'P', 'L', 'N', 'C', 'Y', 'F9', 'F8'] as const;
+ export type Accel = (typeof ACCELS)[number];
+ 
+ /** One press (`down: true`) or release of a virtual button, from any source. */
+diff --git a/client/src/input/router.ts b/client/src/input/router.ts
+index 7d6a99b5..9fbe88cb 100644
+--- a/client/src/input/router.ts
++++ b/client/src/input/router.ts
+@@ -133,6 +133,7 @@ export const ACCEL_PATHS: Readonly<Record<MenuAccel, AccelPath>> = {
+   L: { menu: ['social', 'rankings'], frame: 'social' },
+   N: { menu: ['profile', 'name'], frame: 'renameView' },
+   C: { menu: ['profile', 'account'], frame: 'claimView' },
++  Y: { menu: ['options', 'controls'], frame: 'controlsView' },
+ };
+ 
+ export type AccelDecision =
+diff --git a/client/src/ui/controlsModel.ts b/client/src/ui/controlsModel.ts
+index d54e3e7c..3a70b046 100644
+--- a/client/src/ui/controlsModel.ts
++++ b/client/src/ui/controlsModel.ts
+@@ -85,6 +85,7 @@ const ACCEL_LABELS: Readonly<Record<Accel, () => string>> = {
+   L: () => t('controls.accel.rankings'),
+   N: () => t('controls.accel.name'),
+   C: () => t('controls.accel.account'),
++  Y: () => t('controls.accel.controls'),
+   F9: () => t('controls.accel.bugReport'),
+   F8: () => t('controls.accel.dismissError'),
+ };
+diff --git a/client/src/ui/i18n/catalog.en.ts b/client/src/ui/i18n/catalog.en.ts
+index 2862cf3a..bdb60f2c 100644
+--- a/client/src/ui/i18n/catalog.en.ts
++++ b/client/src/ui/i18n/catalog.en.ts
+@@ -208,6 +208,9 @@ export const CATALOG_EN: Catalog = Object.freeze({
+   // @desc: Name of the shortcut that opens Profile › Account, a row of the Shortcuts tab in Options
+   // › Controls. One short word. ui/controlsModel.ts
+   'controls.accel.account': 'Account',
++  // @desc: Name of the shortcut that opens Options › Controls, a row of the Shortcuts tab in
++  // Options › Controls. One short word. ui/controlsModel.ts
++  'controls.accel.controls': 'Controls',
+   // @desc: Name of the shortcut that saves the local bug-report bundle, a row of the Shortcuts tab
+   // in Options › Controls. ui/controlsModel.ts
+   'controls.accel.bugReport': 'Save bug report',
+diff --git a/client/src/ui/i18n/catalog.fr.ts b/client/src/ui/i18n/catalog.fr.ts
+index d9aa897f..edaf4271 100644
+--- a/client/src/ui/i18n/catalog.fr.ts
++++ b/client/src/ui/i18n/catalog.fr.ts
+@@ -230,6 +230,7 @@ export const CATALOG_FR: Catalog = Object.freeze({
+   // @desc: Name of the shortcut that opens Profile › Account, a row of the Shortcuts tab in Options
+   // › Controls. One short word. ui/controlsModel.ts
+   'controls.accel.account': 'Compte',
++  'controls.accel.controls': 'Commandes',
+   // @desc: Name of the shortcut that saves the local bug-report bundle, a row of the Shortcuts tab
+   // in Options › Controls. ui/controlsModel.ts
+   'controls.accel.bugReport': 'Enregistrer un rapport de bug',
+diff --git a/client/src/ui/i18n/messageIds.ts b/client/src/ui/i18n/messageIds.ts
+index 5aff9f29..2ed6093a 100644
+--- a/client/src/ui/i18n/messageIds.ts
++++ b/client/src/ui/i18n/messageIds.ts
+@@ -83,6 +83,7 @@ export type MessageId =
+   | 'controls.accel.rankings'
+   | 'controls.accel.name'
+   | 'controls.accel.account'
++  | 'controls.accel.controls'
+   | 'controls.accel.bugReport'
+   | 'controls.accel.dismissError'
+   | 'controls.capture.prompt'

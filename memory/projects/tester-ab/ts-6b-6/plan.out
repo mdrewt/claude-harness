@@ -1,0 +1,9 @@
+AB-PLAN ts-6b-6: issue these 6 Agent calls in ONE foreground message, in this order, before any test file exists.
+1. your own tester call, exactly as without the experiment: your prompt file unmodified, the model the QUALITY TIER line names, no effort parameter. It writes the gating tests.
+2. Agent(subagent_type="tester", model="opus", effort="medium", description="tester a1 ts-6b-6", prompt="Your task is in /home/mdrewt/.cache/mr-tester-ab/ts-6b-6/18dcf9667492bee1/TESTER-PROMPT.md. Read it fully and follow it exactly.")
+3. Agent(subagent_type="tester", model="sonnet", effort="medium", description="tester a2 ts-6b-6", prompt="Your task is in /home/mdrewt/.cache/mr-tester-ab/ts-6b-6/98fa34e6811d72e4/TESTER-PROMPT.md. Read it fully and follow it exactly.")
+4. Agent(subagent_type="tester", model="opus", effort="high", description="tester a3 ts-6b-6", prompt="Your task is in /home/mdrewt/.cache/mr-tester-ab/ts-6b-6/763b545f755f6de4/TESTER-PROMPT.md. Read it fully and follow it exactly.")
+5. Agent(subagent_type="tester", model="sonnet", effort="high", description="tester a4 ts-6b-6", prompt="Your task is in /home/mdrewt/.cache/mr-tester-ab/ts-6b-6/6bf9c2abf793399a/TESTER-PROMPT.md. Read it fully and follow it exactly.")
+6. Agent(subagent_type="tester", model="sonnet", effort="medium", description="tester a5 ts-6b-6", prompt="Your task is in /home/mdrewt/.cache/mr-tester-ab/ts-6b-6/e4c0b8a37bdd66a0/TESTER-PROMPT.md. Read it fully and follow it exactly.")
+Calls 2-6 are shadows: their tests never enter the repo. Each ends with the single word `done`; do not read their exports or reports.
+When all have returned run: /home/mdrewt/projects/ai-apps/claude-harness/memory/projects/mr-tester-ab collect ts-6b-6

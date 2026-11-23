@@ -1,0 +1,24 @@
+src/main.dispatch.test.ts > main.ts screen-host commands and views (runtime, ctl-7c) > CTL7C-2-BOOT-VIEWS: every frame id lends ITS OWN view instance to its adapter`s paint: each of the nine recorded stand-in views that back a fra
+AssertionError: boxView: precondition: the one frame over the world: expected [ { kind: 'world' } ] to deeply equal [ { kind: 'world' }, …(1) ]
+src/main.dispatch.test.ts > main.ts store batches and a held key (runtime, ctl-7c) > CTL7C-1-BOOT-RECONCILE-RESET: a D-pad key held on a nav-capable frame that a store batch drops never repeats into the menu the drop uncovers; a b
+AssertionError: b, precondition: the box is a frame above the menu: expected [ { kind: 'battle', …(1) }, …(1) ] to deeply equal [ { kind: 'battle', …(1) }, …(2) ]
+src/main.dispatch.test.ts > main.ts shop quantity and line (runtime, ctl-7d) > CTL7D-3-BOOT-QTY-REJECTED: a buy or sell quantity that is not an integer from 1 to 4294967295 sends nothing, paints no shop line and logs an error nami
+AssertionError: control before the rows, buy 1: the press is consumed: expected false to be true // Object.is equality
+src/main.dispatch.test.ts > main.ts shop quantity and line (runtime, ctl-7d) > CTL7D-4-BOOT-SEND-TIME: the success line comes from the store rows as they were when the command was sent: a buy and a sell-all held open while batches
+AssertionError: buy: precondition: one buy is in flight: expected [] to deeply equal [ 'buy' ]
+src/main.dispatch.test.ts > main.ts batches reach observe (runtime, ctl-7d) > CTL7D-6-BOOT-EVERY-FRAME: a store batch observes every open frame, not only the top one, bottom first; it still observes over a battle base, and before 
+AssertionError: before join: precondition: the box frame is the one frame: expected [ { kind: 'world' } ] to deeply equal [ { kind: 'world' }, …(1) ]
+src/main.dispatch.test.ts > main.ts the Social seam (runtime, ctl-8s) > CTL8S-1-BOOT-MEMORY: a Social stand-in that opts in is seated and painted at open with no button or batch, from init(vm, undefined) after the first connect; r
+AssertionError: pre-join: precondition: the Social frame is on the stack: expected [ { kind: 'world' } ] to deeply equal [ { kind: 'world' }, …(1) ]
+src/main.dispatch.test.ts > main.ts the Social seam (runtime, ctl-8s) > CTL8S-3-BOOT-PANELS: the Social frame`s adapter is lent a composite whose trades, challenges and rankings are the three view instances and whose chrome is one
+AssertionError: precondition: the claim frame covers Social: expected [ { kind: 'world' }, …(2) ] to deeply equal [ { kind: 'world' }, …(3) ]
+src/main.dispatch.test.ts > main.ts the Social seam (runtime, ctl-8s) > CTL8S-3-BOOT-AUTO-SHOW: no challenge opens Social by itself (ctl-13 inverted the auto-show): a pending challenge the player SENT never does, an incoming one d
+AssertionError: overlay: precondition: the box frame is the only one: expected [ { kind: 'world' } ] to deeply equal [ { kind: 'world' }, …(1) ]
+src/main.dispatch.test.ts > main.ts the Social seam (runtime, ctl-8s) > CTL8S-3-BOOT-HOTKEY-AFTER-SWITCH: after the Social adapter switched the shown panel through its lent view, every Social key closes the frame (the key of the p
+AssertionError: covered KeyU: precondition: the claim frame covers Social: expected [ { kind: 'world' }, …(2) ] to deeply equal [ { kind: 'world' }, …(3) ]
+src/main.input.test.ts > main.ts reconcile gaps (runtime, ctl-3 round 2) > CTL3-3-BOOT-HIDE-ALL: rename, tradePropose, heal, raising, evolution and privacy each close through their own hide() when a battle arrives
+AssertionError: evolutionView: hidden once the battle row arrives: expected true to be false // Object.is equality
+src/ui/contextStack.test.ts > context stack: pure core (ctl-2) > CTL2-1-MIRROR: folding mirrorEdges makes the mirrored upper frames (battleView, dialogueView) exactly the visible ones, leaves every player frame and the base untouc
+Error: Property failed after 1 tests
+src/ui/contextStack.test.ts > context stack: the mirror sees only the server trio (so-2, SO2.3) > SO2-3-MIRROR-TRIO: no player id (the Social panels included) raises a push when visible or a pop when its frame stands hidden, over 
+AssertionError: boxView visible at the world: expected [ { kind: 'push', frame: { …(2) } } ] to deeply equal []

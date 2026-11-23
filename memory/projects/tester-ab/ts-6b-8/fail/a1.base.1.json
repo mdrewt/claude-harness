@@ -1,0 +1,3 @@
+{
+ "client/src/ui/screens/shopScreen.test.ts::selling out the cursor's stack seats the cursor on the neighbouring row, not the first": "on Berry, the row now at the Relic`s index: expected { tab: 'sell', activeKey: '7', \u2026(2) } to deeply equal { tab: 'sell', activeKey: '8', \u2026(2) }\n\nAssertionError: on Berry, the row now at the Relic`s index: expected { tab: 'sell', activeKey: '7', \u2026(2) } to deeply equal { tab: 'sell', activeKey: '8', \u2026(2) }\n\n- Expected\n+ Received\n\n  {\n-   \"activeKey\": \"8\",\n+   \"activeKey\": \"7\",\n    \"description\": undefined,\n    \"prompt\": null,\n    \"tab\": \"sell\",\n  }\n\n \u276f src/ui/screens/shopScreen.test.ts:928:88"
+}

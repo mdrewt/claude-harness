@@ -1,0 +1,59 @@
+You are the TESTER for slice ts-6b-7 of the monster-realm game (TDD red phase). Write the gating tests from the EARS criteria below. Do NOT implement anything in production files; the orchestrator runs your tests and proves each fails on the real defect (you have no shell — do not try to run anything).
+
+Worktree (edit ONLY here): /home/mdrewt/projects/ai-apps/claude-harness/projects/monster-realm/.claude/worktrees/ts-6b-7
+Read the project's `AGENTS.md` and the harness `~/.claude/harness/standards/testing-tdd.md` first. Behaviour tests, not source scans. Every test title below must appear EXACTLY ONCE, verbatim (the acceptance gate runs `vitest -t "<title>"` and expects exactly that many passes). Each test carries a `// WRONG IMPL KILLED:` comment naming the cheap wrong implementations it kills (house style — see existing tests in the same files).
+
+## EARS criteria
+- ts-6b-7.1: WHEN a visible tactical battle ingests an own-turn start, a KO or the battle end, THE CLIENT SHALL announce it once through the live region, and SHALL NOT announce damage lines or replayed history.
+- ts-6b-7.2: WHILE a battle clock window is open, THE CLIENT SHALL compute the Still-there countdown and the PvP clock ring from a server-time estimate, not the raw device clock.
+- ts-6b-7.3: WHEN a Finished batch arrives while the tactical shell is playing beats, THE CLIENT SHALL show the results panel only after the playback drains.
+
+## Contracts (decided by the builder; the implementation will match these exactly)
+
+### A. `client/src/net/serverClock.ts` (NEW file) — test file `client/src/net/serverClock.test.ts` (NEW)
+```ts
+export interface ClockWindowRow { readonly clockId: bigint; readonly windowOpenMs: bigint | null }
+export class ServerClock {
+  /** One server-time sample: `serverMs` (server epoch ms) seen at local `localNowMs`. The LATEST call wins:
+   *  offset = serverMs − localNowMs. A non-finite argument is ignored (the offset is unchanged). */
+  observe(serverMs: number, localNowMs: number): void;
+  /** The server-time estimate: localNowMs + offset; exactly `localNowMs` before any observation. */
+  now(localNowMs: number): number;
+  /** Feed the battle clock rows of one store batch. A clockId seen for the FIRST time is only remembered
+   *  (a snapshot/reconnect row may have opened long ago). A KNOWN clockId whose windowOpenMs changed to a
+   *  new NON-null value is a newly opened window: observe(Number(windowOpenMs), localNowMs). An unchanged
+   *  value, or a change to null, observes nothing (null is remembered, so null → value later IS a new window). */
+  observeWindows(rows: readonly ClockWindowRow[], localNowMs: number): void;
+  /** Forget every remembered clockId (a reconnect): the next sighting of each is a first sighting again.
+   *  The offset itself is kept. */
+  forgetWindows(): void;
+}
+```
+Pair it with the real `stillThereSeconds(deadlineMs: bigint | null, wallNowMs: number): number | null` from `client/src/ui/battlePolicy.ts` (shows 1..60 for the last 60 s; null when > 60 s left or past). REQUIRED test in serverClock.test.ts, title verbatim:
+**`a client clock 60 s behind still counts the last minute of a window`** — device clock 60 s behind the server: a window observed through `observeWindows` (first sighting, then a live transition) → `stillThereSeconds(deadline, clock.now(Date-like local))` counts the real last minute (e.g. 50 s left by server time shows 50 while the raw local clock would show null), ticks down with local time, and null after the server deadline. Also cover (separate tests, your titles): first sighting observes nothing; an unchanged re-delivery doesn't re-observe (a later local time must not drag the offset); latest observation wins (a device clock step recovers at the next window); null → value counts; forgetWindows makes the next sighting first again but keeps the offset; non-finite ignored; ids past 2^53 distinct.
+
+### B. `client/src/tactics/tacticsBattle.ts` — test file `client/src/tactics/tacticsBattle.test.ts`
+- `TacticsBattleDeps` gains a REQUIRED `readonly announce: (text: string) => void;` — update the file's `depsOf()` factory (≈ line 614) to record into an array (e.g. `DepsOpts.announced?: string[]`, exposed on `Kit`); this is a named intentional change of the deps freeze — say so in a comment.
+- `TacticsBattle` gains `get playing(): boolean` — true while the playback queue holds beats (the same state the `tactics-battle--playing` root class shows).
+- `client/src/tactics/strings.ts` gains `export const announceTurn = (round: number, unit: string): string` = `turnbarRound(round)` + ` — ` (space, U+2014, space) + `bannerTurn(unit)` → in en: `Round 3 — Mira's turn`.
+- Speech rules (the shell QUEUES lines; `tick()` speaks them as ONE `deps.announce(lines.join(' '))` call and clears the queue; no call when empty):
+  - `ingest(events)` while VISIBLE queues, in event order, the existing ticker line (`tickerLine(ev, names)`) of every `Ko`, every `BattleEnd`, and every `PlanHalted` of an OWN unit (the current vm's unit with `mine: true`). Nothing else: `Executed` (damage), `Missed`, `Moved`, `Status`, `RoundEnded`, `TurnEnded`, … are never spoken. A HIDDEN ingest queues nothing (history replays hidden — main.ts feeds a first sighting while hidden).
+  - The OWN-TURN line is decided after every `render(vm)` and every `show()` while the shell is VISIBLE (a hidden render decides nothing and records nothing — main.ts renders a first sighting hidden and then shows it, and that battle's current own turn, e.g. turn 1 right after Deploying, MUST be spoken once on that show): when `vm.activeUnitId`'s unit is own (`mine && !ai`), `state === 'Active'`, has no READY plan (`!vm.readyPlans.has(id)`), and the turn key `${vm.round}:${vm.turnIdx}:${unitId}` differs from the last heard key → queue `announceTurn(vm.round, names.unit(unitId))` and record the key. In the spoken utterance the event lines come first, then the turn line, whatever the call order. A new battle id / `reset()` forgets the key; `hide()` drops anything queued (the key stays heard, so re-showing the same turn does not repeat it).
+- `TacticsBattle` also gains a public `skip(): void` — drains the playback at once (what B does while a beat plays), so `playing` is false right after it.
+- REQUIRED test, title verbatim: **`announces own turn start, a KO and the finish through the announce dep but not damage lines or replayed history`**. It must prove: a visible own-turn start (render) speaks once and the same key re-rendered speaks nothing; a battle rendered hidden then shown on an own turn speaks that turn once on show; an opponent's / AI / READY turn speaks nothing; a KO and a BattleEnd ingested while visible are spoken in one tick as one call; `Executed` with damage is never spoken; a hidden ingest of history (KOs, BattleEnd) speaks nothing, then or after `show()`; nothing is spoken before `tick()`. Use a real `TacticsBattle` (the file's `make()`/`depsOf()` kit), not a stub.
+
+### C. `client/src/main.ts` — test file `client/src/main.dispatch.test.ts` (the booted-main harness; the tactical shell is the REAL class there)
+Behaviour main.ts will have:
+- `tacticsShellDeps().announce = (t) => announceNow(t)` (the live region; `#a11y-live`).
+- One `ServerClock`; after `refreshBattle` on every store batch (registered after it, so a first Active/Deploying batch already has its shown battle), `observeWindows(store.battleClocks(<shown battle id>), Date.now())`; the frame pump computes `serverNow = serverClock.now(Date.now())` and passes it to BOTH `pumpStillThere` and `pumpClock` (instead of raw `Date.now()`). Reconnect (`resetPredictionState`) calls `forgetWindows()`.
+- Results drain: when a batch turns the shown battle's tactical row `Finished` while the shell is VISIBLE and was already fed for THIS battle (not a first sighting / not after a reconnect), main feeds the Finished batch's new transcript events to the shell (they play live: beats, ticker lines, KO/end speech), and if `shell.playing` it keeps the shell as the frame's only owner and does NOT show the results panel yet; the frame pump re-runs the battle refresh once `playing` is false and then the results panel takes the frame (the shell hides). While waiting, the outcome edge has not started and A, B and Start never pop/continue the outcome: each one SKIPS the playback (`shell.skip()`) and is consumed, so the next frame shows the results panel; the A-grace (`OUTCOME_CONTINUE_GRACE_MS`, 400 ms) and the results auto-advance countdown (`CAPS.resultsMs`) start only when the results panel shows (a mashed A that skipped does not also continue the results). A Finished battle whose shell is not playing (or not visible, or first seen Finished) shows results at once, as today.
+REQUIRED tests, titles verbatim (each exactly once in the file):
+1. **`the Still-there countdown and the PvP clock ring both read the server-time estimate, not the raw device clock`** — `vi.spyOn(Date, 'now')` puts the device 60 s BEHIND the server; first deliver a clock row (first sighting), then a live window transition (same clockId, new `windowOpenMs` = server now at receipt). A WILD battle's `.tactics-countdown` shows the server-time seconds (raw clock would show none), and a PvP battle's clock ring shows the server-time remaining. Note: `frame(t)` from the harness stubs `performance.now` only — Date.now needs its own spy (see the existing `[BT12-2-BOOT-STILL-THERE]` test ≈ line 6690 and the bt-15 B clock-ring tests ≈ line 7590-7700 for fixtures: `bt12bClock`, `bt15bClock`, `bt12bCountdowns`, ring selectors).
+2. **`a Finished batch waits for the shell playback to drain before the results panel takes the frame`** — an Active battle shown (non-first batch fed), then ONE batch carrying the Finished row + terminal anchor + new events (an `Executed`, a `Ko`, a `BattleEnd`): right after it the shell is still the one displayed owner, the results panel is not shown, the ticker holds the KO line; frames before the beats' total (the playback caps live in `client/src/tactics/presentation.ts` `CAPS`; BattleEnd = 3000 ms, Executed = 400 ms) keep it so; a frame past the total shows the results panel with exactly one modal root and the shell hidden; the results stay up for the full `CAPS.resultsMs` counted from that show (not from the Finished batch). Control: a Finished batch with nothing playing shows results at once. Also (same test or a second test with your own title): B — and separately A — pressed during the wait does NOT dismiss the battle: the next frame shows the results panel (the outcome frame is still on the stack), and an A within 400 ms of that show does not continue it.
+Reuse the bt-12 B helpers (`bt12bShell`, `bt12bTicker`, `bt12Shown('tactics-results')`, `bt12ModalRoots`, `bt12bEvent`, `bt12bTactical`, `bt12bAnchor`, `bt15bEnd`, `server(t)`, `frame(t)`, `press`). Put the new tests in ONE new `describe('ts-6b-7: …', { sequential: true }, …)` block at the end of the file with the same `afterEach` cleanup as the bt-15 B block (≈ line 7381).
+
+## Existing tests that may need a named intentional change
+- `main.dispatch.test.ts` fixtures whose `windowOpenMs` changes on a KNOWN clockId to a value far from the spied `Date.now()` at receipt (e.g. ≈ line 6806: `bt12bClock(B, activeDeadline, activeDeadline - 120_000)` after the same clockId carried `null`) will now be read as a newly opened window and skew the estimate. If such a test's expectations depend on the raw clock, adjust the FIXTURE to be physically consistent (a newly opened window's `windowOpenMs` ≈ the server time at receipt) and say so in a `// ts-6b-7 (named intentional change): …` comment. Do not weaken any assertion.
+- Every `depsOf()`-built shell gets the new `announce` recorder.
+
+Do not touch any other file. When done, report: each new test title + file, every existing test you changed and why, and anything in the contract you found ambiguous.
