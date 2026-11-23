@@ -123,8 +123,12 @@ Each default stands unless the operator overrules it:
   changes only on the owner's call.
 - `decision-defaulted:world-address=fixed-loopback-port-per-world` — each world gets a loopback port
   when it is created and keeps it, so its reconnect key never changes (consumed by lpw-12).
-- `decision-defaulted:bundled-host-module-http=disabled` — the host the shell starts runs with
-  `[module-http] enabled = false` (consumed by lpw-12).
+- `decision:bundled-host-module-http=enabled` (operator, monster-realm#874, supersedes the lpw-12
+  default `disabled`) — the host the shell starts leaves module HTTP on, so a world's own procedures
+  redeem tickets and re-check handles at the account service (lpw-35's design B). Its config sets
+  `enabled = true` inside the default file's existing `[module-http]` table; a second table stops the
+  host from starting (lpw-35 P7). The host still refuses loopback and private addresses (P2), and
+  outbound HTTP goes only to the account service the build names (consumed by lpw-12).
 - `decision-defaulted:world-owner-credential=shell-held-never-in-page` — the token that published a
   world (its `config.owner_identity`) stays in the world's directory, readable by the user alone,
   never reaches the page and never enters a backup copy (consumed by lpw-13).
@@ -553,8 +557,8 @@ after: [lpw-11]
 blocked: licence — lifted when the operator records negotiated terms (or that none are needed) in the game's `docs/local-play.md` §1; who lifts it: the operator; fallback: `host.ts` drives a host the player installed separately (a configured binary path, no bundled binary), behind the same gate.
 
 - Residuals: R-lpg-0-ISSUERFETCH (local half).
-- Decisions: `decision-defaulted:world-address=fixed-loopback-port-per-world`, `decision-defaulted:bundled-host-module-http=disabled`.
-- Contract: `host.ts` owns the child process: `spacetimedb-standalone start --data-dir <world>/data --jwt-key-dir <world>/keys --listen-addr 127.0.0.1:<internal port> --non-interactive` with a `config.toml` setting `[module-http] enabled = false`. `hostGate.ts` is the only listener a page reaches (the world's fixed port, loopback): it forwards the SDK's WebSocket route and `/v1/ping` and nothing else, checks `Origin`, and drops a token naming any issuer but `localhost`. The token is read from every place the SDK puts one (the `Authorization` header and the WebSocket upgrade's query string), checked against the pinned SDK when built.
+- Decisions: `decision-defaulted:world-address=fixed-loopback-port-per-world`, `decision:bundled-host-module-http=enabled` (#874).
+- Contract: `host.ts` owns the child process: `spacetimedb-standalone start --data-dir <world>/data --jwt-key-dir <world>/keys --listen-addr 127.0.0.1:<internal port> --non-interactive` with a `config.toml` setting `enabled = true` in its one `[module-http]` table. `hostGate.ts` is the only listener a page reaches (the world's fixed port, loopback): it forwards the SDK's WebSocket route and `/v1/ping` and nothing else, checks `Origin`, and drops a token naming any issuer but `localhost`. The token is read from every place the SDK puts one (the `Authorization` header and the WebSocket upgrade's query string), checked against the pinned SDK when built.
 
 - **lpw-12.1:** WHEN the shell opens a world, THE SYSTEM SHALL start its host, confirm that the process answering is the child it started, and open the page only after `/v1/ping` answers through the gate.
 
@@ -860,7 +864,7 @@ after: [lpw-15, lpw-34]
 
 - **lpw-25.3:** WHEN the bindings differ from those entries only by tables, views, reducers or types none of them holds, or by a variant added to a type reachable only from a reducer argument, THE SYSTEM SHALL pass with `MIN_CLIENT_PROTOCOL` unchanged.
 
-- **lpw-25.4:** WHEN a table an entry above `MIN_CLIENT_PROTOCOL` first recorded gains a column, THE SYSTEM SHALL fail as lpw-25.2 does (a client at that entry's number subscribes it).
+- **lpw-25.4:** WHEN a table an entry above `MIN_CLIENT_PROTOCOL` first recorded gains a column, THE SYSTEM SHALL fail as lpw-25.2 does (a client at that entry's number subscribes it). The operator kept this rule although SDK 2.16.1 skips a trailing top-level column (monster-realm#873): nothing is deployed, so it costs nothing now; revisit before early access.
 - DoD: lpw-25.1 to lpw-25.4 green, each watched failing once on bindings regenerated from an uncommitted scratch schema edit; `just ci` green; "The module publishes its protocol numbers…" in the game's `docs/DECISIONS.md` rewritten to name the check.
 
 ### lpw-26 — a zone's movement tick runs only while there is work for it (design)
