@@ -55,8 +55,11 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    lpw-33 come from the operator's review of the recorded decisions (2026-11-22): the
    wire-contract check (lpw-25), the idle-tick design (lpw-26), tactical content's home (lpw-27),
    the PvP roster reveal (lpw-29), the mutation gates (lpw-30), the schema consolidation (lpw-32)
-   and the second one before early access (lpw-33, `blocked:early-access-schema-freeze`). **lpw-34 upgrades SpacetimeDB from 2.11.0 to 2.16.1, turns the crate's `unstable` feature on and launches next** (operator,
-   2026-11-22), alone, once the slices in flight have merged; lpw-35 then designs account checks made
+   and the second one before early access (lpw-33, `blocked:early-access-schema-freeze`). **lpw-34 upgrades SpacetimeDB from 2.11.0 to 2.16.1 and turns the crate's `unstable` feature on**
+   (operator, 2026-11-22), alone; it is `blocked:npm-cooldown` until 2026-11-27T03:15Z (the npm
+   registry refuses SDK 2.16.1 before then), and lpw-23 to lpw-27, lpw-32 and lpw-35 to lpw-37 all
+   wait on it, so until then this item has no launchable slice but lpw-40 and the build moves on to
+   M-gamepad (status 2026-11-23: 22 slices merged; the rest wait on lpw-34 or an operator block); lpw-35 then designs account checks made
    by the world's server (the operator allows the crate's `unstable` feature for procedures) before
    lpw-24 builds the client's part. lpw-36 and lpw-37 close the two ownership gaps (every reducer checks; a build that names no
    feature enforces). lpw-40 shows the player their own tag on Profile (pulled from M19, operator
