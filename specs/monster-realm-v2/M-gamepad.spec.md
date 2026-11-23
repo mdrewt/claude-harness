@@ -99,15 +99,21 @@ menu flow, one tactical battle turn, the pad remap flow, the Hold-Y clear).
 - `decision-defaulted:pad-accels=lt-party-rt-bag` — LT (6) opens Party (`V`), RT (7) opens the Bag
   (`I`); the stick clicks (10, 11) are unbound by default (a click while steering is a common
   accident) and bindable. Button 16 (Home / Guide) belongs to the OS and is never bindable.
-- `decision-defaulted:pad-all-pads=one-virtual-pad` — every connected pad feeds the one router;
-  pads with `mapping !== 'standard'` use the same index table and remap fixes them.
+- `decision-defaulted:pad-all-pads=one-virtual-pad` — every connected pad feeds the one router.
+  A pad with `mapping !== 'standard'` gets the same button table (remap fixes it) but its axes are
+  ignored: wheels, pedals and touchpads reported as pads often rest at -1 on axis 0 or 1 and would
+  otherwise walk the character forever.
 - `decision-defaulted:hold-b=press-time-skip` — the shipped B press already skips a playing beat
   at the press, from every source (pointer right-click and long-press included); holding B
   therefore skips. A distinct tap-vs-hold B would make the shipped tap undo instead of skip, which
   is a feel change for keyboard and pointer players: deferred to M-battle-tactics depth.
 - `decision-defaulted:hold-y=router-hold-edge` — the router reports a hold to the top frame's
-  adapter only for buttons that frame names as hold-capable at the press; no other adapter, and
-  no adapter's tests, see a change.
+  adapter only for buttons that frame names as hold-capable at the press. A hold-capable button's
+  tap is delivered at its release (before `HOLD_MS`), so a hold never also acts as a tap. No other
+  adapter, and no adapter's tests, see a change.
+- `decision-defaulted:pad-focus=same-guards-as-keys` — a pad press is ignored while focus is outside
+  the game screen and runs the same focus heal a keydown runs; inside the game screen a pad press is
+  a button press even with a text field focused (a pad cannot type; A commits, B backs out).
 
 ## Notes
 
@@ -118,7 +124,8 @@ menu flow, one tactical battle turn, the pad remap flow, the Hold-Y clear).
   function beside `pointerPress`, a keycap function, the capture hand-off and the `routeCtx` hold
   field. No seam exists yet for the input-dispatch glue (`routeEdge`, `applyRouterEffect`,
   `routeCtx`, `runAccel`), which closes over main.ts's session, menu and battle state whose owner is
-  unrecorded; its extraction is filed as a `structure.spec.md` follow-up, not done here. Slices that
+  unrecorded; its design and extraction are the follow-up R-gp-spec-NOTE956108
+  (`structure.spec.md`), not done here. Slices that
   share `inputState.ts`, `main.ts` or the i18n catalogs are ordered by `after:`.
 - **Must not change:** contexts, nav reconcile and the screen adapters' existing behaviour. The one
   additive type change is `NavInput.hold` (gp-6), read only by the battle adapter.
@@ -128,7 +135,9 @@ menu flow, one tactical battle turn, the pad remap flow, the Hold-Y clear).
 - **Mocked Gamepad API (e2e).** `client/e2e/pad.ts` installs, by `page.addInitScript`, a
   `navigator.getGamepads` that returns one fake standard-mapping pad whose buttons and axes the test
   sets through `window.__mrFakePad`; `padPress(page, index)` sets a button down, waits two animation
-  frames, sets it up and waits two more. `client/e2e/controls.ts` gains `setPressSource(page,
+  frames, sets it up and waits two more; `padHold(page, index, ms)` holds it for `ms` first. The
+  mock mutates one object in place, as real browsers may reuse snapshots, so the source must copy
+  what it reads (gp-1.5). `client/e2e/controls.ts` gains `setPressSource(page,
   'pad')`, after which `pressButton` and every helper built on it press the pad button bound to the
   virtual button, so the existing flow helpers drive a pad unchanged.
 
@@ -157,36 +166,54 @@ after: []
   `padButtonFor(b, i)` and `padAccelFor(b, i)` (undefined when unbound).
 - Contract (`stick.ts`): `STICK_ENTER = 0.5`, `STICK_EXIT = 0.35`; `stickToDpad(x: number, y: number,
   prev: DpadDir | null): DpadDir | null`, `DpadDir = 'Up' | 'Down' | 'Left' | 'Right'`; `y < 0` is Up
-  (the W3C axis convention).
-- Contract (`gamepadSource.ts`): `interface PadLike { index: number; connected: boolean; buttons:
-  readonly { pressed: boolean }[]; axes: readonly number[] }`; `class GamepadSource { constructor(
-  getPads: () => readonly (PadLike | null)[], bindings?: PadBindings); poll(): { edges: readonly
-  ButtonEdge[]; accels: readonly MenuAccel[] }; releaseAll(): void }`. Axes 0 and 1 are the left
-  stick. A stick direction and a D-pad button of one pad are separate holders, so the router's
-  holder count releases a direction only when both let go.
+  (the W3C axis convention). The rule, in order: a non-finite axis reads 0; `prev` is kept while its
+  own axis, in its own sign, is at least `STICK_EXIT` and the other axis's magnitude is not larger;
+  otherwise the larger-magnitude axis gives the direction when it is at least `STICK_ENTER` (an
+  exact tie goes to the horizontal axis); otherwise null.
+- Contract (`gamepadSource.ts`): `interface PadLike { index: number; id: string; connected: boolean;
+  mapping: string; buttons: readonly { pressed: boolean }[]; axes: readonly number[] }`;
+  `class GamepadSource { constructor(getPads: () => readonly (PadLike | null)[], bindings?:
+  PadBindings); poll(): { edges: readonly ButtonEdge[]; accels: readonly MenuAccel[] };
+  releaseAll(): void; rebind(next: PadBindings): void; capture(): PadIndex | 'refused' | undefined }`.
+  The source keeps its own copy of each pad's pressed set and stick direction, keyed by `index` and
+  `id` (a different pad in a reused slot is a disconnect plus a connect). Axes 0 and 1 are the left
+  stick, read only on a `standard` pad. A stick direction and the D-pad button of the same direction
+  are separate holders, released separately (the router's holder count merges them). `releaseAll`
+  and `rebind` latch every index held at that moment: it emits nothing until released. `capture()`
+  (gp-5) returns the next newly pressed index without emitting it: the index, or `'refused'` for a
+  reserved or unbindable one. `getPads` throwing reads as no pads; `poll` reports the failure once
+  through an injected `onError` (constructor option), not per poll.
 
 - **gp-1.1:** WHEN `stickToDpad` is given a stick whose larger axis magnitude is below `STICK_ENTER` and `prev` is null, THE SYSTEM SHALL return null.
 
-- **gp-1.2:** WHEN `stickToDpad` is given a stick whose larger axis magnitude is at or above `STICK_ENTER`, THE SYSTEM SHALL return the direction of that axis's sign (x > 0 Right, x < 0 Left, y > 0 Down, y < 0 Up).
+- **gp-1.2:** WHEN `stickToDpad` is given a stick whose larger axis magnitude is at or above `STICK_ENTER`, THE SYSTEM SHALL return the direction of that axis's sign (x > 0 Right, x < 0 Left, y > 0 Down, y < 0 Up), and on an exact tie the horizontal one.
 
-- **gp-1.3:** WHILE `prev` is a direction whose axis magnitude stays at or above `STICK_EXIT` and the other axis's magnitude is below `STICK_ENTER`, THE SYSTEM SHALL return `prev` (hysteresis: no flicker at the deadzone edge or on a diagonal).
+- **gp-1.3:** WHILE `prev` is a direction whose own axis stays at or above `STICK_EXIT` in its sign and the other axis's magnitude is not larger, THE SYSTEM SHALL return `prev` (no flicker at the deadzone edge or on a diagonal).
 
-- **gp-1.4:** WHEN a polled pad's bound button goes from not pressed to pressed, THE SYSTEM SHALL emit exactly one `{button, down: true}` edge for its virtual button, and exactly one `{button, down: false}` edge when it goes back.
+- **gp-1.4:** WHEN `prev` is a direction and both axes' magnitudes fall below `STICK_EXIT`, or an axis is not a finite number and the other is below `STICK_EXIT`, THE SYSTEM SHALL return null.
 
-- **gp-1.5:** WHILE a bound button stays pressed across polls, THE SYSTEM SHALL emit no further edge for it.
+- **gp-1.5:** WHEN a polled pad's bound button goes from not pressed to pressed, THE SYSTEM SHALL emit exactly one `{button, down: true}` edge for its virtual button, and exactly one `{button, down: false}` edge when it goes back, also when `getPads` returns the same object mutated in place between polls.
 
-- **gp-1.6:** WHEN the left stick's `stickToDpad` direction changes from one direction to another, THE SYSTEM SHALL emit the old direction's up edge before the new direction's down edge in the same poll.
+- **gp-1.6:** WHILE a bound button stays pressed across polls, THE SYSTEM SHALL emit no further edge for it.
 
-- **gp-1.7:** WHEN a pad that held buttons or a stick direction disappears from `getPads()` or reports `connected: false`, THE SYSTEM SHALL emit an up edge for every virtual button that pad held, in that poll.
+- **gp-1.7:** WHEN a standard pad's left stick goes from centre to a direction, from one direction to another, or back to centre, THE SYSTEM SHALL emit that direction's down edge, the old direction's up edge before the new one's down edge, or the last direction's up edge, in that poll; and any sequence of stick readings that ends at centre SHALL leave no direction held (a fast-check property).
 
-- **gp-1.8:** WHEN `releaseAll()` runs while pad buttons are held, THE SYSTEM SHALL emit no edge for those buttons until each is released and pressed again.
+- **gp-1.8:** WHEN a pad's D-pad Up button and its stick pushed Up are both held and only one is released, THE SYSTEM SHALL emit one Up up edge for that one, and a second when the other is released.
 
-- **gp-1.9:** WHEN a pad button bound to an accelerator goes down, THE SYSTEM SHALL report that accelerator once in `accels` and emit no button edge for it.
+- **gp-1.9:** WHEN a pad whose `mapping` is not `standard` reports axes 0 and 1 resting at -1, THE SYSTEM SHALL emit no edge for them.
 
-- **gp-1.10:** WHEN a pressed button index is unbound or reserved (16), THE SYSTEM SHALL emit nothing for it.
+- **gp-1.10:** WHEN a pad that held buttons or a stick direction disappears from `getPads()`, reports `connected: false`, or is replaced in its slot by a pad with another `id`, THE SYSTEM SHALL emit an up edge for every virtual button that pad held, in that poll.
 
-- **gp-1.11:** WHEN two pads both hold the same virtual button, THE SYSTEM SHALL emit one down edge per pad and one up edge per pad as each releases.
-- DoD: gp-1.1 to gp-1.11 green (fast-check properties for the stick's hysteresis and the source's balanced edges); `just ci` green.
+- **gp-1.11:** WHEN `releaseAll()` or `rebind()` runs while pad buttons or the stick are held, THE SYSTEM SHALL emit no edge for them until each is released and pressed again.
+
+- **gp-1.12:** WHEN a pad button bound to an accelerator goes down, THE SYSTEM SHALL report that accelerator once in `accels` and emit no button edge for it.
+
+- **gp-1.13:** WHEN a pressed button index is unbound or reserved (16), THE SYSTEM SHALL emit nothing for it.
+
+- **gp-1.14:** WHEN two pads both hold the same virtual button, THE SYSTEM SHALL emit one down edge per pad and one up edge per pad as each releases.
+
+- **gp-1.15:** WHEN `getPads` throws on every poll, THE SYSTEM SHALL return no edges each time and call `onError` exactly once.
+- DoD: gp-1.1 to gp-1.15 green (fast-check properties for the stick's hysteresis and the source's balanced edges); `just ci` green.
 
 ### gp-2 — a connected pad plays the game: the operator's menu flow, pad only
 
@@ -194,12 +221,15 @@ type: feature · tier: hard
 touches: client/src/shell/inputState.ts, client/src/main.ts, client/src/main.input.test.ts, client/e2e/pad.ts, client/e2e/controls.ts, client/e2e/pad-menu-flow.spec.ts
 after: [gp-1]
 - Wiring: `inputState.ts` builds `pad = new GamepadSource(() => navigator.getGamepads?.() ?? [],
-  PAD_DEFAULT_BINDINGS)` (a missing API reads as no pads) and `releaseAllInput` also calls
-  `pad.releaseAll()`. `main.ts` polls once per animation frame before `inputRouter.tick`, and routes
-  each edge through one `padEdge(edge)` beside `pointerPress`: dead while the session gate blocks,
-  the stack synced on both sides, then `routeEdge`; each reported accelerator goes to `runAccel`. A
-  pad press is never owned by a focused DOM element (a pad cannot type), and it clears the pointer's
-  hover mark as a key press does.
+  PAD_DEFAULT_BINDINGS, { onError })` (a missing API reads as no pads; a throwing one is reported
+  once through `reportError`) and `releaseAllInput` also calls `pad.releaseAll()`. `main.ts` polls
+  once per animation frame, FIRST in the frame (before the session-gate early return and before
+  `inputRouter.tick`), and routes each edge through one `padEdge(edge)` beside `pointerPress`: the
+  stack synced on both sides, then `routeEdge`; each reported accelerator goes to `runAccel`. While
+  the session gate blocks, the frame discards the poll's edges and calls `releaseAllInput()`, so a
+  button held through the gate stays latched until released. `padEdge` applies the keydown's
+  guards (`decision-defaulted:pad-focus=same-guards-as-keys`): nothing while focus is outside the
+  game screen, then the same focus heal, and it clears the pointer's hover mark as a key press does.
 - The e2e mirrors `menu-flow.spec.ts` press by press, with `setPressSource(page, 'pad')`; the
   mocked API is `client/e2e/pad.ts` (Notes).
 
@@ -211,12 +241,14 @@ after: [gp-1]
 
 - **gp-2.4:** WHEN a pad accelerator button goes down (LT by default), THE SYSTEM SHALL open that accelerator's menu path, or act as Start on its own screen, exactly as its key does.
 
-- **gp-2.5:** WHILE the session gate blocks input, THE SYSTEM SHALL ignore every pad edge.
+- **gp-2.5:** WHILE the session gate blocks input, THE SYSTEM SHALL act on no pad edge, and WHEN the gate lifts with a pad direction still held from before it, THE SYSTEM SHALL NOT walk until that direction is released and pushed again.
 
-- **gp-2.6:** WHEN `navigator.getGamepads` is absent or returns no pads, THE SYSTEM SHALL play on keyboard and pointer with no error reported.
+- **gp-2.6:** WHEN `navigator.getGamepads` is absent, returns no pads, or throws, THE SYSTEM SHALL play on keyboard and pointer, and a throwing API SHALL be reported once, not once per frame.
 
-- **gp-2.7:** WHEN the operator's required flow is played on the mocked pad only (Start, Down, A to Bag, RB, A A A to feed, B back to the menu with the menu still open, Up A to Monsters, move a monster to storage and back, Start to the world, then Up), THE SYSTEM SHALL reach the same states the keyboard flow reaches, ending with the character one tile North (`pad-menu-flow.spec.ts`).
-- DoD: gp-2.1 to gp-2.7 green; `menu-flow.spec.ts` still green; `just ci` green.
+- **gp-2.7:** WHILE focus is on an element outside the game screen, THE SYSTEM SHALL act on no pad press.
+
+- **gp-2.8:** WHEN the operator's required flow is played on the mocked pad only (Start, Down, A to Bag, RB, A A A to feed, B back to the menu with the menu still open, Up A to Monsters, move a monster to storage and back, Start to the world, then Up), THE SYSTEM SHALL reach the same states the keyboard flow reaches, ending with the character one tile North (`pad-menu-flow.spec.ts`).
+- DoD: gp-2.1 to gp-2.8 green; `menu-flow.spec.ts` still green; `just ci` green.
 
 ### gp-3 — one tactical battle turn, pad only
 
@@ -261,21 +293,25 @@ after: [gp-2]
 ### gp-5 — remap the pad in Controls, saved with the keyboard table
 
 type: feature · tier: hard
-touches: client/src/input/padBindings.ts, client/src/input/padBindings.test.ts, client/src/input/bindingStore.ts, client/src/input/bindingStore.test.ts, client/src/input/gamepadSource.ts, client/src/shell/inputState.ts, client/src/ui/controlsModel.ts, client/src/ui/controlsModel.test.ts, client/src/ui/controlsView.ts, client/src/ui/controlsView.test.ts, client/src/ui/screens/optionsScreen.ts, client/src/ui/screens/optionsScreen.test.ts, client/src/main.ts, client/src/main.remap.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/e2e/pad-controls.spec.ts
+touches: client/src/input/padBindings.ts, client/src/input/padBindings.test.ts, client/src/input/bindingStore.ts, client/src/input/bindingStore.test.ts, client/src/shell/inputState.ts, client/src/ui/controlsModel.ts, client/src/ui/controlsModel.test.ts, client/src/ui/controlsView.ts, client/src/ui/controlsView.test.ts, client/src/ui/screens/optionsScreen.ts, client/src/ui/screens/optionsScreen.test.ts, client/src/main.ts, client/src/main.remap.test.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/e2e/pad-controls.spec.ts
 after: [gp-4]
 - Contract: `parsePadBindings(raw: unknown): PadBindings` (total; `raw` is the record's `pad`
   value); `loadBindings` is unchanged and `loadPadBindings(storage)` reads the same key;
-  `saveBindings(storage, b, pad)` writes `{v: 1, buttons, accels, pad: {buttons, accels}}`.
-  `GamepadSource.capture(): PadIndex | undefined` hands the next newly pressed bindable index to a
-  waiting capture instead of emitting it. `controlsModel.ts` `capturePad(pad, target, index):
-  CaptureOutcome` mirrors `captureKey` in the pad namespace (swap on conflict; the protected
-  buttons keep a pad button). `inputState.ts` `applyPadBindings(next)` saves both tables, releases
-  everything and rebuilds the pad source.
+  `saveBindings(storage, b, pad)` takes the pad table as a REQUIRED argument and writes
+  `{v: 1, buttons, accels, pad: {buttons, accels}}`, so every keyboard save carries the live pad
+  table. `controlsModel.ts` `capturePad(pad, target, index): CaptureOutcome` mirrors `captureKey`
+  in the pad namespace (swap on conflict; the protected buttons keep a pad button). `inputState.ts`
+  `applyPadBindings(next)` saves both tables, releases everything and calls `pad.rebind(next)` (the
+  held buttons latch, gp-1.11).
+- Capture targets name their device. While a Pad cell waits, the frame loop takes `pad.capture()`
+  instead of routing pad edges; the keyboard reaches only Escape (cancel) and the Cancel chip's
+  activation, every other key is ignored. While a Key cell waits, pad presses are ignored. A pad-only
+  player leaves a Pad capture by pressing the button the cell already shows (unchanged), and a
+  reserved or unbindable press shows the refusal line a refused key shows.
 - `controlsModel.ts` `controlsRows` has no production caller (census orphan): the Pad column goes
   into the row list `optionsScreen.ts` and `controlsView.ts` paint.
-- Controls shows a third column, **Pad**, on the Buttons and Shortcuts tabs (F8 and F9 rows show
-  none). A capture on a Pad cell takes the next pad press; the keyboard's Escape and the Cancel chip
-  leave it, and pressing the button the cell already shows ends it unchanged.
+- Controls shows a third column, **Pad**, on the Buttons and Shortcuts tabs (the F8 and F9 rows show
+  none).
 
 - **gp-5.1:** WHEN the stored `mr.controls` record has no `pad` key, or a `pad` value that is not an object, THE SYSTEM SHALL use `PAD_DEFAULT_BINDINGS` and keep the keyboard table it parses today.
 
@@ -283,49 +319,63 @@ after: [gp-4]
 
 - **gp-5.3:** WHEN parsing would leave a protected button with no pad index, THE SYSTEM SHALL use `PAD_DEFAULT_BINDINGS`.
 
-- **gp-5.4:** WHEN a pad table is saved and the page reloads, THE SYSTEM SHALL load the same pad table and the same keyboard table.
+- **gp-5.4:** WHEN a pad remap is saved and then a keyboard remap is saved, or the other way round, and the page reloads, THE SYSTEM SHALL load both remaps.
 
 - **gp-5.5:** WHEN a capture on a Pad cell receives a pad index another row holds, THE SYSTEM SHALL swap the two rows' pad buttons and name both in the outcome line, and SHALL refuse a swap that would leave a protected button with no pad button.
 
-- **gp-5.6:** WHILE a Pad cell waits for a press, THE SYSTEM SHALL route no pad press to the router or to an accelerator.
+- **gp-5.6:** WHILE a Pad cell waits for a press, THE SYSTEM SHALL route no pad press to the router or to an accelerator, and SHALL ignore every key except Escape and the Cancel chip's activation.
 
-- **gp-5.7:** WHEN a pad remap is applied, THE SYSTEM SHALL drive the game with the new table at once, with no button left held from before it.
+- **gp-5.7:** WHILE a Key cell waits for a press, THE SYSTEM SHALL ignore every pad press.
 
-- **gp-5.8:** WHEN a player opens Controls with the mocked pad only, moves to the Pad cell of Confirm (A), presses A to capture and then presses pad button 3, THE SYSTEM SHALL show Y's glyph on that cell, swap Info (Y) onto button 0, and confirm the next menu choice with button 3 (`pad-controls.spec.ts`).
-- DoD: gp-5.1 to gp-5.8 green; `remap.spec.ts` still green; `just ci` green.
+- **gp-5.8:** WHEN a Pad cell's capture receives the reserved index 16, THE SYSTEM SHALL keep waiting and show the refusal line.
+
+- **gp-5.9:** WHEN a pad remap is applied while the captured button is still held, THE SYSTEM SHALL drive the game with the new table at once and act on that button only after it is released and pressed again.
+
+- **gp-5.10:** WHEN a player opens Controls with the mocked pad only, moves to the Pad cell of Confirm (A), presses A to capture and then presses pad button 3 and holds it for 300 ms, THE SYSTEM SHALL show Y's glyph on that cell with no second capture started, swap Info (Y) onto button 0, and confirm the next menu choice with button 3 (`pad-controls.spec.ts`).
+- DoD: gp-5.1 to gp-5.10 green; `remap.spec.ts` still green; `just ci` green.
 
 ### gp-6 — hold edges: Hold Y clears a READY plan
 
 type: feature · tier: hard
-touches: client/src/input/router.ts, client/src/input/router.test.ts, client/src/ui/nav.ts, client/src/ui/screens/battleScreen.ts, client/src/ui/screens/battleScreen.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client/src/main.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/e2e/ui-tactics.spec.ts
-after: [gp-5]
-- Source-agnostic: a held F key and a held pad Y are the same edge pair, so this slice needs no pad
-  code and is ordered after gp-5 only because both edit `main.ts` and the catalogs.
+touches: client/src/input/router.ts, client/src/input/router.test.ts, client/src/ui/nav.ts, client/src/ui/screens/battleScreen.ts, client/src/ui/screens/battleScreen.test.ts, client/src/tactics/tacticsBattle.ts, client/src/tactics/tacticsBattle.test.ts, client/src/main.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/e2e/pad-battle.spec.ts
+after: [gp-3, gp-5]
+- Source-agnostic: a held F key and a held pad Y are the same edge pair. Ordered after gp-3 (it adds
+  a case to `pad-battle.spec.ts`) and gp-5 (`main.ts` and the catalogs).
 - Contract: `HOLD_MS = 500` (router.ts); `NavInput` gains `hold?: true`; `RouteContext` gains
   `hold?: { buttons: ReadonlySet<VButton>; now: number }` — the top frame's hold-capable buttons and
-  the clock. A press of a listed button is delivered as today and arms the hold; `tick` asks the
-  screen once with `{ button, repeat: false, hold: true }` when it has been held `HOLD_MS`; a
-  release, `resetRepeat`, `releaseAll`, or a tick whose `hold.buttons` no longer lists it disarms it.
-  main.ts sets `hold.buttons = {'Y'}` while the tactical shell offers Clear plan
-  (`offers(ctx).cancel`), else omits `hold`. `BattleOp` gains `{kind: 'holdHint'}` (a Y tap) and
-  `{kind: 'clearPlan'}` (a Y hold); `TacticsBattle` answers `holdHint` with the ticker line
-  `tactics.ticker.holdToClear` and `clearPlan` with `onCancelQueue(battleId, selected unit)`, the
-  sink the confirmed Clear plan row uses. Hold B: `decision-defaulted:hold-b=press-time-skip`.
+  the clock. A press of a listed button is consumed and delivered to no screen yet; `tick` asks the
+  screen once with `{ button, repeat: false, hold: true }` when it has been held `HOLD_MS`; a release
+  before that delivers the tap `{ button, repeat: false }` at the release; a release after the hold
+  is swallowed. Arming is per button, not per source: a second down edge while armed is ignored, and
+  the first release ends it. `resetRepeat`, `releaseAll`, or a tick whose `hold.buttons` no longer
+  lists the button disarms it with nothing delivered.
+- main.ts sets `hold.buttons = {'Y'}` only while the tactical battle base is the top frame, the
+  shell's input mode is idle or its root menu, and it offers Clear plan (`offers(ctx).cancel`); else
+  it omits `hold`. `BattleOp` gains `{kind: 'holdHint'}` (a Y tap) and `{kind: 'clearPlan'}` (a Y
+  hold). `TacticsBattle` answers `holdHint` with the ticker line `tactics.ticker.holdToClear`, and
+  `clearPlan` through one `#clearPlan(unitId)` that the confirmed Clear plan row also calls (the
+  `onCancelQueue` call, the in-flight entry dropped, the mode back to idle).
+- Hold B: `decision-defaulted:hold-b=press-time-skip` — B is never listed, so the shipped skip at
+  the press is unchanged.
 
-- **gp-6.1:** WHEN a button the context lists as hold-capable has been held for `HOLD_MS` under the same top frame, THE SYSTEM SHALL ask that frame's adapter exactly once with a hold input, and never again until the button is released and pressed again.
+- **gp-6.1:** WHEN a button the context lists as hold-capable has been held for `HOLD_MS` under the same top frame, THE SYSTEM SHALL ask that frame's adapter exactly once with a hold input, deliver nothing at its release, and deliver nothing more until it is released and pressed again.
 
-- **gp-6.2:** WHEN a button the context does not list as hold-capable is held for any time, THE SYSTEM SHALL deliver no hold input for it.
+- **gp-6.2:** WHEN a hold-capable button is released before `HOLD_MS`, THE SYSTEM SHALL deliver one tap input at the release and no hold input.
 
-- **gp-6.3:** WHEN a hold-capable button is released, or the frame changes, before `HOLD_MS`, THE SYSTEM SHALL deliver no hold input for that press.
+- **gp-6.3:** WHEN a button the context does not list as hold-capable is held for any time, THE SYSTEM SHALL deliver its press at the press as today and no hold input.
 
-- **gp-6.4:** WHILE the tactical shell offers Clear plan, WHEN Y is pressed and released before `HOLD_MS`, THE SYSTEM SHALL show the "Hold Y to clear the plan" ticker line and leave the plan untouched.
+- **gp-6.4:** WHEN the frame changes, or the context stops listing the button, before `HOLD_MS`, THE SYSTEM SHALL deliver neither a hold nor a tap for that press.
 
-- **gp-6.5:** WHILE the tactical shell offers Clear plan, WHEN Y is held for `HOLD_MS`, THE SYSTEM SHALL send `cancel_queue` once for the selected unit, without the confirm row.
+- **gp-6.5:** WHEN two sources both press a hold-capable button while it is armed, THE SYSTEM SHALL keep the first press's timer, and the first release SHALL end the press.
 
-- **gp-6.6:** WHILE a beat plays, WHEN B goes down from any source, THE SYSTEM SHALL drain the playback at that press, and SHALL step back no menu level for the same press however long B is held.
+- **gp-6.6:** WHILE the tactical shell offers Clear plan, WHEN Y is pressed and released before `HOLD_MS`, THE SYSTEM SHALL show the "Hold Y to clear the plan" ticker line and leave the plan untouched.
 
-- **gp-6.7:** WHEN the mounted tactical shell shows a READY plan and the F key (Y) is held for 600 ms in `ui-tactics.spec.ts`, THE SYSTEM SHALL call `onCancelQueue` once for that unit, and a 100 ms press SHALL only show the hint.
-- DoD: gp-6.1 to gp-6.7 green; every screen adapter's existing tests unchanged and green; `just ci` green.
+- **gp-6.7:** WHILE the tactical shell offers Clear plan, WHEN Y is held for `HOLD_MS`, THE SYSTEM SHALL send `cancel_queue` once for the selected unit without the confirm row, and a plan submitted for that unit afterwards SHALL reach the server.
+
+- **gp-6.8:** WHILE an aim, a sub-list or the main menu is open over the tactical battle, WHEN Y is held for `HOLD_MS`, THE SYSTEM SHALL NOT clear any plan.
+
+- **gp-6.9:** WHEN, in a wild tactical battle on the mocked pad only, the player pre-queues a plan for a unit during the wild's turn, submits it with Start, and holds pad Y for 600 ms, THE SYSTEM SHALL clear that unit's plan on the server (`pad-battle.spec.ts`).
+- DoD: gp-6.1 to gp-6.9 green; every screen adapter's existing tests unchanged and green; `just ci` green.
 
 ## Risks
 
@@ -342,7 +392,7 @@ after: [gp-5]
 - **`mr-prune census`** (recorded as `M-gamepad` at game `d515d75f`): no `duplicates` rows. Two
   `orphans` rows in gp-5's area: `controlsModel.ts` `controlsRows` has no production caller, so
   gp-5 adds the Pad column through the row list the Controls screen actually paints and leaves the
-  orphan to its `structure.spec.md` follow-up; `glyphs.ts` `resetLearnedKeys` is a test-reset
+  orphan to its follow-up R-gp-spec-NOTED8195D; `glyphs.ts` `resetLearnedKeys` is a test-reset
   hook kept on purpose. `signals` rows (churn) on `main.input.test.ts`, `main.hintBar.test.ts`,
   `main.remap.test.ts`, `router.test.ts` and `hintBarModel.test.ts`, and a source-text signal on
   `controlsView.test.ts`: each is in the touching slice's `touches:`; a source-text assertion that
