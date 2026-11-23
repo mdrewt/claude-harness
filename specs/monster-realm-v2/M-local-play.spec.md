@@ -784,9 +784,10 @@ touches: server-module/src/world_binding.rs, server-module/src/world_binding_tes
 after: [lpw-15, lpw-21]
 
 - Decision: operator, 2026-11-22, monster-realm#847. In a world we do not operate, a player erases their own binding by a reducer and reads it through the owner-scoped view lpw-15 already ships; keep what a world holds about accounts and identities minimal and secure. No new table, column or export machinery (export is data about the person through simple queries on existing tables).
-- Contract: `unbind_world_account()` deletes the caller's `world_binding` row and any outstanding nonce for `ctx.sender()`, and nothing else; on an official build it is refused with no write (lpw-8 (b)). It is the one reducer the access rule does not gate, so a player the host has removed can still erase their link. The game's `docs/DECISIONS.md` world-binding entry (written by lpw-15) is amended in place to state this.
+- Decision: operator, 2026-11-23, monster-realm#861 (recommendation accepted). An unbind of a binding the build counts also deletes the caller's `world_admission` row under every rule, so an account the owner removed can never get back in through an unbind; a removed player reaches the unbind only over a connection opened while admitted (the owner can still delete the binding row over SQL).
+- Contract: `unbind_world_account()` deletes the caller's `world_binding` row, any outstanding nonce for `ctx.sender()` and, when the binding is one the build counts, the caller's `world_admission` row, and nothing else; on an official build it is refused with no write (lpw-8 (b)). It is the one reducer the access rule does not gate, so a player the host has removed can still erase their link. The game's `docs/DECISIONS.md` world-binding entry (written by lpw-15) is amended in place to state this.
 
-- **lpw-22.1:** WHEN a bound identity calls `unbind_world_account` in a `local` or `private` world, THE SYSTEM SHALL delete that identity's binding and outstanding nonce and write nothing else.
+- **lpw-22.1:** WHEN a bound identity calls `unbind_world_account` in a `local` or `private` world, THE SYSTEM SHALL delete that identity's binding, outstanding nonce and (for a counted binding) admission row, and write nothing else.
 
 - **lpw-22.2:** WHEN the caller has no binding, THE SYSTEM SHALL succeed with no write.
 
