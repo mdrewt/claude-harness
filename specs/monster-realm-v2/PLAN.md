@@ -59,7 +59,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    2026-11-22), alone, once the slices in flight have merged; lpw-35 then designs account checks made
    by the world's server (the operator allows the crate's `unstable` feature for procedures) before
    lpw-24 builds the client's part. lpw-36 and lpw-37 close the two ownership gaps (every reducer checks; a build that names no
-   feature enforces). The decision log's trim is `structure.spec.md`'s `type: docs` sections
+   feature enforces). lpw-40 shows the player their own tag on Profile (pulled from M19, operator
+   2026-11-23). The decision log's trim is `structure.spec.md`'s `type: docs` sections
    (st-14 to st-20). Groundwork built (§Built). **Early access is
    gated on it.**
 2. **M-account-service** (`M-account-service.spec.md`, authored 2026-11-16, 12 `acs-` slices in
@@ -88,12 +89,14 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    (gp-5), and the router's hold edge with the tactical battle's Hold Y clear (gp-6; Hold B keeps
    the shipped press-time skip). **Must land before launch** (operator, 2026-10-01). Ordered after
    the tactical battle UI (M-battle-tactics, built) — operator-CONFIRMED (#583 D4, 2026-10-24).
-5. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — its friend requests and
+5. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — `blocked:early-access-release`
+   (operator, 2026-11-23: deferred until after early access, with M18). Its friend requests and
    chat show players through the tag helpers M-identity-handles built (`formatTag` and
-   `taggedName` in the game's `client/src/ui/playerTag.ts`), and it owns the player's own tag on
-   the Profile screen, which no surface shows yet; ordered AHEAD of M18 — operator-CONFIRMED
-   (#588 D4, 2026-10-24). M23's social a11y retrofit scope un-defers with it.
-6. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — the playtest-3
+   `taggedName` in the game's `client/src/ui/playerTag.ts`); the player's own tag on the Profile
+   screen moved out of it into M-local-play `lpw-40` (operator, 2026-11-23). Ordered AHEAD of M18 —
+   operator-CONFIRMED (#588 D4, 2026-10-24). M23's social a11y retrofit scope un-defers with it.
+6. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — `blocked:early-access-release`
+   (operator, 2026-11-23: deferred until after early access, with M19). The playtest-3
    read did NOT confirm it as next content; its 1v1 "additive resolve_coop_turn" premise dies
    with the tactical overhaul. Re-sketch on the tactical engine (M-battle-tactics P2 is built; tactical sides natively support
    allies).
