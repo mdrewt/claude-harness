@@ -81,11 +81,13 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    no-oracle cases (M-trade-sessions `ts-4`); the M25 spec's S1 text is rewritten when M25 is
    re-elaborated.
    **Opening the official server is gated on its completion.**
-4. **M-gamepad** (`M-gamepad.spec.md`, sketch) — controller support on the virtual-button
-   layer, consuming the context-stack ownership design, plus the hold/long-press edges the
-   tactical battle defers (Hold Y cancel-and-clear, Hold B skip playback). **Must land before launch** (operator,
-   2026-10-01). Ordered after the tactical battle UI (M-battle-tactics, built) — operator-CONFIRMED
-   (#583 D4, 2026-10-24).
+4. **M-gamepad** (`M-gamepad.spec.md`, elaborated 2026-11-22 into 6 `gp-` slices, client-only,
+   no schema change) — controller support on the virtual-button layer: the pad source and stick
+   (gp-1), live play with the operator's menu flow pad-only (gp-2), one battle turn pad-only
+   (gp-3), pad glyphs by last-used source (gp-4), pad remapping stored additively in `mr.controls`
+   (gp-5), and the router's hold edge with the tactical battle's Hold Y clear (gp-6; Hold B keeps
+   the shipped press-time skip). **Must land before launch** (operator, 2026-10-01). Ordered after
+   the tactical battle UI (M-battle-tactics, built) — operator-CONFIRMED (#583 D4, 2026-10-24).
 5. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — its friend requests and
    chat show players through the tag helpers M-identity-handles built (`formatTag` and
    `taggedName` in the game's `client/src/ui/playerTag.ts`), and it owns the player's own tag on
@@ -102,7 +104,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    reserved `Line`/`Cone` shape variants), and the depth re-enable waves (D583.1, each re-running
    the Playtest-4 gates): D1 entry abilities on deploy + 4-AP Swap/reserve, D2 weather/field
    (upkeep slot 3), D3 signature wave + one 2×2-footprint line. Design SSOT:
-   `M-battle-tactics-design.md`. Hold-to-act inputs (Hold Y cancel, Hold B skip) belong to M-gamepad.
+   `M-battle-tactics-design.md`. Hold Y cancel is M-gamepad gp-6; a distinct tap-vs-hold B (a tap undoes during playback, only a hold skips) comes here (M-gamepad keeps the shipped press-time skip).
 8. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
    row a pt3 milestone absorbs is marked in its spec.
 9. **M21b-3 Steamworks in the shell** — the Steamworks wiring (overlay enable, Steam Input onto
