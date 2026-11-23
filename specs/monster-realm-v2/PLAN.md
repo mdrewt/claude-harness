@@ -102,8 +102,8 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 5. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
    row a pt3 milestone absorbs is marked in its spec.
 6. **M21b-3 Steamworks in the shell** — the Steamworks wiring (overlay enable, Steam Input onto
-   the virtual buttons, and its on-screen keyboard so a pad can type a rename) in M-local-play's
-   desktop shell (`lpw-11`), against App ID 480 until the game's own app exists; unspecced, elaborated once `lpw-10` proves the overlay. The Steam sign-in
+   the virtual buttons, and its on-screen keyboard so a pad can type: renames, the box search) in
+   M-local-play's desktop shell (`lpw-11`), against App ID 480 until the game's own app exists; unspecced, elaborated once `lpw-10` proves the overlay. The Steam sign-in
    moved to M-account-service (acs-12).
 7. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
    (`standards/spec-driven.md` §Refactor slices). The supervisor's structural share schedules it
@@ -160,7 +160,7 @@ ONE gate after every coverage milestone closes. No interim playtest.
   (operator, 2026-10-01 and 2026-11-13), is built.
   The second schema consolidation (`lpw-33`) is part of that gate: it is unblocked and elaborated
   when every schema-changing slice of M-local-play and M-account-service has merged (M-gamepad
-  changed no schema).
+  has no schema change).
   **Opening the official server** is gated on M25 completion (human sign-off checklist,
   operator-approved) and on M-scale-readiness's 1,000-client run of record meeting the
   official-server budgets (the milestone is built; the run is residual
@@ -204,9 +204,9 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
   **M-pre-playtest-polish** · **M-ui-foundation** (`wf-1`, `uif-*`; the shared menu kit — tokens,
   one scale authority, TabBar/ContextSheet/EmptyState/RowCard, four feedback channels — and the
   flattened menu IA; design SSOT `M-ui-foundation-wireframes.md`) · **M-gamepad** (`gp-*`; a
-  controller as one more source of the virtual-button edges: the polled standard-mapping pad
-  and its left stick as the D-pad, pad defaults with LT for Party and RT for the Bag, pad
-  remapping in Controls saved as a `pad` key of the same `mr.controls` record, Xbox-letter pad
+  controller as one more source of the virtual-button edges: every polled pad's buttons, and a
+  standard-mapping pad's left stick as the D-pad, pad defaults with LT for Party and RT for the Bag, pad
+  remapping in Controls saved as a `pad` key of the same `mr.controls` record, Xbox-layout pad
   glyphs on the hint bar and interaction chip by the last-used source, and the router's hold
   edge, so Hold Y clears a READY tactical plan while B keeps its press-time skip; the game's
   `docs/DECISIONS.md` "A hold gesture is a router edge: the top frame lists its hold-capable

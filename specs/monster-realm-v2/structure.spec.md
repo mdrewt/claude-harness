@@ -162,6 +162,7 @@ string.
   - reason: a symbol no production file names
   - surviving check: the compiler, and the suites that still run
   - confirmed at merge: the supervisor, who is not the tester that made the deletion, checks that `mr-prune census` on the PR base lists the symbol under `orphans`, and reads the `moved-tests:` rows of the tests removed with it from `client/src/input/glyphs.test.ts`, `client/src/ui/controlsModel.test.ts`, `client/src/ui/controlsView.test.ts`
+  - M-gamepad's spec judged it a test-reset hook kept on purpose: it resets the `learnKey` state in the `beforeEach`/`afterEach` of three suites, so no test reaches only it. The build confirms that judgement and records `mr-prune keep`, or names the reset that replaces it in the PR body.
 - `client/src/ui/controlsModel.ts` :: "controlsRows"
   - reason: a symbol no production file names
   - surviving check: the compiler, and the suites that still run
