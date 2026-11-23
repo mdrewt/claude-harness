@@ -374,6 +374,28 @@ after: [gp-2]
 - **gp-4.6:** WHEN `pad-menu-flow.spec.ts` presses its first pad button, THE SYSTEM SHALL show the Start chip's keycap as the pad's Menu glyph.
 - DoD: gp-4.1 to gp-4.6 green; `just ci` green (the i18n completeness suite included).
 
+Build note (gp-4): gp-4 contract as built: lastSource becomes 'pad' on a pad PRESS (a poll holding a
+down edge or an accelerator), not on any pad edge — a keydown (not a keyup) sets 'keys', and a pad
+button released after a key press would otherwise flip the keycaps back with no new pad input. An
+ignored press (focus outside #game-screen, a Controls key capture) still flips it; a press discarded
+while the session gate blocks does not (pollPad never reads it). 'keys' is noted in main.ts's
+CAPTURE-phase window keydown listener for every code, so a key a field shields with stopPropagation
+(rename, box search) counts. The spec's Contract line 'set to pad by a pad edge' should read 'by a
+pad press'.
+
+Build note (gp-4): gp-4 adds the pure input/padGlyphs.ts keycapFor(source, keys, pad)(button) beside
+padGlyph (the one place a keycap is chosen) and shell/inputState.ts keeps one padBindings const read
+by both the pad source and keycap. For gp-5: when the pad table becomes live (pad.rebind), make
+padBindings a live 'let' assigned in the same step as pad.rebind, or the keycaps will show the
+defaults; the Controls screen's own keycaps (controlsModel/controlsView) still read the keyboard
+table only.
+
+Build note (gp-4): gp-4 changes what a keycap reads after a pad press: any e2e that presses through
+setPressSource(page,'pad') and then reads a hint-bar keycap or the interaction chip (controls.ts
+readChip / A_KEYCAP / CHOOSE_CHIP, which assume the keyboard A keycap 'Enter') now sees pad glyphs
+('A', 'Menu', 'View', 'D-pad ↑'). At gp-4's HEAD only pad-menu-flow.spec.ts uses the pad source and
+reads none of those; gp-3's pad-battle.spec.ts (unmerged, parallel) should be re-run on top of gp-4.
+
 ### gp-5 — remap the pad in Controls, saved with the keyboard table
 
 type: feature · tier: hard
