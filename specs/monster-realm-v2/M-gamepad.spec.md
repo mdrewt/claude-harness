@@ -444,6 +444,50 @@ after: [gp-4]
 - **gp-5.11:** WHEN Reset all is confirmed, THE SYSTEM SHALL restore both the keyboard table and `PAD_DEFAULT_BINDINGS`, and save both.
 - DoD: gp-5.1 to gp-5.11 green; `remap.spec.ts` still green; `just ci` green.
 
+Build note (gp-5): gp-5.7 as specced traps a pad-only player: while a KEY cell waits every pad press
+is ignored, so a pad-only player who presses A on a keyboard Primary/Alt cell (the cursor opens on
+Up_0, a Key cell) can leave that capture only with a key, the Cancel chip (pointer/Tab+Enter) or a
+pointer click. gp-5 builds the spec rule. A pad exit (e.g. pad B cancels a Key capture, or Key cells
+disabled after pad input) is a spec change.
+
+Build note (gp-5): gp-5 as built: an EMPTY Pad cell (8 of 10 Shortcuts rows by default) has no
+unchanged exit for a pad-only player: the cell shows no button to press again, and every protected
+index (D-pad, A, B, Start) is refused there (the protected holder would lose its pad button), so the
+capture ends only by binding a free or non-protected index, or through Escape / the Cancel chip / a
+pointer. Option for the spec: on a row with no pad index, B's index cancels (that press can never
+succeed there).
+
+Build note (gp-5): gp-5 as built: Clear on a Shortcuts row unbinds the keyboard keys only
+(clearAccel is unchanged; the spec is silent); the row's pad button stays. A pad-only player unbinds
+a pad accelerator only by swapping another index onto it. The 'controls.cleared' line says the row
+'has no key'.
+
+Build note (gp-5): gp-5 as built: every save writes the whole mr.controls record from the tab's
+in-memory tables (saveBindings(storage, keys, pad)), so with two tabs open a keyboard save in one
+drops a pad remap saved in the other (and the reverse); the keyboard-only store already overwrote a
+sibling tab's keyboard save. No storage-event sync.
+
+Build note (gp-5): gp-5 contract as built: capturePad returns PadCaptureOutcome =
+CaptureOutcome<PadBindings, PadIndex, PadTarget> (CaptureOutcome became generic with the keyboard's
+types as defaults); targets name their device as CaptureTarget = SlotTarget | PadTarget ({row, slot:
+'pad'}); the F8/F9 placeholder is ControlsItem {kind: 'noPad', row}; Reset all is
+inputState.resetAllBindings() (one save of both defaults); e2e/controls.ts gains livePadBindings
+beside liveBindings (whose return type stays Bindings). The spec's 'capturePad(...): CaptureOutcome'
+line should name PadCaptureOutcome.
+
+Build note (gp-5): gp-5 as built: a poll whose edge starts a Controls capture (Key or Pad) routes no
+later edge or accelerator of that poll and calls releaseAllInput() (in a finally, so a throwing edge
+still releases); this closes gp-2's same-poll note. A button pressed in that same frame is latched,
+not captured: it must be released and pressed again. While a Pad cell waits, an ignored key is
+preventDefault-ed and noted nav-held (its OS repeats are cancelled), except keys the browser owns
+(isBindableCode false: Tab, F5, F11, F12, modifiers).
+
+Build note (gp-5): Comment drift outside gp-5 touches: client/src/shell/views.ts ~84-85 ('what the
+keydown handler reads to hand a key') and client/src/input/pointerSource.ts ~47 ('waits for a key')
+describe the Controls capture as key-only; a Pad cell capture also uses them. Also bindingStore.ts
+codeList (the keyboard parser) iterates with every(), so a sparse non-JSON array like [,] passes as
+[undefined]; parsePadBindings reads by index. Unreachable through loadBindings (JSON has no holes).
+
 ### gp-6 — hold edges: Hold Y clears a READY plan
 
 type: feature · tier: hard
