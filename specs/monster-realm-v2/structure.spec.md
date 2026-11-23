@@ -143,3 +143,40 @@ after: [st-19, lpw-35, lpw-37]
 
 - **st-20.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
 - DoD: st-20.1 and st-20.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
+
+### st-22 — M-gamepad: twin tests and unreached symbols from the close census
+type: refactor · tier: routine
+touches: client/src/input/bindingStore.test.ts, client/src/input/glyphs.test.ts, client/src/input/glyphs.ts, client/src/ui/controlsModel.test.ts, client/src/ui/controlsModel.ts, client/src/ui/controlsView.test.ts
+after: []
+
+`mr-prune close` listed these rows for `M-gamepad` at `40bc77085557469f0ac0f1c2f97050d1c281571e`.
+Each is a candidate, never a reason to delete (`standards/testing-tdd.md` §Deleting a check
+is legitimate). The run that builds this section reads each pair and each symbol's tests
+first and removes only the rows it confirms. A row it does not confirm stays, with its
+reason in the PR body; a pair kept on purpose is recorded with `mr-prune keep`. A twin's
+candidate is deleted and its survivor stays; a symbol is deleted with the tests that reach
+only it. Each deleted test has a `moved-tests:` row in the PR body. A name below is a JSON
+string.
+
+- `client/src/input/glyphs.ts` :: "resetLearnedKeys"
+  - reason: a symbol no production file names
+  - surviving check: the compiler, and the suites that still run
+  - confirmed at merge: the supervisor, who is not the tester that made the deletion, checks that `mr-prune census` on the PR base lists the symbol under `orphans`, and reads the `moved-tests:` rows of the tests removed with it from `client/src/input/glyphs.test.ts`, `client/src/ui/controlsModel.test.ts`, `client/src/ui/controlsView.test.ts`
+  - M-gamepad's spec judged it a test-reset hook kept on purpose: it resets the `learnKey` state in the `beforeEach`/`afterEach` of three suites, so no test reaches only it. The build confirms that judgement and records `mr-prune keep`, or names the reset that replaces it in the PR body.
+- `client/src/ui/controlsModel.ts` :: "controlsRows"
+  - reason: a symbol no production file names
+  - surviving check: the compiler, and the suites that still run
+  - confirmed at merge: the supervisor, who is not the tester that made the deletion, checks that `mr-prune census` on the PR base lists the symbol under `orphans`, and reads the `moved-tests:` rows of the tests removed with it from `client/src/input/bindingStore.test.ts`, `client/src/ui/controlsModel.test.ts`
+
+Pins: none known. Before the first edit the run looks for tests that read a listed file
+as text, and for `.cargo/mutants.toml` entries and bench budgets that name a removed
+symbol; each is disposed of under `standards/testing-tdd.md` §Behavior-preserving changes.
+A removed symbol can still be named outside `touches:`: by a `use` or a re-export, a bench,
+a test file the census does not read, or another symbol that only tests reach. The
+compiler finds each. A row whose removal needs a file or a symbol not listed here stays,
+with that reason in the PR body.
+
+- **ST22.1:** WHEN the client is type-checked and its vitest suites run THEY SHALL pass.
+
+Confirmed in the diff at merge, not by a criterion: each deleted test has its
+`moved-tests:` row, and the run removed no row it did not confirm.
