@@ -331,6 +331,22 @@ after: [gp-2]
 - **gp-3.1:** WHEN a wild tactical battle starts and the player, using only the mocked pad, selects a unit with LB/RB, opens the command menu with A, drafts a move with the D-pad and A, attacks through Skills, a skill and a target with the D-pad and A, and ends the turn with Start if it is still live, THE SYSTEM SHALL execute that turn on the server and show its events, with no key pressed during the battle (`pad-battle.spec.ts`).
 - DoD: gp-3.1 green alongside `battle-dpad.spec.ts`; `just ci` green.
 
+Build note (gp-3): gp-3 as built: with a one-monster party (one own unit, a pack of one) LB/RB
+'select a unit' is observable only as the cycle's return to idle. pad-battle.spec.ts presses each
+bumper with the Move aim open; the aim closes with no menu, the cursor is on the unit, and the next
+A opens the unit's command menu (an unrouted bumper leaves the aim, so A opens nothing; a bumper
+wired to back re-opens the root menu). Neither a swapped LB/RB direction nor cycling between two own
+units is covered by any e2e. A selected unit's reach band is painted at idle too (tacticsBattle.ts
+overlays), so the band is not a mode signal.
+
+Build note (gp-3): gp-3 reading of 'ends the turn with Start if it is still live':
+moveThenAttackByButtons' [Move, Skill] usually spends the whole budget, so the server ends that turn
+itself. pad-battle.spec.ts then presses pad Start on the NEXT own live turn (no draft, so End Turn)
+and asserts a TurnEnded for the unit, so the pad Start is proven on every run. The starter is seeded
+attack 1 (and HP 999, defense 250) so the wild survives and the battle never finishes before Start
+runs. With one wild, the skill aim opens on its only target, so the target step is A on the default
+aim; the D-pad walks only the menu rows. Retargeting a multi-target skill aim on the pad has no e2e.
+
 ### gp-4 — pad glyphs, chosen by the last-used source
 
 type: feature · tier: routine
