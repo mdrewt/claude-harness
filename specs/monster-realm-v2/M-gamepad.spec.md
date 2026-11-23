@@ -537,6 +537,47 @@ after: [gp-3, gp-5]
 - **gp-6.10:** WHILE the tactical shell does not offer Clear plan, WHEN Y is pressed or held, THE SYSTEM SHALL show no hint and change nothing.
 - DoD: gp-6.1 to gp-6.10 green; the named bare-battle Y rows changed, every other adapter's tests unchanged and green; `just ci` green.
 
+Build note (gp-6): gp-6.9 as built: a wild battle never shows the client a 'wild's turn' to
+pre-queue in — the server runs a wild's AI turn inside the transaction that ends the previous turn
+(game-core tactics/queue.rs: the chain of pre-queued and AI turns runs inside one call), so the
+client sees only Waiting(own unit) or a zero-delay Advancing. pad-battle.spec.ts therefore gives the
+test identity a second monster (a donor identity's starter moved by owner SQL on monster and
+monster_pub) and pre-queues the OTHER own unit while the first one's turn is live (wild window 300
+s); a pack of 1 auto-deploys both, a pack of 2-3 shows the deploy panel. The closer-to-the-words
+alternative — pre-queue during the client's playback of the wild's beats after own unit 1 ends its
+turn — is a few seconds long and was not used. The criterion should read 'pre-queues a plan for a
+unit while another unit's turn is live'.
+
+Build note (gp-6): gp-6 contract as built: besides tick, the router asks the hold input at a RELEASE
+that comes HOLD_MS or more after the press when no tick has seen it yet (a pad release is polled
+before the same frame's tick; a frame hitch delays the tick), so a press held HOLD_MS is always a
+hold, never a tap. A hold-capable press arms only under an uncovered nav-capable screen with an
+adapter (ctx.screen defined). A second source's press while armed is swallowed only while the frame
+still lists the button; otherwise the stale entry is dropped and the press is an ordinary one. tick
+drops any entry (fired or not) its frame stops listing. The spec's Contract line 'tick asks the
+screen once' should add the release-time case.
+
+Build note (gp-6): gp-6 as built: the 'Hold Y to clear the plan' ticker line names Y literally (the
+spec's text); a keyboard player's Y is F by default, so the line reads wrong on keys. A keycap-aware
+line (gp-4's keycapFor for the last-used source, a {button} param in tactics.ticker.holdToClear) is
+a spec change. The hint is also announced at the next tick (once per tick, every tap) and is not
+re-added to the ticker while it is the newest line, so a mashed Y never floods the 50-line battle
+log.
+
+Build note (gp-6): gp-6 as built: a held Y clears the unit selected when the hold fires, not the one
+selected at the press; an RB/LB pressed while Y is held moves the selection first (a deliberate
+chord). A server batch cannot move the selection onto another holdable unit (a READY plan is
+consumed at its unit's TurnStart in the same transaction). A second hold inside the cancel round
+trip would send a second cancel_queue (the server refuses it), as the confirmed Clear plan row
+already can. Y at the bare battle base is now consumed (keyboard F preventDefault-ed) even when
+nothing is holdable, deploy panel included — the spec's named change.
+
+Build note (gp-6): gp-6 as built: client/e2e/pad-battle.spec.ts carries a copy of
+trade-full.spec.ts's setMonsterColumn (the donor-monster transfer) because client/e2e/stdb.ts, its
+natural home, was outside gp-6 touches; the same file's gp-3 test also inlines the key counter and
+the sturdy seeding that gp-6.9's helpers (countKeys, seedSturdy) now name. Moving setMonsterColumn
+into stdb.ts and having both tests call the helpers removes the copies.
+
 ## Risks
 
 - **Browser gamepad quirks.** Chromium and Firefox expose a pad only after its first button press
