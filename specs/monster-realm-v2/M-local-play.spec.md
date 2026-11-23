@@ -281,7 +281,7 @@ a private host then learns official identities.
 - The privacy model (private tables behind owner-scoped views) still keeps one player's data from
   another player's client in every world. It does not keep it from the host, who owns the database.
 - `M21b-3 Steamworks in the shell` (its own PLAN §9 item) builds the Steamworks wiring (overlay,
-  Steam Input) on top of lpw-11's shell; the Steam sign-in is M-account-service's acs-12.
+  Steam Input) on top of lpw-11's shell, against App ID 480 until the game's own app exists; the Steam sign-in is M-account-service's acs-12.
 - The shell's own screens (address form, world list, world settings) are shell UI, not client
   frames; each is navigable with the keys the virtual-button layer maps (arrows, Enter as A,
   Escape as B), and gamepad input reaches them with M-gamepad.
@@ -508,12 +508,16 @@ after: [lpw-8, lpw-3, lpw-6]
 
 type: design · tier: hard
 touches: docs/local-play.md
-after: [lpw-8]
-blocked: operator-steam-machine — lifted when the operator runs the probe below on a Windows machine with the Steam client and records the result in `docs/local-play.md` §2 (the loop has no Steam client); who lifts it: the operator; fallback if the overlay cannot draw: lpw-11 onward waits on a `type: design` slice that re-scores the shells with `docs/local-play.md` §2's evidence (Electron 44, the launcher 44, Tauri 43 without an overlay).
+after: [lpw-8, st-21]
 
-- Probe: Electron 45 with `steamworks.js`, the main process calling `electronEnableSteamOverlay()`, app id 480, the unchanged client bundle loaded from a custom protocol; Shift+Tab opens the overlay over the game window. `after: [lpw-8]` serializes the edits to `docs/local-play.md`, nothing more. The operator leans to Tauri (a smaller download, and a Rust shell), and neither shell's overlay has been measured, so the same session on the same machine also runs a Tauri window (WebView2 on Windows) with the same bundle and app id. An overlay that does not draw over Tauri rules it out at once. If it draws over both, the choice is a `type: design` slice, since a Tauri shell rewrites more than the decision entry: lpw-11's page contract (a preload and `contextBridge`, the Electron window flags, "no IPC channel to the page"), lpw-12's child process, acs-12's hand-off and the desktop e2e's driver; and Tauri renders in WebKit on the Steam Deck, where the suite does not run. That slice is preceded by a second operator probe on a Steam Deck: the overlay, and the client's frame time in one named zone for sixty seconds as a median and a 95th percentile, under each shell.
+- Operator, 2026-11-23. The operator has a Steamworks partner account. Until Valve has verified the operator's identity (about four weeks) and the game's own app exists, every Steam feature in development uses App ID 480 (Spacewar, Valve's app for development): the overlay, Steam Input, lobbies and P2P, achievements and the auth ticket. The operator's machine is the one the loop runs on: its Windows host has the Steam client, Node and a Rust toolchain at the versions the game pins, and WebView2, all reachable from WSL through interop (`powershell.exe`). The operator allows the run to drive it: build both probes in a scratch directory on the Windows filesystem (under `C:\dev\`, never a `\\wsl$` path), launch them, send Shift+Tab and take screenshots, which the run reads. Each probe directory holds a `steam_appid.txt` of `480`. If the Steamworks SDK is needed, the operator places it outside the repository and names the path in `STEAMWORKS_SDK`. The repository is public and the SDK's licence forbids redistributing it, so no part of it is committed, copied into a branch or put in a PR.
+- The client bundle is the one built from `master` once the client platform refactor has merged (operator, 2026-11-23): `after:` holds `st-21`, its design, and the supervisor's PR that sections st-21's plan adds the id of the plan's last extraction here. The bundle loads unchanged from a custom protocol in both shells.
+- Probe: Electron 45 with `steamworks.js`, the main process calling `electronEnableSteamOverlay()`, app id 480; Shift+Tab opens the overlay over the game window. `lpw-8` in `after:` serializes the edits to `docs/local-play.md`, nothing more. The operator leans to Tauri (a smaller download, and a Rust shell), and neither shell's overlay has been measured, so the same session on the same machine also runs a Tauri window (WebView2 on Windows) with the same bundle and app id, its Steamworks binding initialised in the Rust process.
+- Debugging allowance (operator, 2026-11-23). A shell is not ruled out the first time its overlay fails to draw. When it fails, the run works through that shell's alternatives: the GPU flags (`--in-process-gpu`, `--disable-direct-composition`, `--disable-gpu-sandbox`, hardware acceleration off and on; for Tauri, the same through WebView2's `additionalBrowserArgs`), an opaque and a transparent window, initialising Steam before the window is created, the repaint-every-frame and other overlay requirements the binding documents, and anything else its own research finds. It spends about two to three hours of wall-clock time per shell on this. A shell whose overlay draws at the first try needs none of it. A shell is ruled out only when its alternatives are used up, and every attempt is recorded with its result.
+- The loop may not be able to drive the host: interop may be refused, Steam may not be signed in, or the overlay may ignore synthesized input or be missing from a screenshot. In any of those cases the run stops before ruling anything out. It leaves the probes and a script that runs them on the Windows host, and parks with `blocked: operator-steam-machine`. That block lifts when the operator runs the script and records what was seen in `docs/local-play.md` §2.
+- If the overlay draws over both shells, the choice is a `type: design` slice that compares them like for like: the same client bundle, machine and app id, with the same checks under each shell. It measures performance (start to first frame; the client's frame time in one named zone for sixty seconds as a median and a 95th percentile; memory), download and installed size, portability, functionality (the client's flows, and the overlay, Steam Input and the auth ticket under 480) and visuals (the same frames captured under each shell). For portability it covers Windows and the Steam Deck: Tauri renders in WebKit on the Deck, where the suite does not run, so a second operator probe on a Steam Deck comes before that slice. Choosing Tauri rewrites more than the decision entry: lpw-11's page contract (a preload and `contextBridge`, the Electron window flags, "no IPC channel to the page"), lpw-12's child process, acs-12's hand-off and the desktop e2e's driver. If the overlay draws over neither, lpw-11 onward waits on a `type: design` slice that re-scores the shells with `docs/local-play.md` §2's evidence (Electron 44, the launcher 44, Tauri 43 without an overlay).
 
-- **lpw-10.1:** WHEN the probe runs under the Steam client on Windows, THE SYSTEM SHALL record in `docs/local-play.md` §2 whether the overlay draws over the game window, with and without GPU flags, for the Electron window and for the Tauri window, with the versions of each shell and of its Steamworks binding.
+- **lpw-10.1:** WHEN the probe runs under the Steam client on Windows, THE SYSTEM SHALL record in `docs/local-play.md` §2 whether the overlay draws over the game window, for the Electron window and for the Tauri window, with the versions of each shell and of its Steamworks binding, the app id, and each debugging attempt made with its result.
 - DoD: the record; a `docs/DECISIONS.md` amendment to "The desktop shell is Electron" either way.
 
 ### lpw-11 — the desktop shell joins a world by address
@@ -521,7 +525,6 @@ blocked: operator-steam-machine — lifted when the operator runs the probe belo
 type: feature · tier: hard
 touches: desktop/package.json, desktop/package-lock.json, desktop/tsconfig.json, desktop/vitest.config.ts, desktop/playwright.config.ts, desktop/src/main.ts, desktop/src/preload.ts, desktop/src/worldEntry.ts, desktop/src/worldEntry.test.ts, desktop/src/window.ts, desktop/src/window.test.ts, desktop/src/appProtocol.ts, desktop/src/appProtocol.test.ts, desktop/src/launcher/addressForm.ts, desktop/src/launcher/addressForm.test.ts, desktop/e2e/shell.spec.ts, justfile, .github/workflows/ci.yml, biome.json, .gitignore
 after: [lpw-10, lpw-2, lpw-3]
-blocked: operator-steam-machine — transitively, through lpw-10 (the shell is built only once the overlay is proved); fallback: as lpw-10.
 
 - Not licence-dependent: the shell hosts the unchanged web client and joins a server someone else runs.
 - Contract: a new `desktop/` package (Electron main + preload). `worldEntry.ts` turns a stored or typed entry into the shell document, validating it with the client's own `resolveConnectionConfig` (imported from `client/src/net/connectionConfig.ts`, never copied). `appProtocol.ts` registers the app's scheme as standard and secure (so `localStorage` persists) and serves `client/dist`. The preload exposes the document with `contextBridge.exposeInMainWorld('__MR_SHELL_CONFIG__', doc)` and nothing else. `justfile` gains `desktop-test` and `desktop-e2e`; `ci.yml` runs them.
@@ -575,7 +578,7 @@ blocked: licence — lifted when the operator records negotiated terms (or that 
 type: feature · tier: hard
 touches: desktop/src/worlds.ts, desktop/src/worlds.test.ts, desktop/src/publish.ts, desktop/src/publish.test.ts, desktop/src/launcher/worldList.ts, desktop/src/launcher/worldList.test.ts, desktop/src/main.ts, desktop/e2e/worlds.spec.ts
 after: [lpw-12, lpw-4, lpw-9]
-blocked: licence — as lpw-12, and transitively operator-steam-machine; fallback: as lpw-12.
+blocked: licence — as lpw-12; fallback: as lpw-12.
 
 - Residuals: R-sr-4b-NOTE505D57 (the shell's publish path).
 - Decisions: `decision-defaulted:world-owner-credential=shell-held-never-in-page`, `decision-defaulted:world-upgrade-backup=copy-before-publish`, `decision-defaulted:publish-reseed=owner-sync-after-every-publish`.
@@ -599,7 +602,7 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 type: feature · tier: hard
 touches: desktop/src/worldCert.ts, desktop/src/worldCert.test.ts, desktop/src/tlsPin.ts, desktop/src/tlsPin.test.ts, desktop/src/hostGate.ts, desktop/src/hostGate.test.ts, desktop/src/worlds.ts, desktop/src/worlds.test.ts, desktop/src/launcher/addressForm.ts, desktop/src/launcher/addressForm.test.ts, desktop/src/main.ts, desktop/e2e/tls.spec.ts, client/src/net/shellDocument.ts, client/src/net/shellDocument.test.ts, client/src/net/connectionConfig.ts, client/src/net/connectionConfig.test.ts, client/src/net/authToken.ts, client/src/net/authToken.test.ts
 after: [lpw-13]
-blocked: licence — as lpw-12, and transitively operator-steam-machine; fallback: as lpw-12.
+blocked: licence — as lpw-12; fallback: as lpw-12.
 
 - Decision: the operator's transport rule (monster-realm#821, 2026-11-16; game `docs/DECISIONS.md` "Private servers carry their own encryption…").
 - Contract: `worldCert.ts` makes one key pair and self-signed certificate per world, kept in the world's directory (readable by the user alone, kept across restarts and upgrades, in the world's backup copy so a restore keeps every friend's pin). The fingerprint is the SHA-256 of the certificate's public key (SPKI), printed in a form the invite and the address form share. Beyond loopback the gate ends TLS with that certificate and forwards to the host on loopback; it also serves the client's built page and a shell document naming itself, so a browser joiner loads the page and its `wss:` from one origin. The shell document gains an optional `connection.fingerprint`; the shell pins it for every connection its window makes (`tlsPin.ts`, through Electron's session certificate check). The client's reconnect key for a target with a fingerprint is `(fingerprint, db)`; without one it stays `(uri, db)` (the `storageKey` derivation, one function in `authToken.ts`).
@@ -625,7 +628,7 @@ blocked: licence — as lpw-12, and transitively operator-steam-machine; fallbac
 type: feature · tier: hard
 touches: desktop/src/openToFriends.ts, desktop/src/openToFriends.test.ts, desktop/src/hostGate.ts, desktop/src/hostGate.test.ts, desktop/src/launcher/worldSettings.ts, desktop/src/launcher/worldSettings.test.ts, desktop/src/main.ts, desktop/e2e/friends.spec.ts
 after: [lpw-18, lpw-9]
-blocked: licence — as lpw-12, and transitively operator-steam-machine; fallback: as lpw-12.
+blocked: licence — as lpw-12; fallback: as lpw-12.
 
 - Residuals: R-lpg-0-ISSUERFETCH (friends half).
 - Decisions: `decision-defaulted:invite-link=copyable-text-no-url-handler`, `decision-defaulted:world-access-default=open-until-opened-to-friends`.
@@ -740,7 +743,7 @@ blocked: licence — transitively, through lpw-14; and account-service, transiti
 type: feature · tier: hard
 touches: desktop/src/serverCli.ts, desktop/src/serverCli.test.ts, desktop/src/acme.ts, desktop/src/acme.test.ts, desktop/e2e/acme.spec.ts, desktop/package.json, docs/hosting.md
 after: [lpw-14]
-blocked: licence — as lpw-12, and transitively operator-steam-machine; fallback: a host installs SpacetimeDB themselves and follows `docs/hosting.md` to publish the module and run the gate.
+blocked: licence — as lpw-12; fallback: a host installs SpacetimeDB themselves and follows `docs/hosting.md` to publish the module and run the gate.
 
 - Residuals: R-lpg-0-ISSUERFETCH (standalone half), R-sr-4b-NOTE505D57 (the package's publish path).
 - Contract: a headless command built from the same `worlds.ts`, `publish.ts`, `host.ts` and `hostGate.ts` as the shell, distributed outside the Steam store; `docs/hosting.md` is the host's guide (install, access rule, backup without the owner token, upgrade, and the three ways to serve TLS: a domain name the command certifies itself, the host's own certificate or reverse proxy, or the world's self-signed certificate and its fingerprint). `acme.ts` obtains and renews a certificate over ACME (HTTP-01 on port 80, or TLS-ALPN-01 on 443); its tests run against Pebble, the ACME test server, never a public CA.

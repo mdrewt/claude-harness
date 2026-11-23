@@ -49,8 +49,11 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    early-access shape — sign-in off and a kept identity for local and private worlds, protocol
    numbers and unattended upgrade, the solo-completeness audit, the access design and the host's
    open or password rule, then the desktop shell, worlds, opening a world to friends and the
-   standalone server package. lpw-1 to lpw-9 build first; the overlay proof and the shell are
-   `blocked:operator-steam-machine`, and the packaging slices `blocked:licence` (operator);
+   standalone server package. lpw-1 to lpw-9 build first. The overlay proof (lpw-10) waits on the client platform refactor
+   (`structure.spec.md` st-21 and the extractions its plan lists; operator, 2026-11-23). It then
+   runs against Steam's development App ID 480 on the operator's Windows host, which the loop may
+   drive (it parks `blocked:operator-steam-machine` only if it cannot). The packaging slices are
+   `blocked:licence` (operator);
    the world binding (lpw-15, every player binds) builds on item 2's attestation route. lpw-25 to
    lpw-33 come from the operator's review of the recorded decisions (2026-11-22): the
    wire-contract check (lpw-25), the idle-tick design (lpw-26), tactical content's home (lpw-27),
@@ -73,9 +76,11 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    `auth.monster-realm.spookyowltech.com` (acs-5 `blocked:operator-dev-host`), the module's trusted
    issuers per build and its ownership rule in `join_game`, and the client's sign-in screen.
    **Phase 2 (acs-8 to acs-12):** Steam ticket and Steam OpenID sign-in, the `CheckAppOwnership`
-   rule, production deployment and the shell's Steam sign-in, `blocked:operator-steamworks` until
-   the operator supplies the Steam app id and publisher key (planned about two months before early
-   access). **Early access is gated on it** (every world's players bind through its attestation).
+   rule, production deployment and the shell's Steam sign-in. acs-8, acs-9, acs-10 and acs-12 build
+   now against App ID 480 in the dev profiles (operator, 2026-11-23: the Steamworks account exists,
+   and Valve's identity check takes about four weeks), with acs-12 following the shell (lpw-11).
+   Only acs-11, production, is `blocked:operator-steamworks` until the operator supplies the game's
+   own app id and publisher key. **Early access is gated on it** (every world's players bind through its attestation).
 3. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S2 changes a frozen schema and waits for the
    operator's ratification at the harness-revision Checkpoint 2, which lifts this block. S1 as
@@ -91,18 +96,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    (gp-5), and the router's hold edge with the tactical battle's Hold Y clear (gp-6; Hold B keeps
    the shipped press-time skip). **Must land before launch** (operator, 2026-10-01). Ordered after
    the tactical battle UI (M-battle-tactics, built) — operator-CONFIRMED (#583 D4, 2026-10-24).
-5. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — `blocked:early-access-release`
-   (operator, 2026-11-23: deferred until after early access, with M18). Its friend requests and
-   chat show players through the tag helpers M-identity-handles built (`formatTag` and
-   `taggedName` in the game's `client/src/ui/playerTag.ts`); the player's own tag on the Profile
-   screen moved out of it into M-local-play `lpw-40` (operator, 2026-11-23). Ordered AHEAD of M18 —
-   operator-CONFIRMED (#588 D4, 2026-10-24). M23's social a11y retrofit scope un-defers with it.
-6. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — `blocked:early-access-release`
-   (operator, 2026-11-23: deferred until after early access, with M19). The playtest-3
-   read did NOT confirm it as next content; its 1v1 "additive resolve_coop_turn" premise dies
-   with the tactical overhaul. Re-sketch on the tactical engine (M-battle-tactics P2 is built; tactical sides natively support
-   allies).
-7. **M-battle-tactics depth** (unspecced) — `blocked:playtest-4-read`: the operator-deferred tactical
+5. **M-battle-tactics depth** (unspecced) — `blocked:playtest-4-read`: the operator-deferred tactical
    features, specced after the Playtest-4 read. Obstacles/cover blocking movement and ranged/AoE
    (pt3-2026-10-138; the `blocks_los` tile column and LoS(blockers) signature are already in place),
    tile elevation with attack bonuses (-139; `elevation` column, default 0), line/cone AoE (-141;
@@ -112,19 +106,44 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    `M-battle-tactics-design.md`. Hold Y cancel is M-gamepad gp-6; a distinct tap-vs-hold B (a tap
    undoes during playback, only a hold skips) comes here (M-gamepad keeps the shipped press-time
    skip).
-8. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
+6. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
    row a pt3 milestone absorbs is marked in its spec.
-9. **M21b-3 Steamworks in the shell** — the Steamworks wiring (overlay enable, Steam Input onto
-   the virtual buttons) in M-local-play's desktop shell (`lpw-11`); unspecced, elaborated once
-   `lpw-10` proves the overlay. The Steam sign-in moved to M-account-service (acs-12).
-10. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
+7. **M21b-3 Steamworks in the shell** — the Steamworks wiring (overlay enable, Steam Input onto
+   the virtual buttons) in M-local-play's desktop shell (`lpw-11`), against App ID 480 until the
+   game's own app exists; unspecced, elaborated once `lpw-10` proves the overlay. The Steam sign-in
+   moved to M-account-service (acs-12).
+8. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
    (`standards/spec-driven.md` §Refactor slices). The supervisor's structural share schedules it
    ahead of this position; when no earlier item has a launchable slice, its slices launch in
    file order. Its `type: design` slices decide internal-design questions; those are not operator
    decisions. An empty file is a finished item once no plan file under the game's
    `docs/refactors/` lists an extraction still to make. With no section open and a plan file
    listing extractions, the tick's action is to section the next three.
-11. **M-modding** (`M-modding.spec.md`, sketch) — `blocked:early-access-release`: host-moddable
+9. **⛩ Closed beta** (operator, 2026-11-23) — `blocked:operator-closed-beta`: an operator release
+   step, not a milestone. It has no spec, nothing in it launches, and no spec is authored for it. It
+   relies on every item above it: M-local-play, M-account-service (acs-11 gives it the game's own
+   Steam app), M25, M-gamepad, M-battle-tactics depth, the residual fill-work, M21b-3 and the
+   structural work. Invited players play the Steam build on the game's own app. The block lifts
+   when the operator records the closed beta as shipped; that is also the lifting event for
+   M-steam-features's `blocked:closed-beta-release`.
+10. **M-steam-features** (`M-steam-features.spec.md`, sketch, 2026-11-23) —
+   `blocked:closed-beta-release`. Steam lobbies and invites, P2P networking over Steam's relay, and
+   achievements, in the desktop shell (operator, 2026-11-23: after the closed beta, before early
+   access). Elaborated via `milestone-loop-prompt.md` once the closed beta has shipped. Its P2P
+   question (can a Steam relay carry the client's SpacetimeDB connection?) opens with a
+   `type: design` slice. **Early access is gated on it.**
+11. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — `blocked:early-access-release`
+   (operator, 2026-11-23: deferred until after early access, with M18). Its friend requests and
+   chat show players through the tag helpers M-identity-handles built (`formatTag` and
+   `taggedName` in the game's `client/src/ui/playerTag.ts`); the player's own tag on the Profile
+   screen moved out of it into M-local-play `lpw-40` (operator, 2026-11-23). Ordered AHEAD of M18 —
+   operator-CONFIRMED (#588 D4, 2026-10-24). M23's social a11y retrofit scope un-defers with it.
+12. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — `blocked:early-access-release`
+   (operator, 2026-11-23: deferred until after early access, with M19). The playtest-3
+   read did NOT confirm it as next content; its 1v1 "additive resolve_coop_turn" premise dies
+   with the tactical overhaul. Re-sketch on the tactical engine (M-battle-tactics P2 is built; tactical sides natively support
+   allies).
+13. **M-modding** (`M-modding.spec.md`, sketch) — `blocked:early-access-release`: host-moddable
    private worlds, part of the official release. Until it opens, its standing constraint binds
    every slice: content is loaded data, one seam per kind of extension, no content id named in
    rules or views.
@@ -135,11 +154,17 @@ ONE gate after every coverage milestone closes. No interim playtest.
 
 ## Gates and constraints (live)
 
-- **Release order** (operator, 2026-11-12; `game-design.md` §14): early access = the Steam build
+- **Release order** (operator, 2026-11-12; `game-design.md` §14; the closed beta added 2026-11-23):
+  a closed beta (invited players, on the game's own Steam app) → early access = the Steam build
   with single-player worlds and friends hosting → the official server opens → official release adds
-  modding. **Early access** is gated on M-local-play, on M-account-service (every player must own the
-  game on Steam, operator 2026-11-16) and on M-gamepad (operator, 2026-10-01; "before early
-  access" confirmed 2026-11-13).
+  modding. The closed beta (operator, 2026-11-23) comes after §9's structural work and relies on every
+  §9 item before it. M-steam-features (`blocked:closed-beta-release`, lifted when the operator
+  records the closed beta as shipped) builds between the closed beta and early access. M19 and
+  M18 rely on early access (`blocked:early-access-release`) and come after the closed beta and
+  before modding. **Early access** is gated on M-local-play, on
+  M-account-service (every player must own the game on Steam, operator 2026-11-16), on M-gamepad
+  (operator, 2026-10-01; "before early access" confirmed 2026-11-13) and on M-steam-features
+  (operator, 2026-11-23).
   The second schema consolidation (`lpw-33`) is part of that gate: it is unblocked and elaborated
   when every schema-changing slice of those three milestones has merged.
   **Opening the official server** is gated on M25 completion (human sign-off checklist,
