@@ -86,11 +86,11 @@ the attestation never learn which method signed a player in.
 - **App ID 480** (operator, 2026-11-23) is Valve's development app. Any Steam account can run it,
   so a ticket made with `GetAuthTicketForWebApi` under 480 and Steam's OpenID sign-in exercise the
   real Steam steps, but nothing under 480 can say whether a player owns our game. Its achievements,
-  stats and lobbies are Spacewar's and shared with every developer who uses it. Whether
-  `AuthenticateUserTicket` accepts an ordinary (non-publisher) Web API key for app 480 is
-  unconfirmed. acs-8 checks it against Valve's current documentation and records the answer in
-  `docs/account-service.md`. If it does not, the live ticket check waits for acs-11 and the stub
-  stays the gate.
+  stats and lobbies are Spacewar's and shared with every developer who uses it. The operator
+  registered an ordinary Web API key on 2026-11-23 (domain `localhost`). Steam's
+  `ISteamWebAPIUtil/GetSupportedAPIList` for that key lists `ISteamUserAuth/AuthenticateUserTicket`
+  v1 and not `CheckAppOwnership`, so a dev profile can check a real ticket under 480 but can never
+  check ownership. acs-8 records the live result in `docs/account-service.md`.
 
 ## Named deferrals (declared, not dropped)
 
@@ -149,7 +149,9 @@ the attestation never learn which method signed a player in.
   operator 2026-11-23) the dev profiles (`local-dev`, `hosted-dev`) may take
   `MR_STEAM_APP_ID`, and accept only `480`, so a dev deployment can never act for the game's own
   app. They may also take `MR_STEAM_WEB_API_KEY`, the operator's ordinary Web API key, which is
-  optional and is used only for a live ticket check. They never take `MR_STEAM_PUBLISHER_KEY`,
+  optional and is used only for a live ticket check. On the operator's machine it lives in
+  `~/.config/monster-realm/steam-dev.env` (mode 600, outside every repository, with
+  `MR_STEAM_APP_ID=480`), and a run sources that file and never prints it, copies it or commits it. They never take `MR_STEAM_PUBLISHER_KEY`,
   which stays production's alone. With 480 set, a dev profile offers the Steam sign-ins beside the
   password form. A Steam player's entitlement there is the admin flag
   (`set-entitlement steam:<steamid64> entitled`), and an account with no flag is not entitled:
@@ -167,8 +169,8 @@ the attestation never learn which method signed a player in.
   access).** The service needs the game's Steam app id and a publisher Web API key; the shell needs
   the app id. Status, 2026-11-23: the operator's Steamworks partner account exists and Valve is
   verifying the operator's identity (about four weeks), so App ID 480 stands in for development
-  (`decision-defaulted:steam-dev`). An ordinary Web API key for the dev profiles' live ticket check
-  is optional, and only the operator can register it. Lifting event for `blocked:operator-steamworks`: the operator records the app id in
+  (`decision-defaulted:steam-dev`). The ordinary Web API key for the dev profiles' live ticket check
+  was registered on 2026-11-23 (see `decision-defaulted:steam-dev` for where it lives). Lifting event for `blocked:operator-steamworks`: the operator records the app id in
   `docs/account-service.md` and stores the publisher key in the production deployment's secret
   store.
 - **Production host and issuer domain (operator-owned, with the Steam inputs).** Where production
@@ -344,7 +346,7 @@ after: [acs-3]
 - **acs-8.5:** WHEN a dev profile is configured with `MR_STEAM_APP_ID` other than `480`, or with `MR_STEAM_PUBLISHER_KEY`, THE SYSTEM SHALL refuse to start, naming the setting and never its value; with `480` and with or without `MR_STEAM_WEB_API_KEY`, it SHALL start and offer the Steam sign-ins beside the password form.
 
 - **acs-8.6:** WHEN a dev profile decides a Steam player's entitlement, THE SYSTEM SHALL read only the admin flag on `steam:<steamid64>` (an account with none is not entitled) and SHALL never call `checkAppOwnership`; `production` SHALL call it and never read a dev flag.
-- DoD: acs-8.1 to acs-8.6 green; `just ci` green; a live `AuthenticateUserTicket` run under 480 recorded in `docs/account-service.md` when the operator's ordinary key is in the local env, or the PR naming why it was not run.
+- DoD: acs-8.1 to acs-8.6 green; `just ci` green; a live `AuthenticateUserTicket` run under 480, with the key from `~/.config/monster-realm/steam-dev.env` and a ticket from the Steam client on the operator's Windows host, recorded in `docs/account-service.md`; if the loop cannot get a ticket, the PR says why.
 
 ### acs-9 — the desktop sign-in: a Steam ticket for an ID token
 

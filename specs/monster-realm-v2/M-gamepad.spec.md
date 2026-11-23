@@ -82,8 +82,8 @@ menu flow, one tactical battle turn, the pad remap flow, the Hold-Y clear).
 |---|---|
 | Per-vendor glyphs (PlayStation shapes, Nintendo letters and its swapped A/B) | backlog [ux-a11y/LOW] — `decision-defaulted:pad-glyphs=xbox-letters`; the glyph table is one module, so a vendor family is one more table keyed by `Gamepad.id` |
 | Rumble and haptics | wontfix (not requested; revisit only on operator request) |
-| Steam Input | M21b-3 (PLAN §9 item 9): it maps onto the same virtual buttons in the desktop shell |
-| A distinct tap-vs-hold B in the tactical battle (tap undoes during playback, only a hold skips; §9.3's pre-queue during playback) | M-battle-tactics depth (PLAN §9 item 7, after the Playtest-4 read) — see Decisions; gp-6's router already delivers a listed button's tap at its release, so it is listing B, not a router change |
+| Steam Input | M21b-3 (PLAN §9 item 7): it maps onto the same virtual buttons in the desktop shell |
+| A distinct tap-vs-hold B in the tactical battle (tap undoes during playback, only a hold skips; §9.3's pre-queue during playback) | M-battle-tactics depth (PLAN §9 item 5, after the Playtest-4 read) — see Decisions; gp-6's router already delivers a listed button's tap at its release, so it is listing B, not a router change |
 | A fill ring on a held Y | backlog [ux-a11y/LOW]; the confirmed Clear plan row stays the non-hold path |
 | Right-stick input and analog walk speed | wontfix for this milestone (the world is tile-based; no camera); walk speed stays residual R-ctl-RUN |
 | Typing with a pad (the rename `textEntry` frames) | M21b-3 (Steam Input's on-screen keyboard in the shell); in the browser a keyboard is needed to type |

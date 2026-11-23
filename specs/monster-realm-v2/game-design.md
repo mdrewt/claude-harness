@@ -330,7 +330,8 @@ in every world, not only in single-player ones.
   (content loading, rule hooks, client asset and text lookup) stay single and explicit.
 
 **Release order.**
-1. *Closed beta* (operator, 2026-11-23): invited players, on the game's own Steam app. Steam lobbies,
+1. *Closed beta* (operator, 2026-11-23): invited players, on the game's own Steam app, once every
+   roadmap item before it is done (PLAN §9 item 9). Steam lobbies,
    P2P networking and achievements follow it (`M-steam-features`).
 2. *Early access:* the Steam build with single-player worlds and friends hosting.
 3. *The official server* opens after that.
