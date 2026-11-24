@@ -180,3 +180,11 @@ with that reason in the PR body.
 
 Confirmed in the diff at merge, not by a criterion: each deleted test has its
 `moved-tests:` row, and the run removed no row it did not confirm.
+
+Build note (st-22): structure.spec.md st-22 asks for 'mr-prune keep' on the resetLearnedKeys orphan,
+but mr-prune keep records twin pairs only: 'mr-prune keep --file client/src/input/glyphs.ts --test
+resetLearnedKeys' returns PRUNE-KEEP-FAIL missing. The kept orphan therefore stays in every census;
+a census-row keep for orphans (or the spec wording) needs a decision. Also: controlsModel.test.ts
+'lists the two tabs, the twelve button rows...' lines that compare controlsRows(...) with
+VBUTTONS.map/ACCELS.map now compare the file-local enumerator with its own definition (the deleted
+export was their only subject); a test-health slice may drop those two expectations.
