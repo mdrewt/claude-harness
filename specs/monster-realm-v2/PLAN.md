@@ -62,9 +62,10 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    (operator, 2026-11-22), alone, and resumes next from the operator's dependency commit on
    `slice/lpw-34` (Node 24.22.3, SDK 2.16.1 installed ahead of the npm cooldown with the operator's
    approval, 2026-11-23); lpw-23 to lpw-27, lpw-32 and lpw-35 to lpw-37 wait on it; lpw-35 then designs account checks made
-   by the world's server (the operator allows the crate's `unstable` feature for procedures) before
-   lpw-24 builds the client's part. lpw-36 and lpw-37 close the two ownership gaps (every reducer checks; a build that names no
-   feature enforces). lpw-40 shows the player their own tag on Profile (pulled from M19, operator
+   by the world's server (the operator allows the crate's `unstable` feature for procedures; design B,
+   monster-realm#874). lpw-41 (procedures on the native test host), acs-14 (the service's routes),
+   lpw-23, lpw-42 and lpw-43 (the module) and lpw-24 (the client) build it in that order. lpw-36 and lpw-37 close the two ownership
+   gaps (every reducer checks; a build that names no feature enforces). lpw-40 shows the player their own tag on Profile (pulled from M19, operator
    2026-11-23). The decision log's trim is `structure.spec.md`'s `type: docs` sections
    (st-14 to st-20). Groundwork built (§Built). **Early access is
    gated on it.**

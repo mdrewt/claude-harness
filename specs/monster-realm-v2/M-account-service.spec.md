@@ -290,7 +290,7 @@ blocked: operator-dev-host — lifted when the operator points `auth.monster-rea
 - **acs-5.1:** WHEN the hosted instance is deployed, THE SYSTEM SHALL serve discovery and keys at `https://auth.monster-realm.spookyowltech.com` under a publicly trusted certificate, and the runbook SHALL record the check.
 
 - **acs-5.2:** WHEN a dev build of the client and module, run on another machine, signs in an entitled and a not-entitled tester account against the hosted instance, THE SYSTEM SHALL let only the entitled one join, recorded in the runbook.
-- Testers use private worlds on dev builds only with acs-13's build (operator, 2026-11-22, monster-realm#849).
+- Testers use private worlds on dev builds only where the build names the hosted-dev account service for worlds (lpw-23; operator, 2026-11-22, monster-realm#849). lpw-23 ends the forgeable local-dev attestation key (R-acs-3-DEVKEY-FORGEABLE), so acs-13 was dropped by lpw-35's design.
 - DoD: acs-5.1 and acs-5.2 recorded; `just ci` green.
 
 ### acs-6 — the module trusts issuers by build and admits only entitled players
@@ -401,7 +401,7 @@ type: feature · tier: hard
 touches: desktop/src/steamTicket.ts, desktop/src/steamTicket.test.ts, desktop/src/preload.ts, desktop/src/main.ts, desktop/package.json, desktop/package-lock.json, client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/main.ts
 after: [lpw-11, acs-7, acs-9]
 - Built against App ID 480 (operator, 2026-11-23): a dev build's shell runs as app 480 and exchanges its ticket at a dev profile with Steam enabled (acs-8). The app id comes from the shell's build configuration and is never named in the page or the client bundle; a release build takes the game's id at acs-11. It follows M-local-play's shell (lpw-11, after lpw-10's overlay probe). If lpw-10's decision picks Tauri, that design slice rewrites this hand-off for the shell's Rust process.
-- Contract: the shell's main process gets a ticket with its Steamworks binding's `getAuthTicketForWebApi("monster-realm-account")` (`steamworks.js` for Electron, the version pinned against the shell's Electron), exchanges it at acs-9's grant, and hands the page an ID token through the preload hook as one more `ConnectCredential` source; the page never sees the ticket. The same source serves lpw-15's attestation request in the shell.
+- Contract: the shell's main process gets a ticket with its Steamworks binding's `getAuthTicketForWebApi("monster-realm-account")` (`steamworks.js` for Electron, the version pinned against the shell's Electron), exchanges it at acs-9's grant, and hands the page an ID token through the preload hook as one more `ConnectCredential` source; the page never sees the ticket. The shell sends the same ID token to `POST /ticket` (acs-14) for each world it joins.
 
 - **acs-12.1:** WHEN the shell starts toward an `official` target with Steam running, THE SYSTEM SHALL sign the player in with no prompt and connect with the issued token (the desktop e2e against the stub; one live run as app 480 on the operator's Windows host is recorded in `docs/account-service.md` when the loop can drive it, per lpw-10).
 
@@ -410,22 +410,46 @@ after: [lpw-11, acs-7, acs-9]
 - **acs-12.3:** WHEN a token nears expiry, THE SYSTEM SHALL exchange a fresh ticket before it expires.
 - DoD: acs-12.1 to acs-12.3 green; `just desktop-test` and `just ci` green.
 
-### acs-13 — a dev build for other machines holds the hosted-dev attestation key alone
+### acs-14 — the account service issues world tickets and answers a world's check
 
 type: feature · tier: hard
-touches: server-module/Cargo.toml, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, docs/local-play.md, docs/account-service.md
-after: [acs-5, lpw-15]
-- Decision: operator, 2026-11-22, monster-realm#849 (accepted the recommendation). The local-dev attestation key is derivable from the public repository, so a build that accepts it stops nobody in a private world. Closes R-acs-3-DEVKEY-FORGEABLE.
-- Contract: one more build feature, for dev builds that testers reach from other machines: it trusts the hosted-dev login issuer and accepts only the attestation key acs-5 publishes, never the local-dev key; local development keeps today's dev build and the public key. A binding made under a key the build does not hold counts for nothing (lpw-15 records each binding's key). A release feature still wins over it, as over every dev feature.
+touches: account-service/src/worldTicket.ts, account-service/src/worldTicket.test.ts, account-service/src/worldHandle.ts, account-service/src/worldHandle.test.ts, account-service/src/attest.ts, account-service/src/server.ts, account-service/src/server.test.ts, account-service/src/provider.ts, account-service/src/provider.test.ts, account-service/src/config.ts, account-service/src/config.test.ts, account-service/src/keys.ts, account-service/src/keys.test.ts, account-service/src/rateLimit.ts, account-service/src/rateLimit.test.ts, account-service/src/store/sqliteAdapter.ts, account-service/src/store/sqliteAdapter.test.ts, account-service/src/deployment.test.ts, account-service/package.json, account-service/package-lock.json, ops/auth/Caddyfile, ops/auth/README.md, docs/account-service.md, docs/runbooks/account-service.md
+after: [acs-3]
+- Residuals: R-lpw-35-NOTEEB32F8.
+- Design SSOT: the game's `docs/refactors/account-checks.md` §5.2 (lpw-35's design B, monster-realm#874). It supersedes acs-3; `POST /attest` stays until acs-15.
+- Contract: `POST /ticket` takes a bearer ID token and `{world}` and answers a one-use ticket of 32 random bytes in base64url, kept for 60 s under its SHA-256. `POST /world/check` takes no token and accepts `{ticket, names, world}` or `{handle, world}`. The handle is the account and the world's database identity under deterministic authenticated encryption with a key id in front; retired keys still decrypt. The service keeps no table of which account joined which world. `address` in an answer is the request's source address under the trusted-proxy rule (acs-1's note n3). One IPv4-only and one IPv6-only name are part of the deployment recipe (operator-hosted; the runbook states the records, and no live name is needed here). Fork (f)'s code redemption is built with its own routes (R-lpw-19-BUILD) and issues a ticket through this slice's one issuing function.
 
-- **acs-13.1:** WHEN the hosted-dev build verifies an attestation signed with the local-dev key, THE SYSTEM SHALL refuse it with no write.
+- **acs-14.1:** WHEN a valid ID token asks for a ticket, THE SYSTEM SHALL issue one, whether or not the account is entitled; WHEN the token is missing, expired or from another issuer, THE SYSTEM SHALL issue none.
 
-- **acs-13.2:** WHEN the hosted-dev build verifies an attestation signed with the hosted-dev key that passes lpw-15.1's checks, THE SYSTEM SHALL record the binding.
+- **acs-14.2:** WHEN a ticket whose world is among `names` is presented, THE SYSTEM SHALL spend it and answer `handle`, `entitled`, `address` and the `name` it was issued for.
 
-- **acs-13.3:** WHEN an identity bound under the local-dev key calls `join_game` on the hosted-dev build, THE SYSTEM SHALL refuse it as unbound.
+- **acs-14.3:** WHEN a ticket is unknown, spent, expired or names a world not in `names`, THE SYSTEM SHALL answer one fixed `403`, and a presented ticket SHALL be spent whatever the answer; of two presentations at once, at most one SHALL be answered.
 
-- **acs-13.4:** WHEN the hosted-dev feature is named with a release feature, THE SYSTEM SHALL build the release profile and accept no dev key.
-- DoD: acs-13.1 to acs-13.4 green; `just ci` green; the game's `docs/DECISIONS.md` entry "Ownership is enforced unless a dev feature switches it off" amended in place.
+- **acs-14.4:** WHEN a handle is presented for its own world, THE SYSTEM SHALL answer the handle under the current key, the account's entitlement and `address`; a gone account SHALL answer exactly as one that is not entitled.
+
+- **acs-14.5:** WHEN a handle does not decrypt, or decrypts to another world, THE SYSTEM SHALL answer `entitled` false and no `handle`.
+
+- **acs-14.6:** WHEN one account and world are checked twice under one key, THE SYSTEM SHALL answer one handle; another world or another account SHALL answer another; and a handle under a retired key SHALL answer its replacement under the current one.
+
+- **acs-14.7:** WHEN a source address, or a handle from one source address, exceeds its limit, THE SYSTEM SHALL refuse that pair alone: the same handle from another source address SHALL still be answered.
+
+- **acs-14.8:** WHEN either route logs, THE SYSTEM SHALL log the account and the time and never a world, name, handle, ticket or address; the store SHALL hold no ticket text.
+
+- **acs-14.9:** WHEN a production profile starts with no handle key, THE SYSTEM SHALL refuse to start, naming the setting and never its value.
+- DoD: acs-14.1 to acs-14.9 green; `just ci` green; `docs/account-service.md` states both routes.
+
+### acs-15 — the attestation route and its keys go
+
+type: feature · tier: hard
+touches: account-service/src/attest.ts, account-service/src/attest.test.ts, account-service/src/keys.ts, account-service/src/keys.test.ts, account-service/src/server.ts, account-service/src/server.test.ts, account-service/src/rateLimit.ts, account-service/src/rateLimit.test.ts, account-service/src/config.ts, account-service/src/config.test.ts, account-service/src/deployment.test.ts, account-service/attestation-public-keys.json, account-service/Dockerfile, ops/auth/README.md, ops/auth/docker-compose.yml, docs/account-service.md, docs/runbooks/account-service.md, docs/local-play.md, docs/DECISIONS.md
+after: [lpw-33, acs-14]
+- Residuals: R-lpw-35-NOTE830006.
+- Contract: once lpw-33 has removed the module's verifier, no build accepts an attestation, so `POST /attest`, the attestation key files and `attestation-public-keys.json` with its generation are removed.
+
+- **acs-15.1:** WHEN `POST /attest` is requested, THE SYSTEM SHALL answer as it answers any path it does not serve.
+
+- **acs-15.2:** WHEN the service starts in any profile, THE SYSTEM SHALL need, read and write no attestation key, and sign-in, `POST /ticket` and `POST /world/check` SHALL answer as before.
+- DoD: acs-15.1 and acs-15.2 green; `just ci` green; no document but the design record states the attestation as current.
 
 ## Post-integration verification
 
