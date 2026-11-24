@@ -79,8 +79,8 @@ Each default stands unless the operator overrules it:
   identity's stored status is written or updated. (2) No answer, an identity the world does not
   know: refused until an answer arrives and the account is verified. (3) No answer, a known
   identity: admitted or refused by its last known status, with no expiry; the next answer updates
-  it. The host's own account is checked once a day the same way. A binding is therefore not
-  "checked once and kept": lpw-23 (module and attestation route) and lpw-24 (client) build it, and
+  it. The host's own account is checked once a day, by the server (lpw-43). A binding is therefore not
+  "checked once and kept": lpw-23, lpw-42 and lpw-43 (module) and lpw-24 (client) build it, and
   lpw-24 replaces lpw-15.6. The operator allows adjusting the workflow per kind of world, with
   judgement.
 - `decision-defaulted:private-server-host-notice=yes-once-per-server` — a player sees, once per
@@ -624,14 +624,15 @@ blocked: licence — as lpw-12; fallback: as lpw-12.
 - **lpw-18.6:** WHEN a pinned target's address changes and its certificate does not, THE CLIENT SHALL resume the identity stored for `(fingerprint, db)`.
 
 - **lpw-18.7:** WHEN a browser loads the client page from the gate over `https:`, THE SYSTEM SHALL serve the page and a shell document whose `uri` is the gate's own `wss:` origin, and the joiner SHALL play without any other origin.
+- **lpw-18.8:** WHEN the gate serves the page or any asset, THE SYSTEM SHALL send `Cache-Control: no-store` and a content security policy holding `worker-src 'none'`; in the e2e, `navigator.serviceWorker.register` rejects, `getRegistrations()` is empty and a reload after the gate stops loads nothing (lpw-35.6).
 - Operator ruling monster-realm#833: lpw-18.7's browser joiner plays on an enforcing build once lpw-19's design is built; until then only on a build that does not enforce ownership.
-- DoD: lpw-18.1 to lpw-18.7 green; `just desktop-test`, `just desktop-e2e` and `just ci` green.
+- DoD: lpw-18.1 to lpw-18.8 green; `just desktop-test`, `just desktop-e2e` and `just ci` green.
 
 ### lpw-14 — open a world to friends, and close it again
 
 type: feature · tier: hard
 touches: desktop/src/openToFriends.ts, desktop/src/openToFriends.test.ts, desktop/src/hostGate.ts, desktop/src/hostGate.test.ts, desktop/src/launcher/worldSettings.ts, desktop/src/launcher/worldSettings.test.ts, desktop/src/main.ts, desktop/e2e/friends.spec.ts
-after: [lpw-18, lpw-9]
+after: [lpw-18, lpw-9, lpw-23]
 blocked: licence — as lpw-12; fallback: as lpw-12.
 
 - Residuals: R-lpg-0-ISSUERFETCH (friends half).
@@ -651,7 +652,8 @@ blocked: licence — as lpw-12; fallback: as lpw-12.
 - **lpw-14.5:** WHEN a player copies the invite, THE SYSTEM SHALL produce the world's `wss:` `uri`, `db` and certificate fingerprint as text that lpw-11's address form accepts as kind `private`.
 
 - **lpw-14.6:** WHEN a joiner gives the gate's door the world's password, THE SYSTEM SHALL admit that identity without any call to the module that carries the password or a value derived from it, and WHEN the password is wrong SHALL admit nobody, write nothing to the world's database and refuse that identity and that address after five wrong attempts in ten minutes.
-- DoD: lpw-14.1 to lpw-14.6 green; the milestone's one e2e flow (create, play, quit, reopen, open to a friend, the friend joins, close) green in `desktop/e2e/friends.spec.ts`.
+- **lpw-14.7:** WHEN a joiner the world has not admitted gives the door a ticket, THE SYSTEM SHALL relay it once through the owner's `check_account_for` (lpw-23) and SHALL keep and log neither the ticket nor the answer's handle.
+- DoD: lpw-14.1 to lpw-14.7 green; the milestone's one e2e flow (create, play, quit, reopen, open to a friend, the friend joins, close) green in `desktop/e2e/friends.spec.ts`.
 
 ### lpw-19 — a browser binds a friends server it reached by address (design)
 
@@ -807,47 +809,126 @@ after: [lpw-15, lpw-21]
 - **lpw-22.6:** WHEN an unbound identity later calls `join_game` on an enforcing build, THE SYSTEM SHALL refuse it as lpw-15.7 defines, until it binds again.
 - DoD: lpw-22.1 to lpw-22.6 green; `just ci` green, `bindings-drift` clean; the game's `docs/DECISIONS.md` world-binding entry amended.
 
-### lpw-23 — a world re-checks a bound account with every answer and keeps the last known status
+### lpw-41 — the native test host runs procedures, with the HTTP answer stubbed
 
 type: feature · tier: hard
-touches: server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/schema.rs, evals/baselines/table-schemas.json, account-service/src/attest.ts, account-service/src/attest.test.ts, docs/account-service.md, docs/local-play.md, client/src/net/wireContract.json, game-core/src/lib.rs
-after: [lpw-15, lpw-22, lpw-35]
+touches: vendor/spacetimedb/**, vendor/native-host.patch, vendor/PRISTINE.sha256, vendor/README.md, server-module/src/native_host_tests.rs
+after: [lpw-34]
 
-- Decision: operator, 2026-11-22, monster-realm#848 (the "Account checks at connection" entry above). An answer can be negative, so the attestation route must be able to say "this account is not entitled" in a form the world can verify.
-- Contract: `POST /attest` for a valid token whose account is not entitled returns an attestation with `mr_ent` false instead of refusing (this amends acs-3.2 for that case only; a missing, expired or foreign token is still refused). `bind_world_account` on an identity that already has a binding replaces its status and check time with the new attestation's, positive or negative, under the same checks as lpw-15.1 and lpw-15.2. `entitled(ctx)` reads the last stored status, with no expiry. The binding row holds the entitlement and the time of its last check; a column is added only if lpw-15's row lacks one (then this slice is schema-serial). The host's daily check is the owner's own binding re-checked the same way (lpw-24 sends it); this slice adds no timer and no outgoing request from the module.
+- Residuals: R-lpw-35-NOTE894961.
+- Contract: the vendored crate's native branches refuse a `ProcedureContext` (2.16.1: `src/lib.rs` panics, `src/http.rs` returns an error). A `cfg` edit in `vendor/native-host.patch` lets a native test build one, and `native_host_tests.rs` supplies the `procedure_*` host functions, as "Server-module tests run on our own host ABI…" (game `docs/DECISIONS.md`) allows. `Fixture` gains one way to run a procedure as a sender or as the database, at a time, with a queue of stubbed HTTP answers that also records each request. The wasm build of the crate is unchanged: every edit is behind a native `cfg`.
 
-- **lpw-23.1:** WHEN a bound identity's new attestation verifies and carries `mr_ent`, THE SYSTEM SHALL update that binding's status to entitled and its check time, and admit it as lpw-15.7 defines.
+- **lpw-41.1:** WHEN a native test runs a procedure that sends an HTTP request, THE TEST HOST SHALL give it the next stubbed answer or error, and SHALL record the request's method, URL, body and timeout, and SHALL open no socket.
 
-- **lpw-23.2:** WHEN a bound identity's new attestation verifies and carries `mr_ent` false, THE SYSTEM SHALL update that binding's status to not entitled, and refuse its later `join_game` calls with acs-6.1's error until a later attestation says entitled.
+- **lpw-41.2:** WHEN a procedure sends a request with no stubbed answer left, THE TEST HOST SHALL fail that test with a message that says so.
 
-- **lpw-23.3:** WHEN a known identity calls `join_game` with no new attestation, THE SYSTEM SHALL admit or refuse it by its stored status, however old.
+- **lpw-41.3:** WHEN a procedure's `with_tx` body returns, THE TEST HOST SHALL keep its writes; WHEN `try_with_tx`'s body returns an error, or a body panics, THE TEST HOST SHALL keep none of that transaction's writes.
 
-- **lpw-23.4:** WHEN an identity with no binding calls `join_game` on an enforcing build, THE SYSTEM SHALL refuse it as lpw-15.7 defines.
+- **lpw-41.4:** WHEN a test changes a row while a procedure waits for its stubbed answer, THE PROCEDURE SHALL see the changed row in its next transaction.
 
-- **lpw-23.5:** WHEN the attestation route receives a valid token for an account that is not entitled, THE SYSTEM SHALL return an attestation with `mr_ent` false and the other claims of acs-3's contract, and SHALL still refuse a missing, expired or foreign token with none.
+- **lpw-41.5:** WHEN the release module is built, THE SYSTEM SHALL produce the wasm it produced at the merge base.
+- DoD: lpw-41.1 to lpw-41.4 green on a test-only procedure, with lpw-41.5 shown by the two artefacts' hashes in the PR; `just ci` green.
 
-- **lpw-23.6:** WHEN a new attestation fails any lpw-15.2 check, THE SYSTEM SHALL leave the stored binding unchanged.
-- DoD: lpw-23.1 to lpw-23.6 green; `just ci` green, `bindings-drift` clean; the game's `docs/DECISIONS.md` world-binding entry amended in place for #848 (no longer "checked once and kept").
-
-### lpw-24 — the client checks the player's account at every connection to a world
+### lpw-23 — a world checks a player's account itself: first contact and every later connection
 
 type: feature · tier: hard
-touches: client/src/net/attestation.ts, client/src/net/attestation.test.ts, client/src/net/oidc.ts, client/src/net/oidc.test.ts, client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/shellDocument.ts, client/src/net/connectionConfig.ts, client/src/shell/session.ts, client/src/main.ts, client/src/main.worldBinding.test.ts, client/src/main.targetKindGate.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts
-after: [lpw-15, lpw-19, lpw-23, lpw-35]
+touches: server-module/src/account_checks.rs, server-module/src/account_checks_tests.rs, server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/guards.rs, server-module/src/schema.rs, server-module/src/lib.rs, server-module/src/lifecycle_tests.rs, server-module/src/privacy.rs, server-module/src/privacy_tests.rs, server-module/src/privacy_enforcement_tests.rs, server-module/src/native_host_tests.rs, game-core/src/lib.rs, scripts/verify-release-reducers.mjs, scripts/verify-release-reducers.test.mjs, evals/baselines/table-schemas.json, evals/baselines/client-visible-tables.json, evals/client-surface-privacy.eval.mjs, evals/account-e2e.eval.mjs, client/src/module_bindings/**, client/src/net/wireContract.json, docs/account-service.md, docs/local-play.md, docs/DECISIONS.md, ARCHITECTURE.md
+after: [lpw-15, lpw-22, lpw-35, lpw-41, acs-14]
 
-- Decision: operator, 2026-11-22, monster-realm#848. This is the client bind flow lpw-15 deferred (lpw-15.6 and lpw-15.8, plan "Sizing"), shaped by the ruling: it replaces lpw-15.6 (no request on a later open) with a check at every connection, and carries lpw-15.8 unchanged. lpw-15's development recipe (a `justfile` entry, which a run cannot be granted) is named in the PR body for the supervisor.
-- Contract: before each `join_game` in a `local` or `private` world the client asks our issuer for an attestation (lpw-15's sign-in, which never reaches `connect` or the host) and binds with it, positive or negative. When the issuer cannot be reached it joins with no attestation and the module decides (lpw-23.3, lpw-23.4). While a world the player hosts is running, the host's client re-checks the host's own account once a day, the same way. lpw-1.1's rule (requests to our issuer during a bind and nowhere else) holds; a boot that opens no world makes zero OIDC requests.
+- Residuals: R-lpw-35-NOTE830006 stays open for acs-15.
+- Design SSOT: the game's `docs/refactors/account-checks.md` §5 (design B, operator-delegated choice, monster-realm#874). §5.1, §5.3 and §5.6 bind here. This section replaces the attestation form of lpw-23 (monster-realm#848's cases 1 to 3 hold). lpw-42 builds the character move and lpw-43 the daily check and the address rule. The split is for size and nothing is deployed between them.
+- Contract: `account_checks.rs` alone declares and writes `world_account {handle, identity, entitled, checked_at_ms, is_host}`, `world_check_budget` and `recheck_schedule` (all private), the view `my_world_account`, and the procedures `check_account(ticket)`, `check_account_for(who, ticket)` (owner only) and `recheck_account` (the database only). `entitled(ctx, profile)` reads `world_account` and no longer `world_binding`, so an attestation grants nothing from here on. Each build profile names the account service a world asks, or none. `unbind_world_account` deletes the caller's `world_account` row and, as now, its admission row. `is_admitted`, `set_world_allowlist` and the allowlist seeding (lpw-21) use handles. lpw-15's tables, views and reducers stay for lpw-33 to remove. A check that names the world presents its `ip:` names unconditionally until lpw-43. Until lpw-42, a handle another identity holds is refused.
 
-- **lpw-24.1:** WHEN the client opens a `local` or `private` world and the issuer answers, THE CLIENT SHALL bind with the new attestation before calling `join_game`.
+- **lpw-23.1:** WHEN an identity the world does not know calls `check_account` with a ticket the service accepts, THE SYSTEM SHALL store the answered handle and entitlement for it in one transaction and tell the caller the outcome, positive or negative.
 
-- **lpw-24.2:** WHEN the issuer cannot be reached, THE CLIENT SHALL call `join_game` with no new attestation and show the module's answer.
+- **lpw-23.2:** WHEN a ticket is not 43 base64url characters, or 30 first-contact redeems were sent in the current minute, THE SYSTEM SHALL refuse the call and send no request.
 
-- **lpw-24.3:** WHEN a world the player hosts has been running a day since the host's last check, THE CLIENT SHALL re-check the host's account as in lpw-24.1, and retry while the issuer cannot be reached.
+- **lpw-23.3:** WHEN the service refuses, errors, answers a body that does not parse or takes more than 3 s, THE SYSTEM SHALL refuse the call and change no `world_account` row.
 
-- **lpw-24.4:** WHEN an account that is not entitled asks for an attestation through the client, THE CLIENT SHALL show acs-7.2's not-owned message (lpw-15.8).
+- **lpw-23.4:** WHEN another transaction changes a row the check decides on while its request waits, THE SYSTEM SHALL decide from the row as it is in the check's transaction.
 
-- **lpw-24.5:** WHEN the client boots toward any target and opens no `local` or `private` world, THE CLIENT SHALL make zero requests to the account service.
-- DoD: lpw-24.1 to lpw-24.5 green; `just ci` green.
+- **lpw-23.5:** WHEN an identity that holds a `world_account` row connects, was last checked 10 minutes ago or more and has no re-check armed, THE SYSTEM SHALL arm one `recheck_account` run, SHALL admit it by its stored status until an answer lands, and SHALL then store that answer; a failed run leaves the status unchanged and is not run again in that connection.
+
+- **lpw-23.6:** WHEN an answer carries a handle under a newer key, THE SYSTEM SHALL replace the old handle in `world_account` and in `world_allowlist` in the same transaction.
+
+- **lpw-23.7:** WHEN `join_game` is called on an enforcing build, THE SYSTEM SHALL admit an identity whose `world_account` row says entitled, however old, and refuse every other with acs-6.1's error, an attestation binding included.
+
+- **lpw-23.8:** WHEN anyone but the owner calls `check_account_for`, or anyone but the database calls `recheck_account`, THE SYSTEM SHALL refuse it and send no request; on a build that names no account service for worlds, every procedure SHALL refuse as its first statement.
+
+- **lpw-23.9:** WHEN the module definition holds any procedure or schedule beyond the ones this slice declares, or any HTTP handler, HTTP route or row filter, THE SYSTEM SHALL fail `findDefinitionViolations`, and the reducer census SHALL fail on a procedure declared outside `account_checks.rs` or a write from one outside its named tables.
+
+- **lpw-23.10:** WHEN an account is deleted or exported, or an identity calls `unbind_world_account`, THE SYSTEM SHALL erase or include that identity's own `world_account` row and no other's.
+
+- **lpw-23.11:** WHEN an identity reads `my_world_account`, THE SYSTEM SHALL return its own row alone.
+- DoD: lpw-23.1 to lpw-23.11 green with the HTTP answer stubbed (lpw-41); `just ci` green, `bindings-drift` clean; in the game's `docs/DECISIONS.md` the private-world account entries and "Observability: the module never times itself or calls out" rewritten to the built state.
+
+### lpw-42 — one character per account in a world, whatever the client
+
+type: feature · tier: hard
+touches: server-module/src/account_checks.rs, server-module/src/account_checks_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/schema.rs, server-module/src/privacy.rs, server-module/src/privacy_tests.rs, server-module/src/privacy_enforcement_tests.rs, server-module/src/lifecycle_tests.rs, server-module/src/native_host_tests.rs, game-core/src/lib.rs, evals/baselines/table-schemas.json, evals/baselines/client-visible-tables.json, evals/account-e2e.eval.mjs, client/src/module_bindings/**, client/src/net/wireContract.json, docs/local-play.md, docs/DECISIONS.md
+after: [lpw-23]
+
+- Design SSOT: `docs/refactors/account-checks.md` §5.4 (operator, monster-realm#855). Adds the private table `world_move {identity, moved_at_ms}` and the view `my_world_move`. The move is a primitive of its own, never `rekey_all`.
+
+- **lpw-42.1:** WHEN an identity that owns no character presents a ticket whose handle another identity holds, THE SYSTEM SHALL move that character's every row to the caller, point the handle at it, and leave the source identity nothing that a later move, deletion or export must find but its `world_move` row; finished battles stay under the source as history.
+
+- **lpw-42.2:** WHEN the first identity checks in again with the same account, THE SYSTEM SHALL move the character back and delete its `world_move` row.
+
+- **lpw-42.3:** WHILE either identity is in a battle or a trade, or the caller already owns a character, WHEN such a ticket is presented, THE SYSTEM SHALL refuse the move and change nothing.
+
+- **lpw-42.4:** WHEN the source identity is connected, THE SYSTEM SHALL move its live position, and its later disconnect SHALL write nothing of the moved character.
+
+- **lpw-42.5:** WHEN the ticket named neither a `spki:` name, a `dns:` name nor an `ip:` name the world has confirmed, THE SYSTEM SHALL move nothing (no `ip:` name is confirmed before lpw-43).
+
+- **lpw-42.6:** WHEN an account is deleted or exported, THE SYSTEM SHALL erase or include its own `world_move` row, and an identity SHALL read its own alone.
+- DoD: lpw-42.1 to lpw-42.6 green; `just ci` green, `bindings-drift` clean; the cost of one move for a full collection measured and recorded in `docs/local-play.md`.
+
+### lpw-43 — the server's own daily check, and an address that changes hands
+
+type: feature · tier: hard
+touches: server-module/src/account_checks.rs, server-module/src/account_checks_tests.rs, server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/schema.rs, server-module/src/privacy_enforcement_tests.rs, server-module/src/native_host_tests.rs, game-core/src/lib.rs, scripts/verify-release-reducers.mjs, scripts/verify-release-reducers.test.mjs, evals/baselines/table-schemas.json, client/src/module_bindings/**, client/src/net/wireContract.json, docs/local-play.md, docs/DECISIONS.md
+after: [lpw-42]
+
+- Design SSOT: `docs/refactors/account-checks.md` §5.1 (3) and §5.5; `decision-defaulted:address-changes-hands=accept-narrowed-for-early-access`. Adds the private tables `world_egress` and `host_check_schedule`, the owner-only reducer `set_host_identity(who)` and the scheduled procedure `host_account_check` (the database only), and allows exactly these in the definition check and the census.
+
+- **lpw-43.1:** WHEN the owner calls `set_host_identity`, THE SYSTEM SHALL mark that identity's `world_account` row, clear every other mark and arm the hourly check; anyone else SHALL be refused.
+
+- **lpw-43.2:** WHEN the hourly tick runs, and the last success is 23 hours old or more or the world's names changed since it, THE SYSTEM SHALL ask about the marked handle and no other, and store the answer; otherwise it SHALL send nothing.
+
+- **lpw-43.3:** WHEN that request fails, THE SYSTEM SHALL leave the status unchanged and ask again at the next tick.
+
+- **lpw-43.4:** WHILE a joining player stays connected through 48 simulated hours of ticks, THE SYSTEM SHALL send no request about that player beyond the one its connection armed.
+
+- **lpw-43.5:** WHEN an answer reports an address, THE SYSTEM SHALL store it for its family, and SHALL present an `ip:` name only while no address of its family is stored, or the stored one equals it and was confirmed in the last 25 hours; a `spki:` or `dns:` name is always presented.
+
+- **lpw-43.6:** WHEN a ticket's only name is an `ip:` name the world has confirmed under lpw-43.5, THE SYSTEM SHALL allow lpw-42's move.
+- DoD: lpw-43.1 to lpw-43.6 green; `just ci` green, `bindings-drift` clean; the changed-address part of the game's `docs/DECISIONS.md` entry rewritten to the built state.
+
+### lpw-24 — the client gets a world its ticket, and a browser keeps nothing past its session
+
+type: feature · tier: hard
+touches: client/src/net/worldTicket.ts, client/src/net/worldTicket.test.ts, client/src/net/authToken.ts, client/src/net/authToken.test.ts, client/e2e/local-identity.spec.ts, client/src/net/oidc.ts, client/src/net/oidc.test.ts, client/src/net/connection.ts, client/src/net/connection.test.ts, client/src/net/store.ts, client/src/net/store.test.ts, client/src/net/shellDocument.ts, client/src/net/connectionConfig.ts, client/src/shell/session.ts, client/src/main.ts, client/src/main.worldAccount.test.ts, client/src/main.targetKindGate.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/messageIds.ts, client/src/ui/i18n/catalog.test.ts
+after: [lpw-15, lpw-19, lpw-23, lpw-42]
+
+- Design SSOT: the game's `docs/refactors/account-checks.md` §5.1, §5.4 and §5.7 (operator, monster-realm#848 and monster-realm#855). This is the client flow lpw-15 deferred; it replaces lpw-15.6 and carries lpw-15.8. A browser at a friends server gets its ticket from the code redemption lpw-19 designed (R-lpw-19-BUILD); this slice takes a ticket from one source interface and builds the source that holds an ID token. A development recipe it needs (`justfile`) is named in the PR body for the supervisor.
+- Contract: the client asks `POST /ticket` for the world as its own software authenticated it and calls `check_account` only when the world holds no `my_world_account` row for its identity; a known identity joins with no request, because the world re-checks it. A ticket is held in memory until it is spent. The daily host check is the server's (lpw-43). In a browser a `local` or `private` target keeps its reconnect token per tab; lpw-2.1, lpw-2.5 and lpw-2.7 hold for the desktop shell only.
+
+- **lpw-24.1:** WHEN the client opens a `local` or `private` world that does not know its identity and the service answers, THE CLIENT SHALL call `check_account` with the ticket before `join_game`.
+
+- **lpw-24.2:** WHEN the world knows its identity, THE CLIENT SHALL call `join_game` with no request to the account service and show the module's answer.
+
+- **lpw-24.3:** WHEN the service cannot be reached for a world that does not know the identity, THE CLIENT SHALL say that a first visit needs the account service and offer to try again.
+
+- **lpw-24.4:** WHEN the check answers not entitled, THE CLIENT SHALL show acs-7.2's not-owned message (lpw-15.8).
+
+- **lpw-24.5:** WHEN `my_world_move` holds the caller's row, THE CLIENT SHALL say the character is playing on another client since that time and offer to sign in again, which runs lpw-24.1.
+
+- **lpw-24.6:** WHILE the client runs in a browser toward a `local` or `private` target, THE CLIENT SHALL write neither the reconnect token nor a ticket to storage that outlives the tab, and SHALL remove a token an earlier build left there for that target.
+
+- **lpw-24.7:** WHEN the desktop shell relaunches into a world it knows, THE CLIENT SHALL resume the identity with no ticket request.
+
+- **lpw-24.8:** WHEN the client boots toward any target and opens no `local` or `private` world, THE CLIENT SHALL make zero requests to the account service for a world.
+- DoD: lpw-24.1 to lpw-24.8 green; `just ci` green.
 
 ### lpw-25 — a change an older client cannot read fails the build until `MIN_CLIENT_PROTOCOL` rises
 
@@ -882,7 +963,6 @@ after: [lpw-25, lpw-34]
 - **lpw-26.2:** WHEN the design is recorded, THE SYSTEM SHALL show by measurement on the pinned host (2.16.1 after lpw-34) that under the chosen alternative a walking player's step-timing distribution is no wider than today's (`docs/send-pipeline-depth.md`), that a remote client receives the row that ends a walk no later than it does today, what a client that reconnects mid-walk is sent, and what arming from the intake reducers adds to a walking player's rows.
 
 - **lpw-26.3:** WHEN the design is recorded, THE SYSTEM SHALL name everything the interval tick does today with how it is done under the chosen alternative: NPC wander; releasing an NPC from a conversation that ended; the drain lock while a battle holds a queue (a held queue is not work); the grass trigger; warps; publishing the standing row and settling it to Idle; the disarm and the NPC reset when the last player leaves; the recovery after a tick whose transaction failed (a one-shot row is consumed and its re-arm rolled back); and converting the interval rows a live database holds at publish. It SHALL name the slices that build it, by a note in this spec.
-- **lpw-35.5:** WHEN the design is recorded, THE SYSTEM SHALL state, for the chosen design, how a world maps a signed-in account to one player identity whatever the client, what the desktop client keeps and where, that a browser keeps nothing past its session (lpw-2's `localStorage` for `local` and `private` targets in a browser removed), what a player who signed in at one client sees on joining from another, and the test that proves each.
 
 - DoD: the record, a judge's scores over the alternatives, and "An empty zone does no work; no state depends on a tick having run" amended in the game's `docs/DECISIONS.md`.
 
@@ -944,6 +1024,7 @@ after: [lpw-32]
 blocked: early-access-schema-freeze — the last consolidation runs once every schema-changing slice of the early-access milestones (M-local-play, M-account-service, M-gamepad) has merged; lifted by the supervisor then, when this section is elaborated from what those slices retired; fallback: none, early access is gated on it (PLAN §9).
 
 - Operator, 2026-11-22: a second wipe-and-consolidate pass is planned and performed before early access. Reserved so the gate has an id; its contract and criteria are written when it is unblocked, on lpw-32's model, and it takes the `encounter` table change of lpw-27's fold if that design chose the fold.
+- It also removes what design B leaves dead of lpw-15: the items of the first table in the game's `docs/refactors/account-checks.md` §5.8 (tables, views, reducers, crates, key lists and the functions that serve only them), and keeps those of the second.
 
 ### lpw-30 — the mutation gates judge rules, not log lines: game-core stays zero-tolerance nightly, the server is gated on a pull request's changed lines
 
@@ -1074,19 +1155,96 @@ after: [lpw-34]
 - **lpw-35.3:** WHEN the design is recorded, THE SYSTEM SHALL name each procedure the chosen design declares and what lpw-34's module-definition check and the reducer census must then allow, and nothing wider.
 
 - **lpw-35.4:** WHEN the design is recorded, THE SYSTEM SHALL list the changes it makes to lpw-2, lpw-23, lpw-24, lpw-19, lpw-22, lpw-36, acs-3 and acs-12, the slices that build it, and every table, view, reducer and crate of lpw-15 the chosen design leaves dead, which lpw-33 removes, by a note in this spec.
+- **lpw-35.5:** WHEN the design is recorded, THE SYSTEM SHALL state, for the chosen design, how a world maps a signed-in account to one player identity whatever the client, what the desktop client keeps and where, that a browser keeps nothing past its session (lpw-2's `localStorage` for `local` and `private` targets in a browser removed), what a player who signed in at one client sees on joining from another, and the test that proves each.
 - **lpw-35.6:** WHEN the design is recorded, THE SYSTEM SHALL state, for the chosen design, how the server's own daily check of its hosting account runs (no client involved) and that no joining player is re-checked within a connection, and how it narrows the two cases where an address changes hands: a friend's page served with no persistent cache and no service worker, and the daily check confirming the server's public address so a moved server stops accepting its old one within a day; each with the test that proves it, or the measured reason it cannot.
 
 - DoD: the record, a judge's scores over the alternatives, the `docs/DECISIONS.md` entries "A private world verifies an account by a per-world attestation our account service signs" and "The official build holds no attestation key…" amended to the outcome, and the building slices named.
+
+Build note (lpw-35): lpw-35 chose design B (docs/refactors/account-checks.md §5): a one-use join
+ticket the world redeems with its own procedures, a per-account-per-world handle, the world's own
+re-check by handle at each connection, and a daily interval check of the hosting account that also
+confirms the world's public address. Changes to the module and client slices (§5.7): lpw-23 is
+rewritten as the module half (procedures check_account, check_account_for, recheck_account,
+host_account_check; reducer set_host_identity; tables world_account, world_move, world_egress,
+recheck_schedule, host_check_schedule; the character move; the check address per build profile; the
+definition-check and census allow-lists; the address check), a schema slice after lpw-41 and acs-14.
+lpw-24 is rewritten as the client half (a ticket only when the world does not know the identity;
+lpw-24.3's daily re-check moves to the server; the 'playing on another client' message). lpw-2: in a
+browser, local and private targets keep their token per tab; lpw-2.1 and lpw-2.5 hold for the
+desktop shell only.
+
+Build note (lpw-35): lpw-35 (docs/refactors/account-checks.md §5.7) also changes: lpw-19, whose
+browser bind redeems its one-use code for a ticket instead of an attestation, posts no nonce, and
+asks at every browser session; lpw-22, whose unbind_world_account deletes the caller's world_account
+row and its admission row; lpw-36, whose exempt list loses the four nonce and bind reducers and
+gains set_host_identity (check_account and check_account_for are procedures and are not gated);
+lpw-21, whose is_admitted and allowlist seeding read world_account handles; lpw-14, whose door
+relays a joiner's ticket through check_account_for; lpw-18, whose gate serves the page and assets
+with Cache-Control: no-store and a CSP holding worker-src 'none'. acs-3 is superseded (acs-14 adds
+POST /ticket and POST /world/check; acs-15 removes POST /attest and the attestation keys); acs-12's
+shell sends its ID token to POST /ticket for each world; acs-13 is dead.
+
+Build note (lpw-35): lpw-35 for lpw-33: the chosen design leaves dead, from lpw-15, the tables
+world_binding and world_bind_nonce with their data-lifecycle manifest entries, the views
+my_world_binding and my_bind_nonce, the reducers request_bind_nonce, request_bind_nonce_for,
+bind_world_account and bind_world_account_for, the crates ed25519-dalek and base64, the key lists
+AttestationKey, BuildProfile::attestation_keys, DEV_ATTESTATION_KEYS, PRODUCTION_ATTESTATION_KEYS
+and LOCAL_DEV_ATTESTATION_KEY, and the functions verify_attestation, trusted_binding,
+bound_entitled, bound_accounts, erase_world_binding and binds_nothing. It keeps world_name,
+set_world_names, world_allowlist (entries become handles), set_world_allowlist and
+unbind_world_account (both rewritten to read world_account), serde and serde_json
+(docs/refactors/account-checks.md §5.8).
+
+Build note (lpw-35): lpw-35 rests on an operator-owned default changing:
+decision-defaulted:bundled-host-module-http=disabled (lpw-12) must become enabled, because a host
+with [module-http] enabled = false refuses every procedure HTTP request (measured,
+docs/refactors/account-checks.md row P7), so a shell world would check nobody. The judge's result (B
+73, A 69) reverses if the operator keeps it off: the attestation (A), which a world verifies
+offline, then wins. The default is reversible; the operator may overrule it.
+
+Build note (lpw-35): Spec gap: lpw-35.5 (how a world maps a signed-in account to one player
+identity, what the desktop keeps, that a browser keeps nothing, what a player sees at a second
+client) sits inside the lpw-26 section of M-local-play.spec.md, after lpw-26.3, not in lpw-35's
+section, so the acceptance ledger seeded no gate for it. The record answers it in
+docs/refactors/account-checks.md §5.4. Also for lpw-23: the docs/DECISIONS.md entry 'Observability:
+the module never times itself or calls out' states that reducers cannot make outbound calls; the
+procedures make account-service calls, so lpw-23 amends that entry when they land.
+
+Build note (lpw-35): lpw-35 names a new slice acs-14: the account service's POST /ticket (bearer ID
+token, {world}; a 32-byte one-use ticket kept 60 s under its SHA-256) and POST /world/check (ticket
+form: spends the ticket, refuses a ticket whose world is not among the presented names, answers
+handle, entitled, address and name; handle form: answers handle under the current key, entitled and
+address, with a gone account answered entitled false), the deterministic handle key with a key id
+and kept retired keys, the limits per source address and per handle-and-source pair, one IPv4-only
+and one IPv6-only name, and fork (f)'s code redemption returning a ticket
+(docs/refactors/account-checks.md §5.2).
+
+Build note (lpw-35): lpw-35 names a new slice lpw-41: the native test host runs procedures with the
+HTTP answer stubbed. The vendored crate's native branches panic for a ProcedureContext at 2.16.1
+(vendor/spacetimedb/src/lib.rs:1614, 1661, 1865; src/http.rs:573-576 returns an error), so it needs
+a cfg edit in vendor/native-host.patch and procedure_* host functions in
+server-module/src/native_host_tests.rs, which the entry 'Server-module tests run on our own host
+ABI…' allows. lpw-23's tests (server-module/src/account_checks_tests.rs) need it.
+
+Build note (lpw-35): lpw-35 names a new slice acs-15, after lpw-33: remove POST /attest, the
+attestation key files (attestation-keys.json, the local-dev fixed key) and
+account-service/attestation-public-keys.json with its generation, once no build accepts an
+attestation.
+
+Build note (lpw-35): lpw-35 for lpw-23, completing the table list above: the module half also adds
+world_check_budget, one private row counting the current minute's first-contact redeems (at most 30,
+then check_account refuses without sending), and set_host_identity clears the host mark from any
+other row (docs/refactors/account-checks.md §5.1, §5.3).
 
 ### lpw-36 — a caller who is not entitled is refused by every reducer, not only at the join
 
 type: feature · tier: hard
 touches: server-module/src/access.rs, server-module/src/access_tests.rs, server-module/src/accounts.rs, server-module/src/accounts_tests.rs, server-module/src/privacy_enforcement_tests.rs, docs/DECISIONS.md, server-module/src/lib.rs, server-module/src/movement.rs, server-module/src/movement_tests.rs, server-module/src/world_binding.rs, server-module/src/world_binding_tests.rs, server-module/src/privacy.rs, server-module/src/privacy_tests.rs
-after: [lpw-23]
+after: [lpw-43]
 
 - Residuals: R-acs-6-NOPLAYERROWREDUCERS.
 - Operator, 2026-11-22 (decision review, concern 1). `accounts::require_entitled` is called by `join_game` alone, so on an enforcing build an identity that has joined keeps moving, battling and trading after its account stops being entitled (lpw-23 can store that), and the five reducers that need no player row never ask. "Ownership is enforced unless a dev feature switches it off" records the gap.
-- Contract: on an enforcing build the ownership rule is made where the admission rule is: one shared gate at the head of every client-callable reducer, never a call copied into each. The reducers it does not gate are the ones a player who is not entitled must still reach: the bind and nonce reducers, `unbind_world_account`, the account's own deletion, export and claim reducers, and the owner-only ones. The roster comes from the generated bindings, as the admission roster does, so a reducer added later is gated or fails the test. What "entitled" means stays inside `entitled(ctx)`; lpw-35 may change it without touching this gate. A build that does not enforce gates nothing.
+- Contract: on an enforcing build the ownership rule is made where the admission rule is: one shared gate at the head of every client-callable reducer, never a call copied into each. `check_account` and `check_account_for` are procedures and are not gated. The reducers it does not gate are the ones a player who is not entitled must still reach: `unbind_world_account`, `set_host_identity`, the account's own deletion, export and claim reducers, and the owner-only ones. The roster comes from the generated bindings, as the admission roster does, so a reducer added later is gated or fails the test. What "entitled" means stays inside `entitled(ctx)`; lpw-23 changed it without touching this gate. A build that does not enforce gates nothing.
 
 - **lpw-36.1:** WHEN an identity that is not entitled calls any client-callable reducer on an enforcing build, other than the ones the contract exempts, THE SYSTEM SHALL refuse it with acs-6.1's error and write nothing, whether or not it has joined.
 
