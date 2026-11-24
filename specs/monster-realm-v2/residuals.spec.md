@@ -15,33 +15,22 @@ the checking apparatus are never tracked here.
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
-### rb-92 — R-rb-52-GRACEANNOUNCE
-category: ux-a11y · severity: MED · status: promoted · **absorbed by M-trade-sessions `ts-6b-9` — do not build separately**
-EARS: WHEN an account moves from active to deletion-grace (including via another session's sync) THE CLIENT SHALL announce the grace deadline exactly once through the live region.
-touches: client/src/main.ts, client/src/ui/liveRegion.ts, client/src/ui/announcements.ts, client/src/ui/announcements.test.ts
+### rb-138 — a pad-only player can leave any waiting Controls cell without a change
 
-When an account moves from active to deletion-grace (including via another session's sync), screen-reader users hear nothing. The countdown banner (client/src/main.ts:2901) is silent by design, and no one-shot announcement fires through client/src/ui/liveRegion.ts. Add a one-shot, edge-triggered announcement of the grace deadline.
+type: feature · tier: routine
+touches: client/src/main.ts, client/src/main.remap.test.ts, client/src/ui/controlsModel.ts, client/src/ui/controlsModel.test.ts, client/src/ui/screens/optionsScreen.ts, client/src/ui/screens/optionsScreen.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/e2e/pad-controls.spec.ts, ARCHITECTURE.md, docs/DECISIONS.md
+after: []
+`category: ux-a11y · severity: MED` · residuals: R-gp-5-NOTE389633 (promoted) and R-close-M-gamepad-PADCELLEXIT (dispositioned fixed at this slice's merge)
 
-### rb-94 — R-rb-53-E1
-category: ux-a11y · severity: LOW · status: promoted · **absorbed by M-trade-sessions `ts-6b-9` — do not build separately**
-EARS: WHEN a data export transitions from incomplete to complete THE CLIENT SHALL announce it once through the live region.
-touches: client/src/ui/privacyBanner.ts, client/src/ui/liveRegion.ts, client/src/ui/privacyBanner.test.ts
+While a Key cell waits, `pollPad` (`client/src/main.ts`) ignores every pad press, so a player with only a pad who presses A on a keyboard cell cannot get out. An empty Pad cell (8 of the 10 Shortcuts rows by default) has the same trap: there is no shown button to press again, and B is refused as protected. decision-defaulted:pad-capture-exit=B cancels (reversible, the live B binding; alternatives not taken: disabling Key cells after pad input, a timeout).
 
-When a data export finishes assembling (incomplete to complete), screen-reader users get no announcement. The status label in client/src/ui/privacyBanner.ts just updates in place. Add a one-shot announcement on that edge through the single live region in client/src/ui/liveRegion.ts.
+- **rb-138.1:** WHILE a Key cell of Controls waits for a key, WHEN a pad button bound to B is pressed, THE CLIENT SHALL end the capture with the tables unchanged, say the cancelled line, and route that press nowhere else (it acts again only once released and pressed again).
+- **rb-138.2:** WHILE a Key cell waits, WHEN any other pad button is pressed, THE CLIENT SHALL keep waiting and route nothing, as today.
+- **rb-138.3:** WHILE a Pad cell whose row has no pad button waits, WHEN a pad button bound to B is pressed, THE CLIENT SHALL end the capture with the pad table unchanged and say the cancelled line.
+- **rb-138.4:** WHILE a Pad cell whose row has a pad button waits, THE CLIENT SHALL treat a press as today: the shown button cancels, a free or unprotected one binds or swaps, and a swap that would leave a protected button without a pad button is refused.
+- **rb-138.5:** WHILE either kind of cell waits and the player's last input is the pad, THE CLIENT SHALL name the pad button that leaves the cell unchanged in the waiting line.
 
-### rb-101 — R-rb-65-RUNBOOK-LOGCAVEAT
-category: security-privacy · severity: LOW · status: promoted · **absorbed by M-trade-sessions `ts-6b-1` — do not build separately**
-EARS: WHEN observability-dr.md §8 lists where an erased identity survives THE RUNBOOK SHALL include the account_deletion_cascade log line and its 30-day Loki retention.
-touches: docs/runbooks/observability-dr.md
-
-docs/runbooks/observability-dr.md §8 lists where an erased account's Identity survives (shared historical rows, backups) but leaves out the operational log. The deletion cascade logs one account_deletion_cascade line containing the subject's Identity (server-module/src/accounts.rs:787-788,1054), and Loki keeps it 30 days. Add that caveat to §8.
-
-### R-rb-128-X2 — R-rb-128-X2
-category: ux-a11y · severity: LOW · status: carried by triage · **absorbed by M-trade-sessions `ts-6b-1` — do not build separately**
-EARS: WHEN require_not_deleting rejects THE SERVER SHALL return a generic, accurate reason covering every gated action class.
-touches: server-module/src/guards.rs, server-module/src/guards_tests.rs
-
-The deletion-gated reject reason (guards.rs:75-76) names only trades, battles and challenges, yet it now fires on join, move, raise, evolve, rename, party edits, recruit and dismiss. Players see a misleading message. Reword it generically and update the tests that pin the exact string.
+Tests: ordinary vitest tests at `controlsModel`, `optionsScreen` and the `main.remap` boot level, each red before the fix; extend `pad-controls.spec.ts` (mocked pad only) with one Key-cell exit and one empty-Pad-cell exit. Out of scope: the session terminal's pad control (R-close-M-gamepad-TERMPAD).
 
 ### R-np-b-SLOWLINK — a player on a slow link walks at full speed
 category: netcode-determinism · severity: MED · status: promoted by operator ruling monster-realm#786 (2026-11-16) · schedule into PLAN §9 by hand
