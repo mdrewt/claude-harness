@@ -15,17 +15,18 @@ the checking apparatus are never tracked here.
 
 <!-- PROMOTED SECTIONS APPEND BELOW THIS LINE -->
 
-### rb-139 — a recruit on the last allowed own turn is counted once: the e2e recruit loop has one home
+### rb-140 — a pad-only player can work the session terminal
 type: feature · tier: routine
-touches: client/e2e/controls.ts, client/e2e/controls.spec.ts, client/e2e/recruit.spec.ts, client/e2e/tactics-wild.spec.ts, docs/e2e-flakes.md
+touches: client/src/main.ts, client/src/main.remap.test.ts, client/src/main.input.test.ts, client/src/ui/sessionView.ts, client/src/ui/sessionView.test.ts, client/src/ui/sessionModel.ts, client/src/ui/sessionModel.test.ts, client/src/ui/i18n/catalog.en.ts, client/src/ui/i18n/catalog.fr.ts, client/src/ui/i18n/catalog.test.ts, ARCHITECTURE.md, docs/DECISIONS.md
 after: []
-`category: loop-ops · severity: MED` · residual: R-th-1-RECRUIT-LASTTURN (planned as th-7)
-Test code only, no product change. `docs/e2e-flakes.md` entry 2 holds the cause, the forcing recipes and the follow-up design: `recruit.spec.ts` R2 answers `'stalled'` before a Recruit pressed on its last own turn resolves, so a success is recruited twice. `tactics-wild.spec.ts` holds a second copy of the loop that already waits.
-- **rb-139.1:** WHEN a Recruit pressed on the loop's last allowed own turn succeeds, THE E2E RECRUIT LOOP SHALL answer `'recruited'`, and its caller SHALL hunt no second wild.
-- **rb-139.2:** WHEN the last allowed own turn has resolved and the battle is still active, THE LOOP SHALL answer `'stalled'`; WHEN it finished with no recruit, `'ended'`.
-- **rb-139.3:** THE E2E SUITE SHALL hold one `fightToRecruit`, in `controls.ts`, taking its own-turn bound as an argument; both specs call it with R2's press and HP bookkeeping and BT12-5-WILD-RECRUIT's forecast-attack count kept and no assertion edited or loosened.
-- **rb-139.4:** WHEN the slice merges, THE SYSTEM SHALL hold no entry 2 in `docs/e2e-flakes.md` (the register's rule: the fix deletes its entry).
-Tests: one case in `controls.spec.ts` for rb-139.1, shown red against a copy of R2's present loop and green against the moved one (both runs in the PR). After the move, the entry's "R2, Recruit held" and "early answer, Recruit held" recipes run on their own spec, 12 runs each, with no run ending with an extra monster; the counts go in the PR. A probe edit never reaches the branch.
+`category: ux-a11y · severity: MED` · residual: R-close-M-gamepad-TERMPAD
+While the session terminal blocks (`sessionGateBlocks`), `pollPad` (`client/src/main.ts`) lets everything go and routes nothing, so a player with only a pad cannot press Retry, Continue as guest, or the confirm step's Yes and No. The terminal stays outside the router and the overlay registry; B and Start stay inert there (CTL8K.1). decision-defaulted:terminal-pad=D-pad moves and A presses (reversible; not taken: B answering No).
+- **rb-140.1:** WHILE the session terminal blocks, WHEN the pad's Down or Up edge arrives from the D-pad or the stick, THE CLIENT SHALL move focus to the next or previous shown terminal button, clamped at the ends, one button per press; from no focused terminal button it seats the default (Retry, or No while armed).
+- **rb-140.2:** WHILE the session terminal blocks, WHEN a pad button bound to A goes down with a shown terminal button focused, THE CLIENT SHALL activate that button exactly once for that press, as a click would.
+- **rb-140.3:** WHEN the session terminal opens, closes, arms or disarms its confirm step while a pad button is held, THE CLIENT SHALL activate nothing and route nothing from that press until the button is released and pressed again.
+- **rb-140.4:** WHILE the session terminal blocks, THE CLIENT SHALL route no pad press to the game, its frames or an accelerator, SHALL do nothing for B, Start and every other button, and SHALL ignore the pad while focus is outside the game screen.
+- **rb-140.5:** WHILE the session terminal blocks, THE CLIENT SHALL keep Tab, Enter and Space working as today and SHALL say in its hint, in English and French, that the D-pad also moves and A also chooses.
+Tests: ordinary vitest tests at the `sessionView` and boot levels (a mocked pad), each red before the fix.
 
 ### R-np-b-SLOWLINK — a player on a slow link walks at full speed
 category: netcode-determinism · severity: MED · status: promoted by operator ruling monster-realm#786 (2026-11-16) · schedule into PLAN §9 by hand
