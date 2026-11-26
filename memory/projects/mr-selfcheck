@@ -944,7 +944,10 @@ try:
     sampled([event(ALLOWED_EV, seven_day=0.40, five_hour=0.10, seven_day_overage_included=0.30)], age=FRESH - 300)
     reads("fresh-inside-bound", {"state": "NORMAL", "source": "telemetry"})
     sampled([event(ALLOWED_EV, seven_day=0.40, five_hour=0.10, seven_day_overage_included=0.30)], age=FRESH + 300)
-    b = reads("stale-falls-back", {"state": "HARD-STOP", "source": "calibration", "effective_usd": 2750.0,
+    # The dollars are past the hard line, but the plan's own (old, low) reading for the window exists:
+    # SOFT-PAUSE, so a session runs and takes the sample that settles it; past hard nothing launches.
+    b = reads("stale-falls-back", {"state": "SOFT-PAUSE", "source": "calibration", "effective_usd": 2750.0,
+                                   "calibration_hard_capped": True, "launchable_tiers": dict((t, False) for t in EST),
                                    "resets_at_utc": utc(NOW - 4 * 86400 + 7 * 86400)})
     if "utilisation" in b or b.get("model_states"):
         fail("governor-stale-falls-back", "a stale reading is still reported: %r" % (b,))
@@ -1008,6 +1011,12 @@ try:
     spent(0.95 * LIMIT)
     os.unlink(TEL)
     reads("no-telemetry", {"state": "SOFT-PAUSE", "source": "calibration", "effective_usd": round(0.95 * LIMIT, 2)})
+    # With no reading of the plan's at all the dollars still HARD-STOP (the cap needs a reading).
+    spent(0.99 * LIMIT)
+    b = reads("no-telemetry-hard", {"state": "HARD-STOP", "source": "calibration"})
+    if "calibration_hard_capped" in b:
+        fail("governor-no-telemetry-hard", "capped without a reading: %r" % (b,))
+    spent(0.95 * LIMIT)
     with open(TEL, "w") as f:
         f.write('not json\n{"ts":"%s","ri":{"unifiedWindows":{"seven_day":{"utilization":"0.2","resetsAt":%d}}}}\n'
                 '{"ts":"%s","rateLimitType":"seven_day","utilization":0.2,"resetsAt":%d}\n'
@@ -1142,7 +1151,7 @@ try:
 
     calls, log = launch_once(SID, True, False)
     if len(calls) != 1 or "--resume %s " % SID not in calls[0] or "THE BRIEF" in calls[0] \
-            or "--model opus --effort high" not in calls[0] or "RESUME=%s PRIOR=28.8414 TS=" % SID not in log:
+            or "--model opus --effort high" not in calls[0] or not re.search(r"RESUME=%s PRIOR=28\.8414 (ARM=off )?TS=" % SID, log):
         fail("launch-resumes-session", "claude calls=%r log=%r" % (calls, log[:300]))
     calls, log = launch_once(SID, False, False)
     if len(calls) != 1 or "--resume" in calls[0] or "THE BRIEF" not in calls[0] or "RESUME=" in log \
@@ -3898,6 +3907,123 @@ for n in names:
 sys.exit(bad)
 PYGATES
 
+
+# Phase-split launch (mr-phase-ab, operator item 2 2026-11-26), driven through the REAL mr-launch.sh
+# with its paths pointed at a sandbox and a stub `claude`: a phased slice runs plan -> build ->
+# finish as three NEW sessions, each told its phase; a control slice runs one session as before; a
+# phase session that stops without its handoff is resumed (not advanced) and told its phase.
+"$MEM/mr-phase-ab" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-phase-ab selftest"; BAD=1; }
+# The other 2026-11-26 tools' own fixtures: the budget re-fit, the no-op fingerprint and its
+# mark/skip predicates, and the read-only residual sorter.
+"$MEM/mr-budget-calibrate" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-budget-calibrate selftest"; BAD=1; }
+"$MEM/mr-tick-fingerprint" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-tick-fingerprint selftest"; BAD=1; }
+"$MEM/mr-residual-history" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-residual-history selftest"; BAD=1; }
+/usr/bin/python3 - "$MEM" <<'PYPHASE' || BAD=1
+import json, os, re, shutil, subprocess, sys, tempfile
+MEM = sys.argv[1]
+LIVE_HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
+bad = 0
+def fail(name, detail=""):
+    global bad
+    bad = 1
+    print("SELFCHECK-FAIL phase-launch-%s%s" % (name, (": " + detail) if detail else ""))
+launch = open(os.path.join(MEM, "mr-launch.sh")).read()
+if LIVE_HARNESS not in launch:
+    fail("anchor", "mr-launch.sh no longer names its HARNESS")
+    sys.exit(1)
+with tempfile.TemporaryDirectory() as root:
+    tmp = os.path.join(root, "tmp"); harness = os.path.join(root, "harness")
+    hmem = os.path.join(harness, "memory", "projects"); specs = os.path.join(harness, "specs", "monster-realm-v2")
+    rundir = os.path.join(harness, "projects", "monster-realm"); stubs = os.path.join(root, "bin"); home = os.path.join(root, "home")
+    for d in (tmp, hmem, specs, rundir, stubs, home):
+        os.makedirs(d)
+    for f in ("mr-cost-sum", "mr-interrupted", "mr-budget-config.json", "mr-phase-ab", "mr-phase-protocol.md"):
+        shutil.copy2(os.path.join(MEM, f), hmem)
+    json.dump({"enabled": True, "target_completed": 5, "max_assigned": 6, "timeout_days": 21}, open(os.path.join(hmem, "mr-phase-ab.json"), "w"))
+    open(os.path.join(specs, "M-x.spec.md"), "w").write("## Slices\n### s-a — a\ntype: feature · tier: routine\n### s-b — b\ntype: feature · tier: routine\n")
+    script = os.path.join(root, "launch.sh")
+    open(script, "w").write(launch.replace(LIVE_HARNESS, harness).replace("/tmp/mr_", tmp + "/mr_"))
+    # claude stub: a new session per call (its own id); writes the phase handoff the prompt asks for,
+    # opens the PR in `finish`, and logs its arguments. `skip-handoff-once` makes one phase session
+    # end without its handoff.
+    open(os.path.join(stubs, "claude"), "w").write(r'''#!/bin/bash
+R=%(root)s; n=$(cat $R/n 2>/dev/null || echo 0); n=$((n+1)); echo $n > $R/n
+sid=$(printf "%%08d-1111-2222-3333-444444444444" $n)
+args="$*"; echo "$args" | tr "\n" " " >> $R/claude-args; echo >> $R/claude-args
+S=$(cat $R/slice)
+echo '{"type":"system","subtype":"init","session_id":"'$sid'"}'
+echo '{"type":"assistant","session_id":"'$sid'","message":{"model":"claude-opus-5-5"}}'
+if [ -e $R/skip-handoff-once ]; then rm -f $R/skip-handoff-once
+elif echo "$args" | grep -q "phase \`plan\`\|this session is phase plan"; then echo "NEXT-PHASE: build" > %(hmem)s/monster-realm-$S-phase.md
+elif echo "$args" | grep -q "phase \`build\`\|this session is phase build"; then echo "NEXT-PHASE: finish" > %(hmem)s/monster-realm-$S-phase.md
+elif echo "$args" | grep -q "phase \`finish\`\|this session is phase finish"; then touch $R/pr-open
+elif ! echo "$args" | grep -q "PHASED RUN"; then touch $R/pr-open
+fi
+echo '{"type":"result","session_id":"'$sid'","total_cost_usd":1.0}'
+''' % {"root": root, "hmem": hmem})
+    open(os.path.join(stubs, "gh"), "w").write('#!/bin/bash\n[ -e "%s/pr-open" ] && printf "feat/s-a\\nfeat/s-b\\n"\nexit 0\n' % root)
+    open(os.path.join(stubs, "sleep"), "w").write("#!/bin/bash\nexit 0\n")
+    for n in ("claude", "gh", "sleep"):
+        os.chmod(os.path.join(stubs, n), 0o755)
+    env = dict(os.environ, HOME=home, PATH=stubs + ":" + os.environ.get("PATH", ""), MR_NO_EVENT_BRIDGE="1", MR_NO_OLLAMA="1",
+               MR_NO_ESCALATE="1", MR_INTERRUPTED_TMP=tmp)
+    def run(slice_, setup=None):
+        for n in ("claude-args", "pr-open", "n", "skip-handoff-once"):
+            try: os.unlink(os.path.join(root, n))
+            except OSError: pass
+        if setup: setup()
+        open(os.path.join(root, "slice"), "w").write(slice_)
+        open(os.path.join(tmp, "mr_pass_%s.md" % slice_), "w").write("THE BRIEF\n")
+        json.dump({"slice": slice_, "tier": "routine"}, open(os.path.join(tmp, "mr_pass_%s.vars.json" % slice_), "w"))
+        r = subprocess.run(["bash", script, slice_, "opus", "high", "project"], env=env, capture_output=True, text=True, timeout=120)
+        args = open(os.path.join(root, "claude-args")).read().splitlines() if os.path.exists(os.path.join(root, "claude-args")) else []
+        log = open(os.path.join(tmp, "mr_pass_%s.log" % slice_), errors="replace").read() if os.path.exists(os.path.join(tmp, "mr_pass_%s.log" % slice_)) else ""
+        done = open(os.path.join(tmp, "mr_pass_%s.done" % slice_)).read().strip() if os.path.exists(os.path.join(tmp, "mr_pass_%s.done" % slice_)) else ""
+        return r, args, log, done
+    r, args, log, done = run("s-a")
+    if len(args) != 3 or any("--resume" in a for a in args):
+        fail("phased-three-new-sessions", "calls=%d %r" % (len(args), [a[:60] for a in args]))
+    elif not ("phase `plan`" in args[0] and "phase `build`" in args[1] and "phase `finish`" in args[2]):
+        fail("phased-phase-order", repr([re.findall(r"phase `(\w+)`", a)[:1] for a in args]))
+    if "ATTEMPT=1 PHASE=build" not in log or "ATTEMPT=1 PHASE=finish" not in log or "ARM=phased" not in log:
+        fail("phased-markers", log[:300])
+    if done != "EXIT=0 ATTEMPTS=1 PHASES=3 ATTEMPTS_TOTAL=3":
+        fail("phased-done", repr(done))
+    jl = os.path.join(hmem, "mr-phase-ab.jsonl")
+    rows = [json.loads(l) for l in open(jl)] if os.path.exists(jl) else []
+    if [r_["phase"] for r_ in rows if r_.get("kind") == "start"] != ["plan", "build", "finish"] \
+            or sum(1 for r_ in rows if r_.get("kind") == "session") != 3:
+        fail("phased-records", repr(rows)[:300])
+    cost = subprocess.run([os.path.join(hmem, "mr-cost-sum"), os.path.join(tmp, "mr_pass_s-a.log")], capture_output=True, text=True, env=env).stdout.strip()
+    if cost != "3.0000":
+        fail("phased-cost", "mr-cost-sum read %r, want 3.0000 over the three sessions" % cost)
+    r, args, log, done = run("s-b")
+    if len(args) != 1 or "PHASED RUN" in args[0] or "ARM=control" not in log or done != "EXIT=0 ATTEMPTS=1":
+        fail("control-one-session", "calls=%d done=%r" % (len(args), done))
+    # a third slice (phased again) whose plan session stops without its handoff: resumed, told its phase
+    with open(os.path.join(specs, "M-x.spec.md"), "a") as fh:
+        fh.write("### s-c — c\ntype: feature · tier: routine\n")
+    open(os.path.join(stubs, "gh"), "w").write('#!/bin/bash\n[ -e "%s/pr-open" ] && printf "feat/s-c\\n"\nexit 0\n' % root)
+    r, args, log, done = run("s-c", setup=lambda: open(os.path.join(root, "skip-handoff-once"), "w").close())
+    if len(args) < 2 or "--resume" not in args[1] or "PHASED RUN: this session is phase plan" not in args[1]:
+        fail("phased-premature-resume", repr([a[:120] for a in args[:2]]))
+    elif not any("phase `build`" in a and "--resume" not in a for a in args[2:]):
+        fail("phased-advance-after-resume", repr([a[:80] for a in args]))
+sys.exit(bad)
+PYPHASE
+
+# Agent roster drift (scripts/sync-agents.mjs): rooted runs start in the game repo, whose
+# .claude/agents/<name>.md shadows the harness agent of that name, so a stale project copy silently
+# overrides a measured routing decision (2026-11: the game tester ran on Sonnet at the parent's
+# effort). A SYNCED agent must equal the harness file; every shared agent must agree on model/effort.
+# Judged against the game's origin/master (what a slice worktree branches from). A harness worktree
+# checks the main checkout's projects/; a fresh clone with none reports AGENTS-SKIPPED: a NOTE.
+AG_OUT=$(node "$MEM/../../scripts/sync-agents.mjs" 2>&1); AG_RC=$?
+case "$AG_RC:$AG_OUT" in
+  0:*AGENTS-OK*) : ;;
+  0:*AGENTS-SKIPPED*) echo "SELFCHECK-NOTE agents-sync skipped ($(echo "$AG_OUT" | grep -m1 '^SKIP' | cut -c1-160))" ;;
+  *) echo "SELFCHECK-FAIL agents-drift: $(echo "$AG_OUT" | grep -E '^(DRIFT|AGENTS-)' | head -4 | tr '\n' ' ' | cut -c1-600) — fix: node scripts/sync-agents.mjs --apply --into <game worktree>, then ship it as a game PR"; BAD=1 ;;
+esac
 
 # Size watch (reports, never gates): the prompt and brief growing back is the failure mode
 # this program existed to stop — surface it, do not block on it.

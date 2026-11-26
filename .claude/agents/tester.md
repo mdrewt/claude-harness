@@ -107,3 +107,5 @@ Read it first when it exists.
   from a space on a Read) and never a `\uXXXX` escape typed into an Edit/Write
   parameter (it may arrive decoded or doubled). After writing, Grep the file for
   a stray `\\u[0-9a-f]{4}` to catch a doubled escape.
+
+<!-- Single source: the harness copy. scripts/sync-agents.mjs generates each project's .claude/agents/tester.md from it and reports drift, so edit it here, never in a project. -->

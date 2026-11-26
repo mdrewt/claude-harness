@@ -1,0 +1,8 @@
+{
+ "_note": "Residual review cadence (operator item 8, 2026-11-26): an rv-<utc> review is due after every_merges merged slices since the last merged rv-* (or since `since`). batch = rows the run checks; max_clusters = fix slices it may propose; min_unreviewed = open rows with no rv verdict yet, below which no review is due. Read by mr-situation (residual_review) and mr-residual-review-playbook.md.",
+ "every_merges": 12,
+ "since": "2026-11-20T00:00:00Z",
+ "batch": 40,
+ "max_clusters": 2,
+ "min_unreviewed": 10
+}

@@ -25,7 +25,7 @@ Put `mr-gates render --slice <SLICE> --format pr` output in the PR body.
 
 **Merge is supervisor-owned:** get this slice's gate green locally, open the PR on `<PR_REPO>`, then STOP. `gh pr merge` is FORBIDDEN to you. After ~4–5 red→fix cycles without local green, PARK (commit + push, leave the PR open, document the blocker).
 
-**Valid stopping points (exhaustive):** (1) PR open + local gate green + every acceptance gate met with evidence or DEFERred; (2) a stop-flag park; (3) the fix-cycle PARK above (blocker in the handoff). On any park, write `$MEM/mr-gates render --slice <SLICE> --format park` to `$MEM/monster-realm-<SLICE>-progress.md`. A mid-slice progress summary is a failure, not a stop — keep working.
+**Valid stopping points (exhaustive; a PHASED RUN block below adds its phase end):** (1) PR open + local gate green + every acceptance gate met with evidence or DEFERred; (2) a stop-flag park; (3) the fix-cycle PARK above (blocker in the handoff). On any park, write `$MEM/mr-gates render --slice <SLICE> --format park` to `$MEM/monster-realm-<SLICE>-progress.md`. A mid-slice progress summary is a failure, not a stop — keep working.
 
 End with: slice · merged|parked|blocked|stopped · PR URL · CI · what changed · decisions · risks.
 

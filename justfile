@@ -2,7 +2,7 @@ set windows-shell := ["cmd.exe", "/c"]
 # Harness self-management (dogfoods the standard the projects follow).
 
 test:
-    node --test scripts/tests/harness.test.mjs scripts/tests/invariants.test.mjs scripts/tests/decision-answers.test.mjs .claude/hooks/quiet/quiet.test.mjs
+    node --test scripts/tests/harness.test.mjs scripts/tests/invariants.test.mjs scripts/tests/decision-answers.test.mjs scripts/tests/sync-agents.test.mjs .claude/hooks/quiet/quiet.test.mjs
 
 # Full harness gate: lint scripts, run tests, gate the research library, and prove the
 # supervisor tooling's own wiring (mr-selfcheck runs each mr-* tool's selftest) — so a

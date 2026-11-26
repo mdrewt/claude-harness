@@ -1,0 +1,9 @@
+{
+ "_note": "Phase-split A/B (operator item 2, 2026-11-26; mr-phase-ab header). enabled is the switch the operator owns; the tool records `disabled` in the gitignored mr-phase-ab.jsonl once the analysis is written.",
+ "enabled": true,
+ "generation": 1,
+ "target_completed": 5,
+ "max_assigned": 6,
+ "timeout_days": 21,
+ "started_utc": "2026-11-26T00:00:00Z"
+}
