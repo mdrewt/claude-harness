@@ -46,10 +46,12 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
 1. **M-weekly-review-2026-11-27** (`M-weekly-review-2026-11-27.spec.md`, authored by the
-   weekly review, pinned @ 26e1e085): four slices — wr261127-a (guest-claim world-row erasure,
-   allowlist retention, the owner’s binding drop), wr261127-b (rename i18n fallback and the
+   weekly review, pinned @ 26e1e085; elaborated 2026-11-27 @ ce7f0000 into four slices under
+   `## Slices`): wr261127-a (guest-claim world-row erasure, allowlist retention, the owner’s
+   binding drop; structural — serial with lpw-32), wr261127-b (rename i18n fallback and the
    turn-bar lead windows), wr261127-c (claim completion on a late account row; a password reset
-   revokes refresh chains), wr261127-d (tester rule: a loaded shared host). Files residuals
+   revokes refresh chains), wr261127-d (tester rule: a loaded shared host; `blocked:` on the
+   operator’s approval of a standards change). Files residuals
    R-weekly-review-2026-11-27-F1..F5; absorbs R-lpw-21-SEED-CAP-DOS, R-acs-7-CLAIMSTALL and
    R-acs-2-RESET-KEEPS-CHAINS.
 2. **M-local-play** (`M-local-play.spec.md`, elaborated 2026-11-16 into 18 `lpw-` slices): the
