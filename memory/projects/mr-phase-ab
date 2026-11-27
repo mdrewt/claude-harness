@@ -393,6 +393,7 @@ def verdict(phased, control, base, timed_out=False):
     Merged slices only; an assigned slice still in flight is listed apart and counts against the
     phased arm only when the experiment ended on its timeout."""
     unmerged = [m for m in phased if not m["merged"]]
+    uc = [m for m in control if not m["merged"]]
     phased = [m for m in phased if m["merged"]]
     control = [m for m in control if m["merged"]]
     ref = control + base
@@ -416,6 +417,12 @@ def verdict(phased, control, base, timed_out=False):
         notes.append("main-thread cost per turn $%.3f vs $%.3f (%+.0f%%)" % (pt, rt, 100 * (pt - rt) / rt))
     if ps and rs:
         notes.append("ledger cost per merged slice $%.1f vs $%.1f (%+.0f%%)" % (ps, rs, 100 * (ps - rs) / rs))
+    # Report-only (2026-11-27, docs/DECISIONS.md "progress per credit"): what the figures above leave
+    # out. Never a guard and never the label: the pre-registered reading stays as registered.
+    if unmerged or uc:
+        notes.append("unmerged at analysis (excluded above): phased %d ($%.1f), control %d ($%.1f)"
+                     % (len(unmerged), sum(m["ledger_cost"] or 0 for m in unmerged),
+                        len(uc), sum(m["ledger_cost"] or 0 for m in uc)))
     if guard or (ps and rs and ps > 1.15 * rs):
         label = "LEANING-REVERT"
     elif pc and rc and pc <= 0.75 * rc and (not (ps and rs) or ps <= 1.10 * rs):
@@ -474,7 +481,10 @@ def report(ctx):
     lines += ["", "Per phase (phased arm): " + "; ".join("%s %s" % (m["slice"], json.dumps(m["per_phase"])) for m in phased), "",
               "In flight at analysis (not in the reading): " + (", ".join(m["slice"] for m in ms if not m["merged"]) or "none"), "",
               "Next: the experiment is now disabled (a `disabled` row in mr-phase-ab.jsonl). Make the changes this analysis "
-              "recommends, then start a fresh experiment by raising `generation` in mr-phase-ab.json (the old rows stay as history)."]
+              "recommends, then start a fresh experiment by raising `generation` in mr-phase-ab.json (the old rows stay as history).", "",
+              "Held for this experiment (docs/DECISIONS.md, \"judged by genuine progress on the game per credit\"): the "
+              "mr-brief-template.md BUDGET line and the milestone-loop-prompt.md slice-count line. Land them now, before "
+              "a new generation starts."]
     return label, "\n".join(lines) + "\n", {"phased": phased, "control": control, "baseline_n": len(base_tiers), "cfg": cfg}
 
 
@@ -504,7 +514,8 @@ def cmd_analyze(ctx, apply_):
     print("PHASE-AB-ANALYZED %s %s -> %s" % (label, why, path), flush=True)
     if os.environ.get("MR_PHASE_AB_NO_NOTIFY") != "1":
         q = ("The phase-split A/B reached its limit (%s) and is now disabled. Reading: %s. Analysis: %s. "
-             "What changes should be made before phased runs are re-enabled (or should they stay off)?" % (why, label, path))
+             "What changes should be made before phased runs are re-enabled (or should they stay off)? The brief and "
+             "milestone-prompt wording held for this experiment can land now (see the analysis's last line)." % (why, label, path))
         for cmd in ([os.path.join(ctx.mem, "mr-ask-drew"), "phase-ab-analysis", "--repo", "mdrewt/claude-harness", "--question", q,
                      "--recommend", "Read %s; adopt only what the per-slice table supports" % path],
                     [os.path.join(ctx.mem, "mr-record"), "handoff", "--title", "Phase-split A/B analysed: %s (experiment disabled)" % label,
@@ -661,12 +672,15 @@ def selftest():
         check("verdict-inflight-ignored", verdict([m(ctx_median=50000), m(merged=False)], [m()], [m()])[0] == "LEANING-ADOPT")
         check("verdict-revert-cost", verdict([m(ctx_median=50000, ledger_cost=40)], [m()], [m()])[0] == "LEANING-REVERT")
         check("verdict-inconclusive", verdict([m(ctx_median=90000)], [m()], [m()])[0] == "INCONCLUSIVE")
+        v = verdict([m(ctx_median=50000), m(merged=False, ledger_cost=12)], [m(), m(merged=False, ledger_cost=7)], [m()])
+        check("verdict-unmerged-noted", v[0] == "LEANING-ADOPT" and not v[2]
+              and "unmerged at analysis (excluded above): phased 1 ($12.0), control 1 ($7.0)" in v[1])
         os.environ.pop("MR_PHASE_AB_NOW", None)
         os.environ.pop("MR_PHASE_AB_NO_NOTIFY", None)
     if bad:
         print("PHASE-AB-SELFTEST-FAIL %s" % " ".join(bad))
         return 1
-    print("PHASE-AB-SELFTEST-OK 39")
+    print("PHASE-AB-SELFTEST-OK 40")
     return 0
 
 
