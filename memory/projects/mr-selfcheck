@@ -1844,7 +1844,7 @@ def fail(name, detail=""):
 def run(args, timeout):
     try:
         r = subprocess.run(["bash", AUDIT] + list(args), capture_output=True, text=True,
-                           timeout=timeout)
+                           timeout=timeout, env=dict(os.environ, MR_AUDIT_NO_LOG="1"))
         return r.returncode, r.stdout or "", r.stderr or ""
     except FileNotFoundError as exc:
         return None, "", "NOT-FOUND: %s" % exc
@@ -3918,6 +3918,7 @@ PYGATES
 "$MEM/mr-budget-calibrate" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-budget-calibrate selftest"; BAD=1; }
 "$MEM/mr-tick-fingerprint" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-tick-fingerprint selftest"; BAD=1; }
 "$MEM/mr-residual-history" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-residual-history selftest"; BAD=1; }
+"$MEM/mr-weekly-rates" --selftest >/dev/null 2>&1 || { echo "SELFCHECK-FAIL mr-weekly-rates selftest"; BAD=1; }
 /usr/bin/python3 - "$MEM" <<'PYPHASE' || BAD=1
 import json, os, re, shutil, subprocess, sys, tempfile
 MEM = sys.argv[1]

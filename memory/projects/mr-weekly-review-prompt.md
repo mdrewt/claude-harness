@@ -203,6 +203,11 @@ default repo, process questions with `--repo mdrewt/claude-harness`. Never pass 
 4. **Stale residuals (visibility only):** reuse the 3a-pull `sweep --dry-run` output and include its obsolete-candidates in the report (only the supervisor may `--apply`); then open MED/LOW rows from `mr-gates residuals list`, oldest
    first, one line each (id, age, title). Do not promote, re-prioritize, or re-report them.
 5. One line on dropped candidates (count + why).
+6. **Loop figures (for the operator to read; nothing gates on them):** run `$MEM/mr-weekly-rates` and
+   paste its three lines verbatim. Add one sentence only if a figure looks worth a look (a rising
+   wontfix share, a merge over a gating or scope finding), naming the slices to sample. The
+   figures come from the registry and mr-audit's own log; never restate or adjust them, and say
+   so when the counts are too small to mean anything.
 
 Then append a short handoff entry via `$MEM/mr-record handoff --title "<title>" --body-file <f>`
 (residual ids, milestone + slice ids, scheduling-PR number, issue numbers, cleanup

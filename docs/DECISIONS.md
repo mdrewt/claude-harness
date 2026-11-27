@@ -50,6 +50,35 @@ of every relaunch.
 Rules out: hand-summing costs at call sites, deciding a session is recorded from its slice name
 and a time window, and editing ledger rows in place.
 
+## The loop is judged by genuine progress on the game per credit; no figure is a target
+The goal is the most genuine, valuable progress on the game per credit spent (operator,
+2026-11-27). Time is not a cost: the same work costs the same credit whenever it runs, so
+finishing more sooner and running out beats spreading less over the week; the governor's
+thresholds exist only so no run starts that the plan's limit would cut off. Quality is fixed: no
+gate, test, lens or Definition-of-Done item is weakened to save credit. Slice counts, cost per
+slice, tokens, lines and test counts are diagnostics people read, never targets — a target gets
+gamed. Scope leaves a slice only as a recorded DEFER or residual; filing one is honest reporting,
+not a cost. Figures come from tools reading ground truth (ledger CLI cost events, PR/CI/git state,
+mr-audit's own log), count every run — failed, crashed, parked and unmerged included — and say
+when the sample is too small: INCONCLUSIVE is a correct reading. Every safeguard costs credit, so a
+check is added only where no mechanism already covers it.
+What this adds is reporting, not steps: mr-phase-ab notes the slices its figures leave out, and the
+weekly review pastes `mr-weekly-rates` (wontfix share of residuals leaving the backlog; merges over
+a detector finding of the slice's own audit, read from mr-audit-log.jsonl). Nothing gates on
+either. The wording changes for build runs wait for the live phase-split analysis, because the brief
+also drives its baseline. They sit in a draft harness PR named by mr-phase-ab.json `held_pr`:
+the brief's BUDGET line ("a sizing TARGET; self-limit to it" becomes a ceiling, scope cut only by
+a recorded DEFER), doc lines a diff made false in scope, small findings on a slice's own new code
+fixed rather than filed, and milestone `touches:` that name the docs a slice's behaviour lives in
+(77 of 240 open residuals on 2026-11-27 were a slice's own fallout in a file it could not edit),
+with slice count never a goal. Recording the analysis queues a supervisor event to merge it.
+Rules out: holding a ready slice to make the budget last (waits that protect quality — CI, green
+tree, quiet window, human activity — stay); splitting, shrinking or reordering work to move a
+number; picking work because it is cheap; reporting an estimate as a measurement; leaving
+unmerged or failed runs out of a figure; a per-slice LLM value judge; a progress-per-credit score
+in the bundle or state; new per-run verification steps; a supervisor-prompt goal block (its pick
+order and holds are already mechanical, and a blunt "never wait" reads against those waits).
+
 ## A credit stop is recorded by the tick wrapper and resumed before any other work
 When a build session ends on a `rejected` rate-limit event, `mr-interrupted` records the stopped
 slices (tier, model, effort, CLI session, launch vars, reset time, and whether the limit covers

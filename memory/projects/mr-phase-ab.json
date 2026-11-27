@@ -5,5 +5,7 @@
  "target_completed": 5,
  "max_assigned": 6,
  "timeout_days": 21,
- "started_utc": "2026-11-26T00:00:00Z"
+ "started_utc": "2026-11-26T00:00:00Z",
+ "held_pr": "mdrewt/claude-harness#300",
+ "_held_note": "held_pr: the PR whose wording waits for this experiment's analysis; analyze --apply queues a supervisor event to merge it (operator 2026-11-27)."
 }

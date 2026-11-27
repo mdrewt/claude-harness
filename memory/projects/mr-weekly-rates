@@ -1,0 +1,250 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands. Python reads this line as a
+# no-op string; sh/bash re-execs the file under python3. Statically enforced by mr-selfcheck.
+"""mr-weekly-rates — two figures the weekly review reports and nothing gates on.
+
+WHY (operator 2026-11-27; docs/DECISIONS.md "progress per credit, no figure is a target")
+The loop has two ways to make work look finished that no per-run check sees: closing a residual
+as `wontfix` instead of fixing it, and merging a slice over a finding of its own audit (the
+supervisor adjudicates audits of slices it launched). Both are often right; a rising share is
+what a human should look at. The figures come from the records themselves — the folded residual
+registry and mr-audit's own log (mr-audit-log.jsonl) — never from a session's account of itself.
+They are COUNTS for a person to read, not a score: nothing in the loop reads this output.
+
+  mr-weekly-rates [--days N] [--now ISO]    report (read-only); rc 0 always
+  mr-weekly-rates --selftest                fixtures in a temp dir; rc 0 = pass
+
+Output:
+  RATES-RESIDUALS days=N new=… left=… wontfix=… (HIGH h MED m LOW l) fixed=… closed=… forced=… open_now=…
+      `left` = residual ids that left the open backlog in the window, by route: `wontfix` and
+      `fixed` dispositions, `closed` by a merged slice (`forced` = closed with a forced reason).
+  RATES-AUDIT days=N merged=… audited=… no_audit_row=… over_finding=… orchestration=… gating=… scope=… acceptance=…
+      Merged slices in the window (latest MERGED ledger row per slice) joined to that slice's last
+      mr-audit row at or before the merge. A finding is a DETECTOR result: orchestration FLAGGED,
+      gating FLAGGED, scope OUT-OF-SCOPE, acceptance FLAGGED, or AUDIT-ERROR on any of them. The
+      hard-tier mandatory read alone is policy, not a finding. `no_audit_row`: merged with no
+      audit row in the log (the log starts 2026-11-27; earlier merges read as no row).
+  RATES-AUDIT-SLICES <slice>:<findings>,…   the merges over a finding, for sampling
+"""
+import datetime
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+import tempfile
+
+MEM = os.path.dirname(os.path.realpath(__file__))
+FINDING = {"orchestration": ("FLAGGED", "AUDIT-ERROR"), "gating": ("FLAGGED", "AUDIT-ERROR"),
+           "scope": ("OUT-OF-SCOPE", "AUDIT-ERROR"), "acceptance": ("FLAGGED", "AUDIT-ERROR")}
+
+
+def _epoch(ts):
+    try:
+        return datetime.datetime.strptime(str(ts)[:19], "%Y-%m-%dT%H:%M:%S").replace(
+            tzinfo=datetime.timezone.utc).timestamp()
+    except Exception:
+        return None
+
+
+def _jsonl(path):
+    out = []
+    try:
+        fh = open(path, errors="replace")
+    except OSError:
+        return out
+    with fh:
+        for line in fh:
+            try:
+                r = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(r, dict):
+                out.append(r)
+    return out
+
+
+def _gates(mem):
+    sys.dont_write_bytecode = True   # mr-gates has no .py name; a cached .pyc would litter MEM
+    loader = importlib.machinery.SourceFileLoader("mr_gates_rates", os.path.join(mem, "mr-gates"))
+    spec = importlib.util.spec_from_loader("mr_gates_rates", loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+def residual_rates(rows, folded_open, t0, t1):
+    """rows: the folded registry (one dict per id); folded_open: count of open ids now."""
+    c = {"new": 0, "left": 0, "wontfix": 0, "fixed": 0, "closed": 0, "forced": 0,
+         "sev": {"HIGH": 0, "MED": 0, "LOW": 0}}
+    for r in rows:
+        e = _epoch(r.get("disclosed_at"))
+        if e is not None and t0 <= e < t1:
+            c["new"] += 1
+        st = r.get("status")
+        if st == "dispositioned":
+            e = _epoch(r.get("dispositioned_at"))
+            if e is None or not (t0 <= e < t1):
+                continue
+            c["left"] += 1
+            if r.get("disposition") == "wontfix":
+                c["wontfix"] += 1
+                sev = str(r.get("severity") or "").upper()
+                if sev in c["sev"]:
+                    c["sev"][sev] += 1
+            elif r.get("disposition") == "fixed":
+                c["fixed"] += 1
+        elif st == "closed":
+            e = _epoch(r.get("closed_at"))
+            if e is None or not (t0 <= e < t1):
+                continue
+            c["left"] += 1
+            c["closed"] += 1
+            if r.get("closed_forced"):
+                c["forced"] += 1
+    c["open_now"] = folded_open
+    return c
+
+
+def audit_rates(ledger, audits, t0, t1):
+    merged = {}
+    for r in ledger:
+        if str(r.get("outcome") or "").strip().upper().startswith("MERGED") and r.get("slice") \
+                and r.get("slice") != "SUPERVISOR":
+            e = _epoch(r.get("ts"))
+            if e is not None and (r["slice"] not in merged or e > merged[r["slice"]]):
+                merged[r["slice"]] = e
+    by_slice = {}
+    for a in audits:
+        e = _epoch(a.get("ts"))
+        if e is not None and a.get("slice"):
+            by_slice.setdefault(a["slice"], []).append((e, a))
+    c = {"merged": 0, "audited": 0, "no_audit_row": 0, "over_finding": 0,
+         "orchestration": 0, "gating": 0, "scope": 0, "acceptance": 0, "slices": []}
+    for sl, me in sorted(merged.items(), key=lambda kv: kv[1]):
+        if not (t0 <= me < t1):
+            continue
+        c["merged"] += 1
+        prior = [x for x in by_slice.get(sl, []) if x[0] <= me + 60]
+        if not prior:
+            c["no_audit_row"] += 1
+            continue
+        c["audited"] += 1
+        last = max(prior, key=lambda x: x[0])[1]
+        hits = [k for k, bad in FINDING.items() if last.get(k) in bad]
+        for k in hits:
+            c[k] += 1
+        if hits:
+            c["over_finding"] += 1
+            c["slices"].append("%s:%s" % (sl, "+".join("%s=%s" % (k, last.get(k)) for k in hits)))
+    return c
+
+
+def report(mem, days, now):
+    t1 = now
+    t0 = now - days * 86400
+    try:
+        g = _gates(mem)
+        rows = g.residual_rows(os.path.join(mem, "mr-residuals.jsonl"))
+        folded = list(g.fold_residuals(rows).values())
+        nopen = len(g.open_residuals(rows))
+        rr = residual_rates(folded, nopen, t0, t1)
+        print("RATES-RESIDUALS days=%d new=%d left=%d wontfix=%d (HIGH %d MED %d LOW %d) fixed=%d closed=%d forced=%d open_now=%d"
+              % (days, rr["new"], rr["left"], rr["wontfix"], rr["sev"]["HIGH"], rr["sev"]["MED"], rr["sev"]["LOW"],
+                 rr["fixed"], rr["closed"], rr["forced"], rr["open_now"]))
+    except Exception as e:
+        print("RATES-RESIDUALS-ERROR %s: %s" % (type(e).__name__, str(e)[:120]))
+    try:
+        ar = audit_rates(_jsonl(os.path.join(mem, "monster-realm-usage-ledger.jsonl")),
+                         _jsonl(os.path.join(mem, "mr-audit-log.jsonl")), t0, t1)
+        print("RATES-AUDIT days=%d merged=%d audited=%d no_audit_row=%d over_finding=%d orchestration=%d gating=%d scope=%d acceptance=%d"
+              % (days, ar["merged"], ar["audited"], ar["no_audit_row"], ar["over_finding"], ar["orchestration"],
+                 ar["gating"], ar["scope"], ar["acceptance"]))
+        print("RATES-AUDIT-SLICES %s" % (",".join(ar["slices"]) or "none"))
+    except Exception as e:
+        print("RATES-AUDIT-ERROR %s: %s" % (type(e).__name__, str(e)[:120]))
+    return 0
+
+
+def selftest():
+    bad = []
+
+    def check(name, cond):
+        if not cond:
+            bad.append(name)
+
+    T = 1_800_000_000
+    iso = lambda e: datetime.datetime.fromtimestamp(e, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    t0, t1 = T - 7 * 86400, T
+    rows = [
+        {"id": "a", "status": "dispositioned", "disposition": "wontfix", "severity": "MED",
+         "disclosed_at": iso(T - 30 * 86400), "dispositioned_at": iso(T - 86400)},
+        {"id": "b", "status": "dispositioned", "disposition": "wontfix", "severity": "LOW",
+         "disclosed_at": iso(T - 2 * 86400), "dispositioned_at": iso(T - 2 * 86400)},
+        {"id": "c", "status": "dispositioned", "disposition": "fixed", "severity": "LOW",
+         "disclosed_at": iso(T - 20 * 86400), "dispositioned_at": iso(T - 3 * 86400)},
+        {"id": "d", "status": "closed", "closed_forced": True, "disclosed_at": iso(T - 40 * 86400),
+         "closed_at": iso(T - 86400)},
+        {"id": "e", "status": "dispositioned", "disposition": "wontfix", "severity": "HIGH",
+         "disclosed_at": iso(T - 40 * 86400), "dispositioned_at": iso(T - 9 * 86400)},   # before the window
+        {"id": "f", "status": "unpromoted", "disclosed_at": iso(T - 3600)},
+    ]
+    r = residual_rates(rows, 1, t0, t1)
+    check("res-new", r["new"] == 2)
+    check("res-left", r["left"] == 4)
+    check("res-wontfix", r["wontfix"] == 2 and r["sev"] == {"HIGH": 0, "MED": 1, "LOW": 1})
+    check("res-fixed-closed", r["fixed"] == 1 and r["closed"] == 1 and r["forced"] == 1)
+    ledger = [
+        {"ts": iso(T - 3600), "slice": "s1", "outcome": "MERGED"},
+        {"ts": iso(T - 7200), "slice": "s2", "outcome": "MERGED"},
+        {"ts": iso(T - 7300), "slice": "s3", "outcome": "MERGED"},
+        {"ts": iso(T - 10 * 86400), "slice": "s4", "outcome": "MERGED"},     # before the window
+        {"ts": iso(T - 3600), "slice": "SUPERVISOR", "outcome": "MERGED"},
+        {"ts": iso(T - 3600), "slice": "s5", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)"},
+    ]
+    audits = [
+        {"ts": iso(T - 4000), "slice": "s1", "gating": "FLAGGED", "orchestration": "CLEAN",
+         "scope": "IN-SCOPE", "acceptance": "CLEAN"},
+        {"ts": iso(T - 3700), "slice": "s1", "gating": "CLEAN", "orchestration": "CLEAN",
+         "scope": "OUT-OF-SCOPE", "acceptance": "CLEAN"},                     # the last one counts
+        {"ts": iso(T - 3000), "slice": "s1", "gating": "FLAGGED"},              # after the merge: ignored
+        {"ts": iso(T - 7500), "slice": "s2", "gating": "CLEAN", "orchestration": "CLEAN", "scope": "IN-SCOPE",
+         "acceptance": "CLEAN", "mandatory_read": True, "read_reason": ["hard-tier"]},   # policy only
+    ]
+    a = audit_rates(ledger, audits, t0, t1)
+    check("aud-merged", a["merged"] == 3)
+    check("aud-rows", a["audited"] == 2 and a["no_audit_row"] == 1)
+    check("aud-last-row", a["over_finding"] == 1 and a["scope"] == 1 and a["gating"] == 0)
+    check("aud-slices", a["slices"] == ["s1:scope=OUT-OF-SCOPE"])
+    check("aud-policy-not-finding", not any(s.startswith("s2") for s in a["slices"]))
+    with tempfile.TemporaryDirectory() as d:
+        open(os.path.join(d, "mr-gates"), "w").write("raise RuntimeError('no gates here')\n")
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = report(d, 7, T)
+        out = buf.getvalue()
+        check("report-rc0", rc == 0)
+        check("report-residual-error-line", "RATES-RESIDUALS-ERROR" in out)
+        check("report-audit-empty", "RATES-AUDIT days=7 merged=0" in out and "RATES-AUDIT-SLICES none" in out)
+    if bad:
+        print("RATES-SELFTEST-FAIL %s" % " ".join(bad))
+        return 1
+    print("RATES-SELFTEST-OK 12")
+    return 0
+
+
+if __name__ == "__main__":
+    argv = sys.argv[1:]
+    if "--selftest" in argv:
+        sys.exit(selftest())
+    try:
+        days = int(argv[argv.index("--days") + 1]) if "--days" in argv else 7
+        now = _epoch(argv[argv.index("--now") + 1]) if "--now" in argv else None
+    except (ValueError, IndexError):
+        print("RATES-ERROR usage: mr-weekly-rates [--days N] [--now ISO]")
+        sys.exit(0)
+    sys.exit(report(MEM, days, now if now is not None else datetime.datetime.now(datetime.timezone.utc).timestamp()))
