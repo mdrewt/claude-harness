@@ -1,6 +1,6 @@
 Build exactly ONE mergeable Monster Realm v2 slice — `<SLICE>` (<TARGET_DESC>) — then stop. Follow `specs/monster-realm-v2/build-loop-prompt.md`, the project `AGENTS.md`, and `~/.claude/harness/standards/` (`testing-tdd.md` is the verification SSOT). Right-size: if planning shows the slice is large, ship the smallest coherent increment and DEFER the rest.
 
-**Scope:** your diff ⊆ `touches:` — <TOUCHES> — plus sibling tests of declared code files and a `docs/DECISIONS.md` entry ONLY at `standards/decisions.md`'s bar (mandatory if `touches:` names it). List extras under PR-body `touches-delta:`. Need another file (proved by probe, red test, compile error or named pin; any stage; never insurance)? Unless your spec forbids widening: `$MEM/mr-touches widen --slice <SLICE> --why "<proof>" <path>…`; REFUSED = hidden dependency: stop + handoff note.
+**Scope:** your diff ⊆ `touches:` — <TOUCHES> — plus sibling tests of declared code files, `ARCHITECTURE.md`/`CHANGELOG.md` lines your diff made false, a `docs/DECISIONS.md` entry ONLY at `standards/decisions.md`'s bar (mandatory if `touches:` names it). List extras under PR-body `touches-delta:`. Need another file (proved by probe, red test, compile error, named pin, or a line your diff made false; any stage; never insurance)? Unless your spec forbids widening: `$MEM/mr-touches widen --slice <SLICE> --why "<proof>" <path>…`; REFUSED = hidden dependency: stop + handoff note.
 **Boy Scout (within `touches:` only):** bounded in-file cleanups (file-local names, dead code, comment accuracy), ≤ ~40 lines / 3 hunks, attributed under `boyscout-delta:` (`file:lines — why`); excess is a follow-up flag, never a blocker; no cleanup in gating tests or interface-freeze slices.
 **`type: refactor` slice:** `standards/spec-driven.md` §Refactor slices binds (PR title `refactor(<scope>): <SLICE> — …`; `moved-tests:` rows; whole or parked, no DEFER, no `mr-touches`); the Boy Scout cap never limits the declared move.
 **Only a `ci-fix-*` slice fixes/reverts a red `master`** (over scope and Boy Scout); others keep building.
@@ -21,7 +21,7 @@ Build exactly ONE mergeable Monster Realm v2 slice — `<SLICE>` (<TARGET_DESC>)
 `DEFER: <gate-id> -> <slice id | backlog | wontfix> [category/SEVERITY] — <reason>` is the only other legal exit; deferring more than half is a sizing failure.
 Put `mr-gates render --slice <SLICE> --format pr` output in the PR body.
 
-**Definition of done:** this slice's gate (REPO above) green, honestly, per `testing-tdd.md` · review lenses closed · comments/docs you add or touch state current behaviour, never history (once committed, `$MEM/mr-comment-scan --repo <WT_ROOT>/<SLICE>`: CLEAN or each finding answered under PR-body `comment-scan:`) · spec gaps/follow-ups: `$MEM/mr-gates notes add`, never a main-checkout edit. **Budget: the weekly plan allowance — prefer lenses catching distinct defect classes over re-runs; never trade a lens for cost.**
+**Definition of done:** this slice's gate (REPO above) green, honestly, per `testing-tdd.md` · review lenses closed (small findings on your new code: fix, don't file) · comments/docs you add or touch state current behaviour, never history (once committed, `$MEM/mr-comment-scan --repo <WT_ROOT>/<SLICE>`: CLEAN or each finding answered under PR-body `comment-scan:`) · spec gaps/follow-ups: `$MEM/mr-gates notes add`, never a main-checkout edit. **Never trade a lens for cost; prefer lenses catching distinct defect classes over re-runs.**
 
 **Merge is supervisor-owned:** get this slice's gate green locally, open the PR on `<PR_REPO>`, then STOP. `gh pr merge` is FORBIDDEN to you. After ~4–5 red→fix cycles without local green, PARK (commit + push, leave the PR open, document the blocker).
 
@@ -33,4 +33,4 @@ End with: slice · merged|parked|blocked|stopped · PR URL · CI · what changed
 
 The PR description MUST include `Items: <feedback-ledger ids, or none>`.
 
-**BUDGET: $<CAP_USD> for this slice — a sizing TARGET; self-limit to it.** Before every subagent spawn and new top-level task check: `/tmp/mr_warn_<SLICE>` = converge on finishing, no new scope or fan-outs; `/tmp/mr_stop_<SLICE>` = spawn nothing, park per Checkpoint. Blowing the cap parks the slice (sizing failure).
+**BUDGET: $<CAP_USD> for this slice — a ceiling, not a goal; cut scope only by a recorded DEFER.** Before every subagent spawn and new top-level task check: `/tmp/mr_warn_<SLICE>` = converge on finishing, no new scope or fan-outs; `/tmp/mr_stop_<SLICE>` = spawn nothing, park per Checkpoint. Blowing the cap parks the slice (sizing failure).
