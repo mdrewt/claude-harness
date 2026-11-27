@@ -35,15 +35,13 @@ Named deferrals (declared, not dropped):
 
 ## Decisions (defaults recorded; each reversible)
 
-- decision-defaulted:allowlist-erasure (decision issue monster-realm#886, unanswered) = the
+- decision-defaulted:allowlist-erasure (decision issue monster-realm#886, the recommendation accepted by the operator 2026-11-27) = the
   deletion cascade removes the deleted account's subject from `world_allowlist` when no other
   counted binding carries it (reversible; not taken: documented retention as host-owned data).
   The account row holds no subject, so the subject removed is the one on the deleted identity's
   own `world_binding` row, read before the cascade erases it; an identity with no binding removes
   nothing. An entry the host typed in by hand that equals that subject goes too: it names the
-  same person. If the answer flips before wr261127-a builds, wr261127-a.3 and wr261127-a.4 are
-  amended to pin retention before the build, and the slice ships the manifest-basis and
-  delete-account wording for it instead.
+  same person.
 - decision-defaulted:drop-unknown-refused = `drop_world_binding` naming an identity with no
   binding is refused with an error, not a silent success (reject, don't clamp; the owner asked
   for something that did not happen). The self-scoped `unbind_world_account` stays idempotent.
