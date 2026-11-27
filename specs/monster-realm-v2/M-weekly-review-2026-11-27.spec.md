@@ -27,7 +27,7 @@ Named deferrals (declared, not dropped):
   the lpw-15 tables that ship today (follow-up `R-lpw-23-NOTEB3940F`, target lpw-23).
 - ID tokens issued before a password reset stay valid until they expire (`ID_TOKEN_TTL_SECONDS`
   in the account service), and the game connection signs in with one: wr261127-c ends the
-  refresh chain, not the live token. Target: backlog, follow-up `R-wr261127-c-NOTE309F3A`.
+  refresh chain, not the live token; a browser sign-in session of the provider (`ttl.Session`, 60 s) that predates the reset is likewise left to expire. Target: backlog, follow-up `R-wr261127-c-NOTE309F3A`.
 - `R-np-b-SLOWLINK` (operator-promoted, monster-realm#786): measure-first work too large for this
   wave; it keeps its own hand-scheduled slot.
 - `R-lpw-15-NOTEF43B6E`: its erase half was fixed by lpw-22 and its export half duplicates
@@ -202,11 +202,11 @@ after: []
 
 - **wr261127-b.1:** WHEN a player whose name is empty opens the rename overlay, THE CLIENT SHALL put the active catalog's `rename.unnamed` string in the current-name element, the English string under `en` and the French one under `fr`.
 
-- **wr261127-b.2:** WHEN the tuning input is a surge start of 5 and a wild cap of 20, THE CLIENT SHALL show the surge lead-in badge from round 3, the active surge badge from round 5 on, and the retreat badge from round 15, and neither badge before its round.
+- **wr261127-b.2:** WHEN the tuning input is a surge start of 5 and a wild cap of 20, THE CLIENT SHALL show, in a PvP battle, the surge lead-in badge from round 3 and the active surge badge from round 5 on, and, in a wild battle, the retreat badge from round 15, and neither badge before its round.
 
-- **wr261127-b.3:** WHEN the tuning input is a surge start of 9 and a wild cap of 30, THE CLIENT SHALL show the surge lead-in badge from round 7, the active surge badge from round 9 and the retreat badge from round 25.
+- **wr261127-b.3:** WHEN the tuning input is a surge start of 9 and a wild cap of 30, THE CLIENT SHALL show, in a PvP battle, the surge lead-in badge from round 7 and the active surge badge from round 9, and, in a wild battle, the retreat badge from round 25.
 
-- **wr261127-b.4:** WHEN the surge start is at or below `SURGE_LEAD`, THE CLIENT SHALL show the surge lead-in badge from the battle's first round.
+- **wr261127-b.4:** WHEN the surge start is at or below `SURGE_LEAD`, THE CLIENT SHALL show a PvP battle a surge badge from its first round: the lead-in before the start, the active badge from it.
 - DoD: wr261127-b.1 to wr261127-b.4 green in vitest; `just ci` green.
 
 ### wr261127-c — account claim completion and reset revocation
@@ -253,10 +253,10 @@ after: []
 
 - **wr261127-c.3:** WHEN the late claim is answered, THE CLIENT SHALL raise `onClaimResult` with the reducer's outcome, success or refusal text, and SHALL NOT raise it before the answer.
 
-- **wr261127-c.4:** WHEN a dev account's password is reset, THE SERVICE SHALL refuse every refresh token and authorization code issued for that account before the reset, so the next refresh or code exchange fails and a new sign-in needs the new password.
+- **wr261127-c.4:** WHEN a dev account's password is reset, THE SERVICE SHALL refuse every refresh token and authorization code issued for that account in an earlier second than the reset, so the next refresh or code exchange fails and a new sign-in needs the new password.
 
 - **wr261127-c.5:** WHEN the account signs in with its new password after a reset, in the same second or later, THE SERVICE SHALL issue codes and refresh tokens that refresh as before.
-- DoD: wr261127-c.1 to wr261127-c.3 green in the connection runtime test, with the account row delayed past the first snapshot and, separately, inside it; wr261127-c.4 and wr261127-c.5 green against a provider and store driven through `resetPassword`; `just ci` green.
+- DoD: wr261127-c.1 to wr261127-c.3 green in the connection runtime test, with the account row delayed past the first snapshot and, separately, inside it; wr261127-c.4 and wr261127-c.5 green against a provider and store driven through `resetPassword` on an injected clock that crosses a second boundary; `just ci` green.
 
 ### wr261127-d — tester rule: a slice's run must survive a loaded host
 
