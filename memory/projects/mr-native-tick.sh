@@ -231,6 +231,30 @@ if [ -d "$ARCH" ] && { [ ! -f "$ARCH/.last-rollup" ] || [ $(( $(date +%s) - $(st
   touch "$ARCH/.last-rollup" 2>/dev/null || true
 fi
 
+# WEEKLY BUDGET-CALIBRATION CHECK (2026-11-26; 7d marker, same shape as the gates above). The plan's
+# own utilisation readings are re-fitted against the ledger (mr-budget-calibrate --check); a fit
+# more than 20% from mr-budget-config.json's weekly_limit_usd files ONE non-blocking operator
+# question for the ISO week. Nothing here writes the tracked config. Never fails the tick. A drift
+# whose question could not be filed, or a check that gave no answer, leaves the marker alone, so the
+# next tick tries again. Its own lock, so two ticks at once (cron + event) never ask twice.
+exec 8>/tmp/mr_calibrate.flock
+if flock -n 8 && { [ ! -f "$MEM/.calibrate-last" ] || [ $(( $(date +%s) - $(stat -c %Y "$MEM/.calibrate-last" 2>/dev/null || echo 0) )) -gt 604800 ]; }; then
+  CB=$(timeout 60 "$MEM/mr-budget-calibrate" --check 2>/dev/null | grep -E '^CALIBRATE-(DRIFT|OK|ERROR)' | tail -1)
+  [ -n "$CB" ] && log "BUDGET-$CB"
+  CB_ASKED=1
+  case "$CB" in
+    ""|CALIBRATE-ERROR*) CB_ASKED=0 ;;
+    CALIBRATE-DRIFT*)
+      CB_ASK=$(timeout 90 "$MEM/mr-ask-drew" "budget-calibration-$(date -u +%G-w%V)" --repo mdrewt/claude-harness \
+        --question "The plan's own utilisation readings put a week at a different number of ledger dollars than mr-budget-config.json: ${CB#CALIBRATE-DRIFT }. Re-fit weekly_limit_usd?" \
+        --recommend "Run memory/projects/mr-budget-calibrate --apply (it moves the value at most 25% toward the fit and scales fable_allowance_usd with it) and ship the config in a harness PR; repeat next week if it still drifts" 2>&1)
+      printf '%s\n' "$CB_ASK" >> "$LOG"
+      case "$CB_ASK" in *ASK-DREW-OK*) : ;; *) CB_ASKED=0 ;; esac ;;
+  esac
+  [ "$CB_ASKED" = 1 ] && touch "$MEM/.calibrate-last" 2>/dev/null || true
+fi
+exec 8>&-
+
 # A due credit-stop resume (CGATE) is not what the marker waits on, so it passes like an event tick.
 if [ -f "$MEM/.blocked-on-human" ] && [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ] && [ "${CGATE#DUE }" = "${CGATE:-}" ]; then
   WAKE=$(grep -m1 -oE "wake_file=[^ ]+" "$MEM/.blocked-on-human" 2>/dev/null | cut -d= -f2)
@@ -426,6 +450,28 @@ fi
 RESUME_FIRST=$(timeout 60 "$MEM/mr-interrupted" vars --due 2>/dev/null)
 
 # assemble prompt (SSOT + situation + pending events + event arg)
+# NO-OP STAND-DOWN (operator item 7, 2026-11-26). The wrapper never guesses what a decision session
+# would decide. It skips one only when every input a decision reads (mr-tick-fingerprint: the bundle's
+# decision fields, both repos' remote heads, HEADs and open PRs with their check states, the spec
+# corpus, the residual and feedback ledgers, the doctrine and budget/review configs, the queue/inflight
+# keys of mr-state.json, the hold/blocked/mutex flags and the UTC date) is identical to the inputs of a
+# session that just STOOD DOWN ON BUDGET ALONE and changed nothing (`.noop-tick`, written after the
+# session below — `mr-tick-fingerprint mark-ok`: any other cause, a human at work, a quiet window, a
+# merge left for later, never marks, because those clear without an input changing). The marker is
+# good for NOOP_MAX_AGE_S from that session's START and only while the plan's utilisation was sampled
+# within NOOP_SAMPLE_MAX_AGE_S, so on the hourly cron at most one tick in a row is skipped and the
+# budget reading never goes stale behind skips. Event, manual and forced ticks, pending events and
+# credit-stop resumes always run a session; an unreadable input never matches. Kept out of the
+# selfcheck's replayed governor/after-session pieces on purpose (both anchors stay where they were).
+NOOP_MAX_AGE_S=5400
+NOOP_SAMPLE_MAX_AGE_S=5400
+FP_PRE=$(printf '%s' "$SIT" | timeout 120 "$MEM/mr-tick-fingerprint" 2>/dev/null | sed -n 's/^FP \([0-9a-f]\{64\}\)$/\1/p')
+if [ "$SRC" = "cron" ] && [ "${MR_FORCE:-0}" != "1" ] && [ -z "$EVFILE" ] && [ -z "$RESUME_FIRST" ] && [ -n "$FP_PRE" ] \
+   && [ -z "$(ls -A "$MEM/pending-events" 2>/dev/null | grep -v '^archive$' | grep -v '^\.' | head -1)" ] && [ -f "$MEM/.noop-tick" ]; then
+  NOOP=$(timeout 30 "$MEM/mr-tick-fingerprint" skip-ok --marker "$MEM/.noop-tick" --fp "$FP_PRE" --max-age "$NOOP_MAX_AGE_S" \
+           --telemetry "$MEM/mr-rate-limit-telemetry.jsonl" --sample-max-age "$NOOP_SAMPLE_MAX_AGE_S" 2>/dev/null)
+  case "$NOOP" in "SKIP "*) log "STANDDOWN unchanged-since-noop ${NOOP#SKIP }"; exit 0 ;; esac
+fi
 RID="native-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 PROMPTF="/tmp/mr_tick_prompt_$RID.md"
 cat "$MEM/mr-supervisor-prompt-native.md" > "$PROMPTF"
@@ -446,6 +492,10 @@ if [ "${MR_TICK_DRYRUN:-0}" = "1" ]; then
   echo "DECISION-NEEDED (dryrun) prompt=$PROMPTF"; exit 0
 fi
 log "SPAWN model=$SUP_MODEL effort=$SUP_EFFORT governor=$GSTATE rid=$RID tlog=$TLOG events=$(echo $CONSUMED | wc -w)"
+# The no-op marker describes only the session about to run: removed now, written again after it only
+# for a session that stood down on budget alone and changed nothing. Its age counts from this start.
+rm -f "$MEM/.noop-tick"
+SESS_T0=$(date -u +%s)
 LOGPOS=$(stat -c %s "$LOG" 2>/dev/null || echo 0)   # the session's own DECISION line lands after this offset
 cd "$HARNESS" || { log "ERROR cd-harness-failed"; exit 1; }
 # Mutex hygiene (2026-11-06): the LLM tick takes the chain-owner mutex under THIS wrapper's pid (the
@@ -565,6 +615,21 @@ if [ "$RC" -eq 0 ]; then
   BR=$(git -C "$HARNESS" rev-parse --abbrev-ref HEAD 2>/dev/null)
   if [ "$BR" = "main" ] && [ -n "$(git -C "$HARNESS" log --oneline origin/main..main 2>/dev/null | head -1)" ]; then
     if git -C "$HARNESS" push origin main >> "$LOG" 2>&1; then log "PUSH origin/main synced"; else log "NOTE push-failed — main stays ahead (non-fatal)"; fi
+  fi
+  # PHASE-SPLIT A/B (mr-phase-ab): once the fifth assigned slice has merged — in the session that just
+  # ended — the analysis is recorded now and the experiment disables itself. A no-op until then;
+  # silent unless it acted.
+  PAB=$(timeout 180 "$MEM/mr-phase-ab" analyze --apply 2>/dev/null | grep -E '^PHASE-AB-ANALYZED' | head -1)
+  [ -n "$PAB" ] && log "$PAB"
+  # NO-OP MARKER (see NO-OP STAND-DOWN above): the session wrote exactly one DECISION line, a
+  # stand-down whose every held candidate was held by the budget and that names no action
+  # (mr-tick-fingerprint mark-ok), and the inputs read again now hash to what they were before it.
+  if [ -n "${FP_PRE:-}" ] && [ "$(printf '%s\n' "$DECLINES" | timeout 30 "$MEM/mr-tick-fingerprint" mark-ok --held "${HELD:-}" 2>/dev/null)" = MARK ]; then
+    FP_POST=$("$MEM/mr-situation" --fresh 2>/dev/null | timeout 120 "$MEM/mr-tick-fingerprint" 2>/dev/null | sed -n 's/^FP \([0-9a-f]\{64\}\)$/\1/p')
+    if [ -n "$FP_POST" ] && [ "$FP_POST" = "$FP_PRE" ]; then
+      printf '{"fp":"%s","ts":%s,"rid":"%s"}\n' "$FP_PRE" "${SESS_T0:-$(date -u +%s)}" "$RID" > "$MEM/.noop-tick"
+      log "NOOP-MARK rid=$RID (the next cron tick stands down free if nothing changes, within ${NOOP_MAX_AGE_S}s of this session's start)"
+    fi
   fi
 else
   REASON=$(grep -m1 -iE 'not logged in|please run /login|invalid api key|api key|authentication|unauthorized|forbidden' "$TLOG" 2>/dev/null | tr -d '\r' | head -c 200)

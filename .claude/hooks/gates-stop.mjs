@@ -31,7 +31,7 @@
 // so interactive sessions, other projects and the supervisor's own decision ticks are untouched
 // (mr-launch.sh prefix-scopes MR_SLICE per invocation and mr-native-tick.sh scrubs it).
 
-import { readFileSync, appendFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, appendFileSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
@@ -41,7 +41,7 @@ const MAX_BLOCKS = 3; // recorded now; enforced by the arming slice
 
 // PURE decision function — no I/O, so it is testable. `exists` is injected; that is the seam the
 // fixtures use, and it is deliberately a parameter rather than an env override.
-export function decide({ slice, text, payload = {}, exists, prevState = null }) {
+export function decide({ slice, text, payload = {}, exists, prevState = null, phase = "", phaseEnd = false }) {
   const { unmet, total, deferred } = parseGates(text);
   const base = {
     total,
@@ -66,6 +66,14 @@ export function decide({ slice, text, payload = {}, exists, prevState = null }) 
   ];
   for (const [p, why] of valves) {
     if (exists(p)) return { decision: `WOULD-RELEASE-${why}`, detail: base, state: prevState };
+  }
+  // A phased run (mr-phase-ab, the phase-split experiment) ends a session at every phase boundary
+  // with later gates unmet by design; the launcher starts the next phase. Recorded as its own
+  // release — only when this session wrote the handoff naming a later phase (`phaseEnd`, computed in
+  // main) — so those stops never enter the WOULD-BLOCK baseline, while any other stop of a phased
+  // session, and every stop in `finish`, is judged like any other.
+  if (phase && phase !== "finish" && phaseEnd) {
+    return { decision: "WOULD-RELEASE-phase-end", detail: { ...base, phase }, state: prevState };
   }
   // Landing pattern: at 80% of cap the right ask is "record DEFER lines for what will not land",
   // not "do more work". NOTE for the arming slice: mr-cost-watch touches this file
@@ -122,7 +130,9 @@ function main() {
     /* fresh */
   }
 
-  const { decision, detail, state } = decide({ slice, text, payload, exists: existsSync, prevState });
+  const phase = /^[a-z]+$/.test(process.env.MR_PHASE || "") ? process.env.MR_PHASE : "";
+  const { decision, detail, state } = decide({ slice, text, payload, exists: existsSync, prevState, phase,
+    phaseEnd: phase ? handedOver(slice, phase, Number(process.env.MR_PHASE_T0) || 0) : false });
   if (state && state !== prevState) {
     try {
       writeFileSync(statePath, JSON.stringify(state));
@@ -131,6 +141,19 @@ function main() {
     }
   }
   log(slice, decision, detail);
+}
+
+// The session handed its phase over: the handoff ($MEM/monster-realm-<slice>-phase.md, written by the
+// run per mr-phase-protocol.md) names a later phase on line 1 and was written since the session began.
+function handedOver(slice, phase, t0) {
+  try {
+    const p = join(MEM, `monster-realm-${slice}-phase.md`);
+    const m = /^NEXT-PHASE:\s*(build|finish)\s*$/.exec(readFileSync(p, "utf8").split(/\r?\n/, 1)[0]);
+    const order = ["plan", "build", "finish"];
+    return !!m && order.indexOf(m[1]) > order.indexOf(phase) && statSync(p).mtimeMs / 1000 >= t0 - 1;
+  } catch {
+    return false;
+  }
 }
 
 function parseGates(text) {
@@ -233,6 +256,13 @@ function selftest() {
     eq(`S8-valve-${why}`, `WOULD-RELEASE-${why}`,
       D({ text: unmetOnly, exists: (q) => q === p }).decision);
   }
+
+  eq("S8-phase-end-releases", "WOULD-RELEASE-phase-end", D({ text: unmetOnly, phase: "plan", phaseEnd: true }).decision,
+    "a phase boundary of a phased run is not a premature stop");
+  eq("S8-phase-stop-without-handoff-blocks", "WOULD-BLOCK", D({ text: unmetOnly, phase: "plan" }).decision,
+    "a phased session that stops without handing over is judged like any stop");
+  eq("S8-phase-finish-still-blocks", "WOULD-BLOCK", D({ text: unmetOnly, phase: "finish" }).decision,
+    "the last phase is judged like any stop");
 
   eq("S9-landing-pattern", "WOULD-NOT-BLOCK-landing-pattern",
     D({ text: unmetOnly, exists: (q) => q === "/tmp/mr_warn_s" }).decision);

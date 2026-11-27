@@ -1,0 +1,323 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands. Python reads this line as a
+# no-op string; sh/bash re-execs the file under python3. Statically enforced by mr-selfcheck.
+"""mr-budget-calibrate — fit `weekly_limit_usd` to the plan's own utilisation readings.
+
+WHY
+---
+The budget governor (mr-situation) puts the plan's real utilisation on a dollar scale:
+`effective_usd = utilisation x weekly_limit_usd`, and a launch fits when `projected_usd +
+launch_est_usd[tier] <= hard_stop_frac x weekly_limit_usd`. `launch_est_usd` and the ledger are in
+LEDGER dollars (the CLI's own cost figures), so `weekly_limit_usd` must be the number of ledger
+dollars one whole window holds — or every headroom figure is off by the same factor. The July
+anchor (internal $1002 = 36%) gave $2783; the readings since then say about $1.7k: a 97% week
+carried $1,406 of ledger rows. An inflated limit overstates headroom, so a launch that should
+have waited starts and is cut off by a credit stop (its resume rereads its whole context).
+
+METHOD
+------
+For each `seven_day` window (keyed by its resetsAt) with at least two readings whose
+utilisation rose by at least MIN_DELTA between the window's first and last reading:
+    W_i = (ledger cost_usd of rows stamped in [first reading, last reading]) / (u_last - u_first)
+Using the rise inside a window, not the level, leaves out what was spent before the first
+reading and needs no reset anchor. Usage outside the ledger (interactive sessions on the same
+plan) raises u without ledger dollars, so it lowers W_i: the governor then reads the week as
+fuller than the ledger alone says, which is what it is. A mid-window credit restore does the
+opposite for one window; the MEDIAN of the most recent RECENT qualifying windows (at least MIN_N;
+RECENT is odd, so a full set's median is one real window) keeps one such window from moving the fit.
+Only CLOSED windows count (resetsAt passed): in an open one the runs still going have spent dollars
+no ledger row holds yet. Rows whose outcome is MERGED* or LAUNCH* add nothing: since 2026-08 a
+MERGED row that carries cost_usd repeats its session's FINISHED row, and a LAUNCH row is an estimate.
+
+CONTRACT
+--------
+  mr-budget-calibrate [--json]                 report only (never writes); rc 0
+  mr-budget-calibrate --apply [--unclamped]    write weekly_limit_usd + `calibration_fit` to
+                                               mr-budget-config.json (atomic). Without --unclamped
+                                               one run moves the value at most CLAMP (25%) toward
+                                               the fit. Refuses (rc 0, `CALIBRATE-SKIP <why>`) when
+                                               fewer than MIN_N windows qualify or the fit is
+                                               outside [0.4, 2.5] x the current value.
+  mr-budget-calibrate --check                  weekly from the tick: `CALIBRATE-DRIFT <why>` when the
+                                               fit and the configured value differ by more than
+                                               DRIFT (20%), else `CALIBRATE-OK`. Writes nothing —
+                                               the tick files a non-blocking operator question, so a
+                                               tracked config never changes behind anyone's back.
+  mr-budget-calibrate --selftest               fixtures in a temp dir; rc 0 = pass
+--apply also scales `fable_allowance_usd` by the same ratio: it came from the same anchor and is in
+the same units.
+`--mem DIR` reads and writes DIR instead of the live memory/projects (a worktree's copy).
+Output lines start with CALIBRATE-REPORT / CALIBRATE-APPLIED / CALIBRATE-SKIP / CALIBRATE-ERROR.
+ALWAYS exits 0 except --selftest failures (rc 1): the tick calls it and must never fail on it.
+"""
+import datetime
+import json
+import os
+import statistics
+import sys
+import tempfile
+
+MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
+MIN_DELTA = 0.20
+RECENT = 9
+MIN_N = 4
+CLAMP = 0.25
+SANE = (0.4, 2.5)
+DRIFT = 0.20
+WINDOW = "seven_day"
+
+
+def _epoch(ts):
+    return datetime.datetime.strptime(str(ts)[:19], "%Y-%m-%dT%H:%M:%S").replace(
+        tzinfo=datetime.timezone.utc).timestamp()
+
+
+def _iso(e):
+    return datetime.datetime.fromtimestamp(e, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def ledger_rows(path):
+    rows = []
+    try:
+        fh = open(path, errors="replace")
+    except OSError:
+        return rows
+    with fh:
+        for line in fh:
+            try:
+                r = json.loads(line)
+                c = r.get("cost_usd")
+                if str(r.get("outcome") or "").strip().upper().startswith(("MERGED", "LAUNCH")):
+                    continue
+                if isinstance(c, bool) or not isinstance(c, (int, float)) or c != c or c < 0:
+                    continue
+                rows.append((_epoch(r["ts"]), float(c)))
+            except Exception:
+                continue
+    rows.sort()
+    return rows
+
+
+def windows(path, window=WINDOW):
+    """{resetsAt: [(ts, u), ...]} for one window type, readings sorted by time."""
+    out = {}
+    try:
+        fh = open(path, errors="replace")
+    except OSError:
+        return out
+    with fh:
+        for line in fh:
+            try:
+                r = json.loads(line)
+            except Exception:
+                continue
+            if not isinstance(r, dict) or r.get("rateLimitType") != window:
+                continue
+            u, rs = r.get("utilization"), r.get("resetsAt")
+            if isinstance(u, bool) or not isinstance(u, (int, float)) or not isinstance(rs, (int, float)):
+                continue
+            if rs > 1e11:
+                rs = rs / 1000.0
+            try:
+                out.setdefault(int(rs), []).append((_epoch(r["ts"]), float(u)))
+            except Exception:
+                continue
+    for k in out:
+        out[k].sort()
+    return out
+
+
+def fit(ledger, wins, now, recent=RECENT, min_n=MIN_N, min_delta=MIN_DELTA):
+    rows = []
+    for rs in sorted(wins):
+        if rs > now:
+            continue    # still open
+        (t0, u0), (t1, u1) = wins[rs][0], wins[rs][-1]
+        du = u1 - u0
+        if len(wins[rs]) < 2 or du < min_delta:
+            continue
+        usd = sum(c for e, c in ledger if t0 <= e <= t1)
+        if usd <= 0:
+            continue
+        rows.append({"resets_at": _iso(rs), "first": _iso(t0), "last": _iso(t1), "u_first": round(u0, 3),
+                     "u_last": round(u1, 3), "ledger_usd": round(usd, 2), "weekly_usd": round(usd / du, 1)})
+    used = rows[-recent:]
+    med = round(statistics.median([r["weekly_usd"] for r in used]), 0) if len(used) >= min_n else None
+    return {"windows": used, "qualifying": len(rows), "median_usd": med}
+
+
+def decide(current, med, unclamped):
+    """(new value or None, why)."""
+    if med is None:
+        return None, "fewer than %d qualifying windows" % MIN_N
+    if not (SANE[0] * current <= med <= SANE[1] * current):
+        return None, "fit $%.0f is outside [%.1f, %.1f] x the current $%.0f — check the inputs by hand" % (
+            med, SANE[0], SANE[1], current)
+    if unclamped:
+        return float(med), "unclamped"
+    lo, hi = current * (1 - CLAMP), current * (1 + CLAMP)
+    new = min(max(med, lo), hi)
+    return float(round(new, 0)), ("clamped to %d%% of the current value" % int(CLAMP * 100)) if new != med else "within the clamp"
+
+
+def run(mem, argv, now=None):
+    now = now if now is not None else datetime.datetime.now(datetime.timezone.utc).timestamp()
+    cfg_path = os.path.join(mem, "mr-budget-config.json")
+    try:
+        cfg = json.load(open(cfg_path))
+        current = float(cfg["weekly_limit_usd"])
+    except Exception as e:
+        print("CALIBRATE-ERROR cannot read %s: %s" % (cfg_path, type(e).__name__))
+        return 0
+    f = fit(ledger_rows(os.path.join(mem, "monster-realm-usage-ledger.jsonl")),
+            windows(os.path.join(mem, "mr-rate-limit-telemetry.jsonl")), now)
+    if "--json" in argv:
+        print(json.dumps(dict(f, current_usd=current), indent=1))
+    else:
+        print("CALIBRATE-REPORT current=$%.0f fit=%s qualifying=%d used=%d %s" % (
+            current, ("$%.0f" % f["median_usd"]) if f["median_usd"] is not None else "none", f["qualifying"],
+            len(f["windows"]), " ".join("%s:%.0f" % (w["resets_at"][:10], w["weekly_usd"]) for w in f["windows"])))
+    if "--check" in argv:
+        med = f["median_usd"]
+        if med is None:
+            print("CALIBRATE-OK no fit (%d qualifying windows)" % f["qualifying"])
+        elif abs(med - current) > DRIFT * current:
+            print("CALIBRATE-DRIFT fit $%.0f vs configured $%.0f (%+.0f%%) over %d windows" % (
+                med, current, 100 * (med - current) / current, len(f["windows"])))
+        else:
+            print("CALIBRATE-OK fit $%.0f within %d%% of $%.0f" % (med, int(DRIFT * 100), current))
+        return 0
+    if "--apply" not in argv:
+        return 0
+    new, why = decide(current, f["median_usd"], "--unclamped" in argv)
+    if new is None:
+        print("CALIBRATE-SKIP %s" % why)
+        return 0
+    if abs(new - current) < 1:
+        print("CALIBRATE-SKIP unchanged at $%.0f (%s)" % (current, why))
+        return 0
+    stamp = _iso(now)
+    cfg["weekly_limit_usd"] = new
+    fa = cfg.get("fable_allowance_usd")
+    if isinstance(fa, (int, float)) and not isinstance(fa, bool) and fa > 0:
+        cfg["fable_allowance_usd"] = float(round(fa * new / current, 0))
+    cfg["calibration_fit"] = {"ts": stamp, "method": "median of within-window ledger $ / utilisation rise, "
+                              "closed seven_day windows with rise >= %.2f, last %d, MERGED/LAUNCH rows "
+                              "excluded (mr-budget-calibrate)" % (MIN_DELTA, RECENT),
+                              "fit_usd": f["median_usd"], "applied_usd": new, "previous_usd": current, "rule": why,
+                              "fable_allowance_previous_usd": fa,
+                              "windows": f["windows"]}
+    fd, tmp = tempfile.mkstemp(dir=mem, prefix=".mr-budget-config.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(cfg, fh, indent=1)
+            fh.write("\n")
+        os.replace(tmp, cfg_path)
+    except Exception as e:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        print("CALIBRATE-ERROR write failed: %s" % type(e).__name__)
+        return 0
+    print("CALIBRATE-APPLIED weekly_limit_usd $%.0f -> $%.0f (fit $%.0f, %s)" % (current, new, f["median_usd"], why))
+    return 0
+
+
+def selftest():
+    bad = []
+
+    def check(name, cond):
+        if not cond:
+            bad.append(name)
+
+    base = 1_800_000_000
+
+    def tel_rows(rs, pts):
+        return [json.dumps({"ts": _iso(base + rs + dt), "rateLimitType": WINDOW, "utilization": u,
+                            "resetsAt": base + rs + 7 * 86400}) for dt, u in pts]
+
+    with tempfile.TemporaryDirectory() as d:
+        tel, led = [], []
+        # five windows: $1000 per 0.5 rise (W=2000), one with a restore (W=6000), one too flat to count
+        for i in range(6):
+            rs = i * 7 * 86400
+            tel += tel_rows(rs, [(3600, 0.25), (5 * 86400, 0.75)])
+            usd = 3000 if i == 2 else 1000
+            led.append(json.dumps({"ts": _iso(base + rs + 2 * 86400), "cost_usd": usd}))
+            led.append(json.dumps({"ts": _iso(base + rs + 6 * 86400), "cost_usd": 500}))   # after the last reading
+        tel += tel_rows(6 * 7 * 86400, [(3600, 0.50), (86400, 0.55)])                     # rise 0.05: skipped
+        tel += tel_rows(7 * 7 * 86400, [(3600, 0.10), (86400, 0.90)])                     # still open at NOW: skipped
+        led.append(json.dumps({"ts": _iso(base + 7 * 7 * 86400 + 4000), "cost_usd": 50}))
+        # a MERGED row repeating a session's cost, and a LAUNCH estimate, inside window 0: no dollars
+        led.append(json.dumps({"ts": _iso(base + 3 * 86400), "outcome": "MERGED", "cost_usd": 90000}))
+        led.append(json.dumps({"ts": _iso(base + 3 * 86400), "outcome": "LAUNCHED tier=hard", "cost_usd": 90000}))
+        tel.append("not json")
+        led.append(json.dumps({"ts": _iso(base + 6 * 7 * 86400 + 4000), "cost_usd": float("nan")}))
+        open(os.path.join(d, "mr-rate-limit-telemetry.jsonl"), "w").write("\n".join(tel) + "\n")
+        open(os.path.join(d, "monster-realm-usage-ledger.jsonl"), "w").write("\n".join(led) + "\n")
+        cfgp = os.path.join(d, "mr-budget-config.json")
+        json.dump({"weekly_limit_usd": 2783, "fable_allowance_usd": 2298, "other": 1}, open(cfgp, "w"))
+        NOW = base + 50 * 86400    # every window but the last has reset
+        f = fit(ledger_rows(os.path.join(d, "monster-realm-usage-ledger.jsonl")),
+                windows(os.path.join(d, "mr-rate-limit-telemetry.jsonl")), NOW)
+        check("qualifying-6", f["qualifying"] == 6)
+        check("merged-launch-excluded", f["windows"][0]["weekly_usd"] == 2000)
+        check("median-2000", f["median_usd"] == 2000)
+        check("restore-window-kept-out-of-median", any(w["weekly_usd"] == 6000 for w in f["windows"]))
+        # clamp: 2783 -> at most 25% down = 2087
+        new, why = decide(2783, 2000, False)
+        check("clamp-down", new == round(2783 * 0.75) and "clamped" in why)
+        new, why = decide(2783, 2000, True)
+        check("unclamped", new == 2000)
+        check("insane-refused", decide(2783, 500, True)[0] is None)
+        check("too-few-refused", decide(2783, None, False)[0] is None)
+        check("within-clamp", decide(2100, 2000, False) == (2000.0, "within the clamp"))
+        # report mode never writes
+        before = open(cfgp).read()
+        run(d, [], now=NOW)
+        check("report-no-write", open(cfgp).read() == before)
+        # apply writes the value and the provenance block, keeps other keys
+        run(d, ["--apply", "--unclamped"], now=NOW)
+        c = json.load(open(cfgp))
+        check("apply-value", c["weekly_limit_usd"] == 2000)
+        check("apply-provenance", c["calibration_fit"]["previous_usd"] == 2783 and c["other"] == 1)
+        check("fable-scaled", c["fable_allowance_usd"] == round(2298 * 2000 / 2783))
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            run(d, ["--check"], now=NOW)
+        check("check-ok-after-apply", "CALIBRATE-OK" in buf.getvalue())
+        json.dump(dict(c, weekly_limit_usd=2783), open(cfgp, "w"))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            run(d, ["--check"], now=NOW)
+        check("check-drift", "CALIBRATE-DRIFT" in buf.getvalue() and json.load(open(cfgp))["weekly_limit_usd"] == 2783)
+        check("no-tmp-left", not [n for n in os.listdir(d) if n.endswith(".tmp")])
+        # too few windows -> skip, no write
+        with tempfile.TemporaryDirectory() as d2:
+            open(os.path.join(d2, "mr-rate-limit-telemetry.jsonl"), "w").write("\n".join(tel_rows(0, [(1, 0.1), (2, 0.9)])) + "\n")
+            open(os.path.join(d2, "monster-realm-usage-ledger.jsonl"), "w").write(json.dumps({"ts": _iso(base + 1), "cost_usd": 10}) + "\n")
+            json.dump({"weekly_limit_usd": 2783}, open(os.path.join(d2, "mr-budget-config.json"), "w"))
+            run(d2, ["--apply"], now=NOW)
+            check("skip-no-write", json.load(open(os.path.join(d2, "mr-budget-config.json")))["weekly_limit_usd"] == 2783)
+    if bad:
+        print("CALIBRATE-SELFTEST-FAIL %s" % " ".join(bad))
+        return 1
+    print("CALIBRATE-SELFTEST-OK 17")
+    return 0
+
+
+if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(selftest())
+    try:
+        a = sys.argv[1:]
+        mem = a[a.index("--mem") + 1] if "--mem" in a and a.index("--mem") + 1 < len(a) else MEM   # a worktree's copy
+        sys.exit(run(mem, a))
+    except Exception as e:   # the tick calls this; it must never fail the tick
+        print("CALIBRATE-ERROR %s" % type(e).__name__)
+        sys.exit(0)

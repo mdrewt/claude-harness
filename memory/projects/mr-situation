@@ -6,6 +6,9 @@ MEM=/home/mdrewt/projects/ai-apps/claude-harness/memory/projects
 CACHE="$MEM/.situation-cache.json"
 FRESH=0; NOGH=0
 for a in "$@"; do case "$a" in --fresh) FRESH=1;; --no-gh) NOGH=1;; esac; done
+# A --no-gh bundle has its gh fields skipped, so it keeps a cache of its own: a decision tick never
+# reads one that mr-launch.sh or mr-spawn wrote moments before.
+[ "$NOGH" = 1 ] && CACHE="$MEM/.situation-cache-nogh.json"
 if [ "$FRESH" = 0 ] && [ -f "$CACHE" ]; then
   AGE=$(( $(date +%s) - $(stat -c %Y "$CACHE") ))
   if [ "$AGE" -lt 45 ]; then cat "$CACHE"; exit 0; fi
@@ -114,7 +117,9 @@ def est_of(t): return float(EST.get(str(t),EST.get("default",25.0)))
 #     `stale` and `probe_every_s`: mr-spawn lets one launch on the model through per that period
 #     to measure it and refuses the rest, and `fable_ok` stays false for escalations;
 #   - older than that and under the soft threshold: not at all.
-# With no reading in force for an axis the ledger's dollars against the calibrated limits decide.
+# With no reading in force for an axis the ledger's dollars against the calibrated limits decide —
+# except that dollars alone never HARD-STOP a window the plan has an (old, low) reading for: that is
+# SOFT-PAUSE (`calibration_hard_capped`), so one session runs to take the sample, launching nothing.
 TEL_TAIL=4<<20   # bytes of the telemetry file read: about a week of rows
 FRESH_S=10800.0  # three hourly ticks: one decision session can hold the tick lock for 90 minutes
 WMODELS={"seven_day_overage_included":"fable"}
@@ -133,6 +138,7 @@ def window_model(name):
     for m in ("fable","opus","sonnet","haiku"):
         if re.search(r"(^|_)%s($|_)"%m, name): return m
     return WMODELS.get(name)
+SEEN_AXES=set()   # axes with a seven_day sample on a window still open, in force or not (real_utilisation fills it)
 def real_utilisation(now):
     """{None or model: {window, u, resets, ts, stale, state}}: per axis, the worst reading in force."""
     wins={}
@@ -164,6 +170,7 @@ def real_utilisation(now):
         ts,r,_u=max(rows)
         w={"window":name,"resets":r,"ts":ts,"u":max(u for t,rr,u in rows if rr==r and t>=ts-60)}
         m=window_model(name); w["stale"]=now-ts>FRESH_S
+        if name.startswith("seven_day"): SEEN_AXES.add(m)   # the weekly line is what the cap is about
         if w["stale"] and w["u"]<=SOFT: continue
         w["state"]="SOFT-PAUSE" if w["stale"] else grade(w["u"])
         key=lambda x: (ORDER.index(x["state"]),x["u"],x["resets"])
@@ -233,6 +240,13 @@ def budget():
     if g:
         state=g["state"]; source="telemetry-stale" if g["stale"] else "telemetry"; eff=g["u"]*WEEKLY; resets=iso(g["resets"])
         real={"utilisation":g["u"],"window":g["window"],"sample_utc":iso(g["ts"])}
+    elif state=="HARD-STOP" and None in SEEN_AXES:
+        # The plan's own figure for this window exists but is too old to be in force, and it was under
+        # the soft line when read. The ledger's dollars alone (a fitted scale, mr-budget-calibrate) do
+        # not stand every decision session down then: HARD-STOP would leave no session to take the
+        # sample that settles it. SOFT-PAUSE runs one, and the headroom below (none, past hard) still
+        # holds every launch.
+        state="SOFT-PAUSE"; real={"calibration_hard_capped":True}
     # A model with a window of its own in force: the worse of that window and the state above.
     models={}
     for m,w in tel.items():
@@ -371,6 +385,49 @@ def ready_slices():
                 entries.append({"milestone":name[:-len(".spec.md")],"slice":i,"after":deps,"last":last.get(i)})
     return entries
 out["ready_slices"]=safe(ready_slices,"")
+# The residual review's cadence (operator item 8, 2026-11-26; mr-residual-review-playbook.md): DUE
+# once `every_merges` slices have merged since the last merged rv-* review (or since `since`, before
+# the first), while at least `min_unreviewed` open rows carry no rv verdict yet and no rv-* run or PR
+# is in flight. A HINT like the rest: the Pick-work line "residual share" decides.
+def residual_review():
+    cfg={"every_merges":12,"since":"2026-11-20T00:00:00Z","min_unreviewed":10}
+    try: cfg.update(json.load(open(MEM+"/mr-residual-review.json")))
+    except Exception: pass
+    last_rv=None; rows=[]
+    for l in open(MEM+"/monster-realm-usage-ledger.jsonl",errors="replace"):
+        try: d=json.loads(l)
+        except Exception: continue
+        if not isinstance(d,dict) or not str(d.get("outcome","")).upper().startswith("MERGED"): continue
+        sl=str(d.get("slice","")); rows.append((str(d.get("ts","")),sl))
+        if sl.startswith("rv-"): last_rv=max(last_rv or "",str(d.get("ts","")))
+    since=last_rv or str(cfg["since"])
+    n=len({sl for ts,sl in rows if ts>since and sl!="SUPERVISOR" and not sl.startswith(("rv-","close-","ci-fix-"))})
+    import importlib.machinery, importlib.util, sys
+    sys.dont_write_bytecode=True
+    loader=importlib.machinery.SourceFileLoader("mr_gates_lib",os.path.join(MEM,"mr-gates"))
+    spec=importlib.util.spec_from_loader("mr_gates_lib",loader)
+    mrg=importlib.util.module_from_spec(spec); loader.exec_module(mrg)
+    open_ids={r.get("id") for r in mrg.open_residuals(mrg.residual_rows(MEM+"/mr-residuals.jsonl"))}
+    reviewed=set()
+    for vp in glob.glob(MEM+"/residual-reviews/*.verdicts.json"):
+        try: reviewed|=set((json.load(open(vp)).get("verdicts") or {}).keys())
+        except Exception: pass
+    opens=len(open_ids); unreviewed=len(open_ids-reviewed)
+    prs=out.get("open_prs"); prs=list(prs) if isinstance(prs,list) else []
+    # A review's deliverables land in this harness's memory, so its PR is usually a harness PR: both
+    # repos are read. An unreadable harness list counts as in flight (a late review beats a twin).
+    hprs_err=False
+    if not NOGH:
+        rc,so,se=run("gh pr list -R mdrewt/claude-harness --state open --json number,headRefName", 25)
+        try:
+            if rc!=0: raise ValueError(se[:80])
+            prs+=json.loads(so or "[]")
+        except Exception: hprs_err=True
+    inflight=hprs_err or any(str(l.get("slice","")).startswith("rv-") for l in out.get("locks",[]) if isinstance(l,dict)) or \
+        any(str(p.get("headRefName","")).split("/")[-1].startswith("rv-") for p in prs if isinstance(p,dict))
+    return {"due":bool(n>=int(cfg["every_merges"]) and unreviewed>=int(cfg["min_unreviewed"]) and not inflight),"merges_since":n,
+            "every_merges":int(cfg["every_merges"]),"since":since,"open":opens,"unreviewed":unreviewed,"inflight":inflight}
+out["residual_review"]=safe(residual_review,{"due":False,"error":"residual-review-unavailable"})
 print(json.dumps(out, indent=1))
 PY
 mv "$CACHE.tmp" "$CACHE"

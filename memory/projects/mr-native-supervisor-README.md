@@ -292,6 +292,49 @@ a pair kept on purpose in `mr-prune-keep.json`), `close`, and `--selftest`; flag
   still in the corpus; the doc-only PR that deletes that spec appends the section to
   `structure.spec.md` (its "Written by" rule names this source).
 
+## Phase split, free stand-downs, calibration, residual review (2026-11-26)
+Decisions and evidence: the harness `docs/DECISIONS.md` (five entries dated 2026-11-26).
+- **Toolchain.** `mr-launch.sh` puts the Node and just asdf shims (links in `/tmp/harness-toolchain-bin`),
+  `~/.cargo/bin` and `~/.local/bin` ahead of the inherited PATH on every `claude` invocation, and
+  writes one `TOOLCHAIN node=… just=… cargo=… spacetime=…` line after the launch marker. python3,
+  pip and gh resolve as before.
+- **Phase split** (`mr-phase-ab`, `mr-phase-protocol.md`, config `mr-phase-ab.json`, record
+  `mr-phase-ab.jsonl`). A phased launch writes `ATTEMPT=1 … PHASE=<p> ARM=phased` markers, one per
+  fresh phase session; retry attempts count per phase. A phased `.done` reads `EXIT=<rc>
+  ATTEMPTS=<last phase's> PHASES=<k> ATTEMPTS_TOTAL=<all>`, plus `PHASE-PENDING=<phase>` when the
+  budget (HARD-STOP) stopped it at a boundary; a control or unassigned run keeps `EXIT=<rc>
+  ATTEMPTS=<n>`. A phased run that ends at a phase boundary without advancing is relaunched like any
+  stopped slice: `mr-spawn` → the launcher starts the phase the handoff names.
+  `mr-phase-ab status` shows the arms; the tick runs `analyze --apply` after every successful
+  session, which acts once five assigned slices have merged: it writes `phase-ab/analysis-*.md`,
+  records `disabled` and files a non-blocking `DECISION(phase-ab-analysis)` issue.
+  The ledger row of a multi-session log lists each session's cost (`sessions=<id>:<usd>,…`), and a
+  late-spend top-up reads each of them, so neither a phase nor a credit-stop resume is undercounted
+  or counted twice.
+- **Free stand-down.** Tick log `NOOP-MARK rid=…` after a session whose one DECISION line stood down
+  with every held candidate held by the budget (`:budget`), naming no action, and whose inputs hash
+  the same before and after it (`mr-tick-fingerprint mark-ok`). Any other stand-down (human at work,
+  quiet window, nothing held) is never marked. The next cron tick with the same fingerprint logs
+  `STANDDOWN unchanged-since-noop since=<rid> age=<s> sample_age=<s>` and spends nothing, only within
+  90 min of that session's START (`NOOP_MAX_AGE_S`) and while the plan's utilisation was sampled
+  within 90 min (`NOOP_SAMPLE_MAX_AGE_S`) — on the hourly cron, at most one skipped tick in a row.
+  Event, manual, reset and forced ticks never skip. Accepted blind spot: a mid-window credit restore
+  with nothing running is seen at most one tick later. Delete `$MEM/.noop-tick` to force the next
+  cron tick to run a session; set `NOOP_MAX_AGE_S=0` in the tick to turn skipping off.
+- **Calibration.** `mr-budget-calibrate` (report; `--check`; `--apply [--unclamped]`). The tick
+  logs `BUDGET-CALIBRATE-OK|DRIFT` weekly (`.calibrate-last`) and on DRIFT files one
+  `DECISION(budget-calibration-<week>)` issue (a failed filing leaves the marker, so the next tick
+  asks again); re-fitting is a harness PR. The fit uses closed windows only and ignores MERGED*/
+  LAUNCH* rows. Dollars alone never HARD-STOP a window the plan has an old, low reading for: the
+  bundle reads SOFT-PAUSE with `calibration_hard_capped: true` when a still-open `seven_day` sample
+  exists (one session runs to resample; nothing fits past hard, so nothing launches; a live run's
+  fallback and next phase go ahead).
+- **Residual review.** Bundle `residual_review` (`mr-residual-review.json`); `rv-<utc>` runs follow
+  `mr-residual-review-playbook.md` and write `memory/projects/residual-reviews/<slice>.md`;
+  `mr-residual-history sort|related` are the read-only views they and elaboration use. A review is
+  in flight (not due) while an `rv-*` lock or PR exists in either repo, or the harness PR list
+  cannot be read.
+
 ## Verification & rollback
 - Dry-run a tick: `MR_TICK_DRYRUN=1 MR_FORCE=1 bash memory/projects/mr-native-tick.sh`
   (assembles the prompt, spawns nothing).

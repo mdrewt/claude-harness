@@ -1,0 +1,35 @@
+# Per-file read volume into agent contexts — 40 most recent build runs, measured 2026-11-26
+# runs = runs whose tool calls named the file; chars_total = result chars of those calls (main + subagents);
+# per_run = chars_total / 40 (divide by runs for per-reading-run). Producer: a one-off pass-log scan (no standing tool —
+# docs/DECISIONS.md "Structural work is not ranked by a tool"). Baseline for the payback re-measure after client-shell extraction 10.
+file                                                         runs/40 chars_total  per_run  lines
+client/src/main.ts                                             22    1617556    40438   5541
+docs/DECISIONS.md                                              35    1370433    34260   3162
+server-module/src/native_host_tests.rs                         11     799777    19994   2973
+docs/local-play.md                                             10     635294    15882   1768
+server-module/src/privacy_enforcement_tests.rs                  9     579685    14492   3473
+client/src/main.remap.test.ts                                   7     570059    14251   3469
+server-module/src/access_tests.rs                               5     561432    14035   2916
+server-module/src/access.rs                                     9     550466    13761    266
+server-module/src/world_binding_tests.rs                        8     546469    13661   5667
+client/e2e/controls.ts                                         10     524596    13114   1816
+client/src/ui/i18n/catalog.test.ts                             10     486182    12154   5523
+server-module/src/world_binding.rs                              6     463585    11589    673
+client/src/net/connection.ts                                   11     414031    10350   1417
+client/src/main.input.test.ts                                  10     410765    10269   6758
+server-module/src/accounts.rs                                  13     348377     8709   1528
+server-module/src/schema.rs                                    15     321822     8045   2651
+client/src/shell/inputState.test.ts                             6     320589     8014   1627
+docs/refactors/client-shell.md                                  4     309260     7731    393
+server-module/src/accounts_tests.rs                             7     300958     7523  14540
+ARCHITECTURE.md                                                25     286044     7151    899
+client/src/main.dispatch.test.ts                                7     284927     7123  10007
+client/src/ui/i18n/catalogParity.test.ts                        6     276456     6911   2134
+client/src/tactics/tacticsBattle.ts                             6     250515     6262   1913
+server-module/src/tactics_tests.rs                              3     244229     6105   8817
+server-module/src/tactics.rs                                    5     242838     6070   3145
+client/src/net/authToken.ts                                     8     233594     5839    354
+client/src/net/connection.runtime.test.ts                       4     233088     5827   4707
+docs/refactors/account-checks.md                                1     217872     5446    557
+server-module/Cargo.toml                                       14     205793     5144     84
+server-module/src/lib.rs                                       14     203283     5082    380

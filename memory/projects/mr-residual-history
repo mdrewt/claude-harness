@@ -1,0 +1,350 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands. Python reads this line as a
+# no-op string; sh/bash re-execs the file under python3. Statically enforced by mr-selfcheck.
+"""mr-residual-history — read-only views of the residual registry for planning and the drain.
+
+Never writes anything. The registry (mr-residuals.jsonl) is folded with mr-gates' own
+`fold_residuals`/`open_residuals` (loaded from the mr-gates file beside this one), so open/closed
+means exactly what `mr-gates residuals list` means.
+
+  mr-residual-history related --paths P[,P...] [--json]
+      For milestone elaboration (milestone-loop-prompt.md, residual pre-mortem). Rows whose cited
+      paths overlap P (a path matches a P that is equal to it or a directory prefix of it):
+        open     — fold candidates (see milestone-loop-prompt.md's pre-mortem for which ones)
+        closed   — the defect classes earlier work on these files produced, counted by category
+      A P may be a glob (`client/src/main.*.test.ts`, `client/src/**`): it matches from its
+      literal prefix up to the first `*`.
+  mr-residual-history sort [--json]
+      For the residual review (mr-residual-review-playbook.md). Every open row, with:
+        paths    — cited paths: the row's `touches` plus repo paths named in its title/reason
+        state    — unchanged: no cited path changed on origin since the row was filed (still real;
+                              no re-check needed)
+                   changed:   a cited path changed since (possibly fixed; check it)
+                   gone:      no cited path exists on origin any more (check where it went)
+                   no-paths:  nothing cited (check it)
+        reviewed — the latest rv verdict on the row (`residual-reviews/*.verdicts.json`) and its
+                   date, or null; `recheck` is false when that verdict still stands (no cited path
+                   changed since) so a review does not re-read it
+        named_in — spec files that already name the row's id (owned there; never clustered again)
+        followup — the row came from a follow-up slice (mr-gates' rule: it may not be promoted)
+        cluster  — category + the leading two path components, for grouping fixes
+  mr-residual-history --selftest
+Paths resolve against origin/master of the game checkout, then origin/main of the harness.
+ALWAYS exits 0 except a --selftest failure (rc 1).
+"""
+import collections
+import glob
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+MEM = "/home/mdrewt/projects/ai-apps/claude-harness/memory/projects"
+HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
+SPECS = HARNESS + "/specs/monster-realm-v2"
+REPOS = ((HARNESS + "/projects/monster-realm", "origin/master"), (HARNESS, "origin/main"))
+PATH_RE = re.compile(r"(?<![\w/.-])((?:\.github|\.claude|[A-Za-z_][\w.-]*)(?:/[\w.@-]+)+\.[A-Za-z]\w*|memory/projects/mr-[\w-]+|[A-Z][A-Z_]+\.md)")
+
+
+def load_gates(here=HERE):
+    loader = importlib.machinery.SourceFileLoader("mr_gates_lib", os.path.join(here, "mr-gates"))
+    spec = importlib.util.spec_from_loader("mr_gates_lib", loader)
+    mod = importlib.util.module_from_spec(spec)
+    sys.dont_write_bytecode = True
+    loader.exec_module(mod)
+    return mod
+
+
+def _norm(p):
+    p = str(p).strip().strip("`'\"").rstrip("/")
+    return p[:p.index("*")].rstrip("/") if "*" in p else p
+
+
+def cited_paths(r):
+    out = []
+    for t in r.get("touches") or []:
+        t = _norm(t)
+        if t and t not in out:
+            out.append(t)
+    for m in PATH_RE.finditer("%s %s" % (r.get("title") or "", r.get("reason") or "")):
+        p = _norm(m.group(1))
+        if p and p not in out:
+            out.append(p)
+    return out
+
+
+def overlaps(path, wanted):
+    for raw in wanted:
+        w = _norm(raw)
+        if not w:
+            continue
+        if path == w or path.startswith(w + "/") or w.startswith(path + "/") or ("*" in str(raw) and path.startswith(w)):
+            return True
+    return False
+
+
+def resolve(p, files):
+    """The repo path a citation means: as written, a directory of files, or relative to client/src/."""
+    if p in files or any(f.startswith(p + "/") for f in files):
+        return p
+    for pre in ("client/src/", "client/"):
+        q = pre + p
+        if q in files or any(f.startswith(q + "/") for f in files):
+            return q
+    return None
+
+
+def tree(repo, ref):
+    try:
+        r = subprocess.run(["git", "-C", repo, "ls-tree", "-r", "--name-only", ref], capture_output=True,
+                           text=True, timeout=60)
+        return set(r.stdout.split("\n")) if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def changed_since(repo, ref, since, paths):
+    try:
+        r = subprocess.run(["git", "-C", repo, "log", "-1", "--format=%h", "--since=" + since, ref, "--"] + paths,
+                           capture_output=True, text=True, timeout=60)
+        return r.stdout.strip() if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def classify(r, repos):
+    paths = cited_paths(r)
+    if not paths:
+        return paths, "no-paths", None
+    found = {}
+    for repo, ref, files in repos:
+        if files is None:
+            continue
+        hit = [q for q in (resolve(p, files) for p in paths) if q]
+        if hit:
+            found[(repo, ref)] = hit
+    if not found:
+        return paths, "gone", None
+    since = r.get("disclosed_at") or "1970-01-01T00:00:00Z"
+    for (repo, ref), hit in found.items():
+        sha = changed_since(repo, ref, since, hit)
+        if sha:
+            return paths, "changed", sha
+    return paths, "unchanged", None
+
+
+def cluster_of(r, paths):
+    lead = "/".join(paths[0].split("/")[:2]) if paths else (r.get("source_slice") or "?").split("-")[0]
+    return "%s:%s" % (r.get("category") or "uncategorised", lead)
+
+
+def verdicts(mem):
+    """{residual id: (verdict, reviewed_at)} — the latest rv verdict per row."""
+    out = {}
+    for p in sorted(glob.glob(os.path.join(mem, "residual-reviews", "*.verdicts.json"))):
+        try:
+            d = json.load(open(p))
+        except Exception:
+            continue
+        at = str(d.get("reviewed_at") or "")
+        for rid, v in (d.get("verdicts") or {}).items():
+            if at >= out.get(rid, ("", ""))[1]:
+                out[rid] = (str(v), at)
+    return out
+
+
+def spec_mentions(specs, ids):
+    named = collections.defaultdict(list)
+    for p in sorted(glob.glob(os.path.join(specs, "*.md"))):
+        try:
+            text = open(p, errors="replace").read()
+        except OSError:
+            continue
+        for rid in ids:
+            if rid and re.search(r"(?<![\w-])%s(?![\w-])" % re.escape(rid), text):
+                named[rid].append(os.path.basename(p))
+    return named
+
+
+def cmd_sort(rows, mg, repos, as_json, mem=MEM, specs=SPECS):
+    opens = mg.open_residuals(rows)
+    seen = verdicts(mem)
+    named = spec_mentions(specs, [r.get("id") for r in opens])
+    out = []
+    for r in sorted(opens, key=lambda x: (x.get("disclosed_at") or "", x.get("id") or "")):
+        paths, state, sha = classify(r, repos)
+        v = seen.get(r.get("id"))
+        recheck = True
+        if v:
+            # A verdict stands until a cited path changes after it was given.
+            since = v[1] or ""
+            moved = any(changed_since(repo, ref, since, [q for q in (resolve(p, files or set()) for p in paths) if q])
+                        for repo, ref, files in repos if files is not None and paths and
+                        [q for q in (resolve(p, files) for p in paths) if q])
+            recheck = bool(moved)
+        out.append({"id": r.get("id"), "severity": r.get("severity"), "category": r.get("category"),
+                    "status": r.get("status"), "disclosed_at": r.get("disclosed_at"),
+                    "source_slice": r.get("source_slice"), "title": (r.get("title") or "")[:160],
+                    "paths": paths, "state": state, "changed_by": sha, "cluster": cluster_of(r, paths),
+                    "reviewed": {"verdict": v[0], "at": v[1]} if v else None, "recheck": recheck,
+                    "named_in": named.get(r.get("id"), []),
+                    "followup": bool(mg.is_followup_slice(r.get("source_slice"), rows))})
+    if as_json:
+        print(json.dumps({"open": out, "states": dict(collections.Counter(x["state"] for x in out)),
+                          "clusters": dict(collections.Counter(x["cluster"] for x in out))}, indent=1))
+    else:
+        for x in out:
+            print("%-34s %-4s %-9s %-28s %s" % (x["id"], x["severity"] or "?", x["state"], x["cluster"][:28], x["title"][:70]))
+        print("RESIDUAL-SORT open=%d to-check=%d %s" % (len(out), sum(1 for x in out if x["recheck"] and x["state"] != "unchanged"),
+                                                        " ".join("%s=%d" % kv for kv in sorted(collections.Counter(x["state"] for x in out).items()))))
+    return 0
+
+
+def cmd_related(rows, mg, wanted, as_json):
+    folded = mg.fold_residuals(rows)
+    open_ids = {r.get("id") for r in mg.open_residuals(rows)}
+    opens, closed = [], collections.defaultdict(list)
+    for rid, r in sorted(folded.items()):
+        paths = [p for p in cited_paths(r) if overlaps(p, wanted)]
+        if not paths:
+            continue
+        row = {"id": rid, "severity": r.get("severity"), "category": r.get("category"), "status": r.get("status"),
+               "title": (r.get("title") or "")[:160], "paths": paths, "source_slice": r.get("source_slice")}
+        if rid in open_ids:
+            opens.append(row)
+        else:
+            closed[r.get("category") or "uncategorised"].append(row)
+    if as_json:
+        print(json.dumps({"open": opens, "closed_by_category": closed}, indent=1))
+    else:
+        print("OPEN (fold each into the slice that touches its paths):")
+        for x in opens:
+            print("  %-34s %-4s %-20s %s  [%s]" % (x["id"], x["severity"] or "?", x["category"] or "?", x["title"][:80], ", ".join(x["paths"])[:80]))
+        print("CLOSED, by category (defect classes earlier work on these paths produced):")
+        for cat, xs in sorted(closed.items(), key=lambda kv: -len(kv[1])):
+            print("  %-20s %3d  e.g. %s" % (cat, len(xs), " | ".join(x["title"][:60] for x in xs[:3])))
+        print("RESIDUAL-RELATED open=%d closed=%d" % (len(opens), sum(len(v) for v in closed.values())))
+    return 0
+
+
+def main(argv, mem=MEM, here=HERE, repos_spec=REPOS, specs=SPECS):
+    mg = load_gates(here)
+    rows = mg.residual_rows(os.path.join(mem, "mr-residuals.jsonl"))
+    as_json = "--json" in argv
+    if argv and argv[0] == "sort":
+        return cmd_sort(rows, mg, [(repo, ref, tree(repo, ref)) for repo, ref in repos_spec], as_json, mem, specs)
+    if argv and argv[0] == "related":
+        try:
+            raw = argv[argv.index("--paths") + 1]
+        except (ValueError, IndexError):
+            print("RESIDUAL-HISTORY-ERROR related needs --paths P[,P...]")
+            return 0
+        return cmd_related(rows, mg, [p.strip() for p in raw.split(",") if p.strip()], as_json)
+    print(__doc__.strip().split("\n\n")[1])
+    return 0
+
+
+def selftest():
+    bad = []
+
+    def check(name, cond):
+        if not cond:
+            bad.append(name)
+
+    import contextlib
+    import io
+    with tempfile.TemporaryDirectory() as d:
+        repo = os.path.join(d, "game")
+        os.makedirs(os.path.join(repo, "client", "src"))
+        git = lambda *a, **kw: subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True,
+                                              env=dict(os.environ, GIT_AUTHOR_DATE=kw.get("date", "2026-01-01T00:00:00Z"),
+                                                       GIT_COMMITTER_DATE=kw.get("date", "2026-01-01T00:00:00Z")))
+        git("init", "-q", "-b", "master")
+        git("config", "user.email", "t@t"); git("config", "user.name", "t")
+        for f in ("client/src/a.ts", "client/src/b.ts"):
+            open(os.path.join(repo, f), "w").write("x\n")
+        git("add", "-A"); git("commit", "-qm", "base")
+        open(os.path.join(repo, "client/src/a.ts"), "w").write("y\n")
+        git("commit", "-qam", "touch a", date="2026-03-01T00:00:00Z")
+        git("update-ref", "refs/remotes/origin/master", "HEAD")
+        rows = [
+            {"id": "R-1", "status": "unpromoted", "severity": "MED", "category": "ux-a11y", "disclosed_at": "2026-02-01T00:00:00Z",
+             "title": "a is wrong", "reason": "client/src/a.ts:3 says so", "touches": []},
+            {"id": "R-2", "status": "unpromoted", "severity": "LOW", "category": "gameplay", "disclosed_at": "2026-02-01T00:00:00Z",
+             "title": "b is wrong", "reason": "see client/src/b.ts", "touches": []},
+            {"id": "R-3", "status": "unpromoted", "severity": "LOW", "category": "gameplay", "disclosed_at": "2026-02-01T00:00:00Z",
+             "title": "gone file", "reason": "client/src/zzz.ts", "touches": []},
+            {"id": "R-4", "status": "unpromoted", "severity": "LOW", "category": "loop-ops", "disclosed_at": "2026-02-01T00:00:00Z",
+             "title": "no path at all", "reason": "prose", "touches": []},
+            {"id": "R-5", "status": "unpromoted", "severity": "MED", "category": "ux-a11y", "disclosed_at": "2026-02-01T00:00:00Z",
+             "title": "closed later", "reason": "client/src/a.ts", "touches": []},
+            {"id": "R-5", "status": "closed"},
+        ]
+        mem = os.path.join(d, "mem")
+        os.makedirs(mem)
+        open(os.path.join(mem, "mr-residuals.jsonl"), "w").write("\n".join(json.dumps(r) for r in rows) + "\n")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            main(["sort", "--json"], mem=mem, repos_spec=((repo, "origin/master"),))
+        s = {x["id"]: x for x in json.loads(buf.getvalue())["open"]}
+        check("sort-open-only", set(s) == {"R-1", "R-2", "R-3", "R-4"})
+        check("changed", s["R-1"]["state"] == "changed" and s["R-1"]["changed_by"])
+        check("unchanged", s["R-2"]["state"] == "unchanged")
+        check("gone", s["R-3"]["state"] == "gone")
+        check("no-paths", s["R-4"]["state"] == "no-paths")
+        check("path-from-text", s["R-1"]["paths"] == ["client/src/a.ts"])
+        check("cluster", s["R-1"]["cluster"] == "ux-a11y:client/src")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            main(["related", "--paths", "client/src/a.ts", "--json"], mem=mem, repos_spec=((repo, "origin/master"),))
+        rel = json.loads(buf.getvalue())
+        check("related-open", [x["id"] for x in rel["open"]] == ["R-1"])
+        check("related-closed", [x["id"] for x in rel["closed_by_category"].get("ux-a11y", [])] == ["R-5"])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            main(["related", "--paths", "client/", "--json"], mem=mem, repos_spec=((repo, "origin/master"),))
+        check("related-dir-prefix", len(json.loads(buf.getvalue())["open"]) == 3)
+        check("overlap-rules", overlaps("client/src/a.ts", ["client/src"]) and not overlaps("client/srcx/a.ts", ["client/src"]))
+        check("overlap-glob", overlaps("client/src/main.x.test.ts", ["client/src/main.*.test.ts"])
+              and not overlaps("client/src/mainly.ts", ["client/src/main.*.test.ts"]))
+        check("resolve-relative", resolve("src/a.ts", {"client/src/a.ts"}) == "client/src/a.ts" and resolve("client/src", {"client/src/a.ts"}) == "client/src")
+        os.makedirs(os.path.join(mem, "residual-reviews"))
+        json.dump({"reviewed_at": "2026-04-01T00:00:00Z", "verdicts": {"R-1": "STILL-REAL", "R-2": "STILL-REAL"}},
+                  open(os.path.join(mem, "residual-reviews", "rv-x.verdicts.json"), "w"))
+        specs = os.path.join(d, "specs")
+        os.makedirs(specs)
+        open(os.path.join(specs, "residuals.spec.md"), "w").write("### rb-1 — x\nresidual: R-2\n")
+        open(os.path.join(repo, "client/src/b.ts"), "w").write("z\n")
+        git("commit", "-qam", "touch b after the review", date="2026-05-01T00:00:00Z")
+        git("update-ref", "refs/remotes/origin/master", "HEAD")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            main(["sort", "--json"], mem=mem, repos_spec=((repo, "origin/master"),), specs=specs)
+        s2 = {x["id"]: x for x in json.loads(buf.getvalue())["open"]}
+        check("verdict-stands", s2["R-1"]["reviewed"]["verdict"] == "STILL-REAL" and s2["R-1"]["recheck"] is False)
+        check("verdict-reopened-by-change", s2["R-2"]["recheck"] is True)
+        check("named-in", s2["R-2"]["named_in"] == ["residuals.spec.md"] and s2["R-1"]["named_in"] == [])
+        check("followup-flag", s2["R-1"]["followup"] is False)
+        check("no-write", sorted(os.listdir(mem)) == ["mr-residuals.jsonl", "residual-reviews"])
+    if bad:
+        print("RESIDUAL-HISTORY-SELFTEST-FAIL %s" % " ".join(bad))
+        return 1
+    print("RESIDUAL-HISTORY-SELFTEST-OK 19")
+    return 0
+
+
+if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(selftest())
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except Exception as e:
+        print("RESIDUAL-HISTORY-ERROR %s: %s" % (type(e).__name__, str(e)[:200]))
+        sys.exit(0)

@@ -92,14 +92,21 @@ UNKNOWN → proceed + record a BLOCKER.
    `origin/master` is a `refactor(` or a `docs(` naming a slice → launch `structure.spec.md`'s first unbuilt non-`blocked:`
    slice whose `after:` is built and quiet window clear; none unbuilt but a
    `$PROJ/docs/refactors/` plan lists extractions → section the next three (doc-only chore PR =
-   the tick's action). Else the oldest bundle `closable_milestones[]` entry → launch its
-   `close-<milestone>` slice (After a pass; also a ready fan-out candidate beside any launch).
-   Else a valid `queue[]` head (re-verify live; remove if stale). Else the **first unfinished non-`blocked:`
+   the tick's action); when more than one plan lists extractions, section first the plan whose
+   extractions move code out of `client/src/main.ts`, else file order (more than five independent ready
+   structural candidates, or three plans listing extractions → one non-blocking `mr-ask-drew`: revisit
+   ranking, harness DECISIONS "Structural work is not ranked by a tool").
+   Else the **residual share**: bundle `residual_review.due` → launch `rv-<utc>` per
+   `$MEM/mr-residual-review-playbook.md` §Launch; else a queued `rb-` cluster when none of the last 8 `$PROJ`
+   `origin/master` subjects names an `rb-` slice → launch the oldest.
+   Else the oldest bundle `closable_milestones[]` entry → launch its `close-<milestone>` slice (After a pass; also a ready fan-out candidate beside any launch).
+   Else a valid `queue[]` head (re-verify live; remove if stale; an `rb-` head launches only through the
+   residual share or an idle fan-out slot). Else the **first unfinished non-`blocked:`
    item in PLAN §9 order** — launch its first unbuilt slice per that milestone's own spec; a
    milestone with no spec gets one authored first (milestone-loop-prompt.md, a doc-only chore PR =
-   the tick's action). Queue-add weighed runners-up whether or not you launch. **MED/LOW residuals
-   only fill otherwise-idle fan-out slots** (oldest first) or fold into the next milestone spec;
-   they never self-promote. A DEFER mr-gates refuses is resolved in-slice or recorded wontfix,
+   the tick's action). Queue-add weighed runners-up whether or not you launch. **MED/LOW residuals are
+   promoted only through an rv review's clusters**; otherwise they only fill idle fan-out slots (oldest
+   first) or fold into a milestone spec at elaboration. A DEFER mr-gates refuses is resolved in-slice or recorded wontfix,
    never new backlog. HIGH/CRITICAL dispositions need `mr-ask-drew`. Nothing
    remains → write DONE + `mr-hold set --by supervisor --reason "<why>"` + exit.
    **BLOCKER discipline:** park-and-wait ONLY for irreversible, security,
@@ -162,7 +169,10 @@ around (push the harness before spawning a harness slice).
 - Outcome from live PR/git state. Missing `.done` + empty `.err` = SIGKILL — finish the pending
   MECHANICAL step yourself (push the existing branch / open the PR / merge; never author code —
   uncommitted worktree changes mean PARK instead); `.done` EXIT!=0 → read the tails; still-dead =
-  real failure: triage, don't blind-relaunch.
+  real failure: triage, don't blind-relaunch. A phased run's `.done` reads `EXIT=<rc> ATTEMPTS=<n>
+  PHASES=<k> ATTEMPTS_TOTAL=<m>`; `PHASE-PENDING=<phase>` on it means the budget stopped it between
+  phases with no PR yet — not a failure: relaunch it with `mr-spawn` once a launch fits (it starts
+  that phase from the handoff).
 - **`mr-audit --slice S --log L --repo R --base B --head H [--tier hard]`** at every merge (R =
   the repo PATH; B = `git merge-base origin/master <branch>`, so sibling fan-out merges never
   read as removals): CLEAN → proceed; FLAGGED/AUDIT-ERROR → read the diff and adjudicate
@@ -173,7 +183,8 @@ around (push the harness before spawning a harness slice).
   added, each `moved-tests:` survivor present at head; merge with
   `--subject 'refactor(<scope>): <slice> — … (#N)'` (`type: design`: audit `--doc-only`, read the
   plan vs the code, subject `docs(design): <slice> — …`; `type: docs`: audit `--doc-only`, read the
-  reviewer's three answers against the diff, subject `docs(<scope>): <slice> — …`). Genuine
+  reviewer's three answers against the diff, subject `docs(<scope>): <slice> — …`; an `rv-*` review is
+  then applied per `mr-residual-review-playbook.md` "After merge"). Genuine
   weakening → BLOCKER + next target = revert/fix; a legitimate deletion proceeds with your
   one-line verdict in the ledger notes.
 - **`mr-gates verify --slice S --json`** (ADVISORY — adjudicate, never rubber-stamp): mr-audit
@@ -181,7 +192,9 @@ around (push the harness before spawning a harness slice).
   adjudicate. `EVIDENCE-MISMATCH`/`NOT-REVERIFIED` = treat unmet; `SEED-DRIFT` = the spec
   changed under the run — adjudicate, then `mr-gates reseed` if legitimate; gates neither met nor
   DEFERred = the slice is not done — prefer resuming over merging a partial. Read the `spotcheck`
-  gate and try to refute it. After merging: `mr-gates residuals close --slice S --pr N`.
+  gate and try to refute it. After merging: `mr-gates residuals close --slice S --pr N`; each other residual id the slice's
+  section or criteria name (an elaboration fold, an rv cluster) whose gate is met, not DEFERred: MED/LOW →
+  `residuals disposition --id R --as fixed --reason '#N'`; HIGH/CRITICAL → a non-blocking `mr-ask-drew` citing #N.
 - PR checks still running → `setsid bash $MEM/mr-ci-watch <pr> <slice> & disown`, print exactly
   `Delegated CI-wait for PR #<n> to mr-ci-watch; resumes via event tick.`, record, EXIT.
 - PR checks red on an infra/flaky step → the same ONE rerun + watch + flake residual; attempt 2

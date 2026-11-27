@@ -109,7 +109,8 @@ try:
     _c=json.load(open(MEM+"/mr-budget-config.json")); _a=_c.get("calibration_anchor")
     if _a:
         print(f"    anchor {_a['ts']}: internal ${_a['internal_total_usd']} = {100*_a['drew_total_pct']:.0f}% real total; internal fable ${_a['internal_fable_usd']} = {100*_a['drew_fable_pct']:.0f}% real fable allowance")
-        print(f"    derived limits: weekly ${_c['weekly_limit_usd']} · fable allowance ${_c.get('fable_allowance_usd')} · latest operator anchor is authoritative; internal-$ is the proxy")
+        _f=_c.get("calibration_fit") or {}
+        print(f"    limits in force: weekly ${_c['weekly_limit_usd']} · fable allowance ${_c.get('fable_allowance_usd')} · " + (f"from calibration_fit {_f.get('ts')} (telemetry fit, mr-budget-calibrate); the anchor above is history" if _f else "derived from the latest operator anchor; internal-$ is the proxy"))
     else: print("    (no calibration anchor recorded — internal-$ only; treat as UNANCHORED)")
 except Exception as e: print("    (anchor unavailable)")
 print("-- governor spend in window (from rows) --", f"${rooted+sup:.2f}")

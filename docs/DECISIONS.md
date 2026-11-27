@@ -106,8 +106,24 @@ window still at its limit can cut off to one run per period instead of a whole f
 newest sample names the window's instance because the plan's latest word is the one in force:
 ranking instances by `resetsAt` would let one row with a later reset time void every sample
 after it.
+The dollar scale itself is fitted to those readings (`mr-budget-calibrate`, 2026-11-26): the
+median, over the last 9 closed seven_day windows whose utilisation rose at least 0.20, of the
+ledger dollars landing between a window's first and last reading divided by that rise. MERGED and
+LAUNCH rows add nothing (since 2026-08 a MERGED row's cost repeats its session's FINISHED row; a
+LAUNCH row is an estimate), and an open window is left out (its live runs are not in the ledger
+yet). The July anchor's $2,783 was 1.6x the fitted $1,713, so every headroom figure overstated
+what a launch could spend before the plan cut it off. `fable_allowance_usd` is scaled by the same
+ratio. The tick re-checks the fit weekly and asks the operator when it drifts more than 20%; it
+never rewrites the tracked config. Because the dollar scale is now the tighter one, dollars alone
+never HARD-STOP a window the plan holds an old, low reading for: that reads SOFT-PAUSE
+(`calibration_hard_capped`), so one session runs and resamples while nothing fits past the hard
+line — a fitted scale must not be able to stop the loop until a weekly reset. Only a `seven_day`
+reading lifts it (a `five_hour` one says nothing about the week). Under the cap a live run's
+fable→opus fallback and its next phase also go ahead, as they do on SOFT-PAUSE: they finish work
+already started.
 Rules out: holding a pause on the highest reading of a window, standing the loop down on a
-reading older than the freshness bound, dropping a model's stale over-threshold reading (the
+reading older than the freshness bound, an automatic weekly rewrite of the limit (it compounds and
+dirties the main checkout), dropping a model's stale over-threshold reading (the
 dollar fallback then reads the model as open), pausing every model for one model's window, and moving
 the grading or the window rules into the supervisor prompt.
 
@@ -188,7 +204,81 @@ the spec, none from a failing test; a blind review of four slices' tests scored 
 nearly the same, with Sonnet medium the leanest. Of 132 judged items, about 70 false positives were
 spec silence claimed as a defect or claims about test files and the brief, which the two-channel
 report separates without losing any real finding (each real one named a concrete wrong outcome).
+The game repo's copy of `tester.md` is generated from the harness file (`scripts/sync-agents.mjs`)
+and `mr-selfcheck` reports drift against the game's `origin/master` (a FAIL in the main checkout's daily
+run): rooted runs start in the game repo, whose agent of the same name
+shadows the harness one, and a stale copy (Sonnet, no effort) silently ran 17 tester calls on
+Sonnet and the hard tier's at the parent's xhigh before 2026-11-26. Every agent both rosters carry
+must also agree on `model:` and `effort:`; their bodies stay project-owned.
 Rules out: a Sonnet tester ($1.86 a run against Opus medium's $5.39, but dearer per slice once a
 missed defect is priced above $10.35, the experiment's break-even), raising tester effort, and
 tests that pin behaviour no criterion states. Untested and cheaper, if cost ever forces it: Sonnet
 medium writing the tests beside an Opus medium pass that only files findings.
+
+## A build session may run as three fresh sessions, measured on the first five slices
+`mr-phase-ab` assigns eligible slices (game repo, `type: feature`, not ci-fix/close/rv) alternately
+within a tier to `phased` or `control` until five assigned slices have merged. A phased slice runs
+plan+red tests, build, and finish (lens batch, gate, PR) as separate sessions; each ends by writing
+a handoff whose first line names the next phase, and `mr-launch.sh` starts the next one fresh from
+the brief plus `mr-phase-protocol.md`. The main thread was 59% of build spend, its context averaged
+275k tokens a turn and 87% of its cost was re-reading that context, so a reset at each boundary
+targets the dominant cost directly. When the fifth assigned slice merges the tick records the
+analysis (`phase-ab/analysis-*.md`, a pre-registered LEANING reading — n is tiny), disables the
+experiment in the gitignored jsonl and files a non-blocking operator issue; phased runs stay off
+until the changes it recommends are made. The Stop hook records a phase end as
+`WOULD-RELEASE-phase-end`, so the arming baseline is not polluted. `mr-cost-sum` sums the transcript
+witness over every session a log starts.
+Rules out: four phases (a tests-only session pays a fresh prefix for one tester call), phasing
+design/docs/refactor slices, and an open-ended experiment.
+
+## A decision session is skipped only when its inputs equal those of a budget-held no-op session
+After a decision session whose one DECISION line is a stand-down naming no action and holding every
+ready candidate on the budget alone (`held=…:budget`; `mr-tick-fingerprint mark-ok`), the tick
+re-reads every input a decision depends on — bundle decision fields, both repos' heads and open PRs
+with their check states, specs, ledgers, doctrine and configs, state keys, flags, the date — and,
+if nothing changed, writes `.noop-tick`. The next cron tick with the same fingerprint, no event, no
+pending event and no credit-stop resume stands down free (`STANDDOWN unchanged-since-noop`), only
+within 90 minutes of that session's start and while the plan's utilisation was sampled within 90
+minutes: on the hourly cron at most one tick in a row is skipped, so the budget reading cannot go
+stale behind skips. An unreadable input never matches. 34 of 245 paid sessions in 14 days only
+stood down; the operator asked for free stand-downs only where they are accurate, and to pay rather
+than risk stopping work, so only the budget hold is ever marked. Its one blind spot is accepted and
+bounded: the plan can restore credit mid-window, and while nothing runs only a paid session takes
+the reading that shows it, so with no live run a restore is seen at most one tick (an hour) later.
+A window's own reset is never hidden — `mr-reset-watch` fires a `src=reset` tick, which never skips
+— and a live run's sample changes the fingerprint. `NOOP_MAX_AGE_S=0` turns skipping off.
+Rules out: predicting the session's decision in the wrapper, skipping event or manual ticks,
+marking a stand-down whose cause clears with time alone (a human at work, a quiet window, a merge
+left for the next tick), and writing the marker from the fingerprint alone (a failed attempt also
+leaves the inputs unchanged).
+
+## The residual backlog is worked by a periodic review, never capped
+Every residual stays recorded until a documented disposition closes it. Every `every_merges` (12)
+merged slices the supervisor launches an `rv-<utc>` review (`mr-residual-review-playbook.md`): a
+routine, report-only run that checks the rows whose cited files changed since they were filed or since
+an earlier verdict (`mr-residual-history sort`), gives each a verdict with evidence (FIXED needs the PR
+and the covering test) in a verdict file later reviews read, and proposes at most two ranked fix
+clusters. The supervisor re-checks a sample of the verdicts, applies them, promotes the clusters the
+next tick, and builds them through the residual share in Pick work; a cluster's other rows are
+dispositioned when its slice merges. Milestone elaboration folds
+the open rows on its files into its slices (`mr-residual-history related`) and gives every
+multi-slice flow a journey criterion, so fewer gaps become residuals at all. Measured 2026-11-26:
+206 open rows (1 HIGH, 46 MED, 159 LOW) and 189 new ids in 14 days against about five fix slices.
+A review is not due while an `rv-*` lock or PR is open in either repo (an unreadable harness PR
+list counts as open).
+Rules out: a ceiling that drops rows, age-based closing, and a review run that writes registry
+rows or specs itself.
+
+## Structural work is not ranked by a tool
+A proposer/skeptic debate and a judge (2026-11-26) found that ordering structural slices by the
+tokens they save decides nothing file order does not: `structure.spec.md`'s open slices are an
+`after:` chain plus one ready design slice, and plan extraction lists are fixed-order. Reads are
+concentrated (`client/src/main.ts` in 22 of 40 runs at about 73k characters a reading run;
+`docs/DECISIONS.md` in 35 of 40 at about 39k: `memory/projects/readshare-2026-11-26.txt`), so st-21
+takes that file as an input and the supervisor sections first the plan that moves code out of
+`main.ts`.
+Revisit when a tick finds more than five independent ready structural candidates, or three or more
+refactor plans list extractions at once (the supervisor files the question); st-21's plan names the
+extraction after which `main.ts` reads are measured again (a drop under 25% is an operator question,
+not a ranking tool).
+

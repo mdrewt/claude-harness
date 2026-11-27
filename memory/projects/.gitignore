@@ -9,6 +9,7 @@
 .native-supervisor-tick-alive
 .ollama-last
 .situation-cache.json
+.situation-cache-nogh.json
 pending-events/
 # lp-01 rate-limit telemetry rows — appended by production several times an hour (tick + every live-slice standdown); tracking it would conflict on every parallel slice branch
 mr-rate-limit-telemetry.jsonl
@@ -32,3 +33,10 @@ mr-interrupted.json
 # mr-prune's recorded census rows (prune/trend.jsonl) — appended by runs; any row can be recomputed from
 # the commit it names. Anchored: fixtures/prune/ is tracked.
 /prune/
+# 2026-11-26 loop-efficiency: the no-op stand-down marker and the weekly calibration-check marker
+# (mr-native-tick.sh), and the phase-split experiment's runtime record and analyses (mr-phase-ab;
+# its switch lives in the jsonl so the tool never dirties the tracked mr-phase-ab.json).
+.noop-tick
+.calibrate-last
+mr-phase-ab.jsonl
+/phase-ab/

@@ -487,6 +487,7 @@ run=None
 helper=next((c for c in (os.path.join(os.environ.get("MEM_SELF") or MEM,"mr-cost-sum"), MEM+"/mr-cost-sum")
              if os.path.exists(c)), MEM+"/mr-cost-sum")
 _SESSION=re.compile(r"\bsession=([0-9a-fA-F-]{8,64})")
+_SESSIONS=re.compile(r"\bsessions=((?:[0-9a-fA-F-]{8,64}:[0-9.]+,?)+)")
 def top_up(fresh=None):
     """Append the spend a session of this slice made after its cost row was written. A session
     resumed outside the wrapper (after a crash or a rate-limit stop) keeps spending on the same
@@ -507,7 +508,18 @@ def top_up(fresh=None):
                 try: d=json.loads(l)
                 except Exception: continue
                 if not isinstance(d,dict) or d.get("slice")!=slice_: continue
-                m=_SESSION.search(str(d.get("notes") or ""))
+                notes_=str(d.get("notes") or "")
+                ms=_SESSIONS.search(notes_)
+                if ms:
+                    # A multi-session row carries each session's own share (mr-cost-sum session_costs).
+                    for pair in ms.group(1).strip(",").split(","):
+                        sid_,_,c_=pair.partition(":")
+                        if fresh is not None and sid_ not in fresh: continue
+                        try: have[sid_]=have.get(sid_,0.0)+float(c_)
+                        except ValueError: continue
+                        rid.setdefault(sid_, d.get("run_id","n/a"))
+                    continue
+                m=_SESSION.search(notes_)
                 if not m or (fresh is not None and m.group(1) not in fresh): continue
                 try: c=float(d.get("cost_usd") or 0)
                 except (TypeError,ValueError): c=0.0
@@ -585,6 +597,10 @@ if run_log:
             model="escalated:%s-to-fable"%m if run.get("escalated") else m
             if not re.match(r"^(opus|sonnet|haiku|fable|escalated:(opus|sonnet|haiku|fable)-to-fable)$", model): model=""
         if run.get("session_id"): notes=why("session=%s"%run["session_id"])
+        # A log that started several sessions (a phased launch) names each one's share, so top_up
+        # compares every session with what the rows already carry for IT, never the whole row.
+        if len(run.get("session_ids") or [])>1 and run.get("session_costs"):
+            notes=why("sessions="+",".join("%s:%.4f"%(s,c) for s,c in run["session_costs"].items()))
 if cost in (None,"","null"):
     cost=None
     # A SUPERVISOR row is the tick's own cost row, so a missing cost there is a gap worth naming.
@@ -672,7 +688,13 @@ if recorded:
     sid=(run or {}).get("session_id")
     # top_up compares a session TOTAL with the session's rows; a launch that resumed the session
     # reports its own share, so what the session had spent before that launch is added back.
-    late=top_up({sid: float(cost)+float((run or {}).get("session_prior") or 0)}) if sid and cost is not None else []
+    prior=float((run or {}).get("session_prior") or 0)
+    sc=(run or {}).get("session_costs") or {}
+    if len((run or {}).get("session_ids") or [])>1 and sc:
+        # A phased launch: each session against its own share, back on the session-total scale.
+        late=top_up(dict((s_, float(c_)+(prior if s_==sid else 0.0)) for s_,c_ in sc.items()))
+    else:
+        late=top_up({sid: float(cost)+prior}) if sid and cost is not None else []
     print("ledger-skip: %s already has its cost row"%row["run_id"])
     if late: _backup(LEDGER)
     sys.exit(0)

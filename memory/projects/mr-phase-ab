@@ -1,0 +1,681 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands. Python reads this line as a
+# no-op string; sh/bash re-execs the file under python3. Statically enforced by mr-selfcheck.
+"""mr-phase-ab — the phase-split experiment: assignment, phase state, prompts, analysis.
+
+WHY (operator item 2, 2026-11-26)
+---------------------------------
+A build session's main thread was 59% of build spend, its context averaged 275k tokens a turn and
+87% of its cost was re-reading that context. Phased runs end the session at two boundaries
+(plan+red tests | build | lens batch+gate+PR) and start a fresh one from a written handoff
+(memory/projects/mr-phase-protocol.md), expecting a 60–300k context. The operator limited the A/B
+to the first ~5 slices completed after it shipped: the analysis is recorded as soon as they are
+merged, and the experiment then disables itself until the changes the analysis recommends are made.
+
+STATE
+-----
+  mr-phase-ab.json   (tracked)   {enabled, target_completed, max_assigned, timeout_days, started_utc}
+  mr-phase-ab.jsonl  (gitignored, append-only) rows: assign | start | session | analysis | disabled
+  phase-ab/analysis-<utc>.md (gitignored)  the recorded analysis
+  $MEM/monster-realm-<slice>-phase.md     the run's handoff; line 1 `NEXT-PHASE: build|finish`
+The experiment is OFF once the config says enabled=false or any `disabled` row exists: the
+runtime switch lives in the gitignored jsonl so the tool never dirties a tracked file.
+
+COMMANDS (all print one line unless noted; ALWAYS rc 0 except --selftest failures)
+  assign  --slice S --repo R [--tier T]  -> phased | control | off   (flock; a slice keeps its arm)
+          Eligible: repo=project, not ci-fix-*/close-*/rv-*, spec `type:` feature or absent;
+          while < max_assigned assigned and the target is not reached. Alternates within a tier,
+          phased first.
+  current --slice S        -> the phase to run now: plan | build | finish
+  started --slice S        -> the phase whose session last started, or nothing
+  next    --slice S        -> the phase to advance to, or nothing: a handoff written after the
+                              current phase started that names a later phase
+  start   --slice S --phase P            record that a new session for P started
+  session --slice S --phase P --sid ID   record a session id (both arms; for the analysis)
+  prompt  --slice S --phase P            the protocol text for that phase (multi-line)
+  status  [--json]
+  analyze [--apply]        when due: the report (+ with --apply: write it, disable the experiment,
+                           file a non-blocking mr-ask-drew issue and a handoff entry)
+"""
+import datetime
+import fcntl
+import glob
+import json
+import os
+import re
+import statistics
+import subprocess
+import sys
+import tempfile
+import time
+
+# SELF-LOCATING (like mr-selfcheck): the experiment's state lives beside the copy that runs, so the
+# selfcheck's sandboxed launch exercises a sandboxed copy. The live copy is the main checkout's.
+MEM = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+SPECS = os.path.join(os.path.dirname(os.path.dirname(MEM)), "specs", "monster-realm-v2")
+TRANSCRIPTS = os.path.expanduser("~/.claude/projects")
+PHASES = ("plan", "build", "finish")
+EXCLUDE = ("ci-fix-", "close-", "rv-", "rb-", "lp-")   # loop and residual-fix slices: not the roadmap work measured
+SLICE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$")
+DEFAULT_CFG = {"enabled": False, "target_completed": 5, "max_assigned": 6, "timeout_days": 21, "generation": 1}
+
+
+def now():
+    try:
+        return float(os.environ["MR_PHASE_AB_NOW"])
+    except (KeyError, ValueError):
+        return time.time()
+
+
+def iso(e):
+    return datetime.datetime.fromtimestamp(e, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def epoch(s):
+    try:
+        return datetime.datetime.strptime(str(s)[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
+    except Exception:
+        return None
+
+
+class Ctx:
+    def __init__(self, mem=MEM, specs=SPECS, transcripts=TRANSCRIPTS):
+        self.mem, self.specs, self.transcripts = mem, specs, transcripts
+        self.cfg_path = os.path.join(mem, "mr-phase-ab.json")
+        self.rows_path = os.path.join(mem, "mr-phase-ab.jsonl")
+
+    def cfg(self):
+        try:
+            c = json.load(open(self.cfg_path))
+            return dict(DEFAULT_CFG, **(c if isinstance(c, dict) else {}))
+        except Exception:
+            return dict(DEFAULT_CFG)
+
+    def gen(self):
+        try:
+            return int(self.cfg().get("generation") or 1)
+        except (TypeError, ValueError):
+            return 1
+
+    def rows(self):
+        """This generation's rows only: bumping `generation` in the config starts a fresh experiment."""
+        g = self.gen()
+        return [r for r in self._all_rows() if int(r.get("gen") or 1) == g]
+
+    def _all_rows(self):
+        out = []
+        try:
+            for line in open(self.rows_path, errors="replace"):
+                try:
+                    r = json.loads(line)
+                    if isinstance(r, dict):
+                        out.append(r)
+                except Exception:
+                    continue
+        except OSError:
+            pass
+        return out
+
+    def append(self, row):
+        row = dict(row, ts=iso(now()), v=1, gen=self.gen())
+        with open(self.rows_path, "a") as fh:
+            fh.write(json.dumps(row, sort_keys=True) + "\n")
+        return row
+
+    def lock(self):
+        fh = open(self.rows_path + ".lock", "a")
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        return fh
+
+    def enabled(self, rows=None):
+        rows = self.rows() if rows is None else rows
+        return bool(self.cfg().get("enabled")) and not any(r.get("kind") == "disabled" for r in rows)
+
+    def handoff(self, slice_):
+        return os.path.join(self.mem, "monster-realm-%s-phase.md" % slice_)
+
+    def ledger(self):
+        out = []
+        try:
+            for line in open(os.path.join(self.mem, "monster-realm-usage-ledger.jsonl"), errors="replace"):
+                try:
+                    r = json.loads(line)
+                    if isinstance(r, dict) and r.get("ts"):
+                        out.append(r)
+                except Exception:
+                    continue
+        except OSError:
+            pass
+        return out
+
+
+def spec_type(ctx, slice_):
+    """The slice's `type:` from its spec section, '' when the section has none, None when no section."""
+    head = re.compile(r"^###\s+%s(\s|$)" % re.escape(slice_))
+    for p in sorted(glob.glob(os.path.join(ctx.specs, "*.md"))):
+        try:
+            lines = open(p, errors="replace").read().split("\n")
+        except OSError:
+            continue
+        for i, line in enumerate(lines):
+            if head.match(line):
+                for nxt in lines[i + 1:i + 8]:
+                    if nxt.startswith("### "):
+                        break
+                    m = re.search(r"\btype:\s*([a-z-]+)", nxt)
+                    if m:
+                        return m.group(1)
+                return ""
+    return None
+
+
+def assigned(rows):
+    out = {}
+    for r in rows:
+        if r.get("kind") == "assign" and r.get("slice") and r["slice"] not in out:
+            out[r["slice"]] = r
+    return out
+
+
+def completed(ctx, rows, ledger=None):
+    """{slice: MERGED row} for assigned slices merged after their assignment."""
+    ledger = ctx.ledger() if ledger is None else ledger
+    out = {}
+    for s, a in assigned(rows).items():
+        t0 = epoch(a.get("ts")) or 0
+        for r in ledger:
+            if r.get("slice") == s and str(r.get("outcome", "")).upper().startswith("MERGED") and (epoch(r.get("ts")) or 0) >= t0:
+                out[s] = r
+                break
+    return out
+
+
+def cmd_assign(ctx, slice_, repo, tier):
+    if not SLICE_RE.match(slice_ or ""):
+        return "off"
+    lk = ctx.lock()
+    try:
+        rows = ctx.rows()
+        have = assigned(rows).get(slice_)
+        if have:
+            return have.get("arm", "off")
+        if not ctx.enabled(rows):
+            return "off"
+        cfg = ctx.cfg()
+        if repo != "project" or slice_.startswith(EXCLUDE):
+            return "off"
+        t = spec_type(ctx, slice_)
+        if t is None or t not in ("", "feature"):
+            return "off"
+        a = assigned(rows)
+        if len(a) >= int(cfg["max_assigned"]) or len(completed(ctx, rows)) >= int(cfg["target_completed"]):
+            return "off"
+        tier = tier or "routine"
+        same = [r for r in a.values() if r.get("tier") == tier]
+        p = sum(1 for r in same if r.get("arm") == "phased")
+        arm = "phased" if p <= len(same) - p else "control"
+        ctx.append({"kind": "assign", "slice": slice_, "arm": arm, "tier": tier})
+        return arm
+    finally:
+        lk.close()
+
+
+def _phase_state(ctx, slice_, rows=None):
+    rows = ctx.rows() if rows is None else rows
+    starts = [r for r in rows if r.get("kind") == "start" and r.get("slice") == slice_ and r.get("phase") in PHASES]
+    cur = starts[-1]["phase"] if starts else None
+    t0 = (epoch(starts[-1]["ts"]) or 0) if starts else 0
+    adv = None
+    try:
+        hp = ctx.handoff(slice_)
+        first = open(hp, errors="replace").readline().strip()
+        m = re.match(r"^NEXT-PHASE:\s*(build|finish)\s*$", first)
+        if m and os.path.getmtime(hp) >= t0 - 1:
+            want = m.group(1)
+            if cur is None or PHASES.index(want) > PHASES.index(cur):
+                adv = want
+    except OSError:
+        pass
+    return cur, adv
+
+
+def cmd_started(ctx, slice_):
+    cur, _ = _phase_state(ctx, slice_)
+    return cur or ""
+
+
+def cmd_current(ctx, slice_):
+    cur, adv = _phase_state(ctx, slice_)
+    return adv or cur or "plan"
+
+
+def cmd_next(ctx, slice_):
+    cur, adv = _phase_state(ctx, slice_)
+    if cur is None:
+        return ""
+    return adv or ""
+
+
+def cmd_prompt(ctx, slice_, phase):
+    if phase not in PHASES or not SLICE_RE.match(slice_ or ""):
+        return ""
+    try:
+        text = open(os.path.join(ctx.mem, "mr-phase-protocol.md")).read()
+    except OSError:
+        return ""
+    return text.replace("<SLICE>", slice_).replace("<PHASE>", phase)
+
+
+# ---------------------------------------------------------------------------------------------
+# Analysis
+# ---------------------------------------------------------------------------------------------
+def _price(cfg_path):
+    try:
+        return json.load(open(cfg_path)).get("pricing_per_mtok") or {}
+    except Exception:
+        return {}
+
+
+def main_thread(ctx, sid, pricing):
+    """Main-thread stats of one session from its transcript: turns, context list, cost."""
+    if not sid or not re.fullmatch(r"[0-9a-fA-F-]{8,64}", sid):
+        return None
+    seen = {}
+    for p in glob.glob(os.path.join(glob.escape(ctx.transcripts), "*", sid + ".jsonl")):
+        try:
+            for line in open(p, errors="replace"):
+                if '"assistant"' not in line:
+                    continue
+                try:
+                    o = json.loads(line)
+                except Exception:
+                    continue
+                m = o.get("message") if isinstance(o, dict) else None
+                if o.get("type") != "assistant" or not isinstance(m, dict) or not m.get("id") or not m.get("usage"):
+                    continue
+                seen[m["id"]] = (m.get("model") or "", m["usage"])
+        except OSError:
+            continue
+    if not seen:
+        return None
+    ctxs, cost = [], 0.0
+    for model, u in seen.values():
+        fam = next((k for k in ("fable", "opus", "sonnet", "haiku") if k in model), "opus")
+        pr = pricing.get(fam) or {}
+        cr, cw, i, o = (u.get("cache_read_input_tokens", 0) or 0, u.get("cache_creation_input_tokens", 0) or 0,
+                        u.get("input_tokens", 0) or 0, u.get("output_tokens", 0) or 0)
+        ctxs.append(cr + cw + i)
+        cost += (cr * pr.get("cache_read", 0) + cw * pr.get("cache_write_5m", 0) + i * pr.get("in", 0) + o * pr.get("out", 0)) / 1e6
+    return {"turns": len(ctxs), "ctx": ctxs, "cost": round(cost, 4)}
+
+
+def _pct(xs, q):
+    if not xs:
+        return None
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(q * len(xs)))]
+
+
+def slice_metrics(ctx, slice_, t0, rows, ledger, pricing, residual_rows):
+    lr = [r for r in ledger if r.get("slice") == slice_ and (epoch(r.get("ts")) or 0) >= t0]
+    cost = round(sum(r["cost_usd"] for r in lr if isinstance(r.get("cost_usd"), (int, float)) and not isinstance(r.get("cost_usd"), bool)), 2)
+    outs = [str(r.get("outcome", "")).upper() for r in lr]
+    merged = next((r for r in lr if str(r.get("outcome", "")).upper().startswith("MERGED")), None)
+    sids = []
+    for r in rows:
+        if r.get("kind") == "session" and r.get("slice") == slice_ and r.get("sid") not in [s for s, _ in sids]:
+            sids.append((r.get("sid"), r.get("phase") or "all"))
+    for r in lr:
+        for sid in re.findall(r"\bsession=([0-9a-fA-F-]{8,64})", str(r.get("notes", ""))):
+            if sid not in [s for s, _ in sids]:
+                sids.append((sid, "all"))
+    sess = []
+    for sid, phase in sids:
+        mt = main_thread(ctx, sid, pricing)
+        if mt:
+            sess.append(dict(mt, sid=sid, phase=phase))
+    allctx = [c for s in sess for c in s["ctx"]]
+    turns = sum(s["turns"] for s in sess)
+    mcost = sum(s["cost"] for s in sess)
+    gates = None
+    for gp in (os.path.join(ctx.mem, "gates", slice_ + ".gates.md"), os.path.join(ctx.mem, "gates", "archive", slice_ + ".gates.md")):
+        try:
+            gates = sum(1 for line in open(gp, errors="replace") if line.startswith("DEFER:"))
+            break
+        except OSError:
+            continue
+    return {"slice": slice_, "ledger_cost": cost, "sessions_rows": sum(1 for o in outs if o.startswith(("FINISHED", "CRASHED"))),
+            "launches": sum(1 for o in outs if o.startswith(("LAUNCHED", "RESUMED"))), "parks": sum(1 for o in outs if o.startswith("PARKED")),
+            "merged": bool(merged), "red_fix_cycles": (merged or {}).get("remote_red_fix_cycles"),
+            "audit": " ".join(str((merged or {}).get(k) or "") for k in ("orchestration_audit", "gating_test_audit")).strip(),
+            "residuals": len({r.get("id") for r in residual_rows if r.get("source_slice") == slice_ and r.get("id")}),
+            "defers": gates, "main_sessions": len(sess), "main_turns": turns, "main_cost": round(mcost, 2),
+            "main_cost_per_turn": round(mcost / turns, 4) if turns else None,
+            "ctx_median": _pct(allctx, 0.5), "ctx_p90": _pct(allctx, 0.9), "ctx_max": max(allctx) if allctx else None,
+            "per_phase": {ph: {"turns": sum(s["turns"] for s in sess if s["phase"] == ph),
+                               "ctx_median": _pct([c for s in sess if s["phase"] == ph for c in s["ctx"]], 0.5),
+                               "ctx_p90": _pct([c for s in sess if s["phase"] == ph for c in s["ctx"]], 0.9)}
+                          for ph in sorted({s["phase"] for s in sess})}}
+
+
+def baseline(ctx, start_e, ledger, pricing, residual_rows, n=30):
+    """The last n slices merged before the experiment started, with their tier from the launch row."""
+    merged = [r for r in ledger if str(r.get("outcome", "")).upper().startswith("MERGED") and (epoch(r.get("ts")) or 0) < start_e
+              and r.get("slice") not in ("SUPERVISOR",) and not str(r.get("slice", "")).startswith(EXCLUDE)
+              and spec_type(ctx, str(r.get("slice"))) not in ("design", "docs", "refactor")]
+    seen, uniq = set(), []
+    for m in reversed(merged):           # the latest MERGED row per slice
+        if m["slice"] not in seen:
+            seen.add(m["slice"])
+            uniq.append(m)
+    merged = list(reversed(uniq))
+    out = []
+    for m in merged[-n:]:
+        s, te = m["slice"], epoch(m["ts"]) or 0
+        first = next((r for r in ledger if r.get("slice") == s and str(r.get("outcome", "")).upper().startswith("LAUNCHED")
+                      and te - 30 * 86400 <= (epoch(r.get("ts")) or 0) <= te), None)
+        t0 = epoch(first["ts"]) if first else te - 14 * 86400
+        tier = (re.search(r"tier=(\w+)", str((first or {}).get("notes", ""))) or [None, "?"])[1]
+        sm = slice_metrics(ctx, s, t0, [], [r for r in ledger if (epoch(r.get("ts")) or 0) <= te], pricing, residual_rows)
+        out.append(dict(sm, tier=tier))
+    return out
+
+
+def _med(xs):
+    xs = [x for x in xs if isinstance(x, (int, float))]
+    return round(statistics.median(xs), 4) if xs else None
+
+
+def verdict(phased, control, base, timed_out=False):
+    """Pre-registered reading (2026-11-26). n is tiny, so this is a LEANING, never a proof.
+    Merged slices only; an assigned slice still in flight is listed apart and counts against the
+    phased arm only when the experiment ended on its timeout."""
+    unmerged = [m for m in phased if not m["merged"]]
+    phased = [m for m in phased if m["merged"]]
+    control = [m for m in control if m["merged"]]
+    ref = control + base
+    notes, guard = [], []
+    pc, rc = _med([m["ctx_median"] for m in phased]), _med([m["ctx_median"] for m in ref])
+    pt, rt = _med([m["main_cost_per_turn"] for m in phased]), _med([m["main_cost_per_turn"] for m in ref])
+    ps, rs = _med([m["ledger_cost"] for m in phased if m["merged"]]), _med([m["ledger_cost"] for m in ref if m["merged"]])
+    if _med([m["launches"] for m in phased]) is not None and _med([m["launches"] for m in control or base]) is not None \
+            and _med([m["launches"] for m in phased]) > _med([m["launches"] for m in control or base]):
+        guard.append("phased slices needed more launches/resumes")
+    pr, rr = _med([m["residuals"] for m in phased]), _med([m["residuals"] for m in ref])
+    if pr is not None and rr is not None and pr > max(1.5 * rr, rr + 1):
+        guard.append("phased slices filed more residuals (%s vs %s)" % (pr, rr))
+    if timed_out and unmerged:
+        guard.append("%d phased slice(s) did not merge before the timeout" % len(unmerged))
+    if any("FLAG" in (m["audit"] or "").upper() for m in phased) and not any("FLAG" in (m["audit"] or "").upper() for m in control):
+        guard.append("only phased slices drew a FLAGGED audit")
+    if pc and rc:
+        notes.append("main-thread median context %.0fk vs %.0fk (%+.0f%%)" % (pc / 1e3, rc / 1e3, 100 * (pc - rc) / rc))
+    if pt and rt:
+        notes.append("main-thread cost per turn $%.3f vs $%.3f (%+.0f%%)" % (pt, rt, 100 * (pt - rt) / rt))
+    if ps and rs:
+        notes.append("ledger cost per merged slice $%.1f vs $%.1f (%+.0f%%)" % (ps, rs, 100 * (ps - rs) / rs))
+    if guard or (ps and rs and ps > 1.15 * rs):
+        label = "LEANING-REVERT"
+    elif pc and rc and pc <= 0.75 * rc and (not (ps and rs) or ps <= 1.10 * rs):
+        label = "LEANING-ADOPT"
+    else:
+        label = "INCONCLUSIVE"
+    return label, notes, guard
+
+
+def due(ctx, rows=None, ledger=None):
+    rows = ctx.rows() if rows is None else rows
+    if any(r.get("kind") == "analysis" for r in rows):
+        return False, "already analysed"
+    cfg = ctx.cfg()
+    a = assigned(rows)
+    if not a:
+        return False, "nothing assigned"
+    done = completed(ctx, rows, ledger)
+    if len(done) >= int(cfg["target_completed"]):
+        return True, "%d assigned slices merged" % len(done)
+    first = min(epoch(r.get("ts")) or now() for r in a.values())
+    if done and now() - first > float(cfg["timeout_days"]) * 86400:
+        return True, "timeout: %d merged after %s days" % (len(done), cfg["timeout_days"])
+    return False, "%d of %d merged" % (len(done), int(cfg["target_completed"]))
+
+
+def report(ctx):
+    rows, ledger = ctx.rows(), ctx.ledger()
+    cfg = ctx.cfg()
+    pricing = _price(os.path.join(ctx.mem, "mr-budget-config.json"))
+    try:
+        res = [json.loads(l) for l in open(os.path.join(ctx.mem, "mr-residuals.jsonl"), errors="replace") if l.strip()]
+    except Exception:
+        res = []
+    a = assigned(rows)
+    start_e = min([epoch(r.get("ts")) or now() for r in a.values()] or [now()])
+    ms = []
+    for s, r in a.items():
+        m = slice_metrics(ctx, s, epoch(r.get("ts")) or 0, rows, ledger, pricing, res)
+        ms.append(dict(m, arm=r.get("arm"), tier=r.get("tier")))
+    base = baseline(ctx, start_e, ledger, pricing, res)
+    phased = [m for m in ms if m["arm"] == "phased"]
+    control = [m for m in ms if m["arm"] == "control"]
+    base_tiers = [b for b in base if b["tier"] in {m["tier"] for m in phased}] or base
+    label, notes, guard = verdict(phased, control, base_tiers, timed_out=due(ctx, rows, ledger)[1].startswith("timeout"))
+    cols = ("slice", "arm", "tier", "merged", "ledger_cost", "launches", "parks", "red_fix_cycles", "residuals", "defers",
+            "main_sessions", "main_turns", "main_cost", "main_cost_per_turn", "ctx_median", "ctx_p90", "ctx_max")
+    lines = ["# Phase-split A/B — analysis %s" % iso(now()), "",
+             "Pre-registered reading (mr-phase-ab `verdict`, merged slices only): **%s** — assigned %d phased, %d control; %d baseline slices "
+             "(baseline = last 30 merged before %s, same tiers as the phased arm). With n this small the reading is a "
+             "leaning; read the runs before deciding." % (label, len(phased), len(control), len(base_tiers), iso(start_e)), ""]
+    lines += ["- " + n for n in notes] + ["- GUARDRAIL: " + g for g in guard] + [""]
+    lines += ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
+    for m in ms + [dict(b, arm="baseline") for b in base_tiers]:
+        lines.append("| " + " | ".join(str(m.get(c)) for c in cols) + " |")
+    lines += ["", "Per phase (phased arm): " + "; ".join("%s %s" % (m["slice"], json.dumps(m["per_phase"])) for m in phased), "",
+              "In flight at analysis (not in the reading): " + (", ".join(m["slice"] for m in ms if not m["merged"]) or "none"), "",
+              "Next: the experiment is now disabled (a `disabled` row in mr-phase-ab.jsonl). Make the changes this analysis "
+              "recommends, then start a fresh experiment by raising `generation` in mr-phase-ab.json (the old rows stay as history)."]
+    return label, "\n".join(lines) + "\n", {"phased": phased, "control": control, "baseline_n": len(base_tiers), "cfg": cfg}
+
+
+def cmd_analyze(ctx, apply_):
+    ok, why = due(ctx)
+    if not ok:
+        print("PHASE-AB-NOT-DUE %s" % why)
+        return 0
+    label, md, _ = report(ctx)
+    if not apply_:
+        sys.stdout.write(md)
+        print("PHASE-AB-DUE %s (dry: nothing written)" % why)
+        return 0
+    lk = ctx.lock()
+    try:
+        if any(r.get("kind") == "analysis" for r in ctx.rows()):
+            print("PHASE-AB-NOT-DUE already analysed")
+            return 0
+        d = os.path.join(ctx.mem, "phase-ab")
+        os.makedirs(d, exist_ok=True)
+        path = os.path.join(d, "analysis-%s.md" % iso(now()).replace(":", ""))
+        open(path, "w").write(md)
+        ctx.append({"kind": "analysis", "path": path, "label": label, "why": why})
+        ctx.append({"kind": "disabled", "reason": "analysis recorded (%s); disabled until its recommended changes are made" % label})
+    finally:
+        lk.close()
+    print("PHASE-AB-ANALYZED %s %s -> %s" % (label, why, path), flush=True)
+    if os.environ.get("MR_PHASE_AB_NO_NOTIFY") != "1":
+        q = ("The phase-split A/B reached its limit (%s) and is now disabled. Reading: %s. Analysis: %s. "
+             "What changes should be made before phased runs are re-enabled (or should they stay off)?" % (why, label, path))
+        for cmd in ([os.path.join(ctx.mem, "mr-ask-drew"), "phase-ab-analysis", "--repo", "mdrewt/claude-harness", "--question", q,
+                     "--recommend", "Read %s; adopt only what the per-slice table supports" % path],
+                    [os.path.join(ctx.mem, "mr-record"), "handoff", "--title", "Phase-split A/B analysed: %s (experiment disabled)" % label,
+                     "--body", "%s. Report: %s" % (why, path)]):
+            try:   # detached: the tick's own timeout must not cut the notice off; each bounded to 90s
+                subprocess.Popen(["timeout", "90"] + cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL, start_new_session=True)
+            except Exception:
+                pass
+    return 0
+
+
+def cmd_status(ctx, as_json):
+    rows = ctx.rows()
+    a = assigned(rows)
+    done = completed(ctx, rows)
+    st = {"enabled": ctx.enabled(rows), "assigned": {s: {"arm": r.get("arm"), "tier": r.get("tier"), "ts": r.get("ts"),
+                                                          "merged": s in done, "phase": cmd_current(ctx, s)} for s, r in a.items()},
+          "due": due(ctx, rows)[1]}
+    print(json.dumps(st, indent=1) if as_json else "PHASE-AB enabled=%s assigned=%d merged=%d (%s)" % (st["enabled"], len(a), len(done), st["due"]))
+    return 0
+
+
+def _arg(argv, name):
+    return argv[argv.index(name) + 1] if name in argv and argv.index(name) + 1 < len(argv) else ""
+
+
+def main(argv, ctx=None):
+    ctx = ctx or Ctx()
+    cmd = argv[0] if argv else ""
+    s, ph = _arg(argv, "--slice"), _arg(argv, "--phase")
+    if cmd in ("assign", "current", "started", "next", "start", "session", "prompt") and not SLICE_RE.match(s or ""):
+        print("off" if cmd == "assign" else "")
+        return 0
+    if cmd == "assign":
+        print(cmd_assign(ctx, s, _arg(argv, "--repo"), _arg(argv, "--tier")))
+    elif cmd == "current":
+        print(cmd_current(ctx, s))
+    elif cmd == "started":
+        print(cmd_started(ctx, s))
+    elif cmd == "next":
+        print(cmd_next(ctx, s))
+    elif cmd == "start" and ph in PHASES:
+        ctx.append({"kind": "start", "slice": s, "phase": ph})
+    elif cmd == "session" and re.fullmatch(r"[0-9a-fA-F-]{8,64}", _arg(argv, "--sid") or ""):
+        sid = _arg(argv, "--sid")
+        if not any(r.get("kind") == "session" and r.get("slice") == s and r.get("sid") == sid for r in ctx.rows()):
+            ctx.append({"kind": "session", "slice": s, "phase": ph or "all", "sid": sid})
+    elif cmd == "prompt":
+        sys.stdout.write(cmd_prompt(ctx, s, ph))
+    elif cmd == "status":
+        cmd_status(ctx, "--json" in argv)
+    elif cmd == "analyze":
+        cmd_analyze(ctx, "--apply" in argv)
+    return 0
+
+
+def selftest():
+    bad = []
+
+    def check(name, cond):
+        if not cond:
+            bad.append(name)
+
+    import contextlib
+    import io
+
+    def run(ctx, *argv):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            main(list(argv), ctx)
+        return buf.getvalue().strip()
+
+    with tempfile.TemporaryDirectory() as d:
+        mem, specs, tr = os.path.join(d, "mem"), os.path.join(d, "specs"), os.path.join(d, "tr")
+        for x in (mem, specs, os.path.join(tr, "-p")):
+            os.makedirs(x)
+        open(os.path.join(specs, "M-a.spec.md"), "w").write(
+            "## Slices\n### f1 — a\ntype: feature · tier: routine\n### f2 — b\ntouches: x\n### f3 — c\n### f4 — d\n### f5 — e\n"
+            "### f6 — f\n### f7 — g\n### d1 — design\ntype: design · tier: hard\n### r1 — refactor\ntype: refactor · tier: routine\n")
+        open(os.path.join(mem, "mr-phase-protocol.md"), "w").write("PHASED <SLICE> <PHASE>\n")
+        json.dump({"enabled": True, "target_completed": 3, "max_assigned": 4, "timeout_days": 21,
+                   "pricing_per_mtok": {}}, open(os.path.join(mem, "mr-phase-ab.json"), "w"))
+        json.dump({"pricing_per_mtok": {"opus": {"in": 5, "out": 25, "cache_read": 0.5, "cache_write_5m": 6.25}}},
+                  open(os.path.join(mem, "mr-budget-config.json"), "w"))
+        ctx = Ctx(mem, specs, tr)
+        os.environ["MR_PHASE_AB_NOW"] = "1800000000"
+        check("ineligible-repo", run(ctx, "assign", "--slice", "f1", "--repo", "harness") == "off")
+        check("ineligible-design", run(ctx, "assign", "--slice", "d1", "--repo", "project") == "off")
+        check("ineligible-refactor", run(ctx, "assign", "--slice", "r1", "--repo", "project") == "off")
+        check("ineligible-prefix", run(ctx, "assign", "--slice", "close-M-a", "--repo", "project") == "off")
+        check("ineligible-nospec", run(ctx, "assign", "--slice", "zz", "--repo", "project") == "off")
+        check("first-phased", run(ctx, "assign", "--slice", "f1", "--repo", "project", "--tier", "hard") == "phased")
+        check("sticky", run(ctx, "assign", "--slice", "f1", "--repo", "project", "--tier", "hard") == "phased")
+        check("alternate-in-tier", run(ctx, "assign", "--slice", "f2", "--repo", "project", "--tier", "hard") == "control")
+        check("other-tier-starts-phased", run(ctx, "assign", "--slice", "f3", "--repo", "project", "--tier", "routine") == "phased")
+        check("hard-third-phased", run(ctx, "assign", "--slice", "f4", "--repo", "project", "--tier", "hard") == "phased")
+        check("max-assigned", run(ctx, "assign", "--slice", "f5", "--repo", "project", "--tier", "hard") == "off")
+        # phase state
+        check("current-fresh", run(ctx, "current", "--slice", "f1") == "plan")
+        check("next-before-start", run(ctx, "next", "--slice", "f1") == "")
+        run(ctx, "start", "--slice", "f1", "--phase", "plan")
+        check("next-no-handoff", run(ctx, "next", "--slice", "f1") == "")
+        hp = ctx.handoff("f1")
+        open(hp, "w").write("NEXT-PHASE: build\nstate\n")
+        os.utime(hp, (1800000100, 1800000100))
+        check("next-advance", run(ctx, "next", "--slice", "f1") == "build")
+        check("current-advanced", run(ctx, "current", "--slice", "f1") == "build")
+        os.environ["MR_PHASE_AB_NOW"] = "1800000200"
+        run(ctx, "start", "--slice", "f1", "--phase", "build")
+        check("stale-handoff-no-advance", run(ctx, "next", "--slice", "f1") == "")
+        open(hp, "w").write("NEXT-PHASE: plan\n")
+        os.utime(hp, (1800000300, 1800000300))
+        check("no-backwards", run(ctx, "next", "--slice", "f1") == "" and run(ctx, "current", "--slice", "f1") == "build")
+        check("prompt", run(ctx, "prompt", "--slice", "f1", "--phase", "build") == "PHASED f1 build")
+        check("prompt-bad-phase", run(ctx, "prompt", "--slice", "f1", "--phase", "x") == "")
+        # analysis: due after target merges; dry writes nothing; apply disables
+        sid = "aaaaaaaa-1111-2222-3333-444444444444"
+        run(ctx, "session", "--slice", "f1", "--phase", "plan", "--sid", sid)
+        run(ctx, "session", "--slice", "f1", "--phase", "plan", "--sid", sid)
+        check("session-dedupe", sum(1 for r in ctx.rows() if r.get("kind") == "session") == 1)
+        with open(os.path.join(tr, "-p", sid + ".jsonl"), "w") as fh:
+            for i in range(4):
+                fh.write(json.dumps({"type": "assistant", "message": {"id": "m%d" % i, "model": "claude-opus-5-5",
+                                                                      "usage": {"cache_read_input_tokens": 100000 * (i + 1), "output_tokens": 10}}}) + "\n")
+        mt = main_thread(ctx, sid, {"opus": {"cache_read": 0.5, "out": 25}})
+        check("main-thread", mt and mt["turns"] == 4 and mt["ctx"] == [100000, 200000, 300000, 400000])
+        check("not-due", run(ctx, "analyze").startswith("PHASE-AB-NOT-DUE"))
+        led = []
+        for s in ("f1", "f2", "f3"):
+            led.append({"ts": iso(1800001000), "slice": s, "outcome": "FINISHED(EXIT=0)", "cost_usd": 20.0, "notes": "x"})
+            led.append({"ts": iso(1800002000), "slice": s, "outcome": "MERGED", "cost_usd": None, "orchestration_audit": "CLEAN"})
+        open(os.path.join(mem, "monster-realm-usage-ledger.jsonl"), "w").write("\n".join(json.dumps(r) for r in led) + "\n")
+        out = run(ctx, "analyze")
+        check("due-dry", "PHASE-AB-DUE" in out and not os.path.exists(os.path.join(mem, "phase-ab")))
+        os.environ["MR_PHASE_AB_NO_NOTIFY"] = "1"
+        out = run(ctx, "analyze", "--apply")
+        check("applied", out.startswith("PHASE-AB-ANALYZED") and glob.glob(os.path.join(mem, "phase-ab", "analysis-*.md")))
+        check("disabled", not ctx.enabled())
+        check("off-after", run(ctx, "assign", "--slice", "f6", "--repo", "project") == "off")
+        check("sticky-after-disable", run(ctx, "assign", "--slice", "f4", "--repo", "project") == "phased")
+        check("once", run(ctx, "analyze", "--apply").startswith("PHASE-AB-NOT-DUE"))
+        check("config-untouched", json.load(open(os.path.join(mem, "mr-phase-ab.json")))["enabled"] is True)
+        check("started", run(ctx, "started", "--slice", "f1") == "build" and run(ctx, "started", "--slice", "f9") == "")
+        c = json.load(open(os.path.join(mem, "mr-phase-ab.json")))
+        json.dump(dict(c, generation=2), open(os.path.join(mem, "mr-phase-ab.json"), "w"))
+        check("new-generation-enabled", ctx.enabled() and run(ctx, "assign", "--slice", "f6", "--repo", "project", "--tier", "hard") == "phased")
+        check("rb-ineligible", run(ctx, "assign", "--slice", "rb-9", "--repo", "project") == "off")
+        # verdict rules
+        m = lambda **kw: dict({"ctx_median": 100000, "main_cost_per_turn": 0.1, "ledger_cost": 30, "merged": True, "launches": 1,
+                               "residuals": 1, "audit": ""}, **kw)
+        check("verdict-adopt", verdict([m(ctx_median=50000)], [m()], [m()])[0] == "LEANING-ADOPT")
+        check("verdict-revert-guard", verdict([m(ctx_median=50000), m(merged=False)], [m()], [m()], timed_out=True)[0] == "LEANING-REVERT")
+        check("verdict-inflight-ignored", verdict([m(ctx_median=50000), m(merged=False)], [m()], [m()])[0] == "LEANING-ADOPT")
+        check("verdict-revert-cost", verdict([m(ctx_median=50000, ledger_cost=40)], [m()], [m()])[0] == "LEANING-REVERT")
+        check("verdict-inconclusive", verdict([m(ctx_median=90000)], [m()], [m()])[0] == "INCONCLUSIVE")
+        os.environ.pop("MR_PHASE_AB_NOW", None)
+        os.environ.pop("MR_PHASE_AB_NO_NOTIFY", None)
+    if bad:
+        print("PHASE-AB-SELFTEST-FAIL %s" % " ".join(bad))
+        return 1
+    print("PHASE-AB-SELFTEST-OK 39")
+    return 0
+
+
+if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(selftest())
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except Exception as e:
+        print("PHASE-AB-ERROR %s: %s" % (type(e).__name__, str(e)[:200]), file=sys.stderr)
+        print("off" if sys.argv[1:2] == ["assign"] else "")
+        sys.exit(0)

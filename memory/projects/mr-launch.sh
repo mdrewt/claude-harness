@@ -43,6 +43,29 @@ case "${REPO:-project}" in
   *)       REPO=project; RUNDIR="$PROJDIR"; OTHERDIR="$HARNESS"; PRREPO="mdrewt/monster-realm" ;;
 esac
 B="/tmp/mr_pass_$S.md"; L="/tmp/mr_pass_$S.log"; E="/tmp/mr_pass_$S.err"; D="/tmp/mr_pass_$S.done"
+# TOOLCHAIN PATH (2026-11-26). A run inherits the cron tick's PATH, which puts /usr/bin ahead of the
+# asdf shims: node resolved to v18 and just to 1.21 (the project pins Node 24.x and just 1.58 in
+# .tool-versions), cargo was absent, and 38 of 40 runs rebuilt PATH by hand from a memory note.
+# The asdf shims resolve each pinned tool from the worktree's own .tool-versions, ~/.cargo/bin holds
+# the rustup toolchain and ~/.local/bin the spacetime CLI. Only the Node and just shims go first,
+# through a small directory of links: putting the whole shims directory first would also swap the
+# run's python3/pip (asdf 3.14 for the system 3.12 and its packages). Scoped to the `claude`
+# invocations only (PATH="$RUN_PATH" on each), so this wrapper's own commands keep their PATH.
+TC_BIN=/tmp/harness-toolchain-bin   # not /tmp/mr_*: the selfcheck sandboxes that prefix and clears what it finds there
+mkdir -p "$TC_BIN" 2>/dev/null
+for _t in node npm npx corepack just; do
+  [ -x "$HOME/.asdf/shims/$_t" ] && ln -sfn "$HOME/.asdf/shims/$_t" "$TC_BIN/$_t" 2>/dev/null
+done
+RUN_PATH="$TC_BIN:$HOME/bin:$HOME/.cargo/bin:$HOME/.local/bin:$PATH"   # ~/bin holds asdf, which the shims exec
+toolchain_line(){   # one line after the ATTEMPT=1 marker: what the run's shell will resolve
+  local v
+  v=$(cd "$RUNDIR" 2>/dev/null && PATH="$RUN_PATH" timeout 20 bash -c '
+    n=$(node --version 2>/dev/null); j=$(just --version 2>/dev/null | cut -d" " -f2)
+    c=$(cargo --version 2>/dev/null | cut -d" " -f2)
+    s=$(spacetime --version 2>/dev/null | sed -n "s/.*tool version \([0-9][0-9.]*\);.*/\1/p")
+    printf "node=%s just=%s cargo=%s spacetime=%s" "${n:-none}" "${j:-none}" "${c:-none}" "${s:-none}"' 2>/dev/null)
+  echo "TOOLCHAIN ${v:-unresolved} TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+}
 
 fire_event(){ # $1=src(done|crash) $2=headline
   [ "${MR_NO_EVENT_BRIDGE:-0}" = "1" ] && return 0
@@ -122,6 +145,39 @@ case "$S" in
   ci-fix-*) MASTER_RULE="A red master is this slice's own work: it is the ci-fix run that owns master, so keep fixing it." ;;
   *) MASTER_RULE="A red master has one owner, the supervisor's ci-fix-* run: never fix or revert master in this session — this overrides the brief and anything else this session read earlier — and keep building $S." ;;
 esac
+# PHASE-SPLIT EXPERIMENT (operator item 2, 2026-11-26; mr-phase-ab's header). A slice assigned
+# `phased` runs as up to three sessions — plan (+ red tests) | build | finish — each started fresh
+# from the brief plus that phase's PHASED RUN block (mr-phase-protocol.md); a session ends its phase
+# by writing the handoff whose line 1 names the next phase. The arm is asked on EVERY launch (a slice
+# keeps its arm across relaunches and credit-stop resumes), and the phase to run is the one the
+# record and the handoff say is current. `control` and `off` behave exactly as before.
+PHASE=""; PHASES_RUN=0; A_TOTAL=0; PHASE_PENDING=""
+LAUNCH_MODEL="$MODEL"; LAUNCH_EFFORT="$EFFORT"   # a phase starts on these: an escalation is the phase's own
+TIER=$(/usr/bin/python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('tier') or 'routine')" "/tmp/mr_pass_$S.vars.json" 2>/dev/null || echo routine)
+ARM=$(timeout 30 "$MEM/mr-phase-ab" assign --slice "$S" --repo "$REPO" --tier "$TIER" 2>/dev/null | head -1)
+case "$ARM" in phased|control) : ;; *) ARM=off ;; esac
+if [ "$ARM" = phased ]; then
+  PHASE=$(timeout 30 "$MEM/mr-phase-ab" current --slice "$S" 2>/dev/null | head -1)
+  case "$PHASE" in plan|build|finish) : ;; *) PHASE=plan ;; esac
+fi
+# The prompt of every NEW session: the brief, plus the phase block for a phased slice.
+new_prompt(){
+  cat "$B"
+  if [ "$ARM" = phased ] && [ -n "$PHASE" ]; then printf '\n\n'; "$MEM/mr-phase-ab" prompt --slice "$S" --phase "$PHASE" 2>/dev/null; fi
+}
+# Said in every --resume prompt of a phased slice: the resumed session is still in its phase.
+resume_note(){
+  [ "$ARM" = phased ] && [ -n "$PHASE" ] && printf ' PHASED RUN: this session is phase %s; end it at that phase'"'"'s boundary exactly as its PHASED RUN block says.' "$PHASE"
+  return 0
+}
+start_phase(){ [ "$ARM" = phased ] && timeout 30 "$MEM/mr-phase-ab" start --slice "$S" --phase "$PHASE" >/dev/null 2>&1; return 0; }
+record_session(){   # the analysis reads each session's transcript, which outlives /tmp
+  [ "$ARM" = off ] && return 0
+  local sid; sid=$(grep -ao '"session_id":"[0-9a-fA-F-]*"' "$L" 2>/dev/null | tail -1 | cut -d'"' -f4)
+  [ -n "$sid" ] && timeout 30 "$MEM/mr-phase-ab" session --slice "$S" --phase "${PHASE:-all}" --sid "$sid" >/dev/null 2>&1
+  return 0
+}
+phase_next(){ [ "$ARM" = phased ] && timeout 30 "$MEM/mr-phase-ab" next --slice "$S" 2>/dev/null | head -1; return 0; }
 A=1
 # ONE-MODEL-LIMIT FALLBACK (operator rule 2026-11-14 — the only downgrade; mapping =
 # `model_fallback` in mr-budget-config.json, read by mr-interrupted). Called after every session
@@ -149,13 +205,14 @@ model_fallback() {
   if [ "$(budget_state)" = "HARD-STOP" ]; then
     echo "FALLBACK-SKIPPED $scope limit: shared windows at HARD-STOP TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"; return 0
   fi
+  record_session
   FELL_BACK=1; from="$MODEL"; MODEL="$fb"
   sid=$(grep -ao '"session_id":"[^"]*"' "$L" | tail -1 | cut -d'"' -f4)
   echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT FALLBACK-FROM=$from session=${sid:-none} TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
   pos=$(stat -c %s "$L" 2>/dev/null || echo 0)
   if [ -n "$sid" ]; then
-    P="The ${scope} usage limit refused this session (the CLI said to switch models). Under the operator's fallback rule it now continues on ${MODEL} at the same tier and effort; nothing about your task changed. Re-verify the worktree and branch state (git status, git log) — the step that was cut off may be half-done — then continue the brief from where you left off. Terminal state is unchanged: PR OPEN with local ci green; NEVER run gh pr merge (supervisor-only)."
-    ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$sid" \
+    P="The ${scope} usage limit refused this session (the CLI said to switch models). Under the operator's fallback rule it now continues on ${MODEL} at the same tier and effort; nothing about your task changed. Re-verify the worktree and branch state (git status, git log) — the step that was cut off may be half-done — then continue the brief from where you left off. Terminal state is unchanged: PR OPEN with local ci green; NEVER run gh pr merge (supervisor-only).$(resume_note)"
+    ( cd "$RUNDIR" && PATH="$RUN_PATH" MR_PHASE="$PHASE" MR_PHASE_T0="$(date +%s)" MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$sid" \
       -p "$P $MASTER_RULE" \
       --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
     RC=$?
@@ -165,7 +222,7 @@ model_fallback() {
     fi
   fi
   if [ -z "$sid" ]; then
-    ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
+    ( cd "$RUNDIR" && PATH="$RUN_PATH" MR_PHASE="$PHASE" MR_PHASE_T0="$(date +%s)" MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(new_prompt)" \
       --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
     RC=$?
   fi
@@ -175,14 +232,23 @@ model_fallback() {
 # the transcript's session total, so this launch's cost row carries only its own spend.
 RSID="${5:-}"; RSID_WHY=""
 case "$RSID" in *[!0-9a-fA-F-]*) RSID=""; RSID_WHY="the session id given is not a CLI session id" ;; esac
+# A phased slice whose stopped session had already written the handoff for the next phase: that
+# phase starts as a NEW session (the reset is the point), not inside the stopped one.
+if [ -n "$RSID" ] && [ "$ARM" = phased ]; then
+  _started=$(timeout 30 "$MEM/mr-phase-ab" started --slice "$S" 2>/dev/null | head -1)
+  if [ -n "$_started" ] && [ "$_started" != "$PHASE" ]; then
+    RSID_WHY="the stopped session ($_started) had already handed over to $PHASE"; RSID=""
+  fi
+fi
 if [ -n "$RSID" ] && [ ! -s "$HOME/.claude/projects/$(printf '%s' "$RUNDIR" | sed 's/[^A-Za-z0-9]/-/g')/$RSID.jsonl" ]; then
   RSID_WHY="no transcript on disk for session $RSID"; RSID=""
 fi
 if [ -n "$RSID" ]; then
   PRIOR=$("$MEM/mr-cost-sum" --session "$RSID" 2>/dev/null); case "$PRIOR" in ''|-) PRIOR=0 ;; esac
-  echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$PRREPO RESUME=$RSID PRIOR=$PRIOR TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
-  P="Your session was stopped by a usage limit, not by a failure, and the limit has reset. Stop flags are cleared. Re-verify the worktree and branch state (git status, git log) — uncommitted changes are from the step that was cut off — then continue the brief from where you left off. Terminal state is unchanged: PR OPEN with local ci green; NEVER run gh pr merge (supervisor-only)."
-  ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$RSID" \
+  echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$PRREPO RESUME=$RSID PRIOR=$PRIOR${PHASE:+ PHASE=$PHASE} ARM=$ARM TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+  toolchain_line; TC_DONE=1
+  P="Your session was stopped by a usage limit, not by a failure, and the limit has reset. Stop flags are cleared. Re-verify the worktree and branch state (git status, git log) — uncommitted changes are from the step that was cut off — then continue the brief from where you left off. Terminal state is unchanged: PR OPEN with local ci green; NEVER run gh pr merge (supervisor-only).$(resume_note)"
+  ( cd "$RUNDIR" && PATH="$RUN_PATH" MR_PHASE="$PHASE" MR_PHASE_T0="$(date +%s)" MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$RSID" \
     -p "$P $MASTER_RULE" \
     --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>"$E"
   RC=$?
@@ -193,29 +259,35 @@ if [ -n "$RSID" ]; then
   fi
 fi
 if [ -z "$RSID" ]; then
-echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$PRREPO TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT REPO=$REPO RUNDIR=$RUNDIR PRREPO=$PRREPO${PHASE:+ PHASE=$PHASE} ARM=$ARM TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+[ "${TC_DONE:-0}" = 1 ] || { toolchain_line; TC_DONE=1; }
 [ -n "$RSID_WHY" ] && echo "RESUME-FALLBACK $RSID_WHY — this is a new session from the brief TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
-( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(cat "$B")" \
+start_phase
+( cd "$RUNDIR" && PATH="$RUN_PATH" MR_PHASE="$PHASE" MR_PHASE_T0="$(date +%s)" MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(new_prompt)" \
   --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>"$E"
 RC=$?
 fi
 model_fallback
+record_session
+while :; do   # one pass per phase; a control or off slice makes exactly one pass
 PREV_SIG=""
 while [ "$A" -lt "$MAX_ATTEMPTS" ] \
       && [ ! -f "/tmp/mr_stop_$S" ] && [ ! -f /tmp/mr_stop_all ] \
       && ! terminal_pr_open; do
+  # A phased session that wrote its phase's handoff stopped where it should: not a premature stop.
+  if [ "$RC" -eq 0 ] && [ -n "$(phase_next)" ]; then break; fi
   if [ "$RC" -ne 0 ] && auth_failure; then break; fi   # auth: dead now; supervisor/toast handles
   CUR_SIG=$(tail -c 1024 "$E" 2>/dev/null | md5sum | cut -d' ' -f1)
   if [ "$RC" -eq 0 ]; then
-    P="You stopped before a valid stopping point (no open PR for this slice, no stop-flag; if you parked you must have pushed the branch + documented the blocker — verify you did). Do not summarize and stop. Push the branch if unpushed, then continue the brief from where you left off. If you reach the point where the PR is OPEN with local ci green: STOP — that IS your terminal state; NEVER run gh pr merge (supervisor-only)."
+    P="You stopped before a valid stopping point (no open PR for this slice, no stop-flag; if you parked you must have pushed the branch + documented the blocker — verify you did). Do not summarize and stop. Push the branch if unpushed, then continue the brief from where you left off. If you reach the point where the PR is OPEN with local ci green: STOP — that IS your terminal state; NEVER run gh pr merge (supervisor-only).$(resume_note)"
   elif [ "$RC" -ne 0 ] && [ -n "$PREV_SIG" ] && [ "$CUR_SIG" = "$PREV_SIG" ]; then
     break  # identical failure signature twice: deterministic bug — real failure, stop
   elif transient_failure; then
     sleep $((60 * A))
-    P="Your previous session was interrupted by a transient API/network error mid-work. Re-verify the worktree and branch state (git status, git log) before assuming anything completed, then continue the brief from where you actually left off. Push any unpushed commits first."
+    P="Your previous session was interrupted by a transient API/network error mid-work. Re-verify the worktree and branch state (git status, git log) before assuming anything completed, then continue the brief from where you actually left off. Push any unpushed commits first.$(resume_note)"
   elif [ "$("$MEM/mr-ollama" triage "$S" 2>/dev/null | head -1 | grep -io "^transient" || echo real)" = "transient" ]; then
     sleep $((60 * A))
-    P="Your previous session was interrupted by what appears to be a transient infrastructure error. Re-verify worktree/branch state before assuming anything completed, then continue the brief from where you actually left off."
+    P="Your previous session was interrupted by what appears to be a transient infrastructure error. Re-verify worktree/branch state before assuming anything completed, then continue the brief from where you actually left off.$(resume_note)"
   else
     break  # real failure — leave for the supervisor to triage
   fi
@@ -236,12 +308,42 @@ while [ "$A" -lt "$MAX_ATTEMPTS" ] \
   [ -n "$SID" ] || break
   { [ -f "/tmp/mr_stop_$S" ] || [ -f /tmp/mr_stop_all ]; } && break   # mechanical gate before EVERY spawn (cost-watch review cond i)
   echo "ATTEMPT=$A MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
-  ( cd "$RUNDIR" && MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
+  ( cd "$RUNDIR" && PATH="$RUN_PATH" MR_PHASE="$PHASE" MR_PHASE_T0="$(date +%s)" MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --resume "$SID" \
     -p "$P $MASTER_RULE" \
     --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
   RC=$?
   model_fallback
+  record_session
 done
+# PHASE ADVANCE. The session ended rc=0 with a handoff naming a later phase: start that phase as a
+# NEW session (the context reset is the point). Retry attempts are counted per phase, so a phase
+# that needed resumes never starves the next one; at most two advances (plan -> build -> finish).
+# The same mechanical gates as every other spawn: no stop flag, no open PR, the shared windows not
+# at HARD-STOP.
+if [ "$ARM" = phased ] && [ "$RC" -eq 0 ] && [ "$PHASES_RUN" -lt 2 ] \
+   && [ ! -f "/tmp/mr_stop_$S" ] && [ ! -f /tmp/mr_stop_all ] && ! terminal_pr_open; then
+  NEXT=$(phase_next)
+  if [ -n "$NEXT" ]; then
+    if [ "$(budget_state)" = "HARD-STOP" ]; then
+      echo "PHASE-ADVANCE-SKIPPED $NEXT: shared windows at HARD-STOP TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+      PHASE_PENDING="$NEXT"
+    else
+      A_TOTAL=$((A_TOTAL + A)); A=1; PHASE="$NEXT"; PHASES_RUN=$((PHASES_RUN + 1))
+      EFFORT="$LAUNCH_EFFORT"; [ "$FELL_BACK" = 1 ] || MODEL="$LAUNCH_MODEL"
+      echo "ATTEMPT=$A PHASE=$PHASE MODEL=$MODEL EFFORT=$EFFORT TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
+      start_phase
+      ( cd "$RUNDIR" && PATH="$RUN_PATH" MR_PHASE="$PHASE" MR_PHASE_T0="$(date +%s)" MR_SLICE="$S" claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions -p "$(new_prompt)" \
+        --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E"
+      RC=$?
+      model_fallback
+      record_session
+      continue
+    fi
+  fi
+fi
+break
+done
+A_TOTAL=$((A_TOTAL + A))
 
 # ===== cost-cap wrap pass (plan v2: watcher retired; unpoliced-but-bounded; stop flag PERSISTS through wrap — cleanup happens only at next spawn, review cond iii) =====
 RC=${RC:-1}
@@ -252,7 +354,7 @@ if grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && [ "$RC" -ne 0 ] &&
   if [ -n "$WSID" ]; then
     echo "COST-CAP-WRAP start TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
     WRAPP="Cost-cap shutdown ($ACT). Do NOT start new work, new scope, or ANY new subagents (the stop flag is active and stays active). If .git/index.lock is stale in the worktree, remove it. Commit all WIP on the slice branch as wip($S): cost-cap park, push the branch, then write the handoff (mr-record handoff): state of work, exactly what remains, and the SIZING LESSON — why this slice exceeded its cap. Any local-model summary you include must be labeled UNVERIFIED advisory. Then stop. NEVER run gh pr merge."
-    ( cd "$RUNDIR" && MR_SLICE="$S" timeout 900 claude --model "$MODEL" --effort low --dangerously-skip-permissions --resume "$WSID" -p "$WRAPP" \
+    ( cd "$RUNDIR" && PATH="$RUN_PATH" MR_PHASE="$PHASE" MR_PHASE_T0="$(date +%s)" MR_SLICE="$S" timeout 900 claude --model "$MODEL" --effort low --dangerously-skip-permissions --resume "$WSID" -p "$WRAPP" \
       --add-dir "$OTHERDIR" --output-format stream-json --verbose ) </dev/null >>"$L" 2>>"$E" || true
     echo "COST-CAP-WRAP end rc=$? TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$L"
   fi
@@ -264,7 +366,15 @@ if grep -q "cost-cap" "/tmp/mr_stop_$S.reason" 2>/dev/null && [ "$RC" -ne 0 ] &&
   echo "$ACT parked=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MEM/.costpark-$S"
   rm -f "/tmp/mr_wrap_$S"
 fi
-echo "EXIT=$RC ATTEMPTS=$A" >"$D"
-if [ "$RC" -eq 0 ] || terminal_pr_open; then fire_event done "run finished rc=$RC attempts=$A model=$MODEL"
-else fire_event crash "run ended rc=$RC attempts=$A model=$MODEL (real failure or stop-flag)"; fi
+# `.done` keeps its contract (ATTEMPTS = the retry attempts of the session that ended); a phased run
+# adds its phase count, the attempts over all phases and, when it stopped between phases, the phase
+# a relaunch (mr-spawn, same vars) starts.
+if [ "$ARM" = phased ]; then
+  echo "EXIT=$RC ATTEMPTS=$A PHASES=$((PHASES_RUN + 1)) ATTEMPTS_TOTAL=$A_TOTAL${PHASE_PENDING:+ PHASE-PENDING=$PHASE_PENDING}" >"$D"
+else
+  echo "EXIT=$RC ATTEMPTS=$A" >"$D"
+fi
+PHASE_NOTE="${PHASE:+ phase=$PHASE}${PHASE_PENDING:+ — stopped before phase $PHASE_PENDING (HARD-STOP): relaunch with mr-spawn to start it}"
+if [ "$RC" -eq 0 ] || terminal_pr_open; then fire_event done "run finished rc=$RC attempts=$A model=$MODEL$PHASE_NOTE"
+else fire_event crash "run ended rc=$RC attempts=$A model=$MODEL$PHASE_NOTE (real failure or stop-flag)"; fi
 exit 0

@@ -1,0 +1,363 @@
+#!/usr/bin/python3
+''''exec /usr/bin/python3 "$0" "$@" # '''
+# ^ POLYGLOT INTERPRETER GUARD (lp-11a). `bash <this file>` would otherwise interpret the python
+# source as shell and EXECUTE any backticked prose in it as commands. Python reads this line as a
+# no-op string; sh/bash re-execs the file under python3. Statically enforced by mr-selfcheck.
+"""mr-tick-fingerprint — one hash of every input a supervisor decision depends on.
+
+WHY (operator item 7, 2026-11-26): 34 paid decision sessions in 14 days only stood down — every
+ready slice was held by the budget and nothing else had changed. The wrapper must not guess what
+a decision session would decide. It only skips a session whose inputs are IDENTICAL to those of a
+session that just stood down and changed nothing (mr-native-tick.sh, `.noop-tick`), and only for
+a short time. So this hash must change whenever anything a session could act on changes; a hash
+that misses an input could hold up work for the bound, so when in doubt an input is IN.
+
+INPUTS
+------
+The situation bundle (stdin, mr-situation's JSON), reduced to its decision fields: locks,
+done_files, pending_events, open_prs, open_decisions, master_ci_latest, master_sha_local,
+interrupted, last_failure, recent_blockers, live_watchers, prune_close, closable_milestones,
+ready_slices, rate_limit_resets_at, and from budget: state, source, launchable_tiers, fable_ok,
+model_states[*].state. Left out on purpose: generated_at, dollar figures, utilisation decimals and
+sample times — they move every tick without changing what may launch (`launchable_tiers` and the
+states carry that).
+Read here as well: the remote heads of the harness `main` and the game `master` (`git ls-remote`,
+which takes no lock, so it cannot collide with a live run's fetch), HEAD of both main checkouts,
+the harness repo's open PRs (`mr-situation` lists only the game's);
+the bytes of the spec corpus (specs/monster-realm-v2/*.md), mr-residuals.jsonl,
+feedback-ledger.jsonl and mr-interrupted.json; the queue, inflight, awaiting_merge, park_counters,
+master and rate_limit_resets_at keys of mr-state.json; whether the hold flag, .blocked-on-human
+and the chain mutex exist; and the UTC date (a session runs at least once a day whatever else).
+
+CONTRACT
+--------
+  mr-tick-fingerprint < bundle.json   -> prints `FP <64 hex>`; rc 0.
+                                         Prints `UNSTABLE <why>` (rc 0) when the bundle is not
+                                         JSON, carries an error, or a source cannot be read: an
+                                         unstable fingerprint never matches, so no tick is skipped.
+  mr-tick-fingerprint --selftest      -> rc 0 pass / 1 fail
+Flags for fixtures only: --harness DIR --proj DIR --mem DIR --date YYYY-MM-DD --no-gh.
+"""
+import datetime
+import glob
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import re
+import tempfile
+import time
+
+HARNESS = "/home/mdrewt/projects/ai-apps/claude-harness"
+BUNDLE_KEYS = ("locks", "done_files", "pending_events", "open_prs", "open_decisions", "master_ci_latest",
+               "master_sha_local", "interrupted", "last_failure", "recent_blockers", "live_watchers",
+               "prune_close", "closable_milestones", "ready_slices", "rate_limit_resets_at", "residual_review")
+STATE_KEYS = ("queue", "inflight", "awaiting_merge", "park_counters", "master", "rate_limit_resets_at")
+FILES = ("mr-residuals.jsonl", "feedback-ledger.jsonl", "mr-interrupted.json", "mr-supervisor-prompt-native.md",
+         "mr-budget-config.json", "mr-residual-review.json")
+FLAGS = (".native-supervisor-disabled", ".blocked-on-human", ".harness-runner.lock.d")
+
+
+class Unstable(Exception):
+    pass
+
+
+def _has_error(v):
+    if isinstance(v, str):
+        return v.startswith("error")
+    if isinstance(v, dict):
+        return "error" in v or any(_has_error(x) for x in v.values())
+    if isinstance(v, list):
+        return any(_has_error(x) for x in v)
+    return False
+
+
+def _rev(repo, ref):
+    try:
+        r = subprocess.run(["git", "-C", repo, "rev-parse", "--verify", "--quiet", ref], capture_output=True,
+                           text=True, timeout=20)
+    except Exception as e:
+        raise Unstable("git %s %s: %s" % (repo, ref, type(e).__name__))
+    if r.returncode != 0:
+        raise Unstable("git rev-parse %s in %s failed" % (ref, repo))
+    return r.stdout.strip()
+
+
+def _remote(repo, branch):
+    try:
+        r = subprocess.run(["git", "-C", repo, "ls-remote", "origin", "refs/heads/" + branch], capture_output=True,
+                           text=True, timeout=30)
+    except Exception as e:
+        raise Unstable("ls-remote %s: %s" % (repo, type(e).__name__))
+    head = r.stdout.split()[0] if r.returncode == 0 and r.stdout.split() else ""
+    if not head:
+        raise Unstable("ls-remote origin %s in %s failed" % (branch, repo))
+    return head
+
+
+def _prs(repo, no_gh):
+    """Open PRs with their head and every check's state: a check that finishes changes the hash."""
+    if no_gh:
+        return "skipped"
+    try:
+        r = subprocess.run(["gh", "pr", "list", "-R", repo, "--state", "open", "--json",
+                            "number,headRefName,headRefOid,mergeStateStatus,isDraft,statusCheckRollup"],
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode != 0:
+            raise Unstable("gh pr list (%s) rc=%d" % (repo, r.returncode))
+        out = []
+        for p in sorted(json.loads(r.stdout or "[]"), key=lambda x: x.get("number") or 0):
+            checks = sorted((str(c.get("name") or c.get("context")), str(c.get("status") or c.get("state")), str(c.get("conclusion")))
+                            for c in (p.get("statusCheckRollup") or []) if isinstance(c, dict))
+            out.append(dict({k: p.get(k) for k in ("number", "headRefName", "headRefOid", "mergeStateStatus", "isDraft")}, checks=checks))
+        return out
+    except Unstable:
+        raise
+    except Exception as e:
+        raise Unstable("gh pr list (%s): %s" % (repo, type(e).__name__))
+
+
+def _file_hash(path):
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except FileNotFoundError:
+        return "absent"
+    except OSError as e:
+        raise Unstable("read %s: %s" % (path, type(e).__name__))
+
+
+def material(bundle, harness, proj, mem, date, no_gh=False):
+    if not isinstance(bundle, dict) or "error" in bundle:
+        raise Unstable("bundle carries an error")
+    picked = {}
+    for k in BUNDLE_KEYS:
+        v = bundle.get(k)
+        if _has_error(v):
+            raise Unstable("bundle field %s carries an error" % k)
+        picked[k] = v
+    if isinstance(picked.get("master_ci_latest"), list):   # the run title is display text
+        picked["master_ci_latest"] = [{x: r.get(x) for x in ("conclusion", "status", "headSha", "attempt")}
+                                      for r in picked["master_ci_latest"] if isinstance(r, dict)]
+    b = bundle.get("budget")
+    if not isinstance(b, dict) or b.get("state") in (None, "UNKNOWN") or "error" in b:
+        raise Unstable("budget is unknown")
+    picked["budget"] = {"state": b.get("state"), "source": b.get("source"), "launchable_tiers": b.get("launchable_tiers"),
+                        "fable_ok": b.get("fable_ok"),
+                        "model_states": {m: (w or {}).get("state") for m, w in sorted((b.get("model_states") or {}).items())}}
+    picked["git"] = {"harness_origin": _remote(harness, "main"), "harness_head": _rev(harness, "HEAD"),
+                     "game_origin": _remote(proj, "master"), "game_head": _rev(proj, "HEAD")}
+    picked["prs"] = {"harness": _prs("mdrewt/claude-harness", no_gh), "game": _prs("mdrewt/monster-realm", no_gh)}
+    picked["specs"] = {os.path.basename(p): _file_hash(p)
+                       for p in sorted(glob.glob(os.path.join(harness, "specs", "monster-realm-v2", "*.md")))}
+    if not picked["specs"]:
+        raise Unstable("no spec files under %s" % harness)
+    picked["files"] = {f: _file_hash(os.path.join(mem, f)) for f in FILES}
+    try:
+        st = json.load(open(os.path.join(mem, "mr-state.json")))
+    except Exception as e:
+        raise Unstable("mr-state.json: %s" % type(e).__name__)
+    picked["state"] = {k: st.get(k) for k in STATE_KEYS}
+    picked["flags"] = {f: os.path.exists(os.path.join(mem, f)) for f in FLAGS}
+    picked["date"] = date
+    return picked
+
+
+def fingerprint(bundle, harness, proj, mem, date, no_gh=False):
+    m = material(bundle, harness, proj, mem, date, no_gh)
+    return hashlib.sha256(json.dumps(m, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+HOLD_RE = re.compile(r"^n=\d+ (\S+)$")
+REJECT_RE = re.compile(r"merged|launch(ed|ing)|promot|consum|section|park|resum|rerun|reran|re-ran|opened|raised|delegat|closed|"
+                       r"disposition|spawn|queue-add|revert|takeover|took over|fixed|filed|asked|human|activity|\bIDE\b|interactive|"
+                       r"deferred|next tick|awaiting|await|green\+|mutex|watch", re.I)
+
+
+def mark_ok(decision_lines, held):
+    """May the session that wrote these DECISION lines (and this HELD summary) mark a no-op?
+    Only a single stand-down line whose every held candidate was held by the BUDGET — the one
+    cause the fingerprint itself carries (`launchable_tiers`). A stand-down for any reason the
+    fingerprint cannot see (a human at work, a quiet window, free memory, a merge left for the next
+    tick) is never marked: those clear without any input changing."""
+    lines = [l for l in (decision_lines or "").split("\n") if l.strip()]
+    if len(lines) != 1:
+        return False
+    d = lines[0]
+    if not re.search(r" DECISION (fast-path )?(stand-?down|no launch)", d, re.I):
+        return False
+    summary = d.split(" held=")[0]
+    if REJECT_RE.search(summary.split(" DECISION ", 1)[-1]):
+        return False
+    m = HOLD_RE.match((held or "").strip())
+    if not m:
+        return False
+    entries = m.group(1).split(",")
+    return bool(entries) and all(e.rsplit(":", 1)[-1] == "budget" for e in entries)
+
+
+def skip_ok(marker_path, fp, max_age_s, telemetry_path, sample_max_age_s, now=None):
+    """'' or the reason to skip: the marker holds this fingerprint, is younger than max_age_s
+    (counted from the no-op session's START), and the plan's utilisation was sampled within
+    sample_max_age_s — so a skipped tick never leaves the budget reading itself to go stale."""
+    now = time.time() if now is None else now
+    try:
+        m = json.load(open(marker_path))
+        age = now - float(m["ts"])
+        sample_age = now - os.path.getmtime(telemetry_path)
+    except Exception:
+        return ""
+    if m.get("fp") != fp or not (0 <= age < max_age_s) or not (0 <= sample_age < sample_max_age_s):
+        return ""
+    return "since=%s age=%ds sample_age=%ds" % (m.get("rid", "?"), age, sample_age)
+
+
+def _arg(argv, name, default):
+    return argv[argv.index(name) + 1] if name in argv and argv.index(name) + 1 < len(argv) else default
+
+
+def main(argv, stdin_text):
+    if argv and argv[0] == "mark-ok":     # stdin = the session's DECISION lines; --held '<HELD summary>'
+        print("MARK" if mark_ok(stdin_text, _arg(argv, "--held", "")) else "NO")
+        return 0
+    if argv and argv[0] == "skip-ok":     # --marker F --fp X --max-age S --telemetry F --sample-max-age S
+        try:
+            why = skip_ok(_arg(argv, "--marker", ""), _arg(argv, "--fp", ""), float(_arg(argv, "--max-age", "0")),
+                          _arg(argv, "--telemetry", ""), float(_arg(argv, "--sample-max-age", "0")))
+        except ValueError:
+            why = ""
+        print(("SKIP " + why) if why else "NO")
+        return 0
+    harness = _arg(argv, "--harness", HARNESS)
+    proj = _arg(argv, "--proj", os.path.join(HARNESS, "projects", "monster-realm"))
+    mem = _arg(argv, "--mem", os.path.join(HARNESS, "memory", "projects"))
+    date = _arg(argv, "--date", datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"))
+    try:
+        bundle = json.loads(stdin_text)
+    except Exception:
+        print("UNSTABLE bundle is not JSON")
+        return 0
+    try:
+        print("FP %s" % fingerprint(bundle, harness, proj, mem, date, "--no-gh" in argv))
+    except Unstable as e:
+        print("UNSTABLE %s" % str(e)[:200])
+    return 0
+
+
+def selftest():
+    bad = []
+
+    def check(name, cond):
+        if not cond:
+            bad.append(name)
+
+    with tempfile.TemporaryDirectory() as d:
+        harness, proj = os.path.join(d, "h"), os.path.join(d, "g")
+        mem = os.path.join(harness, "memory", "projects")
+        os.makedirs(os.path.join(harness, "specs", "monster-realm-v2"))
+        os.makedirs(mem)
+        os.makedirs(proj)
+        for repo, branch in ((harness, "main"), (proj, "master")):
+            g = lambda *a: subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True)
+            g("init", "-q", "-b", branch); g("config", "user.email", "t@t"); g("config", "user.name", "t")
+            open(os.path.join(repo, "f"), "w").write("1\n")
+            g("add", "-A"); g("commit", "-qm", "x")
+            g("remote", "add", "origin", repo)
+        spec = os.path.join(harness, "specs", "monster-realm-v2", "M-x.spec.md")
+        open(spec, "w").write("### a\n")
+        json.dump({"queue": [], "inflight": [], "notes": "n1", "updated_utc": "t1"}, open(os.path.join(mem, "mr-state.json"), "w"))
+        bundle = {"generated_at": "t", "locks": [], "done_files": [], "pending_events": [], "open_prs": [],
+                  "open_decisions": [{"issue": 1, "answered": False}],
+                  "master_ci_latest": [{"conclusion": "success", "status": "completed", "headSha": "abc", "displayTitle": "x"}],
+                  "master_sha_local": "abc", "interrupted": [], "ready_slices": [{"slice": "s1"}],
+                  "budget": {"state": "SOFT-PAUSE", "source": "telemetry", "launchable_tiers": {"hard": False},
+                             "fable_ok": True, "effective_usd": 1.0, "model_states": {}}}
+        fp = lambda b=bundle, date="2026-11-26": fingerprint(b, harness, proj, mem, date, True)
+        base = fp()
+        check("deterministic", base == fp())
+        check("volatile-ignored", fp(dict(bundle, generated_at="u", budget=dict(bundle["budget"], effective_usd=9.0))) == base)
+        check("title-ignored", fp(dict(bundle, master_ci_latest=[dict(bundle["master_ci_latest"][0], displayTitle="y")])) == base)
+        check("answered-decision", fp(dict(bundle, open_decisions=[{"issue": 1, "answered": True}])) != base)
+        check("launchable-flip", fp(dict(bundle, budget=dict(bundle["budget"], launchable_tiers={"hard": True}))) != base)
+        check("ci-conclusion", fp(dict(bundle, master_ci_latest=[{"conclusion": "failure"}])) != base)
+        check("ready-slices", fp(dict(bundle, ready_slices=[])) != base)
+        check("date", fp(date="2026-11-27") != base)
+        open(spec, "a").write("more\n")
+        check("spec-edit", fp() != base)
+        base = fp()
+        open(os.path.join(mem, "mr-residuals.jsonl"), "w").write("{}\n")
+        check("residual-row", fp() != base)
+        base = fp()
+        st = json.load(open(os.path.join(mem, "mr-state.json")))
+        json.dump(dict(st, notes="n2", updated_utc="t2"), open(os.path.join(mem, "mr-state.json"), "w"))
+        check("state-notes-ignored", fp() == base)
+        json.dump(dict(st, queue=[{"slice": "q"}]), open(os.path.join(mem, "mr-state.json"), "w"))
+        check("state-queue", fp() != base)
+        base = fp()
+        open(os.path.join(mem, ".blocked-on-human"), "w").write("x")
+        check("flag", fp() != base)
+        base = fp()
+        subprocess.run(["git", "-C", proj, "commit", "-q", "--allow-empty", "-m", "y"], capture_output=True)
+        check("game-head", fp() != base)
+        base = fp()
+        subprocess.run(["git", "-C", proj, "remote", "set-url", "origin", os.path.join(d, "nowhere")], capture_output=True)
+        try:
+            fp()
+            bad.append("remote-unreachable")
+        except Unstable:
+            pass
+        subprocess.run(["git", "-C", proj, "remote", "set-url", "origin", proj], capture_output=True)
+        for name, b in (("error-field", dict(bundle, open_prs="error:gh:down")),
+                        ("budget-unknown", dict(bundle, budget={"state": "UNKNOWN"})),
+                        ("bundle-error", {"error": "situation-generator-crashed"})):
+            try:
+                fp(b)
+                bad.append(name)
+            except Unstable:
+                pass
+        import contextlib
+        import io
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            main(["--harness", harness, "--proj", proj, "--mem", mem], "not json")
+        check("cli-unstable", out.getvalue().startswith("UNSTABLE"))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            main(["--harness", harness, "--proj", proj, "--mem", mem, "--date", "2026-11-26", "--no-gh"], json.dumps(bundle))
+        check("cli-fp", out.getvalue().startswith("FP ") and len(out.getvalue().split()[1]) == 64)
+    D = "2026-11-24T00:00:45Z mr-sup-native-x DECISION "
+    budget_held = "n=2 acs-8:budget,lpw-23:budget"
+    check("mark-budget", mark_ok(D + "stand-down: hard tier not launchable (SOFT-PAUSE) held=acs-8:budget,lpw-23:budget", budget_held))
+    check("mark-not-human", not mark_ok(D + "standdown: human-activity (recent writes) held=acs-8:budget", "n=1 acs-8:budget"))
+    check("mark-not-quiet", not mark_ok(D + "stand-down held=st-21:quiet", "n=1 st-21:quiet"))
+    check("mark-not-mixed", not mark_ok(D + "stand-down held=a:budget,b:memory", "n=2 a:budget,b:memory"))
+    check("mark-not-deferred", not mark_ok(D + "stand-down: PR#1 green, merge deferred to next tick held=a:budget", "n=1 a:budget"))
+    check("mark-not-action", not mark_ok(D + "merged gp-1; no launch held=a:budget", "n=1 a:budget"))
+    check("mark-not-two-lines", not mark_ok(D + "stand-down held=a:budget\n" + D + "stand-down held=a:budget", "n=1 a:budget"))
+    check("mark-not-no-held", not mark_ok(D + "stand-down: nothing to do", ""))
+    with tempfile.TemporaryDirectory() as d:
+        mk, tel = os.path.join(d, "m"), os.path.join(d, "t")
+        json.dump({"fp": "abc", "ts": 1000.0, "rid": "r1"}, open(mk, "w"))
+        open(tel, "w").write("x\n")
+        os.utime(tel, (1500, 1500))
+        check("skip-yes", skip_ok(mk, "abc", 5400, tel, 4200, now=2000).startswith("since=r1"))
+        check("skip-other-fp", skip_ok(mk, "abd", 5400, tel, 4200, now=2000) == "")
+        check("skip-expired", skip_ok(mk, "abc", 5400, tel, 4200, now=1000 + 5400) == "")
+        check("skip-stale-sample", skip_ok(mk, "abc", 5400, tel, 400, now=2000) == "")
+        check("skip-no-marker", skip_ok(os.path.join(d, "none"), "abc", 5400, tel, 4200, now=2000) == "")
+    if bad:
+        print("FINGERPRINT-SELFTEST-FAIL %s" % " ".join(bad))
+        return 1
+    print("FINGERPRINT-SELFTEST-OK 33")
+    return 0
+
+
+if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(selftest())
+    try:
+        sys.exit(main(sys.argv[1:], sys.stdin.read()))
+    except Exception as e:
+        print("UNSTABLE %s" % type(e).__name__)
+        sys.exit(0)

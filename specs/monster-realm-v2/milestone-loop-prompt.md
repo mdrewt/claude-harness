@@ -87,6 +87,22 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
      symbol and its tests together, inside the three-section limit. `orphan-protected`, `signals`
      and `protected-churn` rows are named in the spec's Risks. A `duplicates` row never gets a
      slice of its own.
+   **Residual pre-mortem** — so what the builds would leave behind is planned now, not filed later:
+   - Run `memory/projects/mr-residual-history related --paths <the union of the slices' touches>`
+     (globs are fine). Each OPEN `unpromoted` MED or HIGH row it lists, at most two per slice,
+     becomes an EARS criterion of the slice that touches its paths and names the residual id (the
+     supervisor dispositions the row `fixed` when that criterion's gate is met at merge); the rest
+     are named in Risks and left to the residual review. A `targeted` or `promoted` row is named with
+     the slice that already owns it, never folded twice. The CLOSED rows are the defect classes
+     earlier work on these files produced; where this milestone could repeat one, a criterion says
+     it does not.
+   - Every user flow that spans two or more slices (an input source used end to end, each way to
+     reach a screen, both locales, a refusal, a save that fails, a reconnect) gets a journey
+     criterion on the last slice of the flow, tested end to end, so the close census does not find
+     the gap.
+   - For each slice, name what its build would most likely defer (a criterion too big for its
+     `touches:`, a behaviour that needs a sibling's change) and resolve it now: resize the slice,
+     add one, or name the deferral.
 3. **Review lenses**: reviewer + red-team + `/simplify` on the draft, against `standards/` and
    the M{N}→M{N+1} boundary. Apply real findings; note what changed.
 4. **Document.** A `docs/DECISIONS.md` entry in the game repo is the BUILD slice's job, not the
@@ -107,6 +123,8 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
 - Every slice adding to a production file that two or more slices touch names its destination
   module, or gives one line on why no seam exists yet; every slice that moves code is
   `type: refactor` with its tier, pins and measured `touches:`.
+- Every open residual `mr-residual-history related` lists for the milestone's paths is a criterion
+  or a named deferral; every flow that spans two or more slices has a journey criterion.
 - Risks/decisions recorded; PLAN §9 line updated; no contradictions left in live files.
 - Every `blocked:` names its lifting event, who lifts it and a fallback; every follow-up is a
   tracked row: an edit this run cannot make (outside its `touches:`, or a loop-control file such
