@@ -379,19 +379,29 @@ if [ "$CS_NEW" = 0 ]; then case "$CGATE" in BLOCKED_UNTIL_*) log "STANDDOWN cred
 
 # gate 3: human-activity probe
 IDE=$(ps -eo cmd 2>/dev/null | grep -F -- '--replay-user-messages' | grep -F -- '--input-format' | grep -v grep | head -1)
+# The game's code-index daemon ($PROJ/.codegraph) reindexes whatever changes, so while a build run
+# is live, or one ended in the probe's own 6-minute window, its writes are the agents' and not a
+# human's (2026-11-27: 90 of ~100 recent-writes stand-downs in a week, ~2h of merge/launch latency
+# in one day). With no run live or just ended they stay in the probe: the backstop described below.
+CG_SKIP=()
+if [ "$LIVE" -eq 1 ] || [ -n "$(find /tmp/mr_pass_*.done -maxdepth 0 -mmin -6 2>/dev/null | head -1)" ]; then
+  CG_SKIP=(-not -path "$PROJ/.codegraph/*")
+fi
 WRITES=$(find "$HARNESS" "$PROJ" -type f \
   -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/target/*' \
   -not -path '*/.claude/worktrees/*' \
-  -not -path "$HARNESS/.codegraph/*" \
+  -not -path "$HARNESS/.codegraph/*" "${CG_SKIP[@]}" \
   -not -path "$HARNESS/projects/monster-scraper/*" \
   -not -path "$HARNESS/memory/*" -mmin -6 2>/dev/null | head -1)
 # (worktrees are AGENT-owned by design — sibling fan-out writes are not human activity; retro 2026-07-24)
 # DELIBERATE DIVERGENCE from mr-spawn:35, which additionally excludes '*/.codegraph/*' (added
-# 2026-07-31, commit 8082e5c). Reviewed 2026-08-01 (cost-accounting decision; docs/DECISIONS.md) and kept: this is the LAST gate
+# 2026-07-31, commit 8082e5c) — narrowed 2026-11-27 by the operator to "only while no build run is
+# live or just ended" (CG_SKIP above). Reviewed 2026-08-01 (cost-accounting decision; docs/DECISIONS.md) and kept: this is the LAST gate
 # before an unattended $60-400 run starts, and codegraph daemon writes are the only remaining
 # accidental backstop for human edits made INSIDE a worktree (excluded above). The measured cost
 # of the false trips is $0 — a standdown exits before any spawn, pending events requeue, and the
-# worst observed case was 15 min of merge latency. Do not "unify" these two lists by widening
+# worst observed case was 15 min of merge latency (2026-11-27: ~2h in one day while runs were live,
+# hence CG_SKIP). Do not "unify" these two lists by widening
 # this one; if they are ever unified, unify toward the stricter list.
 # Explicit operator runs (mr-supervisor-run => src=manual + MR_FORCE=1) are not "human collision"
 # — the human IS the caller. Warn and proceed instead of silently standing down (pre-2026-09 the

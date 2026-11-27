@@ -282,3 +282,12 @@ refactor plans list extractions at once (the supervisor files the question); st-
 extraction after which `main.ts` reads are measured again (a drop under 25% is an operator question,
 not a ranking tool).
 
+
+## The code-index daemon's writes count as human activity only while no build run is live
+The tick's human-activity probe ignores `$PROJ/.codegraph/*` while a build run is live or one
+ended inside the probe's 6-minute window: the daemon reindexes whatever the agents change, and in
+the week to 2026-11-27 its files caused 90 of about 100 recent-writes stand-downs and about two
+hours of merge and launch latency in one day (a finished slice waits through 7-minute retries).
+With no run live or just ended the writes still count, so they remain the backstop for an edit a
+human makes inside a worktree (operator, 2026-11-27).
+Rules out: dropping `.codegraph` from the probe outright (mr-spawn's list), which loses that backstop.
