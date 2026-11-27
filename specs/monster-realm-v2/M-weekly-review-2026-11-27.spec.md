@@ -24,7 +24,10 @@ tester rule in the harness standards (d).
 Named deferrals (declared, not dropped):
 - The design-B successor of `world_binding` (lpw-23's `world_account`, keyed by identity): its
   erasure on a guest claim and an owner's drop of it are lpw-23's to carry; this milestone fixes
-  the lpw-15 tables that ship today (follow-up note filed against lpw-23).
+  the lpw-15 tables that ship today (follow-up `R-lpw-23-NOTEB3940F`, target lpw-23).
+- ID tokens issued before a password reset stay valid until they expire (`ID_TOKEN_TTL_SECONDS`
+  in the account service), and the game connection signs in with one: wr261127-c ends the
+  refresh chain, not the live token. Target: backlog, follow-up `R-wr261127-c-NOTE309F3A`.
 - `R-np-b-SLOWLINK` (operator-promoted, monster-realm#786): measure-first work too large for this
   wave; it keeps its own hand-scheduled slot.
 - `R-lpw-15-NOTEF43B6E`: its erase half was fixed by lpw-22 and its export half duplicates
@@ -35,8 +38,12 @@ Named deferrals (declared, not dropped):
 - decision-defaulted:allowlist-erasure (decision issue monster-realm#886, unanswered) = the
   deletion cascade removes the deleted account's subject from `world_allowlist` when no other
   counted binding carries it (reversible; not taken: documented retention as host-owned data).
-  If the answer flips before wr261127-a builds, the slice ships the manifest-basis and
-  delete-account wording for retention instead, and wr261127-a.3 pins that rule.
+  The account row holds no subject, so the subject removed is the one on the deleted identity's
+  own `world_binding` row, read before the cascade erases it; an identity with no binding removes
+  nothing. An entry the host typed in by hand that equals that subject goes too: it names the
+  same person. If the answer flips before wr261127-a builds, wr261127-a.3 and wr261127-a.4 are
+  amended to pin retention before the build, and the slice ships the manifest-basis and
+  delete-account wording for it instead.
 - decision-defaulted:drop-unknown-refused = `drop_world_binding` naming an identity with no
   binding is refused with an error, not a silent success (reject, don't clamp; the owner asked
   for something that did not happen). The self-scoped `unbind_world_account` stays idempotent.
@@ -45,7 +52,10 @@ Named deferrals (declared, not dropped):
   the provider's in-process `revokeGrant` cannot be called from it. Default: the dev account
   record carries the time its password last changed, and the provider's `findAccount` refuses a
   code or refresh token issued before that time and revokes its grant (the path it already takes
-  for a gone or unentitled account). Not taken: a per-account lookup column in
+  for a gone or unentitled account). The time is stored in whole seconds, as a token's `iat` is,
+  and a token is refused when `iat` is earlier than it, so a sign-in in the same second as the
+  reset still works; the record is a JSON blob in the store, so an older record without the field
+  reads as 0 and needs no migration. Not taken: a per-account lookup column in
   `store/sqliteAdapter.ts` so the CLI revokes the records itself — added by measurement
   (`mr-touches widen`) only if the default proves unworkable. Internal design; never an operator
   question.
@@ -60,6 +70,9 @@ Named deferrals (declared, not dropped):
 - wr261127-a and lpw-23 both edit `world_binding.rs`, `access.rs` and `accounts.rs`; lpw-23
   rewrites the allowlist seeding to handles. Whichever lands second rebases onto the other; the
   claim erase this slice adds is the place lpw-23 adds `world_account`.
+- A guest identity that is also the world owner (`config.owner_identity`) loses its binding on
+  the claim like any other guest; the owner is admitted by identity, not by binding, and the
+  owner identity is not re-keyed by the claim today (out of scope here).
 - wr261127-c shares `account-service/src/provider.ts` with acs-9 and `client/src/net/connection.ts`
   with lpw-24 (both unbuilt); mr-disjoint serializes them at launch.
 - wr261127-b shares `renameModel.ts` and the i18n catalogs with lpw-40 and other client slices;
@@ -130,22 +143,29 @@ after: []
   every counted bound account; the only `world_binding` deletes are the self-scoped
   `unbind_world_account` and `erase_world_binding` (called by the deletion cascade alone) — no
   owner-callable drop, and nothing bounds the table.
-  Fix: an owner-gated `drop_world_binding(identity)` sharing `unbind_world_account`'s body
-  (`require_world_owner` first; reject-don't-clamp refusal texts as elsewhere); it joins the
-  owner-only roster in `privacy_enforcement_tests.rs` and the regenerated bindings.
+  Fix: an owner-gated `drop_world_binding(identity)`. `unbind_world_account`'s body does not fit
+  as is (it answers `Ok` for no binding and checks the caller's deletion state), so the delete of
+  the binding and nonce, and `withdraw_admission` for a counted binding, move into one helper
+  both reducers call. `drop_world_binding` runs `require_binding_build` first (as every binding
+  reducer refuses before reading), then `require_world_owner`, then
+  `require_subject_not_deleting` on the target as the relayed forms do, then refuses a missing
+  binding; reject-don't-clamp refusal texts as elsewhere. It joins the owner-only roster and the
+  generated-reducer count in `privacy_enforcement_tests.rs` and the regenerated bindings.
 
 - **wr261127-a.1:** WHEN a guest who bound the world completes a claim, THE SYSTEM SHALL leave no `world_binding`, `world_bind_nonce`, `world_admission` or `world_admission_attempt` row keyed to the retired guest identity.
 
-- **wr261127-a.2:** WHEN the owner switches the access rule to Allowlist after such a claim, THE SYSTEM SHALL seed no account subject read from the retired guest's binding.
+- **wr261127-a.2:** WHEN the retired guest's binding was the only counted binding carrying a subject and the owner then switches the access rule to Allowlist, THE SYSTEM SHALL NOT seed that subject.
 
-- **wr261127-a.3:** WHEN an account's deletion cascade completes and no other counted binding carries its subject, THE SYSTEM SHALL leave no `world_allowlist` row holding that subject, and WHEN another counted binding still carries it, THE SYSTEM SHALL keep the row; the deletion manifest's `world_allowlist` entry SHALL state that rule.
+- **wr261127-a.3:** WHEN an account's deletion cascade completes for an identity whose own binding carried a subject that no other counted binding carries, THE SYSTEM SHALL leave no `world_allowlist` row holding that subject.
 
-- **wr261127-a.4:** WHEN the world owner calls `drop_world_binding` naming a bound identity, THE SYSTEM SHALL delete that identity's `world_binding` and `world_bind_nonce` rows and withdraw its admission under the rules `unbind_world_account` applies.
+- **wr261127-a.4:** WHEN an account's deletion cascade completes and another counted binding still carries the deleted identity's subject, or the deleted identity held no binding, THE SYSTEM SHALL leave every `world_allowlist` row as it was.
 
-- **wr261127-a.5:** WHEN anyone but the world owner calls `drop_world_binding`, or the owner names an identity with no binding, THE SYSTEM SHALL refuse the call with an error and change no row.
+- **wr261127-a.5:** WHEN the world owner calls `drop_world_binding` naming an identity with a binding, THE SYSTEM SHALL delete that identity's `world_binding` and `world_bind_nonce` rows and, when the binding counted under the build profile, withdraw its admission.
 
-- **wr261127-a.6:** WHEN more than `MAX_ALLOWLIST_ACCOUNTS` counted accounts are bound and the owner drops bindings until they fit, THE SYSTEM SHALL accept the switch to Allowlist and seed exactly the remaining counted accounts.
-- DoD: wr261127-a.1 to wr261127-a.6 green as native-host tests; `just gen` regenerated bindings with the wire contract's new protocol entry (`wireContract.test.ts` green); `just ci` green, `bindings-drift` clean; the game's `docs/DECISIONS.md` records the shipped allowlist-retention rule and the owner's drop.
+- **wr261127-a.6:** WHEN anyone but the world owner calls `drop_world_binding`, or the owner names an identity with no binding or one pending deletion, or the build binds nothing, THE SYSTEM SHALL refuse the call with an error and change no row.
+
+- **wr261127-a.7:** WHEN the allowlist starts empty, more than `MAX_ALLOWLIST_ACCOUNTS` distinct subjects are bound, and the owner drops bindings until the distinct counted subjects fit, THE SYSTEM SHALL accept the switch to Allowlist and seed exactly those remaining subjects.
+- DoD: wr261127-a.1 to wr261127-a.7 green as native-host tests; the deletion manifest's `world_binding` and `world_allowlist` bases state the shipped rules (checked by the reviewer, not a test); `just gen` regenerated bindings with the wire contract's new protocol entry (`wireContract.test.ts` green); `just ci` green, `bindings-drift` clean; the game's `docs/DECISIONS.md` records the shipped allowlist-retention rule and the owner's drop.
 
 ### wr261127-b — client honesty: the rename fallback and the turn-bar leads
 
@@ -175,21 +195,25 @@ after: []
   literals against a fixture tuned 9/31, so no test fails when the tuning moves. If the surge
   start drops to 7 or below, the countdown (and the active badge below round 7) is lost; if the
   wild cap drops to 25 or below, the retreat badge never shows before the cap.
-  Fix: named lead constants (`SURGE_LEAD`, `RETREAT_LEAD`) applied to `input.surgeStartRound` /
-  `input.wildRoundCap`, replacing the two absolute constants and their pins.
+  Fix: named lead constants `SURGE_LEAD = 2` and `RETREAT_LEAD = 5` (today's 9 − 7 and 30 − 25)
+  applied to `input.surgeStartRound` / `input.wildRoundCap`, replacing the two absolute constants
+  and their pins. The `BT10-3-BAR-BADGE` case's 9/31 fixture is re-pointed to today's 9/30: under
+  a cap of 31 the derived retreat badge starts at round 26, not 25.
 
-- **wr261127-b.1:** WHEN a player whose name is empty opens the rename overlay, THE CLIENT SHALL show and announce the missing-name placeholder from the i18n catalog in the active locale, English and French, and no hard-coded English text.
+- **wr261127-b.1:** WHEN a player whose name is empty opens the rename overlay, THE CLIENT SHALL put the active catalog's `rename.unnamed` string in the current-name element, the English string under `en` and the French one under `fr`.
 
-- **wr261127-b.2:** WHEN the tactics tuning moves `surge_start_round` or `wild_round_cap` (a fixture of 5 and 20), THE CLIENT SHALL show the surge lead-in badge from `SURGE_LEAD` rounds before surge starts, the active surge badge from the surge start on, and the retreat badge from `RETREAT_LEAD` rounds before the cap, all derived from the tuning input rather than absolute rounds.
+- **wr261127-b.2:** WHEN the tuning input is a surge start of 5 and a wild cap of 20, THE CLIENT SHALL show the surge lead-in badge from round 3, the active surge badge from round 5 on, and the retreat badge from round 15, and neither badge before its round.
 
-- **wr261127-b.3:** WHEN today's tuning applies (surge start 9, wild cap 30), THE CLIENT SHALL show the surge badge from round 7 and the retreat badge from round 25, as it does now.
-- DoD: wr261127-b.1 to wr261127-b.3 green in vitest; `just ci` green.
+- **wr261127-b.3:** WHEN the tuning input is a surge start of 9 and a wild cap of 30, THE CLIENT SHALL show the surge lead-in badge from round 7, the active surge badge from round 9 and the retreat badge from round 25.
+
+- **wr261127-b.4:** WHEN the surge start is at or below `SURGE_LEAD`, THE CLIENT SHALL show the surge lead-in badge from the battle's first round.
+- DoD: wr261127-b.1 to wr261127-b.4 green in vitest; `just ci` green.
 
 ### wr261127-c — account claim completion and reset revocation
 
 type: feature · tier: routine
 category: data-integrity · severity: MED · size: S
-touches: client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, account-service/src/interactions/devPassword.ts, account-service/src/interactions/devPassword.test.ts, account-service/src/provider.ts, account-service/src/provider.test.ts, account-service/src/admin/cli.ts, account-service/src/admin/cli.test.ts
+touches: client/src/net/connection.ts, client/src/net/connection.runtime.test.ts, account-service/src/interactions/devPassword.ts, account-service/src/interactions/devPassword.test.ts, account-service/src/interactions/router.ts, account-service/src/provider.ts, account-service/src/provider.test.ts
 after: []
 
 - residual: `R-acs-7-CLAIMSTALL` · data-integrity · MED — **the guest claim never completes on
@@ -201,28 +225,38 @@ after: []
   claim" (`claim.awaiting.title`, raised by `main.ts`'s `onClaimAwaitingAccount` callback) — and
   nothing re-fires: `ingestAccount` checks only the PendingDeletion→Active edge
   (`shouldRejoinAfterAccountChange`). Matches the measured stall (account row present,
-  `guest_claim` unconsumed, reducer never sent). `main.ts` needs no change: the late send reuses
-  the gate's `onClaimPending`/`onClaimResult` callbacks.
-  Fix: re-fire the claim send from `ingestAccount`, once per connection, when the gate left a
-  claim awaiting an account; the send stays on the raw connection (the code is a bearer secret).
+  `guest_claim` unconsumed, reducer never sent).
+  Fix: one per-connection "claim sent" latch, set by whichever path sends, read by both: the
+  gate's `onClaimAwaitingAccount` branch marks the claim as awaiting, and `ingestAccount` sends
+  once when the awaited row lands. A row that arrives inside the first snapshot is ingested
+  before the gate runs, so the gate sends and `ingestAccount` does not. The send stays on the raw
+  connection (the code is a bearer secret) and reports through `onClaimResult`. `main.ts` is not
+  in `touches:`: its `claimRaised` latch is set by `onClaimPending`, so a late `onClaimPending`
+  after `onReady` would re-open the claim prompt on a later reconnect; the late path raises
+  `onClaimResult` alone, or the build widens `main.ts` by measurement.
 
 - residual: `R-acs-2-RESET-KEEPS-CHAINS` · security-privacy · MED — **a dev account's password
   reset leaves its refresh chains alive.**
-  Re-verified @ 26e1e085 and @ ce7f0000 (the spec's earlier `oidc/provider.ts` path was wrong;
-  the file is `account-service/src/provider.ts`): `interactions/devPassword.ts` `resetPassword`
+  Re-verified @ 26e1e085 and @ ce7f0000: `interactions/devPassword.ts` `resetPassword`
   rewrites only the hash record; `provider.ts`'s `revokeGrant` is called only from `findAccount`
   for a gone or unentitled account; `rotateRefreshToken: true` keeps a chain rotating for the
   refresh token's lifetime. A reset is the answer to a leaked password, so the leaked session
-  must die with it. Mechanism: decision-defaulted:reset-revocation-mechanism above.
+  must die with it. `provider.ts` reads the account only through `PasswordStep.account(sub)`,
+  whose `Account` type (`interactions/router.ts`) is `{sub, entitled}` today, so the change time
+  joins that type; `devPassword.ts`'s record writer and parser carry it on every write. The
+  admin CLI's `reset-password` calls `resetPassword` and needs no change. Mechanism:
+  decision-defaulted:reset-revocation-mechanism above.
 
 - **wr261127-c.1:** WHEN a stored claim code and an account credential are present and the `my_account` row arrives after the first applied snapshot, THE CLIENT SHALL send `complete_guest_claim` exactly once on that connection, however many later `my_account` updates arrive.
 
-- **wr261127-c.2:** WHEN that late claim is answered, THE CLIENT SHALL leave "Finishing your claim" only on the reducer's answer, showing its success or its refusal text.
+- **wr261127-c.2:** WHEN the `my_account` row arrives inside the first applied snapshot, THE CLIENT SHALL send `complete_guest_claim` exactly once on that connection, from the snapshot's gate.
 
-- **wr261127-c.3:** WHEN a dev account's password is reset, THE SERVICE SHALL refuse every refresh token and authorization code issued for that account before the reset, so the next refresh or code exchange fails and a new sign-in needs the new password.
+- **wr261127-c.3:** WHEN the late claim is answered, THE CLIENT SHALL raise `onClaimResult` with the reducer's outcome, success or refusal text, and SHALL NOT raise it before the answer.
 
-- **wr261127-c.4:** WHEN the account signs in with its new password after a reset, THE SERVICE SHALL issue codes and refresh tokens that refresh as before.
-- DoD: wr261127-c.1 and wr261127-c.2 green in the connection runtime test with the account row delayed past the first snapshot; wr261127-c.3 and wr261127-c.4 green against a provider and store driven through a reset; `just ci` green.
+- **wr261127-c.4:** WHEN a dev account's password is reset, THE SERVICE SHALL refuse every refresh token and authorization code issued for that account before the reset, so the next refresh or code exchange fails and a new sign-in needs the new password.
+
+- **wr261127-c.5:** WHEN the account signs in with its new password after a reset, in the same second or later, THE SERVICE SHALL issue codes and refresh tokens that refresh as before.
+- DoD: wr261127-c.1 to wr261127-c.3 green in the connection runtime test, with the account row delayed past the first snapshot and, separately, inside it; wr261127-c.4 and wr261127-c.5 green against a provider and store driven through `resetPassword`; `just ci` green.
 
 ### wr261127-d — tester rule: a slice's run must survive a loaded host
 
@@ -230,7 +264,7 @@ type: docs · tier: routine
 category: loop-ops · severity: MED · size: XS
 touches: standards/testing-tdd.md
 after: []
-blocked: needs mr-ask-drew approval (anti-reaccretion: standards/) — lifted when the operator approves this rule change through `memory/projects/mr-ask-drew`; who lifts it: the operator (the supervisor deletes this line on the answer); fallback: none needed — the incidents stay tracked as their own residuals and each slice keeps fixing its own case.
+blocked: needs mr-ask-drew approval (anti-reaccretion: standards/) — lifted when the operator approves this rule change through `memory/projects/mr-ask-drew`; who lifts it: the operator (the supervisor deletes this line on the answer); fallback: the slice stays blocked and is re-raised at the next weekly review, and `wontfix` if the operator declines; meanwhile the incidents stay tracked as their own residuals and each slice keeps fixing its own case.
 
 - residual: `R-weekly-review-2026-11-27-F5` · loop-ops · MED — **recurring cause of the week:
   wall-clock margins and host-wide sweeps sized for an idle machine break under fan-out.**
