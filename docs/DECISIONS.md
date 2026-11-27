@@ -65,10 +65,13 @@ check is added only where no mechanism already covers it.
 What this adds is reporting, not steps: mr-phase-ab notes the slices its figures leave out, and the
 weekly review pastes `mr-weekly-rates` (wontfix share of residuals leaving the backlog; merges over
 a detector finding of the slice's own audit, read from mr-audit-log.jsonl). Nothing gates on
-either. Two wording changes wait for the live phase-split analysis, because the brief also drives
-its baseline: mr-brief-template.md's BUDGET line ("a sizing TARGET; self-limit to it" becomes a
-ceiling, scope leaving only by DEFER) and a milestone-loop-prompt.md line that slice count is never
-a goal. The analysis names them when it is recorded.
+either. The wording changes for build runs wait for the live phase-split analysis, because the brief
+also drives its baseline. They sit in a draft harness PR named by mr-phase-ab.json `held_pr`:
+the brief's BUDGET line ("a sizing TARGET; self-limit to it" becomes a ceiling, scope cut only by
+a recorded DEFER), doc lines a diff made false in scope, small findings on a slice's own new code
+fixed rather than filed, and milestone `touches:` that name the docs a slice's behaviour lives in
+(77 of 240 open residuals on 2026-11-27 were a slice's own fallout in a file it could not edit),
+with slice count never a goal. Recording the analysis queues a supervisor event to merge it.
 Rules out: holding a ready slice to make the budget last (waits that protect quality — CI, green
 tree, quiet window, human activity — stay); splitting, shrinking or reordering work to move a
 number; picking work because it is cheap; reporting an estimate as a measurement; leaving
