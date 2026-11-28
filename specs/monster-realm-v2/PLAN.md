@@ -45,16 +45,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
 
 ## §9 Roadmap (build order — first unfinished, non-`blocked:` item wins)
 
-1. **M-weekly-review-2026-11-27** (`M-weekly-review-2026-11-27.spec.md`, authored by the
-   weekly review, pinned @ 26e1e085; elaborated 2026-11-27 @ ce7f0000 into four slices under
-   `## Slices`): wr261127-a (guest-claim world-row erasure, allowlist retention, the owner’s
-   binding drop; structural — serial with lpw-32), wr261127-b (rename i18n fallback and the
-   turn-bar lead windows), wr261127-c (claim completion on a late account row; a password reset
-   revokes refresh chains), wr261127-d (tester rule: a loaded shared host; `blocked:` on the
-   operator’s approval of a standards change). Files residuals
-   R-weekly-review-2026-11-27-F1..F5; absorbs R-lpw-21-SEED-CAP-DOS, R-acs-7-CLAIMSTALL and
-   R-acs-2-RESET-KEEPS-CHAINS.
-2. **M-local-play** (`M-local-play.spec.md`, elaborated 2026-11-16 into 18 `lpw-` slices): the
+1. **M-local-play** (`M-local-play.spec.md`, elaborated 2026-11-16 into 18 `lpw-` slices): the
    early-access shape — sign-in off and a kept identity for local and private worlds, protocol
    numbers and unattended upgrade, the solo-completeness audit, the access design and the host's
    open or password rule, then the desktop shell, worlds, opening a world to friends and the
@@ -78,7 +69,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    2026-11-23). The decision log's trim is `structure.spec.md`'s `type: docs` sections
    (st-14 to st-20). Groundwork built (§Built). **Early access is
    gated on it.**
-3. **M-account-service** (`M-account-service.spec.md`, authored 2026-11-16, 12 `acs-` slices in
+2. **M-account-service** (`M-account-service.spec.md`, authored 2026-11-16, 12 `acs-` slices in
    two phases): **every player must own the game on Steam, for now** (operator, 2026-11-16),
    browser players included, in every way to play. Our own small OIDC issuer (`oidc-provider`).
    **Phase 1 (acs-1 to acs-7), now:** the dev and test service (email-and-password sign-in, a
@@ -91,7 +82,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    and Valve's identity check takes about four weeks), with acs-12 following the shell (lpw-11).
    Only acs-11, production, is `blocked:operator-steamworks` until the operator supplies the game's
    own app id and publisher key. **Early access is gated on it** (every world's players bind through its attestation).
-4. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
+3. **M25 Security audit & launch sign-off** (`M25-security-audit.spec.md`, respecced 2026-09;
    S0 done) — `blocked:checkpoint-2-ratification`: S2 changes a frozen schema and waits for the
    operator's ratification at the harness-revision Checkpoint 2, which lifts this block. S1 as
    written has nothing left to change: `propose_trade`, `respond_trade` and `confirm_trade` return
@@ -99,7 +90,7 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    no-oracle cases (M-trade-sessions `ts-4`); the M25 spec's S1 text is rewritten when M25 is
    re-elaborated.
    **Opening the official server is gated on its completion.**
-5. **M-battle-tactics depth** (unspecced) — `blocked:playtest-4-read`: the operator-deferred tactical
+4. **M-battle-tactics depth** (unspecced) — `blocked:playtest-4-read`: the operator-deferred tactical
    features, specced after the Playtest-4 read. Obstacles/cover blocking movement and ranged/AoE
    (pt3-2026-10-138; the `blocks_los` tile column and LoS(blockers) signature are already in place),
    tile elevation with attack bonuses (-139; `elevation` column, default 0), line/cone AoE (-141;
@@ -109,44 +100,44 @@ rules, privacy model, and all live decisions are the game repo's own docs: `ARCH
    `M-battle-tactics-design.md`. Hold Y already clears a READY plan (M-gamepad); a distinct
    tap-vs-hold B (a tap undoes during playback, only a hold skips) comes here; until then B skips
    at the press, from every source.
-6. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
+5. **Residual fill-work** (`residuals.spec.md`): MED items first when a fan-out slot is idle. A
    row a pt3 milestone absorbs is marked in its spec.
-7. **M21b-3 Steamworks in the shell** — the Steamworks wiring (overlay enable, Steam Input onto
+6. **M21b-3 Steamworks in the shell** — the Steamworks wiring (overlay enable, Steam Input onto
    the virtual buttons, and its on-screen keyboard so a pad can type: renames, the box search) in
    M-local-play's desktop shell (`lpw-11`), against App ID 480 until the game's own app exists; unspecced, elaborated once `lpw-10` proves the overlay. The Steam sign-in
    moved to M-account-service (acs-12).
-8. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
+7. **Structural work** (`structure.spec.md`, standing): open `type: refactor` slices
    (`standards/spec-driven.md` §Refactor slices). The supervisor's structural share schedules it
    ahead of this position; when no earlier item has a launchable slice, its slices launch in
    file order. Its `type: design` slices decide internal-design questions; those are not operator
    decisions. An empty file is a finished item once no plan file under the game's
    `docs/refactors/` lists an extraction still to make. With no section open and a plan file
    listing extractions, the tick's action is to section the next three.
-9. **⛩ Closed beta** (operator, 2026-11-23) — `blocked:operator-closed-beta`: an operator release
+8. **⛩ Closed beta** (operator, 2026-11-23) — `blocked:operator-closed-beta`: an operator release
    step, not a milestone. It has no spec, nothing in it launches, and no spec is authored for it. It
    relies on every item above it: M-local-play, M-account-service (acs-11 gives it the game's own
    Steam app), M25, M-battle-tactics depth, the residual fill-work, M21b-3 and the
    structural work. Invited players play the Steam build on the game's own app. The block lifts
    when the operator records the closed beta as shipped; that is also the lifting event for
    M-steam-features's `blocked:closed-beta-release`.
-10. **M-steam-features** (`M-steam-features.spec.md`, sketch, 2026-11-23) —
+9. **M-steam-features** (`M-steam-features.spec.md`, sketch, 2026-11-23) —
    `blocked:closed-beta-release`. Steam lobbies and invites, P2P networking over Steam's relay, and
    achievements, in the desktop shell (operator, 2026-11-23: after the closed beta, before early
    access). Elaborated via `milestone-loop-prompt.md` once the closed beta has shipped. Its P2P
    question (can a Steam relay carry the client's SpacetimeDB connection?) opens with a
    `type: design` slice. **Early access is gated on it.**
-11. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — `blocked:early-access-release`
+10. **M19 Guilds/chat/social** (`M19-social.spec.md`, sketch) — `blocked:early-access-release`
    (operator, 2026-11-23: deferred until after early access, with M18). Its friend requests and
    chat show players through the tag helpers M-identity-handles built (`formatTag` and
    `taggedName` in the game's `client/src/ui/playerTag.ts`); the player's own tag on the Profile
    screen moved out of it into M-local-play `lpw-40` (operator, 2026-11-23). Ordered AHEAD of M18 —
    operator-CONFIRMED (#588 D4, 2026-10-24). M23's social a11y retrofit scope un-defers with it.
-12. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — `blocked:early-access-release`
+11. **M18 Co-op raids** (`M18-coop-raids.spec.md`, sketch) — `blocked:early-access-release`
    (operator, 2026-11-23: deferred until after early access, with M19). The playtest-3
    read did NOT confirm it as next content; its 1v1 "additive resolve_coop_turn" premise dies
    with the tactical overhaul. Re-sketch on the tactical engine (M-battle-tactics P2 is built; tactical sides natively support
    allies).
-13. **M-modding** (`M-modding.spec.md`, sketch) — `blocked:early-access-release`: host-moddable
+12. **M-modding** (`M-modding.spec.md`, sketch) — `blocked:early-access-release`: host-moddable
    private worlds, part of the official release. Until it opens, its standing constraint binds
    every slice: content is loaded data, one seam per kind of extension, no content id named in
    rules or views.
@@ -271,8 +262,18 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
   low-hanging-fruit wave).
 - Corrective: **M-test-truth** (`ttd-1`; one whole-tree i18n scan replaces the per-file
   scans) · **M-stack-ownership** (`so-*`; the context stack owns player-opened frames).
-- Follow-up rounds: an `N.5` milestone, an "Nth review residuals" milestone and an `NNr-*`
-  slice id each name a review follow-up to the numbered work; **M-playtest-a…d** prepared the
+- Follow-up rounds: an `N.5` milestone, an "Nth review residuals" milestone, an
+  `M-weekly-review-<date>` milestone and an `NNr-*` slice id each name a review follow-up.
+  **M-weekly-review-2026-11-27** (`wr261127-*`): a guest claim erases the retired guest's world
+  rows; an account's deletion delists it from the world's allowlist when its own world row still
+  stands and no other identity's carries it; the owner's `drop_world_binding` brings the bound
+  accounts under the list's bound; the rename overlay's "(unnamed)" comes from the catalog; the
+  turn-bar Surge and Retreat badges lead the tuning they warn about; a `my_account` row that
+  lands after the first snapshot still completes the guest claim; a dev password reset refuses
+  the codes and refresh tokens of earlier sign-ins (an ID token already issued lives out its TTL);
+  and the harness `standards/testing-tdd.md` rule that a slice's suite assumes a loaded, shared
+  host; the game's `docs/DECISIONS.md` "A world that is not open refuses an unadmitted identity
+  at connect and in every reducer; the owner relays the door". **M-playtest-a…d** prepared the
   2026-07 playtest and the other **M-postgate-\*** / **M-evolution-essence-\*** milestones
   acted on it.
 - Test health: **M-test-health** (`th-*`; the CI `e2e` job lists each test that passed only on
