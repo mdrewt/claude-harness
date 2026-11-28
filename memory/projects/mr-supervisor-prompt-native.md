@@ -178,7 +178,10 @@ around (push the harness before spawning a harness slice).
   read as removals): CLEAN → proceed; FLAGGED/AUDIT-ERROR → read the diff and adjudicate
   (hard-tier: always read). `gating_advisory.removed_checks` names each **removed or
   de-wired check** — adjudicate under the deletion rule in `standards/testing-tdd.md` (named
-  reason + named surviving check; protected categories need a demonstrated survivor). A
+  reason + named surviving check; protected categories need a demonstrated survivor).
+  A `contract:` read reason: bindings changed without a protocol bump → confirm older clients
+  still decode it, or send the run back to raise the numbers; deviation text → that criterion is
+  unmet, whatever its test says: it leaves as a DEFER residual, never merged as met. A
   `type: refactor` PR: audit `--tier hard`, read the test diff — no assertion edited, no mock
   added, each `moved-tests:` survivor present at head; merge with
   `--subject 'refactor(<scope>): <slice> — … (#N)'` (`type: design`: audit `--doc-only`, read the

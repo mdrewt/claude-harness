@@ -425,6 +425,62 @@ def scan_dispositions(specs_root):
     return d
 
 
+# CONTRACT (POLICY read triggers, 2026-11-28; memory/projects/model-compare-2026-11-28.md blind review).
+# Two cheap, mechanical signals the merge read must see:
+#  - the generated client bindings changed but the protocol constants did not. A blind review of
+#    20 merged slices found a new public-table variant shipped with PROTOCOL_VERSION /
+#    MIN_CLIENT_PROTOCOL unchanged, so an older client could not decode it. Not every bindings
+#    change breaks old clients (a new reducer does not), so this forces a read, never a block.
+#  - added text that concedes a deviation from the spec. 4 of the review's 7 MED defects were a
+#    criterion not met as written and documented instead of DEFERred. The pattern is narrow on
+#    purpose: "accepted cost" alone is a normal decision-entry trade-off and is NOT matched.
+BINDINGS_PREFIX = "client/src/module_bindings/"
+PROTOCOL_FILE = "game-core/src/lib.rs"
+PROTO_RE = re.compile(r"^[+-]\s*pub const (PROTOCOL_VERSION|MIN_CLIENT_PROTOCOL)\b")
+DEVIATION_RE = re.compile(r"(?i)\b(measured deviation|deviat(?:es|ion|ing) from (?:the |its )?(?:spec|criterion|criteria|EARS)"
+                          r"|not met as written|differs from the spec|contrary to the spec|instead of (?:what )?the (?:spec|criterion))")
+
+
+def contract_findings(paths, proto_diff, added):
+    """PURE: ({bindings_changed, protocol_changed, deviation_lines}, [read reasons])."""
+    bind = [p for p in paths if p.startswith(BINDINGS_PREFIX)]
+    proto = any(PROTO_RE.match(ln) for ln in proto_diff.splitlines())
+    dev = [ln.strip()[:160] for ln in added if DEVIATION_RE.search(ln)]
+    f = {"bindings_changed": len(bind), "protocol_changed": proto, "deviation_lines": dev[:10]}
+    reasons = []
+    if bind and not proto:
+        reasons.append("contract: %d generated binding file(s) changed but PROTOCOL_VERSION/MIN_CLIENT_PROTOCOL "
+                       "did not (%s) - confirm older clients still decode every public table and reducer, or "
+                       "raise them" % (len(bind), PROTOCOL_FILE))
+    if dev:
+        reasons.append("contract: %d added line(s) describe a deviation from the spec (contract.deviation_lines) - "
+                       "a criterion not met as written is a DEFER, not a documented deviation" % len(dev))
+    return f, reasons
+
+
+def audit_contract(a, out):
+    c = {}
+    out["contract"] = c
+    repo, base, head = a.get("repo"), a.get("base"), a.get("head")
+    if not (repo and base and head and os.path.isdir(repo)):
+        c["status"] = "NOT-MEASURED"
+        return
+    def git(*args):
+        r = subprocess.run(["git", "-C", repo] + list(args), capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            raise RuntimeError("git %s failed: %s" % (args[0], r.stderr[:120]))
+        return r.stdout
+    paths = git("diff", "--name-only", "%s...%s" % (base, head)).splitlines()
+    proto = git("diff", "%s...%s" % (base, head), "--", PROTOCOL_FILE)
+    body = git("diff", "-U0", "%s...%s" % (base, head), "--", ".", ":(exclude)%s**" % BINDINGS_PREFIX)
+    added = [ln[1:] for ln in body.splitlines() if ln.startswith("+") and not ln.startswith("+++")]
+    f, reasons = contract_findings(paths, proto, added)
+    c.update(f)
+    c["status"] = "FLAGGED" if reasons else "CLEAN"
+    for r in reasons:
+        force_read(out, r)
+
+
 def emit(out, artifact_dir="/tmp"):
     """Print, THEN write the artifact. Never raises, never exits."""
     s = json.dumps(out, indent=1)
@@ -1734,6 +1790,24 @@ def selftest():
         os.environ.update(saved)
 
 
+def _st_c_battery(chk):
+    """C: the contract read triggers (pure helper; the git wiring is exercised by the S battery's
+    fixture repo, whose diff has no bindings and no deviation text, so its read_reason is unchanged)."""
+    f, r = contract_findings(["client/src/module_bindings/index.ts", "server-module/src/schema.rs"], "", [])
+    chk.check("C1/bindings-without-protocol-reads", 1, len(r))
+    chk.check("C1/counts", (1, False), (f["bindings_changed"], f["protocol_changed"]))
+    f, r = contract_findings(["client/src/module_bindings/index.ts"],
+                             "-pub const PROTOCOL_VERSION: u32 = 9;\n+pub const PROTOCOL_VERSION: u32 = 10;\n", [])
+    chk.check("C2/bump-clears", ([], True), (r, f["protocol_changed"]))
+    f, r = contract_findings(["server-module/src/lib.rs"], "", ["// MEASURED DEVIATION from the criterion's wording"])
+    chk.check("C3/deviation-reads", 1, len(r))
+    chk.check("C3/deviation-line-kept", 1, len(f["deviation_lines"]))
+    f, r = contract_findings(["docs/DECISIONS.md"], "", ["Accepted cost: every site that reads it pays a lookup."])
+    chk.check("C4/accepted-cost-alone-is-not-a-deviation", [], r)
+    f, r = contract_findings(["docs/x.md"], "", ["The spec says join after sign-in but this deviates from the spec here."])
+    chk.check("C5/deviates-from-the-spec", 1, len(r))
+
+
 def _selftest():
     """The lp-04 gating battery. rc 0 = pass, 1 = fail. Prints AUDIT-SELFTEST-OK <n> on pass."""
     chk = _StChk()
@@ -1747,6 +1821,7 @@ def _selftest():
         _st_x_battery(chk, tmp, logs)
         _st_a_battery(chk, tmp)
         _st_t_battery(chk, tmp)
+        _st_c_battery(chk)
 
     # ---- X3: the selftest writes NOTHING under /tmp -------------------------------------------
     # Every emit() above is handed an artifact_dir inside the tempdir. A single missed argument
@@ -1792,6 +1867,7 @@ try:
     audit_gating(a, out)
     audit_acceptance(a, out)
     audit_scope(a, out)
+    audit_contract(a, out)
 except Exception as e:
     out["orchestration"] = out.get("orchestration", {"verdict": "AUDIT-ERROR"})
     # Preserve a successfully computed advisory block for the same reason the line above preserves
@@ -1838,7 +1914,7 @@ if os.environ.get("MR_AUDIT_NO_LOG") != "1":
                "acceptance_reasons": [str(x)[:80] for x in (_v("acceptance", "reasons") or [])[:3]]
                if isinstance(_v("acceptance", "reasons"), list) else [],
                "acceptance_unmet": _v("acceptance", "unmet"), "scope": _v("scope"),
-               "disposition": _v("disposition", "status")}
+               "disposition": _v("disposition", "status"), "contract": _v("contract", "status")}
         with open(os.path.join(os.environ["A_MEM"], "mr-audit-log.jsonl"), "a") as fh:
             fh.write(json.dumps(row, sort_keys=True) + "\n")
     except Exception:
