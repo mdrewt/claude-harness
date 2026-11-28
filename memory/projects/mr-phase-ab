@@ -171,12 +171,29 @@ def spec_type(ctx, slice_):
     return None
 
 
+def excluded(rows):
+    """{slice: why} for slices taken out of the experiment (`exclude` rows): a slice whose arm did not
+    describe how it was built, so its figures would misread the arm."""
+    return {r["slice"]: r.get("why", "") for r in rows if r.get("kind") == "exclude" and r.get("slice")}
+
+
 def assigned(rows):
     out = {}
+    ex = excluded(rows)
     for r in rows:
-        if r.get("kind") == "assign" and r.get("slice") and r["slice"] not in out:
+        if r.get("kind") == "assign" and r.get("slice") and r["slice"] not in out and r["slice"] not in ex:
             out[r["slice"]] = r
     return out
+
+
+RAN = ("FINISHED", "CRASHED", "PARKED")
+
+
+def ran_before(ctx, slice_):
+    """True when a build session of this slice already ran: a fix or credit-stop resume of work
+    begun before it was assigned is not a launch the experiment can describe (2026-11-27: lpw-32,
+    built unphased, was assigned `phased` on its CI-fix resume)."""
+    return any(r.get("slice") == slice_ and str(r.get("outcome", "")).upper().startswith(RAN) for r in ctx.ledger())
 
 
 def completed(ctx, rows, ledger=None):
@@ -198,6 +215,8 @@ def cmd_assign(ctx, slice_, repo, tier):
     lk = ctx.lock()
     try:
         rows = ctx.rows()
+        if slice_ in excluded(rows):
+            return "off"
         have = assigned(rows).get(slice_)
         if have:
             return have.get("arm", "off")
@@ -208,6 +227,8 @@ def cmd_assign(ctx, slice_, repo, tier):
             return "off"
         t = spec_type(ctx, slice_)
         if t is None or t not in ("", "feature"):
+            return "off"
+        if ran_before(ctx, slice_):
             return "off"
         a = assigned(rows)
         if len(a) >= int(cfg["max_assigned"]) or len(completed(ctx, rows)) >= int(cfg["target_completed"]):
@@ -480,6 +501,8 @@ def report(ctx):
         lines.append("| " + " | ".join(str(m.get(c)) for c in cols) + " |")
     lines += ["", "Per phase (phased arm): " + "; ".join("%s %s" % (m["slice"], json.dumps(m["per_phase"])) for m in phased), "",
               "In flight at analysis (not in the reading): " + (", ".join(m["slice"] for m in ms if not m["merged"]) or "none"), "",
+              "Excluded from the experiment (not in the reading or the counts): "
+              + ("; ".join("%s — %s" % kv for kv in sorted(excluded(rows).items())) or "none"), "",
               "Next: the experiment is now disabled (a `disabled` row in mr-phase-ab.jsonl). Make the changes this analysis "
               "recommends, then start a fresh experiment by raising `generation` in mr-phase-ab.json (the old rows stay as history).", "",
               "Held for this experiment (docs/DECISIONS.md, \"judged by genuine progress on the game per credit\"): the "
@@ -597,6 +620,14 @@ def main(argv, ctx=None):
             ctx.append({"kind": "session", "slice": s, "phase": ph or "all", "sid": sid})
     elif cmd == "prompt":
         sys.stdout.write(cmd_prompt(ctx, s, ph))
+    elif cmd == "exclude":   # operator correction: --slice S --why T (recorded, never deleted)
+        why = _arg(argv, "--why") or ""
+        rows = ctx.rows()
+        if not SLICE_RE.match(s or "") or not why or s not in assigned(rows):
+            print("PHASE-AB-EXCLUDE-REFUSED need an assigned --slice and a --why")
+        else:
+            ctx.append({"kind": "exclude", "slice": s, "why": why})
+            print("PHASE-AB-EXCLUDED %s" % s)
     elif cmd == "status":
         cmd_status(ctx, "--json" in argv)
     elif cmd == "analyze":
@@ -695,6 +726,13 @@ def selftest():
         json.dump(dict(c, generation=2), open(os.path.join(mem, "mr-phase-ab.json"), "w"))
         check("new-generation-enabled", ctx.enabled() and run(ctx, "assign", "--slice", "f6", "--repo", "project", "--tier", "hard") == "phased")
         check("rb-ineligible", run(ctx, "assign", "--slice", "rb-9", "--repo", "project") == "off")
+        with open(os.path.join(mem, "monster-realm-usage-ledger.jsonl"), "a") as fh:
+            fh.write(json.dumps({"ts": iso(1800003000), "slice": "f7", "outcome": "FINISHED(EXIT=0 ATTEMPTS=1)", "cost_usd": 9.0}) + "\n")
+        check("resume-ineligible", run(ctx, "assign", "--slice", "f7", "--repo", "project", "--tier", "hard") == "off")
+        check("exclude-needs-why", run(ctx, "exclude", "--slice", "f6").startswith("PHASE-AB-EXCLUDE-REFUSED"))
+        check("exclude", run(ctx, "exclude", "--slice", "f6", "--why", "built unphased") == "PHASE-AB-EXCLUDED f6"
+              and "f6" not in assigned(ctx.rows()) and excluded(ctx.rows()) == {"f6": "built unphased"})
+        check("excluded-stays-off", run(ctx, "assign", "--slice", "f6", "--repo", "project", "--tier", "hard") == "off")
         # verdict rules
         m = lambda **kw: dict({"ctx_median": 100000, "main_cost_per_turn": 0.1, "ledger_cost": 30, "merged": True, "launches": 1,
                                "residuals": 1, "audit": ""}, **kw)
@@ -714,7 +752,7 @@ def selftest():
     if bad:
         print("PHASE-AB-SELFTEST-FAIL %s" % " ".join(bad))
         return 1
-    print("PHASE-AB-SELFTEST-OK 41")
+    print("PHASE-AB-SELFTEST-OK 46")
     return 0
 
 
