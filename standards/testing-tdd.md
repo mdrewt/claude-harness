@@ -167,17 +167,18 @@ host, never an idle one.
   probe or database discovery acts only on what this run started: its own pid
   tree, database and directory. It never matches a pattern across the host (a
   process name, a shared marker file, a well-known port). A host-wide sweep
-  kills or waits on a sibling's run, and both runs read it as a flake.
+  kills or waits on a sibling's run, and the sibling reads it as a flake.
 - **A case whose honest runtime approaches the framework's default timeout
   declares its own budget**, sized for a loaded host, instead of inheriting
-  the default (vitest's 5 s, a 60 s bring-up wait). The budget bounds a hang;
-  it is not a retry, and the work is never cut to fit it.
+  the default (vitest's 5 s `testTimeout`); a hand-written wait, such as a
+  60 s bring-up deadline, is sized the same way. The budget bounds a hang; it
+  is not a retry, and the work is never cut to fit it.
 
 (Each rule answers a recorded failure: a case over vitest's 5 s default at
 load average 12–15, `R-lpw-27-NOTEDC3D77`; an orphan sweep and a shared
 marker file killing sibling runs, `R-ts-6b-8-NOTEB33FB3` and
-`R-acs-6-EVALKILLSSIBLING`; deployment discovery timing out behind load,
-`R-acs-7-DEPLOYFLAKE` and `R-lpw-39-NOTE8318F6`.)
+`R-acs-6-EVALKILLSSIBLING`; deployment discovery missing its 60 s bring-up
+wait on a busy host, `R-acs-7-DEPLOYFLAKE` and `R-lpw-39-NOTE8318F6`.)
 
 ## Definition of done
 The project's `just ci` green, honestly: no test weakened or quarantined to
