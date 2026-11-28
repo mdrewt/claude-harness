@@ -324,3 +324,14 @@ hours of merge and launch latency in one day (a finished slice waits through 7-m
 With no run live or just ended the writes still count, so they remain the backstop for an edit a
 human makes inside a worktree (operator, 2026-11-27).
 Rules out: dropping `.codegraph` from the probe outright (mr-spawn's list), which loses that backstop.
+
+## The merge audit forces a read on a bindings change without a protocol bump, and on conceded deviations
+`mr-audit` adds two POLICY read triggers (`contract`):
+- **Bindings without a protocol bump.** The generated client bindings changed while `game-core`'s `PROTOCOL_VERSION` / `MIN_CLIENT_PROTOCOL` did not. In the 80 commits before 2026-11-28 this happened 4 times in 13 bindings changes.
+- **Conceded deviations.** An added line concedes a deviation from the spec ("measured deviation", "deviates from the spec", "not met as written" and kin).
+
+A blind review of 20 merged slices (memory/projects/model-compare-2026-11-28.md) found both: an older client unable to decode a new public-table variant, and 4 of 7 MED defects that were a criterion not met as written but documented instead of DEFERred. Both triggers force a read, never a block, because not every bindings change breaks old clients. The supervisor treats a conceded deviation as an unmet criterion, and the build-loop prompt says so.
+Rules out:
+- matching "accepted cost" alone, which is a normal decision-entry trade-off (6 of 79 recent feature commits use it);
+- blocking a merge on either trigger;
+- a per-run LLM check for conceded gaps.

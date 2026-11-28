@@ -4,7 +4,7 @@ The build-phase companion to `milestone-loop-prompt.md` (which *specs*). Run in 
 
 ## Mission
 
-Build the specced slices of the **current** roadmap (`PLAN.md` §9, first unfinished item wins) in the game repo at `projects/monster-realm`. Work test-first, one mergeable slice at a time, leaving the code easier to change. The spec is the source of truth: a deviation is a `DEFER` or a recorded spec note (step 9), never a silent call. The builder may adapt its plan (`standards/spec-driven.md` §Adapting the plan during a build), one line each under the PR-body `plan-delta:` heading.
+Build the specced slices of the **current** roadmap (`PLAN.md` §9, first unfinished item wins) in the game repo at `projects/monster-realm`. Work test-first, one mergeable slice at a time, leaving the code easier to change. The spec is the source of truth: a deviation is a `DEFER` or a recorded spec note (step 9), never a silent call. A criterion met only in part, or with a conceded gap (an "accepted cost", a "measured deviation", a case left for later), is NOT met: `DEFER` it with the gap named. A spec note records a question about the spec, never a criterion the slice leaves unmet. The builder may adapt its plan (`standards/spec-driven.md` §Adapting the plan during a build), one line each under the PR-body `plan-delta:` heading.
 
 ## Grounding (re-read fresh each slice)
 
@@ -25,7 +25,7 @@ Work in the worktree `.claude/worktrees/<slice>`. Route model/effort per `docs/r
 5. **Implement** — `specialist` makes them pass without editing the gating tests; a wrong test goes back to the tester.
 6. **Targeted fix loop** — `just ci-fast <crate>` or per-crate clippy/nextest/vitest; never full `just ci` for one failure.
 7. **Full lens batch** — `reviewer`, `/simplify`, `red-team`, `reducer-security-auditor`, `desync-guard`, then `verifier` (no gating test weakened, skipped or deleted without adjudication); close every finding. On a hard-tier slice, a lens-fix commit that changes more than ~100 lines of non-test code is re-read, that diff only, by one reviewer before the full gate.
-8. **Full gate once** — `just ci` green, then `mr-gates check --slice <slice>`: every gate met with evidence or DEFERred.
+8. **Full gate once** — `just ci` green, then `mr-gates check --slice <slice>`: every gate met with evidence or DEFERred (a gate met only with a conceded gap is DEFERred).
 9. **Close** — `doc-keeper`, editing ONLY files inside the declared or widened `touches:`: a `docs/DECISIONS.md` entry only when `standards/decisions.md`'s bar is met (a spec that names DECISIONS.md in `touches:` mandates its edits); memory only when durable. A spec gap or follow-up the build revealed goes to `$MEM/mr-gates notes add --slice <slice> --text "…"` (`--followup` files a follow-up's residual row): a run cannot commit to the spec corpus in the harness main checkout, so the supervisor folds the notes in at merge. Never edit a file in a main checkout.
 10. **STOP** at PR open + local green; the PR body ends with a `not-verified:` heading listing what was not run or could not be confirmed (`none` if nothing).
 
