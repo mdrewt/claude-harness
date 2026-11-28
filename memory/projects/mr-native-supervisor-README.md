@@ -298,7 +298,9 @@ Decisions and evidence: the harness `docs/DECISIONS.md` (five entries dated 2026
   `~/.cargo/bin` and `~/.local/bin` ahead of the inherited PATH on every `claude` invocation, and
   writes one `TOOLCHAIN node=… just=… cargo=… spacetime=…` line after the launch marker. python3,
   pip and gh resolve as before.
-- **Phase split** (`mr-phase-ab`, `mr-phase-protocol.md`, config `mr-phase-ab.json`, record
+- **Phase split: disabled since 2026-11-28** (its analysis read REVERT; see docs/DECISIONS.md "A build
+  session runs as one session"). The machinery below stays for a future trial
+  (`mr-phase-ab`, `mr-phase-protocol.md`, config `mr-phase-ab.json`, record
   `mr-phase-ab.jsonl`). A phased launch writes `ATTEMPT=1 … PHASE=<p> ARM=phased` markers, one per
   fresh phase session; retry attempts count per phase. A phased `.done` reads `EXIT=<rc>
   ATTEMPTS=<last phase's> PHASES=<k> ATTEMPTS_TOTAL=<all>`, plus `PHASE-PENDING=<phase>` when the

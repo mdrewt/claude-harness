@@ -244,21 +244,25 @@ missed defect is priced above $10.35, the experiment's break-even), raising test
 tests that pin behaviour no criterion states. Untested and cheaper, if cost ever forces it: Sonnet
 medium writing the tests beside an Opus medium pass that only files findings.
 
-## A build session may run as three fresh sessions, measured on the first five slices
-`mr-phase-ab` assigns eligible slices (game repo, `type: feature`, not ci-fix/close/rv) alternately
-within a tier to `phased` or `control` until five assigned slices have merged. A phased slice runs
-plan+red tests, build, and finish (lens batch, gate, PR) as separate sessions; each ends by writing
-a handoff whose first line names the next phase, and `mr-launch.sh` starts the next one fresh from
-the brief plus `mr-phase-protocol.md`. The main thread was 59% of build spend, its context averaged
-275k tokens a turn and 87% of its cost was re-reading that context, so a reset at each boundary
-targets the dominant cost directly. When the fifth assigned slice merges the tick records the
-analysis (`phase-ab/analysis-*.md`, a pre-registered LEANING reading — n is tiny), disables the
-experiment in the gitignored jsonl and files a non-blocking operator issue; phased runs stay off
-until the changes it recommends are made. The Stop hook records a phase end as
-`WOULD-RELEASE-phase-end`, so the arming baseline is not polluted. `mr-cost-sum` sums the transcript
-witness over every session a log starts.
-Rules out: four phases (a tests-only session pays a fresh prefix for one tester call), phasing
-design/docs/refactor slices, and an open-ended experiment.
+## A build session runs as one session; splitting it into phases measured worse
+A build runs as one session. The phase split (`mr-phase-ab`: plan+red tests, build, and finish as
+three fresh sessions joined by a handoff) was tried on the first hard-tier feature slices after
+2026-11-27 and is disabled. The analysis was recorded early, at 2 phased and 2 control slices merged,
+because the Fable limit was reached (`phase-ab/analysis-2026-11-28T035922Z.md`). Every slice ran on
+fable at xhigh, in the same milestone family. The split did cut the context each main-thread turn
+re-reads, by about 40%, but each phase re-oriented from scratch: it read the handoff, plan and PR
+draft, loaded the skills again and re-explored the code. Turns rose 76%, cache writes 66% and
+output 48%, so cache reads, the targeted cost, came out flat. Ledger cost rose: +20% against
+control, +14% on a size-matched pair, and about +$21 a slice against a size model fitted on 20
+baseline slices. Quality showed no difference (first-try merges, CI green, residuals no higher).
+n is tiny, so this is a direction, not a measurement. The launcher and `mr-phase-ab` stay in tree,
+disabled. A slice is never assigned after a build session of it has run, and `exclude` records a
+slice whose arm did not describe its build: lpw-32, built unphased, was assigned only on its fix
+resume.
+Rules out: re-enabling the three-phase split as it stands; four phases (a tests-only session pays a
+fresh prefix for one tester call). Untested, and each needing its own trial: a single reset before
+the finish phase, where context peaks, and a handoff that carries verified state and loaded skills.
+Worth a trial only if main-thread context cost dominates again, for example on much larger slices.
 
 ## A decision session is skipped only when its inputs equal those of a budget-held no-op session
 After a decision session whose one DECISION line is a stand-down naming no action and holding every

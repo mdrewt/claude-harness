@@ -1,11 +1,12 @@
 {
  "_note": "Phase-split A/B (operator item 2, 2026-11-26; mr-phase-ab header). enabled is the switch the operator owns; the tool records `disabled` in the gitignored mr-phase-ab.jsonl once the analysis is written.",
- "enabled": true,
+ "enabled": false,
  "generation": 1,
  "target_completed": 5,
  "max_assigned": 6,
  "timeout_days": 21,
  "started_utc": "2026-11-26T00:00:00Z",
  "held_pr": "mdrewt/claude-harness#300",
- "_held_note": "held_pr: the PR whose wording waits for this experiment's analysis; analyze --apply queues a supervisor event to merge it (operator 2026-11-27)."
+ "_held_note": "held_pr: the PR whose wording waits for this experiment's analysis; analyze --apply queues a supervisor event to merge it (operator 2026-11-27).",
+ "_result": "2026-11-28: analysed early at 2 phased / 2 control merged (Fable limit); reading REVERT, phased runs off (docs/DECISIONS.md, phase-ab/analysis-2026-11-28T035922Z.md)."
 }
