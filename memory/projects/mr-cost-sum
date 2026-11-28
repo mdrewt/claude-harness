@@ -195,6 +195,7 @@ def transcript_cost(session_id, root=None):
 def run_of_log(path, transcripts=None):
     """Describe the build session a log holds. Never raises; see the module contract."""
     run = {"launch": None, "session_id": None, "session_ids": [], "session_costs": {}, "model": None, "escalated": False,
+           "models_used": {},
            "attempts": 0, "unpriced": 0, "log_cost": None, "transcript_cost": None,
            "session_prior": 0, "cost": None, "source": None}
     resumed = None       # (session id, PRIOR) from the launch marker of a credit-stop resume
@@ -203,6 +204,7 @@ def run_of_log(path, transcripts=None):
     prev = None          # last cumulative reading of the counter run in progress
     restart = True       # the next reading without its own spend starts a new counter run
     open_unpriced = False
+    seen_msg = set()     # main-thread message ids already counted in models_used
     try:
         fh = open(path, errors="replace")
     except Exception:
@@ -238,6 +240,21 @@ def run_of_log(path, transcripts=None):
                 m = _SID.search(line)
                 if m and m.group(1) not in run["session_ids"]:
                     run["session_ids"].append(m.group(1))
+            # The model each MAIN-THREAD turn ran on (`models_used`, family -> turns): the ATTEMPT
+            # marker names the model a run was launched on, and a refused session goes on under
+            # `model_fallback` on another one (2026-11: 20 hard-tier slices ran entirely on Opus while
+            # their rows said fable). Subagent turns carry a parent_tool_use_id and are not counted.
+            if line.startswith('{"type":"assistant"') and '"parent_tool_use_id":null' in line:
+                try:
+                    msg = json.loads(line).get("message") or {}
+                except Exception:
+                    msg = {}
+                mid, mod = msg.get("id"), str(msg.get("model") or "")
+                if mid and mid not in seen_msg and mod and "synthetic" not in mod:
+                    seen_msg.add(mid)
+                    fam = next((f for f in ("fable", "opus", "sonnet", "haiku") if f in mod), "other")
+                    run["models_used"][fam] = run["models_used"].get(fam, 0) + 1
+                continue
             if '"type":"result"' not in line:
                 continue
             try:
@@ -566,7 +583,7 @@ def selftest():
     if bad:
         print("mr-cost-sum SELFTEST FAIL (%d)" % bad)
         return 1
-    print("mr-cost-sum SELFTEST OK (%d cases)" % (len(_CASES) + 1 + 2 * len(_REAL) + 5 + 9))
+    print("mr-cost-sum SELFTEST OK (%d cases)" % (len(_CASES) + 1 + 2 * len(_REAL) + 5 + 10))
     return 0
 
 
@@ -725,6 +742,20 @@ def _selftest_real_shapes():
             for sid_, val in ((sa, 5.0), (sb, 3.25)):
                 with open(os.path.join(troot, "-proj", sid_ + ".jsonl"), "w") as f:
                     f.write('{"type":"cost-state","totalCostUSD":%s}\n' % val)
+            p = os.path.join(empty, "fallback-models-used")
+            with open(p, "w") as f:
+                f.write("ATTEMPT=1 MODEL=fable EFFORT=xhigh TS=2026-11-27T01:00:00Z\n"
+                        '{"type":"assistant","message":{"id":"s0","model":"<synthetic>"},"parent_tool_use_id":null}\n'
+                        "ATTEMPT=1 MODEL=opus EFFORT=xhigh FALLBACK-FROM=fable session=x TS=2026-11-27T01:01:00Z\n"
+                        '{"type":"assistant","message":{"id":"m1","model":"claude-opus-5-5"},"parent_tool_use_id":null}\n'
+                        '{"type":"assistant","message":{"id":"m1","model":"claude-opus-5-5"},"parent_tool_use_id":null}\n'
+                        '{"type":"assistant","message":{"id":"m2","model":"claude-opus-5-5"},"parent_tool_use_id":null}\n'
+                        '{"type":"assistant","message":{"id":"a1","model":"claude-sonnet-5-5"},"parent_tool_use_id":"toolu_1"}\n')
+            got = run_of_log(p, troot)
+            os.unlink(p)
+            if (got["model"], got["models_used"]) != ("fable", {"opus": 2}):
+                print("FAIL fallback-models-used got=%r" % ((got["model"], got["models_used"]),))
+                bad += 1
             p = os.path.join(empty, "phased-two-sessions")
             with open(p, "w") as f:
                 f.write("ATTEMPT=1 MODEL=opus EFFORT=high TS=2026-11-27T01:00:00Z\n"

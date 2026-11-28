@@ -198,7 +198,8 @@ def budget():
         try: c=float(d.get("cost_usd") or 0)
         except (TypeError,ValueError): c=0.0
         d7+=c
-        if "fable" in str(d.get("model","")).lower(): fab+=c
+        # model_used (mr-record, 2026-11-28) is the model a run RAN on; `model` is its launch model.
+        if "fable" in str(d.get("model_used") or d.get("model","")).lower(): fab+=c
     unrec=0
     for df in glob.glob("/tmp/mr_pass_*.done"):
         sl=os.path.basename(df)[len("mr_pass_"):-len(".done")]
