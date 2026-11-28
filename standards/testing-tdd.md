@@ -178,7 +178,8 @@ host, never an idle one.
 load average 12–15, `R-lpw-27-NOTEDC3D77`; an orphan sweep and a shared
 marker file killing sibling runs, `R-ts-6b-8-NOTEB33FB3` and
 `R-acs-6-EVALKILLSSIBLING`; deployment discovery missing its 60 s bring-up
-wait on a busy host, `R-acs-7-DEPLOYFLAKE` and `R-lpw-39-NOTE8318F6`.)
+wait, red mostly during parallel runs with the cause unconfirmed,
+`R-acs-7-DEPLOYFLAKE` and `R-lpw-39-NOTE8318F6`.)
 
 ## Definition of done
 The project's `just ci` green, honestly: no test weakened or quarantined to
