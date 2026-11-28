@@ -159,6 +159,28 @@ exists. A project's existing, deliberately adjudicated mutation config
 (e.g. monster-realm's nightly game-core zero-miss run and server cap) is
 that project's recorded decision and stands until re-adjudicated.
 
+## A loaded, shared host
+A slice's suite runs beside other slices' suites on one machine, under
+whatever load the fan-out makes. A tester writing or running it assumes that
+host, never an idle one.
+- **Scope every sweep to the run's own resources.** A process kill, port
+  probe or database discovery acts only on what this run started: its own pid
+  tree, database and directory. It never matches a pattern across the host (a
+  process name, a shared marker file, a well-known port). A host-wide sweep
+  kills or waits on a sibling's run, and the sibling reads it as a flake.
+- **A case whose honest runtime approaches the framework's default timeout
+  declares its own budget**, sized for a loaded host, instead of inheriting
+  the default (vitest's 5 s `testTimeout`); a hand-written wait, such as a
+  60 s bring-up deadline, is sized the same way. The budget bounds a hang; it
+  is not a retry, and the work is never cut to fit it.
+
+(Each rule answers a recorded failure: a case over vitest's 5 s default at
+load average 12–15, `R-lpw-27-NOTEDC3D77`; an orphan sweep and a shared
+marker file killing sibling runs, `R-ts-6b-8-NOTEB33FB3` and
+`R-acs-6-EVALKILLSSIBLING`; deployment discovery missing its 60 s bring-up
+wait, red mostly during parallel runs with the cause unconfirmed,
+`R-acs-7-DEPLOYFLAKE` and `R-lpw-39-NOTE8318F6`.)
+
 ## Definition of done
 The project's `just ci` green, honestly: no test weakened or quarantined to
 pass, deletions adjudicated, new behavior covered by a test that was watched
