@@ -230,6 +230,16 @@ after: []
 - **wr261127-b.4:** WHEN the surge start is at or below `SURGE_LEAD`, THE CLIENT SHALL show a PvP battle a surge badge from its first round: the lead-in before the start, the active badge from it.
 - DoD: wr261127-b.1 to wr261127-b.4 green in vitest; `just ci` green.
 
+Build note (wr261127-b): Review found, pre-existing: client/src/ui/i18n/catalogParity.test.ts
+PARITY-02's WRONG IMPL comment says 'the exact 28-file roster' while the pinned roster holds 36
+files (with ui/renameModel.ts). The comment is stale prose and the assertion is exact; a later slice
+that touches that file can correct the count.
+
+Build note (wr261127-b): Red-team survivor, unspecified behaviour: turnBar.ts badgeFor shows the
+retreat badge for any wild round >= wildRoundCap - RETREAT_LEAD, including past the cap; no
+criterion pins a round past the cap (a battle ends at the cap), so a 'round <= cap' variant is
+indistinguishable by tests. Leave unless a spec names past-cap display.
+
 ### wr261127-c — account claim completion and reset revocation
 
 type: feature · tier: routine
