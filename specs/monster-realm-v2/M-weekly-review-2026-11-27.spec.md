@@ -165,6 +165,29 @@ after: []
 - **wr261127-a.7:** WHEN the allowlist starts empty, more than `MAX_ALLOWLIST_ACCOUNTS` distinct subjects are bound, and the owner drops bindings until the distinct counted subjects fit, THE SYSTEM SHALL accept the switch to Allowlist and seed exactly those remaining subjects.
 - DoD: wr261127-a.1 to wr261127-a.7 green as native-host tests; the deletion manifest's `world_binding` and `world_allowlist` bases state the shipped rules (checked by the reviewer, not a test); `just gen` regenerated bindings with the wire contract's new protocol entry (`wireContract.test.ts` green); `just ci` green, `bindings-drift` clean; the game's `docs/DECISIONS.md` records the shipped allowlist-retention rule and the owner's drop.
 
+Build note (wr261127-a): World rows of a guest identity that claimed before this change stay:
+complete_guest_claim erases the retired guest's world_admission, world_admission_attempt,
+world_binding and world_bind_nonce rows only at the claim, so a binding left by an earlier claim is
+still counted by bound_accounts and by the cascade's other-carrier check until the owner drops it
+with drop_world_binding. A one-time sweep keyed on account.claimed_from would clear them.
+
+Build note (wr261127-a): The cascade's allowlist delisting reads the account from the deleted
+identity's own world_binding row, so a player who unbinds, or whose binding the owner drops, before
+the account is deleted leaves the account subject on world_allowlist for good; a guest's subject
+likewise stays listed after its claim. Closing this needs a record of the subject that outlives the
+binding (a schema change) and belongs with the operator's answer to monster-realm#886.
+
+Build note (wr261127-a): The tests of world_binding_tests.rs mod official_build compile only under
+the official feature, which no just ci recipe builds; they run from acceptance-ledger CHECKs alone
+(lpw-15, lpw-22 and this slice's X1), so the official build's binding refusals, drop_world_binding's
+included, are unprotected once a slice merges.
+
+Build note (wr261127-a): Spec clarification for wr261127-a.1: the erase is promised at the claim. A
+retired guest identity that reconnects holds no world row; under Open it is admitted and may bind
+afresh, and that later binding counts like any other. drop_world_binding is not a ban either: under
+Open a dropped identity can bind again at once, so docs/DECISIONS.md tells the host to change to
+Password before dropping.
+
 ### wr261127-b — client honesty: the rename fallback and the turn-bar leads
 
 type: feature · tier: routine
