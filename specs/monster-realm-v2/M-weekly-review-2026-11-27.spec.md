@@ -6,7 +6,7 @@ verifier that was not the finder. Elaborated 2026-11-27 against game master ce7f
 lpw-41, rb-141, acs-14 and the lpw-26/lpw-27 designs landed since): every citation re-read
 there, and named by file and symbol rather than line, so it survives edits.
 Depends on: nothing queued. wr261127-a..c carry pairwise-disjoint `touches:` and may fan out;
-wr261127-d is `blocked:` until the operator approves it.
+wr261127-d was approved by the operator (monster-realm#914, 2026-11-28) and is unblocked.
 
 ## Problem / intent
 
@@ -262,7 +262,7 @@ type: docs · tier: routine
 category: loop-ops · severity: MED · size: XS
 touches: standards/testing-tdd.md
 after: []
-blocked: needs mr-ask-drew approval (anti-reaccretion: standards/) — lifted when the operator approves this rule change through `memory/projects/mr-ask-drew`; who lifts it: the operator (the supervisor deletes this line on the answer); fallback: the slice stays blocked and is re-raised at the next weekly review, and `wontfix` if the operator declines; meanwhile the incidents stay tracked as their own residuals and each slice keeps fixing its own case.
+approved: operator accepted the recommendation on monster-realm#914 (2026-11-28T07:12Z) — the anti-reaccretion approval for this `standards/testing-tdd.md` edit.
 
 - residual: `R-weekly-review-2026-11-27-F5` · loop-ops · MED — **recurring cause of the week:
   wall-clock margins and host-wide sweeps sized for an idle machine break under fan-out.**
