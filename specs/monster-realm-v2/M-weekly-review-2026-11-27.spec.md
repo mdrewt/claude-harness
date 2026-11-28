@@ -289,6 +289,26 @@ after: []
 - **wr261127-c.5:** WHEN the account signs in with its new password after a reset, in the same second or later, THE SERVICE SHALL issue codes and refresh tokens that refresh as before.
 - DoD: wr261127-c.1 to wr261127-c.3 green in the connection runtime test, with the account row delayed past the first snapshot and, separately, inside it; wr261127-c.4 and wr261127-c.5 green against a provider and store driven through `resetPassword` on an injected clock that crosses a second boundary; `just ci` green.
 
+Build note (wr261127-c): A dev password reset ends refresh chains (wr261127-c.4) but an ID token
+issued before it stays valid until ID_TOKEN_TTL_SECONDS expires, and the game connection signs in
+with that token; whether a world or the service should refuse it earlier is unscheduled.
+
+Build note (wr261127-c): decision-defaulted:reset-revocation-mechanism shipped stronger than its iat
+wording: the router passes the second the password check starts as the login ts, so every code and
+refresh token carries it as authTime, and findAccount refuses a token whose authTime is earlier than
+passwordChangedAt (authTime <= iat always, so iat-earlier tokens are refused too). This closes a
+sign-in whose password was checked before the reset but resumed after it. The spec's decision text
+should say authTime.
+
+Build note (wr261127-c): docs/account-service.md (admin command section) still says a reset does not
+end the account's existing sign-ins and their refresh tokens work until the chain ends; wr261127-c
+makes a reset refuse every code and refresh token of an earlier sign-in. mr-touches widen was
+refused (claimed by unmerged lpw-23).
+
+Build note (wr261127-c): devAccounts setEntitled and resetPassword are read-modify-write on one JSON
+record with no compare-and-set; two admin CLI processes at once can write back a stale passwordHash
+and passwordChangedAt, undoing a reset. The doc already says to run one command at a time.
+
 ### wr261127-d — tester rule: a slice's run must survive a loaded host
 
 type: docs · tier: routine
